@@ -39,19 +39,13 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     ?clearance:ClearanceWorld,
     collisionRounds:Int = 8,
     contact:Bool = false,
-    ?stateCost:(
-      Int,
-      motionkit.robot.CartesianCandidateSampler.LatticeCandidate
-    ) -> Float,
+    ?stateCost:(Int, motionkit.robot.CartesianCandidateSampler.LatticeCandidate) -> Float,
     ?retreat:Array<Float>,
     ?weights:Array<Float>,
     rollWeight:Float = 0,
     ?preferenceSource:ManipulatorKinematics,
     ?contactPose:motionkit.kinematics.Pose3 -> Bool,
-    ?contactGuard:(
-      motionkit.kinematics.Pose3,
-      Float
-    ) -> Bool
+    ?contactGuard:(motionkit.kinematics.Pose3, Float) -> Bool
   ) {
     if (group == null
       || collisionRounds < 1) throw "Joint path planner requires a compiled group and positive collision round budget";
@@ -144,10 +138,8 @@ class StructuredJointPathPlanner implements JointPathPlanner {
       retreat,
       weights,
       rollWeight,
-      preferenceSource == null ? null : Std.isOfType(
-        solver,
-        ManipulatorKinematics
-      ) ? cast solver : throw "Planner preference worker requires manipulator kinematics",
+      preferenceSource == null ? null : Std.isOfType(solver,
+      ManipulatorKinematics) ? cast solver : throw "Planner preference worker requires manipulator kinematics",
       contactPose,
       contactGuard
     );
@@ -280,10 +272,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     paths:Array<PosePath>,
     request:PathRequest,
     ?pinStart:Bool,
-    ?entryCheck:(
-      Array<Float>,
-      Array<Float>
-    ) -> Null<ClearanceViolation>,
+    ?entryCheck:(Array<Float>, Array<Float>) -> Null<ClearanceViolation>,
     ?exitCheck:Array<Float> -> Null<ClearanceViolation>
   ):Array<JointPathSamples> {
     selectionCost = null;
@@ -377,13 +366,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
         var provider = providers[section], length = paths[section].length();
         var curve = refiner.refineSection(
           distances,
-          distance -> provider.at(Math.max(
-            0.0,
-            Math.min(
-              length,
-              distance - offset
-            )
-          ))
+          distance -> provider.at(Math.max(0.0, Math.min(length, distance - offset)))
         );
         var local = [for (distance in curve.s) Math.max(0.0, Math.min(length, distance - offset))];
         local[local.length - 1] = length;

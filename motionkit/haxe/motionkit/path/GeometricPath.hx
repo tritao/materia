@@ -157,10 +157,7 @@ class GeometricPath implements MotionPath {
     var lengthSquared = dx * dx + dy * dy + dz * dz;
     var fraction = lengthSquared <= 0.0 ? 0.0 : Math.max(
       0.0,
-      Math.min(
-        1.0,
-        ((point.x - start.x) * dx + (point.y - start.y) * dy + (point.z - start.z) * dz) / lengthSquared
-      )
+      Math.min(1.0, ((point.x - start.x) * dx + (point.y - start.y) * dy + (point.z - start.z) * dz) / lengthSquared)
     );
     var x = point.x - start.x - fraction * dx,
       y = point.y - start.y - fraction * dy, z = point.z - start.z - fraction * dz;

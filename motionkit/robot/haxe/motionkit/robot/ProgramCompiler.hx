@@ -476,10 +476,7 @@ class ProgramCompiler {
       var trajectory = Trajectory.fromSegments([{
         timeFromStartNs: Int64.ofInt(0),
         durationNs: Trajectory.nanoseconds(controllerPeriodSeconds),
-        coefficients: [for (position in c.q)[
-          position,
-          0.0
-        ]]
+        coefficients: [for (position in c.q)[position, 0.0]]
       }]);
       var pending = new PendingMotion(c.currentIndex, c.q, c.q, trajectory, [], null, null);
       attachLeadingOutputs(pending, c.leadingOutputs);
@@ -497,22 +494,10 @@ class ProgramCompiler {
     var count = maxVelocity.length;
     return trajectory.mergePositionBudget(
       [for (joint in 0...count) share * budget.position[joint]],
-      maxVelocity.slice(
-        0,
-        count
-      ),
-      maxAcceleration.slice(
-        0,
-        count
-      ),
-      positionBounds(
-        count,
-        false
-      ),
-      positionBounds(
-        count,
-        true
-      ),
+      maxVelocity.slice(0, count),
+      maxAcceleration.slice(0, count),
+      positionBounds(count, false),
+      positionBounds(count, true),
       budget.seconds
     );
   }
@@ -644,11 +629,7 @@ class ProgramCompiler {
               Math.max(feed, nextFeed),
               [],
               index,
-              [
-                solver.forward(q),
-                pose,
-                cast blendNextPose
-              ],
+              [solver.forward(q), pose, cast blendNextPose],
               blendTolerance
             );
             c.skip = 1;
@@ -668,10 +649,7 @@ class ProgramCompiler {
               var hold = Trajectory.fromSegments([{
                 timeFromStartNs: Int64.ofInt(0),
                 durationNs: Trajectory.nanoseconds(controllerPeriodSeconds),
-                coefficients: [for (position in q)[
-                  position,
-                  0.0
-                ]]
+                coefficients: [for (position in q)[position, 0.0]]
               }]);
               pending = new PendingMotion(index, q, q, hold, [], null, null);
             } else {
@@ -698,21 +676,9 @@ class ProgramCompiler {
             new PosePath(
               frameId,
               [new PoseArc(
-                new PoseWaypoint(
-                  solver.forward(q),
-                  positionTolerance,
-                  orientationTolerance
-                ),
-                new PoseWaypoint(
-                  via,
-                  positionTolerance,
-                  orientationTolerance
-                ),
-                new PoseWaypoint(
-                  endPose,
-                  positionTolerance,
-                  orientationTolerance
-                ),
+                new PoseWaypoint(solver.forward(q), positionTolerance, orientationTolerance),
+                new PoseWaypoint(via, positionTolerance, orientationTolerance),
+                new PoseWaypoint(endPose, positionTolerance, orientationTolerance),
                 freedom == null ? OrientationPolicy.Interpolated : freedom,
                 feed
               )]
@@ -776,10 +742,7 @@ class ProgramCompiler {
     if (!moved) return Trajectory.fromSegments([{
       timeFromStartNs: Int64.ofInt(0),
       durationNs: Trajectory.nanoseconds(controllerPeriodSeconds),
-      coefficients: [for (position in from)[
-        position,
-        0.0
-      ]]
+      coefficients: [for (position in from)[position, 0.0]]
     }]);
     var motors = motorSpace;
     var generated = motors == null ? Trajectory.generateStateToState(
@@ -1218,14 +1181,7 @@ class ProgramCompiler {
         {
           filters: filterSettings(),
           mergeSeconds: budget == null ? 0.0 : budget.seconds,
-          mergeRuns : function(
-            trajectory,
-            share
-          ) return mergeRuns(
-            trajectory,
-            share,
-            budget
-          )
+          mergeRuns : function(trajectory, share) return mergeRuns(trajectory, share, budget)
         },
         projection,
         pending,
@@ -1436,16 +1392,8 @@ class ProgramCompiler {
     var geometry = CornerBlender.blend(
       GeometricPath.lines([
         new PathPoint(start.x, start.y, start.z),
-        new PathPoint(
-          corner.x,
-          corner.y,
-          corner.z
-        ),
-        new PathPoint(
-          end.x,
-          end.y,
-          end.z
-        )
+        new PathPoint(corner.x, corner.y, corner.z),
+        new PathPoint(end.x, end.y, end.z)
       ]),
       tolerance,
       Math.PI * 5.0 / 6.0
@@ -1463,37 +1411,14 @@ class ProgramCompiler {
       frameId,
       [
         new PoseLine(firstStart, firstEnd, OrientationPolicy.Fixed, 0.1, firstFeed),
-        new PoseArc(
-          firstEnd,
-          arcMiddle,
-          arcEnd,
-          OrientationPolicy.Fixed,
-          Math.min(
-            firstFeed,
-            secondFeed
-          )
-        ),
-        new PoseLine(
-          arcEnd,
-          lastEnd,
-          OrientationPolicy.Fixed,
-          0.1,
-          secondFeed
-        )
+        new PoseArc(firstEnd, arcMiddle, arcEnd, OrientationPolicy.Fixed, Math.min(firstFeed, secondFeed)),
+        new PoseLine(arcEnd, lastEnd, OrientationPolicy.Fixed, 0.1, secondFeed)
       ]
     );
   }
 
   function poseWaypoint(point:PathPoint, orientation:Pose3):PoseWaypoint return new PoseWaypoint(
-    new Pose3(
-      point.x,
-      point.y,
-      point.z,
-      orientation.qx,
-      orientation.qy,
-      orientation.qz,
-      orientation.qw
-    ),
+    new Pose3(point.x, point.y, point.z, orientation.qx, orientation.qy, orientation.qz, orientation.qw),
     positionTolerance,
     orientationTolerance
   );
@@ -1526,16 +1451,7 @@ class ProgramCompiler {
     if (jointPathPlanner != null) {
       refined = preplannedCurve != null ? preplannedCurve : jointPathPlanner.plan(
         path,
-        new PathRequest(
-          distances,
-          pathPoses,
-          startQ,
-          ikTolerance,
-          perJointMaxJump,
-          maxVelocity,
-          48,
-          freedoms
-        ),
+        new PathRequest(distances, pathPoses, startQ, ikTolerance, perJointMaxJump, maxVelocity, 48, freedoms),
         true
       );
       if (refined == null || refined.jointCount != startQ.length || refined.s.length
@@ -1857,14 +1773,7 @@ class ProgramCompiler {
     ?freedom:OrientationPolicy
   ):Null<Array<Float>> return solver.solveDifferential(
     q,
-    new Twist6(
-      linear[0],
-      linear[1],
-      linear[2],
-      angular[0],
-      angular[1],
-      angular[2]
-    ),
+    new Twist6(linear[0], linear[1], linear[2], angular[0], angular[1], angular[2]),
     redundancyRate,
     freedom
   );

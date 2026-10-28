@@ -80,12 +80,7 @@ class EaikChain {
       || seed.length != group.group.count() || target == null) throw "EAIK target requires a complete lattice cell";
     var requested = new Transform3(
       new Vec3(target.x, target.y, target.z),
-      new Quat(
-        target.qx,
-        target.qy,
-        target.qz,
-        target.qw
-      )
+      new Quat(target.qx, target.qy, target.qz, target.qw)
     );
     var local = group.linkPoses(seed, [armRoot])[0].inverse().compose(requested).compose(chain.flangeTTcp.inverse());
     var record = new mk_analytic_pose();

@@ -15,11 +15,7 @@ class PathTimingStreamTests extends MotionKitTestSupport {
       [0.0, 0.5, 1.0],
       [[0.0], [0.5], [1.0]],
       [[1.0], [1.0], [1.0]],
-      [
-        [0.0],
-        [0.0],
-        [0.0]
-      ]
+      [[0.0], [0.0], [0.0]]
     );
     var stream = new ToppraPathTiming().prepareStream(geometry, new PathTimingLimits([2.0], [1.0]), 4);
     geometry.q[1][0] = 99;
@@ -73,28 +69,8 @@ class PathTimingStreamTests extends MotionKitTestSupport {
     var path = new JointPathSamples(
       [0.0, 0.5, 1.0],
       [[0.0, 0.0], [0.5, 0.5], [1.0, 1.0]],
-      [
-        [1.0, 1.0],
-        [1.0, 1.0],
-        [
-          1.0,
-          1.0
-        ]
-      ],
-      [
-        [
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0
-        ]
-      ]
+      [[1.0, 1.0], [1.0, 1.0], [1.0, 1.0]],
+      [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]
     );
     var backend = new ToppraPathTiming();
     var motors = new motionkit.robot.MotorSpaceConstraints([[1.0, 1.0], [1.0, -1.0]], [1.0, 1.0]);
@@ -103,26 +79,12 @@ class PathTimingStreamTests extends MotionKitTestSupport {
     var augmented = new JointPathSamples(
       path.s,
       [for (q in path.q) q.concat([q[0] + q[1], q[0] - q[1]])],
-      [for (q in path.qPrime) q.concat([
-        q[0] + q[1],
-        q[0] - q[1]
-      ])],
-      [for (q in path.qDoublePrime) q.concat([
-        q[0] + q[1],
-        q[0] - q[1]
-      ])]
+      [for (q in path.qPrime) q.concat([q[0] + q[1], q[0] - q[1]])],
+      [for (q in path.qDoublePrime) q.concat([q[0] + q[1], q[0] - q[1]])]
     );
     var referenceStream = backend.prepareStream(
       augmented,
-      new PathTimingLimits(
-        [2.0, 2.0, 1.0, 1.0],
-        [
-          1.0,
-          1.0,
-          1e12,
-          1e12
-        ]
-      ),
+      new PathTimingLimits([2.0, 2.0, 1.0, 1.0], [1.0, 1.0, 1e12, 1e12]),
       4
     );
     var reference:motionkit.planner.TimedPath = null;
@@ -185,34 +147,17 @@ class PathTimingStreamTests extends MotionKitTestSupport {
       [for (_ in 0...6) 1.0],
       [for (_ in 0...6) 2.0],
       [for (_ in 0...6) 10.0],
-      motionkit.robot.StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      )
+      motionkit.robot.StartTolerances.uniform(6, 0.02, 0.02, 0.02)
     );
     var geometry = motionkit.path.GeometricPath.lines([
       new motionkit.path.PathPoint(0, 0.001, 0),
-      new motionkit.path.PathPoint(
-        0.1,
-        0.001,
-        0
-      )
+      new motionkit.path.PathPoint(0.1, 0.001, 0)
     ]);
     var path = new motionkit.path.PosePath(
       "work",
       [new motionkit.path.PoseLine(
-        new motionkit.path.PoseWaypoint(
-          new motionkit.kinematics.Pose3(0),
-          0.002,
-          0.02
-        ),
-        new motionkit.path.PoseWaypoint(
-          new motionkit.kinematics.Pose3(0.1),
-          0.002,
-          0.02
-        ),
+        new motionkit.path.PoseWaypoint(new motionkit.kinematics.Pose3(0), 0.002, 0.02),
+        new motionkit.path.PoseWaypoint(new motionkit.kinematics.Pose3(0.1), 0.002, 0.02),
         motionkit.path.OrientationPolicy.Fixed,
         0.02,
         0.02
@@ -220,12 +165,7 @@ class PathTimingStreamTests extends MotionKitTestSupport {
     );
     path.withAuthoredGeometry(geometry, 0.002, 0.001);
     function compile() return compiler.compile(
-      new motionkit.program.MotionProgram([motionkit.program.MotionOp.FollowPath(
-        path,
-        "work",
-        0.02,
-        []
-      )]),
+      new motionkit.program.MotionProgram([motionkit.program.MotionOp.FollowPath(path, "work", 0.02, [])]),
       [for (_ in 0...6) 0.0],
       Int64.ofInt(100)
     );
@@ -257,27 +197,9 @@ class PathTimingStreamTests extends MotionKitTestSupport {
     var ids = ["x", "y", "sum", "difference", "held1", "held2"];
     var couplings = [
       new robotkit.model.JointCoupling("x-sum", "x", "sum", 1, 0),
-      new robotkit.model.JointCoupling(
-        "y-sum",
-        "y",
-        "sum",
-        1,
-        0
-      ),
-      new robotkit.model.JointCoupling(
-        "x-difference",
-        "x",
-        "difference",
-        1,
-        0
-      ),
-      new robotkit.model.JointCoupling(
-        "y-difference",
-        "y",
-        "difference",
-        -1,
-        0
-      )
+      new robotkit.model.JointCoupling("y-sum", "y", "sum", 1, 0),
+      new robotkit.model.JointCoupling("x-difference", "x", "difference", 1, 0),
+      new robotkit.model.JointCoupling("y-difference", "y", "difference", -1, 0)
     ];
     var compiler = new motionkit.robot.ProgramCompiler(
       new MotionKitTestSupport.PlanarSolver(),
@@ -286,12 +208,7 @@ class PathTimingStreamTests extends MotionKitTestSupport {
       velocity,
       acceleration,
       jerk,
-      motionkit.robot.StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      ),
+      motionkit.robot.StartTolerances.uniform(6, 0.02, 0.02, 0.02),
       null,
       0.01,
       0.5,
@@ -356,12 +273,7 @@ class PathTimingStreamTests extends MotionKitTestSupport {
         [for (_ in 0...6) 2.0],
         [for (_ in 0...6) 4.0],
         [for (_ in 0...6) mode == 5 ? 0.001 : 20.0],
-        motionkit.robot.StartTolerances.uniform(
-          6,
-          0.02,
-          0.02,
-          0.02
-        ),
+        motionkit.robot.StartTolerances.uniform(6, 0.02, 0.02, 0.02),
         null,
         0.05
       );
@@ -369,16 +281,8 @@ class PathTimingStreamTests extends MotionKitTestSupport {
       var path = new motionkit.path.PosePath(
         "work",
         [new motionkit.path.PoseLine(
-          new motionkit.path.PoseWaypoint(
-            new motionkit.kinematics.Pose3(0.0),
-            0.005,
-            0.02
-          ),
-          new motionkit.path.PoseWaypoint(
-            new motionkit.kinematics.Pose3(0.1),
-            0.005,
-            0.02
-          ),
+          new motionkit.path.PoseWaypoint(new motionkit.kinematics.Pose3(0.0), 0.005, 0.02),
+          new motionkit.path.PoseWaypoint(new motionkit.kinematics.Pose3(0.1), 0.005, 0.02),
           motionkit.path.OrientationPolicy.Fixed,
           0.1,
           0.1
@@ -389,39 +293,19 @@ class PathTimingStreamTests extends MotionKitTestSupport {
           path,
           "work",
           0.1,
-          [new motionkit.event.PathEvent(
-            0.05,
-            "tool.enabled",
-            motionkit.event.EventValue.Digital(true)
-          )]
+          [new motionkit.event.PathEvent(0.05, "tool.enabled", motionkit.event.EventValue.Digital(true))]
         ),
-        motionkit.program.MotionOp.SetOutput(
-          "tool.enabled",
-          motionkit.event.EventValue.Digital(false)
-        ),
+        motionkit.program.MotionOp.SetOutput("tool.enabled", motionkit.event.EventValue.Digital(false)),
         motionkit.program.MotionOp.Dwell(0.01)
       ]);
       if (mode == 5) program = new motionkit.program.MotionProgram([
         motionkit.program.MotionOp.MoveJ(
-          motionkit.program.MoveTarget.JointTarget([
-            0.1,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0
-          ]),
+          motionkit.program.MoveTarget.JointTarget([0.1, 0.0, 0.0, 0.0, 0.0, 0.0]),
           new motionkit.MotionOptions(),
           motionkit.program.Blend.ExactStop
         ),
-        motionkit.program.MotionOp.SetOutput(
-          "tool.enabled",
-          motionkit.event.EventValue.Digital(true)
-        ),
-        motionkit.program.MotionOp.SetOutput(
-          "tool.enabled",
-          motionkit.event.EventValue.Digital(false)
-        ),
+        motionkit.program.MotionOp.SetOutput("tool.enabled", motionkit.event.EventValue.Digital(true)),
+        motionkit.program.MotionOp.SetOutput("tool.enabled", motionkit.event.EventValue.Digital(false)),
         motionkit.program.MotionOp.Dwell(10 * dt)
       ]);
       var origin = [for (_ in 0...6) 0.0];
@@ -528,28 +412,15 @@ class PathTimingStreamTests extends MotionKitTestSupport {
       [for (_ in 0...6) 2.0],
       [for (_ in 0...6) 4.0],
       [for (_ in 0...6) 20.0],
-      motionkit.robot.StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      ),
+      motionkit.robot.StartTolerances.uniform(6, 0.02, 0.02, 0.02),
       null,
       0.05
     );
     var path = new motionkit.path.PosePath(
       "work",
       [new motionkit.path.PoseLine(
-        new motionkit.path.PoseWaypoint(
-          new motionkit.kinematics.Pose3(0.0),
-          0.005,
-          0.02
-        ),
-        new motionkit.path.PoseWaypoint(
-          new motionkit.kinematics.Pose3(0.1),
-          0.005,
-          0.02
-        ),
+        new motionkit.path.PoseWaypoint(new motionkit.kinematics.Pose3(0.0), 0.005, 0.02),
+        new motionkit.path.PoseWaypoint(new motionkit.kinematics.Pose3(0.1), 0.005, 0.02),
         motionkit.path.OrientationPolicy.Fixed,
         0.1,
         0.1
@@ -559,12 +430,7 @@ class PathTimingStreamTests extends MotionKitTestSupport {
       path,
       "work",
       0.1,
-      [new motionkit.event.PathEvent(
-        0.05,
-        "tool.enabled",
-        motionkit.event.EventValue.Digital(true),
-        0.02
-      )]
+      [new motionkit.event.PathEvent(0.05, "tool.enabled", motionkit.event.EventValue.Digital(true), 0.02)]
     )]);
     var start = [0.0, 0.0, 0.0, 0.0, 0.1, 0.0];
     var whole = compiler.compile(program, start, Int64.ofInt(700));
@@ -631,14 +497,7 @@ class PathTimingStreamTests extends MotionKitTestSupport {
     var source = Trajectory.fromSegments([{
       timeFromStartNs: Trajectory.nanoseconds(0),
       durationNs: Trajectory.nanoseconds(2),
-      coefficients: [[
-        0.0,
-        0.0,
-        0.0,
-        1.25,
-        -0.9375,
-        0.1875
-      ]]
+      coefficients: [[0.0, 0.0, 0.0, 1.25, -0.9375, 0.1875]]
     }]);
     var advanced = source.advanceJoint(0, 0.03, 0.04);
     var whole = advanced.shape([[0.0, 0.02]], [[0.5, 0.5]]);
@@ -671,14 +530,7 @@ class PathTimingStreamTests extends MotionKitTestSupport {
     var source = Trajectory.fromSegments([{
       timeFromStartNs: Trajectory.nanoseconds(0),
       durationNs: Trajectory.nanoseconds(2),
-      coefficients: [[
-        0.0,
-        0.0,
-        0.0,
-        1.25,
-        -0.9375,
-        0.1875
-      ]]
+      coefficients: [[0.0, 0.0, 0.0, 1.25, -0.9375, 0.1875]]
     }]);
     var advanced = source.advanceJoint(0, 0.03, 0.04);
     var whole = advanced.shape([[0.0, 0.02]], [[0.5, 0.5]]);
@@ -791,12 +643,7 @@ class PathTimingStreamTests extends MotionKitTestSupport {
     left.dispose();
     right.dispose();
     var events = new TimedMotionBuffer(
-      {
-        pressureAdvance: 0.0,
-        pressureAdvanceWindow: 0.04,
-        shaping: null,
-        shapingDelay: 0.0
-      },
+      {pressureAdvance: 0.0, pressureAdvanceWindow: 0.04, shaping: null, shapingDelay: 0.0},
       null,
       null,
       0.1,
@@ -808,12 +655,8 @@ class PathTimingStreamTests extends MotionKitTestSupport {
     check(events.preview() == null, "event lead prevents premature prefix publication");
     events.dispose();
     var ticks = new TimedMotionBuffer(
-      {
-        pressureAdvance: 0.0,
-        pressureAdvanceWindow: 0.04,
-        shaping: [ShaperImpulses.delay(0.4e-9)],
-        shapingDelay: 0.4e-9
-      },
+      {pressureAdvance: 0.0,
+      pressureAdvanceWindow: 0.04, shaping: [ShaperImpulses.delay(0.4e-9)], shapingDelay: 0.4e-9},
       null,
       null,
       null,

@@ -88,10 +88,7 @@ class CandidateProblem {
       samples: request.poses.length,
       externalAxes: externalJoints.length,
       pinnedStart: pinnedStart,
-      configuration: settings.configuration == null ? null : cast(
-        settings.configuration,
-        SixAxisConfiguration
-      ).label()
+      configuration: settings.configuration == null ? null : cast(settings.configuration, SixAxisConfiguration).label()
     }));
     samples = [];
     var initialPose = backend.forward(planningStart);
@@ -280,11 +277,7 @@ class CandidateSamplingOptions {
     azimuthCount:Int = 8,
     pinStart:Bool = true,
     ?externalRanges:Array<ExternalAxisRange>,
-    ?externalRule:(
-      Int,
-      Float,
-      Pose3
-    ) -> Array<ExternalAxisRange>,
+    ?externalRule:(Int, Float, Pose3) -> Array<ExternalAxisRange>,
     ?configuration:SixAxisConfiguration
   ) {
     if (rollCount <= 0 || tiltRings <= 0 || azimuthCount <= 0) throw "Candidate lattice resolutions must be positive";

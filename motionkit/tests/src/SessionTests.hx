@@ -229,10 +229,7 @@ class SessionTests extends MotionKitTestSupport {
       "held + queue",
       Held,
       0,
-      () -> idleRig.machine.queueAxes(
-        [new AxisTarget("x", 0.02)],
-        idleRig.options
-      )
+      () -> idleRig.machine.queueAxes([new AxisTarget("x", 0.02)], idleRig.options)
     );
     expect(idleRig, "held + resume", Running, 1, () -> idleRig.machine.resume());
     idleRig.dispose();
@@ -244,13 +241,7 @@ class SessionTests extends MotionKitTestSupport {
     expect(abortRig, "running + abort", Stopping(Discard), 1, () -> abortRig.machine.abort());
     var planCount = abortRig.robot.planCount();
     expect(abortRig, "stopping + move", Stopping(Replan), 0, () -> {check(
-      abortRig.machine.moveAxes(
-        [new AxisTarget(
-          "x",
-          0.02
-        )],
-        abortRig.options
-      ) == null,
+      abortRig.machine.moveAxes([new AxisTarget("x", 0.02)], abortRig.options) == null,
       "move after abort is deferred"
     );
     });
@@ -464,11 +455,7 @@ class SessionTests extends MotionKitTestSupport {
     queuedSimulationHarness.dispose();
 
     var squareBlueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
-        80,
-        80,
-        80
-      )),
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 80, 80)),
       0.08,
       0.2
     );
@@ -500,10 +487,7 @@ class SessionTests extends MotionKitTestSupport {
     var squarePath = squareMachine.movePath(
       GeometricPath.lines([origin, east, northeast, north, origin]),
       PathPlanningOptions.exactStopMode(),
-      new MotionOptions(
-        0.04,
-        0.2
-      )
+      new MotionOptions(0.04, 0.2)
     );
     var cornerStops = 0;
     for (segment in squarePath.segments()) {
@@ -588,11 +572,7 @@ class SessionTests extends MotionKitTestSupport {
     var worstAcceleration = 0.0;
     var worstTick = -1;
     var blueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
-        200,
-        150,
-        100
-      )),
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 150, 100)),
       0.1,
       limit
     );
@@ -792,13 +772,7 @@ class SessionTests extends MotionKitTestSupport {
         var replaced = gantryTrial(
           queueSupport,
           eventTick,
-          machine -> machine.moveAxes(
-            [new AxisTarget("x", 0.02)],
-            new MotionOptions(
-              0.05,
-              limit
-            )
-          ),
+          machine -> machine.moveAxes([new AxisTarget("x", 0.02)], new MotionOptions(0.05, limit)),
           false
         );
         var replacePeak = peakSecondDifference(replaced);
@@ -958,35 +932,11 @@ class SessionTests extends MotionKitTestSupport {
     var origin = new PathPoint(home("x"), home("y"), home("z"));
     // A line, a quarter arc tangent to it, and a line tangent to the arc.
     function arcPath():GeometricPath return new GeometricPath([
+      new LineSegment(origin, new PathPoint(origin.x + 0.05, origin.y, origin.z)),
+      new ArcSegment(new PathPoint(origin.x + 0.05, origin.y + 0.03, origin.z), 0.03, -Math.PI * 0.5, Math.PI * 0.5),
       new LineSegment(
-        origin,
-        new PathPoint(
-          origin.x + 0.05,
-          origin.y,
-          origin.z
-        )
-      ),
-      new ArcSegment(
-        new PathPoint(
-          origin.x + 0.05,
-          origin.y + 0.03,
-          origin.z
-        ),
-        0.03,
-        -Math.PI * 0.5,
-        Math.PI * 0.5
-      ),
-      new LineSegment(
-        new PathPoint(
-          origin.x + 0.08,
-          origin.y + 0.03,
-          origin.z
-        ),
-        new PathPoint(
-          origin.x + 0.08,
-          origin.y + 0.05,
-          origin.z
-        )
+        new PathPoint(origin.x + 0.08, origin.y + 0.03, origin.z),
+        new PathPoint(origin.x + 0.08, origin.y + 0.05, origin.z)
       )
     ]);
     function arcDistance(x:Float, y:Float):Float {
@@ -998,34 +948,13 @@ class SessionTests extends MotionKitTestSupport {
         onArc,
         Math.min(
           segmentDistance(x, y, origin.x, origin.y, origin.x + 0.05, origin.y),
-          segmentDistance(
-            x,
-            y,
-            origin.x + 0.08,
-            origin.y + 0.03,
-            origin.x + 0.08,
-            origin.y + 0.05
-          )
+          segmentDistance(x, y, origin.x + 0.08, origin.y + 0.03, origin.x + 0.08, origin.y + 0.05)
         )
       );
     }
     function cornerDistance(x:Float, y:Float):Float return Math.min(
-      segmentDistance(
-        x,
-        y,
-        origin.x,
-        origin.y,
-        origin.x + 0.05,
-        origin.y
-      ),
-      segmentDistance(
-        x,
-        y,
-        origin.x + 0.05,
-        origin.y,
-        origin.x + 0.05,
-        origin.y + 0.05
-      )
+      segmentDistance(x, y, origin.x, origin.y, origin.x + 0.05, origin.y),
+      segmentDistance(x, y, origin.x + 0.05, origin.y, origin.x + 0.05, origin.y + 0.05)
     );
     var cases:Array<{label:String, begin:MotionSystem -> Void, distance:(Float, Float) -> Float}> = [
       {
@@ -1034,10 +963,7 @@ class SessionTests extends MotionKitTestSupport {
         begin: machine -> machine.movePath(
           arcPath(),
           PathPlanningOptions.exactStopMode(),
-          new MotionOptions(
-            0.05,
-            limit
-          )
+          new MotionOptions(0.05, limit)
         )
       },
       {
@@ -1046,22 +972,11 @@ class SessionTests extends MotionKitTestSupport {
         begin: machine -> machine.movePath(
           GeometricPath.lines([
             origin,
-            new PathPoint(
-              origin.x + 0.05,
-              origin.y,
-              origin.z
-            ),
-            new PathPoint(
-              origin.x + 0.05,
-              origin.y + 0.05,
-              origin.z
-            )
+            new PathPoint(origin.x + 0.05, origin.y, origin.z),
+            new PathPoint(origin.x + 0.05, origin.y + 0.05, origin.z)
           ]),
           PathPlanningOptions.exactStopMode(),
-          new MotionOptions(
-            0.05,
-            limit
-          )
+          new MotionOptions(0.05, limit)
         )
       }
     ];
@@ -1106,10 +1021,7 @@ class SessionTests extends MotionKitTestSupport {
     var limits = [0.4, 0.8];
     var begin:MotionSystem -> Void = machine -> {machine.moveAxes(
       [new AxisTarget("x", 0.06)],
-      new MotionOptions(
-        0.08,
-        0.4
-      )
+      new MotionOptions(0.08, 0.4)
     );
     };
     for (queueSupport in [true]) {
@@ -1119,14 +1031,8 @@ class SessionTests extends MotionKitTestSupport {
       while (eventTick < baseline.length) {
         var trials = [{label: "held", resume: true, event: (machine: MotionSystem) -> machine.hold()},
           {label: "replaced", resume: false, event: (machine: MotionSystem) -> {machine.moveAxes(
-            [new AxisTarget(
-              "x",
-              0.01
-            )],
-            new MotionOptions(
-              0.08,
-              0.4
-            )
+            [new AxisTarget("x", 0.01)],
+            new MotionOptions(0.08, 0.4)
           );
         }}];
         for (trial in trials) {

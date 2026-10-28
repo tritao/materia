@@ -46,42 +46,21 @@ import robotkit.spatial.Vec3;
   static function torch():ClearanceBodyData return {
     name: "torch",
     link: "wrist_3_link",
-    vertices: WeldPlanningTests.box(
-      -0.012,
-      0.012,
-      D6 - 0.012,
-      D6 + 0.012,
-      -0.14,
-      -0.03
-    ),
+    vertices: WeldPlanningTests.box(-0.012, 0.012, D6 - 0.012, D6 + 0.012, -0.14, -0.03),
     tool: true
   };
 
   static function neck():ClearanceBodyData return {
     name: "neck",
     link: "wrist_3_link",
-    vertices: WeldPlanningTests.box(
-      0.0,
-      0.10,
-      D6 - 0.012,
-      D6 + 0.012,
-      -0.14,
-      -0.10
-    ),
+    vertices: WeldPlanningTests.box(0.0, 0.10, D6 - 0.012, D6 + 0.012, -0.14, -0.10),
     tool: true
   };
 
   static function table():ClearanceBodyData return {
     name: "table",
     link: "base_link",
-    vertices: WeldPlanningTests.box(
-      -0.8,
-      0.8,
-      -0.8,
-      0.8,
-      -0.1,
-      0.0
-    ),
+    vertices: WeldPlanningTests.box(-0.8, 0.8, -0.8, 0.8, -0.1, 0.0),
     tool: false
   };
 
@@ -187,14 +166,7 @@ import robotkit.spatial.Vec3;
     var bead:ClearanceBodyData = {
       name: "bead",
       link: "wrist_3_link",
-      vertices: WeldPlanningTests.box(
-        -0.0005,
-        0.0005,
-        D6 - 0.0005,
-        D6 + 0.0005,
-        -0.1405,
-        -0.1395
-      ),
+      vertices: WeldPlanningTests.box(-0.0005, 0.0005, D6 - 0.0005, D6 + 0.0005, -0.1405, -0.1395),
       tool: true
     };
     // The arm reaches out, so the base's turn moves the bead about 12 mm between the sampled check's samples.
@@ -285,15 +257,7 @@ import robotkit.spatial.Vec3;
     var part:ClearanceBodyData = {
       name: "part",
       link: "base_link",
-      vertices: inWrist(
-        START,
-        -0.012,
-        -0.004,
-        D6 - 0.004,
-        D6 + 0.004,
-        -0.146,
-        -0.138
-      ),
+      vertices: inWrist(START, -0.012, -0.004, D6 - 0.004, D6 + 0.004, -0.146, -0.138),
       tool: false
     };
     var fixture = cell(START, 0.001, 0.0005);
@@ -310,28 +274,9 @@ import robotkit.spatial.Vec3;
     var replay = compiler(world);
     replay.clearanceEvents = [
       new ClearanceEvent(0, 0.0, ClearanceChange.Attach("part", "wrist_3_link", ["torch"])),
-      new ClearanceEvent(
-        1,
-        0.0,
-        ClearanceChange.Detach("part")
-      ),
-      new ClearanceEvent(
-        1,
-        0.0,
-        ClearanceChange.OpenWindow(
-          "torch",
-          "part",
-          null
-        )
-      ),
-      new ClearanceEvent(
-        1,
-        1e6,
-        ClearanceChange.CloseWindow(
-          "torch",
-          "part"
-        )
-      )
+      new ClearanceEvent(1, 0.0, ClearanceChange.Detach("part")),
+      new ClearanceEvent(1, 0.0, ClearanceChange.OpenWindow("torch", "part", null)),
+      new ClearanceEvent(1, 1e6, ClearanceChange.CloseWindow("torch", "part"))
     ];
     var compiled = replay.compile(program, START, Int64.ofInt(1));
     var all = reports(compiled);
@@ -353,15 +298,7 @@ import robotkit.spatial.Vec3;
     var seam:ClearanceBodyData = {
       name: "seam",
       link: "base_link",
-      vertices: inWrist(
-        START,
-        -0.012,
-        -0.006,
-        D6 - 0.012,
-        D6 + 0.012,
-        -0.152,
-        -0.142
-      ),
+      vertices: inWrist(START, -0.012, -0.006, D6 - 0.012, D6 + 0.012, -0.152, -0.142),
       tool: false
     };
     var fixture = cell(START);
@@ -379,14 +316,7 @@ import robotkit.spatial.Vec3;
     var windowed = compiler(world);
     windowed.clearanceEvents = [
       new ClearanceEvent(0, 0.0, ClearanceChange.OpenWindow("torch", "seam", 0.001)),
-      new ClearanceEvent(
-        0,
-        1e6,
-        ClearanceChange.CloseWindow(
-          "torch",
-          "seam"
-        )
-      )
+      new ClearanceEvent(0, 1e6, ClearanceChange.CloseWindow("torch", "seam"))
     ];
     var compiled = windowed.compile(moves([START]), above, Int64.ofInt(1));
     var report = reports(compiled)[0];

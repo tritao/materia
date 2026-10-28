@@ -91,10 +91,7 @@ class JointPathTiming {
         var incoming = (path[index][joint] - path[index - 1][joint]) / restSeconds[index - 1];
         var outgoing = (path[index + 1][joint] - path[index][joint]) / restSeconds[index];
         incoming * outgoing <= 0 ? 0.0 : (incoming > 0 ? 1.0 : -1.0) * Math.min(
-          Math.min(
-            Math.abs(incoming),
-            Math.abs(outgoing)
-          ),
+          Math.min(Math.abs(incoming), Math.abs(outgoing)),
           velocity[joint]
         );
       }

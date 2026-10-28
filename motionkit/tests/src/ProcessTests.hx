@@ -131,20 +131,8 @@ class ProcessTests extends MotionKitTestSupport {
     near(path.waypointAt(1.0).positionTolerance, 0.002, "endpoint tolerance", 1e-9);
     var arc = new PoseArc(
       new PoseWaypoint(new Pose3(1, 0, 0), 0.001, 0.01),
-      new PoseWaypoint(
-        new Pose3(0, 1, 0),
-        0.001,
-        0.01
-      ),
-      new PoseWaypoint(
-        new Pose3(
-          -1,
-          0,
-          0
-        ),
-        0.001,
-        0.01
-      ),
+      new PoseWaypoint(new Pose3(0, 1, 0), 0.001, 0.01),
+      new PoseWaypoint(new Pose3(-1, 0, 0), 0.001, 0.01),
       OrientationPolicy.Interpolated,
       0.2
     );
@@ -161,10 +149,7 @@ class ProcessTests extends MotionKitTestSupport {
     var points = [false, true, false, true, false, true, false];
     var toolpoints:Array<ToolpathPoint> = [];
     for (i in 0...points.length) toolpoints.push(new ToolpathPoint(
-      new Transform3(
-        new Vec3(i * 0.1, 0, 0),
-        Quat.identity()
-      ),
+      new Transform3(new Vec3(i * 0.1, 0, 0), Quat.identity()),
       0.2,
       points[i]
     ));
@@ -246,10 +231,7 @@ class ProcessTests extends MotionKitTestSupport {
     near(joint.limits.upper, 0.08, "MachineKit stroke becomes the logical upper limit");
     near(
       joint.limits.requireVelocity(),
-      Math.min(
-        0.1,
-        axis.motor.usableSpeed(24) / Math.abs(blueprint.model.couplings[0].ratio)
-      ),
+      Math.min(0.1, axis.motor.usableSpeed(24) / Math.abs(blueprint.model.couplings[0].ratio)),
       "compiled axis keeps the motor-derived rate"
     );
     check(
@@ -292,14 +274,7 @@ class ProcessTests extends MotionKitTestSupport {
       [0.0],
       [0.0],
       [0.0],
-      [new TrajectorySegment(
-        Int64.ofInt(0),
-        Int64.ofInt(1000000000),
-        [[
-          0.0,
-          0.03
-        ]]
-      )]
+      [new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(1000000000), [[0.0, 0.03]])]
     );
     var rejectedForLimit = false;
     try runtime.submitPlan(plan, 1) catch (error:Dynamic) {
@@ -468,10 +443,7 @@ class ProcessTests extends MotionKitTestSupport {
 
     machine.moveAxes(
       [new AxisTarget("x", 0.02), new AxisTarget("y", 0.01), new AxisTarget("z", 0.015)],
-      new MotionOptions(
-        0.08,
-        0.4
-      )
+      new MotionOptions(0.08, 0.4)
     );
     runMotion(machine, simulationHarness);
     var firstMove = robot.snapshot();
@@ -495,11 +467,7 @@ class ProcessTests extends MotionKitTestSupport {
     var cornerPath = GeometricPath.lines([
       new PathPoint(0.03, 0.02, 0.025),
       new PathPoint(0.04, 0.02, 0.025),
-      new PathPoint(
-        0.04,
-        0.03,
-        0.025
-      )
+      new PathPoint(0.04, 0.03, 0.025)
     ]);
     var cornerMove = machine.movePath(cornerPath, PathPlanningOptions.exactStopMode(), new MotionOptions(0.05, 0.2));
     check(cornerMove.segments().length > 1, "MotionSystem exposes buffered line-path planning");
@@ -552,26 +520,14 @@ class ProcessTests extends MotionKitTestSupport {
       [
         new PoseLine(
           pose(new PathPoint(0.03, 0.02, 0.025)),
-          pose(new PathPoint(
-            0.04,
-            0.02,
-            0.025
-          )),
+          pose(new PathPoint(0.04, 0.02, 0.025)),
           OrientationPolicy.Fixed,
           0.1,
           0.05
         ),
         new PoseLine(
-          pose(new PathPoint(
-            0.04,
-            0.02,
-            0.025
-          )),
-          pose(new PathPoint(
-            0.04,
-            0.03,
-            0.025
-          )),
+          pose(new PathPoint(0.04, 0.02, 0.025)),
+          pose(new PathPoint(0.04, 0.03, 0.025)),
           OrientationPolicy.Fixed,
           0.1,
           0.05

@@ -222,14 +222,7 @@ class KinematicsTests extends MotionKitTestSupport {
     }
     var qdot = solver.solveDifferential(
       q,
-      new Twist6(
-        requested[0],
-        requested[1],
-        requested[2],
-        requested[3],
-        requested[4],
-        requested[5]
-      ),
+      new Twist6(requested[0], requested[1], requested[2], requested[3], requested[4], requested[5]),
       null,
       null
     );
@@ -286,11 +279,7 @@ class KinematicsTests extends MotionKitTestSupport {
       [0.0, 0.0, 0.705],
       [-0.135, 0.0, 0.755],
       [0.0, 0.0, 0.0],
-      [
-        0.0,
-        0.0,
-        0.0
-      ]
+      [0.0, 0.0, 0.0]
     ];
     var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
     var parent = carriage;
@@ -348,10 +337,7 @@ class KinematicsTests extends MotionKitTestSupport {
       for (policy in [
         motionkit.path.OrientationPolicy.Fixed,
         motionkit.path.OrientationPolicy.FreeAboutTool,
-        motionkit.path.OrientationPolicy.Cone(
-          coneAxis,
-          0.1
-        )
+        motionkit.path.OrientationPolicy.Cone(coneAxis, 0.1)
       ]) {
         var activeGrid = switch policy {
           case Cone(_, _):
@@ -433,10 +419,7 @@ class KinematicsTests extends MotionKitTestSupport {
         [0.0, 0.01],
         [nativeTarget, numeric.forward(ruleEnd)],
         nativeSeed,
-        new IkTolerance(
-          1e-6,
-          1e-6
-        ),
+        new IkTolerance(1e-6, 1e-6),
         [for (_ in nativeSeed) 0.5],
         [for (_ in nativeSeed) 1.0]
       );
@@ -547,16 +530,8 @@ class KinematicsTests extends MotionKitTestSupport {
       [0.0, 0.13585, 0.0],
       [0.0, -0.1197, 0.425],
       [0.0, 0.0, 0.39225],
-      [
-        0.0,
-        0.10915,
-        0.0
-      ],
-      [
-        0.0,
-        0.0,
-        0.09465
-      ]
+      [0.0, 0.10915, 0.0],
+      [0.0, 0.0, 0.09465]
     ];
     var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     var parent = carriage;
@@ -653,10 +628,7 @@ class KinematicsTests extends MotionKitTestSupport {
       for (policy in [
         motionkit.path.OrientationPolicy.Fixed,
         motionkit.path.OrientationPolicy.FreeAboutTool,
-        motionkit.path.OrientationPolicy.Cone(
-          coneAxis,
-          0.1
-        )
+        motionkit.path.OrientationPolicy.Cone(coneAxis, 0.1)
       ]) {
         var activeGrid = switch policy {
           case Cone(_, _):
@@ -738,10 +710,7 @@ class KinematicsTests extends MotionKitTestSupport {
         [0.0, 0.01],
         [nativeTarget, numeric.forward(ruleEnd)],
         nativeSeed,
-        new IkTolerance(
-          1e-6,
-          1e-6
-        ),
+        new IkTolerance(1e-6, 1e-6),
         [for (_ in nativeSeed) 0.5],
         [for (_ in nativeSeed) 1.0]
       );
@@ -888,11 +857,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var fallback = new motionkit.robot.NumericBranchIk(
       fixture.arm,
       "seven-axis test arm",
-      new IkTolerance(
-        1e-6,
-        1e-6,
-        60
-      )
+      new IkTolerance(1e-6, 1e-6, 60)
     );
     check(
       fallback.family() == "numeric-fallback" && fallback.diagnostic.indexOf("seven-axis test arm") >= 0,
@@ -906,10 +871,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var target = fallback.forward(q);
     var first = fallback.branchesFromNeighbours(target, [q, q], q), second = fallback.branchesFromNeighbours(
       target,
-      [
-        q,
-        q
-      ],
+      [q, q],
       q
     );
     check(
@@ -947,11 +909,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var sevenSolver = new ManipulatorKinematics(fixture.arm);
     var sevenLine = new PoseLine(
       new PoseWaypoint(sevenSolver.forward(sevenStart), 1e-6, 1e-6),
-      new PoseWaypoint(
-        sevenSolver.forward(sevenEnd),
-        1e-6,
-        1e-6
-      ),
+      new PoseWaypoint(sevenSolver.forward(sevenEnd), 1e-6, 1e-6),
       motionkit.path.OrientationPolicy.Interpolated,
       0.1,
       0.1
@@ -962,10 +920,7 @@ class KinematicsTests extends MotionKitTestSupport {
       sevenDistances,
       [for (s in sevenDistances) sevenPath.poseAt(s)],
       sevenStart,
-      new IkTolerance(
-        1e-6,
-        1e-6
-      ),
+      new IkTolerance(1e-6, 1e-6),
       [for (_ in sevenStart) 0.5],
       [for (_ in sevenStart) 1.0]
     );
@@ -973,10 +928,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var sevenSamples = sevenPlanner.plan(sevenPath, sevenRequest);
     check(sevenSamples.jointCount == 7, "numeric refinement prescribes internal redundancy for a seven-axis arm");
     for (i in 0...sevenDistances.length) near(
-      motionkit.path.PoseMath.distance(
-        sevenSolver.forward(sevenSamples.q[i]),
-        sevenPath.poseAt(sevenDistances[i])
-      ),
+      motionkit.path.PoseMath.distance(sevenSolver.forward(sevenSamples.q[i]), sevenPath.poseAt(sevenDistances[i])),
       0,
       "seven-axis differential refinement preserves authored task geometry",
       1e-6
@@ -1025,10 +977,7 @@ class KinematicsTests extends MotionKitTestSupport {
     }
     var sevenTimed = new ToppraPathTiming().time(
       sevenSamples,
-      new PathTimingLimits(
-        [for (_ in sevenStart) 1.0],
-        [for (_ in sevenStart) 2.0]
-      )
+      new PathTimingLimits([for (_ in sevenStart) 1.0], [for (_ in sevenStart) 2.0])
     );
     try {
       var sevenDuration = sevenTimed.trajectory.durationSeconds();
@@ -1066,16 +1015,8 @@ class KinematicsTests extends MotionKitTestSupport {
       [0.0, 1, 0],
       [0.0, 0, 1],
       [1.0 / Math.sqrt(2), 1.0 / Math.sqrt(2), 0],
-      [
-        1.0 / Math.sqrt(2),
-        0,
-        1.0 / Math.sqrt(2)
-      ],
-      [
-        0.0,
-        1.0 / Math.sqrt(2),
-        1.0 / Math.sqrt(2)
-      ]
+      [1.0 / Math.sqrt(2), 0, 1.0 / Math.sqrt(2)],
+      [0.0, 1.0 / Math.sqrt(2), 1.0 / Math.sqrt(2)]
     ];
     for (i in 0...6) unsupportedFixture.arm.robot.joints[i].axis = axes[i];
     var unsupported = new robotkit.manipulation.KinematicGroup(
@@ -1092,11 +1033,7 @@ class KinematicsTests extends MotionKitTestSupport {
     goal[0] += 0.01;
     var line = new PoseLine(
       new PoseWaypoint(unsupportedSolver.forward(seed), 1e-6, 1e-6),
-      new PoseWaypoint(
-        unsupportedSolver.forward(goal),
-        1e-6,
-        1e-6
-      ),
+      new PoseWaypoint(unsupportedSolver.forward(goal), 1e-6, 1e-6),
       motionkit.path.OrientationPolicy.Interpolated,
       0.1,
       0.1
@@ -1106,10 +1043,7 @@ class KinematicsTests extends MotionKitTestSupport {
       distances,
       [for (s in distances) path.poseAt(s)],
       seed,
-      new IkTolerance(
-        1e-6,
-        1e-6
-      ),
+      new IkTolerance(1e-6, 1e-6),
       [for (_ in seed) 0.5],
       [for (_ in seed) 1.0]
     );
@@ -1118,10 +1052,7 @@ class KinematicsTests extends MotionKitTestSupport {
     check(numericPlanner.fallbackDiagnostic != null,
       "numeric path planner retains the unsupported-geometry diagnostic");
     for (i in 0...distances.length) near(
-      motionkit.path.PoseMath.distance(
-        unsupportedSolver.forward(numericPath.q[i]),
-        path.poseAt(distances[i])
-      ),
+      motionkit.path.PoseMath.distance(unsupportedSolver.forward(numericPath.q[i]), path.poseAt(distances[i])),
       0,
       "numeric continuation refinement preserves authored geometry",
       1e-6
@@ -1130,28 +1061,16 @@ class KinematicsTests extends MotionKitTestSupport {
       [0.0, 0.02],
       [unsupportedSolver.forward(seed), unsupportedSolver.forward(goal)],
       seed,
-      new IkTolerance(
-        1e-6,
-        1e-6,
-        60
-      ),
+      new IkTolerance(1e-6, 1e-6, 60),
       [for (_ in seed) 0.5],
       [for (_ in seed) 1.0],
       48,
-      [
-        motionkit.path.OrientationPolicy.FreeAboutTool,
-        motionkit.path.OrientationPolicy.FreeAboutTool
-      ]
+      [motionkit.path.OrientationPolicy.FreeAboutTool, motionkit.path.OrientationPolicy.FreeAboutTool]
     );
     var finiteNumeric = new motionkit.robot.CandidateProblem(
       unsupported,
       freeNumeric,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-        4,
-        3,
-        8,
-        false
-      )
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4, 3, 8, false)
     );
     for (layer in finiteNumeric.samples) {
       check(layer.candidates.length > 0, "numeric reduced task retains reachable lattice states");
@@ -1207,10 +1126,7 @@ class KinematicsTests extends MotionKitTestSupport {
       [0.0, 0.04],
       [solver.forward(start), solver.forward(end)],
       start,
-      new IkTolerance(
-        1e-6,
-        1e-6
-      ),
+      new IkTolerance(1e-6, 1e-6),
       [for (_ in start) 0.5],
       [for (_ in start) 1.0],
       1
@@ -1281,16 +1197,9 @@ class KinematicsTests extends MotionKitTestSupport {
         request.maxJump,
         request.velocity,
         32,
-        [
-          OrientationPolicy.FreeAboutTool,
-          OrientationPolicy.FreeAboutTool
-        ]
+        [OrientationPolicy.FreeAboutTool, OrientationPolicy.FreeAboutTool]
       ),
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-        4,
-        2,
-        4
-      ),
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4, 2, 4),
       true
     );
     check(
@@ -1303,15 +1212,8 @@ class KinematicsTests extends MotionKitTestSupport {
     var cachedCost = cellPreferences.forProblem(fixture.arm, shiftedSpinProblem);
     for (sample in 0
       ...shiftedSpinProblem.samples.length) for (candidate in shiftedSpinProblem.samples[sample].candidates) near(
-        cachedCost(
-          sample,
-          candidate
-        ),
-        cellPreferences.cost(
-          fixture.arm,
-          shiftedSpinProblem.request.poses[sample],
-          candidate.q
-        ),
+        cachedCost(sample, candidate),
+        cellPreferences.cost(fixture.arm, shiftedSpinProblem.request.poses[sample], candidate.q),
         "analytic cell preference matches per-state FK across branches and turns",
         1e-8
       );
@@ -1319,11 +1221,7 @@ class KinematicsTests extends MotionKitTestSupport {
       shiftedSpinProblem,
       null,
       0,
-      (sample, candidate) -> cellPreferences.cost(
-        fixture.arm,
-        shiftedSpinProblem.request.poses[sample],
-        candidate.q
-      )
+      (sample, candidate) -> cellPreferences.cost(fixture.arm, shiftedSpinProblem.request.poses[sample], candidate.q)
     );
     var cachedSelection = motionkit.robot.StructuredLadder.search(shiftedSpinProblem, null, 0, cachedCost);
     check(referenceCost.diagnostic == cachedSelection.diagnostic, "orientation cell cache preserves reachability");
@@ -1338,11 +1236,7 @@ class KinematicsTests extends MotionKitTestSupport {
       "task",
       [new PoseLine(
         new PoseWaypoint(request.poses[0], 1e-6, 1e-6),
-        new PoseWaypoint(
-          request.poses[1],
-          1e-6,
-          1e-6
-        ),
+        new PoseWaypoint(request.poses[1], 1e-6, 1e-6),
         OrientationPolicy.Free,
         0.1,
         0.1
@@ -1362,21 +1256,14 @@ class KinematicsTests extends MotionKitTestSupport {
     var freeBefore = fixture.arm.numericSolveCount();
     var freeOrientationCurve = new motionkit.robot.StructuredJointPathPlanner(
       fixture.arm,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-        4,
-        2,
-        4
-      )
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4, 2, 4)
     ).plan(
       freeOrientationPath,
       freeOrientationRequest
     );
     check(fixture.arm.numericSolveCount() == freeBefore, "UR full-free structured refinement needs no numeric pose IK");
     for (i in 0...freeOrientationCurve.q.length) near(
-      motionkit.path.PoseMath.distance(
-        solver.forward(freeOrientationCurve.q[i]),
-        freeOrientationRequest.poses[i]
-      ),
+      motionkit.path.PoseMath.distance(solver.forward(freeOrientationCurve.q[i]), freeOrientationRequest.poses[i]),
       0,
       "full-free serial refinement retains its hard position task",
       1e-6
@@ -1388,12 +1275,7 @@ class KinematicsTests extends MotionKitTestSupport {
       [for (_ in start) 1.0],
       [for (_ in start) 2.0],
       [for (_ in start) 20.0],
-      StartTolerances.uniform(
-        6,
-        0.01,
-        0.01,
-        0.01
-      ),
+      StartTolerances.uniform(6, 0.01, 0.01, 0.01),
       null,
       0.01,
       0.5,
@@ -1402,11 +1284,7 @@ class KinematicsTests extends MotionKitTestSupport {
       request.tolerance,
       new motionkit.robot.StructuredJointPathPlanner(
         fixture.arm,
-        new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-          4,
-          2,
-          4
-        )
+        new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4, 2, 4)
       )
     );
     var freeCompiled = freeCompiler.compile(
@@ -1435,13 +1313,7 @@ class KinematicsTests extends MotionKitTestSupport {
     ];
     var flippedFreePath = new PosePath(
       "task",
-      [new PoseLine(
-        flippedFreeWaypoints[0],
-        flippedFreeWaypoints[1],
-        OrientationPolicy.Free,
-        0.1,
-        0.1
-      )]
+      [new PoseLine(flippedFreeWaypoints[0], flippedFreeWaypoints[1], OrientationPolicy.Free, 0.1, 0.1)]
     );
     var flippedFreeRequest = new PathRequest(
       freeOrientationDistances,
@@ -1456,11 +1328,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var flippedFreeProblem = new motionkit.robot.CandidateProblem(
       fixture.arm,
       flippedFreeRequest,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-        4,
-        2,
-        4
-      ),
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4, 2, 4),
       true
     );
     var flippedRefiner = new motionkit.robot.AnalyticPathRefiner(
@@ -1473,10 +1341,7 @@ class KinematicsTests extends MotionKitTestSupport {
       new motionkit.robot.PosePathRefinement(flippedFreePath).at
     );
     for (i in 0...flippedCurve.q.length) near(
-      motionkit.path.PoseMath.distance(
-        solver.forward(flippedCurve.q[i]),
-        flippedFreeRequest.poses[i]
-      ),
+      motionkit.path.PoseMath.distance(solver.forward(flippedCurve.q[i]), flippedFreeRequest.poses[i]),
       0,
       "antipodal authored free orientation does not invalidate the selected path",
       1e-6
@@ -1491,31 +1356,15 @@ class KinematicsTests extends MotionKitTestSupport {
       freeOrientationDistances[1],
       flippedFreeRequest.poses[1],
       OrientationPolicy.Free,
-      [
-        0.0,
-        0.0,
-        0.0
-      ],
-      [
-        0.0,
-        0.0,
-        0.0
-      ]
+      [0.0, 0.0, 0.0],
+      [0.0, 0.0, 0.0]
     );
     var authoredMotion = flippedRefiner.orientationMotion(
       freeOrientationDistances[1],
       flippedFreeRequest.poses[1],
       OrientationPolicy.Free,
-      [
-        1.0,
-        2.0,
-        3.0
-      ],
-      [
-        4.0,
-        5.0,
-        6.0
-      ]
+      [1.0, 2.0, 3.0],
+      [4.0, 5.0, 6.0]
     );
     for (axis in 0...3) {
       near(
@@ -1622,12 +1471,7 @@ class KinematicsTests extends MotionKitTestSupport {
       null,
       0,
       null,
-      new motionkit.robot.StructuredLadder.CoarseSearchOptions(
-        1,
-        1,
-        24,
-        0
-      )
+      new motionkit.robot.StructuredLadder.CoarseSearchOptions(1, 1, 24, 0)
     );
     check(
       coarseSelected.diagnostic == null && coarseSelected.candidates.length == selected.candidates.length,
@@ -1679,12 +1523,7 @@ class KinematicsTests extends MotionKitTestSupport {
     throws(
       function() motionkit.robot.LazyCollisionLadder.selectWithChecks(
         problem,
-        q -> ({
-          a: "arm",
-          b: "fixture",
-          distance: 0.0,
-          required: 0.01
-        })
+        q -> ({a: "arm", b: "fixture", distance: 0.0, required: 0.01})
       ),
       "impossible pinned start reports collision blockage"
     );
@@ -1693,12 +1532,7 @@ class KinematicsTests extends MotionKitTestSupport {
         problem,
         q -> null,
         8,
-        (from, to) -> ({
-          a: "tool",
-          b: "post",
-          distance: 0.0,
-          required: 0.01
-        })
+        (from, to) -> ({a: "tool", b: "post", distance: 0.0, required: 0.01})
       ),
       "sweep blockage cannot return a clear route"
     );
@@ -1715,12 +1549,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var freeStarts = new motionkit.robot.CandidateProblem(
       fixture.arm,
       rerouteRequest,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-        12,
-        3,
-        8,
-        false
-      )
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(12, 3, 8, false)
     );
     var entries = motionkit.robot.StructuredLadder.kBestStarts(freeStarts, 3);
     check(entries.length == 3, "free start retains three complete alternative entries");
@@ -1761,15 +1590,7 @@ class KinematicsTests extends MotionKitTestSupport {
       null,
       null,
       null,
-      (
-        from,
-        to
-      ) -> ({
-        a: "tool",
-        b: "entry-post",
-        distance: 0.0,
-        required: 0.01
-      })
+      (from, to) -> ({a: "tool", b: "entry-post", distance: 0.0, required: 0.01})
     ) catch (error:Dynamic) impossibleEntry = Std.string(error);
     check(
       impossibleEntry.indexOf("entry-post") >= 0 && impossibleEntry.indexOf("sample 0") >= 0,
@@ -1891,12 +1712,7 @@ class KinematicsTests extends MotionKitTestSupport {
       null,
       null,
       null,
-      q -> ({
-        a: "tool",
-        b: "retreat-post",
-        distance: 0.0,
-        required: 0.01
-      })
+      q -> ({a: "tool", b: "retreat-post", distance: 0.0, required: 0.01})
     ) catch (error:Dynamic) impossibleExit = Std.string(error);
     check(
       impossibleExit.indexOf("retreat-post") >= 0 && impossibleExit.indexOf("sample 1") >= 0,
@@ -1953,11 +1769,7 @@ class KinematicsTests extends MotionKitTestSupport {
         0,
         null,
         null,
-        [new motionkit.robot.StructuredLadder.BlockedLadderEdge(
-          0,
-          0,
-          0
-        )]
+        [new motionkit.robot.StructuredLadder.BlockedLadderEdge(0, 0, 0)]
       ),
       "Haxe rejects a nonadjacent blocked edge"
     );
@@ -1967,12 +1779,7 @@ class KinematicsTests extends MotionKitTestSupport {
     return route.candidates[1].q == blockedEndpoint ? new motionkit.robot.LazyCollisionLadder.RefinedCollision(
       1,
       true,
-      {
-        a : "refined-tool",
-        b : "post",
-        distance : 0.0,
-        required : 0.01
-      }
+      {a : "refined-tool", b : "post", distance : 0.0, required : 0.01}
     ) : null;
     });
     check(
@@ -2048,22 +1855,8 @@ class KinematicsTests extends MotionKitTestSupport {
     return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(
       p,
       motionkit.path.OrientationPolicy.Fixed,
-      [
-        -0.75 * p.y,
-        0.75 * p.x,
-        0.0,
-        0.0,
-        0.0,
-        0.75
-      ],
-      [
-        -0.5625 * p.x,
-        -0.5625 * p.y,
-        0.0,
-        0.0,
-        0.0,
-        0.0
-      ]
+      [-0.75 * p.y, 0.75 * p.x, 0.0, 0.0, 0.0, 0.75],
+      [-0.5625 * p.x, -0.5625 * p.y, 0.0, 0.0, 0.0, 0.0]
     );
     });
     for (i in 0...refinedPath.s.length) for (j in 0...start.length) {
@@ -2082,43 +1875,21 @@ class KinematicsTests extends MotionKitTestSupport {
     return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(
       p,
       OrientationPolicy.Fixed,
-      [
-        -0.75 * p.y,
-        0.75 * p.x,
-        0.0,
-        0.0,
-        0.0,
-        0.75
-      ],
-      [
-        -0.5625 * p.x,
-        -0.5625 * p.y,
-        0.0,
-        0.0,
-        0.0,
-        0.0
-      ]
+      [-0.75 * p.y, 0.75 * p.x, 0.0, 0.0, 0.0, 0.75],
+      [-0.5625 * p.x, -0.5625 * p.y, 0.0, 0.0, 0.0, 0.0]
     );
     };
     var sectionProblem = new motionkit.robot.CandidateProblem(
       fixture.arm,
       new PathRequest(
         [0.0, 0.02, 0.04],
-        [for (s in [
-          0.0,
-          0.02,
-          0.04
-        ]) globalTask(s).pose],
+        [for (s in [0.0, 0.02, 0.04]) globalTask(s).pose],
         start,
         request.tolerance,
         request.maxJump,
         request.velocity,
         32,
-        [
-          OrientationPolicy.Fixed,
-          OrientationPolicy.Fixed,
-          OrientationPolicy.Fixed
-        ]
+        [OrientationPolicy.Fixed, OrientationPolicy.Fixed, OrientationPolicy.Fixed]
       ),
       null,
       true
@@ -2154,21 +1925,13 @@ class KinematicsTests extends MotionKitTestSupport {
       fixture.arm,
       new PathRequest(
         [0.0, 0.02, 0.04],
-        [
-          globalTask(0).pose,
-          globalTask(0.02).pose,
-          globalTask(0).pose
-        ],
+        [globalTask(0).pose, globalTask(0.02).pose, globalTask(0).pose],
         start,
         request.tolerance,
         request.maxJump,
         request.velocity,
         32,
-        [
-          OrientationPolicy.Fixed,
-          OrientationPolicy.Fixed,
-          OrientationPolicy.Fixed
-        ]
+        [OrientationPolicy.Fixed, OrientationPolicy.Fixed, OrientationPolicy.Fixed]
       ),
       null,
       true
@@ -2202,10 +1965,7 @@ class KinematicsTests extends MotionKitTestSupport {
     );
     var timed = new ToppraPathTiming().time(
       refinedPath,
-      new PathTimingLimits(
-        [for (_ in start) 1.0],
-        [for (_ in start) 2.0]
-      )
+      new PathTimingLimits([for (_ in start) 1.0], [for (_ in start) 2.0])
     );
     try {
       var duration = timed.trajectory.durationSeconds();
@@ -2252,12 +2012,7 @@ class KinematicsTests extends MotionKitTestSupport {
       [for (_ in start) 1.0],
       [for (_ in start) 2.0],
       [for (_ in start) 20.0],
-      StartTolerances.uniform(
-        start.length,
-        0.02,
-        0.02,
-        0.02
-      ),
+      StartTolerances.uniform(start.length, 0.02, 0.02, 0.02),
       null,
       0.005,
       0.5,
@@ -2327,17 +2082,9 @@ class KinematicsTests extends MotionKitTestSupport {
     serialWorkerPlan.dispose();
     var entryPlanner = new motionkit.robot.StructuredJointPathPlanner(
       fixture.arm,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-        12,
-        3,
-        8,
-        false
-      ),
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(12, 3, 8, false),
       null,
-      new CollisionFixture(
-        fixture.arm,
-        start
-      ).clearance()
+      new CollisionFixture(fixture.arm, start).clearance()
     );
     var entryCompiler = new ProgramCompiler(
       solver,
@@ -2346,12 +2093,7 @@ class KinematicsTests extends MotionKitTestSupport {
       [for (_ in start) 1.0],
       [for (_ in start) 2.0],
       [for (_ in start) 20.0],
-      StartTolerances.uniform(
-        start.length,
-        0.02,
-        0.02,
-        0.02
-      ),
+      StartTolerances.uniform(start.length, 0.02, 0.02, 0.02),
       null,
       0.005,
       0.5,
@@ -2364,11 +2106,7 @@ class KinematicsTests extends MotionKitTestSupport {
       "task",
       [new PoseLine(
         new PoseWaypoint(solver.forward(start), 0.005, 0.02),
-        new PoseWaypoint(
-          solver.forward(end),
-          0.005,
-          0.02
-        ),
+        new PoseWaypoint(solver.forward(end), 0.005, 0.02),
         OrientationPolicy.Interpolated,
         0.1,
         0.1
@@ -2382,11 +2120,7 @@ class KinematicsTests extends MotionKitTestSupport {
         entryPath,
         "task",
         0.1,
-        [new motionkit.event.PathEvent(
-          0.0,
-          "process-on",
-          motionkit.event.EventValue.Digital(true)
-        )]
+        [new motionkit.event.PathEvent(0.0, "process-on", motionkit.event.EventValue.Digital(true))]
       )
     ]);
     var entryCompiled = entryCompiler.compile(entryProgram, current, Int64.ofInt(924));
@@ -2417,17 +2151,9 @@ class KinematicsTests extends MotionKitTestSupport {
     entered.dispose();
     var retreatPlanner = new motionkit.robot.StructuredJointPathPlanner(
       fixture.arm,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-        12,
-        3,
-        8,
-        false
-      ),
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(12, 3, 8, false),
       null,
-      new CollisionFixture(
-        fixture.arm,
-        start
-      ).clearance(),
+      new CollisionFixture(fixture.arm, start).clearance(),
       8,
       false,
       null,
@@ -2440,12 +2166,7 @@ class KinematicsTests extends MotionKitTestSupport {
       [for (_ in start) 1.0],
       [for (_ in start) 2.0],
       [for (_ in start) 20.0],
-      StartTolerances.uniform(
-        start.length,
-        0.02,
-        0.02,
-        0.02
-      ),
+      StartTolerances.uniform(start.length, 0.02, 0.02, 0.02),
       null,
       0.005,
       0.5,
@@ -2485,15 +2206,8 @@ class KinematicsTests extends MotionKitTestSupport {
       "task",
       [new PoseLine(
         new PoseWaypoint(coneStartPose, 1e-6, 1e-6),
-        new PoseWaypoint(
-          coneEndPose,
-          1e-6,
-          1e-6
-        ),
-        motionkit.path.OrientationPolicy.Cone(
-          coneAxis,
-          0.1
-        ),
+        new PoseWaypoint(coneEndPose, 1e-6, 1e-6),
+        motionkit.path.OrientationPolicy.Cone(coneAxis, 0.1),
         0.1,
         0.1
       )]
@@ -2505,12 +2219,7 @@ class KinematicsTests extends MotionKitTestSupport {
       [for (_ in start) 1.0],
       [for (_ in start) 2.0],
       [for (_ in start) 20.0],
-      StartTolerances.uniform(
-        start.length,
-        0.02,
-        0.02,
-        0.02
-      ),
+      StartTolerances.uniform(start.length, 0.02, 0.02, 0.02),
       null,
       0.005,
       0.5,
@@ -2519,11 +2228,7 @@ class KinematicsTests extends MotionKitTestSupport {
       null,
       new motionkit.robot.StructuredJointPathPlanner(
         fixture.arm,
-        new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-          4,
-          1,
-          4
-        )
+        new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4, 1, 4)
       )
     );
     var coneCompiled = coneCompiler.compile(
@@ -2547,10 +2252,7 @@ class KinematicsTests extends MotionKitTestSupport {
       [0.0, 0.02, 0.04],
       [for (s in [0.0, 0.02, 0.04]) solver.forward(cornerQ(s))],
       start,
-      new IkTolerance(
-        1e-6,
-        1e-6
-      ),
+      new IkTolerance(1e-6, 1e-6),
       request.maxJump,
       request.velocity
     );
@@ -2575,14 +2277,7 @@ class KinematicsTests extends MotionKitTestSupport {
     return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(
       p,
       motionkit.path.OrientationPolicy.Fixed,
-      [
-        -rate * p.y,
-        rate * p.x,
-        0.0,
-        0.0,
-        0.0,
-        rate
-      ],
+      [-rate * p.y, rate * p.x, 0.0, 0.0, 0.0, rate],
       acceleration(outgoing),
       acceleration(incoming)
     );
@@ -2653,12 +2348,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var free = new motionkit.robot.CandidateProblem(
       fixture.arm,
       request,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-        4,
-        1,
-        4,
-        false
-      )
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4, 1, 4, false)
     );
     check(free.samples[0].candidates.length > 1, "free-start candidate problem retains the full first layer");
     var toolAxis = fixture.arm.tcpPose(start).transformVector(new Vec3(0, 0, 1)).toArray();
@@ -2670,19 +2360,12 @@ class KinematicsTests extends MotionKitTestSupport {
       [for (_ in start) 0.5],
       [for (_ in start) 1.0],
       1,
-      [motionkit.path.OrientationPolicy.Cone(
-        toolAxis,
-        0.1
-      )]
+      [motionkit.path.OrientationPolicy.Cone(toolAxis, 0.1)]
     );
     var coneProblem = new motionkit.robot.CandidateProblem(
       fixture.arm,
       coneRequest,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-        1,
-        1,
-        1
-      )
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1, 1, 1)
     );
     check(
       coneProblem.samples[0].candidates.length == 1,
@@ -2733,11 +2416,7 @@ class KinematicsTests extends MotionKitTestSupport {
     function target(t:Float):Pose3 {
       var physical = solver.forward(joints(t));
       var rotation = new Quat(physical.qx, physical.qy, physical.qz, physical.qw).multiply(Quat.fromAxisAngle(
-        new Vec3(
-          0,
-          0,
-          1
-        ),
+        new Vec3(0, 0, 1),
         0.7 + 1.2 * t + 0.4 * t * t
       ));
       return new Pose3(physical.x, physical.y, physical.z, rotation.x, rotation.y, rotation.z, rotation.w);
@@ -2759,27 +2438,9 @@ class KinematicsTests extends MotionKitTestSupport {
         joints(t),
         velocity,
         acceleration,
-        [
-          false,
-          false,
-          false,
-          false,
-          false
-        ],
-        [
-          0.0,
-          0,
-          0,
-          0,
-          0
-        ],
-        [
-          0.0,
-          0,
-          0,
-          0,
-          0
-        ],
+        [false, false, false, false, false],
+        [0.0, 0, 0, 0, 0],
+        [0.0, 0, 0, 0, 0],
         1e-6,
         true
       );
@@ -2818,11 +2479,7 @@ class KinematicsTests extends MotionKitTestSupport {
           new Quat(p.qx, p.qy, p.qz, p.qw),
           rates.angular,
           rates.angularSecond,
-          [
-            0.2,
-            0.3,
-            1.0
-          ]
+          [0.2, 0.3, 1.0]
         );
         function projectedPose(s:Float):Pose3 return motionkit.robot.OrientationLattice.centre(
           line.waypointAt(s).pose,
@@ -2880,11 +2537,7 @@ class KinematicsTests extends MotionKitTestSupport {
       var swing = new Quat(-y * Math.sin(tilt / 2) / tilt, x * Math.sin(tilt / 2) / tilt, 0, Math.cos(tilt / 2));
       return Quat.fromAxisAngle(new Vec3(0,
         0, 1), 0.2 + 0.4 * s + 0.05 * s * s).multiply(swing).multiply(Quat.fromAxisAngle(
-          new Vec3(
-            0,
-            0,
-            1
-          ),
+          new Vec3(0, 0, 1),
           0.7 - 0.3 * s + 0.06 * s * s
         ));
     }
@@ -2900,21 +2553,9 @@ class KinematicsTests extends MotionKitTestSupport {
         centre,
         [0.0, 0.0, 0.4 + 0.1 * s],
         [0.0, 0.0, 0.1],
-        new motionkit.robot.RedundancySpline.SplineSample(
-          0.3 + 0.2 * s - 0.03 * s * s,
-          0.2 - 0.06 * s,
-          -0.06
-        ),
-        new motionkit.robot.RedundancySpline.SplineSample(
-          -0.2 + 0.1 * s + 0.04 * s * s,
-          0.1 + 0.08 * s,
-          0.08
-        ),
-        new motionkit.robot.RedundancySpline.SplineSample(
-          0.7 - 0.3 * s + 0.06 * s * s,
-          -0.3 + 0.12 * s,
-          0.12
-        )
+        new motionkit.robot.RedundancySpline.SplineSample(0.3 + 0.2 * s - 0.03 * s * s, 0.2 - 0.06 * s, -0.06),
+        new motionkit.robot.RedundancySpline.SplineSample(-0.2 + 0.1 * s + 0.04 * s * s, 0.1 + 0.08 * s, 0.08),
+        new motionkit.robot.RedundancySpline.SplineSample(0.7 - 0.3 * s + 0.06 * s * s, -0.3 + 0.12 * s, 0.12)
       );
       var expected = rotationAt(s), actual = motion.rotation;
       near(
@@ -2938,21 +2579,9 @@ class KinematicsTests extends MotionKitTestSupport {
       Quat.identity(),
       [0.0, 0.0, 0.0],
       [0.0, 0.0, 0.0],
-      new motionkit.robot.RedundancySpline.SplineSample(
-        0,
-        0.2,
-        0.1
-      ),
-      new motionkit.robot.RedundancySpline.SplineSample(
-        0,
-        0.3,
-        -0.2
-      ),
-      new motionkit.robot.RedundancySpline.SplineSample(
-        0,
-        0.4,
-        0.5
-      )
+      new motionkit.robot.RedundancySpline.SplineSample(0, 0.2, 0.1),
+      new motionkit.robot.RedundancySpline.SplineSample(0, 0.3, -0.2),
+      new motionkit.robot.RedundancySpline.SplineSample(0, 0.4, 0.5)
     );
     for (axis in 0...3) {
       near(zero.velocity[axis], [-0.3, 0.2, 0.4][axis], "zero swing has finite exact angular rates", 1e-12);
@@ -3027,12 +2656,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var drives = new motionkit.kinematics.PathDriveLimits([0.0004], [for (_ in knots) 0.01]);
     var pins = [
       motionkit.robot.DriveAwareRefinement.bound(0, [1.0], 0, 0),
-      motionkit.robot.DriveAwareRefinement.bound(
-        knots.length - 1,
-        [1.0],
-        1,
-        1
-      )
+      motionkit.robot.DriveAwareRefinement.bound(knots.length - 1, [1.0], 1, 1)
     ];
     var constrained = motionkit.robot.DriveAwareRefinement.fit(
       knots,
@@ -3105,19 +2729,13 @@ class KinematicsTests extends MotionKitTestSupport {
     var almostOpposite = rotation.rotate(new Vec3(1e-5, 0, -1).normalized()).toArray();
     var almostFlipped = motionkit.robot.OrientationLattice.centre(
       target,
-      motionkit.path.OrientationPolicy.Cone(
-        almostOpposite,
-        0.0
-      )
+      motionkit.path.OrientationPolicy.Cone(almostOpposite, 0.0)
     );
     near(
       motionkit.robot.ToolFreedom.orientationError(
         almostFlipped,
         target,
-        motionkit.path.OrientationPolicy.Cone(
-          almostOpposite,
-          0.0
-        )
+        motionkit.path.OrientationPolicy.Cone(almostOpposite, 0.0)
       ),
       0,
       "cone axis alignment remains accurate near the antipodal case",
@@ -3132,10 +2750,7 @@ class KinematicsTests extends MotionKitTestSupport {
       motionkit.robot.ToolFreedom.orientationError(
         flipped,
         target,
-        motionkit.path.OrientationPolicy.Cone(
-          opposite,
-          0.2
-        )
+        motionkit.path.OrientationPolicy.Cone(opposite, 0.2)
       ),
       0,
       "cone centre handles the antipodal axis",
@@ -3146,14 +2761,7 @@ class KinematicsTests extends MotionKitTestSupport {
       motionkit.path.OrientationPolicy.Fixed,
       motionkit.path.OrientationPolicy.FreeAboutTool,
       motionkit.path.OrientationPolicy.Free,
-      motionkit.path.OrientationPolicy.Cone(
-        [
-          0.3,
-          0.4,
-          0.5
-        ],
-        0.4
-      )
+      motionkit.path.OrientationPolicy.Cone([0.3, 0.4, 0.5], 0.4)
     ]) {
       var cells = motionkit.robot.OrientationLattice.sample(target, freedom);
       var expected = switch freedom {
@@ -3226,36 +2834,16 @@ class KinematicsTests extends MotionKitTestSupport {
       [0.0, 0.2],
       [rollSolver.forward(rollStart), rollSolver.forward(rollEnd)],
       rollStart,
-      new IkTolerance(
-        1e-6,
-        1e-6
-      ),
-      [
-        1.0,
-        1.0,
-        1.0,
-        2.0
-      ],
-      [
-        1.0,
-        1.0,
-        1.0,
-        1.0
-      ],
+      new IkTolerance(1e-6, 1e-6),
+      [1.0, 1.0, 1.0, 2.0],
+      [1.0, 1.0, 1.0, 1.0],
       32,
-      [
-        motionkit.path.OrientationPolicy.FreeAboutTool,
-        motionkit.path.OrientationPolicy.FreeAboutTool
-      ]
+      [motionkit.path.OrientationPolicy.FreeAboutTool, motionkit.path.OrientationPolicy.FreeAboutTool]
     );
     var rollProblem = new motionkit.robot.CandidateProblem(
       rollGroup,
       rollRequest,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-        4,
-        1,
-        1
-      )
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4, 1, 1)
     );
     var partitionProblem = new motionkit.robot.CandidateProblem(
       rollGroup,
@@ -3264,22 +2852,12 @@ class KinematicsTests extends MotionKitTestSupport {
         rollRequest.poses,
         rollStart,
         rollRequest.tolerance,
-        [
-          1.0,
-          1.0,
-          1.0,
-          0.1
-        ],
+        [1.0, 1.0, 1.0, 0.1],
         rollRequest.velocity,
         32,
         rollRequest.freedoms
       ),
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-        4,
-        1,
-        1,
-        false
-      )
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4, 1, 1, false)
     );
     // Small joint drift crosses a bin boundary near zero without separating
     // its physical component. Packet partitioning must match the full graph.
@@ -3419,28 +2997,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var mixedTrajectory = Trajectory.fromSegments([{
       timeFromStartNs: Int64.ofInt(0),
       durationNs: Trajectory.nanoseconds(1.0),
-      coefficients: [
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
-        [
-          -0.04,
-          0.08,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0
-        ]
-      ]
+      coefficients: [[0.0, 0.0, 0.0], [-0.04, 0.08, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
     }]);
     var mixedPlanner = new motionkit.robot.StructuredJointPathPlanner(
       rollGroup,
@@ -3484,11 +3041,7 @@ class KinematicsTests extends MotionKitTestSupport {
       "task",
       [new PoseLine(
         new PoseWaypoint(rollSolver.forward(policyFrom), 1e-6, 1e-6),
-        new PoseWaypoint(
-          rollSolver.forward(policyTo),
-          1e-6,
-          1e-6
-        ),
+        new PoseWaypoint(rollSolver.forward(policyTo), 1e-6, 1e-6),
         OrientationPolicy.Fixed,
         0.1,
         0.1
@@ -3499,22 +3052,9 @@ class KinematicsTests extends MotionKitTestSupport {
       mixedDistances,
       [for (s in mixedDistances) mixedPath.poseAt(s)],
       policyFrom,
-      new IkTolerance(
-        1e-6,
-        1e-6
-      ),
-      [
-        1.0,
-        1.0,
-        1.0,
-        1.0
-      ],
-      [
-        1.0,
-        1.0,
-        1.0,
-        1.0
-      ],
+      new IkTolerance(1e-6, 1e-6),
+      [1.0, 1.0, 1.0, 1.0],
+      [1.0, 1.0, 1.0, 1.0],
       32,
       [for (_ in mixedDistances) OrientationPolicy.Fixed]
     );
@@ -3523,11 +3063,7 @@ class KinematicsTests extends MotionKitTestSupport {
         "task",
         [new PoseLine(
           new PoseWaypoint(rollSolver.forward(policyFrom), 1e-6, 1e-6),
-          new PoseWaypoint(
-            rollSolver.forward(rollStart),
-            1e-6,
-            1e-6
-          ),
+          new PoseWaypoint(rollSolver.forward(rollStart), 1e-6, 1e-6),
           OrientationPolicy.Fixed,
           0.1,
           0.1
@@ -3536,16 +3072,8 @@ class KinematicsTests extends MotionKitTestSupport {
       new PosePath(
         "task",
         [new PoseLine(
-          new PoseWaypoint(
-            rollSolver.forward(rollStart),
-            1e-6,
-            1e-6
-          ),
-          new PoseWaypoint(
-            rollSolver.forward(policyTo),
-            1e-6,
-            1e-6
-          ),
+          new PoseWaypoint(rollSolver.forward(rollStart), 1e-6, 1e-6),
+          new PoseWaypoint(rollSolver.forward(policyTo), 1e-6, 1e-6),
           OrientationPolicy.Fixed,
           0.1,
           0.1
@@ -3568,32 +3096,13 @@ class KinematicsTests extends MotionKitTestSupport {
         mixedSections,
         new PathRequest(
           [0.0, 0.08],
-          [
-            rollSolver.forward(policyFrom),
-            rollSolver.forward(policyTo)
-          ],
+          [rollSolver.forward(policyFrom), rollSolver.forward(policyTo)],
           policyFrom,
-          new IkTolerance(
-            1e-6,
-            1e-6
-          ),
-          [
-            1.0,
-            1.0,
-            1.0,
-            1.0
-          ],
-          [
-            1.0,
-            1.0,
-            1.0,
-            1.0
-          ],
+          new IkTolerance(1e-6, 1e-6),
+          [1.0, 1.0, 1.0, 1.0],
+          [1.0, 1.0, 1.0, 1.0],
           32,
-          [
-            OrientationPolicy.Fixed,
-            OrientationPolicy.Fixed
-          ]
+          [OrientationPolicy.Fixed, OrientationPolicy.Fixed]
         )
       ),
       "whole-route planning requires sampled timing stops"
@@ -3610,22 +3119,9 @@ class KinematicsTests extends MotionKitTestSupport {
       joinedCurves[0].s,
       [for (distance in joinedCurves[0].s) mixedSections[0].poseAt(distance)],
       joinedCurves[0].q[0],
-      new IkTolerance(
-        1e-6,
-        1e-6
-      ),
-      [
-        1.0,
-        1.0,
-        1.0,
-        1.0
-      ],
-      [
-        1.0,
-        1.0,
-        1.0,
-        1.0
-      ],
+      new IkTolerance(1e-6, 1e-6),
+      [1.0, 1.0, 1.0, 1.0],
+      [1.0, 1.0, 1.0, 1.0],
       32,
       [for (_ in joinedCurves[0].s) OrientationPolicy.Fixed]
     );
@@ -3682,30 +3178,10 @@ class KinematicsTests extends MotionKitTestSupport {
       rollSolver,
       new ValidationLimits(4, Int64.ofInt(1), Int64.ofInt(0)),
       "task",
-      [
-        1.0,
-        1.0,
-        1.0,
-        1.0
-      ],
-      [
-        2.0,
-        2.0,
-        2.0,
-        2.0
-      ],
-      [
-        20.0,
-        20.0,
-        20.0,
-        20.0
-      ],
-      StartTolerances.uniform(
-        4,
-        0.01,
-        0.01,
-        0.01
-      ),
+      [1.0, 1.0, 1.0, 1.0],
+      [2.0, 2.0, 2.0, 2.0],
+      [20.0, 20.0, 20.0, 20.0],
+      StartTolerances.uniform(4, 0.01, 0.01, 0.01),
       null,
       0.02,
       1.0,
@@ -3756,21 +3232,8 @@ class KinematicsTests extends MotionKitTestSupport {
       [
         mixedSections[0].primitives[0],
         new PoseLine(
-          new PoseWaypoint(
-            rollSolver.forward(rollStart),
-            1e-6,
-            1e-6
-          ),
-          new PoseWaypoint(
-            rollSolver.forward([
-              0.04,
-              0.0,
-              0.0,
-              0.0
-            ]),
-            1e-6,
-            1e-6
-          ),
+          new PoseWaypoint(rollSolver.forward(rollStart), 1e-6, 1e-6),
+          new PoseWaypoint(rollSolver.forward([0.04, 0.0, 0.0, 0.0]), 1e-6, 1e-6),
           OrientationPolicy.Fixed,
           0.1,
           0.1
@@ -3781,30 +3244,10 @@ class KinematicsTests extends MotionKitTestSupport {
       rollSolver,
       new ValidationLimits(4, Int64.ofInt(1), Int64.ofInt(0)),
       "task",
-      [
-        1.0,
-        1.0,
-        1.0,
-        1.0
-      ],
-      [
-        2.0,
-        2.0,
-        2.0,
-        2.0
-      ],
-      [
-        20.0,
-        20.0,
-        20.0,
-        20.0
-      ],
-      StartTolerances.uniform(
-        4,
-        0.01,
-        0.01,
-        0.01
-      ),
+      [1.0, 1.0, 1.0, 1.0],
+      [2.0, 2.0, 2.0, 2.0],
+      [20.0, 20.0, 20.0, 20.0],
+      StartTolerances.uniform(4, 0.01, 0.01, 0.01),
       null,
       0.01,
       1.0,
@@ -3818,16 +3261,8 @@ class KinematicsTests extends MotionKitTestSupport {
       "task",
       0.1,
       [
-        new motionkit.event.PathEvent(
-          0.04,
-          "corner-marker",
-          motionkit.event.EventValue.Digital(true)
-        ),
-        new motionkit.event.PathEvent(
-          0.08,
-          "end-marker",
-          motionkit.event.EventValue.Digital(true)
-        )
+        new motionkit.event.PathEvent(0.04, "corner-marker", motionkit.event.EventValue.Digital(true)),
+        new motionkit.event.PathEvent(0.08, "end-marker", motionkit.event.EventValue.Digital(true))
       ]
     )]);
     var cornerCompiled = cornerCompiler.compile(cornerProgram, policyFrom, Int64.ofInt(940));
@@ -3873,28 +3308,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var excursion = Trajectory.fromSegments([{
       timeFromStartNs: Int64.ofInt(0),
       durationNs: Trajectory.nanoseconds(1.0),
-      coefficients: [
-        [
-          0.0,
-          0.8,
-          -0.8
-        ],
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0
-        ]
-      ]
+      coefficients: [[0.0, 0.8, -0.8], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
     }]);
     check(
       rollWorld.sweep(excursion.evaluate(0.0).positions, excursion.evaluate(1.0).positions) == null,
@@ -3915,15 +3329,7 @@ class KinematicsTests extends MotionKitTestSupport {
       "task",
       [new PoseLine(
         new PoseWaypoint(new Pose3(0.2, 0.1, 0.0), 1e-6, 1e-6),
-        new PoseWaypoint(
-          new Pose3(
-            0.21,
-            0.1,
-            0.0
-          ),
-          1e-6,
-          1e-6
-        ),
+        new PoseWaypoint(new Pose3(0.21, 0.1, 0.0), 1e-6, 1e-6),
         OrientationPolicy.FreeAboutTool,
         0.1,
         0.1
@@ -3931,12 +3337,7 @@ class KinematicsTests extends MotionKitTestSupport {
     );
     var physicalEntryPlanner = new motionkit.robot.StructuredJointPathPlanner(
       rollGroup,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-        4,
-        1,
-        1,
-        false
-      ),
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4, 1, 1, false),
       null,
       entryWorld,
       4,
@@ -3948,30 +3349,10 @@ class KinematicsTests extends MotionKitTestSupport {
       rollSolver,
       new ValidationLimits(4, Int64.ofInt(1), Int64.ofInt(0)),
       "task",
-      [
-        1.0,
-        1.0,
-        1.0,
-        1.0
-      ],
-      [
-        2.0,
-        2.0,
-        2.0,
-        2.0
-      ],
-      [
-        20.0,
-        20.0,
-        20.0,
-        20.0
-      ],
-      StartTolerances.uniform(
-        4,
-        0.01,
-        0.01,
-        0.01
-      ),
+      [1.0, 1.0, 1.0, 1.0],
+      [2.0, 2.0, 2.0, 2.0],
+      [20.0, 20.0, 20.0, 20.0],
+      StartTolerances.uniform(4, 0.01, 0.01, 0.01),
       null,
       0.005,
       2.0,
@@ -3984,40 +3365,15 @@ class KinematicsTests extends MotionKitTestSupport {
       entryCurrent,
       [0.0, 0.0, 0.0, 0.0],
       [0.0, 0.0, 0.0, 0.0],
-      [
-        0.2,
-        0.1,
-        0.0,
-        0.0
-      ],
-      [
-        1.0,
-        1.0,
-        1.0,
-        1.0
-      ],
-      [
-        2.0,
-        2.0,
-        2.0,
-        2.0
-      ],
-      [
-        20.0,
-        20.0,
-        20.0,
-        20.0
-      ]
+      [0.2, 0.1, 0.0, 0.0],
+      [1.0, 1.0, 1.0, 1.0],
+      [2.0, 2.0, 2.0, 2.0],
+      [20.0, 20.0, 20.0, 20.0]
     );
     check(physicalEntryPlanner.checkMotion(rejectedEntry) != null, "cheapest generated entry is physically blocked");
     rejectedEntry.dispose();
     var physicalEntryPlan = physicalEntryCompiler.compile(
-      new MotionProgram([MotionOp.FollowPath(
-        entryPath,
-        "task",
-        0.1,
-        []
-      )]),
+      new MotionProgram([MotionOp.FollowPath(entryPath, "task", 0.1, [])]),
       entryCurrent,
       Int64.ofInt(950)
     );
@@ -4069,11 +3425,7 @@ class KinematicsTests extends MotionKitTestSupport {
       "task",
       [new PoseLine(
         new PoseWaypoint(rollRequest.poses[0], 1e-6, 1e-6),
-        new PoseWaypoint(
-          rollRequest.poses[1],
-          1e-6,
-          1e-6
-        ),
+        new PoseWaypoint(rollRequest.poses[1], 1e-6, 1e-6),
         motionkit.path.OrientationPolicy.FreeAboutTool,
         0.1,
         0.1
@@ -4082,11 +3434,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var plannerWeights = [0.1, 0.1, 0.1, 1.0];
     var physicalPlanner = new motionkit.robot.StructuredJointPathPlanner(
       rollGroup,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-        4,
-        1,
-        1
-      ),
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4, 1, 1),
       null,
       rollWorld,
       3,
@@ -4114,30 +3462,10 @@ class KinematicsTests extends MotionKitTestSupport {
       rollSolver,
       new ValidationLimits(4, Int64.ofInt(1), Int64.ofInt(0)),
       "task",
-      [
-        1.0,
-        1.0,
-        1.0,
-        1.0
-      ],
-      [
-        2.0,
-        2.0,
-        2.0,
-        2.0
-      ],
-      [
-        20.0,
-        20.0,
-        20.0,
-        20.0
-      ],
-      StartTolerances.uniform(
-        4,
-        0.01,
-        0.01,
-        0.01
-      ),
+      [1.0, 1.0, 1.0, 1.0],
+      [2.0, 2.0, 2.0, 2.0],
+      [20.0, 20.0, 20.0, 20.0],
+      StartTolerances.uniform(4, 0.01, 0.01, 0.01),
       null,
       0.005,
       2.0,
@@ -4153,11 +3481,7 @@ class KinematicsTests extends MotionKitTestSupport {
     );
     var finalFailure = "";
     try finalCompiler.compile(
-      new MotionProgram([MotionOp.MoveJ(
-        MoveTarget.JointTarget(unsafeEnd),
-        new MotionOptions(),
-        Blend.ExactStop
-      )]),
+      new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(unsafeEnd), new MotionOptions(), Blend.ExactStop)]),
       rollStart,
       Int64.ofInt(960)
     ) catch (error:Dynamic) finalFailure = Std.string(error);
@@ -4385,26 +3709,8 @@ class KinematicsTests extends MotionKitTestSupport {
     var decimalPath = new motionkit.path.PosePath(
       "task",
       [
-        new PoseLine(
-          waypoint(0, 0),
-          waypoint(0.1, 0),
-          motionkit.path.OrientationPolicy.Fixed,
-          0.1,
-          0.1
-        ),
-        new PoseLine(
-          waypoint(
-            0.1,
-            0
-          ),
-          waypoint(
-            0.1,
-            0.2
-          ),
-          motionkit.path.OrientationPolicy.Fixed,
-          0.1,
-          0.1
-        )
+        new PoseLine(waypoint(0, 0), waypoint(0.1, 0), motionkit.path.OrientationPolicy.Fixed, 0.1, 0.1),
+        new PoseLine(waypoint(0.1, 0), waypoint(0.1, 0.2), motionkit.path.OrientationPolicy.Fixed, 0.1, 0.1)
       ]
     );
     var decimalEnd = new motionkit.robot.PosePathRefinement(decimalPath).at(decimalPath.length());
@@ -4452,11 +3758,7 @@ class KinematicsTests extends MotionKitTestSupport {
           "task",
           [new PoseLine(
             new PoseWaypoint(from, 1e-6, 1e-6),
-            new PoseWaypoint(
-              to,
-              1e-6,
-              1e-6
-            ),
+            new PoseWaypoint(to, 1e-6, 1e-6),
             OrientationPolicy.Fixed,
             0.08,
             0.08
@@ -4471,17 +3773,10 @@ class KinematicsTests extends MotionKitTestSupport {
           [from, to],
           start,
           new IkTolerance(1e-6, 1e-6),
-          [
-            1.0,
-            1.0,
-            1.0
-          ],
+          [1.0, 1.0, 1.0],
           speed,
           32,
-          [
-            OrientationPolicy.Fixed,
-            OrientationPolicy.Fixed
-          ],
+          [OrientationPolicy.Fixed, OrientationPolicy.Fixed],
           cap
         );
         var planner = new motionkit.robot.StructuredJointPathPlanner(group), curve = planner.plan(airPath, airRequest);
@@ -4509,15 +3804,7 @@ class KinematicsTests extends MotionKitTestSupport {
             0.001
           ),
           new PoseWaypoint(
-            new Pose3(
-              from.x + 0.02,
-              from.y + 0.02,
-              from.z,
-              from.qx,
-              from.qy,
-              from.qz,
-              from.qw
-            ),
+            new Pose3(from.x + 0.02, from.y + 0.02, from.z, from.qx, from.qy, from.qz, from.qw),
             0.0001,
             0.001
           ),
@@ -4530,20 +3817,9 @@ class KinematicsTests extends MotionKitTestSupport {
           taskArcDistances,
           [for (s in taskArcDistances) taskArcPath.poseAt(s)],
           start,
-          new IkTolerance(
-            1e-6,
-            1e-6
-          ),
-          [
-            1.0,
-            1.0,
-            1.0
-          ],
-          [
-            1.0,
-            1.0,
-            1.0
-          ]
+          new IkTolerance(1e-6, 1e-6),
+          [1.0, 1.0, 1.0],
+          [1.0, 1.0, 1.0]
         );
         var taskArcCurve = planner.plan(taskArcPath,
           taskArcRequest), taskArcProof = motionkit.robot.JointCurveTask.prove(
@@ -4557,10 +3833,7 @@ class KinematicsTests extends MotionKitTestSupport {
         for (span in 0...taskArcCurve.s.length - 1) for (piece in 0...5) {
           var fraction = piece / 4.0;
           var taskArcQ = motionkit.planner.JointPathPolynomial.at(
-            motionkit.planner.JointPathPolynomial.coefficients(
-              taskArcCurve,
-              span
-            ),
+            motionkit.planner.JointPathPolynomial.coefficients(taskArcCurve, span),
             fraction
           );
           var taskArcDistance = taskArcCurve.s[span] + fraction * (taskArcCurve.s[span + 1] - taskArcCurve.s[span]);
@@ -4575,24 +3848,11 @@ class KinematicsTests extends MotionKitTestSupport {
           [from, to],
           start,
           new IkTolerance(1e-6, 1e-6),
-          [
-            1.0,
-            1.0,
-            1.0
-          ],
+          [1.0, 1.0, 1.0],
           speed,
           32,
-          [
-            OrientationPolicy.Fixed,
-            OrientationPolicy.Fixed
-          ],
-          new motionkit.kinematics.PathDriveLimits(
-            acceleration,
-            [
-              0.08,
-              0.08
-            ]
-          )
+          [OrientationPolicy.Fixed, OrientationPolicy.Fixed],
+          new motionkit.kinematics.PathDriveLimits(acceleration, [0.08, 0.08])
         );
         throws(
           function() planner.plan(airPath, fixedRequest),
@@ -4617,10 +3877,7 @@ class KinematicsTests extends MotionKitTestSupport {
       var markedCandidates = markedSampler.sample(markedTarget, markedQ, motionkit.path.OrientationPolicy.Fixed);
       check(markedCandidates.length > 0, "complete Cartesian chain exports despite external markers");
       for (candidate in markedCandidates) near(
-        motionkit.path.PoseMath.distance(
-          new ManipulatorKinematics(marked).forward(candidate.q),
-          markedTarget
-        ),
+        motionkit.path.PoseMath.distance(new ManipulatorKinematics(marked).forward(candidate.q), markedTarget),
         0,
         "marked Cartesian native candidates satisfy compiled FK",
         1e-7
@@ -4642,15 +3899,9 @@ class KinematicsTests extends MotionKitTestSupport {
       refinedEnd[0] += 0.02;
       var refineRequest = new PathRequest(
         [0.0, 0.04],
-        [
-          markedTarget,
-          new ManipulatorKinematics(marked).forward(refinedEnd)
-        ],
+        [markedTarget, new ManipulatorKinematics(marked).forward(refinedEnd)],
         markedQ,
-        new IkTolerance(
-          1e-6,
-          1e-6
-        ),
+        new IkTolerance(1e-6, 1e-6),
         [for (_ in markedQ) 0.5],
         [for (_ in markedQ) 1.0]
       );
@@ -4698,10 +3949,7 @@ class KinematicsTests extends MotionKitTestSupport {
         [0.0, authoredPath.length()],
         [markedTarget, delta],
         markedQ,
-        new IkTolerance(
-          1e-6,
-          1e-6
-        ),
+        new IkTolerance(1e-6, 1e-6),
         [for (_ in markedQ) 0.5],
         [for (_ in markedQ) 1.0]
       );
@@ -4718,10 +3966,7 @@ class KinematicsTests extends MotionKitTestSupport {
       var certifiedTask:motionkit.robot.JointCurveTask = cast taskProof;
       for (span in 0...authoredSamples.s.length - 1) for (piece in 0...5) {
         var at = piece / 4.0, actualQ = motionkit.planner.JointPathPolynomial.at(
-          motionkit.planner.JointPathPolynomial.coefficients(
-            authoredSamples,
-            span
-          ),
+          motionkit.planner.JointPathPolynomial.coefficients(authoredSamples, span),
           at
         );
         var desiredPose = authoredPath.poseAt(authoredSamples.s[span]
@@ -4754,10 +3999,7 @@ class KinematicsTests extends MotionKitTestSupport {
         plannedDistances,
         [for (s in plannedDistances) authoredPath.poseAt(s)],
         markedQ,
-        new IkTolerance(
-          1e-6,
-          1e-6
-        ),
+        new IkTolerance(1e-6, 1e-6),
         [for (_ in markedQ) 0.5],
         [for (_ in markedQ) 1.0]
       );
@@ -4784,15 +4026,7 @@ class KinematicsTests extends MotionKitTestSupport {
       var plannerSolver = new ManipulatorKinematics(marked);
       var ignoredRotation = Quat.fromAxisAngle(new Vec3(1, 2, 3).normalized(), 0.73);
       function freeWaypoint(p:Pose3):PoseWaypoint return new PoseWaypoint(
-        new Pose3(
-          p.x,
-          p.y,
-          p.z,
-          ignoredRotation.x,
-          ignoredRotation.y,
-          ignoredRotation.z,
-          ignoredRotation.w
-        ),
+        new Pose3(p.x, p.y, p.z, ignoredRotation.x, ignoredRotation.y, ignoredRotation.z, ignoredRotation.w),
         1e-6,
         1e-6
       );
@@ -4813,17 +4047,11 @@ class KinematicsTests extends MotionKitTestSupport {
           freeCartesianDistances,
           [for (s in freeCartesianDistances) freeCartesianPath.poseAt(s)],
           markedQ,
-          new IkTolerance(
-            1e-6,
-            1e-6
-          ),
+          new IkTolerance(1e-6, 1e-6),
           [for (_ in markedQ) 0.5],
           [for (_ in markedQ) 1.0],
           32,
-          [
-            OrientationPolicy.Free,
-            OrientationPolicy.Free
-          ]
+          [OrientationPolicy.Free, OrientationPolicy.Free]
         )
       );
       for (i in 0...2) {
@@ -4851,12 +4079,7 @@ class KinematicsTests extends MotionKitTestSupport {
         [for (_ in markedQ) 1.0],
         [for (_ in markedQ) 2.0],
         [for (_ in markedQ) 20.0],
-        StartTolerances.uniform(
-          count,
-          0.02,
-          0.02,
-          0.02
-        ),
+        StartTolerances.uniform(count, 0.02, 0.02, 0.02),
         null,
         0.01,
         0.5,
@@ -4886,15 +4109,9 @@ class KinematicsTests extends MotionKitTestSupport {
         rotaryEnd[3] += 0.5 * 0.04 + 0.2 * 0.04 * 0.04;
         var rotaryRequest = new PathRequest(
           [0.0, 0.04],
-          [
-            markedTarget,
-            new ManipulatorKinematics(marked).forward(rotaryEnd)
-          ],
+          [markedTarget, new ManipulatorKinematics(marked).forward(rotaryEnd)],
           markedQ,
-          new IkTolerance(
-            1e-6,
-            1e-6
-          ),
+          new IkTolerance(1e-6, 1e-6),
           [for (_ in markedQ) 0.5],
           [for (_ in markedQ) 1.0]
         );
@@ -4909,22 +4126,8 @@ class KinematicsTests extends MotionKitTestSupport {
         return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(
           p,
           motionkit.path.OrientationPolicy.Fixed,
-          [
-            -rate * y,
-            rate * x,
-            0.0,
-            0.0,
-            0.0,
-            rate
-          ],
-          [
-            -rate * rate * x - 0.4 * y,
-            -rate * rate * y + 0.4 * x,
-            0.0,
-            0.0,
-            0.0,
-            0.4
-          ]
+          [-rate * y, rate * x, 0.0, 0.0, 0.0, rate],
+          [-rate * rate * x - 0.4 * y, -rate * rate * y + 0.4 * x, 0.0, 0.0, 0.0, 0.4]
         );
         });
         for (i in 0...11) for (j in 0...count) {
@@ -4951,10 +4154,7 @@ class KinematicsTests extends MotionKitTestSupport {
         for (policy in [
           motionkit.path.OrientationPolicy.Fixed,
           motionkit.path.OrientationPolicy.FreeAboutTool,
-          motionkit.path.OrientationPolicy.Cone(
-            axis,
-            0.1
-          )
+          motionkit.path.OrientationPolicy.Cone(axis, 0.1)
         ]) {
           var candidates = sampler.sample(target, q, policy, 4, 1, 4), found = false;
           for (candidate in candidates) {
@@ -5033,14 +4233,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var counted = motionkit.kinematics.SixAxisConfiguration.of(
       "EAIK",
       0,
-      [
-        -2 * Math.PI - 0.1,
-        -Math.PI,
-        Math.PI,
-        2 * Math.PI + 0.1,
-        0,
-        4 * Math.PI + 0.2
-      ]
+      [-2 * Math.PI - 0.1, -Math.PI, Math.PI, 2 * Math.PI + 0.1, 0, 4 * Math.PI + 0.2]
     );
     check(
       haxe.Json.stringify(counted.turns) == "[-1,0,1,1,0,2]",
@@ -5064,11 +4257,7 @@ class KinematicsTests extends MotionKitTestSupport {
       [0.0, 0.0, 0.705],
       [-0.135, 0.0, 0.755],
       [0.0, 0.0, 0.0],
-      [
-        0.0,
-        0.0,
-        0.0
-      ]
+      [0.0, 0.0, 0.0]
     ];
     var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
     for (index in 0...6) {
@@ -5171,12 +4360,7 @@ class KinematicsTests extends MotionKitTestSupport {
       [for (_ in 0...6) 2.0],
       [for (_ in 0...6) 4.0],
       [for (_ in 0...6) 20.0],
-      StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      ),
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02),
       null,
       0.01,
       0.5,
@@ -5206,21 +4390,9 @@ class KinematicsTests extends MotionKitTestSupport {
         [0.0, 0.0, 0.0],
         [values[0], values[2], values[3]],
         [0.0, 0.0, values[4]],
-        [
-          values[1],
-          0.0,
-          values[5]
-        ],
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0
-        ]
+        [values[1], 0.0, values[5]],
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0]
       ];
       for (index in 0...6) {
         var direction = index == 0 || index == 3 || index == 5 ? new Vec3(0.0, 0.0, 1.0) : new Vec3(0.0, 1.0, 0.0);
@@ -5248,53 +4420,25 @@ class KinematicsTests extends MotionKitTestSupport {
       "ABB IRB2400",
       [0.1, -0.135, 0.0, 0.615, 0.705, 0.755, 0.085],
       [0.0, 0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0],
-      [
-        1,
-        1,
-        1,
-        1,
-        1,
-        1
-      ]
+      [1, 1, 1, 1, 1, 1]
     );
     published(
       "KUKA KR6",
       [0.025, -0.035, 0.0, 0.4, 0.315, 0.365, 0.08],
       [0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0, 0.0],
-      [
-        -1,
-        1,
-        1,
-        -1,
-        1,
-        -1
-      ]
+      [-1, 1, 1, -1, 1, -1]
     );
     published(
       "Fanuc R2000",
       [0.72, -0.225, 0.0, 0.6, 1.075, 1.28, 0.235],
       [0.0, 0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0],
-      [
-        1,
-        1,
-        1,
-        1,
-        1,
-        1
-      ]
+      [1, 1, 1, 1, 1, 1]
     );
     published(
       "Stäubli TX40",
       [0.0, 0.0, 0.035, 0.32, 0.225, 0.225, 0.065],
       [0.0, 0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0],
-      [
-        1,
-        1,
-        1,
-        1,
-        1,
-        1
-      ]
+      [1, 1, 1, 1, 1, 1]
     );
     // Equivalent joint frames with displaced axis origins and a placed q=0:
     // extraction must use axis lines rather than a particular frame convention.
@@ -5348,15 +4492,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var pinned = new motionkit.robot.CandidateProblem(
       wrappedArm,
       pinRequest,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-        1,
-        1,
-        1,
-        true,
-        null,
-        null,
-        pin
-      )
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1, 1, 1, true, null, null, pin)
     );
     for (layer in pinned.samples) {
       check(layer.candidates.length > 0, "configuration-pinned ladder retains the authored branch");
@@ -5382,22 +4518,12 @@ class KinematicsTests extends MotionKitTestSupport {
       [for (_ in 0...6) 2.0],
       [for (_ in 0...6) 4.0],
       [for (_ in 0...6) 20.0],
-      StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      )
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02)
     );
     var nextPinned = wrappedQ.copy();
     nextPinned[0] += 0.01;
     var pinnedProgram = new MotionProgram(
-      [MotionOp.MoveL(
-        wrappedAnalytic.forward(nextPinned),
-        "work",
-        0.1,
-        Blend.ExactStop
-      )],
+      [MotionOp.MoveL(wrappedAnalytic.forward(nextPinned), "work", 0.1, Blend.ExactStop)],
       pin
     );
     var pinnedCompilation = pinnedCompiler.compile(pinnedProgram, wrappedQ, Int64.ofInt(910));
@@ -5410,11 +4536,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var pinnedPoseMove = pinnedCompiler.compile(
       new MotionProgram(
         [MotionOp.MoveJ(
-          MoveTarget.PoseTarget(
-            wrappedAnalytic.forward(nextPinned),
-            "work",
-            null
-          ),
+          MoveTarget.PoseTarget(wrappedAnalytic.forward(nextPinned), "work", null),
           new MotionOptions(),
           Blend.ExactStop
         )],
@@ -5428,16 +4550,8 @@ class KinematicsTests extends MotionKitTestSupport {
     var retainedPath = new motionkit.path.PosePath(
       "work",
       [new motionkit.path.PoseLine(
-        new motionkit.path.PoseWaypoint(
-          wrappedTarget,
-          1e-6,
-          1e-6
-        ),
-        new motionkit.path.PoseWaypoint(
-          wrappedAnalytic.forward(nextPinned),
-          1e-6,
-          1e-6
-        ),
+        new motionkit.path.PoseWaypoint(wrappedTarget, 1e-6, 1e-6),
+        new motionkit.path.PoseWaypoint(wrappedAnalytic.forward(nextPinned), 1e-6, 1e-6),
         OrientationPolicy.Interpolated,
         0.01,
         0.1
@@ -5445,15 +4559,9 @@ class KinematicsTests extends MotionKitTestSupport {
     );
     var retainedRequest = new PathRequest(
       [0.0, retainedPath.length()],
-      [
-        wrappedTarget,
-        wrappedAnalytic.forward(nextPinned)
-      ],
+      [wrappedTarget, wrappedAnalytic.forward(nextPinned)],
       wrappedQ,
-      new IkTolerance(
-        1e-6,
-        1e-6
-      ),
+      new IkTolerance(1e-6, 1e-6),
       [for (_ in wrappedQ) 1.0],
       [for (_ in wrappedQ) 1.0]
     );
@@ -5483,24 +4591,13 @@ class KinematicsTests extends MotionKitTestSupport {
     check(badPinStart.indexOf("configuration pin") >= 0, "program rejects a physical start on a different pinned turn");
     var badPinMove = "";
     try pinnedCompiler.compile(
-      new MotionProgram(
-        [MotionOp.MoveJ(
-          MoveTarget.JointTarget(otherTurn),
-          new MotionOptions(),
-          Blend.ExactStop
-        )],
-        pin
-      ),
+      new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(otherTurn), new MotionOptions(), Blend.ExactStop)], pin),
       wrappedQ,
       Int64.ofInt(913)
     ) catch (error:Dynamic) badPinMove = Std.string(error);
     check(badPinMove.indexOf("configuration pin") >= 0, "joint moves cannot leave the program configuration pin");
     var unconstrained = pinnedCompiler.compile(
-      new MotionProgram([MotionOp.MoveJ(
-        MoveTarget.JointTarget(otherTurn),
-        new MotionOptions(),
-        Blend.ExactStop
-      )]),
+      new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(otherTurn), new MotionOptions(), Blend.ExactStop)]),
       wrappedQ,
       Int64.ofInt(914)
     );
@@ -5705,11 +4802,7 @@ class KinematicsTests extends MotionKitTestSupport {
       from,
       zero,
       zero,
-      [new TrajectorySegment(
-        Int64.ofInt(0),
-        Int64.fromFloat(span * 1e9),
-        coefficients
-      )]
+      [new TrajectorySegment(Int64.ofInt(0), Int64.fromFloat(span * 1e9), coefficients)]
     )));
     for (_ in 0...260) harness.step(Int64.ofInt(++ tick));
     for (j in 0...6) near(positions()[j], start[j], '$label: the arm reaches its start (joint $j)', 2.0 * quantumStart);
@@ -6018,10 +5111,7 @@ class KinematicsTests extends MotionKitTestSupport {
       0.4,
       0.0,
       [1.0, -3.0],
-      [
-        0.0,
-        0.02
-      ]
+      [0.0, 0.02]
     );
     var overridden = MotionSystemBlueprint.fromRobotModel(model, [explicit]);
     near(overridden.axes[0].jointScales[1], -3.0, "deprecated explicit scale still overrides the transmission");
@@ -6049,30 +5139,9 @@ class KinematicsTests extends MotionKitTestSupport {
     var blueprint = MotionSystemBlueprint.fromRobotModel(
       model,
       [
-        new MotionAxisBlueprint(
-          "x",
-          ["x.leader", "x.follower"],
-          -0.05,
-          0.05,
-          0.1,
-          0.4
-        ),
-        new MotionAxisBlueprint(
-          "y",
-          ["y"],
-          -0.05,
-          0.05,
-          0.1,
-          0.4
-        ),
-        new MotionAxisBlueprint(
-          "z",
-          ["z"],
-          -0.05,
-          0.05,
-          0.1,
-          0.4
-        )
+        new MotionAxisBlueprint("x", ["x.leader", "x.follower"], -0.05, 0.05, 0.1, 0.4),
+        new MotionAxisBlueprint("y", ["y"], -0.05, 0.05, 0.1, 0.4),
+        new MotionAxisBlueprint("z", ["z"], -0.05, 0.05, 0.1, 0.4)
       ]
     );
     var solver = new AxisKinematics(blueprint);
@@ -6109,15 +5178,7 @@ class KinematicsTests extends MotionKitTestSupport {
       "work",
       [new PoseLine(
         new PoseWaypoint(target, 1e-6, 1e-6),
-        new PoseWaypoint(
-          new Pose3(
-            0.03,
-            0.02,
-            -0.03
-          ),
-          1e-6,
-          1e-6
-        ),
+        new PoseWaypoint(new Pose3(0.03, 0.02, -0.03), 1e-6, 1e-6),
         OrientationPolicy.Fixed,
         0.1,
         0.1
@@ -6134,10 +5195,7 @@ class KinematicsTests extends MotionKitTestSupport {
         [for (_ in 0...4) 0.1],
         [for (_ in 0...4) 0.1],
         32,
-        [
-          OrientationPolicy.Fixed,
-          OrientationPolicy.Fixed
-        ]
+        [OrientationPolicy.Fixed, OrientationPolicy.Fixed]
       )
     );
     near(curve.q[1][1], -0.025, "axis path retains follower offset");
@@ -6148,19 +5206,7 @@ class KinematicsTests extends MotionKitTestSupport {
       "work",
       [new PoseLine(
         new PoseWaypoint(target, 1e-6, 1e-6),
-        new PoseWaypoint(
-          new Pose3(
-            0.03,
-            0.02,
-            -0.03,
-            0.0,
-            0.0,
-            Math.sin(0.2),
-            Math.cos(0.2)
-          ),
-          1e-6,
-          1e-6
-        ),
+        new PoseWaypoint(new Pose3(0.03, 0.02, -0.03, 0.0, 0.0, Math.sin(0.2), Math.cos(0.2)), 1e-6, 1e-6),
         OrientationPolicy.Free,
         0.1,
         0.1
@@ -6170,19 +5216,13 @@ class KinematicsTests extends MotionKitTestSupport {
       freePath,
       new PathRequest(
         [0.0, freePath.length()],
-        [
-          target,
-          freePath.poseAt(freePath.length())
-        ],
+        [target, freePath.poseAt(freePath.length())],
         q,
         new IkTolerance(),
         [for (_ in 0...4) 0.1],
         [for (_ in 0...4) 0.1],
         32,
-        [
-          OrientationPolicy.Free,
-          OrientationPolicy.Free
-        ]
+        [OrientationPolicy.Free, OrientationPolicy.Free]
       )
     );
     near(freeCurve.q[1][0], 0.03, "axis free-orientation path ignores authored rotation");
@@ -6193,12 +5233,7 @@ class KinematicsTests extends MotionKitTestSupport {
       [for (_ in 0...4) 0.1],
       [for (_ in 0...4) 0.4],
       [for (_ in 0...4) 4.0],
-      StartTolerances.uniform(
-        4,
-        0.001,
-        0.001,
-        0.001
-      )
+      StartTolerances.uniform(4, 0.001, 0.001, 0.001)
     );
     check(
       Std.isOfType(axisCompiler.jointPathPlanner, motionkit.robot.AxisJointPathPlanner),
@@ -6249,17 +5284,11 @@ class KinematicsTests extends MotionKitTestSupport {
         [0.0, path.length()],
         [target, path.poseAt(path.length())],
         measured,
-        new IkTolerance(
-          0.0001,
-          0.0001
-        ),
+        new IkTolerance(0.0001, 0.0001),
         [for (_ in 0...4) 0.1],
         [for (_ in 0...4) 0.1],
         32,
-        [
-          OrientationPolicy.Fixed,
-          OrientationPolicy.Fixed
-        ]
+        [OrientationPolicy.Fixed, OrientationPolicy.Fixed]
       )
     );
     near(measuredCurve.q[0][0], measured[0], "axis planner preserves an admissible measured leader start");
@@ -6270,39 +5299,15 @@ class KinematicsTests extends MotionKitTestSupport {
       [
         new PoseLine(
           new PoseWaypoint(new Pose3(0.02, -0.01, 0.0), 1e-6, 1e-6),
-          new PoseWaypoint(
-            arcStart,
-            1e-6,
-            1e-6
-          ),
+          new PoseWaypoint(arcStart, 1e-6, 1e-6),
           OrientationPolicy.Fixed,
           0.1,
           0.1
         ),
         new motionkit.path.PoseArc(
-          new PoseWaypoint(
-            arcStart,
-            1e-6,
-            1e-6
-          ),
-          new PoseWaypoint(
-            new Pose3(
-              0.02 / Math.sqrt(2.0),
-              0.02 / Math.sqrt(2.0),
-              0.0
-            ),
-            1e-6,
-            1e-6
-          ),
-          new PoseWaypoint(
-            new Pose3(
-              0.0,
-              0.02,
-              0.0
-            ),
-            1e-6,
-            1e-6
-          ),
+          new PoseWaypoint(arcStart, 1e-6, 1e-6),
+          new PoseWaypoint(new Pose3(0.02 / Math.sqrt(2.0), 0.02 / Math.sqrt(2.0), 0.0), 1e-6, 1e-6),
+          new PoseWaypoint(new Pose3(0.0, 0.02, 0.0), 1e-6, 1e-6),
           OrientationPolicy.Fixed,
           0.1
         )
@@ -6339,10 +5344,7 @@ class KinematicsTests extends MotionKitTestSupport {
         [for (_ in 0...4) 0.1],
         [for (_ in 0...4) 0.1],
         32,
-        [
-          OrientationPolicy.Fixed,
-          OrientationPolicy.Fixed
-        ]
+        [OrientationPolicy.Fixed, OrientationPolicy.Fixed]
       )
     ) catch (error:Dynamic) failure = Std.string(error);
     check(failure.indexOf("joint mapping") >= 0, "axis planner rejects an inconsistent pinned follower");
@@ -6366,14 +5368,7 @@ class KinematicsTests extends MotionKitTestSupport {
     }
     var blueprint = MotionSystemBlueprint.fromRobotModel(
       model,
-      [new MotionAxisBlueprint(
-        "x",
-        ["x.left", "x.right"],
-        0.0,
-        0.08,
-        0.08,
-        0.4
-      )]
+      [new MotionAxisBlueprint("x", ["x.left", "x.right"], 0.0, 0.08, 0.08, 0.4)]
     );
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;

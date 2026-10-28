@@ -30,10 +30,7 @@ class PoseSampling {
       1,
       Math.max(
         Math.ceil(length * angularRate / angularResolution),
-        Math.max(
-          Math.ceil(length / resolution),
-          Math.ceil(length * curvature / 0.25)
-        )
+        Math.max(Math.ceil(length / resolution), Math.ceil(length * curvature / 0.25))
       )
     ));
   }

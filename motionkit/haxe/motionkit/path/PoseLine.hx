@@ -49,11 +49,7 @@ class PoseLine implements PosePrimitive implements PosePositionBound {
         (end.pose.z - start.pose.z) / pathLength
       ],
       angular.first,
-      [
-        0.0,
-        0.0,
-        0.0
-      ],
+      [0.0, 0.0, 0.0],
       angular.second
     );
   }

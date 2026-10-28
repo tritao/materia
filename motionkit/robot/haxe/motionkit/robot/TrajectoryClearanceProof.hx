@@ -71,10 +71,7 @@ class TrajectoryClearanceProof {
     velocity:Array<Float>,
     contact:Bool,
     contactAt:Null<Array<Float> -> Bool>,
-    neighbourhood:Null<(
-      Array<Float>,
-      Float
-    ) -> Bool>,
+    neighbourhood:Null<(Array<Float>, Float) -> Bool>,
     depthLimit:Int
   ) {
     this.world = world;
@@ -98,10 +95,7 @@ class TrajectoryClearanceProof {
     velocity:Array<Float>,
     contact:Bool,
     ?contactAt:Array<Float> -> Bool,
-    ?neighbourhood:(
-      Array<Float>,
-      Float
-    ) -> Bool,
+    ?neighbourhood:(Array<Float>, Float) -> Bool,
     ?events:Array<ClearanceEvent>,
     depthLimit:Int = 16,
     closestSamples:Int = 8
@@ -138,13 +132,7 @@ class TrajectoryClearanceProof {
         proof.sampleClosest(
           start,
           end,
-          Std.int(Math.max(
-            1,
-            Math.round(closestSamples * (end - start) / Math.max(
-              duration,
-              1e-12
-            ))
-          ))
+          Std.int(Math.max(1, Math.round(closestSamples * (end - start) / Math.max(duration, 1e-12))))
         );
       } else {
         proof.check(start);

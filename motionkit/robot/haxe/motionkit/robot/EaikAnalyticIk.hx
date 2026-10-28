@@ -31,10 +31,7 @@ class EaikAnalyticIk implements AnalyticIk {
     var result = MotionKitNative.mk_eaik_inverse_labelled(
       chain.solver,
       configuration.native,
-      chain.localTarget(
-        target,
-        seed
-      ),
+      chain.localTarget(target, seed),
       [for (j in chain.armIndices) seed[j]],
       32
     );
@@ -49,11 +46,7 @@ class EaikAnalyticIk implements AnalyticIk {
         branch,
         raw.get_singular() != 0,
         true,
-        SixAxisConfiguration.of(
-          "EAIK",
-          branch,
-          [for (j in chain.armIndices) lift.q[j]]
-        )
+        SixAxisConfiguration.of("EAIK", branch, [for (j in chain.armIndices) lift.q[j]])
       ));
     }
     answers.sort((a, b) -> a.branch - b.branch);

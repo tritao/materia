@@ -14,13 +14,7 @@ class ExternalAxisGrid {
     if (Math.isFinite(limits.lower) && value < limits.lower) {
       var tolerance = Math.max(
         STOP_ROUNDOFF_ABSOLUTE,
-        1e-12 * Math.max(
-          1.0,
-          Math.max(
-            Math.abs(value),
-            Math.abs(limits.lower)
-          )
-        )
+        1e-12 * Math.max(1.0, Math.max(Math.abs(value), Math.abs(limits.lower)))
       );
       if (limits.lower - value <= tolerance) return limits.lower;
       throw 'External joint $joint value $value is below planning limit ${limits.lower}';
@@ -28,13 +22,7 @@ class ExternalAxisGrid {
     if (Math.isFinite(limits.upper) && value > limits.upper) {
       var tolerance = Math.max(
         STOP_ROUNDOFF_ABSOLUTE,
-        1e-12 * Math.max(
-          1.0,
-          Math.max(
-            Math.abs(value),
-            Math.abs(limits.upper)
-          )
-        )
+        1e-12 * Math.max(1.0, Math.max(Math.abs(value), Math.abs(limits.upper)))
       );
       if (value - limits.upper <= tolerance) return limits.upper;
       throw 'External joint $joint value $value is above planning limit ${limits.upper}';

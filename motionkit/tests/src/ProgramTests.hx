@@ -130,11 +130,7 @@ class ProgramTests extends MotionKitTestSupport {
 
   public function testProgramStartTolerances():Void {
     var blueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
-        80,
-        80,
-        80
-      )),
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 80, 80)),
       0.1,
       0.4
     );
@@ -178,11 +174,7 @@ class ProgramTests extends MotionKitTestSupport {
       speeds,
       accelerations,
       jerks,
-      new StartTolerances(
-        [0.00001],
-        [for (_ in ids) 0.02],
-        [for (_ in ids) 0.02]
-      )
+      new StartTolerances([0.00001], [for (_ in ids) 0.02], [for (_ in ids) 0.02])
     ) catch (_:Dynamic) rejectedLength = true;
     check(rejectedLength, "program compiler rejects incomplete start tolerances");
     var rejectedNegative = false;
@@ -224,11 +216,7 @@ class ProgramTests extends MotionKitTestSupport {
       goal[joint] = blueprint.axes[0].jointScales[slot] * 0.01;
     }
     var compiled = compiler.compile(
-      new MotionProgram([MotionOp.MoveJ(
-        MoveTarget.JointTarget(goal),
-        new MotionOptions(),
-        Blend.ExactStop
-      )]),
+      new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop)]),
       start,
       Int64.ofInt(812)
     );
@@ -415,12 +403,7 @@ class ProgramTests extends MotionKitTestSupport {
       [for (_ in 0...7) 2.0],
       [for (_ in 0...7) 4.0],
       [for (_ in 0...7) 20.0],
-      StartTolerances.uniform(
-        7,
-        0.02,
-        0.02,
-        0.02
-      )
+      StartTolerances.uniform(7, 0.02, 0.02, 0.02)
     );
     var line = compiler.compile(
       new MotionProgram([MotionOp.MoveL(endPose, "work", 0.1, Blend.ExactStop)]),
@@ -487,10 +470,7 @@ class ProgramTests extends MotionKitTestSupport {
       [for (_ in 0...8) 1.0],
       [for (_ in 0...8) 1.0],
       4,
-      [
-        OrientationPolicy.FreeAboutTool,
-        OrientationPolicy.FreeAboutTool
-      ]
+      [OrientationPolicy.FreeAboutTool, OrientationPolicy.FreeAboutTool]
     ));
     var end = route[1];
     check(
@@ -562,11 +542,7 @@ class ProgramTests extends MotionKitTestSupport {
     solver.preferredPosture = entry;
     for (k in 0...32) lines.push(new PoseLine(
       new PoseWaypoint(points[k], 0.0005, 0.005),
-      new PoseWaypoint(
-        points[k + 1],
-        0.0005,
-        0.005
-      ),
+      new PoseWaypoint(points[k + 1], 0.0005, 0.005),
       OrientationPolicy.Interpolated,
       0.1,
       0.1
@@ -582,12 +558,7 @@ class ProgramTests extends MotionKitTestSupport {
       [for (_ in 0...8) 1.0],
       [for (_ in 0...8) 2.0],
       [for (_ in 0...8) 20.0],
-      StartTolerances.uniform(
-        8,
-        0.02,
-        0.02,
-        0.02
-      ),
+      StartTolerances.uniform(8, 0.02, 0.02, 0.02),
       null,
       0.0025
     );
@@ -634,10 +605,7 @@ class ProgramTests extends MotionKitTestSupport {
       robot,
       compiler,
       function(_) return null,
-      function() return {
-        events: [],
-        overflow: false
-      },
+      function() return {events: [], overflow: false},
       cell.jointIndices()
     );
     motion.run(new MotionProgram([MotionOp.FollowPath(path, "work", 0.05, [])]));
@@ -692,12 +660,7 @@ class ProgramTests extends MotionKitTestSupport {
       velocity,
       acceleration,
       jerk,
-      StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      )
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02)
     );
     var start = [0.2, -0.4, 0.6, 0.1, 0.4, -0.2];
     var goal = start.copy();
@@ -724,15 +687,8 @@ class ProgramTests extends MotionKitTestSupport {
 
     var outputBeforeWait = compiler.compile(
       new MotionProgram([
-        MotionOp.SetOutput(
-          "spindle.speed",
-          EventValue.Analog(8000.0)
-        ),
-        MotionOp.WaitInput(
-          "spindle.at_speed",
-          InputPredicate.Equals(EventValue.Digital(true)),
-          3.0
-        )
+        MotionOp.SetOutput("spindle.speed", EventValue.Analog(8000.0)),
+        MotionOp.WaitInput("spindle.at_speed", InputPredicate.Equals(EventValue.Digital(true)), 3.0)
       ]),
       start,
       Int64.ofInt(150)
@@ -763,11 +719,7 @@ class ProgramTests extends MotionKitTestSupport {
       "work",
       [new PoseLine(
         new PoseWaypoint(startPose, 0.005, 0.02),
-        new PoseWaypoint(
-          endPose,
-          0.005,
-          0.02
-        ),
+        new PoseWaypoint(endPose, 0.005, 0.02),
         OrientationPolicy.Interpolated,
         0.1,
         0.1
@@ -778,26 +730,11 @@ class ProgramTests extends MotionKitTestSupport {
         path,
         "work",
         0.1,
-        [new PathEvent(
-          path.length() * 0.5,
-          "sprayer.enabled",
-          EventValue.Digital(true)
-        )]
+        [new PathEvent(path.length() * 0.5, "sprayer.enabled", EventValue.Digital(true))]
       ),
-      MotionOp.SetOutput(
-        "sprayer.enabled",
-        EventValue.Digital(false)
-      ),
-      MotionOp.WaitInput(
-        "sprayer.ready",
-        InputPredicate.Equals(EventValue.Digital(true)),
-        2.0
-      ),
-      MotionOp.MoveJ(
-        MoveTarget.JointTarget(start),
-        new MotionOptions(),
-        Blend.ExactStop
-      ),
+      MotionOp.SetOutput("sprayer.enabled", EventValue.Digital(false)),
+      MotionOp.WaitInput("sprayer.ready", InputPredicate.Equals(EventValue.Digital(true)), 2.0),
+      MotionOp.MoveJ(MoveTarget.JointTarget(start), new MotionOptions(), Blend.ExactStop),
       MotionOp.Dwell(0.1)
     ]);
     var lowered = compiler.compile(pathProgram, start, Int64.ofInt(200));
@@ -849,11 +786,7 @@ class ProgramTests extends MotionKitTestSupport {
     line.dispose();
     var poseMove = compiler.compile(
       new MotionProgram([MotionOp.MoveJ(
-        MoveTarget.PoseTarget(
-          solver.forward([for (_ in 0...6) 0.0]),
-          "work",
-          null
-        ),
+        MoveTarget.PoseTarget(solver.forward([for (_ in 0...6) 0.0]), "work", null),
         new MotionOptions(),
         Blend.ExactStop
       )]),
@@ -871,21 +804,12 @@ class ProgramTests extends MotionKitTestSupport {
       velocity,
       acceleration,
       jerk,
-      StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      )
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02)
     );
     var poseTarget = new Pose3(0.25);
     var seededPoseMove = seededPoseCompiler.compile(
       new MotionProgram([MotionOp.MoveJ(
-        MoveTarget.PoseTarget(
-          poseTarget,
-          "work",
-          null
-        ),
+        MoveTarget.PoseTarget(poseTarget, "work", null),
         new MotionOptions(),
         Blend.ExactStop
       )]),
@@ -906,20 +830,11 @@ class ProgramTests extends MotionKitTestSupport {
       velocity,
       acceleration,
       jerk,
-      StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      )
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02)
     );
     var fallbackPoseMove = fallbackPoseCompiler.compile(
       new MotionProgram([MotionOp.MoveJ(
-        MoveTarget.PoseTarget(
-          poseTarget,
-          "work",
-          null
-        ),
+        MoveTarget.PoseTarget(poseTarget, "work", null),
         new MotionOptions(),
         Blend.ExactStop
       )]),
@@ -940,12 +855,7 @@ class ProgramTests extends MotionKitTestSupport {
       velocity,
       acceleration,
       jerk,
-      StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      ),
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02),
       null,
       0.05,
       0.5
@@ -954,11 +864,7 @@ class ProgramTests extends MotionKitTestSupport {
       "work",
       [new PoseLine(
         new PoseWaypoint(new Pose3(0.0), 0.005, 0.02),
-        new PoseWaypoint(
-          new Pose3(1.0),
-          0.005,
-          0.02
-        ),
+        new PoseWaypoint(new Pose3(1.0), 0.005, 0.02),
         OrientationPolicy.Fixed,
         0.1,
         0.1
@@ -967,14 +873,7 @@ class ProgramTests extends MotionKitTestSupport {
     var branchError = "";
     try branchCompiler.compile(
       new MotionProgram([MotionOp.FollowPath(branchPath, "work", 0.1, [])]),
-      [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.1,
-        0.0
-      ],
+      [0.0, 0.0, 0.0, 0.0, 0.1, 0.0],
       Int64.ofInt(400)
     ) catch (error:Dynamic) branchError = Std.string(error);
     check(
@@ -990,12 +889,7 @@ class ProgramTests extends MotionKitTestSupport {
       velocity,
       acceleration,
       jerk,
-      StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      ),
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02),
       null,
       0.05
     );
@@ -1003,11 +897,7 @@ class ProgramTests extends MotionKitTestSupport {
       "work",
       [new PoseLine(
         new PoseWaypoint(new Pose3(0.0), 0.005, 0.02),
-        new PoseWaypoint(
-          new Pose3(0.1),
-          0.005,
-          0.02
-        ),
+        new PoseWaypoint(new Pose3(0.1), 0.005, 0.02),
         OrientationPolicy.Fixed,
         0.1,
         0.1
@@ -1017,54 +907,17 @@ class ProgramTests extends MotionKitTestSupport {
       linearPath,
       "work",
       0.1,
-      [new PathEvent(
-        0.05,
-        "sprayer.enabled",
-        EventValue.Digital(true),
-        0.02
-      )]
+      [new PathEvent(0.05, "sprayer.enabled", EventValue.Digital(true), 0.02)]
     )]);
     var linearPlan = linearCompiler.compile(linearProgram, [0.0, 0.0, 0.0, 0.0, 0.1, 0.0], Int64.ofInt(500));
     var reference = new ToppraPathTiming().time(
       new JointPathSamples(
         [0.0, 0.05, 0.1],
-        [
-          [0.0, 0.0, 0.0, 0.0, 0.1, 0.0],
-          [
-            0.05,
-            0.0,
-            0.0,
-            0.0,
-            0.1,
-            0.0
-          ],
-          [
-            0.1,
-            0.0,
-            0.0,
-            0.0,
-            0.1,
-            0.0
-          ]
-        ],
-        [for (_ in 0...3)[
-          1.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0
-        ]],
+        [[0.0, 0.0, 0.0, 0.0, 0.1, 0.0], [0.05, 0.0, 0.0, 0.0, 0.1, 0.0], [0.1, 0.0, 0.0, 0.0, 0.1, 0.0]],
+        [for (_ in 0...3)[1.0, 0.0, 0.0, 0.0, 0.0, 0.0]],
         [for (_ in 0...3)[for (_ in 0...6) 0.0]]
       ),
-      new PathTimingLimits(
-        velocity,
-        acceleration,
-        [
-          0.1,
-          0.1
-        ]
-      )
+      new PathTimingLimits(velocity, acceleration, [0.1, 0.1])
     );
     check(
       Int64.compare(
@@ -1083,26 +936,14 @@ class ProgramTests extends MotionKitTestSupport {
       [
         new PoseLine(
           new PoseWaypoint(new Pose3(0.0), 0.005, 0.02),
-          new PoseWaypoint(
-            new Pose3(0.1),
-            0.005,
-            0.02
-          ),
+          new PoseWaypoint(new Pose3(0.1), 0.005, 0.02),
           OrientationPolicy.Fixed,
           0.1,
           0.1
         ),
         new PoseLine(
-          new PoseWaypoint(
-            new Pose3(0.1),
-            0.005,
-            0.02
-          ),
-          new PoseWaypoint(
-            new Pose3(0.05),
-            0.005,
-            0.02
-          ),
+          new PoseWaypoint(new Pose3(0.1), 0.005, 0.02),
+          new PoseWaypoint(new Pose3(0.05), 0.005, 0.02),
           OrientationPolicy.Fixed,
           0.1,
           0.1
@@ -1112,14 +953,7 @@ class ProgramTests extends MotionKitTestSupport {
     var cornerBlocks = new ProgramBlocks();
     var stepping = linearCompiler.begin(
       new MotionProgram([MotionOp.FollowPath(cornerPath, "work", 0.1, [])]),
-      [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.1,
-        0.0
-      ],
+      [0.0, 0.0, 0.0, 0.0, 0.1, 0.0],
       Int64.ofInt(503),
       0,
       1.0,
@@ -1147,12 +981,7 @@ class ProgramTests extends MotionKitTestSupport {
       velocity,
       acceleration,
       jerk,
-      StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      ),
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02),
       null,
       0.05
     );
@@ -1168,11 +997,7 @@ class ProgramTests extends MotionKitTestSupport {
       "work",
       [new PoseLine(
         new PoseWaypoint(new Pose3(), 0.005, 0.02),
-        new PoseWaypoint(
-          yaw,
-          0.005,
-          0.02
-        ),
+        new PoseWaypoint(yaw, 0.005, 0.02),
         OrientationPolicy.FreeAboutTool,
         0.1,
         0.1
@@ -1180,14 +1005,7 @@ class ProgramTests extends MotionKitTestSupport {
     );
     var freePlan = linearCompiler.compile(
       new MotionProgram([MotionOp.FollowPath(freePath, "work", 0.1, [])]),
-      [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.1,
-        0.0
-      ],
+      [0.0, 0.0, 0.0, 0.0, 0.1, 0.0],
       Int64.ofInt(502)
     );
     check(
@@ -1204,32 +1022,14 @@ class ProgramTests extends MotionKitTestSupport {
       velocity,
       acceleration,
       jerk,
-      StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      ),
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02),
       null,
       0.005
     );
     var blended = planarCompiler.compile(
       new MotionProgram([
-        MotionOp.MoveL(
-          new Pose3(0.05, 0.0),
-          "work",
-          0.1,
-          Blend.ToleranceBlend(0.005)
-        ),
-        MotionOp.MoveL(
-          new Pose3(
-            0.05,
-            0.05
-          ),
-          "work",
-          0.1,
-          Blend.ExactStop
-        )
+        MotionOp.MoveL(new Pose3(0.05, 0.0), "work", 0.1, Blend.ToleranceBlend(0.005)),
+        MotionOp.MoveL(new Pose3(0.05, 0.05), "work", 0.1, Blend.ExactStop)
       ]),
       [for (_ in 0...6) 0.0],
       Int64.ofInt(503)
@@ -1260,21 +1060,8 @@ class ProgramTests extends MotionKitTestSupport {
     var turn = Math.PI / 6.0;
     var shallow = planarCompiler.compile(
       new MotionProgram([
-        MotionOp.MoveL(
-          new Pose3(0.05, 0.0),
-          "work",
-          0.1,
-          Blend.ToleranceBlend(0.001)
-        ),
-        MotionOp.MoveL(
-          new Pose3(
-            0.05 + 0.05 * Math.cos(turn),
-            0.05 * Math.sin(turn)
-          ),
-          "work",
-          0.1,
-          Blend.ExactStop
-        )
+        MotionOp.MoveL(new Pose3(0.05, 0.0), "work", 0.1, Blend.ToleranceBlend(0.001)),
+        MotionOp.MoveL(new Pose3(0.05 + 0.05 * Math.cos(turn), 0.05 * Math.sin(turn)), "work", 0.1, Blend.ExactStop)
       ]),
       [for (_ in 0...6) 0.0],
       Int64.ofInt(504)
@@ -1305,12 +1092,7 @@ class ProgramTests extends MotionKitTestSupport {
       [for (_ in 0...6) 2.0],
       [for (_ in 0...6) 4.0],
       [for (_ in 0...6) 20.0],
-      StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      )
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02)
     );
     var start = [0.2, -0.4, 0.6, 0.1, 0.4, -0.2];
     var ops:Array<MotionOp> = [];
@@ -1401,12 +1183,7 @@ class ProgramTests extends MotionKitTestSupport {
       [for (_ in 0...6) 2.0],
       [for (_ in 0...6) 4.0],
       [for (_ in 0...6) 20.0],
-      StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      )
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02)
     );
     var ready = false, motion = new ManipulatorMotion(
       robot,
@@ -1418,25 +1195,11 @@ class ProgramTests extends MotionKitTestSupport {
     goal[0] = 0.02;
     var program = new MotionProgram([
       MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop),
-      MotionOp.SetOutput(
-        "compiled.enabled",
-        EventValue.Digital(true)
-      ),
-      MotionOp.WaitInput(
-        "ready",
-        InputPredicate.Equals(EventValue.Digital(true)),
-        3.0
-      ),
+      MotionOp.SetOutput("compiled.enabled", EventValue.Digital(true)),
+      MotionOp.WaitInput("ready", InputPredicate.Equals(EventValue.Digital(true)), 3.0),
       MotionOp.Dwell(0.1),
-      MotionOp.MoveJ(
-        MoveTarget.JointTarget(origin),
-        new MotionOptions(),
-        Blend.ExactStop
-      ),
-      MotionOp.SetOutput(
-        "compiled.enabled",
-        EventValue.Digital(false)
-      )
+      MotionOp.MoveJ(MoveTarget.JointTarget(origin), new MotionOptions(), Blend.ExactStop),
+      MotionOp.SetOutput("compiled.enabled", EventValue.Digital(false))
     ]);
     var compiled = compiler.compile(program, origin, Int64.ofInt(700));
     var workers = ProgramPlanner.active();
@@ -1626,12 +1389,7 @@ class ProgramTests extends MotionKitTestSupport {
       [for (_ in 0...6) 2.0],
       [for (_ in 0...6) 4.0],
       [for (_ in 0...6) 20.0],
-      StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      )
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02)
     );
     var unsupported = new RuntimeRobotAdapter(
       "unsupported-arm",
@@ -1670,24 +1428,10 @@ class ProgramTests extends MotionKitTestSupport {
     var second = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
     motion.run(new MotionProgram([
       MotionOp.MoveJ(MoveTarget.JointTarget(first), new MotionOptions(), Blend.ExactStop),
-      MotionOp.SetOutput(
-        "sprayer.enabled",
-        EventValue.Digital(true)
-      ),
-      MotionOp.WaitInput(
-        "ready",
-        InputPredicate.Equals(EventValue.Digital(true)),
-        3.0
-      ),
-      MotionOp.MoveJ(
-        MoveTarget.JointTarget(second),
-        new MotionOptions(),
-        Blend.ExactStop
-      ),
-      MotionOp.SetOutput(
-        "sprayer.enabled",
-        EventValue.Digital(false)
-      )
+      MotionOp.SetOutput("sprayer.enabled", EventValue.Digital(true)),
+      MotionOp.WaitInput("ready", InputPredicate.Equals(EventValue.Digital(true)), 3.0),
+      MotionOp.MoveJ(MoveTarget.JointTarget(second), new MotionOptions(), Blend.ExactStop),
+      MotionOp.SetOutput("sprayer.enabled", EventValue.Digital(false))
     ]));
     check(motion.progress().guarantees != null, "manipulator progress includes the active plan guarantees");
     for (tick in 0...400) {
@@ -1705,15 +1449,8 @@ class ProgramTests extends MotionKitTestSupport {
     ready = false;
     motion.run(new MotionProgram([
       MotionOp.MoveJ(MoveTarget.JointTarget(first), new MotionOptions(), Blend.ExactStop),
-      MotionOp.SetOutput(
-        "sprayer.enabled",
-        EventValue.Digital(true)
-      ),
-      MotionOp.WaitInput(
-        "ready",
-        InputPredicate.Equals(EventValue.Digital(true)),
-        0.2
-      )
+      MotionOp.SetOutput("sprayer.enabled", EventValue.Digital(true)),
+      MotionOp.WaitInput("ready", InputPredicate.Equals(EventValue.Digital(true)), 0.2)
     ]));
     for (tick in 0...400) {
       motion.update(0.01);
@@ -1772,11 +1509,7 @@ class ProgramTests extends MotionKitTestSupport {
       "work",
       [new PoseLine(
         new PoseWaypoint(solver.forward(origin), 0.01, 0.04),
-        new PoseWaypoint(
-          solver.forward(destination),
-          0.01,
-          0.04
-        ),
+        new PoseWaypoint(solver.forward(destination), 0.01, 0.04),
         OrientationPolicy.Interpolated,
         0.1,
         0.05
@@ -1786,13 +1519,7 @@ class ProgramTests extends MotionKitTestSupport {
       path,
       "work",
       0.05,
-      [new PathEvent(
-        path.length() * 0.95,
-        "sprayer.enabled",
-        EventValue.Digital(true),
-        0.0,
-        HoldPolicy.SafeWhileHeld
-      )]
+      [new PathEvent(path.length() * 0.95, "sprayer.enabled", EventValue.Digital(true), 0.0, HoldPolicy.SafeWhileHeld)]
     )]));
     check(pathMotion.running, 'FollowPath starts: ${pathMotion.failure}');
     for (_ in 0...10) {
@@ -1834,16 +1561,8 @@ class ProgramTests extends MotionKitTestSupport {
     var independent = new ProgramPlanner(
       compiler,
       new MotionProgram([
-        MotionOp.MoveJ(
-          MoveTarget.JointTarget(destination),
-          new MotionOptions(),
-          Blend.ExactStop
-        ),
-        MotionOp.MoveJ(
-          MoveTarget.JointTarget(origin),
-          new MotionOptions(),
-          Blend.ExactStop
-        )
+        MotionOp.MoveJ(MoveTarget.JointTarget(destination), new MotionOptions(), Blend.ExactStop),
+        MotionOp.MoveJ(MoveTarget.JointTarget(origin), new MotionOptions(), Blend.ExactStop)
       ]),
       origin,
       Int64.ofInt(900),
@@ -1890,12 +1609,7 @@ class ProgramTests extends MotionKitTestSupport {
       [for (_ in 0...6) 2.0],
       [for (_ in 0...6) 4.0],
       [for (_ in 0...6) 20.0],
-      StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      )
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02)
     );
     var motion = new ManipulatorMotion(robot, compiler, (_) -> null, () -> runtime.pollEvents());
     var origin = [0.2, -0.4, 0.6, 0.1, 0.4, -0.2];
@@ -1905,11 +1619,7 @@ class ProgramTests extends MotionKitTestSupport {
       "work",
       [new PoseLine(
         new PoseWaypoint(solver.forward(origin), 0.01, 0.04),
-        new PoseWaypoint(
-          solver.forward(destination),
-          0.01,
-          0.04
-        ),
+        new PoseWaypoint(solver.forward(destination), 0.01, 0.04),
         OrientationPolicy.Interpolated,
         0.1,
         0.05
@@ -2057,12 +1767,7 @@ class ProgramTests extends MotionKitTestSupport {
       [for (_ in 0...6) 2.0],
       [for (_ in 0...6) 4.0],
       [for (_ in 0...6) 20.0],
-      StartTolerances.uniform(
-        6,
-        0.02,
-        0.02,
-        0.02
-      )
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02)
     );
     var motion = new ManipulatorMotion(robot, compiler, (_) -> null, () -> runtime.pollEvents());
     var target = [0.08, 0.0, 0.0, 0.0, 0.0, 0.0];
@@ -2188,15 +1893,7 @@ class ProgramTests extends MotionKitTestSupport {
       "work",
       [new PoseLine(
         new PoseWaypoint(new Pose3(0.0, 0.0, 0.0), 0.005, 0.02),
-        new PoseWaypoint(
-          new Pose3(
-            0.1,
-            0.0,
-            0.0
-          ),
-          0.005,
-          0.02
-        ),
+        new PoseWaypoint(new Pose3(0.1, 0.0, 0.0), 0.005, 0.02),
         OrientationPolicy.Fixed,
         0.1,
         0.1
@@ -2204,54 +1901,15 @@ class ProgramTests extends MotionKitTestSupport {
     );
     var events = [
       new PathEvent(0.02, "sprayer.enabled", EventValue.Digital(true)),
-      new PathEvent(
-        0.08,
-        "sprayer.enabled",
-        EventValue.Digital(false)
-      )
+      new PathEvent(0.08, "sprayer.enabled", EventValue.Digital(false))
     ];
     var program = new MotionProgram([
-      MotionOp.MoveJ(
-        MoveTarget.JointTarget([0.1, -0.2]),
-        new MotionOptions(1.0, 2.0),
-        Blend.ExactStop
-      ),
-      MotionOp.MoveL(
-        pose,
-        "work",
-        0.2,
-        Blend.ToleranceBlend(0.002)
-      ),
-      MotionOp.MoveC(
-        new Pose3(
-          0.25,
-          0.15,
-          0.3
-        ),
-        new Pose3(
-          0.3,
-          0.1,
-          0.3
-        ),
-        "work",
-        0.15,
-        Blend.ExactStop
-      ),
-      MotionOp.FollowPath(
-        path,
-        "work",
-        0.1,
-        events
-      ),
-      MotionOp.SetOutput(
-        "sprayer.enabled",
-        EventValue.Digital(false)
-      ),
-      MotionOp.WaitInput(
-        "sprayer.ready",
-        InputPredicate.Equals(EventValue.Digital(true)),
-        2.0
-      )
+      MotionOp.MoveJ(MoveTarget.JointTarget([0.1, -0.2]), new MotionOptions(1.0, 2.0), Blend.ExactStop),
+      MotionOp.MoveL(pose, "work", 0.2, Blend.ToleranceBlend(0.002)),
+      MotionOp.MoveC(new Pose3(0.25, 0.15, 0.3), new Pose3(0.3, 0.1, 0.3), "work", 0.15, Blend.ExactStop),
+      MotionOp.FollowPath(path, "work", 0.1, events),
+      MotionOp.SetOutput("sprayer.enabled", EventValue.Digital(false)),
+      MotionOp.WaitInput("sprayer.ready", InputPredicate.Equals(EventValue.Digital(true)), 2.0)
     ]);
     check(program.ops.length == 6, "motion program retains its ordered operations");
     check(MotionProgram.validate(program.ops) == null, "a structurally valid motion program has no validation error");
@@ -2270,10 +1928,7 @@ class ProgramTests extends MotionKitTestSupport {
     check(feedError != null && feedError.indexOf("feed") >= 0, "program validation rejects a non-finite feed");
     var blendError = MotionProgram.validate([
       MotionOp.MoveL(pose, "work", 0.1, Blend.ToleranceBlend(0.01)),
-      MotionOp.SetOutput(
-        "sprayer.enabled",
-        EventValue.Digital(false)
-      )
+      MotionOp.SetOutput("sprayer.enabled", EventValue.Digital(false))
     ]);
     check(
       blendError != null && blendError.indexOf("consecutive moves") >= 0,

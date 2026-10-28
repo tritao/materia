@@ -124,28 +124,12 @@ class PlannerTests extends MotionKitTestSupport {
       [0.0, 1.0, 2.0],
       [[0.0], [1.0], [4.0]],
       [[0.0], [2.0], [4.0]],
-      [
-        [2.0],
-        [2.0],
-        [2.0]
-      ]
+      [[2.0], [2.0], [2.0]]
     );
     var path = new NativeJointPath(samples);
     var law = new PathTimeLaw([
-      new PathTimeStage(
-        Trajectory.nanoseconds(0.0),
-        Trajectory.nanoseconds(1.0),
-        0.0,
-        1.0,
-        0.0
-      ),
-      new PathTimeStage(
-        Trajectory.nanoseconds(1.0),
-        Trajectory.nanoseconds(1.0),
-        1.0,
-        1.0,
-        0.0
-      )
+      new PathTimeStage(Trajectory.nanoseconds(0.0), Trajectory.nanoseconds(1.0), 0.0, 1.0, 0.0),
+      new PathTimeStage(Trajectory.nanoseconds(1.0), Trajectory.nanoseconds(1.0), 1.0, 1.0, 0.0)
     ]);
     near(law.distanceToTime(1.0), 1.0, "native path time law preserves knots");
     // Unit speed over two one-second stages, so distance equals time; times outside the law clamp to its ends.
@@ -291,11 +275,7 @@ class PlannerTests extends MotionKitTestSupport {
           );
           best = Math.min(
             best,
-            point.distanceTo(new PathPoint(
-              line.start.x + t * dx,
-              line.start.y + t * dy,
-              line.start.z + t * dz
-            ))
+            point.distanceTo(new PathPoint(line.start.x + t * dx, line.start.y + t * dy, line.start.z + t * dz))
           );
         } else for (step in 0...4001) best = Math.min(
           best,
@@ -387,19 +367,7 @@ class PlannerTests extends MotionKitTestSupport {
   public function testDistanceDrive():Void {
     var drive = new motionkit.path.DistanceDrive(
       7,
-      [
-        {start: 0.01, end: 0.05, rate: 2.0},
-        {
-          start: 0.05,
-          end: 0.08,
-          rate: 3.0
-        },
-        {
-          start: 0.09,
-          end: 0.095,
-          rate: 1.0
-        }
-      ],
+      [{start: 0.01, end: 0.05, rate: 2.0}, {start: 0.05, end: 0.08, rate: 3.0}, {start: 0.09, end: 0.095, rate: 1.0}],
       0.1,
       0.002
     );
@@ -459,11 +427,7 @@ class PlannerTests extends MotionKitTestSupport {
     var path = GeometricPath.lines([
       new PathPoint(0.0, 0.0, 0.0),
       new PathPoint(0.1, 0.0, 0.0),
-      new PathPoint(
-        0.1,
-        0.1,
-        0.0
-      )
+      new PathPoint(0.1, 0.1, 0.0)
     ]);
     near(path.totalLength, 0.2, "line path accumulates primitive lengths");
     near(path.pointAt(0.05).x, 0.05, "line path samples its first primitive");
@@ -632,22 +596,10 @@ class PlannerTests extends MotionKitTestSupport {
       [0.0, 0.0],
       [0.0, 0.0],
       [0.0, 0.0],
-      [
-        1.0,
-        -0.25
-      ],
-      [
-        limits.maxVelocity,
-        limits.maxVelocity
-      ],
-      [
-        limits.maxAcceleration,
-        limits.maxAcceleration
-      ],
-      [
-        limits.maxJerk,
-        limits.maxJerk
-      ]
+      [1.0, -0.25],
+      [limits.maxVelocity, limits.maxVelocity],
+      [limits.maxAcceleration, limits.maxAcceleration],
+      [limits.maxJerk, limits.maxJerk]
     );
     var first = generate();
     var second = generate();
@@ -683,18 +635,7 @@ class PlannerTests extends MotionKitTestSupport {
       segments.push({
         timeFromStartNs: Int64.ofInt(i * 100000),
         durationNs: Int64.ofInt(100000),
-        coefficients: [
-          [
-            position,
-            speed,
-            0.5 * acceleration
-          ],
-          [
-            2.0 * position,
-            2.0 * speed,
-            acceleration
-          ]
-        ]
+        coefficients: [[position, speed, 0.5 * acceleration], [2.0 * position, 2.0 * speed, acceleration]]
       });
       position += speed * dt + 0.5 * acceleration * dt * dt;
       speed += acceleration * dt;
@@ -706,14 +647,8 @@ class PlannerTests extends MotionKitTestSupport {
       [1.0, 2.0],
       [100.0, 200.0],
       [1000.0, 2000.0],
-      [
-        -1e9,
-        -1e9
-      ],
-      [
-        1e9,
-        1e9
-      ],
+      [-1e9, -1e9],
+      [1e9, 1e9],
       0.01
     );
     check(
@@ -744,10 +679,7 @@ class PlannerTests extends MotionKitTestSupport {
       [100.0, 200.0],
       [10.0, 20.0],
       [-1e9, -1e9],
-      [
-        1e9,
-        1e9
-      ],
+      [1e9, 1e9],
       0.01
     );
     var peak = [0.0, 0.0];
@@ -762,16 +694,8 @@ class PlannerTests extends MotionKitTestSupport {
     // A zigzag of 0.1 ms pieces turns more often than a quintic can follow.
     var zigzag = [for (i in 0...100) {
       timeFromStartNs:Int64.ofInt(i * 100000), durationNs:Int64.ofInt(100000), coefficients:[
-        [
-          i % 2 == 0 ? 0.0 : 0.0005,
-          i % 2 == 0 ? 5.0 : -5.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0
-        ]
+        [i % 2 == 0 ? 0.0 : 0.0005, i % 2 == 0 ? 5.0 : -5.0, 0.0],
+        [0.0, 0.0, 0.0]
       ]
     }
     ];
@@ -783,10 +707,7 @@ class PlannerTests extends MotionKitTestSupport {
       [100.0, 100.0],
       [1000.0, 1000.0],
       [-1e9, -1e9],
-      [
-        1e9,
-        1e9
-      ],
+      [1e9, 1e9],
       0.01
     );
     check(kept.segments().length > 40, 'a zigzag stays mostly as it was, ${kept.segments().length} of 100 segments');
@@ -811,50 +732,17 @@ class PlannerTests extends MotionKitTestSupport {
       {
         timeFromStartNs: Int64.ofInt(0),
         durationNs: Int64.ofInt(50000000),
-        coefficients: [
-          [
-            0.0,
-            0.0,
-            0.5 * a
-          ],
-          [
-            0.0,
-            0.0,
-            a
-          ]
-        ]
+        coefficients: [[0.0, 0.0, 0.5 * a], [0.0, 0.0, a]]
       },
       {
         timeFromStartNs: Int64.ofInt(50000000),
         durationNs: Int64.ofInt(100000000),
-        coefficients: [
-          [
-            d1,
-            v,
-            0.0
-          ],
-          [
-            2.0 * d1,
-            2.0 * v,
-            0.0
-          ]
-        ]
+        coefficients: [[d1, v, 0.0], [2.0 * d1, 2.0 * v, 0.0]]
       },
       {
         timeFromStartNs: Int64.ofInt(150000000),
         durationNs: Int64.ofInt(50000000),
-        coefficients: [
-          [
-            d1 + d2,
-            v,
-            -0.5 * a
-          ],
-          [
-            2.0 * (d1 + d2),
-            2.0 * v,
-            -a
-          ]
-        ]
+        coefficients: [[d1 + d2, v, -0.5 * a], [2.0 * (d1 + d2), 2.0 * v, -a]]
       }
     ];
     var original = motionkit.trajectory.Trajectory.fromSegments(segments);
@@ -870,10 +758,7 @@ class PlannerTests extends MotionKitTestSupport {
     );
     function held(trajectory:motionkit.trajectory.Trajectory,
       joint:Int, time:Float):Float return trajectory.evaluate(Math.min(
-        Math.max(
-          time,
-          0.0
-        ),
+        Math.max(time, 0.0),
         trajectory.durationSeconds()
       )).positions[joint];
     var worst = 0.0, fastest = 0.0, hardest = 0.0, original_fastest = 0.0, original_hardest = 0.0;
@@ -937,10 +822,7 @@ class PlannerTests extends MotionKitTestSupport {
         'the $kind shaper leaves $residual of its own mode'
       );
       if (kind == motionkit.trajectory.InputShaper.InputShaperKind.MZV) check(
-        each.impulses.residual(45.0, 0.1) < 0.1 && each.impulses.residual(
-          55.0,
-          0.1
-        ) < 0.1,
+        each.impulses.residual(45.0, 0.1) < 0.1 && each.impulses.residual(55.0, 0.1) < 0.1,
         "MZV keeps under 10 % for a frequency 10 % off"
       );
     }
@@ -973,11 +855,7 @@ class PlannerTests extends MotionKitTestSupport {
       [0.0, 0.05, 0.1],
       [[0.0], [0.05], [0.1]],
       [[1.0], [1.0], [1.0]],
-      [
-        [0.0],
-        [0.0],
-        [0.0]
-      ]
+      [[0.0], [0.0], [0.0]]
     );
     var timed = new ToppraPathTiming(1e-8).time(path, new PathTimingLimits([0.2], [1.0]));
     near(timed.trajectory.evaluate(0.0).velocities[0], 0.0, "TOPP-RA exact stop begins at rest", 1e-8);
@@ -1035,16 +913,7 @@ class PlannerTests extends MotionKitTestSupport {
     }
     var timed = new ToppraPathTiming().time(
       new JointPathSamples(distances, positions, first, second),
-      new PathTimingLimits(
-        [
-          2.0,
-          2.0
-        ],
-        [
-          1.0,
-          1.0
-        ]
-      )
+      new PathTimingLimits([2.0, 2.0], [1.0, 1.0])
     );
     var peak = 0.0;
     var peakAngle = 0.0;
@@ -1068,11 +937,7 @@ class PlannerTests extends MotionKitTestSupport {
 
   public function testMoveLinearUsesPlannerLimits():Void {
     var blueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
-        80,
-        80,
-        80
-      )),
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 80, 80)),
       0.2,
       2.0
     );
@@ -1092,10 +957,7 @@ class PlannerTests extends MotionKitTestSupport {
     var gentle = planned(machine.moveLinear(
       Pose.xyz(0.02, 0.0, 0.0),
       Feed.metresPerSecond(0.2),
-      new MotionOptions(
-        0.2,
-        0.4
-      )
+      new MotionOptions(0.2, 0.4)
     ));
     var gentleAcceleration = peakChordAcceleration(gentle, 0);
     check(gentleAcceleration <= 0.4 + 1e-6, "moveLinear obeys the lower authored acceleration");
@@ -1151,14 +1013,7 @@ class PlannerTests extends MotionKitTestSupport {
           worst,
           Math.min(
             segmentDistance(point.x, point.y, 0.0, 0.0, corner.x, corner.y),
-            segmentDistance(
-              point.x,
-              point.y,
-              corner.x,
-              corner.y,
-              end.x,
-              end.y
-            )
+            segmentDistance(point.x, point.y, corner.x, corner.y, end.x, end.y)
           )
         );
       }
@@ -1186,15 +1041,7 @@ class PlannerTests extends MotionKitTestSupport {
     );
     var mixedCorner = new GeometricPath([
       new LineSegment(new PathPoint(0.0, 0.0), new PathPoint(0.05, 0.0)),
-      new ArcSegment(
-        new PathPoint(
-          0.07,
-          0.0
-        ),
-        0.02,
-        Math.PI,
-        -Math.PI * 0.5
-      )
+      new ArcSegment(new PathPoint(0.07, 0.0), 0.02, Math.PI, -Math.PI * 0.5)
     ]);
     var mixedGeometry = CornerBlender.blend(mixedCorner, 0.0004, Math.PI * 5.0 / 6.0);
     check(
@@ -1218,22 +1065,11 @@ class PlannerTests extends MotionKitTestSupport {
     }
     var arcToLine = new GeometricPath([
       mixedCorner.primitives[1],
-      new LineSegment(
-        new PathPoint(0.07, 0.02),
-        new PathPoint(
-          0.07,
-          0.07
-        )
-      )
+      new LineSegment(new PathPoint(0.07, 0.02), new PathPoint(0.07, 0.07))
     ]);
     var arcToArc = new GeometricPath([
       mixedCorner.primitives[1],
-      new ArcSegment(
-        new PathPoint(0.09, 0.02),
-        0.02,
-        Math.PI,
-        -Math.PI * 0.5
-      )
+      new ArcSegment(new PathPoint(0.09, 0.02), 0.02, Math.PI, -Math.PI * 0.5)
     ]);
     check(
       CornerBlender.blend(arcToLine, 0.0004, Math.PI * 5.0 / 6.0).path.primitives.length == 3,
@@ -1245,25 +1081,13 @@ class PlannerTests extends MotionKitTestSupport {
     );
     var mixedAtHome = new GeometricPath([
       new LineSegment(origin, new PathPoint(origin.x + 0.05, origin.y, origin.z)),
-      new ArcSegment(
-        new PathPoint(
-          origin.x + 0.07,
-          origin.y,
-          origin.z
-        ),
-        0.02,
-        Math.PI,
-        -Math.PI * 0.5
-      )
+      new ArcSegment(new PathPoint(origin.x + 0.07, origin.y, origin.z), 0.02, Math.PI, -Math.PI * 0.5)
     ]);
     var mixedRig = gantryRig(true);
     var mixedTimed = mixedRig.machine.movePath(
       mixedAtHome,
       PathPlanningOptions.blend(0.0005),
-      new MotionOptions(
-        0.08,
-        0.4
-      )
+      new MotionOptions(0.08, 0.4)
     );
     var mixedReport = mixedRig.machine.lastPathValidationReport;
     if (mixedReport == null) throw "Mixed blend did not record validation";
@@ -1301,14 +1125,7 @@ class PlannerTests extends MotionKitTestSupport {
       var x = state.positions[0], y = state.positions[1];
       var deviation = Math.min(
         segmentDistance(x, y, origin.x, origin.y, east.x, east.y),
-        segmentDistance(
-          x,
-          y,
-          east.x,
-          east.y,
-          northeast.x,
-          northeast.y
-        )
+        segmentDistance(x, y, east.x, east.y, northeast.x, northeast.y)
       );
       check(deviation <= 0.0005 + 1e-5, "0.5 mm fillet stays within its authored path tolerance");
       var cornerDistance = Math.sqrt((x - east.x) * (x - east.x) + (y - east.y) * (y - east.y));
@@ -1371,16 +1188,8 @@ class PlannerTests extends MotionKitTestSupport {
     var planner = new motionkit.robot.PathPlanner(axes, 0.01, Int64.ofInt(1), Int64.ofInt(0), allowances);
     allowances.set("x", 0.001); // The planner must own its immutable configuration snapshot.
     function path(shift:Float):GeometricPath return GeometricPath.lines([
-      new PathPoint(
-        origin.x + shift,
-        origin.y,
-        origin.z
-      ),
-      new PathPoint(
-        origin.x + 0.001,
-        origin.y,
-        origin.z
-      )
+      new PathPoint(origin.x + shift, origin.y, origin.z),
+      new PathPoint(origin.x + 0.001, origin.y, origin.z)
     ]);
     for (sign in [-1, 1]) {
       var result = planner.plan(
@@ -1388,10 +1197,7 @@ class PlannerTests extends MotionKitTestSupport {
         {
           path: path(sign * budget * 0.5),
           pathOptions: PathPlanningOptions.exactStopMode(),
-          motionOptions: new MotionOptions(
-            0.04,
-            0.4
-          )
+          motionOptions: new MotionOptions(0.04, 0.4)
         }
       );
       near(
@@ -1412,13 +1218,7 @@ class PlannerTests extends MotionKitTestSupport {
       "unconfigured path admission retains its original 10 nm bound"
     );
     for (invalid in [-1.0, Math.NaN, Math.POSITIVE_INFINITY]) throws(
-      () -> new motionkit.robot.PathPlanner(
-        axes,
-        0.01,
-        Int64.ofInt(1),
-        Int64.ofInt(0),
-        ["x" => invalid]
-      ),
+      () -> new motionkit.robot.PathPlanner(axes, 0.01, Int64.ofInt(1), Int64.ofInt(0), ["x" => invalid]),
       "invalid path-start budgets are rejected"
     );
     throws(
@@ -1523,14 +1323,7 @@ class PlannerTests extends MotionKitTestSupport {
       var blended = CornerBlender.blend(
         new GeometricPath([
           circular,
-          new LineSegment(
-            circular.end,
-            new PathPoint(
-              circular.end.x + 0.01,
-              circular.end.y,
-              circular.end.z
-            )
-          )
+          new LineSegment(circular.end, new PathPoint(circular.end.x + 0.01, circular.end.y, circular.end.z))
         ]),
         0.001,
         Math.PI * 0.9
@@ -1544,20 +1337,10 @@ class PlannerTests extends MotionKitTestSupport {
       var blendedRun = blendedRig.machine.movePath(
         new GeometricPath([
           circular,
-          new LineSegment(
-            circular.end,
-            new PathPoint(
-              circular.end.x + 0.01,
-              circular.end.y,
-              circular.end.z
-            )
-          )
+          new LineSegment(circular.end, new PathPoint(circular.end.x + 0.01, circular.end.y, circular.end.z))
         ]),
         PathPlanningOptions.blend(0.001),
-        new MotionOptions(
-          0.04,
-          0.4
-        )
+        new MotionOptions(0.04, 0.4)
       );
       check(
         blendedRun.durationSeconds() > 0.0 && blendedRig.machine.lastPathPlanningDiagnostics.length == 1,
@@ -1565,11 +1348,7 @@ class PlannerTests extends MotionKitTestSupport {
       );
       blendedRig.harness.dispose();
       var blueprint = MachineKitRobotCompiler.compileGantry(
-        new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
-          200,
-          200,
-          200
-        )),
+        new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
         0.1,
         0.4
       );

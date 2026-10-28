@@ -154,11 +154,7 @@ class StreamTests extends MotionKitTestSupport {
         true,
         trajectorykit.validation.ValidationGuarantee.Unchecked
       ),
-      new robotkit.core.TimingCapabilities(
-        false,
-        false,
-        trajectorykit.validation.ValidationGuarantee.Unchecked
-      )
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked)
     );
     var unsupported = new ReplayRobot("plan-replay", source, description);
     throws(
@@ -181,11 +177,7 @@ class StreamTests extends MotionKitTestSupport {
 
   public function testBufferedExecution():Void {
     var blueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
-        80,
-        60,
-        40
-      )),
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 60, 40)),
       0.1,
       0.4
     );

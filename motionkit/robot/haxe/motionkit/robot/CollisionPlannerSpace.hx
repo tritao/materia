@@ -116,10 +116,7 @@ class CollisionPlannerSpace implements BoxClearanceSpace {
     for (e in 0...count) pending.push({
       edge: e,
       a: edges.slice(2 * e * n, (2 * e + 1) * n),
-      b: edges.slice(
-        (2 * e + 1) * n,
-        (2 * e + 2) * n
-      ),
+      b: edges.slice((2 * e + 1) * n, (2 * e + 2) * n),
       depth: 0
     });
     var worldBodies = build.bodies.length;

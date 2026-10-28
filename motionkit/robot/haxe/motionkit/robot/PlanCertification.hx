@@ -330,16 +330,8 @@ class PlanCertification {
         if (bound <= path.blendTolerance) authoredBound = bound;
       }
       var error = authoredBound != null ? authoredBound : authoredPolyline != null ? Math.min(
-        distanceToSegment(
-          actual,
-          authoredPolyline[0],
-          authoredPolyline[1]
-        ),
-        distanceToSegment(
-          actual,
-          authoredPolyline[1],
-          authoredPolyline[2]
-        )
+        distanceToSegment(actual, authoredPolyline[0], authoredPolyline[1]),
+        distanceToSegment(actual, authoredPolyline[1], authoredPolyline[2])
       ) : path.authoredGeometry != null ? distanceToGeometry(
         actual,
         path.authoredGeometry
@@ -415,10 +407,7 @@ class PlanCertification {
     var lengthSquared = dx * dx + dy * dy + dz * dz;
     var fraction = lengthSquared <= 0.0 ? 0.0 : Math.max(
       0.0,
-      Math.min(
-        1.0,
-        ((px - sx) * dx + (py - sy) * dy + (pz - sz) * dz) / lengthSquared
-      )
+      Math.min(1.0, ((px - sx) * dx + (py - sy) * dy + (pz - sz) * dz) / lengthSquared)
     );
     var x = px - sx - fraction * dx;
     var y = py - sy - fraction * dy;

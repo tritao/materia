@@ -86,14 +86,7 @@ class AxisJointPathPlanner implements JointPathPlanner {
       function map(values:Array<Float>):Array<Float> {
         var mapped = solver.solveDifferential(
           q,
-          new Twist6(
-            values[0],
-            values[1],
-            values[2],
-            values[3],
-            values[4],
-            values[5]
-          ),
+          new Twist6(values[0], values[1], values[2], values[3], values[4], values[5]),
           null,
           task.freedom
         );

@@ -67,16 +67,8 @@ class MachineKitRobotCompiler {
         lower,
         upper,
         Math.min(maxVelocity, limits.requireVelocity()),
-        Math.min(
-          maxAcceleration,
-          limits.requireAcceleration()
-        ),
-        homingDatum(
-          model,
-          axis.id,
-          lower,
-          upper
-        )
+        Math.min(maxAcceleration, limits.requireAcceleration()),
+        homingDatum(model, axis.id, lower, upper)
       ));
     }
     return MotionSystemBlueprint.fromRobotModel(model, axes);
@@ -128,11 +120,7 @@ class MachineKitRobotCompiler {
         materialId: component.materialSpec(),
         density: 1.0,
         volume: mass.mass * 1e9,
-        centerOfMass: [
-          mass.centreOfMass.x,
-          mass.centreOfMass.y,
-          mass.centreOfMass.z
-        ],
+        centerOfMass: [mass.centreOfMass.x, mass.centreOfMass.y, mass.centreOfMass.z],
         inertia: [
           inertia.xx * 1e9,
           inertia.xy * 1e9,
@@ -218,11 +206,7 @@ class MachineKitRobotCompiler {
         source.id,
         source.maxEffort,
         source.maxRate,
-        Transmission.SimpleTransmission(
-          shaftId,
-          1.0,
-          0.0
-        )
+        Transmission.SimpleTransmission(shaftId, 1.0, 0.0)
       );
       var steps = source.fullStepsPerRevolution,
         inertia = source.rotorInertia, holding = source.holdingTorque, curve = source.torqueSpeed;
@@ -254,14 +238,8 @@ class MachineKitRobotCompiler {
         [binding.travelJointId, binding.shaftJointId],
         0.0,
         binding.axis.stroke * MILLIMETRES_TO_METRES,
-        limits.velocity == null ? maxVelocity : Math.min(
-          maxVelocity,
-          limits.velocity
-        ),
-        limits.maxAcceleration == null ? maxAcceleration : Math.min(
-          maxAcceleration,
-          limits.maxAcceleration
-        )
+        limits.velocity == null ? maxVelocity : Math.min(maxVelocity, limits.velocity),
+        limits.maxAcceleration == null ? maxAcceleration : Math.min(maxAcceleration, limits.maxAcceleration)
       );
     }
     ];
@@ -319,10 +297,7 @@ class MachineKitRobotCompiler {
         assembly.addMemberConnector(
           id + "/motor",
           connector,
-          AssemblyFrames.compose(
-            AssemblyFrames.inverse(motorPose),
-            entry.initialPose
-          )
+          AssemblyFrames.compose(AssemblyFrames.inverse(motorPose), entry.initialPose)
         );
         assembly.addMemberConnector(id + "/" + entry.id, "stageRoot", AssemblyFrames.identity());
         assembly.addMate(
@@ -352,11 +327,7 @@ class MachineKitRobotCompiler {
         materialId: component.materialSpec(),
         density: 1.0,
         volume: mass.mass * 1e9,
-        centerOfMass: [
-          mass.centreOfMass.x,
-          mass.centreOfMass.y,
-          mass.centreOfMass.z
-        ],
+        centerOfMass: [mass.centreOfMass.x, mass.centreOfMass.y, mass.centreOfMass.z],
         inertia: [
           inertia.xx * 1e9,
           inertia.xy * 1e9,
@@ -372,10 +343,7 @@ class MachineKitRobotCompiler {
     }
     var physical = AssemblySimulationBridge.toRobotModel(
       definition,
-      {
-        metresPerUnit: MILLIMETRES_TO_METRES,
-        parts: parts
-      }
+      {metresPerUnit: MILLIMETRES_TO_METRES, parts: parts}
     );
     // Put logical travels first for deterministic XYZ indexing; retain every physical motor joint.
     physical.model.joints.sort((a,

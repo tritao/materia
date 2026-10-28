@@ -53,10 +53,7 @@ class DistanceDriveColumns {
 
   public function acceleration(values:Array<Float>, distance:Float, leaving:Bool):Void write(
     values,
-    drive.curvatureAt(
-      distance,
-      leaving
-    ),
+    drive.curvatureAt(distance, leaving),
     false
   );
 

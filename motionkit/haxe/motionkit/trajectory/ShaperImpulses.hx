@@ -81,10 +81,7 @@ class ShaperImpulses {
     var measured = 0.0;
     for (index in 0...(steps + 1)) measured = Math.max(
       measured,
-      residual(
-        lower + (upper - lower) * index / steps,
-        systemDamping
-      )
+      residual(lower + (upper - lower) * index / steps, systemDamping)
     );
     return Math.min(1.0, measured + derivative * (upper - lower) / (2 * steps) + 1e-14);
   }

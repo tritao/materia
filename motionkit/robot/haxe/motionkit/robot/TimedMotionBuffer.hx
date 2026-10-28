@@ -124,10 +124,7 @@ class TimedMotionBuffer {
     if (raw == null) throw "Motion filter input is required";
     var duration = raw.durationNanoseconds(), nextEnd = Int64.add(end, duration);
     if (Int64.compare(duration, Int64.ofInt(0)) <= 0 || Int64.compare(nextEnd, end) <= 0 || Int64.compare(
-      Int64.add(
-        nextEnd,
-        tailNs
-      ),
+      Int64.add(nextEnd, tailNs),
       nextEnd
     ) < 0) throw "Motion filter input duration is empty or overflows the clock";
     var previous = buffer;

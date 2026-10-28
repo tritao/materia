@@ -123,16 +123,8 @@ class MotionKitTestSupport {
       [0.0, 0.13585, 0.0],
       [0.0, -0.1197, 0.425],
       [0.0, 0.0, 0.39225],
-      [
-        0.0,
-        0.10915,
-        0.0
-      ],
-      [
-        0.0,
-        0.0,
-        0.09465
-      ]
+      [0.0, 0.10915, 0.0],
+      [0.0, 0.0, 0.09465]
     ];
     var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     for (joint in 0...6) {
@@ -188,16 +180,8 @@ class MotionKitTestSupport {
       [0.0, 0.13585, 0.0],
       [0.0, -0.1197, 0.425],
       [0.0, 0.0, 0.39225],
-      [
-        0.0,
-        0.10915,
-        0.0
-      ],
-      [
-        0.0,
-        0.0,
-        0.09465
-      ]
+      [0.0, 0.10915, 0.0],
+      [0.0, 0.0, 0.09465]
     ];
     var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     for (joint in 0...6) {
@@ -226,15 +210,7 @@ class MotionKitTestSupport {
     }
     return {
       model: model,
-      group: new robotkit.manipulation.KinematicGroup(
-        model,
-        floor.id,
-        flange.id,
-        work.id,
-        null,
-        null,
-        null
-      )
+      group: new robotkit.manipulation.KinematicGroup(model, floor.id, flange.id, work.id, null, null, null)
     };
   }
 
@@ -278,11 +254,7 @@ class MotionKitTestSupport {
     var compiled = gantryBlueprint_;
     if (compiled == null) {
       compiled = MachineKitRobotCompiler.compileGantry(
-        new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
-          200,
-          60,
-          40
-        )),
+        new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 60, 40)),
         0.1,
         0.4
       );
@@ -485,23 +457,7 @@ class MotionKitTestSupport {
     rightJoint.limits.maxAcceleration = 0.8;
     var blueprint = MotionSystemBlueprint.fromRobotModel(
       model,
-      [new MotionAxisBlueprint(
-        "x",
-        ["x.left", "x.right"],
-        0.0,
-        0.08,
-        0.08,
-        0.4,
-        0.0,
-        [
-          1.0,
-          -2.0
-        ],
-        [
-          0.0,
-          0.0
-        ]
-      )]
+      [new MotionAxisBlueprint("x", ["x.left", "x.right"], 0.0, 0.08, 0.08, 0.4, 0.0, [1.0, -2.0], [0.0, 0.0])]
     );
     var simulationHarness = new SimulationHarness(0.01);
     var runtime = simulationHarness.simulation.addRobot(blueprint.runtime);

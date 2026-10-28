@@ -155,10 +155,7 @@ class StreamingPathMotion {
     var steps = affine ? 1 : Std.int(Math.max(1, Math.ceil(duration / 0.001)));
     var clocks = [for (i in 0...steps + 1) Math.min(
       Int64.toFloat(end) * 1e-9,
-      Math.max(
-        0.0,
-        begin + duration * i / steps - lag
-      )
+      Math.max(0.0, begin + duration * i / steps - lag)
     )];
     var sampled = [for (distance in laws.timesToDistances(clocks)) Math.max(0.0, Math.min(path.length(), distance))];
     if (candidate.finalChunk) sampled[sampled.length - 1] = path.length();
@@ -181,10 +178,7 @@ class StreamingPathMotion {
       event.timeNs,
       candidate.endNs
     ) == 0)) selected.push(new TimedEvent(
-      Int64.sub(
-        event.timeNs,
-        candidate.startNs
-      ),
+      Int64.sub(event.timeNs, candidate.startNs),
       event.channel,
       event.value,
       event.holdPolicy

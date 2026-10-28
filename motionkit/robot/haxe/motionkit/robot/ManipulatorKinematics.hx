@@ -191,10 +191,7 @@ class ManipulatorKinematics implements RedundantPathSolver {
     // should stay cheaper than full path preparation.
     var attemptLimit = combinationCount <= 32 ? combinationCount : Math.min(
       combinationCount,
-      Math.max(
-        CANDIDATE_SEEDS_PER_RESULT,
-        branchLimit * CANDIDATE_SEEDS_PER_RESULT
-      )
+      Math.max(CANDIDATE_SEEDS_PER_RESULT, branchLimit * CANDIDATE_SEEDS_PER_RESULT)
     );
     for (attempt in 0...Std.int(attemptLimit)) {
       var code = attempt;

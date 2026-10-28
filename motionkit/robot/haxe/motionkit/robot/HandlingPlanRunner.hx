@@ -55,10 +55,7 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
   public static function create(
     robot:Robot,
     manipulator:KinematicGroup,
-    eventSource:Void -> {
-      events: Array<FiredProcessEvent>,
-      overflow: Bool
-    },
+    eventSource:Void -> {events: Array<FiredProcessEvent>, overflow: Bool},
     channel:String,
     planning:PlanningLimits,
     ?approachHeight:Float = DEFAULT_APPROACH_HEIGHT,
@@ -99,12 +96,7 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
       MAX_JOINT_JUMP,
       0.002,
       0.02,
-      ikTolerance == null ? new IkTolerance(
-        2e-3,
-        5e-3,
-        300,
-        0.03
-      ) : ikTolerance,
+      ikTolerance == null ? new IkTolerance(2e-3, 5e-3, 300, 0.03) : ikTolerance,
       pathPlanner
     );
     compiler.planningAssumptions = planning.assumptions.copy();
@@ -183,25 +175,10 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
         Blend.ExactStop,
         orientation == null ? policy : OrientationPolicy.Interpolated
       ),
-      MotionOp.MoveL(
-        at,
-        FRAME,
-        contactSpeed,
-        Blend.ExactStop,
-        policy
-      ),
-      MotionOp.SetOutput(
-        channel,
-        EventValue.Digital(hold)
-      ),
+      MotionOp.MoveL(at, FRAME, contactSpeed, Blend.ExactStop, policy),
+      MotionOp.SetOutput(channel, EventValue.Digital(hold)),
       MotionOp.Dwell(dwell),
-      MotionOp.MoveL(
-        above,
-        FRAME,
-        contactSpeed,
-        Blend.ExactStop,
-        policy
-      )
+      MotionOp.MoveL(above, FRAME, contactSpeed, Blend.ExactStop, policy)
     ]);
     if (orientation == null) ops.push(MotionOp.MoveJ(MoveTarget.JointTarget(home),
       new MotionOptions(), Blend.ExactStop));

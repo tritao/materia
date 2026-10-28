@@ -263,10 +263,7 @@ private class SimpleTimingProfile {
     // Reachability leaves the faster end speed attainable; this keeps rounding from losing it.
     chosenPeak = Math.max(
       Math.max(startSpeed, endSpeed),
-      Math.sqrt(Math.max(
-        0.0,
-        (2.0 * acceleration * span.length + startSpeed * startSpeed + endSpeed * endSpeed) * 0.5
-      ))
+      Math.sqrt(Math.max(0.0, (2.0 * acceleration * span.length + startSpeed * startSpeed + endSpeed * endSpeed) * 0.5))
     );
     peakSpeed = chosenPeak;
     accelerationTime = Math.max(0.0, (peakSpeed - startSpeed) / acceleration);

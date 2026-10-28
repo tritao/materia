@@ -21,10 +21,7 @@ class OrientationLattice {
         var turn = length < 1e-12 ? (dot < 0 ? Quat.fromAxisAngle(original.rotate(new Vec3(1,
           0, 0)), Math.PI) : Quat.identity()) : Quat.fromAxisAngle(
             axis,
-            Math.atan2(
-              length,
-              dot
-            )
+            Math.atan2(length, dot)
           );
         var q = turn.multiply(original);
         new Pose3(target.x, target.y, target.z, q.x, q.y, q.z, q.w);

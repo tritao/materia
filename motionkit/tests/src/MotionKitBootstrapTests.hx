@@ -154,66 +154,22 @@ class MotionKitBootstrapTests {
     var freedomTests = new ToolFreedomTests();
     // Each group is independent of the others, so that the workspace can run them as parallel shards.
     var everything = Shards.run([
-      {
-        name: "PathTimingStreamTests.run",
-        run: () -> PathTimingStreamTests.run(),
-        weight: 0.1
-      },
-      {
-        name: "DistanceDriveCompilerTests.run",
-        run: () -> DistanceDriveCompilerTests.run(),
-        weight: 0.1
-      },
-      {
-        name: "RevoluteReachBoundTests.main",
-        run: () -> RevoluteReachBoundTests.main(),
-        weight: 1.0
-      },
-      {
-        name: "CandidateSeedTests.main",
-        run: () -> CandidateSeedTests.main(),
-        weight: 1.0
-      },
-      {
-        name: "HomingTests.run",
-        run: () -> HomingTests.run(),
-        weight: 1.0
-      },
-      {
-        name: "freedomTests.testFreeSpinPath",
-        run: () -> freedomTests.testFreeSpinPath(),
-        weight: 1.0
-      },
-      {
-        name: "freedomTests.testNumericalZeroMove",
-        run: () -> freedomTests.testNumericalZeroMove(),
-        weight: 1.0
-      },
-      {
-        name: "freedomTests.testUnreachableTilt",
-        run: () -> freedomTests.testUnreachableTilt(),
-        weight: 1.0
-      },
-      {
-        name: "freedomTests.testConeAndRedundancy",
-        run: () -> freedomTests.testConeAndRedundancy(),
-        weight: 1.0
-      },
+      {name: "PathTimingStreamTests.run", run: () -> PathTimingStreamTests.run(), weight: 0.1},
+      {name: "DistanceDriveCompilerTests.run", run: () -> DistanceDriveCompilerTests.run(), weight: 0.1},
+      {name: "RevoluteReachBoundTests.main", run: () -> RevoluteReachBoundTests.main(), weight: 1.0},
+      {name: "CandidateSeedTests.main", run: () -> CandidateSeedTests.main(), weight: 1.0},
+      {name: "HomingTests.run", run: () -> HomingTests.run(), weight: 1.0},
+      {name: "freedomTests.testFreeSpinPath", run: () -> freedomTests.testFreeSpinPath(), weight: 1.0},
+      {name: "freedomTests.testNumericalZeroMove", run: () -> freedomTests.testNumericalZeroMove(), weight: 1.0},
+      {name: "freedomTests.testUnreachableTilt", run: () -> freedomTests.testUnreachableTilt(), weight: 1.0},
+      {name: "freedomTests.testConeAndRedundancy", run: () -> freedomTests.testConeAndRedundancy(), weight: 1.0},
       {
         name: "freedomTests.testFullOrientationIdentity",
         run: () -> freedomTests.testFullOrientationIdentity(),
         weight: 1.0
       },
-      {
-        name: "freedomTests.testCaNearCableLimit",
-        run: () -> freedomTests.testCaNearCableLimit(),
-        weight: 1.0
-      },
-      {
-        name: "PlanCheckTests.testPlanningLimits",
-        run: () -> new PlanCheckTests().testPlanningLimits(),
-        weight: 1.0
-      },
+      {name: "freedomTests.testCaNearCableLimit", run: () -> freedomTests.testCaNearCableLimit(), weight: 1.0},
+      {name: "PlanCheckTests.testPlanningLimits", run: () -> new PlanCheckTests().testPlanningLimits(), weight: 1.0},
       {
         name: "PlanCheckTests.testHandlingUsesCoupledLimits",
         run: () -> new PlanCheckTests().testHandlingUsesCoupledLimits(),
@@ -229,31 +185,11 @@ class MotionKitBootstrapTests {
         run: () -> new PlanCheckTests().testServoStreamRunsPlanCheck(),
         weight: 1.0
       },
-      {
-        name: "CoreXyTests.testMotorSpaceTiming",
-        run: () -> new CoreXyTests().testMotorSpaceTiming(),
-        weight: 1.0
-      },
-      {
-        name: "CoreXyTests.testBeltDisplay",
-        run: () -> new CoreXyTests().testBeltDisplay(),
-        weight: 1.0
-      },
-      {
-        name: "programTests.testExternalPathPosture",
-        run: () -> programTests.testExternalPathPosture(),
-        weight: 1.0
-      },
-      {
-        name: "PlanCheckTests.testPlanCheck",
-        run: () -> new PlanCheckTests().testPlanCheck(),
-        weight: 0.05
-      },
-      {
-        name: "PlanCheckTests.testStepperSlip",
-        run: () -> new PlanCheckTests().testStepperSlip(),
-        weight: 0.05
-      },
+      {name: "CoreXyTests.testMotorSpaceTiming", run: () -> new CoreXyTests().testMotorSpaceTiming(), weight: 1.0},
+      {name: "CoreXyTests.testBeltDisplay", run: () -> new CoreXyTests().testBeltDisplay(), weight: 1.0},
+      {name: "programTests.testExternalPathPosture", run: () -> programTests.testExternalPathPosture(), weight: 1.0},
+      {name: "PlanCheckTests.testPlanCheck", run: () -> new PlanCheckTests().testPlanCheck(), weight: 0.05},
+      {name: "PlanCheckTests.testStepperSlip", run: () -> new PlanCheckTests().testStepperSlip(), weight: 0.05},
       {
         name: "PlanCheckTests.testEncoderSeesStepperSlip",
         run: () -> new PlanCheckTests().testEncoderSeesStepperSlip(),
@@ -269,16 +205,9 @@ class MotionKitBootstrapTests {
         run: () -> new PlanCheckTests().testCompilerRunsPlanCheck(),
         weight: 0.1
       },
-      {
-        name: "CoreXyTests.testTwoBeltCompliance",
-        run: () -> new CoreXyTests().testTwoBeltCompliance(),
-        weight: 0.05
-      },
-      {
-        name: "CoreXyTests.testPlotterDrawsASquare",
-        run: () -> new CoreXyTests().testPlotterDrawsASquare(),
-        weight: 0.5
-      },
+      {name: "CoreXyTests.testTwoBeltCompliance", run: () -> new CoreXyTests().testTwoBeltCompliance(), weight: 0.05},
+      {name: "CoreXyTests.testPlotterDrawsASquare",
+      run: () -> new CoreXyTests().testPlotterDrawsASquare(), weight: 0.5},
       {
         name: "CoreXyTests.testDerivedPulleysFollowBothAxes",
         run: () -> new CoreXyTests().testDerivedPulleysFollowBothAxes(),
@@ -289,16 +218,8 @@ class MotionKitBootstrapTests {
         run: () -> new CoreXyTests().testPlanCheckAddsTheAxesOnASharedMotor(),
         weight: 0.5
       },
-      {
-        name: "processTests.testPoseProcessPath",
-        run: () -> processTests.testPoseProcessPath(),
-        weight: 0.05
-      },
-      {
-        name: "processTests.testMotionEventContracts",
-        run: () -> processTests.testMotionEventContracts(),
-        weight: 0.05
-      },
+      {name: "processTests.testPoseProcessPath", run: () -> processTests.testPoseProcessPath(), weight: 0.05},
+      {name: "processTests.testMotionEventContracts", run: () -> processTests.testMotionEventContracts(), weight: 0.05},
       {
         name: "kinematicsTests.testKinematicsContract",
         run: () -> kinematicsTests.testKinematicsContract(),
@@ -309,26 +230,14 @@ class MotionKitBootstrapTests {
         run: () -> kinematicsTests.testSharedGroupAcrossThreads(),
         weight: 0.1
       },
-      {
-        name: "kinematicsTests.testEaikKinematics",
-        run: () -> kinematicsTests.testEaikKinematics(),
-        weight: 0.05
-      },
+      {name: "kinematicsTests.testEaikKinematics", run: () -> kinematicsTests.testEaikKinematics(), weight: 0.05},
       {
         name: "kinematicsTests.testCartesianAnalyticIk",
         run: () -> kinematicsTests.testCartesianAnalyticIk(),
         weight: 0.05
       },
-      {
-        name: "kinematicsTests.testExternalOpwIk",
-        run: () -> kinematicsTests.testExternalOpwIk(),
-        weight: 0.1
-      },
-      {
-        name: "kinematicsTests.testExternalUrIk",
-        run: () -> kinematicsTests.testExternalUrIk(),
-        weight: 0.1
-      },
+      {name: "kinematicsTests.testExternalOpwIk", run: () -> kinematicsTests.testExternalOpwIk(), weight: 0.1},
+      {name: "kinematicsTests.testExternalUrIk", run: () -> kinematicsTests.testExternalUrIk(), weight: 0.1},
       {
         name: "kinematicsTests.testNumericBranchFallback",
         run: () -> kinematicsTests.testNumericBranchFallback(),
@@ -339,16 +248,8 @@ class MotionKitBootstrapTests {
         run: () -> kinematicsTests.testOrientationLattice(),
         weight: 0.05
       },
-      {
-        name: "kinematicsTests.testCandidateProblem",
-        run: () -> kinematicsTests.testCandidateProblem(),
-        weight: 0.05
-      },
-      {
-        name: "kinematicsTests.testRedundancySpline",
-        run: () -> kinematicsTests.testRedundancySpline(),
-        weight: 0.05
-      },
+      {name: "kinematicsTests.testCandidateProblem", run: () -> kinematicsTests.testCandidateProblem(), weight: 0.05},
+      {name: "kinematicsTests.testRedundancySpline", run: () -> kinematicsTests.testRedundancySpline(), weight: 0.05},
       {
         name: "kinematicsTests.testOrientationDifferential",
         run: () -> kinematicsTests.testOrientationDifferential(),
@@ -359,16 +260,8 @@ class MotionKitBootstrapTests {
         run: () -> programTests.testMotionProgramContracts(),
         weight: 0.05
       },
-      {
-        name: "programTests.testProgramCompiler",
-        run: () -> programTests.testProgramCompiler(),
-        weight: 0.1
-      },
-      {
-        name: "programTests.testRedundantArmPaths",
-        run: () -> programTests.testRedundantArmPaths(),
-        weight: 0.3
-      },
+      {name: "programTests.testProgramCompiler", run: () -> programTests.testProgramCompiler(), weight: 0.1},
+      {name: "programTests.testRedundantArmPaths", run: () -> programTests.testRedundantArmPaths(), weight: 0.3},
       {
         name: "programTests.testCoordinatedExternalAxes",
         run: () -> programTests.testCoordinatedExternalAxes(),
@@ -379,41 +272,17 @@ class MotionKitBootstrapTests {
         run: () -> programTests.testProgramStartTolerances(),
         weight: 0.1
       },
-      {
-        name: "programTests.testProgramPlanner",
-        run: () -> programTests.testProgramPlanner(),
-        weight: 0.2
-      },
-      {
-        name: "kinematicsTests.testAxisKinematics",
-        run: () -> kinematicsTests.testAxisKinematics(),
-        weight: 0.05
-      },
-      {
-        name: "kinematicsTests.testManipulatorServo",
-        run: () -> kinematicsTests.testManipulatorServo(),
-        weight: 0.05
-      },
-      {
-        name: "kinematicsTests.testServoSession",
-        run: () -> kinematicsTests.testServoSession(),
-        weight: 0.1
-      },
-      {
-        name: "kinematicsTests.testServoPlans",
-        run: () -> kinematicsTests.testServoPlans(),
-        weight: 3.7
-      },
+      {name: "programTests.testProgramPlanner", run: () -> programTests.testProgramPlanner(), weight: 0.2},
+      {name: "kinematicsTests.testAxisKinematics", run: () -> kinematicsTests.testAxisKinematics(), weight: 0.05},
+      {name: "kinematicsTests.testManipulatorServo", run: () -> kinematicsTests.testManipulatorServo(), weight: 0.05},
+      {name: "kinematicsTests.testServoSession", run: () -> kinematicsTests.testServoSession(), weight: 0.1},
+      {name: "kinematicsTests.testServoPlans", run: () -> kinematicsTests.testServoPlans(), weight: 3.7},
       {
         name: "programTests.testCompiledManipulatorMotion",
         run: () -> programTests.testCompiledManipulatorMotion(),
         weight: 0.1
       },
-      {
-        name: "programTests.testManipulatorMotion",
-        run: () -> programTests.testManipulatorMotion(),
-        weight: 0.05
-      },
+      {name: "programTests.testManipulatorMotion", run: () -> programTests.testManipulatorMotion(), weight: 0.05},
       {
         name: "programTests.testManipulatorSessionTransitions",
         run: () -> programTests.testManipulatorSessionTransitions(),
@@ -429,26 +298,10 @@ class MotionKitBootstrapTests {
         run: () -> plannerTests.testSimplePathTimingContract(),
         weight: 0.05
       },
-      {
-        name: "plannerTests.testNativePathLowering",
-        run: () -> plannerTests.testNativePathLowering(),
-        weight: 0.05
-      },
-      {
-        name: "plannerTests.testToppraPathTiming",
-        run: () -> plannerTests.testToppraPathTiming(),
-        weight: 0.05
-      },
-      {
-        name: "plannerTests.testDistanceDrive",
-        run: () -> plannerTests.testDistanceDrive(),
-        weight: 0.1
-      },
-      {
-        name: "plannerTests.testLongPathQueries",
-        run: () -> plannerTests.testLongPathQueries(),
-        weight: 0.2
-      },
+      {name: "plannerTests.testNativePathLowering", run: () -> plannerTests.testNativePathLowering(), weight: 0.05},
+      {name: "plannerTests.testToppraPathTiming", run: () -> plannerTests.testToppraPathTiming(), weight: 0.05},
+      {name: "plannerTests.testDistanceDrive", run: () -> plannerTests.testDistanceDrive(), weight: 0.1},
+      {name: "plannerTests.testLongPathQueries", run: () -> plannerTests.testLongPathQueries(), weight: 0.2},
       {
         name: "plannerTests.testGeometricPathPrimitives",
         run: () -> plannerTests.testGeometricPathPrimitives(),
@@ -489,16 +342,8 @@ class MotionKitBootstrapTests {
         run: () -> plannerTests.testToppraCircleAcceleration(),
         weight: 0.05
       },
-      {
-        name: "plannerTests.testPathStartAdmission",
-        run: () -> plannerTests.testPathStartAdmission(),
-        weight: 0.1
-      },
-      {
-        name: "plannerTests.testCircularSegments",
-        run: () -> plannerTests.testCircularSegments(),
-        weight: 1.7
-      },
+      {name: "plannerTests.testPathStartAdmission", run: () -> plannerTests.testPathStartAdmission(), weight: 0.1},
+      {name: "plannerTests.testCircularSegments", run: () -> plannerTests.testCircularSegments(), weight: 1.7},
       {
         name: "processTests.testLinearAxisCompilesToRobotModel",
         run: () -> processTests.testLinearAxisCompilesToRobotModel(),
@@ -519,11 +364,7 @@ class MotionKitBootstrapTests {
         run: () -> processTests.testCompiledAxisRunsThroughSimulation(),
         weight: 0.05
       },
-      {
-        name: "processTests.testHomingAndJogging",
-        run: () -> processTests.testHomingAndJogging(),
-        weight: 0.05
-      },
+      {name: "processTests.testHomingAndJogging", run: () -> processTests.testHomingAndJogging(), weight: 0.05},
       {
         name: "plannerTests.testMoveLinearUsesPlannerLimits",
         run: () -> plannerTests.testMoveLinearUsesPlannerLimits(),
@@ -544,11 +385,7 @@ class MotionKitBootstrapTests {
         run: () -> kinematicsTests.testDualMotorAxisRunsThroughSimulation(),
         weight: 0.05
       },
-      {
-        name: "streamTests.testBufferedExecution",
-        run: () -> streamTests.testBufferedExecution(),
-        weight: 0.1
-      },
+      {name: "streamTests.testBufferedExecution", run: () -> streamTests.testBufferedExecution(), weight: 0.1},
       {
         name: "sessionTests.testNormalAbortWaitsForRest",
         run: () -> sessionTests.testNormalAbortWaitsForRest(),
@@ -564,11 +401,7 @@ class MotionKitBootstrapTests {
         run: () -> streamTests.testPlanCapableReplayRecordsMotionPlan(),
         weight: 0.05
       },
-      {
-        name: "streamTests.testLongBufferedExecution",
-        run: () -> streamTests.testLongBufferedExecution(),
-        weight: 0.1
-      },
+      {name: "streamTests.testLongBufferedExecution", run: () -> streamTests.testLongBufferedExecution(), weight: 0.1},
       {
         name: "streamTests.testHoldRefillsNearChunkBoundary",
         run: () -> streamTests.testHoldRefillsNearChunkBoundary(),
@@ -604,11 +437,7 @@ class MotionKitBootstrapTests {
         run: () -> sessionTests.testMotionChangesStayWithinLimits(),
         weight: 11
       },
-      {
-        name: "sessionTests.testContinuousJog",
-        run: () -> sessionTests.testContinuousJog(),
-        weight: 1.9
-      },
+      {name: "sessionTests.testContinuousJog", run: () -> sessionTests.testContinuousJog(), weight: 1.9},
       {
         name: "sessionTests.testLateJogReplacementRejectsLateArrival",
         run: () -> sessionTests.testLateJogReplacementRejectsLateArrival(),
@@ -619,11 +448,7 @@ class MotionKitBootstrapTests {
         run: () -> sessionTests.testPathHoldsStayOnPathWithinLimits(),
         weight: 14
       },
-      {
-        name: "plannerTests.testToleranceBlend",
-        run: () -> plannerTests.testToleranceBlend(),
-        weight: 1
-      },
+      {name: "plannerTests.testToleranceBlend", run: () -> plannerTests.testToleranceBlend(), weight: 1},
       {
         name: "sessionTests.testDualMotorAxisChangesStayWithinJointLimits",
         run: () -> sessionTests.testDualMotorAxisChangesStayWithinJointLimits(),

@@ -85,14 +85,7 @@ private class ProcessGeometryPlanner implements JointPathPlanner {
       function mapped(values:Array<Float>):Array<Float> {
         var result = solver.solveDifferential(
           solved,
-          new Twist6(
-            values[0],
-            values[1],
-            values[2],
-            values[3],
-            values[4],
-            values[5]
-          ),
+          new Twist6(values[0], values[1], values[2], values[3], values[4], values[5]),
           null,
           task.freedom
         );
@@ -116,10 +109,7 @@ class DistanceDriveCompilerTests extends MotionKitTestSupport {
   static function waypoint(x:Float, y:Float):PoseWaypoint return new PoseWaypoint(new Pose3(x, y), 1e-5, 1e-5);
   static function line(x0:Float, y0:Float, x1:Float, y1:Float):PoseLine return new PoseLine(
     waypoint(x0, y0),
-    waypoint(
-      x1,
-      y1
-    ),
+    waypoint(x1, y1),
     OrientationPolicy.Interpolated,
     0.1,
     0.1
@@ -127,11 +117,7 @@ class DistanceDriveCompilerTests extends MotionKitTestSupport {
   static function driven(path:PosePath,
     joint:Int = 4, rate:Float = 1000):PosePath return path.withDrive(new DistanceDrive(
       joint,
-      [{
-        start: 0.0,
-        end: path.length(),
-        rate: rate
-      }],
+      [{start: 0.0, end: path.length(), rate: rate}],
       path.length(),
       0.002
     ));
@@ -152,12 +138,7 @@ class DistanceDriveCompilerTests extends MotionKitTestSupport {
       velocity,
       acceleration,
       jerk,
-      StartTolerances.uniform(
-        6,
-        1e-6,
-        1e-6,
-        1e-6
-      ),
+      StartTolerances.uniform(6, 1e-6, 1e-6, 1e-6),
       new ToppraPathTiming(),
       0.01,
       0.5,
@@ -166,21 +147,8 @@ class DistanceDriveCompilerTests extends MotionKitTestSupport {
       null,
       planner,
       null,
-      [
-        "x",
-        "y",
-        "unused2",
-        "unused3",
-        "e",
-        "motor"
-      ],
-      coupled ? [new JointCoupling(
-        "process-gear",
-        "e",
-        "motor",
-        3,
-        0.1
-      )] : null
+      ["x", "y", "unused2", "unused3", "e", "motor"],
+      coupled ? [new JointCoupling("process-gear", "e", "motor", 3, 0.1)] : null
     );
   }
   static function program(path:PosePath):MotionProgram return new MotionProgram([MotionOp.FollowPath(
@@ -211,10 +179,7 @@ class DistanceDriveCompilerTests extends MotionKitTestSupport {
           var state = plan.evaluate(plan.durationSeconds * sample / 100);
           var distance = Math.max(
             0.0,
-            Math.min(
-              drive.pathLength,
-              state.positions[0] + state.positions[1] - sections[k].offset
-            )
+            Math.min(drive.pathLength, state.positions[0] + state.positions[1] - sections[k].offset)
           );
           var tolerance = 1e-6 * (1 + drive.maximumRate());
           check(
@@ -244,11 +209,7 @@ class DistanceDriveCompilerTests extends MotionKitTestSupport {
     compiled.dispose();
     fails(() -> compiler(null, true, 50).compile(program(path), START, Int64.ofInt(2)), "joint limit 4");
     fails(
-      () -> compiler().compile(
-        program(driven(new PosePath("work", [line(0, 0, 0.1, 0)]), 5)),
-        START,
-        Int64.ofInt(3)
-      ),
+      () -> compiler().compile(program(driven(new PosePath("work", [line(0, 0, 0.1, 0)]), 5)), START, Int64.ofInt(3)),
       "coupling follower"
     );
     fails(

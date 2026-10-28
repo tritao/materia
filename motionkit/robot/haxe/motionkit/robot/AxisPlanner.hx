@@ -71,12 +71,7 @@ class AxisPlanner {
     var requestedEnd = startLogical + velocity * durationSeconds;
     var endLogical = Math.max(axisValue.lowerLimit, Math.min(axisValue.upperLimit, requestedEnd));
     return {
-      trajectory: planLogical(
-        start,
-        [axisValue],
-        [endLogical],
-        new MotionLimits(Math.abs(velocity), acceleration)
-      ),
+      trajectory: planLogical(start, [axisValue], [endLogical], new MotionLimits(Math.abs(velocity), acceleration)),
       report: null,
       diagnostics: []
     };
@@ -101,13 +96,7 @@ class AxisPlanner {
         state.velocities,
         state.accelerations,
         target,
-        new MotionLimits(
-          Math.max(
-            Math.abs(velocity),
-            Math.abs(currentLogicalVelocity)
-          ),
-          acceleration
-        )
+        new MotionLimits(Math.max(Math.abs(velocity), Math.abs(currentLogicalVelocity)), acceleration)
       ),
       report: null,
       diagnostics: []

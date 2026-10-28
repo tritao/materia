@@ -57,11 +57,7 @@ class RrtVisibilityTests extends MotionKitTestSupport {
     var space = new WallGapSpace();
     var timing = new JointPathTiming([
       {velocity: 2.0, acceleration: 1.8, jerk: 6.0},
-      {
-        velocity: 2.0,
-        acceleration: 1.8,
-        jerk: 6.0
-      }
+      {velocity: 2.0, acceleration: 1.8, jerk: 6.0}
     ]);
     var path = [[-0.8, 0.6], [-0.1, 0.05], [0.1, 0.05], [0.8, 0.5]];
     var original = timing.duration(path), refined = timing.refine(space, path);
@@ -111,11 +107,7 @@ class RrtVisibilityTests extends MotionKitTestSupport {
     var end = new motionkit.kinematics.Pose3(0.003, 0, 0, Math.sin(angle / 2), 0, 0, Math.cos(angle / 2));
     var line = new motionkit.path.PoseLine(
       new motionkit.path.PoseWaypoint(start, 1e-4, 1e-4),
-      new motionkit.path.PoseWaypoint(
-        end,
-        1e-4,
-        1e-4
-      ),
+      new motionkit.path.PoseWaypoint(end, 1e-4, 1e-4),
       motionkit.path.OrientationPolicy.Interpolated,
       0.1,
       0.08
@@ -175,11 +167,7 @@ class RrtVisibilityTests extends MotionKitTestSupport {
   public function testJointPathTiming():Void {
     var timing = new JointPathTiming([
       {velocity: 0.7, acceleration: 2.0, jerk: 20.0},
-      {
-        velocity: 1.2,
-        acceleration: 3.0,
-        jerk: 40.0
-      }
+      {velocity: 1.2, acceleration: 3.0, jerk: 40.0}
     ]);
     var motion = timing.trajectory([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]]);
     var duration = motion.durationSeconds();

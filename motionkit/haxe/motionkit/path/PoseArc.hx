@@ -8,10 +8,7 @@ class PoseArc implements PosePrimitive implements PosePositionBound {
       control,
       from,
       to,
-      HermitePositionBound.circle(
-        radius,
-        (to - from) / radius
-      )
+      HermitePositionBound.circle(radius, (to - from) / radius)
     );
   public final start:PoseWaypoint;
   public final via:PoseWaypoint;
@@ -53,25 +50,11 @@ class PoseArc implements PosePrimitive implements PosePositionBound {
     v = cross(normal, u);
     var viaAngle = Math.atan2(
       dot([via.pose.x - center[0], via.pose.y - center[1], via.pose.z - center[2]], v),
-      dot(
-        [
-          via.pose.x - center[0],
-          via.pose.y - center[1],
-          via.pose.z - center[2]
-        ],
-        u
-      )
+      dot([via.pose.x - center[0], via.pose.y - center[1], via.pose.z - center[2]], u)
     );
     var endAngle = Math.atan2(
       dot([end.pose.x - center[0], end.pose.y - center[1], end.pose.z - center[2]], v),
-      dot(
-        [
-          end.pose.x - center[0],
-          end.pose.y - center[1],
-          end.pose.z - center[2]
-        ],
-        u
-      )
+      dot([end.pose.x - center[0], end.pose.y - center[1], end.pose.z - center[2]], u)
     );
     if (viaAngle < 0.0) viaAngle += 2.0 * Math.PI;
     if (endAngle < 0.0) endAngle += 2.0 * Math.PI;

@@ -327,11 +327,7 @@ class AnalyticPathRefiner {
                 c == offset + 2 ? 1 : 0,
                 0
               ),
-              new motionkit.robot.RedundancySpline.SplineSample(
-                values[offset].value,
-                c == offset ? 1 : 0,
-                0
-              )
+              new motionkit.robot.RedundancySpline.SplineSample(values[offset].value, c == offset ? 1 : 0, 0)
             );
             for (axis in 0...3) taskFirst[axis + 3] = motion.velocity[axis];
           }

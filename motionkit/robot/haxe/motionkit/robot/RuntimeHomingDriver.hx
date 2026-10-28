@@ -133,15 +133,8 @@ class RuntimeHomingDriver implements HomingDriver {
     var trajectory = planner.plan(
       snapshot.setpointPositions.toArray(),
       {
-        targets: [new AxisTarget(
-          axis.id,
-          position - mappings.get(axis.joint).jointOffset(0)
-        )],
-        options: new MotionOptions(
-          velocity,
-          boundedAcceleration,
-          axis.dynamics.planJerk(velocity)
-        )
+        targets: [new AxisTarget(axis.id, position - mappings.get(axis.joint).jointOffset(0))],
+        options: new MotionOptions(velocity, boundedAcceleration, axis.dynamics.planJerk(velocity))
       }
     ).trajectory;
     try {

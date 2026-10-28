@@ -76,10 +76,7 @@ class ManipulatorMotion {
     robot:Robot,
     compiler:ProgramCompiler,
     input:String -> Null<EventValue>,
-    eventSource:Void -> {
-      events: Array<FiredProcessEvent>,
-      overflow: Bool
-    },
+    eventSource:Void -> {events: Array<FiredProcessEvent>, overflow: Bool},
     ?jointIndices:Array<Int>,
     ?completionPositionTolerance:Array<Float>,
     ?springFrequencies:Array<Float>

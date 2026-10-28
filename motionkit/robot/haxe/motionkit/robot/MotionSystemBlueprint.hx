@@ -144,11 +144,7 @@ class MotionSystemBlueprint {
     }
     return new MotionSystemBlueprint(
       model,
-      RobotRuntimeCompiler.compile(
-        model,
-        new robotkit.profile.RobotProfile(),
-        revision
-      ),
+      RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile(), revision),
       mapped,
       fixedTimestepSeconds
     );

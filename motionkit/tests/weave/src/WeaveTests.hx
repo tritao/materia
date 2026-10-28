@@ -20,11 +20,7 @@ class TurningFrame implements WeaveFrame {
     return new WeaveDirection(
       [0.0, Math.cos(a), Math.sin(a)],
       [0.0, -3.0 * Math.sin(a), 3.0 * Math.cos(a)],
-      [
-        0.0,
-        -9.0 * Math.cos(a),
-        -9.0 * Math.sin(a)
-      ]
+      [0.0, -9.0 * Math.cos(a), -9.0 * Math.sin(a)]
     );
   }
 }
@@ -47,16 +43,7 @@ class WeaveTests {
     var event = new PathEvent(0.123, "wire", EventValue.Analog(8.0));
     var base = new PosePath(
       "work",
-      [
-        new PoseLine(a, b, OrientationPolicy.Fixed, 0.1, 0.01),
-        new PoseLine(
-          b,
-          c,
-          OrientationPolicy.Fixed,
-          0.1,
-          0.01
-        )
-      ],
+      [new PoseLine(a, b, OrientationPolicy.Fixed, 0.1, 0.01), new PoseLine(b, c, OrientationPolicy.Fixed, 0.1, 0.01)],
       [event]
     );
     var fixed = new FixedWeaveFrame([0.0, 1.0, 0.0]);

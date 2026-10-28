@@ -38,14 +38,7 @@ class RevoluteReachBoundTests {
       links[0].id,
       flange.id,
       null,
-      new Transform3(
-        new Vec3(0.04, 0.03, 0.02),
-        Quat.fromRollPitchYaw(
-          0.2,
-          -0.1,
-          0.4
-        )
-      )
+      new Transform3(new Vec3(0.04, 0.03, 0.02), Quat.fromRollPitchYaw(0.2, -0.1, 0.4))
     );
     var bound = RevoluteReachBound.of(group);
     check(bound != null, "revolute chain has a bound");
@@ -125,11 +118,7 @@ class RevoluteReachBoundTests {
         [0.0, -0.12, 0.425],
         [0.0, 0, 0.392],
         [0.0, 0.109, 0],
-        [
-          0.0,
-          0,
-          0.095
-        ]
+        [0.0, 0, 0.095]
       ];
       var axes = [[0.0, 0, 1], [0.0, 1, 0], [0.0, 1, 0], [1.0, 0, 0], [0.0, 1, 0], [0.0, 0, 1]];
       if (variant == 1) axes[2] = [0.3, 0.95, 0.2];

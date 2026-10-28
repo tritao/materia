@@ -68,19 +68,7 @@ class HomingTests {
       return new HomingAxis(
         "axis-" + id,
         id == "lift" ? 0 : id == "rail" ? 1 : 2,
-        [new JointSwitch(
-          "switch-" + id,
-          id,
-          "frame",
-          "home",
-          -1,
-          -0.001,
-          0.0002,
-          0.00002,
-          1,
-          null,
-          after
-        )],
+        [new JointSwitch("switch-" + id, id, "frame", "home", -1, -0.001, 0.0002, 0.00002, 1, null, after)],
         0.1,
         1.0,
         0.0,
@@ -262,18 +250,7 @@ class HomingFixture implements HomingDriver implements HomingSideControl {
   public function cycle():HomingCycle {
     var contacts = [
       new JointSwitch("left", "y", "leftFrame", "home", -1, -0.001, 0.0002, 0.00001, 1, "leftMotor"),
-      new JointSwitch(
-        "right",
-        "y",
-        "rightFrame",
-        "home",
-        -1,
-        -0.001,
-        0.0002,
-        0.00001,
-        2,
-        "rightMotor"
-      )
+      new JointSwitch("right", "y", "rightFrame", "home", -1, -0.001, 0.0002, 0.00001, 2, "rightMotor")
     ];
     return new HomingCycle(this, [new HomingAxis("y", 0, contacts, 0.1, 1.0, 0.0, 0.1, 0.01, 0.0, 0.01)], this);
   }

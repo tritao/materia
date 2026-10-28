@@ -129,11 +129,7 @@ class ServoPlan {
       endPosition.copy(),
       endVelocity.copy(),
       endAcceleration.copy(),
-      [new TrajectorySegment(
-        Int64.ofInt(0),
-        durationNs,
-        coefficients
-      )],
+      [new TrajectorySegment(Int64.ofInt(0), durationNs, coefficients)],
       null,
       null,
       tight,

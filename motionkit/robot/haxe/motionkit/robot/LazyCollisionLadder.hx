@@ -22,11 +22,7 @@ class LazyCollisionLadder {
       problem,
       q -> clearance.violation(q, contact),
       rounds,
-      (from, to) -> clearance.sweep(
-        from,
-        to,
-        contact
-      ),
+      (from, to) -> clearance.sweep(from, to, contact),
       coarse
     );
     if (selected.diagnostic != null) return selected;
@@ -45,20 +41,11 @@ class LazyCollisionLadder {
     problem:CandidateProblem,
     check:Array<Float> -> Null<ClearanceViolation>,
     rounds:Int = 8,
-    ?sweep:(
-      Array<Float>,
-      Array<Float>
-    ) -> Null<ClearanceViolation>,
+    ?sweep:(Array<Float>, Array<Float>) -> Null<ClearanceViolation>,
     ?coarse:CoarseSearchOptions,
     ?refinedCheck:LadderSelection -> Null<RefinedCollision>,
-    ?stateCost:(
-      Int,
-      LatticeCandidate
-    ) -> Float,
-    ?entrySweep:(
-      Array<Float>,
-      Array<Float>
-    ) -> Null<ClearanceViolation>,
+    ?stateCost:(Int, LatticeCandidate) -> Float,
+    ?entrySweep:(Array<Float>, Array<Float>) -> Null<ClearanceViolation>,
     ?exitCheck:Array<Float> -> Null<ClearanceViolation>,
     ?weights:Array<Float>,
     rollWeight:Float = 0

@@ -99,11 +99,7 @@ class ToolFreedomTests extends MotionKitTestSupport {
       "work",
       [new PoseLine(
         new PoseWaypoint(solver.forward(seed), 1e-4, 1e-4),
-        new PoseWaypoint(
-          target,
-          1e-4,
-          1e-4
-        ),
+        new PoseWaypoint(target, 1e-4, 1e-4),
         OrientationPolicy.FreeAboutTool,
         0.1,
         0.1
@@ -127,13 +123,7 @@ class ToolFreedomTests extends MotionKitTestSupport {
     }
     compiled.dispose();
     var line = compiler.compile(
-      new MotionProgram([MotionOp.MoveL(
-        target,
-        "work",
-        0.1,
-        Blend.ExactStop,
-        OrientationPolicy.FreeAboutTool
-      )]),
+      new MotionProgram([MotionOp.MoveL(target, "work", 0.1, Blend.ExactStop, OrientationPolicy.FreeAboutTool)]),
       seed,
       Int64.ofInt(21)
     );
@@ -150,17 +140,7 @@ class ToolFreedomTests extends MotionKitTestSupport {
           0.1,
           0.1
         ),
-        new PoseLine(
-          middle,
-          new PoseWaypoint(
-            target,
-            1e-4,
-            1e-4
-          ),
-          OrientationPolicy.FreeAboutTool,
-          0.1,
-          0.1
-        )
+        new PoseLine(middle, new PoseWaypoint(target, 1e-4, 1e-4), OrientationPolicy.FreeAboutTool, 0.1, 0.1)
       ]
     );
     var joined = compiler.compile(
@@ -185,13 +165,7 @@ class ToolFreedomTests extends MotionKitTestSupport {
           0.1,
           0.1
         ),
-        new PoseLine(
-          fullMiddle,
-          fullEnd,
-          OrientationPolicy.Interpolated,
-          0.1,
-          0.1
-        )
+        new PoseLine(fullMiddle, fullEnd, OrientationPolicy.Interpolated, 0.1, 0.1)
       ]
     );
     var stopped = compiler.compile(
@@ -212,17 +186,8 @@ class ToolFreedomTests extends MotionKitTestSupport {
     var target = new Pose3(seed[0] + 1e-16, seed[1], seed[2], 0, 0, Math.sin(0.5), Math.cos(0.5));
     var compiled = compilerFor(solver).compile(
       new MotionProgram([
-        MotionOp.SetOutput(
-          "torch.enable",
-          motionkit.event.EventValue.Digital(true)
-        ),
-        MotionOp.MoveL(
-          target,
-          "work",
-          0.1,
-          Blend.ExactStop,
-          OrientationPolicy.FreeAboutTool
-        )
+        MotionOp.SetOutput("torch.enable", motionkit.event.EventValue.Digital(true)),
+        MotionOp.MoveL(target, "work", 0.1, Blend.ExactStop, OrientationPolicy.FreeAboutTool)
       ]),
       seed,
       Int64.ofInt(32)
@@ -234,13 +199,7 @@ class ToolFreedomTests extends MotionKitTestSupport {
     compiled.dispose();
     var rotated = new Pose3(seed[0] + 1e-16, seed[1], seed[2], 0, 0, Math.sin(0.05), Math.cos(0.05));
     var turn = compilerFor(solver).compile(
-      new MotionProgram([MotionOp.MoveL(
-        rotated,
-        "work",
-        0.1,
-        Blend.ExactStop,
-        OrientationPolicy.Interpolated
-      )]),
+      new MotionProgram([MotionOp.MoveL(rotated, "work", 0.1, Blend.ExactStop, OrientationPolicy.Interpolated)]),
       seed,
       Int64.ofInt(33)
     );
@@ -264,13 +223,7 @@ class ToolFreedomTests extends MotionKitTestSupport {
     );
     var diagnostic = "";
     try compiler.compile(
-      new MotionProgram([MotionOp.MoveL(
-        target,
-        "work",
-        0.1,
-        Blend.ExactStop,
-        OrientationPolicy.Fixed
-      )]),
+      new MotionProgram([MotionOp.MoveL(target, "work", 0.1, Blend.ExactStop, OrientationPolicy.Fixed)]),
       seed,
       Int64.ofInt(30)
     ) catch (error:Dynamic) diagnostic = Std.string(error);
@@ -282,19 +235,7 @@ class ToolFreedomTests extends MotionKitTestSupport {
       "work",
       [new PoseLine(
         new PoseWaypoint(target, 1e-4, 1e-4),
-        new PoseWaypoint(
-          new Pose3(
-            0.3,
-            0.1,
-            0.1,
-            target.qx,
-            target.qy,
-            target.qz,
-            target.qw
-          ),
-          1e-4,
-          1e-4
-        ),
+        new PoseWaypoint(new Pose3(0.3, 0.1, 0.1, target.qx, target.qy, target.qz, target.qw), 1e-4, 1e-4),
         OrientationPolicy.Fixed,
         0.1,
         0.1
@@ -382,22 +323,9 @@ class ToolFreedomTests extends MotionKitTestSupport {
     var tolerance = new IkTolerance();
     var original = solver.solvePose(target, seed, tolerance, null);
     var legacy = fixture.arm.solve(
-      new Transform3(
-        new Vec3(target.x, target.y, target.z),
-        new Quat(
-          target.qx,
-          target.qy,
-          target.qz,
-          target.qw
-        )
-      ),
+      new Transform3(new Vec3(target.x, target.y, target.z), new Quat(target.qx, target.qy, target.qz, target.qw)),
       seed,
-      new IkOptions(
-        tolerance.position,
-        tolerance.orientation,
-        tolerance.maxIterations,
-        tolerance.damping
-      )
+      new IkOptions(tolerance.position, tolerance.orientation, tolerance.maxIterations, tolerance.damping)
     );
     check(legacy.converged, "The G0 full-task solve reaches the comparison target");
     for (i in 0...6) check(original[i] == legacy.q[i], "Full pose IK retains G0 solver bits");
@@ -433,20 +361,10 @@ class ToolFreedomTests extends MotionKitTestSupport {
     var oldSeven = redundant.arm.solve(
       new Transform3(
         new Vec3(sevenTarget.x, sevenTarget.y, sevenTarget.z),
-        new Quat(
-          sevenTarget.qx,
-          sevenTarget.qy,
-          sevenTarget.qz,
-          sevenTarget.qw
-        )
+        new Quat(sevenTarget.qx, sevenTarget.qy, sevenTarget.qz, sevenTarget.qw)
       ),
       sevenSeed,
-      new IkOptions(
-        tolerance.position,
-        tolerance.orientation,
-        tolerance.maxIterations,
-        tolerance.damping
-      ).atSwivel(
+      new IkOptions(tolerance.position, tolerance.orientation, tolerance.maxIterations, tolerance.damping).atSwivel(
         swivel,
         false
       )
@@ -490,14 +408,7 @@ class ToolFreedomTests extends MotionKitTestSupport {
     var clock = Quat.fromAxisAngle(new Vec3(0, 0, 1), Math.PI / 4);
     var offset = new Transform3(
       clock.rotate(new Vec3(0.1365, 0, 0.3105)),
-      clock.multiply(Quat.fromAxisAngle(
-        new Vec3(
-          0,
-          1,
-          0
-        ),
-        Math.PI / 4
-      ))
+      clock.multiply(Quat.fromAxisAngle(new Vec3(0, 1, 0), Math.PI / 4))
     );
     var solver = new ManipulatorKinematics(new KinematicGroup(
       model,
@@ -506,11 +417,7 @@ class ToolFreedomTests extends MotionKitTestSupport {
       null,
       offset,
       null,
-      [
-        "ca-joint-0",
-        "ca-joint-1",
-        "ca-joint-2"
-      ]
+      ["ca-joint-0", "ca-joint-1", "ca-joint-2"]
     ));
     solver.preferTargetOrientation = true;
     var goal = [0.9081, 0.5779, 0.0922, -2.91185, -0.02117];
@@ -582,23 +489,13 @@ class ToolFreedomTests extends MotionKitTestSupport {
       [for (_ in 0...count) 1.0],
       [for (_ in 0...count) 2.0],
       [for (_ in 0...count) 20.0],
-      StartTolerances.uniform(
-        count,
-        0.001,
-        0.001,
-        0.001
-      ),
+      StartTolerances.uniform(count, 0.001, 0.001, 0.001),
       null,
       0.01,
       0.5,
       1e-4,
       1e-4,
-      new IkTolerance(
-        1e-5,
-        1e-5,
-        200,
-        0.01
-      )
+      new IkTolerance(1e-5, 1e-5, 200, 0.01)
     );
   }
 

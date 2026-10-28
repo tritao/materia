@@ -30,10 +30,7 @@ class JointCurveClearance implements JointPathClearanceProof {
     tolerance:Float,
     contact:Bool,
     ?policy:Pose3 -> Bool,
-    ?guard:(
-      Pose3,
-      Float
-    ) -> Bool
+    ?guard:(Pose3, Float) -> Bool
   ) {
     if (world == null || path == null || !Math.isFinite(tolerance)
       || tolerance <= 0) throw "Curve clearance requires a world and finite positive lowering tolerance";

@@ -44,10 +44,7 @@ class PathPlanner {
     fixedTimestepSeconds:Float,
     modelRevision:Int64,
     calibrationRevision:Int64,
-    ?startPositionTolerances:Map<
-      String,
-      Float
-  >
+    ?startPositionTolerances:Map<String, Float>
   ) {
     this.axes = axes.copy();
     this.fixedTimestepSeconds = fixedTimestepSeconds;
@@ -115,10 +112,7 @@ class PathPlanner {
         path,
         options.blendTolerance * CornerBlender.GEOMETRY_SHARE,
         options.maxBlendTurnAngleRadians,
-        CornerBlender.minimumRadius(
-          cornerSpeed,
-          cornerAcceleration
-        )
+        CornerBlender.minimumRadius(cornerSpeed, cornerAcceleration)
       );
       planningPath = blended.path;
       diagnostics = blended.diagnostics;
@@ -176,16 +170,8 @@ class PathPlanner {
           var second = [for (_ in start) 0.0];
           for (entry in [
             {axis: xAxis, prime: tangent[0], second: -tangent[1] * curvature},
-            {
-              axis: yAxis,
-              prime: tangent[1],
-              second: tangent[0] * curvature
-            },
-            {
-              axis: zAxis,
-              prime: tangent[2],
-              second: 0.0
-            }
+            {axis: yAxis, prime: tangent[1], second: tangent[0] * curvature},
+            {axis: zAxis, prime: tangent[2], second: 0.0}
           ]) {
             entry.axis.writeLogicalDelta(prime, entry.prime);
             entry.axis.writeLogicalDelta(second, entry.second);
@@ -251,18 +237,8 @@ class PathPlanner {
         var qDoublePrime = [for (_ in start) 0.0];
         for (entry in [
           {axis: xAxis, position: point.x, prime: tangent[0], second: secondDerivative[0]},
-          {
-            axis: yAxis,
-            position: point.y,
-            prime: tangent[1],
-            second: secondDerivative[1]
-          },
-          {
-            axis: zAxis,
-            position: point.z,
-            prime: tangent[2],
-            second: secondDerivative[2]
-          }
+          {axis: yAxis, position: point.y, prime: tangent[1], second: secondDerivative[1]},
+          {axis: zAxis, position: point.z, prime: tangent[2], second: secondDerivative[2]}
         ]) {
           entry.axis.writeLogicalPosition(q, entry.position);
           entry.axis.writeLogicalDelta(qPrime, entry.prime);
@@ -333,13 +309,7 @@ class PathPlanner {
       timed.trajectory.dispose();
     }
     if (segments.length == 0) return {
-      trajectory: Trajectory.fromPositionSamples(
-        [0.0, fixedTimestepSeconds],
-        [
-          start,
-          start
-        ]
-      ),
+      trajectory: Trajectory.fromPositionSamples([0.0, fixedTimestepSeconds], [start, start]),
       report: null,
       diagnostics: diagnostics
     };
@@ -369,10 +339,7 @@ class PathPlanner {
       for (joint in direct.jointIndices) validation.position(
         joint,
         Math.min(lower[joint], upper[joint]) / jointUnits[joint],
-        Math.max(
-          lower[joint],
-          upper[joint]
-        ) / jointUnits[joint]
+        Math.max(lower[joint], upper[joint]) / jointUnits[joint]
       );
     }
     // Cartesian claims are in metres. Validate every mapped shaft in equivalent

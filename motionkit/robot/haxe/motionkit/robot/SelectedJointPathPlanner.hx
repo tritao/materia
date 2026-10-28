@@ -37,10 +37,7 @@ class SelectedJointPathPlanner implements JointPathPlanner {
         frame: path.frameId,
         geometry: geometryOf(path),
         curve: copy(curve),
-        tasks: [for (s in curve.s) snapshot(provider.at(Math.min(
-          path.length(),
-          s
-        )))]
+        tasks: [for (s in curve.s) snapshot(provider.at(Math.min(path.length(), s)))]
       });
     }
   }
@@ -171,10 +168,8 @@ class SelectedJointPathPlanner implements JointPathPlanner {
       return {type: "slice", from: slice.from, to: slice.to, source: geometryPrimitive(slice.source)};
     }
     return {
-      type: Std.isOfType(primitive, motionkit.path.PoseLine) ? "line" : Std.isOfType(
-        primitive,
-        motionkit.path.PoseArc
-      ) ? "arc" : Std.isOfType(
+      type: Std.isOfType(primitive,
+      motionkit.path.PoseLine) ? "line" : Std.isOfType(primitive, motionkit.path.PoseArc) ? "arc" : Std.isOfType(
         primitive,
         motionkit.path.PoseWeave
       ) ? "weave" : throw "Selected curve reuse requires a known pose primitive",

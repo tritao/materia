@@ -119,10 +119,7 @@ class CoreXyTests extends MotionKitTestSupport {
       goal,
       [1.0, 1.0],
       [100.0, 100.0],
-      [
-        10000.0,
-        10000.0
-      ]
+      [10000.0, 10000.0]
     );
     var single = move([1.0, 0.0]), diagonal = move([1.0, 1.0]), opposite = move([1.0, -1.0]);
     motors.validate(single);
@@ -152,16 +149,7 @@ class CoreXyTests extends MotionKitTestSupport {
       return motors.time(
         new motionkit.planner.ToppraPathTiming(),
         path,
-        new motionkit.planner.PathTimingLimits(
-          [
-            1.0,
-            1.0
-          ],
-          [
-            100.0,
-            100.0
-          ]
-        )
+        new motionkit.planner.PathTimingLimits([1.0, 1.0], [100.0, 100.0])
       );
     }
     var timedSingle = time([1.0, 0.0]), timedDiagonal = time([1.0, 1.0]);
@@ -215,21 +203,13 @@ class CoreXyTests extends MotionKitTestSupport {
       "a.motor",
       1,
       1,
-      robotkit.model.Transmission.SimpleTransmission(
-        "a",
-        1,
-        0
-      )
+      robotkit.model.Transmission.SimpleTransmission("a", 1, 0)
     ));
     model.addActuator(new robotkit.model.Actuator(
       "b.motor",
       1,
       1,
-      robotkit.model.Transmission.SimpleTransmission(
-        "b",
-        1,
-        0
-      )
+      robotkit.model.Transmission.SimpleTransmission("b", 1, 0)
     ));
     near(axisStiffness(), 4000, "independent parallel belts add stiffness", 1e-9);
     model.addCoupling(new robotkit.model.JointCoupling("ya", "y", "a", 1, 0));
@@ -319,12 +299,7 @@ class CoreXyTests extends MotionKitTestSupport {
       [for (limit in velocities) limit * 0.95],
       [for (limit in accelerations) limit * 0.95],
       [for (limit in accelerations) limit * 20.0],
-      StartTolerances.uniform(
-        2,
-        virtual ? 2.5e-5 : 1e-5,
-        0.02,
-        0.02
-      )
+      StartTolerances.uniform(2, virtual ? 2.5e-5 : 1e-5, 0.02, 0.02)
     );
     var options = new PlanCheckOptions();
     options.steady = steady;
@@ -351,15 +326,9 @@ class CoreXyTests extends MotionKitTestSupport {
       robot,
       compiler,
       function(_) return null,
-      function() return {
-        events: [],
-        overflow: false
-      },
+      function() return {events: [], overflow: false},
       driven,
-      virtual ? [
-        2.5e-5,
-        2.5e-5
-      ] : null
+      virtual ? [2.5e-5, 2.5e-5] : null
     );
     motion.run(program);
     var tick = 0, guard = 0;
@@ -467,14 +436,8 @@ class CoreXyTests extends MotionKitTestSupport {
       [0.0, 0.0],
       [0.0, 0.0],
       [0.01, 0.01],
-      [
-        0.01,
-        0.01
-      ],
-      [
-        0.01,
-        0.01
-      ]
+      [0.01, 0.01],
+      [0.01, 0.01]
     );
     trajectory.dispose();
     return made;
@@ -522,16 +485,7 @@ class CoreXyTests extends MotionKitTestSupport {
     var planner = new motionkit.robot.AxisPlanner(axes, 0.01, derived);
     var trajectory = planner.plan(
       [for (_ in names) 0.0],
-      {
-        targets: [
-          new motionkit.AxisTarget("x", 0.03),
-          new motionkit.AxisTarget(
-            "y",
-            -0.02
-          )
-        ],
-        options: null
-      }
+      {targets: [new motionkit.AxisTarget("x", 0.03), new motionkit.AxisTarget("y", -0.02)], options: null}
     ).trajectory;
     var worst = 0.0, moved = 0.0;
     var steps = 40;

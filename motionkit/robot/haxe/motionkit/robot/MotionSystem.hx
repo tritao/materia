@@ -591,13 +591,7 @@ class MotionSystem {
       return trySmoothReplacement(
         executing,
         axisValue.id,
-        state -> axisPlanner.planContinuedJog(
-          state,
-          axisValue,
-          velocity,
-          durationSeconds,
-          acceleration
-        ).trajectory
+        state -> axisPlanner.planContinuedJog(state, axisValue, velocity, durationSeconds, acceleration).trajectory
       );
     }
     return null;
@@ -622,12 +616,7 @@ class MotionSystem {
         replacementOwnerPeriodSeconds,
         replacementMarginOwnerPeriods,
         planFromState,
-        (
-          planned,
-          state,
-          observation,
-          anchorNs
-        ) -> submitSmoothReplacement(
+        (planned, state, observation, anchorNs) -> submitSmoothReplacement(
           planned,
           state,
           observation,
@@ -737,10 +726,7 @@ class MotionSystem {
   function planAxesFrom(start:Array<Float>,
     targets:Array<AxisTarget>, options:Null<MotionOptions>):Trajectory return axisPlanner.plan(
       start,
-      {
-        targets: targets,
-        options: options
-      }
+      {targets: targets, options: options}
     ).trajectory;
 
   function planningStartPositions():Array<Float> {
@@ -811,11 +797,7 @@ class MotionSystem {
         ? robotkit.execution.ExecutionPlanPurpose.Jog : robotkit.execution.ExecutionPlanPurpose.Program,
         jointPositionTolerances
       ),
-        (
-          first,
-          last,
-          error
-        ) -> 'plan chunk [$first,$last] of ${trajectoryValue.segments().length}: $error'
+        (first, last, error) -> 'plan chunk [$first,$last] of ${trajectoryValue.segments().length}: $error'
       );
     } catch (error:Dynamic) {
       session.reject();

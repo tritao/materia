@@ -89,15 +89,7 @@ class PlanCheckTests extends MotionKitTestSupport {
         200.0,
         3e-5,
         1.26,
-        new TorqueSpeedCurve(
-          [0.0, 68.6, 137.2, 274.4],
-          [
-            1.26,
-            1.26,
-            0.63,
-            0.315
-          ]
-        )
+        new TorqueSpeedCurve([0.0, 68.6, 137.2, 274.4], [1.26, 1.26, 0.63, 0.315])
       );
     }
     model.addActuator(motor);
@@ -137,16 +129,7 @@ class PlanCheckTests extends MotionKitTestSupport {
       200.0,
       3e-5,
       0.0001,
-      new TorqueSpeedCurve(
-        [
-          0.0,
-          1000.0
-        ],
-        [
-          0.0001,
-          0.0001
-        ]
-      )
+      new TorqueSpeedCurve([0.0, 1000.0], [0.0001, 0.0001])
     );
     var harness = new SimulationHarness(0.01);
     var runtime = harness.simulation.addRobot(blueprint.runtime);
@@ -199,11 +182,7 @@ class PlanCheckTests extends MotionKitTestSupport {
       "weak-servo",
       null,
       null,
-      Transmission.SimpleTransmission(
-        fixture.model.joints[0].id,
-        1.0,
-        0.0
-      )
+      Transmission.SimpleTransmission(fixture.model.joints[0].id, 1.0, 0.0)
     );
     actuator.drive = new ServoDrive(0.00001, 0.00002, 100.0, 200.0, 1e-3, 4096.0);
     fixture.model.addActuator(actuator);
@@ -309,21 +288,8 @@ class PlanCheckTests extends MotionKitTestSupport {
   /** Missions on an XYZ screw machine use drive caps and submit accepted runtime segments. */
   public function testHandlingUsesCoupledLimits():Void {
     var axis = new motionkit.axis.MotionAxis(
-      new motionkit.axis.MotionAxisBlueprint(
-        "x",
-        ["x"],
-        -0.15,
-        0.15,
-        0.1,
-        0.2,
-        0.0,
-        [1.0],
-        [0.0]
-      ),
-      [
-        "c",
-        "x"
-      ]
+      new motionkit.axis.MotionAxisBlueprint("x", ["x"], -0.15, 0.15, 0.1, 0.2, 0.0, [1.0], [0.0]),
+      ["c", "x"]
     );
     var planner = new motionkit.robot.AxisPlanner([axis], 0.01);
     var homingMove = planner.plan([0.3,
@@ -336,19 +302,8 @@ class PlanCheckTests extends MotionKitTestSupport {
     }
     throws(
       () -> planner.planRetarget(
-        new motionkit.trajectory.TrajectoryState(
-          [0.3, 0.0],
-          [0.1, 0.0],
-          [0.0, 0.0],
-          [
-            0.0,
-            0.0
-          ]
-        ),
-        [new motionkit.AxisTarget(
-          "x",
-          0.04
-        )],
+        new motionkit.trajectory.TrajectoryState([0.3, 0.0], [0.1, 0.0], [0.0, 0.0], [0.0, 0.0]),
+        [new motionkit.AxisTarget("x", 0.04)],
         null
       ),
       "an unmapped moving rotary joint still needs an axis mapping"
@@ -746,10 +701,7 @@ class PlanCheckTests extends MotionKitTestSupport {
     var carrying = new StepperSlip(
       [new CoupledJoint(1, 0, SCREW_RATIO, 0.0)],
       ["slide" => 0],
-      (joint, offset) -> offsets.set(
-        joint,
-        offset
-      )
+      (joint, offset) -> offsets.set(joint, offset)
     );
     carrying.start(stalled);
     carrying.update(0.0);
@@ -778,11 +730,7 @@ class PlanCheckTests extends MotionKitTestSupport {
    */
   function gantryRun(weak:Bool):GantryRun {
     var blueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
-        80,
-        80,
-        80
-      )),
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 80, 80)),
       0.1,
       0.4
     );
@@ -795,13 +743,7 @@ class PlanCheckTests extends MotionKitTestSupport {
         200.0,
         3e-5,
         torque,
-        new TorqueSpeedCurve(
-          [0.0, actuator.requireRate()],
-          [
-            torque,
-            torque
-          ]
-        )
+        new TorqueSpeedCurve([0.0, actuator.requireRate()], [torque, torque])
       );
     }
     // Explicit motor feedback detects lost steps; the load-side scale measures carriage error.
@@ -870,10 +812,7 @@ class PlanCheckTests extends MotionKitTestSupport {
       robot,
       compiler,
       function(_) return null,
-      function() return {
-        events: [],
-        overflow: false
-      },
+      function() return {events: [], overflow: false},
       [for (joint in 0...ids.length) joint]
     );
     var slip = new StepperSlip(
@@ -884,14 +823,7 @@ class PlanCheckTests extends MotionKitTestSupport {
         coupling.offset
       )],
       [for (joint in 0...ids.length) ids[joint] => joint],
-      (
-        joint,
-        offset
-      ) -> harness.simulation.setJointSlip(
-        0,
-        joint,
-        offset
-      )
+      (joint, offset) -> harness.simulation.setJointSlip(0, joint, offset)
     );
     motion.slip = slip;
     var monitor = new EncoderMonitor(model, [for (_ in ids) 0.0]);
@@ -1004,11 +936,7 @@ class PlanCheckTests extends MotionKitTestSupport {
    */
   public function testCompilerRunsPlanCheck():Void {
     var blueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
-        80,
-        80,
-        80
-      )),
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 80, 80)),
       0.1,
       0.4
     );
@@ -1040,12 +968,7 @@ class PlanCheckTests extends MotionKitTestSupport {
         [for (_ in ids) 1e6],
         [for (_ in ids) 1e6],
         [for (_ in ids) 1e9],
-        StartTolerances.uniform(
-          ids.length,
-          0.00001,
-          0.02,
-          0.02
-        )
+        StartTolerances.uniform(ids.length, 0.00001, 0.02, 0.02)
       );
       var options = new PlanCheckOptions();
       options.rejects = rejects;
@@ -1074,12 +997,7 @@ class PlanCheckTests extends MotionKitTestSupport {
       [for (_ in ids) 1e6],
       [for (_ in ids) 1e6],
       [for (_ in ids) 1e9],
-      StartTolerances.uniform(
-        ids.length,
-        0.00001,
-        0.02,
-        0.02
-      )
+      StartTolerances.uniform(ids.length, 0.00001, 0.02, 0.02)
     );
     check(
       plain.compile(moving, start, Int64.ofInt(2)).blocks[0].plans[0].checked == null,

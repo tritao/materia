@@ -205,10 +205,7 @@ class ExecutionPlan implements NativeSpanOwner implements TimedJointTrajectory {
       writeAscii(
         event.channel,
         TrajectoryCoreConstants.MK_EVENT_CHANNEL_BYTES,
-        function(i, code) nativeEvent.set_channel(
-          i,
-          code
-        )
+        function(i, code) nativeEvent.set_channel(i, code)
       );
       nativeEvent.set_time_ns(event.timeNs);
       nativeEvent.set_hold_policy(switch event.holdPolicy {
@@ -233,10 +230,7 @@ class ExecutionPlan implements NativeSpanOwner implements TimedJointTrajectory {
           writeAscii(
             command,
             TrajectoryCoreConstants.MK_EVENT_COMMAND_BYTES,
-            function(i, code) nativeValue.set_command(
-              i,
-              code
-            )
+            function(i, code) nativeValue.set_command(i, code)
           );
           nativeValue.set_argument(argument);
       }

@@ -51,10 +51,7 @@ class RrtConnect implements MotionPlanner {
     for (q in [start, goal]) for (k in 0...n) if (!(q[k] >= lower[k] && q[k] <= upper[k])) {
       var tolerance = 1e-12 * Math.max(
         1.0,
-        Math.max(
-          Math.isFinite(lower[k]) ? Math.abs(lower[k]) : 0.0,
-          Math.isFinite(upper[k]) ? Math.abs(upper[k]) : 0.0
-        )
+        Math.max(Math.isFinite(lower[k]) ? Math.abs(lower[k]) : 0.0, Math.isFinite(upper[k]) ? Math.abs(upper[k]) : 0.0)
       );
       if (Math.isFinite(q[k]) && q[k] < lower[k] && lower[k] - q[k] <= tolerance) q[k] = lower[k];
       else if (Math.isFinite(q[k]) && q[k] > upper[k] && q[k] - upper[k] <= tolerance) q[k] = upper[k];

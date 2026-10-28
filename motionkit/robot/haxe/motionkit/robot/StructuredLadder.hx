@@ -12,10 +12,7 @@ class StructuredLadder {
     count:Int,
     ?weights:Array<Float>,
     rollWeight:Float = 0,
-    ?stateCost:(
-      Int,
-      LatticeCandidate
-    ) -> Float,
+    ?stateCost:(Int, LatticeCandidate) -> Float,
     ?coarse:CoarseSearchOptions,
     ?blockedEdges:Array<BlockedLadderEdge>
   ):Array<LadderSelection> {
@@ -52,10 +49,7 @@ class StructuredLadder {
     problem:CandidateProblem,
     ?weights:Array<Float>,
     rollWeight:Float = 0,
-    ?stateCost:(
-      Int,
-      LatticeCandidate
-    ) -> Float,
+    ?stateCost:(Int, LatticeCandidate) -> Float,
     ?coarse:CoarseSearchOptions,
     ?blockedEdges:Array<BlockedLadderEdge>,
     maxPacketBytes:Int = 268435456
@@ -86,10 +80,7 @@ class StructuredLadder {
     problem:CandidateProblem,
     weights:Null<Array<Float>>,
     rollWeight:Float,
-    stateCost:Null<(
-      Int,
-      LatticeCandidate
-    ) -> Float>,
+    stateCost:Null<(Int, LatticeCandidate) -> Float>,
     coarse:Null<CoarseSearchOptions>,
     blockedEdges:Null<Array<BlockedLadderEdge>>,
     allowed:LatticeCandidate -> Bool,

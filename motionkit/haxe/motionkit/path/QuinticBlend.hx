@@ -15,24 +15,12 @@ class QuinticBlend implements PathPrimitive {
       var left = motionkit.math.QuinticPolynomial.slice(
         actual,
         Math.max(0, Math.min(1, (low - from) / (to - from))),
-        Math.max(
-          0,
-          Math.min(
-            1,
-            (high - from) / (to - from)
-          )
-        )
+        Math.max(0, Math.min(1, (high - from) / (to - from)))
       );
       var right = motionkit.math.QuinticPolynomial.slice(
         reference,
         Math.max(0, Math.min(1, a)),
-        Math.max(
-          0,
-          Math.min(
-            1,
-            b
-          )
-        )
+        Math.max(0, Math.min(1, b))
       );
       bound = Math.max(bound, motionkit.math.QuinticPolynomial.differenceBound(left, right));
     }
@@ -59,21 +47,9 @@ class QuinticBlend implements PathPrimitive {
     controls = [
       a,
       new PathPoint(a.x + d0.x / 5.0, a.y + d0.y / 5.0, a.z),
-      new PathPoint(
-        a.x + 2.0 * d0.x / 5.0 + dd0.x / 20.0,
-        a.y + 2.0 * d0.y / 5.0 + dd0.y / 20.0,
-        a.z
-      ),
-      new PathPoint(
-        b.x - 2.0 * d1.x / 5.0 + dd1.x / 20.0,
-        b.y - 2.0 * d1.y / 5.0 + dd1.y / 20.0,
-        b.z
-      ),
-      new PathPoint(
-        b.x - d1.x / 5.0,
-        b.y - d1.y / 5.0,
-        b.z
-      ),
+      new PathPoint(a.x + 2.0 * d0.x / 5.0 + dd0.x / 20.0, a.y + 2.0 * d0.y / 5.0 + dd0.y / 20.0, a.z),
+      new PathPoint(b.x - 2.0 * d1.x / 5.0 + dd1.x / 20.0, b.y - 2.0 * d1.y / 5.0 + dd1.y / 20.0, b.z),
+      new PathPoint(b.x - d1.x / 5.0, b.y - d1.y / 5.0, b.z),
       b
     ];
     distances = [0.0];

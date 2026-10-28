@@ -43,10 +43,7 @@ class SerialCandidateSampler {
     tiltRings:Int = 3,
     azimuthCount:Int = 8,
     ?maxJump:Array<Float>,
-    ?jointBounds: {
-      lower: Array<Float>,
-      upper: Array<Float>
-    }
+    ?jointBounds: {lower: Array<Float>, upper: Array<Float>}
   ):Array<LatticeCandidate> {
     if (target == null) throw "Serial candidate sampling requires a target";
     var planningSeed = ExternalAxisGrid.normalizeSeed(group, seed);

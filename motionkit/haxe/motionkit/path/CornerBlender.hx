@@ -36,10 +36,7 @@ class CornerBlender {
       path,
       [for (_ in 0...Std.int(Math.max(0, path.primitives.length - 1))) tolerance],
       maxTurnAngleRadians,
-      [for (_ in 0...Std.int(Math.max(
-        0,
-        path.primitives.length - 1
-      ))) minRadius]
+      [for (_ in 0...Std.int(Math.max(0, path.primitives.length - 1))) minRadius]
     );
   }
 

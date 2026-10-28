@@ -11,12 +11,7 @@ import robotkit.spatial.Vec3;
 class RedundancyPoses {
   public static function transform(value:Pose3):Transform3 return new Transform3(
     new Vec3(value.x, value.y, value.z),
-    new Quat(
-      value.qx,
-      value.qy,
-      value.qz,
-      value.qw
-    )
+    new Quat(value.qx, value.qy, value.qz, value.qw)
   );
 
   public static function options(tolerance:IkTolerance):IkOptions return new IkOptions(

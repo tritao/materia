@@ -103,12 +103,7 @@ class NumericBranchIk implements AnalyticIk {
       var solved = group.solve(
         new Transform3(
           new Vec3(task.target.x, task.target.y, task.target.z),
-          new Quat(
-            task.target.qx,
-            task.target.qy,
-            task.target.qz,
-            task.target.qw
-          )
+          new Quat(task.target.qx, task.target.qy, task.target.qz, task.target.qw)
         ),
         q,
         options

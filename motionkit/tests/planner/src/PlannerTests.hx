@@ -218,11 +218,7 @@ private class CountingSpace implements motionkit.planner.PlannerSpace {
       slideX,
       Transform.identity(),
       Transform.identity(),
-      new Vector3(
-        1,
-        0,
-        0
-      ),
+      new Vector3(1, 0, 0),
       -1,
       1
     );
@@ -233,11 +229,7 @@ private class CountingSpace implements motionkit.planner.PlannerSpace {
       slideY,
       Transform.identity(),
       Transform.identity(),
-      new Vector3(
-        0,
-        1,
-        0
-      ),
+      new Vector3(0, 1, 0),
       -1,
       1
     );
@@ -468,27 +460,13 @@ private class CountingSpace implements motionkit.planner.PlannerSpace {
       "torch",
       bodies.bodies[model.bodyIndex("wrist_3_link")],
       CollisionPose.identity(),
-      CollisionGeometry.Convex(WeldPlanningTests.box(
-        -0.012,
-        0.012,
-        D6 - 0.012,
-        D6 + 0.012,
-        -0.14,
-        -0.03
-      ))
+      CollisionGeometry.Convex(WeldPlanningTests.box(-0.012, 0.012, D6 - 0.012, D6 + 0.012, -0.14, -0.03))
     );
     bodies.declare();
     description.addFixed(
       "table",
       CollisionPose.identity(),
-      CollisionGeometry.Convex(WeldPlanningTests.box(
-        -0.8,
-        0.8,
-        -0.8,
-        0.8,
-        -0.1,
-        0.0
-      )),
+      CollisionGeometry.Convex(WeldPlanningTests.box(-0.8, 0.8, -0.8, 0.8, -0.1, 0.0)),
       1
     );
     description.addFixed(
@@ -510,14 +488,8 @@ private class CountingSpace implements motionkit.planner.PlannerSpace {
       space: new CollisionPlannerSpace(description, build, bodies, new CollisionMargins(2, 0.007)),
       world: world,
       goal: goal,
-      lower: [for (j in 0...6) Math.min(
-        START[j],
-        goal[j]
-      ) - 0.8],
-      upper: [for (j in 0...6) Math.max(
-        START[j],
-        goal[j]
-      ) + 0.8]
+      lower: [for (j in 0...6) Math.min(START[j], goal[j]) - 0.8],
+      upper: [for (j in 0...6) Math.max(START[j], goal[j]) + 0.8]
     };
   }
 
@@ -597,27 +569,13 @@ private class CountingSpace implements motionkit.planner.PlannerSpace {
     var torch:collisionkit.CollisionDescription = CollisionClearance.convex(
       "torch",
       "wrist_3_link",
-      WeldPlanningTests.box(
-        -0.012,
-        0.012,
-        D6 - 0.012,
-        D6 + 0.012,
-        -0.14,
-        -0.03
-      ),
+      WeldPlanningTests.box(-0.012, 0.012, D6 - 0.012, D6 + 0.012, -0.14, -0.03),
       true
     );
     var table:collisionkit.CollisionDescription = CollisionClearance.convex(
       "table",
       "base_link",
-      WeldPlanningTests.box(
-        -0.8,
-        0.8,
-        -0.8,
-        0.8,
-        -0.1,
-        0.0
-      ),
+      WeldPlanningTests.box(-0.8, 0.8, -0.8, 0.8, -0.1, 0.0),
       false
     );
     // The post stands where the torch passes halfway round.
@@ -627,14 +585,7 @@ private class CountingSpace implements motionkit.planner.PlannerSpace {
     var post:collisionkit.CollisionDescription = CollisionClearance.convex(
       "post",
       "base_link",
-      WeldPlanningTests.box(
-        tip.x - 0.03,
-        tip.x + 0.03,
-        tip.y - 0.03,
-        tip.y + 0.03,
-        0.0,
-        tip.z + 0.05
-      ),
+      WeldPlanningTests.box(tip.x - 0.03, tip.x + 0.03, tip.y - 0.03, tip.y + 0.03, 0.0, tip.z + 0.05),
       false
     );
     // The planner's world: the arm's bodies from its model, the same hulls.
@@ -667,10 +618,7 @@ private class CountingSpace implements motionkit.planner.PlannerSpace {
       new BoundedSpace(
         space,
         [for (j in 0...6) Math.min(START[j], goal[j]) - 0.8],
-        [for (j in 0...6) Math.max(
-          START[j],
-          goal[j]
-        ) + 0.8]
+        [for (j in 0...6) Math.max(START[j], goal[j]) + 0.8]
       ),
       2
     );
@@ -688,16 +636,8 @@ private class CountingSpace implements motionkit.planner.PlannerSpace {
       ));
     compiler.motionPlanner = planner;
     var compiled = compiler.compile(
-      new MotionProgram([MotionOp.MoveJ(
-        MoveTarget.JointTarget(goal),
-        new MotionOptions(
-          0,
-          0,
-          0,
-          true
-        ),
-        Blend.ExactStop
-      )]),
+      new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal),
+      new MotionOptions(0, 0, 0, true), Blend.ExactStop)]),
       START,
       Int64.ofInt(1)
     );
@@ -726,12 +666,7 @@ private class CountingSpace implements motionkit.planner.PlannerSpace {
     compiler.flyByCertificate = space;
     var ops = [for (k in 1...path.length) MotionOp.MoveJ(
       MoveTarget.JointTarget(path[k]),
-      new MotionOptions(
-        0,
-        0,
-        0,
-        true
-      ),
+      new MotionOptions(0, 0, 0, true),
       k + 1 < path.length ? Blend.FlyBy : Blend.ExactStop
     )];
     var flown = compiler.compile(new MotionProgram(ops), START, Int64.ofInt(2));

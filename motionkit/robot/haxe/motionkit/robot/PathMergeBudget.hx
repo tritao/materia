@@ -58,10 +58,7 @@ class PathMergeBudget {
       allowed = path.blendTolerance;
     } else for (primitive in path.primitives) allowed = Math.min(
       allowed,
-      Math.min(
-        primitive.startWaypoint().positionTolerance,
-        primitive.endWaypoint().positionTolerance
-      )
+      Math.min(primitive.startWaypoint().positionTolerance, primitive.endWaypoint().positionTolerance)
     );
     var interpolation = 0.0, at = 0;
     for (span in 0...curve.s.length - 1) {
