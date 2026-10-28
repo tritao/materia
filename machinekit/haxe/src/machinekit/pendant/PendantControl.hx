@@ -18,7 +18,7 @@ class PendantControl {
   public final above:Float;
   public final behind:Float;
   public final massGrams:Float;
-  /** "vendor-drawing", "measured", "datasheet" or "assumed". */
+  /** "measured", "vendor-drawing", "datasheet", "listing" (a seller's stated size, to be measured) or "assumed". */
   public final source:String;
 
   public function new(id:String, kind:ControlKind, x:Float, y:Float, cutout:Footprint, keepOut:Footprint,
@@ -29,7 +29,7 @@ class PendantControl {
     if (above < 0 || behind < 0 || massGrams < 0) throw 'Control $id has a negative size or mass';
     checkFootprint(cutout, id);
     checkFootprint(keepOut, id);
-    if (["vendor-drawing", "measured", "datasheet", "assumed"].indexOf(source) < 0) throw 'Control $id has an unknown source $source';
+    if (["vendor-drawing", "measured", "datasheet", "listing", "assumed"].indexOf(source) < 0) throw 'Control $id has an unknown source $source';
     this.id = id; this.kind = kind; this.x = x; this.y = y; this.cutout = cutout; this.keepOut = keepOut;
     this.above = above; this.behind = behind; this.massGrams = massGrams; this.source = source;
     this.extraHoles = extraHoles == null ? [] : extraHoles.copy();
