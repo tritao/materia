@@ -16,6 +16,12 @@ import materia.units.LengthUnit;
 
 /** Versioned transport and validation for reusable assembly definitions and states. */
 class AssemblyDefinitionCodec {
+    /** Real assemblies include individual fasteners. Keep a finite decode bound
+     * without limiting a complete machine to 1,000 occurrences. */
+    public static inline final MAX_PARTS=4096;
+    /** Long machine hosts own individual fastener/mate connectors. */
+    public static inline final MAX_CONNECTORS=512;
+
 	public static inline var VERSION:Int = 11;
 
 	public static function validateStop(stop:AssemblyJointStop, joint:String):Void {
@@ -61,8 +67,8 @@ class AssemblyDefinitionCodec {
 	static function validateFlat(definition:AssemblyDefinition):Void {
 		if (definition == null || definition.schemaVersion != VERSION || !validText(definition.id) ||
 			definition.definitions == null || definition.definitions.length == 0 ||
-			definition.definitions.length > 1000 || definition.occurrences == null ||
-			definition.occurrences.length == 0 || definition.occurrences.length > 1000 ||
+			definition.definitions.length > MAX_PARTS || definition.occurrences == null ||
+			definition.occurrences.length == 0 || definition.occurrences.length > MAX_PARTS ||
 			definition.joints == null || definition.joints.length > 4000)
 			throw "Assembly definition has an invalid version, ID, or item count";
 		LengthUnit.metresPerUnit(definition.lengthUnit == null ? "mm" : definition.lengthUnit);
@@ -70,8 +76,9 @@ class AssemblyDefinitionCodec {
 		var definitions = new Map<String, AssemblyComponentDefinition>();
 		for (component in definition.definitions) {
 			if (component == null || !validText(component.id) || definitions.exists(component.id) ||
-				component.connectors == null || component.connectors.length > 100)
-				throw "Assembly definition has an invalid or duplicate component definition";
+				component.connectors == null || component.connectors.length > MAX_CONNECTORS)
+				throw component==null?"Assembly definition has a null component definition":
+                    'Invalid or duplicate component definition "${component.id}" (connectors=${component.connectors==null?-1:component.connectors.length}, maximum=$MAX_CONNECTORS)';
 			var names = new Map<String, Bool>();
 			for (connector in component.connectors) {
 				if (connector == null || !validText(connector.name) || names.exists(connector.name))
