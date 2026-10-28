@@ -8,21 +8,21 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.assembly.AssemblyRecord.AssemblyConnector;
 
 enum abstract AssemblyJointType(String) from String to String {
-	var Fixed = "fixed";
-	var Revolute = "revolute";
-	var Continuous = "continuous";
-	var Prismatic = "prismatic";
-	/** Closures only: a shared point. */
-	var Spherical = "spherical";
-	/** Closures only: a shared axis line, free to slide and turn along it. */
-	var Cylindrical = "cylindrical";
-	/** Closures only: the child connector's origin on the parent's plane (normal = axis), normals parallel. */
-	var Planar = "planar";
+  var Fixed = "fixed";
+  var Revolute = "revolute";
+  var Continuous = "continuous";
+  var Prismatic = "prismatic";
+  /** Closures only: a shared point. */
+  var Spherical = "spherical";
+  /** Closures only: a shared axis line, free to slide and turn along it. */
+  var Cylindrical = "cylindrical";
+  /** Closures only: the child connector's origin on the parent's plane (normal = axis), normals parallel. */
+  var Planar = "planar";
 }
 
 enum abstract AssemblyJointRole(String) from String to String {
-	var Tree = "tree";
-	var Closure = "closure";
+  var Tree = "tree";
+  var Closure = "closure";
 }
 
 /**
@@ -31,115 +31,115 @@ enum abstract AssemblyJointRole(String) from String to String {
 	and d = B's origin − A's origin. Mates position parts; joints move them.
 */
 enum abstract AssemblyMateKind(String) from String to String {
-	/** B's origin on A's origin. */
-	var Coincident = "coincident";
-	/** B's origin on A's axis line, axes parallel. */
-	var Coaxial = "coaxial";
-	/** B's origin on A's plane (normal a), offset by `value` along a; normals parallel. */
-	var Planar = "planar";
-	/** Axes parallel (either direction). */
-	var Parallel = "parallel";
-	/** Axes perpendicular. */
-	var Perpendicular = "perpendicular";
-	/** Origins `value` apart (length unit, positive; zero is `Coincident`). */
-	var Distance = "distance";
-	/** `value` radians between the axes, in [0, π] (0 and π hold the axes aligned or opposed). */
-	var Angle = "angle";
-	/** B's frame on A's frame. */
-	var Lock = "lock";
+  /** B's origin on A's origin. */
+  var Coincident = "coincident";
+  /** B's origin on A's axis line, axes parallel. */
+  var Coaxial = "coaxial";
+  /** B's origin on A's plane (normal a), offset by `value` along a; normals parallel. */
+  var Planar = "planar";
+  /** Axes parallel (either direction). */
+  var Parallel = "parallel";
+  /** Axes perpendicular. */
+  var Perpendicular = "perpendicular";
+  /** Origins `value` apart (length unit, positive; zero is `Coincident`). */
+  var Distance = "distance";
+  /** `value` radians between the axes, in [0, π] (0 and π hold the axes aligned or opposed). */
+  var Angle = "angle";
+  /** B's frame on A's frame. */
+  var Lock = "lock";
 }
 
 @:wire typedef AssemblyVector = {
-	@:id(1) var x:Float;
-	@:id(2) var y:Float;
-	@:id(3) var z:Float;
+  @:id(1) var x:Float;
+  @:id(2) var y:Float;
+  @:id(3) var z:Float;
 }
 
 /** Missing limits are unbounded. Velocity and effort are optional metadata. */
 @:wire typedef AssemblyJointLimits = {
-	@:id(1) var lower:Null<Float>;
-	@:id(2) var upper:Null<Float>;
-	@:id(3) var velocity:Null<Float>;
-	@:id(4) var effort:Null<Float>;
-	/**
+  @:id(1) var lower:Null<Float>;
+  @:id(2) var upper:Null<Float>;
+  @:id(3) var velocity:Null<Float>;
+  @:id(4) var effort:Null<Float>;
+  /**
 	 * How far the joint can travel past `lower` and `upper` before it meets its
 	 * end stop, in the joint's units: a machine's limit switch sits beyond its
 	 * soft limit. Motion stays within the limits; a simulation faults only past
 	 * the overtravel. Absent, a simulation picks a small default.
 	 */
-	@:id(5) @:optional var overtravel:Null<Float>;
-	/** Largest acceleration the joint's drive can give, in the joint's units per second squared. */
-	@:id(6) @:optional var acceleration:Null<Float>;
-	/** Permitted dual-drive displacement disagreement, in the joint coordinate units. */
-	@:id(8) @:optional var rackingTolerance:Null<Float>;
-	@:id(7) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
+  @:id(5) @:optional var overtravel:Null<Float>;
+  /** Largest acceleration the joint's drive can give, in the joint's units per second squared. */
+  @:id(6) @:optional var acceleration:Null<Float>;
+  /** Permitted dual-drive displacement disagreement, in the joint coordinate units. */
+  @:id(8) @:optional var rackingTolerance:Null<Float>;
+  @:id(7) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
 }
 
 /** Connectors belong to a reusable component definition, not an occurrence. */
 @:wire typedef AssemblyComponentDefinition = {
-	@:id(1) var id:String;
-	@:id(2) var connectors:Array<AssemblyConnector>;
-	/** Standard robot tool flange face, declared by the component. */
-	@:id(3) @:optional var robotFlangeConnector:String;
-	/** Authored convex collision pieces in local units; empty explicitly disables collision for visual-only pieces. */
-	@:id(4) @:optional var collisionHulls:Array<Array<Float>>;
+  @:id(1) var id:String;
+  @:id(2) var connectors:Array<AssemblyConnector>;
+  /** Standard robot tool flange face, declared by the component. */
+  @:id(3) @:optional var robotFlangeConnector:String;
+  /** Authored convex collision pieces in local units; empty explicitly disables collision for visual-only pieces. */
+  @:id(4) @:optional var collisionHulls:Array<Array<Float>>;
 }
 
 /** An occurrence references shared component data and has a local initial pose. */
 @:wire typedef AssemblyComponentOccurrence = {
-	@:id(1) var id:String;
-	@:id(2) var definition:String;
-	@:id(3) var initialPose:AssemblyFrame;
-	/** References an entry in AssemblyDefinition.assemblies. */
-	@:id(4) @:optional var assembly:String;
-	/** Mates never move it (see `AssemblyMateSolver`). */
-	@:id(5) @:optional var grounded:Bool;
-	/** Include owning this occurrence; empty for the root assembly. */
-	@:id(6) @:optional var includePath:String;
-	/** Authored default visibility; omitted means visible. Does not remove physics or wiring. */
-	@:id(7) @:optional var visible:Bool;
+  @:id(1) var id:String;
+  @:id(2) var definition:String;
+  @:id(3) var initialPose:AssemblyFrame;
+  /** References an entry in AssemblyDefinition.assemblies. */
+  @:id(4) @:optional var assembly:String;
+  /** Mates never move it (see `AssemblyMateSolver`). */
+  @:id(5) @:optional var grounded:Bool;
+  /** Include owning this occurrence; empty for the root assembly. */
+  @:id(6) @:optional var includePath:String;
+  /** Authored default visibility; omitted means visible. Does not remove physics or wiring. */
+  @:id(7) @:optional var visible:Bool;
 }
 
 /** A placement relation between two occurrence connectors (see `AssemblyMateKind`). */
 @:wire typedef AssemblyMate = {
-	@:id(1) var id:String;
-	@:id(2) var kind:AssemblyMateKind;
-	@:id(3) var first:String;
-	@:id(4) var firstConnector:String;
-	@:id(5) var second:String;
-	@:id(6) var secondConnector:String;
-	/** Unit axis, expressed in each connector frame. */
-	@:id(7) var axis:AssemblyVector;
-	/** Planar offset or distance (length unit), or angle (radians). */
-	@:id(8) @:optional var value:Float;
+  @:id(1) var id:String;
+  @:id(2) var kind:AssemblyMateKind;
+  @:id(3) var first:String;
+  @:id(4) var firstConnector:String;
+  @:id(5) var second:String;
+  @:id(6) var secondConnector:String;
+  /** Unit axis, expressed in each connector frame. */
+  @:id(7) var axis:AssemblyVector;
+  /** Planar offset or distance (length unit), or angle (radians). */
+  @:id(8) @:optional var value:Float;
 }
 
 /** A persistent kinematic edge or closure. The axis is unit length in the parent connector frame. */
 @:wire typedef KinematicJoint = {
-	@:id(1) var id:String;
-	@:id(2) var type:AssemblyJointType;
-	@:id(3) var role:AssemblyJointRole;
-	@:id(4) var parent:String;
-	@:id(5) var parentConnector:String;
-	@:id(6) var child:String;
-	@:id(7) var childConnector:String;
-	@:id(8) var axis:AssemblyVector;
-	@:id(9) var limits:AssemblyJointLimits;
-	@:id(10) var defaultValue:Float;
-	/** Maximum closure position residual in the assembly length unit. */
-	@:id(11) @:optional var closureTolerance:Float;
-	/**
+  @:id(1) var id:String;
+  @:id(2) var type:AssemblyJointType;
+  @:id(3) var role:AssemblyJointRole;
+  @:id(4) var parent:String;
+  @:id(5) var parentConnector:String;
+  @:id(6) var child:String;
+  @:id(7) var childConnector:String;
+  @:id(8) var axis:AssemblyVector;
+  @:id(9) var limits:AssemblyJointLimits;
+  @:id(10) var defaultValue:Float;
+  /** Maximum closure position residual in the assembly length unit. */
+  @:id(11) @:optional var closureTolerance:Float;
+  /**
 		An input of the mechanism (a motor, a cylinder): its coordinate is set, never solved. The other movable tree
 		joints on a closure loop are dependent and follow it (see `AssemblyState.dependentJoints`). Only movable tree
 		joints that are not coupling targets can be driven.
 	*/
-	@:id(12) @:optional var driven:Bool;
-	/** Include owning this joint; empty for the root assembly. */
-	@:id(13) @:optional var includePath:String;
-	/** Passive physical motion; host position control and power-on holding are disabled. */
-	@:id(14) @:optional var passive:Bool;
-	/** Authored mechanical end-stop response; nominal travel remains in `limits`. */
-	@:id(15) @:optional var stop:AssemblyJointStop;
+  @:id(12) @:optional var driven:Bool;
+  /** Include owning this joint; empty for the root assembly. */
+  @:id(13) @:optional var includePath:String;
+  /** Passive physical motion; host position control and power-on holding are disabled. */
+  @:id(14) @:optional var passive:Bool;
+  /** Authored mechanical end-stop response; nominal travel remains in `limits`. */
+  @:id(15) @:optional var stop:AssemblyJointStop;
 }
 
 /**
@@ -149,61 +149,61 @@ enum abstract AssemblyMateKind(String) from String to String {
  * unique and the terms never form a cycle.
  */
 @:wire typedef AssemblyJointCoupling = {
-	@:id(1) var id:String;
-	@:id(2) var source:String;
-	@:id(3) var target:String;
-	@:id(4) var ratio:Float;
-	@:id(5) var offset:Float;
-	/** Power delivered over power put in, between the joints, such as a lead screw's 0.4; 1 when absent. */
-	@:id(6) @:optional var efficiency:Null<Float>;
-	/** Force at the source per unit of source travel (N per assembly unit; N m/rad for a turning source); absent is rigid. */
-	@:id(7) @:optional var stiffness:Null<Float>;
-	/** Lost motion on reversal, in the source's units. */
-	@:id(8) @:optional var backlash:Null<Float>;
-	/** Constant resisting effort the coupling adds at the target while it moves (N m for a turning target). */
-	@:id(9) @:optional var drag:Null<Float>;
-	/** Engineering inputs assumed by the source of this coupling; absent when none. */
-	@:id(10) @:optional var assumed:Null<ReadOnlyArray<String>>;
-	@:id(11) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
-	/** How damped the coupling's response is, as a ratio of critical damping (a timing belt's is about 0.1); absent is critical. */
-	@:id(12) @:optional var dampingRatio:Null<Float>;
-	/** Reciprocal affine compliances in the leader's units per effort, evaluated at physical assembly joint coordinates. */
-	@:id(13) @:optional var stiffnessLaw:Null<Array<AssemblyComplianceSpring>>;
-	@:id(14) @:optional var calibration:Null<materia.assembly.BeltCalibration>;
+  @:id(1) var id:String;
+  @:id(2) var source:String;
+  @:id(3) var target:String;
+  @:id(4) var ratio:Float;
+  @:id(5) var offset:Float;
+  /** Power delivered over power put in, between the joints, such as a lead screw's 0.4; 1 when absent. */
+  @:id(6) @:optional var efficiency:Null<Float>;
+  /** Force at the source per unit of source travel (N per assembly unit; N m/rad for a turning source); absent is rigid. */
+  @:id(7) @:optional var stiffness:Null<Float>;
+  /** Lost motion on reversal, in the source's units. */
+  @:id(8) @:optional var backlash:Null<Float>;
+  /** Constant resisting effort the coupling adds at the target while it moves (N m for a turning target). */
+  @:id(9) @:optional var drag:Null<Float>;
+  /** Engineering inputs assumed by the source of this coupling; absent when none. */
+  @:id(10) @:optional var assumed:Null<ReadOnlyArray<String>>;
+  @:id(11) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
+  /** How damped the coupling's response is, as a ratio of critical damping (a timing belt's is about 0.1); absent is critical. */
+  @:id(12) @:optional var dampingRatio:Null<Float>;
+  /** Reciprocal affine compliances in the leader's units per effort, evaluated at physical assembly joint coordinates. */
+  @:id(13) @:optional var stiffnessLaw:Null<Array<AssemblyComplianceSpring>>;
+  @:id(14) @:optional var calibration:Null<materia.assembly.BeltCalibration>;
 }
 
 /** Series compliance of one parallel spring, in source-coordinate units per effort. */
 @:wire typedef AssemblyComplianceSpring = {
-	@:id(1) var compliance:Float;
-	@:id(2) var coordinates:Array<AssemblyComplianceCoordinate>;
+  @:id(1) var compliance:Float;
+  @:id(2) var coordinates:Array<AssemblyComplianceCoordinate>;
 }
 typedef AssemblyComplianceCoordinate = AssemblyElasticTerm;
 
 /** A derived elastic span; displacement coefficients use assembly length per joint unit. */
 @:wire typedef AssemblyElasticTerm = {
-	@:id(1) var joint:String;
-	@:id(2) var coefficient:Float;
+  @:id(1) var joint:String;
+  @:id(2) var coefficient:Float;
 }
 
 @:wire typedef AssemblyElasticSpan = {
-	/** Axial force per assembly length, N/mm in a millimetre assembly. */
-	@:id(1) var stiffness:Float;
-	@:id(2) var terms:Array<AssemblyElasticTerm>;
+  /** Axial force per assembly length, N/mm in a millimetre assembly. */
+  @:id(1) var stiffness:Float;
+  @:id(2) var terms:Array<AssemblyElasticTerm>;
 }
 
 /** One physical elastic network replaces the scalar springs of its listed motion couplings. */
 @:wire typedef AssemblyElasticClearance = {
-	@:id(1) var joint:String;
-	/** Bounded tooth motion in this joint's coordinate units. */
-	@:id(2) var allowance:Float;
+  @:id(1) var joint:String;
+  /** Bounded tooth motion in this joint's coordinate units. */
+  @:id(2) var allowance:Float;
 }
 
 @:wire typedef AssemblyElasticNetwork = {
-	@:id(1) var id:String;
-	@:id(2) var couplings:Array<String>;
-	@:id(3) var spans:Array<AssemblyElasticSpan>;
-	@:id(4) @:optional var assumptions:Array<QuantityAssumption>;
-	@:id(5) @:optional var clearances:Array<AssemblyElasticClearance>;
+  @:id(1) var id:String;
+  @:id(2) var couplings:Array<String>;
+  @:id(3) var spans:Array<AssemblyElasticSpan>;
+  @:id(4) @:optional var assumptions:Array<QuantityAssumption>;
+  @:id(5) @:optional var clearances:Array<AssemblyElasticClearance>;
 }
 
 /**
@@ -211,65 +211,65 @@ typedef AssemblyComplianceCoordinate = AssemblyElasticTerm;
  * joint's units per second, and the inertia of its rotor (kg m²), which turns with the joint.
  */
 @:wire typedef AssemblyMotorBrake = {
-	@:id(1) var id:String;
-	@:id(2) var releaseChannel:String;
-	@:id(3) var releasedSensor:String;
-	@:id(4) var holdingEffort:Float;
-	@:id(5) var releaseDelay:Float;
-	@:id(6) var applicationDelay:Float;
-	@:id(7) var releaseTimeoutMs:Int;
-	@:id(8) var feedbackMaxAgeMs:Int;
+  @:id(1) var id:String;
+  @:id(2) var releaseChannel:String;
+  @:id(3) var releasedSensor:String;
+  @:id(4) var holdingEffort:Float;
+  @:id(5) var releaseDelay:Float;
+  @:id(6) var applicationDelay:Float;
+  @:id(7) var releaseTimeoutMs:Int;
+  @:id(8) var feedbackMaxAgeMs:Int;
 }
 
 @:wire typedef AssemblyActuator = {
-	@:id(1) var id:String;
-	@:id(2) var joint:String;
-	@:id(3) var maxEffort:Float;
-	@:id(4) var maxRate:Float;
-	@:id(5) @:optional var rotorInertia:Null<Float>;
-	/** Full steps in a turn of a stepper motor's rotor; absent for other motors. */
-	@:id(6) @:optional var fullStepsPerRevolution:Null<Float>;
-	/**
+  @:id(1) var id:String;
+  @:id(2) var joint:String;
+  @:id(3) var maxEffort:Float;
+  @:id(4) var maxRate:Float;
+  @:id(5) @:optional var rotorInertia:Null<Float>;
+  /** Full steps in a turn of a stepper motor's rotor; absent for other motors. */
+  @:id(6) @:optional var fullStepsPerRevolution:Null<Float>;
+  /**
 	 * What drives the joint: "stepper" or "servo". With "stepper", `holdingTorque` and `torqueSpeed`
 	 * describe its pull-out curve; with "servo", the rated and peak torque and speed do. Absent, a
 	 * bare effort and rate (a stepper with only `fullStepsPerRevolution` is still understood).
 	 */
-	@:id(7) @:optional var drive:Null<String>;
-	/** Alternating speed (the joint's units per second) and torque (N m), points of the torque-speed curve. */
-	@:id(8) @:optional var torqueSpeed:Array<Float>;
-	@:id(9) @:optional var holdingTorque:Null<Float>;
-	@:id(10) @:optional var ratedTorque:Null<Float>;
-	@:id(11) @:optional var peakTorque:Null<Float>;
-	@:id(12) @:optional var ratedSpeed:Null<Float>;
-	@:id(13) @:optional var maxSpeed:Null<Float>;
-	@:id(14) @:optional var encoderCounts:Null<Float>;
-	/** Default servo gains in the actuator's units: effort per unit of position and velocity error. */
-	@:id(15) @:optional var servoStiffness:Null<Float>;
-	@:id(16) @:optional var servoDamping:Null<Float>;
-	/** The id of the `AssemblyEncoder` that reads this motor, which a servo's feedback comes from; absent for none. */
-	@:id(17) @:optional var encoder:Null<String>;
-	/**
+  @:id(7) @:optional var drive:Null<String>;
+  /** Alternating speed (the joint's units per second) and torque (N m), points of the torque-speed curve. */
+  @:id(8) @:optional var torqueSpeed:Array<Float>;
+  @:id(9) @:optional var holdingTorque:Null<Float>;
+  @:id(10) @:optional var ratedTorque:Null<Float>;
+  @:id(11) @:optional var peakTorque:Null<Float>;
+  @:id(12) @:optional var ratedSpeed:Null<Float>;
+  @:id(13) @:optional var maxSpeed:Null<Float>;
+  @:id(14) @:optional var encoderCounts:Null<Float>;
+  /** Default servo gains in the actuator's units: effort per unit of position and velocity error. */
+  @:id(15) @:optional var servoStiffness:Null<Float>;
+  @:id(16) @:optional var servoDamping:Null<Float>;
+  /** The id of the `AssemblyEncoder` that reads this motor, which a servo's feedback comes from; absent for none. */
+  @:id(17) @:optional var encoder:Null<String>;
+  /**
 	 * A gearbox between the motor and the joint: the motor turns `gearRatio` times for one turn (or one unit of
 	 * travel) of the joint, and the joint gets `gearEfficiency` of its power. `maxEffort`, `maxRate`, the
 	 * torque-speed curve and the rotor are then the motor's own, before the gearbox. Absent, the motor drives the
 	 * joint directly.
 	 */
-	@:id(18) @:optional var gearRatio:Null<Float>;
-	@:id(19) @:optional var gearEfficiency:Null<Float>;
-	/** Engineering inputs assumed by this motor's rating or curve; absent when none. */
-	@:id(20) @:optional var assumed:Null<ReadOnlyArray<String>>;
-	/** Driver setting and input ceiling; required for step/dir actuators and absent for other drives. */
-	@:id(21) @:optional var microsteps:Null<Int>;
-	@:id(22) @:optional var maxStepRate:Null<Float>;
-	@:id(23) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
-	/** Servo driver position-loop frequency in Hz; absent for other actuators. */
-	@:id(24) @:optional var positionLoopRate:Null<Float>;
-	@:id(25) @:optional var pneumatic:Null<AssemblyPneumaticDrive>;
-	/** Optional process-speed channels for a continuously rotating joint; speed units use radians per second. */
-	@:id(26) @:optional var processVelocity:Null<AssemblyProcessVelocityDrive>;
-	@:id(27) @:optional var brake:Null<AssemblyMotorBrake>;
-	/** Hydraulic cylinder on the same process-driven joint mechanism as a pneumatic drive. */
-	@:id(28) @:optional var hydraulic:Null<AssemblyHydraulicDrive>;
+  @:id(18) @:optional var gearRatio:Null<Float>;
+  @:id(19) @:optional var gearEfficiency:Null<Float>;
+  /** Engineering inputs assumed by this motor's rating or curve; absent when none. */
+  @:id(20) @:optional var assumed:Null<ReadOnlyArray<String>>;
+  /** Driver setting and input ceiling; required for step/dir actuators and absent for other drives. */
+  @:id(21) @:optional var microsteps:Null<Int>;
+  @:id(22) @:optional var maxStepRate:Null<Float>;
+  @:id(23) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
+  /** Servo driver position-loop frequency in Hz; absent for other actuators. */
+  @:id(24) @:optional var positionLoopRate:Null<Float>;
+  @:id(25) @:optional var pneumatic:Null<AssemblyPneumaticDrive>;
+  /** Optional process-speed channels for a continuously rotating joint; speed units use radians per second. */
+  @:id(26) @:optional var processVelocity:Null<AssemblyProcessVelocityDrive>;
+  @:id(27) @:optional var brake:Null<AssemblyMotorBrake>;
+  /** Hydraulic cylinder on the same process-driven joint mechanism as a pneumatic drive. */
+  @:id(28) @:optional var hydraulic:Null<AssemblyHydraulicDrive>;
 }
 
 /**
@@ -279,56 +279,56 @@ typedef AssemblyComplianceCoordinate = AssemblyElasticTerm;
  * and sees where the load is.
  */
 @:wire typedef AssemblyEncoder = {
-	@:id(1) var id:String;
-	@:id(2) var joint:String;
-	/** "incremental" (quadrature counts from where it was powered up) or "absolute" (the position itself). */
-	@:id(3) var kind:String;
-	/** Counts per revolution on a turning joint, per millimetre on a sliding joint. */
-	@:id(4) var counts:Float;
-	/** An index pulse once a revolution on a turning joint, at the reference mark on a sliding one. */
-	@:id(5) @:optional var index:Null<Bool>;
+  @:id(1) var id:String;
+  @:id(2) var joint:String;
+  /** "incremental" (quadrature counts from where it was powered up) or "absolute" (the position itself). */
+  @:id(3) var kind:String;
+  /** Counts per revolution on a turning joint, per millimetre on a sliding joint. */
+  @:id(4) var counts:Float;
+  /** An index pulse once a revolution on a turning joint, at the reference mark on a sliding one. */
+  @:id(5) @:optional var index:Null<Bool>;
 }
 
 /** Geometry-derived switch event on a prismatic joint, in assembly coordinate units. */
 @:wire typedef AssemblySwitch = {
-	@:id(1) var id:String;
-	@:id(2) var joint:String;
-	@:id(3) var part:String;
-	@:id(4) var connector:String;
-	@:id(5) var trigger:String;
-	@:id(6) var triggerConnector:String;
-	@:id(7) var role:String;
-	@:id(8) var side:Int;
-	@:id(9) var trip:Float;
-	@:id(10) var hysteresis:Float;
-	@:id(11) var repeatability:Float;
-	@:id(12) var seed:Int;
-	@:id(13) @:optional var driveJoint:String;
-	/** Home coordinates that must finish before this switch's coordinate can move. */
-	@:id(14) @:optional var homeAfter:Array<String>;
+  @:id(1) var id:String;
+  @:id(2) var joint:String;
+  @:id(3) var part:String;
+  @:id(4) var connector:String;
+  @:id(5) var trigger:String;
+  @:id(6) var triggerConnector:String;
+  @:id(7) var role:String;
+  @:id(8) var side:Int;
+  @:id(9) var trip:Float;
+  @:id(10) var hysteresis:Float;
+  @:id(11) var repeatability:Float;
+  @:id(12) var seed:Int;
+  @:id(13) @:optional var driveJoint:String;
+  /** Home coordinates that must finish before this switch's coordinate can move. */
+  @:id(14) @:optional var homeAfter:Array<String>;
 }
 
 /** A connector exported from a member of an assembly definition. */
 @:wire typedef AssemblyExposedConnector = {
-	@:id(1) var name:String;
-	@:id(2) var occurrence:String;
-	@:id(3) var connector:String;
+  @:id(1) var name:String;
+  @:id(2) var occurrence:String;
+  @:id(3) var connector:String;
 }
 
 /** Reusable nested assembly. Occurrences may reference another entry in the root table. */
 @:wire typedef AssemblySubdefinition = {
-	@:id(1) var id:String;
-	@:id(2) var definitions:Array<AssemblyComponentDefinition>;
-	@:id(3) var occurrences:Array<AssemblyComponentOccurrence>;
-	@:id(4) var joints:Array<KinematicJoint>;
-	@:id(5) @:optional var couplings:Array<AssemblyJointCoupling>;
-	@:id(6) @:optional var exposedConnectors:Array<AssemblyExposedConnector>;
-	@:id(7) @:optional var mates:Array<AssemblyMate>;
-	@:id(8) @:optional var actuators:Array<AssemblyActuator>;
-	@:id(9) @:optional var encoders:Array<AssemblyEncoder>;
-	@:id(10) @:optional var elasticNetworks:Array<AssemblyElasticNetwork>;
-	@:id(11) @:optional var sensors:Array<AssemblySensor>;
-	@:id(12) @:optional var switches:Array<AssemblySwitch>;
+  @:id(1) var id:String;
+  @:id(2) var definitions:Array<AssemblyComponentDefinition>;
+  @:id(3) var occurrences:Array<AssemblyComponentOccurrence>;
+  @:id(4) var joints:Array<KinematicJoint>;
+  @:id(5) @:optional var couplings:Array<AssemblyJointCoupling>;
+  @:id(6) @:optional var exposedConnectors:Array<AssemblyExposedConnector>;
+  @:id(7) @:optional var mates:Array<AssemblyMate>;
+  @:id(8) @:optional var actuators:Array<AssemblyActuator>;
+  @:id(9) @:optional var encoders:Array<AssemblyEncoder>;
+  @:id(10) @:optional var elasticNetworks:Array<AssemblyElasticNetwork>;
+  @:id(11) @:optional var sensors:Array<AssemblySensor>;
+  @:id(12) @:optional var switches:Array<AssemblySwitch>;
 }
 
 /**
@@ -338,78 +338,78 @@ typedef AssemblyComplianceCoordinate = AssemblyElasticTerm;
  * with their occurrence path. Runtime coordinates live in AssemblyStateRecord.
  */
 @:wire typedef AssemblyDefinition = {
-	@:id(1) var schemaVersion:Int;
-	@:id(2) var id:String;
-	@:id(3) @:optional var lengthUnit:String;
-	@:id(4) var definitions:Array<AssemblyComponentDefinition>;
-	@:id(5) var occurrences:Array<AssemblyComponentOccurrence>;
-	@:id(6) var joints:Array<KinematicJoint>;
-	@:id(7) @:optional var couplings:Array<AssemblyJointCoupling>;
-	@:id(8) @:optional var assemblies:Array<AssemblySubdefinition>;
-	@:id(9) @:optional var exposedConnectors:Array<AssemblyExposedConnector>;
-	@:id(10) @:optional var mates:Array<AssemblyMate>;
-	@:id(11) @:optional var actuators:Array<AssemblyActuator>;
-	@:id(12) @:optional var encoders:Array<AssemblyEncoder>;
-	@:id(13) @:optional var elasticNetworks:Array<AssemblyElasticNetwork>;
-	@:id(14) @:optional var sensors:Array<AssemblySensor>;
-	@:id(15) @:optional var switches:Array<AssemblySwitch>;
+  @:id(1) var schemaVersion:Int;
+  @:id(2) var id:String;
+  @:id(3) @:optional var lengthUnit:String;
+  @:id(4) var definitions:Array<AssemblyComponentDefinition>;
+  @:id(5) var occurrences:Array<AssemblyComponentOccurrence>;
+  @:id(6) var joints:Array<KinematicJoint>;
+  @:id(7) @:optional var couplings:Array<AssemblyJointCoupling>;
+  @:id(8) @:optional var assemblies:Array<AssemblySubdefinition>;
+  @:id(9) @:optional var exposedConnectors:Array<AssemblyExposedConnector>;
+  @:id(10) @:optional var mates:Array<AssemblyMate>;
+  @:id(11) @:optional var actuators:Array<AssemblyActuator>;
+  @:id(12) @:optional var encoders:Array<AssemblyEncoder>;
+  @:id(13) @:optional var elasticNetworks:Array<AssemblyElasticNetwork>;
+  @:id(14) @:optional var sensors:Array<AssemblySensor>;
+  @:id(15) @:optional var switches:Array<AssemblySwitch>;
 }
 
 @:wire typedef AssemblyJointCoordinate = {
-	@:id(1) var joint:String;
-	@:id(2) var value:Float;
+  @:id(1) var joint:String;
+  @:id(2) var value:Float;
 }
 
 @:wire typedef AssemblyRootPose = {
-	@:id(1) var occurrence:String;
-	@:id(2) var pose:AssemblyFrame;
+  @:id(1) var occurrence:String;
+  @:id(2) var pose:AssemblyFrame;
 }
 
 /** A saved configuration, separate from the persistent assembly definition. */
 @:wire typedef AssemblyStateRecord = {
-	@:id(1) var schemaVersion:Int;
-	@:id(2) var definition:String;
-	@:id(3) var jointCoordinates:Array<AssemblyJointCoordinate>;
-	@:id(4) var rootPoses:Array<AssemblyRootPose>;
+  @:id(1) var schemaVersion:Int;
+  @:id(2) var definition:String;
+  @:id(3) var jointCoordinates:Array<AssemblyJointCoordinate>;
+  @:id(4) var rootPoses:Array<AssemblyRootPose>;
 }
 
 /** Cylinder dimensions and speed use the assembly length unit; gauge pressure is Pa. */
 @:wire typedef AssemblyPneumaticDrive = {
-	@:id(1) var bore:Float;
-	@:id(2) var rod:Float;
-	@:id(3) var stroke:Float;
-	@:id(4) var ratedSpeed:Float;
-	@:id(5) var pressurePa:Float;
-	@:id(6) var channelA:String;
-	@:id(7) @:optional var channelB:Null<String>;
-	@:id(8) var normallyToA:Bool;
-	@:id(9) var extendSign:Float;
+  @:id(1) var bore:Float;
+  @:id(2) var rod:Float;
+  @:id(3) var stroke:Float;
+  @:id(4) var ratedSpeed:Float;
+  @:id(5) var pressurePa:Float;
+  @:id(6) var channelA:String;
+  @:id(7) @:optional var channelB:Null<String>;
+  @:id(8) var normallyToA:Bool;
+  @:id(9) var extendSign:Float;
 }
 
 /** Hydraulic dimensions are assembly length units, phase speeds length units/s and pressure Pa.
  * Both valve coils off, or both on, select a closed centre; one coil requests extension or return.
  */
 @:wire typedef AssemblyHydraulicDrive = {
-	@:id(1) var bore:Float;
-	@:id(2) var rod:Float;
-	@:id(3) var stroke:Float;
-	@:id(4) var approachSpeed:Float;
-	@:id(5) var workingSpeed:Float;
-	@:id(6) var returnSpeed:Float;
-	/** Extension from the retracted cylinder datum at which working speed begins. */
-	@:id(7) var changePoint:Float;
-	@:id(8) var pressurePa:Float;
-	@:id(9) var channelA:String;
-	@:id(10) var channelB:String;
-	@:id(11) var extendSign:Float;
+  @:id(1) var bore:Float;
+  @:id(2) var rod:Float;
+  @:id(3) var stroke:Float;
+  @:id(4) var approachSpeed:Float;
+  @:id(5) var workingSpeed:Float;
+  @:id(6) var returnSpeed:Float;
+  /** Extension from the retracted cylinder datum at which working speed begins. */
+  @:id(7) var changePoint:Float;
+  @:id(8) var pressurePa:Float;
+  @:id(9) var channelA:String;
+  @:id(10) var channelB:String;
+  @:id(11) var extendSign:Float;
 }
 
 /** A CNC speed setpoint in RPM and a signed direction signal drive a continuous joint. */
 @:wire typedef AssemblyProcessVelocityDrive = {
-	@:id(1) var speedChannel:String;
-	@:id(2) var directionChannel:String;
-	/** Convert the speed channel's units to radians per second. */
-	@:id(3) var radiansPerSpeedUnit:Float;
+  @:id(1) var speedChannel:String;
+  @:id(2) var directionChannel:String;
+  /** Convert the speed channel's units to radians per second. */
+  @:id(3) var radiansPerSpeedUnit:Float;
 }
 
 /**
@@ -418,20 +418,20 @@ typedef AssemblyComplianceCoordinate = AssemblyElasticTerm;
  * extents in millimetres, in the connector's frame.
  */
 @:wire typedef AssemblySensor = {
-	@:id(1) var id:String;
-	@:id(2) var kind:String;
-	@:id(3) @:optional var joint:Null<String>;
-	@:id(4) @:optional var occurrence:Null<String>;
-	@:id(5) @:optional var connector:Null<String>;
-	@:id(6) @:optional var windowLower:Null<Float>;
-	@:id(7) @:optional var windowUpper:Null<Float>;
-	@:id(8) @:optional var hysteresis:Null<Float>;
-	@:id(9) @:optional var range:Null<Float>;
-	@:id(10) @:optional var zoneBoxes:Null<Array<Float>>;
+  @:id(1) var id:String;
+  @:id(2) var kind:String;
+  @:id(3) @:optional var joint:Null<String>;
+  @:id(4) @:optional var occurrence:Null<String>;
+  @:id(5) @:optional var connector:Null<String>;
+  @:id(6) @:optional var windowLower:Null<Float>;
+  @:id(7) @:optional var windowUpper:Null<Float>;
+  @:id(8) @:optional var hysteresis:Null<Float>;
+  @:id(9) @:optional var range:Null<Float>;
+  @:id(10) @:optional var zoneBoxes:Null<Array<Float>>;
 }
 
 /** An engineering assumption attached to the quantity that uses it. */
 @:wire typedef QuantityAssumption = {
-	@:id(1) var quantity:String;
-	@:id(2) var label:String;
+  @:id(1) var quantity:String;
+  @:id(2) var label:String;
 }

@@ -22,25 +22,29 @@ typedef BeltCalibrationPosition = materia.assembly.AssemblyDefinition.AssemblyJo
 class BeltCalibrations {
   public static inline var METHOD = "single-mode-free-decay/common-belt-v1";
   public static function validate(value:BeltCalibration):Void {
-    if (!(value.rigidityPerWidth>0) || !Math.isFinite(value.rigidityPerWidth) ||
-        !(value.frequencyHz>0) || !Math.isFinite(value.frequencyHz) || !(value.massKg>0) || !Math.isFinite(value.massKg) ||
-        !(value.dampingRatio>0 && value.dampingRatio<0.5) || !(value.fitError>=0 && value.fitError<=0.05) ||
-        !Math.isFinite(value.decayStart) || !Math.isFinite(value.decayEnd) || value.decayEnd<=value.decayStart ||
-        value.axis == null || value.axis.length == 0 || value.method != METHOD ||
-        value.spectrumSource == null || value.spectrumSource.length == 0 || value.decaySource == null || value.decaySource.length == 0)
-      throw "Invalid measured belt calibration";
-    var seen = new Map<String,Bool>();
+    if (!(value.rigidityPerWidth > 0) || !Math.isFinite(value.rigidityPerWidth)
+      || !(value.frequencyHz > 0) || !Math.isFinite(value.frequencyHz) || !(value.massKg > 0)
+      || !Math.isFinite(value.massKg) || !(value.dampingRatio > 0 && value.dampingRatio < 0.5) || !(value.fitError >= 0
+      && value.fitError <= 0.05) || !Math.isFinite(value.decayStart) || !Math.isFinite(value.decayEnd)
+      || value.decayEnd <= value.decayStart || value.axis == null || value.axis.length == 0
+      || value.method != METHOD || value.spectrumSource == null || value.spectrumSource.length == 0
+      || value.decaySource == null || value.decaySource.length == 0) throw "Invalid measured belt calibration";
+    var seen = new Map<String, Bool>();
     for (position in value.pose) {
-      if (position.joint == null || position.joint.length == 0 || seen.exists(position.joint) || !Math.isFinite(position.value))
-        throw "Calibration needs unique finite physical joint coordinates";
-      seen.set(position.joint,true);
+      if (position.joint == null || position.joint.length == 0 || seen.exists(position.joint)
+        || !Math.isFinite(position.value)) throw "Calibration needs unique finite physical joint coordinates";
+      seen.set(position.joint, true);
     }
     if (!seen.exists(value.axis)) throw "Calibration pose omits its measured axis";
   }
-  public static function copy(value:BeltCalibration,map:String->String):BeltCalibration {
-    return {rigidityPerWidth:value.rigidityPerWidth,dampingRatio:value.dampingRatio,axis:map(value.axis),
-      pose:[for (p in value.pose) {joint:map(p.joint),value:p.value}],frequencyHz:value.frequencyHz,massKg:value.massKg,
-      spectrumSource:value.spectrumSource,decaySource:value.decaySource,fitError:value.fitError,method:value.method,decayStart:value.decayStart,decayEnd:value.decayEnd};
+  public static function copy(value:BeltCalibration, map:String -> String):BeltCalibration {
+    return {rigidityPerWidth: value.rigidityPerWidth,
+      dampingRatio: value.dampingRatio, axis: map(value.axis), pose: [for (p in value.pose) {
+      joint:map(p.joint), value:p.value
+    }
+    ], frequencyHz:value.frequencyHz,
+      massKg:value.massKg, spectrumSource:value.spectrumSource, decaySource:value.decaySource,
+      fitError:value.fitError, method:value.method, decayStart:value.decayStart, decayEnd:value.decayEnd};
   }
 }
 

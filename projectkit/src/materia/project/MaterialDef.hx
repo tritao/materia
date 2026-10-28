@@ -53,14 +53,14 @@ package materia.project;
 
 /** Assumed router ranges for stated diameter bands, not supplier recommendations. */
 @:wire typedef MaterialRouterCutting = {
- @:id(1) var assumed:Bool;
- @:id(2) var specificEnergyJPerMm3:Float;
- @:id(3) var chipLoads:Array<MaterialRouterChipLoad>;
+  @:id(1) var assumed:Bool;
+  @:id(2) var specificEnergyJPerMm3:Float;
+  @:id(3) var chipLoads:Array<MaterialRouterChipLoad>;
 }
 @:wire typedef MaterialRouterChipLoad = {
- @:id(1) var minDiameterMm:Float;
- @:id(2) var maxDiameterMm:Float;
- @:id(3) var minChipMm:Float;
- @:id(4) var nominalChipMm:Float;
- @:id(5) var maxChipMm:Float;
+  @:id(1) var minDiameterMm:Float;
+  @:id(2) var maxDiameterMm:Float;
+  @:id(3) var minChipMm:Float;
+  @:id(4) var nominalChipMm:Float;
+  @:id(5) var maxChipMm:Float;
 }

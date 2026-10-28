@@ -50,33 +50,87 @@ class SceneContactRegistration {
     if (raw == null) fail();
     var pose:Dynamic = Reflect.field(raw, "nominal");
     if (pose == null) fail();
-    var nominal:AssemblyFrame = {x: number(Reflect.field(pose, "x")), y: number(Reflect.field(pose, "y")),
-      z: number(Reflect.field(pose, "z")), qx: number(Reflect.field(pose, "qx")), qy: number(Reflect.field(pose, "qy")),
-      qz: number(Reflect.field(pose, "qz")), qw: number(Reflect.field(pose, "qw"))};
+    var nominal:AssemblyFrame = {
+      x: number(Reflect.field(pose, "x")),
+      y: number(Reflect.field(pose, "y")),
+      z: number(Reflect.field(
+        pose,
+        "z"
+      )),
+      qx: number(Reflect.field(
+        pose,
+        "qx"
+      )),
+      qy: number(Reflect.field(
+        pose,
+        "qy"
+      )),
+      qz: number(Reflect.field(
+        pose,
+        "qz"
+      )),
+      qw: number(Reflect.field(
+        pose,
+        "qw"
+      ))
+    };
     var faces:Array<SceneContactFace> = [for (face in array(Reflect.field(raw, "faces"))) {
       var target:Dynamic = Reflect.field(face, "target");
       if (!Std.isOfType(target, Bool)) fail();
-      {member: text(Reflect.field(face, "member")), face: text(Reflect.field(face, "face")), target: cast target,
-        normal: vector(Reflect.field(face, "normal")), centre: vector(Reflect.field(face, "centre")),
-        chords: [for (edge in array(Reflect.field(face, "chords"))) [for (point in array(edge)) vector(point)]]};
-    }];
-    return {frame: text(Reflect.field(raw, "frame")), nominal: nominal,
-      translation: vector(Reflect.field(raw, "translation")), rotation: vector(Reflect.field(raw, "rotation")),
-      measurementError: number(Reflect.field(raw, "measurementError")), calibratedError: number(Reflect.field(raw, "calibratedError")),
-      contactOffset: number(Reflect.field(raw, "contactOffset")), faces: faces};
+      {
+        member:text(Reflect.field(face,
+          "member")), face:text(Reflect.field(face, "face")), target:cast target, normal:vector(Reflect.field(
+            face,
+            "normal"
+          )), centre:vector(Reflect.field(
+            face,
+            "centre"
+          )), chords:[for (edge in array(Reflect.field(
+            face,
+            "chords"
+          )))[for (point in array(edge)) vector(point)]]
+      };
+    }
+    ];
+    return {
+      frame: text(Reflect.field(raw, "frame")),
+      nominal: nominal,
+      translation: vector(Reflect.field(
+        raw,
+        "translation"
+      )),
+      rotation: vector(Reflect.field(
+        raw,
+        "rotation"
+      )),
+      measurementError: number(Reflect.field(
+        raw,
+        "measurementError"
+      )),
+      calibratedError: number(Reflect.field(
+        raw,
+        "calibratedError"
+      )),
+      contactOffset: number(Reflect.field(
+        raw,
+        "contactOffset"
+      )),
+      faces: faces
+    };
   }
   static function finiteVector(value:Array<Float>):Bool {
     if (value == null || value.length != 3) return false;
     for (item in value) if (!Math.isFinite(item)) return false;
     return true;
   }
-  static function square(value:Array<Float>):Float return value[0] * value[0] + value[1] * value[1] + value[2] * value[2];
+  static function square(value:Array<Float
+    >):Float return value[0] * value[0] + value[1] * value[1] + value[2] * value[2];
   public static function validate(work:SceneContactWork, occurrences:Array<String>):Void {
-    if (work == null || occurrences == null || occurrences.indexOf(work.frame) < 0 || work.nominal == null ||
-        !finiteVector(work.translation) || !finiteVector(work.rotation) || !Math.isFinite(work.measurementError) ||
-        !(work.measurementError > 0) || !Math.isFinite(work.calibratedError) || work.calibratedError < 0 ||
-        work.calibratedError >= work.measurementError || !Math.isFinite(work.contactOffset) || work.contactOffset < 0 || work.contactOffset > 0.002 ||
-        work.faces == null || work.faces.length < 3 || work.faces.length > 256) fail();
+    if (work == null || occurrences == null || occurrences.indexOf(work.frame) < 0 || work.nominal == null
+      || !finiteVector(work.translation) || !finiteVector(work.rotation) || !Math.isFinite(work.measurementError)
+      || !(work.measurementError > 0) || !Math.isFinite(work.calibratedError) || work.calibratedError < 0
+      || work.calibratedError >= work.measurementError || !Math.isFinite(work.contactOffset) || work.contactOffset < 0
+      || work.contactOffset > 0.002 || work.faces == null || work.faces.length < 3 || work.faces.length > 256) fail();
     for (i in 0...3) if (work.translation[i] < 0 || work.rotation[i] < 0 || work.rotation[i] >= Math.PI / 2) fail();
     var pose = work.nominal;
     for (value in [pose.x, pose.y, pose.z, pose.qx, pose.qy, pose.qz, pose.qw]) if (!Math.isFinite(value)) fail();
@@ -84,9 +138,9 @@ class SceneContactRegistration {
     var seen:Map<String, Bool> = new Map();
     var normals:Array<Array<Float>> = [];
     for (face in work.faces) {
-      if (face == null || occurrences.indexOf(face.member) < 0 || face.face == null || face.face.length == 0 ||
-          !finiteVector(face.normal) || Math.abs(square(face.normal) - 1) > 1e-8 || !finiteVector(face.centre) ||
-          face.chords == null || face.chords.length < 3 || face.chords.length > 512) fail();
+      if (face == null || occurrences.indexOf(face.member) < 0 || face.face == null || face.face.length == 0
+        || !finiteVector(face.normal) || Math.abs(square(face.normal) - 1) > 1e-8 || !finiteVector(face.centre)
+        || face.chords == null || face.chords.length < 3 || face.chords.length > 512) fail();
       var key = face.member + ":" + face.face;
       if (seen.exists(key)) fail();
       seen.set(key, true);
@@ -118,8 +172,8 @@ class SceneContactRegistration {
     var independent = false;
     for (i in 0...normals.length) for (j in i + 1...normals.length) for (k in j + 1...normals.length) {
       var a = normals[i], b = normals[j], c = normals[k];
-      var determinant = (a[1] * b[2] - a[2] * b[1]) * c[0] + (a[2] * b[0] - a[0] * b[2]) * c[1] +
-        (a[0] * b[1] - a[1] * b[0]) * c[2];
+      var determinant = (a[1]
+        * b[2] - a[2] * b[1]) * c[0] + (a[2] * b[0] - a[0] * b[2]) * c[1] + (a[0] * b[1] - a[1] * b[0]) * c[2];
       if (Math.abs(determinant) > 1e-3) independent = true;
     }
     if (!independent) fail();

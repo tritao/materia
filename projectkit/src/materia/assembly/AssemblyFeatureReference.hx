@@ -4,6 +4,6 @@ package materia.assembly;
  * contract determines whether the feature must be a hole, datum or interface.
  */
 @:wire typedef AssemblyFeatureReference = {
-	@:id(1) var member:String;
-	@:id(2) var feature:String;
+  @:id(1) var member:String;
+  @:id(2) var feature:String;
 }

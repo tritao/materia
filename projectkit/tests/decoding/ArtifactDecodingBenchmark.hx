@@ -12,9 +12,15 @@ class ArtifactDecodingBenchmark {
       var decodeSeconds = Sys.time() - start, decodeBytes = hl.Gc.totalAllocated() - allocated;
       start = Sys.time();
       for (part in decoded.parts) @:privateAccess SceneArtifact.validatePart(part, true);
-      Sys.println(haxe.Json.stringify({borrow: borrow, round: round, sourceBytes: source.length, parts: decoded.parts.length,
-        decodeMilliseconds: decodeSeconds * 1000, allocatedBytes: decodeBytes,
-        meshValidationMilliseconds: (Sys.time() - start) * 1000}));
+      Sys.println(haxe.Json.stringify({
+        borrow: borrow,
+        round: round,
+        sourceBytes: source.length,
+        parts: decoded.parts.length,
+        decodeMilliseconds: decodeSeconds * 1000,
+        allocatedBytes: decodeBytes,
+        meshValidationMilliseconds: (Sys.time() - start) * 1000
+      }));
     }
   }
 }

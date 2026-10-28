@@ -43,8 +43,13 @@ class AssemblyBodies {
       var body = byRoot.get(root);
       if (body == null) {
         var carrier = incoming.get(root);
-        body = {id: root, occurrences: [root], parent: carrier == null ? null : rootOf(carrier.parent),
-          joint: carrier == null ? null : carrier.id, jointType: carrier == null ? null : carrier.type};
+        body = {
+          id: root,
+          occurrences: [root],
+          parent: carrier == null ? null : rootOf(carrier.parent),
+          joint : carrier == null ? null : carrier.id,
+          jointType : carrier == null ? null : carrier.type
+        };
         byRoot.set(root, body);
         bodies.push(body);
       }
@@ -82,8 +87,8 @@ class AssemblyBodies {
         previous = " ";
         continue;
       }
-      var boundary = previous != "" && previous != " " &&
-        ((isUpper(c) && !isUpper(previous)) || isDigit(c) != isDigit(previous));
+      var boundary = previous != ""
+        && previous != " " && ((isUpper(c) && !isUpper(previous)) || isDigit(c) != isDigit(previous));
       if (boundary) out.add(" ");
       out.add(c.toLowerCase());
       previous = c;

@@ -19,8 +19,15 @@ import materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
   @:id(1) Frame(select:Array<PartSelector>, yaw:Float, pitch:Float, margin:Float);
   @:id(2) Anchored(anchor:PartSelector, offset:AssemblyVector, span:Float, yaw:Float, pitch:Float);
 }
-@:wire enum VisibilityMode { @:id(1) Shown; @:id(2) Transparent; @:id(3) Hidden; }
-@:wire enum PresentationSource { @:id(1) Generated(producer:String); @:id(2) Authored; }
+@:wire enum VisibilityMode {
+  @:id(1) Shown;
+  @:id(2) Transparent;
+  @:id(3) Hidden;
+}
+@:wire enum PresentationSource {
+  @:id(1) Generated(producer:String);
+  @:id(2) Authored;
+}
 @:wire typedef VisibilityRule = {
   @:id(1) var select:PartSelector;
   @:id(2) var mode:VisibilityMode;
@@ -51,9 +58,19 @@ import materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
   @:id(4) var stage:Int;
   @:id(5) @:optional var source:PresentationSource;
 }
-@:wire enum ProcedureKind { @:id(1) Assembly; @:id(2) Disassembly; @:id(3) Service; }
-@:wire enum ProcedureStart { @:id(1) Assembled; @:id(2) Disassembled; }
-@:wire enum CheckStatus { @:id(1) Passed; @:id(2) Failed; }
+@:wire enum ProcedureKind {
+  @:id(1) Assembly;
+  @:id(2) Disassembly;
+  @:id(3) Service;
+}
+@:wire enum ProcedureStart {
+  @:id(1) Assembled;
+  @:id(2) Disassembled;
+}
+@:wire enum CheckStatus {
+  @:id(1) Passed;
+  @:id(2) Failed;
+}
 @:wire enum MotionEvidence {
   @:id(1) Illustrative;
   @:id(2) Checked(checker:String, status:CheckStatus, geometryFingerprint:String, report:String);
