@@ -56,6 +56,30 @@ tooling and a layout that is frozen, and it is worse with gloves and for acciden
 block of secondary keys (jog increments, axis keys) beside the physical safety and cycle keys, as on commercial pendants,
 once the layout has been proven on the bench.
 
+### Swappable legend overlay (a later revision)
+
+Commercial wireless pendants (a WMPG-6 style unit is the reference picture) put the keys under one printed, coloured legend
+sheet. For the one-SKU pendant this is the way to make the faces differ per machine without changing hardware: the
+legends are the only machine-specific part.
+
+- **Fixed and physical:** E-stop, enabling switch, the wheel, and the two selectors. Start, Hold and Stop stay physical buttons at
+  first, because they are the keys a hand finds by feel.
+- **Keypad zone:** a block of 10 to 12 keys (a stock matrix membrane keypad or a PCB with domes) replaces F1 to F3 and the
+  wheel-enable key, under a printed overlay in a shallow recess in the plate's face, with a gasket for sealing.
+- **Selector ring legends** move onto the overlay, so the 12-position axis switch prints the machine's axis names (X, Y, Z, A ...)
+  instead of plain numbers.
+- **One source for legends.** The operator profile already names each key's function per machine. The overlay artwork (SVG, from
+  our layout and `StrokeText`) and the firmware key map are both generated from it, so a printed legend cannot disagree with
+  what the key does.
+- **Overlay identity.** The keypad connector carries an ID (a resistor value or a small memory). The pendant refuses to run a
+  profile whose overlay is not the one fitted; a mislabelled key is a hazard, so this is a requirement, not a convenience.
+- **Bench path:** a stock 4 x 4 matrix membrane keypad with overlays printed on adhesive polyester needs no tooling for the first
+  unit. A custom membrane or dome PCB comes later if the layout settles.
+- **Costs and risks:** worse with gloves than metal buttons; the overlay wears and must be replaceable; the recess needs a seal.
+  Keep the keypad zone to non-safety functions.
+- **Work in the repo when it is taken up:** a `KeypadOverlay` panel part (cutout, recess, ID), overlay artwork generated from
+  the profile, a keypad zone in `ReferencePendant`, and the ID check in the operator profile and its digest.
+
 ## MPG hand wheel (from the vendor drawing)
 
 Read from the Vallder dimension drawing and the rear photos; the page itself gives no numbers.
