@@ -3,7 +3,6 @@ package app.editor;
 import app.MissionController;
 import app.MissionStepPresentation;
 import materia.project.SceneArtifact.SceneArtifactMission;
-import materia.project.SceneArtifact.SceneArtifactMissionStep;
 import haxeon.ui.Insets;
 import haxeon.ui.LayoutAxis;
 import haxeon.ui.LayoutStyle;

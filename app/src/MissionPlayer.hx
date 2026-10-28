@@ -26,8 +26,6 @@ import materia.project.SceneArtifact.SceneArtifactPlace;
 import materia.project.SceneArtifact.SceneArtifactRobotTool;
 import materia.project.SceneArtifact.SceneArtifactScrewEntrySearch;
 import materia.project.SceneArtifact.SceneArtifactTorch;
-import materia.project.SceneArtifact.SceneArtifactTorchPose;
-import materia.project.SceneArtifact.SceneArtifactMissionWaypoint;
 import materia.project.SceneArtifact.SceneArtifactWeld;
 import materia.project.SceneContactRegistration.SceneContactWork;
 import processkit.perception.ContactPoseEnvelope;

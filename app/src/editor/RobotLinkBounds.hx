@@ -2,7 +2,6 @@ package app.editor;
 
 import nativekit.sim.SimPose;
 import robotkit.model.CollisionShape;
-import collisionkit.CollisionGeometry;
 import robotkit.model.RobotModel;
 
 /** Bounding spheres for a robot model's authored link collision shapes. */

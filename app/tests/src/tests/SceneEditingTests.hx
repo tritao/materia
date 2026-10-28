@@ -39,7 +39,6 @@ import robotkit.model.Joint;
 import robotkit.model.JointLimits;
 import robotkit.model.JointType;
 import robotkit.model.Link;
-import robotkit.model.RobotModel;
 import robotkit.model.CollisionApproximation;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.profile.RobotDriveConfiguration;

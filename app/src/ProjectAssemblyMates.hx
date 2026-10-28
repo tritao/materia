@@ -3,7 +3,6 @@ package app;
 import cadkit.modeling.AssemblyMateSolver;
 import cadkit.parametric.GeometricConnectors;
 import cadkit.parametric.GeometricConnectors.GeometricCandidates;
-import cadkit.parametric.GeometricConnectors.GeometricConnectorError;
 import cadkit.parametric.GeometricConnectors.GeometricFeatureKind;
 import haxeon.wire.JsonWire;
 import materia.assembly.AssemblyDefinition;

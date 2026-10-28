@@ -12,7 +12,6 @@ import machinekit.pressbrake.planning.PressSheetPose;
 import cadkit.sheetmetal.ManufacturedSheetState;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
-import robotkit.spatial.Quat;
 import cadkit.modeling.AssemblyState;
 import robotkit.world.RobotWorld;
 import robotkit.core.RobotSnapshot;
