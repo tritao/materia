@@ -65,11 +65,7 @@ class DampedLeastSquares {
         var ratio = 0.0;
         for (i in 0...width) ratio = Math.max(
           ratio,
-          Math.abs(work.delta[i]) / (maxStep * columnScale(
-            problem,
-            i,
-            translationScale
-          ))
+          Math.abs(work.delta[i]) / (maxStep * columnScale(problem, i, translationScale))
         );
         if (ratio > 1.0) for (i in 0...width) work.delta[i] /= ratio;
       }

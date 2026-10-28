@@ -88,17 +88,9 @@ class NativeKinematicsTests {
         id == "sum" ? JointKind.Prismatic : JointKind.Revolute,
         parent,
         child,
-        Transform.translation(
-          0.1,
-          0.2,
-          0.3
-        ),
+        Transform.translation(0.1, 0.2, 0.3),
         Transform.identity(),
-        new Vector3(
-          0,
-          0,
-          1
-        )
+        new Vector3(0, 0, 1)
       );
       parent = child;
     }
@@ -248,11 +240,7 @@ class NativeKinematicsTests {
         JointKind.Revolute,
         previous,
         body,
-        Transform.translation(
-          0,
-          0,
-          i == 0 ? 0.0 : offsets[i - 1]
-        ),
+        Transform.translation(0, 0, i == 0 ? 0.0 : offsets[i - 1]),
         Transform.identity(),
         i % 2 == 0 ? z : y,
         -2.9,
@@ -390,17 +378,9 @@ class NativeKinematicsTests {
         FrameOrientation.Free
       )).add(new PostureTask(
         model,
-        [
-          base,
-          0.0,
-          0.0
-        ],
+        [base, 0.0, 0.0],
         0.05,
-        [
-          1,
-          0,
-          0
-        ]
+        [1, 0, 0]
       ));
       var run = track(problem, [0.6, 0.4, 0.3], [for (_ in 0...3) Math.POSITIVE_INFINITY], 400);
       check(run.legal, 'redundant tracking stays legal (${run.why})');
@@ -435,11 +415,7 @@ class NativeKinematicsTests {
         origin,
         swivel,
         1e-9,
-        new Vector3(
-          1,
-          0,
-          0
-        )
+        new Vector3(1, 0, 0)
       );
       var problem = new KinematicProblem(model).add(FrameTask.atFrame(model, flange, goal, 1e-9, 1e-9)).add(task);
       var run = track(problem, start, [for (_ in 0...7) Math.POSITIVE_INFINITY], 300);
@@ -546,17 +522,8 @@ class NativeKinematicsTests {
         dt: dt,
         damping: lambda * lambda,
         site: "flange",
-        target_position: [
-          nearby.x,
-          nearby.y,
-          nearby.z
-        ],
-        target_wxyz: [
-          nearby.qw,
-          nearby.qx,
-          nearby.qy,
-          nearby.qz
-        ],
+        target_position: [nearby.x, nearby.y, nearby.z],
+        target_wxyz: [nearby.qw, nearby.qx, nearby.qy, nearby.qz],
         position_cost: 1.0,
         orientation_cost: c.orientation ? 1.0 : 0.0,
         gain : gain,
@@ -672,11 +639,7 @@ class NativeKinematicsTests {
         body,
         randomTransform(rng),
         randomTransform(rng),
-        new Vector3(
-          rng.signed(),
-          rng.signed(),
-          rng.signed() + 0.1
-        )
+        new Vector3(rng.signed(), rng.signed(), rng.signed() + 0.1)
       );
       bodies.push(body);
     }
@@ -691,11 +654,7 @@ class NativeKinematicsTests {
       arm,
       randomTransform(rng),
       randomTransform(rng),
-      new Vector3(
-        0,
-        0,
-        1
-      )
+      new Vector3(0, 0, 1)
     );
     builder.addFrame("tip", bodies[bodies.length - 1], randomTransform(rng));
     return builder.build();

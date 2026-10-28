@@ -127,10 +127,8 @@ class FrameTask implements KinematicTask {
     if (reference < 0 || reference >= model.bodyCount()) throw "Frame task reference must be a body of the model";
     referenceBody = reference;
     FlatTransform.write(
-      referenceOffset == null ? Transform.identity() : Transform.checked(
-        referenceOffset,
-        "Frame task reference offset"
-      ),
+      referenceOffset == null ? Transform.identity() : Transform.checked(referenceOffset,
+      "Frame task reference offset"),
       referenceFlat,
       0
     );

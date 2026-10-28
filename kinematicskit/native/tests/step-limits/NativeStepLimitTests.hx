@@ -25,11 +25,7 @@ class NativeStepLimitTests {
       tip,
       Transform.identity(),
       Transform.identity(),
-      new Vector3(
-        0,
-        0,
-        1
-      )
+      new Vector3(0, 0, 1)
     );
     var model = builder.build();
     var task = new FrameVelocityTask(model, tip);

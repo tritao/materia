@@ -88,11 +88,7 @@ class KinematicsKitTests {
       slide,
       Transform.translation(0.5, 0, 0),
       Transform.identity(),
-      new Vector3(
-        1,
-        0,
-        0
-      )
+      new Vector3(1, 0, 0)
     );
     builder.addJoint("work rotate", Revolute, base, work, Transform.translation(-0.3, 0, 0), Transform.identity(), z);
     var flange = builder.addFrame("flange", slide, Transform.translation(0.2, 0, 0));
@@ -109,11 +105,7 @@ class KinematicsKitTests {
       [0.3, -0.27],
       [0.5, -0.13],
       [slide],
-      [[
-        0.35,
-        0.02,
-        0
-      ]],
+      [[0.35, 0.02, 0]],
       flange,
       offset,
       reference
@@ -196,16 +188,8 @@ class KinematicsKitTests {
       base,
       carriage,
       Transform.axisAngle(0.0, 0.0, 1.0, Math.PI * 0.5),
-      Transform.translation(
-        0.0,
-        0.0,
-        -1.0
-      ),
-      new Vector3(
-        2.0,
-        0.0,
-        0.0
-      ),
+      Transform.translation(0.0, 0.0, -1.0),
+      new Vector3(2.0, 0.0, 0.0),
       -5.0,
       5.0
     );
@@ -235,11 +219,7 @@ class KinematicsKitTests {
       carriage,
       Transform.identity(),
       Transform.identity(),
-      new Vector3(
-        1.0,
-        0.0,
-        0.0
-      )
+      new Vector3(1.0, 0.0, 0.0)
     );
     var tip = builder.addFrame("tip", carriage, Transform.translation(0.0, 0.2, 0.0));
     var model = builder.build();
@@ -251,11 +231,8 @@ class KinematicsKitTests {
       for (body in 0...model.bodyCount()) {
         var actual = snapshot.bodyPose(body), expected = fresh.bodyPose(body);
         check(
-          near(actual.x, expected.x, 1e-12) && near(actual.y, expected.y, 1e-12) && near(
-            actual.z,
-            expected.z,
-            1e-12
-          ) && near(
+          near(actual.x,
+          expected.x, 1e-12) && near(actual.y, expected.y, 1e-12) && near(actual.z, expected.z, 1e-12) && near(
             actual.qx,
             expected.qx,
             1e-12
@@ -334,11 +311,7 @@ class KinematicsKitTests {
       lid,
       Transform.identity(),
       Transform.identity(),
-      new Vector3(
-        1.0,
-        0.0,
-        0.0
-      )
+      new Vector3(1.0, 0.0, 0.0)
     );
     var leftHand = builder.addFrame("left_hand", left, Transform.translation(1.0, 0.0, 0.0));
     var rightHand = builder.addFrame("right_hand", right, Transform.translation(1.0, 0.0, 0.0));
@@ -419,11 +392,7 @@ class KinematicsKitTests {
       bx,
       Transform.identity(),
       Transform.identity(),
-      new Vector3(
-        1.0,
-        0.0,
-        0.0
-      ),
+      new Vector3(1.0, 0.0, 0.0),
       -1.0,
       1.0
     );
@@ -434,11 +403,7 @@ class KinematicsKitTests {
       head,
       Transform.identity(),
       Transform.identity(),
-      new Vector3(
-        0.0,
-        1.0,
-        0.0
-      ),
+      new Vector3(0.0, 1.0, 0.0),
       -1.0,
       1.0
     );
@@ -521,11 +486,7 @@ class KinematicsKitTests {
         body,
         randomTransform(rng),
         randomTransform(rng),
-        new Vector3(
-          rng.signed(),
-          rng.signed(),
-          rng.signed() + 0.1
-        )
+        new Vector3(rng.signed(), rng.signed(), rng.signed() + 0.1)
       );
       bodies.push(body);
     }
@@ -701,13 +662,7 @@ class KinematicsKitTests {
         FrameTask.AXIS_X | FrameTask.AXIS_Y,
         FrameOrientation.Free
       )),
-      new KinematicState(
-        model,
-        [
-          0.3,
-          0.2
-        ]
-      ),
+      new KinematicState(model, [0.3, 0.2]),
       25,
       0.02
     );
@@ -738,14 +693,7 @@ class KinematicsKitTests {
         FrameTask.AXIS_X | FrameTask.AXIS_Y,
         FrameOrientation.Free
       )),
-      new KinematicState(
-        model,
-        [
-          0.2,
-          0.3,
-          0.1
-        ]
-      )
+      new KinematicState(model, [0.2, 0.3, 0.1])
     );
     var pose = KinematicSnapshot.of(solution.state).framePose(tip);
     check(solution.converged() && near(pose.x, 1.2, 1e-7) && near(pose.y, 0.9, 1e-7), "a position-only task converges");
@@ -760,16 +708,8 @@ class KinematicsKitTests {
       new Vector3(0, 1, 0),
       new Vector3(0, 1, 0),
       new Vector3(1, 0, 0),
-      new Vector3(
-        0,
-        1,
-        0
-      ),
-      new Vector3(
-        1,
-        0,
-        0
-      )
+      new Vector3(0, 1, 0),
+      new Vector3(1, 0, 0)
     ];
     for (i in 0...6) {
       var body = builder.addBody('w$i');
@@ -778,11 +718,7 @@ class KinematicsKitTests {
         JointKind.Revolute,
         bodies[i],
         body,
-        Transform.translation(
-          i == 1 ? 0.0 : 0.3,
-          0.0,
-          i == 0 ? 0.4 : 0.0
-        ),
+        Transform.translation(i == 1 ? 0.0 : 0.3, 0.0, i == 0 ? 0.4 : 0.0),
         Transform.identity(),
         axes[i]
       );
@@ -801,23 +737,9 @@ class KinematicsKitTests {
         1e-8,
         null,
         FrameTask.ALL_AXES,
-        FrameOrientation.Axis(
-          0,
-          0,
-          1
-        )
+        FrameOrientation.Axis(0, 0, 1)
       )),
-      new KinematicState(
-        arm,
-        [
-          0.3,
-          -0.2,
-          0.5,
-          0.0,
-          -0.4,
-          0.2
-        ]
-      )
+      new KinematicState(arm, [0.3, -0.2, 0.5, 0.0, -0.4, 0.2])
     );
     var reached = KinematicSnapshot.of(aligned.state).framePose(tool);
     var z = reached.transformVector(0, 0, 1), goalZ = rolled.transformVector(0, 0, 1);
@@ -870,11 +792,7 @@ class KinematicsKitTests {
         left,
         randomTransform(rng),
         randomTransform(rng),
-        new Vector3(
-          0,
-          0,
-          1
-        )
+        new Vector3(0, 0, 1)
       );
       builder.addJoint(
         "l2",
@@ -883,11 +801,7 @@ class KinematicsKitTests {
         leftTip,
         randomTransform(rng),
         randomTransform(rng),
-        new Vector3(
-          1,
-          0,
-          0
-        )
+        new Vector3(1, 0, 0)
       );
       builder.addJoint(
         "r1",
@@ -896,11 +810,7 @@ class KinematicsKitTests {
         right,
         randomTransform(rng),
         randomTransform(rng),
-        new Vector3(
-          0,
-          1,
-          0
-        )
+        new Vector3(0, 1, 0)
       );
       var a = builder.addFrame("a", leftTip, randomTransform(rng));
       var b = builder.addFrame("b", right, randomTransform(rng));
@@ -1004,16 +914,8 @@ class KinematicsKitTests {
     builder.addClosure("pin", ClosureKind.Revolute, end, anchor, z);
     var impossible = builder.build();
     var conflicting = LevenbergMarquardt.solve(
-      new KinematicProblem(impossible).add(new ClosureTask(
-        impossible,
-        0,
-        1e-9,
-        1e-9
-      )),
-      new KinematicState(
-        impossible,
-        [0.3]
-      )
+      new KinematicProblem(impossible).add(new ClosureTask(impossible, 0, 1e-9, 1e-9)),
+      new KinematicState(impossible, [0.3])
     );
     check(
       conflicting.status == KinematicStatus.Conflicting && conflicting.unsatisfied()[0] == "pin",
@@ -1052,11 +954,7 @@ class KinematicsKitTests {
       var offsets = [
         Transform.translation(0, side == "left" ? 0.3 : -0.3, 0.2),
         Transform.translation(0.3, 0, 0),
-        Transform.translation(
-          0.25,
-          0,
-          0
-        )
+        Transform.translation(0.25, 0, 0)
       ];
       var axes = [z, y, y];
       for (i in 0...3) {
@@ -1116,11 +1014,7 @@ class KinematicsKitTests {
 
     // The arms alone, torso held: the right arm's solve never touches the left arm or torso.
     var rightOnly = LevenbergMarquardt.solve(
-      new KinematicProblem(model).setActiveJoints([
-        "right_0",
-        "right_1",
-        "right_2"
-      ]).add(FrameTask.atFrame(
+      new KinematicProblem(model).setActiveJoints(["right_0", "right_1", "right_2"]).add(FrameTask.atFrame(
         model,
         right,
         rightGoal,
@@ -1130,18 +1024,7 @@ class KinematicsKitTests {
         position,
         FrameOrientation.Free
       )),
-      new KinematicState(
-        model,
-        [
-          0.2,
-          0.4,
-          -0.5,
-          0.9,
-          -0.2,
-          0.4,
-          -0.6
-        ]
-      )
+      new KinematicState(model, [0.2, 0.4, -0.5, 0.9, -0.2, 0.4, -0.6])
     );
     check(
       rightOnly.converged() && rightOnly.state.q[0] == 0.2 && rightOnly.state.q[1] == 0.4,
@@ -1168,24 +1051,8 @@ class KinematicsKitTests {
     );
     var look = LookAtTask.atFrame(model, left, new Vector3(1, 0, 0), part, 1e-8);
     var solution = LevenbergMarquardt.solve(
-      new KinematicProblem(model).setActiveJoints([
-        "torso",
-        "left_0",
-        "left_1",
-        "left_2"
-      ]).add(hold).add(look),
-      new KinematicState(
-        model,
-        [
-          0.1,
-          0.3,
-          -0.3,
-          0.7,
-          0.0,
-          0.0,
-          0.0
-        ]
-      )
+      new KinematicProblem(model).setActiveJoints(["torso", "left_0", "left_1", "left_2"]).add(hold).add(look),
+      new KinematicState(model, [0.1, 0.3, -0.3, 0.7, 0.0, 0.0, 0.0])
     );
     var pose = KinematicSnapshot.of(solution.state).framePose(left);
     var axis = pose.transformVector(1, 0, 0);
@@ -1245,16 +1112,8 @@ class KinematicsKitTests {
     seed[large.dofIndex("rocker")] = 1.4;
     var workspace = new SolverWorkspace();
     var solution = LevenbergMarquardt.solve(
-      new KinematicProblem(large).setActiveJoints(["coupler", "rocker"]).add(new ClosureTask(
-        large,
-        0,
-        1e-9,
-        1e-9
-      )),
-      new KinematicState(
-        large,
-        seed
-      ),
+      new KinematicProblem(large).setActiveJoints(["coupler", "rocker"]).add(new ClosureTask(large, 0, 1e-9, 1e-9)),
+      new KinematicState(large, seed),
       100,
       1e-3,
       1e-8,
@@ -1268,20 +1127,8 @@ class KinematicsKitTests {
     );
     var small = fourBar();
     var reference = LevenbergMarquardt.solve(
-      new KinematicProblem(small).setActiveJoints(["coupler", "rocker"]).add(new ClosureTask(
-        small,
-        0,
-        1e-9,
-        1e-9
-      )),
-      new KinematicState(
-        small,
-        [
-          0.6,
-          0.2,
-          1.4
-        ]
-      )
+      new KinematicProblem(small).setActiveJoints(["coupler", "rocker"]).add(new ClosureTask(small, 0, 1e-9, 1e-9)),
+      new KinematicState(small, [0.6, 0.2, 1.4])
     );
     check(
       solution.state.q[large.dofIndex("rocker")] == reference.state.q[2] && solution.iterations == reference.iterations,
@@ -1295,20 +1142,12 @@ class KinematicsKitTests {
     var dlsProblem = new KinematicProblem(arm).add(FrameTask.atFrame(
       arm,
       arm.frameIndex("tip"),
-      Transform.translation(
-        10.0,
-        0.0,
-        0.0
-      ),
+      Transform.translation(10.0, 0.0, 0.0),
       1e-9,
       1e-9
     )).add(new PostureTask(
       arm,
-      [
-        0.0,
-        0.0,
-        0.0
-      ],
+      [0.0, 0.0, 0.0],
       1e-3
     ));
     var seed = new KinematicState(arm, [0.2, 0.3, 0.1]);
@@ -1380,11 +1219,7 @@ class KinematicsKitTests {
         JointKind.Revolute,
         previous,
         body,
-        Transform.translation(
-          0,
-          0,
-          i == 0 ? 0.0 : offsets[i - 1]
-        ),
+        Transform.translation(0, 0, i == 0 ? 0.0 : offsets[i - 1]),
         Transform.identity(),
         i % 2 == 0 ? z : y,
         -2.9,
@@ -1410,11 +1245,7 @@ class KinematicsKitTests {
       origin,
       0.0,
       1e-9,
-      new Vector3(
-        1,
-        0,
-        0
-      )
+      new Vector3(1, 0, 0)
     );
     var q = [0.3, 0.6, 0.5, -1.2, 0.3, 0.8, 0.2];
     var layout = JacobianLayout.all(model);
@@ -1579,25 +1410,12 @@ class KinematicsKitTests {
       origin,
       0.0,
       1e-9,
-      new Vector3(
-        1,
-        0,
-        0
-      )
+      new Vector3(1, 0, 0)
     );
     swivel.target = swivel.angle(KinematicSnapshot.of(new KinematicState(model, reach))) + 0.6;
     var other = DampedLeastSquares.solve(
-      new KinematicProblem(model).add(FrameTask.atFrame(
-        model,
-        flange,
-        goal,
-        1e-10,
-        1e-10
-      )).add(swivel),
-      new KinematicState(
-        model,
-        reach
-      ),
+      new KinematicProblem(model).add(FrameTask.atFrame(model, flange, goal, 1e-10, 1e-10)).add(swivel),
+      new KinematicState(model, reach),
       400
     );
     check(other.converged(), "the same tool pose solves at another swivel");
@@ -1612,13 +1430,7 @@ class KinematicsKitTests {
       return Math.sqrt(Math.pow(pose.x - goal.x, 2) + Math.pow(pose.y - goal.y, 2) + Math.pow(pose.z - goal.z, 2));
     }
     var plain = DampedLeastSquares.solve(
-      new KinematicProblem(model).add(FrameTask.atFrame(
-        model,
-        flange,
-        goal,
-        1e-9,
-        1e-9
-      )),
+      new KinematicProblem(model).add(FrameTask.atFrame(model, flange, goal, 1e-9, 1e-9)),
       seed,
       200
     );
@@ -1640,15 +1452,7 @@ class KinematicsKitTests {
     var limited = new KinematicProblem(model).add(FrameTask.atFrame(model,
       flange, goal, 1e-9, 1e-9)).add(new PostureTask(
         model,
-        [
-          1.5,
-          0.6,
-          0.5,
-          -1.2,
-          0.3,
-          0.8,
-          0.2
-        ],
+        [1.5, 0.6, 0.5, -1.2, 0.3, 0.8, 0.2],
         0.1
       ));
     limited.setLimits(0, -2.9, 0.4);

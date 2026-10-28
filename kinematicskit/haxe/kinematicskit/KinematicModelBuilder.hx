@@ -82,14 +82,8 @@ class KinematicModelBuilder {
       kind,
       parent,
       child,
-      Transform.checked(
-        parentTJoint,
-        'Kinematic joint "$id" parent frame'
-      ),
-      Transform.checked(
-        jointTChild,
-        'Kinematic joint "$id" child frame'
-      ),
+      Transform.checked(parentTJoint, 'Kinematic joint "$id" parent frame'),
+      Transform.checked(jointTChild, 'Kinematic joint "$id" child frame'),
       ax,
       ay,
       az,

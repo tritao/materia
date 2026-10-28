@@ -111,11 +111,7 @@ class PrioritizedSolver {
         var ratio = 0.0;
         for (i in 0...width) ratio = Math.max(
           ratio,
-          Math.abs(delta[i]) / (maxStep * DampedLeastSquares.columnScale(
-            problem,
-            i,
-            translationScale
-          ))
+          Math.abs(delta[i]) / (maxStep * DampedLeastSquares.columnScale(problem, i, translationScale))
         );
         if (ratio > 1.0) for (i in 0...width) delta[i] /= ratio;
       }

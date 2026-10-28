@@ -13,10 +13,7 @@ class StepLimitTests {
     if (!ok) throw message;
   }
   static function close(a:Float, b:Float, message:String):Void check(
-    Math.isFinite(a) && Math.abs(a - b) <= 1e-10 * Math.max(
-      1e-12,
-      Math.abs(b)
-    ),
+    Math.isFinite(a) && Math.abs(a - b) <= 1e-10 * Math.max(1e-12, Math.abs(b)),
     message
   );
   public static function main():Void {
@@ -43,11 +40,7 @@ class StepLimitTests {
       tip,
       Transform.identity(),
       Transform.identity(),
-      new Vector3(
-        0,
-        0,
-        1
-      )
+      new Vector3(0, 0, 1)
     );
     var model = builder.build();
     var problem = new KinematicProblem(model).setLimits(0, -0.1, 0.1);

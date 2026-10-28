@@ -143,10 +143,7 @@ class DifferentialIk {
         width,
         [for (column in 0...width) column],
         residual,
-        Math.max(
-          damping,
-          1e-6
-        )
+        Math.max(damping, 1e-6)
       );
       result = damped == null ? [for (_ in 0...width) 0.0] : damped;
       for (column in 0...width) result[column] = Math.min(Math.max(result[column], lower[column]), upper[column]);

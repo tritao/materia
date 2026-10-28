@@ -41,15 +41,7 @@ class SolverSupport {
       var norm = Math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw);
       state.setRootPose(
         body,
-        new Transform(
-          pose.x + vx,
-          pose.y + vy,
-          pose.z + vz,
-          qx / norm,
-          qy / norm,
-          qz / norm,
-          qw / norm
-        )
+        new Transform(pose.x + vx, pose.y + vy, pose.z + vz, qx / norm, qy / norm, qz / norm, qw / norm)
       );
     }
   }
