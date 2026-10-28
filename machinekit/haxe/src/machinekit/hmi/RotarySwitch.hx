@@ -1,11 +1,11 @@
 package machinekit.hmi;
 
 import cadkit.modeling.Footprint;
-import cadkit.modeling.FootprintGeometry;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as R;
+import materia.assembly.AssemblyDefinition.AssemblyJointLimits;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
 
 /**
@@ -19,6 +19,8 @@ class RotarySwitch extends HmiPart {
   static function inputs():Array<ComponentParameter> return [
     HmiPart.basisParameter("assumed"),
     R.count("positions", 12),
+    R.scalar("detentDegrees", 30, 1, 180),
+    R.scalar("startDegrees", 0, -180, 180),
     R.length("knobDiameter", 25),
     R.length("knobHeight", 18),
     R.length("bushDiameter", 10),
@@ -48,9 +50,11 @@ class RotarySwitch extends HmiPart {
       "nutThickness",
       "bodyDiameter",
       "behindDepth",
-      "massGrams"
+      "massGrams",
+      "detentDegrees"
     ]);
     require(count("positions") >= 2 && count("positions") <= 24, "two to 24 positions");
+    require((count("positions") - 1) * n("detentDegrees") < 360.0, "the positions fit round the switch");
     require(
       n("bushDiameter") < n("nutDiameter") && n("nutDiameter") < n("knobDiameter"),
       "the nut is wider than the bush and narrower than the knob"
@@ -102,11 +106,22 @@ class RotarySwitch extends HmiPart {
     )];
   }
 
-  /** The knob turns on the switch. It is free here; the switch's detents belong to the controller's reading of it. */
-  override public function joints():Array<DeviceJointSpec> return [new DeviceJointSpec(
-    "position",
-    Continuous,
-    "switch",
-    "knob"
-  )];
+  /**
+   * The knob turns on the switch between end stops and clicks into each of its positions, `detentDegrees` apart, the first at
+   * `startDegrees` (the knob's rest angle). Both come from the part: pitch and start differ between switches, and the rotation
+   * outside the first and last position is not available, because the end stops block it. Editors place the knob only at the
+   * positions unless asked for free motion.
+   */
+  override public function joints():Array<DeviceJointSpec> {
+    var pitch = n("detentDegrees") * Math.PI / 180.0, start = n("startDegrees") * Math.PI / 180.0;
+    var positions = count("positions");
+    var limits:AssemblyJointLimits = {
+      lower: start,
+      upper: start + (positions - 1) * pitch,
+      velocity: null,
+      effort: null,
+      detents: [for (i in 0...positions) start + i * pitch]
+    };
+    return [new DeviceJointSpec("position", Revolute, "switch", "knob", limits, start)];
+  }
 }

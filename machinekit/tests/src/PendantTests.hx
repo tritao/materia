@@ -1,4 +1,3 @@
-import cadkit.modeling.Footprint;
 import cadkit.modeling.FootprintGeometry;
 import cadkit.modeling.RoundedRectangle;
 import machinekit.assembly.AssemblyIntegrity;
@@ -177,12 +176,57 @@ class PendantTests {
       m25.pilotDiameter == PendantCase.STANDOFF_PILOT && m25.pilotDepth == PendantCase.STANDOFF_PILOT_DEPTH,
       "Boss pilot matches the short M2.5 insert"
     );
-    // The wheel turns on its housing and each knob on its switch: three free joints, the wheel's named for its encoder.
+    // The wheel turns on its housing and each knob on its switch: three joints, the wheel's named for its encoder.
     var joints = assembly.derived().definition.joints;
     var encoders = [for (j in joints) if (j.id == "jog/wheel/encoder") j];
     check(
       joints.length == 3 && encoders.length == 1,
-      "Three free joints, one the wheel's encoder: " + [for (j in joints) j.id].join(", ")
+      "Three joints, one the wheel's free encoder and two clicking knobs: " + [for (j in joints) j.id].join(", ")
+    );
+    // The switches click: each knob joint is limited between end stops and has a detent at every position, 30 degrees apart.
+    var detentCounts:Map<String, Int> = [];
+    for (j in joints) if (j.limits.detents != null) {
+      detentCounts.set(j.id, j.limits.detents.length);
+      var list:Array<Float> = cast j.limits.detents;
+      var upper = j.limits.upper, lower = j.limits.lower;
+      check(
+        upper != null && lower != null && materia.assembly.JointDetents.valid(j.limits.detents,
+        lower, upper) && Math.abs(list[1] - list[0] - Math.PI / 6) < 1e-9
+        && lower == 0.0 && Math.abs(upper - list[list.length - 1]) < 1e-9,
+        "Knob detents: " + j.id
+      );
+    }
+    check(
+      detentCounts.get("selectors/axis/position") == 12 && detentCounts.get("selectors/step/position") == 3,
+      "Twelve axis and three step positions: " + [for (k in detentCounts.keys()) k].join(", ")
+    );
+    check(encoders.length == 1 && encoders[0].limits.detents == null, "The hand wheel's encoder stays free");
+    var knobLimits = [for (j in joints) if (j.id == "selectors/axis/position") j.limits][0];
+    // The pitch and the first position are the part's: ten positions 10 degrees apart starting at -45 leave 90 degrees of travel.
+    var narrow = new RotarySwitch(new machinekit.component.ComponentValues().setInteger("positions", 10).setNumber(
+      "detentDegrees",
+      10.0
+    ).setNumber(
+      "startDegrees",
+      -45.0
+    ));
+    var narrowLimits = narrow.joints()[0].limits;
+    var narrowDetents:Array<Float> = narrowLimits == null
+      || narrowLimits.detents == null ? [] : cast narrowLimits.detents;
+    check(
+      narrowLimits != null && narrowDetents.length == 10 && Math.abs(narrowDetents[0] + Math.PI / 4) < 1e-9
+      && Math.abs(narrowDetents[1] - narrowDetents[0] - Math.PI / 18) < 1e-9
+      && Math.abs(narrowDetents[9] - narrowDetents[0] - 9 * Math.PI / 18) < 1e-9,
+      "A narrow pitch and an offset start come from the part"
+    );
+    var off = Math.PI / 6 * 3 + 0.12;
+    check(
+      Math.abs(materia.assembly.JointDetents.snap(knobLimits,
+      off) - Math.PI / 6 * 3) < 1e-9 && materia.assembly.JointDetents.snap(
+        null,
+        1.234
+      ) == 1.234,
+      "Snapping goes to the nearest detent and leaves a free joint alone"
     );
     // The exploded view validates against the assembly and moves every member except the shell.
     var scene = machinekit.assembly.AssemblyPreview.scene(assembly, "pendant");

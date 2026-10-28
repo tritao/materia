@@ -3,6 +3,7 @@ package app;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import materia.assembly.AssemblyDefinitionCodec;
+import materia.assembly.JointDetents;
 
 typedef MachineControlAxis = {
   var id:String;
@@ -14,6 +15,8 @@ typedef MachineControlAxis = {
   var step:Float;
   var factor:Float;
   var follows:Null<String>;
+  /** Positions the joint clicks into, in the axis's display units; empty for a joint that moves freely. */
+  var detents:Array<Float>;
 }
 
 /** Joint controls use the document's validated kinematics and undo, in human-facing units. */
@@ -42,6 +45,7 @@ class MachineControlModel {
         unit : linear ? "mm" : "deg",
         step : linear ? 0.1 : 1.0,
         factor : factor,
+        detents : joint.limits.detents == null ? [] : [for (d in joint.limits.detents) d * factor],
         follows : coupled.exists(joint.id)
         ? coupled.get(joint.id) : session.assemblyJointIsDependent(joint.id) ? "closure" : null
       });
@@ -73,13 +77,20 @@ class MachineControlModel {
     return value;
   }
 
+  /** `free` lets a joint that has detents rest between them; by default it is placed at the nearest one. */
   public static function set(session:ProjectDocumentSession,
-    id:String, value:Float, editable:Bool):Bool return session.setAssemblyJointCoordinate(
+    id:String, value:Float, editable:Bool, free:Bool = false):Bool return session.setAssemblyJointCoordinate(
       id,
-      nativePosition(session, id, value, editable)
+      nativePosition(session, id, value, editable, free)
     );
 
-  public static function nativePosition(session:ProjectDocumentSession, id:String, value:Float, editable:Bool):Float {
+  public static function nativePosition(
+    session:ProjectDocumentSession,
+    id:String,
+    value:Float,
+    editable:Bool,
+    free:Bool = false
+  ):Float {
     if (!editable || session.scriptOwnership != null) throw "Machine controls are currently locked";
     if (!Math.isFinite(value)) throw "Enter a finite axis position";
     for (axis in axes(session)) if (axis.id == id) {
@@ -92,6 +103,7 @@ class MachineControlModel {
       if (definition != null) for (joint in definition.joints) if (joint.id == id) {
         if (joint.limits.lower != null) native = Math.max(native, joint.limits.lower);
         if (joint.limits.upper != null) native = Math.min(native, joint.limits.upper);
+        if (!free) native = JointDetents.snap(joint.limits, native);
       }
       return native;
     }

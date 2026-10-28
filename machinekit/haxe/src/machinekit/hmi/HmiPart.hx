@@ -1,7 +1,6 @@
 package machinekit.hmi;
 
 import cadkit.modeling.Footprint;
-import cadkit.modeling.FootprintGeometry;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.assembly.MachineAssembly;
@@ -78,7 +77,7 @@ class HmiPart extends MachineComponent {
    */
   public function hardware():Array<PanelHardware> return [];
 
-  /** Free joints between the bodies, each about the device's z axis: the encoder of a wheel, the shaft of a switch. */
+  /** Joints between the bodies, each about the device's z axis: the encoder of a wheel (free), the shaft of a switch (detented). */
   public function joints():Array<DeviceJointSpec> return [];
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -134,7 +133,8 @@ class HmiPart extends MachineComponent {
         joint.child,
         joint.id + "-turning",
         {x: 0, y: 0, z: 1},
-        0
+        joint.defaultValue,
+        joint.limits
       );
     }
     return assembly;

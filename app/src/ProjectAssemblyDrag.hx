@@ -47,6 +47,8 @@ class ProjectAssemblyDrag implements SceneAssemblyDrag {
     session.previewAssemblyDrag(drag);
   }
 
+  public function setFreeDetents(free:Bool):Void drag.snapToDetents = !free;
+
   public function grabbedPoint():Array<Float> {
     var pose = drag.grabbedPose();
     return [pose.x * metresPerUnit, pose.y * metresPerUnit, pose.z * metresPerUnit];

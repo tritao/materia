@@ -18,6 +18,8 @@ interface SceneAssemblyDrag {
   function following():Bool;
   /** Why the pose stopped short (or "Following"), for the user. */
   function message():String;
+  /** Lets joints with detents (a rotary switch) rest between them while dragging; by default they click to a position. */
+  function setFreeDetents(free:Bool):Void;
   /** Records the previewed pose as one undoable edit; false when nothing changed. */
   function commit():Bool;
   function cancel():Void;

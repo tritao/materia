@@ -8,6 +8,7 @@ import haxeon.ui.LayoutStyle;
 import haxeon.ui.core.View;
 import haxeon.ui.widgets.KeyedView;
 import haxeon.ui.widgets.controls.Button;
+import haxeon.ui.widgets.controls.Checkbox;
 import app.ProjectJointEdit;
 import haxeon.ui.widgets.layout.Column;
 import haxeon.ui.widgets.layout.Row;
@@ -20,6 +21,8 @@ import haxeon.ui.widgets.text.TextField;
 /** Manual travel testing in design mode, independent of the selected component. */
 @:access(app.Main.ReferenceEditorApp) class MachineControlPanel {
   final drafts:Map<String, String> = [];
+  /** Axes with detents that the user has set to turn freely instead of clicking into their positions. */
+  final freeAxes:Map<String, Bool> = [];
   final scroll = new ScrollController();
   var generation = -1;
   var error:Null<String>;
@@ -199,7 +202,13 @@ import haxeon.ui.widgets.text.TextField;
         var set = function(value:Float) {
           try {
             cancelGesture();
-            MachineControlModel.set(app.session, id, value, !app.simulation.isActive() && !app.documents.blocked());
+            MachineControlModel.set(
+              app.session,
+              id,
+              value,
+              !app.simulation.isActive() && !app.documents.blocked(),
+              freeAxes.exists(id)
+            );
             error = null;
             drafts.remove(id);
             app.documentChanged();
@@ -219,7 +228,8 @@ import haxeon.ui.widgets.text.TextField;
               app.session,
               id,
               value,
-              !app.simulation.isActive() && !app.documents.blocked()
+              !app.simulation.isActive() && !app.documents.blocked(),
+              freeAxes.exists(id)
             ));
             error = null;
             drafts.remove(id);
@@ -338,6 +348,29 @@ import haxeon.ui.widgets.text.TextField;
           slider.enabled = editable;
           controls.push(new KeyedView("slider", slider));
           controls.push(new KeyedView("range", new Text(number(minimum) + " … " + number(maximum) + " " + axis.unit)));
+        }
+        if (axis.detents.length > 0) {
+          var at = 0, nearest = Math.POSITIVE_INFINITY;
+          for (i in 0...axis.detents.length) if (Math.abs(axis.detents[i] - axis.value) < nearest) {
+            nearest = Math.abs(axis.detents[i] - axis.value);
+            at = i;
+          }
+          var onDetent = nearest < 1e-3;
+          var free = freeAxes.exists(id);
+          controls.push(new KeyedView(
+            "detents",
+            new Text(onDetent ? "Position " + (at + 1) + " of " + axis.detents.length : "Between positions "
+            + (at + 1) + " and " + axis.detents.length + " · " + (free ? "turning freely" : "clicks to a position"))
+          ));
+          var freeBox = new Checkbox("machine-axis-free:" + id, "Turn freely", free, on -> {if (on) freeAxes.set(
+            id,
+            true
+          );
+          else freeAxes.remove(id);
+          app.invalidateView();
+          });
+          freeBox.enabled = editable;
+          controls.push(new KeyedView("free", freeBox));
         }
         var field = new TextField(
           "machine-axis-value:" + id,

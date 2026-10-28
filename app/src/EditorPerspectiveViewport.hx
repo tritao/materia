@@ -2096,8 +2096,11 @@ class EditorPerspectiveViewport implements View {
         viewportHeight
       );
       else if (objectDrag != null) objectDrag.update(camera, event.localX, event.localY, viewportWidth, viewportHeight);
-      else if (navigationMode == 5 && assemblyDrag != null) updateAssemblyDrag(event.localX, event.localY);
-      else if (navigationMode == 6 && sketchPointDragging) {
+      else if (navigationMode == 5 && assemblyDrag != null) {
+        // Joints with detents click to a position unless Alt is held.
+        assemblyDrag.setFreeDetents((event.modifiers & UiModifier.Alt) != 0);
+        updateAssemblyDrag(event.localX, event.localY);
+      } else if (navigationMode == 6 && sketchPointDragging) {
         var point = sketchPlanePoint(event.localX, event.localY);
         if (point != null && scene.dragSketchDraftPoint(point.x, point.y)) {
           sketchDragRevision++;

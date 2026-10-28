@@ -29,6 +29,9 @@ class ProjectMateDrag implements SceneAssemblyDrag {
     currentTarget = grabbedPoint();
   }
 
+  public function setFreeDetents(free:Bool):Void {
+  }
+
   public function update(x:Float, y:Float, z:Float):Void {
     if (finished) return;
     if (!Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(z)) return;
