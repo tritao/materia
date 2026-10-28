@@ -28,7 +28,7 @@ Numbers and part families below are targets or unchecked suggestions unless stat
 
 | Control | Part | Notes |
 |---|---|---|
-| MPG wheel | Bought, 60 mm, 100 PPR | Read on an MCU encoder timer; 400 counts per turn. Check the output type and supply. |
+| MPG wheel | Bought off the shelf: the "60 mm 6 pin 100 PPR handwheel" the SmartPendant uses (its README links an AliExpress listing; the maker publishes no part number) | Read on an MCU encoder timer; 400 counts per turn. The SmartPendant README says it also works from 3.3 V and wires it to 5 V tolerant pins, so it can run from 3.3 V with no level shifting. Verify the pinout and output type on arrival. |
 | Axis | 12-position panel rotary switch: OFF plus positions 1 to 11 | The position is the state, so it survives power cycles, reads with a glove and does not depend on the display. Positions are printed as plain numbers; the profile maps each to an axis and the OLED shows the name ("3: Z"). If the OLED fails, the printed number and the main HMI still identify the axis. |
 | Step | 3-position panel rotary switch | ×1, ×10, ×100. Universal across machines, so fixed. |
 | Wheel enable | Plain hold button | Wheel counts are accepted only while it is held. A guard against bumps, not a safety function. |
@@ -144,7 +144,7 @@ The wire schema, the controller-side code, the host link and how it is tested ar
 
 - **Button set.** Settled for v1 as three fixed keys and F1 to F3 profile keys. More user keys
   wait until a real machine shows what is missing.
-- **MPG choice.** Output type, supply, wheel feel, detent and price from a real part.
+- **MPG.** Settled on the SmartPendant's part (60 mm, 6 pin, 100 PPR). Still to check on the real part: pinout, output type, whether it runs cleanly from 3.3 V, wheel feel, detent and price. SmartPendant's case is 160 x 65 x 20 mm, 55 mm with the wheel and handle, a size reference for ours.
 - **E-stop contact block.** Rating and terminals.
 - **pcbkit.** Whether it covers a G0B1 with FDCAN and an isolated transceiver today.
 - **Display burn-in.** Settings to confirm on a real module (the Waveshare listing gives no lifetime figures).
