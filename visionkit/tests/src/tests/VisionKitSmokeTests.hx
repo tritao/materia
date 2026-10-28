@@ -28,16 +28,8 @@ class VisionKitSmokeTests {
     if (!rejected) throw "unsupported calibration version accepted";
     for (bad in [
       StringTools.replace(calibration.toJson(), '"width":64', '"width":"64"'),
-      StringTools.replace(
-        calibration.toJson(),
-        '"fx":40',
-        '"fx":"40"'
-      ),
-      StringTools.replace(
-        calibration.toJson(),
-        '"source":"test fixture"',
-        '"source":5'
-      )
+      StringTools.replace(calibration.toJson(), '"fx":40', '"fx":"40"'),
+      StringTools.replace(calibration.toJson(), '"source":"test fixture"', '"source":5')
     ]) {
       rejected = false;
       try CameraCalibration.fromJson(bad) catch (_:Dynamic) rejected = true;
@@ -58,11 +50,7 @@ class VisionKitSmokeTests {
       {x: 0.0, y: half, z: half},
       {x: 0.0, y: -half, z: half},
       {x: 0.0, y: -half, z: -half},
-      {
-        x: 0.0,
-        y: half,
-        z: -half
-      }
+      {x: 0.0, y: half, z: -half}
     ];
     var cameraPoints = [for (p in objectPoints) {
       x:p.x + 1.0, y:p.y, z:p.z

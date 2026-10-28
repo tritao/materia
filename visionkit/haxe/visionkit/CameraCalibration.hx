@@ -83,51 +83,21 @@ class CameraCalibration {
       integer(m, "height"),
       number(m, "fx"),
       number(m, "fy"),
-      number(
-        m,
-        "cx"
-      ),
-      number(
-        m,
-        "cy"
-      ),
-      integer(
-        m,
-        "distortionModel"
-      ),
-      number(
-        m,
-        "k1"
-      ),
-      number(
-        m,
-        "k2"
-      ),
-      number(
-        m,
-        "p1"
-      ),
-      number(
-        m,
-        "p2"
-      ),
-      number(
-        m,
-        "k3"
-      )
+      number(m, "cx"),
+      number(m, "cy"),
+      integer(m, "distortionModel"),
+      number(m, "k1"),
+      number(m, "k2"),
+      number(m, "p1"),
+      number(m, "p2"),
+      number(m, "k3")
     );
     return new CameraCalibration(
       model,
       number(root, "rmsReprojectionError"),
       string(root, "calibrationTime"),
-      string(
-        root,
-        "boardDescription"
-      ),
-      string(
-        root,
-        "source"
-      )
+      string(root, "boardDescription"),
+      string(root, "source")
     );
   }
 }

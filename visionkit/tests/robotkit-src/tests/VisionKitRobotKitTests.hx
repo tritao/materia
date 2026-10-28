@@ -51,12 +51,7 @@ class VisionKitRobotKitTests {
       null,
       "camera.clock",
       "host.clock",
-      new CameraImage(
-        width,
-        height,
-        "rgb8",
-        pixels
-      )
+      new CameraImage(width, height, "rgb8", pixels)
     );
     var detector = new VisionKitFiducialDetector(calibration, MarkerDetector.ARUCO_4X4_50, 0.24);
     var markers = detector.detect(frame);
@@ -102,12 +97,7 @@ class VisionKitRobotKitTests {
       null,
       "source",
       "host",
-      new CameraImage(
-        16,
-        12,
-        "rgb8",
-        Bytes.alloc(16 * 12 * 3)
-      )
+      new CameraImage(16, 12, "rgb8", Bytes.alloc(16 * 12 * 3))
     );
     var depthBytes = Bytes.alloc(16 * 12 * 4);
     for (i in 0...16 * 12) depthBytes.setFloat(i * 4, 2.0);
@@ -124,12 +114,7 @@ class VisionKitRobotKitTests {
       null,
       "source",
       "host",
-      new CameraImage(
-        16,
-        12,
-        "depth32f",
-        depthBytes
-      )
+      new CameraImage(16, 12, "depth32f", depthBytes)
     );
     var digest = "0000000000000000000000000000000000000000000000000000000000000000";
     var box = new ImageDetection("crate", 0.9, 8, 5, 2, 2);
