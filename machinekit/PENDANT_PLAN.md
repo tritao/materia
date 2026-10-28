@@ -33,7 +33,7 @@ Numbers and part families below are targets or unchecked suggestions unless stat
 | Step | 3-position panel rotary switch | ×1, ×10, ×100. Universal across machines, so fixed. |
 | Wheel enable | Plain hold button | Wheel counts are accepted only while it is held. A guard against bumps, not a safety function. |
 | Buttons | 6 with LEDs | **Fixed (3):** Start, Hold, Stop/Reset, with standard icons, the same on every machine. **User keys F1 to F3 (3):** the function comes from the machine profile and the OLED's bottom line shows the current names next to the keys, so the one SKU needs no relabelling. Default profile assignment: F1 door open/close, F2 spindle jog (manual, hold-to-run), F3 work light or MQL toggle; the router can use F3 for the vacuum table. Unused keys stay dark. |
-| E-stop | Bought 22 mm mushroom, NC contact block | In the v1 chain. |
+| E-stop | Bought, 22 mm, a **compact** type with NC contacts: EAO Series 84 (13.5 mm behind the panel with cable connection, 18 mm plug-in; EN 60947-5-5 certified per EAO) or APEM EC Compact (18.7 mm, panel 1 to 4 mm, EN 60947-5-5 per APEM). A standard Harmony XB5AS8445 is 82 mm deep per its datasheet, far too deep. | In the v1 chain. Depths are from the makers' pages; head diameter and height, contacts and termination are still to be read from the datasheet. |
 | Display | 128×64 mono OLED, 2.42 in (SSD1309 class), I2C | Text only; about 21 columns by 8 rows. The 2.42 in size is chosen over 1.3 in for legibility at handheld distance, at the cost of a larger face; the bench confirms it. Footprint for a one-character display as an option. |
 
 An endless rotary encoder for the axis was considered and rejected: the selection would live only
@@ -159,10 +159,10 @@ Start, Hold and Stop/Reset keys. What the checker already shows:
 
 - **The wheel sets the face size.** Its 80 mm flange and 72 mm stud circle need about 90 mm of face
   in one direction, which makes the face about 220 x 110 mm, far from a 160 x 65 slab.
-- **Depth is the real problem.** With the E-stop's contact block assumed at 45 mm behind the plate and
-  the wheel 41 mm above it (27 without the handle), a 50 mm deep case is 94 mm tall with the face up.
-  A shallower E-stop (or a different mounting for its contacts) is the lever, so its measured depth
-  matters more than any other open number.
+- **Depth was the problem.** A standard 22 mm E-stop with its contact block is 82 mm deep (Harmony
+  XB5AS8445 datasheet) and rejected by the checker. A compact one is 13.5 to 18.7 mm behind the panel,
+  so the deepest parts become the switches and buttons (assumed 25 mm), a 30 mm case and the wheel's 41
+  mm (27 without the handle): 74 mm tall face up. Shallower buttons and rotary switches are the next lever.
 - **Assumed numbers:** everything except the wheel (its drawing) is a placeholder until measured.
 
 ## Mechanics

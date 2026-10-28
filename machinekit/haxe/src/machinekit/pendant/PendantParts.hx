@@ -19,9 +19,14 @@ class PendantParts {
     return new PendantControl("wheel", Wheel, x, y, Circle(45.0), Circle(80.0), withHandle ? 41.0 : 27.0, 12.0, 276.0, "vendor-drawing", holes);
   }
 
-  /** 22 mm emergency stop with an NC contact block (assumed: head 40, block 45 deep, 60 g). */
-  public static function eStop22(x:Float, y:Float):PendantControl
-    return new PendantControl("estop", EStop, x, y, Circle(22.3), Circle(40.0), 25.0, 45.0, 60.0, "assumed");
+  /**
+   * Compact 22 mm emergency stop. Depth behind the panel is from the candidates' pages (EAO Series 84
+   * 13.5 mm with cable connection and 18 mm plug-in, APEM EC Compact 18.7 mm); the head diameter and
+   * height are not on those pages, so the 40 mm head and 25 mm height are assumed, and the mass.
+   * A standard Harmony XB5AS8445 is 82 mm deep per its datasheet, which no handheld case can take.
+   */
+  public static function eStopCompact(x:Float, y:Float):PendantControl
+    return new PendantControl("estop", EStop, x, y, Circle(22.3), Circle(40.0), 25.0, 18.7, 40.0, "assumed");
 
   /** Panel rotary switch with a knob (assumed: 10 mm bush hole, 25 mm knob, 25 mm body). */
   public static function rotary(id:String, x:Float, y:Float):PendantControl

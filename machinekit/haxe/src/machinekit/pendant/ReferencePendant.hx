@@ -10,7 +10,7 @@ class ReferencePendant {
   public static function face():PendantFace {
     var controls = [
       PendantParts.vallderWheel(65.0, 0.0),
-      PendantParts.eStop22(-85.0, 30.0),
+      PendantParts.eStopCompact(-85.0, 30.0),
       PendantParts.display242(-29.0, 33.0),
       PendantParts.button("wheel-enable", 17.0, 33.0),
       PendantParts.rotary("axis", -92.5, -8.0),
@@ -22,6 +22,6 @@ class ReferencePendant {
       PendantParts.button("hold", -45.0, -38.0),
       PendantParts.button("stop", -20.0, -38.0)
     ];
-    return new PendantFace(220.0, 110.0, 3.0, 3.0, 50.0, controls);
+    return new PendantFace(220.0, 110.0, 3.0, 3.0, 30.0, controls);
   }
 }
