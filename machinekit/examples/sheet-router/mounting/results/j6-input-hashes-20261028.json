@@ -1,0 +1,13 @@
+{
+  "checkedAtUtc": "2026-10-28T16:34:28.141568+00:00",
+  "histories": 186,
+  "uniqueFiles": 755,
+  "indexSha256": {
+    "j6-executed-pose-grid": "0fceaaaa6b03484569b886eac8d9020cdd1c15fc298db03180a23f2980db3a88",
+    "j6-executed-phase-grid": "04ab3aa29a52b28b6b37d9fdad1a462ad4df67b8d4c1d81754f136e674a1f02f",
+    "j6-full-feed-resume": "b11e706d118a1496fe6e506b18ef2e82e1e514005a0d14718a91e8ab982d2c11"
+  },
+  "errors": [],
+  "status": "PASS",
+  "scope": "streamed output, manifest, immutable producer and loaded-library hashes; no modal replay"
+}
