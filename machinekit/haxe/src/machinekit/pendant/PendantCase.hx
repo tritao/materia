@@ -658,18 +658,15 @@ class PendantCase {
   /**
 	 * The inserts and screws the plan implies: an M3 insert in each post with a button head screw through the plate's
 	 * counterbore, and an M2.5 insert in each standoff with a screw through the board. Screw lengths are the shortest
-	 * standard ones that reach 90 % of the insert, and never past the bottom of its pilot hole.
+	 * standard ones that reach 75 % of the insert, and never past the insert's foot.
 	 */
   public function hardware():Array<PanelHardware> {
     var result:Array<PanelHardware> = [];
     var caseInsert = ThreadedInsert.m3(), boardInsert = ThreadedInsert.m2_5();
     var bearing = face.thickness - PanelFacePlate.COUNTERBORE_DEPTH;
-    var caseLength = standardLength(bearing + 0.9 * caseInsert.length, bearing + caseInsert.pilotDepth);
+    var caseLength = standardLength(bearing + 0.75 * caseInsert.length, bearing + caseInsert.length);
     var underside = boardTop - BOARD_THICKNESS;
-    var boardLength = standardLength(
-      BOARD_THICKNESS + 0.9 * boardInsert.length,
-      BOARD_THICKNESS + boardInsert.pilotDepth
-    );
+    var boardLength = standardLength(BOARD_THICKNESS + 0.75 * boardInsert.length, BOARD_THICKNESS + boardInsert.length);
     var i = 0;
     for (p in posts) {
       i++;

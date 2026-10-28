@@ -14,7 +14,7 @@ class PanelAssemblyBuilder {
 	 * `extras` are further fixed solids in panel coordinates (a board, say), each with an id and a builder, made of
 	 * `extrasMaterial`. The plate and shell are printed nylon, light against the dark controls. When there is a shell or
 	 * extras the plate, shell and extras sit in a `case` group; each of `groups` gathers controls by id, and a control in
-	 * no group stays at the top level. `hardware` (inserts, screws) sits in the case group.
+	 * no group stays at the top level. `hardware` (inserts, screws) goes in a `fasteners` group.
 	 */
   public static function build(
     layout:PanelLayout,
@@ -41,15 +41,6 @@ class PanelAssemblyBuilder {
         extrasMaterial
       )
     );
-    if (hardware != null) for (h in hardware) housing.addComponent(
-      h.id,
-      h.component,
-      AssemblyFrames.translation(
-        h.x,
-        h.y,
-        h.z
-      )
-    );
     if (housing != assembly) assembly.include("case", housing);
     // An included assembly is copied when it is included, so fill each group before including it.
     var groupOf:Map<String, MachineAssembly> = [];
@@ -69,6 +60,11 @@ class PanelAssemblyBuilder {
       else target.include(c.id, expanded, pose);
     }
     for (g in grouped) assembly.include(g.id, g.assembly);
+    if (hardware != null && hardware.length > 0) {
+      var fasteners = new MachineAssembly();
+      for (h in hardware) fasteners.addComponent(h.id, h.component, AssemblyFrames.translation(h.x, h.y, h.z));
+      assembly.include("fasteners", fasteners);
+    }
     return assembly;
   }
 }

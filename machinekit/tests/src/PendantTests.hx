@@ -185,8 +185,8 @@ class PendantTests {
     check(ids.length == 46, "Forty-six bodies, twenty of them hardware: " + ids.length);
     // Hardware: an insert and a screw in each post and standoff, sized from the pilot holes the shell is cut with.
     check(
-      ids.indexOf("case/insert-6") >= 0 && ids.indexOf("case/screw-6") >= 0
-      && ids.indexOf("case/board-insert-4") >= 0 && ids.indexOf("case/board-screw-4") >= 0,
+      ids.indexOf("fasteners/insert-6") >= 0 && ids.indexOf("fasteners/screw-6") >= 0
+      && ids.indexOf("fasteners/board-insert-4") >= 0 && ids.indexOf("fasteners/board-screw-4") >= 0,
       "Hardware members"
     );
     var m3 = ThreadedInsert.m3(), m25 = ThreadedInsert.m2_5();

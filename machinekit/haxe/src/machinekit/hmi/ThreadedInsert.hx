@@ -1,6 +1,11 @@
 package machinekit.hmi;
 
 import cadkit.modeling.Part;
+import cadkit.threads.ThreadSpec;
+import cadkit.threads.ThreadedFace.ThreadStart;
+import cadkit.threads.Threads;
+import machinekit.component.Solids;
+import machinekit.standard.FastenerThreads;
 import machinekit.component.ComponentDetail;
 import machinekit.component.MachineComponent;
 
@@ -11,7 +16,8 @@ import machinekit.component.MachineComponent;
  * derives its pilot hole from `pilotDiameter` and `pilotDepth` so hole and insert cannot disagree.
  */
 class ThreadedInsert extends MachineComponent {
-  public final thread:String;
+  public final name:String;
+  public final thread:ThreadSpec;
 
   /** Printed hole the insert goes into. */
   public final pilotDiameter:Float;
@@ -20,9 +26,11 @@ class ThreadedInsert extends MachineComponent {
   public final length:Float;
   public final boreDiameter:Float;
 
-  public function new(thread:String, pilotDiameter:Float, pilotDepth:Float, length:Float, boreDiameter:Float) {
-    super('HEATSET-$thread-$length', 'heat-set insert $thread x $length', "brass");
-    this.thread = thread;
+  public function new(name:String,
+    pitch:Float, pilotDiameter:Float, pilotDepth:Float, length:Float, boreDiameter:Float) {
+    super('HEATSET-$name-$length', 'heat-set insert $name x $length', "brass");
+    this.name = name;
+    this.thread = FastenerThreads.metric(boreDiameter, pitch).mating();
     this.pilotDiameter = pilotDiameter;
     this.pilotDepth = pilotDepth;
     this.length = length;
@@ -30,19 +38,31 @@ class ThreadedInsert extends MachineComponent {
   }
 
   /** M3 x 5.7 (4.6 mm knurled body) in a 4.2 x 7.5 hole. */
-  public static function m3():ThreadedInsert return new ThreadedInsert("M3", 4.2, 7.5, 5.7, 3.0);
+  public static function m3():ThreadedInsert return new ThreadedInsert("M3", 0.5, 4.2, 7.5, 5.7, 3.0);
 
   /** M2.5 x 4 (3.6 mm knurled body) in a 3.4 x 6 hole. */
-  public static function m2_5():ThreadedInsert return new ThreadedInsert("M2.5", 3.4, 6.0, 4.0, 2.5);
+  public static function m2_5():ThreadedInsert return new ThreadedInsert("M2.5", 0.45, 3.4, 6.0, 4.0, 2.5);
 
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
-    var body = Part.cylinderSpan(pilotDiameter / 2, -length, 0.0, 0.0, 0.0);
-    var bore = Part.cylinderSpan(boreDiameter / 2, -length - 1.0, 1.0, 0.0, 0.0);
-    var result = body.subtract(bore);
-    body.close();
+    // A tube of the installed envelope with a chamfered foot and three retention grooves; its bore carries the thread texture.
+    var r = pilotDiameter / 2;
+    var section = [{r: 0.0, z: 0.0}, {r: r, z: 0.0}];
+    for (i in 1...4) {
+      var z = -length * i / 4.0;
+      section.push({r: r, z: z + 0.3});
+      section.push({r: r - 0.3, z: z + 0.15});
+      section.push({r: r - 0.3, z: z - 0.15});
+      section.push({r: r, z: z - 0.3});
+    }
+    section.push({r: r, z: -length + 0.3});
+    section.push({r: r - 0.3, z: -length});
+    section.push({r: 0.0, z: -length});
+    var body = Part.revolve(section);
+    var bore = Solids.named(Part.cylinderSpan(boreDiameter / 2, -length - 0.1, 0.1), "bore");
+    var threaded = new Part(Threads.attach(bore.shape, "bore:cyl.side", thread, AxisMaximum, length));
     bore.close();
-    return result;
+    return Solids.cut(body, [threaded]);
   }
 }
