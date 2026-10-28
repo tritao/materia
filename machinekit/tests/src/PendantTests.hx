@@ -1,5 +1,6 @@
 import cadkit.modeling.FootprintGeometry;
 import cadkit.modeling.RoundedRectangle;
+import machinekit.assembly.AssemblyIntegrity;
 import machinekit.hmi.*;
 import machinekit.pendant.*;
 import sys.io.File;
@@ -43,8 +44,8 @@ class PendantTests {
     check(Math.abs(shell.volume() - shellExpected) / shellExpected < 0.003, "Shell volume " + shell.volume() + " vs " + shellExpected);
 
     // Every part's solid is clear of the others, the plate and the shell.
-    var found = PanelAssembly.interferences(layout, plate, shell);
-    check(found.length == 0, "Interference: " + found.join(" | "));
+    var report = AssemblyIntegrity.check(PanelAssemblyBuilder.build(layout, () -> pendantCase.plate(), () -> pendantCase.shell()));
+    check(report.errors().length == 0, "Interference: " + [for (e in report.errors()) e.message].join(" | "));
 
     var stepDir = Sys.getEnv("PENDANT_CASE_STEP_DIR");
     if (stepDir != null && stepDir != "") { shell.shape.exportStep(stepDir + "/pendant-shell.step"); plate.shape.exportStep(stepDir + "/pendant-plate.step"); }

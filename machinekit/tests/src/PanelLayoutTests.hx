@@ -2,6 +2,7 @@ import machinekit.component.ComponentValues;
 import cadkit.modeling.Footprint;
 import cadkit.modeling.FootprintGeometry;
 import cadkit.modeling.RoundedRectangle;
+import machinekit.assembly.AssemblyIntegrity;
 import machinekit.hmi.*;
 
 class PanelLayoutTests {
@@ -65,9 +66,12 @@ class PanelLayoutTests {
     check(plate.solidCount() == 1, "One solid");
     check(Math.abs(plate.volume() - expected) / expected < 1e-3, 'Plate volume ${plate.volume()} vs $expected');
     // No part overlaps another or the plate.
-    var found = PanelAssembly.interferences(layout, plate);
-    check(found.length == 0, "Interference: " + found.join(" | "));
     plate.close();
+    var report = AssemblyIntegrity.check(PanelAssemblyBuilder.build(layout, () -> PanelFacePlate.part(layout)));
+    check(report.errors().length == 0, "Interference: " + [for (e in report.errors()) e.message].join(" | "));
+    // Two buttons on top of each other are an error the assembly check reports.
+    var stacked = new PanelLayout(160.0, 100.0, 3.0, 3.0, 48.0, [new PlacedPart("a", PartPresets.pushButton16(), 0.0, 0.0), new PlacedPart("b", PartPresets.pushButton16(), 10.0, 0.0)]);
+    check(AssemblyIntegrity.check(PanelAssemblyBuilder.build(stacked, () -> PanelFacePlate.part(stacked))).errors().length > 0, "Overlapping parts are reported");
     var svg = PanelLayoutSvg.render(layout);
     check(svg.indexOf("<svg") == 0 && svg.indexOf(">wheel<") > 0, "SVG drawing");
     trace("panel layout tests passed");
