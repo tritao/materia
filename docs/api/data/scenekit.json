@@ -595,8 +595,8 @@
       {
        "name": "fitClipRange",
        "kind": "method",
-       "signature": "(bounds:Array<Array<Float>>):Void",
-       "doc": "Fits the depth range to visible world-space axis-aligned bounds."
+       "signature": "(bounds:Array<Array<Float>>, ?aspect:Float, ?fovYOverride:Float):Void",
+       "doc": "Fits depth to world bounds; a positive aspect excludes boxes outside the view."
       },
       {
        "name": "orbit",

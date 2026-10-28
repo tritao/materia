@@ -308,14 +308,14 @@
       {
        "name": "driveRack",
        "kind": "method",
-       "signature": "(axis:AxisSpec, id:String, motor:String, pinion:MachineComponent, pose:AssemblyFrame, rackSide:Array<Float>, rackId:String, rack:MachineComponent, ?rackParent:String, driverForMotor:(String) -> String, ?reducer:MachineComponent, ?preload:PreloadedPinionMount):Void",
-       "doc": "A moving motor's pinion rolls along a rack fixed to `rackParent`. The pinion sits at `pose` with the axis at\ncoordinate zero (its axis along the pose's +Z, its face from z = 0 to its face width), and the rack lies on\n`rackSide` of it. The rack's pose comes from `rackPlacement`, and the coupling's sense from the pinion rolling\non it as the axis slides (`slide` comes first)."
+       "signature": "(axis:AxisSpec, id:String, motor:String, pinion:MachineComponent, pose:AssemblyFrame, rackMount:RackMount, rackId:String, rack:MachineComponent, driverForMotor:(String) -> String, ?reducer:MachineComponent, ?preload:PreloadedPinionMount):Void",
+       "doc": "A moving motor's pinion rolls along a rack on its required physical mount. The pinion sits at `pose` with the axis at\ncoordinate zero (its axis along the pose's +Z, its face from z = 0 to its face width), and the rack lies on\nside declared by the mount face. The rack's pose comes from `rackPlacement`, and the coupling's sense from the pinion rolling\non it as the axis slides (`slide` comes first)."
       },
       {
        "name": "rackPlacement",
        "kind": "method",
-       "signature": "(axis:AxisSpec, pinion:MachineComponent, pose:AssemblyFrame, rackSide:Array<Float>, rack:MachineComponent):{pose:AssemblyFrame, sense:Sense}",
-       "doc": "Where a rack meshes with `pinion` (at `pose` with the axis at zero, see `driveRack`) on its `rackSide` (a direction\nfrom the pinion's axis, square to it and to the axis's travel): the rack's pitch line touches the pinion's pitch\ncircle, its face is centred on the pinion's, a rack gap faces the pinion tooth nearest the pitch point, and the rack\ncovers the pitch point over the whole travel with two teeth to spare at each end (or the rack is too short and\nthis throws). `sense` is the coupling sense that makes the pinion roll on it. Machines size the rack's support from\nthe pose before calling `driveRack`."
+       "signature": "(axis:AxisSpec, pinion:MachineComponent, pose:AssemblyFrame, rackMount:RackMount, rack:MachineComponent):{pose:AssemblyFrame, sense:Sense}",
+       "doc": "Mesh placement from the required physical mount's back plane. Its normal\nfixes the side even for mirrored motors. Reject plane/tangent disagreement\nand broken native contact paths before installing the drive."
       },
       {
        "name": "screwSense",
@@ -2858,6 +2858,89 @@
        "name": "holeDiameter",
        "kind": "var",
        "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "RackContactLink",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/assembly/RackMount.hx",
+     "fields": [
+      {
+       "name": "first",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "second",
+       "kind": "var",
+       "signature": ":String"
+      }
+     ]
+    },
+    {
+     "name": "RackMesh",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/assembly/RackMesh.hx",
+     "doc": "Geometry for designing a support. This never installs a rack/drive.",
+     "fields": [
+      {
+       "name": "backDepth",
+       "kind": "method",
+       "signature": "(rack:MachineComponent):Float",
+       "static": true
+      },
+      {
+       "name": "layout",
+       "kind": "method",
+       "signature": "(axis:AxisSpec, direction:Array<Float>, pinion:MachineComponent, pose:AssemblyFrame, datum:AssemblyFrame, rack:MachineComponent, ?phaseOffsetMm:Float):{pose:AssemblyFrame, sense:Sense}",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "RackMount",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/assembly/RackMount.hx",
+     "doc": "Required physical support. The datum is in host coordinates: +Y from rack\nback towards teeth, +Z along travel. Contact links name actual load-path\nmembers; \"$rack\" denotes the element being placed.",
+     "fields": [
+      {
+       "name": "host",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "datum",
+       "kind": "var",
+       "signature": ":AssemblyFrame"
+      },
+      {
+       "name": "attachment",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "phaseOffsetMm",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "contacts",
+       "kind": "var",
+       "signature": ":Array<RackContactLink>"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(host:String, datum:AssemblyFrame, attachment:String, contacts:Array<RackContactLink>, ?phaseOffsetMm:Float):Void"
+      },
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(builder:AxisBuilder, rack:MachineComponent, pose:AssemblyFrame):Void"
       }
      ]
     },
@@ -6017,6 +6100,44 @@
      ]
     },
     {
+     "name": "PanelBoss",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/component/PanelBoss.hx",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "diameter",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "height",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "pilotDiameter",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "pilotDepth",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "A round boss a part asks for on the back of its panel, with a blind pilot hole in its end for a heat-set insert. Offsets\nare from the part's centre; the boss stands `height` behind the panel's back face and the hole runs `pilotDepth` into it."
+    },
+    {
      "name": "PanelMountFacet",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/component/PanelMountFacet.hx",
@@ -6073,6 +6194,13 @@
        "doc": "The thickest panel it can be fixed to; large when the part states no limit."
       },
       {
+       "name": "bosses",
+       "kind": "var",
+       "signature": ":Array<PanelBoss>",
+       "final": true,
+       "doc": "Bosses it needs on the panel's back to be screwed on; none for a part held by its own nut."
+      },
+      {
        "name": "source",
        "kind": "var",
        "signature": ":String",
@@ -6082,7 +6210,7 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(cutout:Footprint, keepOut:Footprint, holes:Array<{x:Float, y:Float, diameter:Float}>, above:Float, behind:Float, body:Footprint, maxPanelThickness:Float, source:String):Void"
+       "signature": "(cutout:Footprint, keepOut:Footprint, holes:Array<{x:Float, y:Float, diameter:Float}>, above:Float, behind:Float, body:Footprint, maxPanelThickness:Float, source:String, ?bosses:Array<PanelBoss>):Void"
       },
       {
        "name": "check",
@@ -9316,9 +9444,15 @@
        "final": true
       },
       {
+       "name": "rackMounts",
+       "kind": "var",
+       "signature": ":Map<String, machinekit.assembly.RackMount>",
+       "final": true
+      },
+      {
        "name": "cableChainBindings",
        "kind": "var",
-       "signature": ":Array<{axis:String, member:String, carrier:String, pose:AssemblyFrame, chain:machinekit.motion.CableChain}>",
+       "signature": ":Array<{axis:String, member:String, carrier:String, pose:AssemblyFrame, chain:machinekit.motion.CableChain, travel:Float, positionOffset:Float}>",
        "final": true
       },
       {
@@ -9335,6 +9469,11 @@
        "name": "cableChainGeometry",
        "kind": "method",
        "signature": "(axis:String, position:Float):cadkit.modeling.Part"
+      },
+      {
+       "name": "rackMountFor",
+       "kind": "method",
+       "signature": "(axis:AxisSpec, rack:MachineComponent, fixed:String):machinekit.assembly.RackMount"
       }
      ]
     },
@@ -9455,9 +9594,15 @@
        "final": true
       },
       {
+       "name": "positionOffset",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
        "name": "new",
        "kind": "method",
-       "signature": "(chain:CableChain, ?fixedHost:String, ?movingHost:String, ?axis:String):Void"
+       "signature": "(chain:CableChain, ?fixedHost:String, ?movingHost:String, ?axis:String, ?positionOffset:Float):Void"
       },
       {
        "name": "recipeType",
@@ -9710,6 +9855,12 @@
      "file": "machinekit/haxe/src/machinekit/gantry/GantrySpec.hx",
      "fields": [
       {
+       "name": "catalogueRackMount",
+       "kind": "var",
+       "signature": ":Bool",
+       "optional": true
+      },
+      {
        "name": "frontGuides",
        "kind": "var",
        "signature": ":FrontGuideLayout",
@@ -9933,6 +10084,12 @@
        "name": "travelX",
        "kind": "var",
        "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "catalogueRackMount",
+       "kind": "var",
+       "signature": ":Bool",
        "final": true
       },
       {
@@ -10697,7 +10854,7 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(designation:String, description:String, material:String, build:() -> Part, purchase:HmiPart, carriesPurchase:Bool, massKg:Float, centreOfMass:Vector):Void"
+       "signature": "(designation:String, description:String, material:String, build:() -> Part, purchase:HmiPart, carriesPurchase:Bool, massKg:Float, centreOfMass:Vector, ?ports:Array<ComponentPort>):Void"
       },
       {
        "name": "hasGeometry",
@@ -10744,9 +10901,16 @@
        "doc": "Builds a new solid each time it is called, in the device's frame; the caller closes it."
       },
       {
+       "name": "ports",
+       "kind": "var",
+       "signature": ":Array<ComponentPort>",
+       "final": true,
+       "doc": "Ports that belong to this body (the contacts in a switch block), not to the device as a whole."
+      },
+      {
        "name": "new",
        "kind": "method",
-       "signature": "(id:String, label:String, material:String, build:() -> Part):Void"
+       "signature": "(id:String, label:String, material:String, build:() -> Part, ?ports:Array<ComponentPort>):Void"
       }
      ]
     },
@@ -10817,7 +10981,7 @@
        "name": "bodies",
        "kind": "method",
        "signature": "():Null<Array<DeviceBodySpec>>",
-       "doc": "The black operator (stem, ring nut, base and contact blocks) and the red mushroom head on its collar."
+       "doc": "The grey operator (stem and latching base), the stainless ring nut, the dark contact blocks that carry the NC contacts, and\nthe red mushroom head on its collar."
       }
      ]
     },
@@ -10847,15 +11011,111 @@
        "signature": "():Null<ComponentType>"
       },
       {
+       "name": "geometry",
+       "kind": "method",
+       "signature": "(?detail:ComponentDetail):Part",
+       "doc": "The whole device as one solid, with plain studs and nuts: their coincident surfaces cannot keep two thread textures."
+      },
+      {
        "name": "bodies",
        "kind": "method",
        "signature": "():Null<Array<DeviceBodySpec>>",
-       "doc": "The housing (flange, boss, studs, terminal strip) fixed to the panel, and the wheel that turns on it: the cone, grip\nring, dial and spinner handle. The wheel's rotation is the encoder's angle."
+       "doc": "The housing (flange and boss) fixed to the panel; the three studs with their thread texture and the hex nuts on them\nbehind the panel; the terminal block with its screws and the names printed beside its poles; and the wheel that turns on\nthe housing: the cone, grip ring, dial and spinner handle. The wheel's rotation is the encoder's angle."
       },
       {
        "name": "joints",
        "kind": "method",
        "signature": "():Array<DeviceJointSpec>"
+      }
+     ]
+    },
+    {
+     "name": "HexStandoff",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/hmi/HexStandoff.hx",
+     "extends": [
+      "MachineComponent"
+     ],
+     "doc": "A male-female hex standoff, brass: a hex body `length` long with an internal thread in its bottom end and an external stud\non its top. Frame: the bottom face at z = 0 and the axis along +z, so the body fills z from 0 to `length` and the stud\nrises above it. Both threads are textures (`Threads.attach`) on the nominal diameter, which is also the bore of the insert\nthe stud goes into and the shank of the screw that goes into the bottom.",
+     "fields": [
+      {
+       "name": "STANDARD_LENGTHS",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "static": true,
+       "final": true,
+       "doc": "Lengths of the standard stock, millimetres."
+      },
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "length",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "studLength",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "diameter",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "acrossFlats",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "boreDepth",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "thread",
+       "kind": "var",
+       "signature": ":ThreadSpec",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(name:String, diameter:Float, pitch:Float, acrossFlats:Float, length:Float, studLength:Float, boreDepth:Float):Void"
+      },
+      {
+       "name": "m2_5",
+       "kind": "method",
+       "signature": "(length:Float):HexStandoff",
+       "static": true,
+       "doc": "M2.5 with a 5 mm hex, a 4 mm stud and a 5 mm tapped end: the standard stock shortened to the stud the pendant's bosses take."
+      },
+      {
+       "name": "standardLength",
+       "kind": "method",
+       "signature": "(atLeast:Float):Float",
+       "static": true,
+       "doc": "The shortest standard length that is at least `atLeast`."
+      },
+      {
+       "name": "hasGeometry",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "geometry",
+       "kind": "method",
+       "signature": "(?detail:ComponentDetail):Part"
       }
      ]
     },
@@ -10934,6 +11194,12 @@
        "doc": "The device as its separately finished bodies, the purchase first; null for a part that is one solid. The whole device's\n`geometry` is these bodies fused, so there is one description of the shape."
       },
       {
+       "name": "hardware",
+       "kind": "method",
+       "signature": "():Array<PanelHardware>",
+       "doc": "Inserts and screws that hold the part to its panel, with their origins in the part's frame (z = 0 at the panel's front\nface). The panel assembly places them in its `fasteners` group."
+      },
+      {
        "name": "joints",
        "kind": "method",
        "signature": "():Array<DeviceJointSpec>",
@@ -10964,7 +11230,7 @@
      "extends": [
       "HmiPart"
      ],
-     "doc": "A 2.42 in 128x64 OLED module behind a window in the face plate: the glass against the plate's back, four\nstandoffs to the carrier PCB, and a 4-pin header behind it. Origin at the centre of the panel's front face,\nso the glass starts `panelThickness` behind it. Every size is assumed (module 70 x 40, glass 62 x 34 with a\n56 x 28 viewing window, 12 mm deep) until a real module is measured.",
+     "doc": "The Waveshare 2.42 in 128x64 OLED module (SKU 25742, SSD1309), modelled from its vendor drawing and 3D model. Origin at\nthe centre of the active area on the panel's front face, +z toward the operator, x to the right and y up as seen from\nthe front. The panel's back is the glass (60.5 x 37 x 1.5, the active area 2.7 mm off its centre toward the top), the\ncircuit board sits 2.4 mm behind the glass, and the module is 4.0 mm thick over all. Behind the board are the 7-pin\n2.54 right-angle header, the 1.25 mm 7-pin connector, the flex-circuit connector and the flex circuit itself, which\nfolds from the glass round the board's lower edge. The board's four plain 2.5 mm holes lie under the glass and cannot be\nused to fasten it. The module is held by a printed frame over the board's edge strip (open at the bottom for the flex\ncircuit), screwed from behind into heat-set inserts in four bosses on the plate's back just outside the corners; four\npegs on the frame go through the board's holes to locate it.",
      "fields": [
       {
        "name": "new",
@@ -10983,9 +11249,15 @@
        "signature": "():Null<ComponentType>"
       },
       {
-       "name": "geometry",
+       "name": "hardware",
        "kind": "method",
-       "signature": "(?detail:ComponentDetail):Part"
+       "signature": "():Array<PanelHardware>",
+       "doc": "The printed frame, four inserts in the bosses and four screws from behind."
+      },
+      {
+       "name": "bodies",
+       "kind": "method",
+       "signature": "():Null<Array<DeviceBodySpec>>"
       }
      ]
     },
@@ -10998,9 +11270,34 @@
       {
        "name": "build",
        "kind": "method",
-       "signature": "(layout:PanelLayout, plate:() -> Part, ?shell:() -> Part, ?extras:Array<{id:String, solid:() -> Part}>, ?extrasMaterial:String, ?groups:Array<PanelGroup>, ?hardware:Array<PanelHardware>):MachineAssembly",
+       "signature": "(layout:PanelLayout, plate:() -> Part, ?shell:() -> Part, ?extras:Array<PanelExtra>, ?groups:Array<PanelGroup>, ?hardware:Array<PanelHardware>):MachineAssembly",
        "static": true,
-       "doc": "`extras` are further fixed solids in panel coordinates (a board, say), each with an id and a builder, made of\n`extrasMaterial`. The plate and shell are printed nylon, light against the dark controls. When there is a shell or\nextras the plate, shell and extras sit in a `case` group; each of `groups` gathers controls by id, and a control in\nno group stays at the top level. `hardware` (inserts, screws) goes in a `fasteners` group."
+       "doc": "`extras` are further fixed components in panel coordinates (a board, say), each with an id. The plate and shell are printed nylon, light against the dark controls. When there is a shell or\nextras the plate, shell and extras sit in a `case` group; each of `groups` gathers controls by id, and a control in\nno group stays at the top level. `hardware` (inserts, screws) goes in a `fasteners` group."
+      }
+     ]
+    },
+    {
+     "name": "PanelExtra",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/hmi/PanelExtra.hx",
+     "doc": "A further fixed component of a panel, in panel coordinates: a board behind the plate, say.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "component",
+       "kind": "var",
+       "signature": ":MachineComponent",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, component:MachineComponent):Void"
       }
      ]
     },
@@ -11037,7 +11334,7 @@
       {
        "name": "part",
        "kind": "method",
-       "signature": "(face:PanelLayout, ?fasteners:Array<{x:Float, y:Float}>):Part",
+       "signature": "(face:PanelLayout, ?fasteners:Array<{x:Float, y:Float}>, ?extraBosses:Array<PanelBoss>):Part",
        "static": true
       }
      ]
@@ -11069,36 +11366,58 @@
     },
     {
      "name": "PanelHardware",
-     "kind": "typedef",
+     "kind": "class",
      "file": "machinekit/haxe/src/machinekit/hmi/PanelHardware.hx",
+     "doc": "A bought fastener, insert or printed fixing placed in a panel: its member id, the component, and where its origin sits in\npanel coordinates. `flipped` turns it over (about x) so its top faces -z, for a screw entering from behind the panel.",
      "fields": [
       {
        "name": "id",
        "kind": "var",
-       "signature": ":String"
+       "signature": ":String",
+       "final": true
       },
       {
        "name": "component",
        "kind": "var",
-       "signature": ":MachineComponent"
+       "signature": ":MachineComponent",
+       "final": true
       },
       {
        "name": "x",
        "kind": "var",
-       "signature": ":Float"
+       "signature": ":Float",
+       "final": true
       },
       {
        "name": "y",
        "kind": "var",
-       "signature": ":Float"
+       "signature": ":Float",
+       "final": true
       },
       {
        "name": "z",
        "kind": "var",
-       "signature": ":Float"
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "flipped",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, component:MachineComponent, x:Float, y:Float, z:Float, ?flipped:Bool):Void"
+      },
+      {
+       "name": "placed",
+       "kind": "method",
+       "signature": "(newId:String, dx:Float, dy:Float, dz:Float):PanelHardware",
+       "doc": "The same hardware moved by (dx, dy, dz) and renamed, as a part's hardware lands in its panel."
       }
-     ],
-     "doc": "A bought fastener or insert placed in a panel: its member id, and where its origin sits in panel coordinates."
+     ]
     },
     {
      "name": "PanelLayout",
@@ -11390,6 +11709,11 @@
        "signature": "():Array<{x:Float, y:Float, diameter:Float}>"
       },
       {
+       "name": "bosses",
+       "kind": "method",
+       "signature": "():Array<machinekit.component.PanelBoss>"
+      },
+      {
        "name": "body",
        "kind": "method",
        "signature": "():Footprint"
@@ -11450,7 +11774,7 @@
        "name": "bodies",
        "kind": "method",
        "signature": "():Null<Array<DeviceBodySpec>>",
-       "doc": "A black housing (barrel, nut, body) and the coloured cap and bezel in front of it."
+       "doc": "A metal barrel and nut, the grey rear body and the coloured cap and bezel in front."
       }
      ]
     },
@@ -11483,13 +11807,28 @@
        "name": "bodies",
        "kind": "method",
        "signature": "():Null<Array<DeviceBodySpec>>",
-       "doc": "The switch (bush, nut, body) and the knob that turns on it."
+       "doc": "The switch (brass bush and nut, grey body) and the knob that turns on it."
       },
       {
        "name": "joints",
        "kind": "method",
        "signature": "():Array<DeviceJointSpec>",
        "doc": "The knob turns on the switch. It is free here; the switch's detents belong to the controller's reading of it."
+      }
+     ]
+    },
+    {
+     "name": "ScrewHeads",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/hmi/ScrewHeads.hx",
+     "doc": "Screw heads for the terminals of bought devices, drawn pointing back (-z) with their base on z = 0.",
+     "fields": [
+      {
+       "name": "pan",
+       "kind": "method",
+       "signature": "(radius:Float, height:Float, recess:Float, depth:Float):Part",
+       "static": true,
+       "doc": "A pan head `height` tall with a cross recess `recess` across and `depth` deep, of radius `radius` at its widest. The\ncaller owns the solid and closes it."
       }
      ]
     },
@@ -11590,6 +11929,13 @@
        "signature": "():ThreadedInsert",
        "static": true,
        "doc": "M2.5 x 4 (3.6 mm knurled body) in a 3.4 x 6 hole."
+      },
+      {
+       "name": "m2_5Short",
+       "kind": "method",
+       "signature": "():ThreadedInsert",
+       "static": true,
+       "doc": "M2.5 x 3 (3.6 mm knurled body) in a 3.4 x 4.4 hole, for where there is little material behind it."
       },
       {
        "name": "hasGeometry",
@@ -11816,6 +12162,13 @@
        "final": true
       },
       {
+       "name": "CHIP_TRAY_WELL_CLEARANCE_MM",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
        "name": "RAIL_SEAT_HEIGHT",
        "kind": "var",
        "signature": ":Dynamic",
@@ -11901,13 +12254,6 @@
       },
       {
        "name": "FOOT_STEM_CLEARANCE",
-       "kind": "var",
-       "signature": ":Dynamic",
-       "static": true,
-       "final": true
-      },
-      {
-       "name": "FOOT_REGISTER_CLEARANCE",
        "kind": "var",
        "signature": ":Dynamic",
        "static": true,
@@ -12063,6 +12409,34 @@
       },
       {
        "name": "TRAY_SOCKET_POSITION_TOLERANCE",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "SOURCE_STEEL_COVER_MM",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "TRAY_SOCKET_EDGE_INSET",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "TRAY_SOCKET_END_INSET",
+       "kind": "var",
+       "signature": ":Float",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "COLUMN_HEAD_WIDTH",
        "kind": "var",
        "signature": ":Dynamic",
        "static": true,
@@ -12582,6 +12956,11 @@
        "name": "placements",
        "kind": "var",
        "signature": ":Array<CastInsertPlacement>"
+      },
+      {
+       "name": "liftingPoints",
+       "kind": "var",
+       "signature": ":Array<materia.casting.CastingLiftingPoint>"
       }
      ]
     },
@@ -26165,6 +26544,22 @@
    "name": "machinekit.pendant",
    "types": [
     {
+     "name": "PendantBoard",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/pendant/PendantBoard.hx",
+     "extends": [
+      "PanelSolid"
+     ],
+     "doc": "The pendant's circuit board as a component: its envelope, and the terminals the hand wheel is wired to. The board\nsupplies the wheel's 0 V and VCC and reads its two encoder phases.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(build:() -> Part):Void"
+      }
+     ]
+    },
+    {
      "name": "PendantCase",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/pendant/PendantCase.hx",
@@ -26298,6 +26693,13 @@
        "static": true
       },
       {
+       "name": "BOSS_HEIGHT",
+       "kind": "var",
+       "signature": ":Float",
+       "static": true,
+       "doc": "The bosses on the plate's back that the board's standoffs screw into."
+      },
+      {
        "name": "BOARD_HOLE",
        "kind": "var",
        "signature": ":Float",
@@ -26372,6 +26774,13 @@
        "final": true
       },
       {
+       "name": "standoffLength",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "The standard length of the standoffs that hold the board to the plate's bosses."
+      },
+      {
        "name": "strapSlots",
        "kind": "var",
        "signature": ":Array<{x:Float, y:Float}>",
@@ -26404,10 +26813,37 @@
        "static": true
       },
       {
+       "name": "enablingZ",
+       "kind": "method",
+       "signature": "(face:PanelLayout):Float",
+       "static": true,
+       "doc": "The switch's axis sits this far behind the face: against the back wall, where only the deepest parts can reach."
+      },
+      {
+       "name": "boardHalf",
+       "kind": "method",
+       "signature": "(face:PanelLayout):{x:Float, y:Float}",
+       "static": true,
+       "doc": "The board outline's half extents."
+      },
+      {
+       "name": "notches",
+       "kind": "method",
+       "signature": "():Array<{f:Footprint, x:Float, y:Float}>",
+       "doc": "Everything the board must leave room for, as footprints at positions (plan view)."
+      },
+      {
+       "name": "ribTop",
+       "kind": "method",
+       "signature": "(boardTop:Float):Float",
+       "static": true,
+       "doc": "The top of the ribs: just under the board's underside."
+      },
+      {
        "name": "hardware",
        "kind": "method",
        "signature": "():Array<PanelHardware>",
-       "doc": "The inserts and screws the plan implies: an M3 insert in each post with a button head screw through the plate's\ncounterbore, and an M2.5 insert in each standoff with a screw through the board. Screw lengths are the shortest\nstandard ones that reach 75 % of the insert, and never past the insert's foot."
+       "doc": "The inserts and screws the plan implies: an M3 insert in each post with a button head screw through the plate's\ncounterbore, and the board's standoffs: an insert in each boss on the plate's back, a standoff of standard length screwed\ninto it, and a screw from under the board into the standoff. Screw lengths are the shortest standard ones that reach 75 %\nof what they thread into, and never past it."
       },
       {
        "name": "marks",
@@ -26433,10 +26869,15 @@
        "doc": "The board envelope: an outline the size of the case's inside less a margin, with every notch and the four mounting holes."
       },
       {
+       "name": "bosses",
+       "kind": "method",
+       "signature": "():Array<PanelBoss>",
+       "doc": "The bosses on the plate's back that the board's standoffs screw into, in panel coordinates."
+      },
+      {
        "name": "plate",
        "kind": "method",
-       "signature": "():Part",
-       "doc": "The face plate with the screw holes that match the posts and a perimeter tongue that fits inside the walls."
+       "signature": "():Part"
       }
      ]
     },
@@ -26444,7 +26885,7 @@
      "name": "PendantPresentation",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/pendant/PendantPresentation.hx",
-     "doc": "The pendant's views: assembled, and exploded along the panel's z axis in the order it comes apart. The case screws lift\nout, then the plate with every control on it, then the board screws, the board, and last the inserts out of their\nposts and standoffs. Offsets are presentation only; the assembly itself is untouched.",
+     "doc": "The pendant's views: assembled, and exploded along the panel's z axis in the order it comes apart. The case screws lift\nout, then the plate with every control, the standoffs and the display's frame on it, then the board screws drop out and the\nboard lifts from the shell, and last the case inserts leave their posts. Offsets are presentation only; the assembly itself is untouched.",
      "fields": [
       {
        "name": "build",
@@ -26472,6 +26913,13 @@
        "signature": "():Array<PanelGroup>",
        "static": true,
        "doc": "How the controls are grouped in the assembly's hierarchy: by what the operator does with them."
+      },
+      {
+       "name": "assembly",
+       "kind": "method",
+       "signature": "():MachineAssembly",
+       "static": true,
+       "doc": "The whole pendant as an assembly: plate, shell and board in the case group, the controls by group, and the fasteners.\nThe hand wheel's terminals are wired to the board: its 0 V and VCC to the board's supply, A and B to its inputs."
       },
       {
        "name": "pendantCase",
@@ -42360,8 +42808,9 @@
       {
        "name": "foot",
        "kind": "method",
-       "signature": "(ids:{access:String, stem:String, register:Null<String>}, x:Float, y:Float, edge:Float, alongX:Bool, accessWidth:Float, accessDepth:Float, floor:Float, roof:Float, stemSize:Float, stemTop:Float, accessOpenings:Array<CastingOpening>, stemOpenings:Array<CastingOpening>, ?plate:{owner:String, openings:Array<CastingOpening>, width:Float, depth:Float, thickness:Float}):Array<CastingFeature>",
-       "static": true
+       "signature": "(ids:{access:String, stem:String}, x:Float, y:Float, edge:Float, alongX:Bool, accessWidth:Float, accessDepth:Float, floor:Float, roof:Float, stemSize:Float, accessOpenings:Array<CastingOpening>, stemOpenings:Array<CastingOpening>):Array<CastingFeature>",
+       "static": true,
+       "doc": "Compression-foot pocket: the removable plate bears directly on the solid\nceiling. Only the lower stud passage is cast; no plate register or upper bore."
       }
      ]
     },
@@ -42874,7 +43323,7 @@
       {
        "name": "anchors",
        "kind": "method",
-       "signature": "(rows:Array<CastInsertPlacement>, rule:materia.casting.InsertAnchorage.InsertAnchorPatternRule, castingValues:ComponentValues, ?commonSize:Bool):Array<CastInsertPlacement>",
+       "signature": "(rows:Array<CastInsertPlacement>, rule:materia.casting.InsertAnchorage.InsertAnchorPatternRule, castingValues:ComponentValues, ?commonSize:Bool, ?liftingPoints:Array<materia.casting.CastingLiftingPoint>):Array<CastInsertPlacement>",
        "static": true
       }
      ]
@@ -43259,6 +43708,15 @@
      ]
     },
     {
+     "name": "LinearMountCleat",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/structural/LinearMountCleat.hx",
+     "extends": [
+      "MachineComponent"
+     ],
+     "doc": "Machined C45 angle cleat, not a welded overlap or virtual connection.\nLocal base spans X=0..28, Y=±29; web X=0..11. Source dimensions are engineering\ninputs. Two recessed M6 base clearances and two recessed M6 web clearances have real connectors."
+    },
+    {
      "name": "LinearMountCompliance",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/structural/LinearMountCompliance.hx",
@@ -43489,6 +43947,12 @@
        "final": true
       },
       {
+       "name": "compact",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
        "name": "recipeType",
        "kind": "method",
        "signature": "():ComponentType",
@@ -43502,7 +43966,7 @@
       {
        "name": "fromElement",
        "kind": "method",
-       "signature": "(element:MountedElement, placement:materia.assembly.AssemblyRecord.AssemblyFrame, length:Float, ?width:Float):LinearMountNutCassette",
+       "signature": "(element:MountedElement, placement:materia.assembly.AssemblyRecord.AssemblyFrame, length:Float, ?width:Float, ?compact:Bool):LinearMountNutCassette",
        "static": true
       },
       {
@@ -43677,6 +44141,44 @@
      ]
     },
     {
+     "name": "LinearRackMount",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/structural/LinearRackMount.hx",
+     "doc": "Physical welded-host rack mount, assembled from the shared RM2 steel,\nreplication and source-hole derivation. Dimensions are engineering inputs.\nHost face is explicit; this factory never guesses a side from a bounding box.",
+     "fields": [
+      {
+       "name": "mount",
+       "kind": "var",
+       "signature": ":RackMount",
+       "final": true
+      },
+      {
+       "name": "members",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "final": true
+      },
+      {
+       "name": "receiverFrames",
+       "kind": "var",
+       "signature": ":Array<AssemblyFrame>",
+       "final": true
+      },
+      {
+       "name": "connectionScreens",
+       "kind": "var",
+       "signature": ":Array<Dynamic>",
+       "final": true
+      },
+      {
+       "name": "build",
+       "kind": "method",
+       "signature": "(builder:AxisBuilder, id:String, axis:AxisSpec, direction:Array<Float>, pinion:MachineComponent, pinionPose:AssemblyFrame, rack:GearRackRun, rackId:String, host:String, tubeId:String, hostFace:AssemblyFrame, serviceFace:AssemblyFrame):LinearRackMount",
+       "static": true
+      }
+     ]
+    },
+    {
      "name": "MineralCasting",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/structural/MineralCasting.hx",
@@ -43803,7 +44305,12 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(bodyValues:ComponentValues, placements:Array<CastInsertPlacement>, ?rootInsert:String, ?postCure:Array<PostCureInsertPlacement>):Void"
+       "signature": "(bodyValues:ComponentValues, placements:Array<CastInsertPlacement>, ?rootInsert:String, ?postCure:Array<PostCureInsertPlacement>, ?liftingPoints:Array<materia.casting.CastingLiftingPoint>):Void"
+      },
+      {
+       "name": "liftingPoints",
+       "kind": "method",
+       "signature": "():Array<materia.casting.CastingLiftingPoint>"
       },
       {
        "name": "postCureLocations",
@@ -43913,6 +44420,48 @@
      ]
     },
     {
+     "name": "MountDrilledPlate",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/structural/MountDrilledPlate.hx",
+     "extends": [
+      "GantryPlate"
+     ],
+     "doc": "Machined host plate. Thin pads remain clearance-only; thick-host taps require\ntheir explicit material/engagement policy, never a C45 insert assumption.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(?overrides:ComponentValues):Void"
+      },
+      {
+       "name": "recipeType",
+       "kind": "method",
+       "signature": "():ComponentType",
+       "static": true
+      },
+      {
+       "name": "holes",
+       "kind": "method",
+       "signature": "():Array<materia.casting.InsertHole>"
+      },
+      {
+       "name": "componentType",
+       "kind": "method",
+       "signature": "():Null<ComponentType>"
+      },
+      {
+       "name": "values",
+       "kind": "method",
+       "signature": "():ComponentValues"
+      },
+      {
+       "name": "geometry",
+       "kind": "method",
+       "signature": "(?detail:ComponentDetail):Part"
+      }
+     ]
+    },
+    {
      "name": "MountHoleDerivation",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/structural/MountHoleDerivation.hx",
@@ -43965,6 +44514,39 @@
        "name": "requiredMarginMm",
        "kind": "var",
        "signature": ":materia.casting.CastingInput"
+      }
+     ]
+    },
+    {
+     "name": "MountHostThreads",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/structural/MountHostThreads.hx",
+     "doc": "Explicit blind-root policy for thick machined hosts. These are engineering\nassumptions for S235 / 6061, not the C45 insert policy or supplier ratings.\nInstallation target is 9 kN per M8 bolt; qualify tightening on the real finish.",
+     "fields": [
+      {
+       "name": "minimumEngagement",
+       "kind": "method",
+       "signature": "(material:String):Float",
+       "static": true
+      },
+      {
+       "name": "blindM8",
+       "kind": "method",
+       "signature": "(material:String, thickness:Float, frame:AssemblyFrame, id:String):InsertHole",
+       "static": true
+      },
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(h:InsertHole, material:String, thickness:Float):Void",
+       "static": true
+      },
+      {
+       "name": "strippingCapacityN",
+       "kind": "method",
+       "signature": "(material:String, engagement:Float):Float",
+       "static": true,
+       "doc": "Conservative half-cylinder shear area at diameter (major minus pitch); assumed host yield / sqrt(3),\nsafety factor1.5. Returns allowable N; final reaction envelope still required."
       }
      ]
     },
@@ -44267,9 +44849,15 @@
        "final": true
       },
       {
+       "name": "drilling",
+       "kind": "var",
+       "signature": ":Array<materia.casting.InsertHole>",
+       "final": true
+      },
+      {
        "name": "new",
        "kind": "method",
-       "signature": "(width:Float, depth:Float, wall:Float, length:Float):Void"
+       "signature": "(width:Float, depth:Float, wall:Float, length:Float, ?holes:Array<materia.casting.InsertHole>):Void"
       },
       {
        "name": "hasGeometry",
@@ -44502,6 +45090,20 @@
        "name": "maxY",
        "kind": "var",
        "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "SimpleRackMount",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/structural/SimpleRackMount.hx",
+     "doc": "Continuous steel back bracket for nominal/example racks without catalogue\ndrilling. The bracket physically reaches the explicitly dimensioned host side.\nThis does not assign invented supplier holes, ratings or RM2 qualification.",
+     "fields": [
+      {
+       "name": "build",
+       "kind": "method",
+       "signature": "(builder:AxisBuilder, id:String, axis:AxisSpec, direction:Array<Float>, pinion:MachineComponent, pinionPose:AssemblyFrame, rack:MachineComponent, host:String, width:Float, height:Float):RackMount",
+       "static": true
       }
      ]
     },
@@ -45712,6 +46314,11 @@
        "signature": ":RemovalReport"
       },
       {
+       "name": "assemblyPlan",
+       "kind": "var",
+       "signature": ":materia.tooling.casting.MoldAssemblyPlanner.MoldAssemblyPlan"
+      },
+      {
        "name": "demolding",
        "kind": "var",
        "signature": ":RemovalReport"
@@ -45990,6 +46597,11 @@
        "name": "demoldingSteps",
        "kind": "var",
        "signature": ":Array<MoldDemoldingStep>"
+      },
+      {
+       "name": "assemblyPlan",
+       "kind": "var",
+       "signature": ":materia.tooling.casting.MoldAssemblyPlanner.MoldAssemblyPlan"
       },
       {
        "name": "symmetricDifferenceMm3",
@@ -46857,6 +47469,12 @@
        "static": true
       },
       {
+       "name": "Confirm",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
        "name": "FitLooseHardware",
        "kind": "var",
        "signature": ":String",
@@ -47257,33 +47875,7 @@
      "name": "RemovalReport",
      "kind": "typedef",
      "file": "machinekit/haxe/src/machinekit/tooling/SweptRemoval.hx",
-     "fields": [
-      {
-       "name": "blocking",
-       "kind": "var",
-       "signature": ":Array<PanelBlockingRelation>"
-      },
-      {
-       "name": "removalOrder",
-       "kind": "var",
-       "signature": ":Array<String>"
-      },
-      {
-       "name": "assemblyOrder",
-       "kind": "var",
-       "signature": ":Array<String>"
-      },
-      {
-       "name": "travelMm",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "contactVolumeToleranceMm3",
-       "kind": "var",
-       "signature": ":Float"
-      }
-     ]
+     "alias": "materia.tooling.casting.ToolingSweepReport"
     },
     {
      "name": "ReplicationContactCad",
@@ -48514,6 +49106,73 @@
      ]
     },
     {
+     "name": "GearRackRun",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/transmission/GearRackRun.hx",
+     "extends": [
+      "MachineComponent"
+     ],
+     "doc": "Whole sourced sections, never a nominal extrusion with invented drilling.\nConnectors retain section identity. Joint pitch setting is an assembly task.",
+     "fields": [
+      {
+       "name": "section",
+       "kind": "var",
+       "signature": ":GearRack",
+       "final": true
+      },
+      {
+       "name": "count",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "length",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "finishPinDiameter",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Shop operation after pitch alignment, not a supplier pilot dimension."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(?overrides:ComponentValues):Void"
+      },
+      {
+       "name": "recipeType",
+       "kind": "method",
+       "signature": "():ComponentType",
+       "static": true
+      },
+      {
+       "name": "componentType",
+       "kind": "method",
+       "signature": "():Null<ComponentType>"
+      },
+      {
+       "name": "hasGeometry",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "geometry",
+       "kind": "method",
+       "signature": "(?detail:ComponentDetail):Part"
+      },
+      {
+       "name": "nominalRack",
+       "kind": "method",
+       "signature": "():HelicalRack"
+      }
+     ]
+    },
+    {
      "name": "GearRackSpec",
      "kind": "typedef",
      "file": "machinekit/haxe/src/machinekit/transmission/GearRackSpec.hx",
@@ -48830,6 +49489,154 @@
      ]
     },
     {
+     "name": "PinionDiscSpringPack",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/transmission/PinionPreloadHardware.hx",
+     "extends": [
+      "MachineComponent"
+     ],
+     "doc": "Assumed disc-spring pack envelope, OD22/ID10, loaded height12 mm.\nSupplier curve, fatigue and solid-height confirmation remain open sourcing inputs.",
+     "fields": [
+      {
+       "name": "loadedHeight",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(?loadedHeight:Float):Void"
+      },
+      {
+       "name": "hasGeometry",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "geometry",
+       "kind": "method",
+       "signature": "(?detail:ComponentDetail):Part"
+      }
+     ]
+    },
+    {
+     "name": "PinionPivotAnchor",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/transmission/PinionPivotAnchor.hx",
+     "extends": [
+      "MachineComponent"
+     ],
+     "doc": "Machined C45 fixed clevis and closed-section reach arm. Manufacturing stock\nand machining allowances are separate from this finished load-bearing shape.\nX/Y/Z match RadialPinionCarrier. Host face is explicitly top or axial.",
+     "fields": [
+      {
+       "name": "hostZ",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "topMount",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "bores",
+       "kind": "var",
+       "signature": ":Array<{id:String, frame:AssemblyFrame, diameter:Float, depth:Float}>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(hostZ:Float, topMount:Bool):Void"
+      },
+      {
+       "name": "hasGeometry",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "stockRegions",
+       "kind": "method",
+       "signature": "():Array<Array<Float>>",
+       "doc": "Canonical box bounds x0,x1,y0,y1,z0,z1, shared by CAD and local FE."
+      },
+      {
+       "name": "geometry",
+       "kind": "method",
+       "signature": "(?detail:ComponentDetail):Part"
+      }
+     ]
+    },
+    {
+     "name": "PinionPreloadAdjuster",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/transmission/PinionPreloadHardware.hx",
+     "extends": [
+      "MachineComponent"
+     ],
+     "doc": "Machined spring adjuster, M10x1.5 stem. Threads have a nominal envelope;\nthe unverified disc-stack ratings are carried separately by the carrier spec.",
+     "fields": [
+      {
+       "name": "WRENCH_AF",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "HEAD_HEIGHT",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "hasGeometry",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "geometry",
+       "kind": "method",
+       "signature": "(?detail:ComponentDetail):Part"
+      }
+     ]
+    },
+    {
+     "name": "PinionSpringCup",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/transmission/PinionPreloadHardware.hx",
+     "extends": [
+      "MachineComponent"
+     ],
+     "doc": "Upper spring cup fixed to the carrier's rear lug. The centre clears the\nadjuster's guide pilot, so it does not bypass the spring's axial compliance.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "hasGeometry",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "geometry",
+       "kind": "method",
+       "signature": "(?detail:ComponentDetail):Part"
+      }
+     ]
+    },
+    {
      "name": "PreloadedPinionMount",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/transmission/PreloadedPinionMount.hx",
@@ -48996,9 +49803,113 @@
        "static": true
       },
       {
+       "name": "nominalHelical",
+       "kind": "method",
+       "signature": "(part:MachineComponent):HelicalRack",
+       "static": true,
+       "doc": "Engineering mesh properties stay explicit assumptions, distinct from sourced stock/ratings."
+      },
+      {
        "name": "relation",
        "kind": "method",
        "signature": "(pinion:MachineComponent, ?rack:MachineComponent, alignment:Float):TransmissionRelation",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "RadialPinionAssembly",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/transmission/RadialPinionAssembly.hx",
+     "doc": "Builds the fixed anchor first, then a bounded passive lever carrying motor,\nreducer and pinion. No second rigid motor support bypasses the hinge/spring.",
+     "fields": [
+      {
+       "name": "ARM",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "SPRING_ARM",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "lowerAngle",
+       "kind": "method",
+       "signature": "():Float",
+       "static": true
+      },
+      {
+       "name": "upperAngle",
+       "kind": "method",
+       "signature": "():Float",
+       "static": true
+      },
+      {
+       "name": "build",
+       "kind": "method",
+       "signature": "(builder:AxisBuilder, id:String, motorId:String, hostId:String, motor:MachineComponent, oldFace:AssemblyFrame, pinionCentre:AssemblyFrame, spec:PreloadedPinionMount, hostFace:AssemblyFrame, topMount:Bool):Void",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "RadialPinionCarrier",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/transmission/RadialPinionCarrier.hx",
+     "extends": [
+      "PreloadedPinionMount"
+     ],
+     "doc": "Actual motor-carrying lever. Coordinates: X along the lever, Y radial up,\nZ along the shaft. The motor's own flange supplies every pilot/bolt cutout.\nSpring/reducer ratings remain assumptions inherited from the design spec.",
+     "fields": [
+      {
+       "name": "motor",
+       "kind": "var",
+       "signature": ":MachineComponent",
+       "final": true
+      },
+      {
+       "name": "axialCentre",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "THICKNESS",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(motor:MachineComponent, spec:PreloadedPinionMount, axialCentre:Float):Void"
+      },
+      {
+       "name": "componentType",
+       "kind": "method",
+       "signature": "():Null<ComponentType>"
+      },
+      {
+       "name": "stockRegions",
+       "kind": "method",
+       "signature": "():Array<Array<Float>>",
+       "doc": "Canonical boxes; the concentric r14 boss and r7 through bore are separate."
+      },
+      {
+       "name": "geometry",
+       "kind": "method",
+       "signature": "(?detail:ComponentDetail):Part"
+      },
+      {
+       "name": "block",
+       "kind": "method",
+       "signature": "(x0:Float, x1:Float, y0:Float, y1:Float, z0:Float, z1:Float):Part",
        "static": true
       }
      ]

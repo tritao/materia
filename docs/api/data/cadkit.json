@@ -3009,7 +3009,7 @@
      "name": "Footprint",
      "kind": "enum",
      "file": "cadkit/haxe/src/cadkit/modeling/Footprint.hx",
-     "doc": "A flat shape centred on a position, for layout and clearance work. Millimetres.",
+     "doc": "A flat shape centred on a position, for layout and clearance work. Millimetres. `Shifted` is a shape whose centre is\noff the footprint's own origin, such as a module whose body hangs below the window it is placed by.",
      "fields": [
       {
        "name": "Circle",
@@ -3020,6 +3020,11 @@
        "name": "Rect",
        "kind": "case",
        "signature": "(width:Float, height:Float)"
+      },
+      {
+       "name": "Shifted",
+       "kind": "case",
+       "signature": "(shape:Footprint, dx:Float, dy:Float)"
       }
      ]
     },
@@ -3030,11 +3035,25 @@
      "doc": "What can be asked of a Footprint: its extent, distances and gaps, and the solid that cuts it.",
      "fields": [
       {
+       "name": "resolve",
+       "kind": "method",
+       "signature": "(f:Footprint):{shape:Footprint, dx:Float, dy:Float}",
+       "static": true,
+       "doc": "The shape's centre and what it is made of: a `Shifted` footprint unwrapped to its plain shape and total offset."
+      },
+      {
        "name": "halfExtent",
        "kind": "method",
        "signature": "(f:Footprint):{x:Float, y:Float}",
        "static": true,
-       "doc": "Half the shape's width and height."
+       "doc": "Half the width and height of the box about the footprint's origin that contains the shape."
+      },
+      {
+       "name": "extent",
+       "kind": "method",
+       "signature": "(f:Footprint, x:Float, y:Float):{x0:Float, x1:Float, y0:Float, y1:Float}",
+       "static": true,
+       "doc": "The box that exactly contains the shape when its footprint's origin is at (x, y)."
       },
       {
        "name": "grow",
@@ -3048,7 +3067,7 @@
        "kind": "method",
        "signature": "(f:Footprint):Float",
        "static": true,
-       "doc": "Radius of the smallest circle around the shape."
+       "doc": "Radius of the smallest circle around the footprint's origin that contains the shape."
       },
       {
        "name": "area",
@@ -3801,6 +3820,28 @@
        "name": "sweep",
        "kind": "method",
        "signature": "(path:Curve):Part"
+      }
+     ]
+    },
+    {
+     "name": "StrokeText",
+     "kind": "class",
+     "file": "cadkit/haxe/src/cadkit/modeling/StrokeText.hx",
+     "doc": "Raised or engraved lettering as a solid, from a plain stroke font: capital letters, digits and a few signs, each drawn\nas polylines on a 4 x 6 grid and swept to a stroke width with round joins. Meant for labels on printed and moulded parts\n(terminal names, key legends), where the text is read in a few millimetres.",
+     "fields": [
+      {
+       "name": "width",
+       "kind": "method",
+       "signature": "(text:String, height:Float):Float",
+       "static": true,
+       "doc": "The text's width when its letters are `height` tall."
+      },
+      {
+       "name": "solid",
+       "kind": "method",
+       "signature": "(text:String, height:Float, stroke:Float, z0:Float, z1:Float, ?mirror:Bool):Part",
+       "static": true,
+       "doc": "The text as a solid from z0 to z1: its baseline on y = 0, centred on x = 0, letters `height` tall drawn with strokes\n`stroke` wide. `mirror` flips it left to right, for lettering read from the other side of a part. Each stroke is one\nmitred polygon, so a few letters are a handful of solids to fuse."
       }
      ]
     },

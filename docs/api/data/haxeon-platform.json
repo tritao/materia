@@ -463,7 +463,7 @@
       {
        "name": "DialogMessage",
        "kind": "case",
-       "signature": "(request:haxe.Int64, result:Result, button:MessageResult)"
+       "signature": "(request:haxe.Int64, result:Result, button:MessageResult, checkboxChecked:Bool)"
       },
       {
        "name": "WebViewNavigated",

@@ -816,6 +816,54 @@
      ]
     },
     {
+     "name": "CastingLiftingPoint",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/casting/CastingLiftingPoint.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "insertId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "holeId",
+       "kind": "var",
+       "signature": ":String"
+      }
+     ],
+     "doc": "A source lifting attachment is a particular steel thread, not an insert.\nSeveral attachments may share one plate; fixture and anchor holes are never\npromoted to lifting points by their diameter, label or array order."
+    },
+    {
+     "name": "CastingLiftingPoints",
+     "kind": "class",
+     "file": "manufacturingkit/haxe/src/materia/casting/CastingLiftingPoint.hx",
+     "fields": [
+      {
+       "name": "records",
+       "kind": "method",
+       "signature": "(points:Array<CastingLiftingPoint>):Array<Dynamic>",
+       "static": true
+      },
+      {
+       "name": "snapshot",
+       "kind": "method",
+       "signature": "(raw:Dynamic):Array<CastingLiftingPoint>",
+       "static": true
+      },
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(points:Array<CastingLiftingPoint>, inserts:Array<{id:String, role:InsertSpec.InsertRole, spec:InsertSpec}>):Void",
+       "static": true
+      }
+     ]
+    },
+    {
      "name": "CastingOpening",
      "kind": "typedef",
      "file": "manufacturingkit/haxe/src/materia/casting/CastingFeature.hx",
@@ -8517,6 +8565,11 @@
        "name": "inserts",
        "kind": "var",
        "signature": ":Array<CastingToolingInsert>"
+      },
+      {
+       "name": "liftingPoints",
+       "kind": "var",
+       "signature": ":Array<materia.casting.CastingLiftingPoint>"
       }
      ],
      "doc": "A detached, machine-independent design snapshot. Right-handed source coordinates.\nNo draft, core strategy, anchorage qualification or finishing allowance is inferred."
@@ -9154,6 +9207,18 @@
        "name": "add",
        "kind": "method",
        "signature": "(p:CastingMoldPlan, i:CastingToolingInsert, face:materia.assembly.AssemblyRecord.AssemblyFrame, datum:MoldVolume, withdrawal:{x:Float, y:Float, z:Float}, bed:PanelPlacement, ?pocketId:String):Void",
+       "static": true
+      },
+      {
+       "name": "plugId",
+       "kind": "method",
+       "signature": "(p:CastingMoldPlan, insertId:String, holeId:String):String",
+       "static": true
+      },
+      {
+       "name": "memberId",
+       "kind": "method",
+       "signature": "(p:CastingMoldPlan, insertId:String):String",
        "static": true
       },
       {
@@ -9873,6 +9938,11 @@
      "kind": "typedef",
      "file": "manufacturingkit/haxe/src/materia/tooling/casting/CastingMoldPlan.hx",
      "fields": [
+      {
+       "name": "liftingPoints",
+       "kind": "var",
+       "signature": ":Array<materia.casting.CastingLiftingPoint>"
+      },
       {
        "name": "requiresFlip",
        "kind": "var",
@@ -10761,6 +10831,199 @@
        "name": "verificationReference",
        "kind": "var",
        "signature": ":String"
+      }
+     ]
+    },
+    {
+     "name": "MoldAssemblyEvidence",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/tooling/casting/MoldAssemblyPlanner.hx",
+     "fields": [
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":MoldAssemblyEvidenceKind"
+      },
+      {
+       "name": "checkedMember",
+       "kind": "var",
+       "signature": ":Null<String>"
+      },
+      {
+       "name": "blockers",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "travelMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "toleranceMm3",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "MoldAssemblyEvidenceKind",
+     "kind": "abstract",
+     "file": "manufacturingkit/haxe/src/materia/tooling/casting/MoldAssemblyPlanner.hx",
+     "underlying": "String",
+     "fields": [
+      {
+       "name": "CheckedSweep",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "ManualOperation",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "MoldAssemblyPlan",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/tooling/casting/MoldAssemblyPlanner.hx",
+     "fields": [
+      {
+       "name": "steps",
+       "kind": "var",
+       "signature": ":Array<MoldAssemblyStep>"
+      }
+     ]
+    },
+    {
+     "name": "MoldAssemblyPlanner",
+     "kind": "class",
+     "file": "manufacturingkit/haxe/src/materia/tooling/casting/MoldAssemblyPlanner.hx",
+     "doc": "Neutral manufacturing plan. CAD supplies checked sweeps; presentations only adapt this explicit record.",
+     "fields": [
+      {
+       "name": "build",
+       "kind": "method",
+       "signature": "(p:CastingMoldPlan, sweep:ToolingSweepReport, motions:Array<{id:String, x:Float, y:Float, z:Float}>, groups:Array<{id:String, members:Array<String>}>):MoldAssemblyPlan",
+       "static": true
+      },
+      {
+       "name": "order",
+       "kind": "method",
+       "signature": "(steps:Array<MoldAssemblyStep>):Array<MoldAssemblyStep>",
+       "static": true,
+       "doc": "Deterministic dependency order, preferring accessible box construction and promptly securing located parts."
+      }
+     ]
+    },
+    {
+     "name": "MoldAssemblyStep",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/tooling/casting/MoldAssemblyPlanner.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":MoldAssemblyStepKind"
+      },
+      {
+       "name": "title",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "instruction",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "memberIds",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "highlightIds",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "dependsOn",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "clearance",
+       "kind": "var",
+       "signature": ":AssemblyVector"
+      },
+      {
+       "name": "evidence",
+       "kind": "var",
+       "signature": ":MoldAssemblyEvidence"
+      }
+     ]
+    },
+    {
+     "name": "MoldAssemblyStepKind",
+     "kind": "abstract",
+     "file": "manufacturingkit/haxe/src/materia/tooling/casting/MoldAssemblyPlanner.hx",
+     "underlying": "String",
+     "fields": [
+      {
+       "name": "Base",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Panel",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Tooling",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Steel",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Fastening",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Protection",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Preparation",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Ready",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
       }
      ]
     },
@@ -12178,6 +12441,12 @@
      "file": "manufacturingkit/haxe/src/materia/tooling/casting/CoreSupport.hx",
      "fields": [
       {
+       "name": "attachmentIds",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "optional": true
+      },
+      {
        "name": "id",
        "kind": "var",
        "signature": ":String"
@@ -12247,6 +12516,65 @@
        "static": true
       }
      ]
+    },
+    {
+     "name": "ToolingHardwareMembers",
+     "kind": "class",
+     "file": "manufacturingkit/haxe/src/materia/tooling/casting/ToolingHardwareMembers.hx",
+     "doc": "Shared occurrence contract for the planner and the CAD fastener producer.",
+     "fields": [
+      {
+       "name": "fixtureScrew",
+       "kind": "method",
+       "signature": "(id:String):Array<String>",
+       "static": true
+      },
+      {
+       "name": "throughBolt",
+       "kind": "method",
+       "signature": "(id:String):Array<String>",
+       "static": true
+      },
+      {
+       "name": "of",
+       "kind": "method",
+       "signature": "(id:String, kind:SupportHardwareKind):Array<String>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "ToolingSweepReport",
+     "kind": "typedef",
+     "file": "manufacturingkit/haxe/src/materia/tooling/casting/ToolingSweepReport.hx",
+     "fields": [
+      {
+       "name": "blocking",
+       "kind": "var",
+       "signature": ":Array<PanelBlockingRelation>"
+      },
+      {
+       "name": "removalOrder",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "assemblyOrder",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "travelMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "contactVolumeToleranceMm3",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Geometry observations supplied by the CAD sweep checker to neutral manufacturing planners."
     },
     {
      "name": "WithdrawalAxes",

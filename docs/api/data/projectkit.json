@@ -468,6 +468,22 @@
      "doc": "Versioned transport and validation for reusable assembly definitions and states.",
      "fields": [
       {
+       "name": "MAX_PARTS",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true,
+       "doc": "Real assemblies include individual fasteners. Keep a finite decode bound\nwithout limiting a complete machine to 1,000 occurrences."
+      },
+      {
+       "name": "MAX_CONNECTORS",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true,
+       "final": true,
+       "doc": "Long machine hosts own individual fastener/mate connectors."
+      },
+      {
        "name": "VERSION",
        "kind": "var",
        "signature": ":Int",
