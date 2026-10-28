@@ -204,19 +204,14 @@ the Cartesian stock below.
   - Ramps (five tool shapes, plus a climbing ramp), helices and CamKit's
     ramped pocket must lie within the sampled reference's bounds.
   - A deliberate 0.1 µm error in the core fails both kinds of check.
-  - `native/tests/core_tests.cpp` adds closed-form checks through the C ABI:
-    slots, arcs, plunges, capsule floors of ball ramps, necked tools, mesh
-    tie rules, provenance, handle validation, shank and holder contact,
-    target comparison, snapshots and revisions, closed preview meshes whose
-    volume equals the stock's (also when built in chunks), colouring, and
-    bit-identical results with 1, 2, 3, 8 and all threads. Contoured meshes
-    must be closed and oriented; a box comes out exactly (every vertex on
-    it, face normals only, volume to float precision, the same in chunks),
-    flat and ball slots within their chord error, and a 0.1 mm wall shave
-    that no Z ray sees moves the wall and renews the Z tiles along it.
-    A slot too wide and too shallow colours its walls as gouged (seen only
-    by Y rays), its floor as leftover and the box's sides on the same rays
-    as on target, and a groove's gouge ends where the stock resumes.
+  - `native/tests` adds closed-form checks through the C ABI, in three suites that share
+    `test_support.h`:
+    - `sweep_tests.cpp`: cutter shapes along slots, arcs, plunges, ramps and helices, vertical and
+      horizontal, and adding material.
+    - `mesh_tests.cpp`: preview and contour meshes. They must be closed and oriented, a box comes out
+      exactly, and slots stay within their chord error; gouge and leftover colouring is checked too.
+    - `stock_tests.cpp`: provenance, handle validation, snapshots and revisions, shank and holder
+      contact, target comparison, and bit-identical results across thread counts.
   - Every oracle and chain fixture also contours the core stock on a
     60-cell-wide lattice and requires the enclosed volume to match the
     OCCT result within 1% of the removed volume.
@@ -226,7 +221,7 @@ For standalone C++ checks and benchmarks, build the core directly:
 ```sh
 cmake -S stockkit/native -B build/stockkit-core -DCMAKE_BUILD_TYPE=Release
 cmake --build build/stockkit-core
-build/stockkit-core/stockkit_core_tests
+(cd build/stockkit-core && ctest)
 build/stockkit-core/stockkit_core_bench        # optional ray spacing in mm, then "tri"
 ```
 

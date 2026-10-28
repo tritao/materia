@@ -70,9 +70,8 @@ Roughly in priority order.
 
 See [`docs/RING.md`](docs/RING.md) and [`docs/HOBBING.md`](docs/HOBBING.md).
 
-- [ ] Split `native/include/stockkit.h` (ring and rake declarations) and
-  `native/tests/core_tests.cpp` (1,590 lines) by topic; the implementation
-  already lives in `native/src/ring/`.
+- [ ] Split `native/include/stockkit.h` (ring and rake declarations) by topic; the
+  implementation already lives in `native/src/ring/`.
 - [ ] Decide whether `stockkit.ring` and `stockkit.hobbing` become their own
   package (depending on StockKit and GearKit) so CAM users no longer pull in
   GearKit.
