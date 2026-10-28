@@ -11,77 +11,75 @@ import NativeKitSceneRender;
  * renders the view.
  */
 class ScenePresentation {
-	public final interaction:SceneInteraction;
-	public final view:SceneView;
-	final selectionMaterial:Material;
-	final hoverMaterial:Material;
-	var disposed:Bool = false;
+  public final interaction:SceneInteraction;
+  public final view:SceneView;
+  final selectionMaterial:Material;
+  final hoverMaterial:Material;
+  var disposed:Bool = false;
 
-	private function new(interaction:SceneInteraction, view:SceneView,
-			selectionMaterial:Material, hoverMaterial:Material) {
-		this.interaction = interaction;
-		this.view = view;
-		this.selectionMaterial = selectionMaterial;
-		this.hoverMaterial = hoverMaterial;
-	}
+  private function new(interaction:SceneInteraction,
+    view:SceneView, selectionMaterial:Material, hoverMaterial:Material) {
+    this.interaction = interaction;
+    this.view = view;
+    this.selectionMaterial = selectionMaterial;
+    this.hoverMaterial = hoverMaterial;
+  }
 
-	/** Creates a presentation with its own asynchronous interaction state. */
-	public static function create(view:SceneView, selectionMaterial:Material,
-			hoverMaterial:Material):ScenePresentation
-		return new ScenePresentation(SceneInteraction.create(), view,
-			selectionMaterial, hoverMaterial);
+  /** Creates a presentation with its own asynchronous interaction state. */
+  public static function create(view:SceneView,
+    selectionMaterial:Material, hoverMaterial:Material):ScenePresentation return new ScenePresentation(
+      SceneInteraction.create(),
+      view,
+      selectionMaterial,
+      hoverMaterial
+    );
 
-	/** Replaces the pending asynchronous GPU hover request. */
-	public function requestHover(renderer:SceneRenderer, snapshot:SceneSnapshot,
-			width:Int, height:Int, x:Int, y:Int):Void {
-		ensureLive();
-		interaction.requestHover(renderer, snapshot, width, height, x, y);
-	}
+  /** Replaces the pending asynchronous GPU hover request. */
+  public function requestHover(renderer:SceneRenderer,
+    snapshot:SceneSnapshot, width:Int, height:Int, x:Int, y:Int):Void {
+    ensureLive();
+    interaction.requestHover(renderer, snapshot, width, height, x, y);
+  }
 
-	/** Polls hover without applying presentation layers or rendering. */
-	public function pollHover(renderer:SceneRenderer,
-			snapshot:SceneSnapshot):InteractionHoverResult {
-		ensureLive();
-		return interaction.pollHover(renderer, snapshot);
-	}
+  /** Polls hover without applying presentation layers or rendering. */
+  public function pollHover(renderer:SceneRenderer, snapshot:SceneSnapshot):InteractionHoverResult {
+    ensureLive();
+    return interaction.pollHover(renderer, snapshot);
+  }
 
-	public function select(node:NodeId, mode:SelectionMode):Void {
-		ensureLive();
-		interaction.select(node, mode);
-	}
+  public function select(node:NodeId, mode:SelectionMode):Void {
+    ensureLive();
+    interaction.select(node, mode);
+  }
 
-	public function clearSelection():Void {
-		ensureLive();
-		interaction.clearSelection();
-	}
+  public function clearSelection():Void {
+    ensureLive();
+    interaction.clearSelection();
+  }
 
-	/**
+  /**
 	 * Advances interaction state and renders one frame from an immutable
 	 * snapshot. The view and render plan are reused across frames.
 	 */
-	public function render(renderer:SceneRenderer, snapshot:SceneSnapshot,
-			?changes:Null<ChangeSet>):nkscene_render_execution_stats {
-		ensureLive();
-		interaction.synchronize(snapshot);
-		if (renderer.hasPlan())
-			interaction.pollHover(renderer, snapshot);
-		interaction.applySelection(view, selectionMaterial);
-		interaction.applyHover(view, hoverMaterial);
-		return renderer.render(snapshot, view, changes);
-	}
+  public function render(renderer:SceneRenderer,
+    snapshot:SceneSnapshot, ?changes:Null<ChangeSet>):nkscene_render_execution_stats {
+    ensureLive();
+    interaction.synchronize(snapshot);
+    if (renderer.hasPlan()) interaction.pollHover(renderer, snapshot);
+    interaction.applySelection(view, selectionMaterial);
+    interaction.applyHover(view, hoverMaterial);
+    return renderer.render(snapshot, view, changes);
+  }
 
-	public function dispose():Void {
-		if (disposed)
-			return;
-		interaction.dispose();
-		disposed = true;
-	}
+  public function dispose():Void {
+    if (disposed) return;
+    interaction.dispose();
+    disposed = true;
+  }
 
-	public function isDisposed():Bool
-		return disposed;
+  public function isDisposed():Bool return disposed;
 
-	function ensureLive():Void {
-		if (disposed)
-			throw "Scene presentation has been disposed";
-	}
+  function ensureLive():Void {
+    if (disposed) throw "Scene presentation has been disposed";
+  }
 }

@@ -4,38 +4,47 @@ import compiler.runtime.CompilerIntrinsics;
 import sys.io.File;
 
 class HxiNativeKitSceneMain {
-	static function main():Void {
-		var output = Sys.args()[0],
-			sceneHxi = File.getContent(Sys.args()[1]),
-			renderHxi = File.getContent(Sys.args()[2]),
-			interactionHxi = File.getContent(Sys.args()[3]),
-			haxeonRoot = Sys.args()[4],
-			scenekitRoot = Sys.args()[5],
-			nativekitHxi = File.getContent(Sys.args()[6]),
-			gpuHxi = File.getContent(Sys.args()[7]),
-			compiler = new Compiler();
-		CompilerIntrinsics.register(compiler);
-		compiler.addSourceRoot(Sys.getCwd() + "/stdlib");
-		compiler.addSourceRoot(haxeonRoot + "/packages/platform/src");
-		compiler.addSourceRoot(haxeonRoot + "/packages/gpu/src");
-		compiler.addSourceRoot(scenekitRoot + "/scene/bindings/haxe");
-		compiler.addSourceRoot(scenekitRoot + "/scene_render/bindings/haxe");
-		compiler.addSourceRoot(scenekitRoot + "/scene_interaction/bindings/haxe");
-		compiler.update("haxeon/platform/NativeKitWindow.hx", File.getContent(haxeonRoot + "/packages/platform/src/haxeon/platform/NativeKitWindow.hx"));
-		compiler.addFfiProjection("NativeKit.hxmap", File.getContent(haxeonRoot + "/packages/platform/bindings/nativekit.hxmap"));
-		compiler.addFfiProjection("NativeKitGpu.hxmap", File.getContent(haxeonRoot + "/packages/gpu/bindings/nativekit-gpu.hxmap"));
-		compiler.addFfiProjection("NativeKitSceneRender.hxmap", File.getContent(scenekitRoot + "/scene_render/bindings/nativekit-scene-render.hxmap"));
-		compiler.addFfiProjection("NativeKitSceneInteraction.hxmap", File.getContent(scenekitRoot + "/scene_interaction/bindings/nativekit-scene-interaction.hxmap"));
-		compiler.addFfiInterface("NativeKit.hxi", nativekitHxi);
-		compiler.addFfiInterface("NativeKitGpu.hxi", gpuHxi);
-		compiler.addFfiInterface("NativeKitScene.hxi", sceneHxi);
-		compiler.addFfiInterface("NativeKitSceneRender.hxi", renderHxi);
-		compiler.addFfiInterface("NativeKitSceneInteraction.hxi", interactionHxi);
-		compiler.update("Main.hx", source());
-		File.saveBytes(output, HlWriter.encode(compiler.compile("Main").module));
-	}
+  static function main():Void {
+    var output = Sys.args()[0], sceneHxi = File.getContent(Sys.args()[1]), renderHxi = File.getContent(Sys.args()[2]),
+      interactionHxi = File.getContent(Sys.args()[3]), haxeonRoot = Sys.args()[4], scenekitRoot = Sys.args()[5],
+      nativekitHxi = File.getContent(Sys.args()[6]), gpuHxi = File.getContent(Sys.args()[7]), compiler = new Compiler();
+    CompilerIntrinsics.register(compiler);
+    compiler.addSourceRoot(Sys.getCwd() + "/stdlib");
+    compiler.addSourceRoot(haxeonRoot + "/packages/platform/src");
+    compiler.addSourceRoot(haxeonRoot + "/packages/gpu/src");
+    compiler.addSourceRoot(scenekitRoot + "/scene/bindings/haxe");
+    compiler.addSourceRoot(scenekitRoot + "/scene_render/bindings/haxe");
+    compiler.addSourceRoot(scenekitRoot + "/scene_interaction/bindings/haxe");
+    compiler.update(
+      "haxeon/platform/NativeKitWindow.hx",
+      File.getContent(haxeonRoot + "/packages/platform/src/haxeon/platform/NativeKitWindow.hx")
+    );
+    compiler.addFfiProjection(
+      "NativeKit.hxmap",
+      File.getContent(haxeonRoot + "/packages/platform/bindings/nativekit.hxmap")
+    );
+    compiler.addFfiProjection(
+      "NativeKitGpu.hxmap",
+      File.getContent(haxeonRoot + "/packages/gpu/bindings/nativekit-gpu.hxmap")
+    );
+    compiler.addFfiProjection(
+      "NativeKitSceneRender.hxmap",
+      File.getContent(scenekitRoot + "/scene_render/bindings/nativekit-scene-render.hxmap")
+    );
+    compiler.addFfiProjection(
+      "NativeKitSceneInteraction.hxmap",
+      File.getContent(scenekitRoot + "/scene_interaction/bindings/nativekit-scene-interaction.hxmap")
+    );
+    compiler.addFfiInterface("NativeKit.hxi", nativekitHxi);
+    compiler.addFfiInterface("NativeKitGpu.hxi", gpuHxi);
+    compiler.addFfiInterface("NativeKitScene.hxi", sceneHxi);
+    compiler.addFfiInterface("NativeKitSceneRender.hxi", renderHxi);
+    compiler.addFfiInterface("NativeKitSceneInteraction.hxi", interactionHxi);
+    compiler.update("Main.hx", source());
+    File.saveBytes(output, HlWriter.encode(compiler.compile("Main").module));
+  }
 
-	static function source():String return '
+  static function source():String return '
 import NativeKitScene;
 import NativeKitSceneRender;
 import NativeKitSceneInteraction;

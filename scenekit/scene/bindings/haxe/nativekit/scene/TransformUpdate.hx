@@ -4,14 +4,12 @@ import NativeKitScene;
 
 /** One node transform in a bulk transaction update. */
 class TransformUpdate {
-    final value:nkscene_transform_update;
-	public function new(node:NodeId, transform:Transform) {
-		value = new nkscene_transform_update();
-		value.set_node(node.nativeValue());
-        value.set_transform(transform.nativeValue());
-    }
+  final value:nkscene_transform_update;
+  public function new(node:NodeId, transform:Transform) {
+    value = new nkscene_transform_update();
+    value.set_node(node.nativeValue());
+    value.set_transform(transform.nativeValue());
+  }
 
-    @:allow(Transaction)
-    function nativeValue():nkscene_transform_update
-        return value;
+  @:allow(Transaction) function nativeValue():nkscene_transform_update return value;
 }

@@ -7,6 +7,5 @@ package nativekit.scene;
  * sites source-compatible while sharing the same implementation.
  */
 class SourceEntityFilter extends SceneViewFilter {
-	public function new()
-		super();
+  public function new() super();
 }

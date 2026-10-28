@@ -9,47 +9,41 @@ package nativekit.scene;
  * refreshed frame.
  */
 class SceneFrame {
-	final snapshotValue:SceneSnapshot;
-	final changesValue:Null<ChangeSet>;
-	var disposed:Bool = false;
+  final snapshotValue:SceneSnapshot;
+  final changesValue:Null<ChangeSet>;
+  var disposed:Bool = false;
 
-	@:allow(Scene, Transaction)
-	private function new(snapshot:SceneSnapshot, changes:Null<ChangeSet>) {
-		snapshotValue = snapshot;
-		changesValue = changes;
-	}
+  @:allow(Scene, Transaction) private function new(snapshot:SceneSnapshot, changes:Null<ChangeSet>) {
+    snapshotValue = snapshot;
+    changesValue = changes;
+  }
 
-	/** Creates a frame from the scene's current published state. */
-	public static function snapshot(scene:Scene):SceneFrame
-		return new SceneFrame(scene.snapshot(), null);
+  /** Creates a frame from the scene's current published state. */
+  public static function snapshot(scene:Scene):SceneFrame return new SceneFrame(scene.snapshot(), null);
 
-	/** Returns the immutable scene state retained by this frame. */
-	public function sceneSnapshot():SceneSnapshot {
-		ensureLive();
-		return snapshotValue;
-	}
+  /** Returns the immutable scene state retained by this frame. */
+  public function sceneSnapshot():SceneSnapshot {
+    ensureLive();
+    return snapshotValue;
+  }
 
-	/** Returns the commit delta, or null when this frame has no delta. */
-	public function changeSet():Null<ChangeSet> {
-		ensureLive();
-		return changesValue;
-	}
+  /** Returns the commit delta, or null when this frame has no delta. */
+  public function changeSet():Null<ChangeSet> {
+    ensureLive();
+    return changesValue;
+  }
 
-	/** Releases the change set and snapshot in dependency-safe order. */
-	public function dispose():Void {
-		if (disposed)
-			return;
-		if (changesValue != null)
-			changesValue.dispose();
-		snapshotValue.dispose();
-		disposed = true;
-	}
+  /** Releases the change set and snapshot in dependency-safe order. */
+  public function dispose():Void {
+    if (disposed) return;
+    if (changesValue != null) changesValue.dispose();
+    snapshotValue.dispose();
+    disposed = true;
+  }
 
-	public function isDisposed():Bool
-		return disposed;
+  public function isDisposed():Bool return disposed;
 
-	function ensureLive():Void {
-		if (disposed)
-			throw "Scene frame has been disposed";
-	}
+  function ensureLive():Void {
+    if (disposed) throw "Scene frame has been disposed";
+  }
 }

@@ -8,9 +8,15 @@ class TranslationShape {
   public function new(handle:TranslationHandle, label:String, vertices:Array<GizmoPoint>) {
     if (vertices == null || (vertices.length != 2 && vertices.length != 4)) throw "Invalid translation primitive";
     for (point in vertices) if (point == null) throw "Invalid translation primitive point";
-    this.handle = handle; this.label = label; this.vertices = vertices.copy();
+    this.handle = handle;
+    this.label = label;
+    this.vertices = vertices.copy();
   }
   public function points():Array<GizmoPoint> return vertices.copy();
-  public function depth():Float { var value = 0.0; for (point in vertices) value += point.depth/vertices.length; return value; }
-  public function distance(x:Float, y:Float):Null<Float> return GizmoShapeHit.distance(vertices,x,y);
+  public function depth():Float {
+    var value = 0.0;
+    for (point in vertices) value += point.depth / vertices.length;
+    return value;
+  }
+  public function distance(x:Float, y:Float):Null<Float> return GizmoShapeHit.distance(vertices, x, y);
 }

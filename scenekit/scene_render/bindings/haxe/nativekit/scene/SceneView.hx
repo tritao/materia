@@ -5,506 +5,489 @@ import NativeKitSceneRender;
 
 /** Immutable-at-render-boundary view configuration with typed overrides. */
 class SceneView {
-	final value:nkscene_render_view;
-	var visibilityOverrides:Array<nkscene_render_visibility_override> = [];
-	var materialOverrides:Array<nkscene_render_material_override> = [];
-	var selectionOverrides:Array<nkscene_render_material_override> = [];
-	var hoverOverrides:Array<nkscene_render_material_override> = [];
-	var diagnosticOverrides:Array<nkscene_render_material_override> = [];
-	var isolatedSources:Array<nkscene_entity_id> = [];
-	var isolatedNodes:Array<nkscene_node_id> = [];
-	var sourceVisibilityOverrides:Array<nkscene_render_source_visibility_override> = [];
-	var sourceMaterialOverrides:Array<nkscene_render_source_material_override> = [];
-	var clipPlanes:Array<nkscene_render_clip_plane> = [];
-	var poseOverrides:Array<nkscene_render_pose_override> = [];
-	var packedPoses:nkscene_render_pose_overrideBuffer = null;
+  final value:nkscene_render_view;
+  var visibilityOverrides:Array<nkscene_render_visibility_override> = [];
+  var materialOverrides:Array<nkscene_render_material_override> = [];
+  var selectionOverrides:Array<nkscene_render_material_override> = [];
+  var hoverOverrides:Array<nkscene_render_material_override> = [];
+  var diagnosticOverrides:Array<nkscene_render_material_override> = [];
+  var isolatedSources:Array<nkscene_entity_id> = [];
+  var isolatedNodes:Array<nkscene_node_id> = [];
+  var sourceVisibilityOverrides:Array<nkscene_render_source_visibility_override> = [];
+  var sourceMaterialOverrides:Array<nkscene_render_source_material_override> = [];
+  var clipPlanes:Array<nkscene_render_clip_plane> = [];
+  var poseOverrides:Array<nkscene_render_pose_override> = [];
+  var packedPoses:nkscene_render_pose_overrideBuffer = null;
 
-	public function new() {
-		value = new nkscene_render_view();
-		value.set_struct_size(nkscene_render_view.size());
-	}
+  public function new() {
+    value = new nkscene_render_view();
+    value.set_struct_size(nkscene_render_view.size());
+  }
 
-	public function setRoot(root:NodeId):SceneView {
-		value.set_root(root.nativeValue());
-		return this;
-	}
+  public function setRoot(root:NodeId):SceneView {
+    value.set_root(root.nativeValue());
+    return this;
+  }
 
-	public function clearRoot():SceneView {
-		value.set_root(new nkscene_node_id());
-		return this;
-	}
+  public function clearRoot():SceneView {
+    value.set_root(new nkscene_node_id());
+    return this;
+  }
 
-	public function setIncludeInvisible(include:Bool):SceneView {
-		value.set_include_invisible(include ? 1 : 0);
-		return this;
-	}
+  public function setIncludeInvisible(include:Bool):SceneView {
+    value.set_include_invisible(include ? 1 : 0);
+    return this;
+  }
 
-	/** Enables bounds culling and applies a column-major world-to-clip matrix. */
-	public function setViewProjection(transform:Transform):SceneView {
-		var camera = new nkscene_render_camera();
-		camera.set_enabled(1);
-		camera.set_view_projection(transform.nativeValue());
-		value.set_camera(camera);
-		value.set_camera_view_pose_enabled(0);
-		return this;
-	}
+  /** Enables bounds culling and applies a column-major world-to-clip matrix. */
+  public function setViewProjection(transform:Transform):SceneView {
+    var camera = new nkscene_render_camera();
+    camera.set_enabled(1);
+    camera.set_view_projection(transform.nativeValue());
+    value.set_camera(camera);
+    value.set_camera_view_pose_enabled(0);
+    return this;
+  }
 
-	/** Disables bounds culling and restores the default identity projection. */
-	public function clearViewProjection():SceneView {
-		value.set_camera(new nkscene_render_camera());
-		value.set_camera_view_pose_enabled(0);
-		return this;
-	}
+  /** Disables bounds culling and restores the default identity projection. */
+  public function clearViewProjection():SceneView {
+    value.set_camera(new nkscene_render_camera());
+    value.set_camera_view_pose_enabled(0);
+    return this;
+  }
 
-	/** Supplies the exact eye and view direction for an explicit projection. */
-	public function setCameraViewPose(position:Array<Float>, viewDirection:Array<Float>,
-			orthographic:Bool = false):SceneView {
-		if (position.length != 3 || viewDirection.length != 3)
-			throw "invalid camera view pose";
-		value.set_camera_view_pose_enabled(1);
-		for (axis in 0...3) {
-			value.set_camera_world_position(axis, position[axis]);
-			value.set_camera_view_direction(axis, viewDirection[axis]);
-		}
-		value.set_camera_orthographic(orthographic ? 1 : 0);
-		return this;
-	}
+  /** Supplies the exact eye and view direction for an explicit projection. */
+  public function setCameraViewPose(position:Array<Float>,
+    viewDirection:Array<Float>, orthographic:Bool = false):SceneView {
+    if (position.length != 3 || viewDirection.length != 3) throw "invalid camera view pose";
+    value.set_camera_view_pose_enabled(1);
+    for (axis in 0...3) {
+      value.set_camera_world_position(axis, position[axis]);
+      value.set_camera_view_direction(axis, viewDirection[axis]);
+    }
+    value.set_camera_orthographic(orthographic ? 1 : 0);
+    return this;
+  }
 
-	/** Renders an infinite z=0 grid behind scene geometry for editor views.
+  /** Renders an infinite z=0 grid behind scene geometry for editor views.
 	 *  Forward, right, and up are world-space ray basis vectors; right/up include
 	 *  the camera's field-of-view scale for clip-space coordinates in [-1, 1]. */
-	public function setWorkplaneGrid(eye:Array<Float>, forward:Array<Float>,
-			right:Array<Float>, up:Array<Float>, spacing:Float, cameraDistance:Float):SceneView {
-		if (eye.length != 3 || forward.length != 3 || right.length != 3 || up.length != 3 ||
-			spacing <= 0.0) throw "invalid workplane grid data";
-		value.set_workplane_grid_enabled(1);
-		for (axis in 0...3) {
-			value.set_workplane_grid_eye_spacing(axis, eye[axis]);
-			value.set_workplane_grid_forward(axis, forward[axis]);
-			value.set_workplane_grid_right(axis, right[axis]);
-			value.set_workplane_grid_up(axis, up[axis]);
-		}
-		value.set_workplane_grid_eye_spacing(3, spacing);
-		value.set_workplane_grid_forward(3, cameraDistance);
-		return this;
-	}
+  public function setWorkplaneGrid(
+    eye:Array<Float>,
+    forward:Array<Float>,
+    right:Array<Float>,
+    up:Array<Float>,
+    spacing:Float,
+    cameraDistance:Float
+  ):SceneView {
+    if (eye.length != 3 || forward.length != 3
+      || right.length != 3 || up.length != 3 || spacing <= 0.0) throw "invalid workplane grid data";
+    value.set_workplane_grid_enabled(1);
+    for (axis in 0...3) {
+      value.set_workplane_grid_eye_spacing(axis, eye[axis]);
+      value.set_workplane_grid_forward(axis, forward[axis]);
+      value.set_workplane_grid_right(axis, right[axis]);
+      value.set_workplane_grid_up(axis, up[axis]);
+    }
+    value.set_workplane_grid_eye_spacing(3, spacing);
+    value.set_workplane_grid_forward(3, cameraDistance);
+    return this;
+  }
 
-	/** Sets three world-space directions, intensities, and optional RGB light colors. */
-	public function setStudioLighting(directions:Array<Float>, sky:Array<Float>, ground:Array<Float>,
-			?colors:Array<Float>):SceneView {
-		if (directions.length != 12 || sky.length != 3 || ground.length != 3)
-			throw "invalid studio lighting data";
-		if (colors != null && colors.length != 12) throw "invalid studio light colors";
-		value.set_studio_lighting_enabled(1);
-		for (index in 0...12) value.set_studio_light_directions(index, directions[index]);
-		for (index in 0...12) value.set_studio_light_colors(index,
-			colors == null ? (index % 4 == 3 ? 0.0 : 1.0) : colors[index]);
-		for (index in 0...3) {
-			value.set_studio_ambient_sky(index, sky[index]);
-			value.set_studio_ambient_ground(index, ground[index]);
-		}
-		return this;
-	}
+  /** Sets three world-space directions, intensities, and optional RGB light colors. */
+  public function setStudioLighting(
+    directions:Array<Float>,
+    sky:Array<Float>,
+    ground:Array<Float>,
+    ?colors:Array<Float>
+  ):SceneView {
+    if (directions.length != 12 || sky.length != 3 || ground.length != 3) throw "invalid studio lighting data";
+    if (colors != null && colors.length != 12) throw "invalid studio light colors";
+    value.set_studio_lighting_enabled(1);
+    for (index in 0...12) value.set_studio_light_directions(index, directions[index]);
+    for (index in 0...12) value.set_studio_light_colors(
+      index,
+      colors == null ? (index % 4 == 3 ? 0.0 : 1.0) : colors[index]
+    );
+    for (index in 0...3) {
+      value.set_studio_ambient_sky(index, sky[index]);
+      value.set_studio_ambient_ground(index, ground[index]);
+    }
+    return this;
+  }
 
-	/** Studio environment: each light's soft-panel angular radius in radians (zero keeps a point light), how
+  /** Studio environment: each light's soft-panel angular radius in radians (zero keeps a point light), how
 	 *  strongly surfaces reflect the sky/ground room [0,1], and the exposure before PBR Neutral tone mapping
 	 *  (zero shows clamped colour). Without this call studio lights are points, reflection is 0.6, no tone mapping. */
-	public function setStudioEnvironment(radii:Array<Float>, reflection:Float, exposure:Float):SceneView {
-		if (radii.length != 3) throw "invalid studio light radii";
-		for (radius in radii)
-			if (!Math.isFinite(radius) || radius < 0 || radius > 1.5) throw "invalid studio light radius";
-		if (!Math.isFinite(reflection) || reflection < 0 || reflection > 1 || !Math.isFinite(exposure) || exposure < 0
-			|| exposure > 16) throw "invalid studio environment";
-		value.set_studio_environment_enabled(1);
-		for (index in 0...3) value.set_studio_light_radii(index, radii[index]);
-		value.set_studio_light_radii(3, 0.0);
-		value.set_studio_environment(0, reflection);
-		value.set_studio_environment(1, exposure);
-		return this;
-	}
+  public function setStudioEnvironment(radii:Array<Float>, reflection:Float, exposure:Float):SceneView {
+    if (radii.length != 3) throw "invalid studio light radii";
+    for (radius in radii) if (!Math.isFinite(radius) || radius < 0 || radius > 1.5) throw "invalid studio light radius";
+    if (!Math.isFinite(reflection) || reflection < 0 || reflection > 1
+      || !Math.isFinite(exposure) || exposure < 0 || exposure > 16) throw "invalid studio environment";
+    value.set_studio_environment_enabled(1);
+    for (index in 0...3) value.set_studio_light_radii(index, radii[index]);
+    value.set_studio_light_radii(3, 0.0);
+    value.set_studio_environment(0, reflection);
+    value.set_studio_environment(1, exposure);
+    return this;
+  }
 
-	/** CAD edge colours with a studio environment (display RGB): `onLight` on most parts, `onDark` on parts whose
+  /** CAD edge colours with a studio environment (display RGB): `onLight` on most parts, `onDark` on parts whose
 	 *  base colour has a linear luminance below `contrastLuminance`. Call after setStudioEnvironment. */
-	public function setStudioEdges(onLight:Array<Float>, onDark:Array<Float>, contrastLuminance:Float):SceneView {
-		if (onLight.length != 3 || onDark.length != 3) throw "invalid studio edge colours";
-		for (value in onLight.concat(onDark).concat([contrastLuminance]))
-			if (!Math.isFinite(value) || value < 0 || value > 1) throw "invalid studio edge colours";
-		for (index in 0...3) {
-			value.set_studio_edges_on_light(index, onLight[index]);
-			value.set_studio_edges_on_dark(index, onDark[index]);
-		}
-		value.set_studio_edges_on_light(3, 0.0);
-		value.set_studio_edges_on_dark(3, contrastLuminance);
-		return this;
-	}
+  public function setStudioEdges(onLight:Array<Float>, onDark:Array<Float>, contrastLuminance:Float):SceneView {
+    if (onLight.length != 3 || onDark.length != 3) throw "invalid studio edge colours";
+    for (value in onLight.concat(onDark).concat([contrastLuminance])) if (!Math.isFinite(value)
+      || value < 0 || value > 1) throw "invalid studio edge colours";
+    for (index in 0...3) {
+      value.set_studio_edges_on_light(index, onLight[index]);
+      value.set_studio_edges_on_dark(index, onDark[index]);
+    }
+    value.set_studio_edges_on_light(3, 0.0);
+    value.set_studio_edges_on_dark(3, contrastLuminance);
+    return this;
+  }
 
-	/** Display-only depth AO and highlight broadening. Radius uses scene world units; zero strength disables AO. */
-	public function setStudioDetail(radius:Float, strength:Float = 0.6, bias:Float = 0.08, roughnessFloor:Float = 0.4):SceneView {
-		for (parameter in [radius,strength,bias,roughnessFloor])
-			if (!Math.isFinite(parameter) || parameter < 0) throw "Invalid studio detail";
-		if (strength > 1 || bias > 1 || roughnessFloor > 1) throw "Invalid studio detail";
-		value.set_studio_surface_detail(0,radius);
-		value.set_studio_surface_detail(1,strength);
-		value.set_studio_surface_detail(2,bias);
-		value.set_studio_surface_detail(3,roughnessFloor);
-		return this;
-	}
+  /** Display-only depth AO and highlight broadening. Radius uses scene world units; zero strength disables AO. */
+  public function setStudioDetail(radius:Float,
+    strength:Float = 0.6, bias:Float = 0.08, roughnessFloor:Float = 0.4):SceneView {
+    for (parameter in [radius,
+      strength, bias, roughnessFloor]) if (!Math.isFinite(parameter) || parameter < 0) throw "Invalid studio detail";
+    if (strength > 1 || bias > 1 || roughnessFloor > 1) throw "Invalid studio detail";
+    value.set_studio_surface_detail(0, radius);
+    value.set_studio_surface_detail(1, strength);
+    value.set_studio_surface_detail(2, bias);
+    value.set_studio_surface_detail(3, roughnessFloor);
+    return this;
+  }
 
-	/** Selects a scene camera node when no explicit matrix is set. */
-	public function setCameraNode(node:NodeId):SceneView {
-		value.set_camera_node(node.nativeValue());
-		return this;
-	}
+  /** Selects a scene camera node when no explicit matrix is set. */
+  public function setCameraNode(node:NodeId):SceneView {
+    value.set_camera_node(node.nativeValue());
+    return this;
+  }
 
-	public function clearCameraNode():SceneView {
-		value.set_camera_node(new nkscene_node_id());
-		return this;
-	}
+  public function clearCameraNode():SceneView {
+    value.set_camera_node(new nkscene_node_id());
+    return this;
+  }
 
-	/** Adds a conservative node-level section plane. Kept side is normal * p + distance >= 0. */
-	public function addClipPlane(normalX:Float, normalY:Float, normalZ:Float,
-			distance:Float, enabled:Bool = true):SceneView {
-		var plane = new nkscene_render_clip_plane();
-		plane.set_normal(0, normalX);
-		plane.set_normal(1, normalY);
-		plane.set_normal(2, normalZ);
-		plane.set_distance(distance);
-		plane.set_enabled(enabled ? 1 : 0);
-		clipPlanes.push(plane);
-		value.set_clip_planes(clipPlanes);
-		return this;
-	}
+  /** Adds a conservative node-level section plane. Kept side is normal * p + distance >= 0. */
+  public function addClipPlane(normalX:Float,
+    normalY:Float, normalZ:Float, distance:Float, enabled:Bool = true):SceneView {
+    var plane = new nkscene_render_clip_plane();
+    plane.set_normal(0, normalX);
+    plane.set_normal(1, normalY);
+    plane.set_normal(2, normalZ);
+    plane.set_distance(distance);
+    plane.set_enabled(enabled ? 1 : 0);
+    clipPlanes.push(plane);
+    value.set_clip_planes(clipPlanes);
+    return this;
+  }
 
-	public function clearClipPlanes():SceneView {
-		clipPlanes.resize(0);
-		value.set_clip_planes(clipPlanes);
-		return this;
-	}
+  public function clearClipPlanes():SceneView {
+    clipPlanes.resize(0);
+    value.set_clip_planes(clipPlanes);
+    return this;
+  }
 
-	public function setVisibility(node:NodeId, visible:Bool):SceneView {
-		var stable = node.stableValue();
-		for (override in visibilityOverrides) {
-			if (override.get_node().get_value() == stable) {
-				override.set_visible(visible ? 1 : 0);
-				value.set_visibility_overrides(visibilityOverrides);
-				return this;
-			}
-		}
-		var override = new nkscene_render_visibility_override();
-		override.set_node(node.nativeValue());
-		override.set_visible(visible ? 1 : 0);
-		visibilityOverrides.push(override);
-		value.set_visibility_overrides(visibilityOverrides);
-		return this;
-	}
+  public function setVisibility(node:NodeId, visible:Bool):SceneView {
+    var stable = node.stableValue();
+    for (override in visibilityOverrides) {
+      if (override.get_node().get_value() == stable) {
+        override.set_visible(visible ? 1 : 0);
+        value.set_visibility_overrides(visibilityOverrides);
+        return this;
+      }
+    }
+    var override = new nkscene_render_visibility_override();
+    override.set_node(node.nativeValue());
+    override.set_visible(visible ? 1 : 0);
+    visibilityOverrides.push(override);
+    value.set_visibility_overrides(visibilityOverrides);
+    return this;
+  }
 
-	public function setNodeVisibility(node:NodeId, visible:Bool):SceneView
-		return setVisibility(node, visible);
+  public function setNodeVisibility(node:NodeId, visible:Bool):SceneView return setVisibility(node, visible);
 
-	public function setMaterial(node:NodeId, material:Material):SceneView {
-		setMaterialOverride(materialOverrides, node, material);
-		value.set_material_overrides(materialOverrides);
-		return this;
-	}
+  public function setMaterial(node:NodeId, material:Material):SceneView {
+    setMaterialOverride(materialOverrides, node, material);
+    value.set_material_overrides(materialOverrides);
+    return this;
+  }
 
-	public function setNodeMaterial(node:NodeId, material:Material):SceneView
-		return setMaterial(node, material);
+  public function setNodeMaterial(node:NodeId, material:Material):SceneView return setMaterial(node, material);
 
-	/** Adds or replaces a runtime world-space pose without changing the scene snapshot. */
-	public function setPose(node:NodeId, transform:Transform):SceneView {
-		// Materialize only for the incremental editing API, never for bulk publication.
-		if (packedPoses != null) {
-			poseOverrides = [];
-			for (index in 0...packedPoses.length) poseOverrides.push(packedPoses.copy(index));
-			packedPoses = null;
-		}
-		for (override in poseOverrides) {
-			if (override.get_node().get_value() == node.stableValue()) {
-				override.set_world_transform(transform.nativeValue());
-				value.set_pose_overrides(poseOverrides);
-				value.set_pose_override_count(poseOverrides.length);
-				return this;
-			}
-		}
-		var override = new nkscene_render_pose_override();
-		override.set_node(node.nativeValue());
-		override.set_world_transform(transform.nativeValue());
-		poseOverrides.push(override);
-		value.set_pose_overrides(poseOverrides);
-		value.set_pose_override_count(poseOverrides.length);
-		return this;
-	}
+  /** Adds or replaces a runtime world-space pose without changing the scene snapshot. */
+  public function setPose(node:NodeId, transform:Transform):SceneView {
+    // Materialize only for the incremental editing API, never for bulk publication.
+    if (packedPoses != null) {
+      poseOverrides = [];
+      for (index in 0...packedPoses.length) poseOverrides.push(packedPoses.copy(index));
+      packedPoses = null;
+    }
+    for (override in poseOverrides) {
+      if (override.get_node().get_value() == node.stableValue()) {
+        override.set_world_transform(transform.nativeValue());
+        value.set_pose_overrides(poseOverrides);
+        value.set_pose_override_count(poseOverrides.length);
+        return this;
+      }
+    }
+    var override = new nkscene_render_pose_override();
+    override.set_node(node.nativeValue());
+    override.set_world_transform(transform.nativeValue());
+    poseOverrides.push(override);
+    value.set_pose_overrides(poseOverrides);
+    value.set_pose_override_count(poseOverrides.length);
+    return this;
+  }
 
-	/** Replaces all world-space poses with one native publication. */
-	public function replacePoses(nodes:Array<NodeId>, transforms:Array<Transform>):SceneView {
-		if (nodes.length != transforms.length) throw "Pose node/transform count mismatch";
-		// Each view owns its publication; another view cannot overwrite this storage.
-		var replacements = new nkscene_render_pose_overrideBuffer(nodes.length);
-		for (index in 0...nodes.length) {
-			replacements.set_node(index, nodes[index].nativeValue());
-			replacements.set_world_transform(index, transforms[index].nativeValue());
-		}
-		value.set_pose_overrides_packed(replacements);
-		packedPoses = replacements;
-		poseOverrides.resize(0);
-		return this;
-	}
+  /** Replaces all world-space poses with one native publication. */
+  public function replacePoses(nodes:Array<NodeId>, transforms:Array<Transform>):SceneView {
+    if (nodes.length != transforms.length) throw "Pose node/transform count mismatch";
+    // Each view owns its publication; another view cannot overwrite this storage.
+    var replacements = new nkscene_render_pose_overrideBuffer(nodes.length);
+    for (index in 0...nodes.length) {
+      replacements.set_node(index, nodes[index].nativeValue());
+      replacements.set_world_transform(index, transforms[index].nativeValue());
+    }
+    value.set_pose_overrides_packed(replacements);
+    packedPoses = replacements;
+    poseOverrides.resize(0);
+    return this;
+  }
 
-	public function clearPoses():SceneView {
-		packedPoses = null;
-		poseOverrides.resize(0);
-		value.set_pose_overrides(poseOverrides);
-		value.set_pose_override_count(0);
-		return this;
-	}
+  public function clearPoses():SceneView {
+    packedPoses = null;
+    poseOverrides.resize(0);
+    value.set_pose_overrides(poseOverrides);
+    value.set_pose_override_count(0);
+    return this;
+  }
 
-	/** Tints a diagnostic subtree without replacing its material; selection and hover win. */
-	public function setDiagnosticTint(node:NodeId, material:Material):SceneView {
-		setMaterialOverride(diagnosticOverrides, node, material);
-		value.set_diagnostic_overrides(diagnosticOverrides);
-		return this;
-	}
+  /** Tints a diagnostic subtree without replacing its material; selection and hover win. */
+  public function setDiagnosticTint(node:NodeId, material:Material):SceneView {
+    setMaterialOverride(diagnosticOverrides, node, material);
+    value.set_diagnostic_overrides(diagnosticOverrides);
+    return this;
+  }
 
-	public function clearDiagnosticTints():SceneView {
-		diagnosticOverrides.resize(0);
-		value.set_diagnostic_overrides(diagnosticOverrides);
-		return this;
-	}
+  public function clearDiagnosticTints():SceneView {
+    diagnosticOverrides.resize(0);
+    value.set_diagnostic_overrides(diagnosticOverrides);
+    return this;
+  }
 
-	public function diagnosticTintValues():Array<nkscene_render_material_override>
-		return diagnosticOverrides.copy();
+  public function diagnosticTintValues():Array<nkscene_render_material_override> return diagnosticOverrides.copy();
 
-	@:allow(SelectionSet)
-	function setSelectionMaterial(node:NodeId, material:Material):SceneView {
-		setMaterialOverride(selectionOverrides, node, material);
-		value.set_selection_overrides(selectionOverrides);
-		return this;
-	}
+  @:allow(SelectionSet) function setSelectionMaterial(node:NodeId, material:Material):SceneView {
+    setMaterialOverride(selectionOverrides, node, material);
+    value.set_selection_overrides(selectionOverrides);
+    return this;
+  }
 
-	@:allow(SceneInteraction)
-	function setHoverMaterial(node:NodeId, material:Material):SceneView {
-		setMaterialOverride(hoverOverrides, node, material);
-		value.set_hover_overrides(hoverOverrides);
-		return this;
-	}
+  @:allow(SceneInteraction) function setHoverMaterial(node:NodeId, material:Material):SceneView {
+    setMaterialOverride(hoverOverrides, node, material);
+    value.set_hover_overrides(hoverOverrides);
+    return this;
+  }
 
-	/** Adds or replaces a source-level visibility rule. */
-	public function setSourceVisibility(source:haxe.Int64, visible:Bool):SceneView {
-		for (override in sourceVisibilityOverrides) {
-			if (override.get_source().get_value() == source) {
-				override.set_visible(visible ? 1 : 0);
-				value.set_source_visibility_overrides(sourceVisibilityOverrides);
-				return this;
-			}
-		}
-		var override = new nkscene_render_source_visibility_override();
-		var sourceValue = new nkscene_entity_id();
-		sourceValue.set_value(source);
-		override.set_source(sourceValue);
-		override.set_visible(visible ? 1 : 0);
-		sourceVisibilityOverrides.push(override);
-		value.set_source_visibility_overrides(sourceVisibilityOverrides);
-		return this;
-	}
+  /** Adds or replaces a source-level visibility rule. */
+  public function setSourceVisibility(source:haxe.Int64, visible:Bool):SceneView {
+    for (override in sourceVisibilityOverrides) {
+      if (override.get_source().get_value() == source) {
+        override.set_visible(visible ? 1 : 0);
+        value.set_source_visibility_overrides(sourceVisibilityOverrides);
+        return this;
+      }
+    }
+    var override = new nkscene_render_source_visibility_override();
+    var sourceValue = new nkscene_entity_id();
+    sourceValue.set_value(source);
+    override.set_source(sourceValue);
+    override.set_visible(visible ? 1 : 0);
+    sourceVisibilityOverrides.push(override);
+    value.set_source_visibility_overrides(sourceVisibilityOverrides);
+    return this;
+  }
 
-	/** Adds or replaces a source-level base material rule. */
-	public function setSourceMaterial(source:haxe.Int64, material:Material):SceneView {
-		for (override in sourceMaterialOverrides) {
-			if (override.get_source().get_value() == source) {
-				override.set_material(material.id());
-				value.set_source_material_overrides(sourceMaterialOverrides);
-				return this;
-			}
-		}
-		var override = new nkscene_render_source_material_override();
-		var sourceValue = new nkscene_entity_id();
-		sourceValue.set_value(source);
-		override.set_source(sourceValue);
-		override.set_material(material.id());
-		sourceMaterialOverrides.push(override);
-		value.set_source_material_overrides(sourceMaterialOverrides);
-		return this;
-	}
+  /** Adds or replaces a source-level base material rule. */
+  public function setSourceMaterial(source:haxe.Int64, material:Material):SceneView {
+    for (override in sourceMaterialOverrides) {
+      if (override.get_source().get_value() == source) {
+        override.set_material(material.id());
+        value.set_source_material_overrides(sourceMaterialOverrides);
+        return this;
+      }
+    }
+    var override = new nkscene_render_source_material_override();
+    var sourceValue = new nkscene_entity_id();
+    sourceValue.set_value(source);
+    override.set_source(sourceValue);
+    override.set_material(material.id());
+    sourceMaterialOverrides.push(override);
+    value.set_source_material_overrides(sourceMaterialOverrides);
+    return this;
+  }
 
-	/** Adds or removes a source from the declarative isolation set. */
-	public function setIsolatedSource(source:haxe.Int64, isolated:Bool):SceneView {
-		for (index in 0...isolatedSources.length) {
-			if (isolatedSources[index].get_value() == source) {
-				if (!isolated)
-					isolatedSources.splice(index, 1);
-				value.set_isolated_sources(isolatedSources);
-				return this;
-			}
-		}
-		if (isolated) {
-			var sourceValue = new nkscene_entity_id();
-			sourceValue.set_value(source);
-			isolatedSources.push(sourceValue);
-		}
-		value.set_isolated_sources(isolatedSources);
-		return this;
-	}
+  /** Adds or removes a source from the declarative isolation set. */
+  public function setIsolatedSource(source:haxe.Int64, isolated:Bool):SceneView {
+    for (index in 0...isolatedSources.length) {
+      if (isolatedSources[index].get_value() == source) {
+        if (!isolated) isolatedSources.splice(index, 1);
+        value.set_isolated_sources(isolatedSources);
+        return this;
+      }
+    }
+    if (isolated) {
+      var sourceValue = new nkscene_entity_id();
+      sourceValue.set_value(source);
+      isolatedSources.push(sourceValue);
+    }
+    value.set_isolated_sources(isolatedSources);
+    return this;
+  }
 
-	/** Adds or removes an explicit node from the isolation set. */
-	public function setIsolatedNode(node:NodeId,
-			isolated:Bool):SceneView {
-		var stable = node.stableValue();
-		for (index in 0...isolatedNodes.length) {
-			if (isolatedNodes[index].get_value() == stable) {
-				if (!isolated)
-					isolatedNodes.splice(index, 1);
-				value.set_isolated_nodes(isolatedNodes);
-				return this;
-			}
-		}
-		if (isolated)
-			isolatedNodes.push(node.nativeValue());
-		value.set_isolated_nodes(isolatedNodes);
-		return this;
-	}
+  /** Adds or removes an explicit node from the isolation set. */
+  public function setIsolatedNode(node:NodeId, isolated:Bool):SceneView {
+    var stable = node.stableValue();
+    for (index in 0...isolatedNodes.length) {
+      if (isolatedNodes[index].get_value() == stable) {
+        if (!isolated) isolatedNodes.splice(index, 1);
+        value.set_isolated_nodes(isolatedNodes);
+        return this;
+      }
+    }
+    if (isolated) isolatedNodes.push(node.nativeValue());
+    value.set_isolated_nodes(isolatedNodes);
+    return this;
+  }
 
-	/** Clears source and explicit node isolation while preserving rules. */
-	public function clearIsolation():SceneView {
-		isolatedSources.resize(0);
-		isolatedNodes.resize(0);
-		value.set_isolated_sources(isolatedSources);
-		value.set_isolated_nodes(isolatedNodes);
-		return this;
-	}
+  /** Clears source and explicit node isolation while preserving rules. */
+  public function clearIsolation():SceneView {
+    isolatedSources.resize(0);
+    isolatedNodes.resize(0);
+    value.set_isolated_sources(isolatedSources);
+    value.set_isolated_nodes(isolatedNodes);
+    return this;
+  }
 
-	public function clearSourceFilter():SceneView {
-		isolatedSources.resize(0);
-		sourceVisibilityOverrides.resize(0);
-		sourceMaterialOverrides.resize(0);
-		value.set_isolated_sources(isolatedSources);
-		value.set_source_visibility_overrides(sourceVisibilityOverrides);
-		value.set_source_material_overrides(sourceMaterialOverrides);
-		return this;
-	}
+  public function clearSourceFilter():SceneView {
+    isolatedSources.resize(0);
+    sourceVisibilityOverrides.resize(0);
+    sourceMaterialOverrides.resize(0);
+    value.set_isolated_sources(isolatedSources);
+    value.set_source_visibility_overrides(sourceVisibilityOverrides);
+    value.set_source_material_overrides(sourceMaterialOverrides);
+    return this;
+  }
 
-	public function clearSelectionOverrides():SceneView {
-		selectionOverrides.resize(0);
-		value.set_selection_overrides(selectionOverrides);
-		return this;
-	}
+  public function clearSelectionOverrides():SceneView {
+    selectionOverrides.resize(0);
+    value.set_selection_overrides(selectionOverrides);
+    return this;
+  }
 
-	public function clearHoverOverrides():SceneView {
-		hoverOverrides.resize(0);
-		value.set_hover_overrides(hoverOverrides);
-		return this;
-	}
+  public function clearHoverOverrides():SceneView {
+    hoverOverrides.resize(0);
+    value.set_hover_overrides(hoverOverrides);
+    return this;
+  }
 
-	public function clearOverrides():SceneView {
-		clearDiagnosticTints();
-		visibilityOverrides.resize(0);
-		materialOverrides.resize(0);
-		selectionOverrides.resize(0);
-		hoverOverrides.resize(0);
-		isolatedSources.resize(0);
-		isolatedNodes.resize(0);
-		sourceVisibilityOverrides.resize(0);
-		sourceMaterialOverrides.resize(0);
-		value.set_visibility_overrides(visibilityOverrides);
-		value.set_material_overrides(materialOverrides);
-		value.set_selection_overrides(selectionOverrides);
-		value.set_hover_overrides(hoverOverrides);
-		value.set_isolated_sources(isolatedSources);
-		value.set_isolated_nodes(isolatedNodes);
-		value.set_source_visibility_overrides(sourceVisibilityOverrides);
-		value.set_source_material_overrides(sourceMaterialOverrides);
-		return this;
-	}
+  public function clearOverrides():SceneView {
+    clearDiagnosticTints();
+    visibilityOverrides.resize(0);
+    materialOverrides.resize(0);
+    selectionOverrides.resize(0);
+    hoverOverrides.resize(0);
+    isolatedSources.resize(0);
+    isolatedNodes.resize(0);
+    sourceVisibilityOverrides.resize(0);
+    sourceMaterialOverrides.resize(0);
+    value.set_visibility_overrides(visibilityOverrides);
+    value.set_material_overrides(materialOverrides);
+    value.set_selection_overrides(selectionOverrides);
+    value.set_hover_overrides(hoverOverrides);
+    value.set_isolated_sources(isolatedSources);
+    value.set_isolated_nodes(isolatedNodes);
+    value.set_source_visibility_overrides(sourceVisibilityOverrides);
+    value.set_source_material_overrides(sourceMaterialOverrides);
+    return this;
+  }
 
-	public function applyVisibilityFilter(filter:VisibilityFilter):SceneView {
-		filter.apply(this);
-		return this;
-	}
+  public function applyVisibilityFilter(filter:VisibilityFilter):SceneView {
+    filter.apply(this);
+    return this;
+  }
 
-	/** Applies reusable base visibility and material presentation rules. */
-	public function applyPolicy(policy:SceneViewPolicy):SceneView
-		return policy.apply(this);
+  /** Applies reusable base visibility and material presentation rules. */
+  public function applyPolicy(policy:SceneViewPolicy):SceneView return policy.apply(this);
 
-	/** Tints selected subtrees with highlight RGB while retaining each surface material. */
-	public function applySelection(selection:SelectionSet, highlight:Material):SceneView {
-		clearSelectionOverrides();
-		selection.apply(this, highlight);
-		return this;
-	}
+  /** Tints selected subtrees with highlight RGB while retaining each surface material. */
+  public function applySelection(selection:SelectionSet, highlight:Material):SceneView {
+    clearSelectionOverrides();
+    selection.apply(this, highlight);
+    return this;
+  }
 
-	/** Tints a hovered subtree; preserves source alpha and takes precedence over selection. */
-	public function applyHover(node:Null<NodeId>, highlight:Material):SceneView {
-		clearHoverOverrides();
-		if (node != null)
-			setHoverMaterial(node, highlight);
-		return this;
-	}
+  /** Tints a hovered subtree; preserves source alpha and takes precedence over selection. */
+  public function applyHover(node:Null<NodeId>, highlight:Material):SceneView {
+    clearHoverOverrides();
+    if (node != null) setHoverMaterial(node, highlight);
+    return this;
+  }
 
-	/** Replaces the hover layer with every node of one object that is drawn as several. */
-	public function applyHoverNodes(nodes:Array<NodeId>, highlight:Material):SceneView {
-		clearHoverOverrides();
-		for (node in nodes)
-			setHoverMaterial(node, highlight);
-		return this;
-	}
+  /** Replaces the hover layer with every node of one object that is drawn as several. */
+  public function applyHoverNodes(nodes:Array<NodeId>, highlight:Material):SceneView {
+    clearHoverOverrides();
+    for (node in nodes) setHoverMaterial(node, highlight);
+    return this;
+  }
 
-	public function visibilityOverrideValues():Array<nkscene_render_visibility_override>
-		return visibilityOverrides.copy();
+  public function visibilityOverrideValues():Array<nkscene_render_visibility_override
+    > return visibilityOverrides.copy();
 
-	public function materialOverrideValues():Array<nkscene_render_material_override>
-		return materialOverrides.copy();
+  public function materialOverrideValues():Array<nkscene_render_material_override> return materialOverrides.copy();
 
-	public function selectionOverrideValues():Array<nkscene_render_material_override>
-		return selectionOverrides.copy();
+  public function selectionOverrideValues():Array<nkscene_render_material_override> return selectionOverrides.copy();
 
-	public function hoverOverrideValues():Array<nkscene_render_material_override>
-		return hoverOverrides.copy();
+  public function hoverOverrideValues():Array<nkscene_render_material_override> return hoverOverrides.copy();
 
-	public function poseOverrideCount():Int
-		return packedPoses == null ? poseOverrides.length : packedPoses.length;
+  public function poseOverrideCount():Int return packedPoses == null ? poseOverrides.length : packedPoses.length;
 
-	public function visibilityOverrideCount():Int
-		return visibilityOverrides.length;
+  public function visibilityOverrideCount():Int return visibilityOverrides.length;
 
-	public function materialOverrideCount():Int
-		return materialOverrides.length + diagnosticOverrides.length + selectionOverrides.length + hoverOverrides.length;
+  public function materialOverrideCount():Int return materialOverrides.length
+    + diagnosticOverrides.length + selectionOverrides.length + hoverOverrides.length;
 
-	public function selectionOverrideCount():Int
-		return selectionOverrides.length;
+  public function selectionOverrideCount():Int return selectionOverrides.length;
 
-	public function hoverOverrideCount():Int
-		return hoverOverrides.length;
+  public function hoverOverrideCount():Int return hoverOverrides.length;
 
-	public function isolatedSourceCount():Int
-		return isolatedSources.length;
+  public function isolatedSourceCount():Int return isolatedSources.length;
 
-	public function isolatedNodeCount():Int
-		return isolatedNodes.length;
+  public function isolatedNodeCount():Int return isolatedNodes.length;
 
-	public function sourceVisibilityOverrideCount():Int
-		return sourceVisibilityOverrides.length;
+  public function sourceVisibilityOverrideCount():Int return sourceVisibilityOverrides.length;
 
-	public function sourceMaterialOverrideCount():Int
-		return sourceMaterialOverrides.length;
+  public function sourceMaterialOverrideCount():Int return sourceMaterialOverrides.length;
 
-	public function clipPlaneCount():Int
-		return clipPlanes.length;
+  public function clipPlaneCount():Int return clipPlanes.length;
 
-	@:allow(SceneRenderer, SpatialIndex)
-	function nativeValue():nkscene_render_view
-		return value;
+  @:allow(SceneRenderer, SpatialIndex) function nativeValue():nkscene_render_view return value;
 
-	function setMaterialOverride(overrides:Array<nkscene_render_material_override>,
-			node:NodeId, material:Material):Void {
-		var stable = node.stableValue(), materialValue = material.id();
-		for (override in overrides) {
-			if (override.get_node().get_value() == stable) {
-				override.set_material(materialValue);
-				return;
-			}
-		}
-		var override = new nkscene_render_material_override();
-		override.set_node(node.nativeValue());
-		override.set_material(materialValue);
-		overrides.push(override);
-	}
+  function setMaterialOverride(overrides:Array<nkscene_render_material_override>, node:NodeId, material:Material):Void {
+    var stable = node.stableValue(), materialValue = material.id();
+    for (override in overrides) {
+      if (override.get_node().get_value() == stable) {
+        override.set_material(materialValue);
+        return;
+      }
+    }
+    var override = new nkscene_render_material_override();
+    override.set_node(node.nativeValue());
+    override.set_material(materialValue);
+    overrides.push(override);
+  }
 }
