@@ -77,14 +77,7 @@ class DumpAt implements Skill {
       var currentPose = manipulator.tcpPose(seed);
       var toolpath = new Toolpath(
         frameId,
-        [
-          new ToolpathPoint(currentPose, feedRate, false),
-          new ToolpathPoint(
-            pose,
-            feedRate,
-            false
-          )
-        ]
+        [new ToolpathPoint(currentPose, feedRate, false), new ToolpathPoint(pose, feedRate, false)]
       );
       planRunner.run(toolpath, seed);
       if (!planRunner.running()) lifecycle.fail('DumpAt plan failed: ${planRunner.failure()}');

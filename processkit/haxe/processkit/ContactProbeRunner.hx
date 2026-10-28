@@ -182,10 +182,7 @@ class ContactProbeRunner {
         || channels.wireSpeed == channels.voltage) throw "Contact probe torch channels must be distinct";
       if (selectedSafe.length == 0) selectedSafe = [
         MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(0.0)),
-        MotionOp.SetOutput(
-          channels.arc,
-          EventValue.Digital(false)
-        )
+        MotionOp.SetOutput(channels.arc, EventValue.Digital(false))
       ];
     }
     if (selectedSafe.length == 0) throw "Contact probe needs explicit safe process outputs";
@@ -262,17 +259,11 @@ class ContactProbeRunner {
         checkedSpeed,
         SEARCH_AGE_SECONDS,
         0.002,
-        cast(
-          request,
-          ContactProbeRequest
-        ).contactOffset,
+        cast(request, ContactProbeRequest).contactOffset,
         mappings,
         sensorKind,
         coordinateFrame,
-        cast(
-          request,
-          ContactProbeRequest
-        ).calibratedError,
+        cast(request, ContactProbeRequest).calibratedError,
         checkedSpeed * SEARCH_AGE_SECONDS
       );
     } catch (error:Dynamic) {
@@ -291,10 +282,7 @@ class ContactProbeRunner {
   function holdAndHandoff(next:ProbePhase):Void {
     var snapshot = motion.robot.snapshot();
     motion.robot.submit(RobotCommand.JointTargets(
-      [for (index in motion.jointIndices) JointTarget.position(
-        index,
-        snapshot.positions.get(index)
-      )],
+      [for (index in motion.jointIndices) JointTarget.position(index, snapshot.positions.get(index))],
       null
     ));
     handoffAt = snapshot.sourceTimestampNs;

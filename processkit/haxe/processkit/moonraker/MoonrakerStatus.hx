@@ -55,25 +55,11 @@ class MoonrakerStatus {
 
   /** The objects and fields that `fromObjects` reads, as a subscription (`null` fields would mean all of an object's). */
   public static function subscription():Dynamic return {
-    motion_report: [
-      "live_position",
-      "live_velocity",
-      "live_extruder_velocity"
-    ],
+    motion_report: ["live_position", "live_velocity", "live_extruder_velocity"],
     toolhead: ["position"],
-    extruder: [
-      "temperature",
-      "target"
-    ],
-    heater_bed: [
-      "temperature",
-      "target"
-    ],
-    print_stats: [
-      "state",
-      "filename",
-      "message"
-    ],
+    extruder: ["temperature", "target"],
+    heater_bed: ["temperature", "target"],
+    print_stats: ["state", "filename", "message"],
     virtual_sdcard: ["progress"]
   };
 
@@ -121,68 +107,21 @@ class MoonrakerStatus {
     var p = previous;
     return new MoonrakerStatus(
       text(stats, "state", p == null ? "" : p.state),
-      text(
-        stats,
-        "filename",
-        p == null ? "" : p.filename
-      ),
-      number(
-        Reflect.field(
-          status,
-          "virtual_sdcard"
-        ),
-        "progress",
-        p == null ? 0.0 : p.progress
-      ),
-      coordinates(
-        report,
-        "live_position",
-        p == null ? null : p.position
-      ),
-      number(
-        report,
-        "live_velocity",
-        p == null ? 0.0 : p.velocity
-      ),
-      number(
-        report,
-        "live_extruder_velocity",
-        p == null ? 0.0 : p.extruderVelocity
-      ),
-      coordinates(
-        toolhead,
-        "position",
-        p == null ? null : p.queuedPosition
-      ),
+      text(stats, "filename", p == null ? "" : p.filename),
+      number(Reflect.field(status, "virtual_sdcard"), "progress", p == null ? 0.0 : p.progress),
+      coordinates(report, "live_position", p == null ? null : p.position),
+      number(report, "live_velocity", p == null ? 0.0 : p.velocity),
+      number(report, "live_extruder_velocity", p == null ? 0.0 : p.extruderVelocity),
+      coordinates(toolhead, "position", p == null ? null : p.queuedPosition),
       {
-        temperature : number(
-          extruder,
-          "temperature",
-          p == null ? 0.0 : p.extruder.temperature
-        ),
-        target : number(
-          extruder,
-          "target",
-          p == null ? 0.0 : p.extruder.target
-        )
+        temperature : number(extruder, "temperature", p == null ? 0.0 : p.extruder.temperature),
+        target : number(extruder, "target", p == null ? 0.0 : p.extruder.target)
       },
       {
-        temperature : number(
-          bed,
-          "temperature",
-          p == null ? 0.0 : p.bed.temperature
-        ),
-        target : number(
-          bed,
-          "target",
-          p == null ? 0.0 : p.bed.target
-        )
+        temperature : number(bed, "temperature", p == null ? 0.0 : p.bed.temperature),
+        target : number(bed, "target", p == null ? 0.0 : p.bed.target)
       },
-      text(
-        stats,
-        "message",
-        p == null ? "" : p.message
-      )
+      text(stats, "message", p == null ? "" : p.message)
     );
   }
 

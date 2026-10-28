@@ -18,14 +18,7 @@ class ContactClockTests {
     "tcp",
     Int64.ofInt(sequence),
     Int64.ofInt(time),
-    [
-      0.0,
-      0.0,
-      24.0,
-      touch ? 1.0 : 0.0,
-      0.0,
-      0.0
-    ],
+    [0.0, 0.0, 24.0, touch ? 1.0 : 0.0, 0.0, 0.0],
     null,
     "",
     null,

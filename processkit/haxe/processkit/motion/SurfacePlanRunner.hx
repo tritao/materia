@@ -32,10 +32,7 @@ class SurfacePlanRunner implements processkit.skill.SurfacePlanRunner {
   public static function create(
     robot:Robot,
     manipulator:KinematicGroup,
-    eventSource:Void -> {
-      events: Array<FiredProcessEvent>,
-      overflow: Bool
-    },
+    eventSource:Void -> {events: Array<FiredProcessEvent>, overflow: Bool},
     feed:Float,
     planning:PlanningLimits,
     maxJointJump:Float,
@@ -56,19 +53,11 @@ class SurfacePlanRunner implements processkit.skill.SurfacePlanRunner {
       planning.jerk,
       planning.startTolerances(0.005),
       null,
-      Math.min(
-        cartesianResolution,
-        0.0075
-      ),
+      Math.min(cartesianResolution, 0.0075),
       maxJointJump,
       0.005,
       0.02,
-      new IkTolerance(
-        2e-3,
-        5e-3,
-        300,
-        0.03
-      ),
+      new IkTolerance(2e-3, 5e-3, 300, 0.03),
       new StructuredJointPathPlanner(manipulator)
     );
     compiler.planningAssumptions = planning.assumptions.copy();
@@ -121,18 +110,8 @@ class SurfacePlanRunner implements processkit.skill.SurfacePlanRunner {
     return new MotionProgram([
       MotionOp.MoveJ(MoveTarget.JointTarget(approach), new MotionOptions(), Blend.ExactStop),
       MotionOp.Dwell(0.6),
-      MotionOp.FollowPath(
-        path,
-        "arm-base",
-        feed,
-        events
-      ),
-      MotionOp.MoveL(
-        pose(retract),
-        "arm-base",
-        feed,
-        Blend.ExactStop
-      )
+      MotionOp.FollowPath(path, "arm-base", feed, events),
+      MotionOp.MoveL(pose(retract), "arm-base", feed, Blend.ExactStop)
     ]);
   }
 

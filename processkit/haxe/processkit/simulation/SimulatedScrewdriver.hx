@@ -400,12 +400,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     var link = simulation.linkPose(robotIndex, linkIndex);
     var linkFrame = new Transform3(
       Vec3.fromArray(link.position),
-      new Quat(
-        link.rotation[0],
-        link.rotation[1],
-        link.rotation[2],
-        link.rotation[3]
-      )
+      new Quat(link.rotation[0], link.rotation[1], link.rotation[2], link.rotation[3])
     );
     var toolAxis = linkFrame.transformVector(Vec3.fromArray(axis)).normalized();
     var headAxis = actualHead.transformVector(new Vec3(0, 0, 1)).normalized();
@@ -723,10 +718,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       var pickError = actualHead.translation.sub(Vec3.fromArray(tip));
       var pickAlignment = Math.acos(Math.max(
         -1,
-        Math.min(
-          1,
-          headAxis.x * direction[0] + headAxis.y * direction[1] + headAxis.z * direction[2]
-        )
+        Math.min(1, headAxis.x * direction[0] + headAxis.y * direction[1] + headAxis.z * direction[2])
       ));
       // The named socket is calibrated against the body's collision origin. Only the
       // identified body can seal; another screw near the bit is never substituted.
@@ -744,20 +736,12 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
         || (pickError.norm() <= SimulatedSuctionTool.REACH && pickAlignment <= setup.joint.maximumAxisAngle));
       var screwAlignment = Math.acos(Math.max(
         -1,
-        Math.min(
-          1,
-          headAxis.x * holeAxis[0] + headAxis.y * holeAxis[1] + headAxis.z * holeAxis[2]
-        )
+        Math.min(1, headAxis.x * holeAxis[0] + headAxis.y * holeAxis[1] + headAxis.z * holeAxis[2])
       ));
       var alignment = Math.max(pickAlignment, screwAlignment);
       var linkFrame = new Transform3(
         Vec3.fromArray(link.position),
-        new Quat(
-          link.rotation[0],
-          link.rotation[1],
-          link.rotation[2],
-          link.rotation[3]
-        )
+        new Quat(link.rotation[0], link.rotation[1], link.rotation[2], link.rotation[3])
       );
       var anchor = anchoredBody;
       var pending = pendingEngagement;
@@ -987,12 +971,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
   }
   static function transform(value:SimPose):Transform3 return new Transform3(
     new Vec3(value.x, value.y, value.z),
-    new Quat(
-      value.qx,
-      value.qy,
-      value.qz,
-      value.qw
-    )
+    new Quat(value.qx, value.qy, value.qz, value.qw)
   );
   static function pose(value:Transform3):SimPose return new SimPose(
     value.translation.x,

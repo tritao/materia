@@ -17,15 +17,8 @@ class ContactRegistrationSequenceTests {
     if (!ok) throw message;
   }
   static function request(point:Vec3):ContactProbeRequest return new ContactProbeRequest(
-    new Transform3(
-      point,
-      Quat.identity()
-    ),
-    new Vec3(
-      0,
-      0,
-      -1
-    ),
+    new Transform3(point, Quat.identity()),
+    new Vec3(0, 0, -1),
     0.1
   );
   static function observation(
@@ -57,16 +50,8 @@ class ContactRegistrationSequenceTests {
       new Vec3(0.1, -0.1, 0),
       new Vec3(0.1, 0.1, 0),
       new Vec3(-0.1, 0.02, 0.05),
-      new Vec3(
-        0.1,
-        0.02,
-        0.05
-      ),
-      new Vec3(
-        0.04,
-        -0.04,
-        0.05
-      )
+      new Vec3(0.1, 0.02, 0.05),
+      new Vec3(0.04, -0.04, 0.05)
     ];
     var planeNormals = [new Vec3(0, 0, 1), new Vec3(0, 1, 0), new Vec3(1, 0, 0)];
     var checkpoint = [0.03, -0.2];
@@ -203,29 +188,8 @@ class ContactRegistrationSequenceTests {
     try sequence.start() catch (_:Dynamic) rejected = true;
     check(rejected, "Registration cannot reuse contacts at another parking pose");
     var invalid = new ContactRegistrationSequence(
-      new ContactPoseEnvelope(
-        Transform3.identity(),
-        new Vec3(
-          0.02,
-          0.02,
-          0.02
-        ),
-        new Vec3(),
-        0.00001
-      ),
-      (
-        count,
-        _,
-        _
-      ) -> new ContactRegistrationStage(
-        new Vec3(
-          0,
-          0,
-          1
-        ),
-        0,
-        [for (_ in 0...count) request(new Vec3())]
-      )
+      new ContactPoseEnvelope(Transform3.identity(), new Vec3(0.02, 0.02, 0.02), new Vec3(), 0.00001),
+      (count, _, _) -> new ContactRegistrationStage(new Vec3(0, 0, 1), 0, [for (_ in 0...count) request(new Vec3())])
     );
     invalid.start();
     for (i in 1...4) invalid.observeMeasurement(observation(new Vec3(), i));
@@ -233,25 +197,8 @@ class ContactRegistrationSequenceTests {
     try invalid.selectNextStage() catch (_:Dynamic) rejected = true;
     check(rejected && invalid.result == null, "Parallel later-stage planes fail without authorizing welding");
     var deficient = new ContactRegistrationSequence(
-      new ContactPoseEnvelope(
-        Transform3.identity(),
-        new Vec3(
-          0.02,
-          0.02,
-          0.02
-        ),
-        new Vec3(
-          0.01,
-          0.01,
-          0.01
-        ),
-        0.00001
-      ),
-      (
-        count,
-        _,
-        _
-      ) -> new ContactRegistrationStage(
+      new ContactPoseEnvelope(Transform3.identity(), new Vec3(0.02, 0.02, 0.02), new Vec3(0.01, 0.01, 0.01), 0.00001),
+      (count, _, _) -> new ContactRegistrationStage(
         planeNormals[3 - count],
         0,
         [for (_ in 0...count) request(new Vec3())]
@@ -271,29 +218,8 @@ class ContactRegistrationSequenceTests {
       "Independent planes alone cannot authorize a rank-deficient contact pattern"
     );
     var inconsistent = new ContactRegistrationSequence(
-      new ContactPoseEnvelope(
-        Transform3.identity(),
-        new Vec3(
-          0.001,
-          0.001,
-          0.001
-        ),
-        new Vec3(),
-        0.00001
-      ),
-      (
-        count,
-        _,
-        _
-      ) -> new ContactRegistrationStage(
-        new Vec3(
-          0,
-          0,
-          1
-        ),
-        0,
-        [for (_ in 0...count) request(new Vec3())]
-      )
+      new ContactPoseEnvelope(Transform3.identity(), new Vec3(0.001, 0.001, 0.001), new Vec3(), 0.00001),
+      (count, _, _) -> new ContactRegistrationStage(new Vec3(0, 0, 1), 0, [for (_ in 0...count) request(new Vec3())])
     );
     inconsistent.start();
     rejected = false;
@@ -304,29 +230,8 @@ class ContactRegistrationSequenceTests {
       "Inconsistent measured contacts fail before selecting the next stage"
     );
     var mixedSource = new ContactRegistrationSequence(
-      new ContactPoseEnvelope(
-        Transform3.identity(),
-        new Vec3(
-          0.02,
-          0.02,
-          0.02
-        ),
-        new Vec3(),
-        0.00001
-      ),
-      (
-        count,
-        _,
-        _
-      ) -> new ContactRegistrationStage(
-        new Vec3(
-          0,
-          0,
-          1
-        ),
-        0,
-        [for (_ in 0...count) request(new Vec3())]
-      )
+      new ContactPoseEnvelope(Transform3.identity(), new Vec3(0.02, 0.02, 0.02), new Vec3(), 0.00001),
+      (count, _, _) -> new ContactRegistrationStage(new Vec3(0, 0, 1), 0, [for (_ in 0...count) request(new Vec3())])
     );
     mixedSource.start();
     mixedSource.observeMeasurement(observation(new Vec3(), 1));
@@ -337,29 +242,8 @@ class ContactRegistrationSequenceTests {
       "A second sensor cannot be mixed into one accepted registration"
     );
     var overBudget = new ContactRegistrationSequence(
-      new ContactPoseEnvelope(
-        Transform3.identity(),
-        new Vec3(
-          0.02,
-          0.02,
-          0.02
-        ),
-        new Vec3(),
-        0.00001
-      ),
-      (
-        count,
-        _,
-        _
-      ) -> new ContactRegistrationStage(
-        new Vec3(
-          0,
-          0,
-          1
-        ),
-        0,
-        [for (_ in 0...count) request(new Vec3())]
-      )
+      new ContactPoseEnvelope(Transform3.identity(), new Vec3(0.02, 0.02, 0.02), new Vec3(), 0.00001),
+      (count, _, _) -> new ContactRegistrationStage(new Vec3(0, 0, 1), 0, [for (_ in 0...count) request(new Vec3())])
     );
     overBudget.start();
     rejected = false;

@@ -127,20 +127,8 @@ class SimulatedWelder implements SimulationStepObserver {
         wireSpeed: Math.max(0.0, analog(wireSpeedChannel)),
         voltageSet: analog(voltageChannel),
         supplyReady: supplyReady,
-        tipDistance: work.distance(
-          tip[0],
-          tip[1],
-          tip[2]
-        ),
-        wireDistance: work.ray(
-          tip[0],
-          tip[1],
-          tip[2],
-          wire[0],
-          wire[1],
-          wire[2],
-          WeldArcModel.STRIKE_REACH
-        )
+        tipDistance: work.distance(tip[0], tip[1], tip[2]),
+        wireDistance: work.ray(tip[0], tip[1], tip[2], wire[0], wire[1], wire[2], WeldArcModel.STRIKE_REACH)
       }
     );
     // Geometry above comes from this completed physics tick. Observer time controls the

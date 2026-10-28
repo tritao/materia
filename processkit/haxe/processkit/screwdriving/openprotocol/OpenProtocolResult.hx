@@ -55,10 +55,7 @@ class OpenProtocolResult {
       [132, 6],
       [148, 5],
       [155, 5],
-      [
-        162,
-        5
-      ]
+      [162, 5]
     ]) {
       var value = OpenProtocolFrame.number(bytes, field[0], field[1]);
     }

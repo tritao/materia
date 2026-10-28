@@ -50,17 +50,8 @@ class ScrewdrivingArmMotion implements ScrewdrivingMotion {
       waiting = 0;
       motion.run(new MotionProgram(
         [MotionOp.MoveJ(
-          motionkit.program.MoveTarget.PoseTarget(
-            pose,
-            motion.compiler.frameId,
-            null
-          ),
-          new motionkit.MotionOptions(
-            0.4,
-            0,
-            0,
-            true
-          ),
+          motionkit.program.MoveTarget.PoseTarget(pose, motion.compiler.frameId, null),
+          new motionkit.MotionOptions(0.4, 0, 0, true),
           Blend.ExactStop
         )],
         configuration

@@ -38,10 +38,7 @@ class WeldPassPath {
         > WeldPlan.JOIN)) throw 'Pass offset consumes seam "${segment.name}"';
       result.push(new WeldSegment(
         new Transform3(starts[index], segment.start.rotation),
-        new Transform3(
-          stops[index],
-          segment.stop.rotation
-        ),
+        new Transform3(stops[index], segment.stop.rotation),
         segment.name,
         segment.open
       ));

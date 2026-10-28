@@ -159,11 +159,7 @@ class ScrewEntryController {
     var u = displacement.dot(axisU), v = displacement.dot(axisV), depth = displacement.dot(axisN);
     var local = new Wrench3(
       new Vec3(wrench.force.dot(axisU), wrench.force.dot(axisV), wrench.force.dot(axisN)),
-      new Vec3(
-        wrench.torque.dot(axisU),
-        wrench.torque.dot(axisV),
-        wrench.torque.dot(axisN)
-      )
+      new Vec3(wrench.torque.dot(axisU), wrench.torque.dot(axisV), wrench.torque.dot(axisN))
     );
     compressionN = -local.force.z;
     contactSamples = compressionN >= limits.contactThresholdN ? contactSamples + 1 : 0;

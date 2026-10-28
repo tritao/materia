@@ -57,18 +57,9 @@ class WeldStationPlanner {
     required:Array<String>,
     candidates:Array<WeldStationCandidate>,
     start:Pose2,
-    screen:(
-      WeldStationCandidate,
-      String
-    ) -> Null<String>,
-    verify:(
-      WeldStationCandidate,
-      String
-    ) -> Null<String>,
-    route:(
-      Pose2,
-      Pose2
-    ) -> Null<Float>,
+    screen:(WeldStationCandidate, String) -> Null<String>,
+    verify:(WeldStationCandidate, String) -> Null<String>,
+    route:(Pose2, Pose2) -> Null<Float>,
     ?verifyPlan:WeldStationPlan -> Null<WeldStationPlanFailure>
   ):WeldStationPlan {
     if (screen == null || verify == null) throw "Verified station planning requires a screen and full motion check";
@@ -79,14 +70,8 @@ class WeldStationPlanner {
     required:Array<String>,
     candidates:Array<WeldStationCandidate>,
     start:Pose2,
-    access:(
-      WeldStationCandidate,
-      String
-    ) -> Null<String>,
-    route:(
-      Pose2,
-      Pose2
-    ) -> Null<Float>
+    access:(WeldStationCandidate, String) -> Null<String>,
+    route:(Pose2, Pose2) -> Null<Float>
   ):WeldStationPlan {
     if (required == null || candidates == null || start == null || access == null
       || route == null) throw "Station planning requires seams, candidates, start, access and navigation";
@@ -142,10 +127,7 @@ private class StationVerification {
     required:Array<String>,
     candidates:Array<WeldStationCandidate>,
     start:Pose2,
-    route:(
-      Pose2,
-      Pose2
-    ) -> Null<Float>
+    route:(Pose2, Pose2) -> Null<Float>
   ):WeldStationPlan {
     while (true) {
       var plan = WeldStationPlanner.plan(required, candidates, start, access, route);
@@ -195,14 +177,8 @@ private class StationSearch {
     required:Array<String>,
     candidates:Array<WeldStationCandidate>,
     start:Pose2,
-    access:(
-      WeldStationCandidate,
-      String
-    ) -> Null<String>,
-    route:(
-      Pose2,
-      Pose2
-    ) -> Null<Float>
+    access:(WeldStationCandidate, String) -> Null<String>,
+    route:(Pose2, Pose2) -> Null<Float>
   ) {
     this.required = required.copy();
     this.candidates = candidates.copy();
@@ -235,10 +211,7 @@ private class StationSearch {
     var key = '$from>$to';
     if (!costs.exists(key)) costs.set(
       key,
-      checkedCost(route(
-        from < 0 ? start : candidates[from].pose,
-        candidates[to].pose
-      ))
+      checkedCost(route(from < 0 ? start : candidates[from].pose, candidates[to].pose))
     );
     return costs.get(key);
   }

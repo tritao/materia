@@ -17,18 +17,10 @@ class WeldPassPathTests {
       corners[index],
       corners[(index + 1) % 4],
       'side $index',
-      new Vec3(
-        0,
-        0,
-        1
-      )
+      new Vec3(0, 0, 1)
     )];
     var faces = [for (outward in [new Vec3(0, -1, 0), new Vec3(1, 0, 0), new Vec3(0, 1, 0), new Vec3(-1, 0, 0)])[
-      new Vec3(
-        0,
-        0,
-        1
-      ),
+      new Vec3(0, 0, 1),
       outward
     ]];
     check(WeldPassPath.offset(segments, faces, 0, 0) == segments, "zero offset preserves exact path");

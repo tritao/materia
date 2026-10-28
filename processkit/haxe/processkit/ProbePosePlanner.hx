@@ -96,10 +96,7 @@ class ProbePosePlanner {
     var screenTolerance = new IkTolerance(
       fullTolerance.position,
       fullTolerance.orientation,
-      Std.int(Math.min(
-        64,
-        fullTolerance.maxIterations
-      )),
+      Std.int(Math.min(64, fullTolerance.maxIterations)),
       fullTolerance.damping,
       fullTolerance.candidateSeparation
     );

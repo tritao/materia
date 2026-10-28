@@ -88,14 +88,8 @@ class WorkPatchPlanner {
       var patchBoundary = new Polygon2([
         new Point2(colMinX, bounds.minY),
         new Point2(colMaxX, bounds.minY),
-        new Point2(
-          colMaxX,
-          bounds.maxY
-        ),
-        new Point2(
-          colMinX,
-          bounds.maxY
-        )
+        new Point2(colMaxX, bounds.maxY),
+        new Point2(colMinX, bounds.maxY)
       ]);
       var patchExclusions:Array<Polygon2> = [];
       for (exclusion in design.exclusions) {
@@ -105,18 +99,9 @@ class WorkPatchPlanner {
         if (clippedMaxX - clippedMinX <= 1e-9) continue;
         patchExclusions.push(new Polygon2([
           new Point2(clippedMinX, exclusionBounds.minY),
-          new Point2(
-            clippedMaxX,
-            exclusionBounds.minY
-          ),
-          new Point2(
-            clippedMaxX,
-            exclusionBounds.maxY
-          ),
-          new Point2(
-            clippedMinX,
-            exclusionBounds.maxY
-          )
+          new Point2(clippedMaxX, exclusionBounds.minY),
+          new Point2(clippedMaxX, exclusionBounds.maxY),
+          new Point2(clippedMinX, exclusionBounds.maxY)
         ]));
       }
 
@@ -128,10 +113,7 @@ class WorkPatchPlanner {
         patchExclusions,
         design.tolerance,
         design.materialTag,
-        new Provenance(
-          design.provenance.designElementId,
-          SourceKind.Work
-        ),
+        new Provenance(design.provenance.designElementId, SourceKind.Work),
         '${design.surfaceFrameId}:patch$col'
       );
       var patchToolpath = RasterToolpathGenerator.generate(
@@ -190,12 +172,7 @@ class WorkPatchPlanner {
               var p = body.pose;
               var at = candidateTransform.inverse().compose(new Transform3(
                 new Vec3(p.x, p.y, p.z),
-                new Quat(
-                  p.qx,
-                  p.qy,
-                  p.qz,
-                  p.qw
-                )
+                new Quat(p.qx, p.qy, p.qz, p.qw)
               ));
               var t = at.translation, r = at.rotation;
               body.pose = new collisionkit.CollisionPose(t.x, t.y, t.z, r.x, r.y, r.z, r.w);

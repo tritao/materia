@@ -52,12 +52,7 @@ class FakeMoonrakerServer {
     [0.0, 0.0, 0.0, 0.0],
     [100.0, 0.0, 0.2, 5.0],
     [100.0, 100.0, 0.2, 10.0],
-    [
-      0.0,
-      100.0,
-      0.2,
-      15.0
-    ]
+    [0.0, 100.0, 0.2, 15.0]
   ];
   public var speed = 50.0;
   /** How far ahead of the nozzle the queued moves end, millimetres of route, while printing. */
@@ -197,10 +192,7 @@ class FakeMoonrakerServer {
       [
         ["live_position", position.copy()],
         ["live_velocity", printing() ? speed : 0.0],
-        [
-          "live_extruder_velocity",
-          printing() ? here.feed * speed : 0.0
-        ]
+        ["live_extruder_velocity", printing() ? here.feed * speed : 0.0]
       ]
     );
     put("toolhead", [["position", queued]]);
@@ -235,12 +227,7 @@ class FakeMoonrakerServer {
 
   function sendHttp(link:Link, status:Int, reason:String, value:Dynamic):Void NativeTransport.send(
     link.transport,
-    FakeHttpResponse.encode(
-      status,
-      reason,
-      "application/json",
-      Bytes.ofString(Json.stringify(value))
-    )
+    FakeHttpResponse.encode(status, reason, "application/json", Bytes.ofString(Json.stringify(value)))
   );
 
   function sendSocket(link:Link, value:Dynamic):Void {
@@ -315,10 +302,7 @@ class FakeMoonrakerServer {
           if (message.opcode == WebSocketMessage.TEXT) rpc(link, Json.parse(message.text()));
           else if (message.opcode == WebSocketMessage.PING) NativeTransport.send(
             link.transport,
-            WebSocketFrames.encode(
-              WebSocketMessage.PONG,
-              message.payload
-            )
+            WebSocketFrames.encode(WebSocketMessage.PONG, message.payload)
           );
           else if (message.opcode == WebSocketMessage.PONG) {
             if (message.text() == "alive") pongs++;
@@ -357,10 +341,7 @@ class FakeMoonrakerServer {
         var fields:Dynamic = Reflect.field(status, name);
         for (field in Reflect.fields(fields)) link.sent.set(
           name + "." + field,
-          Json.stringify(Reflect.field(
-            fields,
-            field
-          ))
+          Json.stringify(Reflect.field(fields, field))
         );
       }
       sendSocket(link, {jsonrpc: "2.0", result: {eventtime: 0.0, status: status}, id: id});
@@ -440,12 +421,7 @@ class FakeMoonrakerServer {
           if (content == null) sendHttp(link, 404, "Not Found", {error: {message: "file not found"}});
           else NativeTransport.send(
             link.transport,
-            FakeHttpResponse.encode(
-              200,
-              "OK",
-              "text/csv",
-              Bytes.ofString(content)
-            )
+            FakeHttpResponse.encode(200, "OK", "text/csv", Bytes.ofString(content))
           );
         } else sendHttp(link, 404, "Not Found", {error: {message: "no such endpoint"}});
     }

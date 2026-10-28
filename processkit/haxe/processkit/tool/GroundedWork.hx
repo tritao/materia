@@ -58,15 +58,7 @@ class GroundedWork implements WeldWork {
       var direction = turnBack(pose.rotation, dx, dy, dz);
       result = Math.min(
         result,
-        solids[index].ray(
-          origin[0],
-          origin[1],
-          origin[2],
-          direction[0],
-          direction[1],
-          direction[2],
-          range
-        )
+        solids[index].ray(origin[0], origin[1], origin[2], direction[0], direction[1], direction[2], range)
       );
     }
     for (work in additions) result = Math.min(result, work.ray(ox, oy, oz, dx, dy, dz, range));

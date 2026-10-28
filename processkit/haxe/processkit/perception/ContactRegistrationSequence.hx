@@ -125,10 +125,7 @@ class ContactRegistrationSequence {
     var rotation = envelope.rotationBound;
     var rotationLimit = Math.max(
       1e-12,
-      Math.min(
-        Math.PI,
-        Math.abs(rotation.x) + Math.abs(rotation.y) + Math.abs(rotation.z)
-      )
+      Math.min(Math.PI, Math.abs(rotation.x) + Math.abs(rotation.y) + Math.abs(rotation.z))
     );
     // Fit translation is expressed at the work origin, while saved bounds are
     // chassis-origin motion. Include the rotation lever arm about that origin.

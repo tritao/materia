@@ -52,14 +52,8 @@ class ModbusTests {
       1,
       2,
       4,
-      new ModbusRegister(
-        201,
-        0.1
-      ),
-      new ModbusRegister(
-        202,
-        0.01
-      ),
+      new ModbusRegister(201, 0.1),
+      new ModbusRegister(202, 0.01),
       new ModbusRegister(203),
       103,
       200

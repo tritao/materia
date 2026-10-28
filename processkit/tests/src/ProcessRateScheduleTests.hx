@@ -38,11 +38,7 @@ class ProcessRateScheduleTests {
     rejects([0.0, 0.01], [0.0]);
     var normal = [
       new PathEvent(0.0, "wire", EventValue.Analog(8.0)),
-      new PathEvent(
-        0.004,
-        "wire",
-        EventValue.Analog(6.0)
-      )
+      new PathEvent(0.004, "wire", EventValue.Analog(6.0))
     ];
     var recovery = ProcessRateSchedule.overlap(normal, 0.002, 1.0);
     check(
@@ -74,11 +70,7 @@ class ProcessRateScheduleTests {
       2,
       [0.01, 0.02, 0.03],
       [0.0, 2.0, 3.0],
-      [new PathEvent(
-        0.02,
-        "arc",
-        EventValue.Digital(true)
-      )],
+      [new PathEvent(0.02, "arc", EventValue.Digital(true))],
       true,
       8,
       0.015,
@@ -94,11 +86,7 @@ class ProcessRateScheduleTests {
       2,
       [0.01, 0.02],
       [0.0, 1.0],
-      [new PathEvent(
-        0.01,
-        "wire",
-        EventValue.Analog(3)
-      )],
+      [new PathEvent(0.01, "wire", EventValue.Analog(3))],
       true,
       8
     ) catch (_:Dynamic) internalRejected = true;
@@ -108,11 +96,7 @@ class ProcessRateScheduleTests {
       2,
       [0.01, 0.03],
       [0.0, 1.0],
-      [new PathEvent(
-        0.03 - 1e-15,
-        "wire",
-        EventValue.Analog(0)
-      )],
+      [new PathEvent(0.03 - 1e-15, "wire", EventValue.Analog(0))],
       true,
       8
     );

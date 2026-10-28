@@ -31,10 +31,7 @@ private class Span {
   public function sin():Span return new Span(Math.sin(lo), Math.sin(hi));
   public function cos():Span return new Span(
     Math.min(Math.cos(lo), Math.cos(hi)),
-    lo <= 0 && hi >= 0 ? 1.0 : Math.max(
-      Math.cos(lo),
-      Math.cos(hi)
-    )
+    lo <= 0 && hi >= 0 ? 1.0 : Math.max(Math.cos(lo), Math.cos(hi))
   );
   public function radius():Float return Math.max(Math.abs(lo), Math.abs(hi));
 }
@@ -144,28 +141,13 @@ class ContactPoseEnvelope {
     var boundedError = new Transform3(
       new Vec3(
         clamp(error.translation.x, translationBound.x),
-        clamp(
-          error.translation.y,
-          translationBound.y
-        ),
-        clamp(
-          error.translation.z,
-          translationBound.z
-        )
+        clamp(error.translation.y, translationBound.y),
+        clamp(error.translation.z, translationBound.z)
       ),
       Quat.fromRollPitchYaw(
-        clamp(
-          angles.roll,
-          rotationBound.x
-        ),
-        clamp(
-          angles.pitch,
-          rotationBound.y
-        ),
-        clamp(
-          angles.yaw,
-          rotationBound.z
-        )
+        clamp(angles.roll, rotationBound.x),
+        clamp(angles.pitch, rotationBound.y),
+        clamp(angles.yaw, rotationBound.z)
       )
     );
     var bounded = boundedError.inverse().compose(nominalWork);
@@ -360,11 +342,7 @@ class ContactPoseEnvelope {
     var middle = [for (i in 0...6)(low[i] + high[i]) / 2];
     var error = new Transform3(
       new Vec3(middle[0], middle[1], middle[2]),
-      Quat.fromRollPitchYaw(
-        middle[3],
-        middle[4],
-        middle[5]
-      )
+      Quat.fromRollPitchYaw(middle[3], middle[4], middle[5])
     );
     return error.inverse().compose(nominalWork);
   }

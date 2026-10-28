@@ -159,10 +159,7 @@ class GradeRegion implements Skill {
         currentZ,
         cut,
         spec.clearanceZ,
-        new Point2(
-          spec.dumpX,
-          spec.dumpY
-        ),
+        new Point2(spec.dumpX, spec.dumpY),
         spec.dumpZ,
         spec.bucketHalfWidth,
         spec.digPitch,
@@ -211,10 +208,7 @@ class GradeRegion implements Skill {
       totalRemovedVolume += BucketSweep.apply(
         region.existing,
         new Point2(from.translation.x, from.translation.y),
-        new Point2(
-          to.translation.x,
-          to.translation.y
-        ),
+        new Point2(to.translation.x, to.translation.y),
         sweep.sweepHalfWidth,
         minObservedCutZ
       ).removedVolume;

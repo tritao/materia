@@ -64,10 +64,7 @@ class SurfaceRegistration {
       design.exclusions,
       design.tolerance,
       design.materialTag,
-      new Provenance(
-        design.provenance.designElementId,
-        SourceKind.Work
-      ),
+      new Provenance(design.provenance.designElementId, SourceKind.Work),
       registeredSurfaceFrameId
     );
 

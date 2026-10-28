@@ -94,11 +94,7 @@ import motionkit.robot.ServoSession;
       solver.discoveries = 0;
       var preparedProbe = new processkit.ProbePosePlanner(probePlanner).prepare(
         new Vec3(0, 0, -0.02),
-        new Vec3(
-          0,
-          0,
-          -1
-        ),
+        new Vec3(0, 0, -1),
         0.02,
         [0.0],
         WeldArcModel.TOUCH_TOLERANCE,
@@ -120,11 +116,7 @@ import motionkit.robot.ServoSession;
       check(liftedMotion.violation([minimumZ]) != null, "The test fixture blocks the minimum probe standoff");
       var lifted = new processkit.ProbePosePlanner(liftedMotion).prepareObserved(
         new Vec3(0, 0, -0.02),
-        new Vec3(
-          0,
-          0,
-          -1
-        ),
+        new Vec3(0, 0, -1),
         0.02,
         [0.0],
         WeldArcModel.TOUCH_TOLERANCE,
@@ -258,11 +250,7 @@ import motionkit.robot.ServoSession;
       );
       var uncertainProbe = new processkit.ContactProbeRunner.ContactProbeRequest(
         Transform3.identity(),
-        new Vec3(
-          0,
-          0,
-          1
-        ),
+        new Vec3(0, 0, 1),
         0.032,
         0.01,
         0.0005,
@@ -277,11 +265,7 @@ import motionkit.robot.ServoSession;
           precontact
         ) == null && checkedProbe.sensingCorridorViolation(
           [0.0],
-          new Vec3(
-            0,
-            0,
-            1
-          ),
+          new Vec3(0, 0, 1),
           0.022
         ) != null,
         "A surface inside contact uncertainty does not invalidate the guaranteed pre-contact corridor"
@@ -325,14 +309,7 @@ import motionkit.robot.ServoSession;
         "rim obstacle",
         robotkit.collision.CollisionSceneBuilder.CollisionOwner.Fixture,
         collisionkit.CollisionGeometry.Sphere(0.000005),
-        new Transform3(
-          new Vec3(
-            0.000499,
-            0,
-            -0.000001
-          ),
-          Quat.identity()
-        )
+        new Transform3(new Vec3(0.000499, 0, -0.000001), Quat.identity())
       );
       var cutWire = processkit.ProbeWire.describe(
         rimScene,
@@ -469,12 +446,7 @@ import motionkit.robot.ServoSession;
       "tool",
       1,
       [0.0, 0.0, 0.0],
-      [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ]
+      [0.0, 0.0, 0.0, 1.0]
     ));
     var harness = new SimulationHarness(0.01);
     var runtime = harness.simulation.addRobot(blueprint);
@@ -573,12 +545,7 @@ import motionkit.robot.ServoSession;
       "tool",
       1,
       [0.0, 0.0, 0.0],
-      [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ]
+      [0.0, 0.0, 0.0, 1.0]
     ));
     var harness = new SimulationHarness(0.01);
     var runtime = harness.simulation.addRobot(blueprint);
@@ -590,10 +557,7 @@ import motionkit.robot.ServoSession;
       new ProbeMotionPlanner(arm, planning.compiler),
       channels,
       "torch",
-      () -> new ServoSession(
-        robot,
-        arm
-      )
+      () -> new ServoSession(robot, arm)
     );
     var prepared = new Transform3(new Vec3(0, 0, 0.01), arm.tcpPose([0.0]).rotation);
     var requested = new ContactProbeRequest(
@@ -609,11 +573,7 @@ import motionkit.robot.ServoSession;
     var registrationRunner = new processkit.ContactRegistrationRunner(probe,
       new processkit.perception.ContactRegistrationSequence(new processkit.perception.ContactPoseEnvelope(
         Transform3.identity(),
-        new Vec3(
-          0,
-          0,
-          0.001
-        ),
+        new Vec3(0, 0, 0.001),
         new Vec3(),
         0.00001
       ), (
@@ -624,11 +584,7 @@ import motionkit.robot.ServoSession;
     return new processkit.perception.ContactRegistrationSequence.ContactRegistrationStage(
       new Vec3(0, 0, 1),
       -0.02,
-      [
-        requested,
-        requested,
-        requested
-      ]
+      [requested, requested, requested]
     );
     }));
     if (!registration) {
@@ -677,14 +633,7 @@ import motionkit.robot.ServoSession;
       var gap = Math.max(0.0, snapshot.positions.get(0) + 0.02);
       var reading = sensing.step(
         0.01,
-        {
-          arcCommanded: on,
-          voltageSet: 20.0,
-          wireSpeed: feed,
-          supplyReady: true,
-          tipDistance: gap,
-          wireDistance: gap
-        }
+        {arcCommanded: on, voltageSet: 20.0, wireSpeed: feed, supplyReady: true, tipDistance: gap, wireDistance: gap}
       );
       if (reading.touch && !touching) touchEpisodes++;
       touching = reading.touch;
@@ -813,18 +762,11 @@ import motionkit.robot.ServoSession;
       new ProbeMotionPlanner(fixture.arm, planning.compiler),
       channels,
       "torch",
-      () -> new ServoSession(
-        robot,
-        fixture.arm
-      )
+      () -> new ServoSession(robot, fixture.arm)
     );
     var requested = new ContactProbeRequest(
       new Transform3(new Vec3(0, 0, 0.01), fixture.arm.tcpPose([0.0]).rotation),
-      new Vec3(
-        0,
-        0,
-        -1
-      ),
+      new Vec3(0, 0, -1),
       0.04
     );
     if (mode == 1) {
@@ -842,34 +784,14 @@ import motionkit.robot.ServoSession;
     var registration = new processkit.ContactRegistrationRunner(
       probe,
       new processkit.perception.ContactRegistrationSequence(
-        new processkit.perception.ContactPoseEnvelope(
-          Transform3.identity(),
-          new Vec3(
-            0,
-            0,
-            0.001
-          ),
-          new Vec3(),
-          0.00001
-        ),
-        (
-          _,
-          _,
-          _
-        ) -> new processkit.perception.ContactRegistrationSequence.ContactRegistrationStage(
-          new Vec3(
-            0,
-            0,
-            1
-          ),
-          0,
-          [
-            requested,
-            requested,
-            requested
-          ]
-        )
+        new processkit.perception.ContactPoseEnvelope(Transform3.identity(),
+      new Vec3(0, 0, 0.001), new Vec3(), 0.00001),
+      (_, _, _) -> new processkit.perception.ContactRegistrationSequence.ContactRegistrationStage(
+        new Vec3(0, 0, 1),
+        0,
+        [requested, requested, requested]
       )
+    )
     );
     registration.start();
     check(registration.failure == null, 'Reset test starts a valid registration: ${registration.failure}');
@@ -911,41 +833,22 @@ import motionkit.robot.ServoSession;
       new ProbeMotionPlanner(fixture.arm, planning.compiler),
       channels,
       "torch",
-      () -> new ServoSession(
-        robot,
-        fixture.arm
-      )
+      () -> new ServoSession(robot, fixture.arm)
     );
     var points = [
       new Vec3(-0.1, -0.1, 0),
       new Vec3(0.1, -0.1, 0),
       new Vec3(0.1, 0.1, 0),
       new Vec3(-0.1, 0.02, 0.05),
-      new Vec3(
-        0.1,
-        0.02,
-        0.05
-      ),
-      new Vec3(
-        0.04,
-        -0.04,
-        0.05
-      )
+      new Vec3(0.1, 0.02, 0.05),
+      new Vec3(0.04, -0.04, 0.05)
     ];
     var normals = [new Vec3(0, 0, 1), new Vec3(0, 1, 0), new Vec3(1, 0, 0)];
     var selectionStarts:Array<Float> = [];
     var sequence = new processkit.perception.ContactRegistrationSequence(new processkit.perception.ContactPoseEnvelope(
       Transform3.identity(),
-      new Vec3(
-        0.1,
-        0.1,
-        0.1
-      ),
-      new Vec3(
-        0.1,
-        0.1,
-        0.1
-      ),
+      new Vec3(0.1, 0.1, 0.1),
+      new Vec3(0.1, 0.1, 0.1),
       0.00001
     ), (
       count,
@@ -958,15 +861,8 @@ import motionkit.robot.ServoSession;
       normal,
       normal.dot(points[first]),
       [for (index in first...first + count) new ContactProbeRequest(
-        new Transform3(
-          points[index],
-          Quat.identity()
-        ),
-        new Vec3(
-          0,
-          0,
-          -1
-        ),
+        new Transform3(points[index], Quat.identity()),
+        new Vec3(0, 0, -1),
         0.1
       )],
       count == 2 ? [0.03] : null

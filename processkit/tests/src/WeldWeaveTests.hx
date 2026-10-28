@@ -24,40 +24,21 @@ class WeldWeaveTests {
     startDwell: 0.15,
     craterDwell: 0.15,
     burnback: 0.1,
-    weave: new WeaveProfile(
-      WeavePattern.Sine,
-      0.002,
-      50.0,
-      speed
-    )
+    weave: new WeaveProfile(WeavePattern.Sine, 0.002, 50.0, speed)
   };
   static function path(rotation:Quat, speed:Float):PosePath {
     var segment = new WeldSegment(
       new Transform3(new Vec3(0.0, 0.0, 0.0), rotation),
-      new Transform3(
-        new Vec3(
-          0.18,
-          0.0,
-          0.0
-        ),
-        rotation
-      ),
+      new Transform3(new Vec3(0.18, 0.0, 0.0), rotation),
       "fillet",
-      new Vec3(
-        0.0,
-        0.0,
-        1.0
-      )
+      new Vec3(0.0, 0.0, 1.0)
     );
     return new PosePath(
       WeldingPlanRunner.FRAME,
       WeldingPlanRunner.pathOf(
         new WeldPlan([segment], parameters(speed)),
         speed,
-        {
-          angularSpeed: 3.0,
-          angularAcceleration: 2.0
-        },
+        {angularSpeed: 3.0, angularAcceleration: 2.0},
         [0]
       )
     );

@@ -17,19 +17,8 @@ class ContactRegistrationPrecisionTests {
     var normals = [new Vec3(0, 0, 1), new Vec3(0, 1, 0), new Vec3(1, 0, 0)];
     var stages = [
       [new Vec3(), new Vec3(0.011, 0, 0), new Vec3(0, 0.0045, 0)],
-      [
-        new Vec3(0.2, 0.03, 0.04),
-        new Vec3(
-          0.25,
-          0.03,
-          0.04
-        )
-      ],
-      [new Vec3(
-        0.19,
-        0.02,
-        0.09
-      )]
+      [new Vec3(0.2, 0.03, 0.04), new Vec3(0.25, 0.03, 0.04)],
+      [new Vec3(0.19, 0.02, 0.09)]
     ];
     var errors = [for (i in 0...3) precision.contactError(stages[i], normals[i], normals.slice(0, i), 0.00001)];
     var broad = precision.contactError(

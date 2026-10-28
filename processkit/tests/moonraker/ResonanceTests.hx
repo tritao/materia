@@ -33,10 +33,7 @@ class ResonanceTests {
     damping:Float = 0.085):ResonanceMeasurement return KlipperResonance.measure(
       "x",
       spectrum(frequency),
-      decay(
-        frequency,
-        damping
-      ),
+      decay(frequency, damping),
       0,
       0.2,
       "config/resonances/x.csv",
@@ -75,14 +72,8 @@ class ResonanceTests {
       try KlipperResonance.measure(
         "x",
         spectrum(kind == 1 ? 100 : 57),
-        kind == 2 ? spectrum(57) : kind == 5 ? decay(
-          57,
-          -0.085
-        ) : kind == 6 ? StringTools.replace(
-          decay(
-            57,
-            0.085
-          ),
+        kind == 2 ? spectrum(57) : kind == 5 ? decay(57, -0.085) : kind == 6 ? StringTools.replace(
+          decay(57, 0.085),
           "9810",
           "nan"
         ) : decay(

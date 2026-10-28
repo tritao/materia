@@ -86,10 +86,7 @@ class ForceGuidedScrewEntry implements ScrewEntrySearch {
     regionHalfU:Float,
     regionHalfV:Float,
     mappings:Null<ClockMappings>,
-    ?feed: {
-      joint: Int,
-      axisAtTcp: Vec3
-    }
+    ?feed: {joint: Int, axisAtTcp: Vec3}
   ) {
     function positive(value:Float):Bool return Math.isFinite(value) && value > 0;
     if (servo == null || limits == null || admittance == null || entry == null || sensorId == null || sensorId.length

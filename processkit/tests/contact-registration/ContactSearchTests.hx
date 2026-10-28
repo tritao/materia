@@ -18,14 +18,7 @@ class ContactSearchTests {
       "tcp",
       Int64.ofInt(seq),
       Int64.ofInt(time),
-      [
-        arc ? 1.0 : 0.0,
-        0.0,
-        touch ? 0.0 : 24.0,
-        touch ? 1.0 : 0.0,
-        fault,
-        0.0
-      ],
+      [arc ? 1.0 : 0.0, 0.0, touch ? 0.0 : 24.0, touch ? 1.0 : 0.0, fault, 0.0],
       null,
       "",
       null,
@@ -129,14 +122,7 @@ class ContactSearchTests {
       "tcp",
       Int64.ofInt(2),
       late,
-      [
-        0.0,
-        0.0,
-        0.0,
-        1.0,
-        0.0,
-        0.0
-      ],
+      [0.0, 0.0, 0.0, 1.0, 0.0, 0.0],
       null,
       "",
       null,

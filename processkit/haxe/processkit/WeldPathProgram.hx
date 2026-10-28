@@ -65,19 +65,9 @@ class WeldPathProgram {
     endRate = parameters.wireSpeed;
     var ops:Array<MotionOp> = [
       MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(0)),
-      MotionOp.SetOutput(
-        channels.arc,
-        EventValue.Digital(false)
-      ),
-      MotionOp.SetOutput(
-        channels.voltage,
-        EventValue.Analog(parameters.voltage)
-      ),
-      MotionOp.MoveJ(
-        MoveTarget.JointTarget(this.curves[0].q[0].copy()),
-        new MotionOptions(),
-        Blend.ExactStop
-      )
+      MotionOp.SetOutput(channels.arc, EventValue.Digital(false)),
+      MotionOp.SetOutput(channels.voltage, EventValue.Analog(parameters.voltage)),
+      MotionOp.MoveJ(MoveTarget.JointTarget(this.curves[0].q[0].copy()), new MotionOptions(), Blend.ExactStop)
     ];
     lengths = [for (path in problem.sections) path.length()];
     seamOffsets = [];
@@ -216,13 +206,7 @@ class WeldPathProgram {
       events,
       op == lastOp && last,
       endRate,
-      Math.max(
-        0.0,
-        Math.min(
-          lengths[section],
-          overlap - seamOffsets[section]
-        )
-      ),
+      Math.max(0.0, Math.min(lengths[section], overlap - seamOffsets[section])),
       processkit.tool.WeldArcModel.MIN_WIRE_SPEED
     );
     };

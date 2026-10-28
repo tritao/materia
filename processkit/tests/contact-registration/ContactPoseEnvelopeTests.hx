@@ -15,21 +15,9 @@ class ContactPoseEnvelopeTests {
       new Vec3(-0.1, 0.004, 0.02),
       new Vec3(0.1, 0.004, 0.02),
       new Vec3(0.1, 0.004, 0.08),
-      new Vec3(
-        -0.04,
-        -0.03,
-        0.01
-      ),
-      new Vec3(
-        0.04,
-        -0.03,
-        0.01
-      ),
-      new Vec3(
-        0.09,
-        -0.03,
-        0.05
-      )
+      new Vec3(-0.04, -0.03, 0.01),
+      new Vec3(0.04, -0.03, 0.01),
+      new Vec3(0.09, -0.03, 0.05)
     ];
     var normals = [
       new Vec3(0, 1, 0),
@@ -37,11 +25,7 @@ class ContactPoseEnvelopeTests {
       new Vec3(0, 1, 0),
       new Vec3(0, 0, 1),
       new Vec3(0, 0, 1),
-      new Vec3(
-        1,
-        0,
-        0
-      )
+      new Vec3(1, 0, 0)
     ];
     return [for (i in 0...points.length) new PlaneContact(
       normals[i],
@@ -82,11 +66,7 @@ class ContactPoseEnvelopeTests {
         new Vec3(0.29, 0.03, 0.04),
         new Vec3(0, 1, 0),
         new Vec3(1, 0, 0),
-        new Vec3(
-          0,
-          0,
-          1
-        ),
+        new Vec3(0, 0, 1),
         estimate
       );
       check(

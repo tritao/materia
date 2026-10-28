@@ -21,21 +21,13 @@ class WeldContract {
     if (job != null) names.push(job);
     for (i in 0...names.length) for (j in 0...i) if (names[i] == names[j]) throw "Welder channels must be distinct";
     var result = [
-      new ProcessChannelDeclaration(
-        arc,
-        ProcessEventValue.Digital(false),
-        WeldChannelPolicy.ARC_KEEPS_ON_STOP
-      ),
+      new ProcessChannelDeclaration(arc, ProcessEventValue.Digital(false), WeldChannelPolicy.ARC_KEEPS_ON_STOP),
       new ProcessChannelDeclaration(
         wireSpeed,
         ProcessEventValue.Analog(0.0),
         WeldChannelPolicy.WIRE_SPEED_KEEPS_ON_STOP
       ),
-      new ProcessChannelDeclaration(
-        voltage,
-        ProcessEventValue.Analog(0.0),
-        WeldChannelPolicy.VOLTAGE_KEEPS_ON_STOP
-      )
+      new ProcessChannelDeclaration(voltage, ProcessEventValue.Analog(0.0), WeldChannelPolicy.VOLTAGE_KEEPS_ON_STOP)
     ];
     if (job != null) result.push(new ProcessChannelDeclaration(job, ProcessEventValue.Analog(0.0), true));
     return result;

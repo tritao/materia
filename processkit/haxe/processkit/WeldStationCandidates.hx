@@ -50,11 +50,7 @@ class WeldStationCandidates {
         var baseY = armWork.y - (s * chassis_T_arm.x + c * chassis_T_arm.y);
         result.push(new WeldStationCandidate(
           'station:$position:$radial:$heading',
-          map_T_work.compose(new Pose2(
-            baseX,
-            baseY,
-            yaw
-          ))
+          map_T_work.compose(new Pose2(baseX, baseY, yaw))
         ));
       }
     }

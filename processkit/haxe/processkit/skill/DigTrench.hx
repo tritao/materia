@@ -219,10 +219,7 @@ class DigTrench implements Skill {
         currentZ,
         cut,
         spec.clearanceZ,
-        new Point2(
-          spec.dumpX,
-          spec.dumpY
-        ),
+        new Point2(spec.dumpX, spec.dumpY),
         spec.dumpZ,
         width * 0.5,
         spec.digPitch,
@@ -271,10 +268,7 @@ class DigTrench implements Skill {
       totalRemovedVolume += BucketSweep.apply(
         heightMap,
         new Point2(from.translation.x, from.translation.y),
-        new Point2(
-          to.translation.x,
-          to.translation.y
-        ),
+        new Point2(to.translation.x, to.translation.y),
         sweep.sweepHalfWidth + 0.001,
         minObservedCutZ,
         designMap,
@@ -305,18 +299,9 @@ class DigTrench implements Skill {
     var normalX = -dy / length, normalY = dx / length;
     return new Polygon2([
       new Point2(from.x - normalX * halfWidth, from.y - normalY * halfWidth),
-      new Point2(
-        to.x - normalX * halfWidth,
-        to.y - normalY * halfWidth
-      ),
-      new Point2(
-        to.x + normalX * halfWidth,
-        to.y + normalY * halfWidth
-      ),
-      new Point2(
-        from.x + normalX * halfWidth,
-        from.y + normalY * halfWidth
-      )
+      new Point2(to.x - normalX * halfWidth, to.y - normalY * halfWidth),
+      new Point2(to.x + normalX * halfWidth, to.y + normalY * halfWidth),
+      new Point2(from.x + normalX * halfWidth, from.y + normalY * halfWidth)
     ]);
   }
 }

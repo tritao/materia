@@ -86,11 +86,7 @@ class ScrewPlan {
   }
   /** Offset a socket frame along its +Z without changing its orientation. */
   public static function along(frame:Transform3, distance:Float):Transform3 return new Transform3(
-    frame.transformPoint(new Vec3(
-      0,
-      0,
-      distance
-    )),
+    frame.transformPoint(new Vec3(0, 0, distance)),
     frame.rotation
   );
 }

@@ -98,12 +98,7 @@ class ReachabilityChecker {
       ) : manipulator.solve(
         target,
         seedQ,
-        new IkOptions(
-          positionTolerance,
-          orientationTolerance,
-          maxIterations,
-          damping
-        )
+        new IkOptions(positionTolerance, orientationTolerance, maxIterations, damping)
       );
       lastQ = ik.q;
       var clear = ik.converged && (toolClearance == null
@@ -111,11 +106,7 @@ class ReachabilityChecker {
           seedQ,
           ik.q,
           false,
-          toolJointStep == null ? toolClearance.jointStep(
-            seedQ,
-            ik.q,
-            maxToolStep
-          ) : toolJointStep
+          toolJointStep == null ? toolClearance.jointStep(seedQ, ik.q, maxToolStep) : toolJointStep
         ) == null));
       if (clear) {
         reachableCount++;

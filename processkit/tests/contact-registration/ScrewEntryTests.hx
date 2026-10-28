@@ -24,11 +24,7 @@ class ScrewEntryTests {
     var turnedSensor = new Transform3(Vec3.zero(), Quat.fromAxisAngle(new Vec3(0, 0, 1), Math.PI / 2));
     var rotatedWrench = ForceGuidedScrewEntry.sensorTransformAtTcp(turnedSensor,
       sensorPose).transformWrench(new Wrench3(
-        new Vec3(
-          1,
-          0,
-          0
-        ),
+        new Vec3(1, 0, 0),
         Vec3.zero()
       ));
     check(
@@ -38,14 +34,7 @@ class ScrewEntryTests {
     var controller = new CartesianAdmittance(
       new Wrench3(new Vec3(10, 0, 0), Vec3.zero()),
       [1, 1, 1, 1, 1, 1],
-      [
-        10,
-        10,
-        10,
-        10,
-        10,
-        10
-      ],
+      [10, 10, 10, 10, 10, 10],
       0.05,
       0.1,
       0.01
@@ -93,30 +82,9 @@ class ScrewEntryTests {
       0.04,
       0.00002,
       new CartesianAdmittance(
-        new Wrench3(
-          new Vec3(
-            0,
-            0,
-            -5
-          ),
-          Vec3.zero()
-        ),
-        [
-          80,
-          80,
-          80,
-          1,
-          1,
-          1
-        ],
-        [
-          4000,
-          4000,
-          4000,
-          20,
-          20,
-          20
-        ],
+        new Wrench3(new Vec3(0, 0, -5), Vec3.zero()),
+        [80, 80, 80, 1, 1, 1],
+        [4000, 4000, 4000, 20, 20, 20],
         0.004,
         0.01,
         0.01
@@ -179,30 +147,9 @@ class ScrewEntryTests {
       0.04,
       0.00002,
       new CartesianAdmittance(
-        new Wrench3(
-          new Vec3(
-            1,
-            0,
-            -5
-          ),
-          Vec3.zero()
-        ),
-        [
-          1,
-          1,
-          1,
-          1,
-          1,
-          1
-        ],
-        [
-          1,
-          1,
-          1,
-          1,
-          1,
-          1
-        ],
+        new Wrench3(new Vec3(1, 0, -5), Vec3.zero()),
+        [1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1],
         0.004,
         0.01,
         0.01

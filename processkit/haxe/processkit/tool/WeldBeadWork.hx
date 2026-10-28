@@ -82,15 +82,7 @@ class WeldBeadWork implements WeldWork {
       var hull = solid(station);
       if (hull != null) result = Math.min(
         result,
-        hull.ray(
-          origin[0],
-          origin[1],
-          origin[2],
-          direction[0],
-          direction[1],
-          direction[2],
-          range
-        )
+        hull.ray(origin[0], origin[1], origin[2], direction[0], direction[1], direction[2], range)
       );
     }
     return result;

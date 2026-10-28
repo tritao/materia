@@ -103,12 +103,7 @@ class MoonrakerClient {
     headers.set("Accept", accept);
     if (contentType != null) headers.set("Content-Type", contentType);
     queue.push(new Pending(
-      {
-        method: method,
-        target: target,
-        headers: headers,
-        body: body == null ? Bytes.alloc(0) : body
-      },
+      {method: method, target: target, headers: headers, body: body == null ? Bytes.alloc(0) : body},
       complete
     ));
   }
@@ -135,10 +130,7 @@ class MoonrakerClient {
   public function serverInfo(complete:Dynamic -> Void):Void send(
     "GET",
     "/server/info",
-    function(reply) complete(Reflect.field(
-      json(reply),
-      "result"
-    ))
+    function(reply) complete(Reflect.field(json(reply), "result"))
   );
 
   /** Puts `content` in the gcodes as `filename`, and starts printing it when `print` is set. Calls back with the stored path. */

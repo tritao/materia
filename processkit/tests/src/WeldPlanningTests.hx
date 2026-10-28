@@ -187,11 +187,7 @@ class WeldPlanningTests {
     var world = cell(null).clearance.withGroup(fixture.arm);
     var planner = new motionkit.robot.StructuredJointPathPlanner(
       fixture.arm,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-        8,
-        2,
-        4
-      ),
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(8, 2, 4),
       null,
       world,
       8,
@@ -292,41 +288,24 @@ class WeldPlanningTests {
     );
     var compiler = new motionkit.robot.ProgramCompiler(
       solver,
-      new motionkit.trajectory.ValidationLimits(
-        6,
-        haxe.Int64.ofInt(1),
-        haxe.Int64.ofInt(0)
-      ),
+      new motionkit.trajectory.ValidationLimits(6, haxe.Int64.ofInt(1), haxe.Int64.ofInt(0)),
       "weld-task",
       [for (_ in measured) 3.0],
       [for (_ in measured) 2.0],
       [for (_ in measured) 20.0],
-      motionkit.robot.StartTolerances.uniform(
-        6,
-        0.01,
-        0.01,
-        0.01
-      ),
+      motionkit.robot.StartTolerances.uniform(6, 0.01, 0.01, 0.01),
       null,
       0.002,
       0.2,
       0.001,
       0.02,
-      new IkTolerance(
-        1e-6,
-        1e-6
-      )
+      new IkTolerance(1e-6, 1e-6)
     );
     var forwardSelection = problem.selectWithCost(fixture.arm, freeRequest, null, world);
     var reverseProblem = problem.reversed();
     var reverseSelection = reverseProblem.selectWithCost(
       fixture.arm,
-      reverseProblem.request(
-        measured,
-        compiler.ikTolerance,
-        compiler.perJointMaxJump,
-        compiler.maxVelocity
-      ),
+      reverseProblem.request(measured, compiler.ikTolerance, compiler.perJointMaxJump, compiler.maxVelocity),
       null,
       world
     );
@@ -367,11 +346,7 @@ class WeldPlanningTests {
     var recoveryProgram = new processkit.WeldPathProgram(
       recoveryProblem,
       recoveryCurves,
-      {
-        arc: "arc",
-        wireSpeed: "wire",
-        voltage: "voltage"
-      },
+      {arc: "arc", wireSpeed: "wire", voltage: "voltage"},
       0.039
     );
     var recoveryCompiled = recoveryProgram.compile(compiler, fixture.arm, measured, haxe.Int64.ofInt(701), world);
@@ -388,11 +363,7 @@ class WeldPlanningTests {
           if (section >= 0 && recoveryProblem.phases[section] == processkit.WeldPathProblem.WeldPathPhase.Weld) {
             var status = recoveryProgram.progress(
               recoveryCompiled,
-              new motionkit.robot.ManipulatorProgress(
-                recoveryCompiled.blocks.indexOf(block),
-                block.opIndices[i],
-                0.001
-              )
+              new motionkit.robot.ManipulatorProgress(recoveryCompiled.blocks.indexOf(block), block.opIndices[i], 0.001)
             );
             near(status.seamDistance, 0.038, 1e-12, "recovery progress stays in original seam coordinates");
             for (event in block.plans[i].events) if (event.channel == "wire") switch event.value {
@@ -421,11 +392,7 @@ class WeldPlanningTests {
     var selectedProgram = new processkit.WeldPathProgram(
       problem,
       freeCurves,
-      {
-        arc: "arc",
-        wireSpeed: "wire",
-        voltage: "voltage"
-      }
+      {arc: "arc", wireSpeed: "wire", voltage: "voltage"}
     );
     var compiled = selectedProgram.compile(compiler, fixture.arm, measured, haxe.Int64.ofInt(801), world);
     try {
@@ -448,13 +415,7 @@ class WeldPlanningTests {
           case Dwell(_):
             var status = selectedProgram.progress(
               compiled,
-              new motionkit.robot.ManipulatorProgress(
-                compiled.blocks.indexOf(block),
-                -1,
-                0,
-                null,
-                block.barrier
-              )
+              new motionkit.robot.ManipulatorProgress(compiled.blocks.indexOf(block), -1, 0, null, block.barrier)
             );
             check(
               status.phase == (dwells == 0 ? processkit.WeldPathProgram.WeldExecutionPhase.Pooling
@@ -478,11 +439,7 @@ class WeldPlanningTests {
           var halfway = problem.sections[section].length() / 2;
           var status = selectedProgram.progress(
             compiled,
-            new motionkit.robot.ManipulatorProgress(
-              compiled.blocks.indexOf(block),
-              block.opIndices[index],
-              halfway
-            )
+            new motionkit.robot.ManipulatorProgress(compiled.blocks.indexOf(block), block.opIndices[index], halfway)
           );
           near(
             status.seamDistance,
@@ -577,10 +534,7 @@ class WeldPlanningTests {
       [for (joint in fixture.arm.robot.joints) joint.name]
     );
     robot.submit(robotkit.core.RobotCommand.JointTargets(
-      [for (j in 0...6) robotkit.core.JointTarget.position(
-        j,
-        measured[j]
-      )],
+      [for (j in 0...6) robotkit.core.JointTarget.position(j, measured[j])],
       null
     ));
     var tick = 0;
@@ -687,27 +641,16 @@ class WeldPlanningTests {
       new Vec3(0.35, 0.2, 0.15),
       new Vec3(0.45, 0.2, 0.15),
       new Vec3(0.45, 0.3, 0.15),
-      new Vec3(
-        0.35,
-        0.3,
-        0.15
-      )
+      new Vec3(0.35, 0.3, 0.15)
     ];
     var segments:Array<processkit.skill.WeldPlan.WeldSegment> = [];
     for (i in 0...3) {
       var rotation = Quat.fromAxisAngle(new Vec3(0, 0, 1), i * Math.PI / 2).multiply(lean);
       segments.push(new processkit.skill.WeldPlan.WeldSegment(
         new Transform3(points[i], rotation),
-        new Transform3(
-          points[i + 1],
-          rotation
-        ),
+        new Transform3(points[i + 1], rotation),
         'side$i',
-        new Vec3(
-          0,
-          0,
-          1
-        )
+        new Vec3(0, 0, 1)
       ));
     }
     var authored = new WeldPlan(segments,
@@ -724,11 +667,7 @@ class WeldPlanningTests {
     var expected = new processkit.WeldPathProblem(
       authored.reversed(),
       WRIST,
-      [
-        WeldCorner.AROUND,
-        WeldCorner.ROTATION,
-        WeldCorner.ARC
-      ],
+      [WeldCorner.AROUND, WeldCorner.ROTATION, WeldCorner.ARC],
       "weld-task"
     );
     for (i in 0...21) {
@@ -786,33 +725,14 @@ class WeldPlanningTests {
       startDwell: 0.15,
       craterDwell: 0.15,
       burnback: 0.1,
-      weave: new motionkit.path.WeaveProfile(
-        motionkit.path.WeavePattern.Sine,
-        0.002,
-        50.0,
-        0.01
-      )
+      weave: new motionkit.path.WeaveProfile(motionkit.path.WeavePattern.Sine, 0.002, 50.0, 0.01)
     };
     var requested = new WeldPlan(
       [new processkit.skill.WeldPlan.WeldSegment(
-        new Transform3(
-          new Vec3(0.1, 0.2, 0.3),
-          Quat.identity()
-        ),
-        new Transform3(
-          new Vec3(
-            0.28,
-            0.2,
-            0.3
-          ),
-          Quat.identity()
-        ),
+        new Transform3(new Vec3(0.1, 0.2, 0.3), Quat.identity()),
+        new Transform3(new Vec3(0.28, 0.2, 0.3), Quat.identity()),
         "weave",
-        new Vec3(
-          0,
-          0,
-          1
-        )
+        new Vec3(0, 0, 1)
       )],
       parameters
     );
@@ -820,54 +740,25 @@ class WeldPlanningTests {
     var solver = new ManipulatorKinematics(group), start = [problem.approach.x, problem.approach.y, problem.approach.z];
     var compiler = new motionkit.robot.ProgramCompiler(
       solver,
-      new motionkit.trajectory.ValidationLimits(
-        3,
-        haxe.Int64.ofInt(1),
-        haxe.Int64.ofInt(0)
-      ),
+      new motionkit.trajectory.ValidationLimits(3, haxe.Int64.ofInt(1), haxe.Int64.ofInt(0)),
       "weld-task",
-      [
-        1.0,
-        1,
-        1
-      ],
-      [
-        2.0,
-        2,
-        2
-      ],
-      [
-        20.0,
-        20,
-        20
-      ],
-      motionkit.robot.StartTolerances.uniform(
-        3,
-        0.01,
-        0.01,
-        0.01
-      ),
+      [1.0, 1, 1],
+      [2.0, 2, 2],
+      [20.0, 20, 20],
+      motionkit.robot.StartTolerances.uniform(3, 0.01, 0.01, 0.01),
       null,
       0.002,
       0.2,
       0.001,
       0.02,
-      new IkTolerance(
-        1e-6,
-        1e-6
-      )
+      new IkTolerance(1e-6, 1e-6)
     );
     var request = problem.request(start, compiler.ikTolerance, compiler.perJointMaxJump, compiler.maxVelocity);
     check(request.distances.length > 150, "woven selection samples curvature beyond the spatial step");
     var curves = problem.select(
       group,
       request,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-        1,
-        1,
-        1,
-        true
-      )
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1, 1, 1, true)
     );
     var program = new processkit.WeldPathProgram(problem, curves, {arc: "arc", wireSpeed: "wire", voltage: "voltage"});
     var compiled = program.compile(compiler, group, start, haxe.Int64.ofInt(990));
@@ -892,16 +783,7 @@ class WeldPlanningTests {
   static function testAirEntryGeometry():Void {
     var base = seam(), segment = base.segments[0];
     var requested = new WeldPlan(
-      [new processkit.skill.WeldPlan.WeldSegment(
-        segment.start,
-        segment.stop,
-        "air seam",
-        new Vec3(
-          0,
-          0,
-          1
-        )
-      )],
+      [new processkit.skill.WeldPlan.WeldSegment(segment.start, segment.stop, "air seam", new Vec3(0, 0, 1))],
       PARAMETERS
     );
     var direct = new processkit.WeldPathProblem(requested, WRIST, [WeldCorner.AROUND], "weld-task");
@@ -1066,21 +948,9 @@ class WeldPlanningTests {
       new Vec3(0.0, 0.0, d1),
       new Vec3(0.0, shoulderOffset, 0.0),
       new Vec3(0.0, elbowOffset, a2),
-      new Vec3(
-        0.0,
-        0.0,
-        a3
-      ),
-      new Vec3(
-        0.0,
-        d4,
-        0.0
-      ),
-      new Vec3(
-        0.0,
-        0.0,
-        d5
-      )
+      new Vec3(0.0, 0.0, a3),
+      new Vec3(0.0, d4, 0.0),
+      new Vec3(0.0, 0.0, d5)
     ];
     var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     for (i in 0...6) {
@@ -1141,10 +1011,7 @@ class WeldPlanningTests {
     var down = Quat.fromAxisAngle(new Vec3(1.0, 0.0, 0.0), Math.PI);
     return WeldPlan.straight(
       new Transform3(new Vec3(0.35, 0.2, 0.15), down),
-      new Transform3(
-        new Vec3(0.45, 0.2, 0.15),
-        down
-      ),
+      new Transform3(new Vec3(0.45, 0.2, 0.15), down),
       PARAMETERS
     );
   }
@@ -1199,18 +1066,11 @@ class WeldPlanningTests {
       new Vec3(0.35, 0.2, 0.15),
       new Vec3(0.45, 0.2, 0.15),
       new Vec3(0.45, 0.3, 0.15),
-      new Vec3(
-        0.35,
-        0.3,
-        0.15
-      )
+      new Vec3(0.35, 0.3, 0.15)
     ];
     var segments = [for (i in 0...4) new processkit.skill.WeldPlan.WeldSegment(
       new Transform3(points[i], rotation),
-      new Transform3(
-        points[(i + 1) % 4],
-        rotation
-      ),
+      new Transform3(points[(i + 1) % 4], rotation),
       'side$i'
     )];
     var requested = new WeldPlan(segments, PARAMETERS);
@@ -1278,11 +1138,7 @@ class WeldPlanningTests {
     var requested = new WeldPlan(
       [
         new processkit.skill.WeldPlan.WeldSegment(straight.start(), middle, "first"),
-        new processkit.skill.WeldPlan.WeldSegment(
-          middle,
-          straight.stop(),
-          "second"
-        )
+        new processkit.skill.WeldPlan.WeldSegment(middle, straight.stop(), "second")
       ],
       PARAMETERS
     );
@@ -1331,10 +1187,7 @@ class WeldPlanningTests {
     var tilted = Quat.fromAxisAngle(new Vec3(0.0, 1.0, 0.0), -0.17453292519943295).multiply(down);
     var requested = WeldPlan.straight(
       new Transform3(seam().start().translation, tilted),
-      new Transform3(
-        seam().stop().translation,
-        tilted
-      ),
+      new Transform3(seam().stop().translation, tilted),
       PARAMETERS
     );
     var planner = new WeldPathPlanner(new EntryCornerFixture(), new IkTolerance(2e-4, 1e-3, 300, 0.03), [3.0], WRIST);

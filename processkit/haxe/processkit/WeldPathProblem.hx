@@ -75,12 +75,7 @@ class WeldPathProblem {
     var start = seam.poseAt(0), stop = pose(last);
     var restartFrame = new Transform3(
       new Vec3(start.x, start.y, start.z),
-      new robotkit.spatial.Quat(
-        start.qx,
-        start.qy,
-        start.qz,
-        start.qw
-      )
+      new robotkit.spatial.Quat(start.qx, start.qy, start.qz, start.qw)
     );
     var nearEntry = displaced(restartFrame, -plan.parameters.approach);
     var nearExit = displaced(last, -plan.parameters.approach);
@@ -92,23 +87,10 @@ class WeldPathProblem {
     lift = displaced(last, -WeldPathPlanner.LIFT);
     var groups:Array<{phase:WeldPathPhase, path:PosePath}> = [
       {phase: Approach, path: new PosePath(frame, entryLines)},
-      {
-        phase: Weld,
-        path: seam
-      },
+      {phase: Weld, path: seam},
       {
         phase: Burnback,
-        path: new PosePath(
-          frame,
-          [line(
-            stop,
-            lift,
-            Math.max(
-              WeldPathPlanner.LIFT / plan.parameters.burnback,
-              0.01
-            )
-          )]
-        )
+        path: new PosePath(frame, [line(stop, lift, Math.max(WeldPathPlanner.LIFT / plan.parameters.burnback, 0.01))])
       }
     ];
     seamOffset = groups[0].path.length();
@@ -222,10 +204,7 @@ class WeldPathProblem {
     request:PathRequest,
     ?sampling:CandidateSamplingOptions,
     ?clearance:ClearanceWorld,
-    ?entryCheck:(
-      Array<Float>,
-      Array<Float>
-    ) -> Null<ClearanceViolation>,
+    ?entryCheck:(Array<Float>, Array<Float>) -> Null<ClearanceViolation>,
     ?exitCheck:Array<Float> -> Null<ClearanceViolation>,
     ?retreatJoints:Array<Float>,
     ?weights:Array<Float>,
@@ -251,10 +230,7 @@ class WeldPathProblem {
     request:PathRequest,
     ?sampling:CandidateSamplingOptions,
     ?clearance:ClearanceWorld,
-    ?entryCheck:(
-      Array<Float>,
-      Array<Float>
-    ) -> Null<ClearanceViolation>,
+    ?entryCheck:(Array<Float>, Array<Float>) -> Null<ClearanceViolation>,
     ?exitCheck:Array<Float> -> Null<ClearanceViolation>,
     ?retreatJoints:Array<Float>,
     ?weights:Array<Float>,
@@ -355,12 +331,7 @@ class WeldPathProblem {
       velocity,
       48,
       freedoms,
-      acceleration == null ? null : new motionkit.kinematics.PathDriveLimits(
-        acceleration,
-        feeds,
-        null,
-        fixedFeeds
-      )
+      acceleration == null ? null : new motionkit.kinematics.PathDriveLimits(acceleration, feeds, null, fixedFeeds)
     );
   }
 
@@ -380,16 +351,8 @@ class WeldPathProblem {
   }
 
   static function line(from:Pose3, to:Pose3, speed:Float):PoseLine return new PoseLine(
-    new PoseWaypoint(
-      from,
-      WeldingPlanRunner.PATH_TOLERANCE,
-      0.01
-    ),
-    new PoseWaypoint(
-      to,
-      WeldingPlanRunner.PATH_TOLERANCE,
-      0.01
-    ),
+    new PoseWaypoint(from, WeldingPlanRunner.PATH_TOLERANCE, 0.01),
+    new PoseWaypoint(to, WeldingPlanRunner.PATH_TOLERANCE, 0.01),
     OrientationPolicy.FreeAboutTool,
     0.1,
     speed

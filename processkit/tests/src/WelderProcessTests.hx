@@ -118,10 +118,7 @@ class WelderProcessTests {
     device.apply([
       event(channels.voltage, Analog(26.0)),
       event(channels.wireSpeed, Analog(8.0)),
-      event(
-        channels.arc,
-        Analog(1.0)
-      )
+      event(channels.arc, Analog(1.0))
     ]);
     check(
       supply.voltage == 26.0 && supply.wireSpeed == 8.0 && supply.arc,
@@ -175,12 +172,7 @@ class WelderProcessTests {
       "the arc takes no process command"
     );
     expectFailure(
-      function() new WelderProcessDevice(
-        supply,
-        supply,
-        {arc: "a", wireSpeed: "a", voltage: "v"},
-        {voltage: 24.0}
-      ),
+      function() new WelderProcessDevice(supply, supply, {arc: "a", wireSpeed: "a", voltage: "v"}, {voltage: 24.0}),
       "channels must be distinct"
     );
     expectFailure(
@@ -222,13 +214,7 @@ class WelderProcessTests {
       0.0,
       0.01,
       FeedChangePolicy.Reject,
-      new ProcessEngagement(
-        [],
-        [MotionOp.SetOutput(
-          "a",
-          EventValue.Digital(false)
-        )]
-      ),
+      new ProcessEngagement([], [MotionOp.SetOutput("a", EventValue.Digital(false))]),
       0.08
     );
     var session = new MotionSession(), run = new ProcessRun(recipe, seamPath(), device, "w", session);
@@ -277,14 +263,8 @@ class WelderProcessTests {
       0.01,
       FeedChangePolicy.Reject,
       new ProcessEngagement(
-        [MotionOp.SetOutput(
-          channels.arc,
-          EventValue.Digital(true)
-        )],
-        [MotionOp.SetOutput(
-          channels.arc,
-          EventValue.Digital(false)
-        )]
+        [MotionOp.SetOutput(channels.arc, EventValue.Digital(true))],
+        [MotionOp.SetOutput(channels.arc, EventValue.Digital(false))]
       ),
       0.08
     );
@@ -391,20 +371,13 @@ class WelderProcessTests {
     var device = new WelderProcessDevice(supply, supply, channels, {voltage: 24.0});
     var entry = [
       MotionOp.SetOutput(channels.arc, EventValue.Digital(true)),
-      MotionOp.WaitInput(
-        "weld.arc_established",
-        InputPredicate.Equals(EventValue.Digital(true)),
-        2.0
-      ),
+      MotionOp.WaitInput("weld.arc_established", InputPredicate.Equals(EventValue.Digital(true)), 2.0),
       MotionOp.Dwell(0.15)
     ];
     var exit = [
       MotionOp.Dwell(0.15),
       MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(0.0)),
-      MotionOp.SetOutput(
-        channels.arc,
-        EventValue.Digital(false)
-      )
+      MotionOp.SetOutput(channels.arc, EventValue.Digital(false))
     ];
     var recipe = new ProcessRecipe(
       0.005,
@@ -417,10 +390,7 @@ class WelderProcessTests {
       0.0,
       0.01,
       FeedChangePolicy.Reject,
-      new ProcessEngagement(
-        entry,
-        exit
-      ),
+      new ProcessEngagement(entry, exit),
       0.08
     );
     var session = new MotionSession();
@@ -491,14 +461,7 @@ class WelderProcessTests {
       0.0,
       0.01,
       FeedChangePolicy.Reject,
-      new ProcessEngagement(
-        entry,
-        exit,
-        [
-          entry[0],
-          entry[1]
-        ]
-      ),
+      new ProcessEngagement(entry, exit, [entry[0], entry[1]]),
       0.08
     );
     var gentle = new ProcessRun(gentleRecipe, seamPath(), device, channels.wireSpeed, session);

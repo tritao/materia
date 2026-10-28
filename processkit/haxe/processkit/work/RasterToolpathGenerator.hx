@@ -129,18 +129,9 @@ class RasterToolpathGenerator {
       var normalX = -edgeY / edgeLength, normalY = edgeX / edgeLength;
       var strip = new Polygon2([
         new Point2(a.x - normalX * radius, a.y - normalY * radius),
-        new Point2(
-          b.x - normalX * radius,
-          b.y - normalY * radius
-        ),
-        new Point2(
-          b.x + normalX * radius,
-          b.y + normalY * radius
-        ),
-        new Point2(
-          a.x + normalX * radius,
-          a.y + normalY * radius
-        )
+        new Point2(b.x - normalX * radius, b.y - normalY * radius),
+        new Point2(b.x + normalX * radius, b.y + normalY * radius),
+        new Point2(a.x + normalX * radius, a.y + normalY * radius)
       ]);
       intervals = intervals.concat(strip.scanlineIntervals(y));
     }

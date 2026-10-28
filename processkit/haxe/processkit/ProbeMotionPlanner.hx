@@ -245,13 +245,8 @@ class ProbeMotionPlanner {
           directGoal,
           lower,
           upper,
-          (from, to) -> skipDirectEdge && sameConfiguration(
-            from,
-            directStart
-          ) && sameConfiguration(
-            to,
-            directGoal
-          ) ? false : edge(
+          (from, to) -> skipDirectEdge && sameConfiguration(from,
+          directStart) && sameConfiguration(to, directGoal) ? false : edge(
             from,
             to
           ),
@@ -475,10 +470,7 @@ class ProbeMotionPlanner {
         if (limits.lower < limits.upper && (end < limits.lower - roundoff || end > limits.upper + roundoff)) return {
           a: arm.robot.joints[arm.jointIndices()[joint]].id,
           b: "joint travel bound",
-          distance: Math.min(
-            end - limits.lower,
-            limits.upper - end
-          ),
+          distance: Math.min(end - limits.lower, limits.upper - end),
           required: 0.0
         };
         q.push(end);

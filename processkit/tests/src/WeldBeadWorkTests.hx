@@ -44,20 +44,8 @@ class WeldBeadWorkTests {
       wireSpeed: 8.0,
       voltageSet: 24.0,
       supplyReady: true,
-      tipDistance: grounded.distance(
-        0.0055,
-        0.0025,
-        0.0025
-      ),
-      wireDistance: grounded.ray(
-        0.0055,
-        0.0025,
-        0.0025,
-        0,
-        -Math.sqrt(0.5),
-        -Math.sqrt(0.5),
-        0.005
-      )
+      tipDistance: grounded.distance(0.0055, 0.0025, 0.0025),
+      wireDistance: grounded.ray(0.0055, 0.0025, 0.0025, 0, -Math.sqrt(0.5), -Math.sqrt(0.5), 0.005)
     };
     check(model.step(0.0, input).touch, "touch senses the root with the arc off");
     input.arcCommanded = true;

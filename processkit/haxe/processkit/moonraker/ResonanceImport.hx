@@ -19,15 +19,7 @@ class ResonanceImport {
     client.downloadFile(root, spectrum, psd -> {client.downloadFile(
       root,
       decay,
-      raw -> complete(KlipperResonance.measure(
-        axis,
-        psd,
-        raw,
-        start,
-        end,
-        root + "/" + spectrum,
-        root + "/" + decay
-      ))
+      raw -> complete(KlipperResonance.measure(axis, psd, raw, start, end, root + "/" + spectrum, root + "/" + decay))
     );
     });
   }

@@ -482,11 +482,8 @@ class MoonrakerTests {
     // The gear ratio comes back parsed, as Klipper reports a list ([[54, 18]]): the same numbers are not a difference.
     check(agreed.mismatches.length == 0, 'Klipper runs what was generated: ${agreed.mismatches}');
     check(
-      ConfigReadback.compare(
-        ["extruder" => ["gear_ratio" => "54:18"]],
-        {extruder: {gear_ratio: [[54.0, 17.0]]}},
-        []
-      ).length == 1,
+      ConfigReadback.compare(["extruder" => ["gear_ratio" => "54:18"]],
+      {extruder: {gear_ratio: [[54.0, 17.0]]}}, []).length == 1,
       "a list that differs is a difference"
     );
     // Klipper reports something else than the file says, and a warning.

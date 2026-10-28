@@ -85,11 +85,7 @@ class WeldPlanning {
     var program = new WeldPathProgram(
       selected.problem,
       selected.curves,
-      {
-        arc: "station.arc",
-        wireSpeed: "station.wire",
-        voltage: "station.voltage"
-      }
+      {arc: "station.arc", wireSpeed: "station.wire", voltage: "station.voltage"}
     );
     var compiled = program.compile(compiler, group, start, haxe.Int64.ofInt(1), clearance);
     compiled.dispose();
@@ -194,10 +190,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     ops.push(MotionOp.MoveL(
       along(pose(plan.stop()), plan.stop(), -LIFT),
       FRAME,
-      Math.max(
-        LIFT / plan.parameters.burnback,
-        0.01
-      ),
+      Math.max(LIFT / plan.parameters.burnback, 0.01),
       Blend.ExactStop,
       OrientationPolicy.FreeAboutTool
     ));
@@ -210,11 +203,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     maxAcceleration:Float, ?clearance:ClearanceWorld):WeldPlanning {
     return planningWithLimits(
       manipulator,
-      PlanningLimits.ofGroup(
-        manipulator,
-        new robotkit.model.SteadyLoads(),
-        maxAcceleration
-      ),
+      PlanningLimits.ofGroup(manipulator, new robotkit.model.SteadyLoads(), maxAcceleration),
       clearance
     );
   }
@@ -239,12 +228,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       0.2,
       PATH_TOLERANCE,
       0.02,
-      new IkTolerance(
-        5e-5,
-        1e-3,
-        300,
-        0.03
-      )
+      new IkTolerance(5e-5, 1e-3, 300, 0.03)
     );
     compiler.planningAssumptions = planning.assumptions.copy();
     compiler.planCheck = planning.check();
@@ -265,15 +249,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       wrist,
       clearance,
       compiler.perJointMaxJump,
-      function(
-        planned,
-        start
-      ) return compileWeld(
-        compiler,
-        wrist,
-        planned,
-        start
-      )
+      function(planned, start) return compileWeld(compiler, wrist, planned, start)
     );
     return new WeldPlanning(compiler, wrist, planner, clearance);
   }
@@ -285,10 +261,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   public static function create(
     robot:Robot,
     manipulator:KinematicGroup,
-    eventSource:Void -> {
-      events: Array<FiredProcessEvent>,
-      overflow: Bool
-    },
+    eventSource:Void -> {events: Array<FiredProcessEvent>, overflow: Bool},
     channels:WelderChannels,
     limits:PlanningLimits,
     ?maxRestarts:Int = 3,
@@ -499,11 +472,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
         problem.plan,
         [],
         problem.cornerStyles(),
-        new WeldEntry(
-          "globally selected joint entry",
-          curves[0].q[0].copy(),
-          []
-        ),
+        new WeldEntry("globally selected joint entry", curves[0].q[0].copy(), []),
         problem.retreat,
         "along the wire",
         checked,
@@ -558,40 +527,14 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     var selected = clearance == null ? motionkit.robot.StructuredLadder.search(candidates,
       null, 0, weighted) : motionkit.robot.LazyCollisionLadder.selectWithChecks(
         candidates,
-        q -> clearance.violation(
-          q,
-          contactAt(q)
-        ),
+        q -> clearance.violation(q, contactAt(q)),
         8,
-        (
-          from,
-          to
-        ) -> clearance.sweep(
-          from,
-          to,
-          false,
-          0.02,
-          null,
-          contactAt,
-          true
-        ),
+        (from, to) -> clearance.sweep(from, to, false, 0.02, null, contactAt, true),
         null,
         null,
         weighted,
-        (
-          from,
-          to
-        ) -> entryFailure(
-          compiler,
-          clearance,
-          problem,
-          from,
-          to
-        ),
-        q -> clearance.violation(
-          q,
-          false
-        )
+        (from, to) -> entryFailure(compiler, clearance, problem, from, to),
+        q -> clearance.violation(q, false)
       );
     if (Sys.getEnv("PROCESS_PATH_PROFILE") == "1") Sys.println("PROCESS_PATH_COARSE_DIRECTION " + haxe.Json.stringify({
       samples: candidates.samples.length,
@@ -664,17 +607,8 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       request,
       sampling,
       clearance,
-      (from, to) -> entryFailure(
-        compiler,
-        clearance,
-        problem,
-        from,
-        to
-      ),
-      clearance == null ? null : q -> clearance.violation(
-        q,
-        false
-      ),
+      (from, to) -> entryFailure(compiler, clearance, problem, from, to),
+      clearance == null ? null : q -> clearance.violation(q, false),
       null,
       null,
       0,
@@ -714,32 +648,15 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     // Arc on with the wire at the weld speed, held until the arc is established, then the start dwell.
     var entry:Array<MotionOp> = [
       MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(parameters.wireSpeed)),
-      MotionOp.SetOutput(
-        channels.arc,
-        EventValue.Digital(true)
-      ),
-      MotionOp.WaitInput(
-        ARC_ESTABLISHED,
-        InputPredicate.Equals(EventValue.Digital(true)),
-        IGNITION_TIMEOUT
-      )
+      MotionOp.SetOutput(channels.arc, EventValue.Digital(true)),
+      MotionOp.WaitInput(ARC_ESTABLISHED, InputPredicate.Equals(EventValue.Digital(true)), IGNITION_TIMEOUT)
     ];
     if (parameters.startDwell > 0) entry.push(MotionOp.Dwell(parameters.startDwell));
     // A re-strike is over an existing bead: light at the stable minimum and omit the pooling dwell.
     var recoveryEntry:Array<MotionOp> = [
-      MotionOp.SetOutput(
-        channels.wireSpeed,
-        EventValue.Analog(WeldArcModel.MIN_WIRE_SPEED)
-      ),
-      MotionOp.SetOutput(
-        channels.arc,
-        EventValue.Digital(true)
-      ),
-      MotionOp.WaitInput(
-        ARC_ESTABLISHED,
-        InputPredicate.Equals(EventValue.Digital(true)),
-        IGNITION_TIMEOUT
-      )
+      MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(WeldArcModel.MIN_WIRE_SPEED)),
+      MotionOp.SetOutput(channels.arc, EventValue.Digital(true)),
+      MotionOp.WaitInput(ARC_ESTABLISHED, InputPredicate.Equals(EventValue.Digital(true)), IGNITION_TIMEOUT)
     ];
     // Crater fill with the arc up, then the wire stops; the torch lifts while the arc burns back, and the command ends.
     var exit:Array<MotionOp> = [];
@@ -766,11 +683,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       0.0,
       BACKOFF,
       FeedChangePolicy.Reject,
-      new ProcessEngagement(
-        entry,
-        exit,
-        recoveryEntry
-      ),
+      new ProcessEngagement(entry, exit, recoveryEntry),
       APPROACH_SPEED,
       PREPARE_TIMEOUT
     );
@@ -950,27 +863,13 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     var segments = plan.segments;
     var primitives:Array<PosePrimitive> = [];
     function waypoint(point:Vec3, rotation:Quat):PoseWaypoint return new PoseWaypoint(
-      new Pose3(
-        point.x,
-        point.y,
-        point.z,
-        rotation.x,
-        rotation.y,
-        rotation.z,
-        rotation.w
-      ),
+      new Pose3(point.x, point.y, point.z, rotation.x, rotation.y, rotation.z, rotation.w),
       PATH_TOLERANCE,
       0.01
     );
     function line(from:Vec3, fromRotation:Quat, to:Vec3, toRotation:Quat):Void primitives.push(new PoseLine(
-      waypoint(
-        from,
-        fromRotation
-      ),
-      waypoint(
-        to,
-        toRotation
-      ),
+      waypoint(from, fromRotation),
+      waypoint(to, toRotation),
       OrientationPolicy.FreeAboutTool,
       0.1,
       travel
@@ -993,23 +892,9 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
         var f0 = step / steps, f1 = (step + 1) / steps;
         line(
           from.add(to.sub(from).scale(f0)),
-          WeldCorner.orientationAt(
-            r1,
-            r2,
-            s0 + (s1 - s0) * f0,
-            travelA,
-            travelB,
-            style
-          ),
+          WeldCorner.orientationAt(r1, r2, s0 + (s1 - s0) * f0, travelA, travelB, style),
           from.add(to.sub(from).scale(f1)),
-          WeldCorner.orientationAt(
-            r1,
-            r2,
-            s0 + (s1 - s0) * f1,
-            travelA,
-            travelB,
-            style
-          )
+          WeldCorner.orientationAt(r1, r2, s0 + (s1 - s0) * f1, travelA, travelB, style)
         );
       }
     }

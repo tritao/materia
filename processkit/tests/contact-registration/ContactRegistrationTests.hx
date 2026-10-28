@@ -16,16 +16,8 @@ class ContactRegistrationTests {
       new Vec3(0.1, -0.1, 0),
       new Vec3(0.1, 0.1, 0),
       new Vec3(-0.1, 0.02, 0.05),
-      new Vec3(
-        0.1,
-        0.02,
-        0.05
-      ),
-      new Vec3(
-        0.04,
-        -0.04,
-        0.05
-      )
+      new Vec3(0.1, 0.02, 0.05),
+      new Vec3(0.04, -0.04, 0.05)
     ];
     var normals = [
       new Vec3(0, 0, 1),
@@ -33,11 +25,7 @@ class ContactRegistrationTests {
       new Vec3(0, 0, 1),
       new Vec3(0, 1, 0),
       new Vec3(0, 1, 0),
-      new Vec3(
-        1,
-        0,
-        0
-      )
+      new Vec3(1, 0, 0)
     ];
     return [for (i in 0...points.length) new PlaneContact(
       normals[i],
@@ -88,11 +76,7 @@ class ContactRegistrationTests {
     extra.push(new PlaneContact(
       samples[0].normal,
       samples[0].offset,
-      samples[0].measured.add(actual.rotation.rotate(new Vec3(
-        0,
-        0,
-        0.003
-      )))
+      samples[0].measured.add(actual.rotation.rotate(new Vec3(0, 0, 0.003)))
     ));
     check(!ContactRegistration.fit(extra, nominal).accepted, "Contradictory contacts are rejected");
     check(

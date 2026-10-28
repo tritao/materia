@@ -53,12 +53,7 @@ class ToolpathPlanRunner implements processkit.skill.ToolpathPlanRunner {
       maxJointJump,
       positionTolerance,
       orientationTolerance,
-      new IkTolerance(
-        positionTolerance,
-        orientationTolerance,
-        ikMaxIterations,
-        ikDamping
-      )
+      new IkTolerance(positionTolerance, orientationTolerance, ikMaxIterations, ikDamping)
     );
     compiler.planningAssumptions = planning.assumptions.copy();
     compiler.planCheck = planning.check();
@@ -67,10 +62,7 @@ class ToolpathPlanRunner implements processkit.skill.ToolpathPlanRunner {
       robot,
       compiler,
       function(_) return null,
-      function() return {
-        events: [],
-        overflow: false
-      },
+      function() return {events: [], overflow: false},
       indices
     );
     return new ToolpathPlanRunner(
@@ -116,12 +108,7 @@ class ToolpathPlanRunner implements processkit.skill.ToolpathPlanRunner {
       var ik = manipulator.solve(
         point.work_T_tcp,
         previous,
-        new IkOptions(
-          positionTolerance,
-          orientationTolerance,
-          ikMaxIterations,
-          ikDamping
-        )
+        new IkOptions(positionTolerance, orientationTolerance, ikMaxIterations, ikDamping)
       );
       if (!ik.converged) throw "Toolpath waypoint is unreachable";
       var jump = 0.0;

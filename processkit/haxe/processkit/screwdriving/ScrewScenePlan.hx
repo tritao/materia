@@ -15,12 +15,7 @@ import nativekit.sim.SimPose;
 class ScrewScenePlan {
   public static function frame(value:AssemblyFrame):Transform3 return new Transform3(
     new Vec3(value.x, value.y, value.z),
-    new Quat(
-      value.qx,
-      value.qy,
-      value.qz,
-      value.qw
-    )
+    new Quat(value.qx, value.qy, value.qz, value.qw)
   );
   public static function pose(value:Transform3):SimPose {
     var p = value.translation, q = value.rotation;
@@ -82,11 +77,7 @@ class ScrewScenePlan {
       screwPose: pose(body),
       engagementPoint: hole.translation.toArray(),
       hole: hole.translation.toArray(),
-      direction: hole.transformVector(new Vec3(
-        0,
-        0,
-        1
-      )).toArray(),
+      direction: hole.transformVector(new Vec3(0, 0, 1)).toArray(),
       damagedLeadIn: damagedLeadIn
     };
   }

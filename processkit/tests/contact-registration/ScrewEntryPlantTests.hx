@@ -151,22 +151,8 @@ class ScrewEntryPlantTests {
     var lateral = 4000.0;
     return new CartesianAdmittance(
       new Wrench3(new Vec3(0, 0, -limits.contactForceN), Vec3.zero()),
-      [
-        lateral * 0.02,
-        lateral * 0.02,
-        axialDamping * 0.02,
-        1,
-        1,
-        1
-      ],
-      [
-        lateral,
-        lateral,
-        axialDamping,
-        20,
-        20,
-        20
-      ],
+      [lateral * 0.02, lateral * 0.02, axialDamping * 0.02, 1, 1, 1],
+      [lateral, lateral, axialDamping, 20, 20, 20],
       limits.maximumLinearSpeed,
       0.01,
       CONTROL_SECONDS
@@ -185,10 +171,7 @@ class ScrewEntryPlantTests {
       axisV,
       0.040,
       0.00002,
-      admittance(
-        limits,
-        feedSpring == null ? 4000.0 : 400.0
-      )
+      admittance(limits, feedSpring == null ? 4000.0 : 400.0)
     );
     var servoStiffness = 2.0e5, contactStiffness = 2.0e5, tipMass = 0.5, friction = 0.3;
     var axialStiffness = feedSpring == null ? servoStiffness : (feedSpring : Float);

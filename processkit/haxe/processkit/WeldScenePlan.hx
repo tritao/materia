@@ -14,17 +14,8 @@ import robotkit.spatial.Quat;
 class WeldScenePlan {
   public static function pass(weld:SceneArtifactWeld, pass:SceneArtifactWeldPass, frame:Transform3):WeldPlan {
     function pose(torch:SceneArtifactTorchPose):Transform3 return frame.compose(new Transform3(
-      new Vec3(
-        torch.position[0],
-        torch.position[1],
-        torch.position[2]
-      ),
-      new Quat(
-        torch.rotation[0],
-        torch.rotation[1],
-        torch.rotation[2],
-        torch.rotation[3]
-      )
+      new Vec3(torch.position[0], torch.position[1], torch.position[2]),
+      new Quat(torch.rotation[0], torch.rotation[1], torch.rotation[2], torch.rotation[3])
     ));
     var process = pass.process;
     // The open side of a corner is the bisector of its two faces' outward normals.

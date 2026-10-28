@@ -84,10 +84,7 @@ class WeldPlan {
   /** A plan for one straight seam from `start` to `stop`. */
   public static function straight(start:Transform3,
     stop:Transform3, parameters:WeldParameters):WeldPlan return new WeldPlan(
-      [new WeldSegment(
-        start,
-        stop
-      )],
+      [new WeldSegment(start, stop)],
       parameters
     );
 
@@ -115,10 +112,7 @@ class WeldPlan {
       }
       reversedSegments.push(new WeldSegment(
         new Transform3(segment.stop.translation, reversed(segment.stop.rotation)),
-        new Transform3(
-          segment.start.translation,
-          reversed(segment.start.rotation)
-        ),
+        new Transform3(segment.start.translation, reversed(segment.start.rotation)),
         segment.name,
         segment.open
       ));

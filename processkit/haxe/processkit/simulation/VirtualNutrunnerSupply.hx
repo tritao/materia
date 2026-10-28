@@ -86,10 +86,7 @@ class VirtualNutrunnerSupply implements SimulationScrewdriverSupply {
   public function controls():ScrewdriverControlState return {
     start: digital(indices[0]),
     reverse: digital(indices[1]),
-    program: simulation.virtualDeviceChannel(
-      robotIndex,
-      indices[2]
-    ),
+    program: simulation.virtualDeviceChannel(robotIndex, indices[2]),
     vacuum: digital(indices[3])
   };
   public function joints():ScrewdriverJointState {

@@ -168,10 +168,7 @@ class WeldPathPlanner {
     wrist:WristLimits,
     ?clearance:ClearanceWorld,
     ?maxJointJump:Array<Float>,
-    ?compileMotion:(
-      PlannedWeld,
-      Array<Float>
-    ) -> CompiledProgram
+    ?compileMotion:(PlannedWeld, Array<Float>) -> CompiledProgram
   ) {
     if (solver == null || tolerance == null || velocity == null
       || wrist == null) throw "A weld planner needs a solver, tolerances, joint speeds and the wrist's limits";
@@ -276,10 +273,7 @@ class WeldPathPlanner {
       var spin = Quat.fromAxisAngle(new Vec3(0.0, 0.0, 1.0), roll);
       var turned = new WeldSegment(
         new Transform3(segment.start.translation, segment.start.rotation.multiply(spin)),
-        new Transform3(
-          segment.stop.translation,
-          segment.stop.rotation.multiply(spin)
-        ),
+        new Transform3(segment.stop.translation, segment.stop.rotation.multiply(spin)),
         segment.name,
         segment.open
       );
@@ -402,10 +396,7 @@ class WeldPathPlanner {
     segment:WeldSegment,
     start:Array<Float>,
     label:String,
-    accept:(
-      WeldEntry,
-      Array<Float>
-    ) -> Null<PlannedWeld>
+    accept:(WeldEntry, Array<Float>) -> Null<PlannedWeld>
   ):Null<PlannedWeld> {
     var wireIn = segment.start.rotation.rotate(new Vec3(0.0, 0.0, 1.0));
     var distance = requested.parameters.approach;
@@ -472,36 +463,11 @@ class WeldPathPlanner {
   function ways():Array<Way> {
     return [
       {name: "along the wire", open: false, scale: 1.0, high: false},
-      {
-        name: "along the open side",
-        open: true,
-        scale: 1.0,
-        high: false
-      },
-      {
-        name: "along the wire from twice as far",
-        open: false,
-        scale: 2.0,
-        high: false
-      },
-      {
-        name: "along the open side from twice as far",
-        open: true,
-        scale: 2.0,
-        high: false
-      },
-      {
-        name: "over the work, then along the wire",
-        open: false,
-        scale: 1.0,
-        high: true
-      },
-      {
-        name: "over the work, then along the open side",
-        open: true,
-        scale: 1.0,
-        high: true
-      }
+      {name: "along the open side", open: true, scale: 1.0, high: false},
+      {name: "along the wire from twice as far", open: false, scale: 2.0, high: false},
+      {name: "along the open side from twice as far", open: true, scale: 2.0, high: false},
+      {name: "over the work, then along the wire", open: false, scale: 1.0, high: true},
+      {name: "over the work, then along the open side", open: true, scale: 1.0, high: true}
     ];
   }
 

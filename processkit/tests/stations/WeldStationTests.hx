@@ -24,20 +24,8 @@ class WeldStationTests {
     var seams = ["a", "b", "c", "d", "e", "f"];
     var candidates = [
       new WeldStationCandidate("greedy", new Pose2(10, 0)),
-      new WeldStationCandidate(
-        "left",
-        new Pose2(
-          2,
-          0
-        )
-      ),
-      new WeldStationCandidate(
-        "right",
-        new Pose2(
-          1,
-          0
-        )
-      )
+      new WeldStationCandidate("left", new Pose2(2, 0)),
+      new WeldStationCandidate("right", new Pose2(1, 0))
     ];
     function access(station:WeldStationCandidate, seam:String):Null<String> {
       var names = station.id == "greedy" ? ["a", "b", "c", "d"] : station.id == "left" ? ["a", "b", "e"] : [
@@ -107,13 +95,7 @@ class WeldStationTests {
     var sequenceChecks = 0;
     var scheduled = WeldStationPlanner.verified(["a", "b"], [
       new WeldStationCandidate("bad-sequence", new Pose2(1, 0)),
-      new WeldStationCandidate(
-        "good-sequence",
-        new Pose2(
-          2,
-          0
-        )
-      )
+      new WeldStationCandidate("good-sequence", new Pose2(2, 0))
     ], new Pose2(), (
       _,
       _
