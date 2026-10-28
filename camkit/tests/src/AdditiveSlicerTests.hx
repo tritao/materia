@@ -7,7 +7,6 @@ import cnckit.CncController;
 import cnckit.printer.PrinterFlavour;
 import cnckit.printer.PrinterWriter;
 import toolpathkit.geometry.GeometryTools;
-import toolpathkit.path.PrintFeature;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.ToolpathProgram;
 

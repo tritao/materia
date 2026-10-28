@@ -4,7 +4,6 @@ import camkit.CamSheetNfp.CamNestVariant;
 import camkit.CamSheetNfp.CamNestPlaced;
 import camkit.CamSheetNfp.CamNfpStats;
 import materia.sheet.*;
-import materia.sheet.SheetPolygon.SheetPoint;
 import materia.sheet.SheetPolygon.SheetShape;
 import materia.sheet.SheetPolygon.SheetRemnant;
 
