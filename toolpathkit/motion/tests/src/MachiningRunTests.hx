@@ -32,60 +32,79 @@ import toolpathkit.tool.ToolLibrary;
 class MachiningRunTests {
   public static function run():Void {
     var blueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
-      0.02, 0.08);
-    for (channel in ["spindle.speed", "spindle.direction"])
-      blueprint.runtime.channels.push(new ProcessChannelDeclaration(channel,
-        ProcessEventValue.Analog(0.0)));
-    for (channel in ["coolant.mist", "coolant.flood"])
-      blueprint.runtime.channels.push(new ProcessChannelDeclaration(channel,
-        ProcessEventValue.Digital(false)));
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
+        200,
+        200,
+        200
+      )),
+      0.02,
+      0.08
+    );
+    for (channel in ["spindle.speed",
+      "spindle.direction"]) blueprint.runtime.channels.push(new ProcessChannelDeclaration(
+        channel,
+        ProcessEventValue.Analog(0.0)
+      ));
+    for (channel in ["coolant.mist", "coolant.flood"]) blueprint.runtime.channels.push(new ProcessChannelDeclaration(
+      channel,
+      ProcessEventValue.Digital(false)
+    ));
     var simulationHarness = new SimulationHarness(0.01);
 
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
-    var robot = new SimulatedRobot("cam-pocket", runtime, blueprint.model.name,
+    var robot = new SimulatedRobot(
+      "cam-pocket",
+      runtime,
+      blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
-      [for (joint in blueprint.model.joints) joint.name]);
+      [for (joint in blueprint.model.joints) joint.name]
+    );
     homeFixture(robot, blueprint, runtime, simulationHarness);
-    var binding = new MachineBinding("work", "x", "y", "z", 0.02,
-      new toolpathkit.motion.ToolpathChannels(""));
+    var binding = new MachineBinding("work", "x", "y", "z", 0.02, new toolpathkit.motion.ToolpathChannels(""));
     var revisions = runtime.snapshot();
-    var robotBinding = new ToolpathMotionBinding(binding, blueprint,
-      revisions.modelRevision, revisions.calibrationRevision);
+    var robotBinding = new ToolpathMotionBinding(
+      binding,
+      blueprint,
+      revisions.modelRevision,
+      revisions.calibrationRevision
+    );
     var contour = new CamContour([
-      new Point3(0.004, 0.004, 0.01), new Point3(0.012, 0.004, 0.01),
-      new Point3(0.012, 0.012, 0.01), new Point3(0.004, 0.012, 0.01)
+      new Point3(0.004, 0.004, 0.01),
+      new Point3(0.012, 0.004, 0.01),
+      new Point3(
+        0.012,
+        0.012,
+        0.01
+      ),
+      new Point3(
+        0.004,
+        0.012,
+        0.01
+      )
     ]);
-    var setup = new Setup("1", new Point3(0, 0, 0),
-      new SetupStock(0.0, 0.02, 0.0, 0.02, 0.01, 0.008, 0.014));
-    var cam = new CamJob(0.014, 12000).pocket(contour,
-      new Tool(3, 0.0, 0.002), 0.009, 0.01, 0.001).finish(setup);
+    var setup = new Setup("1", new Point3(0, 0, 0), new SetupStock(0.0, 0.02, 0.0, 0.02, 0.01, 0.008, 0.014));
+    var cam = new CamJob(0.014, 12000).pocket(contour, new Tool(3, 0.0, 0.002), 0.009, 0.01, 0.001).finish(setup);
     var baseline = ToolpathMotion.lower(cam, binding);
     var controlledOps = cam.ops.copy();
     var firstMove = -1;
-    for (index in 0...controlledOps.length) if (firstMove < 0)
-      switch controlledOps[index] {
-        case ToolpathOp.Move(_, _, _, _, _): firstMove = index;
-        case _:
-      }
+    for (index in 0...controlledOps.length) if (firstMove < 0) switch controlledOps[index] {
+      case ToolpathOp.Move(_, _, _, _, _):
+        firstMove = index;
+      case _:
+    }
     if (firstMove < 0) throw "CAM pocket has no motion";
-    controlledOps.insert(firstMove + 1,
-      ToolpathOp.Coolant(true, false, Provenance.cam(90)));
-    controlledOps.insert(controlledOps.length - 2,
-      ToolpathOp.Coolant(false, false, Provenance.cam(90)));
-    var lowered = ToolpathMotion.lower(new ToolpathProgram(controlledOps,
-      cam.tools, cam.setups), binding);
+    controlledOps.insert(firstMove + 1, ToolpathOp.Coolant(true, false, Provenance.cam(90)));
+    controlledOps.insert(controlledOps.length - 2, ToolpathOp.Coolant(false, false, Provenance.cam(90)));
+    var lowered = ToolpathMotion.lower(new ToolpathProgram(controlledOps, cam.tools, cam.setups), binding);
     var program:MotionProgram = cast lowered.program;
     if (program == null) throw "CAM pocket did not lower";
     var baselineProgram:MotionProgram = cast baseline.program;
-    if (program.ops.length != baselineProgram.ops.length)
-      throw "coolant changes added exact stops to the CAM pocket";
+    if (program.ops.length != baselineProgram.ops.length) throw "coolant changes added exact stops to the CAM pocket";
     var hasCoolantEvent = false;
     for (op in program.ops) switch op {
       case MotionOp.FollowPath(_, _, _, events):
-        for (event in events)
-          if (event.channel == "coolant.mist") hasCoolantEvent = true;
+        for (event in events) if (event.channel == "coolant.mist") hasCoolantEvent = true;
       case _:
     }
     if (!hasCoolantEvent) throw "CAM pocket lost coolant path events";
@@ -93,16 +112,21 @@ class MachiningRunTests {
     for (index in 0...program.ops.length) switch program.ops[index] {
       case MotionOp.FollowPath(path, _, _, _):
         if (path.length() > targetLength && path.length() > 0.003) {
-          target = index; targetLength = path.length();
+          target = index;
+          targetLength = path.length();
         }
       case _:
     }
     if (target < 0) throw "CAM pocket needs a restartable cutting path";
-    var motion = new ManipulatorMotion(robot, robotBinding.compiler,
-      function(channel) return channel == "spindle.at_speed" ||
-        StringTools.startsWith(channel, "cnc.tool_change.") ?
-        EventValue.Digital(true) : null,
-      function() return runtime.pollEvents());
+    var motion = new ManipulatorMotion(
+      robot,
+      robotBinding.compiler,
+      function(channel) return channel == "spindle.at_speed" || StringTools.startsWith(
+        channel,
+        "cnc.tool_change."
+      ) ? EventValue.Digital(true) : null,
+      function() return runtime.pollEvents()
+    );
     var run = new MachiningRun(new MachiningRecipe(0.01, 0.0, 0.014), program, motion, binding.channels);
     run.start();
     var tick = 0, heldAt = -1.0;
@@ -123,8 +147,7 @@ class MachiningRunTests {
       simulationHarness.step(Int64.ofInt(tick++));
       if (motion.sessionState() == SessionState.Held) break;
     }
-    if (motion.sessionState() != SessionState.Held)
-      throw "machining feed hold did not reach rest";
+    if (motion.sessionState() != SessionState.Held) throw "machining feed hold did not reach rest";
     var continuation = run.prepareRestart(target, heldAt);
     // A held stop can be beyond the restart point. Clear the work and allow a
     // traverse at clearance before reloading the tool and restoring process outputs.
@@ -133,32 +156,32 @@ class MachiningRunTests {
       var toolFound = false;
       switch continuation.program.ops[toolIndex] {
         case MotionOp.MoveL(clear, _, _, _):
-          if (Math.abs(clear.z - 0.014) > 1e-12)
-            throw "restart approach stays at the recipe's clearance height";
-        case MotionOp.WaitInput("cnc.tool_change.3", _, _): toolFound = true;
-        case _: throw "restart must clear the work before reloading the tool or restoring process outputs";
+          if (Math.abs(clear.z - 0.014) > 1e-12) throw "restart approach stays at the recipe's clearance height";
+        case MotionOp.WaitInput("cnc.tool_change.3", _, _):
+          toolFound = true;
+        case _:
+          throw "restart must clear the work before reloading the tool or restoring process outputs";
       }
       if (toolFound) break;
       toolIndex++;
     }
-    if (toolIndex >= continuation.program.ops.length || toolIndex < 1 || toolIndex > 2)
-      throw "restart needs a clearance lift, at most one clearance traverse, then the tool";
+    if (toolIndex >= continuation.program.ops.length || toolIndex < 1
+      || toolIndex > 2) throw "restart needs a clearance lift, at most one clearance traverse, then the tool";
     var slicedLength = 0.0;
     for (op in continuation.program.ops) switch op {
       case MotionOp.FollowPath(path, _, _, _):
-        slicedLength = path.length(); break;
+        slicedLength = path.length();
+        break;
       case _:
     }
-    if (slicedLength <= 0.0 || slicedLength >= targetLength)
-      throw "mid-path restart did not slice the pocket path";
+    if (slicedLength <= 0.0 || slicedLength >= targetLength) throw "mid-path restart did not slice the pocket path";
     var settled = false;
     for (_ in 0...1000) {
       motion.update(0.01);
       simulationHarness.step(Int64.ofInt(tick++));
       var snapshot = robot.snapshot();
-      if (motion.sessionState() == SessionState.Idle &&
-          !snapshot.trajectoryActive && snapshot.trajectoryQueueDepth == 0 &&
-          snapshot.safety == 0) {
+      if (motion.sessionState() == SessionState.Idle
+        && !snapshot.trajectoryActive && snapshot.trajectoryQueueDepth == 0 && snapshot.safety == 0) {
         settled = true;
         break;
       }
@@ -170,19 +193,36 @@ class MachiningRunTests {
       simulationHarness.step(Int64.ofInt(tick++));
       if (!motion.running) break;
     }
-    if (!motion.completed || motion.failure != null)
-      throw 'restarted CAM pocket failed: ${motion.failure}';
+    if (!motion.completed || motion.failure != null) throw 'restarted CAM pocket failed: ${motion.failure}';
     var position = robot.snapshot().positions;
     var start = new Point3(position.get(0), position.get(1), position.get(2));
     var finish = new Point3(start.x + 0.01, start.y, start.z);
-    var faultPath = ToolpathMotion.lower(new ToolpathProgram([
-      ToolpathOp.Spindle(Clockwise, 12000, Provenance.cam(91)),
-      ToolpathOp.Coolant(true, false, Provenance.cam(91)),
-      ToolpathOp.Move(Cut, PathGeometry.Line(start, finish),
-        0.01, 0.0, Provenance.cam(91))
-    ], new ToolLibrary(), [setup]), binding);
-    var faultRun = new MachiningRun(new MachiningRecipe(0.01),
-      cast faultPath.program, motion, binding.channels);
+    var faultPath = ToolpathMotion.lower(
+      new ToolpathProgram(
+        [
+          ToolpathOp.Spindle(Clockwise, 12000, Provenance.cam(91)),
+          ToolpathOp.Coolant(
+            true,
+            false,
+            Provenance.cam(91)
+          ),
+          ToolpathOp.Move(
+            Cut,
+            PathGeometry.Line(
+              start,
+              finish
+            ),
+            0.01,
+            0.0,
+            Provenance.cam(91)
+          )
+        ],
+        new ToolLibrary(),
+        [setup]
+      ),
+      binding
+    );
+    var faultRun = new MachiningRun(new MachiningRecipe(0.01), cast faultPath.program, motion, binding.channels);
     faultRun.start();
     var active = false;
     for (_ in 0...500) {
@@ -196,33 +236,33 @@ class MachiningRunTests {
     }
     if (!active) throw 'fault trial did not start cutting: ${motion.failure}';
     faultRun.spindleFault();
-    if (!motion.session.isStopping())
-      throw "spindle fault did not request a controlled stop";
+    if (!motion.session.isStopping()) throw "spindle fault did not request a controlled stop";
     settled = false;
     for (_ in 0...1000) {
       motion.update(0.01);
       simulationHarness.step(Int64.ofInt(tick++));
       var snapshot = robot.snapshot();
-      if (motion.sessionState() == SessionState.Idle &&
-          !snapshot.trajectoryActive && snapshot.trajectoryQueueDepth == 0 &&
-          snapshot.safety == 0) {
+      if (motion.sessionState() == SessionState.Idle
+        && !snapshot.trajectoryActive && snapshot.trajectoryQueueDepth == 0 && snapshot.safety == 0) {
         settled = true;
         break;
       }
     }
     if (!settled) throw "spindle fault did not reach safe rest";
     var shutdown = faultRun.safeShutdown();
-    if (shutdown.ops.length != 4)
-      throw "spindle fault shutdown needs spindle and coolant off";
+    if (shutdown.ops.length != 4) throw "spindle fault shutdown needs spindle and coolant off";
     simulationHarness.dispose();
     var full = pocketTicks(1.0), slowed = pocketTicks(0.5);
-    if (!(slowed > full * 1.3))
-      throw 'a 50% speed override set mid-run slows the pocket: $slowed ticks against $full';
+    if (!(slowed > full * 1.3)) throw 'a 50% speed override set mid-run slows the pocket: $slowed ticks against $full';
     Sys.println("Machining run tests passed (12 assertions)");
   }
 
-  static function homeFixture(robot:SimulatedRobot, blueprint:motionkit.robot.MotionSystemBlueprint,
-      runtime:robotkit.runtime.RobotRuntime, harness:SimulationHarness):Void {
+  static function homeFixture(
+    robot:SimulatedRobot,
+    blueprint:motionkit.robot.MotionSystemBlueprint,
+    runtime:robotkit.runtime.RobotRuntime,
+    harness:SimulationHarness
+  ):Void {
     var homing = new motionkit.robot.MotionSystem(robot, blueprint);
     homing.configureRuntimeHoming(runtime, () -> {}, harness.simulation.homingSides(0));
     harness.step();
@@ -232,8 +272,7 @@ class MachiningRunTests {
       harness.step();
       homing.update(0.01);
     }
-    if (homing.homingStatus() != "Complete")
-      throw "CAM gantry homing failed: " + homing.homingStatus();
+    if (homing.homingStatus() != "Complete") throw "CAM gantry homing failed: " + homing.homingStatus();
   }
 
   /**
@@ -242,30 +281,67 @@ class MachiningRunTests {
   **/
   static function pocketTicks(override:Float):Int {
     var blueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
-      0.02, 0.08);
-    for (channel in ["spindle.speed", "spindle.direction"])
-      blueprint.runtime.channels.push(new ProcessChannelDeclaration(channel,
-        ProcessEventValue.Analog(0.0)));
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
+        200,
+        200,
+        200
+      )),
+      0.02,
+      0.08
+    );
+    for (channel in ["spindle.speed",
+      "spindle.direction"]) blueprint.runtime.channels.push(new ProcessChannelDeclaration(
+        channel,
+        ProcessEventValue.Analog(0.0)
+      ));
     var harness = new SimulationHarness(0.01);
     var runtime = harness.simulation.addRobot(blueprint.runtime);
-    var robot = new SimulatedRobot("override-pocket", runtime, blueprint.model.name,
+    var robot = new SimulatedRobot(
+      "override-pocket",
+      runtime,
+      blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
-      [for (joint in blueprint.model.joints) joint.name]);
+      [for (joint in blueprint.model.joints) joint.name]
+    );
     homeFixture(robot, blueprint, runtime, harness);
-    var binding = new MachineBinding("work", "x", "y", "z", 0.02,
-      new toolpathkit.motion.ToolpathChannels(""));
+    var binding = new MachineBinding("work", "x", "y", "z", 0.02, new toolpathkit.motion.ToolpathChannels(""));
     var contour = new CamContour([
-      new Point3(0.004, 0.004, 0.01), new Point3(0.012, 0.004, 0.01),
-      new Point3(0.012, 0.012, 0.01), new Point3(0.004, 0.012, 0.01)
+      new Point3(0.004, 0.004, 0.01),
+      new Point3(0.012, 0.004, 0.01),
+      new Point3(
+        0.012,
+        0.012,
+        0.01
+      ),
+      new Point3(
+        0.004,
+        0.012,
+        0.01
+      )
     ]);
-    var cam = new CamJob(0.014, 12000).pocket(contour,
-      new Tool(3, 0.0, 0.002), 0.009, 0.01, 0.001).finish(new Setup("1", new Point3(0, 0, 0)));
+    var cam = new CamJob(0.014, 12000).pocket(contour, new Tool(3, 0.0, 0.002), 0.009, 0.01, 0.001).finish(new Setup(
+      "1",
+      new Point3(
+        0,
+        0,
+        0
+      )
+    ));
     var program:MotionProgram = cast ToolpathMotion.lower(cam, binding).program;
-    var motion = new ManipulatorMotion(robot, new ToolpathMotionBinding(binding, blueprint, runtime.snapshot().modelRevision, runtime.snapshot().calibrationRevision).compiler,
-      channel -> channel == "spindle.at_speed" || StringTools.startsWith(channel, "cnc.tool_change.") ?
-        EventValue.Digital(true) : null,
-      () -> runtime.pollEvents());
+    var motion = new ManipulatorMotion(
+      robot,
+      new ToolpathMotionBinding(
+        binding,
+        blueprint,
+        runtime.snapshot().modelRevision,
+        runtime.snapshot().calibrationRevision
+      ).compiler,
+      channel -> channel == "spindle.at_speed" || StringTools.startsWith(
+        channel,
+        "cnc.tool_change."
+      ) ? EventValue.Digital(true) : null,
+      () -> runtime.pollEvents()
+    );
     motion.run(program);
     var tick = 0, lastOp = -1;
     while (tick < 20000 && (motion.running || tick == 0)) {
@@ -278,8 +354,8 @@ class MachiningRunTests {
         lastOp = op;
       }
     }
-    if (!motion.completed || motion.failure != null)
-      throw 'a pocket under a speed override completes: ${motion.failure}';
+    if (!motion.completed
+      || motion.failure != null) throw 'a pocket under a speed override completes: ${motion.failure}';
     harness.dispose();
     return tick;
   }

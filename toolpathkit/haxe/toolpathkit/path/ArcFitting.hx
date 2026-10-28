@@ -12,8 +12,8 @@ class ArcFitting {
   static inline final MIN_LINES = 3;
 
   public static function fit(ops:Array<ToolpathOp>, tolerance:Float):Array<ToolpathOp> {
-    if (ops == null || !Math.isFinite(tolerance) || tolerance < 0.0)
-      throw "arc fitting needs operations and a finite tolerance";
+    if (ops == null
+      || !Math.isFinite(tolerance) || tolerance < 0.0) throw "arc fitting needs operations and a finite tolerance";
     if (tolerance == 0.0) return ops.copy();
     var result:Array<ToolpathOp> = [];
     var run:Array<Point3> = [];
@@ -24,14 +24,15 @@ class ArcFitting {
       runSpan = null;
     }
     for (op in ops) switch op {
-      case Move(Cut, Line(start, end), feed, blend, span)
-          if (Math.abs(start.z - end.z) <= 1e-12):
-        var continues = run.length > 0 && runSpan == span && feed == runFeed && blend == runBlend &&
-          run[run.length - 1].distanceTo(start) <= 1e-12 && Math.abs(start.z - run[0].z) <= 1e-12;
+      case Move(Cut, Line(start, end), feed, blend, span) if (Math.abs(start.z - end.z) <= 1e-12):
+        var continues = run.length > 0 && runSpan == span && feed == runFeed && blend == runBlend
+          && run[run.length - 1].distanceTo(start) <= 1e-12 && Math.abs(start.z - run[0].z) <= 1e-12;
         if (!continues) {
           flush();
           run = [start];
-          runFeed = feed; runBlend = blend; runSpan = span;
+          runFeed = feed;
+          runBlend = blend;
+          runSpan = span;
         }
         run.push(end);
       case _:
@@ -43,8 +44,14 @@ class ArcFitting {
   }
 
   /** The lines through `points`, with every long enough stretch on a circle as one arc. */
-  static function emitRun(points:Array<Point3>, feed:Float, blend:Float, span:Provenance,
-      tolerance:Float, result:Array<ToolpathOp>):Void {
+  static function emitRun(
+    points:Array<Point3>,
+    feed:Float,
+    blend:Float,
+    span:Provenance,
+    tolerance:Float,
+    result:Array<ToolpathOp>
+  ):Void {
     var i = 0, last = points.length - 1;
     while (i < last) {
       var best:Null<PathGeometry> = null, bestEnd = -1;
@@ -83,16 +90,17 @@ class ArcFitting {
     var sweep = 0.0, direction = 0.0;
     for (k in from...(to + 1)) {
       var p = points[k];
-      if (Math.abs(Math.sqrt((p.x - cx) * (p.x - cx) + (p.y - cy) * (p.y - cy)) - radius) > tolerance)
-        return null;
+      if (Math.abs(Math.sqrt((p.x - cx) * (p.x - cx) + (p.y - cy) * (p.y - cy)) - radius) > tolerance) return null;
       if (k == from) continue;
       var q = points[k - 1];
       var chord = q.distanceTo(p);
       if (chord >= 2.0 * radius) return null;
       // How far the arc bulges from this chord.
       if (radius - Math.sqrt(radius * radius - chord * chord / 4.0) > tolerance) return null;
-      var turn = Math.atan2((q.x - cx) * (p.y - cy) - (q.y - cy) * (p.x - cx),
-        (q.x - cx) * (p.x - cx) + (q.y - cy) * (p.y - cy));
+      var turn = Math.atan2(
+        (q.x - cx) * (p.y - cy) - (q.y - cy) * (p.x - cx),
+        (q.x - cx) * (p.x - cx) + (q.y - cy) * (p.y - cy)
+      );
       var sign = turn > 0.0 ? 1.0 : -1.0;
       if (direction != 0.0 && sign != direction) return null;
       direction = sign;

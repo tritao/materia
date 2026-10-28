@@ -15,12 +15,9 @@ class TravelEnvelope {
   public final upper:Point3;
 
   public function new(lower:Point3, upper:Point3) {
-    if (lower == null || upper == null || !Math.isFinite(lower.x) ||
-        !Math.isFinite(lower.y) || !Math.isFinite(lower.z) ||
-        !Math.isFinite(upper.x) || !Math.isFinite(upper.y) ||
-        !Math.isFinite(upper.z) || lower.x >= upper.x ||
-        lower.y >= upper.y || lower.z >= upper.z)
-      throw "machine travel envelope needs finite ordered bounds";
+    if (lower == null || upper == null || !Math.isFinite(lower.x) || !Math.isFinite(lower.y) || !Math.isFinite(lower.z)
+      || !Math.isFinite(upper.x) || !Math.isFinite(upper.y) || !Math.isFinite(upper.z) || lower.x >= upper.x
+      || lower.y >= upper.y || lower.z >= upper.z) throw "machine travel envelope needs finite ordered bounds";
     this.lower = lower;
     this.upper = upper;
   }
@@ -37,21 +34,19 @@ class TravelEnvelope {
           geometry = GeometryOffset.translate(g, frame.toMachine());
           span = s;
         case MachineMove(_, g, _, _, s):
-          geometry = g; span = s;
+          geometry = g;
+          span = s;
         case _:
       }
       if (geometry == null) continue;
       var distances = [0.0, GeometryTools.length(geometry)];
       switch geometry {
         case Arc(_, _, start, turn), Circular(_, _, start, turn, _, _):
-          var first = Std.int(Math.ceil(Math.min(start, start + turn) /
-            (Math.PI * 0.5)));
-          var last = Std.int(Math.floor(Math.max(start, start + turn) /
-            (Math.PI * 0.5)));
+          var first = Std.int(Math.ceil(Math.min(start, start + turn) / (Math.PI * 0.5)));
+          var last = Std.int(Math.floor(Math.max(start, start + turn) / (Math.PI * 0.5)));
           for (quadrant in first...(last + 1)) {
             var fraction = ((quadrant * Math.PI * 0.5) - start) / turn;
-            if (fraction > 0.0 && fraction < 1.0)
-              distances.push(GeometryTools.length(geometry) * fraction);
+            if (fraction > 0.0 && fraction < 1.0) distances.push(GeometryTools.length(geometry) * fraction);
           }
         case _:
       }
@@ -61,10 +56,8 @@ class TravelEnvelope {
         var values = [point.x, point.y, point.z];
         var lows = [lower.x, lower.y, lower.z];
         var highs = [upper.x, upper.y, upper.z];
-        for (axis in 0...3) if (values[axis] < lows[axis] - 1e-9 ||
-            values[axis] > highs[axis] + 1e-9) {
-          violations.push(new TravelViolation(axis, values[axis],
-            lows[axis], highs[axis], span));
+        for (axis in 0...3) if (values[axis] < lows[axis] - 1e-9 || values[axis] > highs[axis] + 1e-9) {
+          violations.push(new TravelViolation(axis, values[axis], lows[axis], highs[axis], span));
           out = true;
           break;
         }

@@ -18,25 +18,23 @@ class CutterProfile {
     var r = 0.0, z = 0.0;
     for (segment in segments) {
       var start = startOf(segment), end = endOf(segment);
-      if (Math.abs(start.r - r) > 1e-12 || Math.abs(start.z - z) > 1e-12)
-        throw "cutter profile segments must be continuous from the tip at (0, 0)";
-      if (!Math.isFinite(end.r) || !Math.isFinite(end.z) || end.r < 0.0)
-        throw "cutter profile points need finite, non-negative radii";
-      if (end.z < start.z - 1e-12)
-        throw "cutter profile heights must not decrease";
+      if (Math.abs(start.r - r) > 1e-12
+        || Math.abs(start.z - z) > 1e-12) throw "cutter profile segments must be continuous from the tip at (0, 0)";
+      if (!Math.isFinite(end.r)
+        || !Math.isFinite(end.z) || end.r < 0.0) throw "cutter profile points need finite, non-negative radii";
+      if (end.z < start.z - 1e-12) throw "cutter profile heights must not decrease";
       switch segment {
         case Arc(cr, cz, r0, z0, r1, z1, _):
           var a = Math.sqrt((r0 - cr) * (r0 - cr) + (z0 - cz) * (z0 - cz));
           var b = Math.sqrt((r1 - cr) * (r1 - cr) + (z1 - cz) * (z1 - cz));
-          if (!(a > 0.0) || Math.abs(a - b) > 1e-9 * Math.max(1.0, a))
-            throw "cutter profile arc endpoints must be equidistant from its centre";
+          if (!(a > 0.0) || Math.abs(a - b) > 1e-9 * Math.max(1.0,
+            a)) throw "cutter profile arc endpoints must be equidistant from its centre";
         case Line(_, _, _, _, _):
       }
       r = end.r;
       z = end.z;
     }
-    if (!(z > 0.0) || !(r > 0.0))
-      throw "cutter profile must end above the tip and away from the axis";
+    if (!(z > 0.0) || !(r > 0.0)) throw "cutter profile must end above the tip and away from the axis";
     this.segments = segments;
   }
 
@@ -44,10 +42,7 @@ class CutterProfile {
   public static function flat(diameter:Float, fluteLength:Float):CutterProfile {
     var r = positive(diameter, "diameter") / 2;
     positive(fluteLength, "flute length");
-    return new CutterProfile([
-      Line(0, 0, r, 0, Cutting),
-      Line(r, 0, r, fluteLength, Cutting)
-    ]);
+    return new CutterProfile([Line(0, 0, r, 0, Cutting), Line(r, 0, r, fluteLength, Cutting)]);
   }
 
   /** Ball end mill: a hemispherical tip of the cutter's radius. */
@@ -60,33 +55,25 @@ class CutterProfile {
   }
 
   /** Bull-nose (corner radius) end mill. */
-  public static function bullNose(diameter:Float, cornerRadius:Float,
-      fluteLength:Float):CutterProfile {
+  public static function bullNose(diameter:Float, cornerRadius:Float, fluteLength:Float):CutterProfile {
     var r = positive(diameter, "diameter") / 2;
     positive(cornerRadius, "corner radius");
     if (cornerRadius >= r) throw "bull-nose corner radius must be below the cutter radius; use ball()";
     if (!(fluteLength >= cornerRadius)) throw "bull-nose flutes must cover the corner";
     var flatEnd = r - cornerRadius;
-    var segments = [
-      Line(0, 0, flatEnd, 0, Cutting),
-      Arc(flatEnd, cornerRadius, flatEnd, 0, r, cornerRadius, Cutting)
-    ];
-    if (fluteLength > cornerRadius)
-      segments.push(Line(r, cornerRadius, r, fluteLength, Cutting));
+    var segments = [Line(0, 0, flatEnd, 0, Cutting), Arc(flatEnd, cornerRadius, flatEnd, 0, r, cornerRadius, Cutting)];
+    if (fluteLength > cornerRadius) segments.push(Line(r, cornerRadius, r, fluteLength, Cutting));
     return new CutterProfile(segments);
   }
 
   /** V-bit with a sharp tip; `includedAngle` is the full cone angle in radians. */
-  public static function vee(diameter:Float, includedAngle:Float,
-      fluteLength:Float):CutterProfile {
+  public static function vee(diameter:Float, includedAngle:Float, fluteLength:Float):CutterProfile {
     var r = positive(diameter, "diameter") / 2;
-    if (!(includedAngle > 0.0 && includedAngle < Math.PI))
-      throw "V-bit included angle must be between 0 and pi";
+    if (!(includedAngle > 0.0 && includedAngle < Math.PI)) throw "V-bit included angle must be between 0 and pi";
     var coneHeight = r / Math.tan(includedAngle / 2);
     if (!(fluteLength >= coneHeight)) throw "V-bit flutes must cover the cone";
     var segments = [Line(0, 0, r, coneHeight, Cutting)];
-    if (fluteLength > coneHeight)
-      segments.push(Line(r, coneHeight, r, fluteLength, Cutting));
+    if (fluteLength > coneHeight) segments.push(Line(r, coneHeight, r, fluteLength, Cutting));
     return new CutterProfile(segments);
   }
 
@@ -94,38 +81,29 @@ class CutterProfile {
     Tapered ball mill: a ball tip of `tipDiameter` blending tangentially into a
     cone of `taperAngle` (half-angle from the axis) up to `diameter`.
   **/
-  public static function taperedBall(tipDiameter:Float, taperAngle:Float,
-      diameter:Float, fluteLength:Float):CutterProfile {
+  public static function taperedBall(tipDiameter:Float,
+    taperAngle:Float, diameter:Float, fluteLength:Float):CutterProfile {
     var tip = positive(tipDiameter, "tip diameter") / 2;
     var r = positive(diameter, "diameter") / 2;
-    if (!(taperAngle > 0.0 && taperAngle < Math.PI / 2))
-      throw "taper angle must be between 0 and pi/2";
+    if (!(taperAngle > 0.0 && taperAngle < Math.PI / 2)) throw "taper angle must be between 0 and pi/2";
     var tangentR = tip * Math.cos(taperAngle);
     var tangentZ = tip * (1 - Math.sin(taperAngle));
     if (!(r > tangentR)) throw "tapered ball diameter must exceed its ball";
     var coneTop = tangentZ + (r - tangentR) / Math.tan(taperAngle);
     if (!(fluteLength >= coneTop)) throw "tapered ball flutes must cover the taper";
-    var segments = [
-      Arc(0, tip, 0, 0, tangentR, tangentZ, Cutting),
-      Line(tangentR, tangentZ, r, coneTop, Cutting)
-    ];
-    if (fluteLength > coneTop)
-      segments.push(Line(r, coneTop, r, fluteLength, Cutting));
+    var segments = [Arc(0, tip, 0, 0, tangentR, tangentZ, Cutting), Line(tangentR, tangentZ, r, coneTop, Cutting)];
+    if (fluteLength > coneTop) segments.push(Line(r, coneTop, r, fluteLength, Cutting));
     return new CutterProfile(segments);
   }
 
   /** Appends a cylindrical non-cutting section, with a shoulder if the radius changes. */
-  public function withShank(diameter:Float, length:Float):CutterProfile
-    return withCylinder(diameter, length, Shank);
+  public function withShank(diameter:Float, length:Float):CutterProfile return withCylinder(diameter, length, Shank);
 
-  public function withHolder(diameter:Float, length:Float):CutterProfile
-    return withCylinder(diameter, length, Holder);
+  public function withHolder(diameter:Float, length:Float):CutterProfile return withCylinder(diameter, length, Holder);
 
-  public function height():Float
-    return endOf(segments[segments.length - 1]).z;
+  public function height():Float return endOf(segments[segments.length - 1]).z;
 
-  public function topRadius():Float
-    return endOf(segments[segments.length - 1]).r;
+  public function topRadius():Float return endOf(segments[segments.length - 1]).r;
 
   /** Widest diameter of the cutting zone. */
   public function cuttingDiameter():Float {
@@ -137,8 +115,10 @@ class CutterProfile {
         case Arc(cr, cz, r0, z0, r1, z1, _):
           // An arc bulges outwards past its ends when it crosses angle 0.
           var arc = arcAngles(cr, cz, r0, z0, r1, z1);
-          if (Math.min(arc.start, arc.end) < 0.0 && Math.max(arc.start, arc.end) > 0.0)
-            widest = Math.max(widest, cr + arc.radius);
+          if (Math.min(arc.start, arc.end) < 0.0 && Math.max(arc.start, arc.end) > 0.0) widest = Math.max(
+            widest,
+            cr + arc.radius
+          );
         case Line(_, _, _, _, _):
       }
     }
@@ -148,8 +128,7 @@ class CutterProfile {
   /** Height of the top of the cutting zone. */
   public function fluteLength():Float {
     var top = 0.0;
-    for (segment in segments)
-      if (zoneOf(segment) == Cutting) top = endOf(segment).z;
+    for (segment in segments) if (zoneOf(segment) == Cutting) top = endOf(segment).z;
     return top;
   }
 
@@ -189,13 +168,14 @@ class CutterProfile {
     // to the integral of r dz, leaving only the profile.
     var area = 0.0;
     for (segment in segments) switch segment {
-      case Line(r0, z0, r1, z1, _): area += (r0 + r1) / 2 * (z1 - z0);
+      case Line(r0, z0, r1, z1, _):
+        area += (r0 + r1) / 2 * (z1 - z0);
       case Arc(cr, cz, r0, z0, r1, z1, _):
         var arc = arcAngles(cr, cz, r0, z0, r1, z1);
         var R = arc.radius;
         // r = cr + R cos t, dz = R cos t dt
-        area += cr * R * (Math.sin(arc.end) - Math.sin(arc.start))
-          + R * R * (cosSquaredIntegral(arc.end) - cosSquaredIntegral(arc.start));
+        area += cr * R * (Math.sin(arc.end)
+          - Math.sin(arc.start)) + R * R * (cosSquaredIntegral(arc.end) - cosSquaredIntegral(arc.start));
     }
     return area;
   }
@@ -212,32 +192,33 @@ class CutterProfile {
         // pi * integral of (cr + R cos t)^2 R cos t dt
         function antiderivative(t:Float):Float {
           var s = Math.sin(t);
-          return cr * cr * s + 2 * cr * R * cosSquaredIntegral(t)
-            + R * R * (s - s * s * s / 3);
+          return cr * cr * s + 2 * cr * R * cosSquaredIntegral(t) + R * R * (s - s * s * s / 3);
         }
         volume += Math.PI * R * (antiderivative(arc.end) - antiderivative(arc.start));
     }
     return volume;
   }
 
-  static function cosSquaredIntegral(t:Float):Float
-    return t / 2 + Math.sin(2 * t) / 4;
+  static function cosSquaredIntegral(t:Float):Float return t / 2 + Math.sin(2 * t) / 4;
 
   /** Start and end angles of a minor arc, with |end - start| < pi. */
-  static function arcAngles(cr:Float, cz:Float, r0:Float, z0:Float, r1:Float,
-      z1:Float):{start:Float, end:Float, radius:Float} {
+  static function arcAngles(cr:Float, cz:Float, r0:Float, z0:Float, r1:Float, z1:Float): {
+    start: Float,
+    end: Float,
+    radius: Float
+  } {
     var start = Math.atan2(z0 - cz, r0 - cr);
     var sweep = Math.atan2(z1 - cz, r1 - cr) - start;
     while (sweep > Math.PI) sweep -= 2 * Math.PI;
     while (sweep <= -Math.PI) sweep += 2 * Math.PI;
-    return {start: start, end: start + sweep,
-      radius: Math.sqrt((r0 - cr) * (r0 - cr) + (z0 - cz) * (z0 - cz))};
+    return {start: start, end: start + sweep, radius: Math.sqrt((r0 - cr) * (r0 - cr) + (z0 - cz) * (z0 - cz))};
   }
 
   /** Radius never shrinks going up, so the tool's silhouette narrows only towards the tip. */
   public function isRadiallyMonotonic():Bool {
     for (segment in segments) switch segment {
-      case Line(r0, _, r1, _, _): if (r1 < r0 - 1e-12) return false;
+      case Line(r0, _, r1, _, _):
+        if (r1 < r0 - 1e-12) return false;
       case Arc(cr, _, r0, _, r1, _, _):
         if (r1 < r0 - 1e-12) return false;
         // A minor arc whose ends both lie left of its centre bulges inwards.
@@ -246,35 +227,39 @@ class CutterProfile {
     return true;
   }
 
-  public static function startOf(segment:CutterSegment):{r:Float, z:Float}
-    return switch segment {
-      case Line(r0, z0, _, _, _): {r: r0, z: z0};
-      case Arc(_, _, r0, z0, _, _, _): {r: r0, z: z0};
-    };
+  public static function startOf(segment:CutterSegment): {r: Float, z: Float} return switch segment {
+    case Line(r0, z0, _, _, _):
+      {r: r0, z: z0};
+    case Arc(_, _, r0, z0, _, _, _):
+      {r: r0, z: z0};
+  };
 
-  public static function endOf(segment:CutterSegment):{r:Float, z:Float}
-    return switch segment {
-      case Line(_, _, r1, z1, _): {r: r1, z: z1};
-      case Arc(_, _, _, _, r1, z1, _): {r: r1, z: z1};
-    };
+  public static function endOf(segment:CutterSegment): {r: Float, z: Float} return switch segment {
+    case Line(_, _, r1, z1, _):
+      {r: r1, z: z1};
+    case Arc(_, _, _, _, r1, z1, _):
+      {r: r1, z: z1};
+  };
 
-  public static function zoneOf(segment:CutterSegment):CutterZone
-    return switch segment {
-      case Line(_, _, _, _, zone): zone;
-      case Arc(_, _, _, _, _, _, zone): zone;
-    };
+  public static function zoneOf(segment:CutterSegment):CutterZone return switch segment {
+    case Line(_, _, _, _, zone):
+      zone;
+    case Arc(_, _, _, _, _, _, zone):
+      zone;
+  };
 
   /**
     The profile as plain numbers, for JSON: one row per segment, `[0, zone,
     r0, z0, r1, z1]` for a line and `[1, zone, centerR, centerZ, r0, z0, r1,
     z1]` for an arc, with zone 0 cutting, 1 shank and 2 holder.
   **/
-  public function encode():Array<Array<Float>>
-    return [for (segment in segments) switch segment {
-      case Line(r0, z0, r1, z1, zone): [0.0, zoneCode(zone), r0, z0, r1, z1];
-      case Arc(cr, cz, r0, z0, r1, z1, zone):
-        [1.0, zoneCode(zone), cr, cz, r0, z0, r1, z1];
-    }];
+  public function encode():Array<Array<Float>> return [for (segment in segments) switch segment {
+    case Line(r0, z0, r1, z1, zone):
+      [0.0, zoneCode(zone), r0, z0, r1, z1];
+    case Arc(cr, cz, r0, z0, r1, z1, zone):
+      [1.0, zoneCode(zone), cr, cz, r0, z0, r1, z1];
+  }
+  ];
 
   /** The profile `encode` wrote; rejects rows it could not have written. */
   public static function decode(rows:Array<Array<Float>>):CutterProfile {
@@ -288,26 +273,30 @@ class CutterProfile {
     var code = Std.int(row[1]), kind = Std.int(row[0]);
     if (code != row[1] || kind != row[0]) throw "cutter profile codes must be whole numbers";
     var zone = switch code {
-      case 0: Cutting;
-      case 1: Shank;
-      case 2: Holder;
-      case _: throw 'cutter profile zone $code is unknown';
+      case 0:
+        Cutting;
+      case 1:
+        Shank;
+      case 2:
+        Holder;
+      case _:
+        throw 'cutter profile zone $code is unknown';
     };
     if (kind == 0 && row.length == 6) return Line(row[2], row[3], row[4], row[5], zone);
-    if (kind == 1 && row.length == 8)
-      return Arc(row[2], row[3], row[4], row[5], row[6], row[7], zone);
+    if (kind == 1 && row.length == 8) return Arc(row[2], row[3], row[4], row[5], row[6], row[7], zone);
     throw 'cutter profile row kind $kind is unknown';
   }
 
-  static function zoneCode(zone:CutterZone):Float
-    return switch zone {
-      case Cutting: 0.0;
-      case Shank: 1.0;
-      case Holder: 2.0;
-    };
+  static function zoneCode(zone:CutterZone):Float return switch zone {
+    case Cutting:
+      0.0;
+    case Shank:
+      1.0;
+    case Holder:
+      2.0;
+  };
 
-  function withCylinder(diameter:Float, length:Float,
-      zone:CutterZone):CutterProfile {
+  function withCylinder(diameter:Float, length:Float, zone:CutterZone):CutterProfile {
     var r = positive(diameter, "diameter") / 2;
     positive(length, "length");
     var z = height(), top = topRadius();
@@ -318,8 +307,7 @@ class CutterProfile {
   }
 
   static function positive(value:Float, name:String):Float {
-    if (!(value > 0.0) || !Math.isFinite(value))
-      throw 'cutter $name must be positive and finite';
+    if (!(value > 0.0) || !Math.isFinite(value)) throw 'cutter $name must be positive and finite';
     return value;
   }
 }

@@ -11,19 +11,34 @@ import motionkit.robot.MachineKitRobotCompiler;
 class ToolpathAccuracyTests {
   public static function run():Int {
     var blueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
-      0.05, 0.5);
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
+        200,
+        200,
+        200
+      )),
+      0.05,
+      0.5
+    );
     var cnc = new MotionCncRig("work", "x", "y", "z", 0.05, [0.02, 0.02, 0.0], 0.00001);
     var binding = ToolpathTestSupport.cncBinding(cnc, blueprint);
     // The joints where the interpreter's start position is.
-    var start = binding.solver.solvePose(new motionkit.kinematics.Pose3(0.02, 0.02, 0.0),
-      [for (_ in blueprint.model.joints) 0.0], new motionkit.kinematics.IkTolerance(), null);
+    var start = binding.solver.solvePose(
+      new motionkit.kinematics.Pose3(0.02, 0.02, 0.0),
+      [for (_ in blueprint.model.joints) 0.0],
+      new motionkit.kinematics.IkTolerance(),
+      null
+    );
     if (start == null) throw "the gantry reaches its start";
     var assertions = 0;
 
     // A full 1 mm radius circle about (20, 20) mm.
-    var circle = ToolpathTestSupport.compileCnc(binding, cnc,
-      "G21 G90 G17\nG1 F300 X21 Y20\nG2 X21 Y20 I-1 J0\nM2\n", start, Int64.ofInt(10));
+    var circle = ToolpathTestSupport.compileCnc(
+      binding,
+      cnc,
+      "G21 G90 G17\nG1 F300 X21 Y20\nG2 X21 Y20 I-1 J0\nM2\n",
+      start,
+      Int64.ofInt(10)
+    );
     var worst = 0.0;
     for (block in circle.blocks) for (plan in block.plans) for (step in 0...401) {
       var pose = binding.solver.forward(plan.evaluate(plan.durationSeconds * step / 400).positions);
@@ -32,7 +47,7 @@ class ToolpathAccuracyTests {
       if (!onApproach) worst = Math.max(worst, Math.abs(radius - 0.001));
     }
     circle.dispose();
-if (!(worst < 2e-6)) throw 'a 1 mm circle is followed within 2 um, worst ${worst * 1e6} um';
+    if (!(worst < 2e-6)) throw 'a 1 mm circle is followed within 2 um, worst ${worst * 1e6} um';
     assertions++;
 
     // A 96-gon of 2 mm radius blended at 10 um: 96 short sides and fillets, one path.

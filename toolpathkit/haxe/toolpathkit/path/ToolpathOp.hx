@@ -18,11 +18,9 @@ enum ToolpathOp {
     writes them: with G43 active they name the tool tip, and the machine's
     controlled point is the active length above. `ToolpathFrame` maps them.
   **/
-  Move(kind:MoveKind, geometry:PathGeometry, feed:Float,
-    tolerance:Float, provenance:Provenance);
+  Move(kind:MoveKind, geometry:PathGeometry, feed:Float, tolerance:Float, provenance:Provenance);
   /** A move of the controlled point in absolute machine coordinates. */
-  MachineMove(kind:MoveKind, geometry:PathGeometry, feed:Float,
-    tolerance:Float, provenance:Provenance);
+  MachineMove(kind:MoveKind, geometry:PathGeometry, feed:Float, tolerance:Float, provenance:Provenance);
 
   // Auxiliary axes and synchronisation.
 

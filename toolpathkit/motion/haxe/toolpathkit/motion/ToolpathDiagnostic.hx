@@ -9,6 +9,8 @@ class ToolpathDiagnostic {
   public final message:String;
 
   public function new(code:String, provenance:Provenance, message:String) {
-    this.code = code; this.provenance = provenance; this.message = message;
+    this.code = code;
+    this.provenance = provenance;
+    this.message = message;
   }
 }

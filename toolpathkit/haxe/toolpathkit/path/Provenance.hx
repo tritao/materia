@@ -10,9 +10,15 @@ class Provenance {
   public final operationId:Null<String>;
   public final featureRef:Null<String>;
 
-  public function new(line:Int, column:Int, length:Int,
-      kind:ProvenanceKind = GCode, operationIndex:Null<Int> = null,
-      operationId:Null<String> = null, featureRef:Null<String> = null) {
+  public function new(
+    line:Int,
+    column:Int,
+    length:Int,
+    kind:ProvenanceKind = GCode,
+    operationIndex:Null<Int> = null,
+    operationId:Null<String> = null,
+    featureRef:Null<String> = null
+  ) {
     this.kind = kind;
     this.line = line;
     this.column = column;
@@ -22,8 +28,13 @@ class Provenance {
     this.featureRef = featureRef;
   }
 
-  public static function cam(operationIndex:Int,
-      ?featureRef:String):Provenance
-    return new Provenance(operationIndex, 1, 0, Cam, operationIndex,
-      'cam:$operationIndex', featureRef);
+  public static function cam(operationIndex:Int, ?featureRef:String):Provenance return new Provenance(
+    operationIndex,
+    1,
+    0,
+    Cam,
+    operationIndex,
+    'cam:$operationIndex',
+    featureRef
+  );
 }

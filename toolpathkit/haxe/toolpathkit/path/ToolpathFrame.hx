@@ -26,15 +26,16 @@ class ToolpathFrame {
   final setups:Array<Setup>;
 
   public function new(tools:ToolLibrary, setups:Array<Setup>) {
-    if (tools == null || setups == null || setups.length == 0)
-      throw "toolpath frame needs tools and setups";
+    if (tools == null || setups == null || setups.length == 0) throw "toolpath frame needs tools and setups";
     this.tools = tools;
     this.setups = setups;
     setup = setups[0];
   }
 
-  public static function of(program:ToolpathProgram):ToolpathFrame
-    return new ToolpathFrame(program.tools, program.setups);
+  public static function of(program:ToolpathProgram):ToolpathFrame return new ToolpathFrame(
+    program.tools,
+    program.setups
+  );
 
   public function advance(op:ToolpathOp):Void {
     switch op {
@@ -58,8 +59,7 @@ class ToolpathFrame {
   }
 
   /** The tool in the spindle, resolved in the program's library. */
-  public function tool():Null<Tool>
-    return toolNumber < 0 ? null : tools.tool(toolNumber);
+  public function tool():Null<Tool> return toolNumber < 0 ? null : tools.tool(toolNumber);
 
   /** Z translation from a programmed point to the physical tool tip. */
   public function tipShift():Float {
@@ -68,6 +68,5 @@ class ToolpathFrame {
   }
 
   /** Translation from a programmed point to the tool tip in work coordinates. */
-  public function toTip():Array<Float>
-    return [0.0, 0.0, tipShift()];
+  public function toTip():Array<Float> return [0.0, 0.0, tipShift()];
 }

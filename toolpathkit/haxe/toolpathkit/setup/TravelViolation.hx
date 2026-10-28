@@ -10,12 +10,13 @@ class TravelViolation {
   public final upper:Float;
   public final provenance:Provenance;
 
-  public function new(axis:Int, value:Float, lower:Float, upper:Float,
-      provenance:Provenance) {
-    this.axis = axis; this.value = value; this.lower = lower;
-    this.upper = upper; this.provenance = provenance;
+  public function new(axis:Int, value:Float, lower:Float, upper:Float, provenance:Provenance) {
+    this.axis = axis;
+    this.value = value;
+    this.lower = lower;
+    this.upper = upper;
+    this.provenance = provenance;
   }
 
-  public function message():String
-    return '${["X", "Y", "Z"][axis]} travel $value m outside [$lower, $upper] m';
+  public function message():String return '${["X", "Y", "Z"][axis]} travel $value m outside [$lower, $upper] m';
 }

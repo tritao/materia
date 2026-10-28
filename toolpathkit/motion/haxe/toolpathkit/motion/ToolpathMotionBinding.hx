@@ -22,14 +22,17 @@ class ToolpathMotionBinding {
     `heldJoints` are joints the XYZ axes do not move and this binding does not plan (a printer's extruder
     and the motor that turns it): they hold their position.
   **/
-  public function new(machine:MachineBinding, blueprint:MotionSystemBlueprint,
-      ?modelRevision:Int64, ?calibrationRevision:Int64, ?heldJoints:Array<String>) {
-    if (machine == null || blueprint == null)
-      throw "CNC binding needs a machine and motion-system blueprint";
+  public function new(
+    machine:MachineBinding,
+    blueprint:MotionSystemBlueprint,
+    ?modelRevision:Int64,
+    ?calibrationRevision:Int64,
+    ?heldJoints:Array<String>
+  ) {
+    if (machine == null || blueprint == null) throw "CNC binding needs a machine and motion-system blueprint";
     this.machine = machine;
     this.blueprint = blueprint;
-    solver = new AxisKinematics(blueprint, machine.xAxisId,
-      machine.yAxisId, machine.zAxisId);
+    solver = new AxisKinematics(blueprint, machine.xAxisId, machine.yAxisId, machine.zAxisId);
     var count = solver.jointCount();
     var envelopeLower:Array<Float> = [];
     var envelopeUpper:Array<Float> = [];
@@ -49,31 +52,38 @@ class ToolpathMotionBinding {
           high = Math.min(high, Math.max(a, b));
         }
       }
-      envelopeLower.push(low); envelopeUpper.push(high);
+      envelopeLower.push(low);
+      envelopeUpper.push(high);
     }
     var travel = machine.travel;
-    if (travel != null)
-      for (axis in 0...3) {
-        var lower = [travel.lower.x, travel.lower.y, travel.lower.z];
-        var upper = [travel.upper.x, travel.upper.y, travel.upper.z];
-        envelopeLower[axis] = Math.max(envelopeLower[axis], lower[axis]);
-        envelopeUpper[axis] = Math.min(envelopeUpper[axis], upper[axis]);
-      }
+    if (travel != null) for (axis in 0...3) {
+      var lower = [travel.lower.x, travel.lower.y, travel.lower.z];
+      var upper = [travel.upper.x, travel.upper.y, travel.upper.z];
+      envelopeLower[axis] = Math.max(envelopeLower[axis], lower[axis]);
+      envelopeUpper[axis] = Math.min(envelopeUpper[axis], upper[axis]);
+    }
     machine.setTravel(new TravelEnvelope(
       new Point3(envelopeLower[0], envelopeLower[1], envelopeLower[2]),
-      new Point3(envelopeUpper[0], envelopeUpper[1], envelopeUpper[2])));
+      new Point3(
+        envelopeUpper[0],
+        envelopeUpper[1],
+        envelopeUpper[2]
+      )
+    ));
     // A corner is taken in the XY plane, where the weaker of the two axes bounds the acceleration along any direction.
     machine.setCornerAcceleration(Math.min(solver.x.maxAcceleration, solver.y.maxAcceleration));
-    var limits = new ValidationLimits(count,
+    var limits = new ValidationLimits(
+      count,
       modelRevision == null ? Int64.ofInt(blueprint.runtime.revision) : modelRevision,
-      calibrationRevision == null ? Int64.ofInt(blueprint.runtime.calibrationRevision) : calibrationRevision);
+      calibrationRevision == null ? Int64.ofInt(blueprint.runtime.calibrationRevision) : calibrationRevision
+    );
     var velocity = [for (_ in 0...count) 0.0];
     var acceleration = [for (_ in 0...count) 0.0];
     var jerk = [for (_ in 0...count) 0.0];
     var jump = [for (_ in 0...count) 0.1];
     for (axis in [solver.x, solver.y, solver.z]) {
-      if (axis.maxVelocity <= 0.0 || axis.maxAcceleration <= 0.0)
-        throw 'CNC axis "${axis.id}" needs velocity and acceleration limits';
+      if (axis.maxVelocity <= 0.0
+        || axis.maxAcceleration <= 0.0) throw 'CNC axis "${axis.id}" needs velocity and acceleration limits';
       for (entry in 0...axis.jointIndices.length) {
         var joint = axis.jointIndices[entry];
         var scale = Math.abs(axis.jointScale(entry));
@@ -94,15 +104,22 @@ class ToolpathMotionBinding {
       if (extruder < 0) throw 'Printer extruder joint "${printer.extruderJoint}" is not in the machine';
       // A planning model of the axes alone holds the drive's limits on the joint; the full machine derives them.
       var own = blueprint.model.joints[extruder].limits;
-      var drive = own.velocity != null && own.maxAcceleration != null ? own :
-        blueprint.model.coupledLimits(printer.extruderJoint, new robotkit.model.SteadyLoads());
+      var drive = own.velocity != null && own.maxAcceleration != null ? own : blueprint.model.coupledLimits(
+        printer.extruderJoint,
+        new robotkit.model.SteadyLoads()
+      );
       velocity[extruder] = drive.requireVelocity();
       acceleration[extruder] = drive.requireAcceleration();
-      var advance = motionkit.robot.PressureAdvanceLimits.planning(velocity[extruder], acceleration[extruder],
-        printer.pressureAdvance, printer.pressureAdvanceWindow);
+      var advance = motionkit.robot.PressureAdvanceLimits.planning(
+        velocity[extruder],
+        acceleration[extruder],
+        printer.pressureAdvance,
+        printer.pressureAdvanceWindow
+      );
       if (printer.pressureAdvance > 0.0) {
         advanceJoint = extruder;
-        driveVelocity = velocity[extruder]; driveAcceleration = acceleration[extruder];
+        driveVelocity = velocity[extruder];
+        driveAcceleration = acceleration[extruder];
       }
       velocity[extruder] = advance.velocity;
       acceleration[extruder] = advance.acceleration;
@@ -118,8 +135,10 @@ class ToolpathMotionBinding {
       if (heldJoints != null && heldJoints.indexOf(id) >= 0 && machine.gearFollowers.indexOf(id) < 0) continue;
       var own = blueprint.model.coupledLimits(id, new robotkit.model.SteadyLoads());
       if (own.velocity == null || own.maxAcceleration == null) continue;
-      velocity[joint] = own.requireVelocity(); acceleration[joint] = own.requireAcceleration();
-      jerk[joint] = acceleration[joint] * 25; jump[joint] = 0.1;
+      velocity[joint] = own.requireVelocity();
+      acceleration[joint] = own.requireAcceleration();
+      jerk[joint] = acceleration[joint] * 25;
+      jump[joint] = 0.1;
     }
     // A joint that follows several axes (a CoreXY motor's pulley) belongs to none, and the plan times it as a column of
     // its own. It moves at most as fast as its terms add up to when the axes run at their limits, and no faster than its
@@ -128,8 +147,11 @@ class ToolpathMotionBinding {
     // Its acceleration is the sum alone: the drive's torque limit is the plan check's, since a pulley's own inertia says
     // nothing of the carriage its belt moves.
     var ids = [for (joint in blueprint.model.joints) joint.id];
-    var projection = motionkit.robot.CouplingProjection.of([for (coupling in blueprint.model.couplings)
-      {leader: ids.indexOf(coupling.leader), follower: ids.indexOf(coupling.follower), ratio: coupling.ratio, offset: coupling.offset}], count);
+    var projection = motionkit.robot.CouplingProjection.of([for (coupling in blueprint.model.couplings) {
+      leader:ids.indexOf(coupling.leader),
+        follower:ids.indexOf(coupling.follower), ratio:coupling.ratio, offset:coupling.offset
+    }
+    ], count);
     var derivedLimits = [for (_ in 0...count) false];
     for (joint in projection.followers) if (velocity[joint] <= 0.0) {
       var terms = projection.termsOf(joint);
@@ -137,7 +159,10 @@ class ToolpathMotionBinding {
       for (term in terms) if (velocity[term.leader] <= 0.0) ready = false;
       if (!ready) continue;
       derivedLimits[joint] = true;
-      velocity[joint] = 0.0; acceleration[joint] = 0.0; jerk[joint] = 0.0; jump[joint] = 0.0;
+      velocity[joint] = 0.0;
+      acceleration[joint] = 0.0;
+      jerk[joint] = 0.0;
+      jump[joint] = 0.0;
       for (term in terms) {
         var scale = Math.abs(term.ratio);
         velocity[joint] += scale * velocity[term.leader];
@@ -175,19 +200,19 @@ class ToolpathMotionBinding {
     }
     for (joint in 0...count) {
       if (velocity[joint] <= 0.0 || acceleration[joint] <= 0.0) {
-        if (blueprint.model.joints[joint].type != robotkit.model.JointType.Fixed &&
-            (heldJoints == null || heldJoints.indexOf(blueprint.model.joints[joint].id) < 0))
-          throw 'CNC joint $joint is not bound to an XYZ axis';
+        if (blueprint.model.joints[joint].type != robotkit.model.JointType.Fixed
+          && (heldJoints == null || heldJoints.indexOf(blueprint.model.joints[joint].id)
+          < 0)) throw 'CNC joint $joint is not bound to an XYZ axis';
         // Assembly root and mounting joints remain stationary, but native
         // trajectory validation still needs finite positive limit arrays.
         velocity[joint] = 1.0;
         acceleration[joint] = 1.0;
         jerk[joint] = 25.0;
-        certifiedVelocity[joint] = velocity[joint]; certifiedAcceleration[joint] = acceleration[joint];
+        certifiedVelocity[joint] = velocity[joint];
+        certifiedAcceleration[joint] = acceleration[joint];
       }
       var bounds = blueprint.model.joints[joint].limits;
-      if (bounds.lower < bounds.upper) limits.position(joint,
-        bounds.lower, bounds.upper);
+      if (bounds.lower < bounds.upper) limits.position(joint, bounds.lower, bounds.upper);
       limits.velocity(joint, certifiedVelocity[joint]);
       limits.acceleration(joint, certifiedAcceleration[joint]);
       limits.jerk(joint, jerk[joint]);
@@ -195,15 +220,31 @@ class ToolpathMotionBinding {
     var startTolerances = new StartTolerances(
       [for (_ in 0...count) machine.positionTolerance],
       [for (joint in 0...count) acceleration[joint] * blueprint.fixedTimestepSeconds],
-      [for (joint in 0...count) jerk[joint] * blueprint.fixedTimestepSeconds]);
-    compiler = new ProgramCompiler(solver, limits, machine.frameId,
-      velocity, acceleration, jerk, startTolerances, null, 0.002, 0.1,
-      machine.positionTolerance, machine.orientationTolerance,
-      null, null, jump,
-      [for (joint in blueprint.model.joints) joint.id], blueprint.model.couplings,
-      blueprint.fixedTimestepSeconds);
+      [for (joint in 0...count) jerk[joint] * blueprint.fixedTimestepSeconds]
+    );
+    compiler = new ProgramCompiler(
+      solver,
+      limits,
+      machine.frameId,
+      velocity,
+      acceleration,
+      jerk,
+      startTolerances,
+      null,
+      0.002,
+      0.1,
+      machine.positionTolerance,
+      machine.orientationTolerance,
+      null,
+      null,
+      jump,
+      [for (joint in blueprint.model.joints) joint.id],
+      blueprint.model.couplings,
+      blueprint.fixedTimestepSeconds
+    );
     if (printer != null) {
-      compiler.pressureAdvance = printer.pressureAdvance; compiler.pressureAdvanceWindow = printer.pressureAdvanceWindow;
+      compiler.pressureAdvance = printer.pressureAdvance;
+      compiler.pressureAdvanceWindow = printer.pressureAdvanceWindow;
       // A sliced curve lowers to thousands of segments a second, more than the robot's queue or a device's link takes:
       // runs of them are merged into one quintic each where it follows them closely, up to the robot owner's period.
       compiler.mergeSegmentsSeconds = blueprint.ownerPeriodSeconds();
@@ -220,8 +261,7 @@ class ToolpathMotionBinding {
     }
   }
 
-  public function compile(program:ToolpathProgram, initialJoints:Array<Float>,
-      firstPlanId:Int64):CompiledProgram {
+  public function compile(program:ToolpathProgram, initialJoints:Array<Float>, firstPlanId:Int64):CompiledProgram {
     var lowered = ToolpathMotion.lower(program, machine);
     if (lowered.program == null) throw "toolpath has no executable motion";
     return compiler.compile(lowered.program, initialJoints, firstPlanId);

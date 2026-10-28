@@ -12,10 +12,9 @@ class MachiningRecipe {
   public final clearanceZ:Null<Float>;
 
   public function new(approachFeed:Float, ?restartBackoff:Float = 0.0, ?clearanceZ:Float) {
-    if (!Math.isFinite(approachFeed) || approachFeed <= 0.0 ||
-        !Math.isFinite(restartBackoff) || restartBackoff < 0.0 ||
-        (clearanceZ != null && !Math.isFinite(clearanceZ)))
-      throw "machining recipe needs positive approach feed, nonnegative backoff and a finite clearance";
+    if (!Math.isFinite(approachFeed)
+      || approachFeed <= 0.0 || !Math.isFinite(restartBackoff) || restartBackoff < 0.0 || (clearanceZ != null && !Math
+      .isFinite(clearanceZ))) throw "machining recipe needs positive approach feed, nonnegative backoff and a finite clearance";
     this.approachFeed = approachFeed;
     this.restartBackoff = restartBackoff;
     this.clearanceZ = clearanceZ;

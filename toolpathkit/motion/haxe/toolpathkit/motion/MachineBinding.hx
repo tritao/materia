@@ -35,26 +35,31 @@ class MachineBinding {
   /** The extruder and heaters, when the machine prints. */
   public var printer(default, null):Null<PrinterBinding> = null;
 
-  public function new(frameId:String, xAxisId:String, yAxisId:String,
-      zAxisId:String, rapidSpeed:Float, channels:ToolpathChannels,
-      positionTolerance:Float = 0.0005,
-      orientationTolerance:Float = 0.02,
-      maxBlendTurnAngleRadians:Float = Math.PI * 5.0 / 6.0) {
-    if (frameId == null || frameId.length == 0 || xAxisId == null ||
-        yAxisId == null || zAxisId == null || xAxisId.length == 0 ||
-        yAxisId.length == 0 || zAxisId.length == 0 ||
-        xAxisId == yAxisId || xAxisId == zAxisId || yAxisId == zAxisId)
-      throw "machine binding needs a frame and three distinct axes";
-    if (!Math.isFinite(rapidSpeed) || rapidSpeed <= 0.0 ||
-        !Math.isFinite(positionTolerance) || positionTolerance <= 0.0 ||
-        !Math.isFinite(orientationTolerance) || orientationTolerance <= 0.0 ||
-        !Math.isFinite(maxBlendTurnAngleRadians) ||
-        maxBlendTurnAngleRadians <= 0.0 || maxBlendTurnAngleRadians >= Math.PI)
-      throw "machine binding needs positive speed and tolerances";
+  public function new(
+    frameId:String,
+    xAxisId:String,
+    yAxisId:String,
+    zAxisId:String,
+    rapidSpeed:Float,
+    channels:ToolpathChannels,
+    positionTolerance:Float = 0.0005,
+    orientationTolerance:Float = 0.02,
+    maxBlendTurnAngleRadians:Float = Math.PI * 5.0 / 6.0
+  ) {
+    if (frameId == null || frameId.length == 0 || xAxisId == null || yAxisId == null
+      || zAxisId == null || xAxisId.length == 0 || yAxisId.length == 0 || zAxisId.length == 0 || xAxisId == yAxisId
+      || xAxisId == zAxisId || yAxisId == zAxisId) throw "machine binding needs a frame and three distinct axes";
+    if (!Math.isFinite(rapidSpeed) || rapidSpeed <= 0.0
+      || !Math.isFinite(positionTolerance) || positionTolerance <= 0.0 || !Math.isFinite(orientationTolerance)
+      || orientationTolerance <= 0.0 || !Math.isFinite(maxBlendTurnAngleRadians) || maxBlendTurnAngleRadians <= 0.0
+      || maxBlendTurnAngleRadians >= Math.PI) throw "machine binding needs positive speed and tolerances";
     if (channels == null) throw "machine binding needs its controller channels";
     this.channels = channels;
-    this.frameId = frameId; this.xAxisId = xAxisId; this.yAxisId = yAxisId;
-    this.zAxisId = zAxisId; this.rapidSpeed = rapidSpeed;
+    this.frameId = frameId;
+    this.xAxisId = xAxisId;
+    this.yAxisId = yAxisId;
+    this.zAxisId = zAxisId;
+    this.rapidSpeed = rapidSpeed;
     this.positionTolerance = positionTolerance;
     this.orientationTolerance = orientationTolerance;
     this.maxBlendTurnAngleRadians = maxBlendTurnAngleRadians;
@@ -63,7 +68,8 @@ class MachineBinding {
   public function setTravel(value:Null<TravelEnvelope>):Void travel = value;
 
   public function setCornerAcceleration(value:Float):Void {
-    if (!(value >= 0.0) || !Math.isFinite(value)) throw "machine binding needs a finite non-negative corner acceleration";
+    if (!(value >= 0.0)
+      || !Math.isFinite(value)) throw "machine binding needs a finite non-negative corner acceleration";
     cornerAcceleration = value;
   }
 

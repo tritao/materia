@@ -3,20 +3,40 @@ package toolpathkit.path;
 /** Queries over the printing operations of `ToolpathOp`. */
 class PrinterOps {
   /** Does this operation exist only for printing? */
-  public static function isPrinter(op:ToolpathOp):Bool
-    return switch op {
-      case Deposit(_, _, _, _), DepositOff(_), FilamentMove(_, _, _), Heat(_, _, _, _), Fan(_, _, _),
-          Layer(_, _, _), Feature(_, _), PrintObject(_, _, _): true;
-      case _: false;
-    };
+  public static function isPrinter(op:ToolpathOp):Bool return switch op {
+    case Deposit(_,
+      _, _, _), DepositOff(_), FilamentMove(_, _, _), Heat(_, _, _, _), Fan(_, _, _), Layer(_, _, _), Feature(
+        _,
+        _
+      ), PrintObject(
+        _,
+        _,
+        _
+      ):
+      true;
+    case _:
+      false;
+  };
 
   /** The source of a printing operation. */
-  public static function provenance(op:ToolpathOp):Provenance
-    return switch op {
-      case Deposit(_, _, _, span), DepositOff(span), FilamentMove(_, _, span), Heat(_, _, _, span),
-          Fan(_, _, span), Layer(_, _, span), Feature(_, span), PrintObject(_, _, span): span;
-      case _: throw "not a printer operation";
-    };
+  public static function provenance(op:ToolpathOp):Provenance return switch op {
+    case Deposit(_,
+      _, _, span), DepositOff(span), FilamentMove(_, _, span), Heat(_, _, _, span), Fan(_, _, span), Layer(
+        _,
+        _,
+        span
+      ), Feature(
+        _,
+        span
+      ), PrintObject(
+        _,
+        _,
+        span
+      ):
+      span;
+    case _:
+      throw "not a printer operation";
+  };
 
   /** The first printing operation of `ops`, or null. */
   public static function first(ops:Array<ToolpathOp>):Null<ToolpathOp> {
@@ -29,12 +49,11 @@ class PrinterOps {
     function fail(message:String):Void throw 'toolpath op $index: $message';
     switch op {
       case Deposit(area, width, height, _):
-        if (!Math.isFinite(area) || !Math.isFinite(width) || !Math.isFinite(height) ||
-            area <= 0.0 || width <= 0.0 || height <= 0.0)
-          fail("Deposit needs a positive finite area, width and height");
+        if (!Math.isFinite(area) || !Math.isFinite(width) || !Math.isFinite(height) || area <= 0.0
+          || width <= 0.0 || height <= 0.0) fail("Deposit needs a positive finite area, width and height");
         // The bead's section is a rounded rectangle inside its footprint.
-        if (area > width * height * (1.0 + 1e-9))
-          fail('Deposit area $area m^2 exceeds its ${width} x ${height} m footprint');
+        if (area
+          > width * height * (1.0 + 1e-9)) fail('Deposit area $area m^2 exceeds its ${width} x ${height} m footprint');
       case FilamentMove(length, speed, _):
         if (!Math.isFinite(length) || length == 0.0) fail("FilamentMove needs a nonzero finite length");
         if (!Math.isFinite(speed) || speed <= 0.0) fail("FilamentMove needs a positive finite speed");
@@ -60,7 +79,10 @@ class PrinterOps {
     is what makes extruding safe. The device faults a cold extrusion too; this finds it before the print starts.
     Each finding is the source of the offending operation and says what it did.
   **/
-  public static function coldExtrusion(ops:Array<ToolpathOp>, minimumCelsius:Float, ?heater:String = "hotend"):Array<{provenance:Provenance, message:String}> {
+  public static function coldExtrusion(ops:Array<ToolpathOp>, minimumCelsius:Float, ?heater:String = "hotend"):Array<{
+    provenance:Provenance,
+    message:String
+  }> {
     var findings:Array<{provenance:Provenance, message:String}> = [];
     var hot = false, depositing = false;
     for (op in ops) switch op {
@@ -68,12 +90,20 @@ class PrinterOps {
         // Waiting for the minimum makes it hot; turning it down (or only asking, without waiting) does not keep it so.
         if (celsius < minimumCelsius) hot = false;
         else if (wait) hot = true;
-      case Deposit(_, _, _, _): depositing = true;
-      case DepositOff(_): depositing = false;
+      case Deposit(_, _, _, _):
+        depositing = true;
+      case DepositOff(_):
+        depositing = false;
       case FilamentMove(length, _, span) if (length > 0.0 && !hot):
-        findings.push({provenance: span, message: 'filament is pushed before $heater has been waited up to ${minimumCelsius} C'});
+        findings.push({
+          provenance: span,
+          message: 'filament is pushed before $heater has been waited up to ${minimumCelsius} C'
+        });
       case Move(Cut, _, _, _, span) if (depositing && !hot):
-        findings.push({provenance: span, message: 'a bead is laid before $heater has been waited up to ${minimumCelsius} C'});
+        findings.push({
+          provenance: span,
+          message: 'a bead is laid before $heater has been waited up to ${minimumCelsius} C'
+        });
       case _:
     }
     return findings;

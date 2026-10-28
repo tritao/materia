@@ -8,8 +8,7 @@ class ToolpathSourceMapEntry {
   public final endDistance:Float;
   public final provenance:Provenance;
 
-  public function new(opIndex:Int, startDistance:Float, endDistance:Float,
-      provenance:Provenance) {
+  public function new(opIndex:Int, startDistance:Float, endDistance:Float, provenance:Provenance) {
     this.opIndex = opIndex;
     this.startDistance = startDistance;
     this.endDistance = endDistance;

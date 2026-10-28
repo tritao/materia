@@ -21,7 +21,7 @@ class MachiningContinuation {
   }
 
   /** The original op and distance along it for `op` and `distance` of this program; op -1 while approaching. */
-  public function originalAt(op:Int, distance:Float):{op:Int, distance:Float} {
+  public function originalAt(op:Int, distance:Float): {op: Int, distance: Float} {
     if (op < resumeOp) return {op: -1, distance: 0.0};
     if (op == resumeOp) return {op: opIndex, distance: startDistance + distance};
     return {op: opIndex + op - resumeOp, distance: distance};

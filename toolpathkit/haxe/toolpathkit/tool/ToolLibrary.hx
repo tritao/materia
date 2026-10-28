@@ -4,7 +4,8 @@ package toolpathkit.tool;
 class ToolLibrary {
   final tools:Map<Int, Tool> = new Map();
 
-  public function new() {}
+  public function new() {
+  }
 
   public function set(tool:Tool):Void {
     if (tool == null) throw "tool must not be null";

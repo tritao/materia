@@ -6,12 +6,11 @@ import toolpathkit.path.Provenance;
 class ToolpathSourceMap {
   public final entries:Array<ToolpathSourceMapEntry> = [];
 
-  public function new() {}
+  public function new() {
+  }
 
-  public function add(opIndex:Int, startDistance:Float, endDistance:Float,
-      provenance:Provenance):Void {
-    var entry = new ToolpathSourceMapEntry(opIndex, startDistance,
-      endDistance, provenance);
+  public function add(opIndex:Int, startDistance:Float, endDistance:Float, provenance:Provenance):Void {
+    var entry = new ToolpathSourceMapEntry(opIndex, startDistance, endDistance, provenance);
     entries.push(entry);
   }
 
@@ -23,13 +22,10 @@ class ToolpathSourceMap {
     if (!Math.isFinite(distance) || distance < 0.0) return null;
     var last:Null<ToolpathSourceMapEntry> = null;
     for (entry in entries) if (entry.opIndex == opIndex) {
-      if (entry.startDistance <= distance && distance < entry.endDistance)
-        return entry.provenance;
-      if (entry.startDistance == 0.0 && entry.endDistance == 0.0 &&
-          distance == 0.0) return entry.provenance;
+      if (entry.startDistance <= distance && distance < entry.endDistance) return entry.provenance;
+      if (entry.startDistance == 0.0 && entry.endDistance == 0.0 && distance == 0.0) return entry.provenance;
       last = entry;
     }
-    return last != null && Math.abs(distance - last.endDistance) <= 1e-12
-      ? last.provenance : null;
+    return last != null && Math.abs(distance - last.endDistance) <= 1e-12 ? last.provenance : null;
   }
 }

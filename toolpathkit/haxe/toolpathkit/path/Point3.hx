@@ -7,7 +7,9 @@ class Point3 {
   public final z:Float;
 
   public function new(x:Float, y:Float, z:Float) {
-    this.x = x; this.y = y; this.z = z;
+    this.x = x;
+    this.y = y;
+    this.z = z;
   }
 
   public function distanceTo(other:Point3):Float {
