@@ -152,7 +152,7 @@ MachineKit's `Gantry`, configured by a `GantrySpec`:
 
 `GantryPickerPreview.hx` turns the machine into a scene and gives it its job:
 
-<!-- snippet: machinekit/examples/gantry-picker/GantryPickerPreview.hx#L10-L41 -->
+<!-- snippet: machinekit/examples/gantry-picker/GantryPickerPreview.hx#L10-L35 -->
 ```haxe
   static function build(yaw:Bool):Bytes {
     var picker = new GantryPicker(yaw
@@ -163,17 +163,11 @@ MachineKit's `Gantry`, configured by a `GantrySpec`:
     for (index in 0...GantryPicker.BOX_COUNT) {
       var pick:materia.project.SceneArtifact.SceneArtifactMissionStep = {
         kind: "pick",
-        at: {
-          occurrence: "box" + index,
-          connector: "top"
-        }
+        at: {occurrence: "box" + index, connector: "top"}
       };
       var place:materia.project.SceneArtifact.SceneArtifactMissionStep = {
         kind: "place",
-        at: {
-          occurrence: "slot" + index,
-          connector: "top"
-        }
+        at: {occurrence: "slot" + index, connector: "top"}
       };
       if (yaw) {
         pick.yaw = 0.0;
