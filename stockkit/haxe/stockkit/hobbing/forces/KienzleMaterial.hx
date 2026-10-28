@@ -1,4 +1,4 @@
-package stockkit.hobbing;
+package stockkit.hobbing.forces;
 
 /** Empirical coefficients, NOT a hardness/material database. kc11 is N/mm² at
     h=1 mm, mc dimensionless. No rake, speed, wear or ploughing correction. */

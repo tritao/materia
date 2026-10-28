@@ -1,4 +1,6 @@
-package stockkit.hobbing;
+package stockkit.hobbing.forces;
+
+import stockkit.hobbing.GashPass;
 
 /** One gash's window-AVERAGE loads, not an instantaneous tooth peak.
     mm³/mm²/mm inputs; N, Nm, W, J outputs. Table torque is a magnitude bound
@@ -24,10 +26,10 @@ class HobbingForceSample {
     pressureAngle:Float,
     material:KienzleMaterial
   ) {
-    for (v in[volume,
+    for (v in [volume,
       travel, radius, workRadius, edgeWidth, pressureAngle]) if (!Math.isFinite(v)) throw "non-finite force input";
     if (volume < 0 || travel < 0 || radius <= 0 || workRadius <= 0 || edgeWidth <= 0 || pressureAngle < 0
-      || pressureAngle >= Math.PI / 2 ||(volume > 0 && travel <= 0)) throw "invalid force geometry";
+      || pressureAngle >= Math.PI / 2 || (volume > 0 && travel <= 0)) throw "invalid force geometry";
     this.pass = pass;
     removedVolume = volume;
     chipArea = travel == 0 ? 0 : volume / travel;
@@ -38,15 +40,15 @@ class HobbingForceSample {
     hobTorque = tangentialForce * radius / 1000;
     tableTorqueBound = Math.sqrt(tangentialForce * tangentialForce + radialForce * radialForce) * workRadius / 1000;
     energy = tangentialForce * travel / 1000;
-    power = energy /(pass.end - pass.start);
+    power = energy / (pass.end - pass.start);
   }
   /** Scalar rating check, with declared reserve. Does not include acceleration,
       friction or unresolved tooth peaks; these still belong to PlanCheck. */
   public function fits(powerRating:Float, hobTorqueRating:Float, tableTorqueRating:Float, reserve:Float = 0.2):Bool {
-    for (v in[powerRating,
+    for (v in [powerRating,
       hobTorqueRating, tableTorqueRating]) if (!Math.isFinite(v) || v <= 0) throw "invalid force ratings";
     if (!Math.isFinite(reserve) || reserve < 0 || reserve >= 1) throw "invalid force reserve";
-    return power <= powerRating *(1 - reserve)
-      && hobTorque <= hobTorqueRating *(1 - reserve) && tableTorqueBound <= tableTorqueRating *(1 - reserve);
+    return power <= powerRating * (1 - reserve)
+      && hobTorque <= hobTorqueRating * (1 - reserve) && tableTorqueBound <= tableTorqueRating * (1 - reserve);
   }
 }

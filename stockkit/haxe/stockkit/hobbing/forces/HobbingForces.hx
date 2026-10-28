@@ -1,6 +1,8 @@
-package stockkit.hobbing;
+package stockkit.hobbing.forces;
 
 import stockkit.ring.RingStock;
+import stockkit.hobbing.GashPass;
+import stockkit.hobbing.HobbingAxes;
 
 /** Optional per-pass observer. A COW previous stock plus native interval comparison
     gives removed volume, without copying circle intervals into the managed heap.
@@ -37,7 +39,7 @@ class HobbingForces {
     edgeWidth:Float,
     ? material:KienzleMaterial
   ) {
-    for (v in[workRadius, pressureAngle, edgeWidth]) if (!Math.isFinite(v)) throw "invalid force setup";
+    for (v in [workRadius, pressureAngle, edgeWidth]) if (!Math.isFinite(v)) throw "invalid force setup";
     if (workRadius <= 0
       || pressureAngle < 0 || pressureAngle >= Math.PI / 2 || edgeWidth <= 0) throw "invalid force setup";
     this.stock = stock;

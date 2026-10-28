@@ -46,15 +46,15 @@ class FlexsplineHobberChecks {
     var oilSupport=new MandrelRadialSupport(new ExpandingMandrel(oilValues),machine.spec.faceWidth);
     near(oilSupport.stiffness,support.stiffness,1e-9,"oil bulk modulus does not stiffen first-order ovalisation");
     near(oilSupport.uniformOilStiffness,2*support.uniformOilStiffness,1e-6,"uniform oil compression scales with bulk modulus");
-    var ring=new stockkit.hobbing.RingCompliance(machine.spec.rootRadius()-0.3,0.6,machine.spec.faceWidth,210000,1000,"explicit test fixture stiffness");
-    var sync=new stockkit.hobbing.HobbingErrorSource("sync","runtime observations","test zero measured following error",(t,a)->a);
+    var ring=new stockkit.hobbing.errors.RingCompliance(machine.spec.rootRadius()-0.3,0.6,machine.spec.faceWidth,210000,1000,"explicit test fixture stiffness");
+    var sync=new stockkit.hobbing.errors.HobbingErrorSource("sync","runtime observations","test zero measured following error",(t,a)->a);
     var errors=FlexsplineHobberErrors.sources(machine,t->20,ring,sync);
     check(errors.length==21,"HB11 installed parts expose independently selectable error sources");
     var mandrelError=errors.filter(e->e.id=="mandrel")[0];
     near(mandrelError.apply(0,new HobbingAxes(46,0,4,0,0,0)).pose().get_translation(0),46-machine.mandrel.eccentricity,1e-12,"part eccentricity controls physical work offset");
     check(errors.filter(e->e.id=="wall")[0].basis.indexOf("explicit test fixture stiffness")>=0,"wall support assumption stays in budget provenance");
     var forceStock=stockkit.ring.RingStock.annulus(new stockkit.ring.RingGrid(29,30,0,1,1,1));
-    var forces=new stockkit.hobbing.HobbingForces(forceStock,30,20*Math.PI/180,1);
+    var forces=new stockkit.hobbing.forces.HobbingForces(forceStock,30,20*Math.PI/180,1);
     try {
       forceStock.cutRegion([new stockkit.ring.RingCut(0,0,1,0,0.001,0,0)]);
       forces.afterPass(new stockkit.hobbing.GashPass(0,0,0,0.5,1),new HobbingAxes(46,0,0,0,0,0),new HobbingAxes(46,0,0,0,0.625,0),16);
@@ -128,10 +128,10 @@ class FlexsplineHobberChecks {
     var force=100*Math.tan(spec.pressureAngle);
     var rows:Array<{factor:Float,thicknessChangeUm:Float,profileUm:Float}> = [];
     var inspection=new gearkit.GearInspection(spec,spec.pitchRadius());
-    var baseline=new stockkit.hobbing.HobbingErrorJob(spec,hob,motion.axesAt,passes,[],0.6,0.1,0.2,-6,6,0.0001,inspection).run([]);
+    var baseline=new stockkit.hobbing.errors.HobbingErrorJob(spec,hob,motion.axesAt,passes,[],0.6,0.1,0.2,-6,6,0.0001,inspection).run([]);
     for(factor in [0.3,1.0,3.0]){
-      var ring=new stockkit.hobbing.RingCompliance(machine.spec.rootRadius()-0.3,0.6,machine.spec.faceWidth,210000,support.stiffness*factor,support.basis);
-      var job=new stockkit.hobbing.HobbingErrorJob(spec,hob,motion.axesAt,passes,[ring.source("assumed reference support",t->force)],0.6,0.1,0.2,-6,6,0.0001,inspection);
+      var ring=new stockkit.hobbing.errors.RingCompliance(machine.spec.rootRadius()-0.3,0.6,machine.spec.faceWidth,210000,support.stiffness*factor,support.basis);
+      var job=new stockkit.hobbing.errors.HobbingErrorJob(spec,hob,motion.axesAt,passes,[ring.source("assumed reference support",t->force)],0.6,0.1,0.2,-6,6,0.0001,inspection);
       var measured=job.run(["wall"]),delta=0.0;
       for(i in 0...measured.thickness.length)delta=Math.max(delta,Math.abs(measured.thickness[i]-baseline.thickness[i])*1000);
       check(measured.thickness.length==spec.teeth&&delta>0,"physical wall-source cut changes thickness");
@@ -154,12 +154,12 @@ class FlexsplineHobberChecks {
     var s=machine.spec,profileLimit=gearkit.Iso1328.tolerance(s,"Falpha",6),pitchLimit=gearkit.Iso1328.tolerance(s,"fp",6);
     // Explicit physical design allocations. Numerical HB3 tolerance is unrelated.
     var profileBudget=profileLimit*0.2,pitchBudget=pitchLimit*0.2,thicknessTolerance=5.0;
-    var bare=new stockkit.hobbing.RingCompliance(s.rootRadius()-0.3,0.6,s.faceWidth,210000,0,"unsupported reference ring");
+    var bare=new stockkit.hobbing.errors.RingCompliance(s.rootRadius()-0.3,0.6,s.faceWidth,210000,0,"unsupported reference ring");
     var seated=estimate.supportsRim&&estimate.contactPressure>peakForce/(Math.PI*(machine.mandrel.parameterNumber("outside")/2)*s.faceWidth);
     var rows=[];
     for(factor in [0.3,1.0,3.0]){
       var support=seated?estimate.stiffness*factor:0;
-      var ring=new stockkit.hobbing.RingCompliance(bare.radius,0.6,s.faceWidth,210000,support,estimate.basis);
+      var ring=new stockkit.hobbing.errors.RingCompliance(bare.radius,0.6,s.faceWidth,210000,support,estimate.basis);
       var mean=ring.deflection(meanForceBound)*1000,variation=ring.deflection(rangeForceBound)*1000;
       var profile=2*variation,pitch=2*Math.tan(s.pressureAngle)*variation,thickness=2*Math.tan(s.pressureAngle)*mean;
       rows.push({factor:factor,supportNPerMm:support,meanDeflectionUm:mean,varyingDeflectionRangeBoundUm:variation,

@@ -11,8 +11,8 @@ class HobbingMotion {
     for (i in 1...frames.length) if (frames[i].time
       <= frames[i - 1].time) throw "controller sample times must increase";
   }
-  public function samples():Array < HobbingKeyframe > return frames.copy();
-  public function times():Array < Float > return [for (f in frames) f.time];
+  public function samples():Array<HobbingKeyframe> return frames.copy();
+  public function times():Array<Float> return [for (f in frames) f.time];
   public function at(time:Float):HobbingAxes {
     if (!Math.isFinite(time)
       || time < frames[0].time || time > frames[frames.length - 1].time) throw "sample time outside hobbing motion";
@@ -22,8 +22,8 @@ class HobbingMotion {
       if (frames[middle].time <= time) i = middle;
       else j = middle;
     }
-    var a = frames[i], b = frames[j], t =(time - a.time) /(b.time - a.time);
-    function mix(x:Float, y:Float):Float return x +(y - x) * t;
+    var a = frames[i], b = frames[j], t =(time - a.time) / (b.time - a.time);
+    function mix(x:Float, y:Float):Float return x + (y - x) * t;
     var offset:Null<HobbingPoseOffset> = null;
     if (a.axes.offset != null || b.axes.offset != null) {
       var oa = a.axes.offset == null ? new HobbingPoseOffset() : a.axes.offset;
@@ -66,6 +66,6 @@ class HobbingMotion {
       <= frames[k - 1].axes.b) throw "master must increase for gash scheduling";
     while (i + 1 < frames.length - 1 && frames[i + 1].axes.b < phase) i++;
     var a = frames[i], b = frames[i + 1];
-    return a.time +(phase - a.axes.b) *(b.time - a.time) /(b.axes.b - a.axes.b);
+    return a.time + (phase - a.axes.b) * (b.time - a.time) / (b.axes.b - a.axes.b);
   }
 }

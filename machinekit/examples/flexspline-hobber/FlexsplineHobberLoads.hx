@@ -1,4 +1,4 @@
-import stockkit.hobbing.HobbingForces;
+import stockkit.hobbing.forces.HobbingForces;
 import motionkit.robot.PlanCheck.PlanCheckOptions;
 import camkit.HobbingJob;
 

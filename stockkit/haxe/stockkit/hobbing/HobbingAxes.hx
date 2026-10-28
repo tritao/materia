@@ -13,7 +13,7 @@ class HobbingAxes {
   public final c:Float;
   public final offset:Null<HobbingPoseOffset>;
   public function new(x:Float, y:Float, z:Float, a:Float, b:Float, c:Float, ? offset:HobbingPoseOffset) {
-    for (v in[x, y, z, a, b, c]) if (!Math.isFinite(v)) throw "hobbing axes must be finite";
+    for (v in [x, y, z, a, b, c]) if (!Math.isFinite(v)) throw "hobbing axes must be finite";
     this.offset = offset;
     this.x = x;
     this.y = y;
@@ -24,7 +24,7 @@ class HobbingAxes {
   }
   /** Hob +X faces the work centre; hob +Z points along the tilted -Y axis.
       The final inverse C rotation expresses the cut in the workpiece frame. */
-  public function poseValues():Array < Float > {
+  public function poseValues():Array<Float> {
     var ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b), cc = Math.cos(c), sc = Math.sin(c);
     var r = [-cb, -sa * sb, -ca * sb, sb, -sa * cb, -ca * cb, 0.0, -ca, sa]; // columns
     var values = [for (i in 0...12) 0.0];
@@ -48,15 +48,15 @@ class HobbingAxes {
         // Inverse of Rx(tiltX)*Ry(tiltY), about the bearing centre.
         var cx = Math.cos(offset.workTiltX),
           sx = Math.sin(offset.workTiltX), cy = Math.cos(offset.workTiltY), sy = Math.sin(offset.workTiltY);
-        for (v in[offset.workTiltX,
+        for (v in [offset.workTiltX,
           offset.workTiltY, offset.workPivotZ]) if (!Math.isFinite(v)) throw "non-finite table tilt";
         for (j in 0...4) {
           var i = j == 3 ? 9 : j, xx = values[i],
-            yy = values[j == 3 ? 10 : 3 + j], zz = values[j == 3 ? 11 : 6 + j] -(j == 3 ? offset.workPivotZ : 0);
+            yy = values[j == 3 ? 10 : 3 + j], zz = values[j == 3 ? 11 : 6 + j] - (j == 3 ? offset.workPivotZ : 0);
           var ry = cx * yy + sx * zz, rz = -sx * yy + cx * zz;
           values[i] = cy * xx - sy * rz;
           values[j == 3 ? 10 : 3 + j] = ry;
-          values[j == 3 ? 11 : 6 + j] = sy * xx + cy * rz +(j == 3 ? offset.workPivotZ : 0);
+          values[j == 3 ? 11 : 6 + j] = sy * xx + cy * rz + (j == 3 ? offset.workPivotZ : 0);
         }
       }
     }

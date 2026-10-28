@@ -1,4 +1,4 @@
-package stockkit.hobbing;
+package stockkit.hobbing.errors;
 
 /** Quasistatic in-plane n=2 thin-ring model. mm, N, Young's modulus N/mm².
     w=d*cos(2 theta), U=9*pi*E*I*d²/(2R³), I=width*wall³/12.
@@ -14,7 +14,7 @@ class RingCompliance {
   public final stiffness:Float;
   public final basis:String;
   public function new(radius:Float, wall:Float, width:Float, youngs:Float, supportStiffness:Float, basis:String) {
-    for (v in[radius, wall, width, youngs]) if (!Math.isFinite(v) || v <= 0) throw "invalid ring geometry/material";
+    for (v in [radius, wall, width, youngs]) if (!Math.isFinite(v) || v <= 0) throw "invalid ring geometry/material";
     if (wall >= radius / 5 || !Math.isFinite(supportStiffness) || supportStiffness < 0
       || basis == null || basis.length == 0) throw "thin ring needs explicit support stiffness and basis";
     this.radius = radius;
@@ -23,7 +23,7 @@ class RingCompliance {
     this.youngs = youngs;
     this.supportStiffness = supportStiffness;
     this.basis = basis;
-    ringStiffness = 9 * Math.PI * youngs *(width * wall * wall * wall / 12) /(radius * radius * radius);
+    ringStiffness = 9 * Math.PI * youngs * (width * wall * wall * wall / 12) / (radius * radius * radius);
     stiffness = ringStiffness + supportStiffness;
   }
   public function deflection(force:Float):Float {

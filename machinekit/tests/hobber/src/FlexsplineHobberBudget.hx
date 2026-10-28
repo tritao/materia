@@ -2,6 +2,7 @@ import gearkit.*;
 import stockkit.*;
 import stockkit.ring.*;
 import stockkit.hobbing.*;
+import stockkit.hobbing.errors.*;
 import machinekit.hobbing.MandrelRadialSupport;
 
 /** Reproducible physical source studies. Ideal baseline, independent simulated

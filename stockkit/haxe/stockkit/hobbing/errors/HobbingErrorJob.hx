@@ -1,7 +1,10 @@
-package stockkit.hobbing;
+package stockkit.hobbing.errors;
 import gearkit.*;
 import stockkit.ring.RingStock;
 import stockkit.ring.RingGrid;
+import stockkit.hobbing.GashPass;
+import stockkit.hobbing.HobbingSweep;
+import stockkit.hobbing.HobbingAxes;
 
 /** Repeats physical rake subtraction and HB4 inspection from a fresh blank for
     every budget run. at() may be ideal motion or recorded HB7 actual observations;
@@ -19,7 +22,7 @@ class HobbingErrorJob {
   final lastTooth:Int;
   final tolerance:Float;
   final inspection:Null<GearInspection>;
-  final motionKnots:Null<Array < Float>>;
+  final motionKnots:Null<Array<Float>>;
   public final threads:Int;
   final inspectionCross:Bool;
   final faceEndpoints:Bool;
@@ -64,7 +67,7 @@ class HobbingErrorJob {
           var middle = Std.int(Math.min(start + width,
             n)), end = Std.int(Math.min(start + 2 * width, n)), i = start, j = middle, k = start;
           while (k < end) {
-            if (i < middle &&(j >= end || a[i] <= a[j])) b[k++] = a[i++];
+            if (i < middle && (j >= end || a[i] <= a[j])) b[k++] = a[i++];
             else b[k++] = a[j++];
           }
           start = end;
@@ -162,7 +165,7 @@ class HobbingErrorJob {
       sweep = new HobbingSweep(hob, firstTooth, lastTooth, tolerance, warp);
       var done = 0;
       for (pass in passes) {
-        var local:Null<Array < Float>> = null;
+        var local:Null<Array<Float>> = null;
         if (motionKnots != null) {
           var lo = 0, hi = motionKnots.length;
           while (lo < hi) {

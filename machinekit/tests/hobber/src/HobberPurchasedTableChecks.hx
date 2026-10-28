@@ -4,6 +4,7 @@ import machinekit.component.*;
 import machinekit.assembly.MachineAssembly;
 import materia.assembly.AssemblyFrames as F;
 import stockkit.hobbing.*;
+import stockkit.hobbing.errors.*;
 
 /** Interface/persistence, services and conditional analytic pitch screening; not a full HB11 cut. */
 class HobberPurchasedTableChecks {

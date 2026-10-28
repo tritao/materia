@@ -1332,7 +1332,7 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
 
 ### HB10 implementation — full reference force and static ratings passed
 
-- `stockkit.hobbing.HobbingForces` derives chip volume from native removed ring
+- `stockkit.hobbing.forces.HobbingForces` derives chip volume from native removed ring
   intervals after each gash; chip area is volume / peripheral cutter travel.
   Effective edge width is explicit (app: 1 mm assumed). `KienzleMaterial` marks
   40CrNiMo at 38–42 HRC kc1.1=2400 N/mm² and mc=0.25 as uncalibrated assumptions.

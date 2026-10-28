@@ -2,6 +2,7 @@ import gearkit.*;
 import stockkit.*;
 import stockkit.ring.*;
 import stockkit.hobbing.*;
+import stockkit.hobbing.errors.*;
 
 class RingMetrologyTests {
   static var assertions=0;

@@ -41,7 +41,7 @@ class RingPreviewWorker {
     condition.release();
     return true;
   }
-  public function take():Null < StockMesh > {
+  public function take():Null<StockMesh> {
     condition.acquire();
     var value = result, problem = failure;
     result = null;

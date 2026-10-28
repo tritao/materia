@@ -19,7 +19,7 @@ class GashPass {
     this.end = end;
   }
   /** Constant-speed events come from integer phase indices, never tick accumulation. */
-  public static function constantSpeed(gashes:Int, rpm:Float, duration:Float, halfAngle:Float):Array < GashPass > {
+  public static function constantSpeed(gashes:Int, rpm:Float, duration:Float, halfAngle:Float):Array<GashPass> {
     if (gashes < 2
       || !Math.isFinite(rpm) || rpm <= 0 || !Math.isFinite(duration) || duration <= 0 || !Math.isFinite(halfAngle)
       || halfAngle <= 0 || halfAngle >= Math.PI) throw "invalid constant-speed gash schedule";
@@ -42,12 +42,12 @@ class GashPass {
     return result;
   }
   /** Exact phase crossings under piecewise-linear master interpolation. */
-  public static function fromMotion(motion:HobbingMotion, gashes:Int, halfAngle:Float):Array < GashPass > {
+  public static function fromMotion(motion:HobbingMotion, gashes:Int, halfAngle:Float):Array<GashPass> {
     if (gashes < 2
       || !Math.isFinite(halfAngle) || halfAngle <= 0 || halfAngle >= Math.PI) throw "invalid gash schedule";
     var frames = motion.samples(), start = frames[0], end = frames[frames.length - 1], step = 2 * Math.PI / gashes;
     if (Math.abs(start.axes.b / step) > 1000000000 || Math.abs(end.axes.b / step) > 1000000000
-      ||(end.axes.b - start.axes.b) / step > 1999000) throw "master phase outside scheduling limits";
+      || (end.axes.b - start.axes.b) / step > 1999000) throw "master phase outside scheduling limits";
     motion.timeAtMaster(start.axes.b);
     var first = Math.floor((start.axes.b - halfAngle) / step),
       last = Math.ceil((end.axes.b + halfAngle) / step), result:Array<GashPass> = [];

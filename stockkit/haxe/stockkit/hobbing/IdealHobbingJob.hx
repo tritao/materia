@@ -28,7 +28,7 @@ class IdealHobbingJob {
     if (spec.internal) throw "ideal hobbing driver supports external spur gears";
     if (Math.abs(spec.module - hob.rack.module) > 1e-12
       || Math.abs(spec.pressureAngle - hob.rack.pressureAngle) > 1e-12) throw "hob and gear rack must match";
-    for (v in[rpm, workTurns, feed, zStart, shift]) if (!Math.isFinite(v)) throw "job values must be finite";
+    for (v in [rpm, workTurns, feed, zStart, shift]) if (!Math.isFinite(v)) throw "job values must be finite";
     if (rpm <= 0 || workTurns <= 0) throw "job speed and turns must be positive";
     this.spec = spec;
     this.hob = hob;
@@ -47,10 +47,10 @@ class IdealHobbingJob {
   }
   public function axesAt(time:Float):HobbingAxes {
     var b = rpm * 2 * Math.PI / 60 * time, c = b * hob.starts / spec.teeth;
-    return new HobbingAxes(centerDistance, shift, zStart + feed * c /(2 * Math.PI), -hob.leadAngle, b, c + tablePhase);
+    return new HobbingAxes(centerDistance, shift, zStart + feed * c / (2 * Math.PI), -hob.leadAngle, b, c + tablePhase);
   }
-  public function schedule(grid:RingGrid):Array < GashPass > {
-    var limit =(centerDistance - grid.radiusMax) /(hob.outsideDiameter / 2);
+  public function schedule(grid:RingGrid):Array<GashPass> {
+    var limit =(centerDistance - grid.radiusMax) / (hob.outsideDiameter / 2);
     if (limit >= 1) throw "hob does not reach stock";
     var half = Math.acos(Math.max(-1, limit)) + Math.abs(hob.rake) + 0.01;
     return GashPass.constantSpeed(hob.gashes, rpm, duration, Math.min(Math.PI / 2, half));

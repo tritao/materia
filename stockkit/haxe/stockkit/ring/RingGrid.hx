@@ -32,11 +32,11 @@ class RingGrid {
   }
   public function radius(index:Int):Float {
     if (index < 0 || index >= radialCount) throw "ring radial index out of range";
-    return radiusMin +(index + 0.5) * radialStep;
+    return radiusMin + (index + 0.5) * radialStep;
   }
   public function z(index:Int):Float {
     if (index < 0 || index >= axialCount) throw "ring axial index out of range";
-    return zMin +(index + 0.5) * axialStep;
+    return zMin + (index + 0.5) * axialStep;
   }
   /** Volume of a one-radian sector of a cell, in cubic mm. */
   public function sectorVolume(radialIndex:Int):Float return radius(radialIndex) * radialStep * axialStep;

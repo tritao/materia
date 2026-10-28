@@ -2,6 +2,7 @@ import gearkit.*;
 import stockkit.*;
 import stockkit.ring.*;
 import stockkit.hobbing.*;
+import stockkit.hobbing.forces.*;
 
 typedef ForceSpeedResult={summary:Dynamic,stockHash:String,loadHash:String,seconds:Float,stockValues:Array<Float>,stockSources:Array<Int>,loadValues:Array<Float>};
 /** Reference geometry, short virgin engagement and a common-precut mid-face band.

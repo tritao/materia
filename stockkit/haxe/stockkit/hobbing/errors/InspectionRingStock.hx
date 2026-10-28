@@ -1,4 +1,4 @@
-package stockkit.hobbing;
+package stockkit.hobbing.errors;
 import gearkit.GearInspection;
 import gearkit.GearRings;
 import stockkit.ring.RingGrid;
@@ -25,7 +25,7 @@ class InspectionRingStock implements GearRings {
     stocks = [profile, lead];
   }
   static function bracket(values:Array<Float>, value:Float):Int {
-    if (value < values[0] || value > values[values.length - 1]) return - 1;
+    if (value < values[0] || value > values[values.length - 1]) return -1;
     var lo = 0, hi = values.length - 1;
     while (hi - lo > 1) {
       var mid =(lo + hi) >> 1;
@@ -35,19 +35,19 @@ class InspectionRingStock implements GearRings {
     return lo;
   }
   static function slice(min:Float,
-    max:Float, step:Float, values:Array<Float>, first:Int, last:Int):Null < InspectionSlice> {
+    max:Float, step:Float, values:Array<Float>, first:Int, last:Int):Null<InspectionSlice> {
     // Additional border cells may make the translated grid arithmetic exact.
     // Fall back to dense computation if a compact exact slice is unavailable.
     function ulp(v:Float):Float return v == 0 ? 0 : Math.pow(2, Math.floor(Math.log(Math.abs(v)) / Math.log(2)) - 52);
     for (padding in 0...9) {
       var lo = Std.int(Math.max(0, first - padding)), hi = Std.int(Math.min(values.length - 1, last + padding));
-      var baseLow = min + lo * step, baseHigh = hi == values.length - 1 ? max : min +(hi + 1) * step;
+      var baseLow = min + lo * step, baseHigh = hi == values.length - 1 ? max : min + (hi + 1) * step;
       // Rounded domain bounds can otherwise move a retained centre by one ULP.
       // Search nearby bounds, accepting ONLY exact original sample coordinates.
       for (da in - 2...3) for (db in - 2...3) {
         var a = baseLow + da * ulp(baseLow),
-          b = baseHigh + db * ulp(baseHigh), delta =(b - a) /(hi - lo + 1), same = true;
-        for (i in lo...hi + 1) if (a +(i - lo + 0.5) * delta != values[i]) {
+          b = baseHigh + db * ulp(baseHigh), delta =(b - a) / (hi - lo + 1), same = true;
+        for (i in lo...hi + 1) if (a + (i - lo + 0.5) * delta != values[i]) {
           same = false;
           break;
         }
@@ -56,7 +56,7 @@ class InspectionRingStock implements GearRings {
     }
     return null;
   }
-  public static function create(grid:RingGrid, cfg:GearInspection):Null < InspectionRingStock > {
+  public static function create(grid:RingGrid, cfg:GearInspection):Null<InspectionRingStock> {
     if (grid.radialCount < 2 || grid.axialCount < 2) return null;
     var rs = [for (i in 0...grid.radialCount) grid.radius(i)], zs = [for (i in 0...grid.axialCount) grid.z(i)];
     var r = bracket(rs, cfg.measurementRadius), a = bracket(zs, cfg.profileZ), b = bracket(zs, cfg.pitchZ);
@@ -70,14 +70,14 @@ class InspectionRingStock implements GearRings {
       axial.low,
       axial.high,
       grid.radialStep,
-      (axial.high - axial.low) /(axial.last - axial.first + 1)
+      (axial.high - axial.low) / (axial.last - axial.first + 1)
     );
     var lg = new RingGrid(
       radial.low,
       radial.high,
       grid.zMin,
       grid.zMax,
-      (radial.high - radial.low) /(radial.last - radial.first + 1),
+      (radial.high - radial.low) / (radial.last - radial.first + 1),
       grid.axialStep
     );
     if (pg.radialCount != grid.radialCount || pg.axialCount != axial.last - axial.first + 1
@@ -94,18 +94,18 @@ class InspectionRingStock implements GearRings {
       throw e;
     }
   }
-  public function radii():Array < Float > return [for (i in 0...grid.radialCount) grid.radius(i)];
-  public function axialPositions():Array < Float > return [for (i in 0...grid.axialCount) grid.z(i)];
+  public function radii():Array<Float> return [for (i in 0...grid.radialCount) grid.radius(i)];
+  public function axialPositions():Array<Float> return [for (i in 0...grid.axialCount) grid.z(i)];
   public function contains(r:Int,
-    z:Int):Bool return(z >= axial.first && z <= axial.last) ||(r >= radial.first && r <= radial.last);
-  public function circle(r:Int, z:Int):Array < RingInterval > {
+    z:Int):Bool return(z >= axial.first && z <= axial.last) || (r >= radial.first && r <= radial.last);
+  public function circle(r:Int, z:Int):Array<RingInterval> {
     grid.radius(r);
     grid.z(z);
     if (z >= axial.first && z <= axial.last) return stocks[0].circle(r, z - axial.first);
     if (r >= radial.first && r <= radial.last) return stocks[1].circle(r - radial.first, z);
     throw 'uncomputed inspection circle ($r,$z)';
   }
-  public function boundaries(r:Int, z:Int):Array < Float > {
+  public function boundaries(r:Int, z:Int):Array<Float> {
     var out:Array<Float> = [];
     for (a in circle(r, z)) {
       out.push(a.lo);

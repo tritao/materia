@@ -2,6 +2,7 @@ import gearkit.*;
 import stockkit.*;
 import stockkit.ring.*;
 import stockkit.hobbing.*;
+import stockkit.hobbing.forces.*;
 class HobbingForceTests {
   static var checks=0;
   static function check(ok:Bool,label:String):Void {checks++;if(!ok)throw label;}

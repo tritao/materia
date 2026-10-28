@@ -15,6 +15,16 @@ with CAMotics and FreeCAD, the OpenVDB decision, libraries surveyed, ideas
 kept for later) is in [`docs/DESIGN.md`](docs/DESIGN.md); notes on the
 open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md).
 
+## Layout
+
+- `core/` is the native library: C++ sources in `core/src`, the C ABI in `core/include/stockkit.h`
+  (`sk_*` functions), the generated Haxe binding in `core/bindings`, and native tests in `core/tests`.
+  The ring stock and rake code is in `core/src/ring`.
+- `haxe/stockkit` is the Haxe API over it. The root package is the Cartesian stock (`Stock*`, `Cut*`);
+  `stockkit.ring` is the ring stock; `stockkit.hobbing` is the hob sweep, with `hobbing.forces` for
+  cutting loads and `hobbing.errors` for the error budget and inspection; `stockkit.internal` is not API.
+- `docs/` holds the plan, design notes and gear-cutting documents; `tests/` holds the Haxe suites.
+
 ## Gear cutting
 
 `stockkit.ring` holds `RingStock`, a circumferential stock for gear tooth bands, and

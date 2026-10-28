@@ -13,7 +13,7 @@ class HobbingStream {
   public var peakFrames(default, null):Int = 0;
   public var lastTime(default, null):Float = 0;
   final frames:Array<HobbingKeyframe> = [];
-  public var onPass:Null <(GashPass, HobbingAxes, HobbingAxes) -> Void > = null;
+  public var onPass:Null<(GashPass, HobbingAxes, HobbingAxes) -> Void> = null;
   var next:Int = 0;
   var first:Int = 0;
   var initialized = false;

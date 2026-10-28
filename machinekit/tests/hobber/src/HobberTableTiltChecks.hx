@@ -1,4 +1,5 @@
 import stockkit.hobbing.*;
+import stockkit.hobbing.errors.*;
 /** Analytic table axial/tilt signatures; no full reference-budget claim. */
 class HobberTableTiltChecks {
   public static function run():Void {

@@ -1,4 +1,4 @@
-package stockkit.hobbing;
+package stockkit.hobbing.errors;
 import gearkit.GearRings;
 import stockkit.ring.RingGrid;
 import stockkit.ring.RingStock;
@@ -11,10 +11,7 @@ class FaceEndpointStock implements GearRings {
   final base:GearRings;
   final endpointRadii:Array<Int> = [];
   final planes:Array<RingStock> = [];
-  final nodes:Array < {
-    z:Float, base:Int, plane:Int
-  }
-  > = [];
+  final nodes:Array<{z:Float, base:Int, plane:Int}> = [];
   public function new(base:GearRings, baseStocks:Array<RingStock>, grid:RingGrid, faceWidth:Float) {
     if (!Math.isFinite(faceWidth) || faceWidth <= 0) throw "invalid inspected face width";
     this.base = base;
@@ -34,7 +31,7 @@ class FaceEndpointStock implements GearRings {
     for (i in 0...zs.length) nodes.push({z: zs[i], base: i, plane: -1}
     );
     try {
-      for (z in[0.0, faceWidth]) {
+      for (z in [0.0, faceWidth]) {
         var present = false;
         for (value in zs) if (value == z) present = true;
         if (present) continue;
@@ -56,9 +53,9 @@ class FaceEndpointStock implements GearRings {
       throw e;
     }
   }
-  public function radii():Array < Float > return base.radii();
-  public function axialPositions():Array < Float > return [for (node in nodes) node.z];
-  public function boundaries(r:Int, z:Int):Array < Float > {
+  public function radii():Array<Float> return base.radii();
+  public function axialPositions():Array<Float> return [for (node in nodes) node.z];
+  public function boundaries(r:Int, z:Int):Array<Float> {
     if (z < 0 || z >= nodes.length) throw "face-end axial index outside inspection";
     var node = nodes[z];
     if (node.plane < 0) return base.boundaries(r, node.base);

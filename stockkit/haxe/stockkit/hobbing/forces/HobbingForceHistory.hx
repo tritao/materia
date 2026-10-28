@@ -1,4 +1,4 @@
-package stockkit.hobbing;
+package stockkit.hobbing.forces;
 
 /** Opt-in per-gash history, separate from the bounded online force observer.
     Reconstructs the same overlapping rectangular window-mean radial loads.
@@ -16,10 +16,7 @@ class HobbingForceHistory {
   }
   function prepare():Void {
     if (prepared) return;
-    var events:Array < {
-      time:Float, delta:Float
-    }
-    > = [];
+    var events:Array<{time:Float, delta:Float}> = [];
     for (s in samples) {
       events.push({time: s.pass.start, delta: s.radialForce}
       );
@@ -77,7 +74,7 @@ class HobbingForceHistory {
     if (f > 1e-9) activeTime += dt;
     min = Math.min(min, f);
     max = Math.max(max, f);
-    var mean = integral /(end - start),
+    var mean = integral / (end - start),
       stepSquare = 0.0, maxStep = 0.0, passMin = 1e300, passMax = 0.0, previous = 0.0, count = 0;
     for (s in samples) if (s.pass.start >= start && s.pass.start < end) {
       if (count > 0) {
@@ -97,7 +94,7 @@ class HobbingForceHistory {
       radialRangeN: max - min,
       radialStdDevN: Math.sqrt(Math.max(
         0,
-        square /(end - start) - mean * mean
+        square / (end - start) - mean * mean
       )),
       radialPeakDeviationFromMeanN: Math.max(
         max - mean,
@@ -108,7 +105,7 @@ class HobbingForceHistory {
       perPassRadialMinN : count > 0 ? passMin : 0,
       perPassRadialMaxN : passMax,
       perPassRadialMaxStepN : maxStep,
-      perPassRadialRmsStepN : count > 1 ? Math.sqrt(stepSquare /(count - 1)) : 0,
+      perPassRadialRmsStepN : count > 1 ? Math.sqrt(stepSquare / (count - 1)) : 0,
       windows : count,
       startSeconds : start,
       endSeconds : end,

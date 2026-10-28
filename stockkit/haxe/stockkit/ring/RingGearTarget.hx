@@ -36,10 +36,10 @@ class RingGearTarget {
     }
   }
 
-  static function angles(profile:ToothProfile, radius:Float):Array < RingInterval > {
+  static function angles(profile:ToothProfile, radius:Float):Array<RingInterval> {
     var spec = profile.spec, full = 2 * Math.PI;
     if ((!spec.internal
-      && radius <= spec.rootRadius()) ||(spec.internal && radius >= spec.rootRadius())) return [new RingInterval(
+      && radius <= spec.rootRadius()) || (spec.internal && radius >= spec.rootRadius())) return [new RingInterval(
         0,
         full,
         -1,
@@ -47,13 +47,13 @@ class RingGearTarget {
         -1,
         -1
       )];
-    if ((!spec.internal && radius > spec.tipRadius()) ||(spec.internal && radius < spec.tipRadius())) return [];
+    if ((!spec.internal && radius > spec.tipRadius()) || (spec.internal && radius < spec.tipRadius())) return [];
     var lo = Math.min(profile.rootJoinRadius, profile.tipJoinRadius);
     var hi = Math.max(profile.rootJoinRadius, profile.tipJoinRadius);
     var point:Point2;
     if (radius >= lo && radius <= hi) point = profile.flankAtRadius(radius);
     else {
-      var root = spec.sign() *(radius - profile.rootJoinRadius) < 0;
+      var root = spec.sign() * (radius - profile.rootJoinRadius) < 0;
       var a = 0.0, b = 1.0;
       // Root parameter runs flank->root; tip parameter runs flank->tip.
       var increasing = root ? spec.internal : !spec.internal;

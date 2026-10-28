@@ -5,6 +5,7 @@ import gearkit.*;
 import stockkit.*;
 import stockkit.ring.*;
 import stockkit.hobbing.*;
+import stockkit.hobbing.forces.*;
 import nativekit.scene.GeometryData;
 import materia.project.SceneArtifact.SceneArtifactHobbing;
 

@@ -1,5 +1,6 @@
 import gearkit.*;
 import stockkit.hobbing.*;
+import stockkit.hobbing.errors.*;
 import MetrologyTests.SyntheticGearRings;
 class HobbingErrorTests {
   static var checks=0;

@@ -56,7 +56,7 @@ class HobbingSweep {
       }
     }
     probes = [];
-    for (x in[xmin, xmax]) for (y in[ymin, ymax]) for (z in[zmin, zmax]) probes.push(new Point3(x, y, z));
+    for (x in [xmin, xmax]) for (y in [ymin, ymax]) for (z in [zmin, zmax]) probes.push(new Point3(x, y, z));
     var created = StockKitNative.sk_rake_tool_create(vertices, regions, hob.gashes);
     check(created.status, "create rake tool");
     owner = created.out_tool;
@@ -81,7 +81,7 @@ class HobbingSweep {
       for (level in 0...maxRefinements + 1) {
         stock.restore(initial);
         poseCount = 0;
-        var stepTolerance = tolerance /(4 * Math.pow(4, level));
+        var stepTolerance = tolerance / (4 * Math.pow(4, level));
         for (pass in passes) {
           if (pass.gash >= hob.gashes) throw "scheduled gash is outside tool";
           var poses = sample(axesAt, pass.start, pass.end, pass.center, stepTolerance, maxTimeStep, motionKnots);
@@ -141,7 +141,7 @@ class HobbingSweep {
       for (level in 0...maxRefinements + 1) {
         for (i in 0...stocks.length) stocks[i].restore(initial[i]);
         poses = 0;
-        var step = tolerance /(4 * Math.pow(4, level)), began = Sys.time(), completed = 0;
+        var step = tolerance / (4 * Math.pow(4, level)), began = Sys.time(), completed = 0;
         if (progress != null) progress({
           phase: "start",
           level: level,
@@ -153,7 +153,7 @@ class HobbingSweep {
         for (pass in passes) {
           poses += cutPassMany(stocks, axesAt, pass, step, maxTimeStep);
           completed++;
-          if (progress != null &&(completed % 10000 == 0 || completed == passes.length)) progress({
+          if (progress != null && (completed % 10000 == 0 || completed == passes.length)) progress({
             phase: "cut",
             level: level,
             completed: completed,
@@ -312,8 +312,8 @@ class HobbingSweep {
     center:Float,
     tol:Float,
     maxStep:Float,
-    knots:Null<Array < Float>>
-  ):Array < sk_rake_pose> {
+    knots:Null<Array<Float>>
+  ):Array<sk_rake_pose> {
     var result:Array<sk_rake_pose> = [];
     var a = at(start);
     result.push(a.pose());
@@ -323,8 +323,8 @@ class HobbingSweep {
       var tm =(t0 + t1) / 2, sm = at(tm), pm = sm.poseValues(), error = 0.0;
       // Endpoints are cached through recursion. Identical affine arithmetic and
       // refinement tests, without reconstructing three native poses per node.
-      var dr = [for (j in 0...9) pm[j] -(p0[j] + p1[j]) / 2];
-      var dt = [for (k in 0...3) pm[9 + k] -(p0[9 + k] + p1[9 + k]) / 2];
+      var dr = [for (j in 0...9) pm[j] - (p0[j] + p1[j]) / 2];
+      var dt = [for (k in 0...3) pm[9 + k] - (p0[9 + k] + p1[9 + k]) / 2];
       for (v in probes) {
         var dx = dt[0] + dr[0] * v.x + dr[1] * v.y + dr[2] * v.z;
         var dy = dt[1] + dr[3] * v.x + dr[4] * v.y + dr[5] * v.z;
@@ -350,11 +350,11 @@ class HobbingSweep {
     }
     return result;
   }
-  static function simplify(raw:Array<Point3>, tolerance:Float):Array < Point3> {
+  static function simplify(raw:Array<Point3>, tolerance:Float):Array<Point3> {
     var points = raw.copy();
     points.pop();
     var split = Std.int(points.length / 2);
-    function reduce(a:Int, b:Int):Array < Point3 > {
+    function reduce(a:Int, b:Int):Array<Point3> {
       var first = points[a], last = points[b], dx = last.x - first.x, dy = last.y - first.y, dz = last.z - first.z;
       var length = dx * dx + dy * dy + dz * dz, worst = 0.0, index = -1;
       for (k in a + 1...b) {
@@ -362,7 +362,7 @@ class HobbingSweep {
           0,
           Math.min(
             1,
-            ((p.x - first.x) * dx +(p.y - first.y) * dy +(p.z - first.z) * dz) / length
+            ((p.x - first.x) * dx + (p.y - first.y) * dy + (p.z - first.z) * dz) / length
           )
         );
         var ex = p.x - first.x - t * dx,

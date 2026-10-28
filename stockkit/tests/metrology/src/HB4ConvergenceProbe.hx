@@ -2,6 +2,7 @@ import gearkit.*;
 import stockkit.*;
 import stockkit.ring.*;
 import stockkit.hobbing.*;
+import stockkit.hobbing.errors.*;
 
 /** Diagnostic only: exact reference circles and schedule, with full original tool/probes. */
 class HB4ConvergenceProbe {

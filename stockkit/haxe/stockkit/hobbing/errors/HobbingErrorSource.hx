@@ -1,5 +1,7 @@
-package stockkit.hobbing;
+package stockkit.hobbing.errors;
 import gearkit.Point3;
+import stockkit.hobbing.HobbingPoseOffset;
+import stockkit.hobbing.HobbingAxes;
 
 /** Identified error with provenance. Perturbs tool/work motion before cutting,
     never metrology values after the fact. Dimensions mm/rad/s; phases explicit. */
@@ -8,7 +10,7 @@ class HobbingErrorSource {
   public final part:String;
   public final basis:String;
   public final apply:(Float, HobbingAxes) -> HobbingAxes;
-  public final warp:Null < Point3 -> Point3 >;
+  public final warp:Null<Point3 -> Point3 >;
   public function new(
     id:String,
     part:String,
@@ -67,7 +69,7 @@ class HobbingErrorSource {
         a
       ) -> {var force = radialForce(t);
     amplitude(force);
-    var theta = force * forceHeight /(1000 * stiffness);
+    var theta = force * forceHeight / (1000 * stiffness);
     return shifted(a, o -> {if ((o.workTiltX != 0
       || o.workTiltY != 0) && o.workPivotZ != -pivotDepth) throw "incompatible table tilt pivots";
     o.workPivotZ = -pivotDepth;
@@ -166,7 +168,7 @@ class HobbingErrorSource {
       ? "diagnostic delayed master with first-order prediction" : "diagnostic delayed master without prediction",(
         t,
         a
-      ) -> {var error = ratio *(master(t - delay) +(predict ? delay * velocity(t - delay) : 0) - master(t));
+      ) -> {var error = ratio * (master(t - delay) + (predict ? delay * velocity(t - delay) : 0) - master(t));
     return new HobbingAxes(a.x, a.y, a.z, a.a, a.b, a.c + error, a.offset);
     }
     );

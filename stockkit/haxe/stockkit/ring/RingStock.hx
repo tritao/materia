@@ -43,9 +43,9 @@ class RingStock implements gearkit.GearRings {
     return annulus(new RingGrid(inner, outer, 0, spec.faceWidth, radialSpacing, axialSpacing));
   }
 
-  public function radii():Array < Float > return [for (i in 0...grid.radialCount) grid.radius(i)];
-  public function axialPositions():Array < Float > return [for (i in 0...grid.axialCount) grid.z(i)];
-  public function boundaries(radial:Int, axial:Int):Array < Float > {
+  public function radii():Array<Float> return [for (i in 0...grid.radialCount) grid.radius(i)];
+  public function axialPositions():Array<Float> return [for (i in 0...grid.axialCount) grid.z(i)];
+  public function boundaries(radial:Int, axial:Int):Array<Float> {
     var result:Array<Float> = [];
     for (a in circle(radial, axial)) {
       result.push(a.lo);
@@ -58,7 +58,7 @@ class RingStock implements gearkit.GearRings {
     if (threads < 0 || threads > 128) throw "ring thread count must be in [0,128]";
     check(StockKitNative.sk_ring_stock_set_threads(owner.borrow(), threads), "setThreads");
   }
-  public function circle(radialIndex:Int, axialIndex:Int):Array < RingInterval > {
+  public function circle(radialIndex:Int, axialIndex:Int):Array<RingInterval> {
     alive();
     grid.radius(radialIndex);
     grid.z(axialIndex);
@@ -168,7 +168,7 @@ class RingStock implements gearkit.GearRings {
       var indices = StockKitNative.sk_mesh_copy_indices(handle);
       var colors = StockKitNative.sk_mesh_copy_colors(handle);
       var sources = StockKitNative.sk_mesh_copy_triangle_sources(handle);
-      for (status in[info.status,
+      for (status in [info.status,
         positions.status, normals.status, indices.status, colors.status, sources.status]) check(
           status,
           "contour streams"

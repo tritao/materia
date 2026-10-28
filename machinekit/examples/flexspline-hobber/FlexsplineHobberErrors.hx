@@ -1,5 +1,5 @@
-import stockkit.hobbing.HobbingErrorSource;
-import stockkit.hobbing.RingCompliance;
+import stockkit.hobbing.errors.HobbingErrorSource;
+import stockkit.hobbing.errors.RingCompliance;
 
 /** HB11 adapter: amplitudes read from installed parts. Runout fields interpreted
     as TIR, eccentricity fields as offset amplitude. Harmonic shapes/phases assumed.
@@ -72,7 +72,7 @@ class FlexsplineHobberErrors {
       radialStep:Float=0.005,axialStep:Float=0.1,tolerance:Float=0.000025,
       ?inspection:gearkit.GearInspection,?motionKnots:Array<Float>,threads:Int=8):gearkit.ErrorBudget {
     var span=Std.int(Math.ceil(machine.hob.parameterNumber("height")/(2*machine.hob.design.axialPitch)))+2;
-    return new stockkit.hobbing.HobbingErrorJob(machine.spec,machine.hob.design,at,passes,
+    return new stockkit.hobbing.errors.HobbingErrorJob(machine.spec,machine.hob.design,at,passes,
       sources(machine,radialForce,wall,sync),wall.wall,radialStep,axialStep,-span,span,tolerance,inspection,motionKnots,threads).budget();
   }
 }
