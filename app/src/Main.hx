@@ -320,12 +320,14 @@ class Main {
         activeEditor.commands.execute("sim.play");
         ready = !activeEditor.openingProject();
       }
-      if (ready && frameId != null && activeEditor != null && activeEditor.perspectiveViewport != null) {
+      var frameEditor = activeEditor;
+      var frameViewport = frameEditor == null ? null : frameEditor.perspectiveViewport;
+      if (ready && frameId != null && frameEditor != null && frameViewport != null) {
         var id:String = cast frameId;
         frameId = null;
-        if (activeEditor.scene.select(id)) {
-          activeEditor.perspectiveViewport.frameSelected();
-          activeEditor.scene.select("scene");
+        if (frameEditor.scene.select(id)) {
+          frameViewport.frameSelected();
+          frameEditor.scene.select("scene");
         }
       }
       return ready;
