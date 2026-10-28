@@ -1326,6 +1326,10 @@ class EditorPerspectiveViewport implements View {
     var next:Null<String> = hit.id;
     var nextFace = hit.faceIndex;
     if (next == "scene") next = null;
+    if (next != null && scene.object(next) != null && !scene.isVisible(next)) {
+      next = null;
+      nextFace = -1;
+    }
     if (next == hoveredObjectId && nextFace == hoveredFaceIndex) return;
     hoveredObjectId = next;
     hoveredFaceIndex = next == null ? -1 : nextFace;
@@ -1341,6 +1345,9 @@ class EditorPerspectiveViewport implements View {
   function revalidateHover():Void {
     if (hoverSceneRevision == scene.visualRevision) return;
     hoverSceneRevision = scene.visualRevision;
+    // A hover on a part that is now hidden is gone, wherever the cursor is.
+    if (hoveredObjectId != null
+      && scene.object(hoveredObjectId) != null && !scene.isVisible(hoveredObjectId)) clearHover();
     if (!cursorInside || readOnly || navigationPointer != null) return;
     if (simulationActive) {
       if (hoveredObjectId != null && !scene.isVisible(hoveredObjectId)) clearHover();

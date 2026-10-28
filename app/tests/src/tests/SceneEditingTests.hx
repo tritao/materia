@@ -1883,6 +1883,14 @@ import materia.project.MaterialLibrary;
       scene.setVisible("box", false);
       ui.submit(viewport, new LayoutFrame(800.0, 600.0));
       check(viewport.hoveredId() == null, "hiding the hovered part clears the hover without a pointer move");
+      // Even if a stale hover id reaches the render view, a hidden object shows no hover highlight.
+      var hiddenHoverView = scene.configureRenderView(
+        new SceneView(),
+        viewport.camera.viewProjection(800.0 / 600.0),
+        null,
+        "box"
+      );
+      check(hiddenHoverView.hoverOverrideCount() == 0, "a hidden object shows no hover highlight in the render view");
     } catch (error:Dynamic) {
       ui.dispose();
       scene.dispose();

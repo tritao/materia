@@ -215,6 +215,11 @@ import nativekit.scene.ChangeSet;
     view.applySelection(selection, selectionMaterial);
     sourceFaces.apply(owner, view);
     var highlightMaterial = hoverMaterial;
+    // A hidden object shows no hover: its face overlay is forced visible in this view, so it would float where the object was.
+    if (hoveredId != null && !owner.isVisible(hoveredId)) {
+      hoveredId = null;
+      hoveredFaceIndex = -1;
+    }
     var faceHoverNode = hoveredId == null
       || hoveredFaceIndex == null || hoveredFaceIndex < 0 ? null : faceHoverNodes.get(hoveredId);
     var faceHoverShown = faceHoverNode != null && faceHoverIndexes.get(hoveredId) == hoveredFaceIndex;
