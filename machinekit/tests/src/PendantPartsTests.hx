@@ -121,6 +121,19 @@ class PendantPartsTests {
     check(found.length == 0, "Interference: " + found.join(" | "));
     var first = PendantAssembly.interferences(ReferencePendant.face());
     check(first.length == 0, "Interference in the first layout: " + first.join(" | "));
+    // For looking at in a CAD viewer: every part of the compact layout in place, as one STEP file.
+    var stepPath = Sys.getEnv("PENDANT_ASSEMBLY_STEP");
+    if (stepPath != null && stepPath != "") {
+      var placed:Array<Part> = [];
+      for (c in face.controls) {
+        var solid = PendantAssembly.placed(face, c);
+        if (solid != null) placed.push(solid);
+      }
+      var everything = Part.fuseAll(placed);
+      for (solid in placed) solid.close();
+      everything.shape.exportStep(stepPath);
+      everything.close();
+    }
     trace("pendant parts tests passed");
   }
   public static function main():Void run();
