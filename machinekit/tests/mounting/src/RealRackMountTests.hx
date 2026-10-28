@@ -53,7 +53,7 @@ class RealRackMountTests {
     );
     check(run.section.bom.quantity == 1, "run does not mutate catalogue BOM quantity");
     var ownedMass = new machinekit.assembly.MachineAssembly();
-    ownedMass.place("rack", run, materia.assembly.AssemblyFrames.identity());
+    ownedMass.addComponent("rack", run, materia.assembly.AssemblyFrames.identity());
     check(
       Math.abs(ownedMass.massProperties().mass - 4 * run.section.massProperties().mass) < 1e-9,
       "section purchase count does not multiply owned run mass twice"
