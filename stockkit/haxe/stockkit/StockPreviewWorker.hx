@@ -3,21 +3,6 @@ package stockkit;
 import sys.thread.Condition;
 import sys.thread.Thread;
 
-/** The chunks one refresh rebuilt: chunk `chunks[k]` now has mesh `meshes[k]`. */
-class StockPreviewUpdate {
-  public final chunks:Array<Int>;
-  public final meshes:Array<StockMesh>;
-  public final chunksX:Int;
-  public final chunksY:Int;
-
-  public function new(chunks:Array<Int>, meshes:Array<StockMesh>, chunksX:Int, chunksY:Int) {
-    this.chunks = chunks;
-    this.meshes = meshes;
-    this.chunksX = chunksX;
-    this.chunksY = chunksY;
-  }
-}
-
 /**
   A `StockPreview` contoured on a worker thread, so cutting never waits for
   meshing. `refresh` hands the worker a snapshot of `source`, which costs a

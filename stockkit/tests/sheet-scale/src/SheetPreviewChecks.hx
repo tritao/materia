@@ -1,5 +1,5 @@
 import stockkit.*;
-import stockkit.StockPreviewWorker.StockPreviewUpdate;
+import stockkit.StockPreviewUpdate;
 import toolpathkit.tool.Tool;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.Point3;

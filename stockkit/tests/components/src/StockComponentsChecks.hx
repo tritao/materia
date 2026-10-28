@@ -1,5 +1,5 @@
 import stockkit.*;
-import stockkit.StockComponents.StockComponent;
+import stockkit.StockComponent;
 import toolpathkit.tool.Tool;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.Point3;

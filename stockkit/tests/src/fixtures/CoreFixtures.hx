@@ -15,6 +15,7 @@ import stockkit.Stock;
 import stockkit.StockAxis;
 import stockkit.StockLattice;
 import stockkit.StockPreview;
+import stockkit.StockPreviewUpdate;
 import stockkit.StockPreviewWorker;
 import stockkit.StockTimeline;
 
