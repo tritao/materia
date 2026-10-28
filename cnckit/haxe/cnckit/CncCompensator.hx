@@ -1,6 +1,5 @@
 package cnckit;
 
-import toolpathkit.path.MoveKind;
 import cnckit.CncDiagnostic.CncSeverity;
 import toolpathkit.geometry.PathGeometry;
 import toolpathkit.geometry.GeometryTools;
