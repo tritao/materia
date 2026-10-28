@@ -21,298 +21,321 @@ import kinematicskit.KinematicSnapshot;
 import kinematicskit.KinematicState;
 
 typedef AssemblyClosureResidual = {
-	var joint:String;
-	var position:Float;
-	var axis:Float;
-	var rotation:Float;
+  var joint:String;
+  var position:Float;
+  var axis:Float;
+  var rotation:Float;
 }
 
 /** Mutable configuration and derived world poses for an immutable assembly definition. */
 class AssemblyState {
-	public final definition:AssemblyDefinition;
-	public final model:CompiledAssembly;
-	final coordinates:Map<String, Float> = [];
-	final rootPoses:Map<String, AssemblyFrame> = [];
-	final occurrences:Map<String, AssemblyComponentOccurrence>;
-	final components:Map<String, AssemblyComponentDefinition>;
-	final joints:Map<String, KinematicJoint>;
-	final poses:Map<String, AssemblyFrame> = [];
-	final kinematics:AssemblyKinematics;
-	final kinematicState:KinematicState;
-	final snapshot:KinematicSnapshot;
-	var dirty:Bool = true;
+  public final definition:AssemblyDefinition;
+  public final model:CompiledAssembly;
+  final coordinates:Map<String, Float> = [];
+  final rootPoses:Map<String, AssemblyFrame> = [];
+  final occurrences:Map<String, AssemblyComponentOccurrence>;
+  final components:Map<String, AssemblyComponentDefinition>;
+  final joints:Map<String, KinematicJoint>;
+  final poses:Map<String, AssemblyFrame> = [];
+  final kinematics:AssemblyKinematics;
+  final kinematicState:KinematicState;
+  final snapshot:KinematicSnapshot;
+  var dirty:Bool = true;
 
-	/** Existing callers retain snapshot ownership. Reuse a published model through fromModel. */
-	public function new(definition:AssemblyDefinition, ?state:AssemblyStateRecord, ?sharedModel:CompiledAssembly) {
-		if (sharedModel != null && sharedModel.definition != definition) throw "Assembly model does not match its definition";
-		if (state != null) state = AssemblyDefinitionFlattener.flattenState(definition, state);
-		model = sharedModel == null ? CompiledAssembly.snapshot(definition) : sharedModel;
-		this.definition = model.definition;
-		occurrences = model.occurrences;
-		components = model.components;
-		joints = model.joints;
-		for (joint in this.definition.joints)
-			if (joint.role == AssemblyJointRole.Tree && AssemblyDefinitionCodec.hasCoordinate(joint.type))
-				coordinates.set(joint.id, joint.defaultValue);
-		kinematics = model.kinematics;
-		kinematicState = new KinematicState(kinematics.model);
-		snapshot = new KinematicSnapshot(kinematics.model);
-		if (state != null) {
-			AssemblyDefinitionCodec.validateState(this.definition, state);
-			for (coordinate in state.jointCoordinates) coordinates.set(coordinate.joint, coordinate.value);
-			for (root in state.rootPoses) rootPoses.set(root.occurrence, copyFrame(root.pose));
-		}
-	}
+  /** Existing callers retain snapshot ownership. Reuse a published model through fromModel. */
+  public function new(definition:AssemblyDefinition, ?state:AssemblyStateRecord, ?sharedModel:CompiledAssembly) {
+    if (sharedModel != null
+      && sharedModel.definition != definition) throw "Assembly model does not match its definition";
+    if (state != null) state = AssemblyDefinitionFlattener.flattenState(definition, state);
+    model = sharedModel == null ? CompiledAssembly.snapshot(definition) : sharedModel;
+    this.definition = model.definition;
+    occurrences = model.occurrences;
+    components = model.components;
+    joints = model.joints;
+    for (joint in this.definition.joints) if (joint.role == AssemblyJointRole.Tree
+      && AssemblyDefinitionCodec.hasCoordinate(joint.type)) coordinates.set(
+        joint.id,
+        joint.defaultValue
+      );
+    kinematics = model.kinematics;
+    kinematicState = new KinematicState(kinematics.model);
+    snapshot = new KinematicSnapshot(kinematics.model);
+    if (state != null) {
+      AssemblyDefinitionCodec.validateState(this.definition, state);
+      for (coordinate in state.jointCoordinates) coordinates.set(coordinate.joint, coordinate.value);
+      for (root in state.rootPoses) rootPoses.set(root.occurrence, copyFrame(root.pose));
+    }
+  }
 
-	/** Shares immutable topology and compiled kinematics; owns all mutable configuration and evaluated poses. */
-	public static function fromModel(model:CompiledAssembly, ?state:AssemblyStateRecord):AssemblyState
-		return new AssemblyState(model.definition, state, model);
+  /** Shares immutable topology and compiled kinematics; owns all mutable configuration and evaluated poses. */
+  public static function fromModel(model:CompiledAssembly,
+    ?state:AssemblyStateRecord):AssemblyState return new AssemblyState(
+      model.definition,
+      state,
+      model
+    );
 
-	static function copyFrame(pose:AssemblyFrame):AssemblyFrame
-		return {x: pose.x, y: pose.y, z: pose.z, qx: pose.qx, qy: pose.qy, qz: pose.qz, qw: pose.qw};
+  static function copyFrame(pose:AssemblyFrame):AssemblyFrame return {
+    x: pose.x,
+    y: pose.y,
+    z: pose.z,
+    qx: pose.qx,
+    qy: pose.qy,
+    qz: pose.qz,
+    qw: pose.qw
+  };
 
-	var orderedTargets:Array<String>;
+  var orderedTargets:Array<String>;
 
-	public function setJoint(id:String, value:Float):Void {
-		var joint = joints.get(id);
-		if (joint == null || joint.role != AssemblyJointRole.Tree ||
-			!AssemblyDefinitionCodec.hasCoordinate(joint.type))
-			throw 'Joint "$id" is not a driving tree joint';
-		if (!Math.isFinite(value) || (joint.limits.lower != null && value < joint.limits.lower) ||
-			(joint.limits.upper != null && value > joint.limits.upper))
-			throw 'Joint "$id" coordinate is outside its limits';
-		var couplings = definition.couplings == null ? [] : definition.couplings;
-		for (coupling in couplings) if (coupling.target == id)
-			throw 'Joint "$id" is driven by coupled joint "${coupling.source}"';
-		var updates = new Map<String, Float>();
-		updates.set(id, value);
-		// A target is the sum of its terms, so recompute each one a changed joint reaches, sources first.
-		var changed = new Map<String, Bool>();
-		changed.set(id, true);
-		for (target in couplingOrder()) {
-			var reached = false, sum = 0.0;
-			for (coupling in couplings) if (coupling.target == target) {
-				if (changed.exists(coupling.source)) reached = true;
-				var updated = updates.get(coupling.source), stored = coordinates.get(coupling.source);
-				var source = 0.0;
-				if (updated != null) source = updated;
-				else if (stored != null) source = stored;
-				sum += source * coupling.ratio + coupling.offset;
-			}
-			if (!reached) continue;
-			var follower = joints.get(target);
-			if (follower == null || !Math.isFinite(sum) ||
-				(follower.limits.lower != null && sum < follower.limits.lower) ||
-				(follower.limits.upper != null && sum > follower.limits.upper))
-				throw 'Coupled joint "$target" coordinate is outside its limits';
-			updates.set(target, sum);
-			changed.set(target, true);
-		}
-		for (jointId in updates.keys()) coordinates.set(jointId, updates.get(jointId));
-		dirty = true;
-	}
+  public function setJoint(id:String, value:Float):Void {
+    var joint = joints.get(id);
+    if (joint == null || joint.role != AssemblyJointRole.Tree
+      || !AssemblyDefinitionCodec.hasCoordinate(joint.type)) throw 'Joint "$id" is not a driving tree joint';
+    if (!Math.isFinite(value) || (joint.limits.lower != null && value < joint.limits.lower) || (joint.limits.upper
+      != null && value > joint.limits.upper)) throw 'Joint "$id" coordinate is outside its limits';
+    var couplings = definition.couplings == null ? [] : definition.couplings;
+    for (coupling in couplings) if (coupling.target
+      == id) throw 'Joint "$id" is driven by coupled joint "${coupling.source}"';
+    var updates = new Map<String, Float>();
+    updates.set(id, value);
+    // A target is the sum of its terms, so recompute each one a changed joint reaches, sources first.
+    var changed = new Map<String, Bool>();
+    changed.set(id, true);
+    for (target in couplingOrder()) {
+      var reached = false, sum = 0.0;
+      for (coupling in couplings) if (coupling.target == target) {
+        if (changed.exists(coupling.source)) reached = true;
+        var updated = updates.get(coupling.source), stored = coordinates.get(coupling.source);
+        var source = 0.0;
+        if (updated != null) source = updated;
+        else if (stored != null) source = stored;
+        sum += source * coupling.ratio + coupling.offset;
+      }
+      if (!reached) continue;
+      var follower = joints.get(target);
+      if (follower == null || !Math.isFinite(sum)
+        || (follower.limits.lower != null && sum < follower.limits.lower) || (follower.limits.upper != null
+        && sum > follower.limits.upper)) throw 'Coupled joint "$target" coordinate is outside its limits';
+      updates.set(target, sum);
+      changed.set(target, true);
+    }
+    for (jointId in updates.keys()) coordinates.set(jointId, updates.get(jointId));
+    dirty = true;
+  }
 
-	/** Coupled joints with every source before the joints it feeds (the validated terms have no cycle). */
-	function couplingOrder():Array<String> {
-		if (orderedTargets != null) return orderedTargets;
-		var couplings = definition.couplings == null ? [] : definition.couplings;
-		var order:Array<String> = [], placed = new Map<String, Bool>();
-		var targets = [for (coupling in couplings) coupling.target];
-		function place(target:String):Void {
-			if (placed.exists(target)) return;
-			placed.set(target, true);
-			for (coupling in couplings) if (coupling.target == target && targets.indexOf(coupling.source) >= 0)
-				place(coupling.source);
-			order.push(target);
-		}
-		for (target in targets) place(target);
-		return orderedTargets = order;
-	}
+  /** Coupled joints with every source before the joints it feeds (the validated terms have no cycle). */
+  function couplingOrder():Array<String> {
+    if (orderedTargets != null) return orderedTargets;
+    var couplings = definition.couplings == null ? [] : definition.couplings;
+    var order:Array<String> = [], placed = new Map<String, Bool>();
+    var targets = [for (coupling in couplings) coupling.target];
+    function place(target:String):Void {
+      if (placed.exists(target)) return;
+      placed.set(target, true);
+      for (coupling in couplings) if (coupling.target == target
+        && targets.indexOf(coupling.source) >= 0) place(coupling.source);
+      order.push(target);
+    }
+    for (target in targets) place(target);
+    return orderedTargets = order;
+  }
 
-	public function joint(id:String):Float {
-		var joint = joints.get(id);
-		if (joint == null || joint.role != AssemblyJointRole.Tree ||
-			!AssemblyDefinitionCodec.hasCoordinate(joint.type))
-			throw 'Joint "$id" is not a driving tree joint';
-		var value = coordinates.get(id);
-		if (value == null) throw 'Missing coordinate for joint "$id"';
-		return value;
-	}
+  public function joint(id:String):Float {
+    var joint = joints.get(id);
+    if (joint == null || joint.role != AssemblyJointRole.Tree
+      || !AssemblyDefinitionCodec.hasCoordinate(joint.type)) throw 'Joint "$id" is not a driving tree joint';
+    var value = coordinates.get(id);
+    if (value == null) throw 'Missing coordinate for joint "$id"';
+    return value;
+  }
 
-	public function setRootPose(id:String, pose:AssemblyFrame):Void {
-		if (!AssemblyDefinitionCodec.rootOccurrences(definition).exists(id))
-			throw 'Occurrence "$id" is not a kinematic root';
-		AssemblyCodec.validateFrame(pose);
-		rootPoses.set(id, copyFrame(pose));
-		dirty = true;
-	}
+  public function setRootPose(id:String, pose:AssemblyFrame):Void {
+    if (!AssemblyDefinitionCodec
+      .rootOccurrences(definition).exists(id)) throw 'Occurrence "$id" is not a kinematic root';
+    AssemblyCodec.validateFrame(pose);
+    rootPoses.set(id, copyFrame(pose));
+    dirty = true;
+  }
 
-	/**
+  /**
 		Recomputes all occurrence poses from root placements and tree-joint
 		coordinates. A coupled joint follows its source through the compiled
 		coupling, so its pose never depends on a stale stored coordinate.
 	*/
-	public function forwardKinematics():Void {
-		poses.clear();
-		syncKinematicState();
-		snapshot.evaluate(kinematicState);
-		dirty = false;
-	}
+  public function forwardKinematics():Void {
+    poses.clear();
+    syncKinematicState();
+    snapshot.evaluate(kinematicState);
+    dirty = false;
+  }
 
-	/** The compiled model and a copy of this configuration in its terms, for kinematics solvers. */
-	@:allow(cadkit.modeling.AssemblyLoopSolver)
-	@:allow(cadkit.modeling.AssemblyDrag)
-	function kinematicModel():AssemblyKinematics return kinematics;
+  /** The compiled model and a copy of this configuration in its terms, for kinematics solvers. */
+  @:allow(cadkit.modeling.AssemblyLoopSolver) @:allow(cadkit
+    .modeling.AssemblyDrag) function kinematicModel():AssemblyKinematics return kinematics;
 
-	@:allow(cadkit.modeling.AssemblyLoopSolver)
-	@:allow(cadkit.modeling.AssemblyDrag)
-	function kinematicSeed():KinematicState {
-		syncKinematicState();
-		return kinematicState.copy();
-	}
+  @:allow(cadkit
+    .modeling.AssemblyLoopSolver) @:allow(cadkit.modeling.AssemblyDrag) function kinematicSeed():KinematicState {
+    syncKinematicState();
+    return kinematicState.copy();
+  }
 
-	function syncKinematicState():Void {
-		var model = kinematics.model;
-		for (dof in 0...model.dofCount()) {
-			var value = coordinates.get(model.dofId(dof));
-			kinematicState.q[dof] = value == null ? model.jointDefault[model.dofJoint[dof]] : value;
-		}
-		for (id in rootPoses.keys()) kinematicState.setRootPose(kinematics.body(id), AssemblyKinematics.fromFrame(rootPoses.get(id)));
-	}
+  function syncKinematicState():Void {
+    var model = kinematics.model;
+    for (dof in 0...model.dofCount()) {
+      var value = coordinates.get(model.dofId(dof));
+      kinematicState.q[dof] = value == null ? model.jointDefault[model.dofJoint[dof]] : value;
+    }
+    for (id in rootPoses.keys()) kinematicState.setRootPose(
+      kinematics.body(id),
+      AssemblyKinematics.fromFrame(rootPoses.get(id))
+    );
+  }
 
-	public function worldPose(id:String):AssemblyFrame {
-		if (!occurrences.exists(id)) throw 'Missing assembly occurrence "$id"';
-		if (dirty) forwardKinematics();
-		var pose = poses.get(id);
-		if (pose == null) {
-			pose = AssemblyKinematics.toFrame(snapshot.bodyPose(kinematics.body(id)));
-			poses.set(id, pose);
-		}
-		return pose;
-	}
+  public function worldPose(id:String):AssemblyFrame {
+    if (!occurrences.exists(id)) throw 'Missing assembly occurrence "$id"';
+    if (dirty) forwardKinematics();
+    var pose = poses.get(id);
+    if (pose == null) {
+      pose = AssemblyKinematics.toFrame(snapshot.bodyPose(kinematics.body(id)));
+      poses.set(id, pose);
+    }
+    return pose;
+  }
 
-	public function worldConnector(id:String, name:String):AssemblyFrame {
-		var occurrence = occurrences.get(id);
-		if (occurrence == null) throw 'Missing assembly occurrence "$id"';
-		var component = components.get(occurrence.definition);
-		if (component == null) throw 'Missing assembly component "${occurrence.definition}"';
-		for (connector in component.connectors) if (connector.name == name)
-			return AssemblyFrames.compose(worldPose(id), connector.frame);
-		throw 'Missing assembly connector "$id/$name"';
-	}
+  public function worldConnector(id:String, name:String):AssemblyFrame {
+    var occurrence = occurrences.get(id);
+    if (occurrence == null) throw 'Missing assembly occurrence "$id"';
+    var component = components.get(occurrence.definition);
+    if (component == null) throw 'Missing assembly component "${occurrence.definition}"';
+    for (connector in component.connectors) if (connector.name == name) return AssemblyFrames.compose(
+      worldPose(id),
+      connector.frame
+    );
+    throw 'Missing assembly connector "$id/$name"';
+  }
 
-	/** Closure checks are diagnostic only; dependent coordinates need a loop solver. */
-	public function closureResiduals():Array<AssemblyClosureResidual> {
-		if (dirty) forwardKinematics();
-		var result:Array<AssemblyClosureResidual> = [];
-		for (joint in definition.joints) if (joint.role == AssemblyJointRole.Closure) {
-			var first = worldConnector(joint.parent, joint.parentConnector);
-			var second = worldConnector(joint.child, joint.childConnector);
-			var dx = second.x - first.x, dy = second.y - first.y, dz = second.z - first.z;
-			var axisFirst = AssemblyFrames.transformVector(first, joint.axis.x, joint.axis.y, joint.axis.z);
-			var axisSecond = AssemblyFrames.transformVector(second, joint.axis.x, joint.axis.y, joint.axis.z);
-			var axisDot = Math.abs(axisFirst.x * axisSecond.x + axisFirst.y * axisSecond.y + axisFirst.z * axisSecond.z);
-			var position:Float;
-			var along = dx * axisFirst.x + dy * axisFirst.y + dz * axisFirst.z;
-			if (joint.type == AssemblyJointType.Prismatic || joint.type == AssemblyJointType.Cylindrical) {
-				var px = dx - along * axisFirst.x, py = dy - along * axisFirst.y, pz = dz - along * axisFirst.z;
-				position = Math.sqrt(px * px + py * py + pz * pz);
-			} else if (joint.type == AssemblyJointType.Planar)
-				position = Math.abs(along);
-			else position = Math.sqrt(dx * dx + dy * dy + dz * dz);
-			// A spherical closure leaves orientation free.
-			if (joint.type == AssemblyJointType.Spherical) axisDot = 1;
-			var rotation = 0.0;
-			if (joint.type == AssemblyJointType.Fixed || joint.type == AssemblyJointType.Prismatic) {
-				var dot = first.qx * second.qx + first.qy * second.qy + first.qz * second.qz + first.qw * second.qw;
-				rotation = 1 - Math.abs(dot);
-			}
-			result.push({joint: joint.id, position: position, axis: 1 - axisDot, rotation: rotation});
-		}
-		return result;
-	}
+  /** Closure checks are diagnostic only; dependent coordinates need a loop solver. */
+  public function closureResiduals():Array<AssemblyClosureResidual> {
+    if (dirty) forwardKinematics();
+    var result:Array<AssemblyClosureResidual> = [];
+    for (joint in definition.joints) if (joint.role == AssemblyJointRole.Closure) {
+      var first = worldConnector(joint.parent, joint.parentConnector);
+      var second = worldConnector(joint.child, joint.childConnector);
+      var dx = second.x - first.x, dy = second.y - first.y, dz = second.z - first.z;
+      var axisFirst = AssemblyFrames.transformVector(first, joint.axis.x, joint.axis.y, joint.axis.z);
+      var axisSecond = AssemblyFrames.transformVector(second, joint.axis.x, joint.axis.y, joint.axis.z);
+      var axisDot = Math.abs(axisFirst.x * axisSecond.x + axisFirst.y * axisSecond.y + axisFirst.z * axisSecond.z);
+      var position:Float;
+      var along = dx * axisFirst.x + dy * axisFirst.y + dz * axisFirst.z;
+      if (joint.type == AssemblyJointType.Prismatic || joint.type == AssemblyJointType.Cylindrical) {
+        var px = dx - along * axisFirst.x, py = dy - along * axisFirst.y, pz = dz - along * axisFirst.z;
+        position = Math.sqrt(px * px + py * py + pz * pz);
+      } else if (joint.type == AssemblyJointType.Planar) position = Math.abs(along);
+      else position = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      // A spherical closure leaves orientation free.
+      if (joint.type == AssemblyJointType.Spherical) axisDot = 1;
+      var rotation = 0.0;
+      if (joint.type == AssemblyJointType.Fixed || joint.type == AssemblyJointType.Prismatic) {
+        var dot = first.qx * second.qx + first.qy * second.qy + first.qz * second.qz + first.qw * second.qw;
+        rotation = 1 - Math.abs(dot);
+      }
+      result.push({joint: joint.id, position: position, axis: 1 - axisDot, rotation: rotation});
+    }
+    return result;
+  }
 
-	/** Check closures using a one-micrometre default in the definition's length unit. */
-	public function checkClosures():Void {
-		for (residual in closureResiduals()) {
-			var joint = joints.get(residual.joint);
-			if (joint == null) throw 'Missing assembly joint "${residual.joint}"';
-			var tolerance = joint.closureTolerance;
-			if (tolerance == null)
-				tolerance = 1e-6 / LengthUnit.metresPerUnit(definition.lengthUnit == null ? "mm" : definition.lengthUnit);
-			if (residual.position > tolerance)
-				throw 'Assembly joint "${residual.joint}" has separated connectors';
-			if (joint.type == AssemblyJointType.Fixed || joint.type == AssemblyJointType.Prismatic) {
-				if (residual.rotation > 1e-5)
-					throw 'Assembly fixed joint "${residual.joint}" has misaligned frames';
-			} else if (residual.axis > 1e-5)
-				throw 'Assembly joint "${residual.joint}" has misaligned axes';
-		}
-	}
+  /** Check closures using a one-micrometre default in the definition's length unit. */
+  public function checkClosures():Void {
+    for (residual in closureResiduals()) {
+      var joint = joints.get(residual.joint);
+      if (joint == null) throw 'Missing assembly joint "${residual.joint}"';
+      var tolerance = joint.closureTolerance;
+      if (tolerance == null) tolerance = 1e-6 / LengthUnit.metresPerUnit(definition.lengthUnit
+        == null ? "mm" : definition.lengthUnit);
+      if (residual.position > tolerance) throw 'Assembly joint "${residual.joint}" has separated connectors';
+      if (joint.type == AssemblyJointType.Fixed || joint.type == AssemblyJointType.Prismatic) {
+        if (residual.rotation > 1e-5) throw 'Assembly fixed joint "${residual.joint}" has misaligned frames';
+      } else if (residual.axis > 1e-5) throw 'Assembly joint "${residual.joint}" has misaligned axes';
+    }
+  }
 
-	/**
+  /**
 		Adjusts tree-joint coordinates until the assembly closures are satisfied: the named ones, or by default
 		`dependentJoints()`.
 	*/
-	public function solveClosures(?dependentJointIds:Array<String>,
-		?options:AssemblyLoopSolveOptions):AssemblyLoopSolveResult
-		return AssemblyLoopSolver.solve(this, dependentJointIds == null ? dependentJoints() : dependentJointIds, options);
+  public function solveClosures(?dependentJointIds:Array<String>,
+    ?options:AssemblyLoopSolveOptions):AssemblyLoopSolveResult return AssemblyLoopSolver.solve(
+      this,
+      dependentJointIds == null ? dependentJoints() : dependentJointIds,
+      options
+    );
 
-	/**
+  /**
 		The coordinates closures depend on: every movable tree joint on the tree path between a closure's two
 		occurrences that is neither driven nor a coupling target (a coupled joint follows its source). In
 		definition order.
 	*/
-	public function dependentJoints():Array<String> {
-		var parentJoint = new Map<String, KinematicJoint>();
-		for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree) parentJoint.set(joint.child, joint);
-		var coupled = new Map<String, Bool>();
-		if (definition.couplings != null) for (coupling in definition.couplings) coupled.set(coupling.target, true);
-		var onLoop = new Map<String, Bool>();
-		for (closure in definition.joints) if (closure.role == AssemblyJointRole.Closure) {
-			// Occurrences from each end up to its root, then the joints below their lowest common ancestor.
-			var fromParent = pathToRoot(closure.parent, parentJoint), fromChild = pathToRoot(closure.child, parentJoint);
-			var common = new Map<String, Bool>();
-			for (step in fromParent) common.set(step.occurrence, true);
-			var meet:Null<String> = null;
-			for (step in fromChild) if (common.exists(step.occurrence)) { meet = step.occurrence; break; }
-			for (path in [fromParent, fromChild])
-				for (step in path) {
-					if (step.occurrence == meet) break;
-					if (step.joint != null) onLoop.set(step.joint.id, true);
-				}
-		}
-		return [for (joint in definition.joints)
-			if (onLoop.exists(joint.id) && AssemblyDefinitionCodec.hasCoordinate(joint.type) && joint.driven != true && !coupled.exists(joint.id))
-				joint.id];
-	}
+  public function dependentJoints():Array<String> {
+    var parentJoint = new Map<String, KinematicJoint>();
+    for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree) parentJoint.set(joint.child, joint);
+    var coupled = new Map<String, Bool>();
+    if (definition.couplings != null) for (coupling in definition.couplings) coupled.set(coupling.target, true);
+    var onLoop = new Map<String, Bool>();
+    for (closure in definition.joints) if (closure.role == AssemblyJointRole.Closure) {
+      // Occurrences from each end up to its root, then the joints below their lowest common ancestor.
+      var fromParent = pathToRoot(closure.parent, parentJoint), fromChild = pathToRoot(closure.child, parentJoint);
+      var common = new Map<String, Bool>();
+      for (step in fromParent) common.set(step.occurrence, true);
+      var meet:Null<String> = null;
+      for (step in fromChild) if (common.exists(step.occurrence)) {
+        meet = step.occurrence;
+        break;
+      }
+      for (path in [fromParent, fromChild]) for (step in path) {
+        if (step.occurrence == meet) break;
+        if (step.joint != null) onLoop.set(step.joint.id, true);
+      }
+    }
+    return [for (joint in definition.joints) if (onLoop.exists(joint.id)
+      && AssemblyDefinitionCodec.hasCoordinate(joint.type)
+      && joint.driven != true && !coupled.exists(joint.id)) joint.id];
+  }
 
-	/** Each occurrence from `start` to its root, with the tree joint that attaches it to the next (null at the root). */
-	static function pathToRoot(start:String, parentJoint:Map<String, KinematicJoint>):Array<{occurrence:String, joint:Null<KinematicJoint>}> {
-		var path:Array<{occurrence:String, joint:Null<KinematicJoint>}> = [];
-		var current:Null<String> = start;
-		while (current != null) {
-			var joint = parentJoint.get(current);
-			path.push({occurrence: current, joint: joint});
-			current = joint == null ? null : joint.parent;
-		}
-		return path;
-	}
+  /** Each occurrence from `start` to its root, with the tree joint that attaches it to the next (null at the root). */
+  static function pathToRoot(start:String, parentJoint:Map<String, KinematicJoint>):Array<{
+    occurrence:String,
+    joint:Null<KinematicJoint>
+  }> {
+    var path:Array<{occurrence:String, joint:Null<KinematicJoint>}> = [];
+    var current:Null<String> = start;
+    while (current != null) {
+      var joint = parentJoint.get(current);
+      path.push({occurrence: current, joint: joint});
+      current = joint == null ? null : joint.parent;
+    }
+    return path;
+  }
 
-	public function record():AssemblyStateRecord {
-		var values:Array<AssemblyJointCoordinate> = [];
-		for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree &&
-			AssemblyDefinitionCodec.hasCoordinate(joint.type)) {
-			var value = coordinates.get(joint.id);
-			if (value == null) throw 'Missing coordinate for joint "${joint.id}"';
-			values.push({joint: joint.id, value: value});
-		}
-		var roots:Array<AssemblyRootPose> = [];
-		for (occurrence in definition.occurrences) if (rootPoses.exists(occurrence.id))
-			roots.push({occurrence: occurrence.id, pose: copyFrame(rootPoses.get(occurrence.id))});
-		var result:AssemblyStateRecord = {schemaVersion: AssemblyDefinitionCodec.VERSION,
-			definition: definition.id, jointCoordinates: values, rootPoses: roots};
-		AssemblyDefinitionCodec.validateState(definition, result);
-		return result;
-	}
+  public function record():AssemblyStateRecord {
+    var values:Array<AssemblyJointCoordinate> = [];
+    for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree
+      && AssemblyDefinitionCodec.hasCoordinate(joint.type)) {
+      var value = coordinates.get(joint.id);
+      if (value == null) throw 'Missing coordinate for joint "${joint.id}"';
+      values.push({joint: joint.id, value: value});
+    }
+    var roots:Array<AssemblyRootPose> = [];
+    for (occurrence in definition.occurrences) if (rootPoses.exists(occurrence.id)) roots.push({
+      occurrence: occurrence.id,
+      pose: copyFrame(rootPoses.get(occurrence.id))
+    });
+    var result:AssemblyStateRecord = {
+      schemaVersion: AssemblyDefinitionCodec.VERSION,
+      definition: definition.id,
+      jointCoordinates: values,
+      rootPoses: roots
+    };
+    AssemblyDefinitionCodec.validateState(definition, result);
+    return result;
+  }
 }

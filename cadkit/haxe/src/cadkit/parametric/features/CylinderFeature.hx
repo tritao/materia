@@ -8,20 +8,20 @@ import cadkit.parametric.Feature;
 import cadkit.parametric.Parameter;
 
 class CylinderFeature extends Feature {
-	public final radius:Parameter;
-	public final height:Parameter;
+  public final radius:Parameter;
+  public final height:Parameter;
 
-	public function new(radiusValue:Float, heightValue:Float) {
-		super();
-		radius = new Parameter(this, "cylinder.radius", radiusValue, 0.0, false, 1e300, ParameterKind.Length);
-		height = new Parameter(this, "cylinder.height", heightValue, 0.0, false, 1e300, ParameterKind.Length);
-	}
+  public function new(radiusValue:Float, heightValue:Float) {
+    super();
+    radius = new Parameter(this, "cylinder.radius", radiusValue, 0.0, false, 1e300, ParameterKind.Length);
+    height = new Parameter(this, "cylinder.height", heightValue, 0.0, false, 1e300, ParameterKind.Length);
+  }
 
-	override public function serializationType():String {
-		return "cylinder";
-	}
+  override public function serializationType():String {
+    return "cylinder";
+  }
 
-	override public function evaluate(context:EvaluationContext):EvaluationResult {
-		return EvaluationResult.fromShape(Shape.cylinder(radius.value, height.value));
-	}
+  override public function evaluate(context:EvaluationContext):EvaluationResult {
+    return EvaluationResult.fromShape(Shape.cylinder(radius.value, height.value));
+  }
 }

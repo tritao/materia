@@ -57,460 +57,703 @@ import cadkit.sheetmetal.SheetSide;
  * Methods borrow features and dimensions and return document-owned features.
  */
 class DocumentBuilder {
-	private final document:Document;
-	private var finished:Bool;
+  private final document:Document;
+  private var finished:Bool;
 
-	public function new() {
-		document = new Document();
-		finished = false;
-	}
+  public function new() {
+    document = new Document();
+    finished = false;
+  }
 
-	private function check():Void {
-		if (finished)
-			throw new ParametricError("document builder is closed");
-	}
+  private function check():Void {
+    if (finished) throw new ParametricError("document builder is closed");
+  }
 
-	public function dimension(name:String, value:Float):NamedParameter {
-		check();
-		return document.defineParameter(name, value);
-	}
+  public function dimension(name:String, value:Float):NamedParameter {
+    check();
+    return document.defineParameter(name, value);
+  }
 
-	public function typedParameter(name:String, value:Float, kind:String, unit:String):NamedParameter {
-		check();
-		return document.defineTypedParameter(name, value, kind, unit);
-	}
+  public function typedParameter(name:String, value:Float, kind:String, unit:String):NamedParameter {
+    check();
+    return document.defineTypedParameter(name, value, kind, unit);
+  }
 
-	public function length(name:String, value:Float, unit:String = "mm"):NamedParameter {
-		return typedParameter(name, value, ParameterKind.Length, unit);
-	}
+  public function length(name:String, value:Float, unit:String = "mm"):NamedParameter {
+    return typedParameter(name, value, ParameterKind.Length, unit);
+  }
 
-	public function angle(name:String, value:Float, unit:String = "rad"):NamedParameter {
-		return typedParameter(name, value, ParameterKind.Angle, unit);
-	}
+  public function angle(name:String, value:Float, unit:String = "rad"):NamedParameter {
+    return typedParameter(name, value, ParameterKind.Angle, unit);
+  }
 
-	public function count(name:String, value:Int):NamedParameter {
-		return typedParameter(name, value, ParameterKind.Count, "count");
-	}
+  public function count(name:String, value:Int):NamedParameter {
+    return typedParameter(name, value, ParameterKind.Count, "count");
+  }
 
-	public function area(name:String, value:Float, unit:String = "mm2"):NamedParameter {
-		return typedParameter(name, value, ParameterKind.Area, unit);
-	}
+  public function area(name:String, value:Float, unit:String = "mm2"):NamedParameter {
+    return typedParameter(name, value, ParameterKind.Area, unit);
+  }
 
-	public function volume(name:String, value:Float, unit:String = "mm3"):NamedParameter {
-		return typedParameter(name, value, ParameterKind.Volume, unit);
-	}
+  public function volume(name:String, value:Float, unit:String = "mm3"):NamedParameter {
+    return typedParameter(name, value, ParameterKind.Volume, unit);
+  }
 
-	public function expression(name:String, kind:String, unit:String, source:String):NamedParameter {
-		check();
-		return document.defineExpression(name, kind, unit, source);
-	}
+  public function expression(name:String, kind:String, unit:String, source:String):NamedParameter {
+    check();
+    return document.defineExpression(name, kind, unit, source);
+  }
 
-	private function bind(dimension:NamedParameter, feature:Feature, slot:String):Void {
-		if (dimension.document != document)
-			throw new ParametricError("named parameter belongs to another builder");
-		dimension.bind(feature.parameter(slot));
-	}
+  private function bind(dimension:NamedParameter, feature:Feature, slot:String):Void {
+    if (dimension.document != document) throw new ParametricError("named parameter belongs to another builder");
+    dimension.bind(feature.parameter(slot));
+  }
 
-	public function rectangle(width:NamedParameter, height:NamedParameter, ?plane:Plane):SketchFeature {
-		check();
-		var feature = document.add(new SketchFeature("rectangle", width.value, height.value, plane));
-		bind(width, feature, "sketch.width");
-		bind(height, feature, "sketch.height");
-		return feature;
-	}
+  public function rectangle(width:NamedParameter, height:NamedParameter, ?plane:Plane):SketchFeature {
+    check();
+    var feature = document.add(new SketchFeature("rectangle", width.value, height.value, plane));
+    bind(width, feature, "sketch.width");
+    bind(height, feature, "sketch.height");
+    return feature;
+  }
 
-	public function circle(radius:NamedParameter, ?plane:Plane):SketchFeature {
-		check();
-		var feature = document.add(new SketchFeature("circle", radius.value, 1, plane));
-		bind(radius, feature, "sketch.width");
-		return feature;
-	}
+  public function circle(radius:NamedParameter, ?plane:Plane):SketchFeature {
+    check();
+    var feature = document.add(new SketchFeature("circle", radius.value, 1, plane));
+    bind(radius, feature, "sketch.width");
+    return feature;
+  }
 
-	public function slot(length:NamedParameter, width:NamedParameter, ?plane:Plane):SketchFeature {
-		check();
-		var feature = document.add(new SketchFeature("slot", length.value, width.value, plane));
-		bind(length, feature, "sketch.width");
-		bind(width, feature, "sketch.height");
-		return feature;
-	}
+  public function slot(length:NamedParameter, width:NamedParameter, ?plane:Plane):SketchFeature {
+    check();
+    var feature = document.add(new SketchFeature("slot", length.value, width.value, plane));
+    bind(length, feature, "sketch.width");
+    bind(width, feature, "sketch.height");
+    return feature;
+  }
 
-	/** Base stock from one closed constrained-sketch region, with an optional shared thickness dimension. */
-	public function sheetBase(source:ConstrainedSketchFeature, stock:SheetMaterial, ?thickness:NamedParameter,
-		side:SheetSide = A):SheetBaseFeature {
-		check();
-		var selectedStock = thickness == null ? stock
-			: new SheetMaterial(stock.id, thickness.value, stock.bendRule, stock.mechanical, stock.defaultRadiusRatio, stock.minRadiusRatio, stock.grainAngle);
-		var feature = document.add(new SheetBaseFeature(source, selectedStock, side));
-		if (thickness != null) bind(thickness, feature, "sheet.thickness");
-		return feature;
-	}
+  /** Base stock from one closed constrained-sketch region, with an optional shared thickness dimension. */
+  public function sheetBase(
+    source:ConstrainedSketchFeature,
+    stock:SheetMaterial,
+    ?thickness:NamedParameter,
+    side:SheetSide = A
+  ):SheetBaseFeature {
+    check();
+    var selectedStock = thickness == null ? stock : new SheetMaterial(
+      stock.id,
+      thickness.value,
+      stock.bendRule,
+      stock.mechanical,
+      stock.defaultRadiusRatio,
+      stock.minRadiusRatio,
+      stock.grainAngle
+    );
+    var feature = document.add(new SheetBaseFeature(source, selectedStock, side));
+    if (thickness != null) bind(thickness, feature, "sheet.thickness");
+    return feature;
+  }
 
-	/** Through-wall cut from an exact constrained sketch on the chosen sheet side. */
-	public function sheetCut(source:SheetFeature, profile:ConstrainedSketchFeature, wall:Int, side:SheetSide = A):SheetCutFeature {
-		check(); return document.add(new SheetCutFeature(source, profile, wall, side));
-	}
+  /** Through-wall cut from an exact constrained sketch on the chosen sheet side. */
+  public function sheetCut(source:SheetFeature,
+    profile:ConstrainedSketchFeature, wall:Int, side:SheetSide = A):SheetCutFeature {
+    check();
+    return document.add(new SheetCutFeature(source, profile, wall, side));
+  }
 
-	/** Cut the child-side seam of one permanent bend without deleting its allowance strip. */
-	public function sheetRip(source:SheetFeature, bend:Int):SheetRipFeature {
-		check(); return document.add(new SheetRipFeature(source, bend));
-	}
+  /** Cut the child-side seam of one permanent bend without deleting its allowance strip. */
+  public function sheetRip(source:SheetFeature, bend:Int):SheetRipFeature {
+    check();
+    return document.add(new SheetRipFeature(source, bend));
+  }
 
-	/** Close two graph-owned flange ends, with shared gap, relief and optional overlap dimensions. */
-	public function sheetCorner(source:SheetFeature, first:SheetCornerEdge, second:SheetCornerEdge,
-		gap:NamedParameter, relief:CornerRelief, reliefSize:NamedParameter, join:CornerJoin = Gap,
-		?overlap:NamedParameter):SheetCornerFeature {
-		check();
-		var feature = document.add(new SheetCornerFeature(source, first, second, join, gap.value,
-			overlap == null ? 0 : overlap.value, relief, reliefSize.value));
-		bind(gap, feature, "sheet.corner.gap"); bind(reliefSize, feature, "sheet.corner.relief-size");
-		if (overlap != null) bind(overlap, feature, "sheet.corner.overlap");
-		return feature;
-	}
+  /** Close two graph-owned flange ends, with shared gap, relief and optional overlap dimensions. */
+  public function sheetCorner(
+    source:SheetFeature,
+    first:SheetCornerEdge,
+    second:SheetCornerEdge,
+    gap:NamedParameter,
+    relief:CornerRelief,
+    reliefSize:NamedParameter,
+    join:CornerJoin = Gap,
+    ?overlap:NamedParameter
+  ):SheetCornerFeature {
+    check();
+    var feature = document.add(new SheetCornerFeature(
+      source,
+      first,
+      second,
+      join,
+      gap.value,
+      overlap == null ? 0 : overlap.value,
+      relief,
+      reliefSize.value
+    ));
+    bind(gap, feature, "sheet.corner.gap");
+    bind(reliefSize, feature, "sheet.corner.relief-size");
+    if (overlap != null) bind(overlap, feature, "sheet.corner.overlap");
+    return feature;
+  }
 
-	/** Return hem on selected wall-side faces, with one shared straight-return dimension. */
-	public function sheetHem(source:SheetFeature, faces:Array<Shape>, spec:HemSpec, length:NamedParameter,
-		side:SheetSide = A):SheetHemFeature {
-		check();
-		var feature = document.add(new SheetHemFeature(source, faces, spec, length.value, side));
-		bind(length, feature, "sheet.hem.length");
-		return feature;
-	}
+  /** Return hem on selected wall-side faces, with one shared straight-return dimension. */
+  public function sheetHem(
+    source:SheetFeature,
+    faces:Array<Shape>,
+    spec:HemSpec,
+    length:NamedParameter,
+    side:SheetSide = A
+  ):SheetHemFeature {
+    check();
+    var feature = document.add(new SheetHemFeature(source, faces, spec, length.value, side));
+    bind(length, feature, "sheet.hem.length");
+    return feature;
+  }
 
-	/** Flange selected wall-side faces, with shared length/angle dimensions and an optional explicit radius. */
-	public function sheetEdgeFlange(source:SheetFeature, faces:Array<Shape>, length:NamedParameter, angle:NamedParameter,
-		?radius:NamedParameter, lengthSpec:LengthSpec = Leg, position:FlangePosition = BendOutside,
-		offset:Float = 0, gap1:Float = 0, gap2:Float = 0, extend1:Float = 0, extend2:Float = 0,
-		reliefType:ReliefType = None, reliefSizing:ReliefSizing = Absolute, reliefWidth:Float = 0, reliefDepth:Float = 0):SheetEdgeFlangeFeature {
-		check();
-		var feature = document.add(new SheetEdgeFlangeFeature(source, faces, length.value, angle.value,
-			radius == null ? null : radius.value, lengthSpec, position, offset, gap1, gap2, extend1, extend2,
-			null, null, null, reliefType, reliefSizing, reliefWidth, reliefDepth));
-		bind(length, feature, "sheet.length"); bind(angle, feature, "sheet.angle");
-		if (radius != null) bind(radius, feature, "sheet.radius");
-		return feature;
-	}
+  /** Flange selected wall-side faces, with shared length/angle dimensions and an optional explicit radius. */
+  public function sheetEdgeFlange(
+    source:SheetFeature,
+    faces:Array<Shape>,
+    length:NamedParameter,
+    angle:NamedParameter,
+    ?radius:NamedParameter,
+    lengthSpec:LengthSpec = Leg,
+    position:FlangePosition = BendOutside,
+    offset:Float = 0,
+    gap1:Float = 0,
+    gap2:Float = 0,
+    extend1:Float = 0,
+    extend2:Float = 0,
+    reliefType:ReliefType = None,
+    reliefSizing:ReliefSizing = Absolute,
+    reliefWidth:Float = 0,
+    reliefDepth:Float = 0
+  ):SheetEdgeFlangeFeature {
+    check();
+    var feature = document.add(new SheetEdgeFlangeFeature(
+      source,
+      faces,
+      length.value,
+      angle.value,
+      radius == null ? null : radius.value,
+      lengthSpec,
+      position,
+      offset,
+      gap1,
+      gap2,
+      extend1,
+      extend2,
+      null,
+      null,
+      null,
+      reliefType,
+      reliefSizing,
+      reliefWidth,
+      reliefDepth
+    ));
+    bind(length, feature, "sheet.length");
+    bind(angle, feature, "sheet.angle");
+    if (radius != null) bind(radius, feature, "sheet.radius");
+    return feature;
+  }
 
-	/** Record a constrained sketch and bind dimension constraint IDs to named parameters. */
-	public function constrainedSketch(sketch:ConstrainedSketch, dimensions:Map<String, NamedParameter>):ConstrainedSketchFeature {
-		check();
-		var feature = document.add(new ConstrainedSketchFeature(sketch));
-		for (constraintId in dimensions.keys()) {
-			var dimension = dimensions.get(constraintId);
-			if (dimension == null || dimension.document != document)
-				throw new ParametricError("named parameter belongs to another builder");
-			dimension.bind(feature.dimension(constraintId));
-		}
-		return feature;
-	}
+  /** Record a constrained sketch and bind dimension constraint IDs to named parameters. */
+  public function constrainedSketch(sketch:ConstrainedSketch,
+    dimensions:Map<String, NamedParameter>):ConstrainedSketchFeature {
+    check();
+    var feature = document.add(new ConstrainedSketchFeature(sketch));
+    for (constraintId in dimensions.keys()) {
+      var dimension = dimensions.get(constraintId);
+      if (dimension == null
+        || dimension.document != document) throw new ParametricError("named parameter belongs to another builder");
+      dimension.bind(feature.dimension(constraintId));
+    }
+    return feature;
+  }
 
-	public function attachedConstrainedSketch(sketch:ConstrainedSketch, support:Feature, selection:SelectionRecipe,
-		xDirection:Vector, dimensions:Map<String, NamedParameter>, offset:Float = 0, flip:Bool = false):ConstrainedSketchFeature {
-		check();
-		var feature = document.add(new ConstrainedSketchFeature(sketch, support, selection, xDirection, offset, flip));
-		for (constraintId in dimensions.keys()) {
-			var dimension = dimensions.get(constraintId);
-			if (dimension == null || dimension.document != document)
-				throw new ParametricError("named parameter belongs to another builder");
-			dimension.bind(feature.dimension(constraintId));
-		}
-		return feature;
-	}
+  public function attachedConstrainedSketch(
+    sketch:ConstrainedSketch,
+    support:Feature,
+    selection:SelectionRecipe,
+    xDirection:Vector,
+    dimensions:Map<
+      String,
+      NamedParameter
+  >,
+    offset:Float = 0,
+    flip:Bool = false
+  ):ConstrainedSketchFeature {
+    check();
+    var feature = document.add(new ConstrainedSketchFeature(sketch, support, selection, xDirection, offset, flip));
+    for (constraintId in dimensions.keys()) {
+      var dimension = dimensions.get(constraintId);
+      if (dimension == null
+        || dimension.document != document) throw new ParametricError("named parameter belongs to another builder");
+      dimension.bind(feature.dimension(constraintId));
+    }
+    return feature;
+  }
 
-	public function box(width:NamedParameter, depth:NamedParameter, height:NamedParameter):BoxFeature {
-		check();
-		var feature = document.add(new BoxFeature(width.value, depth.value, height.value));
-		bind(width, feature, "box.width");
-		bind(depth, feature, "box.depth");
-		bind(height, feature, "box.height");
-		return feature;
-	}
+  public function box(width:NamedParameter, depth:NamedParameter, height:NamedParameter):BoxFeature {
+    check();
+    var feature = document.add(new BoxFeature(width.value, depth.value, height.value));
+    bind(width, feature, "box.width");
+    bind(depth, feature, "box.depth");
+    bind(height, feature, "box.height");
+    return feature;
+  }
 
-	public function cylinder(radius:NamedParameter, height:NamedParameter):CylinderFeature {
-		check();
-		var feature = document.add(new CylinderFeature(radius.value, height.value));
-		bind(radius, feature, "cylinder.radius");
-		bind(height, feature, "cylinder.height");
-		return feature;
-	}
+  public function cylinder(radius:NamedParameter, height:NamedParameter):CylinderFeature {
+    check();
+    var feature = document.add(new CylinderFeature(radius.value, height.value));
+    bind(radius, feature, "cylinder.radius");
+    bind(height, feature, "cylinder.height");
+    return feature;
+  }
 
-	public function wire(source:Feature):WireFeature {
-		check();
-		return document.add(new WireFeature(source));
-	}
+  public function wire(source:Feature):WireFeature {
+    check();
+    return document.add(new WireFeature(source));
+  }
 
-	public function polyline(points:Array<Vector>, closed:Bool = false):PolylineFeature {
-		check();
-		return document.add(new PolylineFeature(points, closed));
-	}
+  public function polyline(points:Array<Vector>, closed:Bool = false):PolylineFeature {
+    check();
+    return document.add(new PolylineFeature(points, closed));
+  }
 
-	public function grid(source:Feature, columns:Int, rows:Int, spacingX:NamedParameter, spacingY:NamedParameter):GridFeature {
-		check();
-		var feature = document.add(new GridFeature(source, columns, rows, spacingX.value, spacingY.value));
-		bind(spacingX, feature, "grid.spacingX");
-		bind(spacingY, feature, "grid.spacingY");
-		return feature;
-	}
+  public function grid(source:Feature,
+    columns:Int, rows:Int, spacingX:NamedParameter, spacingY:NamedParameter):GridFeature {
+    check();
+    var feature = document.add(new GridFeature(source, columns, rows, spacingX.value, spacingY.value));
+    bind(spacingX, feature, "grid.spacingX");
+    bind(spacingY, feature, "grid.spacingY");
+    return feature;
+  }
 
-	public function linearPattern(source:Feature, count:NamedParameter, spacing:NamedParameter, direction:Vector,
-		?secondCount:NamedParameter, ?secondSpacing:NamedParameter, ?secondDirection:Vector):LinearPatternFeature {
-		check();
-		if ((secondCount == null) != (secondSpacing == null) || (secondCount == null) != (secondDirection == null))
-			throw new ParametricError("linear pattern second axis needs count, spacing, and direction");
-		var feature = document.add(new LinearPatternFeature(source, count.value, spacing.value, direction,
-			secondCount == null ? 1 : secondCount.value, secondSpacing == null ? 1 : secondSpacing.value, secondDirection));
-		bind(count, feature, "linear.count");
-		bind(spacing, feature, "linear.spacing");
-		if (secondCount != null) {
-			bind(secondCount, feature, "linear.secondCount");
-			bind(secondSpacing, feature, "linear.secondSpacing");
-		}
-		return feature;
-	}
+  public function linearPattern(
+    source:Feature,
+    count:NamedParameter,
+    spacing:NamedParameter,
+    direction:Vector,
+    ?secondCount:NamedParameter,
+    ?secondSpacing:NamedParameter,
+    ?secondDirection:Vector
+  ):LinearPatternFeature {
+    check();
+    if ((secondCount == null) != (secondSpacing == null) || (secondCount == null) != (secondDirection
+      == null)) throw new ParametricError("linear pattern second axis needs count, spacing, and direction");
+    var feature = document.add(new LinearPatternFeature(
+      source,
+      count.value,
+      spacing.value,
+      direction,
+      secondCount == null ? 1 : secondCount.value,
+      secondSpacing == null ? 1 : secondSpacing.value,
+      secondDirection
+    ));
+    bind(count, feature, "linear.count");
+    bind(spacing, feature, "linear.spacing");
+    if (secondCount != null) {
+      bind(secondCount, feature, "linear.secondCount");
+      bind(secondSpacing, feature, "linear.secondSpacing");
+    }
+    return feature;
+  }
 
-	public function polarPattern(source:Feature, count:NamedParameter, radius:NamedParameter, angularSpan:NamedParameter,
-		axisOrigin:Vector, axisDirection:Vector, radialDirection:Vector, orientInstances:Bool = true,
-		?startAngle:NamedParameter):PolarPatternFeature {
-		check();
-		var feature = document.add(new PolarPatternFeature(source, count.value, radius.value, angularSpan.value,
-			axisOrigin, axisDirection, radialDirection, orientInstances, startAngle == null ? 0 : startAngle.value));
-		bind(count, feature, "polar.count");
-		bind(radius, feature, "polar.radius");
-		bind(angularSpan, feature, "polar.angularSpan");
-		if (startAngle != null)
-			bind(startAngle, feature, "polar.startAngle");
-		return feature;
-	}
+  public function polarPattern(
+    source:Feature,
+    count:NamedParameter,
+    radius:NamedParameter,
+    angularSpan:NamedParameter,
+    axisOrigin:Vector,
+    axisDirection:Vector,
+    radialDirection:Vector,
+    orientInstances:Bool = true,
+    ?startAngle:NamedParameter
+  ):PolarPatternFeature {
+    check();
+    var feature = document.add(new PolarPatternFeature(
+      source,
+      count.value,
+      radius.value,
+      angularSpan.value,
+      axisOrigin,
+      axisDirection,
+      radialDirection,
+      orientInstances,
+      startAngle == null ? 0 : startAngle.value
+    ));
+    bind(count, feature, "polar.count");
+    bind(radius, feature, "polar.radius");
+    bind(angularSpan, feature, "polar.angularSpan");
+    if (startAngle != null) bind(startAngle, feature, "polar.startAngle");
+    return feature;
+  }
 
-	public function blindHole(target:Feature, selection:SelectionRecipe, xDirection:Vector,
-		x:NamedParameter, y:NamedParameter, diameter:NamedParameter, depth:NamedParameter,
-		offset:Float = 0, flipped:Bool = false):HoleFeature {
-		check();
-		var feature = document.add(HoleFeature.plain(target, selection, xDirection, "blind",
-			x.value, y.value, diameter.value, depth.value, offset, flipped));
-		bindHolePosition(feature, x, y, diameter);
-		bind(depth, feature, "hole.depth");
-		return feature;
-	}
+  public function blindHole(
+    target:Feature,
+    selection:SelectionRecipe,
+    xDirection:Vector,
+    x:NamedParameter,
+    y:NamedParameter,
+    diameter:NamedParameter,
+    depth:NamedParameter,
+    offset:Float = 0,
+    flipped:Bool = false
+  ):HoleFeature {
+    check();
+    var feature = document.add(HoleFeature.plain(
+      target,
+      selection,
+      xDirection,
+      "blind",
+      x.value,
+      y.value,
+      diameter.value,
+      depth.value,
+      offset,
+      flipped
+    ));
+    bindHolePosition(feature, x, y, diameter);
+    bind(depth, feature, "hole.depth");
+    return feature;
+  }
 
-	public function throughHole(target:Feature, selection:SelectionRecipe, xDirection:Vector,
-		x:NamedParameter, y:NamedParameter, diameter:NamedParameter,
-		offset:Float = 0, flipped:Bool = false):HoleFeature {
-		check();
-		var feature = document.add(HoleFeature.plain(target, selection, xDirection, "through-all",
-			x.value, y.value, diameter.value, 1, offset, flipped));
-		bindHolePosition(feature, x, y, diameter);
-		return feature;
-	}
+  public function throughHole(
+    target:Feature,
+    selection:SelectionRecipe,
+    xDirection:Vector,
+    x:NamedParameter,
+    y:NamedParameter,
+    diameter:NamedParameter,
+    offset:Float = 0,
+    flipped:Bool = false
+  ):HoleFeature {
+    check();
+    var feature = document.add(HoleFeature.plain(
+      target,
+      selection,
+      xDirection,
+      "through-all",
+      x.value,
+      y.value,
+      diameter.value,
+      1,
+      offset,
+      flipped
+    ));
+    bindHolePosition(feature, x, y, diameter);
+    return feature;
+  }
 
-	public function blindCounterbore(target:Feature, selection:SelectionRecipe, xDirection:Vector,
-		x:NamedParameter, y:NamedParameter, diameter:NamedParameter, depth:NamedParameter,
-		recessDiameter:NamedParameter, recessDepth:NamedParameter, offset:Float = 0, flipped:Bool = false):HoleFeature {
-		check();
-		var feature = document.add(HoleFeature.counterbore(target, selection, xDirection, "blind", x.value, y.value,
-			diameter.value, depth.value, recessDiameter.value, recessDepth.value, offset, flipped));
-		bindHolePosition(feature, x, y, diameter);
-		bind(depth, feature, "hole.depth");
-		bind(recessDiameter, feature, "hole.recessDiameter");
-		bind(recessDepth, feature, "hole.recessDepth");
-		return feature;
-	}
+  public function blindCounterbore(
+    target:Feature,
+    selection:SelectionRecipe,
+    xDirection:Vector,
+    x:NamedParameter,
+    y:NamedParameter,
+    diameter:NamedParameter,
+    depth:NamedParameter,
+    recessDiameter:NamedParameter,
+    recessDepth:NamedParameter,
+    offset:Float = 0,
+    flipped:Bool = false
+  ):HoleFeature {
+    check();
+    var feature = document.add(HoleFeature.counterbore(
+      target,
+      selection,
+      xDirection,
+      "blind",
+      x.value,
+      y.value,
+      diameter.value,
+      depth.value,
+      recessDiameter.value,
+      recessDepth.value,
+      offset,
+      flipped
+    ));
+    bindHolePosition(feature, x, y, diameter);
+    bind(depth, feature, "hole.depth");
+    bind(recessDiameter, feature, "hole.recessDiameter");
+    bind(recessDepth, feature, "hole.recessDepth");
+    return feature;
+  }
 
-	public function throughCounterbore(target:Feature, selection:SelectionRecipe, xDirection:Vector,
-		x:NamedParameter, y:NamedParameter, diameter:NamedParameter,
-		recessDiameter:NamedParameter, recessDepth:NamedParameter, offset:Float = 0, flipped:Bool = false):HoleFeature {
-		check();
-		var feature = document.add(HoleFeature.counterbore(target, selection, xDirection, "through-all", x.value, y.value,
-			diameter.value, 1, recessDiameter.value, recessDepth.value, offset, flipped));
-		bindHolePosition(feature, x, y, diameter);
-		bind(recessDiameter, feature, "hole.recessDiameter");
-		bind(recessDepth, feature, "hole.recessDepth");
-		return feature;
-	}
+  public function throughCounterbore(
+    target:Feature,
+    selection:SelectionRecipe,
+    xDirection:Vector,
+    x:NamedParameter,
+    y:NamedParameter,
+    diameter:NamedParameter,
+    recessDiameter:NamedParameter,
+    recessDepth:NamedParameter,
+    offset:Float = 0,
+    flipped:Bool = false
+  ):HoleFeature {
+    check();
+    var feature = document.add(HoleFeature.counterbore(
+      target,
+      selection,
+      xDirection,
+      "through-all",
+      x.value,
+      y.value,
+      diameter.value,
+      1,
+      recessDiameter.value,
+      recessDepth.value,
+      offset,
+      flipped
+    ));
+    bindHolePosition(feature, x, y, diameter);
+    bind(recessDiameter, feature, "hole.recessDiameter");
+    bind(recessDepth, feature, "hole.recessDepth");
+    return feature;
+  }
 
-	public function blindCountersink(target:Feature, selection:SelectionRecipe, xDirection:Vector,
-		x:NamedParameter, y:NamedParameter, diameter:NamedParameter, depth:NamedParameter,
-		mouthDiameter:NamedParameter, includedAngle:NamedParameter, offset:Float = 0, flipped:Bool = false):HoleFeature {
-		check();
-		var feature = document.add(HoleFeature.countersink(target, selection, xDirection, "blind", x.value, y.value,
-			diameter.value, depth.value, mouthDiameter.value, includedAngle.value, offset, flipped));
-		bindHolePosition(feature, x, y, diameter);
-		bind(depth, feature, "hole.depth");
-		bind(mouthDiameter, feature, "hole.recessDiameter");
-		bind(includedAngle, feature, "hole.includedAngle");
-		return feature;
-	}
+  public function blindCountersink(
+    target:Feature,
+    selection:SelectionRecipe,
+    xDirection:Vector,
+    x:NamedParameter,
+    y:NamedParameter,
+    diameter:NamedParameter,
+    depth:NamedParameter,
+    mouthDiameter:NamedParameter,
+    includedAngle:NamedParameter,
+    offset:Float = 0,
+    flipped:Bool = false
+  ):HoleFeature {
+    check();
+    var feature = document.add(HoleFeature.countersink(
+      target,
+      selection,
+      xDirection,
+      "blind",
+      x.value,
+      y.value,
+      diameter.value,
+      depth.value,
+      mouthDiameter.value,
+      includedAngle.value,
+      offset,
+      flipped
+    ));
+    bindHolePosition(feature, x, y, diameter);
+    bind(depth, feature, "hole.depth");
+    bind(mouthDiameter, feature, "hole.recessDiameter");
+    bind(includedAngle, feature, "hole.includedAngle");
+    return feature;
+  }
 
-	public function throughCountersink(target:Feature, selection:SelectionRecipe, xDirection:Vector,
-		x:NamedParameter, y:NamedParameter, diameter:NamedParameter,
-		mouthDiameter:NamedParameter, includedAngle:NamedParameter, offset:Float = 0, flipped:Bool = false):HoleFeature {
-		check();
-		var feature = document.add(HoleFeature.countersink(target, selection, xDirection, "through-all", x.value, y.value,
-			diameter.value, 1, mouthDiameter.value, includedAngle.value, offset, flipped));
-		bindHolePosition(feature, x, y, diameter);
-		bind(mouthDiameter, feature, "hole.recessDiameter");
-		bind(includedAngle, feature, "hole.includedAngle");
-		return feature;
-	}
+  public function throughCountersink(
+    target:Feature,
+    selection:SelectionRecipe,
+    xDirection:Vector,
+    x:NamedParameter,
+    y:NamedParameter,
+    diameter:NamedParameter,
+    mouthDiameter:NamedParameter,
+    includedAngle:NamedParameter,
+    offset:Float = 0,
+    flipped:Bool = false
+  ):HoleFeature {
+    check();
+    var feature = document.add(HoleFeature.countersink(
+      target,
+      selection,
+      xDirection,
+      "through-all",
+      x.value,
+      y.value,
+      diameter.value,
+      1,
+      mouthDiameter.value,
+      includedAngle.value,
+      offset,
+      flipped
+    ));
+    bindHolePosition(feature, x, y, diameter);
+    bind(mouthDiameter, feature, "hole.recessDiameter");
+    bind(includedAngle, feature, "hole.includedAngle");
+    return feature;
+  }
 
-	private function bindHolePosition(feature:HoleFeature, x:NamedParameter, y:NamedParameter, diameter:NamedParameter):Void {
-		bind(x, feature, "hole.x");
-		bind(y, feature, "hole.y");
-		bind(diameter, feature, "hole.diameter");
-	}
+  private function bindHolePosition(feature:HoleFeature,
+    x:NamedParameter, y:NamedParameter, diameter:NamedParameter):Void {
+    bind(x, feature, "hole.x");
+    bind(y, feature, "hole.y");
+    bind(diameter, feature, "hole.diameter");
+  }
 
-	public function add(first:Feature, second:Feature):BooleanFeature {
-		check();
-		return document.add(new BooleanFeature(first, second, BooleanOperation.Fuse));
-	}
+  public function add(first:Feature, second:Feature):BooleanFeature {
+    check();
+    return document.add(new BooleanFeature(first, second, BooleanOperation.Fuse));
+  }
 
-	public function subtract(first:Feature, second:Feature):BooleanFeature {
-		check();
-		return document.add(new BooleanFeature(first, second, BooleanOperation.Cut));
-	}
+  public function subtract(first:Feature, second:Feature):BooleanFeature {
+    check();
+    return document.add(new BooleanFeature(first, second, BooleanOperation.Cut));
+  }
 
-	public function intersect(first:Feature, second:Feature):BooleanFeature {
-		check();
-		return document.add(new BooleanFeature(first, second, BooleanOperation.Common));
-	}
+  public function intersect(first:Feature, second:Feature):BooleanFeature {
+    check();
+    return document.add(new BooleanFeature(first, second, BooleanOperation.Common));
+  }
 
-	public function extrude(source:Feature, amount:NamedParameter, ?direction:Vector, reversed:Bool = false,
-		symmetric:Bool = false):ExtrudeFeature {
-		check();
-		if (direction == null) {
-			if (Std.isOfType(source, ConstrainedSketchFeature)) {
-				var constrained:ConstrainedSketchFeature = cast source;
-				direction = constrained.sketch().plane.normal;
-			} else if (Std.isOfType(source, SketchFeature)) {
-				var primitive:SketchFeature = cast source;
-				direction = primitive.plane.normal;
-			} else {
-				direction = Vector.Z();
-			}
-		}
-		var feature = document.add(ExtrudeFeature.along(source, amount.value, direction, reversed, symmetric));
-		bind(amount, feature, "extrude.amount");
-		return feature;
-	}
+  public function extrude(
+    source:Feature,
+    amount:NamedParameter,
+    ?direction:Vector,
+    reversed:Bool = false,
+    symmetric:Bool = false
+  ):ExtrudeFeature {
+    check();
+    if (direction == null) {
+      if (Std.isOfType(source, ConstrainedSketchFeature)) {
+        var constrained:ConstrainedSketchFeature = cast source;
+        direction = constrained.sketch().plane.normal;
+      } else if (Std.isOfType(source, SketchFeature)) {
+        var primitive:SketchFeature = cast source;
+        direction = primitive.plane.normal;
+      } else {
+        direction = Vector.Z();
+      }
+    }
+    var feature = document.add(ExtrudeFeature.along(source, amount.value, direction, reversed, symmetric));
+    bind(amount, feature, "extrude.amount");
+    return feature;
+  }
 
-	public function pocket(target:Feature, profile:Feature, depth:NamedParameter):PocketFeature {
-		check();
-		var feature = document.add(PocketFeature.blind(target, profile, depth.value));
-		bind(depth, feature, "pocket.depth");
-		return feature;
-	}
+  public function pocket(target:Feature, profile:Feature, depth:NamedParameter):PocketFeature {
+    check();
+    var feature = document.add(PocketFeature.blind(target, profile, depth.value));
+    bind(depth, feature, "pocket.depth");
+    return feature;
+  }
 
-	public function pocketThroughAll(target:Feature, profile:Feature):PocketFeature {
-		check();
-		return document.add(PocketFeature.throughAll(target, profile));
-	}
+  public function pocketThroughAll(target:Feature, profile:Feature):PocketFeature {
+    check();
+    return document.add(PocketFeature.throughAll(target, profile));
+  }
 
-	public function translate(source:Feature, x:Float, y:Float, z:Float):TransformFeature {
-		check();
-		return document.add(new TransformFeature(source, x, y, z));
-	}
+  public function translate(source:Feature, x:Float, y:Float, z:Float):TransformFeature {
+    check();
+    return document.add(new TransformFeature(source, x, y, z));
+  }
 
-	public function rotate(source:Feature, pivot:Vector, axis:Vector, angle:NamedParameter):RotationFeature {
-		check();
-		var feature = document.add(new RotationFeature(source, pivot, axis, angle.value));
-		bind(angle, feature, "rotation.angle");
-		return feature;
-	}
+  public function rotate(source:Feature, pivot:Vector, axis:Vector, angle:NamedParameter):RotationFeature {
+    check();
+    var feature = document.add(new RotationFeature(source, pivot, axis, angle.value));
+    bind(angle, feature, "rotation.angle");
+    return feature;
+  }
 
-	public function mirror(source:Feature, planeOrigin:Vector, planeNormal:Vector, mode:String = "copy"):MirrorFeature {
-		check();
-		return document.add(new MirrorFeature(source, planeOrigin, planeNormal, mode));
-	}
+  public function mirror(source:Feature, planeOrigin:Vector, planeNormal:Vector, mode:String = "copy"):MirrorFeature {
+    check();
+    return document.add(new MirrorFeature(source, planeOrigin, planeNormal, mode));
+  }
 
-	public function revolve(source:Feature, origin:Vector, axis:Vector, angle:NamedParameter):RevolveFeature {
-		check();
-		var feature = document.add(new RevolveFeature(source, origin.x, origin.y, origin.z, axis.x, axis.y, axis.z, angle.value));
-		bind(angle, feature, "revolve.angle");
-		return feature;
-	}
+  public function revolve(source:Feature, origin:Vector, axis:Vector, angle:NamedParameter):RevolveFeature {
+    check();
+    var feature = document.add(new RevolveFeature(
+      source,
+      origin.x,
+      origin.y,
+      origin.z,
+      axis.x,
+      axis.y,
+      axis.z,
+      angle.value
+    ));
+    bind(angle, feature, "revolve.angle");
+    return feature;
+  }
 
-	public function loft(sections:Array<Feature>, ruled:Bool = false):LoftFeature {
-		check();
-		return document.add(new LoftFeature(sections, ruled));
-	}
+  public function loft(sections:Array<Feature>, ruled:Bool = false):LoftFeature {
+    check();
+    return document.add(new LoftFeature(sections, ruled));
+  }
 
-	public function sweep(profile:Feature, path:Feature):SweepFeature {
-		check();
-		return document.add(new SweepFeature(profile, path));
-	}
+  public function sweep(profile:Feature, path:Feature):SweepFeature {
+    check();
+    return document.add(new SweepFeature(profile, path));
+  }
 
-	public function offset(source:Feature, distance:NamedParameter):OffsetFeature {
-		check();
-		var feature = document.add(new OffsetFeature(source, distance.value));
-		bind(distance, feature, "offset.distance");
-		return feature;
-	}
+  public function offset(source:Feature, distance:NamedParameter):OffsetFeature {
+    check();
+    var feature = document.add(new OffsetFeature(source, distance.value));
+    bind(distance, feature, "offset.distance");
+    return feature;
+  }
 
-	public function shell(source:Feature, thickness:NamedParameter, selection:SelectionRecipe):ShellFeature {
-		check();
-		var feature = document.add(new ShellFeature(source, thickness.value, selection));
-		bind(thickness, feature, "shell.thickness");
-		return feature;
-	}
+  public function shell(source:Feature, thickness:NamedParameter, selection:SelectionRecipe):ShellFeature {
+    check();
+    var feature = document.add(new ShellFeature(source, thickness.value, selection));
+    bind(thickness, feature, "shell.thickness");
+    return feature;
+  }
 
-	public function project(source:Feature, target:Feature, direction:Vector):ProjectFeature {
-		check();
-		return document.add(new ProjectFeature(source, target, direction));
-	}
+  public function project(source:Feature, target:Feature, direction:Vector):ProjectFeature {
+    check();
+    return document.add(new ProjectFeature(source, target, direction));
+  }
 
-	public function fillet(source:Feature, radius:NamedParameter, selection:SelectionRecipe):FilletFeature {
-		check();
-		var feature = document.add(new FilletFeature(source, radius.value, null, null, selection));
-		bind(radius, feature, "fillet.radius");
-		return feature;
-	}
+  public function fillet(source:Feature, radius:NamedParameter, selection:SelectionRecipe):FilletFeature {
+    check();
+    var feature = document.add(new FilletFeature(source, radius.value, null, null, selection));
+    bind(radius, feature, "fillet.radius");
+    return feature;
+  }
 
-	public function chamfer(source:Feature, distance:NamedParameter, selection:SelectionRecipe):ChamferFeature {
-		check();
-		var feature = document.add(new ChamferFeature(source, distance.value, null, null, selection));
-		bind(distance, feature, "chamfer.distance");
-		return feature;
-	}
+  public function chamfer(source:Feature, distance:NamedParameter, selection:SelectionRecipe):ChamferFeature {
+    check();
+    var feature = document.add(new ChamferFeature(source, distance.value, null, null, selection));
+    bind(distance, feature, "chamfer.distance");
+    return feature;
+  }
 
-	public function output(feature:Feature):Void {
-		check();
-		document.setOutput(feature);
-	}
+  public function output(feature:Feature):Void {
+    check();
+    document.setOutput(feature);
+  }
 
-	public function unsupported(operation:String):Feature {
-		check();
-		throw new ParametricError("operation cannot be recorded: " + operation);
-	}
+  public function unsupported(operation:String):Feature {
+    check();
+    throw new ParametricError("operation cannot be recorded: " + operation);
+  }
 
-	/** Recompute and transfer ownership to the caller. */
-	public function finish():Document {
-		check();
-		try {
-			document.outputFeature();
-			document.recompute();
-			finished = true;
-			return document;
-		} catch (error:Dynamic) {
-			finished = true;
-			document.close();
-			throw error;
-		}
-	}
+  /** Recompute and transfer ownership to the caller. */
+  public function finish():Document {
+    check();
+    try {
+      document.outputFeature();
+      document.recompute();
+      finished = true;
+      return document;
+    } catch (error:Dynamic) {
+      finished = true;
+      document.close();
+      throw error;
+    }
+  }
 
-	public function close():Void {
-		if (finished)
-			return;
-		finished = true;
-		document.close();
-	}
+  public function close():Void {
+    if (finished) return;
+    finished = true;
+    document.close();
+  }
 
-	public static function build(callback:DocumentBuilder->Void):Document {
-		var builder = new DocumentBuilder();
-		try {
-			callback(builder);
-			return builder.finish();
-		} catch (error:Dynamic) {
-			builder.close();
-			throw error;
-		}
-	}
+  public static function build(callback:DocumentBuilder -> Void):Document {
+    var builder = new DocumentBuilder();
+    try {
+      callback(builder);
+      return builder.finish();
+    } catch (error:Dynamic) {
+      builder.close();
+      throw error;
+    }
+  }
 }

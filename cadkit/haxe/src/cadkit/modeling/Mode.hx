@@ -1,7 +1,7 @@
 package cadkit.modeling;
 
 enum Mode {
-	Add;
-	Subtract;
-	Intersect;
+  Add;
+  Subtract;
+  Intersect;
 }

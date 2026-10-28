@@ -10,11 +10,11 @@ import cadkit.solve.ConstraintDiagnosis;
 	without diagnosis reports as is.
 */
 typedef PartStructure = {
-	var position:Array<Int>;
-	var first:Array<Int>;
-	var rows:Null<RowStructure>;
-	var report:DiagnosisReport;
-	var degenerate:Bool;
-	/** The part's variables (sketch-wide indices) that its constraints left free at the last diagnosis. */
-	var free:Array<Int>;
+  var position:Array<Int>;
+  var first:Array<Int>;
+  var rows:Null<RowStructure>;
+  var report:DiagnosisReport;
+  var degenerate:Bool;
+  /** The part's variables (sketch-wide indices) that its constraints left free at the last diagnosis. */
+  var free:Array<Int>;
 }

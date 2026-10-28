@@ -8,103 +8,102 @@ import cadkit.modeling.Sketch;
 	 * ready to drive a solid feature.
 	 */
 class SketchSession {
-	private var authored:ConstrainedSketch;
-	public var solution(default, null):Null<SolvedSketch>;
-	public var lastValidSolution(default, null):Null<SolvedSketch>;
-	public var diagnostic(default, null):Null<SolveDiagnostic>;
-	public var degreesOfFreedom(get, never):Int;
-	public var conflictingConstraintIds(get, never):Array<String>;
-	public var isSolved(get, never):Bool;
+  private var authored:ConstrainedSketch;
+  public var solution(default, null):Null<SolvedSketch>;
+  public var lastValidSolution(default, null):Null<SolvedSketch>;
+  public var diagnostic(default, null):Null<SolveDiagnostic>;
+  public var degreesOfFreedom(get, never):Int;
+  public var conflictingConstraintIds(get, never):Array<String>;
+  public var isSolved(get, never):Bool;
 
-	public function new(sketch:ConstrainedSketch) {
-		if (sketch == null)
-			throw "sketch sessions require an authored sketch";
-		authored = sketch.copy();
-		solution = null;
-		lastValidSolution = null;
-		diagnostic = null;
-		solveDraft();
-	}
+  public function new(sketch:ConstrainedSketch) {
+    if (sketch == null) throw "sketch sessions require an authored sketch";
+    authored = sketch.copy();
+    solution = null;
+    lastValidSolution = null;
+    diagnostic = null;
+    solveDraft();
+  }
 
-	/** Return an isolated copy of the current authored draft. */
-	public function snapshot():ConstrainedSketch
-		return authored.copy();
+  /** Return an isolated copy of the current authored draft. */
+  public function snapshot():ConstrainedSketch return authored.copy();
 
-	/**
+  /**
 	 * Apply one edit to a private copy, then solve it. Solver conflicts remain in
 	 * the draft for repair; malformed edits throw before replacing the current draft.
 	 */
-	public function edit(change:ConstrainedSketch->Void):Bool {
-		if (change == null)
-			throw "sketch edit callback must not be null";
-		var candidate = authored.copy();
-		change(candidate);
-		authored = candidate;
-		return solveDraft();
-	}
+  public function edit(change:ConstrainedSketch -> Void):Bool {
+    if (change == null) throw "sketch edit callback must not be null";
+    var candidate = authored.copy();
+    change(candidate);
+    authored = candidate;
+    return solveDraft();
+  }
 
-	/**
+  /**
 		One step of a soft drag (see `ConstrainedSketch.drag`): the solution with `targets` pulled as close as the
 		constraints allow, not diagnosed, the authored draft unchanged. False (and the solution kept) when the
 		draft does not solve.
 	*/
-	public function dragPreview(targets:Map<String, Array<Float>>):Bool {
-		try {
-			var candidate = authored.drag(targets, solution == null ? lastValidSolution : solution);
-			solution = candidate;
-			diagnostic = candidate.diagnostic;
-			return true;
-		} catch (error:SketchSolveError) {
-			return false;
-		}
-	}
+  public function dragPreview(targets:Map<String, Array<Float>>):Bool {
+    try {
+      var candidate = authored.drag(targets, solution == null ? lastValidSolution : solution);
+      solution = candidate;
+      diagnostic = candidate.diagnostic;
+      return true;
+    } catch (error:SketchSolveError) {
+      return false;
+    }
+  }
 
-	/** Ends a drag: the dragged points' solved positions become their authored ones, and the draft is solved again. */
-	public function commitDrag():Bool {
-		var dragged = solution;
-		if (dragged == null) return solveDraft();
-		var candidate = authored.copy();
-		for (point in authored.points()) {
-			var at = dragged.point(point.id);
-			candidate.replacePoint(new SketchPoint(point.id, at[0], at[1]));
-		}
-		authored = candidate;
-		return solveDraft();
-	}
+  /** Ends a drag: the dragged points' solved positions become their authored ones, and the draft is solved again. */
+  public function commitDrag():Bool {
+    var dragged = solution;
+    if (dragged == null) return solveDraft();
+    var candidate = authored.copy();
+    for (point in authored.points()) {
+      var at = dragged.point(point.id);
+      candidate.replacePoint(new SketchPoint(point.id, at[0], at[1]));
+    }
+    authored = candidate;
+    return solveDraft();
+  }
 
-	/** Abandons a drag: the authored draft is solved again from where it was. */
-	public function cancelDrag():Bool
-		return solveDraft();
+  /** Abandons a drag: the authored draft is solved again from where it was. */
+  public function cancelDrag():Bool return solveDraft();
 
-	/** Build a profile only when the current draft has a valid current solution. */
-	public function buildProfile():Sketch {
-		if (solution == null)
-			throw new SketchSolveError(diagnostic == null
-				? new SolveDiagnostic("invalid", false, 0, 0, 0, [], "sketch has no valid current solution")
-				: diagnostic);
-		return SketchProfile.build(authored, solution);
-	}
+  /** Build a profile only when the current draft has a valid current solution. */
+  public function buildProfile():Sketch {
+    if (solution == null) throw new SketchSolveError(diagnostic == null ? new SolveDiagnostic(
+      "invalid",
+      false,
+      0,
+      0,
+      0,
+      [],
+      "sketch has no valid current solution"
+    ) : diagnostic);
+    return SketchProfile.build(authored, solution);
+  }
 
-	function solveDraft():Bool {
-		try {
-			var candidate = authored.solve(lastValidSolution);
-			solution = candidate;
-			lastValidSolution = candidate;
-			diagnostic = candidate.diagnostic;
-			return true;
-		} catch (error:SketchSolveError) {
-			solution = null;
-			diagnostic = error.diagnostic;
-			return false;
-		}
-	}
+  function solveDraft():Bool {
+    try {
+      var candidate = authored.solve(lastValidSolution);
+      solution = candidate;
+      lastValidSolution = candidate;
+      diagnostic = candidate.diagnostic;
+      return true;
+    } catch (error:SketchSolveError) {
+      solution = null;
+      diagnostic = error.diagnostic;
+      return false;
+    }
+  }
 
-	function get_degreesOfFreedom():Int
-		return diagnostic == null ? 0 : diagnostic.degreesOfFreedom;
+  function get_degreesOfFreedom():Int return diagnostic == null ? 0 : diagnostic.degreesOfFreedom;
 
-	function get_conflictingConstraintIds():Array<String>
-		return diagnostic == null ? [] : diagnostic.constraintIds.copy();
+  function get_conflictingConstraintIds():Array<String
+    > return diagnostic == null ? [] : diagnostic.constraintIds.copy();
 
-	function get_isSolved():Bool
-		return solution != null && solution.diagnostic.converged;
+  function get_isSolved():Bool return solution != null && solution.diagnostic.converged;
 }

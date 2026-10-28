@@ -7,47 +7,43 @@ import cadkit.parametric.ParametricError;
 
 /** Reads committed shapes and staged results during recompute. */
 class EvaluationContext {
-	private final document:Document;
-	private final staged:Map<Int, Shape>;
-	public var sketchSolveSeconds(default,null):Float = 0;
-	public var sketchSolveCount(default,null):Int = 0;
-	public var sketchProfileSeconds(default,null):Float = 0;
+  private final document:Document;
+  private final staged:Map<Int, Shape>;
+  public var sketchSolveSeconds(default, null):Float = 0;
+  public var sketchSolveCount(default, null):Int = 0;
+  public var sketchProfileSeconds(default, null):Float = 0;
 
-	public function new(document:Document) {
-		this.document = document;
-		this.staged = new Map<Int, Shape>();
-	}
+  public function new(document:Document) {
+    this.document = document;
+    this.staged = new Map<Int, Shape>();
+  }
 
-	public function stage(feature:Feature, result:EvaluationResult):Void {
-		staged.set(feature.id.toInt(), result.getShape());
-	}
+  public function stage(feature:Feature, result:EvaluationResult):Void {
+    staged.set(feature.id.toInt(), result.getShape());
+  }
 
-	public function shape(feature:Feature):Shape {
-		var stagedShape = staged.get(feature.id.toInt());
-		if (stagedShape != null)
-			return stagedShape;
+  public function shape(feature:Feature):Shape {
+    var stagedShape = staged.get(feature.id.toInt());
+    if (stagedShape != null) return stagedShape;
 
-		var committed = feature.currentShape();
-		if (committed == null)
-			throw new ParametricError(
-				"feature " + feature.id.toInt() + " has not been evaluated");
-		return committed;
-	}
-	public function owner():Document return document;
+    var committed = feature.currentShape();
+    if (committed == null) throw new ParametricError("feature " + feature.id.toInt() + " has not been evaluated");
+    return committed;
+  }
+  public function owner():Document return document;
 
-	public function isCancelled():Bool return document.isEvaluationCancelled();
+  public function isCancelled():Bool return document.isEvaluationCancelled();
 
-	public function checkCancelled():Void {
-		if (isCancelled())
-			throw new EvaluationCancelled();
-	}
+  public function checkCancelled():Void {
+    if (isCancelled()) throw new EvaluationCancelled();
+  }
 
-	public function recordSketchSolve(seconds:Float):Void {
-		sketchSolveSeconds += seconds;
-		sketchSolveCount++;
-	}
+  public function recordSketchSolve(seconds:Float):Void {
+    sketchSolveSeconds += seconds;
+    sketchSolveCount++;
+  }
 
-	public function recordSketchProfile(seconds:Float):Void {
-		sketchProfileSeconds += seconds;
-	}
+  public function recordSketchProfile(seconds:Float):Void {
+    sketchProfileSeconds += seconds;
+  }
 }

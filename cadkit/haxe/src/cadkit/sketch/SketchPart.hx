@@ -9,11 +9,11 @@ package cadkit.sketch;
 	them. `envelope` is the solve's storage for that matrix.
 */
 typedef SketchPart = {
-	var id:Int;
-	var constraints:Array<Int>;
-	var variables:Array<Int>;
-	var position:Array<Int>;
-	var first:Array<Int>;
-	var ordered:Bool;
-	var envelope:Array<Array<Float>>;
+  var id:Int;
+  var constraints:Array<Int>;
+  var variables:Array<Int>;
+  var position:Array<Int>;
+  var first:Array<Int>;
+  var ordered:Bool;
+  var envelope:Array<Array<Float>>;
 }

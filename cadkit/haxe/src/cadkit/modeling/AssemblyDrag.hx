@@ -42,8 +42,15 @@ class AssemblyDragResult {
   public final limitedJoints:Array<String>;
   public final brokenClosures:Array<String>;
 
-  public function new(status:AssemblyDragStatus, message:String, coordinates:Array<Float>, positionError:Float,
-      orientationError:Float, limitedJoints:Array<String>, brokenClosures:Array<String>) {
+  public function new(
+    status:AssemblyDragStatus,
+    message:String,
+    coordinates:Array<Float>,
+    positionError:Float,
+    orientationError:Float,
+    limitedJoints:Array<String>,
+    brokenClosures:Array<String>
+  ) {
     this.status = status;
     this.message = message;
     this.coordinates = coordinates;
@@ -97,8 +104,14 @@ class AssemblyDrag {
    * assembly's length unit) is the point that follows the target, e.g. where
    * the user pressed; the occurrence's origin by default.
    */
-  public function new(state:AssemblyState, occurrence:String, ?connector:String, ?dependent:Array<String>,
-      ?keepOrientation:Bool = true, ?grabPoint:Vector3) {
+  public function new(
+    state:AssemblyState,
+    occurrence:String,
+    ?connector:String,
+    ?dependent:Array<String>,
+    ?keepOrientation:Bool = true,
+    ?grabPoint:Vector3
+  ) {
     if (connector != null && grabPoint != null) throw "Assembly drag grabs a connector or a point, not both";
     if (state == null) throw "Assembly drag needs a state";
     this.state = state;
@@ -121,7 +134,8 @@ class AssemblyDrag {
     if (dofs.length == 0) throw 'Nothing moves "$occurrence": no driving joint lies between it and its root';
     movableJoints = [for (dof in dofs) model.dofId(dof)];
 
-    var metresPerUnit = LengthUnit.metresPerUnit(state.definition.lengthUnit == null ? "mm" : state.definition.lengthUnit);
+    var metresPerUnit = LengthUnit.metresPerUnit(state.definition.lengthUnit
+      == null ? "mm" : state.definition.lengthUnit);
     // A micrometre and a hundredth of a degree: far below what a viewport shows.
     positionTolerance = 1e-6 / metresPerUnit;
     metre = 1.0 / metresPerUnit;
@@ -130,28 +144,53 @@ class AssemblyDrag {
     snapshot = new KinematicSnapshot(model);
     snapshot.evaluate(preview);
     var offset = grabPoint == null ? null : Transform.translation(grabPoint.x, grabPoint.y, grabPoint.z);
-    var start = connector == null
-      ? (offset == null ? snapshot.bodyPose(body) : snapshot.bodyPose(body).compose(offset))
-      : snapshot.framePose(kinematics.connectorFrame(occurrence, connector));
+    var start = connector == null ? (offset == null ? snapshot.bodyPose(body)
+      : snapshot.bodyPose(body).compose(offset)) : snapshot.framePose(kinematics.connectorFrame(
+        occurrence,
+        connector
+      ));
     var orientation = keepOrientation ? FrameOrientation.Full : FrameOrientation.Free;
-    task = connector == null
-      ? new FrameTask(model, body, offset, start, positionTolerance, orientationTolerance, FrameTask.ALL_AXES, orientation, occurrence)
-      : FrameTask.atFrame(model, kinematics.connectorFrame(occurrence, connector), start, positionTolerance,
-        orientationTolerance, null, FrameTask.ALL_AXES, orientation);
+    task = connector == null ? new FrameTask(
+      model,
+      body,
+      offset,
+      start,
+      positionTolerance,
+      orientationTolerance,
+      FrameTask.ALL_AXES,
+      orientation,
+      occurrence
+    ) : FrameTask.atFrame(
+      model,
+      kinematics.connectorFrame(
+        occurrence,
+        connector
+      ),
+      start,
+      positionTolerance,
+      orientationTolerance,
+      null,
+      FrameTask.ALL_AXES,
+      orientation
+    );
     // Weigh position in metres whatever the drawing unit, so the damping means the same for a
     // millimetre assembly as for a robot in metres (otherwise a far target gets undamped steps).
     task.positionWeight = metresPerUnit;
     problem = new KinematicProblem(model).setActiveDofs(dofs).add(task);
-    for (closure in 0...model.closureCount())
-      problem.add(new ClosureTask(model, closure, positionTolerance, orientationTolerance));
+    for (closure in 0...model.closureCount()) problem.add(new ClosureTask(
+      model,
+      closure,
+      positionTolerance,
+      orientationTolerance
+    ));
   }
 
   /** The grabbed frame's world pose in the current preview. */
   public function grabbedPose():AssemblyFrame return AssemblyKinematics.toFrame(task.currentPose(snapshot));
 
   /** An occurrence's world pose in the current preview, for rendering it. */
-  public function previewPose(occurrenceId:String):AssemblyFrame
-    return AssemblyKinematics.toFrame(snapshot.bodyPose(kinematics.body(occurrenceId)));
+  public function previewPose(occurrenceId:String):AssemblyFrame return AssemblyKinematics
+    .toFrame(snapshot.bodyPose(kinematics.body(occurrenceId)));
 
   /** Moves the grabbed frame towards `target` (a world frame, in the assembly's length unit). */
   public function drag(target:AssemblyFrame, ?maxIterations:Int = 60):AssemblyDragResult {
@@ -171,17 +210,25 @@ class AssemblyDrag {
       message = "Following";
     } else if (broken.length > 0) {
       status = ClosureBroken;
-      message = broken.length == 1 ? 'Linkage "${broken[0]}" cannot stay closed here'
-        : 'Linkages ${broken.join(", ")} cannot stay closed here';
+      message = broken.length == 1
+        ? 'Linkage "${broken[0]}" cannot stay closed here' : 'Linkages ${broken.join(", ")} cannot stay closed here';
     } else if (limited.length > 0) {
       status = Limited;
-      message = limited.length == 1 ? 'Joint "${limited[0]}" is at its limit' : 'Joints ${limited.join(", ")} are at their limits';
+      message = limited.length
+        == 1 ? 'Joint "${limited[0]}" is at its limit' : 'Joints ${limited.join(", ")} are at their limits';
     } else {
       status = OutOfReach;
       message = 'Out of reach: ${formatDistance(grabbed.positionError)} from the target';
     }
-    return new AssemblyDragResult(status, message, coordinates, grabbed.positionError,
-      keepOrientation ? grabbed.orientationError : 0.0, limited, broken);
+    return new AssemblyDragResult(
+      status,
+      message,
+      coordinates,
+      grabbed.positionError,
+      keepOrientation ? grabbed.orientationError : 0.0,
+      limited,
+      broken
+    );
   }
 
   /**

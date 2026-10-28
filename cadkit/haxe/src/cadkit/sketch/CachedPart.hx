@@ -9,9 +9,9 @@ import cadkit.solve.ConstraintDiagnosis;
 	the numbers (settings, dimensions, fixed positions), compared exactly.
 */
 typedef CachedPart = {
-	var values:Array<Float>;
-	var report:DiagnosisReport;
-	var degenerate:Bool;
-	/** The part's variables (sketch-wide indices) that its constraints leave free. */
-	var free:Array<Int>;
+  var values:Array<Float>;
+  var report:DiagnosisReport;
+  var degenerate:Bool;
+  /** The part's variables (sketch-wide indices) that its constraints leave free. */
+  var free:Array<Int>;
 }

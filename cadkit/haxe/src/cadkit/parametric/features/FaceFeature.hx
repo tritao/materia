@@ -13,58 +13,53 @@ import cadkit.parametric.ReferenceState;
 
 /** Extracts an owning face profile, persisting a fingerprint after first evaluation. */
 class FaceFeature extends Feature {
-	public final source:Feature;
-	public final index:Int;
-	private var fingerprint:Null<TopologyFingerprint>;
+  public final source:Feature;
+  public final index:Int;
+  private var fingerprint:Null<TopologyFingerprint>;
 
-	public function new(
-		source:Feature,
-		index:Int,
-		?savedFingerprint:TopologyFingerprint) {
-		super();
-		if (index < 0)
-			throw new ParametricError("face index must not be negative");
-		this.source = source;
-		this.index = index;
-		fingerprint = savedFingerprint;
-	}
+  public function new(source:Feature, index:Int, ?savedFingerprint:TopologyFingerprint) {
+    super();
+    if (index < 0) throw new ParametricError("face index must not be negative");
+    this.source = source;
+    this.index = index;
+    fingerprint = savedFingerprint;
+  }
 
-	override public function serializationType():String {
-		return "face";
-	}
+  override public function serializationType():String {
+    return "face";
+  }
 
-	override public function dependencies():Array<FeatureId> {
-		return [source.id];
-	}
+  override public function dependencies():Array<FeatureId> {
+    return [source.id];
+  }
 
-	override public function dependencyFeatures():Array<Feature> {
-		return [source];
-	}
+  override public function dependencyFeatures():Array<Feature> {
+    return [source];
+  }
 
-	override public function evaluate(context:EvaluationContext):EvaluationResult {
-		var result = selectFace(context.shape(source));
-		return EvaluationResult.fromShape(result);
-	}
+  override public function evaluate(context:EvaluationContext):EvaluationResult {
+    var result = selectFace(context.shape(source));
+    return EvaluationResult.fromShape(result);
+  }
 
-	/** The persisted profile key; null until an index-only feature is evaluated. */
-	public function fingerprintData():Null<TopologyFingerprint> {
-		return fingerprint;
-	}
+  /** The persisted profile key; null until an index-only feature is evaluated. */
+  public function fingerprintData():Null<TopologyFingerprint> {
+    return fingerprint;
+  }
 
-	private function selectFace(sourceShape:Shape):Shape {
-		if (fingerprint == null) {
-			var face = sourceShape.faces().at(index);
-			var result = face.cloneShape();
-			face.close();
-			fingerprint = TopologyFingerprint.capture(result);
-			return result;
-		}
+  private function selectFace(sourceShape:Shape):Shape {
+    if (fingerprint == null) {
+      var face = sourceShape.faces().at(index);
+      var result = face.cloneShape();
+      face.close();
+      fingerprint = TopologyFingerprint.capture(result);
+      return result;
+    }
 
-		var resolution = TopologyResolver.resolve(sourceShape, fingerprint, CadKit.ShapeKind.Face);
-		if (resolution.state == ReferenceState.Ambiguous)
-			throw new ParametricError("face profile remap is ambiguous");
-		if (resolution.state != ReferenceState.Resolved)
-			throw new ParametricError("face profile could not be remapped with sufficient confidence");
-		return sourceShape.subshape(CadKit.ShapeKind.Face, resolution.index);
-	}
+    var resolution = TopologyResolver.resolve(sourceShape, fingerprint, CadKit.ShapeKind.Face);
+    if (resolution.state == ReferenceState.Ambiguous) throw new ParametricError("face profile remap is ambiguous");
+    if (resolution.state != ReferenceState
+      .Resolved) throw new ParametricError("face profile could not be remapped with sufficient confidence");
+    return sourceShape.subshape(CadKit.ShapeKind.Face, resolution.index);
+  }
 }

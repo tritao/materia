@@ -1,7 +1,7 @@
 package cadkit;
 
 enum SelectionErrorKind {
-	Empty;
-	Ambiguous;
-	Invalid;
+  Empty;
+  Ambiguous;
+  Invalid;
 }

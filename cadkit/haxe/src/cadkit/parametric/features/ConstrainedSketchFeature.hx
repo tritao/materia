@@ -29,511 +29,525 @@ import cadkit.sketch.FaceWorkplane;
 
 /** Serializable document feature backed by an authored constrained sketch. */
 class ConstrainedSketchFeature extends Feature {
-	private var authored:ConstrainedSketch;
-	private final dimensionSlots:Map<String, Parameter>;
-	private final dimensionKinds:Map<String, String>;
-	private final retiredDimensionSlots:Map<String, Parameter>;
-	private final retiredDimensionKinds:Map<String, String>;
-	public var lastDiagnostic(default,null):Null<SolveDiagnostic>;
-	public var lastAttemptDiagnostic(default,null):Null<SolveDiagnostic>;
-	public var lastSolveSeconds(default,null):Float;
-	public var lastProfileBuildSeconds(default,null):Float;
-	private var committedSolution:Null<SolvedSketch>;
-	private var pendingSolution:Null<SolvedSketch>;
-	private var committedProfile:Null<ProfileGeometry>;
-	private var pendingProfile:Null<ProfileGeometry>;
-	private var pendingProfileContext:Null<EvaluationContext>;
-	public final support:Null<Feature>;
-	public final supportSelection:Null<SelectionRecipe>;
-	public final supportXDirection:Null<Vector>;
-	public final supportOffset:Float;
-	public final supportFlipped:Bool;
-	public var supportFaceReference(default, null):Null<TopologyReference>;
-	private var pendingSupportFace:Null<Shape>;
-	private var pendingSupportFaceFingerprint:Null<TopologyFingerprint>;
+  private var authored:ConstrainedSketch;
+  private final dimensionSlots:Map<String, Parameter>;
+  private final dimensionKinds:Map<String, String>;
+  private final retiredDimensionSlots:Map<String, Parameter>;
+  private final retiredDimensionKinds:Map<String, String>;
+  public var lastDiagnostic(default, null):Null<SolveDiagnostic>;
+  public var lastAttemptDiagnostic(default, null):Null<SolveDiagnostic>;
+  public var lastSolveSeconds(default, null):Float;
+  public var lastProfileBuildSeconds(default, null):Float;
+  private var committedSolution:Null<SolvedSketch>;
+  private var pendingSolution:Null<SolvedSketch>;
+  private var committedProfile:Null<ProfileGeometry>;
+  private var pendingProfile:Null<ProfileGeometry>;
+  private var pendingProfileContext:Null<EvaluationContext>;
+  public final support:Null<Feature>;
+  public final supportSelection:Null<SelectionRecipe>;
+  public final supportXDirection:Null<Vector>;
+  public final supportOffset:Float;
+  public final supportFlipped:Bool;
+  public var supportFaceReference(default, null):Null<TopologyReference>;
+  private var pendingSupportFace:Null<Shape>;
+  private var pendingSupportFaceFingerprint:Null<TopologyFingerprint>;
 
-	public function new(authored:ConstrainedSketch, ?support:Feature, ?supportSelection:SelectionRecipe, ?supportXDirection:Vector,
-		supportOffset:Float = 0, supportFlipped:Bool = false, ?supportFace:Shape,
-		?savedSupportFaceFingerprint:TopologyFingerprint) {
-		super();
-		this.authored = authored.copy();
-		dimensionSlots = new Map();
-		dimensionKinds = new Map();
-		retiredDimensionSlots = new Map();
-		retiredDimensionKinds = new Map();
-		lastDiagnostic = null;
-		lastAttemptDiagnostic = null;
-		lastSolveSeconds = 0;
-		lastProfileBuildSeconds = 0;
-		committedSolution = null;
-		pendingSolution = null;
-		committedProfile = null;
-		pendingProfile = null;
-		pendingProfileContext = null;
-		this.support = support;
-		this.supportSelection = supportSelection;
-		this.supportXDirection = supportXDirection;
-		this.supportOffset = supportOffset;
-		this.supportFlipped = supportFlipped;
-		var hasFaceReference = supportFace != null || savedSupportFaceFingerprint != null;
-		if ((support == null && (supportSelection != null || hasFaceReference || supportXDirection != null)) ||
-			(support != null && (supportXDirection == null || (supportSelection == null && !hasFaceReference))) ||
-			(supportFace != null && savedSupportFaceFingerprint != null))
-			throw "attached constrained sketches require a support face selection and an X direction";
-		if (hasFaceReference && supportSelection != null && (supportSelection.kind != "face" ||
-			supportSelection.geometry != "plane" || supportSelection.expectedCount != 1))
-			throw "face-reference fallback must select exactly one planar face";
-		pendingSupportFace = supportFace == null ? null : supportFace.cloneShape();
-		pendingSupportFaceFingerprint = savedSupportFaceFingerprint;
-		supportFaceReference = null;
-		for (constraint in authored.constraints())
-			if (isDimensional(constraint.kind) && !constraint.reference) {
-				dimensionSlots.set(constraint.id, new Parameter(this, "constraint." + constraint.id,
-					toCanonicalDimension(authored, constraint.kind, constraint.value),
-					constraint.kind == "angle" ? -1e300 : 0, false, 1e300,
-					constraint.kind == "angle" ? ParameterKind.Angle : ParameterKind.Length));
-				dimensionKinds.set(constraint.id, constraint.kind);
-			}
-	}
+  public function new(
+    authored:ConstrainedSketch,
+    ?support:Feature,
+    ?supportSelection:SelectionRecipe,
+    ?supportXDirection:Vector,
+    supportOffset:Float = 0,
+    supportFlipped:Bool = false,
+    ?supportFace:Shape,
+    ?savedSupportFaceFingerprint:TopologyFingerprint
+  ) {
+    super();
+    this.authored = authored.copy();
+    dimensionSlots = new Map();
+    dimensionKinds = new Map();
+    retiredDimensionSlots = new Map();
+    retiredDimensionKinds = new Map();
+    lastDiagnostic = null;
+    lastAttemptDiagnostic = null;
+    lastSolveSeconds = 0;
+    lastProfileBuildSeconds = 0;
+    committedSolution = null;
+    pendingSolution = null;
+    committedProfile = null;
+    pendingProfile = null;
+    pendingProfileContext = null;
+    this.support = support;
+    this.supportSelection = supportSelection;
+    this.supportXDirection = supportXDirection;
+    this.supportOffset = supportOffset;
+    this.supportFlipped = supportFlipped;
+    var hasFaceReference = supportFace != null || savedSupportFaceFingerprint != null;
+    if ((support == null && (supportSelection != null
+      || hasFaceReference || supportXDirection != null)) || (support != null && (supportXDirection == null
+      || (supportSelection == null && !hasFaceReference))) || (supportFace != null && savedSupportFaceFingerprint
+      != null)) throw "attached constrained sketches require a support face selection and an X direction";
+    if (hasFaceReference
+      && supportSelection != null && (supportSelection.kind != "face" || supportSelection.geometry != "plane"
+      || supportSelection.expectedCount != 1)) throw "face-reference fallback must select exactly one planar face";
+    pendingSupportFace = supportFace == null ? null : supportFace.cloneShape();
+    pendingSupportFaceFingerprint = savedSupportFaceFingerprint;
+    supportFaceReference = null;
+    for (constraint in authored.constraints()) if (isDimensional(constraint.kind) && !constraint.reference) {
+      dimensionSlots.set(
+        constraint.id,
+        new Parameter(
+          this,
+          "constraint." + constraint.id,
+          toCanonicalDimension(
+            authored,
+            constraint.kind,
+            constraint.value
+          ),
+          constraint.kind == "angle" ? -1e300 : 0,
+          false,
+          1e300,
+          constraint.kind == "angle" ? ParameterKind.Angle : ParameterKind.Length
+        )
+      );
+      dimensionKinds.set(constraint.id, constraint.kind);
+    }
+  }
 
-	public function sketch():ConstrainedSketch {
-		return authored.copy();
-	}
+  public function sketch():ConstrainedSketch {
+    return authored.copy();
+  }
 
-	/** Exact regions matching this context's profile, including staged parameter and support edits. */
-	public function profileForEvaluation(context:EvaluationContext):ProfileGeometry {
-		if (context.owner() != document)
-			throw new ParametricError("sketch profile belongs to another document");
-		var shape = context.shape(this);
-		if (pendingProfileContext == context && pendingProfile != null)
-			return pendingProfile;
-		if (committedProfile == null)
-			throw new ParametricError("sketch profile has not been evaluated");
-		return committedProfile;
-	}
+  /** Exact regions matching this context's profile, including staged parameter and support edits. */
+  public function profileForEvaluation(context:EvaluationContext):ProfileGeometry {
+    if (context.owner() != document) throw new ParametricError("sketch profile belongs to another document");
+    var shape = context.shape(this);
+    if (pendingProfileContext == context && pendingProfile != null) return pendingProfile;
+    if (committedProfile == null) throw new ParametricError("sketch profile has not been evaluated");
+    return committedProfile;
+  }
 
-	/** Resolve the world workplane currently used to evaluate this sketch. */
-	public function workplane():Plane {
-		if (support == null)
-			return authored.plane;
-		var supportShape = support.currentShape();
-		if (supportShape == null)
-			throw new ParametricError("attached sketch support has no evaluated shape");
-		if (supportFaceReference == null) {
-			if (supportSelection == null)
-				throw new ParametricError("attached sketch has no selected support face");
-			return FaceWorkplane.resolve(supportShape, supportSelection, supportXDirection,
-				supportOffset, supportFlipped);
-		}
-		var face = supportFaceReference.resolveFor(supportShape);
-		try {
-			var result = FaceWorkplane.fromFace(face, supportXDirection, supportOffset, supportFlipped);
-			face.close();
-			return result;
-		} catch (error:Dynamic) {
-			face.close();
-			throw error;
-		}
-	}
+  /** Resolve the world workplane currently used to evaluate this sketch. */
+  public function workplane():Plane {
+    if (support == null) return authored.plane;
+    var supportShape = support.currentShape();
+    if (supportShape == null) throw new ParametricError("attached sketch support has no evaluated shape");
+    if (supportFaceReference == null) {
+      if (supportSelection == null) throw new ParametricError("attached sketch has no selected support face");
+      return FaceWorkplane.resolve(supportShape, supportSelection, supportXDirection, supportOffset, supportFlipped);
+    }
+    var face = supportFaceReference.resolveFor(supportShape);
+    try {
+      var result = FaceWorkplane.fromFace(face, supportXDirection, supportOffset, supportFlipped);
+      face.close();
+      return result;
+    } catch (error:Dynamic) {
+      face.close();
+      throw error;
+    }
+  }
 
-	/** Resolve an explicitly picked planar face on this sketch's support feature. */
-	public function resolveSupportFace(fingerprint:TopologyFingerprint):Shape {
-		if (support == null || supportFaceReference == null)
-			throw new ParametricError("constrained sketch has no repairable support face");
-		if (fingerprint == null || fingerprint.kind != CadKit.ShapeKind.Face ||
-			fingerprint.surfaceKind != CadKit.SurfaceKind.Plane)
-			throw new ParametricError("replacement support must be a planar face");
-		var source = support.currentShape();
-		if (source == null)
-			throw new ParametricError("support feature has no evaluated shape");
-		var resolution = TopologyResolver.resolve(source, fingerprint, CadKit.ShapeKind.Face);
-		if (resolution.state != ReferenceState.Resolved)
-			throw new ParametricError("selected face does not uniquely match a face on the sketch support",
-				resolution.state);
-		var face = source.subshape(CadKit.ShapeKind.Face, resolution.index);
-		if (face.surfaceKind() != CadKit.SurfaceKind.Plane) {
-			face.close();
-			throw new ParametricError("replacement support must be a planar face");
-		}
-		return face;
-	}
+  /** Resolve an explicitly picked planar face on this sketch's support feature. */
+  public function resolveSupportFace(fingerprint:TopologyFingerprint):Shape {
+    if (support == null
+      || supportFaceReference == null) throw new ParametricError("constrained sketch has no repairable support face");
+    if (fingerprint == null || fingerprint.kind != CadKit.ShapeKind.Face || fingerprint.surfaceKind
+      != CadKit.SurfaceKind.Plane) throw new ParametricError("replacement support must be a planar face");
+    var source = support.currentShape();
+    if (source == null) throw new ParametricError("support feature has no evaluated shape");
+    var resolution = TopologyResolver.resolve(source, fingerprint, CadKit.ShapeKind.Face);
+    if (resolution.state != ReferenceState.Resolved) throw new ParametricError(
+      "selected face does not uniquely match a face on the sketch support",
+      resolution.state
+    );
+    var face = source.subshape(CadKit.ShapeKind.Face, resolution.index);
+    if (face.surfaceKind() != CadKit.SurfaceKind.Plane) {
+      face.close();
+      throw new ParametricError("replacement support must be a planar face");
+    }
+    return face;
+  }
 
-	/** Apply a user-confirmed support-face replacement as one document change. */
-	public function repairSupportFace(fingerprint:TopologyFingerprint):Void {
-		if (document == null)
-			throw new ParametricError("support-face repair requires an attached feature");
-		var reference = supportFaceReference;
-		if (reference == null)
-			throw new ParametricError("constrained sketch has no support-face reference");
-		var replacement = resolveSupportFace(fingerprint);
-		var beforeFingerprint = reference.fingerprintData();
-		var beforeState = reference.state;
-		var afterFingerprint = TopologyFingerprint.capture(replacement);
-		try {
-			reference.rebind(replacement);
-			markDirty();
-			document.recordDocumentChange(new ConstrainedSketchSupportFaceChange(
-				this, beforeFingerprint, beforeState, afterFingerprint));
-		} catch (error:Dynamic) {
-			replacement.close();
-			throw error;
-		}
-		replacement.close();
-	}
+  /** Apply a user-confirmed support-face replacement as one document change. */
+  public function repairSupportFace(fingerprint:TopologyFingerprint):Void {
+    if (document == null) throw new ParametricError("support-face repair requires an attached feature");
+    var reference = supportFaceReference;
+    if (reference == null) throw new ParametricError("constrained sketch has no support-face reference");
+    var replacement = resolveSupportFace(fingerprint);
+    var beforeFingerprint = reference.fingerprintData();
+    var beforeState = reference.state;
+    var afterFingerprint = TopologyFingerprint.capture(replacement);
+    try {
+      reference.rebind(replacement);
+      markDirty();
+      document.recordDocumentChange(new ConstrainedSketchSupportFaceChange(
+        this,
+        beforeFingerprint,
+        beforeState,
+        afterFingerprint
+      ));
+    } catch (error:Dynamic) {
+      replacement.close();
+      throw error;
+    }
+    replacement.close();
+  }
 
-	/** Restore one side of a support-face change without recording nested history. */
-	public function restoreSupportFaceReference(fingerprint:TopologyFingerprint, state:ReferenceState):Void {
-		var reference = supportFaceReference;
-		if (reference == null)
-			throw new ParametricError("constrained sketch has no support-face reference");
-		var replacement:Null<Shape> = null;
-		if (state == ReferenceState.Resolved || state == ReferenceState.Remapped)
-			replacement = resolveSupportFace(fingerprint);
-		try {
-			reference.restore(replacement, fingerprint, state);
-		} catch (error:Dynamic) {
-			if (replacement != null)
-				replacement.close();
-			throw error;
-		}
-		if (replacement != null)
-			replacement.close();
-		markDirty();
-	}
+  /** Restore one side of a support-face change without recording nested history. */
+  public function restoreSupportFaceReference(fingerprint:TopologyFingerprint, state:ReferenceState):Void {
+    var reference = supportFaceReference;
+    if (reference == null) throw new ParametricError("constrained sketch has no support-face reference");
+    var replacement:Null<Shape> = null;
+    if (state == ReferenceState.Resolved
+      || state == ReferenceState.Remapped) replacement = resolveSupportFace(fingerprint);
+    try {
+      reference.restore(replacement, fingerprint, state);
+    } catch (error:Dynamic) {
+      if (replacement != null) replacement.close();
+      throw error;
+    }
+    if (replacement != null) replacement.close();
+    markDirty();
+  }
 
-	public function addPoint(point:SketchPoint):Void {
-		edit(function(sketch) sketch.addPoint(point));
-	}
+  public function addPoint(point:SketchPoint):Void {
+    edit(function(sketch) sketch.addPoint(point));
+  }
 
-	public function addEntity(entity:SketchEntity):Void {
-		edit(function(sketch) sketch.addEntity(entity));
-	}
+  public function addEntity(entity:SketchEntity):Void {
+    edit(function(sketch) sketch.addEntity(entity));
+  }
 
-	public function addConstraint(constraint:SketchConstraint):Void {
-		edit(function(sketch) sketch.addConstraint(constraint));
-	}
+  public function addConstraint(constraint:SketchConstraint):Void {
+    edit(function(sketch) sketch.addConstraint(constraint));
+  }
 
-	public function replaceEntity(entity:SketchEntity):Void {
-		edit(function(sketch) sketch.replaceEntity(entity));
-	}
+  public function replaceEntity(entity:SketchEntity):Void {
+    edit(function(sketch) sketch.replaceEntity(entity));
+  }
 
-	public function replacePoint(point:SketchPoint):Void {
-		edit(function(sketch) sketch.replacePoint(point));
-	}
+  public function replacePoint(point:SketchPoint):Void {
+    edit(function(sketch) sketch.replacePoint(point));
+  }
 
-	public function replaceConstraint(constraint:SketchConstraint):Void {
-		edit(function(sketch) sketch.replaceConstraint(constraint));
-	}
+  public function replaceConstraint(constraint:SketchConstraint):Void {
+    edit(function(sketch) sketch.replaceConstraint(constraint));
+  }
 
-	/** Replace the full authored sketch as one undoable document change. */
-	public function replaceSketch(sketch:ConstrainedSketch):Void {
-		if (document == null)
-			throw "constrained sketch edits require an attached document feature";
-		if (sketch == null)
-			throw "replacement sketch must not be null";
-		var before = authored.copy();
-		var after = sketch.copy();
-		validateReferences(after);
-		restoreSketch(after);
-		document.recordDocumentChange(new ConstrainedSketchChange(this, before, after.copy()));
-	}
+  /** Replace the full authored sketch as one undoable document change. */
+  public function replaceSketch(sketch:ConstrainedSketch):Void {
+    if (document == null) throw "constrained sketch edits require an attached document feature";
+    if (sketch == null) throw "replacement sketch must not be null";
+    var before = authored.copy();
+    var after = sketch.copy();
+    validateReferences(after);
+    restoreSketch(after);
+    document.recordDocumentChange(new ConstrainedSketchChange(this, before, after.copy()));
+  }
 
-	public function removePoint(id:String):Void {
-		edit(function(sketch) sketch.removePoint(id));
-	}
+  public function removePoint(id:String):Void {
+    edit(function(sketch) sketch.removePoint(id));
+  }
 
-	public function removeEntity(id:String):Void {
-		edit(function(sketch) sketch.removeEntity(id));
-	}
+  public function removeEntity(id:String):Void {
+    edit(function(sketch) sketch.removeEntity(id));
+  }
 
-	public function removeConstraint(id:String):Void {
-		edit(function(sketch) sketch.removeConstraint(id));
-	}
+  public function removeConstraint(id:String):Void {
+    edit(function(sketch) sketch.removeConstraint(id));
+  }
 
-	private function edit(change:ConstrainedSketch->Void):Void {
-		if (document == null)
-			throw "constrained sketch edits require an attached document feature";
-		var before = authored.copy();
-		var after = authored.copy();
-		change(after);
-		validateReferences(after);
-		restoreSketch(after);
-		document.recordDocumentChange(new ConstrainedSketchChange(this, before, after.copy()));
-	}
+  private function edit(change:ConstrainedSketch -> Void):Void {
+    if (document == null) throw "constrained sketch edits require an attached document feature";
+    var before = authored.copy();
+    var after = authored.copy();
+    change(after);
+    validateReferences(after);
+    restoreSketch(after);
+    document.recordDocumentChange(new ConstrainedSketchChange(this, before, after.copy()));
+  }
 
-	public function restoreSketch(snapshot:ConstrainedSketch):Void {
-		var next = snapshot.copy();
-		validateReferences(next);
-		reconcileDimensionSlots(next);
-		authored = next;
-		markDirty();
-	}
+  public function restoreSketch(snapshot:ConstrainedSketch):Void {
+    var next = snapshot.copy();
+    validateReferences(next);
+    reconcileDimensionSlots(next);
+    authored = next;
+    markDirty();
+  }
 
-	private function reconcileDimensionSlots(next:ConstrainedSketch):Void {
-		var required:Map<String, SketchConstraint> = new Map();
-		// Reference dimensions are measured, not parameters.
-		for (constraint in next.constraints())
-			if (isDimensional(constraint.kind) && !constraint.reference)
-				required.set(constraint.id, constraint);
+  private function reconcileDimensionSlots(next:ConstrainedSketch):Void {
+    var required:Map<String, SketchConstraint> = new Map();
+    // Reference dimensions are measured, not parameters.
+    for (constraint in next.constraints()) if (isDimensional(constraint.kind) && !constraint.reference) required.set(
+      constraint.id,
+      constraint
+    );
 
-		var removedIds:Array<String> = [];
-		for (id in dimensionSlots.keys()) {
-			if (required.exists(id))
-				continue;
-			var slot = dimensionSlots.get(id);
-			removedIds.push(id);
-			if (document != null)
-				for (named in document.namedParameters())
-					if (named.contains(slot))
-						throw new ParametricError("cannot remove dimensional constraint " + id + " while named parameter "
-							+ named.name + " is bound; unbind the parameter first");
-		}
-		for (id in required.keys()) {
-			var constraint = required.get(id);
-			var existingKind = dimensionKinds.get(id);
-			if (existingKind == null)
-				existingKind = retiredDimensionKinds.get(id);
-			if (existingKind != null && existingKind != constraint.kind)
-				throw new ParametricError("cannot change the kind of a dimensional constraint while preserving its parameter: " + id);
-		}
+    var removedIds:Array<String> = [];
+    for (id in dimensionSlots.keys()) {
+      if (required.exists(id)) continue;
+      var slot = dimensionSlots.get(id);
+      removedIds.push(id);
+      if (document != null) for (named in document
+        .namedParameters()) if (named.contains(slot)) throw new ParametricError("cannot remove dimensional constraint "
+        + id + " while named parameter " + named.name + " is bound; unbind the parameter first");
+    }
+    for (id in required.keys()) {
+      var constraint = required.get(id);
+      var existingKind = dimensionKinds.get(id);
+      if (existingKind == null) existingKind = retiredDimensionKinds.get(id);
+      if (existingKind != null && existingKind != constraint
+        .kind) throw new ParametricError("cannot change the kind of a dimensional constraint while preserving its parameter: "
+        + id);
+    }
 
-		for (id in removedIds) {
-			var slot = dimensionSlots.get(id);
-			retiredDimensionSlots.set(id, slot);
-			retiredDimensionKinds.set(id, dimensionKinds.get(id));
-			dimensionSlots.remove(id);
-			dimensionKinds.remove(id);
-			unregisterParameter(slot);
-		}
+    for (id in removedIds) {
+      var slot = dimensionSlots.get(id);
+      retiredDimensionSlots.set(id, slot);
+      retiredDimensionKinds.set(id, dimensionKinds.get(id));
+      dimensionSlots.remove(id);
+      dimensionKinds.remove(id);
+      unregisterParameter(slot);
+    }
 
-		for (id in required.keys()) {
-			var constraint = required.get(id);
-			if (!dimensionSlots.exists(id)) {
-				var slot = retiredDimensionSlots.get(id);
-				if (slot != null) {
-					retiredDimensionSlots.remove(id);
-					retiredDimensionKinds.remove(id);
-					registerParameter(slot);
-					restoreDimensionValue(slot, toCanonicalDimension(next, constraint.kind, constraint.value));
-				} else {
-					slot = new Parameter(this, "constraint." + id,
-						toCanonicalDimension(next, constraint.kind, constraint.value),
-						constraint.kind == "angle" ? -1e300 : 0, false, 1e300,
-						constraint.kind == "angle" ? ParameterKind.Angle : ParameterKind.Length);
-				}
-				dimensionSlots.set(id, slot);
-				dimensionKinds.set(id, constraint.kind);
-			} else {
-				restoreDimensionValue(dimensionSlots.get(id), toCanonicalDimension(next, constraint.kind, constraint.value));
-			}
-		}
-	}
+    for (id in required.keys()) {
+      var constraint = required.get(id);
+      if (!dimensionSlots.exists(id)) {
+        var slot = retiredDimensionSlots.get(id);
+        if (slot != null) {
+          retiredDimensionSlots.remove(id);
+          retiredDimensionKinds.remove(id);
+          registerParameter(slot);
+          restoreDimensionValue(slot, toCanonicalDimension(next, constraint.kind, constraint.value));
+        } else {
+          slot = new Parameter(
+            this,
+            "constraint." + id,
+            toCanonicalDimension(next, constraint.kind, constraint.value),
+            constraint.kind == "angle" ? -1e300 : 0,
+            false,
+            1e300,
+            constraint.kind == "angle" ? ParameterKind.Angle : ParameterKind.Length
+          );
+        }
+        dimensionSlots.set(id, slot);
+        dimensionKinds.set(id, constraint.kind);
+      } else {
+        restoreDimensionValue(dimensionSlots.get(id), toCanonicalDimension(next, constraint.kind, constraint.value));
+      }
+    }
+  }
 
-	override public function onAttached():Void {
-		if (support == null)
-			return;
-		if (pendingSupportFace != null) {
-			supportFaceReference = TopologyReference.fromShape(this, pendingSupportFace, support, supportSelection);
-			pendingSupportFace = null;
-		} else if (pendingSupportFaceFingerprint != null) {
-			supportFaceReference = TopologyReference.fromFingerprint(
-				this, CadKit.ShapeKind.Face, pendingSupportFaceFingerprint, support, supportSelection);
-			pendingSupportFaceFingerprint = null;
-		}
-	}
+  override public function onAttached():Void {
+    if (support == null) return;
+    if (pendingSupportFace != null) {
+      supportFaceReference = TopologyReference.fromShape(this, pendingSupportFace, support, supportSelection);
+      pendingSupportFace = null;
+    } else if (pendingSupportFaceFingerprint != null) {
+      supportFaceReference = TopologyReference.fromFingerprint(
+        this,
+        CadKit.ShapeKind.Face,
+        pendingSupportFaceFingerprint,
+        support,
+        supportSelection
+      );
+      pendingSupportFaceFingerprint = null;
+    }
+  }
 
-	override public function onClose():Void {
-		if (pendingSupportFace != null) {
-			pendingSupportFace.close();
-			pendingSupportFace = null;
-		}
-	}
+  override public function onClose():Void {
+    if (pendingSupportFace != null) {
+      pendingSupportFace.close();
+      pendingSupportFace = null;
+    }
+  }
 
-	private function restoreDimensionValue(slot:Parameter, value:Float):Void {
-		if (document != null) {
-			for (named in document.namedParameters()) {
-				if (!named.contains(slot))
-					continue;
-				for (binding in named.bindings())
-					binding.restore(value);
-				return;
-			}
-		}
-		slot.restore(value);
-	}
+  private function restoreDimensionValue(slot:Parameter, value:Float):Void {
+    if (document != null) {
+      for (named in document.namedParameters()) {
+        if (!named.contains(slot)) continue;
+        for (binding in named.bindings()) binding.restore(value);
+        return;
+      }
+    }
+    slot.restore(value);
+  }
 
-	override public function parameterChanged(parameter:Parameter, oldValue:Float):Void {
-		synchronizeAuthoredDimension(parameter);
-		if (document != null)
-			document.recordParameterChange(parameter, oldValue);
-		markDirty();
-	}
+  override public function parameterChanged(parameter:Parameter, oldValue:Float):Void {
+    synchronizeAuthoredDimension(parameter);
+    if (document != null) document.recordParameterChange(parameter, oldValue);
+    markDirty();
+  }
 
-	override public function parameterRestored(parameter:Parameter):Void {
-		synchronizeAuthoredDimension(parameter);
-		markDirty();
-	}
+  override public function parameterRestored(parameter:Parameter):Void {
+    synchronizeAuthoredDimension(parameter);
+    markDirty();
+  }
 
-	private function synchronizeAuthoredDimension(parameter:Parameter):Void {
-		for (id in dimensionSlots.keys()) {
-			if (dimensionSlots.get(id) != parameter)
-				continue;
-			for (constraint in authored.constraints()) {
-				if (constraint.id == id) {
-					authored.replaceConstraint(constraint.withValue(fromCanonicalDimension(authored, constraint.kind, parameter.value)));
-					return;
-				}
-			}
-		}
-	}
+  private function synchronizeAuthoredDimension(parameter:Parameter):Void {
+    for (id in dimensionSlots.keys()) {
+      if (dimensionSlots.get(id) != parameter) continue;
+      for (constraint in authored.constraints()) {
+        if (constraint.id == id) {
+          authored.replaceConstraint(constraint.withValue(fromCanonicalDimension(
+            authored,
+            constraint.kind,
+            parameter.value
+          )));
+          return;
+        }
+      }
+    }
+  }
 
-	private static function validateReferences(sketch:ConstrainedSketch):Void {
-		var pointIds:Map<String, Bool> = new Map();
-		var entityIds:Map<String, Bool> = new Map();
-		for (point in sketch.points())
-			pointIds.set(point.id, true);
-		for (entity in sketch.entities()) {
-			if (!pointIds.exists(entity.first) || (entity.kind == "line" && (entity.second == null || !pointIds.exists(entity.second))))
-				throw "entity references a missing point: " + entity.id;
-			entityIds.set(entity.id, true);
-		}
-		for (constraint in sketch.constraints()) {
-			var firstIsPoint = constraint.kind == "fixed" || constraint.kind == "coincident" || constraint.kind == "distance"
-				|| constraint.kind == "pointOn" || constraint.kind == "symmetric";
-			if (firstIsPoint ? !pointIds.exists(constraint.first) : !entityIds.exists(constraint.first))
-				throw "constraint references a missing object: " + constraint.id;
-			if (constraint.second != null) {
-				var secondIsPoint = constraint.kind == "coincident" || constraint.kind == "distance" || constraint.kind == "symmetric";
-				if (secondIsPoint ? !pointIds.exists(constraint.second) : !entityIds.exists(constraint.second))
-					throw "constraint references a missing object: " + constraint.id;
-			}
-			if (constraint.third != null && !entityIds.exists(constraint.third))
-				throw "constraint references a missing object: " + constraint.id;
-		}
-	}
+  private static function validateReferences(sketch:ConstrainedSketch):Void {
+    var pointIds:Map<String, Bool> = new Map();
+    var entityIds:Map<String, Bool> = new Map();
+    for (point in sketch.points()) pointIds.set(point.id, true);
+    for (entity in sketch.entities()) {
+      if (!pointIds.exists(entity.first) || (entity.kind == "line" && (entity.second == null
+        || !pointIds.exists(entity.second)))) throw "entity references a missing point: " + entity.id;
+      entityIds.set(entity.id, true);
+    }
+    for (constraint in sketch.constraints()) {
+      var firstIsPoint = constraint.kind == "fixed" || constraint.kind == "coincident"
+        || constraint.kind == "distance" || constraint.kind == "pointOn" || constraint.kind == "symmetric";
+      if (firstIsPoint ? !pointIds.exists(constraint.first)
+        : !entityIds.exists(constraint.first)) throw "constraint references a missing object: " + constraint.id;
+      if (constraint.second != null) {
+        var secondIsPoint = constraint.kind == "coincident"
+          || constraint.kind == "distance" || constraint.kind == "symmetric";
+        if (secondIsPoint ? !pointIds.exists(constraint.second)
+          : !entityIds.exists(constraint.second)) throw "constraint references a missing object: " + constraint.id;
+      }
+      if (constraint.third != null
+        && !entityIds.exists(constraint.third)) throw "constraint references a missing object: " + constraint.id;
+    }
+  }
 
-	public function dimension(constraintId:String):Parameter {
-		var value = dimensionSlots.get(constraintId);
-		if (value == null)
-			throw "constraint is not dimensional: " + constraintId;
-		return value;
-	}
+  public function dimension(constraintId:String):Parameter {
+    var value = dimensionSlots.get(constraintId);
+    if (value == null) throw "constraint is not dimensional: " + constraintId;
+    return value;
+  }
 
-	public function solvedSketch():Null<SolvedSketch> {
-		return committedSolution;
-	}
+  public function solvedSketch():Null<SolvedSketch> {
+    return committedSolution;
+  }
 
-	override public function serializationType():String {
-		return "constrained-sketch";
-	}
+  override public function serializationType():String {
+    return "constrained-sketch";
+  }
 
-	override public function dependencies():Array<FeatureId> {
-		return support == null ? [] : [support.id];
-	}
+  override public function dependencies():Array<FeatureId> {
+    return support == null ? [] : [support.id];
+  }
 
-	override public function dependencyFeatures():Array<Feature> {
-		return support == null ? [] : [support];
-	}
+  override public function dependencyFeatures():Array<Feature> {
+    return support == null ? [] : [support];
+  }
 
-	override public function evaluate(context:EvaluationContext):EvaluationResult {
-		var plane = authored.plane;
-		if (support != null) {
-			if (supportFaceReference != null) {
-				var selectedFace = supportFaceReference.resolveFor(context.shape(support));
-				try {
-					plane = FaceWorkplane.fromFace(selectedFace, supportXDirection, supportOffset, supportFlipped);
-					selectedFace.close();
-				} catch (error:Dynamic) {
-					selectedFace.close();
-					throw error;
-				}
-			} else if (supportSelection != null) {
-				plane = FaceWorkplane.resolve(context.shape(support), supportSelection, supportXDirection,
-					supportOffset, supportFlipped);
-			} else {
-				throw new ParametricError("attached sketch has no selected support face");
-			}
-		}
-		var candidate = new ConstrainedSketch(plane, authored.units, authored.settings);
-		for (point in authored.points())
-			candidate.addPoint(point);
-		for (entity in authored.entities())
-			candidate.addEntity(entity);
-		for (constraint in authored.constraints()) {
-			var slot = dimensionSlots.get(constraint.id);
-			var value = slot == null ? constraint.value : fromCanonicalDimension(authored, constraint.kind, slot.value);
-			candidate.addConstraint(constraint.withValue(value));
-		}
-		var solved:SolvedSketch;
-		var solveStarted = Sys.time();
-		try {
-			solved = candidate.solve(committedSolution, function() return context.isCancelled());
-		} catch (error:Dynamic) {
-			lastSolveSeconds = Sys.time() - solveStarted;
-			context.recordSketchSolve(lastSolveSeconds);
-			if (Std.isOfType(error, SketchSolveError)) {
-				var solveError:SketchSolveError = cast error;
-				lastAttemptDiagnostic = solveError.diagnostic;
-			}
-			throw error;
-		}
-		lastSolveSeconds = Sys.time() - solveStarted;
-		context.recordSketchSolve(lastSolveSeconds);
-		context.checkCancelled();
-		var profileStarted = Sys.time();
-		var profile:cadkit.modeling.Sketch;
-		var geometry:ProfileGeometry;
-		try {
-			geometry = SketchProfile.geometry(candidate, solved);
-			profile = geometry.build();
-		} catch (error:Dynamic) {
-			lastProfileBuildSeconds = Sys.time() - profileStarted;
-			context.recordSketchProfile(lastProfileBuildSeconds);
-			throw error;
-		}
-		lastProfileBuildSeconds = Sys.time() - profileStarted;
-		context.recordSketchProfile(lastProfileBuildSeconds);
-		try {
-			context.checkCancelled();
-			var result = EvaluationResult.fromShape(profile.shape.cloneShape());
-			profile.close();
-			pendingSolution = solved;
-			pendingProfile = geometry;
-			pendingProfileContext = context;
-			return result;
-		} catch (error:Dynamic) {
-			profile.close();
-			throw error;
-		}
-	}
+  override public function evaluate(context:EvaluationContext):EvaluationResult {
+    var plane = authored.plane;
+    if (support != null) {
+      if (supportFaceReference != null) {
+        var selectedFace = supportFaceReference.resolveFor(context.shape(support));
+        try {
+          plane = FaceWorkplane.fromFace(selectedFace, supportXDirection, supportOffset, supportFlipped);
+          selectedFace.close();
+        } catch (error:Dynamic) {
+          selectedFace.close();
+          throw error;
+        }
+      } else if (supportSelection != null) {
+        plane = FaceWorkplane.resolve(
+          context.shape(support),
+          supportSelection,
+          supportXDirection,
+          supportOffset,
+          supportFlipped
+        );
+      } else {
+        throw new ParametricError("attached sketch has no selected support face");
+      }
+    }
+    var candidate = new ConstrainedSketch(plane, authored.units, authored.settings);
+    for (point in authored.points()) candidate.addPoint(point);
+    for (entity in authored.entities()) candidate.addEntity(entity);
+    for (constraint in authored.constraints()) {
+      var slot = dimensionSlots.get(constraint.id);
+      var value = slot == null ? constraint.value : fromCanonicalDimension(authored, constraint.kind, slot.value);
+      candidate.addConstraint(constraint.withValue(value));
+    }
+    var solved:SolvedSketch;
+    var solveStarted = Sys.time();
+    try {
+      solved = candidate.solve(committedSolution, function() return context.isCancelled());
+    } catch (error:Dynamic) {
+      lastSolveSeconds = Sys.time() - solveStarted;
+      context.recordSketchSolve(lastSolveSeconds);
+      if (Std.isOfType(error, SketchSolveError)) {
+        var solveError:SketchSolveError = cast error;
+        lastAttemptDiagnostic = solveError.diagnostic;
+      }
+      throw error;
+    }
+    lastSolveSeconds = Sys.time() - solveStarted;
+    context.recordSketchSolve(lastSolveSeconds);
+    context.checkCancelled();
+    var profileStarted = Sys.time();
+    var profile:cadkit.modeling.Sketch;
+    var geometry:ProfileGeometry;
+    try {
+      geometry = SketchProfile.geometry(candidate, solved);
+      profile = geometry.build();
+    } catch (error:Dynamic) {
+      lastProfileBuildSeconds = Sys.time() - profileStarted;
+      context.recordSketchProfile(lastProfileBuildSeconds);
+      throw error;
+    }
+    lastProfileBuildSeconds = Sys.time() - profileStarted;
+    context.recordSketchProfile(lastProfileBuildSeconds);
+    try {
+      context.checkCancelled();
+      var result = EvaluationResult.fromShape(profile.shape.cloneShape());
+      profile.close();
+      pendingSolution = solved;
+      pendingProfile = geometry;
+      pendingProfileContext = context;
+      return result;
+    } catch (error:Dynamic) {
+      profile.close();
+      throw error;
+    }
+  }
 
-	override public function commitEvaluation():Void {
-		if (pendingSolution == null)
-			return;
-		committedSolution = pendingSolution;
-		committedProfile = pendingProfile;
-		lastDiagnostic = pendingSolution.diagnostic;
-		lastAttemptDiagnostic = null;
-		pendingSolution = null;
-		pendingProfile = null;
-		pendingProfileContext = null;
-	}
+  override public function commitEvaluation():Void {
+    if (pendingSolution == null) return;
+    committedSolution = pendingSolution;
+    committedProfile = pendingProfile;
+    lastDiagnostic = pendingSolution.diagnostic;
+    lastAttemptDiagnostic = null;
+    pendingSolution = null;
+    pendingProfile = null;
+    pendingProfileContext = null;
+  }
 
-	override public function discardEvaluation():Void {
-		pendingSolution = null;
-		pendingProfile = null;
-		pendingProfileContext = null;
-	}
+  override public function discardEvaluation():Void {
+    pendingSolution = null;
+    pendingProfile = null;
+    pendingProfileContext = null;
+  }
 
-	private static function isDimensional(kind:String):Bool {
-		return kind == "distance" || kind == "radius" || kind == "angle";
-	}
+  private static function isDimensional(kind:String):Bool {
+    return kind == "distance" || kind == "radius" || kind == "angle";
+  }
 
-	private static function toCanonicalDimension(sketch:ConstrainedSketch, kind:String, value:Float):Float {
-		return kind == "angle" ? value : UnitConversion.toCanonical(value, ParameterKind.Length, sketch.units);
-	}
+  private static function toCanonicalDimension(sketch:ConstrainedSketch, kind:String, value:Float):Float {
+    return kind == "angle" ? value : UnitConversion.toCanonical(value, ParameterKind.Length, sketch.units);
+  }
 
-	private static function fromCanonicalDimension(sketch:ConstrainedSketch, kind:String, value:Float):Float {
-		return kind == "angle" ? value : UnitConversion.fromCanonical(value, ParameterKind.Length, sketch.units);
-	}
+  private static function fromCanonicalDimension(sketch:ConstrainedSketch, kind:String, value:Float):Float {
+    return kind == "angle" ? value : UnitConversion.fromCanonical(value, ParameterKind.Length, sketch.units);
+  }
 }

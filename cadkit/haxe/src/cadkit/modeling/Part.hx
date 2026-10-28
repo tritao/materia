@@ -8,264 +8,284 @@ import cadkit.Operation;
 
 /** Solid results may contain zero, one, or several solids. */
 class Part extends Model {
-	public function new(shape:Shape, operation:Null<Operation> = null) {
-		super(shape, operation);
-		try {
-			if (!isEmpty() && solidCount() == 0)
-				throw "part requires solids";
-		} catch (error:Dynamic) {
-			close();
-			throw error;
-		}
-	}
+  public function new(shape:Shape, operation:Null<Operation> = null) {
+    super(shape, operation);
+    try {
+      if (!isEmpty() && solidCount() == 0) throw "part requires solids";
+    } catch (error:Dynamic) {
+      close();
+      throw error;
+    }
+  }
 
-	public static function fromOperation(operation:Operation):Part {
-		try {
-			return new Part(operation.resultShape(), operation);
-		} catch (error:Dynamic) {
-			operation.close();
-			throw error;
-		}
-	}
+  public static function fromOperation(operation:Operation):Part {
+    try {
+      return new Part(operation.resultShape(), operation);
+    } catch (error:Dynamic) {
+      operation.close();
+      throw error;
+    }
+  }
 
-	public static function box(width:Float, depth:Float, height:Float, alignX:Align = Center, alignY:Align = Center, alignZ:Align = Min):Part {
-		var shape = Shape.box(width, depth, height);
-		try {
-			var placed = shape.translate(new Vector(Model.alignment(width, alignX), Model.alignment(depth, alignY), Model.alignment(height, alignZ)).native());
-			shape.close();
-			return new Part(placed);
-		} catch (error:Dynamic) {
-			shape.close();
-			throw error;
-		}
-	}
+  public static function box(
+    width:Float,
+    depth:Float,
+    height:Float,
+    alignX:Align = Center,
+    alignY:Align = Center,
+    alignZ:Align = Min
+  ):Part {
+    var shape = Shape.box(width, depth, height);
+    try {
+      var placed = shape.translate(new Vector(
+        Model.alignment(width, alignX),
+        Model.alignment(depth, alignY),
+        Model.alignment(
+          height,
+          alignZ
+        )
+      ).native());
+      shape.close();
+      return new Part(placed);
+    } catch (error:Dynamic) {
+      shape.close();
+      throw error;
+    }
+  }
 
-	/** A cylinder from z=0 with the given height. */
-	public static function cylinder(radius:Float, height:Float):Part
-		return new Part(Shape.cylinder(radius, height));
+  /** A cylinder from z=0 with the given height. */
+  public static function cylinder(radius:Float, height:Float):Part return new Part(Shape.cylinder(radius, height));
 
-	/** A +Z cylinder spanning z0..z1. */
-	public static function cylinderSpan(radius:Float, z0:Float, z1:Float, x:Float = 0, y:Float = 0):Part {
-		if (!(radius > 0) || !(z1 > z0)) throw "Cylinder needs a positive radius and length";
-		var base = new Part(Shape.cylinder(radius, z1 - z0));
-		try {
-			var result = base.translated(new Vector(x, y, z0));
-			base.close();
-			return result;
-		} catch (error:Dynamic) {
-			base.close();
-			throw error;
-		}
-	}
+  /** A +Z cylinder spanning z0..z1. */
+  public static function cylinderSpan(radius:Float, z0:Float, z1:Float, x:Float = 0, y:Float = 0):Part {
+    if (!(radius > 0) || !(z1 > z0)) throw "Cylinder needs a positive radius and length";
+    var base = new Part(Shape.cylinder(radius, z1 - z0));
+    try {
+      var result = base.translated(new Vector(x, y, z0));
+      base.close();
+      return result;
+    } catch (error:Dynamic) {
+      base.close();
+      throw error;
+    }
+  }
 
-	/** Revolve a closed (radius, z) half-section about +Z. */
-	public static function revolve(section:Array<{r:Float, z:Float}>, angle:Float = Math.PI * 2):Part {
-		var sketch = Sketch.polygon([for (point in section) new Vector(point.r, point.z)], Plane.XZ());
-		try {
-			var result = sketch.revolve(Axis.Z(), angle);
-			sketch.close();
-			return result;
-		} catch (error:Dynamic) {
-			sketch.close();
-			throw error;
-		}
-	}
+  /** Revolve a closed (radius, z) half-section about +Z. */
+  public static function revolve(section:Array<{r:Float, z:Float}>, angle:Float = Math.PI * 2):Part {
+    var sketch = Sketch.polygon([for (point in section) new Vector(point.r, point.z)], Plane.XZ());
+    try {
+      var result = sketch.revolve(Axis.Z(), angle);
+      sketch.close();
+      return result;
+    } catch (error:Dynamic) {
+      sketch.close();
+      throw error;
+    }
+  }
 
-	/** Cylinder along +Y, spanning `y0..y1`. */
-	public static function cylinderAlongY(radius:Float, y0:Float, y1:Float, x:Float = 0, z:Float = 0):Part {
-		if (!(radius > 0) || !(y1 > y0)) throw "Cylinder needs a positive radius and length";
-		var base = Part.cylinder(radius, y1 - y0);
-		try {
-			var placement = Location.translation(new Vector(x, y0, z)).compose(Location.rotation(Axis.X(), -Math.PI / 2));
-			var result = base.placed(placement);
-			base.close();
-			return result;
-		} catch (error:Dynamic) {
-			base.close();
-			throw error;
-		}
-	}
+  /** Cylinder along +Y, spanning `y0..y1`. */
+  public static function cylinderAlongY(radius:Float, y0:Float, y1:Float, x:Float = 0, z:Float = 0):Part {
+    if (!(radius > 0) || !(y1 > y0)) throw "Cylinder needs a positive radius and length";
+    var base = Part.cylinder(radius, y1 - y0);
+    try {
+      var placement = Location.translation(new Vector(x, y0, z)).compose(Location.rotation(Axis.X(), -Math.PI / 2));
+      var result = base.placed(placement);
+      base.close();
+      return result;
+    } catch (error:Dynamic) {
+      base.close();
+      throw error;
+    }
+  }
 
-	/** Cylinder starting at `origin` along a finite direction. */
-	public static function cylinderAlong(radius:Float, origin:Vector, direction:Vector, length:Float):Part {
-		if (!(radius > 0) || !(length > 0) || origin == null || direction == null)
-			throw "Cylinder needs a positive radius and length";
-		var axis = direction.normalized();
-		var reference = Math.abs(axis.z) < 0.9 ? Vector.Z() : Vector.X();
-		var xDirection = reference.subtract(axis.scale(reference.dot(axis))).normalized();
-		var base = Part.cylinder(radius, length);
-		try {
-			var result = base.placed(new Location(new Plane(origin, xDirection, axis)));
-			base.close();
-			return result;
-		} catch (error:Dynamic) {
-			base.close();
-			throw error;
-		}
-	}
+  /** Cylinder starting at `origin` along a finite direction. */
+  public static function cylinderAlong(radius:Float, origin:Vector, direction:Vector, length:Float):Part {
+    if (!(radius > 0)
+      || !(length > 0) || origin == null || direction == null) throw "Cylinder needs a positive radius and length";
+    var axis = direction.normalized();
+    var reference = Math.abs(axis.z) < 0.9 ? Vector.Z() : Vector.X();
+    var xDirection = reference.subtract(axis.scale(reference.dot(axis))).normalized();
+    var base = Part.cylinder(radius, length);
+    try {
+      var result = base.placed(new Location(new Plane(origin, xDirection, axis)));
+      base.close();
+      return result;
+    } catch (error:Dynamic) {
+      base.close();
+      throw error;
+    }
+  }
 
-	/** Extrude a borrowed local XY polygon from `z0` to `z1`. */
-	public static function prism(points:Array<Vector>, z0:Float, z1:Float):Part {
-		var sketch = Sketch.polygon(points, Plane.XY().offset(z0));
-		try {
-			var result = sketch.extrude(z1 - z0);
-			sketch.close();
-			return result;
-		} catch (error:Dynamic) {
-			sketch.close();
-			throw error;
-		}
-	}
+  /** Extrude a borrowed local XY polygon from `z0` to `z1`. */
+  public static function prism(points:Array<Vector>, z0:Float, z1:Float):Part {
+    var sketch = Sketch.polygon(points, Plane.XY().offset(z0));
+    try {
+      var result = sketch.extrude(z1 - z0);
+      sketch.close();
+      return result;
+    } catch (error:Dynamic) {
+      sketch.close();
+      throw error;
+    }
+  }
 
-	/**
+  /**
 	 * Fuse borrowed parts into an independently owned result.
 	 *
 	 * The parts are fused as a balanced tree: each boolean joins two halves of similar size, so most of them work on small
 	 * shapes. Fusing them one after another instead grows one result through every step, and each boolean (and the validity
 	 * check after it) pays for everything fused so far; for a frame of dozens of members that was most of the time to build it.
 	 */
-	public static function fuseAll(parts:Array<Part>):Part {
-		if (parts.length == 0) throw "Fuse needs at least one part";
-		return fuseRange(parts, 0, parts.length);
-	}
+  public static function fuseAll(parts:Array<Part>):Part {
+    if (parts.length == 0) throw "Fuse needs at least one part";
+    return fuseRange(parts, 0, parts.length);
+  }
 
-	static function fuseRange(parts:Array<Part>, from:Int, to:Int):Part {
-		var count = to - from;
-		if (count == 1) return new Part(parts[from].shape.cloneShape());
-		if (count == 2) return parts[from].combine(parts[from + 1]);
-		var middle = from + (count >> 1), left = fuseRange(parts, from, middle), right:Null<Part> = null;
-		try {
-			right = fuseRange(parts, middle, to);
-			var result = left.combine(right);
-			left.close();
-			right.close();
-			return result;
-		} catch (error:Dynamic) {
-			left.close();
-			if (right != null) right.close();
-			throw error;
-		}
-	}
+  static function fuseRange(parts:Array<Part>, from:Int, to:Int):Part {
+    var count = to - from;
+    if (count == 1) return new Part(parts[from].shape.cloneShape());
+    if (count == 2) return parts[from].combine(parts[from + 1]);
+    var middle = from + (count >> 1), left = fuseRange(parts, from, middle), right:Null<Part> = null;
+    try {
+      right = fuseRange(parts, middle, to);
+      var result = left.combine(right);
+      left.close();
+      right.close();
+      return result;
+    } catch (error:Dynamic) {
+      left.close();
+      if (right != null) right.close();
+      throw error;
+    }
+  }
 
-	public static function sphere(radius:Float):Part {
-		return new Part(Shape.sphere(radius));
-	}
+  public static function sphere(radius:Float):Part {
+    return new Part(Shape.sphere(radius));
+  }
 
-	public static function loft(sections:Array<Curve>, ruled:Bool = false):Part {
-		var wires:Array<Curve> = [];
-		var shapes:Array<Shape> = [];
-		try {
-			for (section in sections) {
-				var wire = section.asWire();
-				wires.push(wire);
-				shapes.push(wire.shape);
-			}
-			var result = fromOperation(new Operation(CadKit.loftOperationChecked(Model.refs(shapes), 1, ruled ? 1 : 0), shapes));
-			for (wire in wires)
-				wire.close();
-			return result;
-		} catch (error:Dynamic) {
-			for (wire in wires)
-				wire.close();
-			throw error;
-		}
-	}
+  public static function loft(sections:Array<Curve>, ruled:Bool = false):Part {
+    var wires:Array<Curve> = [];
+    var shapes:Array<Shape> = [];
+    try {
+      for (section in sections) {
+        var wire = section.asWire();
+        wires.push(wire);
+        shapes.push(wire.shape);
+      }
+      var result = fromOperation(new Operation(
+        CadKit.loftOperationChecked(Model.refs(shapes), 1, ruled ? 1 : 0),
+        shapes
+      ));
+      for (wire in wires) wire.close();
+      return result;
+    } catch (error:Dynamic) {
+      for (wire in wires) wire.close();
+      throw error;
+    }
+  }
 
-	public function placed(location:Location):Part {
-		return fromOperation(location.applyOperation(shape));
-	}
+  public function placed(location:Location):Part {
+    return fromOperation(location.applyOperation(shape));
+  }
 
-	public function translated(delta:Vector):Part {
-		return fromOperation(shape.translateOperation(delta.native()));
-	}
+  public function translated(delta:Vector):Part {
+    return fromOperation(shape.translateOperation(delta.native()));
+  }
 
-	public function combine(other:Part, mode:Mode = Add):Part {
-		return fromOperation(switch (mode) {
-			case Add: shape.fuseOperation(other.shape);
-			case Subtract: shape.cutOperation(other.shape);
-			case Intersect: shape.commonOperation(other.shape);
-		});
-	}
+  public function combine(other:Part, mode:Mode = Add):Part {
+    return fromOperation(switch (mode) {
+      case Add:
+        shape.fuseOperation(other.shape);
+      case Subtract:
+        shape.cutOperation(other.shape);
+      case Intersect:
+        shape.commonOperation(other.shape);
+    }
+    );
+  }
 
-	public function subtract(other:Part):Part {
-		return combine(other, Subtract);
-	}
+  public function subtract(other:Part):Part {
+    return combine(other, Subtract);
+  }
 
-	/** Finalize a modeled part before deriving both its mesh and STEP export. */
-	public function refined():Part return fromOperation(shape.refineOperation());
+  /** Finalize a modeled part before deriving both its mesh and STEP export. */
+  public function refined():Part return fromOperation(shape.refineOperation());
 
-	/**
+  /**
 		This part with every face, edge and vertex name prefixed by `tag:` (plans/TOPOLOGICAL_NAMING.md): name the bodies
 		a part is built from (`plate`, `bore`) so their faces keep telling apart, and stay findable, as parameters change.
 	**/
-	public function named(tag:String):Part {
-		return new Part(shape.stamped(tag, []));
-	}
+  public function named(tag:String):Part {
+    return new Part(shape.stamped(tag, []));
+  }
 
-	/** Subtract borrowed tools, preserving this part and every tool. */
-	public function subtractAll(tools:Array<Part>):Part {
-		if (tools.length == 0) return new Part(shape.cloneShape());
-		var tool = Part.fuseAll(tools);
-		try {
-			var result = subtract(tool);
-			tool.close();
-			return result;
-		} catch (error:Dynamic) {
-			tool.close();
-			throw error;
-		}
-	}
+  /** Subtract borrowed tools, preserving this part and every tool. */
+  public function subtractAll(tools:Array<Part>):Part {
+    if (tools.length == 0) return new Part(shape.cloneShape());
+    var tool = Part.fuseAll(tools);
+    try {
+      var result = subtract(tool);
+      tool.close();
+      return result;
+    } catch (error:Dynamic) {
+      tool.close();
+      throw error;
+    }
+  }
 
-	public function intersect(other:Part):Part {
-		return combine(other, Intersect);
-	}
+  public function intersect(other:Part):Part {
+    return combine(other, Intersect);
+  }
 
-	public function fillet(selection:Selection, radius:Float):Part {
-		var edges = selection.edgeValues();
-		try {
-			var result = fromOperation(shape.filletEdgesOperation(edges, radius));
-			for (edge in edges)
-				edge.close();
-			return result;
-		} catch (error:Dynamic) {
-			for (edge in edges)
-				edge.close();
-			throw error;
-		}
-	}
+  public function fillet(selection:Selection, radius:Float):Part {
+    var edges = selection.edgeValues();
+    try {
+      var result = fromOperation(shape.filletEdgesOperation(edges, radius));
+      for (edge in edges) edge.close();
+      return result;
+    } catch (error:Dynamic) {
+      for (edge in edges) edge.close();
+      throw error;
+    }
+  }
 
-	public function chamfer(selection:Selection, distance:Float):Part {
-		var edges = selection.edgeValues();
-		try {
-			var result = fromOperation(shape.chamferEdgesOperation(edges, distance));
-			for (edge in edges)
-				edge.close();
-			return result;
-		} catch (error:Dynamic) {
-			for (edge in edges)
-				edge.close();
-			throw error;
-		}
-	}
+  public function chamfer(selection:Selection, distance:Float):Part {
+    var edges = selection.edgeValues();
+    try {
+      var result = fromOperation(shape.chamferEdgesOperation(edges, distance));
+      for (edge in edges) edge.close();
+      return result;
+    } catch (error:Dynamic) {
+      for (edge in edges) edge.close();
+      throw error;
+    }
+  }
 
-	public function shell(faces:Selection, thickness:Float):Part {
-		return fromOperation(new Operation(CadKit.shellOperationChecked(shape.borrowHandle(), Model.refs(faces.borrowShapes()), thickness), [shape]));
-	}
+  public function shell(faces:Selection, thickness:Float):Part {
+    return fromOperation(new Operation(
+      CadKit.shellOperationChecked(
+        shape.borrowHandle(),
+        Model.refs(faces.borrowShapes()),
+        thickness
+      ),
+      [shape]
+    ));
+  }
 
-	public function volume():Float {
-		return shape.volume();
-	}
+  public function volume():Float {
+    return shape.volume();
+  }
 
-	/** The least distance between this part and `other`; zero where they touch or overlap (see `Shape.distance`). */
-	public function distance(other:Part):Float {
-		return shape.distance(other.shape);
-	}
+  /** The least distance between this part and `other`; zero where they touch or overlap (see `Shape.distance`). */
+  public function distance(other:Part):Float {
+    return shape.distance(other.shape);
+  }
 
-	public function massProperties():PhysicalProperties {
-		return shape.massProperties();
-	}
+  public function massProperties():PhysicalProperties {
+    return shape.massProperties();
+  }
 
-	public function solidCount():Int {
-		return shape.subshapeCount(CadKit.ShapeKind.Solid);
-	}
+  public function solidCount():Int {
+    return shape.subshapeCount(CadKit.ShapeKind.Solid);
+  }
 }
