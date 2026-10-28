@@ -24,4 +24,27 @@ class ReferencePendant {
     ];
     return new PendantFace(220.0, 110.0, 3.0, 3.0, 30.0, controls);
   }
+
+  /**
+   * The same pendant with the 60 mm YUMO wheel and the cheap AliExpress E-stop (43 mm deep, so a 48 mm
+   * case): the wheel and the wheel-enable key share the right-hand column, which takes the face from 220
+   * to 190 mm wide.
+   */
+  public static function compactFace():PendantFace {
+    var controls = [
+      PendantParts.yumoWheel(60.0, 10.0),
+      PendantParts.button("wheel-enable", 60.0, -38.0),
+      PendantParts.eStopGeneric(-70.0, 30.0),
+      PendantParts.display242(-14.0, 33.0),
+      PendantParts.rotary("axis", -77.5, -8.0),
+      PendantParts.rotary("step", -47.5, -8.0),
+      PendantParts.button("f1", -20.0, -8.0),
+      PendantParts.button("f2", 5.0, -8.0),
+      PendantParts.button("f3", -80.0, -38.0),
+      PendantParts.button("start", -55.0, -38.0),
+      PendantParts.button("hold", -30.0, -38.0),
+      PendantParts.button("stop", -5.0, -38.0)
+    ];
+    return new PendantFace(190.0, 110.0, 3.0, 3.0, 48.0, controls);
+  }
 }

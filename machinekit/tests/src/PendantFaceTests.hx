@@ -42,6 +42,18 @@ class PendantFaceTests {
     rejects("duplicate ids", () -> new PendantFace(220.0, 110.0, 3.0, 3.0, 30.0, [wheel, wheel]));
     rejects("unknown source", () -> new PendantControl("x", Button, 0.0, 0.0, Circle(5.0), Circle(6.0), 0.0, 0.0, 0.0, "guess"));
 
+    // The 60 mm YUMO wheel and the cheap E-stop: a narrower face, a deeper case.
+    var compact = ReferencePendant.compactFace();
+    check(compact.problems().length == 0, "The compact layout must pass its own checks: " + compact.problems().join(" | "));
+    check(compact.width == 190.0 && compact.requiredInnerDepth() == 43.0 && compact.overallHeight() == 48.0 + 3.0 + 38.0,
+      "Compact face: 190 wide, 43 deep, " + compact.overallHeight() + " tall");
+    var yumo = compact.control("wheel");
+    check(yumo.source == "vendor-drawing" && yumo.above == 38.0 && yumo.behind == 10.0, "YUMO wheel numbers");
+    for (h in yumo.extraHoles) check(Math.abs(Math.sqrt(h.x * h.x + h.y * h.y) - 25.4) < 1e-9 && h.diameter == 3.2, "YUMO studs on the 50.8 mm circle");
+    var compactPlate = PendantFacePlate.part(compact);
+    check(compactPlate.solidCount() == 1, "The compact plate is one solid");
+    compactPlate.close();
+
     // The wheel's panel template: a 45 mm hole and three 4.8 mm holes on a 72 mm circle at 120 degrees.
     check(wheel.extraHoles.length == 3, "Three stud holes");
     for (h in wheel.extraHoles) check(Math.abs(Math.sqrt(h.x * h.x + h.y * h.y) - 36.0) < 1e-9 && h.diameter == 4.8, "Stud hole on the 72 mm circle");
@@ -60,6 +72,9 @@ class PendantFaceTests {
     if (out != null && out != "") plate.shape.exportStep(out);
     plate.close();
     var svg = PendantFaceSvg.render(face);
+    var compactSvg = PendantFaceSvg.render(ReferencePendant.compactFace());
+    var compactDrawing = Sys.getEnv("PENDANT_COMPACT_SVG");
+    if (compactDrawing != null && compactDrawing != "") File.saveContent(compactDrawing, compactSvg);
     check(svg.indexOf("<svg") == 0 && svg.indexOf(">wheel<") > 0 && svg.split("<circle").length > 10, "SVG drawing");
     var drawing = Sys.getEnv("PENDANT_FACE_SVG");
     if (drawing != null && drawing != "") File.saveContent(drawing, svg);

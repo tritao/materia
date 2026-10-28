@@ -149,7 +149,35 @@ For the switches, buttons and E-stop: Zhejiang Jiushi Electronics Co., Ltd. firs
 Electrical Co., Ltd. (what Ninuo makes is unconfirmed). Details and what to ask for are in
 `PENDANT_BENCH_PARTS.md`.
 
-### MPG wheel alternative
+### MPG wheel: YUMO ISM6045 (smaller, documented)
+
+**Yueqing Yumo Electric Co., Ltd (YUMO)**, model ISM6045 (`yumoelectric.com/ISM6045-100ppr-Cnc-Mpg-Pulse-Generator-pd90343536.html`),
+100 PPR, MOQ 1, CE and RoHS, price on inquiry. The page gives a full electrical table with a choice of
+output circuit, and the maker's drawing gives the size.
+
+| Item | YUMO ISM6045 | Vallder (80 mm flange) |
+|---|---|---|
+| Overall diameter | 60 | 80 (grip 59.5) |
+| Panel template | 43 boss; three M3 studs on a 50.8 circle | 45 hole; three M4 studs on a 72 circle |
+| Above the panel | 26 (about 38 with the 12 mm handle) | 27 (41 with the handle) |
+| Behind the panel | studs 10 mm, terminal boss 5.5 | studs about 6.5 (read), terminal strip height unknown |
+| Weight | 250 g | 276 g |
+| IP | 50 | 54 |
+| Output | selectable: open collector, voltage, push-pull, or line driver | not stated |
+| Price | inquire | about 21.67 EUR ex tax |
+
+Electrical (page): 5 V (5 to 30 V for the open-collector, voltage and push-pull types), at most 80 mA
+(150 mA line driver), 10 kHz, 600 r/min, -25 to 70 C. Line driver: high at least 3.4 V, low at most
+0.4 V, edges 200 ns; push-pull: high at least Vcc minus 1.5 V, low at most 0.8 V. Six terminals: +5 V,
+0 V, A, then A- and B or B and B- (line driver). Model `ISM6045-002-100B-5L` is the 5 V line driver; ask
+YUMO for the code of the 5 V push-pull type. A single-ended push-pull output on 5 V is the simplest
+for a wheel inside the case.
+
+Why it matters: a 60 mm wheel with a 50.8 mm stud circle takes the face from 220 to 190 mm wide
+(`ReferencePendant.compactFace`) and puts only 10 mm of studs behind the panel. It is the better fit
+if the price is acceptable; ask YUMO for a quote. The Vallder wheel stays the cheap known-price fallback.
+
+### MPG wheel: Puyang Yimihelung
 
 **Puyang Yimihelung Precision Technology Co., Ltd.** sells a "Universal Electronic Handwheel for CNC
 Systems" on Alibaba (product 1601665094833, `alibaba.com/product-detail/Universal-Electronic-Handwheel-for-CNC-Systems_1601665094833.html`)

@@ -20,6 +20,21 @@ class PendantParts {
   }
 
   /**
+   * YUMO ISM6045 100 PPR hand wheel (Yueqing Yumo Electric; model ISM6045-002-100B-5L is the 5 V line
+   * driver). From the maker's drawing: 60 mm overall, 26 mm above the panel (about 38 with the handle,
+   * which sticks out 12 mm: 48 mm overall less 10 behind and 26), three M3 studs on a 50.8 mm circle at
+   * 120 degrees, a 43 mm boss, studs 10 mm behind the panel and a 5.5 mm terminal boss, 250 g (page).
+   * The central hole is the boss plus 1 mm clearance and the stud holes are M3 clearance, both mine.
+   */
+  public static function yumoWheel(x:Float, y:Float, withHandle:Bool = true):PendantControl {
+    var holes = [for (i in 0...3) {
+      var a = Math.PI / 2 + i * 2 * Math.PI / 3;
+      {x: 25.4 * Math.cos(a), y: 25.4 * Math.sin(a), diameter: 3.2};
+    }];
+    return new PendantControl("wheel", Wheel, x, y, Circle(44.0), Circle(60.0), withHandle ? 38.0 : 26.0, 10.0, 250.0, "vendor-drawing", holes);
+  }
+
+  /**
    * Compact 22 mm emergency stop. Depth behind the panel is from the candidates' pages (EAO Series 84
    * 13.5 mm with cable connection and 18 mm plug-in, APEM EC Compact 18.7 mm); the head diameter and
    * height are not on those pages, so the 40 mm head and 25 mm height are assumed, and the mass.
