@@ -2,12 +2,10 @@ package fixtures;
 
 import camkit.CamContour;
 import camkit.CamJob;
-import cadkit.modeling.Align;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import toolpathkit.tool.Tool;
 import toolpathkit.geometry.PathGeometry;
-import toolpathkit.path.ToolpathOp;
 import toolpathkit.geometry.Point3;
 import oracle.ExactOracle;
 import stockkit.CutMove;

@@ -5,7 +5,6 @@ import toolpathkit.geometry.PathGeometry;
 import toolpathkit.geometry.Point3;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.ProvenanceKind;
-import toolpathkit.path.SpindleDirection;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.ToolpathProgram;
 import toolpathkit.setup.Setup;

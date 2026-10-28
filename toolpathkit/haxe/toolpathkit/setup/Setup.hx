@@ -9,7 +9,6 @@ import toolpathkit.path.ToolpathFrame;
 import toolpathkit.path.Provenance;
 import toolpathkit.tool.ToolLibrary;
 import toolpathkit.tool.CutterProfile;
-import toolpathkit.tool.CutterZone;
 
 /** Stock, clearance and clamp checks in the same work coordinates as CAM IR. */
 class Setup {

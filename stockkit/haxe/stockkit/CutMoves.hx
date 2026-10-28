@@ -2,7 +2,6 @@ package stockkit;
 
 import toolpathkit.geometry.GeometryOffset;
 import toolpathkit.path.ToolpathFrame;
-import toolpathkit.path.ToolpathOp;
 import toolpathkit.geometry.Point3;
 import toolpathkit.path.ToolpathProgram;
 

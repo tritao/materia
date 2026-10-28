@@ -1,6 +1,5 @@
 import motionkit.math.QuinticPolynomial;
 import motionkit.robot.MergeErrorBudget;
-import motionkit.path.PosePositionBound;
 import motionkit.path.PathPoint;
 import motionkit.path.LineSegment;
 import motionkit.path.ArcSegment;

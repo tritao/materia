@@ -6,8 +6,6 @@ import fixtures.CoreFixtures;
 import fixtures.OracleFixtures;
 import fixtures.SampledReferenceFixtures;
 import toolpathkit.tool.CutterProfile;
-import toolpathkit.tool.CutterSegment;
-import toolpathkit.tool.CutterZone;
 
 class StockKitTests {
   public static function main():Void {

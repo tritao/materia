@@ -1,15 +1,12 @@
 import camkit.CamContour;
 import camkit.CamJob;
 import haxe.Int64;
-import machinekit.assembly.LinearAxis;
 import motionkit.event.EventValue;
 import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
 import motionkit.robot.MachineKitRobotCompiler;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.SessionState;
-import robotkit.runtime.Simulation;
-import robotkit.manipulation.Manipulator;
 import robotkit.runtime.SimulationHarness;
 import robotkit.execution.ProcessChannelDeclaration;
 import robotkit.execution.ProcessEventValue;

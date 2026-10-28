@@ -1,6 +1,5 @@
 import camkit.CamContour;
 
-import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.ToolpathProgram;
 import toolpathkit.path.Provenance;
 import toolpathkit.tool.ToolLibrary;

@@ -1,5 +1,4 @@
 import haxe.Int64;
-import machinekit.assembly.LinearAxis;
 import motionkit.robot.MachineKitRobotCompiler;
 
 /**

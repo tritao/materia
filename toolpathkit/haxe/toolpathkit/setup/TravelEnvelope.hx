@@ -2,7 +2,6 @@ package toolpathkit.setup;
 
 import toolpathkit.geometry.PathGeometry;
 import toolpathkit.geometry.GeometryTools;
-import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.Provenance;
 import toolpathkit.geometry.Point3;
 import toolpathkit.path.ToolpathProgram;

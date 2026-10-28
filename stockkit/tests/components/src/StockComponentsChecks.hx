@@ -1,7 +1,6 @@
 import stockkit.*;
 import stockkit.StockComponent;
 import toolpathkit.tool.Tool;
-import toolpathkit.geometry.PathGeometry;
 import toolpathkit.geometry.Point3;
 import toolpathkit.path.Provenance;
 

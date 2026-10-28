@@ -1,13 +1,9 @@
 package toolpathkit.motion;
 
-import materia.assembly.AssemblyDefinition;
 import materia.project.SceneArtifact.SceneArtifactPrinting;
 import motionkit.axis.MotionAxisBlueprint;
 import motionkit.robot.MotionSystemBlueprint;
 import motionkit.trajectory.InputShaper;
-import robotkit.model.RobotModel;
-import robotkit.model.SteadyLoads;
-import robotkit.runtime.RobotRuntimeBlueprint;
 
 /** One scene-job adapter for application execution and planning benchmarks.
  * Logical XYZ positions are machine metres; explicit joint offsets account for

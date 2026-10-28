@@ -1,6 +1,5 @@
 package fixtures;
 
-import cadkit.modeling.Align;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import toolpathkit.geometry.PathGeometry;

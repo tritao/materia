@@ -1,6 +1,5 @@
 import toolpathkit.motion.ToolpathMotion;
 import toolpathkit.motion.MachineBinding;
-import toolpathkit.motion.ToolpathLowering;
 import toolpathkit.motion.ToolpathMotionBinding;
 import toolpathkit.path.MoveKind;
 import toolpathkit.geometry.PathGeometry;
@@ -16,8 +15,6 @@ import motionkit.path.CornerBlender;
 import motionkit.path.GeometricPath;
 import motionkit.path.PathPoint;
 import motionkit.path.ArcSegment;
-import machinekit.assembly.LinearAxis;
-import motionkit.robot.MachineKitRobotCompiler;
 import haxe.Int64;
 
 class ToolpathMotionTests {

@@ -1,13 +1,10 @@
 package fixtures;
 
-import cadkit.modeling.Align;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import toolpathkit.geometry.PathGeometry;
 import toolpathkit.geometry.Point3;
 import toolpathkit.tool.CutterProfile;
-import toolpathkit.tool.CutterSegment;
-import toolpathkit.tool.CutterZone;
 import oracle.ExactOracle;
 import oracle.SampledReference;
 

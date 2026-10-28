@@ -1,7 +1,6 @@
 import toolpathkit.motion.RapidClearance;
 import toolpathkit.path.ToolpathProgram;
 import toolpathkit.path.ToolpathOp;
-import toolpathkit.geometry.PathGeometry;
 import toolpathkit.path.MoveKind;
 import toolpathkit.geometry.Point3;
 import toolpathkit.path.Provenance;

@@ -1,6 +1,5 @@
 package toolpathkit.motion;
 
-import toolpathkit.motion.ToolpathChannels;
 import toolpathkit.motion.MachineBinding;
 import toolpathkit.motion.ToolpathPosePrimitive;
 import toolpathkit.motion.ToolpathSourceMap;
