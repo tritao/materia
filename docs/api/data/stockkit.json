@@ -250,417 +250,6 @@
      ]
     },
     {
-     "name": "RingComparison",
-     "kind": "class",
-     "file": "stockkit/haxe/stockkit/RingComparison.hx",
-     "doc": "Per-circle angular errors (radians), axial-major, radial index fastest.\nArc lengths and cell-volume estimates use mm and cubic mm. This is geometric\nleftover/gouge, not an ISO gear grade; HB4 supplies metrology evaluation.",
-     "fields": [
-      {
-       "name": "grid",
-       "kind": "var",
-       "signature": ":RingGrid",
-       "final": true
-      },
-      {
-       "name": "leftover",
-       "kind": "var",
-       "signature": ":Array<Float>",
-       "final": true
-      },
-      {
-       "name": "gouge",
-       "kind": "var",
-       "signature": ":Array<Float>",
-       "final": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(grid:RingGrid, leftover:Array<Float>, gouge:Array<Float>):Void"
-      },
-      {
-       "name": "leftoverVolume",
-       "kind": "method",
-       "signature": "():Float"
-      },
-      {
-       "name": "gougeVolume",
-       "kind": "method",
-       "signature": "():Float"
-      },
-      {
-       "name": "leftoverArc",
-       "kind": "method",
-       "signature": "(radialIndex:Int, axialIndex:Int):Float"
-      },
-      {
-       "name": "gougeArc",
-       "kind": "method",
-       "signature": "(radialIndex:Int, axialIndex:Int):Float"
-      }
-     ]
-    },
-    {
-     "name": "RingCut",
-     "kind": "class",
-     "file": "stockkit/haxe/stockkit/RingCut.hx",
-     "doc": "Remove one counterclockwise angular span on a radial circle and consecutive Z cells.\nstart wraps; sweep is in [0,2*pi]. Gash/pass identifiers must be non-negative.",
-     "fields": [
-      {
-       "name": "radialIndex",
-       "kind": "var",
-       "signature": ":Int",
-       "final": true
-      },
-      {
-       "name": "axialFirst",
-       "kind": "var",
-       "signature": ":Int",
-       "final": true
-      },
-      {
-       "name": "axialCount",
-       "kind": "var",
-       "signature": ":Int",
-       "final": true
-      },
-      {
-       "name": "start",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "sweep",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "gash",
-       "kind": "var",
-       "signature": ":Int",
-       "final": true
-      },
-      {
-       "name": "pass",
-       "kind": "var",
-       "signature": ":Int",
-       "final": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(radialIndex:Int, axialFirst:Int, axialCount:Int, start:Float, sweep:Float, gash:Int, pass:Int):Void"
-      }
-     ]
-    },
-    {
-     "name": "RingGearTarget",
-     "kind": "class",
-     "file": "stockkit/haxe/stockkit/RingGearTarget.hx",
-     "doc": "Samples an ideal, undeformed spur gear on an existing ring lattice.\nOnly angular crossings are solved; there is no angular tessellation error.",
-     "fields": [
-      {
-       "name": "create",
-       "kind": "method",
-       "signature": "(grid:RingGrid, spec:GearSpec):RingStock",
-       "static": true
-      }
-     ]
-    },
-    {
-     "name": "RingGrid",
-     "kind": "class",
-     "file": "stockkit/haxe/stockkit/RingGrid.hx",
-     "doc": "Cell-centred circumferential grid. Millimetres; angles about +Z from +X.\nBounds are exact; cell sizes divide the bounds and never exceed requested spacing.",
-     "fields": [
-      {
-       "name": "radiusMin",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "radiusMax",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "zMin",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "zMax",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "radialCount",
-       "kind": "var",
-       "signature": ":Int",
-       "final": true
-      },
-      {
-       "name": "axialCount",
-       "kind": "var",
-       "signature": ":Int",
-       "final": true
-      },
-      {
-       "name": "radialStep",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "axialStep",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(radiusMin:Float, radiusMax:Float, zMin:Float, zMax:Float, radialSpacing:Float, axialSpacing:Float):Void"
-      },
-      {
-       "name": "radius",
-       "kind": "method",
-       "signature": "(index:Int):Float"
-      },
-      {
-       "name": "z",
-       "kind": "method",
-       "signature": "(index:Int):Float"
-      },
-      {
-       "name": "sectorVolume",
-       "kind": "method",
-       "signature": "(radialIndex:Int):Float",
-       "doc": "Volume of a one-radian sector of a cell, in cubic mm."
-      }
-     ]
-    },
-    {
-     "name": "RingInterval",
-     "kind": "class",
-     "file": "stockkit/haxe/stockkit/RingInterval.hx",
-     "doc": "Sorted material arc [lo,hi] in [0,2*pi]. Artificial seam boundaries are not surfaces.\nEach real exposed endpoint retains its gash and pass; -1 means original stock.",
-     "fields": [
-      {
-       "name": "lo",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "hi",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "loGash",
-       "kind": "var",
-       "signature": ":Int",
-       "final": true
-      },
-      {
-       "name": "loPass",
-       "kind": "var",
-       "signature": ":Int",
-       "final": true
-      },
-      {
-       "name": "hiGash",
-       "kind": "var",
-       "signature": ":Int",
-       "final": true
-      },
-      {
-       "name": "hiPass",
-       "kind": "var",
-       "signature": ":Int",
-       "final": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(lo:Float, hi:Float, loGash:Int, loPass:Int, hiGash:Int, hiPass:Int):Void"
-      }
-     ]
-    },
-    {
-     "name": "RingPreviewWorker",
-     "kind": "class",
-     "file": "stockkit/haxe/stockkit/RingPreviewWorker.hx",
-     "doc": "Single-flight, bounded snapshot preview. Worker owns its contour stock and only transfers buffers.",
-     "fields": [
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(source:RingStock):Void"
-      },
-      {
-       "name": "refresh",
-       "kind": "method",
-       "signature": "():Bool"
-      },
-      {
-       "name": "take",
-       "kind": "method",
-       "signature": "():Null<StockMesh>"
-      },
-      {
-       "name": "wait",
-       "kind": "method",
-       "signature": "():Void"
-      },
-      {
-       "name": "dispose",
-       "kind": "method",
-       "signature": "():Void"
-      }
-     ]
-    },
-    {
-     "name": "RingSnapshot",
-     "kind": "class",
-     "file": "stockkit/haxe/stockkit/RingSnapshot.hx",
-     "doc": "Immutable copy-on-write radial layers. Survives destruction of the original stock.",
-     "fields": [
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(owner:Ownedsk_ring_snapshot_handle):Void"
-      },
-      {
-       "name": "borrow",
-       "kind": "method",
-       "signature": "():sk_ring_snapshot_handle"
-      },
-      {
-       "name": "dispose",
-       "kind": "method",
-       "signature": "():Void"
-      }
-     ]
-    },
-    {
-     "name": "RingStock",
-     "kind": "class",
-     "file": "stockkit/haxe/stockkit/RingStock.hx",
-     "implements": [
-      "gearkit.GearRings"
-     ],
-     "doc": "Circumferential stock for gear cutting. Millimetres, radians; unlike Cartesian Stock's metres.\nExact angular interval endpoints at cell-centred (r,z) samples. No angle raster.",
-     "fields": [
-      {
-       "name": "grid",
-       "kind": "var",
-       "signature": ":RingGrid",
-       "final": true
-      },
-      {
-       "name": "annulus",
-       "kind": "method",
-       "signature": "(grid:RingGrid):RingStock",
-       "static": true
-      },
-      {
-       "name": "fromGearBlank",
-       "kind": "method",
-       "signature": "(spec:GearSpec, wallThickness:Float, ?radialSpacing:Float, ?axialSpacing:Float):RingStock",
-       "static": true,
-       "doc": "Cylindrical tooth band plus a continuous wall. wallThickness is measured BELOW\nthe external tooth roots (outside internal roots), not from the blank's tip circle."
-      },
-      {
-       "name": "radii",
-       "kind": "method",
-       "signature": "():Array<Float>"
-      },
-      {
-       "name": "axialPositions",
-       "kind": "method",
-       "signature": "():Array<Float>"
-      },
-      {
-       "name": "boundaries",
-       "kind": "method",
-       "signature": "(radial:Int, axial:Int):Array<Float>"
-      },
-      {
-       "name": "setThreads",
-       "kind": "method",
-       "signature": "(threads:Int):Void"
-      },
-      {
-       "name": "circle",
-       "kind": "method",
-       "signature": "(radialIndex:Int, axialIndex:Int):Array<RingInterval>"
-      },
-      {
-       "name": "cutRegion",
-       "kind": "method",
-       "signature": "(cuts:Array<RingCut>):Void",
-       "doc": "Entire batch is validated before native mutation; array order determines overlapping sources."
-      },
-      {
-       "name": "cutSlab",
-       "kind": "method",
-       "signature": "(normalAngle:Float, offsetMin:Float, offsetMax:Float, gash:Int, pass:Int):Void",
-       "doc": "Exact analytic intersection with a transverse planar slab, through the full Z range."
-      },
-      {
-       "name": "snapshot",
-       "kind": "method",
-       "signature": "():RingSnapshot"
-      },
-      {
-       "name": "restore",
-       "kind": "method",
-       "signature": "(snapshot:RingSnapshot):Void"
-      },
-      {
-       "name": "bytes",
-       "kind": "method",
-       "signature": "():Float"
-      },
-      {
-       "name": "intervalCount",
-       "kind": "method",
-       "signature": "():Float"
-      },
-      {
-       "name": "compareStock",
-       "kind": "method",
-       "signature": "(target:RingStock):RingComparison"
-      },
-      {
-       "name": "compare",
-       "kind": "method",
-       "signature": "(target:GearSpec):RingComparison",
-       "doc": "Geometric comparison against the complete GearKit tooth, root and tip fillets included."
-      },
-      {
-       "name": "contour",
-       "kind": "method",
-       "signature": "(?maxAngle:Float):StockMesh",
-       "doc": "Boundary of the piecewise-cell solid. Angular chords only affect display.\nStreams use mm; convert to metres when passing to the existing app scene."
-      },
-      {
-       "name": "dispose",
-       "kind": "method",
-       "signature": "():Void"
-      }
-     ]
-    },
-    {
      "name": "Stock",
      "kind": "class",
      "file": "stockkit/haxe/stockkit/Stock.hx",
@@ -2490,6 +2079,422 @@
      "kind": "class",
      "file": "stockkit/haxe/stockkit/hobbing/RingCompliance.hx",
      "doc": "Quasistatic in-plane n=2 thin-ring model. mm, N, Young's modulus N/mm².\nw=d*cos(2 theta), U=9*pi*E*I*d²/(2R³), I=width*wall³/12.\nMandrel support is a separately stated generalized stiffness in parallel.\nHigher modes, local tooth bending, contact lift-off and dynamics are omitted."
+    }
+   ]
+  },
+  {
+   "name": "stockkit.ring",
+   "types": [
+    {
+     "name": "RingComparison",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/ring/RingComparison.hx",
+     "doc": "Per-circle angular errors (radians), axial-major, radial index fastest.\nArc lengths and cell-volume estimates use mm and cubic mm. This is geometric\nleftover/gouge, not an ISO gear grade; HB4 supplies metrology evaluation.",
+     "fields": [
+      {
+       "name": "grid",
+       "kind": "var",
+       "signature": ":RingGrid",
+       "final": true
+      },
+      {
+       "name": "leftover",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "gouge",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(grid:RingGrid, leftover:Array<Float>, gouge:Array<Float>):Void"
+      },
+      {
+       "name": "leftoverVolume",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "gougeVolume",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "leftoverArc",
+       "kind": "method",
+       "signature": "(radialIndex:Int, axialIndex:Int):Float"
+      },
+      {
+       "name": "gougeArc",
+       "kind": "method",
+       "signature": "(radialIndex:Int, axialIndex:Int):Float"
+      }
+     ]
+    },
+    {
+     "name": "RingCut",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/ring/RingCut.hx",
+     "doc": "Remove one counterclockwise angular span on a radial circle and consecutive Z cells.\nstart wraps; sweep is in [0,2*pi]. Gash/pass identifiers must be non-negative.",
+     "fields": [
+      {
+       "name": "radialIndex",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "axialFirst",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "axialCount",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "start",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "sweep",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "gash",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "pass",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(radialIndex:Int, axialFirst:Int, axialCount:Int, start:Float, sweep:Float, gash:Int, pass:Int):Void"
+      }
+     ]
+    },
+    {
+     "name": "RingGearTarget",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/ring/RingGearTarget.hx",
+     "doc": "Samples an ideal, undeformed spur gear on an existing ring lattice.\nOnly angular crossings are solved; there is no angular tessellation error.",
+     "fields": [
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(grid:RingGrid, spec:GearSpec):RingStock",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "RingGrid",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/ring/RingGrid.hx",
+     "doc": "Cell-centred circumferential grid. Millimetres; angles about +Z from +X.\nBounds are exact; cell sizes divide the bounds and never exceed requested spacing.",
+     "fields": [
+      {
+       "name": "radiusMin",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "radiusMax",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "zMin",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "zMax",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "radialCount",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "axialCount",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "radialStep",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "axialStep",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(radiusMin:Float, radiusMax:Float, zMin:Float, zMax:Float, radialSpacing:Float, axialSpacing:Float):Void"
+      },
+      {
+       "name": "radius",
+       "kind": "method",
+       "signature": "(index:Int):Float"
+      },
+      {
+       "name": "z",
+       "kind": "method",
+       "signature": "(index:Int):Float"
+      },
+      {
+       "name": "sectorVolume",
+       "kind": "method",
+       "signature": "(radialIndex:Int):Float",
+       "doc": "Volume of a one-radian sector of a cell, in cubic mm."
+      }
+     ]
+    },
+    {
+     "name": "RingInterval",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/ring/RingInterval.hx",
+     "doc": "Sorted material arc [lo,hi] in [0,2*pi]. Artificial seam boundaries are not surfaces.\nEach real exposed endpoint retains its gash and pass; -1 means original stock.",
+     "fields": [
+      {
+       "name": "lo",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "hi",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "loGash",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "loPass",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "hiGash",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "hiPass",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(lo:Float, hi:Float, loGash:Int, loPass:Int, hiGash:Int, hiPass:Int):Void"
+      }
+     ]
+    },
+    {
+     "name": "RingPreviewWorker",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/ring/RingPreviewWorker.hx",
+     "doc": "Single-flight, bounded snapshot preview. Worker owns its contour stock and only transfers buffers.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(source:RingStock):Void"
+      },
+      {
+       "name": "refresh",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "take",
+       "kind": "method",
+       "signature": "():Null<StockMesh>"
+      },
+      {
+       "name": "wait",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "RingSnapshot",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/ring/RingSnapshot.hx",
+     "doc": "Immutable copy-on-write radial layers. Survives destruction of the original stock.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(owner:Ownedsk_ring_snapshot_handle):Void"
+      },
+      {
+       "name": "borrow",
+       "kind": "method",
+       "signature": "():sk_ring_snapshot_handle"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "RingStock",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/ring/RingStock.hx",
+     "implements": [
+      "gearkit.GearRings"
+     ],
+     "doc": "Circumferential stock for gear cutting. Millimetres, radians; unlike Cartesian Stock's metres.\nExact angular interval endpoints at cell-centred (r,z) samples. No angle raster.",
+     "fields": [
+      {
+       "name": "grid",
+       "kind": "var",
+       "signature": ":RingGrid",
+       "final": true
+      },
+      {
+       "name": "annulus",
+       "kind": "method",
+       "signature": "(grid:RingGrid):RingStock",
+       "static": true
+      },
+      {
+       "name": "fromGearBlank",
+       "kind": "method",
+       "signature": "(spec:GearSpec, wallThickness:Float, ?radialSpacing:Float, ?axialSpacing:Float):RingStock",
+       "static": true,
+       "doc": "Cylindrical tooth band plus a continuous wall. wallThickness is measured BELOW\nthe external tooth roots (outside internal roots), not from the blank's tip circle."
+      },
+      {
+       "name": "radii",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      },
+      {
+       "name": "axialPositions",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      },
+      {
+       "name": "boundaries",
+       "kind": "method",
+       "signature": "(radial:Int, axial:Int):Array<Float>"
+      },
+      {
+       "name": "setThreads",
+       "kind": "method",
+       "signature": "(threads:Int):Void"
+      },
+      {
+       "name": "circle",
+       "kind": "method",
+       "signature": "(radialIndex:Int, axialIndex:Int):Array<RingInterval>"
+      },
+      {
+       "name": "cutRegion",
+       "kind": "method",
+       "signature": "(cuts:Array<RingCut>):Void",
+       "doc": "Entire batch is validated before native mutation; array order determines overlapping sources."
+      },
+      {
+       "name": "cutSlab",
+       "kind": "method",
+       "signature": "(normalAngle:Float, offsetMin:Float, offsetMax:Float, gash:Int, pass:Int):Void",
+       "doc": "Exact analytic intersection with a transverse planar slab, through the full Z range."
+      },
+      {
+       "name": "snapshot",
+       "kind": "method",
+       "signature": "():RingSnapshot"
+      },
+      {
+       "name": "restore",
+       "kind": "method",
+       "signature": "(snapshot:RingSnapshot):Void"
+      },
+      {
+       "name": "bytes",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "intervalCount",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "compareStock",
+       "kind": "method",
+       "signature": "(target:RingStock):RingComparison"
+      },
+      {
+       "name": "compare",
+       "kind": "method",
+       "signature": "(target:GearSpec):RingComparison",
+       "doc": "Geometric comparison against the complete GearKit tooth, root and tip fillets included."
+      },
+      {
+       "name": "contour",
+       "kind": "method",
+       "signature": "(?maxAngle:Float):StockMesh",
+       "doc": "Boundary of the piecewise-cell solid. Angular chords only affect display.\nStreams use mm; convert to metres when passing to the existing app scene."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
     }
    ]
   }
