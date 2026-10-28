@@ -36,14 +36,20 @@ export async function loadRuntime(source: BufferSource | Response | Promise<Resp
 	let memory: WebAssembly.Memory | undefined;
 	let printed = "";
 	const decoder = new TextDecoder();
+	// Standard output is what the runtime reports its results on; standard error is not part of the protocol.
+	const write = (address: number, error: number) => {
+		if (error) return;
+		const bytes = new Uint8Array(memory!.buffer);
+		let end = address;
+		while (bytes[end] !== 0) end++;
+		printed += decoder.decode(bytes.subarray(address, end));
+	};
 	const imports = {
 		haxeon_host: {
-			print(address: number) {
-				const bytes = new Uint8Array(memory!.buffer);
-				let end = address;
-				while (bytes[end] !== 0) end++;
-				printed += decoder.decode(bytes.subarray(address, end));
-			},
+			print: (address: number) => write(address, 0),
+			write_output: write,
+			// The runtime prints whole lines and the page reads them after each call, so there is nothing to publish.
+			flush_output: () => {},
 		},
 		haxeon_runtime: {
 			__math_pow: Math.pow,
