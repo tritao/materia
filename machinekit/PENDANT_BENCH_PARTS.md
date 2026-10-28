@@ -23,8 +23,31 @@ Chosen by you, in order of preference:
    push buttons; I did not find an official catalogue.
 2. **Zhejiang Ninuo Electrical Co., Ltd.** A web search found nothing on this company, so what it
    makes is unconfirmed. Ask for its catalogue before assuming any part.
+3. **CNTD** (added from two listing images, not yet researched). Their XA2-ECZ42 mushroom-head push button
+   and CEE-101 (1NO) / CEE-102 (1NC) contact blocks match the XB2 family, and the CEE-102 drawing is the
+   source of the block size the model now uses: 24 mm long (26.2 with the latch lip), 29.1 mm wide, 15 mm
+   thick, two screw terminals per contact. A web search for the company and a catalogue with the head's
+   panel dimensions and depth behind the panel are still to do; the 1NC block (CEE-102) is the one for the E-stop chain.
+4. **Onpow Push Button Manufacture Co., Ltd.** (candidate, ranked first if the E-stop is to be certified later). Founded
+   1988, ISO 9001/14001/45001 per its site, public datasheets (for example the ONPOW63 E-stop PDF). Its E-stop page
+   lists UL, VDE, CCC and CE (LVD, EMC), IP65, anodized aluminium body, in 16, 19 and 22 mm (LAS1-AGQ16 is the 16 mm
+   metal E-stop), plus a 16 mm metal push button range with LED versions. These are marketing claims: ask for the UL
+   file number and CE declaration of the exact part. A 16 mm E-stop could replace the 22 mm XB2 (43 mm deep, which sets
+   the case depth); its depth and head size are not known yet, so get the datasheet first.
+5. **Yueqing Dahe Electric Co., Ltd. (brand CDOE)** (candidate, cheap bench option). Zhejiang push button maker from 2003:
+   buttons, selectors, key and E-stop switches in 16, 19, 22 and 30 mm; example E-stops 16 mm (HBDS1-AY-11TS/R, IP40) and
+   22 mm (HBDS1-AGQ22F-11TSC/J/S2/R, IP67); listings around 2.5 to 4.9 USD with a minimum order of about 10. No
+   certification evidence for specific models was found.
+6. **Yueqing Husa Electric Co., Ltd.** (not pursued). A web search found no company page, only a marketplace listing with
+   "husa" as the manufacturer of a 22 mm latching E-stop that could not be tied to this company. Ask for a catalogue
+   before spending time.
 
-What to source from them for the pendant: the 22 mm E-stop (Jiushi, item 5), and the illuminated or plain
+Jiushi's own range, from its website: 22 mm XB2/XB4/XB5 and LA38/LA39 plastic series (E-stops XB2-ES542, XB2-BS542,
+XB4-BS542, XB5-AS542), 16 mm metal A16 and plastic LA16/AR22 buttons, and a selector category with 2 and 3 position
+knobs only (no 12-position switch and no enabling switch). The listing pages give model numbers without sizes or
+types: ask for the A16 datasheet, a 2NC XB2-ES542 and a 16 mm 3-position selector.
+
+What to source from them for the pendant: the 22 mm E-stop (Jiushi, item 5; CNTD XA2-ECZ42 as a second source), and the illuminated or plain
 momentary buttons and the 3-position step switch if their catalogues have 16 mm or 22 mm versions
 (items 3 and 4; ask Jiushi first, then Ninuo). The electronics (OLED, CAN transceiver, USB-CAN adapter,
 buck module, logic analyzer), the 12-position rotary switch and the Vallder wheel are not from them.
@@ -44,7 +67,7 @@ details before adding a part to the model.
 | 2 | **Rotary switch, 12 position**, panel mount | 2 | 1 pole 12 throw, break-before-make (non-shorting), good detent; a shaft length that fits a 3 mm face plate plus knob. | AliExpress: `rotary switch 1 pole 12 position panel mount`, `1P12T rotary switch with knob` (filter: shaft 6 mm, with knob) | Detent feel; each position closes exactly one contact; bush diameter and body depth. |
 | 3 | **Rotary switch, 3 position**, panel mount | 2 | 1 pole 3 throw (x1, x10, x100). | AliExpress: `rotary switch 1P3T panel mount`, `3 position rotary selector switch with knob` | As above. |
 | 4 | **Illuminated momentary buttons**, 12 to 16 mm | 8 (+3 spare) | 6 with LEDs: green, yellow, red for the fixed keys and 3 neutral for F1 to F3, with LEDs for 5 V or 12 V with a series resistor. Plus 1 plain momentary for wheel enable (no LED). Metal 16 mm buttons are the usual AliExpress find. | AliExpress: `16mm metal push button momentary LED 5V`, `12mm momentary pushbutton LED 12V` (filter: momentary, LED voltage 5 V or 12 V; avoid latching) | LED forward voltage and current; contact bounce; body depth behind the panel; the feel through a glove. |
-| 5 | **Emergency stop**, 22 mm, NC contacts | 2 | The stand-in is the AliExpress XB2-ES542 style (item 1005002447999037, 2.55 EUR, variant 1NC; take one 2NC to try a second contact). Marked ZB2-BE102C, IEC 60947-5-1, CCC. Its block is 29.4 x 29.2 x 14.8 mm per the listing; a seller's drawing for the family gives 31 mm above the panel and 43 mm behind it. Compact makers (EAO Series 84, APEM EC Compact) are the fallback if the case cannot be that deep. | AliExpress: `ZB2-BE102C XB2-ES542 emergency stop 22mm` (the linked item), `22mm emergency stop push button 1NC` | Total depth behind the panel and height above it; mushroom diameter; the block opens when the head is pressed; screw terminal size; the ring nut and the panel thickness it clamps (the face plate is 3 mm); the head latches and twist-releases. |
+| 5 | **Emergency stop**, 22 mm, NC contacts | 2 | The stand-in is the AliExpress XB2-ES542 style (item 1005002447999037, 2.55 EUR, variant 1NC; take one 2NC to try a second contact). Marked ZB2-BE102C, IEC 60947-5-1, CCC. Its block is 29.4 x 29.2 x 14.8 mm per that listing (the model uses the CNTD CEE-102 drawing, 24 x 29.1 x 15); a seller's drawing for the family gives 31 mm above the panel and 43 mm behind it. Compact makers (EAO Series 84, APEM EC Compact) are the fallback if the case cannot be that deep. | AliExpress: `ZB2-BE102C XB2-ES542 emergency stop 22mm` (the linked item), `22mm emergency stop push button 1NC` | Total depth behind the panel and height above it; mushroom diameter; the block opens when the head is pressed; screw terminal size; the ring nut and the panel thickness it clamps (the face plate is 3 mm); the head latches and twist-releases. |
 | 6 | **OLED module**, Waveshare 2.42inch OLED Module (SKU 25742), 128x64, SSD1309 | 2 | Buy Waveshare's own (documented, with examples): white, or the (C) yellow variant. Board 61.5 x 39.5 x 1.6, glass 60.5 x 37, active area 55.01 x 27.49 (visible 57.01 x 29.49), 4.0 mm thick over all, 3.4 mm connector and 2.54 mm right-angle header behind. Ships configured for SPI; **move the two 0 ohm resistors on the back to the I2C position** (DC pin then sets the address, 0x3C low, 0x3D high). Check the 7-pin connector's pitch and make (the listing says MX1.25, resellers say GH1.25) before ordering a cable. The four 2.5 mm board holes are plain and lie under the glass, so the module is held by a printed frame with four corner screws and four locating pegs (see `OledModule`). Drawing and 3D model: the Waveshare wiki page for the module. | waveshare.com, or AliExpress `Waveshare 2.42inch OLED` | I2C address; supply current (about 196 mA with every pixel on); contrast; legibility at arm's length; whether the frame and its four 2.5 mm insert bosses fit the plate; the real connector pitch. |
 | 7 | **CAN-FD transceiver breakout**, 3.3 V logic | 2 | TJA1051, TCAN1042 or MCP2562FD class. Not a classic-CAN-only part. | AliExpress: `TCAN1042 CAN FD module`, `TJA1051 CAN transceiver module`, `MCP2562FD module` | 3.3 V logic compatible; 120 ohm termination jumper or solder pad. |
 | 8 | **USB-CAN FD adapter** | 1 | gs_usb or candleLight firmware, CAN FD capable. | AliExpress: `CANable 2.0 USB CAN FD adapter`, `candlelight USB CAN FD` | Shows up as a `can0` interface and does 2 Mbit/s data phase. |

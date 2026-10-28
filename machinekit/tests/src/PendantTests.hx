@@ -62,14 +62,12 @@ class PendantTests {
     var touching = plate.intersect(shell);
     check(touching.volume() < 1e-3, "The plate must only rest on the shell: " + touching.volume());
     touching.close();
-    // Outer box less the cavity, plus six posts and four standoffs, less the receptacle hole through a 3 mm wall, two strap slots
+    // Outer box less the cavity, plus six posts, less the receptacle hole through a 3 mm wall, two strap slots
     // through the back wall, the enabling switch's hole through a 3 mm side wall and the pilot holes.
     var r = PanelFacePlate.CORNER_RADIUS;
-    var underside = pendantCase.boardTop - PendantCase.BOARD_THICKNESS;
-    var shellExpected = RoundedRectangle.area(114.0,
-      210.0, r) * 51.0 - RoundedRectangle.area(108.0, 204.0, r - 3.0) * 48.0 + 6 * Math.PI * 20.25 * 48.0 + 4 * Math.PI
-      * 12.25 * (underside + 48.0) - Math.PI * 8.1 * 8.1 * 3.0 - 2 * 24.0 * 4.0 * 3.0 - Math.PI * 11.15 * 11.15 * 3.0
-      - 6 * Math.PI * 2.1 * 2.1 * PendantCase.PILOT_DEPTH - 4 * Math.PI * 1.7 * 1.7 * PendantCase.STANDOFF_PILOT_DEPTH;
+    var shellExpected = RoundedRectangle.area(114.0, 210.0,
+      r) * 51.0 - RoundedRectangle.area(108.0, 204.0, r - 3.0) * 48.0 + 6 * Math.PI * 20.25 * 48.0 - Math.PI * 8.1 * 8.1
+      * 3.0 - 2 * 24.0 * 4.0 * 3.0 - Math.PI * 11.15 * 11.15 * 3.0 - 6 * Math.PI * 2.1 * 2.1 * PendantCase.PILOT_DEPTH;
     // Ribs add material above the floor; posts that run into a wall and ribs that run into a tower overlap it, so the estimate is loose.
     var ribHeight = 48.0 + (pendantCase.boardTop - PendantCase.BOARD_THICKNESS - 1.0);
     for (rib in pendantCase.ribs) shellExpected += rib.w * rib.h * ribHeight;
@@ -78,15 +76,9 @@ class PendantTests {
       "Shell volume " + shell.volume() + " vs " + shellExpected
     );
 
-    // Every tower is part of the surrounding structure: it touches a wall, or a rib ties it to one.
+    // Every post is part of the surrounding structure: it touches a wall, or a rib ties it to one.
     var towers:Array<{x:Float, y:Float, r:Float, name:String}> = [];
     for (p in pendantCase.posts) towers.push({x: p.x, y: p.y, r: PendantCase.POST_DIAMETER / 2, name: "post"});
-    for (st in pendantCase.standoffs) towers.push({
-      x: st.x,
-      y: st.y,
-      r: PendantCase.STANDOFF_DIAMETER / 2,
-      name: "standoff"
-    });
     var innerX = layout.width / 2 - layout.wall, innerY = layout.height / 2 - layout.wall;
     for (t in towers) {
       var wallGap = Math.min(Math.min(t.x + innerX, innerX - t.x), Math.min(t.y + innerY, innerY - t.y)) - t.r;
@@ -116,8 +108,8 @@ class PendantTests {
       "A strap slot behind the deep " + c.id
     );
     check(
-      Math.abs(pendantCase.boardTop + 26.0) < 1e-9,
-      "The board sits behind the 25 mm parts: " + pendantCase.boardTop
+      Math.abs(pendantCase.boardTop + (PendantCase.BOSS_HEIGHT + 25.0)) < 1e-9 && pendantCase.standoffLength == 25.0,
+      "The board hangs on 25 mm standoffs behind the 25 mm parts: " + pendantCase.boardTop
     );
     // The enabling switch lies against the back wall on the left side, where only the E-stop (on the right) is deep.
     var pocket = pendantCase.enabling;
@@ -139,17 +131,10 @@ class PendantTests {
     plain.close();
 
     // Every part's solid is clear of the others, the plate and the shell.
-    var assembly = PanelAssemblyBuilder.build(
-      layout,
-      () -> pendantCase.plate(),
-      () -> pendantCase.shell(),
-      [{id: "board", solid: () -> pendantCase.board()}],
-      "FR4 PCB",
-      ReferencePendant.groups(),
-      pendantCase.hardware()
-    );
+    var assembly = ReferencePendant.assembly();
     var report = AssemblyIntegrity.check(assembly);
     check(report.errors().length == 0, "Interference: " + [for (e in report.errors()) e.message].join(" | "));
+    // The wheel's four terminals are wired to the board (the scene below refuses a wheel left without its supply).
     // The hierarchy reads case, jog, selectors, function and cycle keys, with the E-stop and display on their own, and each device is its bodies.
     var ids = [for (c in assembly.components()) c.id];
     for (id in [
@@ -172,7 +157,7 @@ class PendantTests {
       ids.indexOf(id) >= 0,
       "Missing member " + id + " in " + ids.join(", ")
     );
-    check(ids.length == 73, "Seventy-three members, twenty-five of them hardware: " + ids.length);
+    check(ids.length == 84, "Eighty-four members, thirty-three of them hardware: " + ids.length);
     check(
       ids.indexOf("fasteners/display-frame") >= 0 && ids.indexOf("fasteners/display-screw-4") >= 0,
       "The display's frame hardware"
@@ -183,14 +168,14 @@ class PendantTests {
       && ids.indexOf("fasteners/board-insert-4") >= 0 && ids.indexOf("fasteners/board-screw-4") >= 0,
       "Hardware members"
     );
-    var m3 = ThreadedInsert.m3(), m25 = ThreadedInsert.m2_5();
+    var m3 = ThreadedInsert.m3(), m25 = ThreadedInsert.m2_5Short();
     check(
       m3.pilotDiameter == PendantCase.PILOT_DIAMETER && m3.pilotDepth == PendantCase.PILOT_DEPTH,
       "Post pilot matches the M3 insert"
     );
     check(
       m25.pilotDiameter == PendantCase.STANDOFF_PILOT && m25.pilotDepth == PendantCase.STANDOFF_PILOT_DEPTH,
-      "Standoff pilot matches the M2.5 insert"
+      "Boss pilot matches the short M2.5 insert"
     );
     // The wheel turns on its housing and each knob on its switch: three free joints, the wheel's named for its encoder.
     var joints = assembly.derived().definition.joints;
@@ -212,8 +197,8 @@ class PendantTests {
     var purchases = 0;
     for (line in bom.lines()) purchases += line.quantity;
     check(
-      purchases == 44,
-      "Forty purchases (plate, shell, board, twelve controls, twelve inserts and screws, the display frame and its fixings): "
+      purchases == 48,
+      "Forty-eight purchases (plate, shell, board, twelve controls, twelve case inserts and screws, twelve standoff sets, the display frame and its fixings): "
       + purchases + " " + [for (l in bom.lines()) l.partNumber + " x" + l.quantity].join(", ")
     );
 

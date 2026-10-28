@@ -201,94 +201,95 @@ class ControlCatalogs {
         custom(),
         {
           designation: XB2,
-          values: new ComponentValues().setToken("basis", "stated").setNumber("headDiameter", 40).setNumber(
-            "collarDiameter",
-            30
-          ).setNumber(
-            "collarHeight",
-            9
-          ).setNumber(
-            "headHeight",
-            22
-          ).setNumber(
-            "panelHole",
-            22.3
-          ).setNumber(
-            "panelThickness",
-            3
-          ).setNumber(
-            "nutDiameter",
-            30
-          ).setNumber(
-            "nutThickness",
-            5
-          ).setNumber(
-            "baseWidth",
-            42
-          ).setNumber(
-            "baseDepth",
-            30
-          ).setNumber(
-            "baseLength",
-            11
-          ).setNumber(
-            "blockWidth",
-            29
-          ).setNumber(
-            "blockThickness",
-            14.8
-          ).setNumber(
-            "blockLength",
-            24
-          ).setNumber(
-            "massGrams",
-            52.4
-          ),
-          metadata: {
-            source: "AliExpress item 1005002447999037 and a seller's size drawing for the XB2-ES542 family",
-            standard: null,
-            standardEdition: null,
-            dimensionKind: Nominal,
-            conformance: NominalEnvelope,
-            verifiedFields: ["headDiameter", "massGrams"]
-          }
-        },
-        {
-          designation: EAO,
-          values: new ComponentValues().setToken("basis", "assumed").setNumber("headHeight", 16).setNumber(
-            "nutThickness",
-            3
-          ).setNumber(
-            "baseLength",
-            4.7
-          ).setNumber(
-            "blockLength",
-            8
-          ).setNumber(
-            "baseWidth",
-            30
-          ).setNumber(
-            "baseDepth",
-            30
-          ).setNumber(
-            "blockWidth",
-            22
-          ).setNumber(
-            "blockThickness",
-            12
-          ).setNumber(
-            "massGrams",
-            40
-          ),
-          metadata: {
-            source: "EAO Series 84 and APEM EC Compact product pages (depth behind the panel only)",
-            standard: "EN 60947-5-5",
-            standardEdition: null,
-            dimensionKind: Unverified,
-            conformance: GenericApproximation
-          }
+          values: new ComponentValues().setToken("basis",
+      "stated").setNumber("headDiameter", 40).setNumber(
+        "collarDiameter",
+        30
+      ).setNumber(
+        "collarHeight",
+        9
+      ).setNumber(
+        "headHeight",
+        22
+      ).setNumber(
+        "panelHole",
+        22.3
+      ).setNumber(
+        "panelThickness",
+        3
+      ).setNumber(
+        "nutDiameter",
+        30
+      ).setNumber(
+        "nutThickness",
+        5
+      ).setNumber(
+        "baseWidth",
+        42
+      ).setNumber(
+        "baseDepth",
+        30
+      ).setNumber(
+        "baseLength",
+        11
+      ).setNumber(
+        "blockWidth",
+        29.1
+      ).setNumber(
+        "blockThickness",
+        15
+      ).setNumber(
+        "blockLength",
+        24
+      ).setNumber(
+        "massGrams",
+        52.4
+      ),
+      metadata: {
+        source: "AliExpress item 1005002447999037, a seller's size drawing for the XB2-ES542 family and the CNTD CEE-102 contact block drawing (24 x 29.1 x 15)",
+        standard: null,
+        standardEdition: null,
+        dimensionKind: Nominal,
+        conformance: NominalEnvelope,
+        verifiedFields: ["headDiameter", "massGrams"]
+      }
+    },
+      {
+        designation: EAO,
+        values: new ComponentValues().setToken("basis", "assumed").setNumber("headHeight", 16).setNumber(
+          "nutThickness",
+          3
+        ).setNumber(
+          "baseLength",
+          4.7
+        ).setNumber(
+          "blockLength",
+          8
+        ).setNumber(
+          "baseWidth",
+          30
+        ).setNumber(
+          "baseDepth",
+          30
+        ).setNumber(
+          "blockWidth",
+          22
+        ).setNumber(
+          "blockThickness",
+          12
+        ).setNumber(
+          "massGrams",
+          40
+        ),
+        metadata: {
+          source: "EAO Series 84 and APEM EC Compact product pages (depth behind the panel only)",
+          standard: "EN 60947-5-5",
+          standardEdition: null,
+          dimensionKind: Unverified,
+          conformance: GenericApproximation
         }
-      ],
+      }
+    ],
       row -> row.metadata
     );
     return eStopCatalog;

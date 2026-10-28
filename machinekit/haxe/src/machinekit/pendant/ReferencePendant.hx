@@ -1,5 +1,6 @@
 package machinekit.pendant;
 
+import machinekit.assembly.MachineAssembly;
 import machinekit.hmi.*;
 
 /**
@@ -35,6 +36,28 @@ class ReferencePendant {
     new PanelGroup("function-keys", ["f1", "f2", "f3"]),
     new PanelGroup("cycle-keys", ["start", "hold", "stop"])
   ];
+
+  /**
+   * The whole pendant as an assembly: plate, shell and board in the case group, the controls by group, and the fasteners.
+   * The hand wheel's terminals are wired to the board: its 0 V and VCC to the board's supply, A and B to its inputs.
+   */
+  public static function assembly():MachineAssembly {
+    var pendantCase = pendantCase();
+    var assembly = PanelAssemblyBuilder.build(
+      layout(),
+      () -> pendantCase.plate(),
+      () -> pendantCase.shell(),
+      [new PanelExtra("board", new PendantBoard(() -> pendantCase.board()))],
+      groups(),
+      pendantCase.hardware()
+    );
+    var wheel = "jog/wheel/terminals", board = "case/board";
+    assembly.connectPorts("wheel-0v", wheel, "0V", board, "gnd");
+    assembly.connectPorts("wheel-vcc", wheel, "VCC", board, "vcc");
+    assembly.connectPorts("wheel-a", wheel, "A", board, "enc-a");
+    assembly.connectPorts("wheel-b", wheel, "B", board, "enc-b");
+    return assembly;
+  }
 
   /** The case for the reference layout. */
   public static function pendantCase():PendantCase return PendantCase.plan(layout());

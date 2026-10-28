@@ -1,24 +1,12 @@
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.MachineAssembly;
-import machinekit.hmi.PanelAssemblyBuilder;
 import machinekit.pendant.PendantPresentation;
 import machinekit.pendant.ReferencePendant;
 import materia.project.SceneArtifact;
 
 /** The reference jog pendant: face plate, shell, board envelope and the placed controls. */
 class PendantPreview {
-  public static function assembly():MachineAssembly {
-    var pendantCase = ReferencePendant.pendantCase();
-    return PanelAssemblyBuilder.build(
-      ReferencePendant.layout(),
-      () -> pendantCase.plate(),
-      () -> pendantCase.shell(),
-      [{id: "board", solid: () -> pendantCase.board()}],
-      "FR4 PCB",
-      ReferencePendant.groups(),
-      pendantCase.hardware()
-    );
-  }
+  public static function assembly():MachineAssembly return ReferencePendant.assembly();
 
   public static function preview():haxe.io.Bytes {
     var scene = AssemblyPreview.scene(assembly(), "pendant");

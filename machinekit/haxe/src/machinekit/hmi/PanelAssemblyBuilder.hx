@@ -12,8 +12,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
  */
 class PanelAssemblyBuilder {
   /**
-	 * `extras` are further fixed solids in panel coordinates (a board, say), each with an id and a builder, made of
-	 * `extrasMaterial`. The plate and shell are printed nylon, light against the dark controls. When there is a shell or
+	 * `extras` are further fixed components in panel coordinates (a board, say), each with an id. The plate and shell are printed nylon, light against the dark controls. When there is a shell or
 	 * extras the plate, shell and extras sit in a `case` group; each of `groups` gathers controls by id, and a control in
 	 * no group stays at the top level. `hardware` (inserts, screws) goes in a `fasteners` group.
 	 */
@@ -21,8 +20,7 @@ class PanelAssemblyBuilder {
     layout:PanelLayout,
     plate:() -> Part,
     ?shell:() -> Part,
-    ?extras:Array<{id:String, solid:() -> Part}>,
-    extrasMaterial:String = "plastic",
+    ?extras:Array<PanelExtra>,
     ?groups:Array<PanelGroup>,
     ?hardware:Array<PanelHardware>
   ):MachineAssembly {
@@ -30,10 +28,7 @@ class PanelAssemblyBuilder {
     var housing = shell != null || (extras != null && extras.length > 0) ? new MachineAssembly() : assembly;
     housing.addComponent("plate", new PanelSolid("PANEL-PLATE", "panel plate", plate, "PA12 nylon"));
     if (shell != null) housing.addComponent("shell", new PanelSolid("PANEL-SHELL", "case shell", shell, "PA12 nylon"));
-    if (extras != null) for (e in extras) housing.addComponent(
-      e.id,
-      new PanelSolid("PANEL-" + e.id.toUpperCase(), e.id, e.solid, extrasMaterial)
-    );
+    if (extras != null) for (e in extras) housing.addComponent(e.id, e.component);
     if (housing != assembly) assembly.include("case", housing);
     // An included assembly is copied when it is included, so fill each group before including it.
     var groupOf:Map<String, MachineAssembly> = [];

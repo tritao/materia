@@ -108,6 +108,13 @@ class HmiPartsTests {
   }
 
   public static function run():Void {
+    // Every glyph of the stroke font builds a valid solid (a stroke that touches itself fails the polygon).
+    for (i in 0..."ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-+./".length) {
+      var glyph = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-+./".charAt(i);
+      var text = cadkit.modeling.StrokeText.solid(glyph, 3.0, 0.4, 0.0, 0.3, i % 2 == 0);
+      check(text.volume() > 0, 'Stroke glyph $glyph has volume');
+      text.close();
+    }
     checkRecipes();
     var registry = MachineKitComponents.standard();
     for (id in ["hand-wheel", "emergency-stop", "rotary-switch", "push-button", "oled-module"]) check(

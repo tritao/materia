@@ -5,6 +5,7 @@ import cadkit.modeling.FootprintGeometry;
 import cadkit.modeling.Part;
 import cadkit.modeling.RoundedRectangle;
 import cadkit.modeling.Vector;
+import machinekit.component.PanelBoss;
 import machinekit.hmi.*;
 
 /**
@@ -73,7 +74,9 @@ class PendantCase {
   /** Hole for an M2.5 heat-set insert (about 3.6 mm outer, 4 mm long). */
   public static inline var STANDOFF_PILOT:Float = 3.4;
 
-  public static inline var STANDOFF_PILOT_DEPTH:Float = 6.0;
+  public static inline var STANDOFF_PILOT_DEPTH:Float = 4.4;
+  /** The bosses on the plate's back that the board's standoffs screw into. */
+  public static inline var BOSS_HEIGHT:Float = 4.0;
   public static inline var BOARD_HOLE:Float = 2.7;
 
   /** A 22.3 mm opening in a side wall for a 3-position enabling switch whose body is about 26 mm across and 30 long, pointing inwards (assumed). */
@@ -93,6 +96,9 @@ class PendantCase {
   public final boardTop:Float;
 
   public final standoffs:Array<{x:Float, y:Float}>;
+
+  /** The standard length of the standoffs that hold the board to the plate's bosses. */
+  public final standoffLength:Float;
   public final strapSlots:Array<{x:Float, y:Float}>;
 
   /** The enabling switch's body centre in plan, lying against a side wall at the back, or null when no free place exists. */
@@ -110,6 +116,7 @@ class PendantCase {
     connectorZ:Float,
     boardTop:Float,
     standoffs:Array<{x:Float, y:Float}>,
+    standoffLength:Float,
     strapSlots:Array<{x:Float, y:Float}>,
     enabling:Null<{x:Float, y:Float}>,
     ribs:Array<{x:Float, y:Float, w:Float, h:Float}>,
@@ -121,6 +128,7 @@ class PendantCase {
     this.connectorZ = connectorZ;
     this.boardTop = boardTop;
     this.standoffs = standoffs;
+    this.standoffLength = standoffLength;
     this.strapSlots = strapSlots;
     this.enabling = enabling;
     this.ribs = ribs;
@@ -147,14 +155,28 @@ class PendantCase {
     // The board sits just behind the deepest control that ends above it.
     var shallow = 0.0;
     for (c in face.controls) if (c.behind() <= PASS_THROUGH) shallow = Math.max(shallow, c.behind());
-    var boardTop = -(shallow + 1.0);
+    // The board hangs from the plate on standoffs of a standard length from the bosses on the plate's back, below the shallow parts.
+    var standoffLength = HexStandoff.standardLength(shallow + 1.0 - BOSS_HEIGHT);
+    var boardTop = -(BOSS_HEIGHT + standoffLength);
     if (boardTop - BOARD_THICKNESS - BOARD_COMPONENTS
       < -(face.caseInnerDepth - 1.0)) throw "The case is too shallow for a board behind the controls";
     var enabling = placeEnabling(face, posts, connectorX, wallY, notes);
     var standoffs = placeStandoffs(face, posts, connectorX, wallY, enabling);
-    var ribs = placeRibs(face, posts, standoffs, connectorX, wallY, enabling, boardTop);
-    var strapSlots = placeStrapSlots(face, posts, standoffs, enabling, ribs);
-    return new PendantCase(face, posts, connectorX, connectorZ, boardTop, standoffs, strapSlots, enabling, ribs, notes);
+    var ribs = placeRibs(face, posts, [], connectorX, wallY, enabling, boardTop);
+    var strapSlots = placeStrapSlots(face, posts, [], enabling, ribs);
+    return new PendantCase(
+      face,
+      posts,
+      connectorX,
+      connectorZ,
+      boardTop,
+      standoffs,
+      standoffLength,
+      strapSlots,
+      enabling,
+      ribs,
+      notes
+    );
   }
 
   static function placePosts(face:PanelLayout):Array<{x:Float, y:Float}> {
@@ -211,7 +233,7 @@ class PendantCase {
   static function enablingFootprint():Footprint return Rect(ENABLING_DEPTH, ENABLING_BODY);
 
   /** The switch's axis sits this far behind the face: against the back wall, where only the deepest parts can reach. */
-  static function enablingZ(face:PanelLayout):Float return -(face.caseInnerDepth - ENABLING_BODY / 2 - 1.0);
+  public static function enablingZ(face:PanelLayout):Float return -(face.caseInnerDepth - ENABLING_BODY / 2 - 1.0);
 
   /** The enabling switch lies against a side wall at the back, its button through the wall: left wall first, then right. */
   static function placeEnabling(
@@ -276,13 +298,13 @@ class PendantCase {
   }
 
   /** The board outline's half extents. */
-  static function boardHalf(face:PanelLayout): {x: Float, y: Float} return {
+  public static function boardHalf(face:PanelLayout): {x: Float, y: Float} return {
     x: face.width / 2 - face.wall - BOARD_MARGIN,
     y: face.height / 2 - face.wall - BOARD_MARGIN
   };
 
   /** Everything the board must leave room for, as footprints at positions (plan view). */
-  function notches():Array<{f:Footprint, x:Float, y:Float}> {
+  public function notches():Array<{f:Footprint, x:Float, y:Float}> {
     var raw:Array<{f:Footprint, x:Float, y:Float}> = [];
     for (c in face.controls) if (c.behind() > PASS_THROUGH) raw.push({
       f: FootprintGeometry.grow(c.body(), 2.0),
@@ -400,8 +422,8 @@ class PendantCase {
     taken:Array<{x:Float, y:Float}>
   ):Bool {
     var need = STANDOFF_DIAMETER / 2 + 3.0;
-    for (c in face.controls) if (c.behind() > PASS_THROUGH && FootprintGeometry.distanceTo(c.body(),
-      c.x, c.y, x, y) < need) return false;
+    // The standoffs run from the plate down past the shallow parts, so they clear every control's body.
+    for (c in face.controls) if (FootprintGeometry.distanceTo(c.body(), c.x, c.y, x, y) < need) return false;
     for (p in posts) if (dist(p.x, p.y, x, y) < STANDOFF_DIAMETER / 2 + POST_DIAMETER / 2 + 3.0) return false;
     if (FootprintGeometry.distanceTo(receptacleFootprint(),
       connectorX, receptacleCentreY(face, wallY), x, y) < need) return false;
@@ -412,7 +434,7 @@ class PendantCase {
   }
 
   /** The top of the ribs: just under the board's underside. */
-  static function ribTop(boardTop:Float):Float return boardTop - BOARD_THICKNESS - 1.0;
+  public static function ribTop(boardTop:Float):Float return boardTop - BOARD_THICKNESS - 1.0;
 
   /**
 	 * Every post and standoff must be part of the surrounding structure, not a tower standing on the back wall alone: one
@@ -595,16 +617,18 @@ class PendantCase {
 
   /**
 	 * The inserts and screws the plan implies: an M3 insert in each post with a button head screw through the plate's
-	 * counterbore, and an M2.5 insert in each standoff with a screw through the board. Screw lengths are the shortest
-	 * standard ones that reach 75 % of the insert, and never past the insert's foot.
+	 * counterbore, and the board's standoffs: an insert in each boss on the plate's back, a standoff of standard length screwed
+	 * into it, and a screw from under the board into the standoff. Screw lengths are the shortest standard ones that reach 75 %
+	 * of what they thread into, and never past it.
 	 */
   public function hardware():Array<PanelHardware> {
     var result:Array<PanelHardware> = [];
-    var caseInsert = ThreadedInsert.m3(), boardInsert = ThreadedInsert.m2_5();
+    var caseInsert = ThreadedInsert.m3(), bossInsert = ThreadedInsert.m2_5Short();
     var bearing = face.thickness - PanelFacePlate.COUNTERBORE_DEPTH;
     var caseLength = standardLength(bearing + 0.75 * caseInsert.length, bearing + caseInsert.length);
     var underside = boardTop - BOARD_THICKNESS;
-    var boardLength = standardLength(BOARD_THICKNESS + 0.75 * boardInsert.length, BOARD_THICKNESS + boardInsert.length);
+    var standoff = HexStandoff.m2_5(standoffLength);
+    var boardLength = standardLength(BOARD_THICKNESS + 0.75 * standoff.boreDepth, BOARD_THICKNESS + standoff.boreDepth);
     var i = 0;
     for (p in posts) {
       i++;
@@ -614,8 +638,11 @@ class PendantCase {
     i = 0;
     for (s in standoffs) {
       i++;
-      result.push(new PanelHardware('board-insert-$i', boardInsert, s.x, s.y, underside));
-      result.push(new PanelHardware('board-screw-$i', ButtonHeadScrew.m2_5(boardLength), s.x, s.y, boardTop));
+      // An insert in each boss, pressed in from the boss's end; the standoff's stud into it; the board on the standoff's foot;
+      // and a screw from under the board into the standoff.
+      result.push(new PanelHardware('board-insert-$i', bossInsert, s.x, s.y, -BOSS_HEIGHT, true));
+      result.push(new PanelHardware('standoff-$i', standoff, s.x, s.y, boardTop));
+      result.push(new PanelHardware('board-screw-$i', ButtonHeadScrew.m2_5(boardLength), s.x, s.y, underside, true));
     }
     return result;
   }
@@ -702,11 +729,6 @@ class PendantCase {
       var pilot = Part.cylinderSpan(PILOT_DIAMETER / 2, -PILOT_DEPTH, 1.0, p.x, p.y);
       current = fuseThenDrill(current, post, pilot);
     }
-    for (s in standoffs) {
-      var standoff = Part.cylinderSpan(STANDOFF_DIAMETER / 2, -face.caseInnerDepth - 0.5, underside, s.x, s.y);
-      var pilot = Part.cylinderSpan(STANDOFF_PILOT / 2, underside - STANDOFF_PILOT_DEPTH, underside + 1.0, s.x, s.y);
-      current = fuseThenDrill(current, standoff, pilot);
-    }
     var top = ribTop(boardTop);
     for (r in ribs) {
       var rib = FootprintGeometry.solid(Rect(r.w, r.h), r.x, r.y, -face.caseInnerDepth - 0.5, top);
@@ -754,8 +776,15 @@ class PendantCase {
   }
 
   /** The face plate with the screw holes that match the posts and a perimeter tongue that fits inside the walls. */
+  /** The bosses on the plate's back that the board's standoffs screw into, in panel coordinates. */
+  public function bosses():Array<PanelBoss> return [for (s in standoffs) {
+    x:s.x, y:s.y,
+      diameter:STANDOFF_DIAMETER, height:BOSS_HEIGHT, pilotDiameter:STANDOFF_PILOT, pilotDepth:STANDOFF_PILOT_DEPTH
+  }
+  ];
+
   public function plate():Part {
-    var plain = PanelFacePlate.part(face, posts);
+    var plain = PanelFacePlate.part(face, posts, bosses());
     var tongue = perimeterTongue();
     var joined = plain.combine(tongue);
     plain.close();

@@ -4,6 +4,7 @@ import cadkit.modeling.RoundedRectangle;
 import cadkit.modeling.Footprint;
 import cadkit.modeling.FootprintGeometry;
 import cadkit.modeling.Part;
+import machinekit.component.PanelBoss;
 
 /**
  * The panel plate as a solid: a rounded plate with the cutouts of every control and the extra holes of
@@ -16,7 +17,8 @@ class PanelFacePlate {
   public static inline var COUNTERBORE:Float = 6.2;
   public static inline var COUNTERBORE_DEPTH:Float = 1.8;
 
-  public static function part(face:PanelLayout, ?fasteners:Array<{x:Float, y:Float}>):Part {
+  public static function part(face:PanelLayout,
+    ?fasteners:Array<{x:Float, y:Float}>, ?extraBosses:Array<PanelBoss>):Part {
     var plate = RoundedRectangle.box(face.width, face.height, CORNER_RADIUS, 0.0, face.thickness);
     var tools:Array<Part> = [];
     try {
@@ -42,19 +44,22 @@ class PanelFacePlate {
       }
       // Bosses stand on the plate's back (z below 0) and are fused to it before the holes are cut.
       var raised = plate;
-      for (c in face.controls) for (b in c.bosses()) {
-        var boss = Part.cylinderSpan(b.diameter / 2, -b.height, 0.5, c.x + b.x, c.y + b.y);
+      var bosses:Array<PanelBoss> = extraBosses == null ? [] : extraBosses.copy();
+      for (c in face.controls) for (b in c.bosses()) bosses.push({
+        x: c.x + b.x,
+        y: c.y + b.y,
+        diameter: b.diameter,
+        height: b.height,
+        pilotDiameter: b.pilotDiameter,
+        pilotDepth: b.pilotDepth
+      });
+      for (b in bosses) {
+        var boss = Part.cylinderSpan(b.diameter / 2, -b.height, 0.5, b.x, b.y);
         var fused = raised.combine(boss);
         if (raised != plate) raised.close();
         boss.close();
         raised = fused;
-        tools.push(Part.cylinderSpan(
-          b.pilotDiameter / 2,
-          -b.height - 1.0,
-          -b.height + b.pilotDepth,
-          c.x + b.x,
-          c.y + b.y
-        ));
+        tools.push(Part.cylinderSpan(b.pilotDiameter / 2, -b.height - 1.0, -b.height + b.pilotDepth, b.x, b.y));
       }
       var result = raised.subtractAll(tools);
       if (raised != plate) raised.close();
