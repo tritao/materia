@@ -10,6 +10,7 @@
     "../../../processkit/tests/moonraker",
     "../../../machinekit/examples/robot-arm",
     "../../../machinekit/examples/bench-mill",
+    "../../../machinekit/examples/casting-shop",
     "../../../machinekit/examples/machine-tending",
     "../../../machinekit/examples",
     "../../../machinekit/examples/cnc-router",
