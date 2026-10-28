@@ -186,67 +186,29 @@ Variants, diameters, PPR, output type, drawing and price are to be filled in fro
 then the Vallder wheel stays the plan; this is a candidate if its variants include a smaller wheel or
 a better-documented one.
 
-## Parts as components
+## Parts, layout and case
 
-Each bought part is a MachineKit component with real geometry, mass, a BOM line and provenance, in its
-own frame (origin at the centre of the panel's front face, +z toward the operator). `PanelPart` is what
-a part tells the layout about itself (cutout, keep-out, stud holes, height above the face, depth behind it,
-rear body, mass), so the numbers live only in the recipe and the layout and the solid cannot disagree.
-The recipes are registered in `MachineKitComponents` and filed under "Pendant parts".
+The bought parts, the panel layout and its checks are generic and live in `machinekit/haxe/src/machinekit/hmi/`
+(see its README); the pendant adds only its own case and reference layout in `machinekit/pendant/`.
 
-| Recipe | Detail | Numbers from |
-|---|---|---|
-| `machinekit.pendant.hand-wheel` | Revolved flange, flared body, knurl ring and dial recess; spinner handle; boss through the opening; three studs on a circle; terminal strip | YUMO drawing (defaults); the Vallder wheel is the same recipe with other values |
-| `machinekit.pendant.emergency-stop` | Mushroom head on a collar, stem, ring nut, base and one to three contact blocks | A seller's XB2-ES542 family drawing; the compact EAO and APEM type is the same recipe with a thin base |
-| `machinekit.pendant.rotary-switch` | Knob, bush, nut, round body; `positions` (12 axis, 3 step) | Assumed |
-| `machinekit.pendant.push-button` | Bezel and domed cap, barrel, nut, body; colour and LED | Assumed |
-| `machinekit.pendant.oled-module` | Glass, carrier PCB, standoffs, header behind a window | Assumed |
-
-Every part carries a `basis` input (catalog, stated, assumed, measured) that travels in its designation, so
-an assumed number is visible in the BOM. `PendantAssembly` places the solids on the face and checks that no
-part overlaps another, the face plate or the shell; `PendantPartsTests` checks each solid against its own
-stated height, depth and mass, and its plan extent against its footprints.
-
-## Face model
-
-`machinekit/haxe/src/machinekit/pendant/` models the top face: each bought part as a `PendantControl`
-(cutout, keep-out, height above and depth behind the plate, mass, and where each number came from:
-`vendor-drawing`, `measured`, `datasheet` or `assumed`), a `PendantFace` with a checker, and
-`PendantFacePlate`, the plate as a solid with every cutout (the printable layout mock-up, STEP export
-through `Shape.exportStep`). `ReferencePendant` is the first layout and `PendantFaceSvg` draws it for
-review. `PendantFaceTests` asserts the layout passes its own checks, that each check catches what it
-should, and the plate's volume.
-
-First layout: a 220 x 110 mm face, 3 mm plate and wall, wheel on the right, E-stop, display and
-wheel-enable across the top left, axis and step switches with F1 and F2 below, then F3 and the fixed
-Start, Hold and Stop/Reset keys. What the checker already shows:
-
-- **The wheel sets the face size.** Its 80 mm flange and 72 mm stud circle need about 90 mm of face
-  in one direction, which makes the face about 220 x 110 mm, far from a 160 x 65 slab.
-- **Depth was the problem.** A standard 22 mm E-stop with its contact block is 82 mm deep (Harmony
-  XB5AS8445 datasheet) and rejected by the checker. A compact one is 13.5 to 18.7 mm behind the panel,
-  so the deepest parts become the switches and buttons (assumed 25 mm), a 30 mm case and the wheel's 41
-  mm (27 without the handle): 74 mm tall face up. Shallower buttons and rotary switches are the next lever.
-- **Assumed numbers:** everything except the wheel (its drawing) is a placeholder until measured.
-
-## Case model
-
-`PendantCase` (same package) builds the shell behind the face plate for a layout: a rounded box (8 mm
-corners, 3 mm walls and back) open at the top, six M3 screw posts that rise to the plate, a 9 mm cable
-hole through the bottom wall at mid depth, and a matching face plate with six counterbored screw holes.
-Posts are placed where nothing in front or behind needs the room: clear of every keep-out and of every
-part's rear body. `PendantFaceTests` checks it on the compact layout (190 x 110 mm face, 48 mm case):
-shell and plate are single solids that only touch, the shell's volume matches an analytic estimate, the
-posts and screw heads avoid every control and body, and the plate rests on the shell. `PendantFaceSvg`
-draws the bodies, posts and cable hole.
+- **Layout.** `ReferencePendant.layout()`: a 190 x 110 mm face, 3 mm plate and wall, wheel and wheel-enable
+  in the right-hand column, E-stop, display, the two rotary switches, F1 and F2 on the left, F3 and the
+  fixed Start, Hold and Stop/Reset keys along the bottom. The cheap E-stop is 43 mm deep, so the case is
+  48 mm and the pendant 89 mm tall face up with the handle (the wheel stands 38 mm).
+- **Case.** `PendantCase` builds the shell: a rounded box (8 mm corners, 3 mm walls and back) open at the
+  top, six M3 screw posts rising to the plate, a 9 mm cable hole through the bottom wall at mid depth, and
+  a matching plate with six counterbored holes. Posts go where nothing in front or behind needs the room.
+  `PendantTests` checks that the posts avoid every part and body, the shell and plate are single solids
+  that only touch, the shell's volume matches an analytic estimate, and no part overlaps another, the plate
+  or the shell.
 
 Findings so far, all on assumed rear bodies (measure the real parts):
 
-- **No post on the left edge.** The E-stop, the knobs and the left buttons fill that edge, so the six
+- **No post on the left edge.** The E-stop, the knobs and the left buttons fill that side, so the six
   posts sit in the middle and on the right. A printed 3 mm plate may gape on the left; the next steps are
   a perimeter tongue or clips on the shell and smaller measured bodies.
 - **Not yet modelled:** gasket, strap and hang point, the enabling-switch hole, the board and its
-  mounting, the wheel handle's removal.
+  mounting, M12 receptacle and gland.
 - **Printing:** the shell is deep (51 mm) and prints best open side up; the plate prints face down.
 
 ## Mechanics

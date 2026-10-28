@@ -1,5 +1,7 @@
 package machinekit.pendant;
 
+import machinekit.hmi.*;
+
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 
@@ -20,17 +22,17 @@ class PendantCase {
   public static inline var HEAD_CLEARANCE:Float = 3.0;
   public static inline var BODY_CLEARANCE:Float = 1.5;
 
-  public final face:PendantFace;
+  public final face:PanelLayout;
   public final posts:Array<{x:Float, y:Float}>;
   public final cableX:Float;
   public final cableZ:Float;
 
-  function new(face:PendantFace, posts:Array<{x:Float, y:Float}>, cableX:Float, cableZ:Float) {
+  function new(face:PanelLayout, posts:Array<{x:Float, y:Float}>, cableX:Float, cableZ:Float) {
     this.face = face; this.posts = posts; this.cableX = cableX; this.cableZ = cableZ;
   }
 
   /** Places six posts (corners and mid top and bottom) and the cable hole for a face, or throws if there is no room. */
-  public static function plan(face:PendantFace):PendantCase {
+  public static function plan(face:PanelLayout):PendantCase {
     var hw = face.width / 2 - face.wall - POST_DIAMETER / 2 - 1.0, hh = face.height / 2 - face.wall - POST_DIAMETER / 2 - 1.0;
     var wanted = [[-hw, hh], [0.0, hh], [hw, hh], [-hw, -hh], [0.0, -hh], [hw, -hh]];
     var posts:Array<{x:Float, y:Float}> = [];
@@ -61,25 +63,36 @@ class PendantCase {
     return new PendantCase(face, posts, cableX, cableZ);
   }
 
-  static function free(face:PendantFace, x:Float, y:Float, taken:Array<{x:Float, y:Float}>):Bool {
+  static function free(face:PanelLayout, x:Float, y:Float, taken:Array<{x:Float, y:Float}>):Bool {
     for (c in face.controls) {
-      if (PendantFace.distanceToFootprint(c.keepOut, c.x, c.y, x, y) < COUNTERBORE_HEAD() + HEAD_CLEARANCE - 0.0) return false;
-      if (PendantFace.distanceToFootprint(c.body, c.x, c.y, x, y) < POST_DIAMETER / 2 + BODY_CLEARANCE) return false;
-      for (h in c.extraHoles) if (Math.sqrt((c.x + h.x - x) * (c.x + h.x - x) + (c.y + h.y - y) * (c.y + h.y - y)) < POST_DIAMETER / 2 + 2.0) return false;
+      if (PanelLayout.distanceToFootprint(c.keepOut(), c.x, c.y, x, y) < COUNTERBORE_HEAD() + HEAD_CLEARANCE - 0.0) return false;
+      if (PanelLayout.distanceToFootprint(c.body(), c.x, c.y, x, y) < POST_DIAMETER / 2 + BODY_CLEARANCE) return false;
+      for (h in c.holes()) if (Math.sqrt((c.x + h.x - x) * (c.x + h.x - x) + (c.y + h.y - y) * (c.y + h.y - y)) < POST_DIAMETER / 2 + 2.0) return false;
     }
     for (t in taken) if (Math.sqrt((t.x - x) * (t.x - x) + (t.y - y) * (t.y - y)) < POST_DIAMETER + 4.0) return false;
     return true;
   }
 
-  static function COUNTERBORE_HEAD():Float return PendantFacePlate.COUNTERBORE / 2;
+  static function COUNTERBORE_HEAD():Float return PanelFacePlate.COUNTERBORE / 2;
 
   /** The cable runs horizontally at depth z, so only parts that reach that deep and sit near the bottom wall can block it. */
-  static function cableClear(face:PendantFace, x:Float, z:Float):Bool {
+  static function cableClear(face:PanelLayout, x:Float, z:Float):Bool {
     for (c in face.controls) {
-      if (c.behind < -z - CABLE_HOLE / 2) continue;
-      if (PendantFace.distanceToFootprint(c.body, c.x, c.y, x, -face.height / 2 + face.wall) < CABLE_HOLE / 2 + BODY_CLEARANCE) return false;
+      if (c.behind() < -z - CABLE_HOLE / 2) continue;
+      if (PanelLayout.distanceToFootprint(c.body(), c.x, c.y, x, -face.height / 2 + face.wall) < CABLE_HOLE / 2 + BODY_CLEARANCE) return false;
     }
     return true;
+  }
+
+  /** The posts and the cable hole as marks for PanelLayoutSvg: a dashed post and its counterbore, and the hole in the bottom wall. */
+  public function marks():Array<SvgMark> {
+    var result:Array<SvgMark> = [];
+    for (post in posts) {
+      result.push({x: post.x, y: post.y, size: POST_DIAMETER, height: 0.0, filled: false});
+      result.push({x: post.x, y: post.y, size: PanelFacePlate.COUNTERBORE, height: 0.0, filled: false});
+    }
+    result.push({x: cableX, y: -face.height / 2 + face.wall / 2, size: CABLE_HOLE, height: face.wall, filled: true});
+    return result;
   }
 
   public function outerDepth():Float return face.caseInnerDepth + BACK_WALL;
@@ -87,9 +100,9 @@ class PendantCase {
   /** The shell: a rounded box open at the top, with the posts and the cable hole. */
   public function shell():Part {
     var depth = outerDepth();
-    var outer = PendantOutline.box(face.width, face.height, PendantFacePlate.CORNER_RADIUS, -depth, 0.0);
-    var cavity = PendantOutline.box(face.width - 2 * face.wall, face.height - 2 * face.wall,
-      PendantFacePlate.CORNER_RADIUS - face.wall, -face.caseInnerDepth, 1.0);
+    var outer = PanelOutline.box(face.width, face.height, PanelFacePlate.CORNER_RADIUS, -depth, 0.0);
+    var cavity = PanelOutline.box(face.width - 2 * face.wall, face.height - 2 * face.wall,
+      PanelFacePlate.CORNER_RADIUS - face.wall, -face.caseInnerDepth, 1.0);
     var tools:Array<Part> = [cavity];
     var hole = Part.cylinderAlongY(CABLE_HOLE / 2, -face.height / 2 - 1.0, -face.height / 2 + face.wall + 1.0, cableX, cableZ);
     tools.push(hole);
@@ -109,5 +122,5 @@ class PendantCase {
   }
 
   /** The face plate with the screw holes that match the posts. */
-  public function plate():Part return PendantFacePlate.part(face, posts);
+  public function plate():Part return PanelFacePlate.part(face, posts);
 }

@@ -21,7 +21,7 @@ class MachineKitComponents {
 		machinekit.printing.PrintingComponents.register(registry);
 		machinekit.assembly.AssemblyComponents.register(registry);
 		machinekit.control.ControlComponents.register(registry);
-		machinekit.pendant.PendantComponents.register(registry);
+		machinekit.hmi.HmiComponents.register(registry);
 		registry.register(machinekit.structural.LevelingFoot.recipeType());
 		machinekit.routing.RoutingComponents.register(registry);
 		registry.register(machinekit.power.Vfd.recipeType());

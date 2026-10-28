@@ -1,4 +1,4 @@
-package machinekit.pendant;
+package machinekit.hmi;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
@@ -10,11 +10,11 @@ import machinekit.component.ComponentRecipeSupport as R;
  * behind, a knob in front. `positions` says how many throws it has (3 for the step switch, 12
  * for the axis switch). All sizes are assumed until a real switch is measured: knob 25, bush 10, body 30 by 25.
  */
-class PendantRotarySwitch extends PendantPart {
+class RotarySwitch extends HmiPart {
   static var recipe:Null<ComponentType>;
 
   static function inputs():Array<ComponentParameter> return [
-    PendantPart.basisParameter("assumed"),
+    HmiPart.basisParameter("assumed"),
     R.count("positions", 12),
     R.length("knobDiameter", 25), R.length("knobHeight", 18),
     R.length("bushDiameter", 10), R.length("panelThickness", 3), R.length("nutDiameter", 14), R.length("nutThickness", 2),
@@ -23,7 +23,7 @@ class PendantRotarySwitch extends PendantPart {
   ];
 
   public function new(?v:ComponentValues) {
-    super("pendant-rotary-switch", "rotary switch with knob, " + (v == null || v.get("positions") == null ? 12 : v.integer("positions")) + " positions", "plastic", inputs(), v);
+    super("hmi-rotary-switch", "rotary switch with knob, " + (v == null || v.get("positions") == null ? 12 : v.integer("positions")) + " positions", "plastic", inputs(), v);
     positive(["knobDiameter", "knobHeight", "bushDiameter", "panelThickness", "nutDiameter", "nutThickness", "bodyDiameter", "behindDepth", "massGrams"]);
     require(count("positions") >= 2 && count("positions") <= 24, "two to 24 positions");
     require(n("bushDiameter") < n("nutDiameter") && n("nutDiameter") < n("knobDiameter"), "the nut is wider than the bush and narrower than the knob");
@@ -33,7 +33,7 @@ class PendantRotarySwitch extends PendantPart {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.pendant.rotary-switch", inputs(), v -> new PendantRotarySwitch(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.hmi.rotary-switch", inputs(), v -> new RotarySwitch(v));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

@@ -1,4 +1,4 @@
-package machinekit.pendant;
+package machinekit.hmi;
 
 import machinekit.component.AssumedCatalogComponent;
 import machinekit.component.ComponentParameter;
@@ -8,11 +8,11 @@ import machinekit.component.MachineComponent;
 import machinekit.transmission.ValueBasis;
 
 /**
- * A bought part on the pendant. Unlike an assumed catalogue part its numbers may be a maker's drawing or a
+ * A bought operator control for a panel. Unlike an assumed catalogue part its numbers may be a maker's drawing or a
  * measurement; the recipe's `basis` input says which, and travels in its designation and BOM line. Parts
  * are in their own frame: origin at the centre of the panel's front face, +z toward the operator.
  */
-class PendantPart extends MachineComponent implements PanelPart {
+class HmiPart extends MachineComponent implements PanelPart {
   /** How trustworthy the part's numbers are. */
   public final basis:ValueBasis;
   final stored:ComponentValues;
@@ -31,7 +31,7 @@ class PendantPart extends MachineComponent implements PanelPart {
     };
   }
 
-  /** The provenance input every pendant part declares. */
+  /** The provenance input every part declares. */
   public static function basisParameter(value:String = "assumed"):ComponentParameter
     return ComponentRecipeSupport.choice("basis", ["catalog", "stated", "assumed", "measured"], value);
 
@@ -68,4 +68,5 @@ class PendantPart extends MachineComponent implements PanelPart {
   public function behindFace():Float throw "not defined";
   public function rearBody():Footprint return panelCutout();
   public function massGrams():Float throw "not defined";
+  public function maxPanelThickness():Float return 1e9;
 }

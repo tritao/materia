@@ -1,9 +1,0 @@
-{
-  "version": 1,
-  "package": {"name": "machinekit-pendant-face-tests"},
-  "entry": "PendantFaceTests",
-  "sourceRoots": ["src"],
-  "dependencies": {"machinekit": {"path": ".."}},
-  "target": "host",
-  "outputDir": "build/pendant-face"
-}

@@ -23,12 +23,12 @@ class ComponentClassification {
 		file(registry, "machinekit.control.safety-relay", "Safety", ComponentKind.Generic);
 		file(registry, "machinekit.control.digital-sensor", "Sensors and inputs", ComponentKind.Generic);
 		file(registry, "machinekit.control.thermistor-input", "Sensors and inputs", ComponentKind.Generic);
-		// pendant
-		file(registry, "machinekit.pendant.hand-wheel", "Pendant parts", ComponentKind.Supplier);
-		file(registry, "machinekit.pendant.emergency-stop", "Pendant parts", ComponentKind.Generic);
-		file(registry, "machinekit.pendant.rotary-switch", "Pendant parts", ComponentKind.Generic);
-		file(registry, "machinekit.pendant.push-button", "Pendant parts", ComponentKind.Generic);
-		file(registry, "machinekit.pendant.oled-module", "Pendant parts", ComponentKind.Generic);
+		// hmi
+		file(registry, "machinekit.hmi.hand-wheel", "Operator controls", ComponentKind.Supplier);
+		file(registry, "machinekit.hmi.emergency-stop", "Operator controls", ComponentKind.Generic);
+		file(registry, "machinekit.hmi.rotary-switch", "Operator controls", ComponentKind.Generic);
+		file(registry, "machinekit.hmi.push-button", "Operator controls", ComponentKind.Generic);
+		file(registry, "machinekit.hmi.oled-module", "Operator controls", ComponentKind.Generic);
 		// enclosure
 		file(registry, "machinekit.enclosure.panel", "Panels", ComponentKind.Generic);
 		file(registry, "machinekit.enclosure.cut-panel", "Panels", ComponentKind.Generic);

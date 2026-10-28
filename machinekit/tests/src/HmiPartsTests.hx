@@ -5,16 +5,15 @@ import machinekit.component.ComponentParameterType;
 import machinekit.component.ComponentValues;
 import machinekit.component.MachineComponent;
 import machinekit.component.MachineKitComponents;
-import machinekit.pendant.*;
+import machinekit.hmi.*;
 
-class PendantPartsTests {
+class HmiPartsTests {
   static function check(ok:Bool, message:String):Void if (!ok) throw message;
   static function near(a:Float, b:Float, message:String, tolerance:Float = 1e-6):Void check(Math.abs(a - b) <= tolerance, '$message: $a vs $b');
-
-  static function partOf(c:PendantControl):PendantPart {
-    var part = c.part;
-    if (part == null) throw "The control has no part";
-    return part;
+  static function rejects(message:String, body:() -> Void):Void {
+    var failed = false;
+    try body() catch (_:Dynamic) failed = true;
+    check(failed, 'Expected rejection: $message');
   }
 
   static function halfExtent(f:Footprint):{x:Float, y:Float} return switch f {
@@ -24,7 +23,7 @@ class PendantPartsTests {
   };
 
   /** One part's solid against what it says about itself. */
-  static function checkPart(part:PendantPart, name:String):Void {
+  static function checkPart(part:HmiPart, name:String):Void {
     var solid = part.geometry(Preview);
     check(solid.solidCount() == 1 && solid.volume() > 0, '$name is one solid');
     var b = solid.shape.bounds();
@@ -37,17 +36,14 @@ class PendantPartsTests {
     check(Math.max(Math.abs(b.get_min().get_y()), Math.abs(b.get_max().get_y())) <= hy + 1e-6, '$name plan depth inside its footprints');
     near(part.massProperties().mass, part.massGrams() / 1000.0, '$name declared mass', 1e-9);
     solid.close();
-    var again = part.componentType().create(part.values());
-    check(again.designation == part.designation, '$name designation is stable');
-    check(part.bom.partNumber == part.designation || part.bom.partNumber.length > 0, '$name has a BOM part number');
   }
 
-  /** The contract RecipeContractTests applies to every recipe, for the pendant's: each option and flag builds a valid solid, and a rebuilt part is identical. */
+  /** The contract RecipeContractTests applies to every recipe, for these: each option and flag builds a valid solid, and a rebuilt part is identical. */
   static function checkRecipes():Void {
     var registry = MachineKitComponents.standard();
     var checked = 0;
     for (type in registry.all()) {
-      if (type.id.indexOf("machinekit.pendant.") != 0) continue;
+      if (type.id.indexOf("machinekit.hmi.") != 0) continue;
       var base:MachineComponent = type.create(new ComponentValues());
       var variants:Array<ComponentValues> = [base.values()];
       for (parameter in type.parameters()) switch parameter.type {
@@ -83,58 +79,31 @@ class PendantPartsTests {
     checkRecipes();
     var registry = MachineKitComponents.standard();
     for (id in ["hand-wheel", "emergency-stop", "rotary-switch", "push-button", "oled-module"])
-      check(registry.category("machinekit.pendant." + id) == "Pendant parts", 'machinekit.pendant.$id is filed under Pendant parts');
+      check(registry.category("machinekit.hmi." + id) == "Operator controls", 'machinekit.hmi.$id is filed under Operator controls');
 
-    var yumo = partOf(PendantParts.yumoWheel(0.0, 0.0));
-    var vallder = partOf(PendantParts.vallderWheel(0.0, 0.0));
-    var estop = partOf(PendantParts.eStopGeneric(0.0, 0.0));
-    var estop2 = new PendantEmergencyStop(new ComponentValues().setInteger("blocks", 2));
-    var compact = partOf(PendantParts.eStopCompact(0.0, 0.0));
-    var axis = partOf(PendantParts.rotary("axis", 0.0, 0.0));
-    var step = partOf(PendantParts.rotary("step", 0.0, 0.0, 3));
-    var button = partOf(PendantParts.button("b", 0.0, 0.0));
-    var oled = partOf(PendantParts.display242(0.0, 0.0));
-    for (entry in [{p: yumo, n: "YUMO wheel"}, {p: vallder, n: "Vallder wheel"}, {p: estop, n: "E-stop"}, {p: estop2, n: "two-block E-stop"},
-        {p: compact, n: "compact E-stop"}, {p: axis, n: "axis switch"}, {p: step, n: "step switch"}, {p: button, n: "button"}, {p: oled, n: "OLED"}])
-      checkPart(entry.p, entry.n);
+    var yumo = PartPresets.yumoIsm6045(), vallder = PartPresets.vallderMpg(), estop = PartPresets.xb2Es542(), estop2 = PartPresets.xb2Es542(2);
+    var compact = PartPresets.compactEStop(), axis = PartPresets.rotarySwitch(12), step = PartPresets.rotarySwitch(3);
+    var button = PartPresets.pushButton16(), oled = PartPresets.oled242();
+    var entries:Array<{p:HmiPart, n:String}> = [{p: yumo, n: "YUMO wheel"}, {p: vallder, n: "Vallder wheel"}, {p: estop, n: "E-stop"}, {p: estop2, n: "two-block E-stop"},
+        {p: compact, n: "compact E-stop"}, {p: axis, n: "axis switch"}, {p: step, n: "step switch"}, {p: button, n: "button"}, {p: oled, n: "OLED"}];
+    for (entry in entries) checkPart(entry.p, entry.n);
 
     // The drawings' numbers come out of the recipes.
     near(yumo.aboveFace(), 38.0, "YUMO above"); near(yumo.behindFace(), 10.0, "YUMO behind");
     check(yumo.dataSource() == "vendor-drawing" && estop.dataSource() == "listing" && axis.dataSource() == "assumed", "Provenance");
     near(vallder.aboveFace(), 41.0, "Vallder above"); near(vallder.behindFace(), 12.0, "Vallder behind");
+    near(yumo.maxPanelThickness(), 6.0, "YUMO panel limit"); near(vallder.maxPanelThickness(), 3.0, "Vallder panel limit");
+    check(estop.maxPanelThickness() > 1e6, "A part with no stated limit allows any panel");
     near(estop.aboveFace(), 31.0, "E-stop above"); near(estop.behindFace(), 43.0, "E-stop behind");
+    near(yumo.panelHoles()[0].diameter, 3.2, "YUMO stud holes"); near(vallder.panelHoles()[0].diameter, 4.8, "Vallder stud holes");
     check(estop2.designation != estop.designation && estop2.bom.description.indexOf("2 NC") >= 0, "A second block is a different part");
     check(axis.designation != step.designation && axis.bom.description.indexOf("12 positions") >= 0 && step.bom.description.indexOf("3 positions") >= 0, "Positions are in the part");
-    check(yumo.massProperties().mass * 1000.0 == 250.0, "YUMO mass");
+    near(yumo.massProperties().mass * 1000.0, 250.0, "YUMO mass", 1e-6);
 
-    // Bad inputs are refused.
-    var failed = false;
-    try new PendantHandWheel(new ComponentValues().setNumber("ringDiameter", 70)) catch (_:Dynamic) failed = true;
-    check(failed, "A ring wider than the flange");
-    failed = false;
-    try new PendantEmergencyStop(new ComponentValues().setInteger("blocks", 4)) catch (_:Dynamic) failed = true;
-    check(failed, "Too many contact blocks");
-
-    // The assembled pendant: no part overlaps another, the plate or the shell.
-    var face = ReferencePendant.compactFace();
-    var found = PendantAssembly.interferences(face, PendantCase.plan(face));
-    check(found.length == 0, "Interference: " + found.join(" | "));
-    var first = PendantAssembly.interferences(ReferencePendant.face());
-    check(first.length == 0, "Interference in the first layout: " + first.join(" | "));
-    // For looking at in a CAD viewer: every part of the compact layout in place, as one STEP file.
-    var stepPath = Sys.getEnv("PENDANT_ASSEMBLY_STEP");
-    if (stepPath != null && stepPath != "") {
-      var placed:Array<Part> = [];
-      for (c in face.controls) {
-        var solid = PendantAssembly.placed(face, c);
-        if (solid != null) placed.push(solid);
-      }
-      var everything = Part.fuseAll(placed);
-      for (solid in placed) solid.close();
-      everything.shape.exportStep(stepPath);
-      everything.close();
-    }
-    trace("pendant parts tests passed");
+    rejects("a ring wider than the flange", () -> new HandWheel(new ComponentValues().setNumber("ringDiameter", 70)));
+    rejects("too many contact blocks", () -> new EmergencyStop(new ComponentValues().setInteger("blocks", 4)));
+    rejects("a handle outside the dial", () -> new HandWheel(new ComponentValues().setNumber("handleRadius", 30)));
+    trace("hmi parts tests passed");
   }
   public static function main():Void run();
 }

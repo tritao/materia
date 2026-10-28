@@ -1,4 +1,4 @@
-package machinekit.pendant;
+package machinekit.hmi;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
@@ -11,11 +11,11 @@ import machinekit.component.ComponentRecipeSupport as R;
  * so the glass starts `panelThickness` behind it. Every size is assumed (module 70 x 40, glass 62 x 34 with a
  * 56 x 28 viewing window, 12 mm deep) until a real module is measured.
  */
-class PendantOledModule extends PendantPart {
+class OledModule extends HmiPart {
   static var recipe:Null<ComponentType>;
 
   static function inputs():Array<ComponentParameter> return [
-    PendantPart.basisParameter("assumed"),
+    HmiPart.basisParameter("assumed"),
     R.length("windowWidth", 56), R.length("windowHeight", 28), R.length("bezelMargin", 3),
     R.length("glassWidth", 62), R.length("glassHeight", 34), R.length("glassThickness", 1.5),
     R.length("pcbWidth", 70), R.length("pcbHeight", 40), R.length("pcbThickness", 1.6),
@@ -25,7 +25,7 @@ class PendantOledModule extends PendantPart {
   ];
 
   public function new(?v:ComponentValues) {
-    super("pendant-oled-module", "2.42 in 128x64 OLED module", "plastic", inputs(), v);
+    super("hmi-oled-module", "2.42 in 128x64 OLED module", "plastic", inputs(), v);
     positive(["windowWidth", "windowHeight", "glassWidth", "glassHeight", "glassThickness", "pcbWidth", "pcbHeight", "pcbThickness", "panelThickness", "standoffGap", "behindDepth", "headerWidth", "headerHeight", "massGrams"]);
     require(n("windowWidth") <= n("glassWidth") && n("windowHeight") <= n("glassHeight"), "the glass is larger than the viewing window");
     require(n("glassWidth") <= n("pcbWidth") && n("glassHeight") <= n("pcbHeight"), "the carrier is larger than the glass");
@@ -35,7 +35,7 @@ class PendantOledModule extends PendantPart {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.pendant.oled-module", inputs(), v -> new PendantOledModule(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.hmi.oled-module", inputs(), v -> new OledModule(v));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

@@ -1,4 +1,4 @@
-package machinekit.pendant;
+package machinekit.hmi;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
@@ -10,11 +10,11 @@ import machinekit.component.ComponentRecipeSupport as R;
  * with a nut, a body with terminals behind. `illuminated` buttons carry an LED. Sizes are assumed until a
  * real button is measured: 19 mm bezel, 16 mm cap standing 6 mm, 24 mm body 25 mm deep.
  */
-class PendantPushButton extends PendantPart {
+class PushButton extends HmiPart {
   static var recipe:Null<ComponentType>;
 
   static function inputs():Array<ComponentParameter> return [
-    PendantPart.basisParameter("assumed"),
+    HmiPart.basisParameter("assumed"),
     R.choice("colour", ["green", "yellow", "red", "white", "blue", "black"], "white"), R.flag("illuminated", true),
     R.length("bezelDiameter", 19), R.length("bezelHeight", 1.5), R.length("capDiameter", 16), R.length("capHeight", 6),
     R.length("keepOutDiameter", 20),
@@ -24,7 +24,7 @@ class PendantPushButton extends PendantPart {
   ];
 
   public function new(?v:ComponentValues) {
-    super("pendant-push-button", "16 mm push button", "plastic", inputs(), v);
+    super("hmi-push-button", "16 mm push button", "plastic", inputs(), v);
     positive(["bezelDiameter", "bezelHeight", "capDiameter", "capHeight", "keepOutDiameter", "barrelDiameter", "panelThickness", "nutDiameter", "nutThickness", "bodyDiameter", "behindDepth", "massGrams"]);
     require(n("capDiameter") < n("bezelDiameter") && n("bezelDiameter") <= n("keepOutDiameter"), "the cap is smaller than the bezel and the bezel fits its keep-out");
     require(n("capHeight") > n("bezelHeight"), "the cap stands above the bezel");
@@ -35,7 +35,7 @@ class PendantPushButton extends PendantPart {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.pendant.push-button", inputs(), v -> new PendantPushButton(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.hmi.push-button", inputs(), v -> new PushButton(v));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

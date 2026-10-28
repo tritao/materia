@@ -1,4 +1,4 @@
-package machinekit.pendant;
+package machinekit.hmi;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
@@ -12,11 +12,11 @@ import machinekit.component.ComponentRecipeSupport as R;
  * a 42 mm wide base, 29 mm blocks. The block row, the base's other dimension and the head profile are drawn
  * from photos. A compact maker's part (EAO Series 84, APEM EC Compact) is the same recipe with a thin base.
  */
-class PendantEmergencyStop extends PendantPart {
+class EmergencyStop extends HmiPart {
   static var recipe:Null<ComponentType>;
 
   static function inputs():Array<ComponentParameter> return [
-    PendantPart.basisParameter("stated"),
+    HmiPart.basisParameter("stated"),
     R.length("headDiameter", 40), R.length("collarDiameter", 30), R.length("collarHeight", 9), R.length("headHeight", 22),
     R.length("panelHole", 22.3), R.length("panelThickness", 3),
     R.length("nutDiameter", 30), R.length("nutThickness", 5),
@@ -26,7 +26,7 @@ class PendantEmergencyStop extends PendantPart {
   ];
 
   public function new(?v:ComponentValues) {
-    super("pendant-emergency-stop", "twist-release emergency stop with " + (v == null || v.get("blocks") == null ? 1 : v.integer("blocks")) + " NC contact block(s)", "plastic", inputs(), v);
+    super("hmi-emergency-stop", "twist-release emergency stop with " + (v == null || v.get("blocks") == null ? 1 : v.integer("blocks")) + " NC contact block(s)", "plastic", inputs(), v);
     positive(["headDiameter", "collarDiameter", "collarHeight", "headHeight", "panelHole", "panelThickness", "nutDiameter", "nutThickness",
       "baseWidth", "baseDepth", "baseLength", "blockWidth", "blockThickness", "blockLength", "massGrams"]);
     require(n("collarDiameter") < n("headDiameter") && n("panelHole") < n("collarDiameter"), "the head is wider than its collar and the collar wider than the opening");
@@ -37,7 +37,7 @@ class PendantEmergencyStop extends PendantPart {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.pendant.emergency-stop", inputs(), v -> new PendantEmergencyStop(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.hmi.emergency-stop", inputs(), v -> new EmergencyStop(v));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

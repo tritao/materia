@@ -1,10 +1,10 @@
-package machinekit.pendant;
+package machinekit.hmi;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 
 /** The pendant's rounded-rectangle outline, extruded in z. */
-class PendantOutline {
+class PanelOutline {
   /** Plan area of the rounded rectangle, for volume checks. */
   public static function area(width:Float, height:Float, radius:Float):Float
     return width * height - (4.0 - Math.PI) * radius * radius;

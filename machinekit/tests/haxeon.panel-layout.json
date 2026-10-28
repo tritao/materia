@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-panel-layout-tests"},
+  "entry": "PanelLayoutTests",
+  "sourceRoots": ["src"],
+  "dependencies": {"machinekit": {"path": ".."}},
+  "target": "host",
+  "outputDir": "build/panel-layout"
+}

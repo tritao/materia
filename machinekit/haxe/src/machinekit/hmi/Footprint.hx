@@ -1,4 +1,4 @@
-package machinekit.pendant;
+package machinekit.hmi;
 
 /** A flat shape on the face, centred on a control's position. Millimetres. */
 enum Footprint {
