@@ -88,37 +88,17 @@ private class Ifc4Document {
   function createOwnerHistory(creationTimestamp:String):Void {
     var organization = step.add(
       "IFCORGANIZATION",
-      [
-        "$",
-        IfcStepWriter.string("CadKit"),
-        IfcStepWriter.string("CadKit BIM export"),
-        "$",
-        "$"
-      ]
+      ["$", IfcStepWriter.string("CadKit"), IfcStepWriter.string("CadKit BIM export"), "$", "$"]
     );
     var person = step.add("IFCPERSON", ["$", "$", IfcStepWriter.string("CadKit"), "$", "$", "$", "$", "$"]);
     var user = step.add("IFCPERSONANDORGANIZATION", ["#" + person, "#" + organization, "$"]);
     var application = step.add(
       "IFCAPPLICATION",
-      [
-        "#" + organization,
-        IfcStepWriter.string("1"),
-        IfcStepWriter.string("CadKit"),
-        IfcStepWriter.string("CadKit")
-      ]
+      ["#" + organization, IfcStepWriter.string("1"), IfcStepWriter.string("CadKit"), IfcStepWriter.string("CadKit")]
     );
     ownerHistory = step.add(
       "IFCOWNERHISTORY",
-      [
-        "#" + user,
-        "#" + application,
-        "$",
-        ".ADDED.",
-        "$",
-        "$",
-        "$",
-        creationTimestamp
-      ]
+      ["#" + user, "#" + application, "$", ".ADDED.", "$", "$", "$", creationTimestamp]
     );
   }
 
@@ -186,14 +166,7 @@ private class Ifc4Document {
     var world = addAxisPlacement(Placement.identity().location.plane);
     representationContext = step.add(
       "IFCGEOMETRICREPRESENTATIONCONTEXT",
-      [
-        "$",
-        IfcStepWriter.string("Model"),
-        "3",
-        "1.E-5",
-        "#" + world,
-        "$"
-      ]
+      ["$", IfcStepWriter.string("Model"), "3", "1.E-5", "#" + world, "$"]
     );
     projectUnits = units;
   }
@@ -289,10 +262,7 @@ private class Ifc4Document {
           args = args.concat([
             IfcStepWriter.string(element.name),
             ".ELEMENT.",
-            elevation == null ? "$" : real(toMeters(
-              cast elevation,
-              "mm"
-            ))
+            elevation == null ? "$" : real(toMeters(cast elevation, "mm"))
           ]);
         case BimSchema.Space:
           args = args.concat([IfcStepWriter.string(element.name), ".ELEMENT.", ".SPACE.", "$"]);
@@ -304,10 +274,7 @@ private class Ifc4Document {
           args = args.concat([
             "$",
             realOrNull(instanceDimension(element, "height")),
-            realOrNull(instanceDimension(
-              element,
-              "width"
-            )),
+            realOrNull(instanceDimension(element, "width")),
             ".WINDOW.",
             ".NOTDEFINED.",
             "$"
@@ -316,10 +283,7 @@ private class Ifc4Document {
           args = args.concat([
             "$",
             realOrNull(instanceDimension(element, "height")),
-            realOrNull(instanceDimension(
-              element,
-              "width"
-            )),
+            realOrNull(instanceDimension(element, "width")),
             ".DOOR.",
             ".NOTDEFINED.",
             "$"
@@ -480,14 +444,7 @@ private class Ifc4Document {
       var wallPlacement = productPlacements.get(wall.id.value);
       if (wallPlacement == null) throw new BimError("IFC host wall has no product placement: " + wall.id.value);
       var localOpening = new Plane(
-        new Vector(
-          lengthProperty(relationship, "along"),
-          -OpeningOverlap,
-          lengthProperty(
-            relationship,
-            "sill"
-          )
-        ),
+        new Vector(lengthProperty(relationship, "along"), -OpeningOverlap, lengthProperty(relationship, "sill")),
         Vector.X(),
         Vector.Z()
       );
@@ -538,26 +495,9 @@ private class Ifc4Document {
       "opening:" + relationship.id.value,
       openingEntity,
       [
-        TypedProperty.quantity(
-          "along",
-          QuantityKind.Length,
-          along,
-          "mm"
-        ),
-        TypedProperty.quantity(
-          "sill",
-          QuantityKind.Length,
-          sill,
-          "mm"
-        ),
-        TypedProperty.token(
-          "output",
-          tokenProperty(
-            relationship,
-            "output"
-          ),
-          BimSchema.HostOutput
-        )
+        TypedProperty.quantity("along", QuantityKind.Length, along, "mm"),
+        TypedProperty.quantity("sill", QuantityKind.Length, sill, "mm"),
+        TypedProperty.token("output", tokenProperty(relationship, "output"), BimSchema.HostOutput)
       ]
     ));
     step.add(
@@ -788,18 +728,9 @@ private class Ifc4Document {
     }
     if (classification == BimSchema.Slab) return element.output == null ? null : featureDimensions(element.output);
     if (classification == BimSchema.Window || classification == BimSchema.Door) return new IfcBoxDimensions(
-      instanceDimension(
-        element,
-        "width"
-      ),
-      instanceDimension(
-        element,
-        "depth"
-      ),
-      instanceDimension(
-        element,
-        "height"
-      )
+      instanceDimension(element, "width"),
+      instanceDimension(element, "depth"),
+      instanceDimension(element, "height")
     );
     return null;
   }
@@ -881,10 +812,7 @@ private class Ifc4Document {
   function addAxisPlacement(plane:Plane):Int {
     var point = step.add(
       "IFCCARTESIANPOINT",
-      ["(" + real(toMeters(plane.origin.x, "mm")) + "," + real(toMeters(
-        plane.origin.y,
-        "mm"
-      )) + "," + real(toMeters(
+      ["(" + real(toMeters(plane.origin.x, "mm")) + "," + real(toMeters(plane.origin.y, "mm")) + "," + real(toMeters(
         plane.origin.z,
         "mm"
       )) + ")"]
@@ -906,16 +834,7 @@ private class Ifc4Document {
     var profilePlacement = step.add("IFCAXIS2PLACEMENT2D", ["#" + origin, "$"]);
     var profile = step.add(
       "IFCRECTANGLEPROFILEDEF",
-      [
-        ".AREA.",
-        "$",
-        "#" + profilePlacement,
-        real(toMeters(width, "mm")),
-        real(toMeters(
-          depth,
-          "mm"
-        ))
-      ]
+      [".AREA.", "$", "#" + profilePlacement, real(toMeters(width, "mm")), real(toMeters(depth, "mm"))]
     );
     var up = step.add("IFCDIRECTION", ["(0.,0.,1.)"]);
     var solid = step.add("IFCEXTRUDEDAREASOLID", ["#" + profile, "$", "#" + up, real(toMeters(height, "mm"))]);
@@ -956,11 +875,7 @@ private class Ifc4Document {
       hashString(key, 5381, 33),
       hashString(key, 2166136261.0, 65599),
       hashString(key, 1013904223.0, 131),
-      hashString(
-        key,
-        2246822519.0,
-        65587
-      )
+      hashString(key, 2246822519.0, 65587)
     ];
     var result = new StringBuf();
     for (character in 0...22) {

@@ -56,40 +56,14 @@ class BimWindowDefinition {
         name,
         graph,
         [
-          new DefinitionInput(
-            "width",
-            ParameterKind.Length,
-            "mm",
-            width
-          ),
-          new DefinitionInput(
-            "height",
-            ParameterKind.Length,
-            "mm",
-            height
-          ),
-          new DefinitionInput(
-            "frameThickness",
-            ParameterKind.Length,
-            "mm",
-            frameThickness
-          ),
-          new DefinitionInput(
-            "depth",
-            ParameterKind.Length,
-            "mm",
-            depth
-          )
+          new DefinitionInput("width", ParameterKind.Length, "mm", width),
+          new DefinitionInput("height", ParameterKind.Length, "mm", height),
+          new DefinitionInput("frameThickness", ParameterKind.Length, "mm", frameThickness),
+          new DefinitionInput("depth", ParameterKind.Length, "mm", depth)
         ],
         [
-          new DefinitionOutput(
-            "body",
-            DefinitionOutput.Geometry
-          ),
-          new DefinitionOutput(
-            "opening",
-            DefinitionOutput.Tool
-          )
+          new DefinitionOutput("body", DefinitionOutput.Geometry),
+          new DefinitionOutput("opening", DefinitionOutput.Tool)
         ],
         bindings,
         outputFeatures

@@ -57,28 +57,16 @@ class BimKitSmoke {
     var ground = model.createStorey(
       "Ground Storey",
       building.id,
-      new cadkit.parametric.ElementReference(
-        model.cad.id,
-        base.id
-      ),
-      new cadkit.parametric.ElementReference(
-        model.cad.id,
-        upper.id
-      )
+      new cadkit.parametric.ElementReference(model.cad.id, base.id),
+      new cadkit.parametric.ElementReference(model.cad.id, upper.id)
     );
     var secondBase = model.cad.createLevel("Upper base datum", 3200);
     var roof = model.cad.createLevel("Roof datum", 6200);
     var upperStorey = model.createStorey(
       "Upper Storey",
       building.id,
-      new cadkit.parametric.ElementReference(
-        model.cad.id,
-        secondBase.id
-      ),
-      new cadkit.parametric.ElementReference(
-        model.cad.id,
-        roof.id
-      )
+      new cadkit.parametric.ElementReference(model.cad.id, secondBase.id),
+      new cadkit.parametric.ElementReference(model.cad.id, roof.id)
     );
     var space = model.createSpace("Lobby", ground.id);
     var wall = model.createWall("Exterior wall", 5000, 200, 3200);
@@ -155,10 +143,7 @@ class BimKitSmoke {
     try model.setStoreyLevels(
       ground.id,
       new cadkit.parametric.ElementReference(model.cad.id, upper.id),
-      new cadkit.parametric.ElementReference(
-        model.cad.id,
-        base.id
-      )
+      new cadkit.parametric.ElementReference(model.cad.id, base.id)
     ) catch (error:Dynamic) invalidLevels = true;
     check(invalidLevels, "Storey base and top Levels retain vertical ordering validation");
     var deletionBlocked = false;
@@ -251,10 +236,7 @@ class BimKitSmoke {
       {wrappedValue: "LOCAL-17"},
       null,
       null,
-      {
-        propertySet: "Pset_ProjectCommon",
-        sourceType: "IfcIdentifier"
-      }
+      {propertySet: "Pset_ProjectCommon", sourceType: "IfcIdentifier"}
     ));
     model.cad.element(fixture.groundWalls[0].id).setProperty(TypedProperty.boolean("bim.loadBearing", true));
     model.cad.element(fixture.groundWalls[0].id).setProperty(TypedProperty.quantity(

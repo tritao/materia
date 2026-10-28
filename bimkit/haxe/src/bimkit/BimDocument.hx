@@ -219,10 +219,7 @@ class BimDocument {
       cad.createRelationship(
         BimSchema.Aggregates,
         new ElementReference(cad.id, parentId),
-        new ElementReference(
-          cad.id,
-          result.id
-        )
+        new ElementReference(cad.id, result.id)
       );
       transaction.commit();
       return result;
@@ -242,10 +239,7 @@ class BimDocument {
       cad.createRelationship(
         BimSchema.Contains,
         new ElementReference(cad.id, storeyId),
-        new ElementReference(
-          cad.id,
-          result.id
-        )
+        new ElementReference(cad.id, result.id)
       );
       transaction.commit();
       return result;
@@ -268,10 +262,7 @@ class BimDocument {
       var result = cad.createRelationship(
         BimSchema.Contains,
         new ElementReference(cad.id, storeyId),
-        new ElementReference(
-          cad.id,
-          elementId
-        )
+        new ElementReference(cad.id, elementId)
       );
       transaction.commit();
       return result;
@@ -314,10 +305,7 @@ class BimDocument {
       var result = cad.createRelationship(
         BimSchema.Aggregates,
         new ElementReference(cad.id, parentId),
-        new ElementReference(
-          cad.id,
-          childId
-        )
+        new ElementReference(cad.id, childId)
       );
       transaction.commit();
       return result;
@@ -480,10 +468,7 @@ class BimDocument {
     element.setProperty(TypedProperty.token("bim.class", "wall", "bim.element-class"));
     element.setProperty(TypedProperty.featureReference(
       "bim.authoredFeature",
-      PersistentReference.feature(
-        cad,
-        uncutOutput.id
-      )
+      PersistentReference.feature(cad, uncutOutput.id)
     ));
   }
 
@@ -618,10 +603,7 @@ class BimDocument {
         || plane.normal.x != 0 || plane.normal.y != 0 || plane.normal.z != 1) cad.restoreElementPlacement(
           opening,
           desired,
-          new ElementReference(
-            cad.id,
-            value.wallId
-          )
+          new ElementReference(cad.id, value.wallId)
         );
     }
     for (element in cad.allElements()) {
@@ -866,11 +848,7 @@ class BimDocument {
       if (origin.z != desired) cad.restoreElementPlacement(
         element,
         new Placement(new Plane(
-          new Vector(
-            origin.x,
-            origin.y,
-            desired
-          ),
+          new Vector(origin.x, origin.y, desired),
           element.localPlacement.location.plane.xDirection,
           element.localPlacement.location.plane.normal
         )),
@@ -920,36 +898,19 @@ class BimDocument {
     var relation = cad.installRelationship(
       new RelationshipId(),
       "bim.host",
-      new ElementReference(
-        cad.id,
-        value.openingId
-      ),
-      new ElementReference(
-        cad.id,
-        value.wallId
-      )
+      new ElementReference(cad.id, value.openingId),
+      new ElementReference(cad.id, value.wallId)
     );
     if (opening.property("bim.class") == null) opening.restoreProperty(
       "bim.class",
-      TypedProperty.token(
-        "bim.class",
-        BimSchema.Window,
-        BimSchema.ElementClass
-      )
+      TypedProperty.token("bim.class", BimSchema.Window, BimSchema.ElementClass)
     );
     storeHostRelationship(relation, value);
     opening.restorePlacementDerived(true);
     cad.restoreElementPlacement(
       opening,
-      new Placement(new Plane(
-        new Vector(value.along, 0, value.sill),
-        Vector.X(),
-        Vector.Z()
-      )),
-      new ElementReference(
-        cad.id,
-        value.wallId
-      )
+      new Placement(new Plane(new Vector(value.along, 0, value.sill), Vector.X(), Vector.Z())),
+      new ElementReference(cad.id, value.wallId)
     );
   }
 

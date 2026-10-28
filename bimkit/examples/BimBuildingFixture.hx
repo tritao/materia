@@ -44,54 +44,20 @@ class BimBuildingFixture {
     spaces = [
       model.createSpace("Lobby", groundStorey.id),
       model.createSpace("Workshop", groundStorey.id),
-      model.createSpace(
-        "Office",
-        upperStorey.id
-      )
+      model.createSpace("Office", upperStorey.id)
     ];
     groundWalls = [
       placedLevelWall("North Exterior Wall", 6000, 200, groundRef, upperRef, 0, 4800),
-      placedLevelWall(
-        "South Exterior Wall",
-        6000,
-        200,
-        groundRef,
-        upperRef,
-        0,
-        0
-      ),
-      placedLevelWall(
-        "Ground Interior Wall",
-        3000,
-        100,
-        groundRef,
-        upperRef,
-        1500,
-        2400
-      )
+      placedLevelWall("South Exterior Wall", 6000, 200, groundRef, upperRef, 0, 0),
+      placedLevelWall("Ground Interior Wall", 3000, 100, groundRef, upperRef, 1500, 2400)
     ];
     upperWalls = [
       placedLevelWall("Upper North Wall", 6000, 200, upperRef, roofRef, 0, 4800),
-      placedLevelWall(
-        "Upper South Wall",
-        6000,
-        200,
-        upperRef,
-        roofRef,
-        0,
-        0
-      )
+      placedLevelWall("Upper South Wall", 6000, 200, upperRef, roofRef, 0, 0)
     ];
     slabs = [
       placedSlab("Ground Slab", groundStorey.id, 6000, 5000, 200, -200),
-      placedSlab(
-        "Upper Slab",
-        upperStorey.id,
-        6000,
-        5000,
-        200,
-        3000
-      )
+      placedSlab("Upper Slab", upperStorey.id, 6000, 5000, 200, 3000)
     ];
 
     windowType = model.createWindowDefinition("Standard Window", 1200, 1400, 80, 200);
