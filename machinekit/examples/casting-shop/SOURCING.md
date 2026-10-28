@@ -3,32 +3,36 @@
 Purchase options for the epoxy-granite compound of the mill and hobber castings, delivered to
 Portugal, with the mix design, mixing equipment, batch plan, post-cure enclosure, coupon tests and a
 consolidated shopping list. Prices and availability are web snapshots found on 2026-10-25 and will change. Grain
-sizes, purity and dryness are seller claims; no technical sheet has been received yet. The 8 mm aggregate top size and the 5× wall / 3× passage design gates are declared in
+sizes, purity and dryness are seller claims; no technical sheet has been received yet. The 5 mm aggregate top size and the 5× wall / 3× passage design gates are declared in
 `CastingShopRecipe`. Compound strength, modulus and maximum section/lift limits remain
 unqualified; supplier limits and the coupon tests below are still required.
 
 ## Design target
 
-- **Maximum aggregate size 8 mm** (graded 0–8 mm). This is the mix-design target; the wall and passage gates must
-  confirm it against every casting before production. Coarser grain saves little
-  resin but doubles every minimum section. Finer grain needs 3–4 points more resin, which means
-  more shrinkage, exotherm and expansion, and lower stiffness.
-- **Minimum wall or rib** 5 × 8 = 40 mm. **Minimum passage or insert-to-mold gap**
-  3 × 8 = 24 mm (`minimumPassageAggregateRatio` = 3). Rampf's datasheet for its own mineral
-  casting grades gives the same pairing: 8 mm maximum particle with a 40 mm minimum castable wall
-  (EPUMENT 140/8B), 5 mm with 25 mm, and 3 mm with 15 mm.
-- **Steel cover:** at least dg + 5 = **13 mm** to mold, EPS or free faces.
-  **Separate insert assemblies:** clear spacing at least max(dg + 5, 4/3 dg) =
-  **13 mm**. These adopt the aggregate terms from EN 1992-1-1 8.2 and ACI 318;
-  they do not claim full reinforced-concrete code qualification.
+- **Maximum aggregate size 5 mm** (graded 0–5 mm; decision 2026-10-28). This is the mix-design
+  target; the wall and passage gates must confirm it against every casting before production.
+  It replaces the earlier 8 mm target: the 2026-10-26 aggregate review found the hobber plinth's
+  25 mm outer walls, and most other failures, sized for a 5 mm grain. Rampf's 140/5 grade has
+  equal or better stiffness and strength than its 140/8B grade, at about 1 point more resin and a
+  little more expansion (19.5 against 17 ppm/K). Going finer than 5 mm costs more resin, shrinkage,
+  exotherm and expansion for no section we need.
+- **Minimum wall or rib** 5 × 5 = 25 mm. **Minimum flow passage** 3 × 5 = 15 mm
+  (`minimumPassageAggregateRatio` = 3). Rampf's datasheet for its own mineral casting grades gives
+  the same pairing: 5 mm maximum particle with a 25 mm minimum castable wall (EPUMENT 140/5),
+  8 mm with 40 mm, and 3 mm with 15 mm.
+- **Steel cover:** at least dg + 5 = **10 mm** to mold, EPS or free faces. A steel face is
+  either flush with a finished face (exposed, sealed to the mold) or behind full cover, never
+  behind a thinner skin. **Separate insert assemblies:** clear spacing at least
+  max(dg + 5, 4/3 dg) = **10 mm**. These adopt the aggregate terms from EN 1992-1-1 8.2 and
+  ACI 318; they do not claim full reinforced-concrete code qualification.
 - **Within one insert assembly:** its own anchors, flanges and threads are not
-  24 mm flow passages. Open gaps fill with matrix fines. Recesses must open to
+  15 mm flow passages. Open gaps fill with matrix fines. Recesses must open to
   bulk resin; narrow enclosed/dead-end pockets remain defects.
 - **Resin** 9–12 % by mass, low viscosity, slow hardener. Packing decides most of the result:
   less resin beats a better rock.
 - **Quartz aggregate first**, because it is the only aggregate sold washed, dried and graded in
-  bags. Commercial mineral casting expands at about 17–20 ppm/K (Rampf: 17 for the 8 mm grade,
-  19.5 for 5 mm, 20 for 3 mm), well above steel's 11–12. The mismatch with the steel inserts
+  bags. Commercial mineral casting expands at about 17–20 ppm/K (Rampf: 19.5 for the 5 mm grade
+  we follow, 17 for 8 mm, 20 for 3 mm), well above steel's 11–12. The mismatch with the steel inserts
   falls with lower resin content and lower-expansion rock. Crushed basalt is the later bulk
   alternative for the coarse fractions (see below).
 - **Design modulus 25 GPa until coupons are measured.** Structural and stiffness checks on the
@@ -56,7 +60,7 @@ Where professionals are ahead:
 - **Assurance:** datasheets and test certificates.
 
 How we close most of the gap:
-- **Geometry.** Thick, solid sections: 40 mm walls, filled hobber bands, a solid hobber column.
+- **Geometry.** Thick, solid sections: 25 mm minimum walls, filled hobber bands, a solid hobber column.
   30 % less modulus is roughly 30 % less structural stiffness, which added section can win back.
 - **Replication.** Inserts only need to land within about ±0.2–0.5 mm; the seat allowance and a
   replication compound copy a precision master.
@@ -106,29 +110,29 @@ Optimising the blend needs only a bucket and scales:
 
 ## Mix and quantities
 
-Starting split of the aggregate by mass, from a packing curve up to 8 mm. Tune it with the coupon
-tests.
+Starting split of the aggregate by mass, from a Fuller curve (exponent 0.5) up to 5 mm. Tune it
+with the packing and coupon tests.
 
 | Fraction | Share of aggregate |
 | --- | --- |
-| 4–8 mm | 30 % |
-| 2–3 mm | 20 % |
-| 1–2 mm | 15 % |
-| 0.3–0.6 mm | 13 % |
-| 0–1 mm (fine) | 11 % |
-| Filler below 0.1 mm | 11 % |
+| 3–5 mm | 23 % |
+| 2–3 mm | 14 % |
+| 1–2 mm | 18 % |
+| 0.3–0.6 mm | 15 % |
+| 0–1 mm (fine) | 16 % |
+| Filler below 0.1 mm | 14 % |
 
-Quantities per casting, at 11 % resin, mix density 2,400 kg/m³ and 10 % for waste and leftovers:
+Quantities per casting, at 12 % resin (about 1 point more than an 8 mm grading), mix density 2,400 kg/m³ and 10 % for waste and leftovers:
 
 | Casting | Wet mix | Aggregate incl. filler | Epoxy |
 | --- | --- | --- | --- |
-| Mill base | 166 kg (69 L, current kit) | ~163 kg | ~20 kg |
-| Mill column | 99 kg (41 L, current kit) | ~97 kg | ~12 kg |
-| Hobber plinth | ~1,016 kg (842 kg frozen design + filled bands, slots and sliver) | ~995 kg | ~123 kg |
-| Hobber column | ~62 kg (43 kg frozen design + filled back pockets) | ~61 kg | ~7 kg |
-| **Total** | ~1.34 t | **~1,315 kg** | **~163 kg** |
+| Mill base | 166 kg (69 L, current kit) | ~161 kg | ~22 kg |
+| Mill column | 99 kg (41 L, current kit) | ~96 kg | ~13 kg |
+| Hobber plinth | ~1,016 kg (842 kg frozen design + filled bands, slots and sliver) | ~984 kg | ~134 kg |
+| Hobber column | ~62 kg (43 kg frozen design + filled back pockets) | ~60 kg | ~8 kg |
+| **Total** | ~1.34 t | **~1,300 kg** | **~177 kg** |
 
-The hobber figures predate the roof thickening required by the 40 mm wall rule. The hobber plinth
+All four figures predate the thin-spot fixes from the 2026-10-26 aggregate review. The hobber plinth
 is a single pour of about 1 t, so the batch schedule (mixer capacity and working time) is a real
 planning input.
 
@@ -167,25 +171,24 @@ Planned orders, sand in 25 kg bags and filler in 20 kg bags (no single grade rea
 
 | Grade | Order 1: coupon tests + mill base and column | Order 2: hobber plinth and column |
 | --- | --- | --- |
-| 4–8 mm | 5 | 13 |
-| 2–3 mm | 4 | 9 |
-| 1–2 mm | 3 | 7 |
+| 3–5 mm | 5 | 10 |
+| 2–3 mm | 3 | 6 |
+| 1–2 mm | 4 | 8 |
 | 0.3–0.6 mm | 3 | 6 |
-| 0–1 mm | 3 | 5 |
-| Calcium carbonate 63 µm (20 kg bags) | 2 | 6 |
-| **Total** | 20 bags, 490 kg, €85 shipping | 46 bags, 1,120 kg, €80 shipping |
+| 0–1 mm | 3 | 7 |
+| Calcium carbonate 63 µm (20 kg bags) | 4 | 7 |
+| **Total** | 22 bags, 530 kg, €85 shipping | 44 bags, 1,065 kg, €80 shipping |
 
-- Order 1 ships at €85 because the filler takes it past 450 kg. Drop one sand test bag to get
-  back to €80.
-- Order 2 waits for the coupon results and the hobber roof thickening. About 3 more sand bags
-  still ship at €80; beyond 1,200 kg the rate rises to €145.
-- The 3–5 mm grade is left out: a gap between 3 and 4 mm costs little packing.
+- Order 1 ships at €85 (451–900 kg).
+- Order 2 waits for the coupon results and the thin-spot fixes. About 5 more sand bags still ship
+  at €80; beyond 1,200 kg the rate rises to €145.
+- The 4–8 mm grade is no longer used: the top size is 5 mm (see Design target).
 
 ### Alternatives and top-ups
 
 | Fraction | Option | Notes | Link |
 | --- | --- | --- | --- |
-| 4–8, 3–5 mm | Pool-filter sílex, Leroy Merlin | Washed, dried, graded; about €44–57 per 25 kg (about €2/kg) | [3–5 mm](https://www.leroymerlin.pt/produtos/arena-de-silex-especial-para-filtros-de-piscinas-sacos-arena-25-kg-para-piscina-granulometria-3-5-mm-86292100.html), [25 kg range](https://www.leroymerlin.pt/produtos/construcao/cimentos-areias-e-britas/areias/sacos-de-areia-de-25-kg-p.html) |
+| 3–5 mm (4–8 mm also sold) | Pool-filter sílex, Leroy Merlin | Washed, dried, graded; about €44–57 per 25 kg (about €2/kg) | [3–5 mm](https://www.leroymerlin.pt/produtos/arena-de-silex-especial-para-filtros-de-piscinas-sacos-arena-25-kg-para-piscina-granulometria-3-5-mm-86292100.html), [25 kg range](https://www.leroymerlin.pt/produtos/construcao/cimentos-areias-e-britas/areias/sacos-de-areia-de-25-kg-p.html) |
 | 3–5 mm | Astralpool sílex gravel | 8 × 25 kg pack, about €150 | [Outlet Piscinas](https://www.outlet-piscinas.pt/grava-silex-astralpool) |
 | 2–4 mm | Ecopool silica, AmaCasa | About €9 per 25 kg; also 0.6–1.2 mm | [AmaCasa](https://amacasa.pt/shop/piscina/limpeza/saco-areia-de-silica-para-filtros-piscina-25kg/) |
 | 1–2, 0.4–0.8 mm | Pool sílex, Piscinarium | About €8 per 25 kg | [Piscinarium](https://www.piscinarium.com/pt/filtros-de-piscina/1818-areia-de-piscina-de-silex-saco-de-25-kg.html) |
@@ -283,7 +286,7 @@ Requirements:
 3. **Best value, if its datasheet holds up: Harzspezialisten polymer casting system 3550**
    (Germany).
    - Made for polymer concrete casting, "medium" working time.
-   - From €37.95 for about 6.5 kg, about €5.84/kg; all 163 kg would be roughly €950.
+   - From €37.95 for about 6.5 kg, about €5.84/kg; all 177 kg would be roughly €1,030.
    - No published viscosity, Tg or mix ratio, and Portugal shipping is unknown. It becomes the pick
      only if its viscosity is under about 1,000 mPa·s and its working time is at least 45 minutes.
    - [Product](https://www.harzspezialisten.de/polymerverguss-epoxidharz-set).
@@ -338,7 +341,7 @@ is good and the budget matters. The coupon tests decide.
   | 130/3 | 3 mm | 15 mm | > 25 GPa | > 130 MPa | > 35 MPa | ~20 ppm/K | 0.038 |
 
   Density is about 2.3 for all three. No price or Portugal shipping is published, so ask Rampf for
-  a quote. The 140/8B grade matches our design target exactly, so it is both a datasheet-backed
+  a quote. The 140/5 grade matches our design target exactly, so it is both a datasheet-backed
   option for the mill castings (about 9 containers) and the reference mix for the coupon tests.
   [Brochure](https://www.rampf-group.com/fileadmin/Downloads/RMA/Epuself-RAMPF-EN.pdf),
   [product page](https://rampf-group.com/en/products-solutions/details/epuself-1408).
@@ -567,13 +570,13 @@ Prices are 2026-10-25 snapshots incl. VAT unless noted; "not checked" means a ty
 | Silica sand, 5 grades | Vetonek order 1 (tests and mill) | 18 × 25 kg | €135–157 + shipping |
 | Calcium carbonate 63 µm | Vetonek order 1 | 2 × 20 kg | €17 (order 1 ships at €85) |
 | Silica sand and carbonate | Vetonek order 2 (hobber, after coupons) | 40 + 6 bags | €350–400 + €80 shipping |
-| SR 8100 EVO with SD 8822 and SD 8824 | Sicomin or a distributor | smallest kits, then about 163 kg in total | quote needed |
+| SR 8100 EVO with SD 8822 and SD 8824 | Sicomin or a distributor | smallest kits, then about 177 kg in total | quote needed |
 | Resoltech 1050, 1056S and 1055S | Castro Composites | 1.35 kg kit each | about €51 each excl. VAT |
 | Polymer casting system 3550 | Harzspezialisten | ~6.5 kg | ~€38 |
 | Sikafloor‑161 | Sika distributor | smallest kit | quote needed |
 | GPTMS silane | TCI (500 g €82; 100 g €25) or an industrial supplier such as an Evonik Dynasylan GLYMO distributor for technical grade | 100 g for coupons; about 0.8–1.6 kg for all castings | €25, then about €165–330 at TCI prices |
 | Nazza carbonate 5 µm (optional) | Nazza, business buyers | 1 × 25 kg | €26.63 |
-| EPUSELF 140/8B (optional reference) | Rampf | 1 container | quote needed |
+| EPUSELF 140/5 (optional reference) | Rampf | 1 container | quote needed |
 
 Silane: [TCI](https://www.tcichemicals.com/ES/en/p/G0210),
 [Sigma-Aldrich](https://www.sigmaaldrich.com/FR/en/product/aldrich/440167) (1 L €381).
@@ -589,7 +592,7 @@ Silane: [TCI](https://www.tcichemicals.com/ES/en/p/G0210),
 | Bench scale, 5 kg, 1 g | kitchen scale | resin, hardener and silane | ~€15 (not checked) |
 | External form vibrators, 230 V single phase | e.g. Wacker Neuson AR 26/3/230 ([product](https://www.wackerneuson.com/cemea/products/concrete-technology/external-vibrators/loosening-separating-transporting/ar26/model-variations/tab)); ask Portuguese distributors or rental | clamp to the molds; 3,000 rpm typical | quote needed |
 | Small vibrating table | e.g. a 150 W lab table, or a table built on a vibrator motor | coupons | quote needed |
-| Test sieves (0.1, 0.3, 0.6, 1, 2, 4, 8 mm) | lab or garden-supply sieves | grading check on arrival | ~€15–40 each (not checked) |
+| Test sieves (0.1, 0.3, 0.6, 1, 2, 3, 5 mm) | lab or garden-supply sieves | grading check on arrival | ~€15–40 each (not checked) |
 | Kitchen oven and a tray | — | moisture test at 105 °C | — |
 | Calibrated container, about 10 L | bucket marked with a measured water volume | packing test | — |
 | Acetone, rags, release agent for the mixer | builders' merchant | cleaning straight after the last batch | ~€20 (not checked) |
