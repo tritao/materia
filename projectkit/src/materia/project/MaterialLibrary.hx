@@ -192,6 +192,30 @@ class MaterialLibrary {
     1050,
     "ABS blue"
   ), material(
+    "abs-grey",
+    "ABS, mid grey",
+    [0.38, 0.39, 0.41],
+    0.0,
+    0.45,
+    1050,
+    "ABS grey"
+  ), material(
+    "pcb-blue",
+    "FR-4 circuit board, blue",
+    [0.06, 0.22, 0.56],
+    0.0,
+    0.42,
+    1850,
+    "FR4 PCB blue"
+  ), material(
+    "polyimide",
+    "Polyimide film (flex circuit)",
+    [0.80, 0.46, 0.08],
+    0.0,
+    0.35,
+    1420,
+    "polyimide film"
+  ), material(
     "fr4-pcb",
     "FR-4 circuit board, green",
     [0.04, 0.33, 0.17],

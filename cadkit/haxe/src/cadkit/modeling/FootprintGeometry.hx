@@ -2,15 +2,50 @@ package cadkit.modeling;
 
 /** What can be asked of a Footprint: its extent, distances and gaps, and the solid that cuts it. */
 class FootprintGeometry {
-  /** Half the shape's width and height. */
-  public static function halfExtent(f:Footprint): {x: Float, y: Float} return switch f {
-    case Circle(d):
-      {x: d / 2, y: d / 2};
-    case Rect(w, h):
-      {x: w / 2, y: h / 2};
+  /** The shape's centre and what it is made of: a `Shifted` footprint unwrapped to its plain shape and total offset. */
+  public static function resolve(f:Footprint): {shape: Footprint, dx: Float, dy: Float} return switch f {
+    case Shifted(inner, dx, dy):
+      var r = resolve(inner);
+      {shape: r.shape, dx: r.dx + dx, dy: r.dy + dy};
     case _:
-      throw "Unknown footprint";
+      {shape: f, dx: 0.0, dy: 0.0};
   };
+
+  /** Half the width and height of the box about the footprint's origin that contains the shape. */
+  public static function halfExtent(f:Footprint): {x: Float, y: Float} {
+    var r = resolve(f);
+    return switch r.shape {
+      case Circle(d):
+        {x: d / 2 + Math.abs(r.dx), y: d / 2 + Math.abs(r.dy)};
+      case Rect(w, h):
+        {x: w / 2 + Math.abs(r.dx), y: h / 2 + Math.abs(r.dy)};
+      case _:
+        throw "Unknown footprint";
+    };
+  }
+
+  /** The box that exactly contains the shape when its footprint's origin is at (x, y). */
+  public static function extent(f:Footprint, x:Float, y:Float): {x0: Float, x1: Float, y0: Float, y1: Float} {
+    var r = resolve(f);
+    var hx = switch r.shape {
+      case Circle(d):
+        d / 2;
+      case Rect(w, _):
+        w / 2;
+      case _:
+        throw "Unknown footprint";
+    };
+    var hy = switch r.shape {
+      case Circle(d):
+        d / 2;
+      case Rect(_, h):
+        h / 2;
+      case _:
+        throw "Unknown footprint";
+    };
+    var cx = x + r.dx, cy = y + r.dy;
+    return {x0: cx - hx, x1: cx + hx, y0: cy - hy, y1: cy + hy};
+  }
 
   /** The shape grown by a margin on every side. */
   public static function grow(f:Footprint, margin:Float):Footprint return switch f {
@@ -18,25 +53,32 @@ class FootprintGeometry {
       Circle(d + 2 * margin);
     case Rect(w, h):
       Rect(w + 2 * margin, h + 2 * margin);
+    case Shifted(inner, dx, dy):
+      Shifted(grow(inner, margin), dx, dy);
     case _:
       throw "Unknown footprint";
   };
 
-  /** Radius of the smallest circle around the shape. */
-  public static function maxRadius(f:Footprint):Float return switch f {
-    case Circle(d):
-      d / 2;
-    case Rect(w, h):
-      Math.sqrt(w * w + h * h) / 2;
-    case _:
-      throw "Unknown footprint";
-  };
+  /** Radius of the smallest circle around the footprint's origin that contains the shape. */
+  public static function maxRadius(f:Footprint):Float {
+    var r = resolve(f);
+    return switch r.shape {
+      case Circle(d):
+        Math.sqrt(sq(r.dx) + sq(r.dy)) + d / 2;
+      case Rect(w, h):
+        Math.sqrt(sq(Math.abs(r.dx) + w / 2) + sq(Math.abs(r.dy) + h / 2));
+      case _:
+        throw "Unknown footprint";
+    };
+  }
 
   public static function area(f:Footprint):Float return switch f {
     case Circle(d):
       Math.PI * d * d / 4;
     case Rect(w, h):
       w * h;
+    case Shifted(inner, _, _):
+      area(inner);
     case _:
       throw "Unknown footprint";
   };
@@ -48,12 +90,19 @@ class FootprintGeometry {
     case Rect(w, h):
       var dx = Math.abs(px - fx) - w / 2, dy = Math.abs(py - fy) - h / 2;
       dx > 0 || dy > 0 ? Math.sqrt(sq(Math.max(dx, 0.0)) + sq(Math.max(dy, 0.0))) : Math.max(dx, dy);
+    case Shifted(inner, sx, sy):
+      distanceTo(inner, fx + sx, fy + sy, px, py);
     case _:
       throw "Unknown footprint";
   };
 
   /** Gap between two shapes (negative when they overlap), each centred at its own position. */
-  public static function gap(a:Footprint, ax:Float, ay:Float, b:Footprint, bx:Float, by:Float):Float return switch [
+  public static function gap(a:Footprint, ax:Float, ay:Float, b:Footprint, bx:Float, by:Float):Float {
+    var ra = resolve(a), rb = resolve(b);
+    return plainGap(ra.shape, ax + ra.dx, ay + ra.dy, rb.shape, bx + rb.dx, by + rb.dy);
+  }
+
+  static function plainGap(a:Footprint, ax:Float, ay:Float, b:Footprint, bx:Float, by:Float):Float return switch [
     a,
     b
   ] {
@@ -79,6 +128,8 @@ class FootprintGeometry {
       var moved = raw.translated(new Vector(x, y, z0));
       raw.close();
       moved;
+    case Shifted(inner, dx, dy):
+      solid(inner, x + dx, y + dy, z0, z1);
     case _:
       throw "Unknown footprint";
   };

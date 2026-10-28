@@ -113,6 +113,11 @@ class AssemblyFrames {
     ];
   }
 
+  public static function turnX(radians:Float):AssemblyFrame {
+    if (!Math.isFinite(radians)) throw "Assembly angle must be finite";
+    return {x: 0, y: 0, z: 0, qx: Math.sin(radians / 2), qy: 0, qz: 0, qw: Math.cos(radians / 2)};
+  }
+
   public static function turnY(radians:Float):AssemblyFrame {
     if (!Math.isFinite(radians)) throw "Assembly angle must be finite";
     return {x: 0, y: 0, z: 0, qx: 0, qy: Math.sin(radians / 2), qz: 0, qw: Math.cos(radians / 2)};
