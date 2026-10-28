@@ -3,7 +3,6 @@ package cadkit.modeling;
 import CadKit;
 import cadkit.Shape;
 import cadkit.PhysicalProperties;
-import cadkit.Edge;
 import cadkit.Operation;
 
 /** Solid results may contain zero, one, or several solids. */

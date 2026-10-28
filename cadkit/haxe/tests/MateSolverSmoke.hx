@@ -10,7 +10,6 @@ import materia.assembly.AssemblyDefinition.AssemblyJointType;
 import materia.assembly.AssemblyDefinition.AssemblyMate;
 import materia.assembly.AssemblyDefinition.AssemblyMateKind;
 import materia.assembly.AssemblyDefinitionCodec;
-import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** Parts placed by mates: free parts move as rigid bodies, the diagnosis says what stays free or conflicts. */

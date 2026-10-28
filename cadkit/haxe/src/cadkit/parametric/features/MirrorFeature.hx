@@ -2,7 +2,6 @@ package cadkit.parametric.features;
 
 import CadKit;
 import cadkit.Shape;
-import cadkit.modeling.Model;
 import cadkit.modeling.Vector;
 import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;

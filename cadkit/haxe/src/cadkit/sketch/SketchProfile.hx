@@ -1,6 +1,5 @@
 package cadkit.sketch;
 
-import cadkit.modeling.Plane;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
 import cadkit.units.LengthUnits;

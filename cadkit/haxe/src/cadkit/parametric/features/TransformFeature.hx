@@ -2,7 +2,6 @@ package cadkit.parametric.features;
 
 import cadkit.parametric.ParameterKind;
 import cadkit.Geometry;
-import cadkit.Operation;
 import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;
 import cadkit.parametric.Feature;

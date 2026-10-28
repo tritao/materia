@@ -10,7 +10,6 @@ import cadkit.sheetmetal.SheetDemoParts;
 import cadkit.sheetmetal.SheetDiagnosis;
 import cadkit.sheetmetal.SheetEdgeSelection;
 import cadkit.sheetmetal.SheetSolid;
-import cadkit.sheetmetal.WallOutline;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SketchConstraint;
 import cadkit.sketch.SketchEntity;

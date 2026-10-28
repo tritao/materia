@@ -1,7 +1,6 @@
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.ElementReference;
-import cadkit.parametric.PersistentReference;
 import cadkit.parametric.QuantityKind;
 import cadkit.parametric.Relationship;
 import cadkit.parametric.TypedProperty;

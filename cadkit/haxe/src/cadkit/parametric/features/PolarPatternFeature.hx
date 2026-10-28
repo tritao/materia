@@ -5,7 +5,6 @@ import CadKit;
 import cadkit.Shape;
 import cadkit.modeling.Axis;
 import cadkit.modeling.Location;
-import cadkit.modeling.Model;
 import cadkit.modeling.Vector;
 import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;

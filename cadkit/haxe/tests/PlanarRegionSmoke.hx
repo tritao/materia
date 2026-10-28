@@ -1,6 +1,5 @@
 import cadkit.PlanarRegion;
 import cadkit.modeling.Part;
-import cadkit.modeling.Vector;
 
 /** Planar regions through the Haxe layer: sections, offsets, booleans and exact boundary loops. */
 class PlanarRegionSmoke {
