@@ -291,10 +291,10 @@ class DatumFixtures {
 	static function maskId(p:CastingMoldPlan,insertId:String,holeId:String):String
 		return ToolingIds.derive("mask-",p.construction==SinglePocket ? holeId : insertId+"-"+holeId);
 
-	static function plugId(p:CastingMoldPlan,insertId:String,holeId:String):String
+	public static function plugId(p:CastingMoldPlan,insertId:String,holeId:String):String
 		return ToolingIds.derive("resin-plug-",p.construction==SinglePocket ? holeId : insertId+"-"+holeId);
 
-	static function memberId(p:CastingMoldPlan,insertId:String):String
+	public static function memberId(p:CastingMoldPlan,insertId:String):String
 		return p.construction==SinglePocket ? insertId : ToolingIds.derive("insert-",insertId);
 
 	static function panelMaskDiameter(hole:materia.casting.InsertHole,r:materia.tooling.ToolingRecipe):Float {

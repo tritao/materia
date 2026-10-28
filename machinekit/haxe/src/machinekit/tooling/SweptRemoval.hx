@@ -15,13 +15,7 @@ typedef RemovalMember = {
 	var direction:Vector;
 }
 
-typedef RemovalReport = {
-	var blocking:Array<PanelBlockingRelation>;
-	var removalOrder:Array<String>;
-	var assemblyOrder:Array<String>;
-	var travelMm:Float;
-	var contactVolumeToleranceMm3:Float;
-}
+typedef RemovalReport = materia.tooling.casting.ToolingSweepReport;
 
 /** Exact straight-translation sweeps. Inputs remain borrowed; every temporary is closed.
  * Standalone swept solids require supported boundary surfaces. Relation checks

@@ -329,9 +329,9 @@ class MillMoldChecks {
 		var playback = machinekit.tooling.MoldPlayback.frames(p, review, memberIds);
 		var install = playback.filter(f -> f.phase == machinekit.tooling.MoldPlayback.MoldPlaybackPhase.Assembly);
 		var demold = playback.filter(f -> f.phase == machinekit.tooling.MoldPlayback.MoldPlaybackPhase.Demolding);
-		check(install.length == review.assembly.assemblyOrder.length + 1, "one playback snapshot per installation plus explicit loose-hardware step");
-		for (i in 0...review.assembly.assemblyOrder.length)
-			check(install[i].stepId == review.assembly.assemblyOrder[i], "playback preserves the actual checked assembly order");
+		check(install.length == review.assemblyPlan.steps.length, "one playback snapshot per planned assembly operation");
+		for (i in 0...review.assemblyPlan.steps.length)
+			check(install[i].stepId == review.assemblyPlan.steps[i].id, "playback preserves the manufacturing assembly plan");
 		check(demold.length == review.demoldingSteps.length, "playback uses the actual demolding steps including release/flip");
 		check(install[install.length - 1].visibleMemberIds.length == memberIds.length, "final installation snapshot contains every hardware component");
 		check(demold[demold.length - 1].visibleMemberIds.join(",") == "cured-casting", "final scene retains the released casting");

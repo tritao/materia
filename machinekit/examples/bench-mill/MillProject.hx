@@ -54,18 +54,35 @@ class MillProject {
   */
  public static function scene(assembly:MachineAssembly,id:String,diagnostics:Array<String>):Bytes {
   assembly.validate();var model=new AssemblyModel("mm");assembly.addTo(model,"");
+  var definition=model.definition(id);
+  AssemblyPreview.preserveOwnership(definition,assembly.definition());
+  var definitions:Map<String,materia.assembly.AssemblyDefinition.AssemblyComponentDefinition>=
+   [for(component in definition.definitions) component.id => component];
+  var shared=new Map<String,String>(), definitionByOccurrence=new Map<String,String>();
   var parts:Array<materia.project.SceneArtifact.SceneArtifactPart> = [];
   for(row in assembly.components()) {
-   var geometry=row.component.geometry(),mass:MassProperties;
+   var mass:MassProperties;
    if(Std.isOfType(row.component,MotorMount)&&cast(row.component,MotorMount).spec.massKg==null) {
+    var geometry=row.component.geometry();
     var props=geometry.massProperties();
+    geometry.close();
     mass=new MassProperties(props.volume*1e-9*7850,props.centerOfMass,machinekit.component.MassProperties.MassSource.Computed(Preview));
    } else mass=row.component.massProperties();
    var label=Std.isOfType(row.component,LeadshineServo)?row.component.designation+" — "+row.component.description:row.component.description;
-   parts.push(AssemblyPreview.part(row.id,label,geometry,row.component.materialId,null,mass));
+   var component=definitions.get(row.id);
+   if(component==null)throw 'Mill scene has no definition for "${row.id}"';
+   // Share only identical recipe geometry, physical properties and mechanical interfaces.
+   var key=haxe.Json.stringify({geometry:row.component.geometryKey(),label:label,mass:mass,
+    connectors:component.connectors,collisionHulls:component.collisionHulls,
+    robotFlangeConnector:component.robotFlangeConnector});
+   var owner=shared.get(key);
+   if(owner==null) {
+    owner=row.id;shared.set(key,owner);
+    parts.push(AssemblyPreview.part(owner,label,row.component.geometry(),row.component.materialId,null,mass));
+   }
+   definitionByOccurrence.set(row.id,owner);
   }
-  var definition=model.definition(id);
-  AssemblyPreview.preserveOwnership(definition,assembly.definition());
+  AssemblyPreview.shareDefinitions(definition,definitionByOccurrence);
   return SceneArtifact.encode({lengthUnit:"mm",metresPerUnit:0.001,parts:parts,assemblyDefinition:definition,
    recipeDiagnostics:diagnostics.concat(["Imported bearing masses use display-only steel-volume estimates; not engineering sizing inputs."])});
  }

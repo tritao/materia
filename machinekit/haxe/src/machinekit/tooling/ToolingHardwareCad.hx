@@ -10,6 +10,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 /** Nominal metric stack from the plan's selected screw diameter. */
 class ToolingHardwareCad {
 	public static function throughBolt(a:MachineAssembly, id:String, diameter:Float, grip:Float, pose:AssemblyFrame):Void {
+		var members=materia.tooling.casting.ToolingHardwareMembers.throughBolt(id);
 		var thread = "M" + Std.string(diameter);
 		var washer = FlatWasher.metric(thread), nut = HexNut.metric(thread);
 		var length = 5 * Math.ceil((grip + 2 * washer.thickness + nut.height + 1) / 5);
@@ -18,10 +19,10 @@ class ToolingHardwareCad {
 		var nutPose=F.compose(pose,F.translation(0,0,-grip-washer.thickness-nut.height));
 		ToolingFastenerFit.requireNut(screw,screwPose,nut,nutPose,id);
 		a.addComponent(id,screw,screwPose);
-		a.addComponent(materia.tooling.ToolingIds.derive("", id, "-top-washer"), washer, pose);
-		a.addComponent(materia.tooling.ToolingIds.derive("", id, "-bottom-washer"), FlatWasher.metric(thread),
+		a.addComponent(members[1], washer, pose);
+		a.addComponent(members[2], FlatWasher.metric(thread),
 			F.compose(pose, F.translation(0, 0, -grip - washer.thickness)));
-		a.addComponent(materia.tooling.ToolingIds.derive("", id, "-nut"), nut, nutPose);
+		a.addComponent(members[3], nut, nutPose);
 	}
 
 	/** A nominal study screw into a real source hole. Length excludes its washer.
@@ -29,6 +30,7 @@ class ToolingHardwareCad {
 	 */
 	public static function fixtureScrew(a:MachineAssembly,id:String,hole:materia.casting.InsertHole,length:Float,
 		pose:AssemblyFrame,holePose:AssemblyFrame):Void {
+		var members=materia.tooling.casting.ToolingHardwareMembers.fixtureScrew(id);
 		var thread=hole.thread;
 		if (thread==null) throw "Fixture screw requires a source steel thread: "+id;
 		var sourceThread=machinekit.structural.InsertHoles.threadSpec(thread);
@@ -41,6 +43,6 @@ class ToolingHardwareCad {
 		var failures=fits.filter(check -> !check.passed);
 		if (failures.length>0) throw "Invalid fixture screw "+id+": "+[for (failure in failures) failure.code+": "+failure.message].join("; ");
 		a.addComponent(id,screw,screwPose);
-		a.addComponent(materia.tooling.ToolingIds.derive("",id,"-washer"),washer,pose);
+		a.addComponent(members[1],washer,pose);
 	}
 }

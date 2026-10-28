@@ -38,6 +38,7 @@ typedef CastingMoldReview = {
 	var fingerprint:String;
 	var handling:HandlingPlan;
 	var demoldingSteps:Array<MoldDemoldingStep>;
+	var assemblyPlan:materia.tooling.casting.MoldAssemblyPlanner.MoldAssemblyPlan;
 	var symmetricDifferenceMm3:Float;
 	var sourceVolumeMm3:Float;
 	var reconstructedVolumeMm3:Float;
@@ -868,6 +869,7 @@ class CastingMoldCad {
 			];
 			Sys.println("Checking full assembly sweeps for " + members.length + " members");
 			var assembly = SweptRemoval.analyze(members, 1e-4);
+			var assemblyPlan=materia.tooling.casting.MoldAssemblyPlanner.build(p,assembly,assemblyMotions,groups.concat(permanent));
 			for (part in parts)
 				if (!part.shape.isClosed())
 					part.close();
@@ -889,6 +891,7 @@ class CastingMoldCad {
 				sourceVolumeMm3: ov,
 				reconstructedVolumeMm3: rv,
 				assembly: assembly,
+				assemblyPlan:assemblyPlan,
 				demolding: demolding,
 				permanentGroups: permanent,
 				assemblyGroups: groups,

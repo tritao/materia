@@ -128,10 +128,50 @@ class ToolingPresentation {
 
   public static function box(plan:materia.tooling.casting.CastingMoldPlan,artifact:SceneArtifactData,
       review:BoxMoldCad.BoxMoldReview):AssemblyPresentation {
-    return planned(artifact,BoxMoldCad.presentation(plan,artifact.assemblyDefinition),review.demolding,
+    var result=planned(artifact,BoxMoldCad.presentation(plan,artifact.assemblyDefinition),review.demolding,
       review.demoldingMotions,review.rigidGroups,"demould","Demould the box mould",[
         {id:"release-fixings",title:"Release tooling fixings",instruction:"Release loose fasteners and the declared adhesive bonds before straight withdrawal. EPS breakup is a manual operation.",highlight:[],action:Note}
       ]);
+    result.procedures=[result.procedures[0],assemblyProcedure(artifact,review.assemblyPlan)];
+    materia.presentation.PresentationCodec.validate(artifact.assemblyDefinition,result);return result;
+  }
+
+  /** Adapt the ordered manufacturing plan without inventing operations, dependencies or paths. */
+  static function assemblyProcedure(artifact:SceneArtifactData,
+      plan:materia.tooling.casting.MoldAssemblyPlanner.MoldAssemblyPlan):Procedure {
+    var definition=artifact.assemblyDefinition;if(definition==null)throw "Assembly presentation requires a definition";
+    var displacements=new Map<String,materia.assembly.AssemblyDefinition.AssemblyVector>();
+    var installed=new Map<String,Bool>();
+    for(step in plan.steps)for(id in step.memberIds) {
+      if(installed.exists(id))throw "Duplicate planned installation: "+id;
+      installed.set(id,true);displacements.set(id,step.clearance);
+    }
+    var flat=materia.assembly.AssemblyDefinitionFlattener.flattenView(definition);
+    // Reserved rendering reference, not a physical tooling installation.
+    for(part in flat.occurrences)if(part.id!="finished-casting"&&!installed.exists(part.id))
+      throw "Occurrence has no planned assembly operation: "+part.id;
+    var offsets=ToolingExplode.presentation(definition,"assembly-plan",displacements).explode;
+    var byPart=new Map<String,ExplodeOffset>();for(offset in offsets)byPart.set(offset.select.occurrence,offset);
+    var fingerprint=PresentationGeometry.fingerprint(artifact),steps:Array<ProcedureStep>=[];
+    for(planned in plan.steps) {
+      var movements:Array<PartMotion>=[];
+      for(id in planned.memberIds) {
+        var offset=byPart.get(id);
+        var clearance=offset==null?{x:0.0,y:0.0,z:0.0}:
+          {x:offset.direction.x*offset.distance,y:offset.direction.y*offset.distance,z:offset.direction.z*offset.distance};
+        var evidence:MotionEvidence=switch planned.evidence.kind {
+          case CheckedSweep:Checked("swept-removal",Passed,fingerprint,haxe.Json.stringify(planned.evidence));
+          case ManualOperation:Illustrative;
+          default:throw "Unknown planned assembly evidence";
+        };
+        movements.push({select:{occurrence:id,subtree:false},motion:{path:[{x:0,y:0,z:0},clearance],evidence:evidence}});
+      }
+      var action:StepAction=movements.length==0?Note:movements.length==1?
+        Install(movements[0].select,movements[0].motion):InstallGroup(movements);
+      steps.push({id:planned.id,title:planned.title,instruction:planned.instruction,
+        highlight:[for(id in planned.highlightIds){occurrence:id,subtree:false}],action:action});
+    }
+    return {id:"assemble",label:"Assemble the casting mould",kind:Assembly,start:Disassembled,steps:steps,source:Generated("assembly-plan")};
   }
 
   public static function casting(plan:materia.tooling.casting.CastingMoldPlan,artifact:SceneArtifactData,
@@ -157,7 +197,7 @@ class ToolingPresentation {
           "Release the highlighted loose hardware and threaded protection before withdrawing tooling. This is a manual operation.",
         highlight:highlights,action:Note});
     }
-    procedure.steps=steps;result.procedures=[procedure,assemble(procedure,"assemble","Assemble the casting mould")];
+    procedure.steps=steps;result.procedures=[procedure,assemblyProcedure(artifact,review.assemblyPlan)];
     materia.presentation.PresentationCodec.validate(artifact.assemblyDefinition,result);return result;
   }
 

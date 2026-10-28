@@ -52,6 +52,7 @@ class CastingMoldExport {
 		});
 		data(dir + "/feature-inventory.json", p.features);
 		data(dir + "/demolding-steps.json", review.demoldingSteps);
+		data(dir + "/assembly-plan.json", {schemaVersion:1,fingerprint:review.fingerprint,plan:review.assemblyPlan});
 		data(dir + "/handling.json", review.handling);
 		data(dir + "/diagnostics.json", ToolingDiagnostics.fromValidation(p.validation).items);
 		data(dir + "/design-change-requests.json", p.changeRequests);

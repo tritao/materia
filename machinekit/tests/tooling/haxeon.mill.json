@@ -6,6 +6,7 @@
   "entry": "MillMoldSuite",
   "sources": [
     "src/MillMoldSuite.hx",
+    "../../examples/box-mold/SinglePocketSetup.hx",
     "../../examples/bench-mill/BenchMill.hx",
     "../../examples/bench-mill/BenchMillPreview.hx",
     "../../examples/bench-mill/BearingBlock.hx",
@@ -25,7 +26,8 @@
     "../../examples/casting-shop",
     "src",
     "../../examples/bench-mill",
-    "../../examples/cnc-router"
+    "../../examples/cnc-router",
+    "../../examples/box-mold"
   ],
   "dependencies": {
     "robotkit-autonomy": {

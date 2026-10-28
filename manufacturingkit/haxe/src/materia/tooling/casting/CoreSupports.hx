@@ -315,7 +315,7 @@ class CoreSupports {
 			}, r, r.jointClearance);
 			var prefix = materia.tooling.ToolingIds.derive("", c.id, north ? "-north" : "-south");
 			supportHardware(s.hardware, materia.tooling.ToolingIds.derive("", prefix, "-pin"), materia.tooling.ToolingIds.derive("", prefix, "-bolt"),
-				{x: pinx, y: y}, {x: boltx, y: y}, b.z + b.height, r);
+				{x: pinx, y: y}, {x: boltx, y: y}, b.z + b.height, r, [pad.id,bridge.id]);
 			placed(pad, px, py, b.z + b.height);
 		}
 		placed(carrier, foam.x, foam.y, b.z + b.height);
@@ -570,7 +570,7 @@ class CoreSupports {
 					+ (rail.right ? "-right-pin" : "-left-pin"), id
 					+ (rail.right ? "-right-bolt" : "-left-bolt"), {x: x, y: py},
 					{x: x, y: byy}, b.z
-					+ b.height, r);
+					+ b.height, r, [rail.panel.id,beam.id]);
 			}
 			place(beam, bx, by, b.z + b.height + t);
 			for (c in cores) {
@@ -610,11 +610,12 @@ class CoreSupports {
 	}
 
 	static function supportHardware(out:Array<SupportHardware>, pinId:String, boltId:String, pin:{x:Float, y:Float}, bolt:{x:Float, y:Float}, z:Float,
-			r:ToolingRecipe):Void {
+			r:ToolingRecipe, attachments:Array<String>):Void {
 		var t = r.panel.measuredThickness;
 		out.push({
 			id: pinId,
 			kind: LocatingPin,
+			attachmentIds:attachments.copy(),
 			pose: F.translation(pin.x, pin.y, z),
 			diameter: r.hardware.locatingPinDiameter,
 			length: 2 * t
@@ -622,6 +623,7 @@ class CoreSupports {
 		out.push({
 			id: boltId,
 			kind: ClampBolt,
+			attachmentIds:attachments.copy(),
 			pose: F.translation(bolt.x, bolt.y, z + 2 * t),
 			diameter: r.hardware.supportScrewDiameter,
 			length: 2 * t

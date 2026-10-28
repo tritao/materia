@@ -26,6 +26,7 @@ import machinekit.tooling.SweptRemoval.RemovalReport;
 
 typedef BoxMoldReview = {
 	var assembly:RemovalReport;
+	var assemblyPlan:materia.tooling.casting.MoldAssemblyPlanner.MoldAssemblyPlan;
 	var demolding:RemovalReport;
 	var demoldingMotions:Array<{id:String,x:Float,y:Float,z:Float}>;
 	var symmetricDifferenceMm3:Float;
@@ -458,10 +459,12 @@ class BoxMoldCad {
 			members[0].direction = new Vector(0, 0, 1);
 			var assemblyReport = SweptRemoval.analyze(members);
 			var assemblyMotions=[for (member in members) {id:member.id,x:member.direction.x,y:member.direction.y,z:member.direction.z}];
+			var assemblyPlan=materia.tooling.casting.MoldAssemblyPlanner.build(p,assemblyReport,assemblyMotions,assemblyGroups.concat(rigidGroups));
 			for (part in parts)
 				part.close();
 			var result:BoxMoldReview = {
 				assembly: assemblyReport,
+				assemblyPlan:assemblyPlan,
 				demolding: demolding,
 				demoldingMotions:demoldingMotions,
 				symmetricDifferenceMm3: difference,
@@ -489,7 +492,7 @@ class BoxMoldCad {
 		return {fingerprint:fingerprint,handling:p.handling,
 			demoldingSteps:CastingMoldCad.steps(p,review.demolding.removalOrder),symmetricDifferenceMm3:review.symmetricDifferenceMm3,
 			sourceVolumeMm3:state.sourceVolumeMm3,reconstructedVolumeMm3:state.reconstructedVolumeMm3,
-			assembly:review.assembly,demolding:review.demolding,permanentGroups:review.rigidGroups,
+			assembly:review.assembly,assemblyPlan:review.assemblyPlan,demolding:review.demolding,permanentGroups:review.rigidGroups,
 			assemblyGroups:review.assemblyGroups,validation:checks,
 			fabrication:materia.tooling.ToolingValidation.ToolingReadiness.evaluate(checks),
 			assemblyMotions:state.assemblyMotions,demoldingMotions:review.demoldingMotions};

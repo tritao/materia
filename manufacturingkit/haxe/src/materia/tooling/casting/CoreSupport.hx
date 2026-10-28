@@ -42,6 +42,8 @@ typedef CoreFoot = {
 }
 
 typedef SupportHardware = {
+	/** Explicit members joined by support hardware; fixture hardware uses its fixture records. */
+	@:optional var attachmentIds:Array<String>;
 	var id:String;
 	var kind:SupportHardwareKind;
 	var pose:AssemblyFrame;

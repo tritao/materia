@@ -24,6 +24,7 @@ enum abstract MoldPlaybackPhase(String) to String {
 
 enum abstract MoldPlaybackAction(String) to String {
 	var Install = "install";
+	var Confirm = "confirm";
 	var FitLooseHardware = "fit-loose-hardware";
 	var ReleaseLooseHardware = "release-hardware";
 	var WithdrawMember = "withdraw";
@@ -96,30 +97,21 @@ class MoldPlayback {
 				status: status
 			});
 		}
-		for (id in review.assembly.assemblyOrder) {
-			var active = expand(id, []);
+		for (step in review.assemblyPlan.steps) {
+			var active=step.memberIds.copy();
 			for (part in active) {
-				if (visible.exists(part))
-					throw "Assembly playback installs a member twice: " + part;
-				visible.set(part, true);
+				if (ids.indexOf(part)<0)throw "Unknown playback member: "+part;
+				if (visible.exists(part))throw "Assembly playback installs a member twice: "+part;
+				visible.set(part,true);
 			}
-			snapshot(MoldPlaybackPhase.Assembly, id, MoldPlaybackAction.Install, active, ToolingCheckStatus.Pass);
+			var checked=step.evidence.kind==materia.tooling.casting.MoldAssemblyPlanner.MoldAssemblyEvidenceKind.CheckedSweep;
+			var action=active.length==0?MoldPlaybackAction.Confirm:checked?MoldPlaybackAction.Install:MoldPlaybackAction.FitLooseHardware;
+			snapshot(MoldPlaybackPhase.Assembly,step.id,action,active,checked?ToolingCheckStatus.Pass:ToolingCheckStatus.Pending);
 		}
-		var loose:Array<String> = [];
-		for (h in p.hardware)
-			if (CastingMoldCad.looseHardware(p, h))
-				for (part in expand(h.id, []))
-					if (loose.indexOf(part) < 0)
-						loose.push(part);
-		for (id in loose)
-			visible.set(id, true);
-		for (id in ids)
-			if (!visible.exists(id))
-				throw "Assembly playback has no installation step for " + id;
-		snapshot(MoldPlaybackPhase.Assembly, "fit-loose-tooling", MoldPlaybackAction.FitLooseHardware, loose, ToolingCheckStatus.Pending);
+		for (id in ids)if(!visible.exists(id))throw "Assembly playback has no installation step for "+id;
 		// Steel is now represented by the single cured resin/steel solid.
 		for (i in p.document.input.inserts)
-			visible.remove(materia.tooling.ToolingIds.derive("insert-", i.id));
+			visible.remove(materia.tooling.casting.DatumFixtures.memberId(p,i.id));
 		for (hardware in CastingMoldCad.anchorComponents(p))
 			visible.remove(hardware.id);
 		visible.set("cured-casting", true);
