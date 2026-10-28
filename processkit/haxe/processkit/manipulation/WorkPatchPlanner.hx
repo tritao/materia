@@ -13,7 +13,6 @@ import processkit.work.Point2;
 import processkit.work.Provenance;
 import processkit.work.SourceKind;
 import processkit.work.RasterToolpathGenerator;
-import processkit.path.Toolpath;
 import robotkit.model.CollisionShape;
 import collisionkit.CollisionWorld;
 import robotkit.collision.CollisionClearance;

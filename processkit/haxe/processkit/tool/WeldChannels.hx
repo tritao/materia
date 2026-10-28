@@ -3,7 +3,6 @@ package processkit.tool;
 import robotkit.tool.*;
 
 import robotkit.execution.ProcessChannelDeclaration;
-import robotkit.execution.ProcessEventValue;
 
 /**
  * The channels a welding torch is worked by, with their safe values and stop policy (`WeldChannelPolicy`): whatever stops

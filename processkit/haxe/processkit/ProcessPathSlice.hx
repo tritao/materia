@@ -1,6 +1,5 @@
 package processkit;
 
-import motionkit.path.OrientationPolicy;
 import motionkit.path.PosePath;
 import motionkit.path.PosePrimitive;
 

@@ -4,7 +4,6 @@ import robotkit.runtime.*;
 
 import haxe.Int64;
 import processkit.tool.WeldArcModel.WeldArcConfig;
-import processkit.tool.WeldArcModel.WeldArcInput;
 import processkit.tool.WeldArcModel;
 import processkit.tool.WeldSensor.WeldReading;
 import processkit.tool.WeldSensor;

@@ -4,7 +4,6 @@ import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.robot.CompiledProgram;
-import motionkit.trajectory.PlanDiagnostic.PlanCheckResult;
 import robotkit.manipulation.ClearanceWorld;
 import processkit.skill.WeldPlan;
 import processkit.skill.WeldPlan.WeldSegment;
