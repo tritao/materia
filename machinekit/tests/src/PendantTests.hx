@@ -86,10 +86,14 @@ class PendantTests {
     check(report.errors().length == 0, "Interference: " + [for (e in report.errors()) e.message].join(" | "));
     // The hierarchy reads case, jog, selectors, function and cycle keys, with the E-stop and display on their own, and each device is its bodies.
     var ids = [for (c in assembly.components()) c.id];
-    for (id in ["case/plate", "case/shell", "case/board", "jog/wheel", "jog/wheel-enable/housing", "jog/wheel-enable/cap", "selectors/axis/switch", "selectors/axis/knob",
+    for (id in ["case/plate", "case/shell", "case/board", "jog/wheel/housing", "jog/wheel/wheel", "jog/wheel-enable/housing", "jog/wheel-enable/cap", "selectors/axis/switch", "selectors/axis/knob",
         "function-keys/f2/housing", "cycle-keys/hold/cap", "estop/operator", "estop/head", "display"])
       check(ids.indexOf(id) >= 0, "Missing member " + id + " in " + ids.join(", "));
-    check(ids.length == 25, "Twenty-five bodies: " + ids.length);
+    check(ids.length == 26, "Twenty-six bodies: " + ids.length);
+    // The wheel turns on its housing and each knob on its switch: three free joints, the wheel's named for its encoder.
+    var joints = assembly.derived().definition.joints;
+    var encoders = [for (j in joints) if (j.id == "jog/wheel/encoder") j];
+    check(joints.length == 3 && encoders.length == 1, "Three free joints, one the wheel's encoder: " + [for (j in joints) j.id].join(", "));
     // Splitting a device does not change the bill of materials: one line per purchase, the bodies included in it.
     var bom = new machinekit.component.Bom();
     for (c in assembly.components()) bom.addComponent(c.component);

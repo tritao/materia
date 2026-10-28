@@ -6,6 +6,7 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentDetail;
+import materia.assembly.AssemblyFrames;
 import machinekit.component.ComponentParameter;
 import machinekit.component.PanelMountFacet;
 import machinekit.component.ComponentRecipeSupport;
@@ -60,6 +61,9 @@ class HmiPart extends MachineComponent {
    */
   public function bodies():Null<Array<DeviceBodySpec>> return null;
 
+  /** Free joints between the bodies, each about the device's z axis: the encoder of a wheel, the shaft of a switch. */
+  public function joints():Array<DeviceJointSpec> return [];
+
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var specs = bodies();
     if (specs == null) throw designation + ": no geometry";
@@ -89,6 +93,11 @@ class HmiPart extends MachineComponent {
       var name = i == 0 ? designation : designation + "-" + spec.id.toUpperCase();
       assembly.addComponent(spec.id, new DeviceBody(name, spec.label, spec.material, spec.build, this, i == 0,
         n("massGrams") / 1000.0 * volumes[i] / total, centres[i]));
+    }
+    for (joint in joints()) {
+      assembly.addMemberConnector(joint.parent, joint.id + "-fixed", AssemblyFrames.identity());
+      assembly.addMemberConnector(joint.child, joint.id + "-turning", AssemblyFrames.identity());
+      assembly.addMateOnAxis(joint.id, joint.kind, joint.parent, joint.id + "-fixed", joint.child, joint.id + "-turning", {x: 0, y: 0, z: 1}, 0);
     }
     return assembly;
   }

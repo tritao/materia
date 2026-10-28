@@ -6,6 +6,7 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as R;
+import materia.assembly.AssemblyDefinition.AssemblyJointType;
 
 /**
  * A manual pulse generator hand wheel: a flange on the panel, a flared body with a knurled grip ring and a
@@ -66,28 +67,41 @@ class HandWheel extends HmiPart {
   function behindFace():Float return Math.max(n("studLength"), n("terminalDepth"));
   function rearBody():Footprint return Circle(n("studCircleDiameter") + 8.0);
 
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var top = bodyHeight();
-    var body = Part.revolve([
-      {r: 0.0, z: 0.0}, {r: n("outerDiameter") / 2, z: 0.0}, {r: n("outerDiameter") / 2, z: n("flangeThickness")},
-      {r: n("ringDiameter") / 2, z: n("flangeThickness") + n("coneHeight")}, {r: n("ringDiameter") / 2, z: top},
-      {r: n("dialDiameter") / 2, z: top}, {r: n("dialDiameter") / 2, z: top - n("dialRecess")}, {r: 0.0, z: top - n("dialRecess")}
-    ]);
-    var parts:Array<Part> = [Solids.named(body, "wheel")];
-    parts.push(Solids.named(Part.cylinderSpan(n("bossDiameter") / 2, -n("bossDepth"), 0.0), "boss"));
-    var studs = count("studCount");
-    for (i in 0...studs) {
-      var angle = Math.PI / 2 + i * 2 * Math.PI / studs;
-      parts.push(Part.cylinderSpan(n("studDiameter") / 2, -n("studLength"), 0.0, n("studCircleDiameter") / 2 * Math.cos(angle), n("studCircleDiameter") / 2 * Math.sin(angle)));
-    }
-    var strip = Part.box(n("terminalLength"), n("terminalWidth"), n("terminalDepth") - n("bossDepth"));
-    parts.push(Solids.named(shifted(strip, -n("terminalDepth")), "terminals"));
-    if (flag("handle")) {
-      var from = top - n("dialRecess");
-      parts.push(Solids.named(Part.cylinderSpan(n("handleDiameter") / 2, from, top + n("handleProtrusion"), 0.0, -n("handleRadius")), "handle"));
-    }
-    return Solids.union(parts);
+  /**
+   * The housing (flange, boss, studs, terminal strip) fixed to the panel, and the wheel that turns on it: the cone, grip
+   * ring, dial and spinner handle. The wheel's rotation is the encoder's angle.
+   */
+  override public function bodies():Null<Array<DeviceBodySpec>> {
+    var top = bodyHeight(), flange = n("flangeThickness");
+    return [
+      new DeviceBodySpec("housing", "hand wheel housing", "ABS black", function() {
+        var parts:Array<Part> = [Solids.named(Part.cylinderSpan(n("outerDiameter") / 2, 0.0, flange), "flange")];
+        parts.push(Solids.named(Part.cylinderSpan(n("bossDiameter") / 2, -n("bossDepth"), 0.0), "boss"));
+        var studs = count("studCount");
+        for (i in 0...studs) {
+          var angle = Math.PI / 2 + i * 2 * Math.PI / studs;
+          parts.push(Part.cylinderSpan(n("studDiameter") / 2, -n("studLength"), 0.0, n("studCircleDiameter") / 2 * Math.cos(angle), n("studCircleDiameter") / 2 * Math.sin(angle)));
+        }
+        var strip = Part.box(n("terminalLength"), n("terminalWidth"), n("terminalDepth") - n("bossDepth"));
+        parts.push(Solids.named(shifted(strip, -n("terminalDepth")), "terminals"));
+        return Solids.union(parts);
+      }),
+      new DeviceBodySpec("wheel", "hand wheel", materialSpec(), function() {
+        var parts:Array<Part> = [Solids.named(Part.revolve([
+          {r: 0.0, z: flange}, {r: n("outerDiameter") / 2, z: flange}, {r: n("ringDiameter") / 2, z: flange + n("coneHeight")},
+          {r: n("ringDiameter") / 2, z: top}, {r: n("dialDiameter") / 2, z: top}, {r: n("dialDiameter") / 2, z: top - n("dialRecess")},
+          {r: 0.0, z: top - n("dialRecess")}
+        ]), "wheel")];
+        if (flag("handle")) {
+          var from = top - n("dialRecess");
+          parts.push(Solids.named(Part.cylinderSpan(n("handleDiameter") / 2, from, top + n("handleProtrusion"), 0.0, -n("handleRadius")), "handle"));
+        }
+        return Solids.union(parts);
+      })
+    ];
   }
+
+  override public function joints():Array<DeviceJointSpec> return [new DeviceJointSpec("encoder", Continuous, "housing", "wheel")];
 
   static function shifted(part:Part, z:Float):Part {
     var moved = part.translated(new Vector(0, 0, z));

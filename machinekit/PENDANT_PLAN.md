@@ -197,6 +197,12 @@ The bought parts, the panel layout and its checks are generic and live in `machi
   Stop keys, and the wheel at the bottom. The cheap E-stop is 43 mm deep, so the case is 48 mm and the pendant
   89 mm tall face up with the handle (the wheel stands 38 mm). The first layout was a 190 x 110 mm landscape slab; it
   fitted but did not suit holding. The width is set by the top row: the E-stop base (42 mm) and two 30 mm rotary bodies.
+- **Devices are assemblies of bodies.** In the pendant assembly the E-stop (black operator, red head), the buttons
+  (black housing, coloured cap), the rotary switches (body, knob) and the wheel (housing, wheel) are subassemblies of
+  separately finished bodies. The first body is the purchase and keeps the device's BOM line; the others are included in
+  it, and the device's mass is shared by volume. The wheel turns on a free `encoder` joint and each knob on a `position`
+  joint, which the editor's Machine tab rotates. Still open: the E-stop's NC contact ports stay on the whole-device
+  facade, not on the pendant's operator body, until the pendant is wired.
 - **Case.** `PendantCase` plans and builds the shell: a rounded box (8 mm corners, 3 mm walls and back) open at the
   top; six 9 mm M3 screw posts rising to the plate, each merged into a side wall (a post alone on the back wall would flex and its layers would carry the load), each with a hole for an M3 heat-set insert (the board standoffs take M2.5 inserts); an M12 receptacle hole in the bottom wall (16.2 mm, an assumed M16
   rear-mount thread) with room for its body; a **board envelope** behind the shallow controls (1.6 mm, 10 mm of

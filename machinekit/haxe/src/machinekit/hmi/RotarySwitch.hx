@@ -6,6 +6,7 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as R;
+import materia.assembly.AssemblyDefinition.AssemblyJointType;
 
 /**
  * A panel rotary switch with a knob: a threaded bush through the panel with a nut, a round switch body
@@ -64,4 +65,7 @@ class RotarySwitch extends HmiPart {
       })
     ];
   }
+
+  /** The knob turns on the switch. It is free here; the switch's detents belong to the controller's reading of it. */
+  override public function joints():Array<DeviceJointSpec> return [new DeviceJointSpec("position", Continuous, "switch", "knob")];
 }
