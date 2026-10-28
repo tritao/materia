@@ -16,132 +16,195 @@ import materia.assembly.AssemblyFrames as F;
  * an exact model: affected footprints stay blocked and explicitly Unsupported.
  */
 class FillTooling {
-	public static function project(p:CastingMoldPlan):{blockers:Array<MoldBox>, unsupportedIds:Array<String>} {
-		var blockers:Array<MoldBox> = [], unsupportedIds:Array<String> = [];
-		var fill = p.document.setup.fillHeightMm;
-		function add(box:MoldBox):Bool {
-			if (box.z + box.height < fill - 1e-7)
-				return false;
-			var footprint:MoldBox = {
-				x: box.x,
-				y: box.y,
-				z: p.envelope.z,
-				width: box.width,
-				depth: box.depth,
-				height: p.envelope.height
-			};
-			var clip = BoxAlgebra.intersection(footprint, p.envelope);
-			if (clip == null)
-				return false;
-			clip.z = 0;
-			clip.height = 1;
-			blockers.push(clip);
-			return true;
-		}
-		function prism(contour:Array<CastingSegment>, depth:Float, pose:materia.assembly.AssemblyRecord.AssemblyFrame):Array<MoldBox> {
-			var xs = [for (edge in contour) edge.start.x],
-				ys = [for (edge in contour) edge.start.y];
-			xs.sort(Reflect.compare);
-			ys.sort(Reflect.compare);
-			var boxes:Array<MoldBox> = [];
-			for (i in 0...xs.length - 1)
-				for (j in 0...ys.length - 1)
-					if (xs[i + 1] - xs[i] > 1e-7
-						&& ys[j + 1] - ys[j] > 1e-7
-						&& CastingProfileGeometry.inside(contour, (xs[i] + xs[i + 1]) / 2, (ys[j] + ys[j + 1]) / 2))
-						boxes.push(CastingMoldPlanner.box(xs[i + 1] - xs[i], ys[j + 1] - ys[j], depth,
-							F.compose(pose, F.translation((xs[i] + xs[i + 1]) / 2, (ys[j] + ys[j + 1]) / 2, 0))));
-			return boxes;
-		}
-		function orthogonal(contour:Array<CastingSegment>):Bool
-			return contour.filter(edge -> edge.center != null
-				|| (Math.abs(edge.end.x - edge.start.x) > 1e-7 && Math.abs(edge.end.y - edge.start.y) > 1e-7))
-				.length == 0;
-		for (member in p.panels.members.concat(p.supportPanels)) {
-			var outline = PanelContours.outside(member.panel),
-				thickness = member.panel.stock.measuredThickness;
-			var bounds = CastingProfileGeometry.bounds(outline);
-			var broad = CastingMoldPlanner.box(bounds.width, bounds.height, thickness,
-				F.compose(member.pose, F.translation(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, 0)));
-			var old = blockers.length;
-			if (!add(broad))
-				continue;
-			blockers.splice(old, 1);
-			if (!orthogonal(outline)) {
-				add(broad);
-				unsupportedIds.push(member.panel.id);
-				continue;
-			}
-			var material = prism(outline, thickness, member.pose);
-			for (op in member.panel.operations)
-				if (op.kind != OutsideProfile) {
-					var pose = op.side == materia.tooling.ToolingEnums.MachiningSide.PositiveZ ? F.compose(member.pose,
-						F.translation(0, 0, thickness - op.depth)) : member.pose;
-					if (orthogonal(op.contour))
-						material = BoxAlgebra.subtract(material, prism(op.contour, op.depth, pose));
-					else {
-						var cutBounds = CastingProfileGeometry.bounds(op.contour);
-						var cut = CastingMoldPlanner.box(cutBounds.width, cutBounds.height, op.depth,
-							F.compose(pose, F.translation(cutBounds.x + cutBounds.width / 2, cutBounds.y + cutBounds.height / 2, 0)));
-						var before = blockers.length;
-						if (add(cut)) {
-							blockers.splice(before, 1);
-							unsupportedIds.push(member.panel.id);
-						}
-					}
-				}
-			for (box in material)
-				add(box);
-		}
-		for (volume in [for (f in p.formers) f.volume].concat(MoldFixtures.allVolumes(p))) {
-			var material = volume.pieces.copy();
-			for (cut in volume.cuts) {
-				if (orthogonal(cut.operation.contour))
-					material = BoxAlgebra.subtract(material, prism(cut.operation.contour, cut.operation.depth, cut.pose));
-				else {
-					var bounds = CastingProfileGeometry.bounds(cut.operation.contour);
-					var before = blockers.length;
-					if (add(CastingMoldPlanner.box(bounds.width, bounds.height, cut.operation.depth,
-						F.compose(cut.pose, F.translation(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, 0))))) {
-						blockers.splice(before, 1);
-						unsupportedIds.push(volume.id);
-					}
-				}
-			}
-			for (box in material)
-				add(box);
-			for (profile in volume.profiles) {
-				var exact=materia.tooling.casting.MoldRegions.boxes(materia.casting.CastingRegion.Difference(
-					materia.casting.CastingRegion.Placed({solid:materia.casting.CastingFeature.CastingGeometrySolid.Prism(profile.contour,profile.depth),
-						pose:profile.pose}),profile.subtract));
-				if (exact!=null) for (box in exact) add(box);
-				else {
-					var bounds = CastingProfileGeometry.bounds(profile.contour);
-					if (add(CastingMoldPlanner.box(bounds.width, bounds.height, profile.depth,
-						F.compose(profile.pose, F.translation(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, 0)))))
-						unsupportedIds.push(volume.id);
-				}
-			}
-		}
-		for (core in p.cores) {
-			var exact=materia.tooling.casting.MoldRegions.boxes(core.cavity);
-			if (exact!=null) for (box in exact) add(box);
-			else {
-				var bounds=MoldCores.stockBounds(core.cavity,core.id);
-				if (bounds.z+bounds.height>=fill) unsupportedIds.push(core.id);
-			}
-		}
-		for (insert in p.document.input.inserts) {
-			var boxes=materia.tooling.casting.MoldRegions.boxes(
-				materia.tooling.casting.MoldRegions.insert(p.document,insert.id));
-			if (boxes==null) unsupportedIds.push(insert.id);
-			else for (box in boxes) add(box);
-		}
-		var unique:Array<String> = [];
-		for (id in unsupportedIds)
-			if (unique.indexOf(id) < 0)
-				unique.push(id);
-		unique.sort(Reflect.compare);
-		return {blockers: BoxAlgebra.subtract(blockers, []), unsupportedIds: unique};
-	}
+  public static function project(p:CastingMoldPlan): {blockers: Array<MoldBox>, unsupportedIds: Array<String>} {
+    var blockers:Array<MoldBox> = [], unsupportedIds:Array<String> = [];
+    var fill = p.document.setup.fillHeightMm;
+    function add(box:MoldBox):Bool {
+      if (box.z + box.height < fill - 1e-7) return false;
+      var footprint:MoldBox = {
+        x: box.x,
+        y: box.y,
+        z: p.envelope.z,
+        width: box.width,
+        depth: box.depth,
+        height: p.envelope.height
+      };
+      var clip = BoxAlgebra.intersection(footprint, p.envelope);
+      if (clip == null) return false;
+      clip.z = 0;
+      clip.height = 1;
+      blockers.push(clip);
+      return true;
+    }
+    function prism(contour:Array<CastingSegment>,
+      depth:Float, pose:materia.assembly.AssemblyRecord.AssemblyFrame):Array<MoldBox> {
+      var xs = [for (edge in contour) edge.start.x], ys = [for (edge in contour) edge.start.y];
+      xs.sort(Reflect.compare);
+      ys.sort(Reflect.compare);
+      var boxes:Array<MoldBox> = [];
+      for (i in 0...xs.length - 1) for (j in 0...ys.length - 1) if (xs[i + 1] - xs[i] > 1e-7
+        && ys[j + 1] - ys[j] > 1e-7 && CastingProfileGeometry.inside(
+          contour,
+          (xs[i] + xs[i + 1]) / 2,
+          (ys[j] + ys[j + 1]) / 2
+        )) boxes.push(CastingMoldPlanner.box(
+          xs[i + 1] - xs[i],
+          ys[j + 1] - ys[j],
+          depth,
+          F.compose(
+            pose,
+            F.translation(
+              (xs[i] + xs[i + 1]) / 2,
+              (ys[j] + ys[j + 1]) / 2,
+              0
+            )
+          )
+        ));
+      return boxes;
+    }
+    function orthogonal(contour:Array<CastingSegment>):Bool return contour.filter(edge -> edge.center != null
+      || (Math.abs(edge.end.x - edge.start.x) > 1e-7 && Math.abs(edge.end.y - edge.start.y) > 1e-7)).length == 0;
+    for (member in p.panels.members.concat(p.supportPanels)) {
+      var outline = PanelContours.outside(member.panel), thickness = member.panel.stock.measuredThickness;
+      var bounds = CastingProfileGeometry.bounds(outline);
+      var broad = CastingMoldPlanner.box(
+        bounds.width,
+        bounds.height,
+        thickness,
+        F.compose(
+          member.pose,
+          F.translation(
+            bounds.x + bounds.width / 2,
+            bounds.y + bounds.height / 2,
+            0
+          )
+        )
+      );
+      var old = blockers.length;
+      if (!add(broad)) continue;
+      blockers.splice(old, 1);
+      if (!orthogonal(outline)) {
+        add(broad);
+        unsupportedIds.push(member.panel.id);
+        continue;
+      }
+      var material = prism(outline, thickness, member.pose);
+      for (op in member.panel.operations) if (op.kind != OutsideProfile) {
+        var pose = op.side == materia.tooling.ToolingEnums.MachiningSide.PositiveZ ? F.compose(
+          member.pose,
+          F.translation(
+            0,
+            0,
+            thickness - op.depth
+          )
+        ) : member.pose;
+        if (orthogonal(op.contour)) material = BoxAlgebra.subtract(material, prism(op.contour, op.depth, pose));
+        else {
+          var cutBounds = CastingProfileGeometry.bounds(op.contour);
+          var cut = CastingMoldPlanner.box(
+            cutBounds.width,
+            cutBounds.height,
+            op.depth,
+            F.compose(
+              pose,
+              F.translation(
+                cutBounds.x + cutBounds.width / 2,
+                cutBounds.y + cutBounds.height / 2,
+                0
+              )
+            )
+          );
+          var before = blockers.length;
+          if (add(cut)) {
+            blockers.splice(before, 1);
+            unsupportedIds.push(member.panel.id);
+          }
+        }
+      }
+      for (box in material) add(box);
+    }
+    for (volume in [for (f in p.formers) f.volume].concat(MoldFixtures.allVolumes(p))) {
+      var material = volume.pieces.copy();
+      for (cut in volume.cuts) {
+        if (orthogonal(cut.operation.contour)) material = BoxAlgebra.subtract(
+          material,
+          prism(
+            cut.operation.contour,
+            cut.operation.depth,
+            cut.pose
+          )
+        );
+        else {
+          var bounds = CastingProfileGeometry.bounds(cut.operation.contour);
+          var before = blockers.length;
+          if (add(CastingMoldPlanner.box(
+            bounds.width,
+            bounds.height,
+            cut.operation.depth,
+            F.compose(
+              cut.pose,
+              F.translation(
+                bounds.x + bounds.width / 2,
+                bounds.y + bounds.height / 2,
+                0
+              )
+            )
+          ))) {
+            blockers.splice(before, 1);
+            unsupportedIds.push(volume.id);
+          }
+        }
+      }
+      for (box in material) add(box);
+      for (profile in volume.profiles) {
+        var exact = materia.tooling.casting.MoldRegions.boxes(materia.casting.CastingRegion.Difference(
+          materia.casting.CastingRegion.Placed({
+            solid: materia.casting.CastingFeature.CastingGeometrySolid.Prism(
+              profile.contour,
+              profile.depth
+            ),
+            pose: profile.pose
+          }),
+          profile.subtract
+        ));
+        if (exact != null) for (box in exact) add(box);
+        else {
+          var bounds = CastingProfileGeometry.bounds(profile.contour);
+          if (add(CastingMoldPlanner.box(
+            bounds.width,
+            bounds.height,
+            profile.depth,
+            F.compose(
+              profile.pose,
+              F.translation(
+                bounds.x + bounds.width / 2,
+                bounds.y + bounds.height / 2,
+                0
+              )
+            )
+          ))) unsupportedIds.push(volume.id);
+        }
+      }
+    }
+    for (core in p.cores) {
+      var exact = materia.tooling.casting.MoldRegions.boxes(core.cavity);
+      if (exact != null) for (box in exact) add(box);
+      else {
+        var bounds = MoldCores.stockBounds(core.cavity, core.id);
+        if (bounds.z + bounds.height >= fill) unsupportedIds.push(core.id);
+      }
+    }
+    for (insert in p.document.input.inserts) {
+      var boxes = materia.tooling.casting.MoldRegions.boxes(materia.tooling.casting.MoldRegions.insert(
+        p.document,
+        insert.id
+      ));
+      if (boxes == null) unsupportedIds.push(insert.id);
+      else for (box in boxes) add(box);
+    }
+    var unique:Array<String> = [];
+    for (id in unsupportedIds) if (unique.indexOf(id) < 0) unique.push(id);
+    unique.sort(Reflect.compare);
+    return {blockers: BoxAlgebra.subtract(blockers, []), unsupportedIds: unique};
+  }
 }

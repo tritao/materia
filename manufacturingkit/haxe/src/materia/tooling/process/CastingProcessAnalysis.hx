@@ -10,21 +10,22 @@ import materia.tooling.process.FillAnalysis;
 import materia.casting.CastingInput;
 
 /** Native exact fill at the same critical levels used by the box path. */
-typedef ExactFillBackend =(CastingMoldPlan, FillSourceSettings) -> FillAssessment;
+typedef ExactFillBackend = (CastingMoldPlan, FillSourceSettings) -> FillAssessment;
 
-typedef ExactAggregateBackend = (CastingMoldPlan,CastabilityLimits) -> AggregateGate.AggregateReport;
+typedef ExactAggregateBackend = (CastingMoldPlan, CastabilityLimits) -> AggregateGate.AggregateReport;
 
-typedef CastingProcessReport = {var sourceFingerprint: String;
-var processFingerprint:String;
-var spec:CastingProcessSpec;
-var fill:Null<FillReport>;
-var pour:Null<PourPlanning.PourAssessment>;
-var compound:ToolingValidation;
-var sections:Null<OrthogonalSections.OrthogonalSectionReport>;
-var castability:CastabilityAnalysis.CastabilityReport;
-var aggregate:Null<AggregateGate.AggregateReport>;
-var validation:Array<ToolingValidation>;
-var fabrication:materia.tooling.ToolingValidation.FabricationReadiness;
+typedef CastingProcessReport = {
+  var sourceFingerprint:String;
+  var processFingerprint:String;
+  var spec:CastingProcessSpec;
+  var fill:Null<FillReport>;
+  var pour:Null<PourPlanning.PourAssessment>;
+  var compound:ToolingValidation;
+  var sections:Null<OrthogonalSections.OrthogonalSectionReport>;
+  var castability:CastabilityAnalysis.CastabilityReport;
+  var aggregate:Null<AggregateGate.AggregateReport>;
+  var validation:Array<ToolingValidation>;
+  var fabrication:materia.tooling.ToolingValidation.FabricationReadiness;
 }
 
 /** One source-bound fill, geometric screening and supplier-datasheet pass. */
@@ -33,9 +34,9 @@ class CastingProcessAnalysis {
     p:CastingMoldPlan,
     raw:CastingProcessSpec,
     gravityMps2:Float,
-    ? fabrication:materia.tooling.export.FabricationSpec,
-    ? exactFill:ExactFillBackend,
-    ? exactAggregate:ExactAggregateBackend
+    ?fabrication:materia.tooling.export.FabricationSpec,
+    ?exactFill:ExactFillBackend,
+    ?exactAggregate:ExactAggregateBackend
   ):CastingProcessReport {
     CastingMoldPlanner.validate(p);
     if (fabrication != null) fabrication = materia.tooling.export.FabricationSpec.FabricationSpecs.copy(fabrication);
@@ -49,7 +50,7 @@ class CastingProcessAnalysis {
       var bounds =
         materia.casting.CastingProfileGeometry.bounds(materia.tooling.panel.PanelContours.outside(member.panel));
       var bottom = Math.POSITIVE_INFINITY;
-      for (x in[bounds.x, bounds.x + bounds.width]) for (y in[bounds.y, bounds.y + bounds.height]) for (z in[
+      for (x in [bounds.x, bounds.x + bounds.width]) for (y in [bounds.y, bounds.y + bounds.height]) for (z in [
         0.0,
         member.panel.stock.measuredThickness
       ]) bottom = Math.min(
@@ -67,7 +68,7 @@ class CastingProcessAnalysis {
     }
     ];
     var fillSettings:FillSourceSettings = {sourceFingerprint: sourceFingerprint,
-      processFingerprint: fingerprint, cores:[for (c in p.cores) {
+      processFingerprint: fingerprint, cores: [for (c in p.cores) {
       id:c.id, geometry:c.cavity
     }
     ], densityKgM3:p.document.recipe.mixDensityKgM3, gravityMps2:gravityMps2,
@@ -91,14 +92,28 @@ class CastingProcessAnalysis {
     var fill = fillAssessment.report;
     var sectionAssessment = OrthogonalSections.assessRegions(geometry, sourceFingerprint);
     var sections = sectionAssessment.report;
-    var aggregate:Null<AggregateGate.AggregateReport>=null;
-    if(exactAggregate!=null) {
-      aggregate=exactAggregate(p,spec.castability);
-      if(aggregate.sourceFingerprint!=sourceFingerprint || ToolingCodec.canonical(aggregate.limits)!=ToolingCodec.canonical(spec.castability))
-        throw "Stale aggregate wall geometry or mix-design limits";
-    } else if(sections!=null)aggregate=AggregateGate.fromSections(p.document,sourceFingerprint,spec.castability,sections);
-    if(aggregate!=null)aggregate=AggregateGate.withFill(p.document.input.id,aggregate,fill);
-    var castability=CastabilityAnalysis.analyze(p.document,spec,fill,sections,sourceFingerprint,fingerprint,p.validation,aggregate);
+    var aggregate:Null<AggregateGate.AggregateReport> = null;
+    if (exactAggregate != null) {
+      aggregate = exactAggregate(p, spec.castability);
+      if (aggregate.sourceFingerprint != sourceFingerprint || ToolingCodec.canonical(aggregate.limits)
+        != ToolingCodec.canonical(spec.castability)) throw "Stale aggregate wall geometry or mix-design limits";
+    } else if (sections != null) aggregate = AggregateGate.fromSections(
+      p.document,
+      sourceFingerprint,
+      spec.castability,
+      sections
+    );
+    if (aggregate != null) aggregate = AggregateGate.withFill(p.document.input.id, aggregate, fill);
+    var castability = CastabilityAnalysis.analyze(
+      p.document,
+      spec,
+      fill,
+      sections,
+      sourceFingerprint,
+      fingerprint,
+      p.validation,
+      aggregate
+    );
     var pour = fill == null ? null : PourPlanning.analyze(p.document.input.id, fill, spec.mixComposition, spec.mixer);
     var compound = compoundCheck(p.document.input.id, spec, sections, pour, fabrication);
     if (compound.status == Unsupported && sections == null) {
@@ -115,7 +130,7 @@ class CastingProcessAnalysis {
       .validation.concat(fillAssessment.validation).concat(sectionAssessment.validation).concat(castability.validation);
     if (pour != null) checks = checks.concat(pour.validation);
     checks.push(compound);
-    var unique:Map < String, ToolingValidation >=[];
+    var unique:Map<String, ToolingValidation> = [];
     for (check in checks) {
       var previous = unique.get(check.rule);
       if (previous != null && ToolingCodec.canonical(previous)
@@ -143,16 +158,18 @@ class CastingProcessAnalysis {
     p:CastingMoldPlan,
     raw:CastingProcessSpec,
     gravityMps2:Float,
-    ? fabrication:materia.tooling.export.FabricationSpec
+    ?fabrication:materia.tooling.export.FabricationSpec
   ):String {
     if (!Math.isFinite(gravityMps2) || gravityMps2 <= 0) throw "Invalid process gravity";
-    return haxe.crypto.Sha256.encode(ToolingCodec.canonical({source: CastingMoldPlanner.fingerprint(p),
-      spec: ProcessSpecs.copy(raw), gravityMps2: gravityMps2, fabrication: fabrication == null ? null : {
-      resinReference : fabrication.resinReference,
-      adhesiveContainsEPS : fabrication.adhesiveContainsEPS
-    }
-    }
-    ));
+    return haxe.crypto.Sha256.encode(ToolingCodec.canonical({
+      source: CastingMoldPlanner.fingerprint(p),
+      spec: ProcessSpecs.copy(raw),
+      gravityMps2: gravityMps2,
+      fabrication: fabrication == null ? null : {
+        resinReference : fabrication.resinReference,
+        adhesiveContainsEPS : fabrication.adhesiveContainsEPS
+      }
+    }));
   }
 
   public static function compoundPending(sourceId:String):ToolingValidation return FillAnalysis.check(
@@ -165,16 +182,27 @@ class CastingProcessAnalysis {
 
   /** A certified diameter interval is enough to evaluate a section limit.
    * This does not make the box-only section/junction solvers support other geometry. */
-  public static function sectionLimit(lowerMm:Float,upperMm:Float,limit:CompoundThicknessLimit):{status:ToolingCheckStatus,message:String} {
-    if(!Math.isFinite(lowerMm+upperMm) || lowerMm<0 || upperMm<lowerMm || upperMm<=0)
-      throw "Invalid certified section interval";
+  public static function sectionLimit(lowerMm:Float, upperMm:Float, limit:CompoundThicknessLimit): {
+    status: ToolingCheckStatus,
+    message: String
+  } {
+    if (!Math.isFinite(lowerMm + upperMm)
+      || lowerMm < 0 || upperMm < lowerMm || upperMm <= 0) throw "Invalid certified section interval";
     return switch limit {
-      case Unresolved(reason):{status:Pending,message:reason};
-      case Layer(_):{status:Pending,message:"A layer limit requires the continuous pour/lift schedule, not a section diameter"};
+      case Unresolved(reason):
+        {status: Pending, message: reason};
+      case Layer(_):
+        {status: Pending, message: "A layer limit requires the continuous pour/lift schedule, not a section diameter"};
       case Section(maximum):
-        if(lowerMm>maximum+1e-7){status:Fail,message:"Section exceeds the compound datasheet"};
-        else if(upperMm>maximum+1e-7){status:Pending,message:"Section interval refinement at the datasheet threshold"};
-        else {status:Pass,message:"Certified section upper bound meets the declared maximum"};
+        if (lowerMm > maximum + 1e-7) {
+          status:Fail, message:"Section exceeds the compound datasheet"
+        };
+        else if (upperMm > maximum + 1e-7) {
+          status:Pending, message:"Section interval refinement at the datasheet threshold"
+        };
+        else {
+          status:Pass, message:"Certified section upper bound meets the declared maximum"
+        };
     };
   }
 
@@ -185,8 +213,8 @@ class CastingProcessAnalysis {
     pour:Null<PourPlanning.PourAssessment>,
     fabrication:Null<materia.tooling.export.FabricationSpec>
   ):ToolingValidation {
-    var spec = ProcessSpecs.copy(raw), missing:Array < String >=[], failures:Array < String >=[],
-      unsupported:Array < String >=[], notes:Array < String >=[], evidence:Array < String >=[];
+    var spec = ProcessSpecs.copy(raw), missing:Array<String> = [], failures:Array<String> = [],
+      unsupported:Array<String> = [], notes:Array<String> = [], evidence:Array<String> = [];
     var ids = [sourceId];
     var schedule = pour == null ? null : pour.schedule;
     switch spec.compound.reference {
@@ -210,9 +238,9 @@ class CastingProcessAnalysis {
           for (id in bound.witnessSourceIds) if (ids.indexOf(id) < 0) ids.push(id);
           notes.push("Section diameter "
             + bound.lowerDiameterMm + ".." + bound.upperDiameterMm + " mm; datasheet maximum " + maximum + " mm");
-          var section=sectionLimit(bound.lowerDiameterMm,bound.upperDiameterMm,spec.compound.thickness);
-          if(section.status==Fail)failures.push(section.message);
-          else if(section.status==Pending)missing.push(section.message);
+          var section = sectionLimit(bound.lowerDiameterMm, bound.upperDiameterMm, spec.compound.thickness);
+          if (section.status == Fail) failures.push(section.message);
+          else if (section.status == Pending) missing.push(section.message);
         }
       case Layer(maximum):
         if (schedule == null) missing.push("Mixer and batch level ranges");

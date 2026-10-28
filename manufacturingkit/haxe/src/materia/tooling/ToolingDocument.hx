@@ -7,7 +7,7 @@ import materia.tooling.casting.CastingSetup;
  * Schema version and format are supplied by ToolingCodec's outer envelope.
  */
 typedef ToolingDocument = {
-	var input:CastingToolingInput;
-	var setup:CastingSetup;
-	var recipe:ToolingRecipe;
+  var input:CastingToolingInput;
+  var setup:CastingSetup;
+  var recipe:ToolingRecipe;
 }

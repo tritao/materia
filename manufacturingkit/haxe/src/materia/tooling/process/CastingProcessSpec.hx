@@ -11,29 +11,32 @@ enum CompoundThicknessLimit {
   Layer(maximumMm:Float);
 }
 
-typedef CompoundDatasheet = {var reference: CastingTextInput;
-var thickness:CompoundThicknessLimit;
-var maximumMassPerLiftKg:CastingInput;
+typedef CompoundDatasheet = {
+  var reference:CastingTextInput;
+  var thickness:CompoundThicknessLimit;
+  var maximumMassPerLiftKg:CastingInput;
 }
 
-typedef CastabilityLimits = {var maximumAggregateSizeMm: Null<Float>;
-var minimumPassageAggregateRatio:Null<Float>;
-var minimumWallAggregateRatio:Float;
-var steelAggregateMarginMm:Float;
-var steelSpacingAggregateRatio:Float;
-var evidence:Array<String>;
+typedef CastabilityLimits = {
+  var maximumAggregateSizeMm:Null<Float>;
+  var minimumPassageAggregateRatio:Null<Float>;
+  var minimumWallAggregateRatio:Float;
+  var steelAggregateMarginMm:Float;
+  var steelSpacingAggregateRatio:Float;
+  var evidence:Array<String>;
 }
 
 /** In-memory process choices; shop records belong to the delivered package. */
-typedef CastingProcessSpec = {var id: String;
-var revision:Int;
-var recipeFingerprint:String;
-var pourRateMm3PerSecond:Null<Float>;
-var maximumAirEscapeWidthMm:Null<Float>;
-var mixComposition:Null<PourPlanning.MixComposition>;
-var mixer:Null<PourPlanning.PourMixerSpec>;
-var castability:CastabilityLimits;
-var compound:CompoundDatasheet;
+typedef CastingProcessSpec = {
+  var id:String;
+  var revision:Int;
+  var recipeFingerprint:String;
+  var pourRateMm3PerSecond:Null<Float>;
+  var maximumAirEscapeWidthMm:Null<Float>;
+  var mixComposition:Null<PourPlanning.MixComposition>;
+  var mixer:Null<PourPlanning.PourMixerSpec>;
+  var castability:CastabilityLimits;
+  var compound:CompoundDatasheet;
 }
 
 /** Value checks and explicit copies for in-memory process choices. */
@@ -43,12 +46,13 @@ class ProcessSpecs {
     return value;
   }
   static function wallRatio(value:Float):Float {
-    if(value==null || !Math.isFinite(value) || value<1 || value>1e6)throw "Invalid minimum wall/aggregate ratio";
+    if (value == null
+      || !Math.isFinite(value) || value < 1 || value > 1e6) throw "Invalid minimum wall/aggregate ratio";
     return value;
   }
-  static function optional(value:Null<Float>, minimum:Float, maximum:Float):Null < Float> {
+  static function optional(value:Null<Float>, minimum:Float, maximum:Float):Null<Float> {
     if (value != null
-      &&(!Math.isFinite(value) || value < minimum || value > maximum)) throw "Invalid casting process number";
+      && (!Math.isFinite(value) || value < minimum || value > maximum)) throw "Invalid casting process number";
     return value;
   }
   public static function thicknessRecord(value:CompoundThicknessLimit):Dynamic return switch value {
@@ -75,8 +79,7 @@ class ProcessSpecs {
     }
     var thickness:CompoundThicknessLimit = switch compound.thickness {
       case Unresolved(reason):
-        materia.casting.CastingInput.CastingInputs.text({kind: "unresolved", reason: reason}
-        );
+        materia.casting.CastingInput.CastingInputs.text({kind: "unresolved", reason: reason});
         CompoundThicknessLimit.Unresolved(reason);
       case Section(value):
         CompoundThicknessLimit.Section(positive(value));
@@ -85,50 +88,55 @@ class ProcessSpecs {
     };
     var limits = input.castability;
     var evidence = limits.evidence.copy();
-    if (evidence.length>512) throw "Casting process array exceeds limit";
+    if (evidence.length > 512) throw "Casting process array exceeds limit";
     for (value in evidence) {
       if (value == null || StringTools.trim(value).length == 0 || value.length > 2048
         || materia.assembly.AssemblyCodec.containsNul(value)) throw "Invalid casting process evidence";
     }
-    return {id: input.id,
-      revision: input.revision, recipeFingerprint: input.recipeFingerprint, pourRateMm3PerSecond: optional(
+    return {
+      id: input.id,
+      revision: input.revision,
+      recipeFingerprint: input.recipeFingerprint,
+      pourRateMm3PerSecond: optional(
         input.pourRateMm3PerSecond,
         1e-12,
         1e15
-      ), maximumAirEscapeWidthMm: optional(
+      ),
+      maximumAirEscapeWidthMm: optional(
         input.maximumAirEscapeWidthMm,
         1e-9,
         1e6
-      ), mixComposition: input.mixComposition == null ? null : PourPlanning.copyComposition(input.mixComposition),
-      mixer : input.mixer == null ? null : PourPlanning.copyMixer(input.mixer), castability : {
-      maximumAggregateSizeMm : optional(
-        limits.maximumAggregateSizeMm,
-        1e-9,
-        1e6
       ),
-      minimumPassageAggregateRatio : optional(
-        limits.minimumPassageAggregateRatio,
-        1,
-        1e6
-      ),
-      minimumWallAggregateRatio : wallRatio(limits.minimumWallAggregateRatio),
-
-      steelAggregateMarginMm : positive(limits.steelAggregateMarginMm),
-      steelSpacingAggregateRatio : wallRatio(limits.steelSpacingAggregateRatio),
-
-      evidence : evidence
-    }, compound : {
-      reference : reference,
-      thickness : thickness,
-      maximumMassPerLiftKg : mass
-    }
+      mixComposition: input.mixComposition == null ? null : PourPlanning.copyComposition(input.mixComposition),
+      mixer : input.mixer == null ? null : PourPlanning.copyMixer(input.mixer),
+      castability : {
+        maximumAggregateSizeMm : optional(
+          limits.maximumAggregateSizeMm,
+          1e-9,
+          1e6
+        ),
+        minimumPassageAggregateRatio : optional(
+          limits.minimumPassageAggregateRatio,
+          1,
+          1e6
+        ),
+        minimumWallAggregateRatio : wallRatio(limits.minimumWallAggregateRatio),
+        steelAggregateMarginMm : positive(limits.steelAggregateMarginMm),
+        steelSpacingAggregateRatio : wallRatio(limits.steelSpacingAggregateRatio),
+        evidence : evidence
+      },
+      compound : {
+        reference : reference,
+        thickness : thickness,
+        maximumMassPerLiftKg : mass
+      }
     };
   }
-  static function inputNumber(raw:Dynamic,key:String):Null<Float> {
-    var value:Dynamic=Reflect.field(raw,key);
-    if (value==null) return null;
-    if ((!Std.isOfType(value,Float) && !Std.isOfType(value,Int)) || !Math.isFinite(value))
-      throw "Invalid casting process number";
+  static function inputNumber(raw:Dynamic, key:String):Null<Float> {
+    var value:Dynamic = Reflect.field(raw, key);
+    if (value == null) return null;
+    if ((!Std.isOfType(value,
+      Float) && !Std.isOfType(value, Int)) || !Math.isFinite(value)) throw "Invalid casting process number";
     return value;
   }
   public static function fromRecord(raw:Dynamic):CastingProcessSpec {
@@ -152,10 +160,8 @@ class ProcessSpecs {
         "maximumAggregateSizeMm",
         "minimumPassageAggregateRatio",
         "minimumWallAggregateRatio",
-
         "steelAggregateMarginMm",
         "steelSpacingAggregateRatio",
-
         "evidence"
       ]
     );
@@ -176,63 +182,81 @@ class ProcessSpecs {
         throw "Unknown compound thickness limit";
     };
     var limits:Dynamic = Reflect.field(raw, "castability");
-    var evidence:Array < String >=[];
+    var evidence:Array<String> = [];
     for (value in materia.casting.CastingRecordCodec.array(limits, "evidence")) {
       if (!Std.isOfType(value, String)) throw "Invalid casting process evidence";
       var text:String = cast value;
       evidence.push(text);
     }
-    var result:CastingProcessSpec = {id: materia.casting.CastingRecordCodec.string(raw,
-      "id"), revision: materia.casting.CastingRecordCodec.integer(
+    var result:CastingProcessSpec = {
+      id: materia.casting.CastingRecordCodec.string(raw, "id"),
+      revision: materia.casting.CastingRecordCodec.integer(
         raw,
         "revision"
-      ), recipeFingerprint: materia.casting.CastingRecordCodec.string(
+      ),
+      recipeFingerprint: materia.casting.CastingRecordCodec.string(
         raw,
         "recipeFingerprint"
-      ), pourRateMm3PerSecond: inputNumber(
+      ),
+      pourRateMm3PerSecond: inputNumber(
         raw,
         "pourRateMm3PerSecond"
-      ), maximumAirEscapeWidthMm: inputNumber(
+      ),
+      maximumAirEscapeWidthMm: inputNumber(
         raw,
         "maximumAirEscapeWidthMm"
-      ), mixComposition: Reflect.field(
+      ),
+      mixComposition: Reflect.field(
         raw,
         "mixComposition"
       ) == null ? null : PourPlanning.copyComposition(Reflect.field(
         raw,
         "mixComposition"
-      )), mixer : Reflect.field(
+      )),
+      mixer : Reflect.field(
         raw,
         "mixer"
       ) == null ? null : PourPlanning.copyMixer(Reflect.field(
         raw,
         "mixer"
-      )), castability : {
-      maximumAggregateSizeMm : inputNumber(
-        limits,
-        "maximumAggregateSizeMm"
-      ),
-      minimumWallAggregateRatio : materia.casting.CastingRecordCodec.number(Reflect.field(raw,"castability"),"minimumWallAggregateRatio"),
-
-      steelAggregateMarginMm : materia.casting.CastingRecordCodec.number(limits,"steelAggregateMarginMm"),
-      steelSpacingAggregateRatio : materia.casting.CastingRecordCodec.number(limits,"steelSpacingAggregateRatio"),
-
-      minimumPassageAggregateRatio : inputNumber(
-        limits,
-        "minimumPassageAggregateRatio"
-      ),
-      evidence : evidence
-    }, compound : {
-      reference : materia.casting.CastingInput.CastingInputs.text(Reflect.field(
-        c,
-        "reference"
       )),
-      thickness : thickness,
-      maximumMassPerLiftKg : materia.casting.CastingInput.CastingInputs.number(Reflect.field(
-        c,
-        "maximumMassPerLiftKg"
-      ))
-    }
+      castability : {
+        maximumAggregateSizeMm : inputNumber(
+          limits,
+          "maximumAggregateSizeMm"
+        ),
+        minimumWallAggregateRatio : materia.casting.CastingRecordCodec.number(
+          Reflect.field(
+            raw,
+            "castability"
+          ),
+          "minimumWallAggregateRatio"
+        ),
+        steelAggregateMarginMm : materia.casting.CastingRecordCodec.number(
+          limits,
+          "steelAggregateMarginMm"
+        ),
+        steelSpacingAggregateRatio : materia.casting.CastingRecordCodec.number(
+          limits,
+          "steelSpacingAggregateRatio"
+        ),
+        minimumPassageAggregateRatio : inputNumber(
+          limits,
+          "minimumPassageAggregateRatio"
+        ),
+        evidence : evidence
+      },
+      compound : {
+        reference : materia.casting.CastingInput.CastingInputs.text(Reflect.field(
+          c,
+          "reference"
+        )),
+        thickness : thickness,
+        maximumMassPerLiftKg : materia.casting.CastingInput.CastingInputs.number(Reflect.field(
+          c,
+          "maximumMassPerLiftKg"
+        ))
+      }
     };
 
     return copy(result);

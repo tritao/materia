@@ -5,13 +5,13 @@ package materia.tooling.casting;
  * it is not automatically an allowable stress for dimensional control.
  */
 typedef CoreStockSpec = {
-	var materialSpec:String;
-	var width:Float;
-	var depth:Float;
-	var height:Float;
-	var densityKgM3:Null<Float>;
-	var compressionStrengthPa:Null<Float>;
-	var compressionStrainFraction:Null<Float>;
-	var maximumTemperatureC:Null<Float>;
-	var evidence:Array<String>;
+  var materialSpec:String;
+  var width:Float;
+  var depth:Float;
+  var height:Float;
+  var densityKgM3:Null<Float>;
+  var compressionStrengthPa:Null<Float>;
+  var compressionStrainFraction:Null<Float>;
+  var maximumTemperatureC:Null<Float>;
+  var evidence:Array<String>;
 }

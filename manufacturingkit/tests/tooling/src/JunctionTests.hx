@@ -72,8 +72,13 @@ class JunctionTests {
     );
     bounded(disconnected, 6);
     var cavity = BoxAlgebra.subtract([b(-5, -5, -5, 10, 10, 10)], [b(-1, -1, -1, 2, 2, 2)]);
-    var withHole = JunctionThickness.analyze("body", "source", cavity, [{id: "hole", box: b(-1, -1, -1, 2, 2, 2)}
-    ], settings);
+    var withHole = JunctionThickness.analyze(
+      "body",
+      "source",
+      cavity,
+      [{id: "hole", box: b(-1, -1, -1, 2, 2, 2)}],
+      settings
+    );
     check(withHole.upperDiameterMm < 10, "internal cavity limits inscribed diameter");
     check(
       withHole.faces.filter(f -> f.sourceIds.indexOf("hole") >= 0).length == 6,
@@ -83,15 +88,16 @@ class JunctionTests {
     for (face in junction.faces) faceArea += face.axis == X ? face.region.depth * face.region.height
       : face.axis == Y ? face.region.width * face.region.height : face.region.width * face.region.depth;
     near(faceArea, 392, 1e-7, "cross surface excludes artificial internal partitions");
-    var coarse = JunctionThickness.analyze("body", "source", cross, [], {diameterToleranceMm: 1e-8, maximumCells: 20}
-    );
+    var coarse = JunctionThickness.analyze("body", "source", cross, [], {diameterToleranceMm: 1e-8, maximumCells: 20});
     check(!coarse.converged, "exhausted work budget never claims convergence");
     check(
       coarse.lowerDiameterMm <= 2 * Math.sqrt(2) + 1e-7 && coarse.upperDiameterMm >= 2 * Math.sqrt(2) - 1e-7,
       "budget exhaustion retains valid global bounds"
     );
-    rejects(() -> JunctionThickness.analyze("body", "s", block, [], {diameterToleranceMm: 0, maximumCells: 20}
-    ), "Invalid junction search settings");
+    rejects(
+      () -> JunctionThickness.analyze("body", "s", block, [], {diameterToleranceMm: 0, maximumCells: 20}),
+      "Invalid junction search settings"
+    );
     rejects(() -> JunctionThickness.analyze("body", "s", [b(0, 0, 0, -1, 1, 1)], []), "Invalid junction box");
     Sys.println('JunctionTests: $assertions assertions passed');
   }

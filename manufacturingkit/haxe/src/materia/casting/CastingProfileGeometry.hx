@@ -6,336 +6,314 @@ import materia.casting.CastingProfile.CastingCurveKind;
 
 /** Exact line/circle predicates. No tessellation and no cutter compensation. */
 class CastingProfileGeometry {
-	public static inline var TOL = 1e-7;
+  public static inline var TOL = 1e-7;
 
-	/** Oriented derivative at a line/arc endpoint; magnitude is immaterial. */
-	public static function tangent(segment:CastingSegment, atEnd:Bool):CastingPoint2 {
-		var center = segment.center;
-		if (center == null)
-			return {x: segment.end.x - segment.start.x, y: segment.end.y - segment.start.y};
-		var point = atEnd ? segment.end : segment.start, sign = segment.sweep > 0 ? 1.0 : -1.0;
-		return {x: -(point.y - center.y) * sign, y: (point.x - center.x) * sign};
-	}
+  /** Oriented derivative at a line/arc endpoint; magnitude is immaterial. */
+  public static function tangent(segment:CastingSegment, atEnd:Bool):CastingPoint2 {
+    var center = segment.center;
+    if (center == null) return {x: segment.end.x - segment.start.x, y: segment.end.y - segment.start.y};
+    var point = atEnd ? segment.end : segment.start, sign = segment.sweep > 0 ? 1.0 : -1.0;
+    return {x: -(point.y - center.y) * sign, y: (point.x - center.x) * sign};
+  }
 
-	/** Smallest internal stock-corner radius of a CCW removed region.
+  /** Smallest internal stock-corner radius of a CCW removed region.
 	 * Tangent authored arcs retain their real radius; a sharp inward corner is
 	 * zero, and a re-entrant corner is not an internal stock corner.
 	 */
-	public static function minimumInternalRadius(profile:Array<CastingSegment>):Float {
-		validate(profile);
-		var minimum = Math.POSITIVE_INFINITY;
-		for (index in 0...profile.length) {
-			var segment = profile[index], next = profile[(index + 1) % profile.length];
-			if (segment.center != null && segment.sweep > 0)
-				minimum = Math.min(minimum, CastingProfiles.distance(segment.center, segment.start));
-			var a = tangent(segment, true), b = tangent(next, false);
-			var turn = a.x * b.y - a.y * b.x;
-			var tolerance = 1e-8 * Math.sqrt((a.x * a.x + a.y * a.y) * (b.x * b.x + b.y * b.y));
-			if (turn > tolerance || Math.abs(turn) <= tolerance && a.x * b.x + a.y * b.y < 0) return 0;
-		}
-		if (!Math.isFinite(minimum)) throw "Profile has no internal curvature";
-		return minimum;
-	}
+  public static function minimumInternalRadius(profile:Array<CastingSegment>):Float {
+    validate(profile);
+    var minimum = Math.POSITIVE_INFINITY;
+    for (index in 0...profile.length) {
+      var segment = profile[index], next = profile[(index + 1) % profile.length];
+      if (segment.center != null && segment.sweep > 0) minimum = Math.min(
+        minimum,
+        CastingProfiles.distance(
+          segment.center,
+          segment.start
+        )
+      );
+      var a = tangent(segment, true), b = tangent(next, false);
+      var turn = a.x * b.y - a.y * b.x;
+      var tolerance = 1e-8 * Math.sqrt((a.x * a.x + a.y * a.y) * (b.x * b.x + b.y * b.y));
+      if (turn > tolerance || Math.abs(turn) <= tolerance && a.x * b.x + a.y * b.y < 0) return 0;
+    }
+    if (!Math.isFinite(minimum)) throw "Profile has no internal curvature";
+    return minimum;
+  }
 
-	static function cross(ax:Float, ay:Float, bx:Float, by:Float):Float
-		return ax * by - ay * bx;
+  static function cross(ax:Float, ay:Float, bx:Float, by:Float):Float return ax * by - ay * bx;
 
-	static function angle(a:Float):Float {
-		var v = a % (2 * Math.PI);
-		return v < 0 ? v + 2 * Math.PI : v;
-	}
+  static function angle(a:Float):Float {
+    var v = a % (2 * Math.PI);
+    return v < 0 ? v + 2 * Math.PI : v;
+  }
 
-	public static function on(s:CastingSegment, p:CastingPoint2):Bool {
-		var c = s.center;
-		if (c == null) {
-			var dx = s.end.x - s.start.x, dy = s.end.y - s.start.y;
-			return Math.abs(cross(dx, dy, p.x - s.start.x, p.y - s.start.y)) <= TOL * Math.max(1, CastingProfiles.distance(s.start, s.end))
-				&& p.x >= Math.min(s.start.x, s.end.x) - TOL
-				&& p.x <= Math.max(s.start.x, s.end.x) + TOL
-				&& p.y >= Math.min(s.start.y, s.end.y) - TOL
-				&& p.y <= Math.max(s.start.y, s.end.y) + TOL;
-		}
-		if (Math.abs(CastingProfiles.distance(c, p) - CastingProfiles.distance(c, s.start)) > TOL)
-			return false;
-		var a = Math.atan2(s.start.y - c.y, s.start.x - c.x),
-			b = Math.atan2(p.y - c.y, p.x - c.x);
-		return angle(s.sweep > 0 ? b - a : a - b) <= Math.abs(s.sweep) + 1e-9 || CastingProfiles.distance(p, s.start) < TOL;
-	}
+  public static function on(s:CastingSegment, p:CastingPoint2):Bool {
+    var c = s.center;
+    if (c == null) {
+      var dx = s.end.x - s.start.x, dy = s.end.y - s.start.y;
+      return Math.abs(cross(dx, dy, p.x - s.start.x, p.y - s.start.y)) <= TOL * Math.max(
+        1,
+        CastingProfiles.distance(
+          s.start,
+          s.end
+        )
+      ) && p.x >= Math.min(
+        s.start.x,
+        s.end.x
+      ) - TOL && p.x <= Math.max(
+        s.start.x,
+        s.end.x
+      ) + TOL && p.y >= Math.min(
+        s.start.y,
+        s.end.y
+      ) - TOL && p.y <= Math.max(
+        s.start.y,
+        s.end.y
+      ) + TOL;
+    }
+    if (Math.abs(CastingProfiles.distance(c, p) - CastingProfiles.distance(c, s.start)) > TOL) return false;
+    var a = Math.atan2(s.start.y - c.y, s.start.x - c.x), b = Math.atan2(p.y - c.y, p.x - c.x);
+    return angle(s.sweep > 0 ? b - a : a - b) <= Math.abs(s.sweep) + 1e-9 || CastingProfiles.distance(p, s.start) < TOL;
+  }
 
-	public static function intersections(a:CastingSegment, b:CastingSegment):Array<CastingPoint2> {
-		var candidates:Array<CastingPoint2> = [], ca = a.center, cb = b.center;
-		if (ca == null && cb == null) {
-			var ax = a.end.x - a.start.x,
-				ay = a.end.y - a.start.y,
-				bx = b.end.x - b.start.x,
-				by = b.end.y - b.start.y;
-			var d = cross(ax, ay, bx, by);
-			if (Math.abs(d) > 1e-12) {
-				var t = cross(b.start.x - a.start.x, b.start.y - a.start.y, bx, by) / d;
-				candidates.push({x: a.start.x + t * ax, y: a.start.y + t * ay});
-			} else
-				for (p in [a.start, a.end, b.start, b.end])
-					candidates.push(p);
-		} else if (ca == null || cb == null) {
-			var l = ca == null ? a : b,
-				circle = ca == null ? b : a,
-				c = circle.center;
-			if (c == null)
-				throw "Missing circle center";
-			var dx = l.end.x - l.start.x,
-				dy = l.end.y - l.start.y,
-				fx = l.start.x - c.x,
-				fy = l.start.y - c.y;
-			var aa = dx * dx + dy * dy,
-				bb = 2 * (fx * dx + fy * dy),
-				r = CastingProfiles.distance(c, circle.start),
-				cc = fx * fx + fy * fy - r * r;
-			var disc = bb * bb - 4 * aa * cc;
-			if (disc >= -TOL && aa > 0)
-				for (t in [
-					(-bb - Math.sqrt(Math.max(0, disc))) / (2 * aa),
-					(-bb + Math.sqrt(Math.max(0, disc))) / (2 * aa)
-				])
-					candidates.push({x: l.start.x + t * dx, y: l.start.y + t * dy});
-		} else {
-			var d = CastingProfiles.distance(ca, cb),
-				r = CastingProfiles.distance(ca, a.start),
-				q = CastingProfiles.distance(cb, b.start);
-			if (d < TOL && Math.abs(r - q) < TOL) {
-				candidates = [
-					a.start,
-					a.end,
-					b.start,
-					b.end,
-					CastingProfiles.point(a, 0.5),
-					CastingProfiles.point(b, 0.5)
-				];
-			} else if (d > TOL && d <= r + q + TOL && d >= Math.abs(r - q) - TOL) {
-				var x = (r * r - q * q + d * d) / (2 * d),
-					h = Math.sqrt(Math.max(0, r * r - x * x)),
-					ux = (cb.x - ca.x) / d,
-					uy = (cb.y - ca.y) / d;
-				for (sign in [-1.0, 1.0])
-					candidates.push({x: ca.x + x * ux - sign * h * uy, y: ca.y + x * uy + sign * h * ux});
-			}
-		}
-		var result:Array<CastingPoint2> = [];
-		for (p in candidates)
-			if (on(a, p) && on(b, p) && result.filter(q -> CastingProfiles.distance(p, q) < TOL).length == 0)
-				result.push(p);
-		return result;
-	}
+  public static function intersections(a:CastingSegment, b:CastingSegment):Array<CastingPoint2> {
+    var candidates:Array<CastingPoint2> = [], ca = a.center, cb = b.center;
+    if (ca == null && cb == null) {
+      var ax = a.end.x - a.start.x, ay = a.end.y - a.start.y, bx = b.end.x - b.start.x, by = b.end.y - b.start.y;
+      var d = cross(ax, ay, bx, by);
+      if (Math.abs(d) > 1e-12) {
+        var t = cross(b.start.x - a.start.x, b.start.y - a.start.y, bx, by) / d;
+        candidates.push({x: a.start.x + t * ax, y: a.start.y + t * ay});
+      } else for (p in [a.start, a.end, b.start, b.end]) candidates.push(p);
+    } else if (ca == null || cb == null) {
+      var l = ca == null ? a : b, circle = ca == null ? b : a, c = circle.center;
+      if (c == null) throw "Missing circle center";
+      var dx = l.end.x - l.start.x, dy = l.end.y - l.start.y, fx = l.start.x - c.x, fy = l.start.y - c.y;
+      var aa = dx * dx + dy * dy,
+        bb = 2 * (fx * dx + fy * dy), r = CastingProfiles.distance(c, circle.start), cc = fx * fx + fy * fy - r * r;
+      var disc = bb * bb - 4 * aa * cc;
+      if (disc >= -TOL && aa > 0) for (t in [
+        (-bb - Math.sqrt(Math.max(0, disc))) / (2 * aa),
+        (-bb + Math.sqrt(Math.max(
+          0,
+          disc
+        ))) / (2 * aa)
+      ]) candidates.push({
+        x: l.start.x + t * dx,
+        y: l.start.y + t * dy
+      });
+    } else {
+      var d = CastingProfiles.distance(ca, cb), r = CastingProfiles.distance(ca, a.start), q = CastingProfiles.distance(
+        cb,
+        b.start
+      );
+      if (d < TOL && Math.abs(r - q) < TOL) {
+        candidates = [a.start, a.end, b.start, b.end, CastingProfiles.point(a, 0.5), CastingProfiles.point(b, 0.5)];
+      } else if (d > TOL && d <= r + q + TOL && d >= Math.abs(r - q) - TOL) {
+        var x = (r * r - q * q + d * d) / (2 * d),
+          h = Math.sqrt(Math.max(0, r * r - x * x)), ux = (cb.x - ca.x) / d, uy = (cb.y - ca.y) / d;
+        for (sign in [-1.0, 1.0]) candidates.push({x: ca.x + x * ux - sign * h * uy, y: ca.y + x * uy + sign * h * ux});
+      }
+    }
+    var result:Array<CastingPoint2> = [];
+    for (p in candidates) if (on(a,
+      p) && on(b, p) && result.filter(q -> CastingProfiles.distance(p, q) < TOL).length == 0) result.push(p);
+    return result;
+  }
 
-	/** Exact line/arc minimum boundary distance, including interior stationary points. */
-	public static function distanceBetween(a:Array<CastingSegment>, b:Array<CastingSegment>):Float {
-		if (inside(a, b[0].start.x, b[0].start.y) || inside(b, a[0].start.x, a[0].start.y))
-			return 0;
-		var minimum = 1e100;
-		function pointDistance(p:CastingPoint2, s:CastingSegment):Float {
-			var c = s.center;
-			var best = Math.min(CastingProfiles.distance(p, s.start), CastingProfiles.distance(p, s.end));
-			if (c == null) {
-				var dx = s.end.x - s.start.x, dy = s.end.y - s.start.y;
-				var t = ((p.x - s.start.x) * dx + (p.y - s.start.y) * dy) / (dx * dx + dy * dy);
-				t = Math.max(0, Math.min(1, t));
-				return Math.min(best, CastingProfiles.distance(p, {x: s.start.x + t * dx, y: s.start.y + t * dy}));
-			}
-			var length = CastingProfiles.distance(p, c);
-			if (length > TOL) {
-				var r = CastingProfiles.distance(c, s.start),
-					q = {x: c.x + (p.x - c.x) * r / length, y: c.y + (p.y - c.y) * r / length};
-				if (on(s, q))
-					best = Math.min(best, CastingProfiles.distance(p, q));
-			}
-			return best;
-		}
-		for (x in a)
-			for (y in b) {
-				if (intersections(x, y).length > 0)
-					return 0;
-				for (p in [x.start, x.end])
-					minimum = Math.min(minimum, pointDistance(p, y));
-				for (p in [y.start, y.end])
-					minimum = Math.min(minimum, pointDistance(p, x));
-				var cx = x.center, cy = y.center;
-				if (cx != null && cy != null) {
-					var length = CastingProfiles.distance(cx, cy);
-					if (length > TOL)
-						for (sx in [-1.0, 1.0])
-							for (sy in [-1.0, 1.0]) {
-								var rx = CastingProfiles.distance(cx, x.start),
-									ry = CastingProfiles.distance(cy, y.start);
-								var px = {x: cx.x + sx * rx * (cy.x - cx.x) / length, y: cx.y + sx * rx * (cy.y - cx.y) / length};
-								var py = {x: cy.x + sy * ry * (cy.x - cx.x) / length, y: cy.y + sy * ry * (cy.y - cx.y) / length};
-								if (on(x, px) && on(y, py))
-									minimum = Math.min(minimum, CastingProfiles.distance(px, py));
-							}
-				} else if (cx != null || cy != null) {
-					var line = cx == null ? x : y, arc = cx == null ? y : x, c = arc.center;
-					if (c == null)
-						throw "Missing arc center";
-					var dx = line.end.x - line.start.x,
-						dy = line.end.y - line.start.y,
-						length = Math.sqrt(dx * dx + dy * dy),
-						r = CastingProfiles.distance(c, arc.start);
-					for (sign in [-1.0, 1.0]) {
-						var p = {x: c.x - sign * r * dy / length, y: c.y + sign * r * dx / length};
-						if (on(arc, p))
-							minimum = Math.min(minimum, pointDistance(p, line));
-					}
-				}
-			}
-		return minimum;
-	}
+  /** Exact line/arc minimum boundary distance, including interior stationary points. */
+  public static function distanceBetween(a:Array<CastingSegment>, b:Array<CastingSegment>):Float {
+    if (inside(a, b[0].start.x, b[0].start.y) || inside(b, a[0].start.x, a[0].start.y)) return 0;
+    var minimum = 1e100;
+    function pointDistance(p:CastingPoint2, s:CastingSegment):Float {
+      var c = s.center;
+      var best = Math.min(CastingProfiles.distance(p, s.start), CastingProfiles.distance(p, s.end));
+      if (c == null) {
+        var dx = s.end.x - s.start.x, dy = s.end.y - s.start.y;
+        var t = ((p.x - s.start.x) * dx + (p.y - s.start.y) * dy) / (dx * dx + dy * dy);
+        t = Math.max(0, Math.min(1, t));
+        return Math.min(best, CastingProfiles.distance(p, {x: s.start.x + t * dx, y: s.start.y + t * dy}));
+      }
+      var length = CastingProfiles.distance(p, c);
+      if (length > TOL) {
+        var r = CastingProfiles.distance(c, s.start), q = {
+          x: c.x + (p.x - c.x) * r / length,
+          y: c.y + (p.y - c.y) * r / length
+        };
+        if (on(s, q)) best = Math.min(best, CastingProfiles.distance(p, q));
+      }
+      return best;
+    }
+    for (x in a) for (y in b) {
+      if (intersections(x, y).length > 0) return 0;
+      for (p in [x.start, x.end]) minimum = Math.min(minimum, pointDistance(p, y));
+      for (p in [y.start, y.end]) minimum = Math.min(minimum, pointDistance(p, x));
+      var cx = x.center, cy = y.center;
+      if (cx != null && cy != null) {
+        var length = CastingProfiles.distance(cx, cy);
+        if (length > TOL) for (sx in [-1.0, 1.0]) for (sy in [-1.0, 1.0]) {
+          var rx = CastingProfiles.distance(cx, x.start), ry = CastingProfiles.distance(cy, y.start);
+          var px = {x: cx.x + sx * rx * (cy.x - cx.x) / length, y: cx.y + sx * rx * (cy.y - cx.y) / length};
+          var py = {x: cy.x + sy * ry * (cy.x - cx.x) / length, y: cy.y + sy * ry * (cy.y - cx.y) / length};
+          if (on(x, px) && on(y, py)) minimum = Math.min(minimum, CastingProfiles.distance(px, py));
+        }
+      } else if (cx != null || cy != null) {
+        var line = cx == null ? x : y, arc = cx == null ? y : x, c = arc.center;
+        if (c == null) throw "Missing arc center";
+        var dx = line.end.x - line.start.x,
+          dy = line.end.y - line.start.y, length = Math.sqrt(dx * dx + dy * dy), r = CastingProfiles.distance(
+            c,
+            arc.start
+          );
+        for (sign in [-1.0, 1.0]) {
+          var p = {x: c.x - sign * r * dy / length, y: c.y + sign * r * dx / length};
+          if (on(arc, p)) minimum = Math.min(minimum, pointDistance(p, line));
+        }
+      }
+    }
+    return minimum;
+  }
 
-	public static function validate(p:Array<CastingSegment>):Void {
-		if (p == null || p.length < 2 || p.length > 512)
-			throw "Invalid exact profile contour count";
-		for (i in 0...p.length) {
-			var s = p[i], c = s.center;
-			for (v in [s.start.x, s.start.y, s.end.x, s.end.y, s.sweep])
-				if (!Math.isFinite(v))
-					throw "Nonfinite profile contour";
-			if (s.kind == CastingCurveKind.Line) {
-				if (c != null || s.sweep != 0 || CastingProfiles.distance(s.start, s.end) < TOL)
-					throw "Invalid profile line";
-			} else if (s.kind == CastingCurveKind.Arc) {
-				if (c == null
-					|| !Math.isFinite(c.x)
-					|| !Math.isFinite(c.y)
-					|| Math.abs(s.sweep) < 1e-10
-					|| Math.abs(s.sweep) >= 2 * Math.PI - 1e-12
-					|| CastingProfiles.distance(c, s.start) < TOL
-					|| CastingProfiles.distance(CastingProfiles.point(s, 1), s.end) > TOL)
-					throw "Invalid profile arc";
-			} else
-				throw "Unknown profile curve kind";
-			if (CastingProfiles.distance(s.end, p[(i + 1) % p.length].start) > TOL)
-				throw "Open profile contour";
-			for (j in i + 1...p.length)
-				for (hit in intersections(s, p[j])) {
-					var adjacent = j == i + 1 || (i == 0 && j == p.length - 1);
-					var endpoints = (CastingProfiles.distance(hit, s.start) < TOL || CastingProfiles.distance(hit, s.end) < TOL)
-						&& (CastingProfiles.distance(hit, p[j].start) < TOL || CastingProfiles.distance(hit, p[j].end) < TOL);
-					if (!adjacent || !endpoints)
-						throw "Profile contour self-intersects";
-				}
-		}
-		var signedArea = area(p);
-		if (!Math.isFinite(signedArea) || signedArea <= TOL)
-			throw "Profile contour must have finite positive CCW area";
-	}
+  public static function validate(p:Array<CastingSegment>):Void {
+    if (p == null || p.length < 2 || p.length > 512) throw "Invalid exact profile contour count";
+    for (i in 0...p.length) {
+      var s = p[i], c = s.center;
+      for (v in [s.start.x,
+        s.start.y, s.end.x, s.end.y, s.sweep]) if (!Math.isFinite(v)) throw "Nonfinite profile contour";
+      if (s.kind == CastingCurveKind.Line) {
+        if (c != null || s.sweep != 0 || CastingProfiles.distance(s.start, s.end) < TOL) throw "Invalid profile line";
+      } else if (s.kind == CastingCurveKind.Arc) {
+        if (c == null || !Math.isFinite(c.x) || !Math.isFinite(c.y)
+          || Math.abs(s.sweep) < 1e-10 || Math.abs(s.sweep) >= 2 * Math.PI - 1e-12 || CastingProfiles.distance(
+            c,
+            s.start
+          ) < TOL || CastingProfiles.distance(
+            CastingProfiles.point(
+              s,
+              1
+            ),
+            s.end
+          ) > TOL) throw "Invalid profile arc";
+      } else throw "Unknown profile curve kind";
+      if (CastingProfiles.distance(s.end, p[(i + 1) % p.length].start) > TOL) throw "Open profile contour";
+      for (j in i + 1...p.length) for (hit in intersections(s, p[j])) {
+        var adjacent = j == i + 1 || (i == 0 && j == p.length - 1);
+        var endpoints = (CastingProfiles.distance(hit,
+          s.start) < TOL || CastingProfiles.distance(hit, s.end) < TOL) && (CastingProfiles.distance(
+            hit,
+            p[j].start
+          ) < TOL || CastingProfiles.distance(
+            hit,
+            p[j].end
+          ) < TOL);
+        if (!adjacent || !endpoints) throw "Profile contour self-intersects";
+      }
+    }
+    var signedArea = area(p);
+    if (!Math.isFinite(signedArea) || signedArea <= TOL) throw "Profile contour must have finite positive CCW area";
+  }
 
-	public static function area(p:Array<CastingSegment>):Float {
-		var total = 0.0;
-		for (s in p) {
-			var c = s.center;
-			total += c == null ? (s.start.x * s.end.y - s.end.x * s.start.y) / 2 : (c.x * (s.end.y - s.start.y) - c.y * (s.end.x - s.start.x)
-				+ Math.pow(CastingProfiles.distance(c, s.start), 2) * s.sweep) / 2;
-		}
-		return total;
-	}
+  public static function area(p:Array<CastingSegment>):Float {
+    var total = 0.0;
+    for (s in p) {
+      var c = s.center;
+      total += c == null ? (s.start.x * s.end.y - s.end.x * s.start.y) / 2
+        : (c.x * (s.end.y - s.start.y) - c.y * (s.end.x - s.start.x) + Math.pow(
+          CastingProfiles.distance(
+            c,
+            s.start
+          ),
+          2
+        ) * s.sweep) / 2;
+    }
+    return total;
+  }
 
-	public static function extrema(s:CastingSegment):Array<CastingPoint2> {
-		var result = [s.start, s.end], c = s.center;
-		if (c != null)
-			for (i in 0...4) {
-				var r = CastingProfiles.distance(c, s.start),
-					p = {x: c.x + r * Math.cos(i * Math.PI / 2), y: c.y + r * Math.sin(i * Math.PI / 2)};
-				if (on(s, p))
-					result.push(p);
-			}
-		return result;
-	}
+  public static function extrema(s:CastingSegment):Array<CastingPoint2> {
+    var result = [s.start, s.end], c = s.center;
+    if (c != null) for (i in 0...4) {
+      var r = CastingProfiles.distance(c, s.start), p = {
+        x: c.x + r * Math.cos(i * Math.PI / 2),
+        y: c.y + r * Math.sin(i * Math.PI / 2)
+      };
+      if (on(s, p)) result.push(p);
+    }
+    return result;
+  }
 
-	public static function bounds(p:Array<CastingSegment>):{
-		x:Float,
-		y:Float,
-		width:Float,
-		height:Float
-	} {
-		var x = Math.POSITIVE_INFINITY, y = x, xx = Math.NEGATIVE_INFINITY, yy = xx;
-		for (s in p)
-			for (v in extrema(s)) {
-				x = Math.min(x, v.x);
-				y = Math.min(y, v.y);
-				xx = Math.max(xx, v.x);
-				yy = Math.max(yy, v.y);
-			}
-		return {
-			x: x,
-			y: y,
-			width: xx - x,
-			height: yy - y
-		};
-	}
+  public static function bounds(p:Array<CastingSegment>): {x: Float, y: Float, width: Float, height: Float} {
+    var x = Math.POSITIVE_INFINITY, y = x, xx = Math.NEGATIVE_INFINITY, yy = xx;
+    for (s in p) for (v in extrema(s)) {
+      x = Math.min(x, v.x);
+      y = Math.min(y, v.y);
+      xx = Math.max(xx, v.x);
+      yy = Math.max(yy, v.y);
+    }
+    return {x: x, y: y, width: xx - x, height: yy - y};
+  }
 
-	public static function inside(p:Array<CastingSegment>, x:Float, y:Float):Bool {
-		var query = {x: x, y: y}, hits = 0;
-		for (index in 0...p.length) {
-			var s=p[index],end=p[(index+1)%p.length].start;
-			if (CastingProfiles.distance(s.end,end)>TOL) throw "Profile contour is not closed";
-			if (on(s, query))
-				return true;
-			var c = s.center;
-			if (c == null) {
-				if ((s.start.y > y) != (end.y > y) && x < (end.x - s.start.x) * (y - s.start.y) / (end.y - s.start.y) + s.start.x)
-					hits++;
-			} else {
-				// Split at exact Y extrema, then apply the same half-open crossing rule.
-				var fractions = [0.0, 1.0],
-					a = Math.atan2(s.start.y - c.y, s.start.x - c.x),
-					r = CastingProfiles.distance(c, s.start);
-				for (t in [Math.PI / 2, 3 * Math.PI / 2]) {
-					var delta = angle(s.sweep > 0 ? t - a : a - t),
-						f = delta / Math.abs(s.sweep);
-					if (f > 1e-10 && f < 1 - 1e-10)
-						fractions.push(f);
-				}
-				fractions.sort(Reflect.compare);
-				for (i in 0...fractions.length - 1) {
-					// Adjacent edges share one logical vertex. Re-evaluating its
-					// sine at 2pi can put the same endpoint on opposite sides of
-					// a ray, changing parity despite a closed line/arc contour.
-					var u = fractions[i]==0 ? s.start : CastingProfiles.point(s, fractions[i]),
-						v = fractions[i+1]==1 ? end : CastingProfiles.point(s, fractions[i + 1]);
-					if ((u.y > y) != (v.y > y)) {
-						var mid = CastingProfiles.point(s, (fractions[i] + fractions[i + 1]) / 2),
-							dx = Math.sqrt(Math.max(0, r * r - (y - c.y) * (y - c.y)));
-						if (x < c.x + (mid.x >= c.x ? dx : -dx))
-							hits++;
-					}
-				}
-			}
-		}
-		return hits % 2 == 1;
-	}
+  public static function inside(p:Array<CastingSegment>, x:Float, y:Float):Bool {
+    var query = {x: x, y: y}, hits = 0;
+    for (index in 0...p.length) {
+      var s = p[index], end = p[(index + 1) % p.length].start;
+      if (CastingProfiles.distance(s.end, end) > TOL) throw "Profile contour is not closed";
+      if (on(s, query)) return true;
+      var c = s.center;
+      if (c == null) {
+        if ((s.start.y > y) != (end.y > y)
+          && x < (end.x - s.start.x) * (y - s.start.y) / (end.y - s.start.y) + s.start.x) hits++;
+      } else {
+        // Split at exact Y extrema, then apply the same half-open crossing rule.
+        var fractions = [0.0, 1.0], a = Math.atan2(s.start.y - c.y, s.start.x - c.x), r = CastingProfiles.distance(
+          c,
+          s.start
+        );
+        for (t in [Math.PI / 2, 3 * Math.PI / 2]) {
+          var delta = angle(s.sweep > 0 ? t - a : a - t), f = delta / Math.abs(s.sweep);
+          if (f > 1e-10 && f < 1 - 1e-10) fractions.push(f);
+        }
+        fractions.sort(Reflect.compare);
+        for (i in 0...fractions.length - 1) {
+          // Adjacent edges share one logical vertex. Re-evaluating its
+          // sine at 2pi can put the same endpoint on opposite sides of
+          // a ray, changing parity despite a closed line/arc contour.
+          var u = fractions[i] == 0 ? s.start : CastingProfiles.point(s,
+            fractions[i]), v = fractions[i + 1] == 1 ? end : CastingProfiles.point(
+              s,
+              fractions[i + 1]
+            );
+          if ((u.y > y) != (v.y > y)) {
+            var mid = CastingProfiles.point(s, (fractions[i] + fractions[i + 1]) / 2), dx = Math.sqrt(Math.max(
+              0,
+              r * r - (y - c.y) * (y - c.y)
+            ));
+            if (x < c.x + (mid.x >= c.x ? dx : -dx)) hits++;
+          }
+        }
+      }
+    }
+    return hits % 2 == 1;
+  }
 
-	public static function containsRect(p:Array<CastingSegment>, x:Float, y:Float, w:Float, h:Float):Bool {
-		var box = CastingProfiles.rectangle(x, y, w, h);
-		for (s in box)
-			if (!inside(p, s.start.x, s.start.y))
-				return false;
-		for (s in p) {
-			// A straight boundary coincident with a rectangle side cannot
-			// enter its interior. Endpoint intersections with its adjacent
-			// sides are contact, not a transverse boundary crossing.
-			if (s.center==null && (
-				Math.abs(s.start.y-s.end.y)<=TOL && (Math.abs(s.start.y-y)<=TOL || Math.abs(s.start.y-y-h)<=TOL)
-				|| Math.abs(s.start.x-s.end.x)<=TOL && (Math.abs(s.start.x-x)<=TOL || Math.abs(s.start.x-x-w)<=TOL)))
-				continue;
-			for (v in extrema(s))
-				if (v.x > x + TOL && v.x < x + w - TOL && v.y > y + TOL && v.y < y + h - TOL)
-					return false;
-			for (edge in box)
-				for (v in intersections(s, edge)) {
-					var c = s.center;
-					var tx = c == null ? s.end.x - s.start.x : -(v.y - c.y);
-					var ty = c == null ? s.end.y - s.start.y : v.x - c.x;
-					if (edge.start.x == edge.end.x ? Math.abs(tx) > TOL : Math.abs(ty) > TOL)
-						return false;
-				}
-		}
-		return true;
-	}
+  public static function containsRect(p:Array<CastingSegment>, x:Float, y:Float, w:Float, h:Float):Bool {
+    var box = CastingProfiles.rectangle(x, y, w, h);
+    for (s in box) if (!inside(p, s.start.x, s.start.y)) return false;
+    for (s in p) {
+      // A straight boundary coincident with a rectangle side cannot
+      // enter its interior. Endpoint intersections with its adjacent
+      // sides are contact, not a transverse boundary crossing.
+      if (s.center == null && (Math.abs(s.start.y - s.end.y) <= TOL && (Math.abs(s.start.y - y) <= TOL
+        || Math.abs(s.start.y - y - h) <= TOL) || Math.abs(s.start.x - s.end.x) <= TOL
+        && (Math.abs(s.start.x - x) <= TOL || Math.abs(s.start.x - x - w) <= TOL))) continue;
+      for (v in extrema(s)) if (v.x > x + TOL && v.x < x + w - TOL && v.y > y + TOL && v.y < y + h - TOL) return false;
+      for (edge in box) for (v in intersections(s, edge)) {
+        var c = s.center;
+        var tx = c == null ? s.end.x - s.start.x : -(v.y - c.y);
+        var ty = c == null ? s.end.y - s.start.y : v.x - c.x;
+        if (edge.start.x == edge.end.x ? Math.abs(tx) > TOL : Math.abs(ty) > TOL) return false;
+      }
+    }
+    return true;
+  }
 }

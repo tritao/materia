@@ -3,109 +3,157 @@ package materia.casting;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 enum abstract CastingFeatureKind(String) to String {
-	var Lightening = "lightening";
-	var ServiceOpening = "service-opening";
-	var InterfaceRecess = "interface-recess";
-	var InsertRecess = "insert-recess";
-	var Clearance = "clearance";
+  var Lightening = "lightening";
+  var ServiceOpening = "service-opening";
+  var InterfaceRecess = "interface-recess";
+  var InsertRecess = "insert-recess";
+  var Clearance = "clearance";
 }
 
 class CastingFeatureKinds {
-	public static function values():Array<CastingFeatureKind>
-		return [CastingFeatureKind.Lightening, CastingFeatureKind.ServiceOpening, CastingFeatureKind.InterfaceRecess,
-			CastingFeatureKind.InsertRecess, CastingFeatureKind.Clearance];
-	public static function tokens():Array<String> return [for (kind in values()) (kind:String)];
+  public static function values():Array<CastingFeatureKind> return [
+    CastingFeatureKind.Lightening,
+    CastingFeatureKind.ServiceOpening,
+    CastingFeatureKind.InterfaceRecess,
+    CastingFeatureKind.InsertRecess,
+    CastingFeatureKind.Clearance
+  ];
+  public static function tokens():Array<String> return [for (kind in values())(kind:String)];
 }
 
 enum abstract CastingDimension(String) to String {
-	var Width = "width";
-	var Depth = "depth";
-	var Height = "height";
-	var Draft = "draft";
-	var CornerRadius = "cornerRadius";
+  var Width = "width";
+  var Depth = "depth";
+  var Height = "height";
+  var Draft = "draft";
+  var CornerRadius = "cornerRadius";
 }
 
 class CastingDimensions {
-	public static function values():Array<CastingDimension> return [CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height, CastingDimension.Draft, CastingDimension.CornerRadius];
-	public static function tokens():Array<String> return [for (dimension in values()) (dimension:String)];
+  public static function values():Array<CastingDimension> return [
+    CastingDimension.Width,
+    CastingDimension.Depth,
+    CastingDimension.Height,
+    CastingDimension.Draft,
+    CastingDimension.CornerRadius
+  ];
+  public static function tokens():Array<String> return [for (dimension in values())(dimension:String)];
 }
 
 enum abstract CastingOpeningKind(String) to String {
-	var BodyFace = "body-face";
-	var Feature = "feature";
+  var BodyFace = "body-face";
+  var Feature = "feature";
 }
 
 /** Body-face targets are <body ID>.<x-min|x-max|y-min|y-max|z-min|z-max>. */
-typedef CastingOpening = {var kind:CastingOpeningKind; var target:String;}
+typedef CastingOpening = {
+  var kind:CastingOpeningKind;
+  var target:String;
+}
 
 /** Insert recesses preserve their complete source exterior; design cuts stay primitive. */
 enum CastingGeometrySolid {
-	Cut(solid:CastingSolid);
-	Prism(profile:Array<CastingProfile.CastingSegment>, height:Float);
-	Insert(body:InsertSpec.InsertBody);
+  Cut(solid:CastingSolid);
+  Prism(profile:Array<CastingProfile.CastingSegment>, height:Float);
+  Insert(body:InsertSpec.InsertBody);
 }
 
 class CastingGeometrySolids {
-	public static function copy(body:CastingGeometrySolid):CastingGeometrySolid return snapshot(record(body));
+  public static function copy(body:CastingGeometrySolid):CastingGeometrySolid return snapshot(record(body));
 
-	public static function snapshot(raw:Dynamic):CastingGeometrySolid {
-		return switch CastingRecordCodec.string(raw, "kind") {
-			case "cut":
-				CastingFeatureCodec.fields(raw, ["kind", "solid"]);
-				Cut(CastingSolid.CastingSolidCodec.snapshot(Reflect.field(raw, "solid")));
-			case "prism":
-				CastingFeatureCodec.fields(raw,["kind","profile","height"]);
-				var height=CastingRecordCodec.number(raw,"height");
-				if (height<=0) throw "Casting prism height must be positive";
-				Prism(CastingProfile.CastingProfileCodec.snapshot(Reflect.field(raw,"profile")),height);
-			case "insert":
-				CastingFeatureCodec.fields(raw, ["kind", "body"]);
-				Insert(InsertSpec.InsertBodyCodec.snapshot(Reflect.field(raw, "body")));
-			default: throw "Unknown casting geometry kind";
-		};
-	}
-	public static function record(value:CastingGeometrySolid):Dynamic return switch value {
-		case Cut(solid): {kind: "cut", solid: CastingSolid.CastingSolidCodec.record(solid)};
-		case Prism(profile,height): {kind:"prism",profile:CastingProfile.CastingProfileCodec.snapshot(profile),height:height};
-		case Insert(body): {kind: "insert", body: InsertSpec.InsertBodyCodec.record(body)};
-	};
-	public static function isBox(value:CastingGeometrySolid):Bool return switch value {
-		case Cut(solid): switch solid {case Box(_, _, _): true; default: false;};
-		case Prism(_,_): false;
-		case Insert(body): switch body {case Primitive(solid): switch solid {case Box(_, _, _): true; default: false;}; default: false;};
-	};
-	public static function box(value:CastingGeometrySolid, id:String):{width:Float, depth:Float, height:Float} return switch value {
-		case Cut(solid): CastingSolid.CastingSolidCodec.box(solid, id);
-		case Prism(_,_): throw "Unsupported non-box solid: "+id;
-		case Insert(body): InsertSpec.InsertBodyCodec.box(body, id);
-	};
-	public static function height(value:CastingGeometrySolid):Float return switch value {
-		case Cut(solid): CastingSolid.CastingSolidCodec.height(solid);
-		case Prism(_,height): height;
-		case Insert(body): InsertSpec.InsertBodyCodec.height(body);
-	};
-	public static function mouth(value:CastingGeometrySolid):CastingSolid return switch value {
-		case Cut(solid): solid;
-		case Prism(_,_): throw "Profile feature has no primitive mouth";
-		case Insert(body): InsertSpec.InsertBodyCodec.mouth(body);
-	};
+  public static function snapshot(raw:Dynamic):CastingGeometrySolid {
+    return switch CastingRecordCodec.string(raw, "kind") {
+      case "cut":
+        CastingFeatureCodec.fields(raw, ["kind", "solid"]);
+        Cut(CastingSolid.CastingSolidCodec.snapshot(Reflect.field(raw, "solid")));
+      case "prism":
+        CastingFeatureCodec.fields(raw, ["kind", "profile", "height"]);
+        var height = CastingRecordCodec.number(raw, "height");
+        if (height <= 0) throw "Casting prism height must be positive";
+        Prism(CastingProfile.CastingProfileCodec.snapshot(Reflect.field(raw, "profile")), height);
+      case "insert":
+        CastingFeatureCodec.fields(raw, ["kind", "body"]);
+        Insert(InsertSpec.InsertBodyCodec.snapshot(Reflect.field(raw, "body")));
+      default:
+        throw "Unknown casting geometry kind";
+    };
+  }
+  public static function record(value:CastingGeometrySolid):Dynamic return switch value {
+    case Cut(solid):
+      {kind: "cut", solid: CastingSolid.CastingSolidCodec.record(solid)};
+    case Prism(profile, height):
+      {kind: "prism", profile: CastingProfile.CastingProfileCodec.snapshot(profile), height: height};
+    case Insert(body):
+      {kind: "insert", body: InsertSpec.InsertBodyCodec.record(body)};
+  };
+  public static function isBox(value:CastingGeometrySolid):Bool return switch value {
+    case Cut(solid):
+      switch solid {
+        case Box(_, _, _):
+          true;
+        default:
+          false;
+      };
+    case Prism(_, _):
+      false;
+    case Insert(body):
+      switch body {
+        case Primitive(solid):
+          switch solid {
+            case Box(_, _, _):
+              true;
+            default:
+              false;
+          };
+        default:
+          false;
+      };
+  };
+  public static function box(value:CastingGeometrySolid,
+    id:String): {width: Float, depth: Float, height: Float} return switch value {
+    case Cut(solid):
+      CastingSolid.CastingSolidCodec.box(solid, id);
+    case Prism(_, _):
+      throw "Unsupported non-box solid: " + id;
+    case Insert(body):
+      InsertSpec.InsertBodyCodec.box(body, id);
+  };
+  public static function height(value:CastingGeometrySolid):Float return switch value {
+    case Cut(solid):
+      CastingSolid.CastingSolidCodec.height(solid);
+    case Prism(_, height):
+      height;
+    case Insert(body):
+      InsertSpec.InsertBodyCodec.height(body);
+  };
+  public static function mouth(value:CastingGeometrySolid):CastingSolid return switch value {
+    case Cut(solid):
+      solid;
+    case Prism(_, _):
+      throw "Profile feature has no primitive mouth";
+    case Insert(body):
+      InsertSpec.InsertBodyCodec.mouth(body);
+  };
 }
 
 typedef CastingGeometry = {
-	var solid:CastingGeometrySolid;
-	var pose:AssemblyFrame;
+  var solid:CastingGeometrySolid;
+  var pose:AssemblyFrame;
 }
 
-typedef CastingDraft = {var degrees:Float; var axis:{x:Float, y:Float, z:Float};}
+typedef CastingDraft = {
+  var degrees:Float;
+  var axis: {x: Float, y: Float, z: Float};
+}
 
 /** Design cut plus declared openings; derive the finished cavity through CastingCavities. */
 typedef CastingFeature = {
-	var id:String;
-	var kind:CastingFeatureKind;
-	var geometry:CastingGeometry;
-	var openings:Array<CastingOpening>;
-	var draft:CastingDraft;
-	var cornerRadius:Float;
-	var owner:Null<String>;
-	var adjustable:Array<CastingDimension>;
+  var id:String;
+  var kind:CastingFeatureKind;
+  var geometry:CastingGeometry;
+  var openings:Array<CastingOpening>;
+  var draft:CastingDraft;
+  var cornerRadius:Float;
+  var owner:Null<String>;
+  var adjustable:Array<CastingDimension>;
 }

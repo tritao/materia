@@ -10,7 +10,7 @@ import materia.tooling.casting.CastingMoldPlan;
 class ProcessTests {
   static var assertions = 0;
 
-  static function items(v:Dynamic):Array < Dynamic > return cast v;
+  static function items(v:Dynamic):Array<Dynamic> return cast v;
 
   static function check(ok:Bool, label:String):Void {
     assertions++;
@@ -37,16 +37,27 @@ class ProcessTests {
     height: height
   };
 
-  public static function spec():CastingProcessSpec return {id: "process-test",
-    revision: 1, recipeFingerprint: haxe.crypto.Sha256.encode("test-recipe"),
-    pourRateMm3PerSecond: null, maximumAirEscapeWidthMm: null, mixComposition: null, mixer: null, castability: {
-    maximumAggregateSizeMm: null,
-    minimumPassageAggregateRatio: null, minimumWallAggregateRatio:5, steelAggregateMarginMm:5, steelSpacingAggregateRatio:4.0/3.0, evidence:[]
-  }, compound: {
-    reference: materia.casting.CastingInput.CastingTextInput.Unresolved("Production compound and datasheet"),
-    thickness: CompoundThicknessLimit.Unresolved("Compound section/layer thickness"),
-    maximumMassPerLiftKg: materia.casting.CastingInput.Unresolved("Compound mass per lift")
-  }
+  public static function spec():CastingProcessSpec return {
+    id: "process-test",
+    revision: 1,
+    recipeFingerprint: haxe.crypto.Sha256.encode("test-recipe"),
+    pourRateMm3PerSecond: null,
+    maximumAirEscapeWidthMm: null,
+    mixComposition: null,
+    mixer: null,
+    castability: {
+      maximumAggregateSizeMm: null,
+      minimumPassageAggregateRatio: null,
+      minimumWallAggregateRatio: 5,
+      steelAggregateMarginMm: 5,
+      steelSpacingAggregateRatio: 4.0 / 3.0,
+      evidence: []
+    },
+    compound: {
+      reference: materia.casting.CastingInput.CastingTextInput.Unresolved("Production compound and datasheet"),
+      thickness: CompoundThicknessLimit.Unresolved("Compound section/layer thickness"),
+      maximumMassPerLiftKg: materia.casting.CastingInput.Unresolved("Compound mass per lift")
+    }
   };
 
   /** Independent dense-height reference: explicit face graph, no event-plane
@@ -54,18 +65,13 @@ class ProcessTests {
 	 * the analytic right-hand limit as the height step shrinks.
 	 */
   static function sampledTraps(region:Array<MoldBox>, step:Float):Float {
-    var prior:Array<Array < Int>> = [], total = 0.0, index = 0;
+    var prior:Array<Array<Int>> = [], total = 0.0, index = 0;
     while ((index + 0.37) * step < 10) {
-      var height =(index + 0.37) * step;
-      var cells:Array < {
-        id:Int, box:MoldBox
-      }
-      > = [];
+      var height = (index + 0.37) * step;
+      var cells:Array<{id:Int, box:MoldBox}> = [];
       for (i in 0...region.length) {
         var b = region[i], z = Math.max(height, b.z), top = b.z + b.height;
-        if (top > z) cells.push({id: i, box: {x: b.x, y: b.y, z: z, width: b.width, depth: b.depth, height: top - z}
-        }
-        );
+        if (top > z) cells.push({id: i, box: {x: b.x, y: b.y, z: z, width: b.width, depth: b.depth, height: top - z}});
       } while (cells.length > 0) {
         var group = [cells.shift()], cursor = 0;
         while (cursor < group.length) {
@@ -153,11 +159,9 @@ class ProcessTests {
     );
 
     var region = [box(0, 0, 2, 10), box(2, 0, 2, 2), box(4, 0, 4, 6)];
-    var boundaries = [{id: "ceiling-feature", box: box(4, 6, 4, 4)}
-    ];
-    var cores = [{id: "foam", geometry: materia.tooling.casting.MoldRegions.box(box(10, 1, 2, 3))}
-    ];
-    function fill(cells:Array<MoldBox>, ? extra:Array<Float>):FillReport return FillAnalysis.analyze(
+    var boundaries = [{id: "ceiling-feature", box: box(4, 6, 4, 4)}];
+    var cores = [{id: "foam", geometry: materia.tooling.casting.MoldRegions.box(box(10, 1, 2, 3))}];
+    function fill(cells:Array<MoldBox>, ?extra:Array<Float>):FillReport return FillAnalysis.analyze(
       "body",
       "source",
       "process",
@@ -218,19 +222,36 @@ class ProcessTests {
       "dense independent graph agrees on nested ceilings"
     );
     var twoTops = [box(0, 0, 2, 10), box(2, 0, 2, 2), box(4, 0, 2, 10)];
-    var covered = FillAnalysis.analyze("body", "s", "p", twoTops, [], [], 10, 2400, 10, null, null, [5], [box(
-      4,
-      0,
-      2,
-      1
-    )], [{
-      id: "low-wall",
-      bottomMm: 0
-    }, {
-      id: "high-wall",
-      bottomMm: 4
-    }
-    ]);
+    var covered = FillAnalysis.analyze(
+      "body",
+      "s",
+      "p",
+      twoTops,
+      [],
+      [],
+      10,
+      2400,
+      10,
+      null,
+      null,
+      [5],
+      [box(
+        4,
+        0,
+        2,
+        1
+      )],
+      [
+        {
+          id: "low-wall",
+          bottomMm: 0
+        },
+        {
+          id: "high-wall",
+          bottomMm: 4
+        }
+      ]
+    );
     near(covered.openFillAreaMm2, 4, 1e-9, "bridge footprint is subtracted from open fill area");
     check(covered.trappedPockets.length == 1, "tool-covered top cannot vent an isolated pocket");
     near(covered.trappedPockets[0].sealedAtMm, 2, 1e-9, "covered top seals at side neck");
@@ -296,31 +317,34 @@ class ProcessTests {
       () -> FillAnalysis.analyze("body", "s", "p", region, boundaries, [], 5, 2400, 10, null, null),
       "insufficient fill height"
     );
-    var edgeOnly:Array<MoldBox> = [box(0, 0, 2, 10), {x: 2, y: 2, z: 0, width: 2, depth: 2, height: 6}
-    ];
+    var edgeOnly:Array<MoldBox> = [box(0, 0, 2, 10), {x: 2, y: 2, z: 0, width: 2, depth: 2, height: 6}];
     check(fill(edgeOnly).trappedPockets.length == 1, "edge-only contact cannot vent an air region");
-    var ceilingFragments:Array<MoldBox> = [{x: 0, y: 0, z: 0, width: 1, depth: 4, height: 10}, {
-      x: 1,
-      y: 0,
-      z: 0,
-      width: 1,
-      depth: 4,
-      height: 6
-    }, {
-      x: 2,
-      y: 0,
-      z: 0,
-      width: 1,
-      depth: 4,
-      height: 6
-    }, {
-      x: 3,
-      y: 0,
-      z: 0,
-      width: 1,
-      depth: 4,
-      height: 6
-    }
+    var ceilingFragments:Array<MoldBox> = [
+      {x: 0, y: 0, z: 0, width: 1, depth: 4, height: 10},
+      {
+        x: 1,
+        y: 0,
+        z: 0,
+        width: 1,
+        depth: 4,
+        height: 6
+      },
+      {
+        x: 2,
+        y: 0,
+        z: 0,
+        width: 1,
+        depth: 4,
+        height: 6
+      },
+      {
+        x: 3,
+        y: 0,
+        z: 0,
+        width: 1,
+        depth: 4,
+        height: 6
+      }
     ];
     var combinedCeiling = FillAnalysis.analyze("body", "s", "p", ceilingFragments, [], [], 10, 2400, 10, null, 2.5);
     check(
@@ -328,24 +352,35 @@ class ProcessTests {
       && v.status == "fail").length == 1,
       "artificial cell fragments cannot make a wide connected ceiling pass"
     );
-    var overlapCore = FillAnalysis.analyze("body", "s", "p", region, boundaries, [{
-      id: "overlap",
-      geometry: materia.casting.CastingRegion.Union([
-        materia.tooling.casting.MoldRegions.box(box(
-          10,
-          1,
-          2,
-          3
-        )),
-        materia.tooling.casting.MoldRegions.box(box(
-          10,
-          2,
-          2,
-          2
-        ))
-      ])
-    }
-    ], 10, 2400, 10, null, null);
+    var overlapCore = FillAnalysis.analyze(
+      "body",
+      "s",
+      "p",
+      region,
+      boundaries,
+      [{
+        id: "overlap",
+        geometry: materia.casting.CastingRegion.Union([
+          materia.tooling.casting.MoldRegions.box(box(
+            10,
+            1,
+            2,
+            3
+          )),
+          materia.tooling.casting.MoldRegions.box(box(
+            10,
+            2,
+            2,
+            2
+          ))
+        ])
+      }],
+      10,
+      2400,
+      10,
+      null,
+      null
+    );
     near(
       overlapCore.levels[overlapCore.levels.length - 1].cores[0].submergedVolumeMm3,
       12,
@@ -359,11 +394,17 @@ class ProcessTests {
       == ToolingCodec.canonical(s),
       "delivered process shop records parse without an intermediate format"
     );
-    var tooMany=ProcessSpecs.copy(s);tooMany.castability.evidence=[for (_ in 0...513) "fixture"];
-    rejects(() -> ProcessSpecs.copy(tooMany),"Casting process array exceeds limit");
-    var highRate:Dynamic=haxe.Json.parse(ToolingCodec.canonical(s));highRate.pourRateMm3PerSecond=1e14;
-    near(ProcessSpecs.fromRecord(highRate).pourRateMm3PerSecond,1e14,0,
-      "raw shop input retains the previous declared pour-rate range");
+    var tooMany = ProcessSpecs.copy(s);
+    tooMany.castability.evidence = [for (_ in 0...513) "fixture"];
+    rejects(() -> ProcessSpecs.copy(tooMany), "Casting process array exceeds limit");
+    var highRate:Dynamic = haxe.Json.parse(ToolingCodec.canonical(s));
+    highRate.pourRateMm3PerSecond = 1e14;
+    near(
+      ProcessSpecs.fromRecord(highRate).pourRateMm3PerSecond,
+      1e14,
+      0,
+      "raw shop input retains the previous declared pour-rate range"
+    );
     var integrated = CastingProcessAnalysis.analyze(p, s, 9.80665);
     check(integrated.pour != null, "box process includes pour planning");
     if (integrated.pour == null) throw "Missing pour plan";
@@ -379,18 +420,24 @@ class ProcessTests {
     );
     var fabrication = FabricationTests.spec();
     s.compound.reference = materia.casting.CastingInput.CastingTextInput.Known(fabrication.resinReference);
-    s.mixComposition = {reference: "synthetic mix", compoundReference: fabrication.resinReference, ingredients:[{
-      id: "resin",
-      kind: materia.tooling.process.PourPlanning.MixIngredientKind.Resin,
-      materialReference: "synthetic resin",
-      massFraction: 0.1
-    }, {
-      id: "aggregate",
-      kind: materia.tooling.process.PourPlanning.MixIngredientKind.Aggregate,
-      materialReference: "synthetic aggregate",
-      massFraction: 0.9
-    }
-    ]};
+    s.mixComposition = {
+      reference: "synthetic mix",
+      compoundReference: fabrication.resinReference,
+      ingredients: [
+        {
+          id: "resin",
+          kind: materia.tooling.process.PourPlanning.MixIngredientKind.Resin,
+          materialReference: "synthetic resin",
+          massFraction: 0.1
+        },
+        {
+          id: "aggregate",
+          kind: materia.tooling.process.PourPlanning.MixIngredientKind.Aggregate,
+          materialReference: "synthetic aggregate",
+          massFraction: 0.9
+        }
+      ]
+    };
     var mass = integratedPour.totalMixMassKg;
     s.mixer = {
       reference: "synthetic mixer",
@@ -464,8 +511,7 @@ class ProcessTests {
       "missing mixer leaves lift checks pending"
     );
     var raw:Dynamic = haxe.Json.parse(ToolingCodec.canonical(s));
-    Reflect.setField(raw, "solver", {}
-    );
+    Reflect.setField(raw, "solver", {});
     rejects(() -> ProcessSpecs.fromRecord(raw), "Unexpected casting record fields");
     s.recipeFingerprint = haxe.crypto.Sha256.encode("stale");
     rejects(() -> CastingProcessAnalysis.analyze(p, s, 9.80665), "Stale process recipe");

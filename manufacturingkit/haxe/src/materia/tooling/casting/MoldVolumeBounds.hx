@@ -11,35 +11,35 @@ import materia.assembly.AssemblyFrames as F;
  * Never use these boxes to assert exact reconstruction or collision.
  */
 class MoldVolumeBounds {
-	public static function pieces(volume:MoldVolume):Array<MoldBox> {
-		var boxes = [for (box in volume.pieces) BoxAlgebra.copy(box)];
-		for (region in volume.regions) {
-			var bounds=materia.casting.CastingRegionBounds.box(region);
-			if (bounds!=null) boxes.push(bounds);
-		}
-		for (profile in volume.profiles) {
-			var bounds = CastingProfileGeometry.bounds(profile.contour);
-			var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
-			var high = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
-			for (x in [bounds.x, bounds.x + bounds.width])
-				for (y in [bounds.y, bounds.y + bounds.height])
-					for (z in [0.0, profile.depth]) {
-						var point = F.transformPoint(profile.pose, x, y, z),
-							coordinates = [point.x, point.y, point.z];
-						for (axis in 0...3) {
-							low[axis] = Math.min(low[axis], coordinates[axis]);
-							high[axis] = Math.max(high[axis], coordinates[axis]);
-						}
-					}
-			boxes.push({
-				x: low[0],
-				y: low[1],
-				z: low[2],
-				width: high[0] - low[0],
-				depth: high[1] - low[1],
-				height: high[2] - low[2]
-			});
-		}
-		return BoxAlgebra.subtract(boxes, []);
-	}
+  public static function pieces(volume:MoldVolume):Array<MoldBox> {
+    var boxes = [for (box in volume.pieces) BoxAlgebra.copy(box)];
+    for (region in volume.regions) {
+      var bounds = materia.casting.CastingRegionBounds.box(region);
+      if (bounds != null) boxes.push(bounds);
+    }
+    for (profile in volume.profiles) {
+      var bounds = CastingProfileGeometry.bounds(profile.contour);
+      var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
+      var high = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
+      for (x in [bounds.x, bounds.x + bounds.width]) for (y in [bounds.y, bounds.y + bounds.height]) for (z in [
+        0.0,
+        profile.depth
+      ]) {
+        var point = F.transformPoint(profile.pose, x, y, z), coordinates = [point.x, point.y, point.z];
+        for (axis in 0...3) {
+          low[axis] = Math.min(low[axis], coordinates[axis]);
+          high[axis] = Math.max(high[axis], coordinates[axis]);
+        }
+      }
+      boxes.push({
+        x: low[0],
+        y: low[1],
+        z: low[2],
+        width: high[0] - low[0],
+        depth: high[1] - low[1],
+        height: high[2] - low[2]
+      });
+    }
+    return BoxAlgebra.subtract(boxes, []);
+  }
 }

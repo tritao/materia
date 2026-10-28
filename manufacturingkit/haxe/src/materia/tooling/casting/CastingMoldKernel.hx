@@ -7,13 +7,13 @@ import materia.tooling.ToolingDocument;
  * are design-geometry results, not physical capacity or qualification evidence.
  */
 typedef CastingRegionMoments = {
-	var volumeMm3:Float;
-	var firstMomentMm4:{x:Float,y:Float,z:Float};
+  var volumeMm3:Float;
+  var firstMomentMm4: {x: Float, y: Float, z: Float};
 }
 
 typedef CastingMassProperties = {
-	var massKg:Float;
-	var centerOfMassMoldMm:{x:Float,y:Float,z:Float};
+  var massKg:Float;
+  var centerOfMassMoldMm: {x: Float, y: Float, z: Float};
 }
 
 /** An application supplies exact boolean geometry for the non-box planning
@@ -21,24 +21,28 @@ typedef CastingMassProperties = {
  * path retains its existing exact algebra and does not need this service.
  */
 interface CastingMoldKernel {
-	public function moments(region:CastingRegion):CastingRegionMoments;
-	/** Actual extrema for manufacturing stock selection, after all subtractions. */
-	public function bounds(region:CastingRegion,affectedId:String):materia.casting.Box3;
-	public function section(region:CastingRegion,plane:materia.assembly.AssemblyRecord.AssemblyFrame,
-		affectedId:String):Array<materia.casting.CastingSection.CastingSectionContour>;
+  public function moments(region:CastingRegion):CastingRegionMoments;
+  /** Actual extrema for manufacturing stock selection, after all subtractions. */
+  public function bounds(region:CastingRegion, affectedId:String):materia.casting.Box3;
+  public function section(region:CastingRegion, plane:materia.assembly.AssemblyRecord.AssemblyFrame,
+    affectedId:String):Array<materia.casting.CastingSection.CastingSectionContour>;
 
-	/** A candidate section is accepted only when its complete extrusion has
+  /** A candidate section is accepted only when its complete extrusion has
 	 * symmetric difference within tolerance of the source solid. Null means
 	 * the source is not a representable line/arc prism along this direction.
 	 */
-	public function prismaticSection(region:CastingRegion,direction:{x:Float,y:Float,z:Float},
-		toleranceMm3:Float,affectedId:String):Null<materia.casting.CastingSection.CastingPrismSection>;
-	/** Geometry bands only; machining access and wire-stock limits remain separate. */
-	public function prismaticBands(region:CastingRegion,width:Float,depth:Float,height:Float,affectedId:String)
-		:Array<materia.casting.CastingSection.CastingSectionBand>;
-	public function castingMass(document:ToolingDocument):CastingMassProperties;
-	/** True interior intersections with one source resin solid, clipped at the
+  public function prismaticSection(
+    region:CastingRegion,
+    direction: {x: Float, y: Float, z: Float},
+    toleranceMm3:Float,
+    affectedId:String
+  ):Null<materia.casting.CastingSection.CastingPrismSection>;
+  /** Geometry bands only; machining access and wire-stock limits remain separate. */
+  public function prismaticBands(region:CastingRegion,
+    width:Float, depth:Float, height:Float, affectedId:String):Array<materia.casting.CastingSection.CastingSectionBand>;
+  public function castingMass(document:ToolingDocument):CastingMassProperties;
+  /** True interior intersections with one source resin solid, clipped at the
 	 * declared fill plane. Results retain query order; no qualification is cached.
 	 */
-	public function resinIntersections(document:ToolingDocument,regions:Array<CastingRegion>):Array<Float>;
+  public function resinIntersections(document:ToolingDocument, regions:Array<CastingRegion>):Array<Float>;
 }
