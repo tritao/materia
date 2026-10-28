@@ -59,10 +59,7 @@ class SheetBendCutSmoke {
     var ring = new WallOutline(
       [Segment.arc(center, 0.6, 0, 2 * Math.PI)],
       [[Segment.arc(center, 0.2, 0, -2 * Math.PI)]],
-      [
-        ["outer"],
-        ["inner"]
-      ]
+      [["outer"], ["inner"]]
     );
     var cut = source.cutBend(bend.id, ring, "ring");
     var area = 0.0;
@@ -83,14 +80,8 @@ class SheetBendCutSmoke {
     var divider = WallOutline.polygon([
       new Point2(allowance / 2 - 0.1, -1),
       new Point2(allowance / 2 + 0.1, -1),
-      new Point2(
-        allowance / 2 + 0.1,
-        101
-      ),
-      new Point2(
-        allowance / 2 - 0.1,
-        101
-      )
+      new Point2(allowance / 2 + 0.1, 101),
+      new Point2(allowance / 2 - 0.1, 101)
     ]);
     var changed = divided.cutBend(bend.id, divider, "divide");
     var detached = false;
@@ -369,10 +360,7 @@ class SheetBendCutSmoke {
       new Point2(-10, 90),
       new Point2(200, 90),
       new Point2(200, 110),
-      new Point2(
-        -10,
-        110
-      )
+      new Point2(-10, 110)
     ]);
     var shortened = SheetCutGeometry.apply(source, 1, endTool, "trim-end");
     for (state in [shortened.flat(), shortened.folded()]) {

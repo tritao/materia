@@ -29,10 +29,8 @@ class SketchSolver {
     seed:Null<SolvedSketch>,
     cancellationCheck:Null<Void -> Bool>,
     diagnose:Bool,
-    ?targets:Map<
-      String,
-      Array<Float>>
-    ) {
+    ?targets:Map<String, Array<Float>>
+  ) {
     this.targets = targets;
     layout = new SketchLayout(sketch, cancellationCheck);
     equations = new SketchEquations(layout);
@@ -49,10 +47,8 @@ class SketchSolver {
     seed:Null<SolvedSketch> = null,
     cancellationCheck:Null<Void -> Bool> = null,
     diagnose:Bool = true,
-    ?targets:Map<
-      String,
-      Array<Float>>
-    ):SolvedSketch {
+    ?targets:Map<String, Array<Float>>
+  ):SolvedSketch {
     return new SketchSolver(sketch, seed, cancellationCheck, diagnose, targets).run();
   }
 
@@ -82,10 +78,7 @@ class SketchSolver {
       layout.allConstraints).values, jacobian: values -> {var rows = equations.rows(
         values,
         layout.allConstraints,
-        equations.residuals(
-          values,
-          layout.allConstraints
-        ).values.length,
+        equations.residuals(values, layout.allConstraints).values.length,
         writer
       );
     // Entries are with respect to x / s; dividing by s gives them with respect to x.
@@ -199,12 +192,7 @@ class SketchSolver {
       for (variable in partFree) free.push(variable);
       if (solved.norm <= tolerance) cache.set(
         key,
-        {
-          values: values,
-          report: report,
-          degenerate: partDegenerate,
-          free: partFree
-        }
+        {values: values, report: report, degenerate: partDegenerate, free: partFree}
       );
       structures.set(
         key,
@@ -294,10 +282,7 @@ class SketchSolver {
       structures,
       freePoints,
       freeEntities,
-      measureReferences(
-        coordinates,
-        radii
-      )
+      measureReferences(coordinates, radii)
     );
   }
 

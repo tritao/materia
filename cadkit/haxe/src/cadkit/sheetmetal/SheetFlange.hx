@@ -59,10 +59,7 @@ class SheetFlange {
       reliefType,
       reliefWidth,
       reliefDepth,
-      "bend:" + bendId + ":wall:" + wall + ":edge:" + original.identity(
-        edge.loop,
-        edge.segment
-      )
+      "bend:" + bendId + ":wall:" + wall + ":edge:" + original.identity(edge.loop, edge.segment)
     );
     var identity = span.outline.identity(span.edge.loop, span.edge.segment);
     var attachment:Null<WallEdge> = null;

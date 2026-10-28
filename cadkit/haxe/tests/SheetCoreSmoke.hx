@@ -118,10 +118,7 @@ class SheetCoreSmoke {
         new Point2(10, 0),
         new Point2(0, 8),
         new Point2(10, 10),
-        new Point2(
-          0,
-          10
-        )
+        new Point2(0, 10)
       ]);
     }
     );
@@ -192,11 +189,7 @@ class SheetCoreSmoke {
         );
         vector(
           zone.point(1, 0, sheet.thickness()),
-          child.plane.toWorld(new Vector(
-            childEdge.end.x,
-            childEdge.end.y,
-            -sheet.thickness()
-          )),
+          child.plane.toWorld(new Vector(childEdge.end.x, childEdge.end.y, -sheet.thickness())),
           "child side B tangent"
         );
       }
@@ -240,10 +233,7 @@ class SheetCoreSmoke {
       new Point2(-1, 40),
       new Point2(allowance + 1, 40),
       new Point2(allowance + 1, 60),
-      new Point2(
-        -1,
-        60
-      )
+      new Point2(-1, 60)
     ]);
     var trimmed = split.cutBend(original.id, slot, "cross-slot");
     var regions = trimmed.materialRegions(allowance);
@@ -261,10 +251,7 @@ class SheetCoreSmoke {
         new Point2(x - 1, 40),
         new Point2(x + 1, 40),
         new Point2(x + 1, 60),
-        new Point2(
-          x - 1,
-          60
-        )
+        new Point2(x - 1, 60)
       ]);
       var outline = OutlineBoolean.subtract(wall.outline, tool, "cross-slot");
       var changed = split.updateWallMaterial(wallId, outline);

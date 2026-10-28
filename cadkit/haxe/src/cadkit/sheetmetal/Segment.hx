@@ -32,10 +32,7 @@ class Segment {
       );
     return new Segment(
       new Point2(center.x + radius * Math.cos(startAngle), center.y + radius * Math.sin(startAngle)),
-      new Point2(
-        center.x + radius * Math.cos(startAngle + sweep),
-        center.y + radius * Math.sin(startAngle + sweep)
-      ),
+      new Point2(center.x + radius * Math.cos(startAngle + sweep), center.y + radius * Math.sin(startAngle + sweep)),
       center,
       radius,
       startAngle,

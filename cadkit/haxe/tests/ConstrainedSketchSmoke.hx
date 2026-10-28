@@ -38,10 +38,7 @@ class ConstrainedSketchSmoke {
       [-width / 2, -height / 2],
       [width / 2, -height / 2],
       [width / 2, height / 2],
-      [
-        -width / 2,
-        height / 2
-      ]
+      [-width / 2, height / 2]
     ];
     for (index in 0...4) {
       sketch.addPoint(new SketchPoint("rectangle.point" + index, coordinates[index][0], coordinates[index][1]));
@@ -259,36 +256,12 @@ class ConstrainedSketchSmoke {
       new SketchPoint("m0", 0, 0),
       new SketchPoint("m1", 2, 0),
       new SketchPoint("m2", 0, 1),
-      new SketchPoint(
-        "m3",
-        2,
-        1
-      ),
-      new SketchPoint(
-        "m4",
-        0,
-        2
-      ),
-      new SketchPoint(
-        "mc1",
-        0,
-        4
-      ),
-      new SketchPoint(
-        "mc2",
-        2,
-        4
-      ),
-      new SketchPoint(
-        "ms0",
-        -1,
-        2
-      ),
-      new SketchPoint(
-        "ms1",
-        1,
-        2
-      )
+      new SketchPoint("m3", 2, 1),
+      new SketchPoint("m4", 0, 2),
+      new SketchPoint("mc1", 0, 4),
+      new SketchPoint("mc2", 2, 4),
+      new SketchPoint("ms0", -1, 2),
+      new SketchPoint("ms1", 1, 2)
     ]) mixed.addPoint(p);
     mixed.addEntity(SketchEntity.line("ml1",
       "m0", "m1")).addEntity(SketchEntity.line("ml2", "m2", "m3")).addEntity(SketchEntity.line(
@@ -402,36 +375,12 @@ class ConstrainedSketchSmoke {
     for (point in [
       new SketchPoint("cap.left", -3, 0),
       new SketchPoint("cap.right", 3, 0),
-      new SketchPoint(
-        "cap.bl",
-        -3,
-        -2
-      ),
-      new SketchPoint(
-        "cap.br",
-        3,
-        -2
-      ),
-      new SketchPoint(
-        "cap.tl",
-        -3,
-        2
-      ),
-      new SketchPoint(
-        "cap.tr",
-        3,
-        2
-      ),
-      new SketchPoint(
-        "cap.hole",
-        0,
-        0
-      ),
-      new SketchPoint(
-        "cap.island",
-        0,
-        0
-      )
+      new SketchPoint("cap.bl", -3, -2),
+      new SketchPoint("cap.br", 3, -2),
+      new SketchPoint("cap.tl", -3, 2),
+      new SketchPoint("cap.tr", 3, 2),
+      new SketchPoint("cap.hole", 0, 0),
+      new SketchPoint("cap.island", 0, 0)
     ]) capsule.addPoint(point);
     capsule.addEntity(SketchEntity.line("cap.bottom", "cap.bl", "cap.br")).addEntity(SketchEntity.arc(
       "cap.rightArc",
@@ -674,11 +623,7 @@ class ConstrainedSketchSmoke {
       new SketchPoint("l0", 0, 0),
       new SketchPoint("l1", 10, 0),
       new SketchPoint("l2", 10, 5),
-      new SketchPoint(
-        "l3",
-        0,
-        5
-      )
+      new SketchPoint("l3", 0, 5)
     ]) locked.addPoint(point);
     locked.addEntity(SketchEntity.line("locked.bottom", "l0", "l1")).addEntity(SketchEntity.line(
       "locked.right",

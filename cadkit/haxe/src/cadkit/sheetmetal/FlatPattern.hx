@@ -68,28 +68,14 @@ class FlatPattern {
     var bends:Array<FlatBend> = [];
     for (wall in sheet.walls()) domains.push(new FlatDomain(
       FlatOwner.Wall(wall.id),
-      identified(
-        SheetProfile.transform(
-          wall.outline,
-          evaluated.wall(wall.id).plane,
-          plane
-        ),
-        "wall:" + wall.id
-      )
+      identified(SheetProfile.transform(wall.outline, evaluated.wall(wall.id).plane, plane), "wall:" + wall.id)
     ));
     for (bend in sheet.bends()) {
       var zone = evaluated.bend(bend.id);
       var material = bend.materialRegions(zone.allowance);
       for (region in material) domains.push(new FlatDomain(
         FlatOwner.Bend(bend.id),
-        identified(
-          SheetProfile.transform(
-            region,
-            zone.frame.plane,
-            plane
-          ),
-          "bend:" + bend.id
-        )
+        identified(SheetProfile.transform(region, zone.frame.plane, plane), "bend:" + bend.id)
       ));
       var guide = Segment.line(new Point2(zone.allowance / 2, 0), new Point2(zone.allowance / 2, zone.width));
       var intervals:Array<SeamInterval> = [];

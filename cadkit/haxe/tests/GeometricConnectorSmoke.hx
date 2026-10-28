@@ -59,25 +59,14 @@ class GeometricConnectorSmoke {
     var plateDefinition = document.createDefinition(
       "Plate",
       "cadkit.test.mate-plate",
-      [new DefinitionInput(
-        "width",
-        ParameterKind.Length,
-        "mm",
-        60
-      )],
-      [new DefinitionOutput(
-        "body",
-        DefinitionOutput.Geometry
-      )]
+      [new DefinitionInput("width", ParameterKind.Length, "mm", 60)],
+      [new DefinitionOutput("body", DefinitionOutput.Geometry)]
     );
     var pinDefinition = document.createDefinition(
       "Pin",
       "cadkit.test.mate-pin",
       [],
-      [new DefinitionOutput(
-        "body",
-        DefinitionOutput.Geometry
-      )]
+      [new DefinitionOutput("body", DefinitionOutput.Geometry)]
     );
 
     // In memory: connectors captured on the shapes are ordinary connectors with a reference; the mates place the pin.
@@ -133,12 +122,7 @@ class GeometricConnectorSmoke {
     var ball = Shape.sphere(8);
     var withBall = pinOnPlate(plateShape, pinShape);
     withBall.definitions[1].connectors.push(GeometricConnectors.connector(
-      GeometricConnectors.capture(
-        "ball",
-        ball,
-        CadKit.ShapeKind.Face,
-        0
-      ),
+      GeometricConnectors.capture("ball", ball, CadKit.ShapeKind.Face, 0),
       ball
     ));
     var code = "";
@@ -152,11 +136,7 @@ class GeometricConnectorSmoke {
     var described = GeometricConnectors.captureDescribed(
       "bore",
       GeometricConnectors.describeFaces(plateShape),
-      face(
-        plateShape,
-        CadKit.SurfaceKind.Cylinder,
-        0
-      )
+      face(plateShape, CadKit.SurfaceKind.Cylinder, 0)
     );
     near(described.frame.x, 30, "a bore captured from descriptors is framed like one captured from the shape");
     var widePlate = plate(90);
@@ -177,11 +157,7 @@ class GeometricConnectorSmoke {
       firstConnector: "top",
       second: "pin",
       secondConnector: "base",
-      axis: {
-        x: 0,
-        y: 0,
-        z: 1
-      }
+      axis: {x: 0, y: 0, z: 1}
     }];
     check(
       diagnosticCode(() -> AssemblyDocuments.fromDefinition(new Document(),
@@ -336,11 +312,7 @@ class GeometricConnectorSmoke {
       "bore",
       narrow,
       CadKit.ShapeKind.Face,
-      face(
-        narrow,
-        CadKit.SurfaceKind.Cylinder,
-        0
-      )
+      face(narrow, CadKit.SurfaceKind.Cylinder, 0)
     );
     near(GeometricConnectors.frame(wide, bore).x, 45, "a moved bore is found by its axis and radius");
     var tool = Shape.cylinder(5, 12), placed = tool.translate(Geometry.vec3(10, 20, -1)), twoBores = wide.cut(placed);
@@ -385,42 +357,26 @@ class GeometricConnectorSmoke {
       "top",
       plateShape,
       CadKit.ShapeKind.Face,
-      face(
-        plateShape,
-        CadKit.SurfaceKind.Plane,
-        1
-      )
+      face(plateShape, CadKit.SurfaceKind.Plane, 1)
     );
     var bore = GeometricConnectors.capture(
       "bore",
       plateShape,
       CadKit.ShapeKind.Face,
-      face(
-        plateShape,
-        CadKit.SurfaceKind.Cylinder,
-        0
-      )
+      face(plateShape, CadKit.SurfaceKind.Cylinder, 0)
     );
     var base = GeometricConnectors.capture(
       "base",
       pinShape,
       CadKit.ShapeKind.Face,
-      face(
-        pinShape,
-        CadKit.SurfaceKind.Plane,
-        -1
-      ),
+      face(pinShape, CadKit.SurfaceKind.Plane, -1),
       true
     );
     var side = GeometricConnectors.capture(
       "side",
       pinShape,
       CadKit.ShapeKind.Face,
-      face(
-        pinShape,
-        CadKit.SurfaceKind.Cylinder,
-        0
-      )
+      face(pinShape, CadKit.SurfaceKind.Cylinder, 0)
     );
     return {
       schemaVersion: AssemblyDefinitionCodec.VERSION,
@@ -429,51 +385,16 @@ class GeometricConnectorSmoke {
       definitions: [
         {
           id: "plate",
-          connectors: [
-            GeometricConnectors.connector(
-              top,
-              plateShape
-            ),
-            GeometricConnectors.connector(
-              bore,
-              plateShape
-            )
-          ]
+          connectors: [GeometricConnectors.connector(top, plateShape), GeometricConnectors.connector(bore, plateShape)]
         },
         {
           id: "pin",
-          connectors: [
-            GeometricConnectors.connector(
-              base,
-              pinShape
-            ),
-            GeometricConnectors.connector(
-              side,
-              pinShape
-            )
-          ]
+          connectors: [GeometricConnectors.connector(base, pinShape), GeometricConnectors.connector(side, pinShape)]
         }
       ],
       occurrences: [
-        {
-          id: "plate",
-          definition: "plate",
-          initialPose: AssemblyFrames.identity(),
-          grounded: true
-        },
-        {
-          id: "pin",
-          definition: "pin",
-          initialPose: {
-            x: 120,
-            y: -40,
-            z: 75,
-            qx: 0.2,
-            qy: 0,
-            qz: 0,
-            qw: Math.sqrt(0.96)
-          }
-        }
+        {id: "plate", definition: "plate", initialPose: AssemblyFrames.identity(), grounded: true},
+        {id: "pin", definition: "pin", initialPose: {x: 120, y: -40, z: 75, qx: 0.2, qy: 0, qz: 0, qw: Math.sqrt(0.96)}}
       ],
       joints: [],
       mates: [
@@ -484,11 +405,7 @@ class GeometricConnectorSmoke {
           firstConnector: "top",
           second: "pin",
           secondConnector: "base",
-          axis: {
-            x: 0,
-            y: 0,
-            z: 1
-          }
+          axis: {x: 0, y: 0, z: 1}
         },
         {
           id: "shaft",
@@ -497,11 +414,7 @@ class GeometricConnectorSmoke {
           firstConnector: "bore",
           second: "pin",
           secondConnector: "side",
-          axis: {
-            x: 0,
-            y: 0,
-            z: 1
-          }
+          axis: {x: 0, y: 0, z: 1}
         }
       ]
     };

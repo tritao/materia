@@ -26,18 +26,9 @@ class SheetBlankSmoke {
       partId: "part",
       partRevision: 3,
       quantity: quantity,
-      thicknessTolerance: new SheetTolerance(
-        0.05,
-        0.1
-      ),
-      widthTolerance: new SheetTolerance(
-        0.1,
-        0.2
-      ),
-      heightTolerance: new SheetTolerance(
-        0.3,
-        0.4
-      )
+      thicknessTolerance: new SheetTolerance(0.05, 0.1),
+      widthTolerance: new SheetTolerance(0.1, 0.2),
+      heightTolerance: new SheetTolerance(0.3, 0.4)
     };
   }
   public static function run():Int {
@@ -84,19 +75,8 @@ class SheetBlankSmoke {
     project.customMaterials = [{
       id: "blank-fixture",
       name: "Assumed blank integration fixture",
-      visual: {
-        baseColor: [
-          0.7,
-          0.7,
-          0.7
-        ],
-        metallic: 0.5,
-        roughness: 0.5
-      },
-      physical: {
-        density: 7850,
-        spec: "assumed reference steel"
-      }
+      visual: {baseColor: [0.7, 0.7, 0.7], metallic: 0.5, roughness: 0.5},
+      physical: {density: 7850, spec: "assumed reference steel"}
     }];
     var restored = SheetProjectCodec.decode(SheetProjectCodec.encode(project)).requirements[0];
     check(
@@ -123,18 +103,9 @@ class SheetBlankSmoke {
       partId: "part",
       partRevision: 1,
       quantity: 1,
-      thicknessTolerance: new SheetTolerance(
-        1.5,
-        0
-      ),
-      widthTolerance: new SheetTolerance(
-        0,
-        0
-      ),
-      heightTolerance: new SheetTolerance(
-        0,
-        0
-      )
+      thicknessTolerance: new SheetTolerance(1.5, 0),
+      widthTolerance: new SheetTolerance(0, 0),
+      heightTolerance: new SheetTolerance(0, 0)
     };
     refused = false;
     try {

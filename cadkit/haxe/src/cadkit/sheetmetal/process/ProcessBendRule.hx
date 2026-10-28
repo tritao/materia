@@ -29,10 +29,7 @@ class ProcessBendRule {
     if (Math.abs(radius - result.innerRadius) > 1e-8) throw new SheetDiagnosis(
       "sheet.process-radius-mismatch",
       "Authored inner radius " + radius + " differs from the tooling's released radius " + result.innerRadius,
-      [
-        tooling.punchId,
-        tooling.dieId
-      ]
+      [tooling.punchId, tooling.dieId]
     );
     return result.bendAllowance;
   }

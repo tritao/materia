@@ -32,19 +32,9 @@ class VentilatedEnclosure {
       slot = builder.attachedConstrainedSketch(
         slotSketch(),
         enclosure,
-        new SelectionRecipe(
-          "face",
-          "plane",
-          Vector.Z(),
-          "max",
-          Vector.Z(),
-          1
-        ),
+        new SelectionRecipe("face", "plane", Vector.Z(), "max", Vector.Z(), 1),
         Vector.X(),
-        new Map<
-          String,
-          NamedParameter
-      >()
+        new Map<String, NamedParameter>()
       );
       slots = builder.linearPattern(slot, count, spacing, Vector.X());
       finish = builder.pocketThroughAll(enclosure, slots);
@@ -58,16 +48,8 @@ class VentilatedEnclosure {
     for (point in [
       new SketchPoint("vent.bl", -2, -10),
       new SketchPoint("vent.br", 2, -10),
-      new SketchPoint(
-        "vent.tr",
-        2,
-        10
-      ),
-      new SketchPoint(
-        "vent.tl",
-        -2,
-        10
-      )
+      new SketchPoint("vent.tr", 2, 10),
+      new SketchPoint("vent.tl", -2, 10)
     ]) sketch.addPoint(point);
     sketch.addEntity(SketchEntity.line("vent.bottom", "vent.bl", "vent.br")).addEntity(SketchEntity.line(
       "vent.right",
@@ -84,12 +66,7 @@ class VentilatedEnclosure {
     ));
     for (index in 0...4) sketch.addConstraint(SketchConstraint.fixed(
       "vent.fixed" + index,
-      [
-        "vent.bl",
-        "vent.br",
-        "vent.tr",
-        "vent.tl"
-      ][index]
+      ["vent.bl", "vent.br", "vent.tr", "vent.tl"][index]
     ));
     return sketch;
   }

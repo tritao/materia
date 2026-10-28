@@ -26,11 +26,7 @@ class LevelElement extends Element {
   }
   public function setElevation(value:Float, unit:String = "mm"):Void document.setLevelElevation(
     this,
-    UnitConversion.toCanonical(
-      value,
-      "length",
-      unit
-    )
+    UnitConversion.toCanonical(value, "length", unit)
   );
   public function restoreElevation(value:Float):Void {
     elevation = value;

@@ -19,38 +19,13 @@ class AssemblyDragSmoke {
     var tip:AssemblyComponentDefinition = {
       id: "tip-link",
       connectors: [
-        {
-          name: "a",
-          frame: AssemblyLoopSmoke.frame(
-            0,
-            0,
-            0
-          )
-        },
-        {
-          name: "tool",
-          frame: AssemblyLoopSmoke.frame(
-            200,
-            0,
-            0
-          )
-        }
+        {name: "a", frame: AssemblyLoopSmoke.frame(0, 0, 0)},
+        {name: "tool", frame: AssemblyLoopSmoke.frame(200, 0, 0)}
       ]
     };
     return AssemblyLoopSmoke.definition(
       "planar-arm",
-      [
-        AssemblyLoopSmoke.bar("base", 0),
-        AssemblyLoopSmoke.bar(
-          "upper",
-          400
-        ),
-        AssemblyLoopSmoke.bar(
-          "fore",
-          300
-        ),
-        tip
-      ],
+      [AssemblyLoopSmoke.bar("base", 0), AssemblyLoopSmoke.bar("upper", 400), AssemblyLoopSmoke.bar("fore", 300), tip],
       [
         AssemblyLoopSmoke.joint(
           "shoulder",

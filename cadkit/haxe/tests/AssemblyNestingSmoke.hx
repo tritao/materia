@@ -15,25 +15,10 @@ class AssemblyNestingSmoke {
     var nested:AssemblyDefinition = {
       schemaVersion: AssemblyDefinitionCodec.VERSION,
       id: "nested-test",
-      definitions: [{
-        id: "root-part",
-        connectors: [{
-          name: "tip",
-          frame: at(10)
-        }]
-      }],
+      definitions: [{id: "root-part", connectors: [{name: "tip", frame: at(10)}]}],
       occurrences: [
-        {
-          id: "root",
-          definition: "root-part",
-          initialPose: at(100)
-        },
-        {
-          id: "module",
-          definition: "module-design",
-          assembly: "module-design",
-          initialPose: at(10)
-        }
+        {id: "root", definition: "root-part", initialPose: at(100)},
+        {id: "module", definition: "module-design", assembly: "module-design", initialPose: at(10)}
       ],
       joints: [{
         id: "join",
@@ -43,11 +28,7 @@ class AssemblyNestingSmoke {
         parentConnector: "tip",
         child: "module",
         childConnector: "base",
-        axis: {
-          x: 0,
-          y: 1,
-          z: 0
-        },
+        axis: {x: 0, y: 1, z: 0},
         limits: emptyLimits(),
         defaultValue: 0
       }],
@@ -55,34 +36,13 @@ class AssemblyNestingSmoke {
         id: "module-design",
         definitions: [{
           id: "part",
-          connectors: [
-            {
-              name: "base",
-              frame: AssemblyFrames.identity()
-            },
-            {
-              name: "tip",
-              frame: at(5)
-            }
-          ]
+          connectors: [{name: "base", frame: AssemblyFrames.identity()}, {name: "tip", frame: at(5)}]
         }],
-        occurrences: [{
-          id: "body",
-          definition: "part",
-          initialPose: AssemblyFrames.identity()
-        }],
+        occurrences: [{id: "body", definition: "part", initialPose: AssemblyFrames.identity()}],
         joints: [],
         exposedConnectors: [
-          {
-            name: "base",
-            occurrence: "body",
-            connector: "base"
-          },
-          {
-            name: "tip",
-            occurrence: "body",
-            connector: "tip"
-          }
+          {name: "base", occurrence: "body", connector: "base"},
+          {name: "tip", occurrence: "body", connector: "tip"}
         ]
       }]
     };
@@ -94,40 +54,12 @@ class AssemblyNestingSmoke {
       schemaVersion: AssemblyDefinitionCodec.VERSION,
       id: "nested-test",
       definitions: [
-        {
-          id: "root-part",
-          connectors: [{
-            name: "tip",
-            frame: at(10)
-          }]
-        },
-        {
-          id: "module/part",
-          connectors: [
-            {
-              name: "base",
-              frame: AssemblyFrames.identity()
-            },
-            {
-              name: "tip",
-              frame: at(5)
-            }
-          ]
-        }
+        {id: "root-part", connectors: [{name: "tip", frame: at(10)}]},
+        {id: "module/part", connectors: [{name: "base", frame: AssemblyFrames.identity()}, {name: "tip", frame: at(5)}]}
       ],
       occurrences: [
-        {
-          id: "root",
-          definition: "root-part",
-          initialPose: at(100),
-          includePath: ""
-        },
-        {
-          id: "module/body",
-          definition: "module/part",
-          initialPose: at(10),
-          includePath: "module"
-        }
+        {id: "root", definition: "root-part", initialPose: at(100), includePath: ""},
+        {id: "module/body", definition: "module/part", initialPose: at(10), includePath: "module"}
       ],
       joints: [{
         id: "join",
@@ -137,11 +69,7 @@ class AssemblyNestingSmoke {
         parentConnector: "tip",
         child: "module/body",
         childConnector: "base",
-        axis: {
-          x: 0,
-          y: 1,
-          z: 0
-        },
+        axis: {x: 0, y: 1, z: 0},
         limits: emptyLimits(),
         defaultValue: 0,
         includePath: ""
@@ -173,11 +101,7 @@ class AssemblyNestingSmoke {
         initialPose: AssemblyFrames.identity()
       }],
       joints: [],
-      exposedConnectors: [{
-        name: "base",
-        occurrence: "inner",
-        connector: "base"
-      }]
+      exposedConnectors: [{name: "base", occurrence: "inner", connector: "base"}]
     });
     AssemblyDefinitionCodec.validate(deeper);
     if (Math.abs(new AssemblyState(deeper).worldPose("module/inner/body").x - 110)
@@ -188,10 +112,7 @@ class AssemblyNestingSmoke {
       schemaVersion: AssemblyDefinitionCodec.VERSION,
       definition: unjoined.id,
       jointCoordinates: [],
-      rootPoses: [{
-        occurrence: "module",
-        pose: at(200)
-      }]
+      rootPoses: [{occurrence: "module", pose: at(200)}]
     };
     AssemblyDefinitionCodec.validateState(unjoined, groupPose);
     if (Math.abs(new AssemblyState(unjoined, groupPose).worldPose("module/body").x - 200)

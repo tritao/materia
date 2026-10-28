@@ -95,18 +95,9 @@ class BendRadialCuts {
         var cell = new WallOutline(
           WallOutline.polygon([
             new Point2(left.value, lower.value),
-            new Point2(
-              right.value,
-              lower.value
-            ),
-            new Point2(
-              right.value,
-              upper.value
-            ),
-            new Point2(
-              left.value,
-              upper.value
-            )
+            new Point2(right.value, lower.value),
+            new Point2(right.value, upper.value),
+            new Point2(left.value, upper.value)
           ]).loops()[0],
           [],
           [[

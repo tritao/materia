@@ -62,10 +62,7 @@ class SheetIdentityLedger {
       if (id <= 0 || id >= next || (owners.exists(id) && owners.get(id) != label)) throw new SheetDiagnosis(
         "sheet.invalid-identity-ledger",
         "Saved sheet output identity is duplicated or outside its allocator",
-        [
-          label,
-          Std.string(id)
-        ]
+        [label, Std.string(id)]
       );
       owners.set(id, label);
     }

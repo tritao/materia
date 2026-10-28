@@ -15,10 +15,7 @@ class CornerReliefGeometry {
       || source.isRipped(first.id) || source.isRipped(second.id)) throw new SheetDiagnosis(
         "sheet.corner-adjacency",
         "Corner relief requires two active flange bends on one parent wall",
-        [
-          "bend:" + firstBend,
-          "bend:" + secondBend
-        ]
+        ["bend:" + firstBend, "bend:" + secondBend]
       );
     var a = first.edgeA.span;
     var b = second.edgeA.span;
@@ -30,10 +27,7 @@ class CornerReliefGeometry {
     if (Math.abs(determinant) < 1e-8) throw new SheetDiagnosis(
       "sheet.corner-adjacency",
       "Parallel bend seams do not define a corner",
-      [
-        "bend:" + firstBend,
-        "bend:" + secondBend
-      ]
+      ["bend:" + firstBend, "bend:" + secondBend]
     );
     var along = ((b.start.x - a.start.x) * by - (b.start.y - a.start.y) * bx) / determinant;
     var center = new Point2(a.start.x + along * ax, a.start.y + along * ay);
@@ -53,20 +47,8 @@ class CornerReliefGeometry {
         WallOutline.polygon([
           point(center, dx, dy, -half, -half),
           point(center, dx, dy, half, -half),
-          point(
-            center,
-            dx,
-            dy,
-            half,
-            half
-          ),
-          point(
-            center,
-            dx,
-            dy,
-            -half,
-            half
-          )
+          point(center, dx, dy, half, half),
+          point(center, dx, dy, -half, half)
         ]);
     };
   }

@@ -35,10 +35,7 @@ class SheetBlank {
       widthTolerancePlus: order.widthTolerance.plus,
       heightToleranceMinus: order.heightTolerance.minus,
       heightTolerancePlus: order.heightTolerance.plus,
-      allowedRotations: grained ? [0] : [
-        0,
-        90
-      ],
+      allowedRotations: grained ? [0] : [0, 90],
       directionConstraint : grained ? "width-aligned" : "free"
     };
   }

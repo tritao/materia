@@ -80,10 +80,7 @@ class AssemblyClosureDiagnosis {
   }
 
   static function rows(problem:KinematicProblem, state:KinematicState, scale:Float): {
-    rows: Array<{
-      index:Array<Int>,
-      value:Array<Float>
-    }>,
+    rows: Array<{index:Array<Int>, value:Array<Float>}>,
     width: Int,
     owners: Array<String>,
     residual: Array<Float>

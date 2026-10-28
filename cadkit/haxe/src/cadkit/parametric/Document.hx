@@ -172,14 +172,8 @@ class Document {
     graph:Document,
     inputs:Array<DefinitionInput>,
     outputs:Array<DefinitionOutput>,
-    inputBindings:Map<
-      String,
-      String
-  >,
-    outputFeatures:Map<
-      String,
-      Int
-  >
+    inputBindings:Map<String, String>,
+    outputFeatures:Map<String, Int>
   ):Definition {
     ensureOpen();
     if (graph == null || graph == this
@@ -286,10 +280,7 @@ class Document {
       var input = definition(definitionId).input(key);
       result.restoreOverride(
         key,
-        input.normalize(
-          overrides.get(key),
-          input.isNumeric() ? UnitConversion.canonicalUnit(input.kind) : input.unit
-        )
+        input.normalize(overrides.get(key), input.isNumeric() ? UnitConversion.canonicalUnit(input.kind) : input.unit)
       );
     }
     installRecord(result);
@@ -320,11 +311,7 @@ class Document {
       input.name,
       input.kind,
       input.unit,
-      input.isNumeric() ? UnitConversion.fromCanonical(
-        input.defaultValue,
-        input.kind,
-        input.unit
-      ) : input.defaultValue,
+      input.isNumeric() ? UnitConversion.fromCanonical(input.defaultValue, input.kind, input.unit) : input.defaultValue,
       input.allowedValues,
       input.editedByUser
     ));

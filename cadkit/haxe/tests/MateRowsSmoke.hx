@@ -60,11 +60,7 @@ class MateRowsSmoke {
       firstConnector: "g",
       second: "part",
       secondConnector: "p",
-      axis: {
-        x: 0,
-        y: 0,
-        z: 1
-      }
+      axis: {x: 0, y: 0, z: 1}
     };
     if (value != null) mate.value = value;
     definition.mates = [mate];
@@ -107,57 +103,17 @@ class MateRowsSmoke {
     var links = ["sx", "sy", "sz", "rz", "ry", "part"];
     var definitions:Array<AssemblyComponentDefinition> = [{
       id: "ground",
-      connectors: [
-        {name: "a", frame: frame(0, 0, 0)},
-        {
-          name: "g",
-          frame: frame(
-            100,
-            50,
-            25,
-            0.4
-          )
-        }
-      ]
+      connectors: [{name: "a", frame: frame(0, 0, 0)}, {name: "g", frame: frame(100, 50, 25, 0.4)}]
     }];
     for (id in links) definitions.push({
       id: id,
       connectors: id == "part" ? [
         {name : "a", frame : frame(0, 0, 0)},
-        {
-          name : "b",
-          frame : frame(
-            0,
-            0,
-            0
-          )
-        },
-        {
-          name : "p",
-          frame : frame(
-            30,
-            20,
-            10,
-            -0.3
-          )
-        }
+        {name : "b", frame : frame(0, 0, 0)},
+        {name : "p", frame : frame(30, 20, 10, -0.3)}
       ] : [
-        {
-          name : "a",
-          frame : frame(
-            0,
-            0,
-            0
-          )
-        },
-        {
-          name : "b",
-          frame : frame(
-            0,
-            0,
-            0
-          )
-        }
+        {name : "a", frame : frame(0, 0, 0)},
+        {name : "b", frame : frame(0, 0, 0)}
       ]
     });
     var axes = [
@@ -165,16 +121,8 @@ class MateRowsSmoke {
       {x: 0.0, y: 1.0, z: 0.0},
       {x: 0.0, y: 0.0, z: 1.0},
       {x: 0.0, y: 0.0, z: 1.0},
-      {
-        x: 0.0,
-        y: 1.0,
-        z: 0.0
-      },
-      {
-        x: 1.0,
-        y: 0.0,
-        z: 0.0
-      }
+      {x: 0.0, y: 1.0, z: 0.0},
+      {x: 1.0, y: 0.0, z: 0.0}
     ];
     var starts = [5.0, -3.0, 2.0, 0.2, -0.15, 0.3];
     var parents = ["ground", "sx", "sy", "sz", "rz", "ry"];
@@ -205,11 +153,7 @@ class MateRowsSmoke {
       firstConnector: "g",
       second: "part",
       secondConnector: "p",
-      axis: {
-        x: 0,
-        y: 0,
-        z: 1
-      },
+      axis: {x: 0, y: 0, z: 1},
       value: 40
     }];
     definition.occurrences[0].grounded = true;
@@ -246,71 +190,18 @@ class MateRowsSmoke {
       schemaVersion: AssemblyDefinitionCodec.VERSION,
       id: "nested",
       lengthUnit: "mm",
-      definitions: [{
-        id: "plate",
-        connectors: [{
-          name: "top",
-          frame: frame(
-            0,
-            0,
-            5
-          )
-        }]
-      }],
+      definitions: [{id: "plate", connectors: [{name: "top", frame: frame(0, 0, 5)}]}],
       occurrences: [
-        {
-          id: "base",
-          definition: "plate",
-          initialPose: frame(
-            0,
-            0,
-            0
-          )
-        },
-        {
-          id: "module",
-          definition: "pair",
-          assembly: "pair",
-          initialPose: frame(
-            50,
-            0,
-            0
-          )
-        }
+        {id: "base", definition: "plate", initialPose: frame(0, 0, 0)},
+        {id: "module", definition: "pair", assembly: "pair", initialPose: frame(50, 0, 0)}
       ],
       joints: [],
       assemblies: [{
         id: "pair",
-        definitions: [{
-          id: "block",
-          connectors: [{
-            name: "face",
-            frame: frame(
-              0,
-              0,
-              0
-            )
-          }]
-        }],
+        definitions: [{id: "block", connectors: [{name: "face", frame: frame(0, 0, 0)}]}],
         occurrences: [
-          {
-            id: "left",
-            definition: "block",
-            initialPose: frame(
-              0,
-              0,
-              0
-            )
-          },
-          {
-            id: "right",
-            definition: "block",
-            initialPose: frame(
-              10,
-              0,
-              0
-            )
-          }
+          {id: "left", definition: "block", initialPose: frame(0, 0, 0)},
+          {id: "right", definition: "block", initialPose: frame(10, 0, 0)}
         ],
         joints: [],
         mates: [{
@@ -320,17 +211,9 @@ class MateRowsSmoke {
           firstConnector: "face",
           second: "right",
           secondConnector: "face",
-          axis: {
-            x: 0,
-            y: 0,
-            z: 1
-          }
+          axis: {x: 0, y: 0, z: 1}
         }],
-        exposedConnectors: [{
-          name: "face",
-          occurrence: "left",
-          connector: "face"
-        }]
+        exposedConnectors: [{name: "face", occurrence: "left", connector: "face"}]
       }],
       mates: [{
         id: "seat",
@@ -339,11 +222,7 @@ class MateRowsSmoke {
         firstConnector: "top",
         second: "module",
         secondConnector: "face",
-        axis: {
-          x: 0,
-          y: 0,
-          z: 1
-        }
+        axis: {x: 0, y: 0, z: 1}
       }]
     };
     AssemblyDefinitionCodec.validate(nested);

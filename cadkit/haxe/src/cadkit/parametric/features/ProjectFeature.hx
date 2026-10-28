@@ -42,11 +42,7 @@ class ProjectFeature extends Feature {
     return EvaluationResult.fromShape(Shape.fromOwnedHandle(CadKit.projectChecked(
       context.shape(source).borrowHandle(),
       context.shape(target).borrowHandle(),
-      new Vector(
-        x.value,
-        y.value,
-        z.value
-      ).native()
+      new Vector(x.value, y.value, z.value).native()
     )));
   }
 }

@@ -19,11 +19,7 @@ class FlangeDepth {
     var mapped = SheetProfile.transform(
       outline,
       Plane.XY(),
-      new Plane(
-        new Vector(span.start.x, span.start.y),
-        normal,
-        Vector.Z()
-      )
+      new Plane(new Vector(span.start.x, span.start.y), normal, Vector.Z())
     );
     var curves = mapped.loops()[0];
     var events:Array<Float> = [];
@@ -63,14 +59,7 @@ class FlangeDepth {
         // Vertex and cardinal events split each selected branch into monotone pieces.
         result = Math.min(
           result,
-          Math.min(
-            coordinate(selected, values[i], branch),
-            coordinate(
-              selected,
-              values[i + 1],
-              branch
-            )
-          )
+          Math.min(coordinate(selected, values[i], branch), coordinate(selected, values[i + 1], branch))
         );
       }
     }

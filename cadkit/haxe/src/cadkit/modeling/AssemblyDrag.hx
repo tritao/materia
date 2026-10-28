@@ -162,10 +162,7 @@ class AssemblyDrag {
       occurrence
     ) : FrameTask.atFrame(
       model,
-      kinematics.connectorFrame(
-        occurrence,
-        connector
-      ),
+      kinematics.connectorFrame(occurrence, connector),
       start,
       positionTolerance,
       orientationTolerance,

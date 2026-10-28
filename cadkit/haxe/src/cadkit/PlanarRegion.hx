@@ -112,10 +112,7 @@ class PlanarLoop {
     face,
     outer,
     z,
-    segments.slice(index).concat(segments.slice(
-      0,
-      index
-    ))
+    segments.slice(index).concat(segments.slice(0, index))
   );
 }
 

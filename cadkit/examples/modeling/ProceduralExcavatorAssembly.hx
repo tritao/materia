@@ -18,10 +18,7 @@ class ProceduralExcavatorAssembly {
     // coincidence and cylinder lengths.
     for (joint in state.dependentJoints()) state.setJoint(
       joint,
-      state.joint(joint) + (StringTools.endsWith(
-        joint,
-        "-slide"
-      ) ? 0.1 : 0.002)
+      state.joint(joint) + (StringTools.endsWith(joint, "-slide") ? 0.1 : 0.002)
     );
     var result = state.solveClosures();
     if (!result.converged) throw 'Excavator closure solve failed: ${result.message} (${result.closureIds.join(", ")})';
@@ -172,11 +169,7 @@ class ProceduralExcavatorAssembly {
   static function point(model:AssemblyModel, part:String, name:String, x:Float, z:Float):Void model.connector(
     id(part),
     name,
-    AssemblyFrames.translation(
-      x,
-      0,
-      z
-    )
+    AssemblyFrames.translation(x, 0, z)
   );
 
   static function cylinder(

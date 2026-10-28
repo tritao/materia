@@ -7,19 +7,7 @@ class Svg {
   static function escape(value:String):String {
     return StringTools.replace(
       StringTools.replace(
-        StringTools.replace(
-          StringTools.replace(
-            StringTools.replace(
-              value,
-              "&",
-              "&amp;"
-            ),
-            "<",
-            "&lt;"
-          ),
-          ">",
-          "&gt;"
-        ),
+        StringTools.replace(StringTools.replace(StringTools.replace(value, "&", "&amp;"), "<", "&lt;"), ">", "&gt;"),
         "\"",
         "&quot;"
       ),

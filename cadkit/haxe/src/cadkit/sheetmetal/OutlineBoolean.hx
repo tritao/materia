@@ -289,13 +289,7 @@ class OutlineBoolean {
       a.arcCenter(),
       a.radius,
       a.startAngle,
-      Math.max(
-        -2 * Math.PI,
-        Math.min(
-          2 * Math.PI,
-          a.sweep + b.sweep
-        )
-      )
+      Math.max(-2 * Math.PI, Math.min(2 * Math.PI, a.sweep + b.sweep))
     );
   }
   static function same(a:Segment, b:Segment):Bool {

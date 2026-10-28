@@ -189,11 +189,8 @@ class DocumentCodec {
         name: input.name,
         kind: input.kind,
         unit: input.unit,
-        value: input.isNumeric() ? UnitConversion.fromCanonical(
-          input.defaultValue,
-          input.kind,
-          input.unit
-        ) : input.defaultValue,
+        value: input.isNumeric() ? UnitConversion.fromCanonical(input.defaultValue,
+        input.kind, input.unit) : input.defaultValue,
         allowedValues : input.allowedValues,
         editedByUser : input.editedByUser
       });
@@ -263,10 +260,7 @@ class DocumentCodec {
       var records:Array<Dynamic> = cast requiredField(root, "features");
       var sourceDocumentId = optionalString(root, "documentId");
       var targetDocument:Document = clone ? new Document(null, implicitOutput, lengthUnit) : new Document(
-        new DocumentId(stringField(
-          root,
-          "documentId"
-        )),
+        new DocumentId(stringField(root, "documentId")),
         implicitOutput,
         lengthUnit
       );
@@ -301,10 +295,7 @@ class DocumentCodec {
             source,
             decodeSheetStock(data.material, data.thickness),
             data.side,
-            new SheetIdentityLedger(
-              data.identities.nextWall,
-              data.identities.nextBend
-            )
+            new SheetIdentityLedger(data.identities.nextWall, data.identities.nextBend)
           ));
         } else if (featureType == "sheet-edge-flange") {
           var data:SheetFlangeRecord = JsonWire.decode(Json.stringify(requiredField(record, "sheet")));
@@ -357,10 +348,7 @@ class DocumentCodec {
           feature = document.add(new SheetCornerFeature(
             source,
             new SheetCornerEdge(data.firstWall, data.firstEdge),
-            new SheetCornerEdge(
-              data.secondWall,
-              data.secondEdge
-            ),
+            new SheetCornerEdge(data.secondWall, data.secondEdge),
             data.join,
             data.gap,
             data.overlap,
@@ -378,92 +366,44 @@ class DocumentCodec {
           feature = document.add(new DatumSketchFeature(
             stringField(record, "profile"),
             numberField(record, "width"),
-            numberField(
-              record,
-              "height"
-            ),
-            decodeElementReferenceInDocument(requiredField(
-              record,
-              "datum"
-            )),
-            numberField(
-              record,
-              "offset"
-            )
+            numberField(record, "height"),
+            decodeElementReferenceInDocument(requiredField(record, "datum")),
+            numberField(record, "offset")
           ));
         } else if (featureType == "level-extrude") {
           feature = document.add(new LevelExtrudeFeature(
             requiredFeature(document, intField(record, "source")),
-            decodeElementReferenceInDocument(requiredField(
-              record,
-              "base"
-            )),
-            decodeElementReferenceInDocument(requiredField(
-              record,
-              "top"
-            )),
-            numberField(
-              record,
-              "baseOffset"
-            ),
-            numberField(
-              record,
-              "topOffset"
-            )
+            decodeElementReferenceInDocument(requiredField(record, "base")),
+            decodeElementReferenceInDocument(requiredField(record, "top")),
+            numberField(record, "baseOffset"),
+            numberField(record, "topOffset")
           ));
         } else if (featureType == "level-box") {
           feature = document.add(new LevelBoxFeature(
             numberField(record, "width"),
             numberField(record, "depth"),
-            decodeElementReferenceInDocument(requiredField(
-              record,
-              "base"
-            )),
-            decodeElementReferenceInDocument(requiredField(
-              record,
-              "top"
-            )),
-            numberField(
-              record,
-              "baseOffset"
-            ),
-            numberField(
-              record,
-              "topOffset"
-            )
+            decodeElementReferenceInDocument(requiredField(record, "base")),
+            decodeElementReferenceInDocument(requiredField(record, "top")),
+            numberField(record, "baseOffset"),
+            numberField(record, "topOffset")
           ));
         } else if (featureType == "sketch") {
           var planeRecord = requiredField(record, "plane");
           feature = document.add(new SketchFeature(
             stringField(record, "profile"),
             numberField(record, "width"),
-            numberField(
-              record,
-              "height"
-            ),
+            numberField(record, "height"),
             new Plane(
-              decodeVector(requiredField(
-                planeRecord,
-                "origin"
-              )),
-              decodeVector(requiredField(
-                planeRecord,
-                "xDirection"
-              )),
-              decodeVector(requiredField(
-                planeRecord,
-                "normal"
-              ))
+              decodeVector(requiredField(planeRecord, "origin")),
+              decodeVector(requiredField(planeRecord, "xDirection")),
+              decodeVector(requiredField(planeRecord, "normal"))
             )
           ));
         } else if (featureType == "box") {
           feature = document.add(new BoxFeature(
             numberField(record, "width"),
             numberField(record, "depth"),
-            numberField(
-              record,
-              "height"
-            )
+            numberField(record, "height")
           ));
         } else if (featureType == "cylinder") {
           feature = document.add(new CylinderFeature(numberField(record, "radius"), numberField(record, "height")));
@@ -472,10 +412,7 @@ class DocumentCodec {
         } else if (featureType == "face") {
           feature = document.add(new FaceFeature(
             requiredFeature(document, intField(record, "source")),
-            intField(
-              record,
-              "index"
-            ),
+            intField(record, "index"),
             optionalFaceFingerprint(record)
           ));
         } else if (featureType == "extrude") {
@@ -484,95 +421,32 @@ class DocumentCodec {
           feature = encodedAmount == null ? document.add(new ExtrudeFeature(
             extrudeSource,
             numberField(record, "x"),
-            numberField(
-              record,
-              "y"
-            ),
-            numberField(
-              record,
-              "z"
-            )
+            numberField(record, "y"),
+            numberField(record, "z")
           )) : document.add(ExtrudeFeature.along(
             extrudeSource,
-            finiteNumber(
-              encodedAmount,
-              "amount"
-            ),
-            new Vector(
-              numberField(
-                record,
-                "x"
-              ),
-              numberField(
-                record,
-                "y"
-              ),
-              numberField(
-                record,
-                "z"
-              )
-            ),
-            optionalBool(
-              record,
-              "reversed",
-              false
-            ),
-            optionalBool(
-              record,
-              "symmetric",
-              false
-            )
+            finiteNumber(encodedAmount, "amount"),
+            new Vector(numberField(record, "x"), numberField(record, "y"), numberField(record, "z")),
+            optionalBool(record, "reversed", false),
+            optionalBool(record, "symmetric", false)
           ));
         } else if (featureType == "pocket") {
           feature = document.add(new PocketFeature(
             requiredFeature(document, intField(record, "target")),
-            requiredFeature(
-              document,
-              intField(
-                record,
-                "profile"
-              )
-            ),
-            stringField(
-              record,
-              "mode"
-            ),
-            numberField(
-              record,
-              "depth"
-            )
+            requiredFeature(document, intField(record, "profile")),
+            stringField(record, "mode"),
+            numberField(record, "depth")
           ));
         } else if (featureType == "revolve") {
           feature = document.add(new RevolveFeature(
             requiredFeature(document, intField(record, "source")),
-            numberField(
-              record,
-              "originX"
-            ),
-            numberField(
-              record,
-              "originY"
-            ),
-            numberField(
-              record,
-              "originZ"
-            ),
-            numberField(
-              record,
-              "axisX"
-            ),
-            numberField(
-              record,
-              "axisY"
-            ),
-            numberField(
-              record,
-              "axisZ"
-            ),
-            numberField(
-              record,
-              "angle"
-            )
+            numberField(record, "originX"),
+            numberField(record, "originY"),
+            numberField(record, "originZ"),
+            numberField(record, "axisX"),
+            numberField(record, "axisY"),
+            numberField(record, "axisZ"),
+            numberField(record, "angle")
           ));
         } else if (featureType == "fillet") {
           var filletSource = requiredFeature(document, intField(record, "source"));
@@ -595,76 +469,34 @@ class DocumentCodec {
         } else if (featureType == "transform") {
           feature = document.add(new TransformFeature(
             requiredFeature(document, intField(record, "source")),
-            numberField(
-              record,
-              "x"
-            ),
-            numberField(
-              record,
-              "y"
-            ),
-            numberField(
-              record,
-              "z"
-            )
+            numberField(record, "x"),
+            numberField(record, "y"),
+            numberField(record, "z")
           ));
         } else if (featureType == "rotation") {
           feature = document.add(new RotationFeature(
             requiredFeature(document, intField(record, "source")),
-            decodeVector(requiredField(
-              record,
-              "pivot"
-            )),
-            decodeVector(requiredField(
-              record,
-              "axis"
-            )),
-            numberField(
-              record,
-              "angle"
-            )
+            decodeVector(requiredField(record, "pivot")),
+            decodeVector(requiredField(record, "axis")),
+            numberField(record, "angle")
           ));
         } else if (featureType == "mirror") {
           feature = document.add(new MirrorFeature(
             requiredFeature(document, intField(record, "source")),
-            decodeVector(requiredField(
-              record,
-              "planeOrigin"
-            )),
-            decodeVector(requiredField(
-              record,
-              "planeNormal"
-            )),
-            stringField(
-              record,
-              "mode"
-            )
+            decodeVector(requiredField(record, "planeOrigin")),
+            decodeVector(requiredField(record, "planeNormal")),
+            stringField(record, "mode")
           ));
         } else if (featureType == "boolean") {
           feature = document.add(new BooleanFeature(
             requiredFeature(document, intField(record, "first")),
-            requiredFeature(
-              document,
-              intField(
-                record,
-                "second"
-              )
-            ),
-            booleanOperation(stringField(
-              record,
-              "operation"
-            ))
+            requiredFeature(document, intField(record, "second")),
+            booleanOperation(stringField(record, "operation"))
           ));
         } else if (featureType == "definition-output") {
           feature = document.add(new DefinitionOutputFeature(
-            decodeElementReferenceInDocument(requiredField(
-              record,
-              "instance"
-            )),
-            stringField(
-              record,
-              "output"
-            )
+            decodeElementReferenceInDocument(requiredField(record, "instance")),
+            stringField(record, "output")
           ));
         } else if (featureType == "tool-collection") {
           var toolIds:Array<Dynamic> = cast requiredField(record, "tools");
@@ -675,13 +507,7 @@ class DocumentCodec {
             labels.push(cast label);
           }
           feature = document.add(new ToolCollectionFeature(
-            [for (toolId in toolIds) requiredFeature(
-              document,
-              integerValue(
-                toolId,
-                "tool"
-              )
-            )],
+            [for (toolId in toolIds) requiredFeature(document, integerValue(toolId, "tool"))],
             labels
           ));
         } else {
@@ -708,14 +534,8 @@ class DocumentCodec {
         else document.defineTypedParameter(
           stringField(record, "name"),
           numberField(record, "value"),
-          stringField(
-            record,
-            "kind"
-          ),
-          stringField(
-            record,
-            "unit"
-          )
+          stringField(record, "kind"),
+          stringField(record, "unit")
         );
       }
       for (record in parameterRecords) {
@@ -750,11 +570,7 @@ class DocumentCodec {
             stringField(inputRecord, "unit"),
             value,
             rawAllowed == null ? null : cast rawAllowed,
-            optionalBool(
-              inputRecord,
-              "editedByUser",
-              false
-            )
+            optionalBool(inputRecord, "editedByUser", false)
           ));
         }
         var outputRecords:Array<Dynamic> = cast requiredField(definitionRecord, "outputs");
@@ -786,14 +602,8 @@ class DocumentCodec {
         }
         var definition = document.installDefinition(
           new DefinitionId(stringField(definitionRecord, "id")),
-          stringField(
-            definitionRecord,
-            "name"
-          ),
-          stringField(
-            definitionRecord,
-            "recipe"
-          ),
+          stringField(definitionRecord, "name"),
+          stringField(definitionRecord, "recipe"),
           inputs,
           outputs,
           subgraph
@@ -811,13 +621,7 @@ class DocumentCodec {
         var ename = stringField(elementRecord, "name");
         if (kind == "geometry") document.installElement(
           ename,
-          requiredFeature(
-            document,
-            intField(
-              elementRecord,
-              "output"
-            )
-          ),
+          requiredFeature(document, intField(elementRecord, "output")),
           eid
         );
         else if (kind == "instance") {
@@ -825,10 +629,7 @@ class DocumentCodec {
           var overrides = new Map<String, Dynamic>();
           for (overrideRecord in overrideRecords) overrides.set(
             stringField(overrideRecord, "name"),
-            requiredField(
-              overrideRecord,
-              "value"
-            )
+            requiredField(overrideRecord, "value")
           );
           document.installInstance(ename, eid, new DefinitionId(stringField(elementRecord, "definition")), overrides);
         } else if (kind == "level") {
@@ -837,10 +638,7 @@ class DocumentCodec {
             ename,
             eid,
             numberField(elementRecord, "elevation"),
-            numberField(
-              elementRecord,
-              "offset"
-            ),
+            numberField(elementRecord, "offset"),
             relative == null ? null : decodeElementReferenceInDocument(relative)
           );
         } else if (kind == "reference-plane") {
@@ -850,14 +648,8 @@ class DocumentCodec {
             eid,
             new Plane(
               decodeVector(requiredField(p, "origin")),
-              decodeVector(requiredField(
-                p,
-                "xDirection"
-              )),
-              decodeVector(requiredField(
-                p,
-                "normal"
-              ))
+              decodeVector(requiredField(p, "xDirection")),
+              decodeVector(requiredField(p, "normal"))
             )
           );
         } else if (kind == ElementKind.Object) {
@@ -885,18 +677,9 @@ class DocumentCodec {
       for (relationshipRecord in relationshipRecords) {
         var relationship = document.installRelationship(
           new RelationshipId(stringField(relationshipRecord, "id")),
-          stringField(
-            relationshipRecord,
-            "type"
-          ),
-          decodeElementReferenceInDocument(requiredField(
-            relationshipRecord,
-            "source"
-          )),
-          decodeElementReferenceInDocument(requiredField(
-            relationshipRecord,
-            "target"
-          ))
+          stringField(relationshipRecord, "type"),
+          decodeElementReferenceInDocument(requiredField(relationshipRecord, "source")),
+          decodeElementReferenceInDocument(requiredField(relationshipRecord, "target"))
         );
         for (propertyRecord in optionalPropertyRecords(relationshipRecord)) {
           var property = decodeTypedProperty(propertyRecord, remapDocumentId);
@@ -949,10 +732,7 @@ class DocumentCodec {
         thickness: base.thickness.value,
         side: base.side,
         material: encodeSheetStock(base.stock()),
-        identities: {
-          nextWall: base.identityLedger().wallCounter(),
-          nextBend: base.identityLedger().bendCounter()
-        }
+        identities: {nextWall: base.identityLedger().wallCounter(), nextBend: base.identityLedger().bendCounter()}
       };
       return {
         id: feature.id.toInt(),
@@ -1285,14 +1065,8 @@ class DocumentCodec {
   };
 
   private static function decodeElementReference(value:Dynamic):ElementReference return new ElementReference(
-    new DocumentId(stringField(
-      value,
-      "document"
-    )),
-    new ElementId(stringField(
-      value,
-      "element"
-    ))
+    new DocumentId(stringField(value, "document")),
+    new ElementId(stringField(value, "element"))
   );
 
   private static function encodePlacement(value:Placement):Dynamic {
@@ -1301,18 +1075,9 @@ class DocumentCodec {
   }
 
   private static function decodePlacement(value:Dynamic):Placement return new Placement(new Plane(
-    decodeVector(requiredField(
-      value,
-      "origin"
-    )),
-    decodeVector(requiredField(
-      value,
-      "xDirection"
-    )),
-    decodeVector(requiredField(
-      value,
-      "normal"
-    ))
+    decodeVector(requiredField(value, "origin")),
+    decodeVector(requiredField(value, "xDirection")),
+    decodeVector(requiredField(value, "normal"))
   ));
 
   private static function encodeSheetFace(face:TopologyFingerprint):SheetFaceRecord {
@@ -1451,10 +1216,7 @@ class DocumentCodec {
         new PersistentReference(
           remapDocumentId(stringField(rawValue, "document")),
           targetType,
-          stringField(
-            rawValue,
-            "targetId"
-          )
+          stringField(rawValue, "targetId")
         );
       case TypedProperty.TypePlacement:
         decodePlacement(rawValue);
@@ -1536,46 +1298,22 @@ class DocumentCodec {
     var sketch = new ConstrainedSketch(
       new Plane(
         decodeVector(requiredField(plane, "origin")),
-        decodeVector(requiredField(
-          plane,
-          "xDirection"
-        )),
-        decodeVector(requiredField(
-          plane,
-          "normal"
-        ))
+        decodeVector(requiredField(plane, "xDirection")),
+        decodeVector(requiredField(plane, "normal"))
       ),
-      stringField(
-        record,
-        "units"
-      ),
+      stringField(record, "units"),
       new SolverSettings(
-        numberField(
-          settings,
-          "tolerance"
-        ),
-        numberField(
-          settings,
-          "rankTolerance"
-        ),
-        intField(
-          settings,
-          "maxIterations"
-        ),
-        numberField(
-          settings,
-          "initialDamping"
-        )
+        numberField(settings, "tolerance"),
+        numberField(settings, "rankTolerance"),
+        intField(settings, "maxIterations"),
+        numberField(settings, "initialDamping")
       )
     );
     var pointRecords:Array<Dynamic> = cast requiredField(record, "points");
     for (value in pointRecords) sketch.addPoint(new SketchPoint(
       stringField(value, "id"),
       numberField(value, "x"),
-      numberField(
-        value,
-        "y"
-      )
+      numberField(value, "y")
     ));
     var entityRecords:Array<Dynamic> = cast requiredField(record, "entities");
     for (value in entityRecords) {
@@ -1585,42 +1323,24 @@ class DocumentCodec {
             stringField(value, "id"),
             stringField(value, "first"),
             stringField(value, "second"),
-            boolField(
-              value,
-              "construction"
-            )
+            boolField(value, "construction")
           );
         case "circle":
           SketchEntity.circle(
             stringField(value, "id"),
             stringField(value, "first"),
             numberField(value, "radius"),
-            boolField(
-              value,
-              "construction"
-            )
+            boolField(value, "construction")
           );
         case "arc":
           SketchEntity.arc(
             stringField(value, "id"),
             stringField(value, "first"),
             numberField(value, "radius"),
-            numberField(
-              value,
-              "startAngle"
-            ),
-            numberField(
-              value,
-              "endAngle"
-            ),
-            boolField(
-              value,
-              "clockwise"
-            ),
-            boolField(
-              value,
-              "construction"
-            )
+            numberField(value, "startAngle"),
+            numberField(value, "endAngle"),
+            boolField(value, "clockwise"),
+            boolField(value, "construction")
           );
         default:
           throw new ParametricError("unsupported constrained sketch entity");
@@ -1632,22 +1352,10 @@ class DocumentCodec {
       var constraint = SketchConstraint.raw(
         stringField(value, "id"),
         stringField(value, "kind"),
-        stringField(
-          value,
-          "first"
-        ),
-        optionalString(
-          value,
-          "second"
-        ),
-        optionalString(
-          value,
-          "third"
-        ),
-        numberField(
-          value,
-          "value"
-        )
+        stringField(value, "first"),
+        optionalString(value, "second"),
+        optionalString(value, "third"),
+        numberField(value, "value")
       );
       var reference:Null<Bool> = Reflect.field(value, "reference");
       sketch.addConstraint(reference == true ? constraint.asReference() : constraint);
@@ -1660,18 +1368,9 @@ class DocumentCodec {
       sketch,
       requiredFeature(document, integerValue(cast supportValue, "support")),
       supportSelection,
-      decodeVector(requiredField(
-        record,
-        "supportXDirection"
-      )),
-      numberField(
-        record,
-        "supportOffset"
-      ),
-      boolField(
-        record,
-        "supportFlipped"
-      ),
+      decodeVector(requiredField(record, "supportXDirection")),
+      numberField(record, "supportOffset"),
+      boolField(record, "supportFlipped"),
       null,
       optionalSupportFaceFingerprint(record)
     );
@@ -1713,126 +1412,51 @@ class DocumentCodec {
     }
     if (type == "sweep") return new SweepFeature(
       requiredFeature(document, intField(record, "profile")),
-      requiredFeature(
-        document,
-        intField(
-          record,
-          "path"
-        )
-      )
+      requiredFeature(document, intField(record, "path"))
     );
     if (type == "offset") return new OffsetFeature(
       requiredFeature(document, intField(record, "source")),
-      numberField(
-        record,
-        "distance"
-      )
+      numberField(record, "distance")
     );
     if (type == "shell") return new ShellFeature(
       requiredFeature(document, intField(record, "source")),
-      numberField(
-        record,
-        "thickness"
-      ),
-      decodeSelection(requiredField(
-        record,
-        "selection"
-      ))
+      numberField(record, "thickness"),
+      decodeSelection(requiredField(record, "selection"))
     );
     if (type == "project") return new ProjectFeature(
       requiredFeature(document, intField(record, "source")),
-      requiredFeature(
-        document,
-        intField(
-          record,
-          "target"
-        )
-      ),
-      decodeVector(requiredField(
-        record,
-        "direction"
-      ))
+      requiredFeature(document, intField(record, "target")),
+      decodeVector(requiredField(record, "direction"))
     );
     if (type == "grid") return new GridFeature(
       requiredFeature(document, intField(record, "source")),
-      intField(
-        record,
-        "columns"
-      ),
-      intField(
-        record,
-        "rows"
-      ),
-      numberField(
-        record,
-        "spacingX"
-      ),
-      numberField(
-        record,
-        "spacingY"
-      )
+      intField(record, "columns"),
+      intField(record, "rows"),
+      numberField(record, "spacingX"),
+      numberField(record, "spacingY")
     );
     if (type == "linear-pattern") {
       var rawSecondDirection:Dynamic = Reflect.field(record, "secondDirection");
       return new LinearPatternFeature(
         requiredFeature(document, intField(record, "source")),
-        numberField(
-          record,
-          "count"
-        ),
-        numberField(
-          record,
-          "spacing"
-        ),
-        decodeVector(requiredField(
-          record,
-          "direction"
-        )),
-        numberField(
-          record,
-          "secondCount"
-        ),
-        numberField(
-          record,
-          "secondSpacing"
-        ),
+        numberField(record, "count"),
+        numberField(record, "spacing"),
+        decodeVector(requiredField(record, "direction")),
+        numberField(record, "secondCount"),
+        numberField(record, "secondSpacing"),
         rawSecondDirection == null ? null : decodeVector(rawSecondDirection)
       );
     }
     if (type == "polar-pattern") return new PolarPatternFeature(
       requiredFeature(document, intField(record, "source")),
-      numberField(
-        record,
-        "count"
-      ),
-      numberField(
-        record,
-        "radius"
-      ),
-      numberField(
-        record,
-        "angularSpan"
-      ),
-      decodeVector(requiredField(
-        record,
-        "axisOrigin"
-      )),
-      decodeVector(requiredField(
-        record,
-        "axisDirection"
-      )),
-      decodeVector(requiredField(
-        record,
-        "radialDirection"
-      )),
-      boolField(
-        record,
-        "orientInstances"
-      ),
-      numberField(
-        record,
-        "startAngle"
-      )
+      numberField(record, "count"),
+      numberField(record, "radius"),
+      numberField(record, "angularSpan"),
+      decodeVector(requiredField(record, "axisOrigin")),
+      decodeVector(requiredField(record, "axisDirection")),
+      decodeVector(requiredField(record, "radialDirection")),
+      boolField(record, "orientInstances"),
+      numberField(record, "startAngle")
     );
     if (type == "hole") {
       if (!Reflect.hasField(record, "thread")) throw new ParametricError("document field is missing: thread");
@@ -1840,63 +1464,21 @@ class DocumentCodec {
       var threadData:Null<ThreadSpecData> = rawThread == null ? null : JsonWire.decode(Json.stringify(rawThread));
       return new HoleFeature(
         requiredFeature(document, intField(record, "target")),
-        decodeSelection(requiredField(
-          record,
-          "selection"
-        )),
-        decodeVector(requiredField(
-          record,
-          "xDirection"
-        )),
-        stringField(
-          record,
-          "style"
-        ),
-        stringField(
-          record,
-          "mode"
-        ),
-        numberField(
-          record,
-          "x"
-        ),
-        numberField(
-          record,
-          "y"
-        ),
-        numberField(
-          record,
-          "diameter"
-        ),
-        numberField(
-          record,
-          "depth"
-        ),
-        numberField(
-          record,
-          "recessDiameter"
-        ),
-        numberField(
-          record,
-          "recessDepth"
-        ),
-        numberField(
-          record,
-          "offset"
-        ),
-        boolField(
-          record,
-          "flipped"
-        ),
-        numberField(
-          record,
-          "includedAngle"
-        ),
+        decodeSelection(requiredField(record, "selection")),
+        decodeVector(requiredField(record, "xDirection")),
+        stringField(record, "style"),
+        stringField(record, "mode"),
+        numberField(record, "x"),
+        numberField(record, "y"),
+        numberField(record, "diameter"),
+        numberField(record, "depth"),
+        numberField(record, "recessDiameter"),
+        numberField(record, "recessDepth"),
+        numberField(record, "offset"),
+        boolField(record, "flipped"),
+        numberField(record, "includedAngle"),
         threadData == null ? null : ThreadSpec.fromData(cast threadData),
-        numberField(
-          record,
-          "threadDepth"
-        )
+        numberField(record, "threadDepth")
       );
     }
     return null;
@@ -1964,11 +1546,7 @@ class DocumentCodec {
         references: references,
         source: value.source.id.toInt(),
         target: value.target.id.toInt(),
-        direction: encodeVector(new Vector(
-          value.x.value,
-          value.y.value,
-          value.z.value
-        ))
+        direction: encodeVector(new Vector(value.x.value, value.y.value, value.z.value))
       };
     }
     if (type == "grid") {
@@ -2071,22 +1649,10 @@ class DocumentCodec {
       stringField(record, "kind"),
       stringField(record, "geometry"),
       parallel == null ? null : decodeVector(parallel),
-      stringField(
-        record,
-        "position"
-      ),
-      decodeVector(requiredField(
-        record,
-        "axis"
-      )),
-      intField(
-        record,
-        "expectedCount"
-      ),
-      numberField(
-        record,
-        "tolerance"
-      )
+      stringField(record, "position"),
+      decodeVector(requiredField(record, "axis")),
+      intField(record, "expectedCount"),
+      numberField(record, "tolerance")
     );
   }
 
@@ -2183,42 +1749,15 @@ class DocumentCodec {
     return TopologyFingerprint.fromData(
       kind,
       surfaceKind(stringField(record, "surface")),
-      curveKind(stringField(
-        record,
-        "curve"
-      )),
-      numberField(
-        record,
-        "x"
-      ),
-      numberField(
-        record,
-        "y"
-      ),
-      numberField(
-        record,
-        "z"
-      ),
-      numberField(
-        record,
-        "dx"
-      ),
-      numberField(
-        record,
-        "dy"
-      ),
-      numberField(
-        record,
-        "dz"
-      ),
-      numberField(
-        record,
-        "measure"
-      ),
-      Reflect.field(
-        record,
-        "anchor"
-      ) == "midpoint",
+      curveKind(stringField(record, "curve")),
+      numberField(record, "x"),
+      numberField(record, "y"),
+      numberField(record, "z"),
+      numberField(record, "dx"),
+      numberField(record, "dy"),
+      numberField(record, "dz"),
+      numberField(record, "measure"),
+      Reflect.field(record, "anchor") == "midpoint",
       currentName(record)
     );
   }

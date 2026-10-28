@@ -69,11 +69,7 @@ class ProfileGeometry {
           var center = curve.arcCenter();
           if (Math.abs(curve.sweep) == 2 * Math.PI) part = Curve.circle(
             curve.radius,
-            new Plane(
-              plane.toWorld(center),
-              plane.xDirection,
-              plane.normal
-            )
+            new Plane(plane.toWorld(center), plane.xDirection, plane.normal)
           );
           else {
             var a = curve.startAngle + curve.sweep / 2;

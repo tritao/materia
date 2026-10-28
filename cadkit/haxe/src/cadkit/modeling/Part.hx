@@ -40,10 +40,7 @@ class Part extends Model {
       var placed = shape.translate(new Vector(
         Model.alignment(width, alignX),
         Model.alignment(depth, alignY),
-        Model.alignment(
-          height,
-          alignZ
-        )
+        Model.alignment(height, alignZ)
       ).native());
       shape.close();
       return new Part(placed);
@@ -263,11 +260,7 @@ class Part extends Model {
 
   public function shell(faces:Selection, thickness:Float):Part {
     return fromOperation(new Operation(
-      CadKit.shellOperationChecked(
-        shape.borrowHandle(),
-        Model.refs(faces.borrowShapes()),
-        thickness
-      ),
+      CadKit.shellOperationChecked(shape.borrowHandle(), Model.refs(faces.borrowShapes()), thickness),
       [shape]
     ));
   }

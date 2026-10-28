@@ -148,10 +148,7 @@ class AssemblySolve {
     settings:AssemblySolveSettings,
     scale:Float,
     levenberg:Bool,
-    witness:(
-      KinematicState,
-      Float
-    ) -> Null<KinematicState>
+    witness:(KinematicState, Float) -> Null<KinematicState>
   ):AssemblySolveOutcome {
     var solution = LevenbergMarquardt.solve(
       problem,

@@ -67,10 +67,7 @@ class JacobianCheck {
       var rowScale = 0.0;
       for (column in 0...columns) rowScale = Math.max(
         rowScale,
-        Math.max(
-          Math.abs(numeric[row * columns + column]),
-          Math.abs(analytic[row * columns + column])
-        )
+        Math.max(Math.abs(numeric[row * columns + column]), Math.abs(analytic[row * columns + column]))
       );
       for (column in 0...columns) {
         var value = analytic[row * columns + column], expected = numeric[row * columns + column];

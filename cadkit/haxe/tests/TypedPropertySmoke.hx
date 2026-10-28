@@ -64,16 +64,8 @@ class TypedPropertySmoke {
     var definition = document.createDefinition(
       "Typed property type",
       "cadkit.test.typed-property",
-      [new DefinitionInput(
-        "size",
-        ParameterKind.Length,
-        "mm",
-        10
-      )],
-      [new DefinitionOutput(
-        "body",
-        DefinitionOutput.Geometry
-      )]
+      [new DefinitionInput("size", ParameterKind.Length, "mm", 10)],
+      [new DefinitionOutput("body", DefinitionOutput.Geometry)]
     );
     definition.setProperty(TypedProperty.text("bim.class", "window-type"));
     definition.setProperty(TypedProperty.token("bim.fireRating", "EI60", "bim.fire-rating"));
@@ -90,17 +82,11 @@ class TypedPropertySmoke {
     source.setProperty(TypedProperty.elementReference("domain.target", new ElementReference(document.id, target.id)));
     source.setProperty(TypedProperty.definitionReference(
       "domain.type",
-      PersistentReference.definition(
-        document,
-        definition.id
-      )
+      PersistentReference.definition(document, definition.id)
     ));
     source.setProperty(TypedProperty.featureReference(
       "domain.authored",
-      PersistentReference.feature(
-        document,
-        feature.id
-      )
+      PersistentReference.feature(document, feature.id)
     ));
     source.setProperty(TypedProperty.placement("domain.placement", source.localPlacement));
     source.setProperty(new TypedProperty(
@@ -109,10 +95,7 @@ class TypedPropertySmoke {
       {wrappedValue: 4.5},
       null,
       null,
-      {
-        propertySet: "Pset_Custom",
-        sourceType: "IfcPositiveLengthMeasure"
-      }
+      {propertySet: "Pset_Custom", sourceType: "IfcPositiveLengthMeasure"}
     ));
 
     var transaction = document.beginTransaction();

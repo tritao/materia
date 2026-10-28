@@ -38,14 +38,7 @@ class AttachedPocketEnclosure {
       topProfile = builder.attachedConstrainedSketch(
         topSketch(),
         enclosure,
-        new SelectionRecipe(
-          "face",
-          "plane",
-          Vector.Z(),
-          "max",
-          Vector.Z(),
-          1
-        ),
+        new SelectionRecipe("face", "plane", Vector.Z(), "max", Vector.Z(), 1),
         Vector.X(),
         topDimensions
       );
@@ -56,14 +49,7 @@ class AttachedPocketEnclosure {
       sideProfile = builder.attachedConstrainedSketch(
         sideSketch(),
         topPocket,
-        new SelectionRecipe(
-          "face",
-          "plane",
-          Vector.X(),
-          "max",
-          Vector.X(),
-          1
-        ),
+        new SelectionRecipe("face", "plane", Vector.X(), "max", Vector.X(), 1),
         Vector.Y(),
         sideDimensions
       );
@@ -78,16 +64,8 @@ class AttachedPocketEnclosure {
     for (point in [
       new SketchPoint("recess.bl", -15, -10),
       new SketchPoint("recess.br", 15, -10),
-      new SketchPoint(
-        "recess.tr",
-        15,
-        10
-      ),
-      new SketchPoint(
-        "recess.tl",
-        -15,
-        10
-      )
+      new SketchPoint("recess.tr", 15, 10),
+      new SketchPoint("recess.tl", -15, 10)
     ]) sketch.addPoint(point);
     sketch.addEntity(SketchEntity.line("recess.bottom", "recess.bl", "recess.br")).addEntity(SketchEntity.line(
       "recess.right",

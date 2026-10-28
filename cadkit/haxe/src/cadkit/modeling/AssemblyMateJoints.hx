@@ -98,11 +98,7 @@ class AssemblyMateJoints {
       occurrence,
       [],
       [0.0, 0.0, 0.0],
-      [
-        0.0,
-        0.0,
-        1.0
-      ]
+      [0.0, 0.0, 1.0]
     );
     var roots = AssemblyDefinitionCodec.rootOccurrences(flat);
     if (!roots.exists(occurrence)) return none('"$occurrence" hangs from a joint already');
@@ -153,16 +149,8 @@ class AssemblyMateJoints {
       parent,
       occurrence,
       names,
-      [
-        origin.x,
-        origin.y,
-        origin.z
-      ],
-      [
-        v[0] / slide,
-        v[1] / slide,
-        v[2] / slide
-      ]
+      [origin.x, origin.y, origin.z],
+      [v[0] / slide, v[1] / slide, v[2] / slide]
     );
     var axis = [w[0] / turn, w[1] / turn, w[2] / turn];
     var pitch = (v[0] * axis[0] + v[1] * axis[1] + v[2] * axis[2]) / turn;
@@ -177,11 +165,7 @@ class AssemblyMateJoints {
       parent,
       occurrence,
       names,
-      [
-        origin.x + cross[0] / squared,
-        origin.y + cross[1] / squared,
-        origin.z + cross[2] / squared
-      ],
+      [origin.x + cross[0] / squared, origin.y + cross[1] / squared, origin.z + cross[2] / squared],
       axis
     );
   }
@@ -209,17 +193,11 @@ class AssemblyMateJoints {
     }
     var parentConnector:AssemblyConnector = {
       name: jointId + "-parent",
-      frame: AssemblyFrames.compose(
-        AssemblyFrames.inverse(parentPose),
-        world
-      )
+      frame: AssemblyFrames.compose(AssemblyFrames.inverse(parentPose), world)
     };
     var childConnector:AssemblyConnector = {
       name: jointId + "-child",
-      frame: AssemblyFrames.compose(
-        AssemblyFrames.inverse(childPose),
-        world
-      )
+      frame: AssemblyFrames.compose(AssemblyFrames.inverse(childPose), world)
     };
     var joint:KinematicJoint = {
       id: jointId,
@@ -229,17 +207,8 @@ class AssemblyMateJoints {
       parentConnector: parentConnector.name,
       child: inferred.child,
       childConnector: childConnector.name,
-      axis: {
-        x: 0,
-        y: 0,
-        z: 1
-      },
-      limits: {
-        lower: null,
-        upper: null,
-        velocity: null,
-        effort: null
-      },
+      axis: {x: 0, y: 0, z: 1},
+      limits: {lower: null, upper: null, velocity: null, effort: null},
       defaultValue: 0
     };
     return new AssemblyMateJointConversion(
@@ -265,17 +234,7 @@ class AssemblyMateJoints {
       point[0],
       point[1],
       point[2],
-      [
-        x[0],
-        y[0],
-        axis[0],
-        x[1],
-        y[1],
-        axis[1],
-        x[2],
-        y[2],
-        axis[2]
-      ]
+      [x[0], y[0], axis[0], x[1], y[1], axis[1], x[2], y[2], axis[2]]
     );
   }
 

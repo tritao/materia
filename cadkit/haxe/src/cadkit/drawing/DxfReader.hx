@@ -113,10 +113,7 @@ class DxfReader {
     return Segment.arc(
       center,
       chord * (1 + value * value) / (4 * Math.abs(value)),
-      Math.atan2(
-        a.y - center.y,
-        a.x - center.x
-      ),
+      Math.atan2(a.y - center.y, a.x - center.x),
       4 * Math.atan(value)
     );
   }
@@ -200,20 +197,10 @@ class DxfReader {
               b: base.b,
               c: base.c,
               d: base.d,
-              x: base.x + c * column * number(e, 44, 0) - s * row * number(
-                e,
-                45,
-                0
-              ) - base.a * block.base.x - base.b * block.base.y,
-              y: base.y + s * column * number(
-                e,
-                44,
-                0
-              ) + c * row * number(
-                e,
-                45,
-                0
-              ) - base.c * block.base.x - base.d * block.base.y
+              x: base.x + c * column * number(e,
+              44, 0) - s * row * number(e, 45, 0) - base.a * block.base.x - base.b * block.base.y,
+              y: base.y + s * column * number(e,
+              44, 0) + c * row * number(e, 45, 0) - base.c * block.base.x - base.d * block.base.y
             };
             expand(out, block.entities, blocks, compose(t, compose(extrusion(e), item)), layer, stack.concat([name]));
           }
@@ -248,15 +235,8 @@ class DxfReader {
             layer: layer,
             position: apply(textFrame, point(e, 10)),
             height: height * Math.sqrt(textFrame.a * textFrame.a + textFrame.c * textFrame.c),
-            text: value(
-              e,
-              1,
-              ""
-            ),
-            angle: Math.atan2(
-              textFrame.c,
-              textFrame.a
-            ) + angle
+            text: value(e, 1, ""),
+            angle: Math.atan2(textFrame.c, textFrame.a) + angle
           });
         case "ATTRIB", "ATTDEF":
           out.warnings.push('Ignored block annotation ${e.kind} at line ${e.line}');

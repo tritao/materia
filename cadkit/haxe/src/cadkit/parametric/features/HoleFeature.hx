@@ -308,14 +308,8 @@ class HoleFeature extends Feature {
           new Vector(0, 0),
           new Vector(mouthRadius, 0),
           new Vector(mouthRadius, margin),
-          new Vector(
-            boreRadius,
-            sinkDepth + margin
-          ),
-          new Vector(
-            0,
-            sinkDepth + margin
-          )
+          new Vector(boreRadius, sinkDepth + margin),
+          new Vector(0, sinkDepth + margin)
         ],
         Plane.XZ()
       );

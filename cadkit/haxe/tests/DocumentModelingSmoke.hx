@@ -55,28 +55,14 @@ class DocumentModelingSmoke {
     var shell = document.add(new ShellFeature(
       box,
       -1,
-      new SelectionRecipe(
-        "face",
-        "plane",
-        Vector.Z(),
-        "max",
-        Vector.Z(),
-        1
-      )
+      new SelectionRecipe("face", "plane", Vector.Z(), "max", Vector.Z(), 1)
     ));
     var chamfer = document.add(new ChamferFeature(
       box,
       0.5,
       null,
       null,
-      new SelectionRecipe(
-        "edge",
-        "line",
-        Vector.Z(),
-        "all",
-        Vector.Z(),
-        4
-      )
+      new SelectionRecipe("edge", "line", Vector.Z(), "all", Vector.Z(), 4)
     ));
     document.recompute();
     near(loft.currentShape().volume(), 20 * Math.PI);
@@ -179,26 +165,12 @@ class DocumentModelingSmoke {
       0.5,
       null,
       null,
-      new SelectionRecipe(
-        "edge",
-        "line",
-        Vector.Z(),
-        "all",
-        Vector.Z(),
-        4
-      )
+      new SelectionRecipe("edge", "line", Vector.Z(), "all", Vector.Z(), 4)
     ));
     var booleanShell = splitDocument.add(new ShellFeature(
       splitCut,
       -1,
-      new SelectionRecipe(
-        "face",
-        "plane",
-        Vector.Z(),
-        "max",
-        Vector.Z(),
-        1
-      )
+      new SelectionRecipe("face", "plane", Vector.Z(), "max", Vector.Z(), 1)
     ));
     splitDocument.recompute();
     near(booleanShell.currentShape().volume(), 424);

@@ -127,13 +127,7 @@ class SheetCornerSmoke {
     diagnosis("sheet.duplicate-contour-edit", function() {
       var invalid = SheetCutGeometry.applyEdits(
         graph,
-        [
-          new SheetContourEdit(2, graph.wall(2).outline),
-          new SheetContourEdit(
-            2,
-            graph.wall(2).outline
-          )
-        ],
+        [new SheetContourEdit(2, graph.wall(2).outline), new SheetContourEdit(2, graph.wall(2).outline)],
         []
       );
     }

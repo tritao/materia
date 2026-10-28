@@ -84,10 +84,7 @@ class ElementSmoke {
   }
 
   static function near(value:Float, expected:Float):Void check(
-    Math.abs(value - expected) < 1e-6 * Math.max(
-      1,
-      Math.abs(expected)
-    ),
+    Math.abs(value - expected) < 1e-6 * Math.max(1, Math.abs(expected)),
     'expected $expected, got $value'
   );
 
@@ -108,10 +105,7 @@ class ElementSmoke {
       "Upper",
       750,
       25,
-      new ElementReference(
-        datumOnlyDocument.id,
-        datumOnlyRoot.id
-      )
+      new ElementReference(datumOnlyDocument.id, datumOnlyRoot.id)
     );
     datumOnlyDocument.createReferencePlane("Grid A", new Plane(new Vector(10, 0, 0), Vector.X(), Vector.Z()));
     var datumOnlyReload = DocumentCodec.decode(DocumentCodec.encode(datumOnlyDocument));
@@ -302,19 +296,13 @@ class ElementSmoke {
       "Relative",
       200,
       0,
-      new ElementReference(
-        relativeDocument.id,
-        rootLevel.id
-      )
+      new ElementReference(relativeDocument.id, rootLevel.id)
     );
     var relativeSketch = relativeDocument.add(new DatumSketchFeature(
       "rectangle",
       10,
       20,
-      new ElementReference(
-        relativeDocument.id,
-        relativeLevel.id
-      )
+      new ElementReference(relativeDocument.id, relativeLevel.id)
     ));
     var relativeExtrude = relativeDocument.add(new ExtrudeFeature(relativeSketch, 0, 0, 5));
     var unrelatedFeature = relativeDocument.add(new CountingBoxFeature());
@@ -336,10 +324,7 @@ class ElementSmoke {
       "rectangle",
       5,
       5,
-      new ElementReference(
-        externalDocument.id,
-        externalLevel.id
-      )
+      new ElementReference(externalDocument.id, externalLevel.id)
     ));
     externalSketch.restoreActive(false);
     var relativeClone = DocumentCodec.decode(DocumentCodec.encode(relativeDocument), true);
@@ -426,29 +411,11 @@ class ElementSmoke {
       "Box",
       "cadkit.test.box",
       [
-        new DefinitionInput(
-          "width",
-          ParameterKind.Length,
-          "mm",
-          10
-        ),
-        new DefinitionInput(
-          "height",
-          ParameterKind.Length,
-          "mm",
-          20
-        ),
-        new DefinitionInput(
-          "depth",
-          ParameterKind.Length,
-          "mm",
-          30
-        )
+        new DefinitionInput("width", ParameterKind.Length, "mm", 10),
+        new DefinitionInput("height", ParameterKind.Length, "mm", 20),
+        new DefinitionInput("depth", ParameterKind.Length, "mm", 30)
       ],
-      [new DefinitionOutput(
-        "body",
-        DefinitionOutput.Geometry
-      )]
+      [new DefinitionOutput("body", DefinitionOutput.Geometry)]
     );
     var firstPart = parts.createInstance("Box A", definition);
     var secondPart = parts.createInstance("Box B", definition);
@@ -512,47 +479,14 @@ class ElementSmoke {
       "Reusable part",
       graph,
       [
-        new DefinitionInput(
-          "width",
-          ParameterKind.Length,
-          "cm",
-          1
-        ),
-        new DefinitionInput(
-          "depth",
-          ParameterKind.Length,
-          "mm",
-          20
-        ),
-        new DefinitionInput(
-          "height",
-          ParameterKind.Length,
-          "mm",
-          30
-        ),
-        new DefinitionInput(
-          "openingRadius",
-          ParameterKind.Length,
-          "mm",
-          2
-        ),
-        new DefinitionInput(
-          "openingHeight",
-          ParameterKind.Length,
-          "mm",
-          10
-        )
+        new DefinitionInput("width", ParameterKind.Length, "cm", 1),
+        new DefinitionInput("depth", ParameterKind.Length, "mm", 20),
+        new DefinitionInput("height", ParameterKind.Length, "mm", 30),
+        new DefinitionInput("openingRadius", ParameterKind.Length, "mm", 2),
+        new DefinitionInput("openingHeight", ParameterKind.Length, "mm", 10)
       ],
-      [
-        new DefinitionOutput(
-          "frame",
-          DefinitionOutput.Geometry
-        ),
-        new DefinitionOutput(
-          "opening",
-          DefinitionOutput.Tool
-        )
-      ],
+      [new DefinitionOutput("frame",
+      DefinitionOutput.Geometry), new DefinitionOutput("opening", DefinitionOutput.Tool)],
       inputBindings,
       outputFeatures
     );
@@ -626,29 +560,11 @@ class ElementSmoke {
       "Transient",
       "cadkit.test.box",
       [
-        new DefinitionInput(
-          "width",
-          ParameterKind.Length,
-          "mm",
-          100
-        ),
-        new DefinitionInput(
-          "height",
-          ParameterKind.Length,
-          "mm",
-          100
-        ),
-        new DefinitionInput(
-          "depth",
-          ParameterKind.Length,
-          "mm",
-          10
-        )
+        new DefinitionInput("width", ParameterKind.Length, "mm", 100),
+        new DefinitionInput("height", ParameterKind.Length, "mm", 100),
+        new DefinitionInput("depth", ParameterKind.Length, "mm", 10)
       ],
-      [new DefinitionOutput(
-        "body",
-        DefinitionOutput.Geometry
-      )]
+      [new DefinitionOutput("body", DefinitionOutput.Geometry)]
     );
     definitionTransaction.cancel();
     check(definitionTransactionDocument.allDefinitions().length == 0, "definition creation is transactional");
@@ -672,33 +588,12 @@ class ElementSmoke {
       "Typed",
       "cadkit.test.typed-connector",
       [
-        new DefinitionInput(
-          "width",
-          ParameterKind.Length,
-          "mm",
-          10
-        ),
-        DefinitionInput.boolean(
-          "enabled",
-          true
-        ),
-        DefinitionInput.integer(
-          "count",
-          2
-        ),
-        DefinitionInput.token(
-          "detail",
-          "preview",
-          [
-            "preview",
-            "envelope"
-          ]
-        )
+        new DefinitionInput("width", ParameterKind.Length, "mm", 10),
+        DefinitionInput.boolean("enabled", true),
+        DefinitionInput.integer("count", 2),
+        DefinitionInput.token("detail", "preview", ["preview", "envelope"])
       ],
-      [new DefinitionOutput(
-        "body",
-        DefinitionOutput.Geometry
-      )]
+      [new DefinitionOutput("body", DefinitionOutput.Geometry)]
     );
     var instance = doc.createInstance("Part", definition);
     check(

@@ -35,14 +35,7 @@ class ConstrainedSlottedBracket {
       finish = builder.fillet(
         extrusion,
         filletRadius,
-        new SelectionRecipe(
-          "edge",
-          "line",
-          Vector.Z(),
-          "ends",
-          Vector.X(),
-          4
-        )
+        new SelectionRecipe("edge", "line", Vector.Z(), "ends", Vector.X(), 4)
       );
       builder.output(finish);
     }
@@ -55,81 +48,21 @@ class ConstrainedSlottedBracket {
     var halfHeight = height / 2;
     for (point in [
       new SketchPoint("body.bl", -halfWidth, -halfHeight),
-      new SketchPoint(
-        "body.br",
-        halfWidth,
-        -halfHeight
-      ),
-      new SketchPoint(
-        "body.tr",
-        halfWidth,
-        halfHeight
-      ),
-      new SketchPoint(
-        "body.tl",
-        -halfWidth,
-        halfHeight
-      ),
-      new SketchPoint(
-        "axis.x0",
-        -1,
-        0
-      ),
-      new SketchPoint(
-        "axis.x1",
-        1,
-        0
-      ),
-      new SketchPoint(
-        "axis.y0",
-        0,
-        -1
-      ),
-      new SketchPoint(
-        "axis.y1",
-        0,
-        1
-      ),
-      new SketchPoint(
-        "slot.left",
-        -10,
-        0
-      ),
-      new SketchPoint(
-        "slot.right",
-        10,
-        0
-      ),
-      new SketchPoint(
-        "slot.bl",
-        -10,
-        -5
-      ),
-      new SketchPoint(
-        "slot.br",
-        10,
-        -5
-      ),
-      new SketchPoint(
-        "slot.tl",
-        -10,
-        5
-      ),
-      new SketchPoint(
-        "slot.tr",
-        10,
-        5
-      ),
-      new SketchPoint(
-        "hole.left",
-        -28,
-        0
-      ),
-      new SketchPoint(
-        "hole.right",
-        28,
-        0
-      )
+      new SketchPoint("body.br", halfWidth, -halfHeight),
+      new SketchPoint("body.tr", halfWidth, halfHeight),
+      new SketchPoint("body.tl", -halfWidth, halfHeight),
+      new SketchPoint("axis.x0", -1, 0),
+      new SketchPoint("axis.x1", 1, 0),
+      new SketchPoint("axis.y0", 0, -1),
+      new SketchPoint("axis.y1", 0, 1),
+      new SketchPoint("slot.left", -10, 0),
+      new SketchPoint("slot.right", 10, 0),
+      new SketchPoint("slot.bl", -10, -5),
+      new SketchPoint("slot.br", 10, -5),
+      new SketchPoint("slot.tl", -10, 5),
+      new SketchPoint("slot.tr", 10, 5),
+      new SketchPoint("hole.left", -28, 0),
+      new SketchPoint("hole.right", 28, 0)
     ]) sketch.addPoint(point);
 
     sketch.addEntity(SketchEntity.line("body.bottom", "body.bl", "body.br")).addEntity(SketchEntity.line(

@@ -88,10 +88,7 @@ class AssemblyKinematics {
       );
     }
     for (occurrence in definition.occurrences) if (!hasParent.exists(occurrence.id)) builder.setRootPose(
-      bodyOf(
-        bodies,
-        occurrence.id
-      ),
+      bodyOf(bodies, occurrence.id),
       fromFrame(occurrence.initialPose)
     );
     if (definition.couplings != null) for (coupling in definition.couplings) builder.couple(
@@ -123,11 +120,7 @@ class AssemblyKinematics {
         joint.id,
         kind,
         frameIndexIn(builder, joint.parent, joint.parentConnector),
-        frameIndexIn(
-          builder,
-          joint.child,
-          joint.childConnector
-        ),
+        frameIndexIn(builder, joint.child, joint.childConnector),
         axis,
         joint.closureTolerance
       );
@@ -157,16 +150,8 @@ class AssemblyKinematics {
         mate.id,
         kind,
         frameIndexIn(builder, mate.first, mate.firstConnector),
-        frameIndexIn(
-          builder,
-          mate.second,
-          mate.secondConnector
-        ),
-        new Vector3(
-          mate.axis.x,
-          mate.axis.y,
-          mate.axis.z
-        ),
+        frameIndexIn(builder, mate.second, mate.secondConnector),
+        new Vector3(mate.axis.x, mate.axis.y, mate.axis.z),
         null,
         mate.value == null ? 0.0 : mate.value
       );

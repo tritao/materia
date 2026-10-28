@@ -27,38 +27,13 @@ class AssemblyDocumentsSmoke {
       schemaVersion: AssemblyDefinitionCodec.VERSION,
       id: "document-assembly",
       definitions: [
-        {
-          id: "root-part",
-          connectors: [{
-            name: "mount",
-            frame: frame
-          }]
-        },
-        {
-          id: "follower-part",
-          connectors: [{
-            name: "base",
-            frame: frame
-          }]
-        }
+        {id: "root-part", connectors: [{name: "mount", frame: frame}]},
+        {id: "follower-part", connectors: [{name: "base", frame: frame}]}
       ],
       occurrences: [
-        {
-          id: "root",
-          definition: "root-part",
-          initialPose: frame
-        },
-        {
-          id: "module",
-          definition: "module-design",
-          assembly: "module-design",
-          initialPose: frame
-        },
-        {
-          id: "follower",
-          definition: "follower-part",
-          initialPose: frame
-        }
+        {id: "root", definition: "root-part", initialPose: frame},
+        {id: "module", definition: "module-design", assembly: "module-design", initialPose: frame},
+        {id: "follower", definition: "follower-part", initialPose: frame}
       ],
       joints: [
         {
@@ -69,11 +44,7 @@ class AssemblyDocumentsSmoke {
           parentConnector: "mount",
           child: "module",
           childConnector: "base",
-          axis: {
-            x: 0,
-            y: 1,
-            z: 0
-          },
+          axis: {x: 0, y: 1, z: 0},
           limits: limits,
           defaultValue: 0
         },
@@ -85,54 +56,20 @@ class AssemblyDocumentsSmoke {
           parentConnector: "tip",
           child: "follower",
           childConnector: "base",
-          axis: {
-            x: 0,
-            y: 1,
-            z: 0
-          },
+          axis: {x: 0, y: 1, z: 0},
           limits: limits,
           defaultValue: 0
         }
       ],
-      couplings: [{
-        id: "linked",
-        source: "slide",
-        target: "follow",
-        ratio: 1,
-        offset: 0
-      }],
+      couplings: [{id: "linked", source: "slide", target: "follow", ratio: 1, offset: 0}],
       assemblies: [{
         id: "module-design",
-        definitions: [{
-          id: "body-part",
-          connectors: [
-            {
-              name: "base",
-              frame: frame
-            },
-            {
-              name: "tip",
-              frame: frame
-            }
-          ]
-        }],
-        occurrences: [{
-          id: "body",
-          definition: "body-part",
-          initialPose: frame
-        }],
+        definitions: [{id: "body-part", connectors: [{name: "base", frame: frame}, {name: "tip", frame: frame}]}],
+        occurrences: [{id: "body", definition: "body-part", initialPose: frame}],
         joints: [],
         exposedConnectors: [
-          {
-            name: "base",
-            occurrence: "body",
-            connector: "base"
-          },
-          {
-            name: "tip",
-            occurrence: "body",
-            connector: "tip"
-          }
+          {name: "base", occurrence: "body", connector: "base"},
+          {name: "tip", occurrence: "body", connector: "tip"}
         ]
       }]
     };

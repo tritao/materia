@@ -206,10 +206,7 @@ class SheetSolid {
         if (ids[i] != "" && ids[i] != id) throw new SheetDiagnosis(
           "sheet.solid-naming",
           "Two authored segments generated the same face",
-          [
-            ids[i],
-            id
-          ]
+          [ids[i], id]
         );
         ids[i] = id;
         return;
@@ -231,14 +228,8 @@ class SheetSolid {
       [
         new Vector(0, -zone.thickness),
         new Vector(zone.width, -zone.thickness),
-        new Vector(
-          zone.width,
-          0
-        ),
-        new Vector(
-          0,
-          0
-        )
+        new Vector(zone.width, 0),
+        new Vector(0, 0)
       ],
       Plane.YZ()
     );
@@ -302,11 +293,7 @@ class SheetSolid {
     try {
       if (zone.angle == 0) operation = new Operation(CadKit.shapeExtrudeOperationChecked(
         sketch.shape.borrowHandle(),
-        new Vector(
-          0,
-          0,
-          -zone.thickness
-        ).native()
+        new Vector(0, 0, -zone.thickness).native()
       ));
       else {
         try {

@@ -171,32 +171,13 @@ class SheetDrawingSmoke {
     for (sweep in [Math.PI / 3,
       -Math.PI / 3, 4 * Math.PI / 3, -4 * Math.PI / 3, 2 * Math.PI, -2 * Math.PI]) curves.push(Curve(
         Outline,
-        Segment.arc(
-          new Point2(
-            17,
-            -23
-          ),
-          4,
-          5.8,
-          sweep
-        )
+        Segment.arc(new Point2(17, -23), 4, 5.8, sweep)
       ));
     var curved = new Drawing2D(curves);
     compare(curved, read(Dxf.write(curved)));
     var process = new Drawing2D([
       Curve(Process("POCKET"), Segment.line(new Point2(0, 0), new Point2(10, 0))),
-      Curve(
-        Process("POCKET"),
-        Segment.arc(
-          new Point2(
-            10,
-            5
-          ),
-          5,
-          -Math.PI / 2,
-          Math.PI
-        )
-      )
+      Curve(Process("POCKET"), Segment.arc(new Point2(10, 5), 5, -Math.PI / 2, Math.PI))
     ]);
     compare(process, read(Dxf.write(process)));
     check(process.usedLayers().length == 6, "named layers are deduplicated by name");
@@ -218,15 +199,7 @@ class SheetDrawingSmoke {
     }
     var collision = new Drawing2D([
       Label(Process("Pocket"), new Point2(0, 0), 3, "one"),
-      Label(
-        Process("POCKET"),
-        new Point2(
-          0,
-          0
-        ),
-        3,
-        "two"
-      )
+      Label(Process("POCKET"), new Point2(0, 0), 3, "two")
     ]);
     var rejected = false;
     try collision.usedLayers() catch (e:Dynamic) rejected = true;

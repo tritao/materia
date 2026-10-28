@@ -20,10 +20,7 @@ class SheetCornerEdge {
     throw new SheetDiagnosis(
       "sheet.corner-selection",
       "Corner edge no longer exists on its authored wall",
-      [
-        "wall:" + wall,
-        identity
-      ]
+      ["wall:" + wall, identity]
     );
   }
   /** Resolve a picked side face once into graph-owned identities; native names remain opaque. */
@@ -31,10 +28,7 @@ class SheetCornerEdge {
     var selected = SheetEdgeSelection.identify(sheet, face);
     return new SheetCornerEdge(
       selected.wall,
-      sheet.wall(selected.wall).outline.identity(
-        selected.edge.loop,
-        selected.edge.segment
-      )
+      sheet.wall(selected.wall).outline.identity(selected.edge.loop, selected.edge.segment)
     );
   }
 }

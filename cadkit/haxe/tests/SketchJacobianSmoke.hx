@@ -44,10 +44,7 @@ class SketchJacobianSmoke {
       [6.8, 7.9],
       [2.2, 6.1],
       [7.7, 3.3],
-      [
-        4.9,
-        2.6
-      ]
+      [4.9, 2.6]
     ];
     for (i in 0...coordinates.length) sketch.addPoint(new SketchPoint('p$i', coordinates[i][0], coordinates[i][1]));
     sketch.addEntity(SketchEntity.line("l0",

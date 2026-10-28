@@ -205,10 +205,7 @@ class GeometricConnectors {
   /** `geometric` as an assembly connector: framed in `shape`, with the reference that frames it again. */
   public static function connector(geometric:GeometricConnector, shape:Shape):AssemblyConnector return {
     name: geometric.name,
-    frame: frame(
-      shape,
-      geometric
-    ),
+    frame: frame(shape, geometric),
     reference: referenceText(geometric)
   };
 
@@ -240,10 +237,7 @@ class GeometricConnectors {
     var flip:Null<Bool> = Reflect.field(record, "flip");
     return new GeometricConnector(
       connector.name,
-      DocumentCodec.decodeFingerprint(
-        Reflect.field(record, "fingerprint"),
-        kind
-      ),
+      DocumentCodec.decodeFingerprint(Reflect.field(record, "fingerprint"), kind),
       featureKind(feature),
       direction,
       radius,
@@ -321,11 +315,7 @@ class GeometricConnectors {
       if (feature.kind != Plane) continue;
       result.push({
         origin: new cadkit.modeling.Vector(feature.origin[0], feature.origin[1], feature.origin[2]),
-        normal: new cadkit.modeling.Vector(
-          feature.direction[0],
-          feature.direction[1],
-          feature.direction[2]
-        )
+        normal: new cadkit.modeling.Vector(feature.direction[0], feature.direction[1], feature.direction[2])
       });
     }
     return result;
@@ -505,11 +495,7 @@ class GeometricConnectors {
           - point[0]) * direction[0] + (center[1] - point[1]) * direction[1] + (center[2] - point[2]) * direction[2];
         return new GeometricFeature(
           Axis,
-          [
-            point[0] + along * direction[0],
-            point[1] + along * direction[1],
-            point[2] + along * direction[2]
-          ],
+          [point[0] + along * direction[0], point[1] + along * direction[1], point[2] + along * direction[2]],
           direction,
           unit(vector(axis.get_reference())),
           axis.get_radius(),
@@ -588,21 +574,8 @@ class GeometricConnectors {
       var index:Int = Reflect.field(record, "index"), feature:String = Reflect.field(record, "feature");
       new GeometricCandidate(
         index,
-        new GeometricFeature(
-          featureKind(feature),
-          origin,
-          direction,
-          reference,
-          radius,
-          signed
-        ),
-        DocumentCodec.decodeFingerprint(
-          Reflect.field(
-            record,
-            "fingerprint"
-          ),
-          CadKit.ShapeKind.Face
-        )
+        new GeometricFeature(featureKind(feature), origin, direction, reference, radius, signed),
+        DocumentCodec.decodeFingerprint(Reflect.field(record, "fingerprint"), CadKit.ShapeKind.Face)
       );
     }
     ];
@@ -644,17 +617,7 @@ class GeometricConnectors {
       origin[0],
       origin[1],
       origin[2],
-      [
-        xs[0],
-        y[0],
-        z[0],
-        xs[1],
-        y[1],
-        z[1],
-        xs[2],
-        y[2],
-        z[2]
-      ]
+      [xs[0], y[0], z[0], xs[1], y[1], z[1], xs[2], y[2], z[2]]
     );
   }
 

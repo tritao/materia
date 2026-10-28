@@ -190,11 +190,7 @@ class ConstraintDiagnosis {
       groups,
       unsatisfied,
       nearDegenerate,
-      suggestRemovals(
-        input.owners,
-        groups,
-        protectedOwners
-      )
+      suggestRemovals(input.owners, groups, protectedOwners)
     );
   }
 
@@ -229,20 +225,11 @@ class ConstraintDiagnosis {
       return new DiagnosisReport(
         variables,
         rows.length - factored.circuits.length,
-        sparseSubsystems(
-          rows,
-          owners,
-          variables,
-          factored.dropped
-        ),
+        sparseSubsystems(rows, owners, variables, factored.dropped),
         groups,
         unsatisfied,
         factored.nearDegenerate,
-        suggestRemovals(
-          owners,
-          groups,
-          protectedOwners == null ? [] : protectedOwners
-        )
+        suggestRemovals(owners, groups, protectedOwners == null ? [] : protectedOwners)
       );
     }
     var dense = [for (_ in 0...rows.length * variables) 0.0];
@@ -501,10 +488,7 @@ class ConstraintDiagnosis {
 		dependency; `scale` is each row's norm before the last normalization (0 for an empty row).
 	*/
   static function equilibrate(source:Array<{index:Array<Int>, value:Array<Float>}>): {
-    rows: Array<{
-      index:Array<Int>,
-      value:Array<Float>
-    }>,
+    rows: Array<{index:Array<Int>, value:Array<Float>}>,
     scale: Array<Float>
   } {
     var rows = [for (row in source) {

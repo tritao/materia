@@ -92,10 +92,7 @@ class Sheet {
       wallA,
       BendAttachment.fromOutline(wall(wallA).outline, edgeA),
       wallB,
-      BendAttachment.fromOutline(
-        wall(wallB).outline,
-        edgeB
-      ),
+      BendAttachment.fromOutline(wall(wallB).outline, edgeB),
       angle,
       radius
     );
@@ -150,13 +147,7 @@ class Sheet {
         if (partA.length == 0 && (isRipped(b.id) || partB.length == 0)) throw new SheetDiagnosis(
           "sheet.cut-isolated-bend-patch",
           "Cut leaves bend material detached from its walls",
-          [
-            "bend:" + b.id,
-            region.identity(
-              0,
-              0
-            )
-          ]
+          ["bend:" + b.id, region.identity(0, 0)]
         );
         if (partA.length > 0 && partB.length > 0) bridge = true;
         for (interval in partA) regionA.push(interval);
@@ -220,18 +211,12 @@ class Sheet {
     for (i in 0...identities.length) for (j in 0...identities[i].length) if (identities[i][j]
       == attachment.identity) return new BendAttachment(
         attachment.identity,
-        next.segment(
-          i,
-          j
-        )
+        next.segment(i, j)
       );
     throw new SheetDiagnosis(
       "sheet.bend-edge-removed",
       "Wall edit removed an edge belonging to a bend",
-      [
-        "bend:" + bend,
-        attachment.identity
-      ]
+      ["bend:" + bend, attachment.identity]
     );
   }
   /** Change only material contours; attachment datums remain owned by their bends. */
@@ -450,11 +435,7 @@ class Sheet {
         if (gap > tolerance || directionGap > tolerance) throw new SheetDiagnosis(
           "sheet.closure-gap",
           "Closure gap " + gap + " mm; frame direction gap " + directionGap,
-          [
-            "bend:" + b.id,
-            "wall:" + b.wallA,
-            "wall:" + b.wallB
-          ]
+          ["bend:" + b.id, "wall:" + b.wallA, "wall:" + b.wallB]
         );
       }
       var local = localZone(b, state.angle(b.id));

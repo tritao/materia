@@ -19,12 +19,7 @@ class MateSolverSmoke {
     // A motor's flange on a bracket face with its shaft in the bore: one turn about the shaft stays free.
     var seated = motorOnBracket([
       mate("seat", AssemblyMateKind.Planar),
-      mate(
-        "shaft",
-        AssemblyMateKind.Coaxial,
-        "bore",
-        "axis"
-      )
+      mate("shaft", AssemblyMateKind.Coaxial, "bore", "axis")
     ]);
     var result = AssemblyMateSolver.solve(seated);
     check(
@@ -70,13 +65,7 @@ class MateSolverSmoke {
     // Two planar mates with different offsets cannot both hold.
     var conflicting = motorOnBracket([
       mate("seat", AssemblyMateKind.Planar),
-      mate(
-        "lift",
-        AssemblyMateKind.Planar,
-        null,
-        null,
-        5
-      )
+      mate("lift", AssemblyMateKind.Planar, null, null, 5)
     ]);
     var conflict = AssemblyMateSolver.solve(conflicting);
     check(
@@ -128,99 +117,14 @@ class MateSolverSmoke {
       id: "folded-arm",
       lengthUnit: "mm",
       definitions: [
-        {
-          id: "base",
-          connectors: [
-            {
-              name: "pivot",
-              frame: frame(
-                0,
-                0,
-                0
-              )
-            },
-            {
-              name: "point",
-              frame: frame(
-                200,
-                0,
-                0
-              )
-            }
-          ]
-        },
-        {
-          id: "upper",
-          connectors: [
-            {
-              name: "root",
-              frame: frame(
-                0,
-                0,
-                0
-              )
-            },
-            {
-              name: "elbow",
-              frame: frame(
-                100,
-                0,
-                0
-              )
-            }
-          ]
-        },
-        {
-          id: "fore",
-          connectors: [
-            {
-              name: "root",
-              frame: frame(
-                0,
-                0,
-                0
-              )
-            },
-            {
-              name: "tip",
-              frame: frame(
-                40,
-                0,
-                0
-              )
-            }
-          ]
-        }
+        {id: "base", connectors: [{name: "pivot", frame: frame(0, 0, 0)}, {name: "point", frame: frame(200, 0, 0)}]},
+        {id: "upper", connectors: [{name: "root", frame: frame(0, 0, 0)}, {name: "elbow", frame: frame(100, 0, 0)}]},
+        {id: "fore", connectors: [{name: "root", frame: frame(0, 0, 0)}, {name: "tip", frame: frame(40, 0, 0)}]}
       ],
       occurrences: [
-        {
-          id: "base",
-          definition: "base",
-          initialPose: frame(
-            0,
-            0,
-            0
-          ),
-          grounded: true
-        },
-        {
-          id: "upper",
-          definition: "upper",
-          initialPose: frame(
-            0,
-            0,
-            0
-          )
-        },
-        {
-          id: "fore",
-          definition: "fore",
-          initialPose: frame(
-            100,
-            0,
-            0
-          )
-        }
+        {id: "base", definition: "base", initialPose: frame(0, 0, 0), grounded: true},
+        {id: "upper", definition: "upper", initialPose: frame(0, 0, 0)},
+        {id: "fore", definition: "fore", initialPose: frame(100, 0, 0)}
       ],
       joints: [
         {
@@ -231,11 +135,7 @@ class MateSolverSmoke {
           parentConnector: "pivot",
           child: "upper",
           childConnector: "root",
-          axis: {
-            x: 0,
-            y: 0,
-            z: 1
-          },
+          axis: {x: 0, y: 0, z: 1},
           limits: free,
           defaultValue: 0
         },
@@ -247,11 +147,7 @@ class MateSolverSmoke {
           parentConnector: "elbow",
           child: "fore",
           childConnector: "root",
-          axis: {
-            x: 0,
-            y: 0,
-            z: 1
-          },
+          axis: {x: 0, y: 0, z: 1},
           limits: free,
           defaultValue: Math.PI
         }
@@ -263,11 +159,7 @@ class MateSolverSmoke {
         firstConnector: "point",
         second: "fore",
         secondConnector: "tip",
-        axis: {
-          x: 0,
-          y: 0,
-          z: 1
-        },
+        axis: {x: 0, y: 0, z: 1},
         value: 140
       }]
     };
@@ -348,11 +240,7 @@ class MateSolverSmoke {
         firstConnector: "face",
         second: "motor",
         secondConnector: "flange",
-        axis: {
-          x: 1,
-          y: 0,
-          z: 0
-        }
+        axis: {x: 1, y: 0, z: 0}
       }
     ]);
     var slid = AssemblyMateSolver.place(sliding, AssemblyMateSolver.solve(sliding));
@@ -411,11 +299,7 @@ class MateSolverSmoke {
       firstConnector: first == null ? "face" : first,
       second : "motor",
       secondConnector : second == null ? "flange" : second,
-      axis : {
-        x : 0,
-        y : 0,
-        z : 1
-      }
+      axis : {x : 0, y : 0, z : 1}
     };
     if (value != null) result.value = value;
     return result;
@@ -430,68 +314,13 @@ class MateSolverSmoke {
       definitions: [
         {
           id: "bracket",
-          connectors: [
-            {
-              name: "face",
-              frame: frame(
-                40,
-                -20,
-                100
-              )
-            },
-            {
-              name: "bore",
-              frame: frame(
-                40,
-                -20,
-                0
-              )
-            }
-          ]
+          connectors: [{name: "face", frame: frame(40, -20, 100)}, {name: "bore", frame: frame(40, -20, 0)}]
         },
-        {
-          id: "motor",
-          connectors: [
-            {
-              name: "flange",
-              frame: frame(
-                0,
-                0,
-                0
-              )
-            },
-            {
-              name: "axis",
-              frame: frame(
-                0,
-                0,
-                -30
-              )
-            }
-          ]
-        }
+        {id: "motor", connectors: [{name: "flange", frame: frame(0, 0, 0)}, {name: "axis", frame: frame(0, 0, -30)}]}
       ],
       occurrences: [
-        {
-          id: "bracket",
-          definition: "bracket",
-          initialPose: frame(
-            0,
-            0,
-            0
-          ),
-          grounded: true
-        },
-        {
-          id: "motor",
-          definition: "motor",
-          initialPose: rotated(
-            300,
-            150,
-            -80,
-            0.4
-          )
-        }
+        {id: "bracket", definition: "bracket", initialPose: frame(0, 0, 0), grounded: true},
+        {id: "motor", definition: "motor", initialPose: rotated(300, 150, -80, 0.4)}
       ],
       joints: [],
       mates: mates
@@ -509,66 +338,15 @@ class MateSolverSmoke {
         {
           id: "base",
           connectors: [
-            {
-              name: "pivot",
-              frame: frame(
-                0,
-                0,
-                0
-              )
-            },
-            {
-              name: "fixture",
-              frame: frame(
-                1000 * Math.cos(fixtureAngle),
-                1000 * Math.sin(fixtureAngle),
-                0
-              )
-            }
+            {name: "pivot", frame: frame(0, 0, 0)},
+            {name: "fixture", frame: frame(1000 * Math.cos(fixtureAngle), 1000 * Math.sin(fixtureAngle), 0)}
           ]
         },
-        {
-          id: "link",
-          connectors: [
-            {
-              name: "root",
-              frame: frame(
-                0,
-                0,
-                0
-              )
-            },
-            {
-              name: "tip",
-              frame: frame(
-                1000,
-                0,
-                0
-              )
-            }
-          ]
-        }
+        {id: "link", connectors: [{name: "root", frame: frame(0, 0, 0)}, {name: "tip", frame: frame(1000, 0, 0)}]}
       ],
       occurrences: [
-        {
-          id: "base",
-          definition: "base",
-          initialPose: frame(
-            0,
-            0,
-            0
-          ),
-          grounded: true
-        },
-        {
-          id: "link",
-          definition: "link",
-          initialPose: frame(
-            0,
-            0,
-            0
-          )
-        }
+        {id: "base", definition: "base", initialPose: frame(0, 0, 0), grounded: true},
+        {id: "link", definition: "link", initialPose: frame(0, 0, 0)}
       ],
       joints: [{
         id: "shoulder",
@@ -578,17 +356,8 @@ class MateSolverSmoke {
         parentConnector: "pivot",
         child: "link",
         childConnector: "root",
-        axis: {
-          x: 0,
-          y: 0,
-          z: 1
-        },
-        limits: {
-          lower: null,
-          upper: null,
-          velocity: null,
-          effort: null
-        },
+        axis: {x: 0, y: 0, z: 1},
+        limits: {lower: null, upper: null, velocity: null, effort: null},
         defaultValue: 0.2
       }],
       mates: [{
@@ -598,11 +367,7 @@ class MateSolverSmoke {
         firstConnector: "fixture",
         second: "link",
         secondConnector: "tip",
-        axis: {
-          x: 0,
-          y: 0,
-          z: 1
-        }
+        axis: {x: 0, y: 0, z: 1}
       }]
     };
   }

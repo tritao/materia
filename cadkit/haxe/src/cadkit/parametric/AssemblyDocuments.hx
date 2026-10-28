@@ -148,15 +148,9 @@ class AssemblyDocuments {
 
   static function collectScopePaths(
     occurrences:Array<AssemblyComponentOccurrence>,
-    byId:Map<
-      String,
-      AssemblySubdefinition
-  >,
+    byId:Map<String, AssemblySubdefinition>,
     prefix:String,
-    paths:Map<
-      String,
-      String
-  >
+    paths:Map<String, String>
   ):Void {
     for (occurrence in occurrences) if (occurrence.assembly != null) {
       var nested = byId.get(occurrence.assembly);
@@ -247,10 +241,7 @@ class AssemblyDocuments {
       if (parent == null || child == null) {
         if (readRelationshipOrNull(relationship, "owner") == root.id.value) throw new AssemblyDocumentDiagnostic(
           "assembly.missing-joint-endpoint",
-          readRelationship(
-            relationship,
-            "id"
-          ),
+          readRelationship(relationship, "id"),
           "Joint endpoint is missing"
         );
         continue;
@@ -263,30 +254,15 @@ class AssemblyDocuments {
       var limits:AssemblyJointLimits = readLimits(relationship);
       var joint:KinematicJoint = {
         id: readRelationship(relationship, "id"),
-        type: cast readRelationship(
-          relationship,
-          "type"
-        ),
-        role: cast readRelationship(
-          relationship,
-          "role"
-        ),
+        type: cast readRelationship(relationship, "type"),
+        role: cast readRelationship(relationship, "role"),
         parent: parent.id,
-        parentConnector: readRelationship(
-          relationship,
-          "parentConnector"
-        ),
+        parentConnector: readRelationship(relationship, "parentConnector"),
         child: child.id,
-        childConnector: readRelationship(
-          relationship,
-          "childConnector"
-        ),
+        childConnector: readRelationship(relationship, "childConnector"),
         axis: axis,
         limits: limits,
-        defaultValue: number(
-          relationship,
-          "defaultValue"
-        )
+        defaultValue: number(relationship, "defaultValue")
       };
       var tolerance = relationship.property(PREFIX + "closureTolerance");
       if (tolerance != null) joint.closureTolerance = cast tolerance.value;
@@ -303,10 +279,7 @@ class AssemblyDocuments {
       if (source == null || target == null) {
         if (readRelationshipOrNull(relationship, "owner") == root.id.value) throw new AssemblyDocumentDiagnostic(
           "assembly.missing-coupling-endpoint",
-          readRelationship(
-            relationship,
-            "id"
-          ),
+          readRelationship(relationship, "id"),
           "Coupling endpoint is missing"
         );
         continue;
@@ -317,18 +290,9 @@ class AssemblyDocuments {
       scope.couplings.push({
         id: readRelationship(relationship, "id"),
         source: drivingJoint(scope.joints, source.id),
-        target: drivingJoint(
-          scope.joints,
-          target.id
-        ),
-        ratio: number(
-          relationship,
-          "ratio"
-        ),
-        offset: number(
-          relationship,
-          "offset"
-        )
+        target: drivingJoint(scope.joints, target.id),
+        ratio: number(relationship, "ratio"),
+        offset: number(relationship, "offset")
       });
     }
     for (relationship in document.allRelationships()) if (relationship.typeName == MATE) {
@@ -337,10 +301,7 @@ class AssemblyDocuments {
       if (first == null || second == null) {
         if (readRelationshipOrNull(relationship, "owner") == root.id.value) throw new AssemblyDocumentDiagnostic(
           "assembly.missing-mate-endpoint",
-          readRelationship(
-            relationship,
-            "id"
-          ),
+          readRelationship(relationship, "id"),
           "Mate endpoint is missing"
         );
         continue;
@@ -350,20 +311,11 @@ class AssemblyDocuments {
       if (first.scope != scopeName || second.scope != scopeName) throw "Mate crosses assembly scopes";
       var mate:AssemblyMate = {
         id: readRelationship(relationship, "id"),
-        kind: cast readRelationship(
-          relationship,
-          "kind"
-        ),
+        kind: cast readRelationship(relationship, "kind"),
         first: first.id,
-        firstConnector: readRelationship(
-          relationship,
-          "firstConnector"
-        ),
+        firstConnector: readRelationship(relationship, "firstConnector"),
         second: second.id,
-        secondConnector: readRelationship(
-          relationship,
-          "secondConnector"
-        ),
+        secondConnector: readRelationship(relationship, "secondConnector"),
         axis: readAxis(relationship)
       };
       var value = optionalNumber(relationship, "value");
@@ -465,10 +417,7 @@ class AssemblyDocuments {
             occurrence.definition,
             occurrence.assembly == null ? AssemblyMemberEvaluator.RECIPE : AssemblyMemberEvaluator.NESTED_RECIPE,
             [],
-            [new DefinitionOutput(
-              "body",
-              DefinitionOutput.Geometry
-            )]
+            [new DefinitionOutput("body", DefinitionOutput.Geometry)]
           );
           var noConnectors:Array<materia.assembly.AssemblyRecord.AssemblyConnector> = [];
           instanceDefinition.setProperty(TypedProperty.text(
@@ -504,10 +453,7 @@ class AssemblyDocuments {
     scope:String,
     joints:Array<KinematicJoint>,
     couplings:Array<AssemblyJointCoupling>,
-    members:Map<
-      String,
-      Element
-  >,
+    members:Map<String, Element>,
     ?mates:Array<AssemblyMate>
   ):Void {
     var children = new Map<String, Element>();
@@ -515,10 +461,7 @@ class AssemblyDocuments {
       var relationship = document.createRelationship(
         JOINT,
         reference(document, members.get(joint.parent)),
-        reference(
-          document,
-          members.get(joint.child)
-        )
+        reference(document, members.get(joint.child))
       );
       putRelationship(relationship, "owner", root.id.value);
       putRelationship(relationship, "scope", scope);
@@ -555,10 +498,7 @@ class AssemblyDocuments {
       var relationship = document.createRelationship(
         COUPLING,
         reference(document, children.get(coupling.source)),
-        reference(
-          document,
-          children.get(coupling.target)
-        )
+        reference(document, children.get(coupling.target))
       );
       putRelationship(relationship, "owner", root.id.value);
       putRelationship(relationship, "scope", scope);
@@ -570,10 +510,7 @@ class AssemblyDocuments {
       var relationship = document.createRelationship(
         MATE,
         reference(document, members.get(mate.first)),
-        reference(
-          document,
-          members.get(mate.second)
-        )
+        reference(document, members.get(mate.second))
       );
       putRelationship(relationship, "owner", root.id.value);
       putRelationship(relationship, "scope", scope);
@@ -628,22 +565,10 @@ class AssemblyDocuments {
     return {
       lower: optionalNumber(relationship, "limitLower"),
       upper: optionalNumber(relationship, "limitUpper"),
-      velocity: optionalNumber(
-        relationship,
-        "limitVelocity"
-      ),
-      effort: optionalNumber(
-        relationship,
-        "limitEffort"
-      ),
-      overtravel: optionalNumber(
-        relationship,
-        "limitOvertravel"
-      ),
-      acceleration: optionalNumber(
-        relationship,
-        "limitAcceleration"
-      )
+      velocity: optionalNumber(relationship, "limitVelocity"),
+      effort: optionalNumber(relationship, "limitEffort"),
+      overtravel: optionalNumber(relationship, "limitOvertravel"),
+      acceleration: optionalNumber(relationship, "limitAcceleration")
     };
   }
 
@@ -662,10 +587,7 @@ class AssemblyDocuments {
 
   static function putOwner(element:Element, root:Element):Void element.setProperty(TypedProperty.elementReference(
     PREFIX + "owner",
-    new ElementReference(
-      root.document.id,
-      root.id
-    )
+    new ElementReference(root.document.id, root.id)
   ));
 
   static function belongsTo(element:Element, root:Element):Bool {

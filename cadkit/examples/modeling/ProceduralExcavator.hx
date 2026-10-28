@@ -69,19 +69,7 @@ class ProceduralExcavator {
         "BoomCylinderOuter",
         buildCylinderOuter(
           new Vector(-14, 0, 53),
-          extendLine(
-            new Vector(
-              -14,
-              0,
-              53
-            ),
-            new Vector(
-              11,
-              0,
-              128
-            ),
-            2.15
-          ),
+          extendLine(new Vector(-14, 0, 53), new Vector(11, 0, 128), 2.15),
           10.1,
           6.2,
           30
@@ -89,73 +77,23 @@ class ProceduralExcavator {
       ));
       result.push(new ExcavatorComponent(
         "BoomCylinderInner",
-        buildCylinderInner(
-          new Vector(11, 0, 128),
-          new Vector(
-            77,
-            0,
-            295
-          ),
-          6.0,
-          8.5,
-          15
-        )
+        buildCylinderInner(new Vector(11, 0, 128), new Vector(77, 0, 295), 6.0, 8.5, 15)
       ));
       result.push(new ExcavatorComponent(
         "StickCylinderOuter",
-        buildCylinderOuter(
-          new Vector(39, 0, 174),
-          new Vector(
-            209,
-            0,
-            134
-          ),
-          9.8,
-          5.8,
-          30
-        )
+        buildCylinderOuter(new Vector(39, 0, 174), new Vector(209, 0, 134), 9.8, 5.8, 30)
       ));
       result.push(new ExcavatorComponent(
         "StickCylinderInner",
-        buildCylinderInner(
-          new Vector(84, 0, 132),
-          new Vector(
-            257,
-            0,
-            92
-          ),
-          6.1,
-          7.5,
-          15
-        )
+        buildCylinderInner(new Vector(84, 0, 132), new Vector(257, 0, 92), 6.1, 7.5, 15)
       ));
       result.push(new ExcavatorComponent(
         "BucketCylinderOuter",
-        buildCylinderOuter(
-          new Vector(87, 0, 150),
-          new Vector(
-            245,
-            0,
-            83
-          ),
-          6.2,
-          3.6,
-          15
-        )
+        buildCylinderOuter(new Vector(87, 0, 150), new Vector(245, 0, 83), 6.2, 3.6, 15)
       ));
       result.push(new ExcavatorComponent(
         "BucketCylinderInner",
-        buildCylinderInner(
-          new Vector(128, 0, 119),
-          new Vector(
-            291,
-            0,
-            52
-          ),
-          3.8,
-          6.0,
-          15
-        )
+        buildCylinderInner(new Vector(128, 0, 119), new Vector(291, 0, 52), 3.8, 6.0, 15)
       ));
       report("Built hydraulic cylinders");
       if (result.length != 13) throw "procedural excavator component inventory must contain 13 occurrences";
@@ -179,11 +117,7 @@ class ProceduralExcavator {
         pieces.push(scope.own(boxAt(88, 12, 10, 0, y, 0)));
         for (x in [-30.0, 0.0, 30.0]) pieces.push(scope.own(cylinderBetween(
           new Vector(x, y + 6, 8),
-          new Vector(
-            x,
-            y - 6,
-            8
-          ),
+          new Vector(x, y - 6, 8),
           6.5
         )));
       }
@@ -212,42 +146,15 @@ class ProceduralExcavator {
         new Vector(-18, 61),
         new Vector(0, 65),
         new Vector(13, 88),
-        new Vector(
-          25,
-          112
-        ),
-        new Vector(
-          29,
-          139
-        ),
-        new Vector(
-          35,
-          165
-        ),
-        new Vector(
-          46,
-          181
-        ),
-        new Vector(
-          57,
-          190
-        ),
-        new Vector(
-          68,
-          194
-        ),
-        new Vector(
-          72,
-          203
-        ),
-        new Vector(
-          50,
-          210
-        ),
-        new Vector(
-          -15,
-          100
-        )
+        new Vector(25, 112),
+        new Vector(29, 139),
+        new Vector(35, 165),
+        new Vector(46, 181),
+        new Vector(57, 190),
+        new Vector(68, 194),
+        new Vector(72, 203),
+        new Vector(50, 210),
+        new Vector(-15, 100)
       ],
       anchorX,
       anchorZ,
@@ -259,49 +166,17 @@ class ProceduralExcavator {
       plate,
       [
         {x: anchorX, z: anchorZ, radius: 30.0},
-        {
-          x: anchorX + (52 - anchorX) * scaleX,
-          z: anchorZ + (190 - anchorZ) * scaleZ,
-          radius: 30.0
-        }
+        {x: anchorX + (52 - anchorX) * scaleX, z: anchorZ + (190 - anchorZ) * scaleZ, radius: 30.0}
       ],
       61,
       [
-        hole(
-          anchorX,
-          anchorZ,
-          14
-        ),
-        hole(
-          anchorX + (52 - anchorX) * scaleX,
-          anchorZ + (190 - anchorZ) * scaleZ,
-          14
-        ),
-        hole(
-          anchorX + (21 - anchorX) * scaleX,
-          anchorZ + (119 - anchorZ) * scaleZ,
-          9
-        ),
-        hole(
-          anchorX + (5 - anchorX) * scaleX,
-          anchorZ + (85 - anchorZ) * scaleZ,
-          4.5
-        ),
-        hole(
-          anchorX + (26 - anchorX) * scaleX,
-          anchorZ + (132 - anchorZ) * scaleZ,
-          4.5
-        ),
-        hole(
-          anchorX + (35 - anchorX) * scaleX,
-          anchorZ + (158 - anchorZ) * scaleZ,
-          4.5
-        ),
-        hole(
-          anchorX + (43 - anchorX) * scaleX,
-          anchorZ + (171 - anchorZ) * scaleZ,
-          4.5
-        )
+        hole(anchorX, anchorZ, 14),
+        hole(anchorX + (52 - anchorX) * scaleX, anchorZ + (190 - anchorZ) * scaleZ, 14),
+        hole(anchorX + (21 - anchorX) * scaleX, anchorZ + (119 - anchorZ) * scaleZ, 9),
+        hole(anchorX + (5 - anchorX) * scaleX, anchorZ + (85 - anchorZ) * scaleZ, 4.5),
+        hole(anchorX + (26 - anchorX) * scaleX, anchorZ + (132 - anchorZ) * scaleZ, 4.5),
+        hole(anchorX + (35 - anchorX) * scaleX, anchorZ + (158 - anchorZ) * scaleZ, 4.5),
+        hole(anchorX + (43 - anchorX) * scaleX, anchorZ + (171 - anchorZ) * scaleZ, 4.5)
       ]
     );
   }
@@ -317,26 +192,11 @@ class ProceduralExcavator {
         new Vector(53, 196),
         new Vector(84, 174),
         new Vector(139, 137),
-        new Vector(
-          153,
-          124
-        ),
-        new Vector(
-          150,
-          111
-        ),
-        new Vector(
-          136,
-          120
-        ),
-        new Vector(
-          79,
-          155
-        ),
-        new Vector(
-          49,
-          171
-        )
+        new Vector(153, 124),
+        new Vector(150, 111),
+        new Vector(136, 120),
+        new Vector(79, 155),
+        new Vector(49, 171)
       ],
       anchorX,
       anchorZ,
@@ -351,53 +211,17 @@ class ProceduralExcavator {
         [
           hole(anchorX, anchorZ, 9.75),
           hole(
-            mapProfilePoint(
-              144,
-              124,
-              anchorX,
-              anchorZ,
-              scaleX,
-              scaleZ
-            ).x,
-            mapProfilePoint(
-              144,
-              124,
-              anchorX,
-              anchorZ,
-              scaleX,
-              scaleZ
-            ).z,
+            mapProfilePoint(144, 124, anchorX, anchorZ, scaleX, scaleZ).x,
+            mapProfilePoint(144, 124, anchorX, anchorZ, scaleX, scaleZ).z,
             9.75
           ),
           hole(
-            mapProfilePoint(
-              85,
-              157,
-              anchorX,
-              anchorZ,
-              scaleX,
-              scaleZ
-            ).x,
-            mapProfilePoint(
-              85,
-              157,
-              anchorX,
-              anchorZ,
-              scaleX,
-              scaleZ
-            ).z,
+            mapProfilePoint(85, 157, anchorX, anchorZ, scaleX, scaleZ).x,
+            mapProfilePoint(85, 157, anchorX, anchorZ, scaleX, scaleZ).z,
             6.3
           ),
-          hole(
-            320,
-            108,
-            5
-          ),
-          hole(
-            290,
-            116,
-            4
-          )
+          hole(320, 108, 5),
+          hole(290, 116, 4)
         ]
       ));
       var eye = scope.own(pinEye(anchorX, anchorZ, 16.5, 9.75, 32));
@@ -422,34 +246,13 @@ class ProceduralExcavator {
         new Vector(145, 117),
         new Vector(166, 99),
         new Vector(173, 93),
-        new Vector(
-          178,
-          81
-        ),
-        new Vector(
-          184,
-          72
-        ),
-        new Vector(
-          181,
-          58
-        ),
-        new Vector(
-          169,
-          68
-        ),
-        new Vector(
-          155,
-          86
-        ),
-        new Vector(
-          139,
-          94
-        ),
-        new Vector(
-          126,
-          106
-        )
+        new Vector(178, 81),
+        new Vector(184, 72),
+        new Vector(181, 58),
+        new Vector(169, 68),
+        new Vector(155, 86),
+        new Vector(139, 94),
+        new Vector(126, 106)
       ],
       anchorX,
       anchorZ,
@@ -465,20 +268,12 @@ class ProceduralExcavator {
       var pieces:Array<Part> = [leftPlaced, rightPlaced];
       var barrelOuter = scope.own(cylinderBetween(
         new Vector(anchorX, 51.7, anchorZ),
-        new Vector(
-          anchorX,
-          -51.7,
-          anchorZ
-        ),
+        new Vector(anchorX, -51.7, anchorZ),
         9
       ));
       var barrelInner = scope.own(cylinderBetween(
         new Vector(anchorX, 52.7, anchorZ),
-        new Vector(
-          anchorX,
-          -52.7,
-          anchorZ
-        ),
+        new Vector(anchorX, -52.7, anchorZ),
         6
       ));
       pieces.push(scope.own(barrelOuter.subtract(barrelInner)));
@@ -491,11 +286,7 @@ class ProceduralExcavator {
       var boreA = scope.own(cylinderBetween(new Vector(anchorX, 51, anchorZ), new Vector(anchorX, -51, anchorZ), 6));
       var boreB = scope.own(cylinderBetween(
         new Vector(secondPin.x, 51, secondPin.z),
-        new Vector(
-          secondPin.x,
-          -51,
-          secondPin.z
-        ),
+        new Vector(secondPin.x, -51, secondPin.z),
         5.2
       ));
       var cutA = scope.own(result.subtract(boreA));
@@ -538,59 +329,20 @@ class ProceduralExcavator {
       new Vector(111, z1 - 7),
       new Vector(121, z1 - 9),
       new Vector(143, z2 - 5),
-      new Vector(
-        148,
-        z2 + 3
-      ),
-      new Vector(
-        139,
-        z2 + 9
-      ),
-      new Vector(
-        116,
-        z1 + 8
-      )
+      new Vector(148, z2 + 3),
+      new Vector(139, z2 + 9),
+      new Vector(116, z1 + 8)
     ] : [
-      new Vector(
-        111,
-        z1 - 7
-      ),
-      new Vector(
-        121,
-        z1 - 9
-      ),
-      new Vector(
-        130,
-        z1 + 4
-      ),
-      new Vector(
-        138,
-        z2 - 18
-      ),
-      new Vector(
-        143,
-        z2 - 5
-      ),
-      new Vector(
-        148,
-        z2 + 3
-      ),
-      new Vector(
-        143,
-        z2 + 7
-      ),
-      new Vector(
-        139,
-        z2 + 9
-      ),
-      new Vector(
-        116,
-        z1 + 8
-      ),
-      new Vector(
-        112,
-        z1 + 1
-      )
+      new Vector(111, z1 - 7),
+      new Vector(121, z1 - 9),
+      new Vector(130, z1 + 4),
+      new Vector(138, z2 - 18),
+      new Vector(143, z2 - 5),
+      new Vector(148, z2 + 3),
+      new Vector(143, z2 + 7),
+      new Vector(139, z2 + 9),
+      new Vector(116, z1 + 8),
+      new Vector(112, z1 + 1)
     ];
     var plate = profilePlate(first ? 20 : 5, scaleOutline(sourceOutline, anchorX, anchorZ, scaleX, scaleZ), []);
     return addBossPairs(
@@ -598,74 +350,25 @@ class ProceduralExcavator {
       [
         {
           x: mapProfilePoint(116, z1, anchorX, anchorZ, scaleX, scaleZ).x,
-          z: mapProfilePoint(
-            116,
-            z1,
-            anchorX,
-            anchorZ,
-            scaleX,
-            scaleZ
-          ).z,
+          z: mapProfilePoint(116, z1, anchorX, anchorZ, scaleX, scaleZ).z,
           radius: bossRadius
         },
         {
-          x: mapProfilePoint(
-            143,
-            z2,
-            anchorX,
-            anchorZ,
-            scaleX,
-            scaleZ
-          ).x,
-          z: mapProfilePoint(
-            143,
-            z2,
-            anchorX,
-            anchorZ,
-            scaleX,
-            scaleZ
-          ).z,
+          x: mapProfilePoint(143, z2, anchorX, anchorZ, scaleX, scaleZ).x,
+          z: mapProfilePoint(143, z2, anchorX, anchorZ, scaleX, scaleZ).z,
           radius: bossRadius
         }
       ],
       bossLength,
       [
         hole(
-          mapProfilePoint(
-            116,
-            z1,
-            anchorX,
-            anchorZ,
-            scaleX,
-            scaleZ
-          ).x,
-          mapProfilePoint(
-            116,
-            z1,
-            anchorX,
-            anchorZ,
-            scaleX,
-            scaleZ
-          ).z,
+          mapProfilePoint(116, z1, anchorX, anchorZ, scaleX, scaleZ).x,
+          mapProfilePoint(116, z1, anchorX, anchorZ, scaleX, scaleZ).z,
           holeRadius
         ),
         hole(
-          mapProfilePoint(
-            143,
-            z2,
-            anchorX,
-            anchorZ,
-            scaleX,
-            scaleZ
-          ).x,
-          mapProfilePoint(
-            143,
-            z2,
-            anchorX,
-            anchorZ,
-            scaleX,
-            scaleZ
-          ).z,
+          mapProfilePoint(143, z2, anchorX, anchorZ, scaleX, scaleZ).x,
+          mapProfilePoint(143, z2, anchorX, anchorZ, scaleX, scaleZ).z,
           holeRadius
         )
       ]
@@ -683,15 +386,8 @@ class ProceduralExcavator {
       var withEye = scope.own(tube.combine(eye));
       var bore = scope.own(cylinderBetween(
         new Vector(start.x, eyeWidth / 2 + 2, start.z),
-        new Vector(
-          start.x,
-          -eyeWidth / 2 - 2,
-          start.z
-        ),
-        Math.min(
-          boreRadius,
-          4.5
-        )
+        new Vector(start.x, -eyeWidth / 2 - 2, start.z),
+        Math.min(boreRadius, 4.5)
       ));
       var result = scope.own(withEye.subtract(bore));
       scope.release(result);
@@ -714,15 +410,8 @@ class ProceduralExcavator {
       var withEye = scope.own(rod.combine(eye));
       var bore = scope.own(cylinderBetween(
         new Vector(end.x, eyeWidth / 2 + 2, end.z),
-        new Vector(
-          end.x,
-          -eyeWidth / 2 - 2,
-          end.z
-        ),
-        Math.min(
-          rodRadius * 0.75,
-          3.2
-        )
+        new Vector(end.x, -eyeWidth / 2 - 2, end.z),
+        Math.min(rodRadius * 0.75, 3.2)
       ));
       var result = scope.own(withEye.subtract(bore));
       scope.release(result);
@@ -786,11 +475,7 @@ class ProceduralExcavator {
       var parts:Array<Part> = [scope.own(plate)];
       for (boss in bosses) parts.push(scope.own(cylinderBetween(
         new Vector(boss.x, bossLength / 2, boss.z),
-        new Vector(
-          boss.x,
-          -bossLength / 2,
-          boss.z
-        ),
+        new Vector(boss.x, -bossLength / 2, boss.z),
         boss.radius
       )));
       var withBosses = fuseAll(scope, parts);
@@ -798,11 +483,7 @@ class ProceduralExcavator {
       for (item in holes) {
         var cutter = scope.own(cylinderBetween(
           new Vector(item.x, bossLength / 2 + 1, item.z),
-          new Vector(
-            item.x,
-            -bossLength / 2 - 1,
-            item.z
-          ),
+          new Vector(item.x, -bossLength / 2 - 1, item.z),
           item.radius
         ));
         var cut = scope.own(result.subtract(cutter));
@@ -891,14 +572,7 @@ class ProceduralExcavator {
           edges: shape.subshapeCount(CadKit.ShapeKind.Edge),
           volume: physical.volume,
           surfaceArea: physical.surfaceArea,
-          bounds: [
-            minimum.get_x(),
-            minimum.get_y(),
-            minimum.get_z(),
-            maximum.get_x(),
-            maximum.get_y(),
-            maximum.get_z()
-          ]
+          bounds: [minimum.get_x(), minimum.get_y(), minimum.get_z(), maximum.get_x(), maximum.get_y(), maximum.get_z()]
         });
         component.part.exportStep(output + "/" + component.name + ".step");
       }

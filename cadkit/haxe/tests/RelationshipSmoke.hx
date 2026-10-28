@@ -24,10 +24,7 @@ class RelationshipSmoke {
     var relationship = document.createRelationship(
       "bim.host",
       new ElementReference(document.id, window.id),
-      new ElementReference(
-        document.id,
-        wall.id
-      )
+      new ElementReference(document.id, wall.id)
     );
     relationship.setProperty(TypedProperty.quantity("along", QuantityKind.Length, 1800, "mm"));
     relationship.setProperty(TypedProperty.quantity("sill", QuantityKind.Length, 900, "mm"));

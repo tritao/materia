@@ -19,20 +19,11 @@ class SolvedSketch {
     coordinates:Map<String, Array<Float>>,
     radii:Map<String, Float>,
     diagnostic:SolveDiagnostic,
-    ?partCache:Map<
-      String,
-      CachedPart
-  >,
-    ?structures:Map<
-      String,
-      PartStructure
-  >,
+    ?partCache:Map<String, CachedPart>,
+    ?structures:Map<String, PartStructure>,
     ?freePoints:Array<String>,
     ?freeEntities:Array<String>,
-    ?referenceValues:Map<
-      String,
-      Float
-  >
+    ?referenceValues:Map<String, Float>
   ) {
     this.coordinates = coordinates;
     this.radii = radii;

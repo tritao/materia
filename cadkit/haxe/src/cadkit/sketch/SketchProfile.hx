@@ -72,11 +72,7 @@ class SketchProfile {
         segments.push(new ProfileSegment(
           entity,
           arcPoint(center, radius, entity.startAngle),
-          arcPoint(
-            center,
-            radius,
-            entity.endAngle
-          )
+          arcPoint(center, radius, entity.endAngle)
         ));
       }
     }
@@ -338,13 +334,7 @@ class SketchProfile {
     var cdY = d[1] - c[1];
     var padding = Math.max(
       tolerance,
-      tolerance * Math.max(
-        Math.max(Math.abs(abX), Math.abs(abY)),
-        Math.max(
-          Math.abs(cdX),
-          Math.abs(cdY)
-        )
-      )
+      tolerance * Math.max(Math.max(Math.abs(abX), Math.abs(abY)), Math.max(Math.abs(cdX), Math.abs(cdY)))
     );
     if (Math.max(a[0], b[0]) + padding < Math.min(c[0], d[0]) - padding || Math.max(c[0], d[0]) + padding < Math.min(
       a[0],

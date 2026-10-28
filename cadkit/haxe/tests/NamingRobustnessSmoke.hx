@@ -108,15 +108,7 @@ class NamingRobustnessSmoke {
     var edgeIndex = chamfer ? find(shape, CadKit.ShapeKind.Edge, s -> lineAt(s, 5, 20, 30, 1, 0, 0)) : find(
       shape,
       CadKit.ShapeKind.Edge,
-      s -> lineAt(
-        s,
-        10,
-        10,
-        30,
-        0,
-        1,
-        0
-      )
+      s -> lineAt(s, 10, 10, 30, 0, 1, 0)
     );
     var edge = new Edge(shape.subshape(CadKit.ShapeKind.Edge, edgeIndex));
     var finish:Feature = chamfer ? document.add(new ChamferFeature(box, 1, [edge])) : document.add(new FilletFeature(
@@ -142,15 +134,7 @@ class NamingRobustnessSmoke {
       row,
       document,
       reference,
-      chamfer ? s -> lineAt(s, w / 2, d, h, 1, 0, 0) : s -> lineAt(
-        s,
-        w,
-        d / 2,
-        h,
-        0,
-        1,
-        0
-      )
+      chamfer ? s -> lineAt(s, w / 2, d, h, 1, 0, 0) : s -> lineAt(s, w, d / 2, h, 0, 1, 0)
     );
     document.close();
   }
@@ -167,15 +151,7 @@ class NamingRobustnessSmoke {
     document.recompute();
     var top = body.currentShape().subshape(
       CadKit.ShapeKind.Face,
-      find(
-        body.currentShape(),
-        CadKit.ShapeKind.Face,
-        s -> planeAt(
-          s,
-          10,
-          1
-        )
-      )
+      find(body.currentShape(), CadKit.ShapeKind.Face, s -> planeAt(s, 10, 1))
     );
     var sketch = document.add(new ConstrainedSketchFeature(rectangle(8, 6), body, null, Vector.X(), 0, false, top));
     top.close();
@@ -210,15 +186,7 @@ class NamingRobustnessSmoke {
     var shape = ring.currentShape();
     var edge = new Edge(shape.subshape(
       CadKit.ShapeKind.Edge,
-      find(
-        shape,
-        CadKit.ShapeKind.Edge,
-        s -> circleAt(
-          s,
-          10,
-          20
-        )
-      )
+      find(shape, CadKit.ShapeKind.Edge, s -> circleAt(s, 10, 20))
     ));
     var fillet = document.add(new FilletFeature(ring, 1, [edge]));
     edge.close();
@@ -247,17 +215,7 @@ class NamingRobustnessSmoke {
     var shape = body.currentShape();
     var edge = new Edge(shape.subshape(
       CadKit.ShapeKind.Edge,
-      find(
-        shape,
-        CadKit.ShapeKind.Edge,
-        s -> circleCenteredAt(
-          s,
-          40,
-          15,
-          15,
-          3
-        )
-      )
+      find(shape, CadKit.ShapeKind.Edge, s -> circleCenteredAt(s, 40, 15, 15, 3))
     ));
     var fillet = document.add(new FilletFeature(body, 0.5, [edge]));
     edge.close();
@@ -333,14 +291,7 @@ class NamingRobustnessSmoke {
     document.recompute();
     var side = block.currentShape().subshape(
       CadKit.ShapeKind.Face,
-      find(
-        block.currentShape(),
-        CadKit.ShapeKind.Face,
-        s -> planeNormalX(
-          s,
-          10
-        )
-      )
+      find(block.currentShape(), CadKit.ShapeKind.Face, s -> planeNormalX(s, 10))
     );
     var sketch = document.add(new ConstrainedSketchFeature(rectangle(2, 2), block, null, Vector.Y(), 0, false, side));
     side.close();
@@ -500,10 +451,7 @@ class NamingRobustnessSmoke {
       [-width / 2, -height / 2],
       [width / 2, -height / 2],
       [width / 2, height / 2],
-      [
-        -width / 2,
-        height / 2
-      ]
+      [-width / 2, height / 2]
     ];
     for (index in 0...4) {
       sketch.addPoint(new SketchPoint("rectangle.point" + index, coordinates[index][0], coordinates[index][1]));

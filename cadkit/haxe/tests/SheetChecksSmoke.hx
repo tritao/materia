@@ -60,18 +60,7 @@ class SheetChecksSmoke {
     var taperedBend = tapered.bends()[0];
     var taper = tapered.updateWallMaterial(
       taperedBend.wallB,
-      WallOutline.polygon([
-        new Point2(0, 0),
-        new Point2(2, 0),
-        new Point2(
-          20,
-          100
-        ),
-        new Point2(
-          0,
-          100
-        )
-      ])
+      WallOutline.polygon([new Point2(0, 0), new Point2(2, 0), new Point2(20, 100), new Point2(0, 100)])
     );
     near(
       FlangeDepth.minimum(tapered.wall(taperedBend.wallB).outline, taperedBend.edgeB),
@@ -84,62 +73,12 @@ class SheetChecksSmoke {
     var curvedWall = curved.updateWallMaterial(
       curvedBend.wallB,
       new WallOutline([
-        Segment.line(
-          new Point2(0, 0),
-          new Point2(
-            20,
-            0
-          )
-        ),
-        Segment.line(
-          new Point2(
-            20,
-            0
-          ),
-          new Point2(
-            20,
-            32
-          )
-        ),
-        Segment.arc(
-          new Point2(
-            20,
-            50
-          ),
-          18,
-          -Math.PI / 2,
-          -Math.PI
-        ),
-        Segment.line(
-          new Point2(
-            20,
-            68
-          ),
-          new Point2(
-            20,
-            100
-          )
-        ),
-        Segment.line(
-          new Point2(
-            20,
-            100
-          ),
-          new Point2(
-            0,
-            100
-          )
-        ),
-        Segment.line(
-          new Point2(
-            0,
-            100
-          ),
-          new Point2(
-            0,
-            0
-          )
-        )
+        Segment.line(new Point2(0, 0), new Point2(20, 0)),
+        Segment.line(new Point2(20, 0), new Point2(20, 32)),
+        Segment.arc(new Point2(20, 50), 18, -Math.PI / 2, -Math.PI),
+        Segment.line(new Point2(20, 68), new Point2(20, 100)),
+        Segment.line(new Point2(20, 100), new Point2(0, 100)),
+        Segment.line(new Point2(0, 100), new Point2(0, 0))
       ])
     );
     near(FlangeDepth.minimum(curvedWall.outline, curvedBend.edgeB), 2, "arc notch minimum uses an analytic extremum");
@@ -216,24 +155,14 @@ class SheetChecksSmoke {
     var notched = SheetCutGeometry.apply(
       SheetDemoParts.p1(),
       1,
-      new WallOutline([Segment.arc(
-        new Point2(57.5, -1),
-        2,
-        0,
-        2 * Math.PI
-      )]),
+      new WallOutline([Segment.arc(new Point2(57.5, -1), 2, 0, 2 * Math.PI)]),
       "end-notch"
     );
     check(SheetChecks.of(notched).has(CutNearBend), "outer cut notch also triggers clearance");
     var far = SheetCutGeometry.apply(
       SheetDemoParts.p1(),
       1,
-      new WallOutline([Segment.arc(
-        new Point2(-1, 50),
-        2,
-        0,
-        2 * Math.PI
-      )]),
+      new WallOutline([Segment.arc(new Point2(-1, 50), 2, 0, 2 * Math.PI)]),
       "far-notch"
     );
     check(SheetChecks.of(far).findings().length == 0, "far notch is silent");
@@ -253,26 +182,11 @@ class SheetChecksSmoke {
       bend.wallB,
       WallOutline.polygon([
         new Point2(-allowance, -5),
-        new Point2(
-          37.5,
-          -5
-        ),
-        new Point2(
-          37.5,
-          100
-        ),
-        new Point2(
-          0,
-          100
-        ),
-        new Point2(
-          0,
-          0
-        ),
-        new Point2(
-          -allowance,
-          0
-        )
+        new Point2(37.5, -5),
+        new Point2(37.5, 100),
+        new Point2(0, 100),
+        new Point2(0, 0),
+        new Point2(-allowance, 0)
       ])
     );
     check(SheetChecks.of(internal).has(MissingRelief), "fold line terminates inside the developed blank");
@@ -282,21 +196,7 @@ class SheetChecksSmoke {
       var side = SheetDemoParts.flange(overlapping, overlapRoot, edge, 20, Math.PI / 2);
       var extended = overlapping.updateWallMaterial(
         side.id,
-        WallOutline.polygon([
-          new Point2(0, -10),
-          new Point2(
-            20,
-            -10
-          ),
-          new Point2(
-            20,
-            30
-          ),
-          new Point2(
-            0,
-            30
-          )
-        ])
+        WallOutline.polygon([new Point2(0, -10), new Point2(20, -10), new Point2(20, 30), new Point2(0, 30)])
       );
     }
     check(SheetChecks.of(overlapping).has(FlatOverlap), "extended adjacent flanges overlap when developed");
@@ -320,19 +220,7 @@ class SheetChecksSmoke {
     try {
       var missing = FlangeDepth.minimum(
         WallOutline.rectangle(10, 10),
-        new BendAttachment(
-          "missing",
-          Segment.line(
-            new Point2(
-              20,
-              0
-            ),
-            new Point2(
-              20,
-              10
-            )
-          )
-        )
+        new BendAttachment("missing", Segment.line(new Point2(20, 0), new Point2(20, 10)))
       );
     } catch (error:SheetDiagnosis) {
       refused = error.code == "sheet.flange-depth";

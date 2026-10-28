@@ -23,10 +23,7 @@ class SheetOutlineBooleanSmoke {
       new Point2(x, y),
       new Point2(x + width, y),
       new Point2(x + width, y + height),
-      new Point2(
-        x,
-        y + height
-      )
+      new Point2(x, y + height)
     ]);
   }
   public static function run():Int {

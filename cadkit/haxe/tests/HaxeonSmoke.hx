@@ -560,10 +560,7 @@ class HaxeonSmoke {
     var ambiguousSecond = ambiguousDocument.add(new CylinderFeature(10.0, 100.0));
     var ambiguousBase = ambiguousDocument.add(new ToolCollectionFeature(
       [ambiguousFirst, ambiguousSecond],
-      [
-        "first",
-        "second"
-      ]
+      ["first", "second"]
     ));
     ambiguousDocument.recompute();
     var ambiguousShape = ambiguousBase.currentShape();

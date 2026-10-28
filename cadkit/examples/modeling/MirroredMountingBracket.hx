@@ -32,14 +32,7 @@ class MirroredMountingBracket {
       body = builder.mirror(half, new Vector(), Vector.X(), "fuse");
       counterbore = builder.throughCounterbore(
         half,
-        new SelectionRecipe(
-          "face",
-          "plane",
-          Vector.Z(),
-          "max",
-          Vector.Z(),
-          1
-        ),
+        new SelectionRecipe("face", "plane", Vector.Z(), "max", Vector.Z(), 1),
         Vector.X(),
         holeLocalX,
         holeLocalY,

@@ -158,13 +158,7 @@ class SheetCutSmoke {
     var hole = builder.attachedConstrainedSketch(
       circle(),
       base,
-      new SelectionRecipe(
-        "face",
-        "plane",
-        Vector.Z(),
-        "max",
-        Vector.Z()
-      ),
+      new SelectionRecipe("face", "plane", Vector.Z(), "max", Vector.Z()),
       Vector.X(),
       new Map()
     );
@@ -180,10 +174,7 @@ class SheetCutSmoke {
       new Point2(x - 1, 40),
       new Point2(x + 1, 40),
       new Point2(x + 1, 42),
-      new Point2(
-        x - 1,
-        42
-      )
+      new Point2(x - 1, 42)
     ]);
     var crossed = SheetCutGeometry.apply(part, 1, tool, "bend-cut");
     check(crossed.bends()[0].hasCuts(), "developed profile trims bend material as well as the wall");

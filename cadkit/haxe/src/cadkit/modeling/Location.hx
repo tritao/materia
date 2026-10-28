@@ -52,11 +52,7 @@ class Location {
     return new Location(new Plane(
       new Vector(-o.dot(x), -o.dot(y), -o.dot(z)),
       new Vector(x.x, y.x, z.x),
-      new Vector(
-        x.z,
-        y.z,
-        z.z
-      )
+      new Vector(x.z, y.z, z.z)
     ));
   }
 

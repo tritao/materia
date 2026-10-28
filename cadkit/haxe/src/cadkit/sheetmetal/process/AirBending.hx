@@ -40,10 +40,7 @@ class AirBending implements BendProcess {
       if (entry != null) throw new SheetDiagnosis(
         "sheet.calibration-tool-radius",
         "Measured radius requires a loaded radius smaller than the punch tip",
-        [
-          tooling.punchId,
-          tooling.dieId
-        ]
+        [tooling.punchId, tooling.dieId]
       );
       loadedRadius = tooling.punchRadius;
       innerRadius = unloadRadius(loadedRadius, thickness, mechanical);
@@ -53,10 +50,7 @@ class AirBending implements BendProcess {
     if (magnitude >= maximum) throw new SheetDiagnosis(
       "sheet.tool-angle-limit",
       "The loaded bend reaches the punch or die included-angle limit",
-      [
-        tooling.punchId,
-        tooling.dieId
-      ]
+      [tooling.punchId, tooling.dieId]
     );
     var loadedAngle = targetAngle < 0 ? -magnitude : magnitude;
     var analyticDepth = depth(thickness, loadedRadius, tooling, magnitude);
@@ -168,10 +162,7 @@ class AirBending implements BendProcess {
     if (tangentLength <= 0 || separation >= halfWidth) throw new SheetDiagnosis(
       "sheet.tool-contact-limit",
       "The tooling cannot provide separated flange contact points",
-      [
-        tooling.punchId,
-        tooling.dieId
-      ]
+      [tooling.punchId, tooling.dieId]
     );
     return tooling.shoulderRadius + loadedRadius - height;
   }

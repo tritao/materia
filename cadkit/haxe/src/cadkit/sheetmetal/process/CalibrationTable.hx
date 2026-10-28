@@ -19,11 +19,7 @@ class CalibrationTable {
       )) throw new SheetDiagnosis(
         "sheet.ambiguous-calibration",
         "Calibration angle bands overlap for the same lot, thickness and tools",
-        [
-          a.lot,
-          a.punchId,
-          a.dieId
-        ]
+        [a.lot, a.punchId, a.dieId]
       );
     }
   }

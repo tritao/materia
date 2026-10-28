@@ -62,24 +62,7 @@ class AssemblyLoopSmoke {
 
   public static function bar(id:String, length:Float):AssemblyComponentDefinition return {
     id: id,
-    connectors: [
-      {
-        name: "a",
-        frame: frame(
-          0,
-          0,
-          0
-        )
-      },
-      {
-        name: "b",
-        frame: frame(
-          length,
-          0,
-          0
-        )
-      }
-    ]
+    connectors: [{name: "a", frame: frame(0, 0, 0)}, {name: "b", frame: frame(length, 0, 0)}]
   };
 
   public static function joint(
@@ -111,45 +94,10 @@ class AssemblyLoopSmoke {
   public static function fourBarDefinition(coupler:Float,
     lower:Null<Float>, upper:Null<Float>, rocker:Float):AssemblyDefinition return definition(
       "four-bar",
+      [bar("ground", 2000), bar("crank", 1000), bar("coupler", coupler), bar("rocker", 1500)],
       [
-        bar(
-          "ground",
-          2000
-        ),
-        bar(
-          "crank",
-          1000
-        ),
-        bar(
-          "coupler",
-          coupler
-        ),
-        bar(
-          "rocker",
-          1500
-        )
-      ],
-      [
-        joint(
-          "crank",
-          AssemblyJointType.Revolute,
-          AssemblyJointRole.Tree,
-          "ground",
-          "a",
-          "crank",
-          "a",
-          0.6
-        ),
-        joint(
-          "coupler",
-          AssemblyJointType.Revolute,
-          AssemblyJointRole.Tree,
-          "crank",
-          "b",
-          "coupler",
-          "a",
-          0.2
-        ),
+        joint("crank", AssemblyJointType.Revolute, AssemblyJointRole.Tree, "ground", "a", "crank", "a", 0.6),
+        joint("coupler", AssemblyJointType.Revolute, AssemblyJointRole.Tree, "crank", "b", "coupler", "a", 0.2),
         joint(
           "rocker",
           AssemblyJointType.Revolute,
@@ -162,57 +110,16 @@ class AssemblyLoopSmoke {
           lower,
           upper
         ),
-        joint(
-          "pin",
-          AssemblyJointType.Revolute,
-          AssemblyJointRole.Closure,
-          "coupler",
-          "b",
-          "rocker",
-          "b",
-          0.0
-        )
+        joint("pin", AssemblyJointType.Revolute, AssemblyJointRole.Closure, "coupler", "b", "rocker", "b", 0.0)
       ]
     );
 
   public static function sliderCrankDefinition():AssemblyDefinition return definition(
     "slider-crank",
+    [bar("ground", 0), bar("crank", 500), bar("rod", 1500), bar("slider", 0)],
     [
-      bar("ground", 0),
-      bar(
-        "crank",
-        500
-      ),
-      bar(
-        "rod",
-        1500
-      ),
-      bar(
-        "slider",
-        0
-      )
-    ],
-    [
-      joint(
-        "crank",
-        AssemblyJointType.Revolute,
-        AssemblyJointRole.Tree,
-        "ground",
-        "a",
-        "crank",
-        "a",
-        0.9
-      ),
-      joint(
-        "rod",
-        AssemblyJointType.Revolute,
-        AssemblyJointRole.Tree,
-        "crank",
-        "b",
-        "rod",
-        "a",
-        -0.5
-      ),
+      joint("crank", AssemblyJointType.Revolute, AssemblyJointRole.Tree, "ground", "a", "crank", "a", 0.9),
+      joint("rod", AssemblyJointType.Revolute, AssemblyJointRole.Tree, "crank", "b", "rod", "a", -0.5),
       joint(
         "slide",
         AssemblyJointType.Prismatic,
@@ -226,16 +133,7 @@ class AssemblyLoopSmoke {
         3000,
         true
       ),
-      joint(
-        "pin",
-        AssemblyJointType.Revolute,
-        AssemblyJointRole.Closure,
-        "rod",
-        "b",
-        "slider",
-        "a",
-        0.0
-      )
+      joint("pin", AssemblyJointType.Revolute, AssemblyJointRole.Closure, "rod", "b", "slider", "a", 0.0)
     ]
   );
 
@@ -250,63 +148,16 @@ class AssemblyLoopSmoke {
     }
     var ground:AssemblyComponentDefinition = {
       id: "ground",
-      connectors: [
-        {name: "a", frame: frame(0, 0, 0)},
-        {
-          name: "b",
-          frame: frame(
-            x,
-            y,
-            0,
-            angle
-          )
-        }
-      ]
+      connectors: [{name: "a", frame: frame(0, 0, 0)}, {name: "b", frame: frame(x, y, 0, angle)}]
     };
     return definition(
       "fixed-chain",
       [ground, bar("l1", 800), bar("l2", 600), bar("l3", 400)],
       [
-        joint(
-          "j1",
-          AssemblyJointType.Revolute,
-          AssemblyJointRole.Tree,
-          "ground",
-          "a",
-          "l1",
-          "a",
-          0.45
-        ),
-        joint(
-          "j2",
-          AssemblyJointType.Revolute,
-          AssemblyJointRole.Tree,
-          "l1",
-          "b",
-          "l2",
-          "a",
-          -0.8
-        ),
-        joint(
-          "j3",
-          AssemblyJointType.Revolute,
-          AssemblyJointRole.Tree,
-          "l2",
-          "b",
-          "l3",
-          "a",
-          0.6
-        ),
-        joint(
-          "weld",
-          AssemblyJointType.Fixed,
-          AssemblyJointRole.Closure,
-          "l3",
-          "b",
-          "ground",
-          "b",
-          0.0
-        )
+        joint("j1", AssemblyJointType.Revolute, AssemblyJointRole.Tree, "ground", "a", "l1", "a", 0.45),
+        joint("j2", AssemblyJointType.Revolute, AssemblyJointRole.Tree, "l1", "b", "l2", "a", -0.8),
+        joint("j3", AssemblyJointType.Revolute, AssemblyJointRole.Tree, "l2", "b", "l3", "a", 0.6),
+        joint("weld", AssemblyJointType.Fixed, AssemblyJointRole.Closure, "l3", "b", "ground", "b", 0.0)
       ]
     );
   }

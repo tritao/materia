@@ -114,11 +114,7 @@ class ModelingSmoke {
     near(turned.xy, 75000);
     var rotatedShape = Shape.fromOwnedHandle(CadKit.shapeRotateChecked(
       inertiaBox.shape.borrowHandle(),
-      cadkit.Geometry.vec3(
-        0,
-        0,
-        1
-      ),
+      cadkit.Geometry.vec3(0, 0, 1),
       Math.PI / 4
     ));
     near(rotatedShape.massProperties().inertia.xx, turned.xx);

@@ -48,61 +48,17 @@ class ConstrainedMountingPlate {
       new SketchPoint("q0", -hw, -hh),
       new SketchPoint("q1", hw, -hh),
       new SketchPoint("q2", hw, hh),
-      new SketchPoint(
-        "q3",
-        -hw,
-        hh
-      ),
-      new SketchPoint(
-        "xa",
-        -1,
-        0
-      ),
-      new SketchPoint(
-        "xb",
-        1,
-        0
-      ),
-      new SketchPoint(
-        "ya",
-        0,
-        -1
-      ),
-      new SketchPoint(
-        "yb",
-        0,
-        1
-      ),
-      new SketchPoint(
-        "bl",
-        -hw + clearance,
-        -hh + clearance
-      ),
-      new SketchPoint(
-        "br",
-        hw - clearance,
-        -hh + clearance
-      ),
-      new SketchPoint(
-        "tl",
-        -hw + clearance,
-        hh - clearance
-      ),
-      new SketchPoint(
-        "tr",
-        hw - clearance,
-        hh - clearance
-      ),
-      new SketchPoint(
-        "leftAnchor",
-        -hw,
-        -hh + clearance
-      ),
-      new SketchPoint(
-        "bottomAnchor",
-        -hw + clearance,
-        -hh
-      )
+      new SketchPoint("q3", -hw, hh),
+      new SketchPoint("xa", -1, 0),
+      new SketchPoint("xb", 1, 0),
+      new SketchPoint("ya", 0, -1),
+      new SketchPoint("yb", 0, 1),
+      new SketchPoint("bl", -hw + clearance, -hh + clearance),
+      new SketchPoint("br", hw - clearance, -hh + clearance),
+      new SketchPoint("tl", -hw + clearance, hh - clearance),
+      new SketchPoint("tr", hw - clearance, hh - clearance),
+      new SketchPoint("leftAnchor", -hw, -hh + clearance),
+      new SketchPoint("bottomAnchor", -hw + clearance, -hh)
     ]) s.addPoint(p);
     s.addEntity(SketchEntity.line("bottom",
       "q0", "q1")).addEntity(SketchEntity.line("right", "q1", "q2")).addEntity(SketchEntity.line(

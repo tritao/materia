@@ -15,13 +15,7 @@ class Operation {
     try {
       if (inputs != null) for (input in inputs) for (attribute in input.threadedFaces()) threadSources.push({
         attribute: attribute,
-        face: input.subshape(
-          CadKit.ShapeKind.Face,
-          Threads.namedIndex(
-            input,
-            attribute.faceName
-          )
-        )
+        face: input.subshape(CadKit.ShapeKind.Face, Threads.namedIndex(input, attribute.faceName))
       });
     } catch (error:Dynamic) {
       close();

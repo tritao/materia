@@ -275,10 +275,7 @@ class DocumentBuilder {
     support:Feature,
     selection:SelectionRecipe,
     xDirection:Vector,
-    dimensions:Map<
-      String,
-      NamedParameter
-  >,
+    dimensions:Map<String, NamedParameter>,
     offset:Float = 0,
     flip:Bool = false
   ):ConstrainedSketchFeature {

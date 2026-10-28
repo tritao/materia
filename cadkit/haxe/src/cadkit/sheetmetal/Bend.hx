@@ -46,12 +46,7 @@ class Bend {
     return new WallOutline(
       WallOutline.rectangle(allowance, width).loops()[0],
       [],
-      [[
-        "bend:" + id + ":end:0",
-        "bend:" + id + ":join:b",
-        "bend:" + id + ":end:1",
-        "bend:" + id + ":join:a"
-      ]]
+      [["bend:" + id + ":end:0", "bend:" + id + ":join:b", "bend:" + id + ":end:1", "bend:" + id + ":join:a"]]
     );
   }
   public function materialRegions(allowance:Float):Array<WallOutline> {

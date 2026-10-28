@@ -77,10 +77,7 @@ class SheetBoundaryOriginSmoke {
     for (i in 0...ids.length) for (j in 0...ids[i].length) originals.set(ids[i][j], key(notch.origin(i, j)));
     var reflectedIds = reflected.identities();
     for (i in 0...reflectedIds.length) for (j in 0...reflectedIds[i].length) check(
-      originals.get(reflectedIds[i][j]) == key(reflected.origin(
-        i,
-        j
-      )),
+      originals.get(reflectedIds[i][j]) == key(reflected.origin(i, j)),
       "normal reversal maps identities and purposes together"
     );
     var sheet = new Sheet(SheetDemoParts.materialA());

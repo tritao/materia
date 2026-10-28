@@ -51,11 +51,7 @@ class ShellFeature extends Feature {
         shape = solid;
       }
       var result = EvaluationResult.fromOperation(new Operation(
-        CadKit.shellOperationChecked(
-          shape.borrowHandle(),
-          Model.refs(faces),
-          thickness.value
-        ),
+        CadKit.shellOperationChecked(shape.borrowHandle(), Model.refs(faces), thickness.value),
         [context.shape(source)]
       ));
       if (solid != null) solid.close();

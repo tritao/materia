@@ -45,11 +45,7 @@ class MeshFeatureEdges {
     for (i in 0...count) {
       var o = i * 48, key = pair(
         point(strokes.getDouble(o), strokes.getDouble(o + 8), strokes.getDouble(o + 16)),
-        point(
-          strokes.getDouble(o + 24),
-          strokes.getDouble(o + 32),
-          strokes.getDouble(o + 40)
-        )
+        point(strokes.getDouble(o + 24), strokes.getDouble(o + 32), strokes.getDouble(o + 40))
       );
       keys.push(key);
       requested.set(key, {normals: []});

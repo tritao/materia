@@ -61,24 +61,15 @@ class DiagnosisInvarianceSmoke {
     return [{name: "rectangle", expected: "fully-constrained dof=0", build: () -> rectangle(true, null)}, {
       name: "rectangle-open",
       expected: "under-constrained dof=1",
-      build: () -> rectangle(
-        false,
-        null
-      )
+      build: () -> rectangle(false, null)
     }, {
       name: "rectangle-redundant",
       expected: "redundant dof=0 ids=top-length,v0,v1,width",
-      build: () -> rectangle(
-        true,
-        10
-      )
+      build: () -> rectangle(true, 10)
     }, {
       name: "rectangle-conflict",
       expected: "conflicting ids=top-length,v0,v1,width",
-      build: () -> rectangle(
-        true,
-        12
-      )
+      build: () -> rectangle(true, 12)
     }, {
       name: "two-rectangles-redundant",
       expected: "redundant dof=0 ids=a.top-length,a.v0,a.v1,a.width,b.top-length,b.v0,b.v1,b.width",
@@ -98,82 +89,13 @@ class DiagnosisInvarianceSmoke {
     if ((fixture.expected.indexOf(" ids=") >= 0 ? base : classification(base))
       != fixture.expected) failures.push('${fixture.name}/expected: want ${fixture.expected}, got $base');
     var transforms:Array<{name:String, apply:ConstrainedSketch -> ConstrainedSketch}> = [
-      {
-        name: "scale-1e-6",
-        apply: s -> transformSketch(
-          s,
-          1e-6,
-          0,
-          0,
-          0,
-          false,
-          0
-        )
-      },
-      {
-        name: "scale-1e6",
-        apply: s -> transformSketch(
-          s,
-          1e6,
-          0,
-          0,
-          0,
-          false,
-          0
-        )
-      },
-      {
-        name: "translate",
-        apply: s -> transformSketch(
-          s,
-          1,
-          1234.5,
-          -678.9,
-          0,
-          false,
-          0
-        )
-      },
-      {
-        name: "rotate",
-        apply: s -> transformSketch(
-          s,
-          1,
-          0,
-          0,
-          0.7,
-          false,
-          0
-        )
-      },
-      {
-        name: "reorder",
-        apply: s -> transformSketch(
-          s,
-          1,
-          0,
-          0,
-          0,
-          true,
-          0
-        )
-      },
-      {
-        name: "perturb",
-        apply: s -> transformSketch(
-          s,
-          1,
-          0,
-          0,
-          0,
-          false,
-          0.02
-        )
-      },
-      {
-        name: "codec",
-        apply: throughDocument
-      },
+      {name: "scale-1e-6", apply: s -> transformSketch(s, 1e-6, 0, 0, 0, false, 0)},
+      {name: "scale-1e6", apply: s -> transformSketch(s, 1e6, 0, 0, 0, false, 0)},
+      {name: "translate", apply: s -> transformSketch(s, 1, 1234.5, -678.9, 0, false, 0)},
+      {name: "rotate", apply: s -> transformSketch(s, 1, 0, 0, 0.7, false, 0)},
+      {name: "reorder", apply: s -> transformSketch(s, 1, 0, 0, 0, true, 0)},
+      {name: "perturb", apply: s -> transformSketch(s, 1, 0, 0, 0, false, 0.02)},
+      {name: "codec", apply: throughDocument},
     ];
     for (transform in transforms) {
       var summary = sketchSummary(transform.apply(fixture.build()));
@@ -408,35 +330,19 @@ class DiagnosisInvarianceSmoke {
       name: "four-bar",
       expected: "converged dof=0",
       dependent: ["coupler", "rocker"],
-      build: () -> AssemblyLoopSmoke.fourBarDefinition(
-        2200,
-        null,
-        null,
-        1.4
-      )
+      build: () -> AssemblyLoopSmoke.fourBarDefinition(2200, null, null, 1.4)
     },
     // Coupler and rocker collinear at the only closed pose: generically rigid, locally singular.
     {name: "four-bar-toggle", expected: "converged dof=0", dependent: ["coupler", "rocker"], build: toggleFourBar}, {
       name: "slider-crank",
       expected: "converged dof=0",
-      dependent: [
-        "rod",
-        "slide"
-      ],
+      dependent: ["rod", "slide"],
       build: AssemblyLoopSmoke.sliderCrankDefinition
     }, {
       name: "four-bar-impossible",
       expected: "conflicting",
-      dependent: [
-        "coupler",
-        "rocker"
-      ],
-      build: () -> AssemblyLoopSmoke.fourBarDefinition(
-        5000,
-        null,
-        null,
-        1.4
-      )
+      dependent: ["coupler", "rocker"],
+      build: () -> AssemblyLoopSmoke.fourBarDefinition(5000, null, null, 1.4)
     },
     // Planar linkages built from 3D revolute closures: their out-of-plane rows are redundant by design.
     {
@@ -453,50 +359,21 @@ class DiagnosisInvarianceSmoke {
       != fixture.expected) failures.push('${fixture.name}/expected: want ${fixture.expected}, got $base');
     var transforms:Array<{name:String, apply:AssemblyDefinition -> AssemblyDefinition, seed:Float}> = [{
       name: "scale-1e-6",
-      apply: d -> transformAssembly(
-        d,
-        1e-6,
-        AssemblyFrames.identity(),
-        false
-      ),
+      apply: d -> transformAssembly(d, 1e-6, AssemblyFrames.identity(), false),
       seed: 0
     },
     // Assembly positions are capped at 1e9 units by the schema, so the upward scale stops at 1e5.
     {name: "scale-1e5", apply: d -> transformAssembly(d, 1e5, AssemblyFrames.identity(), false), seed: 0}, {
       name: "translate",
-      apply: d -> transformAssembly(
-        d,
-        1,
-        AssemblyFrames.translation(
-          1234.5,
-          -678.9,
-          42
-        ),
-        false
-      ),
+      apply: d -> transformAssembly(d, 1, AssemblyFrames.translation(1234.5, -678.9, 42), false),
       seed: 0
     }, {
       name: "rotate",
-      apply: d -> transformAssembly(
-        d,
-        1,
-        rotation(
-          0.3,
-          0.8,
-          0.52,
-          0.7
-        ),
-        false
-      ),
+      apply: d -> transformAssembly(d, 1, rotation(0.3, 0.8, 0.52, 0.7), false),
       seed: 0
     }, {
       name: "reorder",
-      apply: d -> transformAssembly(
-        d,
-        1,
-        AssemblyFrames.identity(),
-        true
-      ),
+      apply: d -> transformAssembly(d, 1, AssemblyFrames.identity(), true),
       seed: 0
     }, {
       name: "codec",

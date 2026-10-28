@@ -98,10 +98,7 @@ class SheetBaseSmoke {
       new SheetMaterial(
         "unspecified-strength",
         1,
-        BendRule.KFactor(new KFactorTable(
-          [0],
-          [0.4]
-        )),
+        BendRule.KFactor(new KFactorTable([0], [0.4])),
         null,
         null,
         null,

@@ -89,12 +89,7 @@ class SheetSolidSmoke {
     var sheet = new Sheet(SheetDemoParts.materialA());
     var outline = new WallOutline(
       [Segment.arc(new Point2(0, 0), 10, 0, 2 * Math.PI)],
-      [[Segment.arc(
-        new Point2(2, 1),
-        2,
-        0,
-        -2 * Math.PI
-      )]]
+      [[Segment.arc(new Point2(2, 1), 2, 0, -2 * Math.PI)]]
     );
     var wall = sheet.addWall(outline);
     var curved = SheetSolid.build(sheet, sheet.flat());
@@ -103,13 +98,7 @@ class SheetSolidSmoke {
     curved.close();
     var semicircle = new WallOutline([
       Segment.arc(new Point2(0, 0), 10, 0, Math.PI),
-      Segment.line(
-        new Point2(-10, 0),
-        new Point2(
-          10,
-          0
-        )
-      )
+      Segment.line(new Point2(-10, 0), new Point2(10, 0))
     ]);
     var replaced = sheet.updateWall(wall.id, semicircle);
     var half = SheetSolid.build(sheet, sheet.flat());

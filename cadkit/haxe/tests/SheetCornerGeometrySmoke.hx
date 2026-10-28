@@ -51,11 +51,7 @@ class SheetCornerGeometrySmoke {
       var mate = new Plane(
         new Vector(35, 0, 8),
         new Vector(Math.cos(angle), 0, -Math.sin(angle)),
-        new Vector(
-          Math.sin(angle),
-          0,
-          Math.cos(angle)
-        )
+        new Vector(Math.sin(angle), 0, Math.cos(angle))
       );
       var offsets = CornerGeometry.of(outline, edge, first, outline, edge, mate, 2, Gap, 0.75);
       var signed:Array<Float> = [];

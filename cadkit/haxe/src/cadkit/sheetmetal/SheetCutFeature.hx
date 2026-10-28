@@ -45,11 +45,7 @@ class SheetCutFeature extends SheetFeature {
     for (region in geometry.regions()) graph = SheetCutGeometry.apply(
       graph,
       wall,
-      SheetProfile.region(
-        region,
-        geometry.plane,
-        placement
-      ),
+      SheetProfile.region(region, geometry.plane, placement),
       "feature:" + id.toInt() + ":region:" + region.id
     );
     return graph;

@@ -15,11 +15,7 @@ class ProceduralExcavatorPreview {
         [0.35, 0.48, 0.63],
         [0.72, 0.66, 0.48],
         [0.28, 0.34, 0.40],
-        [
-          0.84,
-          0.76,
-          0.57
-        ]
+        [0.84, 0.76, 0.57]
       ];
       for (index in 0...components.length) {
         var component = components[index];

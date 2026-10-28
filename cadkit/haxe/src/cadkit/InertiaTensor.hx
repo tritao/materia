@@ -45,16 +45,8 @@ class InertiaTensor {
       || Math.abs(qx * qx + qy * qy + qz * qz + qw * qw - 1) > 1e-6) throw "inertia rotation needs a unit quaternion";
     var r = [
       [1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy - qz * qw), 2 * (qx * qz + qy * qw)],
-      [
-        2 * (qx * qy + qz * qw),
-        1 - 2 * (qx * qx + qz * qz),
-        2 * (qy * qz - qx * qw)
-      ],
-      [
-        2 * (qx * qz - qy * qw),
-        2 * (qy * qz + qx * qw),
-        1 - 2 * (qx * qx + qy * qy)
-      ]
+      [2 * (qx * qy + qz * qw), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz - qx * qw)],
+      [2 * (qx * qz - qy * qw), 2 * (qy * qz + qx * qw), 1 - 2 * (qx * qx + qy * qy)]
     ];
     var j = [[xx, xy, xz], [xy, yy, yz], [xz, yz, zz]];
     var result:Array<Array<Float>> = [for (_ in 0...3)[0.0, 0.0, 0.0]];

@@ -63,13 +63,7 @@ private class BendCurveBounds {
       );
     return component(zone.point(
       Math.max(0, Math.min(1, point.x / zone.allowance)),
-      Math.max(
-        0,
-        Math.min(
-          zone.width,
-          point.y
-        )
-      ),
+      Math.max(0, Math.min(zone.width, point.y)),
       depth
     ));
   }

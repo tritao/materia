@@ -37,14 +37,7 @@ class EditableMountingPlate {
       finish = builder.fillet(
         extrusion,
         filletRadius,
-        new SelectionRecipe(
-          "edge",
-          "line",
-          Vector.Z(),
-          "ends",
-          Vector.X(),
-          4
-        )
+        new SelectionRecipe("edge", "line", Vector.Z(), "ends", Vector.X(), 4)
       );
       builder.output(finish);
     }

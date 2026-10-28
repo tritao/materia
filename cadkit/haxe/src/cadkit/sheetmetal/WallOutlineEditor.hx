@@ -76,10 +76,7 @@ class WallOutlineEditor {
       center,
       segment.radius,
       start,
-      directed(
-        segment.startAngle + segment.sweep - start,
-        segment.sweep
-      )
+      directed(segment.startAngle + segment.sweep - start, segment.sweep)
     );
   }
   static function replaceEnd(segment:Segment, point:Point2):Segment {

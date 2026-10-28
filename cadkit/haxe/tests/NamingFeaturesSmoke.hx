@@ -172,12 +172,7 @@ class NamingFeaturesSmoke {
     var boss = d.add(new TransformFeature(d.add(new CylinderFeature(3, 5)), 40, 40, 10));
     if (model == "linear pattern") return d.add(new BooleanFeature(
       plate,
-      d.add(new LinearPatternFeature(
-        boss,
-        3,
-        15,
-        Vector.X()
-      )),
+      d.add(new LinearPatternFeature(boss, 3, 15, Vector.X())),
       BooleanOperation.Fuse
     ));
     if (model == "polar pattern") return d.add(new PolarPatternFeature(
@@ -197,16 +192,7 @@ class NamingFeaturesSmoke {
     var offCenter = d.add(new TransformFeature(d.add(new BoxFeature(10, 10, 10)), 5, 0, 0));
     if (model == "mirror both") return d.add(new MirrorFeature(offCenter, new Vector(), Vector.X(), "both"));
     if (model == "mirror fuse") return d.add(new MirrorFeature(
-      d.add(new TransformFeature(
-        d.add(new BoxFeature(
-          10,
-          10,
-          10
-        )),
-        -2,
-        0,
-        0
-      )),
+      d.add(new TransformFeature(d.add(new BoxFeature(10, 10, 10)), -2, 0, 0)),
       new Vector(),
       Vector.X(),
       "fuse"
@@ -223,10 +209,7 @@ class NamingFeaturesSmoke {
       [-width / 2, -height / 2],
       [width / 2, -height / 2],
       [width / 2, height / 2],
-      [
-        -width / 2,
-        height / 2
-      ]
+      [-width / 2, height / 2]
     ];
     for (index in 0...4) {
       sketch.addPoint(new cadkit.sketch.SketchPoint("p" + index, corners[index][0], corners[index][1]));

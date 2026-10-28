@@ -25,16 +25,7 @@ class SheetChecks {
         "Developed material overlaps between " + domains[i].identity() + " and " + domains[j].identity(),
         false,
         AreaMm2(region.area()),
-        [
-          Material(
-            domains[i].owner,
-            region
-          ),
-          Material(
-            domains[j].owner,
-            region
-          )
-        ]
+        [Material(domains[i].owner, region), Material(domains[j].owner, region)]
       ));
     }
     var evaluated = sheet.evaluate(sheet.flat());
@@ -51,10 +42,7 @@ class SheetChecks {
           SmallRadius,
           "Bend " + bend.id + " has an inner radius below the material minimum",
           false,
-          DistanceMm(
-            bend.radius,
-            minimumRadius * sheet.thickness()
-          ),
+          DistanceMm(bend.radius, minimumRadius * sheet.thickness()),
           marks
         ));
       var grainLimit = Math.PI / 12;
@@ -64,10 +52,7 @@ class SheetChecks {
           AlongGrain,
           "Bend " + bend.id + " lies within 15 degrees of the rolling direction",
           false,
-          AngleRadians(
-            angle,
-            grainLimit
-          ),
+          AngleRadians(angle, grainLimit),
           marks
         ));
       }
@@ -76,16 +61,7 @@ class SheetChecks {
         "Bend " + bend.id + " ends at (" + point.x + ", " + point.y + ") inside developed material without an opening",
         false,
         InteriorPoint(point),
-        [
-          BendMark(
-            bend.id,
-            guide
-          ),
-          BendEnd(
-            bend.id,
-            point
-          )
-        ]
+        [BendMark(bend.id, guide), BendEnd(bend.id, point)]
       ));
       var opening = tooling != null ? tooling.vWidth : switch (sheet.material.bendRule) {
         case Process(setup):
@@ -108,10 +84,7 @@ class SheetChecks {
             "Ripped bend "
             + bend.id + " has no straight return beyond its curved strip for the assumed 0.7V tooling minimum",
             true,
-            DistanceMm(
-              0,
-              minimum
-            ),
+            DistanceMm(0, minimum),
             geometry
           ));
           continue;
@@ -125,20 +98,8 @@ class SheetChecks {
             ShortFlange,
             "Wall " + wall.id + " at bend " + bend.id + " is shorter than the assumed 0.7V tooling minimum",
             true,
-            DistanceMm(
-              extent,
-              minimum
-            ),
-            [
-              Material(
-                FlatOwner.Wall(wall.id),
-                mapped
-              ),
-              BendMark(
-                bend.id,
-                guide
-              )
-            ]
+            DistanceMm(extent, minimum),
+            [Material(FlatOwner.Wall(wall.id), mapped), BendMark(bend.id, guide)]
           ));
         }
       }
@@ -161,24 +122,8 @@ class SheetChecks {
             CutNearBend,
             "Cut boundary is closer to bend " + bend.id + " than the assumed 2.5T + R clearance",
             true,
-            DistanceMm(
-              distance,
-              clearance
-            ),
-            [
-              Boundary(
-                region.identity(
-                  i,
-                  j
-                ),
-                origin,
-                loops[i][j]
-              ),
-              BendMark(
-                bend.id,
-                guide
-              )
-            ]
+            DistanceMm(distance, clearance),
+            [Boundary(region.identity(i, j), origin, loops[i][j]), BendMark(bend.id, guide)]
           ));
         }
       }

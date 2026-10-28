@@ -60,10 +60,7 @@ class Sketch extends Model {
         holeShapes.push(wire.shape);
       }
       var result = new Sketch(
-        Shape.fromOwnedHandle(CadKit.planarFaceChecked(
-          boundary.shape.borrowHandle(),
-          Model.refs(holeShapes)
-        )),
+        Shape.fromOwnedHandle(CadKit.planarFaceChecked(boundary.shape.borrowHandle(), Model.refs(holeShapes))),
         plane
       );
       for (wire in wires) wire.close();
@@ -104,15 +101,7 @@ class Sketch extends Model {
     var x = Model.alignment(width, alignX);
     var y = Model.alignment(height, alignY);
     return polygon(
-      [
-        new Vector(x, y),
-        new Vector(x + width, y),
-        new Vector(x + width, y + height),
-        new Vector(
-          x,
-          y + height
-        )
-      ],
+      [new Vector(x, y), new Vector(x + width, y), new Vector(x + width, y + height), new Vector(x, y + height)],
       plane
     );
   }
@@ -150,10 +139,7 @@ class Sketch extends Model {
         Curve.arc(
           plane.toWorld(new Vector(c, -r)),
           plane.toWorld(new Vector(c + r, 0)),
-          plane.toWorld(new Vector(
-            c,
-            r
-          ))
+          plane.toWorld(new Vector(c, r))
         ),
         "slot.right"
       ));
@@ -163,10 +149,7 @@ class Sketch extends Model {
         Curve.arc(
           plane.toWorld(new Vector(-c, r)),
           plane.toWorld(new Vector(-c - r, 0)),
-          plane.toWorld(new Vector(
-            -c,
-            -r
-          ))
+          plane.toWorld(new Vector(-c, -r))
         ),
         "slot.left"
       ));

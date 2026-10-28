@@ -13,14 +13,7 @@ class RoundedRectangle {
     var h = z1 - z0;
     var pieces:Array<Part> = [
       shifted(Part.box(width - 2 * radius, height, h), z0),
-      shifted(
-        Part.box(
-          width,
-          height - 2 * radius,
-          h
-        ),
-        z0
-      )
+      shifted(Part.box(width, height - 2 * radius, h), z0)
     ];
     for (sx in [-1.0, 1.0]) for (sy in [-1.0, 1.0]) pieces.push(Part.cylinderSpan(
       radius,

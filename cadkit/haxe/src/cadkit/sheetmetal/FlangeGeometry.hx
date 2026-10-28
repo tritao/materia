@@ -53,10 +53,7 @@ class FlangeGeometry {
     origins[selected.loop] = boundaryOrigins;
     return new FlangeBoundary(
       new WallOutline(loops[0], loops.slice(1), identities, origins),
-      new WallEdge(
-        attachment,
-        selected.loop
-      )
+      new WallEdge(attachment, selected.loop)
     );
   }
   public static function wall(leg:Float, width:Float, extend1:Float, extend2:Float):FlangeBoundary {
@@ -66,10 +63,7 @@ class FlangeGeometry {
       new Point2(0, -extend1),
       new Point2(leg, -extend1),
       new Point2(leg, width + extend2),
-      new Point2(
-        0,
-        width + extend2
-      )
+      new Point2(0, width + extend2)
     ];
     var ids = ["flange:start", "flange:tip", "flange:end"];
     if (extend2 > 0) {

@@ -56,16 +56,8 @@ class RevolveFeature extends Feature {
 
   override public function evaluate(context:EvaluationContext):EvaluationResult {
     var operation:Operation = context.shape(source).revolveOperation(
-      Geometry.vec3(
-        originX.value,
-        originY.value,
-        originZ.value
-      ),
-      Geometry.vec3(
-        axisX.value,
-        axisY.value,
-        axisZ.value
-      ),
+      Geometry.vec3(originX.value, originY.value, originZ.value),
+      Geometry.vec3(axisX.value, axisY.value, axisZ.value),
       angle.value
     );
     return EvaluationResult.fromOperation(operation);

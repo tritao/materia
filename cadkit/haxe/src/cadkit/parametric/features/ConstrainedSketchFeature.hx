@@ -99,11 +99,7 @@ class ConstrainedSketchFeature extends Feature {
         new Parameter(
           this,
           "constraint." + constraint.id,
-          toCanonicalDimension(
-            authored,
-            constraint.kind,
-            constraint.value
-          ),
+          toCanonicalDimension(authored, constraint.kind, constraint.value),
           constraint.kind == "angle" ? -1e300 : 0,
           false,
           1e300,

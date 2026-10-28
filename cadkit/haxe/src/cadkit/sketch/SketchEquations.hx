@@ -178,10 +178,7 @@ class SketchEquations {
       var circleCenter = center(circleId, x, owner);
       var signedDistance = cross([circleCenter[0] - ends[0][0],
         circleCenter[1] - ends[0][1]], lineDirection) / Math.pow(
-          dot(
-            lineDirection,
-            lineDirection
-          ),
+          dot(lineDirection, lineDirection),
           0.5
         );
       var storedSide = tangentSides.get(owner);
@@ -213,10 +210,7 @@ class SketchEquations {
         var circleCenter = center(circleId, x, constraint.id);
         var signedDistance = cross([circleCenter[0] - ends[0][0],
           circleCenter[1] - ends[0][1]], lineDirection) / Math.pow(
-            dot(
-              lineDirection,
-              lineDirection
-            ),
+            dot(lineDirection, lineDirection),
             0.5
           );
         tangentSides.set(constraint.id, signedDistance < 0 ? -1 : 1);

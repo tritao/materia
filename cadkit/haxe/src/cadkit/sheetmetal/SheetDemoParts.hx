@@ -74,42 +74,15 @@ class SheetDemoParts {
       new Point2(g, 0),
       new Point2(w - g, 0),
       new Point2(w - g, g),
-      new Point2(
-        w,
-        g
-      ),
-      new Point2(
-        w,
-        h - g
-      ),
-      new Point2(
-        w - g,
-        h - g
-      ),
-      new Point2(
-        w - g,
-        h
-      ),
-      new Point2(
-        g,
-        h
-      ),
-      new Point2(
-        g,
-        h - g
-      ),
-      new Point2(
-        0,
-        h - g
-      ),
-      new Point2(
-        0,
-        g
-      ),
-      new Point2(
-        g,
-        g
-      )
+      new Point2(w, g),
+      new Point2(w, h - g),
+      new Point2(w - g, h - g),
+      new Point2(w - g, h),
+      new Point2(g, h),
+      new Point2(g, h - g),
+      new Point2(0, h - g),
+      new Point2(0, g),
+      new Point2(g, g)
     ]));
     for (edge in [0, 3, 6, 9]) {
       var side = flange(sheet, base, edge, 25 - setback, Math.PI / 2, radius);

@@ -41,22 +41,8 @@ class SheetCorner {
     return SheetCutGeometry.applyEdits(
       source,
       [
-        new SheetContourEdit(
-          first.wall,
-          WallOutlineEditor.offset(
-            a,
-            firstEdge,
-            offsets.first
-          )
-        ),
-        new SheetContourEdit(
-          second.wall,
-          WallOutlineEditor.offset(
-            b,
-            secondEdge,
-            offsets.second
-          )
-        )
+        new SheetContourEdit(first.wall, WallOutlineEditor.offset(a, firstEdge, offsets.first)),
+        new SheetContourEdit(second.wall, WallOutlineEditor.offset(b, secondEdge, offsets.second))
       ],
       [cut]
     );

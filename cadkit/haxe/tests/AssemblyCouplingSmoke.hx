@@ -15,13 +15,7 @@ class AssemblyCouplingSmoke {
   public static function run():Void {
     var terms:Array<AssemblyJointCoupling> = [
       {id: "m-x", source: "x", target: "m", ratio: 1, offset: 0},
-      {
-        id: "m-y",
-        source: "y",
-        target: "m",
-        ratio: 1,
-        offset: 0.5
-      }
+      {id: "m-y", source: "y", target: "m", ratio: 1, offset: 0.5}
     ];
     var definition = build(terms);
     AssemblyDefinitionCodec.validate(definition);
@@ -51,46 +45,22 @@ class AssemblyCouplingSmoke {
     throws(
       () -> AssemblyDefinitionCodec.validate(build([
         terms[0],
-        {
-          id: "again",
-          source: "x",
-          target: "m",
-          ratio: 2,
-          offset: 0
-        }
+        {id: "again", source: "x", target: "m", ratio: 2, offset: 0}
       ])),
       "the same leader twice is rejected"
     );
     throws(
       () -> AssemblyDefinitionCodec.validate(build([
         terms[0],
-        {
-          id: "m-x2",
-          source: "y",
-          target: "x",
-          ratio: 1,
-          offset: 0
-        },
-        {
-          id: "x-m",
-          source: "m",
-          target: "y",
-          ratio: 1,
-          offset: 0
-        }
+        {id: "m-x2", source: "y", target: "x", ratio: 1, offset: 0},
+        {id: "x-m", source: "m", target: "y", ratio: 1, offset: 0}
       ])),
       "a cycle through several terms is rejected"
     );
     throws(
       () -> AssemblyDefinitionCodec.validate(build([
         terms[0],
-        {
-          id: "zero",
-          source: "y",
-          target: "m",
-          ratio: 0,
-          offset: 0
-        }
+        {id: "zero", source: "y", target: "m", ratio: 0, offset: 0}
       ])),
       "a zero ratio is rejected"
     );
@@ -120,10 +90,7 @@ class AssemblyCouplingSmoke {
     };
     return {schemaVersion: AssemblyDefinitionCodec.VERSION, id: "sum", definitions: [{
       id: "part",
-      connectors: [{
-        name: "c",
-        frame: frame
-      }]
+      connectors: [{name: "c", frame: frame}]
     }], occurrences: [for (id in [
       "root",
       "a",
@@ -143,11 +110,7 @@ class AssemblyCouplingSmoke {
         parentConnector: "c",
         child: "motor",
         childConnector: "c",
-        axis: {
-          x: 0,
-          y: 0,
-          z: 1
-        },
+        axis: {x: 0, y: 0, z: 1},
         limits: limits,
         defaultValue: 0.5
       }

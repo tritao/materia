@@ -53,65 +53,28 @@ class ReliefGeometry {
     if (type == Rectangular) local = WallOutline.polygon([
       new Point2(0, -reach),
       new Point2(width, -reach),
-      new Point2(
-        width,
-        depth
-      ),
-      new Point2(
-        0,
-        depth
-      )
+      new Point2(width, depth),
+      new Point2(0, depth)
     ]).loops()[0];
     else {
       var radius = width / 2;
       local = [
         Segment.line(new Point2(0, -reach), new Point2(width, -reach)),
-        Segment.line(
-          new Point2(width, -reach),
-          new Point2(
-            width,
-            depth - radius
-          )
-        ),
-        Segment.arc(
-          new Point2(
-            radius,
-            depth - radius
-          ),
-          radius,
-          0,
-          Math.PI
-        ),
-        Segment.line(
-          new Point2(
-            0,
-            depth - radius
-          ),
-          new Point2(
-            0,
-            -reach
-          )
-        )
+        Segment.line(new Point2(width, -reach), new Point2(width, depth - radius)),
+        Segment.arc(new Point2(radius, depth - radius), radius, 0, Math.PI),
+        Segment.line(new Point2(0, depth - radius), new Point2(0, -reach))
       ];
     }
     var transformed:Array<Segment> = [];
     for (segment in local) {
       if (segment.isLine()) transformed.push(Segment.line(
         point(segment.start, origin, dx, dy),
-        point(
-          segment.end,
-          origin,
-          dx,
-          dy
-        )
+        point(segment.end, origin, dx, dy)
       ));
       else transformed.push(Segment.arc(
         point(segment.arcCenter(), origin, dx, dy),
         segment.radius,
-        segment.startAngle + Math.atan2(
-          dy,
-          dx
-        ),
+        segment.startAngle + Math.atan2(dy, dx),
         segment.sweep
       ));
     }

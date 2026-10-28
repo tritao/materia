@@ -71,42 +71,15 @@ class SheetFlatPatternSmoke {
       new Point2(2, -depth),
       new Point2(143, -depth),
       new Point2(143, 2),
-      new Point2(
-        145 + depth,
-        2
-      ),
-      new Point2(
-        145 + depth,
-        93
-      ),
-      new Point2(
-        143,
-        93
-      ),
-      new Point2(
-        143,
-        95 + depth
-      ),
-      new Point2(
-        2,
-        95 + depth
-      ),
-      new Point2(
-        2,
-        93
-      ),
-      new Point2(
-        -depth,
-        93
-      ),
-      new Point2(
-        -depth,
-        2
-      ),
-      new Point2(
-        2,
-        2
-      )
+      new Point2(145 + depth, 2),
+      new Point2(145 + depth, 93),
+      new Point2(143, 93),
+      new Point2(143, 95 + depth),
+      new Point2(2, 95 + depth),
+      new Point2(2, 93),
+      new Point2(-depth, 93),
+      new Point2(-depth, 2),
+      new Point2(2, 2)
     ]);
     near(
       OutlineBoolean.regions(tray.regions()[0], expectedTray, "expected-tray").length,
@@ -137,21 +110,11 @@ class SheetFlatPatternSmoke {
     near(pattern.bends()[0].lines().length, 2, "pattern owns marker arrays");
     var ring = new WallOutline(
       [Segment.arc(new Point2(0, 0), 5, 0, 2 * Math.PI)],
-      [[Segment.arc(
-        new Point2(0, 0),
-        4,
-        0,
-        -2 * Math.PI
-      )]]
+      [[Segment.arc(new Point2(0, 0), 4, 0, -2 * Math.PI)]]
     );
     var innerRing = new WallOutline(
       [Segment.arc(new Point2(0, 0), 2, 0, 2 * Math.PI)],
-      [[Segment.arc(
-        new Point2(0, 0),
-        1,
-        0,
-        -2 * Math.PI
-      )]]
+      [[Segment.arc(new Point2(0, 0), 1, 0, -2 * Math.PI)]]
     );
     near(OutlineBoolean.union(ring, innerRing).length, 2, "nested disconnected rings retain the nearest hole owner");
     var stock = SheetDemoParts.materialA();

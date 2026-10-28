@@ -30,13 +30,7 @@ class SegmentDistance {
     if (OutlineGeometry.intersections(curve, line).length > 0) return 0;
     var result = Math.min(
       Math.min(point(curve, line.start), point(curve, line.end)),
-      Math.min(
-        point(line, curve.start),
-        point(
-          line,
-          curve.end
-        )
-      )
+      Math.min(point(line, curve.start), point(line, curve.end))
     );
     if (!curve.isLine()) {
       var center = curve.arcCenter();

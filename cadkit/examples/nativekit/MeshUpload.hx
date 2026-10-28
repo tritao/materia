@@ -10,10 +10,7 @@ class MeshUpload {
     return {
       vertices: Buffer.fromBytes(renderer, mesh.vertices),
       normals: Buffer.fromBytes(renderer, mesh.normals),
-      indices: Buffer.fromBytes(
-        renderer,
-        mesh.indices
-      )
+      indices: Buffer.fromBytes(renderer, mesh.indices)
     };
   }
 }

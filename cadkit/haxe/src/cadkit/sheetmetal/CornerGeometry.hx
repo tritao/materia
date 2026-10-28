@@ -41,28 +41,8 @@ class CornerGeometry {
     );
     axis = axis.normalized();
     return new CornerGeometry(
-      offset(
-        firstOutline,
-        firstEdge,
-        firstPlane,
-        secondPlane,
-        axis,
-        thickness,
-        gap,
-        join == OverlapFirst,
-        overlap
-      ),
-      offset(
-        secondOutline,
-        secondEdge,
-        secondPlane,
-        firstPlane,
-        axis,
-        thickness,
-        gap,
-        join == OverlapSecond,
-        overlap
-      )
+      offset(firstOutline, firstEdge, firstPlane, secondPlane, axis, thickness, gap, join == OverlapFirst, overlap),
+      offset(secondOutline, secondEdge, secondPlane, firstPlane, axis, thickness, gap, join == OverlapSecond, overlap)
     );
   }
   static function offset(
@@ -80,10 +60,7 @@ class CornerGeometry {
     if (edge.loop != 0 || !segment.isLine()) throw new SheetDiagnosis(
       "sheet.corner-boundary",
       "Corner closure requires a straight outer boundary",
-      [outline.identity(
-        edge.loop,
-        edge.segment
-      )]
+      [outline.identity(edge.loop, edge.segment)]
     );
     var length = segment.length();
     var tangent = plane.xDirection.scale((segment.end.x
@@ -91,10 +68,7 @@ class CornerGeometry {
     if (tangent.cross(axis).length() > 1e-8) throw new SheetDiagnosis(
       "sheet.corner-boundary",
       "Corner boundary must run along the folded planes' intersection",
-      [outline.identity(
-        edge.loop,
-        edge.segment
-      )]
+      [outline.identity(edge.loop, edge.segment)]
     );
     var outward = tangent.cross(plane.normal);
     var projection = outward.dot(mate.normal);

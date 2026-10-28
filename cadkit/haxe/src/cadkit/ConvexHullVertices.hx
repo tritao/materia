@@ -79,12 +79,7 @@ class ConvexHullVertices {
     return {
       vertices: result,
       warning: flat ? "Thin collision mesh was thickened" : null,
-      errorRatio : supportErrorRatio(
-        vertices,
-        count,
-        result,
-        diagonal
-      )
+      errorRatio : supportErrorRatio(vertices, count, result, diagonal)
     };
   }
 

@@ -172,10 +172,7 @@ class SketchPartSolver {
     damping:Float,
     part:SketchPart,
     shapeOnly:Bool,
-    ?targets:Array<{
-      variable:Int,
-      value:Float
-    }>,
+    ?targets:Array<{variable:Int, value:Float}>,
     weight:Float = 0
   ):Null<Array<Float>> {
     var k = part.variables.length, jacobian = rows(x, part, current.values.length, shapeOnly);

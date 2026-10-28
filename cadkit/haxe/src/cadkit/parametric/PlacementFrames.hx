@@ -15,17 +15,7 @@ class PlacementFrames {
       plane.origin.x,
       plane.origin.y,
       plane.origin.z,
-      [
-        x.x,
-        y.x,
-        z.x,
-        x.y,
-        y.y,
-        z.y,
-        x.z,
-        y.z,
-        z.z
-      ]
+      [x.x, y.x, z.x, x.y, y.y, z.y, x.z, y.z, z.z]
     );
   }
 
@@ -34,11 +24,7 @@ class PlacementFrames {
     return new Placement(new Plane(
       new Vector(frame.x, frame.y, frame.z),
       new Vector(matrix[0], matrix[3], matrix[6]),
-      new Vector(
-        matrix[2],
-        matrix[5],
-        matrix[8]
-      )
+      new Vector(matrix[2], matrix[5], matrix[8])
     ));
   }
 }

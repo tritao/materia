@@ -25,11 +25,7 @@ class DatumSketchFeature extends Feature {
     var element = context.owner().resolveElement(datum);
     var plane:Plane;
     if (element.kind == "level") plane = new Plane(
-      new Vector(
-        0,
-        0,
-        context.owner().levelElevation(datum) + offset.value
-      ),
+      new Vector(0, 0, context.owner().levelElevation(datum) + offset.value),
       Vector.X(),
       Vector.Z()
     );

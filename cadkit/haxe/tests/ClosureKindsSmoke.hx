@@ -26,18 +26,9 @@ class ClosureKindsSmoke {
       "cylindrical-slider",
       [
         AssemblyLoopSmoke.bar("ground", 1500),
-        AssemblyLoopSmoke.bar(
-          "crank",
-          500
-        ),
-        AssemblyLoopSmoke.bar(
-          "rod",
-          1500
-        ),
-        AssemblyLoopSmoke.bar(
-          "slider",
-          0
-        )
+        AssemblyLoopSmoke.bar("crank", 500),
+        AssemblyLoopSmoke.bar("rod", 1500),
+        AssemblyLoopSmoke.bar("slider", 0)
       ],
       [
         AssemblyLoopSmoke.joint(
@@ -95,22 +86,8 @@ class ClosureKindsSmoke {
     var ground:AssemblyComponentDefinition = {
       id: "ground",
       connectors: [
-        {
-          name: "a",
-          frame: AssemblyLoopSmoke.frame(
-            0,
-            0,
-            0
-          )
-        },
-        {
-          name: "floor",
-          frame: AssemblyLoopSmoke.frame(
-            0,
-            300,
-            0
-          )
-        }
+        {name: "a", frame: AssemblyLoopSmoke.frame(0, 0, 0)},
+        {name: "floor", frame: AssemblyLoopSmoke.frame(0, 300, 0)}
       ]
     };
     var leg = AssemblyLoopSmoke.definition(
@@ -118,14 +95,8 @@ class ClosureKindsSmoke {
       [
         ground,
         AssemblyLoopSmoke.bar("thigh", 1000),
-        AssemblyLoopSmoke.bar(
-          "shin",
-          800
-        ),
-        AssemblyLoopSmoke.bar(
-          "foot",
-          0
-        )
+        AssemblyLoopSmoke.bar("shin", 800),
+        AssemblyLoopSmoke.bar("foot", 0)
       ],
       [
         AssemblyLoopSmoke.joint(
