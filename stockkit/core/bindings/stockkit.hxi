@@ -8,18 +8,48 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 	const SK_AXIS_X = 0;
 	const SK_AXIS_Y = 1;
 	const SK_AXIS_Z = 2;
+	/**
+	 * An unexpected failure was caught at the boundary; nothing is thrown across it.
+	 */
 	const SK_ERROR_INTERNAL = -6;
+	/**
+	 * A pointer, size, index, flag or value was missing or out of range; nothing changed.
+	 */
 	const SK_ERROR_INVALID_ARGUMENT = -1;
+	/**
+	 * A handle is zero, destroyed, stale (wrong generation) or of the wrong kind.
+	 */
 	const SK_ERROR_INVALID_HANDLE = -2;
+	/**
+	 * Output storage was too small (the count is set to the size needed), or a size or handle limit was reached.
+	 */
 	const SK_ERROR_LIMIT = -4;
+	/**
+	 * An allocation failed; nothing changed.
+	 */
 	const SK_ERROR_OUT_OF_MEMORY = -3;
+	/**
+	 * Valid request that this stock or mesh cannot serve, e.g. contouring without all three grids.
+	 */
 	const SK_ERROR_UNSUPPORTED = -5;
+	/**
+	 * Add bottom faces, which close the column mesh.
+	 */
 	const SK_MESH_BOTTOMS = 1;
+	/**
+	 * Dual-contour the stock instead of building columns.
+	 */
 	const SK_MESH_CONTOUR = 4;
+	/**
+	 * Join equal faces into larger ones; per-ray colouring then needs an unmerged mesh.
+	 */
 	const SK_MESH_MERGE = 2;
 	const SK_MOVE_ARC = 1;
 	const SK_MOVE_LINE = 0;
 	const SK_MOVE_RAPID = 1;
+	/**
+	 * The call succeeded.
+	 */
 	const SK_OK = 0;
 	const SK_SEGMENT_ARC = 1;
 	const SK_SEGMENT_LINE = 0;
@@ -454,6 +484,9 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 	}
 	handle sk_mesh_handle : u32 @destroy("sk_mesh_destroy");
 	handle sk_rake_tool_handle : u32 @destroy("sk_rake_tool_destroy");
+	/**
+	 * Result of every fallible call: `SK_OK`, or one of the negative `SK_ERROR_*` codes.
+	 */
 	type sk_result = i32;
 	handle sk_ring_snapshot_handle : u32 @destroy("sk_ring_snapshot_destroy");
 	handle sk_ring_stock_handle : u32 @destroy("sk_ring_stock_destroy");

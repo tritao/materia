@@ -88,16 +88,25 @@ extern "C" {
 /* Version and results                                                       */
 /* ------------------------------------------------------------------------- */
 
+/** Version of this C ABI, returned by `sk_api_version`; bumped on any incompatible change. */
 enum { SK_API_VERSION = 5 };
 
+/** Result of every fallible call: `SK_OK`, or one of the negative `SK_ERROR_*` codes. */
 typedef int32_t sk_result;
 enum {
+    /** The call succeeded. */
     SK_OK = 0,
+    /** A pointer, size, index, flag or value was missing or out of range; nothing changed. */
     SK_ERROR_INVALID_ARGUMENT = -1,
+    /** A handle is zero, destroyed, stale (wrong generation) or of the wrong kind. */
     SK_ERROR_INVALID_HANDLE = -2,
+    /** An allocation failed; nothing changed. */
     SK_ERROR_OUT_OF_MEMORY = -3,
+    /** Output storage was too small (the count is set to the size needed), or a size or handle limit was reached. */
     SK_ERROR_LIMIT = -4,
+    /** Valid request that this stock or mesh cannot serve, e.g. contouring without all three grids. */
     SK_ERROR_UNSUPPORTED = -5,
+    /** An unexpected failure was caught at the boundary; nothing is thrown across it. */
     SK_ERROR_INTERNAL = -6
 };
 
@@ -105,8 +114,12 @@ enum {
 /* Axes, sources and handles                                                 */
 /* ------------------------------------------------------------------------- */
 
+/** Axis index: the `axis` argument of the ray calls and the index into per-grid arrays. */
 enum { SK_AXIS_X = 0, SK_AXIS_Y = 1, SK_AXIS_Z = 2 };
-/** Axis bits of a lattice: `1 << axis`. */
+/**
+ * Axis bits of a lattice, `1 << axis`: the grids `sk_lattice.axes` asks for.
+ * Z is required; `SK_AXES_ALL` makes the stock tri-dexel.
+ */
 enum { SK_AXES_X = 1, SK_AXES_Y = 2, SK_AXES_Z = 4, SK_AXES_ALL = 7 };
 
 /** Endpoint source for material that no move has touched. */
@@ -127,7 +140,13 @@ typedef struct sk_mesh_handle { uint32_t id; } sk_mesh_handle
 /* Types: tools, moves and stock                                             */
 /* ------------------------------------------------------------------------- */
 
+/** Shape of a `sk_profile_segment`: a straight line, or a minor arc about its centre. */
 enum { SK_SEGMENT_LINE = 0, SK_SEGMENT_ARC = 1 };
+/**
+ * Role of a profile segment. Only the cutting zone removes material; shank and
+ * holder are checked for contact. `SK_ZONE_COUNT` is the number of zones, for
+ * per-zone arrays such as `sk_move_result.contact`.
+ */
 enum { SK_ZONE_CUTTING = 0, SK_ZONE_SHANK = 1, SK_ZONE_HOLDER = 2, SK_ZONE_COUNT = 3 };
 
 /**
@@ -193,7 +212,13 @@ typedef struct sk_box {
     double max[3];
 } sk_box;
 
+/** Shape of a `sk_move`: a straight line, or an arc about the vertical axis (a helix with a rise). */
 enum { SK_MOVE_LINE = 0, SK_MOVE_ARC = 1 };
+/**
+ * Bit for `sk_move.flags`: the move is a rapid traverse. The core cuts it like
+ * any other move; the flag is not interpreted here, so callers use it to tell
+ * a rapid that removes material (a collision) from a cutting move.
+ */
 enum { SK_MOVE_RAPID = 1 };
 
 /**
@@ -441,7 +466,18 @@ SK_API sk_result SK_CALL sk_stock_compare(sk_stock_handle stock, sk_stock_handle
 /* Meshing                                                                   */
 /* ------------------------------------------------------------------------- */
 
-enum { SK_MESH_BOTTOMS = 1, SK_MESH_MERGE = 2, SK_MESH_CONTOUR = 4 };
+/**
+ * Bits for the `flags` of `sk_stock_mesh`. Column meshes combine BOTTOMS and
+ * MERGE; CONTOUR stands alone and needs all three grids.
+ */
+enum {
+    /** Add bottom faces, which close the column mesh. */
+    SK_MESH_BOTTOMS = 1,
+    /** Join equal faces into larger ones; per-ray colouring then needs an unmerged mesh. */
+    SK_MESH_MERGE = 2,
+    /** Dual-contour the stock instead of building columns. */
+    SK_MESH_CONTOUR = 4
+};
 
 typedef struct sk_mesh_info {
     uint32_t struct_size SK_STRUCT_SIZE;
