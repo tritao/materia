@@ -191,25 +191,29 @@ a better-documented one.
 The bought parts, the panel layout and its checks are generic and live in `machinekit/haxe/src/machinekit/hmi/`
 (see its README); the pendant adds only its own case and reference layout in `machinekit/pendant/`.
 
-- **Layout.** `ReferencePendant.layout()`: a 190 x 110 mm face, 3 mm plate and wall, wheel and wheel-enable
-  in the right-hand column, E-stop, display, the two rotary switches, F1 and F2 on the left, F3 and the
-  fixed Start, Hold and Stop/Reset keys along the bottom. The cheap E-stop is 43 mm deep, so the case is
-  48 mm and the pendant 89 mm tall face up with the handle (the wheel stands 38 mm).
+- **Layout.** `ReferencePendant.layout()` is a one-hand handheld like commercial CNC pendants (checked against two
+  of them): a 114 x 210 mm face held with the palm behind it, 3 mm plate and wall. From the top: the axis and step
+  switches beside the E-stop (top right corner), the display, F1 to F3 with the wheel-enable key, the Start, Hold and
+  Stop keys, and the wheel at the bottom. The cheap E-stop is 43 mm deep, so the case is 48 mm and the pendant
+  89 mm tall face up with the handle (the wheel stands 38 mm). The first layout was a 190 x 110 mm landscape slab; it
+  fitted but did not suit holding. The width is set by the top row: the E-stop base (42 mm) and two 30 mm rotary bodies.
 - **Case.** `PendantCase` plans and builds the shell: a rounded box (8 mm corners, 3 mm walls and back) open at the
   top; six 9 mm M3 screw posts rising to the plate, each with a hole for an M3 heat-set insert (the board standoffs take M2.5 inserts); an M12 receptacle hole in the bottom wall (16.2 mm, an assumed M16
   rear-mount thread) with room for its body; a **board envelope** behind the shallow controls (1.6 mm, 10 mm of
   components on the back side) on four standoffs, notched for the posts, the receptacle, the enabling switch and the
-  deep E-stop that passes through its plane; two strap slots through the back wall; the **blanked enabling-switch
-  pocket** (22.3 mm opening, 0.8 mm skin to cut out); and on the plate a **perimeter tongue** that fits inside the
+  deep E-stop that passes through its plane (slivers of board between notches are cut away); two strap slots
+  through the back wall; the **enabling switch**, a side key: a 22.3 mm opening in the left wall (right if the left is
+  full) for a 26 x 30 mm body lying against the back wall, where only the deep parts can reach; and on the plate a **perimeter tongue** that fits inside the
   walls, interrupted around every rear body and post. `PendantTests` checks that the posts avoid every part and
   body, the shell and plate are single solids, the shell's volume matches an analytic estimate, and the whole
   assembly (plate, shell, board, every part) has no overlaps under `AssemblyIntegrity`.
 
 Findings so far, all on assumed rear bodies (measure the real parts):
 
-- **The enabling switch fits on the left.** A free 26 mm column exists behind the display module (only 12 mm deep),
-  left of centre, so the switch can sit under the holding hand. If the display module turns out deeper, the planner
-  says so in `notes` and falls back to behind the wheel.
+- **The enabling switch sits on the left wall at y = +42 mm,** beside the display module (12 mm deep). The buttons and
+  rotaries are 25 mm deep, which blocks a body at the back wall wherever they stand, so the side key goes where only
+  the display is. That is high on the body for a thumb: check it in a printed mock-up, and if it is wrong move the
+  display or shorten the button bodies. The planner falls back to the right wall and says so in `notes`.
 - **The left edge now has a tongue,** which stops the plate gaping where no post fits; it is interrupted where the
   E-stop, knobs and buttons come near the wall.
 - **Board:** it sits 26 mm behind the face (behind the 25 mm buttons and switches) with the deep E-stop through a

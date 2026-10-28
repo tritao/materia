@@ -16,7 +16,7 @@ import machinekit.hmi.*;
  * - the M12 receptacle hole in the bottom wall, with room for its body;
  * - a board envelope behind the controls, with four standoffs. Parts that pass through the board's plane (the deep
  *   E-stop) get notches, as do the posts, the receptacle and the enabling switch;
- * - the enabling switch's blanked pocket in the back wall, and two strap slots;
+ * - an opening in a side wall for the enabling switch, which lies against the back wall, and two strap slots;
  * - a perimeter tongue on the plate that fits inside the walls, interrupted wherever a rear body or a post is near the wall.
  *
  * `notes` lists what did not fit. The board is an envelope for fitting, not the board design.
@@ -41,6 +41,8 @@ class PendantCase {
   /** Height of the board's components on the side away from the face (assumed). */
   public static inline var BOARD_COMPONENTS:Float = 10.0;
   public static inline var BOARD_MARGIN:Float = 2.0;
+  /** A strip of board narrower than this beside a notch is not worth keeping. */
+  static inline var SLIVER:Float = 8.0;
   /** Controls deeper than this pass through the board's plane instead of ending above it. */
   public static inline var PASS_THROUGH:Float = 30.0;
   public static inline var STANDOFF_DIAMETER:Float = 7.0;
@@ -48,11 +50,10 @@ class PendantCase {
   public static inline var STANDOFF_PILOT:Float = 3.4;
   public static inline var STANDOFF_PILOT_DEPTH:Float = 6.0;
   public static inline var BOARD_HOLE:Float = 2.7;
-  /** A 22.3 mm opening for a 3-position enabling switch whose body is about 26 mm across and 30 deep (assumed). */
+  /** A 22.3 mm opening in a side wall for a 3-position enabling switch whose body is about 26 mm across and 30 long, pointing inwards (assumed). */
   public static inline var ENABLING_HOLE:Float = 22.3;
   public static inline var ENABLING_BODY:Float = 26.0;
   public static inline var ENABLING_DEPTH:Float = 30.0;
-  public static inline var ENABLING_SKIN:Float = 0.8;
   public static inline var STRAP_SLOT_WIDTH:Float = 24.0;
   public static inline var STRAP_SLOT_HEIGHT:Float = 4.0;
 
@@ -64,7 +65,7 @@ class PendantCase {
   public final boardTop:Float;
   public final standoffs:Array<{x:Float, y:Float}>;
   public final strapSlots:Array<{x:Float, y:Float}>;
-  /** The enabling switch's pocket, or null when no free column exists. */
+  /** The enabling switch's body centre in plan, lying against a side wall at the back, or null when no free place exists. */
   public final enabling:Null<{x:Float, y:Float}>;
   public final notes:Array<String>;
 
@@ -101,7 +102,7 @@ class PendantCase {
 
   static function placePosts(face:PanelLayout):Array<{x:Float, y:Float}> {
     var hw = face.width / 2 - face.wall - POST_DIAMETER / 2 - 1.0, hh = face.height / 2 - face.wall - POST_DIAMETER / 2 - 1.0;
-    var wanted = [[-hw, hh], [0.0, hh], [hw, hh], [-hw, -hh], [0.0, -hh], [hw, -hh]];
+    var wanted = [[-hw, hh], [hw, hh], [-hw, 0.0], [hw, 0.0], [-hw, -hh], [hw, -hh]];
     var posts:Array<{x:Float, y:Float}> = [];
     for (target in wanted) {
       var best:Null<{x:Float, y:Float}> = null, bestDistance = 1e9;
@@ -143,38 +144,40 @@ class PendantCase {
     return true;
   }
 
-  /** The enabling switch's body needs a free column from the back wall up ENABLING_DEPTH: left half first, then right. */
+  static function enablingFootprint():Footprint return Rect(ENABLING_DEPTH, ENABLING_BODY);
+
+  /** The switch's axis sits this far behind the face: against the back wall, where only the deepest parts can reach. */
+  static function enablingZ(face:PanelLayout):Float return -(face.caseInnerDepth - ENABLING_BODY / 2 - 1.0);
+
+  /** The enabling switch lies against a side wall at the back, its button through the wall: left wall first, then right. */
   static function placeEnabling(face:PanelLayout, posts:Array<{x:Float, y:Float}>, connectorX:Float, wallY:Float,
       notes:Array<String>):Null<{x:Float, y:Float}> {
-    var limit = face.caseInnerDepth - ENABLING_DEPTH - 1.0;
-    var hw = face.width / 2 - face.wall - ENABLING_BODY / 2 - 2.0, hh = face.height / 2 - face.wall - ENABLING_BODY / 2 - 2.0;
+    var limit = face.caseInnerDepth - ENABLING_BODY - 1.0;
+    var hh = face.height / 2 - face.wall - ENABLING_BODY / 2 - 2.0;
     for (side in [-1.0, 1.0]) {
-      var best:Null<{x:Float, y:Float}> = null, bestDistance = 1e9;
-      var x = side * 10.0;
-      while (Math.abs(x) <= hw) {
-        var y = -hh;
-        while (y <= hh + 1e-9) {
-          if (enablingFree(face, x, y, limit, posts, connectorX, wallY) && Math.abs(x) < bestDistance) { best = {x: x, y: y}; bestDistance = Math.abs(x); }
-          y += 3.0;
-        }
-        x += side * 3.0;
+      var x = side * (face.width / 2 - face.wall - ENABLING_DEPTH / 2);
+      var best:Null<{x:Float, y:Float}> = null;
+      var y = -hh;
+      while (y <= hh + 1e-9) {
+        if (enablingFree(face, x, y, limit, posts, connectorX, wallY) && (best == null || Math.abs(y) < Math.abs(best.y))) best = {x: x, y: y};
+        y += 3.0;
       }
       if (best != null) {
-        if (side > 0) notes.push("The enabling switch has no free 26 mm column on the left; it fits at x=" + Math.round(best.x) + " mm, behind the wheel, under the wheel hand.");
+        if (side > 0) notes.push("The enabling switch has no free place on the left wall; it fits on the right wall at y=" + Math.round(best.y) + " mm.");
         return best;
       }
     }
-    notes.push("No free column for the enabling switch anywhere behind the face.");
+    notes.push("No free place for the enabling switch on either side wall.");
     return null;
   }
 
   static function enablingFree(face:PanelLayout, x:Float, y:Float, limit:Float, posts:Array<{x:Float, y:Float}>, connectorX:Float, wallY:Float):Bool {
     for (c in face.controls) {
       if (c.behind() <= limit) continue;
-      if (FootprintGeometry.gap(c.body(), c.x, c.y, Circle(ENABLING_BODY), x, y) < BODY_CLEARANCE) return false;
+      if (FootprintGeometry.gap(c.body(), c.x, c.y, enablingFootprint(), x, y) < BODY_CLEARANCE) return false;
     }
-    for (p in posts) if (dist(p.x, p.y, x, y) < ENABLING_BODY / 2 + POST_DIAMETER / 2 + 2.0) return false;
-    if (FootprintGeometry.gap(receptacleFootprint(), connectorX, receptacleCentreY(face, wallY), Circle(ENABLING_BODY), x, y) < 2.0) return false;
+    for (p in posts) if (FootprintGeometry.distanceTo(enablingFootprint(), x, y, p.x, p.y) < POST_DIAMETER / 2 + 2.0) return false;
+    if (FootprintGeometry.gap(receptacleFootprint(), connectorX, receptacleCentreY(face, wallY), enablingFootprint(), x, y) < 2.0) return false;
     return true;
   }
 
@@ -183,12 +186,47 @@ class PendantCase {
 
   /** Everything the board must leave room for, as footprints at positions (plan view). */
   function notches():Array<{f:Footprint, x:Float, y:Float}> {
-    var result:Array<{f:Footprint, x:Float, y:Float}> = [];
-    for (c in face.controls) if (c.behind() > PASS_THROUGH) result.push({f: FootprintGeometry.grow(c.body(), 2.0), x: c.x, y: c.y});
-    for (p in posts) result.push({f: Circle(POST_DIAMETER + 2.0), x: p.x, y: p.y});
-    result.push({f: receptacleFootprint(), x: connectorX, y: receptacleCentreY(face, -face.height / 2 + face.wall)});
-    if (enabling != null) result.push({f: Circle(ENABLING_BODY + 2.0), x: enabling.x, y: enabling.y});
+    var raw:Array<{f:Footprint, x:Float, y:Float}> = [];
+    for (c in face.controls) if (c.behind() > PASS_THROUGH) raw.push({f: FootprintGeometry.grow(c.body(), 2.0), x: c.x, y: c.y});
+    for (p in posts) raw.push({f: Circle(POST_DIAMETER + 2.0), x: p.x, y: p.y});
+    raw.push({f: receptacleFootprint(), x: connectorX, y: receptacleCentreY(face, -face.height / 2 + face.wall)});
+    if (enabling != null) raw.push({f: FootprintGeometry.grow(enablingFootprint(), 2.0), x: enabling.x, y: enabling.y});
+    // Strips of board narrower than SLIVER, between a notch and the outline or between two notches, are not worth keeping.
+    var result = [for (n in raw) reachEdges(n.f, n.x, n.y)];
+    var merged = true;
+    while (merged) {
+      merged = false;
+      for (i in 0...result.length) {
+        for (j in i + 1...result.length) {
+          if (merged) break;
+          if (FootprintGeometry.gap(result[i].f, result[i].x, result[i].y, result[j].f, result[j].x, result[j].y) >= SLIVER) continue;
+          result[i] = union(result[i], result[j]);
+          result.splice(j, 1);
+          merged = true;
+        }
+        if (merged) break;
+      }
+    }
     return result;
+  }
+
+  static function union(a:{f:Footprint, x:Float, y:Float}, b:{f:Footprint, x:Float, y:Float}):{f:Footprint, x:Float, y:Float} {
+    var ha = FootprintGeometry.halfExtent(a.f), hb = FootprintGeometry.halfExtent(b.f);
+    var x0 = Math.min(a.x - ha.x, b.x - hb.x), x1 = Math.max(a.x + ha.x, b.x + hb.x);
+    var y0 = Math.min(a.y - ha.y, b.y - hb.y), y1 = Math.max(a.y + ha.y, b.y + hb.y);
+    return {f: Rect(x1 - x0, y1 - y0), x: (x0 + x1) / 2, y: (y0 + y1) / 2};
+  }
+
+  /** A notch that would leave a sliver of board between itself and the outline is widened to the outline. */
+  function reachEdges(f:Footprint, x:Float, y:Float):{f:Footprint, x:Float, y:Float} {
+    var board = boardHalf(face), half = FootprintGeometry.halfExtent(f);
+    var x0 = x - half.x, x1 = x + half.x, y0 = y - half.y, y1 = y + half.y;
+    var changed = false;
+    if (board.x - x1 < SLIVER) { x1 = board.x + 1.0; changed = true; }
+    if (x0 + board.x < SLIVER) { x0 = -board.x - 1.0; changed = true; }
+    if (board.y - y1 < SLIVER) { y1 = board.y + 1.0; changed = true; }
+    if (y0 + board.y < SLIVER) { y0 = -board.y - 1.0; changed = true; }
+    return changed ? {f: Rect(x1 - x0, y1 - y0), x: (x0 + x1) / 2, y: (y0 + y1) / 2} : {f: f, x: x, y: y};
   }
 
   static function placeStandoffs(face:PanelLayout, posts:Array<{x:Float, y:Float}>, connectorX:Float, wallY:Float,
@@ -220,7 +258,7 @@ class PendantCase {
     for (c in face.controls) if (c.behind() > PASS_THROUGH && FootprintGeometry.distanceTo(c.body(), c.x, c.y, x, y) < need) return false;
     for (p in posts) if (dist(p.x, p.y, x, y) < STANDOFF_DIAMETER / 2 + POST_DIAMETER / 2 + 3.0) return false;
     if (FootprintGeometry.distanceTo(receptacleFootprint(), connectorX, receptacleCentreY(face, wallY), x, y) < need) return false;
-    if (enabling != null && dist(enabling.x, enabling.y, x, y) < ENABLING_BODY / 2 + need) return false;
+    if (enabling != null && FootprintGeometry.distanceTo(enablingFootprint(), enabling.x, enabling.y, x, y) < need) return false;
     for (t in taken) if (dist(t.x, t.y, x, y) < 20.0) return false;
     return true;
   }
@@ -229,7 +267,7 @@ class PendantCase {
       enabling:Null<{x:Float, y:Float}>):Array<{x:Float, y:Float}> {
     var result:Array<{x:Float, y:Float}> = [];
     var halfX = face.width / 2 - face.wall - STRAP_SLOT_WIDTH / 2 - 8.0, halfY = face.height / 2 - face.wall - 10.0;
-    for (target in [[-45.0, 30.0], [-45.0, -30.0]]) {
+    for (target in [[0.0, 20.0], [0.0, -20.0]]) {
       var best:Null<{x:Float, y:Float}> = null, bestDistance = 1e9;
       var x = -halfX;
       while (x <= halfX + 1e-9) {
@@ -254,14 +292,14 @@ class PendantCase {
     for (c in face.controls) if (c.behind() > face.caseInnerDepth - 8.0 && FootprintGeometry.gap(c.body(), c.x, c.y, slot, x, y) < BODY_CLEARANCE) return false;
     for (p in posts) if (FootprintGeometry.distanceTo(slot, x, y, p.x, p.y) < POST_DIAMETER / 2 + 3.0) return false;
     for (s in standoffs) if (FootprintGeometry.distanceTo(slot, x, y, s.x, s.y) < STANDOFF_DIAMETER / 2 + 3.0) return false;
-    if (enabling != null && FootprintGeometry.distanceTo(slot, x, y, enabling.x, enabling.y) < ENABLING_BODY / 2 + 3.0) return false;
+    if (enabling != null && FootprintGeometry.gap(slot, x, y, enablingFootprint(), enabling.x, enabling.y) < 3.0) return false;
     for (t in taken) if (dist(t.x, t.y, x, y) < 20.0) return false;
     return true;
   }
 
   static function dist(ax:Float, ay:Float, bx:Float, by:Float):Float return Math.sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
 
-  /** The posts, standoffs, receptacle, enabling pocket and strap slots as marks for PanelLayoutSvg. */
+  /** The posts, standoffs, receptacle, enabling switch and strap slots as marks for PanelLayoutSvg. */
   public function marks():Array<SvgMark> {
     var result:Array<SvgMark> = [];
     for (post in posts) {
@@ -270,14 +308,14 @@ class PendantCase {
     }
     for (s in standoffs) result.push({x: s.x, y: s.y, size: STANDOFF_DIAMETER, height: 0.0, filled: true});
     for (s in strapSlots) result.push({x: s.x, y: s.y, size: STRAP_SLOT_WIDTH, height: STRAP_SLOT_HEIGHT, filled: true});
-    if (enabling != null) result.push({x: enabling.x, y: enabling.y, size: ENABLING_HOLE, height: 0.0, filled: false});
+    if (enabling != null) result.push({x: enabling.x, y: enabling.y, size: ENABLING_DEPTH, height: ENABLING_BODY, filled: false});
     result.push({x: connectorX, y: -face.height / 2 + face.wall / 2, size: RECEPTACLE_HOLE, height: face.wall, filled: true});
     return result;
   }
 
   public function outerDepth():Float return face.caseInnerDepth + BACK_WALL;
 
-  /** The shell: a rounded box open at the top, with posts, standoffs, the receptacle hole, strap slots and the enabling pocket. */
+  /** The shell: a rounded box open at the top, with posts, standoffs, the receptacle hole, strap slots and the enabling switch opening. */
   public function shell():Part {
     var depth = outerDepth();
     var outer = RoundedRectangle.box(face.width, face.height, PanelFacePlate.CORNER_RADIUS, -depth, 0.0);
@@ -286,7 +324,11 @@ class PendantCase {
     var tools:Array<Part> = [cavity];
     tools.push(Part.cylinderAlongY(RECEPTACLE_HOLE / 2, -face.height / 2 - 1.0, -face.height / 2 + face.wall + 1.0, connectorX, connectorZ));
     for (s in strapSlots) tools.push(FootprintGeometry.solid(Rect(STRAP_SLOT_WIDTH, STRAP_SLOT_HEIGHT), s.x, s.y, -depth - 1.0, -face.caseInnerDepth + 1.0));
-    if (enabling != null) tools.push(Part.cylinderSpan(ENABLING_HOLE / 2, -depth + ENABLING_SKIN, -face.caseInnerDepth + 0.5, enabling.x, enabling.y));
+    if (enabling != null) {
+      var side = enabling.x < 0 ? -1.0 : 1.0;
+      tools.push(Part.cylinderAlong(ENABLING_HOLE / 2, new Vector(side * (face.width / 2 + 1.0), enabling.y, enablingZ(face)),
+        new Vector(-side, 0.0, 0.0), face.wall + 2.0));
+    }
     var current = outer.subtractAll(tools);
     outer.close();
     for (t in tools) t.close();

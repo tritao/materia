@@ -17,7 +17,7 @@ class PendantTests {
   public static function run():Void {
     var layout = ReferencePendant.layout();
     check(layout.problems().length == 0, "The reference layout must pass its own checks: " + layout.problems().join(" | "));
-    check(layout.controls.length == 12 && layout.width == 190.0, "Twelve parts on a 190 mm face");
+    check(layout.controls.length == 12 && layout.width == 114.0 && layout.height == 210.0, "Twelve parts on a 114 x 210 mm face");
     check(layout.requiredInnerDepth() == 43.0 && layout.overallHeight() == 48.0 + 3.0 + 38.0, "Depth 43, overall " + layout.overallHeight());
     check(Math.abs(layout.partsMassGrams() - 438.4) < 1e-9, "Parts mass " + layout.partsMassGrams());
 
@@ -34,30 +34,30 @@ class PendantTests {
     check(shell.solidCount() == 1 && plate.solidCount() == 1, "Shell and plate are each one solid");
     var bounds = shell.shape.bounds();
     check(Math.abs(bounds.get_min().get_z() + (48.0 + PendantCase.BACK_WALL)) < 1e-6 && Math.abs(bounds.get_max().get_z()) < 1e-6, "Shell depth");
-    check(Math.abs(bounds.get_max().get_x() - 95.0) < 1e-6 && Math.abs(bounds.get_max().get_y() - 55.0) < 1e-6, "Shell outline");
+    check(Math.abs(bounds.get_max().get_x() - 57.0) < 1e-6 && Math.abs(bounds.get_max().get_y() - 105.0) < 1e-6, "Shell outline");
     var touching = plate.intersect(shell);
     check(touching.volume() < 1e-3, "The plate must only rest on the shell: " + touching.volume());
     touching.close();
     // Outer box less the cavity, plus six posts and four standoffs, less the receptacle hole through a 3 mm wall, two strap slots
-    // through the back wall, the enabling pocket and the pilot holes.
+    // through the back wall, the enabling switch's hole through a 3 mm side wall and the pilot holes.
     var r = PanelFacePlate.CORNER_RADIUS;
     var underside = pendantCase.boardTop - PendantCase.BOARD_THICKNESS;
-    var shellExpected = RoundedRectangle.area(190.0, 110.0, r) * 51.0 - RoundedRectangle.area(184.0, 104.0, r - 3.0) * 48.0
+    var shellExpected = RoundedRectangle.area(114.0, 210.0, r) * 51.0 - RoundedRectangle.area(108.0, 204.0, r - 3.0) * 48.0
       + 6 * Math.PI * 20.25 * 48.0 + 4 * Math.PI * 12.25 * (underside + 48.0)
-      - Math.PI * 8.1 * 8.1 * 3.0 - 2 * 24.0 * 4.0 * 3.0 - Math.PI * 11.15 * 11.15 * 2.2
+      - Math.PI * 8.1 * 8.1 * 3.0 - 2 * 24.0 * 4.0 * 3.0 - Math.PI * 11.15 * 11.15 * 3.0
       - 6 * Math.PI * 2.1 * 2.1 * PendantCase.PILOT_DEPTH - 4 * Math.PI * 1.7 * 1.7 * PendantCase.STANDOFF_PILOT_DEPTH;
     check(Math.abs(shell.volume() - shellExpected) / shellExpected < 0.005, "Shell volume " + shell.volume() + " vs " + shellExpected);
 
-    // What the plan added: standoffs, strap slots, a board behind the shallow parts, the enabling pocket and a tongue.
+    // What the plan added: standoffs, strap slots, a board behind the shallow parts, the enabling switch and a tongue.
     check(pendantCase.standoffs.length == 4 && pendantCase.strapSlots.length == 2, "Four standoffs and two strap slots");
     for (slot in pendantCase.strapSlots) for (c in layout.controls)
       if (c.behind() > 40.0) check(FootprintGeometry.gap(c.body(), c.x, c.y, Rect(PendantCase.STRAP_SLOT_WIDTH, PendantCase.STRAP_SLOT_HEIGHT), slot.x, slot.y) >= 1.5 - 1e-9, "A strap slot behind the deep " + c.id);
     check(Math.abs(pendantCase.boardTop + 26.0) < 1e-9, "The board sits behind the 25 mm parts: " + pendantCase.boardTop);
-    // Behind the shallow display module there is a free column for the enabling switch, left of centre.
+    // The enabling switch lies against the back wall on the left side, where only the E-stop (on the right) is deep.
     var pocket = pendantCase.enabling;
     check(pocket != null && pocket.x < 0 && pendantCase.notes.length == 0, "The enabling switch fits on the left: " + pendantCase.notes.join(" | "));
     var board = pendantCase.board();
-    check(board.solidCount() == 1 && board.volume() > 0.5 * 180.0 * 100.0 * 1.6 && board.volume() < 180.0 * 100.0 * 1.6, "Board envelope " + board.volume());
+    check(board.solidCount() == 1 && board.volume() > 0.5 * 104.0 * 200.0 * 1.6 && board.volume() < 104.0 * 200.0 * 1.6, "Board envelope " + board.volume() + " solids " + board.solidCount());
     board.close();
     var plain = PanelFacePlate.part(layout, pendantCase.posts);
     check(plate.volume() > plain.volume() + 100.0 && plate.volume() < plain.volume() + 4000.0, "The tongue adds material: " + (plate.volume() - plain.volume()));

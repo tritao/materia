@@ -1,0 +1,11 @@
+{
+  "format": "materia.project",
+  "version": 1,
+  "name": "Jog pendant",
+  "defaultEntrypoint": "pendant",
+  "build": {"system": "haxeon", "manifest": "haxeon.json"},
+  "entrypoints": {
+    "pendant": {"kind": "cad-preview", "module": "PendantPreview", "function": "preview",
+      "cache": {"inputs": ["PendantPreview.hx"]}}
+  }
+}
