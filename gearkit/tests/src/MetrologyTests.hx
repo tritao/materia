@@ -119,10 +119,7 @@ class MetrologyTests {
     var internalReport = GearMeasurement.fromRings(
       new SyntheticGearRings(internal, ic),
       internal,
-      new GearInspection(
-        internal,
-        ic
-      )
+      new GearInspection(internal, ic)
     );
     check(internalReport.isoClass == 1, 'internal perfect gear class 1: ${internalReport.warnings}');
     var x = [for (i in 0...201) i / 200.0];
