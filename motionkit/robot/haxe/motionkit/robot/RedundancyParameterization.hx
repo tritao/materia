@@ -20,9 +20,16 @@ interface RedundancyParameterization {
   /** The values at `q`, or null where they are undefined (e.g. a straight elbow). */
   function valuesAt(q:Array<Float>):Null<Array<Float>>;
   /** IK for the tool target with the redundancy held at `values`, seeded by `seed`; null if it does not solve. */
-  function solveAt(target:Pose3, seed:Array<Float>, values:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>>;
+  function solveAt(
+    target:Pose3,
+    seed:Array<Float>,
+    values:Array<Float>,
+    tolerance:IkTolerance,
+    ?freedom:OrientationPolicy
+  ):Null<Array<Float>>;
   /** IK keeping the redundancy as near the seed's as the target allows (where `solveAt` is blocked, e.g. by a limit). */
-  function solveNear(target:Pose3, seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>>;
+  function solveNear(target:Pose3,
+    seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>>;
   /**
    * The values' Jacobian at `q`: `dimension()` rows of one entry per group DOF, row-major
    * (d values = G · dq), or null where the values are undefined.

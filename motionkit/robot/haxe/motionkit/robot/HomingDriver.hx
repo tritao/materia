@@ -25,20 +25,33 @@ class HomingSwitchObservation {
   public final closingEdges:Null<Int>;
   /** True only when the source promises hardware/endpoint crossing capture. */
   public final capturesEdges:Bool;
-  public function new(id:String, active:Bool, sequence:Int64, timestampNs:Int64,
-      clockId:String, edgePosition:Null<Float> = null, closingEdges:Null<Int> = null, capturesEdges:Bool = false) {
-    if (id == null || id.length == 0 || (edgePosition != null && !Math.isFinite(edgePosition)))
-      throw "Home signal requires an ID and finite edge coordinate";
-    if (sequence == null || timestampNs == null || Int64.compare(sequence, Int64.ofInt(0)) <= 0 ||
-        Int64.compare(timestampNs, Int64.ofInt(0)) < 0 || clockId == null || clockId.length == 0 ||
-        (closingEdges != null && closingEdges < 0) ||
-        (edgePosition != null && (closingEdges == null || closingEdges == 0)))
-      throw "Home signal requires source freshness and captured-edge identity";
-    if (capturesEdges ? closingEdges == null : edgePosition != null || closingEdges != null)
-      throw "Switch capture payload disagrees with its capability";
+  public function new(
+    id:String,
+    active:Bool,
+    sequence:Int64,
+    timestampNs:Int64,
+    clockId:String,
+    edgePosition:Null<Float> = null,
+    closingEdges:Null<Int> = null,
+    capturesEdges:Bool = false
+  ) {
+    if (id == null || id.length == 0 || (edgePosition != null
+      && !Math.isFinite(edgePosition))) throw "Home signal requires an ID and finite edge coordinate";
+    if (sequence == null || timestampNs == null || Int64.compare(sequence, Int64.ofInt(0)) <= 0 || Int64.compare(
+      timestampNs,
+      Int64.ofInt(0)
+    ) < 0 || clockId == null || clockId.length == 0
+      || (closingEdges != null && closingEdges < 0) || (edgePosition != null && (closingEdges == null
+      || closingEdges == 0))) throw "Home signal requires source freshness and captured-edge identity";
+    if (capturesEdges ? closingEdges == null : edgePosition != null
+      || closingEdges != null) throw "Switch capture payload disagrees with its capability";
     this.capturesEdges = capturesEdges;
-    this.id = id; this.active = active; this.edgePosition = edgePosition;
-    this.sequence = sequence; this.timestampNs = timestampNs; this.clockId = clockId;
+    this.id = id;
+    this.active = active;
+    this.edgePosition = edgePosition;
+    this.sequence = sequence;
+    this.timestampNs = timestampNs;
+    this.clockId = clockId;
     this.closingEdges = closingEdges;
   }
 }
@@ -52,19 +65,28 @@ class HomingObservation {
   public final switches:Array<HomingSwitchObservation>;
   public final timestampNs:Int64;
   public final clockId:String;
-  public function new(position:Float, velocity:Float, switches:Array<HomingSwitchObservation>,
-      timestampNs:Int64, clockId:String, calibrationReady:Bool = true) {
-    if (!Math.isFinite(position) || !Math.isFinite(velocity) || switches == null)
-      throw "Homing observation requires finite position/velocity and switch readings";
-    if (timestampNs == null || Int64.compare(timestampNs, Int64.ofInt(0)) < 0 ||
-        clockId == null || clockId.length == 0) throw "Homing position requires a source clock";
+  public function new(
+    position:Float,
+    velocity:Float,
+    switches:Array<HomingSwitchObservation>,
+    timestampNs:Int64,
+    clockId:String,
+    calibrationReady:Bool = true
+  ) {
+    if (!Math.isFinite(position) || !Math.isFinite(velocity)
+      || switches == null) throw "Homing observation requires finite position/velocity and switch readings";
+    if (timestampNs == null || Int64.compare(timestampNs,
+      Int64.ofInt(0)) < 0 || clockId == null || clockId.length == 0) throw "Homing position requires a source clock";
     var ids = new Map<String, Bool>();
     for (signal in switches) {
       if (signal == null || ids.exists(signal.id)) throw "Homing switch observations must be distinct";
       ids.set(signal.id, true);
     }
-    this.position = position; this.velocity = velocity; this.switches = switches.copy();
-    this.timestampNs = timestampNs; this.clockId = clockId;
+    this.position = position;
+    this.velocity = velocity;
+    this.switches = switches.copy();
+    this.timestampNs = timestampNs;
+    this.clockId = clockId;
     this.calibrationReady = calibrationReady;
   }
 }

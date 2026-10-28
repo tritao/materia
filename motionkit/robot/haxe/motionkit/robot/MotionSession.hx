@@ -27,14 +27,17 @@ class MotionSession {
   public var resumePending(default, null):Bool = false;
   public var faultCode(default, null):Int = 0;
 
-  public function new() {}
+  public function new() {
+  }
 
   public function isFaulted():Bool return state == Faulted;
   public function isActive():Bool return state != Idle && state != Faulted;
   public function isHolding():Bool return state == Holding || state == Held;
   public function isStopping():Bool return switch state {
-    case Stopping(_): true;
-    case _: false;
+    case Stopping(_):
+      true;
+    case _:
+      false;
   }
   public function canStream():Bool return state == Running || state == Idle;
   public function hasPending():Bool return pending.length > 0;
@@ -60,9 +63,15 @@ class MotionSession {
   public function resume():Bool {
     requireReady();
     return switch state {
-      case Holding: resumePending = true; false;
-      case Held: state = Running; resumePending = false; true;
-      case _: false;
+      case Holding:
+        resumePending = true;
+        false;
+      case Held:
+        state = Running;
+        resumePending = false;
+        true;
+      case _:
+        false;
     }
   }
 
@@ -104,7 +113,8 @@ class MotionSession {
         var result = then == Replan ? pending : [];
         pending = [];
         return result;
-      case _: return [];
+      case _:
+        return [];
     }
   }
 
@@ -129,6 +139,5 @@ class MotionSession {
     faultCode = 0;
   }
 
-  public function requireReady():Void
-    if (isFaulted()) throw "Motion session is faulted; call reset() before new motion";
+  public function requireReady():Void if (isFaulted()) throw "Motion session is faulted; call reset() before new motion";
 }

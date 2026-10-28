@@ -7,8 +7,7 @@ class TrajectoryState {
   public final accelerations:Array<Float>;
   public final jerks:Array<Float>;
 
-  public function new(positions:Array<Float>, velocities:Array<Float>,
-      accelerations:Array<Float>, jerks:Array<Float>) {
+  public function new(positions:Array<Float>, velocities:Array<Float>, accelerations:Array<Float>, jerks:Array<Float>) {
     this.positions = positions;
     this.velocities = velocities;
     this.accelerations = accelerations;

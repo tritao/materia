@@ -26,33 +26,50 @@ class RuntimeHomingDriver implements HomingDriver {
   final deviceStop:Null<Void -> Bool>;
 
   /** afterLatch resets the caller-owned encoder and stepper-slip monitors. */
-  public function new(robot:Robot, runtime:RobotRuntime, homes:Array<HomingAxis>,
-      motionAxes:Array<MotionAxis>, afterLatch:Void -> Void, ?deviceStop:Void -> Bool, ?derived:CouplingProjection) {
-    if (robot == null || runtime == null || homes == null || homes.length == 0 ||
-        motionAxes == null || afterLatch == null) throw "Homing driver requires runtime, axes and latch monitor reset";
-    this.robot = robot; this.runtime = runtime; this.afterLatch = afterLatch;
+  public function new(
+    robot:Robot,
+    runtime:RobotRuntime,
+    homes:Array<HomingAxis>,
+    motionAxes:Array<MotionAxis>,
+    afterLatch:Void -> Void,
+    ?deviceStop:Void -> Bool,
+    ?derived:CouplingProjection
+  ) {
+    if (robot == null || runtime == null || homes == null || homes.length == 0
+      || motionAxes == null || afterLatch == null) throw "Homing driver requires runtime, axes and latch monitor reset";
+    this.robot = robot;
+    this.runtime = runtime;
+    this.afterLatch = afterLatch;
     this.deviceStop = deviceStop;
     var expanded:Array<MotionAxis> = [];
     var names = robot.description().joints;
     if (homes[0] == null) throw "Homing driver has a null home axis";
     var timestep = homes[0].timestep;
     for (home in homes) {
-      if (home == null || axes.exists(home.joint) || home.timestep != timestep)
-        throw "Homing driver requires distinct axes on one owner timestep";
+      if (home == null || axes.exists(home.joint)
+        || home.timestep != timestep) throw "Homing driver requires distinct axes on one owner timestep";
       axes.set(home.joint, home);
     }
     for (axis in motionAxes) {
       if (axis == null) throw "Homing driver has a null motion axis";
       var home = axes.get(axis.jointIndices[0]);
-      if (home != null && (axis.id != home.id || axis.jointScale(0) != 1.0))
-        throw "Homing requires the independent joint in SI coordinates";
+      if (home != null && (axis.id != home.id
+        || axis.jointScale(0) != 1.0)) throw "Homing requires the independent joint in SI coordinates";
       if (home != null) mappings.set(home.joint, axis);
-      expanded.push(new MotionAxis(new MotionAxisBlueprint(axis.id, axis.jointIds,
-        home == null ? axis.lowerLimit : home.lowerTravel - axis.jointOffset(0),
-        home == null ? axis.upperLimit : home.upperTravel - axis.jointOffset(0),
-        axis.maxVelocity, axis.maxAcceleration, axis.homePosition,
-        [for (i in 0...axis.jointIndices.length) axis.jointScale(i)],
-        [for (i in 0...axis.jointIndices.length) axis.jointOffset(i)]), names));
+      expanded.push(new MotionAxis(
+        new MotionAxisBlueprint(
+          axis.id,
+          axis.jointIds,
+          home == null ? axis.lowerLimit : home.lowerTravel - axis.jointOffset(0),
+          home == null ? axis.upperLimit : home.upperTravel - axis.jointOffset(0),
+          axis.maxVelocity,
+          axis.maxAcceleration,
+          axis.homePosition,
+          [for (i in 0...axis.jointIndices.length) axis.jointScale(i)],
+          [for (i in 0...axis.jointIndices.length) axis.jointOffset(i)]
+        ),
+        names
+      ));
     }
     for (home in homes) {
       var matched = false;
@@ -61,8 +78,7 @@ class RuntimeHomingDriver implements HomingDriver {
     }
     planner = new AxisPlanner(expanded, timestep, derived);
     // Runtime positions are already logical; captured edges stay endpoint coordinates.
-    observer = new RuntimeHomingObserver(robot, homes, (joint, position) -> position,
-      (joint, edge) -> edge);
+    observer = new RuntimeHomingObserver(robot, homes, (joint, position) -> position, (joint, edge) -> edge);
   }
 
   public function observe(joint:Int):HomingObservation return observer.observe(joint);
@@ -85,11 +101,19 @@ class RuntimeHomingDriver implements HomingDriver {
     afterLatch();
   }
 
-  public function moveTo(joint:Int, position:Float, velocity:Float, acceleration:Float):Void
-    move(requireAxis(joint), position, velocity, acceleration);
+  public function moveTo(joint:Int, position:Float, velocity:Float, acceleration:Float):Void move(
+    requireAxis(joint),
+    position,
+    velocity,
+    acceleration
+  );
 
-  public function returnHome(joint:Int, position:Float, velocity:Float, acceleration:Float):Void
-    move(requireAxis(joint), position, velocity, acceleration);
+  public function returnHome(joint:Int, position:Float, velocity:Float, acceleration:Float):Void move(
+    requireAxis(joint),
+    position,
+    velocity,
+    acceleration
+  );
 
   function requireAxis(joint:Int):HomingAxis {
     var axis = axes.get(joint);
@@ -98,26 +122,48 @@ class RuntimeHomingDriver implements HomingDriver {
   }
 
   function move(axis:HomingAxis, position:Float, velocity:Float, acceleration:Float):Void {
-    if (!Math.isFinite(position) || !Math.isFinite(velocity) || velocity <= 0 ||
-        !Math.isFinite(acceleration) || acceleration <= 0) throw "Homing plan requires a finite target and positive motion limits";
+    if (!Math.isFinite(position) || !Math.isFinite(velocity) || velocity <= 0 || !Math.isFinite(acceleration)
+      || acceleration <= 0) throw "Homing plan requires a finite target and positive motion limits";
     var snapshot = robot.snapshot();
     // Homing polls once per owner period. Keep acceleration ramps observable
     // for two periods, including the slow latch pass, rather than producing
     // sub-period segments that a serial device cannot qualify or stream.
     var boundedAcceleration = Math.min(acceleration, axis.dynamics.planAcceleration(velocity));
     // Native plans anchor on held commanded coordinates, including measured following error.
-    var trajectory = planner.plan(snapshot.setpointPositions.toArray(),
-      {targets: [new AxisTarget(axis.id, position - mappings.get(axis.joint).jointOffset(0))], options: new MotionOptions(velocity, boundedAcceleration, axis.dynamics.planJerk(velocity))}).trajectory;
+    var trajectory = planner.plan(
+      snapshot.setpointPositions.toArray(),
+      {
+        targets: [new AxisTarget(
+          axis.id,
+          position - mappings.get(axis.joint).jointOffset(0)
+        )],
+        options: new MotionOptions(
+          velocity,
+          boundedAcceleration,
+          axis.dynamics.planJerk(velocity)
+        )
+      }
+    ).trajectory;
     try {
       var stream = new TrajectoryStream(robot);
       var segments = trajectory.segments();
       stream.begin(segments, trajectory.durationSeconds());
       var native = runtime.snapshot();
-      var tag = nextTag; nextTag = Int64.add(nextTag, Int64.ofInt(1));
+      var tag = nextTag;
+      nextTag = Int64.add(nextTag, Int64.ofInt(1));
       var tolerances = [for (_ in snapshot.positions.toArray()) 1e-6];
-      var plan = stream.motionSubmission(trajectory, 0, segments.length, tag,
-        Int64.ofInt(0), native.modelRevision, native.calibrationRevision,
-        false, tolerances, ExecutionPlanPurpose.Homing);
+      var plan = stream.motionSubmission(
+        trajectory,
+        0,
+        segments.length,
+        tag,
+        Int64.ofInt(0),
+        native.modelRevision,
+        native.calibrationRevision,
+        false,
+        tolerances,
+        ExecutionPlanPurpose.Homing
+      );
       robot.submit(RobotCommand.ExecutionPlan(plan));
     } catch (error:Dynamic) {
       trajectory.dispose();

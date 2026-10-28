@@ -12,8 +12,7 @@ class NativeJointPath {
   var disposed:Bool = false;
 
   public function new(samples:JointPathSamples) {
-    if (samples.jointCount > TrajectoryCoreConstants.MK_MAX_JOINTS)
-      throw "Native joint path exceeds the joint limit";
+    if (samples.jointCount > TrajectoryCoreConstants.MK_MAX_JOINTS) throw "Native joint path exceeds the joint limit";
     var profile = Sys.getEnv("PROCESS_PATH_PROFILE") == "1";
     var began = profile ? Sys.time() : 0.0;
     var native:Array<mk_path_sample> = [];
@@ -33,7 +32,10 @@ class NativeJointPath {
     var created = MotionKitNative.mk_path_create(native);
     check(created.status, "path.create");
     owner = created.out_path;
-    if (profile) Sys.println("PROCESS_PATH_STAGE " + haxe.Json.stringify({stage:"haxe_native_path_transfer",seconds:Sys.time()-began}));
+    if (profile) Sys.println("PROCESS_PATH_STAGE " + haxe.Json.stringify({
+      stage: "haxe_native_path_transfer",
+      seconds: Sys.time() - began
+    }));
   }
 
   public function lower(law:PathTimeLaw, tolerance:Float):Trajectory {
@@ -45,15 +47,23 @@ class NativeJointPath {
   }
 
   /** Snapshot into a bounded queue. The caller owns certification/publication. */
-  public function prepareTimingStream(limits:PathTimingLimits, loweringTolerance:Float,
-      maxPendingWindows:Int):motionkit.planner.PathTimingStream {
+  public function prepareTimingStream(limits:PathTimingLimits,
+    loweringTolerance:Float, maxPendingWindows:Int):motionkit.planner.PathTimingStream {
     if (disposed) throw "Native joint path has been disposed";
     if (maxPendingWindows <= 0) throw "Timing stream needs a positive pending-window budget";
-    var created = MotionKitNative.mk_path_timing_stream_create(owner.borrow(), limits.maxVelocity,
-      limits.maxAcceleration, limits.speedCaps, limits.startPathSpeed, limits.endPathSpeed,
-      loweringTolerance, limits.requireFeasiblePath ? 1 : 0, maxPendingWindows);
+    var created = MotionKitNative.mk_path_timing_stream_create(
+      owner.borrow(),
+      limits.maxVelocity,
+      limits.maxAcceleration,
+      limits.speedCaps,
+      limits.startPathSpeed,
+      limits.endPathSpeed,
+      loweringTolerance,
+      limits.requireFeasiblePath ? 1 : 0,
+      maxPendingWindows
+    );
     check(created.status, "path.timing.stream.prepare");
-    return new motionkit.planner.PathTimingStream(created.out_stream,limits.requireFeasiblePath);
+    return new motionkit.planner.PathTimingStream(created.out_stream, limits.requireFeasiblePath);
   }
 
   public function dispose():Void {
@@ -63,7 +73,6 @@ class NativeJointPath {
   }
 
   static function check(status:Int, operation:String):Void {
-    if (status != TrajectoryCoreConstants.MK_OK)
-      throw '$operation failed with MotionKit error $status';
+    if (status != TrajectoryCoreConstants.MK_OK) throw '$operation failed with MotionKit error $status';
   }
 }

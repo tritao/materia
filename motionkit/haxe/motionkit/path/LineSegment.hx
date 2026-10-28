@@ -17,23 +17,22 @@ class LineSegment implements PathPrimitive {
   public function length():Float return segmentLength;
 
   public function pointAt(distance:Float):PathPoint {
-    if (!Math.isFinite(distance) || distance < 0.0 || distance > segmentLength)
-      throw "Line-segment distance is outside its length";
+    if (!Math.isFinite(distance)
+      || distance < 0.0 || distance > segmentLength) throw "Line-segment distance is outside its length";
     var alpha = segmentLength <= 0.0 ? 0.0 : distance / segmentLength;
     return start.lerp(end, alpha);
   }
 
   public function tangentAt(distance:Float):Array<Float> {
-    if (!Math.isFinite(distance) || distance < 0.0 || distance > segmentLength)
-      throw "Line-segment distance is outside its length";
+    if (!Math.isFinite(distance)
+      || distance < 0.0 || distance > segmentLength) throw "Line-segment distance is outside its length";
     if (segmentLength <= 0.0) return [0.0, 0.0, 0.0];
-    return [(end.x - start.x) / segmentLength, (end.y - start.y) / segmentLength,
-      (end.z - start.z) / segmentLength];
+    return [(end.x - start.x) / segmentLength, (end.y - start.y) / segmentLength, (end.z - start.z) / segmentLength];
   }
 
   public function curvatureAt(distance:Float):Float {
-    if (!Math.isFinite(distance) || distance < 0.0 || distance > segmentLength)
-      throw "Line-segment distance is outside its length";
+    if (!Math.isFinite(distance)
+      || distance < 0.0 || distance > segmentLength) throw "Line-segment distance is outside its length";
     return 0.0;
   }
 }

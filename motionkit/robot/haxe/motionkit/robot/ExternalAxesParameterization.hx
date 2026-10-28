@@ -22,20 +22,25 @@ class ExternalAxesParameterization implements RedundancyParameterization {
   public final externalCost:Float;
 
   /** `angularRate` (rad per metre of path) and `linearRate` (m per metre) set the lattice resolution. */
-  public function new(group:KinematicGroup, ?angularRate:Float = 6.0, ?linearRate:Float = 1.0, ?externalCost:Float = 0.1) {
+  public function new(
+    group:KinematicGroup,
+    ?angularRate:Float = 6.0,
+    ?linearRate:Float = 1.0,
+    ?externalCost:Float = 0.1
+  ) {
     if (group == null) throw "An external-axes parameterization needs a group";
     indices = [for (i in 0...group.dofCount()) if (group.external[i]) i];
     if (indices.length == 0) throw "The group has no external axes";
-    if (!(angularRate > 0.0) || !(linearRate > 0.0) || !(externalCost > 0.0))
-      throw "External-axis rates and cost must be positive";
+    if (!(angularRate > 0.0)
+      || !(linearRate > 0.0) || !(externalCost > 0.0)) throw "External-axis rates and cost must be positive";
     this.group = group;
     this.externalCost = externalCost;
     rates = [];
     for (index in indices) {
       var id = group.jointIds()[index];
       var angular = true;
-      for (joint in group.robot.joints) if (joint != null && joint.id == id)
-        angular = joint.type != robotkit.model.JointType.Prismatic;
+      for (joint in group.robot.joints) if (joint != null
+        && joint.id == id) angular = joint.type != robotkit.model.JointType.Prismatic;
       rates.push(angular ? angularRate : linearRate);
     }
   }
@@ -45,8 +50,8 @@ class ExternalAxesParameterization implements RedundancyParameterization {
     preferTargetOrientation = preferTarget;
   }
 
-  public function preferringPosture(preference:Null<Array<Float>>):Void
-    posturePreference = preference == null ? null : preference.copy();
+  public function preferringPosture(preference:Null<Array<Float
+    >>):Void posturePreference = preference == null ? null : preference.copy();
 
   public function dimension():Int return indices.length;
 
@@ -59,22 +64,34 @@ class ExternalAxesParameterization implements RedundancyParameterization {
     return rows;
   }
 
-  public function solveAt(target:Pose3, seed:Array<Float>, values:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
+  public function solveAt(
+    target:Pose3,
+    seed:Array<Float>,
+    values:Array<Float>,
+    tolerance:IkTolerance,
+    ?freedom:OrientationPolicy
+  ):Null<Array<Float>> {
     for (k in 0...indices.length) {
       var limits = group.group.limitsOf(indices[k]);
       if (limits.lower < limits.upper && (values[k] < limits.lower || values[k] > limits.upper)) return null;
     }
     var task = ToolFreedom.of(target, freedom, tolerance.orientation);
-    var options = task.options(tolerance, orientationPreference == null && preferTargetOrientation ? target : orientationPreference);
+    var options = task.options(
+      tolerance,
+      orientationPreference == null && preferTargetOrientation ? target : orientationPreference
+    );
     if (posturePreference != null) options.preferring(posturePreference);
-    var result = group.solve(RedundancyPoses.transform(task.target), seed,
-      options.holding(indices, values));
+    var result = group.solve(RedundancyPoses.transform(task.target), seed, options.holding(indices, values));
     return result.converged ? result.q : null;
   }
 
-  public function solveNear(target:Pose3, seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
+  public function solveNear(target:Pose3,
+    seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
     var task = ToolFreedom.of(target, freedom, tolerance.orientation);
-    var options = task.options(tolerance, orientationPreference == null && preferTargetOrientation ? target : orientationPreference);
+    var options = task.options(
+      tolerance,
+      orientationPreference == null && preferTargetOrientation ? target : orientationPreference
+    );
     if (posturePreference != null) options.preferring(posturePreference);
     var result = group.solve(RedundancyPoses.transform(task.target), seed, options);
     return result.converged ? result.q : null;
@@ -82,5 +99,6 @@ class ExternalAxesParameterization implements RedundancyParameterization {
 
   public function ratesPerMetre():Array<Float> return rates.copy();
   public function periodic(index:Int):Bool return false;
-  public function costFactors():Array<Float> return [for (i in 0...group.dofCount()) group.external[i] ? externalCost : 1.0];
+  public function costFactors():Array<Float
+    > return [for (i in 0...group.dofCount()) group.external[i] ? externalCost : 1.0];
 }

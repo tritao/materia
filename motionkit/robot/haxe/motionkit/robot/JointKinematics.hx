@@ -19,12 +19,16 @@ class JointKinematics implements KinematicsSolver {
   public function affineMap():Null<AffineJointMap> return null;
   public function fork():KinematicsSolver return this;
   public function forward(q:Array<Float>):Pose3 throw "This machine exposes joint motion only";
-  public function solvePose(target:Pose3, seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>>
-    throw "This machine exposes joint motion only";
-  public function sampleCandidates(target:Pose3, maxCount:Int, tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>>
-    throw "This machine exposes joint motion only";
-  public function solveDifferential(q:Array<Float>, twist:Twist6, ?redundancyRate:Array<Float>, ?freedom:OrientationPolicy):Null<Array<Float>>
-    throw "This machine exposes joint motion only";
-  public function solvePath(request:PathRequest):Array<Null<Array<Float>>>
-    throw "This machine exposes joint motion only";
+  public function solvePose(target:Pose3, seed:Array<Float>, tolerance:IkTolerance,
+    ?freedom:OrientationPolicy):Null<Array<Float>> throw "This machine exposes joint motion only";
+  public function sampleCandidates(target:Pose3, maxCount:Int, tolerance:IkTolerance,
+    ?freedom:OrientationPolicy):Array<Array<Float>> throw "This machine exposes joint motion only";
+  public function solveDifferential(
+    q:Array<Float>,
+    twist:Twist6,
+    ?redundancyRate:Array<Float>,
+    ?freedom:OrientationPolicy
+  ):Null<Array<Float>> throw "This machine exposes joint motion only";
+  public function solvePath(request:PathRequest):Array<Null<Array<Float
+    >>> throw "This machine exposes joint motion only";
 }

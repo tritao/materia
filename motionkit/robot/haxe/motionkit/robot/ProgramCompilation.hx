@@ -12,8 +12,7 @@ import motionkit.program.MotionProgram;
   it plans to `sink`, which owns the plans from then on; a compilation owns
   only the motion it has not finished planning.
 **/
-@:allow(motionkit.robot.ProgramCompiler)
-class ProgramCompilation {
+@:allow(motionkit.robot.ProgramCompiler) class ProgramCompilation {
   public final compiler:ProgramCompiler;
   public final program:MotionProgram;
   public final sink:ProgramSink;
@@ -35,20 +34,26 @@ class ProgramCompilation {
   var sectionIndex:Int = 0;
   var sectionCursor:Null<motionkit.robot.PathSampler.TimingSectionCursor> = null;
   var streaming:Null<StreamingPathMotion> = null;
-  var streamingComplete:Null<Void->Void> = null;
-  var streamingCleanup:Null<Void->Void> = null;
+  var streamingComplete:Null<Void -> Void> = null;
+  var streamingCleanup:Null<Void -> Void> = null;
   var sectionCurves:Null<Array<motionkit.planner.JointPathSamples>> = null;
   var sectionFeed:Float = 0.0;
   var sectionEvents:Array<PathEvent> = [];
 
-  public function new(compiler:ProgramCompiler, program:MotionProgram, initialQ:Array<Float>,
-      firstPlanId:Int64, firstOp:Int, speedScale:Float, sink:ProgramSink) {
+  public function new(
+    compiler:ProgramCompiler,
+    program:MotionProgram,
+    initialQ:Array<Float>,
+    firstPlanId:Int64,
+    firstOp:Int,
+    speedScale:Float,
+    sink:ProgramSink
+  ) {
     if (sink == null) throw "Program compilation needs a sink";
-    if (program == null || initialQ == null || initialQ.length != compiler.solver.jointCount())
-      throw "Program compiler needs a program and complete start position";
+    if (program == null || initialQ == null || initialQ.length
+      != compiler.solver.jointCount()) throw "Program compiler needs a program and complete start position";
     for (value in initialQ) if (!Math.isFinite(value)) throw "Non-finite program start position";
-    if (!Math.isFinite(speedScale) || speedScale <= 0.0)
-      throw "Program speed scale must be finite and positive";
+    if (!Math.isFinite(speedScale) || speedScale <= 0.0) throw "Program speed scale must be finite and positive";
     this.compiler = compiler;
     this.program = program;
     this.q = initialQ.copy();
@@ -69,12 +74,18 @@ class ProgramCompilation {
     var unfinished = pending;
     if (unfinished != null) {
       unfinished.trajectory.dispose();
-      var abandon = unfinished.abandon; if (abandon != null) abandon();
+      var abandon = unfinished.abandon;
+      if (abandon != null) abandon();
     }
     if (streaming != null) streaming.dispose();
-    var cleanup = streamingCleanup; if (cleanup != null) cleanup();
-    streaming = null; streamingComplete = null; streamingCleanup = null;
+    var cleanup = streamingCleanup;
+    if (cleanup != null) cleanup();
+    streaming = null;
+    streamingComplete = null;
+    streamingCleanup = null;
     pending = null;
-    sectionCurves = null;sectionCursor = null;sections = [];
+    sectionCurves = null;
+    sectionCursor = null;
+    sections = [];
   }
 }

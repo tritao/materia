@@ -34,47 +34,59 @@ class PlanExecutor {
   var jerkUnchecked:Bool = false;
   var deferredRefill:Bool = false;
 
-  public function new(robot:Robot, ?jointIndices:Array<Int>,
-      ?session:MotionSession, ?completionPositionTolerance:Array<Float>, ?springFrequencies:Array<Float>) {
-    if (robot == null || !robot.capabilities().execution.plans)
-      throw "PlanExecutor requires execution plan and trajectory queue support";
+  public function new(
+    robot:Robot,
+    ?jointIndices:Array<Int>,
+    ?session:MotionSession,
+    ?completionPositionTolerance:Array<Float>,
+    ?springFrequencies:Array<Float>
+  ) {
+    if (robot == null || !robot
+      .capabilities().execution.plans) throw "PlanExecutor requires execution plan and trajectory queue support";
     this.robot = robot;
     ownsSession = session == null;
     this.session = session == null ? new MotionSession() : session;
     stream = new TrajectoryStream(robot, true);
-    this.jointIndices = jointIndices == null ?
-      [for (i in 0...robot.description().joints.length) i] : jointIndices.copy();
+    this.jointIndices = jointIndices
+      == null ? [for (i in 0...robot.description().joints.length) i] : jointIndices.copy();
     var frequencies = springFrequencies;
-    if (frequencies != null && frequencies.length != this.jointIndices.length) throw "PlanExecutor needs a spring frequency for each plan joint";
+    if (frequencies != null && frequencies.length
+      != this.jointIndices.length) throw "PlanExecutor needs a spring frequency for each plan joint";
     this.springFrequencies = frequencies == null ? null : frequencies.copy();
     if (completionPositionTolerance != null) {
-      if (completionPositionTolerance.length != this.jointIndices.length)
-        throw "Plan completion tolerances must match the planned joints";
-      for (value in completionPositionTolerance)
-        if (!Math.isFinite(value) || value <= 0.0) throw "Plan completion tolerances must be finite and positive";
+      if (completionPositionTolerance.length
+        != this.jointIndices.length) throw "Plan completion tolerances must match the planned joints";
+      for (value in completionPositionTolerance) if (!Math.isFinite(value)
+        || value <= 0.0) throw "Plan completion tolerances must be finite and positive";
     }
     this.completionPositionTolerance = completionPositionTolerance == null ? null : completionPositionTolerance.copy();
   }
 
   public function start(plan:ExecutionPlan, ?endsAtRest:Bool = true):Void {
     session.requireReady();
-    if (session.isStopping() || session.isHolding())
-      throw "PlanExecutor must reach rest and resume before starting a plan";
+    if (session.isStopping()
+      || session.isHolding()) throw "PlanExecutor must reach rest and resume before starting a plan";
     if (plan == null || this.plan != null) throw "PlanExecutor needs one inactive validated plan";
-    if (plan.evaluate(0.0).positions.length != jointIndices.length)
-      throw "PlanExecutor plan and robot joint map disagree";
+    if (plan.evaluate(0.0).positions.length
+      != jointIndices.length) throw "PlanExecutor plan and robot joint map disagree";
     planEvents = plan.events;
     fixedPositions = robot.snapshot().setpointPositions.toArray();
-    if (ExecutionPlan.COEFFICIENT_STRIDE != SegmentArrays.STRIDE)
-      throw "MotionKit and RobotKit disagree on the segment coefficient layout";
-    var arrays = new SegmentArrays(plan.segmentStarts(), plan.segmentDurations(),
-      plan.segmentDegrees(), plan.segmentCoefficients(), jointIndices, fixedPositions,
-      robot.description().couplings);
+    if (ExecutionPlan.COEFFICIENT_STRIDE
+      != SegmentArrays.STRIDE) throw "MotionKit and RobotKit disagree on the segment coefficient layout";
+    var arrays = new SegmentArrays(
+      plan.segmentStarts(),
+      plan.segmentDurations(),
+      plan.segmentDegrees(),
+      plan.segmentCoefficients(),
+      jointIndices,
+      fixedPositions,
+      robot.description().couplings
+    );
     planArrays = arrays;
     this.plan = plan;
     this.endsAtRest = endsAtRest;
-    jerkUnchecked = plan.report.checks[TrajectoryCoreConstants.MK_CHECK_JERK].status ==
-      TrajectoryCoreConstants.MK_CHECK_UNCHECKED;
+    jerkUnchecked = plan.report.checks[TrajectoryCoreConstants.MK_CHECK_JERK].status
+      == TrajectoryCoreConstants.MK_CHECK_UNCHECKED;
     completed = false;
     stream.beginSegments(new TrajectoryStream.NativeStreamSegments(arrays), plan.durationSeconds);
     deferredRefill = false;
@@ -112,7 +124,7 @@ class PlanExecutor {
     if (session.state == Held) return false;
     var active = plan;
     if (active == null) return !awaitingResume;
-    if (stream.finishedProgram(observation,endsAtRest) && (!endsAtRest || settled(active, observation))) {
+    if (stream.finishedProgram(observation, endsAtRest) && (!endsAtRest || settled(active, observation))) {
       stream.markCompleted();
       completed = true;
       plan = null;
@@ -139,7 +151,10 @@ class PlanExecutor {
       // A joint on a spring (a belt carriage) swings through its band, so it is settled when the amplitude its energy allows,
       // sqrt(x^2 + (v / w)^2) with w the spring's frequency, is inside the band; one with no spring is where it is.
       var frequency = springFrequencies == null ? 0.0 : springFrequencies[joint];
-      var amplitude = frequency > 0.0 ? Math.sqrt(error * error + Math.pow(observation.velocities.get(index) / frequency, 2)) : Math.abs(error);
+      var amplitude = frequency > 0.0 ? Math.sqrt(error * error + Math.pow(
+        observation.velocities.get(index) / frequency,
+        2
+      )) : Math.abs(error);
       if (amplitude > tolerance[joint]) return false;
     }
     return true;
@@ -171,7 +186,10 @@ class PlanExecutor {
   public function abort():Void {
     session.requireReady();
     if (session.isStopping()) return;
-    if (session.state == Idle) { clear(); return; }
+    if (session.state == Idle) {
+      clear();
+      return;
+    }
     stream.submit(session, RobotCommand.Abort);
     session.stop(Discard, []);
   }
@@ -197,54 +215,65 @@ class PlanExecutor {
   }
 
   /** All current coefficients are queued, so a certified successor may be queued. */
-  public function allSubmitted():Bool return plan!=null && stream.allSubmitted();
+  public function allSubmitted():Bool return plan != null && stream.allSubmitted();
 
   function get_elapsedSeconds():Float return stream.elapsedSeconds;
 
-  public function sync():RobotSnapshot
-    return plan == null ? robot.snapshot() : stream.sync();
+  public function sync():RobotSnapshot return plan == null ? robot.snapshot() : stream.sync();
 
   function fill():Void {
     if (plan == null) return;
-    stream.fill(session, buildChunk,
-      (first, last, error) -> {
-        var snapshot = robot.snapshot();
-        return 'plan chunk [$first,$last] of ${planArrays == null ? 0 : planArrays.count()}, '
-          + 'events=$lastChunkEvents, jerkUnchecked=$jerkUnchecked, safety=${snapshot.safety}, '
-          + 'active=${snapshot.trajectoryActive}, queue=${snapshot.trajectoryQueueDepth}: $error';
-      });
+    stream.fill(session, buildChunk, (first, last, error) -> {var snapshot = robot.snapshot();
+    return 'plan chunk [$first,$last] of ${planArrays == null ? 0 : planArrays.count()}, '
+      + 'events=$lastChunkEvents, jerkUnchecked=$jerkUnchecked, safety=${snapshot.safety}, '
+      + 'active=${snapshot.trajectoryActive}, queue=${snapshot.trajectoryQueueDepth}: $error';
+    });
   }
 
   var lastChunkEvents:Int = 0;
 
-  function buildChunk(first:Int, last:Int, tag:Int64, startNs:Int64,
-      endNs:Int64):ExecutionPlanSubmission {
+  function buildChunk(first:Int, last:Int, tag:Int64, startNs:Int64, endNs:Int64):ExecutionPlanSubmission {
     var active = plan, arrays = planArrays;
     if (active == null || arrays == null) throw "PlanExecutor needs an active plan";
-    return stream.programSubmission(active, arrays, first, last, tag, startNs, endNs,
-      chunkEvents, endsAtRest, jerkUnchecked);
+    return stream.programSubmission(
+      active,
+      arrays,
+      first,
+      last,
+      tag,
+      startNs,
+      endNs,
+      chunkEvents,
+      endsAtRest,
+      jerkUnchecked
+    );
   }
 
-  function chunkEvents(startNs:Int64, endNs:Int64,
-      finalChunk:Bool):Array<ProcessTimedEvent> {
+  function chunkEvents(startNs:Int64, endNs:Int64, finalChunk:Bool):Array<ProcessTimedEvent> {
     var events:Array<ProcessTimedEvent> = [];
-    for (event in planEvents)
-      if (Int64.compare(event.timeNs, startNs) >= 0 &&
-          (Int64.compare(event.timeNs, endNs) < 0 ||
-           (finalChunk && Int64.compare(event.timeNs, endNs) <= 0))) {
-        var value = switch event.value {
-          case Digital(enabled): ProcessEventValue.Digital(enabled);
-          case Analog(number): ProcessEventValue.Analog(number);
-          case Process(command, argument): ProcessEventValue.Process(command, argument);
-        };
-        var hold = switch event.holdPolicy {
-          case Keep: ProcessHoldPolicy.Keep;
-          case SafeWhileHeld: ProcessHoldPolicy.SafeWhileHeld;
-          case RestoreOnResume: ProcessHoldPolicy.RestoreOnResume;
-        };
-        events.push(new ProcessTimedEvent(Int64.sub(event.timeNs, startNs),
-          event.channel, value, hold));
-      }
+    for (event in planEvents) if (Int64.compare(event.timeNs,
+      startNs) >= 0 && (Int64.compare(event.timeNs, endNs) < 0 || (finalChunk && Int64.compare(
+        event.timeNs,
+        endNs
+      ) <= 0))) {
+      var value = switch event.value {
+        case Digital(enabled):
+          ProcessEventValue.Digital(enabled);
+        case Analog(number):
+          ProcessEventValue.Analog(number);
+        case Process(command, argument):
+          ProcessEventValue.Process(command, argument);
+      };
+      var hold = switch event.holdPolicy {
+        case Keep:
+          ProcessHoldPolicy.Keep;
+        case SafeWhileHeld:
+          ProcessHoldPolicy.SafeWhileHeld;
+        case RestoreOnResume:
+          ProcessHoldPolicy.RestoreOnResume;
+      };
+      events.push(new ProcessTimedEvent(Int64.sub(event.timeNs, startNs), event.channel, value, hold));
+    }
     lastChunkEvents = events.length;
     return events;
   }

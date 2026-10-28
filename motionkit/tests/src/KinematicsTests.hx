@@ -123,45 +123,54 @@ import MotionKitTestSupport.LaggingRobot;
 import MotionKitTestSupport.TrialRig;
 
 class KinematicsTests extends MotionKitTestSupport {
-  public function new() { super(); }
+  public function new() {
+    super();
+  }
 
   /** One group serves several threads at once: each evaluates in data of its own. */
   public function testSharedGroupAcrossThreads():Void {
     var arm = buildContractArmFixture().arm;
-    var configurations = [for (k in 0...64) [for (j in 0...6) 0.3 * Math.sin(0.7 * k + j)]];
+    var configurations = [for (k in 0...64)[for (j in 0...6) 0.3 * Math.sin(0.7 * k + j)]];
     var expected = [for (q in configurations) arm.tcpPose(q).translation];
     var mismatches = [0, 0, 0, 0], done = new sys.thread.Lock();
-    for (t in 0...4)
-      sys.thread.Thread.create(function() {
-        for (round in 0...200)
-          for (k in 0...configurations.length) {
-            var reached = arm.tcpPose(configurations[(k + t * 7) % configurations.length]).translation;
-            var wanted = expected[(k + t * 7) % configurations.length];
-            if (Math.abs(reached.x - wanted.x) + Math.abs(reached.y - wanted.y) + Math.abs(reached.z - wanted.z) > 1e-12)
-              mismatches[t]++;
-          }
-        done.release();
-      });
+    for (t in 0...4) sys.thread.Thread.create(function() {
+      for (round in 0...200) for (k in 0...configurations.length) {
+        var reached = arm.tcpPose(configurations[(k + t * 7) % configurations.length]).translation;
+        var wanted = expected[(k + t * 7) % configurations.length];
+        if (Math.abs(reached.x - wanted.x) + Math.abs(reached.y - wanted.y) + Math.abs(reached.z - wanted.z)
+          > 1e-12) mismatches[t]++;
+      }
+      done.release();
+    }
+    );
     for (_ in 0...4) done.wait();
-    for (t in 0...4) check(mismatches[t] == 0, 'thread $t evaluates the shared arm as one thread does (${mismatches[t]} off)');
+    for (t in 0...4) check(
+      mismatches[t] == 0,
+      'thread $t evaluates the shared arm as one thread does (${mismatches[t]} off)'
+    );
     var own = arm.newData();
     var withOwn = arm.tcpPose(configurations[5], own).translation;
     near(withOwn.x, expected[5].x, "a caller's own data evaluates the same", 1e-12);
     check(arm.numericSolveCount() == 0 && arm.numericSolveCount(own) == 0,
       "forward queries do not count as numeric IK");
     arm.solve(arm.tcpPose(configurations[5], own), configurations[5], null, own);
-    check(arm.numericSolveCount(own) == 1 && arm.numericSolveCount() == 0,
-      "numeric IK diagnostics stay with their caller-owned context");
+    check(
+      arm.numericSolveCount(own) == 1 && arm.numericSolveCount() == 0,
+      "numeric IK diagnostics stay with their caller-owned context"
+    );
     var countDone = new sys.thread.Lock();
     var workerCount = [0];
     sys.thread.Thread.create(function() {
       arm.solve(arm.tcpPose(configurations[5]), configurations[5]);
       workerCount[0] = arm.numericSolveCount();
       countDone.release();
-    });
+    }
+    );
     countDone.wait();
-    check(workerCount[0] == 1 && arm.numericSolveCount() == 0,
-      "numeric IK diagnostics stay isolated between planning threads");
+    check(
+      workerCount[0] == 1 && arm.numericSolveCount() == 0,
+      "numeric IK diagnostics stay isolated between planning threads"
+    );
   }
 
   public function testKinematicsContract():Void {
@@ -179,21 +188,28 @@ class KinematicsTests extends MotionKitTestSupport {
     near(achieved.x, target.x, "forward/solve round trip preserves TCP x", 1e-5);
     near(achieved.y, target.y, "forward/solve round trip preserves TCP y", 1e-5);
     near(achieved.z, target.z, "forward/solve round trip preserves TCP z", 1e-5);
-    near(Math.abs(achieved.qx * target.qx + achieved.qy * target.qy +
-      achieved.qz * target.qz + achieved.qw * target.qw), 1.0,
-      "forward/solve round trip preserves TCP orientation", 1e-4);
+    near(
+      Math.abs(achieved.qx * target.qx + achieved.qy * target.qy + achieved.qz * target.qz + achieved.qw * target.qw),
+      1.0,
+      "forward/solve round trip preserves TCP orientation",
+      1e-4
+    );
 
     var zeroTarget = solver.forward([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
     var firstCandidates = solver.sampleCandidates(zeroTarget, 4, tolerance, null);
     var secondCandidates = solver.sampleCandidates(zeroTarget, 4, tolerance, null);
-    check(firstCandidates.length > 0 && firstCandidates.length == secondCandidates.length,
-      "candidate sampling returns a deterministic non-empty set");
+    check(
+      firstCandidates.length > 0 && firstCandidates.length == secondCandidates.length,
+      "candidate sampling returns a deterministic non-empty set"
+    );
     for (candidate in 0...firstCandidates.length) {
-      check(firstCandidates[candidate].length == 6,
-        "candidate sampling returns complete joint vectors");
-      for (joint in 0...6)
-        near(firstCandidates[candidate][joint], secondCandidates[candidate][joint],
-          "candidate sampling is identical for identical inputs", 1e-12);
+      check(firstCandidates[candidate].length == 6, "candidate sampling returns complete joint vectors");
+      for (joint in 0...6) near(
+        firstCandidates[candidate][joint],
+        secondCandidates[candidate][joint],
+        "candidate sampling is identical for identical inputs",
+        1e-12
+      );
     }
 
     var expectedQdot = [0.08, -0.04, 0.05, 0.03, -0.02, 0.06];
@@ -204,8 +220,19 @@ class KinematicsTests extends MotionKitTestSupport {
       for (joint in 0...6) value += jacobian[row][joint] * expectedQdot[joint];
       requested.push(value);
     }
-    var qdot = solver.solveDifferential(q, new Twist6(requested[0], requested[1], requested[2],
-      requested[3], requested[4], requested[5]), null, null);
+    var qdot = solver.solveDifferential(
+      q,
+      new Twist6(
+        requested[0],
+        requested[1],
+        requested[2],
+        requested[3],
+        requested[4],
+        requested[5]
+      ),
+      null,
+      null
+    );
     check(qdot != null, "differential IK solves a reachable tool twist");
     var epsilon = 1e-6;
     var plus = q.copy();
@@ -216,152 +243,289 @@ class KinematicsTests extends MotionKitTestSupport {
     }
     var posePlus = solver.forward(plus);
     var poseMinus = solver.forward(minus);
-    near((posePlus.x - poseMinus.x) / (2.0 * epsilon), requested[0],
-      "differential IK linear x matches a finite difference", 1e-5);
-    near((posePlus.y - poseMinus.y) / (2.0 * epsilon), requested[1],
-      "differential IK linear y matches a finite difference", 1e-5);
-    near((posePlus.z - poseMinus.z) / (2.0 * epsilon), requested[2],
-      "differential IK linear z matches a finite difference", 1e-5);
+    near(
+      (posePlus.x - poseMinus.x) / (2.0 * epsilon),
+      requested[0],
+      "differential IK linear x matches a finite difference",
+      1e-5
+    );
+    near(
+      (posePlus.y - poseMinus.y) / (2.0 * epsilon),
+      requested[1],
+      "differential IK linear y matches a finite difference",
+      1e-5
+    );
+    near(
+      (posePlus.z - poseMinus.z) / (2.0 * epsilon),
+      requested[2],
+      "differential IK linear z matches a finite difference",
+      1e-5
+    );
     var angular = poseRotationDelta(poseMinus, posePlus, 1.0 / (2.0 * epsilon));
     near(angular[0], requested[3], "differential IK angular x matches a finite difference", 1e-5);
     near(angular[1], requested[4], "differential IK angular y matches a finite difference", 1e-5);
     near(angular[2], requested[5], "differential IK angular z matches a finite difference", 1e-5);
 
-    throws(function() new Pose3(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0),
-      "MotionKit pose rejects a non-unit quaternion");
-    throws(function() new Twist6(Math.NaN, 0.0, 0.0, 0.0, 0.0, 0.0),
-      "MotionKit twist rejects non-finite components");
-    throws(function() new IkTolerance(0.0, 1e-3),
-      "IK tolerance rejects a non-positive position tolerance");
+    throws(function() new Pose3(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0), "MotionKit pose rejects a non-unit quaternion");
+    throws(function() new Twist6(Math.NaN, 0.0, 0.0, 0.0, 0.0, 0.0), "MotionKit twist rejects non-finite components");
+    throws(function() new IkTolerance(0.0, 1e-3), "IK tolerance rejects a non-positive position tolerance");
   }
 
   public function testExternalOpwIk():Void {
     var model = new RobotModel("opw-track-positioner");
     var root = model.addLink(new Link("cell")), carriage = model.addLink(new Link("carriage"));
     var track = model.addJoint(new Joint("track", JointType.Prismatic, root, carriage));
-    track.axis = [0.8, 0.6, 0.0]; track.limits.lower = -1; track.limits.upper = 1;
+    track.axis = [0.8, 0.6, 0.0];
+    track.limits.lower = -1;
+    track.limits.upper = 1;
     var yaw = Quat.fromAxisAngle(new Vec3(0, 0, 1), 0.37);
     track.parentFrameRotation = [yaw.x, yaw.y, yaw.z, yaw.w];
-    var positions = [[0.0, 0.0, 0.0], [0.1, 0.0, 0.615], [0.0, 0.0, 0.705],
-      [-0.135, 0.0, 0.755], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]];
-    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0],
-      [0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    var positions = [
+      [0.0, 0.0, 0.0],
+      [0.1, 0.0, 0.615],
+      [0.0, 0.0, 0.705],
+      [-0.135, 0.0, 0.755],
+      [0.0, 0.0, 0.0],
+      [
+        0.0,
+        0.0,
+        0.0
+      ]
+    ];
+    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
     var parent = carriage;
     for (index in 0...6) {
       var child = model.addLink(new Link('arm-link-$index'));
       var joint = model.addJoint(new Joint('arm-joint-$index', JointType.Revolute, parent, child));
-      joint.axis = axes[index]; joint.parentFramePosition = positions[index];
-      joint.limits.lower = -2 * Math.PI; joint.limits.upper = 2 * Math.PI;
+      joint.axis = axes[index];
+      joint.parentFramePosition = positions[index];
+      joint.limits.lower = -2 * Math.PI;
+      joint.limits.upper = 2 * Math.PI;
       parent = child;
     }
-    var flange = model.addFrame(new Frame("arm-flange", parent)); flange.position = [0, 0, 0.085];
+    var flange = model.addFrame(new Frame("arm-flange", parent));
+    flange.position = [0, 0, 0.085];
     var work = model.addLink(new Link("positioner-work"));
     var positioner = model.addJoint(new Joint("positioner", JointType.Revolute, root, work));
-    positioner.axis = [0, 0, 1]; positioner.parentFramePosition = [0.25, -0.3, 0.1];
-    positioner.limits.lower = -2 * Math.PI; positioner.limits.upper = 2 * Math.PI;
-    var workFrame = model.addFrame(new Frame("work-frame", work)); workFrame.position = [0.07, 0.02, 0.15];
+    positioner.axis = [0, 0, 1];
+    positioner.parentFramePosition = [0.25, -0.3, 0.1];
+    positioner.limits.lower = -2 * Math.PI;
+    positioner.limits.upper = 2 * Math.PI;
+    var workFrame = model.addFrame(new Frame("work-frame", work));
+    workFrame.position = [0.07, 0.02, 0.15];
     var tcp = new Transform3(new Vec3(0.04, 0.02, 0.13), Quat.fromAxisAngle(new Vec3(0, 1, 0), 0.2));
     for (withPositioner in [false, true]) {
-      var group = new robotkit.manipulation.KinematicGroup(model, root.id, flange.id,
-        withPositioner ? workFrame.id : null, tcp, null, ["track"]);
+      var group = new robotkit.manipulation.KinematicGroup(
+        model,
+        root.id,
+        flange.id,
+        withPositioner ? workFrame.id : null,
+        tcp,
+        null,
+        ["track"]
+      );
       var analytic = new EaikKinematics(group);
       var numeric = new ManipulatorKinematics(group);
       var nativeSampler = new motionkit.robot.SerialCandidateSampler(group);
       check(analytic.jointCount() == (withPositioner ? 8 : 7), "OPW group preserves arm and external DOFs");
       var before = group.numericSolveCount();
-      var nativeSeed = [for(i in 0...group.group.count()) 0.3*Math.sin(i+0.4)];
+      var nativeSeed = [for (i in 0...group.group.count()) 0.3 * Math.sin(i + 0.4)];
       var nativeTarget = numeric.forward(nativeSeed);
       var nativeBefore = group.numericSolveCount();
-      var grid = [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(0,nativeSeed[0]-0.02,nativeSeed[0]+0.02,3)];
-      if(withPositioner) grid.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(nativeSeed.length-1,nativeSeed[nativeSeed.length-1]-0.03,nativeSeed[nativeSeed.length-1]+0.03,3));
-      var coneAxis = group.tcpPose(nativeSeed).transformVector(new Vec3(0,0,1)).toArray();
-      for(policy in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool,
-          motionkit.path.OrientationPolicy.Cone(coneAxis,0.1)]) {
+      var grid = [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(
+        0,
+        nativeSeed[0] - 0.02,
+        nativeSeed[0] + 0.02,
+        3
+      )];
+      if (withPositioner) grid.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(
+        nativeSeed.length - 1,
+        nativeSeed[nativeSeed.length - 1] - 0.03,
+        nativeSeed[nativeSeed.length - 1] + 0.03,
+        3
+      ));
+      var coneAxis = group.tcpPose(nativeSeed).transformVector(new Vec3(0, 0, 1)).toArray();
+      for (policy in [
+        motionkit.path.OrientationPolicy.Fixed,
+        motionkit.path.OrientationPolicy.FreeAboutTool,
+        motionkit.path.OrientationPolicy.Cone(
+          coneAxis,
+          0.1
+        )
+      ]) {
         var activeGrid = switch policy {
-          case Cone(_, _): [for(joint in 0...nativeSeed.length)if(group.external[joint])
-            new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(joint,nativeSeed[joint],nativeSeed[joint],1)];
-          default: grid;
+          case Cone(_, _):
+            [for (joint in 0
+              ...nativeSeed.length) if (group.external[joint]) new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(
+                joint,
+                nativeSeed[joint],
+                nativeSeed[joint],
+                1
+              )];
+          default:
+            grid;
         };
-        var candidates = nativeSampler.sample(nativeTarget,nativeSeed,policy,activeGrid,4,1,4);
-        var repeated = nativeSampler.sample(nativeTarget,nativeSeed,policy,activeGrid,4,1,4);
-        check(candidates.length == repeated.length,"serial candidate counts are deterministic");
-        check(candidates.length>0,"combined native serial sampler has candidates");
+        var candidates = nativeSampler.sample(nativeTarget, nativeSeed, policy, activeGrid, 4, 1, 4);
+        var repeated = nativeSampler.sample(nativeTarget, nativeSeed, policy, activeGrid, 4, 1, 4);
+        check(candidates.length == repeated.length, "serial candidate counts are deterministic");
+        check(candidates.length > 0, "combined native serial sampler has candidates");
         var original = false;
-        for(index in 0...candidates.length) {
-          var candidate = candidates[index],again = repeated[index];
-          check(candidate.branch == again.branch && candidate.singular == again.singular && candidate.roll == again.roll &&
-            candidate.tilt == again.tilt && candidate.azimuth == again.azimuth,"serial branch and orientation coordinates are deterministic");
-          for(joint in 0...candidate.q.length) {
-            near(candidate.q[joint],again.q[joint],"serial candidate joints are deterministic",1e-12);
-            check(candidate.wraps[joint] == again.wraps[joint],"serial candidate wraps are deterministic");
+        for (index in 0...candidates.length) {
+          var candidate = candidates[index], again = repeated[index];
+          check(
+            candidate.branch == again.branch && candidate.singular == again.singular
+            && candidate.roll == again.roll && candidate.tilt == again.tilt && candidate.azimuth == again.azimuth,
+            "serial branch and orientation coordinates are deterministic"
+          );
+          for (joint in 0...candidate.q.length) {
+            near(candidate.q[joint], again.q[joint], "serial candidate joints are deterministic", 1e-12);
+            check(candidate.wraps[joint] == again.wraps[joint], "serial candidate wraps are deterministic");
             var bound = group.group.limitsOf(joint);
-            check(candidate.q[joint] >= bound.lower-1e-9 && candidate.q[joint] <= bound.upper+1e-9,"combined serial lifts satisfy all compiled bounds");
-            if(group.external[joint])check(candidate.wraps[joint]==0,"external lattice coordinates are never independently lifted");
+            check(
+              candidate.q[joint] >= bound.lower - 1e-9 && candidate.q[joint] <= bound.upper + 1e-9,
+              "combined serial lifts satisfy all compiled bounds"
+            );
+            if (group.external[joint]) check(
+              candidate.wraps[joint] == 0,
+              "external lattice coordinates are never independently lifted"
+            );
           }
-          for(axis in 0...candidate.external.length) {
-            check(candidate.external[axis]==again.external[axis],"serial external coordinates are deterministic");
+          for (axis in 0...candidate.external.length) {
+            check(candidate.external[axis] == again.external[axis], "serial external coordinates are deterministic");
             var range = activeGrid[axis];
-            var fraction = range.points == 1 ? 0.0 : candidate.external[axis]/(range.points-1);
-            near(candidate.q[range.joint],range.lower+(range.upper-range.lower)*fraction,"serial external coordinates match their values",1e-12);
+            var fraction = range.points == 1 ? 0.0 : candidate.external[axis] / (range.points - 1);
+            near(
+              candidate.q[range.joint],
+              range.lower + (range.upper - range.lower) * fraction,
+              "serial external coordinates match their values",
+              1e-12
+            );
           }
           var same = true;
-          for (joint in 0...nativeSeed.length) if (Math.abs(candidate.q[joint]-nativeSeed[joint])>1e-5) same = false;
+          for (joint in 0...nativeSeed.length) if (Math.abs(candidate.q[joint] - nativeSeed[joint])
+            > 1e-5) same = false;
           original = original || same;
-          var actual=numeric.forward(candidate.q);
-          near(motionkit.path.PoseMath.distance(actual,nativeTarget),0,"exported serial native candidate task position",1e-6);
-          near(motionkit.robot.ToolFreedom.orientationError(actual,nativeTarget,policy),0,"exported serial native candidate orientation",1e-6);
+          var actual = numeric.forward(candidate.q);
+          near(
+            motionkit.path.PoseMath.distance(actual, nativeTarget),
+            0,
+            "exported serial native candidate task position",
+            1e-6
+          );
+          near(
+            motionkit.robot.ToolFreedom.orientationError(actual, nativeTarget, policy),
+            0,
+            "exported serial native candidate orientation",
+            1e-6
+          );
         }
-        switch policy { case Cone(_, _): default: check(original,"combined native serial sampling retains the original centre-cell branch"); }
+        switch policy {
+          case Cone(_, _):
+          default:
+            check(original, "combined native serial sampling retains the original centre-cell branch");
+        }
       }
-      check(group.numericSolveCount()==nativeBefore,"combined serial native sampler uses no numeric IK");
-      var ruleEnd = nativeSeed.copy();ruleEnd[0] += 0.005;
-      if(withPositioner)ruleEnd[ruleEnd.length-1] += 0.005;
-      var pathRequest = new PathRequest([0.0,0.01],[nativeTarget,numeric.forward(ruleEnd)],nativeSeed,new IkTolerance(1e-6,1e-6),
-        [for(_ in nativeSeed)0.5],[for(_ in nativeSeed)1.0]);
-      var options = new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,4,true,null,
-        (index,distance,target) -> {
-          var q = index == 0 ? nativeSeed : ruleEnd;
-          return [for(joint in 0...q.length)if(group.external[joint])new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(joint,q[joint],q[joint],1)];
-        });
-      var pathProblem = new motionkit.robot.CandidateProblem(group,pathRequest,options);
-      var boundedExternalProblem = new motionkit.robot.CandidateProblem(group,pathRequest,options,true);
-      check(boundedExternalProblem.samples[0].candidates.length == 1 &&
-        boundedExternalProblem.samples[1].candidates.length > 0,
-        "bounded serial construction preserves moving external rules");
-      var broadPinnedOptions = new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1,1,1,true,grid);
-      var broadPinnedProblem = new motionkit.robot.CandidateProblem(group,pathRequest,broadPinnedOptions,true);
-      check(broadPinnedProblem.samples[0].candidates.length == 1,
-        "bounded pinned construction accepts an authored external grid wider than the joint window");
-      check(pathProblem.samples[0].candidates.length == 1 && pathProblem.samples[1].candidates.length > 0,
-        "per-sample external rules build a populated path ladder");
-      for(candidate in pathProblem.samples[1].candidates)for(joint in 0...ruleEnd.length)if(group.external[joint])
-        near(candidate.q[joint],ruleEnd[joint],"path ladder holds the per-sample external rule",1e-12);
+      check(group.numericSolveCount() == nativeBefore, "combined serial native sampler uses no numeric IK");
+      var ruleEnd = nativeSeed.copy();
+      ruleEnd[0] += 0.005;
+      if (withPositioner) ruleEnd[ruleEnd.length - 1] += 0.005;
+      var pathRequest = new PathRequest(
+        [0.0, 0.01],
+        [nativeTarget, numeric.forward(ruleEnd)],
+        nativeSeed,
+        new IkTolerance(
+          1e-6,
+          1e-6
+        ),
+        [for (_ in nativeSeed) 0.5],
+        [for (_ in nativeSeed) 1.0]
+      );
+      var options = new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4, 1, 4, true, null, (
+        index,
+        distance,
+        target
+      ) -> {var q = index == 0 ? nativeSeed : ruleEnd;
+      return [for (joint in 0
+        ...q.length) if (group.external[joint]) new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(
+          joint,
+          q[joint],
+          q[joint],
+          1
+        )];
+      });
+      var pathProblem = new motionkit.robot.CandidateProblem(group, pathRequest, options);
+      var boundedExternalProblem = new motionkit.robot.CandidateProblem(group, pathRequest, options, true);
+      check(
+        boundedExternalProblem.samples[0].candidates.length == 1
+        && boundedExternalProblem.samples[1].candidates.length > 0,
+        "bounded serial construction preserves moving external rules"
+      );
+      var broadPinnedOptions = new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1, 1, 1, true, grid);
+      var broadPinnedProblem = new motionkit.robot.CandidateProblem(group, pathRequest, broadPinnedOptions, true);
+      check(
+        broadPinnedProblem.samples[0].candidates.length == 1,
+        "bounded pinned construction accepts an authored external grid wider than the joint window"
+      );
+      check(
+        pathProblem.samples[0].candidates.length == 1 && pathProblem.samples[1].candidates.length > 0,
+        "per-sample external rules build a populated path ladder"
+      );
+      for (candidate in pathProblem
+        .samples[1].candidates) for (joint in 0...ruleEnd.length) if (group.external[joint]) near(
+          candidate.q[joint],
+          ruleEnd[joint],
+          "path ladder holds the per-sample external rule",
+          1e-12
+        );
 
-      checkMovingExternalRefinement(group,pathProblem,nativeSeed);
+      checkMovingExternalRefinement(group, pathProblem, nativeSeed);
 
       for (sample in 0...30) {
-        var q = [for (joint in 0...group.group.count()) (joint == 0 ? 0.8 : 1.4) * Math.sin((sample + 1) * (joint + 1) * 1.618)];
+        var q = [for (joint in 0...group.group.count())(joint
+          == 0 ? 0.8 : 1.4) * Math.sin((sample + 1) * (joint + 1) * 1.618)];
         var target = numeric.forward(q), original = false;
-        near(motionkit.path.PoseMath.distance(analytic.forward(q), target), 0,
-          "External OPW analytic FK matches the compiled full-group model", 1e-6);
+        near(
+          motionkit.path.PoseMath.distance(analytic.forward(q), target),
+          0,
+          "External OPW analytic FK matches the compiled full-group model",
+          1e-6
+        );
         if (sample == 0) {
           var solved = analytic.solvePose(target, q, new IkTolerance(1e-6, 1e-6));
           check(solved != null, "External OPW KinematicsSolver interface returns a branch");
           var answer:Array<Float> = cast solved;
-          for (joint in 0...q.length) near(answer[joint], q[joint],
-            "External OPW seeded solve selects the original complete configuration", 1e-5);
+          for (joint in 0...q.length) near(
+            answer[joint],
+            q[joint],
+            "External OPW seeded solve selects the original complete configuration",
+            1e-5
+          );
         }
         for (branch in analytic.branches(target, q)) {
           var same = true;
           for (joint in 0...q.length) {
             same = same && Math.abs(branch.q[joint] - q[joint]) < 1e-5;
-            if (group.external[joint]) near(branch.q[joint], q[joint], "OPW holds the requested external lattice cell", 1e-12);
+            if (group.external[joint]) near(
+              branch.q[joint],
+              q[joint],
+              "OPW holds the requested external lattice cell",
+              1e-12
+            );
           }
           original = original || same;
           var actual = numeric.forward(branch.q);
-          near(motionkit.path.PoseMath.distance(actual, target), 0, "External OPW preserves TCP position in its reference", 1e-6);
-          near(motionkit.robot.ToolFreedom.orientationError(actual, target, motionkit.path.OrientationPolicy.Fixed),
-            0, "External OPW preserves work-frame orientation", 1e-6);
+          near(
+            motionkit.path.PoseMath.distance(actual, target),
+            0,
+            "External OPW preserves TCP position in its reference",
+            1e-6
+          );
+          near(
+            motionkit.robot.ToolFreedom.orientationError(actual, target, motionkit.path.OrientationPolicy.Fixed),
+            0,
+            "External OPW preserves work-frame orientation",
+            1e-6
+          );
         }
         check(original, "External OPW includes the original arm branch");
       }
@@ -373,144 +537,289 @@ class KinematicsTests extends MotionKitTestSupport {
     var model = new RobotModel("ur-track-positioner");
     var root = model.addLink(new Link("cell")), carriage = model.addLink(new Link("carriage"));
     var track = model.addJoint(new Joint("track", JointType.Prismatic, root, carriage));
-    track.axis = [0.8, 0.6, 0.0]; track.limits.lower = -1; track.limits.upper = 1;
+    track.axis = [0.8, 0.6, 0.0];
+    track.limits.lower = -1;
+    track.limits.upper = 1;
     var yaw = Quat.fromAxisAngle(new Vec3(0, 0, 1), 0.37);
     track.parentFrameRotation = [yaw.x, yaw.y, yaw.z, yaw.w];
-    var positions = [[0.0,0.0,0.089159],[0.0,0.13585,0.0],[0.0,-0.1197,0.425],
-      [0.0,0.0,0.39225],[0.0,0.10915,0.0],[0.0,0.0,0.09465]];
-    var axes = [[0.0,0.0,1.0],[0.0,1.0,0.0],[0.0,1.0,0.0],
-      [0.0,1.0,0.0],[0.0,0.0,1.0],[0.0,1.0,0.0]];
+    var positions = [
+      [0.0, 0.0, 0.089159],
+      [0.0, 0.13585, 0.0],
+      [0.0, -0.1197, 0.425],
+      [0.0, 0.0, 0.39225],
+      [
+        0.0,
+        0.10915,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.09465
+      ]
+    ];
+    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     var parent = carriage;
     for (index in 0...6) {
       var child = model.addLink(new Link('arm-link-$index'));
       var joint = model.addJoint(new Joint('arm-joint-$index', JointType.Revolute, parent, child));
-      joint.axis = axes[index]; joint.parentFramePosition = positions[index];
-      joint.limits.lower = -2 * Math.PI; joint.limits.upper = 2 * Math.PI;
+      joint.axis = axes[index];
+      joint.parentFramePosition = positions[index];
+      joint.limits.lower = -2 * Math.PI;
+      joint.limits.upper = 2 * Math.PI;
       parent = child;
     }
-    var flange = model.addFrame(new Frame("arm-flange", parent)); flange.position = [0, 0.0823, 0];
+    var flange = model.addFrame(new Frame("arm-flange", parent));
+    flange.position = [0, 0.0823, 0];
     var work = model.addLink(new Link("positioner-work"));
     var positioner = model.addJoint(new Joint("positioner", JointType.Revolute, root, work));
-    positioner.axis = [0, 0, 1]; positioner.parentFramePosition = [0.25, -0.3, 0.1];
-    positioner.limits.lower = -2 * Math.PI; positioner.limits.upper = 2 * Math.PI;
-    var workFrame = model.addFrame(new Frame("work-frame", work)); workFrame.position = [0.07, 0.02, 0.15];
+    positioner.axis = [0, 0, 1];
+    positioner.parentFramePosition = [0.25, -0.3, 0.1];
+    positioner.limits.lower = -2 * Math.PI;
+    positioner.limits.upper = 2 * Math.PI;
+    var workFrame = model.addFrame(new Frame("work-frame", work));
+    workFrame.position = [0.07, 0.02, 0.15];
     var tcp = new Transform3(new Vec3(0.04, 0.02, 0.13), Quat.fromAxisAngle(new Vec3(0, 1, 0), 0.2));
     for (withPositioner in [false, true]) {
-      var group = new robotkit.manipulation.KinematicGroup(model, root.id, flange.id,
-        withPositioner ? workFrame.id : null, tcp, null, ["track"]);
+      var group = new robotkit.manipulation.KinematicGroup(
+        model,
+        root.id,
+        flange.id,
+        withPositioner ? workFrame.id : null,
+        tcp,
+        null,
+        ["track"]
+      );
       var analytic = new motionkit.robot.EaikAnalyticIk(group);
       var numeric = new ManipulatorKinematics(group);
       var nativeSampler = new motionkit.robot.SerialCandidateSampler(group);
       check(analytic.jointCount() == (withPositioner ? 8 : 7), "UR group preserves arm and external DOFs");
       var before = group.numericSolveCount();
-      var seed = [for (i in 0...group.group.count()) 0.3*Math.sin(i+0.4)];
-      var ranges = [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(0,-0.2,0.2,3)];
-      if (withPositioner) ranges.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(seed.length-1,-0.4,0.4,2));
-      var cells = motionkit.robot.ExternalAxisGrid.sample(group,seed,ranges);
-      check(cells.length == (withPositioner ? 6 : 3),"native external grid Cartesian-product count");
+      var seed = [for (i in 0...group.group.count()) 0.3 * Math.sin(i + 0.4)];
+      var ranges = [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(0, -0.2, 0.2, 3)];
+      if (withPositioner) ranges.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(
+        seed.length - 1,
+        -0.4,
+        0.4,
+        2
+      ));
+      var cells = motionkit.robot.ExternalAxisGrid.sample(group, seed, ranges);
+      check(cells.length == (withPositioner ? 6 : 3), "native external grid Cartesian-product count");
       for (i in 0...cells.length) {
         var cell = cells[i];
-        check(cell.coordinates[0] == (withPositioner ? Std.int(i/2) : i),"track lattice coordinate follows group ordering");
-        if (withPositioner) check(cell.coordinates[1] == i%2,"positioner lattice coordinate varies fastest");
-        for (joint in 0...seed.length) if (!group.external[joint])
-          near(cell.q[joint],seed[joint],"native external grid retains arm joints",1e-12);
-        var target = numeric.forward(cell.q),found = false;
-        for (branch in analytic.branches(target,cell.q)) {
+        check(
+          cell.coordinates[0] == (withPositioner ? Std.int(i / 2) : i),
+          "track lattice coordinate follows group ordering"
+        );
+        if (withPositioner) check(cell.coordinates[1] == i % 2, "positioner lattice coordinate varies fastest");
+        for (joint in 0...seed.length) if (!group.external[joint]) near(
+          cell.q[joint],
+          seed[joint],
+          "native external grid retains arm joints",
+          1e-12
+        );
+        var target = numeric.forward(cell.q), found = false;
+        for (branch in analytic.branches(target, cell.q)) {
           var same = true;
-          for (joint in 0...seed.length) if (Math.abs(branch.q[joint]-cell.q[joint]) > 1e-5) same = false;
+          for (joint in 0...seed.length) if (Math.abs(branch.q[joint] - cell.q[joint]) > 1e-5) same = false;
           found = found || same;
         }
-        check(found,"native rotated track/positioner cell retains original UR branch");
+        check(found, "native rotated track/positioner cell retains original UR branch");
       }
-      var heldCells = motionkit.robot.ExternalAxisGrid.sample(group,seed,[]);
-      check(heldCells.length == 1,"unspecified external axes become one-point rules");
-      for (joint in 0...seed.length) near(heldCells[0].q[joint],seed[joint],"held external cell copies complete seed",1e-12);
-      var nativeSeed = [for(i in 0...group.group.count()) 0.3*Math.sin(i+0.4)];
+      var heldCells = motionkit.robot.ExternalAxisGrid.sample(group, seed, []);
+      check(heldCells.length == 1, "unspecified external axes become one-point rules");
+      for (joint in 0...seed.length) near(
+        heldCells[0].q[joint],
+        seed[joint],
+        "held external cell copies complete seed",
+        1e-12
+      );
+      var nativeSeed = [for (i in 0...group.group.count()) 0.3 * Math.sin(i + 0.4)];
       var nativeTarget = numeric.forward(nativeSeed);
       var nativeBefore = group.numericSolveCount();
-      var grid = [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(0,nativeSeed[0]-0.02,nativeSeed[0]+0.02,3)];
-      if(withPositioner) grid.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(nativeSeed.length-1,nativeSeed[nativeSeed.length-1]-0.03,nativeSeed[nativeSeed.length-1]+0.03,3));
-      var coneAxis = group.tcpPose(nativeSeed).transformVector(new Vec3(0,0,1)).toArray();
-      for(policy in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool,
-          motionkit.path.OrientationPolicy.Cone(coneAxis,0.1)]) {
+      var grid = [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(
+        0,
+        nativeSeed[0] - 0.02,
+        nativeSeed[0] + 0.02,
+        3
+      )];
+      if (withPositioner) grid.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(
+        nativeSeed.length - 1,
+        nativeSeed[nativeSeed.length - 1] - 0.03,
+        nativeSeed[nativeSeed.length - 1] + 0.03,
+        3
+      ));
+      var coneAxis = group.tcpPose(nativeSeed).transformVector(new Vec3(0, 0, 1)).toArray();
+      for (policy in [
+        motionkit.path.OrientationPolicy.Fixed,
+        motionkit.path.OrientationPolicy.FreeAboutTool,
+        motionkit.path.OrientationPolicy.Cone(
+          coneAxis,
+          0.1
+        )
+      ]) {
         var activeGrid = switch policy {
-          case Cone(_, _): [for(joint in 0...nativeSeed.length)if(group.external[joint])
-            new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(joint,nativeSeed[joint],nativeSeed[joint],1)];
-          default: grid;
+          case Cone(_, _):
+            [for (joint in 0
+              ...nativeSeed.length) if (group.external[joint]) new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(
+                joint,
+                nativeSeed[joint],
+                nativeSeed[joint],
+                1
+              )];
+          default:
+            grid;
         };
-        var candidates = nativeSampler.sample(nativeTarget,nativeSeed,policy,activeGrid,4,1,4);
-        var repeated = nativeSampler.sample(nativeTarget,nativeSeed,policy,activeGrid,4,1,4);
-        check(candidates.length == repeated.length,"serial candidate counts are deterministic");
-        check(candidates.length>0,"combined native serial sampler has candidates");
+        var candidates = nativeSampler.sample(nativeTarget, nativeSeed, policy, activeGrid, 4, 1, 4);
+        var repeated = nativeSampler.sample(nativeTarget, nativeSeed, policy, activeGrid, 4, 1, 4);
+        check(candidates.length == repeated.length, "serial candidate counts are deterministic");
+        check(candidates.length > 0, "combined native serial sampler has candidates");
         var original = false;
-        for(index in 0...candidates.length) {
-          var candidate = candidates[index],again = repeated[index];
-          check(candidate.branch == again.branch && candidate.singular == again.singular && candidate.roll == again.roll &&
-            candidate.tilt == again.tilt && candidate.azimuth == again.azimuth,"serial branch and orientation coordinates are deterministic");
-          for(joint in 0...candidate.q.length) {
-            near(candidate.q[joint],again.q[joint],"serial candidate joints are deterministic",1e-12);
-            check(candidate.wraps[joint] == again.wraps[joint],"serial candidate wraps are deterministic");
+        for (index in 0...candidates.length) {
+          var candidate = candidates[index], again = repeated[index];
+          check(
+            candidate.branch == again.branch && candidate.singular == again.singular
+            && candidate.roll == again.roll && candidate.tilt == again.tilt && candidate.azimuth == again.azimuth,
+            "serial branch and orientation coordinates are deterministic"
+          );
+          for (joint in 0...candidate.q.length) {
+            near(candidate.q[joint], again.q[joint], "serial candidate joints are deterministic", 1e-12);
+            check(candidate.wraps[joint] == again.wraps[joint], "serial candidate wraps are deterministic");
             var bound = group.group.limitsOf(joint);
-            check(candidate.q[joint] >= bound.lower-1e-9 && candidate.q[joint] <= bound.upper+1e-9,"combined serial lifts satisfy all compiled bounds");
-            if(group.external[joint])check(candidate.wraps[joint]==0,"external lattice coordinates are never independently lifted");
+            check(
+              candidate.q[joint] >= bound.lower - 1e-9 && candidate.q[joint] <= bound.upper + 1e-9,
+              "combined serial lifts satisfy all compiled bounds"
+            );
+            if (group.external[joint]) check(
+              candidate.wraps[joint] == 0,
+              "external lattice coordinates are never independently lifted"
+            );
           }
-          for(axis in 0...candidate.external.length) {
-            check(candidate.external[axis]==again.external[axis],"serial external coordinates are deterministic");
+          for (axis in 0...candidate.external.length) {
+            check(candidate.external[axis] == again.external[axis], "serial external coordinates are deterministic");
             var range = activeGrid[axis];
-            var fraction = range.points == 1 ? 0.0 : candidate.external[axis]/(range.points-1);
-            near(candidate.q[range.joint],range.lower+(range.upper-range.lower)*fraction,"serial external coordinates match their values",1e-12);
+            var fraction = range.points == 1 ? 0.0 : candidate.external[axis] / (range.points - 1);
+            near(
+              candidate.q[range.joint],
+              range.lower + (range.upper - range.lower) * fraction,
+              "serial external coordinates match their values",
+              1e-12
+            );
           }
           var same = true;
-          for (joint in 0...nativeSeed.length) if (Math.abs(candidate.q[joint]-nativeSeed[joint])>1e-5) same = false;
+          for (joint in 0...nativeSeed.length) if (Math.abs(candidate.q[joint] - nativeSeed[joint])
+            > 1e-5) same = false;
           original = original || same;
-          var actual=numeric.forward(candidate.q);
-          near(motionkit.path.PoseMath.distance(actual,nativeTarget),0,"exported serial native candidate task position",1e-6);
-          near(motionkit.robot.ToolFreedom.orientationError(actual,nativeTarget,policy),0,"exported serial native candidate orientation",1e-6);
+          var actual = numeric.forward(candidate.q);
+          near(
+            motionkit.path.PoseMath.distance(actual, nativeTarget),
+            0,
+            "exported serial native candidate task position",
+            1e-6
+          );
+          near(
+            motionkit.robot.ToolFreedom.orientationError(actual, nativeTarget, policy),
+            0,
+            "exported serial native candidate orientation",
+            1e-6
+          );
         }
-        switch policy { case Cone(_, _): default: check(original,"combined native serial sampling retains the original centre-cell branch"); }
+        switch policy {
+          case Cone(_, _):
+          default:
+            check(original, "combined native serial sampling retains the original centre-cell branch");
+        }
       }
-      check(group.numericSolveCount()==nativeBefore,"combined serial native sampler uses no numeric IK");
-      var ruleEnd = nativeSeed.copy();ruleEnd[0] += 0.005;
-      if(withPositioner)ruleEnd[ruleEnd.length-1] += 0.005;
-      var pathRequest = new PathRequest([0.0,0.01],[nativeTarget,numeric.forward(ruleEnd)],nativeSeed,new IkTolerance(1e-6,1e-6),
-        [for(_ in nativeSeed)0.5],[for(_ in nativeSeed)1.0]);
-      var options = new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,4,true,null,
-        (index,distance,target) -> {
-          var q = index == 0 ? nativeSeed : ruleEnd;
-          return [for(joint in 0...q.length)if(group.external[joint])new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(joint,q[joint],q[joint],1)];
-        });
-      var pathProblem = new motionkit.robot.CandidateProblem(group,pathRequest,options);
-      var boundedExternalProblem = new motionkit.robot.CandidateProblem(group,pathRequest,options,true);
-      check(boundedExternalProblem.samples[0].candidates.length == 1 &&
-        boundedExternalProblem.samples[1].candidates.length > 0,
-        "bounded serial construction preserves moving external rules");
-      var broadPinnedOptions = new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1,1,1,true,grid);
-      var broadPinnedProblem = new motionkit.robot.CandidateProblem(group,pathRequest,broadPinnedOptions,true);
-      check(broadPinnedProblem.samples[0].candidates.length == 1,
-        "bounded pinned construction accepts an authored external grid wider than the joint window");
-      check(pathProblem.samples[0].candidates.length == 1 && pathProblem.samples[1].candidates.length > 0,
-        "per-sample external rules build a populated path ladder");
-      for(candidate in pathProblem.samples[1].candidates)for(joint in 0...ruleEnd.length)if(group.external[joint])
-        near(candidate.q[joint],ruleEnd[joint],"path ladder holds the per-sample external rule",1e-12);
+      check(group.numericSolveCount() == nativeBefore, "combined serial native sampler uses no numeric IK");
+      var ruleEnd = nativeSeed.copy();
+      ruleEnd[0] += 0.005;
+      if (withPositioner) ruleEnd[ruleEnd.length - 1] += 0.005;
+      var pathRequest = new PathRequest(
+        [0.0, 0.01],
+        [nativeTarget, numeric.forward(ruleEnd)],
+        nativeSeed,
+        new IkTolerance(
+          1e-6,
+          1e-6
+        ),
+        [for (_ in nativeSeed) 0.5],
+        [for (_ in nativeSeed) 1.0]
+      );
+      var options = new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4, 1, 4, true, null, (
+        index,
+        distance,
+        target
+      ) -> {var q = index == 0 ? nativeSeed : ruleEnd;
+      return [for (joint in 0
+        ...q.length) if (group.external[joint]) new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(
+          joint,
+          q[joint],
+          q[joint],
+          1
+        )];
+      });
+      var pathProblem = new motionkit.robot.CandidateProblem(group, pathRequest, options);
+      var boundedExternalProblem = new motionkit.robot.CandidateProblem(group, pathRequest, options, true);
+      check(
+        boundedExternalProblem.samples[0].candidates.length == 1
+        && boundedExternalProblem.samples[1].candidates.length > 0,
+        "bounded serial construction preserves moving external rules"
+      );
+      var broadPinnedOptions = new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1, 1, 1, true, grid);
+      var broadPinnedProblem = new motionkit.robot.CandidateProblem(group, pathRequest, broadPinnedOptions, true);
+      check(
+        broadPinnedProblem.samples[0].candidates.length == 1,
+        "bounded pinned construction accepts an authored external grid wider than the joint window"
+      );
+      check(
+        pathProblem.samples[0].candidates.length == 1 && pathProblem.samples[1].candidates.length > 0,
+        "per-sample external rules build a populated path ladder"
+      );
+      for (candidate in pathProblem
+        .samples[1].candidates) for (joint in 0...ruleEnd.length) if (group.external[joint]) near(
+          candidate.q[joint],
+          ruleEnd[joint],
+          "path ladder holds the per-sample external rule",
+          1e-12
+        );
 
-      checkMovingExternalRefinement(group,pathProblem,nativeSeed);
+      checkMovingExternalRefinement(group, pathProblem, nativeSeed);
 
       for (sample in 0...30) {
-        var q = [for (joint in 0...group.group.count()) (joint == 0 ? 0.8 : 1.4) * Math.sin((sample + 1) * (joint + 1) * 1.618)];
+        var q = [for (joint in 0...group.group.count())(joint
+          == 0 ? 0.8 : 1.4) * Math.sin((sample + 1) * (joint + 1) * 1.618)];
         var target = numeric.forward(q), original = false;
-        near(motionkit.path.PoseMath.distance(analytic.forward(q), target), 0,
-          "External UR analytic FK matches the compiled full-group model", 1e-6);
+        near(
+          motionkit.path.PoseMath.distance(analytic.forward(q), target),
+          0,
+          "External UR analytic FK matches the compiled full-group model",
+          1e-6
+        );
         for (branch in analytic.branches(target, q)) {
           var same = true;
           for (joint in 0...q.length) {
             same = same && Math.abs(branch.q[joint] - q[joint]) < 1e-5;
-            if (group.external[joint]) near(branch.q[joint], q[joint], "UR holds the requested external lattice cell", 1e-12);
+            if (group.external[joint]) near(
+              branch.q[joint],
+              q[joint],
+              "UR holds the requested external lattice cell",
+              1e-12
+            );
           }
           original = original || same;
           var actual = numeric.forward(branch.q);
-          near(motionkit.path.PoseMath.distance(actual, target), 0, "External UR preserves TCP position in its reference", 1e-6);
-          near(motionkit.robot.ToolFreedom.orientationError(actual, target, motionkit.path.OrientationPolicy.Fixed),
-            0, "External UR preserves work-frame orientation", 1e-6);
+          near(
+            motionkit.path.PoseMath.distance(actual, target),
+            0,
+            "External UR preserves TCP position in its reference",
+            1e-6
+          );
+          near(
+            motionkit.robot.ToolFreedom.orientationError(actual, target, motionkit.path.OrientationPolicy.Fixed),
+            0,
+            "External UR preserves work-frame orientation",
+            1e-6
+          );
         }
         check(original, "External UR includes the original arm branch");
       }
@@ -518,956 +827,2562 @@ class KinematicsTests extends MotionKitTestSupport {
     }
   }
 
-  function checkMovingExternalRefinement(group:robotkit.manipulation.KinematicGroup,
-      pathProblem:motionkit.robot.CandidateProblem,nativeSeed:Array<Float>):Void {
+  function checkMovingExternalRefinement(
+    group:robotkit.manipulation.KinematicGroup,
+    pathProblem:motionkit.robot.CandidateProblem,
+    nativeSeed:Array<Float>
+  ):Void {
     var numeric = new ManipulatorKinematics(group);
     var selected = motionkit.robot.StructuredLadder.search(pathProblem);
-    check(selected.diagnostic == null,"moving external axes have a connected analytic route");
-    var refiner = new motionkit.robot.AnalyticPathRefiner(group,pathProblem,selected);
+    check(selected.diagnostic == null, "moving external axes have a connected analytic route");
+    var refiner = new motionkit.robot.AnalyticPathRefiner(group, pathProblem, selected);
     // Independent full-model FK differences supply task rates. Arm joints
     // remain constant while the track and optional work frame move together.
     function externalPose(s:Float):Pose3 {
       var q = nativeSeed.copy();
-      for(j in 0...q.length)if(group.external[j])q[j] += 0.5*s;
+      for (j in 0...q.length) if (group.external[j]) q[j] += 0.5 * s;
       return numeric.forward(q);
     }
-    var refinedSeed = nativeSeed.copy(),h = 1e-4;
-    for(i in 0...11) {
-      var s = 0.001*i,p = externalPose(s),minus = externalPose(s-h),plus = externalPose(s+h);
-      var omega = poseRotationDelta(minus,plus,1/(2*h));
-      var omegaBefore = poseRotationDelta(externalPose(s-2*h),p,1/(2*h));
-      var omegaAfter = poseRotationDelta(p,externalPose(s+2*h),1/(2*h));
-      var velocity = [(plus.x-minus.x)/(2*h),(plus.y-minus.y)/(2*h),(plus.z-minus.z)/(2*h)].concat(omega);
-      var acceleration = [(plus.x-2*p.x+minus.x)/(h*h),(plus.y-2*p.y+minus.y)/(h*h),
-        (plus.z-2*p.z+minus.z)/(h*h)].concat([for(k in 0...3)(omegaAfter[k]-omegaBefore[k])/(2*h)]);
-      refinedSeed = refiner.sample(s,p,motionkit.path.OrientationPolicy.Fixed,refinedSeed).q;
-      var derivatives = refiner.refinedDerivatives(s,refinedSeed,p,motionkit.path.OrientationPolicy.Fixed,velocity,acceleration);
-      for(j in 0...refinedSeed.length) {
-        near(refinedSeed[j],nativeSeed[j]+(group.external[j]?0.5*s:0),"moving-frame refinement preserves the selected arm configuration",1e-6);
-        near(derivatives.first[j],group.external[j]?0.5:0,"moving-frame differential rates separate arm and external motion",1e-6);
-        near(derivatives.second[j],0,"moving-frame differential acceleration cancels reference curvature",1e-4);
+    var refinedSeed = nativeSeed.copy(), h = 1e-4;
+    for (i in 0...11) {
+      var s = 0.001 * i, p = externalPose(s), minus = externalPose(s - h), plus = externalPose(s + h);
+      var omega = poseRotationDelta(minus, plus, 1 / (2 * h));
+      var omegaBefore = poseRotationDelta(externalPose(s - 2 * h), p, 1 / (2 * h));
+      var omegaAfter = poseRotationDelta(p, externalPose(s + 2 * h), 1 / (2 * h));
+      var velocity = [(plus.x - minus.x) / (2 * h),
+        (plus.y - minus.y) / (2 * h), (plus.z - minus.z) / (2 * h)].concat(omega);
+      var acceleration = [
+        (plus.x - 2 * p.x + minus.x) / (h * h),
+        (plus.y - 2 * p.y + minus.y) / (h * h),
+        (plus.z - 2 * p.z + minus.z) / (h * h)
+      ].concat([for (k in 0...3)(omegaAfter[k] - omegaBefore[k]) / (2 * h)]);
+      refinedSeed = refiner.sample(s, p, motionkit.path.OrientationPolicy.Fixed, refinedSeed).q;
+      var derivatives = refiner.refinedDerivatives(
+        s,
+        refinedSeed,
+        p,
+        motionkit.path.OrientationPolicy.Fixed,
+        velocity,
+        acceleration
+      );
+      for (j in 0...refinedSeed.length) {
+        near(
+          refinedSeed[j],
+          nativeSeed[j] + (group.external[j] ? 0.5 * s : 0),
+          "moving-frame refinement preserves the selected arm configuration",
+          1e-6
+        );
+        near(
+          derivatives.first[j],
+          group.external[j] ? 0.5 : 0,
+          "moving-frame differential rates separate arm and external motion",
+          1e-6
+        );
+        near(derivatives.second[j], 0, "moving-frame differential acceleration cancels reference curvature", 1e-4);
       }
     }
   }
 
   public function testNumericBranchFallback():Void {
     var fixture = buildSevenAxisArmFixture();
-    var fallback = new motionkit.robot.NumericBranchIk(fixture.arm,"seven-axis test arm",new IkTolerance(1e-6,1e-6,60));
-    check(fallback.family() == "numeric-fallback" && fallback.diagnostic.indexOf("seven-axis test arm") >= 0,
-      "unsupported geometry has an explicit numeric fallback diagnostic");
-    var q = [for (i in 0...7) 0.3*Math.sin(i+0.4)];
-    check(motionkit.robot.BranchIk.of(fixture.arm).family() == "numeric-fallback","unsupported model selects the numeric fallback");
+    var fallback = new motionkit.robot.NumericBranchIk(
+      fixture.arm,
+      "seven-axis test arm",
+      new IkTolerance(
+        1e-6,
+        1e-6,
+        60
+      )
+    );
+    check(
+      fallback.family() == "numeric-fallback" && fallback.diagnostic.indexOf("seven-axis test arm") >= 0,
+      "unsupported geometry has an explicit numeric fallback diagnostic"
+    );
+    var q = [for (i in 0...7) 0.3 * Math.sin(i + 0.4)];
+    check(
+      motionkit.robot.BranchIk.of(fixture.arm).family() == "numeric-fallback",
+      "unsupported model selects the numeric fallback"
+    );
     var target = fallback.forward(q);
-    var first = fallback.branchesFromNeighbours(target,[q,q],q), second = fallback.branchesFromNeighbours(target,[q,q],q);
-    check(first.length > 0 && first.length == second.length,"numeric fallback is deterministic and keeps the neighbour solution");
+    var first = fallback.branchesFromNeighbours(target, [q, q], q), second = fallback.branchesFromNeighbours(
+      target,
+      [
+        q,
+        q
+      ],
+      q
+    );
+    check(
+      first.length > 0 && first.length == second.length,
+      "numeric fallback is deterministic and keeps the neighbour solution"
+    );
     for (i in 0...first.length) {
-      check(first[i].branch == second[i].branch,"numeric fallback seed identity is deterministic");
-      check(!first[i].singularityKnown,"numeric fallback reports singularity classification as unknown");
-      near(motionkit.path.PoseMath.distance(fallback.forward(first[i].q),target),0,"numeric fallback satisfies task position",1e-6);
-      near(motionkit.robot.ToolFreedom.orientationError(fallback.forward(first[i].q),target,motionkit.path.OrientationPolicy.Fixed),0,
-        "numeric fallback satisfies task orientation",1e-6);
-      for (j in 0...7) near(first[i].q[j],second[i].q[j],"numeric fallback deterministic joints",1e-9);
+      check(first[i].branch == second[i].branch, "numeric fallback seed identity is deterministic");
+      check(!first[i].singularityKnown, "numeric fallback reports singularity classification as unknown");
+      near(
+        motionkit.path.PoseMath.distance(fallback.forward(first[i].q), target),
+        0,
+        "numeric fallback satisfies task position",
+        1e-6
+      );
+      near(
+        motionkit.robot.ToolFreedom.orientationError(
+          fallback.forward(first[i].q),
+          target,
+          motionkit.path.OrientationPolicy.Fixed
+        ),
+        0,
+        "numeric fallback satisfies task orientation",
+        1e-6
+      );
+      for (j in 0...7) near(first[i].q[j], second[i].q[j], "numeric fallback deterministic joints", 1e-9);
       for (j in 0...i) {
         var distance = 0.0;
-        for (k in 0...7) distance += Math.pow(first[i].q[k]-first[j].q[k],2);
-        check(Math.sqrt(distance) >= 1e-3,"numeric fallback deduplicates neighbour seeds");
+        for (k in 0...7) distance += Math.pow(first[i].q[k] - first[j].q[k], 2);
+        check(Math.sqrt(distance) >= 1e-3, "numeric fallback deduplicates neighbour seeds");
       }
     }
-    var sevenStart=[0.2,-0.8,0.6,-0.4,0.5,0.3,-0.2],sevenEnd=sevenStart.copy();sevenEnd[0]+=0.01;
-    var sevenSolver=new ManipulatorKinematics(fixture.arm);
-    var sevenLine=new PoseLine(new PoseWaypoint(sevenSolver.forward(sevenStart),1e-6,1e-6),
-      new PoseWaypoint(sevenSolver.forward(sevenEnd),1e-6,1e-6),motionkit.path.OrientationPolicy.Interpolated,0.1,0.1);
-    var sevenPath=new motionkit.path.PosePath("task",[sevenLine]),sevenDistances=[for(i in 0...5)sevenPath.length()*i/4];
-    var sevenRequest=new PathRequest(sevenDistances,[for(s in sevenDistances)sevenPath.poseAt(s)],sevenStart,
-      new IkTolerance(1e-6,1e-6),[for(_ in sevenStart)0.5],[for(_ in sevenStart)1.0]);
-    var sevenPlanner=new motionkit.robot.StructuredJointPathPlanner(fixture.arm);
-    var sevenSamples=sevenPlanner.plan(sevenPath,sevenRequest);
-    check(sevenSamples.jointCount==7,"numeric refinement prescribes internal redundancy for a seven-axis arm");
-    for(i in 0...sevenDistances.length)near(motionkit.path.PoseMath.distance(sevenSolver.forward(sevenSamples.q[i]),sevenPath.poseAt(sevenDistances[i])),0,
-      "seven-axis differential refinement preserves authored task geometry",1e-6);
-    var sevenMid=2,sevenQ=sevenSamples.q[sevenMid],sevenRate=sevenSamples.qPrime[sevenMid],sevenCurve=sevenSamples.qDoublePrime[sevenMid];
-    var sevenStep=1e-5;
-    function sevenDerivativePose(offset:Float):Pose3 return sevenSolver.forward([for(j in 0...7)
-      sevenQ[j]+offset*sevenRate[j]+0.5*offset*offset*sevenCurve[j]]);
-    var sevenCentre=sevenDerivativePose(0),sevenMinus=sevenDerivativePose(-sevenStep),sevenPlus=sevenDerivativePose(sevenStep);
-    var sevenTask=sevenLine.derivativesAt(sevenDistances[sevenMid]);
-    var sevenLinear=[(sevenPlus.x-sevenMinus.x)/(2*sevenStep),(sevenPlus.y-sevenMinus.y)/(2*sevenStep),(sevenPlus.z-sevenMinus.z)/(2*sevenStep)];
-    var sevenSecond=[(sevenPlus.x-2*sevenCentre.x+sevenMinus.x)/(sevenStep*sevenStep),
-      (sevenPlus.y-2*sevenCentre.y+sevenMinus.y)/(sevenStep*sevenStep),(sevenPlus.z-2*sevenCentre.z+sevenMinus.z)/(sevenStep*sevenStep)];
-    var sevenAngular=poseRotationDelta(sevenMinus,sevenPlus,1/(2*sevenStep));
-    var sevenAngularBefore=poseRotationDelta(sevenDerivativePose(-2*sevenStep),sevenCentre,1/(2*sevenStep));
-    var sevenAngularAfter=poseRotationDelta(sevenCentre,sevenDerivativePose(2*sevenStep),1/(2*sevenStep));
-    for(axis in 0...3){
-      near(sevenLinear[axis],sevenTask.linear[axis],"seven-axis rates recover task velocity through independent FK",1e-5);
-      near(sevenSecond[axis],sevenTask.linearSecond[axis],"seven-axis curvature recovers task acceleration through independent FK",1e-3);
-      near(sevenAngular[axis],sevenTask.angular[axis],"seven-axis rates recover task angular velocity",1e-5);
-      near((sevenAngularAfter[axis]-sevenAngularBefore[axis])/(2*sevenStep),sevenTask.angularSecond[axis],
-        "seven-axis curvature recovers task angular acceleration",1e-3);
+    var sevenStart = [0.2, -0.8, 0.6, -0.4, 0.5, 0.3, -0.2], sevenEnd = sevenStart.copy();
+    sevenEnd[0] += 0.01;
+    var sevenSolver = new ManipulatorKinematics(fixture.arm);
+    var sevenLine = new PoseLine(
+      new PoseWaypoint(sevenSolver.forward(sevenStart), 1e-6, 1e-6),
+      new PoseWaypoint(
+        sevenSolver.forward(sevenEnd),
+        1e-6,
+        1e-6
+      ),
+      motionkit.path.OrientationPolicy.Interpolated,
+      0.1,
+      0.1
+    );
+    var sevenPath = new motionkit.path.PosePath("task",
+      [sevenLine]), sevenDistances = [for (i in 0...5) sevenPath.length() * i / 4];
+    var sevenRequest = new PathRequest(
+      sevenDistances,
+      [for (s in sevenDistances) sevenPath.poseAt(s)],
+      sevenStart,
+      new IkTolerance(
+        1e-6,
+        1e-6
+      ),
+      [for (_ in sevenStart) 0.5],
+      [for (_ in sevenStart) 1.0]
+    );
+    var sevenPlanner = new motionkit.robot.StructuredJointPathPlanner(fixture.arm);
+    var sevenSamples = sevenPlanner.plan(sevenPath, sevenRequest);
+    check(sevenSamples.jointCount == 7, "numeric refinement prescribes internal redundancy for a seven-axis arm");
+    for (i in 0...sevenDistances.length) near(
+      motionkit.path.PoseMath.distance(
+        sevenSolver.forward(sevenSamples.q[i]),
+        sevenPath.poseAt(sevenDistances[i])
+      ),
+      0,
+      "seven-axis differential refinement preserves authored task geometry",
+      1e-6
+    );
+    var sevenMid = 2, sevenQ = sevenSamples.q[sevenMid],
+      sevenRate = sevenSamples.qPrime[sevenMid], sevenCurve = sevenSamples.qDoublePrime[sevenMid];
+    var sevenStep = 1e-5;
+    function sevenDerivativePose(offset:Float):Pose3 return sevenSolver.forward([for (j in 0...7) sevenQ[j]
+      + offset * sevenRate[j] + 0.5 * offset * offset * sevenCurve[j]]);
+    var sevenCentre = sevenDerivativePose(0),
+      sevenMinus = sevenDerivativePose(-sevenStep), sevenPlus = sevenDerivativePose(sevenStep);
+    var sevenTask = sevenLine.derivativesAt(sevenDistances[sevenMid]);
+    var sevenLinear = [
+      (sevenPlus.x - sevenMinus.x) / (2 * sevenStep),
+      (sevenPlus.y - sevenMinus.y) / (2 * sevenStep),
+      (sevenPlus.z - sevenMinus.z) / (2 * sevenStep)
+    ];
+    var sevenSecond = [
+      (sevenPlus.x - 2 * sevenCentre.x + sevenMinus.x) / (sevenStep * sevenStep),
+      (sevenPlus.y - 2 * sevenCentre.y + sevenMinus.y) / (sevenStep * sevenStep),
+      (sevenPlus.z - 2 * sevenCentre.z + sevenMinus.z) / (sevenStep * sevenStep)
+    ];
+    var sevenAngular = poseRotationDelta(sevenMinus, sevenPlus, 1 / (2 * sevenStep));
+    var sevenAngularBefore = poseRotationDelta(sevenDerivativePose(-2 * sevenStep), sevenCentre, 1 / (2 * sevenStep));
+    var sevenAngularAfter = poseRotationDelta(sevenCentre, sevenDerivativePose(2 * sevenStep), 1 / (2 * sevenStep));
+    for (axis in 0...3) {
+      near(
+        sevenLinear[axis],
+        sevenTask.linear[axis],
+        "seven-axis rates recover task velocity through independent FK",
+        1e-5
+      );
+      near(
+        sevenSecond[axis],
+        sevenTask.linearSecond[axis],
+        "seven-axis curvature recovers task acceleration through independent FK",
+        1e-3
+      );
+      near(sevenAngular[axis], sevenTask.angular[axis], "seven-axis rates recover task angular velocity", 1e-5);
+      near(
+        (sevenAngularAfter[axis] - sevenAngularBefore[axis]) / (2 * sevenStep),
+        sevenTask.angularSecond[axis],
+        "seven-axis curvature recovers task angular acceleration",
+        1e-3
+      );
     }
-    var sevenTimed=new ToppraPathTiming().time(sevenSamples,new PathTimingLimits([for(_ in sevenStart)1.0],[for(_ in sevenStart)2.0]));
+    var sevenTimed = new ToppraPathTiming().time(
+      sevenSamples,
+      new PathTimingLimits(
+        [for (_ in sevenStart) 1.0],
+        [for (_ in sevenStart) 2.0]
+      )
+    );
     try {
-      var sevenDuration=sevenTimed.trajectory.durationSeconds();check(sevenDuration>0,"internally redundant refinement succeeds in TOPP-RA");
-      var sevenFinal=sevenTimed.trajectory.evaluate(sevenDuration);
-      for(j in 0...7)near(sevenFinal.positions[j],sevenSamples.q[sevenSamples.q.length-1][j],"timed seven-axis path reaches its refined endpoint",1e-6);
-      var sevenBounds=new ValidationLimits(7,Int64.ofInt(0),Int64.ofInt(0));
-      for(j in 0...7){var bound=fixture.arm.group.limitsOf(j);sevenBounds.position(j,bound.lower,bound.upper);
-        sevenBounds.velocity(j,1.00001);sevenBounds.acceleration(j,2.00001);}
-      check(!sevenTimed.trajectory.validate(sevenBounds).hasFailure(),"timed seven-axis path passes native extrema limits");
-    }catch(error:Dynamic){sevenTimed.releaseDistanceMap();sevenTimed.trajectory.dispose();throw error;}
-    sevenTimed.releaseDistanceMap();sevenTimed.trajectory.dispose();
-    var unsupportedFixture=buildContractArmFixture();
+      var sevenDuration = sevenTimed.trajectory.durationSeconds();
+      check(sevenDuration > 0, "internally redundant refinement succeeds in TOPP-RA");
+      var sevenFinal = sevenTimed.trajectory.evaluate(sevenDuration);
+      for (j in 0...7) near(
+        sevenFinal.positions[j],
+        sevenSamples.q[sevenSamples.q.length - 1][j],
+        "timed seven-axis path reaches its refined endpoint",
+        1e-6
+      );
+      var sevenBounds = new ValidationLimits(7, Int64.ofInt(0), Int64.ofInt(0));
+      for (j in 0...7) {
+        var bound = fixture.arm.group.limitsOf(j);
+        sevenBounds.position(j, bound.lower, bound.upper);
+        sevenBounds.velocity(j, 1.00001);
+        sevenBounds.acceleration(j, 2.00001);
+      }
+      check(
+        !sevenTimed.trajectory.validate(sevenBounds).hasFailure(),
+        "timed seven-axis path passes native extrema limits"
+      );
+    } catch (error:Dynamic) {
+      sevenTimed.releaseDistanceMap();
+      sevenTimed.trajectory.dispose();
+      throw error;
+    }
+    sevenTimed.releaseDistanceMap();
+    sevenTimed.trajectory.dispose();
+    var unsupportedFixture = buildContractArmFixture();
     // A skew wrist alone remains a known EAIK three-parallel-axis family.
     // Use a genuinely generic six-axis chain to exercise explicit fallback.
-    var axes=[[1.0,0,0],[0.0,1,0],[0.0,0,1],
-      [1.0/Math.sqrt(2),1.0/Math.sqrt(2),0],
-      [1.0/Math.sqrt(2),0,1.0/Math.sqrt(2)],
-      [0.0,1.0/Math.sqrt(2),1.0/Math.sqrt(2)]];
-    for(i in 0...6)unsupportedFixture.arm.robot.joints[i].axis=axes[i];
-    var unsupported=new robotkit.manipulation.KinematicGroup(unsupportedFixture.arm.robot,
-      unsupportedFixture.arm.rootLink,unsupportedFixture.arm.flangeFrame);
-    check(motionkit.robot.BranchIk.of(unsupported).family()=="numeric-fallback","unknown EAIK decomposition retains explicit numeric fallback");
-    var unsupportedSolver=new ManipulatorKinematics(unsupported),seed=[0.2,-0.8,0.6,-0.4,0.5,0.3],goal=seed.copy();goal[0]+=0.01;
-    var line=new PoseLine(new PoseWaypoint(unsupportedSolver.forward(seed),1e-6,1e-6),
-      new PoseWaypoint(unsupportedSolver.forward(goal),1e-6,1e-6),motionkit.path.OrientationPolicy.Interpolated,0.1,0.1);
-    var path=new motionkit.path.PosePath("task",[line]),distances=[for(i in 0...5)path.length()*i/4];
-    var numericRequest=new PathRequest(distances,[for(s in distances)path.poseAt(s)],seed,new IkTolerance(1e-6,1e-6),
-      [for(_ in seed)0.5],[for(_ in seed)1.0]);
-    var numericPlanner=new motionkit.robot.StructuredJointPathPlanner(unsupported);
-    var numericPath=numericPlanner.plan(path,numericRequest);
-    check(numericPlanner.fallbackDiagnostic!=null,"numeric path planner retains the unsupported-geometry diagnostic");
-    for(i in 0...distances.length)near(motionkit.path.PoseMath.distance(unsupportedSolver.forward(numericPath.q[i]),path.poseAt(distances[i])),0,
-      "numeric continuation refinement preserves authored geometry",1e-6);
-    var freeNumeric=new PathRequest([0.0,0.02],[unsupportedSolver.forward(seed),unsupportedSolver.forward(goal)],seed,
-      new IkTolerance(1e-6,1e-6,60),[for(_ in seed)0.5],[for(_ in seed)1.0],48,
-      [motionkit.path.OrientationPolicy.FreeAboutTool,motionkit.path.OrientationPolicy.FreeAboutTool]);
-    var finiteNumeric=new motionkit.robot.CandidateProblem(unsupported,freeNumeric,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,3,8,false));
-    for(layer in finiteNumeric.samples){
-      check(layer.candidates.length>0,"numeric reduced task retains reachable lattice states");
-      var cells=motionkit.robot.OrientationLattice.sample(layer.target,layer.freedom,4,3,8);
-      for(candidate in layer.candidates){
-        check(candidate.roll>=0 && candidate.roll<4,"numeric states retain explicit roll cell coordinates");
-        near(motionkit.path.PoseMath.angle(unsupportedSolver.forward(candidate.q),cells[candidate.roll].pose),0,
-          "numeric fallback solves the declared orientation cell",2e-6);
+    var axes = [
+      [1.0, 0, 0],
+      [0.0, 1, 0],
+      [0.0, 0, 1],
+      [1.0 / Math.sqrt(2), 1.0 / Math.sqrt(2), 0],
+      [
+        1.0 / Math.sqrt(2),
+        0,
+        1.0 / Math.sqrt(2)
+      ],
+      [
+        0.0,
+        1.0 / Math.sqrt(2),
+        1.0 / Math.sqrt(2)
+      ]
+    ];
+    for (i in 0...6) unsupportedFixture.arm.robot.joints[i].axis = axes[i];
+    var unsupported = new robotkit.manipulation.KinematicGroup(
+      unsupportedFixture.arm.robot,
+      unsupportedFixture.arm.rootLink,
+      unsupportedFixture.arm.flangeFrame
+    );
+    check(
+      motionkit.robot.BranchIk.of(unsupported).family() == "numeric-fallback",
+      "unknown EAIK decomposition retains explicit numeric fallback"
+    );
+    var unsupportedSolver = new ManipulatorKinematics(unsupported),
+      seed = [0.2, -0.8, 0.6, -0.4, 0.5, 0.3], goal = seed.copy();
+    goal[0] += 0.01;
+    var line = new PoseLine(
+      new PoseWaypoint(unsupportedSolver.forward(seed), 1e-6, 1e-6),
+      new PoseWaypoint(
+        unsupportedSolver.forward(goal),
+        1e-6,
+        1e-6
+      ),
+      motionkit.path.OrientationPolicy.Interpolated,
+      0.1,
+      0.1
+    );
+    var path = new motionkit.path.PosePath("task", [line]), distances = [for (i in 0...5) path.length() * i / 4];
+    var numericRequest = new PathRequest(
+      distances,
+      [for (s in distances) path.poseAt(s)],
+      seed,
+      new IkTolerance(
+        1e-6,
+        1e-6
+      ),
+      [for (_ in seed) 0.5],
+      [for (_ in seed) 1.0]
+    );
+    var numericPlanner = new motionkit.robot.StructuredJointPathPlanner(unsupported);
+    var numericPath = numericPlanner.plan(path, numericRequest);
+    check(numericPlanner.fallbackDiagnostic != null,
+      "numeric path planner retains the unsupported-geometry diagnostic");
+    for (i in 0...distances.length) near(
+      motionkit.path.PoseMath.distance(
+        unsupportedSolver.forward(numericPath.q[i]),
+        path.poseAt(distances[i])
+      ),
+      0,
+      "numeric continuation refinement preserves authored geometry",
+      1e-6
+    );
+    var freeNumeric = new PathRequest(
+      [0.0, 0.02],
+      [unsupportedSolver.forward(seed), unsupportedSolver.forward(goal)],
+      seed,
+      new IkTolerance(
+        1e-6,
+        1e-6,
+        60
+      ),
+      [for (_ in seed) 0.5],
+      [for (_ in seed) 1.0],
+      48,
+      [
+        motionkit.path.OrientationPolicy.FreeAboutTool,
+        motionkit.path.OrientationPolicy.FreeAboutTool
+      ]
+    );
+    var finiteNumeric = new motionkit.robot.CandidateProblem(
+      unsupported,
+      freeNumeric,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+        4,
+        3,
+        8,
+        false
+      )
+    );
+    for (layer in finiteNumeric.samples) {
+      check(layer.candidates.length > 0, "numeric reduced task retains reachable lattice states");
+      var cells = motionkit.robot.OrientationLattice.sample(layer.target, layer.freedom, 4, 3, 8);
+      for (candidate in layer.candidates) {
+        check(candidate.roll >= 0 && candidate.roll < 4, "numeric states retain explicit roll cell coordinates");
+        near(
+          motionkit.path.PoseMath.angle(unsupportedSolver.forward(candidate.q), cells[candidate.roll].pose),
+          0,
+          "numeric fallback solves the declared orientation cell",
+          2e-6
+        );
       }
     }
     var cell = buildWorkcellFixture();
-    var held = new motionkit.robot.NumericBranchIk(cell.group,"test external arm",new IkTolerance(1e-6,1e-6,30));
-    var complete = [for (i in 0...cell.group.group.count()) 0.1*Math.sin(i+0.3)];
-    var candidates = held.branches(held.forward(complete),complete);
-    check(candidates.length > 0,"numeric fallback accepts an external lattice cell");
-    var changedExternal=complete.copy();
-    for(i in 0...complete.length)if(cell.group.external[i])changedExternal[i]+=0.01;
-    var solveBefore=cell.group.numericSolveCount();
-    var deduplicated=held.branchesFromNeighbours(held.forward(complete),[complete,changedExternal,complete.copy()],complete,null,false);
-    check(cell.group.numericSolveCount()-solveBefore==1,"held external cells collapse identical numeric seeds before solving");
-    check(deduplicated.length==1 && deduplicated[0].branch==0,"collapsed numeric seeds retain the first original identity");
+    var held = new motionkit.robot.NumericBranchIk(cell.group, "test external arm", new IkTolerance(1e-6, 1e-6, 30));
+    var complete = [for (i in 0...cell.group.group.count()) 0.1 * Math.sin(i + 0.3)];
+    var candidates = held.branches(held.forward(complete), complete);
+    check(candidates.length > 0, "numeric fallback accepts an external lattice cell");
+    var changedExternal = complete.copy();
+    for (i in 0...complete.length) if (cell.group.external[i]) changedExternal[i] += 0.01;
+    var solveBefore = cell.group.numericSolveCount();
+    var deduplicated = held.branchesFromNeighbours(
+      held.forward(complete),
+      [complete, changedExternal, complete.copy()],
+      complete,
+      null,
+      false
+    );
+    check(
+      cell.group.numericSolveCount() - solveBefore == 1,
+      "held external cells collapse identical numeric seeds before solving"
+    );
+    check(
+      deduplicated.length == 1 && deduplicated[0].branch == 0,
+      "collapsed numeric seeds retain the first original identity"
+    );
 
-    for (candidate in candidates) for (i in 0...complete.length) if (cell.group.external[i])
-      near(candidate.q[i],complete[i],"numeric fallback holds external coordinates",1e-12);
+    for (candidate in candidates) for (i in 0...complete.length) if (cell.group.external[i]) near(
+      candidate.q[i],
+      complete[i],
+      "numeric fallback holds external coordinates",
+      1e-12
+    );
   }
 
   public function testCandidateProblem():Void {
     var fixture = buildContractArmFixture();
     var solver = new ManipulatorKinematics(fixture.arm);
-    var start = [0.2,-0.8,0.6,-0.4,0.5,0.3],end = start.copy();end[0] += 0.03;
-    var request = new PathRequest([0.0,0.04],[solver.forward(start),solver.forward(end)],start,new IkTolerance(1e-6,1e-6),
-      [for(_ in start)0.5],[for(_ in start)1.0],1);
+    var start = [0.2, -0.8, 0.6, -0.4, 0.5, 0.3], end = start.copy();
+    end[0] += 0.03;
+    var request = new PathRequest(
+      [0.0, 0.04],
+      [solver.forward(start), solver.forward(end)],
+      start,
+      new IkTolerance(
+        1e-6,
+        1e-6
+      ),
+      [for (_ in start) 0.5],
+      [for (_ in start) 1.0],
+      1
+    );
     var before = fixture.arm.numericSolveCount();
-    var problem = new motionkit.robot.CandidateProblem(fixture.arm,request);
-    check(problem.family == "EAIK" && problem.diagnostic == null,"path request selects the native UR family");
-    check(problem.samples.length == 2 && problem.samples[0].candidates.length == 1,"path problem pins the first complete configuration");
-    check(problem.samples[1].candidates.length > request.maxCandidates,"native candidate problem retains all branches beyond the legacy cap");
-    for(joint in 0...6)near(problem.samples[0].candidates[0].q[joint],start[joint],"pinned start stays exact",1e-12);
-    var repeated = new motionkit.robot.CandidateProblem(fixture.arm,request);
-    for(sample in 0...2) {
-      check(problem.samples[sample].candidates.length == repeated.samples[sample].candidates.length,"candidate problem counts are deterministic");
-      for(i in 0...problem.samples[sample].candidates.length) {
-        var candidate = problem.samples[sample].candidates[i],again = repeated.samples[sample].candidates[i];
-        check(candidate.branch == again.branch,"candidate problem branch order is deterministic");
-        for(joint in 0...6)near(candidate.q[joint],again.q[joint],"candidate problem joints are deterministic",1e-12);
+    var problem = new motionkit.robot.CandidateProblem(fixture.arm, request);
+    check(problem.family == "EAIK" && problem.diagnostic == null, "path request selects the native UR family");
+    check(
+      problem.samples.length == 2 && problem.samples[0].candidates.length == 1,
+      "path problem pins the first complete configuration"
+    );
+    check(
+      problem.samples[1].candidates.length > request.maxCandidates,
+      "native candidate problem retains all branches beyond the legacy cap"
+    );
+    for (joint in 0...6) near(
+      problem.samples[0].candidates[0].q[joint],
+      start[joint],
+      "pinned start stays exact",
+      1e-12
+    );
+    var repeated = new motionkit.robot.CandidateProblem(fixture.arm, request);
+    for (sample in 0...2) {
+      check(
+        problem.samples[sample].candidates.length == repeated.samples[sample].candidates.length,
+        "candidate problem counts are deterministic"
+      );
+      for (i in 0...problem.samples[sample].candidates.length) {
+        var candidate = problem.samples[sample].candidates[i], again = repeated.samples[sample].candidates[i];
+        check(candidate.branch == again.branch, "candidate problem branch order is deterministic");
+        for (joint in 0...6) near(
+          candidate.q[joint],
+          again.q[joint],
+          "candidate problem joints are deterministic",
+          1e-12
+        );
       }
     }
-    for(layer in problem.samples)for(candidate in layer.candidates){
-      var expectedLabel=motionkit.kinematics.SixAxisConfiguration.of("EAIK",candidate.branch,candidate.q);
-      check(expectedLabel.accepts(candidate.configuration),"deferred labels preserve native branches and physical turns");
+    for (layer in problem.samples) for (candidate in layer.candidates) {
+      var expectedLabel = motionkit.kinematics.SixAxisConfiguration.of("EAIK", candidate.branch, candidate.q);
+      check(
+        expectedLabel.accepts(candidate.configuration),
+        "deferred labels preserve native branches and physical turns"
+      );
     }
-    check(fixture.arm.numericSolveCount() == before,"native PathRequest candidate construction makes no numeric IK calls");
-    var selected=motionkit.robot.StructuredLadder.search(problem);
-    check(selected.diagnostic==null && selected.candidates.length==2,"Haxe structured ladder selects a complete native route");
-    var selectedAgain=motionkit.robot.StructuredLadder.search(problem);
-    var shiftedSpinTargets=[for(p in request.poses){
-      var rotation=new Quat(p.qx,p.qy,p.qz,p.qw).multiply(Quat.fromAxisAngle(new Vec3(0,0,1),Math.PI));
-      new Pose3(p.x,p.y,p.z,rotation.x,rotation.y,rotation.z,rotation.w);
-    }];
-    var shiftedSpinProblem=new motionkit.robot.CandidateProblem(fixture.arm,new PathRequest(request.distances,
-      shiftedSpinTargets,start,request.tolerance,request.maxJump,request.velocity,32,
-      [OrientationPolicy.FreeAboutTool,OrientationPolicy.FreeAboutTool]),
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,2,4),true);
-    check(shiftedSpinProblem.samples[0].candidates[0].roll==2,
-      "pinned free-spin metadata describes its actual orientation in the authored lattice");
-    solver.preferredPosture=start.copy();solver.preferTargetOrientation=true;
-    var cellPreferences=new motionkit.robot.JointPathPreferences(solver);
-    var cachedCost=cellPreferences.forProblem(fixture.arm,shiftedSpinProblem);
-    for(sample in 0...shiftedSpinProblem.samples.length)for(candidate in shiftedSpinProblem.samples[sample].candidates)
-      near(cachedCost(sample,candidate),cellPreferences.cost(fixture.arm,shiftedSpinProblem.request.poses[sample],candidate.q),
-        "analytic cell preference matches per-state FK across branches and turns",1e-8);
-    var referenceCost=motionkit.robot.StructuredLadder.search(shiftedSpinProblem,null,0,
-      (sample,candidate)->cellPreferences.cost(fixture.arm,shiftedSpinProblem.request.poses[sample],candidate.q));
-    var cachedSelection=motionkit.robot.StructuredLadder.search(shiftedSpinProblem,null,0,cachedCost);
-    check(referenceCost.diagnostic==cachedSelection.diagnostic,"orientation cell cache preserves reachability");
-    near(referenceCost.cost,cachedSelection.cost,"orientation cell cache preserves route cost",1e-8);
-    solver.preferredPosture=null;solver.preferTargetOrientation=false;
-    check(motionkit.robot.StructuredLadder.search(shiftedSpinProblem).diagnostic==null,
-      "a shifted authored spin cannot disconnect a reachable pinned continuation");
-    var freeOrientationPath=new PosePath("task",[new PoseLine(
-      new PoseWaypoint(request.poses[0],1e-6,1e-6),new PoseWaypoint(request.poses[1],1e-6,1e-6),
-      OrientationPolicy.Free,0.1,0.1)]);
-    var freeOrientationDistances=[for(i in 0...3)freeOrientationPath.length()*i/2];
-    var freeOrientationRequest=new PathRequest(freeOrientationDistances,
-      [for(s in freeOrientationDistances)freeOrientationPath.poseAt(s)],start,request.tolerance,
-      request.maxJump,request.velocity,32,[for(_ in freeOrientationDistances)OrientationPolicy.Free]);
-    var freeBefore=fixture.arm.numericSolveCount();
-    var freeOrientationCurve=new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,2,4)).plan(freeOrientationPath,freeOrientationRequest);
-    check(fixture.arm.numericSolveCount()==freeBefore,"UR full-free structured refinement needs no numeric pose IK");
-    for(i in 0...freeOrientationCurve.q.length)
-      near(motionkit.path.PoseMath.distance(solver.forward(freeOrientationCurve.q[i]),freeOrientationRequest.poses[i]),0,
-        "full-free serial refinement retains its hard position task",1e-6);
-    var freeCompiler=new ProgramCompiler(solver,new ValidationLimits(6,Int64.ofInt(1),Int64.ofInt(0)),"task",
-      [for(_ in start)1.0],[for(_ in start)2.0],[for(_ in start)20.0],StartTolerances.uniform(6,0.01,0.01,0.01),
-      null,0.01,0.5,1e-4,1e-4,request.tolerance,new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
-        new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,2,4)));
-    var freeCompiled=freeCompiler.compile(new MotionProgram([
-      MotionOp.FollowPath(freeOrientationPath,"task",0.1,[])]),start,Int64.ofInt(810));
+    check(
+      fixture.arm.numericSolveCount() == before,
+      "native PathRequest candidate construction makes no numeric IK calls"
+    );
+    var selected = motionkit.robot.StructuredLadder.search(problem);
+    check(
+      selected.diagnostic == null && selected.candidates.length == 2,
+      "Haxe structured ladder selects a complete native route"
+    );
+    var selectedAgain = motionkit.robot.StructuredLadder.search(problem);
+    var shiftedSpinTargets = [for (p in request.poses) {
+      var rotation = new Quat(p.qx, p.qy, p.qz, p.qw).multiply(Quat.fromAxisAngle(new Vec3(0, 0, 1), Math.PI));
+      new Pose3(p.x, p.y, p.z, rotation.x, rotation.y, rotation.z, rotation.w);
+    }
+    ];
+    var shiftedSpinProblem = new motionkit.robot.CandidateProblem(
+      fixture.arm,
+      new PathRequest(
+        request.distances,
+        shiftedSpinTargets,
+        start,
+        request.tolerance,
+        request.maxJump,
+        request.velocity,
+        32,
+        [
+          OrientationPolicy.FreeAboutTool,
+          OrientationPolicy.FreeAboutTool
+        ]
+      ),
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+        4,
+        2,
+        4
+      ),
+      true
+    );
+    check(
+      shiftedSpinProblem.samples[0].candidates[0].roll == 2,
+      "pinned free-spin metadata describes its actual orientation in the authored lattice"
+    );
+    solver.preferredPosture = start.copy();
+    solver.preferTargetOrientation = true;
+    var cellPreferences = new motionkit.robot.JointPathPreferences(solver);
+    var cachedCost = cellPreferences.forProblem(fixture.arm, shiftedSpinProblem);
+    for (sample in 0
+      ...shiftedSpinProblem.samples.length) for (candidate in shiftedSpinProblem.samples[sample].candidates) near(
+        cachedCost(
+          sample,
+          candidate
+        ),
+        cellPreferences.cost(
+          fixture.arm,
+          shiftedSpinProblem.request.poses[sample],
+          candidate.q
+        ),
+        "analytic cell preference matches per-state FK across branches and turns",
+        1e-8
+      );
+    var referenceCost = motionkit.robot.StructuredLadder.search(
+      shiftedSpinProblem,
+      null,
+      0,
+      (sample, candidate) -> cellPreferences.cost(
+        fixture.arm,
+        shiftedSpinProblem.request.poses[sample],
+        candidate.q
+      )
+    );
+    var cachedSelection = motionkit.robot.StructuredLadder.search(shiftedSpinProblem, null, 0, cachedCost);
+    check(referenceCost.diagnostic == cachedSelection.diagnostic, "orientation cell cache preserves reachability");
+    near(referenceCost.cost, cachedSelection.cost, "orientation cell cache preserves route cost", 1e-8);
+    solver.preferredPosture = null;
+    solver.preferTargetOrientation = false;
+    check(
+      motionkit.robot.StructuredLadder.search(shiftedSpinProblem).diagnostic == null,
+      "a shifted authored spin cannot disconnect a reachable pinned continuation"
+    );
+    var freeOrientationPath = new PosePath(
+      "task",
+      [new PoseLine(
+        new PoseWaypoint(request.poses[0], 1e-6, 1e-6),
+        new PoseWaypoint(
+          request.poses[1],
+          1e-6,
+          1e-6
+        ),
+        OrientationPolicy.Free,
+        0.1,
+        0.1
+      )]
+    );
+    var freeOrientationDistances = [for (i in 0...3) freeOrientationPath.length() * i / 2];
+    var freeOrientationRequest = new PathRequest(
+      freeOrientationDistances,
+      [for (s in freeOrientationDistances) freeOrientationPath.poseAt(s)],
+      start,
+      request.tolerance,
+      request.maxJump,
+      request.velocity,
+      32,
+      [for (_ in freeOrientationDistances) OrientationPolicy.Free]
+    );
+    var freeBefore = fixture.arm.numericSolveCount();
+    var freeOrientationCurve = new motionkit.robot.StructuredJointPathPlanner(
+      fixture.arm,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+        4,
+        2,
+        4
+      )
+    ).plan(
+      freeOrientationPath,
+      freeOrientationRequest
+    );
+    check(fixture.arm.numericSolveCount() == freeBefore, "UR full-free structured refinement needs no numeric pose IK");
+    for (i in 0...freeOrientationCurve.q.length) near(
+      motionkit.path.PoseMath.distance(
+        solver.forward(freeOrientationCurve.q[i]),
+        freeOrientationRequest.poses[i]
+      ),
+      0,
+      "full-free serial refinement retains its hard position task",
+      1e-6
+    );
+    var freeCompiler = new ProgramCompiler(
+      solver,
+      new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(0)),
+      "task",
+      [for (_ in start) 1.0],
+      [for (_ in start) 2.0],
+      [for (_ in start) 20.0],
+      StartTolerances.uniform(
+        6,
+        0.01,
+        0.01,
+        0.01
+      ),
+      null,
+      0.01,
+      0.5,
+      1e-4,
+      1e-4,
+      request.tolerance,
+      new motionkit.robot.StructuredJointPathPlanner(
+        fixture.arm,
+        new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+          4,
+          2,
+          4
+        )
+      )
+    );
+    var freeCompiled = freeCompiler.compile(
+      new MotionProgram([MotionOp.FollowPath(freeOrientationPath, "task", 0.1, [])]),
+      start,
+      Int64.ofInt(810)
+    );
     try {
-      check(freeCompiled.blocks[0].plans.length>0,"full-free serial path reaches native validated timing");
-      var nativePath=freeCompiled.blocks[0].plans[0];
-      for(j in 0...start.length)near(nativePath.evaluate(0).positions[j],start[j],
-        "compiled full-free path preserves the pinned configuration",1e-12);
-    } catch(error:Dynamic){freeCompiled.dispose();throw error;}
+      check(freeCompiled.blocks[0].plans.length > 0, "full-free serial path reaches native validated timing");
+      var nativePath = freeCompiled.blocks[0].plans[0];
+      for (j in 0...start.length) near(
+        nativePath.evaluate(0).positions[j],
+        start[j],
+        "compiled full-free path preserves the pinned configuration",
+        1e-12
+      );
+    } catch (error:Dynamic) {
+      freeCompiled.dispose();
+      throw error;
+    }
     freeCompiled.dispose();
-    var flippedFreeWaypoints=[for(p in request.poses){
-      var rotation=new Quat(p.qx,p.qy,p.qz,p.qw).multiply(Quat.fromAxisAngle(new Vec3(1,0,0),Math.PI));
-      new PoseWaypoint(new Pose3(p.x,p.y,p.z,rotation.x,rotation.y,rotation.z,rotation.w),1e-6,1e-6);
-    }];
-    var flippedFreePath=new PosePath("task",[new PoseLine(flippedFreeWaypoints[0],flippedFreeWaypoints[1],
-      OrientationPolicy.Free,0.1,0.1)]);
-    var flippedFreeRequest=new PathRequest(freeOrientationDistances,
-      [for(s in freeOrientationDistances)flippedFreePath.poseAt(s)],start,request.tolerance,
-      request.maxJump,request.velocity,32,[for(_ in freeOrientationDistances)OrientationPolicy.Free]);
-    var flippedFreeProblem=new motionkit.robot.CandidateProblem(fixture.arm,flippedFreeRequest,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,2,4),true);
-    var flippedRefiner=new motionkit.robot.AnalyticPathRefiner(fixture.arm,flippedFreeProblem,
-      motionkit.robot.StructuredLadder.search(flippedFreeProblem));
-    var flippedCurve=flippedRefiner.refinePath(freeOrientationDistances,new motionkit.robot.PosePathRefinement(flippedFreePath).at);
-    for(i in 0...flippedCurve.q.length)
-      near(motionkit.path.PoseMath.distance(solver.forward(flippedCurve.q[i]),flippedFreeRequest.poses[i]),0,
-        "antipodal authored free orientation does not invalidate the selected path",1e-6);
-    for(i in 0...flippedCurve.q.length)for(j in 0...start.length)
-      near(flippedCurve.q[i][j],freeOrientationCurve.q[i][j],
-        "unconstrained authored rotations do not shift the free candidate lattice",1e-10);
-    var freeMotion=flippedRefiner.orientationMotion(freeOrientationDistances[1],flippedFreeRequest.poses[1],
-      OrientationPolicy.Free,[0.0,0.0,0.0],[0.0,0.0,0.0]);
-    var authoredMotion=flippedRefiner.orientationMotion(freeOrientationDistances[1],flippedFreeRequest.poses[1],
-      OrientationPolicy.Free,[1.0,2.0,3.0],[4.0,5.0,6.0]);
-    for(axis in 0...3){
-      near(authoredMotion.velocity[axis],freeMotion.velocity[axis],"free angular velocity comes from the selected lift",1e-12);
-      near(authoredMotion.acceleration[axis],freeMotion.acceleration[axis],"free angular acceleration comes from the selected lift",1e-12);
+    var flippedFreeWaypoints = [for (p in request.poses) {
+      var rotation = new Quat(p.qx, p.qy, p.qz, p.qw).multiply(Quat.fromAxisAngle(new Vec3(1, 0, 0), Math.PI));
+      new PoseWaypoint(new Pose3(p.x, p.y, p.z, rotation.x, rotation.y, rotation.z, rotation.w), 1e-6, 1e-6);
     }
-    var flippedCompiled=freeCompiler.compile(new MotionProgram([
-      MotionOp.FollowPath(flippedFreePath,"task",0.1,[])]),start,Int64.ofInt(820));
+    ];
+    var flippedFreePath = new PosePath(
+      "task",
+      [new PoseLine(
+        flippedFreeWaypoints[0],
+        flippedFreeWaypoints[1],
+        OrientationPolicy.Free,
+        0.1,
+        0.1
+      )]
+    );
+    var flippedFreeRequest = new PathRequest(
+      freeOrientationDistances,
+      [for (s in freeOrientationDistances) flippedFreePath.poseAt(s)],
+      start,
+      request.tolerance,
+      request.maxJump,
+      request.velocity,
+      32,
+      [for (_ in freeOrientationDistances) OrientationPolicy.Free]
+    );
+    var flippedFreeProblem = new motionkit.robot.CandidateProblem(
+      fixture.arm,
+      flippedFreeRequest,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+        4,
+        2,
+        4
+      ),
+      true
+    );
+    var flippedRefiner = new motionkit.robot.AnalyticPathRefiner(
+      fixture.arm,
+      flippedFreeProblem,
+      motionkit.robot.StructuredLadder.search(flippedFreeProblem)
+    );
+    var flippedCurve = flippedRefiner.refinePath(
+      freeOrientationDistances,
+      new motionkit.robot.PosePathRefinement(flippedFreePath).at
+    );
+    for (i in 0...flippedCurve.q.length) near(
+      motionkit.path.PoseMath.distance(
+        solver.forward(flippedCurve.q[i]),
+        flippedFreeRequest.poses[i]
+      ),
+      0,
+      "antipodal authored free orientation does not invalidate the selected path",
+      1e-6
+    );
+    for (i in 0...flippedCurve.q.length) for (j in 0...start.length) near(
+      flippedCurve.q[i][j],
+      freeOrientationCurve.q[i][j],
+      "unconstrained authored rotations do not shift the free candidate lattice",
+      1e-10
+    );
+    var freeMotion = flippedRefiner.orientationMotion(
+      freeOrientationDistances[1],
+      flippedFreeRequest.poses[1],
+      OrientationPolicy.Free,
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0
+      ]
+    );
+    var authoredMotion = flippedRefiner.orientationMotion(
+      freeOrientationDistances[1],
+      flippedFreeRequest.poses[1],
+      OrientationPolicy.Free,
+      [
+        1.0,
+        2.0,
+        3.0
+      ],
+      [
+        4.0,
+        5.0,
+        6.0
+      ]
+    );
+    for (axis in 0...3) {
+      near(
+        authoredMotion.velocity[axis],
+        freeMotion.velocity[axis],
+        "free angular velocity comes from the selected lift",
+        1e-12
+      );
+      near(
+        authoredMotion.acceleration[axis],
+        freeMotion.acceleration[axis],
+        "free angular acceleration comes from the selected lift",
+        1e-12
+      );
+    }
+    var flippedCompiled = freeCompiler.compile(
+      new MotionProgram([MotionOp.FollowPath(flippedFreePath, "task", 0.1, [])]),
+      start,
+      Int64.ofInt(820)
+    );
     try {
-      check(flippedCompiled.blocks[0].plans.length>0,
-        "antipodal authored free orientation passes final native and task-space checks");
-    } catch(error:Dynamic){flippedCompiled.dispose();throw error;}
+      check(
+        flippedCompiled.blocks[0].plans.length > 0,
+        "antipodal authored free orientation passes final native and task-space checks"
+      );
+    } catch (error:Dynamic) {
+      flippedCompiled.dispose();
+      throw error;
+    }
     flippedCompiled.dispose();
-    var bounded=new motionkit.robot.CandidateProblem(fixture.arm,request);
-    var unboundedCount=bounded.samples[1].candidates.length;
+    var bounded = new motionkit.robot.CandidateProblem(fixture.arm, request);
+    var unboundedCount = bounded.samples[1].candidates.length;
     bounded.pruneUnreachableBounds();
-    check(bounded.samples[1].candidates.length<unboundedCount,
-      "forward jump bounds remove unreachable periodic lifts");
-    var boundedRoute=motionkit.robot.StructuredLadder.search(bounded);
-    var constructedBounded=new motionkit.robot.CandidateProblem(fixture.arm,request,null,true);
-    for(i in 0...bounded.samples.length){
-      check(constructedBounded.samples[i].candidates.length==bounded.samples[i].candidates.length,
-        "bounded native construction matches exhaustive forward pruning");
-      for(candidate in bounded.samples[i].candidates){
-        var found=false;
-        for(actual in constructedBounded.samples[i].candidates){var same=candidate.branch==actual.branch;
-          for(j in 0...start.length)if(Math.abs(candidate.q[j]-actual.q[j])>1e-10)same=false;
-          if(same)found=true;
+    check(
+      bounded.samples[1].candidates.length < unboundedCount,
+      "forward jump bounds remove unreachable periodic lifts"
+    );
+    var boundedRoute = motionkit.robot.StructuredLadder.search(bounded);
+    var constructedBounded = new motionkit.robot.CandidateProblem(fixture.arm, request, null, true);
+    for (i in 0...bounded.samples.length) {
+      check(
+        constructedBounded.samples[i].candidates.length == bounded.samples[i].candidates.length,
+        "bounded native construction matches exhaustive forward pruning"
+      );
+      for (candidate in bounded.samples[i].candidates) {
+        var found = false;
+        for (actual in constructedBounded.samples[i].candidates) {
+          var same = candidate.branch == actual.branch;
+          for (j in 0...start.length) if (Math.abs(candidate.q[j] - actual.q[j]) > 1e-10) same = false;
+          if (same) found = true;
         }
-        check(found,"bounded construction retains every feasible branch and periodic lift");
+        check(found, "bounded construction retains every feasible branch and periodic lift");
       }
     }
-    check(boundedRoute.diagnostic==null,"bounded candidate problem retains a complete route");
-    near(boundedRoute.cost,selected.cost,"forward bounds preserve the exact optimal route cost",1e-12);
-    for(i in 0...selected.candidates.length)for(j in 0...start.length)
-      near(boundedRoute.candidates[i].q[j],selected.candidates[i].q[j],
-        "forward bounds preserve selected physical joints",1e-12);
-    var serialSampler=new motionkit.robot.SerialCandidateSampler(fixture.arm);
-    var boundedSamples=serialSampler.sample(solver.forward(end),start,
-      motionkit.path.OrientationPolicy.Fixed,[],1,1,1,request.maxJump);
-    var allSamples=serialSampler.sample(solver.forward(end),start,
-      motionkit.path.OrientationPolicy.Fixed,[],1,1,1);
-    var feasible=[for(candidate in allSamples){
-      var legal=true;for(j in 0...start.length)
-        if(Math.abs(candidate.q[j]-start[j])>request.maxJump[j]+1e-12)legal=false;
-      if(legal)candidate;
-    }];
-    check(boundedSamples.length==feasible.length && boundedSamples.length>0,
-      "native bounded sampling retains every feasible periodic lift");
-    for(candidate in feasible){
-      var found=false;
-      for(actual in boundedSamples){var same=candidate.branch==actual.branch;
-        for(j in 0...start.length)if(Math.abs(candidate.q[j]-actual.q[j])>1e-10)same=false;
-        if(same)found=true;
+    check(boundedRoute.diagnostic == null, "bounded candidate problem retains a complete route");
+    near(boundedRoute.cost, selected.cost, "forward bounds preserve the exact optimal route cost", 1e-12);
+    for (i in 0...selected.candidates.length) for (j in 0...start.length) near(
+      boundedRoute.candidates[i].q[j],
+      selected.candidates[i].q[j],
+      "forward bounds preserve selected physical joints",
+      1e-12
+    );
+    var serialSampler = new motionkit.robot.SerialCandidateSampler(fixture.arm);
+    var boundedSamples = serialSampler.sample(
+      solver.forward(end),
+      start,
+      motionkit.path.OrientationPolicy.Fixed,
+      [],
+      1,
+      1,
+      1,
+      request.maxJump
+    );
+    var allSamples = serialSampler.sample(
+      solver.forward(end),
+      start,
+      motionkit.path.OrientationPolicy.Fixed,
+      [],
+      1,
+      1,
+      1
+    );
+    var feasible = [for (candidate in allSamples) {
+      var legal = true;
+      for (j in 0...start.length) if (Math.abs(candidate.q[j] - start[j]) > request.maxJump[j] + 1e-12) legal = false;
+      if (legal) candidate;
+    }
+    ];
+    check(
+      boundedSamples.length == feasible.length && boundedSamples.length > 0,
+      "native bounded sampling retains every feasible periodic lift"
+    );
+    for (candidate in feasible) {
+      var found = false;
+      for (actual in boundedSamples) {
+        var same = candidate.branch == actual.branch;
+        for (j in 0...start.length) if (Math.abs(candidate.q[j] - actual.q[j]) > 1e-10) same = false;
+        if (same) found = true;
       }
-      check(found,"native bounded sampling preserves feasible branches and joints");
+      check(found, "native bounded sampling preserves feasible branches and joints");
     }
-    var coarseSelected=motionkit.robot.StructuredLadder.search(problem,null,0,null,
-      new motionkit.robot.StructuredLadder.CoarseSearchOptions(1,1,24,0));
-    check(coarseSelected.diagnostic==null && coarseSelected.candidates.length==selected.candidates.length,
-      "Haxe coarse ladder selects a complete path");
-    near(coarseSelected.cost,selected.cost,"full-corridor coarse route agrees with exact native search",1e-12);
-    near(selected.cost,selectedAgain.cost,"structured native route cost is deterministic",1e-12);
-    for(sample in 0...2){var actual=solver.forward(selected.candidates[sample].q);
-      near(motionkit.path.PoseMath.distance(actual,request.poses[sample]),0,"selected native route retains task position",1e-6);
-      near(motionkit.path.PoseMath.angle(actual,request.poses[sample]),0,"selected native route retains task orientation",1e-6);
-      for(j in 0...6)near(selected.candidates[sample].q[j],selectedAgain.candidates[sample].q[j],"structured route is deterministic",1e-12);
+    var coarseSelected = motionkit.robot.StructuredLadder.search(
+      problem,
+      null,
+      0,
+      null,
+      new motionkit.robot.StructuredLadder.CoarseSearchOptions(
+        1,
+        1,
+        24,
+        0
+      )
+    );
+    check(
+      coarseSelected.diagnostic == null && coarseSelected.candidates.length == selected.candidates.length,
+      "Haxe coarse ladder selects a complete path"
+    );
+    near(coarseSelected.cost, selected.cost, "full-corridor coarse route agrees with exact native search", 1e-12);
+    near(selected.cost, selectedAgain.cost, "structured native route cost is deterministic", 1e-12);
+    for (sample in 0...2) {
+      var actual = solver.forward(selected.candidates[sample].q);
+      near(
+        motionkit.path.PoseMath.distance(actual, request.poses[sample]),
+        0,
+        "selected native route retains task position",
+        1e-6
+      );
+      near(
+        motionkit.path.PoseMath.angle(actual, request.poses[sample]),
+        0,
+        "selected native route retains task orientation",
+        1e-6
+      );
+      for (j in 0...6) near(
+        selected.candidates[sample].q[j],
+        selectedAgain.candidates[sample].q[j],
+        "structured route is deterministic",
+        1e-12
+      );
     }
-    var collisionChecks=0;
-    var collisionRoute=motionkit.robot.LazyCollisionLadder.selectWithChecks(problem,q -> {collisionChecks++;return null;});
-    near(collisionRoute.cost,selected.cost,"clear route retains native ladder cost",1e-12);
-    check(collisionChecks==problem.samples.length,"lazy collision checks only selected samples");
-    var unreachableExitProblem=new motionkit.robot.CandidateProblem(fixture.arm,request);
+    var collisionChecks = 0;
+    var collisionRoute = motionkit.robot.LazyCollisionLadder.selectWithChecks(problem, q -> {collisionChecks++;
+    return null;
+    });
+    near(collisionRoute.cost, selected.cost, "clear route retains native ladder cost", 1e-12);
+    check(collisionChecks == problem.samples.length, "lazy collision checks only selected samples");
+    var unreachableExitProblem = new motionkit.robot.CandidateProblem(fixture.arm, request);
     unreachableExitProblem.samples[1].candidates.resize(0);
-    var unreachableChecks=0;
-    var unreachableExit=motionkit.robot.LazyCollisionLadder.selectWithChecks(unreachableExitProblem,
-      q -> {unreachableChecks++;return null;},8,
-      null,null,null,null,null,
-      q -> {unreachableChecks++;return null;});
-    check(unreachableExit.diagnostic!=null && unreachableExit.failedSample==1 &&
-      unreachableExit.candidates.length==0 && unreachableChecks==0,
-      "an unreachable route retains its ladder diagnostic when an exit check is configured");
-    throws(function() motionkit.robot.LazyCollisionLadder.selectWithChecks(problem,q ->
-      ({a:"arm",b:"fixture",distance:0.0,required:0.01})),"impossible pinned start reports collision blockage");
-    throws(function() motionkit.robot.LazyCollisionLadder.selectWithChecks(problem,q -> null,8,
-      (from,to) -> ({a:"tool",b:"post",distance:0.0,required:0.01})),"sweep blockage cannot return a clear route");
-    var rerouteRequest=new PathRequest(request.distances,request.poses,start,request.tolerance,
-      [for(_ in start)10.0],request.velocity);
-    var rerouteProblem=new motionkit.robot.CandidateProblem(fixture.arm,rerouteRequest);
-    var initialRoute=motionkit.robot.StructuredLadder.search(rerouteProblem);
-    var freeStarts = new motionkit.robot.CandidateProblem(fixture.arm,rerouteRequest,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(12,3,8,false));
-    var entries = motionkit.robot.StructuredLadder.kBestStarts(freeStarts,3);
+    var unreachableChecks = 0;
+    var unreachableExit = motionkit.robot.LazyCollisionLadder.selectWithChecks(unreachableExitProblem,
+      q -> {unreachableChecks++;
+    return null;
+    }, 8, null, null, null, null, null, q -> {unreachableChecks++;
+    return null;
+    });
+    check(
+      unreachableExit.diagnostic != null
+      && unreachableExit.failedSample == 1 && unreachableExit.candidates.length == 0 && unreachableChecks == 0,
+      "an unreachable route retains its ladder diagnostic when an exit check is configured"
+    );
+    throws(
+      function() motionkit.robot.LazyCollisionLadder.selectWithChecks(
+        problem,
+        q -> ({
+          a: "arm",
+          b: "fixture",
+          distance: 0.0,
+          required: 0.01
+        })
+      ),
+      "impossible pinned start reports collision blockage"
+    );
+    throws(
+      function() motionkit.robot.LazyCollisionLadder.selectWithChecks(
+        problem,
+        q -> null,
+        8,
+        (from, to) -> ({
+          a: "tool",
+          b: "post",
+          distance: 0.0,
+          required: 0.01
+        })
+      ),
+      "sweep blockage cannot return a clear route"
+    );
+    var rerouteRequest = new PathRequest(
+      request.distances,
+      request.poses,
+      start,
+      request.tolerance,
+      [for (_ in start) 10.0],
+      request.velocity
+    );
+    var rerouteProblem = new motionkit.robot.CandidateProblem(fixture.arm, rerouteRequest);
+    var initialRoute = motionkit.robot.StructuredLadder.search(rerouteProblem);
+    var freeStarts = new motionkit.robot.CandidateProblem(
+      fixture.arm,
+      rerouteRequest,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+        12,
+        3,
+        8,
+        false
+      )
+    );
+    var entries = motionkit.robot.StructuredLadder.kBestStarts(freeStarts, 3);
     check(entries.length == 3, "free start retains three complete alternative entries");
-    near(entries[0].cost, motionkit.robot.StructuredLadder.search(freeStarts).cost,
-      "first alternative is the cheapest complete route including entry cost", 1e-12);
+    near(
+      entries[0].cost,
+      motionkit.robot.StructuredLadder.search(freeStarts).cost,
+      "first alternative is the cheapest complete route including entry cost",
+      1e-12
+    );
     for (i in 1...entries.length) {
-      check(entries[i].cost >= entries[i-1].cost - 1e-12, "alternative entries retain cost order");
+      check(entries[i].cost >= entries[i - 1].cost - 1e-12, "alternative entries retain cost order");
       var distinct = false;
-      for (joint in 0...start.length)
-        if (Math.abs(entries[i].candidates[0].q[joint] - entries[0].candidates[0].q[joint]) > 1e-7) distinct = true;
+      for (joint in 0...start.length) if (Math.abs(entries[i].candidates[0].q[joint]
+        - entries[0].candidates[0].q[joint]) > 1e-7) distinct = true;
       check(distinct, "alternative entry changes physical joints");
     }
     var entryChecks = 0;
-    var secondEntry = motionkit.robot.LazyCollisionLadder.selectWithChecks(freeStarts,q -> null,
-      2,null,null,null,null,(from,to) -> {
-        entryChecks++;
-        return to == entries[0].candidates[0].q ? {a:"tool",b:"entry-post",distance:0.0,required:0.01} : null;
-      });
-    check(secondEntry.candidates[0] == entries[1].candidates[0] && entryChecks == 2,
-      "blocked first entry falls back to the second complete route");
+    var secondEntry = motionkit.robot.LazyCollisionLadder.selectWithChecks(freeStarts,
+      q -> null, 2, null, null, null, null, (
+        from,
+        to
+      ) -> {entryChecks++;
+    return to == entries[0].candidates[0].q ? {
+      a:"tool", b:"entry-post", distance:0.0, required:0.01
+    }
+    :null;
+    });
+    check(
+      secondEntry.candidates[0] == entries[1].candidates[0] && entryChecks == 2,
+      "blocked first entry falls back to the second complete route"
+    );
     var impossibleEntry = "";
-    try motionkit.robot.LazyCollisionLadder.selectWithChecks(freeStarts,q -> null,2,null,null,null,null,
-      (from,to) -> ({a:"tool",b:"entry-post",distance:0.0,required:0.01}))
-    catch (error:Dynamic) impossibleEntry = Std.string(error);
-    check(impossibleEntry.indexOf("entry-post") >= 0 && impossibleEntry.indexOf("sample 0") >= 0,
-      "blocked entries report the physical pair and start sample within the retry budget");
-    check(motionkit.robot.StructuredLadder.kBestStarts(problem,3).length == 1,
-      "a pinned start produces one entry alternative");
+    try motionkit.robot.LazyCollisionLadder.selectWithChecks(
+      freeStarts,
+      q -> null,
+      2,
+      null,
+      null,
+      null,
+      null,
+      (
+        from,
+        to
+      ) -> ({
+        a: "tool",
+        b: "entry-post",
+        distance: 0.0,
+        required: 0.01
+      })
+    ) catch (error:Dynamic) impossibleEntry = Std.string(error);
+    check(
+      impossibleEntry.indexOf("entry-post") >= 0 && impossibleEntry.indexOf("sample 0") >= 0,
+      "blocked entries report the physical pair and start sample within the retry budget"
+    );
+    check(
+      motionkit.robot.StructuredLadder.kBestStarts(problem, 3).length == 1,
+      "a pinned start produces one entry alternative"
+    );
 
-    var preference = (sample:Int, candidate:motionkit.robot.CartesianCandidateSampler.LatticeCandidate) ->
-      sample == 1 && candidate == initialRoute.candidates[1] ? 1000.0 : 0.0;
+    var preference = (sample:Int, candidate:motionkit.robot.CartesianCandidateSampler.LatticeCandidate) -> sample == 1
+      && candidate == initialRoute.candidates[1] ? 1000.0 : 0.0;
     var preferredRoute = motionkit.robot.StructuredLadder.search(rerouteProblem, null, 0, preference);
-    var preferredClearRoute = motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,
-      q -> null, 2, null, null, null, preference);
-    check(preferredClearRoute.candidates[1] == preferredRoute.candidates[1] &&
-      preferredClearRoute.candidates[1] != initialRoute.candidates[1],
-      "lazy clearance retains process state preferences");
+    var preferredClearRoute = motionkit.robot.LazyCollisionLadder.selectWithChecks(
+      rerouteProblem,
+      q -> null,
+      2,
+      null,
+      null,
+      null,
+      preference
+    );
+    check(
+      preferredClearRoute.candidates[1] == preferredRoute.candidates[1]
+      && preferredClearRoute.candidates[1] != initialRoute.candidates[1],
+      "lazy clearance retains process state preferences"
+    );
     near(preferredClearRoute.cost, preferredRoute.cost, "lazy clearance retains preference cost", 1e-12);
     var preferredRetry = motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,
-      q -> q == preferredRoute.candidates[1].q ? {a:"tool", b:"post", distance:0.0, required:0.01} : null,
-      2, null, null, null, preference);
-    check(preferredRetry.candidates[1] != preferredRoute.candidates[1] &&
-      preferredRetry.candidates[1] != initialRoute.candidates[1],
-      "collision retries retain process preferences while excluding blocked states");
-    var motionWeights = [0.1,0.2,0.3,2.0,3.0,4.0];
-    var weightedRoute = motionkit.robot.StructuredLadder.search(rerouteProblem,motionWeights,0.5,preference);
-    var weightedClear = motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> null,
-      2,null,null,null,preference,null,null,motionWeights,0.5);
-    near(weightedClear.cost,weightedRoute.cost,"lazy clearance retains weighted motion and preference costs",1e-12);
-    check(weightedClear.candidates[1] == weightedRoute.candidates[1],
-      "lazy clearance retains the weighted winning route");
+      q -> q == preferredRoute.candidates[1].q ? {
+      a:"tool", b:"post", distance:0.0, required:0.01
+    }
+    :null, 2, null, null, null, preference);
+    check(
+      preferredRetry.candidates[1] != preferredRoute.candidates[1]
+      && preferredRetry.candidates[1] != initialRoute.candidates[1],
+      "collision retries retain process preferences while excluding blocked states"
+    );
+    var motionWeights = [0.1, 0.2, 0.3, 2.0, 3.0, 4.0];
+    var weightedRoute = motionkit.robot.StructuredLadder.search(rerouteProblem, motionWeights, 0.5, preference);
+    var weightedClear = motionkit.robot.LazyCollisionLadder.selectWithChecks(
+      rerouteProblem,
+      q -> null,
+      2,
+      null,
+      null,
+      null,
+      preference,
+      null,
+      null,
+      motionWeights,
+      0.5
+    );
+    near(weightedClear.cost, weightedRoute.cost, "lazy clearance retains weighted motion and preference costs", 1e-12);
+    check(
+      weightedClear.candidates[1] == weightedRoute.candidates[1],
+      "lazy clearance retains the weighted winning route"
+    );
     var weightedChecks = 0;
-    var weightedRetry = motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> {
-      weightedChecks++;
-      return q == weightedRoute.candidates[1].q ? {a:"tool",b:"weighted-post",distance:0.0,required:0.01} : null;
-    },2,null,null,null,preference,null,null,motionWeights,0.5);
-    check(weightedRetry.candidates[1] != weightedRoute.candidates[1] && weightedChecks == 4,
-      "weighted collision search retries within the same round bound");
-    throws(function() new motionkit.robot.StructuredJointPathPlanner(fixture.arm,null,null,null,8,false,null,null,
-      [1.0],0.0),"planner rejects a mismatched motion weight vector");
-    throws(function() new motionkit.robot.StructuredJointPathPlanner(fixture.arm,null,null,null,8,false,null,null,
-      null,-1.0),"planner rejects a negative roll-change cost");
+    var weightedRetry = motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem, q -> {weightedChecks++;
+    return q == weightedRoute.candidates[1].q ? {
+      a:"tool", b:"weighted-post", distance:0.0, required:0.01
+    }
+    :null;
+    }, 2, null, null, null, preference, null, null, motionWeights, 0.5);
+    check(
+      weightedRetry.candidates[1] != weightedRoute.candidates[1] && weightedChecks == 4,
+      "weighted collision search retries within the same round bound"
+    );
+    throws(
+      function() new motionkit.robot.StructuredJointPathPlanner(
+        fixture.arm,
+        null,
+        null,
+        null,
+        8,
+        false,
+        null,
+        null,
+        [1.0],
+        0.0
+      ),
+      "planner rejects a mismatched motion weight vector"
+    );
+    throws(
+      function() new motionkit.robot.StructuredJointPathPlanner(
+        fixture.arm,
+        null,
+        null,
+        null,
+        8,
+        false,
+        null,
+        null,
+        null,
+        -1.0
+      ),
+      "planner rejects a negative roll-change cost"
+    );
     var exitChecks = 0;
-    var clearExit = motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> null,
-      2,null,null,null,null,null,q -> {
-        exitChecks++;
-        return q == initialRoute.candidates[1].q ? {a:"tool",b:"retreat-post",distance:0.0,required:0.01} : null;
-      });
-    check(exitChecks == 2 && clearExit.candidates[1] != initialRoute.candidates[1],
-      "blocked retreat retries an alternative complete route");
+    var clearExit = motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,
+      q -> null, 2, null, null, null, null, null, q -> {exitChecks++;
+    return q == initialRoute.candidates[1].q ? {
+      a:"tool", b:"retreat-post", distance:0.0, required:0.01
+    }
+    :null;
+    });
+    check(
+      exitChecks == 2 && clearExit.candidates[1] != initialRoute.candidates[1],
+      "blocked retreat retries an alternative complete route"
+    );
     var impossibleExit = "";
-    try motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> null,
-      2,null,null,null,null,null,q -> ({a:"tool",b:"retreat-post",distance:0.0,required:0.01}))
-    catch (error:Dynamic) impossibleExit = Std.string(error);
-    check(impossibleExit.indexOf("retreat-post") >= 0 && impossibleExit.indexOf("sample 1") >= 0,
-      "impossible retreat identifies the blocking pair and final sample within the shared budget");
-    var blockedEndpoint=initialRoute.candidates[1].q,rerouteChecks=0;
-    var rerouted=motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> {
-      rerouteChecks++;
-      return q==blockedEndpoint ? {a:"wrist",b:"obstacle",distance:0.0,required:0.01} : null;
-    },2);
-    check(rerouted.diagnostic==null && rerouted.candidates[1].q!=blockedEndpoint,
-      "lazy collision retries select a different legal candidate");
-    check(rerouteChecks==4,"one rejected sample causes exactly two bounded search rounds");
-    near(motionkit.path.PoseMath.distance(solver.forward(rerouted.candidates[1].q),request.poses[1]),0,
-      "collision rerouting retains the geometric task",1e-6);
-    throws(function() motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q ->
-      q==blockedEndpoint ? {a:"wrist",b:"obstacle",distance:0.0,required:0.01} : null,1),
-      "collision retry budget is enforced before accepting an unchecked alternate");
-    var sweepChecks=0;
-    var sweepRoute=motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> null,2,
-      (from,to) -> {sweepChecks++;return to==blockedEndpoint ? {a:"tool",b:"post",distance:0.0,required:0.01} : null;});
-    check(sweepRoute.candidates[1].q!=blockedEndpoint && sweepChecks==2,
-      "lazy sweep exclusions reroute the blocked transition in two rounds");
-    var blockedEdge=new motionkit.robot.StructuredLadder.BlockedLadderEdge(1,
+    try motionkit.robot.LazyCollisionLadder.selectWithChecks(
+      rerouteProblem,
+      q -> null,
+      2,
+      null,
+      null,
+      null,
+      null,
+      null,
+      q -> ({
+        a: "tool",
+        b: "retreat-post",
+        distance: 0.0,
+        required: 0.01
+      })
+    ) catch (error:Dynamic) impossibleExit = Std.string(error);
+    check(
+      impossibleExit.indexOf("retreat-post") >= 0 && impossibleExit.indexOf("sample 1") >= 0,
+      "impossible retreat identifies the blocking pair and final sample within the shared budget"
+    );
+    var blockedEndpoint = initialRoute.candidates[1].q, rerouteChecks = 0;
+    var rerouted = motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem, q -> {rerouteChecks++;
+    return q == blockedEndpoint ? {
+      a:"wrist", b:"obstacle", distance:0.0, required:0.01
+    }
+    :null;
+    }, 2);
+    check(
+      rerouted.diagnostic == null && rerouted.candidates[1].q != blockedEndpoint,
+      "lazy collision retries select a different legal candidate"
+    );
+    check(rerouteChecks == 4, "one rejected sample causes exactly two bounded search rounds");
+    near(
+      motionkit.path.PoseMath.distance(solver.forward(rerouted.candidates[1].q), request.poses[1]),
+      0,
+      "collision rerouting retains the geometric task",
+      1e-6
+    );
+    throws(function() motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem, q -> q == blockedEndpoint ? {
+      a:"wrist", b:"obstacle", distance:0.0, required:0.01
+    }
+    :null, 1), "collision retry budget is enforced before accepting an unchecked alternate");
+    var sweepChecks = 0;
+    var sweepRoute = motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,
+      q -> null, 2, (from, to) -> {sweepChecks++;
+    return to == blockedEndpoint ? {
+      a:"tool", b:"post", distance:0.0, required:0.01
+    }
+    :null;
+    });
+    check(
+      sweepRoute.candidates[1].q != blockedEndpoint && sweepChecks == 2,
+      "lazy sweep exclusions reroute the blocked transition in two rounds"
+    );
+    var blockedEdge = new motionkit.robot.StructuredLadder.BlockedLadderEdge(
+      1,
       rerouteProblem.samples[0].candidates.indexOf(initialRoute.candidates[0]),
-      rerouteProblem.samples[1].candidates.indexOf(initialRoute.candidates[1]));
-    var filteredRoute=motionkit.robot.StructuredLadder.search(rerouteProblem,null,0,null,null,[blockedEdge]);
-    check(filteredRoute.diagnostic==null && filteredRoute.candidates[1].q!=blockedEndpoint,
-      "Haxe edge records reach filtered native search");
-    throws(function() motionkit.robot.StructuredLadder.search(rerouteProblem,null,0,null,null,
-      [new motionkit.robot.StructuredLadder.BlockedLadderEdge(0,0,0)]),"Haxe rejects a nonadjacent blocked edge");
-    var refinementChecks=0;
-    var refinedReroute=motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> null,2,null,null,route -> {
-      refinementChecks++;
-      return route.candidates[1].q==blockedEndpoint ? new motionkit.robot.LazyCollisionLadder.RefinedCollision(1,true,
-        {a:"refined-tool",b:"post",distance:0.0,required:0.01}) : null;
+      rerouteProblem.samples[1].candidates.indexOf(initialRoute.candidates[1])
+    );
+    var filteredRoute = motionkit.robot.StructuredLadder.search(rerouteProblem, null, 0, null, null, [blockedEdge]);
+    check(
+      filteredRoute.diagnostic == null && filteredRoute.candidates[1].q != blockedEndpoint,
+      "Haxe edge records reach filtered native search"
+    );
+    throws(
+      function() motionkit.robot.StructuredLadder.search(
+        rerouteProblem,
+        null,
+        0,
+        null,
+        null,
+        [new motionkit.robot.StructuredLadder.BlockedLadderEdge(
+          0,
+          0,
+          0
+        )]
+      ),
+      "Haxe rejects a nonadjacent blocked edge"
+    );
+    var refinementChecks = 0;
+    var refinedReroute = motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,
+      q -> null, 2, null, null, route -> {refinementChecks++;
+    return route.candidates[1].q == blockedEndpoint ? new motionkit.robot.LazyCollisionLadder.RefinedCollision(
+      1,
+      true,
+      {
+        a : "refined-tool",
+        b : "post",
+        distance : 0.0,
+        required : 0.01
+      }
+    ) : null;
     });
-    check(refinementChecks==2 && refinedReroute.candidates[1].q!=blockedEndpoint,
-      "refined sweep failure reroutes within the shared collision budget");
-    var originalRoute=motionkit.robot.StructuredLadder.search(rerouteProblem);
-    check(originalRoute.candidates[1].q==blockedEndpoint,"lazy collision filtering leaves the source candidate problem unchanged");
-    var refiner=new motionkit.robot.AnalyticPathRefiner(fixture.arm,problem,selected);
-    var previous=start.copy();
-    for(i in 0...11){var q=start.copy();q[0]+=0.003*i;var target=solver.forward(q);
-      var refined=refiner.sample(0.004*i,target,motionkit.path.OrientationPolicy.Fixed,previous);
-      check(refined.branch==selected.candidates[0].branch,"refinement retains the selected geometric branch");
-      near(motionkit.path.PoseMath.distance(solver.forward(refined.q),target),0,"refined analytic TCP preserves the task",1e-6);
-      for(j in 0...q.length)near(refined.q[j],q[j],"fixed-orientation refinement retains the continuous joint lift",1e-6);
-      previous=refined.q;
+    check(
+      refinementChecks == 2 && refinedReroute.candidates[1].q != blockedEndpoint,
+      "refined sweep failure reroutes within the shared collision budget"
+    );
+    var originalRoute = motionkit.robot.StructuredLadder.search(rerouteProblem);
+    check(
+      originalRoute.candidates[1].q == blockedEndpoint,
+      "lazy collision filtering leaves the source candidate problem unchanged"
+    );
+    var refiner = new motionkit.robot.AnalyticPathRefiner(fixture.arm, problem, selected);
+    var previous = start.copy();
+    for (i in 0...11) {
+      var q = start.copy();
+      q[0] += 0.003 * i;
+      var target = solver.forward(q);
+      var refined = refiner.sample(0.004 * i, target, motionkit.path.OrientationPolicy.Fixed, previous);
+      check(refined.branch == selected.candidates[0].branch, "refinement retains the selected geometric branch");
+      near(
+        motionkit.path.PoseMath.distance(solver.forward(refined.q), target),
+        0,
+        "refined analytic TCP preserves the task",
+        1e-6
+      );
+      for (j in 0...q.length) near(
+        refined.q[j],
+        q[j],
+        "fixed-orientation refinement retains the continuous joint lift",
+        1e-6
+      );
+      previous = refined.q;
     }
-    var h=1e-4,at=start.copy(),minus=start.copy(),plus=start.copy();
-    at[0]+=0.015;minus[0]+=0.015-0.75*h;plus[0]+=0.015+0.75*h;
-    var pa=solver.forward(at),pm=solver.forward(minus),pp=solver.forward(plus);
-    var relative=new Quat(pp.qx,pp.qy,pp.qz,pp.qw).multiply(new Quat(pm.qx,pm.qy,pm.qz,pm.qw).conjugate());
-    var length=Math.sqrt(relative.x*relative.x+relative.y*relative.y+relative.z*relative.z);
-    var angularScale=2*Math.atan2(length,relative.w)/(2*h*length);
-    var taskFirst=[(pp.x-pm.x)/(2*h),(pp.y-pm.y)/(2*h),(pp.z-pm.z)/(2*h),
-      relative.x*angularScale,relative.y*angularScale,relative.z*angularScale];
-    var taskSecond=[(pp.x-2*pa.x+pm.x)/(h*h),(pp.y-2*pa.y+pm.y)/(h*h),(pp.z-2*pa.z+pm.z)/(h*h),0.0,0.0,0.0];
-    var derivatives=refiner.refinedDerivatives(0.02,at,pa,motionkit.path.OrientationPolicy.Fixed,taskFirst,taskSecond);
-    for(j in 0...at.length){near(derivatives.first[j],j==0?0.75:0,"differential rates match the independently sampled FK path",1e-5);
-      near(derivatives.second[j],0,"differential acceleration cancels Jacobian variation",1e-4);}
-    var refinedPath=refiner.refinePath([for(i in 0...21)0.002*i],(distance)->{
-      var q=start.copy();q[0]+=0.75*distance;var p=solver.forward(q);
-      return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(p,motionkit.path.OrientationPolicy.Fixed,
-        [-0.75*p.y,0.75*p.x,0.0,0.0,0.0,0.75],[-0.5625*p.x,-0.5625*p.y,0.0,0.0,0.0,0.0]);
+    var h = 1e-4, at = start.copy(), minus = start.copy(), plus = start.copy();
+    at[0] += 0.015;
+    minus[0] += 0.015 - 0.75 * h;
+    plus[0] += 0.015 + 0.75 * h;
+    var pa = solver.forward(at), pm = solver.forward(minus), pp = solver.forward(plus);
+    var relative = new Quat(pp.qx, pp.qy, pp.qz, pp.qw).multiply(new Quat(pm.qx, pm.qy, pm.qz, pm.qw).conjugate());
+    var length = Math.sqrt(relative.x * relative.x + relative.y * relative.y + relative.z * relative.z);
+    var angularScale = 2 * Math.atan2(length, relative.w) / (2 * h * length);
+    var taskFirst = [
+      (pp.x - pm.x) / (2 * h),
+      (pp.y - pm.y) / (2 * h),
+      (pp.z - pm.z) / (2 * h),
+      relative.x * angularScale,
+      relative.y * angularScale,
+      relative.z * angularScale
+    ];
+    var taskSecond = [
+      (pp.x - 2 * pa.x + pm.x) / (h * h),
+      (pp.y - 2 * pa.y + pm.y) / (h * h),
+      (pp.z - 2 * pa.z + pm.z) / (h * h),
+      0.0,
+      0.0,
+      0.0
+    ];
+    var derivatives = refiner.refinedDerivatives(
+      0.02,
+      at,
+      pa,
+      motionkit.path.OrientationPolicy.Fixed,
+      taskFirst,
+      taskSecond
+    );
+    for (j in 0...at.length) {
+      near(derivatives.first[j], j == 0 ? 0.75 : 0, "differential rates match the independently sampled FK path", 1e-5);
+      near(derivatives.second[j], 0, "differential acceleration cancels Jacobian variation", 1e-4);
+    }
+    var refinedPath = refiner.refinePath([for (i in 0...21) 0.002 * i], (distance) -> {var q = start.copy();
+    q[0] += 0.75 * distance;
+    var p = solver.forward(q);
+    return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(
+      p,
+      motionkit.path.OrientationPolicy.Fixed,
+      [
+        -0.75 * p.y,
+        0.75 * p.x,
+        0.0,
+        0.0,
+        0.0,
+        0.75
+      ],
+      [
+        -0.5625 * p.x,
+        -0.5625 * p.y,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    );
     });
-    for(i in 0...refinedPath.s.length)for(j in 0...start.length){
-      near(refinedPath.q[i][j],start[j]+(j==0?0.75*refinedPath.s[i]:0),"refined joint path retains the exact analytic curve",1e-6);
-      near(refinedPath.qPrime[i][j],j==0?0.75:0,"refined joint path carries differential velocity",1e-6);
-      near(refinedPath.qDoublePrime[i][j],0,"refined joint path carries differential curvature",1e-5);
+    for (i in 0...refinedPath.s.length) for (j in 0...start.length) {
+      near(
+        refinedPath.q[i][j],
+        start[j] + (j == 0 ? 0.75 * refinedPath.s[i] : 0),
+        "refined joint path retains the exact analytic curve",
+        1e-6
+      );
+      near(refinedPath.qPrime[i][j], j == 0 ? 0.75 : 0, "refined joint path carries differential velocity", 1e-6);
+      near(refinedPath.qDoublePrime[i][j], 0, "refined joint path carries differential curvature", 1e-5);
     }
-    var globalTask=(distance:Float)->{
-      var q=start.copy();q[0]+=0.75*distance;var p=solver.forward(q);
-      return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(p,OrientationPolicy.Fixed,
-        [-0.75*p.y,0.75*p.x,0.0,0.0,0.0,0.75],[-0.5625*p.x,-0.5625*p.y,0.0,0.0,0.0,0.0]);
+    var globalTask = (distance:Float) -> {var q = start.copy();
+    q[0] += 0.75 * distance;
+    var p = solver.forward(q);
+    return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(
+      p,
+      OrientationPolicy.Fixed,
+      [
+        -0.75 * p.y,
+        0.75 * p.x,
+        0.0,
+        0.0,
+        0.0,
+        0.75
+      ],
+      [
+        -0.5625 * p.x,
+        -0.5625 * p.y,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    );
     };
-    var sectionProblem=new motionkit.robot.CandidateProblem(fixture.arm,new PathRequest([0.0,0.02,0.04],
-      [for(s in [0.0,0.02,0.04])globalTask(s).pose],start,request.tolerance,request.maxJump,request.velocity,32,
-      [OrientationPolicy.Fixed,OrientationPolicy.Fixed,OrientationPolicy.Fixed]),null,true);
-    var sectionSelection=motionkit.robot.StructuredLadder.search(sectionProblem);
-    var sectionRefiner=new motionkit.robot.AnalyticPathRefiner(fixture.arm,sectionProblem,sectionSelection);
-    var firstSection=sectionRefiner.refineSection(refinedPath.s.slice(0,11),globalTask);
-    var secondSection=sectionRefiner.refineSection(refinedPath.s.slice(10),globalTask);
-    for(section in [firstSection,secondSection])for(i in 0...section.s.length){
-      var globalIndex=Std.int(Math.round(section.s[i]/0.002));
-      for(j in 0...start.length){
-        near(section.q[i][j],refinedPath.q[globalIndex][j],"section refinement retains global selected geometry",1e-9);
-        near(section.qPrime[i][j],refinedPath.qPrime[globalIndex][j],"section refinement retains global redundancy rates",1e-9);
+    var sectionProblem = new motionkit.robot.CandidateProblem(
+      fixture.arm,
+      new PathRequest(
+        [0.0, 0.02, 0.04],
+        [for (s in [
+          0.0,
+          0.02,
+          0.04
+        ]) globalTask(s).pose],
+        start,
+        request.tolerance,
+        request.maxJump,
+        request.velocity,
+        32,
+        [
+          OrientationPolicy.Fixed,
+          OrientationPolicy.Fixed,
+          OrientationPolicy.Fixed
+        ]
+      ),
+      null,
+      true
+    );
+    var sectionSelection = motionkit.robot.StructuredLadder.search(sectionProblem);
+    var sectionRefiner = new motionkit.robot.AnalyticPathRefiner(fixture.arm, sectionProblem, sectionSelection);
+    var firstSection = sectionRefiner.refineSection(refinedPath.s.slice(0, 11), globalTask);
+    var secondSection = sectionRefiner.refineSection(refinedPath.s.slice(10), globalTask);
+    for (section in [firstSection, secondSection]) for (i in 0...section.s.length) {
+      var globalIndex = Std.int(Math.round(section.s[i] / 0.002));
+      for (j in 0...start.length) {
+        near(
+          section.q[i][j],
+          refinedPath.q[globalIndex][j],
+          "section refinement retains global selected geometry",
+          1e-9
+        );
+        near(
+          section.qPrime[i][j],
+          refinedPath.qPrime[globalIndex][j],
+          "section refinement retains global redundancy rates",
+          1e-9
+        );
       }
     }
-    for(j in 0...start.length)near(firstSection.q[firstSection.q.length-1][j],secondSection.q[0][j],
-      "independently timed sections share the same physical knot",1e-9);
-    var reversalProblem=new motionkit.robot.CandidateProblem(fixture.arm,new PathRequest([0.0,0.02,0.04],
-      [globalTask(0).pose,globalTask(0.02).pose,globalTask(0).pose],start,request.tolerance,
-      request.maxJump,request.velocity,32,[OrientationPolicy.Fixed,OrientationPolicy.Fixed,OrientationPolicy.Fixed]),null,true);
-    var reversalRefiner=new motionkit.robot.AnalyticPathRefiner(fixture.arm,reversalProblem,
-      motionkit.robot.StructuredLadder.search(reversalProblem));
-    var arrivingSection=reversalRefiner.refineSection([0.0,0.01,0.02],globalTask);
-    var departingSection=reversalRefiner.refineSection([0.02,0.03,0.04],distance->{
-      var task=globalTask(0.04-distance);
-      return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(task.pose,task.freedom,
-        [for(value in task.velocity)-value],task.acceleration);
+    for (j in 0...start.length) near(
+      firstSection.q[firstSection.q.length - 1][j],
+      secondSection.q[0][j],
+      "independently timed sections share the same physical knot",
+      1e-9
+    );
+    var reversalProblem = new motionkit.robot.CandidateProblem(
+      fixture.arm,
+      new PathRequest(
+        [0.0, 0.02, 0.04],
+        [
+          globalTask(0).pose,
+          globalTask(0.02).pose,
+          globalTask(0).pose
+        ],
+        start,
+        request.tolerance,
+        request.maxJump,
+        request.velocity,
+        32,
+        [
+          OrientationPolicy.Fixed,
+          OrientationPolicy.Fixed,
+          OrientationPolicy.Fixed
+        ]
+      ),
+      null,
+      true
+    );
+    var reversalRefiner = new motionkit.robot.AnalyticPathRefiner(
+      fixture.arm,
+      reversalProblem,
+      motionkit.robot.StructuredLadder.search(reversalProblem)
+    );
+    var arrivingSection = reversalRefiner.refineSection([0.0, 0.01, 0.02], globalTask);
+    var departingSection = reversalRefiner.refineSection([0.02,
+      0.03, 0.04], distance -> {var task = globalTask(0.04 - distance);
+    return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(
+      task.pose,
+      task.freedom,
+      [for (value in task.velocity) - value],
+      task.acceleration
+    );
     });
-    for(j in 0...start.length)near(arrivingSection.q[2][j],departingSection.q[0][j],
-      "stop-and-reverse sections share their selected physical corner",1e-9);
-    near(arrivingSection.qPrime[2][0],0.75,"corner arrival retains its own derivative",1e-6);
-    near(departingSection.qPrime[0][0],-0.75,"corner departure retains its own derivative",1e-6);
-    throws(function() refiner.refineSection([0.001,0.04],globalTask),
-      "section refinement rejects endpoints missing from the selected route");
-    var timed=new ToppraPathTiming().time(refinedPath,new PathTimingLimits([for(_ in start)1.0],[for(_ in start)2.0]));
+    for (j in 0...start.length) near(
+      arrivingSection.q[2][j],
+      departingSection.q[0][j],
+      "stop-and-reverse sections share their selected physical corner",
+      1e-9
+    );
+    near(arrivingSection.qPrime[2][0], 0.75, "corner arrival retains its own derivative", 1e-6);
+    near(departingSection.qPrime[0][0], -0.75, "corner departure retains its own derivative", 1e-6);
+    throws(
+      function() refiner.refineSection([0.001, 0.04], globalTask),
+      "section refinement rejects endpoints missing from the selected route"
+    );
+    var timed = new ToppraPathTiming().time(
+      refinedPath,
+      new PathTimingLimits(
+        [for (_ in start) 1.0],
+        [for (_ in start) 2.0]
+      )
+    );
     try {
-      var duration=timed.trajectory.durationSeconds();check(duration>0 && Math.isFinite(duration),"refined path succeeds in one TOPP-RA timing pass");
-      near(timed.distanceToTime(0.04),duration,"refined path end maps to timing end",1e-6);
-      for(i in 0...101){var state=timed.trajectory.evaluate(duration*i/100);
-        for(j in 0...start.length){check(Math.abs(state.velocities[j])<=1.00001,"timed refinement respects joint speed");
-          check(Math.abs(state.accelerations[j])<=2.00001,"timed refinement respects joint acceleration");}}
-      var exactLimits=new ValidationLimits(start.length,Int64.ofInt(0),Int64.ofInt(0));
-      for(j in 0...start.length){var bound=fixture.arm.group.limitsOf(j);exactLimits.position(j,bound.lower,bound.upper);
-        exactLimits.velocity(j,1.00001);exactLimits.acceleration(j,2.00001);}
-      check(!timed.trajectory.validate(exactLimits).hasFailure(),"native extrema validation proves refined trajectory bounds");
-      var finalState=timed.trajectory.evaluate(duration);
-      for(j in 0...start.length)near(finalState.positions[j],end[j],"timed refinement reaches the complete path endpoint",1e-6);
-    } catch(error:Dynamic){timed.releaseDistanceMap();timed.trajectory.dispose();throw error;}
-    timed.releaseDistanceMap();timed.trajectory.dispose();
-    var nativeCompileBefore=fixture.arm.numericSolveCount();
-    var serialLimits=new ValidationLimits(start.length,Int64.ofInt(1),Int64.ofInt(0));
-    var serialCompiler=new ProgramCompiler(solver,serialLimits,"task",
-      [for(_ in start)1.0],[for(_ in start)2.0],[for(_ in start)20.0],
-      StartTolerances.uniform(start.length,0.02,0.02,0.02),null,0.005,0.5,0.005,0.02,
-      null);
-    check(Std.isOfType(serialCompiler.jointPathPlanner,motionkit.robot.StructuredJointPathPlanner),
-      "standalone UR adapter defaults to structured planning");
-    var savedPosture=start.copy();
-    solver.preferredPosture=savedPosture;
-    var snapshot=new motionkit.robot.JointPathPreferences(solver);
-    near(snapshot.cost(fixture.arm,request.poses[0],start),0,"preferred posture has zero state cost",1e-12);
-    savedPosture[0]+=1;
-    near(snapshot.cost(fixture.arm,request.poses[0],start),0,"request preferences copy mutable posture",1e-12);
-    var updatedSnapshot=new motionkit.robot.JointPathPreferences(solver);
-    near(updatedSnapshot.cost(fixture.arm,request.poses[0],start),1,"new request sees updated preferences",1e-12);
-    var preferenceWorker:ManipulatorKinematics=cast solver.fork();
-    savedPosture[0]+=1;
-    near(new motionkit.robot.JointPathPreferences(preferenceWorker).cost(fixture.arm,request.poses[0],start),1,
-      "worker preferences remain independent of caller mutation",1e-12);
-    solver.preferredPosture=[0.0];
-    throws(function() new motionkit.robot.JointPathPreferences(solver),
-      "structured posture preferences reject incomplete joint vectors");
-    solver.preferredPosture=start.copy();solver.preferredPosture[0]=Math.NaN;
-    throws(function() new motionkit.robot.JointPathPreferences(solver),
-      "structured posture preferences reject nonfinite joints");
-    solver.preferredPosture=null;
-    solver.preferredOrientation=solver.forward(start);
-    var orientationSnapshot=new motionkit.robot.JointPathPreferences(solver);
-    solver.preferredOrientation=null;
-    near(orientationSnapshot.cost(fixture.arm,request.poses[1],start),0,
-      "explicit orientation preference overrides authored rotation",1e-12);
-    solver.preferTargetOrientation=true;
-    var targetSnapshot=new motionkit.robot.JointPathPreferences(solver);
-    check(targetSnapshot.cost(fixture.arm,request.poses[1],start)>0,
-      "authored target orientation supplies a soft state cost");
-    solver.preferTargetOrientation=false;
-    var serialProgram=new MotionProgram([MotionOp.MoveL(solver.forward(end),"task",0.1,Blend.ExactStop)]);
-    var serialCompiled=serialCompiler.compile(serialProgram,start,Int64.ofInt(920));
-    check(serialCompiled.blocks[0].plans.length==1,"UR MoveL compiles through structured selection and differential refinement");
+      var duration = timed.trajectory.durationSeconds();
+      check(duration > 0 && Math.isFinite(duration), "refined path succeeds in one TOPP-RA timing pass");
+      near(timed.distanceToTime(0.04), duration, "refined path end maps to timing end", 1e-6);
+      for (i in 0...101) {
+        var state = timed.trajectory.evaluate(duration * i / 100);
+        for (j in 0...start.length) {
+          check(Math.abs(state.velocities[j]) <= 1.00001, "timed refinement respects joint speed");
+          check(Math.abs(state.accelerations[j]) <= 2.00001, "timed refinement respects joint acceleration");
+        }
+      }
+      var exactLimits = new ValidationLimits(start.length, Int64.ofInt(0), Int64.ofInt(0));
+      for (j in 0...start.length) {
+        var bound = fixture.arm.group.limitsOf(j);
+        exactLimits.position(j, bound.lower, bound.upper);
+        exactLimits.velocity(j, 1.00001);
+        exactLimits.acceleration(j, 2.00001);
+      }
+      check(
+        !timed.trajectory.validate(exactLimits).hasFailure(),
+        "native extrema validation proves refined trajectory bounds"
+      );
+      var finalState = timed.trajectory.evaluate(duration);
+      for (j in 0...start.length) near(
+        finalState.positions[j],
+        end[j],
+        "timed refinement reaches the complete path endpoint",
+        1e-6
+      );
+    } catch (error:Dynamic) {
+      timed.releaseDistanceMap();
+      timed.trajectory.dispose();
+      throw error;
+    }
+    timed.releaseDistanceMap();
+    timed.trajectory.dispose();
+    var nativeCompileBefore = fixture.arm.numericSolveCount();
+    var serialLimits = new ValidationLimits(start.length, Int64.ofInt(1), Int64.ofInt(0));
+    var serialCompiler = new ProgramCompiler(
+      solver,
+      serialLimits,
+      "task",
+      [for (_ in start) 1.0],
+      [for (_ in start) 2.0],
+      [for (_ in start) 20.0],
+      StartTolerances.uniform(
+        start.length,
+        0.02,
+        0.02,
+        0.02
+      ),
+      null,
+      0.005,
+      0.5,
+      0.005,
+      0.02,
+      null
+    );
+    check(
+      Std.isOfType(serialCompiler.jointPathPlanner, motionkit.robot.StructuredJointPathPlanner),
+      "standalone UR adapter defaults to structured planning"
+    );
+    var savedPosture = start.copy();
+    solver.preferredPosture = savedPosture;
+    var snapshot = new motionkit.robot.JointPathPreferences(solver);
+    near(snapshot.cost(fixture.arm, request.poses[0], start), 0, "preferred posture has zero state cost", 1e-12);
+    savedPosture[0] += 1;
+    near(snapshot.cost(fixture.arm, request.poses[0], start), 0, "request preferences copy mutable posture", 1e-12);
+    var updatedSnapshot = new motionkit.robot.JointPathPreferences(solver);
+    near(updatedSnapshot.cost(fixture.arm, request.poses[0], start), 1, "new request sees updated preferences", 1e-12);
+    var preferenceWorker:ManipulatorKinematics = cast solver.fork();
+    savedPosture[0] += 1;
+    near(
+      new motionkit.robot.JointPathPreferences(preferenceWorker).cost(fixture.arm, request.poses[0], start),
+      1,
+      "worker preferences remain independent of caller mutation",
+      1e-12
+    );
+    solver.preferredPosture = [0.0];
+    throws(
+      function() new motionkit.robot.JointPathPreferences(solver),
+      "structured posture preferences reject incomplete joint vectors"
+    );
+    solver.preferredPosture = start.copy();
+    solver.preferredPosture[0] = Math.NaN;
+    throws(
+      function() new motionkit.robot.JointPathPreferences(solver),
+      "structured posture preferences reject nonfinite joints"
+    );
+    solver.preferredPosture = null;
+    solver.preferredOrientation = solver.forward(start);
+    var orientationSnapshot = new motionkit.robot.JointPathPreferences(solver);
+    solver.preferredOrientation = null;
+    near(
+      orientationSnapshot.cost(fixture.arm, request.poses[1], start),
+      0,
+      "explicit orientation preference overrides authored rotation",
+      1e-12
+    );
+    solver.preferTargetOrientation = true;
+    var targetSnapshot = new motionkit.robot.JointPathPreferences(solver);
+    check(
+      targetSnapshot.cost(fixture.arm, request.poses[1], start) > 0,
+      "authored target orientation supplies a soft state cost"
+    );
+    solver.preferTargetOrientation = false;
+    var serialProgram = new MotionProgram([MotionOp.MoveL(solver.forward(end), "task", 0.1, Blend.ExactStop)]);
+    var serialCompiled = serialCompiler.compile(serialProgram, start, Int64.ofInt(920));
+    check(
+      serialCompiled.blocks[0].plans.length == 1,
+      "UR MoveL compiles through structured selection and differential refinement"
+    );
     serialCompiled.dispose();
-    check(fixture.arm.numericSolveCount()==nativeCompileBefore,"structured UR compilation uses no numeric pose IK");
-    var serialWorker=serialCompiler.forWorker();
-    var serialWorkerPlan=serialWorker.compile(serialProgram,start,Int64.ofInt(921));
-    check(serialWorkerPlan.blocks[0].plans.length==1,"UR worker compiles through independent structured planning");
+    check(fixture.arm.numericSolveCount() == nativeCompileBefore, "structured UR compilation uses no numeric pose IK");
+    var serialWorker = serialCompiler.forWorker();
+    var serialWorkerPlan = serialWorker.compile(serialProgram, start, Int64.ofInt(921));
+    check(serialWorkerPlan.blocks[0].plans.length == 1, "UR worker compiles through independent structured planning");
     serialWorkerPlan.dispose();
-    var entryPlanner = new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(12,3,8,false),null,
-      new CollisionFixture(fixture.arm, start).clearance());
-    var entryCompiler = new ProgramCompiler(solver,serialLimits,"task",
-      [for (_ in start) 1.0],[for (_ in start) 2.0],[for (_ in start) 20.0],
-      StartTolerances.uniform(start.length,0.02,0.02,0.02),null,0.005,0.5,0.005,0.02,null,entryPlanner);
-    var entryPath = new PosePath("task",[new PoseLine(new PoseWaypoint(solver.forward(start),0.005,0.02),
-      new PoseWaypoint(solver.forward(end),0.005,0.02),OrientationPolicy.Interpolated,0.1,0.1)]);
-    var current = start.copy(); current[0] -= 0.02;
+    var entryPlanner = new motionkit.robot.StructuredJointPathPlanner(
+      fixture.arm,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+        12,
+        3,
+        8,
+        false
+      ),
+      null,
+      new CollisionFixture(
+        fixture.arm,
+        start
+      ).clearance()
+    );
+    var entryCompiler = new ProgramCompiler(
+      solver,
+      serialLimits,
+      "task",
+      [for (_ in start) 1.0],
+      [for (_ in start) 2.0],
+      [for (_ in start) 20.0],
+      StartTolerances.uniform(
+        start.length,
+        0.02,
+        0.02,
+        0.02
+      ),
+      null,
+      0.005,
+      0.5,
+      0.005,
+      0.02,
+      null,
+      entryPlanner
+    );
+    var entryPath = new PosePath(
+      "task",
+      [new PoseLine(
+        new PoseWaypoint(solver.forward(start), 0.005, 0.02),
+        new PoseWaypoint(
+          solver.forward(end),
+          0.005,
+          0.02
+        ),
+        OrientationPolicy.Interpolated,
+        0.1,
+        0.1
+      )]
+    );
+    var current = start.copy();
+    current[0] -= 0.02;
     var entryProgram = new MotionProgram([
-      MotionOp.SetOutput("process-ready",motionkit.event.EventValue.Digital(true)),
-      MotionOp.FollowPath(entryPath,"task",0.1,
-        [new motionkit.event.PathEvent(0.0,"process-on",motionkit.event.EventValue.Digital(true))])]);
-    var entryCompiled = entryCompiler.compile(entryProgram,current,Int64.ofInt(924));
+      MotionOp.SetOutput("process-ready", motionkit.event.EventValue.Digital(true)),
+      MotionOp.FollowPath(
+        entryPath,
+        "task",
+        0.1,
+        [new motionkit.event.PathEvent(
+          0.0,
+          "process-on",
+          motionkit.event.EventValue.Digital(true)
+        )]
+      )
+    ]);
+    var entryCompiled = entryCompiler.compile(entryProgram, current, Int64.ofInt(924));
     var entryBlock = entryCompiled.blocks[0];
     check(entryBlock.plans.length == 2, "free-start FollowPath emits an entry motion then a path motion");
-    check(entryBlock.pathLengths[0] == 0.0 && entryBlock.pathLengths[1] == entryPath.length(),
-      "joint entry has no process path progress");
-    check(entryBlock.plans[0].events.length == 1 && entryBlock.plans[1].events.length == 1 &&
-      entryBlock.plans[0].events[0].channel == "process-ready" && entryBlock.plans[1].events[0].channel == "process-on",
-      "explicit outputs retain program order and distance events begin after entry");
+    check(
+      entryBlock.pathLengths[0] == 0.0 && entryBlock.pathLengths[1] == entryPath.length(),
+      "joint entry has no process path progress"
+    );
+    check(
+      entryBlock.plans[0].events.length == 1
+      && entryBlock.plans[1].events.length == 1 && entryBlock.plans[0].events[0].channel == "process-ready"
+      && entryBlock.plans[1].events[0].channel == "process-on",
+      "explicit outputs retain program order and distance events begin after entry"
+    );
     for (joint in 0...start.length) {
-      near(entryBlock.plans[0].evaluate(0.0).positions[joint],current[joint],"entry begins at current state",1e-7);
-      near(entryBlock.plans[0].evaluate(entryBlock.plans[0].durationSeconds).positions[joint],
-        entryBlock.plans[1].evaluate(0.0).positions[joint],"entry joins selected path without a joint jump",1e-7);
+      near(entryBlock.plans[0].evaluate(0.0).positions[joint], current[joint], "entry begins at current state", 1e-7);
+      near(
+        entryBlock.plans[0].evaluate(entryBlock.plans[0].durationSeconds).positions[joint],
+        entryBlock.plans[1].evaluate(0.0).positions[joint],
+        "entry joins selected path without a joint jump",
+        1e-7
+      );
     }
     entryCompiled.dispose();
-    var entered = entryCompiler.compile(entryProgram,start,Int64.ofInt(926));
+    var entered = entryCompiler.compile(entryProgram, start, Int64.ofInt(926));
     check(entered.blocks[0].plans.length == 1, "an already selected start omits zero-length entry motion");
     entered.dispose();
-    var retreatPlanner = new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(12,3,8,false),null,
-      new CollisionFixture(fixture.arm, start).clearance(),8,false,null,current);
-    var retreatCompiler = new ProgramCompiler(solver,serialLimits,"task",
-      [for (_ in start) 1.0],[for (_ in start) 2.0],[for (_ in start) 20.0],
-      StartTolerances.uniform(start.length,0.02,0.02,0.02),null,0.005,0.5,0.005,0.02,null,retreatPlanner);
-    var retreated = retreatCompiler.compile(entryProgram,current,Int64.ofInt(930));
+    var retreatPlanner = new motionkit.robot.StructuredJointPathPlanner(
+      fixture.arm,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+        12,
+        3,
+        8,
+        false
+      ),
+      null,
+      new CollisionFixture(
+        fixture.arm,
+        start
+      ).clearance(),
+      8,
+      false,
+      null,
+      current
+    );
+    var retreatCompiler = new ProgramCompiler(
+      solver,
+      serialLimits,
+      "task",
+      [for (_ in start) 1.0],
+      [for (_ in start) 2.0],
+      [for (_ in start) 20.0],
+      StartTolerances.uniform(
+        start.length,
+        0.02,
+        0.02,
+        0.02
+      ),
+      null,
+      0.005,
+      0.5,
+      0.005,
+      0.02,
+      null,
+      retreatPlanner
+    );
+    var retreated = retreatCompiler.compile(entryProgram, current, Int64.ofInt(930));
     check(retreated.blocks[0].plans.length == 3, "free path emits entry, process and safe retreat motions");
     var retreatPlan = retreated.blocks[0].plans[2];
-    check(retreated.blocks[0].pathLengths[2] == 0.0 && retreatPlan.events.length == 0,
-      "retreat has no process progress or inherited events");
+    check(
+      retreated.blocks[0].pathLengths[2] == 0.0 && retreatPlan.events.length == 0,
+      "retreat has no process progress or inherited events"
+    );
     for (joint in 0...current.length) {
-      near(retreatPlan.evaluate(0.0).positions[joint],
+      near(
+        retreatPlan.evaluate(0.0).positions[joint],
         retreated.blocks[0].plans[1].evaluate(retreated.blocks[0].plans[1].durationSeconds).positions[joint],
-        "retreat joins the process endpoint",1e-7);
-      near(retreatPlan.evaluate(retreatPlan.durationSeconds).positions[joint],current[joint],
-        "retreat reaches the requested safe joints",1e-7);
+        "retreat joins the process endpoint",
+        1e-7
+      );
+      near(
+        retreatPlan.evaluate(retreatPlan.durationSeconds).positions[joint],
+        current[joint],
+        "retreat reaches the requested safe joints",
+        1e-7
+      );
     }
     retreated.dispose();
-    var copiedRetreat = retreatPlanner.retreatTarget(); copiedRetreat[0] += 0.1;
-    near(retreatPlanner.retreatTarget()[0],current[0],"retreat target is protected from caller mutation");
-    var coneStartPose=solver.forward(start),coneEndPose=solver.forward(end);
-    var coneAxis=fixture.arm.tcpPose(start).transformVector(new Vec3(0,0,1)).toArray();
-    var authoredCone=new motionkit.path.PosePath("task",[new PoseLine(
-      new PoseWaypoint(coneStartPose,1e-6,1e-6),new PoseWaypoint(coneEndPose,1e-6,1e-6),
-      motionkit.path.OrientationPolicy.Cone(coneAxis,0.1),0.1,0.1)]);
-    var coneCompiler=new ProgramCompiler(solver,serialLimits,"task",
-      [for(_ in start)1.0],[for(_ in start)2.0],[for(_ in start)20.0],
-      StartTolerances.uniform(start.length,0.02,0.02,0.02),null,0.005,0.5,0.005,0.02,
-      null,new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
-        new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,4)));
-    var coneCompiled=coneCompiler.compile(new MotionProgram([MotionOp.FollowPath(authoredCone,"task",0.1,[])]),
-      start,Int64.ofInt(922));
-    check(coneCompiled.blocks[0].plans.length==1,"UR cone path compiles through projected-centre refinement and timing");
+    var copiedRetreat = retreatPlanner.retreatTarget();
+    copiedRetreat[0] += 0.1;
+    near(retreatPlanner.retreatTarget()[0], current[0], "retreat target is protected from caller mutation");
+    var coneStartPose = solver.forward(start), coneEndPose = solver.forward(end);
+    var coneAxis = fixture.arm.tcpPose(start).transformVector(new Vec3(0, 0, 1)).toArray();
+    var authoredCone = new motionkit.path.PosePath(
+      "task",
+      [new PoseLine(
+        new PoseWaypoint(coneStartPose, 1e-6, 1e-6),
+        new PoseWaypoint(
+          coneEndPose,
+          1e-6,
+          1e-6
+        ),
+        motionkit.path.OrientationPolicy.Cone(
+          coneAxis,
+          0.1
+        ),
+        0.1,
+        0.1
+      )]
+    );
+    var coneCompiler = new ProgramCompiler(
+      solver,
+      serialLimits,
+      "task",
+      [for (_ in start) 1.0],
+      [for (_ in start) 2.0],
+      [for (_ in start) 20.0],
+      StartTolerances.uniform(
+        start.length,
+        0.02,
+        0.02,
+        0.02
+      ),
+      null,
+      0.005,
+      0.5,
+      0.005,
+      0.02,
+      null,
+      new motionkit.robot.StructuredJointPathPlanner(
+        fixture.arm,
+        new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+          4,
+          1,
+          4
+        )
+      )
+    );
+    var coneCompiled = coneCompiler.compile(
+      new MotionProgram([MotionOp.FollowPath(authoredCone, "task", 0.1, [])]),
+      start,
+      Int64.ofInt(922)
+    );
+    check(
+      coneCompiled.blocks[0].plans.length == 1,
+      "UR cone path compiles through projected-centre refinement and timing"
+    );
     coneCompiled.dispose();
-    check(fixture.arm.numericSolveCount()==nativeCompileBefore,"structured cone compilation uses no numeric pose IK");
+    check(fixture.arm.numericSolveCount() == nativeCompileBefore,
+      "structured cone compilation uses no numeric pose IK");
     function cornerQ(distance:Float):Array<Float> {
-      var q=start.copy();q[0]+=0.75*distance-0.1*0.02*0.02+(distance<0.02?0.1*(distance-0.02)*(distance-0.02):0);return q;
+      var q = start.copy();
+      q[0] += 0.75 * distance - 0.1 * 0.02 * 0.02 + (distance < 0.02 ? 0.1 * (distance - 0.02) * (distance - 0.02) : 0);
+      return q;
     }
-    var cornerRequest=new PathRequest([0.0,0.02,0.04],[for(s in [0.0,0.02,0.04])solver.forward(cornerQ(s))],start,
-      new IkTolerance(1e-6,1e-6),request.maxJump,request.velocity);
-    var cornerProblem=new motionkit.robot.CandidateProblem(fixture.arm,cornerRequest);
-    var cornerRefiner=new motionkit.robot.AnalyticPathRefiner(fixture.arm,cornerProblem,motionkit.robot.StructuredLadder.search(cornerProblem));
-    var cornerPath=cornerRefiner.refinePath([for(i in 0...21)0.002*i],(distance)->{
-      var p=solver.forward(cornerQ(distance)),rate=0.75+(distance<0.02?0.2*(distance-0.02):0);
-      var outgoing=distance<0.02?0.2:0.0,incoming=distance<=0.02?0.2:0.0;
-      function acceleration(a:Float):Array<Float> return [-rate*rate*p.x-a*p.y,-rate*rate*p.y+a*p.x,0.0,0.0,0.0,a];
-      return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(p,motionkit.path.OrientationPolicy.Fixed,
-        [-rate*p.y,rate*p.x,0.0,0.0,0.0,rate],acceleration(outgoing),acceleration(incoming));
+    var cornerRequest = new PathRequest(
+      [0.0, 0.02, 0.04],
+      [for (s in [0.0, 0.02, 0.04]) solver.forward(cornerQ(s))],
+      start,
+      new IkTolerance(
+        1e-6,
+        1e-6
+      ),
+      request.maxJump,
+      request.velocity
+    );
+    var cornerProblem = new motionkit.robot.CandidateProblem(fixture.arm, cornerRequest);
+    var cornerRefiner = new motionkit.robot.AnalyticPathRefiner(
+      fixture.arm,
+      cornerProblem,
+      motionkit.robot.StructuredLadder.search(cornerProblem)
+    );
+    var cornerPath = cornerRefiner.refinePath([for (i in 0...21) 0.002 * i],
+      (distance) -> {var p = solver.forward(cornerQ(distance)),
+      rate = 0.75 + (distance < 0.02 ? 0.2 * (distance - 0.02) : 0);
+    var outgoing = distance < 0.02 ? 0.2 : 0.0, incoming = distance <= 0.02 ? 0.2 : 0.0;
+    function acceleration(a:Float):Array<Float> return [
+      -rate * rate * p.x - a * p.y,
+      -rate * rate * p.y + a * p.x,
+      0.0,
+      0.0,
+      0.0,
+      a
+    ];
+    return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(
+      p,
+      motionkit.path.OrientationPolicy.Fixed,
+      [
+        -rate * p.y,
+        rate * p.x,
+        0.0,
+        0.0,
+        0.0,
+        rate
+      ],
+      acceleration(outgoing),
+      acceleration(incoming)
+    );
     });
-    near(cornerPath.qDoublePrime[10][0],0,"refined path preserves outgoing curvature",1e-5);
-    near(cornerPath.qDoublePrimeBefore[10][0],0.2,"refined path preserves incoming curvature at a C1 knot",1e-5);
-    near(cornerPath.qPrime[10][0],0.75,"curvature break retains its continuous tangent",1e-6);
-    var spinTargets=[for(p in request.poses){var rotation=new Quat(p.qx,p.qy,p.qz,p.qw).multiply(Quat.fromAxisAngle(new Vec3(0,0,1),0.17));
-      new Pose3(p.x,p.y,p.z,rotation.x,rotation.y,rotation.z,rotation.w);}];
-    var spinRequest=new PathRequest(request.distances,spinTargets,start,new IkTolerance(1e-6,1e-6),request.maxJump,request.velocity,1,
-      [for(_ in spinTargets)motionkit.path.OrientationPolicy.FreeAboutTool]);
-    var spinProblem=new motionkit.robot.CandidateProblem(fixture.arm,spinRequest);
-    var spinSelected=motionkit.robot.StructuredLadder.search(spinProblem);
-    check(spinSelected.diagnostic==null,"free-spin refinement fixture has a selected path");
-    var spinRefiner=new motionkit.robot.AnalyticPathRefiner(fixture.arm,spinProblem,spinSelected);
-    previous=start.copy();
-    for(i in 0...11){var q=start.copy();q[0]+=0.003*i;var p=solver.forward(q);
-      var rotation=new Quat(p.qx,p.qy,p.qz,p.qw).multiply(Quat.fromAxisAngle(new Vec3(0,0,1),0.17));
-      var target=new Pose3(p.x,p.y,p.z,rotation.x,rotation.y,rotation.z,rotation.w);
-      var refined=spinRefiner.sample(0.004*i,target,motionkit.path.OrientationPolicy.FreeAboutTool,previous);
-      near(motionkit.robot.ToolFreedom.orientationError(solver.forward(refined.q),target,motionkit.path.OrientationPolicy.FreeAboutTool),0,
-        "smoothed free roll remains within task freedom",1e-6);
-      if(i==0)for(j in 0...q.length)near(refined.q[j],start[j],"refinement recovers pinned spin from actual FK",1e-6);
-      for(j in 0...q.length)check(Math.abs(refined.q[j]-previous[j])<request.maxJump[j],"free-roll refinement stays continuous");
-      previous=refined.q;
+    near(cornerPath.qDoublePrime[10][0], 0, "refined path preserves outgoing curvature", 1e-5);
+    near(cornerPath.qDoublePrimeBefore[10][0], 0.2, "refined path preserves incoming curvature at a C1 knot", 1e-5);
+    near(cornerPath.qPrime[10][0], 0.75, "curvature break retains its continuous tangent", 1e-6);
+    var spinTargets = [for (p in request.poses) {
+      var rotation = new Quat(p.qx, p.qy, p.qz, p.qw).multiply(Quat.fromAxisAngle(new Vec3(0, 0, 1), 0.17));
+      new Pose3(p.x, p.y, p.z, rotation.x, rotation.y, rotation.z, rotation.w);
     }
-    var excluded=motionkit.robot.StructuredLadder.search(problem,null,0,(sample,candidate)->sample==1 ? Math.POSITIVE_INFINITY : 0.0);
-    check(excluded.failedSample==1 && excluded.failedDistance==request.distances[1] && excluded.diagnostic!=null,
-      "Haxe native ladder reports disabled-state disconnection at its sample distance");
-    check(fixture.arm.numericSolveCount()==before,"native structured selection makes no numeric IK calls");
-    var free = new motionkit.robot.CandidateProblem(fixture.arm,request,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,4,false));
-    check(free.samples[0].candidates.length > 1,"free-start candidate problem retains the full first layer");
-    var toolAxis=fixture.arm.tcpPose(start).transformVector(new Vec3(0,0,1)).toArray();
-    var coneRequest=new PathRequest([0.0],[solver.forward(start)],start,new IkTolerance(1e-6,1e-6),
-      [for(_ in start)0.5],[for(_ in start)1.0],1,[motionkit.path.OrientationPolicy.Cone(toolAxis,0.1)]);
-    var coneProblem=new motionkit.robot.CandidateProblem(fixture.arm,coneRequest,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1,1,1));
-    check(coneProblem.samples[0].candidates.length==1,"pinned cone start preserves its exact spin beyond the orientation grid");
-    for(joint in 0...6)near(coneProblem.samples[0].candidates[0].q[joint],start[joint],"pinned cone start remains exact",1e-12);
+    ];
+    var spinRequest = new PathRequest(
+      request.distances,
+      spinTargets,
+      start,
+      new IkTolerance(1e-6, 1e-6),
+      request.maxJump,
+      request.velocity,
+      1,
+      [for (_ in spinTargets) motionkit.path.OrientationPolicy.FreeAboutTool]
+    );
+    var spinProblem = new motionkit.robot.CandidateProblem(fixture.arm, spinRequest);
+    var spinSelected = motionkit.robot.StructuredLadder.search(spinProblem);
+    check(spinSelected.diagnostic == null, "free-spin refinement fixture has a selected path");
+    var spinRefiner = new motionkit.robot.AnalyticPathRefiner(fixture.arm, spinProblem, spinSelected);
+    previous = start.copy();
+    for (i in 0...11) {
+      var q = start.copy();
+      q[0] += 0.003 * i;
+      var p = solver.forward(q);
+      var rotation = new Quat(p.qx, p.qy, p.qz, p.qw).multiply(Quat.fromAxisAngle(new Vec3(0, 0, 1), 0.17));
+      var target = new Pose3(p.x, p.y, p.z, rotation.x, rotation.y, rotation.z, rotation.w);
+      var refined = spinRefiner.sample(0.004 * i, target, motionkit.path.OrientationPolicy.FreeAboutTool, previous);
+      near(
+        motionkit.robot.ToolFreedom.orientationError(
+          solver.forward(refined.q),
+          target,
+          motionkit.path.OrientationPolicy.FreeAboutTool
+        ),
+        0,
+        "smoothed free roll remains within task freedom",
+        1e-6
+      );
+      if (i == 0) for (j in 0...q.length) near(
+        refined.q[j],
+        start[j],
+        "refinement recovers pinned spin from actual FK",
+        1e-6
+      );
+      for (j in 0...q.length) check(
+        Math.abs(refined.q[j] - previous[j]) < request.maxJump[j],
+        "free-roll refinement stays continuous"
+      );
+      previous = refined.q;
+    }
+    var excluded = motionkit.robot.StructuredLadder.search(
+      problem,
+      null,
+      0,
+      (sample, candidate) -> sample == 1 ? Math.POSITIVE_INFINITY : 0.0
+    );
+    check(
+      excluded.failedSample == 1 && excluded.failedDistance == request.distances[1] && excluded.diagnostic != null,
+      "Haxe native ladder reports disabled-state disconnection at its sample distance"
+    );
+    check(fixture.arm.numericSolveCount() == before, "native structured selection makes no numeric IK calls");
+    var free = new motionkit.robot.CandidateProblem(
+      fixture.arm,
+      request,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+        4,
+        1,
+        4,
+        false
+      )
+    );
+    check(free.samples[0].candidates.length > 1, "free-start candidate problem retains the full first layer");
+    var toolAxis = fixture.arm.tcpPose(start).transformVector(new Vec3(0, 0, 1)).toArray();
+    var coneRequest = new PathRequest(
+      [0.0],
+      [solver.forward(start)],
+      start,
+      new IkTolerance(1e-6, 1e-6),
+      [for (_ in start) 0.5],
+      [for (_ in start) 1.0],
+      1,
+      [motionkit.path.OrientationPolicy.Cone(
+        toolAxis,
+        0.1
+      )]
+    );
+    var coneProblem = new motionkit.robot.CandidateProblem(
+      fixture.arm,
+      coneRequest,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+        1,
+        1,
+        1
+      )
+    );
+    check(
+      coneProblem.samples[0].candidates.length == 1,
+      "pinned cone start preserves its exact spin beyond the orientation grid"
+    );
+    for (joint in 0...6) near(
+      coneProblem.samples[0].candidates[0].q[joint],
+      start[joint],
+      "pinned cone start remains exact",
+      1e-12
+    );
     problem.samples[1].candidates.resize(0);
-    var empty=motionkit.robot.StructuredLadder.search(problem);
-    check(empty.failedSample==1 && empty.diagnostic=="no candidates (unreachable or joint limits)",
-      "Haxe native ladder distinguishes an empty candidate layer");
+    var empty = motionkit.robot.StructuredLadder.search(problem);
+    check(
+      empty.failedSample == 1 && empty.diagnostic == "no candidates (unreachable or joint limits)",
+      "Haxe native ladder distinguishes an empty candidate layer"
+    );
 
 
   }
 
   function testCartesianAxisDifferential():Void {
-    var model=new RobotModel("axis-task-differential"),base=model.addLink(new Link("base")),parent=base;
-    for(j in 0...5){
-      var child=model.addLink(new Link('axis-link-$j'));
-      var joint=model.addJoint(new Joint('axis-joint-$j',j<3?JointType.Prismatic:JointType.Revolute,parent,child));
-      joint.axis=j<3?[for(k in 0...3)k==j?1.0:0.0]:j==3?[0.0,0,1]:[1.0,0,0];
-      joint.limits.lower=-4;joint.limits.upper=4;parent=child;
+    var model = new RobotModel("axis-task-differential"), base = model.addLink(new Link("base")), parent = base;
+    for (j in 0...5) {
+      var child = model.addLink(new Link('axis-link-$j'));
+      var joint = model.addJoint(new Joint(
+        'axis-joint-$j',
+        j < 3 ? JointType.Prismatic : JointType.Revolute,
+        parent,
+        child
+      ));
+      joint.axis = j < 3 ? [for (k in 0...3) k == j ? 1.0 : 0.0] : j == 3 ? [0.0, 0, 1] : [1.0, 0, 0];
+      joint.limits.lower = -4;
+      joint.limits.upper = 4;
+      parent = child;
     }
-    var tip=model.addFrame(new Frame("tip",parent));tip.position=[0.03,0.02,0.15];
-    var group=new robotkit.manipulation.KinematicGroup(model,base.id,tip.id),solver=new ManipulatorKinematics(group);
-    function joints(t:Float):Array<Float> return [0.1+0.2*t+0.03*t*t,-0.2+0.1*t-0.04*t*t,
-      0.3-0.1*t+0.02*t*t,0.4+0.5*t+0.06*t*t,0.8-0.3*t+0.05*t*t];
+    var tip = model.addFrame(new Frame("tip", parent));
+    tip.position = [0.03, 0.02, 0.15];
+    var group = new robotkit.manipulation.KinematicGroup(model,
+      base.id, tip.id), solver = new ManipulatorKinematics(group);
+    function joints(t:Float):Array<Float> return [
+      0.1 + 0.2 * t + 0.03 * t * t,
+      -0.2 + 0.1 * t - 0.04 * t * t,
+      0.3 - 0.1 * t + 0.02 * t * t,
+      0.4 + 0.5 * t + 0.06 * t * t,
+      0.8 - 0.3 * t + 0.05 * t * t
+    ];
     function target(t:Float):Pose3 {
-      var physical=solver.forward(joints(t));
-      var rotation=new Quat(physical.qx,physical.qy,physical.qz,physical.qw)
-        .multiply(Quat.fromAxisAngle(new Vec3(0,0,1),0.7+1.2*t+0.4*t*t));
-      return new Pose3(physical.x,physical.y,physical.z,rotation.x,rotation.y,rotation.z,rotation.w);
+      var physical = solver.forward(joints(t));
+      var rotation = new Quat(physical.qx, physical.qy, physical.qz, physical.qw).multiply(Quat.fromAxisAngle(
+        new Vec3(
+          0,
+          0,
+          1
+        ),
+        0.7 + 1.2 * t + 0.4 * t * t
+      ));
+      return new Pose3(physical.x, physical.y, physical.z, rotation.x, rotation.y, rotation.z, rotation.w);
     }
-    for(t in [0.0,0.3,0.7,1.0]){
-      var h=1e-4,minus=target(t-h),centre=target(t),plus=target(t+h);
-      var omega=poseRotationDelta(minus,plus,1/(2*h));
-      var before=poseRotationDelta(target(t-2*h),centre,1/(2*h));
-      var after=poseRotationDelta(centre,target(t+2*h),1/(2*h));
-      var velocity=[(plus.x-minus.x)/(2*h),(plus.y-minus.y)/(2*h),(plus.z-minus.z)/(2*h)].concat(omega);
-      var acceleration=[(plus.x-2*centre.x+minus.x)/(h*h),(plus.y-2*centre.y+minus.y)/(h*h),
-        (plus.z-2*centre.z+minus.z)/(h*h)].concat([for(i in 0...3)(after[i]-before[i])/(2*h)]);
-      var rates=motionkit.robot.PathDifferential.solve(group,joints(t),velocity,acceleration,
-        [false,false,false,false,false],[0.0,0,0,0,0],[0.0,0,0,0,0],1e-6,true);
-      var expectedFirst=[0.2+0.06*t,0.1-0.08*t,-0.1+0.04*t,0.5+0.12*t,-0.3+0.1*t];
-      var expectedSecond=[0.06,-0.08,0.04,0.12,0.1];
-      for(j in 0...5){
-        near(rates.first[j],expectedFirst[j],"CA reduced velocity ignores uncommanded tool spin",1e-6);
-        near(rates.second[j],expectedSecond[j],"CA reduced acceleration matches independent joint polynomial",1e-5);
+    for (t in [0.0, 0.3, 0.7, 1.0]) {
+      var h = 1e-4, minus = target(t - h), centre = target(t), plus = target(t + h);
+      var omega = poseRotationDelta(minus, plus, 1 / (2 * h));
+      var before = poseRotationDelta(target(t - 2 * h), centre, 1 / (2 * h));
+      var after = poseRotationDelta(centre, target(t + 2 * h), 1 / (2 * h));
+      var velocity = [(plus.x - minus.x) / (2 * h),
+        (plus.y - minus.y) / (2 * h), (plus.z - minus.z) / (2 * h)].concat(omega);
+      var acceleration = [
+        (plus.x - 2 * centre.x + minus.x) / (h * h),
+        (plus.y - 2 * centre.y + minus.y) / (h * h),
+        (plus.z - 2 * centre.z + minus.z) / (h * h)
+      ].concat([for (i in 0...3)(after[i] - before[i]) / (2 * h)]);
+      var rates = motionkit.robot.PathDifferential.solve(
+        group,
+        joints(t),
+        velocity,
+        acceleration,
+        [
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          0.0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0.0,
+          0,
+          0,
+          0,
+          0
+        ],
+        1e-6,
+        true
+      );
+      var expectedFirst = [0.2 + 0.06 * t, 0.1 - 0.08 * t, -0.1 + 0.04 * t, 0.5 + 0.12 * t, -0.3 + 0.1 * t];
+      var expectedSecond = [0.06, -0.08, 0.04, 0.12, 0.1];
+      for (j in 0...5) {
+        near(rates.first[j], expectedFirst[j], "CA reduced velocity ignores uncommanded tool spin", 1e-6);
+        near(rates.second[j], expectedSecond[j], "CA reduced acceleration matches independent joint polynomial", 1e-5);
       }
     }
   }
 
   public function testOrientationDifferential():Void {
     testCartesianAxisDifferential();
-    for(angle in [0.01,0.06,0.1,1.2,3.0]) {
-      var initial=Quat.fromAxisAngle(new Vec3(1,0,0),0.7);
-      var finalRotation=Quat.fromAxisAngle(new Vec3(0,0,1),angle).multiply(initial);
-      var a=new PoseWaypoint(new Pose3(0,0,0,initial.x,initial.y,initial.z,initial.w),1e-6,1e-6);
-      var b=new PoseWaypoint(new Pose3(1,0,0,finalRotation.x,finalRotation.y,finalRotation.z,finalRotation.w),1e-6,1e-6);
-      var line=new PoseLine(a,b,motionkit.path.OrientationPolicy.Interpolated,0.1,0.1),h=1e-4;
-      for(distance in [0.1,0.3,0.5,0.7,0.9]) {
-        var rates=line.derivativesAt(distance),p=line.waypointAt(distance).pose;
-        var omega=poseRotationDelta(line.waypointAt(distance-h).pose,line.waypointAt(distance+h).pose,1/(2*h));
-        var before=poseRotationDelta(line.waypointAt(distance-2*h).pose,p,1/(2*h));
-        var after=poseRotationDelta(p,line.waypointAt(distance+2*h).pose,1/(2*h));
-        var conePolicy=motionkit.path.OrientationPolicy.Cone([0.2,0.3,1.0],0.2);
-        var projected=motionkit.robot.OrientationDifferential.cone(new Quat(p.qx,p.qy,p.qz,p.qw),rates.angular,rates.angularSecond,[0.2,0.3,1.0]);
-        function projectedPose(s:Float):Pose3 return motionkit.robot.OrientationLattice.centre(line.waypointAt(s).pose,conePolicy);
-        var centre=projectedPose(distance),centreMinus=projectedPose(distance-h),centrePlus=projectedPose(distance+h);
-        var centreOmega=poseRotationDelta(centreMinus,centrePlus,1/(2*h));
-        var centreBefore=poseRotationDelta(projectedPose(distance-2*h),centre,1/(2*h));
-        var centreAfter=poseRotationDelta(centre,projectedPose(distance+2*h),1/(2*h));
-        near(motionkit.path.PoseMath.angle(new Pose3(centre.x,centre.y,centre.z,projected.rotation.x,projected.rotation.y,
-          projected.rotation.z,projected.rotation.w),centre),0,"cone differential uses the lattice centre rotation",1e-7);
-        for(axis in 0...3){near(projected.velocity[axis],centreOmega[axis],"cone centre velocity matches independent quaternion differences",1e-7);
-          near(projected.acceleration[axis],(centreAfter[axis]-centreBefore[axis])/(2*h),
-            "cone centre acceleration matches independent quaternion differences",1e-5);}
-        for(axis in 0...3){near(rates.angular[axis],omega[axis],"primitive angular velocity matches quaternion differences",1e-7);
-          near(rates.angularSecond[axis],(after[axis]-before[axis])/(2*h),"primitive angular acceleration matches quaternion differences",1e-6);}
+    for (angle in [0.01, 0.06, 0.1, 1.2, 3.0]) {
+      var initial = Quat.fromAxisAngle(new Vec3(1, 0, 0), 0.7);
+      var finalRotation = Quat.fromAxisAngle(new Vec3(0, 0, 1), angle).multiply(initial);
+      var a = new PoseWaypoint(new Pose3(0, 0, 0, initial.x, initial.y, initial.z, initial.w), 1e-6, 1e-6);
+      var b = new PoseWaypoint(
+        new Pose3(1, 0, 0, finalRotation.x, finalRotation.y, finalRotation.z, finalRotation.w),
+        1e-6,
+        1e-6
+      );
+      var line = new PoseLine(a, b, motionkit.path.OrientationPolicy.Interpolated, 0.1, 0.1), h = 1e-4;
+      for (distance in [0.1, 0.3, 0.5, 0.7, 0.9]) {
+        var rates = line.derivativesAt(distance), p = line.waypointAt(distance).pose;
+        var omega = poseRotationDelta(
+          line.waypointAt(distance - h).pose,
+          line.waypointAt(distance + h).pose,
+          1 / (2 * h)
+        );
+        var before = poseRotationDelta(line.waypointAt(distance - 2 * h).pose, p, 1 / (2 * h));
+        var after = poseRotationDelta(p, line.waypointAt(distance + 2 * h).pose, 1 / (2 * h));
+        var conePolicy = motionkit.path.OrientationPolicy.Cone([0.2, 0.3, 1.0], 0.2);
+        var projected = motionkit.robot.OrientationDifferential.cone(
+          new Quat(p.qx, p.qy, p.qz, p.qw),
+          rates.angular,
+          rates.angularSecond,
+          [
+            0.2,
+            0.3,
+            1.0
+          ]
+        );
+        function projectedPose(s:Float):Pose3 return motionkit.robot.OrientationLattice.centre(
+          line.waypointAt(s).pose,
+          conePolicy
+        );
+        var centre = projectedPose(distance),
+          centreMinus = projectedPose(distance - h), centrePlus = projectedPose(distance + h);
+        var centreOmega = poseRotationDelta(centreMinus, centrePlus, 1 / (2 * h));
+        var centreBefore = poseRotationDelta(projectedPose(distance - 2 * h), centre, 1 / (2 * h));
+        var centreAfter = poseRotationDelta(centre, projectedPose(distance + 2 * h), 1 / (2 * h));
+        near(
+          motionkit.path.PoseMath.angle(
+            new Pose3(
+              centre.x,
+              centre.y,
+              centre.z,
+              projected.rotation.x,
+              projected.rotation.y,
+              projected.rotation.z,
+              projected.rotation.w
+            ),
+            centre
+          ),
+          0,
+          "cone differential uses the lattice centre rotation",
+          1e-7
+        );
+        for (axis in 0...3) {
+          near(
+            projected.velocity[axis],
+            centreOmega[axis],
+            "cone centre velocity matches independent quaternion differences",
+            1e-7
+          );
+          near(
+            projected.acceleration[axis],
+            (centreAfter[axis] - centreBefore[axis]) / (2 * h),
+            "cone centre acceleration matches independent quaternion differences",
+            1e-5
+          );
+        }
+        for (axis in 0...3) {
+          near(rates.angular[axis], omega[axis], "primitive angular velocity matches quaternion differences", 1e-7);
+          near(
+            rates.angularSecond[axis],
+            (after[axis] - before[axis]) / (2 * h),
+            "primitive angular acceleration matches quaternion differences",
+            1e-6
+          );
+        }
       }
     }
     function rotationAt(s:Float):Quat {
-      var x=0.3+0.2*s-0.03*s*s,y=-0.2+0.1*s+0.04*s*s,tilt=Math.sqrt(x*x+y*y);
-      var swing=new Quat(-y*Math.sin(tilt/2)/tilt,x*Math.sin(tilt/2)/tilt,0,Math.cos(tilt/2));
-      return Quat.fromAxisAngle(new Vec3(0,0,1),0.2+0.4*s+0.05*s*s).multiply(swing)
-        .multiply(Quat.fromAxisAngle(new Vec3(0,0,1),0.7-0.3*s+0.06*s*s));
+      var x = 0.3 + 0.2 * s - 0.03 * s * s, y = -0.2 + 0.1 * s + 0.04 * s * s, tilt = Math.sqrt(x * x + y * y);
+      var swing = new Quat(-y * Math.sin(tilt / 2) / tilt, x * Math.sin(tilt / 2) / tilt, 0, Math.cos(tilt / 2));
+      return Quat.fromAxisAngle(new Vec3(0,
+        0, 1), 0.2 + 0.4 * s + 0.05 * s * s).multiply(swing).multiply(Quat.fromAxisAngle(
+          new Vec3(
+            0,
+            0,
+            1
+          ),
+          0.7 - 0.3 * s + 0.06 * s * s
+        ));
     }
     function finiteOmega(s:Float):Array<Float> {
-      var h=1e-5,relative=rotationAt(s+h).multiply(rotationAt(s-h).conjugate());
-      var length=Math.sqrt(relative.x*relative.x+relative.y*relative.y+relative.z*relative.z);
-      var factor=2*Math.atan2(length,relative.w)/(2*h*length);
-      return [relative.x*factor,relative.y*factor,relative.z*factor];
+      var h = 1e-5, relative = rotationAt(s + h).multiply(rotationAt(s - h).conjugate());
+      var length = Math.sqrt(relative.x * relative.x + relative.y * relative.y + relative.z * relative.z);
+      var factor = 2 * Math.atan2(length, relative.w) / (2 * h * length);
+      return [relative.x * factor, relative.y * factor, relative.z * factor];
     }
-    for(i in 0...21){var s=i/20.0,centre=Quat.fromAxisAngle(new Vec3(0,0,1),0.2+0.4*s+0.05*s*s);
-      var motion=motionkit.robot.OrientationDifferential.refine(centre,[0.0,0.0,0.4+0.1*s],[0.0,0.0,0.1],
-        new motionkit.robot.RedundancySpline.SplineSample(0.3+0.2*s-0.03*s*s,0.2-0.06*s,-0.06),
-        new motionkit.robot.RedundancySpline.SplineSample(-0.2+0.1*s+0.04*s*s,0.1+0.08*s,0.08),
-        new motionkit.robot.RedundancySpline.SplineSample(0.7-0.3*s+0.06*s*s,-0.3+0.12*s,0.12));
-      var expected=rotationAt(s),actual=motion.rotation;
-      near(Math.abs(actual.x*expected.x+actual.y*expected.y+actual.z*expected.z+actual.w*expected.w),1,
-        "orientation jet reproduces direct quaternion composition",1e-10);
-      var omega=finiteOmega(s),h=1e-4,before=finiteOmega(s-h),after=finiteOmega(s+h);
-      for(axis in 0...3){near(motion.velocity[axis],omega[axis],"analytic angular velocity matches quaternion differences",1e-7);
-        near(motion.acceleration[axis],(after[axis]-before[axis])/(2*h),"analytic angular acceleration matches quaternion differences",1e-5);}
+    for (i in 0...21) {
+      var s = i / 20.0, centre = Quat.fromAxisAngle(new Vec3(0, 0, 1), 0.2 + 0.4 * s + 0.05 * s * s);
+      var motion = motionkit.robot.OrientationDifferential.refine(
+        centre,
+        [0.0, 0.0, 0.4 + 0.1 * s],
+        [0.0, 0.0, 0.1],
+        new motionkit.robot.RedundancySpline.SplineSample(
+          0.3 + 0.2 * s - 0.03 * s * s,
+          0.2 - 0.06 * s,
+          -0.06
+        ),
+        new motionkit.robot.RedundancySpline.SplineSample(
+          -0.2 + 0.1 * s + 0.04 * s * s,
+          0.1 + 0.08 * s,
+          0.08
+        ),
+        new motionkit.robot.RedundancySpline.SplineSample(
+          0.7 - 0.3 * s + 0.06 * s * s,
+          -0.3 + 0.12 * s,
+          0.12
+        )
+      );
+      var expected = rotationAt(s), actual = motion.rotation;
+      near(
+        Math.abs(actual.x * expected.x + actual.y * expected.y + actual.z * expected.z + actual.w * expected.w),
+        1,
+        "orientation jet reproduces direct quaternion composition",
+        1e-10
+      );
+      var omega = finiteOmega(s), h = 1e-4, before = finiteOmega(s - h), after = finiteOmega(s + h);
+      for (axis in 0...3) {
+        near(motion.velocity[axis], omega[axis], "analytic angular velocity matches quaternion differences", 1e-7);
+        near(
+          motion.acceleration[axis],
+          (after[axis] - before[axis]) / (2 * h),
+          "analytic angular acceleration matches quaternion differences",
+          1e-5
+        );
+      }
     }
-    var zero=motionkit.robot.OrientationDifferential.refine(Quat.identity(),[0.0,0.0,0.0],[0.0,0.0,0.0],
-      new motionkit.robot.RedundancySpline.SplineSample(0,0.2,0.1),new motionkit.robot.RedundancySpline.SplineSample(0,0.3,-0.2),
-      new motionkit.robot.RedundancySpline.SplineSample(0,0.4,0.5));
-    for(axis in 0...3){near(zero.velocity[axis],[-0.3,0.2,0.4][axis],"zero swing has finite exact angular rates",1e-12);
-      near(zero.acceleration[axis],[0.28,0.22,0.5][axis],"zero swing includes swing-roll acceleration coupling",1e-12);}
+    var zero = motionkit.robot.OrientationDifferential.refine(
+      Quat.identity(),
+      [0.0, 0.0, 0.0],
+      [0.0, 0.0, 0.0],
+      new motionkit.robot.RedundancySpline.SplineSample(
+        0,
+        0.2,
+        0.1
+      ),
+      new motionkit.robot.RedundancySpline.SplineSample(
+        0,
+        0.3,
+        -0.2
+      ),
+      new motionkit.robot.RedundancySpline.SplineSample(
+        0,
+        0.4,
+        0.5
+      )
+    );
+    for (axis in 0...3) {
+      near(zero.velocity[axis], [-0.3, 0.2, 0.4][axis], "zero swing has finite exact angular rates", 1e-12);
+      near(
+        zero.acceleration[axis],
+        [0.28, 0.22, 0.5][axis],
+        "zero swing includes swing-roll acceleration coupling",
+        1e-12
+      );
+    }
   }
 
   public function testRedundancySpline():Void {
-    var knots=[0.0,0.2,0.7,1.0],affine=new motionkit.robot.RedundancySpline(knots,[for(x in knots)0.3+0.7*x]);
-    var periodic=new motionkit.robot.RedundancySpline(knots,[for(x in knots){var angle=3.0+0.4*x;angle>Math.PI ? angle-2*Math.PI : angle;}],2*Math.PI);
-    for(i in 0...101){var x=i/100.0,a=affine.evaluate(x),r=periodic.evaluate(x);
-      near(a.value,0.3+0.7*x,"redundancy spline reproduces affine external motion",1e-10);
-      near(a.first,0.7,"affine external derivative",1e-10);near(a.second,0,"affine external curvature",1e-10);
-      near(r.value,3.0+0.4*x,"period-aware roll stays continuous across its seam",1e-10);
-      near(r.first,0.4,"period-aware roll derivative",1e-10);near(r.second,0,"period-aware roll curvature",1e-10);
+    var knots = [0.0, 0.2, 0.7, 1.0], affine = new motionkit.robot.RedundancySpline(
+      knots,
+      [for (x in knots) 0.3 + 0.7 * x]
+    );
+    var periodic = new motionkit.robot.RedundancySpline(knots, [for (x in knots) {
+      var angle = 3.0 + 0.4 * x;
+      angle > Math.PI ? angle - 2 * Math.PI : angle;
     }
-    var nonlinear=new motionkit.robot.RedundancySpline(knots,[0.0,0.4,-0.1,0.2]);
-    for(i in 0...knots.length)near(nonlinear.evaluate(knots[i]).value,[0.0,0.4,-0.1,0.2][i],"spline interpolates each selected knot",1e-10);
-    for(i in 1...100){var x=i/100.0,step=1e-5,at=nonlinear.evaluate(x),before=nonlinear.evaluate(x-step),after=nonlinear.evaluate(x+step);
-      near(at.first,(after.value-before.value)/(2*step),"spline first derivative matches finite differences",1e-6);
-      near(at.second,(after.first-before.first)/(2*step),"spline second derivative matches finite differences",0.002);
+    ], 2 * Math.PI);
+    for (i in 0...101) {
+      var x = i / 100.0, a = affine.evaluate(x), r = periodic.evaluate(x);
+      near(a.value, 0.3 + 0.7 * x, "redundancy spline reproduces affine external motion", 1e-10);
+      near(a.first, 0.7, "affine external derivative", 1e-10);
+      near(a.second, 0, "affine external curvature", 1e-10);
+      near(r.value, 3.0 + 0.4 * x, "period-aware roll stays continuous across its seam", 1e-10);
+      near(r.first, 0.4, "period-aware roll derivative", 1e-10);
+      near(r.second, 0, "period-aware roll curvature", 1e-10);
     }
-    for(knot in [0.2,0.7]){var before=nonlinear.evaluate(knot-1e-9),after=nonlinear.evaluate(knot+1e-9);
-      near(before.first,after.first,"redundancy spline is C1 at knots",1e-6);
-      near(before.second,after.second,"redundancy spline is C2 at knots",1e-6);}
-    var rejected=false;try new motionkit.robot.RedundancySpline([0.0,0.0],[0.0,1.0]) catch(_:Dynamic)rejected=true;
-    check(rejected,"spline rejects coincident distances");
-    rejected=false;try nonlinear.evaluate(-0.1) catch(_:Dynamic)rejected=true;check(rejected,"spline rejects extrapolation");
-    rejected=false;try new motionkit.robot.RedundancySpline([-1e308,1e308],[0.0,0.0]) catch(_:Dynamic)rejected=true;
-    check(rejected,"spline rejects an overflowing interval");
-    var two=new motionkit.robot.RedundancySpline([0.0,1.0],[0.2,0.6]);
-    near(two.evaluate(0.3).value,0.32,"two-knot spline remains linear",1e-12);
-    near(two.evaluate(0.3).first,0.4,"two-knot spline has the exact derivative",1e-12);
-    var drives=new motionkit.kinematics.PathDriveLimits([0.0004],[for(_ in knots)0.01]);
-    var pins=[motionkit.robot.DriveAwareRefinement.bound(0,[1.0],0,0),
-      motionkit.robot.DriveAwareRefinement.bound(knots.length-1,[1.0],1,1)];
-    var constrained=motionkit.robot.DriveAwareRefinement.fit(knots,[[0.0,0.4,0.5,1.0]],[knots.copy()],
-      [-0.1],[1.1],[0.03],[0.0004],drives,pins)[0];
-    near(constrained.evaluate(0).value,0,"QP keeps the start pin",1e-7);
-    near(constrained.evaluate(1).value,1,"QP keeps the end pin",1e-7);
-    for(i in 1...100){var x=i/100.0,h=1e-5,at=constrained.evaluate(x);
-      var before=constrained.evaluate(x-h),after=constrained.evaluate(x+h);
-      near(at.first,(after.value-before.value)/(2*h),"QP first derivative matches finite differences",1e-6);
-      near(at.second,(after.first-before.first)/(2*h),"QP second derivative matches finite differences",0.002);
-      check(Math.abs(at.first)*0.01<=0.03+1e-8,"QP respects drive speed between knots");
-      check(Math.abs(at.second)*0.0001<=0.0004+1e-8,"QP respects drive acceleration between knots");
+    var nonlinear = new motionkit.robot.RedundancySpline(knots, [0.0, 0.4, -0.1, 0.2]);
+    for (i in 0...knots.length) near(
+      nonlinear.evaluate(knots[i]).value,
+      [0.0, 0.4, -0.1, 0.2][i],
+      "spline interpolates each selected knot",
+      1e-10
+    );
+    for (i in 1...100) {
+      var x = i / 100.0, step = 1e-5,
+        at = nonlinear.evaluate(x), before = nonlinear.evaluate(x - step), after = nonlinear.evaluate(x + step);
+      near(
+        at.first,
+        (after.value - before.value) / (2 * step),
+        "spline first derivative matches finite differences",
+        1e-6
+      );
+      near(
+        at.second,
+        (after.first - before.first) / (2 * step),
+        "spline second derivative matches finite differences",
+        0.002
+      );
     }
-    var corrected=new motionkit.robot.CubicRedundancyCurve([0.0,1.0],[-1e-10,1+1e-10],[1+2e-10,1+2e-10],0,1);
-    near(corrected.evaluate(0).value,0,"QP tolerance normalization keeps the exact lower physical bound",1e-15);
-    near(corrected.evaluate(1).value,1,"QP tolerance normalization keeps the exact upper physical bound",1e-15);
-    near(corrected.evaluate(0.4).first,1,"affine QP normalization preserves consistent derivatives",1e-12);
-    var diagnosis="";try motionkit.robot.DriveAwareRefinement.fit(knots,[knots.copy()],[knots.copy()],
-      [-0.1],[1.1],[0.005],[0.0004],drives,pins) catch(error:Dynamic)diagnosis=Std.string(error);
-    check(diagnosis.indexOf("coordinate 0")>=0 && diagnosis.indexOf("sustainable feed")>=0,
-      "infeasible feed reports its binding coordinate and sustainable scale");
+    for (knot in [0.2, 0.7]) {
+      var before = nonlinear.evaluate(knot - 1e-9), after = nonlinear.evaluate(knot + 1e-9);
+      near(before.first, after.first, "redundancy spline is C1 at knots", 1e-6);
+      near(before.second, after.second, "redundancy spline is C2 at knots", 1e-6);
+    }
+    var rejected = false;
+    try new motionkit.robot.RedundancySpline([0.0, 0.0], [0.0, 1.0]) catch (_:Dynamic) rejected = true;
+    check(rejected, "spline rejects coincident distances");
+    rejected = false;
+    try nonlinear.evaluate(-0.1) catch (_:Dynamic) rejected = true;
+    check(rejected, "spline rejects extrapolation");
+    rejected = false;
+    try new motionkit.robot.RedundancySpline([-1e308, 1e308], [0.0, 0.0]) catch (_:Dynamic) rejected = true;
+    check(rejected, "spline rejects an overflowing interval");
+    var two = new motionkit.robot.RedundancySpline([0.0, 1.0], [0.2, 0.6]);
+    near(two.evaluate(0.3).value, 0.32, "two-knot spline remains linear", 1e-12);
+    near(two.evaluate(0.3).first, 0.4, "two-knot spline has the exact derivative", 1e-12);
+    var drives = new motionkit.kinematics.PathDriveLimits([0.0004], [for (_ in knots) 0.01]);
+    var pins = [
+      motionkit.robot.DriveAwareRefinement.bound(0, [1.0], 0, 0),
+      motionkit.robot.DriveAwareRefinement.bound(
+        knots.length - 1,
+        [1.0],
+        1,
+        1
+      )
+    ];
+    var constrained = motionkit.robot.DriveAwareRefinement.fit(
+      knots,
+      [[0.0, 0.4, 0.5, 1.0]],
+      [knots.copy()],
+      [-0.1],
+      [1.1],
+      [0.03],
+      [0.0004],
+      drives,
+      pins
+    )[0];
+    near(constrained.evaluate(0).value, 0, "QP keeps the start pin", 1e-7);
+    near(constrained.evaluate(1).value, 1, "QP keeps the end pin", 1e-7);
+    for (i in 1...100) {
+      var x = i / 100.0, h = 1e-5, at = constrained.evaluate(x);
+      var before = constrained.evaluate(x - h), after = constrained.evaluate(x + h);
+      near(at.first, (after.value - before.value) / (2 * h), "QP first derivative matches finite differences", 1e-6);
+      near(at.second, (after.first - before.first) / (2 * h), "QP second derivative matches finite differences", 0.002);
+      check(Math.abs(at.first) * 0.01 <= 0.03 + 1e-8, "QP respects drive speed between knots");
+      check(Math.abs(at.second) * 0.0001 <= 0.0004 + 1e-8, "QP respects drive acceleration between knots");
+    }
+    var corrected = new motionkit.robot.CubicRedundancyCurve(
+      [0.0, 1.0],
+      [-1e-10, 1 + 1e-10],
+      [1 + 2e-10, 1 + 2e-10],
+      0,
+      1
+    );
+    near(corrected.evaluate(0).value, 0, "QP tolerance normalization keeps the exact lower physical bound", 1e-15);
+    near(corrected.evaluate(1).value, 1, "QP tolerance normalization keeps the exact upper physical bound", 1e-15);
+    near(corrected.evaluate(0.4).first, 1, "affine QP normalization preserves consistent derivatives", 1e-12);
+    var diagnosis = "";
+    try motionkit.robot.DriveAwareRefinement.fit(
+      knots,
+      [knots.copy()],
+      [knots.copy()],
+      [-0.1],
+      [1.1],
+      [0.005],
+      [0.0004],
+      drives,
+      pins
+    ) catch (error:Dynamic) diagnosis = Std.string(error);
+    check(
+      diagnosis.indexOf("coordinate 0") >= 0 && diagnosis.indexOf("sustainable feed") >= 0,
+      "infeasible feed reports its binding coordinate and sustainable scale"
+    );
 
 
   }
 
   public function testOrientationLattice():Void {
-    var rotation = Quat.fromAxisAngle(new Vec3(1,2,3).normalized(),0.73);
-    var target = new Pose3(0.4,-0.1,0.8,rotation.x,rotation.y,rotation.z,rotation.w);
-    var ownAxis=rotation.rotate(new Vec3(0,0,1)).toArray();
-    var kept=motionkit.robot.OrientationLattice.sample(target,motionkit.path.OrientationPolicy.Cone(ownAxis,0.2),1,1,1);
-    near(motionkit.path.PoseMath.angle(kept[0].pose,target),0,"cone centre preserves the target spin when its axis already matches",1e-7);
-    var almostOpposite=rotation.rotate(new Vec3(1e-5,0,-1).normalized()).toArray();
-    var almostFlipped=motionkit.robot.OrientationLattice.centre(target,motionkit.path.OrientationPolicy.Cone(almostOpposite,0.0));
-    near(motionkit.robot.ToolFreedom.orientationError(almostFlipped,target,motionkit.path.OrientationPolicy.Cone(almostOpposite,0.0)),0,
-      "cone axis alignment remains accurate near the antipodal case",1e-7);
-    var opposite=rotation.rotate(new Vec3(0,0,-1)).toArray();
-    var flipped=motionkit.robot.OrientationLattice.centre(target,motionkit.path.OrientationPolicy.Cone(opposite,0.2));
-    near(motionkit.robot.ToolFreedom.orientationError(flipped,target,motionkit.path.OrientationPolicy.Cone(opposite,0.2)),0,
-      "cone centre handles the antipodal axis",1e-7);
+    var rotation = Quat.fromAxisAngle(new Vec3(1, 2, 3).normalized(), 0.73);
+    var target = new Pose3(0.4, -0.1, 0.8, rotation.x, rotation.y, rotation.z, rotation.w);
+    var ownAxis = rotation.rotate(new Vec3(0, 0, 1)).toArray();
+    var kept = motionkit.robot.OrientationLattice.sample(
+      target,
+      motionkit.path.OrientationPolicy.Cone(ownAxis, 0.2),
+      1,
+      1,
+      1
+    );
+    near(
+      motionkit.path.PoseMath.angle(kept[0].pose, target),
+      0,
+      "cone centre preserves the target spin when its axis already matches",
+      1e-7
+    );
+    var almostOpposite = rotation.rotate(new Vec3(1e-5, 0, -1).normalized()).toArray();
+    var almostFlipped = motionkit.robot.OrientationLattice.centre(
+      target,
+      motionkit.path.OrientationPolicy.Cone(
+        almostOpposite,
+        0.0
+      )
+    );
+    near(
+      motionkit.robot.ToolFreedom.orientationError(
+        almostFlipped,
+        target,
+        motionkit.path.OrientationPolicy.Cone(
+          almostOpposite,
+          0.0
+        )
+      ),
+      0,
+      "cone axis alignment remains accurate near the antipodal case",
+      1e-7
+    );
+    var opposite = rotation.rotate(new Vec3(0, 0, -1)).toArray();
+    var flipped = motionkit.robot.OrientationLattice.centre(
+      target,
+      motionkit.path.OrientationPolicy.Cone(opposite, 0.2)
+    );
+    near(
+      motionkit.robot.ToolFreedom.orientationError(
+        flipped,
+        target,
+        motionkit.path.OrientationPolicy.Cone(
+          opposite,
+          0.2
+        )
+      ),
+      0,
+      "cone centre handles the antipodal axis",
+      1e-7
+    );
 
-    for (freedom in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool,motionkit.path.OrientationPolicy.Free,
-        motionkit.path.OrientationPolicy.Cone([0.3,0.4,0.5],0.4)]) {
-      var cells = motionkit.robot.OrientationLattice.sample(target,freedom);
-      var expected = switch freedom {case Fixed: 1; case FreeAboutTool: 12; default: 300;};
-      check(cells.length == expected,"native orientation lattice count matches policy");
-      var repeated = motionkit.robot.OrientationLattice.sample(target,freedom);
+    for (freedom in [
+      motionkit.path.OrientationPolicy.Fixed,
+      motionkit.path.OrientationPolicy.FreeAboutTool,
+      motionkit.path.OrientationPolicy.Free,
+      motionkit.path.OrientationPolicy.Cone(
+        [
+          0.3,
+          0.4,
+          0.5
+        ],
+        0.4
+      )
+    ]) {
+      var cells = motionkit.robot.OrientationLattice.sample(target, freedom);
+      var expected = switch freedom {
+        case Fixed:
+          1;
+        case FreeAboutTool:
+          12;
+        default:
+          300;
+      };
+      check(cells.length == expected, "native orientation lattice count matches policy");
+      var repeated = motionkit.robot.OrientationLattice.sample(target, freedom);
       for (i in 0...cells.length) {
-        near(motionkit.robot.ToolFreedom.orientationError(cells[i].pose,target,freedom),0,
-          "native orientation lattice satisfies ToolFreedom",1e-7);
-        near(motionkit.path.PoseMath.distance(cells[i].pose,target),0,"orientation lattice preserves position",1e-12);
-        check(cells[i].roll == repeated[i].roll && cells[i].tilt == repeated[i].tilt && cells[i].azimuth == repeated[i].azimuth,
-          "orientation lattice coordinates are deterministic");
-        near(motionkit.path.PoseMath.angle(cells[i].pose,repeated[i].pose),0,"orientation lattice pose is deterministic",1e-7);
+        near(
+          motionkit.robot.ToolFreedom.orientationError(cells[i].pose, target, freedom),
+          0,
+          "native orientation lattice satisfies ToolFreedom",
+          1e-7
+        );
+        near(
+          motionkit.path.PoseMath.distance(cells[i].pose, target),
+          0,
+          "orientation lattice preserves position",
+          1e-12
+        );
+        check(
+          cells[i].roll == repeated[i].roll
+          && cells[i].tilt == repeated[i].tilt && cells[i].azimuth == repeated[i].azimuth,
+          "orientation lattice coordinates are deterministic"
+        );
+        near(
+          motionkit.path.PoseMath.angle(cells[i].pose, repeated[i].pose),
+          0,
+          "orientation lattice pose is deterministic",
+          1e-7
+        );
       }
-      if(freedom==motionkit.path.OrientationPolicy.Free){
-        var axis=rotation.rotate(new Vec3(0,0,1)),oppositeFound=false;
-        for(cell in cells){var q=new Quat(cell.pose.qx,cell.pose.qy,cell.pose.qz,cell.pose.qw);
-          if(q.rotate(new Vec3(0,0,1)).dot(axis)<-1+1e-10)oppositeFound=true;}
-        check(oppositeFound,"full-free orientation samples include the opposite tool axis");
+      if (freedom == motionkit.path.OrientationPolicy.Free) {
+        var axis = rotation.rotate(new Vec3(0, 0, 1)), oppositeFound = false;
+        for (cell in cells) {
+          var q = new Quat(cell.pose.qx, cell.pose.qy, cell.pose.qz, cell.pose.qw);
+          if (q.rotate(new Vec3(0, 0, 1)).dot(axis) < -1 + 1e-10) oppositeFound = true;
+        }
+        check(oppositeFound, "full-free orientation samples include the opposite tool axis");
       }
     }
   }
 
   public function testCartesianAnalyticIk():Void {
-    var rollModel=new RobotModel("physical-roll-reroute");
-    var rollBase=rollModel.addLink(new Link("base")),rollParent=rollBase;
-    for(j in 0...4){var child=rollModel.addLink(new Link('roll-link-$j'));
-      var joint=rollModel.addJoint(new Joint('roll-joint-$j',j<3?JointType.Prismatic:JointType.Revolute,rollParent,child));
-      joint.axis=j<3?[for(k in 0...3)k==j?1.0:0.0]:[0.0,0.0,1.0];
-      joint.limits.lower=j<3?-1:-Math.PI;joint.limits.upper=j<3?1:Math.PI;rollParent=child;}
-    var rollTip=rollModel.addFrame(new Frame("tip",rollParent));
-    var rollGroup=new robotkit.manipulation.KinematicGroup(rollModel,rollBase.id,rollTip.id);
-    var rollStart=[0.0,0.0,0.0,0.0],rollEnd=[0.2,0.0,0.0,0.0];
-    var rollSolver=new ManipulatorKinematics(rollGroup);
-    var rollRequest=new PathRequest([0.0,0.2],[rollSolver.forward(rollStart),rollSolver.forward(rollEnd)],rollStart,
-      new IkTolerance(1e-6,1e-6),[1.0,1.0,1.0,2.0],[1.0,1.0,1.0,1.0],32,
-      [motionkit.path.OrientationPolicy.FreeAboutTool,motionkit.path.OrientationPolicy.FreeAboutTool]);
-    var rollProblem=new motionkit.robot.CandidateProblem(rollGroup,rollRequest,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,1));
-    var partitionProblem=new motionkit.robot.CandidateProblem(rollGroup,new PathRequest(rollRequest.distances,
-      rollRequest.poses,rollStart,rollRequest.tolerance,[1.0,1.0,1.0,0.1],rollRequest.velocity,32,rollRequest.freedoms),
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,1,false));
+    var rollModel = new RobotModel("physical-roll-reroute");
+    var rollBase = rollModel.addLink(new Link("base")), rollParent = rollBase;
+    for (j in 0...4) {
+      var child = rollModel.addLink(new Link('roll-link-$j'));
+      var joint = rollModel.addJoint(new Joint(
+        'roll-joint-$j',
+        j < 3 ? JointType.Prismatic : JointType.Revolute,
+        rollParent,
+        child
+      ));
+      joint.axis = j < 3 ? [for (k in 0...3) k == j ? 1.0 : 0.0] : [0.0, 0.0, 1.0];
+      joint.limits.lower = j < 3 ? -1 : -Math.PI;
+      joint.limits.upper = j < 3 ? 1 : Math.PI;
+      rollParent = child;
+    }
+    var rollTip = rollModel.addFrame(new Frame("tip", rollParent));
+    var rollGroup = new robotkit.manipulation.KinematicGroup(rollModel, rollBase.id, rollTip.id);
+    var rollStart = [0.0, 0.0, 0.0, 0.0], rollEnd = [0.2, 0.0, 0.0, 0.0];
+    var rollSolver = new ManipulatorKinematics(rollGroup);
+    var rollRequest = new PathRequest(
+      [0.0, 0.2],
+      [rollSolver.forward(rollStart), rollSolver.forward(rollEnd)],
+      rollStart,
+      new IkTolerance(
+        1e-6,
+        1e-6
+      ),
+      [
+        1.0,
+        1.0,
+        1.0,
+        2.0
+      ],
+      [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      32,
+      [
+        motionkit.path.OrientationPolicy.FreeAboutTool,
+        motionkit.path.OrientationPolicy.FreeAboutTool
+      ]
+    );
+    var rollProblem = new motionkit.robot.CandidateProblem(
+      rollGroup,
+      rollRequest,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+        4,
+        1,
+        1
+      )
+    );
+    var partitionProblem = new motionkit.robot.CandidateProblem(
+      rollGroup,
+      new PathRequest(
+        rollRequest.distances,
+        rollRequest.poses,
+        rollStart,
+        rollRequest.tolerance,
+        [
+          1.0,
+          1.0,
+          1.0,
+          0.1
+        ],
+        rollRequest.velocity,
+        32,
+        rollRequest.freedoms
+      ),
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+        4,
+        1,
+        1,
+        false
+      )
+    );
     // Small joint drift crosses a bin boundary near zero without separating
     // its physical component. Packet partitioning must match the full graph.
-    for(candidate in partitionProblem.samples[1].candidates)candidate.q[3]-=0.01;
-    var partitionCost=(sample:Int,candidate:motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->
-      10*Math.pow(candidate.q[3]-Math.PI/2,2);
-    var completeRoute=motionkit.robot.StructuredLadder.search(partitionProblem,null,0,partitionCost);
-    var packetBudget=motionkit.robot.StructuredLadder.packetCandidateBytes(partitionProblem)*4;
-    var componentRoute=motionkit.robot.StructuredLadder.search(partitionProblem,null,0,partitionCost,null,null,packetBudget);
-    near(componentRoute.cost,completeRoute.cost,"component packets preserve exhaustive optimal cost",1e-12);
-    for(i in 0...completeRoute.candidates.length)for(j in 0...4)
-      near(componentRoute.candidates[i].q[j],completeRoute.candidates[i].q[j],
-        "component packets retain the exhaustive physical route",1e-12);
-    var removedEdge=new motionkit.robot.StructuredLadder.BlockedLadderEdge(1,
+    for (candidate in partitionProblem.samples[1].candidates) candidate.q[3] -= 0.01;
+    var partitionCost = (sample:Int,
+      candidate:motionkit.robot.CartesianCandidateSampler.LatticeCandidate) -> 10 * Math.pow(
+        candidate.q[3] - Math.PI / 2,
+        2
+      );
+    var completeRoute = motionkit.robot.StructuredLadder.search(partitionProblem, null, 0, partitionCost);
+    var packetBudget = motionkit.robot.StructuredLadder.packetCandidateBytes(partitionProblem) * 4;
+    var componentRoute = motionkit.robot.StructuredLadder.search(
+      partitionProblem,
+      null,
+      0,
+      partitionCost,
+      null,
+      null,
+      packetBudget
+    );
+    near(componentRoute.cost, completeRoute.cost, "component packets preserve exhaustive optimal cost", 1e-12);
+    for (i in 0...completeRoute.candidates.length) for (j in 0...4) near(
+      componentRoute.candidates[i].q[j],
+      completeRoute.candidates[i].q[j],
+      "component packets retain the exhaustive physical route",
+      1e-12
+    );
+    var removedEdge = new motionkit.robot.StructuredLadder.BlockedLadderEdge(
+      1,
       partitionProblem.samples[0].candidates.indexOf(completeRoute.candidates[0]),
-      partitionProblem.samples[1].candidates.indexOf(completeRoute.candidates[1]));
-    var fullFiltered=motionkit.robot.StructuredLadder.search(partitionProblem,null,0,partitionCost,null,[removedEdge]);
-    var componentFiltered=motionkit.robot.StructuredLadder.search(partitionProblem,null,0,partitionCost,null,[removedEdge],packetBudget);
-    near(componentFiltered.cost,fullFiltered.cost,"component packet search preserves global blocked-edge indices",1e-12);
-    for(i in 0...fullFiltered.candidates.length)for(j in 0...4)
-      near(componentFiltered.candidates[i].q[j],fullFiltered.candidates[i].q[j],
-        "component packet blocked edges retain the exhaustive alternative route",1e-12);
-    throws(function() motionkit.robot.StructuredLadder.search(partitionProblem,null,0,null,null,null,
-      motionkit.robot.StructuredLadder.packetCandidateBytes(partitionProblem)),"connected components exceeding a packet are diagnosed without pruning states");
+      partitionProblem.samples[1].candidates.indexOf(completeRoute.candidates[1])
+    );
+    var fullFiltered = motionkit.robot.StructuredLadder.search(
+      partitionProblem,
+      null,
+      0,
+      partitionCost,
+      null,
+      [removedEdge]
+    );
+    var componentFiltered = motionkit.robot.StructuredLadder.search(
+      partitionProblem,
+      null,
+      0,
+      partitionCost,
+      null,
+      [removedEdge],
+      packetBudget
+    );
+    near(
+      componentFiltered.cost,
+      fullFiltered.cost,
+      "component packet search preserves global blocked-edge indices",
+      1e-12
+    );
+    for (i in 0...fullFiltered.candidates.length) for (j in 0...4) near(
+      componentFiltered.candidates[i].q[j],
+      fullFiltered.candidates[i].q[j],
+      "component packet blocked edges retain the exhaustive alternative route",
+      1e-12
+    );
+    throws(
+      function() motionkit.robot.StructuredLadder.search(
+        partitionProblem,
+        null,
+        0,
+        null,
+        null,
+        null,
+        motionkit.robot.StructuredLadder.packetCandidateBytes(partitionProblem)
+      ),
+      "connected components exceeding a packet are diagnosed without pruning states"
+    );
     // Abstract ladder coordinates outside the integer-bin range retain the
     // exhaustive typed-sort fallback; no physical model solve is involved.
-    for(layer in partitionProblem.samples)for(candidate in layer.candidates)candidate.q[0]+=3e9;
-    partitionProblem.request.startQ[0]+=3e9;
-    var wideFull=motionkit.robot.StructuredLadder.search(partitionProblem,null,0,partitionCost);
-    var widePackets=motionkit.robot.StructuredLadder.search(partitionProblem,null,0,partitionCost,null,null,packetBudget);
-    near(widePackets.cost,wideFull.cost,"large-coordinate fallback preserves exhaustive route cost",1e-12);
-    for(i in 0...wideFull.candidates.length)for(j in 0...4)near(widePackets.candidates[i].q[j],wideFull.candidates[i].q[j],
-      "large-coordinate fallback preserves exhaustive route joints",1e-12);
-    function rollHull(x:Float):Array<Float>{var vertices:Array<Float> = [];
-      for(dx in [-0.01,0.01])for(y in [-0.01,0.01])for(z in [-0.01,0.01]){
-        vertices.push(x+dx);vertices.push(y);vertices.push(z);}
-      return vertices;}
+    for (layer in partitionProblem.samples) for (candidate in layer.candidates) candidate.q[0] += 3e9;
+    partitionProblem.request.startQ[0] += 3e9;
+    var wideFull = motionkit.robot.StructuredLadder.search(partitionProblem, null, 0, partitionCost);
+    var widePackets = motionkit.robot.StructuredLadder.search(
+      partitionProblem,
+      null,
+      0,
+      partitionCost,
+      null,
+      null,
+      packetBudget
+    );
+    near(widePackets.cost, wideFull.cost, "large-coordinate fallback preserves exhaustive route cost", 1e-12);
+    for (i in 0...wideFull.candidates.length) for (j in 0...4) near(
+      widePackets.candidates[i].q[j],
+      wideFull.candidates[i].q[j],
+      "large-coordinate fallback preserves exhaustive route joints",
+      1e-12
+    );
+    function rollHull(x:Float):Array<Float> {
+      var vertices:Array<Float> = [];
+      for (dx in [-0.01, 0.01]) for (y in [-0.01, 0.01]) for (z in [-0.01, 0.01]) {
+        vertices.push(x + dx);
+        vertices.push(y);
+        vertices.push(z);
+      }
+      return vertices;
+    }
     var rollFixture = new CollisionFixture(rollGroup, rollStart);
     rollFixture.mechanism("offset-tool", rollParent.id, rollHull(0.1), true);
     rollFixture.fixture("post", rollHull(0.3), false);
@@ -1476,242 +3391,821 @@ class KinematicsTests extends MotionKitTestSupport {
     marginFixture.mechanism("offset-tool", rollParent.id, rollHull(0.1), true);
     marginFixture.fixture("contact-work", rollHull(0.124), true);
     var marginWorld = marginFixture.clearance();
-    check(marginWorld.violation(rollStart,false)!=null && marginWorld.violation(rollStart,true)==null,
-      "contact policy fixture distinguishes air from contact clearance");
-    var policyFrom=[0.0,-0.04,0.0,0.0],policyTo=[0.0,0.04,0.0,0.0];
-    check(marginWorld.violation(policyFrom,false)==null && marginWorld.violation(policyTo,false)==null,
-      "interior sweep fixture has two checked clear endpoints");
-    check(marginWorld.sweep(policyFrom,policyTo,false,0.005,null,null,true)!=null,
-      "reusing clear endpoints retains every colliding interior sample");
-    check(marginWorld.sweep(policyFrom,policyTo,false)!=null,
-      "air-only sweep rejects close approach at its interior");
-    check(marginWorld.sweep(policyFrom,policyTo,false,0.005,null,q->Math.abs(q[1])<0.035)==null,
-      "sweep evaluates contact permission at interior configurations");
-    check(marginWorld.sweep(policyFrom,policyTo,true,0.005,null,q->Math.abs(q[1])>0.035)!=null,
-      "interior air policy overrides permissive endpoint contact");
-    var mixedTrajectory=Trajectory.fromSegments([{
-      timeFromStartNs:Int64.ofInt(0),durationNs:Trajectory.nanoseconds(1.0),
-      coefficients:[[0.0,0.0,0.0],[-0.04,0.08,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]]
+    check(
+      marginWorld.violation(rollStart, false) != null && marginWorld.violation(rollStart, true) == null,
+      "contact policy fixture distinguishes air from contact clearance"
+    );
+    var policyFrom = [0.0, -0.04, 0.0, 0.0], policyTo = [0.0, 0.04, 0.0, 0.0];
+    check(
+      marginWorld.violation(policyFrom, false) == null && marginWorld.violation(policyTo, false) == null,
+      "interior sweep fixture has two checked clear endpoints"
+    );
+    check(
+      marginWorld.sweep(policyFrom, policyTo, false, 0.005, null, null, true) != null,
+      "reusing clear endpoints retains every colliding interior sample"
+    );
+    check(
+      marginWorld.sweep(policyFrom, policyTo, false) != null,
+      "air-only sweep rejects close approach at its interior"
+    );
+    check(
+      marginWorld.sweep(policyFrom, policyTo, false, 0.005, null, q -> Math.abs(q[1]) < 0.035) == null,
+      "sweep evaluates contact permission at interior configurations"
+    );
+    check(
+      marginWorld.sweep(policyFrom, policyTo, true, 0.005, null, q -> Math.abs(q[1]) > 0.035) != null,
+      "interior air policy overrides permissive endpoint contact"
+    );
+    var mixedTrajectory = Trajectory.fromSegments([{
+      timeFromStartNs: Int64.ofInt(0),
+      durationNs: Trajectory.nanoseconds(1.0),
+      coefficients: [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          -0.04,
+          0.08,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ]
+      ]
     }]);
-    var mixedPlanner=new motionkit.robot.StructuredJointPathPlanner(rollGroup,null,null,marginWorld,
-      8,false,null,null,null,0,null,p->Math.abs(p.y)<0.035);
-    check(mixedPlanner.checkMotion(mixedTrajectory)==null,
-      "final timed trajectory uses the pose-dependent contact margin");
-    var mixedWorker=mixedPlanner.withSolver(rollSolver.fork());
-    check(mixedWorker.checkMotion(mixedTrajectory)==null,
-      "worker planner retains contact geometry policy");
-    var airInteriorPlanner=new motionkit.robot.StructuredJointPathPlanner(rollGroup,null,null,marginWorld,
-      8,true,null,null,null,0,null,p->Math.abs(p.y)>0.035);
-    check(airInteriorPlanner.checkMotion(mixedTrajectory)!=null,
-      "final timed checks enforce air margins inside mixed-contact motion");
-    var mixedPath=new PosePath("task",[new PoseLine(
-      new PoseWaypoint(rollSolver.forward(policyFrom),1e-6,1e-6),
-      new PoseWaypoint(rollSolver.forward(policyTo),1e-6,1e-6),OrientationPolicy.Fixed,0.1,0.1)]);
-    var mixedDistances=[for(i in 0...5)mixedPath.length()*i/4];
-    var mixedRequest=new PathRequest(mixedDistances,[for(s in mixedDistances)mixedPath.poseAt(s)],policyFrom,
-      new IkTolerance(1e-6,1e-6),[1.0,1.0,1.0,1.0],[1.0,1.0,1.0,1.0],32,
-      [for(_ in mixedDistances)OrientationPolicy.Fixed]);
-    var mixedSections=[new PosePath("task",[new PoseLine(
-      new PoseWaypoint(rollSolver.forward(policyFrom),1e-6,1e-6),new PoseWaypoint(rollSolver.forward(rollStart),1e-6,1e-6),
-      OrientationPolicy.Fixed,0.1,0.1)]),new PosePath("task",[new PoseLine(
-      new PoseWaypoint(rollSolver.forward(rollStart),1e-6,1e-6),new PoseWaypoint(rollSolver.forward(policyTo),1e-6,1e-6),
-      OrientationPolicy.Fixed,0.1,0.1)])];
-    var joinedCurves=mixedPlanner.planSections(mixedSections,mixedRequest);
-    check(joinedCurves.length==2 && joinedCurves[0].s[0]==0 && joinedCurves[1].s[0]==0,
-      "whole-route selection returns locally timed section curves");
-    for(j in 0...4)near(joinedCurves[0].q[2][j],joinedCurves[1].q[0][j],
-      "whole-route sections retain a shared selected configuration",1e-9);
-    throws(function() mixedPlanner.planSections(mixedSections,new PathRequest([0.0,0.08],
-      [rollSolver.forward(policyFrom),rollSolver.forward(policyTo)],policyFrom,new IkTolerance(1e-6,1e-6),
-      [1.0,1.0,1.0,1.0],[1.0,1.0,1.0,1.0],32,[OrientationPolicy.Fixed,OrientationPolicy.Fixed])),
-      "whole-route planning requires sampled timing stops");
-    var reselections=[0];
-    var reuseChecks=new motionkit.robot.StructuredJointPathPlanner(rollGroup,null,null,marginWorld,8,false,
-      (_,candidate)->{reselections[0]++;return 0.0;},null,null,0,null,p->Math.abs(p.y)<0.035);
-    var retained=new motionkit.robot.SelectedJointPathPlanner(rollSolver,reuseChecks,mixedSections,joinedCurves);
-    var retainedRequest=new PathRequest(joinedCurves[0].s,
-      [for(distance in joinedCurves[0].s)mixedSections[0].poseAt(distance)],joinedCurves[0].q[0],
-      new IkTolerance(1e-6,1e-6),[1.0,1.0,1.0,1.0],[1.0,1.0,1.0,1.0],32,
-      [for(_ in joinedCurves[0].s)OrientationPolicy.Fixed]);
-    var retainedCurve=retained.plan(mixedSections[0],retainedRequest,true);
-    near(retainedCurve.q[1][1],joinedCurves[0].q[1][1],"retained execution uses selected physical joints",0);
-    retainedCurve.q[1][1]+=0.01;
-    near(retained.plan(mixedSections[0],retainedRequest,true).q[1][1],joinedCurves[0].q[1][1],
-      "returned curve mutation cannot change retained selection",0);
-    throws(function() retained.plan(mixedSections[0],retainedRequest,false),
-      "retained execution cannot request a new free start");
-    var changedStart=retainedRequest.startQ.copy();changedStart[0]+=0.01;
-    throws(function() retained.plan(mixedSections[0],new PathRequest(retainedRequest.distances,retainedRequest.poses,
-      changedStart,retainedRequest.tolerance,retainedRequest.maxJump,retainedRequest.velocity,32,retainedRequest.freedoms)),
-      "retained selection rejects a changed execution start");
-    var changedGrid=retainedRequest.distances.copy();changedGrid[1]+=0.001;
-    throws(function() retained.plan(mixedSections[0],new PathRequest(changedGrid,retainedRequest.poses,
-      retainedRequest.startQ,retainedRequest.tolerance,retainedRequest.maxJump,retainedRequest.velocity,32,retainedRequest.freedoms)),
-      "retained selection rejects a changed sampling grid");
-    var retainedCompiler=new ProgramCompiler(rollSolver,new ValidationLimits(4,Int64.ofInt(1),Int64.ofInt(0)),"task",
-      [1.0,1.0,1.0,1.0],[2.0,2.0,2.0,2.0],[20.0,20.0,20.0,20.0],
-      StartTolerances.uniform(4,0.01,0.01,0.01),null,0.02,1.0,1e-4,1e-4,null,retained);
-    var retainedProgram=new MotionProgram([for(path in mixedSections)MotionOp.FollowPath(path,"task",0.1,[])]);
-    for(worker in [false,true]){
-      var execution=(worker?retainedCompiler.forWorker():retainedCompiler).compile(retainedProgram,policyFrom,Int64.ofInt(939));
+    var mixedPlanner = new motionkit.robot.StructuredJointPathPlanner(
+      rollGroup,
+      null,
+      null,
+      marginWorld,
+      8,
+      false,
+      null,
+      null,
+      null,
+      0,
+      null,
+      p -> Math.abs(p.y) < 0.035
+    );
+    check(
+      mixedPlanner.checkMotion(mixedTrajectory) == null,
+      "final timed trajectory uses the pose-dependent contact margin"
+    );
+    var mixedWorker = mixedPlanner.withSolver(rollSolver.fork());
+    check(mixedWorker.checkMotion(mixedTrajectory) == null, "worker planner retains contact geometry policy");
+    var airInteriorPlanner = new motionkit.robot.StructuredJointPathPlanner(
+      rollGroup,
+      null,
+      null,
+      marginWorld,
+      8,
+      true,
+      null,
+      null,
+      null,
+      0,
+      null,
+      p -> Math.abs(p.y) > 0.035
+    );
+    check(
+      airInteriorPlanner.checkMotion(mixedTrajectory) != null,
+      "final timed checks enforce air margins inside mixed-contact motion"
+    );
+    var mixedPath = new PosePath(
+      "task",
+      [new PoseLine(
+        new PoseWaypoint(rollSolver.forward(policyFrom), 1e-6, 1e-6),
+        new PoseWaypoint(
+          rollSolver.forward(policyTo),
+          1e-6,
+          1e-6
+        ),
+        OrientationPolicy.Fixed,
+        0.1,
+        0.1
+      )]
+    );
+    var mixedDistances = [for (i in 0...5) mixedPath.length() * i / 4];
+    var mixedRequest = new PathRequest(
+      mixedDistances,
+      [for (s in mixedDistances) mixedPath.poseAt(s)],
+      policyFrom,
+      new IkTolerance(
+        1e-6,
+        1e-6
+      ),
+      [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      32,
+      [for (_ in mixedDistances) OrientationPolicy.Fixed]
+    );
+    var mixedSections = [
+      new PosePath(
+        "task",
+        [new PoseLine(
+          new PoseWaypoint(rollSolver.forward(policyFrom), 1e-6, 1e-6),
+          new PoseWaypoint(
+            rollSolver.forward(rollStart),
+            1e-6,
+            1e-6
+          ),
+          OrientationPolicy.Fixed,
+          0.1,
+          0.1
+        )]
+      ),
+      new PosePath(
+        "task",
+        [new PoseLine(
+          new PoseWaypoint(
+            rollSolver.forward(rollStart),
+            1e-6,
+            1e-6
+          ),
+          new PoseWaypoint(
+            rollSolver.forward(policyTo),
+            1e-6,
+            1e-6
+          ),
+          OrientationPolicy.Fixed,
+          0.1,
+          0.1
+        )]
+      )
+    ];
+    var joinedCurves = mixedPlanner.planSections(mixedSections, mixedRequest);
+    check(
+      joinedCurves.length == 2 && joinedCurves[0].s[0] == 0 && joinedCurves[1].s[0] == 0,
+      "whole-route selection returns locally timed section curves"
+    );
+    for (j in 0...4) near(
+      joinedCurves[0].q[2][j],
+      joinedCurves[1].q[0][j],
+      "whole-route sections retain a shared selected configuration",
+      1e-9
+    );
+    throws(
+      function() mixedPlanner.planSections(
+        mixedSections,
+        new PathRequest(
+          [0.0, 0.08],
+          [
+            rollSolver.forward(policyFrom),
+            rollSolver.forward(policyTo)
+          ],
+          policyFrom,
+          new IkTolerance(
+            1e-6,
+            1e-6
+          ),
+          [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          32,
+          [
+            OrientationPolicy.Fixed,
+            OrientationPolicy.Fixed
+          ]
+        )
+      ),
+      "whole-route planning requires sampled timing stops"
+    );
+    var reselections = [0];
+    var reuseChecks = new motionkit.robot.StructuredJointPathPlanner(rollGroup, null, null, marginWorld, 8, false, (
+      _,
+      candidate
+    ) -> {reselections[0]++;
+    return 0.0;
+    }, null, null, 0, null, p -> Math.abs(p.y) < 0.035);
+    var retained = new motionkit.robot.SelectedJointPathPlanner(rollSolver, reuseChecks, mixedSections, joinedCurves);
+    var retainedRequest = new PathRequest(
+      joinedCurves[0].s,
+      [for (distance in joinedCurves[0].s) mixedSections[0].poseAt(distance)],
+      joinedCurves[0].q[0],
+      new IkTolerance(
+        1e-6,
+        1e-6
+      ),
+      [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      32,
+      [for (_ in joinedCurves[0].s) OrientationPolicy.Fixed]
+    );
+    var retainedCurve = retained.plan(mixedSections[0], retainedRequest, true);
+    near(retainedCurve.q[1][1], joinedCurves[0].q[1][1], "retained execution uses selected physical joints", 0);
+    retainedCurve.q[1][1] += 0.01;
+    near(
+      retained.plan(mixedSections[0], retainedRequest, true).q[1][1],
+      joinedCurves[0].q[1][1],
+      "returned curve mutation cannot change retained selection",
+      0
+    );
+    throws(
+      function() retained.plan(mixedSections[0], retainedRequest, false),
+      "retained execution cannot request a new free start"
+    );
+    var changedStart = retainedRequest.startQ.copy();
+    changedStart[0] += 0.01;
+    throws(
+      function() retained.plan(
+        mixedSections[0],
+        new PathRequest(
+          retainedRequest.distances,
+          retainedRequest.poses,
+          changedStart,
+          retainedRequest.tolerance,
+          retainedRequest.maxJump,
+          retainedRequest.velocity,
+          32,
+          retainedRequest.freedoms
+        )
+      ),
+      "retained selection rejects a changed execution start"
+    );
+    var changedGrid = retainedRequest.distances.copy();
+    changedGrid[1] += 0.001;
+    throws(
+      function() retained.plan(
+        mixedSections[0],
+        new PathRequest(
+          changedGrid,
+          retainedRequest.poses,
+          retainedRequest.startQ,
+          retainedRequest.tolerance,
+          retainedRequest.maxJump,
+          retainedRequest.velocity,
+          32,
+          retainedRequest.freedoms
+        )
+      ),
+      "retained selection rejects a changed sampling grid"
+    );
+    var retainedCompiler = new ProgramCompiler(
+      rollSolver,
+      new ValidationLimits(4, Int64.ofInt(1), Int64.ofInt(0)),
+      "task",
+      [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      [
+        2.0,
+        2.0,
+        2.0,
+        2.0
+      ],
+      [
+        20.0,
+        20.0,
+        20.0,
+        20.0
+      ],
+      StartTolerances.uniform(
+        4,
+        0.01,
+        0.01,
+        0.01
+      ),
+      null,
+      0.02,
+      1.0,
+      1e-4,
+      1e-4,
+      null,
+      retained
+    );
+    var retainedProgram = new MotionProgram([for (path in mixedSections) MotionOp.FollowPath(path, "task", 0.1, [])]);
+    for (worker in [false, true]) {
+      var execution = (worker ? retainedCompiler.forWorker() : retainedCompiler).compile(
+        retainedProgram,
+        policyFrom,
+        Int64.ofInt(939)
+      );
       try {
-        var selectedPlans=[for(block in execution.blocks)for(plan in block.plans)plan];
-        check(selectedPlans.length==2,"selected process sections compile into separately stopped paths");
-        for(section in 0...2){var trajectory=selectedPlans[section];
-          var from=trajectory.evaluate(0),to=trajectory.evaluate(trajectory.durationSeconds);
-          for(j in 0...4){near(from.positions[j],joinedCurves[section].q[0][j],"execution retains selected section start",1e-8);
-            near(to.positions[j],joinedCurves[section].q[2][j],"execution retains selected section end",1e-8);
-            near(from.velocities[j],0,"retained section starts stopped",1e-7);
-            near(to.velocities[j],0,"retained section ends stopped",1e-7);}
+        var selectedPlans = [for (block in execution.blocks) for (plan in block.plans) plan];
+        check(selectedPlans.length == 2, "selected process sections compile into separately stopped paths");
+        for (section in 0...2) {
+          var trajectory = selectedPlans[section];
+          var from = trajectory.evaluate(0), to = trajectory.evaluate(trajectory.durationSeconds);
+          for (j in 0...4) {
+            near(from.positions[j], joinedCurves[section].q[0][j], "execution retains selected section start", 1e-8);
+            near(to.positions[j], joinedCurves[section].q[2][j], "execution retains selected section end", 1e-8);
+            near(from.velocities[j], 0, "retained section starts stopped", 1e-7);
+            near(to.velocities[j], 0, "retained section ends stopped", 1e-7);
+          }
         }
-      }catch(error:Dynamic){execution.dispose();throw error;}
+      } catch (error:Dynamic) {
+        execution.dispose();
+        throw error;
+      }
       execution.dispose();
     }
-    check(reselections[0]==0,"main and worker execution reuse curves without candidate reselection");
-    var farthestSample=[-1];
-    var cornerPlanner=new motionkit.robot.StructuredJointPathPlanner(rollGroup,null,null,null,8,false,
-      (sample,candidate)->{farthestSample[0]=Std.int(Math.max(farthestSample[0],sample));return 0.0;});
-    var cornerPath=new PosePath("task",[mixedSections[0].primitives[0],new PoseLine(
-      new PoseWaypoint(rollSolver.forward(rollStart),1e-6,1e-6),
-      new PoseWaypoint(rollSolver.forward([0.04,0.0,0.0,0.0]),1e-6,1e-6),OrientationPolicy.Fixed,0.1,0.1)]);
-    var cornerCompiler=new ProgramCompiler(rollSolver,new ValidationLimits(4,Int64.ofInt(1),Int64.ofInt(0)),"task",
-      [1.0,1.0,1.0,1.0],[2.0,2.0,2.0,2.0],[20.0,20.0,20.0,20.0],
-      StartTolerances.uniform(4,0.01,0.01,0.01),null,0.01,1.0,1e-4,1e-4,null,cornerPlanner);
-    var cornerProgram=new MotionProgram([MotionOp.FollowPath(cornerPath,"task",0.1,[
-      new motionkit.event.PathEvent(0.04,"corner-marker",motionkit.event.EventValue.Digital(true)),
-      new motionkit.event.PathEvent(0.08,"end-marker",motionkit.event.EventValue.Digital(true))])]);
-    var cornerCompiled=cornerCompiler.compile(cornerProgram,policyFrom,Int64.ofInt(940));
+    check(reselections[0] == 0, "main and worker execution reuse curves without candidate reselection");
+    var farthestSample = [-1];
+    var cornerPlanner = new motionkit.robot.StructuredJointPathPlanner(rollGroup, null, null, null, 8, false, (
+      sample,
+      candidate
+    ) -> {farthestSample[0] = Std.int(Math.max(
+      farthestSample[0],
+      sample
+    ));
+    return 0.0;
+    });
+    var cornerPath = new PosePath(
+      "task",
+      [
+        mixedSections[0].primitives[0],
+        new PoseLine(
+          new PoseWaypoint(
+            rollSolver.forward(rollStart),
+            1e-6,
+            1e-6
+          ),
+          new PoseWaypoint(
+            rollSolver.forward([
+              0.04,
+              0.0,
+              0.0,
+              0.0
+            ]),
+            1e-6,
+            1e-6
+          ),
+          OrientationPolicy.Fixed,
+          0.1,
+          0.1
+        )
+      ]
+    );
+    var cornerCompiler = new ProgramCompiler(
+      rollSolver,
+      new ValidationLimits(4, Int64.ofInt(1), Int64.ofInt(0)),
+      "task",
+      [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      [
+        2.0,
+        2.0,
+        2.0,
+        2.0
+      ],
+      [
+        20.0,
+        20.0,
+        20.0,
+        20.0
+      ],
+      StartTolerances.uniform(
+        4,
+        0.01,
+        0.01,
+        0.01
+      ),
+      null,
+      0.01,
+      1.0,
+      1e-4,
+      1e-4,
+      null,
+      cornerPlanner
+    );
+    var cornerProgram = new MotionProgram([MotionOp.FollowPath(
+      cornerPath,
+      "task",
+      0.1,
+      [
+        new motionkit.event.PathEvent(
+          0.04,
+          "corner-marker",
+          motionkit.event.EventValue.Digital(true)
+        ),
+        new motionkit.event.PathEvent(
+          0.08,
+          "end-marker",
+          motionkit.event.EventValue.Digital(true)
+        )
+      ]
+    )]);
+    var cornerCompiled = cornerCompiler.compile(cornerProgram, policyFrom, Int64.ofInt(940));
     try {
-      check(cornerCompiled.blocks[0].plans.length==2,"global selection retains two sharp-corner timing stops");
-      check(farthestSample[0]==8,"compiler costs all sections on one global ladder sample index");
-      var beforeCorner=cornerCompiled.blocks[0].plans[0],afterCorner=cornerCompiled.blocks[0].plans[1];
-      check(beforeCorner.events.length==0 && afterCorner.events.length==2 &&
-        afterCorner.events[0].channel=="corner-marker" && afterCorner.events[1].channel=="end-marker",
-        "global corner distance events retain outgoing section ownership");
-      var arrival=beforeCorner.evaluate(beforeCorner.durationSeconds),departure=afterCorner.evaluate(0);
-      for(j in 0...4){near(arrival.positions[j],departure.positions[j],"global corner plans share physical joints",1e-8);
-        near(arrival.velocities[j],0,"global corner stops arriving motion",1e-7);
-        near(departure.velocities[j],0,"global corner starts departing motion from rest",1e-7);}
-    } catch(error:Dynamic){cornerCompiled.dispose();throw error;}
+      check(cornerCompiled.blocks[0].plans.length == 2, "global selection retains two sharp-corner timing stops");
+      check(farthestSample[0] == 8, "compiler costs all sections on one global ladder sample index");
+      var beforeCorner = cornerCompiled.blocks[0].plans[0], afterCorner = cornerCompiled.blocks[0].plans[1];
+      check(
+        beforeCorner.events.length == 0 && afterCorner.events.length == 2
+        && afterCorner.events[0].channel == "corner-marker" && afterCorner.events[1].channel == "end-marker",
+        "global corner distance events retain outgoing section ownership"
+      );
+      var arrival = beforeCorner.evaluate(beforeCorner.durationSeconds), departure = afterCorner.evaluate(0);
+      for (j in 0...4) {
+        near(arrival.positions[j], departure.positions[j], "global corner plans share physical joints", 1e-8);
+        near(arrival.velocities[j], 0, "global corner stops arriving motion", 1e-7);
+        near(departure.velocities[j], 0, "global corner starts departing motion from rest", 1e-7);
+      }
+    } catch (error:Dynamic) {
+      cornerCompiled.dispose();
+      throw error;
+    }
     cornerCompiled.dispose();
-    farthestSample[0]=-1;
-    var cornerWorkerPlan=cornerCompiler.forWorker().compile(cornerProgram,policyFrom,Int64.ofInt(942));
+    farthestSample[0] = -1;
+    var cornerWorkerPlan = cornerCompiler.forWorker().compile(cornerProgram, policyFrom, Int64.ofInt(942));
     try {
-      check(cornerWorkerPlan.blocks[0].plans.length==2 && farthestSample[0]==8,
-        "worker compiler uses the same whole-route selection and timing stops");
-    } catch(error:Dynamic){cornerWorkerPlan.dispose();throw error;}
+      check(
+        cornerWorkerPlan.blocks[0].plans.length == 2 && farthestSample[0] == 8,
+        "worker compiler uses the same whole-route selection and timing stops"
+      );
+    } catch (error:Dynamic) {
+      cornerWorkerPlan.dispose();
+      throw error;
+    }
     cornerWorkerPlan.dispose();
-    var mixedCurve=mixedPlanner.plan(mixedPath,mixedRequest);
-    check(mixedCurve.q.length==5,"lazy route and refinement accept mixed air/contact margins");
-    throws(function() airInteriorPlanner.plan(mixedPath,mixedRequest),
-      "lazy route rejects a contact configuration designated as air");
+    var mixedCurve = mixedPlanner.plan(mixedPath, mixedRequest);
+    check(mixedCurve.q.length == 5, "lazy route and refinement accept mixed air/contact margins");
+    throws(
+      function() airInteriorPlanner.plan(mixedPath, mixedRequest),
+      "lazy route rejects a contact configuration designated as air"
+    );
     mixedTrajectory.dispose();
     var excursion = Trajectory.fromSegments([{
-      timeFromStartNs:Int64.ofInt(0),durationNs:Trajectory.nanoseconds(1.0),
-      coefficients:[[0.0,0.8,-0.8],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]]
+      timeFromStartNs: Int64.ofInt(0),
+      durationNs: Trajectory.nanoseconds(1.0),
+      coefficients: [
+        [
+          0.0,
+          0.8,
+          -0.8
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ]
+      ]
     }]);
-    check(rollWorld.sweep(excursion.evaluate(0.0).positions,excursion.evaluate(1.0).positions) == null,
-      "straight entry endpoints miss a curved trajectory's obstacle");
-    var excursionFailure = motionkit.robot.TrajectoryClearance.violation(rollWorld,excursion);
-    check(excursionFailure != null && (excursionFailure.a == "post" || excursionFailure.b == "post"),
-      "generated trajectory clearance detects the physical mid-motion obstacle");
+    check(
+      rollWorld.sweep(excursion.evaluate(0.0).positions, excursion.evaluate(1.0).positions) == null,
+      "straight entry endpoints miss a curved trajectory's obstacle"
+    );
+    var excursionFailure = motionkit.robot.TrajectoryClearance.violation(rollWorld, excursion);
+    check(
+      excursionFailure != null && (excursionFailure.a == "post" || excursionFailure.b == "post"),
+      "generated trajectory clearance detects the physical mid-motion obstacle"
+    );
     excursion.dispose();
-    var entryCurrent = [0.0,-0.1,0.0,0.0];
+    var entryCurrent = [0.0, -0.1, 0.0, 0.0];
     var entryFixture = new CollisionFixture(rollGroup, entryCurrent);
     entryFixture.mechanism("offset-tool", rollParent.id, rollHull(0.1), true);
     entryFixture.fixture("entry-post", rollHull(0.2), false);
     var entryWorld = entryFixture.clearance();
-    var entryPath = new PosePath("task",[new PoseLine(
-      new PoseWaypoint(new Pose3(0.2,0.1,0.0),1e-6,1e-6),
-      new PoseWaypoint(new Pose3(0.21,0.1,0.0),1e-6,1e-6),OrientationPolicy.FreeAboutTool,0.1,0.1)]);
-    var physicalEntryPlanner = new motionkit.robot.StructuredJointPathPlanner(rollGroup,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,1,false),null,entryWorld,4,false,null,entryCurrent);
-    var physicalEntryCompiler = new ProgramCompiler(rollSolver,
-      new ValidationLimits(4,Int64.ofInt(1),Int64.ofInt(0)),"task",
-      [1.0,1.0,1.0,1.0],[2.0,2.0,2.0,2.0],[20.0,20.0,20.0,20.0],
-      StartTolerances.uniform(4,0.01,0.01,0.01),null,0.005,2.0,0.001,0.001,null,physicalEntryPlanner);
-    var rejectedEntry = Trajectory.generateStateToState(entryCurrent,[0.0,0.0,0.0,0.0],
-      [0.0,0.0,0.0,0.0],[0.2,0.1,0.0,0.0],
-      [1.0,1.0,1.0,1.0],[2.0,2.0,2.0,2.0],[20.0,20.0,20.0,20.0]);
-    check(physicalEntryPlanner.checkMotion(rejectedEntry) != null,
-      "cheapest generated entry is physically blocked");
+    var entryPath = new PosePath(
+      "task",
+      [new PoseLine(
+        new PoseWaypoint(new Pose3(0.2, 0.1, 0.0), 1e-6, 1e-6),
+        new PoseWaypoint(
+          new Pose3(
+            0.21,
+            0.1,
+            0.0
+          ),
+          1e-6,
+          1e-6
+        ),
+        OrientationPolicy.FreeAboutTool,
+        0.1,
+        0.1
+      )]
+    );
+    var physicalEntryPlanner = new motionkit.robot.StructuredJointPathPlanner(
+      rollGroup,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+        4,
+        1,
+        1,
+        false
+      ),
+      null,
+      entryWorld,
+      4,
+      false,
+      null,
+      entryCurrent
+    );
+    var physicalEntryCompiler = new ProgramCompiler(
+      rollSolver,
+      new ValidationLimits(4, Int64.ofInt(1), Int64.ofInt(0)),
+      "task",
+      [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      [
+        2.0,
+        2.0,
+        2.0,
+        2.0
+      ],
+      [
+        20.0,
+        20.0,
+        20.0,
+        20.0
+      ],
+      StartTolerances.uniform(
+        4,
+        0.01,
+        0.01,
+        0.01
+      ),
+      null,
+      0.005,
+      2.0,
+      0.001,
+      0.001,
+      null,
+      physicalEntryPlanner
+    );
+    var rejectedEntry = Trajectory.generateStateToState(
+      entryCurrent,
+      [0.0, 0.0, 0.0, 0.0],
+      [0.0, 0.0, 0.0, 0.0],
+      [
+        0.2,
+        0.1,
+        0.0,
+        0.0
+      ],
+      [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      [
+        2.0,
+        2.0,
+        2.0,
+        2.0
+      ],
+      [
+        20.0,
+        20.0,
+        20.0,
+        20.0
+      ]
+    );
+    check(physicalEntryPlanner.checkMotion(rejectedEntry) != null, "cheapest generated entry is physically blocked");
     rejectedEntry.dispose();
-    var physicalEntryPlan = physicalEntryCompiler.compile(new MotionProgram([
-      MotionOp.FollowPath(entryPath,"task",0.1,[])]),entryCurrent,Int64.ofInt(950));
-    check(physicalEntryPlan.blocks[0].plans.length == 3 &&
-      Math.abs(physicalEntryPlan.blocks[0].plans[1].evaluate(0.0).positions[3]) > 1.0,
-      "compiler retries a blocked generated entry with a clear rolled start");
+    var physicalEntryPlan = physicalEntryCompiler.compile(
+      new MotionProgram([MotionOp.FollowPath(
+        entryPath,
+        "task",
+        0.1,
+        []
+      )]),
+      entryCurrent,
+      Int64.ofInt(950)
+    );
+    check(
+      physicalEntryPlan.blocks[0].plans.length == 3
+      && Math.abs(physicalEntryPlan.blocks[0].plans[1].evaluate(0.0).positions[3]) > 1.0,
+      "compiler retries a blocked generated entry with a clear rolled start"
+    );
     var acceptedEntry = physicalEntryPlan.blocks[0].plans[0];
-    for (i in 0...101) check(entryWorld.violation(acceptedEntry.evaluate(acceptedEntry.durationSeconds*i/100.0).positions) == null,
-      "emitted alternative entry remains clear of the physical post");
+    for (i in 0...101) check(
+      entryWorld.violation(acceptedEntry.evaluate(acceptedEntry.durationSeconds * i / 100.0).positions) == null,
+      "emitted alternative entry remains clear of the physical post"
+    );
     var acceptedExit = physicalEntryPlan.blocks[0].plans[2];
-    for (i in 0...101) check(entryWorld.violation(acceptedExit.evaluate(acceptedExit.durationSeconds*i/100.0).positions) == null,
-      "emitted retreat remains clear of the physical post");
-    for (joint in 0...4) near(acceptedExit.evaluate(acceptedExit.durationSeconds).positions[joint],entryCurrent[joint],
-      "physical retreat reaches its safe station",1e-7);
+    for (i in 0...101) check(
+      entryWorld.violation(acceptedExit.evaluate(acceptedExit.durationSeconds * i / 100.0).positions) == null,
+      "emitted retreat remains clear of the physical post"
+    );
+    for (joint in 0...4) near(
+      acceptedExit.evaluate(acceptedExit.durationSeconds).positions[joint],
+      entryCurrent[joint],
+      "physical retreat reaches its safe station",
+      1e-7
+    );
     physicalEntryPlan.dispose();
-    var unobstructed=motionkit.robot.StructuredLadder.search(rollProblem);
-    check(rollWorld.violation(unobstructed.candidates[1].q)!=null,"physical post blocks the cheapest roll route");
-    var avoided=motionkit.robot.LazyCollisionLadder.select(rollProblem,rollWorld,3);
-    check(avoided.diagnostic==null && Math.abs(avoided.candidates[1].q[3])>1,
-      "physical obstacle forces a native tool-roll change within the round budget");
-    check(rollWorld.sweep(avoided.candidates[0].q,avoided.candidates[1].q)==null,
-      "physical rerouted roll transition has no sampled clearance violation");
-    near(motionkit.path.PoseMath.distance(rollSolver.forward(avoided.candidates[1].q),rollRequest.poses[1]),0,
-      "physical roll rerouting retains the TCP position",1e-8);
-    check(avoided.closestClearance!=null,"physical reroute returns its closest sampled clearance");
-    if(avoided.closestClearance!=null)check(avoided.closestClearance.distance>=avoided.closestClearance.required,
-      "physical reroute clearance exceeds the required margin");
-    var rollPath=new motionkit.path.PosePath("task",[new PoseLine(
-      new PoseWaypoint(rollRequest.poses[0],1e-6,1e-6),new PoseWaypoint(rollRequest.poses[1],1e-6,1e-6),
-      motionkit.path.OrientationPolicy.FreeAboutTool,0.1,0.1)]);
-    var plannerWeights = [0.1,0.1,0.1,1.0];
-    var physicalPlanner=new motionkit.robot.StructuredJointPathPlanner(rollGroup,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,1),null,rollWorld,3,false,null,null,
-      plannerWeights,0.2);
+    var unobstructed = motionkit.robot.StructuredLadder.search(rollProblem);
+    check(rollWorld.violation(unobstructed.candidates[1].q) != null, "physical post blocks the cheapest roll route");
+    var avoided = motionkit.robot.LazyCollisionLadder.select(rollProblem, rollWorld, 3);
+    check(
+      avoided.diagnostic == null && Math.abs(avoided.candidates[1].q[3]) > 1,
+      "physical obstacle forces a native tool-roll change within the round budget"
+    );
+    check(
+      rollWorld.sweep(avoided.candidates[0].q, avoided.candidates[1].q) == null,
+      "physical rerouted roll transition has no sampled clearance violation"
+    );
+    near(
+      motionkit.path.PoseMath.distance(rollSolver.forward(avoided.candidates[1].q), rollRequest.poses[1]),
+      0,
+      "physical roll rerouting retains the TCP position",
+      1e-8
+    );
+    check(avoided.closestClearance != null, "physical reroute returns its closest sampled clearance");
+    if (avoided.closestClearance != null) check(
+      avoided.closestClearance.distance >= avoided.closestClearance.required,
+      "physical reroute clearance exceeds the required margin"
+    );
+    var rollPath = new motionkit.path.PosePath(
+      "task",
+      [new PoseLine(
+        new PoseWaypoint(rollRequest.poses[0], 1e-6, 1e-6),
+        new PoseWaypoint(
+          rollRequest.poses[1],
+          1e-6,
+          1e-6
+        ),
+        motionkit.path.OrientationPolicy.FreeAboutTool,
+        0.1,
+        0.1
+      )]
+    );
+    var plannerWeights = [0.1, 0.1, 0.1, 1.0];
+    var physicalPlanner = new motionkit.robot.StructuredJointPathPlanner(
+      rollGroup,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+        4,
+        1,
+        1
+      ),
+      null,
+      rollWorld,
+      3,
+      false,
+      null,
+      null,
+      plannerWeights,
+      0.2
+    );
     plannerWeights[3] = -1.0; // A caller's later mutation must not corrupt the owned native weights.
-    var physicalCurve=physicalPlanner.plan(rollPath,rollRequest);
-    check(Math.abs(physicalCurve.q[1][3])>1,"integrated planner refines the physical obstacle-avoiding roll");
-    check(rollWorld.sweep(physicalCurve.q[0],physicalCurve.q[1])==null,"integrated refined route has a clear sampled sweep");
-    var weightedWorkerCurve = physicalPlanner.withSolver(rollSolver.fork()).plan(rollPath,rollRequest);
-    for (sample in 0...physicalCurve.q.length) for (joint in 0...4)
-      near(weightedWorkerCurve.q[sample][joint],physicalCurve.q[sample][joint],
-        "weighted planner worker retains the physical route despite caller mutation",1e-7);
-    var finalCompiler = new ProgramCompiler(rollSolver,new ValidationLimits(4,Int64.ofInt(1),Int64.ofInt(0)),
-      "task",[1.0,1.0,1.0,1.0],[2.0,2.0,2.0,2.0],[20.0,20.0,20.0,20.0],
-      StartTolerances.uniform(4,0.01,0.01,0.01),null,0.005,2.0,0.001,0.001,null,physicalPlanner);
-    var unsafeEnd = [0.4,0.0,0.0,0.0];
-    check(rollWorld.violation(rollStart) == null && rollWorld.violation(unsafeEnd) == null,
-      "compiled motion clearance fixture has clear endpoints");
+    var physicalCurve = physicalPlanner.plan(rollPath, rollRequest);
+    check(Math.abs(physicalCurve.q[1][3]) > 1, "integrated planner refines the physical obstacle-avoiding roll");
+    check(
+      rollWorld.sweep(physicalCurve.q[0], physicalCurve.q[1]) == null,
+      "integrated refined route has a clear sampled sweep"
+    );
+    var weightedWorkerCurve = physicalPlanner.withSolver(rollSolver.fork()).plan(rollPath, rollRequest);
+    for (sample in 0...physicalCurve.q.length) for (joint in 0...4) near(
+      weightedWorkerCurve.q[sample][joint],
+      physicalCurve.q[sample][joint],
+      "weighted planner worker retains the physical route despite caller mutation",
+      1e-7
+    );
+    var finalCompiler = new ProgramCompiler(
+      rollSolver,
+      new ValidationLimits(4, Int64.ofInt(1), Int64.ofInt(0)),
+      "task",
+      [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      [
+        2.0,
+        2.0,
+        2.0,
+        2.0
+      ],
+      [
+        20.0,
+        20.0,
+        20.0,
+        20.0
+      ],
+      StartTolerances.uniform(
+        4,
+        0.01,
+        0.01,
+        0.01
+      ),
+      null,
+      0.005,
+      2.0,
+      0.001,
+      0.001,
+      null,
+      physicalPlanner
+    );
+    var unsafeEnd = [0.4, 0.0, 0.0, 0.0];
+    check(
+      rollWorld.violation(rollStart) == null && rollWorld.violation(unsafeEnd) == null,
+      "compiled motion clearance fixture has clear endpoints"
+    );
     var finalFailure = "";
-    try finalCompiler.compile(new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(unsafeEnd),
-      new MotionOptions(),Blend.ExactStop)]),rollStart,Int64.ofInt(960))
-    catch (error:Dynamic) finalFailure = Std.string(error);
-    check(finalFailure.indexOf("compiled trajectory clearance") >= 0 && finalFailure.indexOf("post") >= 0 &&
-      finalFailure.indexOf("op 0") >= 0,
-      "final compiler check rejects an interior collision and names the physical pair and operation");
-    var finalSafe = finalCompiler.compile(new MotionProgram([MotionOp.FollowPath(rollPath,"task",0.1,[])]),
-      rollStart,Int64.ofInt(961));
-    check(finalSafe.blocks[0].plans.length == 1,
-      "final compiler check accepts the obstacle-avoiding timed path after a rejected motion");
+    try finalCompiler.compile(
+      new MotionProgram([MotionOp.MoveJ(
+        MoveTarget.JointTarget(unsafeEnd),
+        new MotionOptions(),
+        Blend.ExactStop
+      )]),
+      rollStart,
+      Int64.ofInt(960)
+    ) catch (error:Dynamic) finalFailure = Std.string(error);
+    check(
+      finalFailure.indexOf("compiled trajectory clearance") >= 0
+      && finalFailure.indexOf("post") >= 0 && finalFailure.indexOf("op 0") >= 0,
+      "final compiler check rejects an interior collision and names the physical pair and operation"
+    );
+    var finalSafe = finalCompiler.compile(
+      new MotionProgram([MotionOp.FollowPath(rollPath, "task", 0.1, [])]),
+      rollStart,
+      Int64.ofInt(961)
+    );
+    check(
+      finalSafe.blocks[0].plans.length == 1,
+      "final compiler check accepts the obstacle-avoiding timed path after a rejected motion"
+    );
     finalSafe.dispose();
     var blockedFixture = new CollisionFixture(rollGroup, rollStart);
     blockedFixture.mechanism("offset-tool", rollParent.id, rollHull(0.1), true);
     blockedFixture.fixture("blocking-post", rollHull(0.1), false);
     var blockedWorld = blockedFixture.clearance();
-    var blockage="";
-    try {motionkit.robot.LazyCollisionLadder.select(rollProblem,blockedWorld,3);}catch(error:Dynamic){blockage=Std.string(error);}
-    check(blockage.indexOf("sample 0")>=0 && blockage.indexOf("offset-tool")>=0 && blockage.indexOf("blocking-post")>=0,
-      "impossible physical pinned start reports both blocking bodies and sample");
-    var clearanceModel=new RobotModel("closest-clearance");
-    var fixedLink=clearanceModel.addLink(new Link("fixed")),movingLink=clearanceModel.addLink(new Link("moving"));
-    var slide=clearanceModel.addJoint(new Joint("slide",JointType.Prismatic,fixedLink,movingLink));
-    slide.axis=[1.0,0.0,0.0];slide.limits.lower=-2;slide.limits.upper=2;
-    var tip=clearanceModel.addFrame(new Frame("tip",movingLink));
-    var clearanceGroup=new robotkit.manipulation.KinematicGroup(clearanceModel,fixedLink.id,tip.id);
+    var blockage = "";
+    try {
+      motionkit.robot.LazyCollisionLadder.select(rollProblem, blockedWorld, 3);
+    } catch (error:Dynamic) {
+      blockage = Std.string(error);
+    }
+    check(
+      blockage.indexOf("sample 0") >= 0
+      && blockage.indexOf("offset-tool") >= 0 && blockage.indexOf("blocking-post") >= 0,
+      "impossible physical pinned start reports both blocking bodies and sample"
+    );
+    var clearanceModel = new RobotModel("closest-clearance");
+    var fixedLink = clearanceModel.addLink(new Link("fixed")), movingLink = clearanceModel.addLink(new Link("moving"));
+    var slide = clearanceModel.addJoint(new Joint("slide", JointType.Prismatic, fixedLink, movingLink));
+    slide.axis = [1.0, 0.0, 0.0];
+    slide.limits.lower = -2;
+    slide.limits.upper = 2;
+    var tip = clearanceModel.addFrame(new Frame("tip", movingLink));
+    var clearanceGroup = new robotkit.manipulation.KinematicGroup(clearanceModel, fixedLink.id, tip.id);
     function cube(x:Float):Array<Float> {
       var vertices:Array<Float> = [];
-      for(dx in [-0.01,0.01])for(y in [-0.01,0.01])for(z in [-0.01,0.01]){vertices.push(x+dx);vertices.push(y);vertices.push(z);}
+      for (dx in [-0.01, 0.01]) for (y in [-0.01, 0.01]) for (z in [-0.01, 0.01]) {
+        vertices.push(x + dx);
+        vertices.push(y);
+        vertices.push(z);
+      }
       return vertices;
     }
     var closestFixture = new CollisionFixture(clearanceGroup, [0.0]);
@@ -1719,121 +4213,223 @@ class KinematicsTests extends MotionKitTestSupport {
     closestFixture.fixture("far", cube(1.5), true);
     closestFixture.fixture("near", cube(1), true);
     var world = closestFixture.clearance();
-    var closest=world.closest([0.0]);check(closest!=null,"closest clearance reports clear pairs");
-    if(closest!=null){near(closest.distance,0.98,"closest clearance measures the nearest hull gap",1e-8);
-      check(closest.a=="near" || closest.b=="near","closest clearance retains the nearest body pair");}
-    var moved=world.closest([0.5],true);if(moved!=null){near(moved.distance,0.48,"closest clearance follows moving geometry",1e-8);
-      near(moved.required,robotkit.collision.CollisionClearance.CONTACT_MARGIN,"closest clearance retains contact margin",1e-12);}
-    var sweepClosest=world.closestSweep([0.0],[1.2],false,0.02);
-    check(sweepClosest!=null,"closest sweep reports a checked hull pair");
-    if(sweepClosest!=null)near(sweepClosest.distance,0,"closest sweep finds an interior collision between clear endpoints",1e-8);
-    var clearSweep=world.closestSweep([0.0],[0.5]);
-    if(clearSweep!=null)near(clearSweep.distance,0.48,"closest sweep aggregates clear route distances",1e-8);
-    throws(function() world.closestSweep([0.0],[0.5],false,Math.POSITIVE_INFINITY),"closest sweep rejects an infinite sampling step");
-    var displacement=world.displacementBounds([0.0],[0.002]);
-    near(displacement[world.bodyIndex("tool")],0.002,"prismatic hull motion includes complete lowering neighborhood",1e-12);
-    near(displacement[world.bodyIndex("near")],0,"held hull has zero displacement",1e-12);
-    var certifiedCurve=new JointPathSamples([0.0,1.0],[[0.0],[0.5]],[[0.5],[0.5]],[[0.0],[0.0]]);
-    var certificate=new motionkit.robot.JointCurveClearance(world,certifiedCurve,1e-6,false);
-    check(!certificate.covers(certifiedCurve,1e-6),"unchecked curve is not clearance evidence");
-    check(certificate.check(),"Bernstein subdivision certifies the continuous quintic curve");
-    check(certificate.covers(certifiedCurve,1e-6),"certificate covers exact curve and lowering budget");
-    check(!certificate.covers(certifiedCurve,2e-6),"larger lowering error needs a fresh certificate");
-    var realigned=new JointPathSamples([0.0,1.0+1e-13],certifiedCurve.q,certifiedCurve.qPrime,certifiedCurve.qDoublePrime);
-    check(certificate.covers(realigned,1e-6),"coefficient bound covers floating-point grid realignment");
-    certifiedCurve.q[1][0]=1.2;
-    check(!certificate.covers(certifiedCurve,1e-6),"mutating public curve arrays invalidates clearance evidence");
-    var bowed=new JointPathSamples([0.0,1.0],[[0.0],[0.0]],[[4.0],[-4.0]],[[0.0],[0.0]]);
-    check(world.violation(bowed.q[0])==null && world.violation(bowed.q[1])==null,
-      "quintic interior collision fixture has clear endpoints");
-    var bowedProof=new motionkit.robot.JointCurveClearance(world,bowed,1e-6,false);
-    check(!bowedProof.check() && bowedProof.failure!=null,"continuous certificate catches collision missed by endpoint chord");
-    var nearCurve=new JointPathSamples([0.0,1.0],[[0.9749995],[0.9749995]],[[0.0],[0.0]],[[0.0],[0.0]]);
-    check(world.violation(nearCurve.q[0])==null,"lowering-margin fixture is clear without inflation");
-    check(!new motionkit.robot.JointCurveClearance(world,nearCurve,1e-6,false).check(),
-      "lowering hull displacement rejects an insufficient geometric margin");
-    var coupledModel=new RobotModel("coupled-clearance-bounds"),root=coupledModel.addLink(new Link("root")),
-      turnLink=coupledModel.addLink(new Link("turn-link")),slideLink=coupledModel.addLink(new Link("slide-link")),
-      followerLink=coupledModel.addLink(new Link("follower-link"));
-    var turn=coupledModel.addJoint(new Joint("turn",JointType.Revolute,root,turnLink));
-    turn.limits.lower=-3;turn.limits.upper=3;turn.childFramePosition=[-0.2,0,0];
-    var travel=coupledModel.addJoint(new Joint("travel",JointType.Prismatic,turnLink,slideLink));
-    travel.axis=[1,0,0];travel.limits.lower=-2;travel.limits.upper=2;
-    var follower=coupledModel.addJoint(new Joint("follower",JointType.Revolute,slideLink,followerLink));
-    follower.parentFramePosition=[0.3,0,0];
-    coupledModel.addCoupling(new JointCoupling("travel-drive",travel.id,follower.id,12,0.1));
-    coupledModel.addCoupling(new JointCoupling("turn-drive",turn.id,follower.id,-0.5,0));
-    var flange=coupledModel.addFrame(new Frame("flange",followerLink)),work=coupledModel.addFrame(new Frame("work",slideLink));
-    var coupledGroup=new robotkit.manipulation.KinematicGroup(coupledModel,root.id,flange.id,work.id);
+    var closest = world.closest([0.0]);
+    check(closest != null, "closest clearance reports clear pairs");
+    if (closest != null) {
+      near(closest.distance, 0.98, "closest clearance measures the nearest hull gap", 1e-8);
+      check(closest.a == "near" || closest.b == "near", "closest clearance retains the nearest body pair");
+    }
+    var moved = world.closest([0.5], true);
+    if (moved != null) {
+      near(moved.distance, 0.48, "closest clearance follows moving geometry", 1e-8);
+      near(
+        moved.required,
+        robotkit.collision.CollisionClearance.CONTACT_MARGIN,
+        "closest clearance retains contact margin",
+        1e-12
+      );
+    }
+    var sweepClosest = world.closestSweep([0.0], [1.2], false, 0.02);
+    check(sweepClosest != null, "closest sweep reports a checked hull pair");
+    if (sweepClosest != null) near(
+      sweepClosest.distance,
+      0,
+      "closest sweep finds an interior collision between clear endpoints",
+      1e-8
+    );
+    var clearSweep = world.closestSweep([0.0], [0.5]);
+    if (clearSweep != null) near(clearSweep.distance, 0.48, "closest sweep aggregates clear route distances", 1e-8);
+    throws(
+      function() world.closestSweep([0.0], [0.5], false, Math.POSITIVE_INFINITY),
+      "closest sweep rejects an infinite sampling step"
+    );
+    var displacement = world.displacementBounds([0.0], [0.002]);
+    near(
+      displacement[world.bodyIndex("tool")],
+      0.002,
+      "prismatic hull motion includes complete lowering neighborhood",
+      1e-12
+    );
+    near(displacement[world.bodyIndex("near")], 0, "held hull has zero displacement", 1e-12);
+    var certifiedCurve = new JointPathSamples([0.0, 1.0], [[0.0], [0.5]], [[0.5], [0.5]], [[0.0], [0.0]]);
+    var certificate = new motionkit.robot.JointCurveClearance(world, certifiedCurve, 1e-6, false);
+    check(!certificate.covers(certifiedCurve, 1e-6), "unchecked curve is not clearance evidence");
+    check(certificate.check(), "Bernstein subdivision certifies the continuous quintic curve");
+    check(certificate.covers(certifiedCurve, 1e-6), "certificate covers exact curve and lowering budget");
+    check(!certificate.covers(certifiedCurve, 2e-6), "larger lowering error needs a fresh certificate");
+    var realigned = new JointPathSamples(
+      [0.0, 1.0 + 1e-13],
+      certifiedCurve.q,
+      certifiedCurve.qPrime,
+      certifiedCurve.qDoublePrime
+    );
+    check(certificate.covers(realigned, 1e-6), "coefficient bound covers floating-point grid realignment");
+    certifiedCurve.q[1][0] = 1.2;
+    check(!certificate.covers(certifiedCurve, 1e-6), "mutating public curve arrays invalidates clearance evidence");
+    var bowed = new JointPathSamples([0.0, 1.0], [[0.0], [0.0]], [[4.0], [-4.0]], [[0.0], [0.0]]);
+    check(
+      world.violation(bowed.q[0]) == null && world.violation(bowed.q[1]) == null,
+      "quintic interior collision fixture has clear endpoints"
+    );
+    var bowedProof = new motionkit.robot.JointCurveClearance(world, bowed, 1e-6, false);
+    check(
+      !bowedProof.check() && bowedProof.failure != null,
+      "continuous certificate catches collision missed by endpoint chord"
+    );
+    var nearCurve = new JointPathSamples([0.0, 1.0], [[0.9749995], [0.9749995]], [[0.0], [0.0]], [[0.0], [0.0]]);
+    check(world.violation(nearCurve.q[0]) == null, "lowering-margin fixture is clear without inflation");
+    check(
+      !new motionkit.robot.JointCurveClearance(world, nearCurve, 1e-6, false).check(),
+      "lowering hull displacement rejects an insufficient geometric margin"
+    );
+    var coupledModel = new RobotModel("coupled-clearance-bounds"), root = coupledModel.addLink(new Link("root")),
+      turnLink = coupledModel.addLink(new Link("turn-link")), slideLink = coupledModel.addLink(new Link("slide-link")),
+      followerLink = coupledModel.addLink(new Link("follower-link"));
+    var turn = coupledModel.addJoint(new Joint("turn", JointType.Revolute, root, turnLink));
+    turn.limits.lower = -3;
+    turn.limits.upper = 3;
+    turn.childFramePosition = [-0.2, 0, 0];
+    var travel = coupledModel.addJoint(new Joint("travel", JointType.Prismatic, turnLink, slideLink));
+    travel.axis = [1, 0, 0];
+    travel.limits.lower = -2;
+    travel.limits.upper = 2;
+    var follower = coupledModel.addJoint(new Joint("follower", JointType.Revolute, slideLink, followerLink));
+    follower.parentFramePosition = [0.3, 0, 0];
+    coupledModel.addCoupling(new JointCoupling("travel-drive", travel.id, follower.id, 12, 0.1));
+    coupledModel.addCoupling(new JointCoupling("turn-drive", turn.id, follower.id, -0.5, 0));
+    var flange = coupledModel.addFrame(new Frame("flange", followerLink)), work = coupledModel.addFrame(new Frame(
+      "work",
+      slideLink
+    ));
+    var coupledGroup = new robotkit.manipulation.KinematicGroup(coupledModel, root.id, flange.id, work.id);
     var coupledFixture = new CollisionFixture(coupledGroup, [0, 0]);
     coupledFixture.mechanism("coupled-tool", followerLink.id, cube(0.4), true);
     var coupledWorld = coupledFixture.clearance();
-    var cachedEnvelope=coupledWorld.motionEnvelope([-2.01,-1.51],[2.01,1.51]);
-    for(i in 0...100){var q=[Math.sin(i*0.31)*2,Math.cos(i*0.17)*1.5],errors=[0.002,0.001],
-      perturbed=[q[0]+errors[0]*(i%2==0?1:-1),q[1]+errors[1]*(i%3==0?1:-1)];
-      check(coupledWorld.auditDisplacement(q,perturbed,errors,cachedEnvelope)<=1+1e-8,
-        "fixed envelope bounds exact hull and moving-work TCP displacement");
-      check(coupledWorld.auditDisplacement(q,perturbed,errors)<=1+1e-8,
-        "rotary, prismatic and multi-source follower hull motion stays inside CL-D5 bound");
-      var exactTip=coupledGroup.tcpPose(perturbed),initialTip=coupledGroup.tcpPose(q),tipJacobian=coupledGroup.tcpJacobian(q),remainderSquared=0.0;
-      for(axis in 0...3){
-        var residual=axis==0 ? exactTip.translation.x-initialTip.translation.x :
-          axis==1 ? exactTip.translation.y-initialTip.translation.y : exactTip.translation.z-initialTip.translation.z;
-        for(j in 0...q.length)residual-=tipJacobian[axis*q.length+j]*(perturbed[j]-q[j]);
-        remainderSquared+=residual*residual;
+    var cachedEnvelope = coupledWorld.motionEnvelope([-2.01, -1.51], [2.01, 1.51]);
+    for (i in 0...100) {
+      var q = [Math.sin(i * 0.31) * 2, Math.cos(i * 0.17) * 1.5], errors = [0.002, 0.001], perturbed = [
+        q[0] + errors[0] * (i % 2 == 0 ? 1 : -1),
+        q[1] + errors[1] * (i % 3 == 0 ? 1 : -1)
+      ];
+      check(
+        coupledWorld.auditDisplacement(q, perturbed, errors, cachedEnvelope) <= 1 + 1e-8,
+        "fixed envelope bounds exact hull and moving-work TCP displacement"
+      );
+      check(
+        coupledWorld.auditDisplacement(q, perturbed, errors) <= 1 + 1e-8,
+        "rotary, prismatic and multi-source follower hull motion stays inside CL-D5 bound"
+      );
+      var exactTip = coupledGroup.tcpPose(perturbed),
+        initialTip = coupledGroup.tcpPose(q), tipJacobian = coupledGroup.tcpJacobian(q), remainderSquared = 0.0;
+      for (axis in 0...3) {
+        var residual = axis == 0 ? exactTip.translation.x - initialTip.translation.x : axis
+          == 1 ? exactTip.translation.y - initialTip.translation.y : exactTip.translation.z - initialTip.translation.z;
+        for (j in 0...q.length) residual -= tipJacobian[axis * q.length + j] * (perturbed[j] - q[j]);
+        remainderSquared += residual * residual;
       }
-      check(Math.sqrt(remainderSquared)<=cachedEnvelope.tcpLinearizationRemainder(errors)+1e-12,
-        "TCP Taylor remainder bounds affine followers and a moving work reference");
+      check(
+        Math.sqrt(remainderSquared) <= cachedEnvelope.tcpLinearizationRemainder(errors) + 1e-12,
+        "TCP Taylor remainder bounds affine followers and a moving work reference"
+      );
     }
-    var screwModel=new RobotModel("axial-screw-bound"),screwRoot=screwModel.addLink(new Link("screw-root")),
-      carriage=screwModel.addLink(new Link("carriage")),shaft=screwModel.addLink(new Link("shaft"));
-    var shaftSlide=screwModel.addJoint(new Joint("slide",JointType.Prismatic,screwRoot,carriage));shaftSlide.axis=[1,0,0];
-    var shaftSpin=screwModel.addJoint(new Joint("spin",JointType.Continuous,screwRoot,shaft));shaftSpin.axis=[0,0,1];
-    screwModel.addCoupling(new JointCoupling("screw-gain",shaftSlide.id,shaftSpin.id,2000,0));
-    var screwFlange=screwModel.addFrame(new Frame("flange",carriage));
-    var screwGroup=new robotkit.manipulation.KinematicGroup(screwModel,screwRoot.id,screwFlange.id),shaftCorners:Array<Float> = [];
-    for(x in [-0.004,0.004])for(y in [-0.004,0.004])for(z in [-1.0,1.0]){shaftCorners.push(x);shaftCorners.push(y);shaftCorners.push(z);}
+    var screwModel = new RobotModel("axial-screw-bound"), screwRoot = screwModel.addLink(new Link("screw-root")),
+      carriage = screwModel.addLink(new Link("carriage")), shaft = screwModel.addLink(new Link("shaft"));
+    var shaftSlide = screwModel.addJoint(new Joint("slide", JointType.Prismatic, screwRoot, carriage));
+    shaftSlide.axis = [1, 0, 0];
+    var shaftSpin = screwModel.addJoint(new Joint("spin", JointType.Continuous, screwRoot, shaft));
+    shaftSpin.axis = [0, 0, 1];
+    screwModel.addCoupling(new JointCoupling("screw-gain", shaftSlide.id, shaftSpin.id, 2000, 0));
+    var screwFlange = screwModel.addFrame(new Frame("flange", carriage));
+    var screwGroup = new robotkit.manipulation.KinematicGroup(screwModel,
+      screwRoot.id, screwFlange.id), shaftCorners:Array<Float> = [];
+    for (x in [-0.004, 0.004]) for (y in [-0.004, 0.004]) for (z in [-1.0, 1.0]) {
+      shaftCorners.push(x);
+      shaftCorners.push(y);
+      shaftCorners.push(z);
+    }
     var screwFixture = new CollisionFixture(screwGroup, [0.0]);
     screwFixture.mechanism("long-shaft", shaft.id, shaftCorners);
     var screwWorld = screwFixture.clearance();
-    var shaftEnvelope=screwWorld.motionEnvelope([-0.1],[0.1]);
+    var shaftEnvelope = screwWorld.motionEnvelope([-0.1], [0.1]);
     var shaftBound = shaftEnvelope.bounds([1e-6])[screwWorld.bodyIndex("long-shaft")];
-    check(shaftBound > 0 && shaftBound < 0.000012,"axial shaft length does not inflate its rotational lever arm");
-    for(i in 0...50)check(screwWorld.auditDisplacement([0.09*Math.sin(i)],
-      [0.09*Math.sin(i)+(i%2==0?1:-1)*1e-6],[1e-6],shaftEnvelope)<=1+1e-8,
-      "perpendicular shaft bound covers exact coupled hull movement");
-    var emptyWorld=new CollisionFixture(clearanceGroup, [0.0]).clearance();
-    check(emptyWorld.closest([0.0])==null,"empty clearance world has no closest pair");
-    function waypoint(x:Float,y:Float):PoseWaypoint return new PoseWaypoint(new Pose3(x,y,0),1e-6,1e-6);
-    var line=new PoseLine(waypoint(-1,0),waypoint(0,0),motionkit.path.OrientationPolicy.Fixed,0.1,0.1);
-    var arc=new motionkit.path.PoseArc(waypoint(0,0),waypoint(Math.sqrt(0.5),1-Math.sqrt(0.5)),
-      waypoint(1,1),motionkit.path.OrientationPolicy.Fixed,0.1);
-    var joined=new motionkit.robot.PosePathRefinement(new motionkit.path.PosePath("task",[line,arc]));
-    var knot=joined.at(line.length());
-    near(knot.velocity[0],1,"line/arc refinement retains the shared tangent",1e-6);
-    near(knot.acceleration[1],1,"line/arc refinement selects outgoing curvature",1e-4);
-    near(knot.accelerationBefore[1],0,"line/arc refinement retains incoming line curvature",1e-6);
-    var corner=new PoseLine(waypoint(0,0),waypoint(0,1),motionkit.path.OrientationPolicy.Fixed,0.1,0.1);
-    var discontinuous=new motionkit.robot.PosePathRefinement(new motionkit.path.PosePath("task",[line,corner]));
-    throws(function() discontinuous.at(line.length()),"refinement rejects an unblended task-velocity corner");
-    throws(function() joined.at(-0.01),"refinement rejects distance before the authored path");
-    var decimalPath=new motionkit.path.PosePath("task",[
-      new PoseLine(waypoint(0,0),waypoint(0.1,0),motionkit.path.OrientationPolicy.Fixed,0.1,0.1),
-      new PoseLine(waypoint(0.1,0),waypoint(0.1,0.2),motionkit.path.OrientationPolicy.Fixed,0.1,0.1)]);
-    var decimalEnd=new motionkit.robot.PosePathRefinement(decimalPath).at(decimalPath.length());
-    near(decimalEnd.pose.y,0.2,"refinement preserves an endpoint after accumulated decimal lengths",1e-12);
-    near(decimalEnd.velocity[1],1,"endpoint roundoff retains final primitive derivatives",1e-12);
-    throws(function() new motionkit.robot.PosePathRefinement(decimalPath).at(decimalPath.length()+1e-6),
-      "endpoint rounding does not admit an out-of-path request");
+    check(shaftBound > 0 && shaftBound < 0.000012, "axial shaft length does not inflate its rotational lever arm");
+    for (i in 0...50) check(
+      screwWorld.auditDisplacement(
+        [0.09 * Math.sin(i)],
+        [0.09 * Math.sin(i) + (i % 2 == 0 ? 1 : -1) * 1e-6],
+        [1e-6],
+        shaftEnvelope
+      ) <= 1 + 1e-8,
+      "perpendicular shaft bound covers exact coupled hull movement"
+    );
+    var emptyWorld = new CollisionFixture(clearanceGroup, [0.0]).clearance();
+    check(emptyWorld.closest([0.0]) == null, "empty clearance world has no closest pair");
+    function waypoint(x:Float, y:Float):PoseWaypoint return new PoseWaypoint(new Pose3(x, y, 0), 1e-6, 1e-6);
+    var line = new PoseLine(waypoint(-1, 0), waypoint(0, 0), motionkit.path.OrientationPolicy.Fixed, 0.1, 0.1);
+    var arc = new motionkit.path.PoseArc(
+      waypoint(0, 0),
+      waypoint(Math.sqrt(0.5), 1 - Math.sqrt(0.5)),
+      waypoint(1, 1),
+      motionkit.path.OrientationPolicy.Fixed,
+      0.1
+    );
+    var joined = new motionkit.robot.PosePathRefinement(new motionkit.path.PosePath("task", [line, arc]));
+    var knot = joined.at(line.length());
+    near(knot.velocity[0], 1, "line/arc refinement retains the shared tangent", 1e-6);
+    near(knot.acceleration[1], 1, "line/arc refinement selects outgoing curvature", 1e-4);
+    near(knot.accelerationBefore[1], 0, "line/arc refinement retains incoming line curvature", 1e-6);
+    var corner = new PoseLine(waypoint(0, 0), waypoint(0, 1), motionkit.path.OrientationPolicy.Fixed, 0.1, 0.1);
+    var discontinuous = new motionkit.robot.PosePathRefinement(new motionkit.path.PosePath("task", [line, corner]));
+    throws(function() discontinuous.at(line.length()), "refinement rejects an unblended task-velocity corner");
+    throws(function() joined.at(-0.01), "refinement rejects distance before the authored path");
+    var decimalPath = new motionkit.path.PosePath(
+      "task",
+      [
+        new PoseLine(
+          waypoint(0, 0),
+          waypoint(0.1, 0),
+          motionkit.path.OrientationPolicy.Fixed,
+          0.1,
+          0.1
+        ),
+        new PoseLine(
+          waypoint(
+            0.1,
+            0
+          ),
+          waypoint(
+            0.1,
+            0.2
+          ),
+          motionkit.path.OrientationPolicy.Fixed,
+          0.1,
+          0.1
+        )
+      ]
+    );
+    var decimalEnd = new motionkit.robot.PosePathRefinement(decimalPath).at(decimalPath.length());
+    near(decimalEnd.pose.y, 0.2, "refinement preserves an endpoint after accumulated decimal lengths", 1e-12);
+    near(decimalEnd.velocity[1], 1, "endpoint roundoff retains final primitive derivatives", 1e-12);
+    throws(
+      function() new motionkit.robot.PosePathRefinement(decimalPath).at(decimalPath.length() + 1e-6),
+      "endpoint rounding does not admit an out-of-path request"
+    );
     for (count in 3...6) {
       var model = new RobotModel('analytic-cartesian-$count');
       var base = model.addLink(new Link("cartesian-base")), parent = base;
       for (index in 0...count) {
         var child = model.addLink(new Link('cartesian-link-$index'));
-        var joint = model.addJoint(new Joint('cartesian-joint-$index',
-          index < 3 ? JointType.Prismatic : JointType.Revolute, parent, child));
-        joint.axis = index < 3 ? [for (axis in 0...3) axis == index ? 1.0 : 0.0]
-          : index == 3 ? [0.0, 0.0, 1.0] : [0.0, 1.0, 0.0];
+        var joint = model.addJoint(new Joint(
+          'cartesian-joint-$index',
+          index < 3 ? JointType.Prismatic : JointType.Revolute,
+          parent,
+          child
+        ));
+        joint.axis = index < 3 ? [for (axis in 0...3) axis == index ? 1.0 : 0.0] : index == 3 ? [0.0, 0.0, 1.0] : [
+          0.0,
+          1.0,
+          0.0
+        ];
         if (index == 0) {
           var yaw = Quat.fromAxisAngle(new Vec3(0, 0, 1), 0.37);
           joint.parentFrameRotation = [yaw.x, yaw.y, yaw.z, yaw.w];
@@ -1850,194 +4446,542 @@ class KinematicsTests extends MotionKitTestSupport {
       var analytic:motionkit.robot.AnalyticIk = new motionkit.robot.CartesianAnalyticIk(group);
       var numeric = new ManipulatorKinematics(group);
       var sampler = new motionkit.robot.CartesianCandidateSampler(group);
-      if(count==3){
-        var start=[0.0,0.0,0.0],end=[0.02,0.0,0.0],from=numeric.forward(start),to=numeric.forward(end);
-        var airPath=new PosePath("task",[new PoseLine(new PoseWaypoint(from,1e-6,1e-6),
-          new PoseWaypoint(to,1e-6,1e-6),OrientationPolicy.Fixed,0.08,0.08)]);
-        var speed=[0.01,1.0,1.0],acceleration=[1.0,1.0,1.0],mask=[false,false];
-        var cap=new motionkit.kinematics.PathDriveLimits(acceleration,[0.08,0.08],null,mask);mask[0]=true;
-        check(!cap.fixedFeed[0],"air feed mask is copied into the path request");
-        var airRequest=new PathRequest([0.0,airPath.length()],[from,to],start,new IkTolerance(1e-6,1e-6),
-          [1.0,1.0,1.0],speed,32,[OrientationPolicy.Fixed,OrientationPolicy.Fixed],cap);
-        var planner=new motionkit.robot.StructuredJointPathPlanner(group),curve=planner.plan(airPath,airRequest);
-        var timed=new ToppraPathTiming().time(curve,new PathTimingLimits(speed,acceleration,[0.08]));
-        check(timed.trajectory.durationSeconds()>=2.0,"air time law slows below its cap to obey actual joint speed");
-        for(i in 0...21)check(Math.abs(timed.trajectory.evaluate(timed.trajectory.durationSeconds()*i/20).velocities[0])<=0.010001,
-          "air slowdown retains the original physical velocity limit");
-        timed.releaseDistanceMap();timed.trajectory.dispose();
-        var taskArc=new motionkit.path.PoseArc(new PoseWaypoint(from,0.0001,0.001),
-          new PoseWaypoint(new Pose3(from.x+0.02*Math.sqrt(0.5),from.y+0.02*(1-Math.sqrt(0.5)),from.z,
-            from.qx,from.qy,from.qz,from.qw),0.0001,0.001),
-          new PoseWaypoint(new Pose3(from.x+0.02,from.y+0.02,from.z,from.qx,from.qy,from.qz,from.qw),0.0001,0.001),
-          OrientationPolicy.Fixed,0.01);
-        var taskArcPath=new PosePath("task",[taskArc]),taskArcDistances=[for(i in 0...21)taskArcPath.length()*i/20];
-        var taskArcRequest=new PathRequest(taskArcDistances,[for(s in taskArcDistances)taskArcPath.poseAt(s)],start,
-          new IkTolerance(1e-6,1e-6),[1.0,1.0,1.0],[1.0,1.0,1.0]);
-        var taskArcCurve=planner.plan(taskArcPath,taskArcRequest),taskArcProof=motionkit.robot.JointCurveTask.prove(group,taskArcPath,taskArcCurve,1e-6);
-        check(taskArcProof!=null,"curved authored geometry has a continuous task certificate");
-        var taskArcBound:motionkit.robot.JointCurveTask=cast taskArcProof;
-        for(span in 0...taskArcCurve.s.length-1)for(piece in 0...5){var fraction=piece/4.0;
-          var taskArcQ=motionkit.planner.JointPathPolynomial.at(motionkit.planner.JointPathPolynomial.coefficients(taskArcCurve,span),fraction);
-          var taskArcDistance=taskArcCurve.s[span]+fraction*(taskArcCurve.s[span+1]-taskArcCurve.s[span]);
-          check(motionkit.path.PoseMath.distance(numeric.forward(taskArcQ),taskArcPath.poseAt(taskArcDistance))<=taskArcBound.positionBound+1e-10,
-            "task bound includes exact interior arc curvature");
+      if (count == 3) {
+        var start = [0.0, 0.0, 0.0], end = [0.02, 0.0, 0.0], from = numeric.forward(start), to = numeric.forward(end);
+        var airPath = new PosePath(
+          "task",
+          [new PoseLine(
+            new PoseWaypoint(from, 1e-6, 1e-6),
+            new PoseWaypoint(
+              to,
+              1e-6,
+              1e-6
+            ),
+            OrientationPolicy.Fixed,
+            0.08,
+            0.08
+          )]
+        );
+        var speed = [0.01, 1.0, 1.0], acceleration = [1.0, 1.0, 1.0], mask = [false, false];
+        var cap = new motionkit.kinematics.PathDriveLimits(acceleration, [0.08, 0.08], null, mask);
+        mask[0] = true;
+        check(!cap.fixedFeed[0], "air feed mask is copied into the path request");
+        var airRequest = new PathRequest(
+          [0.0, airPath.length()],
+          [from, to],
+          start,
+          new IkTolerance(1e-6, 1e-6),
+          [
+            1.0,
+            1.0,
+            1.0
+          ],
+          speed,
+          32,
+          [
+            OrientationPolicy.Fixed,
+            OrientationPolicy.Fixed
+          ],
+          cap
+        );
+        var planner = new motionkit.robot.StructuredJointPathPlanner(group), curve = planner.plan(airPath, airRequest);
+        var timed = new ToppraPathTiming().time(curve, new PathTimingLimits(speed, acceleration, [0.08]));
+        check(timed.trajectory.durationSeconds() >= 2.0, "air time law slows below its cap to obey actual joint speed");
+        for (i in 0...21) check(
+          Math.abs(timed.trajectory.evaluate(timed.trajectory.durationSeconds() * i / 20).velocities[0]) <= 0.010001,
+          "air slowdown retains the original physical velocity limit"
+        );
+        timed.releaseDistanceMap();
+        timed.trajectory.dispose();
+        var taskArc = new motionkit.path.PoseArc(
+          new PoseWaypoint(from, 0.0001, 0.001),
+          new PoseWaypoint(
+            new Pose3(
+              from.x + 0.02 * Math.sqrt(0.5),
+              from.y + 0.02 * (1 - Math.sqrt(0.5)),
+              from.z,
+              from.qx,
+              from.qy,
+              from.qz,
+              from.qw
+            ),
+            0.0001,
+            0.001
+          ),
+          new PoseWaypoint(
+            new Pose3(
+              from.x + 0.02,
+              from.y + 0.02,
+              from.z,
+              from.qx,
+              from.qy,
+              from.qz,
+              from.qw
+            ),
+            0.0001,
+            0.001
+          ),
+          OrientationPolicy.Fixed,
+          0.01
+        );
+        var taskArcPath = new PosePath("task",
+          [taskArc]), taskArcDistances = [for (i in 0...21) taskArcPath.length() * i / 20];
+        var taskArcRequest = new PathRequest(
+          taskArcDistances,
+          [for (s in taskArcDistances) taskArcPath.poseAt(s)],
+          start,
+          new IkTolerance(
+            1e-6,
+            1e-6
+          ),
+          [
+            1.0,
+            1.0,
+            1.0
+          ],
+          [
+            1.0,
+            1.0,
+            1.0
+          ]
+        );
+        var taskArcCurve = planner.plan(taskArcPath,
+          taskArcRequest), taskArcProof = motionkit.robot.JointCurveTask.prove(
+            group,
+            taskArcPath,
+            taskArcCurve,
+            1e-6
+          );
+        check(taskArcProof != null, "curved authored geometry has a continuous task certificate");
+        var taskArcBound:motionkit.robot.JointCurveTask = cast taskArcProof;
+        for (span in 0...taskArcCurve.s.length - 1) for (piece in 0...5) {
+          var fraction = piece / 4.0;
+          var taskArcQ = motionkit.planner.JointPathPolynomial.at(
+            motionkit.planner.JointPathPolynomial.coefficients(
+              taskArcCurve,
+              span
+            ),
+            fraction
+          );
+          var taskArcDistance = taskArcCurve.s[span] + fraction * (taskArcCurve.s[span + 1] - taskArcCurve.s[span]);
+          check(
+            motionkit.path.PoseMath.distance(numeric.forward(taskArcQ),
+            taskArcPath.poseAt(taskArcDistance)) <= taskArcBound.positionBound + 1e-10,
+            "task bound includes exact interior arc curvature"
+          );
         }
-        var fixedRequest=new PathRequest([0.0,airPath.length()],[from,to],start,new IkTolerance(1e-6,1e-6),
-          [1.0,1.0,1.0],speed,32,[OrientationPolicy.Fixed,OrientationPolicy.Fixed],
-          new motionkit.kinematics.PathDriveLimits(acceleration,[0.08,0.08]));
-        throws(function() planner.plan(airPath,fixedRequest),"a fixed process feed remains infeasible under the same physical limits");
+        var fixedRequest = new PathRequest(
+          [0.0, airPath.length()],
+          [from, to],
+          start,
+          new IkTolerance(1e-6, 1e-6),
+          [
+            1.0,
+            1.0,
+            1.0
+          ],
+          speed,
+          32,
+          [
+            OrientationPolicy.Fixed,
+            OrientationPolicy.Fixed
+          ],
+          new motionkit.kinematics.PathDriveLimits(
+            acceleration,
+            [
+              0.08,
+              0.08
+            ]
+          )
+        );
+        throws(
+          function() planner.plan(airPath, fixedRequest),
+          "a fixed process feed remains infeasible under the same physical limits"
+        );
       }
       var before = group.numericSolveCount();
       check(analytic.jointCount() == count, "Cartesian family keeps model DOF count");
-      var marked = new robotkit.manipulation.KinematicGroup(model,base.id,flange.id,null,tool,null,["cartesian-joint-0"]);
-      check(marked.external[0],"Cartesian regression fixture marks a leading axis external");
-      var markedQ = [for(i in 0...count)0.2*Math.sin(i+0.3)];
+      var marked = new robotkit.manipulation.KinematicGroup(
+        model,
+        base.id,
+        flange.id,
+        null,
+        tool,
+        null,
+        ["cartesian-joint-0"]
+      );
+      check(marked.external[0], "Cartesian regression fixture marks a leading axis external");
+      var markedQ = [for (i in 0...count) 0.2 * Math.sin(i + 0.3)];
       var markedTarget = new ManipulatorKinematics(marked).forward(markedQ);
       var markedSampler = new motionkit.robot.CartesianCandidateSampler(marked);
-      var markedCandidates = markedSampler.sample(markedTarget,markedQ,motionkit.path.OrientationPolicy.Fixed);
-      check(markedCandidates.length>0,"complete Cartesian chain exports despite external markers");
-      for(candidate in markedCandidates)near(motionkit.path.PoseMath.distance(new ManipulatorKinematics(marked).forward(candidate.q),markedTarget),0,
-        "marked Cartesian native candidates satisfy compiled FK",1e-7);
-      var markedRequest = new PathRequest([0.0],[markedTarget],markedQ,new IkTolerance(1e-6,1e-6),
-        [for(_ in markedQ)0.5],[for(_ in markedQ)1.0]);
-      var markedProblem = new motionkit.robot.CandidateProblem(marked,markedRequest);
-      check(markedProblem.externalJoints.length==0 && markedProblem.samples[0].candidates.length==1,
-        "Cartesian task axes are solved geometrically rather than sampled independently");
-      var refinedEnd = markedQ.copy();refinedEnd[0] += 0.02;
-      var refineRequest = new PathRequest([0.0,0.04],[markedTarget,new ManipulatorKinematics(marked).forward(refinedEnd)],
-        markedQ,new IkTolerance(1e-6,1e-6),[for(_ in markedQ)0.5],[for(_ in markedQ)1.0]);
-      var refineProblem = new motionkit.robot.CandidateProblem(marked,refineRequest);
+      var markedCandidates = markedSampler.sample(markedTarget, markedQ, motionkit.path.OrientationPolicy.Fixed);
+      check(markedCandidates.length > 0, "complete Cartesian chain exports despite external markers");
+      for (candidate in markedCandidates) near(
+        motionkit.path.PoseMath.distance(
+          new ManipulatorKinematics(marked).forward(candidate.q),
+          markedTarget
+        ),
+        0,
+        "marked Cartesian native candidates satisfy compiled FK",
+        1e-7
+      );
+      var markedRequest = new PathRequest(
+        [0.0],
+        [markedTarget],
+        markedQ,
+        new IkTolerance(1e-6, 1e-6),
+        [for (_ in markedQ) 0.5],
+        [for (_ in markedQ) 1.0]
+      );
+      var markedProblem = new motionkit.robot.CandidateProblem(marked, markedRequest);
+      check(
+        markedProblem.externalJoints.length == 0 && markedProblem.samples[0].candidates.length == 1,
+        "Cartesian task axes are solved geometrically rather than sampled independently"
+      );
+      var refinedEnd = markedQ.copy();
+      refinedEnd[0] += 0.02;
+      var refineRequest = new PathRequest(
+        [0.0, 0.04],
+        [
+          markedTarget,
+          new ManipulatorKinematics(marked).forward(refinedEnd)
+        ],
+        markedQ,
+        new IkTolerance(
+          1e-6,
+          1e-6
+        ),
+        [for (_ in markedQ) 0.5],
+        [for (_ in markedQ) 1.0]
+      );
+      var refineProblem = new motionkit.robot.CandidateProblem(marked, refineRequest);
       var route = motionkit.robot.StructuredLadder.search(refineProblem);
-      check(route.diagnostic==null,"Cartesian refinement has a complete selected route");
-      var refiner = new motionkit.robot.AnalyticPathRefiner(marked,refineProblem,route);
+      check(route.diagnostic == null, "Cartesian refinement has a complete selected route");
+      var refiner = new motionkit.robot.AnalyticPathRefiner(marked, refineProblem, route);
       var delta = new ManipulatorKinematics(marked).forward(refinedEnd);
-      var velocity = [(delta.x-markedTarget.x)/0.04,(delta.y-markedTarget.y)/0.04,(delta.z-markedTarget.z)/0.04,0.0,0.0,0.0];
-      var refined = refiner.refinePath([for(i in 0...11)0.004*i],distance -> {
-        var q=markedQ.copy();q[0]+=0.5*distance;
-        return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(new ManipulatorKinematics(marked).forward(q),
-          motionkit.path.OrientationPolicy.Fixed,velocity,[for(_ in 0...6)0.0]);
+      var velocity = [
+        (delta.x - markedTarget.x) / 0.04,
+        (delta.y - markedTarget.y) / 0.04,
+        (delta.z - markedTarget.z) / 0.04,
+        0.0,
+        0.0,
+        0.0
+      ];
+      var refined = refiner.refinePath([for (i in 0...11) 0.004 * i], distance -> {var q = markedQ.copy();
+      q[0] += 0.5 * distance;
+      return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(
+        new ManipulatorKinematics(marked).forward(q),
+        motionkit.path.OrientationPolicy.Fixed,
+        velocity,
+        [for (_ in 0...6) 0.0]
+      );
       });
-      for(i in 0...11)for(j in 0...count) {
-        near(refined.q[i][j],markedQ[j]+(j==0?0.002*i:0),"Cartesian refinement preserves geometric task axes",1e-7);
-        near(refined.qPrime[i][j],j==0?0.5:0,"Cartesian refinement solves task derivatives",1e-7);
-        near(refined.qDoublePrime[i][j],0,"Cartesian straight refinement has zero curvature",1e-6);
+      for (i in 0...11) for (j in 0...count) {
+        near(
+          refined.q[i][j],
+          markedQ[j] + (j == 0 ? 0.002 * i : 0),
+          "Cartesian refinement preserves geometric task axes",
+          1e-7
+        );
+        near(refined.qPrime[i][j], j == 0 ? 0.5 : 0, "Cartesian refinement solves task derivatives", 1e-7);
+        near(refined.qDoublePrime[i][j], 0, "Cartesian straight refinement has zero curvature", 1e-6);
       }
-      var authoredLine=new PoseLine(new PoseWaypoint(markedTarget,1e-6,1e-6),new PoseWaypoint(delta,1e-6,1e-6),
-        motionkit.path.OrientationPolicy.Fixed,0.1,0.1);
-      var authoredPath=new motionkit.path.PosePath("task",[authoredLine]);
-      var authoredRequest=new PathRequest([0.0,authoredPath.length()],[markedTarget,delta],markedQ,
-        new IkTolerance(1e-6,1e-6),[for(_ in markedQ)0.5],[for(_ in markedQ)1.0]);
-      var authoredProblem=new motionkit.robot.CandidateProblem(marked,authoredRequest);
-      var authoredRefiner=new motionkit.robot.AnalyticPathRefiner(marked,authoredProblem,motionkit.robot.StructuredLadder.search(authoredProblem));
-      var provider=new motionkit.robot.PosePathRefinement(authoredPath);
-      var authoredSamples=authoredRefiner.refinePath([for(i in 0...11)authoredPath.length()*i/10],provider.at);
-      var taskProof=motionkit.robot.JointCurveTask.prove(marked,authoredPath,authoredSamples,1e-8);
-      check(taskProof!=null,"refined Cartesian line has a continuous task certificate");
-      var certifiedTask:motionkit.robot.JointCurveTask=cast taskProof;
-      for(span in 0...authoredSamples.s.length-1)for(piece in 0...5){
-        var at=piece/4.0,actualQ=motionkit.planner.JointPathPolynomial.at(
-          motionkit.planner.JointPathPolynomial.coefficients(authoredSamples,span),at);
-        var desiredPose=authoredPath.poseAt(authoredSamples.s[span]+at*(authoredSamples.s[span+1]-authoredSamples.s[span]));
-        check(motionkit.path.PoseMath.distance(new ManipulatorKinematics(marked).forward(actualQ),desiredPose)<=certifiedTask.positionBound+1e-10,
-          "continuous task bound covers exact interior FK");
+      var authoredLine = new PoseLine(
+        new PoseWaypoint(markedTarget, 1e-6, 1e-6),
+        new PoseWaypoint(delta, 1e-6, 1e-6),
+        motionkit.path.OrientationPolicy.Fixed,
+        0.1,
+        0.1
+      );
+      var authoredPath = new motionkit.path.PosePath("task", [authoredLine]);
+      var authoredRequest = new PathRequest(
+        [0.0, authoredPath.length()],
+        [markedTarget, delta],
+        markedQ,
+        new IkTolerance(
+          1e-6,
+          1e-6
+        ),
+        [for (_ in markedQ) 0.5],
+        [for (_ in markedQ) 1.0]
+      );
+      var authoredProblem = new motionkit.robot.CandidateProblem(marked, authoredRequest);
+      var authoredRefiner = new motionkit.robot.AnalyticPathRefiner(
+        marked,
+        authoredProblem,
+        motionkit.robot.StructuredLadder.search(authoredProblem)
+      );
+      var provider = new motionkit.robot.PosePathRefinement(authoredPath);
+      var authoredSamples = authoredRefiner.refinePath([for (i in 0...11) authoredPath.length() * i / 10], provider.at);
+      var taskProof = motionkit.robot.JointCurveTask.prove(marked, authoredPath, authoredSamples, 1e-8);
+      check(taskProof != null, "refined Cartesian line has a continuous task certificate");
+      var certifiedTask:motionkit.robot.JointCurveTask = cast taskProof;
+      for (span in 0...authoredSamples.s.length - 1) for (piece in 0...5) {
+        var at = piece / 4.0, actualQ = motionkit.planner.JointPathPolynomial.at(
+          motionkit.planner.JointPathPolynomial.coefficients(
+            authoredSamples,
+            span
+          ),
+          at
+        );
+        var desiredPose = authoredPath.poseAt(authoredSamples.s[span]
+          + at * (authoredSamples.s[span + 1] - authoredSamples.s[span]));
+        check(
+          motionkit.path.PoseMath.distance(new ManipulatorKinematics(marked).forward(actualQ),
+          desiredPose) <= certifiedTask.positionBound + 1e-10,
+          "continuous task bound covers exact interior FK"
+        );
       }
-      var badRates=[for(row in authoredSamples.qPrime)row.copy()];badRates[0][1]+=5;
-      var badTaskCurve=new motionkit.planner.JointPathSamples(authoredSamples.s,authoredSamples.q,badRates,
-        authoredSamples.qDoublePrime,authoredSamples.qDoublePrimeBefore);
-      check(motionkit.robot.JointCurveTask.prove(marked,authoredPath,badTaskCurve,1e-8)==null,
-        "matching endpoint IK does not certify an interior task excursion");
-      check(motionkit.robot.JointCurveTask.prove(marked,authoredPath,authoredSamples,0.001)==null,
-        "task certificate refuses a lowering reserve larger than the task tolerance");
-      var plannedDistances=[for(i in 0...11)authoredPath.length()*i/10];
-      var plannedRequest=new PathRequest(plannedDistances,[for(s in plannedDistances)authoredPath.poseAt(s)],markedQ,
-        new IkTolerance(1e-6,1e-6),[for(_ in markedQ)0.5],[for(_ in markedQ)1.0]);
-      var planner:motionkit.robot.JointPathPlanner=new motionkit.robot.StructuredJointPathPlanner(marked);
-      var plannedSamples=planner.plan(authoredPath,plannedRequest);
-      for(i in 0...11)for(j in 0...count) {
-        near(plannedSamples.q[i][j],authoredSamples.q[i][j],"joint planner composes selection and refinement",1e-7);
-        near(plannedSamples.qPrime[i][j],authoredSamples.qPrime[i][j],"joint planner returns timing-ready derivatives",1e-7);
+      var badRates = [for (row in authoredSamples.qPrime) row.copy()];
+      badRates[0][1] += 5;
+      var badTaskCurve = new motionkit.planner.JointPathSamples(
+        authoredSamples.s,
+        authoredSamples.q,
+        badRates,
+        authoredSamples.qDoublePrime,
+        authoredSamples.qDoublePrimeBefore
+      );
+      check(
+        motionkit.robot.JointCurveTask.prove(marked, authoredPath, badTaskCurve, 1e-8) == null,
+        "matching endpoint IK does not certify an interior task excursion"
+      );
+      check(
+        motionkit.robot.JointCurveTask.prove(marked, authoredPath, authoredSamples, 0.001) == null,
+        "task certificate refuses a lowering reserve larger than the task tolerance"
+      );
+      var plannedDistances = [for (i in 0...11) authoredPath.length() * i / 10];
+      var plannedRequest = new PathRequest(
+        plannedDistances,
+        [for (s in plannedDistances) authoredPath.poseAt(s)],
+        markedQ,
+        new IkTolerance(
+          1e-6,
+          1e-6
+        ),
+        [for (_ in markedQ) 0.5],
+        [for (_ in markedQ) 1.0]
+      );
+      var planner:motionkit.robot.JointPathPlanner = new motionkit.robot.StructuredJointPathPlanner(marked);
+      var plannedSamples = planner.plan(authoredPath, plannedRequest);
+      for (i in 0...11) for (j in 0...count) {
+        near(plannedSamples.q[i][j], authoredSamples.q[i][j], "joint planner composes selection and refinement", 1e-7);
+        near(
+          plannedSamples.qPrime[i][j],
+          authoredSamples.qPrime[i][j],
+          "joint planner returns timing-ready derivatives",
+          1e-7
+        );
       }
-      for(i in 0...11)for(j in 0...count) {
-        near(authoredSamples.q[i][j],markedQ[j]+(j==0?0.002*i:0),"authored pose path drives analytic refinement",1e-7);
-        near(authoredSamples.qPrime[i][j],j==0?1.0:0,"authored primitive supplies task rates",1e-6);
+      for (i in 0...11) for (j in 0...count) {
+        near(
+          authoredSamples.q[i][j],
+          markedQ[j] + (j == 0 ? 0.002 * i : 0),
+          "authored pose path drives analytic refinement",
+          1e-7
+        );
+        near(authoredSamples.qPrime[i][j], j == 0 ? 1.0 : 0, "authored primitive supplies task rates", 1e-6);
       }
-      var plannerSolver=new ManipulatorKinematics(marked);
-      var ignoredRotation=Quat.fromAxisAngle(new Vec3(1,2,3).normalized(),0.73);
-      function freeWaypoint(p:Pose3):PoseWaypoint return new PoseWaypoint(new Pose3(p.x,p.y,p.z,
-        ignoredRotation.x,ignoredRotation.y,ignoredRotation.z,ignoredRotation.w),1e-6,1e-6);
-      var freeCartesianPath=new PosePath("task",[new PoseLine(freeWaypoint(authoredPath.poseAt(0)),
-        freeWaypoint(authoredPath.poseAt(authoredPath.length())),OrientationPolicy.Free,0.1,0.1)]);
-      var freeCartesianDistances=[0.0,freeCartesianPath.length()];
-      var freeCartesianCurve=planner.plan(freeCartesianPath,new PathRequest(freeCartesianDistances,
-        [for(s in freeCartesianDistances)freeCartesianPath.poseAt(s)],markedQ,new IkTolerance(1e-6,1e-6),
-        [for(_ in markedQ)0.5],[for(_ in markedQ)1.0],32,[OrientationPolicy.Free,OrientationPolicy.Free]));
-      for(i in 0...2){
-        near(motionkit.path.PoseMath.distance(plannerSolver.forward(freeCartesianCurve.q[i]),
-          freeCartesianPath.poseAt(freeCartesianDistances[i])),0,
-          "Cartesian full-free travel ignores unreachable authored rotation",1e-6);
-        for(j in 3...count)near(freeCartesianCurve.q[i][j],markedQ[j],
-          "Cartesian free travel retains the nearest seeded rotary configuration",1e-6);
+      var plannerSolver = new ManipulatorKinematics(marked);
+      var ignoredRotation = Quat.fromAxisAngle(new Vec3(1, 2, 3).normalized(), 0.73);
+      function freeWaypoint(p:Pose3):PoseWaypoint return new PoseWaypoint(
+        new Pose3(
+          p.x,
+          p.y,
+          p.z,
+          ignoredRotation.x,
+          ignoredRotation.y,
+          ignoredRotation.z,
+          ignoredRotation.w
+        ),
+        1e-6,
+        1e-6
+      );
+      var freeCartesianPath = new PosePath(
+        "task",
+        [new PoseLine(
+          freeWaypoint(authoredPath.poseAt(0)),
+          freeWaypoint(authoredPath.poseAt(authoredPath.length())),
+          OrientationPolicy.Free,
+          0.1,
+          0.1
+        )]
+      );
+      var freeCartesianDistances = [0.0, freeCartesianPath.length()];
+      var freeCartesianCurve = planner.plan(
+        freeCartesianPath,
+        new PathRequest(
+          freeCartesianDistances,
+          [for (s in freeCartesianDistances) freeCartesianPath.poseAt(s)],
+          markedQ,
+          new IkTolerance(
+            1e-6,
+            1e-6
+          ),
+          [for (_ in markedQ) 0.5],
+          [for (_ in markedQ) 1.0],
+          32,
+          [
+            OrientationPolicy.Free,
+            OrientationPolicy.Free
+          ]
+        )
+      );
+      for (i in 0...2) {
+        near(
+          motionkit.path.PoseMath.distance(
+            plannerSolver.forward(freeCartesianCurve.q[i]),
+            freeCartesianPath.poseAt(freeCartesianDistances[i])
+          ),
+          0,
+          "Cartesian full-free travel ignores unreachable authored rotation",
+          1e-6
+        );
+        for (j in 3...count) near(
+          freeCartesianCurve.q[i][j],
+          markedQ[j],
+          "Cartesian free travel retains the nearest seeded rotary configuration",
+          1e-6
+        );
       }
-      var plannerLimits=new ValidationLimits(count,Int64.ofInt(1),Int64.ofInt(0));
-      var plannerCompiler=new ProgramCompiler(plannerSolver,plannerLimits,"task",
-        [for(_ in markedQ)1.0],[for(_ in markedQ)2.0],[for(_ in markedQ)20.0],
-        StartTolerances.uniform(count,0.02,0.02,0.02),null,0.01,0.5,0.005,0.02,
-        null,new motionkit.robot.StructuredJointPathPlanner(marked));
-      var plannerProgram=new MotionProgram([MotionOp.MoveL(delta,"task",0.1,Blend.ExactStop)]);
-      var compiledPlanner=plannerCompiler.compile(plannerProgram,markedQ,Int64.ofInt(910));
-      check(compiledPlanner.blocks[0].plans.length==1,"compiler consumes structured timing-ready joint path");
+      var plannerLimits = new ValidationLimits(count, Int64.ofInt(1), Int64.ofInt(0));
+      var plannerCompiler = new ProgramCompiler(
+        plannerSolver,
+        plannerLimits,
+        "task",
+        [for (_ in markedQ) 1.0],
+        [for (_ in markedQ) 2.0],
+        [for (_ in markedQ) 20.0],
+        StartTolerances.uniform(
+          count,
+          0.02,
+          0.02,
+          0.02
+        ),
+        null,
+        0.01,
+        0.5,
+        0.005,
+        0.02,
+        null,
+        new motionkit.robot.StructuredJointPathPlanner(marked)
+      );
+      var plannerProgram = new MotionProgram([MotionOp.MoveL(delta, "task", 0.1, Blend.ExactStop)]);
+      var compiledPlanner = plannerCompiler.compile(plannerProgram, markedQ, Int64.ofInt(910));
+      check(compiledPlanner.blocks[0].plans.length == 1, "compiler consumes structured timing-ready joint path");
       compiledPlanner.dispose();
-      var workerCompiler=plannerCompiler.forWorker();
-      check(workerCompiler.jointPathPlanner!=plannerCompiler.jointPathPlanner,"worker compiler rebuilds its structured planner");
-      var workerPlan=workerCompiler.compile(plannerProgram,markedQ,Int64.ofInt(911));
-      check(workerPlan.blocks[0].plans.length==1,"worker compiler plans with independent analytic kinematics");
+      var workerCompiler = plannerCompiler.forWorker();
+      check(
+        workerCompiler.jointPathPlanner != plannerCompiler.jointPathPlanner,
+        "worker compiler rebuilds its structured planner"
+      );
+      var workerPlan = workerCompiler.compile(plannerProgram, markedQ, Int64.ofInt(911));
+      check(workerPlan.blocks[0].plans.length == 1, "worker compiler plans with independent analytic kinematics");
       workerPlan.dispose();
-      if(count>3) {
-        var opposite=markedQ.copy();opposite[3]+=Math.PI;
-        var oppositePose=new ManipulatorKinematics(marked).forward(opposite);
-        var centreX=(markedTarget.x+oppositePose.x)/2,centreY=(markedTarget.y+oppositePose.y)/2;
-        var rotaryEnd=markedQ.copy();rotaryEnd[3]+=0.5*0.04+0.2*0.04*0.04;
-        var rotaryRequest=new PathRequest([0.0,0.04],[markedTarget,new ManipulatorKinematics(marked).forward(rotaryEnd)],
-          markedQ,new IkTolerance(1e-6,1e-6),[for(_ in markedQ)0.5],[for(_ in markedQ)1.0]);
-        var rotaryProblem=new motionkit.robot.CandidateProblem(marked,rotaryRequest);
-        var rotaryRoute=motionkit.robot.StructuredLadder.search(rotaryProblem);
-        check(rotaryRoute.diagnostic==null,"Cartesian rotary refinement has a connected route");
-        var rotaryRefiner=new motionkit.robot.AnalyticPathRefiner(marked,rotaryProblem,rotaryRoute);
-        var rotaryPath=rotaryRefiner.refinePath([for(i in 0...11)0.004*i],distance -> {
-          var q=markedQ.copy();q[3]+=0.5*distance+0.2*distance*distance;
-          var p=new ManipulatorKinematics(marked).forward(q),rate=0.5+0.4*distance;
-          var x=p.x-centreX,y=p.y-centreY;
-          return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(p,motionkit.path.OrientationPolicy.Fixed,
-            [-rate*y,rate*x,0.0,0.0,0.0,rate],
-            [-rate*rate*x-0.4*y,-rate*rate*y+0.4*x,0.0,0.0,0.0,0.4]);
+      if (count > 3) {
+        var opposite = markedQ.copy();
+        opposite[3] += Math.PI;
+        var oppositePose = new ManipulatorKinematics(marked).forward(opposite);
+        var centreX = (markedTarget.x + oppositePose.x) / 2, centreY = (markedTarget.y + oppositePose.y) / 2;
+        var rotaryEnd = markedQ.copy();
+        rotaryEnd[3] += 0.5 * 0.04 + 0.2 * 0.04 * 0.04;
+        var rotaryRequest = new PathRequest(
+          [0.0, 0.04],
+          [
+            markedTarget,
+            new ManipulatorKinematics(marked).forward(rotaryEnd)
+          ],
+          markedQ,
+          new IkTolerance(
+            1e-6,
+            1e-6
+          ),
+          [for (_ in markedQ) 0.5],
+          [for (_ in markedQ) 1.0]
+        );
+        var rotaryProblem = new motionkit.robot.CandidateProblem(marked, rotaryRequest);
+        var rotaryRoute = motionkit.robot.StructuredLadder.search(rotaryProblem);
+        check(rotaryRoute.diagnostic == null, "Cartesian rotary refinement has a connected route");
+        var rotaryRefiner = new motionkit.robot.AnalyticPathRefiner(marked, rotaryProblem, rotaryRoute);
+        var rotaryPath = rotaryRefiner.refinePath([for (i in 0...11) 0.004 * i], distance -> {var q = markedQ.copy();
+        q[3] += 0.5 * distance + 0.2 * distance * distance;
+        var p = new ManipulatorKinematics(marked).forward(q), rate = 0.5 + 0.4 * distance;
+        var x = p.x - centreX, y = p.y - centreY;
+        return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(
+          p,
+          motionkit.path.OrientationPolicy.Fixed,
+          [
+            -rate * y,
+            rate * x,
+            0.0,
+            0.0,
+            0.0,
+            rate
+          ],
+          [
+            -rate * rate * x - 0.4 * y,
+            -rate * rate * y + 0.4 * x,
+            0.0,
+            0.0,
+            0.0,
+            0.4
+          ]
+        );
         });
-        for(i in 0...11)for(j in 0...count) {
-          var distance=rotaryPath.s[i];
-          near(rotaryPath.q[i][j],markedQ[j]+(j==3?0.5*distance+0.2*distance*distance:0),
-            "Cartesian rotary refinement preserves the offset-tool curve",1e-7);
-          near(rotaryPath.qPrime[i][j],j==3?0.5+0.4*distance:0,"Cartesian rotary differential velocity",1e-7);
-          near(rotaryPath.qDoublePrime[i][j],j==3?0.4:0,"Cartesian rotary differential curvature",1e-6);
+        for (i in 0...11) for (j in 0...count) {
+          var distance = rotaryPath.s[i];
+          near(
+            rotaryPath.q[i][j],
+            markedQ[j] + (j == 3 ? 0.5 * distance + 0.2 * distance * distance : 0),
+            "Cartesian rotary refinement preserves the offset-tool curve",
+            1e-7
+          );
+          near(
+            rotaryPath.qPrime[i][j],
+            j == 3 ? 0.5 + 0.4 * distance : 0,
+            "Cartesian rotary differential velocity",
+            1e-7
+          );
+          near(rotaryPath.qDoublePrime[i][j], j == 3 ? 0.4 : 0, "Cartesian rotary differential curvature", 1e-6);
         }
       }
       for (sample in 0...40) {
         var q = [for (joint in 0...count) 1.4 * Math.sin((sample + 1) * (joint + 1) * 1.618)];
         var target = numeric.forward(q);
-        var axis = group.tcpPose(q).transformVector(new Vec3(0,0,1)).toArray();
-        for (policy in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool,
-            motionkit.path.OrientationPolicy.Cone(axis,0.1)]) {
-          var candidates = sampler.sample(target,q,policy,4,1,4), found = false;
+        var axis = group.tcpPose(q).transformVector(new Vec3(0, 0, 1)).toArray();
+        for (policy in [
+          motionkit.path.OrientationPolicy.Fixed,
+          motionkit.path.OrientationPolicy.FreeAboutTool,
+          motionkit.path.OrientationPolicy.Cone(
+            axis,
+            0.1
+          )
+        ]) {
+          var candidates = sampler.sample(target, q, policy, 4, 1, 4), found = false;
           for (candidate in candidates) {
             var same = true;
-            for (joint in 0...count) if (Math.abs(candidate.q[joint]-q[joint]) > 1e-6) same = false;
+            for (joint in 0...count) if (Math.abs(candidate.q[joint] - q[joint]) > 1e-6) same = false;
             found = found || same;
             var actual = numeric.forward(candidate.q);
-            near(motionkit.path.PoseMath.distance(actual,target),0,"combined native Cartesian sampler task position",1e-7);
-            near(motionkit.robot.ToolFreedom.orientationError(actual,target,policy),0,"combined native Cartesian sampler freedom",1e-7);
-            check(candidate.wraps.length == count && candidate.external.length == 0,"native candidate retains wrap coordinates");
+            near(
+              motionkit.path.PoseMath.distance(actual, target),
+              0,
+              "combined native Cartesian sampler task position",
+              1e-7
+            );
+            near(
+              motionkit.robot.ToolFreedom.orientationError(actual, target, policy),
+              0,
+              "combined native Cartesian sampler freedom",
+              1e-7
+            );
+            check(
+              candidate.wraps.length == count && candidate.external.length == 0,
+              "native candidate retains wrap coordinates"
+            );
           }
-          check(found,"combined native Cartesian sampler retains original legal configuration");
+          check(found, "combined native Cartesian sampler retains original legal configuration");
         }
-        check(group.numericSolveCount() == before,"combined Cartesian sampling uses no numeric IK");
+        check(group.numericSolveCount() == before, "combined Cartesian sampling uses no numeric IK");
         near(motionkit.path.PoseMath.distance(analytic.forward(q), target), 0, "Cartesian model-derived FK", 1e-7);
         for (freedom in [motionkit.path.OrientationPolicy.Fixed, motionkit.path.OrientationPolicy.FreeAboutTool]) {
           var answers = analytic.branches(target, q, freedom), original = false;
@@ -2047,14 +4991,20 @@ class KinematicsTests extends MotionKitTestSupport {
             for (joint in 0...count) {
               same = same && Math.abs(answer.q[joint] - q[joint]) < 1e-6;
               var bounds = group.group.limitsOf(joint);
-              check(answer.q[joint] >= bounds.lower - 1e-9 && answer.q[joint] <= bounds.upper + 1e-9,
-                "Every Cartesian periodic lift respects compiled limits");
+              check(
+                answer.q[joint] >= bounds.lower - 1e-9 && answer.q[joint] <= bounds.upper + 1e-9,
+                "Every Cartesian periodic lift respects compiled limits"
+              );
             }
             original = original || same;
             var actual = numeric.forward(answer.q);
             near(motionkit.path.PoseMath.distance(actual, target), 0, "Cartesian branch preserves TCP position", 1e-7);
-            near(motionkit.robot.ToolFreedom.orientationError(actual, target, freedom), 0,
-              "Cartesian branch preserves permitted orientation", 1e-7);
+            near(
+              motionkit.robot.ToolFreedom.orientationError(actual, target, freedom),
+              0,
+              "Cartesian branch preserves permitted orientation",
+              1e-7
+            );
           }
           check(original, "Cartesian analytic branches contain original model configuration");
         }
@@ -2063,29 +5013,66 @@ class KinematicsTests extends MotionKitTestSupport {
   }
 
   public function testEaikKinematics():Void {
-    var labels=["front/up/no-flip","front/down/no-flip","back/up/no-flip","back/down/no-flip",
-      "front/up/flip","front/down/flip","back/up/flip","back/down/flip"];
-    for(slot in 0...8){
-      var configuration=motionkit.kinematics.SixAxisConfiguration.of("EAIK",slot,[0,0,0,0,0,0]);
-      check(configuration.label()==labels[slot]+" turns=[0,0,0,0,0,0]","OPW slots have explicit controller-style conventions");
+    var labels = [
+      "front/up/no-flip",
+      "front/down/no-flip",
+      "back/up/no-flip",
+      "back/down/no-flip",
+      "front/up/flip",
+      "front/down/flip",
+      "back/up/flip",
+      "back/down/flip"
+    ];
+    for (slot in 0...8) {
+      var configuration = motionkit.kinematics.SixAxisConfiguration.of("EAIK", slot, [0, 0, 0, 0, 0, 0]);
+      check(
+        configuration.label() == labels[slot] + " turns=[0,0,0,0,0,0]",
+        "OPW slots have explicit controller-style conventions"
+      );
     }
-    var counted=motionkit.kinematics.SixAxisConfiguration.of("EAIK",0,[-2*Math.PI-0.1,-Math.PI,Math.PI,2*Math.PI+0.1,0,4*Math.PI+0.2]);
-    check(haxe.Json.stringify(counted.turns)=="[-1,0,1,1,0,2]","physical turn counts use the half-open principal interval");
-    check(new motionkit.kinematics.SixAxisConfiguration("front","up","no-flip").accepts(counted),"geometric pins leave physical turns free");
-    check(!new motionkit.kinematics.SixAxisConfiguration("front","up","no-flip",[0,0,0,0,0,0]).accepts(counted),"turn pins reject a different periodic lift");
+    var counted = motionkit.kinematics.SixAxisConfiguration.of(
+      "EAIK",
+      0,
+      [
+        -2 * Math.PI - 0.1,
+        -Math.PI,
+        Math.PI,
+        2 * Math.PI + 0.1,
+        0,
+        4 * Math.PI + 0.2
+      ]
+    );
+    check(
+      haxe.Json.stringify(counted.turns) == "[-1,0,1,1,0,2]",
+      "physical turn counts use the half-open principal interval"
+    );
+    check(
+      new motionkit.kinematics.SixAxisConfiguration("front", "up", "no-flip").accepts(counted),
+      "geometric pins leave physical turns free"
+    );
+    check(
+      !new motionkit.kinematics.SixAxisConfiguration("front", "up", "no-flip", [0, 0, 0, 0, 0, 0]).accepts(counted),
+      "turn pins reject a different periodic lift"
+    );
 
 
     var model = new RobotModel("opw-abb-test");
     var links = [for (index in 0...7) model.addLink(new Link('opw-link-$index'))];
-    var positions = [[0.0, 0.0, 0.0], [0.1, 0.0, 0.615],
-      [0.0, 0.0, 0.705], [-0.135, 0.0, 0.755],
-      [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]];
-    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0],
-      [0.0, 1.0, 0.0], [0.0, 0.0, 1.0],
-      [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    var positions = [
+      [0.0, 0.0, 0.0],
+      [0.1, 0.0, 0.615],
+      [0.0, 0.0, 0.705],
+      [-0.135, 0.0, 0.755],
+      [0.0, 0.0, 0.0],
+      [
+        0.0,
+        0.0,
+        0.0
+      ]
+    ];
+    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
     for (index in 0...6) {
-      var joint = model.addJoint(new Joint('opw-joint-$index', JointType.Revolute,
-        links[index], links[index + 1]));
+      var joint = model.addJoint(new Joint('opw-joint-$index', JointType.Revolute, links[index], links[index + 1]));
       joint.parentFramePosition = positions[index];
       joint.axis = axes[index];
       joint.limits.lower = -2.0 * Math.PI;
@@ -2097,28 +5084,44 @@ class KinematicsTests extends MotionKitTestSupport {
     var manipulator = arm;
     var solver = new EaikKinematics(manipulator);
     for (pole in [0.0, Math.PI]) {
-      var seed = [0.2,-0.3,0.4,0.5,pole,0.7];
+      var seed = [0.2, -0.3, 0.4, 0.5, pole, 0.7];
       var before = arm.numericSolveCount();
-      var request = new PathRequest([0.0],[solver.forward(seed)],seed,new IkTolerance(1e-6,1e-6),
-        [for (_ in seed)0.5],[for (_ in seed)1.0]);
-      var problem = new motionkit.robot.CandidateProblem(arm,request);
-      check(problem.family == "EAIK" && problem.samples[0].candidates.length == 1,
-        "OPW wrist-pole path retains its pinned start");
+      var request = new PathRequest(
+        [0.0],
+        [solver.forward(seed)],
+        seed,
+        new IkTolerance(1e-6, 1e-6),
+        [for (_ in seed) 0.5],
+        [for (_ in seed) 1.0]
+      );
+      var problem = new motionkit.robot.CandidateProblem(arm, request);
+      check(
+        problem.family == "EAIK" && problem.samples[0].candidates.length == 1,
+        "OPW wrist-pole path retains its pinned start"
+      );
       if (problem.samples[0].candidates.length == 1) {
         var candidate = problem.samples[0].candidates[0];
-        check(candidate.singular != 0,"OPW pinned wrist-pole candidate reports singularity");
-        for (joint in 0...6)near(candidate.q[joint],seed[joint],"OPW singular pinned joints remain exact",1e-12);
+        check(candidate.singular != 0, "OPW pinned wrist-pole candidate reports singularity");
+        for (joint in 0...6) near(candidate.q[joint], seed[joint], "OPW singular pinned joints remain exact", 1e-12);
       }
-      check(arm.numericSolveCount() == before,"OPW wrist-pole pinning uses no numeric IK");
+      check(arm.numericSolveCount() == before, "OPW wrist-pole pinning uses no numeric IK");
     }
     // Through the interface: type tests work, and the solver runs its own (analytic) path search.
     {
       var general:KinematicsSolver = solver;
-      check(Std.isOfType(general, EaikKinematics) && !Std.isOfType(general, ManipulatorKinematics),
-        "an OPW solver is recognised through the KinematicsSolver interface");
+      check(
+        Std.isOfType(general, EaikKinematics) && !Std.isOfType(general, ManipulatorKinematics),
+        "an OPW solver is recognised through the KinematicsSolver interface"
+      );
       var q0 = [0.2, -0.3, 0.4, 0.5, -0.6, 0.7];
-      var path = general.solvePath(new PathRequest([0.0], [general.forward(q0)], q0, new IkTolerance(),
-        [for (_ in 0...6) 0.5], [for (_ in 0...6) 1.0]));
+      var path = general.solvePath(new PathRequest(
+        [0.0],
+        [general.forward(q0)],
+        q0,
+        new IkTolerance(),
+        [for (_ in 0...6) 0.5],
+        [for (_ in 0...6) 1.0]
+      ));
       check(path.length == 1, "an OPW solver searches its own paths through the interface");
     }
     var q = [0.2, -0.3, 0.4, 0.5, -0.6, 0.7];
@@ -2131,57 +5134,100 @@ class KinematicsTests extends MotionKitTestSupport {
     var found = false;
     for (candidate in candidates) {
       var error = 0.0;
-      for (index in 0...6)
-        error += Math.abs(candidate[index] - q[index]);
+      for (index in 0...6) error += Math.abs(candidate[index] - q[index]);
       if (error < 1e-8) found = true;
     }
     check(found, "OPW analytic candidates include the authored joint pose");
-    var next = q.copy(); next[0] += 0.04;
-    var chosen = solver.solvePath(new PathRequest([0.0, 0.04], [solver.forward(q), solver.forward(next)], q,
-      new IkTolerance(), [for (_ in 0...6) 0.5], [for (_ in 0...6) 1.0]));
+    var next = q.copy();
+    next[0] += 0.04;
+    var chosen = solver.solvePath(new PathRequest(
+      [0.0, 0.04],
+      [solver.forward(q), solver.forward(next)],
+      q,
+      new IkTolerance(),
+      [for (_ in 0...6) 0.5],
+      [for (_ in 0...6) 1.0]
+    ));
     var second:Array<Float> = chosen[1];
     near(second[0], next[0], "structured ladder selects OPW branches natively across a path", 1e-6);
     var disconnected = "";
-    try solver.solvePath(new PathRequest([0.0, 0.04], [solver.forward(q), solver.forward(next)], q,
-      new IkTolerance(), [for (_ in 0...6) 1e-6], [for (_ in 0...6) 1.0]))
-    catch (error:Dynamic) disconnected = Std.string(error);
-    check(disconnected.indexOf("sample 1") >= 0 && disconnected.indexOf("0.04") >= 0,
-      "OPW structured selection reports the first disconnected sample and distance");
+    try solver.solvePath(new PathRequest(
+      [0.0, 0.04],
+      [solver.forward(q), solver.forward(next)],
+      q,
+      new IkTolerance(),
+      [for (_ in 0...6) 1e-6],
+      [for (_ in 0...6) 1.0]
+    )) catch (error:Dynamic) disconnected = Std.string(error);
+    check(
+      disconnected.indexOf("sample 1") >= 0 && disconnected.indexOf("0.04") >= 0,
+      "OPW structured selection reports the first disconnected sample and distance"
+    );
     var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(0));
-    var compiler = new ProgramCompiler(solver, limits, "work",
-      [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0],
-      [for (_ in 0...6) 20.0], StartTolerances.uniform(6, 0.02, 0.02, 0.02),
-      null, 0.01, 0.5, 0.005, 0.02);
-    check(Std.isOfType(compiler.jointPathPlanner, motionkit.robot.StructuredJointPathPlanner),
-      "standalone OPW compiler selects the structured planner by default");
-    var program = new MotionProgram([MotionOp.MoveL(solver.forward(next),
-      "work", 0.1, Blend.ExactStop)]);
+    var compiler = new ProgramCompiler(
+      solver,
+      limits,
+      "work",
+      [for (_ in 0...6) 2.0],
+      [for (_ in 0...6) 4.0],
+      [for (_ in 0...6) 20.0],
+      StartTolerances.uniform(
+        6,
+        0.02,
+        0.02,
+        0.02
+      ),
+      null,
+      0.01,
+      0.5,
+      0.005,
+      0.02
+    );
+    check(
+      Std.isOfType(compiler.jointPathPlanner, motionkit.robot.StructuredJointPathPlanner),
+      "standalone OPW compiler selects the structured planner by default"
+    );
+    var program = new MotionProgram([MotionOp.MoveL(solver.forward(next), "work", 0.1, Blend.ExactStop)]);
     var compiled = compiler.compile(program, q, Int64.ofInt(901));
-    check(compiled.blocks[0].plans.length == 1,
-      "OPW arm path compiles through the shared ProgramCompiler");
+    check(compiled.blocks[0].plans.length == 1, "OPW arm path compiles through the shared ProgramCompiler");
     compiled.dispose();
     var workerCompiler = compiler.forWorker();
-    check(workerCompiler.jointPathPlanner != compiler.jointPathPlanner,
-      "OPW worker receives its own structured planner");
+    check(
+      workerCompiler.jointPathPlanner != compiler.jointPathPlanner,
+      "OPW worker receives its own structured planner"
+    );
     var workerPlan = workerCompiler.compile(program, q, Int64.ofInt(902));
-    check(workerPlan.blocks[0].plans.length == 1,
-      "OPW worker compiles through structured path refinement");
+    check(workerPlan.blocks[0].plans.length == 1, "OPW worker compiles through structured path refinement");
     workerPlan.dispose();
-    function published(name:String, values:Array<Float>, offsets:Array<Float>,
-        signs:Array<Int>):Void {
+    function published(name:String, values:Array<Float>, offsets:Array<Float>, signs:Array<Int>):Void {
       var fixture = new RobotModel(name);
       var parts = [for (index in 0...7) fixture.addLink(new Link('$name-$index'))];
-      var origins = [[0.0, 0.0, 0.0], [values[0], values[2], values[3]],
-        [0.0, 0.0, values[4]], [values[1], 0.0, values[5]],
-        [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]];
+      var origins = [
+        [0.0, 0.0, 0.0],
+        [values[0], values[2], values[3]],
+        [0.0, 0.0, values[4]],
+        [
+          values[1],
+          0.0,
+          values[5]
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ]
+      ];
       for (index in 0...6) {
-        var direction = index == 0 || index == 3 || index == 5
-          ? new Vec3(0.0, 0.0, 1.0) : new Vec3(0.0, 1.0, 0.0);
+        var direction = index == 0 || index == 3 || index == 5 ? new Vec3(0.0, 0.0, 1.0) : new Vec3(0.0, 1.0, 0.0);
         var joint = fixture.addJoint(new Joint('$name-joint-$index',
           JointType.Revolute, parts[index], parts[index + 1]));
         joint.parentFramePosition = origins[index];
-        joint.parentFrameRotation = Quat.fromAxisAngle(direction,
-          -offsets[index]).toArray();
+        joint.parentFrameRotation = Quat.fromAxisAngle(direction, -offsets[index]).toArray();
         joint.axis = direction.scale(signs[index]).toArray();
         joint.limits.lower = -2.0 * Math.PI;
         joint.limits.upper = 2.0 * Math.PI;
@@ -2198,14 +5244,58 @@ class KinematicsTests extends MotionKitTestSupport {
       near(actual.y, expected.y, '$name FK Y', 1e-9);
       near(actual.z, expected.z, '$name FK Z', 1e-9);
     }
-    published("ABB IRB2400", [0.1, -0.135, 0.0, 0.615, 0.705, 0.755, 0.085],
-      [0.0, 0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0], [1, 1, 1, 1, 1, 1]);
-    published("KUKA KR6", [0.025, -0.035, 0.0, 0.4, 0.315, 0.365, 0.08],
-      [0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0, 0.0], [-1, 1, 1, -1, 1, -1]);
-    published("Fanuc R2000", [0.72, -0.225, 0.0, 0.6, 1.075, 1.28, 0.235],
-      [0.0, 0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0], [1, 1, 1, 1, 1, 1]);
-    published("Stäubli TX40", [0.0, 0.0, 0.035, 0.32, 0.225, 0.225, 0.065],
-      [0.0, 0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0], [1, 1, 1, 1, 1, 1]);
+    published(
+      "ABB IRB2400",
+      [0.1, -0.135, 0.0, 0.615, 0.705, 0.755, 0.085],
+      [0.0, 0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0],
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    );
+    published(
+      "KUKA KR6",
+      [0.025, -0.035, 0.0, 0.4, 0.315, 0.365, 0.08],
+      [0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0, 0.0],
+      [
+        -1,
+        1,
+        1,
+        -1,
+        1,
+        -1
+      ]
+    );
+    published(
+      "Fanuc R2000",
+      [0.72, -0.225, 0.0, 0.6, 1.075, 1.28, 0.235],
+      [0.0, 0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0],
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    );
+    published(
+      "Stäubli TX40",
+      [0.0, 0.0, 0.035, 0.32, 0.225, 0.225, 0.065],
+      [0.0, 0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0],
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    );
     // Equivalent joint frames with displaced axis origins and a placed q=0:
     // extraction must use axis lines rather than a particular frame convention.
     var placedOffsets = [0.2, 0.4, -0.7, 0.3, 0.6, -0.2];
@@ -2242,117 +5332,238 @@ class KinematicsTests extends MotionKitTestSupport {
       check(branch.branch >= 0 && branch.branch < 8, "OPW shared interface preserves native branch identity");
       var same = true;
       for (joint in 0...6) same = same && Math.abs(branch.q[joint] - wrappedQ[joint]) < 1e-5;
-      check(branch.configuration!=null,"OPW branches carry a six-axis label");
-      if(same)originalConfiguration=branch.configuration;
+      check(branch.configuration != null, "OPW branches carry a six-axis label");
+      if (same) originalConfiguration = branch.configuration;
       foundOriginal = foundOriginal || same;
     }
-    var pin:motionkit.kinematics.SixAxisConfiguration=cast originalConfiguration;
-    var pinRequest=new PathRequest([0.0,1.0],[wrappedTarget,wrappedTarget],wrappedQ,new IkTolerance(1e-6,1e-6),
-      [for(_ in wrappedQ)7.0],[for(_ in wrappedQ)1.0]);
-    var pinned=new motionkit.robot.CandidateProblem(wrappedArm,pinRequest,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1,1,1,true,null,null,pin));
-    for(layer in pinned.samples){
-      check(layer.candidates.length>0,"configuration-pinned ladder retains the authored branch");
-      for(candidate in layer.candidates)check(pin.accepts(candidate.configuration),"every pinned candidate preserves branch and turn labels");
+    var pin:motionkit.kinematics.SixAxisConfiguration = cast originalConfiguration;
+    var pinRequest = new PathRequest(
+      [0.0, 1.0],
+      [wrappedTarget, wrappedTarget],
+      wrappedQ,
+      new IkTolerance(1e-6, 1e-6),
+      [for (_ in wrappedQ) 7.0],
+      [for (_ in wrappedQ) 1.0]
+    );
+    var pinned = new motionkit.robot.CandidateProblem(
+      wrappedArm,
+      pinRequest,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+        1,
+        1,
+        1,
+        true,
+        null,
+        null,
+        pin
+      )
+    );
+    for (layer in pinned.samples) {
+      check(layer.candidates.length > 0, "configuration-pinned ladder retains the authored branch");
+      for (candidate in layer.candidates) check(
+        pin.accepts(candidate.configuration),
+        "every pinned candidate preserves branch and turn labels"
+      );
     }
-    var pinnedSelection=motionkit.robot.StructuredLadder.search(pinned);
-    check(pinnedSelection.diagnostic==null,"configuration-pinned ladder selects a complete route");
-    var pinnedRefiner=new motionkit.robot.AnalyticPathRefiner(wrappedArm,pinned,pinnedSelection);
+    var pinnedSelection = motionkit.robot.StructuredLadder.search(pinned);
+    check(pinnedSelection.diagnostic == null, "configuration-pinned ladder selects a complete route");
+    var pinnedRefiner = new motionkit.robot.AnalyticPathRefiner(wrappedArm, pinned, pinnedSelection);
     // Seed the same geometric branch on a different legal wrist revolution.
     // Refinement must honor the authored turn constraint rather than proximity.
-    var otherTurn=wrappedQ.copy();otherTurn[5]-=2*Math.PI;
-    var refinedPin=pinnedRefiner.sample(0.5,wrappedTarget,OrientationPolicy.Fixed,otherTurn);
-    check(pin.accepts(refinedPin.configuration),"refinement re-solves preserve the hard configuration pin");
-    near(refinedPin.q[5],wrappedQ[5],"refinement rejects the nearer unpinned wrist revolution",1e-5);
-    var pinnedCompiler=new ProgramCompiler(wrappedAnalytic,limits,"work",
-      [for(_ in 0...6)2.0],[for(_ in 0...6)4.0],[for(_ in 0...6)20.0],
-      StartTolerances.uniform(6,0.02,0.02,0.02));
-    var nextPinned=wrappedQ.copy();nextPinned[0]+=0.01;
-    var pinnedProgram=new MotionProgram([MotionOp.MoveL(wrappedAnalytic.forward(nextPinned),"work",0.1,Blend.ExactStop)],pin);
-    var pinnedCompilation=pinnedCompiler.compile(pinnedProgram,wrappedQ,Int64.ofInt(910));
-    check(pinnedCompilation.blocks[0].plans.length==1,"authored configuration pin compiles through the program path");
+    var otherTurn = wrappedQ.copy();
+    otherTurn[5] -= 2 * Math.PI;
+    var refinedPin = pinnedRefiner.sample(0.5, wrappedTarget, OrientationPolicy.Fixed, otherTurn);
+    check(pin.accepts(refinedPin.configuration), "refinement re-solves preserve the hard configuration pin");
+    near(refinedPin.q[5], wrappedQ[5], "refinement rejects the nearer unpinned wrist revolution", 1e-5);
+    var pinnedCompiler = new ProgramCompiler(
+      wrappedAnalytic,
+      limits,
+      "work",
+      [for (_ in 0...6) 2.0],
+      [for (_ in 0...6) 4.0],
+      [for (_ in 0...6) 20.0],
+      StartTolerances.uniform(
+        6,
+        0.02,
+        0.02,
+        0.02
+      )
+    );
+    var nextPinned = wrappedQ.copy();
+    nextPinned[0] += 0.01;
+    var pinnedProgram = new MotionProgram(
+      [MotionOp.MoveL(
+        wrappedAnalytic.forward(nextPinned),
+        "work",
+        0.1,
+        Blend.ExactStop
+      )],
+      pin
+    );
+    var pinnedCompilation = pinnedCompiler.compile(pinnedProgram, wrappedQ, Int64.ofInt(910));
+    check(pinnedCompilation.blocks[0].plans.length == 1,
+      "authored configuration pin compiles through the program path");
     pinnedCompilation.dispose();
-    var workerPinned=pinnedCompiler.forWorker().compile(pinnedProgram,wrappedQ,Int64.ofInt(911));
-    check(workerPinned.blocks[0].plans.length==1,"worker compilation preserves authored configuration pins");
+    var workerPinned = pinnedCompiler.forWorker().compile(pinnedProgram, wrappedQ, Int64.ofInt(911));
+    check(workerPinned.blocks[0].plans.length == 1, "worker compilation preserves authored configuration pins");
     workerPinned.dispose();
-    var pinnedPoseMove=pinnedCompiler.compile(new MotionProgram([MotionOp.MoveJ(
-      MoveTarget.PoseTarget(wrappedAnalytic.forward(nextPinned),"work",null),new MotionOptions(),Blend.ExactStop)],pin),
-      wrappedQ,Int64.ofInt(915));
-    check(pinnedPoseMove.blocks[0].plans.length==1,"pose-target joint moves select the pinned analytic lift");
+    var pinnedPoseMove = pinnedCompiler.compile(
+      new MotionProgram(
+        [MotionOp.MoveJ(
+          MoveTarget.PoseTarget(
+            wrappedAnalytic.forward(nextPinned),
+            "work",
+            null
+          ),
+          new MotionOptions(),
+          Blend.ExactStop
+        )],
+        pin
+      ),
+      wrappedQ,
+      Int64.ofInt(915)
+    );
+    check(pinnedPoseMove.blocks[0].plans.length == 1, "pose-target joint moves select the pinned analytic lift");
     pinnedPoseMove.dispose();
-    var retainedPath=new motionkit.path.PosePath("work",[new motionkit.path.PoseLine(
-      new motionkit.path.PoseWaypoint(wrappedTarget,1e-6,1e-6),
-      new motionkit.path.PoseWaypoint(wrappedAnalytic.forward(nextPinned),1e-6,1e-6),OrientationPolicy.Interpolated,0.01,0.1)]);
-    var retainedRequest=new PathRequest([0.0,retainedPath.length()],[wrappedTarget,wrappedAnalytic.forward(nextPinned)],wrappedQ,
-      new IkTolerance(1e-6,1e-6),[for(_ in wrappedQ)1.0],[for(_ in wrappedQ)1.0]);
-    var retainedChecking=new motionkit.robot.StructuredJointPathPlanner(wrappedArm);
-    var retainedCurve=retainedChecking.withConfiguration(pin).plan(retainedPath,retainedRequest);
-    var retainedPlanner=new motionkit.robot.SelectedJointPathPlanner(wrappedAnalytic,retainedChecking,[retainedPath],[retainedCurve]);
-    check(retainedPlanner.withConfiguration(pin)!=null,"retained execution accepts a matching configuration pin");
-    var wrongTurns:Array<Int> = cast pin.turns;wrongTurns=wrongTurns.copy();wrongTurns[5]-=1;
-    var retainedMismatch="";
-    try retainedPlanner.withConfiguration(new motionkit.kinematics.SixAxisConfiguration(pin.shoulder,pin.elbow,pin.wrist,wrongTurns))
-      catch(error:Dynamic)retainedMismatch=Std.string(error);
-    check(retainedMismatch.indexOf("configuration pin")>=0,"retained execution rejects conflicting physical turns");
-    var badPinStart="";
-    try pinnedCompiler.compile(pinnedProgram,otherTurn,Int64.ofInt(912)) catch(error:Dynamic)badPinStart=Std.string(error);
-    check(badPinStart.indexOf("configuration pin")>=0,"program rejects a physical start on a different pinned turn");
-    var badPinMove="";
-    try pinnedCompiler.compile(new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(otherTurn),new MotionOptions(),Blend.ExactStop)],pin),
-      wrappedQ,Int64.ofInt(913)) catch(error:Dynamic)badPinMove=Std.string(error);
-    check(badPinMove.indexOf("configuration pin")>=0,"joint moves cannot leave the program configuration pin");
-    var unconstrained=pinnedCompiler.compile(new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(otherTurn),new MotionOptions(),Blend.ExactStop)]),
-      wrappedQ,Int64.ofInt(914));
-    check(unconstrained.blocks[0].plans.length==1,"program pins do not mutate the reusable compiler");
+    var retainedPath = new motionkit.path.PosePath(
+      "work",
+      [new motionkit.path.PoseLine(
+        new motionkit.path.PoseWaypoint(
+          wrappedTarget,
+          1e-6,
+          1e-6
+        ),
+        new motionkit.path.PoseWaypoint(
+          wrappedAnalytic.forward(nextPinned),
+          1e-6,
+          1e-6
+        ),
+        OrientationPolicy.Interpolated,
+        0.01,
+        0.1
+      )]
+    );
+    var retainedRequest = new PathRequest(
+      [0.0, retainedPath.length()],
+      [
+        wrappedTarget,
+        wrappedAnalytic.forward(nextPinned)
+      ],
+      wrappedQ,
+      new IkTolerance(
+        1e-6,
+        1e-6
+      ),
+      [for (_ in wrappedQ) 1.0],
+      [for (_ in wrappedQ) 1.0]
+    );
+    var retainedChecking = new motionkit.robot.StructuredJointPathPlanner(wrappedArm);
+    var retainedCurve = retainedChecking.withConfiguration(pin).plan(retainedPath, retainedRequest);
+    var retainedPlanner = new motionkit.robot.SelectedJointPathPlanner(
+      wrappedAnalytic,
+      retainedChecking,
+      [retainedPath],
+      [retainedCurve]
+    );
+    check(retainedPlanner.withConfiguration(pin) != null, "retained execution accepts a matching configuration pin");
+    var wrongTurns:Array<Int> = cast pin.turns;
+    wrongTurns = wrongTurns.copy();
+    wrongTurns[5] -= 1;
+    var retainedMismatch = "";
+    try retainedPlanner.withConfiguration(new motionkit.kinematics.SixAxisConfiguration(
+      pin.shoulder,
+      pin.elbow,
+      pin.wrist,
+      wrongTurns
+    )) catch (error:Dynamic) retainedMismatch = Std.string(error);
+    check(retainedMismatch.indexOf("configuration pin") >= 0, "retained execution rejects conflicting physical turns");
+    var badPinStart = "";
+    try pinnedCompiler.compile(pinnedProgram,
+      otherTurn, Int64.ofInt(912)) catch (error:Dynamic) badPinStart = Std.string(error);
+    check(badPinStart.indexOf("configuration pin") >= 0, "program rejects a physical start on a different pinned turn");
+    var badPinMove = "";
+    try pinnedCompiler.compile(
+      new MotionProgram(
+        [MotionOp.MoveJ(
+          MoveTarget.JointTarget(otherTurn),
+          new MotionOptions(),
+          Blend.ExactStop
+        )],
+        pin
+      ),
+      wrappedQ,
+      Int64.ofInt(913)
+    ) catch (error:Dynamic) badPinMove = Std.string(error);
+    check(badPinMove.indexOf("configuration pin") >= 0, "joint moves cannot leave the program configuration pin");
+    var unconstrained = pinnedCompiler.compile(
+      new MotionProgram([MotionOp.MoveJ(
+        MoveTarget.JointTarget(otherTurn),
+        new MotionOptions(),
+        Blend.ExactStop
+      )]),
+      wrappedQ,
+      Int64.ofInt(914)
+    );
+    check(unconstrained.blocks[0].plans.length == 1, "program pins do not mutate the reusable compiler");
     unconstrained.dispose();
-    var unsupportedPin="";
-    try new motionkit.robot.ConfigurationConstraint(new ManipulatorKinematics(buildSevenAxisArmFixture().arm),pin)
-      catch(error:Dynamic)unsupportedPin=Std.string(error);
-    check(unsupportedPin.indexOf("labelled six-axis")>=0,"unsupported kinematics reject a hard pin explicitly");
+    var unsupportedPin = "";
+    try new motionkit.robot.ConfigurationConstraint(new ManipulatorKinematics(buildSevenAxisArmFixture().arm),
+      pin) catch (error:Dynamic) unsupportedPin = Std.string(error);
+    check(unsupportedPin.indexOf("labelled six-axis") >= 0, "unsupported kinematics reject a hard pin explicitly");
     check(foundOriginal, "OPW enumerates legal periodic lifts beyond the nearest plus/minus turn");
     var singularQ = wrappedQ.copy();
     singularQ[4] = wrappedAnalytic.analytic.configuration.native.get_reference(4);
     var singularBranches = shared.branches(wrappedAnalytic.forward(singularQ), singularQ);
-    check([for (branch in singularBranches) if (branch.singular) branch].length > 0,
-      "OPW shared interface explicitly reports wrist singularity");
+    check(
+      [for (branch in singularBranches) if (branch.singular) branch].length > 0,
+      "OPW shared interface explicitly reports wrist singularity"
+    );
     var ur = new motionkit.robot.EaikAnalyticIk(bad.arm);
-    check(motionkit.robot.BranchIk.of(bad.arm).family() == "EAIK","model-derived family selection recognizes UR geometry");
+    check(
+      motionkit.robot.BranchIk.of(bad.arm).family() == "EAIK",
+      "model-derived family selection recognizes UR geometry"
+    );
     for (sample in 0...30) {
       var q = [for (joint in 0...6) 0.7 * Math.sin(sample * 0.37 + joint * 0.61)];
       var actual = bad.arm.tcpPose(q), predicted = ur.forward(q);
-      near(actual.translation.sub(new Vec3(predicted.x,predicted.y,predicted.z)).norm(),0.0,"UR model-derived FK",1e-6);
-      var candidates = ur.branches(predicted,q);
-      check(candidates.length > 0,"UR model-derived inverse branches");
+      near(
+        actual.translation.sub(new Vec3(predicted.x, predicted.y, predicted.z)).norm(),
+        0.0,
+        "UR model-derived FK",
+        1e-6
+      );
+      var candidates = ur.branches(predicted, q);
+      check(candidates.length > 0, "UR model-derived inverse branches");
       var found = false;
       for (candidate in candidates) {
         var same = true;
-        for (joint in 0...6) if (Math.abs(candidate.q[joint]-q[joint]) > 1e-5) same = false;
+        for (joint in 0...6) if (Math.abs(candidate.q[joint] - q[joint]) > 1e-5) same = false;
         found = found || same;
       }
-      check(found,"UR inverse contains the original legal lift");
+      check(found, "UR inverse contains the original legal lift");
     }
     var placedUrFixture = buildContractArmFixture();
     for (index in 0...6) {
       var joint = placedUrFixture.model.joints[index];
-      var axis = Vec3.fromArray(joint.axis), shift = axis.scale(0.013*(index+1));
+      var axis = Vec3.fromArray(joint.axis), shift = axis.scale(0.013 * (index + 1));
       joint.parentFramePosition = Vec3.fromArray(joint.parentFramePosition).add(shift).toArray();
       joint.childFramePosition = shift.toArray();
-      joint.parentFrameRotation = Quat.fromAxisAngle(axis,0.17*(index+1)).toArray();
+      joint.parentFrameRotation = Quat.fromAxisAngle(axis, 0.17 * (index + 1)).toArray();
     }
-    var placedUrArm = new Manipulator(placedUrFixture.model,"base","flange");
+    var placedUrArm = new Manipulator(placedUrFixture.model, "base", "flange");
     var placedUr = new motionkit.robot.EaikAnalyticIk(placedUrArm);
     for (sample in 0...30) {
-      var q = [for (joint in 0...6) 0.8*Math.sin(sample*0.39+joint*0.73)];
+      var q = [for (joint in 0...6) 0.8 * Math.sin(sample * 0.39 + joint * 0.73)];
       var target = new ManipulatorKinematics(placedUrArm).forward(q);
       var found = false;
-      for (candidate in placedUr.branches(target,q)) {
+      for (candidate in placedUr.branches(target, q)) {
         var same = true;
-        for (joint in 0...6) if (Math.abs(candidate.q[joint]-q[joint]) > 1e-5) same = false;
+        for (joint in 0...6) if (Math.abs(candidate.q[joint] - q[joint]) > 1e-5) same = false;
         found = found || same;
       }
-      check(found,"UR extraction recovers placed joint references");
+      check(found, "UR extraction recovers placed joint references");
     }
-    check(new EaikKinematics(bad.arm).family()=="EAIK", "Parallel-axis 6R uses the same production backend");
+    check(new EaikKinematics(bad.arm).family() == "EAIK", "Parallel-axis 6R uses the same production backend");
   }
 
   public function testManipulatorServo():Void {
@@ -2365,16 +5576,29 @@ class KinematicsTests extends MotionKitTestSupport {
 
     // Far from every bound it is the damped least-squares step at the same damping.
     var free = servo.step(q, twist, 0.01, unlimited);
-    var expected = LinearAlgebra.dampedStep(arm.tcpJacobian(q), 6, 6, [for (i in 0...6) i],
-      [for (value in twist.toArray()) value * 0.01], 1e-3);
+    var expected = LinearAlgebra.dampedStep(
+      arm.tcpJacobian(q),
+      6,
+      6,
+      [for (i in 0...6) i],
+      [for (value in twist.toArray()) value * 0.01],
+      1e-3
+    );
     check(!free.fallback && free.limited.length == 0, "an unconstrained servo tick solves on the QP");
-    for (joint in 0...6) near(free.velocity[joint], expected[joint] / 0.01,
-      "an unconstrained servo tick is the damped least-squares step", 1e-5);
+    for (joint in 0...6) near(
+      free.velocity[joint],
+      expected[joint] / 0.01,
+      "an unconstrained servo tick is the damped least-squares step",
+      1e-5
+    );
 
     // Velocity limits hold exactly.
     var fast = new Twist6(2.0, -1.0, 1.5, 3.0, -2.0, 2.5);
     var capped = servo.step(q, fast, 0.01, [for (_ in 0...6) 0.5]);
-    for (joint in 0...6) check(Math.abs(capped.velocity[joint]) <= 0.5 + 1e-12, "servo velocities stay within their limits");
+    for (joint in 0...6) check(
+      Math.abs(capped.velocity[joint]) <= 0.5 + 1e-12,
+      "servo velocities stay within their limits"
+    );
     check(capped.limited.length > 0, "a too-fast twist reports the joints held by their velocity limit");
 
     // Turning the whole arm about the base axis (the tool twist v = ω × p, ω = z) is the base joint's
@@ -2398,15 +5622,27 @@ class KinematicsTests extends MotionKitTestSupport {
     var soft = q.copy();
     for (_ in 0...1200) {
       var tcp = arm.tcpPose(soft).translation;
-      var tick = servo.step(soft, new Twist6(-tcp.y, tcp.x, 0.0, 0.0, 0.0, 1.0), 0.01, [for (_ in 0...6) 2.0], 1000, 0.3);
+      var tick = servo.step(
+        soft,
+        new Twist6(-tcp.y, tcp.x, 0.0, 0.0, 0.0, 1.0),
+        0.01,
+        [for (_ in 0...6) 2.0],
+        1000,
+        0.3
+      );
       for (joint in 0...6) soft[joint] += tick.velocity[joint] * 0.01;
     }
-    check(soft[0] < 2.0 * Math.PI && 2.0 * Math.PI - soft[0] < 1e-6, "a limit gain slows the base into its stop without touching it");
+    check(
+      soft[0] < 2.0 * Math.PI && 2.0 * Math.PI - soft[0] < 1e-6,
+      "a limit gain slows the base into its stop without touching it"
+    );
 
     // A QP that runs out of iterations falls back to the clamped damped step, still within limits.
     var starved = servo.step(q, fast, 0.01, [for (_ in 0...6) 0.5], 1);
-    if (starved.fallback) for (joint in 0...6)
-      check(Math.abs(starved.velocity[joint]) <= 0.5 + 1e-12, "the fallback step also respects the limits");
+    if (starved.fallback) for (joint in 0...6) check(
+      Math.abs(starved.velocity[joint]) <= 0.5 + 1e-12,
+      "the fallback step also respects the limits"
+    );
     servo.dispose();
   }
 
@@ -2423,7 +5659,10 @@ class KinematicsTests extends MotionKitTestSupport {
   function servoPlanTrial(virtual:Bool):Void {
     var label = virtual ? "virtual device" : "plan runtime";
     var fixture = buildContractArmFixture();
-    for (joint in fixture.model.joints) { joint.limits.velocity = 2.0; joint.limits.maxAcceleration = 4.0; }
+    for (joint in fixture.model.joints) {
+      joint.limits.velocity = 2.0;
+      joint.limits.maxAcceleration = 4.0;
+    }
     fixture.model.joints[0].limits.upper = 1.2;
     var blueprint = RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile());
     var harness = new SimulationHarness(0.01);
@@ -2435,9 +5674,14 @@ class KinematicsTests extends MotionKitTestSupport {
     }
     var runtime = harness.simulation.addRobot(blueprint, null, options);
     var tick = 0;
-    for (_ in 0...20) harness.step(Int64.ofInt(++tick));
-    var robot = new SimulatedRobot('servo-plans-$virtual', runtime, fixture.model.name,
-      [for (link in fixture.model.links) link.name], [for (joint in fixture.model.joints) joint.name]);
+    for (_ in 0...20) harness.step(Int64.ofInt(++ tick));
+    var robot = new SimulatedRobot(
+      'servo-plans-$virtual',
+      runtime,
+      fixture.model.name,
+      [for (link in fixture.model.links) link.name],
+      [for (joint in fixture.model.joints) joint.name]
+    );
     var arm = fixture.arm;
     function positions():Array<Float> return [for (i in 0...6) robot.snapshot().positions.get(i)];
     var model = Int64.ofInt(blueprint.revision), calibration = Int64.ofInt(blueprint.calibrationRevision);
@@ -2450,11 +5694,24 @@ class KinematicsTests extends MotionKitTestSupport {
     var coefficients = [for (j in 0...6) {
       var d = start[j] - from[j];
       [from[j], 0.0, 0.0, 10.0 * d / Math.pow(span, 3), -15.0 * d / Math.pow(span, 4), 6.0 * d / Math.pow(span, 5)];
-    }];
+    }
+    ];
     var zero = [for (_ in 0...6) 0.0];
-    robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(Int64.ofInt(1), model, calibration, 1, from,
-      zero, zero, [new TrajectorySegment(Int64.ofInt(0), Int64.fromFloat(span * 1e9), coefficients)])));
-    for (_ in 0...260) harness.step(Int64.ofInt(++tick));
+    robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(
+      Int64.ofInt(1),
+      model,
+      calibration,
+      1,
+      from,
+      zero,
+      zero,
+      [new TrajectorySegment(
+        Int64.ofInt(0),
+        Int64.fromFloat(span * 1e9),
+        coefficients
+      )]
+    )));
+    for (_ in 0...260) harness.step(Int64.ofInt(++ tick));
     for (j in 0...6) near(positions()[j], start[j], '$label: the arm reaches its start (joint $j)', 2.0 * quantumStart);
 
     var lead = 0.04;
@@ -2468,12 +5725,15 @@ class KinematicsTests extends MotionKitTestSupport {
     var stamps:Array<Float> = [Int64.toFloat(robot.snapshot().sourceTimestampNs) * 1e-9];
     var sequence = 0;
     function advance():Void {
-      harness.step(Int64.ofInt(++tick));
+      harness.step(Int64.ofInt(++ tick));
       trace.push(positions());
       stamps.push(Int64.toFloat(robot.snapshot().sourceTimestampNs) * 1e-9);
     }
     function tickOnce(refresh:Null<motionkit.kinematics.Twist6>) {
-      if (refresh != null) check(session.command(refresh, ++sequence, session.nowNs() + ms * 100) == null, '$label: a fresh command is accepted');
+      if (refresh != null) check(
+        session.command(refresh, ++ sequence, session.nowNs() + ms * 100) == null,
+        '$label: a fresh command is accepted'
+      );
       var result = session.update();
       advance();
       return result;
@@ -2485,20 +5745,25 @@ class KinematicsTests extends MotionKitTestSupport {
       for (k in 2...distinct.length) {
         var a = distinct[k - 2], b = distinct[k - 1], c = distinct[k];
         var h1 = stamps[b] - stamps[a], h2 = stamps[c] - stamps[b];
-        for (j in 0...6)
-          worst = Math.max(worst, Math.abs(2.0 * ((trace[c][j] - trace[b][j]) / h2 - (trace[b][j] - trace[a][j]) / h1) /
-            (h1 + h2)));
+        for (j in 0...6) worst = Math.max(
+          worst,
+          Math.abs(2.0 * ((trace[c][j] - trace[b][j]) / h2 - (trace[b][j] - trace[a][j]) / h1) / (h1 + h2))
+        );
       }
       return worst;
     }
     function worstSpeed(from:Int):Float {
       var worst = 0.0;
-      for (i in (from + 1)...trace.length) for (j in 0...6) worst = Math.max(worst, Math.abs(trace[i][j] - trace[i - 1][j]) / dt);
+      for (i in (from + 1)...trace.length) for (j in 0...6) worst = Math.max(
+        worst,
+        Math.abs(trace[i][j] - trace[i - 1][j]) / dt
+      );
       return worst;
     }
     function still(count:Int):Bool {
       var last = trace.length - 1;
-      for (i in (last - count)...last) for (j in 0...6) if (Math.abs(trace[i + 1][j] - trace[i][j]) > 1e-9) return false;
+      for (i in (last - count)...last) for (j in 0...6) if (Math.abs(trace[i + 1][j] - trace[i][j])
+        > 1e-9) return false;
       return true;
     }
     var slack = accel + 2.0 * quantum / (dt * dt);
@@ -2517,7 +5782,10 @@ class KinematicsTests extends MotionKitTestSupport {
     var a = samples[0], b = samples[samples.length - 1];
     near((b.x - a.x) / (b.t - a.t), 0.05, '$label: the tool moves at the streamed 5 cm/s', 0.0025);
     near((b.y - a.y) / (b.t - a.t), 0.0, '$label: the tool does not drift sideways', 0.0025);
-    check(worstAcceleration(first) <= slack, '$label: streaming stays within the acceleration limits (${worstAcceleration(first)})');
+    check(
+      worstAcceleration(first) <= slack,
+      '$label: streaming stays within the acceleration limits (${worstAcceleration(first)})'
+    );
     check(worstSpeed(first) <= 2.0 + quantum / dt, '$label: streaming stays within the velocity limits');
 
     // The operator stops (the host keeps updating): the arm brakes to rest.
@@ -2533,8 +5801,14 @@ class KinematicsTests extends MotionKitTestSupport {
     check(rested, '$label: a stopped servo comes to rest');
     // Braking starts at the end of the queue, one lead ahead. A device's queue is done once the
     // runtime's copy of it has run out too, an owner period after the device finishes.
-    check(ticks * dt <= peak / accel + lead + dt + 0.03, '$label: braking takes about v/a (${ticks * dt} s for $peak rad/s)');
-    check(worstAcceleration(first) <= slack, '$label: braking stays within the acceleration limits (${worstAcceleration(first)})');
+    check(
+      ticks * dt <= peak / accel + lead + dt + 0.03,
+      '$label: braking takes about v/a (${ticks * dt} s for $peak rad/s)'
+    );
+    check(
+      worstAcceleration(first) <= slack,
+      '$label: braking stays within the acceleration limits (${worstAcceleration(first)})'
+    );
     for (_ in 0...10) advance();
     check(still(9), '$label: the arm stays at rest');
 
@@ -2548,7 +5822,10 @@ class KinematicsTests extends MotionKitTestSupport {
     }
     check(overshoot <= quantum, '$label: the base joint never passes its stop ($overshoot)');
     near(positions()[0], 1.2, '$label: the base joint ends on its stop', 2e-3);
-    check(worstAcceleration(first) <= slack, '$label: approaching the stop stays within the acceleration limits (${worstAcceleration(first)})');
+    check(
+      worstAcceleration(first) <= slack,
+      '$label: approaching the stop stays within the acceleration limits (${worstAcceleration(first)})'
+    );
     // Last, as a device latches its stop: the host stalls mid-stream, the queue runs dry within the lead,
     // and the robot brakes every joint by itself.
     first = trace.length - 1;
@@ -2562,14 +5839,25 @@ class KinematicsTests extends MotionKitTestSupport {
       if (stoppedAt < 0 && still(1)) stoppedAt = trace.length - 2;
     }
     var stopSeconds = (stoppedAt - stalledAt) * dt;
-    check(stoppedAt >= 0 && stopSeconds <= lead + moving / accel + 0.04,
-      '$label: a stalled host leaves the arm stopping within the lead plus v/a ($stopSeconds s)');
+    check(
+      stoppedAt >= 0 && stopSeconds <= lead + moving / accel + 0.04,
+      '$label: a stalled host leaves the arm stopping within the lead plus v/a ($stopSeconds s)'
+    );
     check(still(40), '$label: the stalled arm stays at rest');
     // The runtime reports the underflow and stays ready; a device latches its stop as a fault.
-    if (virtual) check(robot.snapshot().safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT, '$label: the device latches the underflow stop');
-    else check(robot.snapshot().safety == RobotKitRuntimeConstants.RK_SAFETY_READY &&
-      robot.snapshot().faultCode == RobotKitRuntimeConstants.RK_FAULT_TRAJECTORY_UNDERFLOW, '$label: the runtime reports the underflow');
-    check(worstAcceleration(first) <= slack, '$label: the stalled stop stays within the acceleration limits (${worstAcceleration(first)})');
+    if (virtual) check(
+      robot.snapshot().safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT,
+      '$label: the device latches the underflow stop'
+    );
+    else check(
+      robot.snapshot().safety == RobotKitRuntimeConstants.RK_SAFETY_READY
+      && robot.snapshot().faultCode == RobotKitRuntimeConstants.RK_FAULT_TRAJECTORY_UNDERFLOW,
+      '$label: the runtime reports the underflow'
+    );
+    check(
+      worstAcceleration(first) <= slack,
+      '$label: the stalled stop stays within the acceleration limits (${worstAcceleration(first)})'
+    );
 
     session.dispose();
     harness.dispose();
@@ -2577,12 +5865,23 @@ class KinematicsTests extends MotionKitTestSupport {
 
   public function testServoSession():Void {
     var fixture = buildContractArmFixture();
-    for (joint in fixture.model.joints) { joint.limits.velocity = 2.0; joint.limits.maxAcceleration = 4.0; }
+    for (joint in fixture.model.joints) {
+      joint.limits.velocity = 2.0;
+      joint.limits.maxAcceleration = 4.0;
+    }
     fixture.model.joints[0].limits.upper = 1.2;
     var harness = new SimulationHarness(0.01);
-    var runtime = harness.simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile()));
-    var robot = new SimulatedRobot("servo-arm", runtime, fixture.model.name,
-      [for (link in fixture.model.links) link.name], [for (joint in fixture.model.joints) joint.name]);
+    var runtime = harness.simulation.addRobot(RobotRuntimeCompiler.compile(
+      fixture.model,
+      new robotkit.profile.RobotProfile()
+    ));
+    var robot = new SimulatedRobot(
+      "servo-arm",
+      runtime,
+      fixture.model.name,
+      [for (link in fixture.model.links) link.name],
+      [for (joint in fixture.model.joints) joint.name]
+    );
     var arm = fixture.arm;
     var tick = 0;
     function positions():Array<Float> return [for (i in 0...6) robot.snapshot().positions.get(i)];
@@ -2597,7 +5896,10 @@ class KinematicsTests extends MotionKitTestSupport {
     var worstJump = 0.0, fastest = 0.0, sequence = 0;
     var previous = [for (_ in 0...6) 0.0];
     function tickOnce(refresh:Null<motionkit.kinematics.Twist6>) {
-      if (refresh != null) check(session.command(refresh, ++sequence, session.nowNs() + ms * 100) == null, "a fresh command is accepted");
+      if (refresh != null) check(
+        session.command(refresh, ++ sequence, session.nowNs() + ms * 100) == null,
+        "a fresh command is accepted"
+      );
       harness.step(Int64.ofInt(tick++));
       var result = session.update();
       for (i in 0...6) {
@@ -2675,11 +5977,14 @@ class KinematicsTests extends MotionKitTestSupport {
         fastestNow = Math.max(fastestNow, Math.abs(now[i]));
       }
       seen = now;
-      if (fastestNow <= 1e-9 && stoppedAfter < 0.0) stoppedAfter = Int64.toInt(robot.snapshot().sourceTimestampNs - stalledAt) * 1e-9;
+      if (fastestNow <= 1e-9
+        && stoppedAfter < 0.0) stoppedAfter = Int64.toInt(robot.snapshot().sourceTimestampNs - stalledAt) * 1e-9;
     }
     check(stoppedAfter >= 0.1, 'the runtime keeps the stream running until its deadline ($stoppedAfter s)');
-    check(stoppedAfter <= 0.1 + moving / accel + 0.02,
-      'the runtime stops a stalled stream within v/a of its deadline ($stoppedAfter s)');
+    check(
+      stoppedAfter <= 0.1 + moving / accel + 0.02,
+      'the runtime stops a stalled stream within v/a of its deadline ($stoppedAfter s)'
+    );
     check(stalledJump <= accel * dt * 1.01, 'the runtime brakes within the acceleration limits ($stalledJump)');
     check(robot.snapshot().faultCode == 7, "the snapshot reports the lapsed command");
     session.dispose();
@@ -2697,38 +6002,38 @@ class KinematicsTests extends MotionKitTestSupport {
     first.limits.upper = 0.08;
     second.limits.lower = -0.16;
     second.limits.upper = 0.01;
-    model.addActuator(new Actuator("left-motor", null, 1.0,
-      Transmission.SimpleTransmission(first.id, 1.0, 0.0)));
-    model.addActuator(new Actuator("right-motor", null, 1.0,
-      Transmission.SimpleTransmission(second.id, -0.5, 0.01)));
-    var authored = new MotionAxisBlueprint("x", [first.id, second.id],
-      0.0, 0.08, 0.08, 0.4);
+    model.addActuator(new Actuator("left-motor", null, 1.0, Transmission.SimpleTransmission(first.id, 1.0, 0.0)));
+    model.addActuator(new Actuator("right-motor", null, 1.0, Transmission.SimpleTransmission(second.id, -0.5, 0.01)));
+    var authored = new MotionAxisBlueprint("x", [first.id, second.id], 0.0, 0.08, 0.08, 0.4);
     var derived = MotionSystemBlueprint.fromRobotModel(model, [authored]);
-    near(derived.axes[0].jointScales[0], 1.0,
-      "first transmitted joint defines the logical coordinate");
-    near(derived.axes[0].jointScales[1], -2.0,
-      "transmission ratio derives the old dual-motor scale");
-    near(derived.axes[0].jointOffsets[1], 0.01,
-      "transmission offset is retained in joint coordinates");
-    var explicit = new MotionAxisBlueprint("x", [first.id, second.id],
-      0.0, 0.08, 0.08, 0.4, 0.0, [1.0, -3.0], [0.0, 0.02]);
+    near(derived.axes[0].jointScales[0], 1.0, "first transmitted joint defines the logical coordinate");
+    near(derived.axes[0].jointScales[1], -2.0, "transmission ratio derives the old dual-motor scale");
+    near(derived.axes[0].jointOffsets[1], 0.01, "transmission offset is retained in joint coordinates");
+    var explicit = new MotionAxisBlueprint(
+      "x",
+      [first.id, second.id],
+      0.0,
+      0.08,
+      0.08,
+      0.4,
+      0.0,
+      [1.0, -3.0],
+      [
+        0.0,
+        0.02
+      ]
+    );
     var overridden = MotionSystemBlueprint.fromRobotModel(model, [explicit]);
-    near(overridden.axes[0].jointScales[1], -3.0,
-      "deprecated explicit scale still overrides the transmission");
-    near(overridden.axes[0].jointOffsets[1], 0.02,
-      "deprecated explicit offset still overrides the transmission");
+    near(overridden.axes[0].jointScales[1], -3.0, "deprecated explicit scale still overrides the transmission");
+    near(overridden.axes[0].jointOffsets[1], 0.02, "deprecated explicit offset still overrides the transmission");
     model.addCoupling(new JointCoupling("gantry-gears", first.id, second.id, -1.5, 0.02));
     var coupled = MotionSystemBlueprint.fromRobotModel(model, [authored]);
-    near(coupled.axes[0].jointScales[1], -1.5,
-      "model joint coupling derives the axis follower scale");
-    near(coupled.axes[0].jointOffsets[1], 0.02,
-      "model joint coupling derives the axis follower offset");
-    check(coupled.runtime.couplings.length == 1,
-      "runtime blueprint retains the model joint coupling");
+    near(coupled.axes[0].jointScales[1], -1.5, "model joint coupling derives the axis follower scale");
+    near(coupled.axes[0].jointOffsets[1], 0.02, "model joint coupling derives the axis follower offset");
+    check(coupled.runtime.couplings.length == 1, "runtime blueprint retains the model joint coupling");
     model.actuators.pop();
     var leaderDriven = MotionSystemBlueprint.fromRobotModel(model, [authored]);
-    near(leaderDriven.axes[0].jointScales[1], -1.5,
-      "one transmitted leader drives a coupled follower axis");
+    near(leaderDriven.axes[0].jointScales[1], -1.5, "one transmitted leader drives a coupled follower axis");
   }
 
   public function testAxisKinematics():Void {
@@ -2736,18 +6041,40 @@ class KinematicsTests extends MotionKitTestSupport {
     var links = [for (index in 0...5) model.addLink(new Link('axis-link-$index'))];
     var ids = ["x.leader", "x.follower", "y", "z"];
     for (index in 0...4) {
-      var joint = model.addJoint(new Joint(ids[index], JointType.Prismatic,
-        links[index], links[index + 1]));
+      var joint = model.addJoint(new Joint(ids[index], JointType.Prismatic, links[index], links[index + 1]));
       joint.limits.lower = -0.1;
       joint.limits.upper = 0.1;
     }
-    model.addCoupling(new JointCoupling("x-gears", "x.leader",
-      "x.follower", -1.5, 0.02));
-    var blueprint = MotionSystemBlueprint.fromRobotModel(model, [
-      new MotionAxisBlueprint("x", ["x.leader", "x.follower"], -0.05, 0.05,
-        0.1, 0.4),
-      new MotionAxisBlueprint("y", ["y"], -0.05, 0.05, 0.1, 0.4),
-      new MotionAxisBlueprint("z", ["z"], -0.05, 0.05, 0.1, 0.4)]);
+    model.addCoupling(new JointCoupling("x-gears", "x.leader", "x.follower", -1.5, 0.02));
+    var blueprint = MotionSystemBlueprint.fromRobotModel(
+      model,
+      [
+        new MotionAxisBlueprint(
+          "x",
+          ["x.leader", "x.follower"],
+          -0.05,
+          0.05,
+          0.1,
+          0.4
+        ),
+        new MotionAxisBlueprint(
+          "y",
+          ["y"],
+          -0.05,
+          0.05,
+          0.1,
+          0.4
+        ),
+        new MotionAxisBlueprint(
+          "z",
+          ["z"],
+          -0.05,
+          0.05,
+          0.1,
+          0.4
+        )
+      ]
+    );
     var solver = new AxisKinematics(blueprint);
     var target = new Pose3(0.01, 0.02, -0.03);
     var q = solver.solvePose(target, [0.0, 0.02, 0.0, 0.0], new IkTolerance(), null);
@@ -2756,101 +6083,273 @@ class KinematicsTests extends MotionKitTestSupport {
     near(q[0], 0.01, "axis IK maps the X leader");
     near(q[1], 0.005, "axis IK keeps the coupled follower in proportion");
     near(solver.forward(q).y, 0.02, "axis FK maps Y to the tool");
-    check(solver.sampleCandidates(target, 8, new IkTolerance(), null).length == 1,
-      "axis IK exposes one exact candidate");
-    var velocity = solver.solveDifferential(q,
-      new Twist6(0.02, 0.01, -0.01, 0.0, 0.0, 0.0), null, null);
+    check(
+      solver.sampleCandidates(target, 8, new IkTolerance(), null).length == 1,
+      "axis IK exposes one exact candidate"
+    );
+    var velocity = solver.solveDifferential(q, new Twist6(0.02, 0.01, -0.01, 0.0, 0.0, 0.0), null, null);
     check(velocity != null, "axis differential IK maps a linear twist");
     if (velocity == null) throw "axis differential IK returned no solution";
     near(velocity[0], 0.02, "axis differential IK maps X velocity");
-    near(velocity[1], -0.03,
-      "axis differential IK keeps follower velocity in proportion");
+    near(velocity[1], -0.03, "axis differential IK keeps follower velocity in proportion");
     // The solver declares itself exactly affine, and its map is the one its IK follows.
     var affine = solver.affineMap();
     check(affine != null && affine.jointCount() == 4, "axis kinematics declares an exact affine map");
     if (affine == null) throw "axis kinematics declared no affine map";
-    for (joint in 0...4)
-      near(affine.offsets[joint] + affine.columns[0][joint] * 0.01 + affine.columns[1][joint] * 0.02 +
-        affine.columns[2][joint] * -0.03, q[joint], 'the affine map reproduces IK joint $joint');
+    for (joint in 0...4) near(
+      affine.offsets[joint]
+      + affine.columns[0][joint] * 0.01 + affine.columns[1][joint] * 0.02 + affine.columns[2][joint] * -0.03,
+      q[joint],
+      'the affine map reproduces IK joint $joint'
+    );
     near(affine.columns[0][1], -1.5, "the affine map keeps the follower's ratio on X");
     near(affine.rate(1, 0.02, 0.01, -0.01), velocity[1], "the affine map's rate is the differential IK's");
     check(new motionkit.robot.JointKinematics(4).affineMap() == null, "a joint-space solver declares no affine map");
-    var path = new PosePath("work", [new PoseLine(new PoseWaypoint(target, 1e-6, 1e-6),
-      new PoseWaypoint(new Pose3(0.03, 0.02, -0.03), 1e-6, 1e-6), OrientationPolicy.Fixed, 0.1, 0.1)]);
+    var path = new PosePath(
+      "work",
+      [new PoseLine(
+        new PoseWaypoint(target, 1e-6, 1e-6),
+        new PoseWaypoint(
+          new Pose3(
+            0.03,
+            0.02,
+            -0.03
+          ),
+          1e-6,
+          1e-6
+        ),
+        OrientationPolicy.Fixed,
+        0.1,
+        0.1
+      )]
+    );
     var planner = new motionkit.robot.AxisJointPathPlanner(solver);
-    var curve = planner.plan(path, new PathRequest([0.0, path.length()],
-      [target, path.poseAt(path.length())], q, new IkTolerance(),
-      [for (_ in 0...4) 0.1], [for (_ in 0...4) 0.1], 32,
-      [OrientationPolicy.Fixed, OrientationPolicy.Fixed]));
+    var curve = planner.plan(
+      path,
+      new PathRequest(
+        [0.0, path.length()],
+        [target, path.poseAt(path.length())],
+        q,
+        new IkTolerance(),
+        [for (_ in 0...4) 0.1],
+        [for (_ in 0...4) 0.1],
+        32,
+        [
+          OrientationPolicy.Fixed,
+          OrientationPolicy.Fixed
+        ]
+      )
+    );
     near(curve.q[1][1], -0.025, "axis path retains follower offset");
     near(curve.qPrime[1][0], 1.0, "axis path has exact leader derivative");
     near(curve.qPrime[1][1], -1.5, "axis path has exact follower derivative");
     near(curve.qDoublePrime[1][1], 0.0, "axis line has zero follower curvature");
-    var freePath = new PosePath("work", [new PoseLine(new PoseWaypoint(target, 1e-6, 1e-6),
-      new PoseWaypoint(new Pose3(0.03, 0.02, -0.03, 0.0, 0.0, Math.sin(0.2), Math.cos(0.2)), 1e-6, 1e-6),
-      OrientationPolicy.Free, 0.1, 0.1)]);
-    var freeCurve = planner.plan(freePath, new PathRequest([0.0, freePath.length()],
-      [target, freePath.poseAt(freePath.length())], q, new IkTolerance(),
-      [for (_ in 0...4) 0.1], [for (_ in 0...4) 0.1], 32,
-      [OrientationPolicy.Free, OrientationPolicy.Free]));
+    var freePath = new PosePath(
+      "work",
+      [new PoseLine(
+        new PoseWaypoint(target, 1e-6, 1e-6),
+        new PoseWaypoint(
+          new Pose3(
+            0.03,
+            0.02,
+            -0.03,
+            0.0,
+            0.0,
+            Math.sin(0.2),
+            Math.cos(0.2)
+          ),
+          1e-6,
+          1e-6
+        ),
+        OrientationPolicy.Free,
+        0.1,
+        0.1
+      )]
+    );
+    var freeCurve = planner.plan(
+      freePath,
+      new PathRequest(
+        [0.0, freePath.length()],
+        [
+          target,
+          freePath.poseAt(freePath.length())
+        ],
+        q,
+        new IkTolerance(),
+        [for (_ in 0...4) 0.1],
+        [for (_ in 0...4) 0.1],
+        32,
+        [
+          OrientationPolicy.Free,
+          OrientationPolicy.Free
+        ]
+      )
+    );
     near(freeCurve.q[1][0], 0.03, "axis free-orientation path ignores authored rotation");
-    var axisCompiler = new ProgramCompiler(solver, new ValidationLimits(4, Int64.ofInt(1), Int64.ofInt(0)), "work",
-      [for (_ in 0...4) 0.1], [for (_ in 0...4) 0.4], [for (_ in 0...4) 4.0],
-      StartTolerances.uniform(4, 0.001, 0.001, 0.001));
-    check(Std.isOfType(axisCompiler.jointPathPlanner, motionkit.robot.AxisJointPathPlanner),
-      "compiler defaults to the exact logical-axis planner");
-    check(axisCompiler.forWorker().jointPathPlanner != axisCompiler.jointPathPlanner,
-      "axis worker owns its path planner");
-    axisCompiler.pathEventSchedule=(op,offset,last,ds,ts,events)->events.concat([
-      new motionkit.event.PathEvent(ds[1],"timed-dose",motionkit.event.EventValue.Analog(ts[1]))]);
-    var scheduledProgram=new motionkit.program.MotionProgram([
-      motionkit.program.MotionOp.FollowPath(path,"work",0.1,[])]);
-    for(scheduledCompiler in [axisCompiler,axisCompiler.forWorker()]){
-      var compiled=scheduledCompiler.compile(scheduledProgram,q,Int64.ofInt(400));
+    var axisCompiler = new ProgramCompiler(
+      solver,
+      new ValidationLimits(4, Int64.ofInt(1), Int64.ofInt(0)),
+      "work",
+      [for (_ in 0...4) 0.1],
+      [for (_ in 0...4) 0.4],
+      [for (_ in 0...4) 4.0],
+      StartTolerances.uniform(
+        4,
+        0.001,
+        0.001,
+        0.001
+      )
+    );
+    check(
+      Std.isOfType(axisCompiler.jointPathPlanner, motionkit.robot.AxisJointPathPlanner),
+      "compiler defaults to the exact logical-axis planner"
+    );
+    check(
+      axisCompiler.forWorker().jointPathPlanner != axisCompiler.jointPathPlanner,
+      "axis worker owns its path planner"
+    );
+    axisCompiler.pathEventSchedule = (op, offset, last, ds, ts, events) -> events.concat([new motionkit.event.PathEvent(
+      ds[1],
+      "timed-dose",
+      motionkit.event.EventValue.Analog(ts[1])
+    )]);
+    var scheduledProgram = new motionkit.program.MotionProgram([motionkit.program.MotionOp.FollowPath(
+      path,
+      "work",
+      0.1,
+      []
+    )]);
+    for (scheduledCompiler in [axisCompiler, axisCompiler.forWorker()]) {
+      var compiled = scheduledCompiler.compile(scheduledProgram, q, Int64.ofInt(400));
       try {
-        var event=compiled.blocks[0].plans[0].events[0];
-        check(event.channel=="timed-dose","final timing callback reaches the native execution plan and its worker copy");
+        var event = compiled.blocks[0].plans[0].events[0];
+        check(
+          event.channel == "timed-dose",
+          "final timing callback reaches the native execution plan and its worker copy"
+        );
         switch event.value {
-          case Analog(seconds):near(Int64.toFloat(event.timeNs)*1e-9,seconds,
-            "scheduled output uses the actual section clock",1e-9);
-          case _:throw "Expected timed analog output";
+          case Analog(seconds):
+            near(Int64.toFloat(event.timeNs) * 1e-9, seconds, "scheduled output uses the actual section clock", 1e-9);
+          case _:
+            throw "Expected timed analog output";
         }
-      } catch(error:Dynamic){compiled.dispose();throw error;}
+      } catch (error:Dynamic) {
+        compiled.dispose();
+        throw error;
+      }
       compiled.dispose();
     }
-    axisCompiler.pathEventSchedule=null;
-    var measured = q.copy(); measured[0] += 0.00009; measured[1] -= 0.000135;
-    var measuredCurve = planner.plan(path, new PathRequest([0.0,path.length()],
-      [target,path.poseAt(path.length())],measured,new IkTolerance(0.0001,0.0001),
-      [for (_ in 0...4) 0.1],[for (_ in 0...4) 0.1],32,[OrientationPolicy.Fixed,OrientationPolicy.Fixed]));
-    near(measuredCurve.q[0][0],measured[0],"axis planner preserves an admissible measured leader start");
-    near(measuredCurve.q[0][1],measured[1],"axis planner preserves the measured follower in logical tolerance");
+    axisCompiler.pathEventSchedule = null;
+    var measured = q.copy();
+    measured[0] += 0.00009;
+    measured[1] -= 0.000135;
+    var measuredCurve = planner.plan(
+      path,
+      new PathRequest(
+        [0.0, path.length()],
+        [target, path.poseAt(path.length())],
+        measured,
+        new IkTolerance(
+          0.0001,
+          0.0001
+        ),
+        [for (_ in 0...4) 0.1],
+        [for (_ in 0...4) 0.1],
+        32,
+        [
+          OrientationPolicy.Fixed,
+          OrientationPolicy.Fixed
+        ]
+      )
+    );
+    near(measuredCurve.q[0][0], measured[0], "axis planner preserves an admissible measured leader start");
+    near(measuredCurve.q[0][1], measured[1], "axis planner preserves the measured follower in logical tolerance");
     var arcStart = new Pose3(0.02, 0.0, 0.0);
-    var joined = new PosePath("work", [
-      new PoseLine(new PoseWaypoint(new Pose3(0.02, -0.01, 0.0), 1e-6, 1e-6),
-        new PoseWaypoint(arcStart, 1e-6, 1e-6), OrientationPolicy.Fixed, 0.1, 0.1),
-      new motionkit.path.PoseArc(new PoseWaypoint(arcStart, 1e-6, 1e-6),
-        new PoseWaypoint(new Pose3(0.02 / Math.sqrt(2.0), 0.02 / Math.sqrt(2.0), 0.0), 1e-6, 1e-6),
-        new PoseWaypoint(new Pose3(0.0, 0.02, 0.0), 1e-6, 1e-6), OrientationPolicy.Fixed, 0.1)]);
+    var joined = new PosePath(
+      "work",
+      [
+        new PoseLine(
+          new PoseWaypoint(new Pose3(0.02, -0.01, 0.0), 1e-6, 1e-6),
+          new PoseWaypoint(
+            arcStart,
+            1e-6,
+            1e-6
+          ),
+          OrientationPolicy.Fixed,
+          0.1,
+          0.1
+        ),
+        new motionkit.path.PoseArc(
+          new PoseWaypoint(
+            arcStart,
+            1e-6,
+            1e-6
+          ),
+          new PoseWaypoint(
+            new Pose3(
+              0.02 / Math.sqrt(2.0),
+              0.02 / Math.sqrt(2.0),
+              0.0
+            ),
+            1e-6,
+            1e-6
+          ),
+          new PoseWaypoint(
+            new Pose3(
+              0.0,
+              0.02,
+              0.0
+            ),
+            1e-6,
+            1e-6
+          ),
+          OrientationPolicy.Fixed,
+          0.1
+        )
+      ]
+    );
     var distances = [0.0, joined.primitives[0].length(), joined.length()];
     var start = solver.solvePose(joined.poseAt(0.0), q, new IkTolerance(), OrientationPolicy.Fixed);
-    var joinedCurve = planner.plan(joined, new PathRequest(distances,
-      [for (s in distances) joined.poseAt(s)], start, new IkTolerance(),
-      [for (_ in 0...4) 0.1], [for (_ in 0...4) 0.1], 32,
-      [for (_ in distances) OrientationPolicy.Fixed]));
+    var joinedCurve = planner.plan(
+      joined,
+      new PathRequest(
+        distances,
+        [for (s in distances) joined.poseAt(s)],
+        start,
+        new IkTolerance(),
+        [for (_ in 0...4) 0.1],
+        [for (_ in 0...4) 0.1],
+        32,
+        [for (_ in distances) OrientationPolicy.Fixed]
+      )
+    );
     near(joinedCurve.qDoublePrime[1][0], -50.0, "axis arc preserves exact outgoing curvature", 1e-6);
     near(joinedCurve.qDoublePrime[1][1], 75.0, "axis arc scales follower curvature", 1e-6);
     near(joinedCurve.qDoublePrimeBefore[1][1], 0.0, "axis join retains incoming line curvature");
-    var invalidStart = q.copy(); invalidStart[1] += 0.001;
+    var invalidStart = q.copy();
+    invalidStart[1] += 0.001;
     var failure = "";
-    try planner.plan(path, new PathRequest([0.0, path.length()],
-      [target, path.poseAt(path.length())], invalidStart, new IkTolerance(),
-      [for (_ in 0...4) 0.1], [for (_ in 0...4) 0.1], 32,
-      [OrientationPolicy.Fixed, OrientationPolicy.Fixed]))
-    catch (error:Dynamic) failure = Std.string(error);
+    try planner.plan(
+      path,
+      new PathRequest(
+        [0.0, path.length()],
+        [target, path.poseAt(path.length())],
+        invalidStart,
+        new IkTolerance(),
+        [for (_ in 0...4) 0.1],
+        [for (_ in 0...4) 0.1],
+        32,
+        [
+          OrientationPolicy.Fixed,
+          OrientationPolicy.Fixed
+        ]
+      )
+    ) catch (error:Dynamic) failure = Std.string(error);
     check(failure.indexOf("joint mapping") >= 0, "axis planner rejects an inconsistent pinned follower");
-    check(solver.solvePose(new Pose3(0.06), q, new IkTolerance(), null) == null,
-      "axis IK rejects poses beyond logical limits");
+    check(
+      solver.solvePose(new Pose3(0.06), q, new IkTolerance(), null) == null,
+      "axis IK rejects poses beyond logical limits"
+    );
   }
 
   public function testDualMotorAxisRunsThroughSimulation():Void {
@@ -2865,19 +6364,33 @@ class KinematicsTests extends MotionKitTestSupport {
       joint.limits.upper = 0.08;
       joint.limits.velocity = 0.1;
     }
-    var blueprint = MotionSystemBlueprint.fromRobotModel(model, [
-      new MotionAxisBlueprint("x", ["x.left", "x.right"], 0.0, 0.08, 0.08, 0.4)
-    ]);
+    var blueprint = MotionSystemBlueprint.fromRobotModel(
+      model,
+      [new MotionAxisBlueprint(
+        "x",
+        ["x.left", "x.right"],
+        0.0,
+        0.08,
+        0.08,
+        0.4
+      )]
+    );
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
-    var robot = new SimulatedRobot("dual-motor-x", runtime, blueprint.model.name,
+    var robot = new SimulatedRobot(
+      "dual-motor-x",
+      runtime,
+      blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
-      [for (joint in blueprint.model.joints) joint.name]);
+      [for (joint in blueprint.model.joints) joint.name]
+    );
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
     var logicalAxis = machine.axis("x");
-    check(logicalAxis != null && logicalAxis.jointIndices.length == 2,
-      "one logical axis exposes both dual-motor joints");
+    check(
+      logicalAxis != null && logicalAxis.jointIndices.length == 2,
+      "one logical axis exposes both dual-motor joints"
+    );
 
     machine.home();
     runMotion(machine, simulationHarness);

@@ -3,18 +3,38 @@ package motionkit.path;
 /** Planar quintic Hermite blend, parameterized numerically by arc length. */
 class QuinticBlend implements PathPrimitive {
   /** The arc-length table is piecewise affine, so each table cell is an exact quintic in distance. */
-  public function positionErrorBound(actual:Array<Array<Float>>,from:Float,to:Float):Float {
-    var reference=[for(axis in 0...3)[for(point in controls)axis==0 ? point.x : axis==1 ? point.y : point.z]];
-    var bound=0.0;
-    for(cell in 0...SAMPLES){
-      var low=Math.max(from,distances[cell]),high=Math.min(to,distances[cell+1]);
-      if(high<=low)continue;
-      var width=distances[cell+1]-distances[cell];
-      var a=(cell+(low-distances[cell])/width)/SAMPLES,b=(cell+(high-distances[cell])/width)/SAMPLES;
-      var left=motionkit.math.QuinticPolynomial.slice(actual,
-        Math.max(0,Math.min(1,(low-from)/(to-from))),Math.max(0,Math.min(1,(high-from)/(to-from))));
-      var right=motionkit.math.QuinticPolynomial.slice(reference,Math.max(0,Math.min(1,a)),Math.max(0,Math.min(1,b)));
-      bound=Math.max(bound,motionkit.math.QuinticPolynomial.differenceBound(left,right));
+  public function positionErrorBound(actual:Array<Array<Float>>, from:Float, to:Float):Float {
+    var reference = [for (axis in 0...3)[for (point in controls) axis == 0 ? point.x : axis == 1 ? point.y : point.z]];
+    var bound = 0.0;
+    for (cell in 0...SAMPLES) {
+      var low = Math.max(from, distances[cell]), high = Math.min(to, distances[cell + 1]);
+      if (high <= low) continue;
+      var width = distances[cell + 1] - distances[cell];
+      var a = (cell + (low - distances[cell]) / width) / SAMPLES,
+        b = (cell + (high - distances[cell]) / width) / SAMPLES;
+      var left = motionkit.math.QuinticPolynomial.slice(
+        actual,
+        Math.max(0, Math.min(1, (low - from) / (to - from))),
+        Math.max(
+          0,
+          Math.min(
+            1,
+            (high - from) / (to - from)
+          )
+        )
+      );
+      var right = motionkit.math.QuinticPolynomial.slice(
+        reference,
+        Math.max(0, Math.min(1, a)),
+        Math.max(
+          0,
+          Math.min(
+            1,
+            b
+          )
+        )
+      );
+      bound = Math.max(bound, motionkit.math.QuinticPolynomial.differenceBound(left, right));
     }
     return bound;
   }
@@ -24,8 +44,8 @@ class QuinticBlend implements PathPrimitive {
   final blendLength:Float;
   static inline var SAMPLES = 128;
 
-  public function new(before:PathPrimitive, beforeDistance:Float,
-      after:PathPrimitive, afterDistance:Float, scale:Float) {
+  public function new(before:PathPrimitive,
+    beforeDistance:Float, after:PathPrimitive, afterDistance:Float, scale:Float) {
     var a = before.pointAt(beforeDistance);
     var b = after.pointAt(afterDistance);
     var ta = before.tangentAt(beforeDistance);
@@ -34,17 +54,28 @@ class QuinticBlend implements PathPrimitive {
     var kb = after.curvatureAt(afterDistance);
     var d0 = new PathPoint(ta[0] * scale, ta[1] * scale, 0.0);
     var d1 = new PathPoint(tb[0] * scale, tb[1] * scale, 0.0);
-    var dd0 = new PathPoint(-ta[1] * ka * scale * scale,
-      ta[0] * ka * scale * scale, 0.0);
-    var dd1 = new PathPoint(-tb[1] * kb * scale * scale,
-      tb[0] * kb * scale * scale, 0.0);
-    controls = [a,
+    var dd0 = new PathPoint(-ta[1] * ka * scale * scale, ta[0] * ka * scale * scale, 0.0);
+    var dd1 = new PathPoint(-tb[1] * kb * scale * scale, tb[0] * kb * scale * scale, 0.0);
+    controls = [
+      a,
       new PathPoint(a.x + d0.x / 5.0, a.y + d0.y / 5.0, a.z),
-      new PathPoint(a.x + 2.0 * d0.x / 5.0 + dd0.x / 20.0,
-        a.y + 2.0 * d0.y / 5.0 + dd0.y / 20.0, a.z),
-      new PathPoint(b.x - 2.0 * d1.x / 5.0 + dd1.x / 20.0,
-        b.y - 2.0 * d1.y / 5.0 + dd1.y / 20.0, b.z),
-      new PathPoint(b.x - d1.x / 5.0, b.y - d1.y / 5.0, b.z), b];
+      new PathPoint(
+        a.x + 2.0 * d0.x / 5.0 + dd0.x / 20.0,
+        a.y + 2.0 * d0.y / 5.0 + dd0.y / 20.0,
+        a.z
+      ),
+      new PathPoint(
+        b.x - 2.0 * d1.x / 5.0 + dd1.x / 20.0,
+        b.y - 2.0 * d1.y / 5.0 + dd1.y / 20.0,
+        b.z
+      ),
+      new PathPoint(
+        b.x - d1.x / 5.0,
+        b.y - d1.y / 5.0,
+        b.z
+      ),
+      b
+    ];
     distances = [0.0];
     var previous = a;
     var total = 0.0;
@@ -64,8 +95,7 @@ class QuinticBlend implements PathPrimitive {
   public function tangentAt(distance:Float):Array<Float> {
     var d = derivative(parameter(distance));
     var magnitude = Math.sqrt(d.x * d.x + d.y * d.y);
-    return magnitude <= 0.0 ? [0.0, 0.0, 0.0] :
-      [d.x / magnitude, d.y / magnitude, 0.0];
+    return magnitude <= 0.0 ? [0.0, 0.0, 0.0] : [d.x / magnitude, d.y / magnitude, 0.0];
   }
 
   public function curvatureAt(distance:Float):Float {
@@ -73,13 +103,13 @@ class QuinticBlend implements PathPrimitive {
     var d = derivative(t);
     var dd = secondDerivative(t);
     var magnitudeSquared = d.x * d.x + d.y * d.y;
-    return magnitudeSquared <= 1e-24 ? 0.0 :
-      (d.x * dd.y - d.y * dd.x) / (magnitudeSquared * Math.sqrt(magnitudeSquared));
+    return magnitudeSquared
+      <= 1e-24 ? 0.0 : (d.x * dd.y - d.y * dd.x) / (magnitudeSquared * Math.sqrt(magnitudeSquared));
   }
 
   function parameter(distance:Float):Float {
-    if (!Math.isFinite(distance) || distance < 0.0 || distance > blendLength)
-      throw "Quintic-blend distance is outside its length";
+    if (!Math.isFinite(distance)
+      || distance < 0.0 || distance > blendLength) throw "Quintic-blend distance is outside its length";
     var low = 0, high = SAMPLES;
     while (high - low > 1) {
       var middle = (low + high) >> 1;
@@ -91,24 +121,29 @@ class QuinticBlend implements PathPrimitive {
   }
 
   function derivative(t:Float):PathPoint {
-    var differences = [for (i in 0...5)
-      new PathPoint(5.0 * (controls[i + 1].x - controls[i].x),
-        5.0 * (controls[i + 1].y - controls[i].y), 0.0)];
+    var differences = [for (i in 0...5) new PathPoint(
+      5.0 * (controls[i + 1].x - controls[i].x),
+      5.0 * (controls[i + 1].y - controls[i].y),
+      0.0
+    )];
     return bezier(t, differences);
   }
 
   function secondDerivative(t:Float):PathPoint {
-    var differences = [for (i in 0...4)
-      new PathPoint(20.0 * (controls[i + 2].x - 2.0 * controls[i + 1].x + controls[i].x),
-        20.0 * (controls[i + 2].y - 2.0 * controls[i + 1].y + controls[i].y), 0.0)];
+    var differences = [for (i in 0...4) new PathPoint(
+      20.0 * (controls[i + 2].x - 2.0 * controls[i + 1].x + controls[i].x),
+      20.0 * (controls[i + 2].y - 2.0 * controls[i + 1].y + controls[i].y),
+      0.0
+    )];
     return bezier(t, differences);
   }
 
   static function bezier(t:Float, points:Array<PathPoint>):PathPoint {
     var work = points.copy();
-    for (remaining in 1...points.length)
-      for (i in 0...(points.length - remaining))
-        work[i] = work[i].lerp(work[i + 1], t);
+    for (remaining in 1...points.length) for (i in 0...(points.length - remaining)) work[i] = work[i].lerp(
+      work[i + 1],
+      t
+    );
     return work[0];
   }
 }

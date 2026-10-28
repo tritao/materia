@@ -12,8 +12,8 @@ class PoseDerivatives {
   public final linearSecond:Array<Float>;
   public final angularSecond:Array<Float>;
 
-  public function new(linear:Array<Float>, angular:Array<Float>,
-      linearSecond:Array<Float>, angularSecond:Array<Float>) {
+  public function new(linear:Array<Float>,
+    angular:Array<Float>, linearSecond:Array<Float>, angularSecond:Array<Float>) {
     for (vector in [linear, angular, linearSecond, angularSecond]) {
       if (vector == null || vector.length != 3) throw "Pose derivatives need three components each";
       for (value in vector) if (!Math.isFinite(value)) throw "Pose derivatives must be finite";
@@ -27,13 +27,13 @@ class PoseDerivatives {
   /** Derivatives of a translation along `geometry` with a fixed orientation. */
   public static function ofGeometry(geometry:PathPrimitive, distance:Float):PoseDerivatives {
     var tangent = geometry.tangentAt(distance);
-    var second = geometry.kind() == PathPrimitiveKind.Circular ?
-      (cast geometry:CircularSegment).secondDerivativeAt(distance) : {
-        // Planar primitives turn in their XY plane: the second derivative is
-        // the curvature along the tangent's left normal.
-        var curvature = geometry.curvatureAt(distance);
-        [-tangent[1] * curvature, tangent[0] * curvature, 0.0];
-      };
+    var second = geometry.kind()
+      == PathPrimitiveKind.Circular ? (cast geometry : CircularSegment).secondDerivativeAt(distance) : {
+    // Planar primitives turn in their XY plane: the second derivative is
+    // the curvature along the tangent's left normal.
+    var curvature = geometry.curvatureAt(distance);
+    [-tangent[1] * curvature, tangent[0] * curvature, 0.0];
+    };
     return new PoseDerivatives(tangent, [0.0, 0.0, 0.0], second, [0.0, 0.0, 0.0]);
   }
 
@@ -60,9 +60,8 @@ class PoseDerivatives {
       linearSecond.push(second);
     }
     var before = rotationRate(a, b, step), after = rotationRate(b, c, step);
-    var angularSecond = [for (axis in 0...3) (after[axis] - before[axis]) / step];
-    var angular = [for (axis in 0...3)
-      0.5 * (before[axis] + after[axis]) + angularSecond[axis] * offset];
+    var angularSecond = [for (axis in 0...3)(after[axis] - before[axis]) / step];
+    var angular = [for (axis in 0...3) 0.5 * (before[axis] + after[axis]) + angularSecond[axis] * offset];
     return new PoseDerivatives(linear, angular, linearSecond, angularSecond);
   }
 
@@ -73,7 +72,12 @@ class PoseDerivatives {
     var y = to.qw * -from.qy - to.qx * -from.qz + to.qy * from.qw + to.qz * -from.qx;
     var z = to.qw * -from.qz + to.qx * -from.qy - to.qy * -from.qx + to.qz * from.qw;
     var w = to.qw * from.qw - to.qx * -from.qx - to.qy * -from.qy - to.qz * -from.qz;
-    if (w < 0.0) { x = -x; y = -y; z = -z; w = -w; }
+    if (w < 0.0) {
+      x = -x;
+      y = -y;
+      z = -z;
+      w = -w;
+    }
     var sine = Math.sqrt(x * x + y * y + z * z);
     if (sine < 1e-15) return [0.0, 0.0, 0.0];
     var angle = 2.0 * Math.atan2(sine, w);

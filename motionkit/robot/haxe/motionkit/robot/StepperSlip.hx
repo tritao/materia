@@ -30,7 +30,11 @@ class StepperSlip {
    * `jointOfAxis` maps an axis id to its robot joint index; `couplings` are the robot's, to carry the
    * offset to coupled joints; `sink` sets one joint's offset in the simulation.
    */
-  public function new(couplings:Array<CoupledJoint>, jointOfAxis:Map<String, Int>, sink:(joint:Int, offset:Float) -> Void) {
+  public function new(
+    couplings:Array<CoupledJoint>,
+    jointOfAxis:Map<String, Int>,
+    sink:(joint:Int, offset:Float) -> Void
+  ) {
     this.couplings = couplings.copy();
     this.jointOfAxis = jointOfAxis;
     this.sink = sink;
@@ -84,7 +88,9 @@ class StepperSlip {
   /** Clear loss history after calibration without changing any physical endpoint offset. */
   public function rebaseAfterHoming():Void {
     running = [];
-    lostNow.clear(); lostBefore.clear(); stepsBefore.clear();
+    lostNow.clear();
+    lostBefore.clear();
+    stepsBefore.clear();
     referenceOffsets = new Map<Int, Float>();
     for (joint in touched.keys()) referenceOffsets.set(joint, touched.get(joint));
   }

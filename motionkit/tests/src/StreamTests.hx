@@ -114,39 +114,65 @@ import MotionKitTestSupport.LaggingRobot;
 import MotionKitTestSupport.TrialRig;
 
 class StreamTests extends MotionKitTestSupport {
-  public function new() { super(); }
+  public function new() {
+    super();
+  }
 
   public function testPlanCapableReplayRecordsMotionPlan():Void {
-    var blueprint = MachineKitRobotCompiler.compileLinearAxis(
-      new LinearAxis(23, 10, 80), "x", 0.1, 0.4);
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(new LinearAxis(23, 10, 80), "x", 0.1, 0.4);
     var source = new RobotRecording();
     var initial = [for (_ in blueprint.model.joints) 0.0];
-    var axisMapping = new MotionAxis(blueprint.axes[0],
-      [for (joint in blueprint.model.joints) joint.id]);
+    var axisMapping = new MotionAxis(blueprint.axes[0], [for (joint in blueprint.model.joints) joint.id]);
     axisMapping.writeLogicalPosition(initial, axisMapping.homePosition);
-    source.recordSnapshot(new RobotSnapshot("plan-replay", Int64.ofInt(0),
-      Int64.ofInt(0), initial, [for (_ in initial) 0.0], [for (_ in initial) 0.0], 0, 0));
-    var description = new RobotDescription("plan-replay", blueprint.model.name,
+    source.recordSnapshot(new RobotSnapshot(
+      "plan-replay",
+      Int64.ofInt(0),
+      Int64.ofInt(0),
+      initial,
+      [for (_ in initial) 0.0],
+      [for (_ in initial) 0.0],
+      0,
+      0
+    ));
+    var description = new RobotDescription(
+      "plan-replay",
+      blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
-      [for (joint in blueprint.model.joints) joint.name]);
-    var capabilities = new RobotCapabilities("plan-replay",
+      [for (joint in blueprint.model.joints) joint.name]
+    );
+    var capabilities = new RobotCapabilities(
+      "plan-replay",
       blueprint.model.joints.length,
       [robotkit.core.JointTargetMode.Position],
-      new robotkit.core.ExecutionCapabilities(true, 5, 64, 4096, true, true, true, trajectorykit.validation.ValidationGuarantee.Unchecked),
-      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
+      new robotkit.core.ExecutionCapabilities(
+        true,
+        5,
+        64,
+        4096,
+        true,
+        true,
+        true,
+        trajectorykit.validation.ValidationGuarantee.Unchecked
+      ),
+      new robotkit.core.TimingCapabilities(
+        false,
+        false,
+        trajectorykit.validation.ValidationGuarantee.Unchecked
+      )
+    );
     var unsupported = new ReplayRobot("plan-replay", source, description);
-    throws(function() MotionSystem.fromBlueprint(unsupported, blueprint),
-      "MotionSystem rejects a robot without queue and plan capabilities");
+    throws(
+      function() MotionSystem.fromBlueprint(unsupported, blueprint),
+      "MotionSystem rejects a robot without queue and plan capabilities"
+    );
     unsupported.close();
     var replay = new ReplayRobot("plan-replay", source, description, capabilities);
     var machine = MotionSystem.fromBlueprint(replay, blueprint);
     machine.moveAxes([new AxisTarget("x", 0.02)]);
-    check(replay.generatedCommands.commands.length == 1,
-      "plan-capable replay records one generated command");
+    check(replay.generatedCommands.commands.length == 1, "plan-capable replay records one generated command");
     switch replay.generatedCommands.commands[0] {
       case ExecutionPlan(plan):
-        check(plan.segments.length > 0,
-          "plan-capable replay records generated polynomial segments");
+        check(plan.segments.length > 0, "plan-capable replay records generated polynomial segments");
       case _:
         throw "plan-capable replay did not record an execution plan";
     }
@@ -155,14 +181,24 @@ class StreamTests extends MotionKitTestSupport {
 
   public function testBufferedExecution():Void {
     var blueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(80, 60, 40)),
-      0.1, 0.4);
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
+        80,
+        60,
+        40
+      )),
+      0.1,
+      0.4
+    );
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
-    var robot = new SimulatedRobot("buffered-gantry", runtime, blueprint.model.name,
+    var robot = new SimulatedRobot(
+      "buffered-gantry",
+      runtime,
+      blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
-      [for (joint in blueprint.model.joints) joint.name]);
+      [for (joint in blueprint.model.joints) joint.name]
+    );
     var recording = new RobotRecording();
     var instrumented = new RecordingRobot(robot, recording);
     var machine = MotionSystem.fromBlueprint(instrumented, blueprint);
@@ -171,16 +207,13 @@ class StreamTests extends MotionKitTestSupport {
     // The assertions below count buffered job submissions after setup homing.
     recording.commands.resize(0);
     var options = new MotionOptions(0.05, 0.2);
-    check(machine.robot.capabilities().execution.plans,
-      "simulation runtime advertises trajectory queue support");
+    check(machine.robot.capabilities().execution.plans, "simulation runtime advertises trajectory queue support");
 
     var first = planned(machine.queueAxes([new AxisTarget("x", 0.02)], options));
     var second = planned(machine.queueAxes([new AxisTarget("x", 0.04)], options));
     check(machine.queueDepth() == 2, "buffer reports active and waiting trajectories");
-    check(machine.queuedDurationSeconds() > first.durationSeconds(),
-      "buffer reports the duration of waiting motion");
-    near(second.evaluate(0.0).positions[0], 0.02,
-      "queued axis motion starts at the previous trajectory endpoint");
+    check(machine.queuedDurationSeconds() > first.durationSeconds(), "buffer reports the duration of waiting motion");
+    near(second.evaluate(0.0).positions[0], 0.02, "queued axis motion starts at the previous trajectory endpoint");
     near(machine.progress(), 0.0, "buffer starts with zero progress");
     check(recording.commands.length == 1, "buffer submits the first move as one plan");
     switch recording.commands[0] {
@@ -197,10 +230,14 @@ class StreamTests extends MotionKitTestSupport {
       simulationHarness.step(Int64.ofInt(tick++));
       if (iteration == 0) {
         var nativeProgress = runtime.snapshot();
-        check(nativeProgress.trajectoryActive && nativeProgress.trajectoryQueueDepth > 0,
-          "native runtime reports active trajectory queue progress");
-        check(nativeProgress.trajectoryDurationNs > nativeProgress.trajectoryTimeNs,
-          "native runtime reports trajectory duration beyond current time");
+        check(
+          nativeProgress.trajectoryActive && nativeProgress.trajectoryQueueDepth > 0,
+          "native runtime reports active trajectory queue progress"
+        );
+        check(
+          nativeProgress.trajectoryDurationNs > nativeProgress.trajectoryTimeNs,
+          "native runtime reports trajectory duration beyond current time"
+        );
       }
     }
     // Let the runtime advance while the host-side clock is stalled. Hold must
@@ -216,8 +253,7 @@ class StreamTests extends MotionKitTestSupport {
       simulationHarness.step(Int64.ofInt(tick++));
     }
     var heldPosition = robot.snapshot().positions.get(0);
-    check(heldPosition > beforeHold && heldPosition < 0.02,
-      "controlled hold decelerates before coming to rest");
+    check(heldPosition > beforeHold && heldPosition < 0.02, "controlled hold decelerates before coming to rest");
     var holdTicks = 0;
     while (runtime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
       check(!machine.update(), "held buffer remains paused after deceleration");
@@ -226,13 +262,12 @@ class StreamTests extends MotionKitTestSupport {
       if (holdTicks > 200) throw "controlled hold did not settle";
     }
     var stoppedPosition = robot.snapshot().positions.get(0);
-    check(stoppedPosition >= heldPosition,
-      "controlled hold follows the path while slowing down");
+    check(stoppedPosition >= heldPosition, "controlled hold follows the path while slowing down");
     for (_ in 0...2) {
       simulationHarness.step(Int64.ofInt(tick++));
     }
-    near(robot.snapshot().positions.get(0), stoppedPosition,
-      "controlled hold remains stopped after deceleration", 1e-5);
+    near(robot.snapshot().positions.get(0),
+      stoppedPosition, "controlled hold remains stopped after deceleration", 1e-5);
 
     machine.update();
     machine.resume();
@@ -242,23 +277,20 @@ class StreamTests extends MotionKitTestSupport {
       simulationHarness.step(Int64.ofInt(tick++));
     }
     var resumedPosition = robot.snapshot().positions.get(0);
-    check(resumedPosition >= heldPosition - 1e-6,
-      "resume does not replay a stale trajectory sample backwards");
+    check(resumedPosition >= heldPosition - 1e-6, "resume does not replay a stale trajectory sample backwards");
     while (machine.isMoving()) {
       machine.update();
       simulationHarness.step(Int64.ofInt(tick++));
       if (tick - jobStartTick > 2000) throw "buffered MotionKit trajectory did not complete";
     }
-    near(robot.snapshot().positions.get(0), 0.04,
-      "buffered trajectories execute in order", 1e-5);
+    near(robot.snapshot().positions.get(0), 0.04, "buffered trajectories execute in order", 1e-5);
     check(machine.queueDepth() == 0, "buffer empties after the final trajectory");
     near(machine.progress(), 1.0, "buffer reports completed progress");
 
     machine.queueAxes([new AxisTarget("x", 0.01)], options);
     check(machine.queueDepth() == 1, "buffer accepts a new trajectory after completion");
     machine.abort();
-    check(machine.queueDepth() == 0 && !machine.isMoving(),
-      "abort clears active and waiting trajectories");
+    check(machine.queueDepth() == 0 && !machine.isMoving(), "abort clears active and waiting trajectories");
     check(!machine.isHolding(), "abort clears controlled hold state");
     simulationHarness.dispose();
   }
@@ -269,9 +301,13 @@ class StreamTests extends MotionKitTestSupport {
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
-    var robot = new SimulatedRobot("long-buffer", runtime, blueprint.model.name,
+    var robot = new SimulatedRobot(
+      "long-buffer",
+      runtime,
+      blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
-      [for (joint in blueprint.model.joints) joint.name]);
+      [for (joint in blueprint.model.joints) joint.name]
+    );
     var recording = new RobotRecording();
     var instrumented = new RecordingRobot(robot, recording);
     var machine = MotionSystem.fromBlueprint(instrumented, blueprint);
@@ -283,27 +319,30 @@ class StreamTests extends MotionKitTestSupport {
       axisMapping.writeLogicalPosition(sample, 0.05 * index / 600.0);
       samples.push(sample);
     }
-    var trajectory = Trajectory.fromPositionSamples(
-      [for (index in 0...601) index * 0.01],
-      samples);
+    var trajectory = Trajectory.fromPositionSamples([for (index in 0...601) index * 0.01], samples);
     machine.queueTrajectory(trajectory);
     function submittedSegments():Int {
       var total = 0;
       for (command in recording.commands) switch command {
-        case RobotCommand.ExecutionPlan(plan): total += plan.segments.length;
+        case RobotCommand.ExecutionPlan(plan):
+          total += plan.segments.length;
         case _:
       }
       return total;
     }
     // A quarter second of the six-second, 600-segment trajectory to start with.
     var initialSegments = submittedSegments();
-    check(initialSegments >= 25 && initialSegments <= 40,
-      'long trajectory starts with a short native plan window, got $initialSegments segments');
+    check(
+      initialSegments >= 25 && initialSegments <= 40,
+      'long trajectory starts with a short native plan window, got $initialSegments segments'
+    );
     // Updates top the window up a tenth of a second at a time, to two seconds and no further.
     for (_ in 0...30) machine.update();
     var windowSegments = submittedSegments();
-    check(windowSegments >= 200 && windowSegments <= 212,
-      'the streamer fills a two-second window before the owner advances, got $windowSegments segments');
+    check(
+      windowSegments >= 200 && windowSegments <= 212,
+      'the streamer fills a two-second window before the owner advances, got $windowSegments segments'
+    );
     var windowPlans = recording.commands.length;
     machine.update();
     check(recording.commands.length == windowPlans, "the streamer stops at a full window");
@@ -316,19 +355,16 @@ class StreamTests extends MotionKitTestSupport {
       if (tick > 1200) throw "long buffered trajectory did not complete";
     }
     for (_ in 0...4) simulationHarness.step(Int64.ofInt(tick++));
-    check(recording.commands.length >= 3,
-      "long trajectory refills native chunks before the queue drains");
+    check(recording.commands.length >= 3, "long trajectory refills native chunks before the queue drains");
     for (command in recording.commands) switch command {
       case RobotCommand.JointTargets(_, _):
         throw "long trajectory unexpectedly fell back to sample-by-sample targets";
       case RobotCommand.ExecutionPlan(plan):
-        check(plan.segments.length <= 27,
-          "streamed trajectory plans hold at most a quarter second of motion each");
+        check(plan.segments.length <= 27, "streamed trajectory plans hold at most a quarter second of motion each");
       case Hold | Resume | Abort:
         throw "long trajectory unexpectedly submitted a lifecycle command";
     }
-    near(instrumented.snapshot().positions.get(0), 0.05,
-      "streamed trajectory reaches its final position", 1e-5);
+    near(instrumented.snapshot().positions.get(0), 0.05, "streamed trajectory reaches its final position", 1e-5);
     near(machine.progress(), 1.0, "streamed trajectory reports completed progress");
     simulationHarness.dispose();
   }
@@ -339,9 +375,13 @@ class StreamTests extends MotionKitTestSupport {
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
-    var robot = new SimulatedRobot("hold-refill-boundary", runtime,
-      blueprint.model.name, [for (link in blueprint.model.links) link.name],
-      [for (joint in blueprint.model.joints) joint.name]);
+    var robot = new SimulatedRobot(
+      "hold-refill-boundary",
+      runtime,
+      blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]
+    );
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
     var axisMapping = machine.axis("x");
     if (axisMapping == null) throw "Hold refill axis is missing";
@@ -351,9 +391,7 @@ class StreamTests extends MotionKitTestSupport {
       axisMapping.writeLogicalPosition(sample, 0.06 * index / 2000.0);
       samples.push(sample);
     }
-    machine.queueTrajectory(Trajectory.fromPositionSamples(
-      [for (index in 0...2001) index * 0.005],
-      samples));
+    machine.queueTrajectory(Trajectory.fromPositionSamples([for (index in 0...2001) index * 0.005], samples));
 
     var tick = 0;
     var previousPreHoldPosition = 0.0;
@@ -376,17 +414,17 @@ class StreamTests extends MotionKitTestSupport {
       simulationHarness.step(Int64.ofInt(tick++));
       var position = robot.snapshot().positions.get(0);
       var velocity = (position - previousPosition) / 0.01;
-      peakAcceleration = Math.max(peakAcceleration,
-        Math.abs(velocity - previousVelocity) / 0.01);
+      peakAcceleration = Math.max(peakAcceleration, Math.abs(velocity - previousVelocity) / 0.01);
       previousPosition = position;
       previousVelocity = velocity;
       stopTicks += 1;
       if (stopTicks > 200) throw "near-boundary controlled hold did not settle";
     }
-    check(peakAcceleration <= 0.4 * 1.05,
-      'hold near a streamed refill boundary exceeds requested 0.4 m/s²: $peakAcceleration');
-    check(previousPosition > beforeHold,
-      "hold near a streamed refill boundary continues along the path to rest");
+    check(
+      peakAcceleration <= 0.4 * 1.05,
+      'hold near a streamed refill boundary exceeds requested 0.4 m/s²: $peakAcceleration'
+    );
+    check(previousPosition > beforeHold, "hold near a streamed refill boundary continues along the path to rest");
     simulationHarness.dispose();
   }
 

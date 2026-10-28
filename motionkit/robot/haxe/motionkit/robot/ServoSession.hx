@@ -87,8 +87,14 @@ class ServoSession {
    * `restVelocity`: below this joint speed (rad/s or m/s) a braking arm counts
    * as at rest.
    */
-  public function new(robot:Robot, manipulator:Manipulator, ?controlPeriod:Float = 0.01, ?damping:Float = 1e-3,
-      ?restVelocity:Float = 1e-4, ?plans:ServoPlanOptions) {
+  public function new(
+    robot:Robot,
+    manipulator:Manipulator,
+    ?controlPeriod:Float = 0.01,
+    ?damping:Float = 1e-3,
+    ?restVelocity:Float = 1e-4,
+    ?plans:ServoPlanOptions
+  ) {
     if (robot == null || manipulator == null) throw "Servo session requires a robot and a manipulator";
     if (!(controlPeriod > 0.0) || !Math.isFinite(controlPeriod)) throw "Servo control period must be positive";
     this.controlPeriod = controlPeriod;
@@ -99,8 +105,7 @@ class ServoSession {
     servo = new ManipulatorServo(manipulator, damping);
     indices = manipulator.jointIndices();
     commanded = [for (_ in indices) 0.0];
-    if (plans != null && !robot.capabilities().execution.plans)
-      throw "Servo plans need a robot that executes plans";
+    if (plans != null && !robot.capabilities().execution.plans) throw "Servo plans need a robot that executes plans";
     plan = plans == null ? null : new ServoPlan(plans, manipulator, robot.snapshot().positions.length);
   }
 
@@ -167,16 +172,17 @@ class ServoSession {
         return new ServoTick(commanded.copy(), true, false, step);
       }
       if (!measuredAtRest(snapshot)) {
-        if (hasSubmittedTarget && lastSubmittedAtRest)
-          return new ServoTick(commanded.copy(), true, false, step);
+        if (hasSubmittedTarget && lastSubmittedAtRest) return new ServoTick(commanded.copy(), true, false, step);
         var zeroTargets = [for (index in 0...indices.length) JointTarget.velocity(indices[index], 0.0)];
         robot.submit(RobotCommand.JointTargets(zeroTargets, null));
         hasSubmittedTarget = true;
         lastSubmittedAtRest = true;
         return new ServoTick(commanded.copy(), true, false, step);
       }
-      var positionTargets = [for (index in 0...indices.length)
-        JointTarget.position(indices[index], snapshot.positions.get(indices[index]))];
+      var positionTargets = [for (index in 0...indices.length) JointTarget.position(
+        indices[index],
+        snapshot.positions.get(indices[index])
+      )];
       robot.submit(RobotCommand.JointTargets(positionTargets, null));
       positionHoldSubmittedAt = now;
       return new ServoTick(commanded.copy(), true, false, step);
@@ -184,8 +190,8 @@ class ServoSession {
     if (atRest) return new ServoTick(commanded.copy(), true, true, step);
     var targets = [for (i in 0...indices.length) JointTarget.velocity(indices[i], commanded[i])];
     // The runtime enforces the deadline if this host stalls; a brake in progress gets a short keepalive.
-    var expiry:Null<Int64> = live ? deadlineNs
-      : isAtRest(commanded) ? null : now + Int64.fromFloat(2.0 * controlPeriod * 1e9);
+    var expiry:Null<Int64
+      > = live ? deadlineNs : isAtRest(commanded) ? null : now + Int64.fromFloat(2.0 * controlPeriod * 1e9);
     robot.submit(RobotCommand.JointTargets(targets, expiry));
     hasSubmittedTarget = true;
     lastSubmittedAtRest = isAtRest(commanded);
@@ -216,19 +222,30 @@ class ServoSession {
     while (chunks < 4 && !plan.endedAtRest && (!plan.streaming || plan.endNs - executed < leadNs)) {
       var requested = new Twist6(twist[0], twist[1], twist[2], twist[3], twist[4], twist[5]);
       var armV = plan.armVelocity();
-      step = servo.step(plan.armPosition(), requested, controlPeriod, null, 1000, 1.0, armV,
-        plan.accelerationLimits, true);
+      step = servo.step(
+        plan.armPosition(),
+        requested,
+        controlPeriod,
+        null,
+        1000,
+        1.0,
+        armV,
+        plan.accelerationLimits,
+        true
+      );
       var velocity = step.velocity.copy();
       if (!live) for (i in 0...velocity.length) if (Math.abs(velocity[i]) <= restVelocity) velocity[i] = 0.0;
       var submission = plan.chunk(velocity, periodNs, !live && isAtRest(velocity));
       var check = planCheck;
       if (check != null && check.checks()) {
-        var result = check.checkSegments(new motionkit.robot.TrajectoryStream.ArrayStreamSegments(
-          [for (segment in submission.segments) {timeFromStartNs: segment.timeFromStartNs,
-            durationNs: segment.durationNs, coefficients: segment.coefficients}]));
+        var result = check.checkSegments(new motionkit
+          .robot.TrajectoryStream.ArrayStreamSegments([for (segment in submission.segments) {
+          timeFromStartNs:segment.timeFromStartNs, durationNs:segment.durationNs, coefficients:segment.coefficients
+        }
+        ]));
         planChecks.add(result);
-        if (check.options.rejects && result.diagnostics.length > 0)
-          throw 'plan check: ${[for (diagnostic in result.diagnostics) diagnostic.describe()].join("; ")}';
+        if (check.options.rejects && result.diagnostics.length
+          > 0) throw 'plan check: ${[for (diagnostic in result.diagnostics) diagnostic.describe()].join("; ")}';
       }
       try robot.submit(RobotCommand.ExecutionPlan(submission)) catch (error:RobotRuntimeError) {
         // The queue moved on underneath (it ran dry): start a new stream next update.

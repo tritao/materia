@@ -9,10 +9,9 @@ class Twist6 {
   public final angularY:Float;
   public final angularZ:Float;
 
-  public function new(linearX:Float, linearY:Float, linearZ:Float,
-      angularX:Float, angularY:Float, angularZ:Float) {
-    for (value in [linearX, linearY, linearZ, angularX, angularY, angularZ])
-      if (!Math.isFinite(value)) throw "Twist6 components must be finite";
+  public function new(linearX:Float, linearY:Float, linearZ:Float, angularX:Float, angularY:Float, angularZ:Float) {
+    for (value in [linearX, linearY,
+      linearZ, angularX, angularY, angularZ]) if (!Math.isFinite(value)) throw "Twist6 components must be finite";
     this.linearX = linearX;
     this.linearY = linearY;
     this.linearZ = linearZ;
@@ -21,6 +20,5 @@ class Twist6 {
     this.angularZ = angularZ;
   }
 
-  public function toArray():Array<Float>
-    return [linearX, linearY, linearZ, angularX, angularY, angularZ];
+  public function toArray():Array<Float> return [linearX, linearY, linearZ, angularX, angularY, angularZ];
 }

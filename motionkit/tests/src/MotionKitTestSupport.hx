@@ -111,20 +111,32 @@ import robotkit.execution.TrajectorySegment;
 
 class MotionKitTestSupport {
   public static var assertions:Int = 0;
-  public function new() {}
+  public function new() {
+  }
 
-  public function buildContractArmFixture():{model:RobotModel, arm:Manipulator} {
+  public function buildContractArmFixture(): {model: RobotModel, arm: Manipulator} {
     var model = new RobotModel("motionkit-contract-arm");
-    var links = [for (name in ["base", "shoulder", "upper-arm", "forearm",
-      "wrist-1", "wrist-2", "wrist-3"]) model.addLink(new Link(name))];
-    var offsets = [[0.0, 0.0, 0.089159], [0.0, 0.13585, 0.0],
-      [0.0, -0.1197, 0.425], [0.0, 0.0, 0.39225],
-      [0.0, 0.10915, 0.0], [0.0, 0.0, 0.09465]];
-    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0],
-      [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
+    var links = [for (name in ["base",
+      "shoulder", "upper-arm", "forearm", "wrist-1", "wrist-2", "wrist-3"]) model.addLink(new Link(name))];
+    var offsets = [
+      [0.0, 0.0, 0.089159],
+      [0.0, 0.13585, 0.0],
+      [0.0, -0.1197, 0.425],
+      [0.0, 0.0, 0.39225],
+      [
+        0.0,
+        0.10915,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.09465
+      ]
+    ];
+    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     for (joint in 0...6) {
-      var value = model.addJoint(new Joint('joint-$joint', JointType.Revolute,
-        links[joint], links[joint + 1]));
+      var value = model.addJoint(new Joint('joint-$joint', JointType.Revolute, links[joint], links[joint + 1]));
       value.parentFramePosition = offsets[joint];
       value.axis = axes[joint];
       value.limits.lower = -2.0 * Math.PI;
@@ -132,12 +144,11 @@ class MotionKitTestSupport {
     }
     var flange = model.addFrame(new Frame("flange", links[6]));
     flange.position = [0.0, 0.0823, 0.0];
-    return {model: model,
-      arm: new Manipulator(model, links[0].id, flange.id)};
+    return {model: model, arm: new Manipulator(model, links[0].id, flange.id)};
   }
 
   /** A 7-axis arm with alternating Z/Y axes (the layout of common collaborative arms), limits ±2.9 rad. */
-  public function buildSevenAxisArmFixture():{model:RobotModel, arm:Manipulator} {
+  public function buildSevenAxisArmFixture(): {model: RobotModel, arm: Manipulator} {
     var model = new RobotModel("motionkit-seven-axis-arm");
     var links = [for (i in 0...8) model.addLink(new Link(i == 0 ? "base" : 'link-$i'))];
     var offsets = [0.0, 0.34, 0.0, 0.4, 0.0, 0.4, 0.0];
@@ -161,7 +172,7 @@ class MotionKitTestSupport {
    * frame), placed so the arm cannot reach round its far side.
    * Joints in model order: rail, the arm's six, the turntable.
    */
-  public function buildWorkcellFixture():{model:RobotModel, group:robotkit.manipulation.KinematicGroup} {
+  public function buildWorkcellFixture(): {model: RobotModel, group: robotkit.manipulation.KinematicGroup} {
     var model = new RobotModel("motionkit-workcell");
     var floor = model.addLink(new Link("floor"));
     var carriage = model.addLink(new Link("carriage"));
@@ -170,10 +181,24 @@ class MotionKitTestSupport {
     rail.includePath = "";
     rail.limits.lower = 0.0;
     rail.limits.upper = 2.0;
-    var links = [carriage].concat([for (name in ["shoulder", "upper-arm", "forearm", "wrist-1", "wrist-2", "wrist-3"])
-      model.addLink(new Link(name))]);
-    var offsets = [[0.0, 0.0, 0.089159], [0.0, 0.13585, 0.0], [0.0, -0.1197, 0.425], [0.0, 0.0, 0.39225],
-      [0.0, 0.10915, 0.0], [0.0, 0.0, 0.09465]];
+    var links = [carriage].concat([for (name in ["shoulder",
+      "upper-arm", "forearm", "wrist-1", "wrist-2", "wrist-3"]) model.addLink(new Link(name))]);
+    var offsets = [
+      [0.0, 0.0, 0.089159],
+      [0.0, 0.13585, 0.0],
+      [0.0, -0.1197, 0.425],
+      [0.0, 0.0, 0.39225],
+      [
+        0.0,
+        0.10915,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.09465
+      ]
+    ];
     var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     for (joint in 0...6) {
       var value = model.addJoint(new Joint('joint-$joint', JointType.Revolute, links[joint], links[joint + 1]));
@@ -199,8 +224,18 @@ class MotionKitTestSupport {
       joint.limits.velocity = 1.0;
       joint.limits.maxAcceleration = 2.0;
     }
-    return {model: model, group: new robotkit.manipulation.KinematicGroup(model, floor.id, flange.id, work.id,
-      null, null, null)};
+    return {
+      model: model,
+      group: new robotkit.manipulation.KinematicGroup(
+        model,
+        floor.id,
+        flange.id,
+        work.id,
+        null,
+        null,
+        null
+      )
+    };
   }
 
   public function poseRotationDelta(from:Pose3, to:Pose3, scale:Float):Array<Float> {
@@ -208,7 +243,12 @@ class MotionKitTestSupport {
     var y = to.qw * -from.qy - to.qx * -from.qz + to.qy * from.qw + to.qz * -from.qx;
     var z = to.qw * -from.qz + to.qx * -from.qy - to.qy * -from.qx + to.qz * from.qw;
     var w = to.qw * from.qw - to.qx * -from.qx - to.qy * -from.qy - to.qz * -from.qz;
-    if (w < 0.0) { x = -x; y = -y; z = -z; w = -w; }
+    if (w < 0.0) {
+      x = -x;
+      y = -y;
+      z = -z;
+      w = -w;
+    }
     var sinHalf = Math.sqrt(x * x + y * y + z * z);
     if (sinHalf < 1e-12) return [0.0, 0.0, 0.0];
     var angleScale = 2.0 * Math.atan2(sinHalf, w) * scale / sinHalf;
@@ -218,8 +258,7 @@ class MotionKitTestSupport {
   public function runMotion(machine:MotionSystem, harness:SimulationHarness):Void {
     var tick = 0;
     var homeStatus = machine.homingStatus();
-    var maximumTicks = homeStatus != "Idle" && homeStatus != "Complete" && homeStatus != "Fault"
-      ? 60000 : 2000;
+    var maximumTicks = homeStatus != "Idle" && homeStatus != "Complete" && homeStatus != "Fault" ? 60000 : 2000;
     while (machine.isMoving()) {
       harness.step();
       machine.update();
@@ -239,27 +278,42 @@ class MotionKitTestSupport {
     var compiled = gantryBlueprint_;
     if (compiled == null) {
       compiled = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 60, 40)),
-      0.1, 0.4);
+        new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
+          200,
+          60,
+          40
+        )),
+        0.1,
+        0.4
+      );
       gantryBlueprint_ = compiled;
     }
     return compiled;
   }
 
   /** Establish actual switch references before fixtures submit ordinary gantry plans. */
-  public function homeGantryFixture(blueprint:MotionSystemBlueprint,
-      runtime:robotkit.runtime.RobotRuntime, harness:SimulationHarness, ?fixtureRobot:Robot,
-      ?fixtureMotion:MotionSystem):Int {
+  public function homeGantryFixture(
+    blueprint:MotionSystemBlueprint,
+    runtime:robotkit.runtime.RobotRuntime,
+    harness:SimulationHarness,
+    ?fixtureRobot:Robot,
+    ?fixtureMotion:MotionSystem
+  ):Int {
     var model = blueprint.model;
-    var robot:Robot = fixtureRobot == null ? new SimulatedRobot("homing-fixture", runtime, model.name,
-      [for (link in model.links) link.name], [for (joint in model.joints) joint.name]) : fixtureRobot;
+    var robot:Robot = fixtureRobot == null ? new SimulatedRobot(
+      "homing-fixture",
+      runtime,
+      model.name,
+      [for (link in model.links) link.name],
+      [for (joint in model.joints) joint.name]
+    ) : fixtureRobot;
     var homing = fixtureMotion == null ? new MotionSystem(robot, blueprint) : fixtureMotion;
     homing.configureRuntimeHoming(runtime, () -> {}, harness.simulation.homingSides(0));
     var tick = 1;
     harness.step(Int64.ofInt(tick));
     homing.home();
     while (homing.homingStatus() != "Complete" && tick < 60000) {
-      harness.step(Int64.ofInt(++tick));
+      harness.step(Int64.ofInt(++ tick));
       homing.update(0.01);
     }
     check(homing.homingStatus() == "Complete", "Gantry fixture establishes physical switch references");
@@ -271,16 +325,28 @@ class MotionKitTestSupport {
    * resumes once the machine has come to rest, and runs until everything has
    * settled. Returns the observed x position after every tick.
    */
-  public function gantryTrial(queueSupport:Bool, eventTick:Int, event:MotionSystem -> Void,
-      resumeAfterStop:Bool, ?begin:MotionSystem -> Void):Array<Float> {
+  public function gantryTrial(
+    queueSupport:Bool,
+    eventTick:Int,
+    event:MotionSystem -> Void,
+    resumeAfterStop:Bool,
+    ?begin:MotionSystem -> Void
+  ):Array<Float> {
     var blueprint = gantryBlueprint();
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
-    var robot = new RuntimeRobotAdapter("limits", runtime, blueprint.model.name,
+    var robot = new RuntimeRobotAdapter(
+      "limits",
+      runtime,
+      blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
-      [for (joint in blueprint.model.joints) joint.name], false, false,
-      "simulated runtime fault", queueSupport ? null : robotkit.core.ExecutionCapabilities.unavailable());
+      [for (joint in blueprint.model.joints) joint.name],
+      false,
+      false,
+      "simulated runtime fault",
+      queueSupport ? null : robotkit.core.ExecutionCapabilities.unavailable()
+    );
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
     if (queueSupport) homeGantryFixture(blueprint, runtime, simulationHarness, robot, machine);
     if (begin == null) machine.moveAxes([new AxisTarget("x", 0.15)], new MotionOptions(0.05, 0.4));
@@ -291,11 +357,11 @@ class MotionKitTestSupport {
     function step():Void {
       machine.update();
       tick++;
-      try simulationHarness.step() catch (error:Dynamic)
-        throw 'gantry trial (queue $queueSupport, event at $eventTick) failed at tick $tick: $error';
+      try simulationHarness
+        .step() catch (error:Dynamic) throw 'gantry trial (queue $queueSupport, event at $eventTick) failed at tick $tick: $error';
       var position = robot.snapshot().positions.get(0);
-      stillTicks = positions.length > 0 &&
-        Math.abs(position - positions[positions.length - 1]) < 1e-12 ? stillTicks + 1 : 0;
+      stillTicks = positions.length > 0
+        && Math.abs(position - positions[positions.length - 1]) < 1e-12 ? stillTicks + 1 : 0;
       positions.push(position);
       if (tick > 3000) throw 'gantry trial at tick $eventTick did not settle';
     }
@@ -314,9 +380,10 @@ class MotionKitTestSupport {
 
   public function peakSecondDifference(positions:Array<Float>):Float {
     var peak = 0.0;
-    for (index in 2...positions.length)
-      peak = Math.max(peak, Math.abs(positions[index] - 2.0 * positions[index - 1] +
-        positions[index - 2]) / (0.01 * 0.01));
+    for (index in 2...positions.length) peak = Math.max(
+      peak,
+      Math.abs(positions[index] - 2.0 * positions[index - 1] + positions[index - 2]) / (0.01 * 0.01)
+    );
     return peak;
   }
 
@@ -325,8 +392,13 @@ class MotionKitTestSupport {
    * motion, inject an event at eventTick, optionally resume once at rest, and
    * run until settled.
    */
-  public function rigTrial(rig:TrialRig, eventTick:Int, event:MotionSystem -> Void,
-      resumeAfterStop:Bool, begin:MotionSystem -> Void):Array<Array<Float>> {
+  public function rigTrial(
+    rig:TrialRig,
+    eventTick:Int,
+    event:MotionSystem -> Void,
+    resumeAfterStop:Bool,
+    begin:MotionSystem -> Void
+  ):Array<Array<Float>> {
     var machine = rig.machine;
     begin(machine);
     var positions:Array<Array<Float>> = [];
@@ -338,9 +410,8 @@ class MotionKitTestSupport {
       tick++;
       var current = rig.robot.snapshot().positions.toArray();
       var still = positions.length > 0;
-      if (still)
-        for (joint in 0...current.length)
-          if (Math.abs(current[joint] - positions[positions.length - 1][joint]) >= 1e-12) still = false;
+      if (still) for (joint in 0...current.length) if (Math.abs(current[joint] - positions[positions.length - 1][joint])
+        >= 1e-12) still = false;
       stillTicks = still ? stillTicks + 1 : 0;
       positions.push(current);
       if (tick > 4000) throw 'rig trial at tick $eventTick did not settle';
@@ -360,9 +431,11 @@ class MotionKitTestSupport {
 
   public function jointPeak(positions:Array<Array<Float>>, joint:Int):Float {
     var peak = 0.0;
-    for (index in 2...positions.length)
-      peak = Math.max(peak, Math.abs(positions[index][joint] - 2.0 * positions[index - 1][joint] +
-        positions[index - 2][joint]) / (0.01 * 0.01));
+    for (index in 2...positions.length) peak = Math.max(
+      peak,
+      Math.abs(positions[index][joint]
+      - 2.0 * positions[index - 1][joint] + positions[index - 2][joint]) / (0.01 * 0.01)
+    );
     return peak;
   }
 
@@ -370,10 +443,17 @@ class MotionKitTestSupport {
     var blueprint = gantryBlueprint();
     var simulationHarness = new SimulationHarness(0.01);
     var runtime = simulationHarness.simulation.addRobot(blueprint.runtime);
-    var robot = new RuntimeRobotAdapter("rig", runtime, blueprint.model.name,
+    var robot = new RuntimeRobotAdapter(
+      "rig",
+      runtime,
+      blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
-      [for (joint in blueprint.model.joints) joint.name], false, false,
-      "simulated runtime fault", queueSupport ? null : robotkit.core.ExecutionCapabilities.unavailable());
+      [for (joint in blueprint.model.joints) joint.name],
+      false,
+      false,
+      "simulated runtime fault",
+      queueSupport ? null : robotkit.core.ExecutionCapabilities.unavailable()
+    );
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
     if (queueSupport) homeGantryFixture(blueprint, runtime, simulationHarness, robot, machine);
     return new TrialRig(machine, simulationHarness, robot);
@@ -403,17 +483,43 @@ class MotionKitTestSupport {
     rightJoint.limits.upper = 0.0;
     rightJoint.limits.velocity = 0.2;
     rightJoint.limits.maxAcceleration = 0.8;
-    var blueprint = MotionSystemBlueprint.fromRobotModel(model, [
-      new MotionAxisBlueprint("x", ["x.left", "x.right"], 0.0, 0.08, 0.08, 0.4, 0.0,
-        [1.0, -2.0], [0.0, 0.0])
-    ]);
+    var blueprint = MotionSystemBlueprint.fromRobotModel(
+      model,
+      [new MotionAxisBlueprint(
+        "x",
+        ["x.left", "x.right"],
+        0.0,
+        0.08,
+        0.08,
+        0.4,
+        0.0,
+        [
+          1.0,
+          -2.0
+        ],
+        [
+          0.0,
+          0.0
+        ]
+      )]
+    );
     var simulationHarness = new SimulationHarness(0.01);
     var runtime = simulationHarness.simulation.addRobot(blueprint.runtime);
     var recording = new RobotRecording();
-    var robot = new RecordingRobot(new RuntimeRobotAdapter("dual-motor-geared", runtime,
-      blueprint.model.name, [for (link in blueprint.model.links) link.name],
-      [for (joint in blueprint.model.joints) joint.name], false, false,
-      "simulated runtime fault", queueSupport ? null : robotkit.core.ExecutionCapabilities.unavailable()), recording);
+    var robot = new RecordingRobot(
+      new RuntimeRobotAdapter(
+        "dual-motor-geared",
+        runtime,
+        blueprint.model.name,
+        [for (link in blueprint.model.links) link.name],
+        [for (joint in blueprint.model.joints) joint.name],
+        false,
+        false,
+        "simulated runtime fault",
+        queueSupport ? null : robotkit.core.ExecutionCapabilities.unavailable()
+      ),
+      recording
+    );
     return new TrialRig(MotionSystem.fromBlueprint(robot, blueprint), simulationHarness, robot, recording);
   }
 
@@ -426,16 +532,16 @@ class MotionKitTestSupport {
   public function trajectoryStates(value:Trajectory):Array<motionkit.trajectory.TrajectoryState> {
     var result = [];
     var duration = value.durationSeconds();
-    for (index in 0...101)
-      result.push(value.evaluate(duration * index / 100.0));
+    for (index in 0...101) result.push(value.evaluate(duration * index / 100.0));
     return result;
   }
 
   public function peakChordAcceleration(value:Trajectory, joint:Int):Float {
     var peak = 0.0;
-    for (index in 0...501)
-      peak = Math.max(peak, Math.abs(value.evaluate(
-        value.durationSeconds() * index / 500.0).accelerations[joint]));
+    for (index in 0...501) peak = Math.max(
+      peak,
+      Math.abs(value.evaluate(value.durationSeconds() * index / 500.0).accelerations[joint])
+    );
     return peak;
   }
 
@@ -444,17 +550,19 @@ class MotionKitTestSupport {
     MotionKitTestSupport.assertions++;
   }
 
-  public function near(actual:Float, expected:Float, message:String,
-      tolerance:Float = 1e-6):Void {
-    check(Math.abs(actual - expected) <= tolerance * Math.max(1.0, Math.abs(expected)),
-      '$message: $actual != $expected');
+  public function near(actual:Float, expected:Float, message:String, tolerance:Float = 1e-6):Void {
+    check(
+      Math.abs(actual - expected) <= tolerance * Math.max(1.0, Math.abs(expected)),
+      '$message: $actual != $expected'
+    );
   }
 
   public function throws(action:Void -> Void, message:String):Void {
     var didThrow = false;
     try action() catch (_:Dynamic) didThrow = true;
     check(didThrow, message);
-  }}
+  }
+}
 
 /** Deterministic IK branch switch at a synthetic wrist singularity. */
 class WristBranchSolver implements KinematicsSolver {
@@ -465,42 +573,72 @@ class WristBranchSolver implements KinematicsSolver {
   public function new(?jump:Bool = true) this.jump = jump;
   public function jointCount():Int return 6;
   public function forward(q:Array<Float>):Pose3 return new Pose3(q[0]);
-  public function solvePose(target:Pose3, seed:Array<Float>,
-      tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
+  public function solvePose(target:Pose3,
+    seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
     var q = seed.copy();
     q[0] = target.x;
     q[4] = !jump || target.x < 0.5 ? 0.1 : -2.0;
     return q;
   }
-  public function sampleCandidates(target:Pose3, maxCount:Int,
-      tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>>
-    return [solvePose(target, [for (_ in 0...6) 0.0], tolerance)];
-  public function solvePath(request:motionkit.kinematics.PathRequest):Array<Null<Array<Float>>>
-    return request.followPointByPoint(this);
-  public function solveDifferential(q:Array<Float>, twist:Twist6, ?redundancyRate:Array<Float>, ?freedom:OrientationPolicy):Null<Array<Float>>
-    return [twist.linearX, 0.0, 0.0, 0.0, 0.0, 0.0];
+  public function sampleCandidates(target:Pose3,
+    maxCount:Int, tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>> return [solvePose(
+      target,
+      [for (_ in 0...6) 0.0],
+      tolerance
+    )];
+  public function solvePath(request:motionkit.kinematics.PathRequest):Array<Null<Array<Float
+    >>> return request.followPointByPoint(this);
+  public function solveDifferential(
+    q:Array<Float>,
+    twist:Twist6,
+    ?redundancyRate:Array<Float>,
+    ?freedom:OrientationPolicy
+  ):Null<Array<Float>> return [
+    twist.linearX,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ];
 }
 
 class PlanarSolver implements KinematicsSolver {
   public function affineMap():Null<AffineJointMap> return null;
   public function fork():KinematicsSolver return this;
 
-  public function new() {}
+  public function new() {
+  }
   public function jointCount():Int return 6;
   public function forward(q:Array<Float>):Pose3 return new Pose3(q[0], q[1]);
-  public function solvePose(target:Pose3, seed:Array<Float>,
-      tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
+  public function solvePose(target:Pose3,
+    seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
     var q = seed.copy();
-    q[0] = target.x; q[1] = target.y;
+    q[0] = target.x;
+    q[1] = target.y;
     return q;
   }
-  public function sampleCandidates(target:Pose3, maxCount:Int,
-      tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>>
-    return [solvePose(target, [for (_ in 0...6) 0.0], tolerance)];
-  public function solvePath(request:motionkit.kinematics.PathRequest):Array<Null<Array<Float>>>
-    return request.followPointByPoint(this);
-  public function solveDifferential(q:Array<Float>, twist:Twist6, ?redundancyRate:Array<Float>, ?freedom:OrientationPolicy):Null<Array<Float>>
-    return [twist.linearX, twist.linearY, 0.0, 0.0, 0.0, 0.0];
+  public function sampleCandidates(target:Pose3,
+    maxCount:Int, tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>> return [solvePose(
+      target,
+      [for (_ in 0...6) 0.0],
+      tolerance
+    )];
+  public function solvePath(request:motionkit.kinematics.PathRequest):Array<Null<Array<Float
+    >>> return request.followPointByPoint(this);
+  public function solveDifferential(
+    q:Array<Float>,
+    twist:Twist6,
+    ?redundancyRate:Array<Float>,
+    ?freedom:OrientationPolicy
+  ):Null<Array<Float>> return [
+    twist.linearX,
+    twist.linearY,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ];
 }
 
 /** Virtual robot probe for state transitions and runtime command assertions. */
@@ -519,25 +657,44 @@ class SessionTransitionRobot implements Robot {
   public function capabilities():RobotCapabilities return inner.capabilities();
   public function snapshot():RobotSnapshot {
     var value = inner.snapshot();
-    if (faultOverride == 0 && tagOverride==null) return value;
-    return new RobotSnapshot(value.id, value.sourceSequence, value.sourceTimestampNs,
-      value.positions.toArray(), value.velocities.toArray(), value.efforts.toArray(),
-      value.mode, faultOverride==0 ? value.faultCode : faultOverride, value.receivedTimestampNs, value.sensors.toArray(),
-      value.sourceClockId, value.receivedClockId, value.safety,
-      value.trajectoryQueueDepth, value.trajectoryActive, value.trajectoryTimeNs,
-      value.trajectoryDurationNs, tagOverride==null ? value.trajectoryTag : tagOverride, value.trajectoryTagTimeNs,
-      value.sessionState, value.activePlanId, value.committedUntilNs,
-      value.queueEndTimeNs, value.setpointPositions.toArray());
+    if (faultOverride == 0 && tagOverride == null) return value;
+    return new RobotSnapshot(
+      value.id,
+      value.sourceSequence,
+      value.sourceTimestampNs,
+      value.positions.toArray(),
+      value.velocities.toArray(),
+      value.efforts.toArray(),
+      value.mode,
+      faultOverride == 0 ? value.faultCode : faultOverride,
+      value.receivedTimestampNs,
+      value.sensors.toArray(),
+      value.sourceClockId,
+      value.receivedClockId,
+      value.safety,
+      value.trajectoryQueueDepth,
+      value.trajectoryActive,
+      value.trajectoryTimeNs,
+      value.trajectoryDurationNs,
+      tagOverride == null ? value.trajectoryTag : tagOverride,
+      value.trajectoryTagTimeNs,
+      value.sessionState,
+      value.activePlanId,
+      value.committedUntilNs,
+      value.queueEndTimeNs,
+      value.setpointPositions.toArray()
+    );
   }
   public function streams():robotkit.streams.SensorStreams return inner.streams();
-  public function events(afterOrdinal:Int64, max:Int):Array<robotkit.core.RobotEvent>
-    return inner.events(afterOrdinal, max);
+  public function events(afterOrdinal:Int64, max:Int):Array<robotkit.core.RobotEvent> return inner.events(
+    afterOrdinal,
+    max
+  );
   public function fault():Null<RobotFault> return inner.fault();
   public function submit(command:RobotCommand):Void {
     if (rejectNext) {
       rejectNext = false;
-      throw new RobotRuntimeError(RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE,
-        "runtime.submitPlan");
+      throw new RobotRuntimeError(RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE, "runtime.submitPlan");
     }
     inner.submit(command);
     commands.push(command);
@@ -547,18 +704,21 @@ class SessionTransitionRobot implements Robot {
     stops++;
   }
   public function resetSafety():Void inner.resetSafety();
-  public function setChangeListener(listener:Null<RobotId -> Void>):Void
-    inner.setChangeListener(listener);
+  public function setChangeListener(listener:Null<RobotId -> Void>):Void inner.setChangeListener(listener);
   public function close():Void inner.close();
 
   public function planCount():Int return commandCount("plan");
   public function commandCount(kind:String):Int {
     var count = 0;
     for (command in commands) switch command {
-      case ExecutionPlan(_): if (kind == "plan") count++;
-      case Resume: if (kind == "resume") count++;
-      case Hold: if (kind == "hold") count++;
-      case Abort: if (kind == "abort") count++;
+      case ExecutionPlan(_):
+        if (kind == "plan") count++;
+      case Resume:
+        if (kind == "resume") count++;
+      case Hold:
+        if (kind == "hold") count++;
+      case Abort:
+        if (kind == "abort") count++;
       case _:
     }
     return count;
@@ -574,14 +734,17 @@ class SessionTransitionRig {
   var tick:Int = 0;
 
   public function new(id:String) {
-    var blueprint = MachineKitRobotCompiler.compileLinearAxis(
-      new LinearAxis(23, 10, 80), "x", 0.08, 0.4);
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(new LinearAxis(23, 10, 80), "x", 0.08, 0.4);
     harness = new SimulationHarness(0.01);
     simulation = harness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
-    robot = new SessionTransitionRobot(new SimulatedRobot(id, runtime,
-      blueprint.model.name, [for (link in blueprint.model.links) link.name],
-      [for (joint in blueprint.model.joints) joint.name]));
+    robot = new SessionTransitionRobot(new SimulatedRobot(
+      id,
+      runtime,
+      blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]
+    ));
     machine = MotionSystem.fromBlueprint(robot, blueprint);
   }
 
@@ -599,10 +762,9 @@ class SessionTransitionRig {
 
   public function settleStop():Void {
     var steps = 0;
-    while (machine.sessionState() != SessionState.Idle &&
-        machine.sessionState() != SessionState.Running) {
+    while (machine.sessionState() != SessionState.Idle && machine.sessionState() != SessionState.Running) {
       advance(1);
-      if (++steps > 500) throw "session stop did not settle";
+      if (++ steps > 500) throw "session stop did not settle";
     }
   }
 
@@ -610,7 +772,7 @@ class SessionTransitionRig {
     var steps = 0;
     while (machine.sessionState() == SessionState.Holding) {
       advance(1);
-      if (++steps > 500) throw "session hold did not settle";
+      if (++ steps > 500) throw "session hold did not settle";
     }
   }
 
@@ -640,20 +802,20 @@ class LaggingRobot implements Robot {
   public function capabilities():RobotCapabilities return inner.capabilities();
   public function snapshot():RobotSnapshot return inner.snapshot();
   public function streams():robotkit.streams.SensorStreams return inner.streams();
-  public function events(afterOrdinal:Int64, max:Int):Array<robotkit.core.RobotEvent>
-    return inner.events(afterOrdinal, max);
+  public function events(afterOrdinal:Int64, max:Int):Array<robotkit.core.RobotEvent> return inner.events(
+    afterOrdinal,
+    max
+  );
   public function fault():Null<RobotFault> return inner.fault();
   public function submit(command:RobotCommand):Void {
     switch command {
       case ExecutionPlan(plan):
         if (Int64.compare(plan.replaceAfterPlanId, Int64.ofInt(0)) != 0) {
           replacementAttempts++;
-          lastReplacementLeadNs = Int64.sub(plan.replaceAfterTimeNs,
-            inner.snapshot().committedUntilNs);
+          lastReplacementLeadNs = Int64.sub(plan.replaceAfterTimeNs, inner.snapshot().committedUntilNs);
           if (lateRejections > 0) {
             lateRejections--;
-            throw new RobotRuntimeError(RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE,
-              "runtime.submitPlan");
+            throw new RobotRuntimeError(RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE, "runtime.submitPlan");
           }
         }
       case _:
@@ -663,8 +825,7 @@ class LaggingRobot implements Robot {
   }
   public function stop(mode:StopMode):Void inner.stop(mode);
   public function resetSafety():Void inner.resetSafety();
-  public function setChangeListener(listener:Null < RobotId -> Void >):Void
-    inner.setChangeListener(listener);
+  public function setChangeListener(listener:Null<RobotId -> Void>):Void inner.setChangeListener(listener);
   public function close():Void inner.close();
 }
 
@@ -673,9 +834,19 @@ class FaultingArmRobot extends SimulatedRobot {
   public var faultOverride:Int = 0;
   public final commands:Array<RobotCommand> = [];
 
-  public function new(id:RobotId, runtime:robotkit.runtime.RobotRuntime,
-      name:String, links:Array<String>, joints:Array<String>)
-    super(id, runtime, name, links, joints);
+  public function new(
+    id:RobotId,
+    runtime:robotkit.runtime.RobotRuntime,
+    name:String,
+    links:Array<String>,
+    joints:Array<String>
+  ) super(
+    id,
+    runtime,
+    name,
+    links,
+    joints
+  );
 
   override public function submit(command:RobotCommand):Void {
     super.submit(command);
@@ -685,28 +856,50 @@ class FaultingArmRobot extends SimulatedRobot {
   public function commandCount(kind:String):Int {
     var count = 0;
     for (command in commands) if (switch command {
-      case Hold: kind == "hold";
-      case Resume: kind == "resume";
-      case Abort: kind == "abort";
-      case ExecutionPlan(_): kind == "plan";
-      case _: false;
-    }) count++;
+      case Hold:
+        kind == "hold";
+      case Resume:
+        kind == "resume";
+      case Abort:
+        kind == "abort";
+      case ExecutionPlan(_):
+        kind == "plan";
+      case _:
+        false;
+    }
+    ) count++;
     return count;
   }
 
   override public function snapshot():RobotSnapshot {
     var value = super.snapshot();
     if (faultOverride == 0) return value;
-    return new RobotSnapshot(value.id, value.sourceSequence,
-      value.sourceTimestampNs, value.positions.toArray(),
-      value.velocities.toArray(), value.efforts.toArray(), value.mode,
-      faultOverride, value.receivedTimestampNs, value.sensors.toArray(),
-      value.sourceClockId, value.receivedClockId, value.safety,
-      value.trajectoryQueueDepth, value.trajectoryActive,
-      value.trajectoryTimeNs, value.trajectoryDurationNs,
-      value.trajectoryTag, value.trajectoryTagTimeNs, value.sessionState,
-      value.activePlanId, value.committedUntilNs, value.queueEndTimeNs,
-      value.setpointPositions.toArray());
+    return new RobotSnapshot(
+      value.id,
+      value.sourceSequence,
+      value.sourceTimestampNs,
+      value.positions.toArray(),
+      value.velocities.toArray(),
+      value.efforts.toArray(),
+      value.mode,
+      faultOverride,
+      value.receivedTimestampNs,
+      value.sensors.toArray(),
+      value.sourceClockId,
+      value.receivedClockId,
+      value.safety,
+      value.trajectoryQueueDepth,
+      value.trajectoryActive,
+      value.trajectoryTimeNs,
+      value.trajectoryDurationNs,
+      value.trajectoryTag,
+      value.trajectoryTagTimeNs,
+      value.sessionState,
+      value.activePlanId,
+      value.committedUntilNs,
+      value.queueEndTimeNs,
+      value.setpointPositions.toArray()
+    );
   }
 }
 
@@ -717,8 +910,7 @@ class TrialRig {
   public final robot:Robot;
   public final recording:Null<RobotRecording>;
 
-  public function new(machine:MotionSystem, harness:SimulationHarness, robot:Robot,
-      ?recording:RobotRecording) {
+  public function new(machine:MotionSystem, harness:SimulationHarness, robot:Robot, ?recording:RobotRecording) {
     this.machine = machine;
     this.harness = harness;
     this.robot = robot;

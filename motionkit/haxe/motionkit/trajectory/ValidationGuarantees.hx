@@ -13,10 +13,15 @@ class ValidationGuarantees {
   /** Clearance against the cell (COLLISION.md CL4b); unchecked without a clearance world. */
   public final collision:ValidationGuarantee;
 
-  public function new(jointPosition:ValidationGuarantee,
-      jointVelocity:ValidationGuarantee, jointAcceleration:ValidationGuarantee,
-      jerk:ValidationGuarantee, continuity:ValidationGuarantee,
-      taskSpace:ValidationGuarantee, collision:ValidationGuarantee) {
+  public function new(
+    jointPosition:ValidationGuarantee,
+    jointVelocity:ValidationGuarantee,
+    jointAcceleration:ValidationGuarantee,
+    jerk:ValidationGuarantee,
+    continuity:ValidationGuarantee,
+    taskSpace:ValidationGuarantee,
+    collision:ValidationGuarantee
+  ) {
     this.jointPosition = jointPosition;
     this.jointVelocity = jointVelocity;
     this.jointAcceleration = jointAcceleration;

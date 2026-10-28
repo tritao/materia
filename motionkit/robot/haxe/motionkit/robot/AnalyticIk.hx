@@ -22,8 +22,17 @@ class AnalyticBranch {
   public final singularityKnown:Bool;
   public final configuration:Null<SixAxisConfiguration>;
 
-  public function new(q:Array<Float>, branch:Int, singular:Bool, singularityKnown:Bool = true, ?configuration:SixAxisConfiguration) {
-    this.q = q.copy(); this.branch = branch; this.singular = singular;
-    this.singularityKnown = singularityKnown;this.configuration=configuration;
+  public function new(
+    q:Array<Float>,
+    branch:Int,
+    singular:Bool,
+    singularityKnown:Bool = true,
+    ?configuration:SixAxisConfiguration
+  ) {
+    this.q = q.copy();
+    this.branch = branch;
+    this.singular = singular;
+    this.singularityKnown = singularityKnown;
+    this.configuration = configuration;
   }
 }

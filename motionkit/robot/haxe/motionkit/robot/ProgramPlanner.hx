@@ -8,8 +8,7 @@ import sys.thread.Mutex;
 import sys.thread.Thread;
 
 private enum PlannedStep {
-  Planned(plan:ExecutionPlan, opIndex:Int, length:Float, distances:Array<Float>,
-    times:Array<Float>);
+  Planned(plan:ExecutionPlan, opIndex:Int, length:Float, distances:Array<Float>, times:Array<Float>);
   Barrier(barrier:ProgramBarrier);
   Note(text:String);
   Finished(nextPlanId:Int64);
@@ -58,7 +57,7 @@ class ProgramPlanner {
   #end
 
   /** Worker CPU-phase wall time, excluding lookahead waits, and numeric pose queries. */
-  public function planningMetrics():{seconds:Float, numericIkSolves:Int} {
+  public function planningMetrics(): {seconds: Float, numericIkSolves: Int} {
     condition.acquire();
     var result = {seconds: planningSeconds, numericIkSolves: numericIkSolves};
     condition.release();
@@ -66,42 +65,56 @@ class ProgramPlanner {
   }
 
   /** Starts planning; an invalid program or start position throws here, on the caller's thread. */
-  public function new(compiler:ProgramCompiler, program:MotionProgram, initialQ:Array<Float>,
-      firstPlanId:Int64, firstOp:Int, speedScale:Float, lookaheadSeconds:Float,?compiled:CompiledProgram) {
-    if (!Math.isFinite(lookaheadSeconds) || lookaheadSeconds <= 0.0)
-      throw "Planning lookahead must be finite and positive";
+  public function new(
+    compiler:ProgramCompiler,
+    program:MotionProgram,
+    initialQ:Array<Float>,
+    firstPlanId:Int64,
+    firstOp:Int,
+    speedScale:Float,
+    lookaheadSeconds:Float,
+    ?compiled:CompiledProgram
+  ) {
+    if (!Math.isFinite(lookaheadSeconds)
+      || lookaheadSeconds <= 0.0) throw "Planning lookahead must be finite and positive";
     this.lookaheadSeconds = lookaheadSeconds;
     this.speedScale = speedScale;
     nextPlanId = firstPlanId;
-    if(compiled!=null){
-      for(block in compiled.blocks)if(!block.complete || block.plans.length!=block.opIndices.length ||
-          block.plans.length!=block.pathLengths.length || block.plans.length!=block.pathDistances.length ||
-          block.plans.length!=block.pathTimes.length)throw "Compiled blocks must have complete aligned metadata";
-      var expected=firstPlanId;
-      for(block in compiled.blocks)for(plan in block.plans){
-        if(plan==null || Int64.compare(plan.planId,expected)<0)throw "Compiled plan ids must be increasing and unused";
-        expected=Int64.add(plan.planId,Int64.ofInt(1));
+    if (compiled != null) {
+      for (block in compiled.blocks) if (!block.complete || block.plans.length != block.opIndices.length
+        || block.plans.length != block.pathLengths.length || block.plans.length != block.pathDistances.length
+        || block.plans.length != block.pathTimes.length) throw "Compiled blocks must have complete aligned metadata";
+      var expected = firstPlanId;
+      for (block in compiled.blocks) for (plan in block.plans) {
+        if (plan == null || Int64.compare(plan.planId,
+          expected) < 0) throw "Compiled plan ids must be increasing and unused";
+        expected = Int64.add(plan.planId, Int64.ofInt(1));
       }
-      var owned=compiled.takeBlocks();
+      var owned = compiled.takeBlocks();
       try {
-        for(block in owned){
-          for(i in 0...block.plans.length){var plan=block.plans[i];
-            blocks.plan(plan,block.opIndices[i],block.pathLengths[i],block.pathDistances[i],block.pathTimes[i]);
-            nextPlanId=Int64.add(plan.planId,Int64.ofInt(1));
+        for (block in owned) {
+          for (i in 0...block.plans.length) {
+            var plan = block.plans[i];
+            blocks.plan(plan, block.opIndices[i], block.pathLengths[i], block.pathDistances[i], block.pathTimes[i]);
+            nextPlanId = Int64.add(plan.planId, Int64.ofInt(1));
           }
-          if(block.barrier!=null)blocks.barrier(block.barrier);
+          if (block.barrier != null) blocks.barrier(block.barrier);
         }
-        for(note in compiled.notes)blocks.note(note);
-        blocks.finish(nextPlanId);fixedPlans=true;stopped=true;
-      }catch(error:Dynamic){for(block in owned)for(plan in block.plans)plan.dispose();throw error;}
+        for (note in compiled.notes) blocks.note(note);
+        blocks.finish(nextPlanId);
+        fixedPlans = true;
+        stopped = true;
+      } catch (error:Dynamic) {
+        for (block in owned) for (plan in block.plans) plan.dispose();
+        throw error;
+      }
       return;
     }
     // The worker plans on kinematics of its own: the caller keeps evaluating the arm meanwhile.
     var workerCompiler = compiler.forWorker();
-    if (workerCompiler.maximumPathPlanSeconds == null || workerCompiler.maximumPathPlanSeconds > lookaheadSeconds)
-      workerCompiler.maximumPathPlanSeconds = lookaheadSeconds;
-    var compilation = workerCompiler.begin(program, initialQ, firstPlanId, firstOp, speedScale,
-      new WorkerSink(this));
+    if (workerCompiler.maximumPathPlanSeconds == null || workerCompiler.maximumPathPlanSeconds
+      > lookaheadSeconds) workerCompiler.maximumPathPlanSeconds = lookaheadSeconds;
+    var compilation = workerCompiler.begin(program, initialQ, firstPlanId, firstOp, speedScale, new WorkerSink(this));
     var self = this;
     registry.acquire();
     live.push(this);
@@ -114,9 +127,9 @@ class ProgramPlanner {
   }
 
   /** Adopt checked plans without another compilation or a worker thread. */
-  public static function fromCompiled(compiled:CompiledProgram,firstPlanId:Int64):ProgramPlanner {
-    if(compiled==null)throw "A compiled program is required";
-    return new ProgramPlanner(null,null,[],firstPlanId,0,1.0,1.0,compiled);
+  public static function fromCompiled(compiled:CompiledProgram, firstPlanId:Int64):ProgramPlanner {
+    if (compiled == null) throw "A compiled program is required";
+    return new ProgramPlanner(null, null, [], firstPlanId, 0, 1.0, 1.0, compiled);
   }
 
   /** How many planners have a worker that has not stopped yet. */
@@ -179,19 +192,20 @@ class ProgramPlanner {
   /** Execution has started `count` plans in all; the worker stays `lookaheadSeconds` past them. */
   public function started(count:Int):Void {
     condition.acquire();
-    if (count<startedPlans || (!fixedPlans && count-startedPlans>plannedSeconds.length)) {
-      condition.release();throw "Started plan count is outside the delivered prefix";
+    if (count < startedPlans || (!fixedPlans && count - startedPlans > plannedSeconds.length)) {
+      condition.release();
+      throw "Started plan count is outside the delivered prefix";
     }
-    if (!fixedPlans) plannedSeconds.splice(0,count-startedPlans);
+    if (!fixedPlans) plannedSeconds.splice(0, count - startedPlans);
     startedPlans = count;
     condition.broadcast();
     condition.release();
   }
 
   public function setSpeedScale(scale:Float):Void {
-    if (!Math.isFinite(scale) || scale <= 0.0)
-      throw "Program speed scale must be finite and positive";
-    if(fixedPlans && scale!=speedScale)throw "Compiled motion has a fixed clock; speed changes require recompilation";
+    if (!Math.isFinite(scale) || scale <= 0.0) throw "Program speed scale must be finite and positive";
+    if (fixedPlans
+      && scale != speedScale) throw "Compiled motion has a fixed clock; speed changes require recompilation";
     condition.acquire();
     speedScale = scale;
     condition.release();
@@ -218,12 +232,15 @@ class ProgramPlanner {
       case Planned(plan, opIndex, length, distances, times):
         blocks.plan(plan, opIndex, length, distances, times);
         nextPlanId = Int64.add(plan.planId, Int64.ofInt(1));
-      case Barrier(barrier): blocks.barrier(barrier);
-      case Note(text): blocks.note(text);
+      case Barrier(barrier):
+        blocks.barrier(barrier);
+      case Note(text):
+        blocks.note(text);
       case Finished(next):
         blocks.finish(next);
         nextPlanId = next;
-      case Failed(message): failure = message;
+      case Failed(message):
+        failure = message;
     }
   }
 
@@ -264,8 +281,8 @@ class ProgramPlanner {
     condition.acquire();
     compilation.speedScale = speedScale;
     condition.release();
-    var numeric:Null<ManipulatorKinematics> = Std.isOfType(compilation.compiler.solver, ManipulatorKinematics)
-      ? cast compilation.compiler.solver : null;
+    var numeric:Null<ManipulatorKinematics> = Std.isOfType(compilation.compiler.solver,
+      ManipulatorKinematics) ? cast compilation.compiler.solver : null;
     var before = numeric == null ? 0 : numeric.manipulator.numericSolveCount();
     var began = Sys.time();
     var more = compilation.step();
@@ -283,7 +300,10 @@ class ProgramPlanner {
   function advanceCooperative(required:Bool):Void {
     var compilation = cooperative;
     if (compilation == null) return;
-    if (cancelled) { finishCompilation(compilation); return; }
+    if (cancelled) {
+      finishCompilation(compilation);
+      return;
+    }
     if (!required && secondsAhead() >= lookaheadSeconds) return;
     try {
       if (!advanceCompilation(compilation)) finishCompilation(compilation);
@@ -302,8 +322,7 @@ class ProgramPlanner {
   }
 
   /** Worker side: queues a step for the frame thread, or disposes it once cancelled. */
-  @:allow(motionkit.robot.WorkerSink)
-  function deliver(step:PlannedStep):Void {
+  @:allow(motionkit.robot.WorkerSink) function deliver(step:PlannedStep):Void {
     condition.acquire();
     if (cancelled) {
       condition.release();
@@ -311,7 +330,8 @@ class ProgramPlanner {
       return;
     }
     switch step {
-      case Planned(plan, _, _, _, _): plannedSeconds.push(plan.durationSeconds);
+      case Planned(plan, _, _, _, _):
+        plannedSeconds.push(plan.durationSeconds);
       case _:
     }
     outbox.push(step);
@@ -319,11 +339,11 @@ class ProgramPlanner {
     condition.release();
   }
 
-  static function disposeSteps(steps:Array<PlannedStep>):Void
-    for (step in steps) switch step {
-      case Planned(plan, _, _, _, _): plan.dispose();
-      case _:
-    }
+  static function disposeSteps(steps:Array<PlannedStep>):Void for (step in steps) switch step {
+    case Planned(plan, _, _, _, _):
+      plan.dispose();
+    case _:
+  }
 }
 
 /** The worker's sink: each step goes to the frame thread through the planner. */
@@ -332,9 +352,14 @@ private class WorkerSink implements ProgramSink {
 
   public function new(planner:ProgramPlanner) this.planner = planner;
 
-  public function plan(plan:ExecutionPlan, opIndex:Int, length:Float, distances:Array<Float>,
-      times:Array<Float>):Void
-    planner.deliver(Planned(plan, opIndex, length, distances, times));
+  public function plan(plan:ExecutionPlan,
+    opIndex:Int, length:Float, distances:Array<Float>, times:Array<Float>):Void planner.deliver(Planned(
+      plan,
+      opIndex,
+      length,
+      distances,
+      times
+    ));
 
   public function barrier(barrier:ProgramBarrier):Void planner.deliver(Barrier(barrier));
 

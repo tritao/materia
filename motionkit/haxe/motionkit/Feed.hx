@@ -5,8 +5,7 @@ class Feed {
   public final value:Float;
 
   public function new(metresPerSecond:Float) {
-    if (!Math.isFinite(metresPerSecond) || metresPerSecond <= 0.0)
-      throw "Feed rate must be finite and positive";
+    if (!Math.isFinite(metresPerSecond) || metresPerSecond <= 0.0) throw "Feed rate must be finite and positive";
     this.value = metresPerSecond;
   }
 

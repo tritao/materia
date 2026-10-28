@@ -22,9 +22,12 @@ enum abstract PlanDiagnosticKind(String) from String to String {
 class PlanDiagnostic {
   /** Quantities used by each finding's calculation. */
   public static function quantities(kind:PlanDiagnosticKind):Array<String> return switch kind {
-    case PlanDiagnosticKind.GearSpeed: ["motor curve", "driver rate", "controller rate"];
-    case PlanDiagnosticKind.Accuracy: ["stiffness", "backlash", "drag", "steady loads"];
-    case _: ["motor curve", "inertia", "efficiency", "drag"];
+    case PlanDiagnosticKind.GearSpeed:
+      ["motor curve", "driver rate", "controller rate"];
+    case PlanDiagnosticKind.Accuracy:
+      ["stiffness", "backlash", "drag", "steady loads"];
+    case _:
+      ["motor curve", "inertia", "efficiency", "drag"];
   };
 
   public final kind:PlanDiagnosticKind;
@@ -47,8 +50,16 @@ class PlanDiagnostic {
   /** Assumed model inputs behind this finding. */
   public var assumed:Array<String> = [];
 
-  public function new(kind:PlanDiagnosticKind, opIndex:Int, subject:String, axis:String, timeSeconds:Float,
-      value:Float, limit:Float, samples:Int) {
+  public function new(
+    kind:PlanDiagnosticKind,
+    opIndex:Int,
+    subject:String,
+    axis:String,
+    timeSeconds:Float,
+    value:Float,
+    limit:Float,
+    samples:Int
+  ) {
     this.kind = kind;
     this.opIndex = opIndex;
     this.subject = subject;
@@ -64,14 +75,18 @@ class PlanDiagnostic {
 
   /** Plain-sentence description; `line` is the source line of the op when the caller knows it, else 0. */
   public function describe(line:Int = 0):String {
-    var where = (line > 0 ? 'line $line, ' : '') + 'op $opIndex' + (pathDistance >= 0.0 ? ' at ${round(pathDistance * 1000.0)} mm' : '') +
-      ' (${round(timeSeconds)} s into the plan)';
+    var where = (line > 0 ? 'line $line, ' : '') + 'op $opIndex' + (pathDistance
+      >= 0.0 ? ' at ${round(pathDistance * 1000.0)} mm' : '') + ' (${round(timeSeconds)} s into the plan)';
     var description = switch kind {
-      case GearSpeed: '$where: electronic gear axis $axis needs ${round(value)} joint units/s against ${round(limit)} joint units/s permitted';
-      case Accuracy: '$where: axis $axis deviates ${round(value * 1000.0)} mm against a tolerance of ${round(limit * 1000.0)} mm';
-      case ServoRatedTorque: '$where: motor $subject on $axis runs at ${round(value)} N m RMS against ${round(limit)} N m rated';
-      case _: '$where: motor $subject on $axis needs ${round(value)} N m against ${round(limit)} N m available' +
-        ' (${Std.int(Math.round(100.0 * (ratio() - 1.0)))}% over, $samples samples)';
+      case GearSpeed:
+        '$where: electronic gear axis $axis needs ${round(value)} joint units/s against ${round(limit)} joint units/s permitted';
+      case Accuracy:
+        '$where: axis $axis deviates ${round(value * 1000.0)} mm against a tolerance of ${round(limit * 1000.0)} mm';
+      case ServoRatedTorque:
+        '$where: motor $subject on $axis runs at ${round(value)} N m RMS against ${round(limit)} N m rated';
+      case _:
+        '$where: motor $subject on $axis needs ${round(value)} N m against ${round(limit)} N m available'
+          + ' (${Std.int(Math.round(100.0 * (ratio() - 1.0)))}% over, $samples samples)';
     };
     return description + (assumed.length == 0 ? "" : ' (assumed: ${assumed.join(", ")})');
   }
@@ -111,7 +126,8 @@ class PlanSlip {
     if (time >= times[last]) return lost[last];
     for (index in 1...times.length) if (time <= times[index]) {
       var span = times[index] - times[index - 1];
-      return span > 0.0 ? lost[index - 1] + (time - times[index - 1]) / span * (lost[index] - lost[index - 1]) : lost[index];
+      return span
+        > 0.0 ? lost[index - 1] + (time - times[index - 1]) / span * (lost[index] - lost[index - 1]) : lost[index];
     }
     return lost[last];
   }
@@ -134,8 +150,14 @@ class PlanCheckResult {
   /** Where steppers over their curve would lose sync, for a simulation to carry out; empty when none would. */
   public final slips:Array<PlanSlip>;
 
-  public function new(diagnostics:Array<PlanDiagnostic>, worstTorqueRatio:Float, worstMotor:String,
-      worstDeviation:Float, worstAxis:String, ?slips:Array<PlanSlip>) {
+  public function new(
+    diagnostics:Array<PlanDiagnostic>,
+    worstTorqueRatio:Float,
+    worstMotor:String,
+    worstDeviation:Float,
+    worstAxis:String,
+    ?slips:Array<PlanSlip>
+  ) {
     this.slips = slips == null ? [] : slips;
     this.diagnostics = diagnostics;
     this.worstTorqueRatio = worstTorqueRatio;

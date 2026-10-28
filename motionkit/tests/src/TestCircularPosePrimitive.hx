@@ -20,11 +20,16 @@ class TestCircularPosePrimitive implements PosePrimitive {
   public function endWaypoint():PoseWaypoint return waypoint(geometry.pointAt(geometry.length()));
   public function speedLimit():Float return feed;
   public function orientationPolicy():OrientationPolicy return Fixed;
-  public function derivativesAt(distance:Float):motionkit.path.PoseDerivatives
-    return motionkit.path.PoseDerivatives.numeric(this, distance);
-  public function waypointAt(distance:Float):PoseWaypoint
-    return waypoint(geometry.pointAt(distance));
+  public function derivativesAt(distance:Float):motionkit
+    .path.PoseDerivatives return motionkit.path.PoseDerivatives.numeric(
+      this,
+      distance
+    );
+  public function waypointAt(distance:Float):PoseWaypoint return waypoint(geometry.pointAt(distance));
 
-  function waypoint(point:PathPoint):PoseWaypoint
-    return new PoseWaypoint(new Pose3(point.x, point.y, point.z), 0.0005, 0.02);
+  function waypoint(point:PathPoint):PoseWaypoint return new PoseWaypoint(
+    new Pose3(point.x, point.y, point.z),
+    0.0005,
+    0.02
+  );
 }

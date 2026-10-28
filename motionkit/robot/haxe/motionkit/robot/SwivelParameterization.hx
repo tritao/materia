@@ -26,8 +26,8 @@ class SwivelParameterization implements RedundancyParameterization {
     preferTargetOrientation = preferTarget;
   }
 
-  public function preferringPosture(preference:Null<Array<Float>>):Void
-    posturePreference = preference == null ? null : preference.copy();
+  public function preferringPosture(preference:Null<Array<Float
+    >>):Void posturePreference = preference == null ? null : preference.copy();
 
   public function dimension():Int return 1;
 
@@ -38,23 +38,34 @@ class SwivelParameterization implements RedundancyParameterization {
 
   public function valuesJacobian(q:Array<Float>):Null<Array<Float>> return group.swivelJacobian(q);
 
-  public function solveAt(target:Pose3, seed:Array<Float>, values:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
+  public function solveAt(
+    target:Pose3,
+    seed:Array<Float>,
+    values:Array<Float>,
+    tolerance:IkTolerance,
+    ?freedom:OrientationPolicy
+  ):Null<Array<Float>> {
     var task = ToolFreedom.of(target, freedom, tolerance.orientation);
-    var options = task.options(tolerance, orientationPreference == null && preferTargetOrientation ? target : orientationPreference);
+    var options = task.options(
+      tolerance,
+      orientationPreference == null && preferTargetOrientation ? target : orientationPreference
+    );
     if (posturePreference != null) options.preferring(posturePreference);
-    var result = group.solve(RedundancyPoses.transform(task.target), seed,
-      options.atSwivel(values[0], true));
+    var result = group.solve(RedundancyPoses.transform(task.target), seed, options.atSwivel(values[0], true));
     return result.converged ? result.q : null;
   }
 
-  public function solveNear(target:Pose3, seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
+  public function solveNear(target:Pose3,
+    seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
     var angle = group.swivelAngle(seed);
     if (!Math.isFinite(angle)) return null;
     var task = ToolFreedom.of(target, freedom, tolerance.orientation);
-    var options = task.options(tolerance, orientationPreference == null && preferTargetOrientation ? target : orientationPreference);
+    var options = task.options(
+      tolerance,
+      orientationPreference == null && preferTargetOrientation ? target : orientationPreference
+    );
     if (posturePreference != null) options.preferring(posturePreference);
-    var result = group.solve(RedundancyPoses.transform(task.target), seed,
-      options.atSwivel(angle, false));
+    var result = group.solve(RedundancyPoses.transform(task.target), seed, options.atSwivel(angle, false));
     return result.converged ? result.q : null;
   }
 

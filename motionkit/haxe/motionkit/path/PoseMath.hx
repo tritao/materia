@@ -10,55 +10,73 @@ class PoseMath {
 
   public static function angle(a:Pose3, b:Pose3):Float {
     // Relative quaternion avoids acos magnifying unit-norm roundoff near zero.
-    var x = b.qx*a.qw - b.qw*a.qx + b.qz*a.qy - b.qy*a.qz;
-    var y = b.qy*a.qw - b.qw*a.qy + b.qx*a.qz - b.qz*a.qx;
-    var z = b.qz*a.qw - b.qw*a.qz + b.qy*a.qx - b.qx*a.qy;
-    var dot = Math.abs(a.qx*b.qx + a.qy*b.qy + a.qz*b.qz + a.qw*b.qw);
-    return 2.0 * Math.atan2(Math.sqrt(x*x + y*y + z*z), dot);
+    var x = b.qx * a.qw - b.qw * a.qx + b.qz * a.qy - b.qy * a.qz;
+    var y = b.qy * a.qw - b.qw * a.qy + b.qx * a.qz - b.qz * a.qx;
+    var z = b.qz * a.qw - b.qw * a.qz + b.qy * a.qx - b.qx * a.qy;
+    var dot = Math.abs(a.qx * b.qx + a.qy * b.qy + a.qz * b.qz + a.qw * b.qw);
+    return 2.0 * Math.atan2(Math.sqrt(x * x + y * y + z * z), dot);
   }
 
-  public static function interpolate(a:PoseWaypoint, b:PoseWaypoint, t:Float,
-      policy:OrientationPolicy, x:Float, y:Float, z:Float):PoseWaypoint {
+  public static function interpolate(
+    a:PoseWaypoint,
+    b:PoseWaypoint,
+    t:Float,
+    policy:OrientationPolicy,
+    x:Float,
+    y:Float,
+    z:Float
+  ):PoseWaypoint {
     var q = quaternion(a.pose, b.pose, t, policy);
-    return new PoseWaypoint(new Pose3(x, y, z, q[0], q[1], q[2], q[3]),
+    return new PoseWaypoint(
+      new Pose3(x, y, z, q[0], q[1], q[2], q[3]),
       a.positionTolerance + t * (b.positionTolerance - a.positionTolerance),
-      a.orientationTolerance + t * (b.orientationTolerance - a.orientationTolerance));
+      a.orientationTolerance + t * (b.orientationTolerance - a.orientationTolerance)
+    );
   }
 
   /** Spatial angular derivatives of the exact interpolation used below. */
-  public static function angularRates(a:Pose3,b:Pose3,t:Float,policy:OrientationPolicy,
-      length:Float):{first:Array<Float>,second:Array<Float>} {
-    if(!Math.isFinite(t) || t<0 || t>1 || !Math.isFinite(length) || length<=0)
-      throw "Orientation derivatives require a valid interpolation distance";
+  public static function angularRates(a:Pose3, b:Pose3, t:Float, policy:OrientationPolicy, length:Float): {
+    first: Array<Float>,
+    second: Array<Float>
+  } {
+    if (!Math.isFinite(t) || t < 0 || t > 1
+      || !Math.isFinite(length) || length <= 0) throw "Orientation derivatives require a valid interpolation distance";
     switch policy {
-      case Fixed:return {first:[0.0,0.0,0.0],second:[0.0,0.0,0.0]};
-      case Cone(axis,halfAngle):
-        if(axis==null || axis.length!=3 || !Math.isFinite(halfAngle) || halfAngle<0)throw "Invalid orientation cone";
+      case Fixed:
+        return {first: [0.0, 0.0, 0.0], second: [0.0, 0.0, 0.0]};
+      case Cone(axis, halfAngle):
+        if (axis == null
+          || axis.length != 3 || !Math.isFinite(halfAngle) || halfAngle < 0) throw "Invalid orientation cone";
       default:
     }
-    var dot=a.qx*b.qx+a.qy*b.qy+a.qz*b.qz+a.qw*b.qw;
-    var sign=dot<0?-1.0:1.0;dot=Math.min(1.0,Math.abs(dot));
+    var dot = a.qx * b.qx + a.qy * b.qy + a.qz * b.qz + a.qw * b.qw;
+    var sign = dot < 0 ? -1.0 : 1.0;
+    dot = Math.min(1.0, Math.abs(dot));
     // Vector part of b * conjugate(a), in the path reference frame.
-    var axis=[sign*(-b.qw*a.qx+b.qx*a.qw-b.qy*a.qz+b.qz*a.qy),
-      sign*(-b.qw*a.qy+b.qx*a.qz+b.qy*a.qw-b.qz*a.qx),
-      sign*(-b.qw*a.qz-b.qx*a.qy+b.qy*a.qx+b.qz*a.qw)];
-    var sine=Math.sqrt(axis[0]*axis[0]+axis[1]*axis[1]+axis[2]*axis[2]);
-    if(sine==0)return {first:[0.0,0.0,0.0],second:[0.0,0.0,0.0]};
-    var rate=2*Math.atan2(sine,dot)/length,acceleration=0.0;
-    if(dot>=0.9995){
-      var x=1+t*(dot-1),y=t*sine,denominator=x*x+y*y;
-      rate=2*sine/(denominator*length);
-      acceleration=-4*sine*(x*(dot-1)+y*sine)/(denominator*denominator*length*length);
+    var axis = [
+      sign * (-b.qw * a.qx + b.qx * a.qw - b.qy * a.qz + b.qz * a.qy),
+      sign * (-b.qw * a.qy + b.qx * a.qz + b.qy * a.qw - b.qz * a.qx),
+      sign * (-b.qw * a.qz - b.qx * a.qy + b.qy * a.qx + b.qz * a.qw)
+    ];
+    var sine = Math.sqrt(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]);
+    if (sine == 0) return {first: [0.0, 0.0, 0.0], second: [0.0, 0.0, 0.0]};
+    var rate = 2 * Math.atan2(sine, dot) / length, acceleration = 0.0;
+    if (dot >= 0.9995) {
+      var x = 1 + t * (dot - 1), y = t * sine, denominator = x * x + y * y;
+      rate = 2 * sine / (denominator * length);
+      acceleration = -4 * sine * (x * (dot - 1) + y * sine) / (denominator * denominator * length * length);
     }
-    return {first:[for(value in axis)value*rate/sine],second:[for(value in axis)value*acceleration/sine]};
+    return {first: [for (value in axis) value * rate / sine],
+      second: [for (value in axis) value * acceleration / sine]};
   }
 
   static function quaternion(a:Pose3, b:Pose3, t:Float, policy:OrientationPolicy):Array<Float> {
     switch (policy) {
-      case Fixed: return a.rotationArray();
+      case Fixed:
+        return a.rotationArray();
       case Cone(axis, halfAngle):
-        if (axis == null || axis.length != 3 || !Math.isFinite(halfAngle) || halfAngle < 0.0)
-          throw "Invalid orientation cone";
+        if (axis == null
+          || axis.length != 3 || !Math.isFinite(halfAngle) || halfAngle < 0.0) throw "Invalid orientation cone";
       case Interpolated | FreeAboutTool | Free:
     }
     var dot = a.qx * b.qx + a.qy * b.qy + a.qz * b.qz + a.qw * b.qw;
@@ -71,11 +89,13 @@ class PoseMath {
       left = Math.sin((1.0 - t) * angle) / scale;
       right = Math.sin(t * angle) / scale;
     }
-    var q = [left * a.qx + right * sign * b.qx,
+    var q = [
+      left * a.qx + right * sign * b.qx,
       left * a.qy + right * sign * b.qy,
       left * a.qz + right * sign * b.qz,
-      left * a.qw + right * sign * b.qw];
-    var norm = Math.sqrt(q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3]);
-    return [q[0]/norm, q[1]/norm, q[2]/norm, q[3]/norm];
+      left * a.qw + right * sign * b.qw
+    ];
+    var norm = Math.sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
+    return [q[0] / norm, q[1] / norm, q[2] / norm, q[3] / norm];
   }
 }

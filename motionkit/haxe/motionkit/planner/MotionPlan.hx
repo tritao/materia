@@ -13,8 +13,15 @@ class MotionPlan {
   public final checkSeconds:Float;
   public final totalSeconds:Float;
 
-  public function new(waypoints:Null<Array<Array<Float>>>, failure:String, iterations:Int, nodes:Int, edgeChecks:Int,
-      checkSeconds:Float, totalSeconds:Float) {
+  public function new(
+    waypoints:Null<Array<Array<Float>>>,
+    failure:String,
+    iterations:Int,
+    nodes:Int,
+    edgeChecks:Int,
+    checkSeconds:Float,
+    totalSeconds:Float
+  ) {
     this.waypoints = waypoints;
     this.failure = failure;
     this.iterations = iterations;

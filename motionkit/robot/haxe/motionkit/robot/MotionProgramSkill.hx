@@ -21,8 +21,10 @@ class MotionProgramSkill implements Skill {
 
   public function start():Void {
     lifecycle.begin();
-    try { motion.run(program); settle(); }
-    catch (error:Dynamic) fail(Std.string(error));
+    try {
+      motion.run(program);
+      settle();
+    } catch (error:Dynamic) fail(Std.string(error));
   }
 
   public function update(snapshot:RobotSnapshot, durationSeconds:Float):SkillStatus {
@@ -31,8 +33,10 @@ class MotionProgramSkill implements Skill {
       fail("MotionProgramSkill needs a snapshot and positive finite duration");
       return lifecycle.status();
     }
-    try { motion.update(durationSeconds); settle(); }
-    catch (error:Dynamic) fail(Std.string(error));
+    try {
+      motion.update(durationSeconds);
+      settle();
+    } catch (error:Dynamic) fail(Std.string(error));
     return lifecycle.status();
   }
 
@@ -49,7 +53,8 @@ class MotionProgramSkill implements Skill {
     else if (motion.completed) lifecycle.succeed("motion program completed");
   }
   function fail(message:String):Void {
-    try motion.abort() catch (_:Dynamic) {}
+    try motion.abort() catch (_:Dynamic) {
+    }
     lifecycle.fail(message);
   }
 }

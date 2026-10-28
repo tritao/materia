@@ -6,19 +6,24 @@ import robotkit.manipulation.ClearanceViolation;
 
 /** Sweep the generated joint curve, retaining CollisionClearance's sampled sweep contract. */
 class TrajectoryClearance {
-  public static function violation(world:ClearanceWorld,trajectory:Trajectory,contact:Bool=false,
-      stepSeconds:Float=0.01,?contactAt:Array<Float>->Bool):Null<ClearanceViolation> {
-    if (world == null || trajectory == null || !Math.isFinite(stepSeconds) || stepSeconds <= 0.0)
-      throw "Trajectory clearance requires a world, motion and positive sample step";
+  public static function violation(
+    world:ClearanceWorld,
+    trajectory:Trajectory,
+    contact:Bool = false,
+    stepSeconds:Float = 0.01,
+    ?contactAt:Array<Float> -> Bool
+  ):Null<ClearanceViolation> {
+    if (world == null || trajectory == null || !Math.isFinite(stepSeconds)
+      || stepSeconds <= 0.0) throw "Trajectory clearance requires a world, motion and positive sample step";
     var duration = trajectory.durationSeconds();
     var steps = Std.int(Math.ceil(duration / stepSeconds));
     if (steps < 1) steps = 1;
     var previous = trajectory.evaluate(0.0).positions;
-    var failure = world.violation(previous,contactAt == null ? contact : contactAt(previous));
+    var failure = world.violation(previous, contactAt == null ? contact : contactAt(previous));
     if (failure != null) return failure;
-    for (i in 1...(steps+1)) {
-      var q = trajectory.evaluate(duration*i/steps).positions;
-      failure = world.sweep(previous,q,contact,0.02,null,contactAt);
+    for (i in 1...(steps + 1)) {
+      var q = trajectory.evaluate(duration * i / steps).positions;
+      failure = world.sweep(previous, q, contact, 0.02, null, contactAt);
       if (failure != null) return failure;
       previous = q;
     }

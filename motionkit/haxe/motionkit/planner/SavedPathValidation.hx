@@ -2,7 +2,8 @@ package motionkit.planner;
 
 /** A saved route is only a proposal: endpoints, bounds, points and whole edges are rechecked. */
 class SavedPathValidation {
-  public static function failure(space:PlannerSpace, path:Null<Array<Array<Float>>>, from:Array<Float>, to:Array<Float>):Null<String> {
+  public static function failure(space:PlannerSpace,
+    path:Null<Array<Array<Float>>>, from:Array<Float>, to:Array<Float>):Null<String> {
     if (path == null || path.length < 2) return "missing complete route";
     var n = space.dimension(), low = space.lower(), high = space.upper();
     for (q in path) {
@@ -11,7 +12,10 @@ class SavedPathValidation {
     }
     if (from.length != n || to.length != n) return "wrong endpoint dimension";
     for (i in 0...n) if (path[0][i] != from[i] || path[path.length - 1][i] != to[i]) return "route endpoints changed";
-    for (q in path) { var problem = space.invalid(q); if (problem != null) return problem; }
+    for (q in path) {
+      var problem = space.invalid(q);
+      if (problem != null) return problem;
+    }
     var edges:Array<Float> = [];
     for (i in 1...path.length) {
       for (value in path[i - 1]) edges.push(value);

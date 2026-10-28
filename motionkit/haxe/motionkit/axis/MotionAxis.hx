@@ -20,8 +20,7 @@ class MotionAxis {
     for (jointId in blueprint.jointIds) {
       var index = robotJointNames.indexOf(jointId);
       if (index < 0) throw 'Robot does not expose motion axis joint "$jointId"';
-      if (indices.indexOf(index) >= 0)
-        throw 'Motion axis "${blueprint.id}" maps one joint more than once';
+      if (indices.indexOf(index) >= 0) throw 'Motion axis "${blueprint.id}" maps one joint more than once';
       indices.push(index);
     }
     id = blueprint.id;
@@ -46,15 +45,14 @@ class MotionAxis {
 
   public function writeLogicalPosition(jointPositions:Array<Float>, logicalPosition:Float):Void {
     if (jointPositions == null) throw "Joint positions are required";
-    for (i in 0...jointIndices.length)
-      jointPositions[jointIndices[i]] = jointOffsets[i] + jointScales[i] * logicalPosition;
+    for (i in 0...jointIndices.length) jointPositions[jointIndices[i]] = jointOffsets[i]
+      + jointScales[i] * logicalPosition;
   }
 
   /** Writes a logical velocity or acceleration into all physical joints. */
   public function writeLogicalDelta(jointValues:Array<Float>, logicalValue:Float):Void {
     if (jointValues == null) throw "Joint values are required";
-    for (i in 0...jointIndices.length)
-      jointValues[jointIndices[i]] = jointScales[i] * logicalValue;
+    for (i in 0...jointIndices.length) jointValues[jointIndices[i]] = jointScales[i] * logicalValue;
   }
 
   public function jointScale(index:Int):Float return jointScales[index];

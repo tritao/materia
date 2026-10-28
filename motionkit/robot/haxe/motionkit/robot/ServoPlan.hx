@@ -22,11 +22,15 @@ class ServoPlanOptions {
    */
   public final accelerationLimits:Null<Array<Float>>;
 
-  public function new(modelRevision:Int64, calibrationRevision:Int64, ?leadSeconds:Float = 0.04,
-      ?accelerationLimits:Array<Float>) {
+  public function new(
+    modelRevision:Int64,
+    calibrationRevision:Int64,
+    ?leadSeconds:Float = 0.04,
+    ?accelerationLimits:Array<Float>
+  ) {
     if (!(leadSeconds > 0.0) || !Math.isFinite(leadSeconds)) throw "Servo plan lead must be positive";
-    if (accelerationLimits != null) for (limit in accelerationLimits)
-      if (!(limit > 0.0) || !Math.isFinite(limit)) throw "Servo plan acceleration limits must be positive";
+    if (accelerationLimits != null) for (limit in accelerationLimits) if (!(limit > 0.0)
+      || !Math.isFinite(limit)) throw "Servo plan acceleration limits must be positive";
     this.modelRevision = modelRevision;
     this.calibrationRevision = calibrationRevision;
     this.leadSeconds = leadSeconds;
@@ -71,8 +75,8 @@ class ServoPlan {
     indices = manipulator.jointIndices();
     accelerationLimits = [];
     var commissioned = options.accelerationLimits;
-    if (commissioned != null && commissioned.length != indices.length)
-      throw 'Servo plans need one acceleration limit per arm joint, not ${commissioned.length}';
+    if (commissioned != null && commissioned.length
+      != indices.length) throw 'Servo plans need one acceleration limit per arm joint, not ${commissioned.length}';
     for (k in 0...indices.length) {
       var limit = commissioned != null ? commissioned[k] : manipulator.group.limitsOf(k).maxAcceleration;
       if (limit == null || !(limit > 0.0)) throw 'Servo plans need an acceleration limit on arm joint $k';
@@ -108,14 +112,37 @@ class ServoPlan {
     var target = [for (_ in 0...jointCount) 0.0];
     for (k in 0...indices.length) target[indices[k]] = velocity[k];
     var t = Int64.toFloat(durationNs) * 1e-9;
-    var coefficients = [for (j in 0...jointCount) [endPosition[j], endVelocity[j], 0.5 * (target[j] - endVelocity[j]) / t]];
-    var accelerationTolerance = [for (j in 0...jointCount) Math.abs(2.0 * coefficients[j][2] - endAcceleration[j]) + 1e-5];
+    var coefficients = [for (j in 0...jointCount)[
+      endPosition[j],
+      endVelocity[j],
+      0.5 * (target[j] - endVelocity[j]) / t
+    ]];
+    var accelerationTolerance = [for (j in 0...jointCount) Math.abs(2.0
+      * coefficients[j][2] - endAcceleration[j]) + 1e-5];
     var tight = [for (_ in 0...jointCount) 1e-6];
     nextId = nextId + Int64.ofInt(1);
-    return new ExecutionPlanSubmission(nextId, options.modelRevision, options.calibrationRevision,
-      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE, endPosition.copy(), endVelocity.copy(),
-      endAcceleration.copy(), [new TrajectorySegment(Int64.ofInt(0), durationNs, coefficients)], null, null,
-      tight, tight, accelerationTolerance, endsAtRest, null, true);
+    return new ExecutionPlanSubmission(
+      nextId,
+      options.modelRevision,
+      options.calibrationRevision,
+      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+      endPosition.copy(),
+      endVelocity.copy(),
+      endAcceleration.copy(),
+      [new TrajectorySegment(
+        Int64.ofInt(0),
+        durationNs,
+        coefficients
+      )],
+      null,
+      null,
+      tight,
+      tight,
+      accelerationTolerance,
+      endsAtRest,
+      null,
+      true
+    );
   }
 
   /** Records a chunk the robot accepted: the queue now ends where it does. */

@@ -25,8 +25,15 @@ class ServoStep {
   public final avoided:Array<AvoidancePair>;
   public final relaxed:Array<AvoidancePair>;
 
-  public function new(velocity:Array<Float>, fallback:Bool, qpStatus:Int, iterations:Int, limited:Array<Int>,
-      ?avoided:Array<AvoidancePair>, ?relaxed:Array<AvoidancePair>) {
+  public function new(
+    velocity:Array<Float>,
+    fallback:Bool,
+    qpStatus:Int,
+    iterations:Int,
+    limited:Array<Int>,
+    ?avoided:Array<AvoidancePair>,
+    ?relaxed:Array<AvoidancePair>
+  ) {
     this.velocity = velocity;
     this.fallback = fallback;
     this.qpStatus = qpStatus;
@@ -69,7 +76,7 @@ class ManipulatorServo {
   final task:FrameVelocityTask;
   final workspace = new SolverWorkspace();
   /** The pairs near the arm at a state of the group's model (COLLISION.md CL5), or null for none. */
-  public var avoidance:Null<kinematicskit.KinematicState->Array<AvoidancePair>> = null;
+  public var avoidance:Null<kinematicskit.KinematicState -> Array<AvoidancePair>> = null;
   /** The speed avoidance rows let a pair close at, far from its safety margin. */
   public var avoidanceSpeed:Float = 0.1;
 
@@ -83,9 +90,17 @@ class ManipulatorServo {
     problem = manipulator.problem().add(task);
   }
 
-  public function step(q:Array<Float>, twist:Twist6, dt:Float, ?velocityLimits:Array<Float>,
-      ?maxIterations:Int = 1000, ?limitGain:Float = 1.0, ?previousVelocity:Array<Float>,
-      ?accelerationLimits:Array<Float>, ?ramped:Bool = false):ServoStep {
+  public function step(
+    q:Array<Float>,
+    twist:Twist6,
+    dt:Float,
+    ?velocityLimits:Array<Float>,
+    ?maxIterations:Int = 1000,
+    ?limitGain:Float = 1.0,
+    ?previousVelocity:Array<Float>,
+    ?accelerationLimits:Array<Float>,
+    ?ramped:Bool = false
+  ):ServoStep {
     var n = manipulator.dofCount();
     if (q == null || q.length != n) throw 'Servo requires $n joint values';
     if (twist == null) throw "Servo requires a tool twist";
@@ -96,23 +111,42 @@ class ManipulatorServo {
     limits.velocity = velocityLimits != null ? velocityLimits.copy() : [for (joint in 0...n) {
       var speed = manipulator.group.limitsOf(joint).velocity;
       speed != null ? speed : Math.POSITIVE_INFINITY;
-    }];
+    }
+    ];
     if (previousVelocity != null) {
       limits.previousVelocity = previousVelocity.copy();
-      limits.acceleration = accelerationLimits != null ? accelerationLimits.copy()
-        : [for (joint in 0...n) {
-          var acceleration = manipulator.group.limitsOf(joint).maxAcceleration;
-          acceleration == null ? Math.POSITIVE_INFINITY : acceleration;
-        }];
+      limits.acceleration = accelerationLimits != null ? accelerationLimits.copy() : [for (joint in 0...n) {
+        var acceleration = manipulator.group.limitsOf(joint).maxAcceleration;
+        acceleration == null ? Math.POSITIVE_INFINITY : acceleration;
+      }
+      ];
     }
     task.setTwist(twist.toArray(), dt);
     var state = manipulator.stateOf(q);
     var provider = avoidance;
     var pairs = provider == null ? null : provider(state);
-    var solved = DifferentialIk.step(problem, state, dt, qp, limits, 1.0, damping, workspace, maxIterations, pairs,
-      avoidanceSpeed);
-    return new ServoStep(solved.velocity, solved.fallback, solved.status, solved.iterations, solved.limited,
-      solved.avoided, solved.relaxed);
+    var solved = DifferentialIk.step(
+      problem,
+      state,
+      dt,
+      qp,
+      limits,
+      1.0,
+      damping,
+      workspace,
+      maxIterations,
+      pairs,
+      avoidanceSpeed
+    );
+    return new ServoStep(
+      solved.velocity,
+      solved.fallback,
+      solved.status,
+      solved.iterations,
+      solved.limited,
+      solved.avoided,
+      solved.relaxed
+    );
   }
 
   public function dispose():Void qp.dispose();

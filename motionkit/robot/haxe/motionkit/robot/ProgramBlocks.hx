@@ -15,11 +15,17 @@ class ProgramBlocks implements ProgramSink {
   /** The next unused plan id, once `done`. */
   public var nextPlanId(default, null):Null<Int64> = null;
 
-  public function new() {}
+  public function new() {
+  }
 
-  public function plan(plan:ExecutionPlan, opIndex:Int, length:Float, distances:Array<Float>,
-      times:Array<Float>):Void
-    blocks[blocks.length - 1].add(plan, opIndex, length, distances, times);
+  public function plan(plan:ExecutionPlan,
+    opIndex:Int, length:Float, distances:Array<Float>, times:Array<Float>):Void blocks[blocks.length - 1].add(
+      plan,
+      opIndex,
+      length,
+      distances,
+      times
+    );
 
   public function barrier(barrier:ProgramBarrier):Void {
     blocks[blocks.length - 1].close(barrier);
@@ -35,8 +41,7 @@ class ProgramBlocks implements ProgramSink {
   }
 
   /** Whether there is a plan or barrier to execute yet. */
-  public function hasWork():Bool
-    return done || blocks.length > 1 || blocks[0].plans.length > 0;
+  public function hasWork():Bool return done || blocks.length > 1 || blocks[0].plans.length > 0;
 
   /** The blocks of a finished program, without the empty block its end may close. */
   public function finishedBlocks():Array<ProgramBlock> {
@@ -47,11 +52,9 @@ class ProgramBlocks implements ProgramSink {
   }
 
   public function retireFirstBlock():Void {
-    if (blocks.length==0 || !blocks[0].complete || blocks[0].plans.length!=0)
-      throw "Program block is not consumed";
+    if (blocks.length == 0 || !blocks[0].complete || blocks[0].plans.length != 0) throw "Program block is not consumed";
     blocks.shift();
   }
 
-  public function dispose():Void
-    for (block in blocks) for (plan in block.plans) plan.dispose();
+  public function dispose():Void for (block in blocks) for (plan in block.plans) plan.dispose();
 }

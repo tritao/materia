@@ -19,15 +19,16 @@ class MotorSpaceConstraints {
   public final efforts:Array<Null<Float>>;
 
   public function new(rows:Array<Array<Float>>, rates:Array<Float>, ?efforts:Array<Null<Float>>) {
-    if (rows == null || rates == null || rows.length != rates.length)
-      throw "Motor constraints need matching rows and rates";
-    if (efforts != null && efforts.length != rows.length) throw "Motor constraints need an effort limit (or null) for each row";
+    if (rows == null
+      || rates == null || rows.length != rates.length) throw "Motor constraints need matching rows and rates";
+    if (efforts != null
+      && efforts.length != rows.length) throw "Motor constraints need an effort limit (or null) for each row";
     this.rows = [for (row in rows) row.copy()];
     this.rates = rates.copy();
     this.efforts = [for (i in 0...rows.length) efforts == null ? null : efforts[i]];
     for (i in 0...rows.length) {
-      if (rows[i].length == 0 || rows[i].length != rows[0].length)
-        throw "Motor constraint rows must have matching joint counts";
+      if (rows[i].length == 0
+        || rows[i].length != rows[0].length) throw "Motor constraint rows must have matching joint counts";
       for (value in rows[i]) if (!Math.isFinite(value)) throw "Motor constraint coefficients must be finite";
       if (!Math.isFinite(rates[i]) || rates[i] <= 0.0) throw "Motor constraint rates must be finite and positive";
     }
@@ -35,15 +36,17 @@ class MotorSpaceConstraints {
 
   /** A planned subset of independent axes; shared followers are derived from their coupling terms. */
   public static function of(model:RobotModel, jointIds:Array<String>, ?rateScale:Float = 1.0):MotorSpaceConstraints {
-    if (!Math.isFinite(rateScale) || rateScale <= 0.0 || rateScale > 1.0)
-      throw "Motor rate scale must be in (0, 1]";
+    if (!Math.isFinite(rateScale) || rateScale <= 0.0 || rateScale > 1.0) throw "Motor rate scale must be in (0, 1]";
     function weights(id:String, depth:Int):Array<Float> {
       if (depth > model.joints.length) throw "Cyclic motor coupling";
       var result = [for (_ in jointIds) 0.0];
       var coupled = false;
       for (term in model.couplings) if (term.follower == id) coupled = true;
       var index = jointIds.indexOf(id);
-      if (!coupled && index >= 0) { result[index] = 1.0; return result; }
+      if (!coupled && index >= 0) {
+        result[index] = 1.0;
+        return result;
+      }
       for (term in model.couplings) if (term.follower == id) {
         var source = weights(term.leader, depth + 1);
         for (i in 0...result.length) result[i] += term.ratio * source[i];
@@ -56,7 +59,9 @@ class MotorSpaceConstraints {
       var nonzero = 0;
       for (value in row) if (Math.abs(value) > 1e-12) nonzero++;
       if (nonzero < 2) return;
-      rows.push(row); rates.push(rate * rateScale); efforts.push(effort);
+      rows.push(row);
+      rates.push(rate * rateScale);
+      efforts.push(effort);
     }
     for (joint in model.joints) {
       var mechanical = joint.mechanicalLimits == null ? joint.limits : joint.mechanicalLimits;
@@ -99,14 +104,18 @@ class MotorSpaceConstraints {
     var n = masses.length;
     var r = [for (i in motors) rows[i]];
     // A = R R^T (m x m), solved against R (m x n) for W = A^-1 R by Gauss-Jordan.
-    var a = [for (i in 0...m) [for (j in 0...m) dot(r[i], r[j])]];
+    var a = [for (i in 0...m)[for (j in 0...m) dot(r[i], r[j])]];
     var w = [for (i in 0...m) r[i].copy()];
     for (pivot in 0...m) {
       var best = pivot;
       for (row in pivot + 1...m) if (Math.abs(a[row][pivot]) > Math.abs(a[best][pivot])) best = row;
       if (Math.abs(a[best][pivot]) < 1e-18) throw "The motor rows do not determine the axes' forces";
-      var swapA = a[pivot]; a[pivot] = a[best]; a[best] = swapA;
-      var swapW = w[pivot]; w[pivot] = w[best]; w[best] = swapW;
+      var swapA = a[pivot];
+      a[pivot] = a[best];
+      a[best] = swapA;
+      var swapW = w[pivot];
+      w[pivot] = w[best];
+      w[best] = swapW;
       var scale = a[pivot][pivot];
       for (c in 0...m) a[pivot][c] /= scale;
       for (c in 0...n) w[pivot][c] /= scale;
@@ -136,8 +145,13 @@ class MotorSpaceConstraints {
   }
 
   /** A straight joint move with one jerk-limited progress profile, so all motor sums remain bounded. */
-  public function move(start:Array<Float>, goal:Array<Float>, velocity:Array<Float>,
-      acceleration:Array<Float>, jerk:Array<Float>):Trajectory {
+  public function move(
+    start:Array<Float>,
+    goal:Array<Float>,
+    velocity:Array<Float>,
+    acceleration:Array<Float>,
+    jerk:Array<Float>
+  ):Trajectory {
     var delta = [for (i in 0...start.length) goal[i] - start[i]];
     var moving = false;
     for (value in delta) if (Math.abs(value) > 1e-12) moving = true;
@@ -155,58 +169,95 @@ class MotorSpaceConstraints {
     var progress = Trajectory.generateStateToState([0.0], [0.0], [0.0], [1.0], [speed], [accel], [jolt]);
     try {
       var segments = [for (segment in progress.segments()) {
-        timeFromStartNs: segment.timeFromStartNs, durationNs: segment.durationNs,
-        coefficients: [for (i in 0...start.length) [for (p in 0...segment.coefficients[0].length)
-          (p == 0 ? start[i] : 0.0) + delta[i] * segment.coefficients[0][p]]]
-      }];
+        timeFromStartNs:segment.timeFromStartNs, durationNs:segment.durationNs,
+          coefficients:[for (i in 0...start.length)[for (p in 0...segment.coefficients[0].length)(p
+          == 0 ? start[i] : 0.0) + delta[i] * segment.coefficients[0][p]]]
+      }
+      ];
       var result = Trajectory.fromSegments(segments);
       progress.dispose();
       return result;
-    } catch (error:Dynamic) { progress.dispose(); throw error; }
+    } catch (error:Dynamic) {
+      progress.dispose();
+      throw error;
+    }
   }
 
   /** Time the axes and linear motor coordinates together; return only the authored joints. */
   public function time(backend:PathTimingBackend, path:JointPathSamples, limits:PathTimingLimits):TimedPath {
     if (rows.length == 0) return backend.time(path, limits);
-    var problem = augmented(path,limits);
-    var timed = backend.time(problem.path,problem.limits);
+    var problem = augmented(path, limits);
+    var timed = backend.time(problem.path, problem.limits);
     try return timed.takeSelectedJoints([for (i in 0...path.jointCount) i]);
-    catch (error:Dynamic) { timed.trajectory.dispose(); timed.releaseDistanceMap(); throw error; }
+    catch (error:Dynamic) {
+      timed.trajectory.dispose();
+      timed.releaseDistanceMap();
+      throw error;
+    }
   }
 
   /** Keep shared-drive rows in every streaming solve, selecting physical joints only after timing. */
-  public function prepareStream(backend:ToppraPathTiming, path:JointPathSamples,
-      limits:PathTimingLimits, maximumPendingWindows:Int):PathTimingStream {
-    if (rows.length == 0) return backend.prepareStream(path,limits,maximumPendingWindows);
-    var problem = augmented(path,limits);
-    var stream = backend.prepareStream(problem.path,problem.limits,maximumPendingWindows);
+  public function prepareStream(
+    backend:ToppraPathTiming,
+    path:JointPathSamples,
+    limits:PathTimingLimits,
+    maximumPendingWindows:Int
+  ):PathTimingStream {
+    if (rows.length == 0) return backend.prepareStream(path, limits, maximumPendingWindows);
+    var problem = augmented(path, limits);
+    var stream = backend.prepareStream(problem.path, problem.limits, maximumPendingWindows);
     try return stream.selectJoints([for (i in 0...path.jointCount) i]);
-    catch (error:Dynamic) { stream.dispose(); throw error; }
+    catch (error:Dynamic) {
+      stream.dispose();
+      throw error;
+    }
   }
 
-  function augmented(path:JointPathSamples, limits:PathTimingLimits):{path:JointPathSamples,limits:PathTimingLimits} {
-    function augment(samples:Array<Array<Float>>):Array<Array<Float>>
-      return [for (sample in samples) sample.concat([for (row in rows) dot(row, sample)])];
-    return {path:new JointPathSamples(path.s,augment(path.q),augment(path.qPrime),
-      augment(path.qDoublePrime),augment(path.qDoublePrimeBefore)),
-      limits:new PathTimingLimits(limits.maxVelocity.concat(rates),
-        limits.maxAcceleration.concat([for (_ in rows) 1e12]),limits.speedCaps,
-        limits.startPathSpeed,limits.endPathSpeed,limits.requireFeasiblePath)};
+  function augmented(path:JointPathSamples,
+    limits:PathTimingLimits): {path: JointPathSamples, limits: PathTimingLimits} {
+    function augment(samples:Array<Array<Float
+      >>):Array<Array<Float>> return [for (sample in samples) sample.concat([for (row in rows) dot(
+        row,
+        sample
+      )])];
+    return {
+      path: new JointPathSamples(
+        path.s,
+        augment(path.q),
+        augment(path.qPrime),
+        augment(path.qDoublePrime),
+        augment(path.qDoublePrimeBefore)
+      ),
+      limits: new PathTimingLimits(
+        limits.maxVelocity.concat(rates),
+        limits.maxAcceleration.concat([for (_ in rows) 1e12]),
+        limits.speedCaps,
+        limits.startPathSpeed,
+        limits.endPathSpeed,
+        limits.requireFeasiblePath
+      )
+    };
   }
 
   /** Check polynomial extrema after lowering, including between path timing samples. */
   public function validate(trajectory:Trajectory):Void {
     if (rows.length == 0) return;
     var motors = Trajectory.fromSegments([for (segment in trajectory.segments()) {
-      timeFromStartNs: segment.timeFromStartNs, durationNs: segment.durationNs,
-      coefficients: [for (row in rows) [for (power in 0...segment.coefficients[0].length)
-        dot(row, [for (joint in segment.coefficients) joint[power]])]]
-    }]);
+      timeFromStartNs:segment.timeFromStartNs, durationNs:segment.durationNs,
+        coefficients:[for (row in rows)[for (power in 0...segment.coefficients[0].length) dot(
+          row,
+          [for (joint in segment.coefficients) joint[power]]
+        )]]
+    }
+    ]);
     try {
       var limits = new ValidationLimits(rows.length, Int64.ofInt(1), Int64.ofInt(0));
       for (i in 0...rows.length) limits.velocity(i, rates[i]);
       if (motors.validate(limits).hasFailure()) throw "Motor-space velocity limit exceeded";
       motors.dispose();
-    } catch (error:Dynamic) { motors.dispose(); throw error; }
+    } catch (error:Dynamic) {
+      motors.dispose();
+      throw error;
+    }
   }
 }

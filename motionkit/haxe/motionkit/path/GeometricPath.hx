@@ -12,16 +12,15 @@ class GeometricPath implements MotionPath {
   static inline final CELL:Float = 0.001;
 
   public function new(primitives:Array<PathPrimitive>) {
-    if (primitives == null || primitives.length == 0)
-      throw "Geometric path needs at least one primitive";
+    if (primitives == null || primitives.length == 0) throw "Geometric path needs at least one primitive";
     this.primitives = primitives.copy();
     cumulativeLengths = [];
     var total = 0.0;
     for (primitive in this.primitives) {
       if (primitive == null) throw "Geometric path cannot contain null primitives";
       var length = primitive.length();
-      if (!Math.isFinite(length) || length < 0.0)
-        throw "Geometric path primitive length must be finite and non-negative";
+      if (!Math.isFinite(length)
+        || length < 0.0) throw "Geometric path primitive length must be finite and non-negative";
       total += length;
       cumulativeLengths.push(total);
     }
@@ -29,24 +28,21 @@ class GeometricPath implements MotionPath {
   }
 
   public static function lines(points:Array<PathPoint>):GeometricPath {
-    if (points == null || points.length < 2)
-      throw "A line path needs at least two points";
+    if (points == null || points.length < 2) throw "A line path needs at least two points";
     var segments:Array<PathPrimitive> = [];
-    for (i in 0...(points.length - 1))
-      segments.push(new LineSegment(points[i], points[i + 1]));
+    for (i in 0...(points.length - 1)) segments.push(new LineSegment(points[i], points[i + 1]));
     return new GeometricPath(segments);
   }
 
   public function length():Float return totalLength;
 
   public function pointAt(distance:Float):PathPoint {
-    if (!Math.isFinite(distance) || distance < 0.0 || distance > totalLength)
-      throw "Geometric-path distance is outside its length";
+    if (!Math.isFinite(distance)
+      || distance < 0.0 || distance > totalLength) throw "Geometric-path distance is outside its length";
     var previous = 0.0;
     for (i in 0...primitives.length) {
       var end = cumulativeLengths[i];
-      if (distance <= end || i == primitives.length - 1)
-        return primitives[i].pointAt(distance - previous);
+      if (distance <= end || i == primitives.length - 1) return primitives[i].pointAt(distance - previous);
       previous = end;
     }
     return primitives[primitives.length - 1].pointAt(primitives[primitives.length - 1].length());
@@ -84,8 +80,7 @@ class GeometricPath implements MotionPath {
     return best;
   }
 
-  static function cellKey(x:Int, y:Int, z:Int):Int
-    return x * 73856093 + y * 19349663 + z * 83492791;
+  static function cellKey(x:Int, y:Int, z:Int):Int return x * 73856093 + y * 19349663 + z * 83492791;
 
   function buildGrid():Void {
     var cells = new Map<Int, Array<Int>>();
@@ -101,13 +96,25 @@ class GeometricPath implements MotionPath {
       var previous = primitive.pointAt(0.0);
       for (piece in 1...(pieces + 1)) {
         var at = primitive.pointAt(piece == pieces ? length : length * piece / pieces);
-        var x0 = Std.int(Math.floor((Math.min(previous.x, at.x) - pad) / CELL)), x1 = Std.int(Math.floor((Math.max(previous.x, at.x) + pad) / CELL));
-        var y0 = Std.int(Math.floor((Math.min(previous.y, at.y) - pad) / CELL)), y1 = Std.int(Math.floor((Math.max(previous.y, at.y) + pad) / CELL));
-        var z0 = Std.int(Math.floor((Math.min(previous.z, at.z) - pad) / CELL)), z1 = Std.int(Math.floor((Math.max(previous.z, at.z) + pad) / CELL));
+        var x0 = Std.int(Math.floor((Math.min(previous.x, at.x) - pad) / CELL)), x1 = Std.int(Math.floor((Math.max(
+          previous.x,
+          at.x
+        ) + pad) / CELL));
+        var y0 = Std.int(Math.floor((Math.min(previous.y, at.y) - pad) / CELL)), y1 = Std.int(Math.floor((Math.max(
+          previous.y,
+          at.y
+        ) + pad) / CELL));
+        var z0 = Std.int(Math.floor((Math.min(previous.z, at.z) - pad) / CELL)), z1 = Std.int(Math.floor((Math.max(
+          previous.z,
+          at.z
+        ) + pad) / CELL));
         for (x in x0...(x1 + 1)) for (y in y0...(y1 + 1)) for (z in z0...(z1 + 1)) {
           var key = cellKey(x, y, z);
           var list = cells.get(key);
-          if (list == null) { list = []; cells.set(key, list); }
+          if (list == null) {
+            list = [];
+            cells.set(key, list);
+          }
           // Consecutive pieces share cells; a primitive is filed once per cell.
           if (list.length == 0 || list[list.length - 1] != index) list.push(index);
         }
@@ -135,7 +142,8 @@ class GeometricPath implements MotionPath {
       var inside = arc.sweepAngle >= 0.0 ? delta <= arc.sweepAngle : delta >= arc.sweepAngle;
       if (!inside) return Math.min(point.distanceTo(arc.start), point.distanceTo(arc.end));
       var at = arc.pointAt(arc.length() * (arc.sweepAngle == 0.0 ? 0.0 : delta / arc.sweepAngle));
-      return Math.sqrt((point.x - at.x) * (point.x - at.x) + (point.y - at.y) * (point.y - at.y) + (point.z - at.z) * (point.z - at.z));
+      return Math.sqrt((point.x
+        - at.x) * (point.x - at.x) + (point.y - at.y) * (point.y - at.y) + (point.z - at.z) * (point.z - at.z));
     }
     if (Std.isOfType(primitive, CircularSegment)) {
       var circular:CircularSegment = cast primitive;
@@ -147,9 +155,15 @@ class GeometricPath implements MotionPath {
   static function segmentDistance(point:PathPoint, start:PathPoint, end:PathPoint):Float {
     var dx = end.x - start.x, dy = end.y - start.y, dz = end.z - start.z;
     var lengthSquared = dx * dx + dy * dy + dz * dz;
-    var fraction = lengthSquared <= 0.0 ? 0.0 : Math.max(0.0, Math.min(1.0,
-      ((point.x - start.x) * dx + (point.y - start.y) * dy + (point.z - start.z) * dz) / lengthSquared));
-    var x = point.x - start.x - fraction * dx, y = point.y - start.y - fraction * dy, z = point.z - start.z - fraction * dz;
+    var fraction = lengthSquared <= 0.0 ? 0.0 : Math.max(
+      0.0,
+      Math.min(
+        1.0,
+        ((point.x - start.x) * dx + (point.y - start.y) * dy + (point.z - start.z) * dz) / lengthSquared
+      )
+    );
+    var x = point.x - start.x - fraction * dx,
+      y = point.y - start.y - fraction * dy, z = point.z - start.z - fraction * dz;
     return Math.sqrt(x * x + y * y + z * z);
   }
 }

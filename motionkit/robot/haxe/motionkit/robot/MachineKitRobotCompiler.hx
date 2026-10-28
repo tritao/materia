@@ -32,22 +32,22 @@ class MachineKitRobotCompiler {
 
   /** Compile the authored gantry, including its drives, through the app's bridge.
    * Logical ceilings restrict a job; they do not replace physical drive ratings. */
-  public static function compileGantry(gantry:machinekit.gantry.Gantry,
-      maxVelocity:Float = DEFAULT_MAX_VELOCITY,
-      maxAcceleration:Float = DEFAULT_MAX_ACCELERATION):MotionSystemBlueprint {
+  public static function compileGantry(
+    gantry:machinekit.gantry.Gantry,
+    maxVelocity:Float = DEFAULT_MAX_VELOCITY,
+    maxAcceleration:Float = DEFAULT_MAX_ACCELERATION
+  ):MotionSystemBlueprint {
     if (gantry == null) throw "A physical gantry assembly is required";
-    if (!Math.isFinite(maxVelocity) || maxVelocity <= 0 ||
-        !Math.isFinite(maxAcceleration) || maxAcceleration <= 0)
-      throw "Gantry job ceilings must be finite and positive";
+    if (!Math.isFinite(maxVelocity) || maxVelocity <= 0 || !Math.isFinite(maxAcceleration)
+      || maxAcceleration <= 0) throw "Gantry job ceilings must be finite and positive";
     var model = physicalAssemblyModel(gantry);
     var ids = [for (axis in gantry.axes) axis.id];
     // Preserve the logical XYZ order while retaining every physical shaft joint.
     var order = [for (joint in model.joints) joint.id];
-    model.joints.sort((a, b) -> {
-      var first = ids.indexOf(a.id), second = ids.indexOf(b.id);
-      if (first < 0) first = ids.length + order.indexOf(a.id);
-      if (second < 0) second = ids.length + order.indexOf(b.id);
-      return first - second;
+    model.joints.sort((a, b) -> {var first = ids.indexOf(a.id), second = ids.indexOf(b.id);
+    if (first < 0) first = ids.length + order.indexOf(a.id);
+    if (second < 0) second = ids.length + order.indexOf(b.id);
+    return first - second;
     });
     var axes:Array<MotionAxisBlueprint> = [];
     for (axis in gantry.axes) {
@@ -55,17 +55,29 @@ class MachineKitRobotCompiler {
       for (_ in 0...model.joints.length) for (coupling in model.couplings) {
         var inputs = 0;
         for (candidate in model.couplings) if (candidate.follower == coupling.follower) inputs++;
-        if (inputs == 1 && joints.indexOf(coupling.leader) >= 0 && joints.indexOf(coupling.follower) < 0)
-          joints.push(coupling.follower);
+        if (inputs == 1 && joints.indexOf(coupling.leader) >= 0
+          && joints.indexOf(coupling.follower) < 0) joints.push(coupling.follower);
       }
       var limits = model.coupledLimits(axis.id);
       var lower = axis.lower * MILLIMETRES_TO_METRES;
       var upper = axis.upper * MILLIMETRES_TO_METRES;
-      axes.push(new MotionAxisBlueprint(axis.id, joints,
-        lower, upper,
+      axes.push(new MotionAxisBlueprint(
+        axis.id,
+        joints,
+        lower,
+        upper,
         Math.min(maxVelocity, limits.requireVelocity()),
-        Math.min(maxAcceleration, limits.requireAcceleration()),
-        homingDatum(model, axis.id, lower, upper)));
+        Math.min(
+          maxAcceleration,
+          limits.requireAcceleration()
+        ),
+        homingDatum(
+          model,
+          axis.id,
+          lower,
+          upper
+        )
+      ));
     }
     return MotionSystemBlueprint.fromRobotModel(model, axes);
   }
@@ -76,20 +88,24 @@ class MachineKitRobotCompiler {
     for (index in 0...model.joints.length) if (model.joints[index].id == axisId) jointIndex = index;
     if (jointIndex < 0) throw 'Gantry axis "$axisId" has no compiled joint';
     var repeatability = 0.0;
-    for (contact in model.switches) if (contact.role == "home" && contact.joint == axisId)
-      repeatability = Math.max(repeatability, contact.repeatability);
+    for (contact in model.switches) if (contact.role == "home" && contact.joint == axisId) repeatability = Math.max(
+      repeatability,
+      contact.repeatability
+    );
     var resolution = 0.0;
     for (actuator in model.actuators) {
       var mapping = robotkit.device.DeviceTransmission.of(model, actuator);
-      if (!mapping.singleLeader || mapping.jointIndex != jointIndex || actuator.microsteps == null ||
-          actuator.microsteps <= 0 || actuator.fullStepsPerRevolution <= 0.0) continue;
-      resolution = Math.max(resolution, 2 * Math.PI /
-        (actuator.fullStepsPerRevolution * actuator.microsteps * Math.abs(mapping.ratio)));
+      if (!mapping.singleLeader || mapping.jointIndex != jointIndex
+        || actuator.microsteps == null || actuator.microsteps <= 0 || actuator.fullStepsPerRevolution <= 0.0) continue;
+      resolution = Math.max(
+        resolution,
+        2 * Math.PI / (actuator.fullStepsPerRevolution * actuator.microsteps * Math.abs(mapping.ratio))
+      );
     }
     if (repeatability == 0.0 && resolution == 0.0) return home;
     var inset = repeatability + resolution;
-    if (!Math.isFinite(inset) || inset <= 0.0 || inset >= upper - lower)
-      throw 'Gantry axis "$axisId" has no room for its switch and drive home uncertainty';
+    if (!Math.isFinite(inset) || inset <= 0.0
+      || inset >= upper - lower) throw 'Gantry axis "$axisId" has no room for its switch and drive home uncertainty';
     return lower + inset;
   }
 
@@ -107,12 +123,28 @@ class MachineKitRobotCompiler {
       var mass = component.massProperties();
       var inertia = mass.inertia;
       if (inertia == null) throw 'Machine member "${occurrence.id}" needs inertia';
-      parts.push({id: entry.id, materialId: component.materialSpec(), density: 1.0,
+      parts.push({
+        id: entry.id,
+        materialId: component.materialSpec(),
+        density: 1.0,
         volume: mass.mass * 1e9,
-        centerOfMass: [mass.centreOfMass.x, mass.centreOfMass.y, mass.centreOfMass.z],
-        inertia: [inertia.xx * 1e9, inertia.xy * 1e9, inertia.xz * 1e9,
-          inertia.xy * 1e9, inertia.yy * 1e9, inertia.yz * 1e9,
-          inertia.xz * 1e9, inertia.yz * 1e9, inertia.zz * 1e9]});
+        centerOfMass: [
+          mass.centreOfMass.x,
+          mass.centreOfMass.y,
+          mass.centreOfMass.z
+        ],
+        inertia: [
+          inertia.xx * 1e9,
+          inertia.xy * 1e9,
+          inertia.xz * 1e9,
+          inertia.xy * 1e9,
+          inertia.yy * 1e9,
+          inertia.yz * 1e9,
+          inertia.xz * 1e9,
+          inertia.yz * 1e9,
+          inertia.zz * 1e9
+        ]
+      });
     }
     return AssemblySimulationBridge.toRobotModel(definition,
       {metresPerUnit: MILLIMETRES_TO_METRES, parts: parts}).model;
@@ -121,15 +153,16 @@ class MachineKitRobotCompiler {
   /** Attach MachineKit drives to the part-level assembly model. The motor
    * drives its shaft joint; the existing lead-screw JointCoupling relates
    * shaft rotation to carriage travel. No second joint topology is built. */
-  static function attachLinearAxisDrives(model:RobotModel,
-      bindings:Array<AssemblyAxisBinding>,
-      ?maxVelocity:Float = DEFAULT_MAX_VELOCITY,
-      ?maxAcceleration:Float = DEFAULT_MAX_ACCELERATION):MotionSystemBlueprint {
-    if (model == null || bindings == null || bindings.length == 0)
-      throw "Assembly axes need a physical robot model and bindings";
-    if (!Math.isFinite(maxVelocity) || maxVelocity <= 0 ||
-        !Math.isFinite(maxAcceleration) || maxAcceleration <= 0)
-      throw "Assembly axis limits must be finite and positive";
+  static function attachLinearAxisDrives(
+    model:RobotModel,
+    bindings:Array<AssemblyAxisBinding>,
+    ?maxVelocity:Float = DEFAULT_MAX_VELOCITY,
+    ?maxAcceleration:Float = DEFAULT_MAX_ACCELERATION
+  ):MotionSystemBlueprint {
+    if (model == null
+      || bindings == null || bindings.length == 0) throw "Assembly axes need a physical robot model and bindings";
+    if (!Math.isFinite(maxVelocity) || maxVelocity <= 0 || !Math.isFinite(maxAcceleration)
+      || maxAcceleration <= 0) throw "Assembly axis limits must be finite and positive";
     var axes:Array<MotionAxisBlueprint> = [];
     var ratios:Array<Float> = [];
     var used = new Map<String, Bool>();
@@ -145,45 +178,63 @@ class MachineKitRobotCompiler {
         if (joint.id == binding.shaftJointId) shaft = joint;
         if (joint.id == binding.travelJointId) travel = joint;
       }
-      if (shaft == null || travel == null || shaft.type != JointType.Continuous ||
-          travel.type != JointType.Prismatic || shaft.parent.id != binding.motorLinkId)
-        throw 'Assembly axis "${binding.id}" has no matching motor shaft and carriage joints';
+      if (shaft == null
+        || travel == null || shaft.type != JointType.Continuous || travel.type != JointType.Prismatic || shaft.parent.id
+        != binding.motorLinkId) throw 'Assembly axis "${binding.id}" has no matching motor shaft and carriage joints';
       var expected = assemblyScrewRatio(binding.axis);
       var matched = false;
-      for (coupling in model.couplings)
-        if (coupling.leader == travel.id && coupling.follower == shaft.id &&
-            Math.abs(coupling.ratio - expected) <= Math.abs(expected) * 1e-8) {
-          matched = true;
-          ratios.push(coupling.ratio);
-        }
-      if (!matched)
-        throw 'Assembly axis "${binding.id}" has no matching lead-screw joint coupling';
+      for (coupling in model.couplings) if (coupling.leader == travel.id
+        && coupling.follower == shaft.id && Math.abs(coupling.ratio - expected) <= Math.abs(expected) * 1e-8) {
+        matched = true;
+        ratios.push(coupling.ratio);
+      }
+      if (!matched) throw 'Assembly axis "${binding.id}" has no matching lead-screw joint coupling';
       for (actuator in model.actuators) switch actuator.transmission {
         case SimpleTransmission(jointId, _, _) if (jointId == shaft.id):
           throw 'Assembly motor shaft "${shaft.id}" already has an actuator';
         case _:
       }
-      axes.push(new MotionAxisBlueprint(binding.id, [travel.id, shaft.id],
-        0.0, binding.axis.stroke * MILLIMETRES_TO_METRES,
-        maxVelocity, maxAcceleration));
+      axes.push(new MotionAxisBlueprint(
+        binding.id,
+        [travel.id, shaft.id],
+        0.0,
+        binding.axis.stroke * MILLIMETRES_TO_METRES,
+        maxVelocity,
+        maxAcceleration
+      ));
     }
     for (index in 0...bindings.length) {
       var binding = bindings[index];
       var shaftId = binding.shaftJointId;
       var ratio = ratios[index];
       // This convenience compiler states a 24 V, rated-current drive. The motor part owns its curve.
-      var source = binding.axis.motor.actuator('${binding.id}.motor.${binding.axis.motor.designation}', shaftId, 24, 0.5);
-      var motor = new Actuator(source.id, source.maxEffort,
+      var source = binding.axis.motor.actuator(
+        '${binding.id}.motor.${binding.axis.motor.designation}',
+        shaftId,
+        24,
+        0.5
+      );
+      var motor = new Actuator(
+        source.id,
+        source.maxEffort,
         source.maxRate,
-        Transmission.SimpleTransmission(shaftId, 1.0, 0.0));
-      var steps = source.fullStepsPerRevolution, inertia = source.rotorInertia, holding = source.holdingTorque, curve = source.torqueSpeed;
-      if (steps == null || inertia == null || holding == null || curve == null)
-        throw "Axis motor must supply stepper ratings and a torque-speed curve";
+        Transmission.SimpleTransmission(
+          shaftId,
+          1.0,
+          0.0
+        )
+      );
+      var steps = source.fullStepsPerRevolution,
+        inertia = source.rotorInertia, holding = source.holdingTorque, curve = source.torqueSpeed;
+      if (steps == null || inertia == null
+        || holding == null || curve == null) throw "Axis motor must supply stepper ratings and a torque-speed curve";
       motor.drive = new StepperDrive(steps, inertia, holding, TorqueSpeedCurve.unflatten(curve));
       var assumptions = source.assumed;
       if (assumptions != null) motor.assumed = [for (label in assumptions) label];
-      if (source.assumptions != null) motor.assumptions = [for (value in source.assumptions)
-        {quantity: value.quantity, label: value.label}];
+      if (source.assumptions != null) motor.assumptions = [for (value in source.assumptions) {
+        quantity:value.quantity, label:value.label
+      }
+      ];
       robotkit.model.EngineeringAssumptions.add(motor.assumptions, "motor curve", "convenience compiler 24 V drive");
       robotkit.model.EngineeringAssumptions.add(motor.assumptions, "speed limit", "convenience compiler 24 V drive");
       motor.assumed.push("convenience compiler 24 V drive");
@@ -198,11 +249,22 @@ class MachineKitRobotCompiler {
     model.materializeLimits();
     axes = [for (binding in bindings) {
       var limits = [for (joint in model.joints) if (joint.id == binding.travelJointId) joint.limits][0];
-      new MotionAxisBlueprint(binding.id, [binding.travelJointId, binding.shaftJointId],
-        0.0, binding.axis.stroke * MILLIMETRES_TO_METRES,
-        limits.velocity == null ? maxVelocity : Math.min(maxVelocity, limits.velocity),
-        limits.maxAcceleration == null ? maxAcceleration : Math.min(maxAcceleration, limits.maxAcceleration));
-    }];
+      new MotionAxisBlueprint(
+        binding.id,
+        [binding.travelJointId, binding.shaftJointId],
+        0.0,
+        binding.axis.stroke * MILLIMETRES_TO_METRES,
+        limits.velocity == null ? maxVelocity : Math.min(
+          maxVelocity,
+          limits.velocity
+        ),
+        limits.maxAcceleration == null ? maxAcceleration : Math.min(
+          maxAcceleration,
+          limits.maxAcceleration
+        )
+      );
+    }
+    ];
     return MotionSystemBlueprint.fromRobotModel(model, axes);
   }
 
@@ -211,9 +273,12 @@ class MachineKitRobotCompiler {
    * returned blueprint exposes the RobotModel used to create the runtime, so
    * design, simulation, and deployment all share one compiled description.
    */
-  public static function compileLinearAxis(axis:LinearAxis, axisId:String,
-      ?maxVelocity:Float = DEFAULT_MAX_VELOCITY,
-      ?maxAcceleration:Float = DEFAULT_MAX_ACCELERATION):MotionSystemBlueprint {
+  public static function compileLinearAxis(
+    axis:LinearAxis,
+    axisId:String,
+    ?maxVelocity:Float = DEFAULT_MAX_VELOCITY,
+    ?maxAcceleration:Float = DEFAULT_MAX_ACCELERATION
+  ):MotionSystemBlueprint {
     requireAxis(axis, axisId);
     requireId(axisId);
     var assembly = new MachineAssembly();
@@ -222,27 +287,52 @@ class MachineKitRobotCompiler {
   }
 
   /** Compiles the same part-level assembly used by the complete motion blueprint. */
-  public static function compileLinearAxisModel(axis:LinearAxis, axisId:String,
-      ?maxVelocity:Float = DEFAULT_MAX_VELOCITY,
-      ?maxAcceleration:Float = DEFAULT_MAX_ACCELERATION):RobotModel
-    return compileLinearAxis(axis, axisId, maxVelocity, maxAcceleration).model;
+  public static function compileLinearAxisModel(
+    axis:LinearAxis,
+    axisId:String,
+    ?maxVelocity:Float = DEFAULT_MAX_VELOCITY,
+    ?maxAcceleration:Float = DEFAULT_MAX_ACCELERATION
+  ):RobotModel return compileLinearAxis(
+    axis,
+    axisId,
+    maxVelocity,
+    maxAcceleration
+  ).model;
 
   /** Compile actual members and joints; their resolved transmissions are the only screw ratios. */
-  static function compilePhysicalAxes(assembly:MachineAssembly, ids:Array<String>, axes:Array<LinearAxis>,
-      maxVelocity:Float, maxAcceleration:Float):MotionSystemBlueprint {
+  static function compilePhysicalAxes(
+    assembly:MachineAssembly,
+    ids:Array<String>,
+    axes:Array<LinearAxis>,
+    maxVelocity:Float,
+    maxAcceleration:Float
+  ):MotionSystemBlueprint {
     // LinearAxis's grounded preview parts belong to its motor body when it is a moving stage.
     for (index in 0...ids.length) {
       var id = ids[index];
       var flat = axes[index].definition();
       var motorPose = [for (entry in flat.occurrences) if (entry.id == "motor") entry.initialPose][0];
-      var children = [for (joint in flat.joints) if (joint.role == materia.assembly.AssemblyDefinition.AssemblyJointRole.Tree) joint.child];
+      var children = [for (joint in flat.joints) if (joint.role
+        == materia.assembly.AssemblyDefinition.AssemblyJointRole.Tree) joint.child];
       for (entry in flat.occurrences) if (entry.id != "motor" && children.indexOf(entry.id) < 0) {
         var connector = "root/" + entry.id;
-        assembly.addMemberConnector(id + "/motor", connector,
-          AssemblyFrames.compose(AssemblyFrames.inverse(motorPose), entry.initialPose));
+        assembly.addMemberConnector(
+          id + "/motor",
+          connector,
+          AssemblyFrames.compose(
+            AssemblyFrames.inverse(motorPose),
+            entry.initialPose
+          )
+        );
         assembly.addMemberConnector(id + "/" + entry.id, "stageRoot", AssemblyFrames.identity());
-        assembly.addMate(id + "/ground/" + entry.id, "fixed", id + "/motor", connector,
-          id + "/" + entry.id, "stageRoot");
+        assembly.addMate(
+          id + "/ground/" + entry.id,
+          "fixed",
+          id + "/motor",
+          connector,
+          id + "/" + entry.id,
+          "stageRoot"
+        );
       }
     }
     var mechanical = new AssemblyModel();
@@ -257,28 +347,55 @@ class MachineKitRobotCompiler {
       var inertia = mass.inertia;
       if (inertia == null) throw 'Axis member "${occurrence.id}" needs inertia';
       // Express known kg and kg mm² as unit-density mm³ and mm⁵ for the bridge.
-      parts.push({id: entry.id, materialId: component.materialSpec(), density: 1.0,
+      parts.push({
+        id: entry.id,
+        materialId: component.materialSpec(),
+        density: 1.0,
         volume: mass.mass * 1e9,
-        centerOfMass: [mass.centreOfMass.x, mass.centreOfMass.y, mass.centreOfMass.z],
-        inertia: [inertia.xx * 1e9, inertia.xy * 1e9, inertia.xz * 1e9,
-          inertia.xy * 1e9, inertia.yy * 1e9, inertia.yz * 1e9,
-          inertia.xz * 1e9, inertia.yz * 1e9, inertia.zz * 1e9]});
+        centerOfMass: [
+          mass.centreOfMass.x,
+          mass.centreOfMass.y,
+          mass.centreOfMass.z
+        ],
+        inertia: [
+          inertia.xx * 1e9,
+          inertia.xy * 1e9,
+          inertia.xz * 1e9,
+          inertia.xy * 1e9,
+          inertia.yy * 1e9,
+          inertia.yz * 1e9,
+          inertia.xz * 1e9,
+          inertia.yz * 1e9,
+          inertia.zz * 1e9
+        ]
+      });
     }
-    var physical = AssemblySimulationBridge.toRobotModel(definition, {metresPerUnit: MILLIMETRES_TO_METRES, parts: parts});
+    var physical = AssemblySimulationBridge.toRobotModel(
+      definition,
+      {
+        metresPerUnit: MILLIMETRES_TO_METRES,
+        parts: parts
+      }
+    );
     // Put logical travels first for deterministic XYZ indexing; retain every physical motor joint.
-    physical.model.joints.sort((a, b) -> {
-      var first = ids.indexOf(a.id.split("/")[0]), second = ids.indexOf(b.id.split("/")[0]);
-      if (a.type != JointType.Prismatic) first += ids.length;
-      if (b.type != JointType.Prismatic) second += ids.length;
-      return first == second ? Reflect.compare(a.id, b.id) : first - second;
+    physical.model.joints.sort((a,
+      b) -> {var first = ids.indexOf(a.id.split("/")[0]), second = ids.indexOf(b.id.split("/")[0]);
+    if (a.type != JointType.Prismatic) first += ids.length;
+    if (b.type != JointType.Prismatic) second += ids.length;
+    return first == second ? Reflect.compare(a.id, b.id) : first - second;
     });
     var bindings:Array<AssemblyAxisBinding> = [];
     for (index in 0...ids.length) {
       var id = ids[index];
       var motor = physical.partLinks.get(id + "/motor");
       if (motor == null) throw 'Axis "$id" has no motor body';
-      bindings.push({id: id, axis: axes[index], motorLinkId: physical.model.links[motor.link].id,
-        shaftJointId: id + "/coupling", travelJointId: id + "/carriage-slide"});
+      bindings.push({
+        id: id,
+        axis: axes[index],
+        motorLinkId: physical.model.links[motor.link].id,
+        shaftJointId: id + "/coupling",
+        travelJointId: id + "/carriage-slide"
+      });
     }
     return attachLinearAxisDrives(physical.model, bindings, maxVelocity, maxAcceleration);
   }
@@ -286,8 +403,8 @@ class MachineKitRobotCompiler {
   /** Read the axis's resolved coupling, then convert its mm leader to SI. */
   static function assemblyScrewRatio(axis:LinearAxis):Float {
     var couplings = axis.definition().couplings;
-    if (couplings != null) for (coupling in couplings)
-      if (coupling.id == "lead-screw") return coupling.ratio / MILLIMETRES_TO_METRES;
+    if (couplings != null) for (coupling in couplings) if (coupling.id
+      == "lead-screw") return coupling.ratio / MILLIMETRES_TO_METRES;
     throw "Linear axis has no resolved lead-screw coupling";
   }
 
@@ -296,7 +413,6 @@ class MachineKitRobotCompiler {
   }
 
   static function requireId(id:String):Void {
-    if (id == null || StringTools.trim(id).length == 0)
-      throw "MachineKit axis ID must be non-empty";
+    if (id == null || StringTools.trim(id).length == 0) throw "MachineKit axis ID must be non-empty";
   }
 }

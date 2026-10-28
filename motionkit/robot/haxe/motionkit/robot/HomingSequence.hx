@@ -9,11 +9,13 @@ class HomingSequence {
       var joint = axis.switches[0].joint;
       if (coordinates.exists(joint)) throw "A homing coordinate belongs to multiple axes";
       coordinates.set(joint, axis);
-      var expected = axis.switches[0].homeAfter.copy(); expected.sort(Reflect.compare);
+      var expected = axis.switches[0].homeAfter.copy();
+      expected.sort(Reflect.compare);
       for (contact in axis.switches) {
-        var dependencies = contact.homeAfter.copy(); dependencies.sort(Reflect.compare);
-        if (dependencies.join("\n") != expected.join("\n"))
-          throw "Home switches on one coordinate must agree on dependencies";
+        var dependencies = contact.homeAfter.copy();
+        dependencies.sort(Reflect.compare);
+        if (dependencies.join("\n")
+          != expected.join("\n")) throw "Home switches on one coordinate must agree on dependencies";
       }
     }
     var visiting = new Map<String, Bool>(), visited = new Map<String, Bool>();
@@ -26,9 +28,12 @@ class HomingSequence {
       var axis = coordinates.get(id), dependencies = axis.switches[0].homeAfter.copy();
       dependencies.sort(Reflect.compare);
       for (dependency in dependencies) visit(dependency);
-      visiting.remove(id); visited.set(id, true); result.push(axis);
+      visiting.remove(id);
+      visited.set(id, true);
+      result.push(axis);
     }
-    var names = [for (id in coordinates.keys()) id]; names.sort(Reflect.compare);
+    var names = [for (id in coordinates.keys()) id];
+    names.sort(Reflect.compare);
     for (id in names) visit(id);
     return result;
   }

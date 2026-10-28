@@ -14,10 +14,10 @@ class AffineJointMap {
   public final columns:Array<Array<Float>>;
 
   public function new(offsets:Array<Float>, columns:Array<Array<Float>>) {
-    if (offsets == null || columns == null || columns.length != 3)
-      throw "An affine joint map needs offsets and three columns";
-    for (column in columns) if (column.length != offsets.length)
-      throw "An affine joint map's columns must cover every joint";
+    if (offsets == null
+      || columns == null || columns.length != 3) throw "An affine joint map needs offsets and three columns";
+    for (column in columns) if (column.length
+      != offsets.length) throw "An affine joint map's columns must cover every joint";
     this.offsets = offsets.copy();
     this.columns = [for (column in columns) column.copy()];
   }
@@ -25,6 +25,6 @@ class AffineJointMap {
   public function jointCount():Int return offsets.length;
 
   /** The rate of joint `joint` for a tool velocity. */
-  public function rate(joint:Int, vx:Float, vy:Float, vz:Float):Float
-    return columns[0][joint] * vx + columns[1][joint] * vy + columns[2][joint] * vz;
+  public function rate(joint:Int,
+    vx:Float, vy:Float, vz:Float):Float return columns[0][joint] * vx + columns[1][joint] * vy + columns[2][joint] * vz;
 }

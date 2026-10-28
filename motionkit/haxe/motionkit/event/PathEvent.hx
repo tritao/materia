@@ -8,14 +8,16 @@ class PathEvent {
   public final leadSeconds:Float;
   public final holdPolicy:HoldPolicy;
 
-  public function new(distance:Float, channel:String, value:EventValue,
-      ?leadSeconds:Float = 0.0, ?holdPolicy:HoldPolicy) {
-    if (!Math.isFinite(distance) || distance < 0.0)
-      throw "Path-event distance must be finite and non-negative";
-    if (channel == null || StringTools.trim(channel).length == 0)
-      throw "Path event needs a non-empty channel ID";
-    if (!Math.isFinite(leadSeconds) || leadSeconds < 0.0)
-      throw "Path-event lead time must be finite and non-negative";
+  public function new(
+    distance:Float,
+    channel:String,
+    value:EventValue,
+    ?leadSeconds:Float = 0.0,
+    ?holdPolicy:HoldPolicy
+  ) {
+    if (!Math.isFinite(distance) || distance < 0.0) throw "Path-event distance must be finite and non-negative";
+    if (channel == null || StringTools.trim(channel).length == 0) throw "Path event needs a non-empty channel ID";
+    if (!Math.isFinite(leadSeconds) || leadSeconds < 0.0) throw "Path-event lead time must be finite and non-negative";
     EventValueTools.validate(value, "Path-event value");
     this.distance = distance;
     this.channel = channel;

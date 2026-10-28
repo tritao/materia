@@ -11,8 +11,7 @@ import motionkit.planner.PathPlanningOptions;
 enum MotionRequest {
   Axes(targets:Array<AxisTarget>, options:Null<MotionOptions>);
   Linear(target:PathPoint, feed:Feed, options:Null<MotionOptions>);
-  Path(path:GeometricPath, pathOptions:Null<PathPlanningOptions>,
-    motionOptions:Null<MotionOptions>);
+  Path(path:GeometricPath, pathOptions:Null<PathPlanningOptions>, motionOptions:Null<MotionOptions>);
   Queued(command:QueuedMotionRequest);
   Jog(axisId:String, velocity:Float, durationSeconds:Float, acceleration:Float);
 }

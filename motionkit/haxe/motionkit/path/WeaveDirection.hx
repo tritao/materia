@@ -12,6 +12,8 @@ class WeaveDirection {
     }
     var norm = axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2];
     if (Math.abs(norm - 1.0) > 1e-8) throw "Weave lateral axis must be a unit vector";
-    this.axis = axis.copy(); this.first = first.copy(); this.second = second.copy();
+    this.axis = axis.copy();
+    this.first = first.copy();
+    this.second = second.copy();
   }
 }

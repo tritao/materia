@@ -24,7 +24,7 @@ class DistanceDrive {
   /** The joint index driven. */
   public final joint:Int;
   /** The nominal intervals, in order, rebased so that the path starts at 0. */
-  public var intervals(get,never):Array<DriveInterval>;
+  public var intervals(get, never):Array<DriveInterval>;
   final nominalIntervals:Array<DriveInterval>;
   public final pathLength:Float;
   /** The ramp length the profile aims for, metres. */
@@ -35,16 +35,18 @@ class DistanceDrive {
   final positions:Array<Float> = [];
 
   public function new(joint:Int, intervals:Array<DriveInterval>, pathLength:Float, ramp:Float) {
-    if (joint < 0 || !Math.isFinite(pathLength) || pathLength <= 0.0 || !Math.isFinite(ramp) || ramp <= 0.0)
-      throw "A distance drive needs a joint, a positive path length and a positive ramp";
-    this.joint = joint; this.pathLength = pathLength; this.ramp = ramp;
+    if (joint < 0 || !Math.isFinite(pathLength) || pathLength <= 0.0 || !Math.isFinite(ramp)
+      || ramp <= 0.0) throw "A distance drive needs a joint, a positive path length and a positive ramp";
+    this.joint = joint;
+    this.pathLength = pathLength;
+    this.ramp = ramp;
     // Clean the intervals: ordered, inside the path, nonzero, with equal neighbours merged.
     var cleaned:Array<DriveInterval> = [];
     var previousEnd = 0.0;
     for (interval in intervals) {
-      if (!Math.isFinite(interval.start) || !Math.isFinite(interval.end) || !Math.isFinite(interval.rate) ||
-          interval.start < previousEnd - 1e-12 || interval.end > pathLength + 1e-9 || interval.end < interval.start)
-        throw "Distance-drive intervals must be ordered, finite and inside the path";
+      if (!Math.isFinite(interval.start) || !Math.isFinite(interval.end)
+        || !Math.isFinite(interval.rate) || interval.start < previousEnd - 1e-12 || interval.end > pathLength + 1e-9
+        || interval.end < interval.start) throw "Distance-drive intervals must be ordered, finite and inside the path";
       previousEnd = interval.end;
       var start = Math.max(0.0, interval.start), end = Math.min(pathLength, interval.end);
       if (end - start <= 1e-12 || interval.rate == 0.0) continue;
@@ -56,20 +58,23 @@ class DistanceDrive {
     build();
   }
 
-  function get_intervals():Array<DriveInterval>
-    return [for (interval in nominalIntervals) {start:interval.start,end:interval.end,rate:interval.rate}];
+  function get_intervals():Array<DriveInterval> return [for (interval in nominalIntervals) {
+    start:interval.start, end:interval.end, rate:interval.rate
+  }
+  ];
 
   /** The drive restricted to [from, to] of this path and rebased to start at 0, re-shaped so it starts and ends at rest; null if it drives nothing there. */
   public function slice(from:Float, to:Float):Null<DistanceDrive> {
     var kept:Array<DriveInterval> = [];
-    var low=0,high=nominalIntervals.length;
-    while (low<high) {
-      var middle=low+((high-low)>>1);
-      if (nominalIntervals[middle].end<=from) low=middle+1; else high=middle;
+    var low = 0, high = nominalIntervals.length;
+    while (low < high) {
+      var middle = low + ((high - low) >> 1);
+      if (nominalIntervals[middle].end <= from) low = middle + 1;
+      else high = middle;
     }
-    var index=low;
-    while (index<nominalIntervals.length && nominalIntervals[index].start<to) {
-      var interval=nominalIntervals[index++];
+    var index = low;
+    while (index < nominalIntervals.length && nominalIntervals[index].start < to) {
+      var interval = nominalIntervals[index++];
       var start = Math.max(interval.start, from), end = Math.min(interval.end, to);
       if (end - start > 1e-12) kept.push({start: start - from, end: end - from, rate: interval.rate});
     }
@@ -80,7 +85,9 @@ class DistanceDrive {
   public function stations():Array<Float> return distances.copy();
   /** The rate is piecewise affine, so its absolute maximum occurs at a station, including startup overshoot. */
   public function maximumRate():Float {
-    var bound=0.0;for(rate in rates)bound=Math.max(bound,Math.abs(rate));return bound;
+    var bound = 0.0;
+    for (rate in rates) bound = Math.max(bound, Math.abs(rate));
+    return bound;
   }
 
   /** The joint's position change from the path's start, at `distance`. */
@@ -121,7 +128,8 @@ class DistanceDrive {
     var low = 0, high = distances.length - 1;
     while (low < high) {
       var middle = (low + high + 1) >> 1;
-      if (distances[middle] <= distance + 1e-12) low = middle; else high = middle - 1;
+      if (distances[middle] <= distance + 1e-12) low = middle;
+      else high = middle - 1;
     }
     return low;
   }
@@ -131,13 +139,15 @@ class DistanceDrive {
     function put(s:Float, rate:Float):Void {
       var last = points[points.length - 1];
       if (s < last.s - 1e-12) throw "Distance-drive ramps overlap";
-      if (Math.abs(s - last.s) <= 1e-12) last.rate = rate; else points.push({s: s, rate: rate});
+      if (Math.abs(s - last.s) <= 1e-12) last.rate = rate;
+      else points.push({s: s, rate: rate});
     }
     // Runs: consecutive intervals that touch.
     var i = 0;
     while (i < nominalIntervals.length) {
       var j = i;
-      while (j + 1 < nominalIntervals.length && Math.abs(nominalIntervals[j + 1].start - nominalIntervals[j].end) <= 1e-9) j++;
+      while (j + 1 < nominalIntervals.length
+        && Math.abs(nominalIntervals[j + 1].start - nominalIntervals[j].end) <= 1e-9) j++;
       var begin = nominalIntervals[i].start, end = nominalIntervals[j].end;
       // The ramp a run can carry: its start-up and wind-down take two ramps each, and a change inside it one.
       var shortest = end - begin;
@@ -160,7 +170,8 @@ class DistanceDrive {
     put(pathLength, 0.0);
     positions.push(0.0);
     for (k in 0...points.length) {
-      distances.push(points[k].s); rates.push(points[k].rate);
+      distances.push(points[k].s);
+      rates.push(points[k].rate);
       if (k > 0) positions.push(positions[k - 1] + 0.5 * (rates[k - 1] + rates[k]) * (distances[k] - distances[k - 1]));
     }
   }

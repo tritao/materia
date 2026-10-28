@@ -14,13 +14,15 @@ class ManipulatorPlannerSpace implements BoxClearanceSpace {
   final widthBuffer:Array<Float> = [];
 
   /** Preserve measured process coordinates outside the arm while varying only the arm DOFs. */
-  public function new(inner:CollisionPlannerSpace, arm:Manipulator, reference:Array<Float>, ?fullReference:Array<Float>) {
+  public function new(inner:CollisionPlannerSpace,
+    arm:Manipulator, reference:Array<Float>, ?fullReference:Array<Float>) {
     this.inner = inner;
     this.arm = arm;
     this.reference = fullReference == null ? arm.stateOf(reference).q.copy() : fullReference.copy();
-    if (this.reference.length != inner.bodies.model.dofCount())
-      throw "Manipulator collision reference has the wrong complete-model dimension";
-    for (value in this.reference) if (!Math.isFinite(value)) throw "Manipulator planner needs finite reference coordinates";
+    if (this.reference.length
+      != inner.bodies.model.dofCount()) throw "Manipulator collision reference has the wrong complete-model dimension";
+    for (value in this
+      .reference) if (!Math.isFinite(value)) throw "Manipulator planner needs finite reference coordinates";
     var zero = [for (_ in 0...arm.dofCount()) 0.0];
     var base = arm.stateOf(zero).q;
     dofs = [];
@@ -68,12 +70,16 @@ class ManipulatorPlannerSpace implements BoxClearanceSpace {
 
   public function boxesClear(centres:Array<Float>, halfWidths:Array<Float>, count:Int):Array<Bool> {
     var n = dimension(), fullCentres = mappedBuffer, fullWidths = widthBuffer;
-    fullCentres.resize(0); fullWidths.resize(0);
-    if (centres == null || halfWidths == null || centres.length != count * n || halfWidths.length != count * n)
-      throw "Manipulator planner boxes have the wrong dimension";
+    fullCentres.resize(0);
+    fullWidths.resize(0);
+    if (centres == null || halfWidths == null || centres.length != count * n
+      || halfWidths.length != count * n) throw "Manipulator planner boxes have the wrong dimension";
     for (box in 0...count) {
       var offset = fullCentres.length;
-      for (value in reference) { fullCentres.push(value); fullWidths.push(0.0); }
+      for (value in reference) {
+        fullCentres.push(value);
+        fullWidths.push(0.0);
+      }
       // Held coordinates do not move: only the manipulator's own coordinates span the box.
       for (i in 0...n) {
         fullCentres[offset + dofs[i]] = centres[box * n + i];
@@ -85,4 +91,3 @@ class ManipulatorPlannerSpace implements BoxClearanceSpace {
 
   public function dispose():Void inner.build.world.dispose();
 }
-

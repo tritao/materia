@@ -28,8 +28,12 @@ class AxisKinematics implements KinematicsSolver {
   final couplingRatios:Array<Float> = [];
   final couplingOffsets:Array<Float> = [];
 
-  public function new(blueprint:MotionSystemBlueprint,
-      ?xAxisId:String = "x", ?yAxisId:String = "y", ?zAxisId:String = "z") {
+  public function new(
+    blueprint:MotionSystemBlueprint,
+    ?xAxisId:String = "x",
+    ?yAxisId:String = "y",
+    ?zAxisId:String = "z"
+  ) {
     if (blueprint == null) throw "Axis kinematics needs a motion-system blueprint";
     this.blueprint = blueprint;
     var names = [for (joint in blueprint.model.joints) joint.name];
@@ -38,27 +42,34 @@ class AxisKinematics implements KinematicsSolver {
       for (axis in axes) if (axis.id == id) return axis;
       throw 'Axis kinematics requires logical axis "$id"';
     }
-    x = required(xAxisId); y = required(yAxisId); z = required(zAxisId);
+    x = required(xAxisId);
+    y = required(yAxisId);
+    z = required(zAxisId);
     var used = new Map<Int, Bool>();
     for (axis in [x, y, z]) for (joint in axis.jointIndices) {
-      if (used.exists(joint))
-        throw 'Axis kinematics maps joint $joint to more than one coordinate';
+      if (used.exists(joint)) throw 'Axis kinematics maps joint $joint to more than one coordinate';
       used.set(joint, true);
     }
     var ids = [for (joint in blueprint.model.joints) joint.id];
     var terms:Array<{leader:Int, follower:Int, ratio:Float, offset:Float}> = [];
     for (coupling in blueprint.model.couplings) {
       var leader = ids.indexOf(coupling.leader), follower = ids.indexOf(coupling.follower);
-      if (leader >= 0 && follower >= 0 && !used.exists(follower))
-        terms.push({leader: leader, follower: follower, ratio: coupling.ratio, offset: coupling.offset});
+      if (leader >= 0 && follower >= 0 && !used.exists(follower)) terms.push({
+        leader: leader,
+        follower: follower,
+        ratio: coupling.ratio,
+        offset: coupling.offset
+      });
     }
     // Each derived joint after the derived joints it follows, so one pass completes them all (a cycle throws).
     derived = CouplingProjection.of(terms, ids.length);
     for (coupling in blueprint.model.couplings) {
       var leader = ids.indexOf(coupling.leader), follower = ids.indexOf(coupling.follower);
       if (leader >= 0 && follower >= 0) {
-        couplingLeaders.push(leader); couplingFollowers.push(follower);
-        couplingRatios.push(coupling.ratio); couplingOffsets.push(coupling.offset);
+        couplingLeaders.push(leader);
+        couplingFollowers.push(follower);
+        couplingRatios.push(coupling.ratio);
+        couplingOffsets.push(coupling.offset);
       }
     }
     home = [for (_ in names) 0.0];
@@ -81,7 +92,7 @@ class AxisKinematics implements KinematicsSolver {
     var count = jointCount();
     function placed(position:Array<Float>):Array<Float> {
       var joints = [for (_ in 0...count) 0.0];
-      for (index in 0...3) [x, y, z][index].writeLogicalPosition(joints, position[index]);
+      for (index in 0...3)[x, y, z][index].writeLogicalPosition(joints, position[index]);
       completeDerived(joints, true);
       return joints;
     }
@@ -91,7 +102,8 @@ class AxisKinematics implements KinematicsSolver {
       along[axis] = 1.0;
       var moved = placed(along);
       [for (joint in 0...count) moved[joint] - origin[joint]];
-    }];
+    }
+    ];
     return affine = new AffineJointMap(origin, columns);
   }
 
@@ -100,26 +112,28 @@ class AxisKinematics implements KinematicsSolver {
     return new Pose3(x.logicalPosition(q), y.logicalPosition(q), z.logicalPosition(q));
   }
 
-  public function solvePose(target:Pose3, seed:Array<Float>,
-      tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
+  public function solvePose(target:Pose3,
+    seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
     if (target == null || tolerance == null) throw "Axis IK needs a pose and tolerance";
     requireJoints(seed);
-    if (ToolFreedom.orientationError(new Pose3(0, 0, 0), target, freedom == null ? OrientationPolicy.Interpolated : freedom) > tolerance.orientation)
-      return null;
+    if (ToolFreedom.orientationError(
+      new Pose3(0, 0, 0),
+      target,
+      freedom == null ? OrientationPolicy.Interpolated : freedom
+    ) > tolerance.orientation) return null;
     var logical = [target.x, target.y, target.z];
     var axes = [x, y, z];
     var result = seed.copy();
     for (index in 0...3) {
       var axis = axes[index];
-      if (logical[index] < axis.lowerLimit - tolerance.position ||
-          logical[index] > axis.upperLimit + tolerance.position) return null;
+      if (logical[index] < axis.lowerLimit - tolerance.position
+        || logical[index] > axis.upperLimit + tolerance.position) return null;
       axis.writeLogicalPosition(result, logical[index]);
     }
     for (index in 0...result.length) {
       var bounds = blueprint.model.joints[index].limits;
-      if (bounds.lower < bounds.upper &&
-          (result[index] < bounds.lower - tolerance.position ||
-           result[index] > bounds.upper + tolerance.position)) return null;
+      if (bounds.lower < bounds.upper && (result[index] < bounds.lower - tolerance.position
+        || result[index] > bounds.upper + tolerance.position)) return null;
     }
     completeDerived(result, true);
     // A follower is the sum of its couplings' terms.
@@ -130,16 +144,16 @@ class AxisKinematics implements KinematicsSolver {
       sums[follower] += couplingRatios[coupling] * result[couplingLeaders[coupling]] + couplingOffsets[coupling];
       summed[follower] = true;
     }
-    for (index in 0...result.length)
-      if (summed[index] && Math.abs(result[index] - sums[index]) > tolerance.position) return null;
+    for (index in 0...result.length) if (summed[index]
+      && Math.abs(result[index] - sums[index]) > tolerance.position) return null;
     return result;
   }
 
   /** Logical axes have one solution per pose: the path follows point by point. */
   public function solvePath(request:PathRequest):Array<Null<Array<Float>>> return request.followPointByPoint(this);
 
-  public function sampleCandidates(target:Pose3, maxCount:Int,
-      tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>> {
+  public function sampleCandidates(target:Pose3,
+    maxCount:Int, tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>> {
     if (maxCount < 0) throw "Axis IK candidate count must be non-negative";
     if (maxCount == 0) return [];
     var solution = solvePose(target, home, tolerance, freedom);
@@ -149,17 +163,23 @@ class AxisKinematics implements KinematicsSolver {
   /** Nothing here changes once built. */
   public function fork():KinematicsSolver return this;
 
-  public function solveDifferential(q:Array<Float>, twist:Twist6, ?redundancyRate:Array<Float>, ?freedom:OrientationPolicy):Null<Array<Float>> {
+  public function solveDifferential(
+    q:Array<Float>,
+    twist:Twist6,
+    ?redundancyRate:Array<Float>,
+    ?freedom:OrientationPolicy
+  ):Null<Array<Float>> {
     requireJoints(q);
     if (twist == null) throw "Axis differential IK needs a tool twist";
     var asked = twist.toArray();
     switch freedom {
-      case Cone(_, _): for (i in 3...6) asked[i] = 0.0;
+      case Cone(_, _):
+        for (i in 3...6) asked[i] = 0.0;
       default:
     }
     for (row in ToolFreedom.twistRows(forward(q), freedom)) {
       var angular = 0.0;
-      for (axis in 3...6) angular += row[axis]*asked[axis];
+      for (axis in 3...6) angular += row[axis] * asked[axis];
       if (Math.abs(angular) > 1e-12) return null;
     }
     var result = [for (_ in 0...jointCount()) 0.0];
@@ -183,8 +203,7 @@ class AxisKinematics implements KinematicsSolver {
   }
 
   function requireJoints(q:Array<Float>):Void {
-    if (q == null || q.length != jointCount())
-      throw 'Axis kinematics needs ${jointCount()} joint positions';
+    if (q == null || q.length != jointCount()) throw 'Axis kinematics needs ${jointCount()} joint positions';
     for (value in q) if (!Math.isFinite(value)) throw "Axis joints must be finite";
   }
 }

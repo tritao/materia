@@ -14,8 +14,7 @@ class BindingConstraint {
   public final kind:BindingConstraintKind;
   public final limit:Float;
 
-  public function new(spanIndex:Int, jointIndex:Int, kind:BindingConstraintKind,
-      limit:Float) {
+  public function new(spanIndex:Int, jointIndex:Int, kind:BindingConstraintKind, limit:Float) {
     this.spanIndex = spanIndex;
     this.jointIndex = jointIndex;
     this.kind = kind;

@@ -15,11 +15,11 @@ class PlanLimitError {
     var failures:Array<String> = [];
     for (index in 0...report.checks.length) {
       var check = report.checks[index];
-      if (check.status == 2)
-        failures.push('${index < names.length ? names[index] : "check " + index} on joint ${check.joint} at '
-          + '${check.timeSeconds} s: ${check.value} against ${check.limit}');
+      if (check.status
+        == 2) failures.push('${index < names.length ? names[index] : "check " + index} on joint ${check.joint} at '
+        + '${check.timeSeconds} s: ${check.value} against ${check.limit}');
     }
-    return failures.length == 0 ? "Execution plan exceeds claimed limits"
-      : "Execution plan exceeds claimed limits: " + failures.join("; ");
+    return failures.length
+      == 0 ? "Execution plan exceeds claimed limits" : "Execution plan exceeds claimed limits: " + failures.join("; ");
   }
 }

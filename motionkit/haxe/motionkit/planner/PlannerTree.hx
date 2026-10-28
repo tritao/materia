@@ -87,9 +87,8 @@ class PlannerTree {
     if (from >= to) return -1;
     var axis = depth % dimension;
     var slice = indices.slice(from, to);
-    slice.sort((a, b) -> {
-      var x = coordinates[a * dimension + axis], y = coordinates[b * dimension + axis];
-      return x < y ? -1 : x > y ? 1 : a - b;
+    slice.sort((a, b) -> {var x = coordinates[a * dimension + axis], y = coordinates[b * dimension + axis];
+    return x < y ? -1 : x > y ? 1 : a - b;
     });
     for (i in 0...slice.length) indices[from + i] = slice[i];
     var middle = (from + to) >> 1;
@@ -103,7 +102,7 @@ class PlannerTree {
     return slot;
   }
 
-  function searchKd(slot:Int, q:Array<Float>, best:Int, bestDistance:Float):{index:Int, distance:Float} {
+  function searchKd(slot:Int, q:Array<Float>, best:Int, bestDistance:Float): {index: Int, distance: Float} {
     if (slot < 0) return {index: best, distance: bestDistance};
     var index = kdNode[slot];
     var d = squared(index, q);

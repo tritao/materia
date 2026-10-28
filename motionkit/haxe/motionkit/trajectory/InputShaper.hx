@@ -29,22 +29,34 @@ class InputShaper {
   /** A shaper by the name its kind goes by in a project (`zv`, `mzv`, `ei`). */
   public static function named(kind:String, frequency:Float, damping:Float):InputShaper {
     var found = switch kind {
-      case "zv": InputShaperKind.ZV;
-      case "mzv": InputShaperKind.MZV;
-      case "ei": InputShaperKind.EI;
-      default: throw 'Unknown input shaper "$kind"';
+      case "zv":
+        InputShaperKind.ZV;
+      case "mzv":
+        InputShaperKind.MZV;
+      case "ei":
+        InputShaperKind.EI;
+      default:
+        throw 'Unknown input shaper "$kind"';
     };
     return new InputShaper(found, frequency, damping);
   }
 
   /** A fixed shaper centered on a physical travel envelope; refuses a band this impulse family cannot suppress. */
-  public static function forFrequencyBand(kind:InputShaperKind,lower:Float,upper:Float,damping:Float,
-      uncertainty:Float = 0.1,maximumResidual:Float = 0.2):InputShaper {
-    if (!(lower>0.0) || upper<lower || !Math.isFinite(upper) || !Math.isFinite(uncertainty) || uncertainty<0.0 || uncertainty>=1.0 ||
-        !(maximumResidual>0.0) || maximumResidual>=1.0) throw "Invalid input shaping frequency envelope";
-    var shaped = new InputShaper(kind,Math.sqrt(lower*upper),damping);
-    var residual = shaped.impulses.residualBound(lower*(1-uncertainty),upper*(1+uncertainty),damping);
-    if (residual>maximumResidual) throw 'Fixed input shaper cannot cover $lower..$upper Hz with $uncertainty uncertainty: residual $residual';
+  public static function forFrequencyBand(
+    kind:InputShaperKind,
+    lower:Float,
+    upper:Float,
+    damping:Float,
+    uncertainty:Float = 0.1,
+    maximumResidual:Float = 0.2
+  ):InputShaper {
+    if (!(lower > 0.0) || upper < lower
+      || !Math.isFinite(upper) || !Math.isFinite(uncertainty) || uncertainty < 0.0 || uncertainty >= 1.0
+      || !(maximumResidual > 0.0) || maximumResidual >= 1.0) throw "Invalid input shaping frequency envelope";
+    var shaped = new InputShaper(kind, Math.sqrt(lower * upper), damping);
+    var residual = shaped.impulses.residualBound(lower * (1 - uncertainty), upper * (1 + uncertainty), damping);
+    if (residual
+      > maximumResidual) throw 'Fixed input shaper cannot cover $lower..$upper Hz with $uncertainty uncertainty: residual $residual';
     return shaped;
   }
 

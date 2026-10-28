@@ -18,12 +18,17 @@ class TimedPath {
    * `timesToDistancesMap`, when the timing backend can invert its time law directly, maps many times to
    * path distances in one step; callers otherwise search with `distanceToTime`.
    */
-  public function new(trajectory:Trajectory, distanceToTimeMap:Float -> Float,
-      bindingConstraints:Array<BindingConstraint>, ?releaseMap:Void -> Void,
-      ?timesToDistancesMap:Array<Float> -> Array<Float>, ?lazyBindings:Void -> Array<BindingConstraint>) {
+  public function new(
+    trajectory:Trajectory,
+    distanceToTimeMap:Float -> Float,
+    bindingConstraints:Array<BindingConstraint>,
+    ?releaseMap:Void -> Void,
+    ?timesToDistancesMap:Array<Float> -> Array<Float>,
+    ?lazyBindings:Void -> Array<BindingConstraint>
+  ) {
     this.timesToDistancesMap = timesToDistancesMap;
-    if (trajectory == null || distanceToTimeMap == null || bindingConstraints == null)
-      throw "Timed path needs a trajectory, distance map, and constraint report";
+    if (trajectory == null || distanceToTimeMap == null
+      || bindingConstraints == null) throw "Timed path needs a trajectory, distance map, and constraint report";
     this.trajectory = trajectory;
     this.distanceToTimeMap = distanceToTimeMap;
     bindings = lazyBindings == null ? bindingConstraints.copy() : null;
@@ -38,12 +43,21 @@ class TimedPath {
     if (mapReleased) throw "Timed path distance map has been released";
     var selected = trajectory.selectJoints(indices);
     try {
-      var result = new TimedPath(selected,distanceToTimeMap,bindings == null ? [] : bindings,
-        releaseMap,timesToDistancesMap,bindings == null ? bindingSupplier : null);
+      var result = new TimedPath(
+        selected,
+        distanceToTimeMap,
+        bindings == null ? [] : bindings,
+        releaseMap,
+        timesToDistancesMap,
+        bindings == null ? bindingSupplier : null
+      );
       mapReleased = true;
       trajectory.dispose();
       return result;
-    } catch (error:Dynamic) { selected.dispose(); throw error; }
+    } catch (error:Dynamic) {
+      selected.dispose();
+      throw error;
+    }
   }
 
   function get_bindingConstraints():Array<BindingConstraint> {
@@ -61,8 +75,7 @@ class TimedPath {
     return distanceToTimeMap(distance);
   }
 
-  public function hasDirectInverse():Bool
-    return timesToDistancesMap != null;
+  public function hasDirectInverse():Bool return timesToDistancesMap != null;
 
   /** Path distance reached at each time; only valid when `hasDirectInverse()`. */
   public function timesToDistances(seconds:Array<Float>):Array<Float> {

@@ -61,12 +61,22 @@ class TrajectoryClearanceProof {
   final trajectory:TimedJointTrajectory;
   final velocity:Array<Float>;
   final contact:Bool;
-  final contactAt:Null<Array<Float>->Bool>;
-  final neighbourhood:Null<(Array<Float>, Float)->Bool>;
+  final contactAt:Null<Array<Float> -> Bool>;
+  final neighbourhood:Null<(Array<Float>, Float) -> Bool>;
   final depthLimit:Int;
 
-  function new(world:ClearanceWorld, trajectory:TimedJointTrajectory, velocity:Array<Float>, contact:Bool,
-      contactAt:Null<Array<Float>->Bool>, neighbourhood:Null<(Array<Float>, Float)->Bool>, depthLimit:Int) {
+  function new(
+    world:ClearanceWorld,
+    trajectory:TimedJointTrajectory,
+    velocity:Array<Float>,
+    contact:Bool,
+    contactAt:Null<Array<Float> -> Bool>,
+    neighbourhood:Null<(
+      Array<Float>,
+      Float
+    ) -> Bool>,
+    depthLimit:Int
+  ) {
     this.world = world;
     this.trajectory = trajectory;
     this.velocity = velocity;
@@ -82,23 +92,36 @@ class TrajectoryClearanceProof {
    * world that is a `ClearanceScene`; `closestSamples` closest-pair queries
    * are spread over the motion.
    */
-  public static function run(world:ClearanceWorld, trajectory:TimedJointTrajectory, velocity:Array<Float>, contact:Bool,
-      ?contactAt:Array<Float>->Bool, ?neighbourhood:(Array<Float>, Float)->Bool, ?events:Array<ClearanceEvent>,
-      depthLimit:Int = 16, closestSamples:Int = 8):TrajectoryClearanceProof {
-    if (world == null || trajectory == null || velocity == null || depthLimit < 0)
-      throw "A trajectory clearance proof needs a world, a motion, joint speed bounds and a depth limit";
-    var proof = new TrajectoryClearanceProof(world, trajectory, velocity, contact, contactAt, neighbourhood, depthLimit);
+  public static function run(
+    world:ClearanceWorld,
+    trajectory:TimedJointTrajectory,
+    velocity:Array<Float>,
+    contact:Bool,
+    ?contactAt:Array<Float> -> Bool,
+    ?neighbourhood:(
+      Array<Float>,
+      Float
+    ) -> Bool,
+    ?events:Array<ClearanceEvent>,
+    depthLimit:Int = 16,
+    closestSamples:Int = 8
+  ):TrajectoryClearanceProof {
+    if (world == null || trajectory == null || velocity == null || depthLimit
+      < 0) throw "A trajectory clearance proof needs a world, a motion, joint speed bounds and a depth limit";
+    var proof = new TrajectoryClearanceProof(world,
+      trajectory, velocity, contact, contactAt, neighbourhood, depthLimit);
     var changes = events == null ? [] : events.copy();
     changes.sort((x, y) -> x.timeSeconds < y.timeSeconds ? -1 : x.timeSeconds > y.timeSeconds ? 1 : 0);
     var scene:Null<ClearanceScene> = null;
     if (changes.length > 0) {
-      if (!Std.isOfType(world, ClearanceScene)) throw "Clearance events need a world that replays changes (a ClearanceScene)";
+      if (!Std.isOfType(world,
+        ClearanceScene)) throw "Clearance events need a world that replays changes (a ClearanceScene)";
       scene = cast world;
     }
     var duration = trajectory.duration();
     var bounds = [0.0];
-    for (event in changes) if (event.timeSeconds > bounds[bounds.length - 1] && event.timeSeconds < duration)
-      bounds.push(event.timeSeconds);
+    for (event in changes) if (event.timeSeconds > bounds[bounds.length - 1]
+      && event.timeSeconds < duration) bounds.push(event.timeSeconds);
     bounds.push(duration);
     var next = 0;
     for (k in 0...bounds.length - 1) {
@@ -112,7 +135,17 @@ class TrajectoryClearanceProof {
       if (end > start) {
         proof.piece(start, end, 0);
         if (proof.failure != null) break;
-        proof.sampleClosest(start, end, Std.int(Math.max(1, Math.round(closestSamples * (end - start) / Math.max(duration, 1e-12)))));
+        proof.sampleClosest(
+          start,
+          end,
+          Std.int(Math.max(
+            1,
+            Math.round(closestSamples * (end - start) / Math.max(
+              duration,
+              1e-12
+            ))
+          ))
+        );
       } else {
         proof.check(start);
         if (proof.failure != null) break;

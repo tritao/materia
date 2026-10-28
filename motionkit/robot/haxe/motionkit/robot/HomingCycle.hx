@@ -4,7 +4,20 @@ import motionkit.robot.HomingDriver.HomingObservation;
 import haxe.Int64;
 
 private enum HomingPhase {
-  Idle; AwaitScope; Seek; StopAfterSeek; Backoff; Approach; AwaitSideHolds; StopAfterLatch; AwaitRelease; AwaitCalibration; AwaitScopeEnd; Return; Complete; Fault;
+  Idle;
+  AwaitScope;
+  Seek;
+  StopAfterSeek;
+  Backoff;
+  Approach;
+  AwaitSideHolds;
+  StopAfterLatch;
+  AwaitRelease;
+  AwaitCalibration;
+  AwaitScopeEnd;
+  Return;
+  Complete;
+  Fault;
 }
 
 /** Sensor-driven homing with controlled stops between every change of direction. */
@@ -31,19 +44,21 @@ class HomingCycle {
 
   public function new(driver:HomingDriver, axes:Array<HomingAxis>, ?sides:robotkit.runtime.HomingSideControl) {
     if (driver == null || axes == null || axes.length == 0) throw "Homing requires a driver and physical axes";
-    this.driver = driver; this.axes = HomingSequence.order(axes);
+    this.driver = driver;
+    this.axes = HomingSequence.order(axes);
     this.sides = sides;
     var ids = new Map<String, Bool>(), joints = new Map<Int, Bool>();
     for (axis in this.axes) {
-      if (axis == null || ids.exists(axis.id) || joints.exists(axis.joint))
-        throw "Homing requires distinct non-null axes and joints";
-      ids.set(axis.id, true); joints.set(axis.joint, true);
+      if (axis == null
+        || ids.exists(axis.id) || joints.exists(axis.joint)) throw "Homing requires distinct non-null axes and joints";
+      ids.set(axis.id, true);
+      joints.set(axis.joint, true);
       if (axis.switches.length > 1) {
         if (sides == null) throw "Multi-side homing requires independent motor holds";
         var drives = new Map<String, Bool>();
         for (contact in axis.switches) {
-          if (contact.driveJoint == null || drives.exists(contact.driveJoint))
-            throw "Multi-side homing requires distinct motor bindings";
+          if (contact.driveJoint == null
+            || drives.exists(contact.driveJoint)) throw "Multi-side homing requires distinct motor bindings";
           drives.set(contact.driveJoint, true);
         }
       }
@@ -58,26 +73,31 @@ class HomingCycle {
   public function start():Void {
     if (phase != Idle) throw "Homing cycle has already started";
     try beginAxis() catch (error:Dynamic) {
-      fault = Std.string(error); phase = Fault;
-      try driver.stop(axes[index].joint, axes[index].acceleration) catch (_:Dynamic) {}
-      try releaseSides() catch (_:Dynamic) {}
+      fault = Std.string(error);
+      phase = Fault;
+      try driver.stop(axes[index].joint, axes[index].acceleration) catch (_:Dynamic) {
+      }
+      try releaseSides() catch (_:Dynamic) {
+      }
       throw error;
     }
   }
 
   function beginAxis():Void {
     var axis = axes[index], observation = driver.observe(axis.joint);
-    lastTimestamp = null; observationClock = null;
+    lastTimestamp = null;
+    observationClock = null;
     validateFresh(axis, observation);
-    if (Math.abs(observation.velocity) > axis.latchSpeed * 0.01)
-      throw "Homing must start with the axis at rest";
-    captures = [for (_ in axis.switches) null]; releasePosition = null; switchPosition = null;
+    if (Math.abs(observation.velocity) > axis.latchSpeed * 0.01) throw "Homing must start with the axis at rest";
+    captures = [for (_ in axis.switches) null];
+    releasePosition = null;
+    switchPosition = null;
     captureCapabilities = [for (contact in axis.switches) signalFor(contact.id, observation).capturesEdges];
     var captured = true;
     for (i in 0...captureCapabilities.length) {
       if (!captureCapabilities[i]) captured = false;
-      if (!captureCapabilities[i] && axis.switches[i].repeatability == 0)
-        throw "Zero-repeatability homing requires captured switch edges";
+      if (!captureCapabilities[i]
+        && axis.switches[i].repeatability == 0) throw "Zero-repeatability homing requires captured switch edges";
     }
     approachSpeed = captured ? axis.capturedApproachSpeed : axis.latchSpeed;
     if (axis.switches.length > 1) sides.beginSquaring([for (contact in axis.switches) contact.id]);
@@ -96,16 +116,15 @@ class HomingCycle {
       elapsed += dt;
       var controlsConfirmed = controlsReady();
       var timeout = axis.maximumTravel / axis.latchSpeed + 10 * axis.seekSpeed / axis.acceleration;
-      if (elapsed > timeout || Math.abs(observation.position - origin) > axis.maximumTravel)
-        throw 'Homing axis "${axis.id}" did not reach its switch within physical travel';
+      if (elapsed > timeout || Math.abs(observation.position - origin)
+        > axis.maximumTravel) throw 'Homing axis "${axis.id}" did not reach its switch within physical travel';
       if (!controlsConfirmed && !observationAdvanced(axis, observation)) return true;
       validateFresh(axis, observation);
-      for (i in 0...axis.switches.length)
-        if (signalFor(axis.switches[i].id, observation).capturesEdges != captureCapabilities[i])
-          throw "Homing switch capture capability changed during the cycle";
+      for (i in 0...axis.switches.length) if (signalFor(axis.switches[i].id, observation).capturesEdges
+        != captureCapabilities[i]) throw "Homing switch capture capability changed during the cycle";
       var stopped = Math.abs(observation.velocity) <= axis.latchSpeed * 0.01;
-      if (!stopped || !observation.calibrationReady || Math.abs(observation.position - origin) > axis.positionTolerance)
-        phaseMoved = true;
+      if (!stopped || !observation.calibrationReady
+        || Math.abs(observation.position - origin) > axis.positionTolerance) phaseMoved = true;
       switch phase {
         case AwaitScope:
           if (controlsReady()) startSeeking(axis, observation);
@@ -119,23 +138,26 @@ class HomingCycle {
           if (controlsReady()) enter(Return, driver.observe(axis.joint));
         case Seek:
           if (anyActive(axis, observation)) {
-            switchPosition = observation.position; enter(StopAfterSeek, observation);
-          } else if (phaseMoved && stopped && observation.calibrationReady)
-            throw "Homing search reached its travel boundary without a switch";
+            switchPosition = observation.position;
+            enter(StopAfterSeek, observation);
+          } else if (phaseMoved && stopped
+            && observation.calibrationReady) throw "Homing search reached its travel boundary without a switch";
         case StopAfterSeek:
           if (stopped && observation.calibrationReady && controlsReady()) enter(Backoff, observation);
         case Backoff:
           if (anyActive(axis, observation)) releasePosition = null;
           else if (releasePosition == null) releasePosition = observation.position;
           if (phaseMoved && stopped && observation.calibrationReady && controlsReady()) {
-            if (Math.abs(observation.position - backoffTarget) > axis.positionTolerance)
-              throw "Homing backoff stopped before its planned clearance";
-            if (releasePosition != null && axis.switches[0].side * (releasePosition - observation.position) >= axis.releaseDistance - axis.positionTolerance) {
-              captures = [for (_ in axis.switches) null]; enter(Approach, observation);
+            if (Math.abs(observation.position - backoffTarget)
+              > axis.positionTolerance) throw "Homing backoff stopped before its planned clearance";
+            if (releasePosition != null && axis.switches[0].side * (releasePosition - observation.position)
+              >= axis.releaseDistance - axis.positionTolerance) {
+              captures = [for (_ in axis.switches) null];
+              enter(Approach, observation);
             } else {
               var side = axis.switches[0].side;
-              var target = releasePosition == null ? observation.position - side * axis.releaseSearchDistance :
-                releasePosition - side * (axis.releaseDistance + axis.positionTolerance);
+              var target = releasePosition == null ? observation.position - side * axis.releaseSearchDistance
+                : releasePosition - side * (axis.releaseDistance + axis.positionTolerance);
               planBackoff(axis, observation, target);
             }
           }
@@ -149,26 +171,25 @@ class HomingCycle {
             var baseline:Int = -1, count:Int = -1;
             if (approachEdges[i] != null) baseline = cast approachEdges[i];
             if (signal.closingEdges != null) count = cast signal.closingEdges;
-            if (count >= 0 && baseline >= 0 && count < baseline)
-              throw "Homing edge counter reset during approach";
+            if (count >= 0 && baseline >= 0 && count < baseline) throw "Homing edge counter reset during approach";
             var freshEdge = signal.capturesEdges && baseline >= 0 && count > baseline;
             if ((signal.active || freshEdge) && captures[i] == null) {
-              if (signal.capturesEdges && signal.edgePosition == null)
-                throw "Captured-edge homing source omitted its crossing position";
-              if (signal.edgePosition != null && (baseline < 0 || count <= baseline))
-                throw "Homing closing-edge capture predates the slow approach";
-              if (signal.edgePosition == null && axis.switches[i].repeatability == 0)
-                throw "Zero-repeatability homing requires captured switch edges";
-              if (signal.edgePosition == null && dt > axis.timestep * (1 + 1e-9))
-                throw "Homing sampling interval exceeds its repeatability budget";
+              if (signal.capturesEdges
+                && signal.edgePosition == null) throw "Captured-edge homing source omitted its crossing position";
+              if (signal.edgePosition != null
+                && (baseline < 0 || count <= baseline)) throw "Homing closing-edge capture predates the slow approach";
+              if (signal.edgePosition == null && axis.switches[i].repeatability
+                == 0) throw "Zero-repeatability homing requires captured switch edges";
+              if (signal.edgePosition == null
+                && dt > axis.timestep * (1 + 1e-9)) throw "Homing sampling interval exceeds its repeatability budget";
               captures[i] = signal.edgePosition == null ? observation.position : signal.edgePosition;
               if (axis.switches.length > 1) sides.hold(axis.switches[i].id);
             }
             if (captures[i] == null) all = false;
           }
           if (all) enter(controlsReady() ? StopAfterLatch : AwaitSideHolds, observation);
-          else if (phaseMoved && stopped && observation.calibrationReady && controlsReady())
-            throw "Homing approach reached its travel boundary without all switches";
+          else if (phaseMoved && stopped && observation.calibrationReady
+            && controlsReady()) throw "Homing approach reached its travel boundary without all switches";
         case StopAfterLatch:
           if (stopped && observation.calibrationReady && controlsReady()) {
             if (sides != null) sides.releaseAll();
@@ -176,7 +197,8 @@ class HomingCycle {
             else latchAndCalibrate(axis);
           }
         case Return:
-          if (stopped && observation.calibrationReady && Math.abs(observation.position - axis.home) <= axis.positionTolerance) {
+          if (stopped
+            && observation.calibrationReady && Math.abs(observation.position - axis.home) <= axis.positionTolerance) {
             index++;
             if (index == axes.length) phase = Complete;
             else beginAxis();
@@ -185,19 +207,25 @@ class HomingCycle {
       }
       return isActive();
     } catch (error:Dynamic) {
-      fault = Std.string(error); phase = Fault;
-      try driver.stop(axis.joint, axis.acceleration) catch (_:Dynamic) {}
-      try releaseSides() catch (_:Dynamic) {}
+      fault = Std.string(error);
+      phase = Fault;
+      try driver.stop(axis.joint, axis.acceleration) catch (_:Dynamic) {
+      }
+      try releaseSides() catch (_:Dynamic) {
+      }
       throw error;
     }
   }
 
   public function cancel():Void {
     if (!isActive()) return;
-    fault = "Homing cancelled"; phase = Fault;
+    fault = "Homing cancelled";
+    phase = Fault;
     var failure:Null<String> = null;
     try driver.stop(axes[index].joint, axes[index].acceleration) catch (error:Dynamic) failure = Std.string(error);
-    try releaseSides() catch (error:Dynamic) { if (failure == null) failure = Std.string(error); }
+    try releaseSides() catch (error:Dynamic) {
+      if (failure == null) failure = Std.string(error);
+    }
     if (failure != null) throw failure;
   }
 
@@ -215,7 +243,8 @@ class HomingCycle {
     for (i in 0...axis.switches.length) {
       var capture = captures[i];
       if (capture == null) throw "Homing has no captured latch position";
-      var leaderCapture:Null<Float> = axis.switches.length > 1 ? sides.leaderCapture(axis.switches[i].id, capture) : null;
+      var leaderCapture:Null<Float> = axis.switches.length > 1 ? sides.leaderCapture(axis.switches[i].id,
+        capture) : null;
       driver.latch(axis.switches[i].id, capture, leaderCapture);
     }
     if (axis.switches.length > 1) sides.calibrate([for (contact in axis.switches) contact.id]);
@@ -239,27 +268,35 @@ class HomingCycle {
   }
 
   function enter(next:HomingPhase, observation:HomingObservation):Void {
-    phase = next; origin = observation.position; elapsed = 0.0; phaseMoved = false;
+    phase = next;
+    origin = observation.position;
+    elapsed = 0.0;
+    phaseMoved = false;
     var axis = axes[index], side = axis.switches[0].side;
     switch next {
-      case Seek: driver.velocity(axis.joint, side * axis.seekSpeed, axis.acceleration);
+      case Seek:
+        driver.velocity(axis.joint, side * axis.seekSpeed, axis.acceleration);
       case Backoff:
         var basis = switchPosition == null ? observation.position : switchPosition;
         planBackoff(axis, observation, basis - side * axis.releaseSearchDistance);
       case Approach:
         approachEdges = [for (contact in axis.switches) signalFor(contact.id, observation).closingEdges];
         driver.velocity(axis.joint, side * approachSpeed, axis.acceleration);
-      case StopAfterSeek, StopAfterLatch: driver.stop(axis.joint, axis.acceleration);
-      case Return: driver.returnHome(axis.joint, axis.home, axis.seekSpeed, axis.acceleration);
+      case StopAfterSeek, StopAfterLatch:
+        driver.stop(axis.joint, axis.acceleration);
+      case Return:
+        driver.returnHome(axis.joint, axis.home, axis.seekSpeed, axis.acceleration);
       case _:
     }
   }
 
   function planBackoff(axis:HomingAxis, observation:HomingObservation, target:Float):Void {
     backoffTarget = Math.max(axis.lowerTravel, Math.min(axis.upperTravel, target));
-    if (-axis.switches[0].side * (backoffTarget - observation.position) <= axis.positionTolerance * 0.01)
-      throw "Homing switch did not release within physical travel";
-    origin = observation.position; elapsed = 0.0; phaseMoved = false;
+    if (-axis.switches[0].side * (backoffTarget - observation.position)
+      <= axis.positionTolerance * 0.01) throw "Homing switch did not release within physical travel";
+    origin = observation.position;
+    elapsed = 0.0;
+    phaseMoved = false;
     driver.moveTo(axis.joint, backoffTarget, axis.backoffSpeed, axis.acceleration);
   }
 
@@ -267,31 +304,38 @@ class HomingCycle {
     if (observationClock != null && observation.clockId != observationClock) return true;
     for (contact in axis.switches) {
       var signal = signalFor(contact.id, observation);
-      if (signal.clockId != observation.clockId || Int64.compare(signal.timestampNs, observation.timestampNs) > 0) return true;
+      if (signal.clockId != observation.clockId || Int64.compare(signal.timestampNs,
+        observation.timestampNs) > 0) return true;
     }
     if (lastTimestamp != null && Int64.compare(observation.timestampNs, lastTimestamp) <= 0) return false;
     for (contact in axis.switches) {
       var signal = signalFor(contact.id, observation), previous = sequences.get(signal.id);
-      if (Int64.toFloat(Int64.sub(observation.timestampNs, signal.timestampNs)) > axis.timestep * 1e9 * (1 + 1e-9) ||
-          (previous != null && Int64.compare(signal.sequence, previous) <= 0)) return false;
+      if (Int64.toFloat(Int64.sub(observation.timestampNs,
+        signal.timestampNs)) > axis.timestep * 1e9 * (1 + 1e-9) || (previous != null && Int64.compare(
+          signal.sequence,
+          previous
+        ) <= 0)) return false;
     }
     return true;
   }
 
   function validateFresh(axis:HomingAxis, observation:HomingObservation):Void {
     if (observation == null) throw "Homing has no position observation";
-    if (observationClock != null && observation.clockId != observationClock)
-      throw "Homing observation source clock changed";
-    if (lastTimestamp != null && Int64.compare(observation.timestampNs, lastTimestamp) <= 0)
-      throw "Homing position observation did not advance";
+    if (observationClock != null
+      && observation.clockId != observationClock) throw "Homing observation source clock changed";
+    if (lastTimestamp != null && Int64.compare(observation.timestampNs,
+      lastTimestamp) <= 0) throw "Homing position observation did not advance";
     for (contact in axis.switches) {
       var signal = signalFor(contact.id, observation);
       var previous = sequences.get(signal.id);
-      if (signal.clockId != observation.clockId ||
-          Int64.compare(signal.timestampNs, observation.timestampNs) > 0 ||
-          Int64.toFloat(Int64.sub(observation.timestampNs, signal.timestampNs)) > axis.timestep * 1e9 * (1 + 1e-9) ||
-          (previous != null && Int64.compare(signal.sequence, previous) <= 0))
-        throw 'Homing switch "${signal.id}" has a stale or incompatible source observation';
+      if (signal.clockId != observation.clockId || Int64.compare(signal.timestampNs,
+        observation.timestampNs) > 0 || Int64.toFloat(Int64.sub(
+          observation.timestampNs,
+          signal.timestampNs
+        )) > axis.timestep * 1e9 * (1 + 1e-9) || (previous != null && Int64.compare(
+          signal.sequence,
+          previous
+        ) <= 0)) throw 'Homing switch "${signal.id}" has a stale or incompatible source observation';
     }
     for (contact in axis.switches) {
       var signal = signalFor(contact.id, observation);

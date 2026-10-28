@@ -40,22 +40,31 @@ class RrtConnect implements MotionPlanner {
     checkSeconds = 0.0;
     edgeChecks = 0;
     var n = space.dimension();
-    if (start == null || goal == null || start.length != n || goal.length != n)
-      throw 'RRT-Connect needs a start and a goal of $n joints';
+    if (start == null || goal == null
+      || start.length != n || goal.length != n) throw 'RRT-Connect needs a start and a goal of $n joints';
     var lower = space.lower(), upper = space.upper();
     // Runtime setpoints can land one ULP outside an exact stop after coupled
     // coordinates are reconstructed. Snap residue before collision checks;
     // keep the caller's arrays intact and reject physical overtravel.
-    start = start.copy(); goal = goal.copy();
-    for (q in [start, goal]) for (k in 0...n)
-      if (!(q[k] >= lower[k] && q[k] <= upper[k])) {
-        var tolerance = 1e-12 * Math.max(1.0, Math.max(
+    start = start.copy();
+    goal = goal.copy();
+    for (q in [start, goal]) for (k in 0...n) if (!(q[k] >= lower[k] && q[k] <= upper[k])) {
+      var tolerance = 1e-12 * Math.max(
+        1.0,
+        Math.max(
           Math.isFinite(lower[k]) ? Math.abs(lower[k]) : 0.0,
-          Math.isFinite(upper[k]) ? Math.abs(upper[k]) : 0.0));
-        if (Math.isFinite(q[k]) && q[k] < lower[k] && lower[k] - q[k] <= tolerance) q[k] = lower[k];
-        else if (Math.isFinite(q[k]) && q[k] > upper[k] && q[k] - upper[k] <= tolerance) q[k] = upper[k];
-        else return failed('${q == start ? "start" : "goal"} outside the joint bounds: joint $k (${q[k]}), ${lower[k]}..${upper[k]}', 0, 0, began);
-      }
+          Math.isFinite(upper[k]) ? Math.abs(upper[k]) : 0.0
+        )
+      );
+      if (Math.isFinite(q[k]) && q[k] < lower[k] && lower[k] - q[k] <= tolerance) q[k] = lower[k];
+      else if (Math.isFinite(q[k]) && q[k] > upper[k] && q[k] - upper[k] <= tolerance) q[k] = upper[k];
+      else return failed(
+        '${q == start ? "start" : "goal"} outside the joint bounds: joint $k (${q[k]}), ${lower[k]}..${upper[k]}',
+        0,
+        0,
+        began
+      );
+    }
     var startProblem = timed(() -> space.invalid(start));
     if (startProblem != null) return failed('start in collision: $startProblem', 0, 0, began);
     var goalProblem = timed(() -> space.invalid(goal));
@@ -91,8 +100,7 @@ class RrtConnect implements MotionPlanner {
     var middle = [for (k in 0...n) 0.5 * (start[k] + goal[k])];
     var obstruction = timed(() -> space.invalid(middle));
     var detail = obstruction == null ? "direct edge could not be certified" : 'direct midpoint: $obstruction';
-    return failed('no path found in $maxIterations iterations ($detail)',
-      maxIterations, a.count + b.count, began);
+    return failed('no path found in $maxIterations iterations ($detail)', maxIterations, a.count + b.count, began);
   }
 
   /** Grows `tree` from its node nearest `target` toward it in straight steps; returns the node reaching it, or -1. */
@@ -135,7 +143,7 @@ class RrtConnect implements MotionPlanner {
     return flags;
   }
 
-  function timed(check:Void->Null<String>):Null<String> {
+  function timed(check:Void -> Null<String>):Null<String> {
     var began = Sys.time();
     var result = check();
     checkSeconds += Sys.time() - began;
@@ -198,20 +206,37 @@ class RrtConnect implements MotionPlanner {
         checkSeconds += Sys.time() - began;
         var found = false;
         for (index in 0...indices.length) if (flags[index]) {
-          next = indices[index]; found = true; break;
+          next = indices[index];
+          found = true;
+          break;
         }
         if (found) break;
       }
-      reduced.push(path[next]); from = next;
+      reduced.push(path[next]);
+      from = next;
     }
     return reduced;
   }
 
-  function done(path:Array<Array<Float>>, iterations:Int, nodes:Int, began:Float):MotionPlan
-    return new MotionPlan(path, "", iterations, nodes, edgeChecks, checkSeconds, Sys.time() - began);
+  function done(path:Array<Array<Float>>, iterations:Int, nodes:Int, began:Float):MotionPlan return new MotionPlan(
+    path,
+    "",
+    iterations,
+    nodes,
+    edgeChecks,
+    checkSeconds,
+    Sys.time() - began
+  );
 
-  function failed(why:String, iterations:Int, nodes:Int, began:Float):MotionPlan
-    return new MotionPlan(null, why, iterations, nodes, edgeChecks, checkSeconds, Sys.time() - began);
+  function failed(why:String, iterations:Int, nodes:Int, began:Float):MotionPlan return new MotionPlan(
+    null,
+    why,
+    iterations,
+    nodes,
+    edgeChecks,
+    checkSeconds,
+    Sys.time() - began
+  );
 }
 
 /** A seeded generator (xorshift32), so plans repeat exactly. */

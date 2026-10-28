@@ -19,16 +19,20 @@ class MotionSystemBlueprint {
   public var homingLatencySeconds:Null<Float> = null;
   /** Optional commissioned final capture speed caps by logical axis, in SI units/s.
    * Edge capture removes sampling error, but not load-dependent drive deflection. */
-  public final homingCaptureSpeedLimits:Map<String,Float> = [];
+  public final homingCaptureSpeedLimits:Map<String, Float> = [];
   /** Owner period used for replacement lead; defaults to fixedTimestepSeconds. */
   public var replacementOwnerPeriodSeconds:Float;
 
-  public function new(model:RobotModel, runtime:RobotRuntimeBlueprint,
-      axes:Array<MotionAxisBlueprint>, ?fixedTimestepSeconds:Float = 0.01) {
+  public function new(
+    model:RobotModel,
+    runtime:RobotRuntimeBlueprint,
+    axes:Array<MotionAxisBlueprint>,
+    ?fixedTimestepSeconds:Float = 0.01
+  ) {
     if (model == null || runtime == null) throw "Motion system needs a robot model and runtime blueprint";
     if (axes == null || axes.length == 0) throw "Motion system needs at least one logical axis";
-    if (!Math.isFinite(fixedTimestepSeconds) || fixedTimestepSeconds <= 0.0)
-      throw "Motion system timestep must be finite and positive";
+    if (!Math.isFinite(fixedTimestepSeconds)
+      || fixedTimestepSeconds <= 0.0) throw "Motion system timestep must be finite and positive";
     var ids = new Map<String, Bool>();
     for (axis in axes) {
       if (axis == null) throw "Motion system cannot contain a null axis";
@@ -43,12 +47,15 @@ class MotionSystemBlueprint {
   }
 
   /** The robot owner's control period, seconds: the runtime's, or the fixed timestep where the runtime leaves it to that. */
-  public function ownerPeriodSeconds():Float
-    return haxe.Int64.compare(runtime.ownerPeriodNs, haxe.Int64.ofInt(0)) > 0 ? haxe.Int64.toFloat(runtime.ownerPeriodNs) / 1e9 :
-      fixedTimestepSeconds;
+  public function ownerPeriodSeconds():Float return haxe.Int64.compare(runtime.ownerPeriodNs,
+    haxe.Int64.ofInt(0)) > 0 ? haxe.Int64.toFloat(runtime.ownerPeriodNs) / 1e9 : fixedTimestepSeconds;
 
-  public static function fromRobotModel(model:RobotModel, axes:Array<MotionAxisBlueprint>,
-      ?revision:Int = 1, ?fixedTimestepSeconds:Float = 0.01):MotionSystemBlueprint {
+  public static function fromRobotModel(
+    model:RobotModel,
+    axes:Array<MotionAxisBlueprint>,
+    ?revision:Int = 1,
+    ?fixedTimestepSeconds:Float = 0.01
+  ):MotionSystemBlueprint {
     if (model == null || axes == null) throw "Motion system needs a model and axes";
     var mapped:Array<MotionAxisBlueprint> = [];
     for (axis in axes) {
@@ -65,12 +72,12 @@ class MotionSystemBlueprint {
         // The first actuator is the deterministic reference if a joint has
         // two drives. Device-side skew monitoring is specified separately.
         for (actuator in model.actuators) {
-          if (actuator == null || actuator.transmission == null)
-            throw "Motion system model contains an actuator without a transmission";
+          if (actuator == null
+            || actuator.transmission == null) throw "Motion system model contains an actuator without a transmission";
           switch actuator.transmission {
-          case SimpleTransmission(targetId, _, _) if (targetId == jointId):
-            if (selected == null) selected = actuator;
-          case _:
+            case SimpleTransmission(targetId, _, _) if (targetId == jointId):
+              if (selected == null) selected = actuator;
+            case _:
           }
         }
         if (selected == null) {
@@ -99,35 +106,51 @@ class MotionSystemBlueprint {
       }
       var coupled = false;
       for (_ in 0...axis.jointIds.length) for (coupling in model.couplings) {
-          var leader = axis.jointIds.indexOf(coupling.leader);
-          var follower = axis.jointIds.indexOf(coupling.follower);
-          if (leader < 0 || follower < 0) continue;
-          // A joint that sums several leaders (a CoreXY motor) moves with no one axis: it maps to none.
-          var terms = 0;
-          for (other in model.couplings) if (other.follower == coupling.follower) terms++;
-          if (terms > 1) continue;
-          coupled = true;
-          if (resolved[leader]) {
-            scales[follower] = coupling.ratio * scales[leader];
-            jointOffsets[follower] = coupling.ratio * jointOffsets[leader] + coupling.offset;
-            resolved[follower] = true;
-          } else if (resolved[follower]) {
-            scales[leader] = scales[follower] / coupling.ratio;
-            jointOffsets[leader] = (jointOffsets[follower] - coupling.offset) / coupling.ratio;
-            resolved[leader] = true;
-          }
+        var leader = axis.jointIds.indexOf(coupling.leader);
+        var follower = axis.jointIds.indexOf(coupling.follower);
+        if (leader < 0 || follower < 0) continue;
+        // A joint that sums several leaders (a CoreXY motor) moves with no one axis: it maps to none.
+        var terms = 0;
+        for (other in model.couplings) if (other.follower == coupling.follower) terms++;
+        if (terms > 1) continue;
+        coupled = true;
+        if (resolved[leader]) {
+          scales[follower] = coupling.ratio * scales[leader];
+          jointOffsets[follower] = coupling.ratio * jointOffsets[leader] + coupling.offset;
+          resolved[follower] = true;
+        } else if (resolved[follower]) {
+          scales[leader] = scales[follower] / coupling.ratio;
+          jointOffsets[leader] = (jointOffsets[follower] - coupling.offset) / coupling.ratio;
+          resolved[leader] = true;
+        }
       }
       if (found == 0 && !coupled) {
         mapped.push(axis);
         continue;
       }
-      for (index in 0...resolved.length) if (!resolved[index])
-        throw 'Motion axis "${axis.id}" has an unmapped joint "${axis.jointIds[index]}"';
-      mapped.push(new MotionAxisBlueprint(axis.id, axis.jointIds,
-        axis.lowerLimit, axis.upperLimit, axis.maxVelocity,
-        axis.maxAcceleration, axis.homePosition, scales, jointOffsets));
+      for (index in 0...resolved
+        .length) if (!resolved[index]) throw 'Motion axis "${axis.id}" has an unmapped joint "${axis.jointIds[index]}"';
+      mapped.push(new MotionAxisBlueprint(
+        axis.id,
+        axis.jointIds,
+        axis.lowerLimit,
+        axis.upperLimit,
+        axis.maxVelocity,
+        axis.maxAcceleration,
+        axis.homePosition,
+        scales,
+        jointOffsets
+      ));
     }
-    return new MotionSystemBlueprint(model, RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile(), revision),
-      mapped, fixedTimestepSeconds);
+    return new MotionSystemBlueprint(
+      model,
+      RobotRuntimeCompiler.compile(
+        model,
+        new robotkit.profile.RobotProfile(),
+        revision
+      ),
+      mapped,
+      fixedTimestepSeconds
+    );
   }
 }

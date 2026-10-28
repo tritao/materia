@@ -11,8 +11,12 @@ class MotionOptions {
   public final maxJerk:Float;
   public final planned:Bool;
 
-  public function new(?maxVelocity:Float = 0.0, ?maxAcceleration:Float = 0.0,
-      ?maxJerk:Float = 0.0, ?planned:Bool = false) {
+  public function new(
+    ?maxVelocity:Float = 0.0,
+    ?maxAcceleration:Float = 0.0,
+    ?maxJerk:Float = 0.0,
+    ?planned:Bool = false
+  ) {
     this.planned = planned == true;
     requireNonnegative(maxVelocity, "maximum velocity");
     requireNonnegative(maxAcceleration, "maximum acceleration");
@@ -23,7 +27,6 @@ class MotionOptions {
   }
 
   static function requireNonnegative(value:Float, label:String):Void {
-    if (!Math.isFinite(value) || value < 0.0)
-      throw 'Motion option $label must be finite and non-negative';
+    if (!Math.isFinite(value) || value < 0.0) throw 'Motion option $label must be finite and non-negative';
   }
 }

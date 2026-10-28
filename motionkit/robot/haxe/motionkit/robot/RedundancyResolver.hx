@@ -50,8 +50,10 @@ class RedundancyResolver {
   }
 
   /** The path for `request`. Throws, naming the sample, where no candidate continues. */
-  public function solvePath(solver:KinematicsSolver, request:PathRequest):Array<Null<Array<Float>>>
-    return solve(solver, request).configurations;
+  public function solvePath(solver:KinematicsSolver, request:PathRequest):Array<Null<Array<Float>>> return solve(
+    solver,
+    request
+  ).configurations;
 
   /** The path for `request` and, when the route was smoothed, the exact rate of its redundancy along it. */
   public function solve(solver:KinematicsSolver, request:PathRequest):PathSolution {
@@ -85,14 +87,19 @@ class RedundancyResolver {
     return new PathSolution(result, refined == null ? null : refined.rates);
   }
 
-  function grow(target:Pose3, previous:Array<Candidate>, steps:Array<Float>, weights:Array<Float>,
-      request:PathRequest, freedom:OrientationPolicy):Array<Candidate> {
+  function grow(
+    target:Pose3,
+    previous:Array<Candidate>,
+    steps:Array<Float>,
+    weights:Array<Float>,
+    request:PathRequest,
+    freedom:OrientationPolicy
+  ):Array<Candidate> {
     var dimension = parameterization.dimension();
     var tolerance = request.tolerance;
     // Held first, then one step up and down along each value.
     var offsets:Array<Array<Float>> = [[for (_ in 0...dimension) 0.0]];
-    for (d in 0...dimension) for (sign in [1.0, -1.0])
-      offsets.push([for (k in 0...dimension) k == d ? sign : 0.0]);
+    for (d in 0...dimension) for (sign in [1.0, -1.0]) offsets.push([for (k in 0...dimension) k == d ? sign : 0.0]);
     var found:Array<Candidate> = [];
     var cells = new Map<String, Int>();
     for (o in 0...offsets.length) for (seed in previous) {
@@ -158,7 +165,10 @@ class RedundancyResolver {
    * Σ w_j a_j / Σ w_j, w_j = exp(-½((j-i)/σ)²), a smooth function of i; its derivative in i is
    * Σ w_j' (a_j - v_i) / Σ w_j with w_j' = w_j (j-i)/σ², and a metre of path is the local sample spacing.
    */
-  function refine(request:PathRequest, chosen:Array<Array<Float>>):Null<{configurations:Array<Array<Float>>, rates:Array<Array<Float>>}> {
+  function refine(request:PathRequest, chosen:Array<Array<Float>>):Null<{
+    configurations:Array<Array<Float>>,
+    rates:Array<Array<Float>>
+  }> {
     var count = chosen.length;
     if (count < 3) return null;
     var dimension = parameterization.dimension();
@@ -208,14 +218,15 @@ class RedundancyResolver {
       var before = i > 0 ? i - 1 : i, after = i + 1 < count ? i + 1 : i;
       var spacing = (request.distances[after] - request.distances[before]) / (after - before);
       smoothed.push(value);
-      rates.push([for (d in 0...dimension) (slope[d] - value[d] * slopeWeights) / weights / spacing]);
+      rates.push([for (d in 0...dimension)(slope[d] - value[d] * slopeWeights) / weights / spacing]);
     }
     // The first sample stays where the route starts.
     smoothed[0] = values[0].copy();
     var refined = [chosen[0].copy()];
     for (i in 1...count) {
       var seed = refined[i - 1];
-      var solved = parameterization.solveAt(request.poses[i], seed, smoothed[i], request.tolerance, request.freedoms[i]);
+      var solved = parameterization.solveAt(request.poses[i],
+        seed, smoothed[i], request.tolerance, request.freedoms[i]);
       if (solved == null) return null;
       for (joint in 0...solved.length) if (Math.abs(solved[joint] - seed[joint]) > request.maxJump[joint]) return null;
       refined.push(solved.copy());

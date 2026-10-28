@@ -21,8 +21,7 @@ class ExecutionPlan implements NativeSpanOwner implements TimedJointTrajectory {
   /** What a plan check found, set by the compiler that made the plan when it ran one. */
   public var checked:Null<PlanCheckResult> = null;
   /** False only for a certified publication cut inside continuous motion. */
-  @:allow(motionkit.robot.PlanCertification)
-  public var endsAtRest(default,null):Bool = true;
+  @:allow(motionkit.robot.PlanCertification) public var endsAtRest(default, null):Bool = true;
   /** Validation claims carried with this plan's telemetry. */
   public function guarantees():ValidationGuarantees return report.guarantees();
   public final planId:Int64;
@@ -43,15 +42,23 @@ class ExecutionPlan implements NativeSpanOwner implements TimedJointTrajectory {
   final storedVelocityTolerances:Array<Float>;
   final storedAccelerationTolerances:Array<Float>;
 
-  private function new(owner:Ownedmk_plan_handle, report:ValidationReport,
-      positions:Array<Float>, velocities:Array<Float>,
-      accelerations:Array<Float>, pTol:Array<Float>, vTol:Array<Float>,
-      aTol:Array<Float>) {
+  private function new(
+    owner:Ownedmk_plan_handle,
+    report:ValidationReport,
+    positions:Array<Float>,
+    velocities:Array<Float>,
+    accelerations:Array<Float>,
+    pTol:Array<Float>,
+    vTol:Array<Float>,
+    aTol:Array<Float>
+  ) {
     this.owner = owner;
     this.report = report;
-    storedStartPositions = positions.copy(); storedStartVelocities = velocities.copy();
+    storedStartPositions = positions.copy();
+    storedStartVelocities = velocities.copy();
     storedStartAccelerations = accelerations.copy();
-    storedPositionTolerances = pTol.copy(); storedVelocityTolerances = vTol.copy();
+    storedPositionTolerances = pTol.copy();
+    storedVelocityTolerances = vTol.copy();
     storedAccelerationTolerances = aTol.copy();
     var info = new mk_plan_info();
     info.set_struct_size(mk_plan_info.size());
@@ -67,8 +74,7 @@ class ExecutionPlan implements NativeSpanOwner implements TimedJointTrajectory {
     storedEvents = [];
     for (index in 0...info.get_event_count()) {
       var nativeEvent = new mk_timed_event();
-      check(TrajectoryCore.mk_plan_get_event(owner.borrow(), index, nativeEvent),
-        "plan.event");
+      check(TrajectoryCore.mk_plan_get_event(owner.borrow(), index, nativeEvent), "plan.event");
       var channel = new StringBuf();
       for (i in 0...TrajectoryCoreConstants.MK_EVENT_CHANNEL_BYTES) {
         var code = nativeEvent.get_channel(i);
@@ -89,12 +95,16 @@ class ExecutionPlan implements NativeSpanOwner implements TimedJointTrajectory {
             command.addChar(code);
           }
           EventValue.Process(command.toString(), nativeValue.get_argument());
-        default: throw "Unknown native event value";
+        default:
+          throw "Unknown native event value";
       };
       var hold = switch nativeEvent.get_hold_policy() {
-        case TrajectoryCoreConstants.MK_EVENT_SAFE_WHILE_HELD: HoldPolicy.SafeWhileHeld;
-        case TrajectoryCoreConstants.MK_EVENT_RESTORE_ON_RESUME: HoldPolicy.RestoreOnResume;
-        default: HoldPolicy.Keep;
+        case TrajectoryCoreConstants.MK_EVENT_SAFE_WHILE_HELD:
+          HoldPolicy.SafeWhileHeld;
+        case TrajectoryCoreConstants.MK_EVENT_RESTORE_ON_RESUME:
+          HoldPolicy.RestoreOnResume;
+        default:
+          HoldPolicy.Keep;
       };
       storedEvents.push(new TimedEvent(nativeEvent.get_time_ns(), channel.toString(), value, hold));
     }
@@ -108,33 +118,30 @@ class ExecutionPlan implements NativeSpanOwner implements TimedJointTrajectory {
   public function isClosed():Bool return disposed;
 
   /** Each segment's start, in nanoseconds from the plan's start. */
-  public function segmentStarts():NativeSpan<Int64>
-    return TrajectoryCore.mk_plan_segment_starts(live()).ownedBy(this);
+  public function segmentStarts():NativeSpan<Int64> return TrajectoryCore.mk_plan_segment_starts(live()).ownedBy(this);
 
-  public function segmentDurations():NativeSpan<Int64>
-    return TrajectoryCore.mk_plan_segment_durations(live()).ownedBy(this);
+  public function segmentDurations():NativeSpan<Int64
+    > return TrajectoryCore.mk_plan_segment_durations(live()).ownedBy(this);
 
-  public function segmentDegrees():NativeSpan<Int>
-    return TrajectoryCore.mk_plan_segment_degrees(live()).ownedBy(this);
+  public function segmentDegrees():NativeSpan<Int> return TrajectoryCore.mk_plan_segment_degrees(live()).ownedBy(this);
 
   /**
     Joint `j`'s coefficient of power `p` in segment `i` is at
     `(i * jointCount + j) * COEFFICIENT_STRIDE + p`, zero above the segment's degree.
   **/
-  public function segmentCoefficients():NativeSpan<Float>
-    return TrajectoryCore.mk_plan_segment_coefficients(live()).ownedBy(this);
+  public function segmentCoefficients():NativeSpan<Float
+    > return TrajectoryCore.mk_plan_segment_coefficients(live()).ownedBy(this);
 
   /** Copies the segments out of native memory. */
-  public function segments():Array<{timeFromStartNs:Int64, durationNs:Int64,
-      coefficients:Array<Array<Float>>}> {
-    var starts = segmentStarts(), durations = segmentDurations(), degrees = segmentDegrees(),
-      coefficients = segmentCoefficients();
+  public function segments():Array<{timeFromStartNs:Int64, durationNs:Int64, coefficients:Array<Array<Float>>}> {
+    var starts = segmentStarts(),
+      durations = segmentDurations(), degrees = segmentDegrees(), coefficients = segmentCoefficients();
     return [for (index in 0...starts.length()) {
-      timeFromStartNs: starts.get(index),
-      durationNs: durations.get(index),
-      coefficients: [for (joint in 0...jointCount) [for (power in 0...degrees.get(index) + 1)
-        coefficients.get((index * jointCount + joint) * COEFFICIENT_STRIDE + power)]]
-    }];
+      timeFromStartNs:starts.get(index), durationNs:durations.get(index),
+        coefficients:[for (joint in 0...jointCount)[for (power in 0...degrees.get(index)
+        + 1) coefficients.get((index * jointCount + joint) * COEFFICIENT_STRIDE + power)]]
+    }
+    ];
   }
 
   function live():mk_plan_handle {
@@ -150,15 +157,22 @@ class ExecutionPlan implements NativeSpanOwner implements TimedJointTrajectory {
   public function copyAccelerationTolerances():Array<Float> return storedAccelerationTolerances.copy();
 
   /** Does not infer derivatives from degree-1 chords; callers supply the authored state. */
-  public static function create(trajectory:Trajectory, limits:ValidationLimits, planId:Int64,
-      positions:Array<Float>, velocities:Array<Float>, accelerations:Array<Float>,
-      positionTolerances:Array<Float>, velocityTolerances:Array<Float>,
-      accelerationTolerances:Array<Float>, ?events:Array<TimedEvent>):ExecutionPlan {
+  public static function create(
+    trajectory:Trajectory,
+    limits:ValidationLimits,
+    planId:Int64,
+    positions:Array<Float>,
+    velocities:Array<Float>,
+    accelerations:Array<Float>,
+    positionTolerances:Array<Float>,
+    velocityTolerances:Array<Float>,
+    accelerationTolerances:Array<Float>,
+    ?events:Array<TimedEvent>
+  ):ExecutionPlan {
     var count = trajectory.jointCount();
-    if (count != limits.jointCount || positions.length != count || velocities.length != count ||
-        accelerations.length != count || positionTolerances.length != count ||
-        velocityTolerances.length != count || accelerationTolerances.length != count)
-      throw "Plan start-state joint count mismatch";
+    if (count != limits.jointCount || positions.length != count || velocities.length != count
+      || accelerations.length != count || positionTolerances.length != count || velocityTolerances.length != count
+      || accelerationTolerances.length != count) throw "Plan start-state joint count mismatch";
     limits = limits.withStartTolerance(positionTolerances);
     var start = new mk_start_state();
     start.set_struct_size(mk_start_state.size());
@@ -178,27 +192,34 @@ class ExecutionPlan implements NativeSpanOwner implements TimedJointTrajectory {
     spec.set_calibration_revision(limits.calibrationRevision);
     spec.set_required_capabilities(Int64.ofInt(TrajectoryCoreConstants.MK_CAP_TIMED_TRAJECTORY));
     var authored = events == null ? [] : events;
-    if (authored.length > TrajectoryCoreConstants.MK_MAX_PLAN_EVENTS)
-      throw "Too many timed events in plan";
-    if (authored.length > 0)
-      spec.set_required_capabilities(Int64.ofInt(
-        TrajectoryCoreConstants.MK_CAP_TIMED_TRAJECTORY | TrajectoryCoreConstants.MK_CAP_EVENTS));
+    if (authored.length > TrajectoryCoreConstants.MK_MAX_PLAN_EVENTS) throw "Too many timed events in plan";
+    if (authored.length > 0) spec.set_required_capabilities(Int64.ofInt(TrajectoryCoreConstants.MK_CAP_TIMED_TRAJECTORY
+      | TrajectoryCoreConstants.MK_CAP_EVENTS));
     spec.set_event_count(authored.length);
     var previous = Int64.ofInt(0);
     for (index in 0...authored.length) {
       var event = authored[index];
-      if (event == null || Int64.compare(event.timeNs, previous) < 0)
-        throw "Timed events must be sorted";
+      if (event == null || Int64.compare(event.timeNs, previous) < 0) throw "Timed events must be sorted";
       previous = event.timeNs;
       var nativeEvent = new mk_timed_event();
-      writeAscii(event.channel, TrajectoryCoreConstants.MK_EVENT_CHANNEL_BYTES,
-        function(i, code) nativeEvent.set_channel(i, code));
+      writeAscii(
+        event.channel,
+        TrajectoryCoreConstants.MK_EVENT_CHANNEL_BYTES,
+        function(i, code) nativeEvent.set_channel(
+          i,
+          code
+        )
+      );
       nativeEvent.set_time_ns(event.timeNs);
       nativeEvent.set_hold_policy(switch event.holdPolicy {
-        case Keep: TrajectoryCoreConstants.MK_EVENT_KEEP;
-        case SafeWhileHeld: TrajectoryCoreConstants.MK_EVENT_SAFE_WHILE_HELD;
-        case RestoreOnResume: TrajectoryCoreConstants.MK_EVENT_RESTORE_ON_RESUME;
-      });
+        case Keep:
+          TrajectoryCoreConstants.MK_EVENT_KEEP;
+        case SafeWhileHeld:
+          TrajectoryCoreConstants.MK_EVENT_SAFE_WHILE_HELD;
+        case RestoreOnResume:
+          TrajectoryCoreConstants.MK_EVENT_RESTORE_ON_RESUME;
+      }
+      );
       var nativeValue = new mk_event_value();
       switch event.value {
         case Digital(enabled):
@@ -209,8 +230,14 @@ class ExecutionPlan implements NativeSpanOwner implements TimedJointTrajectory {
           nativeValue.set_analog(number);
         case Process(command, argument):
           nativeValue.set_kind(TrajectoryCoreConstants.MK_EVENT_PROCESS);
-          writeAscii(command, TrajectoryCoreConstants.MK_EVENT_COMMAND_BYTES,
-            function(i, code) nativeValue.set_command(i, code));
+          writeAscii(
+            command,
+            TrajectoryCoreConstants.MK_EVENT_COMMAND_BYTES,
+            function(i, code) nativeValue.set_command(
+              i,
+              code
+            )
+          );
           nativeValue.set_argument(argument);
       }
       nativeEvent.set_value(nativeValue);
@@ -220,22 +247,30 @@ class ExecutionPlan implements NativeSpanOwner implements TimedJointTrajectory {
     spec.set_start_state(start);
     var nativeReport = new mk_validation_report();
     nativeReport.set_struct_size(mk_validation_report.size());
-    var created = TrajectoryCore.mk_plan_create(trajectory.owner.borrow(), spec,
-      limits.nativeValue(), nativeReport);
-    if (created.status == TrajectoryCoreConstants.MK_ERROR_LIMIT)
-      throw new PlanLimitError(new ValidationReport(nativeReport));
+    var created = TrajectoryCore.mk_plan_create(trajectory.owner.borrow(), spec, limits.nativeValue(), nativeReport);
+    if (created.status
+      == TrajectoryCoreConstants.MK_ERROR_LIMIT) throw new PlanLimitError(new ValidationReport(nativeReport));
     check(created.status, "plan.create");
-    return new ExecutionPlan(created.out_plan, new ValidationReport(nativeReport),
-      positions, velocities, accelerations, positionTolerances,
-      velocityTolerances, accelerationTolerances);
+    return new ExecutionPlan(
+      created.out_plan,
+      new ValidationReport(nativeReport),
+      positions,
+      velocities,
+      accelerations,
+      positionTolerances,
+      velocityTolerances,
+      accelerationTolerances
+    );
   }
 
   public function evaluate(timeSeconds:Float):TrajectoryState {
     if (disposed) throw "Native plan has been disposed";
     var state = TrajectoryStateBuffer.acquire();
     try {
-      check(TrajectoryCore.mk_plan_evaluate(owner.borrow(),
-        Trajectory.nanoseconds(timeSeconds), state), "plan.evaluate");
+      check(
+        TrajectoryCore.mk_plan_evaluate(owner.borrow(), Trajectory.nanoseconds(timeSeconds), state),
+        "plan.evaluate"
+      );
       var result = TrajectoryStateBuffer.copyOut();
       TrajectoryStateBuffer.release();
       return result;
@@ -252,13 +287,11 @@ class ExecutionPlan implements NativeSpanOwner implements TimedJointTrajectory {
   }
 
   static function check(status:Int, operation:String):Void {
-    if (status != TrajectoryCoreConstants.MK_OK)
-      throw '$operation failed with MotionKit error $status';
+    if (status != TrajectoryCoreConstants.MK_OK) throw '$operation failed with MotionKit error $status';
   }
 
   static function writeAscii(value:String, capacity:Int, write:Int -> Int -> Void):Void {
-    if (value == null || value.length == 0 || value.length >= capacity)
-      throw "Event text does not fit native ABI";
+    if (value == null || value.length == 0 || value.length >= capacity) throw "Event text does not fit native ABI";
     for (i in 0...value.length) {
       var code = value.charCodeAt(i);
       if (code <= ' '.code || code > '~'.code) throw "Native events need printable ASCII text";

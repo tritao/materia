@@ -16,17 +16,20 @@ class ProgramBlock {
   public var barrier(default, null):Null<ProgramBarrier>;
   public var complete(default, null):Bool;
 
-  public function new(plans:Array<ExecutionPlan>, opIndices:Array<Int>,
-      barrier:Null<ProgramBarrier>, ?pathLengths:Array<Float>,
-      ?pathDistances:Array<Array<Float>>, ?pathTimes:Array<Array<Float>>,
-      ?complete:Bool = true) {
+  public function new(
+    plans:Array<ExecutionPlan>,
+    opIndices:Array<Int>,
+    barrier:Null<ProgramBarrier>,
+    ?pathLengths:Array<Float>,
+    ?pathDistances:Array<Array<Float>>,
+    ?pathTimes:Array<Array<Float>>,
+    ?complete:Bool = true
+  ) {
     this.plans = plans.copy();
     this.opIndices = opIndices.copy();
     this.pathLengths = pathLengths == null ? [for (_ in plans) 0.0] : pathLengths.copy();
-    this.pathDistances = pathDistances == null ? [for (_ in plans) []] :
-      [for (values in pathDistances) values.copy()];
-    this.pathTimes = pathTimes == null ? [for (_ in plans) []] :
-      [for (values in pathTimes) values.copy()];
+    this.pathDistances = pathDistances == null ? [for (_ in plans)[]] : [for (values in pathDistances) values.copy()];
+    this.pathTimes = pathTimes == null ? [for (_ in plans)[]] : [for (values in pathTimes) values.copy()];
     this.barrier = barrier;
     this.complete = complete;
   }
@@ -34,8 +37,7 @@ class ProgramBlock {
   /** An open block, to be filled by `add` and finished by `close`. */
   public static function open():ProgramBlock return new ProgramBlock([], [], null, [], [], [], false);
 
-  public function add(plan:ExecutionPlan, opIndex:Int, length:Float, distances:Array<Float>,
-      times:Array<Float>):Void {
+  public function add(plan:ExecutionPlan, opIndex:Int, length:Float, distances:Array<Float>, times:Array<Float>):Void {
     if (complete) throw "Program block is already complete";
     plans.push(plan);
     opIndices.push(opIndex);
@@ -46,9 +48,13 @@ class ProgramBlock {
 
   /** Retire consumed native coefficients and their aligned path/event metadata. */
   public function retireFirstPlan():Void {
-    if (plans.length==0) throw "No consumed plan to retire";
-    var plan=plans[0];
-    plans.shift();opIndices.shift();pathLengths.shift();pathDistances.shift();pathTimes.shift();
+    if (plans.length == 0) throw "No consumed plan to retire";
+    var plan = plans[0];
+    plans.shift();
+    opIndices.shift();
+    pathLengths.shift();
+    pathDistances.shift();
+    pathTimes.shift();
     plan.dispose();
   }
 

@@ -49,7 +49,8 @@ class ManipulatorKinematics implements RedundantPathSolver {
   /** True when the hard tool task leaves no joint-space null direction. */
   function fullyConstrained(q:Array<Float>, freedom:OrientationPolicy):Bool {
     switch freedom {
-      case Free | Cone(_, _): return false;
+      case Free | Cone(_, _):
+        return false;
       default:
     }
     var n = jointCount();
@@ -59,21 +60,27 @@ class ManipulatorKinematics implements RedundantPathSolver {
     var reduced:Array<Float> = [];
     for (row in projection) for (joint in 0...n) {
       var value = 0.0;
-      for (axis in 0...6) value += row[axis] * jacobian[axis*n + joint];
+      for (axis in 0...6) value += row[axis] * jacobian[axis * n + joint];
       reduced.push(value);
     }
     // Normalize columns before the rank test so metres and radians do not
     // choose the numerical threshold for each other.
     for (joint in 0...n) {
       var norm = 0.0;
-      for (row in 0...projection.length) norm += reduced[row*n + joint] * reduced[row*n + joint];
+      for (row in 0...projection.length) norm += reduced[row * n + joint] * reduced[row * n + joint];
       if (!(norm > 1e-20)) return false;
       norm = Math.sqrt(norm);
-      for (row in 0...projection.length) reduced[row*n + joint] /= norm;
+      for (row in 0...projection.length) reduced[row * n + joint] /= norm;
     }
-    var normal = [for (_ in 0...n*n) 0.0], rhs = [for (_ in 0...n) 0.0];
-    LinearAlgebra.normalEquationsDense(reduced, projection.length, n,
-      [for (_ in 0...projection.length) 0.0], normal, rhs);
+    var normal = [for (_ in 0...n * n) 0.0], rhs = [for (_ in 0...n) 0.0];
+    LinearAlgebra.normalEquationsDense(
+      reduced,
+      projection.length,
+      n,
+      [for (_ in 0...projection.length) 0.0],
+      normal,
+      rhs
+    );
     return LinearAlgebra.solveInPlace(normal, rhs, n, [for (_ in 0...n) 0.0], 1e-10);
   }
 
@@ -83,8 +90,8 @@ class ManipulatorKinematics implements RedundantPathSolver {
 
   public function new(manipulator:KinematicGroup, ?differentialDamping:Float = 1e-6) {
     if (manipulator == null) throw "Manipulator kinematics requires a manipulator";
-    if (!Math.isFinite(differentialDamping) || differentialDamping <= 0.0)
-      throw "Differential IK damping must be finite and positive";
+    if (!Math.isFinite(differentialDamping)
+      || differentialDamping <= 0.0) throw "Differential IK damping must be finite and positive";
     this.manipulator = manipulator;
     this.differentialDamping = differentialDamping;
     reachBound = RevoluteReachBound.of(manipulator);
@@ -107,23 +114,40 @@ class ManipulatorKinematics implements RedundantPathSolver {
 
   public function forward(q:Array<Float>):Pose3 return fromTransform(manipulator.tcpPose(q));
 
-  public function solvePose(target:Pose3, seed:Array<Float>,
-      tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
+  public function solvePose(target:Pose3,
+    seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
     requireTolerance(tolerance);
     lastFailure = null;
     var task = ToolFreedom.of(target, freedom, tolerance.orientation);
-    if (seed != null && seed.length != jointCount())
-      throw 'Kinematic group requires ${jointCount()} values, got ${seed.length}';
-    var toolAxisFixed = switch freedom { case FreeAboutTool: true; default: false; };
-    if (reachBound != null && reachBound.excludes(toTransform(target), tolerance.position,
-        tolerance.orientation, ToolFreedom.isFull(freedom), toolAxisFixed)) {
+    if (seed != null
+      && seed.length != jointCount()) throw 'Kinematic group requires ${jointCount()} values, got ${seed.length}';
+    var toolAxisFixed = switch freedom {
+      case FreeAboutTool:
+        true;
+      default:
+        false;
+    };
+    if (reachBound != null && reachBound.excludes(
+      toTransform(target),
+      tolerance.position,
+      tolerance.orientation,
+      ToolFreedom.isFull(freedom),
+      toolAxisFixed
+    )) {
       lastFailure = "Tool pose is outside the revolute chain reach bound";
       return null;
     }
     var preference = preferredOrientation;
     if (!ToolFreedom.isFull(freedom) && preference != null) {
-      var preferred = PoseMath.angle(target, preference) <= tolerance.orientation ? target
-        : new Pose3(target.x, target.y, target.z, preference.qx, preference.qy, preference.qz, preference.qw);
+      var preferred = PoseMath.angle(target, preference) <= tolerance.orientation ? target : new Pose3(
+        target.x,
+        target.y,
+        target.z,
+        preference.qx,
+        preference.qy,
+        preference.qz,
+        preference.qw
+      );
       if (ToolFreedom.orientationError(preferred, target, freedom) <= tolerance.orientation) {
         // Zero preference error is optimal. If it is unreachable, solve only the hard rows.
         var exact = solvePose(preferred, seed, tolerance);
@@ -138,13 +162,13 @@ class ManipulatorKinematics implements RedundantPathSolver {
       }
     }
     var result = manipulator.solve(toTransform(task.target), seed, options(tolerance, freedom, target));
-    if (!result.converged)
-      lastFailure = 'tool position residual ${result.positionError} m; orientation residual ${result.orientationError} rad';
+    if (!result.converged) lastFailure =
+      'tool position residual ${result.positionError} m; orientation residual ${result.orientationError} rad';
     return result.converged ? result.q.copy() : null;
   }
 
-  public function sampleCandidates(target:Pose3, maxCount:Int,
-      tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>> {
+  public function sampleCandidates(target:Pose3,
+    maxCount:Int, tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>> {
     requireTolerance(tolerance);
     if (target == null) throw "Candidate sampling requires a target pose";
     if (maxCount < 0) throw "Candidate count must be non-negative";
@@ -153,7 +177,10 @@ class ManipulatorKinematics implements RedundantPathSolver {
 
     var combinationCount = 1;
     for (_ in 0...jointCount()) {
-      if (combinationCount > 4096 / 3) { combinationCount = 4096; break; }
+      if (combinationCount > 4096 / 3) {
+        combinationCount = 4096;
+        break;
+      }
       combinationCount *= 3;
     }
     // A redundant arm finds a few IK branches this way, then sweeps each around its swivel.
@@ -162,8 +189,13 @@ class ManipulatorKinematics implements RedundantPathSolver {
     // Enumerate small lattices completely. For larger groups, spend seeds in
     // proportion to the useful branch count; a one-branch feasibility screen
     // should stay cheaper than full path preparation.
-    var attemptLimit = combinationCount <= 32 ? combinationCount
-      : Math.min(combinationCount, Math.max(CANDIDATE_SEEDS_PER_RESULT, branchLimit * CANDIDATE_SEEDS_PER_RESULT));
+    var attemptLimit = combinationCount <= 32 ? combinationCount : Math.min(
+      combinationCount,
+      Math.max(
+        CANDIDATE_SEEDS_PER_RESULT,
+        branchLimit * CANDIDATE_SEEDS_PER_RESULT
+      )
+    );
     for (attempt in 0...Std.int(attemptLimit)) {
       var code = attempt;
       var shift = attempt % 3;
@@ -183,8 +215,7 @@ class ManipulatorKinematics implements RedundantPathSolver {
         }
       }
       var solved = solvePose(target, seed, tolerance, freedom);
-      if (solved == null || containsNear(candidates, solved, tolerance.candidateSeparation))
-        continue;
+      if (solved == null || containsNear(candidates, solved, tolerance.candidateSeparation)) continue;
       candidates.push(solved);
       if (candidates.length >= branchLimit) break;
     }
@@ -195,9 +226,10 @@ class ManipulatorKinematics implements RedundantPathSolver {
       if (candidates.length >= branchLimit) break;
       var seed = [for (i in 0...jointCount()) {
         var limits = manipulator.group.limitsOf(i);
-        limits.lower < limits.upper ? limits.lower + (limits.upper - limits.lower) * (i == joint ? fraction : 0.5)
-          : (i == joint ? (fraction < 0.5 ? -Math.PI : Math.PI) : 0.0);
-      }];
+        limits.lower < limits.upper ? limits.lower + (limits.upper - limits.lower) * (i
+          == joint ? fraction : 0.5) : (i == joint ? (fraction < 0.5 ? -Math.PI : Math.PI) : 0.0);
+      }
+      ];
       var solved = solvePose(target, seed, tolerance, freedom);
       if (solved != null && !containsNear(candidates, solved, tolerance.candidateSeparation)) candidates.push(solved);
     }
@@ -205,8 +237,13 @@ class ManipulatorKinematics implements RedundantPathSolver {
   }
 
   /** Each branch solved at evenly spaced swivel angles, stepping from its own, each solve seeded by the last. */
-  function sweepSwivel(target:Pose3, branches:Array<Array<Float>>, maxCount:Int,
-      tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>> {
+  function sweepSwivel(
+    target:Pose3,
+    branches:Array<Array<Float>>,
+    maxCount:Int,
+    tolerance:IkTolerance,
+    ?freedom:OrientationPolicy
+  ):Array<Array<Float>> {
     var candidates = branches.copy();
     if (branches.length == 0) return candidates;
     var steps = Std.int(Math.max(4, Math.floor(maxCount / branches.length)));
@@ -234,8 +271,8 @@ class ManipulatorKinematics implements RedundantPathSolver {
    * with external axes their values, both through `RedundancyResolver`; a
    * plain arm follows point by point, each sample seeded by the last.
    */
-  public function solvePath(request:PathRequest):Array<Null<Array<Float>>>
-    return solvePathWithRates(request).configurations;
+  public function solvePath(request:PathRequest):Array<Null<Array<Float
+    >>> return solvePathWithRates(request).configurations;
 
   /** The path and, for a redundant group, the exact rate of its redundancy along it (see `RedundancyResolver`). */
   public function solvePathWithRates(request:PathRequest):PathSolution {
@@ -243,8 +280,8 @@ class ManipulatorKinematics implements RedundantPathSolver {
     var freedom = request.freedoms[0];
     var uniform = true;
     for (policy in request.freedoms) if (policy != freedom) uniform = false;
-    if (named == null || (uniform && fullyConstrained(request.startQ, freedom)))
-      return new PathSolution(request.followPointByPoint(this));
+    if (named == null || (uniform && fullyConstrained(request.startQ,
+      freedom))) return new PathSolution(request.followPointByPoint(this));
     named.preferringOrientation(preferredOrientation, preferTargetOrientation);
     named.preferringPosture(preferredPosture);
     return new RedundancyResolver(named).solve(this, request);
@@ -254,10 +291,13 @@ class ManipulatorKinematics implements RedundantPathSolver {
   public function redundancy():Null<RedundancyParameterization> return parameterization;
 
 
-  public function solveDifferential(q:Array<Float>, twist:Twist6,
-      ?redundancyRate:Array<Float>, ?freedom:OrientationPolicy):Null<Array<Float>> {
-    if (q == null || q.length != jointCount())
-      throw 'Differential IK requires ${jointCount()} joint values';
+  public function solveDifferential(
+    q:Array<Float>,
+    twist:Twist6,
+    ?redundancyRate:Array<Float>,
+    ?freedom:OrientationPolicy
+  ):Null<Array<Float>> {
+    if (q == null || q.length != jointCount()) throw 'Differential IK requires ${jointCount()} joint values';
     if (twist == null) throw "Differential IK requires a tool twist";
     var n = jointCount();
     var jacobian = manipulator.tcpJacobian(q);
@@ -268,14 +308,21 @@ class ManipulatorKinematics implements RedundantPathSolver {
         var projected = [asked[0], asked[1], asked[2], 0.0, 0.0, 0.0];
         for (row in ToolFreedom.twistRows(forward(q), freedom)) {
           var value = 0.0;
-          for (axis in 3...6) value += row[axis]*asked[axis];
-          for (axis in 3...6) projected[axis] += row[axis]*value;
+          for (axis in 3...6) value += row[axis] * asked[axis];
+          for (axis in 3...6) projected[axis] += row[axis] * value;
         }
         // Keep roundoff-sized spin untouched so existing full-orientation paths are identical.
         var freeRate = 0.0;
         for (axis in 3...6) freeRate = Math.max(freeRate, Math.abs(projected[axis] - asked[axis]));
         if (freeRate <= 1e-12) projected = asked;
-        var preferredTwist = new Twist6(projected[0], projected[1], projected[2], projected[3], projected[4], projected[5]);
+        var preferredTwist = new Twist6(
+          projected[0],
+          projected[1],
+          projected[2],
+          projected[3],
+          projected[4],
+          projected[5]
+        );
         var exact = solveDifferential(q, preferredTwist, redundancyRate);
         if (fitsRows(jacobian, 6, n, projected, exact)) return exact;
       }
@@ -303,23 +350,29 @@ class ManipulatorKinematics implements RedundantPathSolver {
     return LinearAlgebra.dampedRowStep(jacobian, rows, n, columns, target, differentialDamping);
   }
 
-  function reducedDifferential(q:Array<Float>, twist:Twist6, redundancyRate:Null<Array<Float>>,
-      freedom:OrientationPolicy, jacobian:Array<Float>):Null<Array<Float>> {
+  function reducedDifferential(
+    q:Array<Float>,
+    twist:Twist6,
+    redundancyRate:Null<Array<Float>>,
+    freedom:OrientationPolicy,
+    jacobian:Array<Float>
+  ):Null<Array<Float>> {
     var n = jointCount();
     var projection = ToolFreedom.twistRows(forward(q), freedom);
     var asked = twist.toArray();
     switch freedom {
-      case Cone(_, _): for (i in 3...6) asked[i] = 0.0;
+      case Cone(_, _):
+        for (i in 3...6) asked[i] = 0.0;
       default:
     }
     var reduced:Array<Float> = [], target:Array<Float> = [];
     for (row in projection) {
       var value = 0.0;
-      for (axis in 0...6) value += row[axis]*asked[axis];
+      for (axis in 0...6) value += row[axis] * asked[axis];
       target.push(value);
       for (joint in 0...n) {
         var coefficient = 0.0;
-        for (axis in 0...6) coefficient += row[axis]*jacobian[axis*n + joint];
+        for (axis in 0...6) coefficient += row[axis] * jacobian[axis * n + joint];
         reduced.push(coefficient);
       }
     }
@@ -330,14 +383,21 @@ class ManipulatorKinematics implements RedundantPathSolver {
       var requested:Array<Float> = cast redundancyRate;
       if (requested.length != extra) throw 'Differential IK redundancy rate needs $extra values';
       for (k in 0...extra) {
-        for (joint in 0...n) reduced.push(named[k*n + joint]);
+        for (joint in 0...n) reduced.push(named[k * n + joint]);
         target.push(requested[k]);
       }
       rows += extra;
     }
     var columns = [for (joint in 0...n) joint];
-    var result = rows >= n ? LinearAlgebra.dampedStep(reduced, rows, n, columns, target, differentialDamping)
-      : LinearAlgebra.dampedRowStep(reduced, rows, n, columns, target, differentialDamping);
+    var result = rows >= n ? LinearAlgebra.dampedStep(reduced,
+      rows, n, columns, target, differentialDamping) : LinearAlgebra.dampedRowStep(
+        reduced,
+        rows,
+        n,
+        columns,
+        target,
+        differentialDamping
+      );
     return fitsRows(reduced, rows, n, target, result) ? result : null;
   }
 
@@ -346,7 +406,7 @@ class ManipulatorKinematics implements RedundantPathSolver {
     var position = 0.0, orientation = 0.0;
     for (row in 0...rows) {
       var achieved = 0.0;
-      for (joint in 0...n) achieved += jacobian[row*n + joint]*result[joint];
+      for (joint in 0...n) achieved += jacobian[row * n + joint] * result[joint];
       var residual = Math.abs(achieved - target[row]);
       if (row < 3) position = Math.max(position, residual);
       else orientation = Math.max(orientation, residual);
@@ -357,39 +417,59 @@ class ManipulatorKinematics implements RedundantPathSolver {
   }
 
   function options(tolerance:IkTolerance, ?freedom:OrientationPolicy, ?target:Pose3):IkOptions {
-    var result = target == null ? new IkOptions(tolerance.position, tolerance.orientation, tolerance.maxIterations, tolerance.damping)
-      : ToolFreedom.of(target, freedom, tolerance.orientation).options(tolerance,
-          preferredOrientation == null && preferTargetOrientation ? target : preferredOrientation);
+    var result = target == null ? new IkOptions(
+      tolerance.position,
+      tolerance.orientation,
+      tolerance.maxIterations,
+      tolerance.damping
+    ) : ToolFreedom.of(
+      target,
+      freedom,
+      tolerance.orientation
+    ).options(
+      tolerance,
+      preferredOrientation == null && preferTargetOrientation ? target : preferredOrientation
+    );
     var posture = preferredPosture;
     if (posture != null) result.preferring(posture);
     return result;
   }
 
-  function solveAtSwivel(goal:Transform3, seed:Array<Float>, angle:Float, exact:Bool, tolerance:IkTolerance,
-      ?freedom:OrientationPolicy):IKResult {
-    if (ToolFreedom.isFull(freedom))
-      return manipulator.solve(goal, seed, options(tolerance).atSwivel(angle, exact));
+  function solveAtSwivel(
+    goal:Transform3,
+    seed:Array<Float>,
+    angle:Float,
+    exact:Bool,
+    tolerance:IkTolerance,
+    ?freedom:OrientationPolicy
+  ):IKResult {
+    if (ToolFreedom.isFull(freedom)) return manipulator.solve(goal, seed, options(tolerance).atSwivel(angle, exact));
     var target = fromTransform(goal);
     var task = ToolFreedom.of(target, freedom, tolerance.orientation);
-    return manipulator.solve(toTransform(task.target), seed, options(tolerance, freedom, target).atSwivel(angle, exact));
+    return manipulator.solve(toTransform(task.target),
+      seed, options(tolerance, freedom, target).atSwivel(angle, exact));
   }
 
   static function requireTolerance(tolerance:IkTolerance):Void {
     if (tolerance == null) throw "IK tolerance is required";
   }
 
-  static function fromTransform(value:Transform3):Pose3
-    return new Pose3(value.translation.x, value.translation.y, value.translation.z,
-      value.rotation.x, value.rotation.y, value.rotation.z, value.rotation.w);
+  static function fromTransform(value:Transform3):Pose3 return new Pose3(
+    value.translation.x,
+    value.translation.y,
+    value.translation.z,
+    value.rotation.x,
+    value.rotation.y,
+    value.rotation.z,
+    value.rotation.w
+  );
 
   static function toTransform(value:Pose3):Transform3 {
     if (value == null) throw "IK target pose is required";
-    return new Transform3(new Vec3(value.x, value.y, value.z),
-      new Quat(value.qx, value.qy, value.qz, value.qw));
+    return new Transform3(new Vec3(value.x, value.y, value.z), new Quat(value.qx, value.qy, value.qz, value.qw));
   }
 
-  static function containsNear(candidates:Array<Array<Float>>, value:Array<Float>,
-      separation:Float):Bool {
+  static function containsNear(candidates:Array<Array<Float>>, value:Array<Float>, separation:Float):Bool {
     for (candidate in candidates) {
       var squaredDistance = 0.0;
       for (joint in 0...value.length) {

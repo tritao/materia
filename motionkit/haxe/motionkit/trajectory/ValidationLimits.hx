@@ -11,8 +11,7 @@ class ValidationLimits {
   final native:mk_limits;
 
   public function new(jointCount:Int, modelRevision:Int64, calibrationRevision:Int64) {
-    if (jointCount < 1 || jointCount > TrajectoryCoreConstants.MK_MAX_JOINTS)
-      throw "Invalid validation joint count";
+    if (jointCount < 1 || jointCount > TrajectoryCoreConstants.MK_MAX_JOINTS) throw "Invalid validation joint count";
     this.jointCount = jointCount;
     this.modelRevision = modelRevision;
     this.calibrationRevision = calibrationRevision;
@@ -25,8 +24,7 @@ class ValidationLimits {
 
   public function position(joint:Int, lower:Float, upper:Float):Void {
     validJoint(joint);
-    if (!Math.isFinite(lower) || !Math.isFinite(upper) || lower > upper)
-      throw "Invalid position bounds";
+    if (!Math.isFinite(lower) || !Math.isFinite(upper) || lower > upper) throw "Invalid position bounds";
     native.set_position_claimed(joint, 1);
     native.set_position_lower(joint, lower);
     native.set_position_upper(joint, upper);
@@ -61,8 +59,7 @@ class ValidationLimits {
 
   /** Executor clock resolution in nanoseconds; zero uses 1 ns. Round fractional device ticks up. */
   public function timeResolutionNs(resolution:Int64):Void {
-    if (Int64.compare(resolution, Int64.ofInt(0)) < 0)
-      throw "Validation time resolution must be nonnegative";
+    if (Int64.compare(resolution, Int64.ofInt(0)) < 0) throw "Validation time resolution must be nonnegative";
     native.set_executor_time_resolution_ns(resolution);
   }
 
@@ -79,7 +76,7 @@ class ValidationLimits {
   public function withStartTolerance(tolerances:Array<Float>):ValidationLimits return copy(true, tolerances);
 
   /** The position bounds a joint starting at `start` is held to, by the validator's own start-at-limit rule. */
-  public function admittedBounds(joint:Int, start:Float, tolerance:Float):{lower:Float, upper:Float} {
+  public function admittedBounds(joint:Int, start:Float, tolerance:Float): {lower: Float, upper: Float} {
     validJoint(joint);
     if (native.get_position_claimed(joint) == 0) return {lower: Math.NEGATIVE_INFINITY, upper: Math.POSITIVE_INFINITY};
     var result = TrajectoryCore.mk_limits_admit_start(native, joint, start, tolerance);
@@ -94,15 +91,14 @@ class ValidationLimits {
         result.position(joint, native.get_position_lower(joint), native.get_position_upper(joint));
         if (startTolerances != null) result.native.set_position_start_tolerance(joint, startTolerances[joint]);
       }
-      if ((native.get_derivative_claimed(joint) & 1) != 0)
-        result.velocity(joint, native.get_max_velocity(joint));
-      if ((native.get_derivative_claimed(joint) & 2) != 0)
-        result.acceleration(joint, native.get_max_acceleration(joint));
-      if (keepJerk && (native.get_derivative_claimed(joint) & 4) != 0)
-        result.jerk(joint, native.get_max_jerk(joint));
+      if ((native.get_derivative_claimed(joint) & 1) != 0) result.velocity(joint, native.get_max_velocity(joint));
+      if ((native.get_derivative_claimed(joint) & 2) != 0) result.acceleration(
+        joint,
+        native.get_max_acceleration(joint)
+      );
+      if (keepJerk && (native.get_derivative_claimed(joint) & 4) != 0) result.jerk(joint, native.get_max_jerk(joint));
     }
-    for (order in 0...3)
-      result.continuity(order, native.get_max_continuity_jump(order));
+    for (order in 0...3) result.continuity(order, native.get_max_continuity_jump(order));
     result.timeResolutionNs(native.get_executor_time_resolution_ns());
     return result;
   }

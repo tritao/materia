@@ -8,11 +8,15 @@ package motionkit.robot;
 class MergeErrorBudget {
   public final position:Array<Float>;
   public final seconds:Float;
-  public function new(position:Array<Float>,seconds:Float) {
-    if(position==null || position.length==0 || !Math.isFinite(seconds) || seconds<=0 || seconds>=Math.pow(2,63)*1e-9)
-      throw "Merge budget needs joint allowances and a positive window";
-    this.position=position.copy();this.seconds=seconds;
-    for(value in position)if(!Math.isFinite(value) || value<0)throw "Merge allowances must be finite and nonnegative";
+  public function new(position:Array<Float>, seconds:Float) {
+    if (position == null || position.length == 0 || !Math.isFinite(seconds) || seconds <= 0 || seconds >= Math.pow(
+      2,
+      63
+    ) * 1e-9) throw "Merge budget needs joint allowances and a positive window";
+    this.position = position.copy();
+    this.seconds = seconds;
+    for (value in position) if (!Math.isFinite(value)
+      || value < 0) throw "Merge allowances must be finite and nonnegative";
 
   }
 }

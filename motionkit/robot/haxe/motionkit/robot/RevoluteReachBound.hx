@@ -35,7 +35,8 @@ class RevoluteReachBound {
       if (parent == null || path.indexOf(parent) >= 0) return null;
       switch parent.type {
         case Fixed | Revolute | Continuous:
-        default: return null;
+        default:
+          return null;
       }
       path.unshift(parent);
       link = parent.parent.id;
@@ -62,7 +63,7 @@ class RevoluteReachBound {
       var b = axes[1];
       var axial = b.dot(first), planar = first.sub(b.scale(axial)).norm();
       var remaining = 0.0;
-      for (i in 2...pivots.length) remaining += pivots[i].sub(pivots[i-1]).norm();
+      for (i in 2...pivots.length) remaining += pivots[i].sub(pivots[i - 1]).norm();
       radius = first.norm() + remaining;
       var rotationError = 0.0, positionError = 0.0;
       for (end in 2...pivots.length) {
@@ -73,27 +74,35 @@ class RevoluteReachBound {
           // axes remain safe; parallel prefixes need no pattern threshold.
           rotationError += 5 * Math.min(axes[carrier].sub(b).norm(), axes[carrier].add(b).norm());
         }
-        var span = pivots[end].sub(pivots[end-1]);
+        var span = pivots[end].sub(pivots[end - 1]);
         var length = span.norm(), along = b.dot(span);
         positionError += rotationError * length;
         axial += along;
         planar += span.sub(b.scale(along)).norm();
         remaining = Math.max(0.0, remaining - length);
-        radius = Math.min(radius, Math.sqrt(planar*planar + axial*axial) + positionError + remaining);
+        radius = Math.min(radius, Math.sqrt(planar * planar + axial * axial) + positionError + remaining);
       }
     }
     for (frame in group.robot.frames) if (frame.id == group.flangeFrame) {
-      var rootToTcp = zero.compose(Transform3.fromArrays(frame.position, frame.rotation))
-        .compose(group.flangeTTcp);
-      return new RevoluteReachBound(centre, radius,
-        rootToTcp.inverse().transformPoint(pivots[pivots.length-1]), path.length + 1);
+      var rootToTcp = zero.compose(Transform3.fromArrays(frame.position, frame.rotation)).compose(group.flangeTTcp);
+      return new RevoluteReachBound(
+        centre,
+        radius,
+        rootToTcp.inverse().transformPoint(pivots[pivots.length - 1]),
+        path.length + 1
+      );
     }
     return null;
   }
 
   /** Reject only outside the sphere enlarged by the task's allowed errors. */
-  public function excludes(target:Transform3, positionTolerance:Float,
-      orientationTolerance:Float, fullOrientation:Bool, toolAxisFixed:Bool = false):Bool {
+  public function excludes(
+    target:Transform3,
+    positionTolerance:Float,
+    orientationTolerance:Float,
+    fullOrientation:Bool,
+    toolAxisFixed:Bool = false
+  ):Bool {
     var offset = tcpToPivot.norm();
     var point = fullOrientation ? target.transformPoint(tcpToPivot) : target.translation;
     var allowance = positionTolerance + (fullOrientation ? orientationTolerance * offset : offset);
@@ -101,8 +110,8 @@ class RevoluteReachBound {
       // Free spin changes only the perpendicular offset. The axial component
       // stays on the requested tool axis, up to its angular tolerance.
       point = target.transformPoint(new Vec3(0, 0, tcpToPivot.z));
-      allowance = positionTolerance + Math.sqrt(tcpToPivot.x*tcpToPivot.x + tcpToPivot.y*tcpToPivot.y)
-        + orientationTolerance*Math.abs(tcpToPivot.z);
+      allowance = positionTolerance + Math.sqrt(tcpToPivot.x
+        * tcpToPivot.x + tcpToPivot.y * tcpToPivot.y) + orientationTolerance * Math.abs(tcpToPivot.z);
     }
     // Outward numerical allowance for rigid-transform composition and norms.
     var rounding = 1e-12 * roundingScale * (1.0 + radius + offset + centre.norm() + point.norm());

@@ -10,9 +10,8 @@ class PoseWaypoint {
 
   public function new(pose:Pose3, positionTolerance:Float, orientationTolerance:Float) {
     if (pose == null) throw "Pose waypoint requires a pose";
-    if (!Math.isFinite(positionTolerance) || positionTolerance < 0.0 ||
-        !Math.isFinite(orientationTolerance) || orientationTolerance < 0.0)
-      throw "Pose tolerances must be finite and non-negative";
+    if (!Math.isFinite(positionTolerance) || positionTolerance < 0.0 || !Math.isFinite(orientationTolerance)
+      || orientationTolerance < 0.0) throw "Pose tolerances must be finite and non-negative";
     this.pose = pose;
     this.positionTolerance = positionTolerance;
     this.orientationTolerance = orientationTolerance;

@@ -39,15 +39,23 @@ class PathPlanner {
   final calibrationRevision:Int64;
   final startPositionTolerances:Map<String, Float> = new Map();
 
-  public function new(axes:Array<MotionAxis>, fixedTimestepSeconds:Float,
-      modelRevision:Int64, calibrationRevision:Int64, ?startPositionTolerances:Map<String, Float>) {
+  public function new(
+    axes:Array<MotionAxis>,
+    fixedTimestepSeconds:Float,
+    modelRevision:Int64,
+    calibrationRevision:Int64,
+    ?startPositionTolerances:Map<
+      String,
+      Float
+  >
+  ) {
     this.axes = axes.copy();
     this.fixedTimestepSeconds = fixedTimestepSeconds;
     this.modelRevision = modelRevision;
     this.calibrationRevision = calibrationRevision;
-    if (startPositionTolerances != null) for (id => tolerance in startPositionTolerances) {
-      if (axis(id) == null || !Math.isFinite(tolerance) || tolerance < 0)
-        throw "Path-start tolerances need known axes and finite nonnegative distances";
+    if (startPositionTolerances != null) for (id = > tolerance in startPositionTolerances) {
+      if (axis(id) == null || !Math.isFinite(tolerance)
+        || tolerance < 0) throw "Path-start tolerances need known axes and finite nonnegative distances";
       this.startPositionTolerances.set(id, tolerance);
     }
   }
@@ -65,14 +73,22 @@ class PathPlanner {
     var xAxis = requireAxis("x");
     var yAxis = requireAxis("y");
     var zAxis = requireAxis("z");
-    var current = new PathPoint(xAxis.logicalPosition(start), yAxis.logicalPosition(start),
-      zAxis.logicalPosition(start));
+    var current = new PathPoint(
+      xAxis.logicalPosition(start),
+      yAxis.logicalPosition(start),
+      zAxis.logicalPosition(start)
+    );
     var chosen = options == null ? new MotionOptions(feed.value, 0.0, 0.0) : options;
-    var maxVelocity = chosen.maxVelocity <= 0.0
-      ? feed.value : Math.min(feed.value, chosen.maxVelocity);
+    var maxVelocity = chosen.maxVelocity <= 0.0 ? feed.value : Math.min(feed.value, chosen.maxVelocity);
     var resolved = new MotionOptions(maxVelocity, chosen.maxAcceleration, chosen.maxJerk);
-    return plan(start, {path: GeometricPath.lines([current, target]),
-      pathOptions: PathPlanningOptions.exactStopMode(), motionOptions: resolved});
+    return plan(
+      start,
+      {
+        path: GeometricPath.lines([current, target]),
+        pathOptions: PathPlanningOptions.exactStopMode(),
+        motionOptions: resolved
+      }
+    );
   }
 
   public function plan(start:Array<Float>, request:PathPlanRequest):PlanningResult {
@@ -87,11 +103,23 @@ class PathPlanner {
       // Rounded corners are worth keeping where the axes can take them at a good share of the path speed.
       var cornerSpeed = Math.min(requireAxis("x").maxVelocity, requireAxis("y").maxVelocity);
       var cornerAcceleration = Math.min(requireAxis("x").maxAcceleration, requireAxis("y").maxAcceleration);
-      if (motionOptions != null && motionOptions.maxVelocity > 0.0) cornerSpeed = Math.min(cornerSpeed, motionOptions.maxVelocity);
-      if (motionOptions != null && motionOptions.maxAcceleration > 0.0)
-        cornerAcceleration = Math.min(cornerAcceleration, motionOptions.maxAcceleration);
-      var blended = CornerBlender.blend(path, options.blendTolerance * CornerBlender.GEOMETRY_SHARE,
-        options.maxBlendTurnAngleRadians, CornerBlender.minimumRadius(cornerSpeed, cornerAcceleration));
+      if (motionOptions != null && motionOptions.maxVelocity > 0.0) cornerSpeed = Math.min(
+        cornerSpeed,
+        motionOptions.maxVelocity
+      );
+      if (motionOptions != null && motionOptions.maxAcceleration > 0.0) cornerAcceleration = Math.min(
+        cornerAcceleration,
+        motionOptions.maxAcceleration
+      );
+      var blended = CornerBlender.blend(
+        path,
+        options.blendTolerance * CornerBlender.GEOMETRY_SHARE,
+        options.maxBlendTurnAngleRadians,
+        CornerBlender.minimumRadius(
+          cornerSpeed,
+          cornerAcceleration
+        )
+      );
       planningPath = blended.path;
       diagnostics = blended.diagnostics;
     }
@@ -99,13 +127,12 @@ class PathPlanner {
     var yAxis = requireAxis("y");
     var zAxis = requireAxis("z");
     var first = path.primitives[0].pointAt(0.0);
-    var starts = [xAxis.logicalPosition(start), yAxis.logicalPosition(start),
-      zAxis.logicalPosition(start)];
+    var starts = [xAxis.logicalPosition(start), yAxis.logicalPosition(start), zAxis.logicalPosition(start)];
     var startCoordinates = [first.x, first.y, first.z];
     for (i in 0...3) {
       var tolerance = startPositionTolerances.get(["x", "y", "z"][i]);
-      if (Math.abs(starts[i] - startCoordinates[i]) > (tolerance == null ? 1e-8 : tolerance))
-        throw 'Cartesian path starts at ${startCoordinates[i]} but axis ${["x", "y", "z"][i]} is at ${starts[i]}';
+      if (Math.abs(starts[i] - startCoordinates[i]) > (tolerance == null ? 1e-8
+        : tolerance)) throw 'Cartesian path starts at ${startCoordinates[i]} but axis ${["x", "y", "z"][i]} is at ${starts[i]}';
     }
 
     validatePathLimits(planningPath, [xAxis, yAxis, zAxis]);
@@ -121,24 +148,22 @@ class PathPlanner {
         jointUnits[joint] = scale;
         maxVelocity[joint] = direct.maxVelocity * scale;
         maxAcceleration[joint] = direct.maxAcceleration * scale;
-        if (requested.maxAcceleration > 0.0)
-          maxAcceleration[joint] = Math.min(maxAcceleration[joint],
-            requested.maxAcceleration * scale);
+        if (requested.maxAcceleration > 0.0) maxAcceleration[joint] = Math.min(
+          maxAcceleration[joint],
+          requested.maxAcceleration * scale
+        );
       }
     }
-    var segments:Array<{timeFromStartNs:Int64, durationNs:Int64,
-      coefficients:Array<Array<Float>>}> = [];
+    var segments:Array<{timeFromStartNs:Int64, durationNs:Int64, coefficients:Array<Array<Float>>}> = [];
     var junctionSpeeds = [for (_ in 0...(planningPath.primitives.length + 1)) 0.0];
     if (!options.exactStop) for (index in 1...planningPath.primitives.length) {
       var before = planningPath.primitives[index - 1];
       var after = planningPath.primitives[index];
-      if (before.kind() == PathPrimitiveKind.Circular ||
-          after.kind() == PathPrimitiveKind.Circular) continue;
+      if (before.kind() == PathPrimitiveKind.Circular || after.kind() == PathPrimitiveKind.Circular) continue;
       var beforeTangent = before.tangentAt(before.length());
       var afterTangent = after.tangentAt(0.0);
       var tangentDot = 0.0;
-      for (coordinate in 0...3)
-        tangentDot += beforeTangent[coordinate] * afterTangent[coordinate];
+      for (coordinate in 0...3) tangentDot += beforeTangent[coordinate] * afterTangent[coordinate];
       if (tangentDot < 0.99999) continue;
       var speed = requested.maxVelocity > 0.0 ? requested.maxVelocity : 1e8;
       var pathAcceleration = 1e8;
@@ -149,28 +174,39 @@ class PathPlanner {
           var curvature = side.curvatureAt(distance);
           var prime = [for (_ in start) 0.0];
           var second = [for (_ in start) 0.0];
-          for (entry in [{axis: xAxis, prime: tangent[0], second: -tangent[1] * curvature},
-              {axis: yAxis, prime: tangent[1], second: tangent[0] * curvature},
-              {axis: zAxis, prime: tangent[2], second: 0.0}]) {
+          for (entry in [
+            {axis: xAxis, prime: tangent[0], second: -tangent[1] * curvature},
+            {
+              axis: yAxis,
+              prime: tangent[1],
+              second: tangent[0] * curvature
+            },
+            {
+              axis: zAxis,
+              prime: tangent[2],
+              second: 0.0
+            }
+          ]) {
             entry.axis.writeLogicalDelta(prime, entry.prime);
             entry.axis.writeLogicalDelta(second, entry.second);
           }
           for (joint in 0...start.length) {
             if (Math.abs(prime[joint]) > 1e-12) {
               speed = Math.min(speed, maxVelocity[joint] / Math.abs(prime[joint]));
-              pathAcceleration = Math.min(pathAcceleration,
-                maxAcceleration[joint] / Math.abs(prime[joint]));
+              pathAcceleration = Math.min(pathAcceleration, maxAcceleration[joint] / Math.abs(prime[joint]));
             }
-            if (Math.abs(second[joint]) > 1e-12)
-              speed = Math.min(speed,
-                Math.sqrt((Std.isOfType(side, QuinticBlend) ? 0.5 : 1.0) *
-                  maxAcceleration[joint] / Math.abs(second[joint])));
+            if (Math.abs(second[joint]) > 1e-12) speed = Math.min(
+              speed,
+              Math.sqrt((Std.isOfType(side,
+              QuinticBlend) ? 0.5 : 1.0) * maxAcceleration[joint] / Math.abs(second[joint]))
+            );
           }
         }
       }
-      speed = Math.min(speed * 0.75,
-        0.75 * Math.sqrt(2.0 * pathAcceleration *
-          Math.min(before.length(), after.length())));
+      speed = Math.min(
+        speed * 0.75,
+        0.75 * Math.sqrt(2.0 * pathAcceleration * Math.min(before.length(), after.length()))
+      );
       junctionSpeeds[index] = speed;
     }
     var offset = Int64.ofInt(0);
@@ -181,8 +217,8 @@ class PathPlanner {
       var primitive = planningPath.primitives[primitiveIndex];
       var length = primitive.length();
       var primitiveStart = primitive.pointAt(0.0);
-      if (previousEnd != null && previousEnd.distanceTo(primitiveStart) > 1e-8)
-        throw "Path primitives must form a connected path";
+      if (previousEnd != null
+        && previousEnd.distanceTo(primitiveStart) > 1e-8) throw "Path primitives must form a connected path";
       previousEnd = primitive.pointAt(length);
       if (length <= 1e-12) continue;
       var count = 1;
@@ -204,18 +240,30 @@ class PathPlanner {
         var point = primitive.pointAt(distance);
         var tangent = primitive.tangentAt(distance);
         var curvature = primitive.curvatureAt(distance);
-        var secondDerivative = primitive.kind() == PathPrimitiveKind.Circular ?
-          (cast primitive:motionkit.path.CircularSegment).secondDerivativeAt(distance) :
-          [-tangent[1] * curvature, tangent[0] * curvature, 0.0];
+        var secondDerivative = primitive.kind() == PathPrimitiveKind.Circular
+          ? (cast primitive : motionkit.path.CircularSegment).secondDerivativeAt(distance) : [
+            -tangent[1] * curvature,
+            tangent[0] * curvature,
+            0.0
+          ];
         var q = start.copy();
         var qPrime = [for (_ in start) 0.0];
         var qDoublePrime = [for (_ in start) 0.0];
-        for (entry in [{axis: xAxis, position: point.x, prime: tangent[0],
-            second: secondDerivative[0]},
-            {axis: yAxis, position: point.y, prime: tangent[1],
-              second: secondDerivative[1]},
-            {axis: zAxis, position: point.z, prime: tangent[2],
-              second: secondDerivative[2]}]) {
+        for (entry in [
+          {axis: xAxis, position: point.x, prime: tangent[0], second: secondDerivative[0]},
+          {
+            axis: yAxis,
+            position: point.y,
+            prime: tangent[1],
+            second: secondDerivative[1]
+          },
+          {
+            axis: zAxis,
+            position: point.z,
+            prime: tangent[2],
+            second: secondDerivative[2]
+          }
+        ]) {
           entry.axis.writeLogicalPosition(q, entry.position);
           entry.axis.writeLogicalDelta(qPrime, entry.prime);
           entry.axis.writeLogicalDelta(qDoublePrime, entry.second);
@@ -228,16 +276,17 @@ class PathPlanner {
         second.push([for (joint in 0...start.length) qDoublePrime[joint] / jointUnits[joint]]);
       }
       var jointPath = new JointPathSamples(distances, positions, first, second);
-      var speedCaps = requested.maxVelocity > 0.0
-        ? [for (_ in 0...count) requested.maxVelocity] : [];
+      var speedCaps = requested.maxVelocity > 0.0 ? [for (_ in 0...count) requested.maxVelocity] : [];
       // Leave room for nanosecond stage rounding and Hermite coefficient
       // roundoff before the runtime validates exact polynomial extrema.
       var limits = new PathTimingLimits(
         [for (joint in 0...start.length) maxVelocity[joint] / jointUnits[joint] * 0.999],
-        [for (joint in 0...start.length) maxAcceleration[joint] / jointUnits[joint] * 0.999], speedCaps,
-        junctionSpeeds[primitiveIndex], junctionSpeeds[primitiveIndex + 1]);
-      var loweringTolerance = options.exactStop ? 1e-6 :
-        Math.min(1e-6, options.blendTolerance * 0.01);
+        [for (joint in 0...start.length) maxAcceleration[joint] / jointUnits[joint] * 0.999],
+        speedCaps,
+        junctionSpeeds[primitiveIndex],
+        junctionSpeeds[primitiveIndex + 1]
+      );
+      var loweringTolerance = options.exactStop ? 1e-6 : Math.min(1e-6, options.blendTolerance * 0.01);
       var timed = new ToppraPathTiming(loweringTolerance).time(jointPath, limits);
       var pieceDuration = timed.trajectory.durationSeconds();
       var sampleCount = Std.int(Math.ceil(pieceDuration / 0.001));
@@ -245,8 +294,11 @@ class PathPlanner {
         var localTime = pieceDuration * sampleIndex / sampleCount;
         var normalizedActual = timed.trajectory.evaluate(localTime).positions;
         var actual = [for (joint in 0...start.length) normalizedActual[joint] * jointUnits[joint]];
-        var tool = new PathPoint(xAxis.logicalPosition(actual),
-          yAxis.logicalPosition(actual), zAxis.logicalPosition(actual));
+        var tool = new PathPoint(
+          xAxis.logicalPosition(actual),
+          yAxis.logicalPosition(actual),
+          zAxis.logicalPosition(actual)
+        );
         var deviation = distanceToAuthoredPath(tool, path);
         if (deviation > worstTaskDeviation) {
           worstTaskDeviation = deviation;
@@ -257,38 +309,51 @@ class PathPlanner {
       for (segment in pieceSegments) {
         // Fit each independent coordinate once. Followers come from the axis mapping,
         // rather than independent Hermite fits whose large coefficients can drift apart.
-        var coefficients = [for (joint in 0...start.length)
-          [for (value in segment.coefficients[joint]) value * jointUnits[joint]]];
+        var coefficients = [for (joint in 0...start.length)[for (value in segment.coefficients[joint]) value
+          * jointUnits[joint]]];
         for (power in 0...coefficients[0].length) {
           var values = [for (joint in 0...start.length) coefficients[joint][power]];
           for (direct in [xAxis, yAxis, zAxis]) {
-            var logical = power == 0 ? direct.logicalPosition(values) :
-              values[direct.jointIndices[0]] / direct.jointScale(0);
+            var logical = power
+              == 0 ? direct.logicalPosition(values) : values[direct.jointIndices[0]] / direct.jointScale(0);
             if (power == 0) direct.writeLogicalPosition(values, logical);
             else direct.writeLogicalDelta(values, logical);
           }
           for (joint in 0...start.length) coefficients[joint][power] = values[joint];
         }
-        segments.push({timeFromStartNs: Int64.add(offset, segment.timeFromStartNs),
-          durationNs: segment.durationNs, coefficients: coefficients});
+        segments.push({
+          timeFromStartNs: Int64.add(offset, segment.timeFromStartNs),
+          durationNs: segment.durationNs,
+          coefficients: coefficients
+        });
       }
       var last = pieceSegments[pieceSegments.length - 1];
       offset = Int64.add(offset, Int64.add(last.timeFromStartNs, last.durationNs));
       timed.releaseDistanceMap();
       timed.trajectory.dispose();
     }
-    if (segments.length == 0)
-      return {trajectory: Trajectory.fromPositionSamples(
-        [0.0, fixedTimestepSeconds], [start, start]),
-        report: null, diagnostics: diagnostics};
+    if (segments.length == 0) return {
+      trajectory: Trajectory.fromPositionSamples(
+        [0.0, fixedTimestepSeconds],
+        [
+          start,
+          start
+        ]
+      ),
+      report: null,
+      diagnostics: diagnostics
+    };
     var finalPoint = previousEnd;
     if (finalPoint == null) throw "Cartesian path has no endpoint";
     var finalPosition = start.copy();
     xAxis.writeLogicalPosition(finalPosition, finalPoint.x);
     yAxis.writeLogicalPosition(finalPosition, finalPoint.y);
     zAxis.writeLogicalPosition(finalPosition, finalPoint.z);
-    segments.push({timeFromStartNs: offset, durationNs: Int64.ofInt(1),
-      coefficients: [for (position in finalPosition) [position]]});
+    segments.push({
+      timeFromStartNs: offset,
+      durationNs: Int64.ofInt(1),
+      coefficients: [for (position in finalPosition)[position]]
+    });
     var result = Trajectory.fromSegments(segments);
     var validation = new ValidationLimits(start.length, modelRevision, calibrationRevision);
     validation.continuity(0, 1e-9);
@@ -301,30 +366,39 @@ class PathPlanner {
       var upper = start.copy();
       direct.writeLogicalPosition(lower, direct.lowerLimit);
       direct.writeLogicalPosition(upper, direct.upperLimit);
-      for (joint in direct.jointIndices)
-        validation.position(joint, Math.min(lower[joint], upper[joint]) / jointUnits[joint],
-          Math.max(lower[joint], upper[joint]) / jointUnits[joint]);
+      for (joint in direct.jointIndices) validation.position(
+        joint,
+        Math.min(lower[joint], upper[joint]) / jointUnits[joint],
+        Math.max(
+          lower[joint],
+          upper[joint]
+        ) / jointUnits[joint]
+      );
     }
     // Cartesian claims are in metres. Validate every mapped shaft in equivalent
     // carriage units, so a screw ratio does not turn a 1 nm seam claim into radians.
     var normalized = Trajectory.fromSegments([for (segment in segments) {
-      timeFromStartNs: segment.timeFromStartNs, durationNs: segment.durationNs,
-      coefficients: [for (joint in 0...start.length)
-        [for (value in segment.coefficients[joint]) value / jointUnits[joint]]]
-    }]);
+      timeFromStartNs:segment.timeFromStartNs, durationNs:segment.durationNs,
+        coefficients:[for (joint in 0...start.length)[for (value in segment.coefficients[joint]) value
+        / jointUnits[joint]]]
+    }
+    ]);
     var report = normalized.validate(validation);
     normalized.dispose();
-    var tolerance = options.exactStop || options.blendTolerance == 0.0
-      ? 1e-5 : options.blendTolerance;
-    report.setTaskSpace(worstTaskDeviation <= tolerance
-      ? TrajectoryCoreConstants.MK_CHECK_PASSED
-      : TrajectoryCoreConstants.MK_CHECK_FAILED,
-      worstTaskDeviation, worstTaskTime, tolerance, Int64.ofInt(1000000));
+    var tolerance = options.exactStop || options.blendTolerance == 0.0 ? 1e-5 : options.blendTolerance;
+    report.setTaskSpace(
+      worstTaskDeviation
+      <= tolerance ? TrajectoryCoreConstants.MK_CHECK_PASSED : TrajectoryCoreConstants.MK_CHECK_FAILED,
+      worstTaskDeviation,
+      worstTaskTime,
+      tolerance,
+      Int64.ofInt(1000000)
+    );
     if (report.hasFailure()) {
       for (index in 0...report.checks.length) {
         var check = report.checks[index];
-        if (check.status == TrajectoryCoreConstants.MK_CHECK_FAILED)
-          throw 'Timed Cartesian path check $index failed: ${check.value} > ${check.limit} at ${check.timeSeconds}';
+        if (check.status == TrajectoryCoreConstants
+          .MK_CHECK_FAILED) throw 'Timed Cartesian path check $index failed: ${check.value} > ${check.limit} at ${check.timeSeconds}';
       }
     }
     result.controlAcceleration = maxAcceleration.copy();
@@ -342,19 +416,16 @@ class PathPlanner {
           continue;
         }
         var direction = line.tangentAt(0.0);
-        var projection = (point.x - line.start.x) * direction[0] +
-          (point.y - line.start.y) * direction[1] +
-          (point.z - line.start.z) * direction[2];
-        closest = Math.min(closest, point.distanceTo(
-          line.pointAt(Math.max(0.0, Math.min(length, projection)))));
+        var projection = (point.x - line.start.x)
+          * direction[0] + (point.y - line.start.y) * direction[1] + (point.z - line.start.z) * direction[2];
+        closest = Math.min(closest, point.distanceTo(line.pointAt(Math.max(0.0, Math.min(length, projection)))));
       } else if (primitive.kind() == PathPrimitiveKind.Arc) {
         var arc:ArcSegment = cast primitive;
         var angle = Math.atan2(point.y - arc.center.y, point.x - arc.center.x);
         var baseShift = Math.round((arc.startAngle - angle) / (2.0 * Math.PI));
         for (shift in -2...3) {
           var candidate = angle + 2.0 * Math.PI * (baseShift + shift);
-          var fraction = arc.sweepAngle == 0.0 ? 0.0 :
-            (candidate - arc.startAngle) / arc.sweepAngle;
+          var fraction = arc.sweepAngle == 0.0 ? 0.0 : (candidate - arc.startAngle) / arc.sweepAngle;
           var distance = arc.length() * Math.max(0.0, Math.min(1.0, fraction));
           closest = Math.min(closest, point.distanceTo(arc.pointAt(distance)));
         }
@@ -362,9 +433,10 @@ class PathPlanner {
         var circular:motionkit.path.CircularSegment = cast primitive;
         closest = Math.min(closest, circular.distanceTo(point));
       } else {
-        for (sample in 0...129)
-          closest = Math.min(closest,
-            point.distanceTo(primitive.pointAt(primitive.length() * sample / 128.0)));
+        for (sample in 0...129) closest = Math.min(
+          closest,
+          point.distanceTo(primitive.pointAt(primitive.length() * sample / 128.0))
+        );
       }
     }
     return closest;
@@ -378,9 +450,8 @@ class PathPlanner {
         var coordinates = [point.x, point.y, point.z];
         for (i in 0...3) {
           var roundoff = 1e-12 * Math.max(1.0, directAxes[i].upperLimit - directAxes[i].lowerLimit);
-          if (coordinates[i] < directAxes[i].lowerLimit - roundoff ||
-              coordinates[i] > directAxes[i].upperLimit + roundoff)
-            throw 'Axis "${["x", "y", "z"][i]}" path point ${coordinates[i]} is outside its limits';
+          if (coordinates[i] < directAxes[i].lowerLimit - roundoff || coordinates[i] > directAxes[i].upperLimit
+            + roundoff) throw 'Axis "${["x", "y", "z"][i]}" path point ${coordinates[i]} is outside its limits';
         }
       }
     }

@@ -9,9 +9,12 @@ class ManipulatorProgress {
   public final pathDistance:Float;
   public final barrier:Null<ProgramBarrier>;
   public final guarantees:Null<ValidationGuarantees>;
-  public function new(block:Int, op:Int, pathDistance:Float,
-      ?guarantees:ValidationGuarantees,?barrier:ProgramBarrier) {
-    this.block = block; this.op = op; this.pathDistance = pathDistance;
-    this.guarantees = guarantees;this.barrier=barrier;
+  public function new(block:Int,
+    op:Int, pathDistance:Float, ?guarantees:ValidationGuarantees, ?barrier:ProgramBarrier) {
+    this.block = block;
+    this.op = op;
+    this.pathDistance = pathDistance;
+    this.guarantees = guarantees;
+    this.barrier = barrier;
   }
 }

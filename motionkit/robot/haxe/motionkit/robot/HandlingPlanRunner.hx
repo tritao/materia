@@ -52,10 +52,23 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
   /** Open a physical gripper and allow its valve/stroke dwell before approaching a new part. */
   public final openBeforePick:Bool;
 
-  public static function create(robot:Robot, manipulator:KinematicGroup,
-      eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool}, channel:String,
-      planning:PlanningLimits, ?approachHeight:Float = DEFAULT_APPROACH_HEIGHT, ?travelSpeed:Float = 0.3, ?contactSpeed:Float = 0.08,
-      ?dwell:Float = 0.4, ?pressDepth:Float = 0.003, openBeforePick:Bool = false, ?ikTolerance:IkTolerance):HandlingPlanRunner {
+  public static function create(
+    robot:Robot,
+    manipulator:KinematicGroup,
+    eventSource:Void -> {
+      events: Array<FiredProcessEvent>,
+      overflow: Bool
+    },
+    channel:String,
+    planning:PlanningLimits,
+    ?approachHeight:Float = DEFAULT_APPROACH_HEIGHT,
+    ?travelSpeed:Float = 0.3,
+    ?contactSpeed:Float = 0.08,
+    ?dwell:Float = 0.4,
+    ?pressDepth:Float = 0.003,
+    openBeforePick:Bool = false,
+    ?ikTolerance:IkTolerance
+  ):HandlingPlanRunner {
     var count = manipulator.group.count();
     planning.requireGroup(manipulator);
     var limits = planning.validation();
@@ -68,30 +81,66 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
     // The authored poses use the home orientation. Prefer its spin softly in the
     // geometric ladder; omitted external ranges hold independent station axes.
     var preferred = solver.forward(home);
-    var pathPlanner = new StructuredJointPathPlanner(manipulator,null,null,null,8,false,
-      (sample,candidate) -> {
-        // Numeric fallback candidates do not carry discrete roll indices.
-        var angle = motionkit.path.PoseMath.angle(solver.forward(candidate.q),preferred);
-        return angle*angle;
-      });
-    var compiler = new ProgramCompiler(solver, limits, FRAME,
-      planning.velocity, planning.acceleration, planning.jerk,
+    var pathPlanner = new StructuredJointPathPlanner(manipulator, null, null, null, 8, false, (sample, candidate) -> {
+    // Numeric fallback candidates do not carry discrete roll indices.
+    var angle = motionkit.path.PoseMath.angle(solver.forward(candidate.q), preferred);
+    return angle * angle;
+    });
+    var compiler = new ProgramCompiler(
+      solver,
+      limits,
+      FRAME,
+      planning.velocity,
+      planning.acceleration,
+      planning.jerk,
       planning.startTolerances(0.005),
-      null, CARTESIAN_RESOLUTION, MAX_JOINT_JUMP, 0.002, 0.02, ikTolerance == null ? new IkTolerance(2e-3, 5e-3, 300, 0.03) : ikTolerance,pathPlanner);
+      null,
+      CARTESIAN_RESOLUTION,
+      MAX_JOINT_JUMP,
+      0.002,
+      0.02,
+      ikTolerance == null ? new IkTolerance(
+        2e-3,
+        5e-3,
+        300,
+        0.03
+      ) : ikTolerance,
+      pathPlanner
+    );
     compiler.planningAssumptions = planning.assumptions.copy();
     compiler.angularResolution = ANGULAR_RESOLUTION;
     compiler.planCheck = planning.check();
     var motion = new ManipulatorMotion(robot, compiler, function(_) return null, eventSource, indices);
     // Arm joint values are relative to the robot's starting pose.
-    return new HandlingPlanRunner(motion, channel, home, solver.forward(home), approachHeight, travelSpeed,
-      contactSpeed, dwell, pressDepth, openBeforePick);
+    return new HandlingPlanRunner(
+      motion,
+      channel,
+      home,
+      solver.forward(home),
+      approachHeight,
+      travelSpeed,
+      contactSpeed,
+      dwell,
+      pressDepth,
+      openBeforePick
+    );
   }
 
-  public function new(motion:ManipulatorMotion, channel:String, home:Array<Float>, homePose:Pose3,
-      approachHeight:Float, travelSpeed:Float, contactSpeed:Float, dwell:Float, pressDepth:Float, openBeforePick:Bool = false) {
-    if (motion == null || channel == null || channel.length == 0 || home == null || homePose == null ||
-        !(approachHeight > 0) || !(travelSpeed > 0) || !(contactSpeed > 0) || !(dwell >= 0) || !(pressDepth >= 0))
-      throw "HandlingPlanRunner needs motion, a channel, a home pose and positive speeds";
+  public function new(
+    motion:ManipulatorMotion,
+    channel:String,
+    home:Array<Float>,
+    homePose:Pose3,
+    approachHeight:Float,
+    travelSpeed:Float,
+    contactSpeed:Float,
+    dwell:Float,
+    pressDepth:Float,
+    openBeforePick:Bool = false
+  ) {
+    if (motion == null || channel == null || channel.length == 0 || home == null
+      || homePose == null || !(approachHeight > 0) || !(travelSpeed > 0) || !(contactSpeed > 0) || !(dwell >= 0)
+      || !(pressDepth >= 0)) throw "HandlingPlanRunner needs motion, a channel, a home pose and positive speeds";
     this.motion = motion;
     this.channel = channel;
     this.home = home.copy();
@@ -104,8 +153,12 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
     this.openBeforePick = openBeforePick;
   }
 
-  public function run(contact:Vec3, hold:Bool, ?orientation:Quat, ?approach:Vec3):Void
-    motion.run(program(contact, hold, orientation, approach));
+  public function run(contact:Vec3, hold:Bool, ?orientation:Quat, ?approach:Vec3):Void motion.run(program(
+    contact,
+    hold,
+    orientation,
+    approach
+  ));
 
   /** The program `run` executes. */
   public function program(contact:Vec3, hold:Bool, ?orientation:Quat, ?approach:Vec3):MotionProgram {
@@ -123,22 +176,52 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
       ops.push(MotionOp.Dwell(dwell));
     }
     ops = ops.concat([
-      MotionOp.MoveL(above, FRAME, travelSpeed, Blend.ExactStop,
-        orientation == null ? policy : OrientationPolicy.Interpolated),
-      MotionOp.MoveL(at, FRAME, contactSpeed, Blend.ExactStop, policy),
-      MotionOp.SetOutput(channel, EventValue.Digital(hold)),
+      MotionOp.MoveL(
+        above,
+        FRAME,
+        travelSpeed,
+        Blend.ExactStop,
+        orientation == null ? policy : OrientationPolicy.Interpolated
+      ),
+      MotionOp.MoveL(
+        at,
+        FRAME,
+        contactSpeed,
+        Blend.ExactStop,
+        policy
+      ),
+      MotionOp.SetOutput(
+        channel,
+        EventValue.Digital(hold)
+      ),
       MotionOp.Dwell(dwell),
-      MotionOp.MoveL(above, FRAME, contactSpeed, Blend.ExactStop, policy)
+      MotionOp.MoveL(
+        above,
+        FRAME,
+        contactSpeed,
+        Blend.ExactStop,
+        policy
+      )
     ]);
-    if (orientation == null)
-      ops.push(MotionOp.MoveJ(MoveTarget.JointTarget(home), new MotionOptions(), Blend.ExactStop));
+    if (orientation == null) ops.push(MotionOp.MoveJ(MoveTarget.JointTarget(home),
+      new MotionOptions(), Blend.ExactStop));
     return new MotionProgram(ops, configuration);
   }
 
   /** Derive a step's approach while retaining the tool's actuation policy. */
   public function withApproachDistance(distance:Float):HandlingPlanRunner {
-    return new HandlingPlanRunner(motion, channel, home, homePose, distance, travelSpeed,
-      contactSpeed, dwell, pressDepth, openBeforePick);
+    return new HandlingPlanRunner(
+      motion,
+      channel,
+      home,
+      homePose,
+      distance,
+      travelSpeed,
+      contactSpeed,
+      dwell,
+      pressDepth,
+      openBeforePick
+    );
   }
 
   public function update(dtSeconds:Float):Void motion.update(dtSeconds);

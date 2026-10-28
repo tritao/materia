@@ -7,8 +7,7 @@ class PathPoint {
   public final z:Float;
 
   public function new(x:Float = 0.0, y:Float = 0.0, z:Float = 0.0) {
-    if (!Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(z))
-      throw "Path point coordinates must be finite";
+    if (!Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(z)) throw "Path point coordinates must be finite";
     this.x = x;
     this.y = y;
     this.z = z;
@@ -22,7 +21,6 @@ class PathPoint {
 
   public function lerp(other:PathPoint, alpha:Float):PathPoint {
     if (other == null) throw "Path point interpolation needs another point";
-    return new PathPoint(x + (other.x - x) * alpha,
-      y + (other.y - y) * alpha, z + (other.z - z) * alpha);
+    return new PathPoint(x + (other.x - x) * alpha, y + (other.y - y) * alpha, z + (other.z - z) * alpha);
   }
 }

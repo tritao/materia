@@ -11,13 +11,14 @@ class ShaperImpulses {
   public final amplitudes:Array<Float>;
 
   public function new(delays:Array<Float>, amplitudes:Array<Float>) {
-    if (delays.length < 1 || delays.length != amplitudes.length || delays.length > Trajectory.MAX_SHAPER_IMPULSES)
-      throw "A shaper has between one and " + Trajectory.MAX_SHAPER_IMPULSES + " impulses, each with a delay and an amplitude";
+    if (delays.length < 1 || delays.length != amplitudes.length
+      || delays.length > Trajectory.MAX_SHAPER_IMPULSES) throw "A shaper has between one and "
+      + Trajectory.MAX_SHAPER_IMPULSES + " impulses, each with a delay and an amplitude";
     var total = 0.0;
     for (index in 0...delays.length) {
-      if (!(delays[index] >= 0.0) || !Math.isFinite(delays[index]) || (index>0 && delays[index]<delays[index-1]) ||
-          !(amplitudes[index] > 0.0) || !Math.isFinite(amplitudes[index]))
-        throw "Shaper impulses need ordered nonnegative delays and finite positive amplitudes";
+      if (!(delays[index] >= 0.0) || !Math.isFinite(delays[index])
+        || (index > 0 && delays[index] < delays[index - 1]) || !(amplitudes[index] > 0.0) || !Math
+        .isFinite(amplitudes[index])) throw "Shaper impulses need ordered nonnegative delays and finite positive amplitudes";
       total += amplitudes[index];
     }
     if (!Math.isFinite(total)) throw "Shaper amplitudes must have a finite sum";
@@ -39,8 +40,10 @@ class ShaperImpulses {
   }
 
   /** The same impulses `seconds` later: the shaping lined up with another joint's. */
-  public function later(seconds:Float):ShaperImpulses
-    return new ShaperImpulses([for (value in delays) value + seconds], amplitudes);
+  public function later(seconds:Float):ShaperImpulses return new ShaperImpulses(
+    [for (value in delays) value + seconds],
+    amplitudes
+  );
 
   /**
     What is left of a sinusoid of `frequencyHz` and damping ratio `systemDamping` that the motion would excite, as a
@@ -62,21 +65,28 @@ class ShaperImpulses {
   /** Upper bound over a continuous frequency band, not just sampled resonances.
    * Each interval's nearest endpoint is at most half its width away. The sum of the absolute phasor derivatives is a
    * Lipschitz bound, including decay; refine until its contribution is below accuracy. */
-  public function residualBound(lower:Float,upper:Float,systemDamping:Float,accuracy:Float = 0.001):Float {
-    if (!(lower>0.0) || upper<lower || !Math.isFinite(upper) || !Math.isFinite(systemDamping) || systemDamping<0.0 || systemDamping>=1.0 || !(accuracy>0.0) || !Math.isFinite(accuracy))
-      throw "Residual band needs positive ordered frequencies, damping below one and positive accuracy";
-    var root = Math.sqrt(1.0-systemDamping*systemDamping), derivative = 0.0, last = tail();
+  public function residualBound(lower:Float, upper:Float, systemDamping:Float, accuracy:Float = 0.001):Float {
+    if (!(lower > 0.0) || upper < lower || !Math.isFinite(upper)
+      || !Math.isFinite(systemDamping) || systemDamping < 0.0 || systemDamping >= 1.0 || !(accuracy > 0.0) || !Math
+      .isFinite(accuracy)) throw "Residual band needs positive ordered frequencies, damping below one and positive accuracy";
+    var root = Math.sqrt(1.0 - systemDamping * systemDamping), derivative = 0.0, last = tail();
     for (index in 0...delays.length) {
-      var time = delays[index], decayTime = systemDamping*(last-time);
-      derivative += amplitudes[index]*2*Math.PI*Math.exp(-2*Math.PI*lower*decayTime)*
-        Math.sqrt(decayTime*decayTime+root*root*time*time);
+      var time = delays[index], decayTime = systemDamping * (last - time);
+      derivative += amplitudes[index] * 2 * Math.PI
+        * Math.exp(-2 * Math.PI * lower * decayTime) * Math.sqrt(decayTime * decayTime + root * root * time * time);
     }
-    var refinement = Math.ceil((upper-lower)*derivative/(2*accuracy));
-    if (!Math.isFinite(refinement) || refinement>65536) throw "Residual band requires excessive refinement";
-    var steps = Std.int(Math.max(1,refinement));
+    var refinement = Math.ceil((upper - lower) * derivative / (2 * accuracy));
+    if (!Math.isFinite(refinement) || refinement > 65536) throw "Residual band requires excessive refinement";
+    var steps = Std.int(Math.max(1, refinement));
     var measured = 0.0;
-    for (index in 0...(steps+1)) measured = Math.max(measured,residual(lower+(upper-lower)*index/steps,systemDamping));
-    return Math.min(1.0,measured+derivative*(upper-lower)/(2*steps)+1e-14);
+    for (index in 0...(steps + 1)) measured = Math.max(
+      measured,
+      residual(
+        lower + (upper - lower) * index / steps,
+        systemDamping
+      )
+    );
+    return Math.min(1.0, measured + derivative * (upper - lower) / (2 * steps) + 1e-14);
   }
 
 }

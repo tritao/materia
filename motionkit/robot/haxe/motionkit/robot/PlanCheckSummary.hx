@@ -20,7 +20,8 @@ class PlanCheckSummary {
   public var worstAxis(default, null):String = "";
   final byKind = new Map<String, Int>();
 
-  public function new() {}
+  public function new() {
+  }
 
   public function add(result:PlanCheckResult):Void {
     plans++;

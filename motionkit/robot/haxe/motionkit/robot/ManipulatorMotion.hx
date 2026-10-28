@@ -32,7 +32,7 @@ class ManipulatorMotion {
    */
   public var slip:Null<StepperSlip> = null;
   final input:String -> Null<EventValue>;
-  final eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool};
+  final eventSource:Void -> {events: Array<FiredProcessEvent>, overflow: Bool};
   var executor:PlanExecutor;
   var successorExecutor:PlanExecutor;
   var successorQueued:Bool = false;
@@ -53,10 +53,15 @@ class ManipulatorMotion {
   var releasedNumericIkSolves:Int = 0;
 
   /** Cumulative compilation work across programs; excludes worker lookahead waits. */
-  public function planningMetrics():{seconds:Float, numericIkSolves:Int} {
-    var current = planner == null ? {seconds: 0.0, numericIkSolves: 0} : planner.planningMetrics();
-    return {seconds: releasedPlanningSeconds + current.seconds,
-      numericIkSolves: releasedNumericIkSolves + current.numericIkSolves};
+  public function planningMetrics(): {seconds: Float, numericIkSolves: Int} {
+    var current = planner == null ? {
+      seconds:0.0, numericIkSolves:0
+    }
+    :planner.planningMetrics();
+    return {
+      seconds: releasedPlanningSeconds + current.seconds,
+      numericIkSolves: releasedNumericIkSolves + current.numericIkSolves
+    };
   }
   var planStarted:Bool = false;
   /** Past any plan's end, to bring a finished plan's slip to its total. */
@@ -67,27 +72,42 @@ class ManipulatorMotion {
   /** Speed of every path, as a fraction of its programmed speed. */
   public var speedOverride(default, null):Float = 1.0;
 
-  public function new(robot:Robot, compiler:ProgramCompiler,
-      input:String -> Null<EventValue>,
-      eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool},
-      ?jointIndices:Array<Int>, ?completionPositionTolerance:Array<Float>, ?springFrequencies:Array<Float>) {
-    if (robot == null || compiler == null || input == null || eventSource == null)
-      throw "ManipulatorMotion needs a robot, compiler, input and event source";
-    this.robot = robot; this.compiler = compiler;
-    this.input = input; this.eventSource = eventSource;
+  public function new(
+    robot:Robot,
+    compiler:ProgramCompiler,
+    input:String -> Null<EventValue>,
+    eventSource:Void -> {
+      events: Array<FiredProcessEvent>,
+      overflow: Bool
+    },
+    ?jointIndices:Array<Int>,
+    ?completionPositionTolerance:Array<Float>,
+    ?springFrequencies:Array<Float>
+  ) {
+    if (robot == null || compiler == null || input == null
+      || eventSource == null) throw "ManipulatorMotion needs a robot, compiler, input and event source";
+    this.robot = robot;
+    this.compiler = compiler;
+    this.input = input;
+    this.eventSource = eventSource;
     var count = robot.description().joints.length;
-    this.jointIndices = jointIndices == null ? [for (i in 0...count) i] :
-      jointIndices.copy();
-    if (this.jointIndices.length != compiler.solver.jointCount())
-      throw "ManipulatorMotion joint count does not match compiler";
+    this.jointIndices = jointIndices == null ? [for (i in 0...count) i] : jointIndices.copy();
+    if (this.jointIndices.length
+      != compiler.solver.jointCount()) throw "ManipulatorMotion joint count does not match compiler";
     var seen = new Map<Int, Bool>();
     for (index in this.jointIndices) {
-      if (index < 0 || index >= count || seen.exists(index))
-        throw "ManipulatorMotion needs distinct robot joint indices";
+      if (index < 0
+        || index >= count || seen.exists(index)) throw "ManipulatorMotion needs distinct robot joint indices";
       seen.set(index, true);
     }
     executor = new PlanExecutor(robot, this.jointIndices, session, completionPositionTolerance, springFrequencies);
-    successorExecutor = new PlanExecutor(robot, this.jointIndices, session, completionPositionTolerance, springFrequencies);
+    successorExecutor = new PlanExecutor(
+      robot,
+      this.jointIndices,
+      session,
+      completionPositionTolerance,
+      springFrequencies
+    );
   }
 
   /** A program started with `run(program, false)` whose first plan is still being made. */
@@ -105,13 +125,12 @@ class ManipulatorMotion {
    * from; null before any program has finished and after a failure, when the next one starts from
    * where the robot is.
    */
-  public function commandedPositions():Null<Array<Float>>
-    return lastCommandedQ == null ? null : lastCommandedQ.copy();
+  public function commandedPositions():Null<Array<Float>> return lastCommandedQ == null ? null : lastCommandedQ.copy();
 
   /** First unused ID for a compilation prepared while this motion is idle. */
   public function compilationPlanId():Int64 {
     session.requireReady();
-    if(running || session.isStopping())throw "Compilation IDs are available only while motion is idle";
+    if (running || session.isStopping()) throw "Compilation IDs are available only while motion is idle";
     return nextPlanId;
   }
 
@@ -131,42 +150,73 @@ class ManipulatorMotion {
       return;
     }
     if (running) throw "Manipulator program is already running";
-    release(); programCompleted = false; failure = null; events = []; waitForPlanning=waitForFirstPlan;
-    blockIndex = 0; completedBlockCount = 0; planIndex = 0; barrierElapsed = 0.0; planStarted = false; startedPlans = 0;
+    release();
+    programCompleted = false;
+    failure = null;
+    events = [];
+    waitForPlanning = waitForFirstPlan;
+    blockIndex = 0;
+    completedBlockCount = 0;
+    planIndex = 0;
+    barrierElapsed = 0.0;
+    planStarted = false;
+    startedPlans = 0;
     try {
       var positions = robot.snapshot().setpointPositions;
-      var started = new ProgramPlanner(compiler, program, lastCommandedQ == null
-        ? [for (index in jointIndices) positions.get(index)]
-        : lastCommandedQ.copy(), nextPlanId, 0, speedOverride, LOOKAHEAD_SECONDS);
+      var started = new ProgramPlanner(
+        compiler,
+        program,
+        lastCommandedQ == null ? [for (index in jointIndices) positions.get(index)] : lastCommandedQ.copy(),
+        nextPlanId,
+        0,
+        speedOverride,
+        LOOKAHEAD_SECONDS
+      );
       planner = started;
-      if (!waitForFirstPlan) { starting = true; return; }
+      if (!waitForFirstPlan) {
+        starting = true;
+        return;
+      }
       // Wait for the first motion or barrier, so a program that cannot start
       // fails here, before the session begins.
       while (!started.blocks.hasWork()) waitForPlans(started);
       session.begin();
       advance(0.0);
-    } catch (error:Dynamic) { fail(Std.string(error), false); }
+    } catch (error:Dynamic) {
+      fail(Std.string(error), false);
+    }
   }
 
   /** Submit checked plans once; ownership passes to this motion after validation.
    * Their clock and process events are retained without another compiler pass. */
   public function runCompiled(compiled:CompiledProgram):Void {
     session.requireReady();
-    if(compiled==null)throw "A compiled manipulator program is required";
-    if(session.isStopping() || running)throw "Compiled motion requires an idle ready session";
-    if(speedOverride!=1.0)throw "Compiled motion has a fixed clock; reset the speed override before submission";
-    var expected=nextPlanId;
-    for(block in compiled.blocks)for(plan in block.plans){
-      if(plan.jointCount!=jointIndices.length || Int64.compare(plan.planId,expected)<0)
-        throw "Compiled motion joint count or plan ids do not match this executor";
-      expected=Int64.add(plan.planId,Int64.ofInt(1));
+    if (compiled == null) throw "A compiled manipulator program is required";
+    if (session.isStopping() || running) throw "Compiled motion requires an idle ready session";
+    if (speedOverride != 1.0) throw "Compiled motion has a fixed clock; reset the speed override before submission";
+    var expected = nextPlanId;
+    for (block in compiled.blocks) for (plan in block.plans) {
+      if (plan.jointCount != jointIndices.length || Int64.compare(plan.planId,
+        expected) < 0) throw "Compiled motion joint count or plan ids do not match this executor";
+      expected = Int64.add(plan.planId, Int64.ofInt(1));
     }
-    release();programCompleted=false;failure=null;events=[];
-    blockIndex=0;completedBlockCount=0;planIndex=0;barrierElapsed=0.0;planStarted=false;startedPlans=0;
+    release();
+    programCompleted = false;
+    failure = null;
+    events = [];
+    blockIndex = 0;
+    completedBlockCount = 0;
+    planIndex = 0;
+    barrierElapsed = 0.0;
+    planStarted = false;
+    startedPlans = 0;
     try {
-      planner=ProgramPlanner.fromCompiled(compiled,nextPlanId);
-      session.begin();advance(0.0);
-    }catch(error:Dynamic){fail(Std.string(error),false);}
+      planner = ProgramPlanner.fromCompiled(compiled, nextPlanId);
+      session.begin();
+      advance(0.0);
+    } catch (error:Dynamic) {
+      fail(Std.string(error), false);
+    }
   }
 
   public function update(dtSeconds:Float):Void {
@@ -174,8 +224,7 @@ class ManipulatorMotion {
       drainIdleEvents();
       return;
     }
-    if (!Math.isFinite(dtSeconds) || dtSeconds <= 0.0)
-      throw "Manipulator update duration must be finite and positive";
+    if (!Math.isFinite(dtSeconds) || dtSeconds <= 0.0) throw "Manipulator update duration must be finite and positive";
     if (starting && !startWhenPlanned()) return;
     try {
       collectEvents();
@@ -205,24 +254,29 @@ class ManipulatorMotion {
       }
       var carrying = slip;
       if (carrying != null && planStarted) carrying.update(executor.completed ? plansEnd : executor.elapsedSeconds);
-      if (successorQueued && session.state==Running) successorExecutor.update();
+      if (successorQueued && session.state == Running) successorExecutor.update();
       while (executor.completed && planStarted) {
-        if (planning==null || blockIndex>=planning.blocks.blocks.length) throw "Completed plan has no owner";
-        var block=planning.blocks.blocks[blockIndex];
-        var consumed=block.plans[planIndex];
-        lastCommandedQ=consumed.evaluate(consumed.durationSeconds).positions;
-        if (planIndex!=0) throw "Consumed program prefix was not retired";
+        if (planning == null || blockIndex >= planning.blocks.blocks.length) throw "Completed plan has no owner";
+        var block = planning.blocks.blocks[blockIndex];
+        var consumed = block.plans[planIndex];
+        lastCommandedQ = consumed.evaluate(consumed.durationSeconds).positions;
+        if (planIndex != 0) throw "Consumed program prefix was not retired";
         block.retireFirstPlan();
-        planStarted=false;
+        planStarted = false;
         if (successorQueued) {
-          var old=executor;executor=successorExecutor;successorExecutor=old;
-          successorQueued=false;planStarted=true;
+          var old = executor;
+          executor = successorExecutor;
+          successorExecutor = old;
+          successorQueued = false;
+          planStarted = true;
           startDiagnostics(block.plans[0]);
-          if (executor.completed && carrying!=null) carrying.update(plansEnd);
+          if (executor.completed && carrying != null) carrying.update(plansEnd);
         }
       }
       advance(dtSeconds);
-    } catch (error:Dynamic) { fail(Std.string(error), !session.isFaulted()); }
+    } catch (error:Dynamic) {
+      fail(Std.string(error), !session.isFaulted());
+    }
   }
 
   /**
@@ -231,8 +285,7 @@ class ManipulatorMotion {
     `LOOKAHEAD_SECONDS` ahead, within the joint limits and without stopping.
   **/
   public function setSpeedOverride(scale:Float):Void {
-    if (!Math.isFinite(scale) || scale < 0.05 || scale > 2.0)
-      throw "Speed override must be between 0.05 and 2";
+    if (!Math.isFinite(scale) || scale < 0.05 || scale > 2.0) throw "Speed override must be between 0.05 and 2";
     var planning = planner;
     if (planning != null) planning.setSpeedScale(scale);
     speedOverride = scale;
@@ -247,8 +300,7 @@ class ManipulatorMotion {
       var problem = planning.failure;
       if (problem != null) throw problem;
       if (!planning.blocks.hasWork()) {
-        if (planning.isStopped() && !planning.poll())
-          throw "Program planning stopped before the program was planned";
+        if (planning.isStopped() && !planning.poll()) throw "Program planning stopped before the program was planned";
         return false;
       }
       nextPlanId = planning.nextPlanId;
@@ -287,7 +339,7 @@ class ManipulatorMotion {
     }
     try executor.abort() catch (error:Dynamic) {
       session.reject();
-      fail('Controlled stop rejected: ${Std.string(error)}',false);
+      fail('Controlled stop rejected: ${Std.string(error)}', false);
     }
   }
   public function abort():Void {
@@ -312,8 +364,8 @@ class ManipulatorMotion {
   /** Cancels this motion's planning and waits before its native planning resources are destroyed.
       Other motions and their workers are unaffected. Returns the workers still running at timeout. */
   public function shutdownPlanning(timeoutSeconds:Float = 30.0):Int {
-    if (!Math.isFinite(timeoutSeconds) || timeoutSeconds < 0.0)
-      throw "Planning shutdown timeout must be finite and nonnegative";
+    if (!Math.isFinite(timeoutSeconds)
+      || timeoutSeconds < 0.0) throw "Planning shutdown timeout must be finite and nonnegative";
     abort();
     release();
     var polls = Std.int(Math.ceil(timeoutSeconds / 0.005));
@@ -329,8 +381,11 @@ class ManipulatorMotion {
   }
   public function progress():ManipulatorProgress {
     var planning = planner;
-    if (planning == null || blockIndex >= planning.blocks.blocks.length)
-      return new ManipulatorProgress(completedBlockCount+blockIndex, -1, 0.0);
+    if (planning == null || blockIndex >= planning.blocks.blocks.length) return new ManipulatorProgress(
+      completedBlockCount + blockIndex,
+      -1,
+      0.0
+    );
     var block = planning.blocks.blocks[blockIndex];
     var op = planIndex < block.opIndices.length ? block.opIndices[planIndex] : -1;
     var distance = 0.0;
@@ -340,19 +395,20 @@ class ManipulatorMotion {
       var distances = block.pathDistances[planIndex];
       if (times.length > 1) {
         distance = distances[distances.length - 1];
-        for (index in 1...times.length)
-          if (executor.elapsedSeconds <= times[index]) {
-            var fraction = (executor.elapsedSeconds - times[index - 1]) /
-              (times[index] - times[index - 1]);
-            distance = distances[index - 1] + fraction *
-              (distances[index] - distances[index - 1]);
-            break;
-          }
+        for (index in 1...times.length) if (executor.elapsedSeconds <= times[index]) {
+          var fraction = (executor.elapsedSeconds - times[index - 1]) / (times[index] - times[index - 1]);
+          distance = distances[index - 1] + fraction * (distances[index] - distances[index - 1]);
+          break;
+        }
       }
     }
-    return new ManipulatorProgress(completedBlockCount+blockIndex, op, distance,
+    return new ManipulatorProgress(
+      completedBlockCount + blockIndex,
+      op,
+      distance,
       planIndex < block.plans.length ? block.plans[planIndex].guarantees() : null,
-      planIndex < block.plans.length ? null : block.barrier);
+      planIndex < block.plans.length ? null : block.barrier
+    );
   }
 
   function advance(dt:Float):Void {
@@ -371,19 +427,21 @@ class ManipulatorMotion {
         }
         // Only continuous publication cuts can share the runtime queue. An
         // authored exact stop or barrier retains its settling behavior.
-        if (!block.plans[planIndex].endsAtRest && executor.allSubmitted() && !successorQueued &&
-            planIndex+1>=block.plans.length && !block.complete && waitForPlanning) {
+        if (!block.plans[planIndex].endsAtRest && executor.allSubmitted()
+          && !successorQueued && planIndex + 1 >= block.plans.length && !block.complete && waitForPlanning) {
           // A fixed-step owner can consume simulated time faster than its
           // worker receives CPU. Preserve deterministic stepping at moving
           // cuts just as at authored stops; live hosts keep bounded underflow.
           waitForPlans(planning);
           continue;
         }
-        if (!block.plans[planIndex].endsAtRest && executor.allSubmitted() && !successorQueued &&
-            planIndex+1<block.plans.length) {
-          var next=block.plans[planIndex+1];
-          successorExecutor.start(next,next.endsAtRest);
-          successorQueued=true;startedPlans++;planning.started(startedPlans);
+        if (!block.plans[planIndex].endsAtRest
+          && executor.allSubmitted() && !successorQueued && planIndex + 1 < block.plans.length) {
+          var next = block.plans[planIndex + 1];
+          successorExecutor.start(next, next.endsAtRest);
+          successorQueued = true;
+          startedPlans++;
+          planning.started(startedPlans);
         }
         return;
       }
@@ -400,29 +458,39 @@ class ManipulatorMotion {
           case WaitInput(channel, predicate, timeoutSeconds):
             var current = input(channel);
             var matches = current != null && switch predicate {
-              case Equals(expected): switch [current, expected] {
-                case [Digital(a), Digital(b)]: a == b;
-                case [Analog(a), Analog(b)]: a == b;
-                case [Process(a, x), Process(b, y)]: a == b && x == y;
-                case _: false;
-              };
+              case Equals(expected):
+                switch [current, expected] {
+                  case [Digital(a), Digital(b)]:
+                    a == b;
+                  case [Analog(a), Analog(b)]:
+                    a == b;
+                  case [Process(a, x), Process(b, y)]:
+                    a == b && x == y;
+                  case _:
+                    false;
+                };
             };
             if (!matches) {
               barrierElapsed += dt;
-              if (timeoutSeconds != null && barrierElapsed >= timeoutSeconds)
-                throw 'WaitInput "$channel" timed out after $timeoutSeconds seconds';
+              if (timeoutSeconds != null && barrierElapsed
+                >= timeoutSeconds) throw 'WaitInput "$channel" timed out after $timeoutSeconds seconds';
             }
             matches;
         };
         if (!ready) return;
       }
-      if (blockIndex!=0) throw "Consumed program blocks were not retired";
-      source.retireFirstBlock(); completedBlockCount++; planIndex = 0; barrierElapsed = 0.0;
+      if (blockIndex != 0) throw "Consumed program blocks were not retired";
+      source.retireFirstBlock();
+      completedBlockCount++;
+      planIndex = 0;
+      barrierElapsed = 0.0;
     }
     if (session.state == Running) {
       var next = source.nextPlanId;
       if (next != null) nextPlanId = next;
-      programCompleted = true; session.completed(); release();
+      programCompleted = true;
+      session.completed();
+      release();
     }
   }
 
@@ -440,8 +508,8 @@ class ManipulatorMotion {
 
   function hasPlan():Bool {
     var planning = planner;
-    return planning != null && blockIndex < planning.blocks.blocks.length &&
-      planIndex < planning.blocks.blocks[blockIndex].plans.length;
+    return planning != null
+      && blockIndex < planning.blocks.blocks.length && planIndex < planning.blocks.blocks[blockIndex].plans.length;
   }
   function fail(message:String, stop:Bool):Void {
     if (stop && running && !session.isFaulted()) {
@@ -450,11 +518,15 @@ class ManipulatorMotion {
         message += ': ' + Std.string(error);
       }
     }
-    failure = message; programCompleted = false;
+    failure = message;
+    programCompleted = false;
     pendingProgram = null;
     lastCommandedQ = null;
-    if (session.isFaulted()) { pendingProgram = null; release(); executor.clear(); }
-    else if (session.state == Idle) release();
+    if (session.isFaulted()) {
+      pendingProgram = null;
+      release();
+      executor.clear();
+    } else if (session.state == Idle) release();
   }
   /**
    * Between programs the runtime still records every output change, the controller's own writes
@@ -463,9 +535,11 @@ class ManipulatorMotion {
    */
   function drainIdleEvents():Void {
     var batch = eventSource();
-    for (event in batch.events)
-      if (event.cause != RobotKitRuntimeConstants.RK_EVENT_CONTROLLER) events.push(event);
-    if (batch.overflow) { failure = "Runtime process event overflow"; programCompleted = false; }
+    for (event in batch.events) if (event.cause != RobotKitRuntimeConstants.RK_EVENT_CONTROLLER) events.push(event);
+    if (batch.overflow) {
+      failure = "Runtime process event overflow";
+      programCompleted = false;
+    }
   }
 
   function collectEvents():Void {
@@ -473,19 +547,24 @@ class ManipulatorMotion {
     for (event in batch.events) events.push(event);
     if (batch.overflow) {
       if (running) fail("Runtime process event overflow", true);
-      else { failure = "Runtime process event overflow"; programCompleted = false; }
+      else {
+        failure = "Runtime process event overflow";
+        programCompleted = false;
+      }
     }
   }
   function startDiagnostics(plan:ExecutionPlan):Void {
-    var checked=plan.checked;
-    if (checked!=null) checks.add(checked);
-    var carrying=slip;
-    if (carrying!=null) carrying.start(checked);
+    var checked = plan.checked;
+    if (checked != null) checks.add(checked);
+    var carrying = slip;
+    if (carrying != null) carrying.start(checked);
   }
 
   function release():Void {
     // Detach borrowed native arrays before the planner releases its plans.
-    executor.clear();successorExecutor.clear();successorQueued=false;
+    executor.clear();
+    successorExecutor.clear();
+    successorQueued = false;
     starting = false;
     startupHeld = false;
     var planning = planner;

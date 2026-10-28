@@ -16,8 +16,7 @@ import robotkit.execution.ProcessTimedEvent;
 import robotkit.execution.SegmentArrays;
 import robotkit.execution.TrajectorySegment;
 
-private typedef StreamSegment = {timeFromStartNs:Int64, durationNs:Int64,
-  coefficients:Array<Array<Float>>};
+private typedef StreamSegment = {timeFromStartNs:Int64, durationNs:Int64, coefficients:Array<Array<Float>>};
 
 /** The segments a stream submits: their timing, and each one's degree and coefficients. */
 interface StreamSegments {
@@ -40,8 +39,7 @@ class ArrayStreamSegments implements StreamSegments {
   public function startNs(index:Int):Int64 return segments[index].timeFromStartNs;
   public function durationNs(index:Int):Int64 return segments[index].durationNs;
   public function degree(index:Int):Int return segments[index].coefficients[0].length - 1;
-  public function coefficient(index:Int, joint:Int, power:Int):Float
-    return segments[index].coefficients[joint][power];
+  public function coefficient(index:Int, joint:Int, power:Int):Float return segments[index].coefficients[joint][power];
 }
 
 /** A plan's segments read in place from native arrays, over the robot's joints. */
@@ -55,8 +53,7 @@ class NativeStreamSegments implements StreamSegments {
   public function startNs(index:Int):Int64 return arrays.starts.get(index);
   public function durationNs(index:Int):Int64 return arrays.durations.get(index);
   public function degree(index:Int):Int return arrays.degrees.get(index);
-  public function coefficient(index:Int, joint:Int, power:Int):Float
-    return arrays.coefficient(index, joint, power);
+  public function coefficient(index:Int, joint:Int, power:Int):Float return arrays.coefficient(index, joint, power);
 }
 
 /** Bounded owner-clock stream shared by machine motion and validated programs. */
@@ -75,8 +72,8 @@ class TrajectoryStream {
     if (check != null && check.checks()) {
       var result = check.checkTrajectory(trajectory);
       planChecks.add(result);
-      if (check.options.rejects && result.diagnostics.length > 0)
-        throw 'plan check: ${[for (diagnostic in result.diagnostics) diagnostic.describe()].join("; ")}';
+      if (check.options.rejects && result.diagnostics.length
+        > 0) throw 'plan check: ${[for (diagnostic in result.diagnostics) diagnostic.describe()].join("; ")}';
     }
     checkedTrajectory = trajectory;
   }
@@ -105,12 +102,14 @@ class TrajectoryStream {
     this.programTags = programTags;
   }
 
-  public function begin(segments:Array<StreamSegment>, durationSeconds:Float):Void
-    beginSegments(new ArrayStreamSegments(segments), durationSeconds);
+  public function begin(segments:Array<StreamSegment>, durationSeconds:Float):Void beginSegments(
+    new ArrayStreamSegments(segments),
+    durationSeconds
+  );
 
   public function beginSegments(segments:StreamSegments, durationSeconds:Float):Void {
     checkedTrajectory = null;
-    tagBeforeSubmission = programTags && segments.count()>0 ? robot.snapshot().trajectoryTag : Int64.ofInt(0);
+    tagBeforeSubmission = programTags && segments.count() > 0 ? robot.snapshot().trajectoryTag : Int64.ofInt(0);
     this.segments = segments;
     this.durationSeconds = durationSeconds;
     elapsedSeconds = 0.0;
@@ -122,7 +121,8 @@ class TrajectoryStream {
     finalTag = Int64.ofInt(0);
     finalEndSeconds = 0.0;
     finalDurationNs = Int64.ofInt(0);
-    references = new Map();referenceTags = [];
+    references = new Map();
+    referenceTags = [];
   }
 
   public function clear():Void begin([], 0.0);
@@ -131,7 +131,8 @@ class TrajectoryStream {
     elapsedSeconds = durationSeconds;
     // Release borrowed native arrays before the owner disposes a consumed plan.
     segments = new ArrayStreamSegments([]);
-    references = new Map();referenceTags = [];
+    references = new Map();
+    referenceTags = [];
   }
 
   public function allSubmitted():Bool return submitted && nextSegment >= segments.count();
@@ -143,8 +144,11 @@ class TrajectoryStream {
       // Retire only after observing one of this stream's own publications.
       // Before the owner applies a new command, its snapshot can still carry
       // a numerically larger homing tag from a different identity domain.
-      while (programTags && referenceTags.length>0 && Int64.compare(referenceTags[0],observation.trajectoryTag)<0) {
-        var retired=referenceTags[0];referenceTags.shift();references.remove(Int64.toStr(retired));
+      while (programTags && referenceTags.length > 0 && Int64.compare(referenceTags[0],
+        observation.trajectoryTag) < 0) {
+        var retired = referenceTags[0];
+        referenceTags.shift();
+        references.remove(Int64.toStr(retired));
       }
       elapsedSeconds = elapsedFromSnapshot(observation, start, durationSeconds);
     }
@@ -192,16 +196,15 @@ class TrajectoryStream {
     observe(session, robot.snapshot());
   }
 
-  public static function atRest(snapshot:RobotSnapshot):Bool
-    return (snapshot.sessionState == RobotKitRuntimeConstants.RK_SESSION_HELD ||
-      !snapshot.trajectoryActive) &&
-      snapshot.sessionState != RobotKitRuntimeConstants.RK_SESSION_STOPPING;
+  public static function atRest(snapshot:RobotSnapshot):Bool return (snapshot.sessionState
+    == RobotKitRuntimeConstants.RK_SESSION_HELD
+    || !snapshot.trajectoryActive) && snapshot.sessionState != RobotKitRuntimeConstants.RK_SESSION_STOPPING;
 
   public static function elapsedFromSnapshot(observation:RobotSnapshot,
-      startSeconds:Float, durationSeconds:Float):Float {
+    startSeconds:Float, durationSeconds:Float):Float {
     var runtimeSeconds = Int64.toFloat(observation.trajectoryTagTimeNs) * 1e-9;
-    return Math.isFinite(runtimeSeconds) ?
-      Math.min(durationSeconds, Math.max(0.0, startSeconds + runtimeSeconds)) : 0.0;
+    return Math.isFinite(runtimeSeconds) ? Math.min(durationSeconds,
+      Math.max(0.0, startSeconds + runtimeSeconds)) : 0.0;
   }
 
   /** Seconds of motion a stream keeps submitted ahead of the robot. */
@@ -221,28 +224,32 @@ class TrajectoryStream {
     call, of `CHUNK_SECONDS` or as much as brings the robot's lead to
     `MIN_LEAD_SECONDS`, until `BUFFER_SECONDS` is ahead.
   **/
-  public function fill(session:MotionSession,
-      build:Int -> Int -> Int64 -> Int64 -> Int64 -> ExecutionPlanSubmission,
-      describeFailure:Int -> Int -> Dynamic -> String):Void {
+  public function fill(
+    session:MotionSession,
+    build:Int -> Int -> Int64 -> Int64 -> Int64 -> ExecutionPlanSubmission,
+    describeFailure:Int -> Int -> Dynamic -> String
+  ):Void {
     var total = segments.count();
     var ahead = chunkEndSeconds - elapsedSeconds;
     if (nextSegment >= total || ahead >= BUFFER_SECONDS) return;
     // A submission is bounded only by the room left in the runtime's queue. The depth the snapshot reports lags the
     // submissions still on their way to it, and a dense path (a shaped curve) can fill the queue in a tick or two, so what
     // was submitted and has not run yet is counted as well (and a margin: the runtime counts a knot at the end of every chunk it holds).
-    while (finishedSegments < nextSegment &&
-        Int64.toFloat(Int64.add(segments.startNs(finishedSegments), segments.durationNs(finishedSegments))) * 1e-9 <= elapsedSeconds)
-      finishedSegments++;
+    while (finishedSegments < nextSegment && Int64.toFloat(Int64.add(
+      segments.startNs(finishedSegments),
+      segments.durationNs(finishedSegments)
+    )) * 1e-9 <= elapsedSeconds) finishedSegments++;
     var queued = Std.int(Math.max(robot.snapshot().trajectoryQueueDepth, nextSegment - finishedSegments));
     var available = RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_QUEUE_POINTS - queued - QUEUE_MARGIN;
     var room = Std.int(Math.min(available, total - nextSegment));
     // A queue with no room to speak of is waited on rather than fed a segment at a time.
     if (room < Math.min(16, total - nextSegment)) return;
-    var horizonNs = Trajectory.nanoseconds(Math.max(elapsedSeconds, chunkEndSeconds) +
-      Math.max(CHUNK_SECONDS, MIN_LEAD_SECONDS - ahead));
+    var horizonNs = Trajectory.nanoseconds(Math.max(elapsedSeconds, chunkEndSeconds) + Math.max(
+      CHUNK_SECONDS,
+      MIN_LEAD_SECONDS - ahead
+    ));
     var count = 1;
-    while (count < room && Int64.compare(segments.startNs(nextSegment + count), horizonNs) < 0)
-      count++;
+    while (count < room && Int64.compare(segments.startNs(nextSegment + count), horizonNs) < 0) count++;
     var first = nextSegment;
     var last = first + count;
     var startNs = segments.startNs(first);
@@ -256,11 +263,11 @@ class TrajectoryStream {
         if (programTags) nextProgramTag = tag;
         return;
       }
-    } catch (error:Dynamic)
-      throw describeFailure(first, last, error);
+    } catch (error:Dynamic) throw describeFailure(first, last, error);
     if (!programTags) nextMotionTag = Int64.add(nextMotionTag, Int64.ofInt(1));
     var startSeconds = Int64.toFloat(startNs) * 1e-9;
-    references.set(Int64.toStr(tag), startSeconds);referenceTags.push(tag);
+    references.set(Int64.toStr(tag), startSeconds);
+    referenceTags.push(tag);
     submitted = true;
     nextSegment = last;
     chunkStartSeconds = startSeconds;
@@ -272,25 +279,37 @@ class TrajectoryStream {
     }
   }
 
-  public function motionSubmission(trajectory:Trajectory, first:Int, last:Int, tag:Int64,
-      startNs:Int64, modelRevision:Int64, calibrationRevision:Int64,
-      jerkUnchecked:Bool, jointTolerances:Array<Float>,
-      ?purpose:ExecutionPlanPurpose = Program, ?positionTolerances:Array<Float>):ExecutionPlanSubmission {
+  public function motionSubmission(
+    trajectory:Trajectory,
+    first:Int,
+    last:Int,
+    tag:Int64,
+    startNs:Int64,
+    modelRevision:Int64,
+    calibrationRevision:Int64,
+    jerkUnchecked:Bool,
+    jointTolerances:Array<Float>,
+    ?purpose:ExecutionPlanPurpose = Program,
+    ?positionTolerances:Array<Float>
+  ):ExecutionPlanSubmission {
     checkMotion(trajectory);
     var startSeconds = Int64.toFloat(startNs) * 1e-9;
     var payload:Array<TrajectorySegment> = [];
-    for (index in first...last)
-      payload.push(new TrajectorySegment(Int64.sub(segments.startNs(index), startNs),
-        segments.durationNs(index), [for (joint in 0...segments.jointCount())
-          [for (power in 0...segments.degree(index) + 1) segments.coefficient(index, joint, power)]]));
+    for (index in first...last) payload.push(new TrajectorySegment(
+      Int64.sub(segments.startNs(index), startNs),
+      segments.durationNs(index),
+      [for (joint in 0...segments.jointCount())[for (power in 0...segments.degree(index) + 1) segments.coefficient(
+        index,
+        joint,
+        power
+      )]]
+    ));
     var state = trajectory.evaluate(startSeconds);
     var velocity = state.velocities;
     var acceleration = state.accelerations;
     if (segments.degree(first) == 1) {
       velocity = [for (_ in state.positions) 0.0];
-      if (first > 0)
-        for (joint in 0...velocity.length)
-          velocity[joint] = segments.coefficient(first - 1, joint, 1);
+      if (first > 0) for (joint in 0...velocity.length) velocity[joint] = segments.coefficient(first - 1, joint, 1);
       acceleration = [for (_ in state.positions) 0.0];
     }
     var accelerationTolerance = jointTolerances.copy();
@@ -298,32 +317,56 @@ class TrajectoryStream {
       // Ruckig phases meet on a rounded nanosecond boundary. State the clock
       // allowance here; the runtime also bounds it by the compiled acceleration cap.
       var previous = trajectory.evaluate(Math.max(0.0, startSeconds - 1e-9));
-      for (joint in 0...state.positions.length)
-        accelerationTolerance[joint] = jointTolerances[joint] +
-          0.5e-9 * (Math.abs(previous.jerks[joint]) + Math.abs(state.jerks[joint]));
+      for (joint in 0...state.positions.length) accelerationTolerance[joint] = jointTolerances[joint]
+        + 0.5e-9 * (Math.abs(previous.jerks[joint]) + Math.abs(state.jerks[joint]));
     }
     if (jerkUnchecked && segments.degree(first) != 1) {
-      var previousAcceleration = first == 0 ?
-        [for (_ in state.positions) 0.0] :
-        trajectory.evaluate(Math.max(0.0, startSeconds - 1e-9)).accelerations;
-      for (joint in 0...state.positions.length)
-        accelerationTolerance[joint] =
-          Math.abs(acceleration[joint] - previousAcceleration[joint]) + 10.0 * jointTolerances[joint];
+      var previousAcceleration = first == 0 ? [for (_ in state.positions) 0.0] : trajectory.evaluate(Math.max(
+        0.0,
+        startSeconds - 1e-9
+      )).accelerations;
+      for (joint in 0...state.positions.length) accelerationTolerance[joint] = Math.abs(acceleration[joint]
+        - previousAcceleration[joint]) + 10.0 * jointTolerances[joint];
     }
-    return new ExecutionPlanSubmission(tag, modelRevision, calibrationRevision, 1,
-      state.positions, velocity, acceleration, payload, null, null,
-      first == 0 && positionTolerances != null ? positionTolerances : jointTolerances, jointTolerances,
-      accelerationTolerance, last == segments.count(), null, jerkUnchecked, null, trajectory.controlAcceleration, purpose);
+    return new ExecutionPlanSubmission(
+      tag,
+      modelRevision,
+      calibrationRevision,
+      1,
+      state.positions,
+      velocity,
+      acceleration,
+      payload,
+      null,
+      null,
+      first == 0 && positionTolerances != null ? positionTolerances : jointTolerances,
+      jointTolerances,
+      accelerationTolerance,
+      last == segments.count(),
+      null,
+      jerkUnchecked,
+      null,
+      trajectory.controlAcceleration,
+      purpose
+    );
   }
 
   /**
     Build a program chunk over the robot's joints from the plan's segment
     arrays, which go to the robot in place, after the caller selects events.
   **/
-  public function programSubmission(plan:ExecutionPlan, arrays:SegmentArrays, first:Int,
-      last:Int, tag:Int64, startNs:Int64, endNs:Int64,
-      selectEvents:Int64 -> Int64 -> Bool -> Array<ProcessTimedEvent>,
-      endsAtRest:Bool, jerkUnchecked:Bool):ExecutionPlanSubmission {
+  public function programSubmission(
+    plan:ExecutionPlan,
+    arrays:SegmentArrays,
+    first:Int,
+    last:Int,
+    tag:Int64,
+    startNs:Int64,
+    endNs:Int64,
+    selectEvents:Int64 -> Int64 -> Bool -> Array<ProcessTimedEvent>,
+    endsAtRest:Bool,
+    jerkUnchecked:Bool
+  ):ExecutionPlanSubmission {
     var startSeconds = Int64.toFloat(startNs) * 1e-9;
     var state = plan.evaluate(startSeconds);
     var chunk = arrays.slice(first, last);
@@ -332,15 +375,20 @@ class TrajectoryStream {
     // Joints coupled to planned ones, such as lead screws, start where their leaders put them.
     var positions = arrays.robotValues(state.positions, fixedPositions, true);
     var zero = [for (_ in fixedPositions) 0.0];
-    var startVelocity = arrays.robotValues(first == 0 ? plan.copyStartVelocities() :
-      state.velocities, zero, false);
-    var startAcceleration = arrays.robotValues(first == 0 ? plan.copyStartAccelerations() :
-      state.accelerations, zero, false);
+    var startVelocity = arrays.robotValues(first == 0 ? plan.copyStartVelocities() : state.velocities, zero, false);
+    var startAcceleration = arrays.robotValues(
+      first == 0 ? plan.copyStartAccelerations() : state.accelerations,
+      zero,
+      false
+    );
     // Linear chunks promise the preceding chord at a continuation anchor.
     if (chunk.degrees.get(0) == 1) {
       startAcceleration = zero.copy();
-      startVelocity = first == 0 ? zero.copy() :
-        [for (joint in 0...fixedPositions.length) arrays.coefficient(first - 1, joint, 1)];
+      startVelocity = first == 0 ? zero.copy() : [for (joint in 0...fixedPositions.length) arrays.coefficient(
+        first - 1,
+        joint,
+        1
+      )];
     }
     // A coupled joint allows its leader's error, scaled by the ratio: a lead screw's turns are
     // its axis's travel times thousands.
@@ -352,8 +400,7 @@ class TrajectoryStream {
     var scale = arrays.robotTolerances([for (_ in state.positions) 1.0], [for (_ in fixedPositions) 1.0]);
     // Retain the authored tolerances; the runtime caps checked-C2 seams by its
     // nanosecond rounding bound in the robot's actual joint units.
-    if (!jerkUnchecked && first > 0)
-      aTol = arrays.robotTolerances(plan.copyAccelerationTolerances(), tolerance);
+    if (!jerkUnchecked && first > 0) aTol = arrays.robotTolerances(plan.copyAccelerationTolerances(), tolerance);
     if (chunk.degrees.get(0) > 1) {
       var preceding = plan.evaluate(Math.max(0.0, startSeconds - 1e-9));
       var precedingAcceleration = first == 0 ? zero : arrays.robotValues(preceding.accelerations, zero, false);
@@ -365,38 +412,55 @@ class TrajectoryStream {
         var polynomialAcceleration = 2.0 * chunk.coefficient(0, joint, 2);
         var clock = 1e-9 * (Math.abs(precedingJerk[joint]) + Math.abs(startJerk[joint]));
         if (jerkUnchecked || first == 0) {
-          aTol[joint] = Math.max(aTol[joint],
-            Math.abs(polynomialAcceleration - startAcceleration[joint]) + 1e-5 * scale[joint] + clock);
-          aTol[joint] = Math.max(aTol[joint],
-            Math.abs(polynomialAcceleration - precedingAcceleration[joint]) + 1e-5 * scale[joint] + clock);
+          aTol[joint] = Math.max(
+            aTol[joint],
+            Math.abs(polynomialAcceleration - startAcceleration[joint]) + 1e-5 * scale[joint] + clock
+          );
+          aTol[joint] = Math.max(
+            aTol[joint],
+            Math.abs(polynomialAcceleration - precedingAcceleration[joint]) + 1e-5 * scale[joint] + clock
+          );
         }
         startAcceleration[joint] = polynomialAcceleration;
       }
     }
-    return ExecutionPlanSubmission.ofArrays(tag, plan.modelRevision,
-      plan.calibrationRevision, 1, positions, startVelocity, startAcceleration,
-      chunk, pTol, vTol, aTol, last == segments.count() && endsAtRest, events, jerkUnchecked);
+    return ExecutionPlanSubmission.ofArrays(
+      tag,
+      plan.modelRevision,
+      plan.calibrationRevision,
+      1,
+      positions,
+      startVelocity,
+      startAcceleration,
+      chunk,
+      pTol,
+      vTol,
+      aTol,
+      last == segments.count() && endsAtRest,
+      events,
+      jerkUnchecked
+    );
   }
 
   public function finishedMotion(observation:RobotSnapshot):Bool {
-    if (!submitted || Int64.compare(finalTag, Int64.ofInt(0)) == 0 ||
-        finalEndSeconds < durationSeconds - 1e-9 ||
-        Int64.compare(observation.trajectoryTag, finalTag) != 0)
-      return false;
+    if (!submitted || Int64.compare(finalTag,
+      Int64.ofInt(0)) == 0 || finalEndSeconds < durationSeconds - 1e-9 || Int64.compare(
+        observation.trajectoryTag,
+        finalTag
+      ) != 0) return false;
     var finalTime = Int64.toFloat(observation.trajectoryTagTimeNs) * 1e-9;
-    return Math.isFinite(finalTime) &&
-      finalEndSeconds - chunkStartSeconds <= finalTime + 1e-9 &&
-      !observation.trajectoryActive && observation.trajectoryQueueDepth == 0;
+    return Math.isFinite(finalTime) && finalEndSeconds - chunkStartSeconds <= finalTime + 1e-9
+      && !observation.trajectoryActive && observation.trajectoryQueueDepth == 0;
   }
 
   public function finishedProgram(observation:RobotSnapshot, endsAtRest:Bool = true):Bool {
-    if (Int64.compare(finalTag,Int64.ofInt(0))==0) return false;
+    if (Int64.compare(finalTag, Int64.ofInt(0)) == 0) return false;
     // A previous owner's retained tag is not evidence that this plan ran.
-    if (programTags && Int64.compare(observation.trajectoryTag,tagBeforeSubmission)==0) return false;
-    var tagOrder = Int64.compare(observation.trajectoryTag,finalTag);
-    if (!endsAtRest && tagOrder>0) return true;
-    if (tagOrder!=0 || Int64.compare(observation.trajectoryTagTimeNs,finalDurationNs)<0) return false;
-    return !endsAtRest || (!observation.trajectoryActive && observation.trajectoryQueueDepth==0);
+    if (programTags && Int64.compare(observation.trajectoryTag, tagBeforeSubmission) == 0) return false;
+    var tagOrder = Int64.compare(observation.trajectoryTag, finalTag);
+    if (!endsAtRest && tagOrder > 0) return true;
+    if (tagOrder != 0 || Int64.compare(observation.trajectoryTagTimeNs, finalDurationNs) < 0) return false;
+    return !endsAtRest || (!observation.trajectoryActive && observation.trajectoryQueueDepth == 0);
   }
 
   public function shouldRefill(dt:Float, fixedTimestepSeconds:Float):Bool {
@@ -417,62 +481,84 @@ class TrajectoryStream {
     finalTag = tag;
     finalEndSeconds = durationSeconds;
     finalDurationNs = Trajectory.nanoseconds(durationSeconds);
-    references.set(Int64.toStr(tag), 0.0);referenceTags.push(tag);
+    references.set(Int64.toStr(tag), 0.0);
+    referenceTags.push(tag);
   }
 
-  public function submitSmoothReplacement(planned:Trajectory, state:TrajectoryState,
-      observation:RobotSnapshot, anchorNs:Int64, modelRevision:Int64,
-      calibrationRevision:Int64, jointTolerances:Array<Float>,
-      ?purpose:ExecutionPlanPurpose = Program):Int64 {
+  public function submitSmoothReplacement(
+    planned:Trajectory,
+    state:TrajectoryState,
+    observation:RobotSnapshot,
+    anchorNs:Int64,
+    modelRevision:Int64,
+    calibrationRevision:Int64,
+    jointTolerances:Array<Float>,
+    ?purpose:ExecutionPlanPurpose = Program
+  ):Int64 {
     checkMotion(planned);
     var tag = nextMotionTag;
-    var payload = [for (segment in planned.segments())
-      new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
-        segment.coefficients)];
-    robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
-      modelRevision, calibrationRevision, 1, state.positions, state.velocities,
-      state.accelerations, payload, observation.activePlanId, anchorNs,
-      jointTolerances, jointTolerances, jointTolerances, true, null, false, null, planned.controlAcceleration, purpose)));
+    var payload = [for (segment in planned.segments()) new TrajectorySegment(
+      segment.timeFromStartNs,
+      segment.durationNs,
+      segment.coefficients
+    )];
+    robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(
+      tag,
+      modelRevision,
+      calibrationRevision,
+      1,
+      state.positions,
+      state.velocities,
+      state.accelerations,
+      payload,
+      observation.activePlanId,
+      anchorNs,
+      jointTolerances,
+      jointTolerances,
+      jointTolerances,
+      true,
+      null,
+      false,
+      null,
+      planned.controlAcceleration,
+      purpose
+    )));
     nextMotionTag = Int64.add(nextMotionTag, Int64.ofInt(1));
     return tag;
   }
 
   /** Reobserve the committed horizon after a rejected replacement. */
-  public function replaceWithRetry(executing:Trajectory,
-      observe:Void -> RobotSnapshot, ownerPeriodSeconds:Float, marginPeriods:Int,
-      planFromState:TrajectoryState -> Trajectory,
-      submit:Trajectory -> TrajectoryState -> RobotSnapshot -> Int64 -> Trajectory
-      ):Null<Trajectory> {
+  public function replaceWithRetry(
+    executing:Trajectory,
+    observe:Void -> RobotSnapshot,
+    ownerPeriodSeconds:Float,
+    marginPeriods:Int,
+    planFromState:TrajectoryState -> Trajectory,
+    submit:Trajectory -> TrajectoryState -> RobotSnapshot -> Int64 -> Trajectory
+  ):Null<Trajectory> {
     for (_ in 0...2) {
       var observation = observe();
-      if (!observation.trajectoryActive ||
-          Int64.compare(observation.activePlanId, Int64.ofInt(0)) == 0)
-        return null;
+      if (!observation.trajectoryActive || Int64.compare(observation.activePlanId, Int64.ofInt(0)) == 0) return null;
       // Tags name streamed chunks. Recover the trajectory origin using the
       // chunk's recorded offset, rather than treating every tag as time zero.
       var chunkStart = references.get(Int64.toStr(observation.trajectoryTag));
       var localNs = Int64.ofInt(0);
-      if (chunkStart != null)
-        localNs = Int64.add(Trajectory.nanoseconds(chunkStart), observation.trajectoryTagTimeNs);
-      else if (Int64.compare(observation.trajectoryTimeNs, Int64.ofInt(0)) != 0)
-        return null;
+      if (chunkStart != null) localNs = Int64.add(Trajectory.nanoseconds(chunkStart), observation.trajectoryTagTimeNs);
+      else if (Int64.compare(observation.trajectoryTimeNs, Int64.ofInt(0)) != 0) return null;
       // Before the first owner cycle the accepted queue has no observed tag
       // yet. Its trajectory clock is still zero, so that origin is known.
       var startNs = Int64.sub(observation.trajectoryTimeNs, localNs);
       var marginNs = Trajectory.nanoseconds(ownerPeriodSeconds * marginPeriods);
       var anchorNs = Int64.add(observation.committedUntilNs, marginNs);
       var localSeconds = Int64.toFloat(Int64.sub(anchorNs, startNs)) * 1e-9;
-      if (localSeconds < 0.0 ||
-          localSeconds >= executing.durationSeconds() - ownerPeriodSeconds)
-        return null;
+      if (localSeconds < 0.0 || localSeconds >= executing.durationSeconds() - ownerPeriodSeconds) return null;
       var state = executing.evaluate(localSeconds);
       var planned = planFromState(state);
       try {
         return submit(planned, state, observation, anchorNs);
       } catch (error:RobotRuntimeError) {
         planned.dispose();
-        if (error.status != RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE)
-          throw error;
+        if (error.status != RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE) throw error;
       } catch (error:Dynamic) {
         planned.dispose();
         throw error;
