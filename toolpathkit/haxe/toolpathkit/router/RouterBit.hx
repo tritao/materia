@@ -43,34 +43,10 @@ class RouterBit {
     var radius = diameter / 2, outer = holderDiameter / 2;
     var profile = new CutterProfile([
       CutterSegment.Line(0, 0, radius, 0, CutterZone.Cutting),
-      CutterSegment.Line(
-        radius,
-        0,
-        radius,
-        cuttingLength,
-        CutterZone.Cutting
-      ),
-      CutterSegment.Line(
-        radius,
-        cuttingLength,
-        radius,
-        stickOut,
-        CutterZone.Shank
-      ),
-      CutterSegment.Line(
-        radius,
-        stickOut,
-        outer,
-        stickOut,
-        CutterZone.Holder
-      ),
-      CutterSegment.Line(
-        outer,
-        stickOut,
-        outer,
-        gaugeLength,
-        CutterZone.Holder
-      )
+      CutterSegment.Line(radius, 0, radius, cuttingLength, CutterZone.Cutting),
+      CutterSegment.Line(radius, cuttingLength, radius, stickOut, CutterZone.Shank),
+      CutterSegment.Line(radius, stickOut, outer, stickOut, CutterZone.Holder),
+      CutterSegment.Line(outer, stickOut, outer, gaugeLength, CutterZone.Holder)
     ]);
     tool = new Tool(number, gaugeLength, diameter, profile, cuttingLength, stickOut);
   }

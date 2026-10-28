@@ -153,18 +153,7 @@ class GeometryOffset {
     }
     return Math.min(
       Math.min(pointSegmentDistance(a, c, d), pointSegmentDistance(b, c, d)),
-      Math.min(
-        pointSegmentDistance(
-          c,
-          a,
-          b
-        ),
-        pointSegmentDistance(
-          d,
-          a,
-          b
-        )
-      )
+      Math.min(pointSegmentDistance(c, a, b), pointSegmentDistance(d, a, b))
     );
   }
 

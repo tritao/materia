@@ -29,11 +29,7 @@ import toolpathkit.tool.ToolLibrary;
 class MachiningRunTests {
   public static function run():Void {
     var blueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
-        200,
-        200,
-        200
-      )),
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
       0.02,
       0.08
     );
@@ -69,16 +65,8 @@ class MachiningRunTests {
     var contour = new CamContour([
       new Point3(0.004, 0.004, 0.01),
       new Point3(0.012, 0.004, 0.01),
-      new Point3(
-        0.012,
-        0.012,
-        0.01
-      ),
-      new Point3(
-        0.004,
-        0.012,
-        0.01
-      )
+      new Point3(0.012, 0.012, 0.01),
+      new Point3(0.004, 0.012, 0.01)
     ]);
     var setup = new Setup("1", new Point3(0, 0, 0), new SetupStock(0.0, 0.02, 0.0, 0.02, 0.01, 0.008, 0.014));
     var cam = new CamJob(0.014, 12000).pocket(contour, new Tool(3, 0.0, 0.002), 0.009, 0.01, 0.001).finish(setup);
@@ -118,10 +106,8 @@ class MachiningRunTests {
     var motion = new ManipulatorMotion(
       robot,
       robotBinding.compiler,
-      function(channel) return channel == "spindle.at_speed" || StringTools.startsWith(
-        channel,
-        "cnc.tool_change."
-      ) ? EventValue.Digital(true) : null,
+      function(channel) return channel == "spindle.at_speed" || StringTools.startsWith(channel,
+      "cnc.tool_change.") ? EventValue.Digital(true) : null,
       function() return runtime.pollEvents()
     );
     var run = new MachiningRun(new MachiningRecipe(0.01, 0.0, 0.014), program, motion, binding.channels);
@@ -198,21 +184,8 @@ class MachiningRunTests {
       new ToolpathProgram(
         [
           ToolpathOp.Spindle(Clockwise, 12000, Provenance.cam(91)),
-          ToolpathOp.Coolant(
-            true,
-            false,
-            Provenance.cam(91)
-          ),
-          ToolpathOp.Move(
-            Cut,
-            PathGeometry.Line(
-              start,
-              finish
-            ),
-            0.01,
-            0.0,
-            Provenance.cam(91)
-          )
+          ToolpathOp.Coolant(true, false, Provenance.cam(91)),
+          ToolpathOp.Move(Cut, PathGeometry.Line(start, finish), 0.01, 0.0, Provenance.cam(91))
         ],
         new ToolLibrary(),
         [setup]
@@ -278,11 +251,7 @@ class MachiningRunTests {
   **/
   static function pocketTicks(override:Float):Int {
     var blueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
-        200,
-        200,
-        200
-      )),
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
       0.02,
       0.08
     );
@@ -305,24 +274,12 @@ class MachiningRunTests {
     var contour = new CamContour([
       new Point3(0.004, 0.004, 0.01),
       new Point3(0.012, 0.004, 0.01),
-      new Point3(
-        0.012,
-        0.012,
-        0.01
-      ),
-      new Point3(
-        0.004,
-        0.012,
-        0.01
-      )
+      new Point3(0.012, 0.012, 0.01),
+      new Point3(0.004, 0.012, 0.01)
     ]);
     var cam = new CamJob(0.014, 12000).pocket(contour, new Tool(3, 0.0, 0.002), 0.009, 0.01, 0.001).finish(new Setup(
       "1",
-      new Point3(
-        0,
-        0,
-        0
-      )
+      new Point3(0, 0, 0)
     ));
     var program:MotionProgram = cast ToolpathMotion.lower(cam, binding).program;
     var motion = new ManipulatorMotion(
@@ -333,10 +290,8 @@ class MachiningRunTests {
         runtime.snapshot().modelRevision,
         runtime.snapshot().calibrationRevision
       ).compiler,
-      channel -> channel == "spindle.at_speed" || StringTools.startsWith(
-        channel,
-        "cnc.tool_change."
-      ) ? EventValue.Digital(true) : null,
+      channel -> channel == "spindle.at_speed" || StringTools.startsWith(channel,
+      "cnc.tool_change.") ? EventValue.Digital(true) : null,
       () -> runtime.pollEvents()
     );
     motion.run(program);

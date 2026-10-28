@@ -203,11 +203,8 @@ class ToolpathLowering {
         flush();
         drainQueued();
         add(
-          MotionOp.WaitInput(
-            machine.channels.toolChange(number),
-            InputPredicate.Equals(EventValue.Digital(true)),
-            null
-          ),
+          MotionOp.WaitInput(machine.channels.toolChange(number),
+          InputPredicate.Equals(EventValue.Digital(true)), null),
           span
         );
       case ToolLengthOffset(_, _, _):
@@ -308,10 +305,7 @@ class ToolpathLowering {
       var authored = new GeometricPath(pending);
       // A corner is worth rounding only if the machine can take it at a good share of the slower move's speed.
       var minRadii = [for (i in 0...corners.length) CornerBlender.minimumRadius(
-        Math.min(
-          pendingSpeeds[i],
-          pendingSpeeds[i + 1]
-        ),
+        Math.min(pendingSpeeds[i], pendingSpeeds[i + 1]),
         machine.cornerAcceleration
       )];
       var blended = CornerBlender.blendPerCorner(authored, corners, machine.maxBlendTurnAngleRadians, minRadii);

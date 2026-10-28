@@ -23,14 +23,7 @@ class ToolpathMotionTests {
   static function pathProgram(ops:Array<ToolpathOp>):ToolpathProgram return new ToolpathProgram(
     ops,
     new ToolLibrary(),
-    [new Setup(
-      "1",
-      new Point3(
-        0,
-        0,
-        0
-      )
-    )]
+    [new Setup("1", new Point3(0, 0, 0))]
   );
 
   /**
@@ -41,18 +34,7 @@ class ToolpathMotionTests {
     function line(from:Array<Float>,
       to:Array<Float>, kind:MoveKind, speed:Float, tolerance:Float):ToolpathOp return ToolpathOp.Move(
         kind,
-        PathGeometry.Line(
-          new Point3(
-            from[0],
-            from[1],
-            0
-          ),
-          new Point3(
-            to[0],
-            to[1],
-            0
-          )
-        ),
+        PathGeometry.Line(new Point3(from[0], from[1], 0), new Point3(to[0], to[1], 0)),
         speed,
         tolerance,
         origin
@@ -72,19 +54,7 @@ class ToolpathMotionTests {
     printer.setRapidsAtFeed(true);
     // A cut at 40 mm/s, a corner of 90 degrees, a travel at 150 mm/s: one path of line, arc, line.
     var rounded = ToolpathMotion.lower(
-      pathProgram([
-        line([0, 0], [0.02, 0], Cut, 0.04, 0.0001),
-        line(
-          [0.02, 0],
-          [
-            0.02,
-            0.02
-          ],
-          Rapid,
-          0.15,
-          0.0001
-        )
-      ]),
+      pathProgram([line([0, 0], [0.02, 0], Cut, 0.04, 0.0001), line([0.02, 0], [0.02, 0.02], Rapid, 0.15, 0.0001)]),
       printer
     );
     var pieces = primitives(rounded);
@@ -95,27 +65,8 @@ class ToolpathMotionTests {
     for (_ in rounded.stops) throw "a rounded corner is not a stop";
     // Without the flag a travel is a rapid: the machine's rapid speed, and an exact stop.
     var mill = ToolpathMotion.lower(
-      pathProgram([
-        line([0, 0], [0.02, 0], Cut, 0.04, 0.0001),
-        line(
-          [0.02, 0],
-          [
-            0.02,
-            0.02
-          ],
-          Rapid,
-          0.15,
-          0.0001
-        )
-      ]),
-      new MachineBinding(
-        "work",
-        "x",
-        "y",
-        "z",
-        0.25,
-        new toolpathkit.motion.ToolpathChannels("")
-      )
+      pathProgram([line([0, 0], [0.02, 0], Cut, 0.04, 0.0001), line([0.02, 0], [0.02, 0.02], Rapid, 0.15, 0.0001)]),
+      new MachineBinding("work", "x", "y", "z", 0.25, new toolpathkit.motion.ToolpathChannels(""))
     );
     var millPieces = primitives(mill);
     if (millPieces.length != 2
@@ -126,29 +77,8 @@ class ToolpathMotionTests {
     var sharp = ToolpathMotion.lower(
       pathProgram([
         line([0, 0], [0.02, 0], Cut, 0.04, 0.0001),
-        line(
-          [0.02, 0],
-          [
-            0.02 + 0.02 * Math.cos(turn),
-            0.02 * Math.sin(turn)
-          ],
-          Cut,
-          0.04,
-          0.0001
-        ),
-        line(
-          [
-            0.02 + 0.02 * Math.cos(turn),
-            0.02 * Math.sin(turn)
-          ],
-          [
-            0.0,
-            0.05
-          ],
-          Cut,
-          0.04,
-          0.0
-        )
+        line([0.02, 0], [0.02 + 0.02 * Math.cos(turn), 0.02 * Math.sin(turn)], Cut, 0.04, 0.0001),
+        line([0.02 + 0.02 * Math.cos(turn), 0.02 * Math.sin(turn)], [0.0, 0.05], Cut, 0.04, 0.0)
       ]),
       printer
     );
@@ -170,18 +100,7 @@ class ToolpathMotionTests {
     var area = 8.0e-8;
     function line(from:Array<Float>, to:Array<Float>, kind:MoveKind, speed:Float):ToolpathOp return ToolpathOp.Move(
       kind,
-      PathGeometry.Line(
-        new Point3(
-          from[0],
-          from[1],
-          0
-        ),
-        new Point3(
-          to[0],
-          to[1],
-          0
-        )
-      ),
+      PathGeometry.Line(new Point3(from[0], from[1], 0), new Point3(to[0], to[1], 0)),
       speed,
       0.0001,
       origin
@@ -189,65 +108,14 @@ class ToolpathMotionTests {
     var result = ToolpathMotion.lower(
       pathProgram([
         ToolpathOp.Heat("bed", 60.0, true, origin),
-        ToolpathOp.Heat(
-          "hotend",
-          200.0,
-          false,
-          origin
-        ),
-        ToolpathOp.Fan(
-          "part",
-          0.5,
-          origin
-        ),
-        ToolpathOp.Deposit(
-          area,
-          4.5e-4,
-          2.0e-4,
-          origin
-        ),
-        line(
-          [
-            0,
-            0
-          ],
-          [
-            0.02,
-            0
-          ],
-          Cut,
-          0.2
-        ),
-        line(
-          [
-            0.02,
-            0
-          ],
-          [
-            0.02,
-            0.02
-          ],
-          Cut,
-          0.2
-        ),
+        ToolpathOp.Heat("hotend", 200.0, false, origin),
+        ToolpathOp.Fan("part", 0.5, origin),
+        ToolpathOp.Deposit(area, 4.5e-4, 2.0e-4, origin),
+        line([0, 0], [0.02, 0], Cut, 0.2),
+        line([0.02, 0], [0.02, 0.02], Cut, 0.2),
         ToolpathOp.DepositOff(origin),
-        line(
-          [
-            0.02,
-            0.02
-          ],
-          [
-            0.0,
-            0.02
-          ],
-          Rapid,
-          0.15
-        ),
-        ToolpathOp.FilamentMove(
-          -0.001,
-          0.03,
-          origin
-        )
+        line([0.02, 0.02], [0.0, 0.02], Rapid, 0.15),
+        ToolpathOp.FilamentMove(-0.001, 0.03, origin)
       ]),
       machine
     );
@@ -288,14 +156,7 @@ class ToolpathMotionTests {
     var refused = false;
     try ToolpathMotion.lower(
       pathProgram([ToolpathOp.Heat("bed", 60.0, true, origin)]),
-      new MachineBinding(
-        "work",
-        "x",
-        "y",
-        "z",
-        0.25,
-        new toolpathkit.motion.ToolpathChannels("")
-      )
+      new MachineBinding("work", "x", "y", "z", 0.25, new toolpathkit.motion.ToolpathChannels(""))
     ) catch (_:Dynamic) refused = true;
     if (!refused) throw "a mill has no heaters";
   }
@@ -319,29 +180,8 @@ class ToolpathMotionTests {
     var result = ToolpathMotion.lower(
       pathProgram([
         ToolpathOp.Spindle(Clockwise, 12000, origin),
-        ToolpathOp.Move(
-          Cut,
-          PathGeometry.Line(
-            new Point3(
-              0,
-              0,
-              0
-            ),
-            new Point3(
-              0.01,
-              0,
-              0
-            )
-          ),
-          0.01,
-          0,
-          origin
-        ),
-        ToolpathOp.Coolant(
-          false,
-          false,
-          origin
-        ),
+        ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)), 0.01, 0, origin),
+        ToolpathOp.Coolant(false, false, origin),
         ToolpathOp.End(origin)
       ]),
       machine
@@ -358,20 +198,8 @@ class ToolpathMotionTests {
     machine.setTravel(new TravelEnvelope(new Point3(-0.01, -0.01, -0.01), new Point3(0.005, 0.01, 0.01)));
     var rejected = false;
     try ToolpathMotion.lower(
-      pathProgram([ToolpathOp.Move(
-        Cut,
-        PathGeometry.Line(
-          new Point3(0, 0, 0),
-          new Point3(
-            0.01,
-            0,
-            0
-          )
-        ),
-        0.01,
-        0,
-        origin
-      )]),
+      pathProgram([ToolpathOp.Move(Cut,
+      PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)), 0.01, 0, origin)]),
       machine
     ) catch (error:Dynamic) {
       rejected = Std.string(error).indexOf("X travel") >= 0;
@@ -382,33 +210,9 @@ class ToolpathMotionTests {
     var markers = ToolpathMotion.lower(
       pathProgram([
         ToolpathOp.Layer(0, 0.0002, origin),
-        ToolpathOp.Feature(
-          Perimeter,
-          origin
-        ),
-        ToolpathOp.PrintObject(
-          "a",
-          true,
-          origin
-        ),
-        ToolpathOp.Move(
-          Cut,
-          PathGeometry.Line(
-            new Point3(
-              0,
-              0,
-              0
-            ),
-            new Point3(
-              0.01,
-              0,
-              0
-            )
-          ),
-          0.01,
-          0,
-          origin
-        )
+        ToolpathOp.Feature(Perimeter, origin),
+        ToolpathOp.PrintObject("a", true, origin),
+        ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)), 0.01, 0, origin)
       ]),
       machine
     );
@@ -416,22 +220,9 @@ class ToolpathMotionTests {
     for (printing in [
       ToolpathOp.Deposit(8e-8, 4.5e-4, 2e-4, origin),
       ToolpathOp.DepositOff(origin),
-      ToolpathOp.FilamentMove(
-        -0.001,
-        0.03,
-        origin
-      ),
-      ToolpathOp.Heat(
-        "hotend",
-        210,
-        true,
-        origin
-      ),
-      ToolpathOp.Fan(
-        "part",
-        1.0,
-        origin
-      )
+      ToolpathOp.FilamentMove(-0.001, 0.03, origin),
+      ToolpathOp.Heat("hotend", 210, true, origin),
+      ToolpathOp.Fan("part", 1.0, origin)
     ]) {
       rejected = false;
       try ToolpathMotion.lower(pathProgram([printing]),
@@ -465,14 +256,7 @@ class ToolpathMotionTests {
     var compiled = robotBinding.compile(
       pathProgram([ToolpathOp.Move(
         Cut,
-        PathGeometry.Line(
-          new Point3(0, 0, 0),
-          new Point3(
-            0.01,
-            0,
-            0
-          )
-        ),
+        PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)),
         0.01,
         0,
         Provenance.cam(8)
@@ -494,36 +278,14 @@ class ToolpathMotionTests {
       ),
       ToolpathOp.Move(
         Cut,
-        PathGeometry.Line(
-          new Point3(
-            0,
-            0,
-            0.006
-          ),
-          new Point3(
-            0,
-            0,
-            0.002
-          )
-        ),
+        PathGeometry.Line(new Point3(0, 0, 0.006), new Point3(0, 0, 0.002)),
         0.002,
         0.0,
         Provenance.cam(10)
       ),
       ToolpathOp.Move(
         Cut,
-        PathGeometry.Line(
-          new Point3(
-            0,
-            0,
-            0.002
-          ),
-          new Point3(
-            0.01,
-            0,
-            0.002
-          )
-        ),
+        PathGeometry.Line(new Point3(0, 0, 0.002), new Point3(0.01, 0, 0.002)),
         0.01,
         0.0,
         Provenance.cam(11)
@@ -553,19 +315,10 @@ class ToolpathMotionTests {
       GeometricPath.lines([
         new PathPoint(0.0, 0.0),
         new PathPoint(0.01, 0.0),
-        new PathPoint(
-          0.01,
-          0.01
-        ),
-        new PathPoint(
-          0.02,
-          0.01
-        )
+        new PathPoint(0.01, 0.01),
+        new PathPoint(0.02, 0.01)
       ]),
-      [
-        0.0001,
-        0.0005
-      ],
+      [0.0001, 0.0005],
       Math.PI * 5.0 / 6.0
     );
     if (corners.path.primitives.length != 5) throw "both per-corner tolerances must blend";
@@ -574,52 +327,11 @@ class ToolpathMotionTests {
     if (first.radius >= second.radius) throw "smaller corner tolerance must create a tighter fillet";
     var eventResult = ToolpathMotion.lower(
       pathProgram([
-        ToolpathOp.Move(
-          Cut,
-          PathGeometry.Line(
-            new Point3(0, 0, 0),
-            new Point3(
-              0.01,
-              0,
-              0
-            )
-          ),
-          0.01,
-          0.0002,
-          origin
-        ),
-        ToolpathOp.Coolant(
-          true,
-          false,
-          origin
-        ),
-        ToolpathOp.Move(
-          Cut,
-          PathGeometry.Line(
-            new Point3(
-              0.01,
-              0,
-              0
-            ),
-            new Point3(
-              0.01,
-              0.01,
-              0
-            )
-          ),
-          0.01,
-          0.0004,
-          origin
-        )
+        ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)), 0.01, 0.0002, origin),
+        ToolpathOp.Coolant(true, false, origin),
+        ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0.01, 0, 0), new Point3(0.01, 0.01, 0)), 0.01, 0.0004, origin)
       ]),
-      new MachineBinding(
-        "work",
-        "x",
-        "y",
-        "z",
-        0.2,
-        new toolpathkit.motion.ToolpathChannels("")
-      )
+      new MachineBinding("work", "x", "y", "z", 0.2, new toolpathkit.motion.ToolpathChannels(""))
     );
     var eventProgram:motionkit.program.MotionProgram = cast eventResult.program;
     if (eventProgram == null || eventProgram.ops.length != 1) throw "coolant added a motion stop";
@@ -634,14 +346,7 @@ class ToolpathMotionTests {
       var channels = new toolpathkit.motion.ToolpathChannels(scope);
       var lowered = ToolpathMotion.lower(
         pathProgram([ToolpathOp.Spindle(Clockwise, 3000, origin)]),
-        new MachineBinding(
-          "work",
-          "x",
-          "y",
-          "z",
-          0.2,
-          channels
-        )
+        new MachineBinding("work", "x", "y", "z", 0.2, channels)
       );
       var program = lowered.program;
       if (program == null || program.ops.length != 3) throw "Scoped spindle did not lower";

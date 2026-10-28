@@ -20,11 +20,7 @@ class PathMergeBudgetChecks {
   }
   public static function fixture():ToolpathMotionBinding {
     var blueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
-        200,
-        200,
-        200
-      )),
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
       0.1,
       0.4
     );
@@ -44,11 +40,7 @@ class PathMergeBudgetChecks {
     var timing = new ToppraPathTiming();
     var timed = timing.time(
       curve,
-      new PathTimingLimits(
-        binding.compiler.maxVelocity,
-        binding.compiler.maxAcceleration,
-        [0.01]
-      )
+      new PathTimingLimits(binding.compiler.maxVelocity, binding.compiler.maxAcceleration, [0.01])
     );
     try {
       var pending = new PendingMotion(0, q0, q1, timed.trajectory, [], path, curve.s);

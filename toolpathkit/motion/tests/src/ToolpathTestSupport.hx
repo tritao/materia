@@ -46,11 +46,7 @@ class ToolpathTestSupport extends MotionKitTestSupport {
   }
   public function cncTrial(virtualDevice:Bool, ?linkLoss:Bool = false):Array<Float> {
     var blueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
-        200,
-        200,
-        200
-      )),
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
       0.01,
       0.04
     );
@@ -76,10 +72,7 @@ class ToolpathTestSupport extends MotionKitTestSupport {
       }
       wired = DeviceBinding.bind(
         blueprint.model,
-        new DeviceLayout(
-          DeviceLayout.forActuators(blueprint.model, 2).channels,
-          inputs
-        ),
+        new DeviceLayout(DeviceLayout.forActuators(blueprint.model, 2).channels, inputs),
         options.stepTickHz
       );
       options.actuators = wired.virtualActuators();

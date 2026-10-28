@@ -139,12 +139,7 @@ class ToolpathCoreCoverage {
     rejects(function() GeometryOffset.profile(square, 0, 0, true), "positive radius");
     rejects(function() GeometryOffset.profile(square, 0.6, 0, false), "narrow feature");
     rejects(
-      function() GeometryOffset.profile(
-        [new Point3(0, 0, 0), new Point3(1, 0, 0), new Point3(2, 0, 0)],
-        0.1,
-        0,
-        true
-      ),
+      function() GeometryOffset.profile([new Point3(0, 0, 0), new Point3(1, 0, 0), new Point3(2, 0, 0)], 0.1, 0, true),
       "nonzero contour area"
     );
   }
@@ -156,20 +151,7 @@ class ToolpathCoreCoverage {
     var span = Provenance.cam(3);
     var cut = [
       ToolpathOp.ToolChange(4, span),
-      ToolpathOp.Move(
-        Cut,
-        PathGeometry.Line(
-          new Point3(0, 0, 0),
-          new Point3(
-            0.2,
-            0,
-            -0.1
-          )
-        ),
-        0.01,
-        0,
-        span
-      )
+      ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.2, 0, -0.1)), 0.01, 0, span)
     ];
     clear.validate(cut, library);
     check(true, "stocked setup accepts a clear cut");
@@ -191,80 +173,23 @@ class ToolpathCoreCoverage {
     shaped.set(toolpathkit.tool.Tool.shaped(
       4,
       0.045,
-      toolpathkit.tool.CutterProfile.flat(0.004, 0.01).withShank(
-        0.004,
-        0.005
-      ).withHolder(
-        0.02,
-        0.03
-      )
+      toolpathkit.tool.CutterProfile.flat(0.004, 0.01).withShank(0.004, 0.005).withHolder(0.02, 0.03)
     ));
     var shortCut = [
       ToolpathOp.ToolChange(4, span),
       ToolpathOp.ToolLengthOffset(4, 0.045, span),
-      ToolpathOp.Move(
-        Cut,
-        PathGeometry.Line(
-          new Point3(
-            0,
-            0,
-            0
-          ),
-          new Point3(
-            0.001,
-            0,
-            -0.001
-          )
-        ),
-        0.01,
-        0,
-        span
-      )
+      ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.001, 0, -0.001)), 0.01, 0, span)
     ];
     var holderFixture = new Setup(
       "1",
       new Point3(0, 0, 0),
-      new SetupStock(
-        -1,
-        1,
-        -1,
-        1,
-        0,
-        -0.2,
-        0.2,
-        [new Fixture(
-          "jaw",
-          0.004,
-          0.01,
-          -0.003,
-          0.003,
-          0.02,
-          0.03
-        )]
-      )
+      new SetupStock(-1, 1, -1, 1, 0, -0.2, 0.2, [new Fixture("jaw", 0.004, 0.01, -0.003, 0.003, 0.02, 0.03)])
     );
     rejects(function() holderFixture.validate(shortCut, shaped), "non-cutting tool profile");
     var aboveHolder = new Setup(
       "1",
       new Point3(0, 0, 0),
-      new SetupStock(
-        -1,
-        1,
-        -1,
-        1,
-        0,
-        -0.2,
-        0.2,
-        [new Fixture(
-          "above",
-          0.004,
-          0.01,
-          -0.003,
-          0.003,
-          0.06,
-          0.07
-        )]
-      )
+      new SetupStock(-1, 1, -1, 1, 0, -0.2, 0.2, [new Fixture("above", 0.004, 0.01, -0.003, 0.003, 0.06, 0.07)])
     );
     aboveHolder.validate(shortCut, shaped);
     check(true, "fixture above finite holder does not collide");
@@ -280,13 +205,7 @@ class ToolpathCoreCoverage {
         lower,
         upper
       ).check(new ToolpathProgram(
-        [ToolpathOp.Move(
-          Cut,
-          geometry,
-          0.01,
-          0,
-          span
-        )],
+        [ToolpathOp.Move(Cut, geometry, 0.01, 0, span)],
         library,
         [setup]
       ));

@@ -94,10 +94,7 @@ class MachiningRun {
     // The slice sums its primitives' lengths, which can fall a rounding error short
     // of the source's; an event at the source's end stays at the slice's.
     for (event in sourceEvents) if (event.distance > start) remaining.push(new PathEvent(
-      Math.min(
-        continuation.length(),
-        event.distance - start
-      ),
+      Math.min(continuation.length(), event.distance - start),
       event.channel,
       event.value,
       event.leadSeconds,
@@ -171,18 +168,9 @@ class MachiningRun {
       || snapshot.safety != 0) throw "spindle fault shutdown waits for a controlled stop";
     return new MotionProgram([
       MotionOp.SetOutput(channels.spindleSpeed, EventValue.Analog(0.0)),
-      MotionOp.SetOutput(
-        channels.spindleDirection,
-        EventValue.Analog(0.0)
-      ),
-      MotionOp.SetOutput(
-        channels.coolantMist,
-        EventValue.Digital(false)
-      ),
-      MotionOp.SetOutput(
-        channels.coolantFlood,
-        EventValue.Digital(false)
-      )
+      MotionOp.SetOutput(channels.spindleDirection, EventValue.Analog(0.0)),
+      MotionOp.SetOutput(channels.coolantMist, EventValue.Digital(false)),
+      MotionOp.SetOutput(channels.coolantFlood, EventValue.Digital(false))
     ]);
   }
 }

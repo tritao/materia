@@ -177,11 +177,7 @@ class ToolpathProcessTests extends ToolpathTestSupport {
 
   public function testCncProgramBinding():Void {
     var blueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(
-        200,
-        200,
-        200
-      )),
+      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
       0.1,
       0.4
     );

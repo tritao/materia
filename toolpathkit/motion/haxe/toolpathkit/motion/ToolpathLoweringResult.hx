@@ -14,10 +14,7 @@ class ToolpathLoweringResult {
     program:Null<MotionProgram>,
     sourceMap:ToolpathSourceMap,
     diagnostics:Array<ToolpathDiagnostic>,
-    ?stops:Map<
-      String,
-      Int
-  >
+    ?stops:Map<String, Int>
   ) {
     this.program = program;
     this.sourceMap = sourceMap;

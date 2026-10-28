@@ -36,30 +36,12 @@ class PrinterOpCoverage {
   static function program(ops:Array<ToolpathOp>):ToolpathProgram return new ToolpathProgram(
     ops,
     new ToolLibrary(),
-    [new Setup(
-      "1",
-      new Point3(
-        0,
-        0,
-        0
-      )
-    )]
+    [new Setup("1", new Point3(0, 0, 0))]
   );
 
   static function line(x0:Float, x1:Float, ?z:Float = 0.0):ToolpathOp return ToolpathOp.Move(
     Cut,
-    PathGeometry.Line(
-      new Point3(
-        x0,
-        0,
-        z
-      ),
-      new Point3(
-        x1,
-        0,
-        z
-      )
-    ),
+    PathGeometry.Line(new Point3(x0, 0, z), new Point3(x1, 0, z)),
     0.05,
     0.0,
     span
@@ -173,26 +155,11 @@ class PrinterOpCoverage {
     var ops:Array<ToolpathOp> = [
       ToolpathOp.Heat("hotend", 210, true, span),
       ToolpathOp.Layer(0, 0.0002, span),
-      ToolpathOp.Feature(
-        ExternalPerimeter,
-        span
-      ),
-      ToolpathOp.Deposit(
-        bead,
-        0.00045,
-        0.0002,
-        span
-      ),
-      line(
-        0,
-        0.01
-      ),
+      ToolpathOp.Feature(ExternalPerimeter, span),
+      ToolpathOp.Deposit(bead, 0.00045, 0.0002, span),
+      line(0, 0.01),
       ToolpathOp.DepositOff(span),
-      ToolpathOp.FilamentMove(
-        -0.001,
-        0.03,
-        span
-      )
+      ToolpathOp.FilamentMove(-0.001, 0.03, span)
     ];
     // Arc fitting passes every printing operation through in place.
     var fitted = ArcFitting.fit(ops, 0.00002);

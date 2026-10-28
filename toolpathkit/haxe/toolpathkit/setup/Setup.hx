@@ -105,10 +105,7 @@ class Setup {
             outer + margin,
             fixture,
             Math.min(a.z, b.z),
-            Math.max(
-              a.z,
-              b.z
-            )
+            Math.max(a.z, b.z)
           )) fail(
             span,
             'non-cutting tool profile intersects fixture "${fixture.name}"'
@@ -133,18 +130,8 @@ class Setup {
     // Clip the segment to the fixture's vertical range, then to its expanded XY box.
     for (bound in [
       {origin: a.z, delta: b.z - a.z, min: fixture.minZ - highZ, max: fixture.maxZ - lowZ},
-      {
-        origin: a.x,
-        delta: b.x - a.x,
-        min: fixture.minX - radius,
-        max: fixture.maxX + radius
-      },
-      {
-        origin: a.y,
-        delta: b.y - a.y,
-        min: fixture.minY - radius,
-        max: fixture.maxY + radius
-      }
+      {origin: a.x, delta: b.x - a.x, min: fixture.minX - radius, max: fixture.maxX + radius},
+      {origin: a.y, delta: b.y - a.y, min: fixture.minY - radius, max: fixture.maxY + radius}
     ]) {
       if (Math.abs(bound.delta) < 1e-14) {
         if (bound.origin < bound.min || bound.origin > bound.max) return false;

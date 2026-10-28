@@ -22,16 +22,7 @@ class ToolpathKitTests {
     // by one floating-point step. The terminal sample is the exact endpoint.
     var endpointArc = PathGeometry.Arc(new Point3(0, 0, 0), 0.0035, 0, -0.8410686705678702);
     toolpathkit.geometry.GeometryOffset.validateProfile(
-      [
-        new Point3(1, 1, 0),
-        new Point3(2, 1, 0),
-        new Point3(2, 2, 0),
-        new Point3(
-          1,
-          2,
-          0
-        )
-      ],
+      [new Point3(1, 1, 0), new Point3(2, 1, 0), new Point3(2, 2, 0), new Point3(1, 2, 0)],
       [endpointArc],
       0,
       false
@@ -71,14 +62,7 @@ class ToolpathKitTests {
     var violations = new TravelEnvelope(new Point3(-2, -2, -1), new Point3(2, 0.5, 1)).check(new ToolpathProgram(
       [halfArc],
       new ToolLibrary(),
-      [new Setup(
-        "1",
-        new Point3(
-          0,
-          0,
-          0
-        )
-      )]
+      [new Setup("1", new Point3(0, 0, 0))]
     ));
     if (violations.length != 1
       || violations[0].axis != 1 || violations[0].provenance.operationIndex != 5) throw "arc extreme travel violation";
@@ -98,25 +82,10 @@ class ToolpathKitTests {
     try first.validate([], library) catch (_:Dynamic) rejected = true;
     if (!rejected) throw "stock validation accepted an unstocked setup";
     var placed = new ToolpathProgram(
-      [ToolpathOp.Move(
-        Cut,
-        PathGeometry.Line(
-          new Point3(0, 0, 0),
-          new Point3(0.01, 0, 0)
-        ),
-        0.01,
-        0,
-        Provenance.cam(7)
-      )],
+      [ToolpathOp.Move(Cut,
+      PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)), 0.01, 0, Provenance.cam(7))],
       library,
-      [new Setup(
-        "1",
-        new Point3(
-          0.1,
-          0,
-          0
-        )
-      )]
+      [new Setup("1", new Point3(0.1, 0, 0))]
     );
     var placedViolations = new TravelEnvelope(new Point3(-0.05, -1, -1), new Point3(0.05, 1, 1)).check(placed);
     if (placedViolations.length != 1 || placedViolations[0].axis != 0 || placedViolations[0].provenance.operationIndex
@@ -127,39 +96,17 @@ class ToolpathKitTests {
     var lifted = new ToolpathProgram(
       [
         ToolpathOp.ToolChange(3, Provenance.cam(8)),
-        ToolpathOp.ToolLengthOffset(
-          3,
-          0.04,
-          Provenance.cam(8)
-        ),
+        ToolpathOp.ToolLengthOffset(3, 0.04, Provenance.cam(8)),
         ToolpathOp.Move(
           Cut,
-          PathGeometry.Line(
-            new Point3(
-              0,
-              0,
-              0
-            ),
-            new Point3(
-              0,
-              0,
-              -0.03
-            )
-          ),
+          PathGeometry.Line(new Point3(0, 0, 0), new Point3(0, 0, -0.03)),
           0.01,
           0,
           Provenance.cam(8)
         )
       ],
       measured,
-      [new Setup(
-        "1",
-        new Point3(
-          0,
-          0,
-          0
-        )
-      )]
+      [new Setup("1", new Point3(0, 0, 0))]
     );
     if (new TravelEnvelope(new Point3(-1, -1,
       0), new Point3(1, 1, 1)).check(lifted).length != 0) throw "travel check must lift G43 moves to the gauge line";
@@ -171,39 +118,17 @@ class ToolpathKitTests {
     var shortH = new ToolpathProgram(
       [
         ToolpathOp.ToolChange(3, Provenance.cam(9)),
-        ToolpathOp.ToolLengthOffset(
-          3,
-          0.035,
-          Provenance.cam(9)
-        ),
+        ToolpathOp.ToolLengthOffset(3, 0.035, Provenance.cam(9)),
         ToolpathOp.Move(
           Cut,
-          PathGeometry.Line(
-            new Point3(
-              0,
-              0,
-              0
-            ),
-            new Point3(
-              0,
-              0,
-              -0.018
-            )
-          ),
+          PathGeometry.Line(new Point3(0, 0, 0), new Point3(0, 0, -0.018)),
           0.01,
           0,
           Provenance.cam(9)
         )
       ],
       measured,
-      [new Setup(
-        "1",
-        new Point3(
-          0,
-          0,
-          0
-        )
-      )]
+      [new Setup("1", new Point3(0, 0, 0))]
     );
     rejected = false;
     try new Setup("1", new Point3(0, 0, 0),
@@ -226,10 +151,7 @@ class ToolpathKitTests {
     function cuts(points:Array<Point3>,
       span:Provenance):Array<ToolpathOp> return [for (k in 1...points.length) ToolpathOp.Move(
         Cut,
-        PathGeometry.Line(
-          points[k - 1],
-          points[k]
-        ),
+        PathGeometry.Line(points[k - 1], points[k]),
         0.01,
         0.0,
         span

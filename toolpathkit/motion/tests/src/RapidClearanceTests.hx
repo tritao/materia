@@ -21,24 +21,7 @@ class RapidClearanceTests {
           ToolChange(1, span),
           ToolLengthOffset(1, length, span),
           op,
-          Move(
-            Cut,
-            Line(
-              new Point3(
-                0,
-                0,
-                0.01
-              ),
-              new Point3(
-                0,
-                0,
-                0
-              )
-            ),
-            0.003,
-            0.0001,
-            span
-          )
+          Move(Cut, Line(new Point3(0, 0, 0.01), new Point3(0, 0, 0)), 0.003, 0.0001, span)
         ],
         tools,
         [setup]
@@ -116,32 +99,12 @@ class RapidClearanceTests {
     try {
       RapidClearance.apply(
         new ToolpathProgram(
-          [
-            ToolChange(1, span),
-            Move(
-              Rapid,
-              Line(
-                new Point3(0, 0, 0.06),
-                new Point3(
-                  0,
-                  0,
-                  0.01
-                )
-              ),
-              0,
-              0,
-              span
-            )
-          ],
+          [ToolChange(1, span), Move(Rapid, Line(new Point3(0, 0, 0.06), new Point3(0, 0, 0.01)), 0, 0, span)],
           tools,
           [setup]
         ),
         stocks,
-        [
-          0.001,
-          0.001,
-          0.002
-        ]
+        [0.001, 0.001, 0.002]
       );
     } catch (_:Dynamic) refused = true;
     if (!refused) throw "A risky rapid with no machining feed must be refused";

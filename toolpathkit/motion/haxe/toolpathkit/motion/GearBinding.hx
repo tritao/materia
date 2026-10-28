@@ -12,10 +12,7 @@ class GearBinding {
     binding:MachineBinding,
     model:RobotModel,
     controllerHz:Float,
-    encoderDelayNs:Map<
-      String,
-      Int
-  >,
+    encoderDelayNs:Map<String, Int>,
     followers:Array<String>
   ):Array<ProcessChannelDeclaration> {
     if (!Math.isFinite(controllerHz) || controllerHz <= 0) throw "Gear controller needs a stated owner loop rate";
@@ -37,14 +34,7 @@ class GearBinding {
         if (delay < 0 || delay > 1000000000) throw 'Invalid encoder latency for ${joint.id}';
         binding.gearEncoders.set(
           joint.id,
-          {
-            latencyNs: delay,
-            quantum: encoder.resolution(),
-            loopHz: Math.min(
-              controllerHz,
-              actuator.positionLoopRate
-            )
-          }
+          {latencyNs: delay, quantum: encoder.resolution(), loopHz: Math.min(controllerHz, actuator.positionLoopRate)}
         );
         if (followers.indexOf(joint.id) >= 0
           && actuator.processVelocity == null) channels.push(GearEvents.declaration(i));
