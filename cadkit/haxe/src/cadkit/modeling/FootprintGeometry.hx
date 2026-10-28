@@ -6,7 +6,9 @@ class FootprintGeometry {
   public static function resolve(f:Footprint): {shape: Footprint, dx: Float, dy: Float} return switch f {
     case Shifted(inner, dx, dy):
       var r = resolve(inner);
-      {shape: r.shape, dx: r.dx + dx, dy: r.dy + dy};
+      {
+        shape:r.shape, dx:r.dx + dx, dy:r.dy + dy
+      };
     case _:
       {shape: f, dx: 0.0, dy: 0.0};
   };
@@ -102,10 +104,8 @@ class FootprintGeometry {
     return plainGap(ra.shape, ax + ra.dx, ay + ra.dy, rb.shape, bx + rb.dx, by + rb.dy);
   }
 
-  static function plainGap(a:Footprint, ax:Float, ay:Float, b:Footprint, bx:Float, by:Float):Float return switch [
-    a,
-    b
-  ] {
+  static function plainGap(a:Footprint,
+    ax:Float, ay:Float, b:Footprint, bx:Float, by:Float):Float return switch [a, b] {
     case [Circle(da), Circle(db)]:
       Math.sqrt(sq(ax - bx) + sq(ay - by)) - da / 2 - db / 2;
     case [Circle(_), Rect(_, _)]:
