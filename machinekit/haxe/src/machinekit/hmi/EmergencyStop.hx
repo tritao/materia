@@ -75,14 +75,7 @@ class EmergencyStop extends HmiPart {
     );
     addConnector("panel", Mount, Solids.axial(0, 0, 0));
     mount(panelCutout(), panelKeepOut(), [], aboveFace(), behindFace(), rearBody(), 1e9);
-    // One NC dry contact per block, to be wired into the safety chain.
-    for (i in 1...count("blocks") + 1) addPort({
-      name: "nc" + i,
-      kind: Signal,
-      role: Passive,
-      iface: Plug("dry-contact", 2),
-      required: true
-    });
+    for (port in contactPorts()) addPort(port);
     declareMass(n("massGrams") / 1000.0, new Vector(0, 0, (aboveFace() - behindFace()) / 2));
   }
 
@@ -93,21 +86,42 @@ class EmergencyStop extends HmiPart {
   }
   override public function componentType():Null<ComponentType> return recipeType();
 
+  /** One NC dry contact per block, to be wired into the safety chain. On the device, and on the blocks when it is expanded. */
+  function contactPorts():Array<ComponentPort> return [for (i in 1...count("blocks") + 1) {
+    name:"nc" + i, kind:Signal, role:Passive, iface:Plug("dry-contact", 2), required:true
+  }
+  ];
+
   function panelCutout():Footprint return Circle(n("panelHole"));
   function panelKeepOut():Footprint return Circle(n("headDiameter"));
   function aboveFace():Float return n("collarHeight") + n("headHeight");
   function behindFace():Float return n("panelThickness") + n("nutThickness") + n("baseLength") + n("blockLength");
   function rearBody():Footprint return Rect(n("baseWidth"), n("baseDepth"));
 
-  /** The black operator (stem, ring nut, base and contact blocks) and the red mushroom head on its collar. */
+  /**
+   * The grey operator (stem and latching base), the stainless ring nut, the dark contact blocks that carry the NC contacts, and
+   * the red mushroom head on its collar.
+   */
   override public function bodies():Null<Array<DeviceBodySpec>> {
     var t = n("panelThickness"), nut = n("nutThickness");
-    return [new DeviceBodySpec("operator", "emergency stop operator and contact blocks", "ABS black", function() {
-      var parts:Array<Part> = [Solids.named(Part.cylinderSpan(n("panelHole") / 2, -t - nut, 0.0), "stem")];
-      parts.push(Solids.named(Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t), "nut"));
+    return [new DeviceBodySpec("operator", "emergency stop operator and latching base", "ABS grey", function() {
       var base = Part.box(n("baseWidth"), n("baseDepth"), n("baseLength"));
-      parts.push(Solids.named(drop(base, -t - nut - n("baseLength")), "base"));
+      return Solids.union([
+        Solids.named(Part.cylinderSpan(n("panelHole") / 2, -t - nut, 0.0), "stem"),
+        Solids.named(drop(base, -t - nut - n("baseLength")), "base")
+      ]);
+    }
+    ), new DeviceBodySpec("nut", "emergency stop ring nut", "stainless A2-70", function() {
+      var ring = Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t);
+      var bore = Part.cylinderSpan(n("panelHole") / 2, -t - nut - 1.0, -t + 1.0);
+      var result = ring.subtract(bore);
+      ring.close();
+      bore.close();
+      return Solids.named(result, "nut");
+    }
+    ), new DeviceBodySpec("blocks", "emergency stop contact blocks", "device housing dark", function() {
       // Contact blocks side by side across the base's depth, centred.
+      var parts:Array<Part> = [];
       var blockCount = count("blocks");
       for (i in 0...blockCount) {
         var block = Part.box(n("blockWidth"), n("blockThickness"), n("blockLength"));
@@ -117,8 +131,7 @@ class EmergencyStop extends HmiPart {
         parts.push(Solids.named(moved, "block" + (i + 1)));
       }
       return Solids.union(parts);
-    }
-    ), new DeviceBodySpec("head", "emergency stop mushroom head", materialSpec(), function() {
+    }, contactPorts()), new DeviceBodySpec("head", "emergency stop mushroom head", materialSpec(), function() {
       var above = aboveFace(), c = n("collarHeight"), h = n("headDiameter") / 2;
       return Solids.named(
         Part.revolve([

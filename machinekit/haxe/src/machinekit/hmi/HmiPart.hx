@@ -118,7 +118,8 @@ class HmiPart extends MachineComponent {
           this,
           i == 0,
           n("massGrams") / 1000.0 * volumes[i] / total,
-          centres[i]
+          centres[i],
+          spec.ports
         )
       );
     }

@@ -22,7 +22,8 @@ class DeviceBody extends MachineComponent {
     purchase:HmiPart,
     carriesPurchase:Bool,
     massKg:Float,
-    centreOfMass:Vector
+    centreOfMass:Vector,
+    ?ports:Array<ComponentPort>
   ) {
     super(designation, description, material, true);
     this.build = build;
@@ -30,6 +31,7 @@ class DeviceBody extends MachineComponent {
     this.carriesPurchase = carriesPurchase;
     if (!carriesPurchase) addFacet(new IncludedInPurchase(purchase.bom.partNumber));
     declareMass(massKg, centreOfMass);
+    if (ports != null) for (port in ports) addPort(port);
   }
 
   override function get_bom():BomItem return carriesPurchase ? purchase.bom : super.get_bom();

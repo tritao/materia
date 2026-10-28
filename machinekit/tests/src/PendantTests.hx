@@ -172,7 +172,7 @@ class PendantTests {
       ids.indexOf(id) >= 0,
       "Missing member " + id + " in " + ids.join(", ")
     );
-    check(ids.length == 67, "Sixty-seven members, twenty-five of them hardware: " + ids.length);
+    check(ids.length == 69, "Sixty-nine members, twenty-five of them hardware: " + ids.length);
     check(
       ids.indexOf("fasteners/display-clamp") >= 0 && ids.indexOf("fasteners/display-screw-2") >= 0,
       "The display's clamp hardware"
@@ -253,8 +253,18 @@ class PendantTests {
         "The E-stop head is red"
       );
       for (c in stopBodies.components()) check(
-        c.id != "operator" || c.component.materialId == "abs-black",
-        "The E-stop operator is black"
+        c.id != "operator" || c.component.materialId == "abs-grey",
+        "The E-stop operator is grey"
+      );
+      // The NC contacts are in the blocks, so the ports sit on that body and not on the base or head.
+      var withPorts = [for (c in stopBodies.components()) if (c.component.ports().length > 0) c.id];
+      check(
+        withPorts.length == 1 && withPorts[0] == "blocks",
+        "The contact ports are on the blocks: " + withPorts.join(", ")
+      );
+      for (c in stopBodies.components()) if (c.id == "blocks") check(
+        c.component.ports().length == 1 && c.component.ports()[0].name == "nc1" && c.component.ports()[0].required,
+        "One required NC contact port per block"
       );
     }
 
