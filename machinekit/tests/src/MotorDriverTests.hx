@@ -1,5 +1,4 @@
 import machinekit.motion.MotorDriver;
-import machinekit.component.ComponentValues;
 import machinekit.catalog.CatalogMetadata.Conformance;
 
 /** Driver settings survive recipes and reject settings outside their assumed ratings. */

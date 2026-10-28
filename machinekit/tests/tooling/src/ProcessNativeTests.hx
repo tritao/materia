@@ -4,7 +4,6 @@ import materia.tooling.process.FillAnalysis;
 import materia.tooling.process.OrthogonalSections;
 import materia.tooling.process.OrthogonalSections.SectionAxis;
 import machinekit.tooling.ToolingBlock;
-import machinekit.component.Solids;
 
 /** Independent BREP checks for the neutral exact event-plane fill calculation. */
 class ProcessNativeTests {

@@ -1,5 +1,4 @@
 import cadkit.modeling.Scope;
-import cadkit.modeling.Part;
 import materia.assembly.AssemblyFrames as F;
 import materia.casting.Box3;
 import materia.casting.BoxAlgebra;

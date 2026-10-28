@@ -1,5 +1,4 @@
 import motionkit.kinematics.IkTolerance;
-import motionkit.kinematics.Pose3;
 import motionkit.path.PoseMath;
 
 /** Select compatible clearance/approach IK branches for the same physical targets. */

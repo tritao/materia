@@ -2,7 +2,6 @@ import haxe.io.Bytes;
 import haxe.Json;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
-import cadkit.parametric.InstanceElement;
 import cadkit.parametric.TypedProperty;
 import machinekit.assembly.*;
 import machinekit.assembly.Diagnostics.Diagnostic;

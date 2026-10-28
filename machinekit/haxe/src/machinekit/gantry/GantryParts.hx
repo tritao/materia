@@ -9,7 +9,6 @@ import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
 import machinekit.component.Solids;
 import machinekit.structural.TSlotExtrusion;
-import machinekit.motion.NemaStepper;
 import machinekit.motion.LeadScrewNut;
 import machinekit.standard.ClearanceFit;
 import materia.assembly.AssemblyFrames;

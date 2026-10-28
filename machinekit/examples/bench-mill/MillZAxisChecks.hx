@@ -1,5 +1,4 @@
 import cadkit.modeling.Part;
-import cadkit.modeling.Vector;
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
 import machinekit.assembly.MachineAssembly;

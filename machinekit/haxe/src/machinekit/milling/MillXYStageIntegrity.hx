@@ -5,7 +5,6 @@ import cadkit.modeling.Vector;
 import machinekit.assembly.Diagnostics;
 import machinekit.assembly.PosedParts;
 import machinekit.structural.FoundationIntegrity;
-import machinekit.component.ComponentValues;
 import machinekit.component.Solids;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 

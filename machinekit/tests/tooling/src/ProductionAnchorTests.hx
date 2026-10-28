@@ -1,6 +1,5 @@
 import machinekit.tooling.InsertAnchorGeometry;
 import machinekit.structural.CastInsert;
-import machinekit.component.ComponentValues;
 
 class ProductionAnchorTests {
   static var assertions = 0;

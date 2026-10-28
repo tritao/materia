@@ -1,7 +1,6 @@
 package machinekit.pressbrake.planning;
 
 import cadkit.sheetmetal.Sheet;
-import cadkit.sheetmetal.SheetDiagnosis;
 import cadkit.sheetmetal.SheetState;
 import cadkit.sheetmetal.process.BendProcessResult;
 import cadkit.sheetmetal.process.ProcessTooling;

@@ -1,7 +1,6 @@
 package machinekit.hmi;
 
 import cadkit.modeling.Footprint;
-import cadkit.modeling.FootprintGeometry;
 import cadkit.modeling.Part;
 import cadkit.modeling.Polygon;
 import cadkit.modeling.StrokeText;

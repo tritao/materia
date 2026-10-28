@@ -13,7 +13,6 @@ import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
-import materia.project.MaterialLibrary;
 
 /** External involute spur gear, full-depth teeth (addendum and dedendum are adjusted by the
  * profile-shift coefficient), extruded along local +Z from z=0 to z=faceWidth. Backlash is a

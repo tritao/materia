@@ -3,7 +3,6 @@ package machinekit.structural;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.Dimension;
-import machinekit.component.Solids;
 
 /** C-section channel, extruded along local +Z from z=0 to z=`length`. The web sits at local
  * x=0..thickness spanning the full `height`; the flanges open toward +X.

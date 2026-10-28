@@ -2,10 +2,8 @@ package machinekit.design;
 
 import machinekit.component.ComponentFacet;
 import machinekit.component.MachineComponent;
-import machinekit.component.Solids;
 import machinekit.assembly.PosedParts;
 import cadkit.modeling.Part;
-import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import machinekit.design.DesignRequirement.DesignEnvelope;
 

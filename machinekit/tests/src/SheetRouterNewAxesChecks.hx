@@ -9,7 +9,6 @@ import machinekit.motion.*;
 import machinekit.transmission.*;
 import machinekit.structural.RectTube;
 import machinekit.structural.RectTubeMember;
-import materia.assembly.AssemblyFrames as F;
 import cadkit.modeling.AssemblyState;
 
 class SheetRouterNewAxesChecks {

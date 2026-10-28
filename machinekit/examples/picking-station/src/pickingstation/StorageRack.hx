@@ -1,8 +1,6 @@
 package pickingstation;
 
 import materia.assembly.AssemblyFrames;
-import machinekit.component.Bom;
-import machinekit.component.MachineComponent;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.InstancePath;
 import machinekit.standard.SocketHeadCapScrew;

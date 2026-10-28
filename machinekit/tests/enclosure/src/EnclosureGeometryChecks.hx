@@ -1,6 +1,5 @@
 import machinekit.enclosure.EnclosurePanel;
 import machinekit.enclosure.EnclosureFrame;
-import machinekit.component.ComponentValues;
 import machinekit.component.Bom;
 import cadkit.modeling.Part;
 import cadkit.modeling.Location;

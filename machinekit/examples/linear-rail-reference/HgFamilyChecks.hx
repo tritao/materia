@@ -1,8 +1,6 @@
-import cadkit.Shape;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.motion.*;
-import machinekit.component.ComponentRegistry;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.AssemblyPreview;
 import materia.assembly.AssemblyFrames as F;

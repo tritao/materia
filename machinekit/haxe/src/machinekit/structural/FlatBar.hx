@@ -3,7 +3,6 @@ package machinekit.structural;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.Dimension;
-import machinekit.component.Solids;
 
 /** Solid rectangular bar, extruded along local +Z from z=0 to z=`length`, cross-section centred
  * on the axis.

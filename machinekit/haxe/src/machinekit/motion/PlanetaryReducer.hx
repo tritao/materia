@@ -1,10 +1,8 @@
 package machinekit.motion;
 
 import cadkit.modeling.Part;
-import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
-import materia.assembly.AssemblyFrames as F;
 
 /** Assumed catalogue-class planetary reducer. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */

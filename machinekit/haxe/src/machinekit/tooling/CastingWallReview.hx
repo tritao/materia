@@ -5,7 +5,6 @@ import cadkit.modeling.Model;
 import cadkit.modeling.Scope;
 import cadkit.modeling.Vector;
 import materia.casting.Box3;
-import materia.assembly.AssemblyFrames as F;
 import materia.tooling.process.AggregateGate;
 import materia.tooling.process.AggregateGate.AggregateGap;
 import materia.tooling.process.AggregateGate.AggregateReport;

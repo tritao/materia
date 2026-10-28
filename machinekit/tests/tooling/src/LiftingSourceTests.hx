@@ -1,6 +1,5 @@
 import materia.tooling.casting.CastingMoldPlan.MoldFixtures;
 import materia.casting.InsertSpec.InsertRole;
-import materia.assembly.AssemblyFrames as F;
 
 class LiftingSourceTests {
   static var assertions = 0;

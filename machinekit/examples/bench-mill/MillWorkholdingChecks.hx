@@ -2,7 +2,6 @@ import machinekit.milling.*;
 import machinekit.assembly.*;
 import machinekit.component.MachineKitComponents;
 import cadkit.modeling.*;
-import materia.assembly.AssemblyFrames as F;
 
 class MillWorkholdingChecks {
   static var checks = 0;

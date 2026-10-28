@@ -5,7 +5,6 @@ import machinekit.assembly.AssemblyPreview;
 import machinekit.enclosure.EnclosureLayout;
 import machinekit.enclosure.GeneratedEnclosure;
 import machinekit.enclosure.EnclosureRules;
-import materia.assembly.AssemblyFrames as F;
 import materia.project.SceneArtifact;
 
 /** One enclosed machine and runtime; scenarios and view controls never replace the assembly. */

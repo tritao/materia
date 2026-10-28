@@ -1,5 +1,4 @@
 import machinekit.robotics.OffsetGripperFinger;
-import machinekit.robotics.OffsetFingerSpec;
 import machinekit.component.ComponentRegistry;
 import machinekit.component.ComponentValues;
 import machinekit.component.Bom;

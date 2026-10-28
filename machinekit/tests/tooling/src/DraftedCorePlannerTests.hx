@@ -1,6 +1,4 @@
-import materia.assembly.AssemblyFrames as F;
 import materia.casting.CastingRegion;
-import materia.casting.CastingProfiles;
 import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingDiagnostic.ToolingCheckStatus as Status;
 import materia.tooling.casting.MoldRegions as R;

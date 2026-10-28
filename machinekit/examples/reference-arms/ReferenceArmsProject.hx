@@ -1,5 +1,4 @@
 import haxe.io.Bytes;
-import materia.assembly.AssemblyFrames;
 import materia.project.SceneArtifact;
 import materia.project.SceneArtifact.SceneArtifactData;
 

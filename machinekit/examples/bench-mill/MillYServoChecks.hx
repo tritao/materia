@@ -4,7 +4,6 @@ import machinekit.component.*;
 import machinekit.motion.LinearRail;
 import machinekit.motion.LinearRailBlock;
 import cadkit.modeling.*;
-import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.project.SceneArtifact;
 

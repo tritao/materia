@@ -3,14 +3,9 @@ import machinekit.assembly.AssemblyPreview;
 import haxe.io.Bytes;
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
-import cadkit.modeling.Location;
-import cadkit.modeling.Part;
-import cadkit.modeling.Plane;
-import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
 import machinekit.transmission.TimingBelt;
 import machinekit.transmission.TimingBelt.BeltWrap;
-import machinekit.transmission.TimingPulley;
 import materia.assembly.AssemblyFrames;
 import materia.project.SceneArtifact;
 

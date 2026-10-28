@@ -5,7 +5,6 @@ import collisionkit.CollisionPairStatus;
 import collisionkit.CollisionMargins;
 import collisionkit.native.NativeCollisionWorld;
 import cadkit.modeling.AssemblyState;
-import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import robotkit.runtime.Simulation;
 import nativekit.sim.SimObject;

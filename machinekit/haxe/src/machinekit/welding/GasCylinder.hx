@@ -3,7 +3,6 @@ package machinekit.welding;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
-import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 

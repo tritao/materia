@@ -1,7 +1,6 @@
 package machinekit.routing;
 
 import cadkit.modeling.Part;
-import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 import materia.assembly.AssemblyFrames as F;

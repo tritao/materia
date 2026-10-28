@@ -3,7 +3,6 @@ package machinekit.structural;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.Dimension;
-import machinekit.component.Solids;
 
 /** L-section angle iron, extruded along local +Z from z=0 to z=`length`. The outer corner sits
  * at the local origin, with legs running along +X (`legA`) and +Y (`legB`).

@@ -1,7 +1,6 @@
 package machinekit.transmission;
 
 import cadkit.modeling.Part;
-import cadkit.modeling.Vector;
 import cadkit.threads.ThreadedFace.ThreadStart;
 import machinekit.component.*;
 

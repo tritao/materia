@@ -1,7 +1,6 @@
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import cadkit.modeling.AssemblyState;
-import materia.assembly.AssemblyFrames as F;
 
 /** Native checks of the study's continuous mount profiles against real router
  * members. Profiles omit production drilling: overlap is a blocked candidate,

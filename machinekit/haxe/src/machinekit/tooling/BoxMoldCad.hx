@@ -2,7 +2,6 @@ package machinekit.tooling;
 
 import materia.tooling.casting.CastingMoldPlan.MoldOpenings;
 import materia.tooling.casting.MoldCores;
-import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
@@ -11,8 +10,6 @@ import machinekit.assembly.PosedParts;
 import machinekit.component.ComponentValues;
 import machinekit.component.Solids;
 import machinekit.structural.CastInsert;
-import machinekit.standard.SocketHeadCapScrew;
-import machinekit.standard.FlatWasher;
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.ToolingEnums.MachiningSide;
 import materia.tooling.casting.CastingMoldPlan;
@@ -20,7 +17,6 @@ import materia.tooling.casting.CastingMoldPlan.MoldBox;
 import materia.tooling.casting.CastingMoldPlanner;
 import materia.tooling.casting.CoreSupport.CoreSupportKind;
 import materia.tooling.casting.CoreSupport.SupportHardwareKind;
-import machinekit.standard.HexNut;
 import machinekit.tooling.SweptRemoval.RemovalMember;
 import machinekit.tooling.SweptRemoval.RemovalReport;
 

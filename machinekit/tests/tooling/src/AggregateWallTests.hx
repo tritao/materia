@@ -1,5 +1,4 @@
 import cadkit.modeling.Part;
-import cadkit.modeling.Model;
 import cadkit.modeling.Scope;
 import cadkit.modeling.Vector;
 import materia.casting.CastingPatterns as P;

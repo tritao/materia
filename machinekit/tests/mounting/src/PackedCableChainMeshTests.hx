@@ -1,6 +1,5 @@
 import machinekit.motion.CableChain;
 import machinekit.motion.PackedCableChainMesh;
-import machinekit.component.ComponentValues;
 import materia.assembly.AssemblyFrames as F;
 
 class PackedCableChainMeshTests {

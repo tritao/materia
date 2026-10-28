@@ -2,7 +2,6 @@ import cadkit.modeling.AssemblyState;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.robot.RobotScene;
 import materia.assembly.AssemblyDefinitionFlattener;
-import materia.assembly.AssemblyFrames;
 import materia.project.SceneArtifact;
 import materia.project.SceneArtifact.SceneArtifactData;
 import haxe.io.Bytes;

@@ -3,7 +3,6 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.assembly.PosedParts;
 import machinekit.component.ComponentValues;
-import machinekit.component.Solids;
 import machinekit.structural.CastInsert;
 import materia.casting.CastingPatterns;
 import machinekit.structural.MineralFoundation;

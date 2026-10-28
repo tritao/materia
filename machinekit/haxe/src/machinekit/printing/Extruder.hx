@@ -1,7 +1,6 @@
 package machinekit.printing;
 
 import cadkit.modeling.Part;
-import cadkit.modeling.Vector;
 import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.DimensionKind;
 import machinekit.catalog.CatalogMetadata.Conformance;

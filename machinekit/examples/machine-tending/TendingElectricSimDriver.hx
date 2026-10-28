@@ -1,7 +1,6 @@
 import TendingElectricEdgeExecutor.TendingElectricEdgeDriver;
 import TendingElectricEdgeExecutor.TendingElectricEdgeFeedback;
 import robotkit.runtime.*;
-import robotkit.core.JointTarget;
 import haxe.Int64;
 import runtime.memory.Arena;
 import runtime.memory.RawPtr;

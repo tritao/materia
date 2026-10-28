@@ -2,7 +2,6 @@ import materia.project.SceneArtifact;
 import cadbridge.AssemblyPhysicalPartView;
 import cadbridge.AssemblySimulationBridge;
 import robotkit.manipulation.Manipulator;
-import motionkit.robot.EaikKinematics;
 import motionkit.robot.ManipulatorKinematics;
 import motionkit.path.PoseMath;
 import materia.assembly.AssemblyFrames;

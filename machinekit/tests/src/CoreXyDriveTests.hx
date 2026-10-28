@@ -4,7 +4,6 @@ import materia.project.SceneArtifact;
 import robotkit.device.DeviceBinding;
 import robotkit.device.DeviceLayout;
 import robotkit.model.DriveLoads;
-import robotkit.model.RobotModel;
 import robotkit.model.SteadyLoads;
 
 /**

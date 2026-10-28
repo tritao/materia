@@ -5,7 +5,6 @@ import machinekit.gantry.GantrySpec.GantryDrive;
 import machinekit.component.*;
 import machinekit.motion.*;
 import machinekit.transmission.*;
-import materia.assembly.AssemblyFrames as F;
 
 /** SR2 baseline and focused shared-builder regression gate. */
 class SheetRouterAxesTests {

@@ -2,7 +2,6 @@ import machinekit.structural.*;
 import machinekit.component.*;
 import materia.assembly.AssemblyFrames as F;
 import cadkit.modeling.Part;
-import cadkit.modeling.Vector;
 
 /** Review assembly only; frozen router remains untouched. Shared stock, source
  * holes, real hardware and assumed replication all retain their own identities. */

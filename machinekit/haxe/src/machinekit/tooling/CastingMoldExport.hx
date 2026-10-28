@@ -7,8 +7,6 @@ import materia.tooling.casting.CastingMoldPlanner;
 import haxe.Json;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.panel.PanelCodec;
-import materia.tooling.panel.PanelContours;
-import materia.casting.CastingProfileGeometry;
 import materia.tooling.casting.CoreSupports;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.MachineAssembly;
@@ -19,7 +17,6 @@ import cadkit.drawing.Dxf;
 import cadkit.drawing.Drawing2D;
 import cadkit.drawing.DrawingEntity;
 import cadkit.sheetmetal.Point2;
-import cadkit.sheetmetal.Segment;
 
 /** Review outputs only. Existing CadKit writers render the exact panel operations. */
 class CastingMoldExport {

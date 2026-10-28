@@ -1,7 +1,5 @@
 import cadkit.Shape;
 import cadkit.PlanarRegion;
-import cadkit.modeling.Part;
-import cadkit.modeling.Vector;
 
 /** Extract exact line/arc running sections between holes; never scale another rail. */
 class HgReferenceAudit {

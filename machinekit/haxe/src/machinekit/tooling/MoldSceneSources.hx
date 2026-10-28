@@ -4,7 +4,6 @@ import materia.project.SceneArtifact.SceneArtifactData;
 import materia.project.SceneSourceMap;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.MoldCores;
-import materia.assembly.AssemblyFrames as F;
 
 /** Scene ownership and provenance come from the same plan as physical tooling. */
 class MoldSceneSources {

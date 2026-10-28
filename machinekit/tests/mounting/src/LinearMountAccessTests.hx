@@ -1,6 +1,5 @@
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
-import machinekit.component.ComponentValues;
 import machinekit.component.Solids;
 import machinekit.assembly.PosedParts;
 import machinekit.structural.*;

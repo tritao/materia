@@ -1,5 +1,4 @@
 import CadKit;
-import cadkit.Shape;
 import machinekit.motion.*;
 class Sfu20SeatAudit {
   static function main():Void {

@@ -1,4 +1,3 @@
-import machinekit.milling.MillXYStageLayout;
 import machinekit.tooling.FoundationToolingAdapter;
 import materia.tooling.casting.CastingToolingInput;
 import materia.tooling.casting.CastingMoldPlan;

@@ -1,12 +1,7 @@
-import cadkit.modeling.Part;
-import cadkit.modeling.Vector;
 import machinekit.assembly.AxisBuilder;
 import machinekit.assembly.Sense.SenseTools;
 import machinekit.assembly.Transmission;
 import machinekit.component.ComponentDetail;
-import machinekit.component.Dimension;
-import machinekit.component.MachineComponent;
-import machinekit.component.Solids;
 import machinekit.gantry.GantryParts.GantryExtrusion;
 import machinekit.gantry.GantryParts.GantryIdlerPin;
 import machinekit.gantry.GantryParts.GantryPlate;

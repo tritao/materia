@@ -2,7 +2,6 @@ import machinekit.assembly.*;
 import machinekit.component.*;
 import machinekit.motion.*;
 import cadkit.modeling.Part;
-import materia.assembly.AssemblyFrames as F;
 
 class HzMotionChecks {
   static function check(ok:Bool, label:String):Void {

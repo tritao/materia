@@ -6,7 +6,6 @@ import cadkit.sheetmetal.ManufacturedSheetState;
 import cadkit.sheetmetal.Sheet;
 import cadkit.sheetmetal.SheetAngles;
 import cadkit.sheetmetal.SheetDiagnosis;
-import cadkit.sheetmetal.SheetEvaluation;
 import cadkit.sheetmetal.process.AirBending;
 import cadkit.sheetmetal.process.ProcessTooling;
 import machinekit.pressbrake.planning.BendOrientation;

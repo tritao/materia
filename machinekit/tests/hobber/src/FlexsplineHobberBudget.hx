@@ -3,7 +3,6 @@ import stockkit.*;
 import stockkit.ring.*;
 import stockkit.hobbing.*;
 import stockkit.hobbing.errors.*;
-import machinekit.hobbing.MandrelRadialSupport;
 
 /** Reproducible physical source studies. Ideal baseline, independent simulated
     HB7 sync residual, and frozen HB10 radial loads: neither is injected twice. */

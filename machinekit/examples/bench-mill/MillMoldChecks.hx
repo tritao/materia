@@ -6,7 +6,6 @@ import machinekit.tooling.ToolingVolume;
 import machinekit.tooling.SweptRemoval;
 import machinekit.assembly.PosedParts;
 import cadkit.modeling.Vector;
-import materia.assembly.AssemblyFrames as F;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
 import materia.tooling.process.OrthogonalSections.SectionAxis;

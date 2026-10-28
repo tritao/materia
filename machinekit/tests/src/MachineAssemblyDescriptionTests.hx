@@ -8,7 +8,6 @@ import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.TypedProperty;
 import cadkit.parametric.InstanceElement;
-import cadkit.parametric.Relationship;
 import machinekit.document.MachineAssemblyDocuments;
 import machinekit.pneumatic.PneumaticManifold;
 import machinekit.pneumatic.VacuumGenerator;

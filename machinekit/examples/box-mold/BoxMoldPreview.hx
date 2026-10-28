@@ -9,7 +9,6 @@ import machinekit.tooling.BoxMoldCad;
 import machinekit.tooling.PanelDrawing;
 import machinekit.tooling.ToolingPanel;
 import machinekit.tooling.ToolingBlock;
-import machinekit.component.ComponentValues;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.MachineAssembly;
 import materia.project.SceneArtifact;

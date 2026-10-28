@@ -3,7 +3,6 @@ import FoundationStudyGeometry as Geometry;
 import materia.casting.BoxAlgebra;
 import materia.casting.CastingFeature.CastingFeatureKind;
 import machinekit.hobbing.FoundationLayout;
-import materia.assembly.AssemblyFrames as F;
 
 /** Candidate placement, not an anchor qualification or an alteration to the working machine. */
 class HobberTrayAnchorStudy {

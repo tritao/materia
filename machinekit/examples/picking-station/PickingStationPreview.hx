@@ -5,7 +5,6 @@ import materia.project.SceneArtifact.SceneArtifactPart;
 import materia.sheet.SheetPartPlacement;
 import materia.sheet.SheetPlanValidator;
 import materia.sheet.SheetProjectRecord;
-import materia.sheet.SheetCutRegion;
 import materia.units.LengthUnit;
 import cadkit.modeling.Align;
 import cadkit.modeling.AssemblyModel;
@@ -13,7 +12,6 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
 import pickingstation.PickingStation;
-import pickingstation.StationInstance;
 
 /** Materia preview: stock and cutting layout below, finished CAD panels above it. */
 class PickingStationPreview {

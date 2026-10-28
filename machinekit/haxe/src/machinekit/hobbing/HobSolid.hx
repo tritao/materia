@@ -1,6 +1,5 @@
 package machinekit.hobbing;
 
-import gearkit.HobDesign;
 import gearkit.Point3;
 import cadkit.modeling.Curve;
 import cadkit.modeling.Part;

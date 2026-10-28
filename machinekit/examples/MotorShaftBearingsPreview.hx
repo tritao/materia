@@ -6,7 +6,6 @@ import materia.units.LengthUnit;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Solids;
 import cadkit.modeling.Part;
-import cadkit.modeling.AssemblyModel;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.InstanceElement;

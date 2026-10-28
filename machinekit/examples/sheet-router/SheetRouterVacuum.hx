@@ -1,6 +1,5 @@
 import stockkit.Stock;
 import stockkit.StockComponents;
-import stockkit.StockComponent;
 
 typedef RouterVacuumPoint = {
   var headerPressurePa:Float;

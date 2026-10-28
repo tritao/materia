@@ -28,7 +28,6 @@ import TendingCyclePlan.TendingTransferRole;
 import machinekit.robotics.CobotArm;
 import machinekit.robotics.CobotClass;
 import machinekit.robotics.DualArmGripperTool;
-import machinekit.assembly.AssemblyPreview;
 import materia.assembly.AssemblyFrames;
 import materia.project.SceneArtifact;
 import materia.assembly.AssemblyDefinitionFlattener;

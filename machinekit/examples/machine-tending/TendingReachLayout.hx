@@ -9,8 +9,6 @@ import haxe.Json;
 import haxe.crypto.Sha256;
 import haxe.io.Bytes;
 import haxe.io.BytesBuffer;
-import machinekit.assembly.AssemblyPreview;
-import machinekit.robotics.CobotArm;
 import machinekit.robotics.CobotClass;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.project.SceneArtifact;

@@ -1,5 +1,4 @@
 import machinekit.hobbing.HobberZLayout as Z;
-import machinekit.component.Solids;
 import machinekit.assembly.PosedParts;
 import materia.assembly.AssemblyFrames as F;
 import cadkit.modeling.AssemblyModel;

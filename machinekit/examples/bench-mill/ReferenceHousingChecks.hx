@@ -1,5 +1,4 @@
 import cadkit.modeling.Part;
-import cadkit.modeling.Vector;
 import machinekit.assembly.PosedParts;
 import machinekit.component.Solids;
 import ReferenceHousing.HousingFeature;

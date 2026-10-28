@@ -5,7 +5,6 @@ import machinekit.fluid.PressureSource;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
-import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 

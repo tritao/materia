@@ -5,8 +5,6 @@ import machinekit.component.ComponentValues;
 import machinekit.component.ComponentValue.*;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.ToolSpec;
-import machinekit.component.Dimension;
-import materia.project.MaterialLibrary;
 
 import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;

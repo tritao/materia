@@ -1,4 +1,3 @@
-import cadkit.modeling.Part;
 import haxeon.Equality;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentParameterType;

@@ -1,9 +1,7 @@
 import machinekit.robotics.CobotArm;
 import machinekit.robotics.CobotClass;
-import machinekit.robotics.CobotToolLink;
 import machinekit.robotics.ToolServiceSpec;
 import machinekit.robotics.ToolServiceModule;
-import machinekit.robotics.CobotToolServiceMount;
 import machinekit.component.MachineComponent;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.AssemblyPreview;

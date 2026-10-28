@@ -4,7 +4,6 @@ import machinekit.component.*;
 import cadkit.modeling.Part;
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
-import materia.assembly.AssemblyFrames as F;
 
 class MillMotorStudyChecks {
   static function near(a:Float, b:Float, label:String):Void {

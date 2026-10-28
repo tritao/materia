@@ -1,5 +1,4 @@
 import cadkit.Shape;
-import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Location;
