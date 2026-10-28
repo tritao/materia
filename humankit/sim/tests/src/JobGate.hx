@@ -1,5 +1,4 @@
 import haxeon.animation.rig.HumanBone;
-import humankit.HumanBody;
 import humankit.HumanLimb;
 import humankit.HumanTargetBox;
 import humankit.quality.MotionQuality;

@@ -16,7 +16,6 @@ import humankit.action.Pick;
 import humankit.action.Place;
 import humankit.action.ReleaseLimb;
 import humankit.action.WalkTo;
-import nativekit.sim.SimFrame;
 import nativekit.sim.MotionType;
 import nativekit.sim.SimActor;
 import nativekit.sim.SimObject;
