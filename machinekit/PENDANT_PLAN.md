@@ -231,7 +231,7 @@ Findings so far, all on assumed rear bodies (measure the real parts):
 | Phase | Work |
 |---|---|
 | P0 | This spec; pin budget; message definitions with CC1. |
-| P1 | Bench: Nucleo-G474 with the bought wheel, switches, buttons and an OLED on a proto board; Rust firmware (`embassy-stm32` or similar); CAN-FD to the host. Parts and checks: `PENDANT_BENCH_PARTS.md`. |
+| P1 | Bench: Nucleo-G474 with the bought wheel, switches, buttons and an OLED on a proto board; Rust firmware (`embassy-stm32`, skeleton in `pendant_firmware/`); CAN-FD to the host. Parts and checks: `PENDANT_BENCH_PARTS.md`. |
 | P2 | Board v1 in `pcbkit`. |
 | P3 | Case v1 in CadKit, printed. |
 | P4 | Wiring with the v1 chain; ESD and noise tests with the real cable. |
@@ -246,4 +246,4 @@ Findings so far, all on assumed rear bodies (measure the real parts):
 - **pcbkit.** Whether it covers a G0B1 with FDCAN and an isolated transceiver today.
 - **Display burn-in.** Settings to confirm on a real module (the Waveshare listing gives no lifetime figures).
 - **Z index.** Whether the wheel's index channel is needed. Probably not.
-- **Rust support.** Check the current FDCAN driver status for the chosen MCU before committing.
+- **Rust support.** Checked: embassy-stm32 0.6 has an FDCAN driver with CAN-FD data bit rates and `write_fd`, with active fixes to FD timing, and `pendant_firmware` builds for both the Nucleo-G474 and the STM32G0B1 (the G0B1 shares its FDCAN interrupt lines with TIM16 and TIM17). Compile-checked only: nothing has run on hardware, and the FDCAN kernel clock is still the default.
