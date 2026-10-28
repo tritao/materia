@@ -181,8 +181,13 @@ class RealRackMountTests {
       total += mass.mass;
     }
     Sys.println("Local mount added mass kg=" + total);
+    var output = "build/router-mount-implementation", made = "";
+    for (part in output.split("/")) {
+      made = made == "" ? part : made + "/" + part;
+      if (!sys.FileSystem.exists(made)) sys.FileSystem.createDirectory(made);
+    }
     sys.io.File.saveContent(
-      "build/router-mount-implementation/local-mass.json",
+      output + "/local-mass.json",
       haxe.Json.stringify({massKg: total, members: masses}, null, "  ")
     );
 
