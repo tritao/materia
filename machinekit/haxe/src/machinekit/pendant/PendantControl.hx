@@ -17,15 +17,22 @@ class PendantControl {
   public final extraHoles:Array<{x:Float, y:Float, diameter:Float}>;
   /** What the part occupies behind the face (its body, terminals, nuts), seen from the front. Screw posts and the cable keep clear of it. */
   public final body:Footprint;
+  /** The component behind the numbers, when there is one: its solid is what the 3D checks place. */
+  public final part:Null<PendantPart>;
   public final above:Float;
   public final behind:Float;
   public final massGrams:Float;
   /** "measured", "vendor-drawing", "datasheet", "listing" (a seller's stated size, to be measured) or "assumed". */
   public final source:String;
 
+  /** A control for a part at a position: the part supplies every footprint, height and the mass. */
+  public static function fromPart(id:String, kind:ControlKind, part:PanelPart, x:Float, y:Float):PendantControl
+    return new PendantControl(id, kind, x, y, part.panelCutout(), part.panelKeepOut(), part.aboveFace(), part.behindFace(),
+      part.massGrams(), part.dataSource(), part.panelHoles(), part.rearBody(), Std.downcast(part, PendantPart));
+
   public function new(id:String, kind:ControlKind, x:Float, y:Float, cutout:Footprint, keepOut:Footprint,
       above:Float, behind:Float, massGrams:Float, source:String,
-      ?extraHoles:Array<{x:Float, y:Float, diameter:Float}>, ?body:Footprint) {
+      ?extraHoles:Array<{x:Float, y:Float, diameter:Float}>, ?body:Footprint, ?part:PendantPart) {
     if (id == null || id == "") throw "A control needs an id";
     for (v in [x, y, above, behind, massGrams]) if (!Math.isFinite(v)) throw 'Control $id has a non-finite value';
     if (above < 0 || behind < 0 || massGrams < 0) throw 'Control $id has a negative size or mass';
@@ -37,6 +44,7 @@ class PendantControl {
     this.above = above; this.behind = behind; this.massGrams = massGrams; this.source = source;
     this.extraHoles = extraHoles == null ? [] : extraHoles.copy();
     this.body = body == null ? cutout : body;
+    this.part = part;
   }
 
   static function checkFootprint(f:Footprint, id:String):Void switch f {
@@ -46,5 +54,5 @@ class PendantControl {
 
   /** The same control at another position. */
   public function movedTo(newX:Float, newY:Float):PendantControl
-    return new PendantControl(id, kind, newX, newY, cutout, keepOut, above, behind, massGrams, source, extraHoles, body);
+    return new PendantControl(id, kind, newX, newY, cutout, keepOut, above, behind, massGrams, source, extraHoles, body, part);
 }

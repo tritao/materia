@@ -186,6 +186,27 @@ Variants, diameters, PPR, output type, drawing and price are to be filled in fro
 then the Vallder wheel stays the plan; this is a candidate if its variants include a smaller wheel or
 a better-documented one.
 
+## Parts as components
+
+Each bought part is a MachineKit component with real geometry, mass, a BOM line and provenance, in its
+own frame (origin at the centre of the panel's front face, +z toward the operator). `PanelPart` is what
+a part tells the layout about itself (cutout, keep-out, stud holes, height above the face, depth behind it,
+rear body, mass), so the numbers live only in the recipe and the layout and the solid cannot disagree.
+The recipes are registered in `MachineKitComponents` and filed under "Pendant parts".
+
+| Recipe | Detail | Numbers from |
+|---|---|---|
+| `machinekit.pendant.hand-wheel` | Revolved flange, flared body, knurl ring and dial recess; spinner handle; boss through the opening; three studs on a circle; terminal strip | YUMO drawing (defaults); the Vallder wheel is the same recipe with other values |
+| `machinekit.pendant.emergency-stop` | Mushroom head on a collar, stem, ring nut, base and one to three contact blocks | A seller's XB2-ES542 family drawing; the compact EAO and APEM type is the same recipe with a thin base |
+| `machinekit.pendant.rotary-switch` | Knob, bush, nut, round body; `positions` (12 axis, 3 step) | Assumed |
+| `machinekit.pendant.push-button` | Bezel and domed cap, barrel, nut, body; colour and LED | Assumed |
+| `machinekit.pendant.oled-module` | Glass, carrier PCB, standoffs, header behind a window | Assumed |
+
+Every part carries a `basis` input (catalog, stated, assumed, measured) that travels in its designation, so
+an assumed number is visible in the BOM. `PendantAssembly` places the solids on the face and checks that no
+part overlaps another, the face plate or the shell; `PendantPartsTests` checks each solid against its own
+stated height, depth and mass, and its plan extent against its footprints.
+
 ## Face model
 
 `machinekit/haxe/src/machinekit/pendant/` models the top face: each bought part as a `PendantControl`

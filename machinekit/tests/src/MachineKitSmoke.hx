@@ -2596,6 +2596,7 @@ class MachineKitSmoke {
 			{name: "PendantCompilerTests.run", run: PendantCompilerTests.run, weight: 0.05},
 			{name: "PendantJogDriverTests.run", run: PendantJogDriverTests.run, weight: 0.05},
 			{name: "PendantFaceTests.run", run: PendantFaceTests.run, weight: 0.05},
+			{name: "PendantPartsTests.run", run: PendantPartsTests.run, weight: 0.5},
 			{name: "TendingCell.TendingMissionChecks.run", run: () -> TendingCell.TendingMissionChecks.run(), weight: 1.0},
 			{name: "FastenerThreadTests.run", run: FastenerThreadTests.run, weight: 0.05},
 			{name: "FastenerDataTests.run", run: FastenerDataTests.run, weight: 0.05},

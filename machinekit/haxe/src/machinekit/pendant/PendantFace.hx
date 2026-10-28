@@ -97,6 +97,10 @@ class PendantFace {
       if (gap < minGap - 1e-9)
         found.push('${controls[i].id} and ${controls[j].id} are ${fmt(gap)} mm apart, less than ${fmt(minGap)}');
     }
+    for (i in 0...controls.length) for (j in i + 1...controls.length) {
+      var overlap = bodyGapBetween(controls[i], controls[j]);
+      if (overlap < -1e-9) found.push('the bodies of ${controls[i].id} and ${controls[j].id} overlap behind the face by ${fmt(-overlap)} mm');
+    }
     if (requiredInnerDepth() > caseInnerDepth + 1e-9) {
       var deepest = controls[0];
       for (c in controls) if (c.behind > deepest.behind) deepest = c;
@@ -122,13 +126,18 @@ class PendantFace {
   };
 
   /** Gap between two footprints (negative when they overlap). */
-  public static function gapBetween(a:PendantControl, b:PendantControl):Float {
-    return switch [a.keepOut, b.keepOut] {
-      case [Circle(da), Circle(db)]: Math.sqrt(sq(a.x - b.x) + sq(a.y - b.y)) - da / 2 - db / 2;
-      case [Circle(d), Rect(w, h)]: circleToRect(a.x, a.y, d / 2, b.x, b.y, w, h);
-      case [Rect(w, h), Circle(d)]: circleToRect(b.x, b.y, d / 2, a.x, a.y, w, h);
+  public static function gapBetween(a:PendantControl, b:PendantControl):Float return footprintGap(a.keepOut, a.x, a.y, b.keepOut, b.x, b.y);
+
+  /** Gap between the rear bodies of two controls (negative when they overlap). */
+  public static function bodyGapBetween(a:PendantControl, b:PendantControl):Float return footprintGap(a.body, a.x, a.y, b.body, b.x, b.y);
+
+  static function footprintGap(fa:Footprint, ax:Float, ay:Float, fb:Footprint, bx:Float, by:Float):Float {
+    return switch [fa, fb] {
+      case [Circle(da), Circle(db)]: Math.sqrt(sq(ax - bx) + sq(ay - by)) - da / 2 - db / 2;
+      case [Circle(d), Rect(w, h)]: circleToRect(ax, ay, d / 2, bx, by, w, h);
+      case [Rect(w, h), Circle(d)]: circleToRect(bx, by, d / 2, ax, ay, w, h);
       case [Rect(wa, ha), Rect(wb, hb)]:
-        var gx = Math.abs(a.x - b.x) - (wa + wb) / 2, gy = Math.abs(a.y - b.y) - (ha + hb) / 2;
+        var gx = Math.abs(ax - bx) - (wa + wb) / 2, gy = Math.abs(ay - by) - (ha + hb) / 2;
         gx > 0 && gy > 0 ? Math.sqrt(gx * gx + gy * gy) : Math.max(gx, gy);
       case _: throw "Unknown footprint";
     };

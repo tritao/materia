@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-pendant-parts-tests"},
+  "entry": "PendantPartsTests",
+  "sourceRoots": ["src"],
+  "dependencies": {"machinekit": {"path": ".."}},
+  "target": "host",
+  "outputDir": "build/pendant-parts"
+}

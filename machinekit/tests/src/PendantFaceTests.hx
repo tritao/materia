@@ -38,6 +38,7 @@ class PendantFaceTests {
     check(roomy.problems().length == 0 && roomy.overallHeight() == 48.0 + 3.0 + 41.0, "With a 48 mm case it fits: " + roomy.problems().join(" | "));
     var narrow = ReferencePendant.compactFace();
     check(hasProblem(narrow.withControl(narrow.control("f3").movedTo(-83.0, -38.0)), "body of f3 reaches into the case wall"), "A rear body in the wall");
+    check(hasProblem(face.withControl(face.control("wheel-enable").movedTo(14.0, 33.0)), "bodies of display and wheel-enable overlap"), "Rear bodies that overlap");
     var thick = new PendantFace(220.0, 110.0, 4.0, 3.0, 30.0, face.controls);
     check(hasProblem(thick, "wheel studs allow"), "A face plate thicker than the studs allow");
     check(PendantFace.gapBetween(wheel, face.control("estop")) > 5.0, "Wheel and E-stop gap");
