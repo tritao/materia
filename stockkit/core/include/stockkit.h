@@ -120,7 +120,12 @@ enum { SK_AXIS_X = 0, SK_AXIS_Y = 1, SK_AXIS_Z = 2 };
  * Axis bits of a lattice, `1 << axis`: the grids `sk_lattice.axes` asks for.
  * Z is required; `SK_AXES_ALL` makes the stock tri-dexel.
  */
-enum { SK_AXES_X = 1, SK_AXES_Y = 2, SK_AXES_Z = 4, SK_AXES_ALL = 7 };
+enum {
+    SK_AXES_X = 1 << SK_AXIS_X,
+    SK_AXES_Y = 1 << SK_AXIS_Y,
+    SK_AXES_Z = 1 << SK_AXIS_Z,
+    SK_AXES_ALL = SK_AXES_X | SK_AXES_Y | SK_AXES_Z
+};
 
 /** Endpoint source for material that no move has touched. */
 enum { SK_SOURCE_STOCK = 0xFFFFFFFFu };
