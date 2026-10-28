@@ -15,6 +15,8 @@ class PendantControl {
   public final keepOut:Footprint;
   /** Extra round holes in the face for this part (stud holes, anti-rotation pins), at offsets from its centre. */
   public final extraHoles:Array<{x:Float, y:Float, diameter:Float}>;
+  /** What the part occupies behind the face (its body, terminals, nuts), seen from the front. Screw posts and the cable keep clear of it. */
+  public final body:Footprint;
   public final above:Float;
   public final behind:Float;
   public final massGrams:Float;
@@ -23,16 +25,18 @@ class PendantControl {
 
   public function new(id:String, kind:ControlKind, x:Float, y:Float, cutout:Footprint, keepOut:Footprint,
       above:Float, behind:Float, massGrams:Float, source:String,
-      ?extraHoles:Array<{x:Float, y:Float, diameter:Float}>) {
+      ?extraHoles:Array<{x:Float, y:Float, diameter:Float}>, ?body:Footprint) {
     if (id == null || id == "") throw "A control needs an id";
     for (v in [x, y, above, behind, massGrams]) if (!Math.isFinite(v)) throw 'Control $id has a non-finite value';
     if (above < 0 || behind < 0 || massGrams < 0) throw 'Control $id has a negative size or mass';
     checkFootprint(cutout, id);
     checkFootprint(keepOut, id);
+    if (body != null) checkFootprint(body, id);
     if (["vendor-drawing", "measured", "datasheet", "listing", "assumed"].indexOf(source) < 0) throw 'Control $id has an unknown source $source';
     this.id = id; this.kind = kind; this.x = x; this.y = y; this.cutout = cutout; this.keepOut = keepOut;
     this.above = above; this.behind = behind; this.massGrams = massGrams; this.source = source;
     this.extraHoles = extraHoles == null ? [] : extraHoles.copy();
+    this.body = body == null ? cutout : body;
   }
 
   static function checkFootprint(f:Footprint, id:String):Void switch f {
@@ -42,5 +46,5 @@ class PendantControl {
 
   /** The same control at another position. */
   public function movedTo(newX:Float, newY:Float):PendantControl
-    return new PendantControl(id, kind, newX, newY, cutout, keepOut, above, behind, massGrams, source, extraHoles);
+    return new PendantControl(id, kind, newX, newY, cutout, keepOut, above, behind, massGrams, source, extraHoles, body);
 }

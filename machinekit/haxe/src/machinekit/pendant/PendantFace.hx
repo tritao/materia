@@ -87,6 +87,11 @@ class PendantFace {
           found.push('a hole of ${c.id} reaches the case wall');
       }
     }
+    for (c in controls) {
+      var half = halfSize(c.body);
+      if (Math.abs(c.x) + half.x > width / 2 - wall + 1e-9 || Math.abs(c.y) + half.y > height / 2 - wall + 1e-9)
+        found.push('the body of ${c.id} reaches into the case wall');
+    }
     for (i in 0...controls.length) for (j in i + 1...controls.length) {
       var gap = gapBetween(controls[i], controls[j]);
       if (gap < minGap - 1e-9)
@@ -105,6 +110,15 @@ class PendantFace {
   static function halfSize(f:Footprint):{x:Float, y:Float} return switch f {
     case Circle(d): {x: d / 2, y: d / 2};
     case Rect(w, h): {x: w / 2, y: h / 2};
+  };
+
+  /** Distance from a point to the edge of a footprint centred at (fx, fy), negative inside it. */
+  public static function distanceToFootprint(f:Footprint, fx:Float, fy:Float, px:Float, py:Float):Float return switch f {
+    case Circle(d): Math.sqrt(sq(px - fx) + sq(py - fy)) - d / 2;
+    case Rect(w, h):
+      var dx = Math.abs(px - fx) - w / 2, dy = Math.abs(py - fy) - h / 2;
+      dx > 0 || dy > 0 ? Math.sqrt(sq(Math.max(dx, 0.0)) + sq(Math.max(dy, 0.0))) : Math.max(dx, dy);
+    case _: throw "Unknown footprint";
   };
 
   /** Gap between two footprints (negative when they overlap). */

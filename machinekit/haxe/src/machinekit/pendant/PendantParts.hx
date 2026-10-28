@@ -16,7 +16,7 @@ class PendantParts {
       var a = Math.PI / 2 + i * 2 * Math.PI / 3;
       {x: 36.0 * Math.cos(a), y: 36.0 * Math.sin(a), diameter: 4.8};
     }];
-    return new PendantControl("wheel", Wheel, x, y, Circle(45.0), Circle(80.0), withHandle ? 41.0 : 27.0, 12.0, 276.0, "vendor-drawing", holes);
+    return new PendantControl("wheel", Wheel, x, y, Circle(45.0), Circle(80.0), withHandle ? 41.0 : 27.0, 12.0, 276.0, "vendor-drawing", holes, Circle(76.0));
   }
 
   /**
@@ -31,7 +31,7 @@ class PendantParts {
       var a = Math.PI / 2 + i * 2 * Math.PI / 3;
       {x: 25.4 * Math.cos(a), y: 25.4 * Math.sin(a), diameter: 3.2};
     }];
-    return new PendantControl("wheel", Wheel, x, y, Circle(44.0), Circle(60.0), withHandle ? 38.0 : 26.0, 10.0, 250.0, "vendor-drawing", holes);
+    return new PendantControl("wheel", Wheel, x, y, Circle(44.0), Circle(60.0), withHandle ? 38.0 : 26.0, 10.0, 250.0, "vendor-drawing", holes, Circle(58.0));
   }
 
   /**
@@ -41,7 +41,7 @@ class PendantParts {
    * A standard Harmony XB5AS8445 is 82 mm deep per its datasheet, which no handheld case can take.
    */
   public static function eStopCompact(x:Float, y:Float):PendantControl
-    return new PendantControl("estop", EStop, x, y, Circle(22.3), Circle(40.0), 25.0, 18.7, 40.0, "assumed");
+    return new PendantControl("estop", EStop, x, y, Circle(22.3), Circle(40.0), 25.0, 18.7, 40.0, "assumed", null, Circle(30.0));
 
   /**
    * The AliExpress E-stop (item 1005002447999037, 2.55 EUR for the 1NC variant): a Schneider XB2-ES542
@@ -51,17 +51,17 @@ class PendantParts {
    * "29 x 30 x 68.5 mm" does not say what it measures, so measure on arrival.
    */
   public static function eStopGeneric(x:Float, y:Float):PendantControl
-    return new PendantControl("estop", EStop, x, y, Circle(22.3), Circle(40.0), 31.0, 43.0, 52.4, "listing");
+    return new PendantControl("estop", EStop, x, y, Circle(22.3), Circle(40.0), 31.0, 43.0, 52.4, "listing", null, Rect(42.0, 42.0));
 
   /** Panel rotary switch with a knob (assumed: 10 mm bush hole, 25 mm knob, 25 mm body). */
   public static function rotary(id:String, x:Float, y:Float):PendantControl
-    return new PendantControl(id, Rotary, x, y, Circle(10.2), Circle(25.0), 18.0, 25.0, 25.0, "assumed");
+    return new PendantControl(id, Rotary, x, y, Circle(10.2), Circle(25.0), 18.0, 25.0, 25.0, "assumed", null, Circle(30.0));
 
   /** 16 mm illuminated momentary button (assumed: 16.2 mm hole, 20 mm for the cap and its edge, 25 mm body). */
   public static function button(id:String, x:Float, y:Float):PendantControl
-    return new PendantControl(id, Button, x, y, Circle(16.2), Circle(20.0), 6.0, 25.0, 8.0, "assumed");
+    return new PendantControl(id, Button, x, y, Circle(16.2), Circle(20.0), 6.0, 25.0, 8.0, "assumed", null, Circle(26.0));
 
   /** 2.42 in 128x64 OLED module (assumed: viewing window 56x28 with a 3 mm bezel margin, 12 mm deep, 30 g). */
   public static function display242(x:Float, y:Float):PendantControl
-    return new PendantControl("display", Display, x, y, Rect(56.0, 28.0), Rect(62.0, 34.0), 1.0, 12.0, 30.0, "assumed");
+    return new PendantControl("display", Display, x, y, Rect(56.0, 28.0), Rect(62.0, 34.0), 1.0, 12.0, 30.0, "assumed", null, Rect(70.0, 40.0));
 }

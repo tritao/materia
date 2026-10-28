@@ -208,6 +208,26 @@ Start, Hold and Stop/Reset keys. What the checker already shows:
   mm (27 without the handle): 74 mm tall face up. Shallower buttons and rotary switches are the next lever.
 - **Assumed numbers:** everything except the wheel (its drawing) is a placeholder until measured.
 
+## Case model
+
+`PendantCase` (same package) builds the shell behind the face plate for a layout: a rounded box (8 mm
+corners, 3 mm walls and back) open at the top, six M3 screw posts that rise to the plate, a 9 mm cable
+hole through the bottom wall at mid depth, and a matching face plate with six counterbored screw holes.
+Posts are placed where nothing in front or behind needs the room: clear of every keep-out and of every
+part's rear body. `PendantFaceTests` checks it on the compact layout (190 x 110 mm face, 48 mm case):
+shell and plate are single solids that only touch, the shell's volume matches an analytic estimate, the
+posts and screw heads avoid every control and body, and the plate rests on the shell. `PendantFaceSvg`
+draws the bodies, posts and cable hole.
+
+Findings so far, all on assumed rear bodies (measure the real parts):
+
+- **No post on the left edge.** The E-stop, the knobs and the left buttons fill that edge, so the six
+  posts sit in the middle and on the right. A printed 3 mm plate may gape on the left; the next steps are
+  a perimeter tongue or clips on the shell and smaller measured bodies.
+- **Not yet modelled:** gasket, strap and hang point, the enabling-switch hole, the board and its
+  mounting, the wheel handle's removal.
+- **Printing:** the shell is deep (51 mm) and prints best open side up; the plate prints face down.
+
 ## Mechanics
 
 - Printed case first (CadKit, parametric), PA12 or similar for the product.

@@ -36,6 +36,8 @@ class PendantFaceTests {
     check(generic.source == "listing" && generic.above == 31.0 && generic.behind == 43.0, "The seller drawing's numbers");
     var roomy = new PendantFace(220.0, 110.0, 3.0, 3.0, 48.0, [for (c in face.controls) c.id == "estop" ? generic : c]);
     check(roomy.problems().length == 0 && roomy.overallHeight() == 48.0 + 3.0 + 41.0, "With a 48 mm case it fits: " + roomy.problems().join(" | "));
+    var narrow = ReferencePendant.compactFace();
+    check(hasProblem(narrow.withControl(narrow.control("f3").movedTo(-83.0, -38.0)), "body of f3 reaches into the case wall"), "A rear body in the wall");
     var thick = new PendantFace(220.0, 110.0, 4.0, 3.0, 30.0, face.controls);
     check(hasProblem(thick, "wheel studs allow"), "A face plate thicker than the studs allow");
     check(PendantFace.gapBetween(wheel, face.control("estop")) > 5.0, "Wheel and E-stop gap");
@@ -54,6 +56,34 @@ class PendantFaceTests {
     check(compactPlate.solidCount() == 1, "The compact plate is one solid");
     compactPlate.close();
 
+    // The shell: six posts clear of every control and body, a cable hole, and parts that do not intersect.
+    var pendantCase = PendantCase.plan(compact);
+    check(pendantCase.posts.length == 6, "Six screw posts");
+    for (post in pendantCase.posts) for (c in compact.controls) {
+      check(PendantFace.distanceToFootprint(c.keepOut, c.x, c.y, post.x, post.y) >= 6.0, 'A screw head lands on ${c.id}');
+      check(PendantFace.distanceToFootprint(c.body, c.x, c.y, post.x, post.y) >= 4.0 + 1.5 - 1e-9, 'A post hits the body of ${c.id}');
+    }
+    check(Math.abs(pendantCase.cableX) < compact.width / 2 - compact.wall - 15.0, "Cable hole inside the bottom wall");
+    var shell = pendantCase.shell();
+    var screwPlate = pendantCase.plate();
+    check(shell.solidCount() == 1 && screwPlate.solidCount() == 1, "Shell and plate are each one solid");
+    var shellBounds = shell.shape.bounds();
+    check(Math.abs(shellBounds.get_min().get_z() + (48.0 + PendantCase.BACK_WALL)) < 1e-6 && Math.abs(shellBounds.get_max().get_z()) < 1e-6, "Shell depth");
+    check(Math.abs(shellBounds.get_max().get_x() - 95.0) < 1e-6 && Math.abs(shellBounds.get_max().get_y() - 55.0) < 1e-6, "Shell outline");
+    var touching = screwPlate.intersect(shell);
+    check(touching.volume() < 1e-3, "The plate must only rest on the shell: " + touching.volume());
+    touching.close();
+    // Outer box less the cavity, plus six posts, less the cable hole through a 3 mm wall and six pilot holes.
+    var r = PendantFacePlate.CORNER_RADIUS;
+    var shellExpected = PendantOutline.area(190.0, 110.0, r) * 51.0 - PendantOutline.area(184.0, 104.0, r - 3.0) * 48.0
+      + 6 * Math.PI * 16.0 * 48.0 - Math.PI * 4.5 * 4.5 * 3.0 - 6 * Math.PI * 1.3 * 1.3 * PendantCase.PILOT_DEPTH;
+    check(Math.abs(shell.volume() - shellExpected) / shellExpected < 0.003, "Shell volume " + shell.volume() + " vs " + shellExpected);
+    var stepOut = Sys.getEnv("PENDANT_CASE_STEP_DIR");
+    if (stepOut != null && stepOut != "") { shell.shape.exportStep(stepOut + "/pendant-shell.step"); screwPlate.shape.exportStep(stepOut + "/pendant-plate.step"); }
+    shell.close(); screwPlate.close();
+    rejects("no room for posts", () -> PendantCase.plan(new PendantFace(60.0, 40.0, 3.0, 3.0, 30.0, [PendantParts.button("a", 0.0, 0.0), PendantParts.button("b", 18.0, 0.0), PendantParts.button("c", -18.0, 0.0)])));
+
+
     // The wheel's panel template: a 45 mm hole and three 4.8 mm holes on a 72 mm circle at 120 degrees.
     check(wheel.extraHoles.length == 3, "Three stud holes");
     for (h in wheel.extraHoles) check(Math.abs(Math.sqrt(h.x * h.x + h.y * h.y) - 36.0) < 1e-9 && h.diameter == 4.8, "Stud hole on the 72 mm circle");
@@ -65,14 +95,14 @@ class PendantFaceTests {
       removed += switch c.cutout { case Circle(d): Math.PI * d * d / 4; case Rect(w, h): w * h; case _: 0.0; };
       for (hole in c.extraHoles) removed += Math.PI * hole.diameter * hole.diameter / 4;
     }
-    var expected = (220.0 * 110.0 - removed) * 3.0;
+    var expected = (PendantOutline.area(220.0, 110.0, PendantFacePlate.CORNER_RADIUS) - removed) * 3.0;
     check(plate.solidCount() == 1, "One solid");
     check(Math.abs(plate.volume() - expected) / expected < 1e-3, 'Plate volume ${plate.volume()} vs $expected');
     var out = Sys.getEnv("PENDANT_FACE_STEP");
     if (out != null && out != "") plate.shape.exportStep(out);
     plate.close();
     var svg = PendantFaceSvg.render(face);
-    var compactSvg = PendantFaceSvg.render(ReferencePendant.compactFace());
+    var compactSvg = PendantFaceSvg.render(ReferencePendant.compactFace(), 4.0, pendantCase);
     var compactDrawing = Sys.getEnv("PENDANT_COMPACT_SVG");
     if (compactDrawing != null && compactDrawing != "") File.saveContent(compactDrawing, compactSvg);
     check(svg.indexOf("<svg") == 0 && svg.indexOf(">wheel<") > 0 && svg.split("<circle").length > 10, "SVG drawing");
