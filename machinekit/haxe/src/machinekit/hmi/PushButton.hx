@@ -9,7 +9,8 @@ import machinekit.component.ComponentRecipeSupport as R;
 /**
  * A 16 mm panel push button: a bezel flange and a domed cap in front, a threaded barrel through the panel
  * with a nut, a body with terminals behind. `illuminated` buttons carry an LED. Sizes are assumed until a
- * real button is measured: 19 mm bezel, 16 mm cap standing 6 mm, 24 mm body 25 mm deep.
+ * real button is measured: 19 mm bezel, 16 mm cap standing 6 mm, 24 mm body 25 mm deep. The terminals (assumed solder
+ * terminals) are on the body's rear end, where the wires leave backward.
  */
 class PushButton extends HmiPart {
   static var recipe:Null<ComponentType>;
@@ -65,6 +66,8 @@ class PushButton extends HmiPart {
     );
     require(n("behindDepth") > n("panelThickness") + n("nutThickness"), "the body has room behind the nut");
     addConnector("panel", Mount, Solids.axial(0, 0, 0));
+    addConnector("terminals", Terminal, Solids.rearward(0, 0, -n("behindDepth")));
+    for (port in terminalPorts()) addPort(port);
     mount(panelCutout(), panelKeepOut(), [], aboveFace(), behindFace(), rearBody(), 1e9);
     declareMass(n("massGrams") / 1000.0, new Vector(0, 0, (aboveFace() - behindFace()) / 2));
   }
@@ -74,6 +77,30 @@ class PushButton extends HmiPart {
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
+
+  /**
+   * What is wired at the rear terminals: the normally open contact, and the LED of an illuminated button. The LED is not
+   * required: an unused key stays dark. On the device, and on its rear body when it is expanded.
+   */
+  function terminalPorts():Array<ComponentPort> {
+    var result:Array<ComponentPort> = [{
+      name: "no",
+      kind: Signal,
+      role: Passive,
+      iface: Plug("solder-terminal", 2),
+      required: true,
+      connector: "terminals"
+    }];
+    if (flag("illuminated")) result.push({
+      name: "led",
+      kind: ElectricalPower,
+      role: Consumer,
+      iface: Plug("solder-terminal", 2),
+      required: false,
+      connector: "terminals"
+    });
+    return result;
+  }
 
   function panelCutout():Footprint return Circle(n("barrelDiameter"));
   function panelKeepOut():Footprint return Circle(n("keepOutDiameter"));
@@ -92,8 +119,7 @@ class PushButton extends HmiPart {
     }
     ), new DeviceBodySpec("body", "push button rear body", "ABS grey", function() {
       return Solids.named(Part.cylinderSpan(n("bodyDiameter") / 2, -n("behindDepth"), -t - nut), "body");
-    }
-    ), new DeviceBodySpec("cap", "push button cap", materialSpec(), function() {
+    }, terminalPorts()), new DeviceBodySpec("cap", "push button cap", materialSpec(), function() {
       var b = n("bezelDiameter") / 2, c = n("capDiameter") / 2, bh = n("bezelHeight"), top = n("capHeight");
       return Solids.named(
         Part.revolve([

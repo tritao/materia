@@ -39,7 +39,8 @@ class ReferencePendant {
 
   /**
    * The whole pendant as an assembly: plate, shell and board in the case group, the controls by group, and the fasteners.
-   * The hand wheel's terminals are wired to the board: its 0 V and VCC to the board's supply, A and B to its inputs.
+   * Every wired control is wired to the board (`PendantBoard.wire`): the wheel's 0 V and VCC to the board's supply and A and
+   * B to its inputs, the keys' contacts and LEDs, the selectors' contacts and the display's header.
    */
   public static function assembly():MachineAssembly {
     var pendantCase = pendantCase();
@@ -47,15 +48,11 @@ class ReferencePendant {
       layout(),
       () -> pendantCase.plate(),
       () -> pendantCase.shell(),
-      [new PanelExtra("board", new PendantBoard(() -> pendantCase.board()))],
+      [new PanelExtra("board", new PendantBoard(pendantCase.face, () -> pendantCase.board()))],
       groups(),
       pendantCase.hardware()
     );
-    var wheel = "jog/wheel/terminals", board = "case/board";
-    assembly.connectPorts("wheel-0v", wheel, "0V", board, "gnd");
-    assembly.connectPorts("wheel-vcc", wheel, "VCC", board, "vcc");
-    assembly.connectPorts("wheel-a", wheel, "A", board, "enc-a");
-    assembly.connectPorts("wheel-b", wheel, "B", board, "enc-b");
+    PendantBoard.wire(assembly, pendantCase.face, groups(), "case/board");
     return assembly;
   }
 

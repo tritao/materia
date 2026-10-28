@@ -92,6 +92,7 @@ class HandWheel extends HmiPart {
     );
     require(count("studCount") >= 1 && count("studCount") <= 6, "one to six studs");
     addConnector("panel", Mount, Solids.axial(0, 0, 0));
+    addConnector("terminals", Terminal, Solids.rearward(0, 0, -n("terminalDepth")));
     for (port in terminalPorts()) addPort(port);
     mount(panelCutout(), panelKeepOut(), panelHoles(), aboveFace(), behindFace(), rearBody(), n("maxPanelThickness"));
     declareMass(n("massGrams") / 1000.0, new Vector(0, 0, (aboveFace() - behindFace()) / 2));
@@ -136,7 +137,7 @@ class HandWheel extends HmiPart {
       role : name == "0V" || name == "VCC" ? Consumer : Supply, iface : Plug(
         "screw-terminal",
         1
-      ), required : true
+      ), required : true, connector : "terminals"
   }
   ];
 

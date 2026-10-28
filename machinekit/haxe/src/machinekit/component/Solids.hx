@@ -70,4 +70,14 @@ class Solids {
 
   /** Frame at a point whose +Y joint axis points along CAD +Z. */
   public static function axial(x:Float, y:Float, z:Float):AssemblyFrame return AssemblyFrames.alongY(x, y, z, 0, 0, 1);
+
+  /** Frame at a point whose +Y points along CAD -Z: back from a panel device's face, the way wires leave its rear terminals. */
+  public static function rearward(x:Float, y:Float, z:Float):AssemblyFrame return AssemblyFrames.alongY(
+    x,
+    y,
+    z,
+    0,
+    0,
+    -1
+  );
 }

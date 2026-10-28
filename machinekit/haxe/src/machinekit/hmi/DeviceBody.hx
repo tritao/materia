@@ -31,7 +31,14 @@ class DeviceBody extends MachineComponent {
     this.carriesPurchase = carriesPurchase;
     if (!carriesPurchase) addFacet(new IncludedInPurchase(purchase.bom.partNumber));
     declareMass(massKg, centreOfMass);
-    if (ports != null) for (port in ports) addPort(port);
+    if (ports != null) for (port in ports) {
+      // The body is built in the device's frame, so a port keeps the device's frame for its terminals.
+      if (port.connector != null && !Lambda.exists(connectors(), c -> c.name == port.connector)) {
+        var terminals = purchase.connector(port.connector);
+        addConnector(terminals.name, terminals.role, terminals.frame);
+      }
+      addPort(port);
+    }
   }
 
   override function get_bom():BomItem return carriesPurchase ? purchase.bom : super.get_bom();

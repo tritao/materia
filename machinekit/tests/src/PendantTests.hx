@@ -133,7 +133,25 @@ class PendantTests {
     var assembly = ReferencePendant.assembly();
     var report = AssemblyIntegrity.check(assembly);
     check(report.errors().length == 0, "Interference: " + [for (e in report.errors()) e.message].join(" | "));
-    // The wheel's four terminals are wired to the board (the scene below refuses a wheel left without its supply).
+    // Every wired control but the E-stop is wired to the board: the seven keys' contacts and LEDs, the two selectors' contacts,
+    // the display's header and the wheel's four terminals, 56 wires; the board supplies the display and the wheel (the scene
+    // below refuses a wheel left without its supply). The E-stop's contacts belong to the cable's safety loop.
+    var links = PendantBoard.links(pendantCase.face);
+    var wires = 0;
+    for (link in links) switch link.port.iface {
+      case Plug(_, pins):
+        wires += pins;
+      default:
+        check(false, "A wired port is a plug: " + link.board.name);
+    }
+    check(links.length == 7 * 2 + 2 + 1 + 4 && wires == 56, "Board links " + links.length + ", wires " + wires);
+    check(!Lambda.exists(links, link -> link.control == "estop"), "The E-stop's contacts stay off the board");
+    check(assembly.upstream("display/pins",
+      "header").port.instanceId == "case/board", "The board supplies the display");
+    check(
+      assembly.upstream("jog/wheel/terminals", "VCC").port.instanceId == "case/board",
+      "The board supplies the wheel"
+    );
     // The hierarchy reads case, jog, selectors, function and cycle keys, with the E-stop and display on their own, and each device is its bodies.
     var ids = [for (c in assembly.components()) c.id];
     for (id in [

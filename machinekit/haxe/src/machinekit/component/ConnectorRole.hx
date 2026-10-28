@@ -12,4 +12,6 @@ enum ConnectorRole {
   Shaft;
   /** Contact datum on a gear or rack's theoretical pitch surface. */
   Pitch;
+  /** Where wires are attached to a device's terminals; the wires leave along the frame's +Y. */
+  Terminal;
 }

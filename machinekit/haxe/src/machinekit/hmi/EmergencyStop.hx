@@ -79,6 +79,11 @@ class EmergencyStop extends HmiPart {
     );
     addConnector("panel", Mount, Solids.axial(0, 0, 0));
     mount(panelCutout(), panelKeepOut(), [], aboveFace(), behindFace(), rearBody(), 1e9);
+    for (i in 1...count("blocks") + 1) addConnector(
+      "block" + i,
+      Terminal,
+      Solids.rearward(0, blockY(i - 1), blockRear())
+    );
     for (port in contactPorts()) addPort(port);
     declareMass(n("massGrams") / 1000.0, new Vector(0, 0, (aboveFace() - behindFace()) / 2));
   }
@@ -90,9 +95,12 @@ class EmergencyStop extends HmiPart {
   }
   override public function componentType():Null<ComponentType> return recipeType();
 
-  /** One NC dry contact per block, to be wired into the safety chain. On the device, and on the blocks when it is expanded. */
+  /**
+   * One NC dry contact per block, to be wired into the safety chain, at the terminal screws on the block's rear face. On the
+   * device, and on the blocks when it is expanded.
+   */
   function contactPorts():Array<ComponentPort> return [for (i in 1...count("blocks") + 1) {
-    name:"nc" + i, kind:Signal, role:Passive, iface:Plug("dry-contact", 2), required:true
+    name:"nc" + i, kind:Signal, role:Passive, iface:Plug("dry-contact", 2), required:true, connector:"block" + i
   }
   ];
 

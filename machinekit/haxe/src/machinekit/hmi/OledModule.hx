@@ -6,6 +6,7 @@ import cadkit.modeling.RoundedRectangle;
 import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as R;
+import materia.assembly.AssemblyFrames;
 
 /**
  * The Waveshare 2.42 in 128x64 OLED module (SKU 25742, SSD1309), modelled from its vendor drawing and 3D model. Origin at
@@ -16,7 +17,9 @@ import machinekit.component.ComponentRecipeSupport as R;
  * folds from the glass round the board's lower edge. The board's four plain 2.5 mm holes lie under the glass and cannot be
  * used to fasten it. The module is held by a printed frame over the board's edge strip (open at the bottom for the flex
  * circuit), screwed from behind into heat-set inserts in four bosses on the plate's back just outside the corners; four
- * pegs on the frame go through the board's holes to locate it.
+ * pegs on the frame go through the board's holes to locate it. It is wired at the 2.54 mm header's pin ends, the wires
+ * leaving along +x; its seven pins are VCC, GND, DIN (SDA), CLK (SCL), CS, DC and RES, for I2C with the module's 0 ohm
+ * links moved from the SPI default.
  */
 class OledModule extends HmiPart {
   static var recipe:Null<ComponentType>;
@@ -60,6 +63,8 @@ class OledModule extends HmiPart {
   static inline var PEG_CLEARANCE:Float = 0.7;
   static inline var HEADER_PITCH:Float = 2.54;
   static inline var HEADER_PINS:Int = 7;
+  /** From the header body's inboard face to the pins' ends. */
+  static inline var HEADER_LENGTH:Float = 11.1;
   static inline var CONNECTOR_HEIGHT:Float = 3.4;
 
   static function inputs():Array<ComponentParameter> return [
@@ -72,6 +77,12 @@ class OledModule extends HmiPart {
     super("hmi-oled-module", "2.42 in 128x64 OLED module (Waveshare SKU 25742)", "ABS black", inputs(), v);
     positive(["panelThickness", "massGrams"]);
     addConnector("panel", Mount, Solids.axial(0, 0, 0));
+    addConnector(
+      "header",
+      Terminal,
+      AssemblyFrames.alongY(headerX0() + HEADER_LENGTH, headerCentre(), boardBack() - HEADER_PITCH / 2, 1, 0, 0)
+    );
+    addPort(headerPort());
     var insert = ThreadedInsert.m2_5Short();
     // The glass covers the board's own holes, so the board is held by a frame over its back, screwed into four bosses on the
     // plate's back just outside the corners.
@@ -200,8 +211,8 @@ class OledModule extends HmiPart {
       new DeviceBodySpec("fpc", "OLED flex circuit", "polyimide film", flex),
       new DeviceBodySpec("zif", "flex circuit connector", "ABS grey", zif),
       new DeviceBodySpec("header", "2.54 mm header body", "device housing dark", headerBody),
-      new DeviceBodySpec("pins", "2.54 mm header pins", "brass", headerPins),
-      new DeviceBodySpec("connector", "1.25 mm 7-pin connector", "ABS white", connector)
+      new DeviceBodySpec("pins", "2.54 mm header pins", "brass", headerPins, [headerPort()]),
+      new DeviceBodySpec("connector", "1.25 mm 7-pin connector", "ABS white", sevenPinConnector)
     ];
   }
 
@@ -281,9 +292,19 @@ class OledModule extends HmiPart {
     "header"
   );
 
+  /** The module's I2C and power, on the header's seven pins. On the device, and on its header pins when it is expanded. */
+  function headerPort():ComponentPort return {
+    name: "header",
+    kind: Signal,
+    role: Consumer,
+    iface: Plug("2.54-header", HEADER_PINS),
+    required: true,
+    connector: "header"
+  };
+
   function headerPins():Part {
     var pins:Array<Part> = [];
-    var length = 11.1 - HEADER_PITCH;
+    var length = HEADER_LENGTH - HEADER_PITCH;
     for (i in 0...HEADER_PINS) pins.push(box(
       length,
       0.64,
@@ -296,7 +317,7 @@ class OledModule extends HmiPart {
   }
 
   /** The 1.25 mm connector, open toward the board's left edge, with a slot for the mating housing. */
-  function connector():Part {
+  function sevenPinConnector():Part {
     var body = box(5.2, 14.01, CONNECTOR_HEIGHT, -24.15, boardCentre() + 0.5, boardBack() - CONNECTOR_HEIGHT);
     var slot = box(3.5, 10.5, 2.2, -24.15 - 1.3, boardCentre() + 0.5, boardBack() - 2.8);
     var result = body.subtract(slot);

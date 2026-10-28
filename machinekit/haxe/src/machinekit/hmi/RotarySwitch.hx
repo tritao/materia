@@ -11,7 +11,9 @@ import materia.assembly.AssemblyDefinition.AssemblyJointType;
 /**
  * A panel rotary switch with a knob: a threaded bush through the panel with a nut, a round switch body
  * behind, a knob in front. `positions` says how many throws it has (3 for the step switch, 12
- * for the axis switch). All sizes are assumed until a real switch is measured: knob 25, bush 10, body 30 by 25.
+ * for the axis switch). All sizes are assumed until a real switch is measured: knob 25, bush 10, body 30 by 25. Its
+ * common and one contact per position are on solder terminals at the body's rear end, so a board reads the position as
+ * one input per position: exactly one closed is a valid position.
  */
 class RotarySwitch extends HmiPart {
   static var recipe:Null<ComponentType>;
@@ -61,6 +63,8 @@ class RotarySwitch extends HmiPart {
     );
     require(n("behindDepth") > n("panelThickness") + n("nutThickness"), "the body has room behind the nut");
     addConnector("panel", Mount, Solids.axial(0, 0, 0));
+    addConnector("terminals", Terminal, Solids.rearward(0, 0, -n("behindDepth")));
+    addPort(contactsPort());
     mount(panelCutout(), panelKeepOut(), [], aboveFace(), behindFace(), rearBody(), 1e9);
     declareMass(n("massGrams") / 1000.0, new Vector(0, 0, (aboveFace() - behindFace()) / 2));
   }
@@ -70,6 +74,16 @@ class RotarySwitch extends HmiPart {
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
+
+  /** The common and one contact per position, wired at the rear terminals. On the device, and on its body when it is expanded. */
+  function contactsPort():ComponentPort return {
+    name: "contacts",
+    kind: Signal,
+    role: Passive,
+    iface: Plug("solder-terminal", count("positions") + 1),
+    required: true,
+    connector: "terminals"
+  };
 
   function panelCutout():Footprint return Circle(n("bushDiameter") + 0.2);
   function panelKeepOut():Footprint return Circle(n("knobDiameter"));
@@ -88,8 +102,7 @@ class RotarySwitch extends HmiPart {
     }
     ), new DeviceBodySpec("body", "rotary switch body", "ABS grey", function() {
       return Solids.named(Part.cylinderSpan(n("bodyDiameter") / 2, -n("behindDepth"), -t - nut), "body");
-    }
-    ), new DeviceBodySpec("knob", "rotary switch knob", materialSpec(), function() {
+    }, [contactsPort()]), new DeviceBodySpec("knob", "rotary switch knob", materialSpec(), function() {
       var r = n("knobDiameter") / 2, k = n("knobHeight");
       return Solids.named(
         Part.revolve([

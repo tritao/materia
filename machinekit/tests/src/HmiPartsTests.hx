@@ -8,6 +8,7 @@ import machinekit.component.MachineKitComponents;
 import machinekit.component.PanelMountFacet;
 import cadkit.modeling.FootprintGeometry;
 import machinekit.hmi.*;
+import materia.assembly.AssemblyFrames;
 
 class HmiPartsTests {
   static function m(part:MachineComponent):PanelMountFacet {
@@ -47,6 +48,55 @@ class HmiPartsTests {
     );
     near(part.massProperties().mass, part.n("massGrams") / 1000.0, '$name declared mass', 1e-9);
     solid.close();
+  }
+
+  /**
+   * A wired control's terminals: the named Terminal frame at `at` whose +Y is `direction` (the way its wires leave), every
+   * listed port on it with the stated number of wires, on the device and on the body that carries them when it is expanded.
+   */
+  static function checkTerminals(
+    part:HmiPart,
+    name:String,
+    terminal:String,
+    at:Array<Float>,
+    direction:Array<Float>,
+    ports:Array<{name:String, wires:Int}>
+  ):Void {
+    var c = part.connector(terminal);
+    check(c.role == Terminal, '$name: $terminal is a terminal frame');
+    near(c.frame.x, at[0], '$name: $terminal x');
+    near(c.frame.y, at[1], '$name: $terminal y');
+    near(c.frame.z, at[2], '$name: $terminal z');
+    var tip = AssemblyFrames.transformPoint(c.frame, 0, 1, 0);
+    near(tip.x - c.frame.x, direction[0], '$name: wires leave along x');
+    near(tip.y - c.frame.y, direction[1], '$name: wires leave along y');
+    near(tip.z - c.frame.z, direction[2], '$name: wires leave along z');
+    check(
+      [for (p in part.ports()) p.name].join(",") == [for (p in ports) p.name].join(","),
+      '$name ports: ' + [for (p in part.ports()) p.name].join(",")
+    );
+    for (want in ports) {
+      var port = part.port(want.name);
+      check(port.connector == terminal, '$name: ${want.name} is wired at $terminal');
+      switch port.iface {
+        case Plug(_, pins):
+          check(pins == want.wires, '$name: ${want.name} has ${want.wires} wires, not $pins');
+        default:
+          check(false, '$name: ${want.name} is a plug');
+      }
+    }
+    var bodies = part.expand();
+    if (bodies == null) return;
+    var carried = 0;
+    for (b in bodies.components()) for (p in b.component.ports()) {
+      carried++;
+      near(
+        b.component.connector(p.connector).frame.z,
+        part.connector(p.connector).frame.z,
+        '$name: ${b.id} keeps the frame'
+      );
+    }
+    check(carried == ports.length, '$name: the bodies carry every port once, $carried');
   }
 
   /** The contract RecipeContractTests applies to every recipe, for these: each option and flag builds a valid solid, and a rebuilt part is identical. */
@@ -196,6 +246,42 @@ class HmiPartsTests {
       () -> new HandWheel(new ComponentValues().setToken("model", ControlCatalogs.CUSTOM).setNumber("ringDiameter", 70))
     );
     rejects("too many contact blocks", () -> new EmergencyStop(new ComponentValues().setInteger("blocks", 4)));
+
+    // Every wired control says where its wires attach, so a board can place its connectors near them.
+    var back = [0.0, 0.0, -1.0];
+    checkTerminals(
+      button,
+      "button",
+      "terminals",
+      [0, 0, -m(button).behind],
+      back,
+      [{name: "no", wires: 2}, {name: "led", wires: 2}]
+    );
+    var plain = new PushButton(new ComponentValues().setBoolean("illuminated", false));
+    checkTerminals(plain, "plain button", "terminals", [0, 0, -m(plain).behind], back, [{name: "no", wires: 2}]);
+    checkTerminals(axis, "axis switch", "terminals", [0, 0, -m(axis).behind], back, [{name: "contacts", wires: 13}]);
+    checkTerminals(step, "step switch", "terminals", [0, 0, -m(step).behind], back, [{name: "contacts", wires: 4}]);
+    checkTerminals(vallder, "Vallder wheel", "terminals", [0, 0, -vallder.n("terminalDepth")], back, [for (t in [
+      "A",
+      "B",
+      "0V",
+      "VCC"
+    ]) {
+      name:t, wires:1
+    }
+    ]);
+    check(oled.connector("header").frame.x > 27.0, "The OLED's header pins end at the board's right edge");
+    checkTerminals(
+      oled,
+      "OLED",
+      "header",
+      [oled.connector("header").frame.x, oled.connector("header").frame.y, oled.connector("header").frame.z],
+      [1.0, 0.0, 0.0],
+      [{name: "header", wires: 7}]
+    );
+    var blocks = estop2.connector("block2").frame.y - estop2.connector("block1").frame.y;
+    near(blocks, estop2.n("blockThickness"), "The E-stop's blocks are a block apart");
+    checkTerminals(estop, "E-stop", "block1", [0, 0, -m(estop).behind], back, [{name: "nc1", wires: 2}]);
     rejects(
       "a handle outside the dial",
       () -> new HandWheel(new ComponentValues().setToken("model", ControlCatalogs.CUSTOM).setNumber("handleRadius", 30))
