@@ -4,84 +4,85 @@ import NativeKitSim;
 
 /** Owns one simulation joint handle. */
 class Joint {
-    final world:SimWorld;
-    final value:nksim_joint;
-    var disposed:Bool = false;
+  final world:SimWorld;
+  final value:nksim_joint;
+  var disposed:Bool = false;
 
-    @:allow(SimWorld)
-    private function new(world:SimWorld, value:nksim_joint) {
-        this.world = world;
-        this.value = value;
-    }
+  @:allow(SimWorld) private function new(world:SimWorld, value:nksim_joint) {
+    this.world = world;
+    this.value = value;
+  }
 
-    public function nativeHandle():nksim_joint {
-        ensureLive();
-        return value;
-    }
+  public function nativeHandle():nksim_joint {
+    ensureLive();
+    return value;
+  }
 
-    public function state():JointState {
-        ensureLive();
-        var state = new nksim_joint_state();
-        state.set_struct_size(nksim_joint_state.size());
-        var result = NativeKitSim.nksim_joint_get_state(world.nativeHandle(), value, state);
-        SimWorld.check(result.status, "joint.state");
-        return JointState.fromNative(state);
-    }
+  public function state():JointState {
+    ensureLive();
+    var state = new nksim_joint_state();
+    state.set_struct_size(nksim_joint_state.size());
+    var result = NativeKitSim.nksim_joint_get_state(world.nativeHandle(), value, state);
+    SimWorld.check(result.status, "joint.state");
+    return JointState.fromNative(state);
+  }
 
-    /** Stages a position command for the next world step. */
-    public function setTargetPosition(target:Float, maxForce:Float = 0.0):Void {
-        ensureLive();
-        world.stageJointTarget(this, JointTargetMode.Position, target, maxForce);
-    }
+  /** Stages a position command for the next world step. */
+  public function setTargetPosition(target:Float, maxForce:Float = 0.0):Void {
+    ensureLive();
+    world.stageJointTarget(this, JointTargetMode.Position, target, maxForce);
+  }
 
-    /** Stages a velocity command for the next world step. */
-    public function setTargetVelocity(target:Float, maxForce:Float = 0.0):Void {
-        ensureLive();
-        world.stageJointTarget(this, JointTargetMode.Velocity, target, maxForce);
-    }
+  /** Stages a velocity command for the next world step. */
+  public function setTargetVelocity(target:Float, maxForce:Float = 0.0):Void {
+    ensureLive();
+    world.stageJointTarget(this, JointTargetMode.Velocity, target, maxForce);
+  }
 
-    /** Stages an effort command for the next world step. */
-    public function setTargetEffort(target:Float, maxForce:Float = 0.0):Void {
-        ensureLive();
-        world.stageJointTarget(this, JointTargetMode.Effort, target, maxForce);
-    }
+  /** Stages an effort command for the next world step. */
+  public function setTargetEffort(target:Float, maxForce:Float = 0.0):Void {
+    ensureLive();
+    world.stageJointTarget(this, JointTargetMode.Effort, target, maxForce);
+  }
 
-    /** Configures passive spring-applied friction and physical contact delays, in SI units. */
-    public function configureBrake(holdingEffort:Float, releaseDelay:Float, applicationDelay:Float):Void {
-        ensureLive();
-        var result = NativeKitSim.nksim_joint_configure_brake(world.nativeHandle(), value,
-            holdingEffort, releaseDelay, applicationDelay);
-        SimWorld.check(result, "joint.configureBrake");
-    }
+  /** Configures passive spring-applied friction and physical contact delays, in SI units. */
+  public function configureBrake(holdingEffort:Float, releaseDelay:Float, applicationDelay:Float):Void {
+    ensureLive();
+    var result = NativeKitSim.nksim_joint_configure_brake(
+      world.nativeHandle(),
+      value,
+      holdingEffort,
+      releaseDelay,
+      applicationDelay
+    );
+    SimWorld.check(result, "joint.configureBrake");
+  }
 
-    /** Writes the digital release coil; physical contact changes after its configured delay. */
-    public function setBrakeRelease(energized:Bool):Void {
-        ensureLive();
-        var result = NativeKitSim.nksim_joint_set_brake_release(world.nativeHandle(), value, energized ? 1 : 0);
-        SimWorld.check(result, "joint.setBrakeRelease");
-    }
+  /** Writes the digital release coil; physical contact changes after its configured delay. */
+  public function setBrakeRelease(energized:Bool):Void {
+    ensureLive();
+    var result = NativeKitSim.nksim_joint_set_brake_release(world.nativeHandle(), value, energized ? 1 : 0);
+    SimWorld.check(result, "joint.setBrakeRelease");
+  }
 
-    /** Reads the physical released contact, independently of the coil command. */
-    public function brakeReleased():Bool {
-        ensureLive();
-        var sampled = state();
-        if (!sampled.brakeConfigured) throw "joint.brakeReleased: joint has no brake";
-        return sampled.brakeReleased;
-    }
+  /** Reads the physical released contact, independently of the coil command. */
+  public function brakeReleased():Bool {
+    ensureLive();
+    var sampled = state();
+    if (!sampled.brakeConfigured) throw "joint.brakeReleased: joint has no brake";
+    return sampled.brakeReleased;
+  }
 
-    public function dispose():Void {
-        if (disposed)
-            return;
-        NativeKitSim.nksim_joint_destroy(world.nativeHandle(), value);
-        disposed = true;
-    }
+  public function dispose():Void {
+    if (disposed) return;
+    NativeKitSim.nksim_joint_destroy(world.nativeHandle(), value);
+    disposed = true;
+  }
 
-    public function isDisposed():Bool
-        return disposed;
+  public function isDisposed():Bool return disposed;
 
-    function ensureLive():Void {
-        if (disposed)
-            throw "Simulation joint has been disposed";
-        world.ensureLive();
-    }
+  function ensureLive():Void {
+    if (disposed) throw "Simulation joint has been disposed";
+    world.ensureLive();
+  }
 }

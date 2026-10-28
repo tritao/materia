@@ -1,11 +1,11 @@
 package nativekit.sim;
 
 enum abstract ShapeType(Int) from Int to Int {
-    var Box = 1;
-    var Sphere = 2;
-    var Capsule = 3;
-    var Plane = 4;
-    var Convex = 5;
-    var Compound = 6;
-    var Cylinder = 7;
+  var Box = 1;
+  var Sphere = 2;
+  var Capsule = 3;
+  var Plane = 4;
+  var Convex = 5;
+  var Compound = 6;
+  var Cylinder = 7;
 }
