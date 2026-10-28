@@ -18,11 +18,23 @@ class RobotInterfaceOutputs {
   public final startCycle:Bool;
   public final holdCycle:Bool;
 
-  public function new(ready:Bool, doorOpen:Bool, doorClosed:Bool,
-      clamped:Bool, unclamped:Bool, partPresent:Bool, inCycle:Bool,
-      cycleComplete:Bool, alarm:RobotInterfaceAlarm, doorCoilA:Bool,
-      doorCoilB:Bool, viseCoilA:Bool, viseCoilB:Bool, startCycle:Bool,
-      holdCycle:Bool) {
+  public function new(
+    ready:Bool,
+    doorOpen:Bool,
+    doorClosed:Bool,
+    clamped:Bool,
+    unclamped:Bool,
+    partPresent:Bool,
+    inCycle:Bool,
+    cycleComplete:Bool,
+    alarm:RobotInterfaceAlarm,
+    doorCoilA:Bool,
+    doorCoilB:Bool,
+    viseCoilA:Bool,
+    viseCoilB:Bool,
+    startCycle:Bool,
+    holdCycle:Bool
+  ) {
     this.ready = ready;
     this.doorOpen = doorOpen;
     this.doorClosed = doorClosed;

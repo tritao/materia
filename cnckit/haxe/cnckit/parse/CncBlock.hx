@@ -12,8 +12,16 @@ class CncBlock {
   /** The `KEY=value` arguments of an extended command, keys upper-cased, values unquoted. */
   public final arguments:Map<String, String>;
 
-  public function new(words:Array<CncWord>, span:Provenance, ?comments:Array<CncComment>,
-      ?command:String, ?arguments:Map<String, String>) {
+  public function new(
+    words:Array<CncWord>,
+    span:Provenance,
+    ?comments:Array<CncComment>,
+    ?command:String,
+    ?arguments:Map<
+      String,
+      String
+  >
+  ) {
     this.words = words.copy();
     this.span = span;
     this.comments = comments == null ? [] : comments.copy();

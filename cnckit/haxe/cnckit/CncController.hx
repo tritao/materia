@@ -14,8 +14,7 @@ class CncController {
   final hTools:Map<Int, Int> = new Map();
   final dTools:Map<Int, Int> = new Map();
 
-  public function new(?dialect:CncDialect = LinuxCnc,
-      ?toolLibrary:ToolLibrary, ?printer:PrinterSettings) {
+  public function new(?dialect:CncDialect = LinuxCnc, ?toolLibrary:ToolLibrary, ?printer:PrinterSettings) {
     if (dialect == LinuxCnc && printer != null) throw "only a printer controller has printer settings";
     this.dialect = dialect;
     this.printer = dialect == Printer ? (printer == null ? new PrinterSettings() : printer) : null;
@@ -32,19 +31,19 @@ class CncController {
 
   public function gCodeForSetup(id:String):Int {
     var number = Std.parseInt(id);
-    if (number == null || number < 1 || number > 6 ||
-        Std.string(number) != id)
-      throw 'CNC controller cannot map setup $id to G54-G59';
+    if (number == null
+      || number < 1 || number > 6 || Std.string(number) != id) throw 'CNC controller cannot map setup $id to G54-G59';
     return switch dialect {
-      case LinuxCnc: number + 53;
-      case Printer: throw "a printer controller has no work offsets";
+      case LinuxCnc:
+        number + 53;
+      case Printer:
+        throw "a printer controller has no work offsets";
     };
   }
 
   public function setWorkOffset(code:Int, x:Float, y:Float, z:Float):Void {
     setupId(code);
-    if (!Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(z))
-      throw "CNC work offset needs finite XYZ";
+    if (!Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(z)) throw "CNC work offset needs finite XYZ";
     offsets.set(code, [x, y, z]);
   }
 
@@ -54,9 +53,8 @@ class CncController {
   }
 
   public function setHomePosition(code:Int, x:Float, y:Float, z:Float):Void {
-    if ((code != 28 && code != 30) || !Math.isFinite(x) ||
-        !Math.isFinite(y) || !Math.isFinite(z))
-      throw "CNC home needs G28 or G30 and finite XYZ metres";
+    if ((code != 28 && code != 30) || !Math.isFinite(x)
+      || !Math.isFinite(y) || !Math.isFinite(z)) throw "CNC home needs G28 or G30 and finite XYZ metres";
     homes.set(code, [x, y, z]);
   }
 
@@ -76,17 +74,16 @@ class CncController {
     dTools.set(number, toolId);
   }
 
-  public function toolForH(number:Int):Tool
-    return toolLibrary.tool(hTools.exists(number) ? hTools.get(number) : number);
+  public function toolForH(number:Int):Tool return toolLibrary.tool(hTools.exists(number)
+    ? hTools.get(number) : number);
 
-  public function toolForD(number:Int):Tool
-    return toolLibrary.tool(dTools.exists(number) ? dTools.get(number) : number);
+  public function toolForD(number:Int):Tool return toolLibrary.tool(dTools.exists(number)
+    ? dTools.get(number) : number);
 
   public function setToolLength(h:Int, length:Float):Void {
     var toolId = hTools.exists(h) ? hTools.get(h) : h;
     var old:Null<Tool> = try toolLibrary.tool(toolId) catch (_:Dynamic) null;
-    toolLibrary.set(old == null ? new Tool(toolId, length, 0.0) :
-      old.withLength(length));
+    toolLibrary.set(old == null ? new Tool(toolId, length, 0.0) : old.withLength(length));
   }
 
   public function toolLength(h:Int):Float return toolForH(h).length;

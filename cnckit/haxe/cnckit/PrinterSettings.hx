@@ -26,13 +26,22 @@ class PrinterSettings {
   /** May the controller draw `G2`/`G3` arcs? Otherwise the writer draws them as short lines. */
   public final arcs:Bool;
 
-  public function new(?filamentDiameter:Float = 0.00175, ?retractLength:Float = 0.0008, ?retractSpeed:Float = 0.035,
-      ?unretractExtraLength:Float = 0.0, ?unretractSpeed:Float = 0.035, ?ratioTolerance:Float = 0.005,
-      ?pathTolerance:Float = 0.0001, ?defaultLayerHeight:Float = 0.0002, ?arcs:Bool = true) {
-    for (value in [filamentDiameter, retractLength, retractSpeed, unretractSpeed, defaultLayerHeight])
-      if (!Math.isFinite(value) || value <= 0.0) throw "printer settings need positive finite lengths and speeds";
-    for (value in [unretractExtraLength, ratioTolerance, pathTolerance])
-      if (!Math.isFinite(value) || value < 0.0) throw "printer settings need non-negative finite tolerances";
+  public function new(
+    ?filamentDiameter:Float = 0.00175,
+    ?retractLength:Float = 0.0008,
+    ?retractSpeed:Float = 0.035,
+    ?unretractExtraLength:Float = 0.0,
+    ?unretractSpeed:Float = 0.035,
+    ?ratioTolerance:Float = 0.005,
+    ?pathTolerance:Float = 0.0001,
+    ?defaultLayerHeight:Float = 0.0002,
+    ?arcs:Bool = true
+  ) {
+    for (value in [filamentDiameter,
+      retractLength, retractSpeed, unretractSpeed, defaultLayerHeight]) if (!Math.isFinite(value)
+      || value <= 0.0) throw "printer settings need positive finite lengths and speeds";
+    for (value in [unretractExtraLength, ratioTolerance, pathTolerance]) if (!Math.isFinite(value)
+      || value < 0.0) throw "printer settings need non-negative finite tolerances";
     this.filamentDiameter = filamentDiameter;
     this.retractLength = retractLength;
     this.retractSpeed = retractSpeed;

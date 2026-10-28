@@ -20,14 +20,32 @@ class RobotInterfaceChannels {
 
   /** Four discrete outputs carry the current RobotInterfaceAlarm value to the cell PLC. */
   public static function alarmCodeBits():Array<String> return [
-    "cnc.alarm_code.bit0", "cnc.alarm_code.bit1", "cnc.alarm_code.bit2", "cnc.alarm_code.bit3"];
+    "cnc.alarm_code.bit0",
+    "cnc.alarm_code.bit1",
+    "cnc.alarm_code.bit2",
+    "cnc.alarm_code.bit3"
+  ];
 
-  public static function alarmCodeChannel(scope:String):String
-    return scope == null || scope.length == 0 ? "cnc.alarm_code" : scope + "/cnc.alarm_code";
+  public static function alarmCodeChannel(scope:String):String return scope == null
+    || scope.length == 0 ? "cnc.alarm_code" : scope + "/cnc.alarm_code";
 
-  public static function robotRequests():Array<String> return [REQUEST_DOOR_OPEN,
-    REQUEST_DOOR_CLOSE, REQUEST_CLAMP, REQUEST_UNCLAMP, CYCLE_START, FAULT_RESET];
-  public static function cncOutputs():Array<String> return [CNC_READY, DOOR_OPEN,
-    DOOR_CLOSED, CLAMPED, UNCLAMPED, PART_PRESENT, IN_CYCLE,
-    CYCLE_COMPLETE, ALARM].concat(alarmCodeBits());
+  public static function robotRequests():Array<String> return [
+    REQUEST_DOOR_OPEN,
+    REQUEST_DOOR_CLOSE,
+    REQUEST_CLAMP,
+    REQUEST_UNCLAMP,
+    CYCLE_START,
+    FAULT_RESET
+  ];
+  public static function cncOutputs():Array<String> return [
+    CNC_READY,
+    DOOR_OPEN,
+    DOOR_CLOSED,
+    CLAMPED,
+    UNCLAMPED,
+    PART_PRESENT,
+    IN_CYCLE,
+    CYCLE_COMPLETE,
+    ALARM
+  ].concat(alarmCodeBits());
 }

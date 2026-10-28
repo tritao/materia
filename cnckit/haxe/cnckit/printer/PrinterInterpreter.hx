@@ -77,11 +77,12 @@ class PrinterInterpreter {
   public function interpret(blocks:Array<CncBlock>):Array<ToolpathOp> {
     ops = [];
     diagnostics = [];
-    x = start.x; y = start.y; z = start.z;
+    x = start.x;
+    y = start.y;
+    z = start.z;
     for (block in blocks) {
       var count = ops.length;
-      try process(block)
-      catch (error:CncDiagnostic) {
+      try process(block) catch (error:CncDiagnostic) {
         // A refused line leaves nothing of itself behind.
         while (ops.length > count) ops.pop();
         diagnostics.push(error);
@@ -110,8 +111,10 @@ class PrinterInterpreter {
     var values:Map<String, CncWord> = new Map();
     var g:Array<CncWord> = [], m:Array<CncWord> = [];
     for (word in words) switch word.letter {
-      case "G": g.push(word);
-      case "M": m.push(word);
+      case "G":
+        g.push(word);
+      case "M":
+        m.push(word);
       case _:
         if (values.exists(word.letter)) fail(line, word.column, 'duplicate ${word.letter} word');
         values.set(word.letter, word);
@@ -142,33 +145,57 @@ class PrinterInterpreter {
         placeMarkers();
         depositOff(block.span);
         if (number == 10) ops.push(ToolpathOp.FilamentMove(-settings.retractLength, settings.retractSpeed, block.span));
-        else ops.push(ToolpathOp.FilamentMove(settings.retractLength + settings.unretractExtraLength,
-          settings.unretractSpeed, block.span));
-      case 17: // XY is the only plane
-      case 18, 19: fail(line, word.column, 'G$number arcs outside the XY plane are unsupported');
-      case 20: metric = false;
-      case 21: metric = true;
-      case 28: homes = true;
-      case 29, 30: ignored(block, 'G$number', "bed levelling is not modelled");
-      case 90: absolute = true;
-      case 91: absolute = false;
+        else ops.push(ToolpathOp.FilamentMove(
+          settings.retractLength + settings.unretractExtraLength,
+          settings.unretractSpeed,
+          block.span
+        ));
+      case 17:
+        // XY is the only plane
+      case 18, 19:
+        fail(line, word.column, 'G$number arcs outside the XY plane are unsupported');
+      case 20:
+        metric = false;
+      case 21:
+        metric = true;
+      case 28:
+        homes = true;
+      case 29, 30:
+        ignored(block, 'G$number', "bed levelling is not modelled");
+      case 90:
+        absolute = true;
+      case 91:
+        absolute = false;
       case 92:
         var extruder = values.get("E");
-        if (extruder == null || values.exists("X") || values.exists("Y") || values.exists("Z"))
-          fail(line, word.column, "G92 can only set the extruder position (E): the axes are referenced by homing");
+        if (extruder == null || values.exists("X") || values.exists("Y") || values.exists("Z")) fail(
+          line,
+          word.column,
+          "G92 can only set the extruder position (E): the axes are referenced by homing"
+        );
         e = extruder.value * unitScale();
-      case _: fail(line, word.column, 'unsupported G$number');
+      case _:
+        fail(line, word.column, 'unsupported G$number');
     }
   }
 
   function mCode(number:Int, word:CncWord, values:Map<String, CncWord>, block:CncBlock):Void {
     var line = block.span.line;
     switch number {
-      case 0: placeMarkers(); ops.push(ToolpathOp.ProgramStop(block.span));
-      case 1: placeMarkers(); ops.push(ToolpathOp.OptionalStop(block.span));
-      case 2, 30: placeMarkers(); depositOff(block.span); ops.push(ToolpathOp.End(block.span));
-      case 82: relativeE = false;
-      case 83: relativeE = true;
+      case 0:
+        placeMarkers();
+        ops.push(ToolpathOp.ProgramStop(block.span));
+      case 1:
+        placeMarkers();
+        ops.push(ToolpathOp.OptionalStop(block.span));
+      case 2, 30:
+        placeMarkers();
+        depositOff(block.span);
+        ops.push(ToolpathOp.End(block.span));
+      case 82:
+        relativeE = false;
+      case 83:
+        relativeE = true;
       case 104, 109:
         var target = values.get("S");
         var cooling = values.get("R");
@@ -194,13 +221,16 @@ class PrinterInterpreter {
       case 220, 221:
         var s = values.get("S");
         if (s == null || !(s.value > 0.0)) fail(line, word.column, 'M$number needs S, a percentage above 0');
-        if (number == 220) speedFactor = s.value / 100.0; else flowFactor = s.value / 100.0;
-      case 486: object(values, word, block);
+        if (number == 220) speedFactor = s.value / 100.0;
+        else flowFactor = s.value / 100.0;
+      case 486:
+        object(values, word, block);
       case 17, 18, 73, 75, 76, 77, 84, 108, 117, 118, 155, 300, 413:
         // Display, beeper and stepper-power commands change nothing the toolpath describes.
       case 92, 201, 202, 203, 204, 205, 206, 207, 208, 209, 211, 290, 420, 500, 501, 502, 851, 900:
         ignored(block, 'M$number', "motion limits, calibration and stored settings belong to the machine");
-      case _: fail(line, word.column, 'unsupported M$number');
+      case _:
+        fail(line, word.column, 'unsupported M$number');
     }
   }
 
@@ -221,8 +251,11 @@ class PrinterInterpreter {
 
   function motion(mode:Int, values:Map<String, CncWord>, block:CncBlock):Void {
     var line = block.span.line;
-    for (letter in values.keys())
-      if ("XYZEFIJRKPS".indexOf(letter) < 0) fail(line, columnOf(values.get(letter), 1), 'unsupported $letter word');
+    for (letter in values.keys()) if ("XYZEFIJRKPS".indexOf(letter) < 0) fail(
+      line,
+      columnOf(values.get(letter), 1),
+      'unsupported $letter word'
+    );
     var f = values.get("F");
     if (f != null) {
       if (!(f.value > 0.0)) fail(line, columnOf(f, 1), "F feed must be positive");
@@ -251,9 +284,17 @@ class PrinterInterpreter {
     if (mode >= 2) geometry = arc(mode, from, to, values, line, block);
     else if (hasAxis && from.distanceTo(to) > 1e-12) geometry = PathGeometry.Line(from, to);
     var length = geometry == null ? 0.0 : GeometryTools.length(geometry);
-    if (geometry == null && mode >= 2) fail(line, block.words[0].column, "an arc needs an endpoint or a full circle's centre");
+    if (geometry == null && mode >= 2) fail(
+      line,
+      block.words[0].column,
+      "an arc needs an endpoint or a full circle's centre"
+    );
     if (geometry != null && !Math.isFinite(speed)) fail(line, block.words[0].column, "moves need an F feed");
-    if (geometry == null && delta != 0.0 && !Math.isFinite(speed)) fail(line, columnOf(extruder, 1), "an extruder move needs an F feed");
+    if (geometry == null && delta != 0.0 && !Math.isFinite(speed)) fail(
+      line,
+      columnOf(extruder, 1),
+      "an extruder move needs an F feed"
+    );
     // Everything is checked: commit the block.
     if (f != null) feed = speed;
     e = nextE;
@@ -277,7 +318,9 @@ class PrinterInterpreter {
         }
         ops.push(ToolpathOp.Move(MoveKind.Rapid, geometry, effective, settings.pathTolerance, span));
       }
-      x = to.x; y = to.y; z = to.z;
+      x = to.x;
+      y = to.y;
+      z = to.z;
     }
   }
 
@@ -288,20 +331,40 @@ class PrinterInterpreter {
     if (r != null && (i != null || j != null)) fail(line, columnOf(r, 1), "R and arc-centre offsets conflict");
     if (r == null && i == null && j == null) fail(line, block.words[0].column, "G2/G3 need I and J, or R");
     var scale = unitScale();
-    var center = r == null ? CncInterpreter.centerFromOffsets(from, 17,
-      i == null ? 0.0 : i.value * scale, j == null ? 0.0 : j.value * scale) :
-      CncInterpreter.radiusCenter(from, to, r.value * scale, mode, 17, line, r.column);
+    var center = r == null ? CncInterpreter.centerFromOffsets(
+      from,
+      17,
+      i == null ? 0.0 : i.value * scale,
+      j == null ? 0.0 : j.value * scale
+    ) : CncInterpreter.radiusCenter(
+      from,
+      to,
+      r.value * scale,
+      mode,
+      17,
+      line,
+      r.column
+    );
     var origin = CncInterpreter.coordinates(from, 17), finish = CncInterpreter.coordinates(to, 17);
     var c = CncInterpreter.coordinates(center, 17);
     var radius = Math.sqrt(Math.pow(origin[0] - c[0], 2) + Math.pow(origin[1] - c[1], 2));
     var endRadius = Math.sqrt(Math.pow(finish[0] - c[0], 2) + Math.pow(finish[1] - c[1], 2));
-    if (radius <= 1e-12 || Math.abs(endRadius - radius) > Math.max(1e-8, radius * 1e-5))
-      fail(line, block.words[0].column, "arc endpoint is not on its centre circle");
+    if (radius <= 1e-12 || Math.abs(endRadius - radius) > Math.max(1e-8, radius * 1e-5)) fail(
+      line,
+      block.words[0].column,
+      "arc endpoint is not on its centre circle"
+    );
     var sweep = CncInterpreter.arcSweep(from, to, center, mode, 17);
     var begin = Math.atan2(origin[1] - c[1], origin[0] - c[0]);
     var rise = finish[2] - origin[2];
-    return Math.abs(rise) <= 1e-12 ? PathGeometry.Arc(center, radius, begin, sweep) :
-      PathGeometry.Circular(center, radius, begin, sweep, XY, rise);
+    return Math.abs(rise) <= 1e-12 ? PathGeometry.Arc(center, radius, begin, sweep) : PathGeometry.Circular(
+      center,
+      radius,
+      begin,
+      sweep,
+      XY,
+      rise
+    );
   }
 
   // ---- deposition -----------------------------------------------------------------------
@@ -309,8 +372,8 @@ class PrinterInterpreter {
   function deposit(area:Float, span:Provenance):Void {
     if (depositArea > 0.0 && Math.abs(area / depositArea - 1.0) <= settings.ratioTolerance) return;
     // A rounded bead as tall as the layer: a stadium of area h(w - h) + pi h^2 / 4.
-    var height = toolpathkit.path.BeadSection.heightForArea(area,layerHeight);
-    var width = toolpathkit.path.BeadSection.width(area,height);
+    var height = toolpathkit.path.BeadSection.heightForArea(area, layerHeight);
+    var width = toolpathkit.path.BeadSection.width(area, height);
     ops.push(ToolpathOp.Deposit(area, width, height, span));
     depositArea = area;
   }
@@ -339,8 +402,14 @@ class PrinterInterpreter {
         pending.push(PendingLayer(index, comment.span));
         layerCounter = index + 1;
       }
-    } else if (StringTools.startsWith(upper, "TYPE:")) pending.push(PendingFeature(feature(text.substr(5)), comment.span));
-    else if (StringTools.startsWith(upper, "FEATURE:")) pending.push(PendingFeature(feature(text.substr(8)), comment.span));
+    } else if (StringTools.startsWith(upper, "TYPE:")) pending.push(PendingFeature(
+      feature(text.substr(5)),
+      comment.span
+    ));
+    else if (StringTools.startsWith(upper, "FEATURE:")) pending.push(PendingFeature(
+      feature(text.substr(8)),
+      comment.span
+    ));
     else if (StringTools.startsWith(upper, "MESH:")) {
       var name = StringTools.trim(text.substr(5));
       if (name.length > 0 && name != "NONMESH") startObject(name, comment.span);
@@ -359,7 +428,8 @@ class PrinterInterpreter {
   public static function feature(label:String):PrintFeature {
     var text = StringTools.trim(label), lower = text.toLowerCase();
     function has(part:String):Bool return lower.indexOf(part) >= 0;
-    if (has("external perimeter") || has("outer wall") || has("wall-outer") || has("outer perimeter")) return ExternalPerimeter;
+    if (has("external perimeter")
+      || has("outer wall") || has("wall-outer") || has("outer perimeter")) return ExternalPerimeter;
     if (has("overhang perimeter") || has("perimeter") || has("inner wall") || has("wall-inner")) return Perimeter;
     if (has("top solid") || has("top surface") || has("skin-top")) return TopSolidInfill;
     if (has("solid infill") || has("bottom surface") || lower == "skin") return SolidInfill;
@@ -377,8 +447,10 @@ class PrinterInterpreter {
     }
     unplaced = [];
     for (marker in pending) switch marker {
-      case PendingLayer(index, span): ops.push(ToolpathOp.Layer(index, layerAt(height), span));
-      case PendingFeature(kind, span): ops.push(ToolpathOp.Feature(kind, span));
+      case PendingLayer(index, span):
+        ops.push(ToolpathOp.Layer(index, layerAt(height), span));
+      case PendingFeature(kind, span):
+        ops.push(ToolpathOp.Feature(kind, span));
     }
     pending = [];
   }
@@ -389,7 +461,8 @@ class PrinterInterpreter {
       case PendingLayer(index, span):
         unplaced.push({op: ops.length, index: index, span: span});
         ops.push(ToolpathOp.Layer(index, z, span));
-      case PendingFeature(kind, span): ops.push(ToolpathOp.Feature(kind, span));
+      case PendingFeature(kind, span):
+        ops.push(ToolpathOp.Feature(kind, span));
     }
     pending = [];
   }
@@ -443,9 +516,12 @@ class PrinterInterpreter {
     }
     switch name {
       case "EXCLUDE_OBJECT_DEFINE":
-      case "EXCLUDE_OBJECT_START": startObject(required("NAME"), block.span);
-      case "EXCLUDE_OBJECT_END": endObject(required("NAME"), block.span);
-      case "EXCLUDE_OBJECT": ignored(block, name, "excluding an object happens while printing");
+      case "EXCLUDE_OBJECT_START":
+        startObject(required("NAME"), block.span);
+      case "EXCLUDE_OBJECT_END":
+        endObject(required("NAME"), block.span);
+      case "EXCLUDE_OBJECT":
+        ignored(block, name, "excluding an object happens while printing");
       case "SET_HEATER_TEMPERATURE":
         var target = Std.parseFloat(required("TARGET"));
         if (!Math.isFinite(target)) fail(line, 1, "TARGET is not a number");
@@ -469,13 +545,15 @@ class PrinterInterpreter {
       case "TURN_OFF_HEATERS":
         heat("hotend", 0.0, false, block);
         heat("bed", 0.0, false, block);
-      case _: ignored(block, name, "a macro or setting the toolpath does not model");
+      case _:
+        ignored(block, name, "a macro or setting the toolpath does not model");
     }
   }
 
   static function heaterName(klipper:String):String {
     if (klipper == "extruder") return "hotend";
-    if (StringTools.startsWith(klipper, "extruder") && Std.parseInt(klipper.substr(8)) != null) return "hotend" + klipper.substr(8);
+    if (StringTools.startsWith(klipper,
+      "extruder") && Std.parseInt(klipper.substr(8)) != null) return "hotend" + klipper.substr(8);
     if (klipper == "heater_bed") return "bed";
     return klipper;
   }
@@ -491,17 +569,32 @@ class PrinterInterpreter {
     warn(block, "CNC_PRINTER_IGNORED", '$name ignored: $reason');
   }
 
-  function warn(block:CncBlock, code:String, message:String):Void
-    diagnostics.push(new CncDiagnostic(Warning, code, block.span, message));
+  function warn(block:CncBlock, code:String, message:String):Void diagnostics.push(new CncDiagnostic(
+    Warning,
+    code,
+    block.span,
+    message
+  ));
 
   static function columnOf(word:Null<CncWord>, fallback:Int):Int return word == null ? fallback : word.column;
 
   static function code(word:CncWord, line:Int):Int {
-    if (word.value < 0.0 || word.value != Math.floor(word.value))
-      fail(line, word.column, "code must be a non-negative integer");
+    if (word.value < 0.0 || word.value != Math.floor(word.value)) fail(
+      line,
+      word.column,
+      "code must be a non-negative integer"
+    );
     return Std.int(word.value);
   }
 
-  static function fail(line:Int, column:Int, message:String):Void
-    throw new CncDiagnostic(Error, "CNC_INTERPRET", new Provenance(line, column, 1), message);
+  static function fail(line:Int, column:Int, message:String):Void throw new CncDiagnostic(
+    Error,
+    "CNC_INTERPRET",
+    new Provenance(
+      line,
+      column,
+      1
+    ),
+    message
+  );
 }

@@ -19,11 +19,24 @@ class RobotInterfaceInput {
   public final cycleComplete:Bool;
   public final toolChangeRequired:Bool;
 
-  public function new(requestDoorOpen:Bool, requestDoorClose:Bool,
-      requestClamp:Bool, requestUnclamp:Bool, cycleStart:Bool, clear:Bool,
-      faultReset:Bool, doorOpen:Bool, doorClosed:Bool, clamped:Bool,
-      unclamped:Bool, partPresent:Bool, spindleStopped:Bool, axesAtLoad:Bool,
-      cycleComplete:Bool, toolChangeRequired:Bool) {
+  public function new(
+    requestDoorOpen:Bool,
+    requestDoorClose:Bool,
+    requestClamp:Bool,
+    requestUnclamp:Bool,
+    cycleStart:Bool,
+    clear:Bool,
+    faultReset:Bool,
+    doorOpen:Bool,
+    doorClosed:Bool,
+    clamped:Bool,
+    unclamped:Bool,
+    partPresent:Bool,
+    spindleStopped:Bool,
+    axesAtLoad:Bool,
+    cycleComplete:Bool,
+    toolChangeRequired:Bool
+  ) {
     this.requestDoorOpen = requestDoorOpen;
     this.requestDoorClose = requestDoorClose;
     this.requestClamp = requestClamp;

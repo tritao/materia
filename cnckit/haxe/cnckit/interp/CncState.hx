@@ -39,19 +39,30 @@ class CncState {
 
   public function copy():CncState {
     var result = new CncState(start);
-    result.metric = metric; result.absolute = absolute; result.wcs = wcs;
-    result.toolLength = toolLength; result.feedCommand = feedCommand;
-    result.spindleSpeed = spindleSpeed; result.spindleDirection = spindleDirection;
-    result.coolantMist = coolantMist; result.coolantFlood = coolantFlood;
-    result.selectedTool = selectedTool; result.motionMode = motionMode;
-    result.activeTool = activeTool; result.cutterSide = cutterSide;
+    result.metric = metric;
+    result.absolute = absolute;
+    result.wcs = wcs;
+    result.toolLength = toolLength;
+    result.feedCommand = feedCommand;
+    result.spindleSpeed = spindleSpeed;
+    result.spindleDirection = spindleDirection;
+    result.coolantMist = coolantMist;
+    result.coolantFlood = coolantFlood;
+    result.selectedTool = selectedTool;
+    result.motionMode = motionMode;
+    result.activeTool = activeTool;
+    result.cutterSide = cutterSide;
     result.plane = plane;
-    result.cycleCode = cycleCode; result.cycleDepth = cycleDepth;
-    result.cycleR = cycleR; result.cycleQ = cycleQ; result.cycleP = cycleP;
+    result.cycleCode = cycleCode;
+    result.cycleDepth = cycleDepth;
+    result.cycleR = cycleR;
+    result.cycleQ = cycleQ;
+    result.cycleP = cycleP;
     result.cycleInitialZ = cycleInitialZ;
     result.cycleSpan = cycleSpan;
     result.retractToInitial = retractToInitial;
-    result.blendTolerance = blendTolerance; result.position = position.copy();
+    result.blendTolerance = blendTolerance;
+    result.position = position.copy();
     result.ended = ended;
     return result;
   }

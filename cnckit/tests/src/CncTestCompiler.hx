@@ -21,27 +21,33 @@ class CncTestCompiler {
       var lowered = ToolpathMotion.lower(ir.program, rig.binding);
       program = lowered.program;
       sourceMap = lowered.sourceMap;
-      for (warning in lowered.diagnostics)
-        diagnostics.push(new CncDiagnostic(Warning, warning.code,
-          warning.provenance, warning.message));
+      for (warning in lowered.diagnostics) diagnostics.push(new CncDiagnostic(
+        Warning,
+        warning.code,
+        warning.provenance,
+        warning.message
+      ));
     } catch (error:Dynamic) {
-      diagnostics.push(new CncDiagnostic(Error, "CNC_LOWER",
-        new toolpathkit.path.Provenance(1, 1, 0), Std.string(error)));
+      diagnostics.push(new CncDiagnostic(
+        Error,
+        "CNC_LOWER",
+        new toolpathkit.path.Provenance(1, 1, 0),
+        Std.string(error)
+      ));
     }
     diagnostics.sort(function(a, b) {
       if (a.span.line != b.span.line) return a.span.line - b.span.line;
       return a.span.column - b.span.column;
-    });
-    warnings = [for (diagnostic in diagnostics)
-      if (diagnostic.severity == Warning)
-        'G-code line ${diagnostic.span.line}: ${diagnostic.message}'];
+    }
+    );
+    warnings = [for (diagnostic in diagnostics) if (diagnostic.severity
+      == Warning) 'G-code line ${diagnostic.span.line}: ${diagnostic.message}'];
     return new CncTestCompileResult(program, ir.program.ops, sourceMap, diagnostics);
   }
 
   public function compile(source:String):MotionProgram {
     var result = compileDetailed(source);
-    for (diagnostic in result.diagnostics)
-      if (diagnostic.severity == Error) throw diagnostic.toString();
+    for (diagnostic in result.diagnostics) if (diagnostic.severity == Error) throw diagnostic.toString();
     if (result.program == null) throw "G-code contains no executable motion or barrier";
     return result.program;
   }
@@ -53,8 +59,12 @@ class CncTestCompileResult {
   public final sourceMap:ToolpathSourceMap;
   public final diagnostics:Array<CncDiagnostic>;
 
-  public function new(program:Null<MotionProgram>, ops:Array<ToolpathOp>,
-      sourceMap:ToolpathSourceMap, diagnostics:Array<CncDiagnostic>) {
+  public function new(
+    program:Null<MotionProgram>,
+    ops:Array<ToolpathOp>,
+    sourceMap:ToolpathSourceMap,
+    diagnostics:Array<CncDiagnostic>
+  ) {
     this.program = program;
     this.ops = ops;
     this.sourceMap = sourceMap;
