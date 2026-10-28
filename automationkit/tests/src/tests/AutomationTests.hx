@@ -95,24 +95,7 @@ class AutomationTests {
         "main",
         "map",
         new Pose2(2.0, 1.0, Math.PI / 2),
-        [
-          new RackSlot(
-            "A1",
-            new RackSlotPose(
-              0.2,
-              0.1,
-              0.8
-            )
-          ),
-          new RackSlot(
-            "A2",
-            new RackSlotPose(
-              0.2,
-              -0.1,
-              1.2
-            )
-          )
-        ]
+        [new RackSlot("A1", new RackSlotPose(0.2, 0.1, 0.8)), new RackSlot("A2", new RackSlotPose(0.2, -0.1, 1.2))]
       );
       var charger = new Charger("charger-2", "Charger 2", "main", "map", new Pose2(-1.0, 0.0), "type-2", 11.0);
       facility.addStation(inbound);
@@ -123,10 +106,7 @@ class AutomationTests {
         "inbound-outbound",
         inbound.id,
         outbound.id,
-        new Path(
-          [inbound.pose, outbound.pose],
-          "map"
-        ),
+        new Path([inbound.pose, outbound.pose], "map"),
         2.0,
         0.2,
         false
@@ -135,14 +115,7 @@ class AutomationTests {
         "inbound-rack",
         inbound.id,
         rack.id,
-        new Path(
-          [
-            inbound.pose,
-            new Pose2(2.0, 0.0),
-            rack.pose
-          ],
-          "map"
-        ),
+        new Path([inbound.pose, new Pose2(2.0, 0.0), rack.pose], "map"),
         1.5,
         1.5
       ));
@@ -150,14 +123,7 @@ class AutomationTests {
         "rack-outbound",
         rack.id,
         outbound.id,
-        new Path(
-          [
-            rack.pose,
-            new Pose2(3.0, 1.0),
-            outbound.pose
-          ],
-          "map"
-        ),
+        new Path([rack.pose, new Pose2(3.0, 1.0), outbound.pose], "map"),
         1.5,
         0.3
       ));
@@ -166,10 +132,7 @@ class AutomationTests {
         "Main crossing",
         "main",
         "map",
-        [
-          "inbound-outbound",
-          "inbound-rack"
-        ]
+        ["inbound-outbound", "inbound-rack"]
       ));
       var lane:Lane = cast facility.lane("inbound-outbound");
       var storedRack:Rack = cast facility.rack("rack-4");
@@ -187,13 +150,7 @@ class AutomationTests {
           "bad-frame",
           inbound.id,
           outbound.id,
-          new Path(
-            [
-              inbound.pose,
-              outbound.pose
-            ],
-            "odom"
-          ),
+          new Path([inbound.pose, outbound.pose], "odom"),
           1.0,
           0.5
         )),
@@ -206,24 +163,7 @@ class AutomationTests {
           "main",
           "map",
           new Pose2(),
-          [
-            new RackSlot(
-              "A",
-              new RackSlotPose(
-                0,
-                0,
-                1
-              )
-            ),
-            new RackSlot(
-              "A",
-              new RackSlotPose(
-                0,
-                0,
-                2
-              )
-            )
-          ]
+          [new RackSlot("A", new RackSlotPose(0, 0, 1)), new RackSlot("A", new RackSlotPose(0, 0, 2))]
         ),
         "rack rejects duplicate slot IDs"
       );
@@ -245,24 +185,8 @@ class AutomationTests {
         "main",
         "map",
         new Pose2(6.0, 0.0),
-        [new RackSlot(
-          "S1",
-          new RackSlotPose(
-            0,
-            0,
-            1.0
-          ),
-          [
-            0.05,
-            0.04,
-            0.03
-          ]
-        )],
-        new Surface(
-          0.4,
-          0.3,
-          0.9
-        )
+        [new RackSlot("S1", new RackSlotPose(0, 0, 1.0), [0.05, 0.04, 0.03])],
+        new Surface(0.4, 0.3, 0.9)
       );
       var shelfSlot = shelf.slot("S1"), plainSlot = storedRack.slot("A1");
       var shelfItem = shelfSlot == null ? null : shelfSlot.itemHalfExtents;
@@ -304,23 +228,9 @@ class AutomationTests {
 
       var tasks:Array<Task> = [
         new Pick("pick-1", rack.id, "A1", payload),
-        new Transport(
-          "move-1",
-          inbound.id,
-          outbound.id,
-          payload
-        ),
-        new Place(
-          "place-1",
-          rack.id,
-          "A2",
-          payload
-        ),
-        new Charge(
-          "charge-1",
-          charger.id,
-          0.9
-        )
+        new Transport("move-1", inbound.id, outbound.id, payload),
+        new Place("place-1", rack.id, "A2", payload),
+        new Charge("charge-1", charger.id, 0.9)
       ];
       var mission = new Mission("mission-17", "Restock order 17", tasks);
       var firstTask:Task = cast mission.currentTask();
@@ -456,11 +366,8 @@ class AutomationTests {
         "lower-priority route remains queued behind an active reservation"
       );
       check(
-        traffic.releaseRoute(reverseRoute, thirdRobot.id()) && traffic.reserveRoute(
-          reverseRoute,
-          secondRobot.id(),
-          5
-        ) && traffic.releaseRoute(
+        traffic.releaseRoute(reverseRoute,
+        thirdRobot.id()) && traffic.reserveRoute(reverseRoute, secondRobot.id(), 5) && traffic.releaseRoute(
           reverseRoute,
           secondRobot.id()
         ),
@@ -483,19 +390,7 @@ class AutomationTests {
       var executableMission = new Mission(
         "mission-19",
         "Execute work order",
-        [
-          new Transport(
-            "move-2",
-            inbound.id,
-            outbound.id,
-            payload
-          ),
-          new Charge(
-            "charge-3",
-            charger.id,
-            0.95
-          )
-        ]
+        [new Transport("move-2", inbound.id, outbound.id, payload), new Charge("charge-3", charger.id, 0.95)]
       );
       var executableAssignment:FleetAssignment = cast dispatcher.dispatch(executableMission);
       var skillFactory = new ScriptedTaskSkillFactory();
@@ -586,22 +481,14 @@ class AutomationTests {
       var transportMission = new Mission(
         "mission-21",
         "Drive between stations",
-        [new Transport(
-          "move-3",
-          inbound.id,
-          outbound.id,
-          payload
-        )]
+        [new Transport("move-3", inbound.id, outbound.id, payload)]
       );
       var transportAssignment:FleetAssignment = cast dispatcher.dispatch(transportMission);
       var transportExecutor = new MissionExecutor(
         fleet,
         transportAssignment,
         facility,
-        new FacilityTransportSkillFactory(
-          robotModel,
-          robotDefinition.profile
-        )
+        new FacilityTransportSkillFactory(robotModel, robotDefinition.profile)
       );
       transportExecutor.start();
       check(switch transportExecutor.update(0.02) {
@@ -674,12 +561,7 @@ class AutomationTests {
     rightJoint.axis = [0.0, 1.0, 0.0];
     rightJoint.limits = new JointLimits(-100.0, 100.0, 100.0, 100.0);
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential(
-        "joint/left-wheel",
-        "joint/right-wheel",
-        0.1,
-        0.5
-      ),
+      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel", 0.1, 0.5),
       1.0,
       1.0
     );
@@ -849,12 +731,7 @@ class AutomationTests {
       var replay = new ReplayRobot(
         liveRobot.id(),
         recording,
-        new RobotDescription(
-          liveRobot.id(),
-          "recorded mission forklift",
-          linkNames,
-          jointNames
-        ),
+        new RobotDescription(liveRobot.id(), "recorded mission forklift", linkNames, jointNames),
         new RobotCapabilities(
           liveRobot.id(),
           jointNames.length,
@@ -864,11 +741,7 @@ class AutomationTests {
             robotkit.core.JointTargetMode.Effort
           ],
           robotkit.core.ExecutionCapabilities.unavailable(),
-          new robotkit.core.TimingCapabilities(
-            false,
-            false,
-            trajectorykit.validation.ValidationGuarantee.Unchecked
-          )
+          new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked)
         )
       );
       replayWorld = new RobotWorld();
@@ -994,11 +867,7 @@ private class AutomationFakeRobot implements Robot {
         robotkit.core.JointTargetMode.Effort
       ],
       robotkit.core.ExecutionCapabilities.unavailable(),
-      new robotkit.core.TimingCapabilities(
-        false,
-        false,
-        trajectorykit.validation.ValidationGuarantee.Unchecked
-      )
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked)
     );
     snapshotValue = new RobotSnapshot(
       logicalId,

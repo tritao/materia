@@ -21,10 +21,7 @@ class FacilityRouter {
     fromStationId:String,
     toStationId:String,
     ?unavailableLaneIds:Array<String>,
-    ?laneSpeedLimits:Map<
-      String,
-      Float
-  >
+    ?laneSpeedLimits:Map<String, Float>
   ):FacilityRoute {
     var start = facility.station(fromStationId);
     var goal = facility.station(toStationId);
