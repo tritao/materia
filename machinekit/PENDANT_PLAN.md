@@ -72,7 +72,7 @@ its own pendant. If the OLED proves troublesome, the switch and the HMI still wo
 - The case has a blanked mounting hole for a 3-position enabling switch. The certified upgrade
   fills the hole and wires the four reserved pins, with no new pendant.
 
-## Protocol (payloads implemented in `PendantWire`; CAN identifiers are placeholders)
+## Protocol (payloads in `pendant_wire`; CAN identifiers are placeholders)
 
 CAN-FD frames, at most 64 bytes. These are small pendant messages, not RKD6 frames, which can be
 several KB. Values are placeholders.
@@ -83,10 +83,15 @@ several KB. Values are placeholders.
 | `PENDANT_CONFIG` | cabinet controller to pendant | Axis names for the profile (short strings, up to about 12), step labels. |
 | `PENDANT_OUTPUT` | cabinet controller to pendant | LED states, status line text, refusal code, lease state. |
 
-- Payload layouts are in `machinekit/haxe/src/machinekit/operator/PendantWire.hx`: STATE is 7 bytes
-  (padded to 8), CONFIG one label per frame (kind, index, 12 text bytes; padded to 16), OUTPUT LEDs,
-  lease state and a 21-character status line (padded to 24). The decoder accepts only the exact
-  length, zero padding and zero reserved bits, and `PendantWireTests` pin the byte layout.
+- Payloads are defined in `pendant_wire/schema/pendant.wire.idl`, the same `.wire.idl` system as
+  RKD6, with a compatibility lock. `python -m tools.wire generate --config machinekit/pendant_wire/wire.json`
+  writes the `no_std` Rust codec; `pendant_wire/src/lib.rs` adds the validation the schema cannot
+  express (ranges, reserved bits, NUL-terminated text) and pins the byte layout in tests. Each
+  record is exactly a valid CAN-FD length (STATE 8, CONFIG 16, OUTPUT 24 bytes), and CAN provides
+  the identifier, length and CRC.
+- The host never sees CAN frames: the pendant talks to the cabinet controller, which owns the lease.
+  `PendantAuthority` (Haxe) is the reference model and headless test; the controller needs the same
+  rules in Rust.
 - Sequence numbers reject stale and duplicate frames.
 - Heartbeat loss at the cabinet controller ends the pendant's lease and stops motion. A heartbeat
   loss at the pendant lights a fault LED.

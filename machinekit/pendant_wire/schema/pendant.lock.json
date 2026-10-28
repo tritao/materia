@@ -1,0 +1,121 @@
+{
+  "constants": {
+    "POSITIONS": {
+      "type": "u8",
+      "value": 11
+    },
+    "PROTOCOL_VERSION": {
+      "type": "u8",
+      "value": 1
+    }
+  },
+  "enums": {
+    "ConfigKind": {
+      "underlying": "u8",
+      "values": {
+        "axis": 0,
+        "key": 1
+      }
+    },
+    "LeaseState": {
+      "underlying": "u8",
+      "values": {
+        "granted": 1,
+        "lost": 2,
+        "no_lease": 0
+      }
+    }
+  },
+  "messages": {},
+  "packed_structs": {
+    "PendantConfig": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "kind",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "index",
+          "type": "u8"
+        },
+        {
+          "length": 12,
+          "name": "text",
+          "type": "u8"
+        },
+        {
+          "length": 2,
+          "name": "reserved",
+          "type": "u8"
+        }
+      ],
+      "size": 16
+    },
+    "PendantOutput": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "leds",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "lease",
+          "type": "u8"
+        },
+        {
+          "length": 21,
+          "name": "text",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "reserved",
+          "type": "u8"
+        }
+      ],
+      "size": 24
+    },
+    "PendantState": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "sequence",
+          "type": "u16"
+        },
+        {
+          "length": 1,
+          "name": "wheel_delta",
+          "type": "i16"
+        },
+        {
+          "length": 1,
+          "name": "position",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "step",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "buttons",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "flags",
+          "type": "u8"
+        }
+      ],
+      "size": 8
+    }
+  },
+  "version": 1
+}

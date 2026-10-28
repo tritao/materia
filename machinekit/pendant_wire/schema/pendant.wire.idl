@@ -1,0 +1,47 @@
+# Jog pendant CAN-FD payloads (see ../../PENDANT_PLAN.md). Fixed records, little endian, no framing:
+# CAN supplies the identifier, length and CRC. Each record is exactly a valid CAN-FD frame length
+# (8, 16, 24 bytes), so there is no wire padding to interpret. Reserved bytes must be zero.
+const PROTOCOL_VERSION : u8 = 1;
+const POSITIONS : u8 = 11;
+
+enum LeaseState : u8 {
+    no_lease = 0
+    granted = 1
+    lost = 2
+}
+
+enum ConfigKind : u8 {
+    axis = 0
+    key = 1
+}
+
+# Pendant to cabinet controller, about 100 Hz; also the heartbeat.
+packed PendantState endian little {
+    sequence : u16
+    wheel_delta : i16
+    # 0 is OFF, 1 to 11 select a profile axis.
+    position : u8
+    # 0, 1, 2 for x1, x10, x100.
+    step : u8
+    # Bits 0 to 5: Start, Hold, Stop, F1, F2, F3.
+    buttons : u8
+    # Bit 0 wheel enable, bit 1 E-stop chain closed; other bits reserved zero.
+    flags : u8
+}
+
+# Cabinet controller to pendant: one label per frame, NUL terminated and padded.
+packed PendantConfig endian little {
+    kind : u8
+    index : u8
+    text : u8[12]
+    reserved : u8[2]
+}
+
+# Cabinet controller to pendant: LEDs, lease and the one-line status text.
+packed PendantOutput endian little {
+    # One bit per button, in the same order as PendantState.buttons.
+    leds : u8
+    lease : u8
+    text : u8[21]
+    reserved : u8
+}

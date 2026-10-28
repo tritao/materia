@@ -1,9 +1,0 @@
-{
-  "version": 1,
-  "package": {"name": "machinekit-pendant-wire-tests"},
-  "entry": "PendantWireTests",
-  "sourceRoots": ["src"],
-  "dependencies": {"machinekit": {"path": ".."}},
-  "target": "host",
-  "outputDir": "build/pendant-wire"
-}
