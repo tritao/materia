@@ -10524,10 +10524,10 @@
      "extends": [
       "MachineComponent"
      ],
-     "doc": "An ISO 7380 button head socket screw, A2 stainless. Frame: the head's bearing face at z = 0, the head above it and the\nshank below. Threads are semantic: the shank is the nominal diameter, which is also the bore of its insert.",
+     "doc": "An ISO 7380 button head socket screw, A2 stainless. Frame: the head's bearing face at z = 0, the domed head (with a hex\nsocket) above it and the shank below. The thread is a texture on the shank (`Threads.attach`), not geometry: the shank\nis the nominal diameter, which is also the bore of its insert.",
      "fields": [
       {
-       "name": "thread",
+       "name": "name",
        "kind": "var",
        "signature": ":String",
        "final": true
@@ -10557,23 +10557,41 @@
        "final": true
       },
       {
+       "name": "socketAcrossFlats",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "socketDepth",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "thread",
+       "kind": "var",
+       "signature": ":ThreadSpec",
+       "final": true
+      },
+      {
        "name": "new",
        "kind": "method",
-       "signature": "(thread:String, diameter:Float, length:Float, headDiameter:Float, headHeight:Float):Void"
+       "signature": "(name:String, diameter:Float, pitch:Float, length:Float, headDiameter:Float, headHeight:Float, socketAcrossFlats:Float, socketDepth:Float):Void"
       },
       {
        "name": "m3",
        "kind": "method",
        "signature": "(length:Float):ButtonHeadScrew",
        "static": true,
-       "doc": "M3 x `length`: 5.7 mm head, 1.65 high."
+       "doc": "M3 x `length`: 5.7 mm head, 1.65 high, 2 mm hex socket."
       },
       {
        "name": "m2_5",
        "kind": "method",
        "signature": "(length:Float):ButtonHeadScrew",
        "static": true,
-       "doc": "M2.5 x `length`: 4.7 mm head, 1.4 high."
+       "doc": "M2.5 x `length`: 4.7 mm head, 1.4 high, 1.5 mm hex socket."
       },
       {
        "name": "hasGeometry",
@@ -10982,7 +11000,7 @@
        "kind": "method",
        "signature": "(layout:PanelLayout, plate:() -> Part, ?shell:() -> Part, ?extras:Array<{id:String, solid:() -> Part}>, ?extrasMaterial:String, ?groups:Array<PanelGroup>, ?hardware:Array<PanelHardware>):MachineAssembly",
        "static": true,
-       "doc": "`extras` are further fixed solids in panel coordinates (a board, say), each with an id and a builder, made of\n`extrasMaterial`. The plate and shell are printed nylon, light against the dark controls. When there is a shell or\nextras the plate, shell and extras sit in a `case` group; each of `groups` gathers controls by id, and a control in\nno group stays at the top level. `hardware` (inserts, screws) sits in the case group."
+       "doc": "`extras` are further fixed solids in panel coordinates (a board, say), each with an id and a builder, made of\n`extrasMaterial`. The plate and shell are printed nylon, light against the dark controls. When there is a shell or\nextras the plate, shell and extras sit in a `case` group; each of `groups` gathers controls by id, and a control in\nno group stays at the top level. `hardware` (inserts, screws) goes in a `fasteners` group."
       }
      ]
     },
@@ -11518,9 +11536,15 @@
      "doc": "A heat-set brass insert, pressed into a printed hole with a soldering iron. Frame: the top (the face the screw enters)\nat z = 0, the insert below it. It is modelled at its installed envelope, the pilot hole's diameter, because melted\nplastic flows round the knurls; the bore is the screw's nominal diameter, since threads are semantic. A design\nderives its pilot hole from `pilotDiameter` and `pilotDepth` so hole and insert cannot disagree.",
      "fields": [
       {
-       "name": "thread",
+       "name": "name",
        "kind": "var",
        "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "thread",
+       "kind": "var",
+       "signature": ":ThreadSpec",
        "final": true
       },
       {
@@ -11551,7 +11575,7 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(thread:String, pilotDiameter:Float, pilotDepth:Float, length:Float, boreDiameter:Float):Void"
+       "signature": "(name:String, pitch:Float, pilotDiameter:Float, pilotDepth:Float, length:Float, boreDiameter:Float):Void"
       },
       {
        "name": "m3",
@@ -26383,7 +26407,7 @@
        "name": "hardware",
        "kind": "method",
        "signature": "():Array<PanelHardware>",
-       "doc": "The inserts and screws the plan implies: an M3 insert in each post with a button head screw through the plate's\ncounterbore, and an M2.5 insert in each standoff with a screw through the board. Screw lengths are the shortest\nstandard ones that reach 90 % of the insert, and never past the bottom of its pilot hole."
+       "doc": "The inserts and screws the plan implies: an M3 insert in each post with a button head screw through the plate's\ncounterbore, and an M2.5 insert in each standoff with a screw through the board. Screw lengths are the shortest\nstandard ones that reach 75 % of the insert, and never past the insert's foot."
       },
       {
        "name": "marks",
@@ -26413,6 +26437,20 @@
        "kind": "method",
        "signature": "():Part",
        "doc": "The face plate with the screw holes that match the posts and a perimeter tongue that fits inside the walls."
+      }
+     ]
+    },
+    {
+     "name": "PendantPresentation",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/pendant/PendantPresentation.hx",
+     "doc": "The pendant's views: assembled, and exploded along the panel's z axis in the order it comes apart. The case screws lift\nout, then the plate with every control on it, then the board screws, the board, and last the inserts out of their\nposts and standoffs. Offsets are presentation only; the assembly itself is untouched.",
+     "fields": [
+      {
+       "name": "build",
+       "kind": "method",
+       "signature": "(definition:AssemblyDefinition):AssemblyPresentation",
+       "static": true
       }
      ]
     },

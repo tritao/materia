@@ -239,7 +239,7 @@ the test runtime path, and builds CadKit's core the same way (`cadkit/haxeon.jso
 automatically (see the CadKit README), so the Haxe tests run with:
 
 ```sh
-./haxeon/scripts/haxeon run --project stockkit/tests/haxeon.json            # everything, about 5 minutes
+./haxeon/scripts/haxeon run --project stockkit/tests/haxeon.json            # everything, about 3 minutes
 ./haxeon/scripts/haxeon run --project stockkit/tests/haxeon.json -- --quick  # about 30 seconds
 ```
 

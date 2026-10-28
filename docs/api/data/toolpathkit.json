@@ -13,6 +13,147 @@
    ]
   },
   {
+   "name": "toolpathkit.geometry",
+   "types": [
+    {
+     "name": "ArcPlane",
+     "kind": "enum",
+     "file": "toolpathkit/haxe/toolpathkit/geometry/ArcPlane.hx",
+     "doc": "Arc planes in G-code coordinate order.",
+     "fields": [
+      {
+       "name": "XY",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "XZ",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "YZ",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "GeometryOffset",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/geometry/GeometryOffset.hx",
+     "doc": "Translates paths and offsets planar closed contours without CAM dependencies.",
+     "fields": [
+      {
+       "name": "translate",
+       "kind": "method",
+       "signature": "(geometry:PathGeometry, offset:Array<Float>):PathGeometry",
+       "static": true
+      },
+      {
+       "name": "profile",
+       "kind": "method",
+       "signature": "(vertices:Array<Point3>, radius:Float, depth:Float, outside:Bool):Array<PathGeometry>",
+       "static": true,
+       "doc": "Round corners that open toward the cutter and trim the other joins."
+      },
+      {
+       "name": "validateProfile",
+       "kind": "method",
+       "signature": "(vertices:Array<Point3>, path:Array<PathGeometry>, radius:Float, expectedInside:Bool):Void",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "GeometryTools",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/geometry/GeometryTools.hx",
+     "doc": "Preview queries that do not require MotionKit.",
+     "fields": [
+      {
+       "name": "length",
+       "kind": "method",
+       "signature": "(geometry:PathGeometry):Float",
+       "static": true
+      },
+      {
+       "name": "pointAt",
+       "kind": "method",
+       "signature": "(geometry:PathGeometry, distance:Float):Point3",
+       "static": true
+      },
+      {
+       "name": "tangentAt",
+       "kind": "method",
+       "signature": "(geometry:PathGeometry, distance:Float):Point3",
+       "static": true,
+       "doc": "Unit tangent in the direction of travel at a distance along a path."
+      }
+     ]
+    },
+    {
+     "name": "PathGeometry",
+     "kind": "enum",
+     "file": "toolpathkit/haxe/toolpathkit/geometry/PathGeometry.hx",
+     "doc": "Authored toolpath primitive. All coordinates and lengths are metres.",
+     "fields": [
+      {
+       "name": "Line",
+       "kind": "case",
+       "signature": "(start:Point3, end:Point3)"
+      },
+      {
+       "name": "Arc",
+       "kind": "case",
+       "signature": "(center:Point3, radius:Float, startAngle:Float, sweepAngle:Float)"
+      },
+      {
+       "name": "Circular",
+       "kind": "case",
+       "signature": "(center:Point3, radius:Float, startAngle:Float, sweepAngle:Float, plane:ArcPlane, axialRise:Float)"
+      }
+     ]
+    },
+    {
+     "name": "Point3",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/geometry/Point3.hx",
+     "doc": "Cartesian point in machine metres, independent of MotionKit.",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "z",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, z:Float):Void"
+      },
+      {
+       "name": "distanceTo",
+       "kind": "method",
+       "signature": "(other:Point3):Float"
+      }
+     ]
+    }
+   ]
+  },
+  {
    "name": "toolpathkit.motion",
    "types": [
     {
@@ -978,29 +1119,6 @@
      ]
     },
     {
-     "name": "ArcPlane",
-     "kind": "enum",
-     "file": "toolpathkit/haxe/toolpathkit/path/ArcPlane.hx",
-     "doc": "Arc planes in G-code coordinate order.",
-     "fields": [
-      {
-       "name": "XY",
-       "kind": "case",
-       "signature": ""
-      },
-      {
-       "name": "XZ",
-       "kind": "case",
-       "signature": ""
-      },
-      {
-       "name": "YZ",
-       "kind": "case",
-       "signature": ""
-      }
-     ]
-    },
-    {
      "name": "BeadSection",
      "kind": "class",
      "file": "toolpathkit/haxe/toolpathkit/path/BeadSection.hx",
@@ -1063,60 +1181,6 @@
        "name": "new",
        "kind": "method",
        "signature": "(master:String, ratio:Float):Void"
-      }
-     ]
-    },
-    {
-     "name": "GeometryOffset",
-     "kind": "class",
-     "file": "toolpathkit/haxe/toolpathkit/path/GeometryOffset.hx",
-     "doc": "Translates paths and offsets planar closed contours without CAM dependencies.",
-     "fields": [
-      {
-       "name": "translate",
-       "kind": "method",
-       "signature": "(geometry:PathGeometry, offset:Array<Float>):PathGeometry",
-       "static": true
-      },
-      {
-       "name": "profile",
-       "kind": "method",
-       "signature": "(vertices:Array<Point3>, radius:Float, depth:Float, outside:Bool):Array<PathGeometry>",
-       "static": true,
-       "doc": "Round corners that open toward the cutter and trim the other joins."
-      },
-      {
-       "name": "validateProfile",
-       "kind": "method",
-       "signature": "(vertices:Array<Point3>, path:Array<PathGeometry>, radius:Float, expectedInside:Bool):Void",
-       "static": true
-      }
-     ]
-    },
-    {
-     "name": "GeometryTools",
-     "kind": "class",
-     "file": "toolpathkit/haxe/toolpathkit/path/GeometryTools.hx",
-     "doc": "Preview queries that do not require MotionKit.",
-     "fields": [
-      {
-       "name": "length",
-       "kind": "method",
-       "signature": "(geometry:PathGeometry):Float",
-       "static": true
-      },
-      {
-       "name": "pointAt",
-       "kind": "method",
-       "signature": "(geometry:PathGeometry, distance:Float):Point3",
-       "static": true
-      },
-      {
-       "name": "tangentAt",
-       "kind": "method",
-       "signature": "(geometry:PathGeometry, distance:Float):Point3",
-       "static": true,
-       "doc": "Unit tangent in the direction of travel at a distance along a path."
       }
      ]
     },
@@ -1198,65 +1262,6 @@
       }
      ],
      "doc": "Material laid for one printed object, in m^3."
-    },
-    {
-     "name": "PathGeometry",
-     "kind": "enum",
-     "file": "toolpathkit/haxe/toolpathkit/path/PathGeometry.hx",
-     "doc": "Authored toolpath primitive. All coordinates and lengths are metres.",
-     "fields": [
-      {
-       "name": "Line",
-       "kind": "case",
-       "signature": "(start:Point3, end:Point3)"
-      },
-      {
-       "name": "Arc",
-       "kind": "case",
-       "signature": "(center:Point3, radius:Float, startAngle:Float, sweepAngle:Float)"
-      },
-      {
-       "name": "Circular",
-       "kind": "case",
-       "signature": "(center:Point3, radius:Float, startAngle:Float, sweepAngle:Float, plane:ArcPlane, axialRise:Float)"
-      }
-     ]
-    },
-    {
-     "name": "Point3",
-     "kind": "class",
-     "file": "toolpathkit/haxe/toolpathkit/path/Point3.hx",
-     "doc": "Cartesian point in machine metres, independent of MotionKit.",
-     "fields": [
-      {
-       "name": "x",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "y",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "z",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(x:Float, y:Float, z:Float):Void"
-      },
-      {
-       "name": "distanceTo",
-       "kind": "method",
-       "signature": "(other:Point3):Float"
-      }
-     ]
     },
     {
      "name": "PrintFeature",
@@ -1712,6 +1717,147 @@
    ]
   },
   {
+   "name": "toolpathkit.router",
+   "types": [
+    {
+     "name": "RouterBit",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/router/RouterBit.hx",
+     "doc": "Router tooling dimensions in metres; the holder envelope includes the collet/nut.\nGauge length is spindle gauge plane to tip, independent of exposed cutting length.",
+     "fields": [
+      {
+       "name": "tool",
+       "kind": "var",
+       "signature": ":Tool",
+       "final": true
+      },
+      {
+       "name": "flutes",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "helix",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "collet",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "holder",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "holderDiameter",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "holderLength",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(number:Int, diameter:Float, cuttingLength:Float, stickOut:Float, gaugeLength:Float, flutes:Int, helix:String, collet:String, holder:String, holderDiameter:Float, holderLength:Float):Void"
+      }
+     ]
+    },
+    {
+     "name": "RouterCut",
+     "kind": "class",
+     "file": "toolpathkit/haxe/toolpathkit/router/RouterCut.hx",
+     "doc": "Explicit planning inputs: chip loads in mm/tooth; energy in J/mm3.\nValues are assumptions until qualified for the actual bit/material lot.",
+     "fields": [
+      {
+       "name": "evaluate",
+       "kind": "method",
+       "signature": "(operation:String, bit:RouterBit, rpm:Float, chipMm:Float, minChipMm:Float, maxChipMm:Float, energyJPerMm3:Float, depthMm:Float, widthMm:Float, maxFeedMPerMinute:Float, maxRpm:Float):RouterCutResult",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "RouterCutResult",
+     "kind": "typedef",
+     "file": "toolpathkit/haxe/toolpathkit/router/RouterCutResult.hx",
+     "fields": [
+      {
+       "name": "operation",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "rpm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "requestedFeedMPerMinute",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "feedMPerMinute",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "chipMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "meltingRisk",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "aboveChipRange",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "powerW",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "torqueNm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "meanForceN",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "forceEnvelopeN",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "assumed",
+       "kind": "var",
+       "signature": ":Bool"
+      }
+     ]
+    }
+   ]
+  },
+  {
    "name": "toolpathkit.setup",
    "types": [
     {
@@ -2148,142 +2294,6 @@
        "kind": "case",
        "signature": "",
        "doc": "Overlap with stock is a holder collision."
-      }
-     ]
-    },
-    {
-     "name": "RouterBit",
-     "kind": "class",
-     "file": "toolpathkit/haxe/toolpathkit/tool/RouterBit.hx",
-     "doc": "Router tooling dimensions in metres; the holder envelope includes the collet/nut.\nGauge length is spindle gauge plane to tip, independent of exposed cutting length.",
-     "fields": [
-      {
-       "name": "tool",
-       "kind": "var",
-       "signature": ":Tool",
-       "final": true
-      },
-      {
-       "name": "flutes",
-       "kind": "var",
-       "signature": ":Int",
-       "final": true
-      },
-      {
-       "name": "helix",
-       "kind": "var",
-       "signature": ":String",
-       "final": true
-      },
-      {
-       "name": "collet",
-       "kind": "var",
-       "signature": ":String",
-       "final": true
-      },
-      {
-       "name": "holder",
-       "kind": "var",
-       "signature": ":String",
-       "final": true
-      },
-      {
-       "name": "holderDiameter",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "holderLength",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(number:Int, diameter:Float, cuttingLength:Float, stickOut:Float, gaugeLength:Float, flutes:Int, helix:String, collet:String, holder:String, holderDiameter:Float, holderLength:Float):Void"
-      }
-     ]
-    },
-    {
-     "name": "RouterCut",
-     "kind": "class",
-     "file": "toolpathkit/haxe/toolpathkit/tool/RouterCut.hx",
-     "doc": "Explicit planning inputs: chip loads in mm/tooth; energy in J/mm3.\nValues are assumptions until qualified for the actual bit/material lot.",
-     "fields": [
-      {
-       "name": "evaluate",
-       "kind": "method",
-       "signature": "(operation:String, bit:RouterBit, rpm:Float, chipMm:Float, minChipMm:Float, maxChipMm:Float, energyJPerMm3:Float, depthMm:Float, widthMm:Float, maxFeedMPerMinute:Float, maxRpm:Float):RouterCutResult",
-       "static": true
-      }
-     ]
-    },
-    {
-     "name": "RouterCutResult",
-     "kind": "typedef",
-     "file": "toolpathkit/haxe/toolpathkit/tool/RouterCutResult.hx",
-     "fields": [
-      {
-       "name": "operation",
-       "kind": "var",
-       "signature": ":String"
-      },
-      {
-       "name": "rpm",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "requestedFeedMPerMinute",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "feedMPerMinute",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "chipMm",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "meltingRisk",
-       "kind": "var",
-       "signature": ":Bool"
-      },
-      {
-       "name": "aboveChipRange",
-       "kind": "var",
-       "signature": ":Bool"
-      },
-      {
-       "name": "powerW",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "torqueNm",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "meanForceN",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "forceEnvelopeN",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "assumed",
-       "kind": "var",
-       "signature": ":Bool"
       }
      ]
     },
