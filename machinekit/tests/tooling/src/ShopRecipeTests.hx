@@ -34,6 +34,14 @@ class ShopRecipeTests {
   same(CastingShopRecipe.fabrication(), reference.fabrication, "fabrication inputs");
   same(CastingShopRecipe.compaction(), reference.compaction, "compaction");
   same(CastingShopRecipe.process(base,"mill-base-process-review"), reference.process, "process and compound");
+  var aggregate = CastingShopRecipe.process(base,"aggregate-design-target").castability;
+  var dg:Float = cast aggregate.maximumAggregateSizeMm;
+  same(dg,5,"declared aggregate design target");
+  same(dg * aggregate.minimumWallAggregateRatio,25,"wall and rib minimum");
+  same(dg * (cast aggregate.minimumPassageAggregateRatio:Float),15,"flow passage minimum");
+  same(dg + aggregate.steelAggregateMarginMm,10,"steel cover minimum");
+  same(Math.max(dg + aggregate.steelAggregateMarginMm,dg * aggregate.steelSpacingAggregateRatio),10,
+   "separate steel spacing minimum");
   var expectedCam:Dynamic = reference.cam;
   var diameters:Array<Float> = reference.panelToolDiametersMm;
   var panels = [for (index in 0...diameters.length) {

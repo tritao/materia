@@ -1728,7 +1728,7 @@ compound and bond evidence remain Pending. Proud raw steel is rebated into the
 bed. Cured closures fill the actual clearance and cutter relief of both steel
 and datum receivers; source screw/pin access stays dry and open. Exact coverage
 and the bed-with-closure removal group verify those physical seals.
-The mix design declares 8 mm maximum aggregate from the shop SOURCING.md;
+The mix design declares 5 mm maximum aggregate from the shop SOURCING.md (963246295);
 the named in-house minimum flow-passage ratio is three aggregate diameters.
 Actual grading and compound properties remain unqualified pending evidence.
 Board-limited recipe rules measure the finished cavity along the selected
@@ -1892,7 +1892,7 @@ Former registration decision (2026-10-22): neck and flange sheets register again
 
 Mill step detail decision (2026-10-25): retain the 150 mm foot height and form the step with two declared side clearances, with a structural inside-corner radius (the original cutter-derived 3.2 mm is superseded by the approved 12 mm correction below). Yaw the column pour frame a quarter turn so its tall EPS clearances fit the existing stock. Anchor screening uses an exact insert-local intersection containing every candidate and cover test; the selected pattern still receives whole-body native confirmation.
 
-Mill column foot source correction (user, 2026-10-26): `columnFootCornerRadiusMm` is an independent structural 12 mm radius (1.5 × the declared 8 mm aggregate), replacing the router-derived 3.2 mm. The step clearances are EPS, so the router limit does not apply; actual board formers retain the recipe's cutter-radius-plus-margin rule. The larger fillet addresses a brittle re-entrant corner under clamp load, shrinkage and thermal cycling; a sub-aggregate radius leaves a resin-rich fillet. Preserve all service holes. Verify clamp-bolt access, sole pads, anchor cover and the joint, and report conflicts rather than shrinking the radius. Capture the approved corrected frozen CAD, regenerate the column kit, and compare the two radii with the existing FEM export as a conditional elastic result.
+Mill column foot source correction (user, 2026-10-26): `columnFootCornerRadiusMm` is an independent structural 12 mm radius (1.5 × the then-declared 8 mm aggregate; retained after the 5 mm mix revision), replacing the router-derived 3.2 mm. The step clearances are EPS, so the router limit does not apply; actual board formers retain the recipe's cutter-radius-plus-margin rule. The larger fillet addresses a brittle re-entrant corner under clamp load, shrinkage and thermal cycling; a sub-aggregate radius leaves a resin-rich fillet. Preserve all service holes. Verify clamp-bolt access, sole pads, anchor cover and the joint, and report conflicts rather than shrinking the radius. Capture the approved corrected frozen CAD, regenerate the column kit, and compare the two radii with the existing FEM export as a conditional elastic result.
 
 Column corner study detail decision (2026-10-26): use the canonical Small frame factory for FEM export, including its selected supplier Y drive, rather than reconstructing a second frame with default drive clearances. Keep the torsion study's assumed elastic properties (cast E = 35 GPa, ν = 0.25; steel E = 210 GPa, ν = 0.30). Compare policy clamp preload plus the existing 500 N bending reference on a clamped sole, with perfectly bonded source sole pads and rigid bolt-head patches. This is a conditional linear continuum comparison, without material strength, slip, shrinkage or thermal-cycle qualification. Retain serial direct SPOOLES explicitly; an iterative-solver substitution failed same-deck numerical agreement and was rejected. Keep the existing force, moment, energy and mesh checks. Conditional result: the refined integration-point first-principal peaks are 0.882 MPa at 3.2 mm and 0.566 MPa at 12 mm (36% lower); refinement changes are 1.5% and 2.9%, within the stated 5% numerical tolerance. The approved frozen comparison is zero; access, sole pads and joint checks pass with no new cover conflict. Existing aggregate-gate findings remain open.
 
@@ -1907,7 +1907,7 @@ Mill interface detail decision (2026-10-25): the finished Y seat plane is the ca
 Mill bed detail decision (2026-10-25): keep the bed at the source casting boundary and route rebates for proud raw steel. Model the compatible cured closure as the exact routed clearance/relief volume minus the steel envelope; it remains attached to the bed in assembly and removal. Do not fill those corner gaps with a geometric tolerance. Dry-fit/protect the raw mounting faces, cure and inspect the closure before the pour, and keep all steel/anchor bonding faces uncoated. The existing material/coupon qualification remains Pending. Fixing length uses the remaining board below each rebate floor.
 
 Mill joint detail decision (2026-10-25): retain the four M12 clamp centres and use three fully threaded ISO 4026 flat-point M8 × 25 jacks in a 3 mm grout gap. The fully threaded source holes need ordinary bore protection and no counterbore. Jack bearing and strength remain unqualified. Jack/fixture spacing and access depth follow the hole policy and a 2.5 mm driver clearance; the two anchor lands are sized from demand. All four sole pads have the same jack and dedicated fixture drilling; three jacks are installed, with unused holes protected during the pour. Cure precedes final clamp torque. The lifting selector admits 36 × 100 × 30 mm blanks: the centred M12 thread retains the policy's 12 mm radial wall, the demand-sized M6 pattern fits, and exact neighbour/cover checks pass. Front base lifts quarter-turn that same part. The rear chamber floor also retains the declared roof web above the bolt-access ceiling.
-Mill passage detail decision (2026-10-25, aggregate declaration updated 2026-10-26): use the shared in-house minimum flow-passage/aggregate ratio of 3 with the shop mix design's declared 8 mm top size. Actual grading and compound properties still need qualification.
+Mill passage detail decision (2026-10-25, aggregate declaration updated 2026-10-26): use the shared in-house minimum flow-passage/aggregate ratio of 3 with the shop mix design's declared 5 mm top size (user revision 2026-10-28). Actual grading and compound properties still need qualification.
 
 ## Source-simplification leftover sweep (2026-10-26)
 
@@ -1919,16 +1919,16 @@ The unused fragment ancestry field and parent-opening aliases are deleted. Casti
 
 ## Aggregate gate scope (user, 2026-10-26)
 
-The shop mix declares 8 mm maximum aggregate (`SOURCING.md`, Vetonek 4–8 mm).
+The shop mix declares 5 mm maximum aggregate (`machinekit/examples/casting-shop/SOURCING.md`, commit 963246295, user decision 2026-10-28).
 Compound strength and modulus remain unqualified pending coupons. Finished-resin
 measurements use these separate recipe classes:
 
-| Class | Requirement at dg = 8 mm |
+| Class | Requirement at dg = 5 mm |
 | --- | --- |
-| Wall/rib between cavity, mold or free faces | 5 dg = 40 mm (Rampf EPUMENT 140/8B pairing) |
-| Pour-flow passage between cores and/or mold walls | 3 dg = 24 mm |
-| Steel cover to mold, EPS or free face | dg + 5 = 13 mm |
-| Clear spacing between separate insert assemblies | max(dg + 5, 4/3 dg) = 13 mm |
+| Wall/rib between cavity, mold or free faces | 5 dg = 25 mm (Rampf EPUMENT 140/5 pairing) |
+| Pour-flow passage between cores and/or mold walls | 3 dg = 15 mm |
+| Steel cover to mold, EPS or free face | dg + 5 = 10 mm |
+| Clear spacing between separate insert assemblies | max(dg + 5, 4/3 dg) = 10 mm |
 | Within one insert assembly, including its own anchors | No passage-spacing floor; recesses must open to bulk resin, with no narrow enclosed/dead-end pocket along its whole depth; open gaps fill with matrix fines |
 
 The aggregate-related steel terms are adopted from EN 1992-1-1 8.2 (`dg + 5`)
@@ -1937,7 +1937,17 @@ Where a structural resin wall also carries a flow path, both rules apply.
 Report one row per source feature pair and rule class: minimum measurement,
 required clearance, witness count and location bounding box. Attach every raw
 witness. Keep socket-tail shadow coverage Unsupported where exact projection is
-unavailable. No geometry change is authorised by the report; source corrections
-wait for the user's decision.
+unavailable. The report itself does not authorise geometry changes; the approved
+2026-10-28 source decision below governs the corrections.
 
 Status: aggregate-gate code complete; the four-casting grouped report records source geometry holds, with socket-tail coverage Unsupported and the compound section limit Pending. No gate-driven geometry correction has been applied. The source-only `haxeon.aggregate-review.json` entry and normal kit export use the same process-analysis pipeline and report renderer.
+
+## Aggregate source decision (user, 2026-10-28)
+
+First rerun the grouped report on unchanged geometry with the 5 mm mix design above and send its failure table before source changes. SOURCING.md at 963246295 is the mix-design authority; compound strength and modulus remain Pending on coupons.
+
+For remaining failures, approved corrections are: steel faces flush with an already-finished exposed face and sealed to the mold, or behind at least 10 mm resin cover (prefer moving/resizing steel); separate insert assemblies at least 10 mm apart. Apply this to the mill lifting blocks, column sole pads, bolt-access/foot inserts and Z rail cover, and plinth tray-clamp seats. Clear mill rear lifts from column-joint pads and column front lifts from Z rails. Merge each hobber-column side's lifting blocks into one plate with two lifting threads, retaining four lift points and the four-point shop rule.
+
+Replace hobber cast foot-plate registers with the mill removable compression-foot arrangement from REVIEW.md B1, using the single levelling-foot family. Remaining thin webs at mill base shoulders/bearing seat and foot access, mill column shaft/motor/Z-channel/bolt access, and plinth work well/drive channel/tray ledges must be at least 25 mm, or removed by merging voids or filling one solid, whichever is simpler and preserves function. Report every choice. Preserve the approved 12 mm structural column-foot radius.
+
+Stop for a decision if a correction would move a functional rail, drive, joint or datum interface or lose function. Record each approved frozen-CAD correction and verify exact agreement against the corrected source; regenerate and verify affected kits. No geometry correction has yet been applied under this decision.

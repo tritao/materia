@@ -13,9 +13,9 @@ import materia.tooling.panel.PanelPlan;
  */
 class CastingShopRecipe {
  public static inline var BOARD_THICKNESS_MM = 18;
- /** Mix-design top size from SOURCING.md (Vetonek 4–8 mm). Actual grading still needs qualification. */
- public static inline var MAXIMUM_AGGREGATE_MM = 8;
- /** SOURCING.md design target; RAMPF EPUSELF brochure, EPUMENT 140/8B: 8 mm / 40 mm. */
+ /** Mix-design top size from SOURCING.md (Vetonek graded 0–5 mm; SOURCING.md decision 2026-10-28). Actual grading still needs qualification. */
+ public static inline var MAXIMUM_AGGREGATE_MM = 5;
+ /** SOURCING.md design target; RAMPF EPUSELF brochure, EPUMENT 140/5: 5 mm / 25 mm. */
  public static inline var MINIMUM_WALL_AGGREGATE_RATIO = 5;
  /** In-house minimum clear passage/aggregate ratio. */
  public static inline var MINIMUM_PASSAGE_AGGREGATE_RATIO = 3;
@@ -150,8 +150,8 @@ class CastingShopRecipe {
    steelSpacingAggregateRatio:STEEL_SPACING_AGGREGATE_RATIO,evidence:[
    "EN 1992-1-1 8.2: adopted aggregate-related dg+5 mm term for steel cover and spacing (not full RC code qualification)",
    "ACI 318: adopted clear-spacing term 4/3 dg",
-   "machinekit/examples/casting-shop/SOURCING.md#design-target (Vetonek 4–8 mm top grade)",
-   "https://www.rampf-group.com/fileadmin/Downloads/RMA/Epuself-RAMPF-EN.pdf pp.6–7, EPUMENT 140/8B (8 mm / 40 mm)"
+   "machinekit/examples/casting-shop/SOURCING.md#design-target (5 mm mix-design maximum, decision 2026-10-28)",
+   "https://www.rampf-group.com/fileadmin/Downloads/RMA/Epuself-RAMPF-EN.pdf pp.6–7, EPUMENT 140/5 (5 mm / 25 mm)"
   ]},
 		compound:{reference:materia.casting.CastingInput.CastingTextInput.Unresolved("Production compound and datasheet"),
 			thickness:materia.tooling.process.CastingProcessSpec.CompoundThicknessLimit.Unresolved("Compound section or layer thickness limit"),
