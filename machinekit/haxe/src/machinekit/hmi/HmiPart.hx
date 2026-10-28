@@ -2,11 +2,16 @@ package machinekit.hmi;
 
 import cadkit.modeling.Footprint;
 import cadkit.modeling.FootprintGeometry;
+import cadkit.modeling.Part;
+import cadkit.modeling.Vector;
+import machinekit.assembly.MachineAssembly;
+import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentParameter;
 import machinekit.component.PanelMountFacet;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.ComponentValues;
 import machinekit.component.MachineComponent;
+import machinekit.component.Solids;
 import machinekit.transmission.ValueBasis;
 
 /**
@@ -48,6 +53,45 @@ class HmiPart extends MachineComponent {
     if (!ok) throw designation + ": " + message;
   }
   override public function hasGeometry():Bool return true;
+
+  /**
+   * The device as its separately finished bodies, the purchase first; null for a part that is one solid. The whole device's
+   * `geometry` is these bodies fused, so there is one description of the shape.
+   */
+  public function bodies():Null<Array<DeviceBodySpec>> return null;
+
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    var specs = bodies();
+    if (specs == null) throw designation + ": no geometry";
+    return Solids.union([for (spec in specs) spec.build()]);
+  }
+
+  /**
+   * The device as an assembly of its bodies in the device's own frame, or null when it is one solid. The first body is the
+   * purchase and carries the BOM line; the others are included in it. Each body takes a share of the declared mass by volume.
+   */
+  public function expand():Null<MachineAssembly> {
+    var specs = bodies();
+    if (specs == null) return null;
+    var volumes:Array<Float> = [], centres:Array<Vector> = [];
+    var total = 0.0;
+    for (spec in specs) {
+      var solid = spec.build();
+      var physical = solid.massProperties();
+      volumes.push(physical.volume);
+      centres.push(physical.centerOfMass);
+      total += physical.volume;
+      solid.close();
+    }
+    var assembly = new MachineAssembly();
+    for (i in 0...specs.length) {
+      var spec = specs[i];
+      var name = i == 0 ? designation : designation + "-" + spec.id.toUpperCase();
+      assembly.addComponent(spec.id, new DeviceBody(name, spec.label, spec.material, spec.build, this, i == 0,
+        n("massGrams") / 1000.0 * volumes[i] / total, centres[i]));
+    }
+    return assembly;
+  }
 
   public function dataSource():String return switch basis {
     case Catalog: "vendor-drawing";

@@ -34,7 +34,11 @@ class PanelAssemblyBuilder {
     }
     for (c in layout.controls) {
       var target = groupOf.exists(c.id) ? groupOf.get(c.id) : assembly;
-      target.addComponent(c.id, c.part, AssemblyFrames.translation(c.x, c.y, layout.thickness));
+      var pose = AssemblyFrames.translation(c.x, c.y, layout.thickness);
+      // A device made of several finished bodies goes in as a subassembly of them; a one-solid part goes in as itself.
+      var device:Null<HmiPart> = Std.isOfType(c.part, HmiPart) ? cast c.part : null;
+      var expanded = device == null ? null : device.expand();
+      if (expanded == null) target.addComponent(c.id, c.part, pose); else target.include(c.id, expanded, pose);
     }
     for (g in grouped) assembly.include(g.id, g.assembly);
     return assembly;

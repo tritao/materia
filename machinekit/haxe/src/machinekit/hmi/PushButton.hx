@@ -49,16 +49,23 @@ class PushButton extends HmiPart {
   function behindFace():Float return n("behindDepth");
   function rearBody():Footprint return Circle(n("bodyDiameter"));
 
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var b = n("bezelDiameter") / 2, c = n("capDiameter") / 2, bh = n("bezelHeight"), top = n("capHeight");
-    var front = Part.revolve([
-      {r: 0.0, z: 0.0}, {r: b, z: 0.0}, {r: b, z: bh}, {r: c, z: bh}, {r: c, z: top - 1.2}, {r: c - 1.2, z: top}, {r: 0.0, z: top}
-    ]);
-    var parts:Array<Part> = [Solids.named(front, "cap")];
+  /** A black housing (barrel, nut, body) and the coloured cap and bezel in front of it. */
+  override public function bodies():Null<Array<DeviceBodySpec>> {
     var t = n("panelThickness"), nut = n("nutThickness");
-    parts.push(Solids.named(Part.cylinderSpan(n("barrelDiameter") / 2, -t - nut, 0.0), "barrel"));
-    parts.push(Solids.named(Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t), "nut"));
-    parts.push(Solids.named(Part.cylinderSpan(n("bodyDiameter") / 2, -n("behindDepth"), -t - nut), "body"));
-    return Solids.union(parts);
+    return [
+      new DeviceBodySpec("housing", "push button housing", "ABS black", function() {
+        return Solids.union([
+          Solids.named(Part.cylinderSpan(n("barrelDiameter") / 2, -t - nut, 0.0), "barrel"),
+          Solids.named(Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t), "nut"),
+          Solids.named(Part.cylinderSpan(n("bodyDiameter") / 2, -n("behindDepth"), -t - nut), "body")
+        ]);
+      }),
+      new DeviceBodySpec("cap", "push button cap", materialSpec(), function() {
+        var b = n("bezelDiameter") / 2, c = n("capDiameter") / 2, bh = n("bezelHeight"), top = n("capHeight");
+        return Solids.named(Part.revolve([
+          {r: 0.0, z: 0.0}, {r: b, z: 0.0}, {r: b, z: bh}, {r: c, z: bh}, {r: c, z: top - 1.2}, {r: c - 1.2, z: top}, {r: 0.0, z: top}
+        ]), "cap");
+      })
+    ];
   }
 }

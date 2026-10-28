@@ -54,29 +54,35 @@ class EmergencyStop extends HmiPart {
   function behindFace():Float return n("panelThickness") + n("nutThickness") + n("baseLength") + n("blockLength");
   function rearBody():Footprint return Rect(n("baseWidth"), n("baseDepth"));
 
-  override public function geometry(detail:ComponentDetail = Preview):Part {
-    var above = aboveFace(), c = n("collarHeight"), h = n("headDiameter") / 2;
-    var head = Part.revolve([
-      {r: 0.0, z: 0.0}, {r: n("collarDiameter") / 2, z: 0.0}, {r: n("collarDiameter") / 2, z: c},
-      {r: h - 1.5, z: c + 1.5}, {r: h, z: c + 4.0}, {r: h, z: above - 3.0}, {r: h - 3.0, z: above - 0.6},
-      {r: h - 8.0, z: above}, {r: 0.0, z: above}
-    ]);
-    var parts:Array<Part> = [Solids.named(head, "head")];
+  /** The black operator (stem, ring nut, base and contact blocks) and the red mushroom head on its collar. */
+  override public function bodies():Null<Array<DeviceBodySpec>> {
     var t = n("panelThickness"), nut = n("nutThickness");
-    parts.push(Solids.named(Part.cylinderSpan(n("panelHole") / 2, -t - nut, 0.0), "stem"));
-    parts.push(Solids.named(Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t), "nut"));
-    var base = Part.box(n("baseWidth"), n("baseDepth"), n("baseLength"));
-    parts.push(Solids.named(drop(base, -t - nut - n("baseLength")), "base"));
-    // Contact blocks side by side across the base's depth, centred.
-    var blockCount = count("blocks");
-    for (i in 0...blockCount) {
-      var block = Part.box(n("blockWidth"), n("blockThickness"), n("blockLength"));
-      var y = (i - (blockCount - 1) / 2) * n("blockThickness");
-      var moved = block.translated(new Vector(0, y, -t - nut - n("baseLength") - n("blockLength")));
-      block.close();
-      parts.push(Solids.named(moved, "block" + (i + 1)));
-    }
-    return Solids.union(parts);
+    return [
+      new DeviceBodySpec("operator", "emergency stop operator and contact blocks", "ABS black", function() {
+        var parts:Array<Part> = [Solids.named(Part.cylinderSpan(n("panelHole") / 2, -t - nut, 0.0), "stem")];
+        parts.push(Solids.named(Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t), "nut"));
+        var base = Part.box(n("baseWidth"), n("baseDepth"), n("baseLength"));
+        parts.push(Solids.named(drop(base, -t - nut - n("baseLength")), "base"));
+        // Contact blocks side by side across the base's depth, centred.
+        var blockCount = count("blocks");
+        for (i in 0...blockCount) {
+          var block = Part.box(n("blockWidth"), n("blockThickness"), n("blockLength"));
+          var y = (i - (blockCount - 1) / 2) * n("blockThickness");
+          var moved = block.translated(new Vector(0, y, -t - nut - n("baseLength") - n("blockLength")));
+          block.close();
+          parts.push(Solids.named(moved, "block" + (i + 1)));
+        }
+        return Solids.union(parts);
+      }),
+      new DeviceBodySpec("head", "emergency stop mushroom head", materialSpec(), function() {
+        var above = aboveFace(), c = n("collarHeight"), h = n("headDiameter") / 2;
+        return Solids.named(Part.revolve([
+          {r: 0.0, z: 0.0}, {r: n("collarDiameter") / 2, z: 0.0}, {r: n("collarDiameter") / 2, z: c},
+          {r: h - 1.5, z: c + 1.5}, {r: h, z: c + 4.0}, {r: h, z: above - 3.0}, {r: h - 3.0, z: above - 0.6},
+          {r: h - 8.0, z: above}, {r: 0.0, z: above}
+        ]), "head");
+      })
+    ];
   }
 
   static function drop(part:Part, z:Float):Part {

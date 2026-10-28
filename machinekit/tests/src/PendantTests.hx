@@ -84,11 +84,30 @@ class PendantTests {
     var assembly = PanelAssemblyBuilder.build(layout, () -> pendantCase.plate(), () -> pendantCase.shell(), [{id: "board", solid: () -> pendantCase.board()}], "FR4 PCB", ReferencePendant.groups());
     var report = AssemblyIntegrity.check(assembly);
     check(report.errors().length == 0, "Interference: " + [for (e in report.errors()) e.message].join(" | "));
-    // The hierarchy reads case, jog, selectors, function and cycle keys, with the E-stop and display on their own.
+    // The hierarchy reads case, jog, selectors, function and cycle keys, with the E-stop and display on their own, and each device is its bodies.
     var ids = [for (c in assembly.components()) c.id];
-    for (id in ["case/plate", "case/shell", "case/board", "jog/wheel", "jog/wheel-enable", "selectors/axis", "selectors/step", "function-keys/f2", "cycle-keys/hold", "estop", "display"])
+    for (id in ["case/plate", "case/shell", "case/board", "jog/wheel", "jog/wheel-enable/housing", "jog/wheel-enable/cap", "selectors/axis/switch", "selectors/axis/knob",
+        "function-keys/f2/housing", "cycle-keys/hold/cap", "estop/operator", "estop/head", "display"])
       check(ids.indexOf(id) >= 0, "Missing member " + id + " in " + ids.join(", "));
-    check(ids.length == 15, "Fifteen members: " + ids.length);
+    check(ids.length == 25, "Twenty-five bodies: " + ids.length);
+    // Splitting a device does not change the bill of materials: one line per purchase, the bodies included in it.
+    var bom = new machinekit.component.Bom();
+    for (c in assembly.components()) bom.addComponent(c.component);
+    var purchases = 0;
+    for (line in bom.lines()) purchases += line.quantity;
+    check(purchases == 15, "Fifteen purchases (plate, shell, board and twelve controls): " + purchases + " " + [for (l in bom.lines()) l.partNumber + " x" + l.quantity].join(", "));
+
+    // The bodies of a device share its declared mass, and the head is the colour the part shows.
+    var stop = PartPresets.xb2Es542();
+    var stopBodies = stop.expand();
+    check(stopBodies != null, "The E-stop expands into bodies");
+    if (stopBodies != null) {
+      var sum = 0.0;
+      for (c in stopBodies.components()) sum += c.component.massProperties().mass;
+      check(Math.abs(sum - stop.n("massGrams") / 1000.0) < 1e-9, "Body masses add up to the device: " + sum);
+      for (c in stopBodies.components()) check(c.id != "head" || c.component.materialId == "abs-red", "The E-stop head is red");
+      for (c in stopBodies.components()) check(c.id != "operator" || c.component.materialId == "abs-black", "The E-stop operator is black");
+    }
 
     var stepDir = Sys.getEnv("PENDANT_CASE_STEP_DIR");
     if (stepDir != null && stepDir != "") { shell.shape.exportStep(stepDir + "/pendant-shell.step"); plate.shape.exportStep(stepDir + "/pendant-plate.step"); }
