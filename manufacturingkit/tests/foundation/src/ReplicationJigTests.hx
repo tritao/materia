@@ -2,7 +2,6 @@ import materia.assembly.AssemblyFrames as F;
 import materia.casting.CastingSolid;
 import materia.casting.InterfaceRequirement;
 import materia.casting.InterfaceRelationship;
-import materia.casting.InterfaceRelationship.InterfaceRelationships as R;
 import materia.casting.CastingInterfaceContext;
 import materia.tooling.casting.ReplicationJig;
 import materia.tooling.casting.ReplicationJig.ReplicationJigCodec as Codec;

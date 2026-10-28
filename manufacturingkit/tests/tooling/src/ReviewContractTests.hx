@@ -4,7 +4,6 @@ import materia.tooling.ToolingValidation;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
 import materia.tooling.casting.CastingMoldPlan.MoldOptions;
-import materia.casting.BoxAlgebra;
 import materia.tooling.export.ToolingFabrication;
 import materia.tooling.export.ToolingLoads;
 import materia.tooling.process.CastabilityAnalysis;

@@ -1,6 +1,5 @@
 package tests;
 
-import materia.sheet.SheetCut;
 import materia.sheet.SheetCutExecution;
 import materia.sheet.SheetCutPlan;
 import materia.sheet.SheetInventory;
@@ -11,7 +10,6 @@ import materia.sheet.SheetPlanValidation;
 import materia.sheet.SheetPlanValidator;
 import materia.sheet.SheetProjectCodec;
 import materia.sheet.SheetProjectRecord;
-import materia.sheet.SheetRequirementReference;
 import materia.sheet.SheetStockSpec;
 import materia.project.MaterialDef;
 import sys.FileSystem;

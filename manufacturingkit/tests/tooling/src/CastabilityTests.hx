@@ -1,7 +1,6 @@
 import materia.casting.CastingProfiles as Profiles;
 import materia.casting.CastingFeature.CastingGeometrySolid;
 import materia.tooling.ToolingCodec;
-import materia.tooling.ToolingDocument;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlan.MoldBox;
 import materia.tooling.process.CastingProcessSpec;

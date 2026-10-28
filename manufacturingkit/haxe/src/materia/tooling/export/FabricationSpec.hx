@@ -1,6 +1,5 @@
 package materia.tooling.export;
 
-import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingIds;
 
 enum abstract ResinSolvent(String) to String {
