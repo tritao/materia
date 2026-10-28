@@ -18,6 +18,7 @@ class EmergencyStop extends HmiPart {
   static var recipe:Null<ComponentType>;
 
   static function inputs():Array<ComponentParameter> return [
+    R.catalog("model", ControlCatalogs.eStops(), ControlCatalogs.XB2),
     HmiPart.basisParameter("stated"),
     R.length("headDiameter", 40), R.length("collarDiameter", 30), R.length("collarHeight", 9), R.length("headHeight", 22),
     R.length("panelHole", 22.3), R.length("panelThickness", 3),
@@ -28,7 +29,7 @@ class EmergencyStop extends HmiPart {
   ];
 
   public function new(?v:ComponentValues) {
-    super("hmi-emergency-stop", "twist-release emergency stop with " + (v == null || v.get("blocks") == null ? 1 : v.integer("blocks")) + " NC contact block(s)", "plastic", inputs(), v);
+    super("hmi-emergency-stop", "twist-release emergency stop with " + (v == null || v.get("blocks") == null ? 1 : v.integer("blocks")) + " NC contact block(s)", "plastic", inputs(), ControlCatalogs.withModel(ControlCatalogs.eStops(), ControlCatalogs.XB2, v));
     positive(["headDiameter", "collarDiameter", "collarHeight", "headHeight", "panelHole", "panelThickness", "nutDiameter", "nutThickness",
       "baseWidth", "baseDepth", "baseLength", "blockWidth", "blockThickness", "blockLength", "massGrams"]);
     require(n("collarDiameter") < n("headDiameter") && n("panelHole") < n("collarDiameter"), "the head is wider than its collar and the collar wider than the opening");

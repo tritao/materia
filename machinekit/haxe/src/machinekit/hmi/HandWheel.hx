@@ -18,6 +18,7 @@ class HandWheel extends HmiPart {
   static var recipe:Null<ComponentType>;
 
   static function inputs():Array<ComponentParameter> return [
+    R.catalog("model", ControlCatalogs.wheels(), ControlCatalogs.YUMO),
     HmiPart.basisParameter("catalog"),
     R.length("outerDiameter", 60), R.length("flangeThickness", 6), R.length("coneHeight", 11),
     R.length("ringDiameter", 49), R.length("ringHeight", 9),
@@ -30,7 +31,7 @@ class HandWheel extends HmiPart {
   ];
 
   public function new(?v:ComponentValues) {
-    super("hmi-hand-wheel", "manual pulse generator hand wheel", "aluminium 6061", inputs(), v);
+    super("hmi-hand-wheel", "manual pulse generator hand wheel", "aluminium 6061", inputs(), ControlCatalogs.withModel(ControlCatalogs.wheels(), ControlCatalogs.YUMO, v));
     positive(["outerDiameter", "flangeThickness", "ringDiameter", "ringHeight", "dialDiameter", "bossDiameter", "studCircleDiameter", "studDiameter", "studHoleDiameter", "studLength", "massGrams", "maxPanelThickness"]);
     require(n("studHoleDiameter") >= n("studDiameter"), "the stud holes pass the studs");
     require(n("ringDiameter") <= n("outerDiameter") && n("dialDiameter") < n("ringDiameter"), "the wheel narrows from flange to ring to dial");

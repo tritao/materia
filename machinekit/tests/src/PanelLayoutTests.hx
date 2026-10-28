@@ -38,7 +38,7 @@ class PanelLayoutTests {
     check(hasProblem(layout.withControl(layout.control("button").movedTo(-45.0, -15.0)), "axis and button"), "Overlap");
     check(hasProblem(layout.withControl(layout.control("estop").movedTo(-50.0, 31.0)), "estop does not fit"), "E-stop above the panel");
     check(hasProblem(layout.withControl(layout.control("estop").movedTo(-76.0, 25.0)), "body of estop reaches into the case wall"), "A rear body in the wall");
-    var deep = new EmergencyStop(new ComponentValues().setNumber("blockLength", 38));
+    var deep = new EmergencyStop(new ComponentValues().setToken("model", ControlCatalogs.CUSTOM).setNumber("blockLength", 38));
     check(hasProblem(layout.withControl(new PlacedPart("estop", deep, -50.0, 25.0)), "estop reaches 57 mm"), "An E-stop with a long block is too deep for the case");
     var overlapping = new PanelLayout(160.0, 100.0, 3.0, 3.0, 48.0, [new PlacedPart("a", PartPresets.pushButton16(), 0.0, 0.0), new PlacedPart("b", PartPresets.pushButton16(), 23.0, 0.0)]);
     check(hasProblem(overlapping, "bodies of a and b overlap"), "Rear bodies that overlap");

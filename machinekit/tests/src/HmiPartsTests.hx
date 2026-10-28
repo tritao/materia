@@ -3,6 +3,7 @@ import haxeon.Equality;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentParameterType;
 import machinekit.component.ComponentValues;
+import machinekit.catalog.CatalogMetadata;
 import machinekit.component.MachineComponent;
 import machinekit.component.MachineKitComponents;
 import machinekit.component.PanelMountFacet;
@@ -50,6 +51,7 @@ class HmiPartsTests {
       var variants:Array<ComponentValues> = [base.values()];
       for (parameter in type.parameters()) switch parameter.type {
         case Choice(options): for (option in options) variants.push(base.values().setToken(parameter.name, option));
+        case CatalogDesignation(index): for (designation in index.designations()) variants.push(base.values().setToken(parameter.name, designation));
         case Bool: variants.push(base.values().setBoolean(parameter.name, !base.values().boolean(parameter.name)));
         case _:
       }
@@ -106,9 +108,17 @@ class HmiPartsTests {
     check(estop.ports().length == 1 && compact.ports().length == 1, "One block, one contact port");
     near(yumo.massProperties().mass * 1000.0, 250.0, "YUMO mass", 1e-6);
 
-    rejects("a ring wider than the flange", () -> new HandWheel(new ComponentValues().setNumber("ringDiameter", 70)));
+    // The numbers come from catalog rows, with their provenance.
+    check(yumo.values().token("model") == ControlCatalogs.YUMO && vallder.values().token("model") == ControlCatalogs.VALLDER, "Presets select catalog rows");
+    check(ControlCatalogs.wheels().designations().join(",") == "CUSTOM,YUMO-ISM6045-100B,VALLDER-1165001", "Wheel designations");
+    var yumoMeta = ControlCatalogs.wheels().metadata(ControlCatalogs.YUMO);
+    check(yumoMeta.verifiedFields.indexOf("studCircleDiameter") >= 0 && yumoMeta.conformance == NominalEnvelope, "Wheel provenance");
+    check(ControlCatalogs.eStops().metadata(ControlCatalogs.EAO).standard == "EN 60947-5-5", "Compact E-stop standard");
+    check(compact.values().token("model") == ControlCatalogs.EAO && m(compact).behind < 20.0, "The compact E-stop row is shallow");
+    rejects("a ring wider than the flange", () -> new HandWheel(new ComponentValues().setToken("model", ControlCatalogs.CUSTOM).setNumber("ringDiameter", 70)));
     rejects("too many contact blocks", () -> new EmergencyStop(new ComponentValues().setInteger("blocks", 4)));
-    rejects("a handle outside the dial", () -> new HandWheel(new ComponentValues().setNumber("handleRadius", 30)));
+    rejects("a handle outside the dial", () -> new HandWheel(new ComponentValues().setToken("model", ControlCatalogs.CUSTOM).setNumber("handleRadius", 30)));
+    rejects("an unknown model", () -> new HandWheel(new ComponentValues().setToken("model", "NOT-A-WHEEL")));
     trace("hmi parts tests passed");
   }
   public static function main():Void run();
