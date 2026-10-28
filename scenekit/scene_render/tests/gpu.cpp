@@ -3,6 +3,7 @@
 #include "nativekit_window.h"
 
 #include "scene_internal.hpp"
+#include "stroke_support.hpp"
 
 #include <array>
 #include <cassert>
@@ -220,6 +221,106 @@ void sidedness_regression(nkgpu_renderer renderer) {
 
 } // namespace
 
+// A wall meets a bed along a slanted screen-space seam. Both surfaces
+// approach the eye away from that seam, hiding a centerline-depth ribbon.
+void contact_edge_regression(nkgpu_renderer renderer) {
+    auto scene = std::make_shared<Scene>();
+    const auto wall = scene->reserve_geometry_id(), bed = scene->reserve_geometry_id();
+    auto &mesh = scene->geometry_store().create(wall);
+    const std::array<float,3> a{-0.8f,-0.3f,0}, b{0.8f,0.3f,0};
+    mesh.edit_payload().vertices = {{a},{b},{{0.8f,0.9f,-0.5f}},{{-0.8f,0.3f,-0.5f}}};
+    mesh.edit_payload().indices = {0,1,2,0,2,3};
+    auto &floor = scene->geometry_store().create(bed);
+    floor.edit_payload().vertices = {{a},{{-0.8f,-0.9f,-0.25f}},{{0.8f,-0.3f,-0.25f}},{b}};
+    floor.edit_payload().indices = {0,1,2,0,2,3};
+    const auto material = scene->reserve_material_id();
+    auto &state = scene->material_store().create(material).edit_state();
+    state.base_color = {1,1,1,1}; state.emissive = {1,1,1};
+    state.flags = static_cast<unsigned>(nkscene::MaterialFlags::Opaque);
+    const auto wall_node = scene->reserve_node_id(), bed_node = scene->reserve_node_id();
+    Transaction create(scene);create.add_create(wall_node);create.add_create(bed_node);
+    create.add_geometry(wall_node,wall);create.add_geometry(bed_node,bed);
+    create.add_material(wall_node,material);create.add_material(bed_node,material);
+    ChangeSet changes;assert(scene->commit(create,changes)==NKS_OK);create.close();
+    mesh.edit_payload().stroke_segments = {{a,b,1}};
+    auto incident = nkscene::render_internal::stroke_supports(*mesh.payload);
+    assert(incident.size()==1 && incident[0].count==1 && !incident[0].triangles[0].reversed);
+    mesh.edit_payload().stroke_segments = {{b,a,1}};
+    incident = nkscene::render_internal::stroke_supports(*mesh.payload);
+    assert(incident[0].count==1 && incident[0].triangles[0].reversed);
+    mesh.edit_payload().stroke_segments = {{{-0.5f,0,0},{0.5f,0,0},1}};
+    assert(nkscene::render_internal::stroke_supports(*mesh.payload)[0].count==0);
+    mesh.edit_payload().stroke_segments.clear();
+    nkscene::NativeKitGpuExecutor executor(renderer);
+    nkscene::SceneView view;
+    auto capture = [&] {
+        scene->publish();auto plan = nkscene::compile(scene->snapshot(),view);
+        std::vector<std::uint8_t> pixels;
+        assert(executor.capture_rgba8(plan,scene->snapshot(),256,192,{1,1,1,1},pixels)==NKGPU_OK);
+        return pixels;
+    };
+    // A separate, closely spaced foreground sheet must hide the supported
+    // stroke too. Extend it beyond the edge endpoints and across the seam.
+    const auto blocker = scene->reserve_geometry_id();
+    auto &foreground = scene->geometry_store().create(blocker);
+    for (const auto xy : {std::array<float,2>{-1,-0.575f}, {1,0.175f}, {1,1.275f}, {-1,0.525f}})
+        foreground.edit_payload().vertices.push_back({{xy[0],xy[1],-(xy[1]-xy[0]*0.375f)/1.2f-0.0001f}});
+    foreground.edit_payload().indices = {0,1,2,0,2,3};
+    const auto blocker_node = scene->reserve_node_id();
+    Transaction block(scene);block.add_create(blocker_node);block.add_geometry(blocker_node,blocker);
+    block.add_material(blocker_node,material);assert(scene->commit(block,changes)==NKS_OK);block.close();
+    view.set_visibility_override(blocker_node,false);
+    for (bool sequential : {false,true}) {
+        if (sequential) {
+            const auto original=mesh.edit_payload().vertices;
+            mesh.edit_payload().vertices.clear();
+            for(auto index : {0,1,2,0,2,3})mesh.edit_payload().vertices.push_back(original[index]);
+            mesh.edit_payload().indices.clear();
+        }
+        for (bool reflected : {false,true}) {
+            nkscene::LocalTransform transform;transform.matrix[0]=reflected?-1:1;
+            transform.matrix[5]=0.8f; // nonuniform scaling preserves incidence
+            Transaction move(scene);
+            for(auto node : {wall_node,bed_node,blocker_node})move.add_transform(node,transform);
+            assert(scene->commit(move,changes)==NKS_OK);move.close();
+            for(bool perspective : {false,true}) {
+                view.camera.enabled=true;view.camera.view_projection[11]=perspective?0.2f:0;
+                for (unsigned samples : {1u,4u}) {
+                    executor.set_sample_count(samples);
+                    mesh.edit_payload().stroke_segments.clear();const auto plain = capture();
+                    mesh.edit_payload().stroke_segments = {{a,b,1}};const auto edged = capture();
+                    for (int x=40;x<216;++x) {
+                        const float ndc_x=(x+0.5f)/128-1;
+                        const int center=static_cast<int>((1-ndc_x*0.375f*0.8f*(reflected?-1:1))*96);
+                        bool dark=false;
+                        for(int y=center-2;y<=center+2;++y)
+                            dark |= edged[(y*256+x)*4]+20 < plain[(y*256+x)*4];
+                        assert(dark && "contact edge must have continuous coverage");
+                    }
+                    view.set_visibility_override(blocker_node,true);
+                    mesh.edit_payload().stroke_segments.clear();const auto hidden_plain=capture();
+                    mesh.edit_payload().stroke_segments={{a,b,1}};
+                    const auto hidden_edged=capture();
+                    // Ignore the old ribbon's round caps outside the wall/bed
+                    // silhouettes: this thin sloping sheet does not cover those.
+                    for(unsigned y=0;y<192;++y)for(unsigned x=40;x<216;++x)
+                        for(unsigned channel=0;channel<4;++channel)
+                            assert(hidden_edged[(y*256+x)*4+channel]==hidden_plain[(y*256+x)*4+channel]);
+                    view.set_visibility_override(blocker_node,false);
+                    view.clip_planes = {{{{1,0,0}},0,true}};
+                    mesh.edit_payload().stroke_segments.clear();const auto cut_plain=capture();
+                    mesh.edit_payload().stroke_segments={{a,b,1}};const auto cut_edged=capture();
+                    for(unsigned y=0;y<192;++y)for(unsigned x=0;x<128;++x)
+                        for(unsigned channel=0;channel<4;++channel)
+                            assert(cut_edged[(y*256+x)*4+channel]==cut_plain[(y*256+x)*4+channel]);
+                    view.clip_planes.clear();
+                }
+            }
+        }
+    }
+
+}
+
 int main() {
     nk_init_options init{};
     init.struct_size = sizeof(init);
@@ -256,6 +357,7 @@ int main() {
 
     highlight_alpha_regression(renderer);
     sidedness_regression(renderer);
+    contact_edge_regression(renderer);
 
     {
         auto scene = std::make_shared<Scene>();

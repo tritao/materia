@@ -3,6 +3,7 @@
 #include "capture_profiler.hpp"
 #include "render_internal.hpp"
 #include "section_contours.hpp"
+#include "stroke_support.hpp"
 
 #include <algorithm>
 #include <array>
@@ -39,6 +40,7 @@ struct StrokeVertex {
     std::array<float, 3> start{};
     std::array<float, 3> end{};
     std::array<float, 2> coordinate{};
+    std::array<float, 3> support{};
 };
 
 constexpr std::uint32_t vertex_stride = sizeof(SceneVertex);
@@ -50,9 +52,10 @@ constexpr std::uint32_t default_viewport_height = 768;
 
 static_assert(sizeof(SceneVertex) == sizeof(float) * 12);
 static_assert(sizeof(PickVertex) == sizeof(float) * 4);
-static_assert(sizeof(StrokeVertex) == sizeof(float) * 8);
+static_assert(sizeof(StrokeVertex) == sizeof(float) * 11);
 
 struct StrokeUniformData {
+    // w: ordinary single-sided (0), section contour (1), ordinary double-sided (2).
     std::array<float, 4> viewport_width_height_half_width{};
     std::array<float, 4> depth_unprojection{};
     std::array<float, 4> x_unprojection{};
@@ -930,6 +933,7 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32
             (result = attribute(4, "transform1")) != NKGPU_OK ||
             (result = attribute(5, "transform2")) != NKGPU_OK ||
             (result = attribute(6, "transform3")) != NKGPU_OK ||
+            (result = attribute(7, "support_position")) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 1, NKGPU_SHADERSTAGE_VERTEX,
                                                  sizeof(float) * 16)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 1, 0, "view_params",
@@ -977,6 +981,9 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32
                                                 NKGPU_PRIMITIVETYPE_TRIANGLES)) != NKGPU_OK)
         return set_failure(state, stats, result);
 
+    if ((result = nkgpu_pipeline_attribute(pipeline_builder, 7, 0, sizeof(float)*8,
+                                           NKGPU_VERTEXFORMAT_FLOAT3)) != NKGPU_OK)
+        return set_failure(state, stats, result);
     if ((result = nkgpu_pipeline_cull_mode(pipeline_builder, NKGPU_CULLMODE_NONE,
                                            NKGPU_FACEWINDING_CCW)) != NKGPU_OK)
         return set_failure(state, stats, result);
@@ -1074,6 +1081,8 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnaps
         const auto *material = snapshot.find_material(batch.key.material);
         if (material && material_is_invisible(*material->state))
             continue;
+        viewport.viewport_width_height_half_width[3] = material &&
+            has_material_flag(material->state->flags, MaterialFlags::DoubleSided) ? 2.0f : 0.0f;
         const auto color = stroke_color_for(plan,material);
         auto result = nkgpu_apply_pipeline(state.renderer, stroke_pipeline);
         if (result == NKGPU_OK)
@@ -1812,20 +1821,28 @@ bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecuti
         pick_vertex_count / 3 > 0x00ffffffu)
         return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
     if (resource.payload->stroke_segments.size() >
-        std::numeric_limits<std::uint32_t>::max() / (18 * sizeof(StrokeVertex)))
+        std::numeric_limits<std::uint32_t>::max() / (24 * sizeof(StrokeVertex)))
         return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
-    std::vector<StrokeVertex> stroke_vertices;
-    stroke_vertices.reserve(resource.payload->stroke_segments.size() * 18);
-    // Body and two caps have separate quads so cap extension cannot flatten
-    // the body's depth slope. Coordinates outside [0,1] identify the caps.
-    for (const auto &segment : resource.payload->stroke_segments) {
-        for (const auto &corner : stroke_corners)
-            stroke_vertices.push_back({segment.start, segment.end, corner});
-    }
-    const auto stroke_byte_size = stroke_vertices.size() * sizeof(StrokeVertex);
     const bool revision_changed = inserted || cached.revision != resource.revision;
     if (!revision_changed)
         return true;
+    const auto supports = render_internal::stroke_supports(*resource.payload);
+    std::vector<StrokeVertex> stroke_vertices;
+    stroke_vertices.reserve(resource.payload->stroke_segments.size() * 24);
+    for (std::size_t index=0; index<resource.payload->stroke_segments.size(); ++index) {
+        const auto &segment=resource.payload->stroke_segments[index];
+        for (const auto &corner : stroke_corners)
+            stroke_vertices.push_back({segment.start, segment.end, corner});
+        // Use the incident triangle's original vertices for identical per-sample
+        // rasterized depth. Merely projecting a ribbon onto its analytic plane
+        // still fights rasterizer subpixel snapping on sloping surfaces.
+        for (const auto &support : supports[index]) {
+            for (int corner : {support.reversed ? 1 : 0, support.reversed ? 0 : 1, 2})
+                stroke_vertices.push_back({segment.start, segment.end,
+                    {static_cast<float>(corner), 2.0f}, support.third});
+        }
+    }
+    const auto stroke_byte_size = stroke_vertices.size() * sizeof(StrokeVertex);
 
     if (cached.buffer.id) {
         if (cached.byte_size == byte_size && byte_size != 0) {

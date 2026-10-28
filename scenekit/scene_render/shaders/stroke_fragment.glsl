@@ -7,11 +7,17 @@ in float line_length;
 in float line_half_width;
 in vec3 world_position;
 in vec3 world_depth_bias;
+flat in float support_sidedness;
 uniform vec4 clip_planes[32];
 uniform vec4 clip_plane_count;
 out vec4 fragment_color;
 
 void main() {
+    if (abs(support_sidedness) == 1.0 && gl_FrontFacing != (support_sidedness > 0.0)) discard;
+    vec2 line_coordinate = line_coordinate_homogeneous.xy / line_coordinate_homogeneous.z;
+    vec2 nearest = vec2(clamp(line_coordinate.x, 0.0, line_length), 0.0);
+    float signed_distance = length(line_coordinate - nearest) - line_half_width;
+    float coverage = clamp(0.5 - signed_distance / max(fwidth(signed_distance), 1e-4), 0.0, 1.0);
     for (int index = 0; index < 32; ++index) {
         if (index >= int(clip_plane_count.x)) break;
         float distance_to_plane = dot(clip_planes[index].xyz, world_position) + clip_planes[index].w;
@@ -26,9 +32,6 @@ void main() {
             if (distance_to_plane < 0.0) discard;
         } else if (distance_to_plane <= footprint) discard;
     }
-    vec2 line_coordinate = line_coordinate_homogeneous.xy / line_coordinate_homogeneous.z;
-    vec2 nearest = vec2(clamp(line_coordinate.x, 0.0, line_length), 0.0);
-    float signed_distance = length(line_coordinate - nearest) - line_half_width;
-    float coverage = clamp(0.5 - signed_distance / max(fwidth(signed_distance), 1e-4), 0.0, 1.0);
+    if (coverage <= 0.0) discard;
     fragment_color = vec4(stroke_color.rgb * coverage, stroke_color.a * coverage);
 }

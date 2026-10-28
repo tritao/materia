@@ -41,6 +41,27 @@ is needed. This prevents expanded, depth-biased B-rep edge remnants from reachin
 an adjacent cap. Ordinary coplanar edge/face ties away from cuts keep the original
 bias. Synthetic section outlines would require their own boundary strokes.
 
+Authored strokes that exactly match a manifold render-mesh edge also carry up
+to two incident triangles. `stroke_support.hpp` matches object-local endpoints
+without a welding tolerance, for both indexed and sequential meshes. The stroke
+shader restricts these triangles to the same antialiased edge footprint, using
+their original vertices for depth interpolation. This fills the interior side
+of contact edges that the centerline-depth ribbon otherwise loses against its
+own sloping face. Projecting a ribbon onto the mathematical plane alone is not
+sufficient: rasterizer subpixel snapping can still produce different depths.
+These strips retain face sidedness (including reflected instances), per-sample
+depth tests and section clipping; there is no fragment-depth override or larger
+depth bias. Unmatched/nonmanifold edges and support triangles crossing the eye
+keep the ordinary ribbon. Preparation happens on geometry revision, and the
+triangles share the existing stroke buffer and draw call. This increases stroke
+geometry and fragment work; filled interiors discard without contributing colour.
+
+Depth precision also depends on the camera fit. `PerspectiveCamera.fitClipRange`
+accepts the viewport aspect and optional lens FOV to exclude bounds wholly outside
+the four side planes. Off-screen exploded parts must not force the tiny near
+plane reserved for a camera inside visible bounds: that can make ordinary edges
+fight their faces even with correct stroke interpolation and tie bias.
+
 Ambient occlusion samples world-space surface positions from an on-demand RGBA32F
 prepass target. Its alpha channel marks valid samples. This avoids reconstructing
 positions from nonlinear device depth, which loses precision with very small near

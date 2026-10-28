@@ -8,6 +8,7 @@ layout(location=3) in vec4 transform0;
 layout(location=4) in vec4 transform1;
 layout(location=5) in vec4 transform2;
 layout(location=6) in vec4 transform3;
+layout(location=7) in vec3 support_position;
 uniform mat4 view_projection;
 uniform vec4 stroke_view[5];
 out vec3 line_coordinate_homogeneous;
@@ -15,13 +16,48 @@ out float line_length;
 out float line_half_width;
 out vec3 world_position;
 out vec3 world_depth_bias;
+flat out float support_sidedness;
 
 void main() {
+    support_sidedness = 0.0;
     mat4 model = mat4(transform0, transform1, transform2, transform3);
     vec3 world_a = (model * vec4(start_position, 1.0)).xyz;
     vec3 world_b = (model * vec4(end_position, 1.0)).xyz;
     vec4 a = view_projection * vec4(world_a, 1.0);
     vec4 b = view_projection * vec4(world_b, 1.0);
+    if (stroke_coordinate.y > 1.5) {
+        // Fill only the narrow strip inside an incident mesh triangle. Its
+        // original vertices reproduce the shaded face's rasterized MSAA depth.
+        vec3 world_c = (model * vec4(support_position, 1.0)).xyz;
+        vec4 c = view_projection * vec4(world_c, 1.0);
+        // A support triangle crossing the eye can no longer use finite
+        // projected line coordinates. The ordinary clipped ribbon remains.
+        if (a.w <= 1e-5 || b.w <= 1e-5 || c.w <= 1e-5) {
+            gl_Position = vec4(2.0,2.0,2.0,1.0);
+            world_position = world_a;
+            world_depth_bias = vec3(0.0);
+            line_coordinate_homogeneous = vec3(0.0,0.0,1.0);
+            line_length = 0.0;
+            line_half_width = stroke_view[0].z;
+            return;
+        }
+        float corner = stroke_coordinate.x;
+        vec4 clip = corner < 0.5 ? a : (corner < 1.5 ? b : c);
+        world_position = corner < 0.5 ? world_a : (corner < 1.5 ? world_b : world_c);
+        vec2 delta = (b.xy / b.w - a.xy / a.w) * 0.5 * stroke_view[0].xy;
+        float length_px = max(length(delta), 1e-5);
+        vec2 tangent = delta / length_px;
+        vec2 offset = (clip.xy / clip.w - a.xy / a.w) * 0.5 * stroke_view[0].xy;
+        gl_Position = clip;
+        line_coordinate_homogeneous = vec3(vec2(dot(offset,tangent), dot(offset,vec2(-tangent.y,tangent.x))) * clip.w, clip.w);
+        line_length = length_px;
+        line_half_width = stroke_view[0].z;
+        float parity = sign(dot(transform0.xyz, cross(transform1.xyz,transform2.xyz)));
+        support_sidedness = parity * (stroke_view[0].w > 1.5 ? 2.0 : 1.0);
+        vec4 dz = stroke_view[1] * (clip.w * (4.0 / 16777216.0));
+        world_depth_bias = dz.xyz - world_position * dz.w;
+        return;
+    }
     if (a.w <= 1e-5 && b.w <= 1e-5) {
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
         line_coordinate_homogeneous = vec3(0.0, 0.0, 1.0);
@@ -57,7 +93,7 @@ void main() {
     // Caps may continue the depth ramp away from the eye, but must never
     // extrapolate towards it and peek through a foreground surface.
     float cap_depth = (cap_extension / length_px) * (b.z / b.w - a.z / a.w);
-    if (stroke_view[0].w > 0.5) {
+    if (stroke_view[0].w > 0.5 && stroke_view[0].w < 1.5) {
         // Expand contour ribbons in their cutting plane. Their depth must match
         // that plane at the expanded pixel, not at the unexpanded centerline;
         // otherwise one side sinks into the cap and the other floats above it.
