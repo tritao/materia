@@ -1,6 +1,6 @@
 import toolpathkit.tool.RouterBit;
 import toolpathkit.tool.RouterCut;
-import toolpathkit.tool.RouterCut.RouterCutResult;
+import toolpathkit.tool.RouterCutResult;
 import materia.project.MaterialLibrary;
 import motionkit.robot.PlanCheck;
 

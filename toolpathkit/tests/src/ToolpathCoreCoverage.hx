@@ -189,7 +189,7 @@ class ToolpathCoreCoverage {
     var setup = new Setup("1", new Point3(0, 0, 0));
     var span = Provenance.cam(11);
     function violations(geometry:PathGeometry, lower:Point3,
-        upper:Point3):Array<toolpathkit.setup.TravelEnvelope.TravelViolation>
+        upper:Point3):Array<toolpathkit.setup.TravelViolation>
       return new TravelEnvelope(lower, upper).check(new ToolpathProgram([
         ToolpathOp.Move(Cut, geometry, 0.01, 0, span)], library, [setup]));
     for (sweep in [Math.PI / 2, -Math.PI / 2]) {

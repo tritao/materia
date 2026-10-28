@@ -4,7 +4,7 @@ import toolpathkit.path.MoveKind;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.Point3;
 import toolpathkit.path.Provenance;
-import toolpathkit.path.Provenance.ProvenanceKind;
+import toolpathkit.path.ProvenanceKind;
 import toolpathkit.path.SpindleDirection;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.ToolpathProgram;

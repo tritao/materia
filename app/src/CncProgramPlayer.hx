@@ -295,7 +295,7 @@ class CncProgramPlayer extends ToolpathPlayer {
 		var planning = planningModel(machineModel, job.axes, steady);
 		var machine = new MachineBinding("machine", job.axes[0], job.axes[1], job.axes[2], rapid, channels);
 		rapidDisplacement = interfaceManaged || job.kinematicPreview == true ? [0.0, 0.0, 0.0] : robotkit.model.DriveLoads.rapidDisplacement(machineModel, job.axes, steady);
-		var clearanceStocks:Array<toolpathkit.motion.RapidClearance.ClearanceStock> = [];
+		var clearanceStocks:Array<toolpathkit.motion.ClearanceStock> = [];
 		// Fixed stock has a known machine frame at compile time. Robot-tended blanks move before their CNC cycle;
 		// those retain their existing cell planning until its active-stock pose is available to the compiler.
 		if (!interfaceManaged) for (source in job.stockSources) {
@@ -844,7 +844,7 @@ class CncProgramPlayer extends ToolpathPlayer {
 	 * and carries on from there. Returns false when no later line moves.
 	 */
 	override public function restartFromLine(line:Int):Bool {
-		var best:Null<toolpathkit.motion.ToolpathSourceMap.ToolpathSourceMapEntry> = null;
+		var best:Null<toolpathkit.motion.ToolpathSourceMapEntry> = null;
 		for (entry in sourceMap.entries) {
 			var at = entry.provenance.line;
 			if (at < line || entry.endDistance <= entry.startDistance) continue;

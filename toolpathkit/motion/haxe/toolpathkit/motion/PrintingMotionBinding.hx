@@ -9,18 +9,6 @@ import robotkit.model.RobotModel;
 import robotkit.model.SteadyLoads;
 import robotkit.runtime.RobotRuntimeBlueprint;
 
-/** Assembly placement and execution context; initial positions are in authored assembly units. */
-typedef PrintingMotionContext = {
-  var definition:AssemblyDefinition;
-  var initialPositions:Array<Float>;
-  var metresPerUnit:Float;
-  var model:RobotModel;
-  var runtime:RobotRuntimeBlueprint;
-  var fixedTimestepSeconds:Float;
-  var channels:ToolpathChannels;
-  var steady:SteadyLoads;
-}
-
 /** One scene-job adapter for application execution and planning benchmarks.
  * Logical XYZ positions are machine metres; explicit joint offsets account for
  * the assembly's initial placement. Optional overrides describe benchmark variants.

@@ -6,7 +6,7 @@ import robotkit.device.DeviceBinding;
 import robotkit.model.SteadyLoads;
 import robotkit.runtime.RobotRuntimeCompiler;
 import toolpathkit.motion.PrintingMotionBinding;
-import toolpathkit.motion.PrintingMotionBinding.PrintingMotionContext;
+import toolpathkit.motion.PrintingMotionContext;
 import toolpathkit.motion.ToolpathChannels;
 
 /** Non-default scene placement and job values must reach the shared app/benchmark adapter. */

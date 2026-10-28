@@ -4,8 +4,13 @@ import toolpathkit.path.Provenance;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.ArcPlane;
 
-/** Controller-independent CNC operations in LinuxCNC block order. */
+/**
+  Controller-independent machining operations: milling and turning in LinuxCNC block order, with
+  electronic gearing for lathes and the printing operations below.
+**/
 enum ToolpathOp {
+  // Setups and motion.
+
   /** Selects a work-coordinate setup. IDs have no controller-specific meaning. */
   SetSetup(id:String, provenance:Provenance);
   /**
@@ -18,15 +23,22 @@ enum ToolpathOp {
   /** A move of the controlled point in absolute machine coordinates. */
   MachineMove(kind:MoveKind, geometry:PathGeometry, feed:Float,
     tolerance:Float, provenance:Provenance);
-  /** Add measured master motion to the follower's independently planned motion. */
+
+  // Auxiliary axes and synchronisation.
+
   /** Absolute auxiliary joint position, SI units; independent planned coordinate when geared. */
   PositionJoint(joint:String, position:Float, provenance:Provenance);
   /** Digital barrier; the machine binding supplies the measured signal. */
   WaitSignal(channel:String, expected:Bool, timeoutSeconds:Float, provenance:Provenance);
   /** Modal axial feed in metres/work revolution on Cut lines; distance=0 restores explicit feeds. */
   FeedPerRevolution(master:String, axis:String, distance:Float, provenance:Provenance);
+  /** Add measured master motion to the follower's independently planned motion. */
   ElectronicGear(follower:String, terms:Array<GearTerm>, provenance:Provenance);
+  /** Stops following the master: the follower returns to its own planned motion. */
   ReleaseGear(follower:String, provenance:Provenance);
+
+  // Machine state.
+
   Dwell(seconds:Float, span:Provenance);
   Spindle(direction:SpindleDirection, rpm:Float, provenance:Provenance);
   Coolant(mist:Bool, flood:Bool, provenance:Provenance);

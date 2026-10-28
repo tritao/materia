@@ -27,8 +27,3 @@ class Provenance {
     return new Provenance(operationIndex, 1, 0, Cam, operationIndex,
       'cam:$operationIndex', featureRef);
 }
-
-enum ProvenanceKind {
-  GCode;
-  Cam;
-}

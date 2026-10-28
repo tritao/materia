@@ -9,9 +9,6 @@ import toolpathkit.path.Provenance;
 import toolpathkit.path.MoveKind;
 import toolpathkit.tool.CutterProfile;
 
-/** A fixed stock envelope in machine coordinates, metres. */
-typedef ClearanceStock = { var minimum:Array<Float>; var maximum:Array<Float>; }
-
 /** Reserves drive displacement around stock. Portions without this clearance are explicit exact-stop feed approaches.
  * Raw stock boxes are conservative: an already machined pocket is still treated as occupied. No geometry is displaced.
  */
