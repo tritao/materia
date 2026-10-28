@@ -2593,6 +2593,7 @@ class MachineKitSmoke {
 		var everything = Shards.run([
 			{name: "ControllerWiringTests.run", run: ControllerWiringTests.run, weight: 0.05},
 			{name: "OperatorProfileTests.run", run: OperatorProfileTests.run, weight: 0.05},
+			{name: "PendantAuthorityTests.run", run: PendantAuthorityTests.run, weight: 0.05},
 			{name: "TendingCell.TendingMissionChecks.run", run: () -> TendingCell.TendingMissionChecks.run(), weight: 1.0},
 			{name: "FastenerThreadTests.run", run: FastenerThreadTests.run, weight: 0.05},
 			{name: "FastenerDataTests.run", run: FastenerDataTests.run, weight: 0.05},
