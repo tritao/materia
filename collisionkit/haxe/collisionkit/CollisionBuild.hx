@@ -50,27 +50,11 @@ class CollisionBuild {
     if (releasedPolicy == null) description.setHeldContacts(body, namedContacts);
     else description.restoreBodyPolicy(body, releasedPolicy);
     var from = kinematicskit.Transform.checked(
-      new kinematicskit.Transform(
-        current.x,
-        current.y,
-        current.z,
-        current.qx,
-        current.qy,
-        current.qz,
-        current.qw
-      ),
+      new kinematicskit.Transform(current.x, current.y, current.z, current.qx, current.qy, current.qz, current.qw),
       "Attachment source pose"
     );
     var to = kinematicskit.Transform.checked(
-      new kinematicskit.Transform(
-        target.x,
-        target.y,
-        target.z,
-        target.qx,
-        target.qy,
-        target.qz,
-        target.qw
-      ),
+      new kinematicskit.Transform(target.x, target.y, target.z, target.qx, target.qy, target.qz, target.qw),
       "Attachment target pose"
     );
     var delta = to.inverse().compose(from);

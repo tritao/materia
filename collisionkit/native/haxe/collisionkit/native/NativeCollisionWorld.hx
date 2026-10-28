@@ -323,21 +323,9 @@ class NativeCollisionWorld implements CollisionWorld {
       bodyA,
       bodyB,
       rows[r],
-      [
-        rows[r + 1],
-        rows[r + 2],
-        rows[r + 3]
-      ],
-      [
-        rows[r + 4],
-        rows[r + 5],
-        rows[r + 6]
-      ],
-      [
-        rows[r + 7],
-        rows[r + 8],
-        rows[r + 9]
-      ]
+      [rows[r + 1], rows[r + 2], rows[r + 3]],
+      [rows[r + 4], rows[r + 5], rows[r + 6]],
+      [rows[r + 7], rows[r + 8], rows[r + 9]]
     );
 
   static function flat(pose:CollisionPose):Array<Float> {

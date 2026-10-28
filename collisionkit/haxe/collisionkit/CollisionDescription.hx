@@ -91,12 +91,7 @@ class CollisionDescription {
           body: bodyIds[base.body],
           first: a,
           second: b,
-          authored: original == null ? null : {
-            first : a,
-            second : b,
-            air : original.air,
-            contact : original.contact
-          }
+          authored: original == null ? null : {first : a, second : b, air : original.air, contact : original.contact}
         }
       );
     }

@@ -304,16 +304,8 @@ class ModelBodies {
         a,
         b,
         new Vector3(d.pointA[0], d.pointA[1], d.pointA[2]),
-        new Vector3(
-          d.pointB[0],
-          d.pointB[1],
-          d.pointB[2]
-        ),
-        new Vector3(
-          d.normal[0],
-          d.normal[1],
-          d.normal[2]
-        ),
+        new Vector3(d.pointB[0], d.pointB[1], d.pointB[2]),
+        new Vector3(d.normal[0], d.normal[1], d.normal[2]),
         d.distance,
         safety,
         influence

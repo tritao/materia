@@ -190,31 +190,19 @@ class NativeCollisionTests {
       "part/box",
       part,
       CollisionPose.translation(0, 0.2, 0),
-      CollisionGeometry.Box(
-        0.01,
-        0.02,
-        0.03
-      )
+      CollisionGeometry.Box(0.01, 0.02, 0.03)
     );
     var grip = source.addObject(
       "carrier/grip",
       carrier,
       CollisionPose.identity(),
-      CollisionGeometry.Box(
-        0.001,
-        0.001,
-        0.001
-      )
+      CollisionGeometry.Box(0.001, 0.001, 0.001)
     );
     var otherGrip = source.addObject(
       "carrier/other-grip",
       carrier,
       CollisionPose.translation(0, 0, 0.1),
-      CollisionGeometry.Box(
-        0.001,
-        0.001,
-        0.001
-      )
+      CollisionGeometry.Box(0.001, 0.001, 0.001)
     );
     var first = source.addFixed(
       "probe/sphere",
@@ -227,18 +215,8 @@ class NativeCollisionTests {
     var build = source.build(new NativeCollisionWorld());
     var ids = build.objects.copy();
     var queries = [
-      new CollisionPair(
-        ids[sphere],
-        ids[first],
-        build.bodies[part],
-        build.bodies[source.objects[first].body]
-      ),
-      new CollisionPair(
-        ids[box],
-        ids[second],
-        build.bodies[part],
-        build.bodies[source.objects[second].body]
-      )
+      new CollisionPair(ids[sphere], ids[first], build.bodies[part], build.bodies[source.objects[first].body]),
+      new CollisionPair(ids[box], ids[second], build.bodies[part], build.bodies[source.objects[second].body])
     ];
     var before = build.world.pairDistances(queries);
     check(before.length == 2 && Math.abs(before[0].distance - 0.015) < 1e-9, "described sphere keeps radial inflation");
@@ -363,13 +341,7 @@ class NativeCollisionTests {
     var floor = world.add(
       -1,
       CollisionPose.translation(0, 0, -1),
-      CollisionGeometry.HeightField(
-        4,
-        4,
-        [for (_ in 0...9) 0.0],
-        3,
-        -1
-      )
+      CollisionGeometry.HeightField(4, 4, [for (_ in 0...9) 0.0], 3, -1)
     );
 
     check(world.pairStatus(foreCapsule, toolBox) == CollisionPairStatus.Rigid, "forearm and tool are rigid");
@@ -444,35 +416,15 @@ class NativeCollisionTests {
     world.setBodyStatic(b, true);
     var tools = [
       world.add(a + 3, CollisionPose.identity(), CollisionGeometry.Sphere(0.11)),
-      world.add(
-        b + 3,
-        CollisionPose.identity(),
-        CollisionGeometry.Sphere(0.11)
-      )
+      world.add(b + 3, CollisionPose.identity(), CollisionGeometry.Sphere(0.11))
     ];
     var fores = [
       world.add(a + 2, CollisionPose.translation(0.5, 0, 0), CollisionGeometry.Sphere(0.1)),
-      world.add(
-        b + 2,
-        CollisionPose.translation(
-          0.5,
-          0,
-          0
-        ),
-        CollisionGeometry.Sphere(0.1)
-      )
+      world.add(b + 2, CollisionPose.translation(0.5, 0, 0), CollisionGeometry.Sphere(0.1))
     ];
     var bases = [
       world.add(a, CollisionPose.identity(), CollisionGeometry.Box(0.1, 0.1, 0.1)),
-      world.add(
-        b,
-        CollisionPose.identity(),
-        CollisionGeometry.Box(
-          0.1,
-          0.1,
-          0.1
-        )
-      )
+      world.add(b, CollisionPose.identity(), CollisionGeometry.Box(0.1, 0.1, 0.1))
     ];
     check(world.pairStatus(tools[0], fores[0]) == CollisionPairStatus.Rigid, "left keeps its rules");
     check(world.pairStatus(tools[1], fores[1]) == CollisionPairStatus.Rigid, "right keeps its rules");
@@ -731,15 +683,8 @@ class NativeCollisionTests {
     for (body in 1...3) description.addObject(
       'other$body',
       otherBodies.bodies[body],
-      CollisionPose.translation(
-        0.5,
-        0,
-        0
-      ),
-      CollisionGeometry.Capsule(
-        0.05,
-        0.5
-      )
+      CollisionPose.translation(0.5, 0, 0),
+      CollisionGeometry.Capsule(0.05, 0.5)
     );
     otherBodies.declare();
     var world = new NativeCollisionWorld();
@@ -771,11 +716,7 @@ class NativeCollisionTests {
     description.addFixed(
       "wall",
       CollisionPose.translation(tipX + 0.05 + 0.004 + 0.1, 0, 0),
-      CollisionGeometry.Box(
-        0.1,
-        2,
-        2
-      ),
+      CollisionGeometry.Box(0.1, 2, 2),
       1
     );
     var world = new NativeCollisionWorld();
@@ -954,11 +895,7 @@ class NativeCollisionTests {
         body,
         randomTransform(rng),
         randomTransform(rng),
-        new Vector3(
-          rng.signed(),
-          rng.signed(),
-          rng.signed() + 0.1
-        )
+        new Vector3(rng.signed(), rng.signed(), rng.signed() + 0.1)
       );
       bodies.push(body);
     }
@@ -973,11 +910,7 @@ class NativeCollisionTests {
       arm,
       randomTransform(rng),
       randomTransform(rng),
-      new Vector3(
-        0,
-        0,
-        1
-      )
+      new Vector3(0, 0, 1)
     );
     builder.addFrame("tip", bodies[bodies.length - 1], randomTransform(rng));
     return builder.build();
