@@ -69,20 +69,27 @@ class WeldPlan {
   public final parameters:WeldParameters;
 
   public function new(segments:Array<WeldSegment>, parameters:WeldParameters) {
-    if (segments == null || segments.length == 0 || parameters == null) throw "A weld plan needs segments and parameters";
-    for (index in 1...segments.length)
-      if (segments[index].start.translation.sub(segments[index - 1].stop.translation).norm() > JOIN)
-        throw 'Weld segment $index does not start where the one before it ends';
-    if (!(parameters.wireSpeed > 0) || !(parameters.voltage > 0) || !(parameters.travelSpeed > 0) || !(parameters.approach > 0) ||
-        !(parameters.startDwell >= 0) || !(parameters.craterDwell >= 0) || !(parameters.burnback >= MIN_BURNBACK))
-      throw 'A weld plan needs positive wire speed, voltage, travel speed and approach, dwells of zero or more, and a burnback of at least $MIN_BURNBACK s';
+    if (segments == null
+      || segments.length == 0 || parameters == null) throw "A weld plan needs segments and parameters";
+    for (index in 1...segments.length) if (segments[index].start.translation.sub(segments[index
+      - 1].stop.translation).norm() > JOIN) throw 'Weld segment $index does not start where the one before it ends';
+    if (!(parameters.wireSpeed > 0)
+      || !(parameters.voltage > 0) || !(parameters.travelSpeed > 0) || !(parameters.approach > 0)
+      || !(parameters.startDwell >= 0) || !(parameters.craterDwell >= 0) || !(parameters.burnback
+      >= MIN_BURNBACK)) throw 'A weld plan needs positive wire speed, voltage, travel speed and approach, dwells of zero or more, and a burnback of at least $MIN_BURNBACK s';
     this.segments = segments.copy();
     this.parameters = parameters;
   }
 
   /** A plan for one straight seam from `start` to `stop`. */
-  public static function straight(start:Transform3, stop:Transform3, parameters:WeldParameters):WeldPlan
-    return new WeldPlan([new WeldSegment(start, stop)], parameters);
+  public static function straight(start:Transform3,
+    stop:Transform3, parameters:WeldParameters):WeldPlan return new WeldPlan(
+      [new WeldSegment(
+        start,
+        stop
+      )],
+      parameters
+    );
 
   /** Where the path starts and ends. */
   public function start():Transform3 return segments[0].start;
@@ -106,14 +113,27 @@ class WeldPlan {
         var crossSection = wire.sub(travel.scale(wire.dot(travel))).normalized();
         return Quat.fromAxisAngle(crossSection, Math.PI).multiply(rotation);
       }
-      reversedSegments.push(new WeldSegment(new Transform3(segment.stop.translation, reversed(segment.stop.rotation)),
-        new Transform3(segment.start.translation, reversed(segment.start.rotation)), segment.name, segment.open));
+      reversedSegments.push(new WeldSegment(
+        new Transform3(segment.stop.translation, reversed(segment.stop.rotation)),
+        new Transform3(
+          segment.start.translation,
+          reversed(segment.start.rotation)
+        ),
+        segment.name,
+        segment.open
+      ));
     }
     return new WeldPlan(reversedSegments, parameters);
   }
 
   /** The plan in the frame `frame_T_this` leads to: its poses become `frame_T_this * pose`. */
-  public function transformed(frame_T_this:Transform3):WeldPlan
-    return new WeldPlan([for (segment in segments) new WeldSegment(frame_T_this.compose(segment.start), frame_T_this.compose(segment.stop),
-      segment.name, segment.open == null ? null : frame_T_this.transformVector(segment.open))], parameters);
+  public function transformed(frame_T_this:Transform3):WeldPlan return new WeldPlan(
+    [for (segment in segments) new WeldSegment(
+      frame_T_this.compose(segment.start),
+      frame_T_this.compose(segment.stop),
+      segment.name,
+      segment.open == null ? null : frame_T_this.transformVector(segment.open)
+    )],
+    parameters
+  );
 }

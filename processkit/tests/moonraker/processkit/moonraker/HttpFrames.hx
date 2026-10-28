@@ -6,8 +6,8 @@ import haxe.io.BytesBuffer;
 /** A request as it goes on the wire: HTTP/1.1, the body (if any) sized by Content-Length. */
 class HttpRequest {
   /** The `Host` header's authority for a host and port: an IPv6 literal (it has a colon) goes in brackets. */
-  public static function authority(host:String, port:Int):String
-    return (host.indexOf(":") >= 0 ? "[" + host + "]" : host) + ":" + port;
+  public static function authority(host:String,
+    port:Int):String return (host.indexOf(":") >= 0 ? "[" + host + "]" : host) + ":" + port;
 
   public final method:String;
   public final target:String;
@@ -15,7 +15,10 @@ class HttpRequest {
   public final body:Bytes;
 
   public function new(method:String, target:String, headers:Map<String, String>, body:Bytes) {
-    this.method = method; this.target = target; this.headers = headers; this.body = body;
+    this.method = method;
+    this.target = target;
+    this.headers = headers;
+    this.body = body;
   }
 
   /** Header names are case-insensitive: `header("content-type")`. */
@@ -28,8 +31,8 @@ class HttpRequest {
   public function encode(host:String):Bytes {
     var out = new BytesBuffer();
     out.addString('$method $target HTTP/1.1\r\nHost: $host\r\n');
-    for (key in headers.keys()) if (key.toLowerCase() != "content-length" && key.toLowerCase() != "host")
-      out.addString('$key: ${headers.get(key)}\r\n');
+    for (key in headers.keys()) if (key.toLowerCase() != "content-length"
+      && key.toLowerCase() != "host") out.addString('$key: ${headers.get(key)}\r\n');
     if (body.length > 0 || method == "POST" || method == "PUT") out.addString('Content-Length: ${body.length}\r\n');
     out.addString("\r\n");
     out.add(body);
@@ -45,7 +48,10 @@ class FakeHttpResponse {
   public final body:Bytes;
 
   public function new(status:Int, reason:String, headers:Map<String, String>, body:Bytes) {
-    this.status = status; this.reason = reason; this.headers = headers; this.body = body;
+    this.status = status;
+    this.reason = reason;
+    this.headers = headers;
+    this.body = body;
   }
 
   public function header(name:String):Null<String> {
@@ -75,7 +81,8 @@ class HttpFrameStream {
 
   var buffer:Bytes = Bytes.alloc(0);
 
-  public function new() {}
+  public function new() {
+  }
 
   public function feed(bytes:Bytes):Void {
     if (bytes.length == 0) return;
@@ -98,8 +105,8 @@ class HttpFrameStream {
   /** The header block's end (the index after the blank line), or -1 while it is incomplete. */
   function headerEnd():Int {
     var limit = Std.int(Math.min(buffer.length, MAX_HEADERS + 4));
-    for (i in 3...limit)
-      if (buffer.get(i - 3) == 13 && buffer.get(i - 2) == 10 && buffer.get(i - 1) == 13 && buffer.get(i) == 10) return i + 1;
+    for (i in 3...limit) if (buffer.get(i - 3) == 13
+      && buffer.get(i - 2) == 10 && buffer.get(i - 1) == 13 && buffer.get(i) == 10) return i + 1;
     if (buffer.length > MAX_HEADERS) throw "HTTP header block is too large";
     return -1;
   }
@@ -121,11 +128,12 @@ class HttpFrameStream {
     var length = 0;
     for (key in headers.keys()) {
       var name = key.toLowerCase();
-      if (name == "transfer-encoding" && headers.get(key).toLowerCase().indexOf("chunked") >= 0)
-        throw "HTTP chunked transfer coding is not supported";
+      if (name == "transfer-encoding" && headers.get(key).toLowerCase().indexOf("chunked")
+        >= 0) throw "HTTP chunked transfer coding is not supported";
       if (name == "content-length") {
         var parsed = Std.parseInt(headers.get(key));
-        if (parsed == null || parsed < 0 || parsed > MAX_BODY) throw 'HTTP Content-Length "${headers.get(key)}" is invalid';
+        if (parsed == null
+          || parsed < 0 || parsed > MAX_BODY) throw 'HTTP Content-Length "${headers.get(key)}" is invalid';
         length = parsed;
       }
     }
@@ -153,7 +161,8 @@ class HttpFrameStream {
     var message = next();
     if (message == null) return null;
     var parts = message.start.split(" ");
-    if (parts.length < 2 || !StringTools.startsWith(parts[0], "HTTP/")) throw 'HTTP status line "${message.start}" is malformed';
+    if (parts.length < 2 || !StringTools.startsWith(parts[0],
+      "HTTP/")) throw 'HTTP status line "${message.start}" is malformed';
     var status = Std.parseInt(parts[1]);
     if (status == null) throw 'HTTP status "${parts[1]}" is not a number';
     return new FakeHttpResponse(status, parts.slice(2).join(" "), message.headers, message.body);
@@ -164,7 +173,8 @@ class HttpFrameStream {
     var message = next();
     if (message == null) return null;
     var parts = message.start.split(" ");
-    if (parts.length != 3 || !StringTools.startsWith(parts[2], "HTTP/")) throw 'HTTP request line "${message.start}" is malformed';
+    if (parts.length != 3 || !StringTools.startsWith(parts[2],
+      "HTTP/")) throw 'HTTP request line "${message.start}" is malformed';
     return new HttpRequest(parts[0], parts[1], message.headers, message.body);
   }
 }

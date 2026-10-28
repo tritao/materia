@@ -31,12 +31,16 @@ class ProcessRun {
   var pausedForFeed:Bool = false;
   var preparing:Float = 0.0;
 
-  public function new(recipe:ProcessRecipe, path:PosePath,
-      device:ProcessDevice, channel:String, motionSession:MotionSession) {
-    if (recipe == null || path == null || path.length() <= 0.0 ||
-        device == null || channel == null || StringTools.trim(channel).length == 0 ||
-        motionSession == null)
-      throw "Process run needs a recipe, path, device, channel and motion session";
+  public function new(
+    recipe:ProcessRecipe,
+    path:PosePath,
+    device:ProcessDevice,
+    channel:String,
+    motionSession:MotionSession
+  ) {
+    if (recipe == null || path == null
+      || path.length() <= 0.0 || device == null || channel == null || StringTools.trim(channel).length == 0
+      || motionSession == null) throw "Process run needs a recipe, path, device, channel and motion session";
     this.recipe = recipe;
     this.path = path;
     this.device = device;
@@ -94,15 +98,18 @@ class ProcessRun {
    * output change, so when the recipe's engagement exit ends on one the caller gives the `closing` motion that follows it.
    */
   public function takeProgram(?closing:MotionOp):MotionProgram {
-    var startDistance=availableStart();
+    var startDistance = availableStart();
     var continuation = ProcessPathSlice.from(path, startDistance);
     var events = processEvents(startDistance, currentFeed);
     var approach = recipe.approachSpeed;
     var engagement = recipe.engagement;
-    var ops:Array<MotionOp> = [
-      MotionOp.MoveL(continuation.waypointAt(0.0).pose, path.frameId,
-        approach == null ? currentFeed : approach, Blend.ExactStop, recipe.orientationPolicy)
-    ];
+    var ops:Array<MotionOp> = [MotionOp.MoveL(
+      continuation.waypointAt(0.0).pose,
+      path.frameId,
+      approach == null ? currentFeed : approach,
+      Blend.ExactStop,
+      recipe.orientationPolicy
+    )];
     if (engagement != null) {
       var entry = state == ProcessRunState.Recovery ? engagement.recoveryEntry : engagement.entry;
       for (op in entry) ops.push(op);
@@ -112,7 +119,8 @@ class ProcessRun {
     if (engagement != null) for (op in engagement.exit) ops.push(op);
     if (closing != null) ops.push(closing);
     switch ops[ops.length - 1] {
-      case SetOutput(_, _): throw "A process program may not end on an output change: give the closing motion that follows the engagement exit";
+      case SetOutput(_, _):
+        throw "A process program may not end on an output change: give the closing motion that follows the engagement exit";
       default:
     }
     var program = new MotionProgram(ops);
@@ -123,25 +131,24 @@ class ProcessRun {
   /** Activate a caller's already checked program without rebuilding geometry
    * or events. Its start must match the current initial/recovery boundary. */
   public function activatePrepared(startDistance:Float):Void {
-    var expected=availableStart();
-    if(!Math.isFinite(startDistance) || Math.abs(startDistance-expected)>1e-12)
-      throw "Prepared process program does not match the current recovery start";
-    lastProgramStart=expected;
-    transition(ProcessRunState.Active,expected,expected>0.0?"resume after backoff":"begin process");
+    var expected = availableStart();
+    if (!Math.isFinite(startDistance) || Math.abs(startDistance - expected)
+      > 1e-12) throw "Prepared process program does not match the current recovery start";
+    lastProgramStart = expected;
+    transition(ProcessRunState.Active, expected, expected > 0.0 ? "resume after backoff" : "begin process");
   }
 
   /** Current validated start boundary, without activating the process. */
   public function preparedStart():Float return availableStart();
 
   function availableStart():Float {
-    if(state==null || state!=ProcessRunState.Ready && state!=ProcessRunState.Recovery)
-      throw "Process program is available only when ready or recovering";
-    if(pausedForFeed)throw "Process feed override is paused";
-    if(state==ProcessRunState.Recovery && !canRecover())
-      throw "Process recovery requires held or idle motion";
-    if(!device.ready())throw "Process device is not ready";
-    var start=state==ProcessRunState.Recovery?Math.max(0.0,interruptedAt-pendingBackoff):0.0;
-    if(start>=path.length())throw "Process restart is at the path end";
+    if (state == null || state != ProcessRunState.Ready
+      && state != ProcessRunState.Recovery) throw "Process program is available only when ready or recovering";
+    if (pausedForFeed) throw "Process feed override is paused";
+    if (state == ProcessRunState.Recovery && !canRecover()) throw "Process recovery requires held or idle motion";
+    if (!device.ready()) throw "Process device is not ready";
+    var start = state == ProcessRunState.Recovery ? Math.max(0.0, interruptedAt - pendingBackoff) : 0.0;
+    if (start >= path.length()) throw "Process restart is at the path end";
     return start;
   }
 
@@ -162,8 +169,8 @@ class ProcessRun {
    */
   public function interruptNow(distance:Float, reason:String):Void {
     requireDistance(distance);
-    if (state != ProcessRunState.Active && state != ProcessRunState.Ready && state != ProcessRunState.Recovery)
-      throw "Only a running process can be interrupted";
+    if (state != ProcessRunState.Active && state != ProcessRunState.Ready
+      && state != ProcessRunState.Recovery) throw "Only a running process can be interrupted";
     interrupt(distance, reason, recipe.recoveryBackoff);
   }
 
@@ -172,8 +179,8 @@ class ProcessRun {
     return engagement != null && engagement.exit.length > 0;
   }
 
-  function canRecover():Bool return motionSession.state == SessionState.Held ||
-    motionSession.state == SessionState.Idle;
+  function canRecover():Bool return motionSession.state == SessionState.Held
+    || motionSession.state == SessionState.Idle;
 
   /** Apply runtime-fired process records to the bound simulation device. */
   public function applyRecords(records:Array<FiredProcessEvent>):Void device.apply(records);
@@ -188,16 +195,14 @@ class ProcessRun {
       case Pause:
         if (speed != recipe.nominalSpeed) {
           pausedForFeed = true;
-          if (state == ProcessRunState.Active)
-            interrupt(distance, "feed override paused", 0.0);
+          if (state == ProcessRunState.Active) interrupt(distance, "feed override paused", 0.0);
         } else {
           pausedForFeed = false;
           currentFeed = speed;
         }
       case Adapt:
         recipe.rateForSpeed(speed);
-        if (speed != currentFeed && state == ProcessRunState.Active)
-          interrupt(distance, "adapt feed", 0.0);
+        if (speed != currentFeed && state == ProcessRunState.Active) interrupt(distance, "adapt feed", 0.0);
         currentFeed = speed;
     }
   }
@@ -223,30 +228,41 @@ class ProcessRun {
       active = enabled(event.value);
     }
     var remaining = path.length() - startDistance;
-    var events = [new PathEvent(0.0, channel,
+    var events = [new PathEvent(
+      0.0,
+      channel,
       EventValue.Analog(active ? recipe.rateForSpeed(feed) : 0.0),
-      active ? recipe.triggerLeadSeconds : 0.0, HoldPolicy.RestoreOnResume)];
+      active ? recipe.triggerLeadSeconds : 0.0,
+      HoldPolicy.RestoreOnResume
+    )];
     for (event in path.events) {
       if (event.distance <= startDistance || event.distance >= path.length()) continue;
       if (event.channel != channel) continue;
       active = enabled(event.value);
-      events.push(new PathEvent(event.distance - startDistance, channel,
+      events.push(new PathEvent(
+        event.distance - startDistance,
+        channel,
         EventValue.Analog(active ? recipe.rateForSpeed(feed) : 0.0),
-        active ? recipe.triggerLeadSeconds : 0.0, HoldPolicy.RestoreOnResume));
+        active ? recipe.triggerLeadSeconds : 0.0,
+        HoldPolicy.RestoreOnResume
+      ));
     }
     if (!disengages()) events.push(new PathEvent(remaining, channel, EventValue.Analog(0.0)));
     return events;
   }
 
   static function enabled(value:EventValue):Bool return switch value {
-    case Digital(on): on;
-    case Analog(rate): rate > 0.0;
-    case Process(_, amount): amount > 0.0;
+    case Digital(on):
+      on;
+    case Analog(rate):
+      rate > 0.0;
+    case Process(_, amount):
+      amount > 0.0;
   };
 
   function requireDistance(distance:Float):Void {
-    if (!Math.isFinite(distance) || distance < 0.0 || distance > path.length())
-      throw "Observed process distance lies outside path";
+    if (!Math.isFinite(distance)
+      || distance < 0.0 || distance > path.length()) throw "Observed process distance lies outside path";
   }
 
   function transition(next:ProcessRunState, distance:Float, reason:String):Void {

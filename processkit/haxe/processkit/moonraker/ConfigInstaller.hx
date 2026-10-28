@@ -23,10 +23,20 @@ class ConfigInstaller {
   var inFlight = false;
 
   /** `expected` is the file as sections and keys (the caller's own parser reads it). */
-  public function new(client:MoonrakerClient, filename:String, text:String, expected:Map<String, Map<String, String>>, interval:Float = 0.25,
-      readyTimeout:Float = 30.0) {
-    this.client = client; this.filename = filename; this.text = text; this.expected = expected;
-    this.interval = interval; this.readyTimeout = readyTimeout;
+  public function new(
+    client:MoonrakerClient,
+    filename:String,
+    text:String,
+    expected:Map<String, Map<String, String>>,
+    interval:Float = 0.25,
+    readyTimeout:Float = 30.0
+  ) {
+    this.client = client;
+    this.filename = filename;
+    this.text = text;
+    this.expected = expected;
+    this.interval = interval;
+    this.readyTimeout = readyTimeout;
   }
 
   function finish(problems:Array<String>):Void {
@@ -44,18 +54,26 @@ class ConfigInstaller {
         inFlight = false;
         phase = 2;
         restartedAt = Math.NEGATIVE_INFINITY;
-      });
-    });
+      }
+      );
+    }
+    );
   }
 
   public function poll(now:Float):Void {
     if (done || phase == 0) return;
     // A failed upload or restart ends the install too, not only a failure while waiting for Klippy.
-    if (client.fault != null) { finish(['Moonraker connection failed: ${client.fault}']); return; }
+    if (client.fault != null) {
+      finish(['Moonraker connection failed: ${client.fault}']);
+      return;
+    }
     if (phase < 2) return;
     if (restartedAt == Math.NEGATIVE_INFINITY) restartedAt = now;
     if (inFlight || now - asked < interval) return;
-    if (now - restartedAt > readyTimeout) { finish(["Klippy did not come back after the restart"]); return; }
+    if (now - restartedAt > readyTimeout) {
+      finish(["Klippy did not come back after the restart"]);
+      return;
+    }
     asked = now;
     inFlight = true;
     if (phase == 2) client.serverInfo(function(info) {
@@ -66,10 +84,12 @@ class ConfigInstaller {
         var why:Dynamic = Reflect.field(info, "state_message");
         finish(['Klippy did not start ($state): ${why == null ? "no message" : Std.string(why)}']);
       }
-    });
+    }
+    );
     else client.runningConfig(function(running) {
       inFlight = false;
       finish(ConfigReadback.compare(expected, running.settings, running.warnings));
-    });
+    }
+    );
   }
 }

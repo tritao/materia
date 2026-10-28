@@ -25,9 +25,15 @@ class SurfaceRegistrationResult {
   public final rotationCorrectionRadians:Float;
   public final rejectionReason:Null<String>;
 
-  public function new(accepted:Bool, correction:Transform3, registered:Null<WorkSurface>,
-      planeEstimate:PlaneEstimate, translationCorrection:Float, rotationCorrectionRadians:Float,
-      ?rejectionReason:String) {
+  public function new(
+    accepted:Bool,
+    correction:Transform3,
+    registered:Null<WorkSurface>,
+    planeEstimate:PlaneEstimate,
+    translationCorrection:Float,
+    rotationCorrectionRadians:Float,
+    ?rejectionReason:String
+  ) {
     this.accepted = accepted;
     this.correction = correction;
     this.registered = registered;

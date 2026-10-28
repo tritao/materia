@@ -63,26 +63,47 @@ class ForceGuidedScrewEntry implements ScrewEntrySearch {
 
   /** `tcp_T_sensor` from the two frames' poses in their shared link. */
   public static function sensorTransformAtTcp(linkFromSensor:Transform3, linkFromTcp:Transform3):Transform3 {
-    if (linkFromSensor == null || linkFromTcp == null)
-      throw "Force/torque conversion needs the mounted sensor and screwdriver TCP frames";
+    if (linkFromSensor == null
+      || linkFromTcp == null) throw "Force/torque conversion needs the mounted sensor and screwdriver TCP frames";
     return linkFromTcp.inverse().compose(linkFromSensor);
   }
 
-  public function new(servo:ServoSession, limits:ScrewEntryLimits, admittance:CartesianAdmittance, entry:Transform3,
-      depthTolerance:Float, sensorId:String, sensorFrame:String,
-      tcpFromSensor:Transform3, maximumAgeNs:Int64, maximumForceN:Float, maximumTorqueNm:Float,
-      maximumTravelMeters:Float, maximumTravelRadians:Float, maximumRunSeconds:Float, regionHalfU:Float,
-      regionHalfV:Float, mappings:Null<ClockMappings>, ?feed:{joint:Int, axisAtTcp:Vec3}) {
+  public function new(
+    servo:ServoSession,
+    limits:ScrewEntryLimits,
+    admittance:CartesianAdmittance,
+    entry:Transform3,
+    depthTolerance:Float,
+    sensorId:String,
+    sensorFrame:String,
+    tcpFromSensor:Transform3,
+    maximumAgeNs:Int64,
+    maximumForceN:Float,
+    maximumTorqueNm:Float,
+    maximumTravelMeters:Float,
+    maximumTravelRadians:Float,
+    maximumRunSeconds:Float,
+    regionHalfU:Float,
+    regionHalfV:Float,
+    mappings:Null<ClockMappings>,
+    ?feed: {
+      joint: Int,
+      axisAtTcp: Vec3
+    }
+  ) {
     function positive(value:Float):Bool return Math.isFinite(value) && value > 0;
-    if (servo == null || limits == null || admittance == null || entry == null || sensorId == null || sensorId.length == 0 || sensorFrame == null ||
-        sensorFrame.length == 0 || tcpFromSensor == null || Int64.compare(maximumAgeNs, Int64.ofInt(0)) <= 0 ||
-        !positive(maximumForceN) || maximumForceN <= limits.contactForceN || !positive(maximumTorqueNm) ||
-        !positive(maximumTravelMeters) || !positive(maximumTravelRadians) || !positive(maximumRunSeconds) ||
-        !positive(regionHalfU) || !positive(regionHalfV) ||
-        limits.spiralRadius + limits.trackingTolerance > Math.min(regionHalfU, regionHalfV))
-      throw "Force-guided screw entry needs explicit sensor, freshness, force, travel, time and region bounds";
-    if (servo.robot.snapshot().trajectoryActive)
-      throw "Force-guided screw entry cannot take over an active motion program";
+    if (servo == null || limits == null || admittance == null || entry == null || sensorId == null || sensorId.length
+      == 0 || sensorFrame == null || sensorFrame.length == 0 || tcpFromSensor == null || Int64.compare(
+        maximumAgeNs,
+        Int64.ofInt(0)
+      ) <= 0 || !positive(maximumForceN) || maximumForceN <= limits.contactForceN || !positive(maximumTorqueNm)
+      || !positive(maximumTravelMeters) || !positive(maximumTravelRadians) || !positive(maximumRunSeconds)
+      || !positive(regionHalfU) || !positive(regionHalfV) || limits.spiralRadius + limits.trackingTolerance > Math.min(
+        regionHalfU,
+        regionHalfV
+      )) throw "Force-guided screw entry needs explicit sensor, freshness, force, travel, time and region bounds";
+    if (servo
+      .robot.snapshot().trajectoryActive) throw "Force-guided screw entry cannot take over an active motion program";
     this.servo = servo;
     this.limits = limits;
     this.admittance = admittance;
@@ -106,8 +127,8 @@ class ForceGuidedScrewEntry implements ScrewEntrySearch {
   public function start():Void {
     if (active || complete || failure != null) throw "Force-guided screw entry cannot be reused";
     var snapshot = servo.robot.snapshot();
-    if (snapshot.sourceClockId == null || snapshot.sourceClockId.length == 0 || snapshot.sourceClockId == "unspecified")
-      throw "Force-guided screw entry needs the robot's identified monotonic source clock";
+    if (snapshot.sourceClockId == null || snapshot.sourceClockId.length == 0 || snapshot.sourceClockId
+      == "unspecified") throw "Force-guided screw entry needs the robot's identified monotonic source clock";
     sourceClock = snapshot.sourceClockId;
     startNs = snapshot.sourceTimestampNs;
     previousUpdateNs = startNs;
@@ -133,11 +154,16 @@ class ForceGuidedScrewEntry implements ScrewEntrySearch {
     if (snapshot.sourceClockId != sourceClock) {
       // The joint observations no longer share the search's clock; stop with what the robot reports.
       requestStop("robot clock changed epoch during the screw entry");
-      try servo.robot.stop(robotkit.core.StopMode.Normal) catch (_:Dynamic) {}
+      try servo.robot.stop(robotkit.core.StopMode.Normal) catch (_:Dynamic) {
+      }
       if (atRest(snapshot)) active = false;
       return;
     }
-    if (now < previousUpdateNs) { requestStop("robot clock moved backwards during the screw entry"); brake(snapshot); return; }
+    if (now < previousUpdateNs) {
+      requestStop("robot clock moved backwards during the screw entry");
+      brake(snapshot);
+      return;
+    }
     if (now == previousUpdateNs) return;
     var dt = Int64.toFloat(Int64.sub(now, previousUpdateNs)) * 1e-9;
     previousUpdateNs = now;
@@ -146,32 +172,43 @@ class ForceGuidedScrewEntry implements ScrewEntrySearch {
       brake(snapshot);
       return;
     }
-    if (stopping) { brake(snapshot); return; }
-    if (!screwHeld) { requestStop("screwdriver lost the held screw during the entry search"); brake(snapshot); return; }
+    if (stopping) {
+      brake(snapshot);
+      return;
+    }
+    if (!screwHeld) {
+      requestStop("screwdriver lost the held screw during the entry search");
+      brake(snapshot);
+      return;
+    }
     try {
       var measurement = freshSample(snapshot, now);
-      if (measurement == null) { servo.update(); return; }
+      if (measurement == null) {
+        servo.update();
+        return;
+      }
       var tcp = tip(snapshot);
       var start = origin, control = controller;
       if (start == null || control == null) throw "screw entry lost its approach origin";
       var displacement = tcp.translation.sub(start.translation);
       var travel = displacement.norm();
-      if (travel > maximumTravelMeters)
-        throw 'screw entry exhausted its measured TCP travel: ${travel} m > ${maximumTravelMeters} m';
+      if (travel
+        > maximumTravelMeters) throw 'screw entry exhausted its measured TCP travel: ${travel} m > ${maximumTravelMeters} m';
       var angle = tcp.rotation.angularDistance(start.rotation);
-      if (angle > maximumTravelRadians)
-        throw 'screw entry exhausted its measured TCP rotation: ${angle} rad > ${maximumTravelRadians} rad';
+      if (angle
+        > maximumTravelRadians) throw 'screw entry exhausted its measured TCP rotation: ${angle} rad > ${maximumTravelRadians} rad';
       var u = displacement.dot(control.axisU), v = displacement.dot(control.axisV);
-      if (Math.abs(u) > regionHalfU || Math.abs(v) > regionHalfV)
-        throw 'screw TCP left the registered search region at ${u} m, ${v} m';
-      var wrench = new Transform3(Vec3.zero(), tcp.rotation).transformWrench(tcpFromSensor.transformWrench(measurement.wrench));
+      if (Math.abs(u) > regionHalfU
+        || Math.abs(v) > regionHalfV) throw 'screw TCP left the registered search region at ${u} m, ${v} m';
+      var wrench = new Transform3(Vec3.zero(),
+        tcp.rotation).transformWrench(tcpFromSensor.transformWrench(measurement.wrench));
       var force = wrench.force.norm(), torque = wrench.torque.norm();
       if (force > peakForceN) peakForceN = force;
       if (force > maximumForceN) {
         var f = wrench.force, slide = feed;
-        throw 'screw entry measured ${force} N, above its ${maximumForceN} N bound: ' +
-          'u ${f.dot(control.axisU)} N, v ${f.dot(control.axisV)} N, n ${f.dot(control.axisN)} N at depth ' +
-          '${displacement.dot(control.axisN)} m, feed ${slide == null ? 0.0 : snapshot.positions.get(slide.joint)} m';
+        throw 'screw entry measured ${force} N, above its ${maximumForceN} N bound: '
+          + 'u ${f.dot(control.axisU)} N, v ${f.dot(control.axisV)} N, n ${f.dot(control.axisN)} N at depth '
+          + '${displacement.dot(control.axisN)} m, feed ${slide == null ? 0.0 : snapshot.positions.get(slide.joint)} m';
       }
       if (torque > maximumTorqueNm) throw 'screw entry measured ${torque} N m, above its ${maximumTorqueNm} N m bound';
       // Integrate over the sensor's acquisition period, the time the measured wrench actually covers.
@@ -181,8 +218,14 @@ class ForceGuidedScrewEntry implements ScrewEntrySearch {
       previousControlNs = controlNs;
       var twist = control.step(displacement, wrench, period > 0 ? period : dt);
       switch (control.phase) {
-        case Seated: requestStop(null); brake(snapshot); return;
-        case Failed: requestStop(control.failure); brake(snapshot); return;
+        case Seated:
+          requestStop(null);
+          brake(snapshot);
+          return;
+        case Failed:
+          requestStop(control.failure);
+          brake(snapshot);
+          return;
         case Approach, Search, Descend:
       }
       commandSequence++;
@@ -197,7 +240,8 @@ class ForceGuidedScrewEntry implements ScrewEntrySearch {
 
   public function cancel():Void if (active) {
     requestStop("screw entry cancelled");
-    try servo.robot.stop(robotkit.core.StopMode.Normal) catch (_:Dynamic) {}
+    try servo.robot.stop(robotkit.core.StopMode.Normal) catch (_:Dynamic) {
+    }
   }
 
   /** The newest sample if it is a new acquisition, null when the sensor has not sampled again since the last step. */
@@ -207,20 +251,30 @@ class ForceGuidedScrewEntry implements ScrewEntrySearch {
       var candidate = snapshot.sensors.get(index);
       if (candidate.sensorId == sensorId) frame = candidate;
     }
-    var measurement = ForceTorqueMeasurement.fromFrame(frame, sensorId, sensorFrame, now, sourceClock, maximumAgeNs,
-      mappings);
-    if (sensorClock != null && measurement.sourceClockId != sensorClock)
-      throw 'force/torque sensor "$sensorId" changed source clock during the screw entry';
+    var measurement = ForceTorqueMeasurement.fromFrame(
+      frame,
+      sensorId,
+      sensorFrame,
+      now,
+      sourceClock,
+      maximumAgeNs,
+      mappings
+    );
+    if (sensorClock != null && measurement.sourceClockId
+      != sensorClock) throw 'force/torque sensor "$sensorId" changed source clock during the screw entry';
     sensorClock = measurement.sourceClockId;
     var sequence = previousSequence;
     if (sequence != null) {
-      if (measurement.sequence < sequence ||
-          (measurement.sequence > sequence && measurement.sourceTimestampNs <= cast(previousSampleNs, Int64)))
-        throw 'force/torque sensor "$sensorId" sequence or source time moved backwards';
+      if (measurement.sequence < sequence || (measurement.sequence > sequence && measurement.sourceTimestampNs <= cast(
+        previousSampleNs,
+        Int64
+      ))) throw 'force/torque sensor "$sensorId" sequence or source time moved backwards';
       if (measurement.sequence == sequence) {
         var last = lastMeasurement;
-        if (last == null || measurement.sourceTimestampNs != last.sourceTimestampNs || !sameWrench(measurement.wrench, last.wrench))
-          throw 'force/torque sensor "$sensorId" repeated a sequence with different data';
+        if (last == null || measurement.sourceTimestampNs != last.sourceTimestampNs || !sameWrench(
+          measurement.wrench,
+          last.wrench
+        )) throw 'force/torque sensor "$sensorId" repeated a sequence with different data';
         return null;
       }
     }
@@ -253,14 +307,15 @@ class ForceGuidedScrewEntry implements ScrewEntrySearch {
 
   /** The measured bit tip: the arm's TCP, plus the feed's measured travel when the tool has one. */
   function tip(snapshot:robotkit.core.RobotSnapshot):Transform3 {
-    var tcp = servo.manipulator.tcpPose([for (index in servo.manipulator.jointIndices()) snapshot.positions.get(index)]);
+    var tcp =
+      servo.manipulator.tcpPose([for (index in servo.manipulator.jointIndices()) snapshot.positions.get(index)]);
     var slide = feed;
     if (slide == null) return tcp;
     var travel = snapshot.positions.get(slide.joint);
     return new Transform3(tcp.translation.add(tcp.rotation.rotate(slide.axisAtTcp.scale(travel))), tcp.rotation);
   }
 
-  static function sameWrench(left:Wrench3, right:Wrench3):Bool
-    return left.force.x == right.force.x && left.force.y == right.force.y && left.force.z == right.force.z &&
-      left.torque.x == right.torque.x && left.torque.y == right.torque.y && left.torque.z == right.torque.z;
+  static function sameWrench(left:Wrench3, right:Wrench3):Bool return left.force.x == right.force.x
+    && left.force.y == right.force.y && left.force.z == right.force.z
+    && left.torque.x == right.torque.x && left.torque.y == right.torque.y && left.torque.z == right.torque.z;
 }

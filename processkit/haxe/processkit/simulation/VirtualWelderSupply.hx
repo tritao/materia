@@ -18,14 +18,23 @@ class VirtualWelderSupply implements SimulationWelderSupply {
   final slot:Int;
   var sequence:Int64 = Int64.ofInt(0);
   var publicationSequence:Int64 = Int64.ofInt(0);
-  var latest:WeldReading = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:0, powerW:0.0};
+  var latest:WeldReading = {arc: false, currentA: 0.0, voltageV: 0.0, touch: false, fault: 0, powerW: 0.0};
 
   public function new(simulation:Simulation, runtime:RobotRuntime, robotIndex:Int, sensorId:String, slot:Int = 0) {
-    this.simulation = simulation; this.runtime = runtime; this.robotIndex = robotIndex; this.sensorId = sensorId; this.slot = slot;
+    this.simulation = simulation;
+    this.runtime = runtime;
+    this.robotIndex = robotIndex;
+    this.sensorId = sensorId;
+    this.slot = slot;
   }
 
-  public static function configure(options:VirtualDeviceOptions, blueprint:RobotRuntimeBlueprint,
-      channels:WelderChannels, efficiency:Float, slot:Int = 0):Void {
+  public static function configure(
+    options:VirtualDeviceOptions,
+    blueprint:RobotRuntimeBlueprint,
+    channels:WelderChannels,
+    efficiency:Float,
+    slot:Int = 0
+  ):Void {
     var indices:Array<Float> = [];
     for (name in [channels.arc, channels.wireSpeed, channels.voltage]) {
       var found = -1;
@@ -49,9 +58,15 @@ class VirtualWelderSupply implements SimulationWelderSupply {
       // RKD6 joint and peripheral records carry ticks from the same board oscillator.
       // Observe the runtime first so an endpoint reset has advanced its clock epoch.
       runtime.snapshot();
-      runtime.publishSensorFrame(sensorId, values, publicationSequence, sample.get_source_timestamp_ns(),
-        runtime.endpoint.sourceClockId());
-      sequence = sample.get_sequence(); latest = WeldSensor.reading(values);
+      runtime.publishSensorFrame(
+        sensorId,
+        values,
+        publicationSequence,
+        sample.get_source_timestamp_ns(),
+        runtime.endpoint.sourceClockId()
+      );
+      sequence = sample.get_sequence();
+      latest = WeldSensor.reading(values);
     }
     return latest;
   }
@@ -59,6 +74,6 @@ class VirtualWelderSupply implements SimulationWelderSupply {
   public function reset():Void {
     // The simulation recreates the board; preserve publication ordering across that device epoch.
     sequence = Int64.ofInt(0);
-    latest = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:0, powerW:0.0};
+    latest = {arc: false, currentA: 0.0, voltageV: 0.0, touch: false, fault: 0, powerW: 0.0};
   }
 }

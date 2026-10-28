@@ -14,7 +14,7 @@ class WeldBeadWork implements WeldWork {
     if (bead == null || pose == null) throw "Bead work needs a bead and its live frame";
     this.bead = bead;
     this.pose = pose;
-    sizes = [for (_ in 0...bead.count) -1.0];
+    sizes = [for (_ in 0...bead.count) - 1.0];
     solids = [for (_ in 0...bead.count) null];
   }
 
@@ -25,8 +25,8 @@ class WeldBeadWork implements WeldWork {
     var result:Array<Float> = [];
     for (distance in [bead.stationAt(station), bead.stationAt(station) + bead.binLength(station)]) {
       var base = bead.pointAt(distance);
-      for (direction in [[0.0, 0.0, 0.0], bead.legA, bead.legB])
-        for (axis in 0...3) result.push(base[axis] + direction[axis] * leg);
+      for (direction in [[0.0,
+        0.0, 0.0], bead.legA, bead.legB]) for (axis in 0...3) result.push(base[axis] + direction[axis] * leg);
     }
     return result;
   }
@@ -80,13 +80,28 @@ class WeldBeadWork implements WeldWork {
       var start = bead.stationAt(station);
       if (start > high + 1e-9 || start + bead.binLength(station) < low - 1e-9) continue;
       var hull = solid(station);
-      if (hull != null) result = Math.min(result, hull.ray(origin[0], origin[1], origin[2], direction[0], direction[1], direction[2], range));
+      if (hull != null) result = Math.min(
+        result,
+        hull.ray(
+          origin[0],
+          origin[1],
+          origin[2],
+          direction[0],
+          direction[1],
+          direction[2],
+          range
+        )
+      );
     }
     return result;
   }
 
-  static function localPoint(frame:WeldBodyPose, x:Float, y:Float, z:Float):Array<Float>
-    return turnBack(frame.rotation, x - frame.position[0], y - frame.position[1], z - frame.position[2]);
+  static function localPoint(frame:WeldBodyPose, x:Float, y:Float, z:Float):Array<Float> return turnBack(
+    frame.rotation,
+    x - frame.position[0],
+    y - frame.position[1],
+    z - frame.position[2]
+  );
 
   static function turnBack(q:Array<Float>, vx:Float, vy:Float, vz:Float):Array<Float> {
     var x = -q[0], y = -q[1], z = -q[2], w = q[3];

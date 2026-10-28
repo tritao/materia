@@ -32,13 +32,18 @@ class WelderProcessDevice implements ProcessDevice {
   final feedback:WelderFeedback;
   var prepared = false;
 
-  public function new(outputs:WelderOutputs, feedback:WelderFeedback, channels:WelderChannels, setpoints:WelderSetpoints) {
-    if (outputs == null || feedback == null || channels == null || setpoints == null)
-      throw "Welder process device needs outputs, feedback, channels and setpoints";
-    for (name in [channels.arc, channels.wireSpeed, channels.voltage])
-      if (name == null || StringTools.trim(name).length == 0) throw "Welder process device needs three channel names";
-    if (channels.arc == channels.wireSpeed || channels.arc == channels.voltage || channels.wireSpeed == channels.voltage)
-      throw "Welder channels must be distinct";
+  public function new(
+    outputs:WelderOutputs,
+    feedback:WelderFeedback,
+    channels:WelderChannels,
+    setpoints:WelderSetpoints
+  ) {
+    if (outputs == null || feedback == null || channels == null
+      || setpoints == null) throw "Welder process device needs outputs, feedback, channels and setpoints";
+    for (name in [channels.arc, channels.wireSpeed, channels.voltage]) if (name == null
+      || StringTools.trim(name).length == 0) throw "Welder process device needs three channel names";
+    if (channels.arc == channels.wireSpeed || channels.arc == channels.voltage
+      || channels.wireSpeed == channels.voltage) throw "Welder channels must be distinct";
     if (!Math.isFinite(setpoints.voltage) || setpoints.voltage <= 0.0) throw "Welder setpoints need a positive voltage";
     this.outputs = outputs;
     this.feedback = feedback;
@@ -67,19 +72,24 @@ class WelderProcessDevice implements ProcessDevice {
     for (record in records) {
       var value = record.value;
       if (record.channel == channels.arc) outputs.setArc(switch value {
-        case Digital(on): on;
-        case Analog(rate): rate > 0.0;
-        case Process(_, _): throw "The arc channel needs a digital or analog event";
-      });
+        case Digital(on):
+          on;
+        case Analog(rate):
+          rate > 0.0;
+        case Process(_, _):
+          throw "The arc channel needs a digital or analog event";
+      }
+      );
       else if (record.channel == channels.wireSpeed) outputs.setWireSpeed(analog(value, record.channel));
       else if (record.channel == channels.voltage) outputs.setVoltage(analog(value, record.channel));
       else throw 'The welder has no channel ${record.channel}';
     }
   }
 
-  static function analog(value:ProcessEventValue, channel:String):Float
-    return switch value {
-      case Analog(number): number;
-      case Digital(_), Process(_, _): throw 'Welder channel $channel needs an analog event';
-    };
+  static function analog(value:ProcessEventValue, channel:String):Float return switch value {
+    case Analog(number):
+      number;
+    case Digital(_), Process(_, _):
+      throw 'Welder channel $channel needs an analog event';
+  };
 }

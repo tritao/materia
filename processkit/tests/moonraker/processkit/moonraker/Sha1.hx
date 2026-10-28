@@ -24,14 +24,31 @@ class Sha1 {
       var a = h0, b = h1, c = h2, d = h3, e = h4;
       for (t in 0...80) {
         var f:Int, k:Int;
-        if (t < 20) { f = (b & c) | (~b & d); k = (0x5A82 << 16) | 0x7999; }
-        else if (t < 40) { f = b ^ c ^ d; k = (0x6ED9 << 16) | 0xEBA1; }
-        else if (t < 60) { f = (b & c) | (b & d) | (c & d); k = (0x8F1B << 16) | 0xBCDC; }
-        else { f = b ^ c ^ d; k = (0xCA62 << 16) | 0xC1D6; }
+        if (t < 20) {
+          f = (b & c) | (~b & d);
+          k = (0x5A82 << 16) | 0x7999;
+        } else if (t < 40) {
+          f = b ^ c ^ d;
+          k = (0x6ED9 << 16) | 0xEBA1;
+        } else if (t < 60) {
+          f = (b & c) | (b & d) | (c & d);
+          k = (0x8F1B << 16) | 0xBCDC;
+        } else {
+          f = b ^ c ^ d;
+          k = (0xCA62 << 16) | 0xC1D6;
+        }
         var next = rotate(a, 5) + f + e + k + w[t];
-        e = d; d = c; c = rotate(b, 30); b = a; a = next;
+        e = d;
+        d = c;
+        c = rotate(b, 30);
+        b = a;
+        a = next;
       }
-      h0 += a; h1 += b; h2 += c; h3 += d; h4 += e;
+      h0 += a;
+      h1 += b;
+      h2 += c;
+      h3 += d;
+      h4 += e;
     }
     var out = Bytes.alloc(20);
     for (index in 0...5) {

@@ -26,7 +26,10 @@ class DigCyclePlanner {
   /** `Rz(atan2(y, x)) * Ry(pitch)`: the one tip orientation this chain shape can reach at `(x, y)`. */
   public static function poseAt(x:Float, y:Float, z:Float, pitch:Float):Transform3 {
     var slew = Math.atan2(y, x);
-    var rotation = Quat.fromAxisAngle(new Vec3(0.0, 0.0, 1.0), slew).multiply(Quat.fromAxisAngle(new Vec3(0.0, 1.0, 0.0), pitch));
+    var rotation = Quat.fromAxisAngle(new Vec3(0.0, 0.0, 1.0), slew).multiply(Quat.fromAxisAngle(
+      new Vec3(0.0, 1.0, 0.0),
+      pitch
+    ));
     return new Transform3(new Vec3(x, y, z), rotation);
   }
 
@@ -45,16 +48,30 @@ class DigCyclePlanner {
    * authored region. This keeps the tool out of the wall and accounts for the
    * whole bucket footprint in the terrain update.
    */
-  public static function planCycle(frameId:String, entry:Point2, exit:Point2, groundZ:Float, depth:Float,
-      clearanceZ:Float, dump:Point2, dumpZ:Float, bucketHalfWidth:Float,
-      digPitch:Float, curlPitch:Float, dumpPitch:Float, feedRate:Float, ?swingSteps:Int = 8):DigCyclePlan {
+  public static function planCycle(
+    frameId:String,
+    entry:Point2,
+    exit:Point2,
+    groundZ:Float,
+    depth:Float,
+    clearanceZ:Float,
+    dump:Point2,
+    dumpZ:Float,
+    bucketHalfWidth:Float,
+    digPitch:Float,
+    curlPitch:Float,
+    dumpPitch:Float,
+    feedRate:Float,
+    ?swingSteps:Int = 8
+  ):DigCyclePlan {
     if (frameId == null || frameId.length == 0) throw "Dig cycle planning requires a non-empty frame id";
     if (entry == null || exit == null || dump == null) throw "Dig cycle planning requires entry, exit, and dump points";
     if (!Math.isFinite(groundZ)) throw "Dig cycle ground elevation must be finite";
     if (!Math.isFinite(depth) || depth <= 0.0) throw "Dig cycle depth must be positive and finite";
     if (!Math.isFinite(clearanceZ) || clearanceZ <= groundZ) throw "Dig cycle clearance height must be above ground";
     if (!Math.isFinite(dumpZ)) throw "Dig cycle dump elevation must be finite";
-    if (!Math.isFinite(bucketHalfWidth) || bucketHalfWidth <= 0.0) throw "Dig cycle bucket half-width must be positive and finite";
+    if (!Math.isFinite(bucketHalfWidth)
+      || bucketHalfWidth <= 0.0) throw "Dig cycle bucket half-width must be positive and finite";
     if (!Math.isFinite(feedRate) || feedRate <= 0.0) throw "Dig cycle feed rate must be positive and finite";
     if (swingSteps < 1) throw "Dig cycle swing requires at least one step";
 

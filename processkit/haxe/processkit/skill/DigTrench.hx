@@ -93,17 +93,30 @@ class DigTrench implements Skill {
   var minObservedCutZ:Float = Math.POSITIVE_INFINITY;
   final jointIndices:Array<Int>;
 
-  public function new(manipulator:Manipulator, robot:Robot, heightMap:HeightMap, frameId:String,
-      lineFrom:Point2, lineTo:Point2, width:Float, depth:Float, gradeTolerance:Float,
-      spec:DigTrenchSpec, seed:Array<Float>, planRunner:ToolpathPlanRunner,
-      ?designMap:HeightMap, ?footprint:Polygon2,
-      ?footprintTolerance:Float = -1.0) {
-    if (manipulator == null || robot == null || heightMap == null || frameId == null || frameId.length == 0 ||
-        lineFrom == null || lineTo == null || spec == null || seed == null)
-      throw "DigTrench requires a manipulator, robot, height map, frame id, line, spec, and seed";
+  public function new(
+    manipulator:Manipulator,
+    robot:Robot,
+    heightMap:HeightMap,
+    frameId:String,
+    lineFrom:Point2,
+    lineTo:Point2,
+    width:Float,
+    depth:Float,
+    gradeTolerance:Float,
+    spec:DigTrenchSpec,
+    seed:Array<Float>,
+    planRunner:ToolpathPlanRunner,
+    ?designMap:HeightMap,
+    ?footprint:Polygon2,
+    ?footprintTolerance:Float = -1.0
+  ) {
+    if (manipulator == null || robot == null || heightMap == null
+      || frameId == null || frameId.length == 0 || lineFrom == null || lineTo == null || spec == null
+      || seed == null) throw "DigTrench requires a manipulator, robot, height map, frame id, line, spec, and seed";
     if (!Math.isFinite(width) || width <= 0.0) throw "DigTrench width must be positive and finite";
     if (!Math.isFinite(depth) || depth <= 0.0) throw "DigTrench depth must be positive and finite";
-    if (!Math.isFinite(gradeTolerance) || gradeTolerance < 0.0) throw "DigTrench grade tolerance must be finite and non-negative";
+    if (!Math.isFinite(gradeTolerance)
+      || gradeTolerance < 0.0) throw "DigTrench grade tolerance must be finite and non-negative";
     this.manipulator = manipulator;
     this.robot = robot;
     this.heightMap = heightMap;
@@ -119,8 +132,8 @@ class DigTrench implements Skill {
     this.initialSeed = seed.copy();
     this.jointIndices = [for (target in manipulator.toJointTargets(seed)) target.joint];
     if (designMap != null) HeightMap.ensureSameGrid(heightMap, designMap);
-    if (!Math.isFinite(footprintTolerance) || footprintTolerance < -1.0)
-      throw "DigTrench footprint tolerance must be finite and non-negative";
+    if (!Math.isFinite(footprintTolerance)
+      || footprintTolerance < -1.0) throw "DigTrench footprint tolerance must be finite and non-negative";
     this.designMap = designMap;
     this.footprint = footprint;
     this.footprintTolerance = footprintTolerance < 0.0 ? heightMap.cellSize * 0.5 : footprintTolerance;
@@ -158,7 +171,8 @@ class DigTrench implements Skill {
 
   public function cancel():Void {
     if (!lifecycle.isRunning()) return;
-    try planRunner.abort() catch (_:Dynamic) {}
+    try planRunner.abort() catch (_:Dynamic) {
+    }
     lifecycle.cancel();
   }
 
@@ -189,7 +203,8 @@ class DigTrench implements Skill {
       return;
     }
     if (cyclesCompleted >= spec.maxCycles) {
-      lifecycle.fail('DigTrench did not reach grade within ${spec.maxCycles} cycles (remaining=${remainingDepthError()})');
+      lifecycle
+        .fail('DigTrench did not reach grade within ${spec.maxCycles} cycles (remaining=${remainingDepthError()})');
       return;
     }
     try {
@@ -197,9 +212,24 @@ class DigTrench implements Skill {
       var targetZ = designMap == null ? originalGroundZ - depth : designMap.bilinearSample(lineFrom.x, lineFrom.y);
       var remaining = currentZ - targetZ;
       var cut = remaining < spec.maxCutPerPass ? remaining : spec.maxCutPerPass;
-      var plan = DigCyclePlanner.planCycle(frameId, lineFrom, lineTo, currentZ, cut,
-        spec.clearanceZ, new Point2(spec.dumpX, spec.dumpY), spec.dumpZ, width * 0.5,
-        spec.digPitch, spec.curlPitch, spec.dumpPitch, spec.feedRate);
+      var plan = DigCyclePlanner.planCycle(
+        frameId,
+        lineFrom,
+        lineTo,
+        currentZ,
+        cut,
+        spec.clearanceZ,
+        new Point2(
+          spec.dumpX,
+          spec.dumpY
+        ),
+        spec.dumpZ,
+        width * 0.5,
+        spec.digPitch,
+        spec.curlPitch,
+        spec.dumpPitch,
+        spec.feedRate
+      );
       planRunner.run(plan.toolpath, initialSeed);
       if (!planRunner.running()) {
         lifecycle.fail('dig cycle $cyclesCompleted plan failed: ${planRunner.failure()}');
@@ -238,10 +268,19 @@ class DigTrench implements Skill {
         lifecycle.fail("DigTrench completed without an observed cut");
         return;
       }
-      totalRemovedVolume += BucketSweep.apply(heightMap,
+      totalRemovedVolume += BucketSweep.apply(
+        heightMap,
         new Point2(from.translation.x, from.translation.y),
-        new Point2(to.translation.x, to.translation.y), sweep.sweepHalfWidth + 0.001,
-        minObservedCutZ, designMap, footprint, footprintTolerance).removedVolume;
+        new Point2(
+          to.translation.x,
+          to.translation.y
+        ),
+        sweep.sweepHalfWidth + 0.001,
+        minObservedCutZ,
+        designMap,
+        footprint,
+        footprintTolerance
+      ).removedVolume;
       cyclesCompleted++;
       stage = PreparingCycle;
       beginNextCycle();
@@ -254,8 +293,7 @@ class DigTrench implements Skill {
     if (region == null) throw "DigTrench has no footprint for its generated design map";
     for (row in 0...result.rows) for (col in 0...result.columns) {
       var point = new Point2(result.worldX(col), result.worldY(row));
-      if (region.containsOrWithin(point, 1e-9))
-        result.setElevation(col, row, heightMap.elevationAt(col, row) - depth);
+      if (region.containsOrWithin(point, 1e-9)) result.setElevation(col, row, heightMap.elevationAt(col, row) - depth);
     }
     return result;
   }
@@ -263,14 +301,22 @@ class DigTrench implements Skill {
   static function makeFootprint(from:Point2, to:Point2, halfWidth:Float):Polygon2 {
     var dx = to.x - from.x, dy = to.y - from.y;
     var length = Math.sqrt(dx * dx + dy * dy);
-    if (!Math.isFinite(length) || length <= 1e-9)
-      throw "DigTrench line must have non-zero length";
+    if (!Math.isFinite(length) || length <= 1e-9) throw "DigTrench line must have non-zero length";
     var normalX = -dy / length, normalY = dx / length;
     return new Polygon2([
       new Point2(from.x - normalX * halfWidth, from.y - normalY * halfWidth),
-      new Point2(to.x - normalX * halfWidth, to.y - normalY * halfWidth),
-      new Point2(to.x + normalX * halfWidth, to.y + normalY * halfWidth),
-      new Point2(from.x + normalX * halfWidth, from.y + normalY * halfWidth)
+      new Point2(
+        to.x - normalX * halfWidth,
+        to.y - normalY * halfWidth
+      ),
+      new Point2(
+        to.x + normalX * halfWidth,
+        to.y + normalY * halfWidth
+      ),
+      new Point2(
+        from.x + normalX * halfWidth,
+        from.y + normalY * halfWidth
+      )
     ]);
   }
 }

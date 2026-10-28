@@ -11,7 +11,10 @@ class HttpResponse {
   public final body:Bytes;
 
   public function new(status:Int, reason:String, headers:Map<String, String>, body:Bytes) {
-    this.status = status; this.reason = reason; this.headers = headers; this.body = body;
+    this.status = status;
+    this.reason = reason;
+    this.headers = headers;
+    this.body = body;
   }
 
   public function header(name:String):Null<String> {

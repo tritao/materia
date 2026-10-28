@@ -66,12 +66,18 @@ class WeldBead {
    * `start` and `stop` bound the seam and `normalA`, `normalB` are the faces' outward unit normals, all in one frame.
    * `wireDiameterMm` is the wire's diameter and `depositionEfficiency` the fraction of its melted metal that reaches the bead.
    */
-  public function new(start:Array<Float>, stop:Array<Float>, normalA:Array<Float>, normalB:Array<Float>, wireDiameterMm:Float,
-      depositionEfficiency:Float) {
-    if (start == null || stop == null || normalA == null || normalB == null || start.length != 3 || stop.length != 3 ||
-        normalA.length != 3 || normalB.length != 3 || !(wireDiameterMm > 0) ||
-        !(depositionEfficiency > 0 && depositionEfficiency <= 1))
-      throw "A weld bead needs a seam, the faces' normals, a wire diameter and a deposition efficiency in (0, 1]";
+  public function new(
+    start:Array<Float>,
+    stop:Array<Float>,
+    normalA:Array<Float>,
+    normalB:Array<Float>,
+    wireDiameterMm:Float,
+    depositionEfficiency:Float
+  ) {
+    if (start == null || stop == null
+      || normalA == null || normalB == null || start.length != 3 || stop.length != 3 || normalA.length != 3
+      || normalB.length != 3 || !(wireDiameterMm > 0) || !(depositionEfficiency > 0 && depositionEfficiency
+      <= 1)) throw "A weld bead needs a seam, the faces' normals, a wire diameter and a deposition efficiency in (0, 1]";
     this.depositionEfficiency = depositionEfficiency;
     var along = [for (axis in 0...3) stop[axis] - start[axis]];
     var seamLength = norm(along);
@@ -164,7 +170,8 @@ class WeldBead {
   public function stationAt(i:Int):Float return i * BIN;
 
   /** Point on the seam line at `distance` metres along it. */
-  public function pointAt(distance:Float):Array<Float> return [for (axis in 0...3) start[axis] + tangent[axis] * distance];
+  public function pointAt(distance:Float):Array<Float
+    > return [for (axis in 0...3) start[axis] + tangent[axis] * distance];
 
   /** Stations with metal in them. */
   public function covered():Int {
@@ -180,7 +187,7 @@ class WeldBead {
       if (first < 0) first = i;
       last = i;
     }
-    return first < 0 ? null : {first: first, last: last};
+    return first < 0 ? null : {first : first, last : last};
   }
 
   /** Metres of seam from the first station with metal to the last, however many between have none. */
@@ -208,14 +215,14 @@ class WeldBead {
   }
 
   /** Smallest and largest leg over the same stretch, in metres. */
-  public function legRange(from:Float, to:Float):{min:Float, max:Float} {
+  public function legRange(from:Float, to:Float): {min: Float, max: Float} {
     var low = Std.int(Math.max(0, Math.floor(from * count))), high = Std.int(Math.min(count, Math.ceil(to * count)));
     var smallest = Math.POSITIVE_INFINITY, largest = 0.0;
     for (i in low...high) {
       smallest = Math.min(smallest, leg(i));
       largest = Math.max(largest, leg(i));
     }
-    return {min: high <= low ? 0.0 : smallest, max: largest};
+    return {min: high <= low ? 0.0 : smallest, max : largest};
   }
 
   /**

@@ -17,13 +17,24 @@ class WeldPathBead {
   var strayAway:Float = 0.0;
 
   /** `starts`, `stops` and `normals` (two per segment) give the segments in order, in one frame. */
-  public function new(starts:Array<Array<Float>>, stops:Array<Array<Float>>, normals:Array<Array<Array<Float>>>, wireDiameterMm:Float,
-      depositionEfficiency:Float) {
-    if (starts == null || starts.length == 0 || stops == null || stops.length != starts.length || normals == null ||
-        normals.length != starts.length)
-      throw "A weld path bead needs a start, a stop and two normals for every segment";
-    beads = [for (index in 0...starts.length) new WeldBead(starts[index], stops[index], normals[index][0], normals[index][1], wireDiameterMm,
-      depositionEfficiency)];
+  public function new(
+    starts:Array<Array<Float>>,
+    stops:Array<Array<Float>>,
+    normals:Array<Array<Array<Float>>>,
+    wireDiameterMm:Float,
+    depositionEfficiency:Float
+  ) {
+    if (starts == null
+      || starts.length == 0 || stops == null || stops.length != starts.length || normals == null || normals.length
+      != starts.length) throw "A weld path bead needs a start, a stop and two normals for every segment";
+    beads = [for (index in 0...starts.length) new WeldBead(
+      starts[index],
+      stops[index],
+      normals[index][0],
+      normals[index][1],
+      wireDiameterMm,
+      depositionEfficiency
+    )];
     wireArea = beads[0].wireArea;
     this.depositionEfficiency = depositionEfficiency;
   }
@@ -61,8 +72,7 @@ class WeldPathBead {
         chosen = index;
       }
     }
-    if (chosen < 0 && established)
-      strayAway += Math.max(0.0, wireSpeed) / 60.0 * wireArea * dt * depositionEfficiency;
+    if (chosen < 0 && established) strayAway += Math.max(0.0, wireSpeed) / 60.0 * wireArea * dt * depositionEfficiency;
     for (index in 0...beads.length) beads[index].step(dt, established && index == chosen, wireSpeed, tip);
   }
 

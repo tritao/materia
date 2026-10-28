@@ -11,15 +11,45 @@ class ContactRegistrationTests {
     if (!value) throw message;
   }
   static function contacts(actual:Transform3):Array<PlaneContact> {
-    var points = [new Vec3(-0.1, -0.1, 0), new Vec3(0.1, -0.1, 0), new Vec3(0.1, 0.1, 0),
-      new Vec3(-0.1, 0.02, 0.05), new Vec3(0.1, 0.02, 0.05), new Vec3(0.04, -0.04, 0.05)];
-    var normals = [new Vec3(0, 0, 1), new Vec3(0, 0, 1), new Vec3(0, 0, 1),
-      new Vec3(0, 1, 0), new Vec3(0, 1, 0), new Vec3(1, 0, 0)];
-    return [for (i in 0...points.length) new PlaneContact(normals[i], normals[i].dot(points[i]), actual.transformPoint(points[i]))];
+    var points = [
+      new Vec3(-0.1, -0.1, 0),
+      new Vec3(0.1, -0.1, 0),
+      new Vec3(0.1, 0.1, 0),
+      new Vec3(-0.1, 0.02, 0.05),
+      new Vec3(
+        0.1,
+        0.02,
+        0.05
+      ),
+      new Vec3(
+        0.04,
+        -0.04,
+        0.05
+      )
+    ];
+    var normals = [
+      new Vec3(0, 0, 1),
+      new Vec3(0, 0, 1),
+      new Vec3(0, 0, 1),
+      new Vec3(0, 1, 0),
+      new Vec3(0, 1, 0),
+      new Vec3(
+        1,
+        0,
+        0
+      )
+    ];
+    return [for (i in 0...points.length) new PlaneContact(
+      normals[i],
+      normals[i].dot(points[i]),
+      actual.transformPoint(points[i])
+    )];
   }
   static function close(found:Transform3, expected:Transform3):Void {
-    for (point in [new Vec3(), new Vec3(0.2, -0.1, 0.3), new Vec3(-0.1, 0.2, 0.1)])
-      check(found.transformPoint(point).sub(expected.transformPoint(point)).norm() < 1e-7, "Registration recovers the full rigid frame");
+    for (point in [new Vec3(), new Vec3(0.2, -0.1, 0.3), new Vec3(-0.1, 0.2, 0.1)]) check(
+      found.transformPoint(point).sub(expected.transformPoint(point)).norm() < 1e-7,
+      "Registration recovers the full rigid frame"
+    );
   }
   public static function main():Void {
     ContactSearchTests.run();
@@ -55,17 +85,37 @@ class ContactRegistrationTests {
     var two = ContactRegistration.fit(samples.slice(0, 5), nominal);
     check(!two.accepted && two.rank == 5, "Two faces leave translation along their intersection unobserved");
     var extra = samples.copy();
-    extra.push(new PlaneContact(samples[0].normal, samples[0].offset, samples[0].measured.add(actual.rotation.rotate(new Vec3(0, 0, 0.003)))));
+    extra.push(new PlaneContact(
+      samples[0].normal,
+      samples[0].offset,
+      samples[0].measured.add(actual.rotation.rotate(new Vec3(
+        0,
+        0,
+        0.003
+      )))
+    ));
     check(!ContactRegistration.fit(extra, nominal).accepted, "Contradictory contacts are rejected");
-    check(!ContactRegistration.fit(samples, nominal, 0.0005, 0.005).accepted, "Corrections outside the configured translation bound are rejected");
-    check(!ContactRegistration.fit(samples, nominal, 0.0005, 0.15, 0.01).accepted, "Corrections outside the configured angular bound are rejected");
+    check(
+      !ContactRegistration.fit(samples, nominal, 0.0005, 0.005).accepted,
+      "Corrections outside the configured translation bound are rejected"
+    );
+    check(
+      !ContactRegistration.fit(samples, nominal, 0.0005, 0.15, 0.01).accepted,
+      "Corrections outside the configured angular bound are rejected"
+    );
     var observer = new Transform3(new Vec3(-4, 2, 1), Quat.fromRollPitchYaw(0.2, -0.3, 1.1));
-    close(ContactRegistration.fit(contacts(observer.compose(actual)), observer.compose(nominal)).require(), observer.compose(actual));
+    close(
+      ContactRegistration.fit(contacts(observer.compose(actual)), observer.compose(nominal)).require(),
+      observer.compose(actual)
+    );
     var scaled = [for (sample in samples) new PlaneContact(sample.normal.scale(3), sample.offset * 3, sample.measured)];
     close(ContactRegistration.fit(scaled, nominal).require(), actual);
     var duplicate = [for (_ in 0...6) samples[0]];
     check(!ContactRegistration.fit(duplicate, nominal).accepted, "Repeated contacts do not create observability");
-    check(!ContactRegistration.fit(samples, nominal, 0.0005, 0.15, 0.1, 1).accepted, "An exhausted iteration budget is not accepted");
+    check(
+      !ContactRegistration.fit(samples, nominal, 0.0005, 0.15, 0.1, 1).accepted,
+      "An exhausted iteration budget is not accepted"
+    );
     var bad = false;
     try ContactRegistration.fit([], nominal) catch (_:Dynamic) bad = true;
     check(bad, "Empty observations are rejected");

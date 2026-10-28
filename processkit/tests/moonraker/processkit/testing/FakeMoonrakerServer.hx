@@ -48,7 +48,17 @@ class FakeMoonrakerServer {
   public var filename = "";
   public var message = "";
   /** The polyline the toolhead follows while printing: x, y, z, e of each corner, millimetres. */
-  public var route:Array<Array<Float>> = [[0.0, 0.0, 0.0, 0.0], [100.0, 0.0, 0.2, 5.0], [100.0, 100.0, 0.2, 10.0], [0.0, 100.0, 0.2, 15.0]];
+  public var route:Array<Array<Float>> = [
+    [0.0, 0.0, 0.0, 0.0],
+    [100.0, 0.0, 0.2, 5.0],
+    [100.0, 100.0, 0.2, 10.0],
+    [
+      0.0,
+      100.0,
+      0.2,
+      15.0
+    ]
+  ];
   public var speed = 50.0;
   /** How far ahead of the nozzle the queued moves end, millimetres of route, while printing. */
   public var lookahead = 8.0;
@@ -66,7 +76,7 @@ class FakeMoonrakerServer {
   public final scripts:Array<String> = [];
   public var restarts(default, null) = 0;
   public var fragmentedSocketMessages = false;
-  public var pongs(default,null) = 0;
+  public var pongs(default, null) = 0;
   var settings:Dynamic = {};
   var startupLeft = 0;
   var travelled = 0.0;
@@ -83,11 +93,16 @@ class FakeMoonrakerServer {
     var token = runtime.events.listen(function(event:NativeKitEventValue) {
       switch event {
         case Raw(kind, source, _, _, _, _, data):
-          if (kind == EventKind.TransportAccepted && source.rawValue() == listener.borrow().rawValue() && holder.length == 1)
-            holder[0].links.push(new Link(new TransportHandle(NativeKitEventBytes.readU32(data, 4))));
-        case _: return;
+          if (kind == EventKind.TransportAccepted && source.rawValue() == listener.borrow().rawValue()
+            && holder.length == 1) holder[0].links.push(new Link(new TransportHandle(NativeKitEventBytes.readU32(
+              data,
+              4
+            ))));
+        case _:
+          return;
       }
-    });
+    }
+    );
     var server = new FakeMoonrakerServer(listener, token);
     holder.push(server);
     return server;
@@ -104,7 +119,10 @@ class FakeMoonrakerServer {
   }
 
   public function drop():Void {
-    for (link in links) if (!link.dropped) { NativeTransport.close(link.transport); link.dropped = true; }
+    for (link in links) if (!link.dropped) {
+      NativeTransport.close(link.transport);
+      link.dropped = true;
+    }
   }
 
   function length():Float {
@@ -113,8 +131,13 @@ class FakeMoonrakerServer {
     return total;
   }
 
-  static function distance(a:Array<Float>, b:Array<Float>):Float
-    return Math.sqrt(Math.pow(b[0] - a[0], 2) + Math.pow(b[1] - a[1], 2) + Math.pow(b[2] - a[2], 2));
+  static function distance(a:Array<Float>, b:Array<Float>):Float return Math.sqrt(Math.pow(b[0] - a[0], 2) + Math.pow(
+    b[1] - a[1],
+    2
+  ) + Math.pow(
+    b[2] - a[2],
+    2
+  ));
 
   function progress():Float {
     var total = length();
@@ -122,14 +145,17 @@ class FakeMoonrakerServer {
   }
 
   /** The route's point `along` millimetres from its start, and its extruder travel per millimetre there. */
-  function routeAt(along:Float):{point:Array<Float>, feed:Float} {
+  function routeAt(along:Float): {point: Array<Float>, feed: Float} {
     var left = Math.max(0.0, along);
     for (index in 1...route.length) {
       var span = distance(route[index - 1], route[index]);
       if (left <= span) {
         var fraction = span <= 0.0 ? 0.0 : left / span;
-        return {point: [for (axis in 0...4) route[index - 1][axis] + fraction * (route[index][axis] - route[index - 1][axis])],
-          feed: span <= 0.0 ? 0.0 : (route[index][3] - route[index - 1][3]) / span};
+        return {
+          point: [for (axis in 0...4) route[index
+          - 1][axis] + fraction * (route[index][axis] - route[index - 1][axis])],
+          feed: span <= 0.0 ? 0.0 : (route[index][3] - route[index - 1][3]) / span
+        };
       }
       left -= span;
     }
@@ -141,7 +167,8 @@ class FakeMoonrakerServer {
     function approach(heater:MoonrakerHeater):Void {
       var goal = heater.target > 0.0 ? heater.target : 22.0;
       var step = 5.0 * seconds;
-      heater.temperature = Math.abs(goal - heater.temperature) <= step ? goal : heater.temperature + (goal > heater.temperature ? step : -step);
+      heater.temperature = Math.abs(goal - heater.temperature)
+        <= step ? goal : heater.temperature + (goal > heater.temperature ? step : -step);
     }
     approach(extruder);
     approach(bed);
@@ -165,14 +192,26 @@ class FakeMoonrakerServer {
       for (field in fields) map.set(field[0], field[1]);
       table.set(name, map);
     }
-    put("motion_report", [["live_position", position.copy()], ["live_velocity", printing() ? speed : 0.0],
-      ["live_extruder_velocity", printing() ? here.feed * speed : 0.0]]);
+    put(
+      "motion_report",
+      [
+        ["live_position", position.copy()],
+        ["live_velocity", printing() ? speed : 0.0],
+        [
+          "live_extruder_velocity",
+          printing() ? here.feed * speed : 0.0
+        ]
+      ]
+    );
     put("toolhead", [["position", queued]]);
     put("extruder", [["temperature", extruder.temperature], ["target", extruder.target]]);
     put("heater_bed", [["temperature", bed.temperature], ["target", bed.target]]);
     put("print_stats", [["state", state], ["filename", filename], ["message", message]]);
     put("virtual_sdcard", [["progress", progress()]]);
-    put("configfile", [["settings", settings], ["warnings", [for (text in warnings) {type: "warning", message: text}]]]);
+    put("configfile", [["settings", settings], ["warnings", [for (text in warnings) {
+      type:"warning", message:text
+    }
+    ]]]);
     return table;
   }
 
@@ -184,14 +223,25 @@ class FakeMoonrakerServer {
       if (own == null) continue;
       var fields:Dynamic = {};
       var wanted = asked.get(name);
-      for (field in own.keys()) if (wanted.length == 0 || wanted.indexOf(field) >= 0) Reflect.setField(fields, field, own.get(field));
+      for (field in own.keys()) if (wanted.length == 0 || wanted.indexOf(field) >= 0) Reflect.setField(
+        fields,
+        field,
+        own.get(field)
+      );
       Reflect.setField(result, name, fields);
     }
     return result;
   }
 
-  function sendHttp(link:Link, status:Int, reason:String, value:Dynamic):Void
-    NativeTransport.send(link.transport, FakeHttpResponse.encode(status, reason, "application/json", Bytes.ofString(Json.stringify(value))));
+  function sendHttp(link:Link, status:Int, reason:String, value:Dynamic):Void NativeTransport.send(
+    link.transport,
+    FakeHttpResponse.encode(
+      status,
+      reason,
+      "application/json",
+      Bytes.ofString(Json.stringify(value))
+    )
+  );
 
   function sendSocket(link:Link, value:Dynamic):Void {
     var payload = Bytes.ofString(Json.stringify(value));
@@ -199,13 +249,13 @@ class FakeMoonrakerServer {
       NativeTransport.send(link.transport, WebSocketFrames.encode(WebSocketMessage.TEXT, payload));
       return;
     }
-    var first = WebSocketFrames.encode(WebSocketMessage.TEXT,payload.sub(0,3));
-    first.set(0,WebSocketMessage.TEXT); // FIN clear, followed by a control frame and a continuation.
+    var first = WebSocketFrames.encode(WebSocketMessage.TEXT, payload.sub(0, 3));
+    first.set(0, WebSocketMessage.TEXT); // FIN clear, followed by a control frame and a continuation.
     var wire = new haxe.io.BytesBuffer();
     wire.add(first);
-    wire.add(WebSocketFrames.encode(WebSocketMessage.PING,Bytes.ofString("alive")));
-    wire.add(WebSocketFrames.encode(0,payload.sub(3,payload.length-3)));
-    NativeTransport.send(link.transport,wire.getBytes());
+    wire.add(WebSocketFrames.encode(WebSocketMessage.PING, Bytes.ofString("alive")));
+    wire.add(WebSocketFrames.encode(0, payload.sub(3, payload.length - 3)));
+    NativeTransport.send(link.transport, wire.getBytes());
   }
 
   /** Tells each subscriber the fields that changed since it was last told. */
@@ -231,10 +281,14 @@ class FakeMoonrakerServer {
 
   function begin(name:String):Bool {
     if (!files.exists(name)) return false;
-    filename = name; state = "printing"; travelled = 0.0; message = "";
+    filename = name;
+    state = "printing";
+    travelled = 0.0;
+    message = "";
     // The toolhead stands at the start of its route when the print begins, not where it was before.
     if (route.length > 0) position = route[0].copy();
-    extruder.target = 210.0; bed.target = 60.0;
+    extruder.target = 210.0;
+    bed.target = 60.0;
     return true;
   }
 
@@ -246,10 +300,12 @@ class FakeMoonrakerServer {
       var received = nativekit.ffi.NativeKit.nk_transport_receive(link.transport, buffer);
       if (received.status == -205) continue;
       if (received.status == -206) {
-        NativeTransport.close(link.transport); link.dropped = true; continue;
+        NativeTransport.close(link.transport);
+        link.dropped = true;
+        continue;
       }
       if (received.status != Result.Ok) throw 'Fake Moonraker receive failed: ${received.status}';
-      var bytes = Bytes.view(buffer,0,haxe.Int64.toInt(received.out_received));
+      var bytes = Bytes.view(buffer, 0, haxe.Int64.toInt(received.out_received));
       var socket = link.socket;
       if (socket != null) {
         socket.feed(bytes);
@@ -257,9 +313,19 @@ class FakeMoonrakerServer {
           var message = socket.next();
           if (message == null) break;
           if (message.opcode == WebSocketMessage.TEXT) rpc(link, Json.parse(message.text()));
-          else if (message.opcode == WebSocketMessage.PING) NativeTransport.send(link.transport, WebSocketFrames.encode(WebSocketMessage.PONG, message.payload));
-          else if (message.opcode == WebSocketMessage.PONG) { if (message.text() == "alive") pongs++; }
-          else if (message.opcode == WebSocketMessage.CLOSE) { NativeTransport.close(link.transport); link.dropped = true; }
+          else if (message.opcode == WebSocketMessage.PING) NativeTransport.send(
+            link.transport,
+            WebSocketFrames.encode(
+              WebSocketMessage.PONG,
+              message.payload
+            )
+          );
+          else if (message.opcode == WebSocketMessage.PONG) {
+            if (message.text() == "alive") pongs++;
+          } else if (message.opcode == WebSocketMessage.CLOSE) {
+            NativeTransport.close(link.transport);
+            link.dropped = true;
+          }
         }
         continue;
       }
@@ -289,7 +355,13 @@ class FakeMoonrakerServer {
       var status = select(asked);
       for (name in Reflect.fields(status)) {
         var fields:Dynamic = Reflect.field(status, name);
-        for (field in Reflect.fields(fields)) link.sent.set(name + "." + field, Json.stringify(Reflect.field(fields, field)));
+        for (field in Reflect.fields(fields)) link.sent.set(
+          name + "." + field,
+          Json.stringify(Reflect.field(
+            fields,
+            field
+          ))
+        );
       }
       sendSocket(link, {jsonrpc: "2.0", result: {eventtime: 0.0, status: status}, id: id});
     } else sendSocket(link, {jsonrpc: "2.0", error: {code: -32601, message: "Method not found"}, id: id});
@@ -304,18 +376,31 @@ class FakeMoonrakerServer {
       query.set(equals < 0 ? pair : pair.substr(0, equals), equals < 0 ? "" : percentDecode(pair.substr(equals + 1)));
     }
     switch [request.method, path] {
-      case ["GET", "/websocket"]: upgrade(link, request);
+      case ["GET", "/websocket"]:
+        upgrade(link, request);
       case ["GET", "/server/info"]:
         var answer = klippyState;
-        if (startupLeft > 0) { startupLeft--; answer = "startup"; }
-        else if (klippyState == "startup") klippyState = answer = "ready";
-        sendHttp(link, 200, "OK", {result: {klippy_state: answer, klippy_connected: answer != "error", state_message: stateMessage,
-          moonraker_version: "fake"}});
+        if (startupLeft > 0) {
+          startupLeft--;
+          answer = "startup";
+        } else if (klippyState == "startup") klippyState = answer = "ready";
+        sendHttp(
+          link,
+          200,
+          "OK",
+          {result: {
+            klippy_state: answer,
+            klippy_connected: answer != "error",
+            state_message: stateMessage,
+            moonraker_version: "fake"
+          }}
+        );
       case ["GET", "/printer/objects/query"]:
         var asked = new Map<String, Array<String>>();
         for (name in query.keys()) asked.set(name, query.get(name).length == 0 ? [] : query.get(name).split(","));
         sendHttp(link, 200, "OK", {result: {eventtime: 0.0, status: select(asked)}});
-      case ["POST", "/server/files/upload"]: upload(link, request);
+      case ["POST", "/server/files/upload"]:
+        upload(link, request);
       case ["POST", "/printer/gcode/script"]:
         var script = query.get("script");
         scripts.push(script);
@@ -327,8 +412,10 @@ class FakeMoonrakerServer {
         restart();
         sendHttp(link, 200, "OK", {result: "ok"});
       case ["POST", "/printer/print/start"]:
-        if (begin(query.get("filename"))) { sendHttp(link, 200, "OK", {result: "ok"}); push(); }
-        else sendHttp(link, 404, "Not Found", {error: {message: "file not found"}});
+        if (begin(query.get("filename"))) {
+          sendHttp(link, 200, "OK", {result: "ok"});
+          push();
+        } else sendHttp(link, 404, "Not Found", {error: {message: "file not found"}});
       case ["POST", "/printer/print/pause"]:
         if (state == "printing") state = "paused";
         sendHttp(link, 200, "OK", {result: "ok"});
@@ -338,25 +425,43 @@ class FakeMoonrakerServer {
         sendHttp(link, 200, "OK", {result: "ok"});
         push();
       case ["POST", "/printer/print/cancel"]:
-        if (state == "printing" || state == "paused") { state = "cancelled"; extruder.target = 0.0; bed.target = 0.0; }
+        if (state == "printing" || state == "paused") {
+          state = "cancelled";
+          extruder.target = 0.0;
+          bed.target = 0.0;
+        }
         sendHttp(link, 200, "OK", {result: "ok"});
         push();
       case _:
-        if (request.method == "GET" && StringTools.startsWith(path,"/server/files/")) {
-          var parts=path.substr(14).split("/"), root=parts.shift();
-          var name=[for (part in parts) percentDecode(part)].join("/");
-          var content=root == "config" ? configFiles.get(name) : root == "gcodes" ? files.get(name) : null;
-          if (content == null) sendHttp(link,404,"Not Found",{error:{message:"file not found"}});
-          else NativeTransport.send(link.transport,FakeHttpResponse.encode(200,"OK","text/csv",Bytes.ofString(content)));
+        if (request.method == "GET" && StringTools.startsWith(path, "/server/files/")) {
+          var parts = path.substr(14).split("/"), root = parts.shift();
+          var name = [for (part in parts) percentDecode(part)].join("/");
+          var content = root == "config" ? configFiles.get(name) : root == "gcodes" ? files.get(name) : null;
+          if (content == null) sendHttp(link, 404, "Not Found", {error: {message: "file not found"}});
+          else NativeTransport.send(
+            link.transport,
+            FakeHttpResponse.encode(
+              200,
+              "OK",
+              "text/csv",
+              Bytes.ofString(content)
+            )
+          );
         } else sendHttp(link, 404, "Not Found", {error: {message: "no such endpoint"}});
     }
   }
 
   function upgrade(link:Link, request:HttpRequest):Void {
     var key = request.header("Sec-WebSocket-Key");
-    if (key == null || request.header("Upgrade") == null) { sendHttp(link, 400, "Bad Request", {error: {message: "not an upgrade"}}); return; }
-    NativeTransport.send(link.transport, Bytes.ofString("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
-      "Sec-WebSocket-Accept: " + WebSocketFrames.acceptFor(key) + "\r\n\r\n"));
+    if (key == null || request.header("Upgrade") == null) {
+      sendHttp(link, 400, "Bad Request", {error: {message: "not an upgrade"}});
+      return;
+    }
+    NativeTransport.send(
+      link.transport,
+      Bytes.ofString("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+      + "Sec-WebSocket-Accept: " + WebSocketFrames.acceptFor(key) + "\r\n\r\n")
+    );
     link.socket = new WebSocketReader();
   }
 
@@ -364,7 +469,12 @@ class FakeMoonrakerServer {
   function restart():Void {
     restarts++;
     var text = configFiles.get("printer.cfg");
-    if (text == null) { klippyState = "error"; stateMessage = "Unable to open config file printer.cfg"; settings = {}; return; }
+    if (text == null) {
+      klippyState = "error";
+      stateMessage = "Unable to open config file printer.cfg";
+      settings = {};
+      return;
+    }
     settings = typed(text);
     klippyState = "ready";
     stateMessage = "";
@@ -375,7 +485,8 @@ class FakeMoonrakerServer {
     if (text.length == 0) return null;
     for (index in 0...text.length) {
       var code = text.charCodeAt(index);
-      if (!((code >= 48 && code <= 57) || code == 43 || code == 45 || code == 46 || code == 101 || code == 69)) return null;
+      if (!((code >= 48
+        && code <= 57) || code == 43 || code == 45 || code == 46 || code == 101 || code == 69)) return null;
     }
     var value = Std.parseFloat(text);
     return Math.isFinite(value) ? value : null;
@@ -392,7 +503,10 @@ class FakeMoonrakerServer {
       if (line.charAt(0) == "[") {
         sectionName = line.substr(1, line.length - 2);
         var existing:Dynamic = Reflect.field(result, sectionName.toLowerCase());
-        if (existing == null) { existing = {}; Reflect.setField(result, sectionName.toLowerCase(), existing); }
+        if (existing == null) {
+          existing = {};
+          Reflect.setField(result, sectionName.toLowerCase(), existing);
+        }
         section = existing;
         continue;
       }
@@ -407,9 +521,10 @@ class FakeMoonrakerServer {
       var parsed = number(value);
       var typedValue:Dynamic = value;
       // Klipper parses a ratio list (`gear_ratio: 54:18`) into lists of numbers.
-      var ratios = [for (pair in value.split(",")) [for (part in pair.split(":")) number(StringTools.trim(part))]];
-      var isList = value.indexOf(":") >= 0 && [for (pair in ratios) for (part in pair) if (part == null) part].length == 0;
-      if (isList) typedValue = [for (pair in ratios) [for (part in pair) (part:Float)]];
+      var ratios = [for (pair in value.split(","))[for (part in pair.split(":")) number(StringTools.trim(part))]];
+      var isList = value.indexOf(":") >= 0
+        && [for (pair in ratios) for (part in pair) if (part == null) part].length == 0;
+      if (isList) typedValue = [for (pair in ratios)[for (part in pair)(part:Float)]];
       else if (parsed != null) typedValue = parsed;
       else if (value.toLowerCase() == "true") typedValue = true;
       else if (value.toLowerCase() == "false") typedValue = false;
@@ -439,7 +554,10 @@ class FakeMoonrakerServer {
   function upload(link:Link, request:HttpRequest):Void {
     var type = request.header("Content-Type");
     var marker = type == null ? -1 : type.indexOf("boundary=");
-    if (marker < 0) { sendHttp(link, 400, "Bad Request", {error: {message: "not multipart"}}); return; }
+    if (marker < 0) {
+      sendHttp(link, 400, "Bad Request", {error: {message: "not multipart"}});
+      return;
+    }
     var boundary = "--" + type.substr(marker + 9);
     var fields = new Map<String, String>();
     var name = "", content = "";
@@ -452,11 +570,16 @@ class FakeMoonrakerServer {
       if (nameAt < 0) continue;
       var field = head.substring(nameAt + 6, head.indexOf('"', nameAt + 6));
       var fileAt = head.indexOf('filename="');
-      if (fileAt >= 0) { name = head.substring(fileAt + 10, head.indexOf('"', fileAt + 10)); content = value; }
-      else fields.set(field, value);
+      if (fileAt >= 0) {
+        name = head.substring(fileAt + 10, head.indexOf('"', fileAt + 10));
+        content = value;
+      } else fields.set(field, value);
     }
     var root = fields.get("root");
-    if (name.length == 0 || (root != "gcodes" && root != "config")) { sendHttp(link, 400, "Bad Request", {error: {message: "no file"}}); return; }
+    if (name.length == 0 || (root != "gcodes" && root != "config")) {
+      sendHttp(link, 400, "Bad Request", {error: {message: "no file"}});
+      return;
+    }
     var started = false;
     if (root == "config") configFiles.set(name, content);
     else {

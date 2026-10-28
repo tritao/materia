@@ -46,12 +46,15 @@ class CoverageMap {
         excluded = true;
         break;
       }
-      if (excluded) excludedFlag[index] = true; else allowedFlag[index] = true;
+      if (excluded) excludedFlag[index] = true;
+      else allowedFlag[index] = true;
     }
   }
 
-  public function cellCenter(col:Int, row:Int):Point2
-    return new Point2(originX + (col + 0.5) * cellSize, originY + (row + 0.5) * cellSize);
+  public function cellCenter(col:Int, row:Int):Point2 return new Point2(
+    originX + (col + 0.5) * cellSize,
+    originY + (row + 0.5) * cellSize
+  );
 
   /** Marks every cell whose center lies within `radius` of `center` as covered, regardless of classification. */
   public function markFootprint(center:Point2, radius:Float):Void {

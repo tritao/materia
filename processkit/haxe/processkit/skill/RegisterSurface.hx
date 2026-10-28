@@ -28,9 +28,15 @@ class RegisterSurface implements Skill {
 
   final lifecycle:SkillLifecycle = new SkillLifecycle();
 
-  public function new(design:WorkSurface, cloud:PointCloud, seed:Int,
-      ?maxIterations:Int = 500, ?inlierThreshold:Float = 0.01,
-      ?maxTranslationCorrection:Float = 0.05, ?maxRotationCorrection:Float = 0.0872665) {
+  public function new(
+    design:WorkSurface,
+    cloud:PointCloud,
+    seed:Int,
+    ?maxIterations:Int = 500,
+    ?inlierThreshold:Float = 0.01,
+    ?maxTranslationCorrection:Float = 0.05,
+    ?maxRotationCorrection:Float = 0.0872665
+  ) {
     if (design == null || cloud == null) throw "RegisterSurface requires a design surface and observed cloud";
     this.design = design;
     this.cloud = cloud;
@@ -44,8 +50,15 @@ class RegisterSurface implements Skill {
   public function start():Void {
     lifecycle.begin();
     try {
-      var value = SurfaceRegistration.register(design, cloud, seed, maxIterations, inlierThreshold,
-        maxTranslationCorrection, maxRotationCorrection);
+      var value = SurfaceRegistration.register(
+        design,
+        cloud,
+        seed,
+        maxIterations,
+        inlierThreshold,
+        maxTranslationCorrection,
+        maxRotationCorrection
+      );
       registration = value;
       if (value.accepted) lifecycle.succeed("registration accepted");
       else lifecycle.fail(value.rejectionReason == null ? "registration rejected" : value.rejectionReason);

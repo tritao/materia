@@ -28,8 +28,8 @@ class WeldSeam implements Skill {
   var silent:Float = 0.0;
 
   public function new(runner:WeldRunner, localization:Localization, seam:Void -> WeldPlan, sensor:String) {
-    if (runner == null || localization == null || seam == null || sensor == null || sensor.length == 0)
-      throw "WeldSeam needs a runner, localization, a seam and the torch's weld sensor";
+    if (runner == null || localization == null || seam == null || sensor == null
+      || sensor.length == 0) throw "WeldSeam needs a runner, localization, a seam and the torch's weld sensor";
     this.runner = runner;
     this.localization = localization;
     this.seam = seam;
@@ -66,7 +66,8 @@ class WeldSeam implements Skill {
       else if (runner.completed()) {
         if (reading.fault != WeldFault.None) lifecycle.fail(WeldSensor.faultMessage(reading.fault));
         else if (reading.arc) lifecycle.fail("the arc is still burning after the weld");
-        else lifecycle.succeed(runner.restarts() == 0 ? "seam welded" : 'seam welded after ${runner.restarts()} restarts');
+        else lifecycle.succeed(runner.restarts()
+          == 0 ? "seam welded" : 'seam welded after ${runner.restarts()} restarts');
       }
     } catch (error:Dynamic) {
       fail(Std.string(error));
@@ -93,7 +94,8 @@ class WeldSeam implements Skill {
   }
 
   function fail(message:String):Void {
-    try runner.abort() catch (_:Dynamic) {}
+    try runner.abort() catch (_:Dynamic) {
+    }
     lifecycle.fail(message);
   }
 }

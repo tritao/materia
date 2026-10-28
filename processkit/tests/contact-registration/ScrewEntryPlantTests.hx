@@ -6,8 +6,18 @@ import robotkit.spatial.Wrench3;
 /** A hole in a plate, in hole-plane coordinates (metres); `depth` below the plate top is its seat, or none. */
 private typedef PlantHole = {u:Float, v:Float, radius:Float, chamfer:Float, ?depth:Float};
 private typedef PlantPlate = {top:Float, thickness:Float, holes:Array<PlantHole>};
-private typedef PlantRun = {phase:ScrewEntryPhase, failure:Null<String>, peakForceN:Float, seconds:Float,
-  searches:Int, depth:Float, u:Float, v:Float, contactDepth:Null<Float>, peakAt:String};
+private typedef PlantRun = {
+  phase:ScrewEntryPhase,
+  failure:Null<String>,
+  peakForceN:Float,
+  seconds:Float,
+  searches:Int,
+  depth:Float,
+  u:Float,
+  v:Float,
+  contactDepth:Null<Float>,
+  peakAt:String
+};
 
 /**
  * Screw entry against a small plant, fast enough to iterate on: the screw tip is a mass on a stiff position servo
@@ -42,15 +52,18 @@ class ScrewEntryPlantTests {
     // A flange housing over a tapped plate: an M6 clearance bore with 0.3 mm radial play and a chamfer, then the
     // tapped hole whose lead-in lets the screw tip sink 0.5 mm before the thread stops it.
     function cell(offsetU:Float, offsetV:Float, tapped:Null<PlantHole>, ?flangeBore:PlantHole):Array<PlantPlate> {
-      var bore = flangeBore != null ? flangeBore : {u: offsetU, v: offsetV, radius: 0.0003, chamfer: 0.0004};
+      var bore = flangeBore != null ? flangeBore : {u : offsetU, v : offsetV, radius : 0.0003, chamfer : 0.0004};
       var plate:PlantPlate = {top: 0.040, thickness: 0.016, holes: tapped == null ? [] : [tapped]};
       return [{top: 0.023, thickness: 0.017, holes: [bore]}, plate];
     }
     function tappedAt(u:Float, v:Float):PlantHole return {u: u, v: v, radius: 0.0003, chamfer: 0.0004, depth: 0.0005};
 
     var nominal = simulate(cell(0, 0, tappedAt(0, 0)), spring);
-    check(nominal.phase == Seated, 'nominal screw seats in the tapped hole: ${nominal.failure} (${nominal.searches} searches, ' +
-      'last contact at ${nominal.contactDepth}, peak ${nominal.peakForceN} N, at ${nominal.u}, ${nominal.v})');
+    check(
+      nominal.phase == Seated,
+      'nominal screw seats in the tapped hole: ${nominal.failure} (${nominal.searches} searches, '
+      + 'last contact at ${nominal.contactDepth}, peak ${nominal.peakForceN} N, at ${nominal.u}, ${nominal.v})'
+    );
     check(nominal.searches == 0, 'nominal screw passes the clearance bore without searching (${nominal.searches})');
     check(nominal.peakForceN < MAXIMUM_FORCE_N, 'nominal seating stays below the force bound: ${nominal.peakForceN} N');
     check(nominal.seconds < 30, 'nominal entry takes seconds, not minutes: ${nominal.seconds} s');
@@ -59,47 +72,76 @@ class ScrewEntryPlantTests {
     var summary = ['$tool: nominal ${round(nominal.seconds)} s ${round(nominal.peakForceN)} N'];
     for (offset in [[0.001, 0.0], [-0.0007, 0.0009], [0.0, -0.0013]]) {
       var shifted = simulate(cell(offset[0], offset[1], tappedAt(offset[0], offset[1])), spring);
-      summary.push('offset ${round(Math.sqrt(offset[0] * offset[0] + offset[1] * offset[1]) * 1000)} mm ' +
-        '${round(shifted.seconds)} s ${round(shifted.peakForceN)} N (${shifted.peakAt})');
-      check(shifted.phase == Seated, 'a ${offset} m registration error is found on the flange face: ${shifted.failure}');
+      summary.push('offset ${round(Math.sqrt(offset[0] * offset[0] + offset[1] * offset[1]) * 1000)} mm '
+        + '${round(shifted.seconds)} s ${round(shifted.peakForceN)} N (${shifted.peakAt})');
+      check(shifted.phase == Seated,
+        'a ${offset} m registration error is found on the flange face: ${shifted.failure}');
       check(shifted.searches >= 1, "an offset bore is found by searching the face the screw lands on");
-      check(Math.abs(shifted.u - offset[0]) < 0.0004 && Math.abs(shifted.v - offset[1]) < 0.0004,
-        'the seated screw is on the hole axis: ${shifted.u}, ${shifted.v} for ${offset}');
-      check(shifted.peakForceN < MAXIMUM_FORCE_N, 'searching the flange face stays below the force bound: ${shifted.peakForceN} N');
+      check(
+        Math.abs(shifted.u - offset[0]) < 0.0004 && Math.abs(shifted.v - offset[1]) < 0.0004,
+        'the seated screw is on the hole axis: ${shifted.u}, ${shifted.v} for ${offset}'
+      );
+      check(
+        shifted.peakForceN < MAXIMUM_FORCE_N,
+        'searching the flange face stays below the force bound: ${shifted.peakForceN} N'
+      );
       check(shifted.seconds < 120, 'an offset entry takes well under two minutes: ${shifted.seconds} s');
     }
 
     var noTappedHole = simulate(cell(0, 0, null), spring);
-    check(noTappedHole.phase == Failed && noTappedHole.peakForceN < MAXIMUM_FORCE_N,
-      'a plate without its tapped hole fails the search inside the bore: ${noTappedHole.failure}, ' +
-      'peak ${noTappedHole.peakForceN} N (${noTappedHole.peakAt})');
+    check(
+      noTappedHole.phase == Failed && noTappedHole.peakForceN < MAXIMUM_FORCE_N,
+      'a plate without its tapped hole fails the search inside the bore: ${noTappedHole.failure}, '
+      + 'peak ${noTappedHole.peakForceN} N (${noTappedHole.peakAt})'
+    );
     var noBore = simulate([{top: 0.023, thickness: 0.017, holes: []}], spring);
-    check(noBore.phase == Failed && noBore.failure.indexOf("exhausted") >= 0 && noBore.peakForceN < MAXIMUM_FORCE_N,
-      'a flange without its bore exhausts the spiral: ${noBore.failure}');
-    var blocked = simulate(cell(0, 0, tappedAt(0, 0), {u: 0, v: 0, radius: 0.0003, chamfer: 0.0004, depth: 0.002}), spring);
-    check(blocked.phase == Failed && blocked.depth < 0.030 && blocked.peakForceN < MAXIMUM_FORCE_N,
-      'debris in the bore stops the screw above the CAD plane and fails: ${blocked.failure} at ${blocked.depth}');
+    check(
+      noBore.phase == Failed && noBore.failure.indexOf("exhausted") >= 0 && noBore.peakForceN < MAXIMUM_FORCE_N,
+      'a flange without its bore exhausts the spiral: ${noBore.failure}'
+    );
+    var blocked = simulate(
+      cell(0, 0, tappedAt(0, 0), {u: 0, v: 0, radius: 0.0003, chamfer: 0.0004, depth: 0.002}),
+      spring
+    );
+    check(
+      blocked.phase == Failed && blocked.depth < 0.030 && blocked.peakForceN < MAXIMUM_FORCE_N,
+      'debris in the bore stops the screw above the CAD plane and fails: ${blocked.failure} at ${blocked.depth}'
+    );
     // A tapped hole modelled as a plain bore (as the CAD cell's MuJoCo geometry is) still hands over at the plane:
     // whether a thread is there to engage is the tightening cycle's to measure.
     var plainBore = simulate(cell(0, 0, {u: 0, v: 0, radius: 0.0003, chamfer: 0.0004, depth: null}), spring);
-    check(plainBore.phase == Seated && plainBore.searches == 0,
-      'a bore without a modelled thread hands over at the CAD plane: ${plainBore.failure}');
+    check(
+      plainBore.phase == Seated && plainBore.searches == 0,
+      'a bore without a modelled thread hands over at the CAD plane: ${plainBore.failure}'
+    );
     Sys.println('Screw entry plant, ${summary.join(", ")}');
   }
 
   static function rejections():Void {
     var limits = limitsFor();
     var rejected = false;
-    try new ScrewEntryController(limits, axisU, axisV, 0.04, limits.entryAdvance, admittance(limits, 4000.0))
-      catch (_:Dynamic) rejected = true;
+    try new ScrewEntryController(limits,
+      axisU, axisV, 0.04, limits.entryAdvance, admittance(limits, 4000.0)) catch (_:Dynamic) rejected = true;
     check(rejected, "a depth tolerance as large as the entry advance would accept a flat surface as a hole");
     Sys.println('Screw entry plant: $checks checks passed');
   }
 
   static function round(value:Float):Float return Math.round(value * 100) / 100;
 
-  static function limitsFor():ScrewEntryLimits
-    return new ScrewEntryLimits(5.0, 2.0, 2, 0.002, 0.004, 0.0016, 0.0004, 0.002, 10.0, 0.00015, 0.0003, 5.0);
+  static function limitsFor():ScrewEntryLimits return new ScrewEntryLimits(
+    5.0,
+    2.0,
+    2,
+    0.002,
+    0.004,
+    0.0016,
+    0.0004,
+    0.002,
+    10.0,
+    0.00015,
+    0.0003,
+    5.0
+  );
 
   /**
    * Search-axis admittance with a 20 ms relaxation. Each axis is damped above the stiffness it pushes against times
@@ -107,9 +149,28 @@ class ScrewEntryPlantTests {
    */
   static function admittance(limits:ScrewEntryLimits, axialDamping:Float):CartesianAdmittance {
     var lateral = 4000.0;
-    return new CartesianAdmittance(new Wrench3(new Vec3(0, 0, -limits.contactForceN), Vec3.zero()),
-      [lateral * 0.02, lateral * 0.02, axialDamping * 0.02, 1, 1, 1], [lateral, lateral, axialDamping, 20, 20, 20],
-      limits.maximumLinearSpeed, 0.01, CONTROL_SECONDS);
+    return new CartesianAdmittance(
+      new Wrench3(new Vec3(0, 0, -limits.contactForceN), Vec3.zero()),
+      [
+        lateral * 0.02,
+        lateral * 0.02,
+        axialDamping * 0.02,
+        1,
+        1,
+        1
+      ],
+      [
+        lateral,
+        lateral,
+        axialDamping,
+        20,
+        20,
+        20
+      ],
+      limits.maximumLinearSpeed,
+      0.01,
+      CONTROL_SECONDS
+    );
   }
 
   /**
@@ -118,8 +179,17 @@ class ScrewEntryPlantTests {
    */
   static function simulate(plates:Array<PlantPlate>, ?feedSpring:Float):PlantRun {
     var limits = limitsFor();
-    var controller = new ScrewEntryController(limits, axisU, axisV, 0.040, 0.00002,
-      admittance(limits, feedSpring == null ? 4000.0 : 400.0));
+    var controller = new ScrewEntryController(
+      limits,
+      axisU,
+      axisV,
+      0.040,
+      0.00002,
+      admittance(
+        limits,
+        feedSpring == null ? 4000.0 : 400.0
+      )
+    );
     var servoStiffness = 2.0e5, contactStiffness = 2.0e5, tipMass = 0.5, friction = 0.3;
     var axialStiffness = feedSpring == null ? servoStiffness : (feedSpring : Float);
     var stiffness = [servoStiffness, servoStiffness, axialStiffness];
@@ -129,8 +199,11 @@ class ScrewEntryPlantTests {
     var command = [0.0, 0.0, 0.0];
     var delayed = Wrench3.zero(), peak = 0.0, time = 0.0, peakAt = '';
     while (!controller.finished() && time < 600) {
-      var twist = controller.step(axisU.scale(tip[0]).add(axisV.scale(tip[1])).add(axisN.scale(tip[2])), delayed,
-        CONTROL_SECONDS);
+      var twist = controller.step(
+        axisU.scale(tip[0]).add(axisV.scale(tip[1])).add(axisN.scale(tip[2])),
+        delayed,
+        CONTROL_SECONDS
+      );
       var linear = new Vec3(twist.linearX, twist.linearY, twist.linearZ);
       command = [linear.dot(axisU), linear.dot(axisV), linear.dot(axisN)];
       var force = [0.0, 0.0, 0.0];
@@ -141,11 +214,12 @@ class ScrewEntryPlantTests {
         var magnitude = Math.sqrt(force[0] * force[0] + force[1] * force[1] + force[2] * force[2]);
         if (magnitude > peak) {
           peak = magnitude;
-          peakAt = '${controller.phase} at ${round(time)} s, depth ${round(tip[2] * 1000)} mm, force ${[for (f in force) round(f)]}';
+          peakAt =
+            '${controller.phase} at ${round(time)} s, depth ${round(tip[2] * 1000)} mm, force ${[for (f in force) round(f)]}';
         }
         for (i in 0...3) {
-          var acceleration = (stiffness[i] * (commanded[i] - tip[i]) + damping[i] * (command[i] - velocity[i]) +
-            force[i]) / tipMass;
+          var acceleration = (stiffness[i]
+            * (commanded[i] - tip[i]) + damping[i] * (command[i] - velocity[i]) + force[i]) / tipMass;
           velocity[i] += acceleration * h;
           tip[i] += velocity[i] * h;
         }
@@ -154,9 +228,18 @@ class ScrewEntryPlantTests {
       delayed = new Wrench3(axisU.scale(force[0]).add(axisV.scale(force[1])).add(axisN.scale(force[2])), Vec3.zero());
       time += CONTROL_SECONDS;
     }
-    return {phase: controller.phase, failure: controller.failure, peakForceN: peak, seconds: time,
-      searches: controller.searches, depth: tip[2], u: tip[0], v: tip[1],
-      contactDepth: controller.contactDepth, peakAt: peakAt};
+    return {
+      phase: controller.phase,
+      failure: controller.failure,
+      peakForceN: peak,
+      seconds: time,
+      searches: controller.searches,
+      depth: tip[2],
+      u: tip[0],
+      v: tip[1],
+      contactDepth: controller.contactDepth,
+      peakAt: peakAt
+    };
   }
 
   /**
@@ -165,8 +248,13 @@ class ScrewEntryPlantTests {
    * penetration is the smaller of the vertical one and the lateral one into the nearest bore wall, as a collision
    * would resolve it.
    */
-  static function contact(plates:Array<PlantPlate>, tip:Array<Float>, velocity:Array<Float>, stiffness:Float,
-      friction:Float):Array<Float> {
+  static function contact(
+    plates:Array<PlantPlate>,
+    tip:Array<Float>,
+    velocity:Array<Float>,
+    stiffness:Float,
+    friction:Float
+  ):Array<Float> {
     var u = tip[0], v = tip[1], depth = tip[2];
     var force = [0.0, 0.0, 0.0];
     for (plate in plates) {
@@ -174,7 +262,10 @@ class ScrewEntryPlantTests {
       var hole:Null<PlantHole> = null, radial = Math.POSITIVE_INFINITY;
       for (candidate in plate.holes) {
         var distance = Math.sqrt((u - candidate.u) * (u - candidate.u) + (v - candidate.v) * (v - candidate.v));
-        if (distance < radial) { radial = distance; hole = candidate; }
+        if (distance < radial) {
+          radial = distance;
+          hole = candidate;
+        }
       }
       if (depth > plate.top + plate.thickness) {
         // Passed through: the shank is in this plate's bore.

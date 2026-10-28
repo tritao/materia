@@ -40,17 +40,27 @@ class ScrewEntryLimits {
   /** Time the spiral may make no progress before the search fails. */
   public final stallSeconds:Float;
 
-  public function new(contactForceN:Float, contactThresholdN:Float, confirmationSamples:Int, approachSpeed:Float,
-      maximumLinearSpeed:Float, spiralRadius:Float, spiralPitch:Float, spiralSpeed:Float,
-      trackingGainPerSecond:Float, trackingTolerance:Float, entryAdvance:Float, stallSeconds:Float) {
+  public function new(
+    contactForceN:Float,
+    contactThresholdN:Float,
+    confirmationSamples:Int,
+    approachSpeed:Float,
+    maximumLinearSpeed:Float,
+    spiralRadius:Float,
+    spiralPitch:Float,
+    spiralSpeed:Float,
+    trackingGainPerSecond:Float,
+    trackingTolerance:Float,
+    entryAdvance:Float,
+    stallSeconds:Float
+  ) {
     function positive(value:Float):Bool return Math.isFinite(value) && value > 0;
-    if (!positive(contactForceN) || !positive(contactThresholdN) || contactThresholdN >= contactForceN ||
-        confirmationSamples < 1 || !positive(approachSpeed) || !positive(maximumLinearSpeed) ||
-        approachSpeed > maximumLinearSpeed || !positive(spiralRadius) || !positive(spiralPitch) ||
-        spiralPitch > spiralRadius || !positive(spiralSpeed) || spiralSpeed > maximumLinearSpeed ||
-        !positive(trackingGainPerSecond) || !positive(trackingTolerance) || !positive(entryAdvance) ||
-        !positive(stallSeconds))
-      throw "Screw entry needs explicit positive forces, speeds, spiral, entry and stall bounds that agree";
+    if (!positive(contactForceN) || !positive(contactThresholdN) || contactThresholdN >= contactForceN
+      || confirmationSamples < 1 || !positive(approachSpeed) || !positive(maximumLinearSpeed)
+      || approachSpeed > maximumLinearSpeed || !positive(spiralRadius) || !positive(spiralPitch)
+      || spiralPitch > spiralRadius || !positive(spiralSpeed) || spiralSpeed > maximumLinearSpeed
+      || !positive(trackingGainPerSecond) || !positive(trackingTolerance) || !positive(entryAdvance)
+      || !positive(stallSeconds)) throw "Screw entry needs explicit positive forces, speeds, spiral, entry and stall bounds that agree";
     this.contactForceN = contactForceN;
     this.contactThresholdN = contactThresholdN;
     this.confirmationSamples = confirmationSamples;
@@ -103,21 +113,27 @@ class ScrewEntryController {
   var contactSamples = 0;
 
   /** `admittance` works in the search axes (u, v, n, then rotations about them), with a target of `-contactForceN` on n. */
-  public function new(limits:ScrewEntryLimits, axisU:Vec3, axisV:Vec3, entryDepth:Float, depthTolerance:Float,
-      admittance:CartesianAdmittance) {
-    if (limits == null || axisU == null || axisV == null || admittance == null ||
-        Math.abs(axisU.norm() - 1.0) > 1e-8 || Math.abs(axisV.norm() - 1.0) > 1e-8 || Math.abs(axisU.dot(axisV)) > 1e-8)
-      throw "Screw entry needs its limits, orthonormal hole-plane axes and an admittance";
-    if (!Math.isFinite(depthTolerance) || depthTolerance < 0 || depthTolerance >= limits.entryAdvance)
-      throw "Screw entry depth tolerance must be below the entry advance, or a flat surface would pass for a hole";
-    if (!Math.isFinite(entryDepth) || !(entryDepth > depthTolerance))
-      throw "Screw entry plane must lie ahead of the approach origin";
+  public function new(
+    limits:ScrewEntryLimits,
+    axisU:Vec3,
+    axisV:Vec3,
+    entryDepth:Float,
+    depthTolerance:Float,
+    admittance:CartesianAdmittance
+  ) {
+    if (limits == null || axisU == null || axisV == null || admittance == null
+      || Math.abs(axisU.norm() - 1.0) > 1e-8 || Math.abs(axisV.norm() - 1.0) > 1e-8 || Math.abs(axisU.dot(axisV))
+      > 1e-8) throw "Screw entry needs its limits, orthonormal hole-plane axes and an admittance";
+    if (!Math.isFinite(depthTolerance) || depthTolerance < 0 || depthTolerance >= limits
+      .entryAdvance) throw "Screw entry depth tolerance must be below the entry advance, or a flat surface would pass for a hole";
+    if (!Math.isFinite(entryDepth)
+      || !(entryDepth > depthTolerance)) throw "Screw entry plane must lie ahead of the approach origin";
     var target = admittance.target;
-    if (target.force.x != 0 || target.force.y != 0 || Math.abs(target.force.z + limits.contactForceN) > 1e-12 ||
-        target.torque.norm() != 0)
-      throw "Screw entry admittance must regulate only the commissioned axial contact force";
-    if (admittance.maxLinearSpeed > limits.maximumLinearSpeed)
-      throw "Screw entry admittance exceeds the commissioned linear speed";
+    if (target.force.x != 0
+      || target.force.y != 0 || Math.abs(target.force.z + limits.contactForceN) > 1e-12 || target.torque.norm()
+      != 0) throw "Screw entry admittance must regulate only the commissioned axial contact force";
+    if (admittance.maxLinearSpeed
+      > limits.maximumLinearSpeed) throw "Screw entry admittance exceeds the commissioned linear speed";
     this.limits = limits;
     this.axisU = axisU;
     this.axisV = axisV;
@@ -138,11 +154,17 @@ class ScrewEntryController {
    */
   public function step(displacement:Vec3, wrench:Wrench3, dt:Float):Twist6 {
     if (finished()) return new Twist6(0, 0, 0, 0, 0, 0);
-    if (displacement == null || wrench == null || !Math.isFinite(dt) || !(dt > 0))
-      throw "Screw entry needs a measured displacement, wrench and positive period";
+    if (displacement == null || wrench == null
+      || !Math.isFinite(dt) || !(dt > 0)) throw "Screw entry needs a measured displacement, wrench and positive period";
     var u = displacement.dot(axisU), v = displacement.dot(axisV), depth = displacement.dot(axisN);
-    var local = new Wrench3(new Vec3(wrench.force.dot(axisU), wrench.force.dot(axisV), wrench.force.dot(axisN)),
-      new Vec3(wrench.torque.dot(axisU), wrench.torque.dot(axisV), wrench.torque.dot(axisN)));
+    var local = new Wrench3(
+      new Vec3(wrench.force.dot(axisU), wrench.force.dot(axisV), wrench.force.dot(axisN)),
+      new Vec3(
+        wrench.torque.dot(axisU),
+        wrench.torque.dot(axisV),
+        wrench.torque.dot(axisN)
+      )
+    );
     compressionN = -local.force.z;
     contactSamples = compressionN >= limits.contactThresholdN ? contactSamples + 1 : 0;
     var touching = contactSamples >= limits.confirmationSamples;
@@ -161,7 +183,7 @@ class ScrewEntryController {
           stalledSeconds = 0.0;
         }
       case Search:
-        if (depth >= (contactDepth : Float) + limits.entryAdvance) phase = Descend;
+        if (depth >= (contactDepth:Float) + limits.entryAdvance) phase = Descend;
       case Seated, Failed:
     }
     if (phase == Descend) {
@@ -195,10 +217,10 @@ class ScrewEntryController {
         theta += Math.min(limits.spiralSpeed * dt / tangent, Math.PI / 8.0);
         stalledSeconds = 0.0;
         radius = scale * theta;
-        if (radius > limits.spiralRadius)
-          return fail('spiral exhausted its ${millimetres(limits.spiralRadius)} mm radius at ' +
-            '${millimetres(depth)} mm depth (${millimetres(depth - entryDepth)} mm from the CAD entry plane) ' +
-            'without an entry');
+        if (radius
+          > limits.spiralRadius) return fail('spiral exhausted its ${millimetres(limits.spiralRadius)} mm radius at '
+          + '${millimetres(depth)} mm depth (${millimetres(depth - entryDepth)} mm from the CAD entry plane) '
+          + 'without an entry');
         var speed = limits.spiralSpeed;
         var tangentU = (Math.cos(theta) - theta * Math.sin(theta)) / Math.sqrt(1.0 + theta * theta);
         var tangentV = (Math.sin(theta) + theta * Math.cos(theta)) / Math.sqrt(1.0 + theta * theta);
@@ -206,10 +228,10 @@ class ScrewEntryController {
         lateralV += speed * tangentV;
       } else {
         stalledSeconds += dt;
-        if (stalledSeconds >= limits.stallSeconds)
-          return fail('spiral made no progress for ${limits.stallSeconds} s: ${millimetres(Math.sqrt(lagU * lagU +
-            lagV * lagV))} mm behind its reference at radius ${millimetres(radius)} mm, ' +
-            '${Math.round(compressionN * 100) / 100} N compression');
+        if (stalledSeconds >= limits
+          .stallSeconds) return fail('spiral made no progress for ${limits.stallSeconds} s: ${millimetres(Math.sqrt(lagU * lagU +
+            lagV * lagV))} mm behind its reference at radius ${millimetres(radius)} mm, '
+          + '${Math.round(compressionN * 100) / 100} N compression');
       }
       referenceU = targetU + radius * Math.cos(theta);
       referenceV = targetV + radius * Math.sin(theta);
@@ -219,8 +241,8 @@ class ScrewEntryController {
     var speed = Math.sqrt(lateralU * lateralU + lateralV * lateralV + axial * axial);
     var scale = speed > limits.maximumLinearSpeed ? limits.maximumLinearSpeed / speed : 1.0;
     var linear = axisU.scale(lateralU * scale).add(axisV.scale(lateralV * scale)).add(axisN.scale(axial * scale));
-    var angular = axisU.scale(correction.angularX).add(axisV.scale(correction.angularY))
-      .add(axisN.scale(correction.angularZ));
+    var angular =
+      axisU.scale(correction.angularX).add(axisV.scale(correction.angularY)).add(axisN.scale(correction.angularZ));
     return new Twist6(linear.x, linear.y, linear.z, angular.x, angular.y, angular.z);
   }
 

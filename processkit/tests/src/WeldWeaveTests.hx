@@ -17,15 +17,50 @@ class WeldWeaveTests {
     assertions++;
   }
   static function parameters(speed:Float):WeldParameters return {
-    wireSpeed: 8.0, voltage: 24.0, travelSpeed: speed, approach: 0.04,
-    startDwell: 0.15, craterDwell: 0.15, burnback: 0.1,
-    weave: new WeaveProfile(WeavePattern.Sine, 0.002, 50.0, speed)
+    wireSpeed: 8.0,
+    voltage: 24.0,
+    travelSpeed: speed,
+    approach: 0.04,
+    startDwell: 0.15,
+    craterDwell: 0.15,
+    burnback: 0.1,
+    weave: new WeaveProfile(
+      WeavePattern.Sine,
+      0.002,
+      50.0,
+      speed
+    )
   };
   static function path(rotation:Quat, speed:Float):PosePath {
-    var segment = new WeldSegment(new Transform3(new Vec3(0.0, 0.0, 0.0), rotation),
-      new Transform3(new Vec3(0.18, 0.0, 0.0), rotation), "fillet", new Vec3(0.0, 0.0, 1.0));
-    return new PosePath(WeldingPlanRunner.FRAME, WeldingPlanRunner.pathOf(new WeldPlan([segment], parameters(speed)),
-      speed, {angularSpeed: 3.0, angularAcceleration: 2.0}, [0]));
+    var segment = new WeldSegment(
+      new Transform3(new Vec3(0.0, 0.0, 0.0), rotation),
+      new Transform3(
+        new Vec3(
+          0.18,
+          0.0,
+          0.0
+        ),
+        rotation
+      ),
+      "fillet",
+      new Vec3(
+        0.0,
+        0.0,
+        1.0
+      )
+    );
+    return new PosePath(
+      WeldingPlanRunner.FRAME,
+      WeldingPlanRunner.pathOf(
+        new WeldPlan([segment], parameters(speed)),
+        speed,
+        {
+          angularSpeed: 3.0,
+          angularAcceleration: 2.0
+        },
+        [0]
+      )
+    );
   }
   public static function run():Void {
     var a = path(Quat.identity(), 0.01);
@@ -36,8 +71,10 @@ class WeldWeaveTests {
       var s = 0.18 * i / 100;
       var p = a.poseAt(s), q = b.poseAt(s);
       maximum = Math.max(maximum, Math.abs(p.y));
-      check(Math.abs(p.x - q.x) < 1e-12 && Math.abs(p.y - q.y) < 1e-12 && Math.abs(p.z - q.z) < 1e-12,
-        "weave direction is independent of the torch roll");
+      check(
+        Math.abs(p.x - q.x) < 1e-12 && Math.abs(p.y - q.y) < 1e-12 && Math.abs(p.z - q.z) < 1e-12,
+        "weave direction is independent of the torch roll"
+      );
     }
     check(maximum > 0.0019, "the native preflight path contains the authored weave");
     var area = 0.007 * 0.007 / 2.0;
@@ -50,9 +87,14 @@ class WeldWeaveTests {
       var p = woven.poseAt(woven.length() * (i + 0.5) / steps);
       bead.step(dt, true, 8.0, [p.x, p.y, p.z]);
     }
-    check(Math.abs(bead.meanLeg(0.15, 0.85) - 0.007) < 0.0005,
-      "a woven pass deposits a measured 7 mm leg at the seam-progress feed");
-    check(bead.gaps() == 0 && bead.stray == 0.0, "woven positions deposit into the seam stations without gaps or stray metal");
+    check(
+      Math.abs(bead.meanLeg(0.15, 0.85) - 0.007) < 0.0005,
+      "a woven pass deposits a measured 7 mm leg at the seam-progress feed"
+    );
+    check(
+      bead.gaps() == 0 && bead.stray == 0.0,
+      "woven positions deposit into the seam stations without gaps or stray metal"
+    );
     check(Math.abs(bead.deposited - area * 0.18) < 1e-12, "lateral motion does not increase metal per seam metre");
     Sys.println('ProcessKit weld weave tests passed ($assertions assertions)');
   }

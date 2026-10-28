@@ -21,8 +21,8 @@ class Toolpath {
   /** Sum of straight-line distances between consecutive points. */
   public function length():Float {
     var total = 0.0;
-    for (i in 0...(points.length - 1))
-      total += points[i + 1].work_T_tcp.translation.sub(points[i].work_T_tcp.translation).norm();
+    for (i in 0...(points.length
+      - 1)) total += points[i + 1].work_T_tcp.translation.sub(points[i].work_T_tcp.translation).norm();
     return total;
   }
 
@@ -33,8 +33,8 @@ class Toolpath {
    */
   public function processOnLength():Float {
     var total = 0.0;
-    for (i in 0...(points.length - 1)) if (points[i].processOn)
-      total += points[i + 1].work_T_tcp.translation.sub(points[i].work_T_tcp.translation).norm();
+    for (i in 0...(points.length - 1)) if (points[i].processOn) total += points[i
+      + 1].work_T_tcp.translation.sub(points[i].work_T_tcp.translation).norm();
     return total;
   }
 
@@ -50,12 +50,30 @@ class Toolpath {
       if (firstOn < 0) firstOn = i;
       lastOn = i;
     }
-    if (firstOn < 0)
-      return new ToolpathSegments(new Toolpath(frameId, points), new Toolpath(frameId, []), new Toolpath(frameId, []));
+    if (firstOn < 0) return new ToolpathSegments(
+      new Toolpath(frameId, points),
+      new Toolpath(frameId, []),
+      new Toolpath(
+        frameId,
+        []
+      )
+    );
     return new ToolpathSegments(
       new Toolpath(frameId, points.slice(0, firstOn)),
-      new Toolpath(frameId, points.slice(firstOn, lastOn + 1)),
-      new Toolpath(frameId, points.slice(lastOn + 1, points.length))
+      new Toolpath(
+        frameId,
+        points.slice(
+          firstOn,
+          lastOn + 1
+        )
+      ),
+      new Toolpath(
+        frameId,
+        points.slice(
+          lastOn + 1,
+          points.length
+        )
+      )
     );
   }
 }

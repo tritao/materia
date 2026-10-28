@@ -16,11 +16,18 @@ class WaitForScrewFeeder implements Skill {
   var previous:Null<Int64> = null;
   var requested = false;
   public function new(feeder:ScrewFeederDevice, timeout:Float, receiptLabel:String = "pickup nest") {
-    if (feeder == null || !Math.isFinite(timeout) || timeout <= 0) throw "Feeder wait needs a device and explicit timeout";
-    this.feeder = feeder; this.timeout = timeout; this.receiptLabel = receiptLabel;
+    if (feeder == null
+      || !Math.isFinite(timeout) || timeout <= 0) throw "Feeder wait needs a device and explicit timeout";
+    this.feeder = feeder;
+    this.timeout = timeout;
+    this.receiptLabel = receiptLabel;
   }
   public function start():Void {
-    lifecycle.begin(); elapsed = 0; silent = 0; previous = null; requested = false;
+    lifecycle.begin();
+    elapsed = 0;
+    silent = 0;
+    previous = null;
+    requested = false;
     try feeder.enable(true) catch (error:Dynamic) fail(Std.string(error));
   }
   public function update(snapshot:RobotSnapshot, durationSeconds:Float):SkillStatus {
@@ -28,26 +35,41 @@ class WaitForScrewFeeder implements Skill {
     try {
       if (!Math.isFinite(durationSeconds) || durationSeconds <= 0) throw "Feeder wait needs positive time";
       elapsed += durationSeconds;
-      var fault = feeder.faultDetail(); if (fault != null) throw fault;
+      var fault = feeder.faultDetail();
+      if (fault != null) throw fault;
       var value = feeder.reading();
       if (value == null) silent += durationSeconds;
       else {
         var prior = previous;
-        if (prior != null && Int64.compare(value.sequence,prior) < 0) throw "Feeder source sequence regressed";
-        if (prior == null || Int64.compare(value.sequence,prior) > 0) {silent = 0; previous = value.sequence;}
-        else silent += durationSeconds;
+        if (prior != null && Int64.compare(value.sequence, prior) < 0) throw "Feeder source sequence regressed";
+        if (prior == null || Int64.compare(value.sequence, prior) > 0) {
+          silent = 0;
+          previous = value.sequence;
+        } else silent += durationSeconds;
         if (value.jammed == true) throw "Feeder jam prevents delivery";
-        if (value.present) lifecycle.succeed("screw physically present at "+receiptLabel);
+        if (value.present) lifecycle.succeed("screw physically present at " + receiptLabel);
         else if (!requested && value.empty == true) throw "Feeder supply is empty";
-        else if (!requested && value.ready) {feeder.request(); requested = true;}
+        else if (!requested && value.ready) {
+          feeder.request();
+          requested = true;
+        }
       }
       if (silent > timeout) throw "Feeder wait has no fresh acquisition";
       if (elapsed > timeout && lifecycle.isRunning()) throw "Feeder receipt timed out";
     } catch (error:Dynamic) fail(Std.string(error));
     return lifecycle.status();
   }
-  public function cancel():Void {if (lifecycle.isRunning()) {feeder.safe(); lifecycle.cancel();}}
+  public function cancel():Void {
+    if (lifecycle.isRunning()) {
+      feeder.safe();
+      lifecycle.cancel();
+    }
+  }
   public function status():SkillStatus return lifecycle.status();
   public function result():Null<SkillResult> return lifecycle.result();
-  function fail(message:String):Void {try feeder.safe() catch (_:Dynamic) {} lifecycle.fail(message);}
+  function fail(message:String):Void {
+    try feeder.safe() catch (_:Dynamic) {
+    }
+    lifecycle.fail(message);
+  }
 }

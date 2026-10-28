@@ -8,7 +8,11 @@ import processkit.screwdriving.FasteningRunReport;
 import processkit.screwdriving.FasteningRunReport.FasteningPass;
 
 /** The cell binds an attempt's body, program and motion before its skill starts. */
-typedef ScrewAttempt = {var screw:String; var skill:Skill; var runner:ScrewdrivingRunner;}
+typedef ScrewAttempt = {
+  var screw:String;
+  var skill:Skill;
+  var runner:ScrewdrivingRunner;
+}
 
 /** Try an identified screw, recover a NOK, then use one identified replacement before reporting and moving on. */
 class DriveFastening implements FasteningExecution implements ResumableSkill {
@@ -22,30 +26,55 @@ class DriveFastening implements FasteningExecution implements ResumableSkill {
   var active:Null<Skill> = null;
   var runner:Null<ScrewdrivingRunner> = null;
   var screw:String = "";
-  public function new(fastening:String, attempt:Int -> ScrewAttempt, recover:ScrewdrivingRunner -> Skill, attemptLimit:Int = 2, pass:FasteningPass = SinglePass) {
+  public function new(
+    fastening:String,
+    attempt:Int -> ScrewAttempt,
+    recover:ScrewdrivingRunner -> Skill,
+    attemptLimit:Int = 2,
+    pass:FasteningPass = SinglePass
+  ) {
     if (attempt == null || recover == null) throw "Fastening execution needs identified attempts and a recovery skill";
     if (attemptLimit < 1 || attemptLimit > 2) throw "Fastening execution allows one or two identified attempts";
-    report = new FasteningRunReport(fastening,pass); this.attempt = attempt; this.recover = recover;
+    report = new FasteningRunReport(fastening, pass);
+    this.attempt = attempt;
+    this.recover = recover;
     this.attemptLimit = attemptLimit;
   }
-  public function canResume():Bool return (switch lifecycle.status() {case Cancelled:true; case _:false;}) && !recovering &&
-    Std.isOfType(active,ResumableSkill) && cast(active,ResumableSkill).canResume();
+  public function canResume():Bool return (switch lifecycle.status() {
+    case Cancelled:
+      true;
+    case _:
+      false;
+  }
+  ) && !recovering && Std.isOfType(active, ResumableSkill) && cast(active, ResumableSkill).canResume();
   public function start():Void {
     if (canResume()) {
-      lifecycle.begin(); report.resumeAfterStop();
+      lifecycle.begin();
+      report.resumeAfterStop();
       var selected:Skill = cast active;
       try selected.start() catch (error:Dynamic) fail(Std.string(error));
       return;
     }
-    lifecycle.begin(); report.reset(); index = 0; recovering = false; active = null; runner = null;
+    lifecycle.begin();
+    report.reset();
+    index = 0;
+    recovering = false;
+    active = null;
+    runner = null;
     beginAttempt();
   }
   function beginAttempt():Void {
     try {
       var selected = attempt(index);
-      if (selected == null || selected.skill == null || selected.runner == null || selected.screw == null || selected.screw.length == 0) throw "Fastening attempt has no skill or runner";
-      for (previous in report.attempts) if (previous.screw == selected.screw) throw "Replacement reuses an attempted screw";
-      screw = selected.screw; active = selected.skill; runner = selected.runner; recovering = false; selected.skill.start();
+      if (selected == null || selected.skill == null || selected.runner == null
+        || selected.screw == null || selected.screw.length == 0) throw "Fastening attempt has no skill or runner";
+      for (previous in report.attempts) if (previous.screw
+        == selected.screw) throw "Replacement reuses an attempted screw";
+      screw = selected.screw;
+      active = selected.skill;
+      runner = selected.runner;
+      recovering = false;
+      selected.skill.start();
     } catch (error:Dynamic) fail(Std.string(error));
   }
   public function update(snapshot:RobotSnapshot, durationSeconds:Float):SkillStatus {
@@ -53,16 +82,25 @@ class DriveFastening implements FasteningExecution implements ResumableSkill {
     try {
       var skill = active, drive = runner;
       if (skill == null || drive == null) throw "Fastening execution lost its active attempt";
-      switch skill.update(snapshot,durationSeconds) {
+      switch skill.update(snapshot, durationSeconds) {
         case Succeeded:
           if (recovering) {
             report.recovered();
-            if (index+1 < attemptLimit) {index++; beginAttempt();}
-            else {report.finish(); lifecycle.succeed(attemptLimit == 2 ? "fastening failed after one replacement" : "fastening failed with no replacement remaining");}
+            if (index + 1 < attemptLimit) {
+              index++;
+              beginAttempt();
+            } else {
+              report.finish();
+              lifecycle.succeed(attemptLimit
+                == 2 ? "fastening failed after one replacement" : "fastening failed with no replacement remaining");
+            }
           } else {
             var result = drive.tighteningResult;
-            if (result == null || result.outcome != ScrewdriverContract.OK) throw "Successful screw skill has no measured OK result";
-            report.record(index,screw,result); report.finish(); lifecycle.succeed("fastening tightened");
+            if (result == null
+              || result.outcome != ScrewdriverContract.OK) throw "Successful screw skill has no measured OK result";
+            report.record(index, screw, result);
+            report.finish();
+            lifecycle.succeed("fastening tightened");
           }
         case Failed(message):
           if (recovering) fail('recovery: $message');
@@ -70,16 +108,23 @@ class DriveFastening implements FasteningExecution implements ResumableSkill {
             var result = drive.tighteningResult;
             if (result == null) fail(message);
             else {
-              report.record(index,screw,result);
-              if (result.outcome == ScrewdriverContract.OK) {fail(message); return lifecycle.status();}
+              report.record(index, screw, result);
+              if (result.outcome == ScrewdriverContract.OK) {
+                fail(message);
+                return lifecycle.status();
+              }
               recovering = true;
               var recovery = recover(drive);
               if (recovery == null) throw "Fastening has no recovery skill";
-              active = recovery; recovery.start();
+              active = recovery;
+              recovery.start();
             }
           }
-        case Cancelled: report.stop("cancelled"); lifecycle.cancel();
-        case _: {}
+        case Cancelled:
+          report.stop("cancelled");
+          lifecycle.cancel();
+        case _:
+          {}
       }
     } catch (error:Dynamic) fail(Std.string(error));
     return lifecycle.status();
@@ -88,14 +133,17 @@ class DriveFastening implements FasteningExecution implements ResumableSkill {
     if (!lifecycle.isRunning()) return;
     var skill = active;
     if (skill != null) skill.cancel();
-    report.stop("cancelled"); lifecycle.cancel();
+    report.stop("cancelled");
+    lifecycle.cancel();
   }
   public function status():SkillStatus return lifecycle.status();
   public function result():Null<SkillResult> return lifecycle.result();
   public function runReport():FasteningRunReport return report;
   function fail(message:String):Void {
     var skill = active;
-    if (skill != null) try skill.cancel() catch (_:Dynamic) {}
-    report.stop(message); lifecycle.fail(message);
+    if (skill != null) try skill.cancel() catch (_:Dynamic) {
+    }
+    report.stop(message);
+    lifecycle.fail(message);
   }
 }

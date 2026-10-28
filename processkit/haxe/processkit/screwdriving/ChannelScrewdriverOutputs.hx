@@ -7,7 +7,8 @@ class ChannelScrewdriverOutputs implements ScrewdriverOutputs {
   final runtime:robotkit.runtime.RobotRuntime;
   final channels:ScrewdriverChannelNames;
   public function new(runtime:robotkit.runtime.RobotRuntime, channels:ScrewdriverChannelNames) {
-    this.runtime = runtime; this.channels = channels;
+    this.runtime = runtime;
+    this.channels = channels;
   }
   public function selectProgram(slot:Int):Void {
     if (slot <= 0) throw "Screwdriver needs a positive program slot";

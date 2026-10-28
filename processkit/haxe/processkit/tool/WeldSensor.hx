@@ -33,32 +33,49 @@ class WeldSensor {
   public static inline var POWER:Int = WeldContract.POWER;
   public static inline var COUNT:Int = WeldContract.SENSOR_COUNT;
 
-  public static function values(reading:WeldReading):Array<Float>
-    return [reading.arc ? 1.0 : 0.0, reading.currentA, reading.voltageV, reading.touch ? 1.0 : 0.0, reading.fault, reading.powerW];
+  public static function values(reading:WeldReading):Array<Float> return [
+    reading.arc ? 1.0 : 0.0,
+    reading.currentA,
+    reading.voltageV,
+    reading.touch ? 1.0 : 0.0,
+    reading.fault,
+    reading.powerW
+  ];
 
   /** The fault code in words, or null for none. */
   public static function faultMessage(code:Int):Null<String> {
     return switch code {
-      case 0: null;
-      case 1: "weld: the arc did not ignite";
-      case 2: "weld: the arc was lost";
-      case 3: "weld: the wire is stuck to the work";
-      default: 'weld: unknown fault $code';
+      case 0:
+        null;
+      case 1:
+        "weld: the arc did not ignite";
+      case 2:
+        "weld: the arc was lost";
+      case 3:
+        "weld: the wire is stuck to the work";
+      default:
+        'weld: unknown fault $code';
     }
   }
 
   public static function reading(values:Array<Float>):WeldReading {
     if (values == null || values.length != COUNT) throw 'A tool_weld frame has $COUNT values';
-    return {arc: values[ARC] != 0.0, currentA: values[CURRENT], voltageV: values[VOLTAGE], touch: values[TOUCH] != 0.0,
-      fault: Std.int(values[FAULT]), powerW: values[POWER]};
+    return {
+      arc: values[ARC] != 0.0,
+      currentA: values[CURRENT],
+      voltageV: values[VOLTAGE],
+      touch: values[TOUCH] != 0.0,
+      fault: Std.int(values[FAULT]),
+      powerW: values[POWER]
+    };
   }
 
   /** Whether `values` is a well-formed frame: six finite values, flags 0 or 1, a known fault code, no negative current or power. */
   public static function valid(values:Array<Float>):Bool {
     if (values == null || values.length != COUNT) return false;
     for (value in values) if (!Math.isFinite(value)) return false;
-    return (values[ARC] == 0.0 || values[ARC] == 1.0) && (values[TOUCH] == 0.0 || values[TOUCH] == 1.0) &&
-      values[CURRENT] >= 0.0 && values[POWER] >= 0.0 && values[FAULT] == Std.int(values[FAULT]) &&
-      values[FAULT] >= 0.0 && values[FAULT] <= 3.0;
+    return (values[ARC] == 0.0 || values[ARC] == 1.0)
+      && (values[TOUCH] == 0.0 || values[TOUCH] == 1.0) && values[CURRENT] >= 0.0 && values[POWER] >= 0.0
+      && values[FAULT] == Std.int(values[FAULT]) && values[FAULT] >= 0.0 && values[FAULT] <= 3.0;
   }
 }

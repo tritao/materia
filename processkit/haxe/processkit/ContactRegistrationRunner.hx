@@ -21,15 +21,18 @@ class ContactRegistrationRunner {
   var pendingProbe:Null<ContactProbeRequest> = null;
 
   public function new(probe:ContactProbeRunner, sequence:ContactRegistrationSequence) {
-    if (probe == null || sequence == null) throw "Contact registration runner needs a probe owner and measured sequence";
-    this.probe = probe; this.sequence = sequence;
+    if (probe == null
+      || sequence == null) throw "Contact registration runner needs a probe owner and measured sequence";
+    this.probe = probe;
+    this.sequence = sequence;
   }
   public function running():Bool return active;
   public function completed():Bool return workFrame != null && failure == null;
 
   public function start():Void {
     if (started || probe.running()) throw "Contact registration runner needs an idle owner and cannot be reused";
-    started = true; active = true;
+    started = true;
+    active = true;
     try {
       var snapshot = probe.motion.robot.snapshot();
       sourceClock = snapshot.sourceClockId;
@@ -42,18 +45,19 @@ class ContactRegistrationRunner {
   public function update(dt:Float):Void {
     if (!active) return;
     try {
-      if (probe.motion.robot.snapshot().sourceClockId != sourceClock)
-        throw "Contact registration joint clock changed epoch";
+      if (probe.motion.robot.snapshot().sourceClockId
+        != sourceClock) throw "Contact registration joint clock changed epoch";
       if (returning) {
         probe.motion.update(dt);
         if (probe.motion.failure != null) throw 'Contact registration return failed: ${probe.motion.failure}';
         if (!probe.motion.completed) return;
-        if (returnTarget == null || returnTarget.length != probe.motion.jointIndices.length)
-          throw "Contact registration return has no valid checked target";
+        if (returnTarget == null || returnTarget.length
+          != probe.motion.jointIndices.length) throw "Contact registration return has no valid checked target";
         var snapshot = probe.motion.robot.snapshot();
         var target:Array<Float> = cast returnTarget;
-        for (joint in 0...target.length) if (Math.abs(snapshot.positions.get(probe.motion.jointIndices[joint]) - target[joint]) > 0.005)
-          throw 'Contact registration return missed joint ${probe.motion.jointIndices[joint]}';
+        for (joint in 0...target.length) if (Math.abs(snapshot.positions.get(probe.motion.jointIndices[joint])
+          - target[joint])
+          > 0.005) throw 'Contact registration return missed joint ${probe.motion.jointIndices[joint]}';
         if (betweenStages) {
           betweenStages = false;
           returning = false;
@@ -76,9 +80,9 @@ class ContactRegistrationRunner {
       if (probe.failure != null) throw probe.failure;
       if (!probe.completed()) return;
       var measurement = probe.contactMeasurement;
-      if (measurement == null || measurement.sensorId != probe.sensor || measurement.sensorKind != probe.sensorKind ||
-          measurement.coordinateFrame != probe.coordinateFrame)
-        throw "Contact registration lost the identified, framed measurement from its selected probe sensor";
+      if (measurement == null || measurement.sensorId != probe.sensor
+        || measurement.sensorKind != probe.sensorKind || measurement.coordinateFrame != probe
+        .coordinateFrame) throw "Contact registration lost the identified, framed measurement from its selected probe sensor";
       var next = sequence.observeMeasurement(measurement);
       if (next != null) {
         probe.start(next);
@@ -86,7 +90,8 @@ class ContactRegistrationRunner {
       } else if (sequence.stageTransitionPending) {
         beginStage(sequence.selectNextStage());
       } else {
-        acceptedFrame = cast(sequence.result, processkit.perception.ContactRegistration.ContactRegistrationResult).require();
+        acceptedFrame = cast(sequence.result,
+          processkit.perception.ContactRegistration.ContactRegistrationResult).require();
         var current = [for (index in probe.motion.jointIndices) probe.motion.robot.snapshot().positions.get(index)];
         if (startJoints == null) throw "Contact registration lost its saved starting posture";
         var target:Array<Float> = cast startJoints;
@@ -134,11 +139,20 @@ class ContactRegistrationRunner {
   }
   public function cancel():Void if (active) fail("contact registration cancelled");
   function fail(reason:String):Void {
-    probe.cancel(); workFrame = null; failure = reason; active = false;
+    probe.cancel();
+    workFrame = null;
+    failure = reason;
+    active = false;
     if (returning) {
-      try probe.motion.robot.stop(robotkit.core.StopMode.Normal) catch (_:Dynamic) {}
-      try probe.motion.abort() catch (_:Dynamic) {}
+      try probe.motion.robot.stop(robotkit.core.StopMode.Normal) catch (_:Dynamic) {
+      }
+      try probe.motion.abort() catch (_:Dynamic) {
+      }
     }
-    acceptedFrame = null; returning = false; betweenStages = false; returnTarget = null; pendingProbe = null;
+    acceptedFrame = null;
+    returning = false;
+    betweenStages = false;
+    returnTarget = null;
+    pendingProbe = null;
   }
 }

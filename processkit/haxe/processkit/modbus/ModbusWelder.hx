@@ -23,25 +23,35 @@ class ModbusWelder implements WelderOutputs implements WelderFeedback implements
   var dirty = true;
   var offAcknowledged = false;
   var nextPoll = 0.0;
-  var latest:WeldReading = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:0, powerW:0.0};
+  var latest:WeldReading = {arc: false, currentA: 0.0, voltageV: 0.0, touch: false, fault: 0, powerW: 0.0};
 
   public function new(client:ModbusTcpClient, map:ModbusWelderMap) {
     if (client == null || map == null || client.unit != map.unit) throw "Modbus welder needs matching client and map";
-    this.client = client; this.map = map;
+    this.client = client;
+    this.map = map;
     var outputs = [map.arcAddress, map.wire.address, map.voltage.address, map.leaseAddress];
     if (map.job != null) outputs.push(map.job.address);
     var first = outputs[0], last = outputs[0];
-    for (address in outputs) { first = Std.int(Math.min(first, address)); last = Std.int(Math.max(last, address)); }
+    for (address in outputs) {
+      first = Std.int(Math.min(first, address));
+      last = Std.int(Math.max(last, address));
+    }
     // Never overwrite an unmapped vendor register to fill a gap.
     if (last - first + 1 != outputs.length) throw "Modbus welder outputs and lease must form one atomic register block";
-    outputStart = first; outputCount = outputs.length;
+    outputStart = first;
+    outputCount = outputs.length;
     var inputs = [map.statusAddress, map.current.address, map.measuredVoltage.address, map.power.address];
-    first = inputs[0]; last = inputs[0];
-    for (address in inputs) { first = Std.int(Math.min(first, address)); last = Std.int(Math.max(last, address)); }
+    first = inputs[0];
+    last = inputs[0];
+    for (address in inputs) {
+      first = Std.int(Math.min(first, address));
+      last = Std.int(Math.max(last, address));
+    }
     if (last - first + 1 > 125) throw "Modbus feedback must fit one coherent read";
-    inputStart = first; inputCount = last - first + 1;
-    if (map.leaseMs / 1000.0 <= 2.0 * client.timeout + 0.1)
-      throw "Modbus device lease is too short for two bounded transactions and the owner tick";
+    inputStart = first;
+    inputCount = last - first + 1;
+    if (map.leaseMs / 1000.0 <= 2.0
+      * client.timeout + 0.1) throw "Modbus device lease is too short for two bounded transactions and the owner tick";
   }
   public function reading():WeldReading return latest;
   public function outputs():WelderOutputs return this;
@@ -55,37 +65,55 @@ class ModbusWelder implements WelderOutputs implements WelderFeedback implements
     return latest.fault != WeldFault.None ? "Modbus supply reports a fault" : null;
   }
   public function setArc(on:Bool):Void {
-    if (on && (faultMessage != null || !initialized || latest.fault != WeldFault.None)) throw "Faulted Modbus welder cannot ignite";
+    if (on && (faultMessage != null
+      || !initialized || latest.fault != WeldFault.None)) throw "Faulted Modbus welder cannot ignite";
     if (!on) client.discardQueued();
-    arc = on; dirty = true; offAcknowledged = false;
+    arc = on;
+    dirty = true;
+    offAcknowledged = false;
   }
   public function setWireSpeed(value:Float):Void {
-    map.wire.encode(value); if (value < 0.0) throw "Negative welding wire speed";
-    wire = value; dirty = true;
+    map.wire.encode(value);
+    if (value < 0.0) throw "Negative welding wire speed";
+    wire = value;
+    dirty = true;
   }
   public function setVoltage(value:Float):Void {
-    map.voltage.encode(value); if (value < 0.0) throw "Negative welding voltage";
-    voltage = value; dirty = true;
+    map.voltage.encode(value);
+    if (value < 0.0) throw "Negative welding voltage";
+    voltage = value;
+    dirty = true;
   }
   public function setJob(value:Int):Void {
     var register = map.job;
     if (register == null || value < 0) throw "Modbus job is unsupported or negative";
-    register.encode(value); job = value; dirty = true;
+    register.encode(value);
+    job = value;
+    dirty = true;
   }
-  public function safe():Void { wire = 0.0; arc = false; dirty = true; offAcknowledged = false; client.discardQueued(); }
+  public function safe():Void {
+    wire = 0.0;
+    arc = false;
+    dirty = true;
+    offAcknowledged = false;
+    client.discardQueued();
+  }
   public function disconnect():Void {
-    safe(); client.close(); faultMessage = "Modbus welder disconnected";
-    latest = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:WeldFault.ArcLost, powerW:0.0};
+    safe();
+    client.close();
+    faultMessage = "Modbus welder disconnected";
+    latest = {arc: false, currentA: 0.0, voltageV: 0.0, touch: false, fault: WeldFault.ArcLost, powerW: 0.0};
   }
   public function poll(now:Float):Void {
     client.poll(now);
     if (client.fault != null) {
       faultMessage = client.fault;
-      latest = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:WeldFault.ArcLost, powerW:0.0};
+      latest = {arc: false, currentA: 0.0, voltageV: 0.0, touch: false, fault: WeldFault.ArcLost, powerW: 0.0};
       return;
     }
     if (faultMessage != null || !client.idle() || (!dirty && now < nextPoll)) return;
-    dirty = false; nextPoll = now + Math.min(0.05, map.leaseMs / 4000.0);
+    dirty = false;
+    nextPoll = now + Math.min(0.05, map.leaseMs / 4000.0);
     var values:Array<Int> = [];
     for (_ in 0...outputCount) values.push(0);
     values[map.arcAddress - outputStart] = arc ? map.arcMask : 0;
@@ -95,19 +123,26 @@ class ModbusWelder implements WelderOutputs implements WelderFeedback implements
     var jobRegister = map.job;
     if (jobRegister != null) values[jobRegister.address - outputStart] = jobRegister.encode(job);
     var sendingSafe = !arc && wire == 0.0;
-    client.writeMultiple(outputStart, values, function() { offAcknowledged = sendingSafe; });
+    client.writeMultiple(outputStart, values, function() {
+      offAcknowledged = sendingSafe;
+    }
+    );
     client.read(inputStart, inputCount, function(registers:Array<Int>) {
       var status = registers[map.statusAddress - inputStart];
-      var reading:WeldReading = {arc:(status & map.establishedMask) != 0,
-        currentA:map.current.decode(registers[map.current.address - inputStart]),
-        voltageV:map.measuredVoltage.decode(registers[map.measuredVoltage.address - inputStart]),
-        touch:(status & map.touchMask) != 0, fault:(status & map.faultMask) != 0 ? WeldFault.ArcLost : WeldFault.None,
-        powerW:map.power.decode(registers[map.power.address - inputStart])};
+      var reading:WeldReading = {
+        arc: (status & map.establishedMask) != 0,
+        currentA: map.current.decode(registers[map.current.address - inputStart]),
+        voltageV: map.measuredVoltage.decode(registers[map.measuredVoltage.address - inputStart]),
+        touch: (status & map.touchMask) != 0,
+        fault: (status & map.faultMask) != 0 ? WeldFault.ArcLost : WeldFault.None,
+        powerW : map.power.decode(registers[map.power.address - inputStart])
+      };
       if (!WeldSensor.valid(WeldSensor.values(reading))) throw "Invalid Modbus welding feedback";
       latest = reading;
       initialized = true;
       if (latest.fault != WeldFault.None) safe();
-    });
+    }
+    );
     client.poll(now);
   }
 }

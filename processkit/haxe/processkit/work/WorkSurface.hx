@@ -25,9 +25,17 @@ class WorkSurface {
   public final materialTag:String;
   public final provenance:Provenance;
 
-  public function new(id:WorkSurfaceId, frameId:String, frame_T_surface:Transform3, boundary:Polygon2,
-      ?exclusions:Array<Polygon2>, ?tolerance:Float = 0.002, ?materialTag:String = "",
-      ?provenance:Provenance, ?surfaceFrameId:String) {
+  public function new(
+    id:WorkSurfaceId,
+    frameId:String,
+    frame_T_surface:Transform3,
+    boundary:Polygon2,
+    ?exclusions:Array<Polygon2>,
+    ?tolerance:Float = 0.002,
+    ?materialTag:String = "",
+    ?provenance:Provenance,
+    ?surfaceFrameId:String
+  ) {
     if (id == null || id.length == 0) throw "WorkSurface requires a non-empty id";
     if (frameId == null || frameId.length == 0) throw "WorkSurface requires a non-empty frame id";
     if (frame_T_surface == null) throw "WorkSurface requires a frame_T_surface transform";

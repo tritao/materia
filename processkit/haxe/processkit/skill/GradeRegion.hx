@@ -76,11 +76,17 @@ class GradeRegion implements Skill {
   var minObservedCutZ:Float = Math.POSITIVE_INFINITY;
   final jointIndices:Array<Int>;
 
-  public function new(manipulator:Manipulator, robot:Robot, region:EarthworkRegion, frameId:String,
-      spec:GradeRegionSpec, seed:Array<Float>, planRunner:ToolpathPlanRunner) {
-    if (manipulator == null || robot == null || region == null || frameId == null || frameId.length == 0 ||
-        spec == null || seed == null)
-      throw "GradeRegion requires a manipulator, robot, region, frame id, spec, and seed";
+  public function new(
+    manipulator:Manipulator,
+    robot:Robot,
+    region:EarthworkRegion,
+    frameId:String,
+    spec:GradeRegionSpec,
+    seed:Array<Float>,
+    planRunner:ToolpathPlanRunner
+  ) {
+    if (manipulator == null || robot == null || region == null || frameId == null || frameId.length == 0 || spec == null
+      || seed == null) throw "GradeRegion requires a manipulator, robot, region, frame id, spec, and seed";
     this.manipulator = manipulator;
     this.robot = robot;
     this.region = region;
@@ -117,7 +123,8 @@ class GradeRegion implements Skill {
 
   public function cancel():Void {
     if (!lifecycle.isRunning()) return;
-    try planRunner.abort() catch (_:Dynamic) {}
+    try planRunner.abort() catch (_:Dynamic) {
+    }
     lifecycle.cancel();
   }
 
@@ -145,9 +152,24 @@ class GradeRegion implements Skill {
       var remaining = currentZ - targetZ;
       var cut = remaining < spec.maxCutPerPass ? remaining : spec.maxCutPerPass;
       var point = new Point2(x, y);
-      var plan = DigCyclePlanner.planCycle(frameId, point, point, currentZ, cut,
-        spec.clearanceZ, new Point2(spec.dumpX, spec.dumpY), spec.dumpZ, spec.bucketHalfWidth,
-        spec.digPitch, spec.curlPitch, spec.dumpPitch, spec.feedRate);
+      var plan = DigCyclePlanner.planCycle(
+        frameId,
+        point,
+        point,
+        currentZ,
+        cut,
+        spec.clearanceZ,
+        new Point2(
+          spec.dumpX,
+          spec.dumpY
+        ),
+        spec.dumpZ,
+        spec.bucketHalfWidth,
+        spec.digPitch,
+        spec.curlPitch,
+        spec.dumpPitch,
+        spec.feedRate
+      );
       planRunner.run(plan.toolpath, initialSeed);
       if (!planRunner.running()) {
         lifecycle.fail('grade cycle $cyclesCompleted plan failed: ${planRunner.failure()}');
@@ -186,10 +208,16 @@ class GradeRegion implements Skill {
         lifecycle.fail("GradeRegion completed without an observed cut");
         return;
       }
-      totalRemovedVolume += BucketSweep.apply(region.existing,
+      totalRemovedVolume += BucketSweep.apply(
+        region.existing,
         new Point2(from.translation.x, from.translation.y),
-        new Point2(to.translation.x, to.translation.y), sweep.sweepHalfWidth,
-        minObservedCutZ).removedVolume;
+        new Point2(
+          to.translation.x,
+          to.translation.y
+        ),
+        sweep.sweepHalfWidth,
+        minObservedCutZ
+      ).removedVolume;
       cyclesCompleted++;
       stage = PreparingCycle;
       beginNextCycle();

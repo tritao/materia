@@ -21,21 +21,43 @@ class DriveScrew implements robotkit.skill.ResumableSkill {
   final prepare:Null<robotkit.skill.Skill>;
   var prepared = false;
 
-  public function new(runner:ScrewdrivingRunner, localization:Localization, plan:Void -> ScrewPlan, sensor:String, ?prepare:robotkit.skill.Skill) {
-    if (runner == null || localization == null || plan == null || sensor == null || sensor.length == 0)
-      throw "DriveScrew needs a runner, localization, fastening plan and screwdriver sensor";
-    this.runner = runner; this.localization = localization; this.plan = plan; this.prepare = prepare; frames = new ScrewdriverFrames(sensor);
+  public function new(
+    runner:ScrewdrivingRunner,
+    localization:Localization,
+    plan:Void -> ScrewPlan,
+    sensor:String,
+    ?prepare:robotkit.skill.Skill
+  ) {
+    if (runner == null || localization == null || plan == null || sensor == null
+      || sensor.length == 0) throw "DriveScrew needs a runner, localization, fastening plan and screwdriver sensor";
+    this.runner = runner;
+    this.localization = localization;
+    this.plan = plan;
+    this.prepare = prepare;
+    frames = new ScrewdriverFrames(sensor);
   }
-  public function canResume():Bool return (switch lifecycle.status() {case Cancelled:true; case _:false;}) && prepared && runner.canResume();
+  public function canResume():Bool return (switch lifecycle.status() {
+    case Cancelled:
+      true;
+    case _:
+      false;
+  }
+  ) && prepared && runner.canResume();
   public function start():Void {
     if (canResume()) {
-      lifecycle.begin(); frames.reset();
+      lifecycle.begin();
+      frames.reset();
       try runner.resume() catch (error:Dynamic) fail(Std.string(error));
       return;
     }
-    lifecycle.begin(); frames.reset(); prepared = prepare == null;
+    lifecycle.begin();
+    frames.reset();
+    prepared = prepare == null;
     try {
-      if (prepare != null) {prepare.start(); return;}
+      if (prepare != null) {
+        prepare.start();
+        return;
+      }
       startRunner();
     } catch (error:Dynamic) fail(Std.string(error));
   }
@@ -50,17 +72,23 @@ class DriveScrew implements robotkit.skill.ResumableSkill {
     if (!lifecycle.isRunning()) return lifecycle.status();
     try {
       if (!prepared && prepare != null) {
-        switch prepare.update(snapshot,durationSeconds) {
-          case Succeeded: prepared = true; frames.reset(); startRunner();
-          case Failed(message): fail(message);
-          case Cancelled: lifecycle.cancel();
-          case _: {}
+        switch prepare.update(snapshot, durationSeconds) {
+          case Succeeded:
+            prepared = true;
+            frames.reset();
+            startRunner();
+          case Failed(message):
+            fail(message);
+          case Cancelled:
+            lifecycle.cancel();
+          case _:
+            {}
         }
         return lifecycle.status();
       }
-      var reading = frames.read(snapshot,durationSeconds);
+      var reading = frames.read(snapshot, durationSeconds);
       if (reading != null) {
-        runner.update(durationSeconds,reading);
+        runner.update(durationSeconds, reading);
         var failure = runner.failure();
         if (failure != null) fail(failure);
         else if (runner.completed()) lifecycle.succeed("screw tightened and tool retracted");
@@ -71,13 +99,20 @@ class DriveScrew implements robotkit.skill.ResumableSkill {
   public function cancel():Void {
     if (!lifecycle.isRunning()) return;
     if (!prepared && prepare != null) prepare.cancel();
-    if (runner.running()) runner.abort(); lifecycle.cancel();
+    if (runner.running()) runner.abort();
+    lifecycle.cancel();
   }
   public function status():SkillStatus return lifecycle.status();
   public function result():Null<SkillResult> return lifecycle.result();
   function fail(message:String):Void {
-    try { if (!prepared && prepare != null) prepare.cancel(); } catch (_:Dynamic) {}
-    try { if (runner.running()) runner.abort(); } catch (_:Dynamic) {}
+    try {
+      if (!prepared && prepare != null) prepare.cancel();
+    } catch (_:Dynamic) {
+    }
+    try {
+      if (runner.running()) runner.abort();
+    } catch (_:Dynamic) {
+    }
     lifecycle.fail(message);
   }
 }

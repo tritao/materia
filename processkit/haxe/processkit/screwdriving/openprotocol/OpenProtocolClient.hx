@@ -2,9 +2,10 @@ package processkit.screwdriving.openprotocol;
 
 private class Command {
   public final frame:OpenProtocolFrame;
-  public final complete:Void->Void;
-  public function new(frame:OpenProtocolFrame, complete:Void->Void) {
-    this.frame = frame; this.complete = complete;
+  public final complete:Void -> Void;
+  public function new(frame:OpenProtocolFrame, complete:Void -> Void) {
+    this.frame = frame;
+    this.complete = complete;
   }
 }
 
@@ -21,10 +22,10 @@ class OpenProtocolClient {
   final stream = new OpenProtocolStream();
   final queue:Array<Command> = [];
   final results:Array<OpenProtocolResult> = [];
-  public var initialized(default,null) = false;
-  public var selectedProgram(default,null) = 0;
-  public var enabled(default,null) = false;
-  public var fault(default,null):Null<String> = null;
+  public var initialized(default, null) = false;
+  public var selectedProgram(default, null) = 0;
+  public var enabled(default, null) = false;
+  public var fault(default, null):Null<String> = null;
   var pending:Null<Command> = null;
   var lastResult:Null<OpenProtocolResult> = null;
   var deadline = 0.0;
@@ -37,59 +38,76 @@ class OpenProtocolClient {
 
   public function new(transport:OpenProtocolTransport, timeout:Float = 0.5) {
     if (transport == null) throw "Open Protocol needs a transport";
-    this.transport = transport; this.timeout = checkedTimeout(timeout);
-    enqueue(1,"",function() {
-      enqueue(42,"",function() {
+    this.transport = transport;
+    this.timeout = checkedTimeout(timeout);
+    enqueue(1, "", function() {
+      enqueue(42, "", function() {
         disabledAcknowledged = true;
-        enqueue(60,"",function() initialized = true);
-      });
-    });
+        enqueue(60, "", function() initialized = true);
+      }
+      );
+    }
+    );
   }
   static function checkedTimeout(value:Float):Float {
-    if (!Math.isFinite(value) || value <= 0 || value >= 10)
-      throw "Open Protocol needs a positive response timeout below ten seconds";
+    if (!Math.isFinite(value)
+      || value <= 0 || value >= 10) throw "Open Protocol needs a positive response timeout below ten seconds";
     return value;
   }
   public static function connect(host:String, port:Int, timeout:Float = 0.5):OpenProtocolClient {
     // Reject invalid configuration before constructing an owned socket.
     var responseTimeout = checkedTimeout(timeout);
-    return new OpenProtocolClient(new OpenProtocolTcp(host,port),responseTimeout);
+    return new OpenProtocolClient(new OpenProtocolTcp(host, port), responseTimeout);
   }
-  function enqueue(mid:Int, data:String, complete:Void->Void):Void {
+  function enqueue(mid:Int, data:String, complete:Void -> Void):Void {
     if (closed || fault != null) throw "Open Protocol client is disconnected";
     if (queue.length >= 64) throw "Open Protocol command backlog exceeded";
-    queue.push(new Command(new OpenProtocolFrame(mid,data),complete));
+    queue.push(new Command(new OpenProtocolFrame(mid, data), complete));
   }
   public function idle():Bool return pending == null && queue.length == 0;
-  public function ready():Bool return initialized && enabled && selectedProgram > 0 && idle() && fault == null && !closed;
+  public function ready():Bool return initialized
+    && enabled && selectedProgram > 0 && idle() && fault == null && !closed;
   public function selectProgram(slot:Int):Void {
-    if (!initialized || !idle() || enabled) throw "Open Protocol selection requires an initialized, idle, disabled tool";
+    if (!initialized
+      || !idle() || enabled) throw "Open Protocol selection requires an initialized, idle, disabled tool";
     if (slot < 1 || slot > 999) throw "Open Protocol parameter set must be in 1..999";
     selectedProgram = 0;
-    enqueue(18,OpenProtocolFrame.digits(slot,3),function() selectedProgram = slot);
+    enqueue(18, OpenProtocolFrame.digits(slot, 3), function() selectedProgram = slot);
   }
   public function enable():Void {
-    if (!initialized || !idle() || selectedProgram == 0) throw "Open Protocol enable requires an acknowledged parameter set";
+    if (!initialized
+      || !idle() || selectedProgram == 0) throw "Open Protocol enable requires an acknowledged parameter set";
     disabledAcknowledged = false;
-    enqueue(43,"",function() enabled = true);
+    enqueue(43, "", function() enabled = true);
   }
   /** Discard unsent work; acknowledge any in-flight command before disabling. */
   public function safe():Void {
     if (closed || fault != null) return;
     if (!initialized) return;
-    queue.splice(0,queue.length); disabledAcknowledged = false;
-    enqueue(42,"",function() { enabled = false; disabledAcknowledged = true; });
+    queue.splice(0, queue.length);
+    disabledAcknowledged = false;
+    enqueue(42, "", function() {
+      enabled = false;
+      disabledAcknowledged = true;
+    }
+    );
     // During initialization the communication-start callback always disables first.
   }
-  public function safeAcknowledged():Bool return initialized && disabledAcknowledged && !enabled && idle() && fault == null && !closed;
+  public function safeAcknowledged():Bool return initialized
+    && disabledAcknowledged && !enabled && idle() && fault == null && !closed;
   public function nextResult():Null<OpenProtocolResult> return results.length == 0 ? null : results.shift();
   public function close():Void {
     if (closed) return;
-    closed = true; initialized = false; enabled = false;
-    pending = null; queue.splice(0,queue.length); transport.close();
+    closed = true;
+    initialized = false;
+    enabled = false;
+    pending = null;
+    queue.splice(0, queue.length);
+    transport.close();
   }
   function send(frame:OpenProtocolFrame, now:Float):Void {
-    transport.send(frame.bytes); lastTraffic = now;
+    transport.send(frame.bytes);
+    lastTraffic = now;
   }
   function accept(frame:OpenProtocolFrame, now:Float):Void {
     var bytes = frame.bytes;
@@ -102,32 +120,43 @@ class OpenProtocolClient {
         if (result.fingerprint != previous.fingerprint) throw "Open Protocol repeated tightening ID changed its result";
       } else {
         if (results.length >= 64) throw "Open Protocol result backlog exceeded";
-        results.push(result); lastResult = result;
+        results.push(result);
+        lastResult = result;
       }
-      send(new OpenProtocolFrame(62),now); return;
+      send(new OpenProtocolFrame(62), now);
+      return;
     }
     if (frame.mid == 9999) {
       if (!heartbeatPending || bytes.length != 21) throw "Unexpected Open Protocol keep-alive";
-      heartbeatPending = false; return;
+      heartbeatPending = false;
+      return;
     }
     var command = pending;
     if (command == null) throw 'Unexpected Open Protocol MID ${frame.mid}';
     if (frame.mid == 4) {
-      if (bytes.length != 27 || OpenProtocolFrame.number(bytes,20,4) != command.frame.mid)
-        throw "Open Protocol command error does not match its request";
-      var code = OpenProtocolFrame.number(bytes,24,2);
+      if (bytes.length != 27 || OpenProtocolFrame.number(bytes,
+        20, 4) != command.frame.mid) throw "Open Protocol command error does not match its request";
+      var code = OpenProtocolFrame.number(bytes, 24, 2);
       throw 'Open Protocol rejected MID ${command.frame.mid}: error $code';
     }
     if (command.frame.mid == 1) {
-      if (frame.mid != 2 || bytes.length != 58 || OpenProtocolFrame.number(bytes,20,2) != 1
-          || OpenProtocolFrame.number(bytes,26,2) != 2 || OpenProtocolFrame.number(bytes,30,2) != 3)
-        throw "Open Protocol communication acknowledgement differs from revision 1";
-      var cell = OpenProtocolFrame.number(bytes,22,4);
-      var channel = OpenProtocolFrame.number(bytes,28,2);
+      if (frame.mid != 2 || bytes.length != 58 || OpenProtocolFrame.number(bytes,
+        20, 2) != 1 || OpenProtocolFrame.number(
+          bytes,
+          26,
+          2
+        ) != 2 || OpenProtocolFrame.number(
+          bytes,
+          30,
+          2
+        ) != 3) throw "Open Protocol communication acknowledgement differs from revision 1";
+      var cell = OpenProtocolFrame.number(bytes, 22, 4);
+      var channel = OpenProtocolFrame.number(bytes, 28, 2);
       if (channel > 20) throw "Open Protocol acknowledgement has invalid channel";
-    } else if (frame.mid != 5 || bytes.length != 25 || OpenProtocolFrame.number(bytes,20,4) != command.frame.mid)
-      throw "Open Protocol command acknowledgement does not match its request";
-    pending = null; command.complete();
+    } else if (frame.mid != 5 || bytes.length != 25 || OpenProtocolFrame.number(bytes,
+      20, 4) != command.frame.mid) throw "Open Protocol command acknowledgement does not match its request";
+    pending = null;
+    command.complete();
   }
   public function poll(now:Float):Void {
     if (closed || fault != null) return;
@@ -137,24 +166,30 @@ class OpenProtocolClient {
       var received = transport.receive();
       if (received.length > 0) stream.feed(received);
       while (true) {
-        var frame = stream.next(); if (frame == null) break;
-        lastTraffic = now; accept(frame,now);
+        var frame = stream.next();
+        if (frame == null) break;
+        lastTraffic = now;
+        accept(frame, now);
       }
       if (pending != null && now >= deadline) throw "Open Protocol command acknowledgement timed out";
       if (heartbeatPending && now >= heartbeatDeadline) throw "Open Protocol keep-alive timed out";
       if (pending == null && queue.length > 0) {
         var command = queue.shift();
         if (command != null) {
-          pending = command; deadline = now + timeout; send(command.frame,now);
+          pending = command;
+          deadline = now + timeout;
+          send(command.frame, now);
         }
       }
       if (initialized && !heartbeatPending && now - lastTraffic >= 10) {
-        heartbeatPending = true; heartbeatDeadline = now + timeout;
-        send(new OpenProtocolFrame(9999),now);
+        heartbeatPending = true;
+        heartbeatDeadline = now + timeout;
+        send(new OpenProtocolFrame(9999), now);
       }
     } catch (error:Dynamic) {
       fault = Std.string(error);
-      try close() catch (_:Dynamic) {}
+      try close() catch (_:Dynamic) {
+      }
     }
   }
 }

@@ -38,28 +38,52 @@ class ProbePosePlanner {
   }
 
   /** Prefer configurations reached by continuation from observed joints; global discovery remains a separate fallback. */
-  public function hasClearObservedApproachConfiguration(point:Vec3, outward:Vec3, normalTravel:Float, start:Array<Float>):Bool {
+  public function hasClearObservedApproachConfiguration(
+    point:Vec3,
+    outward:Vec3,
+    normalTravel:Float,
+    start:Array<Float>
+  ):Bool {
     return observedApproachLift(point, outward, normalTravel, start) != null;
   }
 
   /** Additional standoff lift that lets a geometric candidate pass the inexpensive reach/clearance screen. */
-  public function checkedApproachLift(point:Vec3, outward:Vec3, normalTravel:Float, start:Array<Float>,
-      maxLift:Float = 0.04, airMargin:Float = 0.003):Null<Float> {
+  public function checkedApproachLift(
+    point:Vec3,
+    outward:Vec3,
+    normalTravel:Float,
+    start:Array<Float>,
+    maxLift:Float = 0.04,
+    airMargin:Float = 0.003
+  ):Null<Float> {
     return clearApproachLift(point, outward, normalTravel, start, true, maxLift, airMargin);
   }
 
   /** The corresponding lift on the observed IK branch, without global discovery. */
-  public function observedApproachLift(point:Vec3, outward:Vec3, normalTravel:Float, start:Array<Float>,
-      maxLift:Float = 0.04, airMargin:Float = 0.003):Null<Float> {
+  public function observedApproachLift(
+    point:Vec3,
+    outward:Vec3,
+    normalTravel:Float,
+    start:Array<Float>,
+    maxLift:Float = 0.04,
+    airMargin:Float = 0.003
+  ):Null<Float> {
     return clearApproachLift(point, outward, normalTravel, start, false, maxLift, airMargin);
   }
 
-  function clearApproachLift(point:Vec3, outward:Vec3, normalTravel:Float, start:Array<Float>, discover:Bool,
-      maxLift:Float, airMargin:Float):Null<Float> {
-    if (point == null || outward == null || Math.abs(outward.norm() - 1) > 1e-8 ||
-        !Math.isFinite(normalTravel) || normalTravel < 0 || start == null || start.length != motion.arm.group.count() ||
-        !Math.isFinite(maxLift) || maxLift < 0 || maxLift > 0.04 || !Math.isFinite(airMargin) || !(airMargin > 0))
-      throw "Probe candidate screening needs a unit normal, observed joints and finite search bounds";
+  function clearApproachLift(
+    point:Vec3,
+    outward:Vec3,
+    normalTravel:Float,
+    start:Array<Float>,
+    discover:Bool,
+    maxLift:Float,
+    airMargin:Float
+  ):Null<Float> {
+    if (point == null || outward == null || Math.abs(outward.norm() - 1) > 1e-8
+      || !Math.isFinite(normalTravel) || normalTravel < 0 || start == null || start.length != motion.arm.group.count()
+      || !Math.isFinite(maxLift) || maxLift < 0 || maxLift > 0.04 || !Math.isFinite(airMargin) || !(airMargin
+      > 0)) throw "Probe candidate screening needs a unit normal, observed joints and finite search bounds";
     var current = motion.arm.tcpPose(start).rotation;
     var fullTolerance = motion.compiler.ikTolerance;
     // This is a cheap candidate screen, not the proof of a probe motion. A
@@ -69,14 +93,22 @@ class ProbePosePlanner {
     // plans the air move and proves the complete sensing corridor. A global
     // screen gets one free-roll sample; exhaustive branch search belongs to
     // the selected point, not every lattice candidate.
-    var screenTolerance = new IkTolerance(fullTolerance.position, fullTolerance.orientation,
-      Std.int(Math.min(64, fullTolerance.maxIterations)), fullTolerance.damping, fullTolerance.candidateSeparation);
+    var screenTolerance = new IkTolerance(
+      fullTolerance.position,
+      fullTolerance.orientation,
+      Std.int(Math.min(
+        64,
+        fullTolerance.maxIterations
+      )),
+      fullTolerance.damping,
+      fullTolerance.candidateSeparation
+    );
     for (lift in [0.0, 0.005, 0.01, 0.02, 0.04]) {
       if (lift > maxLift + 1e-9) break;
       var at = point.add(outward.scale(normalTravel + airMargin + lift + motion.airPoseReserve));
       var targets = [for (rotation in orientations(outward, current, 16)) pose(new Transform3(at, rotation))];
-      for (q in axisGoals(targets[0], start, discover, 1, screenTolerance))
-        if (axisMatches(q, at, outward) && motion.violation(q) == null) return lift;
+      for (q in axisGoals(targets[0], start,
+        discover, 1, screenTolerance)) if (axisMatches(q, at, outward) && motion.violation(q) == null) return lift;
       // Try every roll on the observed branch before paying for global branch discovery.
       for (target in targets) {
         var q = motion.inverse.solvePose(target, start, motion.compiler.ikTolerance);
@@ -86,14 +118,18 @@ class ProbePosePlanner {
     return null;
   }
 
-  function axisGoals(target:Pose3, start:Array<Float>, discover:Bool, maxCandidates:Int = 12,
-      ?tolerance:IkTolerance):Array<Array<Float>> {
+  function axisGoals(target:Pose3,
+    start:Array<Float>, discover:Bool, maxCandidates:Int = 12, ?tolerance:IkTolerance):Array<Array<Float>> {
     // EAIK solves fixed orientations. The shared roll grid below supplies
     // that freedom; do not route a supported arm back through numeric IK.
-    if(Std.isOfType(motion.inverse,motionkit.robot.EaikKinematics))return [];
+    if (Std.isOfType(motion.inverse, motionkit.robot.EaikKinematics)) return [];
     var solveTolerance = tolerance == null ? motion.compiler.ikTolerance : tolerance;
-    if (discover) return motion.inverse.sampleCandidates(target, maxCandidates,
-      solveTolerance, OrientationPolicy.FreeAboutTool);
+    if (discover) return motion.inverse.sampleCandidates(
+      target,
+      maxCandidates,
+      solveTolerance,
+      OrientationPolicy.FreeAboutTool
+    );
     var q = motion.inverse.solvePose(target, start, solveTolerance, OrientationPolicy.FreeAboutTool);
     return q == null ? [] : [q];
   }
@@ -107,24 +143,48 @@ class ProbePosePlanner {
   }
 
   /** Wire +Z points inward; roll is chosen by reach and clearance, nearest the observed torch orientation first. */
-  public function prepare(point:Vec3, outward:Vec3, normalTravel:Float, start:Array<Float>, contactOffset:Float,
-      airMargin:Float = 0.003, rolls:Int = 16, initialLift:Float = 0.0):ContactProbeRequest {
+  public function prepare(
+    point:Vec3,
+    outward:Vec3,
+    normalTravel:Float,
+    start:Array<Float>,
+    contactOffset:Float,
+    airMargin:Float = 0.003,
+    rolls:Int = 16,
+    initialLift:Float = 0.0
+  ):ContactProbeRequest {
     return prepareChecked(point, outward, normalTravel, start, contactOffset, airMargin, rolls, initialLift, true);
   }
 
   /** Local refinement must not trigger global discovery when a checked continuation fails. */
-  public function prepareObserved(point:Vec3, outward:Vec3, normalTravel:Float, start:Array<Float>, contactOffset:Float,
-      airMargin:Float = 0.003, rolls:Int = 16, initialLift:Float = 0.0):ContactProbeRequest {
+  public function prepareObserved(
+    point:Vec3,
+    outward:Vec3,
+    normalTravel:Float,
+    start:Array<Float>,
+    contactOffset:Float,
+    airMargin:Float = 0.003,
+    rolls:Int = 16,
+    initialLift:Float = 0.0
+  ):ContactProbeRequest {
     return prepareChecked(point, outward, normalTravel, start, contactOffset, airMargin, rolls, initialLift, false);
   }
 
-  function prepareChecked(point:Vec3, outward:Vec3, normalTravel:Float, start:Array<Float>, contactOffset:Float,
-      airMargin:Float, rolls:Int, initialLift:Float, discover:Bool):ContactProbeRequest {
-    if (point == null || outward == null || Math.abs(outward.norm() - 1) > 1e-8 ||
-        !Math.isFinite(normalTravel) || normalTravel < 0 || start == null || start.length != motion.arm.group.count() ||
-        !Math.isFinite(airMargin) || !(airMargin > 0) || !Math.isFinite(initialLift) || initialLift < 0 || initialLift > 0.04 ||
-        rolls < 1 || rolls > 64)
-      throw "Probe pose preparation needs a unit plane normal, observed joints and finite search bounds";
+  function prepareChecked(
+    point:Vec3,
+    outward:Vec3,
+    normalTravel:Float,
+    start:Array<Float>,
+    contactOffset:Float,
+    airMargin:Float,
+    rolls:Int,
+    initialLift:Float,
+    discover:Bool
+  ):ContactProbeRequest {
+    if (point == null || outward == null || Math.abs(outward.norm() - 1) > 1e-8 || !Math.isFinite(normalTravel)
+      || normalTravel < 0 || start == null || start.length != motion.arm.group.count() || !Math.isFinite(airMargin)
+      || !(airMargin > 0) || !Math.isFinite(initialLift) || initialLift < 0 || initialLift > 0.04 || rolls < 1
+      || rolls > 64) throw "Probe pose preparation needs a unit plane normal, observed joints and finite search bounds";
     var current = motion.arm.tcpPose(start).rotation;
     var candidates = orientations(outward, current, rolls);
     var reasons:Array<String> = [];
@@ -149,14 +209,21 @@ class ProbePosePlanner {
         var axisTarget = pose(new Transform3(approachPoint, candidates[0]));
         for (q in axisGoals(axisTarget, start, pass != 0)) {
           try {
-            if (!axisMatches(q, approachPoint, outward) || motion.violation(q) != null)
-              throw "Probe axis candidate is outside the task or clearance bounds";
-            var checked = pass == 0 ? motion.observedApproachJoints(q, start)
-              : motion.approachJoints(q, start);
-            if (!motion.corridorReachable(checked.endJoints, outward.scale(-1), distance))
-              throw "Probe sensing corridor leaves the reachable IK branch";
-            return new ContactProbeRequest(motion.arm.tcpPose(checked.endJoints), outward.scale(-1), distance,
-              0.01, 0.0005, 0.002, contactOffset, checked.endJoints);
+            if (!axisMatches(q, approachPoint, outward)
+              || motion.violation(q) != null) throw "Probe axis candidate is outside the task or clearance bounds";
+            var checked = pass == 0 ? motion.observedApproachJoints(q, start) : motion.approachJoints(q, start);
+            if (!motion.corridorReachable(checked.endJoints,
+              outward.scale(-1), distance)) throw "Probe sensing corridor leaves the reachable IK branch";
+            return new ContactProbeRequest(
+              motion.arm.tcpPose(checked.endJoints),
+              outward.scale(-1),
+              distance,
+              0.01,
+              0.0005,
+              0.002,
+              contactOffset,
+              checked.endJoints
+            );
           } catch (error:Dynamic) note(error);
         }
         // Position-only candidates keep search cheap when they work. If none
@@ -168,9 +235,18 @@ class ProbePosePlanner {
             var checked = pass == 0 ? motion.observedApproach(approach, start) : motion.approach(approach, start);
             // Contact is not yet localized, so a nominal contact move could penetrate the real plane.
             // Check corridor kinematics here; CAD region screening and measured servo/brake checks own obstruction checks.
-            if (!motion.corridorReachable(checked.endJoints, outward.scale(-1), distance))
-              throw "Probe sensing corridor leaves the reachable IK branch";
-            return new ContactProbeRequest(approach, outward.scale(-1), distance, 0.01, 0.0005, 0.002, contactOffset, checked.endJoints);
+            if (!motion.corridorReachable(checked.endJoints,
+              outward.scale(-1), distance)) throw "Probe sensing corridor leaves the reachable IK branch";
+            return new ContactProbeRequest(
+              approach,
+              outward.scale(-1),
+              distance,
+              0.01,
+              0.0005,
+              0.002,
+              contactOffset,
+              checked.endJoints
+            );
           } catch (error:Dynamic) note(error);
         }
       }

@@ -15,15 +15,27 @@ class WeldContract {
   public static inline var SENSOR_COUNT:Int = 6;
 
   /** Wire speed is m/min, voltage is V; an optional job is a nonnegative integer encoded as an analog value. */
-  public static function declarations(arc:String, wireSpeed:String, voltage:String, job:Null<String> = null):Array<ProcessChannelDeclaration> {
+  public static function declarations(arc:String,
+    wireSpeed:String, voltage:String, job:Null<String> = null):Array<ProcessChannelDeclaration> {
     var names = [arc, wireSpeed, voltage];
     if (job != null) names.push(job);
-    for (i in 0...names.length) for (j in 0...i)
-      if (names[i] == names[j]) throw "Welder channels must be distinct";
+    for (i in 0...names.length) for (j in 0...i) if (names[i] == names[j]) throw "Welder channels must be distinct";
     var result = [
-      new ProcessChannelDeclaration(arc, ProcessEventValue.Digital(false), WeldChannelPolicy.ARC_KEEPS_ON_STOP),
-      new ProcessChannelDeclaration(wireSpeed, ProcessEventValue.Analog(0.0), WeldChannelPolicy.WIRE_SPEED_KEEPS_ON_STOP),
-      new ProcessChannelDeclaration(voltage, ProcessEventValue.Analog(0.0), WeldChannelPolicy.VOLTAGE_KEEPS_ON_STOP)
+      new ProcessChannelDeclaration(
+        arc,
+        ProcessEventValue.Digital(false),
+        WeldChannelPolicy.ARC_KEEPS_ON_STOP
+      ),
+      new ProcessChannelDeclaration(
+        wireSpeed,
+        ProcessEventValue.Analog(0.0),
+        WeldChannelPolicy.WIRE_SPEED_KEEPS_ON_STOP
+      ),
+      new ProcessChannelDeclaration(
+        voltage,
+        ProcessEventValue.Analog(0.0),
+        WeldChannelPolicy.VOLTAGE_KEEPS_ON_STOP
+      )
     ];
     if (job != null) result.push(new ProcessChannelDeclaration(job, ProcessEventValue.Analog(0.0), true));
     return result;

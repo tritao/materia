@@ -89,15 +89,24 @@ class FinishSurface implements Skill {
   var eventIndex:Int = 0;
   var toolOn:Bool = false;
 
-  public function new(navigator:Navigator, manipulator:Manipulator, robot:Robot,
-      map_T_surface:Transform3, surface:WorkSurface, spec:FinishSpec,
-      observePerception:RobotSnapshot -> PerceptionSnapshot,
-      runner:SurfacePlanRunner, toolAdapter:ChannelToolAdapter, processChannel:String,
-      seed:Array<Float>, ?obstacles:CollisionDescription, ?toolPlanning:ToolPlanningContext) {
-    if (navigator == null || manipulator == null || robot == null || map_T_surface == null ||
-        surface == null || spec == null || observePerception == null || runner == null ||
-        toolAdapter == null || processChannel == null || seed == null)
-      throw "FinishSurface requires navigation, a manipulator, a robot, a surface, a spec, and a seed";
+  public function new(
+    navigator:Navigator,
+    manipulator:Manipulator,
+    robot:Robot,
+    map_T_surface:Transform3,
+    surface:WorkSurface,
+    spec:FinishSpec,
+    observePerception:RobotSnapshot -> PerceptionSnapshot,
+    runner:SurfacePlanRunner,
+    toolAdapter:ChannelToolAdapter,
+    processChannel:String,
+    seed:Array<Float>,
+    ?obstacles:CollisionDescription,
+    ?toolPlanning:ToolPlanningContext
+  ) {
+    if (navigator == null || manipulator == null || robot == null || map_T_surface == null || surface == null
+      || spec == null || observePerception == null || runner == null || toolAdapter == null || processChannel == null
+      || seed == null) throw "FinishSurface requires navigation, a manipulator, a robot, a surface, a spec, and a seed";
     this.navigator = navigator;
     this.manipulator = manipulator;
     this.robot = robot;
@@ -110,26 +119,41 @@ class FinishSurface implements Skill {
     this.processChannel = processChannel;
     this.seed = seed.copy();
     this.obstacles = obstacles == null ? new CollisionDescription() : obstacles;
-    if (toolPlanning != null &&
-        (toolPlanning.tool.flangeTTcp.translation.sub(manipulator.flangeTTcp.translation).norm() > 1e-6 ||
-         toolPlanning.tool.flangeTTcp.rotation.angularDistance(manipulator.flangeTTcp.rotation) > 1e-6))
-      throw "FinishSurface mounted tool TCP does not match the manipulator TCP";
+    if (toolPlanning != null && (toolPlanning.tool.flangeTTcp.translation.sub(manipulator.flangeTTcp.translation).norm()
+      > 1e-6 || toolPlanning.tool.flangeTTcp.rotation.angularDistance(manipulator.flangeTTcp.rotation)
+      > 1e-6)) throw "FinishSurface mounted tool TCP does not match the manipulator TCP";
     this.toolPlanning = toolPlanning;
   }
 
   public function start():Void {
     lifecycle.begin();
     try {
-      var result = WorkPatchPlanner.plan(surface, map_T_surface, manipulator,
-        spec.maxPatchWidth, spec.toolWidth, spec.overlap, spec.standoff, spec.feedRate, spec.leadInOut,
-        spec.standoffDistanceMin, spec.standoffDistanceMax, seed, 3, 3, 0.4, obstacles,
-        1e-4, 1e-3,
+      var result = WorkPatchPlanner.plan(
+        surface,
+        map_T_surface,
+        manipulator,
+        spec.maxPatchWidth,
+        spec.toolWidth,
+        spec.overlap,
+        spec.standoff,
+        spec.feedRate,
+        spec.leadInOut,
+        spec.standoffDistanceMin,
+        spec.standoffDistanceMax,
+        seed,
+        3,
+        3,
+        0.4,
+        obstacles,
+        1e-4,
+        1e-3,
         toolPlanning == null ? null : toolPlanning.tool.collision,
         toolPlanning == null ? null : toolPlanning.obstacles,
         toolPlanning == null ? 0.0 : toolPlanning.clearance,
         toolPlanning == null ? null : toolPlanning.maxJointStep,
         toolPlanning == null ? 0.005 : toolPlanning.maxToolStep,
-        toolPlanning == null ? null : toolPlanning.makeWorld);
+        toolPlanning == null ? null : toolPlanning.makeWorld
+      );
       if (result.patches.length == 0) {
         lifecycle.fail("work patch planner produced no patches");
         return;
@@ -158,21 +182,26 @@ class FinishSurface implements Skill {
         lifecycle.fail("FinishSurface reached update() before a patch was staged");
       case NavigatingToPatch:
         var goTo:Null<GoTo> = currentGoTo;
-        if (goTo == null) { lifecycle.fail("FinishSurface has no active navigation task"); return lifecycle.status(); }
+        if (goTo == null) {
+          lifecycle.fail("FinishSurface has no active navigation task");
+          return lifecycle.status();
+        }
         var navStatus = goTo.update(snapshot, durationSeconds);
         switch navStatus {
           case SkillStatus.Running:
-          case SkillStatus.Succeeded: awaitBaseStop();
-          case SkillStatus.Cancelled: lifecycle.cancel();
-          case SkillStatus.Failed(message): lifecycle.fail(message);
-          case SkillStatus.Idle: lifecycle.fail("navigation returned to idle");
+          case SkillStatus.Succeeded:
+            awaitBaseStop();
+          case SkillStatus.Cancelled:
+            lifecycle.cancel();
+          case SkillStatus.Failed(message):
+            lifecycle.fail(message);
+          case SkillStatus.Idle:
+            lifecycle.fail("navigation returned to idle");
         }
       case ExecutingPatch:
-        try advanceExecution(snapshot, durationSeconds)
-        catch (error:Dynamic) lifecycle.fail(Std.string(error));
+        try advanceExecution(snapshot, durationSeconds) catch (error:Dynamic) lifecycle.fail(Std.string(error));
       case AwaitingBaseStop:
-        if (snapshot.safety == RobotKitRuntimeConstants.RK_SAFETY_READY)
-          beginExecution();
+        if (snapshot.safety == RobotKitRuntimeConstants.RK_SAFETY_READY) beginExecution();
     }
     return lifecycle.status();
   }
@@ -180,7 +209,8 @@ class FinishSurface implements Skill {
   public function cancel():Void {
     if (!lifecycle.isRunning()) return;
     if (currentGoTo != null) currentGoTo.cancel();
-    try runner.abort() catch (_:Dynamic) {}
+    try runner.abort() catch (_:Dynamic) {
+    }
     lifecycle.cancel();
   }
 
@@ -192,15 +222,17 @@ class FinishSurface implements Skill {
 
   function beginPatch(index:Int):Void {
     var patch = patches[index];
-    var goTo = new GoTo(navigator,
-      new NavigationGoal(patch.basePose, surface.frameId, 0.02, 0.02), observePerception);
+    var goTo = new GoTo(navigator, new NavigationGoal(patch.basePose, surface.frameId, 0.02, 0.02), observePerception);
     currentGoTo = goTo;
     stage = NavigatingToPatch;
     goTo.start();
     switch goTo.status() {
-      case SkillStatus.Succeeded: awaitBaseStop();
-      case SkillStatus.Failed(message): lifecycle.fail(message);
-      case SkillStatus.Cancelled: lifecycle.cancel();
+      case SkillStatus.Succeeded:
+        awaitBaseStop();
+      case SkillStatus.Failed(message):
+        lifecycle.fail(message);
+      case SkillStatus.Cancelled:
+        lifecycle.cancel();
       case _:
     }
   }
@@ -234,9 +266,12 @@ class FinishSurface implements Skill {
       var event = fired[eventIndex++];
       toolAdapter.apply(event);
       if (event.channel == processChannel) toolOn = switch event.value {
-        case Digital(enabled): enabled;
-        case Analog(value): value > 0.0;
-        case Process(_, _): false;
+        case Digital(enabled):
+          enabled;
+        case Analog(value):
+          value > 0.0;
+        case Process(_, _):
+          false;
       };
     }
     if (runner.failure() != null) {
@@ -252,8 +287,7 @@ class FinishSurface implements Skill {
         var baseWorld = Transform3.fromPose2(state.pose, 0.0);
         var tcpWorld = baseWorld.compose(manipulator.tcpPose(q));
         var local = map_T_surface.inverse().transformPoint(tcpWorld.translation);
-        if (coverage != null)
-          coverage.markFootprint(new Point2(local.x, local.y), spec.footprintRadius);
+        if (coverage != null) coverage.markFootprint(new Point2(local.x, local.y), spec.footprintRadius);
       }
     }
     if (runner.completed()) {

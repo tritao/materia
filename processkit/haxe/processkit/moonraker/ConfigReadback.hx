@@ -15,7 +15,8 @@ class ConfigReadback {
     if (trimmed.length == 0) return null;
     for (index in 0...trimmed.length) {
       var code = trimmed.charCodeAt(index);
-      if (!((code >= 48 && code <= 57) || code == 43 || code == 45 || code == 46 || code == 101 || code == 69)) return null;
+      if (!((code >= 48
+        && code <= 57) || code == 43 || code == 45 || code == 46 || code == 101 || code == 69)) return null;
     }
     var value = Std.parseFloat(trimmed);
     return Math.isFinite(value) ? value : null;
@@ -32,21 +33,28 @@ class ConfigReadback {
   }
 
   /** The differences, each a sentence: a section or key the machine does not have, a value that differs, a warning Klipper gave. */
-  public static function compare(expected:Map<String, Map<String, String>>, settings:Dynamic, warnings:Array<Dynamic>):Array<String> {
+  public static function compare(expected:Map<String,
+    Map<String, String>>, settings:Dynamic, warnings:Array<Dynamic>):Array<String> {
     var problems:Array<String> = [];
     if (settings == null) return ["Klipper reports no running configuration"];
     var sections = [for (name in expected.keys()) name];
     sections.sort(Reflect.compare);
     for (name in sections) {
       var running:Dynamic = Reflect.field(settings, name.toLowerCase());
-      if (running == null) { problems.push('[$name] is not in the running configuration'); continue; }
+      if (running == null) {
+        problems.push('[$name] is not in the running configuration');
+        continue;
+      }
       var keys = expected.get(name);
       var names = [for (key in keys.keys()) key];
       names.sort(Reflect.compare);
       for (key in names) {
         var wanted = StringTools.trim(keys.get(key));
         var actual:Dynamic = Reflect.field(running, key.toLowerCase());
-        if (actual == null) { problems.push('[$name] $key is not in the running configuration'); continue; }
+        if (actual == null) {
+          problems.push('[$name] $key is not in the running configuration');
+          continue;
+        }
         var same:Bool;
         if (Std.isOfType(actual, Array)) {
           // A list Klipper parsed (`gear_ratio: 54:18` is [[54, 18]]): the same numbers in the same order.

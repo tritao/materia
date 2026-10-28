@@ -14,8 +14,15 @@ class DigCyclePlan {
   public final cuttingEdgeFrom:Point2;
   public final cuttingEdgeTo:Point2;
 
-  public function new(toolpath:Toolpath, sweepFrom:Point2, sweepTo:Point2, sweepHalfWidth:Float,
-      sweepEdgeHeight:Float, ?cuttingEdgeFrom:Point2, ?cuttingEdgeTo:Point2) {
+  public function new(
+    toolpath:Toolpath,
+    sweepFrom:Point2,
+    sweepTo:Point2,
+    sweepHalfWidth:Float,
+    sweepEdgeHeight:Float,
+    ?cuttingEdgeFrom:Point2,
+    ?cuttingEdgeTo:Point2
+  ) {
     this.toolpath = toolpath;
     this.sweepFrom = sweepFrom;
     this.sweepTo = sweepTo;

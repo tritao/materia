@@ -22,13 +22,22 @@ import processkit.work.Point2;
  * bow itself remains visible as a spatial pattern in a `DeviationMap`.
  */
 class SimulatedSurfaceScanner {
-  public static function scan(design:WorkSurface, surface_T_trueSurface:Transform3, bowAmplitude:Float,
-      pointSpacing:Float, noiseStdDev:Float, seed:Int, sourceTimestampNs:Int64):PointCloud {
+  public static function scan(
+    design:WorkSurface,
+    surface_T_trueSurface:Transform3,
+    bowAmplitude:Float,
+    pointSpacing:Float,
+    noiseStdDev:Float,
+    seed:Int,
+    sourceTimestampNs:Int64
+  ):PointCloud {
     if (design == null) throw "Simulated surface scan requires a design work surface";
     if (surface_T_trueSurface == null) throw "Simulated surface scan requires a surface_T_trueSurface transform";
     if (!Math.isFinite(bowAmplitude)) throw "Simulated surface scan bow amplitude must be finite";
-    if (!Math.isFinite(pointSpacing) || pointSpacing <= 0.0) throw "Simulated surface scan point spacing must be positive and finite";
-    if (!Math.isFinite(noiseStdDev) || noiseStdDev < 0.0) throw "Simulated surface scan noise stddev must be finite and non-negative";
+    if (!Math.isFinite(pointSpacing)
+      || pointSpacing <= 0.0) throw "Simulated surface scan point spacing must be positive and finite";
+    if (!Math.isFinite(noiseStdDev)
+      || noiseStdDev < 0.0) throw "Simulated surface scan noise stddev must be finite and non-negative";
 
     var bounds = design.boundary.bounds();
     var centerX = (bounds.minX + bounds.maxX) * 0.5;
@@ -46,7 +55,10 @@ class SimulatedSurfaceScanner {
         var candidate = new Point2(x, y);
         var inside = design.boundary.contains(candidate);
         if (inside) {
-          for (exclusion in design.exclusions) if (exclusion.contains(candidate)) { inside = false; break; }
+          for (exclusion in design.exclusions) if (exclusion.contains(candidate)) {
+            inside = false;
+            break;
+          }
         }
         if (inside) {
           var dx = x - centerX, dy = y - centerY;

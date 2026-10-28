@@ -22,8 +22,13 @@ import processkit.work.WorkSurfaceId;
  * so geometry is scaled by 1/1000 into RobotKit's meters.
  */
 class WallBridge {
-  public static function wallToWorkSurface(bim:BimDocument, wallId:ElementId, id:WorkSurfaceId,
-      frameId:String, ?sideNormal:Vec3):WorkSurface {
+  public static function wallToWorkSurface(
+    bim:BimDocument,
+    wallId:ElementId,
+    id:WorkSurfaceId,
+    frameId:String,
+    ?sideNormal:Vec3
+  ):WorkSurface {
     if (bim == null || wallId == null) throw "Wall bridge requires a document and a wall id";
     var target = sideNormal == null ? new Vec3(0.0, 1.0, 0.0) : sideNormal.normalized();
     var shape = bim.cad.element(wallId).shape();

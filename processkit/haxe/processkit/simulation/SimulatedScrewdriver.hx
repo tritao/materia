@@ -39,7 +39,7 @@ typedef ScrewdriverSetup = {
   /** CAD member under this head, when it is a free dynamic part. Final preload retains it on the fixture. */
   @:optional var clamped:SimObject;
   /** Exact CAD connection; required when a released joint can be continued. */
-  @:optional var connection:{fastening:String,member:String,face:String};
+  @:optional var connection: {fastening: String, member: String, face: String};
   @:optional var retightening:Bool;
   /** Selects the solver-coupled screw body instead of the process-model pose. */
   @:optional var physicalThread:Bool;
@@ -50,7 +50,7 @@ typedef ScrewdriverSetup = {
   /** Axial stiffness of the engaged thread, in N/m. */
   @:optional var physicalThreadStiffnessNPerM:Float;
   /** The arm owns axial search, engagement or recovery motion; lock the compliant feed slide. */
-  @:optional var armOwnsAxialMotion:Null<Void->Bool>;
+  @:optional var armOwnsAxialMotion:Null<Void -> Bool>;
 };
 
 /**
@@ -132,136 +132,217 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
   var pendingEngagement:Null<RetainedEngagement> = null;
   var carriage:ScrewCarriage = Empty;
 
-  public function new(simulation:Simulation, runtime:RobotRuntime, robotIndex:Int, linkIndex:Int,
-      feedJoint:Int, spindleJoint:Int, tipPosition:Array<Float>, axis:Array<Float>, channels:ScrewdriverChannelNames,
-      sensorId:String, strokeLimitMm:Float, maxSpeed:Float, maxTorque:Float, springRate:Float,
-      spindleAxisAlignment:Float, spindleInertia:Float, feedMass:Float) {
-    if (simulation == null || runtime == null || channels == null || sensorId == null ||
-        robotIndex < 0 || linkIndex < 0 || feedJoint < 0 || spindleJoint < 0 || feedJoint == spindleJoint ||
-        tipPosition == null || tipPosition.length != 3 || axis == null || axis.length != 3)
-      throw "Simulated screwdriver needs its mounted tool, joints, channels and sensor";
-    for (value in [strokeLimitMm, maxSpeed, maxTorque, springRate, spindleInertia, feedMass])
-      if (!Math.isFinite(value) || value <= 0) throw "Simulated screwdriver needs positive finite ratings and spindle inertia";
-    var norm = Math.sqrt(axis[0]*axis[0]+axis[1]*axis[1]+axis[2]*axis[2]);
+  public function new(
+    simulation:Simulation,
+    runtime:RobotRuntime,
+    robotIndex:Int,
+    linkIndex:Int,
+    feedJoint:Int,
+    spindleJoint:Int,
+    tipPosition:Array<Float>,
+    axis:Array<Float>,
+    channels:ScrewdriverChannelNames,
+    sensorId:String,
+    strokeLimitMm:Float,
+    maxSpeed:Float,
+    maxTorque:Float,
+    springRate:Float,
+    spindleAxisAlignment:Float,
+    spindleInertia:Float,
+    feedMass:Float
+  ) {
+    if (simulation == null
+      || runtime == null || channels == null || sensorId == null || robotIndex < 0 || linkIndex < 0 || feedJoint < 0
+      || spindleJoint < 0 || feedJoint == spindleJoint || tipPosition == null || tipPosition.length != 3 || axis == null
+      || axis.length != 3) throw "Simulated screwdriver needs its mounted tool, joints, channels and sensor";
+    for (value in [strokeLimitMm, maxSpeed, maxTorque, springRate, spindleInertia, feedMass]) if (!Math.isFinite(value)
+      || value <= 0) throw "Simulated screwdriver needs positive finite ratings and spindle inertia";
+    var norm = Math.sqrt(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]);
     if (!Math.isFinite(norm) || norm <= 0) throw "Simulated screwdriver needs a finite tool axis";
-    if (!Math.isFinite(spindleAxisAlignment) || Math.abs(spindleAxisAlignment) > 1.0 + 1e-8)
-      throw "Simulated screwdriver needs a finite spindle-axis alignment";
-    this.simulation = simulation; this.runtime = runtime; this.robotIndex = robotIndex; this.linkIndex = linkIndex;
-    this.feedJoint = feedJoint; this.spindleJoint = spindleJoint; this.tipPosition = tipPosition.copy();
+    if (!Math.isFinite(spindleAxisAlignment) || Math.abs(spindleAxisAlignment)
+      > 1.0 + 1e-8) throw "Simulated screwdriver needs a finite spindle-axis alignment";
+    this.simulation = simulation;
+    this.runtime = runtime;
+    this.robotIndex = robotIndex;
+    this.linkIndex = linkIndex;
+    this.feedJoint = feedJoint;
+    this.spindleJoint = spindleJoint;
+    this.tipPosition = tipPosition.copy();
     this.spindleInertia = spindleInertia;
     this.feedMass = feedMass;
-    this.axis = [for (value in axis) value / norm]; this.channels = channels; this.sensorId = sensorId;
-    this.strokeLimitMm = strokeLimitMm; this.maxSpeed = maxSpeed; this.maxTorque = maxTorque; this.springRate = springRate;
+    this.axis = [for (value in axis) value / norm];
+    this.channels = channels;
+    this.sensorId = sensorId;
+    this.strokeLimitMm = strokeLimitMm;
+    this.maxSpeed = maxSpeed;
+    this.maxTorque = maxTorque;
+    this.springRate = springRate;
     this.spindleAxisAlignment = Math.max(-1, Math.min(1, spindleAxisAlignment));
     holding = new SimulatedSuctionTool(simulation, runtime, robotIndex, linkIndex, null, []);
     observed = ScrewdriverSensor.idle();
   }
-  public function configure(slot:Int, setup:ScrewdriverSetup):Null<processkit.screwdriving.ScrewPlan.ScrewFinalContact> {
-    if (slot <= 0 || setup == null || setup.program == null || setup.joint == null || setup.work == null ||
-        (setup.hand != 1 && setup.hand != -1)) throw "Screwdriver slot needs an identified screw, live frame and qualified program";
+  public function configure(slot:Int,
+    setup:ScrewdriverSetup):Null<processkit.screwdriving.ScrewPlan.ScrewFinalContact> {
+    if (slot <= 0 || setup == null || setup.program == null || setup.joint == null || setup.work == null || (setup.hand
+      != 1 && setup.hand != -1)) throw "Screwdriver slot needs an identified screw, live frame and qualified program";
     if (lastStart) throw "Cannot configure a screwdriver while its start output is on";
-    if (threadedScrew() != null && threadedScrew() != setup.screw)
-      throw "Cannot replace the qualified screw while its physical thread slide is attached";
+    if (threadedScrew() != null && threadedScrew()
+      != setup.screw) throw "Cannot replace the qualified screw while its physical thread slide is attached";
     var settings = setup.program.settings;
-    if (settings.runDownSpeed > maxSpeed || settings.finalSpeed > maxSpeed || settings.finalTorqueLimit > maxTorque ||
-        settings.maximumStroke > strokeLimitMm || setup.joint.springRate != springRate)
-      throw "Screwdriver program exceeds its capacity, stroke or spring rating";
+    if (settings.runDownSpeed > maxSpeed || settings.finalSpeed > maxSpeed
+      || settings.finalTorqueLimit > maxTorque || settings.maximumStroke > strokeLimitMm || setup.joint.springRate
+      != springRate) throw "Screwdriver program exceeds its capacity, stroke or spring rating";
     var checked = new TighteningModel(setup.program, setup.joint);
     if (carried() != null && carried() != setup.screw) throw "Qualified slot does not describe the held screw";
     var connection = setup.connection;
-    if (setup.clamped != null && (setup.fixture == null || setup.clamped == setup.screw ||
-        setup.clamped.motion != nativekit.sim.MotionType.Dynamic))
-      throw "A clamped member needs its own dynamic body and identified threaded fixture";
+    if (setup.clamped != null
+      && (setup.fixture == null || setup.clamped == setup.screw || setup.clamped.motion != nativekit
+      .sim.MotionType.Dynamic)) throw "A clamped member needs its own dynamic body and identified threaded fixture";
     if (setup.physicalThread == true) {
-      requiredPositive(setup.threadLeadMm,"Physical screw engagement needs a positive CAD thread lead");
-      requiredPositive(setup.physicalThreadMaxForceN,"Physical screw engagement needs an explicit positive axial force cap");
-      requiredPositive(setup.physicalThreadStiffnessNPerM,"Physical screw engagement needs an explicit positive thread stiffness");
-      if (setup.screw == null || setup.fixture == null || connection == null)
-        throw "Physical screw engagement needs its identified screw and retained fixture";
+      requiredPositive(setup.threadLeadMm, "Physical screw engagement needs a positive CAD thread lead");
+      requiredPositive(
+        setup.physicalThreadMaxForceN,
+        "Physical screw engagement needs an explicit positive axial force cap"
+      );
+      requiredPositive(
+        setup.physicalThreadStiffnessNPerM,
+        "Physical screw engagement needs an explicit positive thread stiffness"
+      );
+      if (setup.screw == null || setup.fixture == null
+        || connection == null) throw "Physical screw engagement needs its identified screw and retained fixture";
     }
-    if (setup.physicalThread == true && Math.abs(Math.abs(spindleAxisAlignment) - 1.0) > 1e-6)
-      throw "Physical screw engagement requires the spindle axis to be collinear with the tool thread axis";
+    if (setup.physicalThread == true && Math.abs(Math.abs(spindleAxisAlignment) - 1.0)
+      > 1e-6) throw "Physical screw engagement requires the spindle axis to be collinear with the tool thread axis";
     if (setup.fixture != null || setup.retightening == true) {
-      if (connection == null || connection.fastening == null || connection.fastening.length == 0 ||
-          connection.member == null || connection.member.length == 0 || connection.face == null || connection.face.length == 0)
-        throw "Retained screw needs its exact fastening, threaded member and named face";
+      if (connection == null || connection.fastening == null || connection.fastening.length == 0 || connection.member
+        == null || connection.member.length == 0 || connection.face == null || connection.face.length
+        == 0) throw "Retained screw needs its exact fastening, threaded member and named face";
     }
     var contact:Null<processkit.screwdriving.ScrewPlan.ScrewFinalContact> = null;
     if (setup.retightening == true) {
       if (carried() != null) throw "Final setup needs a successfully released screw";
       var engagement = retainedFor(setup);
-      var continued = engagement.model.retighten(setup.program,setup.joint);
+      var continued = engagement.model.retighten(setup.program, setup.joint);
       var socket = transform(simulation.objectPose(engagement.screw)).compose(engagement.bodyToHead);
-      contact = {socket:socket,advanceMm:continued.advanceMm};
+      contact = {socket: socket, advanceMm: continued.advanceMm};
     }
     setups.set(slot, setup);
-    if (activeSlot == slot) { activeSlot = 0; selected = null; model = null; }
+    if (activeSlot == slot) {
+      activeSlot = 0;
+      selected = null;
+      model = null;
+    }
     return contact;
   }
   /** Only an accepted final preload joins the clamped member; snug and failed attempts leave it free. */
   function retainClamped(setup:ScrewdriverSetup):Void {
     var body = setup.clamped, fixture = setup.fixture;
     if (body == null || fixture == null || setup.program.stopAtSeat || fixture.carries(body)) return;
-    if (simulation.objectCarrier(body).rawValue() != 0)
-      throw "Cannot fasten a clamped member still owned by another carrier";
+    if (simulation.objectCarrier(body).rawValue()
+      != 0) throw "Cannot fasten a clamped member still owned by another carrier";
     fixture.retainRigid(body);
     if (!fixture.carries(body)) throw "Final preload did not retain its named clamped member";
   }
 
   function retainedFor(setup:ScrewdriverSetup):RetainedEngagement {
     var connection = setup.connection;
-    if (connection == null || setup.screw == null) throw "Final setup needs its identified released screw and connection";
-    for (engagement in retained) if (engagement.screw == setup.screw && engagement.fastening == connection.fastening &&
-        engagement.member == connection.member && engagement.face == connection.face) {
+    if (connection == null
+      || setup.screw == null) throw "Final setup needs its identified released screw and connection";
+    for (engagement in retained) if (engagement.screw == setup.screw && engagement.fastening == connection.fastening
+      && engagement.member == connection.member && engagement.face == connection.face) {
       if (engagement.hand != setup.hand) throw "Final setup cannot change the engaged thread hand";
       if (!engagement.fixture.carries(engagement.screw)) {
         retained.remove(engagement);
         throw 'Fastening "${connection.fastening}" is no longer retained by its named threaded member "${connection.member}"';
       }
       var fixture = setup.fixture;
-      if (fixture == null || fixture != engagement.fixture || !fixture.carries(engagement.screw))
-        throw 'Fastening "${connection.fastening}" final setup does not identify its original release fixture for member "${connection.member}"';
+      if (fixture == null || fixture != engagement.fixture || !fixture.carries(engagement
+        .screw)) throw 'Fastening "${connection.fastening}" final setup does not identify its original release fixture for member "${connection.member}"';
       return engagement;
     }
     throw 'Fastening "${connection.fastening}" has no retained successful engagement for its exact screw, member and face';
   }
   /** Absolute measured shaft coordinate, used to align the next free-bit approach. */
-  public function spindlePosition():Float return supply == null ? runtime.snapshot().q.get(spindleJoint) : supply.joints().spindlePosition;
+  public function spindlePosition():Float return supply
+    == null ? runtime.snapshot().q.get(spindleJoint) : supply.joints().spindlePosition;
   /** Receiving interlock uses measured angular/feed speeds with explicit commissioned limits. */
   public function receivingReady(angularSpeed:Float, feedSpeed:Float):Bool {
-    if (!Math.isFinite(angularSpeed) || angularSpeed <= 0 || !Math.isFinite(feedSpeed) || feedSpeed <= 0)
-      throw "Receiving speed bounds must be commissioned positive values";
+    if (!Math.isFinite(angularSpeed) || angularSpeed <= 0 || !Math.isFinite(feedSpeed)
+      || feedSpeed <= 0) throw "Receiving speed bounds must be commissioned positive values";
     if (carried() != null) return false;
     var measured = runtime.snapshot();
-    for (i in 0...measured.dq.length) if (Math.abs(measured.dq.get(i)) > (i == feedJoint ? feedSpeed : angularSpeed)) return false;
+    for (i in 0...measured.dq.length) if (Math.abs(measured.dq.get(i))
+      > (i == feedJoint ? feedSpeed : angularSpeed)) return false;
     return !digital(channels.start) && !digital(channels.direction);
   }
-  public function reading():ScrewdriverReading return supply == null ? ScrewdriverSensor.reading(ScrewdriverSensor.values(observed)) : supply.reading();
+  public function reading():ScrewdriverReading return supply
+    == null ? ScrewdriverSensor.reading(ScrewdriverSensor.values(observed)) : supply.reading();
   public function reset():Void {
     beforeReset();
-    holding.reset(); carriage = Empty; anchoredBody = null; model = null; selected = null; lastTime = null; angle = 0; reversed = false; reverseTargetAngle = 0; origin = 0;
-    activeSlot = 0; lastStart = false; observed = ScrewdriverSensor.idle();
-    retained.resize(0); pendingEngagement = null;
+    holding.reset();
+    carriage = Empty;
+    anchoredBody = null;
+    model = null;
+    selected = null;
+    lastTime = null;
+    angle = 0;
+    reversed = false;
+    reverseTargetAngle = 0;
+    origin = 0;
+    activeSlot = 0;
+    lastStart = false;
+    observed = ScrewdriverSensor.idle();
+    retained.resize(0);
+    pendingEngagement = null;
     if (supply != null) supply.reset();
   }
   /** The identified screw the bit carries by any path, or null. */
   public function carried():Null<SimObject> return switch carriage {
-    case Empty: null;
-    case Suction(screw): screw;
-    case Welded(screw, _): screw;
-    case Threaded(screw, _): screw;
-    case Seated(screw): screw;
-    case Engaged(screw): screw;
+    case Empty:
+      null;
+    case Suction(screw):
+      screw;
+    case Welded(screw, _):
+      screw;
+    case Threaded(screw, _):
+      screw;
+    case Seated(screw):
+      screw;
+    case Engaged(screw):
+      screw;
   };
   function jointOf():Null<nksim_joint> return switch carriage {
-    case Welded(_, joint): joint;
-    case Threaded(_, joint): joint;
-    case _: null;
+    case Welded(_, joint):
+      joint;
+    case Threaded(_, joint):
+      joint;
+    case _:
+      null;
   };
-  function threadedScrew():Null<SimObject> return switch carriage { case Threaded(screw, _): screw; case _: null; };
-  function suctionScrew():Null<SimObject> return switch carriage { case Suction(screw): screw; case _: null; };
-  function seatedScrew():Null<SimObject> return switch carriage { case Seated(screw): screw; case _: null; };
-  function engagedScrew():Null<SimObject> return switch carriage { case Engaged(screw): screw; case _: null; };
+  function threadedScrew():Null<SimObject> return switch carriage {
+    case Threaded(screw, _):
+      screw;
+    case _:
+      null;
+  };
+  function suctionScrew():Null<SimObject> return switch carriage {
+    case Suction(screw):
+      screw;
+    case _:
+      null;
+  };
+  function seatedScrew():Null<SimObject> return switch carriage {
+    case Seated(screw):
+      screw;
+    case _:
+      null;
+  };
+  function engagedScrew():Null<SimObject> return switch carriage {
+    case Engaged(screw):
+      screw;
+    case _:
+      null;
+  };
   /** Places the anchored screw on its threaded member at the process model's turned pose. */
   function engage(screw:SimObject, fixture:SimulationObjectFixture, placed:SimPose):Void {
     if (suctionScrew() != null) holding.release();
@@ -279,7 +360,12 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
   /** Whether the qualified screw is in the socket on a physical thread: running down or seated on its member. */
   public function physicalThreadAttached():Bool return threadedScrew() != null || seatedScrew() != null;
   /** Whether the screw is rigidly jointed to the bit for an arm-owned search. */
-  public function welded():Bool return switch carriage { case Welded(_, _): true; case _: false; };
+  public function welded():Bool return switch carriage {
+    case Welded(_, _):
+      true;
+    case _:
+      false;
+  };
   /**
    * Runs before the next physics step. While the arm owns axial motion the held screw is a rigid physical
    * child of the bit, so its contacts load the feed spring and the arm; once the process model takes over it
@@ -287,21 +373,20 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
    */
   public function prepareCarriage():Void {
     var setup = selected;
-    var axialOwner:Null<Void->Bool> = setup == null ? null : cast setup.armOwnsAxialMotion;
+    var axialOwner:Null<Void -> Bool> = setup == null ? null : cast setup.armOwnsAxialMotion;
     var armOwnsAxialMotion = axialOwner != null && axialOwner();
     var held = suctionScrew();
     // Once the thread start holds the screw (anchored), the bit no longer carries it.
-    if (held != null && armOwnsAxialMotion && setup != null && held == setup.screw && !reversed && anchoredBody == null)
-      weld(held);
+    if (held != null
+      && armOwnsAxialMotion && setup != null && held == setup.screw && !reversed && anchoredBody == null) weld(held);
     else if (welded() && !armOwnsAxialMotion) unjoin(true);
     // An arm-owned search keeps the screw on the bit until it hands the seat over.
-    if (setup == null || setup.physicalThread != true || threadedScrew() != null || seatedScrew() != null ||
-        reversed || armOwnsAxialMotion || setup.screw == null || carried() != setup.screw) return;
+    if (setup == null || setup.physicalThread != true || threadedScrew() != null || seatedScrew() != null
+      || reversed || armOwnsAxialMotion || setup.screw == null || carried() != setup.screw) return;
     var state = setup.work();
-    if (state == null || state.hole == null || state.hole.length != 3 || state.direction == null ||
-        state.direction.length != 3 || state.head == null || state.screwPose == null ||
-        state.engagementPoint == null || state.engagementPoint.length != 3)
-      throw "Physical thread engagement lost its qualified CAD work frame";
+    if (state == null || state.hole == null || state.hole.length != 3 || state.direction == null
+      || state.direction.length != 3 || state.head == null || state.screwPose == null || state.engagementPoint == null
+      || state.engagementPoint.length != 3) throw "Physical thread engagement lost its qualified CAD work frame";
     var referenceHead = transform(state.head);
     var actualBody = transform(simulation.objectPose(setup.screw));
     var bodyToHead = transform(state.screwPose).inverse().compose(referenceHead);
@@ -311,20 +396,32 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     var holeAxis = Vec3.fromArray(state.direction).normalized();
     var leadError = lead.sub(Vec3.fromArray(state.hole));
     var along = leadError.dot(holeAxis);
-    var radial = Math.sqrt(Math.max(0,leadError.dot(leadError)-along*along))*1000;
-    var link = simulation.linkPose(robotIndex,linkIndex);
-    var linkFrame = new Transform3(Vec3.fromArray(link.position),
-      new Quat(link.rotation[0],link.rotation[1],link.rotation[2],link.rotation[3]));
+    var radial = Math.sqrt(Math.max(0, leadError.dot(leadError) - along * along)) * 1000;
+    var link = simulation.linkPose(robotIndex, linkIndex);
+    var linkFrame = new Transform3(
+      Vec3.fromArray(link.position),
+      new Quat(
+        link.rotation[0],
+        link.rotation[1],
+        link.rotation[2],
+        link.rotation[3]
+      )
+    );
     var toolAxis = linkFrame.transformVector(Vec3.fromArray(axis)).normalized();
-    var headAxis = actualHead.transformVector(new Vec3(0,0,1)).normalized();
-    var pickAlignment = Math.acos(Math.max(-1,Math.min(1,headAxis.dot(toolAxis))));
-    var screwAlignment = Math.acos(Math.max(-1,Math.min(1,headAxis.dot(holeAxis))));
-    var alignment = Math.max(pickAlignment,screwAlignment);
+    var headAxis = actualHead.transformVector(new Vec3(0, 0, 1)).normalized();
+    var pickAlignment = Math.acos(Math.max(-1, Math.min(1, headAxis.dot(toolAxis))));
+    var screwAlignment = Math.acos(Math.max(-1, Math.min(1, headAxis.dot(holeAxis))));
+    var alignment = Math.max(pickAlignment, screwAlignment);
     // The thread engages where the process model's would: the screw's lead-in point within the qualified lead-in of
     // the hole's entry, on axis. Earlier, the screw is still carried by the bit.
-    if (radial <= setup.joint.leadInMm && Math.abs(along)*1000 <= setup.joint.leadInMm &&
-        alignment <= setup.joint.maximumAxisAngle)
-      attachPhysicalThread(setup,referenceHead,actualBody,lead,holeAxis);
+    if (radial <= setup.joint.leadInMm && Math.abs(along) * 1000 <= setup.joint.leadInMm
+      && alignment <= setup.joint.maximumAxisAngle) attachPhysicalThread(
+        setup,
+        referenceHead,
+        actualBody,
+        lead,
+        holeAxis
+      );
   }
   /** Holds the identified screw by vacuum at `worldPose`. */
   function grip(screw:SimObject, worldPose:SimPose):Void {
@@ -383,13 +480,18 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
    * Threads the screw into its member: a helical joint along the hole axis through the screw's own lead-in point,
    * turned by the spindle through the socket. The thread's axial reaction stays between the screw and the member.
    */
-  function attachPhysicalThread(setup:ScrewdriverSetup, referenceHead:Transform3, actualBody:Transform3,
-      leadPoint:Vec3, holeAxis:Vec3):Void {
+  function attachPhysicalThread(
+    setup:ScrewdriverSetup,
+    referenceHead:Transform3,
+    actualBody:Transform3,
+    leadPoint:Vec3,
+    holeAxis:Vec3
+  ):Void {
     var screw = setup.screw, fixture = setup.fixture;
-    if (threadedScrew() != null || screw == null || fixture == null || carried() != screw || setup.physicalThread != true)
-      throw "Physical thread attachment needs the qualified screw held at the screwdriver over its fixture";
-    var leadMm = requiredPositive(setup.threadLeadMm,"Physical thread lost its CAD lead");
-    var stiffness = requiredPositive(setup.physicalThreadStiffnessNPerM,"Physical thread lost its stiffness");
+    if (threadedScrew() != null || screw == null || fixture == null || carried() != screw || setup.physicalThread
+      != true) throw "Physical thread attachment needs the qualified screw held at the screwdriver over its fixture";
+    var leadMm = requiredPositive(setup.threadLeadMm, "Physical thread lost its CAD lead");
+    var stiffness = requiredPositive(setup.physicalThreadStiffnessNPerM, "Physical thread lost its stiffness");
     var settings = setup.program.settings;
     // Every turn the program may take, either way, with a turn to spare.
     var span = settings.maximumRunDownAngle + settings.maximumAngle + 2 * Math.PI;
@@ -400,9 +502,24 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     holding.release();
     carriage = Empty;
     try {
-      carriage = Threaded(screw, simulation.createObjectScrewJoint(robotIndex, spindleJoint, member, screw,
-        leadPoint.toArray(), holeAxis.toArray(), lead, -span, span, spindleAxisAlignment < 0 ? -1 : 1,
-        stiffness, 1.0, threadArmature(lead / (2 * Math.PI))));
+      carriage = Threaded(
+        screw,
+        simulation.createObjectScrewJoint(
+          robotIndex,
+          spindleJoint,
+          member,
+          screw,
+          leadPoint.toArray(),
+          holeAxis.toArray(),
+          lead,
+          -span,
+          span,
+          spindleAxisAlignment < 0 ? -1 : 1,
+          stiffness,
+          1.0,
+          threadArmature(lead / (2 * Math.PI))
+        )
+      );
       anchoredBody = referenceHead.inverse().compose(actualBody);
     } catch (error:Dynamic) {
       grip(screw, pose(actualBody));
@@ -412,8 +529,8 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
   /** The run-down torque the spindle may apply through a physical thread: the program's limit, and no more than
    * the commissioned axial force cap through the lead. */
   function threadTorqueLimit(setup:ScrewdriverSetup):Float {
-    var leadM = requiredPositive(setup.threadLeadMm,"Physical thread lost its CAD lead") / 1000.0;
-    var cap = requiredPositive(setup.physicalThreadMaxForceN,"Physical thread lost its axial force cap");
+    var leadM = requiredPositive(setup.threadLeadMm, "Physical thread lost its CAD lead") / 1000.0;
+    var cap = requiredPositive(setup.physicalThreadMaxForceN, "Physical thread lost its axial force cap");
     return Math.min(setup.program.settings.runDownTorqueLimit, cap * leadM / (2 * Math.PI));
   }
   /** At the model's seat the screw leaves the thread for its member, retained at its measured seated pose. */
@@ -448,7 +565,8 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     return checked;
   }
   public function afterSimulationStep(timestamp:Int64):Void {
-    var previous = lastTime; lastTime = timestamp;
+    var previous = lastTime;
+    lastTime = timestamp;
     var dt = previous == null ? 0.0 : Math.max(0, Int64.toFloat(Int64.sub(timestamp, previous)) * 1e-9);
     var controls = supply == null ? null : supply.controls();
     var joints = supply == null ? null : supply.joints();
@@ -468,38 +586,55 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     var unfinishedThread = threadedBody != null && model != null && model.reading.result != ScrewdriverContract.OK;
     if (!vacuum && threadedBody != null && !unfinishedThread) {
       var oldSetup = selected, oldProcess = model, threaded:SimObject = threadedBody;
-      if (oldSetup == null || oldProcess == null)
-        throw "Physical thread release lost its qualified screw setup";
+      if (oldSetup == null || oldProcess == null) throw "Physical thread release lost its qualified screw setup";
       var releasedPose = letGo();
       var fastened = oldProcess.reading.result == ScrewdriverContract.OK;
       if (fastened && oldSetup.fixture != null) {
         var fixture = oldSetup.fixture, anchor = anchoredBody, state = oldSetup.work();
         var connection = oldSetup.connection;
-        if (releasedPose == null || anchor == null || state == null || connection == null)
-          throw "Successful physical thread release lost its qualified engagement";
+        if (releasedPose == null || anchor == null || state == null
+          || connection == null) throw "Successful physical thread release lost its qualified engagement";
         fixture.retainRigid(threaded);
-        if (!fixture.carries(threaded)) throw "Successful physical thread release did not retain its screw on the named fixture";
+        if (!fixture
+          .carries(threaded)) throw "Successful physical thread release did not retain its screw on the named fixture";
         retainClamped(oldSetup);
         var head = transform(state.head);
-        retained.push({fastening:connection.fastening,member:connection.member,face:connection.face,screw:threaded,
-          hand:oldSetup.hand,model:oldProcess,anchor:anchor,bodyToHead:transform(state.screwPose).inverse().compose(head),
-          leadInHead:head.inverse().transformPoint(Vec3.fromArray(state.engagementPoint)),fixture:fixture});
+        retained.push({
+          fastening: connection.fastening,
+          member: connection.member,
+          face: connection.face,
+          screw: threaded,
+          hand: oldSetup.hand,
+          model: oldProcess,
+          anchor: anchor,
+          bodyToHead: transform(state.screwPose).inverse().compose(head),
+          leadInHead: head.inverse().transformPoint(Vec3.fromArray(state.engagementPoint)),
+          fixture: fixture
+        });
       }
       anchoredBody = null;
     }
     if ((slot != activeSlot || (start && selected == null)) && !(slot == 0 && !start && unfinishedThread)) {
       var setup = setups.get(slot);
       if (setup == null && start) throw 'Screwdriver slot $slot has no qualified joint program';
-      if ((threadedScrew() != null || seatedScrew() != null) && (setup == null || carried() != setup.screw))
-        throw "Cannot select another fastening while a screw is threaded in the socket";
-      anchoredBody = null; selected = setup; activeSlot = slot; model = setup == null ? null : new TighteningModel(setup.program, setup.joint); angle = 0; reversed = false; reverseTargetAngle = 0; origin = joints == null ? runtime.snapshot().q.get(spindleJoint) : joints.spindlePosition;
+      if ((threadedScrew() != null || seatedScrew() != null) && (setup == null
+        || carried() != setup.screw)) throw "Cannot select another fastening while a screw is threaded in the socket";
+      anchoredBody = null;
+      selected = setup;
+      activeSlot = slot;
+      model = setup == null ? null : new TighteningModel(setup.program, setup.joint);
+      angle = 0;
+      reversed = false;
+      reverseTargetAngle = 0;
+      origin = joints == null ? runtime.snapshot().q.get(spindleJoint) : joints.spindlePosition;
       pendingEngagement = null;
       if (setup != null) {
         if (setup.retightening == true) {
           var engagement = retainedFor(setup);
-          var continued = engagement.model.retighten(setup.program,setup.joint);
+          var continued = engagement.model.retighten(setup.program, setup.joint);
           model = continued;
-          angle = continued.reading.angle; origin -= setup.hand*angle;
+          angle = continued.reading.angle;
+          origin -= setup.hand * angle;
           pendingEngagement = engagement;
         }
         // Once selected, an attempt owns this body's engagement. A failed
@@ -512,11 +647,11 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     lastStart = start;
     var setup = selected, process = model;
     var state = setup == null ? null : setup.work();
-    var axialOwner:Null<Void->Bool> = setup == null ? null : cast setup.armOwnsAxialMotion;
+    var axialOwner:Null<Void -> Bool> = setup == null ? null : cast setup.armOwnsAxialMotion;
     var armOwnsAxialMotion = axialOwner != null && axialOwner();
-    if (state != null && (state.hole == null || state.hole.length != 3 || state.direction == null || state.direction.length != 3 ||
-        state.head == null || state.screwPose == null || state.engagementPoint == null || state.engagementPoint.length != 3))
-      throw "Screwdriver live work needs a head and hole axis";
+    if (state != null && (state.hole == null || state.hole.length != 3 || state.direction == null
+      || state.direction.length != 3 || state.head == null || state.screwPose == null || state.engagementPoint == null
+      || state.engagementPoint.length != 3)) throw "Screwdriver live work needs a head and hole axis";
     if (start && !reverse && reversed) throw "Screwdriver needs a newly configured cycle after reversal";
     if (setup != null && process != null && threadedScrew() != null && reversed && !start && !reverse && vacuum) {
       var shaft = joints == null ? runtime.snapshot().q.get(spindleJoint) : joints.spindlePosition;
@@ -530,30 +665,46 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       var fastened = process != null && process.reading.result == ScrewdriverContract.OK && anchoredBody != null;
       var releasedPose = letGo();
       if (fastened && fixture != null) {
-        if (released == null || releasedPose == null) throw "Successful release lost the identified screw body or its live pose";
+        if (released == null
+          || releasedPose == null) throw "Successful release lost the identified screw body or its live pose";
         fixture.retainRigid(released);
         if (!fixture.carries(released)) throw "Successful release did not retain the screw on its named fixture";
         if (setup == null) throw "Successful release lost its qualified setup";
         retainClamped(setup);
         var connection = setup.connection, anchor = anchoredBody;
-        if (connection == null || anchor == null || process == null || state == null) throw "Successful release lost its qualified engagement";
+        if (connection == null || anchor == null
+          || process == null || state == null) throw "Successful release lost its qualified engagement";
         var head = transform(state.head);
-        retained.push({fastening:connection.fastening,member:connection.member,face:connection.face,screw:released,
-          hand:setup.hand,model:process,anchor:anchor,bodyToHead:transform(state.screwPose).inverse().compose(head),
-          leadInHead:head.inverse().transformPoint(Vec3.fromArray(state.engagementPoint)),fixture:fixture});
+        retained.push({
+          fastening: connection.fastening,
+          member: connection.member,
+          face: connection.face,
+          screw: released,
+          hand: setup.hand,
+          model: process,
+          anchor: anchor,
+          bodyToHead: transform(state.screwPose).inverse().compose(head),
+          leadInHead: head.inverse().transformPoint(Vec3.fromArray(state.engagementPoint)),
+          fixture: fixture
+        });
       }
       anchoredBody = null;
     }
     if (setup != null && process != null) {
       if (state == null) throw "Screwdriver lost its sampled live work";
       var link = simulation.linkPose(robotIndex, linkIndex);
-      var orientation = new robotkit.spatial.Quat(link.rotation[0],link.rotation[1],link.rotation[2],link.rotation[3]);
-      var localTip = orientation.rotate(new robotkit.spatial.Vec3(tipPosition[0],tipPosition[1],tipPosition[2]));
-      var tip = [link.position[0]+localTip.x,link.position[1]+localTip.y,link.position[2]+localTip.z];
-      var rotatedAxis = orientation.rotate(new robotkit.spatial.Vec3(axis[0],axis[1],axis[2]));
-      var direction = [rotatedAxis.x,rotatedAxis.y,rotatedAxis.z];
+      var orientation = new robotkit.spatial.Quat(
+        link.rotation[0],
+        link.rotation[1],
+        link.rotation[2],
+        link.rotation[3]
+      );
+      var localTip = orientation.rotate(new robotkit.spatial.Vec3(tipPosition[0], tipPosition[1], tipPosition[2]));
+      var tip = [link.position[0] + localTip.x, link.position[1] + localTip.y, link.position[2] + localTip.z];
+      var rotatedAxis = orientation.rotate(new robotkit.spatial.Vec3(axis[0], axis[1], axis[2]));
+      var direction = [rotatedAxis.x, rotatedAxis.y, rotatedAxis.z];
       var holeAxis = state.direction;
-      var norm = Math.sqrt(dot(holeAxis,holeAxis));
+      var norm = Math.sqrt(dot(holeAxis, holeAxis));
       if (!Math.isFinite(norm) || norm <= 0) throw "Screwdriver work axis must be finite and nonzero";
       holeAxis = [for (value in holeAxis) value / norm];
       // Undo the actual feed retraction before comparing the commanded free tip with the head.
@@ -568,48 +719,77 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       var leadInHead = referenceHead.inverse().transformPoint(Vec3.fromArray(state.engagementPoint));
       var actualBody = screw == null ? transform(state.screwPose) : transform(simulation.objectPose(screw));
       var actualHead = actualBody.compose(bodyToHead);
-      var headAxis = actualHead.transformVector(new Vec3(0,0,1));
+      var headAxis = actualHead.transformVector(new Vec3(0, 0, 1));
       var pickError = actualHead.translation.sub(Vec3.fromArray(tip));
-      var pickAlignment = Math.acos(Math.max(-1,Math.min(1,headAxis.x*direction[0]+headAxis.y*direction[1]+headAxis.z*direction[2])));
+      var pickAlignment = Math.acos(Math.max(
+        -1,
+        Math.min(
+          1,
+          headAxis.x * direction[0] + headAxis.y * direction[1] + headAxis.z * direction[2]
+        )
+      ));
       // The named socket is calibrated against the body's collision origin. Only the
       // identified body can seal; another screw near the bit is never substituted.
-      if (vacuum && screw != null && carried() == null &&
-          pickError.norm() <= SimulatedSuctionTool.REACH &&
-          pickAlignment <= setup.joint.maximumAxisAngle) {
-        if (pendingEngagement != null && setup.fixture != null && setup.fixture.carries(screw))
-          setup.fixture.releaseRigid(screw);
+      if (vacuum && screw != null && carried() == null
+        && pickError.norm() <= SimulatedSuctionTool.REACH && pickAlignment <= setup.joint.maximumAxisAngle) {
+        if (pendingEngagement != null
+          && setup.fixture != null && setup.fixture.carries(screw)) setup.fixture.releaseRigid(screw);
         grip(screw, pose(actualBody));
       }
       var lead = actualHead.transformPoint(leadInHead);
       var leadError = lead.sub(Vec3.fromArray(state.hole));
       var along = leadError.dot(Vec3.fromArray(holeAxis));
-      var radial = Math.sqrt(Math.max(0,leadError.dot(leadError)-along*along))*1000;
-      var sealed = vacuum && carried() == screw && (!physicalThreadAttached() ||
-        (pickError.norm() <= SimulatedSuctionTool.REACH && pickAlignment <= setup.joint.maximumAxisAngle));
-      var screwAlignment = Math.acos(Math.max(-1,Math.min(1,headAxis.x*holeAxis[0]+headAxis.y*holeAxis[1]+headAxis.z*holeAxis[2])));
-      var alignment = Math.max(pickAlignment,screwAlignment);
-      var linkFrame = new Transform3(Vec3.fromArray(link.position), new Quat(link.rotation[0],link.rotation[1],link.rotation[2],link.rotation[3]));
+      var radial = Math.sqrt(Math.max(0, leadError.dot(leadError) - along * along)) * 1000;
+      var sealed = vacuum && carried() == screw && (!physicalThreadAttached()
+        || (pickError.norm() <= SimulatedSuctionTool.REACH && pickAlignment <= setup.joint.maximumAxisAngle));
+      var screwAlignment = Math.acos(Math.max(
+        -1,
+        Math.min(
+          1,
+          headAxis.x * holeAxis[0] + headAxis.y * holeAxis[1] + headAxis.z * holeAxis[2]
+        )
+      ));
+      var alignment = Math.max(pickAlignment, screwAlignment);
+      var linkFrame = new Transform3(
+        Vec3.fromArray(link.position),
+        new Quat(
+          link.rotation[0],
+          link.rotation[1],
+          link.rotation[2],
+          link.rotation[3]
+        )
+      );
       var anchor = anchoredBody;
       var pending = pendingEngagement;
       if (anchor == null && pending != null && suctionScrew() != null) {
-        if (suctionScrew() != pending.screw || bodyToHead.translation.sub(pending.bodyToHead.translation).norm() > 1e-9 ||
-            Math.abs(quaternionDot(bodyToHead.rotation,pending.bodyToHead.rotation)) < 1-1e-12 ||
-            leadInHead.sub(pending.leadInHead).norm() > 1e-9)
-          throw 'Fastening "${pending.fastening}" on "${pending.member}" face "${pending.face}": final recontact changed its retained socket or thread-entry geometry';
+        if (suctionScrew() != pending.screw
+          || bodyToHead.translation.sub(pending.bodyToHead.translation).norm() > 1e-9 || Math.abs(quaternionDot(
+            bodyToHead.rotation,
+            pending.bodyToHead.rotation
+          )) < 1 - 1e-12 || leadInHead.sub(pending.leadInHead).norm()
+          > 1e-9) throw 'Fastening "${pending.fastening}" on "${pending.member}" face "${pending.face}": final recontact changed its retained socket or thread-entry geometry';
         var initial = referenceHead.compose(pending.anchor);
-        var expected = transform(turnedPose(initial,initial.compose(bodyToHead).translation,holeAxis,
-          setup.hand*angle,process.advanceAtAngle(angle)/1000));
-        if (actualBody.translation.sub(expected.translation).norm() > 1e-6 ||
-            Math.abs(quaternionDot(actualBody.rotation,expected.rotation)) < 1-1e-8)
-          throw 'Fastening "${pending.fastening}" on "${pending.member}" face "${pending.face}": final recontact no longer describes the actual retained seated screw';
-        anchor = pending.anchor; anchoredBody = anchor; pendingEngagement = null;
+        var expected = transform(turnedPose(
+          initial,
+          initial.compose(bodyToHead).translation,
+          holeAxis,
+          setup.hand * angle,
+          process.advanceAtAngle(angle) / 1000
+        ));
+        if (actualBody.translation.sub(expected.translation).norm() > 1e-6 || Math.abs(quaternionDot(
+          actualBody.rotation,
+          expected.rotation
+        )) < 1
+          - 1e-8) throw 'Fastening "${pending.fastening}" on "${pending.member}" face "${pending.face}": final recontact no longer describes the actual retained seated screw';
+        anchor = pending.anchor;
+        anchoredBody = anchor;
+        pendingEngagement = null;
       }
       // Thread teeth are not collision geometry, so the thread start is this anchor: a screw reaching the entry
       // within the qualified lead-in stops there until it is turned, also under an arm-owned search.
-      if (anchor == null && setup.physicalThread != true && setup.retightening != true &&
-          (suctionScrew() != null || welded()) && !reversed &&
-          radial <= setup.joint.leadInMm && Math.abs(along)*1000 <= setup.joint.leadInMm &&
-          alignment <= setup.joint.maximumAxisAngle) {
+      if (anchor == null && setup.physicalThread != true && setup.retightening != true
+        && (suctionScrew() != null || welded()) && !reversed && radial <= setup.joint.leadInMm
+        && Math.abs(along) * 1000 <= setup.joint.leadInMm && alignment <= setup.joint.maximumAxisAngle) {
         if (welded()) unjoin(true);
         // Retain the actual contact pose rather than snapping to the nominal CAD axis.
         anchor = referenceHead.inverse().compose(actualBody);
@@ -621,50 +801,82 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       var leadStart = startingHead.transformPoint(leadInHead);
       var headError = leadStart.sub(Vec3.fromArray(state.hole));
       along = headError.dot(Vec3.fromArray(holeAxis));
-      radial = Math.sqrt(Math.max(0,headError.dot(headError)-along*along))*1000;
-      var toolError = [for (i in 0...3) freeTip[i]-state.hole[i]];
-      var toolAlong = dot(toolError,holeAxis);
-      radial = Math.max(radial,Math.sqrt(Math.max(0,dot(toolError,toolError)-toolAlong*toolAlong))*1000);
+      radial = Math.sqrt(Math.max(0, headError.dot(headError) - along * along)) * 1000;
+      var toolError = [for (i in 0...3) freeTip[i] - state.hole[i]];
+      var toolAlong = dot(toolError, holeAxis);
+      radial = Math.max(radial, Math.sqrt(Math.max(0, dot(toolError, toolError) - toolAlong * toolAlong)) * 1000);
       var advanced = process.advanceAtAngle(angle) / 1000;
-      var toHead = [head.x + holeAxis[0]*advanced - freeTip[0],
-        head.y + holeAxis[1]*advanced - freeTip[1],head.z + holeAxis[2]*advanced - freeTip[2]];
+      var toHead = [
+        head.x + holeAxis[0] * advanced - freeTip[0],
+        head.y + holeAxis[1] * advanced - freeTip[1],
+        head.z + holeAxis[2] * advanced - freeTip[2]
+      ];
       // During transfer the bit carries the screw freely. Compliance only compresses
       // against a contacted thread, never against the distant authored work frame.
-      var stroke = armOwnsAxialMotion || anchor == null ? 0.0 : Math.max(0,-dot(toHead,direction)*1000);
-      if (anchor != null && reversed && angle == 0 && !start && dot(toHead,direction) > SimulatedSuctionTool.REACH) {
-        anchoredBody = null; anchor = null; stroke = 0;
+      var stroke = armOwnsAxialMotion || anchor == null ? 0.0 : Math.max(0, -dot(toHead, direction) * 1000);
+      if (anchor != null && reversed && angle == 0 && !start && dot(toHead, direction) > SimulatedSuctionTool.REACH) {
+        anchoredBody = null;
+        anchor = null;
+        stroke = 0;
         // Backed out to the thread start and lifted: the bit's vacuum carries it again.
         var engaged = engagedScrew();
-        if (engaged != null) { var live = simulation.objectPose(engaged); carriage = Empty; grip(engaged, live); }
+        if (engaged != null) {
+          var live = simulation.objectPose(engaged);
+          carriage = Empty;
+          grip(engaged, live);
+        }
       }
       if (reverse && start) {
         if (seatedScrew() != null) throw "Backing out a physically seated screw is not modelled; release it first";
-        if (!reversed) { reversed = true; reverseTargetAngle = angle; }
+        if (!reversed) {
+          reversed = true;
+          reverseTargetAngle = angle;
+        }
         reverseTargetAngle = Math.max(0, reverseTargetAngle - setup.program.settings.runDownSpeed * dt);
-        angle = Math.max(0, setup.hand*((joints == null ? q.get(spindleJoint) : joints.spindlePosition)-origin));
+        angle = Math.max(0, setup.hand * ((joints == null ? q.get(spindleJoint) : joints.spindlePosition) - origin));
         // Numerical zero for a settled spindle, while retaining measured reversal feedback.
         if (angle < 1e-6) angle = 0;
-        observed.torqueNm = 0; observed.angle = angle; observed.speed = -setup.program.settings.runDownSpeed;
+        observed.torqueNm = 0;
+        observed.angle = angle;
+        observed.speed = -setup.program.settings.runDownSpeed;
         if (angle == 0) observed.speed = 0;
         driveSpeed = observed.speed;
-        observed.strokeMm = stroke; observed.vacuum = sealed;
+        observed.strokeMm = stroke;
+        observed.vacuum = sealed;
       } else if (!reversed) {
-        if (start) angle = Math.max(angle, setup.hand*((joints == null ? q.get(spindleJoint) : joints.spindlePosition)-origin));
+        if (start) angle = Math.max(
+          angle,
+          setup.hand * ((joints == null ? q.get(spindleJoint) : joints.spindlePosition) - origin)
+        );
         var screwRetained = setup.screw != null && carried() == setup.screw;
-        observed = process.step({screwPresent:setup.screw != null && screwRetained, vacuum:sealed && screwRetained,
-          start:start, angle:angle, strokeMm:stroke, radialErrorMm:radial, axialErrorMm:along*1000, axisAngle:alignment, damagedLeadIn:state.damagedLeadIn});
+        observed = process.step({
+          screwPresent: setup.screw != null && screwRetained,
+          vacuum: sealed && screwRetained,
+          start: start,
+          angle: angle,
+          strokeMm: stroke,
+          radialErrorMm: radial,
+          axialErrorMm: along * 1000,
+          axisAngle: alignment,
+          damagedLeadIn: state.damagedLeadIn
+        });
         if (observed.result != ScrewdriverContract.NONE) angle = observed.angle;
         driveSpeed = observed.speed;
-        var seatedPhase = observed.phase == ScrewdriverContract.SNUG || observed.phase == ScrewdriverContract.FINAL ||
-          observed.result == ScrewdriverContract.OK;
+        var seatedPhase = observed.phase == ScrewdriverContract.SNUG
+          || observed.phase == ScrewdriverContract.FINAL || observed.result == ScrewdriverContract.OK;
         if (threadedScrew() != null && seatedPhase) seat(setup);
         // Seated heads bear on the authored plane. Thread-entry axial error includes the
         // tilted lead-in's lever arm, so aligning the head alone leaves a residual gap.
         // Keep the corrected pose as the anchor for subsequent tightening passes.
         if (seatedPhase && anchoredBody != null && setup.physicalThread != true) {
           var axis = Vec3.fromArray(holeAxis);
-          startingBody = seatedOnPlane(startingBody, bodyToHead, axis,
-            referenceHead.translation.add(axis.scale(setup.joint.runDownMm/1000)), process.advanceAtAngle(angle)/1000);
+          startingBody = seatedOnPlane(
+            startingBody,
+            bodyToHead,
+            axis,
+            referenceHead.translation.add(axis.scale(setup.joint.runDownMm / 1000)),
+            process.advanceAtAngle(angle) / 1000
+          );
           head = startingBody.compose(bodyToHead).translation;
           anchoredBody = referenceHead.inverse().compose(startingBody);
         }
@@ -672,17 +884,25 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       // Vacuum feedback remains live after reversal has stopped, even though
       // the tightening result and driven angle are retained for recovery.
       observed.vacuum = sealed;
-      if (!start) { driveSpeed = 0; if (reversed) reverseTargetAngle = angle; }
+      if (!start) {
+        driveSpeed = 0;
+        if (reversed) reverseTargetAngle = angle;
+      }
       if (armOwnsAxialMotion) springFeed();
-      else simulation.driveProcessJoint(robotIndex, feedJoint, -Math.min(strokeLimitMm,stroke)/1000, 0);
-      var targetAngle = start && reverse ? reverseTargetAngle : angle + driveSpeed*dt;
-      simulation.driveProcessJoint(robotIndex, spindleJoint, origin + setup.hand*targetAngle,
-        setup.hand*driveSpeed, threadedScrew() != null ? threadTorqueLimit(setup) : 0);
-      observed.speed = setup.hand*(joints == null ? measured.dq.get(spindleJoint) : joints.spindleSpeed);
+      else simulation.driveProcessJoint(robotIndex, feedJoint, -Math.min(strokeLimitMm, stroke) / 1000, 0);
+      var targetAngle = start && reverse ? reverseTargetAngle : angle + driveSpeed * dt;
+      simulation.driveProcessJoint(
+        robotIndex,
+        spindleJoint,
+        origin + setup.hand * targetAngle,
+        setup.hand * driveSpeed,
+        threadedScrew() != null ? threadTorqueLimit(setup) : 0
+      );
+      observed.speed = setup.hand * (joints == null ? measured.dq.get(spindleJoint) : joints.spindleSpeed);
       var anchoredScrew = suctionScrew() != null ? suctionScrew() : engagedScrew();
       if (anchoredScrew != null && anchor != null) {
-        var advance = process.advanceAtAngle(angle)/1000;
-        var placed = turnedPose(startingBody,head,holeAxis,setup.hand*angle,advance);
+        var advance = process.advanceAtAngle(angle) / 1000;
+        var placed = turnedPose(startingBody, head, holeAxis, setup.hand * angle, advance);
         var fixture = setup.fixture;
         if (fixture != null) engage(anchoredScrew, fixture, placed);
         else holding.placeHeld(placed);
@@ -690,59 +910,109 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     } else {
       observed = ScrewdriverSensor.idle();
       var measured = runtime.snapshot();
-      observed.strokeMm = Math.max(0,-(joints == null ? measured.q.get(feedJoint) : joints.feedPosition)*1000);
+      observed.strokeMm = Math.max(0, -(joints == null ? measured.q.get(feedJoint) : joints.feedPosition) * 1000);
       observed.speed = joints == null ? measured.dq.get(spindleJoint) : joints.spindleSpeed;
       observed.vacuum = vacuum && carried() != null;
-      simulation.driveProcessJoint(robotIndex,feedJoint,0,0);
-      simulation.driveProcessJoint(robotIndex,spindleJoint,joints == null ? measured.q.get(spindleJoint) : joints.spindlePosition,0);
+      simulation.driveProcessJoint(robotIndex, feedJoint, 0, 0);
+      simulation.driveProcessJoint(
+        robotIndex,
+        spindleJoint,
+        joints == null ? measured.q.get(spindleJoint) : joints.spindlePosition,
+        0
+      );
     }
     // The process result retains its final angle. Live feedback follows the
     // measured shaft through stopping and reversal, including physical coast.
-    var measuredAngle = selected == null ? observed.angle : Math.max(0,selected.hand*((joints == null ? runtime.snapshot().q.get(spindleJoint) : joints.spindlePosition)-origin));
-    observed = {torqueNm:observed.torqueNm,angle:measuredAngle,speed:observed.speed,
-      strokeMm:observed.strokeMm,phase:observed.phase,result:observed.result,
-      vacuum:observed.vacuum};
+    var measuredAngle = selected == null ? observed.angle : Math.max(
+      0,
+      selected.hand * ((joints == null ? runtime.snapshot().q.get(spindleJoint) : joints.spindlePosition) - origin)
+    );
+    observed = {
+      torqueNm: observed.torqueNm,
+      angle: measuredAngle,
+      speed: observed.speed,
+      strokeMm: observed.strokeMm,
+      phase: observed.phase,
+      result: observed.result,
+      vacuum: observed.vacuum
+    };
     if (supply != null) supply.publish(observed);
-    else runtime.publishSensorFrame(sensorId, ScrewdriverSensor.values(observed), Int64.ofInt(++sequence),
-      runtime.snapshot().sourceTimestampNs, runtime.endpoint.sourceClockId());
+    else runtime.publishSensorFrame(
+      sensorId,
+      ScrewdriverSensor.values(observed),
+      Int64.ofInt(++ sequence),
+      runtime.snapshot().sourceTimestampNs,
+      runtime.endpoint.sourceClockId()
+    );
   }
-  static function dot(a:Array<Float>,b:Array<Float>):Float return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+  static function dot(a:Array<Float>, b:Array<Float>):Float return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   /** `body` turned about its head point so the head's +Z lies on `holeAxis`; null when it already does. */
   static function seatedOnAxis(body:Transform3, bodyToHead:Transform3, holeAxis:Vec3):Null<Transform3> {
     var head = body.compose(bodyToHead);
-    var axis = head.transformVector(new Vec3(0,0,1)).normalized(), target = holeAxis.normalized();
+    var axis = head.transformVector(new Vec3(0, 0, 1)).normalized(), target = holeAxis.normalized();
     var cross = axis.cross(target), sine = cross.norm(), cosine = axis.dot(target);
     if (sine < 1e-12) return null;
-    var turn = Quat.fromAxisAngle(cross.scale(1/sine), Math.atan2(sine, cosine));
+    var turn = Quat.fromAxisAngle(cross.scale(1 / sine), Math.atan2(sine, cosine));
     var offset = turn.rotate(body.translation.sub(head.translation));
     return new Transform3(head.translation.add(offset), turn.multiply(body.rotation));
   }
   /** Align a seated head and constrain its advanced bearing point to its seat, preserving lateral offset. */
-  static function seatedOnPlane(body:Transform3, bodyToHead:Transform3, axis:Vec3, seatPlane:Vec3, advance:Float):Transform3 {
+  static function seatedOnPlane(body:Transform3,
+    bodyToHead:Transform3, axis:Vec3, seatPlane:Vec3, advance:Float):Transform3 {
     var aligned = seatedOnAxis(body, bodyToHead, axis);
     var seated = aligned == null ? body : aligned;
     var reached = seated.compose(bodyToHead).translation.add(axis.scale(advance));
     var gap = seatPlane.sub(reached).dot(axis);
     return new Transform3(seated.translation.add(axis.scale(gap)), seated.rotation);
   }
-  static function quaternionDot(a:Quat,b:Quat):Float return a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w;
-  static function turnedPose(startingBody:Transform3,head:Vec3,holeAxis:Array<Float>,angle:Float,advance:Float):SimPose {
-    var rotation = Quat.fromAxisAngle(new Vec3(holeAxis[0],holeAxis[1],holeAxis[2]),angle);
+  static function quaternionDot(a:Quat, b:Quat):Float return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+  static function turnedPose(startingBody:Transform3,
+    head:Vec3, holeAxis:Array<Float>, angle:Float, advance:Float):SimPose {
+    var rotation = Quat.fromAxisAngle(new Vec3(holeAxis[0], holeAxis[1], holeAxis[2]), angle);
     var turned = rotation.multiply(startingBody.rotation);
-    var offset = rotation.rotate(new Vec3(startingBody.translation.x-head.x,
-      startingBody.translation.y-head.y,startingBody.translation.z-head.z));
-    return new SimPose(head.x+offset.x+holeAxis[0]*advance,head.y+offset.y+holeAxis[1]*advance,
-      head.z+offset.z+holeAxis[2]*advance,turned.x,turned.y,turned.z,turned.w);
+    var offset = rotation.rotate(new Vec3(
+      startingBody.translation.x - head.x,
+      startingBody.translation.y - head.y,
+      startingBody.translation.z - head.z
+    ));
+    return new SimPose(
+      head.x + offset.x + holeAxis[0] * advance,
+      head.y + offset.y + holeAxis[1] * advance,
+      head.z + offset.z + holeAxis[2] * advance,
+      turned.x,
+      turned.y,
+      turned.z,
+      turned.w
+    );
   }
-  static function transform(value:SimPose):Transform3
-    return new Transform3(new Vec3(value.x,value.y,value.z),new Quat(value.qx,value.qy,value.qz,value.qw));
-  static function pose(value:Transform3):SimPose
-    return new SimPose(value.translation.x,value.translation.y,value.translation.z,
-      value.rotation.x,value.rotation.y,value.rotation.z,value.rotation.w);
+  static function transform(value:SimPose):Transform3 return new Transform3(
+    new Vec3(value.x, value.y, value.z),
+    new Quat(
+      value.qx,
+      value.qy,
+      value.qz,
+      value.qw
+    )
+  );
+  static function pose(value:Transform3):SimPose return new SimPose(
+    value.translation.x,
+    value.translation.y,
+    value.translation.z,
+    value.rotation.x,
+    value.rotation.y,
+    value.rotation.z,
+    value.rotation.w
+  );
   function digital(channel:String):Bool return switch runtime.channelValue(channel) {
-    case Digital(on): on; case _: throw 'Screwdriver channel "$channel" needs digital values';
+    case Digital(on):
+      on;
+    case _:
+      throw 'Screwdriver channel "$channel" needs digital values';
   };
   function analog(channel:String):Float return switch runtime.channelValue(channel) {
-    case Analog(value): value; case _: throw 'Screwdriver channel "$channel" needs analog values';
+    case Analog(value):
+      value;
+    case _:
+      throw 'Screwdriver channel "$channel" needs analog values';
   };
 }

@@ -25,32 +25,74 @@ class ToolpathPlanRunner implements processkit.skill.ToolpathPlanRunner {
   var cutActive:Bool = false;
   var processSpans:Array<Bool> = [];
 
-  public static function create(robot:Robot, manipulator:KinematicGroup, frameId:String,
-      planning:PlanningLimits, maxJointJump:Float, positionTolerance:Float,
-      orientationTolerance:Float, ikMaxIterations:Int, ikDamping:Float):ToolpathPlanRunner {
+  public static function create(
+    robot:Robot,
+    manipulator:KinematicGroup,
+    frameId:String,
+    planning:PlanningLimits,
+    maxJointJump:Float,
+    positionTolerance:Float,
+    orientationTolerance:Float,
+    ikMaxIterations:Int,
+    ikDamping:Float
+  ):ToolpathPlanRunner {
     var count = manipulator.group.count();
     planning.requireGroup(manipulator);
     var limits = planning.validation();
     var solver = new ManipulatorKinematics(manipulator, 1e-8);
-    var compiler = new ProgramCompiler(solver, limits, frameId,
-      planning.velocity, planning.acceleration, planning.jerk,
+    var compiler = new ProgramCompiler(
+      solver,
+      limits,
+      frameId,
+      planning.velocity,
+      planning.acceleration,
+      planning.jerk,
       planning.startTolerances(positionTolerance),
-      null, 0.01, maxJointJump, positionTolerance,
-      orientationTolerance, new IkTolerance(positionTolerance,
-        orientationTolerance, ikMaxIterations, ikDamping));
+      null,
+      0.01,
+      maxJointJump,
+      positionTolerance,
+      orientationTolerance,
+      new IkTolerance(
+        positionTolerance,
+        orientationTolerance,
+        ikMaxIterations,
+        ikDamping
+      )
+    );
     compiler.planningAssumptions = planning.assumptions.copy();
     compiler.planCheck = planning.check();
-    var indices = [for (target in manipulator.toJointTargets(
-      [for (_ in 0...count) 0.0])) target.joint];
-    var motion = new ManipulatorMotion(robot, compiler, function(_) return null,
-      function() return {events:[], overflow:false}, indices);
-    return new ToolpathPlanRunner(motion, manipulator, positionTolerance,
-      orientationTolerance, ikMaxIterations, ikDamping, maxJointJump);
+    var indices = [for (target in manipulator.toJointTargets([for (_ in 0...count) 0.0])) target.joint];
+    var motion = new ManipulatorMotion(
+      robot,
+      compiler,
+      function(_) return null,
+      function() return {
+        events: [],
+        overflow: false
+      },
+      indices
+    );
+    return new ToolpathPlanRunner(
+      motion,
+      manipulator,
+      positionTolerance,
+      orientationTolerance,
+      ikMaxIterations,
+      ikDamping,
+      maxJointJump
+    );
   }
 
-  public function new(motion:ManipulatorMotion, manipulator:KinematicGroup,
-      positionTolerance:Float, orientationTolerance:Float,
-      ikMaxIterations:Int, ikDamping:Float, maxJointJump:Float) {
+  public function new(
+    motion:ManipulatorMotion,
+    manipulator:KinematicGroup,
+    positionTolerance:Float,
+    orientationTolerance:Float,
+    ikMaxIterations:Int,
+    ikDamping:Float,
+    maxJointJump:Float
+  ) {
     this.motion = motion;
     this.manipulator = manipulator;
     this.positionTolerance = positionTolerance;
@@ -61,33 +103,35 @@ class ToolpathPlanRunner implements processkit.skill.ToolpathPlanRunner {
   }
 
   public function run(toolpath:Toolpath, seed:Array<Float>):Void {
-    if (toolpath == null || toolpath.points.length < 2)
-      throw "Toolpath plan needs at least two points";
-    if (toolpath.frameId != motion.compiler.frameId)
-      throw 'Toolpath frame ${toolpath.frameId} does not match ${motion.compiler.frameId}';
-    if (seed == null || seed.length != manipulator.group.count())
-      throw "Toolpath plan needs one seed value per joint";
+    if (toolpath == null || toolpath.points.length < 2) throw "Toolpath plan needs at least two points";
+    if (toolpath.frameId
+      != motion.compiler.frameId) throw 'Toolpath frame ${toolpath.frameId} does not match ${motion.compiler.frameId}';
+    if (seed == null || seed.length != manipulator.group.count()) throw "Toolpath plan needs one seed value per joint";
     var previous = seed.copy();
     var previousPose = manipulator.tcpPose(seed);
     var ops:Array<MotionOp> = [];
     processSpans = [];
     for (index in 0...toolpath.points.length) {
       var point = toolpath.points[index];
-      var ik = manipulator.solve(point.work_T_tcp, previous, new IkOptions(positionTolerance, orientationTolerance, ikMaxIterations, ikDamping));
+      var ik = manipulator.solve(
+        point.work_T_tcp,
+        previous,
+        new IkOptions(
+          positionTolerance,
+          orientationTolerance,
+          ikMaxIterations,
+          ikDamping
+        )
+      );
       if (!ik.converged) throw "Toolpath waypoint is unreachable";
       var jump = 0.0;
-      for (joint in 0...previous.length)
-        jump = Math.max(jump, Math.abs(ik.q[joint] - previous[joint]));
+      for (joint in 0...previous.length) jump = Math.max(jump, Math.abs(ik.q[joint] - previous[joint]));
       if (jump > maxJointJump) throw 'Toolpath waypoint joint jump $jump exceeds $maxJointJump';
-      var linearDistance = point.work_T_tcp.translation
-        .sub(previousPose.translation).norm();
-      var angularDistance = previousPose.rotation
-        .angularDistance(point.work_T_tcp.rotation) * 0.1;
-      var pathDistance = Math.sqrt(linearDistance * linearDistance +
-        angularDistance * angularDistance);
+      var linearDistance = point.work_T_tcp.translation.sub(previousPose.translation).norm();
+      var angularDistance = previousPose.rotation.angularDistance(point.work_T_tcp.rotation) * 0.1;
+      var pathDistance = Math.sqrt(linearDistance * linearDistance + angularDistance * angularDistance);
       var jointSpeed = pathDistance > 1e-9 ? jump * point.feedRate / pathDistance : 0.0;
-      ops.push(MotionOp.MoveJ(MoveTarget.JointTarget(ik.q),
-        new MotionOptions(jointSpeed), Blend.ExactStop));
+      ops.push(MotionOp.MoveJ(MoveTarget.JointTarget(ik.q), new MotionOptions(jointSpeed), Blend.ExactStop));
       // Spatial cutting is active only on engaged translation spans; a curl
       // at one position does not extend the swept cut area.
       processSpans.push(point.processOn && linearDistance > 1e-9);
@@ -105,8 +149,7 @@ class ToolpathPlanRunner implements processkit.skill.ToolpathPlanRunner {
     // The next op may be an approach or retract reached exactly at this tick.
     cutActive = spanIsOn(before);
   }
-  function spanIsOn(index:Int):Bool
-    return index >= 0 && index < processSpans.length && processSpans[index];
+  function spanIsOn(index:Int):Bool return index >= 0 && index < processSpans.length && processSpans[index];
   public function abort():Void {
     motion.abort();
     cutActive = false;

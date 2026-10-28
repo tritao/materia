@@ -27,102 +27,148 @@ class DiscreteScrewdriver implements ScrewdriverOutputs implements ScrewdriverFe
   var lastValues:Array<Float> = [];
   public function new(io:ScrewdriverIo, profile:ScrewdriverIoProfile) {
     if (io == null || profile == null) throw "Discrete screwdriver needs I/O and a commissioned profile";
-    this.io = io; this.profile = profile.copy();
+    this.io = io;
+    this.profile = profile.copy();
     safe();
   }
-  public function ready():Bool return !closed && fault == null && controllerReady && slot > 0
-    && selectedProgramCode == profile.code(slot) && Int64.compare(sequence,selectedAfter) > 0;
+  public function ready():Bool return !closed
+    && fault == null && controllerReady && slot > 0 && selectedProgramCode == profile.code(slot) && Int64.compare(
+      sequence,
+      selectedAfter
+    ) > 0;
   public function outputs():ScrewdriverOutputs return this;
   public function feedback():ScrewdriverFeedback return this;
-  public function acquisition():Null<ScrewdriverAcquisition> return Int64.compare(sequence,Int64.ofInt(0)) <= 0
-    ? null : {sequence:sequence,acquiredAt:acquiredAt,clockId:profile.clockId,values:lastValues.copy()};
-  public function safeAcknowledged():Bool return !closed && fault == null && !running && !reversing
-    && Int64.compare(sequence,stoppedAfter) > 0 && latest.speed == 0;
-  public function close():Void {if (!closed) {safe(); closed = true;}}
+  public function acquisition():Null<ScrewdriverAcquisition> return Int64.compare(sequence,
+    Int64.ofInt(0)) <= 0 ? null : {
+      sequence : sequence,
+      acquiredAt : acquiredAt,
+      clockId : profile.clockId,
+      values : lastValues.copy()
+    };
+  public function safeAcknowledged():Bool return !closed && fault == null && !running && !reversing && Int64.compare(
+    sequence,
+    stoppedAfter
+  ) > 0 && latest.speed == 0;
+  public function close():Void {
+    if (!closed) {
+      safe();
+      closed = true;
+    }
+  }
   public function faultDetail():Null<String> return fault;
-  public function reading():ScrewdriverReading return {torqueNm:latest.torqueNm,angle:latest.angle,speed:latest.speed,
-    strokeMm:latest.strokeMm,phase:latest.phase,result:latest.result,vacuum:latest.vacuum};
+  public function reading():ScrewdriverReading return {
+    torqueNm: latest.torqueNm,
+    angle: latest.angle,
+    speed: latest.speed,
+    strokeMm: latest.strokeMm,
+    phase: latest.phase,
+    result: latest.result,
+    vacuum: latest.vacuum
+  };
   public function selectProgram(slot:Int):Void {
-    if (closed || fault != null || running || reversing) throw "Discrete screwdriver selection requires stopped, healthy outputs";
+    if (closed || fault != null
+      || running || reversing) throw "Discrete screwdriver selection requires stopped, healthy outputs";
     var code = profile.code(slot);
-    for (i in 0...profile.programBits.length) io.write(profile.programBits[i],(code & (1 << i)) != 0);
-    this.slot = slot; selectedAfter = sequence; controllerReady = false;
+    for (i in 0...profile.programBits.length) io.write(profile.programBits[i], (code & (1 << i)) != 0);
+    this.slot = slot;
+    selectedAfter = sequence;
+    controllerReady = false;
   }
   public function start(on:Bool):Void {
     if (on && !ready()) throw "Discrete screwdriver start requires fresh acknowledged readiness";
     if (!on) {
-      io.write(profile.start,false); io.write(profile.reverse,false);
-      running = false; reversing = false; stoppedAfter = sequence;
+      io.write(profile.start, false);
+      io.write(profile.reverse, false);
+      running = false;
+      reversing = false;
+      stoppedAfter = sequence;
     } else if (reversing) {
       // The shared runner starts after selecting reverse. A dedicated reverse pin
       // must not energize the forward-start output when its profile says otherwise.
-      io.write(profile.start,profile.reverseNeedsStart);
-    } else {io.write(profile.start,true); running = true;}
+      io.write(profile.start, profile.reverseNeedsStart);
+    } else {
+      io.write(profile.start, true);
+      running = true;
+    }
   }
   public function reverse(on:Bool):Void {
-    if (on && (!ready() || running)) throw "Discrete screwdriver reverse requires fresh readiness and stopped forward drive";
+    if (on
+      && (!ready() || running)) throw "Discrete screwdriver reverse requires fresh readiness and stopped forward drive";
     if (!on && reversing) {
-      if (profile.reverseNeedsStart) io.write(profile.start,false);
+      if (profile.reverseNeedsStart) io.write(profile.start, false);
       stoppedAfter = sequence;
     }
-    io.write(profile.reverse,on);
-    if (on && profile.reverseNeedsStart) io.write(profile.start,true);
+    io.write(profile.reverse, on);
+    if (on && profile.reverseNeedsStart) io.write(profile.start, true);
     reversing = on;
   }
   public function vacuum(on:Bool):Void {
     if (on && (closed || fault != null)) throw "Discrete screwdriver cannot acquire after an I/O fault";
-    io.write(profile.vacuum,on);
+    io.write(profile.vacuum, on);
   }
   /** Stop drive and reverse independently; preserve the held screw's vacuum. */
   public function safe():Void {
     var error:Null<String> = null;
-    try io.write(profile.start,false) catch (failure:Dynamic) error = Std.string(failure);
-    try io.write(profile.reverse,false) catch (failure:Dynamic) error = Std.string(failure);
-    running = false; reversing = false;
+    try io.write(profile.start, false) catch (failure:Dynamic) error = Std.string(failure);
+    try io.write(profile.reverse, false) catch (failure:Dynamic) error = Std.string(failure);
+    running = false;
+    reversing = false;
     stoppedAfter = sequence;
-    if (error != null) {fault = error; throw error;}
+    if (error != null) {
+      fault = error;
+      throw error;
+    }
   }
   public function poll(now:Float):Void {
     if (closed || fault != null) return;
     try {
       if (!Math.isFinite(now) || now < 0 || now < lastNow) throw "Discrete screwdriver owner clock moved backwards";
-      lastNow = now; if (firstPoll < 0) firstPoll = now;
+      lastNow = now;
+      if (firstPoll < 0) firstPoll = now;
       var sample = io.sample();
       if (sample != null) {
-        if (sample.selectedProgramCode < 0 || sample.selectedProgramCode >= (1 << profile.programBits.length)
-            || sample.clockId != profile.clockId || !Math.isFinite(sample.acquiredAt) || sample.acquiredAt < 0
-            || sample.acquiredAt > now || Int64.compare(sample.sequence,Int64.ofInt(0)) <= 0)
-          throw "Discrete screwdriver acquisition has invalid clock, time or sequence";
-        if (Int64.compare(sample.sequence,sequence) < 0) throw "Discrete screwdriver acquisition sequence moved backwards";
-        if (Int64.compare(sample.sequence,sequence) > 0) {
-          if (sample.acquiredAt < acquiredAt || !ScrewdriverSensor.valid(sample.values) || sample.inputs == null)
-            throw "Discrete screwdriver needs a consistent measured seven-value acquisition";
-          for (pin in [profile.ready,profile.ok,profile.nok]) if (pin >= sample.inputs.length)
-            throw 'Discrete screwdriver acquisition is missing input $pin';
+        if (sample.selectedProgramCode < 0
+          || sample.selectedProgramCode >= (1 << profile.programBits.length) || sample.clockId != profile.clockId
+          || !Math.isFinite(sample.acquiredAt) || sample.acquiredAt < 0 || sample.acquiredAt > now || Int64.compare(
+            sample.sequence,
+            Int64.ofInt(0)
+          ) <= 0) throw "Discrete screwdriver acquisition has invalid clock, time or sequence";
+        if (Int64.compare(sample.sequence,
+          sequence) < 0) throw "Discrete screwdriver acquisition sequence moved backwards";
+        if (Int64.compare(sample.sequence, sequence) > 0) {
+          if (sample.acquiredAt < acquiredAt || !ScrewdriverSensor.valid(sample.values)
+            || sample.inputs == null) throw "Discrete screwdriver needs a consistent measured seven-value acquisition";
+          for (pin in [profile.ready, profile.ok, profile.nok]) if (pin
+            >= sample.inputs.length) throw 'Discrete screwdriver acquisition is missing input $pin';
           var value = ScrewdriverSensor.reading(sample.values);
           var ok = sample.inputs[profile.ok], nok = sample.inputs[profile.nok];
-          if (ok && nok || ok != (value.result == ScrewdriverContract.OK) || nok != (value.result > ScrewdriverContract.OK)
-              || (ok || nok) && value.phase != ScrewdriverContract.COMPLETE)
-            throw "Discrete screwdriver result bits disagree with measured feedback";
-          sequence = sample.sequence; acquiredAt = sample.acquiredAt; latest = value;
+          if (ok && nok || ok != (value.result == ScrewdriverContract.OK)
+            || nok != (value.result > ScrewdriverContract.OK) || (ok || nok) && value.phase
+            != ScrewdriverContract.COMPLETE) throw "Discrete screwdriver result bits disagree with measured feedback";
+          sequence = sample.sequence;
+          acquiredAt = sample.acquiredAt;
+          latest = value;
           selectedProgramCode = sample.selectedProgramCode;
-          lastInputs = sample.inputs.copy(); lastValues = sample.values.copy();
+          lastInputs = sample.inputs.copy();
+          lastValues = sample.values.copy();
           controllerReady = sample.inputs[profile.ready];
         } else {
-          if (sample.selectedProgramCode != selectedProgramCode || sample.acquiredAt != acquiredAt || sample.inputs == null || sample.values == null
-              || sample.inputs.length != lastInputs.length || sample.values.length != lastValues.length)
-            throw "Discrete screwdriver repeated sequence changed its acquisition";
-          for (i in 0...lastInputs.length) if (sample.inputs[i] != lastInputs[i])
-            throw "Discrete screwdriver repeated sequence changed its inputs";
-          for (i in 0...lastValues.length) if (sample.values[i] != lastValues[i])
-            throw "Discrete screwdriver repeated sequence changed its measurements";
+          if (sample.selectedProgramCode != selectedProgramCode || sample.acquiredAt != acquiredAt || sample.inputs
+            == null || sample.values == null || sample.inputs.length != lastInputs.length || sample.values.length
+            != lastValues.length) throw "Discrete screwdriver repeated sequence changed its acquisition";
+          for (i in 0...lastInputs.length) if (sample.inputs[i]
+            != lastInputs[i]) throw "Discrete screwdriver repeated sequence changed its inputs";
+          for (i in 0...lastValues.length) if (sample.values[i]
+            != lastValues[i]) throw "Discrete screwdriver repeated sequence changed its measurements";
         }
       }
-      if (now - (acquiredAt < 0 ? firstPoll : acquiredAt) >= profile.maximumAge)
-        throw "Discrete screwdriver measured feedback is stale";
+      if (now - (acquiredAt
+        < 0 ? firstPoll : acquiredAt) >= profile.maximumAge) throw "Discrete screwdriver measured feedback is stale";
     } catch (error:Dynamic) {
-      fault = Std.string(error); controllerReady = false;
-      try safe() catch (_:Dynamic) {}
+      fault = Std.string(error);
+      controllerReady = false;
+      try safe() catch (_:Dynamic) {
+      }
     }
   }
 }

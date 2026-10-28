@@ -7,9 +7,11 @@ class ModbusRegister {
   public final offset:Float;
 
   public function new(address:Int, scale:Float = 1.0, offset:Float = 0.0) {
-    if (address < 0 || address > 65535 || !Math.isFinite(scale) || scale <= 0.0 || !Math.isFinite(offset))
-      throw "Invalid Modbus register mapping";
-    this.address = address; this.scale = scale; this.offset = offset;
+    if (address < 0 || address > 65535
+      || !Math.isFinite(scale) || scale <= 0.0 || !Math.isFinite(offset)) throw "Invalid Modbus register mapping";
+    this.address = address;
+    this.scale = scale;
+    this.offset = offset;
   }
   public function encode(value:Float):Int {
     if (!Math.isFinite(value)) throw "Modbus setpoint must be finite";

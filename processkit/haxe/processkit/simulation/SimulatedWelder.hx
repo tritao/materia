@@ -44,7 +44,7 @@ class SimulatedWelder implements SimulationStepObserver {
   public var supplyReady:Bool = true;
   /** Optional device supply; its real feedback also controls the bead model. */
   public var supply:Null<SimulationWelderSupply> = null;
-  var deviceReading:WeldReading = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:0, powerW:0.0};
+  var deviceReading:WeldReading = {arc: false, currentA: 0.0, voltageV: 0.0, touch: false, fault: 0, powerW: 0.0};
 
   final work:processkit.tool.GroundedWork;
   final tipPosition:Array<Float>;
@@ -52,15 +52,26 @@ class SimulatedWelder implements SimulationStepObserver {
   var sequence:Int = 0;
   var lastTimestampNs:Null<Int64> = null;
 
-  public function new(simulation:Simulation, runtime:RobotRuntime, robotIndex:Int, linkIndex:Int, tipPosition:Array<Float>,
-      wireDirection:Array<Float>, work:WeldWork, arcChannel:String, wireSpeedChannel:String, voltageChannel:String,
-      sensorId:String, config:WeldArcConfig) {
-    if (simulation == null || runtime == null || robotIndex < 0 || linkIndex < 0 || work == null ||
-        tipPosition == null || tipPosition.length != 3 || wireDirection == null || wireDirection.length != 3 ||
-        arcChannel == null || wireSpeedChannel == null || voltageChannel == null || sensorId == null)
-      throw "Simulated welder needs a simulation, robot, link, tip, wire direction, work, channels and sensor";
-    var length = Math.sqrt(wireDirection[0] * wireDirection[0] + wireDirection[1] * wireDirection[1] +
-      wireDirection[2] * wireDirection[2]);
+  public function new(
+    simulation:Simulation,
+    runtime:RobotRuntime,
+    robotIndex:Int,
+    linkIndex:Int,
+    tipPosition:Array<Float>,
+    wireDirection:Array<Float>,
+    work:WeldWork,
+    arcChannel:String,
+    wireSpeedChannel:String,
+    voltageChannel:String,
+    sensorId:String,
+    config:WeldArcConfig
+  ) {
+    if (simulation == null || runtime == null || robotIndex < 0 || linkIndex < 0 || work == null
+      || tipPosition == null || tipPosition.length != 3 || wireDirection == null || wireDirection.length != 3
+      || arcChannel == null || wireSpeedChannel == null || voltageChannel == null || sensorId
+      == null) throw "Simulated welder needs a simulation, robot, link, tip, wire direction, work, channels and sensor";
+    var length = Math.sqrt(wireDirection[0]
+      * wireDirection[0] + wireDirection[1] * wireDirection[1] + wireDirection[2] * wireDirection[2]);
     if (!(length > 0)) throw "Simulated welder needs a wire direction";
     this.simulation = simulation;
     this.runtime = runtime;
@@ -102,22 +113,46 @@ class SimulatedWelder implements SimulationStepObserver {
     if (supply != null) {
       var touching = work.distance(tip[0], tip[1], tip[2]) <= WeldArcModel.STRIKE_REACH;
       var ahead = work.ray(tip[0], tip[1], tip[2], wire[0], wire[1], wire[2], WeldArcModel.STRIKE_REACH);
-      deviceReading = supply.observe(dt, sourceTimestampNs, supplyReady && (touching || ahead <= WeldArcModel.STRIKE_REACH));
+      deviceReading = supply.observe(
+        dt,
+        sourceTimestampNs,
+        supplyReady && (touching || ahead <= WeldArcModel.STRIKE_REACH)
+      );
       return;
     }
-    var reading = model.step(dt, {
-      arcCommanded: digital(arcChannel),
-      wireSpeed: Math.max(0.0, analog(wireSpeedChannel)),
-      voltageSet: analog(voltageChannel),
-      supplyReady: supplyReady,
-      tipDistance: work.distance(tip[0], tip[1], tip[2]),
-      wireDistance: work.ray(tip[0], tip[1], tip[2], wire[0], wire[1], wire[2], WeldArcModel.STRIKE_REACH)
-    });
+    var reading = model.step(
+      dt,
+      {
+        arcCommanded: digital(arcChannel),
+        wireSpeed: Math.max(0.0, analog(wireSpeedChannel)),
+        voltageSet: analog(voltageChannel),
+        supplyReady: supplyReady,
+        tipDistance: work.distance(
+          tip[0],
+          tip[1],
+          tip[2]
+        ),
+        wireDistance: work.ray(
+          tip[0],
+          tip[1],
+          tip[2],
+          wire[0],
+          wire[1],
+          wire[2],
+          WeldArcModel.STRIKE_REACH
+        )
+      }
+    );
     // Geometry above comes from this completed physics tick. Observer time controls the
     // process integration, but the observation timestamp belongs to the sampled physics clock.
     var snapshot = runtime.snapshot();
-    runtime.publishSensorFrame(sensorId, WeldSensor.values(reading), Int64.ofInt(++sequence), snapshot.sourceTimestampNs,
-      runtime.endpoint.sourceClockId());
+    runtime.publishSensorFrame(
+      sensorId,
+      WeldSensor.values(reading),
+      Int64.ofInt(++ sequence),
+      snapshot.sourceTimestampNs,
+      runtime.endpoint.sourceClockId()
+    );
   }
 
   /** The session reset restored the robot's channels: forget the arc and any fault. */
@@ -127,17 +162,19 @@ class SimulatedWelder implements SimulationStepObserver {
     lastTimestampNs = null;
   }
 
-  function digital(channel:String):Bool
-    return switch runtime.channelValue(channel) {
-      case Digital(value): value;
-      case _: throw 'Welder channel "$channel" is not digital';
-    };
+  function digital(channel:String):Bool return switch runtime.channelValue(channel) {
+    case Digital(value):
+      value;
+    case _:
+      throw 'Welder channel "$channel" is not digital';
+  };
 
-  function analog(channel:String):Float
-    return switch runtime.channelValue(channel) {
-      case Analog(value): value;
-      case _: throw 'Welder channel "$channel" is not analog';
-    };
+  function analog(channel:String):Float return switch runtime.channelValue(channel) {
+    case Analog(value):
+      value;
+    case _:
+      throw 'Welder channel "$channel" is not analog';
+  };
 
   static function place(position:Array<Float>, rotation:Array<Float>, local:Array<Float>):Array<Float> {
     var moved = turn(rotation, local);

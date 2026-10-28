@@ -14,8 +14,8 @@ class WeldPasses implements Skill {
   var remaining:Float = 0;
 
   public function new(passes:Array<Void -> Skill>, dwells:Array<Float>) {
-    if (passes == null || passes.length == 0 || dwells == null || dwells.length != passes.length)
-      throw "WeldPasses needs passes and their interpass dwells";
+    if (passes == null || passes.length == 0
+      || dwells == null || dwells.length != passes.length) throw "WeldPasses needs passes and their interpass dwells";
     for (pass in passes) if (pass == null) throw "WeldPasses has an empty pass";
     for (dwell in dwells) if (!(dwell >= 0 && dwell <= 10)) throw "Invalid interpass dwell";
     this.passes = passes.copy();
@@ -39,7 +39,8 @@ class WeldPasses implements Skill {
       pass.start();
     } catch (error:Dynamic) {
       var pass = active;
-      if (pass != null) try pass.cancel() catch (_:Dynamic) {}
+      if (pass != null) try pass.cancel() catch (_:Dynamic) {
+      }
       lifecycle.fail(Std.string(error));
     }
   }
@@ -66,13 +67,17 @@ class WeldPasses implements Skill {
             remaining = dwells[index];
             waiting = true;
           }
-        case Failed(message): lifecycle.fail('pass ${index + 1}: $message');
-        case Cancelled: lifecycle.cancel();
-        case _: {}
+        case Failed(message):
+          lifecycle.fail('pass ${index + 1}: $message');
+        case Cancelled:
+          lifecycle.cancel();
+        case _:
+          {}
       }
     } catch (error:Dynamic) {
       var pass = active;
-      if (pass != null) try pass.cancel() catch (_:Dynamic) {}
+      if (pass != null) try pass.cancel() catch (_:Dynamic) {
+      }
       lifecycle.fail(Std.string(error));
     }
     return lifecycle.status();

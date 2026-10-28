@@ -10,7 +10,7 @@ import processkit.tool.WeldFault;
 /** One transport owner, independent of planning. Its mailbox holds only the latest desired state. */
 class WelderDeviceOwner implements WelderOutputs implements WelderFeedback {
   final device:PolledWelderDevice;
-  final clock:Void->Float;
+  final clock:Void -> Float;
   final period:Float;
   final mutex = new Mutex();
   final ended = new Lock();
@@ -24,12 +24,14 @@ class WelderDeviceOwner implements WelderOutputs implements WelderFeedback {
   var changed = true;
   var initialized = false;
   var failure:Null<String> = null;
-  var latest:WeldReading = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:0, powerW:0.0};
+  var latest:WeldReading = {arc: false, currentA: 0.0, voltageV: 0.0, touch: false, fault: 0, powerW: 0.0};
 
-  public function new(device:PolledWelderDevice, clock:Void->Float, period:Float = 0.005) {
-    if (device == null || clock == null || !Math.isFinite(period) || period <= 0.0 || period > 0.05)
-      throw "Welder owner needs a device, monotonic clock and bounded polling period";
-    this.device = device; this.clock = clock; this.period = period;
+  public function new(device:PolledWelderDevice, clock:Void -> Float, period:Float = 0.005) {
+    if (device == null || clock == null || !Math.isFinite(period) || period <= 0.0
+      || period > 0.05) throw "Welder owner needs a device, monotonic clock and bounded polling period";
+    this.device = device;
+    this.clock = clock;
+    this.period = period;
     #if wasm
     throw "Welder device owner requires a threaded host";
     #else
@@ -38,53 +40,89 @@ class WelderDeviceOwner implements WelderOutputs implements WelderFeedback {
   }
 
   public function ready():Bool {
-    mutex.acquire(); var value = initialized && failure == null && !closed && !closing; mutex.release(); return value;
+    mutex.acquire();
+    var value = initialized && failure == null && !closed && !closing;
+    mutex.release();
+    return value;
   }
   public function faultDetail():Null<String> {
-    mutex.acquire(); var value = failure; mutex.release(); return value;
+    mutex.acquire();
+    var value = failure;
+    mutex.release();
+    return value;
   }
   public function reading():WeldReading {
-    mutex.acquire(); var value = copy(latest);
+    mutex.acquire();
+    var value = copy(latest);
     if (failure != null && value.fault == WeldFault.None) value.fault = WeldFault.ArcLost;
-    mutex.release(); return value;
+    mutex.release();
+    return value;
   }
   /** Explicit rearming only; clearing device feedback never replays an old ignition request. */
   public function reset():Void {
     mutex.acquire();
     if (!initialized || latest.fault != WeldFault.None || closing || closed || latest.arc) {
-      mutex.release(); throw "Welder owner cannot reset until its device is ready and safe";
+      mutex.release();
+      throw "Welder owner cannot reset until its device is ready and safe";
     }
-    failure = null; inhibited = false; desiredArc = false; desiredWire = 0.0; changed = true;
+    failure = null;
+    inhibited = false;
+    desiredArc = false;
+    desiredWire = 0.0;
+    changed = true;
     mutex.release();
   }
   public function setArc(on:Bool):Void {
     mutex.acquire();
     if (on && (inhibited || failure != null || closing || closed)) {
-      mutex.release(); throw "Welder owner is inhibited";
+      mutex.release();
+      throw "Welder owner is inhibited";
     }
-    desiredArc = on; changed = true; mutex.release();
+    desiredArc = on;
+    changed = true;
+    mutex.release();
   }
   public function setWireSpeed(value:Float):Void {
     if (!Math.isFinite(value) || value < 0.0) throw "Invalid welding wire speed";
-    mutex.acquire(); desiredWire = inhibited || closing || closed ? 0.0 : value; changed = true; mutex.release();
+    mutex.acquire();
+    desiredWire = inhibited || closing || closed ? 0.0 : value;
+    changed = true;
+    mutex.release();
   }
   public function setVoltage(value:Float):Void {
     if (!Math.isFinite(value) || value < 0.0) throw "Invalid welding voltage";
-    mutex.acquire(); desiredVoltage = value; changed = true; mutex.release();
+    mutex.acquire();
+    desiredVoltage = value;
+    changed = true;
+    mutex.release();
   }
   public function safe():Void {
-    mutex.acquire(); inhibit(); mutex.release();
+    mutex.acquire();
+    inhibit();
+    mutex.release();
   }
   /** Wait for acknowledged off, or close the link after a bounded shutdown attempt. */
   public function close():Void {
     mutex.acquire();
-    if (closed) { mutex.release(); return; }
-    if (closing) { mutex.release(); throw "Welder owner close already in progress"; }
-    closing = true; inhibit(); mutex.release();
+    if (closed) {
+      mutex.release();
+      return;
+    }
+    if (closing) {
+      mutex.release();
+      throw "Welder owner close already in progress";
+    }
+    closing = true;
+    inhibit();
+    mutex.release();
     ended.wait();
   }
   function inhibit():Void {
-    inhibited = true; desiredArc = false; desiredWire = 0.0; stopPending = true; changed = true;
+    inhibited = true;
+    desiredArc = false;
+    desiredWire = 0.0;
+    stopPending = true;
+    changed = true;
   }
   function run():Void {
     var until = -1.0;
@@ -99,7 +137,10 @@ class WelderDeviceOwner implements WelderOutputs implements WelderFeedback {
           if (!Math.isFinite(now) || now < 0.0 || now < previous) throw "Welder owner clock moved backwards";
           previous = now;
           if (closing && until < 0.0) until = now + 2.0;
-          if (stopPending) { device.safe(); stopPending = false; }
+          if (stopPending) {
+            device.safe();
+            stopPending = false;
+          }
           if (changed && device.ready() && failure == null) {
             var output = device.outputs();
             output.setVoltage(desiredVoltage);
@@ -114,26 +155,41 @@ class WelderDeviceOwner implements WelderOutputs implements WelderFeedback {
           var detail = device.faultDetail();
           if (detail != null || latest.fault != WeldFault.None) {
             if (failure == null) {
-              failure = detail == null ? "Welder device fault" : detail; inhibit();
+              failure = detail == null ? "Welder device fault" : detail;
+              inhibit();
             }
           }
           var done = closing && (device.safeAcknowledged() || now >= until);
           mutex.release();
           if (done) break;
-        } catch (error:Dynamic) { mutex.release(); throw error; }
+        } catch (error:Dynamic) {
+          mutex.release();
+          throw error;
+        }
         Sys.sleep(period);
       }
     } catch (error:Dynamic) {
-      mutex.acquire(); failure = Std.string(error); inhibit();
-      latest = {arc:false, currentA:0.0, voltageV:0.0, touch:false, fault:WeldFault.ArcLost, powerW:0.0};
+      mutex.acquire();
+      failure = Std.string(error);
+      inhibit();
+      latest = {arc: false, currentA: 0.0, voltageV: 0.0, touch: false, fault: WeldFault.ArcLost, powerW: 0.0};
       mutex.release();
-      try device.safe() catch (_:Dynamic) {}
+      try device.safe() catch (_:Dynamic) {
+      }
     }
-    try device.close() catch (_:Dynamic) {}
-    mutex.acquire(); closed = true; mutex.release(); ended.release();
+    try device.close() catch (_:Dynamic) {
+    }
+    mutex.acquire();
+    closed = true;
+    mutex.release();
+    ended.release();
   }
   static function copy(value:WeldReading):WeldReading return {
-    arc:value.arc, currentA:value.currentA, voltageV:value.voltageV, touch:value.touch,
-    fault:value.fault, powerW:value.powerW
+    arc: value.arc,
+    currentA: value.currentA,
+    voltageV: value.voltageV,
+    touch: value.touch,
+    fault: value.fault,
+    powerW: value.powerW
   };
 }

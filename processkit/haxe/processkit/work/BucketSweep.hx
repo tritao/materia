@@ -12,14 +12,22 @@ package processkit.work;
  * difference before and after the sweep, rather than a per-vertex estimate.
  */
 class BucketSweep {
-  public static function apply(map:HeightMap, from:Point2, to:Point2, halfWidth:Float, edgeHeight:Float,
-      ?design:HeightMap, ?footprint:Polygon2, ?footprintTolerance:Float = 0.0):BucketSweepResult {
+  public static function apply(
+    map:HeightMap,
+    from:Point2,
+    to:Point2,
+    halfWidth:Float,
+    edgeHeight:Float,
+    ?design:HeightMap,
+    ?footprint:Polygon2,
+    ?footprintTolerance:Float = 0.0
+  ):BucketSweepResult {
     if (map == null) throw "Bucket sweep requires a height map";
     if (from == null || to == null) throw "Bucket sweep requires from/to endpoints";
     if (!Math.isFinite(halfWidth) || halfWidth <= 0.0) throw "Bucket sweep half-width must be positive and finite";
     if (!Math.isFinite(edgeHeight)) throw "Bucket sweep edge height must be finite";
-    if (!Math.isFinite(footprintTolerance) || footprintTolerance < 0.0)
-      throw "Bucket sweep footprint tolerance must be finite and non-negative";
+    if (!Math.isFinite(footprintTolerance)
+      || footprintTolerance < 0.0) throw "Bucket sweep footprint tolerance must be finite and non-negative";
     if (design != null) HeightMap.ensureSameGrid(map, design);
 
     var before = map.copy();

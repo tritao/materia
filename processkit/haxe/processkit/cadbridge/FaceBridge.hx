@@ -31,8 +31,14 @@ import processkit.work.WorkSurfaceId;
  * needed to read a face's boundary loops.
  */
 class FaceBridge {
-  public static function toWorkSurface(face:Face, id:WorkSurfaceId, frameId:String,
-      ?provenance:Provenance, ?surfaceFrameId:String, ?scale:Float = 1.0):WorkSurface {
+  public static function toWorkSurface(
+    face:Face,
+    id:WorkSurfaceId,
+    frameId:String,
+    ?provenance:Provenance,
+    ?surfaceFrameId:String,
+    ?scale:Float = 1.0
+  ):WorkSurface {
     if (face == null) throw "Face bridge requires a face";
     if (face.surfaceKind() != CadKit.SurfaceKind.Plane) throw "Face bridge only supports planar faces";
     if (!Math.isFinite(scale) || scale <= 0.0) throw "Face bridge scale must be positive and finite";
@@ -72,14 +78,29 @@ class FaceBridge {
     for (i in 0...polygons.length) if (i != outerIndex) exclusions.push(polygons[i]);
 
     var rotation = Quat.fromRotationMatrix([
-      basisU.x, basisU.y, basisU.z,
-      basisV.x, basisV.y, basisV.z,
-      normal.x, normal.y, normal.z
+      basisU.x,
+      basisU.y,
+      basisU.z,
+      basisV.x,
+      basisV.y,
+      basisV.z,
+      normal.x,
+      normal.y,
+      normal.z
     ]);
     var frame_T_surface = new Transform3(center, rotation);
 
-    return new WorkSurface(id, frameId, frame_T_surface, polygons[outerIndex], exclusions,
-      0.002, "", provenance, surfaceFrameId);
+    return new WorkSurface(
+      id,
+      frameId,
+      frame_T_surface,
+      polygons[outerIndex],
+      exclusions,
+      0.002,
+      "",
+      provenance,
+      surfaceFrameId
+    );
   }
 
   static function wirePoints(wireShape:Shape, center:Vec3, basisU:Vec3, basisV:Vec3, scale:Float):Array<Point2> {
@@ -90,8 +111,8 @@ class FaceBridge {
     for (i in 0...edgeCount) {
       var edgeShape = wireShape.subshape(CadKit.ShapeKind.Edge, i);
       try {
-        if (edgeShape.subshapeCount(CadKit.ShapeKind.Vertex) != 2)
-          throw "Face bridge requires two endpoints for every wire edge";
+        if (edgeShape.subshapeCount(CadKit.ShapeKind.Vertex)
+          != 2) throw "Face bridge requires two endpoints for every wire edge";
         var startShape = edgeShape.subshape(CadKit.ShapeKind.Vertex, 0);
         var endShape = edgeShape.subshape(CadKit.ShapeKind.Vertex, 1);
         starts.push(toVec3(startShape.position(), scale));
@@ -126,14 +147,12 @@ class FaceBridge {
           break;
         }
       }
-      if (nextIndex < 0 || next == null)
-        throw "Face bridge could not follow a connected wire edge chain";
+      if (nextIndex < 0 || next == null) throw "Face bridge could not follow a connected wire edge chain";
       ordered.push(current);
       used[nextIndex] = true;
       current = next;
     }
-    if (!samePoint(current, first, tolerance))
-      throw "Face bridge wire edge chain does not close";
+    if (!samePoint(current, first, tolerance)) throw "Face bridge wire edge chain does not close";
 
     var points:Array<Point2> = [];
     for (position in ordered) {
@@ -158,6 +177,9 @@ class FaceBridge {
     return sum * 0.5;
   }
 
-  static function toVec3(v:CadKit.Vec3, scale:Float):Vec3
-    return new Vec3(v.get_x() * scale, v.get_y() * scale, v.get_z() * scale);
+  static function toVec3(v:CadKit.Vec3, scale:Float):Vec3 return new Vec3(
+    v.get_x() * scale,
+    v.get_y() * scale,
+    v.get_z() * scale
+  );
 }

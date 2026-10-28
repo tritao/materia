@@ -13,14 +13,23 @@ import robotkit.runtime.RobotRuntime;
 class ModbusWelderSupply implements SimulationWelderSupply {
   public final welder:WelderDeviceOwner;
   final bridge:WelderRuntimeBinding;
-  final clock:Void->Float;
-  final pollOwner:Bool->Void;
+  final clock:Void -> Float;
+  final pollOwner:Bool -> Void;
 
-  public function new(welder:WelderDeviceOwner, runtime:RobotRuntime, channels:WelderChannels, sensorId:String,
-      clock:Void->Float, pollOwner:Bool->Void) {
-    this.welder = welder; this.clock = clock; this.pollOwner = pollOwner;
-    bridge = new WelderRuntimeBinding(runtime,
-      new WelderChannelBinding(channels, welder, welder, function(_:Float) {}), sensorId, "robotkit.simulation");
+  public function new(
+    welder:WelderDeviceOwner,
+    runtime:RobotRuntime,
+    channels:WelderChannels,
+    sensorId:String,
+    clock:Void -> Float,
+    pollOwner:Bool -> Void
+  ) {
+    this.welder = welder;
+    this.clock = clock;
+    this.pollOwner = pollOwner;
+    bridge = new WelderRuntimeBinding(runtime, new WelderChannelBinding(channels, welder, welder, function(_:Float) {
+    }
+    ), sensorId, "robotkit.simulation");
   }
   public function observe(dt:Float, timestamp:Int64, grounded:Bool):WeldReading {
     pollOwner(grounded);
@@ -28,7 +37,8 @@ class ModbusWelderSupply implements SimulationWelderSupply {
     return WeldSensor.reading(frame.values.toArray());
   }
   public function safe():Void {
-    bridge.safe(); welder.safe();
+    bridge.safe();
+    welder.safe();
   }
   public function reset():Void safe();
 }

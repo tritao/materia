@@ -23,31 +23,61 @@ import robotkit.core.RobotSnapshot;
 class Paint implements Skill {
   public final finish:FinishSurface;
 
-  public function new(navigator:Navigator, manipulator:Manipulator, robot:Robot,
-      map_T_surface:Transform3, surface:WorkSurface, spec:FinishSpec,
-      observePerception:RobotSnapshot -> PerceptionSnapshot, sprayer:Sprayer,
-      litersPerMinute:Float, pressureBar:Float, seed:Array<Float>,
-      runner:SurfacePlanRunner, ?obstacles:CollisionDescription, ?toolPlanning:ToolPlanningContext) {
+  public function new(
+    navigator:Navigator,
+    manipulator:Manipulator,
+    robot:Robot,
+    map_T_surface:Transform3,
+    surface:WorkSurface,
+    spec:FinishSpec,
+    observePerception:RobotSnapshot -> PerceptionSnapshot,
+    sprayer:Sprayer,
+    litersPerMinute:Float,
+    pressureBar:Float,
+    seed:Array<Float>,
+    runner:SurfacePlanRunner,
+    ?obstacles:CollisionDescription,
+    ?toolPlanning:ToolPlanningContext
+  ) {
     if (sprayer == null) throw "Paint requires a sprayer";
     var adapter = new ChannelToolAdapter();
     adapter.bind("surface.process", function(event) {
       var on = switch event.value {
-        case Digital(value): value;
-        case Analog(value): value > 0.0;
-        case Process(_, _): throw "Paint process channel needs a digital or analog value";
+        case Digital(value):
+          value;
+        case Analog(value):
+          value > 0.0;
+        case Process(_, _):
+          throw "Paint process channel needs a digital or analog value";
       };
       sprayer.setFlow(on ? litersPerMinute : 0.0, event.scheduledTimeNs);
       sprayer.setPressure(on ? pressureBar : 0.0, event.scheduledTimeNs);
-    });
-    finish = new FinishSurface(navigator, manipulator, robot, map_T_surface, surface, spec,
-      observePerception, runner, adapter, "surface.process", seed, obstacles, toolPlanning);
+    }
+    );
+    finish = new FinishSurface(
+      navigator,
+      manipulator,
+      robot,
+      map_T_surface,
+      surface,
+      spec,
+      observePerception,
+      runner,
+      adapter,
+      "surface.process",
+      seed,
+      obstacles,
+      toolPlanning
+    );
   }
 
   public function coverage():Null<CoverageMap> return finish.coverage;
 
   public function start():Void finish.start();
-  public function update(snapshot:RobotSnapshot, durationSeconds:Float):SkillStatus
-    return finish.update(snapshot, durationSeconds);
+  public function update(snapshot:RobotSnapshot, durationSeconds:Float):SkillStatus return finish.update(
+    snapshot,
+    durationSeconds
+  );
   public function cancel():Void finish.cancel();
   public function hold():Void finish.hold();
   public function resume():Void finish.resume();

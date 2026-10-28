@@ -23,6 +23,10 @@ class WeldChannels implements ToolChannels {
     this.job = job;
   }
 
-  public function declarations():Array<ProcessChannelDeclaration>
-    return WeldContract.declarations(arc, wireSpeed, voltage, job);
+  public function declarations():Array<ProcessChannelDeclaration> return WeldContract.declarations(
+    arc,
+    wireSpeed,
+    voltage,
+    job
+  );
 }

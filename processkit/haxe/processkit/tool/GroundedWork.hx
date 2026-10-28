@@ -14,7 +14,8 @@ class GroundedWork implements WeldWork {
   final poses:Array<Void -> WeldBodyPose> = [];
   final additions:Array<WeldWork> = [];
 
-  public function new() {}
+  public function new() {
+  }
 
   /** Runtime metal, whose geometry changes as it is deposited. */
   public function addWork(work:WeldWork):GroundedWork {
@@ -55,15 +56,30 @@ class GroundedWork implements WeldWork {
       var pose = poses[index]();
       var origin = toLocal(pose, ox, oy, oz);
       var direction = turnBack(pose.rotation, dx, dy, dz);
-      result = Math.min(result, solids[index].ray(origin[0], origin[1], origin[2], direction[0], direction[1], direction[2], range));
+      result = Math.min(
+        result,
+        solids[index].ray(
+          origin[0],
+          origin[1],
+          origin[2],
+          direction[0],
+          direction[1],
+          direction[2],
+          range
+        )
+      );
     }
     for (work in additions) result = Math.min(result, work.ray(ox, oy, oz, dx, dy, dz, range));
     return result;
   }
 
   /** The world point in the body's frame. */
-  static function toLocal(pose:WeldBodyPose, x:Float, y:Float, z:Float):Array<Float>
-    return turnBack(pose.rotation, x - pose.position[0], y - pose.position[1], z - pose.position[2]);
+  static function toLocal(pose:WeldBodyPose, x:Float, y:Float, z:Float):Array<Float> return turnBack(
+    pose.rotation,
+    x - pose.position[0],
+    y - pose.position[1],
+    z - pose.position[2]
+  );
 
   /** `v` turned by the inverse of the xyzw quaternion `q`. */
   static function turnBack(q:Array<Float>, vx:Float, vy:Float, vz:Float):Array<Float> {

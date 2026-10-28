@@ -38,13 +38,23 @@ class DumpAt implements Skill {
   final lifecycle:SkillLifecycle = new SkillLifecycle();
   final seed:Array<Float>;
 
-  public function new(manipulator:Manipulator, robot:Robot, frameId:String, pose:Transform3, seed:Array<Float>,
-      ?feedRate:Float = 0.4, ?maxAcceleration:Float = 0.6,
-      ?maxJointStep:Float = 3.0, ?positionTolerance:Float = 2e-3, ?orientationTolerance:Float = 5e-3,
-      ?ikMaxIterations:Int = 300, ?ikDamping:Float = 0.03,
-      ?planRunner:ToolpathPlanRunner) {
-    if (manipulator == null || robot == null || frameId == null || frameId.length == 0 || pose == null || seed == null)
-      throw "DumpAt requires a manipulator, robot, frame id, pose, and seed";
+  public function new(
+    manipulator:Manipulator,
+    robot:Robot,
+    frameId:String,
+    pose:Transform3,
+    seed:Array<Float>,
+    ?feedRate:Float = 0.4,
+    ?maxAcceleration:Float = 0.6,
+    ?maxJointStep:Float = 3.0,
+    ?positionTolerance:Float = 2e-3,
+    ?orientationTolerance:Float = 5e-3,
+    ?ikMaxIterations:Int = 300,
+    ?ikDamping:Float = 0.03,
+    ?planRunner:ToolpathPlanRunner
+  ) {
+    if (manipulator == null || robot == null || frameId == null || frameId.length == 0
+      || pose == null || seed == null) throw "DumpAt requires a manipulator, robot, frame id, pose, and seed";
     this.manipulator = manipulator;
     this.robot = robot;
     this.frameId = frameId;
@@ -65,10 +75,17 @@ class DumpAt implements Skill {
     lifecycle.begin();
     try {
       var currentPose = manipulator.tcpPose(seed);
-      var toolpath = new Toolpath(frameId, [
-        new ToolpathPoint(currentPose, feedRate, false),
-        new ToolpathPoint(pose, feedRate, false)
-      ]);
+      var toolpath = new Toolpath(
+        frameId,
+        [
+          new ToolpathPoint(currentPose, feedRate, false),
+          new ToolpathPoint(
+            pose,
+            feedRate,
+            false
+          )
+        ]
+      );
       planRunner.run(toolpath, seed);
       if (!planRunner.running()) lifecycle.fail('DumpAt plan failed: ${planRunner.failure()}');
     } catch (error:Dynamic) {
@@ -96,7 +113,8 @@ class DumpAt implements Skill {
 
   public function cancel():Void {
     if (!lifecycle.isRunning()) return;
-    try planRunner.abort() catch (_:Dynamic) {}
+    try planRunner.abort() catch (_:Dynamic) {
+    }
     lifecycle.cancel();
   }
 

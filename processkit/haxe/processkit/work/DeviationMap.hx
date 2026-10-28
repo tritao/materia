@@ -39,8 +39,8 @@ class DeviationMap {
 
   /** Accumulates one `(x, y) -> deviation` sample; ignored if outside the grid. */
   public function addSample(x:Float, y:Float, deviation:Float):Void {
-    if (!Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(deviation))
-      throw "Deviation map sample must be finite";
+    if (!Math.isFinite(x)
+      || !Math.isFinite(y) || !Math.isFinite(deviation)) throw "Deviation map sample must be finite";
     var index = cellIndex(x, y);
     if (index < 0) return;
     sum[index] += deviation;

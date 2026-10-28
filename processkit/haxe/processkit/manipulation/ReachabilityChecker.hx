@@ -43,20 +43,36 @@ class ReachabilityChecker {
    * (`check`) and running a plan (`SurfacePlanRunner`) both solve it here, so the one that calls a pose reachable is the one
    * that reaches it.
    */
-  public static function solveApproach(manipulator:KinematicGroup, target:Transform3, seed:Array<Float>, ?positionTolerance:Float = 1e-4,
-      ?orientationTolerance:Float = 1e-3, ?maxIterations:Int = 100, ?damping:Float = 0.02):IKResult {
+  public static function solveApproach(
+    manipulator:KinematicGroup,
+    target:Transform3,
+    seed:Array<Float>,
+    ?positionTolerance:Float = 1e-4,
+    ?orientationTolerance:Float = 1e-3,
+    ?maxIterations:Int = 100,
+    ?damping:Float = 0.02
+  ):IKResult {
     var options = new IkOptions(positionTolerance, orientationTolerance, maxIterations, damping);
     options.method = IkMethod.Reaching;
     return manipulator.solve(target, seed, options);
   }
 
-  public static function check(manipulator:Manipulator, toolpath:Toolpath, base_T_work:Transform3,
-      seed:Array<Float>, ?positionTolerance:Float = 1e-4, ?orientationTolerance:Float = 1e-3,
-      ?maxIterations:Int = 100, ?damping:Float = 0.02,
-      ?toolClearance:CollisionClearance, ?toolJointStep:Null<Float>,
-      ?maxToolStep:Float = 0.005, ?checkApproach:Bool = false):ReachabilityResult {
-    if (manipulator == null || toolpath == null || base_T_work == null)
-      throw "Reachability check requires a manipulator, toolpath, and base_T_work transform";
+  public static function check(
+    manipulator:Manipulator,
+    toolpath:Toolpath,
+    base_T_work:Transform3,
+    seed:Array<Float>,
+    ?positionTolerance:Float = 1e-4,
+    ?orientationTolerance:Float = 1e-3,
+    ?maxIterations:Int = 100,
+    ?damping:Float = 0.02,
+    ?toolClearance:CollisionClearance,
+    ?toolJointStep:Null<Float>,
+    ?maxToolStep:Float = 0.005,
+    ?checkApproach:Bool = false
+  ):ReachabilityResult {
+    if (manipulator == null || toolpath == null
+      || base_T_work == null) throw "Reachability check requires a manipulator, toolpath, and base_T_work transform";
     if (seed == null) throw "Reachability check requires a seed joint configuration";
 
     // Seeding continues from the last *converged* solution, not a failed
@@ -71,13 +87,36 @@ class ReachabilityChecker {
       var point = toolpath.points[index];
       var target = base_T_work.compose(point.work_T_tcp);
       // The first point is the approach from the seed posture; the following ones continue from the previous solution.
-      var ik = index == 0 ? solveApproach(manipulator, target, seedQ, positionTolerance, orientationTolerance, maxIterations, damping) : manipulator.solve(target,
-        seedQ, new IkOptions(positionTolerance, orientationTolerance, maxIterations, damping));
+      var ik = index == 0 ? solveApproach(
+        manipulator,
+        target,
+        seedQ,
+        positionTolerance,
+        orientationTolerance,
+        maxIterations,
+        damping
+      ) : manipulator.solve(
+        target,
+        seedQ,
+        new IkOptions(
+          positionTolerance,
+          orientationTolerance,
+          maxIterations,
+          damping
+        )
+      );
       lastQ = ik.q;
-      var clear = ik.converged && (toolClearance == null || (reachableCount == 0 && !checkApproach
-        ? toolClearance.violation(ik.q) == null
-        : toolClearance.sweep(seedQ, ik.q, false,
-            toolJointStep == null ? toolClearance.jointStep(seedQ, ik.q, maxToolStep) : toolJointStep) == null));
+      var clear = ik.converged && (toolClearance == null
+        || (reachableCount == 0 && !checkApproach ? toolClearance.violation(ik.q) == null : toolClearance.sweep(
+          seedQ,
+          ik.q,
+          false,
+          toolJointStep == null ? toolClearance.jointStep(
+            seedQ,
+            ik.q,
+            maxToolStep
+          ) : toolJointStep
+        ) == null));
       if (clear) {
         reachableCount++;
         seedQ = ik.q;

@@ -9,18 +9,22 @@ import robotkit.core.RobotSnapshot;
 
 /** Acquire an accepted work frame through executed, source-identified contact probes. */
 class FindContactWork implements Skill {
-  final make:Void->ContactRegistrationRunner;
-  final accept:ContactRegistrationRunner->Void;
+  final make:Void -> ContactRegistrationRunner;
+  final accept:ContactRegistrationRunner -> Void;
   final lifecycle = new SkillLifecycle();
   var runner:Null<ContactRegistrationRunner> = null;
-  public function new(make:Void->ContactRegistrationRunner, accept:ContactRegistrationRunner->Void) {
-    if (make == null || accept == null) throw "Finding work needs an executed registration factory and evidence consumer";
-    this.make = make; this.accept = accept;
+  public function new(make:Void -> ContactRegistrationRunner, accept:ContactRegistrationRunner -> Void) {
+    if (make == null
+      || accept == null) throw "Finding work needs an executed registration factory and evidence consumer";
+    this.make = make;
+    this.accept = accept;
   }
   public function start():Void {
     lifecycle.begin();
-    try { runner = make(); cast(runner, ContactRegistrationRunner).start(); }
-    catch (error:Dynamic) lifecycle.fail(Std.string(error));
+    try {
+      runner = make();
+      cast(runner, ContactRegistrationRunner).start();
+    } catch (error:Dynamic) lifecycle.fail(Std.string(error));
   }
   public function update(snapshot:RobotSnapshot, durationSeconds:Float):SkillStatus {
     if (!lifecycle.isRunning()) return lifecycle.status();
@@ -33,13 +37,15 @@ class FindContactWork implements Skill {
         lifecycle.succeed("work frame measured from contacts");
       }
     } catch (error:Dynamic) {
-      var active = runner; if (active != null) active.cancel();
+      var active = runner;
+      if (active != null) active.cancel();
       lifecycle.fail(Std.string(error));
     }
     return lifecycle.status();
   }
   public function cancel():Void {
-    var active = runner; if (active != null) active.cancel();
+    var active = runner;
+    if (active != null) active.cancel();
     lifecycle.cancel();
   }
   public function status():SkillStatus return lifecycle.status();

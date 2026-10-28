@@ -20,15 +20,21 @@ class ToolpathPoint {
   public final positionTolerance:Float;
   public final orientationTolerance:Float;
 
-  public function new(work_T_tcp:Transform3, feedRate:Float, processOn:Bool,
-      ?normal:Vec3, ?standoff:Float, ?positionTolerance:Float = 1e-3,
-      ?orientationTolerance:Float = 1e-2) {
+  public function new(
+    work_T_tcp:Transform3,
+    feedRate:Float,
+    processOn:Bool,
+    ?normal:Vec3,
+    ?standoff:Float,
+    ?positionTolerance:Float = 1e-3,
+    ?orientationTolerance:Float = 1e-2
+  ) {
     if (work_T_tcp == null) throw "Toolpath point requires a work_T_tcp pose";
     if (!Math.isFinite(feedRate) || feedRate <= 0.0) throw "Toolpath point feed rate must be positive and finite";
-    if (!Math.isFinite(positionTolerance) || positionTolerance < 0.0)
-      throw "Toolpath point position tolerance must be finite and non-negative";
-    if (!Math.isFinite(orientationTolerance) || orientationTolerance < 0.0)
-      throw "Toolpath point orientation tolerance must be finite and non-negative";
+    if (!Math.isFinite(positionTolerance)
+      || positionTolerance < 0.0) throw "Toolpath point position tolerance must be finite and non-negative";
+    if (!Math.isFinite(orientationTolerance)
+      || orientationTolerance < 0.0) throw "Toolpath point orientation tolerance must be finite and non-negative";
     this.work_T_tcp = work_T_tcp;
     this.feedRate = feedRate;
     this.processOn = processOn;

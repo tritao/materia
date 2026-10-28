@@ -30,27 +30,46 @@ import robotkit.collision.CollisionClearance;
  * this planner does no joint base+arm optimization.
  */
 class WorkPatchPlanner {
-  public static function plan(design:WorkSurface, map_T_surface:Transform3, manipulator:Manipulator,
-      maxPatchWidth:Float, toolWidth:Float, overlap:Float, standoff:Float, feedRate:Float, leadInOut:Float,
-      standoffDistanceMin:Float, standoffDistanceMax:Float, seed:Array<Float>,
-      ?standoffSteps:Int = 3, ?lateralSteps:Int = 5, ?clearance:Float = 0.4,
-      ?obstacles:CollisionDescription, ?positionTolerance:Float = 1e-4, ?orientationTolerance:Float = 1e-3,
-      ?toolCollision:Array<CollisionShape>, ?toolObstacles:CollisionDescription,
-      ?toolClearance:Float = 0.0, ?toolJointStep:Null<Float>,
-      ?maxToolStep:Float = 0.005, ?makeWorld:Void->CollisionWorld,
-      ?checkApproach:Bool = false):WorkPatchPlanResult {
+  public static function plan(
+    design:WorkSurface,
+    map_T_surface:Transform3,
+    manipulator:Manipulator,
+    maxPatchWidth:Float,
+    toolWidth:Float,
+    overlap:Float,
+    standoff:Float,
+    feedRate:Float,
+    leadInOut:Float,
+    standoffDistanceMin:Float,
+    standoffDistanceMax:Float,
+    seed:Array<Float>,
+    ?standoffSteps:Int = 3,
+    ?lateralSteps:Int = 5,
+    ?clearance:Float = 0.4,
+    ?obstacles:CollisionDescription,
+    ?positionTolerance:Float = 1e-4,
+    ?orientationTolerance:Float = 1e-3,
+    ?toolCollision:Array<CollisionShape>,
+    ?toolObstacles:CollisionDescription,
+    ?toolClearance:Float = 0.0,
+    ?toolJointStep:Null<Float>,
+    ?maxToolStep:Float = 0.005,
+    ?makeWorld:Void -> CollisionWorld,
+    ?checkApproach:Bool = false
+  ):WorkPatchPlanResult {
     if (design == null) throw "Work patch planning requires a design work surface";
     if (map_T_surface == null) throw "Work patch planning requires a map_T_surface transform";
     if (manipulator == null) throw "Work patch planning requires a manipulator";
-    if (!Math.isFinite(maxPatchWidth) || maxPatchWidth <= 0.0) throw "Work patch planning max patch width must be positive and finite";
-    if (!Math.isFinite(standoffDistanceMin) || !Math.isFinite(standoffDistanceMax) || standoffDistanceMin > standoffDistanceMax)
-      throw "Work patch planning requires standoffDistanceMin <= standoffDistanceMax";
+    if (!Math.isFinite(maxPatchWidth)
+      || maxPatchWidth <= 0.0) throw "Work patch planning max patch width must be positive and finite";
+    if (!Math.isFinite(standoffDistanceMin) || !Math.isFinite(standoffDistanceMax) || standoffDistanceMin
+      > standoffDistanceMax) throw "Work patch planning requires standoffDistanceMin <= standoffDistanceMax";
     var obstacleList = obstacles == null ? new CollisionDescription() : obstacles;
     var toolObstacleList = toolObstacles == null ? new CollisionDescription() : toolObstacles;
-    if (toolObstacleList.objects.length > 0 && toolCollision == null)
-      throw "Tool obstacles require a tool collision shape";
-    if ((obstacleList.objects.length > 0 || toolObstacleList.objects.length > 0) && makeWorld == null)
-      throw "Work obstacles require a collision backend";
+    if (toolObstacleList.objects.length > 0
+      && toolCollision == null) throw "Tool obstacles require a tool collision shape";
+    if ((obstacleList.objects.length > 0
+      || toolObstacleList.objects.length > 0) && makeWorld == null) throw "Work obstacles require a collision backend";
 
 
     var bounds = design.boundary.bounds();
@@ -67,8 +86,16 @@ class WorkPatchPlanner {
       var colMinX = bounds.minX + col * columnWidth;
       var colMaxX = colMinX + columnWidth;
       var patchBoundary = new Polygon2([
-        new Point2(colMinX, bounds.minY), new Point2(colMaxX, bounds.minY),
-        new Point2(colMaxX, bounds.maxY), new Point2(colMinX, bounds.maxY)
+        new Point2(colMinX, bounds.minY),
+        new Point2(colMaxX, bounds.minY),
+        new Point2(
+          colMaxX,
+          bounds.maxY
+        ),
+        new Point2(
+          colMinX,
+          bounds.maxY
+        )
       ]);
       var patchExclusions:Array<Polygon2> = [];
       for (exclusion in design.exclusions) {
@@ -77,15 +104,44 @@ class WorkPatchPlanner {
         var clippedMaxX = Math.min(exclusionBounds.maxX, colMaxX);
         if (clippedMaxX - clippedMinX <= 1e-9) continue;
         patchExclusions.push(new Polygon2([
-          new Point2(clippedMinX, exclusionBounds.minY), new Point2(clippedMaxX, exclusionBounds.minY),
-          new Point2(clippedMaxX, exclusionBounds.maxY), new Point2(clippedMinX, exclusionBounds.maxY)
+          new Point2(clippedMinX, exclusionBounds.minY),
+          new Point2(
+            clippedMaxX,
+            exclusionBounds.minY
+          ),
+          new Point2(
+            clippedMaxX,
+            exclusionBounds.maxY
+          ),
+          new Point2(
+            clippedMinX,
+            exclusionBounds.maxY
+          )
         ]));
       }
 
-      var patchSurface = new WorkSurface('${design.id}:patch$col', design.frameId, design.frame_T_surface,
-        patchBoundary, patchExclusions, design.tolerance, design.materialTag,
-        new Provenance(design.provenance.designElementId, SourceKind.Work), '${design.surfaceFrameId}:patch$col');
-      var patchToolpath = RasterToolpathGenerator.generate(patchSurface, toolWidth, overlap, standoff, feedRate, leadInOut);
+      var patchSurface = new WorkSurface(
+        '${design.id}:patch$col',
+        design.frameId,
+        design.frame_T_surface,
+        patchBoundary,
+        patchExclusions,
+        design.tolerance,
+        design.materialTag,
+        new Provenance(
+          design.provenance.designElementId,
+          SourceKind.Work
+        ),
+        '${design.surfaceFrameId}:patch$col'
+      );
+      var patchToolpath = RasterToolpathGenerator.generate(
+        patchSurface,
+        toolWidth,
+        overlap,
+        standoff,
+        feedRate,
+        leadInOut
+      );
 
       var midX = (colMinX + colMaxX) * 0.5;
       var patchWidthHalf = (colMaxX - colMinX) * 0.5;
@@ -93,17 +149,21 @@ class WorkPatchPlanner {
       var best:Null<ReachabilityResult> = null;
       var bestPose:Null<Pose2> = null;
       for (standoffStep in 0...standoffSteps) {
-        var d = standoffSteps == 1 ? standoffDistanceMin :
-          standoffDistanceMin + (standoffDistanceMax - standoffDistanceMin) * (standoffStep / (standoffSteps - 1));
+        var d = standoffSteps == 1 ? standoffDistanceMin
+          : standoffDistanceMin + (standoffDistanceMax - standoffDistanceMin) * (standoffStep / (standoffSteps - 1));
         for (lateralStep in 0...lateralSteps) {
-          var lateral = lateralSteps == 1 ? 0.0 :
-            -patchWidthHalf + (2.0 * patchWidthHalf) * (lateralStep / (lateralSteps - 1));
+          var lateral = lateralSteps
+            == 1 ? 0.0 : -patchWidthHalf + (2.0 * patchWidthHalf) * (lateralStep / (lateralSteps - 1));
           var candidateLocal = new Vec3(midX + lateral, patchCenterY, d);
           var candidatePosMap = map_T_surface.transformPoint(candidateLocal);
           var wallPointMap = map_T_surface.transformPoint(new Vec3(midX + lateral, patchCenterY, 0.0));
 
-          if (obstacleList.objects.length > 0 &&
-              !CollisionClearance.placementClear(obstacleList, candidatePosMap, clearance, cast makeWorld)) continue;
+          if (obstacleList.objects.length > 0 && !CollisionClearance.placementClear(
+            obstacleList,
+            candidatePosMap,
+            clearance,
+            cast makeWorld
+          )) continue;
 
           var yaw = Math.atan2(wallPointMap.y - candidatePosMap.y, wallPointMap.x - candidatePosMap.x);
           var candidateTransform = new Transform3(candidatePosMap, Quat.fromAxisAngle(new Vec3(0.0, 0.0, 1.0), yaw));
@@ -112,14 +172,14 @@ class WorkPatchPlanner {
           var collisionChecker:Null<CollisionClearance> = null;
           if (toolCollision != null && toolObstacleList.objects.length > 0) {
             var scene = new CollisionDescription();
-            for (link in manipulator.robot.links)
-              scene.append(CollisionClearance.shapes(link.id, link.collisionShapes));
+            for (link in manipulator.robot.links) scene.append(CollisionClearance.shapes(link.id,
+              link.collisionShapes));
             var flange = manipulator.model.frameTransform(manipulator.model.frameIndex(manipulator.flangeFrame));
             var prepared:Array<CollisionShape> = [];
             for (i in 0...toolCollision.length) {
               var shape = toolCollision[i], p = shape.position, q = shape.rotation;
-              var at = flange.compose(new kinematicskit.Transform(p[0],p[1],p[2],q[0],q[1],q[2],q[3]));
-              var posed = new CollisionShape(shape.geometry, [at.x,at.y,at.z], [at.qx,at.qy,at.qz,at.qw]);
+              var at = flange.compose(new kinematicskit.Transform(p[0], p[1], p[2], q[0], q[1], q[2], q[3]));
+              var posed = new CollisionShape(shape.geometry, [at.x, at.y, at.z], [at.qx, at.qy, at.qz, at.qw]);
               posed.name = shape.name == "" ? 'tool$i' : shape.name;
               posed.inflation = shape.inflation;
               prepared.push(posed);
@@ -128,21 +188,43 @@ class WorkPatchPlanner {
             var obstacles = toolObstacleList.copy();
             for (body in obstacles.bodies) {
               var p = body.pose;
-              var at = candidateTransform.inverse().compose(new Transform3(new Vec3(p.x,p.y,p.z),
-                new Quat(p.qx,p.qy,p.qz,p.qw)));
+              var at = candidateTransform.inverse().compose(new Transform3(
+                new Vec3(p.x, p.y, p.z),
+                new Quat(
+                  p.qx,
+                  p.qy,
+                  p.qz,
+                  p.qw
+                )
+              ));
               var t = at.translation, r = at.rotation;
-              body.pose = new collisionkit.CollisionPose(t.x,t.y,t.z,r.x,r.y,r.z,r.w);
+              body.pose = new collisionkit.CollisionPose(t.x, t.y, t.z, r.x, r.y, r.z, r.w);
             }
             scene.append(obstacles);
-            for (first in 0...scene.groupCount()) for (second in first...scene.groupCount())
-              scene.setGroupMargins(first, second, toolClearance, toolClearance);
+            for (first in 0...scene.groupCount()) for (second in first...scene.groupCount()) scene.setGroupMargins(
+              first,
+              second,
+              toolClearance,
+              toolClearance
+            );
             collisionChecker = new CollisionClearance(manipulator, scene, seed, cast makeWorld);
           }
           var result:ReachabilityChecker.ReachabilityResult;
           try {
-            result = ReachabilityChecker.check(manipulator, patchToolpath, base_T_work, seed,
-              positionTolerance, orientationTolerance, 100, 0.02, collisionChecker, toolJointStep,
-              maxToolStep, checkApproach);
+            result = ReachabilityChecker.check(
+              manipulator,
+              patchToolpath,
+              base_T_work,
+              seed,
+              positionTolerance,
+              orientationTolerance,
+              100,
+              0.02,
+              collisionChecker,
+              toolJointStep,
+              maxToolStep,
+              checkApproach
+            );
           } catch (error:Dynamic) {
             if (collisionChecker != null) collisionChecker.world.dispose();
             throw error;
@@ -158,7 +240,8 @@ class WorkPatchPlanner {
         if (best != null && best.fullyReachable()) break;
       }
 
-      if (best == null) throw 'Work patch planner found no viable base candidate for patch $col (all candidates blocked by obstacles)';
+      if (best
+        == null) throw 'Work patch planner found no viable base candidate for patch $col (all candidates blocked by obstacles)';
       if (!best.fullyReachable()) fullyPlanned = false;
       patches.push(new WorkPatch(patchSurface, patchToolpath, bestPose, best.reachableFraction));
     }

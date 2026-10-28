@@ -48,9 +48,11 @@ class WeldCorner {
   /** The time a rest-to-rest turn by `angle` radians takes under the wrist's limits, in seconds. */
   public static function turnTime(angle:Float, limits:WristLimits):Float {
     if (!(angle > STRAIGHT)) return 0.0;
-    if (!(limits.angularSpeed > 0.0) || !(limits.angularAcceleration > 0.0)) throw "A corner turn needs a wrist speed and acceleration";
+    if (!(limits.angularSpeed > 0.0)
+      || !(limits.angularAcceleration > 0.0)) throw "A corner turn needs a wrist speed and acceleration";
     var speed = HEADROOM * limits.angularSpeed, acceleration = HEADROOM * limits.angularAcceleration;
-    return angle >= speed * speed / acceleration ? angle / speed + speed / acceleration : 2.0 * Math.sqrt(angle / acceleration);
+    return angle
+      >= speed * speed / acceleration ? angle / speed + speed / acceleration : 2.0 * Math.sqrt(angle / acceleration);
   }
 
   /**
@@ -64,8 +66,10 @@ class WeldCorner {
   }
 
   /** What a segment of `segmentLength` metres gives to a corner whose turn is `turn` long on each side. */
-  public static function given(turn:Float, segmentLength:Float):Float
-    return turn <= 0.0 ? 0.0 : Math.min(turn, SHARE * segmentLength);
+  public static function given(turn:Float, segmentLength:Float):Float return turn <= 0.0 ? 0.0 : Math.min(
+    turn,
+    SHARE * segmentLength
+  );
 
   /** Roll about `to`'s wire that carries `from` to the new wire by its shortest swing, without extra wrist twist. */
   public static function continuationRoll(from:Quat, to:Quat):Float {
@@ -106,7 +110,10 @@ class WeldCorner {
           var u1 = p1.normalized(), u2 = p2.normalized();
           var azimuth = Math.atan2(k.dot(u1.cross(u2)), u1.dot(u2));
           var a = a1 + (a2 - a1) * t;
-          wireAt = k.scale(a).add(Quat.fromAxisAngle(k, azimuth * t).rotate(u1).scale(Math.sqrt(Math.max(0.0, 1.0 - a * a))));
+          wireAt = k.scale(a).add(Quat.fromAxisAngle(k, azimuth * t).rotate(u1).scale(Math.sqrt(Math.max(
+            0.0,
+            1.0 - a * a
+          ))));
         }
       }
     }

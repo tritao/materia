@@ -15,26 +15,38 @@ class WelderRuntimeBinding {
   var previousTimestamp:Null<Int64> = null;
 
   public function new(runtime:RobotRuntime, binding:WelderChannelBinding, sensorId:String, sourceClockId:String) {
-    if (runtime == null || binding == null || sensorId == null || StringTools.trim(sensorId).length == 0 ||
-        sourceClockId == null || StringTools.trim(sourceClockId).length == 0)
-      throw "Welder runtime binding needs a runtime, supply, authored sensor and source clock";
-    this.runtime = runtime; this.binding = binding; this.sensorId = sensorId; this.sourceClockId = sourceClockId;
+    if (runtime == null || binding == null || sensorId == null
+      || StringTools.trim(sensorId).length == 0 || sourceClockId == null || StringTools.trim(sourceClockId).length
+      == 0) throw "Welder runtime binding needs a runtime, supply, authored sensor and source clock";
+    this.runtime = runtime;
+    this.binding = binding;
+    this.sensorId = sensorId;
+    this.sourceClockId = sourceClockId;
   }
 
   /** Poll time belongs to the transport owner; source time identifies the published observation. */
   public function update(now:Float, sourceTimestampNs:Int64):SensorFrame {
     try {
-      if (!Math.isFinite(now) || now < 0.0 || Int64.compare(sourceTimestampNs, Int64.ofInt(0)) < 0 ||
-          (previousTimestamp != null && Int64.compare(sourceTimestampNs, previousTimestamp) < 0))
-        throw "Welder observation clocks must be finite, nonnegative and monotonic";
+      if (!Math.isFinite(now) || now < 0.0 || Int64.compare(sourceTimestampNs,
+        Int64.ofInt(0)) < 0 || (previousTimestamp != null && Int64.compare(
+          sourceTimestampNs,
+          previousTimestamp
+        ) < 0)) throw "Welder observation clocks must be finite, nonnegative and monotonic";
       var reading = binding.update(now, runtime.channelValue);
       var next = Int64.add(sequence, Int64.ofInt(1));
-      var frame = runtime.publishSensorFrameAndGet(sensorId, WeldSensor.values(reading), next,
-        sourceTimestampNs, sourceClockId);
-      sequence = next; previousTimestamp = sourceTimestampNs;
+      var frame = runtime.publishSensorFrameAndGet(
+        sensorId,
+        WeldSensor.values(reading),
+        next,
+        sourceTimestampNs,
+        sourceClockId
+      );
+      sequence = next;
+      previousTimestamp = sourceTimestampNs;
       return frame;
     } catch (error:Dynamic) {
-      binding.safe(); throw error;
+      binding.safe();
+      throw error;
     }
   }
 

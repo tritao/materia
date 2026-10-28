@@ -49,9 +49,17 @@ private enum WeldingPhase {
 
 /** The welder's latest reading, which the device and the program's input wait both read. */
 private class LatestReading implements WelderFeedback {
-  public var value:WeldReading = {arc: false, currentA: 0.0, voltageV: 0.0, touch: false, fault: WeldFault.None, powerW: 0.0};
+  public var value:WeldReading = {
+    arc: false,
+    currentA: 0.0,
+    voltageV: 0.0,
+    touch: false,
+    fault: WeldFault.None,
+    powerW: 0.0
+  };
 
-  public function new() {}
+  public function new() {
+  }
 
   public function reading():WeldReading return value;
 }
@@ -62,8 +70,8 @@ class WeldPlanning {
   public final wrist:WristLimits;
   public final planner:WeldPathPlanner;
   final clearance:Null<ClearanceWorld>;
-  public function new(compiler:ProgramCompiler, wrist:WristLimits, planner:WeldPathPlanner,?clearance:ClearanceWorld) {
-    this.clearance=clearance;
+  public function new(compiler:ProgramCompiler, wrist:WristLimits, planner:WeldPathPlanner, ?clearance:ClearanceWorld) {
+    this.clearance = clearance;
     this.compiler = compiler;
     this.planner = planner;
     this.wrist = wrist;
@@ -71,13 +79,21 @@ class WeldPlanning {
 
   /** Offline station verification uses execution's geometric choice and the
    * same retained, timed program checks, without submitting a device command. */
-  public function checked(requested:WeldPlan,start:Array<Float>):processkit.WeldPathProblem.WeldPathSelection {
-    var selected=WeldingPlanRunner.selectWeld(compiler,wrist,clearance,requested,start);
-    var group=cast(compiler.solver,ManipulatorKinematics).manipulator;
-    var program=new WeldPathProgram(selected.problem,selected.curves,
-      {arc:"station.arc",wireSpeed:"station.wire",voltage:"station.voltage"});
-    var compiled=program.compile(compiler,group,start,haxe.Int64.ofInt(1),clearance);
-    compiled.dispose();return selected;
+  public function checked(requested:WeldPlan, start:Array<Float>):processkit.WeldPathProblem.WeldPathSelection {
+    var selected = WeldingPlanRunner.selectWeld(compiler, wrist, clearance, requested, start);
+    var group = cast(compiler.solver, ManipulatorKinematics).manipulator;
+    var program = new WeldPathProgram(
+      selected.problem,
+      selected.curves,
+      {
+        arc: "station.arc",
+        wireSpeed: "station.wire",
+        voltage: "station.voltage"
+      }
+    );
+    var compiled = program.compile(compiler, group, start, haxe.Int64.ofInt(1), clearance);
+    compiled.dispose();
+    return selected;
   }
 }
 
@@ -150,37 +166,86 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   public function lastPlan():Null<PlannedWeld> return planned;
 
   /** The weld's complete motion, validated without arc outputs or robot submission. Exact stops match the process program. */
-  static function compileWeld(compiler:ProgramCompiler, wrist:WristLimits, planned:PlannedWeld,
-      start:Array<Float>):motionkit.robot.CompiledProgram {
+  static function compileWeld(compiler:ProgramCompiler,
+    wrist:WristLimits, planned:PlannedWeld, start:Array<Float>):motionkit.robot.CompiledProgram {
     var plan = planned.plan;
-    var ops:Array<MotionOp> = [MotionOp.MoveJ(MoveTarget.JointTarget(planned.entry.joints), new MotionOptions(), Blend.ExactStop)];
-    for (move in planned.entry.moves) ops.push(MotionOp.MoveL(move, FRAME, APPROACH_SPEED, Blend.ExactStop, OrientationPolicy.FreeAboutTool));
-    ops.push(MotionOp.MoveL(pose(plan.start()), FRAME, APPROACH_SPEED, Blend.ExactStop, OrientationPolicy.FreeAboutTool));
+    var ops:Array<MotionOp> = [MotionOp.MoveJ(
+      MoveTarget.JointTarget(planned.entry.joints),
+      new MotionOptions(),
+      Blend.ExactStop
+    )];
+    for (move in planned.entry.moves) ops.push(MotionOp.MoveL(
+      move,
+      FRAME,
+      APPROACH_SPEED,
+      Blend.ExactStop,
+      OrientationPolicy.FreeAboutTool
+    ));
+    ops.push(MotionOp.MoveL(pose(plan.start()),
+      FRAME, APPROACH_SPEED, Blend.ExactStop, OrientationPolicy.FreeAboutTool));
     if (plan.parameters.startDwell > 0) ops.push(MotionOp.Dwell(plan.parameters.startDwell));
-    ops.push(MotionOp.FollowPath(new PosePath(FRAME, pathOf(plan, plan.parameters.travelSpeed, wrist, planned.styles)), FRAME,
-      plan.parameters.travelSpeed, []));
+    ops.push(MotionOp.FollowPath(
+      new PosePath(FRAME, pathOf(plan, plan.parameters.travelSpeed, wrist, planned.styles)),
+      FRAME,
+      plan.parameters.travelSpeed,
+      []
+    ));
     if (plan.parameters.craterDwell > 0) ops.push(MotionOp.Dwell(plan.parameters.craterDwell));
-    ops.push(MotionOp.MoveL(along(pose(plan.stop()), plan.stop(), -LIFT), FRAME,
-      Math.max(LIFT / plan.parameters.burnback, 0.01), Blend.ExactStop, OrientationPolicy.FreeAboutTool));
+    ops.push(MotionOp.MoveL(
+      along(pose(plan.stop()), plan.stop(), -LIFT),
+      FRAME,
+      Math.max(
+        LIFT / plan.parameters.burnback,
+        0.01
+      ),
+      Blend.ExactStop,
+      OrientationPolicy.FreeAboutTool
+    ));
     ops.push(MotionOp.MoveL(planned.retreat, FRAME, APPROACH_SPEED, Blend.ExactStop, OrientationPolicy.FreeAboutTool));
     return compiler.compile(new MotionProgram(ops), start, haxe.Int64.ofInt(1));
   }
 
   /** The same complete-motion planner used by execution, without a robot or channel owner. */
-  public static function planning(manipulator:KinematicGroup, maxAcceleration:Float, ?clearance:ClearanceWorld):WeldPlanning {
-    return planningWithLimits(manipulator, PlanningLimits.ofGroup(manipulator, new robotkit.model.SteadyLoads(), maxAcceleration), clearance);
+  public static function planning(manipulator:KinematicGroup,
+    maxAcceleration:Float, ?clearance:ClearanceWorld):WeldPlanning {
+    return planningWithLimits(
+      manipulator,
+      PlanningLimits.ofGroup(
+        manipulator,
+        new robotkit.model.SteadyLoads(),
+        maxAcceleration
+      ),
+      clearance
+    );
   }
 
-  static function planningWithLimits(manipulator:KinematicGroup, planning:PlanningLimits, ?clearance:ClearanceWorld):WeldPlanning {
+  static function planningWithLimits(manipulator:KinematicGroup,
+    planning:PlanningLimits, ?clearance:ClearanceWorld):WeldPlanning {
     var count = manipulator.group.count();
     planning.requireGroup(manipulator);
     var limits = planning.validation();
     var solver = new ManipulatorKinematics(manipulator, 1e-8);
     solver.preferTargetOrientation = true;
-    var compiler = new ProgramCompiler(solver, limits, FRAME,
-      planning.velocity, planning.acceleration, planning.jerk,
+    var compiler = new ProgramCompiler(
+      solver,
+      limits,
+      FRAME,
+      planning.velocity,
+      planning.acceleration,
+      planning.jerk,
       planning.startTolerances(0.005),
-      null, 0.002, 0.2, PATH_TOLERANCE, 0.02, new IkTolerance(5e-5, 1e-3, 300, 0.03));
+      null,
+      0.002,
+      0.2,
+      PATH_TOLERANCE,
+      0.02,
+      new IkTolerance(
+        5e-5,
+        1e-3,
+        300,
+        0.03
+      )
+    );
     compiler.planningAssumptions = planning.assumptions.copy();
     compiler.planCheck = planning.check();
     // Corner turns use the nearest rotary joints on the tool chain, in angular units.
@@ -193,18 +258,42 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       wristAcceleration = Math.min(wristAcceleration, planning.acceleration[joint]);
     }
     var wrist:WristLimits = {angularSpeed: wristSpeed, angularAcceleration: wristAcceleration};
-    var planner = new WeldPathPlanner(compiler.solver, compiler.ikTolerance, compiler.maxVelocity, wrist, clearance, compiler.perJointMaxJump,
-      function(planned, start) return compileWeld(compiler, wrist, planned, start));
-    return new WeldPlanning(compiler, wrist, planner,clearance);
+    var planner = new WeldPathPlanner(
+      compiler.solver,
+      compiler.ikTolerance,
+      compiler.maxVelocity,
+      wrist,
+      clearance,
+      compiler.perJointMaxJump,
+      function(
+        planned,
+        start
+      ) return compileWeld(
+        compiler,
+        wrist,
+        planned,
+        start
+      )
+    );
+    return new WeldPlanning(compiler, wrist, planner, clearance);
   }
 
   /**
    * An arm's welding runner. `channels` are the torch's; `limits` supplies the drive-derived caps in joint order.
    * `clearance`, when given, is what the welds are planned to be clear of the work with (`WeldPathPlanner`).
    */
-  public static function create(robot:Robot, manipulator:KinematicGroup,
-      eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool}, channels:WelderChannels, limits:PlanningLimits,
-      ?maxRestarts:Int = 3, ?clearance:ClearanceWorld):WeldingPlanRunner {
+  public static function create(
+    robot:Robot,
+    manipulator:KinematicGroup,
+    eventSource:Void -> {
+      events: Array<FiredProcessEvent>,
+      overflow: Bool
+    },
+    channels:WelderChannels,
+    limits:PlanningLimits,
+    ?maxRestarts:Int = 3,
+    ?clearance:ClearanceWorld
+  ):WeldingPlanRunner {
     var checked = planningWithLimits(manipulator, limits, clearance);
     var count = manipulator.group.count();
     var compiler = checked.compiler;
@@ -217,19 +306,29 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     }
     // The program waits on the established arc, which the welder's reading says.
     var latest = new LatestReading();
-    var motion = new ManipulatorMotion(robot, compiler, function(channel) return channel == ARC_ESTABLISHED
-      ? EventValue.Digital(latest.reading().arc) : null, eventSource, indices);
-    return new WeldingPlanRunner(motion, channels, latest, maxRestarts, checked.wrist,clearance);
+    var motion = new ManipulatorMotion(
+      robot,
+      compiler,
+      function(channel) return channel == ARC_ESTABLISHED ? EventValue.Digital(latest.reading().arc) : null,
+      eventSource,
+      indices
+    );
+    return new WeldingPlanRunner(motion, channels, latest, maxRestarts, checked.wrist, clearance);
   }
 
   /** Up to three rotary drivers nearest the tool; work-positioner joints are excluded. */
   public static function wristJointIndices(manipulator:robotkit.manipulation.KinematicGroup):Array<Int> {
     var ids = [for (id in manipulator.jointIds()) Std.string(id)];
-    var path = robotkit.manipulation.KinematicGroup.walk(manipulator.robot, manipulator.rootLink, manipulator.flangeLink);
+    var path = robotkit.manipulation.KinematicGroup.walk(
+      manipulator.robot,
+      manipulator.rootLink,
+      manipulator.flangeLink
+    );
     path.reverse();
     var indices:Array<Int> = [];
     for (joint in path) {
-      if (joint.type != robotkit.model.JointType.Revolute && joint.type != robotkit.model.JointType.Continuous) continue;
+      if (joint.type != robotkit.model.JointType.Revolute
+        && joint.type != robotkit.model.JointType.Continuous) continue;
       var index = ids.indexOf(Std.string(joint.id));
       if (index < 0) continue;
       indices.push(index);
@@ -239,11 +338,18 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   }
 
   /** Over an existing motion, whose input wait reads the established arc from `latest`. */
-  function new(motion:ManipulatorMotion, channels:WelderChannels, latest:LatestReading, maxRestarts:Int,
-      wrist:WristLimits,?clearance:ClearanceWorld) {
-    if (motion == null || channels == null || latest == null || maxRestarts < 0 || wrist == null)
-      throw "WeldingPlanRunner needs motion, the torch's channels, a restart limit of zero or more, the wrist's limits";
-    this.wrist = wrist;this.clearance=clearance;
+  function new(
+    motion:ManipulatorMotion,
+    channels:WelderChannels,
+    latest:LatestReading,
+    maxRestarts:Int,
+    wrist:WristLimits,
+    ?clearance:ClearanceWorld
+  ) {
+    if (motion == null || channels == null || latest == null || maxRestarts < 0 || wrist
+      == null) throw "WeldingPlanRunner needs motion, the torch's channels, a restart limit of zero or more, the wrist's limits";
+    this.wrist = wrist;
+    this.clearance = clearance;
     this.motion = motion;
     this.channels = channels;
     this.maxRestarts = maxRestarts;
@@ -259,204 +365,415 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   public function run(requested:WeldPlan):Void {
     if (running()) throw "A weld is already running";
     releaseSelected();
-    var began=Sys.time();
-    var group=cast(motion.compiler.solver,ManipulatorKinematics).manipulator;
-    var before=group.numericSolveCount(),start=startPositions();
-    var chosen=selectWeld(motion.compiler,wrist,clearance,requested,start,configuration);
-    runSelected(chosen.problem,chosen.curves);
-    planningSeconds=Sys.time()-began;planningIkSolves=group.numericSolveCount()-before;
+    var began = Sys.time();
+    var group = cast(motion.compiler.solver, ManipulatorKinematics).manipulator;
+    var before = group.numericSolveCount(), start = startPositions();
+    var chosen = selectWeld(motion.compiler, wrist, clearance, requested, start, configuration);
+    runSelected(chosen.problem, chosen.curves);
+    planningSeconds = Sys.time() - began;
+    planningIkSolves = group.numericSolveCount() - before;
   }
 
   /** Shared geometry and air policy for runtime and offline cell verification. */
-  public static function selectWeld(compiler:ProgramCompiler,wrist:WristLimits,clearance:Null<ClearanceWorld>,
-      requested:WeldPlan,start:Array<Float>,?configuration:motionkit.kinematics.SixAxisConfiguration):processkit.WeldPathProblem.WeldPathSelection {
-    var problem=new WeldPathProblem(requested,wrist,[for(_ in requested.segments)WeldCorner.AROUND],FRAME,APPROACH_SPEED);
+  public static function selectWeld(
+    compiler:ProgramCompiler,
+    wrist:WristLimits,
+    clearance:Null<ClearanceWorld>,
+    requested:WeldPlan,
+    start:Array<Float>,
+    ?configuration:motionkit.kinematics.SixAxisConfiguration
+  ):processkit.WeldPathProblem.WeldPathSelection {
+    var problem = new WeldPathProblem(
+      requested,
+      wrist,
+      [for (_ in requested.segments) WeldCorner.AROUND],
+      FRAME,
+      APPROACH_SPEED
+    );
     var best:Null<processkit.WeldPathProblem.WeldPathSelection> = null;
     var reasons:Array<String> = [];
     // A checked cell needs an air departure before another run can cross the
     // work. The same geometry owns entry and retreat; both directions use DP.
-    var airDistance=2*requested.parameters.approach;
-    var alternatives=clearance==null ? [0.0] : [airDistance,0.0];
-    var auditDirections=Sys.getEnv("PROCESS_PATH_VERIFY_DIRECTIONS")=="1";
-    for(clearanceDistance in alternatives){
-      var directions=[problem,problem.reversed()];
-      var ranked:Array<{problem:WeldPathProblem,index:Int,cost:Float}> = [];
-      for(index in 0...directions.length)try {
-        var alternative=clearanceDistance==0 ? directions[index] : directions[index].withAirClearance(clearanceDistance);
-        ranked.push({problem:alternative,index:index,cost:Math.POSITIVE_INFINITY});
-      }catch(error:Dynamic)reasons.push(Std.string(error));
-      if(ranked.length==0)continue;
+    var airDistance = 2 * requested.parameters.approach;
+    var alternatives = clearance == null ? [0.0] : [airDistance, 0.0];
+    var auditDirections = Sys.getEnv("PROCESS_PATH_VERIFY_DIRECTIONS") == "1";
+    for (clearanceDistance in alternatives) {
+      var directions = [problem, problem.reversed()];
+      var ranked:Array<{problem:WeldPathProblem, index:Int, cost:Float}> = [];
+      for (index in 0...directions.length) try {
+        var alternative = clearanceDistance
+          == 0 ? directions[index] : directions[index].withAirClearance(clearanceDistance);
+        ranked.push({problem: alternative, index: index, cost: Math.POSITIVE_INFINITY});
+      } catch (error:Dynamic) reasons.push(Std.string(error));
+      if (ranked.length == 0) continue;
       // Keep the physical jump limit. A sparse grid that disconnects a
       // tight wrist turn is densified for both directions before ranking.
-      for(resolution in [0.02,0.01,0.005,0.0025,WeldPathPlanner.STEP]){
-        var complete=true;
-        for(direction in ranked){
-          try direction.cost=coarseCost(compiler,clearance,direction.problem,start,configuration,resolution)
-          catch(error:Dynamic){direction.cost=Math.POSITIVE_INFINITY;reasons.push(Std.string(error));}
-          if(!Math.isFinite(direction.cost))complete=false;
+      for (resolution in [0.02, 0.01, 0.005, 0.0025, WeldPathPlanner.STEP]) {
+        var complete = true;
+        for (direction in ranked) {
+          try direction.cost = coarseCost(compiler,
+            clearance, direction.problem, start, configuration, resolution) catch (error:Dynamic) {
+            direction.cost = Math.POSITIVE_INFINITY;
+            reasons.push(Std.string(error));
+          }
+          if (!Math.isFinite(direction.cost)) complete = false;
         }
-        if(complete)break;
+        if (complete) break;
       }
-      ranked.sort((a,b)->a.cost<b.cost?-1:a.cost>b.cost?1:a.index-b.index);
-      var chosen:Null<processkit.WeldPathProblem.WeldPathSelection> = null,chosenIndex = -1,bestIndex = -1;
-      for(rank in 0...ranked.length){
-        var direction=ranked[rank];
+      ranked.sort((a, b) -> a.cost < b.cost ? -1 : a.cost > b.cost ? 1 : a.index - b.index);
+      var chosen:Null<processkit.WeldPathProblem.WeldPathSelection> = null, chosenIndex = -1, bestIndex = -1;
+      for (rank in 0...ranked.length) {
+        var direction = ranked[rank];
         try {
-          var selected=selectProblem(compiler,clearance,direction.problem,start,configuration);
-          if(auditDirections)Sys.println("PROCESS_PATH_DIRECTION_FINE "+haxe.Json.stringify({direction:direction.index,cost:selected.cost}));
-          if(chosen==null){chosen=selected;chosenIndex=direction.index;}
-          if(best==null || selected.cost<cast(best,processkit.WeldPathProblem.WeldPathSelection).cost ||
-              selected.cost==cast(best,processkit.WeldPathProblem.WeldPathSelection).cost && direction.index<bestIndex){best=selected;bestIndex=direction.index;}
-          if(!auditDirections)break;
-        }catch(error:Dynamic){reasons.push(Std.string(error));
-          if(Sys.getEnv("PROCESS_PATH_PROFILE")=="1")Sys.println("PROCESS_PATH_ALTERNATIVE_REJECTED "+haxe.Json.stringify({
-            reversed:direction.index==1,airClearance:clearanceDistance,reason:Std.string(error)}));
+          var selected = selectProblem(compiler, clearance, direction.problem, start, configuration);
+          if (auditDirections) Sys.println("PROCESS_PATH_DIRECTION_FINE " + haxe.Json.stringify({
+            direction: direction.index,
+            cost: selected.cost
+          }));
+          if (chosen == null) {
+            chosen = selected;
+            chosenIndex = direction.index;
+          }
+          if (best == null || selected.cost < cast(best,
+            processkit.WeldPathProblem.WeldPathSelection).cost || selected.cost == cast(
+              best,
+              processkit.WeldPathProblem.WeldPathSelection
+            ).cost && direction.index < bestIndex) {
+            best = selected;
+            bestIndex = direction.index;
+          }
+          if (!auditDirections) break;
+        } catch (error:Dynamic) {
+          reasons.push(Std.string(error));
+          if (Sys.getEnv("PROCESS_PATH_PROFILE")
+            == "1") Sys.println("PROCESS_PATH_ALTERNATIVE_REJECTED " + haxe.Json.stringify({
+              reversed: direction.index == 1,
+              airClearance: clearanceDistance,
+              reason: Std.string(error)
+            }));
         }
       }
-      if(Sys.getEnv("PROCESS_PATH_PROFILE")=="1" || auditDirections)
-        Sys.println("PROCESS_PATH_DIRECTION "+haxe.Json.stringify({coarseFirst:ranked[0].index,
-          coarseCosts:[for(direction in ranked)direction.cost],coarseDirections:[for(direction in ranked)direction.index],
-          segments:[for(segment in requested.segments)segment.name],selected:chosenIndex,audited:auditDirections,
-          agrees:!auditDirections || chosen==null ? null : best!=null && chosen.problem==best.problem,airClearance:clearanceDistance}));
-      if(auditDirections && chosen!=null && best!=null && chosen.problem!=best.problem)
-        throw "Coarse weld direction differs from full two-direction selection";
-      if(best!=null)break;
+      if (Sys.getEnv("PROCESS_PATH_PROFILE") == "1"
+        || auditDirections) Sys.println("PROCESS_PATH_DIRECTION " + haxe.Json.stringify({
+          coarseFirst: ranked[0].index,
+          coarseCosts: [for (direction in ranked) direction.cost],
+          coarseDirections: [for (direction in ranked) direction.index],
+          segments: [for (segment in requested.segments) segment.name],
+          selected: chosenIndex,
+          audited: auditDirections,
+          agrees: !auditDirections || chosen == null ? null : best != null && chosen.problem == best.problem,
+          airClearance : clearanceDistance
+        }));
+      if (auditDirections && chosen != null && best != null
+        && chosen.problem != best.problem) throw "Coarse weld direction differs from full two-direction selection";
+      if (best != null) break;
     }
-    if(best==null)throw 'Cannot select either weld travel direction: ${reasons.join("; ")}';
-    return cast(best,processkit.WeldPathProblem.WeldPathSelection);
+    if (best == null) throw 'Cannot select either weld travel direction: ${reasons.join("; ")}';
+    return cast(best, processkit.WeldPathProblem.WeldPathSelection);
   }
 
   /** Execute a global selection without running the legacy roll/entry search.
    * The selected geometry is compiled once before preparing the device. */
-  public function runSelected(problem:WeldPathProblem,curves:Array<motionkit.planner.JointPathSamples>):Void {
-    if(running())throw "A weld is already running";
-    if(problem==null || problem.path.frameId!=FRAME)throw "Selected weld must use the runner's task frame";
+  public function runSelected(problem:WeldPathProblem, curves:Array<motionkit.planner.JointPathSamples>):Void {
+    if (running()) throw "A weld is already running";
+    if (problem == null || problem.path.frameId != FRAME) throw "Selected weld must use the runner's task frame";
     releaseSelected();
-    var group=cast(motion.compiler.solver,ManipulatorKinematics).manipulator;
-    var began=Sys.time(),before=group.numericSolveCount();
-    var program=new WeldPathProgram(problem,curves,channels);
-    var compiled=program.compile(motion.compiler,group,startPositions(),motion.compilationPlanId(),clearance,configuration);
+    var group = cast(motion.compiler.solver, ManipulatorKinematics).manipulator;
+    var began = Sys.time(), before = group.numericSolveCount();
+    var program = new WeldPathProgram(problem, curves, channels);
+    var compiled = program.compile(
+      motion.compiler,
+      group,
+      startPositions(),
+      motion.compilationPlanId(),
+      clearance,
+      configuration
+    );
     try {
-      selectedProblem=problem;selectedProgram=program;selectedCompilation=compiled;
-      var last=curves[curves.length-1],checked=0;
-      for(curve in curves)checked+=curve.q.length;
-      planned=new PlannedWeld(problem.plan,[],problem.cornerStyles(),
-        new WeldEntry("globally selected joint entry",curves[0].q[0].copy(),[]),
-        problem.retreat,"along the wire",checked,last.q[last.q.length-1],true);
-      prepareWeld(problem.plan,problem.seam,problem.retreat);
-      planningSeconds=Sys.time()-began;planningIkSolves=group.numericSolveCount()-before;
-    }catch(error:Dynamic){releaseSelected();throw error;}
+      selectedProblem = problem;
+      selectedProgram = program;
+      selectedCompilation = compiled;
+      var last = curves[curves.length - 1], checked = 0;
+      for (curve in curves) checked += curve.q.length;
+      planned = new PlannedWeld(
+        problem.plan,
+        [],
+        problem.cornerStyles(),
+        new WeldEntry(
+          "globally selected joint entry",
+          curves[0].q[0].copy(),
+          []
+        ),
+        problem.retreat,
+        "along the wire",
+        checked,
+        last.q[last.q.length - 1],
+        true
+      );
+      prepareWeld(problem.plan, problem.seam, problem.retreat);
+      planningSeconds = Sys.time() - began;
+      planningIkSolves = group.numericSolveCount() - before;
+    } catch (error:Dynamic) {
+      releaseSelected();
+      throw error;
+    }
   }
 
   /** A sparse geometric ladder ranks directions without refinement or timing.
    * Fine selection still owns entry, drive and continuous-clearance acceptance. */
-  static function coarseCost(compiler:ProgramCompiler,clearance:Null<ClearanceWorld>,problem:WeldPathProblem,start:Array<Float>,
-      configuration:Null<motionkit.kinematics.SixAxisConfiguration>,resolution:Float):Float {
-    var began=Sys.time(),group=cast(compiler.solver,ManipulatorKinematics).manipulator;
-    var inputs=selectionInputs(compiler,problem,start,configuration,resolution);
-    var candidates=new motionkit.robot.CandidateProblem(group,inputs.request,inputs.sampling,true);
+  static function coarseCost(
+    compiler:ProgramCompiler,
+    clearance:Null<ClearanceWorld>,
+    problem:WeldPathProblem,
+    start:Array<Float>,
+    configuration:Null<motionkit.kinematics.SixAxisConfiguration>,
+    resolution:Float
+  ):Float {
+    var began = Sys.time(), group = cast(compiler.solver, ManipulatorKinematics).manipulator;
+    var inputs = selectionInputs(compiler, problem, start, configuration, resolution);
+    var candidates = new motionkit.robot.CandidateProblem(group, inputs.request, inputs.sampling, true);
     candidates.pruneUnreachableBounds();
-    var preferences=new motionkit.robot.JointPathPreferences(cast compiler.solver);
-    var cost=preferences.forProblem(group,candidates);
+    var preferences = new motionkit.robot.JointPathPreferences(cast compiler.solver);
+    var cost = preferences.forProblem(group, candidates);
     // Weight each sparse state by its nearest fine-grid samples. Curved
     // primitives can retain the fine density even at a coarse resolution.
-    var weights=[for(_ in candidates.samples)0.0],offset=0.0,nearest=0;
-    for(section in problem.sections)for(primitive in section.primitives){
-      var pieces=motionkit.path.PoseSampling.pieces(primitive,WeldPathPlanner.STEP),length=primitive.length();
-      for(piece in 0...pieces){
-        var distance=offset+length*piece/pieces;
-        while(nearest<candidates.samples.length-1 && distance>
-            (candidates.samples[nearest].distance+candidates.samples[nearest+1].distance)*0.5)nearest++;
+    var weights = [for (_ in candidates.samples) 0.0], offset = 0.0, nearest = 0;
+    for (section in problem.sections) for (primitive in section.primitives) {
+      var pieces = motionkit.path.PoseSampling.pieces(primitive, WeldPathPlanner.STEP), length = primitive.length();
+      for (piece in 0...pieces) {
+        var distance = offset + length * piece / pieces;
+        while (nearest < candidates.samples.length - 1 && distance
+          > (candidates.samples[nearest].distance + candidates.samples[nearest + 1].distance) * 0.5) nearest++;
         weights[nearest]++;
       }
-      offset+=length;
+      offset += length;
     }
-    weights[weights.length-1]++;
-    var weighted:(Int,motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->Float =
-      (sample,candidate)->cost(sample,candidate)*weights[sample];
-    var contactAt:Array<Float>->Bool=q->problem.contact(compiler.solver.forward(q));
-    var selected=clearance==null ? motionkit.robot.StructuredLadder.search(candidates,null,0,weighted) :
-      motionkit.robot.LazyCollisionLadder.selectWithChecks(candidates,
-        q->clearance.violation(q,contactAt(q)),8,
-        (from,to)->clearance.sweep(from,to,false,0.02,null,contactAt,true),null,null,weighted,
-        (from,to)->entryFailure(compiler,clearance,problem,from,to),q->clearance.violation(q,false));
-    if(Sys.getEnv("PROCESS_PATH_PROFILE")=="1")Sys.println("PROCESS_PATH_COARSE_DIRECTION "+haxe.Json.stringify({
-      samples:candidates.samples.length,resolution:resolution,cost:selected.cost,seconds:Sys.time()-began,diagnostic:selected.diagnostic}));
+    weights[weights.length - 1]++;
+    var weighted:(Int,
+      motionkit.robot.CartesianCandidateSampler.LatticeCandidate) -> Float = (sample, candidate) -> cost(
+        sample,
+        candidate
+      ) * weights[sample];
+    var contactAt:Array<Float> -> Bool = q -> problem.contact(compiler.solver.forward(q));
+    var selected = clearance == null ? motionkit.robot.StructuredLadder.search(candidates,
+      null, 0, weighted) : motionkit.robot.LazyCollisionLadder.selectWithChecks(
+        candidates,
+        q -> clearance.violation(
+          q,
+          contactAt(q)
+        ),
+        8,
+        (
+          from,
+          to
+        ) -> clearance.sweep(
+          from,
+          to,
+          false,
+          0.02,
+          null,
+          contactAt,
+          true
+        ),
+        null,
+        null,
+        weighted,
+        (
+          from,
+          to
+        ) -> entryFailure(
+          compiler,
+          clearance,
+          problem,
+          from,
+          to
+        ),
+        q -> clearance.violation(
+          q,
+          false
+        )
+      );
+    if (Sys.getEnv("PROCESS_PATH_PROFILE") == "1") Sys.println("PROCESS_PATH_COARSE_DIRECTION " + haxe.Json.stringify({
+      samples: candidates.samples.length,
+      resolution: resolution,
+      cost: selected.cost,
+      seconds: Sys.time() - began,
+      diagnostic: selected.diagnostic
+    }));
     return selected.cost;
   }
 
-  static function selectionInputs(compiler:ProgramCompiler,problem:WeldPathProblem,start:Array<Float>,
-      configuration:Null<motionkit.kinematics.SixAxisConfiguration>,resolution:Float):
-      {request:motionkit.kinematics.PathRequest,sampling:motionkit.robot.CandidateProblem.CandidateSamplingOptions} {
-    var solver=cast(compiler.solver,ManipulatorKinematics),group=solver.manipulator;
-    var cartesian=Std.isOfType(motionkit.robot.BranchIk.of(group),motionkit.robot.CartesianAnalyticIk);
-    var request=problem.request(start,compiler.ikTolerance,
-      compiler.perJointMaxJump,compiler.maxVelocity,resolution,compiler.maxAcceleration,!cartesian);
+  static function selectionInputs(
+    compiler:ProgramCompiler,
+    problem:WeldPathProblem,
+    start:Array<Float>,
+    configuration:Null<motionkit.kinematics.SixAxisConfiguration>,
+    resolution:Float
+  ): {
+    request: motionkit.kinematics.PathRequest,
+    sampling: motionkit.robot.CandidateProblem.CandidateSamplingOptions
+  } {
+    var solver = cast(compiler.solver, ManipulatorKinematics), group = solver.manipulator;
+    var cartesian = Std.isOfType(motionkit.robot.BranchIk.of(group), motionkit.robot.CartesianAnalyticIk);
+    var request = problem.request(
+      start,
+      compiler.ikTolerance,
+      compiler.perJointMaxJump,
+      compiler.maxVelocity,
+      resolution,
+      compiler.maxAcceleration,
+      !cartesian
+    );
     // Omitted ranges hold axes at the seed. Welds with a work positioner or
     // rail must search its physical range rather than freezing it there.
     var ranges:Array<motionkit.robot.ExternalAxisGrid.ExternalAxisRange> = [];
     // A Cartesian head solves all its axes directly; its linear axes are not
     // external coordinates to enumerate around a serial-arm solution.
-    for(joint in 0...group.group.count())if(!cartesian && group.external[joint]){
-      var limits=group.group.limitsOf(joint);
-      if(!Math.isFinite(limits.lower) || !Math.isFinite(limits.upper))
-        throw "Weld external-axis selection requires finite planning bounds";
-      var span=limits.upper-limits.lower;
-      var points=span==0 ? 1 : Std.int(Math.ceil(span/(compiler.perJointMaxJump[joint]*0.5)))+1;
-      ranges.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(joint,limits.lower,limits.upper,points));
+    for (joint in 0...group.group.count()) if (!cartesian && group.external[joint]) {
+      var limits = group.group.limitsOf(joint);
+      if (!Math.isFinite(limits.lower)
+        || !Math.isFinite(limits.upper)) throw "Weld external-axis selection requires finite planning bounds";
+      var span = limits.upper - limits.lower;
+      var points = span == 0 ? 1 : Std.int(Math.ceil(span / (compiler.perJointMaxJump[joint] * 0.5))) + 1;
+      ranges.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(joint, limits.lower, limits.upper, points));
     }
-    var sampling=new motionkit.robot.CandidateProblem.CandidateSamplingOptions(8,3,8,false,ranges,null,configuration);
-    return {request:request,sampling:sampling};
+    var sampling = new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
+      8,
+      3,
+      8,
+      false,
+      ranges,
+      null,
+      configuration
+    );
+    return {request: request, sampling: sampling};
   }
 
-  static function selectProblem(compiler:ProgramCompiler,clearance:Null<ClearanceWorld>,problem:WeldPathProblem,
-      start:Array<Float>,configuration:Null<motionkit.kinematics.SixAxisConfiguration>):processkit.WeldPathProblem.WeldPathSelection {
-    var solver=cast(compiler.solver,ManipulatorKinematics),group=solver.manipulator;
-    var inputs=selectionInputs(compiler,problem,start,configuration,WeldPathPlanner.STEP);
-    var request=inputs.request,sampling=inputs.sampling;
-    return problem.selectWithCost(group,request,sampling,clearance,
-      (from,to)->entryFailure(compiler,clearance,problem,from,to),
-      clearance==null ? null : q->clearance.violation(q,false),null,null,0,solver);
+  static function selectProblem(
+    compiler:ProgramCompiler,
+    clearance:Null<ClearanceWorld>,
+    problem:WeldPathProblem,
+    start:Array<Float>,
+    configuration:Null<motionkit.kinematics.SixAxisConfiguration>
+  ):processkit.WeldPathProblem.WeldPathSelection {
+    var solver = cast(compiler.solver, ManipulatorKinematics), group = solver.manipulator;
+    var inputs = selectionInputs(compiler, problem, start, configuration, WeldPathPlanner.STEP);
+    var request = inputs.request, sampling = inputs.sampling;
+    return problem.selectWithCost(
+      group,
+      request,
+      sampling,
+      clearance,
+      (from, to) -> entryFailure(
+        compiler,
+        clearance,
+        problem,
+        from,
+        to
+      ),
+      clearance == null ? null : q -> clearance.violation(
+        q,
+        false
+      ),
+      null,
+      null,
+      0,
+      solver
+    );
   }
 
-  static function entryFailure(compiler:ProgramCompiler,clearance:Null<ClearanceWorld>,problem:WeldPathProblem,
-      from:Array<Float>,to:Array<Float>):Null<ClearanceViolation> {
-    var entry=compiler.generateEntry(from,to);
+  static function entryFailure(
+    compiler:ProgramCompiler,
+    clearance:Null<ClearanceWorld>,
+    problem:WeldPathProblem,
+    from:Array<Float>,
+    to:Array<Float>
+  ):Null<ClearanceViolation> {
+    var entry = compiler.generateEntry(from, to);
     try {
-      var violation=clearance==null ? null : motionkit.robot.TrajectoryClearance.violation(
-        clearance,entry,false,0.01,q->problem.contact(compiler.solver.forward(q)));
-      entry.dispose();return violation;
-    }catch(error:Dynamic){entry.dispose();throw error;}
+      var violation = clearance == null ? null : motionkit.robot.TrajectoryClearance.violation(
+        clearance,
+        entry,
+        false,
+        0.01,
+        q -> problem.contact(compiler.solver.forward(q))
+      );
+      entry.dispose();
+      return violation;
+    } catch (error:Dynamic) {
+      entry.dispose();
+      throw error;
+    }
   }
 
-  function prepareWeld(prepared:WeldPlan,path:PosePath,exitPose:Pose3):Void {
-    var plan=prepared;this.plan=plan;
-    var parameters=plan.parameters,stop=pose(plan.stop()),travel=parameters.travelSpeed;
-    seam=path;
+  function prepareWeld(prepared:WeldPlan, path:PosePath, exitPose:Pose3):Void {
+    var plan = prepared;
+    this.plan = plan;
+    var parameters = plan.parameters, stop = pose(plan.stop()), travel = parameters.travelSpeed;
+    seam = path;
     // Arc on with the wire at the weld speed, held until the arc is established, then the start dwell.
     var entry:Array<MotionOp> = [
       MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(parameters.wireSpeed)),
-      MotionOp.SetOutput(channels.arc, EventValue.Digital(true)),
-      MotionOp.WaitInput(ARC_ESTABLISHED, InputPredicate.Equals(EventValue.Digital(true)), IGNITION_TIMEOUT)
+      MotionOp.SetOutput(
+        channels.arc,
+        EventValue.Digital(true)
+      ),
+      MotionOp.WaitInput(
+        ARC_ESTABLISHED,
+        InputPredicate.Equals(EventValue.Digital(true)),
+        IGNITION_TIMEOUT
+      )
     ];
     if (parameters.startDwell > 0) entry.push(MotionOp.Dwell(parameters.startDwell));
     // A re-strike is over an existing bead: light at the stable minimum and omit the pooling dwell.
     var recoveryEntry:Array<MotionOp> = [
-      MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(WeldArcModel.MIN_WIRE_SPEED)),
-      MotionOp.SetOutput(channels.arc, EventValue.Digital(true)),
-      MotionOp.WaitInput(ARC_ESTABLISHED, InputPredicate.Equals(EventValue.Digital(true)), IGNITION_TIMEOUT)
+      MotionOp.SetOutput(
+        channels.wireSpeed,
+        EventValue.Analog(WeldArcModel.MIN_WIRE_SPEED)
+      ),
+      MotionOp.SetOutput(
+        channels.arc,
+        EventValue.Digital(true)
+      ),
+      MotionOp.WaitInput(
+        ARC_ESTABLISHED,
+        InputPredicate.Equals(EventValue.Digital(true)),
+        IGNITION_TIMEOUT
+      )
     ];
     // Crater fill with the arc up, then the wire stops; the torch lifts while the arc burns back, and the command ends.
     var exit:Array<MotionOp> = [];
     if (parameters.craterDwell > 0) exit.push(MotionOp.Dwell(parameters.craterDwell));
     exit.push(MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(0.0)));
     if (parameters.burnback > 0) {
-      exit.push(MotionOp.MoveL(along(stop, plan.stop(), -LIFT), FRAME, Math.max(LIFT / parameters.burnback, 0.01), Blend.ExactStop, OrientationPolicy.FreeAboutTool));
+      exit.push(MotionOp.MoveL(
+        along(stop, plan.stop(), -LIFT),
+        FRAME,
+        Math.max(LIFT / parameters.burnback, 0.01),
+        Blend.ExactStop,
+        OrientationPolicy.FreeAboutTool
+      ));
     }
     exit.push(MotionOp.SetOutput(channels.arc, EventValue.Digital(false)));
-    var recipe = new ProcessRecipe(travel * 0.5, travel * 2.0, travel, 0.0, OrientationPolicy.FreeAboutTool, 0.001,
-      parameters.wireSpeed / travel, 0.0, BACKOFF, FeedChangePolicy.Reject, new ProcessEngagement(entry, exit, recoveryEntry), APPROACH_SPEED,
-      PREPARE_TIMEOUT);
+    var recipe = new ProcessRecipe(
+      travel * 0.5,
+      travel * 2.0,
+      travel,
+      0.0,
+      OrientationPolicy.FreeAboutTool,
+      0.001,
+      parameters.wireSpeed / travel,
+      0.0,
+      BACKOFF,
+      FeedChangePolicy.Reject,
+      new ProcessEngagement(
+        entry,
+        exit,
+        recoveryEntry
+      ),
+      APPROACH_SPEED,
+      PREPARE_TIMEOUT
+    );
     var device = new WelderProcessDevice(outputs, latest, channels, {voltage: parameters.voltage});
     var process = new ProcessRun(recipe, seam, device, channels.wireSpeed, motion.session);
     current = process;
@@ -488,8 +805,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
             if (motion.progress().op == igniteIndex || problem.indexOf(ARC_ESTABLISHED) >= 0) {
               process.interruptNow(travelled(), "the arc did not establish");
               beginStop();
-            } else
-              fail(problem);
+            } else fail(problem);
           } else if (problem == null) {
             // Once past the path the seam is welded: a fault in the crater, the burnback or the lift is not a reason to
             // travel it again, only to finish ending the arc, which the rest of the program does and which clears it.
@@ -510,8 +826,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
           waiting += dtSeconds;
           process.update(process.interruptedAt);
           if (process.state == ProcessRunState.Recovery && !motion.running) launch(false);
-          else if (waiting > CLEAR_TIMEOUT)
-            fail('the welder did not clear: ${WeldSensor.faultMessage(reading.fault)}');
+          else if (waiting > CLEAR_TIMEOUT) fail('the welder did not clear: ${WeldSensor.faultMessage(reading.fault)}');
       }
     } catch (error:Dynamic) {
       fail(Std.string(error));
@@ -520,7 +835,8 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
 
   public function abort():Void {
     if (!running()) return;
-    motion.abort();releaseSelected();
+    motion.abort();
+    releaseSelected();
     phase = Idle;
   }
 
@@ -539,54 +855,77 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   /** Starts the process run's program, the first time from a joint move to the approach pose. */
   function launch(first:Bool):Void {
     var process = cast(current, ProcessRun);
-    if(selectedProblem!=null){
-      var start=process.preparedStart();
-      if(!first){
-        var problem=cast(selectedProblem,WeldPathProblem).recovery(start);
-        var group=cast(motion.compiler.solver,ManipulatorKinematics).manipulator;
+    if (selectedProblem != null) {
+      var start = process.preparedStart();
+      if (!first) {
+        var problem = cast(selectedProblem, WeldPathProblem).recovery(start);
+        var group = cast(motion.compiler.solver, ManipulatorKinematics).manipulator;
         // Recovery starts at the measured stopped state, never the prior program's endpoint.
-        var positions=motion.robot.snapshot().positions;
-        var stopped=[for(index in motion.jointIndices)positions.get(index)];
-        var began=Sys.time(),before=group.numericSolveCount();
-        var curves=selectProblem(motion.compiler,clearance,problem,stopped,configuration).curves;
-        var program=new WeldPathProgram(problem,curves,channels,process.interruptedAt);
-        var compiled=program.compile(motion.compiler,group,stopped,motion.compilationPlanId(),clearance,configuration);
-        if(selectedCompilation!=null)selectedCompilation.dispose();
-        selectedProgram=program;selectedCompilation=compiled;
-        planningSeconds+=Sys.time()-began;planningIkSolves+=group.numericSolveCount()-before;
+        var positions = motion.robot.snapshot().positions;
+        var stopped = [for (index in motion.jointIndices) positions.get(index)];
+        var began = Sys.time(), before = group.numericSolveCount();
+        var curves = selectProblem(motion.compiler, clearance, problem, stopped, configuration).curves;
+        var program = new WeldPathProgram(problem, curves, channels, process.interruptedAt);
+        var compiled = program.compile(
+          motion.compiler,
+          group,
+          stopped,
+          motion.compilationPlanId(),
+          clearance,
+          configuration
+        );
+        if (selectedCompilation != null) selectedCompilation.dispose();
+        selectedProgram = program;
+        selectedCompilation = compiled;
+        planningSeconds += Sys.time() - began;
+        planningIkSolves += group.numericSolveCount() - before;
       }
-      process.activatePrepared(start);outputs.drain();
-      selectedActive=true;igniteIndex=cast(selectedProgram,WeldPathProgram).ignitionOp;waiting=0;
-      motion.runCompiled(selectedCompilation);phase=Welding;return;
+      process.activatePrepared(start);
+      outputs.drain();
+      selectedActive = true;
+      igniteIndex = cast(selectedProgram, WeldPathProgram).ignitionOp;
+      waiting = 0;
+      motion.runCompiled(selectedCompilation);
+      phase = Welding;
+      return;
     }
-    selectedActive=false;
+    selectedActive = false;
     throw "Weld execution requires a selected problem and retained compilation";
   }
 
   /** The seam distance the torch has reached: where the program is on the path, before and after it the start and the end. */
   function travelled():Float {
-    if(selectedActive)return selectedProgram.progress(selectedCompilation,motion.progress(),motion.completed).seamDistance;
+    if (selectedActive) return selectedProgram.progress(selectedCompilation,
+      motion.progress(), motion.completed).seamDistance;
     throw "Weld progress requires its selected compilation";
   }
 
   /** The program is past the path, in the crater fill, burnback, lift or retreat. */
   function pastPath():Bool {
-    if(selectedActive)return switch selectedProgram.progress(selectedCompilation,motion.progress(),motion.completed).phase {
-      case FillingCrater | BurningBack | Retreating | Complete:true;
-      default:false;
+    if (selectedActive) return switch selectedProgram.progress(selectedCompilation,
+      motion.progress(), motion.completed).phase {
+      case FillingCrater | BurningBack | Retreating | Complete:
+        true;
+      default:
+        false;
     };
     return false;
   }
 
   function fail(message:String):Void {
-    try motion.abort() catch (_:Dynamic) {}
-    releaseSelected();failureMessage = message;
+    try motion.abort() catch (_:Dynamic) {
+    }
+    releaseSelected();
+    failureMessage = message;
     phase = Failed;
   }
 
   function releaseSelected():Void {
-    if(selectedCompilation!=null)selectedCompilation.dispose();
-    selectedCompilation=null;selectedProgram=null;selectedProblem=null;selectedActive=false;
+    if (selectedCompilation != null) selectedCompilation.dispose();
+    selectedCompilation = null;
+    selectedProgram = null;
+    selectedProblem = null;
+    selectedActive = false;
   }
 
   /** Where the arm's joints are now, or will be when the program running ends: where the next program starts. */
@@ -606,20 +945,72 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
    * where the torch would otherwise stand still to turn. How long the stretch is comes from the angle and the wrist's
    * limits (`WeldCorner`), and a corner takes at most `WeldCorner.SHARE` of a segment.
    */
-  public static function pathOf(plan:WeldPlan, travel:Float, wrist:WristLimits, styles:Array<Int>):Array<PosePrimitive> {
+  public static function pathOf(plan:WeldPlan,
+    travel:Float, wrist:WristLimits, styles:Array<Int>):Array<PosePrimitive> {
     var segments = plan.segments;
     var primitives:Array<PosePrimitive> = [];
-    function waypoint(point:Vec3, rotation:Quat):PoseWaypoint
-      return new PoseWaypoint(new Pose3(point.x, point.y, point.z, rotation.x, rotation.y, rotation.z, rotation.w), PATH_TOLERANCE, 0.01);
-    function line(from:Vec3, fromRotation:Quat, to:Vec3, toRotation:Quat):Void
-      primitives.push(new PoseLine(waypoint(from, fromRotation), waypoint(to, toRotation), OrientationPolicy.FreeAboutTool, 0.1, travel));
+    function waypoint(point:Vec3, rotation:Quat):PoseWaypoint return new PoseWaypoint(
+      new Pose3(
+        point.x,
+        point.y,
+        point.z,
+        rotation.x,
+        rotation.y,
+        rotation.z,
+        rotation.w
+      ),
+      PATH_TOLERANCE,
+      0.01
+    );
+    function line(from:Vec3, fromRotation:Quat, to:Vec3, toRotation:Quat):Void primitives.push(new PoseLine(
+      waypoint(
+        from,
+        fromRotation
+      ),
+      waypoint(
+        to,
+        toRotation
+      ),
+      OrientationPolicy.FreeAboutTool,
+      0.1,
+      travel
+    ));
     /** A stretch of a turn from `r1` to `r2` of `angle` radians, taking it from fraction `s0` to `s1`, in steps of at most TURN_STEP radians. */
-    function turn(from:Vec3, to:Vec3, r1:Quat, r2:Quat, s0:Float, s1:Float, angle:Float, travelA:Vec3, travelB:Vec3, style:Int):Void {
+    function turn(
+      from:Vec3,
+      to:Vec3,
+      r1:Quat,
+      r2:Quat,
+      s0:Float,
+      s1:Float,
+      angle:Float,
+      travelA:Vec3,
+      travelB:Vec3,
+      style:Int
+    ):Void {
       var steps = Std.int(Math.max(1.0, Math.ceil(angle * (s1 - s0) / TURN_STEP)));
       for (step in 0...steps) {
         var f0 = step / steps, f1 = (step + 1) / steps;
-        line(from.add(to.sub(from).scale(f0)), WeldCorner.orientationAt(r1, r2, s0 + (s1 - s0) * f0, travelA, travelB, style),
-          from.add(to.sub(from).scale(f1)), WeldCorner.orientationAt(r1, r2, s0 + (s1 - s0) * f1, travelA, travelB, style));
+        line(
+          from.add(to.sub(from).scale(f0)),
+          WeldCorner.orientationAt(
+            r1,
+            r2,
+            s0 + (s1 - s0) * f0,
+            travelA,
+            travelB,
+            style
+          ),
+          from.add(to.sub(from).scale(f1)),
+          WeldCorner.orientationAt(
+            r1,
+            r2,
+            s0 + (s1 - s0) * f1,
+            travelA,
+            travelB,
+            style
+          )
+        );
       }
     }
     var progress = 0.0;
@@ -631,7 +1022,8 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       var direction = b.sub(a).scale(1.0 / length);
       var startRotation = segment.start.rotation, stopRotation = segment.stop.rotation;
       var beforeAngle = index > 0 ? segments[index - 1].stop.rotation.angularDistance(startRotation) : 0.0;
-      var afterAngle = index + 1 < segments.length ? stopRotation.angularDistance(segments[index + 1].start.rotation) : 0.0;
+      var afterAngle = index + 1
+        < segments.length ? stopRotation.angularDistance(segments[index + 1].start.rotation) : 0.0;
       var before = beforeAngle > WeldCorner.STRAIGHT;
       var after = afterAngle > WeldCorner.STRAIGHT;
       var rampIn = before ? WeldCorner.given(WeldCorner.turnLength(beforeAngle, travel, wrist), length) : 0.0;
@@ -640,13 +1032,35 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       if (before) {
         // The second half of the turn from the segment before.
         var end = a.add(direction.scale(rampIn));
-        turn(a, end, segments[index - 1].stop.rotation, startRotation, 0.5, 1.0, beforeAngle, directionOf(segments[index - 1]), direction, styles[index]);
+        turn(
+          a,
+          end,
+          segments[index - 1].stop.rotation,
+          startRotation,
+          0.5,
+          1.0,
+          beforeAngle,
+          directionOf(segments[index - 1]),
+          direction,
+          styles[index]
+        );
         from = end;
       }
       var until = after ? b.sub(direction.scale(rampOut)) : b;
       if (until.sub(from).norm() > 1e-6) line(from, startRotation, until, stopRotation);
       // The first half of the turn to the segment after.
-      if (after) turn(until, b, stopRotation, segments[index + 1].start.rotation, 0.0, 0.5, afterAngle, direction, directionOf(segments[index + 1]), styles[index + 1]);
+      if (after) turn(
+        until,
+        b,
+        stopRotation,
+        segments[index + 1].start.rotation,
+        0.0,
+        0.5,
+        afterAngle,
+        direction,
+        directionOf(segments[index + 1]),
+        styles[index + 1]
+      );
       var weave = plan.parameters.weave;
       if (weave != null && weave.amplitude > 0.0) {
         var open = segment.open;
@@ -662,8 +1076,8 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   }
 
   /** The unit direction a segment runs in. */
-  static function directionOf(segment:WeldSegment):Vec3
-    return segment.stop.translation.sub(segment.start.translation).normalized();
+  static function directionOf(segment:WeldSegment):Vec3 return segment
+    .stop.translation.sub(segment.start.translation).normalized();
 
   static function pose(frame:Transform3):Pose3 {
     var t = frame.translation, r = frame.rotation;
@@ -673,7 +1087,14 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   /** `from` moved `distance` metres along its +Z, the wire. */
   static function along(from:Pose3, frame:Transform3, distance:Float):Pose3 {
     var wire = frame.rotation.rotate(new Vec3(0.0, 0.0, 1.0));
-    return new Pose3(from.x + wire.x * distance, from.y + wire.y * distance, from.z + wire.z * distance, from.qx, from.qy, from.qz,
-      from.qw);
+    return new Pose3(
+      from.x + wire.x * distance,
+      from.y + wire.y * distance,
+      from.z + wire.z * distance,
+      from.qx,
+      from.qy,
+      from.qz,
+      from.qw
+    );
   }
 }

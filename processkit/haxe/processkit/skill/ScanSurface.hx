@@ -17,7 +17,7 @@ import robotkit.perception.PointCloud;
  * wall-clock or hidden randomness), so this skill replays identically.
  */
 class ScanSurface implements Skill {
-  public final scan:Void->PointCloud;
+  public final scan:Void -> PointCloud;
   public final dwellUpdates:Int;
   /** The captured cloud once this skill succeeds; null until then. */
   public var cloud(default, null):Null<PointCloud> = null;
@@ -25,7 +25,7 @@ class ScanSurface implements Skill {
   final lifecycle:SkillLifecycle = new SkillLifecycle();
   var remaining:Int = 0;
 
-  public function new(scan:Void->PointCloud, ?dwellUpdates:Int = 1) {
+  public function new(scan:Void -> PointCloud, ?dwellUpdates:Int = 1) {
     if (scan == null) throw "ScanSurface requires a scan callback";
     if (dwellUpdates < 0) throw "ScanSurface dwell updates cannot be negative";
     this.scan = scan;

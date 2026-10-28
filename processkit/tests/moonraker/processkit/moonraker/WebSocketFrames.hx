@@ -15,7 +15,10 @@ class WebSocketMessage {
   public final opcode:Int;
   public final payload:Bytes;
 
-  public function new(opcode:Int, payload:Bytes) { this.opcode = opcode; this.payload = payload; }
+  public function new(opcode:Int, payload:Bytes) {
+    this.opcode = opcode;
+    this.payload = payload;
+  }
 
   public function text():String return payload.toString();
 }
@@ -45,8 +48,11 @@ class WebSocketFrames {
     out.addByte(0x80 | opcode);
     var masked = mask != null ? 0x80 : 0;
     if (payload.length < 126) out.addByte(masked | payload.length);
-    else if (payload.length < 65536) { out.addByte(masked | 126); out.addByte(payload.length >> 8); out.addByte(payload.length & 0xFF); }
-    else {
+    else if (payload.length < 65536) {
+      out.addByte(masked | 126);
+      out.addByte(payload.length >> 8);
+      out.addByte(payload.length & 0xFF);
+    } else {
       out.addByte(masked | 127);
       for (shift in [56, 48, 40, 32]) out.addByte(0);
       for (shift in [24, 16, 8, 0]) out.addByte((payload.length >> shift) & 0xFF);
@@ -74,7 +80,8 @@ class WebSocketReader {
   var fragmentOpcode = 0;
   var fragmentLength = 0;
 
-  public function new() {}
+  public function new() {
+  }
 
   public function feed(bytes:Bytes):Void {
     if (bytes.length == 0) return;
@@ -109,7 +116,10 @@ class WebSocketReader {
       if (masked) at += 4;
       if (buffer.length < at + length) return null;
       var payload = Bytes.alloc(length);
-      for (index in 0...length) payload.set(index, masked ? buffer.get(at + index) ^ buffer.get(maskAt + (index & 3)) : buffer.get(at + index));
+      for (index in 0...length) payload.set(
+        index,
+        masked ? buffer.get(at + index) ^ buffer.get(maskAt + (index & 3)) : buffer.get(at + index)
+      );
       var rest = Bytes.alloc(buffer.length - at - length);
       rest.blit(0, buffer, at + length, rest.length);
       buffer = rest;

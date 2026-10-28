@@ -14,13 +14,18 @@ class EarthworkRegion {
   public final exclusions:Array<Polygon2>;
   public final gradeTolerance:Float;
 
-  public function new(id:String, existing:HeightMap, design:HeightMap,
-      ?exclusions:Array<Polygon2>, ?gradeTolerance:Float = 0.02) {
+  public function new(
+    id:String,
+    existing:HeightMap,
+    design:HeightMap,
+    ?exclusions:Array<Polygon2>,
+    ?gradeTolerance:Float = 0.02
+  ) {
     if (id == null || id.length == 0) throw "Earthwork region requires a non-empty id";
     if (existing == null || design == null) throw "Earthwork region requires existing and design height maps";
     HeightMap.ensureSameGrid(existing, design);
-    if (!Math.isFinite(gradeTolerance) || gradeTolerance < 0.0)
-      throw "Earthwork region grade tolerance must be finite and non-negative";
+    if (!Math.isFinite(gradeTolerance)
+      || gradeTolerance < 0.0) throw "Earthwork region grade tolerance must be finite and non-negative";
     this.id = id;
     this.existing = existing;
     this.design = design;
@@ -62,7 +67,7 @@ class EarthworkRegion {
       var magnitude = Math.abs(delta);
       if (magnitude > gradeTolerance && magnitude > bestMagnitude) {
         bestMagnitude = magnitude;
-        best = { col: col, row: row, delta: delta };
+        best = {col: col, row: row, delta: delta};
       }
     }
     return best;
@@ -71,8 +76,11 @@ class EarthworkRegion {
   /** Remaining cut/fill volume, ignoring any grid cell touching an exclusion. */
   public function remainingVolume():VolumeResult {
     return HeightMap.volumeBetween(existing, design, function(col:Int, row:Int) {
-      return isExcludedAt(col, row) || isExcludedAt(col + 1, row) ||
-        isExcludedAt(col, row + 1) || isExcludedAt(col + 1, row + 1);
-    });
+      return isExcludedAt(col, row) || isExcludedAt(col + 1, row) || isExcludedAt(col, row + 1) || isExcludedAt(
+        col + 1,
+        row + 1
+      );
+    }
+    );
   }
 }

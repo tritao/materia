@@ -37,7 +37,8 @@ class ModelWelder implements WelderOutputs implements WelderFeedback {
   public var voltage = 0.0;
   public var log:Array<String> = [];
 
-  public function new() {}
+  public function new() {
+  }
 
   public function setArc(on:Bool):Void {
     arc = on;
@@ -58,25 +59,46 @@ class ModelWelder implements WelderOutputs implements WelderFeedback {
 
   /** Lets `seconds` pass over a flat work whose top is the plane z = 0. */
   public function elapse(seconds:Float):Void {
-    for (i in 0...Math.round(seconds / 0.01))
-      model.step(0.01, {arcCommanded: arc, wireSpeed: wireSpeed, voltageSet: voltage, supplyReady: true,
-        tipDistance: height, wireDistance: height});
+    for (i in 0...Math.round(seconds / 0.01)) model.step(
+      0.01,
+      {
+        arcCommanded: arc,
+        wireSpeed: wireSpeed,
+        voltageSet: voltage,
+        supplyReady: true,
+        tipDistance: height,
+        wireDistance: height
+      }
+    );
   }
 }
 
 /** Feedback of a supply that holds a wire-stuck fault. */
 class StuckWelder implements WelderFeedback {
-  public function new() {}
+  public function new() {
+  }
 
-  public function reading():WeldReading
-    return {arc: false, currentA: 0.0, voltageV: 0.0, touch: true, fault: WeldFault.WireStuck, powerW: 0.0};
+  public function reading():WeldReading return {
+    arc: false,
+    currentA: 0.0,
+    voltageV: 0.0,
+    touch: true,
+    fault: WeldFault.WireStuck,
+    powerW: 0.0
+  };
 }
 
 class WelderProcessTests {
   static var assertions = 0;
 
-  static function event(channel:String, value:ProcessEventValue):FiredProcessEvent
-    return new FiredProcessEvent(Int64.ofInt(1), channel, value, Int64.ofInt(100), Int64.ofInt(100), 1);
+  static function event(channel:String, value:ProcessEventValue):FiredProcessEvent return new FiredProcessEvent(
+    Int64.ofInt(1),
+    channel,
+    value,
+    Int64.ofInt(100),
+    Int64.ofInt(100),
+    1
+  );
 
   public static function run():Int {
     assertions = 0;
@@ -87,15 +109,29 @@ class WelderProcessTests {
     check(!device.ready(), "a device that was not prepared is not ready");
     check(device.fault() == null, "and has no fault");
     device.prepare();
-    check(device.ready() && supply.voltage == 24.0 && supply.wireSpeed == 0.0 && !supply.arc,
-      "prepare sets the voltage and leaves the arc off and the wire still");
+    check(
+      device.ready() && supply.voltage == 24.0 && supply.wireSpeed == 0.0 && !supply.arc,
+      "prepare sets the voltage and leaves the arc off and the wire still"
+    );
 
     // Fired records work the three outputs: a process run emits the arc as an analog rate.
-    device.apply([event(channels.voltage, Analog(26.0)), event(channels.wireSpeed, Analog(8.0)), event(channels.arc, Analog(1.0))]);
-    check(supply.voltage == 26.0 && supply.wireSpeed == 8.0 && supply.arc, "the records set voltage, wire speed and arc");
+    device.apply([
+      event(channels.voltage, Analog(26.0)),
+      event(channels.wireSpeed, Analog(8.0)),
+      event(
+        channels.arc,
+        Analog(1.0)
+      )
+    ]);
+    check(
+      supply.voltage == 26.0 && supply.wireSpeed == 8.0 && supply.arc,
+      "the records set voltage, wire speed and arc"
+    );
     supply.elapse(0.3);
-    check(supply.reading().arc && supply.reading().currentA > 200 && device.ready() && device.fault() == null,
-      "the arc burns and the device stays ready");
+    check(
+      supply.reading().arc && supply.reading().currentA > 200 && device.ready() && device.fault() == null,
+      "the arc burns and the device stays ready"
+    );
     device.apply([event(channels.arc, Digital(false))]);
     check(!supply.arc, "a digital off record puts the arc out");
     device.apply([event(channels.arc, Analog(0.0))]);
@@ -105,8 +141,10 @@ class WelderProcessTests {
     device.apply([event(channels.arc, Digital(true)), event(channels.wireSpeed, Analog(8.0))]);
     supply.log = [];
     device.safe();
-    check(supply.log.join(",") == "wire 0,arc false" && !supply.arc && supply.wireSpeed == 0.0,
-      "safe stops the wire, then switches the arc off: " + supply.log);
+    check(
+      supply.log.join(",") == "wire 0,arc false" && !supply.arc && supply.wireSpeed == 0.0,
+      "safe stops the wire, then switches the arc off: " + supply.log
+    );
 
     // A fault from the supply is the device's fault and stops it being ready.
     var open = new ModelWelder();
@@ -115,7 +153,10 @@ class WelderProcessTests {
     failing.prepare();
     failing.apply([event(channels.wireSpeed, Analog(8.0)), event(channels.arc, Digital(true))]);
     open.elapse(1.2);
-    check(failing.fault() == "weld: the arc did not ignite" && !failing.ready(), "no arc is the device's fault: " + failing.fault());
+    check(
+      failing.fault() == "weld: the arc did not ignite" && !failing.ready(),
+      "no arc is the device's fault: " + failing.fault()
+    );
     failing.safe();
     open.elapse(0.05);
     check(failing.fault() == null, "the fault clears once the arc is off");
@@ -125,11 +166,27 @@ class WelderProcessTests {
 
     // Refusals.
     expectFailure(function() device.apply([event("other", Analog(1.0))]), "a record on another channel is refused");
-    expectFailure(function() device.apply([event(channels.wireSpeed, Digital(true))]), "a wire speed needs an analog value");
-    expectFailure(function() device.apply([event(channels.arc, Process("go", 1.0))]), "the arc takes no process command");
-    expectFailure(function() new WelderProcessDevice(supply, supply, {arc: "a", wireSpeed: "a", voltage: "v"}, {voltage: 24.0}),
-      "channels must be distinct");
-    expectFailure(function() new WelderProcessDevice(supply, supply, channels, {voltage: 0.0}), "a setpoint voltage must be positive");
+    expectFailure(
+      function() device.apply([event(channels.wireSpeed, Digital(true))]),
+      "a wire speed needs an analog value"
+    );
+    expectFailure(
+      function() device.apply([event(channels.arc, Process("go", 1.0))]),
+      "the arc takes no process command"
+    );
+    expectFailure(
+      function() new WelderProcessDevice(
+        supply,
+        supply,
+        {arc: "a", wireSpeed: "a", voltage: "v"},
+        {voltage: 24.0}
+      ),
+      "channels must be distinct"
+    );
+    expectFailure(
+      function() new WelderProcessDevice(supply, supply, channels, {voltage: 0.0}),
+      "a setpoint voltage must be positive"
+    );
     runEngagement();
     runPreparedActivation();
     runRestartPoint();
@@ -140,45 +197,97 @@ class WelderProcessTests {
   }
 
   /** The motion that closes a program whose exit ends on an output change. */
-  static function closing():MotionOp return MotionOp.MoveL(new Pose3(0.18, 0.0, 0.04), "arm-base", 0.08, Blend.ExactStop);
+  static function closing():MotionOp return MotionOp.MoveL(
+    new Pose3(0.18, 0.0, 0.04),
+    "arm-base",
+    0.08,
+    Blend.ExactStop
+  );
 
   /**
    * A restart backs up from where the metal stopped, once. A re-strike that fails, over and over, retries the same point
    * and does not move further back each time; a restart that gets some way along and then stops backs up from there.
    */
   static function runPreparedActivation():Void {
-    var supply=new ModelWelder(),channels={arc:"a",wireSpeed:"w",voltage:"v"};
-    var device=new WelderProcessDevice(supply,supply,channels,{voltage:24.0});
-    var recipe=new ProcessRecipe(0.005,0.03,0.0115,0.0,OrientationPolicy.FreeAboutTool,0.001,
-      8.0/0.0115,0.0,0.01,FeedChangePolicy.Reject,
-      new ProcessEngagement([], [MotionOp.SetOutput("a",EventValue.Digital(false))]),0.08);
-    var session=new MotionSession(),run=new ProcessRun(recipe,seamPath(),device,"w",session);
-    expectFailure(()->run.activatePrepared(0),"prepared activation requires a ready process");
-    run.start();run.update(0);
-    expectFailure(()->run.activatePrepared(0.01),"prepared initial program must begin at the seam start");
-    check(run.state==ProcessRunState.Ready,"rejected prepared activation leaves readiness unchanged");
+    var supply = new ModelWelder(), channels = {arc: "a", wireSpeed: "w", voltage: "v"};
+    var device = new WelderProcessDevice(supply, supply, channels, {voltage: 24.0});
+    var recipe = new ProcessRecipe(
+      0.005,
+      0.03,
+      0.0115,
+      0.0,
+      OrientationPolicy.FreeAboutTool,
+      0.001,
+      8.0 / 0.0115,
+      0.0,
+      0.01,
+      FeedChangePolicy.Reject,
+      new ProcessEngagement(
+        [],
+        [MotionOp.SetOutput(
+          "a",
+          EventValue.Digital(false)
+        )]
+      ),
+      0.08
+    );
+    var session = new MotionSession(), run = new ProcessRun(recipe, seamPath(), device, "w", session);
+    expectFailure(() -> run.activatePrepared(0), "prepared activation requires a ready process");
+    run.start();
+    run.update(0);
+    expectFailure(() -> run.activatePrepared(0.01), "prepared initial program must begin at the seam start");
+    check(run.state == ProcessRunState.Ready, "rejected prepared activation leaves readiness unchanged");
     run.activatePrepared(0);
-    check(run.state==ProcessRunState.Active && run.lastProgramStart==0,"prepared program activates without constructing another program");
-    expectFailure(()->run.activatePrepared(0),"an active prepared program cannot be activated again");
-    run.interruptNow(0.09,"arc lost");session.begin();run.update(0.09);
-    expectFailure(()->run.activatePrepared(0.08),"prepared recovery waits for physical motion to stop");
-    session.stop(motionkit.robot.StopDisposition.Discard,[]);session.rest();run.update(0.09);
-    check(run.state==ProcessRunState.Recovery,"prepared interruption uses the ordinary recovery lifecycle");
-    expectFailure(()->run.activatePrepared(0.09),"prepared recovery must include the required backoff");
+    check(
+      run.state == ProcessRunState.Active && run.lastProgramStart == 0,
+      "prepared program activates without constructing another program"
+    );
+    expectFailure(() -> run.activatePrepared(0), "an active prepared program cannot be activated again");
+    run.interruptNow(0.09, "arc lost");
+    session.begin();
+    run.update(0.09);
+    expectFailure(() -> run.activatePrepared(0.08), "prepared recovery waits for physical motion to stop");
+    session.stop(motionkit.robot.StopDisposition.Discard, []);
+    session.rest();
+    run.update(0.09);
+    check(run.state == ProcessRunState.Recovery, "prepared interruption uses the ordinary recovery lifecycle");
+    expectFailure(() -> run.activatePrepared(0.09), "prepared recovery must include the required backoff");
     run.activatePrepared(0.08);
-    near(run.lastProgramStart,0.08,"prepared recovery activates at its validated backoff boundary");
+    near(run.lastProgramStart, 0.08, "prepared recovery activates at its validated backoff boundary");
     run.finish();
-    check(run.state==ProcessRunState.Completion && !supply.arc && supply.wireSpeed==0,
-      "prepared completion makes the welder safe through the ordinary process lifecycle");
+    check(
+      run.state == ProcessRunState.Completion && !supply.arc && supply.wireSpeed == 0,
+      "prepared completion makes the welder safe through the ordinary process lifecycle"
+    );
   }
 
   static function runRestartPoint():Void {
     var supply = new ModelWelder();
     var channels = {arc: "tool/torch.arc", wireSpeed: "tool/torch.wire_speed", voltage: "tool/torch.voltage"};
     var device = new WelderProcessDevice(supply, supply, channels, {voltage: 24.0});
-    var recipe = new ProcessRecipe(0.005, 0.03, 0.0115, 0.0, OrientationPolicy.Interpolated, 0.001, 8.0 / 0.0115, 0.0, 0.01,
-      FeedChangePolicy.Reject, new ProcessEngagement([MotionOp.SetOutput(channels.arc, EventValue.Digital(true))],
-        [MotionOp.SetOutput(channels.arc, EventValue.Digital(false))]), 0.08);
+    var recipe = new ProcessRecipe(
+      0.005,
+      0.03,
+      0.0115,
+      0.0,
+      OrientationPolicy.Interpolated,
+      0.001,
+      8.0 / 0.0115,
+      0.0,
+      0.01,
+      FeedChangePolicy.Reject,
+      new ProcessEngagement(
+        [MotionOp.SetOutput(
+          channels.arc,
+          EventValue.Digital(true)
+        )],
+        [MotionOp.SetOutput(
+          channels.arc,
+          EventValue.Digital(false)
+        )]
+      ),
+      0.08
+    );
     var run = new ProcessRun(recipe, seamPath(), device, channels.wireSpeed, new MotionSession());
     run.start();
     run.update(0.0);
@@ -208,8 +317,21 @@ class WelderProcessTests {
     var stuck = new StuckWelder();
     var channels = {arc: "tool/torch.arc", wireSpeed: "tool/torch.wire_speed", voltage: "tool/torch.voltage"};
     var device = new WelderProcessDevice(supply, stuck, channels, {voltage: 24.0});
-    var recipe = new ProcessRecipe(0.005, 0.03, 0.0115, 0.0, OrientationPolicy.Interpolated, 0.001, 8.0 / 0.0115, 0.0, 0.01,
-      FeedChangePolicy.Reject, null, null, 1.0);
+    var recipe = new ProcessRecipe(
+      0.005,
+      0.03,
+      0.0115,
+      0.0,
+      OrientationPolicy.Interpolated,
+      0.001,
+      8.0 / 0.0115,
+      0.0,
+      0.01,
+      FeedChangePolicy.Reject,
+      null,
+      null,
+      1.0
+    );
     var run = new ProcessRun(recipe, seamPath(), device, channels.wireSpeed, new MotionSession());
     run.start();
     run.update(0.0, 0.5);
@@ -222,8 +344,13 @@ class WelderProcessTests {
     check(reason != null && reason.indexOf("stuck") >= 0, "with the welder's fault as the reason: " + reason);
     expectFailure(function() run.takeProgram(), "a failed run gives no program");
     // A healthy welder is ready at once, whatever the timeout.
-    var healthy = new ProcessRun(recipe, seamPath(), new WelderProcessDevice(supply, supply, channels, {voltage: 24.0}), channels.wireSpeed,
-      new MotionSession());
+    var healthy = new ProcessRun(
+      recipe,
+      seamPath(),
+      new WelderProcessDevice(supply, supply, channels, {voltage: 24.0}),
+      channels.wireSpeed,
+      new MotionSession()
+    );
     healthy.start();
     healthy.update(0.0, 0.1);
     check(healthy.state == ProcessRunState.Ready, "a healthy welder prepares within the timeout");
@@ -235,16 +362,23 @@ class WelderProcessTests {
     return new PosePath("arm-base", [new PoseLine(start, end, OrientationPolicy.Interpolated, 0.1, 0.0115)]);
   }
 
-  static function kinds(program:MotionProgram):String
-    return [for (op in program.ops) switch op {
-      case MoveJ(_, _, _): "MoveJ";
-      case MoveL(_, _, _, _, _): "MoveL";
-      case MoveC(_, _, _, _, _, _): "MoveC";
-      case FollowPath(_, _, _, _): "FollowPath";
-      case Dwell(_): "Dwell";
-      case SetOutput(_, _): "SetOutput";
-      case WaitInput(_, _, _): "WaitInput";
-    }].join(",");
+  static function kinds(program:MotionProgram):String return [for (op in program.ops) switch op {
+    case MoveJ(_, _, _):
+      "MoveJ";
+    case MoveL(_, _, _, _, _):
+      "MoveL";
+    case MoveC(_, _, _, _, _, _):
+      "MoveC";
+    case FollowPath(_, _, _, _):
+      "FollowPath";
+    case Dwell(_):
+      "Dwell";
+    case SetOutput(_, _):
+      "SetOutput";
+    case WaitInput(_, _, _):
+      "WaitInput";
+  }
+  ].join(",");
 
   /**
    * A process with an engagement: its entry follows the approach move and its exit the path; the path's events do not
@@ -255,12 +389,40 @@ class WelderProcessTests {
     var supply = new ModelWelder();
     var channels = {arc: "tool/torch.arc", wireSpeed: "tool/torch.wire_speed", voltage: "tool/torch.voltage"};
     var device = new WelderProcessDevice(supply, supply, channels, {voltage: 24.0});
-    var entry = [MotionOp.SetOutput(channels.arc, EventValue.Digital(true)),
-      MotionOp.WaitInput("weld.arc_established", InputPredicate.Equals(EventValue.Digital(true)), 2.0), MotionOp.Dwell(0.15)];
-    var exit = [MotionOp.Dwell(0.15), MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(0.0)),
-      MotionOp.SetOutput(channels.arc, EventValue.Digital(false))];
-    var recipe = new ProcessRecipe(0.005, 0.03, 0.0115, 0.0, OrientationPolicy.FreeAboutTool, 0.001, 8.0 / 0.0115, 0.0, 0.01,
-      FeedChangePolicy.Reject, new ProcessEngagement(entry, exit), 0.08);
+    var entry = [
+      MotionOp.SetOutput(channels.arc, EventValue.Digital(true)),
+      MotionOp.WaitInput(
+        "weld.arc_established",
+        InputPredicate.Equals(EventValue.Digital(true)),
+        2.0
+      ),
+      MotionOp.Dwell(0.15)
+    ];
+    var exit = [
+      MotionOp.Dwell(0.15),
+      MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(0.0)),
+      MotionOp.SetOutput(
+        channels.arc,
+        EventValue.Digital(false)
+      )
+    ];
+    var recipe = new ProcessRecipe(
+      0.005,
+      0.03,
+      0.0115,
+      0.0,
+      OrientationPolicy.FreeAboutTool,
+      0.001,
+      8.0 / 0.0115,
+      0.0,
+      0.01,
+      FeedChangePolicy.Reject,
+      new ProcessEngagement(
+        entry,
+        exit
+      ),
+      0.08
+    );
     var session = new MotionSession();
     var run = new ProcessRun(recipe, seamPath(), device, channels.wireSpeed, session);
     run.start();
@@ -269,29 +431,38 @@ class WelderProcessTests {
     // The exit ends on an output change, which a program may not: the caller closes it with a motion.
     expectFailure(function() run.takeProgram(), "a program may not end on an output change");
     var program = run.takeProgram(closing());
-    check(kinds(program) == "MoveL,SetOutput,WaitInput,Dwell,FollowPath,Dwell,SetOutput,SetOutput,MoveL",
-      "the approach, then the entry, the path and the exit: " + kinds(program));
+    check(
+      kinds(program) == "MoveL,SetOutput,WaitInput,Dwell,FollowPath,Dwell,SetOutput,SetOutput,MoveL",
+      "the approach, then the entry, the path and the exit: " + kinds(program)
+    );
     check(run.followOp == 4, "the path is the fifth operation");
     switch program.ops[0] {
       case MoveL(_, _, feed, _, freedom):
         near(feed, 0.08, "the approach moves at the recipe's approach speed");
         check(freedom == OrientationPolicy.FreeAboutTool, "the approach preserves the recipe's tool-axis freedom");
-      case _: check(false, "the program begins with a straight move");
+      case _:
+        check(false, "the program begins with a straight move");
     }
     switch program.ops[4] {
       case FollowPath(_, _, feed, events):
         near(feed, 0.0115, "the seam is followed at the travel speed");
         check(events.length == 1, "the path sets the wire speed once and does not zero it at the end");
         switch events[0].value {
-          case Analog(rate): near(rate, 8.0, "the wire speed is the rate for the travel speed");
-          case _: check(false, "the wire speed is an analogue value");
+          case Analog(rate):
+            near(rate, 8.0, "the wire speed is the rate for the travel speed");
+          case _:
+            check(false, "the wire speed is an analogue value");
         }
-      case _: check(false, "the fifth operation follows the path");
+      case _:
+        check(false, "the fifth operation follows the path");
     }
     run.update(0.18);
     check(run.state == ProcessRunState.Active, "at the path's end the run stays active through the exit");
     run.finish();
-    check(run.state == ProcessRunState.Completion && !supply.arc && supply.wireSpeed == 0.0, "finish ends the run and makes the device safe");
+    check(
+      run.state == ProcessRunState.Completion && !supply.arc && supply.wireSpeed == 0.0,
+      "finish ends the run and makes the device safe"
+    );
     expectFailure(function() run.finish(), "a finished run cannot finish again");
 
     // An interruption at 0.09 m restarts 10 mm back, and the restart engages again.
@@ -309,9 +480,27 @@ class WelderProcessTests {
     expectFailure(function() again.interruptNow(0.5, "off the path"), "an interruption has to be on the path");
 
     // A process may use a different re-engagement, without repeating its initial pooling dwell.
-    var gentleRecipe = new ProcessRecipe(0.005, 0.03, 0.0115, 0.0, OrientationPolicy.Interpolated, 0.001,
-      8.0 / 0.0115, 0.0, 0.01, FeedChangePolicy.Reject,
-      new ProcessEngagement(entry, exit, [entry[0], entry[1]]), 0.08);
+    var gentleRecipe = new ProcessRecipe(
+      0.005,
+      0.03,
+      0.0115,
+      0.0,
+      OrientationPolicy.Interpolated,
+      0.001,
+      8.0 / 0.0115,
+      0.0,
+      0.01,
+      FeedChangePolicy.Reject,
+      new ProcessEngagement(
+        entry,
+        exit,
+        [
+          entry[0],
+          entry[1]
+        ]
+      ),
+      0.08
+    );
     var gentle = new ProcessRun(gentleRecipe, seamPath(), device, channels.wireSpeed, session);
     gentle.start();
     gentle.update(0.0);
@@ -319,16 +508,37 @@ class WelderProcessTests {
     gentle.interruptNow(0.09, "arc loss");
     gentle.update(0.09);
     var recovered = gentle.takeProgram(closing());
-    check(kinds(recovered) == "MoveL,SetOutput,WaitInput,FollowPath,Dwell,SetOutput,SetOutput,MoveL",
-      "recovery omits the start dwell but retains the arc wait and crater exit");
+    check(
+      kinds(recovered) == "MoveL,SetOutput,WaitInput,FollowPath,Dwell,SetOutput,SetOutput,MoveL",
+      "recovery omits the start dwell but retains the arc wait and crater exit"
+    );
     check(gentle.followOp == 3, "recovery path progress follows the shorter engagement");
 
     // Without an engagement the run ends at the path's end, as it always did.
-    var plain = new ProcessRun(new ProcessRecipe(0.005, 0.03, 0.0115, 0.0, OrientationPolicy.Interpolated, 0.001, 8.0 / 0.0115, 0.0,
-      0.01, FeedChangePolicy.Reject), seamPath(), device, channels.wireSpeed, new MotionSession());
+    var plain = new ProcessRun(
+      new ProcessRecipe(
+        0.005,
+        0.03,
+        0.0115,
+        0.0,
+        OrientationPolicy.Interpolated,
+        0.001,
+        8.0 / 0.0115,
+        0.0,
+        0.01,
+        FeedChangePolicy.Reject
+      ),
+      seamPath(),
+      device,
+      channels.wireSpeed,
+      new MotionSession()
+    );
     plain.start();
     plain.update(0.0);
-    check(kinds(plain.takeProgram()) == "MoveL,FollowPath" && plain.followOp == 1, "a plain process is a move and a path");
+    check(
+      kinds(plain.takeProgram()) == "MoveL,FollowPath" && plain.followOp == 1,
+      "a plain process is a move and a path"
+    );
     plain.update(0.18);
     check(plain.state == ProcessRunState.Completion, "and ends at the path's end");
   }
@@ -345,14 +555,22 @@ class WelderProcessTests {
     var ops = outputs.drain();
     check(ops.length == 3, "each channel written is one operation, the last write winning");
     check(switch ops[0] {
-      case SetOutput("v", Analog(24.0)): true;
-      case _: false;
-    } && switch ops[1] {
-      case SetOutput("w", Analog(8.0)): true;
-      case _: false;
-    } && switch ops[2] {
-      case SetOutput("a", Digital(false)): true;
-      case _: false;
+      case SetOutput("v", Analog(24.0)):
+        true;
+      case _:
+        false;
+    }
+    && switch ops[1] {
+      case SetOutput("w", Analog(8.0)):
+        true;
+      case _:
+        false;
+    }
+    && switch ops[2] {
+      case SetOutput("a", Digital(false)):
+        true;
+      case _:
+        false;
     }, "the voltage first, then the wire, then the arc");
     check(outputs.drain().length == 0, "and they are written once");
   }

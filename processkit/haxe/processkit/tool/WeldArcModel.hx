@@ -95,7 +95,14 @@ class WeldArcModel {
 
   public final config:WeldArcConfig;
   /** The latest reading. */
-  public var reading(default, null):WeldReading = {arc: false, currentA: 0.0, voltageV: 0.0, touch: false, fault: 0, powerW: 0.0};
+  public var reading(default, null):WeldReading = {
+    arc: false,
+    currentA: 0.0,
+    voltageV: 0.0,
+    touch: false,
+    fault: 0,
+    powerW: 0.0
+  };
 
   var arc = false;
   var fault:Int = WeldFault.None;
@@ -103,9 +110,9 @@ class WeldArcModel {
   var waiting = 0.0;
 
   public function new(config:WeldArcConfig) {
-    if (config == null || !(config.maxCurrentA > 0) || !(config.efficiency > 0 && config.efficiency <= 1) ||
-        !(config.wireDiameterMm > 0) || !(config.stickoutMm > 0))
-      throw "A weld arc model needs a positive rating, wire and stickout and an efficiency in (0, 1]";
+    if (config == null || !(config.maxCurrentA > 0)
+      || !(config.efficiency > 0 && config.efficiency <= 1) || !(config.wireDiameterMm > 0) || !(config.stickoutMm
+      > 0)) throw "A weld arc model needs a positive rating, wire and stickout and an efficiency in (0, 1]";
     this.config = config;
   }
 
@@ -123,8 +130,10 @@ class WeldArcModel {
   }
 
   /** The arc voltage for an arc of length `arcLength` metres at setpoint `voltageSet`. */
-  public static function arcVoltage(voltageSet:Float, arcLength:Float):Float
-    return Math.max(MIN_ARC_VOLTAGE, voltageSet + ARC_VOLTAGE_GRADIENT * (arcLength - NOMINAL_ARC_LENGTH));
+  public static function arcVoltage(voltageSet:Float, arcLength:Float):Float return Math.max(
+    MIN_ARC_VOLTAGE,
+    voltageSet + ARC_VOLTAGE_GRADIENT * (arcLength - NOMINAL_ARC_LENGTH)
+  );
 
   /** Forgets the arc and any fault, as a power cycle does. */
   public function reset():Void {
@@ -172,9 +181,14 @@ class WeldArcModel {
     if (fault != WeldFault.None) arc = false;
     var current = arc ? currentFor(input.wireSpeed) : 0.0;
     var voltage = arc ? arcVoltage(input.voltageSet, arcLength) : input.supplyReady && !touching ? SENSE_VOLTAGE : 0.0;
-    reading = {arc: arc, currentA: current, voltageV: voltage,
-      touch: touching && !arc && input.supplyReady, fault: fault,
-      powerW: arc ? current * voltage / config.efficiency : 0.0};
+    reading = {
+      arc: arc,
+      currentA: current,
+      voltageV: voltage,
+      touch: touching && !arc && input.supplyReady,
+      fault: fault,
+      powerW: arc ? current * voltage / config.efficiency : 0.0
+    };
     return reading;
   }
 }

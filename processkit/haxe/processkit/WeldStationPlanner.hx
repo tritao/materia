@@ -31,9 +31,8 @@ class WeldStationPlanFailure {
   public final seams:Array<String>;
   public final reason:String;
   public function new(stationId:String, seams:Array<String>, reason:String) {
-    if (stationId == null || stationId.length == 0 || seams == null || seams.length == 0 ||
-        reason == null || reason.length == 0)
-      throw "A station-plan failure needs a station, assigned seams and a reason";
+    if (stationId == null || stationId.length == 0 || seams == null || seams.length == 0 || reason == null
+      || reason.length == 0) throw "A station-plan failure needs a station, assigned seams and a reason";
     this.stationId = stationId;
     this.seams = seams.copy();
     this.reason = reason;
@@ -54,20 +53,43 @@ class WeldStationPlanner {
    * Failed edges are removed and selection repeats. A successful optimistic minimum cover is
    * also a minimum proven cover: rejecting other provisional edges cannot improve its count/cost.
    */
-  public static function verified(required:Array<String>, candidates:Array<WeldStationCandidate>, start:Pose2,
-      screen:(WeldStationCandidate, String) -> Null<String>,
-      verify:(WeldStationCandidate, String) -> Null<String>,
-      route:(Pose2, Pose2) -> Null<Float>,
-      ?verifyPlan:WeldStationPlan -> Null<WeldStationPlanFailure>):WeldStationPlan {
+  public static function verified(
+    required:Array<String>,
+    candidates:Array<WeldStationCandidate>,
+    start:Pose2,
+    screen:(
+      WeldStationCandidate,
+      String
+    ) -> Null<String>,
+    verify:(
+      WeldStationCandidate,
+      String
+    ) -> Null<String>,
+    route:(
+      Pose2,
+      Pose2
+    ) -> Null<Float>,
+    ?verifyPlan:WeldStationPlan -> Null<WeldStationPlanFailure>
+  ):WeldStationPlan {
     if (screen == null || verify == null) throw "Verified station planning requires a screen and full motion check";
     return new StationVerification(screen, verify, verifyPlan).solve(required, candidates, start, route);
   }
 
-  public static function plan(required:Array<String>, candidates:Array<WeldStationCandidate>, start:Pose2,
-      access:(WeldStationCandidate, String) -> Null<String>,
-      route:(Pose2, Pose2) -> Null<Float>):WeldStationPlan {
-    if (required == null || candidates == null || start == null || access == null || route == null)
-      throw "Station planning requires seams, candidates, start, access and navigation";
+  public static function plan(
+    required:Array<String>,
+    candidates:Array<WeldStationCandidate>,
+    start:Pose2,
+    access:(
+      WeldStationCandidate,
+      String
+    ) -> Null<String>,
+    route:(
+      Pose2,
+      Pose2
+    ) -> Null<Float>
+  ):WeldStationPlan {
+    if (required == null || candidates == null || start == null || access == null
+      || route == null) throw "Station planning requires seams, candidates, start, access and navigation";
     var names = new Map<String, Bool>();
     for (name in required) {
       if (name == null || name == "" || names.exists(name)) throw "Station seams must have unique nonempty names";
@@ -90,9 +112,11 @@ private class StationVerification {
   final screened:Map<String, Map<String, Null<String>>> = new Map();
   final verified:Map<String, Map<String, Null<String>>> = new Map();
 
-  public function new(screen:(WeldStationCandidate, String) -> Null<String>,
-      verify:(WeldStationCandidate, String) -> Null<String>,
-      verifyPlan:Null<WeldStationPlan -> Null<WeldStationPlanFailure>>) {
+  public function new(
+    screen:(WeldStationCandidate, String) -> Null<String>,
+    verify:(WeldStationCandidate, String) -> Null<String>,
+    verifyPlan:Null<WeldStationPlan -> Null<WeldStationPlanFailure>>
+  ) {
     this.screen = screen;
     this.verify = verify;
     this.verifyPlan = verifyPlan;
@@ -114,8 +138,15 @@ private class StationVerification {
     return cheap.get(seam);
   }
 
-  public function solve(required:Array<String>, candidates:Array<WeldStationCandidate>, start:Pose2,
-      route:(Pose2, Pose2) -> Null<Float>):WeldStationPlan {
+  public function solve(
+    required:Array<String>,
+    candidates:Array<WeldStationCandidate>,
+    start:Pose2,
+    route:(
+      Pose2,
+      Pose2
+    ) -> Null<Float>
+  ):WeldStationPlan {
     while (true) {
       var plan = WeldStationPlanner.plan(required, candidates, start, access, route);
       var complete = true;
@@ -132,14 +163,13 @@ private class StationVerification {
         var failure = verifyPlan(plan);
         if (failure == null) return plan;
         var stationIndex = -1;
-        for (index in 0...plan.stations.length)
-          if (plan.stations[index].id == failure.stationId) stationIndex = index;
+        for (index in 0...plan.stations.length) if (plan.stations[index].id == failure.stationId) stationIndex = index;
         if (stationIndex < 0) throw "Station-plan verification rejected a station outside the proposed plan";
         var full = results(verified, failure.stationId);
         var rejected = 0;
         for (seam in failure.seams) {
-          if (plan.seams[stationIndex].indexOf(seam) < 0)
-            throw 'Station-plan verification rejected unassigned seam "$seam"';
+          if (plan.seams[stationIndex].indexOf(seam)
+            < 0) throw 'Station-plan verification rejected unassigned seam "$seam"';
           if (full.get(seam) == null) {
             full.set(seam, failure.reason);
             rejected++;
@@ -161,13 +191,24 @@ private class StationSearch {
   var best:Array<Int> = [];
   var bestCost:Float = Math.POSITIVE_INFINITY;
 
-  public function new(required:Array<String>, candidates:Array<WeldStationCandidate>, start:Pose2,
-      access:(WeldStationCandidate, String) -> Null<String>, route:(Pose2, Pose2) -> Null<Float>) {
+  public function new(
+    required:Array<String>,
+    candidates:Array<WeldStationCandidate>,
+    start:Pose2,
+    access:(
+      WeldStationCandidate,
+      String
+    ) -> Null<String>,
+    route:(
+      Pose2,
+      Pose2
+    ) -> Null<Float>
+  ) {
     this.required = required.copy();
     this.candidates = candidates.copy();
     this.start = start;
     this.route = route;
-    var failures:Array<Array<String>> = [for (_ in required) []];
+    var failures:Array<Array<String>> = [for (_ in required)[]];
     for (candidate in candidates) {
       var covered:Array<Bool> = [];
       for (index in 0...required.length) {
@@ -185,14 +226,20 @@ private class StationSearch {
   }
 
   static function checkedCost(value:Null<Float>):Null<Float> {
-    if (value != null && (!Math.isFinite(value) || value < 0))
-      throw "Navigation route costs must be finite and nonnegative, or null for unreachable";
+    if (value != null && (!Math.isFinite(value)
+      || value < 0)) throw "Navigation route costs must be finite and nonnegative, or null for unreachable";
     return value;
   }
 
   function edgeCost(from:Int, to:Int):Null<Float> {
     var key = '$from>$to';
-    if (!costs.exists(key)) costs.set(key, checkedCost(route(from < 0 ? start : candidates[from].pose, candidates[to].pose)));
+    if (!costs.exists(key)) costs.set(
+      key,
+      checkedCost(route(
+        from < 0 ? start : candidates[from].pose,
+        candidates[to].pose
+      ))
+    );
     return costs.get(key);
   }
 
@@ -233,7 +280,10 @@ private class StationSearch {
       var pivotCount = candidates.length + 1;
       for (seam in 0...required.length) {
         var alreadyCovered = false;
-        for (index in selected) if (covers[index][seam]) { alreadyCovered = true; break; }
+        for (index in selected) if (covers[index][seam]) {
+          alreadyCovered = true;
+          break;
+        }
         if (alreadyCovered) continue;
         complete = false;
         uncovered++;
@@ -242,7 +292,10 @@ private class StationSearch {
           if (selected.indexOf(index) < 0 && covers[index][seam]) options.push(index);
         }
         if (options.length == 0) return;
-        if (options.length < pivotCount) { pivot = options; pivotCount = options.length; }
+        if (options.length < pivotCount) {
+          pivot = options;
+          pivotCount = options.length;
+        }
       }
 
       if (selected.length == size) {
@@ -266,7 +319,10 @@ private class StationSearch {
         var gain = 0;
         for (seam in 0...required.length) {
           var covered = false;
-          for (chosen in selected) if (covers[chosen][seam]) { covered = true; break; }
+          for (chosen in selected) if (covers[chosen][seam]) {
+            covered = true;
+            break;
+          }
           if (!covered && covers[index][seam]) gain++;
         }
         maximumGain = Std.int(Math.max(maximumGain, gain));

@@ -20,8 +20,14 @@ import processkit.path.Toolpath;
  * geometry stays planar.
  */
 class RasterToolpathGenerator {
-  public static function generate(surface:WorkSurface, toolWidth:Float, overlap:Float,
-      standoff:Float, feedRate:Float, leadInOut:Float):Toolpath {
+  public static function generate(
+    surface:WorkSurface,
+    toolWidth:Float,
+    overlap:Float,
+    standoff:Float,
+    feedRate:Float,
+    leadInOut:Float
+  ):Toolpath {
     if (surface == null) throw "Raster toolpath generation requires a work surface";
     if (!Math.isFinite(toolWidth) || toolWidth <= 0.0) throw "Raster tool width must be positive and finite";
     if (!Math.isFinite(overlap) || overlap < 0.0 || overlap >= 1.0) throw "Raster overlap must be in [0, 1)";
@@ -53,11 +59,13 @@ class RasterToolpathGenerator {
 
     for (rowY in rows) {
       var allowed:Array<Interval1D> = [];
-      for (raw in surface.boundary.scanlineIntervals(rowY))
-        allowed.push(new Interval1D(raw[0], raw[1]));
+      for (raw in surface.boundary.scanlineIntervals(rowY)) allowed.push(new Interval1D(raw[0], raw[1]));
       var forbidden:Array<Array<Float>> = [];
-      for (exclusion in surface.exclusions)
-        forbidden = forbidden.concat(expandedExclusionIntervals(exclusion, rowY, halfWidth));
+      for (exclusion in surface.exclusions) forbidden = forbidden.concat(expandedExclusionIntervals(
+        exclusion,
+        rowY,
+        halfWidth
+      ));
       allowed = subtractIntervals(allowed, mergeIntervals(forbidden));
       var kept:Array<Array<Float>> = [];
       for (interval in allowed) {
@@ -86,7 +94,11 @@ class RasterToolpathGenerator {
 
     if (!wroteAny) throw "Raster toolpath generator found no reachable area inside the boundary";
 
-    points.unshift(new ToolpathPoint(surfacePose(firstStart - firstDir * leadInOut, firstRowY, standoff), feedRate, false));
+    points.unshift(new ToolpathPoint(
+      surfacePose(firstStart - firstDir * leadInOut, firstRowY, standoff),
+      feedRate,
+      false
+    ));
     points.push(new ToolpathPoint(surfacePose(lastEnd + lastDir * leadInOut, lastRowY, standoff), feedRate, false));
 
     return new Toolpath(surface.surfaceFrameId, points);
@@ -99,8 +111,7 @@ class RasterToolpathGenerator {
   }
 
   /** Returns the horizontal slice of an exclusion expanded by `radius`. */
-  static function expandedExclusionIntervals(exclusion:Polygon2, y:Float,
-      radius:Float):Array<Array<Float>> {
+  static function expandedExclusionIntervals(exclusion:Polygon2, y:Float, radius:Float):Array<Array<Float>> {
     var intervals = exclusion.scanlineIntervals(y);
     var vertices = exclusion.vertices();
     for (index in 0...vertices.length) {
@@ -118,9 +129,18 @@ class RasterToolpathGenerator {
       var normalX = -edgeY / edgeLength, normalY = edgeX / edgeLength;
       var strip = new Polygon2([
         new Point2(a.x - normalX * radius, a.y - normalY * radius),
-        new Point2(b.x - normalX * radius, b.y - normalY * radius),
-        new Point2(b.x + normalX * radius, b.y + normalY * radius),
-        new Point2(a.x + normalX * radius, a.y + normalY * radius)
+        new Point2(
+          b.x - normalX * radius,
+          b.y - normalY * radius
+        ),
+        new Point2(
+          b.x + normalX * radius,
+          b.y + normalY * radius
+        ),
+        new Point2(
+          a.x + normalX * radius,
+          a.y + normalY * radius
+        )
       ]);
       intervals = intervals.concat(strip.scanlineIntervals(y));
     }
@@ -130,13 +150,16 @@ class RasterToolpathGenerator {
   /** Merges overlapping or touching horizontal intervals in ascending order. */
   static function mergeIntervals(input:Array<Array<Float>>):Array<Array<Float>> {
     var sorted:Array<Array<Float>> = [];
-    for (interval in input) if (interval != null && interval.length >= 2 &&
-        interval[1] - interval[0] > 1e-12)
-      sorted.push([interval[0], interval[1]]);
+    for (interval in input) if (interval != null
+      && interval.length >= 2 && interval[1] - interval[0] > 1e-12) sorted.push([
+        interval[0],
+        interval[1]
+      ]);
     sorted.sort(function(left, right) {
       if (left[0] != right[0]) return left[0] < right[0] ? -1 : 1;
       return left[1] < right[1] ? -1 : (left[1] > right[1] ? 1 : 0);
-    });
+    }
+    );
     var result:Array<Array<Float>> = [];
     for (interval in sorted) {
       if (result.length == 0 || interval[0] > result[result.length - 1][1] + 1e-10) {

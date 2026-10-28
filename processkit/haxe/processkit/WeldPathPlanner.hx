@@ -43,9 +43,18 @@ class PlannedWeld {
   /** Verified joint configuration after retreat, for planning the next motion on the same branch. */
   public final endJoints:Array<Float>;
 
-  public function new(plan:WeldPlan, rolls:Array<Float>, styles:Array<Int>, entry:WeldEntry, retreat:Pose3, exitName:String, checked:Int,
-      endJoints:Array<Float>,selected:Bool=false) {
-    this.selected=selected;
+  public function new(
+    plan:WeldPlan,
+    rolls:Array<Float>,
+    styles:Array<Int>,
+    entry:WeldEntry,
+    retreat:Pose3,
+    exitName:String,
+    checked:Int,
+    endJoints:Array<Float>,
+    selected:Bool = false
+  ) {
+    this.selected = selected;
     this.styles = styles;
     this.plan = plan;
     this.rolls = rolls;
@@ -119,7 +128,16 @@ class WeldPathPlanner {
   /** How many distinct IK branches are useful before sweeping each around the wrist. */
   static inline var GOALS:Int = 4;
   /** The rolls about the wire tried for a segment, in radians: a quarter turns, and the eighths between. */
-  public static final ROLLS:Array<Float> = [0.0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, 3 * Math.PI / 4, -3 * Math.PI / 4, Math.PI];
+  public static final ROLLS:Array<Float> = [
+    0.0,
+    Math.PI / 4,
+    -Math.PI / 4,
+    Math.PI / 2,
+    -Math.PI / 2,
+    3 * Math.PI / 4,
+    -3 * Math.PI / 4,
+    Math.PI
+  ];
 
   final solver:KinematicsSolver;
   final tolerance:IkTolerance;
@@ -143,9 +161,20 @@ class WeldPathPlanner {
    * where it stands); `wrist` limits the corner turns (`WeldCorner`); `clearance` is null for a cell without hulls.
    * `maxJointJump` is the compiler's continuity bound; `compileMotion` returns validated plans without robot submission.
    */
-  public function new(solver:KinematicsSolver, tolerance:IkTolerance, velocity:Array<Float>, wrist:WristLimits, ?clearance:ClearanceWorld,
-      ?maxJointJump:Array<Float>, ?compileMotion:(PlannedWeld, Array<Float>) -> CompiledProgram) {
-    if (solver == null || tolerance == null || velocity == null || wrist == null) throw "A weld planner needs a solver, tolerances, joint speeds and the wrist's limits";
+  public function new(
+    solver:KinematicsSolver,
+    tolerance:IkTolerance,
+    velocity:Array<Float>,
+    wrist:WristLimits,
+    ?clearance:ClearanceWorld,
+    ?maxJointJump:Array<Float>,
+    ?compileMotion:(
+      PlannedWeld,
+      Array<Float>
+    ) -> CompiledProgram
+  ) {
+    if (solver == null || tolerance == null || velocity == null
+      || wrist == null) throw "A weld planner needs a solver, tolerances, joint speeds and the wrist's limits";
     this.solver = solver;
     this.tolerance = tolerance;
     this.velocity = velocity;
@@ -154,7 +183,8 @@ class WeldPathPlanner {
     this.compileMotion = compileMotion;
     this.maxJointJump = maxJointJump == null ? [for (_ in 0...solver.jointCount()) 0.2] : maxJointJump.copy();
     if (this.maxJointJump.length != solver.jointCount()) throw "A weld planner needs one continuity bound per joint";
-    for (jump in this.maxJointJump) if (!(jump > 0.0) || !Math.isFinite(jump)) throw "Weld continuity bounds must be finite and positive";
+    for (jump in this.maxJointJump) if (!(jump > 0.0)
+      || !Math.isFinite(jump)) throw "Weld continuity bounds must be finite and positive";
   }
 
   /**
@@ -168,10 +198,11 @@ class WeldPathPlanner {
     entryMotionBlocked = false;
     collisions.splice(0, collisions.length);
     unreachable.splice(0, unreachable.length);
-    path = [for (item in requested.segments) ({from: item.start.translation, to: item.stop.translation} : Segment3)];
+    path = [for (item in requested.segments)({from: item.start.translation, to: item.stop.translation}:Segment3)];
     var found = search(requested, start, 0, [], [], [], null, 0.0, null);
     // A closed run has no required starting corner. The CAD tour's nearest corner may strand the wrist later in the run.
-    if (found == null && requested.segments.length > 1 && requested.stop().translation.sub(requested.start().translation).norm() <= WeldPlan.JOIN) {
+    if (found == null && requested.segments.length > 1
+      && requested.stop().translation.sub(requested.start().translation).norm() <= WeldPlan.JOIN) {
       for (corner in 1...requested.segments.length) {
         var segments = requested.segments.slice(corner).concat(requested.segments.slice(0, corner));
         var rotated = new WeldPlan(segments, requested.parameters);
@@ -184,9 +215,13 @@ class WeldPathPlanner {
       var reversed = requested.reversed();
       budget = BUDGET;
       found = search(reversed, start, 0, [], [], [], null, 0.0, null);
-      if (found == null && reversed.segments.length > 1 && reversed.stop().translation.sub(reversed.start().translation).norm() <= WeldPlan.JOIN) {
+      if (found == null && reversed.segments.length > 1
+        && reversed.stop().translation.sub(reversed.start().translation).norm() <= WeldPlan.JOIN) {
         for (corner in 1...reversed.segments.length) {
-          var rotated = new WeldPlan(reversed.segments.slice(corner).concat(reversed.segments.slice(0, corner)), reversed.parameters);
+          var rotated = new WeldPlan(
+            reversed.segments.slice(corner).concat(reversed.segments.slice(0, corner)),
+            reversed.parameters
+          );
           budget = BUDGET;
           found = search(rotated, start, 0, [], [], [], null, 0.0, null);
           if (found != null) break;
@@ -195,7 +230,8 @@ class WeldPathPlanner {
     }
     if (found == null) {
       var names:Array<String> = [];
-      for (segment in requested.segments) if (segment.name != "" && names.indexOf(segment.name) < 0) names.push(segment.name);
+      for (segment in requested.segments) if (segment.name != ""
+        && names.indexOf(segment.name) < 0) names.push(segment.name);
       var label = names.length == 0 ? "the weld" : 'the weld of ${names.join(", ")}';
       // Keep both kinds of failure visible; a large number of collisions must not hide the reach failures.
       var all:Array<String> = [];
@@ -206,15 +242,24 @@ class WeldPathPlanner {
       var reasons:Array<String> = [];
       for (reason in all) if (reasons.indexOf(reason) < 0) reasons.push(reason);
       var shown = reasons.slice(0, 80);
-      throw 'Cannot plan $label: no roll of the torch is both reachable and clear of the work ($attempts tries); ' + shown.join("; ") +
-        (reasons.length > shown.length ? '; and ${reasons.length - shown.length} more' : "");
+      throw 'Cannot plan $label: no roll of the torch is both reachable and clear of the work ($attempts tries); '
+        + shown.join("; ") + (reasons.length > shown.length ? '; and ${reasons.length - shown.length} more' : "");
     }
     return found;
   }
 
   /** The search over segment `index` and the ones after: null when no choice of rolls gets through them. */
-  function search(requested:WeldPlan, start:Array<Float>, index:Int, rolled:Array<WeldSegment>, rolls:Array<Float>, styles:Array<Int>,
-      carry:Null<Array<Float>>, previous:Float, entry:Null<WeldEntry>):Null<PlannedWeld> {
+  function search(
+    requested:WeldPlan,
+    start:Array<Float>,
+    index:Int,
+    rolled:Array<WeldSegment>,
+    rolls:Array<Float>,
+    styles:Array<Int>,
+    carry:Null<Array<Float>>,
+    previous:Float,
+    entry:Null<WeldEntry>
+  ):Null<PlannedWeld> {
     var segments = requested.segments;
     var segment = segments[index];
     var candidates = ROLLS.copy();
@@ -229,9 +274,17 @@ class WeldPathPlanner {
       if (index > 0) budget--;
       attempts++;
       var spin = Quat.fromAxisAngle(new Vec3(0.0, 0.0, 1.0), roll);
-      var turned = new WeldSegment(new Transform3(segment.start.translation, segment.start.rotation.multiply(spin)),
-        new Transform3(segment.stop.translation, segment.stop.rotation.multiply(spin)), segment.name, segment.open);
-      var label = '${segment.name == "" ? 'segment $index' : segment.name} at roll ${Math.round(roll * 180 / Math.PI)} degrees';
+      var turned = new WeldSegment(
+        new Transform3(segment.start.translation, segment.start.rotation.multiply(spin)),
+        new Transform3(
+          segment.stop.translation,
+          segment.stop.rotation.multiply(spin)
+        ),
+        segment.name,
+        segment.open
+      );
+      var label =
+        '${segment.name == "" ? 'segment $index' : segment.name} at roll ${Math.round(roll * 180 / Math.PI)} degrees';
       if (index == 0) {
         var found = enter(requested, turned, start, label, function(chosen, q) {
           // A reachable approach can lead into an IK branch that cannot finish the chain. Try each entry against
@@ -239,7 +292,8 @@ class WeldPathPlanner {
           budget = BUDGET;
           attempts++;
           return follow(requested, start, index, turned, rolled, rolls, styles, q, roll, chosen, label);
-        });
+        }
+        );
         if (found != null) return found;
       } else {
         var found = follow(requested, start, index, turned, rolled, rolls, styles, cast carry, roll, cast entry, label);
@@ -250,8 +304,19 @@ class WeldPathPlanner {
   }
 
   /** Follow a segment and the rest of the chain from this entry or the preceding segment's IK branch. */
-  function follow(requested:WeldPlan, start:Array<Float>, index:Int, turned:WeldSegment, rolled:Array<WeldSegment>,
-      rolls:Array<Float>, styles:Array<Int>, q:Array<Float>, roll:Float, entry:WeldEntry, label:String):Null<PlannedWeld> {
+  function follow(
+    requested:WeldPlan,
+    start:Array<Float>,
+    index:Int,
+    turned:WeldSegment,
+    rolled:Array<WeldSegment>,
+    rolls:Array<Float>,
+    styles:Array<Int>,
+    q:Array<Float>,
+    roll:Float,
+    entry:WeldEntry,
+    label:String
+  ):Null<PlannedWeld> {
     for (style in 0...(index == 0 ? 1 : WeldCorner.STYLES)) {
       if (entryMotionBlocked) return null;
       if (budget <= 0) return null;
@@ -267,7 +332,16 @@ class WeldPathPlanner {
       if (index == requested.segments.length - 1) {
         var out = leave(requested, turned, done.q, label);
         if (out == null) continue;
-        var candidate = new PlannedWeld(new WeldPlan(finished, requested.parameters), rollsNow, stylesNow, entry, out.retreat, out.name, checked, out.q);
+        var candidate = new PlannedWeld(
+          new WeldPlan(finished, requested.parameters),
+          rollsNow,
+          stylesNow,
+          entry,
+          out.retreat,
+          out.name,
+          checked,
+          out.q
+        );
         var end = verify(candidate, start, label);
         if (end == null) continue;
         return new PlannedWeld(candidate.plan, rollsNow, stylesNow, entry, out.retreat, out.name, checked, end);
@@ -301,13 +375,14 @@ class WeldPathPlanner {
             // Later seam rolls cannot change the same entry or approach. Try
             // another entry rather than rechecking this blocked trajectory.
             if (block.opIndices[index] <= candidate.entry.moves.length + 1) entryMotionBlocked = true;
-            throw describe(hit, tip) + ' in operation ${block.opIndices[index]} at ${trajectory.durationSeconds * sample / samples}s';
+            throw describe(hit,
+              tip) + ' in operation ${block.opIndices[index]} at ${trajectory.durationSeconds * sample / samples}s';
           }
         }
       }
       var end = candidate.endJoints.copy();
-      for (block in compiled.blocks) for (trajectory in block.plans)
-        end = trajectory.evaluate(trajectory.durationSeconds).positions.copy();
+      for (block in compiled.blocks) for (trajectory in block.plans) end =
+        trajectory.evaluate(trajectory.durationSeconds).positions.copy();
       compiled.dispose();
       return end;
     } catch (error:Dynamic) {
@@ -322,8 +397,16 @@ class WeldPathPlanner {
    * (goals nearest to where it stands) to the segment's start. `accept` checks whether the whole weld can be finished
    * from that entry. Null, noting the reasons, when none can.
    */
-  function enter(requested:WeldPlan, segment:WeldSegment, start:Array<Float>, label:String,
-      accept:(WeldEntry, Array<Float>) -> Null<PlannedWeld>):Null<PlannedWeld> {
+  function enter(
+    requested:WeldPlan,
+    segment:WeldSegment,
+    start:Array<Float>,
+    label:String,
+    accept:(
+      WeldEntry,
+      Array<Float>
+    ) -> Null<PlannedWeld>
+  ):Null<PlannedWeld> {
     var wireIn = segment.start.rotation.rotate(new Vec3(0.0, 0.0, 1.0));
     var distance = requested.parameters.approach;
     for (way in ways()) {
@@ -340,22 +423,30 @@ class WeldPathPlanner {
         if (!discovery) {
           if (continued != null) goals.push(continued);
         } else {
-          for (goal in solver.sampleCandidates(poses[0], GOALS, tolerance, motionkit.path.OrientationPolicy.FreeAboutTool)) {
+          for (goal in solver.sampleCandidates(
+            poses[0],
+            GOALS,
+            tolerance,
+            motionkit.path.OrientationPolicy.FreeAboutTool
+          )) {
             var duplicate = false;
             if (continued != null) {
               var separation = 0.0;
-              for (joint in 0...goal.length) separation += (goal[joint] - continued[joint]) * (goal[joint] - continued[joint]);
+              for (joint in 0...goal.length) separation += (goal[joint]
+                - continued[joint]) * (goal[joint] - continued[joint]);
               duplicate = separation < tolerance.candidateSeparation * tolerance.candidateSeparation;
             }
             if (!duplicate) goals.push(goal);
           }
         }
-        if (discovery && continued == null && goals.length == 0) unreachable.push('$label, ${way.name}: no entry IK configuration at ' + where(poses[0]));
+        if (discovery && continued == null && goals.length
+          == 0) unreachable.push('$label, ${way.name}: no entry IK configuration at ' + where(poses[0]));
         goals.sort(function(a, b) return Reflect.compare(cost(a, start), cost(b, start)));
         for (goal in goals) {
           var air = clearance == null ? null : clearance.sweep(start, goal, false, AIR_STEP);
           if (air != null) {
-            collisions.push('$label, ${way.name}: the joint move to the entry (tip bound for ' + where(poses[0]) + ') ' + describeHit(air));
+            collisions.push('$label, ${way.name}: the joint move to the entry (tip bound for '
+              + where(poses[0]) + ') ' + describeHit(air));
             continue;
           }
           var steps:Array<Step> = [{pose: poses[0], contact: false}];
@@ -381,16 +472,45 @@ class WeldPathPlanner {
   function ways():Array<Way> {
     return [
       {name: "along the wire", open: false, scale: 1.0, high: false},
-      {name: "along the open side", open: true, scale: 1.0, high: false},
-      {name: "along the wire from twice as far", open: false, scale: 2.0, high: false},
-      {name: "along the open side from twice as far", open: true, scale: 2.0, high: false},
-      {name: "over the work, then along the wire", open: false, scale: 1.0, high: true},
-      {name: "over the work, then along the open side", open: true, scale: 1.0, high: true}
+      {
+        name: "along the open side",
+        open: true,
+        scale: 1.0,
+        high: false
+      },
+      {
+        name: "along the wire from twice as far",
+        open: false,
+        scale: 2.0,
+        high: false
+      },
+      {
+        name: "along the open side from twice as far",
+        open: true,
+        scale: 2.0,
+        high: false
+      },
+      {
+        name: "over the work, then along the wire",
+        open: false,
+        scale: 1.0,
+        high: true
+      },
+      {
+        name: "over the work, then along the open side",
+        open: true,
+        scale: 1.0,
+        high: true
+      }
     ];
   }
 
   /** How the torch leaves the end of the last segment: the first way that is reachable and clear from the weld's end. */
-  function leave(requested:WeldPlan, segment:WeldSegment, from:Array<Float>, label:String):Null<{retreat:Pose3, name:String, q:Array<Float>}> {
+  function leave(requested:WeldPlan, segment:WeldSegment, from:Array<Float>, label:String):Null<{
+    retreat:Pose3,
+    name:String,
+    q:Array<Float>
+  }> {
     var wireOut = segment.stop.rotation.rotate(new Vec3(0.0, 0.0, 1.0));
     var distance = requested.parameters.approach;
     var end = segment.stop.translation;
@@ -414,7 +534,8 @@ class WeldPathPlanner {
    * the corner from the segment before (`rolled` ends with it), then the segment itself up to where the turn to the next
    * begins (the last segment, to its end).
    */
-  function weldSteps(requested:WeldPlan, index:Int, segment:WeldSegment, rolled:Array<WeldSegment>, style:Int):Array<Step> {
+  function weldSteps(requested:WeldPlan,
+    index:Int, segment:WeldSegment, rolled:Array<WeldSegment>, style:Int):Array<Step> {
     var steps:Array<Step> = [];
     var a = segment.start.translation, b = segment.stop.translation;
     var length = segment.length();
@@ -434,11 +555,42 @@ class WeldPathPlanner {
       // The part of the segment before that the corner covers, and what of it is turning.
       var covered = Math.min(WeldCorner.MAX_TURN, WeldCorner.SHARE * beforeLength);
       var corner = before.stop.translation;
-      line(corner.sub(back.scale(covered)), before.stop.rotation, corner.sub(back.scale(outer)), before.stop.rotation, steps, false);
+      line(
+        corner.sub(back.scale(covered)),
+        before.stop.rotation,
+        corner.sub(back.scale(outer)),
+        before.stop.rotation,
+        steps,
+        false
+      );
       // The two halves of the turn, the wire swinging along the shortest arc (`WeldCorner.orientationAt`).
-      if (outer > 0.0) turn(corner.sub(back.scale(outer)), corner, before.stop.rotation, segment.start.rotation, 0.0, 0.5, back, forward, style, steps, true);
+      if (outer > 0.0) turn(
+        corner.sub(back.scale(outer)),
+        corner,
+        before.stop.rotation,
+        segment.start.rotation,
+        0.0,
+        0.5,
+        back,
+        forward,
+        style,
+        steps,
+        true
+      );
       if (inner > 0.0) {
-        turn(a, a.add(forward.scale(inner)), before.stop.rotation, segment.start.rotation, 0.5, 1.0, back, forward, style, steps, true);
+        turn(
+          a,
+          a.add(forward.scale(inner)),
+          before.stop.rotation,
+          segment.start.rotation,
+          0.5,
+          1.0,
+          back,
+          forward,
+          style,
+          steps,
+          true
+        );
         from = a.add(forward.scale(inner));
       }
     }
@@ -448,12 +600,27 @@ class WeldPathPlanner {
   }
 
   /** The poses along a stretch of a turn from `r1` to `r2` at a corner between travel directions `travelA` and `travelB`, from fraction `s0` of it to `s1`. */
-  function turn(from:Vec3, to:Vec3, r1:Quat, r2:Quat, s0:Float, s1:Float, travelA:Vec3, travelB:Vec3, style:Int, into:Array<Step>, skipFirst:Bool):Void {
+  function turn(
+    from:Vec3,
+    to:Vec3,
+    r1:Quat,
+    r2:Quat,
+    s0:Float,
+    s1:Float,
+    travelA:Vec3,
+    travelB:Vec3,
+    style:Int,
+    into:Array<Step>,
+    skipFirst:Bool
+  ):Void {
     var steps = Std.int(Math.max(1.0, Math.ceil(to.sub(from).norm() / STEP)));
     for (step in (skipFirst ? 1 : 0)...steps + 1) {
       var fraction = step / steps;
       var at = from.add(to.sub(from).scale(fraction));
-      into.push({pose: pose(at, WeldCorner.orientationAt(r1, r2, s0 + (s1 - s0) * fraction, travelA, travelB, style)), contact: near(at)});
+      into.push({
+        pose: pose(at, WeldCorner.orientationAt(r1, r2, s0 + (s1 - s0) * fraction, travelA, travelB, style)),
+        contact: near(at)
+      });
     }
   }
 
@@ -508,21 +675,20 @@ class WeldPathPlanner {
         collided = blocked;
       }
     }
-    if (reason != null) (collided ? collisions : unreachable).push('$label: $reason');
+    if (reason != null)(collided ? collisions : unreachable).push('$label: $reason');
     return {q: null, reason: reason, collision: collided};
   }
 
-  static function styleName(style:Int):String
-    return style == WeldCorner.AROUND ? "around the corner" : style == WeldCorner.ARC ? "along the wire's arc" : "by rotation";
+  static function styleName(style:Int):String return style
+    == WeldCorner.AROUND ? "around the corner" : style == WeldCorner.ARC ? "along the wire's arc" : "by rotation";
 
-  static function describeHit(hit:robotkit.manipulation.ClearanceViolation):String
-    return '${hit.a} is ${Math.round(hit.distance * 10000) / 10} mm from ${hit.b} (needs ${Math.round(hit.required * 10000) / 10} mm)';
+  static function describeHit(hit:robotkit.manipulation
+    .ClearanceViolation):String return '${hit.a} is ${Math.round(hit.distance * 10000) / 10} mm from ${hit.b} (needs ${Math.round(hit.required * 10000) / 10} mm)';
 
-  static function describe(hit:robotkit.manipulation.ClearanceViolation, pose:Pose3):String
-    return describeHit(hit) + ' with the tip at ' + where(pose);
+  static function describe(hit:robotkit.manipulation.ClearanceViolation,
+    pose:Pose3):String return describeHit(hit) + ' with the tip at ' + where(pose);
 
-  static function where(pose:Pose3):String
-    return '(${Math.round(pose.x * 10000) / 10}, ${Math.round(pose.y * 10000) / 10}, ${Math.round(pose.z * 10000) / 10}) mm';
+  static function where(pose:Pose3):String return '(${Math.round(pose.x * 10000) / 10}, ${Math.round(pose.y * 10000) / 10}, ${Math.round(pose.z * 10000) / 10}) mm';
 
   function cost(q:Array<Float>, from:Array<Float>):Float {
     var sum = 0.0;
@@ -533,7 +699,15 @@ class WeldPathPlanner {
     return sum;
   }
 
-  static function pose(at:Vec3, rotation:Quat):Pose3 return new Pose3(at.x, at.y, at.z, rotation.x, rotation.y, rotation.z, rotation.w);
+  static function pose(at:Vec3, rotation:Quat):Pose3 return new Pose3(
+    at.x,
+    at.y,
+    at.z,
+    rotation.x,
+    rotation.y,
+    rotation.z,
+    rotation.w
+  );
 
   /** Whether `point` is within the contact zone of the weld path. */
   function near(point:Vec3):Bool {

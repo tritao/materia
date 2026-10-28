@@ -2,7 +2,7 @@ package processkit.work;
 
 
 /** Axis-aligned bounding box of a Polygon2, in its own plane. */
-typedef PolygonBounds = { minX:Float, minY:Float, maxX:Float, maxY:Float };
+typedef PolygonBounds = {minX:Float, minY:Float, maxX:Float, maxY:Float};
 
 /** Immutable simple polygon in a WorkSurface's own XY plane; vertices counter-clockwise. */
 class Polygon2 {
@@ -19,8 +19,7 @@ class Polygon2 {
       this.points.push(new Point2(point.x, point.y));
       twiceArea += point.x * next.y - next.x * point.y;
     }
-    if (!Math.isFinite(twiceArea) || twiceArea <= 1e-9)
-      throw "Polygon must have positive counter-clockwise area";
+    if (!Math.isFinite(twiceArea) || twiceArea <= 1e-9) throw "Polygon must have positive counter-clockwise area";
   }
 
   public function vertices():Array<Point2> return [for (point in points) new Point2(point.x, point.y)];
@@ -43,7 +42,7 @@ class Polygon2 {
       if (point.y < minY) minY = point.y;
       if (point.y > maxY) maxY = point.y;
     }
-    return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
+    return {minX: minX, minY: minY, maxX: maxX, maxY: maxY};
   }
 
   /** X-intervals (ascending, non-overlapping) where the horizontal line at `y` is inside this polygon. */
@@ -85,8 +84,8 @@ class Polygon2 {
   /** Point-in-polygon with a finite distance tolerance around the boundary. */
   public function containsOrWithin(point:Point2, tolerance:Float):Bool {
     if (point == null) throw "Polygon containment requires a point";
-    if (!Math.isFinite(tolerance) || tolerance < 0.0)
-      throw "Polygon containment tolerance must be finite and non-negative";
+    if (!Math.isFinite(tolerance)
+      || tolerance < 0.0) throw "Polygon containment tolerance must be finite and non-negative";
     if (contains(point)) return true;
     if (tolerance == 0.0) return false;
     var limitSquared = tolerance * tolerance;
@@ -101,8 +100,7 @@ class Polygon2 {
   static function segmentDistanceSquared(point:Point2, a:Point2, b:Point2):Float {
     var dx = b.x - a.x, dy = b.y - a.y;
     var lengthSquared = dx * dx + dy * dy;
-    var t = lengthSquared <= 1e-12 ? 0.0 :
-      ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared;
+    var t = lengthSquared <= 1e-12 ? 0.0 : ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared;
     if (t < 0.0) t = 0.0;
     if (t > 1.0) t = 1.0;
     var x = a.x + t * dx, y = a.y + t * dy;
