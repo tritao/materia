@@ -29,7 +29,7 @@ class EmergencyStop extends HmiPart {
   ];
 
   public function new(?v:ComponentValues) {
-    super("hmi-emergency-stop", "twist-release emergency stop with " + (v == null || v.get("blocks") == null ? 1 : v.integer("blocks")) + " NC contact block(s)", "plastic", inputs(), ControlCatalogs.withModel(ControlCatalogs.eStops(), ControlCatalogs.XB2, v));
+    super("hmi-emergency-stop", "twist-release emergency stop with " + (v == null || v.get("blocks") == null ? 1 : v.integer("blocks")) + " NC contact block(s)", "ABS red", inputs(), ControlCatalogs.withModel(ControlCatalogs.eStops(), ControlCatalogs.XB2, v));
     positive(["headDiameter", "collarDiameter", "collarHeight", "headHeight", "panelHole", "panelThickness", "nutDiameter", "nutThickness",
       "baseWidth", "baseDepth", "baseLength", "blockWidth", "blockThickness", "blockLength", "massGrams"]);
     require(n("collarDiameter") < n("headDiameter") && n("panelHole") < n("collarDiameter"), "the head is wider than its collar and the collar wider than the opening");

@@ -10,12 +10,16 @@ import materia.assembly.AssemblyFrames;
  * that overlap.
  */
 class PanelAssemblyBuilder {
-  /** `extras` are further fixed solids in panel coordinates (a board, say), each with an id and a builder. */
-  public static function build(layout:PanelLayout, plate:() -> Part, ?shell:() -> Part, ?extras:Array<{id:String, solid:() -> Part}>):MachineAssembly {
+  /**
+   * `extras` are further fixed solids in panel coordinates (a board, say), each with an id and a builder, made of
+   * `extrasMaterial`. The plate and shell are printed nylon, light against the dark controls.
+   */
+  public static function build(layout:PanelLayout, plate:() -> Part, ?shell:() -> Part, ?extras:Array<{id:String, solid:() -> Part}>,
+      extrasMaterial:String = "plastic"):MachineAssembly {
     var assembly = new MachineAssembly();
-    assembly.addComponent("plate", new PanelSolid("PANEL-PLATE", "panel plate", plate));
-    if (shell != null) assembly.addComponent("shell", new PanelSolid("PANEL-SHELL", "case shell", shell));
-    if (extras != null) for (e in extras) assembly.addComponent(e.id, new PanelSolid("PANEL-" + e.id.toUpperCase(), e.id, e.solid));
+    assembly.addComponent("plate", new PanelSolid("PANEL-PLATE", "panel plate", plate, "PA12 nylon"));
+    if (shell != null) assembly.addComponent("shell", new PanelSolid("PANEL-SHELL", "case shell", shell, "PA12 nylon"));
+    if (extras != null) for (e in extras) assembly.addComponent(e.id, new PanelSolid("PANEL-" + e.id.toUpperCase(), e.id, e.solid, extrasMaterial));
     for (c in layout.controls) assembly.addComponent(c.id, c.part, AssemblyFrames.translation(c.x, c.y, layout.thickness));
     return assembly;
   }

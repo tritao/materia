@@ -27,7 +27,7 @@ class OledModule extends HmiPart {
   ];
 
   public function new(?v:ComponentValues) {
-    super("hmi-oled-module", "2.42 in 128x64 OLED module", "plastic", inputs(), v);
+    super("hmi-oled-module", "2.42 in 128x64 OLED module", "ABS black", inputs(), v);
     positive(["windowWidth", "windowHeight", "glassWidth", "glassHeight", "glassThickness", "pcbWidth", "pcbHeight", "pcbThickness", "panelThickness", "standoffGap", "behindDepth", "headerWidth", "headerHeight", "massGrams"]);
     require(n("windowWidth") <= n("glassWidth") && n("windowHeight") <= n("glassHeight"), "the glass is larger than the viewing window");
     require(n("glassWidth") <= n("pcbWidth") && n("glassHeight") <= n("pcbHeight"), "the carrier is larger than the glass");

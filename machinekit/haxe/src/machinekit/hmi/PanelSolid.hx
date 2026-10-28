@@ -9,8 +9,8 @@ class PanelSolid extends MachineComponent {
   final build:() -> Part;
 
   /** `build` makes a new solid each time it is called; the caller of `geometry` owns and closes it. */
-  public function new(designation:String, description:String, build:() -> Part) {
-    super(designation, description, "plastic", true);
+  public function new(designation:String, description:String, build:() -> Part, material:String = "plastic") {
+    super(designation, description, material, true);
     this.build = build;
   }
 

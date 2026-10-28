@@ -37,6 +37,14 @@ class MaterialLibrary {
     // Nominal planning density; print-lot properties must be supplied for production validation.
     material("pa12-nylon", "PA12 nylon (nominal)", [0.68, 0.69, 0.71], 0.0, 0.85, 1000, "PA12 nylon"),
     material("plastic", "Engineering plastic", [0.28, 0.30, 0.32], 0.0, 0.55, 1200, "plastic"),
+    // Moulded operator controls (buttons, knobs, caps): the colour a panel shows. Nominal ABS density.
+    material("abs-black", "ABS, black", [0.07, 0.07, 0.08], 0.0, 0.45, 1050, "ABS black"),
+    material("abs-white", "ABS, white", [0.86, 0.86, 0.84], 0.0, 0.40, 1050, "ABS white"),
+    material("abs-red", "ABS, signal red", [0.78, 0.07, 0.06], 0.0, 0.32, 1050, "ABS red"),
+    material("abs-green", "ABS, signal green", [0.07, 0.52, 0.20], 0.0, 0.35, 1050, "ABS green"),
+    material("abs-yellow", "ABS, signal yellow", [0.95, 0.74, 0.06], 0.0, 0.35, 1050, "ABS yellow"),
+    material("abs-blue", "ABS, signal blue", [0.10, 0.28, 0.68], 0.0, 0.35, 1050, "ABS blue"),
+    material("fr4-pcb", "FR-4 circuit board, green", [0.04, 0.33, 0.17], 0.0, 0.42, 1850, "FR4 PCB"),
     // Housings of purchased electrical devices (DIN-rail modules, drives, controller cabinets): what is seen and what
     // the BOM names. Their mass comes from an assumed effective density, not this density (machinekit EffectiveDensities).
     material("device-housing", "Device housing, light grey", [0.80, 0.80, 0.78], 0.0, 0.55, 1200, "device housing"),

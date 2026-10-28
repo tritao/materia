@@ -28,8 +28,8 @@ class PartPresets {
   public static function rotarySwitch(positions:Int = 12):RotarySwitch
     return new RotarySwitch(new ComponentValues().setInteger("positions", positions));
 
-  /** 16 mm illuminated momentary button. */
-  public static function pushButton16():PushButton return new PushButton();
+  /** 16 mm illuminated momentary button; `colour` is one of the PushButton choices. */
+  public static function pushButton16(colour:String = "white"):PushButton return new PushButton(new ComponentValues().setToken("colour", colour));
 
   /** 2.42 in 128x64 OLED module. */
   public static function oled242():OledModule return new OledModule();

@@ -9,7 +9,7 @@ class PendantPreview {
   public static function assembly():MachineAssembly {
     var pendantCase = ReferencePendant.pendantCase();
     return PanelAssemblyBuilder.build(ReferencePendant.layout(), () -> pendantCase.plate(), () -> pendantCase.shell(),
-      [{id: "board", solid: () -> pendantCase.board()}]);
+      [{id: "board", solid: () -> pendantCase.board()}], "FR4 PCB");
   }
   public static function preview():haxe.io.Bytes return SceneArtifact.encode(AssemblyPreview.scene(assembly(), "pendant"));
   public static function main():Void {

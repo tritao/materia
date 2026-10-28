@@ -25,7 +25,7 @@ class RotarySwitch extends HmiPart {
   ];
 
   public function new(?v:ComponentValues) {
-    super("hmi-rotary-switch", "rotary switch with knob, " + (v == null || v.get("positions") == null ? 12 : v.integer("positions")) + " positions", "plastic", inputs(), v);
+    super("hmi-rotary-switch", "rotary switch with knob, " + (v == null || v.get("positions") == null ? 12 : v.integer("positions")) + " positions", "ABS black", inputs(), v);
     positive(["knobDiameter", "knobHeight", "bushDiameter", "panelThickness", "nutDiameter", "nutThickness", "bodyDiameter", "behindDepth", "massGrams"]);
     require(count("positions") >= 2 && count("positions") <= 24, "two to 24 positions");
     require(n("bushDiameter") < n("nutDiameter") && n("nutDiameter") < n("knobDiameter"), "the nut is wider than the bush and narrower than the knob");

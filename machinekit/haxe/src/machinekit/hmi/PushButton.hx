@@ -26,7 +26,7 @@ class PushButton extends HmiPart {
   ];
 
   public function new(?v:ComponentValues) {
-    super("hmi-push-button", "16 mm push button", "plastic", inputs(), v);
+    super("hmi-push-button", "16 mm push button", "ABS " + (v == null || v.get("colour") == null ? "white" : v.token("colour")), inputs(), v);
     positive(["bezelDiameter", "bezelHeight", "capDiameter", "capHeight", "keepOutDiameter", "barrelDiameter", "panelThickness", "nutDiameter", "nutThickness", "bodyDiameter", "behindDepth", "massGrams"]);
     require(n("capDiameter") < n("bezelDiameter") && n("bezelDiameter") <= n("keepOutDiameter"), "the cap is smaller than the bezel and the bezel fits its keep-out");
     require(n("capHeight") > n("bezelHeight"), "the cap stands above the bezel");
