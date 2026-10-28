@@ -1,7 +1,15 @@
 #ifndef STOCKKIT_H
 #define STOCKKIT_H
 
+/* ------------------------------------------------------------------------- */
+/* Dependencies                                                              */
+/* ------------------------------------------------------------------------- */
+
 #include <stdint.h>
+
+/* ------------------------------------------------------------------------- */
+/* API annotations                                                           */
+/* ------------------------------------------------------------------------- */
 
 #if defined(__clang__)
 #define SK_OUT __attribute__((annotate("hxi:out")))
@@ -27,6 +35,10 @@
 #define SK_INITIAL_CAPACITY(count)
 #endif
 
+/* ------------------------------------------------------------------------- */
+/* Symbol export                                                             */
+/* ------------------------------------------------------------------------- */
+
 #if defined(_WIN32)
 #if defined(SK_STATIC)
 #define SK_API
@@ -41,9 +53,17 @@
 #define SK_CALL
 #endif
 
+/* ------------------------------------------------------------------------- */
+/* C linkage                                                                 */
+/* ------------------------------------------------------------------------- */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* ------------------------------------------------------------------------- */
+/* Overview                                                                  */
+/* ------------------------------------------------------------------------- */
 
 /*
  * StockKit core: material-removal simulation on tri-dexel grids.
@@ -64,6 +84,10 @@ extern "C" {
  * same stock. Handles are process-local, generation-checked and never zero.
  */
 
+/* ------------------------------------------------------------------------- */
+/* Version and results                                                       */
+/* ------------------------------------------------------------------------- */
+
 enum { SK_API_VERSION = 5 };
 
 typedef int32_t sk_result;
@@ -76,6 +100,10 @@ enum {
     SK_ERROR_UNSUPPORTED = -5,
     SK_ERROR_INTERNAL = -6
 };
+
+/* ------------------------------------------------------------------------- */
+/* Axes, sources and handles                                                 */
+/* ------------------------------------------------------------------------- */
 
 enum { SK_AXIS_X = 0, SK_AXIS_Y = 1, SK_AXIS_Z = 2 };
 /** Axis bits of a lattice: `1 << axis`. */
@@ -94,6 +122,10 @@ typedef struct sk_snapshot_handle { uint32_t id; } sk_snapshot_handle
     SK_HANDLE SK_HANDLE_DESTROY(sk_snapshot_destroy);
 typedef struct sk_mesh_handle { uint32_t id; } sk_mesh_handle
     SK_HANDLE SK_HANDLE_DESTROY(sk_mesh_destroy);
+
+/* ------------------------------------------------------------------------- */
+/* Types: tools, moves and stock                                             */
+/* ------------------------------------------------------------------------- */
 
 enum { SK_SEGMENT_LINE = 0, SK_SEGMENT_ARC = 1 };
 enum { SK_ZONE_CUTTING = 0, SK_ZONE_SHANK = 1, SK_ZONE_HOLDER = 2, SK_ZONE_COUNT = 3 };
@@ -247,6 +279,10 @@ typedef struct sk_cut_summary {
     uint64_t tiles_skipped;
 } sk_cut_summary;
 
+/* ------------------------------------------------------------------------- */
+/* Tools and swept rays                                                      */
+/* ------------------------------------------------------------------------- */
+
 SK_API uint32_t SK_CALL sk_api_version(void);
 
 /** Validates and stores a tool profile. */
@@ -268,6 +304,10 @@ SK_API sk_result SK_CALL sk_sweep_ray(sk_tool_handle tool, const sk_move *move,
     uint32_t axis, double u, double v,
     sk_interval *out_intervals SK_OUT_ARRAY(interval_count) SK_INITIAL_CAPACITY(8),
     uint32_t *interval_count SK_INOUT);
+
+/* ------------------------------------------------------------------------- */
+/* Cartesian stock                                                           */
+/* ------------------------------------------------------------------------- */
 
 /** Solid box stock. */
 SK_API sk_result SK_CALL sk_stock_create_box(const sk_lattice *lattice, const sk_box *box,
@@ -355,6 +395,10 @@ SK_API sk_result SK_CALL sk_stock_add(sk_stock_handle stock, sk_tool_handle tool
     const sk_move *moves SK_IN_ARRAY(move_count), uint32_t move_count,
     double *out_added SK_OUT_ARRAY(move_count), sk_add_summary *out_summary SK_OUT);
 
+/* ------------------------------------------------------------------------- */
+/* Stock queries and comparison                                              */
+/* ------------------------------------------------------------------------- */
+
 /**
  * The rays of the grid along `axis` in the block [i0, i0 + ni) x [j0, j0 +
  * nj), i fastest: each ray's interval count, then all their intervals ray
@@ -392,6 +436,10 @@ typedef struct sk_ray_comparison {
 SK_API sk_result SK_CALL sk_stock_compare(sk_stock_handle stock, sk_stock_handle target, uint32_t axis,
     uint32_t i0, uint32_t j0, uint32_t ni, uint32_t nj,
     sk_ray_comparison *out_comparisons SK_OUT_ARRAY(comparison_capacity), uint32_t comparison_capacity);
+
+/* ------------------------------------------------------------------------- */
+/* Meshing                                                                   */
+/* ------------------------------------------------------------------------- */
 
 enum { SK_MESH_BOTTOMS = 1, SK_MESH_MERGE = 2, SK_MESH_CONTOUR = 4 };
 
@@ -494,6 +542,10 @@ SK_API sk_result SK_CALL sk_mesh_color_by_deviation(sk_mesh_handle mesh, sk_stoc
     double tolerance, uint32_t on_target, uint32_t leftover, uint32_t gouge);
 
 
+/* ------------------------------------------------------------------------- */
+/* Ring stock                                                                */
+/* ------------------------------------------------------------------------- */
+
 /* Circumferential stock. Lengths in caller units (Haxe RingStock uses mm), angles
  * in radians about +Z from +X. Each grid cell samples its centre circle; bounds
  * define the exact annulus/height and the piecewise-cell contour/volume estimate.
@@ -563,6 +615,10 @@ SK_API sk_result SK_CALL sk_ring_stock_compare(sk_ring_stock_handle stock, sk_ri
  * The mesh is for display; metrology reads exact circle intervals. */
 SK_API sk_result SK_CALL sk_ring_stock_contour(sk_ring_stock_handle stock, double max_angle,
     sk_mesh_handle *out_mesh SK_OUT SK_OWNED);
+
+/* ------------------------------------------------------------------------- */
+/* Rake tools and sweeps                                                     */
+/* ------------------------------------------------------------------------- */
 
 /* Planar cutting-region tool. Coordinates are hob-local; polygon loops may repeat
  * their first vertex. Regions are triangulated once; 2 <= gashes <= 256. */
