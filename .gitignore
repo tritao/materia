@@ -50,3 +50,11 @@ __pycache__/
 /stockkit/tests/ring/build/
 
 /stockkit/tests/hobbing/build/
+
+# Scratch outputs of local investigations.
+/machinekit/examples/bench-mill/debug.json
+/machinekit/tests/haxeon.targeted-tmp.json
+/machinekit/tests/tooling/.insert-anchor-compile.json
+/machinekit/tests/tooling/.production-anchor.json
+/manufacturingkit/tests/foundation/.hole-budget.json
+/manufacturingkit/tests/foundation/build/
