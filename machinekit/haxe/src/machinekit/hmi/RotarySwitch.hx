@@ -73,15 +73,17 @@ class RotarySwitch extends HmiPart {
   function behindFace():Float return n("behindDepth");
   function rearBody():Footprint return Circle(n("bodyDiameter"));
 
-  /** The switch (bush, nut, body) and the knob that turns on it. */
+  /** The switch (brass bush and nut, grey body) and the knob that turns on it. */
   override public function bodies():Null<Array<DeviceBodySpec>> {
     var t = n("panelThickness"), nut = n("nutThickness");
-    return [new DeviceBodySpec("switch", "rotary switch body", "ABS black", function() {
+    return [new DeviceBodySpec("switch", "rotary switch bush and nut", "brass", function() {
       return Solids.union([
         Solids.named(Part.cylinderSpan(n("bushDiameter") / 2, -t - nut, 0.0), "bush"),
-        Solids.named(Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t), "nut"),
-        Solids.named(Part.cylinderSpan(n("bodyDiameter") / 2, -n("behindDepth"), -t - nut), "body")
+        Solids.named(Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t), "nut")
       ]);
+    }
+    ), new DeviceBodySpec("body", "rotary switch body", "ABS grey", function() {
+      return Solids.named(Part.cylinderSpan(n("bodyDiameter") / 2, -n("behindDepth"), -t - nut), "body");
     }
     ), new DeviceBodySpec("knob", "rotary switch knob", materialSpec(), function() {
       var r = n("knobDiameter") / 2, k = n("knobHeight");

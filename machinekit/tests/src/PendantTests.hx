@@ -166,12 +166,17 @@ class PendantTests {
       "cycle-keys/hold/cap",
       "estop/operator",
       "estop/head",
-      "display"
+      "display/glass",
+      "display/pcb"
     ]) check(
       ids.indexOf(id) >= 0,
       "Missing member " + id + " in " + ids.join(", ")
     );
-    check(ids.length == 46, "Forty-six bodies, twenty of them hardware: " + ids.length);
+    check(ids.length == 67, "Sixty-seven members, twenty-five of them hardware: " + ids.length);
+    check(
+      ids.indexOf("fasteners/display-clamp") >= 0 && ids.indexOf("fasteners/display-screw-2") >= 0,
+      "The display's clamp hardware"
+    );
     // Hardware: an insert and a screw in each post and standoff, sized from the pilot holes the shell is cut with.
     check(
       ids.indexOf("fasteners/insert-6") >= 0 && ids.indexOf("fasteners/screw-6") >= 0
@@ -207,10 +212,33 @@ class PendantTests {
     var purchases = 0;
     for (line in bom.lines()) purchases += line.quantity;
     check(
-      purchases == 35,
-      "Thirty-five purchases (plate, shell, board, twelve controls, ten inserts and ten screws): "
+      purchases == 40,
+      "Forty purchases (plate, shell, board, twelve controls, twelve inserts and screws, the display clamp and its fixings): "
       + purchases + " " + [for (l in bom.lines()) l.partNumber + " x" + l.quantity].join(", ")
     );
+
+    // The OLED module against the vendor's 3D model (Waveshare SKU 25742): board 61.5 x 39.5 x 1.6, 4.0 mm from glass front to
+    // board back, the connector 3.4 mm further back, the glass 60.5 x 37.
+    var oledPart = PartPresets.oled242();
+    var oledBodies = oledPart.bodies();
+    check(oledBodies != null && oledBodies.length == 8, "The OLED is eight bodies");
+    if (oledBodies != null) {
+      var board = oledBodies[0].build();
+      var b = board.shape.bounds();
+      check(
+        Math.abs(b.get_max().get_x() - b.get_min().get_x() - 61.5) < 1e-6 && Math.abs(b.get_max().get_y()
+        - b.get_min().get_y() - 39.5) < 1e-6 && Math.abs(b.get_max().get_z() - b.get_min().get_z() - 1.6) < 1e-6,
+        "OLED board is 61.5 x 39.5 x 1.6"
+      );
+      board.close();
+      var whole = oledPart.geometry();
+      var w = whole.shape.bounds();
+      check(
+        Math.abs(w.get_max().get_z() - -3.0) < 1e-6 && Math.abs(w.get_min().get_z() - -(3.0 + 4.0 + 3.4)) < 1e-6,
+        "OLED is 4.0 + 3.4 mm behind the plate: " + w.get_min().get_z()
+      );
+      whole.close();
+    }
 
     // The bodies of a device share its declared mass, and the head is the colour the part shows.
     var stop = PartPresets.xb2Es542();

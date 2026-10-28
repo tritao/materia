@@ -317,16 +317,16 @@ class PendantCase {
     x: Float,
     y: Float
   } {
-    var ha = FootprintGeometry.halfExtent(a.f), hb = FootprintGeometry.halfExtent(b.f);
-    var x0 = Math.min(a.x - ha.x, b.x - hb.x), x1 = Math.max(a.x + ha.x, b.x + hb.x);
-    var y0 = Math.min(a.y - ha.y, b.y - hb.y), y1 = Math.max(a.y + ha.y, b.y + hb.y);
+    var ea = FootprintGeometry.extent(a.f, a.x, a.y), eb = FootprintGeometry.extent(b.f, b.x, b.y);
+    var x0 = Math.min(ea.x0, eb.x0), x1 = Math.max(ea.x1, eb.x1);
+    var y0 = Math.min(ea.y0, eb.y0), y1 = Math.max(ea.y1, eb.y1);
     return {f: Rect(x1 - x0, y1 - y0), x: (x0 + x1) / 2, y: (y0 + y1) / 2};
   }
 
   /** A notch that would leave a sliver of board between itself and the outline is widened to the outline. */
   function reachEdges(f:Footprint, x:Float, y:Float): {f: Footprint, x: Float, y: Float} {
-    var board = boardHalf(face), half = FootprintGeometry.halfExtent(f);
-    var x0 = x - half.x, x1 = x + half.x, y0 = y - half.y, y1 = y + half.y;
+    var board = boardHalf(face), box = FootprintGeometry.extent(f, x, y);
+    var x0 = box.x0, x1 = box.x1, y0 = box.y0, y1 = box.y1;
     var changed = false;
     if (board.x - x1 < SLIVER) {
       x1 = board.x + 1.0;
@@ -608,14 +608,14 @@ class PendantCase {
     var i = 0;
     for (p in posts) {
       i++;
-      result.push({id: 'insert-$i', component: caseInsert, x: p.x, y: p.y, z: 0.0});
-      result.push({id: 'screw-$i', component: ButtonHeadScrew.m3(caseLength), x: p.x, y: p.y, z: bearing});
+      result.push(new PanelHardware('insert-$i', caseInsert, p.x, p.y, 0.0));
+      result.push(new PanelHardware('screw-$i', ButtonHeadScrew.m3(caseLength), p.x, p.y, bearing));
     }
     i = 0;
     for (s in standoffs) {
       i++;
-      result.push({id: 'board-insert-$i', component: boardInsert, x: s.x, y: s.y, z: underside});
-      result.push({id: 'board-screw-$i', component: ButtonHeadScrew.m2_5(boardLength), x: s.x, y: s.y, z: boardTop});
+      result.push(new PanelHardware('board-insert-$i', boardInsert, s.x, s.y, underside));
+      result.push(new PanelHardware('board-screw-$i', ButtonHeadScrew.m2_5(boardLength), s.x, s.y, boardTop));
     }
     return result;
   }

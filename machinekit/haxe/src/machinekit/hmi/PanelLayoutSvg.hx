@@ -19,6 +19,28 @@ typedef SvgMark = {
  * assumed are drawn in orange. SVG y points down, so the panel is flipped. `marks` are drawn in green on top.
  */
 class PanelLayoutSvg {
+  /** One footprint at a position, as an SVG element with the given style attributes. */
+  static function shape(
+    f:Footprint,
+    x:Float,
+    y:Float,
+    style:String,
+    px:Float -> String,
+    py:Float -> String,
+    len:Float -> String
+  ):String {
+    var r = FootprintGeometry.resolve(f);
+    var cx = x + r.dx, cy = y + r.dy;
+    return switch r.shape {
+      case Circle(d):
+        '<circle cx="${px(cx)}" cy="${py(cy)}" r="${len(d / 2)}" $style/>';
+      case Rect(rw, rh):
+        '<rect x="${px(cx - rw / 2)}" y="${py(cy + rh / 2)}" width="${len(rw)}" height="${len(rh)}" $style/>';
+      case _:
+        throw "Unknown footprint";
+    };
+  }
+
   public static function render(layout:PanelLayout, scale:Float = 4.0, ?marks:Array<SvgMark>):String {
     var w = layout.width * scale, h = layout.height * scale;
     function px(x:Float):String return Std.string(Math.round((x + layout.width / 2) * scale * 10) / 10);
@@ -29,33 +51,11 @@ class PanelLayoutSvg {
       '<rect width="$w" height="$h" fill="#f4f4f4" stroke="#222"/>',
       '<rect x="${px(-layout.usableHalfWidth())}" y="${py(layout.usableHalfHeight())}" width="${len(layout.usableHalfWidth() * 2)}" height="${len(layout.usableHalfHeight() * 2)}" fill="none" stroke="#888" stroke-dasharray="2 2"/>'
     ];
-    for (c in layout.controls) switch c.body() {
-      case Circle(d):
-        out.push('<circle cx="${px(c.x)}" cy="${py(c.y)}" r="${len(d / 2)}" fill="#e2e2e2" stroke="#bbb"/>');
-      case Rect(rw, rh):
-        out
-          .push('<rect x="${px(c.x - rw / 2)}" y="${py(c.y + rh / 2)}" width="${len(rw)}" height="${len(rh)}" fill="#e2e2e2" stroke="#bbb"/>');
-      case _:
-    }
+    for (c in layout.controls) out.push(shape(c.body(), c.x, c.y, 'fill="#e2e2e2" stroke="#bbb"', px, py, len));
     for (c in layout.controls) {
       var colour = c.source() == "assumed" ? "#c60" : "#06a";
-      switch c.keepOut() {
-        case Circle(d):
-          out
-            .push('<circle cx="${px(c.x)}" cy="${py(c.y)}" r="${len(d / 2)}" fill="none" stroke="$colour" stroke-dasharray="4 3"/>');
-        case Rect(rw, rh):
-          out
-            .push('<rect x="${px(c.x - rw / 2)}" y="${py(c.y + rh / 2)}" width="${len(rw)}" height="${len(rh)}" fill="none" stroke="$colour" stroke-dasharray="4 3"/>');
-        case _:
-      }
-      switch c.cutout() {
-        case Circle(d):
-          out.push('<circle cx="${px(c.x)}" cy="${py(c.y)}" r="${len(d / 2)}" fill="#fff" stroke="$colour"/>');
-        case Rect(rw, rh):
-          out
-            .push('<rect x="${px(c.x - rw / 2)}" y="${py(c.y + rh / 2)}" width="${len(rw)}" height="${len(rh)}" fill="#fff" stroke="$colour"/>');
-        case _:
-      }
+      out.push(shape(c.keepOut(), c.x, c.y, 'fill="none" stroke="$colour" stroke-dasharray="4 3"', px, py, len));
+      out.push(shape(c.cutout(), c.x, c.y, 'fill="#fff" stroke="$colour"', px, py, len));
       for (hole in c.holes()) out
         .push('<circle cx="${px(c.x + hole.x)}" cy="${py(c.y + hole.y)}" r="${len(hole.diameter / 2)}" fill="#fff" stroke="$colour"/>');
       out

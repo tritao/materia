@@ -146,6 +146,32 @@ class PanelLayoutTests {
     );
     var svg = PanelLayoutSvg.render(layout);
     check(svg.indexOf("<svg") == 0 && svg.indexOf(">wheel<") > 0, "SVG drawing");
+    // A shifted footprint hangs off its origin: exact extent, the gap measured from its true edge, and the cutting solid in place.
+    var hung = Shifted(Rect(20.0, 10.0), 0.0, -8.0);
+    var box = FootprintGeometry.extent(hung, 5.0, 100.0);
+    check(
+      box.x0 == -5.0 && box.x1 == 15.0 && box.y0 == 87.0 && box.y1 == 97.0,
+      "Extent of a shifted rectangle: " + [box.x0, box.x1, box.y0, box.y1]
+    );
+    check(
+      Math.abs(FootprintGeometry.gap(hung, 0.0, 0.0, Circle(4.0), 0.0, 3.0) - 4.0) < 1e-9,
+      "Gap from a shifted rectangle's own edge"
+    );
+    check(
+      Math.abs(FootprintGeometry.gap(Rect(10.0, 10.0), 0.0, 20.0, hung, 0.0, 0.0) - 18.0) < 1e-9,
+      "Gap between plain and shifted"
+    );
+    check(
+      FootprintGeometry.halfExtent(hung).y == 13.0 && FootprintGeometry.area(hung) == 200.0,
+      "Half extent about the origin and area"
+    );
+    var cut = FootprintGeometry.solid(hung, 0.0, 0.0, 0.0, 1.0);
+    var cutBox = cut.shape.bounds();
+    check(
+      Math.abs(cutBox.get_min().get_y() + 13.0) < 1e-9 && Math.abs(cutBox.get_max().get_y() + 3.0) < 1e-9,
+      "Solid of a shifted rectangle"
+    );
+    cut.close();
     trace("panel layout tests passed");
   }
   public static function main():Void run();

@@ -15,14 +15,14 @@ class ReferencePendant {
       new PlacedPart("axis", PartPresets.rotarySwitch(12), -39.0, 80.0),
       new PlacedPart("step", PartPresets.rotarySwitch(3), -8.0, 80.0),
       new PlacedPart("estop", PartPresets.xb2Es542(), 32.0, 80.0),
-      new PlacedPart("display", PartPresets.oled242(), 0.0, 38.0),
-      new PlacedPart("f1", PartPresets.pushButton16(), -40.5, 4.0),
-      new PlacedPart("f2", PartPresets.pushButton16(), -13.5, 4.0),
-      new PlacedPart("f3", PartPresets.pushButton16(), 13.5, 4.0),
-      new PlacedPart("wheel-enable", PartPresets.pushButton16("blue"), 40.5, 4.0),
-      new PlacedPart("start", PartPresets.pushButton16("green"), -40.5, -23.0),
-      new PlacedPart("hold", PartPresets.pushButton16("yellow"), -13.5, -23.0),
-      new PlacedPart("stop", PartPresets.pushButton16("red"), 13.5, -23.0),
+      new PlacedPart("display", PartPresets.oled242(), 0.0, 37.0),
+      new PlacedPart("f1", PartPresets.pushButton16(), -40.5, 1.5),
+      new PlacedPart("f2", PartPresets.pushButton16(), -13.5, 1.5),
+      new PlacedPart("f3", PartPresets.pushButton16(), 13.5, 1.5),
+      new PlacedPart("wheel-enable", PartPresets.pushButton16("blue"), 40.5, 1.5),
+      new PlacedPart("start", PartPresets.pushButton16("green"), -40.5, -25.5),
+      new PlacedPart("hold", PartPresets.pushButton16("yellow"), -13.5, -25.5),
+      new PlacedPart("stop", PartPresets.pushButton16("red"), 13.5, -25.5),
       new PlacedPart("wheel", PartPresets.yumoIsm6045(), 0.0, -70.0)
     ];
     return new PanelLayout(114.0, 210.0, 3.0, 3.0, 48.0, controls);

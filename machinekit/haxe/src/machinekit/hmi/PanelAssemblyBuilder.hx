@@ -3,6 +3,7 @@ package machinekit.hmi;
 import cadkit.modeling.Part;
 import machinekit.assembly.MachineAssembly;
 import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /**
  * A panel as a MachineAssembly: the plate (and an optional shell) at the origin and every part at its
@@ -42,21 +43,30 @@ class PanelAssemblyBuilder {
       for (id in g.members) groupOf.set(id, members);
       grouped.push({id: g.id, assembly: members});
     }
+    var partHardware:Array<PanelHardware> = [];
     for (c in layout.controls) {
       var target = groupOf.exists(c.id) ? groupOf.get(c.id) : assembly;
       var pose = AssemblyFrames.translation(c.x, c.y, layout.thickness);
       // A device made of several finished bodies goes in as a subassembly of them; a one-solid part goes in as itself.
       var device:Null<HmiPart> = Std.isOfType(c.part, HmiPart) ? cast c.part : null;
       var expanded = device == null ? null : device.expand();
+      if (device != null) for (h in device.hardware()) partHardware.push(h.placed(c.id + "-" + h.id, c.x, c.y, layout.thickness));
       if (expanded == null) target.addComponent(c.id, c.part, pose);
       else target.include(c.id, expanded, pose);
     }
     for (g in grouped) assembly.include(g.id, g.assembly);
-    if (hardware != null && hardware.length > 0) {
+    var allHardware = (hardware == null ? [] : hardware).concat(partHardware);
+    if (allHardware.length > 0) {
       var fasteners = new MachineAssembly();
-      for (h in hardware) fasteners.addComponent(h.id, h.component, AssemblyFrames.translation(h.x, h.y, h.z));
+      for (h in allHardware) fasteners.addComponent(h.id, h.component, pose(h));
       assembly.include("fasteners", fasteners);
     }
     return assembly;
+  }
+
+  /** A hardware item's pose: its position, turned over about x when it is flipped. */
+  static function pose(h:PanelHardware):AssemblyFrame {
+    var at = AssemblyFrames.translation(h.x, h.y, h.z);
+    return h.flipped ? AssemblyFrames.compose(at, AssemblyFrames.turnX(Math.PI)) : at;
   }
 }

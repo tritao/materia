@@ -43,6 +43,9 @@ class ThreadedInsert extends MachineComponent {
   /** M2.5 x 4 (3.6 mm knurled body) in a 3.4 x 6 hole. */
   public static function m2_5():ThreadedInsert return new ThreadedInsert("M2.5", 0.45, 3.4, 6.0, 4.0, 2.5);
 
+  /** M2.5 x 3 (3.6 mm knurled body) in a 3.4 x 4.4 hole, for where there is little material behind it. */
+  public static function m2_5Short():ThreadedInsert return new ThreadedInsert("M2.5", 0.45, 3.4, 4.4, 3.0, 2.5);
+
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {

@@ -22,6 +22,8 @@ class PanelMountFacet implements ComponentFacet {
   public final body:Footprint;
   /** The thickest panel it can be fixed to; large when the part states no limit. */
   public final maxPanelThickness:Float;
+  /** Bosses it needs on the panel's back to be screwed on; none for a part held by its own nut. */
+  public final bosses:Array<PanelBoss>;
   /** "vendor-drawing", "listing", "measured" or "assumed". */
   public final source:String;
 
@@ -33,7 +35,8 @@ class PanelMountFacet implements ComponentFacet {
     behind:Float,
     body:Footprint,
     maxPanelThickness:Float,
-    source:String
+    source:String,
+    ?bosses:Array<PanelBoss>
   ) {
     this.cutout = cutout;
     this.keepOut = keepOut;
@@ -43,6 +46,7 @@ class PanelMountFacet implements ComponentFacet {
     this.body = body;
     this.maxPanelThickness = maxPanelThickness;
     this.source = source;
+    this.bosses = bosses == null ? [] : bosses.copy();
   }
 
   public function check(component:MachineComponent):Void {
@@ -53,6 +57,8 @@ class PanelMountFacet implements ComponentFacet {
       > 0)) throw '$name needs a height above of zero or more and a positive depth and panel limit';
     for (f in [cutout, keepOut, body]) if (!(FootprintGeometry.area(f) > 0)) throw '$name has an empty panel footprint';
     for (h in holes) if (!(h.diameter > 0) || !Math.isFinite(h.x + h.y)) throw '$name has a bad panel hole';
+    for (b in bosses) if (!(b.diameter > b.pilotDiameter) || !(b.pilotDiameter > 0)
+      || !(b.height > 0) || !(b.pilotDepth > 0) || !Math.isFinite(b.x + b.y)) throw '$name has a bad panel boss';
     if (["vendor-drawing",
       "listing", "measured", "assumed"].indexOf(source) < 0) throw '$name has an unknown data source $source';
   }

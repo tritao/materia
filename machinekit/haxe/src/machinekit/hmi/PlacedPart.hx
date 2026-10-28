@@ -35,6 +35,7 @@ class PlacedPart {
   public function cutout():Footprint return mount.cutout;
   public function keepOut():Footprint return mount.keepOut;
   public function holes():Array<{x:Float, y:Float, diameter:Float}> return mount.holes;
+  public function bosses():Array<machinekit.component.PanelBoss> return mount.bosses;
   public function body():Footprint return mount.body;
   public function above():Float return mount.above;
   public function behind():Float return mount.behind;

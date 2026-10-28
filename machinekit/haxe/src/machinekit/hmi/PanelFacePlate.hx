@@ -40,7 +40,24 @@ class PanelFacePlate {
           screw.y
         ));
       }
-      var result = plate.subtractAll(tools);
+      // Bosses stand on the plate's back (z below 0) and are fused to it before the holes are cut.
+      var raised = plate;
+      for (c in face.controls) for (b in c.bosses()) {
+        var boss = Part.cylinderSpan(b.diameter / 2, -b.height, 0.5, c.x + b.x, c.y + b.y);
+        var fused = raised.combine(boss);
+        if (raised != plate) raised.close();
+        boss.close();
+        raised = fused;
+        tools.push(Part.cylinderSpan(
+          b.pilotDiameter / 2,
+          -b.height - 1.0,
+          -b.height + b.pilotDepth,
+          c.x + b.x,
+          c.y + b.y
+        ));
+      }
+      var result = raised.subtractAll(tools);
+      if (raised != plate) raised.close();
       plate.close();
       for (t in tools) t.close();
       return result;

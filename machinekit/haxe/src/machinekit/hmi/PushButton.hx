@@ -82,15 +82,17 @@ class PushButton extends HmiPart {
   function behindFace():Float return n("behindDepth");
   function rearBody():Footprint return Circle(n("bodyDiameter"));
 
-  /** A black housing (barrel, nut, body) and the coloured cap and bezel in front of it. */
+  /** A metal barrel and nut, the grey rear body and the coloured cap and bezel in front. */
   override public function bodies():Null<Array<DeviceBodySpec>> {
     var t = n("panelThickness"), nut = n("nutThickness");
-    return [new DeviceBodySpec("housing", "push button housing", "ABS black", function() {
+    return [new DeviceBodySpec("housing", "push button barrel and nut", "stainless A2-70", function() {
       return Solids.union([
         Solids.named(Part.cylinderSpan(n("barrelDiameter") / 2, -t - nut, 0.0), "barrel"),
-        Solids.named(Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t), "nut"),
-        Solids.named(Part.cylinderSpan(n("bodyDiameter") / 2, -n("behindDepth"), -t - nut), "body")
+        Solids.named(Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t), "nut")
       ]);
+    }
+    ), new DeviceBodySpec("body", "push button rear body", "ABS grey", function() {
+      return Solids.named(Part.cylinderSpan(n("bodyDiameter") / 2, -n("behindDepth"), -t - nut), "body");
     }
     ), new DeviceBodySpec("cap", "push button cap", materialSpec(), function() {
       var b = n("bezelDiameter") / 2, c = n("capDiameter") / 2, bh = n("bezelHeight"), top = n("capHeight");

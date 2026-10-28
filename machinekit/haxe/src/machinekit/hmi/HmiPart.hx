@@ -8,6 +8,7 @@ import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentDetail;
 import materia.assembly.AssemblyFrames;
 import machinekit.component.ComponentParameter;
+import machinekit.component.PanelBoss;
 import machinekit.component.PanelMountFacet;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.ComponentValues;
@@ -70,6 +71,12 @@ class HmiPart extends MachineComponent {
    * `geometry` is these bodies fused, so there is one description of the shape.
    */
   public function bodies():Null<Array<DeviceBodySpec>> return null;
+
+  /**
+   * Inserts and screws that hold the part to its panel, with their origins in the part's frame (z = 0 at the panel's front
+   * face). The panel assembly places them in its `fasteners` group.
+   */
+  public function hardware():Array<PanelHardware> return [];
 
   /** Free joints between the bodies, each about the device's z axis: the encoder of a wheel, the shaft of a switch. */
   public function joints():Array<DeviceJointSpec> return [];
@@ -151,7 +158,8 @@ class HmiPart extends MachineComponent {
     above:Float,
     behind:Float,
     body:Footprint,
-    maxPanelThickness:Float = 1e9
+    maxPanelThickness:Float = 1e9,
+    ?bosses:Array<PanelBoss>
   ):Void addFacet(new PanelMountFacet(
     cutout,
     keepOut,
@@ -160,6 +168,7 @@ class HmiPart extends MachineComponent {
     behind,
     body,
     maxPanelThickness,
-    dataSource()
+    dataSource(),
+    bosses
   ));
 }

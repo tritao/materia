@@ -99,8 +99,8 @@ class PanelLayout {
     var found:Array<String> = [];
     var hw = usableHalfWidth(), hh = usableHalfHeight();
     for (c in controls) {
-      var half = FootprintGeometry.halfExtent(c.keepOut());
-      if (Math.abs(c.x) + half.x > hw + 1e-9 || Math.abs(c.y) + half.y > hh + 1e-9) found
+      var box = FootprintGeometry.extent(c.keepOut(), c.x, c.y);
+      if (box.x0 < -hw - 1e-9 || box.x1 > hw + 1e-9 || box.y0 < -hh - 1e-9 || box.y1 > hh + 1e-9) found
         .push('${c.id} does not fit inside the usable face (needs x within ${fmt(hw)}, y within ${fmt(hh)} with its keep-out)');
       for (hole in c.holes()) {
         var r = hole.diameter / 2;
@@ -109,9 +109,9 @@ class PanelLayout {
       }
     }
     for (c in controls) {
-      var half = FootprintGeometry.halfExtent(c.body());
-      if (Math.abs(c.x) + half.x > width / 2 - wall + 1e-9 || Math.abs(c.y) + half.y
-        > height / 2 - wall + 1e-9) found.push('the body of ${c.id} reaches into the case wall');
+      var box = FootprintGeometry.extent(c.body(), c.x, c.y);
+      var wx = width / 2 - wall + 1e-9, wy = height / 2 - wall + 1e-9;
+      if (box.x0 < -wx || box.x1 > wx || box.y0 < -wy || box.y1 > wy) found.push('the body of ${c.id} reaches into the case wall');
     }
     for (i in 0...controls.length) for (j in i + 1...controls.length) {
       var gap = gapBetween(controls[i], controls[j]);
