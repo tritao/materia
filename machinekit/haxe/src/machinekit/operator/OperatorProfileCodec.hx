@@ -5,8 +5,8 @@ import haxe.io.Bytes;
 
 /** The single saved operator profile format. Other schema versions are rejected. */
 class OperatorProfileCodec {
-  static final FIELDS:Array<String> = ["schemaVersion", "name", "cabinet", "axes", "pendantAxes", "keys", "modes", "pages",
-    "hasSpindle", "guard", "jogRules"];
+  static final FIELDS:Array<String> = ["schemaVersion", "name", "axes", "pendantAxes", "keys", "modes",
+    "hasSpindle", "hasDoor", "jogRules"];
 
   public static function encode(profile:OperatorProfile):Bytes
     return Bytes.ofString(Json.stringify(toRecord(profile)));
@@ -15,14 +15,13 @@ class OperatorProfileCodec {
   public static function toRecord(p:OperatorProfile):Dynamic {
     if (p == null) throw "Operator profile is required";
     return {
-      schemaVersion:OperatorProfile.CURRENT_VERSION, name:p.name, cabinet:p.cabinet,
+      schemaVersion:OperatorProfile.CURRENT_VERSION, name:p.name,
       axes:[for (a in p.axes) {id:a.id, label:a.label}],
       pendantAxes:p.pendantAxes.copy(),
       keys:[for (k in p.keys) {action:actionName(k.action), label:k.label}],
       modes:[for (m in p.modes) modeName(m)],
-      pages:[for (g in p.pages) pageName(g)],
       hasSpindle:p.hasSpindle,
-      guard:p.guard == null ? null : {setupSpeedLimit:p.guard.setupSpeedLimit, timeoutSeconds:p.guard.timeoutSeconds},
+      hasDoor:p.hasDoor,
       jogRules:[for (r in p.jogRules) {axis:r.axis, blockedWhen:conditionName(r.blockedWhen), reason:r.reason}]
     };
   }
@@ -33,20 +32,18 @@ class OperatorProfileCodec {
       throw "Unsupported OperatorProfile schema version";
     for (key in Reflect.fields(value))
       if (!FIELDS.contains(key)) throw 'Invalid OperatorProfile field $key';
-    var guardRecord = required(value, "guard");
     var pendant:Array<Null<String>> = [];
     for (item in list(value, "pendantAxes")) {
       if (item != null && !Std.isOfType(item, String)) throw "Invalid OperatorProfile pendant axis";
       pendant.push(item);
     }
-    return new OperatorProfile(text(value, "name"), text(value, "cabinet"),
+    return new OperatorProfile(text(value, "name"),
       [for (a in list(value, "axes")) new OperatorAxis(text(a, "id"), text(a, "label"))],
       pendant,
       [for (k in list(value, "keys")) new OperatorKey(readAction(text2(k, "action")), text2(k, "label"))],
       [for (m in list(value, "modes")) readMode(name(m))],
-      [for (g in list(value, "pages")) readPage(name(g))],
       flag(value, "hasSpindle"),
-      guardRecord == null ? null : new OperatorGuard(number(guardRecord, "setupSpeedLimit"), number(guardRecord, "timeoutSeconds")),
+      flag(value, "hasDoor"),
       [for (r in list(value, "jogRules")) new JogRule(text(r, "axis"), readCondition(text(r, "blockedWhen")), text(r, "reason"))]);
   }
 
@@ -71,14 +68,6 @@ class OperatorProfileCodec {
   static function modeName(m:OperatorMode):String return switch m { case Auto: "auto"; case Mdi: "mdi"; case Jog: "jog"; };
   static function readMode(s:String):OperatorMode return switch s {
     case "auto": Auto; case "mdi": Mdi; case "jog": Jog; case _: throw "Invalid OperatorProfile mode";
-  };
-  static function pageName(g:OperatorPage):String return switch g {
-    case Dro: "dro"; case Program: "program"; case Tools: "tools"; case Offsets: "offsets";
-    case Services: "services"; case Diagnostics: "diagnostics";
-  };
-  static function readPage(s:String):OperatorPage return switch s {
-    case "dro": Dro; case "program": Program; case "tools": Tools; case "offsets": Offsets;
-    case "services": Services; case "diagnostics": Diagnostics; case _: throw "Invalid OperatorProfile page";
   };
 
   static function name(value:Dynamic):String {

@@ -74,7 +74,9 @@ class PendantCompilerTests {
         record.rule_reason[0] != 0 || record.rule_reason[1] != 0 || record.rule_axis[2] != 0) throw "Rules";
     if (hobber.reasons.length != 1 || hobber.labels.length != 14) throw "Reasons and labels";
     if (record.spindle_key != 1 || record.has_spindle != 1 || record.timeout_ms != 50) throw "Spindle key and timeout";
-    var none = PendantCompiler.compile(ReferenceOperatorProfiles.arm(), [1, 10, 100], 50, 250);
+    var plain = new OperatorProfile("plain", [new OperatorAxis("x", "X")], ["x", null, null, null, null, null, null, null, null, null, null],
+      [new OperatorKey(Unused, ""), new OperatorKey(Unused, ""), new OperatorKey(Unused, "")], [Auto, Jog], false, false, []);
+    var none = PendantCompiler.compile(plain, [1, 10, 100], 50, 250);
     if (PendantProfile.decode(none.profile).spindle_key != 255) throw "No spindle key";
     var same = PendantCompiler.compile(ReferenceOperatorProfiles.hobber(), [1, 10, 100], 50, 250);
     var other = PendantCompiler.compile(ReferenceOperatorProfiles.hobber(), [1, 10, 100], 60, 250);
@@ -97,8 +99,7 @@ class PendantCompilerTests {
     rejects("unknown type", () -> new OperatorFrame(9, Bytes.alloc(4)));
 
     // Shared vectors: the Rust tests decode these same bytes. Set PENDANT_VECTORS=write to refresh.
-    var lines = [line("drill-tap", ReferenceOperatorProfiles.drillTap()), line("hobber", ReferenceOperatorProfiles.hobber()),
-      line("arm", ReferenceOperatorProfiles.arm())].join("\n") + "\n";
+    var lines = [line("drill-tap", ReferenceOperatorProfiles.drillTap()), line("hobber", ReferenceOperatorProfiles.hobber())].join("\n") + "\n";
     var h = PendantCompiler.compile(ReferenceOperatorProfiles.hobber(), [1, 10, 100], 50, 250);
     var event = new PendantEvent();
     event.sequence = 9; event.axis = 2; event.flags = 1; event.distance = -50; event.pressed = 8; event.refusal = 6; event.reason = 0;

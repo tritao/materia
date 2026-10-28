@@ -113,9 +113,6 @@ mod tests {
         assert_eq!(c.pendant_axes[..6], [2, 3, 4, 5, 1, 0]);
         assert_eq!(c.rules, [JogRule { axis: 1, condition: 0, reason: 0 }, JogRule { axis: 0, condition: 0, reason: 0 }]);
         assert_eq!((c.has_spindle, c.spindle_key, c.step_units, c.timeout_us), (true, Some(1), [1, 10, 100], 50_000));
-        let arm_profile = CompiledProfile::from_record(&vector("arm").profile).unwrap();
-        let arm = arm_profile.config();
-        assert_eq!((arm.has_spindle, arm.spindle_key, arm.rules.len()), (false, None, 0));
     }
 
     #[test]
@@ -139,7 +136,7 @@ mod tests {
 
     #[test]
     fn digest_matches_the_host() {
-        for name in ["drill-tap", "hobber", "arm"] {
+        for name in ["drill-tap", "hobber"] {
             let v = vector(name);
             let mut records: std::vec::Vec<&[u8]> = std::vec![&v.profile[..]];
             records.extend(v.reasons.iter().map(|r| &r[..]));

@@ -8,15 +8,15 @@ class OperatorProfileTests {
     if (!failed) throw 'Expected rejection: $message';
   }
   static function profile(?pendant:Array<Null<String>>, ?keys:Array<OperatorKey>, ?rules:Array<JogRule>,
-      guard:Null<OperatorGuard> = null, spindle = true):OperatorProfile
-    return new OperatorProfile("test", "machinekit.control.cnc-controller",
+      hasDoor = false, spindle = true):OperatorProfile
+    return new OperatorProfile("test",
       [new OperatorAxis("x", "X"), new OperatorAxis("z", "Z")],
       pendant != null ? pendant : ["x", "z", null, null, null, null, null, null, null, null, null],
       keys != null ? keys : [new OperatorKey(Unused, ""), new OperatorKey(Unused, ""), new OperatorKey(Unused, "")],
-      [Auto, Jog], [Dro], spindle, guard, rules != null ? rules : []);
+      [Auto, Jog], spindle, hasDoor, rules != null ? rules : []);
 
   public static function run():Void {
-    for (p in [ReferenceOperatorProfiles.drillTap(), ReferenceOperatorProfiles.hobber(), ReferenceOperatorProfiles.arm()]) {
+    for (p in [ReferenceOperatorProfiles.drillTap(), ReferenceOperatorProfiles.hobber()]) {
       var bytes = OperatorProfileCodec.encode(p);
       var back = OperatorProfileCodec.decode(bytes);
       if (Std.string(OperatorProfileCodec.toRecord(back)) != Std.string(OperatorProfileCodec.toRecord(p)))
@@ -26,22 +26,21 @@ class OperatorProfileTests {
     var hobber = ReferenceOperatorProfiles.hobber();
     if (hobber.pendantLabel(5) != "B hob" || hobber.pendantLabel(7) != "") throw "Pendant labels";
     if (hobber.jogRules.length != 2 || hobber.jogRules[0].blockedWhen != GearboxEngaged) throw "Hobber jog rules";
-    var guard = ReferenceOperatorProfiles.drillTap().guard;
-    if (guard == null || guard.setupSpeedLimit != 0.25) throw "Guard parameters";
+    if (!ReferenceOperatorProfiles.drillTap().hasDoor) throw "The drill-tap has a door";
 
     rejects("unknown pendant axis", () -> profile(["q", null, null, null, null, null, null, null, null, null, null]));
     rejects("axis twice", () -> profile(["x", "x", null, null, null, null, null, null, null, null, null]));
     rejects("short pendant map", () -> profile(["x", "z"]));
-    rejects("door key without guard", () -> profile(null, [new OperatorKey(DoorToggle, "Door"), new OperatorKey(Unused, ""), new OperatorKey(Unused, "")]));
-    rejects("spindle key without spindle", () -> profile(null, [new OperatorKey(SpindleJog, "Spin"), new OperatorKey(Unused, ""), new OperatorKey(Unused, "")], null, null, false));
+    rejects("door key without a door", () -> profile(null, [new OperatorKey(DoorToggle, "Door"), new OperatorKey(Unused, ""), new OperatorKey(Unused, "")]));
+    rejects("spindle key without spindle", () -> profile(null, [new OperatorKey(SpindleJog, "Spin"), new OperatorKey(Unused, ""), new OperatorKey(Unused, "")], null, false, false));
     rejects("rule with unknown axis", () -> profile(null, null, [new JogRule("q", DoorOpen, "Blocked")]));
     rejects("long axis label", () -> new OperatorAxis("x", "ABCDEFGHIJKLM"));
     rejects("long key label", () -> new OperatorKey(Mist, "Mist on"));
     rejects("labelled unused key", () -> new OperatorKey(Unused, "No"));
     rejects("non-ASCII label", () -> new OperatorAxis("x", "Ä"));
-    rejects("no jog mode", () -> new OperatorProfile("t", "c", [new OperatorAxis("x", "X")],
+    rejects("no jog mode", () -> new OperatorProfile("t", [new OperatorAxis("x", "X")],
       ["x", null, null, null, null, null, null, null, null, null, null],
-      [new OperatorKey(Unused, ""), new OperatorKey(Unused, ""), new OperatorKey(Unused, "")], [Auto], [Dro], false, null, []));
+      [new OperatorKey(Unused, ""), new OperatorKey(Unused, ""), new OperatorKey(Unused, "")], [Auto], false, false, []));
 
     var record = OperatorProfileCodec.toRecord(hobber);
     record.schemaVersion = 2;

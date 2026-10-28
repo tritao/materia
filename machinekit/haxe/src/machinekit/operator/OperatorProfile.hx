@@ -12,24 +12,19 @@ class OperatorProfile {
   public static inline final KEYS:Int = 3;
 
   public final name:String;
-  /** Recipe id of the control cabinet component this profile operates, for example a CncController. */
-  public final cabinet:String;
   public final axes:Array<OperatorAxis>;
   /** Axis id at pendant position i + 1, or null when that position is unused. */
   public final pendantAxes:Array<Null<String>>;
   public final keys:Array<OperatorKey>;
   public final modes:Array<OperatorMode>;
-  public final pages:Array<OperatorPage>;
   public final hasSpindle:Bool;
-  /** Null when the machine has no enclosure. */
-  public final guard:Null<OperatorGuard>;
+  /** True when the machine has a powered door the operator can open and close from the pendant. */
+  public final hasDoor:Bool;
   public final jogRules:Array<JogRule>;
 
-  public function new(name:String, cabinet:String, axes:Array<OperatorAxis>, pendantAxes:Array<Null<String>>,
-      keys:Array<OperatorKey>, modes:Array<OperatorMode>, pages:Array<OperatorPage>, hasSpindle:Bool,
-      guard:Null<OperatorGuard>, jogRules:Array<JogRule>) {
+  public function new(name:String, axes:Array<OperatorAxis>, pendantAxes:Array<Null<String>>,
+      keys:Array<OperatorKey>, modes:Array<OperatorMode>, hasSpindle:Bool, hasDoor:Bool, jogRules:Array<JogRule>) {
     requireId(name, "profile name");
-    requireId(cabinet, "cabinet");
     if (axes == null || axes.length == 0) throw "A profile needs at least one axis";
     var ids:Array<String> = [];
     for (axis in axes) {
@@ -47,25 +42,22 @@ class OperatorProfile {
     if (keys == null || keys.length != KEYS) throw "A profile needs exactly 3 function keys";
     for (key in keys) {
       if (key == null) throw "Missing function key";
-      if (key.action == DoorToggle && guard == null) throw "A door key needs a guard";
+      if (key.action == DoorToggle && !hasDoor) throw "A door key needs a door";
       if (key.action == SpindleJog && !hasSpindle) throw "A spindle key needs a spindle";
     }
     requireUnique(modes, "mode");
-    requireUnique(pages, "page");
     if (mapped.length > 0 && !modes.contains(Jog)) throw "A pendant with axes needs the Jog mode";
     for (rule in jogRules) {
       if (rule == null) throw "Missing jog rule";
       if (!ids.contains(rule.axis)) throw 'Jog rule names unknown axis ${rule.axis}';
     }
     this.name = name;
-    this.cabinet = cabinet;
     this.axes = axes.copy();
     this.pendantAxes = pendantAxes.copy();
     this.keys = keys.copy();
     this.modes = modes.copy();
-    this.pages = pages.copy();
     this.hasSpindle = hasSpindle;
-    this.guard = guard;
+    this.hasDoor = hasDoor;
     this.jogRules = jogRules.copy();
   }
 

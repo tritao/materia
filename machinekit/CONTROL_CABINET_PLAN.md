@@ -31,7 +31,7 @@ A profile is the data a machine hands to the platform:
 
 | Field | Meaning |
 |---|---|
-| HMI pages | Which pages exist and their order (DRO, program, alarms, gearbox, teach, ...). |
+| HMI pages | Which pages exist and their order (DRO, program, alarms, gearbox, teach, ...). Not in `OperatorProfile` yet: it gains the field when the HMI exists to use it. |
 | Pendant legend | Axis selector entries, soft-key labels, LED meanings. |
 | Jog permissions | Which axes the pendant may jog in which state (see hobber). |
 | Guard parameters | `EnclosureGuard` configuration: setup-mode speed limit, hold-to-run, unlock rules. |
