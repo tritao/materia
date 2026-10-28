@@ -574,6 +574,11 @@ class EditorPerspectiveViewport implements View {
   var hoveredObjectId:Null<String> = null;
   var hoveredFaceIndex:Int = -1;
   var hoverRevision:Int = 0;
+  /** Where the cursor last was over the viewport (viewport coordinates), so the hover can be tested again when the scene changes under it. */
+  var cursorInside:Bool = false;
+  var cursorX:Float = 0.0;
+  var cursorY:Float = 0.0;
+  var hoverSceneRevision:Int = -1;
   var objectDrag:Null<PerspectiveSceneDrag> = null;
   /** An IK drag of a joint-driven part: the pressed point follows a screen-parallel plane. */
   var assemblyDrag:Null<SceneAssemblyDrag> = null;
@@ -669,6 +674,7 @@ class EditorPerspectiveViewport implements View {
       node.hitTestSelf = true;
       node.focusable = true;
       node.semantics = new Semantics(AccessibilityRole.Image, "Scene perspective GPU view");
+      revalidateHover();
       updatePresentation();
       node.onPaint(
         paint,
@@ -1325,6 +1331,22 @@ class EditorPerspectiveViewport implements View {
     hoveredFaceIndex = next == null ? -1 : nextFace;
     hoverRevision++;
     host.requestFrame();
+  }
+
+  /**
+   * The scene changed (a part shown or hidden, isolated, moved) while the cursor stood still, so what is under it may
+   * have changed too: test it again, or drop a hover on a part that is now hidden. Under a drag the hover stays cleared,
+   * and under a running simulation, whose revisions tick every frame, only a hidden part is dropped.
+   */
+  function revalidateHover():Void {
+    if (hoverSceneRevision == scene.visualRevision) return;
+    hoverSceneRevision = scene.visualRevision;
+    if (!cursorInside || readOnly || navigationPointer != null) return;
+    if (simulationActive) {
+      if (hoveredObjectId != null && !scene.isVisible(hoveredObjectId)) clearHover();
+      return;
+    }
+    updateHover(cursorX, cursorY);
   }
 
   function clearHover():Void {
@@ -2014,6 +2036,9 @@ class EditorPerspectiveViewport implements View {
     }
     );
     node.on(UiEventKind.PointerMove, function(event:UiEvent) {
+      cursorInside = true;
+      cursorX = event.localX;
+      cursorY = event.localY;
       if (navigationPointer == null) {
         updateHover(event.localX, event.localY);
         return;
@@ -2099,10 +2124,14 @@ class EditorPerspectiveViewport implements View {
     }
     );
     node.on(UiEventKind.HoverEnter, function(event:UiEvent) {
+      cursorInside = true;
+      cursorX = event.localX;
+      cursorY = event.localY;
       if (navigationPointer == null) updateHover(event.localX, event.localY);
     }
     );
     node.on(UiEventKind.HoverLeave, function(_) {
+      cursorInside = false;
       if (navigationPointer == null) clearHover();
     }
     );

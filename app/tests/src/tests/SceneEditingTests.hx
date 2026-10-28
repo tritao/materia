@@ -1876,6 +1876,13 @@ import materia.project.MaterialLibrary;
         clearedView.hoverOverrideCount() == 0,
         "cleared perspective pointer hover removes the scene presentation layer"
       );
+
+      // Hiding the hovered part while the cursor stands still drops the hover when the scene next presents, with no pointer move.
+      ui.events.pointerMove(400.0, 300.0);
+      check(viewport.hoveredId() == "box", "the cursor is over the box again");
+      scene.setVisible("box", false);
+      ui.submit(viewport, new LayoutFrame(800.0, 600.0));
+      check(viewport.hoveredId() == null, "hiding the hovered part clears the hover without a pointer move");
     } catch (error:Dynamic) {
       ui.dispose();
       scene.dispose();
