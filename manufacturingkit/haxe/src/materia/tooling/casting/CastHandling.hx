@@ -111,6 +111,8 @@ class CastHandling {
     var relative = F.compose(o.serviceOrientation, F.inverse(d.setup.sourceToMold));
     var vertical = F.transformVector(relative, 0, 0, 1);
     return {
+      liftingPoints: materia.casting.CastingLiftingPoint.CastingLiftingPoints
+      .snapshot(materia.casting.CastingLiftingPoint.CastingLiftingPoints.records(d.input.liftingPoints)),
       requiresFlip: vertical.z < 1 - 1e-8,
       moldToService: relative,
       castingMassKg: source.massKg,
@@ -122,10 +124,10 @@ class CastHandling {
 	 * Anchor holes are occupied and post-cast holes do not yet exist at the lift. */
   public static function liftingIds(d:ToolingDocument):Array<String> {
     var ids:Array<String> = [];
-    for (insert in d.input.inserts) if (insert.role == materia.casting.InsertSpec.InsertRole.LiftingMount) {
-      var occupied = materia.casting.InsertAnchorage.InsertAnchorageCodec.occupiedHoleIds(insert.anchorage);
-      if (InsertFixturePlanner.holes(insert).filter(hole -> hole.thread != null
-        && occupied.indexOf(hole.id) < 0).length > 0) ids.push(insert.id);
+    for (point in d.input.liftingPoints) {
+      var inserts = d.input.inserts.filter(insert -> insert.id == point.insertId);
+      if (inserts.length == 1 && InsertFixturePlanner.holes(inserts[0]).filter(hole -> hole.id == point.holeId
+        && hole.thread != null).length == 1) ids.push(point.id);
     }
     ids.sort(Reflect.compare);
     return ids;

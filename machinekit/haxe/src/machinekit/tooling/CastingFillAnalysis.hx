@@ -220,9 +220,6 @@ class CastingFillAnalysis {
         var components = geometry.airComponents(height), keys = new Map<String, Bool>();
         for (part in components) own(resources, part);
         for (part in components) {
-          var key = CastingFillGeometry.componentKey(part);
-          if (keys.exists(key)) throw "Ambiguous exact fill components: " + sourceId;
-          keys.set(key, true);
           var vented = commonMeasure(part, open, false) > EPS;
           var known = false;
           for (previous in trapped) if (commonMeasure(part, previous, true) > EPS) known = true;
@@ -231,6 +228,11 @@ class CastingFillAnalysis {
             part.close();
             continue;
           }
+          // Only newly trapped pockets need a persistent identity. Vented and
+          // previously recorded regions are proven by exact geometry above.
+          var key = CastingFillGeometry.componentKey(part);
+          if (keys.exists(key)) throw "Ambiguous exact fill components: " + sourceId;
+          keys.set(key, true);
           var ceiling = new CastingFillGeometry(sourceId, part);
           geometries.push(ceiling);
           var point = ceiling.highestPoint(), ids = boundaryIds(part, boundaries, sourceId);

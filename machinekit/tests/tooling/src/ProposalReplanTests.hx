@@ -27,10 +27,20 @@ class ProposalReplanTests {
     if (!value) throw message;
   }
 
-  static function foundation(placements:Array<CastInsertPlacement>):MineralFoundation return new MineralFoundation(
-    new ComponentValues().setNumber("width", 240).setNumber("depth", 180).setNumber("height", 100),
-    placements
-  );
+  static function foundation(placements:Array<CastInsertPlacement
+    >):MineralFoundation return new MineralFoundation(new ComponentValues().setNumber(
+      "width",
+      240
+    ).setNumber(
+      "depth",
+      180
+    ).setNumber(
+      "height",
+      100
+    ), placements, null, null, [for (row in placements) {
+    id:row.id, insertId:row.id, holeId:"fixing"
+  }
+  ]);
 
   static function document(source:MineralFoundation, revision:Int):ToolingDocument {
     var result = SinglePocketSetup.document();
@@ -99,6 +109,10 @@ class ProposalReplanTests {
       );
     }
     var accepted = document(foundation(placements), initial.input.revision + 1);
+    check(
+      accepted.input.liftingPoints.length == candidates.length,
+      "Accepted authoring declares each source insert/thread lifting attachment"
+    );
     check(
       accepted.input.revision == 2 && accepted.setup.revision == 2,
       "accepted source authoring creates a new casting and setup revision"

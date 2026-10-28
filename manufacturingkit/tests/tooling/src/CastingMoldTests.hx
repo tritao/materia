@@ -189,6 +189,7 @@ class CastingMoldTests {
     hole.clearanceDiameter = 6.6;
     hole.limits.threaded = {minEngagement: 7.8, minTipGap: 1};
     d.recipe.designReview.minimumLiftingPoints = 1;
+    d.input.liftingPoints = [{id: "lift", insertId: insert.id, holeId: hole.id}];
     d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
     var p = CastingMoldPlanner.plan(d, options(d));
     check(
@@ -204,6 +205,57 @@ class CastingMoldTests {
       levelOne.validation.filter(row -> row.rule == "process.level1.lifting-points"
       && row.status == "pass" && row.affectedIds.length == 1 && row.affectedIds[0] == d.input.id).length == 1,
       "the source-only lifting rule passes with the actual declared source ID"
+    );
+    var twin = ToolingCodec.copy(d), plate = twin.input.inserts[0], first = plate.holes[0];
+    first.frame.x = -10;
+    var second = materia.casting.InsertHole.InsertHoleCodec.snapshot([first])[0];
+    second.id = "second-lift";
+    second.frame.x = 10;
+    plate.holes.push(second);
+    var fixture = materia.casting.InsertHole.InsertHoleCodec.snapshot([first])[0];
+    fixture.id = "fixture-only";
+    fixture.frame.x = 0;
+    fixture.frame.y = 10;
+    plate.holes.push(fixture);
+    var routes = switch plate.origin {
+      case Fabricated(plan):
+        plan;
+      default:
+        throw "Fabricated lifting plate required";
+    };
+    routes.holeRoutes = [for (hole in plate.holes) {
+      holeId:hole.id, route:materia.casting.InsertManufacturing.InsertHoleRoute.BeforeCasting
+    }
+    ];
+    twin.input.liftingPoints = [
+      {id: "lift-a", insertId: plate.id, holeId: first.id},
+      {id: "lift-b", insertId: plate.id, holeId: second.id}
+    ];
+    twin.recipe.designReview.minimumLiftingPoints = 2;
+    var copied = ToolingCodec.copyInput(twin.input);
+    twin.input = copied;
+    check(
+      materia.tooling.casting.CastHandling.liftingIds(twin).join(",") == "lift-a,lift-b",
+      "two declared lifting threads on one plate count twice; the fixture-only thread does not count"
+    );
+    check(
+      materia.tooling.casting.CastHandling.sourceDeclared(twin),
+      "the two-point source requirement uses threads, not plate count"
+    );
+    var fingerprint = ToolingCodec.inputFingerprint(copied);
+    twin.input.liftingPoints.pop();
+    check(
+      !materia.tooling.casting.CastHandling.sourceDeclared(twin),
+      "removing a lifting declaration restores the missing-point finding"
+    );
+    check(ToolingCodec.inputFingerprint(twin.input) != fingerprint,
+      "lifting declarations enter the source fingerprint");
+    twin.input.liftingPoints.push({id: "duplicate", insertId: plate.id, holeId: first.id});
+    var duplicate = "";
+    try ToolingCodec.copyInput(twin.input) catch (error:Dynamic) duplicate = Std.string(error);
+    check(
+      duplicate == "Duplicate source lifting thread: " + plate.id + "/" + first.id,
+      "one physical thread cannot satisfy two lifting-point declarations"
     );
     var manufacturing = switch insert.origin {
       case Fabricated(plan):
@@ -225,6 +277,7 @@ class CastingMoldTests {
       route: materia.casting.InsertManufacturing.InsertHoleRoute.BeforeCasting
     }];
     insert.role = materia.casting.InsertSpec.InsertRole.GuideSeat;
+    d.input.liftingPoints = [];
     d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
     var missing = CastingMoldPlanner.plan(d, options(d));
     check(

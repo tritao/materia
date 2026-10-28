@@ -62,6 +62,7 @@ class ReplicationJigTests {
       interfaceContext: CastingInterfaceContexts.copy(context),
       interfaces: [a, b],
       postCureInserts: [],
+      liftingPoints: [],
       envelope: materia.casting.CastingEnvelope.build(100, 80, 40),
       features: [],
       inserts: []

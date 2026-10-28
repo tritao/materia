@@ -175,6 +175,8 @@ class HobberSaddle extends MachineComponent {
         var skirt = Math.max(parameterNumber("tableHousingDiameter") / 2 + 15, lip + 5);
         var top = parameterNumber("tableFaceHeight") - 3, bottom = parameterNumber("tableSeatHeight") + 2;
         var shoulder = Math.max(bottom + 5, top - 61);
+        var front = FoundationLayout.WORK_WELL_CENTRE_X
+          - FoundationLayout.WORK_WELL_WIDTH / 2 + FoundationLayout.CHIP_TRAY_WELL_CLEARANCE_MM;
         [
           Part.revolve([
             {r: lip + 2, z: top},
@@ -186,9 +188,9 @@ class HobberSaddle extends MachineComponent {
           ]),
           Solids.cut(
             Solids.union([
-              box(-245, 90, -170, 170, 135, 139),
-              box(-245, 90, -174, -170, 135, 164),
-              box(-245, 90, 170, 174, 135, 164)
+              box(front, 90, -170, 170, 135, 139),
+              box(front, 90, -174, -170, 135, 164),
+              box(front, 90, 170, 174, 135, 164)
             ]),
             [box(-skirt, skirt, -skirt, skirt, 134, 165)]
           )

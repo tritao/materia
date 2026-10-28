@@ -5,23 +5,24 @@ import machinekit.tooling.CastingMoldCad.CastingMoldReview;
 class HobberMoldChecks {
   /** Source geometry can prove the lift polygon and vertical demand, but cannot
   * certify bought lifting equipment or invent its permitted sling angle. */
-  public static function liftingReview(planned:CastingMoldPlan):Array<materia.tooling.ToolingValidation> {
-    var ids = materia.tooling.casting.CastHandling.liftingIds(planned.document);
-    var inverse = materia.assembly.AssemblyFrames.inverse(planned.document.setup.sourceToMold);
+  public static function liftingReview(
+    document:materia.tooling.ToolingDocument,
+    handling:materia.tooling.casting.CastingMoldPlan.HandlingPlan
+  ):Array<materia.tooling.ToolingValidation> {
+    var ids = materia.tooling.casting.CastHandling.liftingIds(document);
+    var inverse = materia.assembly.AssemblyFrames.inverse(document.setup.sourceToMold);
     var center = materia.assembly.AssemblyFrames.transformPoint(
       inverse,
-      planned.handling.centerOfMassMoldMm.x,
-      planned.handling.centerOfMassMoldMm.y,
-      planned.handling.centerOfMassMoldMm.z
+      handling.centerOfMassMoldMm.x,
+      handling.centerOfMassMoldMm.y,
+      handling.centerOfMassMoldMm.z
     );
     var points:Array<{id:String, x:Float, y:Float}> = [];
-    for (id in ids) {
-      var insert = planned.document.input.inserts.filter(insert -> insert.id == id)[0];
-      var occupied = materia.casting.InsertAnchorage.InsertAnchorageCodec.occupiedHoleIds(insert.anchorage);
-      var holes = materia.tooling.casting.InsertFixturePlanner.holes(insert).filter(hole -> hole.thread != null
-        && occupied.indexOf(hole.id) < 0);
-      var entry = materia.assembly.AssemblyFrames.compose(insert.pose, holes[0].frame);
-      points.push({id: id, x: entry.x, y: entry.y});
+    for (point in document.input.liftingPoints) if (ids.indexOf(point.id) >= 0) {
+      var insert = document.input.inserts.filter(insert -> insert.id == point.insertId)[0];
+      var hole = materia.tooling.casting.InsertFixturePlanner.holes(insert).filter(hole -> hole.id == point.holeId)[0];
+      var entry = materia.assembly.AssemblyFrames.compose(insert.pose, hole.frame);
+      points.push({id: point.id, x: entry.x, y: entry.y});
     }
     points.sort((a, b) -> Reflect.compare(
       Math.atan2(a.y - center.y, a.x - center.x),
@@ -43,7 +44,7 @@ class HobberMoldChecks {
       []
     )];
     var rule = materia.casting.InsertAnchorage.InsertAnchorSelection.sourceDemandRule("hobber-source-anchors");
-    var vertical = planned.handling.castingMassKg * rule.gravityMps2 * rule.demandFactor / Math.min(
+    var vertical = handling.castingMassKg * rule.gravityMps2 * rule.demandFactor / Math.min(
       rule.liftingLoadPaths,
       points.length
     );
@@ -63,7 +64,7 @@ class HobberMoldChecks {
     var shares:Array<String> = [];
     if (rectangle && inside) {
       var fx = (center.x - x0) / (x1 - x0), fy = (center.y - y0) / (y1 - y0);
-      var force = 0.0, mx = 0.0, my = 0.0, weight = planned.handling.castingMassKg * rule.gravityMps2;
+      var force = 0.0, mx = 0.0, my = 0.0, weight = handling.castingMassKg * rule.gravityMps2;
       for (point in points) {
         var load = weight * (Math.abs(point.x - x0)
           < 1e-7 ? 1 - fx : fx) * (Math.abs(point.y - y0) < 1e-7 ? 1 - fy : fy);
@@ -124,7 +125,7 @@ class HobberMoldChecks {
   }
 
   public static function run(planned:CastingMoldPlan, review:CastingMoldReview):Void {
-    for (check in liftingReview(planned)) if (check.status
+    for (check in liftingReview(planned.document, planned.handling)) if (check.status
       == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail) throw check.rule + ": " + check.message;
     if (review.symmetricDifferenceMm3 > 1e-3) throw 'Hobber native reconstruction differs from source';
     var cured = review.permanentGroups.filter(group -> group.id == 'cured-casting');

@@ -28,8 +28,9 @@ class FoundationToolingAdapter {
     if (ToolingCodec.canonical(materia.casting.InsertAnchorage.EmbeddedAnchors.records(expected))
       != ToolingCodec.canonical(materia.casting.InsertAnchorage.EmbeddedAnchors.records(foundation
       .body.embeddedAnchors()))) throw "Foundation embedded anchor occupancy differs from source inserts";
-    return ToolingCodec.copyInput({id: id, revision: revision, lengthUnit: ToolingLengthUnit.Millimetres,
-      datumScheme: foundation.body.foundationDatumScheme(), interfaceContext: context,
+    return ToolingCodec.copyInput({id: id, revision: revision,
+      lengthUnit: ToolingLengthUnit.Millimetres, datumScheme: foundation.body.foundationDatumScheme(),
+      liftingPoints: foundation.liftingPoints(), interfaceContext: context,
       interfaces: foundation.body.precisionRequirements(), envelope: foundation.body.castingEnvelope(),
       features: foundation.body.castingFeatures(), postCureInserts: [for (row in foundation.postCureLocations()) {
       insert:insert(row), bond:foundation.body.postCureBonds().filter(bond -> bond.insertId == row.id)[0]

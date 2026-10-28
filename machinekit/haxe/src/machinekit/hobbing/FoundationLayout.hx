@@ -27,7 +27,7 @@ class FoundationLayout {
   public static inline final TABLE_SEAT_HEIGHT = 608.0;
   public static inline final TABLE_WELL_FLOOR_HEIGHT = 598.0;
   public static inline final WORK_WELL_TOP = 810.0;
-  public static inline final WORK_WELL_WIDTH = 410.0;
+  public static inline final WORK_WELL_WIDTH = 398.0;
   public static inline final WORK_WELL_DEPTH = 350.0;
   public static inline final WORK_WELL_CENTRE_X = -45.0;
   public static inline final DRIVE_CHANNEL_FRONT_CLEARANCE = 12.5;
@@ -35,6 +35,7 @@ class FoundationLayout {
   public static inline final DRIVE_CHANNEL_WIDTH = 110.0;
   public static inline final CHIP_DRAIN_DEPTH = 80.0;
   public static inline final CHIP_DRAIN_WIDTH = 180.0;
+  public static inline final CHIP_TRAY_WELL_CLEARANCE_MM = 5.0;
   public static inline final RAIL_SEAT_HEIGHT = 790.0;
   public static inline final DRIVE_SEAT_HEIGHT = 710.0;
   public static inline final LIFT_SEAT_HEIGHT = 770.0;
@@ -48,7 +49,6 @@ class FoundationLayout {
   public static inline final FOOT_ACCESS_WIDTH = 140.0;
   public static inline final FOOT_BOSS_WIDTH = 190.0;
   public static inline final FOOT_STEM_CLEARANCE = 28.0;
-  public static inline final FOOT_REGISTER_CLEARANCE = 1.0;
   public static inline final FOOT_PLATE_THICKNESS = 15.0;
   public static inline final FOOT_PLATE_WIDTH = 110.0;
   public static inline final PLINTH_CORE_FLOOR = 85.0;
@@ -199,6 +199,14 @@ class FoundationLayout {
   public static inline final TRAY_SOCKET_TAIL_WAVE = 1.4;
   public static inline final TRAY_SOCKET_TAIL_BLEND = 0.5;
   public static inline final TRAY_SOCKET_POSITION_TOLERANCE = 0.5;
+  // Approved 5 mm mix design: a 10 mm steel-to-ledge land. The toe
+  // clamps remain on the same finished plane; side/end toe overlap is
+  // 11/9.5 mm respectively, with grip qualification still a physical input.
+  public static inline final SOURCE_STEEL_COVER_MM = 10.0;
+  public static inline final TRAY_SOCKET_EDGE_INSET = machinekit.enclosure.TraySeat.WIDTH
+    + TRAY_SOCKET_OUTSIDE_DIAMETER / 2 + SOURCE_STEEL_COVER_MM;
+  public static inline final TRAY_SOCKET_END_INSET:Float = machinekit.enclosure.TraySeat.WIDTH + (TRAY_SOCKET_TAIL_WIDTH
+    > TRAY_SOCKET_OUTSIDE_DIAMETER ? TRAY_SOCKET_TAIL_WIDTH : TRAY_SOCKET_OUTSIDE_DIAMETER) / 2 + SOURCE_STEEL_COVER_MM;
 
   public static function traySocket():CastInsert return machinekit.structural.FixingSockets.pfeiferStudy(
     {
@@ -221,9 +229,9 @@ class FoundationLayout {
       pose: F.translation(x, y, d[2] - machinekit.structural.FixingSockets.LENGTH),
       clampHeight: height
     });
-    for (side in [-1, 1]) for (x in [-1, 0, 1]) add(x * (d[0] / 2 - 100), side * (d[1] / 2 - 35));
-    for (side in [-1, 1]) for (y in [-150.0, 150.0]) add(side * (d[0] / 2 - 35), y);
-    for (y in [-75.0, 75.0]) add(d[0] / 2 - 35, y, 17);
+    for (side in [-1, 1]) for (x in [-1, 0, 1]) add(x * (d[0] / 2 - 100), side * (d[1] / 2 - TRAY_SOCKET_EDGE_INSET));
+    for (side in [-1, 1]) for (y in [-150.0, 150.0]) add(side * (d[0] / 2 - TRAY_SOCKET_END_INSET), y);
+    for (y in [-75.0, 75.0]) add(d[0] / 2 - TRAY_SOCKET_END_INSET, y, 17);
     return out;
   }
 
@@ -257,7 +265,7 @@ class FoundationLayout {
   };
 
   static inline final COLUMN_SPINE_HALF_WIDTH = 60.0;
-  static inline final COLUMN_HEAD_WIDTH = 240.0;
+  public static inline final COLUMN_HEAD_WIDTH = 240.0;
   static inline final COLUMN_HEAD_DEPTH = 100.0;
   static inline final COLUMN_HEAD_CENTRE_Y = 60.0;
 
@@ -273,7 +281,7 @@ class FoundationLayout {
         var opening = alongX ? "body.x-max" : p.y < 0 ? "body.y-min" : "body.y-max";
         var edge = alongX ? d[0] / 2 : p.y < 0 ? -d[1] / 2 : d[1] / 2;
         cores = cores.concat(Patterns.foot(
-          {access: 'foot$i-access', stem: 'foot$i-stem', register: 'foot$i-plate-register'},
+          {access: 'foot$i-access', stem: 'foot$i-stem'},
           p.x,
           p.y,
           edge,
@@ -283,16 +291,8 @@ class FoundationLayout {
           FOOT_FLOOR,
           FOOT_ROOF,
           FOOT_STEM_CLEARANCE,
-          FOOT_SUPPORT_TOP,
           faces([opening]),
-          faces(["body.z-min"]).concat(i == 2 ? [C.feature("pocket-motorRibRear-leftWebInside-footRoof")] : []),
-          {
-            owner : "footSeat" + i,
-            openings : [C.feature('foot$i-access')],
-            width : FOOT_PLATE_WIDTH + FOOT_REGISTER_CLEARANCE,
-            depth : FOOT_PLATE_WIDTH + FOOT_REGISTER_CLEARANCE,
-            thickness : FOOT_PLATE_THICKNESS
-          }
+          faces(["body.z-min"])
         ));
       }
       cores.push(Patterns.box(
@@ -308,7 +308,7 @@ class FoundationLayout {
       ));
       // This drain starts at the front chamber: the part of the former
       // rectangular cut already inside that chamber is not another feature.
-      var drainFront = -140.0 - centre, drainRear = 90.0 - centre;
+      var drainFront = -TABLE_INSERT_WIDTH / 2 - SOURCE_STEEL_COVER_MM - centre, drainRear = 90.0 - centre;
       cores.push(Patterns.box(
         "chip-drain",
         ServiceOpening,
@@ -534,8 +534,8 @@ class FoundationLayout {
         side < 0 ? "railLeft" : "railRight",
         GuideSeat,
         "Z rail seat",
-        35,
-        480,
+        30,
+        470,
         20,
         F.fromRotationMatrix(side * 145, 90, 245, [1.0, 0, 0, 0, 0, 1, 0, -1, 0]),
         ["body.y-max"],

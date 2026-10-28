@@ -21,6 +21,12 @@ class HobberFootChecks {
       machine.bed.insertLocations().filter(p -> StringTools.startsWith(p.id, "foot")).length == 0,
       "no permanently embedded foot anchors"
     );
+    var features = machine.bed.body.castingFeatures();
+    check(
+      features.filter(feature -> feature.id.indexOf("plate-register") >= 0
+      || feature.id.indexOf("stem-upper") >= 0).length == 0,
+      "no cast plate registers or upper stud passages"
+    );
     var restored = MachineAssembly.decode(machine.encode(), MachineKitComponents.standard());
     check(restored.components().length == members.length, "separate foot hardware persists");
     var body = machine.bed.body.geometry(), plate = LevelingFoot.of(Plate(
@@ -45,28 +51,25 @@ class HobberFootChecks {
     try {
       for (i in 0...feet.length) {
         var p = feet[i];
-        var support = box(110, 110, 70, p.x, p.y, Pocket.FOOT_ROOF), hole = box(
-          Pocket.FOOT_STEM_CLEARANCE,
-          Pocket.FOOT_STEM_CLEARANCE,
-          72,
+        var roof = box(
+          Pocket.FOOT_PLATE_WIDTH,
+          Pocket.FOOT_PLATE_WIDTH,
+          Pocket.FOOT_SUPPORT_TOP - Pocket.FOOT_ROOF,
           p.x,
           p.y,
-          Pocket.FOOT_ROOF - 1
+          Pocket.FOOT_ROOF
         );
-        var roof = support.subtract(hole);
-        support.close();
-        hole.close();
         var expected = roof.volume();
-        check(Math.abs(volumeInBody(roof) - expected) < 1e-5, "continuous 70 mm roof around stem " + i);
+        check(Math.abs(volumeInBody(roof) - expected) < 1e-5, "continuous solid compression roof " + i);
         roof.close();
-        var passage = box(Pocket.FOOT_STEM_CLEARANCE, Pocket.FOOT_STEM_CLEARANCE, Pocket.FOOT_SUPPORT_TOP, p.x, p.y, 0);
-        check(volumeInBody(passage) < 0.001, "stem has casting clearance " + i);
+        var passage = box(Pocket.FOOT_STEM_CLEARANCE, Pocket.FOOT_STEM_CLEARANCE, Pocket.FOOT_FLOOR, p.x, p.y, 0);
+        check(volumeInBody(passage) < 0.001, "lower stud has casting clearance " + i);
         passage.close();
         var foot = members.filter(member -> member.id == "foot" + i)[0];
         var installedFoot = cache.posed(foot.component, F.compose(toCasting, poses.get(foot.id)));
         var overlap = volumeInBody(installedFoot);
         installedFoot.close();
-        check(overlap < 0.001, "actual installed foot clears the finished blind stem passage " + i);
+        check(overlap < 0.001, "actual installed foot ends below the solid compression roof " + i);
         // An 80 mm-wide, 12 mm-thick wrench corridor reaches both nuts.
         for (z in [
           Pocket.FOOT_ROOF - Pocket.FOOT_PLATE_THICKNESS - 9.5,
@@ -109,7 +112,7 @@ class HobberFootChecks {
           plateShape,
           F.translation(p.x, p.y, Pocket.FOOT_ROOF - Pocket.FOOT_PLATE_THICKNESS)
         );
-        check(volumeInBody(loaded) < 0.001, "installed plate fits registered roof recess " + i);
+        check(volumeInBody(loaded) < 0.001, "installed plate bears directly on the solid roof " + i);
         loaded.close();
         check(
           members.filter(m -> m.id == "footSeat" + i
@@ -150,8 +153,7 @@ class HobberFootChecks {
       base.beam.status == "unsupported" && base.beam.newMinimumIyMm4 == null && base.beam.passed == false,
       "round socket sections do not become a passing beam screen"
     );
-    var contactArea = Pocket.FOOT_PLATE_WIDTH
-      * Pocket.FOOT_PLATE_WIDTH - Pocket.FOOT_STEM_CLEARANCE * Pocket.FOOT_STEM_CLEARANCE;
+    var contactArea = Pocket.FOOT_PLATE_WIDTH * Pocket.FOOT_PLATE_WIDTH - 26 * 26 * Math.PI / 4;
     var result = {
       assertions: n,
       seconds: Sys.time() - began,

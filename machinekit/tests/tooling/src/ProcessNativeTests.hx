@@ -46,6 +46,11 @@ class ProcessNativeTests {
       for (b in cells) owned.push(ToolingBlock.placedBox(b));
       var source = Part.fuseAll(owned);
       owned.push(source);
+      var expectedKey = vented ? "region-309f3c650a5f2104caa68736" : "region-af25c6ff7f81cebabb25d66c";
+      check(
+        machinekit.tooling.CastingFillGeometry.componentKey(source) == expectedKey,
+        "Caching canonical vertex keys preserves the established native component identity"
+      );
       check(
         Math.abs(source.volume() - report.geometricResinVolumeMm3) < 1e-7,
         "fill region agrees with fused BREP volume"

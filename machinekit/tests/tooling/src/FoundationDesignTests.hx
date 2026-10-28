@@ -571,7 +571,7 @@ class FoundationDesignTests {
             && feature.owner != null && StringTools.startsWith(
               feature.owner,
               "footSeat"
-            )).length != 3) throw "Removable foot plate registers must name their owners";
+            )).length != 0) throw "Compression feet must not leave cast plate registers";
         }
         assertions++;
         if (row.part.insertLocations().filter(insert -> insert.id == "driveSeat")[0].part.parameterToken("role")

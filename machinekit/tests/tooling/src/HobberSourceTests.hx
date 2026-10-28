@@ -42,6 +42,30 @@ import materia.assembly.AssemblyFrames as F;
           "Every source cavity network has a declared body opening: " + [for (feature in members) feature.id].join(", ")
         );
       }
+      if (kind == "bed") {
+        for (site in FoundationLayout.trayClampSeats().filter(row -> row.id == "trayClampSeat10"
+          || row.id == "trayClampSeat11")) {
+          var featureId = site.id == "trayClampSeat10"
+            ? "pocket-rearDeckRibRight-leftCap-capTop" : "pocket-rearDeckRibRight-rightDeckRibInside-capTop";
+          var local = site.part.geometry(), steel = machinekit.assembly.PosedParts.moved(local, site.pose);
+          local.close();
+          try for (box in byFeature.get(featureId)) {
+            var cavity = machinekit.tooling.ToolingBlock.placedBox(box);
+            try check(
+              steel.shape.distance(cavity.shape) + 1e-7 >= FoundationLayout.SOURCE_STEEL_COVER_MM,
+              "Relocated rear socket retains exact native cover to its actual adjacent core: " + site.id
+            ) catch (error:Dynamic) {
+              cavity.close();
+              throw error;
+            }
+            cavity.close();
+          } catch (error:Dynamic) {
+            steel.close();
+            throw error;
+          }
+          steel.close();
+        }
+      }
       if (kind == "column") {
         check(
           cuts.length == 3 && cuts.filter(feature -> feature.kind == ServiceOpening && StringTools.startsWith(
@@ -83,36 +107,108 @@ import materia.assembly.AssemblyFrames as F;
       );
       check(axis.z < -1 + 1e-8, "Declared mounting faces point toward the mold bed: " + kind);
       var lifting = input.inserts.filter(insert -> insert.role == materia.casting.InsertSpec.InsertRole.LiftingMount);
-      var original = lifting.filter(insert -> insert.id == "liftLeft" || insert.id == "liftRight");
-      var additional = lifting.filter(insert -> StringTools.startsWith(insert.id, "liftAdditional"));
+      var points = [for (point in input.liftingPoints) {
+        var insert = input.inserts.filter(insert -> insert.id == point.insertId)[0];
+        var hole = insert.holes.filter(hole -> hole.id == point.holeId)[0];
+        var position = F.transformPoint(F.compose(insert.pose, hole.frame), 0, 0, 0);
+        {
+          id:point.id, x:position.x, y:position.y, z:position.z
+        };
+      }
+      ];
       check(
-        original.length == 2 && additional.length == 2,
-        "Preserve both original lifts and add exactly one symmetric pair"
+        points.length == 4 && lifting.length == (kind == Plinth ? 4 : 2),
+        "Four source lifting threads; the column shares two continuous plates"
       );
-      for (insert in original) {
+      for (point in points.filter(point -> point.id == "liftLeft" || point.id == "liftRight")) {
         var expectedX = kind == Plinth
-          ? -150 - machinekit.hobbing.HobberXLayout.front().bedCentre : (insert.id == "liftLeft" ? -160.0 : 160.0);
-        var expectedY = kind == Plinth ? (insert.id == "liftLeft" ? -310.0 : 310.0) : -40.0;
+          ? -150 - machinekit.hobbing.HobberXLayout.front().bedCentre : (point.id == "liftLeft" ? -160.0 : 160.0);
+        var expectedY = kind == Plinth ? (point.id == "liftLeft" ? -310.0 : 310.0) : -40.0;
         check(
-          Math.abs(insert.pose.x - expectedX) + Math.abs(insert.pose.y - expectedY) < 1e-7,
-          "Original lifting service centre does not move: " + insert.id
+          Math.abs(point.x - expectedX) + Math.abs(point.y - expectedY) < 1e-7,
+          "Original lifting service X/Y centre does not move: " + point.id
+        );
+      }
+      var additional = points.filter(point -> StringTools.startsWith(point.id, "liftAdditional"));
+      check(additional.length == 2, "The source retains exactly two additional lifting points");
+      check(
+        kind == Plinth ? Math.abs(additional[0].x - additional[1].x) < 1e-7
+        && Math.abs(additional[0].y + additional[1].y) < 1e-7 : Math.abs(additional[0].x + additional[1].x) < 1e-7
+        && Math.abs(additional[0].y - additional[1].y) < 1e-7,
+        "The additional lifting pair remains symmetric"
+      );
+      var mass = machinekit.structural.FoundationSizing.asCastMass(foundation);
+      var relative = F.compose(
+        HobberMoldSetup.options(input).serviceOrientation,
+        F.inverse(document.setup.sourceToMold)
+      );
+      var handling:materia.tooling.casting.CastingMoldPlan.HandlingPlan = {
+        liftingPoints: input.liftingPoints,
+        requiresFlip: F.transformVector(relative, 0, 0, 1).z < 1 - 1e-8,
+        moldToService: relative,
+        castingMassKg: mass.mass,
+        centerOfMassMoldMm: F.transformPoint(
+          document.setup.sourceToMold,
+          mass.centreOfMass.x,
+          mass.centreOfMass.y,
+          mass.centreOfMass.z
+        )
+      };
+      var liftingChecks = HobberMoldChecks.liftingReview(document, handling);
+      check(
+        liftingChecks.filter(row -> row.status
+        == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail).length == 0,
+        "Delivered lift review resolves each explicit thread, including multiple threads on one plate"
+      );
+      check(
+        liftingChecks.filter(row -> row.rule == "tooling.handling.lift-polygon"
+        && row.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length == 1,
+        "Delivered lifting polygon uses all four source threads"
+      );
+      var xs = [for (point in points) point.x], ys = [for (point in points) point.y];
+      xs.sort(Reflect.compare);
+      ys.sort(Reflect.compare);
+      var x0 = xs[0], x1 = xs[xs.length - 1], y0 = ys[0], y1 = ys[ys.length - 1], c = mass.centreOfMass;
+      check(
+        mass.unaccounted.length == 0 && c.x > x0 && c.x < x1 && c.y > y0 && c.y < y1,
+        "Actual source CoM lies inside the four-thread lifting polygon"
+      );
+      var total = 0.0;
+      for (point in points) {
+        var wx = Math.abs(point.x - x0) < 1e-7 ? (x1 - c.x) / (x1 - x0) : (c.x - x0) / (x1 - x0);
+        var wy = Math.abs(point.y - y0) < 1e-7 ? (y1 - c.y) / (y1 - y0) : (c.y - y0) / (y1 - y0);
+        var force = mass.mass * 9.80665 * wx * wy;
+        total += force;
+        check(
+          force > 0 && force <= mass.mass * 9.80665 / 2,
+          "Nominal vertical point share is positive and below the two-load-path anchor demand: " + point.id
         );
       }
       check(
-        kind == Plinth ? Math.abs(additional[0].pose.x - additional[1].pose.x) < 1e-7
-        && Math.abs(additional[0].pose.y + additional[1].pose.y) < 1e-7 : Math.abs(additional[0].pose.x
-        + additional[1].pose.x) < 1e-7 && Math.abs(additional[0].pose.y - additional[1].pose.y) < 1e-7,
-        "The new lifting pair remains symmetric"
+        Math.abs(total - mass.mass * 9.80665) < 1e-6,
+        "Nominal vertical shares balance source weight; hardware and sling qualification remain Pending"
       );
       for (insert in lifting) {
+        var count = input.liftingPoints.filter(point -> point.insertId == insert.id).length;
+        var rules = switch insert.anchorage {
+          case Bolted(rules, _):
+            rules;
+          default:
+            throw "Missing lifting anchors";
+        };
+        var expected = mass.mass * 9.80665 * Math.min(2, count) / 2;
+        check(
+          Math.abs(rules.demand.liftingShareN - expected) < 1e-4,
+          "A shared plate carries both possible active lifting paths, not only one point's share: " + insert.id
+        );
         var size = materia.casting.InsertSpec.InsertBodyCodec.box(insert.body, insert.id);
         Sys.println("Source lifting " + kind + "/" + insert.id + " at "
           + insert.pose.x + ", " + insert.pose.y + "; blank " + size.width + " x " + size.depth + " x " + size.height);
       }
       var minimum = document.recipe.designReview.minimumLiftingPoints;
       check(
-        minimum != null && lifting.length >= minimum,
-        "Source lifting inserts satisfy the unchanged shop point-count rule: " + kind
+        minimum != null && materia.tooling.casting.CastHandling.liftingIds(document).length >= minimum,
+        "Source lifting threads satisfy the unchanged shop point-count rule: " + kind
       );
       for (insert in input.inserts) {
         var stock = F.compose(document.setup.sourceToMold, insert.pose);
@@ -143,7 +239,7 @@ import materia.assembly.AssemblyFrames as F;
         }
       }
       if (kind == Column) {
-        var rows = foundation.insertLocations(), site = rows.filter(row -> row.id == "liftAdditional1")[0];
+        var rows = foundation.insertLocations(), site = rows.filter(row -> row.id == "liftRight")[0];
         var neighbours = rows.filter(row -> row.id != site.id),
           resin = new machinekit.structural.MineralCasting(FoundationLayout.bodyValues("column")).geometry();
         var cover = switch site.part.insertSpec().anchorage {
@@ -156,7 +252,7 @@ import materia.assembly.AssemblyFrames as F;
           id: site.id,
           part: site.part,
           openings: site.openings,
-          pose: F.fromRotationMatrix(site.pose.x, 54, site.pose.z, F.toRotationMatrix(site.pose))
+          pose: F.compose(site.pose, F.translation(0, 1, 0))
         };
         var message = "";
         try machinekit.tooling.InsertAnchorGeometry.checkSourceClearance(
@@ -179,9 +275,12 @@ import materia.assembly.AssemblyFrames as F;
         resin.close();
         check(
           message.indexOf("Lifting blank lacks casting cover to source anchor:") >= 0 && message.indexOf("rail") >= 0,
-          "The former Y=54 layout is rejected against the real rail-anchor heads, not only the rail blanks"
+          "Moving a merged plate 1 mm toward the rails is rejected against their real anchor heads, not only the rail blanks"
         );
-        check(site.pose.y < 54, "The nearest admitted lifting land preserves cover to neighbouring anchor hardware");
+        check(
+          lifting.length == 2 && points.length == 4,
+          "The merged source keeps four independent threads on two clear plates"
+        );
       }
       if (Sys.args().indexOf("--mold-check") >= 0) {
         var planned = machinekit.tooling.CastingMoldCad.plan(document, HobberMoldSetup.options(document.input));

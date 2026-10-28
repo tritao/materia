@@ -618,6 +618,7 @@ class ToolingTests {
       interfaces: [],
       interfaceContext: null,
       postCureInserts: [],
+      liftingPoints: [],
       envelope: [{
         id: "body",
         profile: [{x: -100, y: -90}, {x: 100, y: -90}, {x: 100, y: 90}, {x: -100, y: 90}],

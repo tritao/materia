@@ -127,21 +127,51 @@
       "Demand-sized ISO 4162 anchors; preserve catalogue socket retention",
       "Keep original lifting service centres; add plinth points at CoM-proposed X and symmetric Y=310 mm outer bands",
       "Add column pair at X=160/-160 mm, Y=46 mm with demand-selected 65 x 58 x 30 mm blanks: keep 6 mm cover to the original lifting plates and rail-anchor heads; the earlier Y=54 mm square overlapped those heads",
-      "Reframe the column sole from its underside without changing its steel envelope or fixture-hole location, so rear anchors enter resin"
+      "Reframe the column sole from its underside without changing its steel envelope or fixture-hole location, so rear anchors enter resin",
+      "5 mm aggregate source correction (user, 2026-10-28): current compression feet, work-well/support lands, tray-socket cover, rail blanks and merged four-thread lifting plates supersede the earlier 6 mm cover / Y=46 additional-block layout; see aggregateCorrection."
     ],
     "files": [
       {
         "id": "hobber-bed",
-        "stepSha256": "8d08d419e8055966ad17c2bc55db2056b161c74a3e620a1e3e4727780a9db0fd",
-        "stepBytes": 7583177,
-        "compressedBytes": 1099295
+        "stepSha256": "39c68637c80cc48f36d686890bdbd723f0d9d3995180f138bcde5694881f95e8",
+        "stepBytes": 7415693,
+        "compressedBytes": 1072170
       },
       {
         "id": "hobber-column",
-        "stepSha256": "5517f6606d8c1ce251074a462bde8a82d0eeae990b6944046573025a960e3e48",
-        "stepBytes": 1733663,
-        "compressedBytes": 262497
+        "stepSha256": "a76808113ab0e52068468f4e2d4c837819359cc0b42b26957aedf301d5dff322",
+        "stepBytes": 1177336,
+        "compressedBytes": 180678
       }
-    ]
+    ],
+    "aggregateCorrection": {
+      "decision": "Aggregate source decision (user, 2026-10-28)",
+      "controlGeometryCommit": "f0b14908d",
+      "maximumAggregateSizeMm": 5,
+      "previousFiles": [
+        {
+          "id": "hobber-bed",
+          "stepSha256": "8d08d419e8055966ad17c2bc55db2056b161c74a3e620a1e3e4727780a9db0fd",
+          "stepBytes": 7583177,
+          "compressedBytes": 1099295
+        },
+        {
+          "id": "hobber-column",
+          "stepSha256": "5517f6606d8c1ce251074a462bde8a82d0eeae990b6944046573025a960e3e48",
+          "stepBytes": 1733663,
+          "compressedBytes": 262497
+        }
+      ],
+      "changes": [
+        "Compression feet: remove the cast plate register and upper stud bore, retaining the 70 mm solid roof, plate plane, foot centres and nominal ground datum",
+        "Narrow the centred work well to 398 mm and leave 25 mm beneath tray ledges; enlarge table-support lands, fill absorbed and isolated lightening pockets, extend the drain to the new chamber boundary",
+        "Move side tray sockets 4 mm and end sockets 5.5 mm inward for 10 mm cover; retain their finished plane and nominal catalogue retention body",
+        "Derive the rear socket pocket end from actual tail width and 10 mm cover, filling the last 1 mm while keeping socket and clamp frames fixed",
+        "Keep column rail mount frames and axes; use 30 x 470 x 20 mm seat blanks for 10 mm resin cover",
+        "Merge each column side lifting pair into a 60 x 151.9 x 30 mm C45 plate with two explicit M12 threads; common finished top Z=500, original X/Y centres retained, additional Y=43.9 for 10 mm clearance to actual rail-anchor heads",
+        "Shared-plate anchor demand includes both active lifting paths; four declared source threads remain four lifting points, capacity and sling evidence Pending",
+        "Derive chip-tray front from the revised well plus its existing 5 mm clearance, preserving mounting frame, drain and table interfaces"
+      ]
+    }
   }
 }

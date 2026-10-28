@@ -46,7 +46,7 @@ class HobberMoldPreview {
       "hobber-" + casting + "-process-review",
       root,
       HobberMoldChecks.run,
-      HobberMoldChecks.liftingReview
+      p -> HobberMoldChecks.liftingReview(p.document, p.handling)
     );
   }
 }

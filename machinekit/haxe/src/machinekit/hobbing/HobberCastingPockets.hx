@@ -15,16 +15,16 @@ class HobberCastingPockets {
 
   public static function plinth(width:Float, depth:Float, height:Float):Array<CastingFeature> {
     var layout = HobberXLayout.front();
-    var wall = 25.0, socketBossHalf = 20.0, socketEdgeInset = 35.0;
+    var wall = 25.0;
     var footInset = 120.0, footBossHalf = FoundationLayout.FOOT_BOSS_WIDTH / 2;
-    var tableHalf = 140.0, ribHalf = FoundationLayout.PLINTH_CORE_WEB / 2;
+    var tableHalf = FoundationLayout.TABLE_INSERT_WIDTH / 2 + FoundationLayout.SOURCE_STEEL_COVER_MM,
+      ribHalf = FoundationLayout.PLINTH_CORE_WEB / 2;
     var driveRibHalf = FoundationLayout.DRIVE_RIB_HALF_WIDTH;
     var railCentre = FoundationLayout.BED_RAIL_CENTRE, railBeamHalf = FoundationLayout.BED_RAIL_BEAM_WIDTH / 2;
     var capHalf = 150.0, webCentre = 112.5;
     var frontDeckRibX = 100.0, middleDeckRibX = 160.0, rearDeckRibX = 220.0, deckRibY = 80.0;
     var deckRibHalf = DECK_RIB_WIDTH / 2;
     var xFrontWall = -width / 2 + wall;
-    var xFrontSocketEnd = -width / 2 + socketEdgeInset + socketBossHalf;
     var xTableFront = -tableHalf - layout.bedCentre;
     var xTableRear = tableHalf - layout.bedCentre;
     var xCentreWebLeft = -ribHalf;
@@ -38,10 +38,14 @@ class HobberCastingPockets {
     var xRearDeckRibRight = rearDeckRibX + deckRibHalf;
     var xRearFootFront = width / 2 - footInset - footBossHalf;
     var xMotorRibFront = layout.screwStart - layout.bedCentre - driveRibHalf;
-    var xMotorRibRear = layout.screwStart - layout.bedCentre + driveRibHalf;
-    var xRearSocketStart = width / 2 - socketEdgeInset - socketBossHalf;
+    // The pocket stops a full cover land before the actual relocated socket tail.
+    var socketHalf = Math.max(FoundationLayout.TRAY_SOCKET_OUTSIDE_DIAMETER,
+      FoundationLayout.TRAY_SOCKET_TAIL_WIDTH) / 2;
+    var xRearSocketStart = width
+      / 2 - FoundationLayout.TRAY_SOCKET_END_INSET - socketHalf - FoundationLayout.SOURCE_STEEL_COVER_MM;
     var xRearWall = width / 2 - wall;
     var xWellFront = FoundationLayout.WORK_WELL_CENTRE_X - layout.bedCentre - FoundationLayout.WORK_WELL_WIDTH / 2;
+    var xFrontSocketEnd = xWellFront;
     var yLeftRailInside = -railCentre + railBeamHalf;
     var yLeftCap = -capHalf;
     var yLeftTable = -tableHalf;
@@ -61,7 +65,8 @@ class HobberCastingPockets {
     var zCapSole = FoundationLayout.DRIVE_CAP_UNDERSIDE;
     var zCapTop = DRIVE_CAP_TOP;
     var zSocketSole = height - SOCKET_BOSS_DEPTH;
-    var zRoof = height - wall;
+    // Retain the full wall below the recessed tray seats, not only below the top.
+    var zRoof = height - wall - machinekit.enclosure.TraySeat.DEPTH;
     var zWellFloor = FoundationLayout.TABLE_WELL_FLOOR_HEIGHT;
     return [
       pocket(
@@ -104,12 +109,12 @@ class HobberCastingPockets {
         zFloor,
         zWellFloor,
         [
+          "pocket-frontWall-leftRailInside-floor",
+          "pocket-frontWall-leftWebOutside-floor",
+          "pocket-frontWall-rightWebOutside-floor",
           "chip-drain",
           "pocket-tableFront-leftRailInside-floor",
           "pocket-tableFront-rightTable-floor",
-          "pocket-wellFront-leftRailInside-floor",
-          "pocket-wellFront-leftWebOutside-floor",
-          "pocket-wellFront-rightWebOutside-floor",
           "work-well"
         ]
       ),
@@ -169,7 +174,7 @@ class HobberCastingPockets {
         yLeftWebOutside,
         zFloor,
         zSocketSole,
-        ["pocket-frontWall-leftWebOutside-floor", "pocket-wellFront-leftRailInside-floor", "work-well"]
+        ["pocket-frontSocketEnd-leftRailInside-floor", "pocket-frontWall-leftWebOutside-floor", "work-well"]
       ),
       pocket(
         "pocket-frontWall-leftWebOutside-floor",
@@ -180,10 +185,10 @@ class HobberCastingPockets {
         zFloor,
         zRoof,
         [
+          "pocket-frontSocketEnd-leftRailInside-floor",
           "coolant-front-access",
           "pocket-frontWall-leftRailInside-floor",
           "pocket-frontWall-rightWebOutside-floor",
-          "pocket-wellFront-leftWebOutside-floor",
           "work-well"
         ]
       ),
@@ -195,7 +200,7 @@ class HobberCastingPockets {
         yRightRailInside,
         zFloor,
         zSocketSole,
-        ["pocket-frontWall-leftWebOutside-floor", "pocket-wellFront-rightWebOutside-floor", "work-well"]
+        ["pocket-frontSocketEnd-leftRailInside-floor", "pocket-frontWall-leftWebOutside-floor", "work-well"]
       ),
       pocket(
         "pocket-middleDeckRibLeft-leftCap-capTop",
@@ -240,16 +245,6 @@ class HobberCastingPockets {
           "pocket-middleDeckRibLeft-rightDeckRibOutside-capTop",
           "pocket-rearDeckRibLeft-rightDeckRibInside-capTop"
         ]
-      ),
-      pocket(
-        "pocket-motorRibRear-leftWebInside-footRoof",
-        xMotorRibRear,
-        xRearWall,
-        yLeftWebInside,
-        yRightWebInside,
-        zFootRoof,
-        zCapSole,
-        ["foot2-stem-upper"]
       ),
       pocket(
         "pocket-rearFootFront-leftWebInside-footRoof",
@@ -367,12 +362,7 @@ class HobberCastingPockets {
         yLeftTable,
         zFloor,
         zWellFloor,
-        [
-          "pocket-frontSocketEnd-leftRailInside-floor",
-          "pocket-tableRear-leftCap-floor",
-          "pocket-tableRear-leftRailInside-floor",
-          "work-well"
-        ]
+        ["pocket-frontSocketEnd-leftRailInside-floor", "work-well"]
       ),
       pocket(
         "pocket-tableFront-rightTable-floor",
@@ -382,108 +372,7 @@ class HobberCastingPockets {
         yRightRailInside,
         zFloor,
         zWellFloor,
-        [
-          "pocket-frontSocketEnd-leftRailInside-floor",
-          "pocket-tableRear-rightCap-floor",
-          "pocket-tableRear-rightWebOutside-floor",
-          "work-well"
-        ]
-      ),
-      pocket(
-        "pocket-tableRear-leftCap-floor",
-        xTableRear,
-        xCentreWebLeft,
-        yLeftCap,
-        yLeftWebOutside,
-        zFloor,
-        zWellFloor,
-        ["pocket-tableFront-leftRailInside-floor", "pocket-tableRear-leftRailInside-floor", "work-well"]
-      ),
-      pocket(
-        "pocket-tableRear-leftRailInside-floor",
-        xTableRear,
-        xCentreWebLeft,
-        yLeftRailInside,
-        yLeftCap,
-        zFloor,
-        zWellFloor,
-        ["pocket-tableFront-leftRailInside-floor", "pocket-tableRear-leftCap-floor", "work-well"]
-      ),
-      pocket(
-        "pocket-tableRear-leftWebInside-floor",
-        xTableRear,
-        xCentreWebLeft,
-        yLeftWebInside,
-        yRightWebInside,
-        zFloor,
-        zWellFloor,
-        ["work-well"]
-      ),
-      pocket(
-        "pocket-tableRear-rightCap-floor",
-        xTableRear,
-        xCentreWebLeft,
-        yRightCap,
-        yRightRailInside,
-        zFloor,
-        zWellFloor,
-        ["pocket-tableFront-rightTable-floor", "pocket-tableRear-rightWebOutside-floor", "work-well"]
-      ),
-      pocket(
-        "pocket-tableRear-rightWebOutside-floor",
-        xTableRear,
-        xCentreWebLeft,
-        yRightWebOutside,
-        yRightCap,
-        zFloor,
-        zWellFloor,
-        ["pocket-tableFront-rightTable-floor", "pocket-tableRear-rightCap-floor", "work-well"]
-      ),
-      pocket(
-        "pocket-wellFront-leftRailInside-floor",
-        xWellFront,
-        xFrontSocketEnd,
-        yLeftRailInside,
-        yLeftWebOutside,
-        zFloor,
-        zWellFloor,
-        [
-          "pocket-frontSocketEnd-leftRailInside-floor",
-          "pocket-frontWall-leftRailInside-floor",
-          "pocket-wellFront-leftWebOutside-floor",
-          "work-well"
-        ]
-      ),
-      pocket(
-        "pocket-wellFront-leftWebOutside-floor",
-        xWellFront,
-        xFrontSocketEnd,
-        yLeftWebOutside,
-        yRightWebOutside,
-        zFloor,
-        zWellFloor,
-        [
-          "pocket-frontSocketEnd-leftRailInside-floor",
-          "pocket-frontWall-leftWebOutside-floor",
-          "pocket-wellFront-leftRailInside-floor",
-          "pocket-wellFront-rightWebOutside-floor",
-          "work-well"
-        ]
-      ),
-      pocket(
-        "pocket-wellFront-rightWebOutside-floor",
-        xWellFront,
-        xFrontSocketEnd,
-        yRightWebOutside,
-        yRightRailInside,
-        zFloor,
-        zWellFloor,
-        [
-          "pocket-frontSocketEnd-leftRailInside-floor",
-          "pocket-frontWall-rightWebOutside-floor",
-          "pocket-wellFront-leftWebOutside-floor",
-          "work-well"
-        ]
+        ["pocket-frontSocketEnd-leftRailInside-floor", "work-well"]
       )
     ];
   }

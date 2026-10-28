@@ -205,6 +205,7 @@ typedef LiftingQualification = {
 }
 
 typedef HandlingPlan = {
+  var liftingPoints:Array<materia.casting.CastingLiftingPoint>;
   var requiresFlip:Bool;
   var moldToService:AssemblyFrame;
   var castingMassKg:Float;

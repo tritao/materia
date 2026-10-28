@@ -163,6 +163,7 @@ class InsertAnchorGeometry {
           case Undeclared, CatalogueRetention:
         }
       }
+      var steelBounds = machinekit.assembly.PosedParts.boxOf(steel);
       // Confirm the screened choice with the complete neighbouring steel,
       // including the actual anchor hardware, once all analytic checks pass.
       for (other in others) {
@@ -175,6 +176,14 @@ class InsertAnchorGeometry {
         }
         var blank = own(cadkit.modeling.Part.fuseAll(blanks));
         var placed = own(machinekit.assembly.PosedParts.moved(blank, other.pose));
+        // Bounds include the complete placed blank and its anchor hardware.
+        // Axis separation beyond the requirement proves both nonintersection
+        // and sufficient distance, even for a remote catalogue spline tail.
+        if (machinekit.assembly.PosedParts.apart(
+          steelBounds,
+          machinekit.assembly.PosedParts.boxOf(placed),
+          minimumClearance
+        )) continue;
         var common = own(steel.intersect(placed));
         if (common.volume() > 1e-6 || steel.distance(placed) + 1e-7 < minimumClearance) {
           if (materia.casting.CastingFeature

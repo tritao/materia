@@ -82,8 +82,8 @@ class FlexsplineHobber extends MachineAssembly {
         15,
         footThread,
         15,
-        47 + FoundationLayout.FOOT_ROOF + 25,
-        47 + FoundationLayout.FOOT_ROOF,
+        47 + FoundationLayout.FOOT_ROOF - 2,
+        47 + FoundationLayout.FOOT_ROOF - FoundationLayout.FOOT_PLATE_THICKNESS - 19,
         Nominal,
         NoCollar
       ));

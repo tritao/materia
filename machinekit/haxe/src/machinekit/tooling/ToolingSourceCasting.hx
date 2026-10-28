@@ -34,6 +34,7 @@ class ToolingSourceCasting extends MachineComponent {
           interfaces: [],
           interfaceContext: null,
           postCureInserts: [],
+          liftingPoints: [],
           envelope: [{
             id: "body",
             height: 1,

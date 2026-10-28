@@ -36,8 +36,10 @@ class CastingFeaturePatterns {
       [CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height]
     );
 
+  /** Compression-foot pocket: the removable plate bears directly on the solid
+	 * ceiling. Only the lower stud passage is cast; no plate register or upper bore. */
   public static function foot(
-    ids: {access: String, stem: String, register: Null<String>},
+    ids: {access: String, stem: String},
     x:Float,
     y:Float,
     edge:Float,
@@ -47,27 +49,19 @@ class CastingFeaturePatterns {
     floor:Float,
     roof:Float,
     stemSize:Float,
-    stemTop:Float,
     accessOpenings:Array<CastingOpening>,
-    stemOpenings:Array<CastingOpening>,
-    ?plate: {owner: String, openings: Array<CastingOpening>, width: Float, depth: Float, thickness: Float}
+    stemOpenings:Array<CastingOpening>
   ):Array<CastingFeature> {
-    var centre = alongX ? x : y, low = Math.min(centre - accessWidth / 2, edge), high = Math.max(
-      centre + accessWidth / 2,
-      edge
-    );
-    // The bore enters the dry access pocket at its floor. If it continues
-    // above the register, that is a separate, directly authored upper bore.
-    var lowerTop = Math.min(stemTop, floor);
-    var upperFloor = roof;
-    var out = [
+    var centre = alongX ? x : y;
+    var low = Math.min(centre - accessWidth / 2, edge), high = Math.max(centre + accessWidth / 2, edge);
+    return [
       box(
         ids.access,
         ServiceOpening,
         accessOpenings,
         alongX ? high - low : accessDepth,
         alongX ? accessDepth : high - low,
-        roof - floor - (plate == null ? 0 : plate.thickness),
+        roof - floor,
         alongX ? (low + high) / 2 : x,
         alongX ? y : (low + high) / 2,
         floor
@@ -75,48 +69,14 @@ class CastingFeaturePatterns {
       box(
         ids.stem,
         Clearance,
-        stemOpenings.filter(opening -> opening.kind == BodyFace),
+        stemOpenings.concat([CastingPatterns.feature(ids.access)]),
         stemSize,
         stemSize,
-        lowerTop,
+        floor,
         x,
         y,
         0
       )
     ];
-    if (stemTop > upperFloor) {
-      var upperOpenings = stemOpenings.filter(opening -> opening.kind == Feature);
-      upperOpenings.push(CastingPatterns.feature(plate == null ? ids.access : ids.register));
-      out.push(box(
-        ids.stem + "-upper",
-        Clearance,
-        upperOpenings,
-        stemSize,
-        stemSize,
-        stemTop - upperFloor,
-        x,
-        y,
-        upperFloor
-      ));
-    }
-    if (plate != null) {
-      if (ids.register == null) throw "Foot plate requires an explicit register feature ID";
-      out.push(box(
-        ids.register,
-        InterfaceRecess,
-        plate.openings,
-        plate.width,
-        plate.depth,
-        plate.thickness,
-        x,
-        y,
-        roof - plate.thickness,
-        plate.owner
-      ));
-    }
-    out[1].openings = out[1].openings.copy();
-    out[1].openings.push(CastingPatterns.feature(out[0].id));
-    return out;
   }
-
 }

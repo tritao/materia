@@ -61,7 +61,7 @@ private class MillCastingSource extends MachineAssembly {
     super();
     var baseInserts = sizing.baseInserts, columnInserts = sizing.columnInserts;
     var stripCentre = sizing.stripCentre;
-    base = new MineralFoundation(sizing.baseValues, baseInserts);
+    base = new MineralFoundation(sizing.baseValues, baseInserts, null, null, liftingPoints(baseInserts));
     if (l.footPockets) for (sx in [-1, 1]) for (sy in [-1, 1]) {
       var id = corner(sx, sy);
       base.addComponent(
@@ -105,7 +105,13 @@ private class MillCastingSource extends MachineAssembly {
       addMate('foot-lock-$id', "fixed", 'footSupportNut$id', "mount", 'footLockNut$id', "top");
     }
 
-    column = new MineralFoundation(sizing.columnValues, columnInserts, "footLeftFront", sizing.columnPostCure);
+    column = new MineralFoundation(
+      sizing.columnValues,
+      columnInserts,
+      "footLeftFront",
+      sizing.columnPostCure,
+      liftingPoints(columnInserts)
+    );
     for (side in ["Left", "Right"]) {
       var id = 'railZ$side', top = Solids.axial(0, 0, l.insertThickness);
       column.addMemberConnector(
@@ -218,6 +224,12 @@ private class MillCastingSource extends MachineAssembly {
       "top"
     );
   }
+
+  public static function liftingPoints(rows:Array<CastInsertPlacement>):Array<materia.casting.CastingLiftingPoint
+    > return [for (row in rows) if (row.part.parameterToken("role") == InsertRole.LiftingMount) {
+    id:row.id, insertId:row.id, holeId:"fixing"
+  }
+  ];
 
   static function sourceHolePoint(insert:CastInsertPlacement, id:String, exit:Bool = false): {
     x: Float,
@@ -445,7 +457,7 @@ private class MillCastingSizing {
         var fx = sx * (l.baseWidth / 2 - l.wall),
           fy = (sy < 0 ? l.front + details.footEndSetback : l.rear - details.footEndSetback) - l.baseCentreY;
         var foot = CastingFeaturePatterns.foot(
-          {access: 'foot-access-$id', stem: 'foot-stem-$id', register: null},
+          {access: 'foot-access-$id', stem: 'foot-stem-$id'},
           fx,
           fy,
           sx * l.baseWidth / 2,
@@ -455,7 +467,6 @@ private class MillCastingSizing {
           details.footAccessFloor,
           details.footRoof,
           details.footStemSize,
-          details.footStemTop,
           [CastingPatterns.face(sx < 0 ? "body.x-min" : "body.x-max")],
           [CastingPatterns.face("body.z-min")]
         );
@@ -496,7 +507,9 @@ private class MillCastingSizing {
     baseInserts = machinekit.structural.FoundationSizing.anchors(
       baseInserts,
       anchorRule,
-      body(l.baseWidth, l.baseDepth, l.baseHeight, baseVoids, "bench-mill-base")
+      body(l.baseWidth, l.baseDepth, l.baseHeight, baseVoids, "bench-mill-base"),
+      false,
+      MillCastingSource.liftingPoints(baseInserts)
     );
     this.baseValues = body(l.baseWidth, l.baseDepth, l.baseHeight, baseVoids, "bench-mill-base");
     this.baseInserts = baseInserts;
@@ -788,7 +801,13 @@ private class MillCastingSizing {
       {width: l.columnWidth, depth: l.columnDepth},
       anchorRule
     ));
-    columnInserts = machinekit.structural.FoundationSizing.anchors(columnInserts, anchorRule, columnValues);
+    columnInserts = machinekit.structural.FoundationSizing.anchors(
+      columnInserts,
+      anchorRule,
+      columnValues,
+      false,
+      MillCastingSource.liftingPoints(columnInserts)
+    );
     this.columnValues = columnValues;
     this.columnInserts = columnInserts;
     this.stripCentre = stripCentre;

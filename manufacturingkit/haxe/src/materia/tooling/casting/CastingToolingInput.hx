@@ -44,4 +44,5 @@ typedef CastingToolingInput = {
   var features:Array<CastingFeature>;
   var postCureInserts:Array<{insert:CastingToolingInsert, bond:materia.casting.PostCureBond}>;
   var inserts:Array<CastingToolingInsert>;
+  var liftingPoints:Array<materia.casting.CastingLiftingPoint>;
 }

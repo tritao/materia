@@ -28,6 +28,7 @@ class MineralFoundation extends MachineAssembly {
   public final body:MineralCasting;
 
   final inserts:Array<CastInsertPlacement>;
+  final declaredLifting:Array<materia.casting.CastingLiftingPoint>;
   final bonded:Array<PostCureInsertPlacement> = [];
   // Components declared by this source as permanent during the pour. Parts
   // added later (such as removable levelling plates) belong to service assembly.
@@ -37,11 +38,14 @@ class MineralFoundation extends MachineAssembly {
     bodyValues:ComponentValues,
     placements:Array<CastInsertPlacement>,
     ?rootInsert:String,
-    ?postCure:Array<PostCureInsertPlacement>
+    ?postCure:Array<PostCureInsertPlacement>,
+    ?liftingPoints:Array<materia.casting.CastingLiftingPoint>
   ) {
     super();
     if (placements == null) throw "Foundation needs an insert list";
     inserts = [];
+    declaredLifting = materia.casting.CastingLiftingPoint.CastingLiftingPoints.snapshot(materia
+      .casting.CastingLiftingPoint.CastingLiftingPoints.records(liftingPoints == null ? [] : liftingPoints));
     var v = machinekit.component.ComponentRecipeSupport.resolve(MineralCasting.parameters(), bodyValues);
     var features = CastingPatterns.decode(v.token("features"));
     var ids:Map<String, Bool> = ["casting" => true];
@@ -62,6 +66,10 @@ class MineralFoundation extends MachineAssembly {
       features.push(copy);
       inserts.push({id: row.id, part: row.part, pose: copy.geometry.pose, openings: copy.openings});
     }
+    materia.casting.CastingLiftingPoint.CastingLiftingPoints.validate(declaredLifting, [for (row in inserts) {
+      id:row.id, role:cast row.part.parameterToken("role"), spec:row.part.insertSpec()
+    }
+    ]);
     if (rootInsert != null
       && (rootInsert == "casting" || !ids.exists(rootInsert))) throw "Unknown foundation root insert";
     var embedded:Array<materia.casting.InsertAnchorage.EmbeddedInsertAnchors> = [];
@@ -128,6 +136,9 @@ class MineralFoundation extends MachineAssembly {
     if (rootInsert != null) exposeConnector("mount", rootInsert, "mount");
     else exposeConnector("mount", "casting", "mount");
   }
+
+  public function liftingPoints():Array<materia.casting.CastingLiftingPoint> return materia.casting.CastingLiftingPoint
+    .CastingLiftingPoints.snapshot(materia.casting.CastingLiftingPoint.CastingLiftingPoints.records(declaredLifting));
 
   function validateBond(row:PostCureInsertPlacement, bond:materia.casting.PostCureBond):Void {
     var spec = row.part.insertSpec();

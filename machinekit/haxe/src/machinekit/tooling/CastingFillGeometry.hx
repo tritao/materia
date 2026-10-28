@@ -198,10 +198,14 @@ class CastingFillGeometry {
         throw error;
       }
     }
-    vertices.sort((a, b) -> Reflect.compare(
-      materia.tooling.ToolingCodec.canonical(a),
-      materia.tooling.ToolingCodec.canonical(b)
-    ));
+    // Canonical strings determine the existing order; compute each once,
+    // rather than allocating two JSON trees on every sort comparison.
+    var keyed = [for (vertex in vertices) {
+      vertex:vertex, key:materia.tooling.ToolingCodec.canonical(vertex)
+    }
+    ];
+    keyed.sort((a, b) -> Reflect.compare(a.key, b.key));
+    vertices = [for (row in keyed) row.vertex];
     // No bounding box enters identity: native bounds may include triangulation
     // tolerances and are reserved for sizing Boolean tools.
     return "region-" + haxe.crypto.Sha256.encode(materia.tooling.ToolingCodec.canonical({

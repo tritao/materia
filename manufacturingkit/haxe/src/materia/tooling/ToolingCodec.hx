@@ -26,7 +26,7 @@ import materia.tooling.casting.CastingSetup.CoreStrategy;
  */
 class ToolingCodec {
   public static inline var FORMAT = "materia.casting-tooling";
-  public static inline var VERSION = 27;
+  public static inline var VERSION = 28;
   public static inline var MAX_RECORDS = 512;
   public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -91,6 +91,7 @@ class ToolingCodec {
   public static function inputRecord(input:CastingToolingInput):Dynamic {
     return Json.parse(canonical({id: input.id, revision: input.revision,
       lengthUnit: input.lengthUnit, envelope: input.envelope, features: input.features, datumScheme: input.datumScheme,
+      liftingPoints: materia.casting.CastingLiftingPoint.CastingLiftingPoints.records(input.liftingPoints),
       interfaces: materia.casting.InterfaceRequirement.InterfaceRequirements.records(input.interfaces),
       interfaceContext: input.interfaceContext
       == null ? null : materia.casting.CastingInterfaceContext.CastingInterfaceContexts.record(input.interfaceContext),
@@ -145,7 +146,8 @@ class ToolingCodec {
         "inserts",
         "datumScheme",
         "interfaces",
-        "interfaceContext"
+        "interfaceContext",
+        "liftingPoints"
       ],
       "input"
     );
@@ -154,6 +156,18 @@ class ToolingCodec {
     if (envelope.length == 0) throw "Tooling input needs an envelope";
     var features = materia.casting.CastingFeatureCodec.snapshot(array(raw, "features"));
     var inserts:Array<CastingToolingInsert> = [for (i in array(raw, "inserts")) readInsert(i)];
+    var lifting = materia.casting.CastingLiftingPoint.CastingLiftingPoints.snapshot(Reflect.field(raw,
+      "liftingPoints"));
+    materia.casting.CastingLiftingPoint.CastingLiftingPoints.validate(lifting, [for (insert in inserts) {
+      id:insert.id, role:insert.role, spec: {
+        body: insert.body,
+        holes: insert.holes,
+        origin: insert.origin,
+        anchorage: insert.anchorage,
+        interfaces: insert.interfaces
+      }
+    }
+    ]);
     var postCure = [for (row in array(raw, "postCureInserts")) {
       object(row, ["insert", "bond"], "post-cure insert");
       var insert = readInsert(Reflect.field(row, "insert"));
@@ -223,6 +237,7 @@ class ToolingCodec {
       envelope: envelope,
       features: features,
       postCureInserts: postCure,
+      liftingPoints: lifting,
       inserts: inserts
     };
   }

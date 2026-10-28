@@ -468,8 +468,10 @@ the machine design rather than the casting:
 - **Datum scheme:** primary, secondary and tertiary datum faces or features for
   replication, machining and fixtures. Masters and datum fixtures reference them.
 - **Lifting and handling:** `LiftingMount` inserts placed by the design. Handling
-  checks use them, and the lifting-point castability rule proposes positions from
-  casting mass and centre of mass.
+  checks use explicit source insert/thread references, so multiple lifting points
+  may share one plate without counting fixture or anchor holes. Anchor demand
+  accounts for the number of active points sharing each plate. The castability
+  rule proposes positions from casting mass and centre of mass.
 - **Foundation joints:** the base–column interface becomes an explicit joint
   between two foundations, with grout or replication gap, jacking screws, anchor
   pattern and cure-before-torque. It replaces the standing change request.
@@ -1940,7 +1942,7 @@ witness. Keep socket-tail shadow coverage Unsupported where exact projection is
 unavailable. The report itself does not authorise geometry changes; the approved
 2026-10-28 source decision below governs the corrections.
 
-Status: aggregate-gate code complete; the four-casting grouped report records source geometry holds, with socket-tail coverage Unsupported and the compound section limit Pending. No gate-driven geometry correction has been applied. The source-only `haxeon.aggregate-review.json` entry and normal kit export use the same process-analysis pipeline and report renderer.
+Status: aggregate gate and approved four-casting source corrections code complete; all four verified kits have zero Fail, trapped pockets and aggregate failures. The unchanged-source grouped report is retained; socket-tail coverage remains Unsupported and the compound section limit Pending. The source-only `haxeon.aggregate-review.json` entry and normal kit export use the same process-analysis pipeline and report renderer.
 
 ## Aggregate source decision (user, 2026-10-28)
 
@@ -1958,4 +1960,18 @@ Stop for a decision if a correction would move a functional rail, drive, joint o
 - Resolve the lower joint-pad depth from the rear lifting-stock envelope, edge cover and steel spacing. Keep the clamp/jack locations and the 3 mm joint gap.
 - Apply 10 mm anchor cover and use the existing source footprint search and the shared native clearance check to place all four lifting connections. Source geometry changes are validated before the approved frozen references are captured.
 
-Status: 5 mm limits and mill source corrections verified; both mill kits have zero Fail and zero trapped pockets, with unchanged service/datum frames and zero symmetric difference against the approved references. Hobber corrections remain in progress in their own slice.
+Status: approved 5 mm aggregate source corrections and four-kit verification code complete, with zero Fail, trapped pockets and aggregate failures. All four corrected frozen-CAD comparisons have zero symmetric difference. Physical qualification remains phase 9.
+
+Hobber compression-foot detail under the aggregate source approval: remove the cast plate register and upper stud bore; retain the 70 mm solid roof, plate contact plane, foot centres and pad positions. End the stud 2 mm below the roof. The source uses the same lower-passage/side-access builder and removable levelling-foot family as the mill; wrench access and unloaded plate removal remain checked.
+
+Hobber aggregate detail choices under the same approval: narrow the work well from 410 to 398 mm about its existing centre, retaining the table and drive datums; retain 25 mm beneath the 4 mm-deep tray ledges. Increase the table-support keepout by the 10 mm steel-cover land and extend the chip drain to its new chamber boundary. Fill the lightening spans absorbed by those support lands. Fill the isolated rear-foot lightening pocket that loses its only support opening when the upper stud bore is removed; keep the solid compression roof rather than reintroducing a cast-in support mechanism. Move side tray toe-clamp sockets 4 mm inward and end sockets 5.5 mm inward, retaining the finished mounting plane. The end inset covers the wider nominal tail as well as the mouth; the tray has no mating holes. Side/end toe overlap is 11/9.5 mm and remains subject to the grip trial. The nominal geometry passes native clearance, aggregate and corrected-reference checks; product and grip qualification remain Pending.
+
+Hobber column lifting detail under the aggregate approval: use one continuous C45 plate on each side land, with separately declared primary/secondary source threads. Derive its land from the head recess, casting boundary and the placed rail-anchor hardware; retain the original X/Y service centres and a symmetric additional pair. Put the threads on the common finished top at Z=500 mm (the old primary blanks stood 10 mm proud). Source lifting declarations name insert + hole, so four points remain four on two plates and fixture/anchor threads never count by inference. Anchor demand counts the declared threads per plate against the unchanged two-active-path rule; a two-point plate is checked for the whole casting weight, not one point's half share. Ratings, sling geometry and compound capacity remain Pending. Narrow/shorten the Z-seat blanks to 30 × 470 mm, preserving their source frames, rail mount connectors and hole axes. The selected continuous lifting blanks are 60 × 151.9 × 30 mm, with additional lifting threads at Y = 43.9 mm.
+
+Hobber chip-tray fit follows the revised well: derive its front edge from the well boundary plus the existing 5 mm clearance, retaining the mounting frame, table skirt, drain centre and elevations. This removes the obsolete hard-coded edge rather than cutting a thin casting skin to accommodate it.
+
+Hobber rear-socket land detail: derive the adjacent lightening-pocket end from the relocated socket centre, its full nominal tail half-width and 10 mm cover. This fills the final 1 mm beside both rear-bridge sockets; the old boss station was tied to the superseded 35 mm socket inset. No clamp plane or functional datum moves.
+
+Fill identity performance detail: cache each vertex's canonical string once before sorting component identity, preserving the existing lexical order and component IDs. Geometry, critical levels, trap checks and their tolerances are unchanged.
+
+Fill identity work is deferred until the exact vented/already-recorded tests prove a new trapped pocket needs a record. Duplicate-ID rejection remains on emitted pockets; all geometry, trap volumes, source attribution and thresholds are preserved.

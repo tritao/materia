@@ -85,14 +85,15 @@ class FoundationSizing {
     rows:Array<CastInsertPlacement>,
     rule:materia.casting.InsertAnchorage.InsertAnchorPatternRule,
     castingValues:ComponentValues,
-    commonSize:Bool = false
+    commonSize:Bool = false,
+    ?liftingPoints:Array<materia.casting.CastingLiftingPoint>
   ):Array<CastInsertPlacement> {
     if (commonSize) {
       var sizes = rule.allowedNominalDiametersMm.copy(), failures:Array<String> = [];
       sizes.sort(Reflect.compare);
       for (size in sizes) {
         var single = singleThreadRule(rule, size);
-        try return anchors(rows, single, castingValues) catch (error:Dynamic) {
+        try return anchors(rows, single, castingValues, false, liftingPoints) catch (error:Dynamic) {
           if (Std.isOfType(error, machinekit.tooling.InsertAnchorGeometry.InsertAnchorScreenDefect)) throw error;
           failures.push(Std.string(size) + " mm: " + Std.string(error));
         }
@@ -103,12 +104,27 @@ class FoundationSizing {
     try {
       var lifting = rows.filter(row -> row.part.parameterToken("role")
         == materia.casting.InsertSpec.InsertRole.LiftingMount);
+      var points = materia.casting.CastingLiftingPoint.CastingLiftingPoints.snapshot(materia
+        .casting.CastingLiftingPoint.CastingLiftingPoints.records(liftingPoints == null ? [] : liftingPoints));
+      materia.casting.CastingLiftingPoint.CastingLiftingPoints.validate(points, [for (row in rows) {
+        id:row.id, role:cast row.part.parameterToken("role"), spec:row.part.insertSpec()
+      }
+      ]);
+      for (row in lifting) if (points.filter(point -> point.insertId
+        == row.id).length == 0) throw "Lifting anchor demand requires declared source threads: " + row.id;
+      var loadPaths = Math.min(rule.liftingLoadPaths, points.length);
+      // Several active points may load one plate; cap its share at the
+      // complete casting weight instead of assuming one thread per insert.
+      function shareCount(id:String):Float return Math.min(
+        loadPaths,
+        points.filter(point -> point.insertId == id).length
+      );
       function share(placed:Array<CastInsertPlacement>):Float {
         if (lifting.length == 0) return 0;
         var mass = asCastMass(new MineralFoundation(castingValues.copy().setToken("postCureBonds", "[]"), placed));
         if (mass.unaccounted.length > 0 || !Math.isFinite(mass.mass)
           || mass.mass <= 0) throw "Anchor lifting demand requires the actual source casting mass";
-        return mass.mass * rule.gravityMps2 / Math.min(rule.liftingLoadPaths, lifting.length);
+        return mass.mass * rule.gravityMps2 / loadPaths;
       }
       var liftingShare = share(rows);
       // Only lifting demand depends on the resolved casting mass. Other
@@ -135,7 +151,7 @@ class FoundationSizing {
               row.part,
               rule,
               Casting(body, row.pose),
-              liftingShare
+              liftingShare * shareCount(row.id)
             )
         }
         ];

@@ -9769,8 +9769,8 @@
   "currentDesign": [
     {
       "id": "mill-base",
-      "sourceFingerprint": "b5d1377e16d29e0f22ec7e035e265f42f6b367de44b575afe40cd2a022ae5215",
-      "sourceCodecVersion": 27,
+      "sourceFingerprint": "f2a64058d05cb8507e490e320c6b832a77821528d4fe208d2527745419a254fc",
+      "sourceCodecVersion": 28,
       "volumeMm3": 68934199.70856015,
       "massKg": 165.44207930054438,
       "boxStatus": "unsupported",
@@ -9780,8 +9780,8 @@
     },
     {
       "id": "mill-column",
-      "sourceFingerprint": "f747b39b981b8a5aec4a2c4d36b6ef3d7b1edb29157f78ca9a6010b069808d53",
-      "sourceCodecVersion": 27,
+      "sourceFingerprint": "a125c0f06ab058d8e74f888d2f4df3d833aa5bf44045f50b2efb8731305acdb8",
+      "sourceCodecVersion": 28,
       "volumeMm3": 41541990.716762036,
       "massKg": 99.7007777202289,
       "boxStatus": "unsupported",
@@ -9794,10 +9794,10 @@
     },
     {
       "id": "hobber-bed",
-      "sourceFingerprint": "7f528cf30a35e4148b6ed4e3a3fc9f97292c81f1cdae1449dd1997e592923319",
-      "sourceCodecVersion": 27,
-      "volumeMm3": 471682156.0256817,
-      "massKg": 1132.0371744616361,
+      "sourceFingerprint": "e2d6871c6c5792c50ef09f8e84526009265442defb846a22e45de34c8dc31524",
+      "sourceCodecVersion": 28,
+      "volumeMm3": 488727751.02567893,
+      "massKg": 1172.9466024616295,
       "boxStatus": "unsupported",
       "boxReason": "Non-box anchor occupancy for inserts: driveSeat, enclosureSeat00, enclosureSeat02, enclosureSeat20, enclosureSeat22, liftAdditional1, liftAdditional2, liftLeft, liftRight, railLeft, railRight, tablePlate",
       "unsupportedFeatures": [
@@ -9818,12 +9818,12 @@
     },
     {
       "id": "hobber-column",
-      "sourceFingerprint": "d200dc072fd259f64e1a7c500cb394a1b694c37361e7759c8871c9c22be953b5",
-      "sourceCodecVersion": 27,
-      "volumeMm3": 29267979.66861247,
-      "massKg": 70.24315120466993,
+      "sourceFingerprint": "0b2e49ceb22c7cc4431f0451d9e8789afbb093782da388673b122dad76fcdaef",
+      "sourceCodecVersion": 28,
+      "volumeMm3": 29130391.17043551,
+      "massKg": 69.91293880904523,
       "boxStatus": "unsupported",
-      "boxReason": "Non-box anchor occupancy for inserts: basePlate, driveSeat, liftAdditional1, liftAdditional2, liftLeft, liftRight, railLeft, railRight",
+      "boxReason": "Non-box anchor occupancy for inserts: basePlate, driveSeat, liftLeft, liftRight, railLeft, railRight",
       "unsupportedFeatures": [],
       "minimumIyMm4": null
     }
