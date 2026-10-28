@@ -15,7 +15,7 @@ Nucleo is powered over USB; the 24 V path is rehearsed separately.
 
 | # | Part | Qty | Ask for | Search terms | Check on arrival |
 |---|---|---:|---|---|---|
-| 1 | **MPG handwheel**, Vallder 100 PPR, 4-pin (5 V, GND, A, B), SKU 1165001 | 2 | Ask Vallder first which variant is 60 mm (the page says "60 mm / 80 mm" and the model name says 80), the output type, the mounting hole and depth, and whether it has a detent. Assume 60 mm for design until answered. 5 V supply. About 21.67 EUR ex tax each. Fallback: the SmartPendant's "60 mm 6 pin 100 PPR" AliExpress listing. | `vallder.com/product/mpg-hand-wheel/`, `OSBAO-80-100B-5E-4P` | Diameter; output type; pinout; counts per turn on a logic analyzer; 5 V high level against the MCU pin tolerance; weight (276 g listed); mounting hole and depth. |
+| 1 | **MPG handwheel**, Vallder 100 PPR, 4-pin single-ended (A, B, 0V, VCC), SKU 1165001 | 2 | Diameters are known from the vendor drawing (80 flange, 59.5 grip; see `PENDANT_PLAN.md`). Ask Vallder only for the output type (push-pull or open collector). 5 V supply. About 21.67 EUR ex tax each. Fallback: the SmartPendant's "60 mm 6 pin 100 PPR" AliExpress listing. | `vallder.com/product/mpg-hand-wheel/`, `OSBAO-80-100B-5E-4P` | Output type; counts per turn on a logic analyzer; 5 V high level against the MCU pin tolerance; the stud and boss protrusion and the terminal strip height behind the panel; weight (276 g listed); panel thickness that the studs allow. |
 | 2 | **Rotary switch, 12 position**, panel mount | 2 | 1 pole 12 throw, break-before-make (non-shorting), good detent. We read OFF plus 11 positions. | `12 position rotary switch 1 pole 12 throw panel mount`, `rotary switch 1P12T non-shorting` | Detent feel; each position closes exactly one contact; contact bounce. |
 | 3 | **Rotary switch, 3 position**, panel mount | 2 | 1 pole 3 throw (x1, x10, x100). | `3 position rotary switch 1P3T panel mount` | As above. |
 | 4 | **Illuminated momentary buttons**, 12 to 16 mm | 8 (+3 spare) | 6 with LEDs: green, yellow, red for the fixed keys and 3 neutral for F1 to F3, with LEDs for 5 V or 12 V with a series resistor. Plus 1 plain momentary for wheel enable (no LED). | `16mm momentary push button LED 5V`, `12mm illuminated momentary pushbutton` | LED forward voltage and current; contact bounce; the feel through a glove. |
@@ -53,7 +53,7 @@ ladder on one ADC pin or an I/O expander would replace the 12 axis-switch inputs
 
 ## What to settle with the bench
 
-1. The MPG (Vallder, assumed 60 mm): diameter, output type, pin tolerance, feel, detent, weight. This sets the input stage on the board.
+1. The MPG (Vallder, drawing-confirmed dimensions): output type, pin tolerance, the rear protrusion and the allowed panel thickness, feel, detent, weight. This sets the input stage on the board and the face thickness.
 2. Read the 12-position switch on 12 GPIOs now; decide ladder or GPIO for the board later.
 3. OLED (2.42 in): legibility, dim and blank behaviour, contrast at the handheld distance, and the face size it forces on the case.
 4. The connector set and the cabinet side: price, pin numbering on both ends, the dummy plug, shield bonding at the bulkhead, and noise on a 5 m run at 2 Mbit/s data phase.
