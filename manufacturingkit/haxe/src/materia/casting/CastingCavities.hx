@@ -38,10 +38,7 @@ class CastingCavities {
   public static function envelopeRegion(body:Array<CastingPrism>):CastingRegion {
     if (body == null || body.length == 0) throw "Casting region needs an envelope";
     return CastingRegion.Union([for (prism in body) CastingRegion.Placed({
-      solid: CastingFeature.CastingGeometrySolid.Prism(
-        CastingProfiles.polygon(prism.profile),
-        prism.height
-      ),
+      solid: CastingFeature.CastingGeometrySolid.Prism(CastingProfiles.polygon(prism.profile), prism.height),
       pose: prism.pose
     })]);
   }
@@ -122,14 +119,7 @@ class CastingCavities {
           id: f.id + "-" + prism.id,
           profile: profile,
           height: high - low,
-          pose: F.compose(
-            prism.pose,
-            F.translation(
-              0,
-              0,
-              low
-            )
-          )
+          pose: F.compose(prism.pose, F.translation(0, 0, low))
         });
       }
       if (pieces.length == 0) throw "Casting cut does not reach body: " + f.id;
@@ -171,14 +161,7 @@ class CastingCavities {
       ys.sort(Reflect.compare);
       result.push(CastingBounds.box({
         solid: Cut(CastingSolid.Box(xs[3] - xs[0], ys[3] - ys[0], p.height)),
-        pose: F.compose(
-          p.pose,
-          F.translation(
-            (xs[0] + xs[3]) / 2,
-            (ys[0] + ys[3]) / 2,
-            0
-          )
-        )
+        pose: F.compose(p.pose, F.translation((xs[0] + xs[3]) / 2, (ys[0] + ys[3]) / 2, 0))
       }));
     }
     return BoxAlgebra.coalesce(result);
@@ -203,12 +186,7 @@ class CastingCavities {
     for (axis in [
       F.transformVector(p.pose, 1, 0, 0),
       F.transformVector(p.pose, 0, 1, 0),
-      F.transformVector(
-        p.pose,
-        0,
-        0,
-        1
-      )
+      F.transformVector(p.pose, 0, 0, 1)
     ]) if (CastingBounds.axis(axis) == null) return false;
     return true;
   }
@@ -227,17 +205,8 @@ class CastingCavities {
   static function boxesMeet(a:Box3, b:Box3):Bool {
     var overlaps = [
       Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x),
-      Math.min(a.y + a.depth, b.y + b.depth) - Math.max(
-        a.y,
-        b.y
-      ),
-      Math.min(
-        a.z + a.height,
-        b.z + b.height
-      ) - Math.max(
-        a.z,
-        b.z
-      )
+      Math.min(a.y + a.depth, b.y + b.depth) - Math.max(a.y, b.y),
+      Math.min(a.z + a.height, b.z + b.height) - Math.max(a.z, b.z)
     ];
     if (overlaps.filter(length -> length < -1e-9).length > 0) return false;
     overlaps.sort((a, b) -> Reflect.compare(b, a));

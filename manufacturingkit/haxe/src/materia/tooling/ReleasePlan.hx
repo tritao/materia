@@ -261,10 +261,7 @@ class ReleasePlans {
       expectedCoated.length > 0
     )) {
       result.push(ToolingLoads.check(
-        "fabrication.release.input." + haxe.crypto.Sha256.encode(input.reason).substr(
-          0,
-          16
-        ),
+        "fabrication.release.input." + haxe.crypto.Sha256.encode(input.reason).substr(0, 16),
         ids,
         Pending,
         input.reason + "; blocks " + input.blocks.join(", ") + ".",

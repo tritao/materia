@@ -8,14 +8,8 @@ import materia.casting.CastingProfile.CastingCurveKind;
 class CastingProfiles {
   public static function line(a:CastingPoint2, b:CastingPoint2):CastingSegment return {
     kind: CastingCurveKind.Line,
-    start: {
-      x: a.x,
-      y: a.y
-    },
-    end: {
-      x: b.x,
-      y: b.y
-    },
+    start: {x: a.x, y: a.y},
+    end: {x: b.x, y: b.y},
     center: null,
     sweep: 0
   };
@@ -26,14 +20,8 @@ class CastingProfiles {
     return {
       kind: CastingCurveKind.Arc,
       start: {x: x + r * Math.cos(start), y: y + r * Math.sin(start)},
-      end: {
-        x: x + r * Math.cos(start + sweep),
-        y: y + r * Math.sin(start + sweep)
-      },
-      center: {
-        x: x,
-        y: y
-      },
+      end: {x: x + r * Math.cos(start + sweep), y: y + r * Math.sin(start + sweep)},
+      center: {x: x, y: y},
       sweep: sweep
     };
   }
@@ -61,13 +49,7 @@ class CastingProfiles {
 
   public static function circle(x:Float, y:Float, r:Float):Array<CastingSegment> return [
     arc(x, y, r, 0, Math.PI),
-    arc(
-      x,
-      y,
-      r,
-      Math.PI,
-      Math.PI
-    )
+    arc(x, y, r, Math.PI, Math.PI)
   ];
 
   public static function obround(x:Float, y:Float, w:Float, h:Float):Array<CastingSegment> {
@@ -85,23 +67,8 @@ class CastingProfiles {
     return [
       line({x: x - a, y: y - r}, {x: x + a, y: y - r}),
       arc(x + a, y, r, -Math.PI / 2, Math.PI),
-      line(
-        {
-          x: x + a,
-          y: y + r
-        },
-        {
-          x: x - a,
-          y: y + r
-        }
-      ),
-      arc(
-        x - a,
-        y,
-        r,
-        Math.PI / 2,
-        Math.PI
-      )
+      line({x: x + a, y: y + r}, {x: x - a, y: y + r}),
+      arc(x - a, y, r, Math.PI / 2, Math.PI)
     ];
   }
 
@@ -111,57 +78,12 @@ class CastingProfiles {
     return [
       line({x: x + r, y: y}, {x: right - r, y: y}),
       arc(right - r, y + r, r, -Math.PI / 2, Math.PI / 2),
-      line(
-        {
-          x: right,
-          y: y + r
-        },
-        {
-          x: right,
-          y: top - r
-        }
-      ),
-      arc(
-        right - r,
-        top - r,
-        r,
-        0,
-        Math.PI / 2
-      ),
-      line(
-        {
-          x: right - r,
-          y: top
-        },
-        {
-          x: x + r,
-          y: top
-        }
-      ),
-      arc(
-        x + r,
-        top - r,
-        r,
-        Math.PI / 2,
-        Math.PI / 2
-      ),
-      line(
-        {
-          x: x,
-          y: top - r
-        },
-        {
-          x: x,
-          y: y + r
-        }
-      ),
-      arc(
-        x + r,
-        y + r,
-        r,
-        Math.PI,
-        Math.PI / 2
-      )
+      line({x: right, y: y + r}, {x: right, y: top - r}),
+      arc(right - r, top - r, r, 0, Math.PI / 2),
+      line({x: right - r, y: top}, {x: x + r, y: top}),
+      arc(x + r, top - r, r, Math.PI / 2, Math.PI / 2),
+      line({x: x, y: top - r}, {x: x, y: y + r}),
+      arc(x + r, y + r, r, Math.PI, Math.PI / 2)
     ];
   }
 

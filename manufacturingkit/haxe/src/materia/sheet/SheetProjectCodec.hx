@@ -38,26 +38,11 @@ class SheetProjectCodec {
       )) decodeMaterial(item)];
     var record:SheetProjectRecord = {
       schemaVersion: intField(raw, "schemaVersion"),
-      stockSpecs: [for (item in arrayField(
-        raw,
-        "stockSpecs"
-      )) decodeStock(item)],
-      requirements: [for (item in arrayField(
-        raw,
-        "requirements"
-      )) decodeRequirement(item)],
-      plans: [for (item in arrayField(
-        raw,
-        "plans"
-      )) decodePlan(item)],
-      stockPieces: [for (item in arrayField(
-        raw,
-        "stockPieces"
-      )) decodePiece(item)],
-      executions: [for (item in arrayField(
-        raw,
-        "executions"
-      )) decodeExecution(item)]
+      stockSpecs: [for (item in arrayField(raw, "stockSpecs")) decodeStock(item)],
+      requirements: [for (item in arrayField(raw, "requirements")) decodeRequirement(item)],
+      plans: [for (item in arrayField(raw, "plans")) decodePlan(item)],
+      stockPieces: [for (item in arrayField(raw, "stockPieces")) decodePiece(item)],
+      executions: [for (item in arrayField(raw, "executions")) decodeExecution(item)]
     };
     if (customMaterials != null) record.customMaterials = customMaterials;
     validate(record);
@@ -68,26 +53,11 @@ class SheetProjectCodec {
     var result:SheetStockSpec = {
       id: textField(value, "id"),
       revision: intField(value, "revision"),
-      materialId: textField(
-        value,
-        "materialId"
-      ),
-      lengthUnit: textField(
-        value,
-        "lengthUnit"
-      ),
-      width: numberField(
-        value,
-        "width"
-      ),
-      height: numberField(
-        value,
-        "height"
-      ),
-      thickness: numberField(
-        value,
-        "thickness"
-      )
+      materialId: textField(value, "materialId"),
+      lengthUnit: textField(value, "lengthUnit"),
+      width: numberField(value, "width"),
+      height: numberField(value, "height"),
+      thickness: numberField(value, "thickness")
     };
     var supplier = optionalText(value, "supplier"), supplierCode = optionalText(value, "supplierCode");
     if (supplier != null) result.supplier = supplier;
@@ -99,73 +69,22 @@ class SheetProjectCodec {
     var result:SheetPartRequirement = {
       id: textField(value, "id"),
       revision: intField(value, "revision"),
-      partId: textField(
-        value,
-        "partId"
-      ),
-      partRevision: intField(
-        value,
-        "partRevision"
-      ),
-      quantity: intField(
-        value,
-        "quantity"
-      ),
-      materialId: textField(
-        value,
-        "materialId"
-      ),
-      lengthUnit: textField(
-        value,
-        "lengthUnit"
-      ),
-      thickness: numberField(
-        value,
-        "thickness"
-      ),
-      thicknessToleranceMinus: numberField(
-        value,
-        "thicknessToleranceMinus"
-      ),
-      thicknessTolerancePlus: numberField(
-        value,
-        "thicknessTolerancePlus"
-      ),
-      blankWidth: numberField(
-        value,
-        "blankWidth"
-      ),
-      blankHeight: numberField(
-        value,
-        "blankHeight"
-      ),
-      widthToleranceMinus: numberField(
-        value,
-        "widthToleranceMinus"
-      ),
-      widthTolerancePlus: numberField(
-        value,
-        "widthTolerancePlus"
-      ),
-      heightToleranceMinus: numberField(
-        value,
-        "heightToleranceMinus"
-      ),
-      heightTolerancePlus: numberField(
-        value,
-        "heightTolerancePlus"
-      ),
-      allowedRotations: [for (item in arrayField(
-        value,
-        "allowedRotations"
-      )) integerValue(
-        item,
-        "allowedRotations"
-      )],
-      directionConstraint: textField(
-        value,
-        "directionConstraint"
-      )
+      partId: textField(value, "partId"),
+      partRevision: intField(value, "partRevision"),
+      quantity: intField(value, "quantity"),
+      materialId: textField(value, "materialId"),
+      lengthUnit: textField(value, "lengthUnit"),
+      thickness: numberField(value, "thickness"),
+      thicknessToleranceMinus: numberField(value, "thicknessToleranceMinus"),
+      thicknessTolerancePlus: numberField(value, "thicknessTolerancePlus"),
+      blankWidth: numberField(value, "blankWidth"),
+      blankHeight: numberField(value, "blankHeight"),
+      widthToleranceMinus: numberField(value, "widthToleranceMinus"),
+      widthTolerancePlus: numberField(value, "widthTolerancePlus"),
+      heightToleranceMinus: numberField(value, "heightToleranceMinus"),
+      heightTolerancePlus: numberField(value, "heightTolerancePlus"),
+      allowedRotations: [for (item in arrayField(value, "allowedRotations")) integerValue(item, "allowedRotations")],
+      directionConstraint: textField(value, "directionConstraint")
     };
     var rawShape:Dynamic = Reflect.field(value, "shape"), angles:Dynamic = Reflect.field(value, "allowedAngles");
     if (rawShape != null) result.shape = decodeShape(rawShape);
@@ -278,30 +197,12 @@ class SheetProjectCodec {
     var result:StockPiece = {
       id: textField(value, "id"),
       stockSpecId: textField(value, "stockSpecId"),
-      materialId: textField(
-        value,
-        "materialId"
-      ),
-      lengthUnit: textField(
-        value,
-        "lengthUnit"
-      ),
-      width: numberField(
-        value,
-        "width"
-      ),
-      height: numberField(
-        value,
-        "height"
-      ),
-      thickness: numberField(
-        value,
-        "thickness"
-      ),
-      state: textField(
-        value,
-        "state"
-      )
+      materialId: textField(value, "materialId"),
+      lengthUnit: textField(value, "lengthUnit"),
+      width: numberField(value, "width"),
+      height: numberField(value, "height"),
+      thickness: numberField(value, "thickness"),
+      state: textField(value, "state")
     };
     for (name in [
       "batch",
@@ -382,29 +283,11 @@ class SheetProjectCodec {
       id: textField(value, "id"),
       name: textField(value, "name"),
       visual: {
-        baseColor: floatArray(field(
-          visual,
-          "baseColor"
-        )),
-        metallic: numberField(
-          visual,
-          "metallic"
-        ),
-        roughness: numberField(
-          visual,
-          "roughness"
-        )
+        baseColor: floatArray(field(visual, "baseColor")),
+        metallic: numberField(visual, "metallic"),
+        roughness: numberField(visual, "roughness")
       },
-      physical: {
-        density: numberField(
-          physical,
-          "density"
-        ),
-        spec: textField(
-          physical,
-          "spec"
-        )
-      }
+      physical: {density: numberField(physical, "density"), spec: textField(physical, "spec")}
     };
     if (Reflect.hasField(visual,
       "emissive") && Reflect.field(visual, "emissive") != null) result.visual.emissive = floatArray(Reflect.field(

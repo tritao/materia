@@ -17,10 +17,7 @@ class CastHandling {
   public static function resinVolume(d:ToolingDocument):Float {
     var region = materia.casting.CastingRegion.Difference(
       MoldRegions.envelope(d),
-      [for (feature in d.input.features) MoldRegions.feature(
-        d,
-        feature.id
-      )]
+      [for (feature in d.input.features) MoldRegions.feature(d, feature.id)]
     );
     var volume = MoldRegions.volume(region, d.input.id);
     for (insert in d.input.inserts) {

@@ -104,11 +104,7 @@ class CastabilityAnalysis {
     ?target:Float,
     ?axis:SectionAxis,
     ?region:MoldBox,
-    ?point: {
-      x: Float,
-      y: Float,
-      z: Float
-    }
+    ?point: {x: Float, y: Float, z: Float}
   ):CastabilityProposal {
     var record:CastabilityProposal = {
       id: "proposal",
@@ -223,12 +219,7 @@ class CastabilityAnalysis {
     }
     if (aggregate == null && sections != null) aggregate = AggregateGate.withFill(
       root,
-      AggregateGate.fromSections(
-        d,
-        expectedSourceFingerprint,
-        limits,
-        sections
-      ),
+      AggregateGate.fromSections(d, expectedSourceFingerprint, limits, sections),
       fill
     );
     if (aggregate != null) {
@@ -499,12 +490,7 @@ class CastabilityAnalysis {
       var axial = [
         F.transformVector(insertToMold, 1, 0, 0),
         F.transformVector(insertToMold, 0, 1, 0),
-        F.transformVector(
-          insertToMold,
-          0,
-          0,
-          1
-        )
+        F.transformVector(insertToMold, 0, 0, 1)
       ].filter(axis -> materia.casting.CastingBounds.axis(axis) == null).length == 0;
       if (envelope == null || !axial) {
         for (name in ["insert-edge", "insert-cover"]) checks.push(FillAnalysis.check(
@@ -519,10 +505,7 @@ class CastabilityAnalysis {
       var box = CastingMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, insertToMold);
       var edge = Math.min(
         Math.min(box.x - envelope.x, envelope.x + envelope.width - box.x - box.width),
-        Math.min(
-          box.y - envelope.y,
-          envelope.y + envelope.depth - box.y - box.depth
-        )
+        Math.min(box.y - envelope.y, envelope.y + envelope.depth - box.y - box.depth)
       );
       var wet = BoxAlgebra.intersection(box, envelope);
       var embed = wet == null ? 0 : wet.width * wet.depth * wet.height / (dimensions.width * dimensions.depth);
@@ -555,20 +538,11 @@ class CastabilityAnalysis {
             proposed,
             dimensions.depth,
             dimensions.height,
-            F.compose(
-              d.setup.sourceToMold,
-              insert.pose
-            )
+            F.compose(d.setup.sourceToMold, insert.pose)
           );
           var improved = Math.min(
-            Math.min(
-              smaller.x - envelope.x,
-              envelope.x + envelope.width - smaller.x - smaller.width
-            ),
-            Math.min(
-              smaller.y - envelope.y,
-              envelope.y + envelope.depth - smaller.y - smaller.depth
-            )
+            Math.min(smaller.x - envelope.x, envelope.x + envelope.width - smaller.x - smaller.width),
+            Math.min(smaller.y - envelope.y, envelope.y + envelope.depth - smaller.y - smaller.depth)
           );
           var requiredEdge:Float = cast limits.minimumInsertEdgeMm;
           if (improved < requiredEdge - 1e-7) proposed = null;
@@ -623,10 +597,7 @@ class CastabilityAnalysis {
     }
     var resin = envelope == null || unsupported.length > 0 ? null : BoxAlgebra.subtract(
       [envelope],
-      [for (feature in d.input.features) CastingMoldPlanner.featureBox(
-        d,
-        feature
-      )]
+      [for (feature in d.input.features) CastingMoldPlanner.featureBox(d, feature)]
     );
     for (strategy in materia.tooling.casting.CastingStrategies.resolve(d)) {
       var rule = "process.level1.removal-direction." + strategy.featureId;
@@ -681,14 +652,8 @@ class CastabilityAnalysis {
       }
       var sweep:MoldBox = {
         x: box.x + Math.min(0, direction.x * distance),
-        y: box.y + Math.min(
-          0,
-          direction.y * distance
-        ),
-        z: box.z + Math.min(
-          0,
-          direction.z * distance
-        ),
+        y: box.y + Math.min(0, direction.y * distance),
+        z: box.z + Math.min(0, direction.z * distance),
         width: box.width + Math.abs(direction.x * distance),
         depth: box.depth + Math.abs(direction.y * distance),
         height: box.height + Math.abs(direction.z * distance)
@@ -719,14 +684,7 @@ class CastabilityAnalysis {
       envelope.width,
       envelope.depth,
       envelope.height,
-      F.compose(
-        inverse,
-        F.translation(
-          envelope.x + envelope.width / 2,
-          envelope.y + envelope.depth / 2,
-          envelope.z
-        )
-      )
+      F.compose(inverse, F.translation(envelope.x + envelope.width / 2, envelope.y + envelope.depth / 2, envelope.z))
     );
     var result:Array<CastabilityProposal> = [];
     for (location in materia.casting.InsertAnchorage.InsertAnchorSelection.liftingPositions(source, center, count)) {

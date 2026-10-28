@@ -54,22 +54,7 @@ class ToolingTests {
       materia.tooling.casting.InsertFixturePlanner.select(
         hole,
         F.identity(),
-        F.fromRotationMatrix(
-          0,
-          0,
-          0,
-          [
-            1,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            0,
-            0,
-            -1
-          ]
-        ),
+        F.fromRotationMatrix(0, 0, 0, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
         hardware
       ) == null,
       "short blind thread has no tip clearance without an explicit relief"
@@ -78,22 +63,7 @@ class ToolingTests {
     var fixing = materia.tooling.casting.InsertFixturePlanner.select(
       hole,
       F.identity(),
-      F.fromRotationMatrix(
-        0,
-        0,
-        0,
-        [
-          1,
-          0,
-          0,
-          0,
-          -1,
-          0,
-          0,
-          0,
-          -1
-        ]
-      ),
+      F.fromRotationMatrix(0, 0, 0, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
       hardware
     );
     check(
@@ -105,22 +75,7 @@ class ToolingTests {
       materia.tooling.casting.InsertFixturePlanner.select(
         hole,
         F.identity(),
-        F.fromRotationMatrix(
-          0,
-          0,
-          0,
-          [
-            1,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            0,
-            0,
-            -1
-          ]
-        ),
+        F.fromRotationMatrix(0, 0, 0, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
         hardware
       ) == null,
       "deep relief never contributes thread engagement"
@@ -187,12 +142,8 @@ class ToolingTests {
     var feature = materia.casting.CastingPatterns.box(
       "multiple-portals",
       Lightening,
-      [for (face in [
-        "body.y-min",
-        "body.y-max",
-        "body.z-min",
-        "body.z-max"
-      ]) materia.casting.CastingPatterns.face(face)],
+      [for (face in ["body.y-min",
+      "body.y-max", "body.z-min", "body.z-max"]) materia.casting.CastingPatterns.face(face)],
       100,
       180,
       100
@@ -223,39 +174,9 @@ class ToolingTests {
       [1.0, 0, 0, 0, 1, 0, 0, 0, 1],
       [1.0, 0, 0, 0, -1, 0, 0, 0, -1],
       [1.0, 0, 0, 0, 0, -1, 0, 1, 0],
-      [
-        1.0,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        -1,
-        0
-      ],
-      [
-        0.0,
-        0,
-        1,
-        0,
-        1,
-        0,
-        -1,
-        0,
-        0
-      ],
-      [
-        0.0,
-        0,
-        -1,
-        0,
-        1,
-        0,
-        1,
-        0,
-        0
-      ]
+      [1.0, 0, 0, 0, 0, 1, 0, -1, 0],
+      [0.0, 0, 1, 0, 1, 0, -1, 0, 0],
+      [0.0, 0, -1, 0, 1, 0, 1, 0, 0]
     ];
     for (rotation in rotations) for (positive in [false, true]) {
       var r = fixture().recipe;
@@ -274,31 +195,15 @@ class ToolingTests {
         ? materia.tooling.ToolingEnums.MachiningSide.NegativeZ : materia.tooling.ToolingEnums.MachiningSide.PositiveZ;
       var receiver:materia.tooling.panel.PanelAssemblyPlan.PanelPlacement = {
         panel: panel,
-        pose: F.fromRotationMatrix(
-          31,
-          -27,
-          92,
-          rotation
-        ),
-        withdrawal: {
-          x: 0,
-          y: 0,
-          z: 1
-        }
+        pose: F.fromRotationMatrix(31, -27, 92, rotation),
+        withdrawal: {x: 0, y: 0, z: 1}
       };
       var frame = materia.tooling.casting.CoreSupports.socketFrame(receiver);
       var cavity = materia.tooling.casting.CastingMoldPlanner.box(
         60,
         40,
         30,
-        F.compose(
-          frame,
-          F.translation(
-            50,
-            positive ? 50 : -50,
-            0
-          )
-        )
+        F.compose(frame, F.translation(50, positive ? 50 : -50, 0))
       );
       var built = materia.tooling.casting.CoreSupports.routedSocket(cavity, "side-pocket", r, receiver);
       var core = built.core,
@@ -357,39 +262,9 @@ class ToolingTests {
       [1.0, 0, 0, 0, 1, 0, 0, 0, 1],
       [1.0, 0, 0, 0, -1, 0, 0, 0, -1],
       [1.0, 0, 0, 0, 0, -1, 0, 1, 0],
-      [
-        1.0,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        -1,
-        0
-      ],
-      [
-        0.0,
-        0,
-        1,
-        0,
-        1,
-        0,
-        -1,
-        0,
-        0
-      ],
-      [
-        0.0,
-        0,
-        -1,
-        0,
-        1,
-        0,
-        1,
-        0,
-        0
-      ]
+      [1.0, 0, 0, 0, 0, 1, 0, -1, 0],
+      [0.0, 0, 1, 0, 1, 0, -1, 0, 0],
+      [0.0, 0, -1, 0, 1, 0, 1, 0, 0]
     ];
     for (rotation in rotations) {
       var pose = F.fromRotationMatrix(31, -27, 92, rotation);
@@ -430,52 +305,16 @@ class ToolingTests {
       [1.0, 0, 0, 0, 1, 0, 0, 0, 1],
       [1.0, 0, 0, 0, -1, 0, 0, 0, -1],
       [1.0, 0, 0, 0, 0, -1, 0, 1, 0],
-      [
-        1.0,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        -1,
-        0
-      ],
-      [
-        0.0,
-        0,
-        1,
-        0,
-        1,
-        0,
-        -1,
-        0,
-        0
-      ],
-      [
-        0.0,
-        0,
-        -1,
-        0,
-        1,
-        0,
-        1,
-        0,
-        0
-      ]
+      [1.0, 0, 0, 0, 0, 1, 0, -1, 0],
+      [0.0, 0, 1, 0, 1, 0, -1, 0, 0],
+      [0.0, 0, -1, 0, 1, 0, 1, 0, 0]
     ];
     var sample = fixture().input.inserts[0];
     var size = materia.casting.InsertSpec.InsertBodyCodec.box(sample.body, sample.id);
     var shapes = [
       materia.casting.CastingSolid.Box(size.width, size.depth, size.height),
-      materia.casting.CastingSolid.Cylinder(
-        16,
-        size.height
-      ),
-      materia.casting.CastingSolid.Cylinder(
-        8,
-        size.height
-      )
+      materia.casting.CastingSolid.Cylinder(16, size.height),
+      materia.casting.CastingSolid.Cylinder(8, size.height)
     ];
     for (shape in shapes) for (rotation in rotations) {
       var document = fixture(), source = document.input.inserts[0];
@@ -496,22 +335,14 @@ class ToolingTests {
         F.translation(0, 0, size.height)), thickness = document.recipe.panel.measuredThickness;
       var pose = F.compose(
         F.compose(face, F.fromRotationMatrix(0, 0, 0, [1, 0, 0, 0, -1, 0, 0, 0, -1])),
-        F.translation(
-          -50,
-          -50,
-          -thickness
-        )
+        F.translation(-50, -50, -thickness)
       );
       var panel = materia.tooling.panel.PanelJoints.blank("face-fixture", 100, 100, document.recipe.panel, 6, 2);
       panel.contactFace = materia.tooling.ToolingEnums.ContactFace.PositiveZ;
       panel.operations.push(materia.tooling.panel.PanelJoints.operation(
         "mask-access",
         materia.tooling.panel.PanelPlan.PanelOperationKind.Drill,
-        materia.tooling.panel.PanelContours.circle(
-          50,
-          50,
-          thin ? 3.3 : 4.5
-        ),
+        materia.tooling.panel.PanelContours.circle(50, 50, thin ? 3.3 : 4.5),
         thickness,
         thin ? 6.6 : 9,
         materia.tooling.ToolingEnums.MachiningSide.PositiveZ,
@@ -521,15 +352,7 @@ class ToolingTests {
         source,
         transform,
         face,
-        {
-          panel: panel,
-          pose: pose,
-          withdrawal: {
-            x: 0,
-            y: 0,
-            z: 1
-          }
-        },
+        {panel: panel, pose: pose, withdrawal: {x: 0, y: 0, z: 1}},
         []
       );
       check(
@@ -579,11 +402,7 @@ class ToolingTests {
     insert.body = materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(40, 30, 21));
     insert.interfaces = [{
       id: "finished-top",
-      geometry: materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(
-        0,
-        0,
-        20
-      )),
+      geometry: materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0, 0, 20)),
       route: materia.casting.InterfaceRequirement.InterfaceRoute.Ground,
       allowanceMm: 1,
       finishingProcessErrorMm: materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
@@ -671,11 +490,7 @@ class ToolingTests {
       locatorSideInset: 20,
       screwStock: [{
         thread: cast hole.thread,
-        lengths: [
-          25,
-          30,
-          35
-        ],
+        lengths: [25, 30, 35],
         threadedLength: 28,
         washerThickness: 1.6,
         driverDiameter: 16,
@@ -805,24 +620,7 @@ class ToolingTests {
       postCureInserts: [],
       envelope: [{
         id: "body",
-        profile: [
-          {
-            x: -100,
-            y: -90
-          },
-          {
-            x: 100,
-            y: -90
-          },
-          {
-            x: 100,
-            y: 90
-          },
-          {
-            x: -100,
-            y: 90
-          }
-        ],
+        profile: [{x: -100, y: -90}, {x: 100, y: -90}, {x: 100, y: 90}, {x: -100, y: 90}],
         height: 100,
         pose: F.identity()
       }],
@@ -832,90 +630,46 @@ class ToolingTests {
           kind: materia.casting.CastingFeature.CastingFeatureKind.Lightening,
           owner: null,
           geometry: {
-            solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(
-              100,
-              80,
-              61
-            )),
-            pose: F.translation(
-              0,
-              0,
-              -1
-            )
-          },
-          openings: [materia.casting.CastingPatterns.face("body.z-min")],
-          draft: {
-            degrees: 0,
-            axis: {
-              x: 0,
-              y: 0,
-              z: 1
-            }
-          },
-          cornerRadius: 0,
-          adjustable: [
-            CastingDimension.Width,
-            CastingDimension.Depth,
-            CastingDimension.Height
-          ]
-        },
-        {
-          id: "insert-seat",
-          kind: InsertRecess,
-          owner: "seat",
-          geometry: {
-            solid: materia.casting.CastingFeature
+            solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(100,
+      80, 61)),
+      pose: F.translation(0, 0, -1)
+    },
+      openings: [materia.casting.CastingPatterns.face("body.z-min")],
+      draft: {degrees: 0, axis: {x: 0, y: 0, z: 1}},
+      cornerRadius: 0,
+      adjustable: [CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height]
+    },
+      {
+        id: "insert-seat",
+        kind: InsertRecess,
+        owner: "seat",
+        geometry: {
+          solid: materia.casting.CastingFeature
       .CastingGeometrySolid.Insert(materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(
         40,
         30,
         20
       ))),
-      pose: F.translation(
-        80,
-        0,
-        90
-      )
+      pose: F.translation(80, 0, 90)
     },
       openings: [
         materia.casting.CastingPatterns.face("body.z-max"),
         materia.casting.CastingPatterns.face("body.x-max")
       ],
-      draft: {
-        degrees: 0,
-        axis: {
-          x: 0,
-          y: 0,
-          z: 1
-        }
-      },
+      draft: {degrees: 0, axis: {x: 0, y: 0, z: 1}},
       cornerRadius: 0,
-      adjustable: [
-        CastingDimension.Width,
-        CastingDimension.Depth,
-        CastingDimension.Height
-      ]
+      adjustable: [CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height]
     }
     ],
       inserts: [{
         id: "seat",
-        body: materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(
-          40,
-          30,
-          20
-        )),
+        body: materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(40, 30, 20)),
         anchorage: materia.casting.InsertAnchorage.Undeclared,
         origin: materia.casting.InsertOrigin.Fabricated(materia.casting.InsertManufacturing
       .InsertManufacturingCodec.draft(materia.casting.InsertMaterial.InsertMaterials.specification(C45Bright))),
       interfaces: [],
-      holes: TestInsertHoles.through(
-        8,
-        20
-      ),
-      pose: F.translation(
-        80,
-        0,
-        90
-      ),
+      holes: TestInsertHoles.through(8, 20),
+      pose: F.translation(80, 0, 90),
       role: InsertRole.GuideSeat,
       label: "rail seat",
       positionTolerance: 0.01,
@@ -932,10 +686,7 @@ class ToolingTests {
       width: 2440,
       height: 1220,
       coatedFace: CoatedFace.Both,
-      allowedRotations: [
-        0,
-        90
-      ],
+      allowedRotations: [0, 90],
       directionConstraint: StockDirection.Free
     };
     var formerStocks = [stock];
@@ -947,31 +698,13 @@ class ToolingTests {
     }
     var recipe:ToolingRecipe = {
       former: {
-        pocketScrew: {
-          diameterMm: 4,
-          lengthMm: 30,
-          jigAngleDegrees: 15,
-          edgeDistanceMm: 20,
-          maximumPitchMm: 100
-        },
+        pocketScrew: {diameterMm: 4, lengthMm: 30, jigAngleDegrees: 15, edgeDistanceMm: 20, maximumPitchMm: 100},
         stocks: formerStocks,
         finishingStockMm: 0.5,
         toleranceMm: 0.1,
         cutters: [
-          {
-            id: "former-straight-6",
-            tipDiameterMm: 6,
-            taperDegrees: 0,
-            fluteLengthMm: 30,
-            stickOutMm: 35
-          },
-          {
-            id: "former-taper-3deg-6",
-            tipDiameterMm: 6,
-            taperDegrees: 3,
-            fluteLengthMm: 30,
-            stickOutMm: 35
-          }
+          {id: "former-straight-6", tipDiameterMm: 6, taperDegrees: 0, fluteLengthMm: 30, stickOutMm: 35},
+          {id: "former-taper-3deg-6", tipDiameterMm: 6, taperDegrees: 3, fluteLengthMm: 30, stickOutMm: 35}
         ]
       },
       featureRules: materia.tooling.casting.CastingStrategies.standardRules(),
@@ -1049,22 +782,7 @@ class ToolingTests {
         sourceFingerprint: ToolingCodec.inputFingerprint(input),
         fillHeightMm: 100,
         freeboardMm: 0,
-        sourceToMold: F.fromRotationMatrix(
-          0,
-          0,
-          100,
-          [
-            1,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            0,
-            0,
-            -1
-          ]
-        )
+        sourceToMold: F.fromRotationMatrix(0, 0, 100, [1, 0, 0, 0, -1, 0, 0, 0, -1])
       }
     };
   }
@@ -1076,10 +794,7 @@ class ToolingTests {
     d.input.features.push(materia.casting.CastingPatterns.box(
       "through-opening",
       ServiceOpening,
-      [
-        materia.casting.CastingPatterns.face("body.z-min"),
-        materia.casting.CastingPatterns.face("body.z-max")
-      ],
+      [materia.casting.CastingPatterns.face("body.z-min"), materia.casting.CastingPatterns.face("body.z-max")],
       20,
       20,
       100
@@ -1213,13 +928,7 @@ class ToolingTests {
     );
     var socket = materia.casting.InsertSpec.InsertBody.CrimpedSocket(
       materia.casting.CastingSolid.Cylinder(8, 20),
-      {
-        length: 25,
-        width: 11,
-        thickness: 2.2,
-        wave: 1.4,
-        blend: 0.5
-      }
+      {length: 25, width: 11, thickness: 2.2, wave: 1.4, blend: 0.5}
     );
     var ends = materia.casting.InsertSpec.InsertBodyCodec.planarEndFrames(socket);
     check(ends.length == 1 && ends[0].z == 45, "A crimped retention tail does not invent a planar back receiver");

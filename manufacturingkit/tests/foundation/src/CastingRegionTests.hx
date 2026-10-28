@@ -21,11 +21,7 @@ class CastingRegionTests {
     });
     var b = CastingRegion.Placed({
       solid: CastingGeometrySolid.Cut(materia.casting.CastingSolid.Cylinder(10, 40)),
-      pose: F.translation(
-        1,
-        2,
-        3
-      )
+      pose: F.translation(1, 2, 3)
     });
     var one = CastingRegion.Union([a, b]), two = CastingRegion.Union([b, a]);
     check(
@@ -68,13 +64,7 @@ class CastingRegionTests {
     rejects(
       () -> C.copy(CastingRegion.Drafted(
         "bad-former",
-        materia.casting.CastingProfiles.roundedRectangle(
-          -20,
-          -15,
-          40,
-          30,
-          1
-        ),
+        materia.casting.CastingProfiles.roundedRectangle(-20, -15, 40, 30, 1),
         F.identity(),
         60,
         2

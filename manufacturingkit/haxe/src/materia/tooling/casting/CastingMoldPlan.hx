@@ -245,11 +245,7 @@ enum MoldFixtureSupport {
   OnDatum(
     volume:MoldVolume,
     withdrawal: {x: Float, y: Float, z: Float},
-    lateralLocation: {
-      primaryId: String,
-      secondaryId: String,
-      baselineMm: Float
-    }
+    lateralLocation: {primaryId: String, secondaryId: String, baselineMm: Float}
   );
 }
 
@@ -432,10 +428,7 @@ class MoldOptions {
       joints.push({
         jointId: text(j, "jointId"),
         materialReference: nullableText(j, "materialReference"),
-        cureEvidence: strings(
-          j,
-          "cureEvidence"
-        )
+        cureEvidence: strings(j, "cureEvidence")
       });
     }
     var precision:Array<PrecisionInterface> = [];
@@ -455,26 +448,11 @@ class MoldOptions {
       precision.push({
         insertId: text(p, "insertId"),
         masterReference: nullableText(p, "masterReference"),
-        jigReference: nullableText(
-          p,
-          "jigReference"
-        ),
-        masterFlatnessMm: nullableNumber(
-          p,
-          "masterFlatnessMm"
-        ),
-        releaseSpec: nullableText(
-          p,
-          "releaseSpec"
-        ),
-        holeProtectionReference: nullableText(
-          p,
-          "holeProtectionReference"
-        ),
-        evidence: strings(
-          p,
-          "evidence"
-        )
+        jigReference: nullableText(p, "jigReference"),
+        masterFlatnessMm: nullableNumber(p, "masterFlatnessMm"),
+        releaseSpec: nullableText(p, "releaseSpec"),
+        holeProtectionReference: nullableText(p, "holeProtectionReference"),
+        evidence: strings(p, "evidence")
       });
     }
     var c = Reflect.field(o, "compaction");
@@ -506,26 +484,11 @@ class MoldOptions {
     var orientation:materia.assembly.AssemblyRecord.AssemblyFrame = {
       x: number(pose, "x"),
       y: number(pose, "y"),
-      z: number(
-        pose,
-        "z"
-      ),
-      qx: number(
-        pose,
-        "qx"
-      ),
-      qy: number(
-        pose,
-        "qy"
-      ),
-      qz: number(
-        pose,
-        "qz"
-      ),
-      qw: number(
-        pose,
-        "qw"
-      )
+      z: number(pose, "z"),
+      qx: number(pose, "qx"),
+      qy: number(pose, "qy"),
+      qz: number(pose, "qz"),
+      qw: number(pose, "qw")
     };
     materia.assembly.AssemblyCodec.validateFrame(orientation);
     if (Math.abs(orientation.qx * orientation.qx + orientation.qy * orientation.qy + orientation.qz
@@ -565,61 +528,24 @@ class MoldOptions {
         equipmentReference: text(item, "equipmentReference"),
         capacityKg: capacity,
         verifiedMassKg: mass,
-        centerOfMass: {
-          x: number(
-            com,
-            "x"
-          ),
-          y: number(
-            com,
-            "y"
-          ),
-          z: number(
-            com,
-            "z"
-          )
-        },
+        centerOfMass: {x: number(com, "x"), y: number(com, "y"), z: number(com, "z")},
         positionToleranceMm: tolerance,
-        attachmentIds: strings(
-          item,
-          "attachmentIds"
-        ),
-        verificationReference: text(
-          item,
-          "verificationReference"
-        )
+        attachmentIds: strings(item, "attachmentIds"),
+        verificationReference: text(item, "verificationReference")
       });
     }
     precision.sort((a, b) -> Reflect.compare(a.insertId, b.insertId));
     return {
       foundationJointProcesses: joints,
-      replicationJigs: ReplicationJig.ReplicationJigCodec.snapshot(Reflect.field(
-        o,
-        "replicationJigs"
-      )),
+      replicationJigs: ReplicationJig.ReplicationJigCodec.snapshot(Reflect.field(o, "replicationJigs")),
       precision: precision,
       compaction: {
         method: method,
-        bedInterfaceReference: nullableText(
-          c,
-          "bedInterfaceReference"
-        ),
-        frequencyHz: nullableNumber(
-          c,
-          "frequencyHz"
-        ),
-        amplitudeMm: nullableNumber(
-          c,
-          "amplitudeMm"
-        ),
-        durationSeconds: nullableNumber(
-          c,
-          "durationSeconds"
-        ),
-        evidence: strings(
-          c,
-          "evidence"
-        )
+        bedInterfaceReference: nullableText(c, "bedInterfaceReference"),
+        frequencyHz: nullableNumber(c, "frequencyHz"),
+        amplitudeMm: nullableNumber(c, "amplitudeMm"),
+        durationSeconds: nullableNumber(c, "durationSeconds"),
+        evidence: strings(c, "evidence")
       },
       serviceOrientation: orientation,
       overlapRule: ReservedThenPriority,
@@ -636,14 +562,8 @@ class MoldOptions {
         y: number(b, "y"),
         z: number(b, "z"),
         width: number(b, "width"),
-        depth: number(
-          b,
-          "depth"
-        ),
-        height: number(
-          b,
-          "height"
-        )
+        depth: number(b, "depth"),
+        height: number(b, "height")
       };
       if (n.width <= 0 || n.depth <= 0 || n.height <= 0) throw "Invalid process geometry";
       out.push(n);

@@ -63,12 +63,7 @@ class EPSAccessNetworks {
       CoreSupports.socketFoot(
         core,
         {x: bounds.x, y: bounds.y, width: bounds.width, depth: bounds.depth},
-        {
-          x: network.receiver.x,
-          y: network.receiver.y,
-          width: network.receiver.width,
-          depth: network.receiver.depth
-        },
+        {x: network.receiver.x, y: network.receiver.y, width: network.receiver.width, depth: network.receiver.depth},
         p.cavity.z,
         foam.z,
         p.document.recipe,
@@ -97,14 +92,7 @@ class EPSAccessNetworks {
       var bounds = G.bounds(outer.contour);
       var domain = BoxAlgebra.intersection(
         receiver,
-        {
-          x: bounds.x,
-          y: bounds.y,
-          z: receiver.z,
-          width: bounds.width,
-          depth: bounds.height,
-          height: receiver.height
-        }
+        {x: bounds.x, y: bounds.y, z: receiver.z, width: bounds.width, depth: bounds.height, height: receiver.height}
       );
       if (domain == null) continue;
       var holes = rows.filter(row -> row.depth == outer.depth + 1 && G.inside(

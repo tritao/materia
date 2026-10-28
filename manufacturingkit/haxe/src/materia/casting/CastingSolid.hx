@@ -44,10 +44,7 @@ class CastingSolidCodec {
         Box(
           CastingRecordCodec.number(raw, "width"),
           CastingRecordCodec.number(raw, "depth"),
-          CastingRecordCodec.number(
-            raw,
-            "height"
-          )
+          CastingRecordCodec.number(raw, "height")
         );
       case "cylinder":
         CastingFeatureCodec.fields(raw, ["kind", "diameter", "height"]);

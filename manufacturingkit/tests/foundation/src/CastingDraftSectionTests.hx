@@ -39,18 +39,7 @@ class CastingDraftSectionTests {
     rejects(() -> O.inward(opening, -1), "Invalid draft section offset");
     var body:Array<materia.casting.CastingPrism> = [{
       id: "body",
-      profile: [
-        {x: -60.0, y: -50.0},
-        {x: 60.0, y: -50.0},
-        {
-          x: 60.0,
-          y: 50.0
-        },
-        {
-          x: -60.0,
-          y: 50.0
-        }
-      ],
+      profile: [{x: -60.0, y: -50.0}, {x: 60.0, y: -50.0}, {x: 60.0, y: 50.0}, {x: -60.0, y: 50.0}],
       height: 80,
       pose: materia.assembly.AssemblyFrames.identity()
     }];

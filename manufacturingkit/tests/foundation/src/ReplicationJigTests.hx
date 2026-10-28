@@ -24,11 +24,7 @@ class ReplicationJigTests {
   }
   static function requirement(id:String, x:Float):InterfaceRequirement return {
     id: id,
-    geometry: Plane(F.translation(
-      x,
-      0,
-      20
-    )),
+    geometry: Plane(F.translation(x, 0, 20)),
     route: InterfaceRoute.Replicated,
     allowanceMm: 1,
     finishingProcessErrorMm: materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
@@ -42,16 +38,7 @@ class ReplicationJigTests {
     var relationship:InterfaceRelationship = {
       id: "rail-planes",
       kind: Coplanar,
-      members: [
-        ComponentInterface(
-          "casting",
-          "a"
-        ),
-        ComponentInterface(
-          "casting",
-          "b"
-        )
-      ],
+      members: [ComponentInterface("casting", "a"), ComponentInterface("casting", "b")],
       tolerance: Linear(0.01),
       metrology: {
         method: MetrologyMethod.IndicatorReversal,
@@ -64,22 +51,8 @@ class ReplicationJigTests {
       jointSources: materia.casting.FoundationJointSources.FoundationJointSourceCodec.empty(),
       bodyMember: "casting",
       inserts: [],
-      relationships: [{
-        id: "rail-planes",
-        relationship: relationship
-      }],
-      sources: [
-        Precision(
-          "casting",
-          a,
-          F.identity()
-        ),
-        Precision(
-          "casting",
-          b,
-          F.identity()
-        )
-      ]
+      relationships: [{id: "rail-planes", relationship: relationship}],
+      sources: [Precision("casting", a, F.identity()), Precision("casting", b, F.identity())]
     };
     return {
       id: "jig-fixture",
@@ -87,16 +60,9 @@ class ReplicationJigTests {
       lengthUnit: materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
       datumScheme: null,
       interfaceContext: CastingInterfaceContexts.copy(context),
-      interfaces: [
-        a,
-        b
-      ],
+      interfaces: [a, b],
       postCureInserts: [],
-      envelope: materia.casting.CastingEnvelope.build(
-        100,
-        80,
-        40
-      ),
+      envelope: materia.casting.CastingEnvelope.build(100, 80, 40),
       features: [],
       inserts: []
     };
@@ -109,56 +75,15 @@ class ReplicationJigTests {
     masters: [{
       id: "ground-bar",
       kind: ReplicationMasterKind.GroundBar,
-      body: Box(
-        60,
-        20,
-        10
-      ),
-      pose: F.translation(
-        0,
-        0,
-        20
-      ),
+      body: Box(60, 20, 10),
+      pose: F.translation(0, 0, 20),
       reference: F.identity(),
-      members: [
-        ComponentInterface(
-          "casting",
-          "a"
-        ),
-        ComponentInterface(
-          "casting",
-          "b"
-        )
-      ],
+      members: [ComponentInterface("casting", "a"), ComponentInterface("casting", "b")],
       finish: InterfaceFinish.JigMaster,
       jacks: [
-        {
-          id: "jack-a",
-          position: {
-            x: -20,
-            y: -5,
-            z: 0
-          },
-          lockReference: "lock-a"
-        },
-        {
-          id: "jack-b",
-          position: {
-            x: 20,
-            y: -5,
-            z: 0
-          },
-          lockReference: "lock-b"
-        },
-        {
-          id: "jack-c",
-          position: {
-            x: 0,
-            y: 5,
-            z: 0
-          },
-          lockReference: "lock-c"
-        }
+        {id: "jack-a", position: {x: -20, y: -5, z: 0}, lockReference: "lock-a"},
+        {id: "jack-b", position: {x: 20, y: -5, z: 0}, lockReference: "lock-b"},
+        {id: "jack-c", position: {x: 0, y: 5, z: 0}, lockReference: "lock-c"}
       ],
       releaseSpec: null,
       flatnessMm: null,
@@ -231,17 +156,7 @@ class ReplicationJigTests {
       0,
       0,
       20,
-      [
-        Math.cos(0.001),
-        -Math.sin(0.001),
-        0,
-        Math.sin(0.001),
-        Math.cos(0.001),
-        0,
-        0,
-        0,
-        1
-      ]
+      [Math.cos(0.001), -Math.sin(0.001), 0, Math.sin(0.001), Math.cos(0.001), 0, 0, 0, 1]
     );
     check(
       measure().status == ToolingCheckStatus.Fail,
@@ -339,13 +254,7 @@ class ReplicationJigTests {
     var relation:InterfaceRelationship = {
       id: "rail-planes",
       kind: Coplanar,
-      members: [
-        ComponentInterface("left", "a"),
-        ComponentInterface(
-          "right",
-          "b"
-        )
-      ],
+      members: [ComponentInterface("left", "a"), ComponentInterface("right", "b")],
       tolerance: Linear(0.01),
       metrology: {
         method: MetrologyMethod.IndicatorReversal,
@@ -357,32 +266,9 @@ class ReplicationJigTests {
       foundationJoints: new Array<materia.casting.FoundationJointSources.FoundationJointOccurrence>(),
       jointSources: materia.casting.FoundationJointSources.FoundationJointSourceCodec.empty(),
       bodyMember: "casting",
-      inserts: [
-        {
-          id: "a",
-          member: "left"
-        },
-        {
-          id: "b",
-          member: "right"
-        }
-      ],
-      relationships: [{
-        id: "rail-planes",
-        relationship: relation
-      }],
-      sources: [
-        Precision(
-          "left",
-          a,
-          F.identity()
-        ),
-        Precision(
-          "right",
-          b,
-          F.identity()
-        )
-      ]
+      inserts: [{id: "a", member: "left"}, {id: "b", member: "right"}],
+      relationships: [{id: "rail-planes", relationship: relation}],
+      sources: [Precision("left", a, F.identity()), Precision("right", b, F.identity())]
     });
     var common = jig();
     common.masters[0].members = relation.members.copy();
@@ -530,15 +416,7 @@ class ReplicationJigTests {
     if (context == null) throw "Expected fixture context";
     context.sources = [
       Precision("casting", source.interfaces[0], F.identity()),
-      Axis(
-        "Z",
-        F.identity(),
-        {
-          x: 0,
-          y: 0,
-          z: 1
-        }
-      )
+      Axis("Z", F.identity(), {x: 0, y: 0, z: 1})
     ];
     source.interfaces = [source.interfaces[0]];
     context.relationships[0].relationship.members = [ComponentInterface("casting", "a"), MachineAxis("Z")];

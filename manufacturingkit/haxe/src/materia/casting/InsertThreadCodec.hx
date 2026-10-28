@@ -9,16 +9,7 @@ class InsertThreadCodec {
   public static function snapshot(t:Dynamic):InsertThread {
     CastingFeatureCodec.fields(
       t,
-      [
-        "designation",
-        "majorDiameter",
-        "pitch",
-        "starts",
-        "hand",
-        "internal",
-        "toleranceClass",
-        "profile"
-      ]
+      ["designation", "majorDiameter", "pitch", "starts", "hand", "internal", "toleranceClass", "profile"]
     );
     var hand = switch CastingRecordCodec.string(t, "hand") {
       case "right":
@@ -44,21 +35,12 @@ class InsertThreadCodec {
     if (starts != Math.floor(starts) || !Std.isOfType(internal, Bool)) throw "Invalid thread specification";
     var thread:InsertThread = {
       designation: CastingRecordCodec.string(t, "designation"),
-      majorDiameter: CastingRecordCodec.number(
-        t,
-        "majorDiameter"
-      ),
-      pitch: CastingRecordCodec.number(
-        t,
-        "pitch"
-      ),
+      majorDiameter: CastingRecordCodec.number(t, "majorDiameter"),
+      pitch: CastingRecordCodec.number(t, "pitch"),
       starts: Std.int(starts),
       hand: hand,
       internal: cast internal,
-      toleranceClass: CastingRecordCodec.string(
-        t,
-        "toleranceClass"
-      ),
+      toleranceClass: CastingRecordCodec.string(t, "toleranceClass"),
       profile: profile
     };
     if (StringTools.trim(thread.designation).length == 0

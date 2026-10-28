@@ -138,46 +138,22 @@ class PanelCodec {
       revision: Std.int(revision),
       stock: {
         materialSpec: s(raw, "materialSpec"),
-        nominalThickness: pos(
-          raw,
-          "nominalThickness"
-        ),
+        nominalThickness: pos(raw, "nominalThickness"),
         measuredThickness: t,
         thicknessVariation: variation,
-        width: pos(
-          raw,
-          "width"
-        ),
-        height: pos(
-          raw,
-          "height"
-        ),
+        width: pos(raw, "width"),
+        height: pos(raw, "height"),
         coatedFace: coating,
         allowedRotations: rotations,
         directionConstraint: direction
       },
       operations: [],
       contactOpenings: openings,
-      minimumLigament: pos(
-        r,
-        "minimumLigament"
-      ),
-      contactFace: contact(s(
-        r,
-        "contactFace"
-      )),
-      labelSide: side(s(
-        r,
-        "labelSide"
-      )),
-      labelX: n(
-        r,
-        "labelX"
-      ),
-      labelY: n(
-        r,
-        "labelY"
-      )
+      minimumLigament: pos(r, "minimumLigament"),
+      contactFace: contact(s(r, "contactFace")),
+      labelSide: side(s(r, "labelSide")),
+      labelX: n(r, "labelX"),
+      labelY: n(r, "labelY")
     };
     identifier(p.id);
     if (p.contactFace != ContactFace.None
@@ -238,10 +214,7 @@ class PanelCodec {
         && other.kind != OutsideProfile && op.accessVia != other.id && other.accessVia != op.id) {
         var a = CastingProfileGeometry.bounds(other.contour), dx = Math.max(
           0,
-          Math.max(
-            a.x - q.x - q.width,
-            q.x - a.x - a.width
-          )
+          Math.max(a.x - q.x - q.width, q.x - a.x - a.width)
         );
         var dy = Math.max(0, Math.max(a.y - q.y - q.height, q.y - a.y - a.height));
         if (Math.sqrt(dx * dx + dy * dy) < m && CastingProfileGeometry.distanceBetween(op.contour, other.contour)
@@ -313,33 +286,12 @@ class PanelCodec {
       kind: kind(s(o, "kind")),
       contour: contour,
       side: side(s(o, "side")),
-      setupId: s(
-        o,
-        "setupId"
-      ),
-      depth: pos(
-        o,
-        "depth"
-      ),
-      through: flag(
-        o,
-        "through"
-      ),
-      toolDiameter: pos(
-        o,
-        "toolDiameter"
-      ),
-      reliefToolDiameter: relief == null ? null : pos(
-        o,
-        "reliefToolDiameter"
-      ),
-      accessVia : Reflect.field(
-        o,
-        "accessVia"
-      ) == null ? null : s(
-        o,
-        "accessVia"
-      )
+      setupId: s(o, "setupId"),
+      depth: pos(o, "depth"),
+      through: flag(o, "through"),
+      toolDiameter: pos(o, "toolDiameter"),
+      reliefToolDiameter: relief == null ? null : pos(o, "reliefToolDiameter"),
+      accessVia : Reflect.field(o, "accessVia") == null ? null : s(o, "accessVia")
     };
     identifier(op.id);
     identifier(op.setupId);
@@ -392,10 +344,7 @@ class PanelCodec {
         start: point(Reflect.field(seg, "start")),
         end: point(Reflect.field(seg, "end")),
         center: c == null ? null : point(c),
-        sweep : n(
-          seg,
-          "sweep"
-        )
+        sweep : n(seg, "sweep")
       });
     }
     CastingProfileGeometry.validate(result);

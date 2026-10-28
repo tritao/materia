@@ -21,38 +21,20 @@ class FoundationJointTests {
     gapToleranceMm: 0.1,
     seats: [{
       id: "front",
-      lower: {
-        member: "base/seat",
-        feature: "seat"
-      },
-      upper: {
-        member: "column/seat",
-        feature: "seat"
-      }
+      lower: {member: "base/seat", feature: "seat"},
+      upper: {member: "column/seat", feature: "seat"}
     }],
     jacks: [{
       id: "front",
       screw: "jack",
-      bearing: {
-        member: "column/seat",
-        feature: "seat"
-      },
-      receiver: {
-        member: "block",
-        feature: "fixing"
-      }
+      bearing: {member: "column/seat", feature: "seat"},
+      receiver: {member: "block", feature: "fixing"}
     }],
     anchors: [{
       id: "front",
       screw: "anchor",
-      target: {
-        member: "base/seat",
-        feature: "fixing"
-      },
-      through: [{
-        member: "column/seat",
-        feature: "fixing"
-      }]
+      target: {member: "base/seat", feature: "fixing"},
+      through: [{member: "column/seat", feature: "fixing"}]
     }],
     cureBeforeTorque: true
   };

@@ -149,10 +149,7 @@ class ToolingLoads {
     ]);
     for (c in cores) {
       var displaced = materia.casting.CastingRegion.Difference(
-        materia.casting.CastingRegion.Intersection([
-          c.cavity,
-          fluid
-        ]),
+        materia.casting.CastingRegion.Intersection([c.cavity, fluid]),
         occupied.copy()
       );
       var volume = materia.tooling.casting.MoldRegions.volume(displaced, c.id);
@@ -326,24 +323,8 @@ class ToolingLoads {
       var lateralX = pressure * projection(0) * 1e-6, lateralY = pressure * projection(1) * 1e-6;
       for (demand in [
         {id: member.id, kind: RigidGrossUpliftBound, force: uplift},
-        {
-          id: materia.tooling.ToolingIds.derive(
-            "",
-            member.id,
-            "-lateral-x"
-          ),
-          kind: RigidLateralXBound,
-          force: lateralX
-        },
-        {
-          id: materia.tooling.ToolingIds.derive(
-            "",
-            member.id,
-            "-lateral-y"
-          ),
-          kind: RigidLateralYBound,
-          force: lateralY
-        }
+        {id: materia.tooling.ToolingIds.derive("", member.id, "-lateral-x"), kind: RigidLateralXBound, force: lateralX},
+        {id: materia.tooling.ToolingIds.derive("", member.id, "-lateral-y"), kind: RigidLateralYBound, force: lateralY}
       ]) {
         var load:LoadEstimate = {
           id: demand.id,

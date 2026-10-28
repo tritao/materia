@@ -73,23 +73,11 @@ class JunctionThickness {
         c,
         axis
       ) > plane + EPS) cover.push({
-        x : lo(
-          c,
-          u
-        ),
-        y : lo(
-          c,
-          v
-        ),
+        x : lo(c, u),
+        y : lo(c, v),
         z : 0,
-        width : size(
-          c,
-          u
-        ),
-        depth : size(
-          c,
-          v
-        ),
+        width : size(c, u),
+        depth : size(c, v),
         height : 1
       });
       for (f in BoxAlgebra.subtract([footprint], cover)) {
@@ -103,10 +91,7 @@ class JunctionThickness {
             y: lo(owner.box, v),
             z: 0,
             width: size(owner.box, u),
-            depth: size(
-              owner.box,
-              v
-            ),
+            depth: size(owner.box, v),
             height: 1
           };
           var next = [];
@@ -176,29 +161,13 @@ class JunctionThickness {
     var faceUpper = 0.0;
     for (x in 0...2) for (y in 0...2) for (z in 0...2) faceUpper = Math.max(
       faceUpper,
-      distance(
-        {
-          x: b.x + x * b.width,
-          y: b.y + y * b.depth,
-          z: b.z + z * b.height
-        },
-        nearest
-      )
+      distance({x: b.x + x * b.width, y: b.y + y * b.depth, z: b.z + z * b.height}, nearest)
     );
     return {
       box: b,
       point: p,
       radius: radius,
-      upper: Math.max(
-        radius,
-        Math.min(
-          cap,
-          Math.min(
-            radius + diagonal,
-            faceUpper
-          )
-        ) + 1e-9
-      )
+      upper: Math.max(radius, Math.min(cap, Math.min(radius + diagonal, faceUpper)) + 1e-9)
     };
   }
 
@@ -282,11 +251,7 @@ class JunctionThickness {
         upper[2] - lower[2],
         2
       )) + distance(
-        {
-          x: lower[0],
-          y: lower[1],
-          z: lower[2]
-        },
+        {x: lower[0], y: lower[1], z: lower[2]},
         faces[0]
       );
     var heap:Array<SearchCell> = [], best:SearchCell = null, count = 0;
@@ -336,10 +301,7 @@ class JunctionThickness {
     ids.sort(Reflect.compare);
     return {
       sourceFingerprint: fingerprint,
-      settings: {
-        diameterToleranceMm: settings.diameterToleranceMm,
-        maximumCells: settings.maximumCells
-      },
+      settings: {diameterToleranceMm: settings.diameterToleranceMm, maximumCells: settings.maximumCells},
       lowerDiameterMm: 2 * best.radius,
       upperDiameterMm: 2 * maxRadius,
       witness: best.point,

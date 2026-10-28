@@ -27,24 +27,9 @@ class PourPlanningTests {
     reference: "synthetic mix by weight",
     compoundReference: "synthetic resin system",
     ingredients: [
-      {
-        id: "resin",
-        kind: Resin,
-        materialReference: "test resin",
-        massFraction: 0.1
-      },
-      {
-        id: "hardener",
-        kind: Hardener,
-        materialReference: "test hardener",
-        massFraction: 0.05
-      },
-      {
-        id: "aggregate",
-        kind: Aggregate,
-        materialReference: "test aggregate",
-        massFraction: 0.85
-      }
+      {id: "resin", kind: Resin, materialReference: "test resin", massFraction: 0.1},
+      {id: "hardener", kind: Hardener, materialReference: "test hardener", massFraction: 0.05},
+      {id: "aggregate", kind: Aggregate, materialReference: "test aggregate", massFraction: 0.85}
     ]
   };
   static function mixer():PourMixerSpec return {
@@ -59,14 +44,7 @@ class PourPlanningTests {
     "cast",
     "source",
     "fill-spec",
-    [{
-      x: 0.0,
-      y: 0,
-      z: 0,
-      width: 100.0,
-      depth: 100.0,
-      height: 100.0
-    }],
+    [{x: 0.0, y: 0, z: 0, width: 100.0, depth: 100.0, height: 100.0}],
     [],
     [],
     100,
@@ -159,22 +137,8 @@ class PourPlanningTests {
       "source",
       "fill-spec",
       [
-        {
-          x: 0.0,
-          y: 0,
-          z: 0,
-          width: 10.0,
-          depth: 10.0,
-          height: 5.0
-        },
-        {
-          x: 0.0,
-          y: 0,
-          z: 5,
-          width: 20.0,
-          depth: 10.0,
-          height: 5.0
-        }
+        {x: 0.0, y: 0, z: 0, width: 10.0, depth: 10.0, height: 5.0},
+        {x: 0.0, y: 0, z: 5, width: 20.0, depth: 10.0, height: 5.0}
       ],
       [],
       [],
@@ -196,42 +160,11 @@ class PourPlanningTests {
       "source",
       "fill-spec",
       [
-        {
-          x: 0.0,
-          y: 0,
-          z: 0,
-          width: 2.0,
-          depth: 2.0,
-          height: 10.0
-        },
-        {
-          x: 2.0,
-          y: 0,
-          z: 0,
-          width: 2.0,
-          depth: 2.0,
-          height: 2.0
-        },
-        {
-          x: 4.0,
-          y: 0,
-          z: 0,
-          width: 4.0,
-          depth: 2.0,
-          height: 6.0
-        }
+        {x: 0.0, y: 0, z: 0, width: 2.0, depth: 2.0, height: 10.0},
+        {x: 2.0, y: 0, z: 0, width: 2.0, depth: 2.0, height: 2.0},
+        {x: 4.0, y: 0, z: 0, width: 4.0, depth: 2.0, height: 6.0}
       ],
-      [{
-        id: "ceiling",
-        box: {
-          x: 4.0,
-          y: 0,
-          z: 6,
-          width: 4.0,
-          depth: 2.0,
-          height: 4.0
-        }
-      }],
+      [{id: "ceiling", box: {x: 4.0, y: 0, z: 6, width: 4.0, depth: 2.0, height: 4.0}}],
       [],
       10,
       2400,

@@ -193,18 +193,9 @@ class SheetInventory {
         partRevision: requirement.partRevision,
         sourcePieceId: pieceId,
         sourceStockSpecId: source.stockSpecId,
-        widthMm: SheetPlanValidator.millimetres(
-          placement.width,
-          targetPlan.lengthUnit
-        ),
-        heightMm: SheetPlanValidator.millimetres(
-          placement.height,
-          targetPlan.lengthUnit
-        ),
-        thicknessMm: SheetPlanValidator.millimetres(
-          source.thickness,
-          source.lengthUnit
-        ),
+        widthMm: SheetPlanValidator.millimetres(placement.width, targetPlan.lengthUnit),
+        heightMm: SheetPlanValidator.millimetres(placement.height, targetPlan.lengthUnit),
+        thicknessMm: SheetPlanValidator.millimetres(source.thickness, source.lengthUnit),
         materialId: requirement.materialId
       });
     }
@@ -219,10 +210,7 @@ class SheetInventory {
         lengthUnit: "mm",
         width: region.widthMm,
         height: region.heightMm,
-        thickness: SheetPlanValidator.millimetres(
-          source.thickness,
-          source.lengthUnit
-        ),
+        thickness: SheetPlanValidator.millimetres(source.thickness, source.lengthUnit),
         state: "available",
         location: source.location,
         parentPieceId: source.id,
@@ -239,10 +227,7 @@ class SheetInventory {
       remnantPieceIds: remnantIds,
       kerfLossAreaMm2: validation.kerfLossAreaMm2,
       marginWasteAreaMm2: validation.marginWasteAreaMm2,
-      discardedAreaMm2: Math.max(
-        0,
-        validation.discardedAreaMm2 - validation.marginWasteAreaMm2
-      ),
+      discardedAreaMm2: Math.max(0, validation.discardedAreaMm2 - validation.marginWasteAreaMm2),
       completedAtUnixMilliseconds: Date.now().getTime()
     };
     next.executions.push(execution);

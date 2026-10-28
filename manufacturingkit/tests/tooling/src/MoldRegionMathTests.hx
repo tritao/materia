@@ -32,34 +32,13 @@ class MoldRegionMathTests {
     check(R.overlaps(a, contact, 0, "overlap"), "positive interior overlap is detected");
     check(!R.overlaps(a, contact, 100, "tolerance"), "contact tolerance is explicit in volume units");
     var rectangle = CastingRegion.Placed({
-      solid: CastingGeometrySolid.Prism(
-        materia.casting.CastingProfiles.rectangle(
-          -10,
-          -15,
-          20,
-          30
-        ),
-        40
-      ),
+      solid: CastingGeometrySolid.Prism(materia.casting.CastingProfiles.rectangle(-10, -15, 20, 30), 40),
       pose: F.identity()
     });
     near(R.volume(rectangle, "rectangular-prism"), 24000, "exact rectangular profiles retain the algebraic path");
     var triangle = CastingRegion.Placed({
       solid: CastingGeometrySolid.Prism(
-        materia.casting.CastingProfiles.polygon([
-          {
-            x: 0,
-            y: 0
-          },
-          {
-            x: 20,
-            y: 0
-          },
-          {
-            x: 0,
-            y: 20
-          }
-        ]),
+        materia.casting.CastingProfiles.polygon([{x: 0, y: 0}, {x: 20, y: 0}, {x: 0, y: 20}]),
         40
       ),
       pose: F.identity()
@@ -82,20 +61,8 @@ class MoldRegionMathTests {
         operationId: "access",
         pose: F.identity(),
         depth: 10,
-        contour: materia.casting.CastingProfiles.rectangle(
-          0,
-          0,
-          20,
-          20
-        ),
-        subtract: [R.box({
-          x: 7.5,
-          y: 7.5,
-          z: 0,
-          width: 5,
-          depth: 5,
-          height: 10
-        })]
+        contour: materia.casting.CastingProfiles.rectangle(0, 0, 20, 20),
+        subtract: [R.box({x: 7.5, y: 7.5, z: 0, width: 5, depth: 5, height: 10})]
       }]
     };
     near(

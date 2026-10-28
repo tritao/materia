@@ -22,10 +22,7 @@ class FoundationRequirementTests {
     route: Replicated,
     allowanceMm: 1,
     finishingProcessErrorMm: materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
-    permittedFinishes: [
-      JigMaster,
-      SurfacePlateMaster
-    ],
+    permittedFinishes: [JigMaster, SurfacePlateMaster],
     positionToleranceMm: 0.01,
     datumReference: "primary",
     relationshipIds: ["rail-coplanarity"]
@@ -33,16 +30,7 @@ class FoundationRequirementTests {
   static function relationship():InterfaceRelationship return {
     id: "rail-coplanarity",
     kind: Coplanar,
-    members: [
-      ComponentInterface(
-        "base/railLeft",
-        "rail-plane"
-      ),
-      ComponentInterface(
-        "base/railRight",
-        "rail-plane"
-      )
-    ],
+    members: [ComponentInterface("base/railLeft", "rail-plane"), ComponentInterface("base/railRight", "rail-plane")],
     tolerance: Linear(0.005),
     metrology: {
       method: IndicatorReversal,
@@ -174,14 +162,8 @@ class FoundationRequirementTests {
     check(InterfaceRelationships.copy([rel]).length == 1, "distance carries an explicit target");
     rel = relationship();
     var sources:Array<materia.casting.InterfaceRelationship.ScopedInterfaceRequirement> = [
-      {
-        member: rel.members[0],
-        requirement: requirement()
-      },
-      {
-        member: rel.members[1],
-        requirement: requirement()
-      }
+      {member: rel.members[0], requirement: requirement()},
+      {member: rel.members[1], requirement: requirement()}
     ];
     InterfaceRelationships.validateReferences([rel], sources, []);
     check(true, "same local interface ID resolves independently on two inserts");

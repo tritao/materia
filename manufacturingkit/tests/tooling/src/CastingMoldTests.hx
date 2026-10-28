@@ -105,14 +105,7 @@ class CastingMoldTests {
       componentPath: "rail",
       connectorId: "mount1",
       componentFingerprint: haxe.crypto.Sha256.encode("test rail"),
-      connectorFrame: F.alongY(
-        0,
-        0,
-        20,
-        0,
-        0,
-        1
-      ),
+      connectorFrame: F.alongY(0, 0, 20, 0, 0, 1),
       clearanceReference: materia.casting.CastingInput.CastingTextInput.Known("test clearance reference"),
       permittedRoutes: [],
       budget: {
@@ -159,22 +152,7 @@ class CastingMoldTests {
     var pending = materia.tooling.casting.InsertFixturePlanner.missingFixing(
       insert,
       insertPose,
-      F.fromRotationMatrix(
-        0,
-        0,
-        0,
-        [
-          1,
-          0,
-          0,
-          0,
-          -1,
-          0,
-          0,
-          0,
-          -1
-        ]
-      ),
+      F.fromRotationMatrix(0, 0, 0, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
       d.recipe.hardware
     );
     check(
@@ -283,19 +261,9 @@ class CastingMoldTests {
       id: "insert-raised-seat",
       kind: InsertRecess,
       owner: extra.id,
-      geometry: {
-        solid: materia.casting.CastingFeature.CastingGeometrySolid.Insert(extra.body),
-        pose: extra.pose
-      },
+      geometry: {solid: materia.casting.CastingFeature.CastingGeometrySolid.Insert(extra.body), pose: extra.pose},
       openings: [materia.casting.CastingPatterns.feature("raised-seat-access")],
-      draft: {
-        degrees: 0,
-        axis: {
-          x: 0,
-          y: 0,
-          z: 1
-        }
-      },
+      draft: {degrees: 0, axis: {x: 0, y: 0, z: 1}},
       cornerRadius: 0,
       adjustable: []
     });
@@ -364,19 +332,9 @@ class CastingMoldTests {
         id: "insert-seat",
         kind: InsertRecess,
         owner: insert.id,
-        geometry: {
-          solid: Insert(insert.body),
-          pose: insert.pose
-        },
+        geometry: {solid: Insert(insert.body), pose: insert.pose},
         openings: [],
-        draft: {
-          degrees: 0,
-          axis: {
-            x: 0,
-            y: 0,
-            z: 1
-          }
-        },
+        draft: {degrees: 0, axis: {x: 0, y: 0, z: 1}},
         cornerRadius: 0,
         adjustable: []
       },
@@ -426,11 +384,7 @@ class CastingMoldTests {
       featureId: "bed-void",
       strategy: SacrificialEPS,
       priority: 0,
-      withdrawal: {
-        x: 0,
-        y: 0,
-        z: -1
-      }
+      withdrawal: {x: 0, y: 0, z: -1}
     }];
     var networks = materia.tooling.casting.EPSAccessNetworks.plan(d, strategies, [], [post]);
     check(
@@ -443,10 +397,7 @@ class CastingMoldTests {
     );
     check(
       materia.tooling.casting.MoldRegions.volume(
-        Intersection([
-          networks[0].cavity,
-          materia.tooling.casting.MoldRegions.box(post)
-        ]),
+        Intersection([networks[0].cavity, materia.tooling.casting.MoldRegions.box(post)]),
         "bed-void"
       ) < 1e-6,
       "The routed-foot EPS network never occupies its datum support"
@@ -484,10 +435,7 @@ class CastingMoldTests {
     d.input.features.push(materia.casting.CastingPatterns.box(
       "seat-access",
       InterfaceRecess,
-      [
-        materia.casting.CastingPatterns.face("body.z-max"),
-        materia.casting.CastingPatterns.face("body.x-max")
-      ],
+      [materia.casting.CastingPatterns.face("body.z-max"), materia.casting.CastingPatterns.face("body.x-max")],
       40,
       30,
       4,
@@ -568,16 +516,8 @@ class CastingMoldTests {
     offsetInsert.pose = F.translation(65, 0, 76);
     var offsetAccess = offsetThread.input.features.filter(feature -> feature.id == "seat-access")[0];
     offsetAccess.geometry = {
-      solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(
-        71,
-        45,
-        4
-      )),
-      pose: F.translation(
-        65,
-        0,
-        96
-      )
+      solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(71, 45, 4)),
+      pose: F.translation(65, 0, 96)
     };
     var offsetHole = materia.casting.InsertHole.InsertHoleCodec.snapshot(threads)[0];
     offsetHole.frame.x = 17.5;
@@ -634,11 +574,7 @@ class CastingMoldTests {
     var permuted = materia.tooling.casting.DatumFixtureLocation.plan(
       reordered,
       sourceThreads.setup.sourceToMold,
-      {
-        mountingFace: datum.mountingFace,
-        datum: reversedCuts,
-        fixings: datum.fixings
-      }
+      {mountingFace: datum.mountingFace, datum: reversedCuts, fixings: datum.fixings}
     );
     check(
       ToolingCodec.canonical(permuted) == ToolingCodec.canonical(fixtureLocation),
@@ -660,11 +596,7 @@ class CastingMoldTests {
     var unsupportedLocation = materia.tooling.casting.DatumFixtureLocation.plan(
       reordered,
       sourceThreads.setup.sourceToMold,
-      {
-        mountingFace: datum.mountingFace,
-        datum: missingSupport,
-        fixings: datum.fixings
-      }
+      {mountingFace: datum.mountingFace, datum: missingSupport, fixings: datum.fixings}
     );
     check(
       unsupportedLocation.report.rank == 0
@@ -724,22 +656,7 @@ class CastingMoldTests {
     );
     var handlingOptions = options(d);
     handlingOptions.serviceOrientation = materia.assembly.AssemblyFrames.compose(
-      materia.assembly.AssemblyFrames.fromRotationMatrix(
-        0,
-        0,
-        0,
-        [
-          0,
-          -1,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ]
-      ),
+      materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 0, [0, -1, 0, 1, 0, 0, 0, 0, 1]),
       d.setup.sourceToMold
     );
     check(
@@ -747,22 +664,7 @@ class CastingMoldTests {
       "yaw preserves the vertical and does not require lifting/flip"
     );
     handlingOptions.serviceOrientation = materia.assembly.AssemblyFrames.compose(
-      materia.assembly.AssemblyFrames.fromRotationMatrix(
-        0,
-        0,
-        0,
-        [
-          1,
-          0,
-          0,
-          0,
-          0,
-          -1,
-          0,
-          1,
-          0
-        ]
-      ),
+      materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 0, [1, 0, 0, 0, 0, -1, 0, 1, 0]),
       d.setup.sourceToMold
     );
     check(
@@ -814,14 +716,7 @@ class CastingMoldTests {
       carrierBounds.width,
       carrierBounds.height,
       carrier.panel.stock.measuredThickness,
-      F.compose(
-        carrier.pose,
-        F.translation(
-          carrierBounds.width / 2,
-          carrierBounds.height / 2,
-          0
-        )
-      )
+      F.compose(carrier.pose, F.translation(carrierBounds.width / 2, carrierBounds.height / 2, 0))
     );
     var expectedCarrier = MoldCores.stockBounds(originalCore.foamEnvelope, originalCore.id);
     check(
@@ -844,10 +739,7 @@ class CastingMoldTests {
     var intersecting = CastingMoldPlanner.plan(d, o);
     var resinPieces = BoxAlgebra.subtract(
       [p.envelope],
-      [for (f in p.document.input.features) CastingMoldPlanner.featureBox(
-        p.document,
-        f
-      )]
+      [for (f in p.document.input.features) CastingMoldPlanner.featureBox(p.document, f)]
     );
     MoldFixtures.datum(intersecting.fixtures[0]).pieces = [resinPieces[0]];
     rejects(() -> CastingMoldPlanner.validate(intersecting), "datum/resin intersection rejected before CAD");
@@ -860,11 +752,7 @@ class CastingMoldTests {
       masters: [{
         id: "synthetic-bar",
         kind: materia.tooling.casting.ReplicationJig.ReplicationMasterKind.GroundBar,
-        body: materia.casting.CastingSolid.Box(
-          60,
-          20,
-          10
-        ),
+        body: materia.casting.CastingSolid.Box(60, 20, 10),
         pose: materia.assembly.AssemblyFrames.identity(),
         reference: materia.assembly.AssemblyFrames.identity(),
         members: [materia.casting.InterfaceRelationship.InterfaceMember.ComponentInterface(
@@ -904,10 +792,7 @@ class CastingMoldTests {
         dimensions.width,
         dimensions.depth,
         dimensions.height,
-        materia.assembly.AssemblyFrames.compose(
-          d.setup.sourceToMold,
-          i.pose
-        )
+        materia.assembly.AssemblyFrames.compose(d.setup.sourceToMold, i.pose)
       ));
     }
     var source = BoxAlgebra.subtract([p.envelope], cuts), reconstructed = BoxAlgebra.subtract([p.cavity], negative);
@@ -943,14 +828,7 @@ class CastingMoldTests {
       cuts: [],
       regions: [],
       profiles: [],
-      pieces: [{
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-        width: 10.0,
-        depth: 20.0,
-        height: 30.0
-      }]
+      pieces: [{x: 0.0, y: 0.0, z: 0.0, width: 10.0, depth: 20.0, height: 30.0}]
     };
     var encoded = ToolingCodec.canonical(MoldVolumeRecords.record(volume));
     check(
@@ -964,12 +842,7 @@ class CastingMoldTests {
     shaped.pieces = [];
     shaped.regions = [materia.casting.CastingRegion.Drafted(
       "shaped-former",
-      materia.casting.CastingProfiles.rectangle(
-        -20,
-        -15,
-        40,
-        30
-      ),
+      materia.casting.CastingProfiles.rectangle(-20, -15, 40, 30),
       F.identity(),
       60,
       2
@@ -1038,17 +911,7 @@ class CastingMoldTests {
       0,
       0,
       100,
-      [
-        0,
-        -1,
-        0,
-        -1,
-        0,
-        0,
-        0,
-        0,
-        -1
-      ]
+      [0, -1, 0, -1, 0, 0, 0, 0, -1]
     );
     var rotatedPlan = CastingMoldPlanner.plan(rotated, options(rotated));
     var rotatedNegative:Array<materia.casting.Box3> = [];
@@ -1060,29 +923,14 @@ class CastingMoldTests {
       case OnPanel(_):
     }
     for (i in rotated.input.inserts) rotatedNegative.push(materia.tooling.casting.CastingMoldPlanner.box(
-      InsertBodies.box(
-        i.body,
-        i.id
-      ).width,
-      InsertBodies.box(
-        i.body,
-        i.id
-      ).depth,
-      InsertBodies.box(
-        i.body,
-        i.id
-      ).height,
-      materia.assembly.AssemblyFrames.compose(
-        rotated.setup.sourceToMold,
-        i.pose
-      )
+      InsertBodies.box(i.body, i.id).width,
+      InsertBodies.box(i.body, i.id).depth,
+      InsertBodies.box(i.body, i.id).height,
+      materia.assembly.AssemblyFrames.compose(rotated.setup.sourceToMold, i.pose)
     ));
     var rotatedSource = BoxAlgebra.subtract(
       [rotatedPlan.envelope],
-      [for (f in rotated.input.features) CastingMoldPlanner.featureBox(
-        rotated,
-        f
-      )]
+      [for (f in rotated.input.features) CastingMoldPlanner.featureBox(rotated, f)]
     ), rotatedRebuilt = BoxAlgebra.subtract(
       [rotatedPlan.cavity],
       rotatedNegative
@@ -1250,11 +1098,7 @@ class CastingMoldTests {
     insert.finish = materia.casting.InsertSpec.InsertFinish.ReplicatedAfterCasting;
     insert.interfaces = [{
       id: "replication-face",
-      geometry: materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(
-        0,
-        0,
-        15
-      )),
+      geometry: materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0, 0, 15)),
       route: materia.casting.InterfaceRequirement.InterfaceRoute.Replicated,
       allowanceMm: 1,
       finishingProcessErrorMm: materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
@@ -1279,16 +1123,8 @@ class CastingMoldTests {
     gap.id = "replication-gap";
     gap.kind = materia.casting.CastingFeature.CastingFeatureKind.InterfaceRecess;
     gap.geometry = {
-      solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(
-        40,
-        30,
-        1
-      )),
-      pose: F.translation(
-        80,
-        0,
-        99
-      )
+      solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(40, 30, 1)),
+      pose: F.translation(80, 0, 99)
     };
     gap.openings = [
       materia.casting.CastingPatterns.face("body.x-max"),

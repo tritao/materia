@@ -27,27 +27,12 @@ class SheetPlanExporter {
         requirement.partId,
         requirement.partRevision,
         requirement.materialId,
-        SheetPlanValidator.millimetres(
-          requirement.thickness,
-          requirement.lengthUnit
-        ),
-        SheetPlanValidator.millimetres(
-          placement.width,
-          plan.lengthUnit
-        ),
-        SheetPlanValidator.millimetres(
-          placement.height,
-          plan.lengthUnit
-        ),
+        SheetPlanValidator.millimetres(requirement.thickness, requirement.lengthUnit),
+        SheetPlanValidator.millimetres(placement.width, plan.lengthUnit),
+        SheetPlanValidator.millimetres(placement.height, plan.lengthUnit),
         placement.rotation,
-        SheetPlanValidator.millimetres(
-          placement.x,
-          plan.lengthUnit
-        ),
-        SheetPlanValidator.millimetres(
-          placement.y,
-          plan.lengthUnit
-        ),
+        SheetPlanValidator.millimetres(placement.x, plan.lengthUnit),
+        SheetPlanValidator.millimetres(placement.y, plan.lengthUnit),
         "",
         source == null ? "" : source.id
       ]));
@@ -62,10 +47,7 @@ class SheetPlanExporter {
         "",
         "",
         stock.materialId,
-        SheetPlanValidator.millimetres(
-          stock.thickness,
-          stock.lengthUnit
-        ),
+        SheetPlanValidator.millimetres(stock.thickness, stock.lengthUnit),
         "",
         "",
         "",
@@ -189,15 +171,7 @@ class SheetPlanExporter {
     return text;
   }
   static function xml(value:String):String return StringTools.replace(
-    StringTools.replace(
-      StringTools.replace(
-        value,
-        "&",
-        "&amp;"
-      ),
-      "<",
-      "&lt;"
-    ),
+    StringTools.replace(StringTools.replace(value, "&", "&amp;"), "<", "&lt;"),
     "\"",
     "&quot;"
   );

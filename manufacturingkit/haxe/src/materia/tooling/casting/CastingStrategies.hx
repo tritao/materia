@@ -80,14 +80,7 @@ class CastingStrategies {
     for (row in rows) {
       CastingFeatureCodec.fields(
         row,
-        [
-          "kind",
-          "opening",
-          "strategy",
-          "priority",
-          "preferredAxis",
-          "useEPSAboveBoardThickness"
-        ]
+        ["kind", "opening", "strategy", "priority", "preferredAxis", "useEPSAboveBoardThickness"]
       );
       var limit:Dynamic = Reflect.field(row, "useEPSAboveBoardThickness");
       if (!Std.isOfType(limit, Bool)) throw "Invalid casting strategy board limit";
@@ -122,11 +115,7 @@ class CastingStrategies {
   static function withdrawalDepth(
     document:ToolingDocument,
     feature:CastingFeature,
-    normal: {
-      x: Float,
-      y: Float,
-      z: Float
-    }
+    normal: {x: Float, y: Float, z: Float}
   ):Null<Float> {
     var cavity = CastingCavities.derive(document.input.envelope,
       document.input.features).filter(cavity -> cavity.featureId == feature.id)[0];

@@ -75,26 +75,11 @@ class InsertBodyCodec {
         CrimpedSocket(
           CastingSolid.CastingSolidCodec.snapshot(Reflect.field(raw, "mouth")),
           {
-            length: CastingRecordCodec.number(
-              tail,
-              "length"
-            ),
-            width: CastingRecordCodec.number(
-              tail,
-              "width"
-            ),
-            thickness: CastingRecordCodec.number(
-              tail,
-              "thickness"
-            ),
-            wave: CastingRecordCodec.number(
-              tail,
-              "wave"
-            ),
-            blend: CastingRecordCodec.number(
-              tail,
-              "blend"
-            )
+            length: CastingRecordCodec.number(tail, "length"),
+            width: CastingRecordCodec.number(tail, "width"),
+            thickness: CastingRecordCodec.number(tail, "thickness"),
+            wave: CastingRecordCodec.number(tail, "wave"),
+            blend: CastingRecordCodec.number(tail, "blend")
           }
         );
       default:
@@ -112,13 +97,7 @@ class InsertBodyCodec {
         {
           kind: "crimped-socket",
           mouth: CastingSolid.CastingSolidCodec.record(mouth),
-          tail: {
-            length: tail.length,
-            width: tail.width,
-            thickness: tail.thickness,
-            wave: tail.wave,
-            blend: tail.blend
-          }
+          tail: {length: tail.length, width: tail.width, thickness: tail.thickness, wave: tail.wave, blend: tail.blend}
         };
     };
   }

@@ -139,11 +139,7 @@ class FoundationJointAnalysis {
     return ThreadedFastenerFit.checkIntervals(
       target,
       frame,
-      {
-        shankLength: fastener.shankLength,
-        threadedLength: fastener.threadedLength,
-        bearingFrame: fastener.bearingFrame
-      },
+      {shankLength: fastener.shankLength, threadedLength: fastener.threadedLength, bearingFrame: fastener.bearingFrame},
       subject
     );
   }

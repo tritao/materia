@@ -84,17 +84,7 @@ class CastingMoldPlanner {
       xs[3] - xs[0],
       ys[3] - ys[0],
       e.height,
-      F.compose(
-        d.setup.sourceToMold,
-        F.compose(
-          e.pose,
-          F.translation(
-            (xs[0] + xs[3]) / 2,
-            (ys[0] + ys[3]) / 2,
-            0
-          )
-        )
-      )
+      F.compose(d.setup.sourceToMold, F.compose(e.pose, F.translation((xs[0] + xs[3]) / 2, (ys[0] + ys[3]) / 2, 0)))
     );
   }
 
@@ -120,10 +110,7 @@ class CastingMoldPlanner {
       dimensions.width,
       dimensions.depth,
       dimensions.height,
-      F.compose(
-        document.setup.sourceToMold,
-        insert.pose
-      )
+      F.compose(document.setup.sourceToMold, insert.pose)
     );
   }
 
@@ -305,11 +292,7 @@ class CastingMoldPlanner {
     return {
       construction: SharedBridges,
       handling: CastHandling.plan(d, o),
-      id: materia.tooling.ToolingIds.derive(
-        "",
-        d.input.id,
-        "-mold"
-      ),
+      id: materia.tooling.ToolingIds.derive("", d.input.id, "-mold"),
       document: d,
       sourceFingerprint: ToolingCodec.documentFingerprint(d),
       options: o,
@@ -327,10 +310,7 @@ class CastingMoldPlanner {
       hardware: [],
       changeRequests: [],
       validation: geometryChecks,
-      fabrication: {
-        ready: false,
-        blockingRules: []
-      }
+      fabrication: {ready: false, blockingRules: []}
     };
   }
 
@@ -370,10 +350,7 @@ class CastingMoldPlanner {
       "draft-" + former.volume.id,
       ReleaseAlternative,
       [former.volume.id],
-      (StringTools.startsWith(
-        former.volume.id,
-        "envelope-former-"
-      )
+      (StringTools.startsWith(former.volume.id, "envelope-former-")
       ? "Envelope-shaping zero-draft rigid former needs release qualification or a supported source/setup alternative."
       : "Bed-backing zero-draft rigid former needs a source/setup or supported sacrificial-tooling change; draft on a different feature does not qualify this part."),
       "tooling.former.draft." + former.volume.id
@@ -478,10 +455,7 @@ class CastingMoldPlanner {
       var a = reusable[index], b = reusable[other];
       if (a.priority == b.priority && MoldRegions.overlaps(
         MoldRegions.feature(d, a.featureId),
-        MoldRegions.feature(
-          d,
-          b.featureId
-        ),
+        MoldRegions.feature(d, b.featureId),
         1e-7,
         a.featureId
       )) throw "Overlapping reusable formers require distinct priorities: " + a.featureId + ", " + b.featureId;
@@ -553,10 +527,7 @@ class CastingMoldPlanner {
         result.features.push({
           featureId: d.input.features.filter(f -> f.kind == CastingFeatureKind.InsertRecess && f.owner == i.id)[0].id,
           kind: InsertFeature,
-          memberIds: [materia.tooling.ToolingIds.derive(
-            "insert-",
-            i.id
-          )]
+          memberIds: [materia.tooling.ToolingIds.derive("insert-", i.id)]
         });
         return;
       }
@@ -609,10 +580,7 @@ class CastingMoldPlanner {
         && strategies.filter(s -> s.featureId == f.id
         && (s.strategy == CoreStrategy.ReusableFormer || s.strategy == CoreStrategy.SacrificialEPS)
         && s.withdrawal != null && Math.abs(s.withdrawal.x) > 0.9).length == 1 && MoldRegions.overlaps(
-          MoldRegions.feature(
-            d,
-            f.id
-          ),
+          MoldRegions.feature(d, f.id),
           MoldRegions.box(pad),
           1e-7,
           f.id
@@ -688,10 +656,7 @@ class CastingMoldPlanner {
           panelId: "bed",
           operationId: op.id,
           kind: ToolingOpening,
-          sealingIds: [materia.tooling.ToolingIds.derive(
-            "datum-",
-            i.id
-          )],
+          sealingIds: [materia.tooling.ToolingIds.derive("datum-", i.id)],
           protection: null,
           sealSpec: r.hardware.sealMaterial
         });
@@ -702,22 +667,13 @@ class CastingMoldPlanner {
         cuts: [],
         regions: [],
         profiles: [],
-        pieces: BoxAlgebra.subtract(
-          pieces,
-          []
-        )
+        pieces: BoxAlgebra.subtract(pieces, [])
       };
       DatumFixtures.add(result, i, face, datum, withdrawal, bed, pocketId);
       result.features.push({
         featureId: d.input.features.filter(f -> f.kind == CastingFeatureKind.InsertRecess && f.owner == i.id)[0].id,
         kind: InsertFeature,
-        memberIds: [
-          materia.tooling.ToolingIds.derive(
-            "insert-",
-            i.id
-          ),
-          datum.id
-        ]
+        memberIds: [materia.tooling.ToolingIds.derive("insert-", i.id), datum.id]
       });
       result.validation.push(materia.tooling.ToolingValidation.ToolingReadiness.pending(
         "tooling.fixture.attachment." + i.id,
@@ -832,11 +788,7 @@ class CastingMoldPlanner {
           volume: {id: id, material: FormerStock, cuts: [], regions: [], profiles: [], pieces: group},
           draftDegrees: 0,
           featureIds: [],
-          withdrawal: {
-            x: 0,
-            y: 0,
-            z: -1
-          }
+          withdrawal: {x: 0, y: 0, z: -1}
         });
       }
     }
@@ -993,11 +945,7 @@ class CastingMoldPlanner {
           },
           draftDegrees : f.draft.degrees,
           featureIds : [f.id],
-          withdrawal : {
-            x : direction.x,
-            y : direction.y,
-            z : direction.z
-          }
+          withdrawal : {x : direction.x, y : direction.y, z : direction.z}
         });
       }
       if (ids.length == 0) {
@@ -1551,14 +1499,8 @@ class CastingMoldPlanner {
       y: y,
       z: z,
       width: Math.min(a.x + a.width, b.x + b.width) - x,
-      depth: Math.min(
-        a.y + a.depth,
-        b.y + b.depth
-      ) - y,
-      height: Math.min(
-        a.z + a.height,
-        b.z + b.height
-      ) - z
+      depth: Math.min(a.y + a.depth, b.y + b.depth) - y,
+      height: Math.min(a.z + a.height, b.z + b.height) - z
     };
     if (out.width <= 0 || out.depth <= 0 || out.height <= 0) throw "Feature misses casting envelope";
     return out;
@@ -1612,11 +1554,7 @@ class CastingMoldPlanner {
       ip
     ), face = F.compose(
       ip,
-      F.translation(
-        0,
-        0,
-        dimensions.height
-      )
+      F.translation(0, 0, dimensions.height)
     ), normal = F.transformVector(
       face,
       0,

@@ -83,23 +83,11 @@ class InsertOriginCodec {
     var result:CatalogueInsert = {
       manufacturer: text(raw, "manufacturer"),
       reference: text(raw, "reference"),
-      revision: text(
-        raw,
-        "revision"
-      ),
-      holePolicyId: text(
-        raw,
-        "holePolicyId"
-      ),
-      document: text(
-        raw,
-        "document"
-      ),
+      revision: text(raw, "revision"),
+      holePolicyId: text(raw, "holePolicyId"),
+      document: text(raw, "document"),
       geometryBasis: basis,
-      geometryFingerprint: CastingRecordCodec.optionalString(
-        raw,
-        "geometryFingerprint"
-      ),
+      geometryFingerprint: CastingRecordCodec.optionalString(raw, "geometryFingerprint"),
       evidence: []
     };
     for (row in CastingRecordCodec.array(raw, "evidence")) {

@@ -32,10 +32,7 @@ class PostCureBonds {
       result.push({
         insertId: id,
         receiver: hole,
-        adhesive: CastingInput.CastingInputs.text(Reflect.field(
-          row,
-          "adhesive"
-        ))
+        adhesive: CastingInput.CastingInputs.text(Reflect.field(row, "adhesive"))
       });
     }
     result.sort((a, b) -> Reflect.compare(a.insertId, b.insertId));

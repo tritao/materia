@@ -99,10 +99,7 @@ class PourPlanning {
         mixer: equipment
       })),
       totalMixMassKg: mass,
-      quantities: quantities(
-        recipe,
-        mass
-      ),
+      quantities: quantities(recipe, mass),
       schedule: null,
       validation: []
     };
@@ -205,14 +202,8 @@ class PourPlanning {
         index: i + 1,
         massKg: amount,
         quantities: quantities(recipe, amount),
-        lowerHeightMm: heightAtMass(
-          fill,
-          cumulative
-        ),
-        upperHeightMm: heightAtMass(
-          fill,
-          cumulative + amount
-        ),
+        lowerHeightMm: heightAtMass(fill, cumulative),
+        upperHeightMm: heightAtMass(fill, cumulative + amount),
         mixingStartSeconds: elapsed,
         pourStartSeconds: start,
         pourEndSeconds: endTime
@@ -225,10 +216,7 @@ class PourPlanning {
     result.schedule = {
       batches: batches,
       totalElapsedSeconds: elapsed,
-      minimumWorkingTimeMarginSeconds: Math.max(
-        0,
-        margin
-      )
+      minimumWorkingTimeMarginSeconds: Math.max(0, margin)
     };
     result.validation.push(check(
       sourceId,
@@ -318,37 +306,15 @@ class PourPlanning {
   public static function copyMixer(raw:Dynamic):PourMixerSpec {
     CastingFeatureCodec.fields(
       raw,
-      [
-        "reference",
-        "capacityKg",
-        "mixingSeconds",
-        "transferSeconds",
-        "workingTimeSeconds",
-        "workingTimeReference"
-      ]
+      ["reference", "capacityKg", "mixingSeconds", "transferSeconds", "workingTimeSeconds", "workingTimeReference"]
     );
     var result:PourMixerSpec = {
       reference: text(raw, "reference"),
-      capacityKg: CastingRecordCodec.number(
-        raw,
-        "capacityKg"
-      ),
-      mixingSeconds: CastingRecordCodec.number(
-        raw,
-        "mixingSeconds"
-      ),
-      transferSeconds: CastingRecordCodec.number(
-        raw,
-        "transferSeconds"
-      ),
-      workingTimeSeconds: CastingRecordCodec.number(
-        raw,
-        "workingTimeSeconds"
-      ),
-      workingTimeReference: text(
-        raw,
-        "workingTimeReference"
-      )
+      capacityKg: CastingRecordCodec.number(raw, "capacityKg"),
+      mixingSeconds: CastingRecordCodec.number(raw, "mixingSeconds"),
+      transferSeconds: CastingRecordCodec.number(raw, "transferSeconds"),
+      workingTimeSeconds: CastingRecordCodec.number(raw, "workingTimeSeconds"),
+      workingTimeReference: text(raw, "workingTimeReference")
     };
     if (result.capacityKg <= 0 || result.mixingSeconds <= 0
       || result.transferSeconds < 0 || result.workingTimeSeconds <= 0) throw "Invalid mixer capacity or times";

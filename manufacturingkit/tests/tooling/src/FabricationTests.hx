@@ -41,11 +41,7 @@ class FabricationTests {
     rigidRestraints: [],
     blankMarginMm: 10,
     blankKerfMm: 3.2,
-    couponClearancesMm: [
-      0.2,
-      0.3,
-      0.4
-    ]
+    couponClearancesMm: [0.2, 0.3, 0.4]
   };
 
   public static function run(p:CastingMoldPlan):Void {
@@ -91,10 +87,7 @@ class FabricationTests {
           secondRegionId: "top"
         }
       ],
-      retainedRegionIds: [
-        "right",
-        "top"
-      ]
+      retainedRegionIds: ["right", "top"]
     };
     var blankReview = materia.sheet.SheetPlanValidator.validate(blankPlan, stock, [requirement]);
     check(

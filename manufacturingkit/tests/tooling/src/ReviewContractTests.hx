@@ -169,18 +169,9 @@ class ReviewContractTests {
     for (row in [
       {rule: "corner-radius.pocket", id: "pocket"},
       {rule: "insert-cover.seat", id: "seat"},
-      {
-        rule: "insert-edge.seat",
-        id: "seat"
-      },
-      {
-        rule: "fixing-access.seat",
-        id: "seat"
-      },
-      {
-        rule: "lifting-points",
-        id: limits.input.id
-      }
+      {rule: "insert-edge.seat", id: "seat"},
+      {rule: "fixing-access.seat", id: "seat"},
+      {rule: "lifting-points", id: limits.input.id}
     ]) sourceFinding(
       levelOne,
       row.rule,
@@ -201,14 +192,8 @@ class ReviewContractTests {
     for (row in [
       {rule: "insert-cover.seat", id: "seat"},
       {rule: "insert-edge.seat", id: "seat"},
-      {
-        rule: "fixing-access.seat",
-        id: "seat"
-      },
-      {
-        rule: "removal-direction.pocket",
-        id: "pocket"
-      }
+      {rule: "fixing-access.seat", id: "seat"},
+      {rule: "removal-direction.pocket", id: "pocket"}
     ]) sourceFinding(
       positive,
       row.rule,
@@ -281,11 +266,7 @@ class ReviewContractTests {
         strategy.featureId,
         materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,
         0,
-        {
-          x: 0,
-          y: 0,
-          z: 1
-        }
+        {x: 0, y: 0, z: 1}
       );
     }
     var noCore = CastingMoldPlanner.plan(rigid, p.options);

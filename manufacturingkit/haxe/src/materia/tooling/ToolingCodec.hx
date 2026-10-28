@@ -72,10 +72,7 @@ class ToolingCodec {
     var document:ToolingDocument = {
       input: input,
       setup: readSetup(Reflect.field(raw, "setup"), input),
-      recipe: readRecipe(Reflect.field(
-        raw,
-        "recipe"
-      ))
+      recipe: readRecipe(Reflect.field(raw, "recipe"))
     };
     materia.tooling.casting.CastingStrategies.resolve(document);
     return document;
@@ -352,22 +349,10 @@ class ToolingCodec {
     var source:materia.casting.InsertSpec;
     try source = materia.casting.InsertSpec.InsertSpecCodec.snapshot({
       body: Reflect.field(raw, "body"),
-      holes: Reflect.field(
-        raw,
-        "holes"
-      ),
-      origin: Reflect.field(
-        raw,
-        "origin"
-      ),
-      anchorage: Reflect.field(
-        raw,
-        "anchorage"
-      ),
-      interfaces: Reflect.field(
-        raw,
-        "interfaces"
-      )
+      holes: Reflect.field(raw, "holes"),
+      origin: Reflect.field(raw, "origin"),
+      anchorage: Reflect.field(raw, "anchorage"),
+      interfaces: Reflect.field(raw, "interfaces")
     }) catch (error:Dynamic) throw "Invalid insert " + string(
       raw,
       "id"
@@ -399,27 +384,12 @@ class ToolingCodec {
       origin: source.origin,
       anchorage: source.anchorage,
       interfaces: source.interfaces,
-      pose: frame(
-        raw,
-        "pose"
-      ),
-      role: insertRole(string(
-        raw,
-        "role"
-      )),
-      label: string(
-        raw,
-        "label"
-      ),
-      positionTolerance: positive(
-        raw,
-        "positionTolerance"
-      ),
+      pose: frame(raw, "pose"),
+      role: insertRole(string(raw, "role")),
+      label: string(raw, "label"),
+      positionTolerance: positive(raw, "positionTolerance"),
       material: material,
-      finish: insertFinish(string(
-        raw,
-        "finish"
-      ))
+      finish: insertFinish(string(raw, "finish"))
     };
   }
 
@@ -431,18 +401,9 @@ class ToolingCodec {
       id: string(raw, "id"),
       revision: revision(raw),
       sourceFingerprint: fingerprint,
-      fillHeightMm: number(
-        raw,
-        "fillHeightMm"
-      ),
-      freeboardMm: nonnegative(
-        raw,
-        "freeboardMm"
-      ),
-      sourceToMold: frame(
-        raw,
-        "sourceToMold"
-      )
+      fillHeightMm: number(raw, "fillHeightMm"),
+      freeboardMm: nonnegative(raw, "freeboardMm"),
+      sourceToMold: frame(raw, "sourceToMold")
     };
   }
 
@@ -481,14 +442,8 @@ class ToolingCodec {
       nominalThickness: positive(p, "nominalThickness"),
       measuredThickness: thickness,
       thicknessVariation: variation,
-      width: positive(
-        p,
-        "width"
-      ),
-      height: positive(
-        p,
-        "height"
-      ),
+      width: positive(p, "width"),
+      height: positive(p, "height"),
       coatedFace: face,
       allowedRotations: rotations,
       directionConstraint: direction
@@ -605,82 +560,25 @@ class ToolingCodec {
     );
     var hardware:materia.tooling.ToolingRecipe.ToolingHardware = {
       plugDepth: positive(hw, "plugDepth"),
-      plugMaterial: string(
-        hw,
-        "plugMaterial"
-      ),
-      sealMargin: nonnegative(
-        hw,
-        "sealMargin"
-      ),
-      sealMaterial: string(
-        hw,
-        "sealMaterial"
-      ),
-      minimumBridgeWidth: positive(
-        hw,
-        "minimumBridgeWidth"
-      ),
-      locatingPinDiameter: positive(
-        hw,
-        "locatingPinDiameter"
-      ),
-      supportScrewDiameter: positive(
-        hw,
-        "supportScrewDiameter"
-      ),
-      supportClearanceDiameter: positive(
-        hw,
-        "supportClearanceDiameter"
-      ),
-      secondaryPinTravel: positive(
-        hw,
-        "secondaryPinTravel"
-      ),
-      padDepth: positive(
-        hw,
-        "padDepth"
-      ),
-      labelOffset: positive(
-        hw,
-        "labelOffset"
-      ),
-      datumThickness: positive(
-        hw,
-        "datumThickness"
-      ),
-      datumPostWidth: positive(
-        hw,
-        "datumPostWidth"
-      ),
-      formerFlangeThickness: positive(
-        hw,
-        "formerFlangeThickness"
-      ),
-      formerFlangeMargin: positive(
-        hw,
-        "formerFlangeMargin"
-      ),
-      fixturePinDiameter: positive(
-        hw,
-        "fixturePinDiameter"
-      ),
-      fixturePinEmbed: positive(
-        hw,
-        "fixturePinEmbed"
-      ),
-      fixturePinSpacing: positive(
-        hw,
-        "fixturePinSpacing"
-      ),
-      fixtureReceiver: materia.tooling.ToolingRecipe.FixtureReceivers.decode(string(
-        hw,
-        "fixtureReceiver"
-      )),
-      fixtureSlotToolDiameter: positive(
-        hw,
-        "fixtureSlotToolDiameter"
-      )
+      plugMaterial: string(hw, "plugMaterial"),
+      sealMargin: nonnegative(hw, "sealMargin"),
+      sealMaterial: string(hw, "sealMaterial"),
+      minimumBridgeWidth: positive(hw, "minimumBridgeWidth"),
+      locatingPinDiameter: positive(hw, "locatingPinDiameter"),
+      supportScrewDiameter: positive(hw, "supportScrewDiameter"),
+      supportClearanceDiameter: positive(hw, "supportClearanceDiameter"),
+      secondaryPinTravel: positive(hw, "secondaryPinTravel"),
+      padDepth: positive(hw, "padDepth"),
+      labelOffset: positive(hw, "labelOffset"),
+      datumThickness: positive(hw, "datumThickness"),
+      datumPostWidth: positive(hw, "datumPostWidth"),
+      formerFlangeThickness: positive(hw, "formerFlangeThickness"),
+      formerFlangeMargin: positive(hw, "formerFlangeMargin"),
+      fixturePinDiameter: positive(hw, "fixturePinDiameter"),
+      fixturePinEmbed: positive(hw, "fixturePinEmbed"),
+      fixturePinSpacing: positive(hw, "fixturePinSpacing"),
+      fixtureReceiver: materia.tooling.ToolingRecipe.FixtureReceivers.decode(string(hw, "fixtureReceiver")),
+      fixtureSlotToolDiameter: positive(hw, "fixtureSlotToolDiameter")
     };
     if (hardware.supportClearanceDiameter
       <= hardware.supportScrewDiameter) throw "Hardware clearance must exceed screw diameter";
@@ -720,38 +618,15 @@ class ToolingCodec {
         raw,
         "id"
       ), revision: revision(raw), panel: panel, core: {
-        materialSpec: string(
-          c,
-          "materialSpec"
-        ),
-        width: positive(
-          c,
-          "width"
-        ),
-        depth: positive(
-          c,
-          "depth"
-        ),
-        height: positive(
-          c,
-          "height"
-        ),
-        densityKgM3: nullableNumber(
-          c,
-          "densityKgM3",
-          true
-        ),
+        materialSpec: string(c, "materialSpec"),
+        width: positive(c, "width"),
+        depth: positive(c, "depth"),
+        height: positive(c, "height"),
+        densityKgM3: nullableNumber(c, "densityKgM3", true),
         compressionStrengthPa: strength,
         compressionStrainFraction: strain,
-        maximumTemperatureC: nullableNumber(
-          c,
-          "maximumTemperatureC",
-          false
-        ),
-        evidence: evidence(
-          c,
-          "evidence"
-        )
+        maximumTemperatureC: nullableNumber(c, "maximumTemperatureC", false),
+        evidence: evidence(c, "evidence")
       }, adhesiveLineThickness: positive(
         raw,
         "adhesiveLineThickness"
@@ -938,18 +813,9 @@ class ToolingCodec {
       y: number(p, "y"),
       z: number(p, "z"),
       qx: number(p, "qx"),
-      qy: number(
-        p,
-        "qy"
-      ),
-      qz: number(
-        p,
-        "qz"
-      ),
-      qw: number(
-        p,
-        "qw"
-      )
+      qy: number(p, "qy"),
+      qz: number(p, "qz"),
+      qw: number(p, "qw")
     };
     AssemblyCodec.validateFrame(result);
     var norm = result.qx * result.qx + result.qy * result.qy + result.qz * result.qz + result.qw * result.qw;

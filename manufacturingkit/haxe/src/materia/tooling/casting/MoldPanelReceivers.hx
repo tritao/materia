@@ -40,14 +40,7 @@ class MoldPanelReceivers {
           operationId: pocketId,
           contour: operation.contour,
           depth: operation.depth,
-          pose: F.compose(
-            bed.pose,
-            F.translation(
-              0,
-              0,
-              bed.panel.stock.measuredThickness - operation.depth
-            )
-          ),
+          pose: F.compose(bed.pose, F.translation(0, 0, bed.panel.stock.measuredThickness - operation.depth)),
           subtract: [MoldRegions.tooling(gross)]
         }]
       }
@@ -129,18 +122,8 @@ class MoldPanelReceivers {
               operationId: id,
               contour: operation.contour,
               depth: depth,
-              pose: F.compose(
-                panel.pose,
-                F.translation(
-                  0,
-                  0,
-                  sign < 0 ? t - depth : 0
-                )
-              ),
-              subtract : [MoldRegions.insert(
-                d,
-                insert.id
-              )]
+              pose: F.compose(panel.pose, F.translation(0, 0, sign < 0 ? t - depth : 0)),
+              subtract : [MoldRegions.insert(d, insert.id)]
             }]
           }
         });
@@ -148,13 +131,7 @@ class MoldPanelReceivers {
           panelId: panel.panel.id,
           operationId: id,
           kind: ToolingOpening,
-          sealingIds: [
-            materia.tooling.ToolingIds.derive(
-              "insert-",
-              insert.id
-            ),
-            sealId
-          ],
+          sealingIds: [materia.tooling.ToolingIds.derive("insert-", insert.id), sealId],
           protection: null,
           sealSpec: r.hardware.sealMaterial
         });

@@ -87,11 +87,7 @@ class InsertManufacturingTests {
     }, "oblique curved containment is explicit, never a box approximation");
     check(switch InsertBlankFit.assess(
       Primitive(Cylinder(8, 1000)),
-      Stock(
-        "small-angle",
-        Cylinder(8, 1000),
-        F.turnY(1e-9)
-      )
+      Stock("small-angle", Cylinder(8, 1000), F.turnY(1e-9))
     ) {
       case Unsupported(_):
         true;
@@ -190,11 +186,7 @@ class InsertManufacturingTests {
     );
     insert.interfaces = [{
       id: "ground-face",
-      geometry: materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(
-        0,
-        0,
-        19
-      )),
+      geometry: materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0, 0, 19)),
       route: materia.casting.InterfaceRequirement.InterfaceRoute.Ground,
       allowanceMm: 1,
       finishingProcessErrorMm: materia.casting.CastingInput.Unresolved("Finishing process error allocation"),

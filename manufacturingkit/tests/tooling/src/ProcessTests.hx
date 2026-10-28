@@ -80,20 +80,8 @@ class ProcessTests {
             var b = cells[j].box;
             var overlap = [
               Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x),
-              Math.min(
-                a.y + a.depth,
-                b.y + b.depth
-              ) - Math.max(
-                a.y,
-                b.y
-              ),
-              Math.min(
-                a.z + a.height,
-                b.z + b.height
-              ) - Math.max(
-                a.z,
-                b.z
-              )
+              Math.min(a.y + a.depth, b.y + b.depth) - Math.max(a.y, b.y),
+              Math.min(a.z + a.height, b.z + b.height) - Math.max(a.z, b.z)
             ];
             if (overlap.filter(v -> v < -1e-8).length == 0
               && overlap.filter(v -> v > 1e-8).length >= 2) group.push(cells.splice(
@@ -150,10 +138,7 @@ class ProcessTests {
     rejects(
       () -> materia.tooling.ToolingCodec.canonical(materia.tooling.process.FillAnalysis.FillOpeningGeometry.CadOpening(
         2,
-        [
-          "cover",
-          "cover"
-        ]
+        ["cover", "cover"]
       )),
       "Duplicate CAD opening blocker ID"
     );
@@ -235,22 +220,8 @@ class ProcessTests {
       null,
       null,
       [5],
-      [box(
-        4,
-        0,
-        2,
-        1
-      )],
-      [
-        {
-          id: "low-wall",
-          bottomMm: 0
-        },
-        {
-          id: "high-wall",
-          bottomMm: 4
-        }
-      ]
+      [box(4, 0, 2, 1)],
+      [{id: "low-wall", bottomMm: 0}, {id: "high-wall", bottomMm: 4}]
     );
     near(covered.openFillAreaMm2, 4, 1e-9, "bridge footprint is subtracted from open fill area");
     check(covered.trappedPockets.length == 1, "tool-covered top cannot vent an isolated pocket");
@@ -259,26 +230,7 @@ class ProcessTests {
     near(halfway.panelHeads.filter(v -> v.id == "low-wall")[0].headPa, 120, 1e-9, "per-level low panel head");
     near(halfway.panelHeads.filter(v -> v.id == "high-wall")[0].headPa, 24, 1e-9, "per-level elevated panel head");
     rejects(
-      () -> FillAnalysis.analyze(
-        "body",
-        "s",
-        "p",
-        twoTops,
-        [],
-        [],
-        10,
-        2400,
-        10,
-        null,
-        null,
-        null,
-        [box(
-          0,
-          0,
-          6,
-          1
-        )]
-      ),
+      () -> FillAnalysis.analyze("body", "s", "p", twoTops, [], [], 10, 2400, 10, null, null, null, [box(0, 0, 6, 1)]),
       "Fill face has zero open area"
     );
     region.reverse();
@@ -321,30 +273,9 @@ class ProcessTests {
     check(fill(edgeOnly).trappedPockets.length == 1, "edge-only contact cannot vent an air region");
     var ceilingFragments:Array<MoldBox> = [
       {x: 0, y: 0, z: 0, width: 1, depth: 4, height: 10},
-      {
-        x: 1,
-        y: 0,
-        z: 0,
-        width: 1,
-        depth: 4,
-        height: 6
-      },
-      {
-        x: 2,
-        y: 0,
-        z: 0,
-        width: 1,
-        depth: 4,
-        height: 6
-      },
-      {
-        x: 3,
-        y: 0,
-        z: 0,
-        width: 1,
-        depth: 4,
-        height: 6
-      }
+      {x: 1, y: 0, z: 0, width: 1, depth: 4, height: 6},
+      {x: 2, y: 0, z: 0, width: 1, depth: 4, height: 6},
+      {x: 3, y: 0, z: 0, width: 1, depth: 4, height: 6}
     ];
     var combinedCeiling = FillAnalysis.analyze("body", "s", "p", ceilingFragments, [], [], 10, 2400, 10, null, 2.5);
     check(
@@ -361,18 +292,8 @@ class ProcessTests {
       [{
         id: "overlap",
         geometry: materia.casting.CastingRegion.Union([
-          materia.tooling.casting.MoldRegions.box(box(
-            10,
-            1,
-            2,
-            3
-          )),
-          materia.tooling.casting.MoldRegions.box(box(
-            10,
-            2,
-            2,
-            2
-          ))
+          materia.tooling.casting.MoldRegions.box(box(10, 1, 2, 3)),
+          materia.tooling.casting.MoldRegions.box(box(10, 2, 2, 2))
         ])
       }],
       10,

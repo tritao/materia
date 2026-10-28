@@ -43,10 +43,7 @@ class CastingRegionBounds {
           x: x,
           y: y,
           width: Math.max(a.x + a.width, b.x + b.width) - x,
-          height: Math.max(
-            a.y + a.height,
-            b.y + b.height
-          ) - y
+          height: Math.max(a.y + a.height, b.y + b.height) - y
         },
         depth,
         pose
@@ -64,14 +61,8 @@ class CastingRegionBounds {
             y: y,
             z: z,
             width: Math.max(result.x + result.width, next.x + next.width) - x,
-            depth: Math.max(
-              result.y + result.depth,
-              next.y + next.depth
-            ) - y,
-            height: Math.max(
-              result.z + result.height,
-              next.z + next.height
-            ) - z
+            depth: Math.max(result.y + result.depth, next.y + next.depth) - y,
+            height: Math.max(result.z + result.height, next.z + next.height) - z
           };
         }
       }

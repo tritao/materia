@@ -29,12 +29,7 @@ class CastingBounds {
     var directions = [
       F.transformVector(g.pose, 1, 0, 0),
       F.transformVector(g.pose, 0, 1, 0),
-      F.transformVector(
-        g.pose,
-        0,
-        0,
-        1
-      )
+      F.transformVector(g.pose, 0, 0, 1)
     ];
     var used = new Map<Int, Bool>();
     for (local in 0...3) {

@@ -30,24 +30,7 @@ class AnchorCapacityTests {
     ]};
     var origin = {x: 0.0, y: 0.0, z: 0.0}, axis = {x: 0.0, y: 0.0, z: 1.0}, normal = {x: 0.0, y: 0.0, z: 1.0};
     function rectangle(x0:Float, y0:Float, x1:Float, y1:Float, z:Float) return face(
-      [
-        {x: x0, y: y0, z: z},
-        {
-          x: x1,
-          y: y0,
-          z: z
-        },
-        {
-          x: x1,
-          y: y1,
-          z: z
-        },
-        {
-          x: x0,
-          y: y1,
-          z: z
-        }
-      ],
+      [{x: x0, y: y0, z: z}, {x: x1, y: y0, z: z}, {x: x1, y: y1, z: z}, {x: x0, y: y1, z: z}],
       normal
     );
     var horizontal = rectangle(-5, -5, 5, 5, 3);
@@ -63,21 +46,8 @@ class AnchorCapacityTests {
       "end-disc projection overlaps a face excluding its centre"
     );
     var generator = face(
-      [
-        {x: 3.0, y: -0.2, z: 0.3},
-        {x: 3.0, y: 0.2, z: 0.3},
-        {x: 3.0, y: 0.2, z: 0.7},
-        {
-          x: 3.0,
-          y: -0.2,
-          z: 0.7
-        }
-      ],
-      {
-        x: 1.0,
-        y: 0.0,
-        z: 0.0
-      }
+      [{x: 3.0, y: -0.2, z: 0.3}, {x: 3.0, y: 0.2, z: 0.3}, {x: 3.0, y: 0.2, z: 0.7}, {x: 3.0, y: -0.2, z: 0.7}],
+      {x: 1.0, y: 0.0, z: 0.0}
     );
     near(
       InsertAnchorScreen.cylinderFace(origin, axis, 1, 1, generator),
@@ -85,21 +55,9 @@ class AnchorCapacityTests {
       "side generator overlaps only inside the cylinder height"
     );
     var diagonal = face(
-      [
-        {x: -5.0, y: -5.0, z: 10.0},
-        {x: 10.0, y: -5.0, z: -5.0},
-        {x: 10.0, y: 5.0, z: -5.0},
-        {
-          x: -5.0,
-          y: 5.0,
-          z: 10.0
-        }
-      ],
-      {
-        x: Math.sqrt(0.5),
-        y: 0.0,
-        z: Math.sqrt(0.5)
-      }
+      [{x: -5.0,
+      y: -5.0, z: 10.0}, {x: 10.0, y: -5.0, z: -5.0}, {x: 10.0, y: 5.0, z: -5.0}, {x: -5.0, y: 5.0, z: 10.0}],
+      {x: Math.sqrt(0.5), y: 0.0, z: Math.sqrt(0.5)}
     );
     near(
       InsertAnchorScreen.cylinderFace(origin, axis, 1, 2, diagonal),
@@ -141,11 +99,7 @@ class AnchorCapacityTests {
       Checks.projectedConeUnionArea([
         {x: 0, y: 0, radius: 1},
         {x: 1, y: 0, radius: 1},
-        {
-          x: 0.5,
-          y: Math.sqrt(3) / 2,
-          radius: 1
-        }
+        {x: 0.5, y: Math.sqrt(3) / 2, radius: 1}
       ]),
       1.5 * pi + Math.sqrt(3),
       "triple overlap is not subtracted three times"
@@ -247,13 +201,7 @@ class AnchorCapacityTests {
     Reflect.setField(
       lockingRows[0],
       "locking",
-      {
-        kind: "retaining-compound",
-        reference: {
-          kind: "known",
-          value: "Declared process trial"
-        }
-      }
+      {kind: "retaining-compound", reference: {kind: "known", value: "Declared process trial"}}
     );
     var knownLock = C.snapshot(lockingRaw);
     check(switch knownLock {

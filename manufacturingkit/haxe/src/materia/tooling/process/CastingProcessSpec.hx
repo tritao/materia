@@ -97,39 +97,19 @@ class ProcessSpecs {
       id: input.id,
       revision: input.revision,
       recipeFingerprint: input.recipeFingerprint,
-      pourRateMm3PerSecond: optional(
-        input.pourRateMm3PerSecond,
-        1e-12,
-        1e15
-      ),
-      maximumAirEscapeWidthMm: optional(
-        input.maximumAirEscapeWidthMm,
-        1e-9,
-        1e6
-      ),
+      pourRateMm3PerSecond: optional(input.pourRateMm3PerSecond, 1e-12, 1e15),
+      maximumAirEscapeWidthMm: optional(input.maximumAirEscapeWidthMm, 1e-9, 1e6),
       mixComposition: input.mixComposition == null ? null : PourPlanning.copyComposition(input.mixComposition),
       mixer : input.mixer == null ? null : PourPlanning.copyMixer(input.mixer),
       castability : {
-        maximumAggregateSizeMm : optional(
-          limits.maximumAggregateSizeMm,
-          1e-9,
-          1e6
-        ),
-        minimumPassageAggregateRatio : optional(
-          limits.minimumPassageAggregateRatio,
-          1,
-          1e6
-        ),
+        maximumAggregateSizeMm : optional(limits.maximumAggregateSizeMm, 1e-9, 1e6),
+        minimumPassageAggregateRatio : optional(limits.minimumPassageAggregateRatio, 1, 1e6),
         minimumWallAggregateRatio : wallRatio(limits.minimumWallAggregateRatio),
         steelAggregateMarginMm : positive(limits.steelAggregateMarginMm),
         steelSpacingAggregateRatio : wallRatio(limits.steelSpacingAggregateRatio),
         evidence : evidence
       },
-      compound : {
-        reference : reference,
-        thickness : thickness,
-        maximumMassPerLiftKg : mass
-      }
+      compound : {reference : reference, thickness : thickness, maximumMassPerLiftKg : mass}
     };
   }
   static function inputNumber(raw:Dynamic, key:String):Null<Float> {
@@ -190,67 +170,28 @@ class ProcessSpecs {
     }
     var result:CastingProcessSpec = {
       id: materia.casting.CastingRecordCodec.string(raw, "id"),
-      revision: materia.casting.CastingRecordCodec.integer(
-        raw,
-        "revision"
-      ),
-      recipeFingerprint: materia.casting.CastingRecordCodec.string(
-        raw,
-        "recipeFingerprint"
-      ),
-      pourRateMm3PerSecond: inputNumber(
-        raw,
-        "pourRateMm3PerSecond"
-      ),
-      maximumAirEscapeWidthMm: inputNumber(
-        raw,
-        "maximumAirEscapeWidthMm"
-      ),
-      mixComposition: Reflect.field(
-        raw,
-        "mixComposition"
-      ) == null ? null : PourPlanning.copyComposition(Reflect.field(
+      revision: materia.casting.CastingRecordCodec.integer(raw, "revision"),
+      recipeFingerprint: materia.casting.CastingRecordCodec.string(raw, "recipeFingerprint"),
+      pourRateMm3PerSecond: inputNumber(raw, "pourRateMm3PerSecond"),
+      maximumAirEscapeWidthMm: inputNumber(raw, "maximumAirEscapeWidthMm"),
+      mixComposition: Reflect.field(raw, "mixComposition") == null ? null : PourPlanning.copyComposition(Reflect.field(
         raw,
         "mixComposition"
       )),
-      mixer : Reflect.field(
-        raw,
-        "mixer"
-      ) == null ? null : PourPlanning.copyMixer(Reflect.field(
-        raw,
-        "mixer"
-      )),
+      mixer : Reflect.field(raw, "mixer") == null ? null : PourPlanning.copyMixer(Reflect.field(raw, "mixer")),
       castability : {
-        maximumAggregateSizeMm : inputNumber(
-          limits,
-          "maximumAggregateSizeMm"
-        ),
+        maximumAggregateSizeMm : inputNumber(limits, "maximumAggregateSizeMm"),
         minimumWallAggregateRatio : materia.casting.CastingRecordCodec.number(
-          Reflect.field(
-            raw,
-            "castability"
-          ),
+          Reflect.field(raw, "castability"),
           "minimumWallAggregateRatio"
         ),
-        steelAggregateMarginMm : materia.casting.CastingRecordCodec.number(
-          limits,
-          "steelAggregateMarginMm"
-        ),
-        steelSpacingAggregateRatio : materia.casting.CastingRecordCodec.number(
-          limits,
-          "steelSpacingAggregateRatio"
-        ),
-        minimumPassageAggregateRatio : inputNumber(
-          limits,
-          "minimumPassageAggregateRatio"
-        ),
+        steelAggregateMarginMm : materia.casting.CastingRecordCodec.number(limits, "steelAggregateMarginMm"),
+        steelSpacingAggregateRatio : materia.casting.CastingRecordCodec.number(limits, "steelSpacingAggregateRatio"),
+        minimumPassageAggregateRatio : inputNumber(limits, "minimumPassageAggregateRatio"),
         evidence : evidence
       },
       compound : {
-        reference : materia.casting.CastingInput.CastingInputs.text(Reflect.field(
-          c,
-          "reference"
-        )),
+        reference : materia.casting.CastingInput.CastingInputs.text(Reflect.field(c, "reference")),
         thickness : thickness,
         maximumMassPerLiftKg : materia.casting.CastingInput.CastingInputs.number(Reflect.field(
           c,

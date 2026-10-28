@@ -125,15 +125,8 @@ class SheetCuttingTests {
     customRecord.customMaterials = [{
       id: "shop-plywood",
       name: "Shop plywood",
-      visual: {
-        baseColor: [0.7, 0.55, 0.34],
-        metallic: 0,
-        roughness: 0.7
-      },
-      physical: {
-        density: 650,
-        spec: "custom shop plywood"
-      }
+      visual: {baseColor: [0.7, 0.55, 0.34], metallic: 0, roughness: 0.7},
+      physical: {density: 650, spec: "custom shop plywood"}
     }];
     customRecord.stockSpecs[0].materialId = "shop-plywood";
     customRecord.requirements[0].materialId = "shop-plywood";
@@ -360,10 +353,7 @@ class SheetCuttingTests {
       widthTolerancePlus: 0.05,
       heightToleranceMinus: 0.05,
       heightTolerancePlus: 0.05,
-      allowedRotations: [
-        0,
-        90
-      ],
+      allowedRotations: [0, 90],
       directionConstraint: "free"
     };
     var second:SheetPartRequirement = {
@@ -408,27 +398,18 @@ class SheetCuttingTests {
         regionId: "part-a"
       }],
       cuts: [
-        {
-          id: "cut-1",
-          regionId: "stock",
-          axis: "vertical",
-          position: 30,
-          firstRegionId: "left",
-          secondRegionId: "right"
-        },
-        {
-          id: "cut-2",
-          regionId: "left",
-          axis: "horizontal",
-          position: 20,
-          firstRegionId: "part-a",
-          secondRegionId: "drop-a"
-        }
-      ],
-      retainedRegionIds: [
-        "drop-a",
-        "right"
-      ]
+        {id: "cut-1",
+      regionId: "stock", axis: "vertical", position: 30, firstRegionId: "left", secondRegionId: "right"},
+      {
+        id: "cut-2",
+        regionId: "left",
+        axis: "horizontal",
+        position: 20,
+        firstRegionId: "part-a",
+        secondRegionId: "drop-a"
+      }
+    ],
+      retainedRegionIds: ["drop-a", "right"]
     };
     var secondPlan:SheetCutPlan = {
       schemaVersion: 1,
@@ -469,10 +450,7 @@ class SheetCuttingTests {
           secondRegionId: "drop-b"
         }
       ],
-      retainedRegionIds: [
-        "drop-b",
-        "right-b"
-      ]
+      retainedRegionIds: ["drop-b", "right-b"]
     };
     return {
       schemaVersion: 1,

@@ -27,21 +27,9 @@ class CastingProfileCodec {
       result.push({
         kind: cast CastingRecordCodec.string(row, "kind"),
         start: point(Reflect.field(row, "start")),
-        end: point(Reflect.field(
-          row,
-          "end"
-        )),
-        center: Reflect.field(
-          row,
-          "center"
-        ) == null ? null : point(Reflect.field(
-          row,
-          "center"
-        )),
-        sweep : CastingRecordCodec.number(
-          row,
-          "sweep"
-        )
+        end: point(Reflect.field(row, "end")),
+        center: Reflect.field(row, "center") == null ? null : point(Reflect.field(row, "center")),
+        sweep : CastingRecordCodec.number(row, "sweep")
       });
     }
     CastingProfileGeometry.validate(result);

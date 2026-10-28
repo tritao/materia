@@ -99,14 +99,7 @@ class HoleClearanceBudgetTests {
       componentPath: "xyStage/railYLeft",
       componentFingerprint: haxe.crypto.Sha256.encode("test rail recipe"),
       connectorId: "mount1",
-      connectorFrame: F.alongY(
-        0,
-        200,
-        35,
-        0,
-        0,
-        1
-      ),
+      connectorFrame: F.alongY(0, 200, 35, 0, 0, 1),
       clearanceReference: materia.casting.CastingInput.CastingTextInput.Known("test reference"),
       permittedRoutes: both,
       budget: budget()
@@ -139,10 +132,7 @@ class HoleClearanceBudgetTests {
       relief: null,
       limits: {
         policyId: "test-thread-policy",
-        threaded: {
-          minEngagement: 5.2,
-          minTipGap: 1
-        },
+        threaded: {minEngagement: 5.2, minTipGap: 1},
         minBack: 3,
         minWall: 4,
         minClearance: 1,
@@ -184,11 +174,7 @@ class HoleClearanceBudgetTests {
     materia.casting.InsertManufacturing.InsertManufacturingCodec.references(manufacturing, holes, []);
     var insert:materia.tooling.casting.CastingToolingInput.CastingToolingInsert = {
       id: "rail-seat",
-      body: Primitive(materia.casting.CastingSolid.Box(
-        40,
-        500,
-        20
-      )),
+      body: Primitive(materia.casting.CastingSolid.Box(40, 500, 20)),
       holes: holes,
       origin: Fabricated(manufacturing),
       anchorage: Undeclared,
@@ -230,13 +216,7 @@ class HoleClearanceBudgetTests {
       "transfer operation names the bushing and swarf protection"
     );
     var before = materia.casting.InsertStages.holes(
-      {
-        body: insert.body,
-        holes: holes,
-        origin: insert.origin,
-        anchorage: insert.anchorage,
-        interfaces: []
-      },
+      {body: insert.body, holes: holes, origin: insert.origin, anchorage: insert.anchorage, interfaces: []},
       materia.casting.InsertStages.InsertStage.BeforeCasting
     );
     check(before.length == 0, "proposed transfer holes never enter pre-cast geometry");

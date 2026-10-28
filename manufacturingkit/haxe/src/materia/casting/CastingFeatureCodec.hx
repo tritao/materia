@@ -60,44 +60,20 @@ class CastingFeatureCodec {
         id: CastingRecordCodec.string(row, "id"),
         kind: cast CastingRecordCodec.string(row, "kind"),
         geometry: {
-          solid: CastingFeature.CastingGeometrySolids.snapshot(Reflect.field(
-            g,
-            "solid"
-          )),
-          pose: CastingRecordCodec.frame(Reflect.field(
-            g,
-            "pose"
-          ))
+          solid: CastingFeature.CastingGeometrySolids.snapshot(Reflect.field(g, "solid")),
+          pose: CastingRecordCodec.frame(Reflect.field(g, "pose"))
         },
         openings: openings,
         draft: {
-          degrees: CastingRecordCodec.number(
-            d,
-            "degrees"
-          ),
+          degrees: CastingRecordCodec.number(d, "degrees"),
           axis: {
-            x: CastingRecordCodec.number(
-              axis,
-              "x"
-            ),
-            y: CastingRecordCodec.number(
-              axis,
-              "y"
-            ),
-            z: CastingRecordCodec.number(
-              axis,
-              "z"
-            )
+            x: CastingRecordCodec.number(axis, "x"),
+            y: CastingRecordCodec.number(axis, "y"),
+            z: CastingRecordCodec.number(axis, "z")
           }
         },
-        cornerRadius: CastingRecordCodec.number(
-          row,
-          "cornerRadius"
-        ),
-        owner: CastingRecordCodec.optionalString(
-          row,
-          "owner"
-        ),
+        cornerRadius: CastingRecordCodec.number(row, "cornerRadius"),
+        owner: CastingRecordCodec.optionalString(row, "owner"),
         adjustable: adjustable
       });
     }

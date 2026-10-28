@@ -115,11 +115,7 @@ class InsertManufacturingPlan {
     var operations:Array<InsertOperationRecord> = [], missing:Array<String> = [];
     function add(suffix:String,
       kind:InsertOperationKind, stage:InsertOperationStage, ids:Array<String>):Void operations.push({
-        id: materia.tooling.ToolingIds.derive(
-          "make-",
-          insert.id,
-          "-" + suffix
-        ),
+        id: materia.tooling.ToolingIds.derive("make-", insert.id, "-" + suffix),
         kind: kind,
         stage: stage,
         sourceIds: ids
@@ -178,10 +174,7 @@ class InsertManufacturingPlan {
           "anchor-" + haxe.crypto.Sha256.encode(anchor.id).substr(0, 12),
           FitAnchors,
           InsertOperationStage.BeforeCasting,
-          [
-            anchor.id,
-            anchor.holeId
-          ]
+          [anchor.id, anchor.holeId]
         );
       case Undeclared, CatalogueRetention:
     }

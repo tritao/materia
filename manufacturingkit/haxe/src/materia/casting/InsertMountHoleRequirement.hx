@@ -86,16 +86,10 @@ class InsertMountHoleRequirements {
         componentPath: component,
         componentFingerprint: fingerprint,
         connectorId: connector,
-        connectorFrame: CastingRecordCodec.frame(Reflect.field(
-          row,
-          "connectorFrame"
-        )),
+        connectorFrame: CastingRecordCodec.frame(Reflect.field(row, "connectorFrame")),
         clearanceReference: reference,
         permittedRoutes: routes,
-        budget: HoleClearanceBudgets.snapshot(Reflect.field(
-          row,
-          "budget"
-        ))
+        budget: HoleClearanceBudgets.snapshot(Reflect.field(row, "budget"))
       });
     }
     result.sort((a, b) -> Reflect.compare(a.holeId, b.holeId));

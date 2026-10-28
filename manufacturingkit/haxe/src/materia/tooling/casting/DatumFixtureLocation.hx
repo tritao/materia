@@ -98,14 +98,7 @@ class DatumFixtureLocation {
       bounds.width,
       bounds.height,
       thickness,
-      F.compose(
-        panel.pose,
-        F.translation(
-          bounds.x + bounds.width / 2,
-          bounds.y + bounds.height / 2,
-          0
-        )
-      )
+      F.compose(panel.pose, F.translation(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, 0))
     );
     var cuts:Array<MoldVolumeCut> = [];
     for (operation in panel.panel.operations) if (operation.kind
@@ -141,10 +134,7 @@ class DatumFixtureLocation {
             width,
             depth,
             height,
-            F.compose(
-              F.inverse(frame),
-              stock
-            )
+            F.compose(F.inverse(frame), stock)
           );
           footprint = ContactFootprint.Rectangle({
             x: bounds.x,
@@ -226,26 +216,12 @@ class DatumFixtureLocation {
           world.width,
           world.depth,
           world.height,
-          F.compose(
-            inverse,
-            F.translation(
-              world.x + world.width / 2,
-              world.y + world.depth / 2,
-              world.z
-            )
-          )
+          F.compose(inverse, F.translation(world.x + world.width / 2, world.y + world.depth / 2, world.z))
         );
         if (Math.abs(piece.z + piece.height - plane) <= EPS) {
           var patch = BoxAlgebra.intersection(
             footprint,
-            {
-              x: piece.x,
-              y: piece.y,
-              z: 0,
-              width: piece.width,
-              depth: piece.depth,
-              height: 1
-            }
+            {x: piece.x, y: piece.y, z: 0, width: piece.width, depth: piece.depth, height: 1}
           );
           if (patch != null) patches.push(patch);
         }
@@ -263,14 +239,8 @@ class DatumFixtureLocation {
         var rz = radius * Math.sqrt(Math.max(0, 1 - axis.z * axis.z));
         if (plane >= Math.min(entry.z,
           end.z) - rz - EPS && plane <= Math.max(entry.z, end.z) + rz + EPS) excluded.push({
-            x: Math.min(
-              entry.x,
-              end.x
-            ) - rx - EPS,
-            y: Math.min(
-              entry.y,
-              end.y
-            ) - ry - EPS,
+            x: Math.min(entry.x, end.x) - rx - EPS,
+            y: Math.min(entry.y, end.y) - ry - EPS,
             z: 0,
             width: Math.abs(entry.x - end.x) + 2 * (rx + EPS),
             depth: Math.abs(entry.y - end.y) + 2 * (ry + EPS),
@@ -329,12 +299,7 @@ class DatumFixtureLocation {
             patch.y + patch.depth * (index == 2 ? 0.75 : 0.25),
             plane
           ),
-          normal : F.transformVector(
-            basis.frame,
-            0,
-            0,
-            1
-          )
+          normal : F.transformVector(basis.frame, 0, 0, 1)
         });
       }
     }
@@ -344,16 +309,8 @@ class DatumFixtureLocation {
         id: fixing.hardwareId,
         sourceId: fixing.hardwareId,
         role: Preload,
-        point: {
-          x: fixing.entry.x,
-          y: fixing.entry.y,
-          z: fixing.entry.z
-        },
-        normal: {
-          x: -axis.x,
-          y: -axis.y,
-          z: -axis.z
-        }
+        point: {x: fixing.entry.x, y: fixing.entry.y, z: fixing.entry.z},
+        normal: {x: -axis.x, y: -axis.y, z: -axis.z}
       });
     }
     contacts.sort((a, b) -> Reflect.compare(a.id, b.id));
@@ -361,12 +318,7 @@ class DatumFixtureLocation {
       contacts: contacts,
       origin: origin,
       referenceLengthMm: scale,
-      report: FixtureConstraints.analyze(
-        contacts,
-        origin,
-        scale,
-        RANK_TOLERANCE
-      ),
+      report: FixtureConstraints.analyze(contacts, origin, scale, RANK_TOLERANCE),
       unsupportedReasons: reasons
     };
   }

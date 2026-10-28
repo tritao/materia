@@ -35,26 +35,11 @@ class PanelAssemblyPlan {
       id: pair.joint.id,
       joints: [pair.joint],
       members: [
-        {
-          panel: pair.fixed,
-          pose: base,
-          withdrawal: {
-            x: direction.x,
-            y: direction.y,
-            z: direction.z
-          }
-        },
+        {panel: pair.fixed, pose: base, withdrawal: {x: direction.x, y: direction.y, z: direction.z}},
         {
           panel: pair.moving,
-          pose: PanelJoints.movingPose(
-            pair.joint,
-            base
-          ),
-          withdrawal: {
-            x: direction.x,
-            y: direction.y,
-            z: direction.z
-          }
+          pose: PanelJoints.movingPose(pair.joint, base),
+          withdrawal: {x: direction.x, y: direction.y, z: direction.z}
         }
       ]
     };
@@ -102,10 +87,7 @@ class PanelAssemblyPlan {
         var outline = PanelContours.outside(b.panel);
         var section = PanelContours.line(
           {x: fit.tabCenter - fit.tabWidth, y: fit.tabSectionY},
-          {
-            x: fit.tabCenter + fit.tabWidth,
-            y: fit.tabSectionY
-          }
+          {x: fit.tabCenter + fit.tabWidth, y: fit.tabSectionY}
         );
         var hits:Array<Float> = [];
         for (edge in outline) for (hit in CastingProfileGeometry.intersections(section,
@@ -138,12 +120,7 @@ class PanelAssemblyPlan {
         var cx = bounds.x + bounds.width / 2, cy = bounds.y + bounds.height / 2;
         var expectedFixed = PanelContours.circle(cx, cy, pin.openingDiameter / 2);
         var expectedMoving = pin.travel == 0 ? expectedFixed : PanelContours.placed(
-          PanelContours.obround(
-            0,
-            0,
-            pin.openingDiameter + pin.travel,
-            pin.openingDiameter
-          ),
+          PanelContours.obround(0, 0, pin.openingDiameter + pin.travel, pin.openingDiameter),
           pin.angle,
           cx,
           cy

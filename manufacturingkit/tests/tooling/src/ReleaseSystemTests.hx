@@ -29,15 +29,8 @@ class ReleaseSystemTests {
       recoatSeconds: CastingInput.Known(30),
       cureSeconds: CastingInput.Known(60)
     },
-    pva: {
-      reference: CastingTextInput.Known("fixture PVA"),
-      coats: 1,
-      drySeconds: CastingInput.Known(60)
-    },
-    epsCovering: {
-      kind: EPSCoveringKind.Tape,
-      reference: CastingTextInput.Known("fixture tape")
-    },
+    pva: {reference: CastingTextInput.Known("fixture PVA"), coats: 1, drySeconds: CastingInput.Known(60)},
+    epsCovering: {kind: EPSCoveringKind.Tape, reference: CastingTextInput.Known("fixture tape")},
     epsSafety: EPSReleaseSafety.DeclaredSafe
   };
 

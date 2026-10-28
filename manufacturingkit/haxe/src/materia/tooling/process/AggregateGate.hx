@@ -201,14 +201,8 @@ class AggregateGate {
       y: y,
       z: z,
       width: Math.max(a.x + a.width, b.x + b.width) - x,
-      depth: Math.max(
-        a.y + a.depth,
-        b.y + b.depth
-      ) - y,
-      height: Math.max(
-        a.z + a.height,
-        b.z + b.height
-      ) - z
+      depth: Math.max(a.y + a.depth, b.y + b.depth) - y,
+      height: Math.max(a.z + a.height, b.z + b.height) - z
     };
   }
 
@@ -268,10 +262,7 @@ class AggregateGate {
     for (group in groups) group.sourceIds.sort(Reflect.compare);
     groups.sort((a, b) -> Reflect.compare(
       ToolingCodec.canonical([a.kind, a.featurePair]),
-      ToolingCodec.canonical([
-        b.kind,
-        b.featurePair
-      ])
+      ToolingCodec.canonical([b.kind, b.featurePair])
     ));
     var checks:Array<ToolingValidation> = [];
     for (kind in kinds()) {

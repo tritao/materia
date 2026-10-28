@@ -74,14 +74,8 @@ class CastingProfileOffsets {
       var dx = segment.end.x - segment.start.x,
         dy = segment.end.y - segment.start.y, length = Math.sqrt(dx * dx + dy * dy);
       return CastingProfiles.line(
-        {
-          x: segment.start.x - dy / length * distance,
-          y: segment.start.y + dx / length * distance
-        },
-        {
-          x: segment.end.x - dy / length * distance,
-          y: segment.end.y + dx / length * distance
-        }
+        {x: segment.start.x - dy / length * distance, y: segment.start.y + dx / length * distance},
+        {x: segment.end.x - dy / length * distance, y: segment.end.y + dx / length * distance}
       );
     }
     var radius = CastingProfiles.distance(center,

@@ -21,30 +21,16 @@ class CastingPatterns {
     id: id,
     kind: kind,
     geometry: {
-      solid: kind == InsertRecess ? Insert(InsertSpec.InsertBody.Primitive(CastingSolid.Box(
-        width,
-        depth,
-        height
-      ))) : Cut(CastingSolid.Box(
-        width,
-        depth,
-        height
-      )),
-      pose : F.translation(
-        x,
-        y,
-        z
-      )
-    },
+      solid: kind == InsertRecess ? Insert(InsertSpec.InsertBody.Primitive(CastingSolid.Box(width,
+    depth, height))) : Cut(CastingSolid.Box(
+      width,
+      depth,
+      height
+    )),
+    pose : F.translation(x, y, z)
+  },
     openings : openings,
-    draft : {
-      degrees : 0,
-      axis : {
-        x : 0,
-        y : 0,
-        z : 1
-      }
-    },
+    draft : {degrees : 0, axis : {x : 0, y : 0, z : 1}},
     cornerRadius : 0,
     owner : owner,
     adjustable : adjustable == null ? [] : adjustable
@@ -85,11 +71,7 @@ class CastingPatterns {
       -depth / 2 + wall + d / 2 + y * (d + rib),
       sole,
       null,
-      [
-        CastingDimension.Width,
-        CastingDimension.Depth,
-        CastingDimension.Height
-      ]
+      [CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height]
     )];
   }
 }

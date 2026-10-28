@@ -89,13 +89,7 @@ class FormerConstruction {
   public static function recipeSnapshot(raw:Dynamic):FormerRecipe {
     materia.casting.CastingFeatureCodec.fields(
       raw,
-      [
-        "stocks",
-        "cutters",
-        "finishingStockMm",
-        "toleranceMm",
-        "pocketScrew"
-      ]
+      ["stocks", "cutters", "finishingStockMm", "toleranceMm", "pocketScrew"]
     );
     var stocks = [for (row in materia.casting.CastingRecordCodec.array(raw,
       "stocks")) materia.tooling.ToolingCodec.stockSnapshot(row)];
@@ -103,32 +97,14 @@ class FormerConstruction {
     for (row in materia.casting.CastingRecordCodec.array(raw, "cutters")) {
       materia.casting.CastingFeatureCodec.fields(
         row,
-        [
-          "id",
-          "tipDiameterMm",
-          "taperDegrees",
-          "fluteLengthMm",
-          "stickOutMm"
-        ]
+        ["id", "tipDiameterMm", "taperDegrees", "fluteLengthMm", "stickOutMm"]
       );
       var tool:FormerCutter = {
         id: materia.casting.CastingRecordCodec.string(row, "id"),
-        tipDiameterMm: materia.casting.CastingRecordCodec.number(
-          row,
-          "tipDiameterMm"
-        ),
-        taperDegrees: materia.casting.CastingRecordCodec.number(
-          row,
-          "taperDegrees"
-        ),
-        fluteLengthMm: materia.casting.CastingRecordCodec.number(
-          row,
-          "fluteLengthMm"
-        ),
-        stickOutMm: materia.casting.CastingRecordCodec.number(
-          row,
-          "stickOutMm"
-        )
+        tipDiameterMm: materia.casting.CastingRecordCodec.number(row, "tipDiameterMm"),
+        taperDegrees: materia.casting.CastingRecordCodec.number(row, "taperDegrees"),
+        fluteLengthMm: materia.casting.CastingRecordCodec.number(row, "fluteLengthMm"),
+        stickOutMm: materia.casting.CastingRecordCodec.number(row, "stickOutMm")
       };
       materia.casting.CastingFeatureCodec.identifier(tool.id);
       if (ids.exists(tool.id) || tool.tipDiameterMm <= 0 || tool.taperDegrees < 0 || tool.taperDegrees >= 90
@@ -153,32 +129,14 @@ class FormerConstruction {
     var rawScrew = Reflect.field(raw, "pocketScrew");
     materia.casting.CastingFeatureCodec.fields(
       rawScrew,
-      [
-        "diameterMm",
-        "lengthMm",
-        "jigAngleDegrees",
-        "edgeDistanceMm",
-        "maximumPitchMm"
-      ]
+      ["diameterMm", "lengthMm", "jigAngleDegrees", "edgeDistanceMm", "maximumPitchMm"]
     );
     var screw:FormerPocketScrew = {
       diameterMm: materia.casting.CastingRecordCodec.number(rawScrew, "diameterMm"),
-      lengthMm: materia.casting.CastingRecordCodec.number(
-        rawScrew,
-        "lengthMm"
-      ),
-      jigAngleDegrees: materia.casting.CastingRecordCodec.number(
-        rawScrew,
-        "jigAngleDegrees"
-      ),
-      edgeDistanceMm: materia.casting.CastingRecordCodec.number(
-        rawScrew,
-        "edgeDistanceMm"
-      ),
-      maximumPitchMm: materia.casting.CastingRecordCodec.number(
-        rawScrew,
-        "maximumPitchMm"
-      )
+      lengthMm: materia.casting.CastingRecordCodec.number(rawScrew, "lengthMm"),
+      jigAngleDegrees: materia.casting.CastingRecordCodec.number(rawScrew, "jigAngleDegrees"),
+      edgeDistanceMm: materia.casting.CastingRecordCodec.number(rawScrew, "edgeDistanceMm"),
+      maximumPitchMm: materia.casting.CastingRecordCodec.number(rawScrew, "maximumPitchMm")
     };
     if (screw.diameterMm <= 0 || screw.lengthMm <= screw.diameterMm
       || screw.jigAngleDegrees <= 0 || screw.jigAngleDegrees >= 45 || screw.edgeDistanceMm < 2 * screw.diameterMm

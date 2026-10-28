@@ -27,10 +27,7 @@ class CastingProfileGeometry {
       var segment = profile[index], next = profile[(index + 1) % profile.length];
       if (segment.center != null && segment.sweep > 0) minimum = Math.min(
         minimum,
-        CastingProfiles.distance(
-          segment.center,
-          segment.start
-        )
+        CastingProfiles.distance(segment.center, segment.start)
       );
       var a = tangent(segment, true), b = tangent(next, false);
       var turn = a.x * b.y - a.y * b.x;
@@ -54,10 +51,7 @@ class CastingProfileGeometry {
       var dx = s.end.x - s.start.x, dy = s.end.y - s.start.y;
       return Math.abs(cross(dx, dy, p.x - s.start.x, p.y - s.start.y)) <= TOL * Math.max(
         1,
-        CastingProfiles.distance(
-          s.start,
-          s.end
-        )
+        CastingProfiles.distance(s.start, s.end)
       ) && p.x >= Math.min(
         s.start.x,
         s.end.x
@@ -95,10 +89,7 @@ class CastingProfileGeometry {
       var disc = bb * bb - 4 * aa * cc;
       if (disc >= -TOL && aa > 0) for (t in [
         (-bb - Math.sqrt(Math.max(0, disc))) / (2 * aa),
-        (-bb + Math.sqrt(Math.max(
-          0,
-          disc
-        ))) / (2 * aa)
+        (-bb + Math.sqrt(Math.max(0, disc))) / (2 * aa)
       ]) candidates.push({
         x: l.start.x + t * dx,
         y: l.start.y + t * dy
@@ -189,10 +180,7 @@ class CastingProfileGeometry {
             c,
             s.start
           ) < TOL || CastingProfiles.distance(
-            CastingProfiles.point(
-              s,
-              1
-            ),
+            CastingProfiles.point(s, 1),
             s.end
           ) > TOL) throw "Invalid profile arc";
       } else throw "Unknown profile curve kind";
@@ -220,10 +208,7 @@ class CastingProfileGeometry {
       var c = s.center;
       total += c == null ? (s.start.x * s.end.y - s.end.x * s.start.y) / 2
         : (c.x * (s.end.y - s.start.y) - c.y * (s.end.x - s.start.x) + Math.pow(
-          CastingProfiles.distance(
-            c,
-            s.start
-          ),
+          CastingProfiles.distance(c, s.start),
           2
         ) * s.sweep) / 2;
     }

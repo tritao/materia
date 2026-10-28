@@ -22,10 +22,7 @@ class PanelCoupon {
       bodyHeight: 50,
       offsetX: 5,
       slotY: 40,
-      tabs: [{
-        center: 30.0,
-        width: 30.0
-      }],
+      tabs: [{center: 30.0, width: 30.0}],
       clearance: clearances[0],
       routerDiameter: router,
       minimumLigament: 6
@@ -39,13 +36,7 @@ class PanelCoupon {
       pair.fixed.operations.push(PanelJoints.operation(
         'fit-$i',
         InsideProfile,
-        PanelContours.relievedRectangle(
-          35 + 50 * i,
-          40,
-          30 + c,
-          stock.measuredThickness + c,
-          router / 2
-        ),
+        PanelContours.relievedRectangle(35 + 50 * i, 40, 30 + c, stock.measuredThickness + c, router / 2),
         stock.measuredThickness,
         router,
         MachiningSide.PositiveZ,

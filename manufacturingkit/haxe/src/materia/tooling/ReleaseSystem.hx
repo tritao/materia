@@ -82,10 +82,7 @@ class ReleaseSystems {
         cureSeconds: CastingInput.Unresolved(agent)
       },
       pva: pva,
-      epsCovering: {
-        kind: kind,
-        reference: CastingTextInput.Unresolved("Select the declared EPS covering product")
-      },
+      epsCovering: {kind: kind, reference: CastingTextInput.Unresolved("Select the declared EPS covering product")},
       epsSafety: EPSReleaseSafety.Unresolved("Release-agent EPS safety is not yet declared")
     });
   }
@@ -158,14 +155,7 @@ class ReleaseSystems {
     CastingFeatureCodec.fields(sealer, ["reference", "coats", "drySeconds", "cureSeconds"]);
     CastingFeatureCodec.fields(
       agent,
-      [
-        "reference",
-        "coats",
-        "drySeconds",
-        "buffSeconds",
-        "recoatSeconds",
-        "cureSeconds"
-      ]
+      ["reference", "coats", "drySeconds", "buffSeconds", "recoatSeconds", "cureSeconds"]
     );
     var pvaRaw:Dynamic = Reflect.field(raw, "pva"), pva:Null<ReleaseFilm> = null;
     if (pvaRaw != null) {
@@ -173,10 +163,7 @@ class ReleaseSystems {
       pva = {
         reference: CastingInputs.text(Reflect.field(pvaRaw, "reference")),
         coats: coats(pvaRaw),
-        drySeconds: seconds(
-          pvaRaw,
-          "drySeconds"
-        )
+        drySeconds: seconds(pvaRaw, "drySeconds")
       };
     }
     var eps:Dynamic = Reflect.field(raw, "epsCovering");
@@ -185,53 +172,23 @@ class ReleaseSystems {
       sealer: {
         reference: CastingInputs.text(Reflect.field(sealer, "reference")),
         coats: coats(sealer),
-        drySeconds: seconds(
-          sealer,
-          "drySeconds"
-        ),
-        cureSeconds: seconds(
-          sealer,
-          "cureSeconds"
-        )
+        drySeconds: seconds(sealer, "drySeconds"),
+        cureSeconds: seconds(sealer, "cureSeconds")
       },
       agent: {
-        reference: CastingInputs.text(Reflect.field(
-          agent,
-          "reference"
-        )),
+        reference: CastingInputs.text(Reflect.field(agent, "reference")),
         coats: coats(agent),
-        drySeconds: seconds(
-          agent,
-          "drySeconds"
-        ),
-        buffSeconds: seconds(
-          agent,
-          "buffSeconds"
-        ),
-        recoatSeconds: seconds(
-          agent,
-          "recoatSeconds"
-        ),
-        cureSeconds: seconds(
-          agent,
-          "cureSeconds"
-        )
+        drySeconds: seconds(agent, "drySeconds"),
+        buffSeconds: seconds(agent, "buffSeconds"),
+        recoatSeconds: seconds(agent, "recoatSeconds"),
+        cureSeconds: seconds(agent, "cureSeconds")
       },
       pva: pva,
       epsCovering: {
-        kind: covering(CastingRecordCodec.string(
-          eps,
-          "kind"
-        )),
-        reference: CastingInputs.text(Reflect.field(
-          eps,
-          "reference"
-        ))
+        kind: covering(CastingRecordCodec.string(eps, "kind")),
+        reference: CastingInputs.text(Reflect.field(eps, "reference"))
       },
-      epsSafety: safety(Reflect.field(
-        raw,
-        "epsSafety"
-      ))
+      epsSafety: safety(Reflect.field(raw, "epsSafety"))
     };
   }
 

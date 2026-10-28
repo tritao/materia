@@ -55,10 +55,7 @@ class FoundationJointSourceCodec {
       var body:FoundationJointBody = {
         member: member(row, seen),
         pose: C.frame(Reflect.field(row, "pose")),
-        interfaces: InterfaceRequirements.snapshot(Reflect.field(
-          row,
-          "interfaces"
-        )),
+        interfaces: InterfaceRequirements.snapshot(Reflect.field(row, "interfaces")),
         insertMembers: []
       };
       var owners:Map<String, Bool> = [];
@@ -78,10 +75,7 @@ class FoundationJointSourceCodec {
       result.inserts.push({
         member: member(row, seen),
         pose: C.frame(Reflect.field(row, "pose")),
-        spec: InsertSpecCodec.snapshot(Reflect.field(
-          row,
-          "spec"
-        ))
+        spec: InsertSpecCodec.snapshot(Reflect.field(row, "spec"))
       });
     }
     for (row in bounded(raw, "screws")) {
@@ -101,22 +95,10 @@ class FoundationJointSourceCodec {
         member: member(row, seen),
         kind: kind,
         partNumber: partNumber,
-        thread: InsertThreadCodec.snapshot(Reflect.field(
-          row,
-          "thread"
-        )),
-        shankLength: C.number(
-          row,
-          "shankLength"
-        ),
-        threadedLength: C.number(
-          row,
-          "threadedLength"
-        ),
-        bearingFrame: C.frame(Reflect.field(
-          row,
-          "bearingFrame"
-        ))
+        thread: InsertThreadCodec.snapshot(Reflect.field(row, "thread")),
+        shankLength: C.number(row, "shankLength"),
+        threadedLength: C.number(row, "threadedLength"),
+        bearingFrame: C.frame(Reflect.field(row, "bearingFrame"))
       };
       if (screw.thread.internal || screw.shankLength <= 0 || screw.threadedLength <= 0 || screw.threadedLength
         > screw.shankLength) throw "Invalid foundation joint external screw geometry: " + screw.member;

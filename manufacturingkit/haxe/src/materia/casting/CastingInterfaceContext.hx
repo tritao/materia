@@ -28,14 +28,7 @@ class CastingInterfaceContexts {
   public static function snapshot(raw:Dynamic):CastingInterfaceContext {
     CastingFeatureCodec.fields(
       raw,
-      [
-        "bodyMember",
-        "inserts",
-        "relationships",
-        "sources",
-        "foundationJoints",
-        "jointSources"
-      ]
+      ["bodyMember", "inserts", "relationships", "sources", "foundationJoints", "jointSources"]
     );
     var body = CastingRecordCodec.string(raw, "bodyMember");
     CastingRecordCodec.referencePath(body);
@@ -48,10 +41,7 @@ class CastingInterfaceContexts {
         raw,
         "foundationJoints"
       )),
-      jointSources: FoundationJointSources.FoundationJointSourceCodec.snapshot(Reflect.field(
-        raw,
-        "jointSources"
-      ))
+      jointSources: FoundationJointSources.FoundationJointSourceCodec.snapshot(Reflect.field(raw, "jointSources"))
     };
     FoundationJointAnalysis.validate(result.jointSources, result.foundationJoints);
     for (instance in result.foundationJoints) if (instance.joint.lowerBody != body
@@ -150,11 +140,7 @@ class CastingInterfaceContexts {
         kind: "axis",
         joint: joint,
         frame: CastingRecordCodec.frame(frame),
-        direction: {
-          x: direction.x,
-          y: direction.y,
-          z: direction.z
-        }
+        direction: {x: direction.x, y: direction.y, z: direction.z}
       };
   };
 
@@ -167,10 +153,7 @@ class CastingInterfaceContexts {
         Precision(
           member,
           InterfaceRequirements.snapshot([Reflect.field(raw, "requirement")])[0],
-          CastingRecordCodec.frame(Reflect.field(
-            raw,
-            "pose"
-          ))
+          CastingRecordCodec.frame(Reflect.field(raw, "pose"))
         );
       case "axis":
         CastingFeatureCodec.fields(raw, ["kind", "joint", "frame", "direction"]);
@@ -181,10 +164,7 @@ class CastingInterfaceContexts {
         var direction = {
           x: CastingRecordCodec.number(d, "x"),
           y: CastingRecordCodec.number(d, "y"),
-          z: CastingRecordCodec.number(
-            d,
-            "z"
-          )
+          z: CastingRecordCodec.number(d, "z")
         };
         if (Math.abs(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z - 1)
           > 1e-8) throw "Interface context machine axis must be unit length";

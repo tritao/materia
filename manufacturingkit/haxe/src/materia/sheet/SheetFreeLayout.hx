@@ -34,19 +34,7 @@ class SheetFreeLayout {
       || !Math.isFinite(r.height) || r.width <= 0 || r.height <= 0) throw "Invalid free-form rectangular remnant";
   }
   static function xml(text:String):String return StringTools.replace(
-    StringTools.replace(
-      StringTools.replace(
-        StringTools.replace(
-          text,
-          "&",
-          "&amp;"
-        ),
-        "<",
-        "&lt;"
-      ),
-      ">",
-      "&gt;"
-    ),
+    StringTools.replace(StringTools.replace(StringTools.replace(text, "&", "&amp;"), "<", "&lt;"), ">", "&gt;"),
     '"',
     "&quot;"
   );
@@ -72,12 +60,7 @@ class SheetFreeLayout {
       r.y,
       0,
       r.width * r.height,
-      haxe.Json.stringify(SheetPolygon.rectangle(
-        r.x,
-        r.y,
-        r.width,
-        r.height
-      ))
+      haxe.Json.stringify(SheetPolygon.rectangle(r.x, r.y, r.width, r.height))
     ]));
     return rows.join("\n") + "\n";
   }

@@ -57,11 +57,7 @@ class InterfaceQualification {
         )),
         pose: materia.assembly.AssemblyFrames.compose(
           insert.pose,
-          materia.assembly.AssemblyFrames.translation(
-            layer.x + layer.width / 2,
-            layer.y + layer.depth / 2,
-            layer.z
-          )
+          materia.assembly.AssemblyFrames.translation(layer.x + layer.width / 2, layer.y + layer.depth / 2, layer.z)
         )
       });
       var material = materia.casting.BoxAlgebra.material(input.envelope, input.features);
@@ -212,10 +208,7 @@ class InterfaceQualification {
     var checks:Array<ToolingValidation> = [];
     for (datum in unresolved) checks.push({
       rule: "tooling.datum.reference." + datum.datumId,
-      affectedIds: [
-        input.id,
-        datum.featureId
-      ],
+      affectedIds: [input.id, datum.featureId],
       status: ToolingCheckStatus.Unsupported,
       severity: ToolingSeverity.Error,
       message: datum.reason + ": " + datum.featureId,

@@ -44,10 +44,7 @@ class MoldRegions {
     var source = matches[0];
     return Placed({
       solid: Insert(materia.casting.InsertSpec.InsertBodyCodec.copy(source.body)),
-      pose: F.compose(
-        document.setup.sourceToMold,
-        source.pose
-      )
+      pose: F.compose(document.setup.sourceToMold, source.pose)
     });
   }
 
@@ -77,10 +74,7 @@ class MoldRegions {
   }
 
   public static function profile(part:CastingMoldPlan.MoldVolumeProfile):CastingRegion return CastingRegion.Placed({
-    solid: CastingGeometrySolid.Prism(
-      part.contour,
-      part.depth
-    ),
+    solid: CastingGeometrySolid.Prism(part.contour, part.depth),
     pose: part.pose
   });
 
@@ -90,10 +84,7 @@ class MoldRegions {
     depth:Float
   ):CastingRegion {
     function prism(contour:Array<materia.casting.CastingProfile.CastingSegment>):CastingRegion return Placed({
-      solid: Prism(
-        contour,
-        depth
-      ),
+      solid: Prism(contour, depth),
       pose: pose
     });
     var pieces:Array<CastingRegion> = [];
@@ -123,16 +114,8 @@ class MoldRegions {
   };
 
   public static function box(value:Box3):CastingRegion return CastingRegion.Placed({
-    solid: CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(
-      value.width,
-      value.depth,
-      value.height
-    )),
-    pose: F.translation(
-      value.x + value.width / 2,
-      value.y + value.depth / 2,
-      value.z
-    )
+    solid: CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(value.width, value.depth, value.height)),
+    pose: F.translation(value.x + value.width / 2, value.y + value.depth / 2, value.z)
   });
 
   public static function boxes(region:CastingRegion):Null<Array<Box3
@@ -203,19 +186,8 @@ class MoldRegions {
             || (segment.start.x != bounds.x && segment.start.x != bounds.x + bounds.width)
             || (segment.start.y != bounds.y && segment.start.y != bounds.y + bounds.height)).length > 0) return null;
           candidate = {
-            solid: CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(
-              bounds.width,
-              bounds.height,
-              height
-            )),
-            pose: F.compose(
-              geometry.pose,
-              F.translation(
-                bounds.x + bounds.width / 2,
-                bounds.y + bounds.height / 2,
-                0
-              )
-            )
+            solid: CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(bounds.width, bounds.height, height)),
+            pose: F.compose(geometry.pose, F.translation(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, 0))
           };
         default:
       }
@@ -312,14 +284,8 @@ class MoldVolumeRecords {
         y: number(b, "y"),
         z: number(b, "z"),
         width: number(b, "width"),
-        depth: number(
-          b,
-          "depth"
-        ),
-        height: number(
-          b,
-          "height"
-        )
+        depth: number(b, "depth"),
+        height: number(b, "height")
       };
       if (box.width <= 0 || box.depth <= 0 || box.height <= 0) throw "Invalid mold box dimensions";
       box;
@@ -332,26 +298,11 @@ class MoldVolumeRecords {
     var pose:materia.assembly.AssemblyRecord.AssemblyFrame = {
       x: number(raw, "x"),
       y: number(raw, "y"),
-      z: number(
-        raw,
-        "z"
-      ),
-      qx: number(
-        raw,
-        "qx"
-      ),
-      qy: number(
-        raw,
-        "qy"
-      ),
-      qz: number(
-        raw,
-        "qz"
-      ),
-      qw: number(
-        raw,
-        "qw"
-      )
+      z: number(raw, "z"),
+      qx: number(raw, "qx"),
+      qy: number(raw, "qy"),
+      qz: number(raw, "qz"),
+      qw: number(raw, "qw")
     };
     materia.assembly.AssemblyCodec.validateFrame(pose);
     if (Math.abs(pose.qx * pose.qx + pose.qy * pose.qy + pose.qz * pose.qz + pose.qw * pose.qw - 1)
@@ -405,10 +356,7 @@ class MoldVolumeRecords {
       profiles.push({
         panelId: text(p, "panelId"),
         operationId: text(p, "operationId"),
-        contour: PanelCodec.contourSnapshot(Reflect.field(
-          p,
-          "contour"
-        )),
+        contour: PanelCodec.contourSnapshot(Reflect.field(p, "contour")),
         pose: pose,
         depth: depth,
         subtract: subtract

@@ -54,10 +54,7 @@ class MoldCoreLayers {
       foamEnvelope: MoldRegions.box(foam),
       layers: layers,
       coveringThickness: cover,
-      support: CoreSupports.specification(
-        kind,
-        r
-      )
+      support: CoreSupports.specification(kind, r)
     };
   }
 
@@ -67,11 +64,7 @@ class MoldCoreLayers {
     return MoldCoreDrafts.hasDraft(region,
       id) ? MoldCoreDrafts.section(region, id, EPS) != null : kernel.prismaticSection(
         region,
-        {
-          x : 0,
-          y : 0,
-          z : 1
-        },
+        {x : 0, y : 0, z : 1},
         EPS,
         id
       ) != null;
@@ -79,10 +72,7 @@ class MoldCoreLayers {
 
   static function prism(profile:Array<CastingSegment>,
     pose:materia.assembly.AssemblyRecord.AssemblyFrame, depth:Float):CastingRegion return CastingRegion.Placed({
-      solid: Prism(
-        profile,
-        depth
-      ),
+      solid: Prism(profile, depth),
       pose: pose
     });
 
@@ -96,11 +86,7 @@ class MoldCoreLayers {
     if (kernel == null) throw "Exact geometry kernel required";
     var section = MoldCoreDrafts.hasDraft(region, featureId) ? null : kernel.prismaticSection(
       region,
-      {
-        x : 0,
-        y : 0,
-        z : 1
-      },
+      {x : 0, y : 0, z : 1},
       EPS,
       featureId
     );
@@ -123,24 +109,13 @@ class MoldCoreLayers {
       ));
       var sourcePiece = CastingRegion.Difference(
         prism(outer.contour, section.pose, section.depth),
-        [for (hole in holes) prism(
-          hole.contour,
-          section.pose,
-          section.depth
-        )]
+        [for (hole in holes) prism(hole.contour, section.pose, section.depth)]
       );
       var cavity = outers.length == 1 ? region : CastingRegion.Intersection([region, sourcePiece]);
       var pose = F.compose(section.pose, F.translation(0, 0, cover));
       var foam = CastingRegion.Difference(
         prism(Offset.inward(outer.contour, cover), pose, height),
-        [for (hole in holes) prism(
-          Offset.outward(
-            hole.contour,
-            cover
-          ),
-          pose,
-          height
-        )]
+        [for (hole in holes) prism(Offset.outward(hole.contour, cover), pose, height)]
       );
       var id = materia.tooling.ToolingIds.derive("core-", featureId, outers.length == 1 ? "" : "-piece-" + index);
       result.push(core(cavity, foam, featureId, id, r, true));
@@ -226,14 +201,7 @@ class MoldCoreLayers {
           var pose = F.translation(0, 0, bottom);
           outers.push(CastingRegion.Difference(
             prism(Offset.inward(outer.contour, cover), pose, top - bottom),
-            [for (hole in holes) prism(
-              Offset.outward(
-                hole.contour,
-                cover
-              ),
-              pose,
-              top - bottom
-            )]
+            [for (hole in holes) prism(Offset.outward(hole.contour, cover), pose, top - bottom)]
           ));
         }
         sections.push(CastingRegion.Union(outers));
@@ -254,10 +222,7 @@ class MoldCoreLayers {
         if (other == null) throw "EPS stock interval is not prismatic: " + featureId;
         var old = MoldRegions.section(other.contours, F.identity(), 1);
         var difference = MoldRegions.volume(CastingRegion.Difference(footprint, [old]), featureId) + MoldRegions.volume(
-          CastingRegion.Difference(
-            old,
-            [footprint]
-          ),
+          CastingRegion.Difference(old, [footprint]),
           featureId
         );
         if (difference <= EPS) {
@@ -282,14 +247,7 @@ class MoldCoreLayers {
         <= bottom) throw "Adhesive consumes EPS stock band " + cell.bottom + ".." + cell.top + " mm: " + featureId;
       var trimmed = CastingRegion.Intersection([
         cell.region,
-        MoldRegions.box({
-          x: 0,
-          y: 0,
-          z: bottom,
-          width: bounds.width,
-          depth: bounds.depth,
-          height: top - bottom
-        })
+        MoldRegions.box({x: 0, y: 0, z: bottom, width: bounds.width, depth: bounds.depth, height: top - bottom})
       ]);
       for (cutting in tiles(trimmed, id, r, true)) {
         cutting.stockToMold = F.compose(frame, cutting.stockToMold);
@@ -334,17 +292,9 @@ class MoldCoreLayers {
       featureId: featureId,
       cavity: cavity,
       foamEnvelope: foam,
-      layers: tiles(
-        foam,
-        id,
-        r,
-        allowProfileSplit
-      ),
+      layers: tiles(foam, id, r, allowProfileSplit),
       coveringThickness: r.linerThickness,
-      support: CoreSupports.specification(
-        CoreSupport.CoreSupportKind.Bridge,
-        r
-      )
+      support: CoreSupports.specification(CoreSupport.CoreSupportKind.Bridge, r)
     };
   }
 

@@ -33,12 +33,7 @@ class CastingSourceRegions {
     for (axis in [
       F.transformVector(d.setup.sourceToMold, 1, 0, 0),
       F.transformVector(d.setup.sourceToMold, 0, 1, 0),
-      F.transformVector(
-        d.setup.sourceToMold,
-        0,
-        0,
-        1
-      )
+      F.transformVector(d.setup.sourceToMold, 0, 0, 1)
     ]) if (materia.casting.CastingBounds.axis(axis) == null) {
       result.validation = [FillAnalysis.check(
         RULE + "." + d.input.id,
@@ -55,14 +50,7 @@ class CastingSourceRegions {
         box.width,
         box.depth,
         box.height,
-        F.compose(
-          d.setup.sourceToMold,
-          F.translation(
-            box.x + box.width / 2,
-            box.y + box.depth / 2,
-            box.z
-          )
-        )
+        F.compose(d.setup.sourceToMold, F.translation(box.x + box.width / 2, box.y + box.depth / 2, box.z))
       );
     }
     var envelope:CastingCavities.FinishedCastingCavity = {

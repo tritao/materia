@@ -107,58 +107,22 @@ class InsertHoleCodec {
         CastingFeatureCodec.fields(cb, ["diameter", "depth"]);
         counterbore = {
           diameter: CastingRecordCodec.number(cb, "diameter"),
-          depth: CastingRecordCodec.number(
-            cb,
-            "depth"
-          )
+          depth: CastingRecordCodec.number(cb, "depth")
         };
       }
       result.push({
         id: CastingRecordCodec.string(row, "id"),
         frame: CastingRecordCodec.frame(Reflect.field(row, "frame")),
-        diameter: CastingRecordCodec.number(
-          row,
-          "diameter"
-        ),
-        depth: CastingRecordCodec.number(
-          row,
-          "depth"
-        ),
-        extent: cast CastingRecordCodec.string(
-          row,
-          "extent"
-        ),
+        diameter: CastingRecordCodec.number(row, "diameter"),
+        depth: CastingRecordCodec.number(row, "depth"),
+        extent: cast CastingRecordCodec.string(row, "extent"),
         thread: thread,
-        tapDrill: Reflect.field(
-          row,
-          "tapDrill"
-        ) == null ? null : CastingRecordCodec.number(
-          row,
-          "tapDrill"
-        ),
-        clearanceDiameter : CastingRecordCodec.number(
-          row,
-          "clearanceDiameter"
-        ),
-        threadDepth : Reflect.field(
-          row,
-          "threadDepth"
-        ) == null ? null : CastingRecordCodec.number(
-          row,
-          "threadDepth"
-        ),
+        tapDrill: Reflect.field(row, "tapDrill") == null ? null : CastingRecordCodec.number(row, "tapDrill"),
+        clearanceDiameter : CastingRecordCodec.number(row, "clearanceDiameter"),
+        threadDepth : Reflect.field(row, "threadDepth") == null ? null : CastingRecordCodec.number(row, "threadDepth"),
         counterbore : counterbore,
-        relief : relief(Reflect.field(
-          row,
-          "relief"
-        )),
-        limits : limits(
-          Reflect.field(
-            row,
-            "limits"
-          ),
-          thread != null
-        )
+        relief : relief(Reflect.field(row, "relief")),
+        limits : limits(Reflect.field(row, "limits"), thread != null)
       });
     }
     for (h in result) {
@@ -230,18 +194,9 @@ class InsertHoleCodec {
     var result:InsertHoleLimits = {
       policyId: CastingRecordCodec.string(raw, "policyId"),
       threaded: null,
-      minBack: CastingRecordCodec.number(
-        raw,
-        "minBack"
-      ),
-      minWall: CastingRecordCodec.number(
-        raw,
-        "minWall"
-      ),
-      minClearance: CastingRecordCodec.number(
-        raw,
-        "minClearance"
-      ),
+      minBack: CastingRecordCodec.number(raw, "minBack"),
+      minWall: CastingRecordCodec.number(raw, "minWall"),
+      minClearance: CastingRecordCodec.number(raw, "minClearance"),
       overrides: []
     };
     if (threaded) {

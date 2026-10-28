@@ -13,11 +13,7 @@ class ToolingTestRules {
     id:String,
     strategy:CoreStrategy,
     priority:Int = 0,
-    ?direction: {
-      x: Float,
-      y: Float,
-      z: Float
-    }
+    ?direction: {x: Float, y: Float, z: Float}
   ):Void {
     var feature = d.input.features.filter(feature -> feature.id == id)[0];
     if (feature == null || feature.kind == InsertRecess) throw "Invalid test source feature: " + id;

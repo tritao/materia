@@ -51,16 +51,7 @@ class PanelTests {
         bodyHeight: 100,
         offsetX: 20,
         slotY: 150,
-        tabs: [
-          {
-            center: 55.0,
-            width: 30.0
-          },
-          {
-            center: 210.0,
-            width: 44.0
-          }
-        ],
+        tabs: [{center: 55.0, width: 30.0}, {center: 210.0, width: 44.0}],
         clearance: 0.2,
         routerDiameter: 6,
         minimumLigament: 6
@@ -117,10 +108,7 @@ class PanelTests {
         valid,
         [
           {movingId: mismatch.fixed.id, blockerId: mismatch.moving.id},
-          {
-            movingId: mismatch.moving.id,
-            blockerId: mismatch.fixed.id
-          }
+          {movingId: mismatch.moving.id, blockerId: mismatch.fixed.id}
         ]
       ),
       "Cyclic panel blocking graph"
@@ -169,22 +157,7 @@ class PanelTests {
       7,
       6,
       6,
-      {
-        width: 220,
-        height: 160,
-        primary: {
-          x: 40,
-          y: 40
-        },
-        secondary: {
-          x: 140,
-          y: 80
-        },
-        bolt: {
-          x: 90,
-          y: 110
-        }
-      }
+      {width: 220, height: 160, primary: {x: 40, y: 40}, secondary: {x: 140, y: 80}, bolt: {x: 90, y: 110}}
     );
     PanelAssemblyPlan.validate(PanelAssemblyPlan.pair(diagonal));
     check(
@@ -237,13 +210,7 @@ class PanelTests {
     reliefRadius.operations.push(PanelJoints.operation(
       "small-radius",
       Pocket,
-      PanelContours.relievedRectangle(
-        40,
-        40,
-        30,
-        20,
-        2
-      ),
+      PanelContours.relievedRectangle(40, 40, 30, 20, 2),
       4,
       6,
       MachiningSide.NegativeZ,
@@ -271,10 +238,7 @@ class PanelTests {
       bodyHeight: 70,
       offsetX: 20,
       slotY: 80,
-      tabs: [{
-        center: 60.0,
-        width: 30.0
-      }],
+      tabs: [{center: 60.0, width: 30.0}],
       clearance: 0.2,
       routerDiameter: 6,
       minimumLigament: 6
@@ -294,17 +258,7 @@ class PanelTests {
     var cyclicMessage = "";
     try PanelAssemblyPlan.topological(
       ["dependent", "a", "b"],
-      [
-        {movingId: "dependent", blockerId: "a"},
-        {
-          movingId: "a",
-          blockerId: "b"
-        },
-        {
-          movingId: "b",
-          blockerId: "a"
-        }
-      ]
+      [{movingId: "dependent", blockerId: "a"}, {movingId: "a", blockerId: "b"}, {movingId: "b", blockerId: "a"}]
     ) catch (e:Dynamic) cyclicMessage = Std.string(e);
     check(
       cyclicMessage == "Cyclic panel blocking graph: a, b; edges: a -> b, b -> a",

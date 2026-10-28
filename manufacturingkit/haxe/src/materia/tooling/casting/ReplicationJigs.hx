@@ -113,10 +113,7 @@ class ReplicationJigs {
             requirement.id
           ))) < 0) result.push(check(
             "tooling.replication.jig-reference." + choice.insertId + "." + requirement.id,
-            [
-              choice.insertId,
-              requirement.id
-            ],
+            [choice.insertId, requirement.id],
             ToolingCheckStatus.Fail,
             "Selected jig does not carry the source replication interface: " + requirement.id
           ));
@@ -216,10 +213,7 @@ class ReplicationJigs {
         var bottom = p.z, top = height - p.z;
         dx >= -epsilon && dy >= -epsilon && bottom >= -epsilon && top >= -epsilon && Math.min(
           Math.min(dx, dy),
-          Math.min(
-            bottom,
-            top
-          )
+          Math.min(bottom, top)
         ) <= epsilon;
       case Cylinder(diameter, height):
         var radial = diameter / 2 - Math.sqrt(p.x * p.x + p.y * p.y), bottom = p.z, top = height - p.z;

@@ -58,11 +58,7 @@ class FoundationModelTests {
       0,
       0,
       null,
-      [
-        CastingDimension.Width,
-        CastingDimension.Depth,
-        CastingDimension.Height
-      ]
+      [CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height]
     );
     var encoded = CastingFeatureCodec.encode([cut]);
     check(CastingFeatureCodec.encode(CastingFeatureCodec.decode(encoded)) == encoded, "typed feature codec roundtrip");
@@ -110,22 +106,8 @@ class FoundationModelTests {
     );
     var nearPlanes = BoxAlgebra.compact([
       {x: 0.0, y: 0.0, z: 0.0, width: 20.0, depth: 10.0, height: 10.0},
-      {
-        x: 20.0 - 5e-14,
-        y: 10.0,
-        z: 0.0,
-        width: 20.0,
-        depth: 10.0,
-        height: 10.0
-      },
-      {
-        x: 0.0,
-        y: 20.0,
-        z: 0.0,
-        width: 40.0,
-        depth: 10.0,
-        height: 10.0
-      }
+      {x: 20.0 - 5e-14, y: 10.0, z: 0.0, width: 20.0, depth: 10.0, height: 10.0},
+      {x: 0.0, y: 20.0, z: 0.0, width: 40.0, depth: 10.0, height: 10.0}
     ]);
     for (piece in nearPlanes) check(
       piece.width > 1e-9 && piece.depth > 1e-9 && piece.height > 1e-9,
@@ -152,17 +134,7 @@ class FoundationModelTests {
       0,
       0,
       10,
-      [
-        cosine,
-        -sine,
-        0,
-        sine,
-        cosine,
-        0,
-        0,
-        0,
-        1
-      ]
+      [cosine, -sine, 0, sine, cosine, 0, 0, 0, 1]
     );
     rejects(() -> CastingCavities.derive(body, [tilted]), "Unsupported casting feature: almost-axis");
     var drafted = P.box("drafted-intent", Lightening, [], 10, 10, 10, 0, 0, 10);
@@ -200,22 +172,8 @@ class FoundationModelTests {
     var near = 20.000000000000057;
     var sections:Array<materia.casting.Box3> = [
       {x: 0, y: 0, z: 0, width: 40, depth: 10, height: 10},
-      {
-        x: 0,
-        y: 0,
-        z: 10,
-        width: 20,
-        depth: 10,
-        height: 10
-      },
-      {
-        x: near,
-        y: 0,
-        z: 10,
-        width: 40 - near,
-        depth: 10,
-        height: 10
-      }
+      {x: 0, y: 0, z: 10, width: 20, depth: 10, height: 10},
+      {x: near, y: 0, z: 10, width: 40 - near, depth: 10, height: 10}
     ];
     check(
       Math.abs(BoxAlgebra.minimumIy(sections, 0, 40) - 10 * 20 * 20 * 20 / 12) < 1e-6,
@@ -305,26 +263,14 @@ class FoundationModelTests {
     rejects(
       () -> InsertBodyCodec.record(CrimpedSocket(
         Box(8, 8, 25),
-        {
-          length: 15,
-          width: 11,
-          thickness: 2.2,
-          wave: 1.4,
-          blend: 0.5
-        }
+        {length: 15, width: 11, thickness: 2.2, wave: 1.4, blend: 0.5}
       )),
       "mouth must be cylindrical"
     );
     rejects(
       () -> InsertBodyCodec.record(CrimpedSocket(
         Cylinder(8, 25),
-        {
-          length: 15,
-          width: 7,
-          thickness: 2.2,
-          wave: 1.4,
-          blend: 0.5
-        }
+        {length: 15, width: 7, thickness: 2.2, wave: 1.4, blend: 0.5}
       )),
       "Inconsistent insert crimped tail"
     );

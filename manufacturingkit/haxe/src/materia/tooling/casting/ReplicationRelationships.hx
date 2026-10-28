@@ -84,10 +84,7 @@ class ReplicationRelationships {
         point: {x: frame.x, y: frame.y, z: frame.z},
         direction: unit(direction),
         kind: kind,
-        radius: ReplicationPlacement.stockRadius(
-          master.body,
-          master.reference
-        )
+        radius: ReplicationPlacement.stockRadius(master.body, master.reference)
       });
     }
     var limit = R.maxDeviation(relationship.tolerance), worst = 0.0;
@@ -145,10 +142,7 @@ class ReplicationRelationships {
           var sine = length(cross(a.direction, b.direction));
           worst = Math.max(
             Math.abs(Math.abs(dot(delta, a.direction)) - separation) + b.radius * sine,
-            Math.abs(Math.abs(dot(
-              delta,
-              b.direction
-            )) - separation) + a.radius * sine
+            Math.abs(Math.abs(dot(delta, b.direction)) - separation) + a.radius * sine
           );
         } else if (a.kind == LineReference && b.kind == LineReference) {
           if (length(cross(a.direction, b.direction)) > DIRECTION_ROUNDOFF) return result(

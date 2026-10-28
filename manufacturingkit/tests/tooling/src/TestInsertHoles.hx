@@ -17,22 +17,7 @@ class TestInsertHoles {
       || diameter <= 0 || depth <= 0) throw "Test hole pattern requires positive drilling dimensions";
     return [{
       id: "fixing",
-      frame: materia.assembly.AssemblyFrames.fromRotationMatrix(
-        0,
-        0,
-        depth,
-        [
-          1,
-          0,
-          0,
-          0,
-          -1,
-          0,
-          0,
-          0,
-          -1
-        ]
-      ),
+      frame: materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, depth, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
       diameter: diameter,
       depth: depth,
       extent: Through,

@@ -39,10 +39,7 @@ class CastingDraftSections {
       pose: CastingRecordCodec.frame(pose),
       depth: depth,
       opening: opening,
-      inner: CastingProfileOffsets.inward(
-        opening,
-        depth * Math.tan(degrees * Math.PI / 180)
-      )
+      inner: CastingProfileOffsets.inward(opening, depth * Math.tan(degrees * Math.PI / 180))
     } catch (error:Dynamic) throw "Casting feature " + featureId + ": " + Std.string(error);
   }
 
@@ -113,15 +110,9 @@ class CastingDraftSections {
             reversed.push({
               kind: segment.kind,
               start: {x: segment.end.x, y: -segment.end.y},
-              end: {
-                x: segment.start.x,
-                y: -segment.start.y
-              },
+              end: {x: segment.start.x, y: -segment.start.y},
               sweep: segment.sweep,
-              center: segment.center == null ? null : {
-                x : segment.center.x,
-                y : -segment.center.y
-              }
+              center: segment.center == null ? null : {x : segment.center.x, y : -segment.center.y}
             });
           }
           profile = reversed;
@@ -131,17 +122,7 @@ class CastingDraftSections {
       center[0] - w[0] * length / 2,
       center[1] - w[1] * length / 2,
       center[2] - w[2] * length / 2,
-      [
-        u[0],
-        v[0],
-        w[0],
-        u[1],
-        v[1],
-        w[1],
-        u[2],
-        v[2],
-        w[2]
-      ]
+      [u[0], v[0], w[0], u[1], v[1], w[1], u[2], v[2], w[2]]
     );
     var pose = F.compose(feature.geometry.pose, localPose), planes:Array<Float> = [];
     for (opening in feature.openings) if (opening.kind == CastingOpeningKind.BodyFace) {

@@ -65,14 +65,8 @@ class ReplicationJigCodec {
       var jig:ReplicationJig = {
         id: id(row, "id"),
         datumSchemeId: id(row, "datumSchemeId"),
-        frameReference: reference(
-          row,
-          "frameReference"
-        ),
-        pose: C.frame(Reflect.field(
-          row,
-          "pose"
-        )),
+        frameReference: reference(row, "frameReference"),
+        pose: C.frame(Reflect.field(row, "pose")),
         masters: []
       };
       if (ids.exists(jig.id)) throw "Duplicate replication jig: " + jig.id;
@@ -98,33 +92,15 @@ class ReplicationJigCodec {
         var master:ReplicationMaster = {
           id: id(m, "id"),
           kind: kind(C.string(m, "kind")),
-          body: CastingSolidCodec.snapshot(Reflect.field(
-            m,
-            "body"
-          )),
-          pose: C.frame(Reflect.field(
-            m,
-            "pose"
-          )),
-          reference: C.frame(Reflect.field(
-            m,
-            "reference"
-          )),
+          body: CastingSolidCodec.snapshot(Reflect.field(m, "body")),
+          pose: C.frame(Reflect.field(m, "pose")),
+          reference: C.frame(Reflect.field(m, "reference")),
           members: [],
-          finish: InterfaceRequirements.readFinish(C.string(
-            m,
-            "finish"
-          )),
+          finish: InterfaceRequirements.readFinish(C.string(m, "finish")),
           jacks: [],
-          releaseSpec: optionalReference(
-            m,
-            "releaseSpec"
-          ),
+          releaseSpec: optionalReference(m, "releaseSpec"),
           flatnessMm: null,
-          inspectionReference: optionalReference(
-            m,
-            "inspectionReference"
-          )
+          inspectionReference: optionalReference(m, "inspectionReference")
         };
         if (masterIds.exists(master.id)) throw "Duplicate replication master: " + master.id;
         masterIds.set(master.id, true);
@@ -154,21 +130,8 @@ class ReplicationJigCodec {
           Fields.fields(position, ["x", "y", "z"]);
           var jack:ReplicationJack = {
             id: id(value, "id"),
-            position: {
-              x: C.number(position, "x"),
-              y: C.number(
-                position,
-                "y"
-              ),
-              z: C.number(
-                position,
-                "z"
-              )
-            },
-            lockReference: optionalReference(
-              value,
-              "lockReference"
-            )
+            position: {x: C.number(position, "x"), y: C.number(position, "y"), z: C.number(position, "z")},
+            lockReference: optionalReference(value, "lockReference")
           };
           if (jackIds.exists(jack.id)) throw "Duplicate replication jack: " + jack.id;
           jackIds.set(jack.id, true);

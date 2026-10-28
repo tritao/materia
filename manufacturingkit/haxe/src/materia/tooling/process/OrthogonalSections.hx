@@ -167,17 +167,8 @@ class OrthogonalSections {
           b,
           v
         ) >= v1 - EPS) intervals.push({
-          start: lo(
-            b,
-            axis
-          ),
-          end: lo(
-            b,
-            axis
-          ) + size(
-            b,
-            axis
-          )
+          start: lo(b, axis),
+          end: lo(b, axis) + size(b, axis)
         });
         intervals.sort((a,
           b) -> a.start == b.start ? Reflect.compare(a.end, b.end) : Reflect.compare(a.start, b.start));
@@ -251,20 +242,11 @@ class OrthogonalSections {
     var junction = JunctionThickness.analyze(sourceId, sourceFingerprint, boxes, boundaries);
     return {
       sourceFingerprint: sourceFingerprint,
-      geometryFingerprint: haxe.crypto.Sha256.encode(ToolingCodec.canonical({
-        spans: result,
-        volumeMm3: volume
-      })),
+      geometryFingerprint: haxe.crypto.Sha256.encode(ToolingCodec.canonical({spans: result, volumeMm3: volume})),
       spans: result,
       mixVolumeMm3: volume,
       coveredVolumeByAxisMm3: coverage,
-      maximumInscribedThicknessMm: rectangular ? Math.min(
-        w,
-        Math.min(
-          d,
-          h
-        )
-      ) : null,
+      maximumInscribedThicknessMm: rectangular ? Math.min(w, Math.min(d, h)) : null,
       junction : junction,
       validation : [
         FillAnalysis.check(

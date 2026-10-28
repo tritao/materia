@@ -85,63 +85,11 @@ class CastabilityTests {
     var semicircle = [Profiles.arc(0, 0, 40, -Math.PI / 2, Math.PI), Profiles.line({x: 0, y: 40}, {x: 0, y: -40})];
     var cases = [
       {solid: Cut(materia.casting.CastingSolid.Box(100, 80, 61)), rounding: 6.0, measured: 6.0},
-      {
-        solid: Prism(
-          Profiles.roundedRectangle(
-            -50,
-            -40,
-            100,
-            80,
-            6
-          ),
-          61
-        ),
-        rounding: 0.0,
-        measured: 6.0
-      },
-      {
-        solid: Prism(
-          Profiles.roundedRectangle(
-            -50,
-            -40,
-            100,
-            80,
-            2
-          ),
-          61
-        ),
-        rounding: 0.0,
-        measured: 2.0
-      },
-      {
-        solid: Prism(
-          Profiles.rectangle(
-            -50,
-            -40,
-            100,
-            80
-          ),
-          61
-        ),
-        rounding: 0.0,
-        measured: 0.0
-      },
-      {
-        solid: Cut(materia.casting.CastingSolid.Cylinder(
-          20,
-          61
-        )),
-        rounding: 0.0,
-        measured: 10.0
-      },
-      {
-        solid: Prism(
-          semicircle,
-          61
-        ),
-        rounding: 0.0,
-        measured: 0.0
-      }
+      {solid: Prism(Profiles.roundedRectangle(-50, -40, 100, 80, 6), 61), rounding: 0.0, measured: 6.0},
+      {solid: Prism(Profiles.roundedRectangle(-50, -40, 100, 80, 2), 61), rounding: 0.0, measured: 2.0},
+      {solid: Prism(Profiles.rectangle(-50, -40, 100, 80), 61), rounding: 0.0, measured: 0.0},
+      {solid: Cut(materia.casting.CastingSolid.Cylinder(20, 61)), rounding: 0.0, measured: 10.0},
+      {solid: Prism(semicircle, 61), rounding: 0.0, measured: 0.0}
     ];
     for (sample in cases) {
       var document = ToolingTests.fixture();
@@ -185,27 +133,8 @@ class CastabilityTests {
       document.input.id,
       source,
       process,
-      [
-        box(0, 0, 2, 2, 10),
-        box(2, 0, 2, 2, 2),
-        box(
-          4,
-          0,
-          4,
-          2,
-          6
-        )
-      ],
-      [{
-        id: "pocket",
-        box: box(
-          4,
-          6,
-          4,
-          2,
-          4
-        )
-      }],
+      [box(0, 0, 2, 2, 10), box(2, 0, 2, 2, 2), box(4, 0, 4, 2, 6)],
+      [{id: "pocket", box: box(4, 6, 4, 2, 4)}],
       [],
       10,
       2400,
@@ -232,10 +161,7 @@ class CastabilityTests {
       "a non-box cavity cannot hide missing typed lifting connections"
     );
     for (name in ["insert-edge", "insert-cover", "fixing-access"]) check(
-      status(
-        report,
-        "process.level1." + name + ".seat"
-      ) == "pass",
+      status(report, "process.level1." + name + ".seat") == "pass",
       "a curved pocket does not suppress independent exact insert checks: " + name
     );
     check(
@@ -403,14 +329,7 @@ class CastabilityTests {
     );
     var cross:Array<MoldBox> = [
       {x: -5, y: -1, z: -4, width: 10, depth: 2, height: 8},
-      {
-        x: -1,
-        y: -5,
-        z: -4,
-        width: 2,
-        depth: 10,
-        height: 8
-      }
+      {x: -1, y: -5, z: -4, width: 2, depth: 10, height: 8}
     ];
     var crossSections = OrthogonalSections.analyze(d.input.id, source, cross, []);
     crossSections.junction = materia.tooling.process.JunctionThickness.analyze(
@@ -418,10 +337,7 @@ class CastabilityTests {
       source,
       cross,
       [],
-      {
-        diameterToleranceMm: 1e-8,
-        maximumCells: 20
-      }
+      {diameterToleranceMm: 1e-8, maximumCells: 20}
     );
     var crossFill = FillAnalysis.analyze(d.input.id, source, "process", cross, [], [], 4, 2400, 10, null, null);
     var interval = crossSections.junction;

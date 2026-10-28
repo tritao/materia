@@ -234,11 +234,7 @@ class ToolingFabrication {
       spec : s,
       panelRequirements : requirements,
       sheetStock : {
-        id : materia.tooling.ToolingIds.derive(
-          "",
-          p.document.recipe.id,
-          "-sheet-stock"
-        ),
+        id : materia.tooling.ToolingIds.derive("", p.document.recipe.id, "-sheet-stock"),
         revision : p.document.recipe.revision,
         materialId : s.sheetMaterialId,
         lengthUnit : "mm",
@@ -253,38 +249,19 @@ class ToolingFabrication {
       validation : checks,
       fabrication : ToolingReadiness.evaluate(checks),
       replacementGroups : [
-        {
-          id : "panels-and-coupons",
-          use : Reusable,
-          memberIds : [for (v in requirements) v.partId]
-        },
-        {
-          id : "formers",
-          use : Reusable,
-          memberIds : [for (v in p.formers) v.volume.id]
-        },
+        {id : "panels-and-coupons", use : Reusable, memberIds : [for (v in requirements) v.partId]},
+        {id : "formers", use : Reusable, memberIds : [for (v in p.formers) v.volume.id]},
         {
           id : "datum-supports",
           use : Reusable,
           memberIds : [for (volume in materia.tooling.casting.CastingMoldPlan.MoldFixtures.allVolumes(p)) volume.id]
         },
-        {
-          id : "hardware",
-          use : Reusable,
-          memberIds : [for (v in p.hardware) v.id]
-        },
-        {
-          id : "eps-cores",
-          use : PerCasting,
-          memberIds : [for (v in p.cores) v.id]
-        },
+        {id : "hardware", use : Reusable, memberIds : [for (v in p.hardware) v.id]},
+        {id : "eps-cores", use : PerCasting, memberIds : [for (v in p.cores) v.id]},
         {
           id : "embedded-inserts",
           use : PerCasting,
-          memberIds : [for (v in p.document.input.inserts) materia.tooling.ToolingIds.derive(
-            "insert-",
-            v.id
-          )]
+          memberIds : [for (v in p.document.input.inserts) materia.tooling.ToolingIds.derive("insert-", v.id)]
         }
       ]
     };

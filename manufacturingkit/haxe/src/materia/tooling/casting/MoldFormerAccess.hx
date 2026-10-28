@@ -95,18 +95,8 @@ class MoldFormerAccess {
     // Above the bed it stops at the actual inner wall planes instead.
     var neck:Null<CastingRegion> = bounds.z > inner + EPS ? Intersection([
       Placed({
-        solid : Prism(
-          contour,
-          bounds.z - inner
-        ),
-        pose : F.compose(
-          bed.pose,
-          F.translation(
-            0,
-            0,
-            r.panel.measuredThickness
-          )
-        )
+        solid : Prism(contour, bounds.z - inner),
+        pose : F.compose(bed.pose, F.translation(0, 0, r.panel.measuredThickness))
       }),
       MoldRegions.box(plan.cavity)
     ]) : null;
@@ -140,11 +130,7 @@ class MoldFormerAccess {
         height + 2 * r.hardware.formerFlangeMargin,
         r.hardware.formerFlangeThickness
       )),
-      pose: F.translation(
-        cx,
-        cy,
-        bed.pose.z - r.hardware.formerFlangeThickness
-      )
+      pose: F.translation(cx, cy, bed.pose.z - r.hardware.formerFlangeThickness)
     });
     var extensions:Array<CastingRegion> = [flange];
     if (neck != null) extensions.unshift(neck);
@@ -223,11 +209,7 @@ class MoldFormerAccess {
       )),
       pose: F.compose(
         wall.pose,
-        F.translation(
-          bounds.x + bounds.width / 2,
-          bounds.y + bounds.height / 2,
-          operation.depth
-        )
+        F.translation(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, operation.depth)
       )
     });
     volume.regions.push(CastingRegion.Difference(flange, exclusions.copy()));

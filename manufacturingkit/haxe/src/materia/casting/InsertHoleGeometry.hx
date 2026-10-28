@@ -26,10 +26,7 @@ class InsertHoleGeometry {
     var wall = Math.POSITIVE_INFINITY;
     for (index in 0...3) if (index != direction) wall = Math.min(
       wall,
-      Math.min(
-        entry[index] - low[index],
-        high[index] - entry[index]
-      ) - radius
+      Math.min(entry[index] - low[index], high[index] - entry[index]) - radius
     );
     return wall;
   }
@@ -37,11 +34,7 @@ class InsertHoleGeometry {
   /** Exact insert volume and centroid for disjoint axial drilling patterns. */
   public static function massProperties(width:Float, depth:Float, height:Float, holes:Array<InsertHole>): {
     volume: Float,
-    center: {
-      x: Float,
-      y: Float,
-      z: Float
-    }
+    center: {x: Float, y: Float, z: Float}
   } {
     var volume = width * depth * height, mx = 0.0, my = 0.0, mz = volume * height / 2;
     var occupied:Array<Box3> = [];

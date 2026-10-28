@@ -201,15 +201,7 @@ class FabricationSpecs {
     rows(
       v.braces,
       ["id"],
-      [
-        "spanMm",
-        "tributaryWidthMm",
-        "widthMm",
-        "depthMm",
-        "youngPa",
-        "allowableStressPa",
-        "maximumDeflectionMm"
-      ],
+      ["spanMm", "tributaryWidthMm", "widthMm", "depthMm", "youngPa", "allowableStressPa", "maximumDeflectionMm"],
       ["panelIds"]
     );
     rows(v.fasteners, ["id"], ["allowableN"], ["loadIds", "hardwareIds"]);

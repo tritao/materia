@@ -71,51 +71,17 @@ class BoxPlannerTests {
       primary: {
         id: "primary",
         reference: materia.casting.FoundationDatumScheme.DatumReference.BodyFace("body.z-max"),
-        frame: F.translation(
-          0,
-          0,
-          100
-        )
+        frame: F.translation(0, 0, 100)
       },
       secondary: {
         id: "secondary",
         reference: materia.casting.FoundationDatumScheme.DatumReference.BodyFace("body.x-min"),
-        frame: F.fromRotationMatrix(
-          -100,
-          0,
-          50,
-          [
-            0,
-            0,
-            -1,
-            0,
-            1,
-            0,
-            1,
-            0,
-            0
-          ]
-        )
+        frame: F.fromRotationMatrix(-100, 0, 50, [0, 0, -1, 0, 1, 0, 1, 0, 0])
       },
       tertiary: {
         id: "tertiary",
         reference: materia.casting.FoundationDatumScheme.DatumReference.BodyFace("body.y-min"),
-        frame: F.fromRotationMatrix(
-          0,
-          -90,
-          50,
-          [
-            1,
-            0,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            1,
-            0
-          ]
-        )
+        frame: F.fromRotationMatrix(0, -90, 50, [1, 0, 0, 0, 0, -1, 0, 1, 0])
       }
     };
     withDatums.setup.sourceFingerprint = ToolingCodec.inputFingerprint(withDatums.input);
@@ -131,14 +97,7 @@ class BoxPlannerTests {
       carrierPlan,
       "dry-fixture",
       carrierFace,
-      {
-        x: -20,
-        y: 60,
-        z: 90,
-        width: 40,
-        depth: 20,
-        height: 12
-      }
+      {x: -20, y: 60, z: 90, width: 40, depth: 20, height: 12}
     );
     check(
       carrier.panel.contactFace == materia.tooling.ToolingEnums.ContactFace.NegativeZ,
@@ -174,14 +133,7 @@ class BoxPlannerTests {
         carrierPlan,
         "low",
         F.translation(0, 70, 101),
-        {
-          x: -20,
-          y: 60,
-          z: 90,
-          width: 40,
-          depth: 20,
-          height: 11
-        }
+        {x: -20, y: 60, z: 90, width: 40, depth: 20, height: 11}
       ),
       "Carrier below dry clearance is rejected"
     );
@@ -190,14 +142,7 @@ class BoxPlannerTests {
       carrierPlan,
       "blocked-contact",
       F.translation(0, 0, 102),
-      {
-        x: -20,
-        y: -10,
-        z: 90,
-        width: 40,
-        depth: 20,
-        height: 12
-      }
+      {x: -20, y: -10, z: 90, width: 40, depth: 20, height: 12}
     ) catch (error:Dynamic) blockedContact = Std.string(error);
     check(
       blockedContact.indexOf("crosses the source insert contact plane") >= 0,
@@ -219,14 +164,7 @@ class BoxPlannerTests {
       carrierPlan,
       "dry-cross",
       carrierFace,
-      {
-        x: -20,
-        y: 60,
-        z: 90,
-        width: 40,
-        depth: 20,
-        height: 12
-      }
+      {x: -20, y: 60, z: 90, width: 40, depth: 20, height: 12}
     );
     var clearances = cross.panel.operations.filter(operation -> operation.id == "clear-cross-beam");
     check(
@@ -247,14 +185,7 @@ class BoxPlannerTests {
       carrierPlan,
       "round-cross",
       carrierFace,
-      {
-        x: -20,
-        y: 60,
-        z: 90,
-        width: 40,
-        depth: 20,
-        height: 12
-      }
+      {x: -20, y: 60, z: 90, width: 40, depth: 20, height: 12}
     ) catch (error:Dynamic) nonRectangle = Std.string(error);
     check(
       nonRectangle.indexOf("exact non-rectangular support intersection") >= 0,
@@ -265,14 +196,7 @@ class BoxPlannerTests {
       sidePlan,
       "right-arm",
       F.translation(60, 70, 102),
-      {
-        x: 40,
-        y: 60,
-        z: 90,
-        width: 40,
-        depth: 20,
-        height: 12
-      }
+      {x: 40, y: 60, z: 90, width: 40, depth: 20, height: 12}
     );
     check(
       arm.pose.x == 40 - d.recipe.minimumLigament,
@@ -299,10 +223,7 @@ class BoxPlannerTests {
     check(
       materia.tooling.casting.InsertFixturePlanner.select(
         shallow,
-        F.compose(
-          pattern.setup.sourceToMold,
-          pattern.input.inserts[0].pose
-        ),
+        F.compose(pattern.setup.sourceToMold, pattern.input.inserts[0].pose),
         patterned.fixtures[0].mountingFace,
         pattern.recipe.hardware
       ) == null,
@@ -320,10 +241,7 @@ class BoxPlannerTests {
     var counterboredPlan = CastingMoldPlanner.planSinglePocket(counterbored);
     var selected = materia.tooling.casting.InsertFixturePlanner.select(
       counterbored.input.inserts[0].holes[0],
-      F.compose(
-        counterbored.setup.sourceToMold,
-        counterbored.input.inserts[0].pose
-      ),
+      F.compose(counterbored.setup.sourceToMold, counterbored.input.inserts[0].pose),
       counterboredPlan.fixtures[0].mountingFace,
       counterbored.recipe.hardware
     );
@@ -415,11 +333,7 @@ class BoxPlannerTests {
     var stocked = ToolingCodec.copy(d);
     stocked.input.inserts[0].interfaces = [{
       id: "ground-top",
-      geometry: materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(
-        0,
-        0,
-        14
-      )),
+      geometry: materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0, 0, 14)),
       route: materia.casting.InterfaceRequirement.InterfaceRoute.Ground,
       allowanceMm: 1,
       finishingProcessErrorMm: materia.casting.CastingInput.Unresolved("Finishing process error allocation"),

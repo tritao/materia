@@ -286,10 +286,7 @@ class InsertFixturePlanner {
     var secondary = {x: width - options.locatorEndInset, y: options.locatorSideInset};
     var clamps = [
       {x: primary.x, y: depth - options.locatorSideInset},
-      {
-        x: secondary.x,
-        y: depth - options.locatorSideInset
-      }
+      {x: secondary.x, y: depth - options.locatorSideInset}
     ];
     var recipe = d.recipe, hardware = recipe.hardware, thickness = recipe.panel.measuredThickness;
     var pair = materia.tooling.panel.PanelJoints.pinBolt(
@@ -301,13 +298,7 @@ class InsertFixturePlanner {
       hardware.supportClearanceDiameter,
       hardware.fixtureSlotToolDiameter,
       recipe.minimumLigament,
-      {
-        width: width,
-        height: depth,
-        primary: primary,
-        secondary: secondary,
-        bolt: clamps[0]
-      }
+      {width: width, height: depth, primary: primary, secondary: secondary, bolt: clamps[0]}
     );
     pair.joint.liningAllowance = recipe.jointLiningAllowance;
     pair.joint.machiningAllowance = recipe.jointMachiningAllowance;
@@ -315,11 +306,7 @@ class InsertFixturePlanner {
       var closure = materia.tooling.panel.PanelJoints.operation(
         "second-closure",
         Drill,
-        materia.tooling.panel.PanelContours.circle(
-          clamps[1].x,
-          clamps[1].y,
-          hardware.supportClearanceDiameter / 2
-        ),
+        materia.tooling.panel.PanelContours.circle(clamps[1].x, clamps[1].y, hardware.supportClearanceDiameter / 2),
         thickness,
         hardware.supportClearanceDiameter
       );
@@ -381,14 +368,7 @@ class InsertFixturePlanner {
           var fit = materia.casting.ThreadedFastenerFit.checkIntervals(
             hole,
             fixing.entry,
-            {
-              shankLength: candidate,
-              threadedLength: Math.min(
-                candidate,
-                choice.threadedLength
-              ),
-              bearingFrame: bearing
-            },
+            {shankLength: candidate, threadedLength: Math.min(candidate, choice.threadedLength), bearingFrame: bearing},
             id + "/" + hole.id
           );
           if (length == null && fit.filter(check -> !check.passed).length == 0
@@ -400,19 +380,12 @@ class InsertFixturePlanner {
         var siteId = materia.tooling.ToolingIds.derive(
           "fixture-",
           id,
-          "-" + haxe.crypto.Sha256.encode(hole.id).substr(
-            0,
-            12
-          )
+          "-" + haxe.crypto.Sha256.encode(hole.id).substr(0, 12)
         );
         var clearance = materia.tooling.panel.PanelJoints.operation(
           siteId,
           Drill,
-          materia.tooling.panel.PanelContours.circle(
-            x,
-            y,
-            fixing.clearanceDiameter / 2
-          ),
+          materia.tooling.panel.PanelContours.circle(x, y, fixing.clearanceDiameter / 2),
           thickness,
           fixing.clearanceDiameter
         );
@@ -420,17 +393,9 @@ class InsertFixturePlanner {
         pair.moving.operations.push(clearance);
         pair.moving.contactOpenings.push(siteId);
         var access = materia.tooling.panel.PanelJoints.operation(
-          materia.tooling.ToolingIds.derive(
-            "",
-            siteId,
-            "-access"
-          ),
+          materia.tooling.ToolingIds.derive("", siteId, "-access"),
           InsideProfile,
-          materia.tooling.panel.PanelContours.circle(
-            x,
-            y,
-            choice.driverDiameter / 2
-          ),
+          materia.tooling.panel.PanelContours.circle(x, y, choice.driverDiameter / 2),
           thickness,
           choice.driverToolDiameter
         );
@@ -456,10 +421,7 @@ class InsertFixturePlanner {
         var maskId = materia.tooling.ToolingIds.derive(
           "mask-",
           id,
-          "-" + haxe.crypto.Sha256.encode(hole.id).substr(
-            0,
-            12
-          )
+          "-" + haxe.crypto.Sha256.encode(hole.id).substr(0, 12)
         );
         var entry = F.compose(pose, hole.frame), axis = F.transformVector(entry, 0, 0, -1);
         masks.push({insertId: id, protection: mask(hole, maskId, hardware.plugDepth, axis)});
@@ -490,11 +452,7 @@ class InsertFixturePlanner {
     }
     var assembly = materia.tooling.panel.PanelAssemblyPlan.pair(
       pair,
-      F.translation(
-        minX,
-        minY,
-        options.contactZ - 2 * thickness
-      )
+      F.translation(minX, minY, options.contactZ - 2 * thickness)
     );
     for (member in assembly.members) member.withdrawal = {x: 0, y: 0, z: -1};
     materia.tooling.panel.PanelAssemblyPlan.validate(assembly);
@@ -528,28 +486,13 @@ class InsertFixturePlanner {
       || options.screwStock == null) throw "Fixture plate needs selected inserts and declared screw stock";
     materia.casting.CastingFeatureCodec.fields(
       options,
-      [
-        "id",
-        "insertIds",
-        "contactZ",
-        "edgeMargin",
-        "locatorEndInset",
-        "locatorSideInset",
-        "screwStock"
-      ]
+      ["id", "insertIds", "contactZ", "edgeMargin", "locatorEndInset", "locatorSideInset", "screwStock"]
     );
     var stock:Array<FixtureScrewStock> = [];
     for (row in options.screwStock) {
       materia.casting.CastingFeatureCodec.fields(
         row,
-        [
-          "thread",
-          "lengths",
-          "threadedLength",
-          "washerThickness",
-          "driverDiameter",
-          "driverToolDiameter"
-        ]
+        ["thread", "lengths", "threadedLength", "washerThickness", "driverDiameter", "driverToolDiameter"]
       );
       if (row.thread == null || row.lengths == null) throw "Fixture screw stock needs a source thread and lengths";
       var t = row.thread;
@@ -599,10 +542,7 @@ class InsertFixturePlanner {
         || thread.starts != 1 ? "Select protection hardware for this non-standard set-screw thread." : null;
       if (reason != null) result.push({
         rule: "tooling.fixture.hole-protection." + insert.id + "." + hole.id,
-        affectedIds: [
-          insert.id,
-          hole.id
-        ],
+        affectedIds: [insert.id, hole.id],
         status: materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported,
         severity: materia.tooling.ToolingDiagnostic.ToolingSeverity.Error,
         message: reason,
@@ -623,10 +563,7 @@ class InsertFixturePlanner {
       sourceHoleId: hole.id,
       hardwareId: id,
       plugLength: threaded ? plugLength : null,
-      farEndId : threaded && hole.extent == Through ? materia.tooling.ToolingIds.derive(
-        "far-end-",
-        id
-      ) : null,
+      farEndId : threaded && hole.extent == Through ? materia.tooling.ToolingIds.derive("far-end-", id) : null,
       withdrawal : withdrawal
     };
   }
@@ -657,11 +594,7 @@ class InsertFixturePlanner {
     engagement:Float,
     insertion:Float,
     clearanceDiameter:Float,
-    plug:Null<{
-      diameter:Float,
-      length:Float,
-      materialSpec:String
-    }>
+    plug:Null<{diameter:Float, length:Float, materialSpec:String}>
   }> {
     var entry = F.compose(insertToMold, hole.frame);
     if (hole.thread == null || !facing(entry, supportFace)) return null;

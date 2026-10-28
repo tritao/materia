@@ -51,14 +51,7 @@ class FillTooling {
           xs[i + 1] - xs[i],
           ys[j + 1] - ys[j],
           depth,
-          F.compose(
-            pose,
-            F.translation(
-              (xs[i] + xs[i + 1]) / 2,
-              (ys[j] + ys[j + 1]) / 2,
-              0
-            )
-          )
+          F.compose(pose, F.translation((xs[i] + xs[i + 1]) / 2, (ys[j] + ys[j + 1]) / 2, 0))
         ));
       return boxes;
     }
@@ -71,14 +64,7 @@ class FillTooling {
         bounds.width,
         bounds.height,
         thickness,
-        F.compose(
-          member.pose,
-          F.translation(
-            bounds.x + bounds.width / 2,
-            bounds.y + bounds.height / 2,
-            0
-          )
-        )
+        F.compose(member.pose, F.translation(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, 0))
       );
       var old = blockers.length;
       if (!add(broad)) continue;
@@ -92,11 +78,7 @@ class FillTooling {
       for (op in member.panel.operations) if (op.kind != OutsideProfile) {
         var pose = op.side == materia.tooling.ToolingEnums.MachiningSide.PositiveZ ? F.compose(
           member.pose,
-          F.translation(
-            0,
-            0,
-            thickness - op.depth
-          )
+          F.translation(0, 0, thickness - op.depth)
         ) : member.pose;
         if (orthogonal(op.contour)) material = BoxAlgebra.subtract(material, prism(op.contour, op.depth, pose));
         else {
@@ -105,14 +87,7 @@ class FillTooling {
             cutBounds.width,
             cutBounds.height,
             op.depth,
-            F.compose(
-              pose,
-              F.translation(
-                cutBounds.x + cutBounds.width / 2,
-                cutBounds.y + cutBounds.height / 2,
-                0
-              )
-            )
+            F.compose(pose, F.translation(cutBounds.x + cutBounds.width / 2, cutBounds.y + cutBounds.height / 2, 0))
           );
           var before = blockers.length;
           if (add(cut)) {
@@ -128,11 +103,7 @@ class FillTooling {
       for (cut in volume.cuts) {
         if (orthogonal(cut.operation.contour)) material = BoxAlgebra.subtract(
           material,
-          prism(
-            cut.operation.contour,
-            cut.operation.depth,
-            cut.pose
-          )
+          prism(cut.operation.contour, cut.operation.depth, cut.pose)
         );
         else {
           var bounds = CastingProfileGeometry.bounds(cut.operation.contour);
@@ -141,14 +112,7 @@ class FillTooling {
             bounds.width,
             bounds.height,
             cut.operation.depth,
-            F.compose(
-              cut.pose,
-              F.translation(
-                bounds.x + bounds.width / 2,
-                bounds.y + bounds.height / 2,
-                0
-              )
-            )
+            F.compose(cut.pose, F.translation(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, 0))
           ))) {
             blockers.splice(before, 1);
             unsupportedIds.push(volume.id);
@@ -159,10 +123,7 @@ class FillTooling {
       for (profile in volume.profiles) {
         var exact = materia.tooling.casting.MoldRegions.boxes(materia.casting.CastingRegion.Difference(
           materia.casting.CastingRegion.Placed({
-            solid: materia.casting.CastingFeature.CastingGeometrySolid.Prism(
-              profile.contour,
-              profile.depth
-            ),
+            solid: materia.casting.CastingFeature.CastingGeometrySolid.Prism(profile.contour, profile.depth),
             pose: profile.pose
           }),
           profile.subtract
@@ -174,14 +135,7 @@ class FillTooling {
             bounds.width,
             bounds.height,
             profile.depth,
-            F.compose(
-              profile.pose,
-              F.translation(
-                bounds.x + bounds.width / 2,
-                bounds.y + bounds.height / 2,
-                0
-              )
-            )
+            F.compose(profile.pose, F.translation(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, 0))
           ))) unsupportedIds.push(volume.id);
         }
       }

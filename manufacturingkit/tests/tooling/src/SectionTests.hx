@@ -28,14 +28,7 @@ class SectionTests {
     var box = {x: 0.0, y: 0.0, z: 0.0, width: 100.0, depth: 60.0, height: 20.0};
     var split = [
       {x: 0.0, y: 0.0, z: 0.0, width: 30.0, depth: 60.0, height: 20.0},
-      {
-        x: 30.0,
-        y: 0.0,
-        z: 0.0,
-        width: 70.0,
-        depth: 60.0,
-        height: 20.0
-      }
+      {x: 30.0, y: 0.0, z: 0.0, width: 70.0, depth: 60.0, height: 20.0}
     ];
     var report = OrthogonalSections.analyze("body", "hash", split, []);
     check(report.spans.length == 3, "coplanar strips aggregate by physical endpoints");
@@ -69,17 +62,7 @@ class SectionTests {
       "body",
       "hash",
       [box],
-      [{
-        id: "core",
-        box: {
-          x: 0,
-          y: 0,
-          z: 20,
-          width: 100,
-          depth: 60,
-          height: 20
-        }
-      }]
+      [{id: "core", box: {x: 0, y: 0, z: 20, width: 100, depth: 60, height: 20}}]
     );
     check(owners.spans.filter(x -> x.axis == Z)[0].upperSourceIds[0] == "core", "opposing face preserves feature ID");
     var effort = materia.tooling.export.ToolingFabrication.effort(p, FabricationTests.spec());

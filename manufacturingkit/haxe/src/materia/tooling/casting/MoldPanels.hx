@@ -74,10 +74,7 @@ class MoldPanels {
         kind: PanelJointKind.Rebate,
         fixedId: a.panel.id,
         movingId: b.panel.id,
-        fixedFrame: F.compose(
-          F.inverse(a.pose),
-          b.pose
-        ),
+        fixedFrame: F.compose(F.inverse(a.pose), b.pose),
         movingFrame: F.identity(),
         clearance: c,
         closure: PanelClosure.InternalPocketScrews,
@@ -127,15 +124,7 @@ class MoldPanels {
     bed.contactOpenings = [];
     var assembly:PanelAssemblyRecord = {
       id: "box-panels",
-      members: [{
-        panel: bed,
-        pose: F.translation(ox, oy, b.z - t),
-        withdrawal: {
-          x: 0,
-          y: 0,
-          z: -1
-        }
-      }],
+      members: [{panel: bed, pose: F.translation(ox, oy, b.z - t), withdrawal: {x: 0, y: 0, z: -1}}],
       joints: []
     };
     var penetrations:Array<PenetrationPlan> = [];
@@ -175,13 +164,7 @@ class MoldPanels {
       var op = PanelJoints.operation(
         materia.tooling.ToolingIds.derive("", id, "-socket"),
         Pocket,
-        PanelContours.relievedRectangle(
-          sx - ox + sw / 2,
-          sy - oy + sh / 2,
-          sw,
-          sh,
-          r.routerDiameter / 2
-        ),
+        PanelContours.relievedRectangle(sx - ox + sw / 2, sy - oy + sh / 2, sw, sh, r.routerDiameter / 2),
         seat,
         r.routerDiameter,
         MachiningSide.PositiveZ,
@@ -207,10 +190,7 @@ class MoldPanels {
         kind: PanelJointKind.TabSlot,
         fixedId: bed.id,
         movingId: id,
-        fixedFrame: F.compose(
-          F.inverse(assembly.members[0].pose),
-          pose
-        ),
+        fixedFrame: F.compose(F.inverse(assembly.members[0].pose), pose),
         movingFrame: F.identity(),
         clearance: c,
         liningAllowance: r.jointLiningAllowance,
@@ -220,14 +200,8 @@ class MoldPanels {
         seat: {
           operationId: op.id,
           acrossX: sw < sh,
-          openingWidth: Math.min(
-            sw,
-            sh
-          ),
-          openingLength: Math.max(
-            sw,
-            sh
-          ),
+          openingWidth: Math.min(sw, sh),
+          openingLength: Math.max(sw, sh),
           memberWidth: t / 2,
           memberLength: width,
           thicknessFraction: 0.5,
@@ -250,22 +224,7 @@ class MoldPanels {
     wall(
       "north",
       b.width + 2 * t,
-      F.fromRotationMatrix(
-        b.x + b.width + t,
-        b.y + b.depth,
-        b.z - seat,
-        [
-          -1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          1,
-          0
-        ]
-      ),
+      F.fromRotationMatrix(b.x + b.width + t, b.y + b.depth, b.z - seat, [-1, 0, 0, 0, 0, 1, 0, 1, 0]),
       b.x - t - c,
       b.y + b.depth + t / 2,
       b.width + 2 * t + 2 * c,

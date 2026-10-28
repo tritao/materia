@@ -141,10 +141,7 @@ class FixtureConstraints {
           y: motion[4] / referenceLengthMm,
           z: motion[5] / referenceLengthMm
         },
-        affectedCoordinates: coordinates(
-          motion,
-          rankTolerance
-        )
+        affectedCoordinates: coordinates(motion, rankTolerance)
       });
     }
     var redundant:Array<FixtureDependency> = [];
@@ -164,10 +161,7 @@ class FixtureConstraints {
       redundant.push({
         constraintIds: memberIds,
         coefficients: coefficients,
-        affectedCoordinates: coordinates(
-          directions,
-          rankTolerance
-        )
+        affectedCoordinates: coordinates(directions, rankTolerance)
       });
     }
     redundant.sort((a, b) -> Reflect.compare(a.constraintIds.join("|"), b.constraintIds.join("|")));

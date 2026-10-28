@@ -39,10 +39,7 @@ class CastingRegionCodec {
         CastingFeatureCodec.fields(geometry, ["solid", "pose"]);
         CastingRegion.Placed({
           solid: CastingFeature.CastingGeometrySolids.snapshot(Reflect.field(geometry, "solid")),
-          pose: CastingRecordCodec.frame(Reflect.field(
-            geometry,
-            "pose"
-          ))
+          pose: CastingRecordCodec.frame(Reflect.field(geometry, "pose"))
         });
       case "drafted":
         CastingFeatureCodec.fields(raw, ["kind", "featureId", "opening", "pose", "depth", "degrees"]);
@@ -84,10 +81,7 @@ class CastingRegionCodec {
       case Placed(geometry):
         {
           kind: "placed",
-          geometry: {
-            solid: CastingFeature.CastingGeometrySolids.record(geometry.solid),
-            pose: geometry.pose
-          }
+          geometry: {solid: CastingFeature.CastingGeometrySolids.record(geometry.solid), pose: geometry.pose}
         };
       case Drafted(id, opening, pose, height, degrees):
         {kind: "drafted", featureId: id, opening: opening, pose: pose, depth: height, degrees: degrees};
@@ -99,11 +93,7 @@ class CastingRegionCodec {
         {
           kind: "difference",
           body: write(body, depth + 1, budget),
-          cuts: [for (child in cuts) write(
-            child,
-            depth + 1,
-            budget
-          )]
+          cuts: [for (child in cuts) write(child, depth + 1, budget)]
         };
     };
   }

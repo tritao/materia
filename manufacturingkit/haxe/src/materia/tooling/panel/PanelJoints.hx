@@ -116,10 +116,7 @@ class PanelJoints {
     width: 2440,
     height: 1220,
     coatedFace: CoatedFace.Both,
-    allowedRotations: [
-      0,
-      90
-    ],
+    allowedRotations: [0, 90],
     directionConstraint: StockDirection.Free
   };
 
@@ -159,12 +156,7 @@ class PanelJoints {
     operations: [operation(
       "outline",
       OutsideProfile,
-      PanelContours.rectangle(
-        0,
-        0,
-        width,
-        height
-      ),
+      PanelContours.rectangle(0, 0, width, height),
       stock.measuredThickness,
       router
     )],
@@ -235,11 +227,7 @@ class PanelJoints {
     moving.operations = [operation(
       "outline",
       OutsideProfile,
-      PanelContours.relievedPolygon(
-        points,
-        s.routerDiameter / 2,
-        roundedTips
-      ),
+      PanelContours.relievedPolygon(points, s.routerDiameter / 2, roundedTips),
       mt,
       s.routerDiameter,
       MachiningSide.PositiveZ,
@@ -279,12 +267,7 @@ class PanelJoints {
     fixed.operations.push(operation(
       "edge-rebate",
       Rebate,
-      PanelContours.rectangle(
-        width - t - clearance,
-        0,
-        t + clearance,
-        height
-      ),
+      PanelContours.rectangle(width - t - clearance, 0, t + clearance, height),
       depth,
       router,
       MachiningSide.PositiveZ,
@@ -322,22 +305,7 @@ class PanelJoints {
         lengthClearance: 0,
         reliefDiameter: 0
       },
-      fixedFrame: F.fromRotationMatrix(
-        width - t,
-        0,
-        depth,
-        [
-          0,
-          0,
-          1,
-          1,
-          0,
-          0,
-          0,
-          1,
-          0
-        ]
-      ),
+      fixedFrame: F.fromRotationMatrix(width - t, 0, depth, [0, 0, 1, 1, 0, 0, 0, 1, 0]),
       movingFrame: F.identity()
     };
     return {fixed: PanelCodec.copy(fixed), moving: PanelCodec.copy(moving), joint: joint};
@@ -367,11 +335,7 @@ class PanelJoints {
     var angle = Math.atan2(dy, dx);
     var fixed = blank(materia.tooling.ToolingIds.derive("",
       id, "-lower"), l.width, l.height, stock, router, ligament), moving = blank(
-        materia.tooling.ToolingIds.derive(
-          "",
-          id,
-          "-upper"
-        ),
+        materia.tooling.ToolingIds.derive("", id, "-upper"),
         l.width,
         l.height,
         stock,
@@ -384,17 +348,8 @@ class PanelJoints {
       p.operations.push(operation(
         "secondary-pin",
         p == fixed ? Drill : InsideProfile,
-        p == fixed ? PanelContours.circle(
-          l.secondary.x,
-          l.secondary.y,
-          d / 2
-        ) : PanelContours.placed(
-          PanelContours.obround(
-            0,
-            0,
-            d + secondaryTravel,
-            d
-          ),
+        p == fixed ? PanelContours.circle(l.secondary.x, l.secondary.y, d / 2) : PanelContours.placed(
+          PanelContours.obround(0, 0, d + secondaryTravel, d),
           angle,
           l.secondary.x,
           l.secondary.y
@@ -437,16 +392,8 @@ class PanelJoints {
           angle: angle
         }
       ],
-      fixedFrame: F.translation(
-        l.primary.x,
-        l.primary.y,
-        t
-      ),
-      movingFrame: F.translation(
-        l.primary.x,
-        l.primary.y,
-        0
-      )
+      fixedFrame: F.translation(l.primary.x, l.primary.y, t),
+      movingFrame: F.translation(l.primary.x, l.primary.y, 0)
     };
     return {fixed: PanelCodec.copy(fixed), moving: PanelCodec.copy(moving), joint: joint};
   }
@@ -459,9 +406,6 @@ class PanelJoints {
 
   public static function movingPose(joint:PanelJoint, fixedPose:AssemblyFrame):AssemblyFrame return F.compose(
     fixedPose,
-    F.compose(
-      joint.fixedFrame,
-      F.inverse(joint.movingFrame)
-    )
+    F.compose(joint.fixedFrame, F.inverse(joint.movingFrame))
   );
 }

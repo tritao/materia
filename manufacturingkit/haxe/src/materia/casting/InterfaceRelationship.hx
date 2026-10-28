@@ -184,10 +184,7 @@ class InterfaceRelationships {
         members: members,
         tolerance: tolerance,
         metrology: {
-          method: readMethod(CastingRecordCodec.string(
-            m,
-            "method"
-          )),
+          method: readMethod(CastingRecordCodec.string(m, "method")),
           instrumentReference: instrument,
           uncertaintyMm: uncertainty
         }

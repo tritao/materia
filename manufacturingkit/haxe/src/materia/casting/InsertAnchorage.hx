@@ -82,24 +82,12 @@ class InsertAnchorageCodec {
         var r = Reflect.field(raw, "rules");
         CastingFeatureCodec.fields(
           r,
-          [
-            "demand",
-            "minimumEmbedmentMm",
-            "minimumBearingAreaMm2",
-            "minimumSpacingMm",
-            "minimumCoverMm"
-          ]
+          ["demand", "minimumEmbedmentMm", "minimumBearingAreaMm2", "minimumSpacingMm", "minimumCoverMm"]
         );
         var d = Reflect.field(r, "demand");
         CastingFeatureCodec.fields(
           d,
-          [
-            "ruleId",
-            "factor",
-            "servicePreloads",
-            "servicePreloadReference",
-            "liftingShareN"
-          ]
+          ["ruleId", "factor", "servicePreloads", "servicePreloadReference", "liftingShareN"]
         );
         var loads:Array<{holeId:String, preloadN:Float}> = [], loadIds:Map<String, Bool> = [];
         for (load in CastingRecordCodec.array(d, "servicePreloads")) {
@@ -117,27 +105,15 @@ class InsertAnchorageCodec {
           ruleId: text(d, "ruleId"),
           factor: factor,
           servicePreloads: loads,
-          servicePreloadReference: text(
-            d,
-            "servicePreloadReference"
-          ),
+          servicePreloadReference: text(d, "servicePreloadReference"),
           liftingShareN: lifting
         };
         var rules:InsertAnchorRules = {
           demand: demand,
           minimumEmbedmentMm: positive(r, "minimumEmbedmentMm"),
-          minimumBearingAreaMm2: positive(
-            r,
-            "minimumBearingAreaMm2"
-          ),
-          minimumSpacingMm: positive(
-            r,
-            "minimumSpacingMm"
-          ),
-          minimumCoverMm: positive(
-            r,
-            "minimumCoverMm"
-          )
+          minimumBearingAreaMm2: positive(r, "minimumBearingAreaMm2"),
+          minimumSpacingMm: positive(r, "minimumSpacingMm"),
+          minimumCoverMm: positive(r, "minimumCoverMm")
         };
         var anchors:Array<InsertBoltAnchor> = [], ids:Map<String, Bool> = [], holes:Map<String, Bool> = [];
         for (a in CastingRecordCodec.array(raw, "anchors")) {
@@ -172,46 +148,16 @@ class InsertAnchorageCodec {
           var screw:InsertAnchorScrew = {
             partNumber: text(s, "partNumber"),
             thread: thread,
-            lengthMm: positive(
-              s,
-              "lengthMm"
-            ),
-            threadedLengthMm: positive(
-              s,
-              "threadedLengthMm"
-            ),
-            headHeightMm: positive(
-              s,
-              "headHeightMm"
-            ),
-            headAcrossFlatsMm: positive(
-              s,
-              "headAcrossFlatsMm"
-            ),
-            flangeDiameterMm: positive(
-              s,
-              "flangeDiameterMm"
-            ),
-            flangeThicknessMm: positive(
-              s,
-              "flangeThicknessMm"
-            ),
-            bearingInnerDiameterMm: positive(
-              s,
-              "bearingInnerDiameterMm"
-            ),
-            bearingOuterDiameterMm: positive(
-              s,
-              "bearingOuterDiameterMm"
-            ),
-            assemblyPreloadN: positive(
-              s,
-              "assemblyPreloadN"
-            ),
-            preloadReference: text(
-              s,
-              "preloadReference"
-            )
+            lengthMm: positive(s, "lengthMm"),
+            threadedLengthMm: positive(s, "threadedLengthMm"),
+            headHeightMm: positive(s, "headHeightMm"),
+            headAcrossFlatsMm: positive(s, "headAcrossFlatsMm"),
+            flangeDiameterMm: positive(s, "flangeDiameterMm"),
+            flangeThicknessMm: positive(s, "flangeThicknessMm"),
+            bearingInnerDiameterMm: positive(s, "bearingInnerDiameterMm"),
+            bearingOuterDiameterMm: positive(s, "bearingOuterDiameterMm"),
+            assemblyPreloadN: positive(s, "assemblyPreloadN"),
+            preloadReference: text(s, "preloadReference")
           };
           if (screw.flangeThicknessMm >= screw.headHeightMm || screw.headAcrossFlatsMm <= thread.majorDiameter
             || screw.threadedLengthMm > screw.lengthMm || screw.bearingInnerDiameterMm < thread.majorDiameter
@@ -334,11 +280,7 @@ class InsertAnchorageCodec {
 
   public static function bearingFrame(hole:InsertHole, anchor:InsertBoltAnchor):AssemblyFrame return F.compose(
     hole.frame,
-    F.translation(
-      0,
-      0,
-      anchor.insertionMm - anchor.screw.lengthMm
-    )
+    F.translation(0, 0, anchor.insertionMm - anchor.screw.lengthMm)
   );
 
   public static function demandN(rules:InsertAnchorRules):Float {
@@ -412,11 +354,7 @@ class EmbeddedAnchors {
 	 * overlap is counted once). Callers qualify containment with source CAD. */
   public static function moments(spec:InsertSpec, exposedOnly:Bool): {
     volume: Float,
-    center: {
-      x: Float,
-      y: Float,
-      z: Float
-    }
+    center: {x: Float, y: Float, z: Float}
   } {
     var volume = 0.0, mx = 0.0, my = 0.0, mz = 0.0;
     function add(v:Float, frame:AssemblyFrame, z:Float):Void {
@@ -521,11 +459,7 @@ class InsertAnchorageChecks {
 	 * overlap; no empirical edge/group factor is introduced. */
   public static function materialChecks(
     insert:CastingToolingInput.CastingToolingInsert,
-    facts:Array<{
-      anchorId:String,
-      bearingAreaMm2:Float,
-      embedmentMm:Float
-    }>,
+    facts:Array<{anchorId:String, bearingAreaMm2:Float, embedmentMm:Float}>,
     bearingStrengthMPa:CastingInput,
     tensileStrengthMPa:CastingInput
   ):Array<ToolingValidation> {
@@ -560,12 +494,7 @@ class InsertAnchorageChecks {
           var prefix = "tooling.insert.anchorage." + insert.id + "." + anchor.id + ".capacity.";
           for (item in [
             {name: "bearing", area: bearing, strength: bearingStrengthMPa, model: BEARING_MODEL},
-            {
-              name: "cone",
-              area: cone,
-              strength: tensileStrengthMPa,
-              model: CONE_MODEL
-            }
+            {name: "cone", area: cone, strength: tensileStrengthMPa, model: CONE_MODEL}
           ]) {
             var status = item.area <= 0 ? ToolingCheckStatus.Fail : switch item.strength {
               case Unresolved(_):
@@ -626,10 +555,7 @@ class InsertAnchorageChecks {
         if (d == 0 || d >= c.radius + q.radius || d + q.radius <= c.radius) continue;
         var half = Math.acos(Math.max(
           -1,
-          Math.min(
-            1,
-            (c.radius * c.radius + d * d - q.radius * q.radius) / (2 * c.radius * d)
-          )
+          Math.min(1, (c.radius * c.radius + d * d - q.radius * q.radius) / (2 * c.radius * d))
         ));
         var middle = Math.atan2(dy, dx), start = middle - half, finish = middle + half;
         while (start < 0) {
@@ -691,11 +617,7 @@ class InsertAnchorageChecks {
           for (finding in materia.casting.ThreadedFastenerFit.checkIntervals(
             hole,
             hole.frame,
-            {
-              shankLength: anchor.screw.lengthMm,
-              threadedLength: anchor.screw.threadedLengthMm,
-              bearingFrame: bearing
-            },
+            {shankLength: anchor.screw.lengthMm, threadedLength: anchor.screw.threadedLengthMm, bearingFrame: bearing},
             anchor.id
           )) result.push(record(
             key + "." + finding.code,
@@ -815,30 +737,8 @@ class InsertAnchorSelection {
     embedmentDiameters: 2,
     coverDiameters: 1,
     spacingDiameters: 0.5,
-    screwLengthsMm: [
-      10,
-      12,
-      16,
-      20,
-      25,
-      30,
-      35,
-      40,
-      45,
-      50,
-      60,
-      70,
-      80
-    ],
-    allowedNominalDiametersMm: [
-      5,
-      6,
-      8,
-      10,
-      12,
-      14,
-      16
-    ]
+    screwLengthsMm: [10, 12, 16, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80],
+    allowedNominalDiametersMm: [5, 6, 8, 10, 12, 14, 16]
   };
 
   /** The same CoM-based source locations used by the castability proposals.
@@ -884,14 +784,8 @@ class InsertAnchorSelection {
 
 
   public static function requiredHoleLigament(a:InsertHole, b:InsertHole):Float return Math.max(
-    Math.max(
-      a.limits.minWall,
-      b.limits.minWall
-    ),
-    Math.max(
-      a.limits.minClearance,
-      b.limits.minClearance
-    )
+    Math.max(a.limits.minWall, b.limits.minWall),
+    Math.max(a.limits.minClearance, b.limits.minClearance)
   );
 
   public static function select(
@@ -1003,17 +897,11 @@ class InsertAnchorSelection {
                 for (point in points) {
                   landX = Math.max(
                     landX,
-                    Math.max(
-                      stock.x + margin - point.xMm,
-                      point.xMm + margin - stock.x - stock.width
-                    )
+                    Math.max(stock.x + margin - point.xMm, point.xMm + margin - stock.x - stock.width)
                   );
                   landY = Math.max(
                     landY,
-                    Math.max(
-                      stock.y + margin - point.yMm,
-                      point.yMm + margin - stock.y - stock.depth
-                    )
+                    Math.max(stock.y + margin - point.yMm, point.yMm + margin - stock.y - stock.depth)
                   );
                 }
                 var key = haxe.Json.stringify(points);
@@ -1172,14 +1060,7 @@ class InsertAnchorScreen {
     var along = dot(n, axis), radial = sub(n, scale(axis, along)), length = norm(radial);
     return add(
       add(origin, scale(axis, along > EPS ? h : along < -EPS ? 0 : h / 2)),
-      length > EPS ? scale(
-        radial,
-        r / length
-      ) : {
-        x : 0,
-        y : 0,
-        z : 0
-      }
+      length > EPS ? scale(radial, r / length) : {x : 0, y : 0, z : 0}
     );
   }
 
@@ -1227,33 +1108,13 @@ class InsertAnchorScreen {
       ), denominator = a * c - b * b;
     var best = Math.min(
       Math.min(pointSegment(first.a, second.a, second.b), pointSegment(first.b, second.a, second.b)),
-      Math.min(
-        pointSegment(
-          second.a,
-          first.a,
-          first.b
-        ),
-        pointSegment(
-          second.b,
-          first.a,
-          first.b
-        )
-      )
+      Math.min(pointSegment(second.a, first.a, first.b), pointSegment(second.b, first.a, first.b))
     );
     if (denominator > 1e-20) {
       var s = (b * e - c * d) / denominator, t = (a * e - b * d) / denominator;
       if (s >= 0 && s <= 1 && t >= 0 && t <= 1) best = Math.min(
         best,
-        norm(sub(
-          add(first.a, scale(u, s)),
-          add(
-            second.a,
-            scale(
-              v,
-              t
-            )
-          )
-        ))
+        norm(sub(add(first.a, scale(u, s)), add(second.a, scale(v, t))))
       );
     }
     return best;
@@ -1316,23 +1177,11 @@ class InsertAnchorScreen {
     var end = add(origin, scale(axis, h)), low = {
       x: Math.min(origin.x, end.x) - r,
       y: Math.min(origin.y, end.y) - r,
-      z: Math.min(
-        origin.z,
-        end.z
-      ) - r
+      z: Math.min(origin.z, end.z) - r
     }, high = {
-      x: Math.max(
-        origin.x,
-        end.x
-      ) + r,
-      y: Math.max(
-        origin.y,
-        end.y
-      ) + r,
-      z: Math.max(
-        origin.z,
-        end.z
-      ) + r
+      x: Math.max(origin.x, end.x) + r,
+      y: Math.max(origin.y, end.y) + r,
+      z: Math.max(origin.z, end.z) + r
     };
     var minimum = {x: Math.POSITIVE_INFINITY, y: Math.POSITIVE_INFINITY, z: Math.POSITIVE_INFINITY}, maximum = {
       x: Math.NEGATIVE_INFINITY,
@@ -1349,16 +1198,10 @@ class InsertAnchorScreen {
     }
     var dx = Math.max(0, Math.max(minimum.x - high.x, low.x - maximum.x)), dy = Math.max(
       0,
-      Math.max(
-        minimum.y - high.y,
-        low.y - maximum.y
-      )
+      Math.max(minimum.y - high.y, low.y - maximum.y)
     ), dz = Math.max(
       0,
-      Math.max(
-        minimum.z - high.z,
-        low.z - maximum.z
-      )
+      Math.max(minimum.z - high.z, low.z - maximum.z)
     );
     return dx * dx + dy * dy + dz * dz < cover * cover;
   }
@@ -1397,11 +1240,7 @@ class InsertAnchorScreen {
     );
     for (cylinder in [
       {origin: origin, r: screw.thread.majorDiameter / 2, h: shankHeight},
-      {
-        origin: flangeOrigin,
-        r: screw.flangeDiameterMm / 2,
-        h: screw.flangeThicknessMm
-      }
+      {origin: flangeOrigin, r: screw.flangeDiameterMm / 2, h: screw.flangeThicknessMm}
     ]) {
       if (!inside(add(cylinder.origin, scale(axis, cylinder.h / 2)), faces)) return false;
       for (face in faces) if (near(cylinder.origin, axis, cylinder.r, cylinder.h, face, cover) && cylinderFace(

@@ -77,19 +77,10 @@ class FoundationJoints {
     var result:FoundationJoint = {
       id: id(raw, "id"),
       lowerBody: path(raw, "lowerBody"),
-      upperBody: path(
-        raw,
-        "upperBody"
-      ),
+      upperBody: path(raw, "upperBody"),
       route: route,
-      gapMm: CastingRecordCodec.number(
-        raw,
-        "gapMm"
-      ),
-      gapToleranceMm: CastingRecordCodec.number(
-        raw,
-        "gapToleranceMm"
-      ),
+      gapMm: CastingRecordCodec.number(raw, "gapMm"),
+      gapToleranceMm: CastingRecordCodec.number(raw, "gapToleranceMm"),
       seats: [],
       jacks: [],
       anchors: [],
@@ -106,10 +97,7 @@ class FoundationJoints {
       var seat:FoundationJointSeat = {
         id: id(row, "id"),
         lower: reference(Reflect.field(row, "lower")),
-        upper: reference(Reflect.field(
-          row,
-          "upper"
-        ))
+        upper: reference(Reflect.field(row, "upper"))
       };
       unique(ids, seat.id, "seat");
       var lower = key(seat.lower), upper = key(seat.upper), pair = lower + "|" + upper;
@@ -124,14 +112,8 @@ class FoundationJoints {
       var jack:FoundationJointJack = {
         id: id(row, "id"),
         screw: path(row, "screw"),
-        bearing: reference(Reflect.field(
-          row,
-          "bearing"
-        )),
-        receiver: reference(Reflect.field(
-          row,
-          "receiver"
-        ))
+        bearing: reference(Reflect.field(row, "bearing")),
+        receiver: reference(Reflect.field(row, "receiver"))
       };
       unique(ids, jack.id, "jack");
       unique(screws, jack.screw, "jack screw");
@@ -144,10 +126,7 @@ class FoundationJoints {
       var anchor:FoundationJointAnchor = {
         id: id(row, "id"),
         screw: path(row, "screw"),
-        target: reference(Reflect.field(
-          row,
-          "target"
-        )),
+        target: reference(Reflect.field(row, "target")),
         through: []
       };
       unique(ids, anchor.id, "anchor");

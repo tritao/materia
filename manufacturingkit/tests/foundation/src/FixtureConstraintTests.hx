@@ -18,68 +18,21 @@ class FixtureConstraintTests {
     id: id,
     sourceId: id + "-source",
     role: Location,
-    point: {
-      x: x,
-      y: y,
-      z: 0
-    },
-    normal: {
-      x: nx,
-      y: ny,
-      z: nz
-    }
+    point: {x: x, y: y, z: 0},
+    normal: {x: nx, y: ny, z: nz}
   };
   static function fixture():Array<FixtureConstraint> return [
     contact("pad-a", 0, 0, 0, 0, 1),
-    contact(
-      "pad-b",
-      100,
-      0,
-      0,
-      0,
-      1
-    ),
-    contact(
-      "pad-c",
-      0,
-      100,
-      0,
-      0,
-      1
-    ),
-    contact(
-      "pin-x",
-      0,
-      0,
-      1,
-      0,
-      0
-    ),
-    contact(
-      "pin-y",
-      0,
-      0,
-      0,
-      1,
-      0
-    ),
-    contact(
-      "slot-y",
-      100,
-      0,
-      0,
-      1,
-      0
-    )
+    contact("pad-b", 100, 0, 0, 0, 1),
+    contact("pad-c", 0, 100, 0, 0, 1),
+    contact("pin-x", 0, 0, 1, 0, 0),
+    contact("pin-y", 0, 0, 0, 1, 0),
+    contact("slot-y", 100, 0, 0, 1, 0)
   ];
   static function analyze(rows:Array<FixtureConstraint
     >):materia.casting.FixtureConstraints.FixtureConstraintReport return FixtureConstraints.analyze(
       rows,
-      {
-        x: 0,
-        y: 0,
-        z: 0
-      },
+      {x: 0, y: 0, z: 0},
       100,
       1e-9
     );

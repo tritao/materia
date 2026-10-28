@@ -51,17 +51,7 @@ class CastingProfileTests {
       "meeting fillets retain exact arcs without zero-length lines"
     );
     var reentrant = P.roundedPolygon(
-      [
-        {x: -20, y: -15},
-        {x: 20, y: -15},
-        {x: 20, y: 0},
-        {x: 0, y: 0},
-        {x: 0, y: 15},
-        {
-          x: -20,
-          y: 15
-        }
-      ],
+      [{x: -20, y: -15}, {x: 20, y: -15}, {x: 20, y: 0}, {x: 0, y: 0}, {x: 0, y: 15}, {x: -20, y: 15}],
       2
     );
     check(
@@ -92,10 +82,7 @@ class CastingProfileTests {
     var cut = CastingPatterns.box(
       "profile-port",
       ServiceOpening,
-      [
-        CastingPatterns.face("body.z-min"),
-        CastingPatterns.face("body.z-max")
-      ],
+      [CastingPatterns.face("body.z-min"), CastingPatterns.face("body.z-max")],
       40,
       30,
       20
@@ -117,20 +104,14 @@ class CastingProfileTests {
     var connected = CastingPatterns.box(
       "box-port",
       Clearance,
-      [
-        CastingPatterns.face("body.z-min"),
-        CastingPatterns.feature("profile-port")
-      ],
+      [CastingPatterns.face("body.z-min"), CastingPatterns.feature("profile-port")],
       20,
       20,
       10
     );
     var cavities = materia.casting.CastingCavities.derive(
       materia.casting.CastingEnvelope.build(80, 60, 20),
-      [
-        connected,
-        decoded
-      ]
+      [connected, decoded]
     );
     check(switch cavities.filter(region -> region.featureId == connected.id)[0].geometry {
       case SolidIntersection(_, _, _):

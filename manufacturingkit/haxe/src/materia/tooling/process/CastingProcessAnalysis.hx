@@ -55,12 +55,7 @@ class CastingProcessAnalysis {
         member.panel.stock.measuredThickness
       ]) bottom = Math.min(
         bottom,
-        materia.assembly.AssemblyFrames.transformPoint(
-          member.pose,
-          x,
-          y,
-          z
-        ).z
+        materia.assembly.AssemblyFrames.transformPoint(member.pose, x, y, z).z
       );
       {
         id:member.panel.id, bottomMm:Math.max(p.envelope.z, bottom)

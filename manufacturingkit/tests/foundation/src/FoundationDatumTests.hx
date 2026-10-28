@@ -18,27 +18,9 @@ class FoundationDatumTests {
   static function scheme():FoundationDatumScheme return {
     id: "base-datums",
     foundationId: "base",
-    primary: {
-      id: "z-primary",
-      reference: BodyFace("body.z-min"),
-      frame: F.identity()
-    },
-    secondary: {
-      id: "x-secondary",
-      reference: FeatureFace(
-        "register",
-        "side-0"
-      ),
-      frame: F.identity()
-    },
-    tertiary: {
-      id: "a-tertiary",
-      reference: DatumReference.InsertInterface(
-        "seat",
-        "edge"
-      ),
-      frame: F.identity()
-    }
+    primary: {id: "z-primary", reference: BodyFace("body.z-min"), frame: F.identity()},
+    secondary: {id: "x-secondary", reference: FeatureFace("register", "side-0"), frame: F.identity()},
+    tertiary: {id: "a-tertiary", reference: DatumReference.InsertInterface("seat", "edge"), frame: F.identity()}
   };
   public static function run():Void {
     var s = scheme(), saved = haxe.Json.stringify(FoundationDatums.record(s));
@@ -127,21 +109,8 @@ class FoundationDatumTests {
       relationshipIds: []
     };
     var inserts:Array<materia.casting.FoundationDatumScheme.FoundationDatumInsert> = [
-      {
-        id: "seat",
-        pose: F.identity(),
-        holes: TestInsertHoles.through(
-          5,
-          20
-        ),
-        interfaces: [edge]
-      },
-      {
-        id: "other-seat",
-        pose: F.identity(),
-        holes: [],
-        interfaces: [edge]
-      }
+      {id: "seat", pose: F.identity(), holes: TestInsertHoles.through(5, 20), interfaces: [edge]},
+      {id: "other-seat", pose: F.identity(), holes: [], interfaces: [edge]}
     ];
     check(
       FoundationDatums.validateSource(s, envelope, [feature], inserts, [requirement]).length == 0,

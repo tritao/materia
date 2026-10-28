@@ -68,14 +68,8 @@ class CastingRecordCodec {
       z: number(raw, "z"),
       qx: number(raw, "qx"),
       qy: number(raw, "qy"),
-      qz: number(
-        raw,
-        "qz"
-      ),
-      qw: number(
-        raw,
-        "qw"
-      )
+      qz: number(raw, "qz"),
+      qw: number(raw, "qw")
     };
     materia.assembly.AssemblyCodec.validateFrame(f);
     return f;

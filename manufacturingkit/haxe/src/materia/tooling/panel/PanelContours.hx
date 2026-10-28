@@ -96,54 +96,12 @@ class PanelContours {
     return [
       line({x: l + r, y: b}, {x: rr - r, y: b}),
       arc(rr, b, r, Math.PI, 3 * Math.PI / 2),
-      line(
-        {x: rr, y: b + r},
-        {
-          x: rr,
-          y: t - r
-        }
-      ),
-      arc(
-        rr,
-        t,
-        r,
-        -Math.PI / 2,
-        3 * Math.PI / 2
-      ),
-      line(
-        {
-          x: rr - r,
-          y: t
-        },
-        {
-          x: l + r,
-          y: t
-        }
-      ),
-      arc(
-        l,
-        t,
-        r,
-        0,
-        3 * Math.PI / 2
-      ),
-      line(
-        {
-          x: l,
-          y: t - r
-        },
-        {
-          x: l,
-          y: b + r
-        }
-      ),
-      arc(
-        l,
-        b,
-        r,
-        Math.PI / 2,
-        3 * Math.PI / 2
-      )
+      line({x: rr, y: b + r}, {x: rr, y: t - r}),
+      arc(rr, t, r, -Math.PI / 2, 3 * Math.PI / 2),
+      line({x: rr - r, y: t}, {x: l + r, y: t}),
+      arc(l, t, r, 0, 3 * Math.PI / 2),
+      line({x: l, y: t - r}, {x: l, y: b + r}),
+      arc(l, b, r, Math.PI / 2, 3 * Math.PI / 2)
     ];
   }
 

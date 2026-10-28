@@ -355,10 +355,7 @@ class FillAnalysis {
           id: ToolingIds.derive("air-", hash, ""),
           sealedAtMm: h,
           volumeMm3: BoxAlgebra.volume(component),
-          geometry: Rectilinear(
-            sorted(component),
-            faces
-          ),
+          geometry: Rectilinear(sorted(component), faces),
           sourceIds: ids,
           proposedVentPoint: {
             x: highest.box.x + highest.box.width / 2,

@@ -108,10 +108,7 @@ class SheetPolygon {
   static function pointDistance(p:SheetPoint, a:SheetPoint, b:SheetPoint):Float {
     var dx = b.x - a.x, dy = b.y - a.y, t = Math.max(
       0,
-      Math.min(
-        1,
-        ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)
-      )
+      Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy))
     );
     var x = p.x - a.x - t * dx, y = p.y - a.y - t * dy;
     return Math.sqrt(x * x + y * y);
@@ -125,18 +122,7 @@ class SheetPolygon {
         best,
         Math.min(
           Math.min(pointDistance(p, r, s), pointDistance(q, r, s)),
-          Math.min(
-            pointDistance(
-              r,
-              p,
-              q
-            ),
-            pointDistance(
-              s,
-              p,
-              q
-            )
-          )
+          Math.min(pointDistance(r, p, q), pointDistance(s, p, q))
         )
       );
     }
@@ -209,13 +195,7 @@ class SheetPolygon {
   public static function rectangle(x:Float, y:Float, w:Float, h:Float):SheetShape return [[
     point(x, y),
     point(x + w, y),
-    point(
-      x + w,
-      y + h
-    ),
-    point(
-      x,
-      y + h
-    )
+    point(x + w, y + h),
+    point(x, y + h)
   ]];
 }

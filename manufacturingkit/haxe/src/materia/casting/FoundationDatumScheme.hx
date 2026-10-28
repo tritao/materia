@@ -65,18 +65,9 @@ class FoundationDatums {
     var result:FoundationDatumScheme = {
       id: id,
       foundationId: foundation,
-      primary: readDatum(Reflect.field(
-        raw,
-        "primary"
-      )),
-      secondary: readDatum(Reflect.field(
-        raw,
-        "secondary"
-      )),
-      tertiary: readDatum(Reflect.field(
-        raw,
-        "tertiary"
-      ))
+      primary: readDatum(Reflect.field(raw, "primary")),
+      secondary: readDatum(Reflect.field(raw, "secondary")),
+      tertiary: readDatum(Reflect.field(raw, "tertiary"))
     };
     var ids:Array<String> = [];
     for (datum in ordered(result)) {
@@ -211,10 +202,7 @@ class FoundationDatums {
     return {
       id: id,
       reference: readReference(Reflect.field(raw, "reference")),
-      frame: CastingRecordCodec.frame(Reflect.field(
-        raw,
-        "frame"
-      ))
+      frame: CastingRecordCodec.frame(Reflect.field(raw, "frame"))
     };
   }
 

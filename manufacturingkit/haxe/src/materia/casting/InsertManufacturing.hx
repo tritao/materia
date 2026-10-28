@@ -59,14 +59,7 @@ class InsertManufacturingCodec {
   public static function snapshot(raw:Dynamic):InsertManufacturing {
     CastingFeatureCodec.fields(
       raw,
-      [
-        "material",
-        "blank",
-        "holeRoutes",
-        "mountingRequirements",
-        "inspections",
-        "processReference"
-      ]
+      ["material", "blank", "holeRoutes", "mountingRequirements", "inspections", "processReference"]
     );
     var blankRaw:Dynamic = Reflect.field(raw, "blank");
     var blank:InsertBlank = switch CastingRecordCodec.string(blankRaw, "kind") {
@@ -78,10 +71,7 @@ class InsertManufacturingCodec {
         Stock(
           text(blankRaw, "reference"),
           CastingSolid.CastingSolidCodec.snapshot(Reflect.field(blankRaw, "solid")),
-          CastingRecordCodec.frame(Reflect.field(
-            blankRaw,
-            "partToStock"
-          ))
+          CastingRecordCodec.frame(Reflect.field(blankRaw, "partToStock"))
         );
       default:
         throw "Unknown insert blank kind";

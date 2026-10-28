@@ -74,10 +74,7 @@ class MoldCores {
       id: core.id,
       featureId: core.featureId,
       cavity: singleBox(core.cavity, core.id),
-      foam: singleBox(
-        core.foamEnvelope,
-        core.id
-      ),
+      foam: singleBox(core.foamEnvelope, core.id),
       materialSpec: recipe.core.materialSpec,
       coveringThickness: core.coveringThickness,
       removal: removal(core),
@@ -286,16 +283,8 @@ class MoldCores {
       }
       return {
         panel: materia.tooling.panel.PanelCodec.copy(panel),
-        pose: materia.assembly.AssemblyFrames.translation(
-          originX,
-          bounds.y,
-          z
-        ),
-        withdrawal: {
-          x: 0,
-          y: 0,
-          z: 1
-        }
+        pose: materia.assembly.AssemblyFrames.translation(originX, bounds.y, z),
+        withdrawal: {x: 0, y: 0, z: 1}
       };
     } catch (error:Dynamic) {
       throw "Core carrier " + core.featureId + ": " + Std.string(error);

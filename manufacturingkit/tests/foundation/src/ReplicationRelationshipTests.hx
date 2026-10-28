@@ -15,11 +15,7 @@ class ReplicationRelationshipTests {
   }
   static function requirement(id:String, x:Float):InterfaceRequirement return {
     id: id,
-    geometry: Plane(F.translation(
-      x,
-      0,
-      0
-    )),
+    geometry: Plane(F.translation(x, 0, 0)),
     route: InterfaceRoute.Replicated,
     allowanceMm: 1,
     finishingProcessErrorMm: materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
@@ -31,21 +27,10 @@ class ReplicationRelationshipTests {
   static function master(id:String, x:Float):ReplicationMaster return {
     id: id,
     kind: ReplicationMasterKind.GroundPlate,
-    body: materia.casting.CastingSolid.Box(
-      40,
-      20,
-      4
-    ),
-    pose: F.translation(
-      x,
-      0,
-      0
-    ),
+    body: materia.casting.CastingSolid.Box(40, 20, 4),
+    pose: F.translation(x, 0, 0),
     reference: F.identity(),
-    members: [ComponentInterface(
-      "casting",
-      id
-    )],
+    members: [ComponentInterface("casting", id)],
     finish: InterfaceFinish.JigMaster,
     jacks: [],
     releaseSpec: null,
@@ -57,13 +42,7 @@ class ReplicationRelationshipTests {
     var r:InterfaceRelationship = {
       id: "pair",
       kind: Coplanar,
-      members: [
-        ComponentInterface("casting", "a"),
-        ComponentInterface(
-          "casting",
-          "b"
-        )
-      ],
+      members: [ComponentInterface("casting", "a"), ComponentInterface("casting", "b")],
       tolerance: Linear(0.01),
       metrology: {
         method: MetrologyMethod.IndicatorReversal,
@@ -76,38 +55,15 @@ class ReplicationRelationshipTests {
       jointSources: materia.casting.FoundationJointSources.FoundationJointSourceCodec.empty(),
       bodyMember: "casting",
       inserts: [],
-      relationships: [{
-        id: "instance",
-        relationship: r
-      }],
-      sources: [
-        Precision(
-          "casting",
-          a,
-          F.identity()
-        ),
-        Precision(
-          "casting",
-          b,
-          F.identity()
-        )
-      ]
+      relationships: [{id: "instance", relationship: r}],
+      sources: [Precision("casting", a, F.identity()), Precision("casting", b, F.identity())]
     };
     var j:ReplicationJig = {
       id: "frame",
       datumSchemeId: "datums",
       frameReference: "synthetic-frame",
       pose: F.identity(),
-      masters: [
-        master(
-          "a",
-          0
-        ),
-        master(
-          "b",
-          50
-        )
-      ]
+      masters: [master("a", 0), master("b", 50)]
     };
     function evaluate():materia.tooling.ToolingValidation return ReplicationRelationships.check(
       j,
@@ -176,17 +132,7 @@ class ReplicationRelationshipTests {
       0,
       10,
       0,
-      [
-        Math.cos(0.001),
-        -Math.sin(0.001),
-        0,
-        Math.sin(0.001),
-        Math.cos(0.001),
-        0,
-        0,
-        0,
-        1
-      ]
+      [Math.cos(0.001), -Math.sin(0.001), 0, Math.sin(0.001), Math.cos(0.001), 0, 0, 0, 1]
     );
     check(
       evaluate().status == ToolingCheckStatus.Unsupported,

@@ -15,14 +15,7 @@ class ReleasePlanTests {
     faceIndex: 0,
     areaMm2: 100,
     wettedAreaMm2: wet,
-    bounds: {
-      x: 0,
-      y: 0,
-      z: 0,
-      width: 10,
-      depth: 10,
-      height: 0
-    },
+    bounds: {x: 0, y: 0, z: 0, width: 10, depth: 10, height: 0},
     substrate: kind,
     needsSealing: seal,
     adjacentCoatedFaceIds: []
@@ -38,35 +31,11 @@ class ReleasePlanTests {
       0.1,
       [
         face("board-wet", "board", Board, 100, true),
-        face(
-          "board-dry",
-          "board",
-          Board,
-          0,
-          true
-        ),
-        face(
-          "fixture-wet",
-          "fixture",
-          ToolingMetal,
-          100,
-          false
-        ),
-        face(
-          "eps-wet",
-          "eps",
-          EPSCovering,
-          100,
-          false
-        ),
+        face("board-dry", "board", Board, 0, true),
+        face("fixture-wet", "fixture", ToolingMetal, 100, false),
+        face("eps-wet", "eps", EPSCovering, 100, false),
         bond,
-        face(
-          "anchor-bond",
-          "anchor",
-          BondingSteel,
-          100,
-          false
-        )
+        face("anchor-bond", "anchor", BondingSteel, 100, false)
       ]
     );
   }
