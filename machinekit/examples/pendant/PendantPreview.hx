@@ -1,6 +1,7 @@
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.MachineAssembly;
 import machinekit.hmi.PanelAssemblyBuilder;
+import machinekit.pendant.PendantPresentation;
 import machinekit.pendant.ReferencePendant;
 import materia.project.SceneArtifact;
 
@@ -22,10 +23,11 @@ class PendantPreview {
     );
   }
 
-  public static function preview():haxe.io.Bytes return SceneArtifact.encode(AssemblyPreview.scene(
-    assembly(),
-    "pendant"
-  ));
+  public static function preview():haxe.io.Bytes {
+    var scene = AssemblyPreview.scene(assembly(), "pendant");
+    scene.presentation = PendantPresentation.build(scene.assemblyDefinition);
+    return SceneArtifact.encode(scene);
+  }
 
   public static function main():Void {
     var bytes = preview();

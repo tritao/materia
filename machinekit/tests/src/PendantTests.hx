@@ -205,6 +205,13 @@ class PendantTests {
       joints.length == 3 && encoders.length == 1,
       "Three free joints, one the wheel's encoder: " + [for (j in joints) j.id].join(", ")
     );
+    // The exploded view validates against the assembly and moves every member except the shell.
+    var scene = machinekit.assembly.AssemblyPreview.scene(assembly, "pendant");
+    var presentation = PendantPresentation.build(scene.assemblyDefinition);
+    check(
+      presentation.views.length == 2 && presentation.explode.length == ids.length - 1,
+      "Exploded view covers all but the shell: " + presentation.explode.length
+    );
     // Splitting a device does not change the bill of materials: one line per purchase, the bodies included in it.
     var bom = new machinekit.component.Bom();
     for (c in assembly.components()) bom.addComponent(c.component);
