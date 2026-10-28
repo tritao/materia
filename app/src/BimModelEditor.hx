@@ -7,7 +7,6 @@ import haxeon.ui.widgets.controls.Select;
 import bimkit.BimDocument;
 import haxeon.ui.editing.EditorDocument;
 import cadkit.parametric.Definition;
-import cadkit.parametric.Element;
 import cadkit.parametric.ElementId;
 import cadkit.parametric.InstanceElement;
 import haxeon.ui.LayoutAxis;

@@ -9,7 +9,6 @@ import app.BimModelEditor;
 import app.BimSpatialTree;
 import app.BimTypeTree;
 import bimkit.BimDocument;
-import bimkit.BimSchema;
 import cadkit.parametric.ElementReference;
 import cadkit.parametric.DefinitionInput;
 import cadkit.parametric.DefinitionOutput;

@@ -20,7 +20,6 @@ import haxe.io.Bytes;
 import nativekit.scene.GeometryData;
 import stockkit.CutMove;
 import stockkit.CutMoves;
-import stockkit.MoveOutcome;
 import stockkit.Stock;
 import stockkit.StockColoring;
 import stockkit.StockLattice;

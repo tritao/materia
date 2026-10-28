@@ -10,7 +10,6 @@ import collisionkit.CollisionPairRule;
 import collisionkit.CollisionPairStatus;
 import motionkit.robot.ManipulatorPlannerSpace;
 import motionkit.planner.MotionPlanner;
-import motionkit.planner.PlannerSpace;
 import motionkit.planner.RrtConnect;
 import app.SimulatedTools.GripObject;
 import cadkit.modeling.AssemblyState;

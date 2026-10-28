@@ -7,7 +7,6 @@ import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyFrames;
 import materia.presentation.AssemblyPresentation;
-import materia.presentation.PresentationCodec;
 import materia.presentation.PresentationEdits;
 import materia.project.SceneArtifact;
 import haxe.io.Bytes;
