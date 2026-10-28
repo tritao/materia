@@ -10,8 +10,11 @@ class RingInterval {
   public final hiGash:Int;
   public final hiPass:Int;
   public function new(lo:Float, hi:Float, loGash:Int, loPass:Int, hiGash:Int, hiPass:Int) {
-    this.lo = lo; this.hi = hi;
-    this.loGash = loGash; this.loPass = loPass;
-    this.hiGash = hiGash; this.hiPass = hiPass;
+    this.lo = lo;
+    this.hi = hi;
+    this.loGash = loGash;
+    this.loPass = loPass;
+    this.hiGash = hiGash;
+    this.hiPass = hiPass;
   }
 }

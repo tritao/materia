@@ -30,34 +30,45 @@ class RingGearTarget {
         stock.cutRegion(cuts);
       }
       return stock;
-    } catch (error:Dynamic) { stock.dispose(); throw error; }
+    } catch (error:Dynamic) {
+      stock.dispose();
+      throw error;
+    }
   }
 
-  static function angles(profile:ToothProfile, radius:Float):Array<RingInterval> {
+  static function angles(profile:ToothProfile, radius:Float):Array < RingInterval > {
     var spec = profile.spec, full = 2 * Math.PI;
-    if ((!spec.internal && radius <= spec.rootRadius()) || (spec.internal && radius >= spec.rootRadius()))
-      return [new RingInterval(0, full, -1, -1, -1, -1)];
-    if ((!spec.internal && radius > spec.tipRadius()) || (spec.internal && radius < spec.tipRadius())) return [];
+    if ((!spec.internal
+      && radius <= spec.rootRadius()) ||(spec.internal && radius >= spec.rootRadius())) return [new RingInterval(
+        0,
+        full,
+        -1,
+        -1,
+        -1,
+        -1
+      )];
+    if ((!spec.internal && radius > spec.tipRadius()) ||(spec.internal && radius < spec.tipRadius())) return [];
     var lo = Math.min(profile.rootJoinRadius, profile.tipJoinRadius);
     var hi = Math.max(profile.rootJoinRadius, profile.tipJoinRadius);
     var point:Point2;
     if (radius >= lo && radius <= hi) point = profile.flankAtRadius(radius);
     else {
-      var root = spec.sign() * (radius - profile.rootJoinRadius) < 0;
+      var root = spec.sign() *(radius - profile.rootJoinRadius) < 0;
       var a = 0.0, b = 1.0;
       // Root parameter runs flank->root; tip parameter runs flank->tip.
       var increasing = root ? spec.internal : !spec.internal;
       for (_ in 0...64) {
-        var t = (a + b) / 2;
+        var t =(a + b) / 2;
         var p = root ? profile.rootFillet(t) : profile.tipFillet(t);
-        if ((p.radius() < radius) == increasing) a = t; else b = t;
+        if ((p.radius() < radius) == increasing) a = t;
+        else b = t;
       }
       point = root ? profile.rootFillet((a + b) / 2) : profile.tipFillet((a + b) / 2);
     }
     var half = Math.atan2(point.x, point.y), pitch = full / spec.teeth;
     var spans:Array<RingInterval> = [];
     for (tooth in 0...spec.teeth) {
-      var centre = (Math.PI / 2 + tooth * pitch) % full;
+      var centre =(Math.PI / 2 + tooth * pitch) % full;
       var left = centre - half, right = centre + half;
       if (left < 0) {
         spans.push(new RingInterval(0, right, -1, -1, -1, -1));
