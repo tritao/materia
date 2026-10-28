@@ -1,0 +1,437 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:materia:cable-assembly:1",
+  "title": "Materia terminal cable reference recipe v1",
+  "description": "Straight, individually routed wires between crimp housings. No implied supplier availability, mating compatibility, bend qualification, or production approval.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "units",
+    "description",
+    "supplier_length_mm",
+    "supplier_length_note",
+    "ends",
+    "wire_types",
+    "wires"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "units": {
+      "const": "mm"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "supplier_length_mm": {
+      "anyOf": [
+        {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "supplier_length_note": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ends": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/end"
+      }
+    },
+    "wire_types": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/wire_type"
+      }
+    },
+    "wires": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/wire"
+      }
+    }
+  },
+  "$defs": {
+    "vector": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "positive_property": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "status",
+        "evidence"
+      ],
+      "properties": {
+        "value": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "status": {
+          "enum": [
+            "documented",
+            "design_assumption"
+          ]
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "nonnegative_property": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "status",
+        "evidence"
+      ],
+      "properties": {
+        "value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "status": {
+          "enum": [
+            "documented",
+            "design_assumption"
+          ]
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "end": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "housing_id",
+        "origin",
+        "exit_direction",
+        "up",
+        "unpopulated_cavities"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "housing_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "origin": {
+          "$ref": "#/$defs/vector"
+        },
+        "exit_direction": {
+          "$ref": "#/$defs/vector"
+        },
+        "up": {
+          "$ref": "#/$defs/vector"
+        },
+        "unpopulated_cavities": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "end_id",
+        "cavity",
+        "contact_id",
+        "termination_allowance_mm",
+        "strip_length_mm",
+        "tinning_length_mm"
+      ],
+      "properties": {
+        "end_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cavity": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "contact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "termination_allowance_mm": {
+          "$ref": "#/$defs/nonnegative_property"
+        },
+        "strip_length_mm": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/positive_property"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tinning_length_mm": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "wire_type": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "manufacturer_mpn",
+        "supplier_style",
+        "awg",
+        "outer_diameter_mm",
+        "minimum_bend_radius_mm",
+        "voltage_v",
+        "temperature_range_c",
+        "strand_construction",
+        "length_tolerance_mm"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manufacturer_mpn": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "supplier_style": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "productMpn",
+            "displayMpn",
+            "slotNum",
+            "voltage"
+          ],
+          "properties": {
+            "productMpn": {
+              "type": "string",
+              "minLength": 1
+            },
+            "displayMpn": {
+              "type": "string",
+              "minLength": 1
+            },
+            "slotNum": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "voltage": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "awg": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 40
+        },
+        "outer_diameter_mm": {
+          "$ref": "#/$defs/positive_property"
+        },
+        "minimum_bend_radius_mm": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/positive_property"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "voltage_v": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/positive_property"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "temperature_range_c": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "status",
+                "evidence"
+              ],
+              "properties": {
+                "value": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                "status": {
+                  "enum": [
+                    "documented",
+                    "design_assumption"
+                  ]
+                },
+                "evidence": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "strand_construction": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "status",
+                "evidence"
+              ],
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "status": {
+                  "enum": [
+                    "documented",
+                    "design_assumption"
+                  ]
+                },
+                "evidence": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "length_tolerance_mm": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/nonnegative_property"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "wire": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "wire_type_id",
+        "color",
+        "cut_length_mm",
+        "route",
+        "from",
+        "to"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "wire_type_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "color": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cut_length_mm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "route": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/vector"
+          }
+        },
+        "from": {
+          "$ref": "#/$defs/endpoint"
+        },
+        "to": {
+          "$ref": "#/$defs/endpoint"
+        }
+      }
+    }
+  }
+}
