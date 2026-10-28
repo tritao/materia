@@ -5,7 +5,6 @@ import collisionkit.CollisionDescription;
 import collisionkit.CollisionPairRule;
 import collisionkit.CollisionPairStatus;
 import collisionkit.CollisionPose;
-import collisionkit.CollisionWorld;
 import collisionkit.CollisionDistance;
 import kinematicskit.AvoidancePair;
 import kinematicskit.BodyPairRelation;
