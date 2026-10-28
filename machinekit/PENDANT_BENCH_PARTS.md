@@ -24,11 +24,14 @@ Nucleo is powered over USB; the 24 V path is rehearsed separately.
 | 7 | **CAN-FD transceiver breakout**, 3.3 V logic | 2 | TJA1051, TCAN1042 or MCP2562FD class. Not a classic-CAN-only part. | `TJA1051 breakout`, `TCAN1042 breakout`, `MCP2562FD breakout` | 3.3 V logic compatible; 120 ohm termination jumper or solder pad. |
 | 8 | **USB-CAN FD adapter** | 1 | gs_usb or candleLight firmware, CAN FD capable. | `CANable 2.0`, `candleLight FD USB CAN` | Shows up as a `can0` interface and does 2 Mbit/s data phase. |
 | 9 | **120 ohm resistors**, 1/4 W | 4 | Bus termination at both ends. | any | Measure about 60 ohm across the bus with both ends fitted. |
-| 10 | **M12 A-coded 12-pin** panel connector and a **5 m shielded cable** to match | 1 each | The real connector and cable, to retire the sourcing risk and test the noise. | `M12 A-coded 12 pin panel mount connector`, `M12 12 pin cable 5m shielded` | Availability and price; pin numbering; wire gauge; cable shielding. |
+| 10 | **M12 A-coded 12-pin connector set**: a 5 m shielded cable (plug at one end, free wires or a plug at the other), a **panel-mount receptacle** for the pendant side (bench rig), a **bulkhead receptacle** for the cabinet wall with a pigtail or terminals, and a **dummy plug** | 1 each | The real connector family. Same coding and pin count on both ends. Rear-mount with a molded pigtail is easiest to wire; screw or solder terminals work. Shield must be reachable at the bulkhead. | `M12 A-coded 12 pin panel mount receptacle`, `M12 12 pin bulkhead rear mount pigtail`, `M12 12 pin cable 5m shielded`, `M12 12 pin dummy plug` | Availability and price; pin numbering matches on both ends; wire gauge for 24 V and the loop; shield contact at the bulkhead; the dummy plug can take a jumper across the loop pins. |
 | 11 | **24 V to 5 V DC-DC module** | 2 | Wide input, 24 V in, 5 V at 1 A. | `24V to 5V buck converter 3A module` | Output under load; ripple on a scope if one is to hand. |
 | 12 | **Level shifting** | 1 pack | 5 V MPG outputs into 3.3 V inputs: resistors for dividers, or a 74LVC/74HCT buffer. Check first whether the Nucleo pins are 5 V tolerant. | `74LVC245 breakout`, `5V 3.3V level shifter 4 channel` | MPG high level; edge shape. |
 | 13 | **Prototyping** | | Breadboard or perfboard, jumpers, pin headers, 2 to 3 m of 4-wire shielded cable, ferrules, heat shrink. | | |
 | 14 | **Logic analyzer**, 8 channel USB (skip if owned) | 1 | Saleae-compatible. | `USB logic analyzer 8 channel 24MHz` | Sees the MPG A/B edges. |
+| 15 | **Cabinet-side terminals** (v1 pendant interface) | 1 set | DIN rail, 2 to 3 spring or screw terminal blocks per signal group, a short DIN rail piece, end clamps, a PE terminal. | `DIN rail terminal block 2.5mm2`, `DIN rail PE terminal` | Wire gauge fits the pigtail; groups: loop, 24 V, CAN, shield. |
+| 16 | **Fuse holder and fuses** | 1 + 5 | DIN or terminal fuse holder, 1 A or 2 A fast fuses for the pendant's 24 V. | `DIN rail fuse terminal block 5x20`, `fuse 5x20 1A` | Holder rating; indicator, if any. |
+| 17 | **Cabinet wall mock-up** | 1 | A scrap of plate (about as thick as the real enclosure wall) with the M12 bulkhead hole, to test mounting, shield contact and cable entry. | | Hole size and torque; whether the shield bonds to the plate. |
 
 A bench supply (24 V) and a multimeter are assumed. A scope helps with items 1, 7 and 11.
 
@@ -53,7 +56,7 @@ ladder on one ADC pin or an I/O expander would replace the 12 axis-switch inputs
 1. The MPG: output type, supply, feel, detent. This sets the input stage on the board.
 2. Read the 12-position switch on 12 GPIOs now; decide ladder or GPIO for the board later.
 3. OLED (2.42 in): legibility, dim and blank behaviour, contrast at the handheld distance, and the face size it forces on the case.
-4. The connector and cable: price, pin numbering, and noise on a 5 m run at 2 Mbit/s data phase.
+4. The connector set and the cabinet side: price, pin numbering on both ends, the dummy plug, shield bonding at the bulkhead, and noise on a 5 m run at 2 Mbit/s data phase.
 5. A rough control layout on a flat board, then a printed mock-up with the real parts.
 
 ## Rough budget

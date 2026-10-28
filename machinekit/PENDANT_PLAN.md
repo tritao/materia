@@ -72,6 +72,32 @@ its own pendant. If the OLED proves troublesome, the switch and the HMI still wo
 - The case has a blanked mounting hole for a 3-position enabling switch. The certified upgrade
   fills the hole and wires the four reserved pins, with no new pendant.
 
+## Cabinet side
+
+The pendant cable never runs to a board. It ends at a bulkhead M12 receptacle on the enclosure wall
+(door or side), and short internal wires split the signals to where each belongs:
+
+```
+Pendant ──M12 12-pin cable──▶ bulkhead receptacle on the enclosure wall
+                                   │ rear pigtail or terminals
+                                   ▼
+  E-stop loop (2 wires) ───────▶ safety chain terminals
+  24 V / 0 V, through a fuse ──▶ 24 V distribution
+  CAN_H / CAN_L / ground ──────▶ FDCAN connector on the RKD6 cabinet node
+  shield ──────────────────────▶ chassis / PE at the wall
+```
+
+- **Why not straight to a board.** The loop, power and data have different destinations, and the
+  cable stays removable at the wall. A dummy plug with a jumper across the loop pins closes the
+  chain when the pendant is unplugged.
+- **Shield and protection at the entry.** The shield lands on the enclosure at the bulkhead (360
+  degrees where the connector allows). ESD or TVS protection on the CAN lines sits at the same point.
+- **CAN termination** (120 ohm) at the cabinet end, on the RKD6 board's connector or a terminal.
+- **v1:** no PCB. The receptacle's pigtail goes to DIN rail terminals and a fuse holder. The four
+  reserved pins get terminals for the later enabling-switch channels.
+- **Later:** a small interface board behind the bulkhead (terminals, fuse, TVS, termination, status
+  LED) in pcbkit, with the same function and less wiring.
+
 ## Protocol
 
 CAN-FD frames, at most 64 bytes, between the pendant and the cabinet controller. These are small
