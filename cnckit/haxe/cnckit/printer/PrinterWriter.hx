@@ -7,7 +7,6 @@ import toolpathkit.path.MoveKind;
 import toolpathkit.geometry.PathGeometry;
 import toolpathkit.geometry.Point3;
 import toolpathkit.path.PrintFeature;
-import toolpathkit.path.Provenance;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.ToolpathProgram;
 
