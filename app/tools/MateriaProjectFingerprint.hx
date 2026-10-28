@@ -91,9 +91,10 @@ class MateriaProjectFingerprint {
 	}
 
 	static function add(paths:Map<String, Bool>, path:String):Void {
+		// HashLink fullPath can return null for a missing file. Validate before resolving it.
+		if (path == null || !FileSystem.exists(path) || FileSystem.isDirectory(path))
+			throw 'CAD cache input is not a file: $path';
 		var absolute = FileSystem.fullPath(path);
-		if (!FileSystem.exists(absolute) || FileSystem.isDirectory(absolute))
-			throw 'CAD cache input is not a file: $absolute';
 		paths.set(absolute, true);
 	}
 
