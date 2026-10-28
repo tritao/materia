@@ -65,7 +65,7 @@ here (see FC3).
 - `ToolpathOp.Move(kind, PathGeometry, feed, tol, provenance)`. `PathGeometry` is
   `Line/Arc/Circular` of `Point3`.
 - There is no 4th or 5th axis, no U/V and no tool-axis vector. G-D9 ("CNC stays three-axis") and
-  `toolpathkit/docs/PLAN.md` defer multi-axis on purpose.
+  `toolpathkit/docs/HISTORY.md` defer multi-axis on purpose.
 - `MachineBinding` requires exactly three axes.
 - The chain is `ToolpathLowering` → `MotionOp.FollowPath(PosePath)` → `ProgramCompiler`
   (`KinematicsSolver.solvePath`, TOPP-RA) → `ProgramPlanner`/`TrajectoryStream`.

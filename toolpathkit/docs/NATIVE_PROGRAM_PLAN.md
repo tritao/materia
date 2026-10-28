@@ -11,7 +11,7 @@ plans yet.
 - CamKit produces `ToolpathProgram` (work-frame moves, typed move kinds, per-move tolerance,
   exact arcs, `Cam(operationId, featureRef)` provenance). `cnckit.CncWriter` exports it as
   LinuxCNC-dialect G-code, and `CncCompiler` reads G-code back into a program; the round trip
-  is tested (PLAN.md T5).
+  is tested (HISTORY.md T5).
 - `toolpathkit-motion` lowers a program onto MotionKit (`ToolpathMotion.lower`,
   `MachineBinding`), with source maps, position-tied spindle and coolant events, corner
   diagnostics, feed hold and path-slice restart (`MachiningRun`, `MachiningContinuation`; T6).
@@ -186,7 +186,7 @@ Acceptance:
 ## Out of scope
 
 - Splines, adaptive engagement feed, and 4/5-axis or robot tool orientation (deferred as in
-  PLAN.md).
+  HISTORY.md).
 - Controller-side G-code features beyond what `CncCompiler` already reads.
 - A G-code sender for third-party controllers.
 - EtherCAT drives.

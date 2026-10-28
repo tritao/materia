@@ -466,7 +466,7 @@ section; it does not copy them.
 | README.md | keep | Short, accurate. |
 | docs/ADR-001-toolpath-ir.md | internal | ADR; decisions already in `concepts/process/toolpaths.md`. |
 | docs/NATIVE_PROGRAM_PLAN.md | internal | Plan (unscheduled). |
-| docs/PLAN.md | internal | T0–T7 complete; still cited by NATIVE_PROGRAM_PLAN and the README. Delete once those references go. |
+| docs/HISTORY.md | internal | T0–T7 migration record (complete); cited by the README, NATIVE_PROGRAM_PLAN and two machinekit plans. |
 | motion/README.md | keep | Short adapter README. |
 
 ## tools

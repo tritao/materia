@@ -159,7 +159,7 @@ Surveyed 2026-10-21 on local main c667adae4.
 - **Not available:**
   - no tool changer;
   - no 4th axis on a mill;
-  - ToolpathKit defers 4/5-axis tool orientation (`toolpathkit/docs/PLAN.md`);
+  - ToolpathKit defers 4/5-axis tool orientation (`toolpathkit/docs/HISTORY.md`);
   - no indexed rotary in CncKit or the stock cutter.
 
 ## Phases

@@ -1,8 +1,9 @@
-# ToolpathKit migration plan
+# ToolpathKit migration history
 
-The T0–T7 migration is complete. The table below records what landed and the
-cleanup that followed. Use an isolated worktree for edits and run the suites
-listed at the end before integrating further format changes.
+The T0–T7 migration is complete; this file records what landed and the cleanup
+that followed. Use an isolated worktree for edits and run the suites listed at
+the end before integrating further format changes. Planned work is in
+[NATIVE_PROGRAM_PLAN.md](NATIVE_PROGRAM_PLAN.md).
 
 ## Historical inputs
 
