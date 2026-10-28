@@ -149,6 +149,15 @@ For the switches, buttons and E-stop: Zhejiang Jiushi Electronics Co., Ltd. firs
 Electrical Co., Ltd. (what Ninuo makes is unconfirmed). Details and what to ask for are in
 `PENDANT_BENCH_PARTS.md`.
 
+### MPG wheel alternative
+
+**Puyang Yimihelung Precision Technology Co., Ltd.** sells a "Universal Electronic Handwheel for CNC
+Systems" on Alibaba (product 1601665094833, `alibaba.com/product-detail/Universal-Electronic-Handwheel-for-CNC-Systems_1601665094833.html`)
+with several variants. The listing has not been read: Alibaba returned a CAPTCHA to the page fetch.
+Variants, diameters, PPR, output type, drawing and price are to be filled in from the listing. Until
+then the Vallder wheel stays the plan; this is a candidate if its variants include a smaller wheel or
+a better-documented one.
+
 ## Face model
 
 `machinekit/haxe/src/machinekit/pendant/` models the top face: each bought part as a `PendantControl`

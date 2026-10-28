@@ -28,6 +28,10 @@ What to source from them for the pendant: the 22 mm E-stop (Jiushi, item 5), and
 momentary buttons and the 3-position step switch if their catalogues have 16 mm or 22 mm versions
 (items 3 and 4; ask Jiushi first, then Ninuo). The electronics (OLED, CAN transceiver, USB-CAN adapter,
 buck module, logic analyzer), the 12-position rotary switch and the Vallder wheel are not from them.
+An alternative MPG wheel source is recorded in `PENDANT_PLAN.md`: Puyang Yimihelung Precision
+Technology Co., Ltd. (Alibaba product 1601665094833, "Universal Electronic Handwheel for CNC Systems",
+several variants, not yet read).
+
 For one unit buy from their AliExpress store; Alibaba direct has minimum orders (a Jiushi E-stop listing
 there shows 20 pieces). Ask each for the catalogue PDF with dimensions and the contact and mounting
 details before adding a part to the model.
