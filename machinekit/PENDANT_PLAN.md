@@ -282,14 +282,19 @@ the face on four M2.5 standoffs, notched for the E-stop, posts, receptacle and e
 so the case has to hand pcbkit its constraints as data, and pcbkit has to hand the real board back. Nothing
 is copied by hand in either direction.
 
-**Proposed decisions (to confirm before EN3):**
+**Decisions (2026-10-28, chosen for the long term):**
 
 - **Component side.** Every part on the side facing the back wall, so JLCPCB assembles one side; the face
   side stays empty. It has about 1 mm under the button and switch bodies, so it could not take much anyway.
   In pcbkit terms the PCB's top side faces the back wall, so the case plan is mirrored on the board; the
   envelope record states the transform.
-- **Axis switch wiring.** A resistor ladder on one ADC pin (2 wires, fault-detectable with an open and a
-  short band) rather than 13 wires. The step switch keeps 3 + common wires.
+- **Axis switch wiring.** Read digitally: the common and all 12 positions go to the board (13 wires), and
+  the board reads them as 12 inputs. Exactly one active input is a valid position; none or more than one is
+  a fault (a broken wire, a worn contact, the moment between detents) and refuses jogging. This needs no
+  parts at the switch, so nothing is hand-soldered onto its lugs, and no analogue thresholds can drift. A
+  resistor ladder would save 11 wires but needs 11 resistors wired on the switch and an ADC band per
+  position; a coded (BCD or Gray) switch is a dearer special part. The step switch is read the same way
+  (3 positions and common).
 - **M12 pigtail.** It lands on the pendant board (24 V, 0 V, CAN_H/L/ground, shield, and two taps on the
   E-stop loop for the isolated read-back). The loop itself stays wire-only between the E-stop block and the
   receptacle; the board never carries it.
