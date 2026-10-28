@@ -13,6 +13,7 @@ class MillLiftingPattern {
 
 	public static function placements(body:ComponentValues,existing:Array<CastInsertPlacement>,
 		details:MillCastingDetails,topFace:{width:Float,depth:Float},rule:materia.casting.InsertAnchorage.InsertAnchorPatternRule):Array<CastInsertPlacement> {
+		var fixed=machinekit.structural.FoundationSizing.anchors(existing,rule,body);
 		var foundation=new MineralFoundation(body.copy().setToken("postCureBonds","[]"),existing),mass=machinekit.structural.FoundationSizing.asCastMass(foundation);
 		if (mass.mass<=0 || !Math.isFinite(mass.mass) || mass.unaccounted.length>0)
 			throw "Lifting layout needs the source foundation mass and centre of mass";
@@ -34,7 +35,9 @@ class MillLiftingPattern {
 		var seeds:Array<{x:Float,y:Float,turn:Int}> = [];
 		var count=Std.int(Math.floor(details.liftingMaximumLandMm/details.liftingLandStepMm));
 		for (ix in 1...count+1) for (iy in 1...count+1) for (turn in [0,1])
-			seeds.push({x:ix*details.liftingLandStepMm,y:iy*details.liftingLandStepMm,turn:turn});
+			if(ix*details.liftingLandStepMm>=CastingShopRecipe.minimumSteelCoverMm()
+				&& iy*details.liftingLandStepMm>=CastingShopRecipe.minimumSteelCoverMm())
+				seeds.push({x:ix*details.liftingLandStepMm,y:iy*details.liftingLandStepMm,turn:turn});
 		seeds.sort((a,b) -> {
 			var sum=Reflect.compare(a.x+a.y,b.x+b.y);
 			if (sum!=0) return sum;
@@ -43,10 +46,20 @@ class MillLiftingPattern {
 		});
 		// The centred service drilling is identical at every site. Reject a
 		// thread/blank that cannot carry demand before searching placements.
-		var trial=placement("lifting-blank",body,details,details.liftingPlateWidthMm,
-			details.liftingPlateDepthMm,1,1,share,seeds[0],topFace);
-		InsertAnchorGeometry.derive(trial.id,trial.part,rule,FootprintOnly,share);
+		var admissible:Array<{width:Float,depth:Float}> = [];
+		for(footprint in footprints) {
+			var trial=placement("lifting-blank",body,details,footprint.width,footprint.depth,1,1,share,seeds[0],topFace);
+			try {
+				InsertAnchorGeometry.derive(trial.id,trial.part,rule,FootprintOnly,share);
+				admissible.push(footprint);
+			} catch(error:Dynamic) {
+				if(Std.isOfType(error,machinekit.tooling.InsertAnchorGeometry.InsertAnchorScreenDefect))throw error;
+			}
+		}
+		footprints=admissible;
+		if(footprints.length==0)throw "No declared lifting blank meets source anchor demand";
 		var resin=foundation.body.geometry(),result:Array<CastInsertPlacement> = [];
+		var neighbours=fixed.copy();
 		try {
 			for (sx in [-1,1]) for (sy in [-1,1]) {
 				var id="lift"+(sx<0 ? "Left" : "Right")+(sy<0 ? "Front" : "Rear");
@@ -55,6 +68,8 @@ class MillLiftingPattern {
 					for (seed in seeds) {
 						try {
 							var candidate=placement(id,body,details,footprint.width,footprint.depth,sx,sy,share,seed,topFace);
+							InsertAnchorGeometry.checkSourceClearance(candidate,neighbours,resin,
+								[body.number("width"),body.number("depth"),body.number("height")],CastingShopRecipe.minimumSteelSpacingMm());
 							// Use the source contract to reject a new side breakout as
 							// well as volume outside the resin. Only the top is open.
 							new MineralFoundation(body.copy().setToken("postCureBonds","[]"),existing.concat([candidate])).body.finishedCavities();
@@ -74,7 +89,8 @@ class MillLiftingPattern {
 							var steel=new machinekit.assembly.MachineAssembly();steel.addComponent(id,candidate.part,F.identity());
 							var checked=machinekit.design.AssemblyDesignChecks.check(steel);
 							if (checked.hasErrors()) throw checked.items.map(item -> item.message).join("; ");
-							InsertAnchorGeometry.derive(id,candidate.part,rule,Casting(resin,candidate.pose),share);
+							var anchored=InsertAnchorGeometry.derive(id,candidate.part,rule,Casting(resin,candidate.pose),share);
+							neighbours.push({id:candidate.id,part:anchored,pose:candidate.pose,openings:candidate.openings});
 							chosen=candidate;break;
 						} catch (error:Dynamic) {
 							if (Std.isOfType(error,machinekit.tooling.InsertAnchorGeometry.InsertAnchorScreenDefect)) throw error;

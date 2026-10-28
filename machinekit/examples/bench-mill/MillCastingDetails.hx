@@ -18,7 +18,7 @@ class MillCastingDetails {
 	public var footEndSetback:Float = 80;
 	public var footAccessDepth:Float = 90;
 	public var footAccessHeight:Float = 100;
-	public var footAccessFloor:Float = 18;
+	public var footAccessFloor:Float = 25;
 	public var footStemSize:Float = 18;
 	/** Removable roof plate carries compression through its upper face. */
 	public var footPlateSide:Float = 60;
@@ -49,7 +49,7 @@ class MillCastingDetails {
 	 * bottoming-tap runout, tip gap and intact policy back wall. */
 	public var columnAnchorThickness:Float = 30;
 	/** Structural re-entrant fillet, independent of the board-former cutter.
-	 * User correction 2026-10-26: 1.5 times the declared 8 mm aggregate.
+	 * User correction 2026-10-26: 1.5 times the then-declared 8 mm aggregate; retained with the 5 mm mix.
 	 * The step is formed by EPS; board-former radii retain their shop rule. */
 	public var columnFootCornerRadiusMm:Float = 12;
 	public var columnBoltLengthIncrement:Float = 5;
@@ -66,6 +66,10 @@ class MillCastingDetails {
 	public var hatchAnchorServiceFaceOffset:Float = 2;
 	public var zStripBearingExtension:Float = 20;
 	public var columnBoltAccessHalfWidth:Float = 20;
+	/** Sole blanks meet the existing outer finished faces. Off-centre drilling
+  * preserves the four clamp/jack/fixture axes while retaining the 10 mm lands. */
+	public var columnSolePadWidthMm:Float = 100;
+	public var columnSolePadDepthMm:Float = 125;
 	public var jointToolClearanceMm:Float = 2.5;
 	public var jointJackThread:machinekit.design.ThreadedHolePolicy.ThreadedHoleChoice;
 	public var jointFixtureThread:machinekit.design.ThreadedHolePolicy.ThreadedHoleChoice;
@@ -97,12 +101,12 @@ class MillCastingDetails {
 		materia.casting.InsertManufacturing.InsertHoleRoute.TransferAfterCasting
 	];
 	/** Source lifting connections; thread capacity and rigging remain unqualified. */
-	public var liftingPlateWidthMm:Float = 40;
+	public var liftingPlateWidthMm:Float = 46;
 	public var liftingPlateDepthMm:Float = 100;
 	public var liftingPlateThicknessMm:Float = 30;
 	/** One centred blank per lifting role. Its edge land is resolved before source realization. */
 	public var liftingLandStepMm:Float = 5;
-	public var liftingMaximumLandMm:Float = 30;
+	public var liftingMaximumLandMm:Float = 60;
 	public var liftingThread:machinekit.design.ThreadedHolePolicy.ThreadedHoleChoice;
 	public var columnAnchorThread:machinekit.design.ThreadedHolePolicy.ThreadedHoleChoice;
 	public var hatchAnchorThread:machinekit.design.ThreadedHolePolicy.ThreadedHoleChoice;
@@ -114,11 +118,6 @@ class MillCastingDetails {
 		// exact geometric floor; tangent bores are not rounded inward.
 		return Math.ceil(minimum);
 	}
-
-	/** Absolute joint-pad floor from access, policy edge wall, flange and cover.
-	 * The final demand-sized pattern must still pass native containment. */
-	public function minimumColumnPadDepth(thicknessMm:Float,rule:materia.casting.InsertAnchorage.InsertAnchorPatternRule):Float
-		return machinekit.tooling.InsertAnchorGeometry.minimumBandDepth(columnBoltAccessDepth,thicknessMm,C45Bright,rule);
 
 	public function new() {
 		anchorRule.allowedNominalDiametersMm=CastingShopRecipe.anchorDiametersMm();

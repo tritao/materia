@@ -1,0 +1,1687 @@
+{
+  "version": 1,
+  "sourceCommit": "963246295",
+  "purpose": "Service-hole axes and finished planes before the approved aggregate corrections; lifting positions and anchorage patterns intentionally excluded.",
+  "castings": [
+    {
+      "id": "base",
+      "sourceFingerprint": "901941d12d80ccf14a3e2db05505c2584f5e9ac2d1905613ba31f4b276a61394",
+      "inserts": [
+        {
+          "id": "columnLeftFront",
+          "holes": [
+            {
+              "id": "fixing",
+              "entry": [
+                -190,
+                162.5,
+                220
+              ],
+              "axis": [
+                0,
+                0,
+                -1
+              ],
+              "depth": 27,
+              "diameter": 10.2,
+              "thread": {
+                "designation": "M12",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 12,
+                "pitch": 1.75,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            }
+          ],
+          "interfaces": [
+            {
+              "id": "joint-seat",
+              "normal": [
+                0,
+                0,
+                1
+              ],
+              "origin": [
+                -190,
+                162.5,
+                220
+              ],
+              "tangent": [
+                1,
+                0,
+                0
+              ],
+              "planeOffsetMm": 220.0,
+              "route": "as-supplied",
+              "allowanceMm": 0,
+              "positionToleranceMm": 0.01
+            }
+          ]
+        },
+        {
+          "id": "columnLeftRear",
+          "holes": [
+            {
+              "id": "fixing",
+              "entry": [
+                -190,
+                302.5,
+                220
+              ],
+              "axis": [
+                0,
+                0,
+                -1
+              ],
+              "depth": 27,
+              "diameter": 10.2,
+              "thread": {
+                "designation": "M12",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 12,
+                "pitch": 1.75,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            }
+          ],
+          "interfaces": [
+            {
+              "id": "joint-seat",
+              "normal": [
+                0,
+                0,
+                1
+              ],
+              "origin": [
+                -190,
+                302.5,
+                220
+              ],
+              "tangent": [
+                1,
+                0,
+                0
+              ],
+              "planeOffsetMm": 220.0,
+              "route": "as-supplied",
+              "allowanceMm": 0,
+              "positionToleranceMm": 0.01
+            }
+          ]
+        },
+        {
+          "id": "columnRightFront",
+          "holes": [
+            {
+              "id": "fixing",
+              "entry": [
+                190,
+                162.5,
+                220
+              ],
+              "axis": [
+                0,
+                0,
+                -1
+              ],
+              "depth": 27,
+              "diameter": 10.2,
+              "thread": {
+                "designation": "M12",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 12,
+                "pitch": 1.75,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            }
+          ],
+          "interfaces": [
+            {
+              "id": "joint-seat",
+              "normal": [
+                0,
+                0,
+                1
+              ],
+              "origin": [
+                190,
+                162.5,
+                220
+              ],
+              "tangent": [
+                1,
+                0,
+                0
+              ],
+              "planeOffsetMm": 220.0,
+              "route": "as-supplied",
+              "allowanceMm": 0,
+              "positionToleranceMm": 0.01
+            }
+          ]
+        },
+        {
+          "id": "columnRightRear",
+          "holes": [
+            {
+              "id": "fixing",
+              "entry": [
+                190,
+                302.5,
+                220
+              ],
+              "axis": [
+                0,
+                0,
+                -1
+              ],
+              "depth": 27,
+              "diameter": 10.2,
+              "thread": {
+                "designation": "M12",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 12,
+                "pitch": 1.75,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            }
+          ],
+          "interfaces": [
+            {
+              "id": "joint-seat",
+              "normal": [
+                0,
+                0,
+                1
+              ],
+              "origin": [
+                190,
+                302.5,
+                220
+              ],
+              "tangent": [
+                1,
+                0,
+                0
+              ],
+              "planeOffsetMm": 220.0,
+              "route": "as-supplied",
+              "allowanceMm": 0,
+              "positionToleranceMm": 0.01
+            }
+          ]
+        },
+        {
+          "id": "driveYFixed",
+          "holes": [],
+          "interfaces": [
+            {
+              "id": "finished-seat",
+              "normal": [
+                0,
+                0,
+                1
+              ],
+              "origin": [
+                0,
+                229.2,
+                208
+              ],
+              "tangent": [
+                1,
+                0,
+                0
+              ],
+              "planeOffsetMm": 208.0,
+              "route": "ground",
+              "allowanceMm": 4,
+              "positionToleranceMm": 0.01
+            }
+          ]
+        },
+        {
+          "id": "driveYFloating",
+          "holes": [],
+          "interfaces": [
+            {
+              "id": "finished-seat",
+              "normal": [
+                0,
+                0,
+                1
+              ],
+              "origin": [
+                0,
+                -315.5,
+                208
+              ],
+              "tangent": [
+                1,
+                0,
+                0
+              ],
+              "planeOffsetMm": 208.0,
+              "route": "ground",
+              "allowanceMm": 4,
+              "positionToleranceMm": 0.01
+            }
+          ]
+        },
+        {
+          "id": "railYLeft",
+          "holes": [
+            {
+              "id": "mount-mount1",
+              "entry": [
+                -110,
+                -302.5,
+                220
+              ],
+              "axis": [
+                0.0,
+                4.440892098500626e-16,
+                -1.0
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount2",
+              "entry": [
+                -110,
+                -242.5,
+                220
+              ],
+              "axis": [
+                0.0,
+                4.440892098500626e-16,
+                -1.0
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount3",
+              "entry": [
+                -110,
+                -182.5,
+                220
+              ],
+              "axis": [
+                0.0,
+                4.440892098500626e-16,
+                -1.0
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount4",
+              "entry": [
+                -110.0,
+                -122.50000000000003,
+                220.0
+              ],
+              "axis": [
+                0.0,
+                4.440892098500626e-16,
+                -1.0
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount5",
+              "entry": [
+                -110,
+                -62.5,
+                220
+              ],
+              "axis": [
+                0.0,
+                4.440892098500626e-16,
+                -1.0
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount6",
+              "entry": [
+                -110,
+                -2.5,
+                220
+              ],
+              "axis": [
+                0.0,
+                4.440892098500626e-16,
+                -1.0
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount7",
+              "entry": [
+                -110.0,
+                57.49999999999994,
+                220.0
+              ],
+              "axis": [
+                0.0,
+                4.440892098500626e-16,
+                -1.0
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            }
+          ],
+          "interfaces": [
+            {
+              "id": "finished-seat",
+              "normal": [
+                0,
+                0,
+                1
+              ],
+              "origin": [
+                -110,
+                -117.5,
+                220
+              ],
+              "tangent": [
+                1,
+                0,
+                0
+              ],
+              "planeOffsetMm": 220.0,
+              "route": "ground",
+              "allowanceMm": 4,
+              "positionToleranceMm": 0.01
+            }
+          ]
+        },
+        {
+          "id": "railYRight",
+          "holes": [
+            {
+              "id": "mount-mount1",
+              "entry": [
+                110,
+                -302.5,
+                220
+              ],
+              "axis": [
+                0.0,
+                4.440892098500626e-16,
+                -1.0
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount2",
+              "entry": [
+                110,
+                -242.5,
+                220
+              ],
+              "axis": [
+                0.0,
+                4.440892098500626e-16,
+                -1.0
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount3",
+              "entry": [
+                110,
+                -182.5,
+                220
+              ],
+              "axis": [
+                0.0,
+                4.440892098500626e-16,
+                -1.0
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount4",
+              "entry": [
+                110.0,
+                -122.50000000000003,
+                220.0
+              ],
+              "axis": [
+                0.0,
+                4.440892098500626e-16,
+                -1.0
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount5",
+              "entry": [
+                110,
+                -62.5,
+                220
+              ],
+              "axis": [
+                0.0,
+                4.440892098500626e-16,
+                -1.0
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount6",
+              "entry": [
+                110,
+                -2.5,
+                220
+              ],
+              "axis": [
+                0.0,
+                4.440892098500626e-16,
+                -1.0
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount7",
+              "entry": [
+                110.0,
+                57.49999999999994,
+                220.0
+              ],
+              "axis": [
+                0.0,
+                4.440892098500626e-16,
+                -1.0
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            }
+          ],
+          "interfaces": [
+            {
+              "id": "finished-seat",
+              "normal": [
+                0,
+                0,
+                1
+              ],
+              "origin": [
+                110,
+                -117.5,
+                220
+              ],
+              "tangent": [
+                1,
+                0,
+                0
+              ],
+              "planeOffsetMm": 220.0,
+              "route": "ground",
+              "allowanceMm": 4,
+              "positionToleranceMm": 0.01
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "column",
+      "sourceFingerprint": "19167cf388b0694ca988ab4816e456e51b65ba71ea6852e283c2bbd7143a578a",
+      "inserts": [
+        {
+          "id": "footLeftFront",
+          "holes": [
+            {
+              "id": "fixing",
+              "entry": [
+                -190,
+                -70,
+                0
+              ],
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "depth": 20,
+              "diameter": 13.5,
+              "thread": null
+            },
+            {
+              "id": "fixture",
+              "entry": [
+                -190,
+                -45,
+                0
+              ],
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "depth": 18.5,
+              "diameter": 5,
+              "thread": {
+                "designation": "M6",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 6,
+                "pitch": 1,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "jack",
+              "entry": [
+                -190,
+                -95,
+                20
+              ],
+              "axis": [
+                0,
+                0,
+                -1
+              ],
+              "depth": 20,
+              "diameter": 6.8,
+              "thread": {
+                "designation": "M8",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 8,
+                "pitch": 1.25,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            }
+          ],
+          "interfaces": [
+            {
+              "id": "joint-seat",
+              "normal": [
+                0,
+                0,
+                -1
+              ],
+              "origin": [
+                -190,
+                -70,
+                0
+              ],
+              "tangent": [
+                1,
+                0,
+                0
+              ],
+              "planeOffsetMm": 0,
+              "route": "as-supplied",
+              "allowanceMm": 0,
+              "positionToleranceMm": 0.01
+            }
+          ]
+        },
+        {
+          "id": "footLeftRear",
+          "holes": [
+            {
+              "id": "fixing",
+              "entry": [
+                -190,
+                70,
+                0
+              ],
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "depth": 20,
+              "diameter": 13.5,
+              "thread": null
+            },
+            {
+              "id": "fixture",
+              "entry": [
+                -190,
+                45,
+                0
+              ],
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "depth": 18.5,
+              "diameter": 5,
+              "thread": {
+                "designation": "M6",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 6,
+                "pitch": 1,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "jack",
+              "entry": [
+                -190,
+                95,
+                20
+              ],
+              "axis": [
+                0,
+                0,
+                -1
+              ],
+              "depth": 20,
+              "diameter": 6.8,
+              "thread": {
+                "designation": "M8",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 8,
+                "pitch": 1.25,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            }
+          ],
+          "interfaces": [
+            {
+              "id": "joint-seat",
+              "normal": [
+                0,
+                0,
+                -1
+              ],
+              "origin": [
+                -190,
+                70,
+                0
+              ],
+              "tangent": [
+                -1,
+                0,
+                0
+              ],
+              "planeOffsetMm": 0,
+              "route": "as-supplied",
+              "allowanceMm": 0,
+              "positionToleranceMm": 0.01
+            }
+          ]
+        },
+        {
+          "id": "footRightFront",
+          "holes": [
+            {
+              "id": "fixing",
+              "entry": [
+                190,
+                -70,
+                0
+              ],
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "depth": 20,
+              "diameter": 13.5,
+              "thread": null
+            },
+            {
+              "id": "fixture",
+              "entry": [
+                190,
+                -45,
+                0
+              ],
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "depth": 18.5,
+              "diameter": 5,
+              "thread": {
+                "designation": "M6",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 6,
+                "pitch": 1,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "jack",
+              "entry": [
+                190,
+                -95,
+                20
+              ],
+              "axis": [
+                0,
+                0,
+                -1
+              ],
+              "depth": 20,
+              "diameter": 6.8,
+              "thread": {
+                "designation": "M8",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 8,
+                "pitch": 1.25,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            }
+          ],
+          "interfaces": [
+            {
+              "id": "joint-seat",
+              "normal": [
+                0,
+                0,
+                -1
+              ],
+              "origin": [
+                190,
+                -70,
+                0
+              ],
+              "tangent": [
+                1,
+                0,
+                0
+              ],
+              "planeOffsetMm": 0,
+              "route": "as-supplied",
+              "allowanceMm": 0,
+              "positionToleranceMm": 0.01
+            }
+          ]
+        },
+        {
+          "id": "footRightRear",
+          "holes": [
+            {
+              "id": "fixing",
+              "entry": [
+                190,
+                70,
+                0
+              ],
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "depth": 20,
+              "diameter": 13.5,
+              "thread": null
+            },
+            {
+              "id": "fixture",
+              "entry": [
+                190,
+                45,
+                0
+              ],
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "depth": 18.5,
+              "diameter": 5,
+              "thread": {
+                "designation": "M6",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 6,
+                "pitch": 1,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "jack",
+              "entry": [
+                190,
+                95,
+                20
+              ],
+              "axis": [
+                0,
+                0,
+                -1
+              ],
+              "depth": 20,
+              "diameter": 6.8,
+              "thread": {
+                "designation": "M8",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 8,
+                "pitch": 1.25,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            }
+          ],
+          "interfaces": [
+            {
+              "id": "joint-seat",
+              "normal": [
+                0,
+                0,
+                -1
+              ],
+              "origin": [
+                190,
+                70,
+                0
+              ],
+              "tangent": [
+                -1,
+                0,
+                0
+              ],
+              "planeOffsetMm": 0,
+              "route": "as-supplied",
+              "allowanceMm": 0,
+              "positionToleranceMm": 0.01
+            }
+          ]
+        },
+        {
+          "id": "railZLeft",
+          "holes": [
+            {
+              "id": "mount-mount1",
+              "entry": [
+                -90.0,
+                -130.00000000000006,
+                140.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount10",
+              "entry": [
+                -90.0,
+                -129.99999999999994,
+                680.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount11",
+              "entry": [
+                -90.0,
+                -129.99999999999994,
+                740.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount2",
+              "entry": [
+                -90.0,
+                -130.00000000000003,
+                200.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount3",
+              "entry": [
+                -90.0,
+                -130.00000000000003,
+                260.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount4",
+              "entry": [
+                -90.0,
+                -130.00000000000003,
+                320.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount5",
+              "entry": [
+                -90.0,
+                -130.0,
+                380.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount6",
+              "entry": [
+                -90.0,
+                -130.0,
+                440.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount7",
+              "entry": [
+                -90.0,
+                -130.0,
+                499.99999999999994
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount8",
+              "entry": [
+                -90.0,
+                -129.99999999999997,
+                560.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount9",
+              "entry": [
+                -90.0,
+                -129.99999999999997,
+                620.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            }
+          ],
+          "interfaces": [
+            {
+              "id": "finished-seat",
+              "normal": [
+                0.0,
+                -1.0,
+                2.220446049250313e-16
+              ],
+              "origin": [
+                -90.0,
+                -130.0,
+                416.5
+              ],
+              "tangent": [
+                1.0,
+                0.0,
+                0.0
+              ],
+              "planeOffsetMm": 130.00000000000009,
+              "route": "ground",
+              "allowanceMm": 4,
+              "positionToleranceMm": 0.01
+            }
+          ]
+        },
+        {
+          "id": "railZRight",
+          "holes": [
+            {
+              "id": "mount-mount1",
+              "entry": [
+                90.0,
+                -130.00000000000006,
+                140.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount10",
+              "entry": [
+                90.0,
+                -129.99999999999994,
+                680.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount11",
+              "entry": [
+                90.0,
+                -129.99999999999994,
+                740.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount2",
+              "entry": [
+                90.0,
+                -130.00000000000003,
+                200.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount3",
+              "entry": [
+                90.0,
+                -130.00000000000003,
+                260.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount4",
+              "entry": [
+                90.0,
+                -130.00000000000003,
+                320.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount5",
+              "entry": [
+                90.0,
+                -130.0,
+                380.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount6",
+              "entry": [
+                90.0,
+                -130.0,
+                440.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount7",
+              "entry": [
+                90.0,
+                -130.0,
+                499.99999999999994
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount8",
+              "entry": [
+                90.0,
+                -129.99999999999997,
+                560.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            },
+            {
+              "id": "mount-mount9",
+              "entry": [
+                90.0,
+                -129.99999999999997,
+                620.0
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                2.220446049250313e-16
+              ],
+              "depth": 19,
+              "diameter": 3.3,
+              "thread": {
+                "designation": "M4",
+                "hand": "right",
+                "internal": true,
+                "majorDiameter": 4,
+                "pitch": 0.7,
+                "profile": "metric",
+                "starts": 1,
+                "toleranceClass": "6H"
+              }
+            }
+          ],
+          "interfaces": [
+            {
+              "id": "finished-seat",
+              "normal": [
+                0.0,
+                -1.0,
+                2.220446049250313e-16
+              ],
+              "origin": [
+                90.0,
+                -130.0,
+                416.5
+              ],
+              "tangent": [
+                1.0,
+                0.0,
+                0.0
+              ],
+              "planeOffsetMm": 130.00000000000009,
+              "route": "ground",
+              "allowanceMm": 4,
+              "positionToleranceMm": 0.01
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

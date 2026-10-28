@@ -1950,4 +1950,12 @@ For remaining failures, approved corrections are: steel faces flush with an alre
 
 Replace hobber cast foot-plate registers with the mill removable compression-foot arrangement from REVIEW.md B1, using the single levelling-foot family. Remaining thin webs at mill base shoulders/bearing seat and foot access, mill column shaft/motor/Z-channel/bolt access, and plinth work well/drive channel/tray ledges must be at least 25 mm, or removed by merging voids or filling one solid, whichever is simpler and preserves function. Report every choice. Preserve the approved 12 mm structural column-foot radius.
 
-Stop for a decision if a correction would move a functional rail, drive, joint or datum interface or lose function. Record each approved frozen-CAD correction and verify exact agreement against the corrected source; regenerate and verify affected kits. No geometry correction has yet been applied under this decision.
+Stop for a decision if a correction would move a functional rail, drive, joint or datum interface or lose function. Record each approved frozen-CAD correction and verify exact agreement against the corrected source; regenerate and verify affected kits. Mill detail choices under this approval:
+- Raise the foot-access floor to 25 mm; the removable compression foot retains its nominal ground position.
+- Join the shallow shoulder recess to the front bearing recess, removing the 9 mm web. The floating-bearing blank reaches the existing recess end faces; its finished plane and holes stay fixed.
+- Extend the column motor bay to the Z channel, removing the shaft-passage floor and separating web without reducing shaft or motor clearance.
+- Use 100 × 125 × 20 mm sole blanks, with off-centre holes and datum frames preserving the joint interfaces. Their existing outer finished planes meet the mold directly; steel replaces the thin skins and the unsupported resin floor below bolt access.
+- Resolve the lower joint-pad depth from the rear lifting-stock envelope, edge cover and steel spacing. Keep the clamp/jack locations and the 3 mm joint gap.
+- Apply 10 mm anchor cover and use the existing source footprint search and the shared native clearance check to place all four lifting connections. Source geometry changes are validated before the approved frozen references are captured.
+
+Status: 5 mm limits and mill source corrections verified; both mill kits have zero Fail and zero trapped pockets, with unchanged service/datum frames and zero symmetric difference against the approved references. Hobber corrections remain in progress in their own slice.

@@ -71,7 +71,7 @@ class AggregateGate {
     }
     if(a.insert || b.insert)return [SteelCover];
     // A permanent resin wall also carries a process clearance when bounded by
-    // forming tooling. The 24 mm flow rule never weakens its 40 mm wall rule.
+				// forming tooling. The flow threshold never weakens the structural wall threshold.
     return a.tooling || b.tooling ? [Wall,FlowPassage] : [Wall];
   }
 
@@ -195,7 +195,7 @@ class AggregateGate {
       if(kind==WithinAssembly && fill==null && rows.length>0)status=Pending;
       checks.push(FillAnalysis.check(rule(kind),ids.length==0 ? [sourceId] : ids,status,
         failed.length+" failing feature pairs; "+rows.length+" measured pairs for "+kind+". "
-        +(kind==WithinAssembly ? "No 24 mm passage rule applies within one insert assembly; exact fill topology checks bulk access."
+								+(kind==WithinAssembly ? "No aggregate flow-passage floor applies within one insert assembly; exact fill topology checks bulk access."
           : "Required "+required(kind,limits)+" mm. See aggregate-groups.csv; per-witness data remains attached."),limits.evidence));
     }
     return {sourceFingerprint:sourceFingerprint,limits:limits,gaps:sorted,failures:failures,groups:groups,validation:checks.concat(coverage)};

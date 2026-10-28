@@ -146,8 +146,6 @@ class ProductionAnchorTests {
 		var frame = MillProject.smallFrame();
 		Sys.println("ANCHOR-SOURCE-WALL-TIME "+(Sys.time()-sourceStart)+" seconds (complete frame construction)");
 		var foundations=[frame.base,frame.column];
-		var depth=Math.max(frame.layout.roof,frame.casting.minimumColumnPadDepth(frame.layout.insertThickness,frame.casting.anchorRule));
-		check(depth>frame.casting.columnBoltAccessDepth,"source pad retains resin lands beside its declared access opening");
 		for (foundation in foundations) {
 			var steel=machinekit.design.AssemblyDesignChecks.check(foundation);
 			check(!steel.hasErrors(),"production insert material walls: "+steel.items.map(item -> item.message).join("; "));

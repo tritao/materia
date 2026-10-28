@@ -157,7 +157,7 @@ class HobberFoundationSizing {
 								F.fromRotationMatrix(0,0,0,[0.0,-1,0,1,0,0,0,0,1]));
 							var candidate:CastInsertPlacement={id:site.id,part:blank(width,depth),pose:pose,openings:site.openings};
 							try {
-								checkBlank(candidate,neighbours,resin,dimensions,rule.coverDiameters*rule.allowedNominalDiametersMm[0]);
+								machinekit.tooling.InsertAnchorGeometry.checkSourceClearance(candidate,neighbours,resin,dimensions,rule.coverDiameters*rule.allowedNominalDiametersMm[0]);
 								var anchored=machinekit.tooling.InsertAnchorGeometry.derive(candidate.id,candidate.part,rule,
 									Casting(resin,pose),mass.mass*rule.gravityMps2/Math.min(rule.liftingLoadPaths,LIFT_POINT_COUNT));
 								chosen=candidate;chosenHardware={id:site.id,part:anchored,pose:pose,openings:site.openings};
@@ -179,91 +179,5 @@ class HobberFoundationSizing {
 		resin.close();return result;
 	}
 
-	/** Proud steel is permitted only beyond the declared casting face. Inside
- * the envelope it must remain in resin and clear all other source inserts. */
-	static function checkBlank(candidate:CastInsertPlacement,others:Array<CastInsertPlacement>,
-		resin:cadkit.modeling.Part,dimensions:Array<Float>,minimumClearance:Float):Void {
-		// The hobber's sheet/plate frames are signed axis permutations. Their
-		// box-to-box distance is exact, so reject insufficient source lands before
-		// constructing native solids. Catalogue/socket geometry keeps the native path.
-		function aligned(pose:materia.assembly.AssemblyRecord.AssemblyFrame):Bool {
-			for(axis in [[1.0,0,0],[0.0,1,0],[0.0,0,1]]) {
-				var v=F.transformVector(pose,axis[0],axis[1],axis[2]);
-				for(value in [v.x,v.y,v.z])if(Math.abs(value)>1e-9 && Math.abs(Math.abs(value)-1)>1e-9)return false;
-			}
-			return true;
-		}
-		var ownGeometry:materia.casting.CastingFeature.CastingGeometry={solid:Insert(candidate.part.bodySpec()),pose:candidate.pose};
-		if(aligned(candidate.pose))for(other in others) {
-			var geometry:materia.casting.CastingFeature.CastingGeometry={solid:Insert(other.part.bodySpec()),pose:other.pose};
-			if(!materia.casting.CastingFeature.CastingGeometrySolids.isBox(geometry.solid) || !aligned(other.pose))continue;
-			var a=materia.casting.CastingRegionBounds.box(Placed(ownGeometry));
-			var b=materia.casting.CastingRegionBounds.box(Placed(geometry));
-			if(a==null || b==null)throw "Missing exact source plate bounds";
-			var dx=Math.max(0,Math.max(a.x-b.x-b.width,b.x-a.x-a.width));
-			var dy=Math.max(0,Math.max(a.y-b.y-b.depth,b.y-a.y-a.depth));
-			var dz=Math.max(0,Math.max(a.z-b.z-b.height,b.z-a.z-a.height));
-			if(Math.sqrt(dx*dx+dy*dy+dz*dz)+1e-7<minimumClearance)
-				throw "Lifting blank lacks casting cover to source insert: "+candidate.id+" / "+other.id;
-		}
-		var owned:Array<cadkit.modeling.Part>=[];
-		function own(part:cadkit.modeling.Part):cadkit.modeling.Part {owned.push(part);return part;}
-		try {
-			var local=own(machinekit.structural.InsertBodies.part(candidate.part.bodySpec()));
-			var steel=own(machinekit.assembly.PosedParts.moved(local,candidate.pose));
-			var envelope=materia.casting.CastingEnvelope.build(dimensions[0],dimensions[1],dimensions[2]);
-			var feature:materia.casting.CastingFeature={id:"lifting-candidate",kind:InsertRecess,
-				geometry:ownGeometry,openings:candidate.openings,draft:{degrees:0,axis:{x:0,y:0,z:1}},
-				cornerRadius:0,owner:candidate.id,adjustable:[]};
-			var cavity=materia.casting.CastingCavities.derive(envelope,[feature])[0];
-			var embedded=own(machinekit.structural.CastingCavityCad.part(cavity));
-			var missing=own(embedded.subtract(resin));
-			if(missing.volume()>1e-6)throw "Lifting blank meets a source cavity: "+candidate.id;
-			var faces=machinekit.tooling.InsertAnchorGeometry.planarBoundary(steel);
-			for(other in others) {
-				var spec=other.part.insertSpec();
-				switch spec.anchorage {
-					case Bolted(_,anchors):for(anchor in anchors) {
-						var hole=spec.holes.filter(hole->hole.id==anchor.holeId)[0];
-						var frame=F.compose(other.pose,materia.casting.InsertAnchorage.InsertAnchorageCodec.bearingFrame(hole,anchor));
-						var screw=anchor.screw,axis=F.transformVector(frame,0,0,1);
-						var origin=F.transformPoint(frame,0,0,0),flange=F.transformPoint(frame,0,0,-screw.flangeThicknessMm);
-						var distance=materia.casting.InsertAnchorage.InsertAnchorScreen.inside(origin,faces) ? 0.0 : Math.POSITIVE_INFINITY;
-						for(face in faces) {
-							distance=Math.min(distance,materia.casting.InsertAnchorage.InsertAnchorScreen.cylinderFace(
-								origin,axis,screw.thread.majorDiameter/2,screw.lengthMm,face));
-							distance=Math.min(distance,materia.casting.InsertAnchorage.InsertAnchorScreen.cylinderFace(
-								flange,axis,screw.flangeDiameterMm/2,screw.flangeThicknessMm,face));
-							distance=Math.min(distance,materia.casting.InsertAnchorage.InsertAnchorScreen.hexFace(
-								frame,screw.headAcrossFlatsMm,-screw.headHeightMm,-screw.flangeThicknessMm,face));
-						}
-						if(distance+1e-7<minimumClearance)
-							throw "Lifting blank lacks casting cover to source anchor: "+candidate.id+" / "+other.id+"/"+anchor.id;
-					}
-					case Undeclared,CatalogueRetention:
-				}
-			}
-			// Confirm the screened choice with the complete neighbouring steel,
-			// including the actual anchor hardware, once all analytic checks pass.
-			for(other in others) {
-				var spec=other.part.insertSpec();
-				var blanks=[own(machinekit.structural.InsertBodies.part(other.part.bodySpec()))];
-				for(hardware in machinekit.tooling.InsertAnchorGeometry.components(spec)) {
-					var local=own(hardware.part.geometry());local.shape.setThreadedFaces([]);
-					blanks.push(own(machinekit.assembly.PosedParts.moved(local,hardware.pose)));
-				}
-				var blank=own(cadkit.modeling.Part.fuseAll(blanks));
-				var placed=own(machinekit.assembly.PosedParts.moved(blank,other.pose));
-				var common=own(steel.intersect(placed));
-				if(common.volume()>1e-6 || steel.distance(placed)+1e-7<minimumClearance) {
-					if(materia.casting.CastingFeature.CastingGeometrySolids.isBox(
-						materia.casting.CastingFeature.CastingGeometrySolid.Insert(spec.body)) && aligned(other.pose))
-						throw new machinekit.tooling.InsertAnchorGeometry.InsertAnchorScreenDefect(
-							"Lifting clearance screen disagrees with native steel/anchor geometry: "+candidate.id+" / "+other.id);
-					throw "Lifting blank lacks casting cover to source insert: "+candidate.id+" / "+other.id;
-				}
-			}
-		} catch(error:Dynamic) {for(part in owned)part.close();throw error;}
-		for(part in owned)part.close();
-	}
+
 }

@@ -101,9 +101,9 @@ class HobberSourceTests {
     var bad:machinekit.structural.MineralFoundation.CastInsertPlacement={id:site.id,part:site.part,openings:site.openings,
      pose:F.fromRotationMatrix(site.pose.x,54,site.pose.z,F.toRotationMatrix(site.pose))};
     var message="";
-    try machinekit.hobbing.HobberFoundationSizing.checkBlank(bad,neighbours,resin,FoundationLayout.dimensions("column"),cover)
+				try machinekit.tooling.InsertAnchorGeometry.checkSourceClearance(bad,neighbours,resin,FoundationLayout.dimensions("column"),cover)
      catch(error:Dynamic)message=Std.string(error);
-    try machinekit.hobbing.HobberFoundationSizing.checkBlank(site,neighbours,resin,FoundationLayout.dimensions("column"),cover)
+				try machinekit.tooling.InsertAnchorGeometry.checkSourceClearance(site,neighbours,resin,FoundationLayout.dimensions("column"),cover)
      catch(error:Dynamic){resin.close();throw error;}
     resin.close();
     check(message.indexOf("Lifting blank lacks casting cover to source anchor:")>=0 && message.indexOf("rail")>=0,

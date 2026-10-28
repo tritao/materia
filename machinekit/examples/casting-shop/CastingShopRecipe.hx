@@ -23,6 +23,9 @@ class CastingShopRecipe {
  public static inline var STEEL_AGGREGATE_MARGIN_MM = 5;
  /** ACI 318 aggregate-related clear-spacing term, 4.0/3.0 dg. */
  public static inline var STEEL_SPACING_AGGREGATE_RATIO = 4.0/3.0;
+	public static function minimumSteelCoverMm():Float return MAXIMUM_AGGREGATE_MM + STEEL_AGGREGATE_MARGIN_MM;
+	public static function minimumSteelSpacingMm():Float
+		return Math.max(minimumSteelCoverMm(), MAXIMUM_AGGREGATE_MM * STEEL_SPACING_AGGREGATE_RATIO);
  public static inline var FORMER_PROFILE_DIAMETER_MM = 6;
  public static inline var FORMER_CORNER_MARGIN_MM = 0.2;
  public static function formerCornerRadiusMm():Float

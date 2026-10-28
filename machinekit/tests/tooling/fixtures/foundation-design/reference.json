@@ -49,20 +49,21 @@
       "Source M6 anchor family and centred M12 lifting plates; 36 x 100 x 30 mm common blank",
       "3 mm base-column gap, four M12 clamps and three fully threaded ISO 4026 M8 jacks; source access and retained roof",
       "Post-cure bonded D12 x 12 mm hatch inserts in D12.2 x 12 mm receivers",
-      "Structural 12 mm column-step inside radius, replacing router-derived 3.2 mm (user, 2026-10-26); service-hole positions unchanged"
+      "Structural 12 mm column-step inside radius, replacing router-derived 3.2 mm (user, 2026-10-26); service-hole positions unchanged",
+      "5 mm aggregate correction (user, 2026-10-28): 25 mm foot floors, merged shoulder/bearing and motor/Z-channel openings, source-hole-aligned resized joint steel, 10 mm anchor cover and clear lifting placements; all service-hole and datum frames preserved"
     ],
     "files": [
       {
         "id": "mill-base",
-        "stepSha256": "0c5415dae0fed1813dcf9e0273ffb825d26dc52aa0b89d5873fd01c3fe624375",
-        "stepBytes": 2904208,
-        "compressedBytes": 437469
+        "stepSha256": "42a52f0239a4322e094b0f93f1108e4e0005b2dd9e4147694b50c9613724f049",
+        "stepBytes": 3711103,
+        "compressedBytes": 556798
       },
       {
         "id": "mill-column",
-        "stepSha256": "c7316f83dc5160962503bbac6537710fe812e29d822d47338dd289487e9546af",
-        "stepBytes": 2697458,
-        "compressedBytes": 407912
+        "stepSha256": "685d893ff84aac464bdebd3c847e1ea7d98ed7d0f5f1a1bcb4ed825b64d0edbc",
+        "stepBytes": 3242810,
+        "compressedBytes": 490146
       }
     ],
     "sourceAlignment": {
@@ -86,6 +87,34 @@
       "castingAddedMm3": 14926.67366525739,
       "castingRemovedMm3": 0.0,
       "geometryCertificate": "Exact difference is confined to the two 12 mm fillet regions and agrees with the analytic fillet addition; base and all column insert/service-hole positions are unchanged."
+    },
+    "aggregateCorrection": {
+      "decision": "Aggregate source decision (user, 2026-10-28)",
+      "controlGeometryCommit": "963246295",
+      "maximumAggregateSizeMm": 5,
+      "previousFiles": [
+        {
+          "id": "mill-base",
+          "stepSha256": "0c5415dae0fed1813dcf9e0273ffb825d26dc52aa0b89d5873fd01c3fe624375",
+          "stepBytes": 2904208,
+          "compressedBytes": 437469
+        },
+        {
+          "id": "mill-column",
+          "stepSha256": "c7316f83dc5160962503bbac6537710fe812e29d822d47338dd289487e9546af",
+          "stepBytes": 2697458,
+          "compressedBytes": 407912
+        }
+      ],
+      "functionalReference": "aggregate-interface-reference.json",
+      "changes": [
+        "25 mm foot-access floors with the same nominal ground datum",
+        "Shoulder and floating-bearing recesses joined; floating-bearing blank extended to existing recess end faces",
+        "Motor bay extended to Z channel, removing the shaft-passage floor and separating web",
+        "100 x 125 x 20 mm source sole pads meet the existing finished outer faces; off-centre source holes and datum frames preserve interfaces",
+        "Lower joint pads sized for the existing clamps/jacks and rear lifting clearances",
+        "10 mm anchor cover and lifting/steel clearance; structural corner radius remains 12 mm"
+      ]
     }
   },
   "approvedHobberSimplification": {
