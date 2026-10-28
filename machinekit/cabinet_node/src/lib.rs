@@ -16,11 +16,11 @@ use pendant_wire::authority::{condition_bit, Authority, CompiledProfile, HostLin
 use pendant_wire::operator_frame::{self, FrameError};
 use pendant_wire::pendant_wire::{OperatorCondition, OperatorMessage, OperatorState, PendantEvent};
 use pendant_wire::{decode_state, Invalid, WireError};
-use robotkit_device_protocol::{Board, ScheduledCore, StopReason};
+use robotkit_device_protocol::{jog_must_stop, Board, JogGate, JogVerdict, ScheduledCore, StopReason};
 
 /// `Segment6Header.purpose` values (schema/device_wire6.wire.idl).
+pub use robotkit_device_protocol::PURPOSE_JOG;
 pub const PURPOSE_PROGRAM: u8 = 0;
-pub const PURPOSE_JOG: u8 = 1;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ServiceError {
@@ -31,13 +31,8 @@ pub enum ServiceError {
     WrongType,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Verdict {
-    /// A jog segment may execute.
-    pub permit: bool,
-    /// An executing jog must stop now.
-    pub stop_jog: bool,
-}
+/// What the gate decides each tick; the core defines it so any deployment can host a gate.
+pub type Verdict = JogVerdict;
 
 pub struct OperatorService<'a> {
     authority: Authority<'a>,
@@ -92,7 +87,7 @@ impl<'a> OperatorService<'a> {
 
 /// Stops an executing jog when the verdict says so. Returns true if it stopped one.
 pub fn enforce_jog<const A: usize, const CAP: usize>(core: &mut ScheduledCore<A, CAP>, verdict: &Verdict) -> bool {
-    if verdict.stop_jog && core.stop_reason().is_none() && core.executing_purpose() == Some(PURPOSE_JOG) {
+    if jog_must_stop(core, verdict) {
         core.stop(StopReason::Stop);
         true
     } else {
@@ -108,3 +103,8 @@ pub fn core_conditions<const A: usize, const CAP: usize>(core: &ScheduledCore<A,
 
 /// Used by the node's setup path to tie the board clock to the service's microseconds.
 pub fn ticks_to_us<B: Board>(board: &B) -> u64 { board.now_ticks() * 1_000_000 / board.tick_hz() }
+
+/// The virtual device (and later the board) asks the service directly each control tick.
+impl JogGate for OperatorService<'_> {
+    fn verdict(&mut self, now_us: u64) -> JogVerdict { self.poll(now_us) }
+}

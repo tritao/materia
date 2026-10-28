@@ -3,8 +3,8 @@ use robotkit_device_protocol::config_digest::{config_digest6, controller_matches
 use robotkit_device_protocol::device_wire6::*;
 use robotkit_device_protocol::frame6::{decode_frame6, encode_frame6, MAX_FRAME_SIZE};
 use robotkit_device_protocol::{
-    Board, DeviceEvents, InputBinding, Output, ScheduledCore, ScheduledSegment, SkewGroup,
-    StepGenerator, StopReason, VirtualBoard, VirtualSwitch,
+    Board, DeviceEvents, InputBinding, JogGate, Output, ScheduledCore, ScheduledSegment, SkewGroup,
+    StepGenerator, StopReason, jog_must_stop, VirtualBoard, VirtualSwitch,
 };
 use std::collections::VecDeque;
 pub mod heaters;
@@ -49,6 +49,7 @@ pub struct VirtualDevice {
     heaters: heaters::VirtualHeaters,
     heater_sequence: [u64; 8],
     nutrunner: Option<nutrunner::VirtualNutrunner>,
+    jog_gate: Option<Box<dyn JogGate>>,
 }
 
 impl VirtualDevice {
@@ -103,8 +104,12 @@ impl VirtualDevice {
             heaters: heaters::VirtualHeaters::default(),
             heater_sequence: [0; 8],
             nutrunner: None,
+            jog_gate: None,
         })
     }
+
+    /// Places an external authority over jogging (a pendant). It is asked every control tick.
+    pub fn set_jog_gate(&mut self, gate: Box<dyn JogGate>) { self.jog_gate = Some(gate); }
 
     /// The process profile is configured before opening its deployment session.
     pub fn configure_welder(&mut self, config: welder::WelderConfig) -> bool {
@@ -636,6 +641,15 @@ impl VirtualDevice {
         while self.host_ns + step_ns <= host_ns {
             self.host_ns += step_ns;
             self.board.advance_host_ns(self.host_ns);
+            if let (Some(gate), Some(core)) = (self.jog_gate.as_mut(), self.core.as_mut()) {
+                let now_us = self.board.now_ticks() * 1_000_000 / self.board.tick_hz();
+                if jog_must_stop(core, &gate.verdict(now_us)) {
+                    // A commanded stop, as a STOP frame would make.
+                    core.stop(StopReason::Stop);
+                    let reason = core.stop_reason().unwrap();
+                    self.events.as_mut().unwrap().command_stop(&mut self.board, reason);
+                }
+            }
             if let Some(core) = self.core.as_mut() {
                 core.tick_with_process(&mut self.board, self.events.as_ref().unwrap().requires_link());
                 if let Some(reason) = core.stop_reason() {

@@ -180,7 +180,7 @@ impl HostLink {
 
     /// The `jog_mode` argument of `Authority::accept`.
     pub fn jog_allowed(&self, now_us: u64) -> bool {
-        self.jog_allowed && self.last_sequence.is_some() && now_us.wrapping_sub(self.last_seen) <= self.timeout_us
+        self.jog_allowed && self.last_sequence.is_some() && now_us.saturating_sub(self.last_seen) <= self.timeout_us
     }
 }
 
@@ -238,13 +238,13 @@ impl<'a> Authority<'a> {
     /// True while a live pendant has its axis switch away from OFF. The HMI must not jog then.
     pub fn holds_authority(&self, now_us: u64) -> bool {
         self.alive
-            && now_us.wrapping_sub(self.last_seen) <= self.cfg.timeout_us
+            && now_us.saturating_sub(self.last_seen) <= self.cfg.timeout_us
             && self.previous.map_or(false, |p| p.position != 0)
     }
 
     /// Call periodically even without frames; ends the lease when the heartbeat stops.
     pub fn tick(&mut self, now_us: u64) {
-        if self.alive && now_us.wrapping_sub(self.last_seen) > self.cfg.timeout_us {
+        if self.alive && now_us.saturating_sub(self.last_seen) > self.cfg.timeout_us {
             self.alive = false;
             self.needs_release = true;
             self.previous = None;
@@ -506,6 +506,19 @@ mod tests {
         bad[36] = 0; // spindle key without a spindle
         assert_eq!(CompiledProfile::from_record(&bad).unwrap_err(), ProfileError::SpindleKey);
         assert!(CompiledProfile::from_record(&good[..51]).is_err());
+    }
+
+    #[test]
+    fn a_clock_slightly_behind_a_frame_timestamp_is_not_a_timeout() {
+        let (mut a, mut b) = (Authority::new(DRILL), Bench::new());
+        let f = b.frame(3, 0, true, 0, 1, true);
+        a.accept(&f, 10_000, true, 0);
+        assert!(a.holds_authority(9_975), "the consumer's clock may read a little earlier than the producer's");
+        a.tick(9_975);
+        assert!(a.holds_authority(10_020));
+        let mut h = HostLink::new(250_000);
+        h.accept(&OperatorState { sequence: 1, jog_allowed: 1, reserved: 0 }, 10_000);
+        assert!(h.jog_allowed(9_975));
     }
 
     #[test]

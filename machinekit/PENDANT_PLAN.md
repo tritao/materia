@@ -114,7 +114,11 @@ several KB. Values are placeholders.
   executing jog is stopped with the existing `StopReason::Stop`; programs and homing are untouched.
   Pendant decisions go back to the host as `PendantEvent` frames. `cabinet_node/tests/jog_lease.rs`
   runs this against the real `ScheduledCore`: the lease lapsing stops a jog within 10 ms of the
-  50 ms timeout, even when the host still allows jogging.
+  50 ms timeout, even when the host still allows jogging. The RKD6 core defines the hook
+  (`JogGate`, `jog_must_stop` in `device_protocol`, so robotkit never depends on machinekit), the
+  virtual device asks an installed gate every control tick, and `cabinet_node/tests/virtual_device.rs`
+  runs the whole chain headless: RKD6 session and jog segment to a `VirtualDevice`, pendant frames to
+  the service. Gated, the jog stops at the lease; ungated, the same jog runs on.
 - The host never sees CAN frames: the pendant talks to the cabinet controller, which owns the lease.
   `PendantAuthority` (Haxe) is the reference model and headless test; the controller needs the same
   rules in Rust.

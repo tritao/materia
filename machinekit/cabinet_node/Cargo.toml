@@ -9,3 +9,6 @@ path = "src/lib.rs"
 [dependencies]
 pendant-wire = { path = "../pendant_wire" }
 robotkit-device-protocol = { path = "../../robotkit/device_protocol" }
+
+[dev-dependencies]
+robotkit-device-virtual = { path = "../../robotkit/device_virtual" }

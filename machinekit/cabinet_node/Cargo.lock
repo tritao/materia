@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "pendant-wire",
  "robotkit-device-protocol",
+ "robotkit-device-virtual",
 ]
 
 [[package]]
@@ -17,3 +18,10 @@ version = "0.1.0"
 [[package]]
 name = "robotkit-device-protocol"
 version = "0.1.0"
+
+[[package]]
+name = "robotkit-device-virtual"
+version = "0.1.0"
+dependencies = [
+ "robotkit-device-protocol",
+]

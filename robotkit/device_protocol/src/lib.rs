@@ -8,6 +8,7 @@ pub mod device_wire6;
 pub mod frame6;
 mod board;
 mod input_capture;
+mod jog_gate;
 mod scheduled_core;
 mod step_generator;
 mod device_events;
@@ -16,6 +17,7 @@ mod virtual_board;
 
 pub use board::*;
 pub use input_capture::*;
+pub use jog_gate::*;
 pub use scheduled_core::*;
 pub use step_generator::*;
 pub use device_events::*;
