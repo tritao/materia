@@ -300,7 +300,7 @@ the screen. For the cabinet case: HDMI to the monitor and USB for touch.
 
 | Phase | Work | Depends on |
 |---|---|---|
-| CC0 | Profile data model and requirements for the three cases | none |
+| CC0 | Operator profile data model and requirements for the three cases. **Started:** `machinekit.operator` has `OperatorProfile` (named so it does not clash with RobotKit's `RobotProfile`), a one-version codec, validation (pendant map, F-keys, jog rules, guard) and drill-tap, hobber and arm reference profiles, with `tests/haxeon.operator-profile.json`. Left: HMI page content, service wiring from the cabinet components. | none |
 | CC1 | Pendant protocol and motion lease in the RobotKit runtime, headless tests (link loss, enable release, two clients) | CC0 |
 | CC1b | EtherCAT master spike (EtherCrab on Pi 5, then STM32F429 and H723; jitter measured) | CC0 |
 | CC2 | Operator HMI app on the desktop GTK build, drill-tap and hobber sims | CC0, CC1 |
