@@ -41,6 +41,14 @@ class PendantCase {
   /** Height of the board's components on the side away from the face (assumed). */
   public static inline var BOARD_COMPONENTS:Float = 10.0;
   public static inline var BOARD_MARGIN:Float = 2.0;
+  /** A tower that does not touch a wall is tied to the nearest one by a rib this thick, up to just below the board. */
+  public static inline var RIB_THICKNESS:Float = 1.6;
+  /** How far a post's circle runs into the wall it is placed against, so the two print as one body. */
+  static inline var POST_EMBED:Float = 0.75;
+  /** The longest rib worth printing; a tower further from every wall is tied to a nearby post instead. */
+  static inline var MAX_RIB:Float = 16.0;
+  /** Ribs and the elements they join overlap by this much, which makes the union one solid. */
+  static inline var RIB_OVERLAP:Float = 0.2;
   /** A strip of board narrower than this beside a notch is not worth keeping. */
   static inline var SLIVER:Float = 8.0;
   /** Controls deeper than this pass through the board's plane instead of ending above it. */
@@ -67,12 +75,15 @@ class PendantCase {
   public final strapSlots:Array<{x:Float, y:Float}>;
   /** The enabling switch's body centre in plan, lying against a side wall at the back, or null when no free place exists. */
   public final enabling:Null<{x:Float, y:Float}>;
+  /** Plan rectangles (centre and size) of the ribs that tie free-standing posts and standoffs to a wall. */
+  public final ribs:Array<{x:Float, y:Float, w:Float, h:Float}>;
   public final notes:Array<String>;
 
   function new(face:PanelLayout, posts:Array<{x:Float, y:Float}>, connectorX:Float, connectorZ:Float, boardTop:Float,
-      standoffs:Array<{x:Float, y:Float}>, strapSlots:Array<{x:Float, y:Float}>, enabling:Null<{x:Float, y:Float}>, notes:Array<String>) {
+      standoffs:Array<{x:Float, y:Float}>, strapSlots:Array<{x:Float, y:Float}>, enabling:Null<{x:Float, y:Float}>,
+      ribs:Array<{x:Float, y:Float, w:Float, h:Float}>, notes:Array<String>) {
     this.face = face; this.posts = posts; this.connectorX = connectorX; this.connectorZ = connectorZ; this.boardTop = boardTop;
-    this.standoffs = standoffs; this.strapSlots = strapSlots; this.enabling = enabling; this.notes = notes;
+    this.standoffs = standoffs; this.strapSlots = strapSlots; this.enabling = enabling; this.ribs = ribs; this.notes = notes;
   }
 
   public static function plan(face:PanelLayout):PendantCase {
@@ -96,12 +107,13 @@ class PendantCase {
       throw "The case is too shallow for a board behind the controls";
     var enabling = placeEnabling(face, posts, connectorX, wallY, notes);
     var standoffs = placeStandoffs(face, posts, connectorX, wallY, enabling);
-    var strapSlots = placeStrapSlots(face, posts, standoffs, enabling);
-    return new PendantCase(face, posts, connectorX, connectorZ, boardTop, standoffs, strapSlots, enabling, notes);
+    var ribs = placeRibs(face, posts, standoffs, connectorX, wallY, enabling, boardTop);
+    var strapSlots = placeStrapSlots(face, posts, standoffs, enabling, ribs);
+    return new PendantCase(face, posts, connectorX, connectorZ, boardTop, standoffs, strapSlots, enabling, ribs, notes);
   }
 
   static function placePosts(face:PanelLayout):Array<{x:Float, y:Float}> {
-    var hw = face.width / 2 - face.wall - POST_DIAMETER / 2 - 1.0, hh = face.height / 2 - face.wall - POST_DIAMETER / 2 - 1.0;
+    var hw = face.width / 2 - face.wall - POST_DIAMETER / 2 + POST_EMBED, hh = face.height / 2 - face.wall - POST_DIAMETER / 2 + POST_EMBED;
     var wanted = [[-hw, hh], [hw, hh], [-hw, 0.0], [hw, 0.0], [-hw, -hh], [hw, -hh]];
     var posts:Array<{x:Float, y:Float}> = [];
     for (target in wanted) {
@@ -263,8 +275,74 @@ class PendantCase {
     return true;
   }
 
+  /** The top of the ribs: just under the board's underside. */
+  static function ribTop(boardTop:Float):Float return boardTop - BOARD_THICKNESS - 1.0;
+
+  /**
+   * Every post and standoff must be part of the surrounding structure, not a tower standing on the back wall alone: one
+   * that touches a wall is already joined to it, any other gets a thin rib to the nearest wall that is clear of the
+   * deep parts, the receptacle, the enabling switch and the other towers.
+   */
+  static function placeRibs(face:PanelLayout, posts:Array<{x:Float, y:Float}>, standoffs:Array<{x:Float, y:Float}>, connectorX:Float,
+      wallY:Float, enabling:Null<{x:Float, y:Float}>, boardTop:Float):Array<{x:Float, y:Float, w:Float, h:Float}> {
+    var result:Array<{x:Float, y:Float, w:Float, h:Float}> = [];
+    var towers:Array<{x:Float, y:Float, r:Float}> = [];
+    for (p in posts) towers.push({x: p.x, y: p.y, r: POST_DIAMETER / 2});
+    for (s in standoffs) towers.push({x: s.x, y: s.y, r: STANDOFF_DIAMETER / 2});
+    var halfX = face.width / 2 - face.wall, halfY = face.height / 2 - face.wall;
+    for (tower in towers) {
+      // Distance from the tower's edge to each wall's inner face: left, right, bottom, top.
+      var gaps = [tower.x + halfX - tower.r, halfX - tower.x - tower.r, tower.y + halfY - tower.r, halfY - tower.y - tower.r];
+      var smallest = Math.min(Math.min(gaps[0], gaps[1]), Math.min(gaps[2], gaps[3]));
+      if (smallest <= 0.0) continue;
+      var order = [0, 1, 2, 3];
+      order.sort((a, b) -> gaps[a] < gaps[b] ? -1 : (gaps[a] > gaps[b] ? 1 : 0));
+      var placed = false;
+      for (direction in order) {
+        if (gaps[direction] > MAX_RIB) continue;
+        var length = gaps[direction] + 2 * RIB_OVERLAP;
+        var rib = switch direction {
+          case 0: {x: -halfX - RIB_OVERLAP + length / 2, y: tower.y, w: length, h: RIB_THICKNESS};
+          case 1: {x: halfX + RIB_OVERLAP - length / 2, y: tower.y, w: length, h: RIB_THICKNESS};
+          case 2: {x: tower.x, y: -halfY - RIB_OVERLAP + length / 2, w: RIB_THICKNESS, h: length};
+          default: {x: tower.x, y: halfY + RIB_OVERLAP - length / 2, w: RIB_THICKNESS, h: length};
+        };
+        if (ribFree(face, rib, tower, towers, connectorX, wallY, enabling, boardTop)) { result.push(rib); placed = true; break; }
+      }
+      // A standoff far from every wall, or with the way blocked, leans on a nearby post that is in line with it.
+      if (!placed) for (p in posts) {
+        if (p.x == tower.x && p.y == tower.y) continue;
+        var dx = p.x - tower.x, dy = p.y - tower.y;
+        var horizontal = Math.abs(dy) <= 2.0 && Math.abs(dx) <= MAX_RIB + POST_DIAMETER;
+        var vertical = Math.abs(dx) <= 2.0 && Math.abs(dy) <= MAX_RIB + POST_DIAMETER;
+        if (!horizontal && !vertical) continue;
+        var span = (horizontal ? Math.abs(dx) : Math.abs(dy)) - tower.r - POST_DIAMETER / 2;
+        if (span > MAX_RIB) continue;
+        var length = span + 2 * RIB_OVERLAP;
+        var sign = horizontal ? (dx > 0 ? 1.0 : -1.0) : (dy > 0 ? 1.0 : -1.0);
+        var reach = tower.r - RIB_OVERLAP + length / 2;
+        var rib = horizontal ? {x: tower.x + sign * reach, y: tower.y, w: length, h: RIB_THICKNESS} : {x: tower.x, y: tower.y + sign * reach, w: RIB_THICKNESS, h: length};
+        var others = [for (t in towers) if (!(t.x == p.x && t.y == p.y)) t];
+        if (ribFree(face, rib, tower, others, connectorX, wallY, enabling, boardTop)) { result.push(rib); placed = true; break; }
+      }
+      if (!placed) throw "No clear rib ties the tower at (" + tower.x + ", " + tower.y + ") to a wall";
+    }
+    return result;
+  }
+
+  static function ribFree(face:PanelLayout, rib:{x:Float, y:Float, w:Float, h:Float}, own:{x:Float, y:Float, r:Float},
+      towers:Array<{x:Float, y:Float, r:Float}>, connectorX:Float, wallY:Float, enabling:Null<{x:Float, y:Float}>, boardTop:Float):Bool {
+    var footprint = Rect(rib.w, rib.h);
+    var top = -ribTop(boardTop);
+    for (c in face.controls) if (c.behind() > top && FootprintGeometry.gap(c.body(), c.x, c.y, footprint, rib.x, rib.y) < BODY_CLEARANCE) return false;
+    if (FootprintGeometry.gap(receptacleFootprint(), connectorX, receptacleCentreY(face, wallY), footprint, rib.x, rib.y) < 1.0) return false;
+    if (enabling != null && FootprintGeometry.gap(enablingFootprint(), enabling.x, enabling.y, footprint, rib.x, rib.y) < 1.0) return false;
+    for (t in towers) if (t != own && FootprintGeometry.distanceTo(footprint, rib.x, rib.y, t.x, t.y) < t.r + 0.5) return false;
+    return true;
+  }
+
   static function placeStrapSlots(face:PanelLayout, posts:Array<{x:Float, y:Float}>, standoffs:Array<{x:Float, y:Float}>,
-      enabling:Null<{x:Float, y:Float}>):Array<{x:Float, y:Float}> {
+      enabling:Null<{x:Float, y:Float}>, ribs:Array<{x:Float, y:Float, w:Float, h:Float}>):Array<{x:Float, y:Float}> {
     var result:Array<{x:Float, y:Float}> = [];
     var halfX = face.width / 2 - face.wall - STRAP_SLOT_WIDTH / 2 - 8.0, halfY = face.height / 2 - face.wall - 10.0;
     for (target in [[0.0, 20.0], [0.0, -20.0]]) {
@@ -274,7 +352,7 @@ class PendantCase {
         var y = -halfY;
         while (y <= halfY + 1e-9) {
           var d = dist(x, y, target[0], target[1]);
-          if (d < bestDistance && slotFree(face, x, y, posts, standoffs, enabling, result)) { best = {x: x, y: y}; bestDistance = d; }
+          if (d < bestDistance && slotFree(face, x, y, posts, standoffs, enabling, ribs, result)) { best = {x: x, y: y}; bestDistance = d; }
           y += 1.5;
         }
         x += 1.5;
@@ -286,13 +364,14 @@ class PendantCase {
   }
 
   static function slotFree(face:PanelLayout, x:Float, y:Float, posts:Array<{x:Float, y:Float}>, standoffs:Array<{x:Float, y:Float}>,
-      enabling:Null<{x:Float, y:Float}>, taken:Array<{x:Float, y:Float}>):Bool {
+      enabling:Null<{x:Float, y:Float}>, ribs:Array<{x:Float, y:Float, w:Float, h:Float}>, taken:Array<{x:Float, y:Float}>):Bool {
     var slot = Rect(STRAP_SLOT_WIDTH, STRAP_SLOT_HEIGHT);
     // A strap passes behind the parts: keep clear of any that leave less than 8 mm to the back wall.
     for (c in face.controls) if (c.behind() > face.caseInnerDepth - 8.0 && FootprintGeometry.gap(c.body(), c.x, c.y, slot, x, y) < BODY_CLEARANCE) return false;
     for (p in posts) if (FootprintGeometry.distanceTo(slot, x, y, p.x, p.y) < POST_DIAMETER / 2 + 3.0) return false;
     for (s in standoffs) if (FootprintGeometry.distanceTo(slot, x, y, s.x, s.y) < STANDOFF_DIAMETER / 2 + 3.0) return false;
     if (enabling != null && FootprintGeometry.gap(slot, x, y, enablingFootprint(), enabling.x, enabling.y) < 3.0) return false;
+    for (r in ribs) if (FootprintGeometry.gap(slot, x, y, Rect(r.w, r.h), r.x, r.y) < 2.0) return false;
     for (t in taken) if (dist(t.x, t.y, x, y) < 20.0) return false;
     return true;
   }
@@ -308,6 +387,7 @@ class PendantCase {
     }
     for (s in standoffs) result.push({x: s.x, y: s.y, size: STANDOFF_DIAMETER, height: 0.0, filled: true});
     for (s in strapSlots) result.push({x: s.x, y: s.y, size: STRAP_SLOT_WIDTH, height: STRAP_SLOT_HEIGHT, filled: true});
+    for (r in ribs) result.push({x: r.x, y: r.y, size: r.w, height: r.h, filled: true});
     if (enabling != null) result.push({x: enabling.x, y: enabling.y, size: ENABLING_DEPTH, height: ENABLING_BODY, filled: false});
     result.push({x: connectorX, y: -face.height / 2 + face.wall / 2, size: RECEPTACLE_HOLE, height: face.wall, filled: true});
     return result;
@@ -342,6 +422,13 @@ class PendantCase {
       var standoff = Part.cylinderSpan(STANDOFF_DIAMETER / 2, -face.caseInnerDepth - 0.5, underside, s.x, s.y);
       var pilot = Part.cylinderSpan(STANDOFF_PILOT / 2, underside - STANDOFF_PILOT_DEPTH, underside + 1.0, s.x, s.y);
       current = fuseThenDrill(current, standoff, pilot);
+    }
+    var top = ribTop(boardTop);
+    for (r in ribs) {
+      var rib = FootprintGeometry.solid(Rect(r.w, r.h), r.x, r.y, -face.caseInnerDepth - 0.5, top);
+      var joined = current.combine(rib);
+      current.close(); rib.close();
+      current = joined;
     }
     return current;
   }

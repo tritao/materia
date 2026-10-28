@@ -46,7 +46,24 @@ class PendantTests {
       + 6 * Math.PI * 20.25 * 48.0 + 4 * Math.PI * 12.25 * (underside + 48.0)
       - Math.PI * 8.1 * 8.1 * 3.0 - 2 * 24.0 * 4.0 * 3.0 - Math.PI * 11.15 * 11.15 * 3.0
       - 6 * Math.PI * 2.1 * 2.1 * PendantCase.PILOT_DEPTH - 4 * Math.PI * 1.7 * 1.7 * PendantCase.STANDOFF_PILOT_DEPTH;
-    check(Math.abs(shell.volume() - shellExpected) / shellExpected < 0.005, "Shell volume " + shell.volume() + " vs " + shellExpected);
+    // Ribs add material above the floor; posts that run into a wall and ribs that run into a tower overlap it, so the estimate is loose.
+    var ribHeight = 48.0 + (pendantCase.boardTop - PendantCase.BOARD_THICKNESS - 1.0);
+    for (rib in pendantCase.ribs) shellExpected += rib.w * rib.h * ribHeight;
+    check(Math.abs(shell.volume() - shellExpected) / shellExpected < 0.03, "Shell volume " + shell.volume() + " vs " + shellExpected);
+
+    // Every tower is part of the surrounding structure: it touches a wall, or a rib ties it to one.
+    var towers:Array<{x:Float, y:Float, r:Float, name:String}> = [];
+    for (p in pendantCase.posts) towers.push({x: p.x, y: p.y, r: PendantCase.POST_DIAMETER / 2, name: "post"});
+    for (st in pendantCase.standoffs) towers.push({x: st.x, y: st.y, r: PendantCase.STANDOFF_DIAMETER / 2, name: "standoff"});
+    var innerX = layout.width / 2 - layout.wall, innerY = layout.height / 2 - layout.wall;
+    for (t in towers) {
+      var wallGap = Math.min(Math.min(t.x + innerX, innerX - t.x), Math.min(t.y + innerY, innerY - t.y)) - t.r;
+      var tied = wallGap <= 0.25;
+      for (rib in pendantCase.ribs) if (FootprintGeometry.distanceTo(Rect(rib.w, rib.h), rib.x, rib.y, t.x, t.y) <= t.r + 0.3) tied = true;
+      check(tied, "A free-standing " + t.name + " at " + t.x + ", " + t.y);
+    }
+    for (p in pendantCase.posts) check(Math.min(Math.min(p.x + innerX, innerX - p.x), Math.min(p.y + innerY, innerY - p.y)) - PendantCase.POST_DIAMETER / 2 <= 0.25,
+      "A post stands off its wall at " + p.x + ", " + p.y + " and relies on a rib");
 
     // What the plan added: standoffs, strap slots, a board behind the shallow parts, the enabling switch and a tongue.
     check(pendantCase.standoffs.length == 4 && pendantCase.strapSlots.length == 2, "Four standoffs and two strap slots");
