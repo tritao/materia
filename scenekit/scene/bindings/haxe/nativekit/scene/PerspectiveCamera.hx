@@ -31,8 +31,7 @@ class PerspectiveCamera {
   }
 
   /** Fits depth to world bounds; a positive aspect excludes boxes outside the view. */
-  public function fitClipRange(bounds:Array<Array<Float>>, aspect:Float = 0.0,
-      fovYOverride:Float = 0.0):Void {
+  public function fitClipRange(bounds:Array<Array<Float>>, aspect:Float = 0.0, fovYOverride:Float = 0.0):Void {
     var eye = eyePosition(), backward = viewDirection();
     var forward = [-backward[0], -backward[1], -backward[2]];
     var sidePlanes:Array<Array<Float>> = [];
@@ -42,8 +41,12 @@ class PerspectiveCamera {
       var fov = fovYOverride > 0.0 ? clamp(fovYOverride, 1.0, 170.0) : FOV_Y;
       var tanY = Math.tan(fov * Math.PI / 360.0), tanX = tanY * Math.max(0.01, aspect);
       for (sign in [-1.0, 1.0]) {
-        sidePlanes.push([forward[0]*tanX+sign*right[0], forward[1]*tanX+sign*right[1], forward[2]*tanX]);
-        sidePlanes.push([forward[0]*tanY+sign*up[0], forward[1]*tanY+sign*up[1], forward[2]*tanY+sign*up[2]]);
+        sidePlanes.push([forward[0] * tanX + sign * right[0], forward[1] * tanX + sign * right[1], forward[2] * tanX]);
+        sidePlanes.push([
+          forward[0] * tanY + sign * up[0],
+          forward[1] * tanY + sign * up[1],
+          forward[2] * tanY + sign * up[2]
+        ]);
       }
     }
     var nearest = 1e300, farthest = 0.0, crossesEye = false;
@@ -52,32 +55,34 @@ class PerspectiveCamera {
       var cx = (box[0] + box[3]) * 0.5 - eye[0];
       var cy = (box[1] + box[4]) * 0.5 - eye[1];
       var cz = (box[2] + box[5]) * 0.5 - eye[2];
-      var hx = (box[3]-box[0])*0.5, hy = (box[4]-box[1])*0.5, hz = (box[5]-box[2])*0.5;
+      var hx = (box[3] - box[0]) * 0.5, hy = (box[4] - box[1]) * 0.5, hz = (box[5] - box[2]) * 0.5;
       // Off-screen parts can straddle the eye's depth even when they cannot
       // contribute a pixel. Letting them force the tiny inside-box near plane
       // makes close-up CAD edges fight their own faces. Reject only boxes
       // wholly outside a side plane, retaining conservative silhouette bounds.
       var outside = false;
       for (plane in sidePlanes) {
-        if (cx*plane[0]+cy*plane[1]+cz*plane[2]+
-            hx*Math.abs(plane[0])+hy*Math.abs(plane[1])+hz*Math.abs(plane[2]) < 0.0) {
-          outside = true;break;
+        if (cx * plane[0] + cy * plane[1]
+          + cz * plane[2] + hx * Math.abs(plane[0]) + hy * Math.abs(plane[1]) + hz * Math.abs(plane[2]) < 0.0) {
+          outside = true;
+          break;
         }
       }
       if (outside) continue;
-      var radius = Math.abs(forward[0]) * (box[3] - box[0]) * 0.5 +
-        Math.abs(forward[1]) * (box[4] - box[1]) * 0.5 +
-        Math.abs(forward[2]) * (box[5] - box[2]) * 0.5;
+      var radius = Math.abs(forward[0]) * (box[3] - box[0])
+        * 0.5 + Math.abs(forward[1]) * (box[4] - box[1]) * 0.5 + Math.abs(forward[2]) * (box[5] - box[2]) * 0.5;
       var depth = cx * forward[0] + cy * forward[1] + cz * forward[2];
       if (depth + radius <= 0.0) continue;
       farthest = Math.max(farthest, depth + radius);
       if (depth - radius <= 0.0) crossesEye = true;
       else nearest = Math.min(nearest, depth - radius);
     }
-    if (farthest <= 0.0) { resetClipRange(); return; }
+    if (farthest <= 0.0) {
+      resetClipRange();
+      return;
+    }
     // A bounding box is conservative; the margin also prevents clipping while orbiting.
-    clipNear = crossesEye ? Math.max(0.000001, distance / 10000.0)
-      : Math.max(0.000001, nearest * 0.8);
+    clipNear = crossesEye ? Math.max(0.000001, distance / 10000.0) : Math.max(0.000001, nearest * 0.8);
     clipFar = Math.max(clipNear * 2.0, farthest * 1.2);
   }
 
@@ -93,15 +98,15 @@ class PerspectiveCamera {
   public function orbitAround(deltaX:Float, deltaY:Float, x:Float, y:Float, z:Float):Void {
     var backward = viewDirection(), right = [-Math.sin(yaw), Math.cos(yaw), 0.0];
     var up = cross(backward, right);
-    var offset = [targetX-x, targetY-y, targetZ-z];
+    var offset = [targetX - x, targetY - y, targetZ - z];
     var horizontal = dot(offset, right), vertical = dot(offset, up), depth = dot(offset, backward);
     orbit(deltaX, deltaY);
     backward = viewDirection();
     right = [-Math.sin(yaw), Math.cos(yaw), 0.0];
     up = cross(backward, right);
-    targetX = x + right[0]*horizontal + up[0]*vertical + backward[0]*depth;
-    targetY = y + right[1]*horizontal + up[1]*vertical + backward[1]*depth;
-    targetZ = z + right[2]*horizontal + up[2]*vertical + backward[2]*depth;
+    targetX = x + right[0] * horizontal + up[0] * vertical + backward[0] * depth;
+    targetY = y + right[1] * horizontal + up[1] * vertical + backward[1] * depth;
+    targetZ = z + right[2] * horizontal + up[2] * vertical + backward[2] * depth;
   }
 
   /** Mouse-look turns around the eye rather than orbiting the target. */
@@ -129,10 +134,15 @@ class PerspectiveCamera {
   }
 
   /** Explicit metric focus, including small-part inspection below the navigation zoom floor. */
-  public function setTarget(x:Float,y:Float,z:Float,nextDistance:Float):Void {
-    if(!Math.isFinite(x+y+z+nextDistance)||nextDistance<0.0001)throw "Camera focus needs finite coordinates and positive distance";
-    if(targetX==x&&targetY==y&&targetZ==z&&distance==nextDistance)return;
-    targetX=x;targetY=y;targetZ=z;distance=nextDistance;revision++;
+  public function setTarget(x:Float, y:Float, z:Float, nextDistance:Float):Void {
+    if (!Math.isFinite(x + y + z + nextDistance)
+      || nextDistance < 0.0001) throw "Camera focus needs finite coordinates and positive distance";
+    if (targetX == x && targetY == y && targetZ == z && distance == nextDistance) return;
+    targetX = x;
+    targetY = y;
+    targetZ = z;
+    distance = nextDistance;
+    revision++;
   }
 
   /** Set a standard camera angle without changing the current focus or zoom. */
@@ -150,8 +160,7 @@ class PerspectiveCamera {
   }
 
   public function pan(deltaX:Float, deltaY:Float, viewportHeight:Float):Void {
-    var scale = 2.0 * distance * Math.tan(FOV_Y * Math.PI / 360.0) /
-      Math.max(1.0, viewportHeight);
+    var scale = 2.0 * distance * Math.tan(FOV_Y * Math.PI / 360.0) / Math.max(1.0, viewportHeight);
     var rightX = -Math.sin(yaw), rightY = Math.cos(yaw);
     var forwardX = -Math.cos(pitch) * Math.cos(yaw);
     var forwardY = -Math.cos(pitch) * Math.sin(yaw);
@@ -185,16 +194,23 @@ class PerspectiveCamera {
   /** Cursor anchor on the plane through the orbit target, parallel to the screen. */
   public function cursorAnchor(x:Float, y:Float, width:Float, height:Float):Array<Float> {
     var ray = screenRay(x, y, width, height), normal = viewDirection();
-    var t = ((targetX - ray.originX) * normal[0] + (targetY - ray.originY) * normal[1] +
-      (targetZ - ray.originZ) * normal[2]) /
-      (ray.directionX * normal[0] + ray.directionY * normal[1] + ray.directionZ * normal[2]);
-    return [ray.originX + ray.directionX * t, ray.originY + ray.directionY * t,
-      ray.originZ + ray.directionZ * t];
+    var t = ((targetX - ray.originX) * normal[0] + (targetY - ray.originY) * normal[1] + (targetZ - ray.originZ)
+      * normal[2]) / (ray.directionX * normal[0] + ray.directionY * normal[1] + ray.directionZ * normal[2]);
+    return [ray.originX + ray.directionX * t, ray.originY + ray.directionY * t, ray.originZ + ray.directionZ * t];
   }
 
-  public function frame(centerX:Float, centerY:Float, centerZ:Float,
-      width:Float, height:Float, depth:Float, aspect:Float):Void {
-    targetX = centerX; targetY = centerY; targetZ = centerZ;
+  public function frame(
+    centerX:Float,
+    centerY:Float,
+    centerZ:Float,
+    width:Float,
+    height:Float,
+    depth:Float,
+    aspect:Float
+  ):Void {
+    targetX = centerX;
+    targetY = centerY;
+    targetZ = centerZ;
     // Fit every corner against both side planes, including its depth from the target.
     var backward = viewDirection();
     var right = [-Math.sin(yaw), Math.cos(yaw), 0.0];
@@ -204,32 +220,66 @@ class PerspectiveCamera {
     var required = 0.05;
     for (ix in 0...2) for (iy in 0...2) for (iz in 0...2) {
       var corner = [(ix - 0.5) * width, (iy - 0.5) * height, (iz - 0.5) * depth];
-      required = Math.max(required, dot(corner, backward) +
-        Math.max(Math.abs(dot(corner, right)) / tanX, Math.abs(dot(corner, up)) / tanY));
+      required = Math.max(
+        required,
+        dot(corner, backward) + Math.max(Math.abs(dot(corner, right)) / tanX, Math.abs(dot(corner, up)) / tanY)
+      );
     }
     distance = clamp(required * 1.15, 0.05, 1000000.0);
     resetClipRange();
     revision++;
   }
 
-  public function viewProjection(aspect:Float, nearOverride:Float = -1.0,
-      farOverride:Float = -1.0, fovYOverride:Float = 0.0):Transform {
+  public function viewProjection(
+    aspect:Float,
+    nearOverride:Float = -1.0,
+    farOverride:Float = -1.0,
+    fovYOverride:Float = 0.0
+  ):Transform {
     var eye = eyePosition();
     var forward = normalize([targetX - eye[0], targetY - eye[1], targetZ - eye[2]]);
     var side = normalize(cross(forward, [0.0, 0.0, 1.0]));
     var up = cross(side, forward);
-    var view = [side[0], up[0], -forward[0], 0.0,
-      side[1], up[1], -forward[1], 0.0,
-      side[2], up[2], -forward[2], 0.0,
-      -dot(side, eye), -dot(up, eye), dot(forward, eye), 1.0];
+    var view = [
+      side[0],
+      up[0],
+      -forward[0],
+      0.0,
+      side[1],
+      up[1],
+      -forward[1],
+      0.0,
+      side[2],
+      up[2],
+      -forward[2],
+      0.0,
+      -dot(side, eye),
+      -dot(up, eye),
+      dot(forward, eye),
+      1.0
+    ];
     var near = nearOverride > 0.0 ? nearOverride : clipNear;
     var far = farOverride > near ? farOverride : clipFar;
     var fov = fovYOverride > 0.0 ? clamp(fovYOverride, 1.0, 170.0) : FOV_Y;
     var scale = 1.0 / Math.tan(fov * Math.PI / 360.0);
-    var projection = [scale / Math.max(0.01, aspect), 0.0, 0.0, 0.0,
-      0.0, scale, 0.0, 0.0,
-      0.0, 0.0, (far + near) / (near - far), -1.0,
-      0.0, 0.0, 2.0 * far * near / (near - far), 0.0];
+    var projection = [
+      scale / Math.max(0.01, aspect),
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      scale,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      (far + near) / (near - far),
+      -1.0,
+      0.0,
+      0.0,
+      2.0 * far * near / (near - far),
+      0.0
+    ];
     var combined:Array<Float> = [];
     for (column in 0...4) for (row in 0...4) {
       var value = 0.0;
@@ -247,14 +297,17 @@ class PerspectiveCamera {
     var forward = normalize([targetX - eye[0], targetY - eye[1], targetZ - eye[2]]);
     var right = normalize(cross(forward, [0.0, 0.0, 1.0]));
     var up = cross(right, forward);
-    return [right[0] * x + up[0] * y - forward[0] * z,
+    return [
+      right[0] * x + up[0] * y - forward[0] * z,
       right[1] * x + up[1] * y - forward[1] * z,
-      right[2] * x + up[2] * y - forward[2] * z];
+      right[2] * x + up[2] * y - forward[2] * z
+    ];
   }
 
   /** Builds a world-space camera ray through a viewport pixel. */
   public function screenRay(x:Float, y:Float, width:Float, height:Float):PerspectiveRay {
-    width = Math.max(1.0, width); height = Math.max(1.0, height);
+    width = Math.max(1.0, width);
+    height = Math.max(1.0, height);
     var eye = eyePosition();
     var forward = normalize([targetX - eye[0], targetY - eye[1], targetZ - eye[2]]);
     var right = normalize(cross(forward, [0.0, 0.0, 1.0]));
@@ -262,40 +315,55 @@ class PerspectiveCamera {
     var scale = Math.tan(FOV_Y * Math.PI / 360.0);
     var screenX = (2.0 * x / width - 1.0) * scale * width / height;
     var screenY = (1.0 - 2.0 * y / height) * scale;
-    var direction = normalize([forward[0] + right[0] * screenX + up[0] * screenY,
+    var direction = normalize([
+      forward[0] + right[0] * screenX + up[0] * screenY,
       forward[1] + right[1] * screenX + up[1] * screenY,
-      forward[2] + right[2] * screenX + up[2] * screenY]);
-    return new PerspectiveRay(eye[0], eye[1], eye[2],
-      direction[0], direction[1], direction[2]);
+      forward[2] + right[2] * screenX + up[2] * screenY
+    ]);
+    return new PerspectiveRay(eye[0], eye[1], eye[2], direction[0], direction[1], direction[2]);
   }
 
-  public function project(x:Float,y:Float,z:Float,width:Float,height:Float):Null<PerspectiveScreenPoint>
-    return projectWithMatrix(viewProjection(width/Math.max(1.0,height)),x,y,z,width,height);
+  public function project(x:Float,
+    y:Float, z:Float, width:Float, height:Float):Null<PerspectiveScreenPoint> return projectWithMatrix(
+      viewProjection(width / Math.max(1.0, height)),
+      x,
+      y,
+      z,
+      width,
+      height
+    );
 
   /** Projects a point using the same immutable matrix as the other points in this paint. */
-  public function projectWithMatrix(matrix:Transform,x:Float,y:Float,z:Float,
-      width:Float,height:Float):Null<PerspectiveScreenPoint> {
-    var w=matrix.element(3)*x+matrix.element(7)*y+matrix.element(11)*z+matrix.element(15);
-    if(w<=0.000001)return null;
-    var cx=matrix.element(0)*x+matrix.element(4)*y+matrix.element(8)*z+matrix.element(12);
-    var cy=matrix.element(1)*x+matrix.element(5)*y+matrix.element(9)*z+matrix.element(13);
-    var cz=matrix.element(2)*x+matrix.element(6)*y+matrix.element(10)*z+matrix.element(14);
-    return new PerspectiveScreenPoint((cx/w*0.5+0.5)*width,(0.5-cy/w*0.5)*height,cz/w);
+  public function projectWithMatrix(matrix:Transform,
+    x:Float, y:Float, z:Float, width:Float, height:Float):Null<PerspectiveScreenPoint> {
+    var w = matrix.element(3) * x + matrix.element(7) * y + matrix.element(11) * z + matrix.element(15);
+    if (w <= 0.000001) return null;
+    var cx = matrix.element(0) * x + matrix.element(4) * y + matrix.element(8) * z + matrix.element(12);
+    var cy = matrix.element(1) * x + matrix.element(5) * y + matrix.element(9) * z + matrix.element(13);
+    var cz = matrix.element(2) * x + matrix.element(6) * y + matrix.element(10) * z + matrix.element(14);
+    return new PerspectiveScreenPoint((cx / w * 0.5 + 0.5) * width, (0.5 - cy / w * 0.5) * height, cz / w);
   }
 
   /** Projects the visible part of a world-space line after clipping it to the camera frustum. */
-  public function projectSegment(x0:Float, y0:Float, z0:Float, x1:Float, y1:Float, z1:Float,
-      width:Float, height:Float):Null<Array<PerspectiveScreenPoint>> {
+  public function projectSegment(x0:Float,
+    y0:Float, z0:Float, x1:Float, y1:Float, z1:Float, width:Float, height:Float):Null<Array<PerspectiveScreenPoint>> {
     width = Math.max(1.0, width);
     height = Math.max(1.0, height);
-    return projectSegmentWithMatrix(viewProjection(width / height),
-      x0, y0, z0, x1, y1, z1, width, height);
+    return projectSegmentWithMatrix(viewProjection(width / height), x0, y0, z0, x1, y1, z1, width, height);
   }
 
   /** Uses one frame's projection for multiple lines in the same viewport. */
-  public function projectSegmentWithMatrix(matrix:Transform,
-      x0:Float, y0:Float, z0:Float, x1:Float, y1:Float, z1:Float,
-      width:Float, height:Float):Null<Array<PerspectiveScreenPoint>> {
+  public function projectSegmentWithMatrix(
+    matrix:Transform,
+    x0:Float,
+    y0:Float,
+    z0:Float,
+    x1:Float,
+    y1:Float,
+    z1:Float,
+    width:Float,
+    height:Float
+  ):Null<Array<PerspectiveScreenPoint>> {
     width = Math.max(1.0, width);
     height = Math.max(1.0, height);
     var start = clipPoint(matrix, x0, y0, z0);
@@ -317,20 +385,26 @@ class PerspectiveCamera {
     return [screenPoint(clippedStart, width, height), screenPoint(clippedEnd, width, height)];
   }
 
-  public function intersectPlaneZ(x:Float, y:Float, width:Float, height:Float,
-      planeZ:Float):Null<PerspectivePlanePoint> {
+  public function intersectPlaneZ(x:Float,
+    y:Float, width:Float, height:Float, planeZ:Float):Null<PerspectivePlanePoint> {
     var ray = screenRay(x, y, width, height);
     if (Math.abs(ray.directionZ) < 0.000001) return null;
     var distance = (planeZ - ray.originZ) / ray.directionZ;
     if (distance < 0.0) return null;
-    return new PerspectivePlanePoint(ray.originX + ray.directionX * distance,
-      ray.originY + ray.directionY * distance, planeZ);
+    return new PerspectivePlanePoint(
+      ray.originX + ray.directionX * distance,
+      ray.originY + ray.directionY * distance,
+      planeZ
+    );
   }
 
   public function eyePosition():Array<Float> {
     var cosPitch = Math.cos(pitch);
-    return [targetX + distance * cosPitch * Math.cos(yaw),
-      targetY + distance * cosPitch * Math.sin(yaw), targetZ + distance * Math.sin(pitch)];
+    return [
+      targetX + distance * cosPitch * Math.cos(yaw),
+      targetY + distance * cosPitch * Math.sin(yaw),
+      targetZ + distance * Math.sin(pitch)
+    ];
   }
 
   public function viewDirection():Array<Float> {
@@ -348,36 +422,45 @@ class PerspectiveCamera {
     return clip;
   }
 
-  static inline function clipPlaneDistance(point:Array<Float>, plane:Int):Float
-    return switch plane {
-      case 0: point[3] + point[0];
-      case 1: point[3] - point[0];
-      case 2: point[3] + point[1];
-      case 3: point[3] - point[1];
-      case 4: point[3] + point[2];
-      default: point[3] - point[2];
-    }
+  static inline function clipPlaneDistance(point:Array<Float>, plane:Int):Float return switch plane {
+    case 0:
+      point[3] + point[0];
+    case 1:
+      point[3] - point[0];
+    case 2:
+      point[3] + point[1];
+    case 3:
+      point[3] - point[1];
+    case 4:
+      point[3] + point[2];
+    default:
+      point[3] - point[2];
+  }
 
   static function interpolateClip(start:Array<Float>, end:Array<Float>, amount:Float):Array<Float> {
     return [for (index in 0...4) start[index] + (end[index] - start[index]) * amount];
   }
 
   static function screenPoint(clip:Array<Float>, width:Float, height:Float):PerspectiveScreenPoint {
-    return new PerspectiveScreenPoint((clip[0] / clip[3] * 0.5 + 0.5) * width,
-      (0.5 - clip[1] / clip[3] * 0.5) * height, clip[2] / clip[3]);
+    return new PerspectiveScreenPoint(
+      (clip[0] / clip[3] * 0.5 + 0.5) * width,
+      (0.5 - clip[1] / clip[3] * 0.5) * height,
+      clip[2] / clip[3]
+    );
   }
 
-  static inline function clamp(value:Float, low:Float, high:Float):Float
-    return Math.max(low, Math.min(high, value));
+  static inline function clamp(value:Float, low:Float, high:Float):Float return Math.max(low, Math.min(high, value));
   static function normalize(value:Array<Float>):Array<Float> {
     var length = Math.pow(dot(value, value), 0.5);
     return [value[0] / length, value[1] / length, value[2] / length];
   }
-  static function dot(left:Array<Float>, right:Array<Float>):Float
-    return left[0] * right[0] + left[1] * right[1] + left[2] * right[2];
-  static function cross(left:Array<Float>, right:Array<Float>):Array<Float>
-    return [left[1] * right[2] - left[2] * right[1],
-      left[2] * right[0] - left[0] * right[2], left[0] * right[1] - left[1] * right[0]];
+  static function dot(left:Array<Float>,
+    right:Array<Float>):Float return left[0] * right[0] + left[1] * right[1] + left[2] * right[2];
+  static function cross(left:Array<Float>, right:Array<Float>):Array<Float> return [
+    left[1] * right[2] - left[2] * right[1],
+    left[2] * right[0] - left[0] * right[2],
+    left[0] * right[1] - left[1] * right[0]
+  ];
 }
 
 class PerspectiveRay {
@@ -387,10 +470,14 @@ class PerspectiveRay {
   public final directionX:Float;
   public final directionY:Float;
   public final directionZ:Float;
-  public function new(originX:Float, originY:Float, originZ:Float,
-      directionX:Float, directionY:Float, directionZ:Float) {
-    this.originX = originX; this.originY = originY; this.originZ = originZ;
-    this.directionX = directionX; this.directionY = directionY; this.directionZ = directionZ;
+  public function new(originX:Float,
+    originY:Float, originZ:Float, directionX:Float, directionY:Float, directionZ:Float) {
+    this.originX = originX;
+    this.originY = originY;
+    this.originZ = originZ;
+    this.directionX = directionX;
+    this.directionY = directionY;
+    this.directionZ = directionZ;
   }
 }
 
@@ -399,10 +486,18 @@ class PerspectivePlanePoint {
   public final y:Float;
   public final z:Float;
   public function new(x:Float, y:Float, z:Float) {
-    this.x = x; this.y = y; this.z = z;
+    this.x = x;
+    this.y = y;
+    this.z = z;
   }
 }
 class PerspectiveScreenPoint {
-  public final x:Float;public final y:Float;public final depth:Float;
-  public function new(x:Float,y:Float,depth:Float){this.x=x;this.y=y;this.depth=depth;}
+  public final x:Float;
+  public final y:Float;
+  public final depth:Float;
+  public function new(x:Float, y:Float, depth:Float) {
+    this.x = x;
+    this.y = y;
+    this.depth = depth;
+  }
 }
