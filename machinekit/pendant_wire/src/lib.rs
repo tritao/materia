@@ -4,6 +4,7 @@
 //! cabinet controller.
 #![no_std]
 
+pub mod authority;
 pub mod pendant_wire;
 
 use pendant_wire::{ConfigKind, LeaseState, PendantConfig, PendantOutput, PendantState};
