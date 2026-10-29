@@ -17,3 +17,16 @@ jobs:
           haxe-version: 4.3.7
       # Fails when a tracked source file differs from `haxeon fmt` output; fix it with `haxeon fmt <paths>`.
       - run: git ls-files -z '*.hx' | xargs -0 haxe -cp haxeon/src --run tools.HaxeonCli fmt --check
+
+  imports:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: git submodule update --init --depth 1 haxeon
+      - uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: 4.3.7
+      # Fails when a tracked source file has an import it never uses; fix it with `haxeon lint --fix`.
+      - run: |
+          manifests=$(git ls-files '*haxeon*.json' | sed 's/^/--manifest /')
+          git ls-files -z '*.hx' | xargs -0 haxe -cp haxeon/src --run tools.HaxeonCli lint $manifests
