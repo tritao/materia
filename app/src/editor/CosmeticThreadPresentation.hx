@@ -3,7 +3,10 @@ package app.editor;
 import app.EditorScene;
 import app.EditorScene.SceneBridge;
 import app.CadGeometryData;
+import cadkit.threads.DetailTexture;
 import haxe.Json;
+import materia.project.SurfaceDetailRenderData.SurfaceDetailKinds;
+import nativekit.scene.MaterialData;
 import nativekit.scene.GeometryData;
 import nativekit.scene.Geometry;
 import nativekit.scene.Material;
@@ -24,12 +27,20 @@ private typedef ThreadTextures = {
   var normalImage:SceneImage;
   var references:Int;
 }
+/** A display's picture: its source, and the image the source rewrites. */
+private typedef LiveDisplay = {
+  var source:LiveDisplaySource;
+  var image:SceneImage;
+  var texture:Texture;
+}
 private typedef ThreadNode = {
   var node:NodeId;
   var geometry:Geometry;
   var material:Material;
-  var textureKey:String;
+  /** The shared texture pair, or null for a display (which owns its picture). */
+  var textureKey:Null<String>;
   var faceIndex:Int;
+  var live:Null<LiveDisplay>;
 }
 private typedef ThreadGroup = {
   var source:GeometryData;
@@ -120,11 +131,17 @@ private typedef ThreadGroup = {
             geometry: geometry,
             material: material,
             textureKey: key,
-            faceIndex: thread.source.faceIndex
+            faceIndex: thread.source.faceIndex,
+            live: null
           });
         }
         // Knurling and scales: the same overlay, with texture coordinates made from the face's own axis.
         for (detail in cad.details) {
+          if (detail.source.kind == SurfaceDetailKinds.DISPLAY) {
+            var display = displayNode(owner, item.id, item.kind, parent, detail);
+            if (display != null) nodes.push(display);
+            continue;
+          }
           var data = CosmeticDetailMesh.build(cad, detail);
           if (data.triangleCount() == 0) continue;
           var key = CosmeticDetailTexture.key(detail);
@@ -160,7 +177,8 @@ private typedef ThreadGroup = {
             geometry: geometry,
             material: material,
             textureKey: key,
-            faceIndex: detail.source.faceIndex
+            faceIndex: detail.source.faceIndex,
+            live: null
           });
         }
         groups.set(item.id, {source: cad, parent: parentKey, appearance: appearance, nodes: nodes});
@@ -177,6 +195,72 @@ private typedef ThreadGroup = {
       changed = true;
     }
     if (changed) owner.publish(null, false);
+  }
+
+  /** A display's quad with a dark glass material that glows with its picture; null when no live source is known for it. */
+  function displayNode(owner:EditorScene,
+    id:String, kind:String, parent:NodeId, detail:CadDetailGeometry):Null<ThreadNode> {
+    var source = LiveDisplays.create(detail.source.source);
+    if (source == null) return null;
+    if (sampler == null) {
+      sampler = owner.scene.createSampler();
+      owner.scene.setSamplerData(sampler, new SamplerData().setWrap(1, 1).setFilters(2, 2));
+    }
+    var image = owner.scene.createImage();
+    owner.scene.setImageData(image, black(source));
+    var texture = owner.scene.createTexture();
+    owner.scene.setTextureData(texture, new TextureData(image));
+    var geometry = owner.scene.createGeometry();
+    owner.scene.setGeometryData(geometry, LiveDisplayMesh.build(detail));
+    var material = owner.scene.createMaterial();
+    owner.scene.setMaterialData(
+      material,
+      new MaterialData().setBaseColor(0.0,
+      0.0, 0.0).setRoughness(0.25).setMetallic(0.0).setEmissive(1.0, 1.0, 1.0).setEmissiveTexture(texture)
+    );
+    var transaction = owner.scene.beginTransaction();
+    var node = transaction.createNode();
+    transaction.setName(node, "Display " + detail.source.faceName);
+    transaction.setParent(node, parent);
+    transaction.setVisibility(node, false);
+    transaction.setTransform(node, Transform.identity());
+    transaction.setGeometry(node, geometry);
+    transaction.setMaterial(node, material);
+    transaction.commit();
+    owner.bridge.mapNode(node, id);
+    return {
+      node: node,
+      geometry: geometry,
+      material: material,
+      textureKey: null,
+      faceIndex: detail.source.faceIndex,
+      live: {source: source, image: image, texture: texture}
+    };
+  }
+
+  static function picture(source:LiveDisplaySource, rgba:haxe.io.Bytes):ImageData {
+    var chain = DetailTexture.mipChain(rgba, source.width(), source.height(), false);
+    return new ImageData(chain.width, chain.height).setMipCount(chain.mips).setPixels(chain.pixels);
+  }
+
+  static function black(source:LiveDisplaySource):ImageData {
+    var empty = haxe.io.Bytes.alloc(source.width() * source.height() * 4);
+    for (i in 0...source.width() * source.height()) empty.set(i * 4 + 3, 255);
+    return picture(source, empty);
+  }
+
+  /** Lets every display's source draw its next picture; true when any picture changed. */
+  public function advance(owner:EditorScene, nowMs:Int):Bool {
+    var changed = false;
+    for (group in groups) for (entry in group.nodes) {
+      var live = entry.live;
+      if (live == null) continue;
+      var rgba = live.source.advance(nowMs);
+      if (rgba == null) continue;
+      owner.scene.setImageData(live.image, picture(live.source, rgba));
+      changed = true;
+    }
+    return changed;
   }
 
   /** The overlay that textures face `faceIndex` of object `id` (a thread or a surface detail), or null when that face has none. */
@@ -239,6 +323,12 @@ private typedef ThreadGroup = {
     for (entry in group.nodes) {
       entry.geometry.dispose();
       entry.material.dispose();
+      var live = entry.live;
+      if (live != null) {
+        live.texture.dispose();
+        live.image.dispose();
+        continue;
+      }
       var pair:ThreadTextures = cast textures.get(entry.textureKey);
       pair.references--;
       if (pair.references == 0) {

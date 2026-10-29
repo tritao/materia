@@ -158,7 +158,7 @@ class DetailTexture {
   static function channel(value:Float):Int return Std.int(Math.round((value * 0.5 + 0.5) * 255));
 
   /** Every mip level below `base`, each half the size (at least one texel) of the last, appended after it. */
-  static function mipChain(base:Bytes, width:Int, height:Int, normal:Bool):DetailImage {
+  public static function mipChain(base:Bytes, width:Int, height:Int, normal:Bool):DetailImage {
     var levels:Array<{w:Int, h:Int, offset:Int}> = [{w: width, h: height, offset: 0}];
     var total = width * height * 4, w = width, h = height;
     while (w > 1 || h > 1) {

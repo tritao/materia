@@ -19,12 +19,21 @@ class Details {
       case Graduation(divisions, every, slant, endRadius):
         if (divisions < 2 || every < 0 || every > divisions || !(slant > 0)
           || !(endRadius >= 0)) throw 'Graduation on $name needs two or more divisions and its surface size';
+      case Display(width, height, offsetX, offsetY, source):
+        if (source == null || source.length == 0) throw 'Display on $name needs a source';
+        if (!(width > 0) || !(height > 0) || !Math.isFinite(offsetX)
+          || !Math.isFinite(offsetY)) throw 'Display on $name needs a positive size and a finite offset';
     }
     var index = Threads.namedIndex(shape, name);
     var face = shape.subshape(CadKit.ShapeKind.Face, index);
     var minimum = 0.0;
     try {
-      minimum = Threads.extent(face).minimum;
+      switch detail {
+        case Display(_, _, _, _, _):
+          if (face.surfaceKind() != CadKit.SurfaceKind.Plane) throw 'Display on $name needs a planar face';
+        case _:
+          minimum = Threads.extent(face).minimum;
+      }
       face.close();
     } catch (error:Dynamic) {
       face.close();
@@ -46,6 +55,13 @@ class Details {
       var index = Threads.namedIndex(shape, attribute.faceName);
       var face = shape.subshape(CadKit.ShapeKind.Face, index);
       try {
+        switch detail {
+          case Display(width, height, offsetX, offsetY, source):
+            result.push(displayData(face, attribute.faceName, index, width, height, offsetX, offsetY, source));
+            face.close();
+            continue;
+          case _:
+        }
         var span = Threads.extent(face), axis = face.faceAxis();
         var direction = Vector.fromNative(axis.get_direction());
         var origin = Vector.fromNative(axis.get_origin()).add(direction.scale(span.minimum));
@@ -63,6 +79,8 @@ class Details {
             every = e;
             surface = slant;
             radiusEnd = endRadius;
+          case Display(_, _, _, _, _):
+            throw "unreachable";
         }
         result.push({
           faceName: attribute.faceName,
@@ -77,7 +95,10 @@ class Details {
           depth: depth,
           numberedEvery: every,
           surface: surface,
-          radiusEnd: radiusEnd
+          radiusEnd: radiusEnd,
+          width: 0.0,
+          height: 0.0,
+          source: ""
         });
         face.close();
       } catch (error:Dynamic) {
@@ -86,5 +107,45 @@ class Details {
       }
     }
     return result;
+  }
+
+  /** A display's frame: x along the face's reference direction, z out of the face, the picture centred at its offset. */
+  static function displayData(
+    face:Shape,
+    name:String,
+    index:Int,
+    width:Float,
+    height:Float,
+    offsetX:Float,
+    offsetY:Float,
+    source:String
+  ):SurfaceDetailRenderData {
+    var normal = Vector.fromNative(face.faceNormal());
+    var reference = Vector.fromNative(face.faceAxis().get_reference());
+    var z = normal.scale(1.0 / normal.length());
+    // The reference direction is in the face's plane; take it orthogonal to the normal to be sure.
+    var x = reference.subtract(z.scale(reference.dot(z)));
+    x = x.scale(1.0 / x.length());
+    var y = z.cross(x);
+    var c = Vector.fromNative(face.center());
+    var origin = c.add(x.scale(offsetX)).add(y.scale(offsetY));
+    return {
+      faceName: name,
+      faceIndex: index,
+      kind: SurfaceDetailKinds.DISPLAY,
+      origin: [origin.x, origin.y, origin.z],
+      xDirection: [x.x, x.y, x.z],
+      direction: [z.x, z.y, z.z],
+      length: height,
+      radius: width / 2,
+      count: 2,
+      depth: 0.0,
+      numberedEvery: 0,
+      surface: height,
+      radiusEnd: width / 2,
+      width: width,
+      height: height,
+      source: source
+    };
   }
 }

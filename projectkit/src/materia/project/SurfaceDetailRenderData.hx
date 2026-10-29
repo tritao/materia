@@ -4,6 +4,8 @@ package materia.project;
 class SurfaceDetailKinds {
   public static inline var KNURL:Int = 1;
   public static inline var GRADUATION:Int = 2;
+  /** A live picture on a planar face: the frame's z is the face normal, and `width` by `height` the picture. */
+  public static inline var DISPLAY:Int = 3;
 }
 
 /**
@@ -32,6 +34,11 @@ class SurfaceDetailKinds {
   @:id(12) var surface:Float;
   /** The face's radius at the far end of the interval, in the part's unit. */
   @:id(13) var radiusEnd:Float;
+  /** A display's picture size in the part's unit; 0 for the other kinds. */
+  @:id(14) var width:Float;
+  @:id(15) var height:Float;
+  /** What drives a display (the editor chooses a live source by this name); empty for the other kinds. */
+  @:id(16) var source:String;
 }
 
 /** Display packets are validated before an editor allocates resources. */
@@ -41,8 +48,13 @@ class SurfaceDetailRenderDataValues {
       || detail.faceName.length > 4096 || detail.faceIndex < 0 || !Math.isFinite(detail.length) || detail.length <= 0
       || !Math.isFinite(detail.radius) || detail.radius < 0 || !(detail.surface > 0) || !Math.isFinite(detail.radiusEnd)
       || detail.radiusEnd < 0) throw "Surface detail needs a face name, index, positive length and radius";
-    if (detail.kind != SurfaceDetailKinds.KNURL
-      && detail.kind != SurfaceDetailKinds.GRADUATION) throw 'Surface detail ${detail.faceName} has an unknown kind';
+    if (detail.kind != SurfaceDetailKinds.KNURL && detail.kind != SurfaceDetailKinds.GRADUATION
+      && detail.kind != SurfaceDetailKinds.DISPLAY) throw 'Surface detail ${detail.faceName} has an unknown kind';
+    if (detail.kind == SurfaceDetailKinds.DISPLAY
+      && !(detail.width > 0 && detail.height > 0 && Math.isFinite(detail.width)
+      && Math.isFinite(detail.height))) throw 'Display ${detail.faceName} needs a positive size';
+    if (detail.kind == SurfaceDetailKinds.DISPLAY && (detail.source == null
+      || detail.source.length == 0 || detail.source.length > 256)) throw 'Display ${detail.faceName} needs a source';
     if (detail.count < 2
       || detail.count > 4096 || !Math.isFinite(detail.depth) || detail.depth < 0 || detail.numberedEvery < 0
       || detail.numberedEvery > detail.count) throw 'Surface detail ${detail.faceName} has invalid numbers';

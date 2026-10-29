@@ -844,7 +844,10 @@ class ProjectKitTests {
       depth: 0.5,
       numberedEvery: 0,
       surface: 9,
-      radiusEnd: 24.5
+      radiusEnd: 24.5,
+      width: 0.0,
+      height: 0.0,
+      source: ""
     };
     data.parts[0].details = [detail];
     var detailed = SceneArtifact.decodeView(SceneArtifact.encode(data)).parts[0].details;

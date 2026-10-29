@@ -1,9 +1,12 @@
 package machinekit.hmi;
 
+import CadKit;
+import cadkit.Shape;
 import cadkit.modeling.Footprint;
 import cadkit.modeling.Part;
 import cadkit.modeling.RoundedRectangle;
 import cadkit.modeling.Vector;
+import cadkit.threads.Details;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as R;
 import materia.assembly.AssemblyFrames;
@@ -23,6 +26,9 @@ import materia.assembly.AssemblyFrames;
  */
 class OledModule extends HmiPart {
   static var recipe:Null<ComponentType>;
+
+  /** Names the simulation that fills the display (see `app.editor.LiveDisplays`). */
+  public static inline var DISPLAY_SOURCE:String = "pendant-oled";
 
   // Vendor drawing 2_42inch_oled_module-sku25742 (millimetres).
   static inline var GLASS_WIDTH:Float = 60.5;
@@ -248,10 +254,42 @@ class OledModule extends HmiPart {
     return Solids.named(Solids.union(pieces), "foam");
   }
 
-  function glass():Part return Solids.named(
-    box(GLASS_WIDTH, GLASS_HEIGHT, GLASS_THICKNESS, 0.0, boardCentre(), glassFront() - GLASS_THICKNESS),
-    "glass"
-  );
+  /** The glass, its front face carrying the display: the active area, which a simulator fills from the pendant firmware. */
+  function glass():Part {
+    var plain = Solids.named(
+      box(GLASS_WIDTH, GLASS_HEIGHT, GLASS_THICKNESS, 0.0, boardCentre(), glassFront() - GLASS_THICKNESS),
+      "glass"
+    );
+    try {
+      var shape = Details.attach(
+        plain.shape,
+        frontFace(plain.shape),
+        Display(VIEW_WIDTH, VIEW_HEIGHT, 0.0, ACTIVE_OFFSET, DISPLAY_SOURCE)
+      );
+      plain.close();
+      return new Part(shape);
+    } catch (error:Dynamic) {
+      plain.close();
+      throw error;
+    }
+  }
+
+  /** The strong name of the face looking toward the operator. */
+  static function frontFace(shape:Shape):String {
+    var names = shape.elementNames(CadKit.ShapeKind.Face);
+    var found:Null<String> = null;
+    for (index in 0...names.length) {
+      var face = shape.subshape(CadKit.ShapeKind.Face, index);
+      var front = face.surfaceKind() == CadKit.SurfaceKind.Plane && face.faceNormal().get_z() > 0.99;
+      face.close();
+      if (front) {
+        if (found != null) throw "The OLED glass has more than one front face";
+        found = names[index];
+      }
+    }
+    if (found == null) throw "The OLED glass has no front face";
+    return found;
+  }
 
   /** The flex circuit: along the glass's back, round the board's lower edge and up its back to the connector. */
   function flex():Part {

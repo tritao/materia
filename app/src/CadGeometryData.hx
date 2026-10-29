@@ -38,6 +38,9 @@ class CadDetailGeometry {
   public final radiusMm:Float;
   public final radiusEndMm:Float;
   public final surfaceMm:Float;
+  /** A display's picture size in the scene's units. */
+  public final width:Float;
+  public final height:Float;
   public function new(source:SurfaceDetailRenderData, center:Array<Float>, scale:Float) {
     this.source = source;
     frame = new Plane(
@@ -54,6 +57,8 @@ class CadDetailGeometry {
     radiusMm = source.radius * millimetres;
     radiusEndMm = source.radiusEnd * millimetres;
     surfaceMm = source.surface * millimetres;
+    width = source.width * scale;
+    height = source.height * scale;
   }
 }
 

@@ -1,7 +1,7 @@
 package cadkit.threads;
 
 /**
- * A cosmetic pattern on a surface of revolution (a cylinder or cone face), drawn as a texture rather than modelled: the solid
+ * A cosmetic pattern on a surface of revolution (a cylinder or cone face), or a display on a plane, drawn as a texture rather than modelled: the solid
  * stays plain, and a viewer with textures shows the pattern, filtered at any distance. Dimensions are millimetres.
  */
 enum SurfaceDetail {
@@ -15,4 +15,11 @@ enum SurfaceDetail {
    * marks and numerals keep their proportions on a cone.
    */
   Graduation(divisions:Int, numberedEvery:Int, slant:Float, endRadius:Float);
+
+  /**
+   * A live display on a planar face: a `width` by `height` picture whose centre is `offsetX` along the face's reference
+   * direction and `offsetY` along the face normal crossed with it, from the face's centre. The pixels are not part of the
+   * model; a viewer fills them from the running simulation that `source` names.
+   */
+  Display(width:Float, height:Float, offsetX:Float, offsetY:Float, source:String);
 }

@@ -1965,6 +1965,15 @@ class EditorScene {
     return value;
   }
 
+  var liveDisplayClock:Float = -1;
+
+  /** Lets the displays on the scene's models draw their next picture; true when any changed and the view needs a frame. */
+  public function advanceLiveDisplays():Bool {
+    var now = Sys.time();
+    if (liveDisplayClock < 0) liveDisplayClock = now;
+    return presentation.threads.advance(this, Std.int((now - liveDisplayClock) * 1000));
+  }
+
   public function renderSnapshot():SceneSnapshot {
     refreshPresentationIfStale();
     presentation.sourceFaces.prepare(this);
