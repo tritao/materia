@@ -11,6 +11,7 @@ pub mod font;
 pub mod screen;
 pub mod view;
 pub mod core;
+pub mod hardware;
 
 pub use crate::core::{DisplayPower, Inputs, PendantCore};
 pub use screen::{Framebuffer, Screen, Style};

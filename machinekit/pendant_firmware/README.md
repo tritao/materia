@@ -1,7 +1,7 @@
 # Pendant firmware (skeleton)
 
 Rust (`embassy-stm32`) firmware for the jog pendant. It sends the `PENDANT_STATE` heartbeat as a CAN-FD frame
-every 10 ms using the generated `operator-link` codec. The controls are not read yet.
+every 10 ms using the generated `operator-link` codec. It reads the controls and drives the key LEDs and the OLED (`src/board.rs`; the decisions are in `pendant_core::hardware`, tested on the host).
 
 | Feature | Chip | Target | Use |
 |---|---|---|---|
@@ -16,9 +16,10 @@ cargo build --release --target thumbv8m.main-none-eabihf --features h503
 Both build to a linked image (about 39 KB; `.cargo/config.toml` passes cortex-m-rt's `link.x` for each target, and a
 target without it links an empty image); neither has run on hardware. embassy-stm32 0.6 provides `CanConfigurator`,
 `set_fd_data_bitrate` and `write_fd`. The FDCAN kernel clock is still the default: the board clocks it from an HSE crystal,
-so set the clock tree from that crystal before relying on the bit timing. Next: the wheel on TIM2's encoder mode, the
-keys with debounce, the selectors through the 74HC165 chain on SPI1, the OLED on I2C1, and receiving `PENDANT_CONFIG`
-and `PENDANT_OUTPUT`.
+so set the clock tree from that crystal before relying on the bit timing. Not yet checked on hardware: the wheel's counting
+direction and 400 counts per turn, the selector bit order (the host test follows the board's SPEC), the SSD1309 init sequence
+and its mirroring (`OLED_INIT`), and the I2C timing. Next: receiving and applying `PENDANT_CONFIG` is done by the core; the
+bench run is what is left, with the simulator's frame checksum (`pendant_virtual`) as the reference for the screen.
 
 ## Pendant pin assignment (STM32H503RBT6, LQFP-64)
 
