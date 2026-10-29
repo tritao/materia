@@ -3049,10 +3049,12 @@ class MachineKitSmoke {
     );
     var shaft = faces.indexOf("shaft:cyl.side");
     var connector = cadkit.parametric.GeometricConnectors.capture("shaft", short.shape, CadKit.ShapeKind.Face, shaft);
-    var long = NemaStepper.frame(23).geometry(); // a thicker shaft: only its name finds it
+    // A thicker shaft: only its name finds it. The NEMA 23 variants are drawn from supplier models whose faces are not
+    // named by body, so the larger frame is the NEMA 34, which uses the generic geometry.
+    var long = NemaStepper.frame(34).geometry();
     var frame = cadkit.parametric.GeometricConnectors.frame(long.shape, connector);
-    near(frame.x, 0, "a connector on the shaft is found on a NEMA 23");
-    near(frame.y, 0, "a connector on the shaft is found on a NEMA 23");
+    near(frame.x, 0, "a connector on the shaft is found on a NEMA 34");
+    near(frame.y, 0, "a connector on the shaft is found on a NEMA 34");
     short.close();
     long.close();
   }
