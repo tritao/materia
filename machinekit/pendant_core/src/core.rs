@@ -68,6 +68,7 @@ pub struct PendantCore {
     key_names: [[u8; LABEL]; KEYS],
     last_output_ms: Option<u32>,
     last_activity_ms: u32,
+    debounce_ms: u32,
 }
 
 impl PendantCore {
@@ -98,7 +99,14 @@ impl PendantCore {
             key_names: [[0; LABEL]; KEYS],
             last_output_ms: None,
             last_activity_ms: now_ms,
+            debounce_ms: Self::DEBOUNCE_MS,
         }
+    }
+
+    /// A core whose controls count the moment they change, for a simulator whose switches do not bounce.
+    pub fn without_debounce(mut self) -> Self {
+        self.debounce_ms = 0;
+        self
     }
 
     /// Reads the controls; returns the `PENDANT_STATE` payload when one is due.
@@ -107,7 +115,8 @@ impl PendantCore {
         if reading != self.candidate {
             self.candidate = reading;
             self.candidate_since = now_ms;
-        } else if reading != self.stable && now_ms.wrapping_sub(self.candidate_since) >= Self::DEBOUNCE_MS {
+        }
+        if reading != self.stable && now_ms.wrapping_sub(self.candidate_since) >= self.debounce_ms {
             self.stable = reading;
             self.last_activity_ms = now_ms;
         }

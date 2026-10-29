@@ -63,7 +63,7 @@ pub unsafe extern "C" fn pendant_virtual_create(now_ms: u32, out_pendant: *mut H
         return ERROR_ARGUMENT;
     }
     let Ok(mut pendants) = PENDANTS.lock() else { return ERROR_HANDLE };
-    pendants.push(Some(PendantVirtual { core: PendantCore::new(now_ms), frame: [0; 8], controller: None }));
+    pendants.push(Some(PendantVirtual { core: PendantCore::new(now_ms).without_debounce(), frame: [0; 8], controller: None }));
     *out_pendant = Handle { id: pendants.len() as u32 };
     OK
 }
@@ -374,6 +374,30 @@ mod tests {
         assert_eq!(unsafe { pendant_virtual_attach_controller(p, 0, junk.as_ptr(), 3, [].as_ptr(), 0, [].as_ptr(), 0) }, ERROR_ARGUMENT);
         let mut jog = 0i32;
         assert_eq!(unsafe { pendant_virtual_take_jog(p, &mut jog) }, ERROR_ARGUMENT);
+        pendant_virtual_destroy(p);
+    }
+
+    #[test]
+    fn a_control_shows_on_the_screen_in_the_same_tick() {
+        let (profile, reasons, labels) = vector("hobber");
+        let p = create();
+        unsafe {
+            pendant_virtual_attach_controller(p, 0, profile.as_ptr(), profile.len() as u32, reasons.as_ptr(), reasons.len() as u32, labels.as_ptr(), labels.len() as u32);
+        }
+        let mut now = 0u32;
+        while now < 2_000 {
+            unsafe { pendant_virtual_tick(p, now, 0, 0, 0, 0, 1, 1) };
+            now += 16;
+        }
+        let sum = |now| {
+            let mut sum = 0u32;
+            unsafe { pendant_virtual_checksum(p, now, &mut sum) };
+            sum
+        };
+        let before = sum(now);
+        // The simulated switches do not bounce, so there is no settling time before a change counts.
+        unsafe { pendant_virtual_tick(p, now, 0, 3, 0, 0, 1, 1) };
+        assert_ne!(sum(now), before);
         pendant_virtual_destroy(p);
     }
 }
