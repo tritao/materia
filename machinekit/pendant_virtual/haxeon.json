@@ -1,0 +1,27 @@
+{
+	"version": 1,
+	"package": { "name": "machinekit-pendant-native" },
+	"sourceRoots": ["haxe"],
+	"scopeSourceRoots": false,
+	"ffi": {
+		"interfaces": ["bindings/machinekit-pendant.hxi"]
+	},
+	"native": {
+		"cmake": {
+			"source": ".",
+			"target": "machinekit_pendant",
+			"library": "machinekit_pendant",
+			"inputs": [
+				"CMakeLists.txt",
+				"Cargo.toml",
+				"include/pendant_virtual.h",
+				"src",
+				"../pendant_core/Cargo.toml",
+				"../pendant_core/src",
+				"../operator_link/Cargo.toml",
+				"../operator_link/src"
+			]
+		}
+	},
+	"target": "host"
+}

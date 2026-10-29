@@ -1,0 +1,14 @@
+[package]
+name = "pendant-virtual"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# The pendant's firmware core as a C library, so the simulator runs the code that ships on the pendant.
+[lib]
+path = "src/lib.rs"
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+pendant-core = { path = "../pendant_core" }
+operator-link = { path = "../operator_link" }

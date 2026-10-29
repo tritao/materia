@@ -1,0 +1,9 @@
+{
+	"version": 1,
+	"package": { "name": "machinekit-pendant-native-tests" },
+	"entry": "VirtualPendantTests",
+	"sourceRoots": ["src"],
+	"dependencies": { "machinekit-pendant-native": { "path": ".." } },
+	"target": "host",
+	"outputDir": "build"
+}
