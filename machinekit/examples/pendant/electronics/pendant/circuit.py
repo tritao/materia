@@ -66,7 +66,7 @@ HEADERS = {
 }
 
 # Passives (LCSC catalog, basic tier unless noted; pcbkit parts/ records).
-R_0, R_4K7, R_51K, R_100K, R_1M, R_60R4 = "C21189", "C23162", "C23196", "C25803", "C22935", "C57572"
+R_0, R_4K7, R_49K9, R_100K, R_1M, R_60R4 = "C21189", "C23162", "C23184", "C25803", "C22935", "C57572"
 RPACK_10K = "C29718"
 C_1U, C_2U2, C_4U7, C_12P, C_4N7 = "C15849", "C23630", "C19666", "C38523", "C53987"
 C_10U_50V, C_22U, C_4N7_2KV = "C13585", "C45783", "C41017"
@@ -176,7 +176,8 @@ def build(out_dir=HERE, refs_path=None):
         tvs = b.part("Device", "D_TVS", "d_tvs", value="SMBJ30CA", footprint=D_SMB, lcsc="C19077585")
         root["+24V_F"] += tvs["A1"]
         gnd += tvs["A2"]
-        d_rev = b.part("Device", "D", "d_rev", value="M7", footprint=D_SMA, lcsc="C95872")
+        # Schottky: about half an M7's drop, 100 V reverse (above the TVS clamp), 2 A.
+        d_rev = b.part("Device", "D", "d_rev", value="SS210", footprint=D_SMA, lcsc="C14996")
         root["+24V_F"] += d_rev["A"]
         root["+24V"] += d_rev["K"]
         cap("c_bulk", "10u 50V", C_10U_50V, root["+24V"], footprint=C1206)
@@ -198,8 +199,9 @@ def build(out_dir=HERE, refs_path=None):
         l1 = b.part("Device", "L", "l1", value="33u SWPA6045S330MT", footprint=L_6045, lcsc="C83451")
         sw += l1[1]
         v5 += l1[2]
-        # 0.8 V x (1 + 51k / 10k) = 4.88 V (datasheet equation 7); basic-tier values instead of the example's 118k/22.1k.
-        r("r_fb_top", "51k", R_51K, v5, fb)
+        # 0.8 V x (1 + 49.9k / 10k) = 4.79 V (datasheet equation 7): over the reference and 1 % tolerances 4.64 to 4.95 V,
+        # inside the CAN transceiver's 4.5 V minimum and the ESD arrays' 5.0 V stand-off (the power check derives both).
+        r("r_fb_top", "49.9k", R_49K9, v5, fb)
         r("r_fb_bot", "10k", R_10K, fb, gnd)
         cap("c_out", "22u", C_22U, v5, footprint=C0805)
         cap("c_out_hf", "100n", C_100N, v5)
@@ -531,6 +533,13 @@ def build(out_dir=HERE, refs_path=None):
         ("can/c_viso", "CAN_V5ISO"),
     ):
         i.role(cap_tag, "bulk", net=net)
+    # What the board feeds through its connectors, which no part on it shows.
+    for name, net, amps, what in (
+        ("wheel", "+5V", 0.1, "the MPG hand wheel: the vendor listing gives at most 100 mA at 5 V; measure on arrival"),
+        ("oled", "+3V3", 0.05, "the Waveshare 2.42 in OLED module: a budget for a full white screen until it is measured"),
+        ("key_leds", "LED_SUPPLY", 0.14, "seven button LEDs: 7 x 20 mA, a budget until the buttons' LEDs are measured (DEC-PENDANT-LED-SUPPLY)"),
+    ):
+        i.external_load(name, net, current_max_a=proposed(amps, what), what=what.split(":")[0])
     i.power_source(
         "cabinet_24v",
         "+24V_IN",

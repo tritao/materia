@@ -10,7 +10,7 @@ them. Every review is pending; the specification, parts, connector, LED supply a
 
 | Sheet | Contents |
 |---|---|
-| power | 24 V from the pigtail: PTC 1812L050/60GR, SMBJ30CA, M7 reverse diode, LMR51606 buck to 5 V (4.88 V nominal, EN divider: on at 13.5 V, off at 11 V), XC6206 LDO to 3.3 V, the LED supply link (24 V fitted, 5 V alternative not fitted) |
+| power | 24 V from the pigtail: PTC 1812L050/60GR, SMBJ30CA, SS210 Schottky reverse diode, LMR51606 buck to 5 V (4.79 V nominal, 4.64 to 4.95 V over tolerances; EN divider: on at 13.5 V, off at 11 V), XC6206 LDO to 3.3 V, the LED supply link (24 V fitted, 5 V alternative not fitted) |
 | mcu | STM32H503RBT6 on the pin table, decoupling, 2 x 2.2 uF VCAP, 16 MHz crystal with 12 pF loads, NRST 100 nF, BOOT0 10k pull-down |
 | can | CA-IS2062A isolated CAN FD with its own isolated 5 V, split termination (2 x 60.4 ohm 1206, 4.7 nF), PESD2CAN on the bus, the cable shield to 0 V through 1 Mohm and 4.7 nF 2 kV |
 | cable | the M12 pigtail header: 24 V, 0 V, CAN_H, CAN_L, CAN ground, shield, E-stop taps 1 and 2 |
@@ -37,9 +37,20 @@ the loop toward its 0 V and is never across the contact.
 ## Checks
 
 `checks.py`: the shared lint, ERC, parts lock, block and gate checks, the supplier pin maps of every locked part, the pin
-table, and the 5 V rail (the buck's divider over its reference and resistor tolerances, inside the CAN transceiver's VDDP
-range). The power phase is not graded yet: the ICs' part records need supply data, and pcbkit's power check has no model of
-a regulated switching buck, so it cannot see that the buck drives 5 V.
+table, and the power check. The power check derives every rail from part data and the declared external loads (the wheel,
+the OLED module and the key LEDs, budgets until they are measured):
+
+| Rail | Range | Worst-case load | Limit |
+|---|---|---|---|
+| +24V_IN (cabinet) | 18 to 30 V | 273 mA | unknown (a physical review) |
+| +24V_F (after the PTC) | 17.3 to 30 V | 273 mA | 500 mA hold |
+| +24V (after the SS210) | 16.45 to 30 V | 273 mA | 2 A |
+| +5V (LMR51606, 49.9k/10k) | 4.64 to 4.95 V | 353 mA (CAN 150 mA dominant, wheel 100 mA, the LDO 103 mA) | 600 mA |
+| +3V3 (XC6206) | 3.234 to 3.366 V | 103 mA | 200 mA |
+| LED_SUPPLY (0 ohm from +24V) | 16.45 to 30 V | 140 mA | — |
+
+Unknowns: the cabinet supply's capacity, the CAN transceiver's VDDL current (its datasheet gives VDDP and VDDL together),
+the LDO's thermal resistance.
 
 ## Mechanical interface and floorplan
 

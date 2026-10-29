@@ -1242,12 +1242,12 @@
       (tstamps "f64731b3-aefd-5694-82f6-f072c87aa249"))
     (comp
       (ref "D2")
-      (value "M7")
+      (value "SS210")
       (description "Diode")
       (footprint "Diode_SMD:D_SMA")
       (fields
         (field
-          (name "LCSC") "C95872")
+          (name "LCSC") "C14996")
         (field
           (name "Description") "Diode")
         (field
@@ -2178,12 +2178,12 @@
       (tstamps "f7451a43-3198-5fc2-bcdd-7f790284f4ee"))
     (comp
       (ref "R3")
-      (value "51k")
+      (value "49.9k")
       (description "Resistor")
       (footprint "Resistor_SMD:R_0603_1608Metric")
       (fields
         (field
-          (name "LCSC") "C23196")
+          (name "LCSC") "C23184")
         (field
           (name "Description") "Resistor")
         (field

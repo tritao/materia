@@ -45,6 +45,17 @@
       "snapshot": "2026-10-23",
       "used_for": "can/c_vddp_hf, can/c_viso_hf, mcu/c_nrst, mcu/c_vdd1, mcu/c_vdd2, mcu/c_vdd3, mcu/c_vdd4, mcu/c_vdd5, mcu/c_vdd6, power/c_boot, power/c_in_hf, power/c_out_hf, selectors/c_u_sr1, selectors/c_u_sr2, wheel/c_buf"
     },
+    "C14996": {
+      "lcsc": "C14996",
+      "mpn": "SS210",
+      "package": "SMA(DO-214AC)",
+      "tier": "basic",
+      "stock": 658054,
+      "price_qty": 10,
+      "unit_price": 0.0325,
+      "snapshot": "2026-10-23",
+      "used_for": "power/d_rev"
+    },
     "C15849": {
       "lcsc": "C15849",
       "mpn": "CL10A105KB8NNNC",
@@ -177,14 +188,14 @@
       "snapshot": "2026-10-23",
       "used_for": "oled/r_scl, oled/r_sda"
     },
-    "C23196": {
-      "lcsc": "C23196",
-      "mpn": "0603WAF5102T5E",
+    "C23184": {
+      "lcsc": "C23184",
+      "mpn": "0603WAF4992T5E",
       "package": "0603",
       "tier": "basic",
-      "stock": 2613857,
+      "stock": 1691456,
       "price_qty": 10,
-      "unit_price": 0.0017,
+      "unit_price": 0.003,
       "snapshot": "2026-10-23",
       "used_for": "power/r_fb_top"
     },

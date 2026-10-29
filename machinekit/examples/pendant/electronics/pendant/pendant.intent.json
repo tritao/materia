@@ -166,6 +166,38 @@
       ]
     }
   },
+  "external_loads": {
+    "key_leds": {
+      "current_max_a": {
+        "source": {
+          "placeholder": "pendant draft: seven button LEDs: 7 x 20 mA, a budget until the buttons' LEDs are measured (DEC-PENDANT-LED-SUPPLY); review pending"
+        },
+        "value": 0.14
+      },
+      "net": "LED_SUPPLY",
+      "what": "seven button LEDs"
+    },
+    "oled": {
+      "current_max_a": {
+        "source": {
+          "placeholder": "pendant draft: the Waveshare 2.42 in OLED module: a budget for a full white screen until it is measured; review pending"
+        },
+        "value": 0.05
+      },
+      "net": "+3V3",
+      "what": "the Waveshare 2.42 in OLED module"
+    },
+    "wheel": {
+      "current_max_a": {
+        "source": {
+          "placeholder": "pendant draft: the MPG hand wheel: the vendor listing gives at most 100 mA at 5 V; measure on arrival; review pending"
+        },
+        "value": 0.1
+      },
+      "net": "+5V",
+      "what": "the MPG hand wheel"
+    }
+  },
   "manufacturing": {
     "assembly_service": "standard",
     "assembly_side": "top",
@@ -524,7 +556,7 @@
       }
     }
   },
-  "netlist_hash": "sha256:e89c76fd4ef4a1322851e67c8c000f9038acbb0fb47255b0367e56a6a51a07f0",
+  "netlist_hash": "sha256:a4ffd9ed222238cc24ec136b010e1e4da630ae5468518924f57f25f00ff4afff",
   "placement": {
     "anchors": {},
     "groups": {
