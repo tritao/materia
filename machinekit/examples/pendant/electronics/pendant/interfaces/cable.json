@@ -1,0 +1,216 @@
+{
+  "schema": 1,
+  "id": "cable",
+  "part": {
+    "value": "C265121",
+    "source": {
+      "url": "https://lceda.cn/api/products/C265121/components",
+      "where": "JST S8B-PH-SM4-TB, the pigtail's header"
+    }
+  },
+  "pins": {
+    "1": {
+      "role": "+24V",
+      "domain": "logic",
+      "polarity": "positive",
+      "direction": "power_in",
+      "net": "+24V_IN",
+      "voltage_v": {
+        "value": [
+          0,
+          30
+        ],
+        "source": {
+          "placeholder": "pendant draft: working envelope at the pendant end of the cable; review pending"
+        }
+      },
+      "current_a": {
+        "value": 0.5,
+        "source": {
+          "placeholder": "pendant draft: the PTC's 0.5 A hold current; review pending"
+        }
+      }
+    },
+    "2": {
+      "role": "0V",
+      "domain": "logic",
+      "polarity": "negative",
+      "direction": "passive",
+      "net": "GND",
+      "voltage_v": {
+        "value": [
+          0,
+          0
+        ],
+        "source": {
+          "placeholder": "pendant draft: working envelope at the pendant end of the cable; review pending"
+        }
+      },
+      "current_a": {
+        "value": 0.5,
+        "source": {
+          "placeholder": "pendant draft: the supply's return; review pending"
+        }
+      }
+    },
+    "3": {
+      "role": "CAN_H",
+      "domain": "can_bus",
+      "polarity": "neutral",
+      "direction": "bidirectional",
+      "net": "CAN_H",
+      "voltage_v": {
+        "value": [
+          0,
+          5.5
+        ],
+        "source": {
+          "placeholder": "pendant draft: working envelope at the pendant end of the cable; review pending"
+        }
+      },
+      "current_a": {
+        "value": 0.07,
+        "source": {
+          "placeholder": "pendant draft: the transceiver's driver; review pending"
+        }
+      }
+    },
+    "4": {
+      "role": "CAN_L",
+      "domain": "can_bus",
+      "polarity": "neutral",
+      "direction": "bidirectional",
+      "net": "CAN_L",
+      "voltage_v": {
+        "value": [
+          0,
+          5.5
+        ],
+        "source": {
+          "placeholder": "pendant draft: working envelope at the pendant end of the cable; review pending"
+        }
+      },
+      "current_a": {
+        "value": 0.07,
+        "source": {
+          "placeholder": "pendant draft: the transceiver's driver; review pending"
+        }
+      }
+    },
+    "5": {
+      "role": "CAN_GND",
+      "domain": "can_bus",
+      "polarity": "negative",
+      "direction": "passive",
+      "net": "CAN_GND",
+      "voltage_v": {
+        "value": [
+          0,
+          0
+        ],
+        "source": {
+          "placeholder": "pendant draft: working envelope at the pendant end of the cable; review pending"
+        }
+      },
+      "current_a": {
+        "value": 0.07,
+        "source": {
+          "placeholder": "pendant draft: the bus's return; review pending"
+        }
+      }
+    },
+    "6": {
+      "role": "SHIELD",
+      "domain": "logic",
+      "polarity": "neutral",
+      "direction": "passive",
+      "net": "SHIELD",
+      "voltage_v": {
+        "value": [
+          0,
+          30
+        ],
+        "source": {
+          "placeholder": "pendant draft: working envelope at the pendant end of the cable; review pending"
+        }
+      },
+      "current_a": {
+        "value": 0.01,
+        "source": {
+          "placeholder": "pendant draft: the shield's RC to 0 V; no DC current; review pending"
+        }
+      }
+    },
+    "7": {
+      "role": "ESTOP_SENSE",
+      "domain": "field24",
+      "polarity": "positive",
+      "direction": "in",
+      "net": "ESTOP_SENSE_IN",
+      "voltage_v": {
+        "value": [
+          0,
+          30
+        ],
+        "source": {
+          "placeholder": "pendant draft: working envelope at the pendant end of the cable; review pending"
+        }
+      },
+      "current_a": {
+        "value": 0.015,
+        "source": {
+          "placeholder": "pendant draft: the read-back input's current; review pending"
+        }
+      }
+    },
+    "8": {
+      "role": "ESTOP_REF",
+      "domain": "field24",
+      "polarity": "negative",
+      "direction": "passive",
+      "net": "ESTOP_SENSE_REF",
+      "voltage_v": {
+        "value": [
+          0,
+          0
+        ],
+        "source": {
+          "placeholder": "pendant draft: working envelope at the pendant end of the cable; review pending"
+        }
+      },
+      "current_a": {
+        "value": 0.015,
+        "source": {
+          "placeholder": "pendant draft: the read-back input's return; review pending"
+        }
+      }
+    }
+  },
+  "mechanics": {
+    "edge": {
+      "value": "internal",
+      "source": {
+        "url": "https://github.com/tritao/materia/blob/main/machinekit/PENDANT_PLAN.md",
+        "where": "Connector and cable, and Board v1: the M12 pigtail lands on the board"
+      }
+    },
+    "mating_face": {
+      "value": "edge",
+      "source": {
+        "placeholder": "side-entry header; its position comes from the envelope's cable connection"
+      }
+    },
+    "cable_exit": {
+      "value": null,
+      "source": {
+        "placeholder": "the pigtail's route to the receptacle is not drawn yet"
+      }
+    },
+    "clearance_mm": {
+      "value": null,
+      "source": {
+        "placeholder": "the crimped plug's envelope inside the case is not measured"
+      }
+    }
+  }
+}

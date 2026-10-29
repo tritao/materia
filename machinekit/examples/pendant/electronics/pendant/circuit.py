@@ -13,7 +13,7 @@ from pathlib import Path
 import sys
 
 from skidl import POWER
-from pcbkit import assets, blocks, enclosure, netlist, pinassign
+from pcbkit import assets, blocks, enclosure, netlist, part_interfaces, pinassign
 from pcbkit.blocks.parts import (
     C0603,
     C0805,
@@ -430,15 +430,11 @@ def build(out_dir=HERE, refs_path=None):
         creepage_mm=proposed(3.0, "functional isolation (24 V system, ground offsets only); the LGA16 lands keep 3.15 mm"),
         clearance_mm=proposed(3.0, "functional isolation; the package's own CLR/CPG is 3.45 mm (datasheet section 7)"),
     )
-    # The pigtail header carries the 24 V supply (logic), the isolated bus and the E-stop loop on neighbouring contacts.
-    i.barrier(
-        "cable/j_cable",
-        ["logic", "can_bus", "field24"],
-        creepage_mm=proposed(0.9, "functional spacing below 30 V between JST PH 2 mm contacts (about 1 mm between lands)"),
-        clearance_mm=proposed(0.9, "functional spacing below 30 V between JST PH 2 mm contacts"),
-    )
-    extra = {net: "can_bus" for net in ("CAN_GND", "CAN_V5ISO", "CAN_H", "CAN_L", "can/term_mid")}
-    domains = domains_from_ports(nl, b.block_uses, i.barriers, extra)
+    # The pigtail header carries the 24 V supply (logic), the isolated bus and the E-stop loop on neighbouring contacts:
+    # its interface record (interfaces/cable.json) names each pin's domain, so it is a connector, not a barrier.
+    pinouts = part_interfaces.apply(i, out_dir, {"cable/j_cable": "interfaces/cable.json"})
+    extra = {net: "can_bus" for net in ("CAN_V5ISO", "can/term_mid")}
+    domains = domains_from_ports(nl, b.block_uses, i.barriers, extra, interfaces=pinouts)
     for domain in sorted(set(domains.values())):
         i.domain(domain, *sorted(net for net, owner in domains.items() if owner == domain))
     for name, kind, voltage, current in (
@@ -456,6 +452,7 @@ def build(out_dir=HERE, refs_path=None):
         ("estop_input", "signal", 30, 0.015),
         ("estop_ref", "field_power", 0, 0.015),
         ("estop_led", "signal", 1.4, 0.015),
+        ("cable_shield", "signal", 30, 0.01),
     ):
         i.net_class(
             name,
@@ -478,7 +475,7 @@ def build(out_dir=HERE, refs_path=None):
         "CAN_H": "can_signal",
         "CAN_L": "can_signal",
         "can/term_mid": "can_signal",
-        "SHIELD": "estop_input",
+        "SHIELD": "cable_shield",
         "WHEEL_A": "wheel_signal",
         "WHEEL_B": "wheel_signal",
         "ESTOP_SENSE_REF": "estop_ref",

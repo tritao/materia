@@ -22,11 +22,17 @@ def circuit(ctx):
 
 
 def electrical(ctx):
-    blocks, gates = ctx.blocks(), ctx.gates()
+    blocks, gates, pinouts = ctx.blocks(), ctx.gates(), ctx.part_interfaces()
     return status.Observation(
-        errors=circuit(ctx) + blocks.errors + gates.errors,
+        errors=circuit(ctx) + blocks.errors + gates.errors + pinouts.errors,
         unknowns=blocks.unknowns + gates.unknowns,
     )
+
+
+def cable_exits(ctx):
+    """Where the wires arrive (the envelope) and how each cable connector mates (its interface record's mechanics)."""
+    envelope, pinouts = ctx.envelope(), ctx.part_interfaces()
+    return status.Observation(errors=envelope.errors, unknowns=envelope.unknowns + pinouts.unknowns)
 
 
 @functools.cache
@@ -44,14 +50,14 @@ GATES = {
     # unknowns, so these stay open until the parts are measured.
     "mechanical/mounting": lambda: board().envelope(),
     "mechanical/heights": lambda: board().envelope(),
-    "mechanical/cable_exits": lambda: board().envelope(),
+    "mechanical/cable_exits": lambda: cable_exits(board()),
 }
 
 
 def check_board(nl, doc, pcb):
     ctx = context(nl=nl, doc=doc, pcb=pcb)
     errors = circuit(ctx)
-    for name in ("parts", "lint", "erc", "blocks", "gates", "power"):
+    for name in ("parts", "lint", "erc", "blocks", "gates", "power", "part_interfaces"):
         errors += getattr(ctx, name)().errors
     return errors
 

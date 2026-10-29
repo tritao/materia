@@ -1,24 +1,5 @@
 {
   "barriers": {
-    "cable/j_cable": {
-      "clearance_mm": {
-        "source": {
-          "placeholder": "pendant draft: functional spacing below 30 V between JST PH 2 mm contacts; review pending"
-        },
-        "value": 0.9
-      },
-      "creepage_mm": {
-        "source": {
-          "placeholder": "pendant draft: functional spacing below 30 V between JST PH 2 mm contacts (about 1 mm between lands); review pending"
-        },
-        "value": 0.9
-      },
-      "joins": [
-        "logic",
-        "can_bus",
-        "field24"
-      ]
-    },
     "can/u_can": {
       "clearance_mm": {
         "source": {
@@ -195,6 +176,12 @@
       "what": "the MPG hand wheel"
     }
   },
+  "interfaces": {
+    "cable/j_cable": {
+      "digest": "c73264a2f8470ba776336ac6c268d94848e8fc8b509305dab61681b300e6a220",
+      "file": "interfaces/cable.json"
+    }
+  },
   "manufacturing": {
     "assembly_service": "standard",
     "assembly_side": "top",
@@ -312,7 +299,7 @@
     "OLED_RES": "logic_signal",
     "OSC_IN": "logic_signal",
     "OSC_OUT": "logic_signal",
-    "SHIELD": "estop_input",
+    "SHIELD": "cable_shield",
     "SR_DATA": "logic_signal",
     "SR_LOAD": "logic_signal",
     "SR_SCK": "logic_signal",
@@ -339,6 +326,21 @@
     "wheel/in_b": "logic_signal"
   },
   "net_classes": {
+    "cable_shield": {
+      "current_a": {
+        "source": {
+          "placeholder": "pendant draft: routing current reserve, not a qualified load rating; review pending"
+        },
+        "value": 0.01
+      },
+      "kind": "signal",
+      "voltage_v": {
+        "source": {
+          "placeholder": "pendant draft: maximum working class voltage; review pending"
+        },
+        "value": 30
+      }
+    },
     "can_power": {
       "current_a": {
         "source": {
