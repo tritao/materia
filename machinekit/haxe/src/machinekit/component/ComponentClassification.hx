@@ -33,6 +33,8 @@ class ComponentClassification {
     file(registry, "machinekit.enclosure.panel", "Panels", ComponentKind.Generic);
     file(registry, "machinekit.enclosure.cut-panel", "Panels", ComponentKind.Generic);
     file(registry, "machinekit.enclosure.tray-toe-clamp", "Fixings", ComponentKind.Generic);
+    // pendant
+    file(registry, "machinekit.pendant.plate", "Panels", ComponentKind.Generic);
     // hobbing
     file(registry, "machinekit.hobbing.hob", "Cutting tools", ComponentKind.Generic);
     file(registry, "machinekit.hobbing.hob-arbor", "Cutting tools", ComponentKind.Reference);

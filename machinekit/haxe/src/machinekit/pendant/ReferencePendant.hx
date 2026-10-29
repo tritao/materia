@@ -11,7 +11,13 @@ import machinekit.hmi.*;
  * checker; every assumed part is to be replaced by the measured one.
  */
 class ReferencePendant {
-  public static function layout(leftHanded:Bool = false):PanelLayout {
+  /** The reference case's dimensions. */
+  public static function size():PendantSize return {width: 114.0,
+    height: 210.0, thickness: 3.0, wall: 3.0, depth: 48.0};
+
+  /** The reference layout, or the same controls on a case of another size; `leftHanded` mirrors it. */
+  public static function layout(?size:PendantSize, leftHanded:Bool = false):PanelLayout {
+    var dimensions = size == null ? ReferencePendant.size() : size;
     // The pendant is held in the left hand, with the enabling switch on the left wall and the Start, Hold and Stop keys under the
     // thumb; the free right hand turns the selectors and the wheel, so they sit on the right and the E-stop at the top left, where
     // the holding hand can reach it. A left-handed pendant is the same layout turned left to right.
@@ -30,7 +36,14 @@ class ReferencePendant {
       new PlacedPart("stop", PartPresets.pushButton16("red"), side * 13.5, -25.5),
       new PlacedPart("wheel", PartPresets.yumoIsm6045(), 0.0, -70.0)
     ];
-    return new PanelLayout(114.0, 210.0, 3.0, 3.0, 48.0, controls);
+    return new PanelLayout(
+      dimensions.width,
+      dimensions.height,
+      dimensions.thickness,
+      dimensions.wall,
+      dimensions.depth,
+      controls
+    );
   }
 
   /** How the controls are grouped in the assembly's hierarchy: by what the operator does with them. */
@@ -42,17 +55,21 @@ class ReferencePendant {
   ];
 
   /**
-   * The whole pendant as an assembly: plate, shell and board in the case group, the controls by group, and the fasteners.
+   * The whole pendant as an assembly: plate, shell and board in the case group (from `documents` when given, so their
+   * faces match the recorded steps), the controls by group, and the fasteners.
    * Every wired control is wired to the board (`PendantBoard.wire`): the wheel's 0 V and VCC to the board's supply and A and
    * B to its inputs, the keys' contacts and LEDs, the selectors' contacts and the display's header.
    */
-  public static function assembly():MachineAssembly {
-    var pendantCase = pendantCase();
+  public static function assembly(?documents:PendantDocuments):MachineAssembly {
+    var pendantCase = documents == null ? pendantCase() : documents.pendantCase;
     var assembly = PanelAssemblyBuilder.build(
-      layout(),
-      () -> pendantCase.plate(),
-      () -> pendantCase.shell(),
-      [new PanelExtra("board", new PendantBoard(pendantCase.face, () -> pendantCase.board()))],
+      pendantCase.face,
+      () -> documents == null ? pendantCase.plate() : documents.plate.part(),
+      () -> documents == null ? pendantCase.shell() : documents.shell.part(),
+      [new PanelExtra(
+        "board",
+        new PendantBoard(pendantCase.face, () -> documents == null ? pendantCase.board() : documents.board.part())
+      )],
       groups(),
       pendantCase.hardware()
     );
@@ -60,6 +77,9 @@ class ReferencePendant {
     return assembly;
   }
 
-  /** The case for the reference layout. */
-  public static function pendantCase(leftHanded:Bool = false):PendantCase return PendantCase.plan(layout(leftHanded), leftHanded);
+  /** The case for the reference layout, or for the same controls on a case of another size. */
+  public static function pendantCase(?size:PendantSize, leftHanded:Bool = false):PendantCase return PendantCase.plan(
+    layout(size, leftHanded),
+    leftHanded
+  );
 }

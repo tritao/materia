@@ -5,7 +5,7 @@
   "defaultEntrypoint": "pendant",
   "build": {"system": "haxeon", "manifest": "haxeon.json"},
   "entrypoints": {
-    "pendant": {"kind": "cad-preview", "module": "PendantPreview", "function": "preview",
+    "pendant": {"kind": "cad-preview", "documentInput": true, "reconcilesSavedRecipe": true, "module": "PendantPreview", "function": "preview",
       "cache": {"inputs": ["PendantPreview.hx"]}}
   }
 }

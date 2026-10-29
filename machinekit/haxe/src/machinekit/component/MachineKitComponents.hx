@@ -22,6 +22,7 @@ class MachineKitComponents {
     machinekit.assembly.AssemblyComponents.register(registry);
     machinekit.control.ControlComponents.register(registry);
     machinekit.hmi.HmiComponents.register(registry);
+    registry.register(machinekit.pendant.PendantCasePlate.recipeType());
     registry.register(machinekit.structural.LevelingFoot.recipeType());
     machinekit.routing.RoutingComponents.register(registry);
     registry.register(machinekit.power.Vfd.recipeType());
