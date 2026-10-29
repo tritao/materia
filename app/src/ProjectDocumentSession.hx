@@ -90,6 +90,11 @@ class ProjectDocumentSession {
   var authoredPresentation:Null<AuthoredPresentation>;
   public var projectAssemblyDefinition(default, null):Null<AssemblyDefinition> = null;
   public var projectAssemblyState(default, null):Null<AssemblyStateRecord> = null;
+  /**
+   * While a joint is dragged in the scene, the state the drag is previewing. The recorded state changes only when the drag is
+   * released, so anything that follows the joints live (the machine controls, a simulated display) reads this when it is set.
+   */
+  public var assemblyDragPreview(default, null):Null<AssemblyStateRecord> = null;
   public var projectPhysical(default, null):Null<AssemblyPhysicalData> = null;
   /** Face descriptors written by the project generator for one assembly definition. */
   public function assemblyFaceDescriptorsFor(definitionId:String):Null<String
@@ -1278,7 +1283,10 @@ class ProjectDocumentSession {
   }
 
   @:allow(app
-    .ProjectAssemblyDrag) function previewAssemblyDrag(drag:AssemblyDrag):Void previewAssemblyPoses(drag.previewPose);
+    .ProjectAssemblyDrag) function previewAssemblyDrag(drag:AssemblyDrag):Void {
+    assemblyDragPreview = drag.commit();
+    previewAssemblyPoses(drag.previewPose);
+  }
 
   /** Shows each occurrence at `poseOf(occurrence)` without recording history (a drag's preview). */
   @:allow(app.ProjectMateDrag) function previewAssemblyPoses(poseOf:String -> AssemblyFrame):Void {
@@ -1309,6 +1317,7 @@ class ProjectDocumentSession {
       before:AssemblyStateRecord,
       after:Null<AssemblyStateRecord>
     ):Bool {
+    assemblyDragPreview = null;
     if (after == null || sameAssemblyState(before, after)) {
       applyAssemblyStateRecord(before);
       return false;

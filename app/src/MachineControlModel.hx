@@ -22,7 +22,9 @@ typedef MachineControlAxis = {
 /** Joint controls use the document's validated kinematics and undo, in human-facing units. */
 class MachineControlModel {
   public static function axes(session:ProjectDocumentSession):Array<MachineControlAxis> {
-    var definition = session.projectAssemblyDefinition, state = session.projectAssemblyState;
+    var definition = session.projectAssemblyDefinition;
+    var dragged = session.assemblyDragPreview;
+    var state = dragged == null ? session.projectAssemblyState : dragged;
     if (definition == null || state == null) return [];
     var positions:Map<String, Float> = [];
     for (coordinate in state.jointCoordinates) positions.set(coordinate.joint, coordinate.value);
