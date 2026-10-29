@@ -220,8 +220,8 @@ class PendantTests {
     var joints = assembly.derived().definition.joints;
     var encoders = [for (j in joints) if (j.id == "jog/wheel/encoder") j];
     check(
-      joints.length == 12 && encoders.length == 1,
-      "Twelve joints: the wheel's free encoder, two clicking knobs and a fixed pointer on each knob, and a press on each of the seven keys: "
+      joints.length == 13 && encoders.length == 1,
+      "Thirteen joints: the wheel's free encoder, two clicking knobs and a fixed pointer on each knob, a press on each of the seven keys and the E-stop's latching head: "
       + [for (j in joints) j.id].join(", ")
     );
     // The switches click: each knob joint is limited between end stops and has a detent at every position, 30 degrees apart.
@@ -243,7 +243,7 @@ class PendantTests {
     );
     check(encoders.length == 1 && encoders[0].limits.detents == null, "The hand wheel's encoder stays free");
     // Each key's cap slides along its axis between released (0) and pressed (the end of its travel), clicking at both.
-    var presses = [for (j in joints) if (StringTools.endsWith(j.id, "/press")) j];
+    var presses = [for (j in joints) if (StringTools.endsWith(j.id, "/press") && j.id != "estop/press") j];
     check(presses.length == 7, "A press joint on each of the seven keys: " + presses.length);
     for (j in presses) {
       var list:Array<Float> = j.limits.detents == null ? [] : cast j.limits.detents;
@@ -254,6 +254,16 @@ class PendantTests {
       );
       check(j.limits.rest == 0.0, "A key is momentary: its spring returns it to released: " + j.id);
     }
+    // The E-stop's head latches: pushed in at the end of its travel, with no spring, and it is the joint the display's chain read-back follows.
+    var stops = [for (j in joints) if (j.id == "estop/press") j];
+    check(
+      stops.length == 1 && stops[0].limits.rest == null && stops[0].limits.detents != null && stops[0].limits.detents.length == 2,
+      "The E-stop's head latches in two positions"
+    );
+    check(
+      [for (b in ReferencePendant.displayBindings()) if (b.signal == machinekit.operator.PendantDisplaySignals.ESTOP) b.joint].join(",") == "estop/press",
+      "The display reads the chain from the E-stop's head"
+    );
     var knobLimits = [for (j in joints) if (j.id == "selectors/axis/position") j.limits][0];
     // The pitch and the first position are the part's: ten positions 10 degrees apart starting at -45 leave 90 degrees of travel.
     var narrow = new RotarySwitch(new machinekit.component.ComponentValues().setInteger("positions", 10).setNumber(
