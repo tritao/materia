@@ -78,3 +78,7 @@
 [submodule "collisionkit/native/vendor/v-hacd"]
 	path = collisionkit/native/vendor/v-hacd
 	url = https://github.com/kmammou/v-hacd.git
+[submodule "pcbkit"]
+	path = pcbkit
+	url = https://github.com/tritao/pcbkit.git
+	shallow = true
