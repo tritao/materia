@@ -252,6 +252,7 @@ class PendantTests {
         && Math.abs(list[0] - j.limits.lower) < 1e-9 && list[1] == 0.0 && j.limits.lower < 0.0,
         "Key press travel and detents: " + j.id
       );
+      check(j.limits.rest == 0.0, "A key is momentary: its spring returns it to released: " + j.id);
     }
     var knobLimits = [for (j in joints) if (j.id == "selectors/axis/position") j.limits][0];
     // The pitch and the first position are the part's: ten positions 10 degrees apart starting at -45 leave 90 degrees of travel.
