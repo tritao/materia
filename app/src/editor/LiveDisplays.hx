@@ -12,14 +12,21 @@ class LiveDisplays {
 }
 
 /**
- * The pendant's OLED as the pendant firmware's own core draws it. No controller is attached yet, so the core shows what the
- * pendant shows with no link; the controls stay at rest.
+ * The pendant's OLED as the pendant firmware's own core draws it. The axis and step selectors and the wheel are the model's
+ * joints, read as the pendant would read them. No controller is attached yet, so the core shows what the pendant shows with
+ * no link.
  */
 class PendantOledSource implements LiveDisplaySource {
   /** The module's colour: lit pixels in a cool white, scaled down when the core dims the display. */
   static inline var RED:Int = 200;
   static inline var GREEN:Int = 230;
   static inline var BLUE:Int = 255;
+
+  static inline var AXIS:String = "selectors/axis/position";
+  static inline var STEP:String = "selectors/step/position";
+  static inline var WHEEL:String = "jog/wheel/encoder";
+  /** The 100 PPR wheel, read in quadrature. */
+  static inline var COUNTS_PER_TURN:Int = 400;
 
   final pendant:VirtualPendant;
   var lastChecksum:Int = 0;
@@ -34,8 +41,9 @@ class PendantOledSource implements LiveDisplaySource {
 
   public function height():Int return VirtualPendant.HEIGHT;
 
-  public function advance(nowMs:Int):Null<Bytes> {
-    pendant.tick(nowMs, 0, 0, 1, 0, false, true);
+  public function advance(nowMs:Int, controls:LiveControls):Null<Bytes> {
+    var counts = Math.round(controls.position(WHEEL) / 360 * COUNTS_PER_TURN);
+    pendant.tick(nowMs, counts, controls.detentIndex(AXIS), controls.detentIndex(STEP), 0, true, true);
     var power = pendant.displayPower(nowMs);
     var checksum = pendant.checksum(nowMs);
     if (started && power == lastPower && checksum == lastChecksum) return null;

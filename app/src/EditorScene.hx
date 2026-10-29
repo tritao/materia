@@ -1968,10 +1968,12 @@ class EditorScene {
   var liveDisplayClock:Float = -1;
 
   /** Lets the displays on the scene's models draw their next picture; true when any changed and the view needs a frame. */
-  public function advanceLiveDisplays():Bool {
+  public function hasLiveDisplays():Bool return presentation.threads.hasLiveDisplays();
+
+  public function advanceLiveDisplays(controls:app.editor.LiveControls):Bool {
     var now = Sys.time();
     if (liveDisplayClock < 0) liveDisplayClock = now;
-    return presentation.threads.advance(this, Std.int((now - liveDisplayClock) * 1000));
+    return presentation.threads.advance(this, Std.int((now - liveDisplayClock) * 1000), controls);
   }
 
   public function renderSnapshot():SceneSnapshot {
@@ -2225,8 +2227,8 @@ class EditorScene {
 
   public function canRollForward():Bool {
     var item = object(selectedId);
-    return item != null && item.kind == "cad-part" && activeSketchEdit == null
-      && requireCadSession(selectedId).document.rollbackIndex >= 0;
+    return item != null && item.kind == "cad-part"
+      && activeSketchEdit == null && requireCadSession(selectedId).document.rollbackIndex >= 0;
   }
 
   public function rollForward():Bool {

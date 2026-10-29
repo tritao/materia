@@ -219,8 +219,8 @@ private typedef ThreadGroup = {
     var material = owner.scene.createMaterial();
     owner.scene.setMaterialData(
       material,
-      new MaterialData().setBaseColor(0.0, 0.0, 0.0).setRoughness(0.25).setMetallic(0.0).setEmissive(1.0,
-      1.0, 1.0).setEmissiveTexture(texture).setBaseColorTexture(
+      new MaterialData().setBaseColor(0.0, 0.0, 0.0).setRoughness(0.25).setMetallic(0.0).setEmissive(2.0,
+      2.0, 2.0).setEmissiveTexture(texture).setBaseColorTexture(
         texture,
         sampler
       )
@@ -256,13 +256,18 @@ private typedef ThreadGroup = {
     return picture(source, empty);
   }
 
+  public function hasLiveDisplays():Bool {
+    for (group in groups) for (entry in group.nodes) if (entry.live != null) return true;
+    return false;
+  }
+
   /** Lets every display's source draw its next picture; true when any picture changed. */
-  public function advance(owner:EditorScene, nowMs:Int):Bool {
+  public function advance(owner:EditorScene, nowMs:Int, controls:LiveControls):Bool {
     var changed = false;
     for (group in groups) for (entry in group.nodes) {
       var live = entry.live;
       if (live == null) continue;
-      var rgba = live.source.advance(nowMs);
+      var rgba = live.source.advance(nowMs, controls);
       if (rgba == null) continue;
       owner.scene.setImageData(live.image, picture(live.source, rgba));
       changed = true;

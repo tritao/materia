@@ -1355,7 +1355,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       characterPreview.advance(scene);
       if (hostContext != null) hostContext.requestFrame();
     }
-    if (scene.advanceLiveDisplays() && hostContext != null) hostContext.requestFrame();
+    if (scene.hasLiveDisplays()
+      && scene.advanceLiveDisplays(new app.editor.LiveControls(MachineControlModel.axes(session)))
+      && hostContext != null) hostContext.requestFrame();
     if (!refinementFrameSubmitted) return;
     refinementFrameSubmitted = false;
     var before = scene.visualRevision;
