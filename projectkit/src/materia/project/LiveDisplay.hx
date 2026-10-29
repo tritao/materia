@@ -20,11 +20,14 @@ class LiveDisplayConfig {
   public final profile:String;
   /** The joint (an assembly joint id) that feeds each signal the driver reads, by the driver's signal name. */
   public final bindings:Map<String, String>;
+  /** Which output of the driver this display shows; empty for its main picture. */
+  public final channel:String;
 
-  public function new(source:String, profile:String, bindings:Map<String, String>) {
+  public function new(source:String, profile:String, bindings:Map<String, String>, channel:String = "") {
     this.source = source;
     this.profile = profile;
     this.bindings = bindings;
+    this.channel = channel;
   }
 
   public function joint(signal:String):String {

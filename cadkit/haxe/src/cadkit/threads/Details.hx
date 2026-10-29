@@ -103,7 +103,9 @@ class Details {
           height: 0.0,
           source: "",
           profile: "",
-          bindings: []
+          bindings: [],
+          channel: "",
+          round: false
         });
         face.close();
       } catch (error:Dynamic) {
@@ -136,7 +138,7 @@ class Details {
         z.z
       ], length: spec.height, radius: spec.width / 2,
       count: 2, depth: 0.0, numberedEvery: 0, surface: spec.height, radiusEnd: spec.width / 2, width: spec.width,
-      height: spec.height, source: spec.source, profile: spec.profile, bindings: [for (binding in spec.bindings) {
+      height: spec.height, source: spec.source, profile: spec.profile, channel: spec.channel, round: spec.round, bindings: [for (binding in spec.bindings) {
       signal:binding.signal, joint:binding.joint
     }
     ]};

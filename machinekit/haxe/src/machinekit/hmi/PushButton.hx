@@ -3,6 +3,10 @@ package machinekit.hmi;
 import cadkit.modeling.Footprint;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
+import cadkit.threads.Details;
+import cadkit.threads.SurfaceDetail;
+import cadkit.threads.SurfaceDetail.DisplayBinding;
+import cadkit.threads.SurfaceDetail.DisplaySpec;
 import machinekit.component.*;
 import materia.assembly.AssemblyDefinition.AssemblyJointLimits;
 import machinekit.component.ComponentRecipeSupport as R;
@@ -123,6 +127,19 @@ class PushButton extends HmiPart {
     return [new DeviceJointSpec("press", Prismatic, "bezel", "cap", limits, 0.0)];
   }
 
+  var light:Null<DisplaySpec> = null;
+
+  /**
+   * Says who lights the cap in a simulation: the driver `source`, the operator profile it serves, the joints that feed its signals
+   * and the `output` of the driver that is this button's LED. The cap's top face then carries a disc a simulator fills with the
+   * LED's colour. Without it the cap is plain. Returns the button, for a layout to chain.
+   */
+  public function lit(source:String, profile:String, bindings:Array<DisplayBinding>, output:String):PushButton {
+    var size = n("capDiameter") * 0.8;
+    light = new DisplaySpec(size, size, 0.0, 0.0, source, profile, bindings, output, true);
+    return this;
+  }
+
   /** A metal barrel and nut, the grey rear body and the coloured cap and bezel in front. */
   override public function bodies():Null<Array<DeviceBodySpec>> {
     var t = n("panelThickness"), nut = n("nutThickness");
@@ -141,11 +158,21 @@ class PushButton extends HmiPart {
     ), new DeviceBodySpec("cap", "push button cap", materialSpec(), function() {
       // The cap stands clear of the barrel by its travel (no more than the bezel is deep, so it stays in the bezel), and sinks as it is pressed.
       var c = n("capDiameter") / 2, top = n("capHeight"), rest = n("pressTravel");
-      return Solids.named(
+      var plain = Solids.named(
         Part.revolve([{r: 0.0,
         z: rest}, {r: c, z: rest}, {r: c, z: top - 1.2}, {r: c - 1.2, z: top}, {r: 0.0, z: top}]),
         "cap"
       );
+      var spec = light;
+      if (spec == null) return plain;
+      try {
+        var shape = Details.attach(plain.shape, HmiPart.frontFace(plain.shape, "push button cap"), Display(spec));
+        plain.close();
+        return new Part(shape);
+      } catch (error:Dynamic) {
+        plain.close();
+        throw error;
+      }
     }
     )];
   }

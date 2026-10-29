@@ -34,13 +34,13 @@ class ReferencePendant {
         0.0,
         37.0
       ),
-      new PlacedPart("f1", PartPresets.pushButton16(), side * -40.5, 1.5),
-      new PlacedPart("f2", PartPresets.pushButton16(), side * -13.5, 1.5),
-      new PlacedPart("f3", PartPresets.pushButton16(), side * 13.5, 1.5),
+      new PlacedPart("f1", lit(PartPresets.pushButton16(), "f1"), side * -40.5, 1.5),
+      new PlacedPart("f2", lit(PartPresets.pushButton16(), "f2"), side * -13.5, 1.5),
+      new PlacedPart("f3", lit(PartPresets.pushButton16(), "f3"), side * 13.5, 1.5),
       new PlacedPart("wheel-enable", PartPresets.pushButton16("blue"), side * 40.5, 1.5),
-      new PlacedPart("start", PartPresets.pushButton16("green"), side * -40.5, -25.5),
-      new PlacedPart("hold", PartPresets.pushButton16("yellow"), side * -13.5, -25.5),
-      new PlacedPart("stop", PartPresets.pushButton16("red"), side * 13.5, -25.5),
+      new PlacedPart("start", lit(PartPresets.pushButton16("green"), "start"), side * -40.5, -25.5),
+      new PlacedPart("hold", lit(PartPresets.pushButton16("yellow"), "hold"), side * -13.5, -25.5),
+      new PlacedPart("stop", lit(PartPresets.pushButton16("red"), "stop"), side * 13.5, -25.5),
       new PlacedPart("wheel", PartPresets.yumoIsm6045(), 0.0, -70.0)
     ];
     return new PanelLayout(
@@ -63,6 +63,11 @@ class ReferencePendant {
   public static function jointId(part:String, joint:String):String {
     for (group in groups()) if (group.members.indexOf(part) >= 0) return group.id + "/" + part + "/" + joint;
     return part + "/" + joint;
+  }
+
+  /** A key whose LED the simulated pendant lights: the cap shows the output of the driver that is this key's LED. */
+  static function lit(button:machinekit.hmi.PushButton, key:String):machinekit.hmi.PushButton {
+    return button.lit(PendantDisplaySignals.LED_SOURCE, PROFILE, displayBindings(), key);
   }
 
   /** Which joint feeds each signal of the display's driver. */

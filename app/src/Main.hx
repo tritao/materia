@@ -822,6 +822,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     #if !wasm
     // The drivers for the live displays the editor knows how to fill (the web build has no native pendant core yet).
     machinekit.operator.PendantDisplayDriver.register();
+    machinekit.operator.PendantLedDriver.register();
     #end
     printerLink = new PrinterLink(hostContext == null ? null : hostContext.events);
     semanticRecordPath = recordPath;

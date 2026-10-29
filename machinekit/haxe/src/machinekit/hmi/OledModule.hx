@@ -274,30 +274,13 @@ class OledModule extends HmiPart {
     var spec = driver;
     if (spec == null) return plain;
     try {
-      var shape = Details.attach(plain.shape, frontFace(plain.shape), Display(spec));
+      var shape = Details.attach(plain.shape, HmiPart.frontFace(plain.shape, "OLED glass"), Display(spec));
       plain.close();
       return new Part(shape);
     } catch (error:Dynamic) {
       plain.close();
       throw error;
     }
-  }
-
-  /** The strong name of the face looking toward the operator. */
-  static function frontFace(shape:Shape):String {
-    var names = shape.elementNames(CadKit.ShapeKind.Face);
-    var found:Null<String> = null;
-    for (index in 0...names.length) {
-      var face = shape.subshape(CadKit.ShapeKind.Face, index);
-      var front = face.surfaceKind() == CadKit.SurfaceKind.Plane && face.faceNormal().get_z() > 0.99;
-      face.close();
-      if (front) {
-        if (found != null) throw "The OLED glass has more than one front face";
-        found = names[index];
-      }
-    }
-    if (found == null) throw "The OLED glass has no front face";
-    return found;
   }
 
   /** The flex circuit: along the glass's back, round the board's lower edge and up its back to the connector. */

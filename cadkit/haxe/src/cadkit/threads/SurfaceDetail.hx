@@ -47,6 +47,10 @@ class DisplaySpec {
   public final source:String;
   public final profile:String;
   public final bindings:Array<DisplayBinding>;
+  /** Which output of the driver fills this display; empty for its main picture. */
+  public final channel:String;
+  /** A disc inscribed in the width and height (an indicator on a round cap), not a rectangle. */
+  public final round:Bool;
 
   public function new(
     width:Float,
@@ -55,7 +59,9 @@ class DisplaySpec {
     offsetY:Float,
     source:String,
     profile:String,
-    bindings:Array<DisplayBinding>
+    bindings:Array<DisplayBinding>,
+    channel:String = "",
+    round:Bool = false
   ) {
     this.width = width;
     this.height = height;
@@ -64,5 +70,7 @@ class DisplaySpec {
     this.source = source;
     this.profile = profile;
     this.bindings = bindings;
+    this.channel = channel;
+    this.round = round;
   }
 }

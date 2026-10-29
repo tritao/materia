@@ -24,6 +24,17 @@ class PendantDisplaySignals {
   public static inline var F2:String = "f2";
   public static inline var F3:String = "f3";
 
+  /** The source name of a key's LED; its output is the key's own signal name (`keys()`). */
+  public static inline var LED_SOURCE:String = "pendant-led";
+
+  /** The colour a key's LED lights in, as red, green and blue out of 255: the colour of its cap. */
+  public static function ledColour(key:String):Array<Int> {
+    if (key == START) return [60, 230, 90];
+    if (key == HOLD) return [250, 210, 40];
+    if (key == STOP) return [255, 60, 50];
+    return [235, 240, 255];
+  }
+
   /** The keys in the order of PENDANT_STATE's button bits. */
   public static function keys():Array<String> return [START, HOLD, STOP, F1, F2, F3];
 }

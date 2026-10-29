@@ -207,7 +207,7 @@ private typedef ThreadGroup = {
     id:String, kind:String, parent:NodeId, detail:CadDetailGeometry):Null<ThreadNode> {
     var bindings:Map<String, String> = [];
     for (binding in detail.source.bindings) bindings.set(binding.signal, binding.joint);
-    var source = LiveDisplays.create(new LiveDisplayConfig(detail.source.source, detail.source.profile, bindings));
+    var source = LiveDisplays.create(new LiveDisplayConfig(detail.source.source, detail.source.profile, bindings, detail.source.channel));
     if (source == null) return null;
     if (sampler == null) {
       sampler = owner.scene.createSampler();

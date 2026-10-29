@@ -1,5 +1,7 @@
 package machinekit.hmi;
 
+import CadKit;
+import cadkit.Shape;
 import cadkit.modeling.Footprint;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
@@ -42,6 +44,23 @@ class HmiPart extends MachineComponent {
       case _:
         Assumed;
     };
+  }
+
+  /** The strong name of the one planar face of `shape` that looks toward the operator (+z); `what` names the part in the error. */
+  public static function frontFace(shape:Shape, what:String):String {
+    var names = shape.elementNames(CadKit.ShapeKind.Face);
+    var found:Null<String> = null;
+    for (index in 0...names.length) {
+      var face = shape.subshape(CadKit.ShapeKind.Face, index);
+      var front = face.surfaceKind() == CadKit.SurfaceKind.Plane && face.faceNormal().get_z() > 0.99;
+      face.close();
+      if (front) {
+        if (found != null) throw "The " + what + " has more than one front face";
+        found = names[index];
+      }
+    }
+    if (found == null) throw "The " + what + " has no front face";
+    return found;
   }
 
   /** The provenance input every part declares. */

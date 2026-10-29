@@ -849,6 +849,8 @@ class ProjectKitTests {
       height: 0.0,
       source: "",
       profile: "",
+      channel: "",
+      round: false,
       bindings: []
     };
     data.parts[0].details = [detail];
@@ -886,6 +888,8 @@ class ProjectKitTests {
       height: 29.49,
       source: "pendant-oled",
       profile: "hobber",
+      channel: "start",
+      round: true,
       bindings: [{signal: "axis", joint: "selectors/axis/position"}]
     };
     data.parts[0].details = [display];
@@ -897,6 +901,7 @@ class ProjectKitTests {
       && shown[0].bindings.length == 1 && shown[0].bindings[0].joint == "selectors/axis/position",
       "a display round trips with its size, source, profile and bindings"
     );
+    check(shown[0].channel == "start" && shown[0].round, "a display round trips with its channel and its shape");
     display.source = "";
     rejects(function() SceneArtifact.encode(data), "a display needs a source");
     display.source = "pendant-oled";

@@ -129,8 +129,40 @@ class VirtualPendantTests {
     check(machinekit.operator.PendantDevice.active() == before, "it stops with its last user, and a repeated release counts once");
   }
 
+  /** A key's cap is lit by the pendant's own LED bits: the Stop key lights while the E-stop chain reads open. */
+  static function checkKeyLed():Void {
+    var bindings = new Map<String, String>();
+    for (binding in machinekit.pendant.ReferencePendant.displayBindings()) bindings.set(binding.signal, binding.joint);
+    var config = new materia.project.LiveDisplay.LiveDisplayConfig(
+      PendantDisplaySignals.LED_SOURCE,
+      machinekit.pendant.ReferencePendant.PROFILE,
+      bindings,
+      PendantDisplaySignals.STOP
+    );
+    var led = new machinekit.operator.PendantLedDriver(config);
+    var inputs = restingInputs();
+    var now = 0;
+    var picture = led.advance(now, inputs);
+    check(picture != null && picture.length == led.width() * led.height() * 4, "the LED draws a first picture");
+    var unlit = picture.get(0);
+    while (now < 1000) {
+      now += 16;
+      led.advance(now, inputs);
+    }
+    var stopped = new PressedInputs(bindings.get(PendantDisplaySignals.ESTOP));
+    var lit:Null<haxe.io.Bytes> = null;
+    for (_ in 0...20) {
+      now += 16;
+      var next = led.advance(now, stopped);
+      if (next != null) lit = next;
+    }
+    check(lit != null && lit.get(0) > unlit * 2, "the Stop LED lights when the chain opens: " + unlit + " -> " + (lit == null ? -1 : lit.get(0)));
+    led.release();
+  }
+
   static function main():Void {
     checkModelDisplay();
+    checkKeyLed();
     checkSharedDevice();
     checkDriverTimeline();
     var pendant = new VirtualPendant(0);

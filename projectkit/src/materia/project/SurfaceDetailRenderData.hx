@@ -50,6 +50,10 @@ class SurfaceDetailKinds {
   @:id(17) var profile:String;
   /** Which joint feeds each signal of the driver; empty for the other kinds. */
   @:id(18) var bindings:Array<DisplayBindingData>;
+  /** Which output of the driver fills the display (an LED, say); empty for the driver's main picture. */
+  @:id(19) var channel:String;
+  /** The display is a disc inscribed in its width and height, not a rectangle (an indicator on a round cap). */
+  @:id(20) var round:Bool;
 }
 
 /** Display packets are validated before an editor allocates resources. */
@@ -66,6 +70,7 @@ class SurfaceDetailRenderDataValues {
       && Math.isFinite(detail.height))) throw 'Display ${detail.faceName} needs a positive size';
     if (detail.kind == SurfaceDetailKinds.DISPLAY && (detail.source == null
       || detail.source.length == 0 || detail.source.length > 256)) throw 'Display ${detail.faceName} needs a source';
+    if (detail.channel == null || detail.channel.length > 256) throw 'Surface detail ${detail.faceName} has an invalid channel';
     if (detail.bindings == null) throw 'Surface detail ${detail.faceName} has no bindings list';
     for (binding in detail.bindings) if (binding.signal == null || binding.signal.length == 0 || binding.joint == null
       || binding.joint.length == 0) throw 'Display ${detail.faceName} has a binding without a signal or a joint';

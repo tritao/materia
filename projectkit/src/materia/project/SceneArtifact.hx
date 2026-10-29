@@ -950,7 +950,7 @@ typedef SceneArtifactHeater = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-  public static inline var VERSION:Int = 46;
+  public static inline var VERSION:Int = 47;
   public static inline var MAX_BYTES:Int = 150000000;
   static inline var MAX_VERTICES:Int = 2000000;
   static inline var MAX_TRIANGLES:Int = 4000000;

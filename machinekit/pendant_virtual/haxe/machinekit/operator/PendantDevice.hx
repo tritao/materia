@@ -78,6 +78,9 @@ class PendantDevice {
     pendant.tick(nowMs, counts, axis, step, keys, enabled, chainClosed);
   }
 
+  /** The key LEDs, in the order of `PendantDisplaySignals.keys()`: bit n is key n's LED. */
+  public function leds(nowMs:Int):Int return pendant.leds(nowMs);
+
   public function displayPower(nowMs:Int):Int return pendant.displayPower(nowMs);
 
   public function checksum(nowMs:Int):Int return pendant.checksum(nowMs);
