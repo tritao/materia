@@ -19,8 +19,12 @@ class AssemblyDefinitionCodec {
   /** Real assemblies include individual fasteners. Keep a finite decode bound
      * without limiting a complete machine to 1,000 occurrences. */
   public static inline final MAX_PARTS = 4096;
-  /** Long machine hosts own individual fastener/mate connectors. */
-  public static inline final MAX_CONNECTORS = 512;
+  /**
+   * Long machine hosts own individual fastener/mate connectors, and a definition shared by many occurrences (every washer
+   * of one size) carries the attach/to connectors of all of them, about 0.6 per occurrence on the sheet router. So the
+   * bound matches the occurrence bound (`MAX_PARTS`).
+   */
+  public static inline final MAX_CONNECTORS:Int = 4096;
 
   public static inline var VERSION:Int = 11;
 
