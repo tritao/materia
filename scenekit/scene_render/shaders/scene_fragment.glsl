@@ -152,7 +152,10 @@ void main() {
                           ? srgb_to_linear(texture_color.rgb) : texture_color.rgb;
     vec3 albedo = srgb_to_linear(base_color.rgb) * base_texel *
                   srgb_to_linear(vertex_color.rgb);
-    albedo = mix(albedo, srgb_to_linear(surface_highlight.rgb), surface_highlight.a);
+    // A hover or selection colours the surface but keeps what the base-colour texture draws (a scale, a legend, ink), scaled
+    // by the texture's brightness, so that detail stays readable under the highlight. An untextured surface has a white texel.
+    float texture_detail = dot(base_texel, vec3(1.0 / 3.0));
+    albedo = mix(albedo, srgb_to_linear(surface_highlight.rgb) * texture_detail, surface_highlight.a);
     if (cap_surface) {
         vec3 plane_N = normalize(vertex_normal);
         vec3 axis = abs(plane_N.z) < 0.9 ? vec3(0,0,1) : vec3(0,1,0);
