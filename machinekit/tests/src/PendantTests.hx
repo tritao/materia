@@ -102,8 +102,8 @@ class PendantTests {
       xOf(layout, "axis") > 0 && xOf(layout, "step") > 0 && xOf(layout, "estop") < 0,
       "Selectors on the right, E-stop on the left"
     );
-    var mirrored = ReferencePendant.layout(true);
-    var mirroredCase = ReferencePendant.pendantCase(true);
+    var mirrored = ReferencePendant.layout(null, true);
+    var mirroredCase = ReferencePendant.pendantCase(null, true);
     check(
       mirrored.problems().length == 0 && xOf(mirrored, "axis") < 0 && xOf(mirrored, "estop") > 0,
       "The left-handed layout passes its checks, mirrored: " + mirrored.problems().join(" | ")
