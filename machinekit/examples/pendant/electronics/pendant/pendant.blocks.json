@@ -1,0 +1,39 @@
+{
+  "blocks": [
+    {
+      "block": "din_type3",
+      "domains": {
+        "analog": "iso_analog",
+        "field": "field24",
+        "logic": "logic"
+      },
+      "instance": "estop",
+      "parameters": {
+        "input_type": 3
+      },
+      "parts": [
+        "estop/d_rev",
+        "estop/d_tvs",
+        "estop/r1",
+        "estop/r_pu",
+        "estop/rs",
+        "estop/u_opto"
+      ],
+      "ports": {
+        "FIELD_GND": "ESTOP_SENSE_REF",
+        "GND": "GND",
+        "IN": "ESTOP_SENSE_IN",
+        "OUT": "ESTOP_SENSE",
+        "VLOGIC": "+3V3"
+      },
+      "sha256": "1e94080bcf3dec0026ca90855db3c80b287c879b4529ec18d087c66b9593dce5",
+      "sheets": {
+        "main": "estop"
+      },
+      "version": 7
+    }
+  ],
+  "board": "pendant",
+  "netlist_hash": "sha256:e89c76fd4ef4a1322851e67c8c000f9038acbb0fb47255b0367e56a6a51a07f0",
+  "schema": 1
+}

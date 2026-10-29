@@ -1,13 +1,578 @@
 {
-  "barriers": {},
+  "barriers": {
+    "cable/j_cable": {
+      "clearance_mm": {
+        "source": {
+          "placeholder": "pendant draft: functional spacing below 30 V between JST PH 2 mm contacts; review pending"
+        },
+        "value": 0.9
+      },
+      "creepage_mm": {
+        "source": {
+          "placeholder": "pendant draft: functional spacing below 30 V between JST PH 2 mm contacts (about 1 mm between lands); review pending"
+        },
+        "value": 0.9
+      },
+      "joins": [
+        "logic",
+        "can_bus",
+        "field24"
+      ]
+    },
+    "can/u_can": {
+      "clearance_mm": {
+        "source": {
+          "placeholder": "pendant draft: functional isolation; the package's own CLR/CPG is 3.45 mm (datasheet section 7); review pending"
+        },
+        "value": 3.0
+      },
+      "creepage_mm": {
+        "source": {
+          "placeholder": "pendant draft: functional isolation (24 V system, ground offsets only); the LGA16 lands keep 3.15 mm; review pending"
+        },
+        "value": 3.0
+      },
+      "joins": [
+        "logic",
+        "can_bus"
+      ]
+    },
+    "estop/u_opto": {
+      "clearance_mm": {
+        "source": {
+          "url": "https://webstore.iec.ch/en/searchform?q=IEC%2060664-1",
+          "where": "Table F.4 (standard p. 68), pollution degree 2, material group III: 1.20 mm at 50 V (1.10 mm at 40 V, 0.48 mm at 20 V); Table F.2 case A (standard p. 65): 0.2 mm at 0.5 kV, 1.5 mm at 2.5 kV; design value 1.5 mm = clearance of the 2.5 kV step, 1.25 x the 50 V creepage; IPC-2221B Table 6-1 31-50 V external uncoated B2 0.6 mm is the bare-board minimum (SPEC 4)"
+        },
+        "value": 1.5
+      },
+      "creepage_mm": {
+        "source": {
+          "url": "https://webstore.iec.ch/en/searchform?q=IEC%2060664-1",
+          "where": "Table F.4 (standard p. 68), pollution degree 2, material group III: 1.20 mm at 50 V (1.10 mm at 40 V, 0.48 mm at 20 V); Table F.2 case A (standard p. 65): 0.2 mm at 0.5 kV, 1.5 mm at 2.5 kV; design value 1.5 mm = clearance of the 2.5 kV step, 1.25 x the 50 V creepage; IPC-2221B Table 6-1 31-50 V external uncoated B2 0.6 mm is the bare-board minimum (SPEC 4)"
+        },
+        "value": 1.5
+      },
+      "joins": [
+        "field24",
+        "logic"
+      ]
+    }
+  },
   "board": "pendant",
-  "domains": {},
-  "net_class_of": {},
-  "net_classes": {},
-  "netlist_hash": "sha256:4b78539d56e57ba18295ac46ad32f315ed541248c92b61714aaa867fe081107e",
+  "domains": {
+    "can_bus": {
+      "nets": [
+        "CAN_GND",
+        "CAN_H",
+        "CAN_L",
+        "CAN_V5ISO",
+        "can/term_mid"
+      ]
+    },
+    "field24": {
+      "nets": [
+        "ESTOP_SENSE_IN",
+        "ESTOP_SENSE_REF",
+        "estop/led_a"
+      ]
+    },
+    "logic": {
+      "nets": [
+        "+24V",
+        "+24V_F",
+        "+24V_IN",
+        "+3V3",
+        "+5V",
+        "AXIS_0",
+        "AXIS_1",
+        "AXIS_10",
+        "AXIS_11",
+        "AXIS_2",
+        "AXIS_3",
+        "AXIS_4",
+        "AXIS_5",
+        "AXIS_6",
+        "AXIS_7",
+        "AXIS_8",
+        "AXIS_9",
+        "BOOT0",
+        "CAN_RX",
+        "CAN_TX",
+        "ENABLE_1",
+        "ENABLE_2",
+        "ENABLE_3",
+        "ENABLE_4",
+        "ENC_A",
+        "ENC_B",
+        "ESTOP_SENSE",
+        "GND",
+        "I2C1_SCL",
+        "I2C1_SDA",
+        "KEYPAD_ID",
+        "KEY_F1",
+        "KEY_F2",
+        "KEY_F3",
+        "KEY_HOLD",
+        "KEY_START",
+        "KEY_STOP",
+        "KEY_WHEEL_EN",
+        "LED_F1",
+        "LED_F2",
+        "LED_F3",
+        "LED_HOLD",
+        "LED_K_F1",
+        "LED_K_F2",
+        "LED_K_F3",
+        "LED_K_HOLD",
+        "LED_K_START",
+        "LED_K_STOP",
+        "LED_K_WHEEL_EN",
+        "LED_START",
+        "LED_STOP",
+        "LED_SUPPLY",
+        "LED_WHEEL_EN",
+        "MATRIX_5",
+        "MATRIX_6",
+        "NRST",
+        "OLED_RES",
+        "OSC_IN",
+        "OSC_OUT",
+        "SHIELD",
+        "SR_DATA",
+        "SR_LOAD",
+        "SR_SCK",
+        "SR_SPARE",
+        "STEP_1",
+        "STEP_10",
+        "STEP_100",
+        "SWCLK",
+        "SWDIO",
+        "USB_DM",
+        "USB_DP",
+        "USB_VBUS",
+        "WHEEL_A",
+        "WHEEL_B",
+        "mcu/vcap1",
+        "mcu/vcap2",
+        "power/cb",
+        "power/en",
+        "power/fb",
+        "power/sw",
+        "prog/cc1",
+        "prog/cc2",
+        "selectors/chain",
+        "wheel/in_a",
+        "wheel/in_b"
+      ]
+    }
+  },
+  "manufacturing": {
+    "assembly_service": "standard",
+    "assembly_side": "top",
+    "mask_colour": "green",
+    "process_options": {
+      "impedance": {
+        "requested": false,
+        "targets": [],
+        "tolerance": null
+      },
+      "laminate_grade": "supplier_standard",
+      "outline_tolerance_mm": 0.2,
+      "special_features": [],
+      "via_plating_method": "not_specified"
+    },
+    "profile_sha256": "9d86afa4f00ee56a15eb300892b6a5807a960aef5b068960517c0b5c9fbd8a63",
+    "reason": "pendant v1 two-layer draft: 1.6 mm, the thickness the case model assumes; every review pending",
+    "schema": 1,
+    "silkscreen_colour": "white",
+    "stackup": {
+      "copper_weight_oz": {
+        "inner": 0,
+        "outer": 1
+      },
+      "layers": [
+        {
+          "kind": "copper",
+          "name": "F.Cu",
+          "thickness_mm": 0.035
+        },
+        {
+          "epsilon_r": 4.5,
+          "kind": "core",
+          "material": "FR4",
+          "name": "dielectric 1",
+          "thickness_mm": 1.53
+        },
+        {
+          "kind": "copper",
+          "name": "B.Cu",
+          "thickness_mm": 0.035
+        }
+      ],
+      "material": "FR4",
+      "thickness_mm": 1.6
+    },
+    "stackup_id": "FR4-2L-1.6-1OZ-NOMINAL",
+    "supplier_profile": "jlcpcb-fr4-2l-v1",
+    "surface_finish": "lead_free_hasl",
+    "via_covering": "tented"
+  },
+  "net_class_of": {
+    "+24V": "supply_24v",
+    "+24V_F": "supply_24v",
+    "+24V_IN": "supply_24v",
+    "+3V3": "logic_3v3",
+    "+5V": "logic_5v",
+    "AXIS_0": "logic_signal",
+    "AXIS_1": "logic_signal",
+    "AXIS_10": "logic_signal",
+    "AXIS_11": "logic_signal",
+    "AXIS_2": "logic_signal",
+    "AXIS_3": "logic_signal",
+    "AXIS_4": "logic_signal",
+    "AXIS_5": "logic_signal",
+    "AXIS_6": "logic_signal",
+    "AXIS_7": "logic_signal",
+    "AXIS_8": "logic_signal",
+    "AXIS_9": "logic_signal",
+    "BOOT0": "logic_signal",
+    "CAN_GND": "can_power",
+    "CAN_H": "can_signal",
+    "CAN_L": "can_signal",
+    "CAN_RX": "logic_signal",
+    "CAN_TX": "logic_signal",
+    "CAN_V5ISO": "can_power",
+    "ENABLE_1": "logic_signal",
+    "ENABLE_2": "logic_signal",
+    "ENABLE_3": "logic_signal",
+    "ENABLE_4": "logic_signal",
+    "ENC_A": "logic_signal",
+    "ENC_B": "logic_signal",
+    "ESTOP_SENSE": "logic_signal",
+    "ESTOP_SENSE_IN": "estop_input",
+    "ESTOP_SENSE_REF": "estop_ref",
+    "GND": "logic_gnd",
+    "I2C1_SCL": "logic_signal",
+    "I2C1_SDA": "logic_signal",
+    "KEYPAD_ID": "logic_signal",
+    "KEY_F1": "logic_signal",
+    "KEY_F2": "logic_signal",
+    "KEY_F3": "logic_signal",
+    "KEY_HOLD": "logic_signal",
+    "KEY_START": "logic_signal",
+    "KEY_STOP": "logic_signal",
+    "KEY_WHEEL_EN": "logic_signal",
+    "LED_F1": "logic_signal",
+    "LED_F2": "logic_signal",
+    "LED_F3": "logic_signal",
+    "LED_HOLD": "logic_signal",
+    "LED_K_F1": "led_drive",
+    "LED_K_F2": "led_drive",
+    "LED_K_F3": "led_drive",
+    "LED_K_HOLD": "led_drive",
+    "LED_K_START": "led_drive",
+    "LED_K_STOP": "led_drive",
+    "LED_K_WHEEL_EN": "led_drive",
+    "LED_START": "logic_signal",
+    "LED_STOP": "logic_signal",
+    "LED_SUPPLY": "led_supply",
+    "LED_WHEEL_EN": "logic_signal",
+    "MATRIX_5": "logic_signal",
+    "MATRIX_6": "logic_signal",
+    "NRST": "logic_signal",
+    "OLED_RES": "logic_signal",
+    "OSC_IN": "logic_signal",
+    "OSC_OUT": "logic_signal",
+    "SHIELD": "estop_input",
+    "SR_DATA": "logic_signal",
+    "SR_LOAD": "logic_signal",
+    "SR_SCK": "logic_signal",
+    "SR_SPARE": "logic_signal",
+    "STEP_1": "logic_signal",
+    "STEP_10": "logic_signal",
+    "STEP_100": "logic_signal",
+    "SWCLK": "logic_signal",
+    "SWDIO": "logic_signal",
+    "USB_DM": "logic_signal",
+    "USB_DP": "logic_signal",
+    "USB_VBUS": "logic_5v",
+    "WHEEL_A": "wheel_signal",
+    "WHEEL_B": "wheel_signal",
+    "can/term_mid": "can_signal",
+    "estop/led_a": "estop_led",
+    "mcu/vcap1": "logic_signal",
+    "mcu/vcap2": "logic_signal",
+    "power/cb": "switching",
+    "power/en": "logic_signal",
+    "power/fb": "logic_signal",
+    "power/sw": "switching",
+    "prog/cc1": "logic_signal",
+    "prog/cc2": "logic_signal",
+    "selectors/chain": "logic_signal",
+    "wheel/in_a": "logic_signal",
+    "wheel/in_b": "logic_signal"
+  },
+  "net_classes": {
+    "can_power": {
+      "current_a": {
+        "source": {
+          "placeholder": "pendant draft: routing current reserve, not a qualified load rating; review pending"
+        },
+        "value": 0.1
+      },
+      "kind": "power",
+      "voltage_v": {
+        "source": {
+          "placeholder": "pendant draft: maximum working class voltage; review pending"
+        },
+        "value": 5.5
+      }
+    },
+    "can_signal": {
+      "current_a": {
+        "source": {
+          "placeholder": "pendant draft: routing current reserve, not a qualified load rating; review pending"
+        },
+        "value": 0.07
+      },
+      "kind": "signal",
+      "voltage_v": {
+        "source": {
+          "placeholder": "pendant draft: maximum working class voltage; review pending"
+        },
+        "value": 5.5
+      }
+    },
+    "estop_input": {
+      "current_a": {
+        "source": {
+          "placeholder": "pendant draft: routing current reserve, not a qualified load rating; review pending"
+        },
+        "value": 0.015
+      },
+      "kind": "signal",
+      "voltage_v": {
+        "source": {
+          "placeholder": "pendant draft: maximum working class voltage; review pending"
+        },
+        "value": 30
+      }
+    },
+    "estop_led": {
+      "current_a": {
+        "source": {
+          "placeholder": "pendant draft: routing current reserve, not a qualified load rating; review pending"
+        },
+        "value": 0.015
+      },
+      "kind": "signal",
+      "voltage_v": {
+        "source": {
+          "placeholder": "pendant draft: maximum working class voltage; review pending"
+        },
+        "value": 1.4
+      }
+    },
+    "estop_ref": {
+      "current_a": {
+        "source": {
+          "placeholder": "pendant draft: routing current reserve, not a qualified load rating; review pending"
+        },
+        "value": 0.015
+      },
+      "kind": "field_power",
+      "voltage_v": {
+        "source": {
+          "placeholder": "pendant draft: maximum working class voltage; review pending"
+        },
+        "value": 0
+      }
+    },
+    "led_drive": {
+      "current_a": {
+        "source": {
+          "placeholder": "pendant draft: routing current reserve, not a qualified load rating; review pending"
+        },
+        "value": 0.03
+      },
+      "kind": "signal",
+      "voltage_v": {
+        "source": {
+          "placeholder": "pendant draft: maximum working class voltage; review pending"
+        },
+        "value": 30
+      }
+    },
+    "led_supply": {
+      "current_a": {
+        "source": {
+          "placeholder": "pendant draft: routing current reserve, not a qualified load rating; review pending"
+        },
+        "value": 0.15
+      },
+      "kind": "field_power",
+      "voltage_v": {
+        "source": {
+          "placeholder": "pendant draft: maximum working class voltage; review pending"
+        },
+        "value": 30
+      }
+    },
+    "logic_3v3": {
+      "current_a": {
+        "source": {
+          "placeholder": "pendant draft: routing current reserve, not a qualified load rating; review pending"
+        },
+        "value": 0.15
+      },
+      "kind": "power",
+      "voltage_v": {
+        "source": {
+          "placeholder": "pendant draft: maximum working class voltage; review pending"
+        },
+        "value": 3.465
+      }
+    },
+    "logic_5v": {
+      "current_a": {
+        "source": {
+          "placeholder": "pendant draft: routing current reserve, not a qualified load rating; review pending"
+        },
+        "value": 0.4
+      },
+      "kind": "power",
+      "voltage_v": {
+        "source": {
+          "placeholder": "pendant draft: maximum working class voltage; review pending"
+        },
+        "value": 5.25
+      }
+    },
+    "logic_gnd": {
+      "current_a": {
+        "source": {
+          "placeholder": "pendant draft: routing current reserve, not a qualified load rating; review pending"
+        },
+        "value": 0.5
+      },
+      "kind": "power",
+      "voltage_v": {
+        "source": {
+          "placeholder": "pendant draft: maximum working class voltage; review pending"
+        },
+        "value": 0
+      }
+    },
+    "logic_signal": {
+      "current_a": {
+        "source": {
+          "placeholder": "pendant draft: routing current reserve, not a qualified load rating; review pending"
+        },
+        "value": 0.01
+      },
+      "kind": "signal",
+      "voltage_v": {
+        "source": {
+          "placeholder": "pendant draft: maximum working class voltage; review pending"
+        },
+        "value": 3.465
+      }
+    },
+    "supply_24v": {
+      "current_a": {
+        "source": {
+          "placeholder": "pendant draft: routing current reserve, not a qualified load rating; review pending"
+        },
+        "value": 0.5
+      },
+      "kind": "field_power",
+      "voltage_v": {
+        "source": {
+          "placeholder": "pendant draft: maximum working class voltage; review pending"
+        },
+        "value": 30
+      }
+    },
+    "switching": {
+      "current_a": {
+        "source": {
+          "placeholder": "pendant draft: routing current reserve, not a qualified load rating; review pending"
+        },
+        "value": 0.8
+      },
+      "kind": "power",
+      "voltage_v": {
+        "source": {
+          "placeholder": "pendant draft: maximum working class voltage; review pending"
+        },
+        "value": 30
+      }
+    },
+    "wheel_signal": {
+      "current_a": {
+        "source": {
+          "placeholder": "pendant draft: routing current reserve, not a qualified load rating; review pending"
+        },
+        "value": 0.01
+      },
+      "kind": "signal",
+      "voltage_v": {
+        "source": {
+          "placeholder": "pendant draft: maximum working class voltage; review pending"
+        },
+        "value": 5.25
+      }
+    }
+  },
+  "netlist_hash": "sha256:e89c76fd4ef4a1322851e67c8c000f9038acbb0fb47255b0367e56a6a51a07f0",
   "placement": {
     "anchors": {},
-    "groups": {},
+    "groups": {
+      "cable": {
+        "owner": "rules",
+        "sheet": "cable"
+      },
+      "can": {
+        "owner": "rules",
+        "sheet": "can"
+      },
+      "estop": {
+        "owner": "rules",
+        "sheet": "estop"
+      },
+      "keys": {
+        "owner": "rules",
+        "sheet": "keys"
+      },
+      "mcu": {
+        "owner": "rules",
+        "sheet": "mcu"
+      },
+      "oled": {
+        "owner": "rules",
+        "sheet": "oled"
+      },
+      "power": {
+        "owner": "rules",
+        "sheet": "power"
+      },
+      "prog": {
+        "owner": "rules",
+        "sheet": "prog"
+      },
+      "reserved": {
+        "owner": "rules",
+        "sheet": "reserved"
+      },
+      "selectors": {
+        "owner": "rules",
+        "sheet": "selectors"
+      },
+      "wheel": {
+        "owner": "rules",
+        "sheet": "wheel"
+      }
+    },
     "keepouts": {},
     "modules": {},
     "outline": null,
@@ -36,7 +601,18 @@
         },
         "value": 0.5
       },
-      "flows": {},
+      "flows": {
+        "estop": {
+          "from": {
+            "pin": "7",
+            "tag": "cable/j_cable"
+          },
+          "to": {
+            "pin": "1",
+            "tag": "estop/u_opto"
+          }
+        }
+      },
       "hardware": {},
       "heights": {},
       "ic_clearance_mm": {
@@ -46,27 +622,280 @@
         "value": 0.25
       },
       "near": {},
-      "protection": {},
+      "protection": {
+        "estop/d_tvs": {
+          "max_mm": {
+            "source": {
+              "placeholder": "design rule, not from a datasheet: a clamp or fuse is 'next to its terminal pin' when the copper between the terminal pad and the part's pad stays below about 8 mm (about 1 nH per mm of trace, so under 10 nH in the 8 mm); SPEC 8: the shunt/TVS stay on the field side"
+            },
+            "value": 8.0
+          },
+          "rank": 1,
+          "terminal": {
+            "pin": "7",
+            "tag": "cable/j_cable"
+          }
+        },
+        "estop/r1": {
+          "max_mm": {
+            "source": {
+              "placeholder": "design rule, not from a datasheet: the series element (entry resistor, reverse diode) follows the clamp along the signal, so it may sit one part length behind it: 12 mm of copper from the terminal pad, the clamp stays within 8 mm"
+            },
+            "value": 12.0
+          },
+          "rank": 2,
+          "terminal": {
+            "pin": "7",
+            "tag": "cable/j_cable"
+          }
+        }
+      },
       "thermal": {}
     }
   },
-  "power_sources": {},
-  "roles": {},
+  "power_sources": {
+    "cabinet_24v": {
+      "current_max_a": {
+        "source": {
+          "placeholder": "pendant draft: the cabinet's supply capacity is a physical review; review pending"
+        },
+        "value": null
+      },
+      "net": "+24V_IN",
+      "range_v": {
+        "source": {
+          "placeholder": "pendant draft: cabinet 24 V supply envelope at the pendant end of the cable; review pending"
+        },
+        "value": [
+          18,
+          30
+        ]
+      },
+      "voltage_v": {
+        "source": {
+          "placeholder": "pendant draft: the cabinet's pendant supply, through the M12 cable; review pending"
+        },
+        "value": 24
+      }
+    }
+  },
+  "roles": {
+    "can/c_shield": {
+      "net": "SHIELD",
+      "role": "filter"
+    },
+    "can/c_term": {
+      "net": "can/term_mid",
+      "role": "termination"
+    },
+    "can/c_vddl": {
+      "for": {
+        "pin": "7",
+        "tag": "can/u_can"
+      },
+      "net": "+3V3",
+      "role": "decoupling"
+    },
+    "can/c_vddp": {
+      "net": "+5V",
+      "role": "bulk"
+    },
+    "can/c_vddp_hf": {
+      "for": {
+        "pin": "6",
+        "tag": "can/u_can"
+      },
+      "net": "+5V",
+      "role": "decoupling"
+    },
+    "can/c_viso": {
+      "net": "CAN_V5ISO",
+      "role": "bulk"
+    },
+    "can/c_viso_hf": {
+      "for": {
+        "pin": "11",
+        "tag": "can/u_can"
+      },
+      "net": "CAN_V5ISO",
+      "role": "decoupling"
+    },
+    "can/c_visoin": {
+      "for": {
+        "pin": "10",
+        "tag": "can/u_can"
+      },
+      "net": "CAN_V5ISO",
+      "role": "decoupling"
+    },
+    "estop/r_pu": {
+      "net": "ESTOP_SENSE",
+      "role": "pullup",
+      "to": "+3V3"
+    },
+    "estop/u_opto": {
+      "role": "barrier"
+    },
+    "mcu/c_bulk": {
+      "net": "+3V3",
+      "role": "bulk"
+    },
+    "mcu/c_nrst": {
+      "net": "NRST",
+      "role": "filter"
+    },
+    "mcu/c_osc_in": {
+      "net": "OSC_IN",
+      "role": "crystal_load"
+    },
+    "mcu/c_osc_out": {
+      "net": "OSC_OUT",
+      "role": "crystal_load"
+    },
+    "mcu/c_vcap1": {
+      "net": "mcu/vcap1",
+      "role": "bulk"
+    },
+    "mcu/c_vcap2": {
+      "net": "mcu/vcap2",
+      "role": "bulk"
+    },
+    "mcu/c_vdd1": {
+      "for": {
+        "pin": "19",
+        "tag": "mcu/u_mcu"
+      },
+      "net": "+3V3",
+      "role": "decoupling"
+    },
+    "mcu/c_vdd2": {
+      "for": {
+        "pin": "32",
+        "tag": "mcu/u_mcu"
+      },
+      "net": "+3V3",
+      "role": "decoupling"
+    },
+    "mcu/c_vdd3": {
+      "for": {
+        "pin": "48",
+        "tag": "mcu/u_mcu"
+      },
+      "net": "+3V3",
+      "role": "decoupling"
+    },
+    "mcu/c_vdd4": {
+      "for": {
+        "pin": "64",
+        "tag": "mcu/u_mcu"
+      },
+      "net": "+3V3",
+      "role": "decoupling"
+    },
+    "mcu/c_vdd5": {
+      "for": {
+        "pin": "1",
+        "tag": "mcu/u_mcu"
+      },
+      "net": "+3V3",
+      "role": "decoupling"
+    },
+    "mcu/c_vdd6": {
+      "for": {
+        "pin": "13",
+        "tag": "mcu/u_mcu"
+      },
+      "net": "+3V3",
+      "role": "decoupling"
+    },
+    "mcu/c_vdda": {
+      "net": "+3V3",
+      "role": "bulk"
+    },
+    "power/c_boot": {
+      "net": "power/cb",
+      "role": "bootstrap"
+    },
+    "power/c_bulk": {
+      "net": "+24V",
+      "role": "bulk"
+    },
+    "power/c_in": {
+      "net": "+24V",
+      "role": "bulk"
+    },
+    "power/c_in_hf": {
+      "for": {
+        "pin": "5",
+        "tag": "power/u_buck"
+      },
+      "net": "+24V",
+      "role": "decoupling"
+    },
+    "power/c_ldo_in": {
+      "for": {
+        "pin": "3",
+        "tag": "power/u_ldo"
+      },
+      "net": "+5V",
+      "role": "decoupling"
+    },
+    "power/c_ldo_out": {
+      "for": {
+        "pin": "2",
+        "tag": "power/u_ldo"
+      },
+      "net": "+3V3",
+      "role": "decoupling"
+    },
+    "power/c_out": {
+      "net": "+5V",
+      "role": "bulk"
+    },
+    "power/c_out_hf": {
+      "net": "+5V",
+      "role": "bulk"
+    },
+    "selectors/c_u_sr1": {
+      "for": {
+        "pin": "16",
+        "tag": "selectors/u_sr1"
+      },
+      "net": "+3V3",
+      "role": "decoupling"
+    },
+    "selectors/c_u_sr2": {
+      "for": {
+        "pin": "16",
+        "tag": "selectors/u_sr2"
+      },
+      "net": "+3V3",
+      "role": "decoupling"
+    },
+    "wheel/c_buf": {
+      "for": {
+        "pin": "5",
+        "tag": "wheel/u_buf"
+      },
+      "net": "+3V3",
+      "role": "decoupling"
+    }
+  },
   "routing": {
     "copper_um": {
       "inner": {
         "source": {
-          "url": "https://jlcpcb.com/capabilities/pcb-capabilities",
-          "where": "JLCPCB 4-layer inner copper 0.5 oz (the stackup of the board file: 15.2 um)"
+          "url": "https://jlcpcb.com/capabilities/pcb-capabilities/",
+          "where": "2-layer FR4, 1.6 mm nominal, 1 oz finished outer copper, Er 4.5. 35 um copper is the nominal 1 oz representation; 1.53 mm core is derived as 1.6 - 2*0.035, NOT a supplier-guaranteed core thickness."
         },
-        "value": 15.2
+        "value": 0
       },
       "outer": {
         "source": {
-          "url": "https://jlcpcb.com/capabilities/pcb-capabilities",
-          "where": "JLCPCB 4-layer, 1 oz outer copper (35 um finished); the stackup of the board file"
+          "url": "https://jlcpcb.com/capabilities/pcb-capabilities/",
+          "where": "2-layer FR4, 1.6 mm nominal, 1 oz finished outer copper, Er 4.5. 35 um copper is the nominal 1 oz representation; 1.53 mm core is derived as 1.6 - 2*0.035, NOT a supplier-guaranteed core thickness."
         },
-        "value": 35
+        "value": 35.0
       }
     },
     "limits": {
@@ -151,25 +980,25 @@
     "signal": {
       "clearance_mm": {
         "source": {
-          "placeholder": "design rule: 0.15 mm spacing (JLCPCB minimum 0.09 mm, capabilities page)"
+          "placeholder": "pcbkit design preferences, not JLCPCB minima: 0.2 mm tracks, 0.15 mm clearance, 0.45/0.2 mm vias avoid the published small-diameter via surcharge condition. Override for electrical or density requirements after review."
         },
         "value": 0.15
       },
       "via_diameter_mm": {
         "source": {
-          "placeholder": "design rule: 0.4 mm / 0.2 mm drill vias (JLCPCB 4-layer minimum 0.25 / 0.15 mm, capabilities page: a ring of 0.1 mm)"
+          "placeholder": "pcbkit design preferences, not JLCPCB minima: 0.2 mm tracks, 0.15 mm clearance, 0.45/0.2 mm vias avoid the published small-diameter via surcharge condition. Override for electrical or density requirements after review."
         },
-        "value": 0.4
+        "value": 0.45
       },
       "via_drill_mm": {
         "source": {
-          "placeholder": "design rule: 0.2 mm drill (JLCPCB 4-layer minimum 0.15 mm)"
+          "placeholder": "pcbkit design preferences, not JLCPCB minima: 0.2 mm tracks, 0.15 mm clearance, 0.45/0.2 mm vias avoid the published small-diameter via surcharge condition. Override for electrical or density requirements after review."
         },
         "value": 0.2
       },
       "width_mm": {
         "source": {
-          "placeholder": "design rule: 0.2 mm signal tracks (JLCPCB minimum 0.09 mm; 0.2 mm keeps yield and leaves room between 1.27 mm pitch pads)"
+          "placeholder": "pcbkit design preferences, not JLCPCB minima: 0.2 mm tracks, 0.15 mm clearance, 0.45/0.2 mm vias avoid the published small-diameter via surcharge condition. Override for electrical or density requirements after review."
         },
         "value": 0.2
       }

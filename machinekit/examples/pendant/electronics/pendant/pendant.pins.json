@@ -1,0 +1,244 @@
+{
+  "schema": 1,
+  "board": "pendant",
+  "part": {
+    "tag": "mcu/u_mcu",
+    "lcsc": "C6807804"
+  },
+  "pins": {
+    "PA0": {
+      "net": "ENC_A",
+      "function": "TIM2_CH1 (AF1)",
+      "note": "the wheel's phase A, through the 5 V-tolerant buffer"
+    },
+    "PA1": {
+      "net": "ENC_B",
+      "function": "TIM2_CH2 (AF1)",
+      "note": "the wheel's phase B"
+    },
+    "PA2": {
+      "net": "ESTOP_SENSE",
+      "function": "GPIO input",
+      "note": "E-stop loop read-back (isolated input, high while the loop is energised)"
+    },
+    "PA3": {
+      "net": null,
+      "note": "free"
+    },
+    "PA4": {
+      "net": "SR_LOAD",
+      "function": "GPIO output",
+      "note": "74HC165 parallel load (low loads)"
+    },
+    "PA5": {
+      "net": "SR_SCK",
+      "function": "SPI1_SCK (AF5)",
+      "note": "74HC165 clock"
+    },
+    "PA6": {
+      "net": "SR_DATA",
+      "function": "SPI1_MISO (AF5)",
+      "note": "74HC165 serial out"
+    },
+    "PA7": {
+      "net": null,
+      "note": "free"
+    },
+    "PA8": {
+      "net": null,
+      "note": "free"
+    },
+    "PA9": {
+      "net": null,
+      "note": "free; USART1_TX (AF7) for a debug console"
+    },
+    "PA10": {
+      "net": null,
+      "note": "free; USART1_RX (AF7) for a debug console"
+    },
+    "PA11": {
+      "net": "USB_DM",
+      "function": "USB_DM (AF10)",
+      "note": "bench only: test pad and the unfitted USB-C footprint"
+    },
+    "PA12": {
+      "net": "USB_DP",
+      "function": "USB_DP (AF10)",
+      "note": "bench only"
+    },
+    "PA13": {
+      "net": "SWDIO",
+      "function": "SWDIO (AF0, reset state)",
+      "note": "Tag-Connect TC2030"
+    },
+    "PA14": {
+      "net": "SWCLK",
+      "function": "SWCLK (AF0, reset state)",
+      "note": "Tag-Connect TC2030"
+    },
+    "PA15": {
+      "net": null,
+      "note": "free"
+    },
+    "PB0": {
+      "net": "KEY_START",
+      "function": "GPIO input, interrupt",
+      "note": "Start key contact (low when pressed)"
+    },
+    "PB1": {
+      "net": "KEY_HOLD",
+      "function": "GPIO input, interrupt",
+      "note": "Hold key contact"
+    },
+    "PB2": {
+      "net": "KEY_STOP",
+      "function": "GPIO input, interrupt",
+      "note": "Stop/Reset key contact"
+    },
+    "PB3": {
+      "net": "KEY_WHEEL_EN",
+      "function": "GPIO input, interrupt",
+      "note": "wheel enable key contact"
+    },
+    "PB4": {
+      "net": "LED_START",
+      "function": "GPIO output",
+      "note": "Start key LED (ULN2003 input, high lights)"
+    },
+    "PB5": {
+      "net": "LED_HOLD",
+      "function": "GPIO output",
+      "note": "Hold key LED"
+    },
+    "PB6": {
+      "net": "I2C1_SCL",
+      "function": "I2C1_SCL (AF4)",
+      "note": "the OLED, and a keypad ID memory later"
+    },
+    "PB7": {
+      "net": "I2C1_SDA",
+      "function": "I2C1_SDA (AF4)",
+      "note": "the OLED, and a keypad ID memory later"
+    },
+    "PB8": {
+      "net": "LED_STOP",
+      "function": "GPIO output",
+      "note": "Stop/Reset key LED"
+    },
+    "PB10": {
+      "net": "LED_WHEEL_EN",
+      "function": "GPIO output",
+      "note": "wheel enable key LED"
+    },
+    "PB12": {
+      "net": "CAN_RX",
+      "function": "FDCAN1_RX (AF9)",
+      "note": "from the isolated transceiver"
+    },
+    "PB13": {
+      "net": "CAN_TX",
+      "function": "FDCAN1_TX (AF9)",
+      "note": "to the isolated transceiver"
+    },
+    "PB14": {
+      "net": "OLED_RES",
+      "function": "GPIO output",
+      "note": "the OLED's reset (low resets)"
+    },
+    "PB15": {
+      "net": null,
+      "note": "free"
+    },
+    "PC0": {
+      "net": "KEYPAD_ID",
+      "function": "ADC1_INP10",
+      "note": "reserved: a keypad ID resistor (pulled up on the board)"
+    },
+    "PC1": {
+      "net": "ENABLE_1",
+      "function": "GPIO input",
+      "note": "reserved: enabling switch channel 1"
+    },
+    "PC2": {
+      "net": "ENABLE_2",
+      "function": "GPIO input",
+      "note": "reserved: enabling switch channel 2"
+    },
+    "PC3": {
+      "net": "ENABLE_3",
+      "function": "GPIO input",
+      "note": "reserved: enabling switch channel 3"
+    },
+    "PC4": {
+      "net": "ENABLE_4",
+      "function": "GPIO input",
+      "note": "reserved: enabling switch channel 4"
+    },
+    "PC5": {
+      "net": null,
+      "note": "free"
+    },
+    "PC6": {
+      "net": "KEY_F1",
+      "function": "GPIO input, interrupt",
+      "note": "F1 key contact; keypad matrix group"
+    },
+    "PC7": {
+      "net": "KEY_F2",
+      "function": "GPIO input, interrupt",
+      "note": "F2 key contact; keypad matrix group"
+    },
+    "PC8": {
+      "net": "KEY_F3",
+      "function": "GPIO input, interrupt",
+      "note": "F3 key contact; keypad matrix group"
+    },
+    "PC9": {
+      "net": "LED_F1",
+      "function": "GPIO output",
+      "note": "F1 key LED; keypad matrix group"
+    },
+    "PC10": {
+      "net": "LED_F2",
+      "function": "GPIO output",
+      "note": "F2 key LED; keypad matrix group"
+    },
+    "PC11": {
+      "net": "LED_F3",
+      "function": "GPIO output",
+      "note": "F3 key LED; keypad matrix group"
+    },
+    "PC12": {
+      "net": "MATRIX_5",
+      "function": "GPIO",
+      "note": "spare; keypad matrix group"
+    },
+    "PC13": {
+      "net": null,
+      "note": "free; low drive (backup domain)"
+    },
+    "PC14": {
+      "net": null,
+      "note": "free; low drive (backup domain)"
+    },
+    "PC15": {
+      "net": null,
+      "note": "free; low drive (backup domain)"
+    },
+    "PD2": {
+      "net": "MATRIX_6",
+      "function": "GPIO",
+      "note": "spare; keypad matrix group"
+    },
+    "PH0": {
+      "net": "OSC_IN",
+      "function": "HSE oscillator in",
+      "note": "16 MHz crystal"
+    },
+    "PH1": {
+      "net": "OSC_OUT",
+      "function": "HSE oscillator out",
+      "note": "16 MHz crystal"
+    }
+  }
+}

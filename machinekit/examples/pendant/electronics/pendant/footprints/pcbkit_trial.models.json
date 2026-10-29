@@ -1,0 +1,465 @@
+{
+  "generator_sha256": "8833b38beec398775cc16c0d1300799e7175ddb24d7a7581944da2be48382c7b",
+  "models": {
+    "pcbkit_trial:Fuse_1812_4532Metric_LUTE_050_60": {
+      "assumptions": [
+        "Maximum body envelope; termination length 0.30 mm is the drawing's minimum. No internal construction modelled."
+      ],
+      "body_bounds_mm": [
+        -2.365,
+        -1.705,
+        0,
+        2.365,
+        1.705,
+        1.5
+      ],
+      "contacts_mm": {
+        "1": [
+          -2.215,
+          0
+        ],
+        "2": [
+          2.215,
+          0
+        ]
+      },
+      "file": "footprints/pcbkit_trial.3dshapes/Fuse_1812_4532Metric_LUTE_050_60.step",
+      "kind": "original-simplified",
+      "pin1": null,
+      "sha256": "b1069614647010b1dd0f6850316624b49ac39b6e0263b22689d49568bdd4038b",
+      "source": {
+        "url": "https://jlcpcb.com/api/file/downloadByFileSystemAccessId/8763854899052457984",
+        "where": "LUTE 1812L050/60GR dimension table: A 4.37..4.73, B 3.07..3.41, C 0.80..1.50, D >=0.30 mm"
+      },
+      "step_bounds_xyz_mm": [
+        -2.365,
+        -1.705,
+        -0.0,
+        2.365,
+        1.705,
+        1.5
+      ]
+    },
+    "pcbkit_trial:MountingHole_3.2mm_M3_NylonSupport": {
+      "assumptions": [
+        "Assembly approximation: 5.5 mm hex flats, 3.2 mm bore, no thread geometry; generic steel screw lengths are illustrative.",
+        "Carrier thickness 1.6 mm; Nucleo slab thickness 1.6 mm is illustrative. Hardware is not added to the assembly BOM."
+      ],
+      "contacts_mm": {},
+      "file": "footprints/pcbkit_trial.3dshapes/MountingHole_3.2mm_M3_NylonSupport.step",
+      "hardware_axis_mm": [
+        0,
+        0
+      ],
+      "kind": "original-simplified",
+      "pin1": null,
+      "sha256": "7ce2e84fc8f60bab45af88cf887e63d663200d8cacc484a5221a7a22b8a6cc9f",
+      "source": {
+        "url": "boards/trial/SPEC.md#8-board",
+        "where": "Hardware list: 8 mm corner supports, 8.5 mm module gap, M3 head heights; H2 Keystone 29341 and Audiophonics 11668 sources in circuit intent"
+      },
+      "step_bounds_xyz_mm": [
+        -3.175427,
+        -2.75,
+        -9.6,
+        3.175427,
+        2.75,
+        1.7
+      ]
+    },
+    "pcbkit_trial:MountingHole_3.2mm_M3_Spacer": {
+      "assumptions": [
+        "Assembly approximation: 5.5 mm hex flats, 3.2 mm bore, no thread geometry; generic steel screw lengths are illustrative.",
+        "Carrier thickness 1.6 mm; Nucleo slab thickness 1.6 mm is illustrative. Hardware is not added to the assembly BOM."
+      ],
+      "contacts_mm": {},
+      "file": "footprints/pcbkit_trial.3dshapes/MountingHole_3.2mm_M3_Spacer.step",
+      "hardware_axis_mm": [
+        0,
+        0
+      ],
+      "kind": "original-simplified",
+      "pin1": null,
+      "sha256": "db2c1750e1c5058fc9c02ccdf251c696d0e5802256b91c722915bb069dede50b",
+      "source": {
+        "url": "boards/trial/SPEC.md#8-board",
+        "where": "Hardware list: 8 mm corner supports, 8.5 mm module gap, M3 head heights; H2 Keystone 29341 and Audiophonics 11668 sources in circuit intent"
+      },
+      "step_bounds_xyz_mm": [
+        -3.175427,
+        -2.75,
+        -5.0,
+        3.175427,
+        2.75,
+        13.1
+      ]
+    },
+    "pcbkit_trial:MountingHole_3.2mm_M3_SteelSupport": {
+      "assumptions": [
+        "Assembly approximation: 5.5 mm hex flats, 3.2 mm bore, no thread geometry; generic steel screw lengths are illustrative.",
+        "Carrier thickness 1.6 mm; Nucleo slab thickness 1.6 mm is illustrative. Hardware is not added to the assembly BOM."
+      ],
+      "contacts_mm": {},
+      "file": "footprints/pcbkit_trial.3dshapes/MountingHole_3.2mm_M3_SteelSupport.step",
+      "hardware_axis_mm": [
+        0,
+        0
+      ],
+      "kind": "original-simplified",
+      "pin1": null,
+      "sha256": "59eb71aa4cda2997d28cbc9fc40bdcf7afeeeb4427afcbb2a7f2f01bef23a8b9",
+      "source": {
+        "url": "boards/trial/SPEC.md#8-board",
+        "where": "Hardware list: 8 mm corner supports, 8.5 mm module gap, M3 head heights; H2 Keystone 29341 and Audiophonics 11668 sources in circuit intent"
+      },
+      "step_bounds_xyz_mm": [
+        -3.175427,
+        -2.75,
+        -9.6,
+        3.175427,
+        2.75,
+        3.0
+      ]
+    },
+    "pcbkit_trial:SIP-4_Evisun_B0512S-1WR3_L11.68mm_W6.0mm_P2.54mm_TopView": {
+      "assumptions": [
+        "Rectangular body; markings, mould draft and solder fillets omitted. Pin section 0.5 x 0.3 mm."
+      ],
+      "body_bounds_mm": [
+        -2.03,
+        -5.1,
+        0,
+        9.65,
+        0.9,
+        10.2
+      ],
+      "contacts_mm": {
+        "1": [
+          0,
+          0
+        ],
+        "2": [
+          2.54,
+          0
+        ],
+        "3": [
+          5.08,
+          0
+        ],
+        "4": [
+          7.62,
+          0
+        ]
+      },
+      "file": "footprints/pcbkit_trial.3dshapes/SIP-4_Evisun_B0512S-1WR3_L11.68mm_W6.0mm_P2.54mm_TopView.step",
+      "kind": "original-simplified",
+      "pin1": [
+        0,
+        0
+      ],
+      "sha256": "3637f49a7cb890b455daa0be9390d84ed90ef1280815ee4d0f66e1d769c6a6fb",
+      "source": {
+        "url": "https://jlcpcb.com/api/file/downloadByFileSystemAccessId/8590904450456502272",
+        "where": "EVISUN drawing: outline, pin definition and bottom view (B_S page 4; E/F_S page 5)"
+      },
+      "step_bounds_xyz_mm": [
+        -2.03,
+        -0.9,
+        -4.1,
+        9.65,
+        5.1,
+        10.2
+      ]
+    },
+    "pcbkit_trial:SIP-7_Evisun_F0505S-1WR3_L19.65mm_W6.0mm_P2.54mm_single": {
+      "assumptions": [
+        "Rectangular body; markings, mould draft and solder fillets omitted. Pin section 0.5 x 0.3 mm."
+      ],
+      "body_bounds_mm": [
+        -2.21,
+        -0.9,
+        0,
+        17.44,
+        5.1,
+        10.16
+      ],
+      "contacts_mm": {
+        "1": [
+          0,
+          0
+        ],
+        "2": [
+          2.54,
+          0
+        ],
+        "5": [
+          10.16,
+          0
+        ],
+        "7": [
+          15.24,
+          0
+        ]
+      },
+      "file": "footprints/pcbkit_trial.3dshapes/SIP-7_Evisun_F0505S-1WR3_L19.65mm_W6.0mm_P2.54mm_single.step",
+      "kind": "original-simplified",
+      "pin1": [
+        0,
+        0
+      ],
+      "sha256": "e724a80fbb29b78372f7885f2083e971b56b7946216830899fa3304db1f0e5d9",
+      "source": {
+        "url": "https://jlcpcb.com/api/file/downloadByFileSystemAccessId/8590904383783710720",
+        "where": "EVISUN drawing: outline, pin definition and bottom view (B_S page 4; E/F_S page 5)"
+      },
+      "step_bounds_xyz_mm": [
+        -2.21,
+        -5.1,
+        -4.1,
+        17.44,
+        0.9,
+        10.16
+      ]
+    },
+    "pcbkit_trial:SMDIP-4_LiteOn_LTV-817S_W9.0mm_P2.54mm": {
+      "assumptions": [
+        "Maximum 4.0 mm top envelope from existing sourced part data; gull-wing bends and mould draft simplified."
+      ],
+      "body_bounds_mm": [
+        -3.25,
+        -2.3,
+        0.35,
+        3.25,
+        2.3,
+        4
+      ],
+      "contacts_mm": {
+        "1": [
+          -4.58,
+          -1.27
+        ],
+        "2": [
+          -4.58,
+          1.27
+        ],
+        "3": [
+          4.58,
+          1.27
+        ],
+        "4": [
+          4.58,
+          -1.27
+        ]
+      },
+      "file": "footprints/pcbkit_trial.3dshapes/SMDIP-4_LiteOn_LTV-817S_W9.0mm_P2.54mm.step",
+      "kind": "original-simplified",
+      "pin1": [
+        -4.58,
+        -1.27
+      ],
+      "sha256": "83d30dbbb99b67653f1a694dafb66a579a6f4d47dbc0d4d488c64e01cef26273",
+      "source": {
+        "url": "https://jlcpcb.com/api/file/downloadByFileSystemAccessId/8588884725767278592",
+        "where": "Lite-On LTV-817S outline, printed page 4 (PDF page 5): body 6.5 x 4.6, lead span 10.16, pitch 2.54, foot 1.0, lead width 1.2"
+      },
+      "step_bounds_xyz_mm": [
+        -5.08,
+        -2.3,
+        -0.0,
+        5.08,
+        2.3,
+        4.0
+      ]
+    },
+    "pcbkit_trial:TerminalBlock_Kangnex_WJ15EDGRC-3.81_1x02_P3.81mm_Horizontal": {
+      "assumptions": [
+        "Cavity walls, mating contacts and lip are illustrative; the overall envelope and PCB contact row are dimensioned.",
+        "No detachable screw plug or cable is modelled. Confirm the exact mating header/plug before ordering."
+      ],
+      "body_bounds_mm": [
+        -2.3449999999999998,
+        -1.2,
+        0,
+        6.155,
+        6.05,
+        9.2
+      ],
+      "contacts_mm": {
+        "1": [
+          0.0,
+          0
+        ],
+        "2": [
+          3.81,
+          0
+        ]
+      },
+      "file": "footprints/pcbkit_trial.3dshapes/TerminalBlock_Kangnex_WJ15EDGRC-3.81_1x02_P3.81mm_Horizontal.step",
+      "kind": "original-simplified",
+      "pin1": [
+        0,
+        0
+      ],
+      "sha256": "e30d864d833fa458af8cfab515e396c000e8f93bc8ab722660e9e8b610c68936",
+      "source": {
+        "url": "https://jlcpcb.com/api/file/downloadByFileSystemAccessId/8702230374586970112",
+        "where": "Manufacturer drawing, page 1: pitch, body width/depth/height, PCB pin row and tail length"
+      },
+      "step_bounds_xyz_mm": [
+        -2.345,
+        -6.05,
+        -3.5,
+        6.155,
+        1.2,
+        9.2
+      ]
+    },
+    "pcbkit_trial:TerminalBlock_Kangnex_WJ15EDGRC-3.81_1x04_P3.81mm_Horizontal": {
+      "assumptions": [
+        "Cavity walls, mating contacts and lip are illustrative; the overall envelope and PCB contact row are dimensioned.",
+        "No detachable screw plug or cable is modelled. Confirm the exact mating header/plug before ordering."
+      ],
+      "body_bounds_mm": [
+        -2.3450000000000006,
+        -1.2,
+        0,
+        13.775,
+        6.05,
+        9.2
+      ],
+      "contacts_mm": {
+        "1": [
+          0.0,
+          0
+        ],
+        "2": [
+          3.81,
+          0
+        ],
+        "3": [
+          7.62,
+          0
+        ],
+        "4": [
+          11.43,
+          0
+        ]
+      },
+      "file": "footprints/pcbkit_trial.3dshapes/TerminalBlock_Kangnex_WJ15EDGRC-3.81_1x04_P3.81mm_Horizontal.step",
+      "kind": "original-simplified",
+      "pin1": [
+        0,
+        0
+      ],
+      "sha256": "bb17c5b66f57ea18a41b53e2a4676ef3fa97e474b4ed0895f40a2956670708df",
+      "source": {
+        "url": "https://jlcpcb.com/api/file/downloadByFileSystemAccessId/8702230374586970112",
+        "where": "Manufacturer drawing, page 1: pitch, body width/depth/height, PCB pin row and tail length"
+      },
+      "step_bounds_xyz_mm": [
+        -2.345,
+        -6.05,
+        -3.5,
+        13.775,
+        1.2,
+        9.2
+      ]
+    },
+    "pcbkit_trial:TerminalBlock_Kefa_KF2EDGR-5.08_1x02_P5.08mm_Horizontal": {
+      "assumptions": [
+        "Cavity walls, mating contacts and lip are illustrative; the overall envelope and PCB contact row are dimensioned.",
+        "No detachable screw plug or cable is modelled. Confirm the exact mating header/plug before ordering."
+      ],
+      "body_bounds_mm": [
+        -2.54,
+        -1.3,
+        0,
+        7.62,
+        7.1000000000000005,
+        12.2
+      ],
+      "contacts_mm": {
+        "1": [
+          0.0,
+          0
+        ],
+        "2": [
+          5.08,
+          0
+        ]
+      },
+      "file": "footprints/pcbkit_trial.3dshapes/TerminalBlock_Kefa_KF2EDGR-5.08_1x02_P5.08mm_Horizontal.step",
+      "kind": "original-simplified",
+      "pin1": [
+        0,
+        0
+      ],
+      "sha256": "b6587b70a0083bffde2481a2e5f1ce1d65ee8d7a6072eb42538d8e23ac90569b",
+      "source": {
+        "url": "https://jlcpcb.com/api/file/downloadByFileSystemAccessId/8588888156422737920",
+        "where": "Manufacturer drawing, page 1: pitch, body width/depth/height, PCB pin row and tail length"
+      },
+      "step_bounds_xyz_mm": [
+        -2.54,
+        -7.1,
+        -4.1,
+        7.62,
+        1.3,
+        12.2
+      ]
+    },
+    "pcbkit_trial:TerminalBlock_Kefa_KF2EDGR-5.08_1x04_P5.08mm_Horizontal": {
+      "assumptions": [
+        "Cavity walls, mating contacts and lip are illustrative; the overall envelope and PCB contact row are dimensioned.",
+        "No detachable screw plug or cable is modelled. Confirm the exact mating header/plug before ordering."
+      ],
+      "body_bounds_mm": [
+        -2.54,
+        -1.3,
+        0,
+        17.78,
+        7.1000000000000005,
+        12.2
+      ],
+      "contacts_mm": {
+        "1": [
+          0.0,
+          0
+        ],
+        "2": [
+          5.08,
+          0
+        ],
+        "3": [
+          10.16,
+          0
+        ],
+        "4": [
+          15.24,
+          0
+        ]
+      },
+      "file": "footprints/pcbkit_trial.3dshapes/TerminalBlock_Kefa_KF2EDGR-5.08_1x04_P5.08mm_Horizontal.step",
+      "kind": "original-simplified",
+      "pin1": [
+        0,
+        0
+      ],
+      "sha256": "a120357e671a15c82a93ae56f2f5ca8a51693df561a3f1bc2b7e3ccb0977e818",
+      "source": {
+        "url": "https://jlcpcb.com/api/file/downloadByFileSystemAccessId/8588888156422737920",
+        "where": "Manufacturer drawing, page 1: pitch, body width/depth/height, PCB pin row and tail length"
+      },
+      "step_bounds_xyz_mm": [
+        -2.54,
+        -7.1,
+        -4.1,
+        17.78,
+        1.3,
+        12.2
+      ]
+    }
+  },
+  "schema": 1,
+  "units": "mm; STEP Y up, footprint/contact Y down"
+}

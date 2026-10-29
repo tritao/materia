@@ -1,0 +1,5 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "pcbkit_parts")(type "KiCad")(uri "${KIPRJMOD}/footprints/pcbkit_parts.pretty")(options "")(descr "pcbkit footprints for catalogue parts"))
+  (lib (name "pcbkit_trial")(type "KiCad")(uri "${KIPRJMOD}/footprints/pcbkit_trial.pretty")(options "")(descr "Owned pcbkit block footprints"))
+)

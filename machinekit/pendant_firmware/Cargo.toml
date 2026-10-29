@@ -21,3 +21,6 @@ operator-link = { path = "../operator_link" }
 pendant-core = { path = "../pendant_core" }
 embassy-futures = "0.1"
 embedded-can = "0.4"
+
+[build-dependencies]
+serde_json = "1"
