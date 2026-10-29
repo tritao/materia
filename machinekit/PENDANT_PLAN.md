@@ -345,11 +345,11 @@ with a content hash so pcbkit marks the board stale when the case changes):
 
 Reserved for the later membrane keypad zone:
 
-- **Matrix group:** the contacts and LEDs of F1, F2, F3 and one more key sit on 8 plain GPIO, able to act as a 4 x 4 matrix's
-  rows (outputs) and columns (inputs with pull-ups and interrupts) and not needed by any alternate function. The keypad
-  variant reuses those 8 pins; it has no key LEDs.
+- **Matrix group:** the contacts and LEDs of F1, F2 and F3 (6 pins) and two of the three spare pins form a group of 8 plain
+  GPIO, able to act as a 4 x 4 matrix's rows (outputs) and columns (inputs with pull-ups and interrupts) and not needed by
+  any alternate function. The keypad variant reuses those 8 pins; it has no key LEDs. That leaves one spare pin.
 - **ID:** one ADC-capable pin (a resistor ID) and the I2C bus (a small memory on the keypad tail) both reach the keypad
-  connector, so either ID method works. With the ADC pin the budget is 47 of 49.
+  connector, so either ID method works. With the ADC pin as well, all 49 pins are used.
 - **Connector:** a keypad connector footprint beside the button harness, unfitted in v1 (a stock 4 x 4 keypad has a 2.54 mm
   8-pin tail; a custom membrane usually a flat-flex tail, chosen with the keypad), with ESD protection on the matrix lines.
 - **Margin:** if more pins are needed, the axis and step switches (15 inputs) move to two 74HC165 (C5613, preferred) on
