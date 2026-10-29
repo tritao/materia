@@ -8,7 +8,7 @@
 //!
 //! Axes are profile indices and conditions are bits of a mask, so no strings reach the controller.
 
-use crate::operator_wire::{OperatorCondition, PendantEvent, PendantRefusal, PendantState};
+use crate::operator_wire::{LeaseState, OperatorCondition, PendantEvent, PendantRefusal, PendantState};
 use crate::{FLAG_CHAIN_CLOSED, FLAG_WHEEL_ENABLE};
 
 pub const BUTTON_START: u8 = 1;
@@ -114,6 +114,18 @@ impl<'a> Authority<'a> {
         self.alive
             && now_us.saturating_sub(self.last_seen) <= self.cfg.timeout_us
             && self.previous.map_or(false, |p| p.position != 0)
+    }
+
+    /// What the controller tells the pendant about its lease: none before the first frame, granted while frames keep coming (whatever
+    /// the axis switch says), lost after the heartbeat stopped until the pendant has come back.
+    pub fn lease(&self, now_us: u64) -> LeaseState {
+        if self.alive && now_us.saturating_sub(self.last_seen) <= self.cfg.timeout_us {
+            LeaseState::Granted
+        } else if self.last_sequence.is_some() {
+            LeaseState::Lost
+        } else {
+            LeaseState::NoLease
+        }
     }
 
     /// Call periodically even without frames; ends the lease when the heartbeat stops.

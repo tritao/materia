@@ -12,12 +12,12 @@
 #[cfg(test)]
 extern crate std;
 
-use operator_link::authority::{condition_bit, Authority, Output};
+use operator_link::authority::{condition_bit, Authority, Output, Refusal};
 use operator_link::host_link::HostLink;
 use operator_link::profile::CompiledProfile;
 use operator_link::operator_frame::{self, FrameError};
-use operator_link::operator_wire::{OperatorCondition, OperatorMessage, OperatorState, PendantEvent};
-use operator_link::{decode_state, Invalid, WireError};
+use operator_link::operator_wire::{ConfigKind, OperatorCondition, OperatorMessage, OperatorState, PendantConfig, PendantEvent, PendantOutput};
+use operator_link::{decode_config, decode_state, label, Invalid, WireError};
 use robotkit_device_protocol::{jog_must_stop, Board, JogGate, JogVerdict, ScheduledCore, StopReason};
 
 /// `Segment6Header.purpose` values (schema/device_wire6.wire.idl).
@@ -36,21 +36,36 @@ pub enum ServiceError {
 /// What the gate decides each tick; the core defines it so any deployment can host a gate.
 pub type Verdict = JogVerdict;
 
+/// Axis names (switch positions 1 to 11) and F-key labels the host gave, to be shown on the pendant.
+struct Labels {
+    axes: [[u8; 12]; 11],
+    keys: [[u8; 12]; 3],
+    /// One bit per label: axes in bits 0 to 10, keys in bits 11 to 13.
+    set: u16,
+    next: u8,
+}
+
 pub struct OperatorService<'a> {
+    profile: &'a CompiledProfile,
     authority: Authority<'a>,
     host: HostLink,
     was_holding: bool,
     event_sequence: u16,
+    last: Option<Output>,
+    labels: Labels,
 }
 
 impl<'a> OperatorService<'a> {
     /// `profile` is the host's compiled profile, already checked against its digest.
     pub fn new(profile: &'a CompiledProfile) -> Self {
         OperatorService {
+            profile,
             authority: Authority::new(profile.config()),
             host: HostLink::new(profile.host_timeout_us()),
             was_holding: false,
             event_sequence: 0,
+            last: None,
+            labels: Labels { axes: [[0; 12]; 11], keys: [[0; 12]; 3], set: 0, next: 0 },
         }
     }
 
@@ -59,15 +74,75 @@ impl<'a> OperatorService<'a> {
     pub fn on_pendant_frame(&mut self, payload: &[u8], now_us: u64, active: u32) -> Result<Option<PendantEvent>, ServiceError> {
         let state = decode_state(payload).map_err(ServiceError::Pendant)?;
         let jog_mode = self.host.jog_allowed(now_us);
-        Ok(self.authority.accept(&state, now_us, jog_mode, active).map(|output| self.event(&output)))
+        Ok(self.authority.accept(&state, now_us, jog_mode, active).map(|output| {
+            self.last = Some(output);
+            self.event(&output)
+        }))
     }
 
-    /// One whole `OPR1` frame from the host. After setup only `OperatorState` is taken.
+    /// One whole `OPR1` frame from the host. `OperatorState` is the host's jog permission (the result says whether it was fresh);
+    /// `Config` is an axis name or F-key label for the pendant's display, kept to be sent on `PENDANT_CONFIG`.
     pub fn on_operator_frame(&mut self, frame: &[u8], now_us: u64) -> Result<bool, ServiceError> {
         let (kind, payload) = operator_frame::decode(frame).map_err(ServiceError::Frame)?;
+        if kind == OperatorMessage::Config as u8 {
+            let config = decode_config(payload).map_err(ServiceError::Pendant)?;
+            let slot = if config.kind == ConfigKind::Axis as u8 {
+                self.labels.axes[config.index as usize - 1] = config.text;
+                config.index as u16 - 1
+            } else {
+                self.labels.keys[config.index as usize] = config.text;
+                11 + config.index as u16
+            };
+            self.labels.set |= 1 << slot;
+            return Ok(true);
+        }
         if kind != OperatorMessage::State as u8 { return Err(ServiceError::WrongType); }
         let state = OperatorState::decode(payload).map_err(ServiceError::Wire)?;
         Ok(self.host.accept(&state, now_us))
+    }
+
+    /// The next label to send on `PENDANT_CONFIG`, one per call, cycling through the ones the host gave; `None` before any arrived.
+    /// Call it about every 100 ms so a pendant that has just started, or lost a frame, soon has all of them.
+    pub fn next_config(&mut self) -> Option<PendantConfig> {
+        for _ in 0..14 {
+            let slot = self.labels.next;
+            self.labels.next = (slot + 1) % 14;
+            if self.labels.set & (1 << slot) == 0 { continue; }
+            return Some(if slot < 11 {
+                PendantConfig { kind: ConfigKind::Axis as u8, index: slot + 1, text: self.labels.axes[slot as usize], reserved: [0; 2] }
+            } else {
+                PendantConfig { kind: ConfigKind::Key as u8, index: slot - 11, text: self.labels.keys[slot as usize - 11], reserved: [0; 2] }
+            });
+        }
+        None
+    }
+
+    /// `PENDANT_OUTPUT`: the LEDs, the lease and the status line, from the last decision on a pendant frame. The LEDs follow the buttons'
+    /// order: Start while a program runs (`active` is the same condition mask the pendant frames were judged with), Stop when the
+    /// E-stop chain reads open, and the spindle-jog key while it is held. The status line says why a jog was refused, from the profile's
+    /// reason text for a rule and fixed text for the rest.
+    pub fn pendant_output(&self, now_us: u64, active: u32) -> PendantOutput {
+        let mut leds = 0u8;
+        if active & condition_bit(OperatorCondition::ProgramRunning) != 0 { leds |= 1; }
+        let mut text = [0u8; 21];
+        if let Some(last) = &self.last {
+            if last.refusal == Refusal::ChainOpen { leds |= 4; }
+            if last.spindle_jog {
+                if let Some(key) = self.profile.config().spindle_key { leds |= 8 << key; }
+            }
+            let shown: &[u8] = match last.refusal {
+                Refusal::None => b"",
+                Refusal::NotJogMode => b"Not in jog mode",
+                Refusal::NoAxis => b"Select an axis",
+                Refusal::ChainOpen => b"E-stop chain open",
+                Refusal::Busy => b"Program running",
+                Refusal::ReleaseKeys => b"Release the keys",
+                Refusal::Rule(id) => label(self.profile.reason_text_bytes(id)),
+            };
+            let n = shown.len().min(21);
+            text[..n].copy_from_slice(&shown[..n]);
+        }
+        PendantOutput { leds, lease: self.authority.lease(now_us) as u8, text, reserved: 0 }
     }
 
     /// Call every control tick, before the core's own tick.

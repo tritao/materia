@@ -72,6 +72,14 @@ impl CompiledProfile {
         }
     }
 
+    /// The stored text for a rule reason id as its raw 21 bytes (NUL padded); empty when the id is out of range.
+    pub fn reason_text_bytes(&self, id: u8) -> &[u8] {
+        match self.reasons.get(id as usize) {
+            Some(text) => &text[..],
+            None => &[],
+        }
+    }
+
     /// How long an OperatorState stays fresh; give it to `HostLink::new`.
     pub fn host_timeout_us(&self) -> u64 { self.host_timeout_us }
 

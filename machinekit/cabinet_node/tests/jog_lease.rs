@@ -163,9 +163,10 @@ fn bad_frames_are_refused() {
     let mut host = host_frame(1, true);
     host[10] ^= 1;
     assert!(service.on_operator_frame(&host, 0).is_err());
-    let mut payload = [0u8; 16];
+    // A controller-to-host message is not taken on this channel.
+    let mut payload = [0u8; operator_link::operator_wire::PendantEvent::SIZE];
     let mut frame = vec![0u8; operator_frame::MAX_FRAME_SIZE];
-    operator_link::operator_wire::PendantConfig { kind: 0, index: 1, text: [0; 12], reserved: [0; 2] }.encode(&mut payload).unwrap();
-    let n = operator_frame::encode(OperatorMessage::Config as u8, &payload, &mut frame).unwrap();
+    operator_link::operator_wire::PendantEvent { sequence: 1, axis: 255, flags: 0, distance: 0, pressed: 0, refusal: 0, reason: 0, reserved: 0 }.encode(&mut payload).unwrap();
+    let n = operator_frame::encode(OperatorMessage::Event as u8, &payload, &mut frame).unwrap();
     assert_eq!(service.on_operator_frame(&frame[..n], 0), Err(cabinet_node::ServiceError::WrongType));
 }
