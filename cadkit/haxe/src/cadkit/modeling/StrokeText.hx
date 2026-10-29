@@ -6,9 +6,9 @@ package cadkit.modeling;
  * (terminal names, key legends), where the text is read in a few millimetres.
  */
 class StrokeText {
-  static inline var CELL_WIDTH:Float = 4.0;
-  static inline var CELL_HEIGHT:Float = 6.0;
-  static inline var GAP:Float = 1.5;
+  public static inline var CELL_WIDTH:Float = 4.0;
+  public static inline var CELL_HEIGHT:Float = 6.0;
+  public static inline var GAP:Float = 1.5;
   static var font:Null<Map<String, Array<Array<Float>>>>;
 
   /** Each glyph as strokes of `x,y` points separated by spaces, strokes separated by a slash. */
@@ -74,6 +74,10 @@ class StrokeText {
     font = parsed;
     return parsed;
   }
+
+  /** The strokes of one character as flat x, y pairs on the 4 x 6 grid, or null when the font has none. */
+  public static function strokes(character:String):Null<Array<Array<Float
+    >>> return glyphs().get(character.toUpperCase());
 
   /** The text's width when its letters are `height` tall. */
   public static function width(text:String, height:Float):Float {

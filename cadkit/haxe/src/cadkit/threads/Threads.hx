@@ -109,7 +109,7 @@ class Threads {
     }
     var direction = start == AxisMinimum ? 1 : -1;
     var parameter = (direction == 1 ? span.minimum : span.maximum) + direction * offset;
-    var attributes = shape.threadedFaces();
+    var attributes = shape.faceAttributes();
     attributes.push(new ThreadedFace(name, spec, parameter, direction, length));
     var copy = shape.cloneShape();
     copy.setThreadedFaces(attributes);

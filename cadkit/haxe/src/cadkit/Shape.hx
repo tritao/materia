@@ -491,8 +491,16 @@ class Shape {
     return native.isClosed();
   }
 
-  /** Semantic face attributes travel with the immutable B-rep owner. */
-  public function threadedFaces():Array<ThreadedFace> return threadAttributes.copy();
+  /** The threads on this shape's faces. Semantic face attributes travel with the immutable B-rep owner. */
+  public function threadedFaces():Array<ThreadedFace
+    > return [for (attribute in threadAttributes) if (attribute.detail == null) attribute];
+
+  /** The cosmetic surface details (knurling, scales) on this shape's faces. */
+  public function surfaceDetails():Array<ThreadedFace
+    > return [for (attribute in threadAttributes) if (attribute.detail != null) attribute];
+
+  /** Every face attribute, threads and details: what an operation carries from its inputs to its result. */
+  public function faceAttributes():Array<ThreadedFace> return threadAttributes.copy();
 
   /** Internal propagation boundary; attributes contain no native handles. */
   public function setThreadedFaces(attributes:Array<ThreadedFace>):Void threadAttributes = attributes.copy();
@@ -519,7 +527,7 @@ class Shape {
       var ref = new CadKit.ShapeRef();
       ref.set_shape(shape.borrowHandle());
       refs.push(ref);
-      for (attribute in shape.threadedFaces()) attributes.push(attribute);
+      for (attribute in shape.faceAttributes()) attributes.push(attribute);
     }
     var result = fromOwnedHandle(CadKit.compoundChecked(refs));
     result.setThreadedFaces(attributes);

@@ -2,6 +2,7 @@ package app;
 
 import nativekit.scene.GeometryData;
 import materia.project.ThreadRenderData;
+import materia.project.SurfaceDetailRenderData;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 
@@ -29,9 +30,37 @@ class CadThreadGeometry {
   }
 }
 
+/** A cosmetic detail's face frame and size in the scene's units, and its radii in millimetres for the texture. */
+class CadDetailGeometry {
+  public final source:SurfaceDetailRenderData;
+  public final frame:Plane;
+  public final length:Float;
+  public final radiusMm:Float;
+  public final radiusEndMm:Float;
+  public final surfaceMm:Float;
+  public function new(source:SurfaceDetailRenderData, center:Array<Float>, scale:Float) {
+    this.source = source;
+    frame = new Plane(
+      new Vector(
+        (source.origin[0] - center[0]) * scale,
+        (source.origin[1] - center[1]) * scale,
+        (source.origin[2] - center[2]) * scale
+      ),
+      new Vector(source.xDirection[0], source.xDirection[1], source.xDirection[2]),
+      new Vector(source.direction[0], source.direction[1], source.direction[2])
+    );
+    length = source.length * scale;
+    var millimetres = scale / CadSceneGeometry.METRES_PER_MILLIMETRE;
+    radiusMm = source.radius * millimetres;
+    radiusEndMm = source.radiusEnd * millimetres;
+    surfaceMm = source.surface * millimetres;
+  }
+}
+
 /** Base triangles and their derived semantic display data share one geometry lifetime. */
 class CadGeometryData extends GeometryData {
   public final threads:Array<CadThreadGeometry>;
+  public final details:Array<CadDetailGeometry>;
   final cadStrokes:Array<{points:Array<Float>, id:Int, feature:Bool}> = [];
   var edgeMode:CadEdgeMode = Feature;
   public function addCadStroke(points:Array<Float>, id:Int, feature:Bool):Void {
@@ -58,8 +87,14 @@ class CadGeometryData extends GeometryData {
     }
   }
 
-  public function new(threads:Array<ThreadRenderData>, center:Array<Float>, scale:Float) {
+  public function new(
+    threads:Array<ThreadRenderData>,
+    center:Array<Float>,
+    scale:Float,
+    ?details:Array<SurfaceDetailRenderData>
+  ) {
     super();
     this.threads = threads == null ? [] : [for (thread in threads) new CadThreadGeometry(thread, center, scale)];
+    this.details = details == null ? [] : [for (detail in details) new CadDetailGeometry(detail, center, scale)];
   }
 }

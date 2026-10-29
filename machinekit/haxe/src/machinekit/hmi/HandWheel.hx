@@ -7,6 +7,8 @@ import cadkit.modeling.Location;
 import cadkit.modeling.Part;
 import cadkit.modeling.Polygon;
 import cadkit.modeling.StrokeText;
+import cadkit.threads.Details;
+import cadkit.threads.SurfaceDetail;
 import cadkit.threads.ThreadedFace.ThreadStart;
 import cadkit.threads.Threads;
 import cadkit.modeling.Vector;
@@ -40,6 +42,7 @@ class HandWheel extends HmiPart {
     R.length("ringHeight", 9),
     R.length("dialDiameter", 44),
     R.length("dialRecess", 2),
+    R.choice("detail", ["textured", "modelled"], "textured"),
     R.count("knurlTeeth", 120),
     R.length("knurlDepth", 0.5),
     R.count("scaleDivisions", 100),
@@ -211,7 +214,7 @@ class HandWheel extends HmiPart {
 
   /**
    * The whole device as one solid, with plain studs and nuts: their coincident surfaces cannot keep two thread textures. The
-   * envelope has a plain wheel (no knurling or scale), which is the silhouette; the preview is the fused bodies, built once
+   * envelope has a plain wheel (no knurling or scale), which is the silhouette, and so does a textured wheel's single solid; the preview is the fused bodies, built once
    * for each set of numbers because the knurling and scale make it cost seconds.
    */
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -221,8 +224,8 @@ class HandWheel extends HmiPart {
       if (cached != null) return new Part(cached.cloneShape());
     }
     var parts:Array<Part> = [];
-    for (spec in bodies()) parts.push(spec.id == "studs" ? studSolid(false)
-      : spec.id == "nuts" ? nutSolid(false) : spec.id == "wheel" && detail == Envelope ? plainWheel() : spec.build());
+    for (spec in bodies()) parts.push(spec.id == "studs" ? studSolid(false) : spec.id == "nuts"
+      ? nutSolid(false) : spec.id == "wheel" && (detail == Envelope || textured()) ? plainWheel() : spec.build());
     var result = Solids.union(parts);
     if (detail != Envelope) previewCache.set(key, result.shape.cloneShape());
     return result;
@@ -360,8 +363,8 @@ class HandWheel extends HmiPart {
       "handleProtrusion",
       "handleRadius",
       "knurlDepth"
-    ]) Std.string(n(name))].join("|")
-      + "|" + count("knurlTeeth") + "|" + count("scaleDivisions") + "|" + (flag("handle") ? "h" : "-");
+    ]) Std.string(n(name))].join("|") + "|" + count("knurlTeeth")
+      + "|" + count("scaleDivisions") + "|" + values().token("detail") + "|" + (flag("handle") ? "h" : "-");
     var cached = wheelCache.get(key);
     if (cached != null) return new Part(cached.cloneShape());
     var built = buildWheel();
@@ -369,10 +372,18 @@ class HandWheel extends HmiPart {
     return built;
   }
 
+  /** Whether the knurling and scale are textures on a plain wheel (the default) or modelled as geometry. */
+  function textured():Bool return values().token("detail") == "textured";
+
+  /** The wheel's faces that carry details, named by their segment in the revolved profile below. */
+  static inline var CONE_FACE:String = "wheel:side(seg.1)";
+  static inline var GRIP_FACE:String = "wheel:side(seg.2)";
+
   function buildWheel():Part {
     var top = bodyHeight(), flange = n("flangeThickness");
-    var root = n("ringDiameter") / 2 - n("knurlDepth");
-    var parts:Array<Part> = [Solids.named(
+    // Textured, the grip is a plain cylinder at its tip radius; modelled, its root, with the teeth added to it.
+    var root = textured() ? n("ringDiameter") / 2 : n("ringDiameter") / 2 - n("knurlDepth");
+    var body = Solids.named(
       Part.revolve([
         {r: 0.0, z: flange},
         {r: n("outerDiameter") / 2, z: flange},
@@ -383,9 +394,25 @@ class HandWheel extends HmiPart {
         {r: 0.0, z: top - n("dialRecess")}
       ]),
       "wheel"
-    )];
-    parts.push(knurledRing(flange + n("coneHeight"), top, root));
-    if (count("scaleDivisions") > 0) parts.push(scaleBand());
+    );
+    var parts:Array<Part> = [];
+    if (textured()) {
+      // The knurling on the grip and the scale on the skirt are cosmetic details of those two faces.
+      var knurled = Details.attach(body.shape, GRIP_FACE, Knurl(count("knurlTeeth"), n("knurlDepth")));
+      body.close();
+      var rise = n("coneHeight"), reach = n("ringDiameter") / 2 - n("outerDiameter") / 2;
+      var graduated = count("scaleDivisions") > 0 ? Details.attach(
+        knurled,
+        CONE_FACE,
+        Graduation(count("scaleDivisions"), 10, Math.sqrt(rise * rise + reach * reach), n("ringDiameter") / 2)
+      ) : knurled;
+      if (graduated != knurled) knurled.close();
+      parts.push(new Part(graduated));
+    } else {
+      parts.push(body);
+      parts.push(knurledRing(flange + n("coneHeight"), top, root));
+      if (count("scaleDivisions") > 0) parts.push(scaleBand());
+    }
     if (flag("handle")) {
       var from = top - n("dialRecess");
       var pin = Part.cylinderSpan(n("handleDiameter") / 2, from, top + n("handleProtrusion"), 0.0, -n("handleRadius"));

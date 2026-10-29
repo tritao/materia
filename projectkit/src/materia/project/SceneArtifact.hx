@@ -4,6 +4,8 @@ import haxe.io.Bytes;
 import haxeon.wire.JsonWire;
 import materia.project.ThreadRenderData;
 import materia.project.ThreadRenderData.ThreadRenderDataValues;
+import materia.project.SurfaceDetailRenderData;
+import materia.project.SurfaceDetailRenderData.SurfaceDetailRenderDataValues;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import materia.assembly.AssemblyDefinitionCodec;
@@ -59,6 +61,8 @@ typedef SceneArtifactPart = {
   @:optional var faceDescriptors:String;
   /** Named semantic intervals derived beside this exact tessellation. */
   @:optional var threads:Array<ThreadRenderData>;
+  /** Cosmetic surface details (knurling, scales) on faces of revolution, drawn as textures. */
+  @:optional var details:Array<SurfaceDetailRenderData>;
 }
 
 typedef SceneArtifactData = {
@@ -937,7 +941,7 @@ typedef SceneArtifactHeater = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-  public static inline var VERSION:Int = 44;
+  public static inline var VERSION:Int = 45;
   public static inline var MAX_BYTES:Int = 150000000;
   static inline var MAX_VERTICES:Int = 2000000;
   static inline var MAX_TRIANGLES:Int = 4000000;
@@ -961,7 +965,8 @@ class SceneArtifact {
       physicalMassDeclared:Bool,
       physicalInertia:Array<Float>,
       faces:Bytes,
-      threads:Bytes
+      threads:Bytes,
+      details:Bytes
     }> = [];
     var assemblyDefinition = data.assemblyDefinition
       == null ? Bytes.alloc(0) : Bytes.ofString(AssemblyDefinitionCodec.encode(data.assemblyDefinition));
@@ -1035,6 +1040,8 @@ class SceneArtifact {
       var faces = faceDescriptors == null ? Bytes.alloc(0) : Bytes.ofString(faceDescriptors);
       var threads = part.threads == null
         || part.threads.length == 0 ? Bytes.alloc(0) : Bytes.ofString(JsonWire.encode(part.threads));
+      var details = part.details == null
+        || part.details.length == 0 ? Bytes.alloc(0) : Bytes.ofString(JsonWire.encode(part.details));
       names.push({
         id: id,
         name: name,
@@ -1044,6 +1051,7 @@ class SceneArtifact {
         density: density,
         faces: faces,
         threads: threads,
+        details: details,
         volume: volume,
         center: part.centerOfMass == null ? meshProperties.centerOfMass : part.centerOfMass,
         inertia : part.inertia == null ? meshProperties.inertia : part.inertia,
@@ -1055,7 +1063,7 @@ class SceneArtifact {
       length += 250 + finish.length + materialId.length + materialSpec.length + id.length
         + name.length + part.vertices.length + part.normals.length + part.indices.length + (part.edgeSegments
         == null ? 0 : part.edgeSegments.length) + (part.edgeIds
-        == null ? 0 : part.edgeIds.length) + part.faceRanges.length * 12 + 4 + faces.length + 4 + threads.length;
+        == null ? 0 : part.edgeIds.length) + part.faceRanges.length * 12 + 4 + faces.length + 4 + threads.length + 4 + details.length;
       if (length > MAX_BYTES) throw "Scene artifact exceeds the 150 MB limit";
     }
     var result = Bytes.alloc(length), offset = 0;
@@ -1140,6 +1148,9 @@ class SceneArtifact {
       offset = putInt(result, offset, text.threads.length);
       result.blit(offset, text.threads, 0, text.threads.length);
       offset += text.threads.length;
+      offset = putInt(result, offset, text.details.length);
+      result.blit(offset, text.details, 0, text.details.length);
+      offset += text.details.length;
     }
     offset = putInt(result, offset, assemblyDefinition.length);
     result.blit(offset, assemblyDefinition, 0, assemblyDefinition.length);
@@ -3837,6 +3848,16 @@ class SceneArtifact {
       }
     }
 
+    if (part.details != null) {
+      if (part.details.length > MAX_FACE_RANGES) throw 'Part ${part.id} has too many surface details';
+      for (detail in part.details) {
+        SurfaceDetailRenderDataValues.validate(detail);
+        var found = false;
+        for (range in part.faceRanges) if (range.faceIndex == detail.faceIndex) found = true;
+        if (!found) throw 'Surface detail ${part.id}/${detail.faceName} has no tessellated face range';
+      }
+    }
+
     for (range in part.faceRanges) if (range.faceIndex < 0 || range.firstIndex < 0 || range.indexCount < 0
       || range.firstIndex % 3 != 0 || range.indexCount % 3 != 0 || range.firstIndex + range.indexCount
       > part.indexCount) throw 'Scene artifact part "${part.id}" has an invalid face range';
@@ -3915,9 +3936,13 @@ private class SceneArtifactReader {
       var threadText = readOpaqueText(16000000, 'part "$id" threads');
       var threads:Array<ThreadRenderData
         > = threadText.length == 0 ? [] : JsonWire.decode(SceneWireJson.preserveNumbers(threadText));
+      var detailText = readOpaqueText(16000000, 'part "$id" surface details');
+      var details:Array<SurfaceDetailRenderData
+        > = detailText.length == 0 ? [] : JsonWire.decode(SceneWireJson.preserveNumbers(detailText));
       var part:SceneArtifactPart = {
         closed: closed == 1,
         threads: threads,
+        details: details,
         id: id,
         name: name,
         red: red,

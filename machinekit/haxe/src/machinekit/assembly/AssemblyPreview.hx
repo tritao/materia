@@ -175,6 +175,7 @@ class AssemblyPreview {
     part.edgeSegments = null;
     part.edgeIds = null;
     part.threads = new Array<materia.project.ThreadRenderData>();
+    part.details = new Array<materia.project.SurfaceDetailRenderData>();
   }
 
   static function movingBelts(assembly:MachineAssembly):materia.project.SceneArtifact.SceneArtifactMachineMotion {
@@ -341,7 +342,8 @@ class AssemblyPreview {
       ], vertices:mesh.vertices, normals:mesh.normals, indices:mesh.indices, edgeSegments:mesh.edgeSegments,
         edgeIds:mesh.edgeIds, faceDescriptors:maxGeometricFaces > 0 && part.shape.subshapeCount(CadKit.ShapeKind.Face)
         > maxGeometricFaces ? null : cadkit.parametric.GeometricConnectors.describeFaces(part.shape),
-        threads : Threads.renderData(part.shape), faceRanges : [for (range in mesh.faceRanges) {
+        threads : Threads.renderData(part.shape),
+        details : cadkit.threads.Details.renderData(part.shape), faceRanges : [for (range in mesh.faceRanges) {
         faceIndex:range.faceIndex, firstIndex:range.firstIndex, indexCount:range.indexCount
       }
       ]};

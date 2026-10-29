@@ -69,7 +69,7 @@ class Location {
   }
 
   public function apply(shape:Shape):Shape {
-    if (shape.threadedFaces().length > 0) {
+    if (shape.faceAttributes().length > 0) {
       var operation = applyOperation(shape);
       try {
         var result = operation.resultShape();

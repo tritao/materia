@@ -13,7 +13,7 @@ class Operation {
     this.native = native;
     threadSources = [];
     try {
-      if (inputs != null) for (input in inputs) for (attribute in input.threadedFaces()) threadSources.push({
+      if (inputs != null) for (input in inputs) for (attribute in input.faceAttributes()) threadSources.push({
         attribute: attribute,
         face: input.subshape(CadKit.ShapeKind.Face, Threads.namedIndex(input, attribute.faceName))
       });

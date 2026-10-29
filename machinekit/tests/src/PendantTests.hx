@@ -287,6 +287,60 @@ class PendantTests {
       whole.close();
     }
 
+    // A textured wheel is a plain solid whose grip and skirt carry cosmetic details; a modelled one has geometry and none.
+    var texturedWheel = PartPresets.yumoIsm6045();
+    var wheelBodies = texturedWheel.bodies();
+    if (wheelBodies != null) {
+      var wheelSpec = wheelBodies[wheelBodies.length - 1];
+      var wheelSolid = wheelSpec.build();
+      var wheelDetails = cadkit.threads.Details.renderData(wheelSolid.shape);
+      check(
+        wheelDetails.length == 2 && wheelSolid.shape.threadedFaces().length == 0,
+        "A textured wheel carries a knurl and a scale, and no threads"
+      );
+      var kinds = [for (d in wheelDetails) d.kind];
+      check(
+        kinds.indexOf(materia.project.SurfaceDetailRenderData.SurfaceDetailKinds.KNURL) >= 0
+        && kinds.indexOf(materia.project.SurfaceDetailRenderData.SurfaceDetailKinds.GRADUATION) >= 0,
+        "The wheel's details are a knurl and a graduation"
+      );
+      for (d in wheelDetails) if (d.kind == materia.project.SurfaceDetailRenderData.SurfaceDetailKinds.KNURL) check(
+        d.count == 120 && Math.abs(d.radius - 24.5) < 1e-6 && Math.abs(d.depth - 0.5) < 1e-9,
+        "The knurl is 120 teeth 0.5 deep on the 49 mm grip"
+      );
+      // A detail follows its face through placement.
+      var moved = wheelSolid.translated(new cadkit.modeling.Vector(5.0, 0.0, 0.0));
+      check(cadkit.threads.Details.renderData(moved.shape).length == 2, "Details survive placement");
+      moved.close();
+      wheelSolid.close();
+    }
+    var modelled = new HandWheel(new machinekit.component.ComponentValues().setToken("detail", "modelled"));
+    var modelledBodies = modelled.bodies();
+    if (modelledBodies != null) {
+      var modelledSolid = modelledBodies[modelledBodies.length - 1].build();
+      check(
+        cadkit.threads.Details.renderData(modelledSolid.shape).length == 0
+        && modelledSolid.shape.subshapeCount(CadKit.ShapeKind.Face) > 400,
+        "A modelled wheel is geometry, with no details"
+      );
+      modelledSolid.close();
+    }
+    // The detail textures: a knurl tooth and the 100-division scale, with every mip level down to one texel.
+    var knurlImage = cadkit.threads.DetailTexture.knurl(120, 0.5, 24.5, true);
+    var scaleImage = cadkit.threads.DetailTexture.graduation(100, 10, 30.0, 24.5, 12.3, false);
+    check(
+      knurlImage.width == 64
+      && knurlImage.mips == 7 && scaleImage.width == 2048 && scaleImage.height == 128 && scaleImage.mips == 12,
+      "Detail texture sizes and mip counts"
+    );
+    check(
+      scaleImage.pixels.length > 2048 * 128 * 4 && scaleImage.pixels.length < 2048 * 128 * 4 * 2,
+      "A scale texture carries its mip chain"
+    );
+    var inked = 0;
+    for (i in 0...2048 * 128) if (scaleImage.pixels.get(i * 4) < 128) inked++;
+    check(inked > 500, "The scale texture has ink: " + inked);
+
     // The bodies of a device share its declared mass, and the head is the colour the part shows.
     var stop = PartPresets.xb2Es542();
     var stopBodies = stop.expand();

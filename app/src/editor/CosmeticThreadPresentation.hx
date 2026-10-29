@@ -9,6 +9,7 @@ import nativekit.scene.Geometry;
 import nativekit.scene.Material;
 import nativekit.scene.Texture;
 import nativekit.scene.TextureData;
+import nativekit.scene.ImageData;
 import nativekit.scene.Image as SceneImage;
 import nativekit.scene.Sampler;
 import nativekit.scene.SamplerData;
@@ -37,7 +38,10 @@ private typedef ThreadGroup = {
   var nodes:Array<ThreadNode>;
 }
 
-/** Runtime children derived from the base mesh. They share its pose, appearance and highlight state. */
+/**
+ * Runtime children derived from the base mesh: cosmetic threads, and the knurling and scales of surface details. They share its
+ * pose, appearance and highlight state, and are shown or hidden together.
+ */
 @:access(app.EditorScene) class CosmeticThreadPresentation {
   final groups:Map<String, ThreadGroup> = [];
   final textures:Map<String, ThreadTextures> = [];
@@ -68,7 +72,7 @@ private typedef ThreadGroup = {
         && item.meshSnapshot != null) source = owner.previewGeometry(item.meshSnapshot);
       if (!Std.isOfType(source, CadGeometryData)) continue;
       var cad:CadGeometryData = cast source;
-      if (cad.threads.length == 0) continue;
+      if (cad.threads.length == 0 && cad.details.length == 0) continue;
       seen.set(item.id, true);
       var parent = owner.runtimeFor(item.id).node;
       var parentKey = SceneBridge.nodeKey(parent);
@@ -83,7 +87,13 @@ private typedef ThreadGroup = {
           if (data.triangleCount() == 0) continue;
           var key =
             '${thread.source.spec.profile}|${thread.source.spec.majorDiameter}|${thread.source.spec.pitch}|${thread.source.spec.starts}';
-          var pair = acquire(owner, key, thread.source.spec);
+          var spec = thread.source.spec;
+          var pair = acquire(
+            owner,
+            key,
+            () -> CosmeticThreadTexture.image(spec, false),
+            () -> CosmeticThreadTexture.image(spec, true)
+          );
           var geometry = owner.scene.createGeometry();
           owner.scene.setGeometryData(geometry, data);
           var material = owner.scene.createMaterial();
@@ -98,6 +108,40 @@ private typedef ThreadGroup = {
           var transaction = owner.scene.beginTransaction();
           var node = transaction.createNode();
           transaction.setName(node, "Thread " + thread.source.faceName);
+          transaction.setParent(node, parent);
+          transaction.setVisibility(node, false);
+          transaction.setTransform(node, Transform.identity());
+          transaction.setGeometry(node, geometry);
+          transaction.setMaterial(node, material);
+          transaction.commit();
+          owner.bridge.mapNode(node, item.id);
+          nodes.push({node: node, geometry: geometry, material: material, textureKey: key});
+        }
+        // Knurling and scales: the same overlay, with texture coordinates made from the face's own axis.
+        for (detail in cad.details) {
+          var data = CosmeticDetailMesh.build(cad, detail);
+          if (data.triangleCount() == 0) continue;
+          var key = CosmeticDetailTexture.key(detail);
+          var pair = acquire(
+            owner,
+            key,
+            () -> CosmeticDetailTexture.image(detail, false),
+            () -> CosmeticDetailTexture.image(detail, true)
+          );
+          var geometry = owner.scene.createGeometry();
+          owner.scene.setGeometryData(geometry, data);
+          var material = owner.scene.createMaterial();
+          owner.scene.setMaterialData(
+            material,
+            ScenePresentation.materialFor(item.red,
+            item.green, item.blue, item.appearance, item.kind).setBaseColorTexture(
+              pair.color,
+              sampler
+            ).setNormalTexture(pair.normal)
+          );
+          var transaction = owner.scene.beginTransaction();
+          var node = transaction.createNode();
+          transaction.setName(node, "Detail " + detail.source.faceName);
           transaction.setParent(node, parent);
           transaction.setVisibility(node, false);
           transaction.setTransform(node, Transform.identity());
@@ -141,7 +185,7 @@ private typedef ThreadGroup = {
     }
   }
 
-  function acquire(owner:EditorScene, key:String, spec:ThreadSpecData):ThreadTextures {
+  function acquire(owner:EditorScene, key:String, color:() -> ImageData, normal:() -> ImageData):ThreadTextures {
     var pair = textures.get(key);
     if (pair == null) {
       if (sampler == null) {
@@ -149,8 +193,8 @@ private typedef ThreadGroup = {
         owner.scene.setSamplerData(sampler, new SamplerData().setWrap(1, 1).setFilters(2, 2));
       }
       var colorImage = owner.scene.createImage(), normalImage = owner.scene.createImage();
-      owner.scene.setImageData(colorImage, CosmeticThreadTexture.image(spec, false));
-      owner.scene.setImageData(normalImage, CosmeticThreadTexture.image(spec, true));
+      owner.scene.setImageData(colorImage, color());
+      owner.scene.setImageData(normalImage, normal());
       var color = owner.scene.createTexture(), normal = owner.scene.createTexture();
       owner.scene.setTextureData(color, new TextureData(colorImage));
       owner.scene.setTextureData(normal, new TextureData(normalImage));

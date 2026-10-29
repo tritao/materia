@@ -830,6 +830,39 @@ class ProjectKitTests {
     thread.spec.pitch = 0;
     rejects(function() SceneArtifact.encode(data), "nominal thread pitch must be positive");
     thread.spec.pitch = 1;
+    // Cosmetic surface details (knurling, a scale) ride beside the threads and are validated the same way.
+    var detail:materia.project.SurfaceDetailRenderData = {
+      faceName: "wheel:side(seg.2)",
+      faceIndex: 7,
+      kind: materia.project.SurfaceDetailRenderData.SurfaceDetailKinds.KNURL,
+      origin: [0, 0, 17],
+      xDirection: [1, 0, 0],
+      direction: [0, 0, 1],
+      length: 9,
+      radius: 24.5,
+      count: 120,
+      depth: 0.5,
+      numberedEvery: 0,
+      surface: 9,
+      radiusEnd: 24.5
+    };
+    data.parts[0].details = [detail];
+    var detailed = SceneArtifact.decodeView(SceneArtifact.encode(data)).parts[0].details;
+    check(
+      detailed != null && detailed.length == 1 && detailed[0].faceName == detail.faceName && detailed[0].count == 120
+      && detailed[0].depth == 0.5 && detailed[0].length == 9 && detailed[0].origin[2] == 17 && detailed[0].surface == 9,
+      "surface detail round trips"
+    );
+    detail.faceIndex = 8;
+    rejects(function() SceneArtifact.encode(data), "a surface detail must reference a base face range");
+    detail.faceIndex = 7;
+    detail.count = 1;
+    rejects(function() SceneArtifact.encode(data), "a surface detail needs at least two teeth or divisions");
+    detail.count = 120;
+    detail.direction = [1, 0, 0];
+    rejects(function() SceneArtifact.encode(data), "a surface detail frame must have perpendicular axes");
+    detail.direction = [0, 0, 1];
+    data.parts[0].details = new Array<materia.project.SurfaceDetailRenderData>();
     SceneScrewTests.namedFace(data, thread);
     data.parts[0].threads = new Array<materia.project.ThreadRenderData>();
     data.parts[0].faceRanges.resize(0);
