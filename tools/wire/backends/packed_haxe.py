@@ -12,14 +12,36 @@ from .common import lower_camel
 SUPPORTED = {"u8": (1, False), "u16": (2, False), "i8": (1, True), "i16": (2, True), "i32": (4, True)}
 
 
+WRAP = 80
+
+
+def _wrap(line: str, indent: str) -> list[str]:
+    """Breaks a long condition before its `||` the way `haxeon fmt` does, so formatting leaves the generated file unchanged.
+
+    The formatter fills a line up to 80 columns and continues two columns in; what follows the condition's closing parenthesis
+    (the `throw`) does not count towards the width.
+    """
+    parts = line.split(" || ")
+    if len(parts) == 1:
+        return [line]
+    lines = [parts[0]]
+    for part in parts[1:]:
+        counted = part[: part.index(")") + 1] if ")" in part else part
+        if len(lines[-1]) + 4 + len(counted) >= WRAP:
+            lines.append(indent + "  || " + part)
+        else:
+            lines[-1] += " || " + part
+    return lines
+
+
 def _check(field: dict[str, Any], struct: str, enums: dict[str, list[int]], indent: str) -> list[str]:
     name = field["name"]
     fail = f'throw "{struct}.{name} violates its constraint";'
     array = field["array"]
     def each(test: str) -> list[str]:
         if not array:
-            return [f"{indent}if ({test.replace('@', name)}) {fail}"]
-        return [f"{indent}for (v in {name}) if ({test.replace('@', 'v')}) {fail}"]
+            return _wrap(f"{indent}if ({test.replace('@', name)}) {fail}", indent)
+        return _wrap(f"{indent}for (v in {name}) if ({test.replace('@', 'v')}) {fail}", indent)
     if "range" in field:
         low, high = field["range"]
         return each(f"@ < {low} || @ > {high}")
@@ -32,7 +54,7 @@ def _check(field: dict[str, Any], struct: str, enums: dict[str, list[int]], inde
     return [
         f"{indent}var {name}End = 0;",
         f"{indent}while ({name}End < {name}.length && {name}[{name}End] != 0) {name}End++;",
-        f"{indent}for (i in 0...{name}.length) if (i < {name}End ? ({name}[i] < 32 || {name}[i] > 126) : {name}[i] != 0) {fail}",
+        *_wrap(f"{indent}for (i in 0...{name}.length) if (i < {name}End ? ({name}[i] < 32 || {name}[i] > 126) : {name}[i] != 0) {fail}", indent),
     ]
 
 
@@ -62,7 +84,7 @@ def files(schema: Schema, norm: dict[str, Any], *, root: Path, package: str, lab
                 lines.append(f"  public var {field['name']}:Array<Int> = [{', '.join(['0'] * field['length'])}];")
             else:
                 lines.append(f"  public var {field['name']}:Int = 0;")
-        lines.extend(["  public function new() {}", ""])
+        lines.extend(["  public function new() {", "  }", ""])
         lines.append("  /** Constraints declared in the schema; checked on encode and decode. */")
         lines.append("  public function check():Void {")
         for field in fields:

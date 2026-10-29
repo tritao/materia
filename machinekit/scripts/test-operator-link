@@ -7,11 +7,7 @@ repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 materia_root="$(cd -- "$repo_root/.." && pwd)"
 cd "$materia_root"
 
-# The repo formats its Haxe, which rewrites the generated wire classes, so `check` (raw generator output) cannot hold for them:
-# regenerate, format, and require that nothing differs from what is committed.
-python3 -B -m tools.wire generate --config machinekit/operator_link.json
-./haxeon/scripts/haxeon fmt machinekit/haxe/src/machinekit/operator/wire/*.hx
-git diff --exit-code -- machinekit/haxe/src/machinekit/operator/wire machinekit/operator_link/src/operator_wire.rs machinekit/operator_link/schema/operator.lock.json
+python3 -B -m tools.wire check --config machinekit/operator_link.json
 python3 -B -m unittest discover -s tools/wire/tests -t .
 cargo test --offline --manifest-path machinekit/operator_link/Cargo.toml
 cargo test --offline --manifest-path machinekit/pendant_core/Cargo.toml
