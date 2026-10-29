@@ -83,10 +83,22 @@ class StrokeText {
 
   /**
    * The text as a solid from z0 to z1: its baseline on y = 0, centred on x = 0, letters `height` tall drawn with strokes
-   * `stroke` wide. `mirror` flips it left to right, for lettering read from the other side of a part. Each stroke is one
+   * `stroke` wide. `mirror` flips it left to right, for lettering read from the other side of a part. `rotation` (radians, counter-clockwise)
+   * turns it about its own origin and `placeX`, `placeY` then move that origin. `rotation` (radians,
+   * counter-clockwise) turns it about its own origin and `placeX`, `placeY` then move that origin. Each stroke is one
    * mitred polygon, so a few letters are a handful of solids to fuse.
    */
-  public static function solid(text:String, height:Float, stroke:Float, z0:Float, z1:Float, mirror:Bool = false):Part {
+  public static function solid(
+    text:String,
+    height:Float,
+    stroke:Float,
+    z0:Float,
+    z1:Float,
+    mirror:Bool = false,
+    placeX:Float = 0.0,
+    placeY:Float = 0.0,
+    rotation:Float = 0.0
+  ):Part {
     if (!(height > 0)
       || !(stroke > 0) || !(z1 > z0) || text.length == 0) throw "Text needs a height, a stroke, a depth and characters";
     var scale = height / CELL_HEIGHT, half = stroke / 2, total = width(text, height);
@@ -108,6 +120,13 @@ class StrokeText {
           if (mirror) {
             outline = [for (point in outline) new Vector(-point.x, point.y)];
             outline.reverse();
+          }
+          if (rotation != 0.0 || placeX != 0.0 || placeY != 0.0) {
+            var c = Math.cos(rotation), d = Math.sin(rotation);
+            outline = [for (point in outline) new Vector(
+              placeX + point.x * c - point.y * d,
+              placeY + point.x * d + point.y * c
+            )];
           }
           pieces.push(Part.prism(outline, z0, z1));
         }

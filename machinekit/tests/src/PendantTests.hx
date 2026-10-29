@@ -174,7 +174,7 @@ class PendantTests {
       ids.indexOf(id) >= 0,
       "Missing member " + id + " in " + ids.join(", ")
     );
-    check(ids.length == 84, "Eighty-four members, thirty-three of them hardware: " + ids.length);
+    check(ids.length == 86, "Eighty-six members, thirty-three of them hardware: " + ids.length);
     check(
       ids.indexOf("fasteners/display-frame") >= 0 && ids.indexOf("fasteners/display-screw-4") >= 0,
       "The display's frame hardware"
