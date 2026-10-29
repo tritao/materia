@@ -19,6 +19,29 @@ class CollisionBounds {
       == 0 ? c.x : a == 1 ? c.y : c.z) + ((i & (1 << a)) == 0 ? -1 : 1) * (a == 0 ? h.x : a == 1 ? h.y : h.z)];
   }
 
+  /** How far a shape reaches from its own origin; infinite for height fields and half-spaces. */
+  public static function reach(geometry:CollisionGeometry):Float {
+    return switch geometry {
+      case Box(x, y, z):
+        Math.sqrt(x * x + y * y + z * z);
+      case Sphere(r):
+        r;
+      case Capsule(r, h):
+        r + h;
+      case Cylinder(r, h):
+        Math.sqrt(r * r + h * h);
+      case Convex(points) | Mesh(points, _):
+        var far = 0.0;
+        for (i in 0...Std.int(points.length / 3)) {
+          var x = points[3 * i], y = points[3 * i + 1], z = points[3 * i + 2];
+          far = Math.max(far, Math.sqrt(x * x + y * y + z * z));
+        }
+        far;
+      case HalfSpace(_, _, _, _) | HeightField(_, _, _, _, _):
+        Math.POSITIVE_INFINITY;
+    }
+  }
+
   public static function of(geometry:CollisionGeometry, pose:CollisionPose, inflation:Float = 0):CollisionBounds {
     if (geometry == null || pose == null || !Math.isFinite(inflation)
       || inflation < 0) throw "Collision bounds require geometry, pose and nonnegative inflation";

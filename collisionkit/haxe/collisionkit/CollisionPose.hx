@@ -1,5 +1,7 @@
 package collisionkit;
 
+import kinematicskit.Transform;
+
 /**
  * A rigid transform: a translation and a unit quaternion (x, y, z, w), in
  * the world's frame for a body, in its body's frame for an object's offset.
@@ -36,6 +38,18 @@ class CollisionPose {
     0,
     1
   );
+
+  public static function fromTransform(t:Transform):CollisionPose return new CollisionPose(
+    t.x,
+    t.y,
+    t.z,
+    t.qx,
+    t.qy,
+    t.qz,
+    t.qw
+  );
+
+  public function toTransform():Transform return new Transform(x, y, z, qx, qy, qz, qw);
 
   /** Appends the seven numbers to `out`. */
   public function writeTo(out:Array<Float>):Void {

@@ -169,7 +169,22 @@ class CollisionDescription {
     }
   }
 
+  /** An absent margin is valid; a given one must be finite and nonnegative. */
+  static function validMargin(value:Null<Float>):Bool return value == null || (Math.isFinite(value) && value >= 0);
+
   static function pairKey(a:Int, b:Int):String return a < b ? '$a\n$b' : '$b\n$a';
+
+  /** Replaces a described body's state, e.g. a new frame after a transfer. */
+  public function replaceBody(body:Int, value:DescribedBody):Void {
+    if (body < 0 || body >= bodies.length) throw "Replacing a body needs a described body";
+    bodies[body] = value;
+  }
+
+  /** Replaces a described object, keeping its id. */
+  public function replaceObject(object:Int, value:DescribedObject):Void {
+    if (object < 0 || object >= objects.length) throw "Replacing an object needs a described object";
+    objects[object] = value;
+  }
 
   public function bodyRule(a:Int, b:Int):Null<DescribedRule> {
     var index = bodyRuleIndex.get(pairKey(a, b));
@@ -221,8 +236,7 @@ class CollisionDescription {
     if (body < 0 || body >= bodies.length) throw "Held stock needs a described body";
     for (contact in contacts) if (contact < 0 || contact >= objects.length
       || objects[contact].body == body) throw "Held contacts must name outside described objects";
-    if (margin != null
-      && (!Math.isFinite(margin) || margin < 0)) throw "Held contact margin must be finite and nonnegative";
+    if (!validMargin(margin)) throw "Held contact margin must be finite and nonnegative";
     restoreHeldMargins(body);
     var contactIds:Map<Int, Bool> = new Map();
     for (contact in contacts) contactIds.set(contact, true);
@@ -264,10 +278,9 @@ class CollisionDescription {
   /** Exact object-pair margins do not alter any other object in the same margin class. */
   public function setObjectMargins(a:Int, b:Int, ?air:Float, ?contact:Float):Void {
     if (a < 0 || b < 0 || a >= objects.length || b >= objects.length) throw "Collision margins need described objects";
-    if ((air != null && (!Math.isFinite(air) || air < 0)) || (contact != null
-      && (!Math.isFinite(contact) || contact < 0))) throw "Object margins must be finite and nonnegative";
+    if (!validMargin(air) || !validMargin(contact)) throw "Object margins must be finite and nonnegative";
     if (air == null && contact == null) return;
-    var key = a < b ? '$a\n$b' : '$b\n$a';
+    var key = pairKey(a, b);
     var previous = objectMargins.get(key);
     objectMargins.set(
       key,
@@ -282,7 +295,7 @@ class CollisionDescription {
 
   /** Restore only this described pair's sparse margins, without rewriting the class table. */
   public function applyObjectMargins(world:CollisionWorld, ids:Array<Int>, a:Int, b:Int):Void {
-    var value = objectMargins.get(a < b ? '$a\n$b' : '$b\n$a');
+    var value = objectMargins.get(pairKey(a, b));
     world.setObjectMargins(
       ids[a],
       ids[b],
@@ -293,7 +306,7 @@ class CollisionDescription {
 
   public function marginBetweenObjects(a:Int, b:Int, contact:Bool = false):Float {
     if (a < 0 || b < 0 || a >= objects.length || b >= objects.length) throw "Margins need described object ids";
-    var pair = objectMargins.get(a < b ? '$a\n$b' : '$b\n$a');
+    var pair = objectMargins.get(pairKey(a, b));
     var exact = pair == null ? -1.0 : contact ? pair.contact : pair.air;
     if (exact >= 0) return exact;
     var first = objects[a].body, second = objects[b].body;
@@ -307,9 +320,8 @@ class CollisionDescription {
   public function setGroupMargins(g:Int, h:Int, ?air:Float, ?contact:Float):Void {
     if (g < 0 || h < 0) throw "Collision margin classes must be nonnegative";
     if (g >= groups || h >= groups) groups = Std.int(Math.max(g, h)) + 1;
-    if ((air != null && (!Math.isFinite(air) || air < 0)) || (contact != null
-      && (!Math.isFinite(contact) || contact < 0))) throw "Collision pair margins must be finite and nonnegative";
-    var key = g < h ? '$g\n$h' : '$h\n$g';
+    if (!validMargin(air) || !validMargin(contact)) throw "Collision pair margins must be finite and nonnegative";
+    var key = pairKey(g, h);
     var previous = pairMargins.get(key);
     var normal = air == null ? (previous == null ? defaultMargin : previous.air) : air;
     var process = contact == null ? (air != null ? air : previous == null ? defaultMargin : previous.contact) : contact;
@@ -353,26 +365,7 @@ class CollisionDescription {
       var o = object.offset;
       var centre = Math.sqrt(o.x * o.x + o.y * o.y + o.z * o.z);
       // Rotations keep distances from the offset's origin, so local extents add to the offset's length.
-      var extent = switch object.geometry {
-        case Box(x, y, z):
-          Math.sqrt(x * x + y * y + z * z);
-        case Sphere(r):
-          r;
-        case Capsule(r, h):
-          r + h;
-        case Cylinder(r, h):
-          Math.sqrt(r * r + h * h);
-        case Convex(points) | Mesh(points, _):
-          var far = 0.0;
-          for (i in 0...Std.int(points.length / 3)) far = Math.max(
-            far,
-            Math.sqrt(points[3
-            * i] * points[3 * i] + points[3 * i + 1] * points[3 * i + 1] + points[3 * i + 2] * points[3 * i + 2])
-          );
-          far;
-        case HalfSpace(_, _, _, _) | HeightField(_, _, _, _, _):
-          Math.POSITIVE_INFINITY;
-      }
+      var extent = CollisionBounds.reach(object.geometry);
       radius = Math.max(radius, centre + extent + object.inflation);
     }
     return radius;

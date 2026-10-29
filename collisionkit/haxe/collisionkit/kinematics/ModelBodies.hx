@@ -318,8 +318,7 @@ class ModelBodies {
     for (body in 0...bodies.length) description.bodies[bodies[body]].pose = pose(snapshot.bodyPose(body));
   }
 
-  public static function pose(t:Transform):CollisionPose return new CollisionPose(t.x,
-    t.y, t.z, t.qx, t.qy, t.qz, t.qw);
+  public static function pose(t:Transform):CollisionPose return CollisionPose.fromTransform(t);
 
   static function reasonOf(relation:BodyPairRelation):CollisionPairStatus {
     return switch relation {

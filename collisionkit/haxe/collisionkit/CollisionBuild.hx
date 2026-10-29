@@ -1,5 +1,7 @@
 package collisionkit;
 
+import kinematicskit.Transform;
+
 /**
  * A `CollisionDescription` built into a world: the world's id of every
  * described body and object, how many pairs overlapped at their
@@ -49,31 +51,27 @@ class CollisionBuild {
     // Validate and author policy before mutating the physical world.
     if (releasedPolicy == null) description.setHeldContacts(body, namedContacts);
     else description.restoreBodyPolicy(body, releasedPolicy);
-    var from = kinematicskit.Transform.checked(
-      new kinematicskit.Transform(current.x, current.y, current.z, current.qx, current.qy, current.qz, current.qw),
-      "Attachment source pose"
-    );
-    var to = kinematicskit.Transform.checked(
-      new kinematicskit.Transform(target.x, target.y, target.z, target.qx, target.qy, target.qz, target.qw),
-      "Attachment target pose"
-    );
+    var from = Transform.checked(current.toTransform(), "Attachment source pose");
+    var to = Transform.checked(target.toTransform(), "Attachment target pose");
     var delta = to.inverse().compose(from);
     for (i in 0...description.objects.length) {
       var shape = description.objects[i];
       if (shape.body != body) continue;
       var old = shape.offset;
-      var at = delta.compose(new kinematicskit.Transform(old.x, old.y, old.z, old.qx, old.qy, old.qz, old.qw));
-      var offset = new CollisionPose(at.x, at.y, at.z, at.qx, at.qy, at.qz, at.qw);
+      var offset = CollisionPose.fromTransform(delta.compose(old.toTransform()));
       world.attach(objects[i], bodies[body], offset);
-      description.objects[i] = new DescribedObject(
-        shape.name,
-        body,
-        offset,
-        shape.geometry,
-        shape.inflation,
-        shape.source,
-        shape.member,
-        shape.tool
+      description.replaceObject(
+        i,
+        new DescribedObject(
+          shape.name,
+          body,
+          offset,
+          shape.geometry,
+          shape.inflation,
+          shape.source,
+          shape.member,
+          shape.tool
+        )
       );
       for (other in 0...description.objects.length) if (description.objects[other].body
         != body) description.applyObjectMargins(
@@ -84,7 +82,7 @@ class CollisionBuild {
         );
     }
     var previous = description.bodies[body];
-    description.bodies[body] = new DescribedBody(previous.name, previous.group, fixed, target);
+    description.replaceBody(body, new DescribedBody(previous.name, previous.group, fixed, target));
     world.setBodyPose(bodies[body], target);
     world.setBodyStatic(bodies[body], fixed);
     for (other in 0...bodies.length) if (other != body) restoreBodyRule(body, other);
