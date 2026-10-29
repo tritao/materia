@@ -7,8 +7,8 @@ publish = false
 [features]
 # Bench: a Nucleo-G474RE with a CAN-FD transceiver on PA11 (RX) and PA12 (TX).
 nucleo-g474 = ["embassy-stm32/stm32g474re", "embassy-stm32/single-bank"]
-# The pendant's own MCU: STM32G0B1 (Cortex-M0+), same pins.
-g0b1 = ["embassy-stm32/stm32g0b1re", "embassy-stm32/dual-bank"]
+# The pendant's own MCU: STM32H503RB (Cortex-M33), FDCAN1 on PB12 (RX) and PB13 (TX); PA11/PA12 are its USB.
+h503 = ["embassy-stm32/stm32h503rb"]
 
 [dependencies]
 embassy-stm32 = { version = "0.6", features = ["time-driver-any", "memory-x", "unstable-pac"] }

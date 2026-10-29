@@ -325,35 +325,34 @@ with a content hash so pcbkit marks the board stale when the case changes):
 | Frame: the case plan (origin at the face centre, y up, seen from the face) to the board frame (top-left origin, y down, seen from the PCB's top side) | stated, mirrored per the component-side decision |
 | Status: every value from an assumed part is a placeholder until the part is measured | the part sources |
 
-**Board v1 pin budget** (STM32H503RBT6, 49 I/O; assigned in EN4 from the datasheet's alternate-function table):
+**Board v1 pin budget** (STM32H503RBT6, 49 I/O). Decided 2026-10-29: the axis (12) and step (3) switches are read through
+two 74HC165 shift registers (C5613, preferred) on SPI1, about $0.22, which keeps 11 pins free. The pin-by-pin assignment,
+with alternate functions from ST's data (stm32-metapac), is in `pendant_firmware/README.md`, "Pendant pin assignment":
+the firmware and the board follow that table.
 
 | Function | Pins |
 |---|---:|
-| Axis switch (one-hot) | 12 |
-| Step switch | 3 |
+| Selector shift registers (load, clock, data) | 3 |
 | Keys (contacts) | 7 |
-| Key LEDs | 7 |
-| Wheel encoder (timer channels) | 2 |
-| I2C (OLED, keypad ID) | 2 |
-| FDCAN TX/RX | 2 |
+| Key LEDs (through transistors: 16 mm button LEDs) | 7 |
+| Wheel encoder (TIM2, through a 5 V-tolerant buffer) | 2 |
+| I2C1 (OLED, keypad ID memory) and the OLED's reset | 3 |
+| FDCAN1 (PB12/PB13; PA11/PA12 are USB) | 2 |
 | E-stop read-back | 1 |
 | Enabling switch (reserved) | 4 |
-| HSE crystal | 2 |
-| SWD | 2 |
-| USB | 2 |
-| **Total** | **46** |
+| Keypad ID ADC pin and 2 matrix spares (reserved) | 3 |
+| HSE crystal, SWD, USB | 6 |
+| **Used / free** | **38 / 11** |
 
 Reserved for the later membrane keypad zone:
 
-- **Matrix group:** the contacts and LEDs of F1, F2 and F3 (6 pins) and two of the three spare pins form a group of 8 plain
-  GPIO, able to act as a 4 x 4 matrix's rows (outputs) and columns (inputs with pull-ups and interrupts) and not needed by
-  any alternate function. The keypad variant reuses those 8 pins; it has no key LEDs. That leaves one spare pin.
-- **ID:** one ADC-capable pin (a resistor ID) and the I2C bus (a small memory on the keypad tail) both reach the keypad
-  connector, so either ID method works. With the ADC pin as well, all 49 pins are used.
+- **Matrix group:** the contacts and LEDs of F1, F2 and F3 (PC6 to PC11) and two spare pins (PC12, PD2) form a group of 8
+  plain GPIO that can act as a 4 x 4 matrix's rows (outputs) and columns (inputs with pull-ups and interrupts). The keypad
+  variant reuses those 8 pins; it has no key LEDs.
+- **ID:** an ADC pin (PC0, for a resistor ID) and the I2C bus (a small memory on the keypad tail) both reach the keypad
+  connector, so either ID method works.
 - **Connector:** a keypad connector footprint beside the button harness, unfitted in v1 (a stock 4 x 4 keypad has a 2.54 mm
   8-pin tail; a custom membrane usually a flat-flex tail, chosen with the keypad), with ESD protection on the matrix lines.
-- **Margin:** if more pins are needed, the axis and step switches (15 inputs) move to two 74HC165 (C5613, preferred) on
-  3 pins, which frees about 12.
 
 **Steps:**
 
@@ -362,7 +361,7 @@ Reserved for the later membrane keypad zone:
 | EN1 | Ports for every wired control in machinekit: switch and LED contacts on the push buttons, the rotary switches' contacts, the OLED's I2C header, the receptacle's pins (8 of 12 used, 4 reserved for the enabling switch), each with a terminal position in the control's frame. **Done 2026-10-28 for the face's controls:** every wired port names a `Terminal` connector frame where its wires attach (push button: `no` and `led` at the body's rear; rotary switch: `contacts`, positions + 1 wires; OLED: the 7-pin `header` at its pin ends, wires along +x; wheel: its four terminals; E-stop: `nc<n>` on each block's rear face), and expanded bodies keep those frames. `PendantBoard` derives one matching port per control port from the layout and `PendantBoard.wire` connects them all (56 wires); the E-stop's contacts stay off the board. The receptacle and the enabling switch are still case openings, not parts: their ports come when they are modelled (with EN3). |
 | EN2 | pcbkit (its PLAN, "Enclosure envelope" E1–E3): the envelope schema and reader, height zones per side and region that are not tied to a plug-in module, part keep-outs (not just copper keep-outs), and generating the board's mechanical record and intent placement from the envelope. |
 | EN3 | `PendantCase.envelope()` writes the record next to the pendant example; pcbkit becomes a pinned submodule of materia (the dependency direction decided 2026-10-25) and the pendant board gets its folder beside the pendant. |
-| EN4 | The board v1 design in pcbkit, inside the envelope: STM32H503RBT6, isolated FDCAN (CA-IS2062A candidate), 24 V entry with reverse protection and TVS, 5 V and 3.3 V, the wheel's encoder input at 5 V levels, protected switch inputs, LED drivers, the OLED's I2C, the E-stop read-back. Every review pending, as for any pcbkit board. |
+| EN4 | The board v1 design in pcbkit, inside the envelope: STM32H503RBT6 (pins as in `pendant_firmware/README.md`), two 74HC165 for the selectors, isolated FDCAN (CA-IS2062A candidate), 24 V entry with reverse protection and TVS, 5 V and 3.3 V, the wheel's encoder input at 5 V levels, protected switch inputs, LED drivers, the OLED's I2C, the E-stop read-back. Every review pending, as for any pcbkit board. |
 | EN5 | Back from pcbkit (its PLAN E4): the real board's outline, holes, connector positions and a STEP model. `PendantBoard` uses them instead of the envelope solid, with one port per connector; the controls are wired to those ports and `AssemblyIntegrity` checks the board against the case and the controls. |
 
 ## Phases
@@ -385,4 +384,4 @@ Reserved for the later membrane keypad zone:
 - **pcbkit.** The H503 and the CA-IS2062A need part data and pin maps in pcbkit (EN4).
 - **Display burn-in.** Settings to confirm on a real module (the Waveshare listing gives no lifetime figures).
 - **Z index.** Whether the wheel's index channel is needed. Probably not.
-- **Rust support.** Checked: embassy-stm32 0.6 has an FDCAN driver with CAN-FD data bit rates and `write_fd`, with active fixes to FD timing, and `pendant_firmware` builds for both the Nucleo-G474 and the STM32G0B1 (the G0B1 shares its FDCAN interrupt lines with TIM16 and TIM17); an STM32H503 target replaces the G0B1 one. Compile-checked only: nothing has run on hardware, and the FDCAN kernel clock is still the default.
+- **Rust support.** Checked: embassy-stm32 0.6 has an FDCAN driver with CAN-FD data bit rates and `write_fd`, with active fixes to FD timing, and `pendant_firmware` builds for both the Nucleo-G474 and the STM32G0B1 (the G0B1 shares its FDCAN interrupt lines with TIM16 and TIM17); the `h503` target (2026-10-29) replaced the G0B1 one and builds a linked image. Compile-checked only: nothing has run on hardware, and the FDCAN kernel clock is still the default.
