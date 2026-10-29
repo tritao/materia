@@ -126,14 +126,15 @@ Quantities per casting, at 12 % resin (about 1 point more than an 8 mm grading),
 
 | Casting | Wet mix | Aggregate incl. filler | Epoxy |
 | --- | --- | --- | --- |
-| Mill base | 166 kg (69 L, current kit) | ~161 kg | ~22 kg |
-| Mill column | 99 kg (41 L, current kit) | ~96 kg | ~13 kg |
-| Hobber plinth | ~1,016 kg (842 kg frozen design + filled bands, slots and sliver) | ~984 kg | ~134 kg |
-| Hobber column | ~62 kg (43 kg frozen design + filled back pockets) | ~60 kg | ~8 kg |
-| **Total** | ~1.34 t | **~1,300 kg** | **~177 kg** |
+| Mill base | 165 kg (69 L) | ~160 kg | ~22 kg |
+| Mill column | 100 kg (42 L) | ~97 kg | ~13 kg |
+| Hobber plinth | 1,173 kg (489 L) | ~1,135 kg | ~155 kg |
+| Hobber column | 70 kg (29 L) | ~68 kg | ~9 kg |
+| **Total** | ~1.51 t | **~1,460 kg** | **~199 kg** |
 
-All four figures predate the thin-spot fixes from the 2026-10-26 aggregate review. The hobber plinth
-is a single pour of about 1 t, so the batch schedule (mixer capacity and working time) is a real
+Wet-mix masses are the four verified kits after the 5 mm thin-spot fixes (43b01a3d4, 2026-10-28).
+Filled lightening spans and wider support lands added about 157 kg to the plinth. The hobber plinth
+is a single pour of about 1.2 t, so the batch schedule (mixer capacity and working time) is a real
 planning input.
 
 ## Aggregate
@@ -171,17 +172,18 @@ Planned orders, sand in 25 kg bags and filler in 20 kg bags (no single grade rea
 
 | Grade | Order 1: coupon tests + mill base and column | Order 2: hobber plinth and column |
 | --- | --- | --- |
-| 3–5 mm | 5 | 10 |
-| 2–3 mm | 3 | 6 |
-| 1–2 mm | 4 | 8 |
-| 0.3–0.6 mm | 3 | 6 |
-| 0–1 mm | 3 | 7 |
-| Calcium carbonate 63 µm (20 kg bags) | 4 | 7 |
-| **Total** | 22 bags, 530 kg, €85 shipping | 44 bags, 1,065 kg, €80 shipping |
+| 3–5 mm | 5 | 11 |
+| 2–3 mm | 3 | 7 |
+| 1–2 mm | 4 | 9 |
+| 0.3–0.6 mm | 3 | 7 |
+| 0–1 mm | 3 | 8 |
+| Calcium carbonate 63 µm (20 kg bags) | 5 | 7 |
+| **Total** | 23 bags, 550 kg, €85 shipping | 49 bags, 1,190 kg, €80 shipping |
 
 - Order 1 ships at €85 (451–900 kg).
-- Order 2 waits for the coupon results and the thin-spot fixes. About 5 more sand bags still ship
-  at €80; beyond 1,200 kg the rate rises to €145.
+- Order 2 waits for the coupon results. It needs about 1,200 kg, right at the step where shipping
+  rises from €80 to €145, so it carries 140 of the hobber's ~168 kg of filler and order 1 carries
+  one extra filler bag for the rest. Re-plan the split if the coupons change the grading.
 - The 4–8 mm grade is no longer used: the top size is 5 mm (see Design target).
 
 ### Alternatives and top-ups
@@ -262,7 +264,7 @@ Requirements:
    | Compressive yield | 100–107 MPa | 90–100 MPa |
 
    - Use SD 8822 for the hobber plinth: very low viscosity, a very long working time and slow
-     heat release in the 1 t pour. Use SD 8824 for the smaller castings, which then cure and
+     heat release in the 1.2 t pour. Use SD 8824 for the smaller castings, which then cure and
      demould sooner. The bulk gel time of a filled mass is shorter than the film figure, but still
      hours.
    - Slow, high-Tg systems need post-curing. Sicomin recommends room-temperature cure, then
@@ -286,7 +288,7 @@ Requirements:
 3. **Best value, if its datasheet holds up: Harzspezialisten polymer casting system 3550**
    (Germany).
    - Made for polymer concrete casting, "medium" working time.
-   - From €37.95 for about 6.5 kg, about €5.84/kg; all 177 kg would be roughly €1,030.
+   - From €37.95 for about 6.5 kg, about €5.84/kg; all ~199 kg would be roughly €1,160.
    - No published viscosity, Tg or mix ratio, and Portugal shipping is unknown. It becomes the pick
      only if its viscosity is under about 1,000 mPa·s and its working time is at least 45 minutes.
    - [Product](https://www.harzspezialisten.de/polymerverguss-epoxidharz-set).
@@ -295,7 +297,7 @@ Requirements:
      Dry heat resistance +80 °C for up to 7 days, +100 °C for 12 h.
    - Pot life about 50 min at 10 °C, 25 min at 20 °C and 15 min at 30 °C. That works for the mill
      castings and the hobber column with 30 kg drill batches, mixed and placed within about 12
-     minutes on a cool day. It is not suitable for the hobber plinth: a fast-reacting resin in a 1 t
+     minutes on a cool day. It is not suitable for the hobber plinth: a fast-reacting resin in a 1.2 t
      casting builds heat too quickly, and a warm day leaves no margin.
    - Kits are 10 and 20 kg in France and 4 and 24 kg in Morocco. No Portuguese retail price was
      found; ask a Sika distributor.
@@ -308,7 +310,7 @@ Other candidates:
 | SKresin 3530 (Harzspezialisten) | Very thin, developed for filled systems; about 30 min pot life with Epohard 35, about €20/kg | [Harzspezialisten](https://www.harzspezialisten.de/polymerverguss-epoxidharz) |
 | Breddermann E45GB (Germany) | Low-viscosity casting system, 45 min working time, advertised for mineral casting; no datasheet or product link found | search "Breddermann E45GB" |
 | Aditya Birla CeTePox AM XP 340 | Specialist system for large machine beds, from the manufacturer's mineral-casting portfolio; datasheet, packs and Portugal supply not yet checked | Aditya Birla Advanced Materials, mineral-casting portfolio |
-| Aditya Birla CeTePox AM 3641 | Low-exotherm mineral-casting binder, a possible fit for the 1 t hobber plinth; datasheet, packs and Portugal supply not yet checked | Aditya Birla Advanced Materials, mineral-casting portfolio |
+| Aditya Birla CeTePox AM 3641 | Low-exotherm mineral-casting binder, a possible fit for the 1.2 t hobber plinth; datasheet, packs and Portugal supply not yet checked | Aditya Birla Advanced Materials, mineral-casting portfolio |
 
 Not recommended:
 - **Nazza art, table and floor resins.** No viscosity, Tg, modulus or creep data.
@@ -408,7 +410,7 @@ Ask the seller (suporte@magmag.pt, +351 236 621 161, or ferramentas.pt for the G
 - how the shaft ends are sealed, since resin in the bearings or seals ruins a mixer;
 - the discharge: bottom gate or tilting.
 
-Buy the MH 80 only if more large castings will follow the hobber. For a single 1 t pour, renting or
+Buy the MH 80 only if more large castings will follow the hobber. For a single 1.2 t pour, renting or
 two drills is cheaper.
 
 Any mixer used with epoxy:
@@ -431,10 +433,10 @@ Any mixer used with epoxy:
 
 | Casting | Wet mix | Drill mixer, ~30 kg | Trough or pan mixer, ~80 kg | Pour time |
 | --- | --- | --- | --- | --- |
-| Mill base | 166 kg | 6 × ~28 kg | — | ~45 min |
-| Mill column | 99 kg | 4 × ~25 kg | — | ~30 min |
-| Hobber column | ~62 kg | 3 × ~21 kg | — | ~20 min |
-| Hobber plinth | ~1,016 kg | 34 × 30 kg | 13 × ~78 kg | 2–2.5 h with a trough mixer or two drills; ~4 h with one drill |
+| Mill base | 165 kg | 6 × ~28 kg | — | ~45 min |
+| Mill column | 100 kg | 4 × ~25 kg | — | ~30 min |
+| Hobber column | 70 kg | 3 × ~23 kg | — | ~20 min |
+| Hobber plinth | 1,173 kg | 40 × ~29 kg | 15 × ~78 kg | 2.5–3 h with a trough mixer or two drills; ~4.5–5 h with one drill |
 
 The masses exclude waste. Prepare one extra batch's worth of dry kits per casting, and fill the
 coupon moulds from the last batch. On the plinth, each 30 kg batch adds a layer about 18 mm deep,
@@ -568,9 +570,9 @@ Prices are 2026-10-25 snapshots incl. VAT unless noted; "not checked" means a ty
 | Item | Source | Qty | Cost |
 | --- | --- | --- | --- |
 | Silica sand, 5 grades | Vetonek order 1 (tests and mill) | 18 × 25 kg | €135–157 + shipping |
-| Calcium carbonate 63 µm | Vetonek order 1 | 2 × 20 kg | €17 (order 1 ships at €85) |
-| Silica sand and carbonate | Vetonek order 2 (hobber, after coupons) | 40 + 6 bags | €350–400 + €80 shipping |
-| SR 8100 EVO with SD 8822 and SD 8824 | Sicomin or a distributor | smallest kits, then about 177 kg in total | quote needed |
+| Calcium carbonate 63 µm | Vetonek order 1 | 5 × 20 kg | €42 (order 1 ships at €85) |
+| Silica sand and carbonate | Vetonek order 2 (hobber, after coupons) | 42 + 7 bags | €370–430 + €80 shipping |
+| SR 8100 EVO with SD 8822 and SD 8824 | Sicomin or a distributor | smallest kits, then about 199 kg in total | quote needed |
 | Resoltech 1050, 1056S and 1055S | Castro Composites | 1.35 kg kit each | about €51 each excl. VAT |
 | Polymer casting system 3550 | Harzspezialisten | ~6.5 kg | ~€38 |
 | Sikafloor‑161 | Sika distributor | smallest kit | quote needed |
