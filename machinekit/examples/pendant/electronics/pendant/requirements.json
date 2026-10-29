@@ -3,24 +3,197 @@
   "board": "pendant",
   "requirements": [
     {
-      "id": "REQ-SPEC-1",
-      "text": "Replace the bootstrap with sourced product requirements before designing the board.",
+      "id": "REQ-PENDANT-POWER-1",
+      "text": "Run from the cable's 24 V with reverse-polarity protection and a TVS, and make 5 V and 3.3 V on the board.",
       "source": {
-        "placeholder": "New-board bootstrap: product requirements have not been defined or reviewed"
+        "file": "machinekit/PENDANT_PLAN.md",
+        "revision": "22a1006dd67641b7266073185fa0fd0efca6a883",
+        "where": "Electrical: Power"
       },
       "verified_by": [
-        "check:skeleton"
+        "check:power"
+      ]
+    },
+    {
+      "id": "REQ-PENDANT-CAN-1",
+      "text": "Talk to the cabinet controller over CAN-FD through an isolated transceiver (3-5 m cable).",
+      "source": {
+        "file": "machinekit/PENDANT_PLAN.md",
+        "revision": "22a1006dd67641b7266073185fa0fd0efca6a883",
+        "where": "Electrical: CAN-FD"
+      },
+      "verified_by": [
+        "check:can",
+        "bench:can"
+      ]
+    },
+    {
+      "id": "REQ-PENDANT-ESTOP-1",
+      "text": "Read the E-stop loop back on an isolated input; the loop itself never runs through the board.",
+      "source": {
+        "file": "machinekit/PENDANT_PLAN.md",
+        "revision": "22a1006dd67641b7266073185fa0fd0efca6a883",
+        "where": "Board v1 and the enclosure: decisions, M12 pigtail"
+      },
+      "verified_by": [
+        "check:inputs"
+      ]
+    },
+    {
+      "id": "REQ-PENDANT-INPUTS-1",
+      "text": "Read the 12-position axis switch and the 3-position step switch one-hot (exactly one closed is valid), seven keys and the wheel's two 5 V phases.",
+      "source": {
+        "file": "machinekit/PENDANT_PLAN.md",
+        "revision": "22a1006dd67641b7266073185fa0fd0efca6a883",
+        "where": "Board v1 and the enclosure: decisions, axis switch wiring"
+      },
+      "verified_by": [
+        "check:inputs",
+        "bench:wheel"
+      ]
+    },
+    {
+      "id": "REQ-PENDANT-OUTPUTS-1",
+      "text": "Drive the seven key LEDs.",
+      "source": {
+        "file": "machinekit/PENDANT_PLAN.md",
+        "revision": "22a1006dd67641b7266073185fa0fd0efca6a883",
+        "where": "Controls: Buttons"
+      },
+      "verified_by": [
+        "check:outputs",
+        "bench:led"
+      ]
+    },
+    {
+      "id": "REQ-PENDANT-PINS-1",
+      "text": "Use the STM32H503RBT6 pin assignment the firmware uses (one table).",
+      "source": {
+        "file": "machinekit/pendant_firmware/README.md",
+        "revision": "22a1006dd67641b7266073185fa0fd0efca6a883",
+        "where": "Pendant pin assignment"
+      },
+      "verified_by": [
+        "check:pins"
+      ]
+    },
+    {
+      "id": "REQ-PENDANT-ENCLOSURE-1",
+      "text": "Fit the pendant case: outline, holes, height zones and wire arrivals from its envelope record; all parts on the side facing the back wall.",
+      "source": {
+        "file": "machinekit/PENDANT_PLAN.md",
+        "revision": "22a1006dd67641b7266073185fa0fd0efca6a883",
+        "where": "Board v1 and the enclosure (P2)"
+      },
+      "verified_by": [
+        "check:envelope"
+      ]
+    },
+    {
+      "id": "REQ-PENDANT-KEYPAD-1",
+      "text": "Reserve a later membrane keypad zone: an 8-pin matrix group, an ID pin and a connector footprint.",
+      "source": {
+        "file": "machinekit/PENDANT_PLAN.md",
+        "revision": "22a1006dd67641b7266073185fa0fd0efca6a883",
+        "where": "Board v1 pin budget: reserved for the later membrane keypad zone"
+      },
+      "verified_by": [
+        "check:keypad"
       ]
     }
   ],
   "verifications": [
     {
-      "id": "check:skeleton",
+      "id": "check:power",
       "kind": "check",
-      "text": "Refuse an unfinished new-board skeleton",
+      "text": "24 V entry (fuse, reverse diode, TVS), buck to 5 V and LDO to 3.3 V within every part's limits",
       "source": {
         "file": "machinekit/examples/pendant/electronics/pendant/checks.py",
-        "where": "unfinished"
+        "where": "planned: power"
+      }
+    },
+    {
+      "id": "check:can",
+      "kind": "check",
+      "text": "FDCAN1 on PB12/PB13 to the CA-IS2062A, its bus side on the M12 pins with PESD2CAN",
+      "source": {
+        "file": "machinekit/examples/pendant/electronics/pendant/checks.py",
+        "where": "planned: can"
+      }
+    },
+    {
+      "id": "check:inputs",
+      "kind": "check",
+      "text": "keys, selectors (74HC165 chain on SPI1), wheel buffer and E-stop read-back wired to the assigned pins",
+      "source": {
+        "file": "machinekit/examples/pendant/electronics/pendant/checks.py",
+        "where": "planned: inputs"
+      }
+    },
+    {
+      "id": "check:outputs",
+      "kind": "check",
+      "text": "seven key LEDs through the ULN2003 from the LED supply",
+      "source": {
+        "file": "machinekit/examples/pendant/electronics/pendant/checks.py",
+        "where": "planned: outputs"
+      }
+    },
+    {
+      "id": "check:pins",
+      "kind": "check",
+      "text": "every MCU net on the pin the firmware's assignment table names",
+      "source": {
+        "file": "machinekit/examples/pendant/electronics/pendant/checks.py",
+        "where": "planned: pins"
+      }
+    },
+    {
+      "id": "check:envelope",
+      "kind": "check",
+      "text": "the board is generated from and checked against the pendant case's envelope",
+      "source": {
+        "file": "machinekit/examples/pendant/electronics/pendant/checks.py",
+        "where": "planned: envelope"
+      }
+    },
+    {
+      "id": "check:keypad",
+      "kind": "check",
+      "text": "the keypad matrix group, ID pin and connector footprint are reserved",
+      "source": {
+        "file": "machinekit/examples/pendant/electronics/pendant/checks.py",
+        "where": "planned: keypad"
+      }
+    },
+    {
+      "id": "bench:led",
+      "kind": "bench",
+      "text": "button LED voltage and current",
+      "source": {
+        "file": "machinekit/PENDANT_PLAN.md",
+        "revision": "22a1006dd67641b7266073185fa0fd0efca6a883",
+        "where": "Board v1 parts: to measure on the bought parts"
+      }
+    },
+    {
+      "id": "bench:wheel",
+      "kind": "bench",
+      "text": "wheel current and output type",
+      "source": {
+        "file": "machinekit/PENDANT_PLAN.md",
+        "revision": "22a1006dd67641b7266073185fa0fd0efca6a883",
+        "where": "Board v1 parts: to measure on the bought parts"
+      }
+    },
+    {
+      "id": "bench:can",
+      "kind": "bench",
+      "text": "CAN-FD heartbeat to the cabinet node over the 3-5 m cable",
+      "source": {
+        "file": "machinekit/PENDANT_PLAN.md",
+        "revision": "22a1006dd67641b7266073185fa0fd0efca6a883",
+        "where": "Board v1 parts: to measure on the bought parts"
       }
     }
   ]

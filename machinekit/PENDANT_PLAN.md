@@ -294,6 +294,11 @@ the face on four M2.5 standoffs, notched for the E-stop, posts, receptacle and e
 so the case has to hand pcbkit its constraints as data, and pcbkit has to hand the real board back. Nothing
 is copied by hand in either direction.
 
+**The board is `machinekit/examples/pendant/electronics/pendant/`** (a pcbkit board in materia, created 2026-10-29; pcbkit is
+the `pcbkit/` submodule). Its requirements (`REQ-PENDANT-*`) and decisions (`DEC-PENDANT-*`, `DEC-SPEC`) are records there,
+which `pcbkit status` grades; the sections below are their rationale. Open: `DEC-SPEC` (the specification review),
+`DEC-PENDANT-PARTS` (the parts review), `DEC-PENDANT-CONNECTORS` and `DEC-PENDANT-LED-SUPPLY`.
+
 **Decisions (2026-10-28, chosen for the long term):**
 
 - **Component side.** Every part on the side facing the back wall, so JLCPCB assembles one side; the face
