@@ -66,7 +66,24 @@ def build():
                                   'revision': '22a1006dd67641b7266073185fa0fd0efca6a883',
                                   'where': 'Board v1 pin budget: reserved for the later '
                                            'membrane keypad zone'},
-                       'verified_by': ['check:keypad']}],
+                       'verified_by': ['check:keypad']},
+                      {'id': 'REQ-PENDANT-PROGRAM-1',
+                       'text': 'Program and debug over SWD on a Tag-Connect footprint, with '
+                               'BOOT0 able to force the ROM bootloader; USB only as bench '
+                               'pads and an unfitted connector.',
+                       'source': {'file': 'machinekit/PENDANT_PLAN.md',
+                                  'revision': 'f60fbad5fa355be6654b9f7b1725a6700b8c46b3',
+                                  'where': 'Board v1 and the enclosure: Programming and '
+                                           'updates'},
+                       'verified_by': ['check:programming']},
+                      {'id': 'REQ-PENDANT-UPDATE-1',
+                       'text': 'Update the firmware over CAN-FD through the cable with the '
+                               'case closed.',
+                       'source': {'file': 'machinekit/PENDANT_PLAN.md',
+                                  'revision': 'f60fbad5fa355be6654b9f7b1725a6700b8c46b3',
+                                  'where': 'Board v1 and the enclosure: Programming and '
+                                           'updates'},
+                       'verified_by': ['bench:can-update']}],
      'verifications': [{'id': 'check:power',
                         'kind': 'check',
                         'text': '24 V entry (fuse, reverse diode, TVS), buck to 5 V and LDO '
@@ -128,7 +145,22 @@ def build():
                         'source': {'file': 'machinekit/PENDANT_PLAN.md',
                                    'revision': '22a1006dd67641b7266073185fa0fd0efca6a883',
                                    'where': 'Board v1 parts: to measure on the bought '
-                                            'parts'}}]}
+                                            'parts'}},
+                       {'id': 'check:programming',
+                        'kind': 'check',
+                        'text': 'Tag-Connect SWD footprint on PA13/PA14/NRST/3.3 V/GND, '
+                                'BOOT0 pull-down and test pad, USB pads and the unfitted '
+                                'USB-C footprint',
+                        'source': {'file': 'machinekit/examples/pendant/electronics/pendant/checks.py',
+                                   'where': 'planned: programming'}},
+                       {'id': 'bench:can-update',
+                        'kind': 'bench',
+                        'text': 'a firmware update pushed over CAN-FD through the cable, '
+                                'case closed',
+                        'source': {'file': 'machinekit/PENDANT_PLAN.md',
+                                   'revision': 'f60fbad5fa355be6654b9f7b1725a6700b8c46b3',
+                                   'where': 'Board v1 and the enclosure: Programming and '
+                                            'updates'}}]}
 
 
 if __name__ == "__main__":

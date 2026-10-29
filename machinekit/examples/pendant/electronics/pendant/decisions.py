@@ -181,7 +181,42 @@ def build():
                     'blocks': ['circuit', 'export', 'order'],
                     'source': {'file': 'machinekit/PENDANT_PLAN.md',
                                'revision': '22a1006dd67641b7266073185fa0fd0efca6a883',
-                               'where': 'Board v1 parts: to measure on the bought parts'}}],
+                               'where': 'Board v1 parts: to measure on the bought parts'}},
+                   {'id': 'DEC-PENDANT-PROGRAMMING',
+                    'question': 'How is the pendant programmed and updated?',
+                    'options': ['SWD for development, CAN-FD for field updates, USB '
+                                'bench-only',
+                                'USB connector through the case'],
+                    'choice': 'SWD for development, CAN-FD for field updates, USB bench-only',
+                    'rationale': 'The M12 cable is the only external connection; a USB port '
+                                 'through the case would need sealing and adds nothing SWD '
+                                 'does not cover on the bench.',
+                    'decided_by': 'user',
+                    'date': '2026-10-29',
+                    'affects': ['REQ-PENDANT-PROGRAM-1', 'REQ-PENDANT-UPDATE-1'],
+                    'status': 'accepted',
+                    'blocks': [],
+                    'source': {'file': 'machinekit/PENDANT_PLAN.md',
+                               'revision': 'f60fbad5fa355be6654b9f7b1725a6700b8c46b3',
+                               'where': 'Board v1 and the enclosure: Programming and '
+                                        'updates'}},
+                   {'id': 'DEC-PENDANT-BOOTLOADER',
+                    'question': 'Which bootloader takes field updates over CAN-FD?',
+                    'options': ["ST's ROM bootloader over FDCAN, if the H503 offers it "
+                                '(AN2606)',
+                                'our own bootloader in flash that checks the image'],
+                    'choice': None,
+                    'rationale': "Confirm FDCAN in the H503's system bootloader first; our "
+                                 'own bootloader adds image checking at the cost of flash.',
+                    'decided_by': None,
+                    'date': None,
+                    'affects': ['REQ-PENDANT-UPDATE-1'],
+                    'status': 'open',
+                    'blocks': ['export', 'order'],
+                    'source': {'file': 'machinekit/PENDANT_PLAN.md',
+                               'revision': 'f60fbad5fa355be6654b9f7b1725a6700b8c46b3',
+                               'where': 'Board v1 and the enclosure: Programming and '
+                                        'updates'}}],
      'reviews': {}}
 
 
