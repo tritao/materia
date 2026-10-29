@@ -123,8 +123,17 @@ typedef SceneArtifactCellSignal = {
   var to:SceneArtifactSignalPort;
 }
 
+/** The recorded modeling history of one occurrence's part, so a viewer can roll the part back through its steps. */
+typedef SceneArtifactHistory = {
+  /** The assembly occurrence whose part this is. */
+  var occurrence:String;
+  /** A `cadkit.document` (JSON): the steps that built the part, in authoring order. Opaque here; the viewer decodes it. */
+  var document:String;
+}
+
 typedef SceneArtifactProject = {
   @:optional var sources:materia.project.SceneSourceMap;
+  @:optional var histories:Array<SceneArtifactHistory>;
   @:optional var navigation:Array<materia.project.SceneSourceMap.SceneNavigation>;
   /** Source configuration selected by the generated project. */
   @:optional var variant:String;
@@ -1062,8 +1071,8 @@ class SceneArtifact {
       });
       length += 250 + finish.length + materialId.length + materialSpec.length + id.length
         + name.length + part.vertices.length + part.normals.length + part.indices.length + (part.edgeSegments
-        == null ? 0 : part.edgeSegments.length) + (part.edgeIds
-        == null ? 0 : part.edgeIds.length) + part.faceRanges.length * 12 + 4 + faces.length + 4 + threads.length + 4 + details.length;
+        == null ? 0 : part.edgeSegments.length) + (part.edgeIds == null ? 0 : part.edgeIds.length)
+        + part.faceRanges.length * 12 + 4 + faces.length + 4 + threads.length + 4 + details.length;
       if (length > MAX_BYTES) throw "Scene artifact exceeds the 150 MB limit";
     }
     var result = Bytes.alloc(length), offset = 0;
@@ -1248,13 +1257,28 @@ class SceneArtifact {
         raw,
         "navigation"
       ));
+    var histories:Null<Array<SceneArtifactHistory>> = null;
+    if (Reflect.field(raw, "histories") != null) {
+      var rawHistories:Dynamic = Reflect.field(raw, "histories");
+      if (!Std.isOfType(rawHistories,
+        Array) || (cast rawHistories:Array<Dynamic>).length > 256) throw "Invalid project histories";
+      histories = [];
+      for (entry in (cast rawHistories:Array<Dynamic>)) {
+        var occurrence:Dynamic = Reflect.field(entry,
+          "occurrence"), document:Dynamic = Reflect.field(entry, "document");
+        if (!Std.isOfType(occurrence, String) || !Std.isOfType(document, String) || occurrence.length == 0
+          || document.length == 0 || document.length > 1000000) throw "Invalid project history";
+        histories.push({occurrence: occurrence, document: document});
+      }
+    }
     return {
       variant: variant,
       job: job,
       dynamicParts: dynamicParts,
       motions: tracks,
       sources: sources,
-      navigation: navigation
+      navigation: navigation,
+      histories: histories
     };
   }
 
@@ -1266,6 +1290,14 @@ class SceneArtifact {
     var occurrences = definition
       == null ? [for (part in data.parts) part.id] : [for (item in definition.occurrences) item.id];
     if (project.sources != null) materia.project.SceneSourceMap.SceneSourceMaps.validate(project.sources, data);
+    if (project.histories != null) {
+      var historyIds = new Map<String, Bool>();
+      for (history in project.histories) {
+        if (occurrences.indexOf(history.occurrence) < 0
+          || historyIds.exists(history.occurrence)) throw "Invalid project history occurrence";
+        historyIds.set(history.occurrence, true);
+      }
+    }
     if (project.navigation != null) {
       var navigationIds = new Map<String, Bool>();
       for (link in project.navigation) {
