@@ -275,10 +275,10 @@ Measured with the interaction and tab-matrix scenarios, before to after, on the 
 | | before | after |
 |---|---|---|
 | hover onto a tab (bytes per frame) | 195,472 | 158,744 (-18.8%) |
-| tab switch, hierarchy to sensors (KiB) | 421.6 | 312.7 (-25.8%) |
-| sensors to hierarchy | 369.3 | 260.4 (-29.5%) |
-| console to telemetry | 355.8 | 251.9 (-29.2%) |
-| telemetry to console | 357.2 | 255.2 (-28.6%) |
+| tab switch, hierarchy to sensors (KiB) | 421.6 | 290.7 (-31.0%) |
+| sensors to hierarchy | 369.3 | 252.2 (-31.7%) |
+| console to telemetry | 355.8 | 248.9 (-30.0%) |
+| telemetry to console | 357.2 | 249.7 (-30.1%) |
 
 What changed, in the order it paid:
 
@@ -295,6 +295,8 @@ What changed, in the order it paid:
 - Icon paint keys use a cached color text and name prefix; `StateStore.prunePaths`, `BuildContext.pruneKeyCaches` and the
   layout decode no longer snapshot maps or box ints (`IntIndex`).
 - HashLink makes a nullary enum constructor once (a global, filled on first use) instead of at every evaluation.
+- `ResolvedLayoutItem.decode` shares the identity transform and repeats of the previous clip and content rectangle (all immutable);
+  the sensors panel, 192 nodes, saved 22 KiB per switch.
 
 Found, and not fixed:
 
@@ -306,9 +308,11 @@ Found, and not fixed:
 - `==` on enums compares only the constructor index in Haxeon: `Circle(1) == Circle(2)` is true. Haxe compares by identity
   (false). Nullary constructors are now shared, which makes identity correct for them.
 
-Remaining in the tab-switch census (KiB per six-frame cycle of about 2,080): the `LayoutNode` and `LayoutStyle` of each node
-(130), children arrays in `RenderNode.add` and `LayoutNode.add` (55), `ResolvedLayoutItem.decode` and `viewportBounds` (100),
-`TextLayout.caret` (28), scope path strings in `KeyScope` (32) and `ResolvedTextStyle` copies (28).
+Remaining in the tab-switch census (KiB per six-frame cycle of about 2,000): the `LayoutNode` and `LayoutStyle` of each node
+(130), `TextLayout.caret` (28), scope path strings in `KeyScope` (32), `ResolvedTextStyle` copies (28) and `viewportBounds` (16).
+The children arrays of `RenderNode` and `LayoutNode` (55) are not worth chasing: an array of up to four children costs the same
+72 bytes however it is built, and growth starts at five. `ResolvedTextStyle` results are mutable by contract, so they cannot be
+shared.
 
 `HAXEON_IR_ALLOC_ROOTS` (`docs/IR_ALLOCATION_REPORT.md` in Haxeon) lists what a function can allocate before it runs.
 
