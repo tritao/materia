@@ -343,12 +343,7 @@ class HandWheel extends HmiPart {
       }
       return Solids.named(Solids.union(pieces), "labels");
     }
-    ), new DeviceBodySpec("wheel", "hand wheel", materialSpec(), wheelSolid), new DeviceBodySpec(
-      "index",
-      "hand wheel index mark",
-      "ABS white",
-      () -> Solids.named(indexGroove(), "index")
-    )];
+    ), new DeviceBodySpec("wheel", "hand wheel", materialSpec(), wheelSolid)];
   }
 
   /** Wheel solids already built, by the numbers they depend on: the knurling and the scale make one cost seconds to build. */
@@ -434,8 +429,7 @@ class HandWheel extends HmiPart {
       socketMoved.close();
       parts.push(Solids.named(handle, "handle"));
     }
-    var joined = Solids.union(parts);
-    return Solids.cut(joined, [indexGroove()]);
+    return Solids.union(parts);
   }
 
   /** Fine straight knurling round the grip: a triangular tooth profile, one extrusion from root radius to tip radius. */
@@ -533,18 +527,7 @@ class HandWheel extends HmiPart {
     Continuous,
     "housing",
     "wheel"
-  ),
-  // The index mark is part of the wheel: fixed to it, turning with it.
-  new DeviceJointSpec("index-mount", Fixed, "wheel", "index")];
-
-  /** The white index mark's shape: a line across the dial's floor from near its centre toward the rim, opposite the spinner. */
-  function indexGroove():Part {
-    var floor = bodyHeight() - n("dialRecess"), depth = 0.5, from = 5.0, to = n("dialDiameter") / 2 - 2.0;
-    var raw = Part.box(1.6, to - from, depth);
-    var moved = raw.translated(new Vector(0.0, (from + to) / 2, floor - depth));
-    raw.close();
-    return moved;
-  }
+  )];
 
   /** A box centred on (x, y) with its lower face at z0. */
   static function boxAt(w:Float, h:Float, d:Float, x:Float, z0:Float):Part return boxAtY(w, h, d, x, 0.0, z0);

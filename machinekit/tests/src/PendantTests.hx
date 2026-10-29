@@ -196,7 +196,7 @@ class PendantTests {
       ids.indexOf(id) >= 0,
       "Missing member " + id + " in " + ids.join(", ")
     );
-    check(ids.length == 89, "Eighty-nine members, thirty-three of them hardware: " + ids.length);
+    check(ids.length == 88, "Eighty-eight members, thirty-three of them hardware: " + ids.length);
     check(
       ids.indexOf("fasteners/display-frame") >= 0 && ids.indexOf("fasteners/display-screw-4") >= 0,
       "The display's frame hardware"
@@ -220,8 +220,8 @@ class PendantTests {
     var joints = assembly.derived().definition.joints;
     var encoders = [for (j in joints) if (j.id == "jog/wheel/encoder") j];
     check(
-      joints.length == 6 && encoders.length == 1,
-      "Six joints: the wheel's free encoder, two clicking knobs and a fixed pointer or index mark on each: "
+      joints.length == 5 && encoders.length == 1,
+      "Five joints: the wheel's free encoder, two clicking knobs and a fixed pointer on each knob: "
       + [for (j in joints) j.id].join(", ")
     );
     // The switches click: each knob joint is limited between end stops and has a detent at every position, 30 degrees apart.
