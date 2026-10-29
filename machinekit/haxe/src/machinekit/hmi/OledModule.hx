@@ -7,6 +7,9 @@ import cadkit.modeling.Part;
 import cadkit.modeling.RoundedRectangle;
 import cadkit.modeling.Vector;
 import cadkit.threads.Details;
+import cadkit.threads.SurfaceDetail;
+import cadkit.threads.SurfaceDetail.DisplayBinding;
+import cadkit.threads.SurfaceDetail.DisplaySpec;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as R;
 import materia.assembly.AssemblyFrames;
@@ -26,9 +29,6 @@ import materia.assembly.AssemblyFrames;
  */
 class OledModule extends HmiPart {
   static var recipe:Null<ComponentType>;
-
-  /** Names the simulation that fills the display (see `app.editor.LiveDisplays`). */
-  public static inline var DISPLAY_SOURCE:String = "pendant-oled";
 
   // Vendor drawing 2_42inch_oled_module-sku25742 (millimetres).
   static inline var GLASS_WIDTH:Float = 60.5;
@@ -209,6 +209,17 @@ class OledModule extends HmiPart {
     return result;
   }
 
+  var driver:Null<DisplaySpec> = null;
+
+  /**
+   * Says who fills the display in a simulation: the driver `source`, the operator profile it serves and which joint feeds each of
+   * its signals. Without it the glass is plain. Returns the module, for a layout to chain.
+   */
+  public function driven(source:String, profile:String, bindings:Array<DisplayBinding>):OledModule {
+    driver = new DisplaySpec(VIEW_WIDTH, VIEW_HEIGHT, 0.0, ACTIVE_OFFSET, source, profile, bindings);
+    return this;
+  }
+
   override public function bodies():Null<Array<DeviceBodySpec>> {
     return [
       new DeviceBodySpec("pcb", "OLED module circuit board", "FR4 PCB blue", pcb),
@@ -254,18 +265,16 @@ class OledModule extends HmiPart {
     return Solids.named(Solids.union(pieces), "foam");
   }
 
-  /** The glass, its front face carrying the display: the active area, which a simulator fills from the pendant firmware. */
+  /** The glass; when the module is `driven`, its front face carries the display (the active area), which a simulator fills. */
   function glass():Part {
     var plain = Solids.named(
       box(GLASS_WIDTH, GLASS_HEIGHT, GLASS_THICKNESS, 0.0, boardCentre(), glassFront() - GLASS_THICKNESS),
       "glass"
     );
+    var spec = driver;
+    if (spec == null) return plain;
     try {
-      var shape = Details.attach(
-        plain.shape,
-        frontFace(plain.shape),
-        Display(VIEW_WIDTH, VIEW_HEIGHT, 0.0, ACTIVE_OFFSET, DISPLAY_SOURCE)
-      );
+      var shape = Details.attach(plain.shape, frontFace(plain.shape), Display(spec));
       plain.close();
       return new Part(shape);
     } catch (error:Dynamic) {

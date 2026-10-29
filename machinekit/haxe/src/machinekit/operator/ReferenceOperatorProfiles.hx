@@ -7,6 +7,16 @@ class ReferenceOperatorProfiles {
     p[1]
   )];
 
+  /** The profile called `name` ("drill-tap" or "hobber"), or null. */
+  public static function named(name:String):Null<OperatorProfile> return switch name {
+    case "drill-tap":
+      drillTap();
+    case "hobber":
+      hobber();
+    case _:
+      null;
+  };
+
   public static function drillTap():OperatorProfile return new OperatorProfile(
     "drill-tap",
     axes([["x", "X"], ["y", "Y"], ["z", "Z"], ["a", "A"], ["spindle", "Spindle"]]),

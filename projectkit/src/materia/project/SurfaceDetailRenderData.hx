@@ -13,6 +13,13 @@ class SurfaceDetailKinds {
  * without a B-rep. The frame has its origin on the axis at the start of the interval, its normal along the axis and its
  * x direction at the reference angle; lengths are in the part's unit, `depth` in millimetres.
  */
+/** Which joint feeds one signal of a live display's driver. */
+@:wire typedef DisplayBindingData = {
+  @:id(1) var signal:String;
+  /** An assembly joint id. */
+  @:id(2) var joint:String;
+}
+
 @:wire typedef SurfaceDetailRenderData = {
   @:id(1) var faceName:String;
   @:id(2) var faceIndex:Int;
@@ -39,6 +46,10 @@ class SurfaceDetailKinds {
   @:id(15) var height:Float;
   /** What drives a display (the editor chooses a live source by this name); empty for the other kinds. */
   @:id(16) var source:String;
+  /** The operator profile (by name) a display's driver serves; empty when the driver needs none. */
+  @:id(17) var profile:String;
+  /** Which joint feeds each signal of the driver; empty for the other kinds. */
+  @:id(18) var bindings:Array<DisplayBindingData>;
 }
 
 /** Display packets are validated before an editor allocates resources. */
@@ -55,6 +66,9 @@ class SurfaceDetailRenderDataValues {
       && Math.isFinite(detail.height))) throw 'Display ${detail.faceName} needs a positive size';
     if (detail.kind == SurfaceDetailKinds.DISPLAY && (detail.source == null
       || detail.source.length == 0 || detail.source.length > 256)) throw 'Display ${detail.faceName} needs a source';
+    if (detail.bindings == null) throw 'Surface detail ${detail.faceName} has no bindings list';
+    for (binding in detail.bindings) if (binding.signal == null || binding.signal.length == 0 || binding.joint == null
+      || binding.joint.length == 0) throw 'Display ${detail.faceName} has a binding without a signal or a joint';
     if (detail.count < 2
       || detail.count > 4096 || !Math.isFinite(detail.depth) || detail.depth < 0 || detail.numberedEvery < 0
       || detail.numberedEvery > detail.count) throw 'Surface detail ${detail.faceName} has invalid numbers';

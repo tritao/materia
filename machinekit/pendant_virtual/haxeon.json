@@ -3,6 +3,10 @@
 	"package": { "name": "machinekit-pendant-native" },
 	"sourceRoots": ["haxe"],
 	"scopeSourceRoots": false,
+	"dependencies": {
+		"projectkit": { "path": "../../projectkit" },
+		"machinekit": { "path": ".." }
+	},
 	"ffi": {
 		"interfaces": ["bindings/machinekit-pendant.hxi"]
 	},

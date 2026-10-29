@@ -3,6 +3,7 @@ package cadkit.threads;
 import CadKit;
 import cadkit.Shape;
 import cadkit.modeling.Vector;
+import cadkit.threads.SurfaceDetail.DisplaySpec;
 import materia.project.SurfaceDetailRenderData;
 import materia.project.SurfaceDetailRenderData.SurfaceDetailKinds;
 
@@ -19,17 +20,19 @@ class Details {
       case Graduation(divisions, every, slant, endRadius):
         if (divisions < 2 || every < 0 || every > divisions || !(slant > 0)
           || !(endRadius >= 0)) throw 'Graduation on $name needs two or more divisions and its surface size';
-      case Display(width, height, offsetX, offsetY, source):
-        if (source == null || source.length == 0) throw 'Display on $name needs a source';
-        if (!(width > 0) || !(height > 0) || !Math.isFinite(offsetX)
-          || !Math.isFinite(offsetY)) throw 'Display on $name needs a positive size and a finite offset';
+      case Display(spec):
+        if (spec.source == null || spec.source.length == 0) throw 'Display on $name needs a source';
+        if (!(spec.width > 0) || !(spec.height > 0) || !Math.isFinite(spec.offsetX)
+          || !Math.isFinite(spec.offsetY)) throw 'Display on $name needs a positive size and a finite offset';
+        for (binding in spec.bindings) if (binding.signal == null || binding.signal == "" || binding.joint == null
+          || binding.joint == "") throw 'Display on $name has a binding without a signal or a joint';
     }
     var index = Threads.namedIndex(shape, name);
     var face = shape.subshape(CadKit.ShapeKind.Face, index);
     var minimum = 0.0;
     try {
       switch detail {
-        case Display(_, _, _, _, _):
+        case Display(_):
           if (face.surfaceKind() != CadKit.SurfaceKind.Plane) throw 'Display on $name needs a planar face';
         case _:
           minimum = Threads.extent(face).minimum;
@@ -56,8 +59,8 @@ class Details {
       var face = shape.subshape(CadKit.ShapeKind.Face, index);
       try {
         switch detail {
-          case Display(width, height, offsetX, offsetY, source):
-            result.push(displayData(face, attribute.faceName, index, width, height, offsetX, offsetY, source));
+          case Display(spec):
+            result.push(displayData(face, attribute.faceName, index, spec));
             face.close();
             continue;
           case _:
@@ -79,7 +82,7 @@ class Details {
             every = e;
             surface = slant;
             radiusEnd = endRadius;
-          case Display(_, _, _, _, _):
+          case Display(_):
             throw "unreachable";
         }
         result.push({
@@ -98,7 +101,9 @@ class Details {
           radiusEnd: radiusEnd,
           width: 0.0,
           height: 0.0,
-          source: ""
+          source: "",
+          profile: "",
+          bindings: []
         });
         face.close();
       } catch (error:Dynamic) {
@@ -110,16 +115,7 @@ class Details {
   }
 
   /** A display's frame: x along the face's reference direction, z out of the face, the picture centred at its offset. */
-  static function displayData(
-    face:Shape,
-    name:String,
-    index:Int,
-    width:Float,
-    height:Float,
-    offsetX:Float,
-    offsetY:Float,
-    source:String
-  ):SurfaceDetailRenderData {
+  static function displayData(face:Shape, name:String, index:Int, spec:DisplaySpec):SurfaceDetailRenderData {
     var normal = Vector.fromNative(face.faceNormal());
     var reference = Vector.fromNative(face.faceAxis().get_reference());
     var z = normal.scale(1.0 / normal.length());
@@ -128,24 +124,21 @@ class Details {
     x = x.scale(1.0 / x.length());
     var y = z.cross(x);
     var c = Vector.fromNative(face.center());
-    var origin = c.add(x.scale(offsetX)).add(y.scale(offsetY));
-    return {
-      faceName: name,
-      faceIndex: index,
-      kind: SurfaceDetailKinds.DISPLAY,
-      origin: [origin.x, origin.y, origin.z],
-      xDirection: [x.x, x.y, x.z],
-      direction: [z.x, z.y, z.z],
-      length: height,
-      radius: width / 2,
-      count: 2,
-      depth: 0.0,
-      numberedEvery: 0,
-      surface: height,
-      radiusEnd: width / 2,
-      width: width,
-      height: height,
-      source: source
-    };
+    var origin = c.add(x.scale(spec.offsetX)).add(y.scale(spec.offsetY));
+    return {faceName: name,
+      faceIndex: index, kind: SurfaceDetailKinds.DISPLAY, origin: [origin.x, origin.y, origin.z], xDirection: [
+        x.x,
+        x.y,
+        x.z
+      ], direction: [
+        z.x,
+        z.y,
+        z.z
+      ], length: spec.height, radius: spec.width / 2,
+      count: 2, depth: 0.0, numberedEvery: 0, surface: spec.height, radiusEnd: spec.width / 2, width: spec.width,
+      height: spec.height, source: spec.source, profile: spec.profile, bindings: [for (binding in spec.bindings) {
+      signal:binding.signal, joint:binding.joint
+    }
+    ]};
   }
 }

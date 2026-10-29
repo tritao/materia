@@ -17,9 +17,52 @@ enum SurfaceDetail {
   Graduation(divisions:Int, numberedEvery:Int, slant:Float, endRadius:Float);
 
   /**
-   * A live display on a planar face: a `width` by `height` picture whose centre is `offsetX` along the face's reference
-   * direction and `offsetY` along the face normal crossed with it, from the face's centre. The pixels are not part of the
-   * model; a viewer fills them from the running simulation that `source` names.
+   * A live display on a planar face: a picture the viewer fills from a running simulation (see `DisplaySpec`).
    */
-  Display(width:Float, height:Float, offsetX:Float, offsetY:Float, source:String);
+  Display(spec:DisplaySpec);
+}
+
+/** Which joint feeds one signal of a display's driver. */
+class DisplayBinding {
+  public final signal:String;
+  /** An assembly joint id. */
+  public final joint:String;
+
+  public function new(signal:String, joint:String) {
+    this.signal = signal;
+    this.joint = joint;
+  }
+}
+
+/**
+ * A `width` by `height` picture whose centre is `offsetX` along the face's reference direction and `offsetY` along the face
+ * normal crossed with it, from the face's centre. `source` names the driver that fills it, `profile` the operator profile that
+ * driver serves, and `bindings` the joints that feed its signals; the pixels are not part of the model.
+ */
+class DisplaySpec {
+  public final width:Float;
+  public final height:Float;
+  public final offsetX:Float;
+  public final offsetY:Float;
+  public final source:String;
+  public final profile:String;
+  public final bindings:Array<DisplayBinding>;
+
+  public function new(
+    width:Float,
+    height:Float,
+    offsetX:Float,
+    offsetY:Float,
+    source:String,
+    profile:String,
+    bindings:Array<DisplayBinding>
+  ) {
+    this.width = width;
+    this.height = height;
+    this.offsetX = offsetX;
+    this.offsetY = offsetY;
+    this.source = source;
+    this.profile = profile;
+    this.bindings = bindings;
+  }
 }

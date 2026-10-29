@@ -1,4 +1,5 @@
 import haxe.io.Bytes;
+import machinekit.operator.PendantDisplaySignals;
 import machinekit.operator.VirtualPendant;
 
 class VirtualPendantTests {
@@ -12,7 +13,56 @@ class VirtualPendantTests {
     return count;
   }
 
+  /** The pendant layout's display: one display on the glass, framed on the active area, bound to the pendant's joints. */
+  static function checkModelDisplay():Void {
+    var module = new machinekit.hmi.OledModule();
+    var plainBodies = 0;
+    for (body in module.bodies()) if (body.id == "glass") {
+      var plain = body.build();
+      check(cadkit.threads.Details.renderData(plain.shape).length == 0, "an undriven module's glass is plain");
+      plain.close();
+      plainBodies++;
+    }
+    check(plainBodies == 1, "the module has a glass body");
+    var layout = machinekit.pendant.ReferencePendant.layout();
+    var oled:machinekit.hmi.OledModule = null;
+    for (placed in layout.controls) if (placed.id == "display") oled = cast placed.part;
+    check(oled != null, "the layout has a display");
+    var found = 0;
+    for (body in oled.bodies()) {
+      if (body.id != "glass") continue;
+      var glass = body.build();
+      var details = cadkit.threads.Details.renderData(glass.shape);
+      glass.close();
+      check(details.length == 1, "the glass has one detail");
+      var d = details[0];
+      check(d.kind == materia.project.SurfaceDetailRenderData.SurfaceDetailKinds.DISPLAY, "it is a display");
+      check(d.source == PendantDisplaySignals.SOURCE, "it names the pendant OLED source");
+      check(d.profile == machinekit.pendant.ReferencePendant.PROFILE, "it names its operator profile");
+      check(Math.abs(d.width - 57.01) < 1e-6 && Math.abs(d.height - 29.49) < 1e-6, "the active area's size");
+      // x to the right and z toward the operator, so y is up; the active area is centred on the module's origin.
+      check(Math.abs(d.xDirection[0] - 1) < 1e-9 && Math.abs(d.direction[2] - 1) < 1e-9, "the picture reads upright");
+      check(Math.abs(d.origin[0]) < 1e-6 && Math.abs(d.origin[1]) < 1e-6, "centred on the module's origin");
+      var joints = [for (j in machinekit.pendant.ReferencePendant.assembly().derived().definition.joints) j.id => true];
+      var expected = [
+        PendantDisplaySignals.AXIS,
+        PendantDisplaySignals.STEP,
+        PendantDisplaySignals.WHEEL,
+        PendantDisplaySignals.WHEEL_ENABLE
+      ].concat(PendantDisplaySignals.keys());
+      check(d.bindings.length == expected.length, "every signal is bound: " + d.bindings.length);
+      for (binding in d.bindings) {
+        check(expected.indexOf(binding.signal) >= 0, "a known signal: " + binding.signal);
+        check(joints.exists(binding.joint), "a bound joint exists in the assembly: " + binding.joint);
+      }
+      materia.project.SurfaceDetailRenderData.SurfaceDetailRenderDataValues.validate(d);
+      found++;
+    }
+    check(found == 1, "the display module has a glass body");
+  }
+
   static function main():Void {
+    checkModelDisplay();
     var pendant = new VirtualPendant(0);
     var pixels = pendant.pixels(0);
     check(pixels.length == VirtualPendant.WIDTH * VirtualPendant.HEIGHT, "the OLED is 128x64");

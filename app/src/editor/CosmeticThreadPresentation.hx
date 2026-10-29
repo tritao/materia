@@ -5,6 +5,7 @@ import app.EditorScene.SceneBridge;
 import app.CadGeometryData;
 import cadkit.threads.DetailTexture;
 import haxe.Json;
+import materia.project.LiveDisplay;
 import materia.project.SurfaceDetailRenderData.SurfaceDetailKinds;
 import nativekit.scene.MaterialData;
 import nativekit.scene.GeometryData;
@@ -204,7 +205,9 @@ private typedef ThreadGroup = {
    */
   function displayNode(owner:EditorScene,
     id:String, kind:String, parent:NodeId, detail:CadDetailGeometry):Null<ThreadNode> {
-    var source = LiveDisplays.create(detail.source.source);
+    var bindings:Map<String, String> = [];
+    for (binding in detail.source.bindings) bindings.set(binding.signal, binding.joint);
+    var source = LiveDisplays.create(new LiveDisplayConfig(detail.source.source, detail.source.profile, bindings));
     if (source == null) return null;
     if (sampler == null) {
       sampler = owner.scene.createSampler();
@@ -271,6 +274,9 @@ private typedef ThreadGroup = {
       if (live.source.busy()) changed = true;
       if (rgba == null) continue;
       owner.scene.setImageData(live.image, picture(live.source, rgba));
+      // The viewport redraws only for a new scene revision; a changed picture is one, and the renderer picks up new image data when the scene is refreshed.
+      owner.requireRenderRefresh();
+      owner.markVisualChanged();
       changed = true;
     }
     return changed;

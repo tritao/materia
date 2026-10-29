@@ -1,7 +1,9 @@
 package machinekit.pendant;
 
 import machinekit.assembly.MachineAssembly;
+import cadkit.threads.SurfaceDetail.DisplayBinding;
 import machinekit.hmi.*;
+import machinekit.operator.PendantDisplaySignals;
 
 /**
  * The first layout of the one-SKU pendant, a one-hand handheld like commercial CNC pendants: a 114 x 210 mm face, held
@@ -26,7 +28,12 @@ class ReferencePendant {
       new PlacedPart("axis", PartPresets.rotarySwitch(12), side * 39.0, 80.0),
       new PlacedPart("step", PartPresets.rotarySwitch(3), side * 8.0, 80.0),
       new PlacedPart("estop", PartPresets.xb2Es542(), side * -32.0, 80.0),
-      new PlacedPart("display", PartPresets.oled242(), 0.0, 37.0),
+      new PlacedPart(
+        "display",
+        PartPresets.oled242().driven(PendantDisplaySignals.SOURCE, PROFILE, displayBindings()),
+        0.0,
+        37.0
+      ),
       new PlacedPart("f1", PartPresets.pushButton16(), side * -40.5, 1.5),
       new PlacedPart("f2", PartPresets.pushButton16(), side * -13.5, 1.5),
       new PlacedPart("f3", PartPresets.pushButton16(), side * 13.5, 1.5),
@@ -44,6 +51,30 @@ class ReferencePendant {
       dimensions.depth,
       controls
     );
+  }
+
+  /**
+   * The operator profile the simulated display serves. A pendant belongs to a machine and should take that machine's profile; until a
+   * layout is built for one, the hobber's stands in.
+   */
+  public static inline var PROFILE:String = "hobber";
+
+  /** The joint of `joint` on the part `part`, as the assembly names it: its group, the part, then the joint. */
+  public static function jointId(part:String, joint:String):String {
+    for (group in groups()) if (group.members.indexOf(part) >= 0) return group.id + "/" + part + "/" + joint;
+    return part + "/" + joint;
+  }
+
+  /** Which joint feeds each signal of the display's driver. */
+  public static function displayBindings():Array<DisplayBinding> {
+    var bindings = [
+      new DisplayBinding(PendantDisplaySignals.AXIS, jointId("axis", "position")),
+      new DisplayBinding(PendantDisplaySignals.STEP, jointId("step", "position")),
+      new DisplayBinding(PendantDisplaySignals.WHEEL, jointId("wheel", "encoder")),
+      new DisplayBinding(PendantDisplaySignals.WHEEL_ENABLE, jointId("wheel-enable", "press"))
+    ];
+    for (key in PendantDisplaySignals.keys()) bindings.push(new DisplayBinding(key, jointId(key, "press")));
+    return bindings;
   }
 
   /** How the controls are grouped in the assembly's hierarchy: by what the operator does with them. */

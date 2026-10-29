@@ -2,8 +2,8 @@ package app.editor;
 
 import app.MachineControlModel.MachineControlAxis;
 
-/** The model's joint positions in display units (degrees or millimetres), as a live display's source reads its controls. */
-class LiveControls {
+/** The model's joint positions in display units (degrees or millimetres), as a live display's driver reads its controls. */
+class LiveControls implements materia.project.LiveInputs {
   final axes:Map<String, MachineControlAxis> = [];
 
   public function new(list:Array<MachineControlAxis>) {

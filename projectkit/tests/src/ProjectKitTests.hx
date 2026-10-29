@@ -847,7 +847,9 @@ class ProjectKitTests {
       radiusEnd: 24.5,
       width: 0.0,
       height: 0.0,
-      source: ""
+      source: "",
+      profile: "",
+      bindings: []
     };
     data.parts[0].details = [detail];
     var detailed = SceneArtifact.decodeView(SceneArtifact.encode(data)).parts[0].details;
@@ -882,18 +884,25 @@ class ProjectKitTests {
       radiusEnd: 28.505,
       width: 57.01,
       height: 29.49,
-      source: "pendant-oled"
+      source: "pendant-oled",
+      profile: "hobber",
+      bindings: [{signal: "axis", joint: "selectors/axis/position"}]
     };
     data.parts[0].details = [display];
     var shown = SceneArtifact.decodeView(SceneArtifact.encode(data)).parts[0].details;
     check(
-      shown != null && shown.length == 1 && shown[0].kind == materia.project.SurfaceDetailRenderData.SurfaceDetailKinds.DISPLAY
-      && shown[0].width == 57.01 && shown[0].height == 29.49 && shown[0].source == "pendant-oled",
-      "a display round trips with its size and source"
+      shown != null && shown.length == 1
+      && shown[0].kind == materia.project.SurfaceDetailRenderData.SurfaceDetailKinds.DISPLAY && shown[0].width == 57.01
+      && shown[0].height == 29.49 && shown[0].source == "pendant-oled" && shown[0].profile == "hobber"
+      && shown[0].bindings.length == 1 && shown[0].bindings[0].joint == "selectors/axis/position",
+      "a display round trips with its size, source, profile and bindings"
     );
     display.source = "";
     rejects(function() SceneArtifact.encode(data), "a display needs a source");
     display.source = "pendant-oled";
+    display.bindings = [{signal: "axis", joint: ""}];
+    rejects(function() SceneArtifact.encode(data), "a binding needs a joint");
+    display.bindings = [{signal: "axis", joint: "selectors/axis/position"}];
     display.width = 0;
     rejects(function() SceneArtifact.encode(data), "a display needs a positive size");
     data.parts[0].details = new Array<materia.project.SurfaceDetailRenderData>();
