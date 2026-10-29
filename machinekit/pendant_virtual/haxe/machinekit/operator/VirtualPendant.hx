@@ -68,11 +68,14 @@ class VirtualPendant {
     check(MachineKitPendant.pendant_virtual_set_conditions(owner.borrow(), conditions), "set_conditions");
   }
 
-  /** The jog distance the controller forwarded to the host since the last call, in thousandths of a unit. **/
-  public function takeJog():Int {
+  /**
+   * The oldest jog the controller forwarded and the host has not taken: the profile's axis index and the distance in thousandths of
+   * a unit; null when none is pending.
+   **/
+  public function takeJog():Null<{axis:Int, distance:Int}> {
     var result = MachineKitPendant.pendant_virtual_take_jog(owner.borrow());
     check(result.status, "take_jog");
-    return result.out_distance;
+    return result.out_axis == 255 ? null : {axis: result.out_axis, distance: result.out_distance};
   }
 
   static function pack(records:Array<Bytes>):Bytes {

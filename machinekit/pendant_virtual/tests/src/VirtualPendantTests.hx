@@ -160,8 +160,42 @@ class VirtualPendantTests {
     led.release();
   }
 
+  /** Turning the wheel with an axis selected asks the model to move the joint the model binds to that axis. */
+  static function checkWheelJogsBoundJoint():Void {
+    var bindings = new Map<String, String>();
+    for (binding in machinekit.pendant.ReferencePendant.displayBindings()) bindings.set(binding.signal, binding.joint);
+    bindings.set(PendantDisplaySignals.jog("x"), "machine/x");
+    var config = new materia.project.LiveDisplay.LiveDisplayConfig(
+      PendantDisplaySignals.SOURCE,
+      machinekit.pendant.ReferencePendant.PROFILE,
+      bindings
+    );
+    var driver = new machinekit.operator.PendantDisplayDriver(config);
+    var wheel = new WheelInputs(bindings);
+    var now = 0;
+    while (now < 2000) {
+      now += 16;
+      driver.advance(now, wheel);
+    }
+    check(driver.takeJogs().length == 0, "nothing turns, nothing jogs");
+    // Four counts of a 400-count wheel, at x100 (0.1 per count).
+    wheel.degrees = 4 * 360 / 400;
+    var moved = 0.0;
+    for (_ in 0...40) {
+      now += 16;
+      driver.advance(now, wheel);
+      for (jog in driver.takeJogs()) {
+        check(jog.joint == "machine/x", "the jog moves the bound joint: " + jog.joint);
+        moved += jog.delta;
+      }
+    }
+    check(Math.abs(moved - 0.4) < 1e-9, "four counts at x100 are 0.4 mm: " + moved);
+    driver.release();
+  }
+
   static function main():Void {
     checkModelDisplay();
+    checkWheelJogsBoundJoint();
     checkKeyLed();
     checkSharedDevice();
     checkDriverTimeline();
@@ -198,7 +232,7 @@ class VirtualPendantTests {
       now += 16;
     }
     check(linked.checksum(now) != bare, "the screen follows the controller");
-    check(linked.takeJog() == 0, "no wheel turns, no jog");
+    check(linked.takeJog() == null, "no wheel turns, no jog");
     linked.close();
     trace("virtual pendant tests passed");
   }
@@ -226,4 +260,26 @@ private class PressedInputs extends RestingInputs {
   }
 
   override public function pressed(id:String):Bool return id == joint;
+}
+
+/** The hobber's X axis selected (position 1), x100, the wheel enabled, the wheel at `degrees`. */
+private class WheelInputs implements materia.project.LiveDisplay.LiveInputs {
+  public var degrees = 0.0;
+  final wheel:String;
+  final axis:String;
+  final step:String;
+  final enable:String;
+
+  public function new(bindings:Map<String, String>) {
+    wheel = bindings.get(PendantDisplaySignals.WHEEL);
+    axis = bindings.get(PendantDisplaySignals.AXIS);
+    step = bindings.get(PendantDisplaySignals.STEP);
+    enable = bindings.get(PendantDisplaySignals.WHEEL_ENABLE);
+  }
+
+  public function position(joint:String):Float return joint == wheel ? degrees : 0.0;
+
+  public function detentIndex(joint:String):Int return joint == axis ? 1 : joint == step ? 2 : 0;
+
+  public function pressed(joint:String):Bool return joint == enable;
 }

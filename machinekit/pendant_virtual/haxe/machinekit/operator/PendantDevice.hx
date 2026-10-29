@@ -18,6 +18,8 @@ class PendantDevice {
   final key:String;
   final config:LiveDisplayConfig;
   final pendant:VirtualPendant;
+  final profile:OperatorProfile;
+  final jogs:Array<LiveJog> = [];
   var users = 0;
   var updatedAt = -1;
 
@@ -40,6 +42,7 @@ class PendantDevice {
     this.config = config;
     pendant = new VirtualPendant(0);
     var profile = ReferenceOperatorProfiles.named(config.profile);
+    this.profile = profile;
     if (profile == null) throw 'The pendant display has no operator profile called "${config.profile}"';
     var compiled = PendantCompiler.compile(profile, [1, 10, 100], 50, 250);
     pendant.attachController(0, compiled.profile, compiled.reasons, compiled.labels);
@@ -74,8 +77,19 @@ class PendantDevice {
     var enabled = inputs.pressed(config.joint(PendantDisplaySignals.WHEEL_ENABLE));
     // The E-stop's head pushed in opens the chain; a model without one leaves it closed.
     var chainClosed = !inputs.pressed(config.joint(PendantDisplaySignals.ESTOP));
-    pendant.takeJog();
     pendant.tick(nowMs, counts, axis, step, keys, enabled, chainClosed);
+    // What the controller let through to the host: a jog of one of the profile's axes, which the model binds to a joint (or not).
+    while (true) {
+      var jog = pendant.takeJog();
+      if (jog == null) break;
+      var joint = config.joint(PendantDisplaySignals.jog(profile.axes[jog.axis].id));
+      if (joint != "") jogs.push(new LiveJog(joint, jog.distance * PendantJogDriver.UNIT));
+    }
+  }
+
+  /** The jogs since they were last taken, for the model's joints. */
+  public function takeJogs():Array<LiveJog> {
+    return jogs.splice(0, jogs.length);
   }
 
   /** The key LEDs, in the order of `PendantDisplaySignals.keys()`: bit n is key n's LED. */

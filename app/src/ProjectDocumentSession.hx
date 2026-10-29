@@ -1133,6 +1133,25 @@ class ProjectDocumentSession {
       value
     ));
 
+  /**
+   * Moves joints as a live device asks (a pendant's wheel): each jog adds its distance, in the joint's display units, to the joint's
+   * position, held within its limits. Like dragging a joint it changes the shown pose only; nothing is recorded in the history.
+   */
+  public function applyLiveJogs(jogs:Array<materia.project.LiveDisplay.LiveJog>):Void {
+    var runtime = assemblyRuntime, definition = projectAssemblyDefinition;
+    if (runtime == null || definition == null) return;
+    for (jog in jogs) {
+      var found:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
+      for (joint in definition.joints) if (joint.id == jog.joint) found = joint;
+      if (found == null || found.role != Tree || assemblyDependentJoints.exists(jog.joint)) continue;
+      var factor = found.type == Prismatic ? assemblyUnitMetres() * 1000 : 180 / Math.PI;
+      var next = runtime.joint(jog.joint) + jog.delta / factor;
+      if (found.limits.lower != null) next = Math.max(next, found.limits.lower);
+      if (found.limits.upper != null) next = Math.min(next, found.limits.upper);
+      previewJointEdit(runtime.record(), jog.joint, next);
+    }
+  }
+
   public function assemblyJointIsDependent(jointId:String):Bool return assemblyDependentJoints.exists(jointId);
 
   /** A separate kinematic state for procedure display; the live runtime is never edited. */

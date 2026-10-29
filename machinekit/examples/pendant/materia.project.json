@@ -6,6 +6,8 @@
   "build": {"system": "haxeon", "manifest": "haxeon.json"},
   "entrypoints": {
     "pendant": {"kind": "cad-preview", "documentInput": true, "reconcilesSavedRecipe": true, "module": "PendantPreview", "function": "preview",
-      "cache": {"inputs": ["PendantPreview.hx"]}}
+      "cache": {"inputs": ["PendantPreview.hx"]}},
+    "pendant-stage": {"kind": "cad-preview", "documentInput": true, "reconcilesSavedRecipe": true, "module": "PendantPreview", "function": "stage",
+      "cache": {"inputs": ["PendantPreview.hx", "JogStage.hx"]}}
   }
 }

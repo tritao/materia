@@ -35,6 +35,8 @@ class PendantLedDriver implements LiveDisplaySource {
 
   public function height():Int return SIZE;
 
+  public function takeJogs():Array<LiveJog> return [];
+
   public function release():Void {
     if (released) return;
     released = true;

@@ -4,6 +4,7 @@ import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.TypedProperty;
 import machinekit.assembly.AssemblyPreview;
+import machinekit.assembly.MachineAssembly;
 import machinekit.document.MachineKitDocuments;
 import machinekit.document.MachineKitRecipes;
 import materia.project.SceneArtifact.SceneArtifactData;
@@ -17,7 +18,11 @@ class PendantScene {
   /** The occurrence whose Inspector carries the case's inputs. */
   public static inline var RECIPE_OCCURRENCE:String = "case/plate";
 
-  public static function build(?savedDocument:String):SceneArtifactData {
+  public static function build(
+    ?savedDocument:String,
+    ?machine:PendantMachine,
+    ?extend:MachineAssembly -> Void
+  ):SceneArtifactData {
     MachineKitRecipes.register();
     var recipe = new Document();
     try {
@@ -33,11 +38,14 @@ class PendantScene {
         wall: instance.resolved("wall"),
         depth: instance.resolved("depth")
       };
-      var problems = ReferencePendant.layout(size).problems();
+      var problems = ReferencePendant.layout(size, false, machine).problems();
       if (problems.length > 0) throw "The pendant does not fit its controls: " + problems.join("; ");
-      var documents = new PendantDocuments(ReferencePendant.pendantCase(size));
+      var documents = new PendantDocuments(ReferencePendant.pendantCase(size, false, machine));
       try {
-        var scene = AssemblyPreview.scene(ReferencePendant.assembly(documents), "pendant");
+        var assembly = ReferencePendant.assembly(documents);
+        // Whatever else is in the scene: the machine the pendant belongs to.
+        if (extend != null) extend(assembly);
+        var scene = AssemblyPreview.scene(assembly, "pendant");
         scene.presentation = PendantPresentation.build(scene.assemblyDefinition);
         scene.project = {dynamicParts: [], motions: [], sources: documents.sources(), histories: documents.histories()};
         scene.recipeDocument = DocumentCodec.encode(recipe);

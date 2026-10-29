@@ -261,9 +261,16 @@ private typedef ThreadGroup = {
     return picture(source, empty);
   }
 
+  final jogs:Array<LiveJog> = [];
+
   public function hasLiveDisplays():Bool {
     for (group in groups) for (entry in group.nodes) if (entry.live != null) return true;
     return false;
+  }
+
+  /** The moves the live displays' devices asked of the model since they were last taken. */
+  public function takeJogs():Array<LiveJog> {
+    return jogs.splice(0, jogs.length);
   }
 
   /** Lets every display's source draw its next picture; true when any picture changed. */
@@ -273,6 +280,7 @@ private typedef ThreadGroup = {
       var live = entry.live;
       if (live == null) continue;
       var rgba = live.source.advance(nowMs, controls);
+      for (jog in live.source.takeJogs()) jogs.push(jog);
       if (rgba == null) continue;
       // The picture is the image's new content. Publishing the node is how the editor tells the renderer a scene resource changed: it
       // refreshes the presentation snapshot the viewport draws from and marks the scene visually changed.

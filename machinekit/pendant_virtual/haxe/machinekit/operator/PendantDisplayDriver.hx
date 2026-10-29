@@ -32,6 +32,8 @@ class PendantDisplayDriver implements LiveDisplaySource {
 
   public function height():Int return VirtualPendant.HEIGHT;
 
+  public function takeJogs():Array<LiveJog> return device.takeJogs();
+
   public function release():Void {
     if (released) return;
     released = true;

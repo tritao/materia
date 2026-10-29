@@ -35,6 +35,9 @@ class PendantDisplaySignals {
     return [235, 240, 255];
   }
 
+  /** The binding that names the joint a jog of the profile's axis `axisId` moves: a machine's pendant binds one per axis it has. */
+  public static function jog(axisId:String):String return "jog:" + axisId;
+
   /** The keys in the order of PENDANT_STATE's button bits. */
   public static function keys():Array<String> return [START, HOLD, STOP, F1, F2, F3];
 }

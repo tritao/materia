@@ -1976,6 +1976,9 @@ class EditorScene {
     return presentation.threads.advance(this, Std.int((now - liveDisplayClock) * 1000), controls);
   }
 
+  /** The moves the live displays' devices asked of the model since they were last taken (see `LiveDisplaySource.takeJogs`). */
+  public function takeLiveJogs():Array<materia.project.LiveDisplay.LiveJog> return presentation.threads.takeJogs();
+
   public function renderSnapshot():SceneSnapshot {
     refreshPresentationIfStale();
     presentation.sourceFaces.prepare(this);

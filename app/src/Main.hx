@@ -1363,6 +1363,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (scene.hasLiveDisplays()
       && scene.advanceLiveDisplays(new app.editor.LiveControls(MachineControlModel.axes(session)))
       && hostContext != null) hostContext.requestFrame();
+    var jogs = scene.takeLiveJogs();
+    if (jogs.length > 0) session.applyLiveJogs(jogs);
     if (!refinementFrameSubmitted) return;
     refinementFrameSubmitted = false;
     var before = scene.visualRevision;

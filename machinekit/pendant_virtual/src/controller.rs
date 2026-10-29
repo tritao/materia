@@ -1,6 +1,8 @@
 //! The controller side of a simulated pendant: the real cabinet-node operator service, with the host's part played here (an allowing
 //! `OperatorState` and the profile's labels), so the pendant core shows what it would on a machine.
 
+use std::collections::VecDeque;
+
 use cabinet_node::OperatorService;
 use operator_link::operator_frame;
 use operator_link::operator_wire::{OperatorMessage, OperatorState, PendantConfig, PendantOutput};
@@ -10,6 +12,7 @@ use pendant_core::PendantCore;
 
 const HOST_PERIOD_MS: u32 = 100;
 const OUTPUT_PERIOD_MS: u32 = 100;
+const MAX_JOGS: usize = 256;
 
 pub struct Controller {
     profile: *mut CompiledProfile,
@@ -19,8 +22,9 @@ pub struct Controller {
     next_output_ms: u32,
     /// The condition mask the controller builds from its own facts (see the profile's conditions).
     pub active: u32,
-    /// The jog distance the controller has forwarded to the host since it was last taken, in thousandths of a unit.
-    jog: i32,
+    /// The jogs the controller has forwarded to the host since they were last taken: the profile's axis index and the distance in
+    /// thousandths of a unit, consecutive jogs of one axis added together.
+    jogs: VecDeque<(u8, i32)>,
 }
 
 // SAFETY: the raw pointer is a uniquely owned heap allocation that only this controller and its service reach.
@@ -54,7 +58,7 @@ impl Controller {
             next_host_ms: now_ms,
             next_output_ms: now_ms.wrapping_add(OUTPUT_PERIOD_MS / 2),
             active: 0,
-            jog: 0,
+            jogs: VecDeque::new(),
         };
         for label in labels {
             if controller.service().on_operator_frame(&frame_of(OperatorMessage::Config, label), 0).is_err() {
@@ -83,7 +87,16 @@ impl Controller {
         }
         if let Some(frame) = heartbeat {
             if let Ok(Some(event)) = self.service().on_pendant_frame(&frame, now_us, active) {
-                self.jog = self.jog.saturating_add(event.distance);
+                if event.distance != 0 {
+                    match self.jogs.back_mut() {
+                        Some((axis, distance)) if *axis == event.axis => *distance = distance.saturating_add(event.distance),
+                        _ => self.jogs.push_back((event.axis, event.distance)),
+                    }
+                    // A host that never takes them cannot grow this without bound.
+                    while self.jogs.len() > MAX_JOGS {
+                        self.jogs.pop_front();
+                    }
+                }
             }
         }
         if due(now_ms, self.next_output_ms) {
@@ -102,9 +115,9 @@ impl Controller {
         self.service().poll(now_us);
     }
 
-    /// The jog distance forwarded since the last call.
-    pub fn take_jog(&mut self) -> i32 {
-        std::mem::take(&mut self.jog)
+    /// The oldest jog forwarded and not yet taken: the profile's axis index and the distance in thousandths of a unit.
+    pub fn take_jog(&mut self) -> Option<(u8, i32)> {
+        self.jogs.pop_front()
     }
 }
 

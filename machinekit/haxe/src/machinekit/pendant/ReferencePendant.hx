@@ -18,7 +18,8 @@ class ReferencePendant {
     height: 210.0, thickness: 3.0, wall: 3.0, depth: 48.0};
 
   /** The reference layout, or the same controls on a case of another size; `leftHanded` mirrors it. */
-  public static function layout(?size:PendantSize, leftHanded:Bool = false):PanelLayout {
+  public static function layout(?size:PendantSize, leftHanded:Bool = false, ?machine:PendantMachine):PanelLayout {
+    var owner = machine == null ? PendantMachine.reference() : machine;
     var dimensions = size == null ? ReferencePendant.size() : size;
     // The pendant is held in the left hand, with the enabling switch on the left wall and the Start, Hold and Stop keys under the
     // thumb; the free right hand turns the selectors and the wheel, so they sit on the right and the E-stop at the top left, where
@@ -30,17 +31,17 @@ class ReferencePendant {
       new PlacedPart("estop", PartPresets.xb2Es542(), side * -32.0, 80.0),
       new PlacedPart(
         "display",
-        PartPresets.oled242().driven(PendantDisplaySignals.SOURCE, PROFILE, displayBindings()),
+        PartPresets.oled242().driven(PendantDisplaySignals.SOURCE, owner.profile, displayBindings(owner)),
         0.0,
         37.0
       ),
-      new PlacedPart("f1", lit(PartPresets.pushButton16(), "f1"), side * -40.5, 1.5),
-      new PlacedPart("f2", lit(PartPresets.pushButton16(), "f2"), side * -13.5, 1.5),
-      new PlacedPart("f3", lit(PartPresets.pushButton16(), "f3"), side * 13.5, 1.5),
+      new PlacedPart("f1", lit(PartPresets.pushButton16(), "f1", owner), side * -40.5, 1.5),
+      new PlacedPart("f2", lit(PartPresets.pushButton16(), "f2", owner), side * -13.5, 1.5),
+      new PlacedPart("f3", lit(PartPresets.pushButton16(), "f3", owner), side * 13.5, 1.5),
       new PlacedPart("wheel-enable", PartPresets.pushButton16("blue"), side * 40.5, 1.5),
-      new PlacedPart("start", lit(PartPresets.pushButton16("green"), "start"), side * -40.5, -25.5),
-      new PlacedPart("hold", lit(PartPresets.pushButton16("yellow"), "hold"), side * -13.5, -25.5),
-      new PlacedPart("stop", lit(PartPresets.pushButton16("red"), "stop"), side * 13.5, -25.5),
+      new PlacedPart("start", lit(PartPresets.pushButton16("green"), "start", owner), side * -40.5, -25.5),
+      new PlacedPart("hold", lit(PartPresets.pushButton16("yellow"), "hold", owner), side * -13.5, -25.5),
+      new PlacedPart("stop", lit(PartPresets.pushButton16("red"), "stop", owner), side * 13.5, -25.5),
       new PlacedPart("wheel", PartPresets.yumoIsm6045(), 0.0, -70.0)
     ];
     return new PanelLayout(
@@ -66,12 +67,12 @@ class ReferencePendant {
   }
 
   /** A key whose LED the simulated pendant lights: the cap shows the output of the driver that is this key's LED. */
-  static function lit(button:machinekit.hmi.PushButton, key:String):machinekit.hmi.PushButton {
-    return button.lit(PendantDisplaySignals.LED_SOURCE, PROFILE, displayBindings(), key);
+  static function lit(button:machinekit.hmi.PushButton, key:String, owner:PendantMachine):machinekit.hmi.PushButton {
+    return button.lit(PendantDisplaySignals.LED_SOURCE, owner.profile, displayBindings(owner), key);
   }
 
-  /** Which joint feeds each signal of the display's driver. */
-  public static function displayBindings():Array<DisplayBinding> {
+  /** Which joint feeds each signal of the display's driver, and which joint each of the machine's axes moves. */
+  public static function displayBindings(?machine:PendantMachine):Array<DisplayBinding> {
     var bindings = [
       new DisplayBinding(PendantDisplaySignals.AXIS, jointId("axis", "position")),
       new DisplayBinding(PendantDisplaySignals.STEP, jointId("step", "position")),
@@ -80,6 +81,7 @@ class ReferencePendant {
       new DisplayBinding(PendantDisplaySignals.ESTOP, jointId("estop", "press"))
     ];
     for (key in PendantDisplaySignals.keys()) bindings.push(new DisplayBinding(key, jointId(key, "press")));
+    if (machine != null) for (jog in machine.jogs) bindings.push(jog);
     return bindings;
   }
 
@@ -115,8 +117,9 @@ class ReferencePendant {
   }
 
   /** The case for the reference layout, or for the same controls on a case of another size. */
-  public static function pendantCase(?size:PendantSize, leftHanded:Bool = false):PendantCase return PendantCase.plan(
-    layout(size, leftHanded),
+  public static function pendantCase(?size:PendantSize, leftHanded:Bool = false,
+    ?machine:PendantMachine):PendantCase return PendantCase.plan(
+    layout(size, leftHanded, machine),
     leftHanded
   );
 }

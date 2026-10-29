@@ -80,8 +80,9 @@ PV_API int32_t pendant_virtual_attach_controller(pendant_virtual_handle pendant,
     const uint8_t *labels PV_IN_ARRAY(labels_length), uint32_t labels_length);
 /* The condition mask the controller judges jogs with (the profile's conditions: bit 0 the gearbox, bit 3 a program running...). */
 PV_API int32_t pendant_virtual_set_conditions(pendant_virtual_handle pendant, uint32_t conditions);
-/* The jog distance the controller forwarded to the host since the last call, in thousandths of a unit. */
-PV_API int32_t pendant_virtual_take_jog(pendant_virtual_handle pendant, int32_t *out_distance PV_OUT);
+/* The oldest jog the controller forwarded and the host has not taken: the profile's axis index and the distance in thousandths of a
+   unit. With none pending out_axis is 255 and out_distance 0. */
+PV_API int32_t pendant_virtual_take_jog(pendant_virtual_handle pendant, uint8_t *out_axis PV_OUT, int32_t *out_distance PV_OUT);
 
 /* A frame from the controller (id is the 11-bit CAN id). PV_ERROR_FRAME when the payload is malformed. */
 PV_API int32_t pendant_virtual_on_frame(pendant_virtual_handle pendant, uint32_t now_ms, uint32_t id,

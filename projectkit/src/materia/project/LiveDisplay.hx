@@ -36,6 +36,17 @@ class LiveDisplayConfig {
   }
 }
 
+/** A move a live device asks of the model: `delta` added to the position of `joint`, in the joint's display units (degrees or millimetres). */
+class LiveJog {
+  public final joint:String;
+  public final delta:Float;
+
+  public function new(joint:String, delta:Float) {
+    this.joint = joint;
+    this.delta = delta;
+  }
+}
+
 /** What fills a display in the scene while a simulation runs: a picture that changes. */
 interface LiveDisplaySource {
   public function width():Int;
@@ -48,6 +59,12 @@ interface LiveDisplaySource {
    * `inputs` are the model's joints, which the source reads through the bindings of its `LiveDisplayConfig`.
    */
   public function advance(nowMs:Int, inputs:LiveInputs):Null<Bytes>;
+
+  /**
+   * The moves the device behind this display asks of the model since they were last taken (a pendant's wheel jogging an axis); empty
+   * for a display that only shows. The editor applies them to the joints.
+   */
+  public function takeJogs():Array<LiveJog>;
 
   /** The display is gone from the scene; the source gives up what it shares with others. Called once. */
   public function release():Void;

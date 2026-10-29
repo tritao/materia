@@ -171,16 +171,21 @@ pub extern "C" fn pendant_virtual_set_conditions(pendant: Handle, conditions: u3
     }))
 }
 
+/// The oldest jog the controller forwarded and the host has not taken: the profile's axis index and the distance in thousandths of
+/// a unit. With none pending `*out_axis` is 255 and `*out_distance` 0.
+///
 /// # Safety
-/// `out_distance` is writable.
+/// `out_axis` and `out_distance` are writable.
 #[no_mangle]
-pub unsafe extern "C" fn pendant_virtual_take_jog(pendant: Handle, out_distance: *mut i32) -> i32 {
-    if out_distance.is_null() {
+pub unsafe extern "C" fn pendant_virtual_take_jog(pendant: Handle, out_axis: *mut u8, out_distance: *mut i32) -> i32 {
+    if out_axis.is_null() || out_distance.is_null() {
         return ERROR_ARGUMENT;
     }
     code(with(pendant, |p| match p.controller.as_mut() {
         Some(controller) => {
-            *out_distance = controller.take_jog();
+            let (axis, distance) = controller.take_jog().unwrap_or((255, 0));
+            *out_axis = axis;
+            *out_distance = distance;
             OK
         }
         None => ERROR_ARGUMENT,
@@ -388,9 +393,39 @@ mod tests {
         let mut after = 0u32;
         unsafe { pendant_virtual_checksum(p, now, &mut after) };
         assert_ne!(before, after, "the screen changed once the controller answered");
-        let mut jog = 9i32;
-        assert_eq!(unsafe { pendant_virtual_take_jog(p, &mut jog) }, OK);
-        assert_eq!(jog, 0);
+        let (mut axis, mut jog) = (0u8, 9i32);
+        assert_eq!(unsafe { pendant_virtual_take_jog(p, &mut axis, &mut jog) }, OK);
+        assert_eq!((axis, jog), (255, 0));
+        pendant_virtual_destroy(p);
+    }
+
+    #[test]
+    fn a_wheel_turn_with_an_axis_selected_is_a_jog_of_that_axis() {
+        let (profile, reasons, labels) = vector("hobber");
+        let p = create();
+        unsafe {
+            assert_eq!(pendant_virtual_attach_controller(p, 0, profile.as_ptr(), profile.len() as u32, reasons.as_ptr(), reasons.len() as u32, labels.as_ptr(), labels.len() as u32), OK);
+        }
+        // The hobber's pendant position 1 is X, the third axis of its profile; step 2 is x100 (0.1 per count); 4 counts turn.
+        let (mut now, mut counts) = (0u32, 0u16);
+        while now < 2_000 {
+            pendant_virtual_tick(p, now, counts, 1, 2, 0, 1, 1);
+            now += 10;
+        }
+        for _ in 0..4 {
+            counts = counts.wrapping_add(1);
+            pendant_virtual_tick(p, now, counts, 1, 2, 0, 1, 1);
+            now += 10;
+        }
+        for _ in 0..30 {
+            pendant_virtual_tick(p, now, counts, 1, 2, 0, 1, 1);
+            now += 10;
+        }
+        let (mut axis, mut jog) = (0u8, 0i32);
+        assert_eq!(unsafe { pendant_virtual_take_jog(p, &mut axis, &mut jog) }, OK);
+        assert_eq!((axis, jog), (2, 400), "X, four counts at 0.1: 0.4 mm in thousandths");
+        assert_eq!(unsafe { pendant_virtual_take_jog(p, &mut axis, &mut jog) }, OK);
+        assert_eq!((axis, jog), (255, 0), "nothing else is pending");
         pendant_virtual_destroy(p);
     }
 
@@ -399,8 +434,8 @@ mod tests {
         let p = create();
         let junk = [1u8, 2, 3];
         assert_eq!(unsafe { pendant_virtual_attach_controller(p, 0, junk.as_ptr(), 3, [].as_ptr(), 0, [].as_ptr(), 0) }, ERROR_ARGUMENT);
-        let mut jog = 0i32;
-        assert_eq!(unsafe { pendant_virtual_take_jog(p, &mut jog) }, ERROR_ARGUMENT);
+        let (mut axis, mut jog) = (0u8, 0i32);
+        assert_eq!(unsafe { pendant_virtual_take_jog(p, &mut axis, &mut jog) }, ERROR_ARGUMENT);
         pendant_virtual_destroy(p);
     }
 

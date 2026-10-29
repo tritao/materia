@@ -10,7 +10,7 @@ interface MachineKitPendant @target("portable-abi64") @library("machinekit_penda
 	extern fn pendant_virtual_on_frame(pendant: pendant_virtual_handle, now_ms: u32, id: u32, bytes: ptr<const<u8>> @in_array("length"), length: u32) -> i32;
 	extern fn pendant_virtual_pixels(pendant: pendant_virtual_handle, now_ms: u32, pixels: nullable<ptr<u8>> @out_buffer("inout_pixels_size") @initial_capacity(8192), inout_pixels_size: ptr<u32> @inout) -> i32;
 	extern fn pendant_virtual_set_conditions(pendant: pendant_virtual_handle, conditions: u32) -> i32;
-	extern fn pendant_virtual_take_jog(pendant: pendant_virtual_handle, out_distance: ptr<i32> @out) -> i32;
+	extern fn pendant_virtual_take_jog(pendant: pendant_virtual_handle, out_axis: ptr<u8> @out, out_distance: ptr<i32> @out) -> i32;
 	extern fn pendant_virtual_tick(pendant: pendant_virtual_handle, now_ms: u32, wheel_counts: u16, position: u8, step: u8, keys: u8, wheel_enable: u8, chain_closed: u8) -> i32;
 	handle pendant_virtual_handle : u32 @destroy("pendant_virtual_destroy");
 }
