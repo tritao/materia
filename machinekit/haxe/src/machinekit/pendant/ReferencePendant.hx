@@ -71,7 +71,8 @@ class ReferencePendant {
       new DisplayBinding(PendantDisplaySignals.AXIS, jointId("axis", "position")),
       new DisplayBinding(PendantDisplaySignals.STEP, jointId("step", "position")),
       new DisplayBinding(PendantDisplaySignals.WHEEL, jointId("wheel", "encoder")),
-      new DisplayBinding(PendantDisplaySignals.WHEEL_ENABLE, jointId("wheel-enable", "press"))
+      new DisplayBinding(PendantDisplaySignals.WHEEL_ENABLE, jointId("wheel-enable", "press")),
+      new DisplayBinding(PendantDisplaySignals.ESTOP, jointId("estop", "press"))
     ];
     for (key in PendantDisplaySignals.keys()) bindings.push(new DisplayBinding(key, jointId(key, "press")));
     return bindings;
