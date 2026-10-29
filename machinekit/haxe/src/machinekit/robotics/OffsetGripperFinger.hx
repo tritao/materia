@@ -80,7 +80,7 @@ class OffsetGripperFinger extends MachineComponent {
     }
     return familyCache;
   }
-  override public function componentType():ComponentType return family().recipe;
+  override public function componentType():Null<ComponentType> return family().recipe;
   override public function values():ComponentValues return new ComponentValues().setToken(
     "side",
     spec.left ? "left" : "right"

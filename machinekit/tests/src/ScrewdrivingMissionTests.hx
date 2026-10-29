@@ -38,7 +38,7 @@ class ScrewdrivingMissionTests {
     var cell = new ScrewdrivingCell(null, 0, machinekit.standard.DeepGrooveBearing.metric("6003"));
     var unqualified = cell.work.fastenings().require();
     for (fastening in unqualified) {
-      var declared = cell.work.join(fastening.screw.member, null, {minimum: 0.2, maximum: 1.0});
+      var declared = cell.work.declareFastening(fastening.screw.member, null, {minimum: 0.2, maximum: 1.0});
     }
     var found = cell.work.fastenings();
     var scene = AssemblyPreview.scene(cell, "screw-mission-checks");

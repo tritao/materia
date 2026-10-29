@@ -7,7 +7,7 @@ import machinekit.component.Solids;
 
 /** Small adjustable foot used by the example rack. */
 class AdjustableFoot extends MachineComponent {
-  override public function componentType():machinekit.component.ComponentType return PickingStationRecipes.foot();
+  override public function componentType():Null<machinekit.component.ComponentType> return PickingStationRecipes.foot();
   override public function values():machinekit.component.ComponentValues return PickingStationRecipes.values(this);
   public final diameter:Float;
   public final height:Float;

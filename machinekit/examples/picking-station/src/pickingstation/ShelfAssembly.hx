@@ -12,7 +12,7 @@ import machinekit.component.Solids;
 
 /** Flat sheet shelf with separate supports and a front retaining lip. */
 class ShelfAssembly extends MachineComponent {
-  override public function componentType():machinekit.component.ComponentType return PickingStationRecipes.shelf();
+  override public function componentType():Null<machinekit.component.ComponentType> return PickingStationRecipes.shelf();
   override public function values():machinekit.component.ComponentValues return PickingStationRecipes.values(this);
   public final width:Float;
   public final depth:Float;

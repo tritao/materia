@@ -17,7 +17,7 @@ class FastenedAssembly extends MachineAssembly {
   public function new() super();
 
   /** Declare an engineering minimum or qualified angle limits for a seated screw occurrence. */
-  public function join(
+  public function declareFastening(
     screw:String,
     minimumDiameters:Null<Float> = null,
     angleWindow:Null<TighteningAngleWindow> = null

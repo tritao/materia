@@ -342,11 +342,11 @@ class FasteningTests {
     error(fixture(SocketHeadCapScrew.metric("M6", 40)).fastenings(), "fastening.plain-shank");
     var unspecified = fixture(six, new FasteningTap(six.thread.mating(), "bronze"));
     error(unspecified.fastenings(), "fastening.engagement-material");
-    var specified = unspecified.join("screw", 1);
+    var specified = unspecified.declareFastening("screw", 1);
     near(specified.fastenings().require()[0].engagementLength, 7);
     var unseated = new FastenedAssembly();
     unseated.addComponent("missing", six);
-    var missing = unseated.join("missing");
+    var missing = unseated.declareFastening("missing");
     error(missing.fastenings(), "fastening.missing-seat");
     error(fixture(six, null, new FasteningClamp(5.5)).fastenings(), "fastening.clearance-small");
     error(
@@ -403,7 +403,7 @@ class FasteningTests {
     nutAssembly.addComponent("screw", six);
     nutAssembly.addComponent("nut", nut, AssemblyFrames.translation(0, 0, -5 - nut.height));
     nutAssembly.addMate("seat", "fixed", "clamp", "head", "screw", "head");
-    var declared = nutAssembly.join("screw", nut.height / six.diameter, {minimum: 0.1, maximum: 0.3});
+    var declared = nutAssembly.declareFastening("screw", nut.height / six.diameter, {minimum: 0.1, maximum: 0.3});
     var nutFastening = nutAssembly.fastenings().require()[0];
     near(nutFastening.engagementLength, nut.height);
     check(nutFastening.angleWindow != null, "authored angle limits are retained");

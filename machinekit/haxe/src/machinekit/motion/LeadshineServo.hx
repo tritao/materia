@@ -173,7 +173,7 @@ class LeadshineServo extends ServoMotor {
     return result;
   }
 
-  override public function mounting():machinekit.motion.MotorFlange return {
+  override public function mounting():Null<machinekit.motion.MotorFlange> return {
     face: spec.face,
     flangeThickness: spec.flangeThickness,
     pilotDiameter: spec.pilotDiameter,

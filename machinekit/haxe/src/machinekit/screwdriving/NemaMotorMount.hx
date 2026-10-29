@@ -22,7 +22,7 @@ class NemaMotorMount extends FastenedAssembly {
       var id = 'screw$index';
       addComponent(id, screw);
       addMate('$id-seat', "fixed", "plate", 'bolt$index', id, "head");
-      var declared = join(id, MotorPlate.MINIMUM_ENGAGEMENT_DIAMETERS);
+      var declared = declareFastening(id, MotorPlate.MINIMUM_ENGAGEMENT_DIAMETERS);
     }
   }
 }
