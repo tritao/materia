@@ -6,11 +6,16 @@
   "entry": "LevelingFootTests",
   "sourceRoots": [
     "src",
-    "../../examples/bench-mill"
+    "../../examples/bench-mill",
+    "../../examples/casting-shop",
+    "../../examples/cnc-router"
   ],
   "dependencies": {
     "machinekit": {
       "path": "../.."
+    },
+    "camkit": {
+      "path": "../../../camkit"
     }
   },
   "target": "host",

@@ -7,7 +7,8 @@
     "machinekit": {"path": "../.."},
     "machinekit-robot": {"path": "../../robot"},
     "cadbridge": {"path": "../../../robotkit/cadbridge"},
-    "processkit": {"path": "../../../processkit"}
+    "processkit": {"path": "../../../processkit"},
+    "machinekit-process": {"path": "../../process"}
   },
   "target": "host",
   "outputDir": "build"

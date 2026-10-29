@@ -2,7 +2,7 @@
   "version": 1,
   "package": {"name": "processkit-weld-planning-tests"},
   "entry": "WeldPlanningMain",
-  "sourceRoots": [".", "../src"],
+  "sourceRoots": [".", "../src", "../../../robotkit/tests/support"],
   "dependencies": {"processkit": {"path": "../.."}, "collisionkit-native": {"path": "../../../collisionkit/native"}},
   "target": "host",
   "outputDir": "build"
