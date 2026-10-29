@@ -97,6 +97,163 @@
      ]
     },
     {
+     "name": "FileWatch",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/FileWatch.hx",
+     "doc": "A NativeKit file watch: directories registered recursively or not, subtrees left out, and typed events.\n\nA recursive registration returns once its directory is watched; the directories under it may be registered\nafterwards, and `ready` is false until they all are. A caller that relies on events for correctness treats the\nwatch as complete only while `ready` holds, and rescans (or polls) otherwise.\n\nRegistrations survive what invalidates them natively: after an overflow, or a removal or move at or above one,\nthe watch registers them again (not ready until that completes) and reports `Lost` for one that is gone.",
+     "fields": [
+      {
+       "name": "ready",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(events:EventPump, listener:(FileWatchEvent) -> Void):FileWatch",
+       "static": true,
+       "doc": "Throws NativeKitError when the platform cannot watch files."
+      },
+      {
+       "name": "add",
+       "kind": "method",
+       "signature": "(path:String, recursive:Bool):Bool",
+       "doc": "Watches `path`, and everything under it when `recursive`; returns false when it already was. Throws\nNativeKitError when it cannot be watched."
+      },
+      {
+       "name": "remove",
+       "kind": "method",
+       "signature": "(path:String):Void",
+       "doc": "Stops watching `path` and everything registered under it."
+      },
+      {
+       "name": "exclude",
+       "kind": "method",
+       "signature": "(path:String):Void",
+       "doc": "Leaves `path` and everything under it out of recursive registrations, including directories created there later."
+      },
+      {
+       "name": "directories",
+       "kind": "method",
+       "signature": "():Array<String>",
+       "doc": "The registered directories."
+      },
+      {
+       "name": "exclusions",
+       "kind": "method",
+       "signature": "():Array<String>",
+       "doc": "The excluded subtrees."
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Stops the backend and its events; safe to call more than once."
+      },
+      {
+       "name": "pathKey",
+       "kind": "method",
+       "signature": "(path:String):String",
+       "static": true,
+       "doc": "A path in the form events and registrations are compared in: forward slashes, no trailing one, and folded case\nwhere the filesystem ignores it."
+      },
+      {
+       "name": "within",
+       "kind": "method",
+       "signature": "(parent:String, child:String):Bool",
+       "static": true,
+       "doc": "Whether `child` is `parent` or below it, for paths in any spelling."
+      }
+     ]
+    },
+    {
+     "name": "FileWatchChange",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/FileWatchChange.hx",
+     "doc": "One change a file watch reported. Paths are absolute but not canonical: compare them with FileWatch.pathKey.",
+     "fields": [
+      {
+       "name": "change",
+       "kind": "var",
+       "signature": ":FileChangeType",
+       "final": true
+      },
+      {
+       "name": "item",
+       "kind": "var",
+       "signature": ":FileItemKind",
+       "final": true
+      },
+      {
+       "name": "path",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "oldPath",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "final": true,
+       "doc": "The path before a move, or null."
+      },
+      {
+       "name": "rescan",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true,
+       "doc": "The backend could not tell exactly what changed at `path`, so it needs a rescan."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(change:FileChangeType, item:FileItemKind, path:String, ?oldPath:String, rescan:Bool):Void"
+      }
+     ]
+    },
+    {
+     "name": "FileWatchEvent",
+     "kind": "enum",
+     "file": "haxeon/packages/platform/src/haxeon/platform/FileWatchEvent.hx",
+     "fields": [
+      {
+       "name": "Changed",
+       "kind": "case",
+       "signature": "(change:FileWatchChange)",
+       "doc": "A file or directory changed."
+      },
+      {
+       "name": "Overflow",
+       "kind": "case",
+       "signature": "",
+       "doc": "Changes were missed: everything watched needs a rescan."
+      },
+      {
+       "name": "Ready",
+       "kind": "case",
+       "signature": "",
+       "doc": "Every registration is now watched (`ready` became true); changes are reported from here on."
+      },
+      {
+       "name": "Lost",
+       "kind": "case",
+       "signature": "(path:String)",
+       "doc": "A registered directory no longer exists, so it is no longer watched."
+      },
+      {
+       "name": "Failed",
+       "kind": "case",
+       "signature": "(error:NativeKitError)",
+       "doc": "The watch could not register a directory again and has disposed itself; changes are no longer reported."
+      }
+     ]
+    },
+    {
      "name": "GraphicsImageRef",
      "kind": "class",
      "file": "haxeon/packages/platform/src/haxeon/platform/GraphicsImageRef.hx",
@@ -1121,7 +1278,7 @@
       {
        "name": "DialogMessage",
        "kind": "case",
-       "signature": "(request:haxe.Int64, result:Result, button:MessageResult)"
+       "signature": "(request:haxe.Int64, result:Result, button:MessageResult, checkboxChecked:Bool)"
       },
       {
        "name": "WebViewNavigated",

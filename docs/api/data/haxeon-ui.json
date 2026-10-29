@@ -11,6 +11,12 @@
      "doc": "Stateful, typed immediate-mode graphics encoder.",
      "fields": [
       {
+       "name": "retainRectangles",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "doc": "When set, solid rectangles keep their path and paint between updates, so repainting identical content records\nidentical commands and the retained list does not look changed. Each reset disposes the rectangles the previous\nupdate did not draw, so a paint of any size keeps its own and no more. Release with `releaseRetained`."
+      },
+      {
        "name": "new",
        "kind": "method",
        "signature": "(?capacity:Int):Void"
@@ -119,6 +125,12 @@
        "kind": "method",
        "signature": "(rect:Rect, color:Color):Void",
        "doc": "Adds one filled rectangle using a transient path and solid paint resource."
+      },
+      {
+       "name": "releaseRetained",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Disposes the paths and paints kept by `retainRectangles`."
       },
       {
        "name": "fillRectIfPositive",
@@ -2221,11 +2233,84 @@
      ]
     },
     {
+     "name": "RenderPlanReuse",
+     "kind": "class",
+     "file": "haxeon/packages/ui/bindings/haxe/haxeon/ui/Renderer.hx",
+     "doc": "Cumulative render plan compile and reuse counts, with the reason for each compile.",
+     "fields": [
+      {
+       "name": "compiles",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "reuses",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "missEpoch",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "The session's layout changed."
+      },
+      {
+       "name": "missFrame",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "The frame size, scale, target or load mode changed."
+      },
+      {
+       "name": "missLists",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "A custom paint list, composite or cache policy changed."
+      },
+      {
+       "name": "missDependencies",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "A text layout or render target the plan read changed."
+      },
+      {
+       "name": "missAtlas",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "The session text engine's atlas, layout or fonts changed."
+      },
+      {
+       "name": "missUnsettled",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "The first plan, or one not yet confirmed by a second identical build."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(compiles:Float, reuses:Float, missEpoch:Float, missFrame:Float, missLists:Float, missDependencies:Float, missAtlas:Float, missUnsettled:Float):Void"
+      }
+     ]
+    },
+    {
      "name": "Renderer",
      "kind": "class",
      "file": "haxeon/packages/ui/bindings/haxe/haxeon/ui/Renderer.hx",
      "doc": "Typed renderer facade for retained UI display lists.",
      "fields": [
+      {
+       "name": "gpuFrameNanoseconds",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "GPU time of the newest measured frame in nanoseconds, as of the last pollGpuFrameTime."
+      },
       {
        "name": "create",
        "kind": "method",
@@ -2264,6 +2349,24 @@
        "name": "stats",
        "kind": "method",
        "signature": "():RendererStats"
+      },
+      {
+       "name": "planReuse",
+       "kind": "method",
+       "signature": "():RenderPlanReuse",
+       "doc": "How often layout-session frames compiled a render plan or reused the last one, and why each compile was needed.\nCumulative; the reasons add up to `compiles`."
+      },
+      {
+       "name": "setGpuFrameTiming",
+       "kind": "method",
+       "signature": "(enabled:Bool):Void",
+       "doc": "Measures the GPU time of the renderer's frames while enabled. Off by default; cheap to call each frame."
+      },
+      {
+       "name": "pollGpuFrameTime",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Reads the newest GPU frame time while timing is enabled; true when a result arrived since the last poll. A result\nbelongs to a frame a few frames back."
       },
       {
        "name": "dispose",
@@ -2784,6 +2887,12 @@
        "kind": "method",
        "signature": "(ranges:Array<TextColorRange>):Void",
        "doc": "Replaces sorted, disjoint foreground ranges without changing measured geometry.\nOffsets are codepoints; shaped clusters use their first codepoint's color.\nAn empty array clears overrides. Updating text/layout also clears them."
+      },
+      {
+       "name": "setGridPositions",
+       "kind": "method",
+       "signature": "(positions:Array<Float>):Void",
+       "doc": "Physical x positions per codepoint boundary for a single-row terminal grid.\nEmpty positions restore natural spacing; text updates clear the projection."
       },
       {
        "name": "update",
@@ -3405,6 +3514,12 @@
        "signature": ":Int"
       },
       {
+       "name": "needsFrame",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "Whether some animation changes on every frame, as opposed to only waiting for a deadline."
+      },
+      {
        "name": "new",
        "kind": "method",
        "signature": "():Void"
@@ -3430,6 +3545,29 @@
        "name": "cancelAll",
        "kind": "method",
        "signature": "():Void"
+      },
+      {
+       "name": "waitSeconds",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Seconds until the earliest deadline when every active animation is waiting, or -1 when\nnothing is active or some animation needs frames now."
+      }
+     ]
+    },
+    {
+     "name": "DelayedAnimation",
+     "kind": "interface",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/animation/DelayedAnimation.hx",
+     "implements": [
+      "Animation"
+     ],
+     "doc": "An animation that can spend time waiting for a deadline with nothing visibly changing.\nThe scheduler asks for frames only while an animation is not waiting, and the host wakes\nonce at the earliest deadline instead of drawing frames to count the delay down.",
+     "fields": [
+      {
+       "name": "delaySeconds",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Seconds until the next visible change, or 0 when the animation changes every frame."
       }
      ]
     },
@@ -3745,6 +3883,12 @@
        "doc": "A resolved widget can request another native layout pass in this submit."
       },
       {
+       "name": "keyCachePrunes",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "How many times pruneKeyCaches walked the caches, rather than finding nothing changed."
+      },
+      {
        "name": "inheritedStyle",
        "kind": "var",
        "signature": ":Null<ComputedStyle>",
@@ -3796,6 +3940,12 @@
        "kind": "method",
        "signature": "(target:StyleTarget, ?local:LayoutStyle, ?localTextColor:haxeon.ui.Color):ComputedStyle",
        "doc": "Resolves one node against the active inherited style and current layers."
+      },
+      {
+       "name": "hasHoverStyle",
+       "kind": "method",
+       "signature": "(node:RenderNode):Bool",
+       "doc": "Conservative guard for retained hover. Conditional rules are included even when inactive."
       },
       {
        "name": "setFocusRequester",
@@ -3932,8 +4082,8 @@
       {
        "name": "pruneKeyCaches",
        "kind": "method",
-       "signature": "(mounted:Map<Int, RenderNode>):Void",
-       "doc": "Cache identities only for the committed tree and retained application state."
+       "signature": "(mounted:Map<Int, RenderNode>, mountedHash:Int):Void",
+       "doc": "Drops the cached IDs and key paths of widgets that are no longer mounted. `mountedHash` summarizes which nodes are\nmounted (any hash of their IDs in tree order will do). A cache entry only becomes stale when the mounted nodes change,\nso with the same hash and the same cached IDs since the last walk there is nothing to find, and the walk, which hashes\nthe path of every cached key, is skipped. Scopes that hold no widget are created and dropped again by a build, a few\nevery frame, and are left until `SCOPE_GROWTH_PRUNE` of them have collected: they only cache path strings. A change that\ngoes unnoticed (a hash collision, or state released for a widget that stays unmounted) only leaves an entry cached until\nthe next change."
       },
       {
        "name": "dispose",
@@ -3951,6 +4101,18 @@
        "name": "withScope",
        "kind": "method",
        "signature": "(key:Key, build:() -> T):T"
+      },
+      {
+       "name": "currentScope",
+       "kind": "method",
+       "signature": "():KeyScope",
+       "doc": "The scope widgets built now are keyed under; withScopeUnder keys a deeper subtree by it."
+      },
+      {
+       "name": "withScopeUnder",
+       "kind": "method",
+       "signature": "(base:KeyScope, key:Key, build:() -> T):T",
+       "doc": "Builds under `base`'s child `key` rather than the current scope's, so a subtree placed anywhere below `base`\nkeeps one identity, and its state, wherever it moves. Keys must be unique among the subtrees built under `base`."
       },
       {
        "name": "state",
@@ -4428,8 +4590,8 @@
       {
        "name": "dispatchContextInScopes",
        "kind": "method",
-       "signature": "(key:Int, modifiers:Int, ?context:CommandContext, ?pathScopes:Array<String>, ?repeated:Bool):CommandResult",
-       "doc": "Dispatches through focused-node scopes before the registry's active scopes.\nThe supplied path is ordered from root to focused node; the deepest scope\ntherefore wins without mutating the registry's persistent scope stack."
+       "signature": "(key:Int, modifiers:Int, ?context:CommandContext, ?pathScopes:Array<String>, ?repeated:Bool, ?shortcutFilter:(String) -> Bool):CommandResult",
+       "doc": "Dispatches through focused-node scopes before the registry's active scopes.\nThe supplied path is ordered from root to focused node; the deepest scope\ntherefore wins without mutating the registry's persistent scope stack.\nAn optional filter can leave the winning enabled command's keys to an input\nwidget. A filtered command never exposes a lower-priority binding."
       },
       {
        "name": "refresh",
@@ -5060,6 +5222,17 @@
        "signature": "(id:WidgetId, value:Int):Void"
       },
       {
+       "name": "changes",
+       "kind": "method",
+       "signature": "():Array<{id:Int, before:Int, after:Int}>",
+       "doc": "Net state changes since the last submitted frame, bounded by touched widget IDs."
+      },
+      {
+       "name": "acknowledge",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
        "name": "dispose",
        "kind": "method",
        "signature": "():Void"
@@ -5295,6 +5468,12 @@
        "doc": "Whether a widget recorded interaction state on this node. Structural nodes that never read it have no reason to rebuild\nwhen the pointer moves over them, so cache validation ignores them."
       },
       {
+       "name": "hoverPaintOnly",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "Opt-in contract: hover changes only custom paint, or have no visual effect.\nUiContext still rejects this path when a matching stylesheet hover rule exists."
+      },
+      {
        "name": "styleType",
        "kind": "var",
        "signature": ":Null<String>"
@@ -5324,6 +5503,12 @@
        "kind": "var",
        "signature": ":Null<String>",
        "doc": "Optional command scope contributed by this node and its focused subtree."
+      },
+      {
+       "name": "commandShortcutFilter",
+       "kind": "var",
+       "signature": ":Null<(String) -> Bool>",
+       "doc": "Focused input widgets may route selected commands before consuming their keys.\nThe predicate receives the winning command ID, after scope and binding resolution.\nOther keys still reach the widget; modal focus traps suppress this routing."
       },
       {
        "name": "computedStyle",
@@ -5387,6 +5572,12 @@
        "kind": "var",
        "signature": ":Null<RenderNode>",
        "doc": "Set when this node was rebuilt in place: the node that took its place. Retained caches that still hold this one follow it."
+      },
+      {
+       "name": "invalidatePaint",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Invalidate a retained custom display list without changing geometry or text."
       },
       {
        "name": "new",
@@ -5466,6 +5657,12 @@
        "name": "on",
        "kind": "method",
        "signature": "(kind:String, handler:(UiEvent) -> Void, ?phase:String):RenderNode"
+      },
+      {
+       "name": "onActivate",
+       "kind": "method",
+       "signature": "(handler:(UiEvent) -> Void, ?phase:String):RenderNode",
+       "doc": "Primary pointer clicks and semantic activation (keyboard/accessibility).\nOther mouse buttons remain available to raw Click/context-menu handlers."
       },
       {
        "name": "onPointerDownOutside",
@@ -5581,6 +5778,54 @@
        "name": "build",
        "kind": "method",
        "signature": "(context:BuildContext):RenderNode"
+      }
+     ]
+    },
+    {
+     "name": "SelectionGesture",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/core/SelectionGesture.hx",
+     "doc": "Shared editor/terminal pointer policy; adapters own text boundaries and storage.",
+     "fields": [
+      {
+       "name": "granularity",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "register",
+       "kind": "method",
+       "signature": "(key:String, timestamp:Float, x:Float, y:Float):Int"
+      },
+      {
+       "name": "complete",
+       "kind": "method",
+       "signature": "(x:Float, y:Float):Void"
+      },
+      {
+       "name": "cancelIfMoved",
+       "kind": "method",
+       "signature": "(x:Float, y:Float):Void"
+      },
+      {
+       "name": "cancel",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "anchor",
+       "kind": "method",
+       "signature": "(first:Int, last:Int):Void"
+      },
+      {
+       "name": "extend",
+       "kind": "method",
+       "signature": "(first:Int, last:Int):{anchor:Int, focus:Int}"
       }
      ]
     },
@@ -6082,6 +6327,18 @@
        "signature": ":Null<RenderNode>"
       },
       {
+       "name": "inspectionHighlight",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "Opt-in developer selection. Drawn after application paint and excluded from hit testing."
+      },
+      {
+       "name": "onInspectionPaint",
+       "kind": "var",
+       "signature": ":Null<(Int, Float) -> Void>",
+       "doc": "Optional detailed paint probe. Disabled unless an inspector explicitly subscribes."
+      },
+      {
        "name": "onAnimationFrameRequested",
        "kind": "var",
        "signature": ":Null<() -> Void>",
@@ -6247,6 +6504,12 @@
        "doc": "Clears transient pointer state and reports loss of platform window focus."
       },
       {
+       "name": "windowFocusGained",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Restore keyboard ownership after activation, subject to current focus eligibility."
+      },
+      {
        "name": "pointerMove",
        "kind": "method",
        "signature": "(x:Float, y:Float, ?modifiers:Int, ?pointerId:Int, ?data:Dynamic):Void"
@@ -6308,6 +6571,12 @@
        "name": "isDirty",
        "kind": "method",
        "signature": "():Bool"
+      },
+      {
+       "name": "animationWaitSeconds",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Seconds until animations that are only waiting next need a frame, or -1 for none."
       },
       {
        "name": "inspect",
@@ -6803,6 +7072,12 @@
       },
       {
        "name": "F5",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "F6",
        "kind": "var",
        "signature": ":Int",
        "static": true
@@ -7539,6 +7814,12 @@
        "signature": ":Bool"
       },
       {
+       "name": "hoverPaintUpdatedNodes",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "Custom painters invalidated by a retained hover-only submission."
+      },
+      {
        "name": "renderSeconds",
        "kind": "var",
        "signature": ":Float"
@@ -7603,6 +7884,13 @@
      "file": "haxeon/packages/ui/haxe/haxeon/ui/debug/UiInspector.hx",
      "doc": "Produces deterministic, headless snapshots and readable render-tree dumps.",
      "fields": [
+      {
+       "name": "nodeSnapshot",
+       "kind": "method",
+       "signature": "(node:RenderNode, ?focused:WidgetId):UiNodeSnapshot",
+       "static": true,
+       "doc": "Inspect one node without traversing its descendants."
+      },
       {
        "name": "snapshot",
        "kind": "method",
@@ -9391,6 +9679,12 @@
      "doc": "Window, pacing, and deterministic-capture policy for DesktopUiHost.",
      "fields": [
       {
+       "name": "applicationId",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "doc": "Stable application identity, including Windows taskbar grouping."
+      },
+      {
        "name": "customTitlebar",
        "kind": "var",
        "signature": ":Bool"
@@ -9595,7 +9889,7 @@
      "name": "ScriptedInput",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/host/ScriptedInput.hx",
-     "doc": "Timed, window-local logical input through the normal managed event pump.\nTimes are seconds after the first content-ready frame; coordinates are window logical pixels.\nDelayed events retain their original deadlines, so overload remains measurable.",
+     "doc": "Timed, window-local logical input through the normal managed event pump.\nTimes are seconds after the first content-ready frame; coordinates are window logical pixels.\nA key event presses and releases NativeKit key code `key` with `modifiers` held (NativeKit bits, default none); a\ntext event types `text` as one text input per code point, as a keyboard layout would.\nDelayed events retain their original deadlines, so overload remains measurable.",
      "fields": [
       {
        "name": "scheduledAt",
@@ -9881,7 +10175,8 @@
       {
        "name": "nextDelta",
        "kind": "method",
-       "signature": "(timeSeconds:Float):Float"
+       "signature": "(timeSeconds:Float, ?maxSeconds:Float):Float",
+       "doc": "Elapsed time since the last frame, capped so a stall does not jump an animation."
       }
      ]
     },
@@ -11061,6 +11356,30 @@
        "final": true
       },
       {
+       "name": "description",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "final": true
+      },
+      {
+       "name": "restartRequired",
+       "kind": "var",
+       "signature": ":Bool",
+       "final": true
+      },
+      {
+       "name": "modified",
+       "kind": "var",
+       "signature": ":Null<() -> Bool>",
+       "final": true
+      },
+      {
+       "name": "reset",
+       "kind": "var",
+       "signature": ":Null<() -> Void>",
+       "final": true
+      },
+      {
        "name": "readOnly",
        "kind": "var",
        "signature": ":Bool",
@@ -11163,6 +11482,26 @@
        "name": "category",
        "kind": "var",
        "signature": ":String"
+      },
+      {
+       "name": "description",
+       "kind": "var",
+       "signature": ":Null<String>"
+      },
+      {
+       "name": "restartRequired",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "modified",
+       "kind": "var",
+       "signature": ":Null<() -> Bool>"
+      },
+      {
+       "name": "reset",
+       "kind": "var",
+       "signature": ":Null<() -> Void>"
       },
       {
        "name": "readOnly",
@@ -11663,6 +12002,33 @@
      ],
      "doc": "JSON-compatible structured editor. Nested lists expose individual items; each action\nstages a detached value. Apply submits the entire value as one transaction.\nDomain validation, model mutation and undo history remain application-owned.",
      "fields": [
+      {
+       "name": "chooseItems",
+       "kind": "var",
+       "signature": ":Null<((Array<String>) -> Void) -> Void>",
+       "doc": "Optional host chooser; selected paths join the staged list until Apply."
+      },
+      {
+       "name": "retainDrafts",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "Keep drafts when an inspector is rebuilt or changes category."
+      },
+      {
+       "name": "onDraftChanged",
+       "kind": "var",
+       "signature": ":Null<() -> Void>"
+      },
+      {
+       "name": "hasDrafts",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "discardDrafts",
+       "kind": "method",
+       "signature": "():Void"
+      },
       {
        "name": "new",
        "kind": "method",
@@ -12713,10 +13079,36 @@
        "doc": "Sets an editor value when its code-point length is already cached."
       },
       {
-       "name": "setValueProvider",
+       "name": "setValueSource",
        "kind": "method",
-       "signature": "(provider:() -> String, length:Int):Void",
+       "signature": "(source:SemanticsValueSource, length:Int):Void",
        "doc": "Defers assembling an editable document until a consumer reads its value."
+      },
+      {
+       "name": "sameValue",
+       "kind": "method",
+       "signature": "(other:Semantics):Bool",
+       "doc": "Whether this value equals `other`'s. Two values from the same source are compared by revision without reading\neither: a deferred value reads its source as it is now, so reading one set at an older revision would compare the\ncurrent value with itself."
+      }
+     ]
+    },
+    {
+     "name": "SemanticsValueSource",
+     "kind": "interface",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/semantics/SemanticsValueSource.hx",
+     "doc": "A value `Semantics` defers: read only when a consumer asks for it, and compared by revision instead of by content, so\nan editor's whole document is neither assembled nor compared on frames where it did not change.",
+     "fields": [
+      {
+       "name": "semanticsValue",
+       "kind": "method",
+       "signature": "():String",
+       "doc": "The current value."
+      },
+      {
+       "name": "semanticsValueRevision",
+       "kind": "method",
+       "signature": "():Int",
+       "doc": "A number that changes whenever `semanticsValue` would return something different."
       }
      ]
     }
@@ -12939,6 +13331,11 @@
        "final": true
       },
       {
+       "name": "onlyPaths",
+       "kind": "var",
+       "signature": ":Null<Array<String>>"
+      },
+      {
        "name": "new",
        "kind": "method",
        "signature": "(store:SettingsStore):Void"
@@ -12964,22 +13361,33 @@
        "doc": "\"interface/editor\" becomes \"Editor\"; \"text_editor\" becomes \"Text Editor\"."
       },
       {
+       "name": "setDescriptor",
+       "kind": "method",
+       "signature": "(path:String, descriptor:PropertyDescriptor):Void",
+       "doc": "Whether the dialog lists the setting. Internal settings never show;\nadvanced ones only when asked for, or when the filter names them. The\nfilter matches the label or path, ignoring case."
+      },
+      {
        "name": "visible",
        "kind": "method",
        "signature": "(definition:SettingDefinition, filter:String, showAdvanced:Bool):Bool",
-       "static": true,
-       "doc": "Whether the dialog lists the setting. Internal settings never show;\nadvanced ones only when asked for, or when the filter names them. The\nfilter matches the label or path, ignoring case."
+       "static": true
       },
       {
        "name": "categories",
        "kind": "method",
-       "signature": "(filter:String, showAdvanced:Bool):Array<String>",
+       "signature": "(filter:String, showAdvanced:Bool, ?modifiedOnly:Bool):Array<String>",
        "doc": "Categories that hold a visible setting, in definition order."
+      },
+      {
+       "name": "categoryCounts",
+       "kind": "method",
+       "signature": "(filter:String, showAdvanced:Bool, ?modifiedOnly:Bool):Map<String, Int>",
+       "doc": "Counts share the result rows' filter, Advanced, and override rules."
       },
       {
        "name": "sections",
        "kind": "method",
-       "signature": "(category:String, filter:String, showAdvanced:Bool):Array<PropertyInspectorSection>",
+       "signature": "(category:String, filter:String, showAdvanced:Bool, ?modifiedOnly:Bool):Array<PropertyInspectorSection>",
        "doc": "The category's visible settings as inspector sections: unsectioned first, then in definition order."
       }
      ]
@@ -13120,6 +13528,18 @@
        "name": "get",
        "kind": "method",
        "signature": "(path:String):PropertyValue"
+      },
+      {
+       "name": "inheritRestartBaseline",
+       "kind": "method",
+       "signature": "(previous:SettingsStore):Void",
+       "doc": "Preserve the running baseline when replacing a store after an external reload."
+      },
+      {
+       "name": "restartChanges",
+       "kind": "method",
+       "signature": "():Array<SettingDefinition>",
+       "doc": "Changes from the running application's initial values; never persisted."
       },
       {
        "name": "getBool",
@@ -17375,6 +17795,23 @@
        "signature": ":Color"
       },
       {
+       "name": "tooltipFontSize",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Logical font size shared by ordinary tooltip content."
+      },
+      {
+       "name": "tabHeaderHeight",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Shared tab chrome metrics, in logical pixels."
+      },
+      {
+       "name": "tabHeaderFontSize",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
        "name": "radiusSmall",
        "kind": "var",
        "signature": ":Float"
@@ -18585,6 +19022,48 @@
      ]
     },
     {
+     "name": "TreeItemDrag",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/collections/TreeItemDrag.hx",
+     "implements": [
+      "haxeon.ui.animation.Animation"
+     ],
+     "doc": "Pointer gesture shared by model-backed trees; application policy owns mutations.",
+     "fields": [
+      {
+       "name": "rows",
+       "kind": "var",
+       "signature": ":Map<String, RenderNode>",
+       "final": true
+      },
+      {
+       "name": "clear",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(deltaSeconds:Float):Bool"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "attach",
+       "kind": "method",
+       "signature": "(root:RenderNode, tree:TreeView, context:BuildContext):Void"
+      }
+     ]
+    },
+    {
      "name": "TreeRootMetadata",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/collections/TreeRootMetadata.hx",
@@ -18679,6 +19158,12 @@
        "signature": ":Null<(String) -> Void>"
       },
       {
+       "name": "onItemActivatedWithEvent",
+       "kind": "var",
+       "signature": ":Null<(String, UiEvent) -> Void>",
+       "doc": "Event-aware activation for callers that need pointer or keyboard modifiers."
+      },
+      {
        "name": "onItemClicked",
        "kind": "var",
        "signature": ":Null<(String, Int) -> Void>",
@@ -18705,6 +19190,22 @@
        "name": "onItemRename",
        "kind": "var",
        "signature": ":Null<(String) -> Void>"
+      },
+      {
+       "name": "canDragItem",
+       "kind": "var",
+       "signature": ":Null<(String) -> Bool>",
+       "doc": "Optional intra-tree drag/drop policy. Drops use stable model keys."
+      },
+      {
+       "name": "canDropItem",
+       "kind": "var",
+       "signature": ":Null<(String, String) -> Bool>"
+      },
+      {
+       "name": "onItemDrop",
+       "kind": "var",
+       "signature": ":Null<(String, String) -> Void>"
       },
       {
        "name": "itemBuilder",
@@ -18757,6 +19258,12 @@
        "name": "new",
        "kind": "method",
        "signature": "(key:String, model:TreeViewModel, ?viewportStyle:LayoutStyle, ?controller:ScrollController, ?viewportHeight:Float, ?selectedKey:String, ?expandedKeys:Array<String>, ?onSelectionChanged:(String) -> Void, ?onItemActivated:(String) -> Void, ?onExpandedChanged:(String, Bool) -> Void, ?virtualization:VirtualizationPolicy):Void"
+      },
+      {
+       "name": "cancelDrag",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Cancel an in-flight drag when the owning workspace changes."
       },
       {
        "name": "select",
@@ -19163,7 +19670,7 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(key:String, itemCount:Int, itemHeight:Float, itemBuilder:(Int) -> View, ?viewportStyle:LayoutStyle, ?keyForIndex:(Int) -> String, ?controller:ScrollController, ?viewportHeight:Float, ?virtualization:VirtualizationPolicy):Void"
+       "signature": "(key:String, itemCount:Int, itemHeight:Float, itemBuilder:(Int) -> View, ?viewportStyle:LayoutStyle, ?keyForIndex:(Int) -> String, ?controller:ScrollController, ?viewportHeight:Float, ?virtualization:VirtualizationPolicy, ?itemMetadata:ListViewItemMetadata):Void"
       },
       {
        "name": "build",
@@ -19527,6 +20034,178 @@
        "signature": "(context:BuildContext):RenderNode"
       }
      ]
+    },
+    {
+     "name": "SearchPicker",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/commands/SearchPicker.hx",
+     "implements": [
+      "View"
+     ],
+     "doc": "Search input and virtualized results with input-owned keyboard focus. Retain across builds.",
+     "fields": [
+      {
+       "name": "model",
+       "kind": "var",
+       "signature": ":SearchPickerModel"
+      },
+      {
+       "name": "buildRow",
+       "kind": "var",
+       "signature": ":(BuildContext, Int, Bool, Bool, Int) -> View"
+      },
+      {
+       "name": "onDismiss",
+       "kind": "var",
+       "signature": ":() -> Void"
+      },
+      {
+       "name": "onChanged",
+       "kind": "var",
+       "signature": ":() -> Void"
+      },
+      {
+       "name": "width",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "rowHeight",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxListHeight",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "centered",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "label",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "placeholder",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "prefix",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "emptyText",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "modal",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "dimBackdrop",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "menuSurface",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "layerZIndex",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(key:String, model:SearchPickerModel, buildRow:(BuildContext, Int, Bool, Bool, Int) -> View, onDismiss:() -> Void, onChanged:() -> Void):Void"
+      },
+      {
+       "name": "build",
+       "kind": "method",
+       "signature": "(context:BuildContext):RenderNode"
+      }
+     ]
+    },
+    {
+     "name": "SearchPickerModel",
+     "kind": "interface",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/commands/SearchPickerModel.hx",
+     "implements": [
+      "haxeon.ui.widgets.collections.ListViewItemMetadata"
+     ],
+     "doc": "Application-owned results and selection; the picker owns focus and scrolling.",
+     "fields": [
+      {
+       "name": "query",
+       "kind": "method",
+       "signature": "():String"
+      },
+      {
+       "name": "selectedIndex",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "count",
+       "kind": "method",
+       "signature": "():Int"
+      },
+      {
+       "name": "labelAt",
+       "kind": "method",
+       "signature": "(index:Int):String"
+      },
+      {
+       "name": "enabledAt",
+       "kind": "method",
+       "signature": "(index:Int):Bool"
+      },
+      {
+       "name": "setQuery",
+       "kind": "method",
+       "signature": "(value:String):Void"
+      },
+      {
+       "name": "navigate",
+       "kind": "method",
+       "signature": "(key:Int, modifiers:Int, pageSize:Int):Void",
+       "doc": "Normalized UiKey/UiModifier values; pageSize is the visible row count."
+      },
+      {
+       "name": "activate",
+       "kind": "method",
+       "signature": "(index:Int):Void"
+      }
+     ]
+    },
+    {
+     "name": "ShortcutKeycaps",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/commands/ShortcutKeycaps.hx",
+     "implements": [
+      "View"
+     ],
+     "doc": "Alternatives use “or”; whitespace separates sequential chords, + joins simultaneous keys."
     }
    ]
   },
@@ -21206,6 +21885,30 @@
        "doc": "Available content width when the workspace sits beside application chrome."
       },
       {
+       "name": "headerActions",
+       "kind": "var",
+       "signature": ":Null<(Array<String>, String) -> Null<View>>",
+       "doc": "Optional fixed actions for a dock tab group, including single dock headers."
+      },
+      {
+       "name": "headerActionsRevision",
+       "kind": "var",
+       "signature": ":String",
+       "doc": "Application-owned action state included in retained pane keys."
+      },
+      {
+       "name": "expandedGroup",
+       "kind": "var",
+       "signature": ":Null<Array<String>>",
+       "doc": "Expand a matching group vertically without changing the persisted dock tree."
+      },
+      {
+       "name": "hiddenPanels",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "doc": "Presentation-only suppression; preserves the model, split paths and saved layout."
+      },
+      {
        "name": "new",
        "kind": "method",
        "signature": "(key:String, model:DockWorkspaceModel, ?panelContents:Array<DockPanelContent>, ?style:LayoutStyle, ?interaction:DockWorkspaceInteraction):Void"
@@ -21713,6 +22416,12 @@
        "doc": "Visible divider width; null uses the full draggable extent."
       },
       {
+       "name": "dividerHairline",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "Paint a device-aligned one-pixel separator with an overlapping resize target and no layout gap."
+      },
+      {
        "name": "style",
        "kind": "var",
        "signature": ":Null<LayoutStyle>"
@@ -21907,6 +22616,12 @@
        "final": true
       },
       {
+       "name": "onOutsideClick",
+       "kind": "var",
+       "signature": ":Null<(haxeon.ui.core.UiEvent) -> Bool>",
+       "doc": "Optional outside-click routing for associated menu triggers."
+      },
+      {
        "name": "onDismiss",
        "kind": "var",
        "signature": ":() -> Void"
@@ -22077,6 +22792,12 @@
        "doc": "Open to the left of the anchor when the popup does not fit to its right\nbut fits to its left, as native context menus do. Otherwise the popup is\nshifted to stay inside the layer."
       },
       {
+       "name": "onOutsideClick",
+       "kind": "var",
+       "signature": ":Null<(UiEvent) -> Bool>",
+       "doc": "Handle an outside click (for example, a sibling menu trigger); true skips default dismissal."
+      },
+      {
        "name": "onDismiss",
        "kind": "var",
        "signature": ":() -> Void"
@@ -22107,6 +22828,38 @@
      ],
      "doc": "Hover-triggered tooltip layered above its anchor with persistent Haxe state.",
      "fields": [
+      {
+       "name": "placement",
+       "kind": "var",
+       "signature": ":Null<TooltipPlacement>",
+       "doc": "Preferred side. Null preserves explicit x/y positioning."
+      },
+      {
+       "name": "delaySeconds",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Initial hover delay for side-positioned tooltips."
+      },
+      {
+       "name": "hoverGroup",
+       "kind": "var",
+       "signature": ":Null<TooltipHoverGroup>"
+      },
+      {
+       "name": "groupVisible",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "boundsProvider",
+       "kind": "var",
+       "signature": ":Null<() -> Rect>"
+      },
+      {
+       "name": "startAtAnchorMiddle",
+       "kind": "var",
+       "signature": ":Bool"
+      },
       {
        "name": "x",
        "kind": "var",
@@ -22147,6 +22900,127 @@
        "name": "new",
        "kind": "method",
        "signature": "(key:String, anchor:View, content:View, ?x:Float, ?y:Float):Void"
+      },
+      {
+       "name": "build",
+       "kind": "method",
+       "signature": "(context:BuildContext):RenderNode"
+      },
+      {
+       "name": "place",
+       "kind": "method",
+       "signature": "(anchorX:Float, anchorHeight:Float, railX:Float, railWidth:Float, ?preferredOffset:Float, ?boxWidth:Float):{x:Float, y:Float, width:Float}",
+       "static": true,
+       "doc": "Content width excludes the tooltip's own padding."
+      },
+      {
+       "name": "placeRight",
+       "kind": "method",
+       "signature": "(anchor:Rect, width:Float, height:Float, viewport:Rect):{x:Float, y:Float, width:Float}",
+       "static": true,
+       "doc": "Returns anchor-relative coordinates, preferring right and keeping the box in the viewport."
+      }
+     ]
+    },
+    {
+     "name": "TooltipHoverDelay",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/overlays/TooltipHoverDelay.hx",
+     "implements": [
+      "Animation"
+     ],
+     "fields": [
+      {
+       "name": "delaySeconds",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(scheduler:AnimationScheduler, changed:(Bool) -> Void, ?delaySeconds:Float):Void"
+      },
+      {
+       "name": "start",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "cancel",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(deltaSeconds:Float):Bool"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "TooltipHoverGroup",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/overlays/TooltipHoverGroup.hx",
+     "implements": [
+      "Animation"
+     ],
+     "doc": "Shared hover timing lets neighboring labels switch without restarting the delay.",
+     "fields": [
+      {
+       "name": "delaySeconds",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(scheduler:AnimationScheduler, changed:(Null<String>) -> Void, delaySeconds:Float):Void"
+      },
+      {
+       "name": "enter",
+       "kind": "method",
+       "signature": "(key:String):Void"
+      },
+      {
+       "name": "leave",
+       "kind": "method",
+       "signature": "(key:String):Void"
+      },
+      {
+       "name": "cancel",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "advance",
+       "kind": "method",
+       "signature": "(deltaSeconds:Float):Bool"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "TooltipOverlayHost",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/overlays/TooltipOverlayHost.hx",
+     "implements": [
+      "View"
+     ],
+     "doc": "Lift tooltip surfaces out of clipped stacking contexts before layout.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(content:View):Void"
       },
       {
        "name": "build",
@@ -22316,6 +23190,16 @@
        "signature": ":Float"
       },
       {
+       "name": "stackedRows",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "searchQuery",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
        "name": "showCategories",
        "kind": "var",
        "signature": ":Bool",
@@ -22331,6 +23215,11 @@
        "kind": "method",
        "signature": "(context:BuildContext, descriptor:PropertyDescriptor, next:PropertyValue, ?coalesceKey:String):Bool",
        "doc": "Applies through the document or external transaction owner. Pending returns false."
+      },
+      {
+       "name": "resetValue",
+       "kind": "method",
+       "signature": "(context:BuildContext, descriptor:PropertyDescriptor):Void"
       },
       {
        "name": "build",
@@ -22403,6 +23292,16 @@
        "name": "labelWidth",
        "kind": "var",
        "signature": ":Float"
+      },
+      {
+       "name": "stackedRows",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "searchQuery",
+       "kind": "var",
+       "signature": ":String"
       },
       {
        "name": "scrollable",
@@ -22718,7 +23617,7 @@
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/scroll/ScrollbarVisibilityController.hx",
      "implements": [
-      "Animation"
+      "DelayedAnimation"
      ],
      "doc": "Mount-owned scrollbar visibility, independent of scroll geometry and paint.",
      "fields": [
@@ -22800,6 +23699,12 @@
        "doc": "Reveals from the current opacity; repeated activity never restarts the fade."
       },
       {
+       "name": "delaySeconds",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "The idle grace after a fade-in changes nothing on screen, so it needs a wake, not frames."
+      },
+      {
        "name": "advance",
        "kind": "method",
        "signature": "(deltaSeconds:Float):Bool"
@@ -22848,6 +23753,16 @@
        "signature": ":Bool"
       },
       {
+       "name": "modifiedOnly",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "restartOnly",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
        "name": "selectedCategory",
        "kind": "var",
        "signature": ":Null<String>",
@@ -22869,9 +23784,46 @@
        "signature": ":Float"
       },
       {
+       "name": "editorRegistry",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "final": true
+      },
+      {
+       "name": "compact",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
        "name": "new",
        "kind": "method",
        "signature": "(key:String, store:SettingsStore, ?onChanged:() -> Void):Void"
+      },
+      {
+       "name": "hasUnsavedChanges",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "discardUnsavedChanges",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "requestSearchFocus",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "showRestartChanges",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Include advanced restart changes and resets back to a default value."
+      },
+      {
+       "name": "showAllSettings",
+       "kind": "method",
+       "signature": "():Void"
       },
       {
        "name": "setFilter",
@@ -22880,6 +23832,11 @@
       },
       {
        "name": "setShowAdvanced",
+       "kind": "method",
+       "signature": "(value:Bool):Void"
+      },
+      {
+       "name": "setModifiedOnly",
        "kind": "method",
        "signature": "(value:Bool):Void"
       },
@@ -22896,15 +23853,20 @@
        "doc": "Categories the tree lists for the current filter, in order."
       },
       {
-       "name": "currentInspector",
+       "name": "categoryCount",
        "kind": "method",
-       "signature": "():Null<PropertyInspector>",
+       "signature": "(category:String):Int",
        "doc": "The inspector for the selected category; rebuilt only when the category, filter or Advanced switch changes."
       },
       {
-       "name": "build",
+       "name": "invalidateInspector",
        "kind": "method",
-       "signature": "(context:BuildContext):RenderNode"
+       "signature": "():Void"
+      },
+      {
+       "name": "currentInspector",
+       "kind": "method",
+       "signature": "():Null<PropertyInspector>"
       }
      ]
     },
@@ -23383,6 +24345,34 @@
      "doc": "Compatibility name for the editor core type."
     },
     {
+     "name": "HighlightedText",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/text/HighlightedText.hx",
+     "implements": [
+      "View"
+     ],
+     "doc": "Search marking without splitting text runs or changing their wrapping.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(value:String, query:String, ?style:LayoutStyle, ?color:Color, ?textStyle:TextStyleOverride, ?role:TextRole):Void"
+      },
+      {
+       "name": "matches",
+       "kind": "method",
+       "signature": "(value:String, query:String):Array<{start:Int, end:Int}>",
+       "static": true,
+       "doc": "Native text ranges use codepoints; String searches use target-specific offsets."
+      },
+      {
+       "name": "build",
+       "kind": "method",
+       "signature": "(context:BuildContext):RenderNode"
+      }
+     ]
+    },
+    {
      "name": "MiddleEllipsisText",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/text/MiddleEllipsisText.hx",
@@ -23450,6 +24440,11 @@
        "name": "configure",
        "kind": "method",
        "signature": "(scheduler:AnimationScheduler, editor:TextEditorState, geometry:() -> Null<ResolvedLayoutItem>, selectAt:(Float, Float) -> Void, scroll:(Float) -> Bool):Void"
+      },
+      {
+       "name": "configureAdapter",
+       "kind": "method",
+       "signature": "(scheduler:AnimationScheduler, active:() -> Bool, geometry:() -> Null<ResolvedLayoutItem>, selectAt:(Float, Float) -> Void, scroll:(Float) -> Bool):Void"
       },
       {
        "name": "update",
@@ -23876,7 +24871,7 @@
      "name": "TextEditorLayout",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/text/TextEditorLayout.hx",
-     "doc": "Retained layouts for bounded groups of paragraphs in one editor document.",
+     "doc": "Retained layouts for bounded groups of paragraphs in one editor document.\n\nUnwrapped, a group is shaped the first time something needs its geometry (painting it, hit-testing or measuring\nit), not when the document is set, so opening a large document shapes only what is shown. Until then each of its\nparagraphs is one row of the first group's row height, which is exact for text of one line height. When a group\nis shaped and differs, the groups after it move, and a change above `scrollAnchorY` is reported through\n`takeScrollShift` so a view keeps its content in place. Wrapped text is shaped whole, since its rows depend on it.",
      "fields": [
       {
        "name": "codeWordBoundaries",
@@ -23899,6 +24894,12 @@
        "kind": "var",
        "signature": ":Int",
        "doc": "Changes whenever edits or shaping constraints recompute paragraph geometry."
+      },
+      {
+       "name": "visualRowsRevision",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "Logical/visual row boundaries and vertical placement; unwrapped viewport widths do not change these."
       },
       {
        "name": "textStyle",
@@ -23927,6 +24928,12 @@
        "name": "decorationProvider",
        "kind": "var",
        "signature": ":Null<(Int, Int) -> Array<TextDecoration>>"
+      },
+      {
+       "name": "scrollAnchorY",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Where a view's content starts (its scroll offset); shaped groups above it move it by takeScrollShift."
       },
       {
        "name": "new",
@@ -23971,7 +24978,7 @@
        "name": "visualRows",
        "kind": "method",
        "signature": "():Array<{start:Int, end:Int, top:Float, bottom:Float}>",
-       "doc": "Resolved visual rows, including wrapped continuations and the final empty row.\nOffsets are absolute codepoints; vertical bounds are in document coordinates."
+       "doc": "Resolved visual rows, including wrapped continuations and the final empty row.\nOffsets are absolute codepoints and contiguous; vertical bounds are in document coordinates."
       },
       {
        "name": "paragraphIndexAtY",
@@ -24084,6 +25091,18 @@
        "name": "dispose",
        "kind": "method",
        "signature": "():Void"
+      },
+      {
+       "name": "shapedGroups",
+       "kind": "method",
+       "signature": "():{shaped:Int, total:Int}",
+       "doc": "Paragraph groups shaped so far, and all of them: an unwrapped document shapes only what was needed."
+      },
+      {
+       "name": "takeScrollShift",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "How far content above `scrollAnchorY` moved since the last call, as groups there were shaped."
       }
      ]
     },
@@ -24128,10 +25147,39 @@
        "signature": ":Null<Array<TextColorRange>>"
       },
       {
+       "name": "rows",
+       "kind": "var",
+       "signature": ":Null<Array<TextEditorParagraphRow>>",
+       "doc": "Visual rows of this paragraph's current layout (see TextEditorLayout.measureRows); null until measured."
+      },
+      {
+       "name": "paragraphCount",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "Paragraphs in the group, which estimate its height until it is shaped."
+      },
+      {
+       "name": "rowsHeight",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "The row height estimated rows were made with."
+      },
+      {
        "name": "layout",
        "kind": "var",
        "signature": ":TextLayout",
-       "final": true
+       "doc": "The group's shaped layout, made when first needed."
+      },
+      {
+       "name": "laidOut",
+       "kind": "var",
+       "signature": ":Bool"
+      },
+      {
+       "name": "hasRightToLeftText",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether the text holds a right-to-left character or mark, which can make a paragraph's base direction\nright-to-left. A superset of the strong right-to-left ranges, so it never misses one."
       },
       {
        "name": "whitespaceTokens",
@@ -24139,9 +25187,63 @@
        "signature": "():Array<{start:Int, end:Int, kind:Int}>"
       },
       {
+       "name": "setText",
+       "kind": "method",
+       "signature": "(next:String, width:Float, textStyle:TextStyle, paragraphStyle:ParagraphStyle):Void",
+       "doc": "Replaces the text, reshaping now only if the group is already shaped."
+      },
+      {
+       "name": "editText",
+       "kind": "method",
+       "signature": "(start:Int, end:Int, replacement:String, next:String):Void",
+       "doc": "Replaces `start...end` of the text with `replacement`, reshaping only that if the group is shaped."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
        "name": "new",
        "kind": "method",
-       "signature": "(text:String, layout:TextLayout):Void"
+       "signature": "(text:String, shapeText:(TextEditorParagraphRecord) -> TextLayout, ?onShaped:(TextEditorParagraphRecord) -> Void):Void"
+      }
+     ]
+    },
+    {
+     "name": "TextEditorParagraphRow",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/text/TextEditorLayout.hx",
+     "doc": "One visual row of a paragraph, in offsets and vertical bounds relative to the paragraph.",
+     "fields": [
+      {
+       "name": "start",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "end",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "top",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "bottom",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(start:Int, end:Int, top:Float, bottom:Float):Void"
       }
      ]
     },
@@ -24204,6 +25306,9 @@
      "name": "TextEditorState",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/text/TextEditorState.hx",
+     "implements": [
+      "SemanticsValueSource"
+     ],
      "doc": "Persistent editable text, selection and IME composition state for one widget ID.",
      "fields": [
       {
@@ -24418,7 +25523,7 @@
        "name": "surroundingText",
        "kind": "method",
        "signature": "(maxBefore:Int, maxAfter:Int):TextInputWindow",
-       "doc": "Returns surrounding text while keeping selection and composition in the window."
+       "doc": "The text around the caret for platform text input: up to `maxBefore` and `maxAfter` code points either side of the\nselection's focus, widened to hold a composition. The window does not grow with the selection, so a large one is\nreported clamped into it; a selection within the bounds is reported whole."
       },
       {
        "name": "applyTextEdit",
@@ -24633,14 +25738,12 @@
       {
        "name": "completePointerClick",
        "kind": "method",
-       "signature": "(x:Float, y:Float):Void",
-       "doc": "Arms a click for a possible double click only after a nearby pointer release."
+       "signature": "(x:Float, y:Float):Void"
       },
       {
        "name": "cancelPointerClickIfMoved",
        "kind": "method",
-       "signature": "(x:Float, y:Float):Void",
-       "doc": "Cancels click recognition once movement exceeds the platform-independent slop."
+       "signature": "(x:Float, y:Float):Void"
       },
       {
        "name": "cancelPointerClick",
@@ -24662,6 +25765,17 @@
        "kind": "method",
        "signature": "():String",
        "doc": "Native text services interpret Haxeon's null representation of empty strings as empty UTF-8."
+      },
+      {
+       "name": "semanticsValue",
+       "kind": "method",
+       "signature": "():String"
+      },
+      {
+       "name": "semanticsValueRevision",
+       "kind": "method",
+       "signature": "():Int",
+       "doc": "Advances when the text changes, including when the editor switches to another document."
       }
      ]
     },
@@ -24946,7 +26060,7 @@
      "name": "TextInputWindow",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/text/TextInputWindow.hx",
-     "doc": "A bounded UTF-8 window with absolute document code-point offsets.",
+     "doc": "A bounded UTF-8 window with absolute document code-point offsets, and the selection as reported with it: clamped\ninto the window, since platform text input requires it there, when a selection reaches past it.",
      "fields": [
       {
        "name": "text",
@@ -24967,9 +26081,21 @@
        "final": true
       },
       {
+       "name": "selectionStart",
+       "kind": "var",
+       "signature": ":CodepointOffset",
+       "final": true
+      },
+      {
+       "name": "selectionEnd",
+       "kind": "var",
+       "signature": ":CodepointOffset",
+       "final": true
+      },
+      {
        "name": "new",
        "kind": "method",
-       "signature": "(text:String, start:CodepointOffset, end:CodepointOffset):Void"
+       "signature": "(text:String, start:CodepointOffset, end:CodepointOffset, ?selectionStart:CodepointOffset, ?selectionEnd:CodepointOffset):Void"
       }
      ]
     },
