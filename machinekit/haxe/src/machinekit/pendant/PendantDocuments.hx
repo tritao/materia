@@ -14,9 +14,12 @@ class PendantDocuments {
   public final plate:PendantCaseDocument;
   public final shell:PendantCaseDocument;
   public final board:PendantCaseDocument;
+  /** What the parts' occurrences are prefixed with in the scene (see `PendantMachine.prefix`). */
+  public final prefix:String;
 
-  public function new(pendantCase:PendantCase) {
+  public function new(pendantCase:PendantCase, prefix:String = "") {
     this.pendantCase = pendantCase;
+    this.prefix = prefix;
     plate = PendantCaseDocument.plate(pendantCase);
     shell = PendantCaseDocument.shell(pendantCase);
     board = PendantCaseDocument.board(pendantCase);
@@ -30,9 +33,9 @@ class PendantDocuments {
 
   /** Each part's recorded steps, for a viewer that rolls the part back. */
   public function histories():Array<SceneArtifactHistory> return [
-    {occurrence: "case/plate", document: DocumentCodec.encode(plate.document)},
-    {occurrence: "case/shell", document: DocumentCodec.encode(shell.document)},
-    {occurrence: "case/board", document: DocumentCodec.encode(board.document)}
+    {occurrence: prefix + "case/plate", document: DocumentCodec.encode(plate.document)},
+    {occurrence: prefix + "case/shell", document: DocumentCodec.encode(shell.document)},
+    {occurrence: prefix + "case/board", document: DocumentCodec.encode(board.document)}
   ];
 
   /**
@@ -41,8 +44,8 @@ class PendantDocuments {
    */
   public function sources():SceneSourceMap {
     var features:Array<SceneSourceFeature> = [];
-    for (part in [{occurrence: "case/plate", document: plate}, {occurrence: "case/shell", document: shell},
-      {occurrence: "case/board", document: board}]) for (row in TimelineModel.of(part.document.document)) {
+    for (part in [{occurrence: prefix + "case/plate", document: plate}, {occurrence: prefix + "case/shell", document: shell},
+      {occurrence: prefix + "case/board", document: board}]) for (row in TimelineModel.of(part.document.document)) {
       if (row.parent >= 0) continue;
       features.push({
         id: part.occurrence + "#" + row.id,

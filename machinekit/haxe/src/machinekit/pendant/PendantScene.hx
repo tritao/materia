@@ -7,6 +7,7 @@ import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.MachineAssembly;
 import machinekit.document.MachineKitDocuments;
 import machinekit.document.MachineKitRecipes;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.project.SceneArtifact.SceneArtifactData;
 
 /**
@@ -18,17 +19,34 @@ class PendantScene {
   /** The occurrence whose Inspector carries the case's inputs. */
   public static inline var RECIPE_OCCURRENCE:String = "case/plate";
 
+  /**
+   * The pendant of a machine: `machine` is the scene's root and the pendant is included in it under `PendantMachine.ACCESSORY` at
+   * `pose`, serving the machine's operator profile and jogging its joints (see `PendantMachine.attachedTo`).
+   */
+  public static function attach(
+    root:MachineAssembly,
+    profile:String,
+    pose:AssemblyFrame,
+    ?savedDocument:String
+  ):SceneArtifactData {
+    return build(savedDocument, PendantMachine.attachedTo(root, profile), root, pose);
+  }
+
+  /** The pendant alone, or (with `root` and `pose`) included in the machine `root`; `machine` says whose pendant it is. */
   public static function build(
     ?savedDocument:String,
     ?machine:PendantMachine,
-    ?extend:MachineAssembly -> Void
+    ?root:MachineAssembly,
+    ?pose:AssemblyFrame
   ):SceneArtifactData {
+    var prefix = machine == null ? "" : machine.prefix;
+    var recipeOccurrence = prefix + RECIPE_OCCURRENCE;
     MachineKitRecipes.register();
     var recipe = new Document();
     try {
       var definition = MachineKitDocuments.define(recipe, PendantCasePlate.recipeType());
-      var instance = recipe.createInstance(RECIPE_OCCURRENCE, definition);
-      instance.restoreProperty("machinekit.occurrence", TypedProperty.text("machinekit.occurrence", RECIPE_OCCURRENCE));
+      var instance = recipe.createInstance(recipeOccurrence, definition);
+      instance.restoreProperty("machinekit.occurrence", TypedProperty.text("machinekit.occurrence", recipeOccurrence));
       var diagnostics:Array<String> = [];
       if (savedDocument != null) MachineKitRecipes.reconcileDocument(recipe, savedDocument, diagnostics);
       var size:PendantSize = {
@@ -40,13 +58,15 @@ class PendantScene {
       };
       var problems = ReferencePendant.layout(size, false, machine).problems();
       if (problems.length > 0) throw "The pendant does not fit its controls: " + problems.join("; ");
-      var documents = new PendantDocuments(ReferencePendant.pendantCase(size, false, machine));
+      var documents = new PendantDocuments(ReferencePendant.pendantCase(size, false, machine), prefix);
       try {
         var assembly = ReferencePendant.assembly(documents);
-        // Whatever else is in the scene: the machine the pendant belongs to.
-        if (extend != null) extend(assembly);
-        var scene = AssemblyPreview.scene(assembly, "pendant");
-        scene.presentation = PendantPresentation.build(scene.assemblyDefinition);
+        if (root != null) {
+          root.include(PendantMachine.ACCESSORY, assembly, pose);
+          assembly = root;
+        }
+        var scene = AssemblyPreview.scene(assembly, root == null ? "pendant" : "machine-with-pendant");
+        scene.presentation = PendantPresentation.build(scene.assemblyDefinition, prefix);
         scene.project = {dynamicParts: [], motions: [], sources: documents.sources(), histories: documents.histories()};
         scene.recipeDocument = DocumentCodec.encode(recipe);
         scene.recipeDiagnostics = diagnostics;

@@ -3,6 +3,11 @@
 	"version": 1,
 	"name": "XYZ stage",
 	"defaultEntrypoint": "stage",
+	"defaultVariant": "stage",
+	"variants": [
+		{"id": "stage", "label": "Stage", "entrypoint": "stage", "kind": "configuration", "summary": "The table-top XYZ stage."},
+		{"id": "with-pendant", "label": "Stage with jog pendant", "entrypoint": "with-pendant", "kind": "configuration", "summary": "The stage with a jog pendant beside it: pick an axis, hold the wheel-enable key and turn the wheel."}
+	],
 	"build": {
 		"system": "haxeon",
 		"manifest": "haxeon.json"
@@ -12,6 +17,14 @@
 			"kind": "cad-preview",
 			"module": "XyzStagePreview",
 			"function": "stage",
+			"cache": {"inputs": []}
+		},
+		"with-pendant": {
+			"kind": "cad-preview",
+			"documentInput": true,
+			"reconcilesSavedRecipe": true,
+			"module": "XyzStagePreview",
+			"function": "withPendant",
 			"cache": {"inputs": []}
 		}
 	}

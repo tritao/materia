@@ -61,9 +61,9 @@ class ReferencePendant {
   public static inline var PROFILE:String = "hobber";
 
   /** The joint of `joint` on the part `part`, as the assembly names it: its group, the part, then the joint. */
-  public static function jointId(part:String, joint:String):String {
-    for (group in groups()) if (group.members.indexOf(part) >= 0) return group.id + "/" + part + "/" + joint;
-    return part + "/" + joint;
+  public static function jointId(part:String, joint:String, prefix:String = ""):String {
+    for (group in groups()) if (group.members.indexOf(part) >= 0) return prefix + group.id + "/" + part + "/" + joint;
+    return prefix + part + "/" + joint;
   }
 
   /** A key whose LED the simulated pendant lights: the cap shows the output of the driver that is this key's LED. */
@@ -73,14 +73,15 @@ class ReferencePendant {
 
   /** Which joint feeds each signal of the display's driver, and which joint each of the machine's axes moves. */
   public static function displayBindings(?machine:PendantMachine):Array<DisplayBinding> {
+    var prefix = machine == null ? "" : machine.prefix;
     var bindings = [
-      new DisplayBinding(PendantDisplaySignals.AXIS, jointId("axis", "position")),
-      new DisplayBinding(PendantDisplaySignals.STEP, jointId("step", "position")),
-      new DisplayBinding(PendantDisplaySignals.WHEEL, jointId("wheel", "encoder")),
-      new DisplayBinding(PendantDisplaySignals.WHEEL_ENABLE, jointId("wheel-enable", "press")),
-      new DisplayBinding(PendantDisplaySignals.ESTOP, jointId("estop", "press"))
+      new DisplayBinding(PendantDisplaySignals.AXIS, jointId("axis", "position", prefix)),
+      new DisplayBinding(PendantDisplaySignals.STEP, jointId("step", "position", prefix)),
+      new DisplayBinding(PendantDisplaySignals.WHEEL, jointId("wheel", "encoder", prefix)),
+      new DisplayBinding(PendantDisplaySignals.WHEEL_ENABLE, jointId("wheel-enable", "press", prefix)),
+      new DisplayBinding(PendantDisplaySignals.ESTOP, jointId("estop", "press", prefix))
     ];
-    for (key in PendantDisplaySignals.keys()) bindings.push(new DisplayBinding(key, jointId(key, "press")));
+    for (key in PendantDisplaySignals.keys()) bindings.push(new DisplayBinding(key, jointId(key, "press", prefix)));
     if (machine != null) for (jog in machine.jogs) bindings.push(jog);
     return bindings;
   }

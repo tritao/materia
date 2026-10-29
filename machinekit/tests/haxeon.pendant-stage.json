@@ -1,9 +1,0 @@
-{
-  "version": 1,
-  "package": {"name": "machinekit-pendant-stage-tests"},
-  "entry": "PendantStageTests",
-  "sourceRoots": ["src", "../examples/pendant"],
-  "dependencies": {"machinekit": {"path": ".."}},
-  "target": "host",
-  "outputDir": "build/pendant-stage"
-}

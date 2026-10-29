@@ -3,16 +3,9 @@
   "version": 1,
   "name": "Jog pendant",
   "defaultEntrypoint": "pendant",
-  "defaultVariant": "pendant",
-  "variants": [
-    {"id": "pendant", "label": "Pendant", "entrypoint": "pendant", "kind": "configuration", "summary": "The reference jog pendant."},
-    {"id": "stage", "label": "Pendant with jog stage", "entrypoint": "pendant-stage", "kind": "configuration", "summary": "The pendant beside three sliders its wheel jogs: pick an axis, enable the wheel and turn it."}
-  ],
   "build": {"system": "haxeon", "manifest": "haxeon.json"},
   "entrypoints": {
     "pendant": {"kind": "cad-preview", "documentInput": true, "reconcilesSavedRecipe": true, "module": "PendantPreview", "function": "preview",
-      "cache": {"inputs": ["PendantPreview.hx"]}},
-    "pendant-stage": {"kind": "cad-preview", "documentInput": true, "reconcilesSavedRecipe": true, "module": "PendantPreview", "function": "stage",
-      "cache": {"inputs": ["PendantPreview.hx", "JogStage.hx"]}}
+      "cache": {"inputs": ["PendantPreview.hx"]}}
   }
 }

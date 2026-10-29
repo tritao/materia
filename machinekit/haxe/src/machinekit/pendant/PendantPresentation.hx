@@ -12,9 +12,10 @@ import materia.presentation.Presentations;
  * board lifts from the shell, and last the case inserts leave their posts. Offsets are presentation only; the assembly itself is untouched.
  */
 class PendantPresentation {
-  public static function build(definition:AssemblyDefinition):AssemblyPresentation {
+  public static function build(definition:AssemblyDefinition, prefix:String = ""):AssemblyPresentation {
     var result = Presentations.assembled(definition, -1.1, 0.35, "pendant");
-    var ids = [for (part in AssemblyDefinitionFlattener.flattenView(definition).occurrences) part.id];
+    // Only the pendant comes apart; a machine it is attached to stays as it is.
+    var ids = [for (part in AssemblyDefinitionFlattener.flattenView(definition).occurrences) if (StringTools.startsWith(part.id, prefix)) part.id];
     var all:Array<PartSelector> = [for (id in ids) {
       occurrence:id, subtree:false
     }
@@ -29,7 +30,7 @@ class PendantPresentation {
       source: Generated("pendant")
     });
     for (id in ids) {
-      var offset = lift(id);
+      var offset = lift(id.substr(prefix.length));
       if (offset == null) continue;
       result.explode.push({
         select: {occurrence: id, subtree: false},

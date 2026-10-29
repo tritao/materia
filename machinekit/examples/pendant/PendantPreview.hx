@@ -13,11 +13,6 @@ class PendantPreview {
    */
   public static function preview(?savedDocument:String):haxe.io.Bytes return SceneArtifact.encode(PendantScene.build(savedDocument));
 
-  /** The pendant beside a three-axis demonstration stage, which its wheel jogs (see `JogStage`). */
-  public static function stage(?savedDocument:String):haxe.io.Bytes {
-    return SceneArtifact.encode(PendantScene.build(savedDocument, JogStage.machine(), JogStage.addTo));
-  }
-
   public static function main():Void {
     var bytes = preview();
     var root = Sys.getCwd();
