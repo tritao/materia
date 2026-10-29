@@ -1,5 +1,6 @@
 package machinekit.transmission;
 
+import haxeon.Equality;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
@@ -284,7 +285,7 @@ class TimingBelt extends MachineComponent {
   /** Resolve from the current loop geometry and width, never a saved stiffness. */
   public static function relation(belt:TimingBelt,
     pulley:TimingPulley, alignment:Float, idler:Bool = false):TransmissionRelation {
-    if (belt.beltProfile != pulley.beltProfile) throw new machinekit
+    if (!Equality.equals(belt.beltProfile, pulley.beltProfile)) throw new machinekit
       .transmission.TransmissionDesignError("Belt and pulley profiles differ; update the belt to match the pulley");
     var result = new TransmissionRelation(
       alignment * 2 / pulley.pitchDiameter,
@@ -315,8 +316,7 @@ class TimingBelt extends MachineComponent {
     followerPulley:TimingPulley,
     alignment:Float
   ):TransmissionRelation {
-    if (leaderPulley.beltProfile != belt.beltProfile || followerPulley.beltProfile != belt
-      .beltProfile) throw new TransmissionDesignError("Belt and reduction pulley profiles differ; update the pulleys");
+    if (!Equality.equals(leaderPulley.beltProfile, belt.beltProfile) || !Equality.equals(followerPulley.beltProfile, belt.beltProfile)) throw new TransmissionDesignError("Belt and reduction pulley profiles differ; update the pulleys");
     var ratio = alignment * leaderPulley.teeth / followerPulley.teeth;
     var result = new TransmissionRelation(
       ratio,

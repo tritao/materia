@@ -1,5 +1,6 @@
 package tests;
 
+import haxeon.Equality;
 import collisionkit.CollisionGeometry;
 
 import RobotKitRuntime;
@@ -7454,11 +7455,11 @@ class RobotWorldTests {
     runtime.writeDigitalOutput("controller.ready", true);
     runtime.writeOutput("controller.alarm_code", ProcessEventValue.Analog(7.0));
     check(
-      runtime.channelValue("controller.ready") == ProcessEventValue.Digital(true),
+      Equality.equals(runtime.channelValue("controller.ready"), ProcessEventValue.Digital(true)),
       "controller logic writes a declared digital output while idle"
     );
     check(
-      runtime.channelValue("controller.alarm_code") == ProcessEventValue.Analog(7.0),
+      Equality.equals(runtime.channelValue("controller.alarm_code"), ProcessEventValue.Analog(7.0)),
       "controller logic writes a declared analog output while idle"
     );
     check(runtime.pollEvents().events.length == 2, "controller output writes enter the process event stream");
@@ -7470,7 +7471,7 @@ class RobotWorldTests {
     );
     runtime.writeDigitalOutput("controller.ready", false);
     check(
-      runtime.channelValue("controller.ready") == ProcessEventValue.Digital(false),
+      Equality.equals(runtime.channelValue("controller.ready"), ProcessEventValue.Digital(false)),
       "a stopped runtime still accepts a safe digital output"
     );
     harness.dispose();

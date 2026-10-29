@@ -86,7 +86,7 @@ import materia.project.MaterialLibrary;
         scene.context()).apply(PropertyValue.Float(0.2)) == PropertyEditResult.Applied,
         "metallic edit succeeds"
       );
-      check(binding.read() == PropertyValue.Enum("custom"), "edited library finish is shown as Custom");
+      check(haxeon.ui.properties.PropertyValueTools.same(binding.read(), PropertyValue.Enum("custom")), "edited library finish is shown as Custom");
     } catch (error:Dynamic) {
       scene.dispose();
       throw error;

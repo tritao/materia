@@ -1,3 +1,4 @@
+import haxeon.Equality;
 import haxe.Int64;
 import haxe.io.Bytes;
 import motionkit.MotionOptions;
@@ -1618,7 +1619,7 @@ class ProgramTests extends MotionKitTestSupport {
       "process fault interrupts the pass and makes the tool safe"
     );
     motion.abort();
-    check(motion.sessionState() == Stopping(Discard), "arm stops before process recovery");
+    check(Equality.equals(motion.sessionState(), Stopping(Discard)), "arm stops before process recovery");
     robot.faultOverride = 42;
     motion.update(0.01);
     check(motion.sessionState() == Faulted, "runtime fault while stopping latches the shared session");
@@ -1724,19 +1725,19 @@ class ProgramTests extends MotionKitTestSupport {
     }
     motion.abort();
     check(
-      motion.sessionState() == Stopping(Discard) && motion.running && robot.commandCount("abort") == 1,
+      Equality.equals(motion.sessionState(), Stopping(Discard)) && motion.running && robot.commandCount("abort") == 1,
       "arm abort keeps the program in Stopping while runtime slows"
     );
     var commandsAtStop = robot.commands.length;
     motion.run(homeMove);
     check(
-      motion.sessionState() == Stopping(Discard) && motion.running && robot.commands.length == commandsAtStop,
+      Equality.equals(motion.sessionState(), Stopping(Discard)) && motion.running && robot.commands.length == commandsAtStop,
       "arm accepts a replacement program during Stopping without submitting it"
     );
     motion.hold();
     motion.resume();
     check(
-      motion.sessionState() == Stopping(Discard) && robot.commands.length == commandsAtStop,
+      Equality.equals(motion.sessionState(), Stopping(Discard)) && robot.commands.length == commandsAtStop,
       "arm hold and resume during Stopping do not change state"
     );
     for (_ in 0...800) {

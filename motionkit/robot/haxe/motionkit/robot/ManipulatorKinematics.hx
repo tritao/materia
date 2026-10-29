@@ -1,5 +1,6 @@
 package motionkit.robot;
 
+import haxeon.Equality;
 import motionkit.path.OrientationPolicy;
 import motionkit.path.PoseMath;
 
@@ -276,7 +277,7 @@ class ManipulatorKinematics implements RedundantPathSolver {
     var named = parameterization;
     var freedom = request.freedoms[0];
     var uniform = true;
-    for (policy in request.freedoms) if (policy != freedom) uniform = false;
+    for (policy in request.freedoms) if (!Equality.equals(policy, freedom)) uniform = false;
     if (named == null || (uniform && fullyConstrained(request.startQ,
       freedom))) return new PathSolution(request.followPointByPoint(this));
     named.preferringOrientation(preferredOrientation, preferTargetOrientation);

@@ -1,5 +1,6 @@
 package motionkit.robot;
 
+import haxeon.Equality;
 import haxe.Int64;
 import motionkit.AxisTarget;
 import motionkit.Feed;
@@ -435,7 +436,7 @@ class MotionSystem {
   function advanceStop():Void {
     if (!stopSettled()) return;
     var wasHolding = session.state == Holding;
-    var discarding = session.state == Stopping(Discard);
+    var discarding = Equality.equals(session.state, Stopping(Discard));
     var actions = session.rest();
     if (discarding) clearBufferedMotion();
     if (wasHolding && session.resumePending) resume();

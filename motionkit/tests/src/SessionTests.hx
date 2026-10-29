@@ -1,3 +1,4 @@
+import haxeon.Equality;
 import haxe.Int64;
 import haxe.io.Bytes;
 import machinekit.assembly.LinearAxis;
@@ -131,7 +132,7 @@ class SessionTests extends MotionKitTestSupport {
       label:String, expected:SessionState, commands:Int, action:Void -> Void):Void {
       var before = rig.robot.commands.length;
       action();
-      check(rig.machine.sessionState() == expected, '$label transitions to ${Std.string(expected)}');
+      check(Equality.equals(rig.machine.sessionState(), expected), '$label transitions to ${Std.string(expected)}');
       check(rig.robot.commands.length - before == commands, '$label sends $commands command(s) to the runtime');
     }
 
