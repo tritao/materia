@@ -68,6 +68,19 @@ PV_API int32_t pendant_virtual_tick(pendant_virtual_handle pendant, uint32_t now
 PV_API int32_t pendant_virtual_frame(pendant_virtual_handle pendant,
     uint8_t *frame PV_OUT_BUFFER(inout_frame_size) PV_INITIAL_CAPACITY(8), uint32_t *inout_frame_size PV_INOUT);
 
+/* Attaches the cabinet-node operator service as the pendant's controller, with the host's part played here: an allowing state
+ * every 100 ms and the profile's labels. `profile` is a compiled profile record; `reasons` and `labels` are its refusal-text and
+ * label records, each preceded by one length byte. PV_ERROR_ARGUMENT when the profile or a record is invalid. After this the
+ * pendant's screen and LEDs follow the controller. */
+PV_API int32_t pendant_virtual_attach_controller(pendant_virtual_handle pendant, uint32_t now_ms,
+    const uint8_t *profile PV_IN_ARRAY(profile_length), uint32_t profile_length,
+    const uint8_t *reasons PV_IN_ARRAY(reasons_length), uint32_t reasons_length,
+    const uint8_t *labels PV_IN_ARRAY(labels_length), uint32_t labels_length);
+/* The condition mask the controller judges jogs with (the profile's conditions: bit 0 the gearbox, bit 3 a program running...). */
+PV_API int32_t pendant_virtual_set_conditions(pendant_virtual_handle pendant, uint32_t conditions);
+/* The jog distance the controller forwarded to the host since the last call, in thousandths of a unit. */
+PV_API int32_t pendant_virtual_take_jog(pendant_virtual_handle pendant, int32_t *out_distance PV_OUT);
+
 /* A frame from the controller (id is the 11-bit CAN id). PV_ERROR_FRAME when the payload is malformed. */
 PV_API int32_t pendant_virtual_on_frame(pendant_virtual_handle pendant, uint32_t now_ms, uint32_t id,
     const uint8_t *bytes PV_IN_ARRAY(length), uint32_t length);

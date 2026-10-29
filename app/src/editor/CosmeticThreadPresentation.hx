@@ -268,6 +268,7 @@ private typedef ThreadGroup = {
       var live = entry.live;
       if (live == null) continue;
       var rgba = live.source.advance(nowMs, controls);
+      if (live.source.busy()) changed = true;
       if (rgba == null) continue;
       owner.scene.setImageData(live.image, picture(live.source, rgba));
       changed = true;

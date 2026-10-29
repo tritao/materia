@@ -1,5 +1,8 @@
 //! C ABI over `pendant-core`, for the simulator. The header is include/pendant_virtual.h.
 
+mod controller;
+
+use controller::Controller;
 use pendant_core::screen::{HEIGHT, WIDTH};
 use pendant_core::{DisplayPower, Inputs, PendantCore};
 use std::slice;
@@ -10,6 +13,7 @@ pub const PIXELS: usize = WIDTH * HEIGHT;
 pub struct PendantVirtual {
     core: PendantCore,
     frame: [u8; 8],
+    controller: Option<Controller>,
 }
 
 impl PendantVirtual {
@@ -59,7 +63,7 @@ pub unsafe extern "C" fn pendant_virtual_create(now_ms: u32, out_pendant: *mut H
         return ERROR_ARGUMENT;
     }
     let Ok(mut pendants) = PENDANTS.lock() else { return ERROR_HANDLE };
-    pendants.push(Some(PendantVirtual { core: PendantCore::new(now_ms), frame: [0; 8] }));
+    pendants.push(Some(PendantVirtual { core: PendantCore::new(now_ms), frame: [0; 8], controller: None }));
     *out_pendant = Handle { id: pendants.len() as u32 };
     OK
 }
@@ -78,12 +82,81 @@ pub extern "C" fn pendant_virtual_tick(
     pendant: Handle, now_ms: u32, wheel_counts: u16, position: u8, step: u8, keys: u8, wheel_enable: u8, chain_closed: u8,
 ) -> i32 {
     let inputs = Inputs { wheel_counts, position, step, keys, wheel_enable: wheel_enable != 0, chain_closed: chain_closed != 0 };
-    code(with(pendant, |p| match p.core.tick(now_ms, &inputs) {
-        Some(payload) => {
+    code(with(pendant, |p| {
+        let heartbeat = p.core.tick(now_ms, &inputs);
+        if let Some(payload) = heartbeat {
             p.frame = payload;
-            1
         }
-        None => 0,
+        if let Some(controller) = p.controller.as_mut() {
+            controller.step(now_ms, heartbeat, &mut p.core);
+        }
+        heartbeat.is_some() as i32
+    }))
+}
+
+/// Splits length-prefixed records (one length byte, then that many bytes), as the Haxe side packs them.
+fn records(blob: &[u8]) -> Option<Vec<Vec<u8>>> {
+    let mut out = Vec::new();
+    let mut at = 0;
+    while at < blob.len() {
+        let len = blob[at] as usize;
+        let record = blob.get(at + 1..at + 1 + len)?;
+        out.push(record.to_vec());
+        at += 1 + len;
+    }
+    Some(out)
+}
+
+/// # Safety
+/// Each pointer is null with its length zero, or points at that many readable bytes.
+#[no_mangle]
+pub unsafe extern "C" fn pendant_virtual_attach_controller(
+    pendant: Handle, now_ms: u32, profile: *const u8, profile_length: u32, reasons: *const u8, reasons_length: u32,
+    labels: *const u8, labels_length: u32,
+) -> i32 {
+    fn bytes<'a>(p: *const u8, n: u32) -> Option<&'a [u8]> {
+        if n == 0 { Some(&[]) } else if p.is_null() { None } else { Some(unsafe { slice::from_raw_parts(p, n as usize) }) }
+    }
+    let (Some(profile), Some(reasons), Some(labels)) =
+        (bytes(profile, profile_length), bytes(reasons, reasons_length), bytes(labels, labels_length))
+    else {
+        return ERROR_ARGUMENT;
+    };
+    let (Some(reasons), Some(labels)) = (records(reasons), records(labels)) else { return ERROR_ARGUMENT };
+    code(with(pendant, |p| match Controller::new(now_ms, profile, &reasons, &labels) {
+        Ok(controller) => {
+            p.controller = Some(controller);
+            OK
+        }
+        Err(()) => ERROR_ARGUMENT,
+    }))
+}
+
+/// Sets the condition mask the controller judges jogs with (bit meanings are the profile's conditions).
+#[no_mangle]
+pub extern "C" fn pendant_virtual_set_conditions(pendant: Handle, conditions: u32) -> i32 {
+    code(with(pendant, |p| match p.controller.as_mut() {
+        Some(controller) => {
+            controller.active = conditions;
+            OK
+        }
+        None => ERROR_ARGUMENT,
+    }))
+}
+
+/// # Safety
+/// `out_distance` is writable.
+#[no_mangle]
+pub unsafe extern "C" fn pendant_virtual_take_jog(pendant: Handle, out_distance: *mut i32) -> i32 {
+    if out_distance.is_null() {
+        return ERROR_ARGUMENT;
+    }
+    code(with(pendant, |p| match p.controller.as_mut() {
+        Some(controller) => {
+            *out_distance = controller.take_jog();
+            OK
+        }
+        None => ERROR_ARGUMENT,
     }))
 }
 
@@ -242,5 +315,65 @@ mod tests {
         let mut leds = 0u8;
         assert_eq!(unsafe { pendant_virtual_leds(p, 0, &mut leds) }, ERROR_HANDLE);
         assert_eq!(unsafe { pendant_virtual_leds(Handle { id: 0 }, 0, &mut leds) }, ERROR_HANDLE);
+    }
+
+    const VECTORS: &str = include_str!("../../operator_link/vectors/profiles.txt");
+
+    fn unhex(s: &str) -> Vec<u8> {
+        (0..s.len() / 2).map(|i| u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).unwrap()).collect()
+    }
+
+    /// The profile record and the length-prefixed reason and label blobs of a named vector.
+    fn vector(name: &str) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+        let line = VECTORS.lines().find(|l| l.starts_with(name)).unwrap();
+        let f: Vec<&str> = line.split(' ').collect();
+        let pack = |field: &str| -> Vec<u8> {
+            if field == "-" {
+                return vec![];
+            }
+            field.split(';').flat_map(|h| { let r = unhex(h); let mut v = vec![r.len() as u8]; v.extend(r); v }).collect()
+        };
+        (unhex(f[2]), pack(f[3]), pack(f[4]))
+    }
+
+    #[test]
+    fn an_attached_controller_gives_the_pendant_its_labels_and_leds() {
+        let (profile, reasons, labels) = vector("hobber");
+        let p = create();
+        let before = {
+            let mut sum = 0u32;
+            unsafe { pendant_virtual_checksum(p, 0, &mut sum) };
+            sum
+        };
+        unsafe {
+            assert_eq!(
+                pendant_virtual_attach_controller(p, 0, profile.as_ptr(), profile.len() as u32, reasons.as_ptr(), reasons.len() as u32, labels.as_ptr(), labels.len() as u32),
+                OK
+            );
+            assert_eq!(pendant_virtual_set_conditions(p, 0), OK);
+        }
+        // Two seconds at a 16 ms editor frame: the link comes up and every label has arrived.
+        let mut now = 0u32;
+        while now < 2_000 {
+            pendant_virtual_tick(p, now, 0, 5, 0, 0, 1, 1);
+            now += 16;
+        }
+        let mut after = 0u32;
+        unsafe { pendant_virtual_checksum(p, now, &mut after) };
+        assert_ne!(before, after, "the screen changed once the controller answered");
+        let mut jog = 9i32;
+        assert_eq!(unsafe { pendant_virtual_take_jog(p, &mut jog) }, OK);
+        assert_eq!(jog, 0);
+        pendant_virtual_destroy(p);
+    }
+
+    #[test]
+    fn a_bad_profile_is_refused() {
+        let p = create();
+        let junk = [1u8, 2, 3];
+        assert_eq!(unsafe { pendant_virtual_attach_controller(p, 0, junk.as_ptr(), 3, [].as_ptr(), 0, [].as_ptr(), 0) }, ERROR_ARGUMENT);
+        let mut jog = 0i32;
+        assert_eq!(unsafe { pendant_virtual_take_jog(p, &mut jog) }, ERROR_ARGUMENT);
+        pendant_virtual_destroy(p);
     }
 }

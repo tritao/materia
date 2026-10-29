@@ -12,3 +12,4 @@ crate-type = ["staticlib", "rlib"]
 [dependencies]
 pendant-core = { path = "../pendant_core" }
 operator-link = { path = "../operator_link" }
+cabinet-node = { path = "../cabinet_node" }
