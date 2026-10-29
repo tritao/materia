@@ -195,13 +195,6 @@ class StreamClockSink implements ProgramSink {
  */
 class PrintingBenchmark {
 
-  /** A NUL-terminated copy of `value`: the natives below read a `const char *`, and `Bytes.ofString` has no terminator. */
-  static function cString(value:String):hl.Bytes {
-    var text = haxe.io.Bytes.ofString(value);
-    var terminated = haxe.io.Bytes.alloc(text.length + 1);
-    terminated.blit(0, text, 0, text.length);
-    return terminated.getData();
-  }
   /** The process's peak resident memory in megabytes (the kernel's high-water mark), or -1. */
   /** The planning-only view of a print: its moves, without heaters, fans, filament and markers. */
   static function motionOnly(program:ToolpathProgram):ToolpathProgram {
@@ -808,7 +801,7 @@ class PrintingBenchmark {
     mainLoads();
     if (census != null) {
       hl.Gc.censusStop();
-      hl.Gc.censusDump(cString(census + "/census.json"));
+      hl.Gc.censusDump(census + "/census.json");
     }
   }
 

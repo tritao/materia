@@ -224,10 +224,7 @@ class TendingReach {
       triggerBytes: hl.Gc.triggerBytes()
     }));
     for (arg in Sys.args()) if (StringTools.startsWith(arg, "--profile-census=")) {
-      var path = arg.substr("--profile-census=".length);
-      var bytes = haxe.io.Bytes.ofString(path), terminated = haxe.io.Bytes.alloc(bytes.length + 1);
-      terminated.blit(0, bytes, 0, bytes.length);
-      hl.Gc.censusDump(terminated.getData());
+      hl.Gc.censusDump(arg.substr("--profile-census=".length));
     }
     #end
     Sys.stdout().flush();
