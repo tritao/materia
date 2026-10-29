@@ -23,8 +23,7 @@ typedef MachineControlAxis = {
 class MachineControlModel {
   public static function axes(session:ProjectDocumentSession):Array<MachineControlAxis> {
     var definition = session.projectAssemblyDefinition;
-    var dragged = session.assemblyDragPreview;
-    var state = dragged == null ? session.projectAssemblyState : dragged;
+    var state = session.liveAssemblyState;
     if (definition == null || state == null) return [];
     var positions:Map<String, Float> = [];
     for (coordinate in state.jointCoordinates) positions.set(coordinate.joint, coordinate.value);

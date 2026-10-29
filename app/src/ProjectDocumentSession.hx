@@ -90,11 +90,18 @@ class ProjectDocumentSession {
   var authoredPresentation:Null<AuthoredPresentation>;
   public var projectAssemblyDefinition(default, null):Null<AssemblyDefinition> = null;
   public var projectAssemblyState(default, null):Null<AssemblyStateRecord> = null;
+  var assemblyDragPreview:Null<AssemblyStateRecord> = null;
   /**
-   * While a joint is dragged in the scene, the state the drag is previewing. The recorded state changes only when the drag is
-   * released, so anything that follows the joints live (the machine controls, a simulated display) reads this when it is set.
+   * The joint state the scene shows right now: the state a drag in the scene is previewing, else the recorded one. The recorded
+   * state changes only when a drag is released, so whatever follows the joints live (the machine controls, a simulated display)
+   * reads this.
    */
-  public var assemblyDragPreview(default, null):Null<AssemblyStateRecord> = null;
+  public var liveAssemblyState(get, never):Null<AssemblyStateRecord>;
+
+  function get_liveAssemblyState():Null<AssemblyStateRecord> {
+    return assemblyDragPreview == null ? projectAssemblyState : assemblyDragPreview;
+  }
+
   public var projectPhysical(default, null):Null<AssemblyPhysicalData> = null;
   /** Face descriptors written by the project generator for one assembly definition. */
   public function assemblyFaceDescriptorsFor(definitionId:String):Null<String
