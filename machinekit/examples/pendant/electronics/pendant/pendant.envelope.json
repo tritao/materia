@@ -1,0 +1,932 @@
+{
+  "board": "pendant",
+  "connections": {
+    "cable": {
+      "entry": "horizontal",
+      "interface": null,
+      "max_distance_mm": {
+        "source": {
+          "placeholder": "harness slack from a control's terminals to its header; a budget until the harness is drawn"
+        },
+        "value": 40
+      },
+      "point_mm": [52, 177],
+      "ports": [
+        "case:receptacle"
+      ],
+      "side": "top",
+      "source": {
+        "placeholder": "a case opening, not a modelled part yet: where its wires reach the board"
+      },
+      "wires": 8
+    },
+    "cycle-keys-hold-body": {
+      "entry": "horizontal",
+      "interface": null,
+      "max_distance_mm": {
+        "source": {
+          "placeholder": "harness slack from a control's terminals to its header; a budget until the harness is drawn"
+        },
+        "value": 40
+      },
+      "point_mm": [65.5, 125.5],
+      "ports": [
+        "cycle-keys/hold/body:led",
+        "cycle-keys/hold/body:no"
+      ],
+      "side": "top",
+      "source": {
+        "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+      },
+      "wires": 4
+    },
+    "cycle-keys-start-body": {
+      "entry": "horizontal",
+      "interface": null,
+      "max_distance_mm": {
+        "source": {
+          "placeholder": "harness slack from a control's terminals to its header; a budget until the harness is drawn"
+        },
+        "value": 40
+      },
+      "point_mm": [92.5, 125.5],
+      "ports": [
+        "cycle-keys/start/body:led",
+        "cycle-keys/start/body:no"
+      ],
+      "side": "top",
+      "source": {
+        "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+      },
+      "wires": 4
+    },
+    "cycle-keys-stop-body": {
+      "entry": "horizontal",
+      "interface": null,
+      "max_distance_mm": {
+        "source": {
+          "placeholder": "harness slack from a control's terminals to its header; a budget until the harness is drawn"
+        },
+        "value": 40
+      },
+      "point_mm": [38.5, 125.5],
+      "ports": [
+        "cycle-keys/stop/body:led",
+        "cycle-keys/stop/body:no"
+      ],
+      "side": "top",
+      "source": {
+        "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+      },
+      "wires": 4
+    },
+    "display-pins": {
+      "entry": "horizontal",
+      "interface": null,
+      "max_distance_mm": {
+        "source": {
+          "placeholder": "harness slack from a control's terminals to its header; a budget until the harness is drawn"
+        },
+        "value": 40
+      },
+      "point_mm": [24.81, 67.175],
+      "ports": [
+        "display/pins:header"
+      ],
+      "side": "top",
+      "source": {
+        "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+      },
+      "wires": 7
+    },
+    "enabling": {
+      "entry": "horizontal",
+      "interface": null,
+      "max_distance_mm": {
+        "source": {
+          "placeholder": "harness slack from a control's terminals to its header; a budget until the harness is drawn"
+        },
+        "value": 40
+      },
+      "point_mm": [91, 154],
+      "ports": [
+        "case:enabling-switch"
+      ],
+      "side": "top",
+      "source": {
+        "placeholder": "a case opening, not a modelled part yet: where its wires reach the board"
+      },
+      "wires": 5
+    },
+    "function-keys-f1-body": {
+      "entry": "horizontal",
+      "interface": null,
+      "max_distance_mm": {
+        "source": {
+          "placeholder": "harness slack from a control's terminals to its header; a budget until the harness is drawn"
+        },
+        "value": 40
+      },
+      "point_mm": [92.5, 98.5],
+      "ports": [
+        "function-keys/f1/body:led",
+        "function-keys/f1/body:no"
+      ],
+      "side": "top",
+      "source": {
+        "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+      },
+      "wires": 4
+    },
+    "function-keys-f2-body": {
+      "entry": "horizontal",
+      "interface": null,
+      "max_distance_mm": {
+        "source": {
+          "placeholder": "harness slack from a control's terminals to its header; a budget until the harness is drawn"
+        },
+        "value": 40
+      },
+      "point_mm": [65.5, 98.5],
+      "ports": [
+        "function-keys/f2/body:led",
+        "function-keys/f2/body:no"
+      ],
+      "side": "top",
+      "source": {
+        "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+      },
+      "wires": 4
+    },
+    "function-keys-f3-body": {
+      "entry": "horizontal",
+      "interface": null,
+      "max_distance_mm": {
+        "source": {
+          "placeholder": "harness slack from a control's terminals to its header; a budget until the harness is drawn"
+        },
+        "value": 40
+      },
+      "point_mm": [38.5, 98.5],
+      "ports": [
+        "function-keys/f3/body:led",
+        "function-keys/f3/body:no"
+      ],
+      "side": "top",
+      "source": {
+        "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+      },
+      "wires": 4
+    },
+    "jog-wheel-enable-body": {
+      "entry": "horizontal",
+      "interface": null,
+      "max_distance_mm": {
+        "source": {
+          "placeholder": "harness slack from a control's terminals to its header; a budget until the harness is drawn"
+        },
+        "value": 40
+      },
+      "point_mm": [11.5, 98.5],
+      "ports": [
+        "jog/wheel-enable/body:led",
+        "jog/wheel-enable/body:no"
+      ],
+      "side": "top",
+      "source": {
+        "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+      },
+      "wires": 4
+    },
+    "jog-wheel-terminals": {
+      "entry": "horizontal",
+      "interface": null,
+      "max_distance_mm": {
+        "source": {
+          "placeholder": "harness slack from a control's terminals to its header; a budget until the harness is drawn"
+        },
+        "value": 40
+      },
+      "point_mm": [52, 170],
+      "ports": [
+        "jog/wheel/terminals:0V",
+        "jog/wheel/terminals:A",
+        "jog/wheel/terminals:B",
+        "jog/wheel/terminals:VCC"
+      ],
+      "side": "top",
+      "source": {
+        "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+      },
+      "wires": 4
+    },
+    "selectors-axis-body": {
+      "entry": "horizontal",
+      "interface": null,
+      "max_distance_mm": {
+        "source": {
+          "placeholder": "harness slack from a control's terminals to its header; a budget until the harness is drawn"
+        },
+        "value": 40
+      },
+      "point_mm": [13, 20],
+      "ports": [
+        "selectors/axis/body:contacts"
+      ],
+      "side": "top",
+      "source": {
+        "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+      },
+      "wires": 13
+    },
+    "selectors-step-body": {
+      "entry": "horizontal",
+      "interface": null,
+      "max_distance_mm": {
+        "source": {
+          "placeholder": "harness slack from a control's terminals to its header; a budget until the harness is drawn"
+        },
+        "value": 40
+      },
+      "point_mm": [44, 20],
+      "ports": [
+        "selectors/step/body:contacts"
+      ],
+      "side": "top",
+      "source": {
+        "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+      },
+      "wires": 4
+    }
+  },
+  "frame": {
+    "matrix": [
+      [-1, 0],
+      [0, -1]
+    ],
+    "note": "the board member's own plan (x right, y up, seen from +z); the board's top side faces -z, so the plan is seen mirrored",
+    "offset_mm": [52, 100]
+  },
+  "holes": {
+    "h1": {
+      "conductive": true,
+      "drill_mm": {
+        "source": {
+          "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/pendant/PendantCase.hx",
+          "where": "PendantCase.standoffs, BOARD_HOLE"
+        },
+        "value": 2.7
+      },
+      "hardware": {
+        "bottom": {
+          "height_mm": {
+            "source": {
+              "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/hmi/HexStandoff.hx",
+              "where": "HexStandoff.m2_5: the hexagon's corner diameter, 0.5 mm clearance around"
+            },
+            "value": 25
+          },
+          "keepout_diameter_mm": {
+            "source": {
+              "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/hmi/HexStandoff.hx",
+              "where": "HexStandoff.m2_5: the hexagon's corner diameter, 0.5 mm clearance around"
+            },
+            "value": 6.7735
+          },
+          "what": "M2.5 hex standoff, 5 mm across flats"
+        },
+        "top": {
+          "height_mm": {
+            "source": {
+              "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/hmi/ButtonHeadScrew.hx",
+              "where": "ButtonHeadScrew.m2_5: head diameter and height, 0.5 mm clearance around"
+            },
+            "value": 1.4
+          },
+          "keepout_diameter_mm": {
+            "source": {
+              "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/hmi/ButtonHeadScrew.hx",
+              "where": "ButtonHeadScrew.m2_5: head diameter and height, 0.5 mm clearance around"
+            },
+            "value": 5.7
+          },
+          "what": "M2.5 button head screw"
+        }
+      },
+      "plated": false,
+      "pos_mm": [97.5, 52.5],
+      "source": {
+        "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/pendant/PendantCase.hx",
+        "where": "PendantCase.standoffs, BOARD_HOLE"
+      }
+    },
+    "h2": {
+      "conductive": true,
+      "drill_mm": {
+        "source": {
+          "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/pendant/PendantCase.hx",
+          "where": "PendantCase.standoffs, BOARD_HOLE"
+        },
+        "value": 2.7
+      },
+      "hardware": {
+        "bottom": {
+          "height_mm": {
+            "source": {
+              "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/hmi/HexStandoff.hx",
+              "where": "HexStandoff.m2_5: the hexagon's corner diameter, 0.5 mm clearance around"
+            },
+            "value": 25
+          },
+          "keepout_diameter_mm": {
+            "source": {
+              "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/hmi/HexStandoff.hx",
+              "where": "HexStandoff.m2_5: the hexagon's corner diameter, 0.5 mm clearance around"
+            },
+            "value": 6.7735
+          },
+          "what": "M2.5 hex standoff, 5 mm across flats"
+        },
+        "top": {
+          "height_mm": {
+            "source": {
+              "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/hmi/ButtonHeadScrew.hx",
+              "where": "ButtonHeadScrew.m2_5: head diameter and height, 0.5 mm clearance around"
+            },
+            "value": 1.4
+          },
+          "keepout_diameter_mm": {
+            "source": {
+              "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/hmi/ButtonHeadScrew.hx",
+              "where": "ButtonHeadScrew.m2_5: head diameter and height, 0.5 mm clearance around"
+            },
+            "value": 5.7
+          },
+          "what": "M2.5 button head screw"
+        }
+      },
+      "plated": false,
+      "pos_mm": [6, 40.5],
+      "source": {
+        "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/pendant/PendantCase.hx",
+        "where": "PendantCase.standoffs, BOARD_HOLE"
+      }
+    },
+    "h3": {
+      "conductive": true,
+      "drill_mm": {
+        "source": {
+          "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/pendant/PendantCase.hx",
+          "where": "PendantCase.standoffs, BOARD_HOLE"
+        },
+        "value": 2.7
+      },
+      "hardware": {
+        "bottom": {
+          "height_mm": {
+            "source": {
+              "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/hmi/HexStandoff.hx",
+              "where": "HexStandoff.m2_5: the hexagon's corner diameter, 0.5 mm clearance around"
+            },
+            "value": 25
+          },
+          "keepout_diameter_mm": {
+            "source": {
+              "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/hmi/HexStandoff.hx",
+              "where": "HexStandoff.m2_5: the hexagon's corner diameter, 0.5 mm clearance around"
+            },
+            "value": 6.7735
+          },
+          "what": "M2.5 hex standoff, 5 mm across flats"
+        },
+        "top": {
+          "height_mm": {
+            "source": {
+              "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/hmi/ButtonHeadScrew.hx",
+              "where": "ButtonHeadScrew.m2_5: head diameter and height, 0.5 mm clearance around"
+            },
+            "value": 1.4
+          },
+          "keepout_diameter_mm": {
+            "source": {
+              "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/hmi/ButtonHeadScrew.hx",
+              "where": "ButtonHeadScrew.m2_5: head diameter and height, 0.5 mm clearance around"
+            },
+            "value": 5.7
+          },
+          "what": "M2.5 button head screw"
+        }
+      },
+      "plated": false,
+      "pos_mm": [96, 189],
+      "source": {
+        "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/pendant/PendantCase.hx",
+        "where": "PendantCase.standoffs, BOARD_HOLE"
+      }
+    },
+    "h4": {
+      "conductive": true,
+      "drill_mm": {
+        "source": {
+          "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/pendant/PendantCase.hx",
+          "where": "PendantCase.standoffs, BOARD_HOLE"
+        },
+        "value": 2.7
+      },
+      "hardware": {
+        "bottom": {
+          "height_mm": {
+            "source": {
+              "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/hmi/HexStandoff.hx",
+              "where": "HexStandoff.m2_5: the hexagon's corner diameter, 0.5 mm clearance around"
+            },
+            "value": 25
+          },
+          "keepout_diameter_mm": {
+            "source": {
+              "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/hmi/HexStandoff.hx",
+              "where": "HexStandoff.m2_5: the hexagon's corner diameter, 0.5 mm clearance around"
+            },
+            "value": 6.7735
+          },
+          "what": "M2.5 hex standoff, 5 mm across flats"
+        },
+        "top": {
+          "height_mm": {
+            "source": {
+              "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/hmi/ButtonHeadScrew.hx",
+              "where": "ButtonHeadScrew.m2_5: head diameter and height, 0.5 mm clearance around"
+            },
+            "value": 1.4
+          },
+          "keepout_diameter_mm": {
+            "source": {
+              "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/hmi/ButtonHeadScrew.hx",
+              "where": "ButtonHeadScrew.m2_5: head diameter and height, 0.5 mm clearance around"
+            },
+            "value": 5.7
+          },
+          "what": "M2.5 button head screw"
+        }
+      },
+      "plated": false,
+      "pos_mm": [10.5, 190.5],
+      "source": {
+        "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/pendant/PendantCase.hx",
+        "where": "PendantCase.standoffs, BOARD_HOLE"
+      }
+    }
+  },
+  "outline": {
+    "polygon_mm": [
+      [74, 169],
+      [104, 169],
+      [104, 192.75],
+      [96.75, 192.75],
+      [96.75, 200],
+      [65, 200],
+      [65, 176],
+      [39, 176],
+      [39, 200],
+      [7.25, 200],
+      [7.25, 192.75],
+      [0, 192.75],
+      [0, 119.75],
+      [7.25, 119.75],
+      [7.25, 108.75],
+      [0, 108.75],
+      [0, 7.25],
+      [7.25, 7.25],
+      [7.25, 0],
+      [61, 0],
+      [61, 47.75],
+      [104, 47.75],
+      [104, 77.25],
+      [96.75, 77.25],
+      [96.75, 88.25],
+      [104, 88.25],
+      [104, 139],
+      [74, 139]
+    ],
+    "source": {
+      "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+    }
+  },
+  "product": {
+    "model": "machinekit.pendant.ReferencePendant",
+    "name": "jog pendant",
+    "revision": "ReferencePendant, reference layout"
+  },
+  "schema": 1,
+  "sides": {
+    "bottom": {
+      "faces": "the face plate and the controls' rear bodies"
+    },
+    "top": {
+      "faces": "the back wall, where the board's parts stand"
+    }
+  },
+  "thickness_mm": {
+    "source": {
+      "url": "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/pendant/PendantCase.hx",
+      "where": "PendantCase.BOARD_THICKNESS"
+    },
+    "value": 1.6
+  },
+  "zones": {
+    "case-plate-bottom-49": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 24.5
+      },
+      "note": "the room to case/plate (PANEL-PLATE), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [2.5, 37, 9.5, 44],
+        [7, 187, 14, 194],
+        [92.5, 185.5, 99.5, 192.5],
+        [94, 49, 101, 56]
+      ],
+      "side": "bottom"
+    },
+    "case-plate-bottom-57": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 28.5
+      },
+      "note": "the room to case/plate (PANEL-PLATE), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [0, 0, 104, 200]
+      ],
+      "side": "bottom"
+    },
+    "case-shell-top-34": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 17
+      },
+      "note": "the room to case/shell (PANEL-SHELL), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [0, 0, 104, 200]
+      ],
+      "side": "top"
+    },
+    "cycle-keys-hold-body-bottom-13": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 6.5
+      },
+      "note": "the room to cycle-keys/hold/body (HMI-PUSH-BUTTON-ASSUMED-2c36e89dc1a8-BODY), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [53.5, 113.5, 77.5, 137.5]
+      ],
+      "side": "bottom"
+    },
+    "cycle-keys-start-body-bottom-13": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 6.5
+      },
+      "note": "the room to cycle-keys/start/body (HMI-PUSH-BUTTON-ASSUMED-077e18513458-BODY), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [80.5, 113.5, 104.5, 137.5]
+      ],
+      "side": "bottom"
+    },
+    "cycle-keys-stop-body-bottom-13": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 6.5
+      },
+      "note": "the room to cycle-keys/stop/body (HMI-PUSH-BUTTON-ASSUMED-36e35b6f05e4-BODY), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [26.5, 113.5, 50.5, 137.5]
+      ],
+      "side": "bottom"
+    },
+    "display-connector-bottom-43": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 21.5
+      },
+      "note": "the room to display/connector (HMI-OLED-MODULE-CATALOG-ad614e53c1f4-CONNECTOR), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [73.55, 58.17, 78.75, 72.18]
+      ],
+      "side": "bottom"
+    },
+    "display-header-bottom-44": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 22
+      },
+      "note": "the room to display/header (HMI-OLED-MODULE-CATALOG-ad614e53c1f4-HEADER), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [33.37, 58.285, 35.91, 76.065]
+      ],
+      "side": "bottom"
+    },
+    "fasteners-display-frame-bottom-44": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 22
+      },
+      "note": "the room to fasteners/display-frame (DISPLAY-FRAME), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [14.3, 45.175, 89.7, 86.175]
+      ],
+      "side": "bottom"
+    },
+    "fasteners-display-screw-1-bottom-42": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 21
+      },
+      "note": "the room to fasteners/display-screw-1 (ISO7380-M2.5-5), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [84.3629, 80.8379, 88.6371, 85.1121]
+      ],
+      "side": "bottom"
+    },
+    "fasteners-display-screw-1-bottom-43": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 21.5
+      },
+      "note": "the room to fasteners/display-screw-1 (ISO7380-M2.5-5), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [84.15, 80.625, 88.85, 85.325]
+      ],
+      "side": "bottom"
+    },
+    "fasteners-display-screw-2-bottom-42": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 21
+      },
+      "note": "the room to fasteners/display-screw-2 (ISO7380-M2.5-5), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [84.3629, 46.2379, 88.6371, 50.5121]
+      ],
+      "side": "bottom"
+    },
+    "fasteners-display-screw-2-bottom-43": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 21.5
+      },
+      "note": "the room to fasteners/display-screw-2 (ISO7380-M2.5-5), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [84.15, 46.025, 88.85, 50.725]
+      ],
+      "side": "bottom"
+    },
+    "fasteners-display-screw-3-bottom-42": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 21
+      },
+      "note": "the room to fasteners/display-screw-3 (ISO7380-M2.5-5), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [15.3629, 80.8379, 19.6371, 85.1121]
+      ],
+      "side": "bottom"
+    },
+    "fasteners-display-screw-3-bottom-43": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 21.5
+      },
+      "note": "the room to fasteners/display-screw-3 (ISO7380-M2.5-5), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [15.15, 80.625, 19.85, 85.325]
+      ],
+      "side": "bottom"
+    },
+    "fasteners-display-screw-4-bottom-42": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 21
+      },
+      "note": "the room to fasteners/display-screw-4 (ISO7380-M2.5-5), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [15.3629, 46.2379, 19.6371, 50.5121]
+      ],
+      "side": "bottom"
+    },
+    "fasteners-display-screw-4-bottom-43": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 21.5
+      },
+      "note": "the room to fasteners/display-screw-4 (ISO7380-M2.5-5), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [15.15, 46.025, 19.85, 50.725]
+      ],
+      "side": "bottom"
+    },
+    "function-keys-f1-body-bottom-13": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 6.5
+      },
+      "note": "the room to function-keys/f1/body (HMI-PUSH-BUTTON-ASSUMED-f453f255966f-BODY), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [80.5, 86.5, 104.5, 110.5]
+      ],
+      "side": "bottom"
+    },
+    "function-keys-f2-body-bottom-13": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 6.5
+      },
+      "note": "the room to function-keys/f2/body (HMI-PUSH-BUTTON-ASSUMED-f453f255966f-BODY), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [53.5, 86.5, 77.5, 110.5]
+      ],
+      "side": "bottom"
+    },
+    "function-keys-f3-body-bottom-13": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 6.5
+      },
+      "note": "the room to function-keys/f3/body (HMI-PUSH-BUTTON-ASSUMED-f453f255966f-BODY), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [26.5, 86.5, 50.5, 110.5]
+      ],
+      "side": "bottom"
+    },
+    "jog-wheel-enable-body-bottom-13": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 6.5
+      },
+      "note": "the room to jog/wheel-enable/body (HMI-PUSH-BUTTON-ASSUMED-c2d7d84c10bd-BODY), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [-0.5, 86.5, 23.5, 110.5]
+      ],
+      "side": "bottom"
+    },
+    "jog-wheel-nuts-bottom-53": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 26.5
+      },
+      "note": "the room to jog/wheel/nuts (HMI-HAND-WHEEL-CATALOG-e8f4f69aaf9e-NUTS), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [49.25, 141.4246, 54.75, 147.7754],
+        [71.247, 179.5246, 76.747, 185.8754],
+        [27.253, 179.5246, 32.753, 185.8754]
+      ],
+      "side": "bottom"
+    },
+    "jog-wheel-studs-bottom-43": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 21.5
+      },
+      "note": "the room to jog/wheel/studs (HMI-HAND-WHEEL-CATALOG-e8f4f69aaf9e-STUDS), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [50.5, 143.1, 53.5, 146.1],
+        [72.497, 181.2, 75.497, 184.2],
+        [28.503, 181.2, 31.503, 184.2]
+      ],
+      "side": "bottom"
+    },
+    "jog-wheel-terminal-screws-bottom-53": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 26.5
+      },
+      "note": "the room to jog/wheel/terminal-screws (HMI-HAND-WHEEL-CATALOG-e8f4f69aaf9e-TERMINAL-SCREWS), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [60.1023, 168.0523, 63.9977, 171.9477],
+        [53.4023, 168.0523, 57.2977, 171.9477],
+        [46.7023, 168.0523, 50.5977, 171.9477],
+        [40.0023, 168.0523, 43.8977, 171.9477]
+      ],
+      "side": "bottom"
+    },
+    "jog-wheel-terminal-screws-bottom-54": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 27
+      },
+      "note": "the room to jog/wheel/terminal-screws (HMI-HAND-WHEEL-CATALOG-e8f4f69aaf9e-TERMINAL-SCREWS), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [59.7539, 167.7039, 64.3461, 172.2961],
+        [53.0539, 167.7039, 57.6461, 172.2961],
+        [46.3539, 167.7039, 50.9461, 172.2961],
+        [39.6539, 167.7039, 44.2461, 172.2961]
+      ],
+      "side": "bottom"
+    },
+    "jog-wheel-terminals-bottom-52": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 26
+      },
+      "note": "the room to jog/wheel/terminals (HMI-HAND-WHEEL-CATALOG-e8f4f69aaf9e-TERMINALS), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [64.8, 164.5, 66, 175.5],
+        [58.1, 164.5, 59.3, 175.5],
+        [51.4, 164.5, 52.6, 175.5],
+        [44.7, 164.5, 45.9, 175.5],
+        [38, 164.5, 39.2, 175.5]
+      ],
+      "side": "bottom"
+    },
+    "jog-wheel-terminals-bottom-55": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 27.5
+      },
+      "note": "the room to jog/wheel/terminals (HMI-HAND-WHEEL-CATALOG-e8f4f69aaf9e-TERMINALS), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [38, 164.5, 66, 175.5]
+      ],
+      "side": "bottom"
+    },
+    "selectors-axis-body-bottom-13": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 6.5
+      },
+      "note": "the room to selectors/axis/body (HMI-ROTARY-SWITCH-ASSUMED-42452af2ce18-BODY), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [-2, 5, 28, 35]
+      ],
+      "side": "bottom"
+    },
+    "selectors-step-body-bottom-13": {
+      "max_height_mm": {
+        "source": {
+          "placeholder": "the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured"
+        },
+        "value": 6.5
+      },
+      "note": "the room to selectors/step/body (HMI-ROTARY-SWITCH-ASSUMED-4c59401974c6-BODY), read from its solid in 0.5 mm steps",
+      "rects_mm": [
+        [29, 5, 59, 35]
+      ],
+      "side": "bottom"
+    }
+  }
+}

@@ -54,5 +54,9 @@ the LDO's thermal resistance.
 
 ## Mechanical interface and floorplan
 
-The outline, mounting holes, height zones and connector arrivals come from the case's envelope record (EN3), before any
-placement.
+`pendant.envelope.json` is the case's envelope, derived by machinekit's `BoardEnvelope` from the pendant assembly (see
+`machinekit/PENDANT_PLAN.md`, EN3): a 104 x 200 mm outline less the notches, four M2.5 mounting holes (h1 to h4) with the
+screw heads on the top side and the standoffs on the bottom, the room on each side (17 mm to the back wall over the top
+side, 6.5 mm under the buttons' and selectors' bodies on the bottom side) and where each control's wires arrive. The
+circuit applies it: the outline, the holes as code-owned anchors, the zones, and each header near its control's wires
+(within 40 mm, a harness budget). The case's parts are assumed until measured, so the mechanical review stays open.

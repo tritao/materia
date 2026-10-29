@@ -40,6 +40,11 @@ GATES = {
     "circuit/erc": lambda: board().erc(),
     "circuit/electrical": lambda: electrical(board()),
     "power/power": lambda: board().power(),
+    # The case's envelope: stale when the case model changed since the intent was generated; its assumed parts are
+    # unknowns, so these stay open until the parts are measured.
+    "mechanical/mounting": lambda: board().envelope(),
+    "mechanical/heights": lambda: board().envelope(),
+    "mechanical/cable_exits": lambda: board().envelope(),
 }
 
 

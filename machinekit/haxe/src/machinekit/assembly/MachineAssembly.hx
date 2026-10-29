@@ -31,6 +31,14 @@ typedef MachineAssemblyConnector = {
   var instanceId:String;
   var connectorName:String;
 }
+/** A port connection between two members, by member path. */
+typedef MachinePortConnection = {
+  var id:String;
+  var fromInstance:String;
+  var fromPort:String;
+  var toInstance:String;
+  var toPort:String;
+}
 typedef PortRef = {
   var instanceId:String;
   var portName:String;
@@ -1180,6 +1188,13 @@ typedef MachineAssemblyMassProperties = {
   /** Every member, subassembly members included, by path. */
   public function components():Array<MachineAssemblyComponent> return [for (member in flat().members) {
     id:member.id, component:member.component
+  }
+  ];
+
+  /** Every port connection, subassemblies' included, with both ends as member paths (as `components` names them). */
+  public function portConnections():Array<MachinePortConnection> return [for (entry in flat().connections) {
+    id:entry.id,
+      fromInstance:entry.fromInstance, fromPort:entry.fromPort, toInstance:entry.toInstance, toPort:entry.toPort
   }
   ];
 

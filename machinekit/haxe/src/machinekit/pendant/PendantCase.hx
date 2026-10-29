@@ -6,6 +6,10 @@ import cadkit.modeling.Part;
 import cadkit.modeling.RoundedRectangle;
 import cadkit.modeling.Vector;
 import machinekit.component.PanelBoss;
+import machinekit.electrical.BoardEnvelope.EnvelopeHardware;
+import machinekit.electrical.BoardEnvelope.EnvelopeHole;
+import machinekit.electrical.BoardEnvelope.EnvelopeOpening;
+import machinekit.electrical.BoardEnvelope.EnvelopeSource;
 import machinekit.hmi.*;
 
 /**
@@ -656,6 +660,81 @@ class PendantCase {
       return l;
     }
     throw 'No standard screw length reaches $atLeast mm';
+  }
+
+  /**
+	 * What pcbkit's envelope needs from the case beyond the assembly (`machinekit.electrical.BoardEnvelope` reads the rest):
+	 * the board member, its top side (towards the back wall, where its parts stand), the four mounting holes with the screw
+	 * head under the board and the standoff above it, the fasteners that are the board's mounting, and the receptacle and the
+	 * enabling switch, which are case openings and not parts yet, as openings with the wires that reach the board there.
+	 */
+  public function boardEnvelope(revision:String):machinekit.electrical.BoardEnvelope.BoardEnvelopeSpec {
+    var source = "https://github.com/tritao/materia/blob/main/machinekit/haxe/src/machinekit/";
+    var spec = new machinekit.electrical.BoardEnvelope.BoardEnvelopeSpec();
+    spec.board = "pendant";
+    spec.productName = "jog pendant";
+    spec.model = "machinekit.pendant.ReferencePendant";
+    spec.revision = revision;
+    spec.member = "case/board";
+    spec.topUp = false;
+    spec.topFaces = "the back wall, where the board's parts stand";
+    spec.bottomFaces = "the face plate and the controls' rear bodies";
+    spec.thicknessSource = EnvelopeSource.document(source + "pendant/PendantCase.hx", "PendantCase.BOARD_THICKNESS");
+    spec.geometrySource = EnvelopeSource
+      .assumed("the pendant case model: its controls, receptacle and enabling switch are assumed parts until measured");
+    var screw = ButtonHeadScrew.m2_5(4.0), standoff = HexStandoff.m2_5(standoffLength);
+    var screwSource = EnvelopeSource.document(
+      source + "hmi/ButtonHeadScrew.hx",
+      "ButtonHeadScrew.m2_5: head diameter and height, 0.5 mm clearance around"
+    );
+    var standoffSource = EnvelopeSource.document(
+      source + "hmi/HexStandoff.hx",
+      "HexStandoff.m2_5: the hexagon's corner diameter, 0.5 mm clearance around"
+    );
+    var i = 0;
+    for (s in standoffs) {
+      i++;
+      spec.holes.push(new EnvelopeHole(
+        'h$i',
+        s.x,
+        s.y,
+        BOARD_HOLE,
+        false,
+        true,
+        new EnvelopeHardware("M2.5 button head screw", screw.headDiameter + 1.0, screw.headHeight, screwSource),
+        new EnvelopeHardware(
+          'M2.5 hex standoff, ${standoff.acrossFlats} mm across flats',
+          standoff.acrossFlats / Math.cos(Math.PI / 6) + 1.0,
+          standoffLength,
+          standoffSource
+        ),
+        EnvelopeSource.document(source + "pendant/PendantCase.hx", "PendantCase.standoffs, BOARD_HOLE")
+      ));
+    }
+    spec.mounting = [for (k in 1...standoffs.length + 1) for (what in ["standoff",
+      "board-screw", "board-insert"]) 'fasteners/$what-$k'];
+    var assumed = EnvelopeSource.assumed("a case opening, not a modelled part yet: where its wires reach the board");
+    var wallY = -face.height / 2 + face.wall;
+    spec.openings.push(new EnvelopeOpening(
+      "cable",
+      connectorX,
+      wallY + RECEPTACLE_LENGTH,
+      8,
+      ["case:receptacle"],
+      assumed
+    ));
+    if (enabling != null) spec.openings.push(new EnvelopeOpening(
+      "enabling",
+      enabling.x,
+      enabling.y,
+      5,
+      ["case:enabling-switch"],
+      assumed
+    ));
+    spec.connectionDistance = 40.0;
+    spec.connectionSource = EnvelopeSource
+      .assumed("harness slack from a control's terminals to its header; a budget until the harness is drawn");
+    return spec;
   }
 
   /** The posts, standoffs, receptacle, enabling switch and strap slots as marks for PanelLayoutSvg. */

@@ -13,7 +13,7 @@ from pathlib import Path
 import sys
 
 from skidl import POWER
-from pcbkit import assets, blocks, netlist, pinassign
+from pcbkit import assets, blocks, enclosure, netlist, pinassign
 from pcbkit.blocks.parts import (
     C0603,
     C0805,
@@ -421,6 +421,18 @@ def build(out_dir=HERE, refs_path=None):
             tp = b.part("Connector", "TestPoint", "tp_" + net.lower(), value=net, footprint=TP, fit="hand-fitted")
             root[net] += tp[1]
 
+    # ---------------------------------------------------------------- the four mounting holes the case's standoffs take
+    with b.sheet("mech"):
+        for n in range(1, 5):
+            b.part(
+                "Mechanical",
+                "MountingHole",
+                "h" + str(n),
+                value="M2.5",
+                footprint="MountingHole:MountingHole_2.7mm_M2.5",
+                fit="hand-fitted",
+            )
+
     path = b.write(out_dir)
     run_erc(b, out_dir / "pendant.erc.json")
     b.fragments(i, path, bindings={"estop": {"IN": {"tag": "cable/j_cable", "pin": "7"}}})
@@ -547,7 +559,25 @@ def build(out_dir=HERE, refs_path=None):
         current_max_a=proposed(None, "the cabinet's supply capacity is a physical review"),
         range_v=proposed([18, 30], "cabinet 24 V supply envelope at the pendant end of the cable"),
     )
-    # The outline and page come with the enclosure envelope (EN3), before any placement.
+    # The case's envelope (pendant.envelope.json, written by machinekit's BoardEnvelope from the pendant assembly) gives
+    # the outline, the mounting holes, the height zones on both sides and where each control's wires arrive.
+    enclosure.apply(
+        i,
+        out_dir,
+        holes={"h" + str(n): "mech/h" + str(n) for n in range(1, 5)},
+        connections={
+            "cable": "cable/j_cable",
+            "enabling": "reserved/j_enable",
+            "display-pins": "oled/j_oled",
+            "jog-wheel-terminals": "wheel/j_wheel",
+            "selectors-axis-body": "selectors/j_axis",
+            "selectors-step-body": "selectors/j_step",
+            "jog-wheel-enable-body": "keys/j_wheel_en",
+            **{f"cycle-keys-{k}-body": f"keys/j_{k}" for k in ("start", "hold", "stop")},
+            **{f"function-keys-{k}-body": f"keys/j_{k}" for k in ("f1", "f2", "f3")},
+        },
+    )
+    i.page("A4", revision="pendant v1 draft", comment="every review pending; outline and zones from the case's envelope")
     for sheet in sorted({p.sheet for p in nl.parts}):
         i.group(sheet)
     b.gates(i)
