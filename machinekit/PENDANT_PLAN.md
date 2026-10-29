@@ -18,8 +18,15 @@ Numbers and part families below are targets or unchecked suggestions unless stat
 3. **Small display.** A monochrome OLED (128×64, I2C, 2.42") shows text only. No
    graphic UI and no touch. The main HMI already shows the DRO and program, and a second UI on
    the pendant would duplicate it.
-4. **Small MCU.** An STM32G0B1-class part with FDCAN and an encoder timer. The Nucleo-G474 is the
-   bench stand-in.
+4. **MCU: STM32H503RBT6** (decided 2026-10-29). Cortex-M33 at 250 MHz, 128 KB flash, 32 KB RAM, FDCAN and
+   encoder-capable timers on chip, LQFP-64 with 49 I/O, enough for every control without shift registers. LCSC
+   C6807804 (JLCPCB extended, 612 in stock and $3.70 at 1–9 on 2026-10-23). Chosen for a wired pendant over: the
+   STM32G0B1 (almost no JLCPCB stock); RP2354A + MCP2518FD (cheaper chip, but CAN-FD needs a second chip, so more
+   extended parts and setup fees); TI MSPM0G3507 (cheaper, 60 I/O, but young Rust support); classic-CAN parts such as
+   the CH32V203 or the ESP32's TWAI (a classic controller disturbs an FD bus). Same Rust stack as before
+   (embassy-stm32). The NUCLEO-H503RB is the matching bench board; the Nucleo-G474 stays usable for the CAN-FD bench.
+   **Wireless** is not in v1. If it comes, it is jog-only (the cabinet keeps its hardwired E-stop and stops motion when
+   the link drops) and an ESP32-C6-MINI-1 module (C6553337) is added next to the H503 rather than replacing it.
 5. **Safety is outside the MCU.** v1 uses the uncertified bench chain: the pendant's E-stop (NC
    contact) is in series with the door switch (see `CONTROL_CABINET_PLAN.md`). The MCU only
    reads its state back.
@@ -108,7 +115,9 @@ ribs behind it. The case model takes every one of these as a parameter.
 - **Inputs.** ESD protection on every input. Check whether the MPG outputs are 5 V TTL and
   whether the chosen MCU pins are 5 V tolerant; add a level shifter or Schmitt buffer if not.
   If the wheel has differential outputs, add a line receiver.
-- **CAN-FD.** One FDCAN port with an isolated transceiver, since the cable is 3–5 m. TI offers
+- **CAN-FD.** The H503's FDCAN with an isolated transceiver, since the cable is 3–5 m: candidate CA-IS2062A
+  (C22438481, CAN-FD, 5 Mbps, isolated supply built in, 2.5 kVrms; check its datasheet before the parts review). A
+  crystal clocks the FDCAN (the internal oscillator is not accurate enough for CAN). TI offers
   isolated CAN parts (for example the ISO1042); verify before choosing.
 - **E-stop read-back.** An isolated input observes the chain state; it is never in the chain.
 - **Display.** I2C inside the case, text only, dimmed after a few idle seconds and blanked when
@@ -320,7 +329,7 @@ with a content hash so pcbkit marks the board stale when the case changes):
 | EN1 | Ports for every wired control in machinekit: switch and LED contacts on the push buttons, the rotary switches' contacts, the OLED's I2C header, the receptacle's pins (8 of 12 used, 4 reserved for the enabling switch), each with a terminal position in the control's frame. **Done 2026-10-28 for the face's controls:** every wired port names a `Terminal` connector frame where its wires attach (push button: `no` and `led` at the body's rear; rotary switch: `contacts`, positions + 1 wires; OLED: the 7-pin `header` at its pin ends, wires along +x; wheel: its four terminals; E-stop: `nc<n>` on each block's rear face), and expanded bodies keep those frames. `PendantBoard` derives one matching port per control port from the layout and `PendantBoard.wire` connects them all (56 wires); the E-stop's contacts stay off the board. The receptacle and the enabling switch are still case openings, not parts: their ports come when they are modelled (with EN3). |
 | EN2 | pcbkit (its PLAN, "Enclosure envelope" E1–E3): the envelope schema and reader, height zones per side and region that are not tied to a plug-in module, part keep-outs (not just copper keep-outs), and generating the board's mechanical record and intent placement from the envelope. |
 | EN3 | `PendantCase.envelope()` writes the record next to the pendant example; pcbkit becomes a pinned submodule of materia (the dependency direction decided 2026-10-25) and the pendant board gets its folder beside the pendant. |
-| EN4 | The board v1 design in pcbkit, inside the envelope: STM32G0B1, isolated FDCAN, 24 V entry with reverse protection and TVS, 5 V and 3.3 V, the wheel's encoder input at 5 V levels, protected switch inputs, LED drivers, the OLED's I2C, the E-stop read-back. Every review pending, as for any pcbkit board. |
+| EN4 | The board v1 design in pcbkit, inside the envelope: STM32H503RBT6, isolated FDCAN (CA-IS2062A candidate), 24 V entry with reverse protection and TVS, 5 V and 3.3 V, the wheel's encoder input at 5 V levels, protected switch inputs, LED drivers, the OLED's I2C, the E-stop read-back. Every review pending, as for any pcbkit board. |
 | EN5 | Back from pcbkit (its PLAN E4): the real board's outline, holes, connector positions and a STEP model. `PendantBoard` uses them instead of the envelope solid, with one port per connector; the controls are wired to those ports and `AssemblyIntegrity` checks the board against the case and the controls. |
 
 ## Phases
@@ -340,7 +349,7 @@ with a content hash so pcbkit marks the board stale when the case changes):
   wait until a real machine shows what is missing.
 - **MPG.** Settled on the Vallder 100 PPR 4-pin single-ended wheel (diameters now known from its drawing). To check on the real part: output type (push-pull or open collector), 5 V tolerance of the timer pins, the stud and boss protrusion behind the panel (two small drawing dimensions, 3.5 and 3 mm, read as about 6.5 mm in total, so the panel may be limited to about 3 mm), wheel feel, detent, and weight (276 g listed). SmartPendant's case is 160 x 65 x 20 mm, 55 mm with its wheel and handle; ours is larger because this wheel needs an 80 mm circle of face.
 - **E-stop contact block.** Rating and terminals.
-- **pcbkit.** Whether it covers a G0B1 with FDCAN and an isolated transceiver today.
+- **pcbkit.** The H503 and the CA-IS2062A need part data and pin maps in pcbkit (EN4).
 - **Display burn-in.** Settings to confirm on a real module (the Waveshare listing gives no lifetime figures).
 - **Z index.** Whether the wheel's index channel is needed. Probably not.
-- **Rust support.** Checked: embassy-stm32 0.6 has an FDCAN driver with CAN-FD data bit rates and `write_fd`, with active fixes to FD timing, and `pendant_firmware` builds for both the Nucleo-G474 and the STM32G0B1 (the G0B1 shares its FDCAN interrupt lines with TIM16 and TIM17). Compile-checked only: nothing has run on hardware, and the FDCAN kernel clock is still the default.
+- **Rust support.** Checked: embassy-stm32 0.6 has an FDCAN driver with CAN-FD data bit rates and `write_fd`, with active fixes to FD timing, and `pendant_firmware` builds for both the Nucleo-G474 and the STM32G0B1 (the G0B1 shares its FDCAN interrupt lines with TIM16 and TIM17); an STM32H503 target replaces the G0B1 one. Compile-checked only: nothing has run on hardware, and the FDCAN kernel clock is still the default.
