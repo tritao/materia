@@ -104,19 +104,36 @@ class RotarySwitch extends HmiPart {
       return Solids.named(Part.cylinderSpan(n("bodyDiameter") / 2, -n("behindDepth"), -t - nut), "body");
     }, [contactsPort()]), new DeviceBodySpec("knob", "rotary switch knob", materialSpec(), function() {
       var r = n("knobDiameter") / 2, k = n("knobHeight");
-      return Solids.named(
-        Part.revolve([
-          {r: 0.0, z: 0.0},
-          {r: r - 1.0, z: 0.0},
-          {r: r, z: 1.0},
-          {r: r, z: k - 2.0},
-          {r: r - 2.0, z: k},
-          {r: 0.0, z: k}
-        ]),
-        "knob"
-      );
+      var body = Part.revolve([
+        {r: 0.0, z: 0.0},
+        {r: r - 1.0, z: 0.0},
+        {r: r, z: 1.0},
+        {r: r, z: k - 2.0},
+        {r: r - 2.0, z: k},
+        {r: 0.0, z: k}
+      ]);
+      // The pointer's groove, filled flush by the white pointer body.
+      var groove = pointerGroove();
+      var cut = body.subtract(groove);
+      body.close();
+      groove.close();
+      return Solids.named(cut, "knob");
     }
+    ), new DeviceBodySpec(
+      "pointer",
+      "rotary switch pointer",
+      "ABS white",
+      () -> Solids.named(pointerGroove(), "pointer")
     )];
+  }
+
+  /** The white pointer's shape: a line along the knob's top from near the centre toward its rim, 0.5 mm deep, at the knob's rest angle (up). */
+  function pointerGroove():Part {
+    var r = n("knobDiameter") / 2, k = n("knobHeight"), from = 4.0, to = r - 3.5, depth = 0.5;
+    var raw = Part.box(1.4, to - from, depth);
+    var moved = raw.translated(new Vector(0.0, (from + to) / 2, k - depth));
+    raw.close();
+    return moved;
   }
 
   /**
@@ -135,6 +152,10 @@ class RotarySwitch extends HmiPart {
       effort: null,
       detents: [for (i in 0...positions) start + i * pitch]
     };
-    return [new DeviceJointSpec("position", Revolute, "switch", "knob", limits, start)];
+    // The pointer is part of the knob: it is fixed to it and turns with it.
+    return [
+      new DeviceJointSpec("position", Revolute, "switch", "knob", limits, start),
+      new DeviceJointSpec("pointer-mount", Fixed, "knob", "pointer")
+    ];
   }
 }

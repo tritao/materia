@@ -135,7 +135,8 @@ class PendantCase {
     this.notes = notes;
   }
 
-  public static function plan(face:PanelLayout):PendantCase {
+  /** `enablingOnRight` puts the enabling switch on the right wall first (a left-handed pendant), the left wall otherwise. */
+  public static function plan(face:PanelLayout, enablingOnRight:Bool = false):PendantCase {
     var notes:Array<String> = [];
     var posts = placePosts(face);
     // The receptacle leaves at the bottom, at the free x nearest the centre, low enough to clear the shallow parts.
@@ -160,7 +161,7 @@ class PendantCase {
     var boardTop = -(BOSS_HEIGHT + standoffLength);
     if (boardTop - BOARD_THICKNESS - BOARD_COMPONENTS
       < -(face.caseInnerDepth - 1.0)) throw "The case is too shallow for a board behind the controls";
-    var enabling = placeEnabling(face, posts, connectorX, wallY, notes);
+    var enabling = placeEnabling(face, posts, connectorX, wallY, notes, enablingOnRight);
     var standoffs = placeStandoffs(face, posts, connectorX, wallY, enabling);
     var ribs = placeRibs(face, posts, [], connectorX, wallY, enabling, boardTop);
     var strapSlots = placeStrapSlots(face, posts, [], enabling, ribs);
@@ -241,14 +242,16 @@ class PendantCase {
     posts:Array<{x:Float, y:Float}>,
     connectorX:Float,
     wallY:Float,
-    notes:Array<String>
+    notes:Array<String>,
+    preferRight:Bool = false
   ):Null<{
     x:Float,
     y:Float
   }> {
     var limit = face.caseInnerDepth - ENABLING_BODY - 1.0;
     var hh = face.height / 2 - face.wall - ENABLING_BODY / 2 - 2.0;
-    for (side in [-1.0, 1.0]) {
+    var sides = preferRight ? [1.0, -1.0] : [-1.0, 1.0];
+    for (side in sides) {
       var x = side * (face.width / 2 - face.wall - ENABLING_DEPTH / 2);
       var best:Null<{x:Float, y:Float}> = null;
       var y = -hh;
@@ -261,9 +264,9 @@ class PendantCase {
         y += 3.0;
       }
       if (best != null) {
-        if (side
-          > 0) notes.push("The enabling switch has no free place on the left wall; it fits on the right wall at y="
-          + Math.round(best.y) + " mm.");
+        if (side != sides[0]) notes.push("The enabling switch has no free place on the " + (preferRight
+          ? "right" : "left") + " wall; it fits on the " + (side
+          > 0 ? "right" : "left") + " wall at y=" + Math.round(best.y) + " mm.");
         return best;
       }
     }

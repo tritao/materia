@@ -92,6 +92,28 @@ class PendantTests {
       "A post stands off its wall at " + p.x + ", " + p.y + " and relies on a rib"
     );
 
+    // Handedness: the reference holds in the left hand and turns with the right, so the selectors are on the right and the E-stop on
+    // the left; a left-handed pendant is the mirror image, with its enabling switch on the right wall.
+    function xOf(l:PanelLayout, id:String):Float {
+      for (c in l.controls) if (c.id == id) return c.x;
+      throw "No control " + id;
+    }
+    check(
+      xOf(layout, "axis") > 0 && xOf(layout, "step") > 0 && xOf(layout, "estop") < 0,
+      "Selectors on the right, E-stop on the left"
+    );
+    var mirrored = ReferencePendant.layout(true);
+    var mirroredCase = ReferencePendant.pendantCase(true);
+    check(
+      mirrored.problems().length == 0 && xOf(mirrored, "axis") < 0 && xOf(mirrored, "estop") > 0,
+      "The left-handed layout passes its checks, mirrored: " + mirrored.problems().join(" | ")
+    );
+    var mirroredEnabling = mirroredCase.enabling;
+    check(
+      mirroredEnabling != null && mirroredEnabling.x > 0 && mirroredCase.notes.length == 0,
+      "A left-handed pendant's enabling switch is on the right wall: " + mirroredCase.notes.join(" | ")
+    );
+
     // What the plan added: standoffs, strap slots, a board behind the shallow parts, the enabling switch and a tongue.
     check(pendantCase.standoffs.length == 4 && pendantCase.strapSlots.length == 2,
       "Four standoffs and two strap slots");
@@ -174,7 +196,7 @@ class PendantTests {
       ids.indexOf(id) >= 0,
       "Missing member " + id + " in " + ids.join(", ")
     );
-    check(ids.length == 86, "Eighty-six members, thirty-three of them hardware: " + ids.length);
+    check(ids.length == 89, "Eighty-nine members, thirty-three of them hardware: " + ids.length);
     check(
       ids.indexOf("fasteners/display-frame") >= 0 && ids.indexOf("fasteners/display-screw-4") >= 0,
       "The display's frame hardware"
@@ -198,8 +220,9 @@ class PendantTests {
     var joints = assembly.derived().definition.joints;
     var encoders = [for (j in joints) if (j.id == "jog/wheel/encoder") j];
     check(
-      joints.length == 3 && encoders.length == 1,
-      "Three joints, one the wheel's free encoder and two clicking knobs: " + [for (j in joints) j.id].join(", ")
+      joints.length == 6 && encoders.length == 1,
+      "Six joints: the wheel's free encoder, two clicking knobs and a fixed pointer or index mark on each: "
+      + [for (j in joints) j.id].join(", ")
     );
     // The switches click: each knob joint is limited between end stops and has a detent at every position, 30 degrees apart.
     var detentCounts:Map<String, Int> = [];
@@ -291,12 +314,13 @@ class PendantTests {
     var texturedWheel = PartPresets.yumoIsm6045();
     var wheelBodies = texturedWheel.bodies();
     if (wheelBodies != null) {
-      var wheelSpec = wheelBodies[wheelBodies.length - 1];
+      var wheelSpec = [for (b in wheelBodies) if (b.id == "wheel") b][0];
       var wheelSolid = wheelSpec.build();
       var wheelDetails = cadkit.threads.Details.renderData(wheelSolid.shape);
       check(
         wheelDetails.length == 2 && wheelSolid.shape.threadedFaces().length == 0,
-        "A textured wheel carries a knurl and a scale, and no threads"
+        "A textured wheel carries a knurl and a scale, and no threads: "
+        + wheelDetails.length + " details, " + wheelSolid.shape.threadedFaces().length + " threads"
       );
       var kinds = [for (d in wheelDetails) d.kind];
       check(
@@ -317,7 +341,7 @@ class PendantTests {
     var modelled = new HandWheel(new machinekit.component.ComponentValues().setToken("detail", "modelled"));
     var modelledBodies = modelled.bodies();
     if (modelledBodies != null) {
-      var modelledSolid = modelledBodies[modelledBodies.length - 1].build();
+      var modelledSolid = [for (b in modelledBodies) if (b.id == "wheel") b][0].build();
       check(
         cadkit.threads.Details.renderData(modelledSolid.shape).length == 0
         && modelledSolid.shape.subshapeCount(CadKit.ShapeKind.Face) > 400,

@@ -11,19 +11,23 @@ import machinekit.hmi.*;
  * checker; every assumed part is to be replaced by the measured one.
  */
 class ReferencePendant {
-  public static function layout():PanelLayout {
+  public static function layout(leftHanded:Bool = false):PanelLayout {
+    // The pendant is held in the left hand, with the enabling switch on the left wall and the Start, Hold and Stop keys under the
+    // thumb; the free right hand turns the selectors and the wheel, so they sit on the right and the E-stop at the top left, where
+    // the holding hand can reach it. A left-handed pendant is the same layout turned left to right.
+    var side = leftHanded ? -1.0 : 1.0;
     var controls = [
-      new PlacedPart("axis", PartPresets.rotarySwitch(12), -39.0, 80.0),
-      new PlacedPart("step", PartPresets.rotarySwitch(3), -8.0, 80.0),
-      new PlacedPart("estop", PartPresets.xb2Es542(), 32.0, 80.0),
+      new PlacedPart("axis", PartPresets.rotarySwitch(12), side * 39.0, 80.0),
+      new PlacedPart("step", PartPresets.rotarySwitch(3), side * 8.0, 80.0),
+      new PlacedPart("estop", PartPresets.xb2Es542(), side * -32.0, 80.0),
       new PlacedPart("display", PartPresets.oled242(), 0.0, 37.0),
-      new PlacedPart("f1", PartPresets.pushButton16(), -40.5, 1.5),
-      new PlacedPart("f2", PartPresets.pushButton16(), -13.5, 1.5),
-      new PlacedPart("f3", PartPresets.pushButton16(), 13.5, 1.5),
-      new PlacedPart("wheel-enable", PartPresets.pushButton16("blue"), 40.5, 1.5),
-      new PlacedPart("start", PartPresets.pushButton16("green"), -40.5, -25.5),
-      new PlacedPart("hold", PartPresets.pushButton16("yellow"), -13.5, -25.5),
-      new PlacedPart("stop", PartPresets.pushButton16("red"), 13.5, -25.5),
+      new PlacedPart("f1", PartPresets.pushButton16(), side * -40.5, 1.5),
+      new PlacedPart("f2", PartPresets.pushButton16(), side * -13.5, 1.5),
+      new PlacedPart("f3", PartPresets.pushButton16(), side * 13.5, 1.5),
+      new PlacedPart("wheel-enable", PartPresets.pushButton16("blue"), side * 40.5, 1.5),
+      new PlacedPart("start", PartPresets.pushButton16("green"), side * -40.5, -25.5),
+      new PlacedPart("hold", PartPresets.pushButton16("yellow"), side * -13.5, -25.5),
+      new PlacedPart("stop", PartPresets.pushButton16("red"), side * 13.5, -25.5),
       new PlacedPart("wheel", PartPresets.yumoIsm6045(), 0.0, -70.0)
     ];
     return new PanelLayout(114.0, 210.0, 3.0, 3.0, 48.0, controls);
@@ -57,5 +61,5 @@ class ReferencePendant {
   }
 
   /** The case for the reference layout. */
-  public static function pendantCase():PendantCase return PendantCase.plan(layout());
+  public static function pendantCase(leftHanded:Bool = false):PendantCase return PendantCase.plan(layout(leftHanded), leftHanded);
 }
