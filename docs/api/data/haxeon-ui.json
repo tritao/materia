@@ -769,6 +769,36 @@
      ]
     },
     {
+     "name": "IntIndex",
+     "kind": "class",
+     "file": "haxeon/packages/ui/bindings/haxe/haxeon/ui/IntIndex.hx",
+     "doc": "Maps integer keys to non-negative integers without allocating per `set` or `get`: `Map<Int, Int>` boxes both the value it\nstores and the one it returns. Open addressing over three arrays; `clear` bumps a generation instead of touching the slots.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(?capacity:Int):Void"
+      },
+      {
+       "name": "get",
+       "kind": "method",
+       "signature": "(key:Int):Int",
+       "doc": "The value stored for `key`, or -1 when there is none."
+      },
+      {
+       "name": "set",
+       "kind": "method",
+       "signature": "(key:Int, value:Int):Void",
+       "doc": "Stores a non-negative `value`, replacing any earlier one for `key`."
+      },
+      {
+       "name": "clear",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
      "name": "LayoutAlignmentX",
      "kind": "abstract",
      "file": "haxeon/packages/ui/bindings/haxe/haxeon/ui/LayoutAlignmentX.hx",
@@ -1335,13 +1365,12 @@
        "name": "textStyle",
        "kind": "var",
        "signature": ":TextStyle",
-       "final": true
+       "doc": "Most nodes never show text, so a node allocates its own text and paragraph style on first use. Anything that reads\nthese for every node must use `peekTextStyle` and `peekParagraphStyle`, which allocate nothing."
       },
       {
        "name": "paragraphStyle",
        "kind": "var",
-       "signature": ":ParagraphStyle",
-       "final": true
+       "signature": ":ParagraphStyle"
       },
       {
        "name": "hitSelf",
@@ -1395,6 +1424,18 @@
        "name": "new",
        "kind": "method",
        "signature": "(id:Int, ?visualKind:LayoutVisualKind, ?style:LayoutStyle):Void"
+      },
+      {
+       "name": "peekTextStyle",
+       "kind": "method",
+       "signature": "():TextStyle",
+       "doc": "Read-only view of the text style: the node's own, or a shared default that must never be changed. Allocates nothing."
+      },
+      {
+       "name": "peekParagraphStyle",
+       "kind": "method",
+       "signature": "():ParagraphStyle",
+       "doc": "Read-only view of the paragraph style: the node's own, or a shared default that must never be changed. Allocates nothing."
       },
       {
        "name": "add",
@@ -1793,6 +1834,12 @@
        "name": "clipToParent",
        "kind": "var",
        "signature": ":Bool"
+      },
+      {
+       "name": "overlay",
+       "kind": "var",
+       "signature": ":Bool",
+       "doc": "Paint above ordinary content, scoped to the nearest enclosing overlay. Requires Absolute positioning."
       },
       {
        "name": "padding",
@@ -2682,7 +2729,7 @@
       {
        "name": "fromNativeSurface",
        "kind": "method",
-       "signature": "(surface:NativeKitSurface):Surface",
+       "signature": "(surface:PlatformSurface):Surface",
        "static": true
       }
      ]
@@ -3792,7 +3839,7 @@
       {
        "name": "platformSurface",
        "kind": "var",
-       "signature": ":Null<NativeKitSurface>"
+       "signature": ":Null<Surface>"
       },
       {
        "name": "textInput",
@@ -3979,7 +4026,7 @@
       {
        "name": "setPlatformSurface",
        "kind": "method",
-       "signature": "(surface:NativeKitSurface):Void",
+       "signature": "(surface:Surface):Void",
        "doc": "Provides the NativeKit surface used for IME and other platform services."
       },
       {
@@ -4222,7 +4269,7 @@
       {
        "name": "consume",
        "kind": "method",
-       "signature": "(event:NativeKitEventValue):Bool",
+       "signature": "(event:PlatformEvent):Bool",
        "doc": "Consumes a decoded clipboard completion only when this service owns its request."
       },
       {
@@ -5259,6 +5306,55 @@
      ]
     },
     {
+     "name": "KeyHash",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/core/KeyHash.hx",
+     "doc": "Accumulates a cache key from numbers and strings without building a string. Two 32-bit lanes with different mixing\nmake an accidental match between two different keys about as unlikely as a 64-bit hash collision. Reuse one instance\nwith `reset`: nothing here allocates. Floats count to a resolution of 2^-24.",
+     "fields": [
+      {
+       "name": "a",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "b",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "reset",
+       "kind": "method",
+       "signature": "():KeyHash"
+      },
+      {
+       "name": "addInt",
+       "kind": "method",
+       "signature": "(value:Int):KeyHash"
+      },
+      {
+       "name": "addBool",
+       "kind": "method",
+       "signature": "(value:Bool):KeyHash"
+      },
+      {
+       "name": "addFloat",
+       "kind": "method",
+       "signature": "(value:Float):KeyHash"
+      },
+      {
+       "name": "addString",
+       "kind": "method",
+       "signature": "(?value:String):KeyHash",
+       "doc": "The length goes in first, so (\"ab\", \"c\") and (\"a\", \"bc\") differ."
+      }
+     ]
+    },
+    {
      "name": "KeyScope",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/core/KeyScope.hx",
@@ -5355,7 +5451,7 @@
       {
        "name": "attach",
        "kind": "method",
-       "signature": "(events:NativeKitEvents):Void",
+       "signature": "(events:EventPump):Void",
        "doc": "Subscribes this adapter to the runtime's shared event pump."
       },
       {
@@ -5367,7 +5463,7 @@
       {
        "name": "consume",
        "kind": "method",
-       "signature": "(event:NativeKitEventValue):Bool",
+       "signature": "(event:PlatformEvent):Bool",
        "doc": "Consumes recognized input for this window; other event kinds/sources pass through."
       }
      ]
@@ -6100,7 +6196,7 @@
       {
        "name": "attach",
        "kind": "method",
-       "signature": "(surface:NativeKitSurface):Void"
+       "signature": "(surface:Surface):Void"
       },
       {
        "name": "activate",
@@ -6422,7 +6518,7 @@
       {
        "name": "attachPlatformSurface",
        "kind": "method",
-       "signature": "(surface:NativeKitSurface):Void",
+       "signature": "(surface:PlatformSurface):Void",
        "doc": "Attaches the host surface used by platform text-input synchronization."
       },
       {
@@ -6457,7 +6553,7 @@
       {
        "name": "updateAccessibility",
        "kind": "method",
-       "signature": "(surface:NativeKitSurface):Void",
+       "signature": "(surface:PlatformSurface):Void",
        "doc": "Connects this frame's semantic projection to a NativeKit platform surface."
       },
       {
@@ -9925,7 +10021,7 @@
       {
        "name": "tick",
        "kind": "method",
-       "signature": "(now:Float, pump:NativeKitEvents, window:WindowHandle, checkpoint:(String) -> Void, before:(Float) -> Void, after:(Float) -> Void):Bool",
+       "signature": "(now:Float, pump:EventPump, window:WindowHandle, checkpoint:(String) -> Void, before:(Float) -> Void, after:(Float) -> Void):Bool",
        "doc": "Dispatch one due event; the host drains overdue input before requesting the next frame."
       }
      ]
@@ -9993,7 +10089,7 @@
       {
        "name": "events",
        "kind": "var",
-       "signature": ":NativeKitEvents",
+       "signature": ":EventPump",
        "final": true
       },
       {
@@ -10022,7 +10118,7 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(fonts:FontCollection, events:NativeKitEvents, close:() -> Void, scheduleFrame:() -> Void):Void"
+       "signature": "(fonts:FontCollection, events:EventPump, close:() -> Void, scheduleFrame:() -> Void):Void"
       },
       {
        "name": "supports",
@@ -12243,7 +12339,7 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(surface:NativeKitSurface):Void"
+       "signature": "(surface:Surface):Void"
       },
       {
        "name": "project",
@@ -13986,7 +14082,8 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "():Void"
+       "signature": "(?from:ComputedStyle):Void",
+       "doc": "With `from`, the new style reads `from`'s storage and detaches it on the first mutation, as `fork` does."
       },
       {
        "name": "set",
@@ -16152,6 +16249,13 @@
        "final": true
       },
       {
+       "name": "Overlay",
+       "kind": "var",
+       "signature": ":StyleProperty<Bool>",
+       "static": true,
+       "final": true
+      },
+      {
        "name": "ClipToParent",
        "kind": "var",
        "signature": ":StyleProperty<Bool>",
@@ -16949,6 +17053,13 @@
        "kind": "var",
        "signature": ":String",
        "doc": "Stable text form of the selector inputs, for diagnostics; the style cache compares structurally instead."
+      },
+      {
+       "name": "shared",
+       "kind": "method",
+       "signature": "(?values:Array<String>):Array<String>",
+       "static": true,
+       "doc": "An array of class or tag names that nobody will mutate. The common one-name array is shared by every node that uses\nit, so a widget's `[\"row\"]` costs no copy per node; anything else is copied. Style identity arrays are only ever read."
       },
       {
        "name": "new",
@@ -21753,6 +21864,13 @@
      "alias": "() -> String"
     },
     {
+     "name": "DockPanelCacheKeyHasher",
+     "kind": "typedef",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/docking/DockPanelContent.hx",
+     "alias": "(KeyHash) -> Void",
+     "doc": "Adds the panel's revision inputs to a key hash, in place of building a string. Do not reset the hash."
+    },
+    {
      "name": "DockPanelContent",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/docking/DockPanelContent.hx",
@@ -21785,9 +21903,16 @@
        "doc": "Optional application-owned revision key enabling retained panel trees."
       },
       {
+       "name": "cacheKeyHash",
+       "kind": "var",
+       "signature": ":Null<DockPanelCacheKeyHasher>",
+       "final": true,
+       "doc": "Allocation-free alternative to `cacheKey`; when both are given this one is used."
+      },
+      {
        "name": "new",
        "kind": "method",
-       "signature": "(panelId:String, build:DockPanelBuilder, ?buildWithWidth:WidthAwareDockPanelBuilder, ?cacheKey:DockPanelCacheKeyBuilder):Void"
+       "signature": "(panelId:String, build:DockPanelBuilder, ?buildWithWidth:WidthAwareDockPanelBuilder, ?cacheKey:DockPanelCacheKeyBuilder, ?cacheKeyHash:DockPanelCacheKeyHasher):Void"
       }
      ]
     },
@@ -25528,7 +25653,7 @@
       {
        "name": "applyTextEdit",
        "kind": "method",
-       "signature": "(edit:NativeKitTextEdit):Bool",
+       "signature": "(edit:TextEdit):Bool",
        "doc": "Applies one transactional NativeKit composition/edit update."
       },
       {

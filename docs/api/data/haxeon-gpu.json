@@ -533,6 +533,22 @@
      ]
     },
     {
+     "name": "GpuError",
+     "kind": "class",
+     "file": "haxeon/packages/gpu/src/haxeon/gpu/GpuError.hx",
+     "extends": [
+      "haxeon.platform.PlatformError"
+     ],
+     "doc": "GPU adapter status codes belong to their own domain, separate from nk_result.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(status:Int, operation:String, ?diagnostic:String):Void"
+      }
+     ]
+    },
+    {
      "name": "GpuResult",
      "kind": "class",
      "file": "haxeon/packages/gpu/src/haxeon/gpu/GpuResult.hx",
@@ -1576,13 +1592,13 @@
       {
        "name": "create",
        "kind": "method",
-       "signature": "(window:NativeKitWindow, width:Int, height:Int):Surface",
+       "signature": "(window:Window, width:Int, height:Int):Surface",
        "static": true
       },
       {
        "name": "createForApi",
        "kind": "method",
-       "signature": "(window:NativeKitWindow, api:GraphicsApi, width:Int, height:Int):Surface",
+       "signature": "(window:Window, api:GraphicsApi, width:Int, height:Int):Surface",
        "static": true
       },
       {
