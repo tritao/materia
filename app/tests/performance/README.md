@@ -268,6 +268,50 @@ replaces them, and `StateStore.usedIdsSince` reuses a scratch set instead of mak
 booleans 4,251 to 16 per cycle. Interaction frames (KiB, harness floor of about 48 included): hover onto a tab 145, scroll 187, type a character 165.
 What is left in the census is many sites of 1-2% each: pane cache key strings, `FocusManager.collect`, `LayoutAxis.fit` per node, style diffs, geometry decode for changed nodes.
 
+### Cutting per-node and per-frame allocation (2026-10-29)
+
+Measured with the interaction and tab-matrix scenarios, before to after, on the same machine:
+
+| | before | after |
+|---|---|---|
+| hover onto a tab (bytes per frame) | 195,472 | 158,744 (-18.8%) |
+| tab switch, hierarchy to sensors (KiB) | 421.6 | 312.7 (-25.8%) |
+| sensors to hierarchy | 369.3 | 260.4 (-29.5%) |
+| console to telemetry | 355.8 | 251.9 (-29.2%) |
+| telemetry to console | 357.2 | 255.2 (-28.6%) |
+
+What changed, in the order it paid:
+
+- `ComputedStyle.fork` shared its three arrays and rule list with its source and detached on write; before, each fork built
+  three empty arrays it then overwrote and copied the rule list (about 290 forks per tab switch).
+- One-name class and tag arrays (`["row"]`) are interned in `StyleTarget.shared` instead of copied by both `StyleTarget` and
+  `RenderNode.setStyleIdentity`.
+- Cache keys of dock panes, dock panels and `RetainedView` are `KeyHash` lanes, not concatenated strings; four app panels
+  (`hierarchy`, `perspective`, `inspector`, `sensors`) hash their inputs through `DockPanelContent.cacheKeyHash`.
+- `TextRoleStyle.toOverride` keeps its last override while the role is unchanged.
+- A `LayoutNode` allocates its text and paragraph styles when it shows text; the encoder and the layout diff read a shared
+  default through `peekTextStyle` and `peekParagraphStyle`.
+- A hidden `Tooltip` keeps its node but builds no content.
+- Icon paint keys use a cached color text and name prefix; `StateStore.prunePaths`, `BuildContext.pruneKeyCaches` and the
+  layout decode no longer snapshot maps or box ints (`IntIndex`).
+- HashLink makes a nullary enum constructor once (a global, filled on first use) instead of at every evaluation.
+
+Found, and not fixed:
+
+- Converting `Rect` and `Transform2D` to structs would save far less than first estimated. A struct holds the same floats as a
+  class and only drops the 8-byte header; the gain is the temporaries of `viewportBounds()` and friends (about 25 KiB per
+  tab-switch cycle), against `Null<Rect>` API changes in dozens of files. A struct in an `Array` or `Map` still allocates.
+- A pool of recycled `RenderNode`s is unsafe while anything keeps node references across frames (`TooltipOverlayHost` holds
+  `{tip, anchor}` in a `State`).
+- `==` on enums compares only the constructor index in Haxeon: `Circle(1) == Circle(2)` is true. Haxe compares by identity
+  (false). Nullary constructors are now shared, which makes identity correct for them.
+
+Remaining in the tab-switch census (KiB per six-frame cycle of about 2,080): the `LayoutNode` and `LayoutStyle` of each node
+(130), children arrays in `RenderNode.add` and `LayoutNode.add` (55), `ResolvedLayoutItem.decode` and `viewportBounds` (100),
+`TextLayout.caret` (28), scope path strings in `KeyScope` (32) and `ResolvedTextStyle` copies (28).
+
+`HAXEON_IR_ALLOC_ROOTS` (`docs/IR_ALLOCATION_REPORT.md` in Haxeon) lists what a function can allocate before it runs.
+
 ## Belt presentation
 
 Belt animation writes tooth geometry into reusable packed buffers, caches each

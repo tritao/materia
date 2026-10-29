@@ -1,13 +1,13 @@
 {
-  "about": "Ceilings for `check-editor-performance.py --budgets`: medians of a headless run, per action. Time ceilings are about 2.5x what a quiet machine measures, because machines differ; allocation ceilings are about 25% over the measured value, because allocation depends on the code and not on the machine. After a deliberate change, re-measure with `--budgets --measure` and lower or raise the number with the reason in the commit. Measured 2026-10-01: tab switch 1.0-1.5 ms and 132-203 KiB, interaction 0.9-1.7 ms, selection 2.3 ms. Tab-switch allocation re-baselined 2026-10-29 to 301-362 KiB: since 2026-10-01 the app grew from 9 to 14 dock panels (mission panel, machine axis travel controls, project configurations, inspection camera), every switch walks the tab chrome of all of them, and the per-node cost fell meanwhile (a RenderNode was 936 bytes, now 288). How much of the rise comes from the extra panels, and how much from a code change, is not attributed to commits.",
+  "about": "Ceilings for `check-editor-performance.py --budgets`: medians of a headless run, per action. Time ceilings are about 2.5x what a quiet machine measures, because machines differ; allocation ceilings are about 25% over the measured value, because allocation depends on the code and not on the machine. After a deliberate change, re-measure with `--budgets --measure` and lower or raise the number with the reason in the commit. Measured 2026-10-01: tab switch 1.0-1.5 ms and 132-203 KiB, interaction 0.9-1.7 ms, selection 2.3 ms. Tab-switch allocation re-baselined 2026-10-29 to 252-313 KiB (after the same day's allocation work: hashed cache keys, shared style storage and identity arrays, lazy tooltip content and layout-node text styles, shared enum constants): since 2026-10-01 the app grew from 9 to 14 dock panels (mission panel, machine axis travel controls, project configurations, inspection camera), every switch walks the tab chrome of all of them, and the per-node cost fell meanwhile (a RenderNode was 936 bytes, now 288). How much of the rise comes from the extra panels, and how much from a code change, is not attributed to commits.",
   "scenarios": {
     "tab-matrix": {
       "cycles": 30,
       "actions": {
-        "hierarchy->sensors": {"frameMs": 4.0, "allocKiB": 450},
-        "sensors->hierarchy": {"frameMs": 4.0, "allocKiB": 385},
-        "console->telemetry": {"frameMs": 4.0, "allocKiB": 380},
-        "telemetry->console": {"frameMs": 4.0, "allocKiB": 378}
+        "hierarchy->sensors": {"frameMs": 4.0, "allocKiB": 390},
+        "sensors->hierarchy": {"frameMs": 4.0, "allocKiB": 325},
+        "console->telemetry": {"frameMs": 4.0, "allocKiB": 315},
+        "telemetry->console": {"frameMs": 4.0, "allocKiB": 320}
       }
     },
     "interaction": {
