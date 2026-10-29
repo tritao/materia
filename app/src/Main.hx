@@ -37,6 +37,7 @@ import sys.FileSystem;
 import sys.io.File;
 import haxe.Json;
 import materia.sheet.SheetInventory;
+import haxeon.ui.core.KeyHash;
 import haxeon.ui.core.Command;
 import haxeon.ui.core.CommandContext;
 import haxeon.ui.core.CommandRegistry;
@@ -2114,15 +2115,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   // The viewport also consumes simulation poses, so its dependencies include presentation revisions.
-  function perspectiveRevisionKey():String {
+  /** Adds everything the perspective panel's retained tree depends on to `hash`. */
+  function perspectiveRevisionHash(hash:KeyHash):Void {
     var presentationRevision = framePresentation == null ? -1 : framePresentation.revision;
-    return "generation=" + sceneGeneration + ":scene=" + scene.revision
-      + ":selection=" + scene.selectionRevision + ":simulation=" + simulation.appliedRevision + ":active="
-      + simulation.isActive() + ":running=" + simulation.isRunning() + ":error=" + (simulation.error == null ? ""
-      : simulation.error) + ":world=" + Std.string(world.status()) + ":presentation=" + presentationRevision + ":grid="
-      + gridSpacing + ":snap=" + gridSnapEnabled + ":scenario=" + session.hobbingScenario + ":mode=" + mode.id
-      + ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible + ":viewport=" + viewportWidth
-      + "x" + viewportHeight + ":view=" + viewRevision + ":mates=" + Std.string(session.assemblyMateStatus());
+    hash.addInt(sceneGeneration).addInt(scene.revision).addInt(scene.selectionRevision).addInt(simulation.appliedRevision)
+      .addBool(simulation.isActive()).addBool(simulation.isRunning()).addString(simulation.error == null ? "" : simulation.error)
+      .addString(Std.string(world.status())).addInt(presentationRevision).addFloat(gridSpacing).addBool(gridSnapEnabled)
+      .addString(session.hobbingScenario).addString(mode.id).addString(Std.string(toolbarDensity)).addBool(toolbarMenuVisible)
+      .addFloat(viewportWidth).addFloat(viewportHeight).addInt(viewRevision)
+      .addString(Std.string(session.assemblyMateStatus()));
   }
 
   function statusBar():View {
@@ -2249,8 +2250,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       "hierarchy",
       function(_) return hierarchyPanel(),
       null,
-      function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision + ":filter="
-      + hierarchySearch + ":expansion=" + hierarchyExpansionRevision + ":simulating=" + simulation.isActive()
+      null,
+      function(hash) hash.addInt(scene.revision).addInt(scene.selectionRevision).addString(hierarchySearch)
+        .addInt(hierarchyExpansionRevision).addBool(simulation.isActive())
     ), new DockPanelContent(
       "bim",
       function(_) return bimEditor
@@ -2260,10 +2262,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
     ) return perspectivePanel(width),
     // perspectivePanel() pushes grid and simulation settings into the viewport, so a hit may only skip it when
     // none of its inputs changed: this key includes the current simulation presentation.
-    function() return perspectiveRevisionKey() + ":inspection=" + inspectionCamera.presentationKey()
-      + ":gridVisible=" + gridVisible + ":options=" + viewportOptionsVisible + ":visibility=" + visibilityPopupVisible
-      + ":viewportPresentation=" + (perspectiveViewport == null ? "" : perspectiveViewport.presentationKey())
-      + ":collisions=" + collisionsVisible + "/" + collisionNearMillimetres), new DockPanelContent(
+    null,
+    function(hash) {
+      perspectiveRevisionHash(hash);
+      hash.addString(inspectionCamera.presentationKey()).addBool(gridVisible).addBool(viewportOptionsVisible)
+        .addBool(visibilityPopupVisible).addString(perspectiveViewport == null ? "" : perspectiveViewport.presentationKey())
+        .addBool(collisionsVisible).addFloat(collisionNearMillimetres);
+    }), new DockPanelContent(
         "inspection-camera",
         function(_) return inspectionCamera.build(this)
       ), new DockPanelContent(
@@ -2273,16 +2278,17 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "inspector",
         function(_) return inspectorPanel(),
         null,
-        function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision
-      + ":simulation=" + simulation.appliedRevision + ":active=" + simulation.isActive() + ":content=" + (sceneInspector
-      == null ? 0 : sceneInspector.contentRevision())
+        null,
+        function(hash) hash.addInt(scene.revision).addInt(scene.selectionRevision).addInt(simulation.appliedRevision)
+          .addBool(simulation.isActive()).addInt(sceneInspector == null ? 0 : sceneInspector.contentRevision())
     ), new DockPanelContent(
       "sensors",
       function(_) return sensorPanel(),
       null,
-      function() return "generation=" + session.generation + ":document=" + session.document.revision + ":sensors="
-      + sensors.revision() + ":robot=" + sensors.robotId + ":selected=" + sensors.selectedIndex + ":simulation="
-      + simulation.appliedRevision + ":active=" + simulation.isActive() + ":running=" + simulation.isRunning()
+      null,
+      function(hash) hash.addInt(session.generation).addInt(session.document.revision).addInt(sensors.revision())
+        .addString(sensors.robotId).addInt(sensors.selectedIndex).addInt(simulation.appliedRevision)
+        .addBool(simulation.isActive()).addBool(simulation.isRunning())
     ), new DockPanelContent(
       "console",
       function(_) return consolePanel(),
