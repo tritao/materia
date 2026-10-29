@@ -104,29 +104,59 @@ class DocumentBuilder {
     return document.defineExpression(name, kind, unit, source);
   }
 
-  private function bind(dimension:NamedParameter, feature:Feature, slot:String):Void {
-    if (dimension.document != document) throw new ParametricError("named parameter belongs to another builder");
-    dimension.bind(feature.parameter(slot));
+  private function bind(dimension:Dimension, feature:Feature, slot:String):Void {
+    var named = dimension.named();
+    if (named == null) return;
+    if (named.document != document) throw new ParametricError("named parameter belongs to another builder");
+    named.bind(feature.parameter(slot));
   }
 
-  public function rectangle(width:NamedParameter, height:NamedParameter, ?plane:Plane):SketchFeature {
+  /** Features added inside `body` are put in `name` unless they already have a group. */
+  public function group(name:String, body:() -> Void):Void {
     check();
-    var feature = document.add(new SketchFeature("rectangle", width.value, height.value, plane));
+    var previous = document.currentGroup;
+    document.currentGroup = name;
+    try body() catch (error:Dynamic) {
+      document.currentGroup = previous;
+      throw error;
+    }
+    document.currentGroup = previous;
+  }
+
+  /** Name a feature for history views. */
+  public function label<T:Feature>(feature:T, text:String):T {
+    check();
+    feature.label = text;
+    return feature;
+  }
+
+  public function rectangle(width:Dimension, height:Dimension, ?plane:Plane):SketchFeature {
+    check();
+    var feature = document.add(new SketchFeature("rectangle", width.number(), height.number(), plane));
     bind(width, feature, "sketch.width");
     bind(height, feature, "sketch.height");
     return feature;
   }
 
-  public function circle(radius:NamedParameter, ?plane:Plane):SketchFeature {
+  public function roundedRectangle(width:Dimension, height:Dimension, radius:Dimension, ?plane:Plane):SketchFeature {
     check();
-    var feature = document.add(new SketchFeature("circle", radius.value, 1, plane));
+    var feature = document.add(new SketchFeature("rounded-rectangle", width.number(), height.number(), plane, radius.number()));
+    bind(width, feature, "sketch.width");
+    bind(height, feature, "sketch.height");
+    bind(radius, feature, "sketch.radius");
+    return feature;
+  }
+
+  public function circle(radius:Dimension, ?plane:Plane):SketchFeature {
+    check();
+    var feature = document.add(new SketchFeature("circle", radius.number(), 1, plane));
     bind(radius, feature, "sketch.width");
     return feature;
   }
 
-  public function slot(length:NamedParameter, width:NamedParameter, ?plane:Plane):SketchFeature {
+  public function slot(length:Dimension, width:Dimension, ?plane:Plane):SketchFeature {
     check();
-    var feature = document.add(new SketchFeature("slot", length.value, width.value, plane));
+    var feature = document.add(new SketchFeature("slot", length.number(), width.number(), plane));
     bind(length, feature, "sketch.width");
     bind(width, feature, "sketch.height");
     return feature;
@@ -136,13 +166,13 @@ class DocumentBuilder {
   public function sheetBase(
     source:ConstrainedSketchFeature,
     stock:SheetMaterial,
-    ?thickness:NamedParameter,
+    ?thickness:Dimension,
     side:SheetSide = A
   ):SheetBaseFeature {
     check();
     var selectedStock = thickness == null ? stock : new SheetMaterial(
       stock.id,
-      thickness.value,
+      thickness.number(),
       stock.bendRule,
       stock.mechanical,
       stock.defaultRadiusRatio,
@@ -172,11 +202,11 @@ class DocumentBuilder {
     source:SheetFeature,
     first:SheetCornerEdge,
     second:SheetCornerEdge,
-    gap:NamedParameter,
+    gap:Dimension,
     relief:CornerRelief,
-    reliefSize:NamedParameter,
+    reliefSize:Dimension,
     join:CornerJoin = Gap,
-    ?overlap:NamedParameter
+    ?overlap:Dimension
   ):SheetCornerFeature {
     check();
     var feature = document.add(new SheetCornerFeature(
@@ -184,10 +214,10 @@ class DocumentBuilder {
       first,
       second,
       join,
-      gap.value,
-      overlap == null ? 0 : overlap.value,
+      gap.number(),
+      overlap == null ? 0 : overlap.number(),
       relief,
-      reliefSize.value
+      reliefSize.number()
     ));
     bind(gap, feature, "sheet.corner.gap");
     bind(reliefSize, feature, "sheet.corner.relief-size");
@@ -200,11 +230,11 @@ class DocumentBuilder {
     source:SheetFeature,
     faces:Array<Shape>,
     spec:HemSpec,
-    length:NamedParameter,
+    length:Dimension,
     side:SheetSide = A
   ):SheetHemFeature {
     check();
-    var feature = document.add(new SheetHemFeature(source, faces, spec, length.value, side));
+    var feature = document.add(new SheetHemFeature(source, faces, spec, length.number(), side));
     bind(length, feature, "sheet.hem.length");
     return feature;
   }
@@ -213,9 +243,9 @@ class DocumentBuilder {
   public function sheetEdgeFlange(
     source:SheetFeature,
     faces:Array<Shape>,
-    length:NamedParameter,
-    angle:NamedParameter,
-    ?radius:NamedParameter,
+    length:Dimension,
+    angle:Dimension,
+    ?radius:Dimension,
     lengthSpec:LengthSpec = Leg,
     position:FlangePosition = BendOutside,
     offset:Float = 0,
@@ -232,9 +262,9 @@ class DocumentBuilder {
     var feature = document.add(new SheetEdgeFlangeFeature(
       source,
       faces,
-      length.value,
-      angle.value,
-      radius == null ? null : radius.value,
+      length.number(),
+      angle.number(),
+      radius == null ? null : radius.number(),
       lengthSpec,
       position,
       offset,
@@ -290,18 +320,18 @@ class DocumentBuilder {
     return feature;
   }
 
-  public function box(width:NamedParameter, depth:NamedParameter, height:NamedParameter):BoxFeature {
+  public function box(width:Dimension, depth:Dimension, height:Dimension):BoxFeature {
     check();
-    var feature = document.add(new BoxFeature(width.value, depth.value, height.value));
+    var feature = document.add(new BoxFeature(width.number(), depth.number(), height.number()));
     bind(width, feature, "box.width");
     bind(depth, feature, "box.depth");
     bind(height, feature, "box.height");
     return feature;
   }
 
-  public function cylinder(radius:NamedParameter, height:NamedParameter):CylinderFeature {
+  public function cylinder(radius:Dimension, height:Dimension):CylinderFeature {
     check();
-    var feature = document.add(new CylinderFeature(radius.value, height.value));
+    var feature = document.add(new CylinderFeature(radius.number(), height.number()));
     bind(radius, feature, "cylinder.radius");
     bind(height, feature, "cylinder.height");
     return feature;
@@ -318,9 +348,9 @@ class DocumentBuilder {
   }
 
   public function grid(source:Feature,
-    columns:Int, rows:Int, spacingX:NamedParameter, spacingY:NamedParameter):GridFeature {
+    columns:Int, rows:Int, spacingX:Dimension, spacingY:Dimension):GridFeature {
     check();
-    var feature = document.add(new GridFeature(source, columns, rows, spacingX.value, spacingY.value));
+    var feature = document.add(new GridFeature(source, columns, rows, spacingX.number(), spacingY.number()));
     bind(spacingX, feature, "grid.spacingX");
     bind(spacingY, feature, "grid.spacingY");
     return feature;
@@ -328,11 +358,11 @@ class DocumentBuilder {
 
   public function linearPattern(
     source:Feature,
-    count:NamedParameter,
-    spacing:NamedParameter,
+    count:Dimension,
+    spacing:Dimension,
     direction:Vector,
-    ?secondCount:NamedParameter,
-    ?secondSpacing:NamedParameter,
+    ?secondCount:Dimension,
+    ?secondSpacing:Dimension,
     ?secondDirection:Vector
   ):LinearPatternFeature {
     check();
@@ -340,11 +370,11 @@ class DocumentBuilder {
       == null)) throw new ParametricError("linear pattern second axis needs count, spacing, and direction");
     var feature = document.add(new LinearPatternFeature(
       source,
-      count.value,
-      spacing.value,
+      count.number(),
+      spacing.number(),
       direction,
-      secondCount == null ? 1 : secondCount.value,
-      secondSpacing == null ? 1 : secondSpacing.value,
+      secondCount == null ? 1 : secondCount.number(),
+      secondSpacing == null ? 1 : secondSpacing.number(),
       secondDirection
     ));
     bind(count, feature, "linear.count");
@@ -358,26 +388,26 @@ class DocumentBuilder {
 
   public function polarPattern(
     source:Feature,
-    count:NamedParameter,
-    radius:NamedParameter,
-    angularSpan:NamedParameter,
+    count:Dimension,
+    radius:Dimension,
+    angularSpan:Dimension,
     axisOrigin:Vector,
     axisDirection:Vector,
     radialDirection:Vector,
     orientInstances:Bool = true,
-    ?startAngle:NamedParameter
+    ?startAngle:Dimension
   ):PolarPatternFeature {
     check();
     var feature = document.add(new PolarPatternFeature(
       source,
-      count.value,
-      radius.value,
-      angularSpan.value,
+      count.number(),
+      radius.number(),
+      angularSpan.number(),
       axisOrigin,
       axisDirection,
       radialDirection,
       orientInstances,
-      startAngle == null ? 0 : startAngle.value
+      startAngle == null ? 0 : startAngle.number()
     ));
     bind(count, feature, "polar.count");
     bind(radius, feature, "polar.radius");
@@ -390,10 +420,10 @@ class DocumentBuilder {
     target:Feature,
     selection:SelectionRecipe,
     xDirection:Vector,
-    x:NamedParameter,
-    y:NamedParameter,
-    diameter:NamedParameter,
-    depth:NamedParameter,
+    x:Dimension,
+    y:Dimension,
+    diameter:Dimension,
+    depth:Dimension,
     offset:Float = 0,
     flipped:Bool = false
   ):HoleFeature {
@@ -403,10 +433,10 @@ class DocumentBuilder {
       selection,
       xDirection,
       "blind",
-      x.value,
-      y.value,
-      diameter.value,
-      depth.value,
+      x.number(),
+      y.number(),
+      diameter.number(),
+      depth.number(),
       offset,
       flipped
     ));
@@ -419,9 +449,9 @@ class DocumentBuilder {
     target:Feature,
     selection:SelectionRecipe,
     xDirection:Vector,
-    x:NamedParameter,
-    y:NamedParameter,
-    diameter:NamedParameter,
+    x:Dimension,
+    y:Dimension,
+    diameter:Dimension,
     offset:Float = 0,
     flipped:Bool = false
   ):HoleFeature {
@@ -431,9 +461,9 @@ class DocumentBuilder {
       selection,
       xDirection,
       "through-all",
-      x.value,
-      y.value,
-      diameter.value,
+      x.number(),
+      y.number(),
+      diameter.number(),
       1,
       offset,
       flipped
@@ -446,12 +476,12 @@ class DocumentBuilder {
     target:Feature,
     selection:SelectionRecipe,
     xDirection:Vector,
-    x:NamedParameter,
-    y:NamedParameter,
-    diameter:NamedParameter,
-    depth:NamedParameter,
-    recessDiameter:NamedParameter,
-    recessDepth:NamedParameter,
+    x:Dimension,
+    y:Dimension,
+    diameter:Dimension,
+    depth:Dimension,
+    recessDiameter:Dimension,
+    recessDepth:Dimension,
     offset:Float = 0,
     flipped:Bool = false
   ):HoleFeature {
@@ -461,12 +491,12 @@ class DocumentBuilder {
       selection,
       xDirection,
       "blind",
-      x.value,
-      y.value,
-      diameter.value,
-      depth.value,
-      recessDiameter.value,
-      recessDepth.value,
+      x.number(),
+      y.number(),
+      diameter.number(),
+      depth.number(),
+      recessDiameter.number(),
+      recessDepth.number(),
       offset,
       flipped
     ));
@@ -481,11 +511,11 @@ class DocumentBuilder {
     target:Feature,
     selection:SelectionRecipe,
     xDirection:Vector,
-    x:NamedParameter,
-    y:NamedParameter,
-    diameter:NamedParameter,
-    recessDiameter:NamedParameter,
-    recessDepth:NamedParameter,
+    x:Dimension,
+    y:Dimension,
+    diameter:Dimension,
+    recessDiameter:Dimension,
+    recessDepth:Dimension,
     offset:Float = 0,
     flipped:Bool = false
   ):HoleFeature {
@@ -495,12 +525,12 @@ class DocumentBuilder {
       selection,
       xDirection,
       "through-all",
-      x.value,
-      y.value,
-      diameter.value,
+      x.number(),
+      y.number(),
+      diameter.number(),
       1,
-      recessDiameter.value,
-      recessDepth.value,
+      recessDiameter.number(),
+      recessDepth.number(),
       offset,
       flipped
     ));
@@ -514,12 +544,12 @@ class DocumentBuilder {
     target:Feature,
     selection:SelectionRecipe,
     xDirection:Vector,
-    x:NamedParameter,
-    y:NamedParameter,
-    diameter:NamedParameter,
-    depth:NamedParameter,
-    mouthDiameter:NamedParameter,
-    includedAngle:NamedParameter,
+    x:Dimension,
+    y:Dimension,
+    diameter:Dimension,
+    depth:Dimension,
+    mouthDiameter:Dimension,
+    includedAngle:Dimension,
     offset:Float = 0,
     flipped:Bool = false
   ):HoleFeature {
@@ -529,12 +559,12 @@ class DocumentBuilder {
       selection,
       xDirection,
       "blind",
-      x.value,
-      y.value,
-      diameter.value,
-      depth.value,
-      mouthDiameter.value,
-      includedAngle.value,
+      x.number(),
+      y.number(),
+      diameter.number(),
+      depth.number(),
+      mouthDiameter.number(),
+      includedAngle.number(),
       offset,
       flipped
     ));
@@ -549,11 +579,11 @@ class DocumentBuilder {
     target:Feature,
     selection:SelectionRecipe,
     xDirection:Vector,
-    x:NamedParameter,
-    y:NamedParameter,
-    diameter:NamedParameter,
-    mouthDiameter:NamedParameter,
-    includedAngle:NamedParameter,
+    x:Dimension,
+    y:Dimension,
+    diameter:Dimension,
+    mouthDiameter:Dimension,
+    includedAngle:Dimension,
     offset:Float = 0,
     flipped:Bool = false
   ):HoleFeature {
@@ -563,12 +593,12 @@ class DocumentBuilder {
       selection,
       xDirection,
       "through-all",
-      x.value,
-      y.value,
-      diameter.value,
+      x.number(),
+      y.number(),
+      diameter.number(),
       1,
-      mouthDiameter.value,
-      includedAngle.value,
+      mouthDiameter.number(),
+      includedAngle.number(),
       offset,
       flipped
     ));
@@ -579,7 +609,7 @@ class DocumentBuilder {
   }
 
   private function bindHolePosition(feature:HoleFeature,
-    x:NamedParameter, y:NamedParameter, diameter:NamedParameter):Void {
+    x:Dimension, y:Dimension, diameter:Dimension):Void {
     bind(x, feature, "hole.x");
     bind(y, feature, "hole.y");
     bind(diameter, feature, "hole.diameter");
@@ -602,7 +632,7 @@ class DocumentBuilder {
 
   public function extrude(
     source:Feature,
-    amount:NamedParameter,
+    amount:Dimension,
     ?direction:Vector,
     reversed:Bool = false,
     symmetric:Bool = false
@@ -619,14 +649,14 @@ class DocumentBuilder {
         direction = Vector.Z();
       }
     }
-    var feature = document.add(ExtrudeFeature.along(source, amount.value, direction, reversed, symmetric));
+    var feature = document.add(ExtrudeFeature.along(source, amount.number(), direction, reversed, symmetric));
     bind(amount, feature, "extrude.amount");
     return feature;
   }
 
-  public function pocket(target:Feature, profile:Feature, depth:NamedParameter):PocketFeature {
+  public function pocket(target:Feature, profile:Feature, depth:Dimension):PocketFeature {
     check();
-    var feature = document.add(PocketFeature.blind(target, profile, depth.value));
+    var feature = document.add(PocketFeature.blind(target, profile, depth.number()));
     bind(depth, feature, "pocket.depth");
     return feature;
   }
@@ -641,9 +671,9 @@ class DocumentBuilder {
     return document.add(new TransformFeature(source, x, y, z));
   }
 
-  public function rotate(source:Feature, pivot:Vector, axis:Vector, angle:NamedParameter):RotationFeature {
+  public function rotate(source:Feature, pivot:Vector, axis:Vector, angle:Dimension):RotationFeature {
     check();
-    var feature = document.add(new RotationFeature(source, pivot, axis, angle.value));
+    var feature = document.add(new RotationFeature(source, pivot, axis, angle.number()));
     bind(angle, feature, "rotation.angle");
     return feature;
   }
@@ -653,7 +683,7 @@ class DocumentBuilder {
     return document.add(new MirrorFeature(source, planeOrigin, planeNormal, mode));
   }
 
-  public function revolve(source:Feature, origin:Vector, axis:Vector, angle:NamedParameter):RevolveFeature {
+  public function revolve(source:Feature, origin:Vector, axis:Vector, angle:Dimension):RevolveFeature {
     check();
     var feature = document.add(new RevolveFeature(
       source,
@@ -663,7 +693,7 @@ class DocumentBuilder {
       axis.x,
       axis.y,
       axis.z,
-      angle.value
+      angle.number()
     ));
     bind(angle, feature, "revolve.angle");
     return feature;
@@ -679,16 +709,16 @@ class DocumentBuilder {
     return document.add(new SweepFeature(profile, path));
   }
 
-  public function offset(source:Feature, distance:NamedParameter):OffsetFeature {
+  public function offset(source:Feature, distance:Dimension):OffsetFeature {
     check();
-    var feature = document.add(new OffsetFeature(source, distance.value));
+    var feature = document.add(new OffsetFeature(source, distance.number()));
     bind(distance, feature, "offset.distance");
     return feature;
   }
 
-  public function shell(source:Feature, thickness:NamedParameter, selection:SelectionRecipe):ShellFeature {
+  public function shell(source:Feature, thickness:Dimension, selection:SelectionRecipe):ShellFeature {
     check();
-    var feature = document.add(new ShellFeature(source, thickness.value, selection));
+    var feature = document.add(new ShellFeature(source, thickness.number(), selection));
     bind(thickness, feature, "shell.thickness");
     return feature;
   }
@@ -698,16 +728,16 @@ class DocumentBuilder {
     return document.add(new ProjectFeature(source, target, direction));
   }
 
-  public function fillet(source:Feature, radius:NamedParameter, selection:SelectionRecipe):FilletFeature {
+  public function fillet(source:Feature, radius:Dimension, selection:SelectionRecipe):FilletFeature {
     check();
-    var feature = document.add(new FilletFeature(source, radius.value, null, null, selection));
+    var feature = document.add(new FilletFeature(source, radius.number(), null, null, selection));
     bind(radius, feature, "fillet.radius");
     return feature;
   }
 
-  public function chamfer(source:Feature, distance:NamedParameter, selection:SelectionRecipe):ChamferFeature {
+  public function chamfer(source:Feature, distance:Dimension, selection:SelectionRecipe):ChamferFeature {
     check();
-    var feature = document.add(new ChamferFeature(source, distance.value, null, null, selection));
+    var feature = document.add(new ChamferFeature(source, distance.number(), null, null, selection));
     bind(distance, feature, "chamfer.distance");
     return feature;
   }

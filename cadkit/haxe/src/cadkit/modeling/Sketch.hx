@@ -106,6 +106,43 @@ class Sketch extends Model {
     );
   }
 
+  /** Rectangle centred on the origin with four equal corner arcs; the radius must be below half the smaller side. */
+  public static function roundedRectangle(width:Float, height:Float, radius:Float, ?plane:Plane):Sketch {
+    Model.positive(width);
+    Model.positive(height);
+    Model.positive(radius);
+    if (radius * 2 >= Math.min(width, height)) throw "rounded rectangle radius must be below half its smaller side";
+    if (plane == null) plane = Plane.XY();
+    var hx = width / 2;
+    var hy = height / 2;
+    var k = radius * (1 - Math.sqrt(0.5));
+    function at(x:Float, y:Float):Vector return plane.toWorld(new Vector(x, y));
+    var edges:Array<Curve> = [];
+    try {
+      edges.push(Curve.named(Curve.line(at(-hx + radius, -hy), at(hx - radius, -hy)), "rounded.bottom"));
+      edges.push(Curve.named(Curve.arc(at(hx - radius, -hy), at(hx - k, -hy + k), at(hx, -hy + radius)), "rounded.corner-br"));
+      edges.push(Curve.named(Curve.line(at(hx, -hy + radius), at(hx, hy - radius)), "rounded.right"));
+      edges.push(Curve.named(Curve.arc(at(hx, hy - radius), at(hx - k, hy - k), at(hx - radius, hy)), "rounded.corner-tr"));
+      edges.push(Curve.named(Curve.line(at(hx - radius, hy), at(-hx + radius, hy)), "rounded.top"));
+      edges.push(Curve.named(Curve.arc(at(-hx + radius, hy), at(-hx + k, hy - k), at(-hx, hy - radius)), "rounded.corner-tl"));
+      edges.push(Curve.named(Curve.line(at(-hx, hy - radius), at(-hx, -hy + radius)), "rounded.left"));
+      edges.push(Curve.named(Curve.arc(at(-hx, -hy + radius), at(-hx + k, -hy + k), at(-hx + radius, -hy)), "rounded.corner-bl"));
+      var wire = Curve.wire(edges);
+      try {
+        var result = face(wire, [], plane);
+        wire.close();
+        for (edge in edges) edge.close();
+        return result;
+      } catch (error:Dynamic) {
+        wire.close();
+        throw error;
+      }
+    } catch (error:Dynamic) {
+      for (edge in edges) edge.close();
+      throw error;
+    }
+  }
+
   public static function circle(radius:Float, ?plane:Plane):Sketch {
     if (plane == null) plane = Plane.XY();
     var curve = Curve.named(Curve.circle(radius, plane), "circle");

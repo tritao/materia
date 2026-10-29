@@ -93,6 +93,8 @@ class DocumentCodec {
       var feature = document.featureAt(index);
       var encoded = encodeFeature(feature);
       Reflect.setField(encoded, "active", feature.active);
+      if (feature.label != "") Reflect.setField(encoded, "label", feature.label);
+      if (feature.group != "") Reflect.setField(encoded, "group", feature.group);
       encodedFeatures.push(encoded);
     }
     var encodedParameters:Array<Dynamic> = [];
@@ -396,7 +398,8 @@ class DocumentCodec {
               decodeVector(requiredField(planeRecord, "origin")),
               decodeVector(requiredField(planeRecord, "xDirection")),
               decodeVector(requiredField(planeRecord, "normal"))
-            )
+            ),
+            Reflect.hasField(record, "radius") ? numberField(record, "radius") : 0
           ));
         } else if (featureType == "box") {
           feature = document.add(new BoxFeature(
@@ -515,6 +518,10 @@ class DocumentCodec {
 
         if (feature.id.toInt() != featureId) throw new ParametricError("feature IDs must be contiguous and ordered");
         if (!optionalBool(record, "active", true)) feature.restoreActive(false);
+        var savedLabel = optionalString(record, "label");
+        if (savedLabel != null) feature.label = savedLabel;
+        var savedGroup = optionalString(record, "group");
+        if (savedGroup != null) feature.group = savedGroup;
         var rawReferences:Array<Dynamic> = cast requiredField(record, "references");
         pendingReferences.push({feature: feature, references: rawReferences});
       }
@@ -882,7 +889,7 @@ class DocumentCodec {
       return encodeConstrainedSketch(cast feature, references);
     } else if (featureType == "sketch") {
       var sketch:SketchFeature = cast feature;
-      return {
+      var encodedSketch:Dynamic = {
         id: feature.id.toInt(),
         type: featureType,
         profile: sketch.profile,
@@ -895,6 +902,8 @@ class DocumentCodec {
         },
         references: references
       };
+      if (sketch.radius != null) Reflect.setField(encodedSketch, "radius", sketch.radius.value);
+      return encodedSketch;
     } else if (featureType == "box") {
       var box:BoxFeature = cast feature;
       return {

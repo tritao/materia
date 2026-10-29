@@ -1148,9 +1148,19 @@ class Document {
       != output) throw new ParametricError("element output belongs to another document");
   }
 
+  /** Group name given to features added while it is set; authoring metadata for history views. */
+  public var currentGroup:String = "";
+
+  /**
+   * Session view state, never saved or undone: while it is not -1, features after this index are left out of
+   * recompute and the document shows the last active feature at or before it. See `rollTo`.
+   */
+  public var rollbackIndex(default, null):Int = -1;
+
   public function add < T:Feature > (feature:T):T {
     ensureOpen();
     if (feature.document != null) throw new ParametricError("feature is already attached to a document");
+    if (rollbackIndex >= 0) throw new ParametricError("roll the timeline forward before adding features");
 
     for (dependency in feature.dependencyFeatures()) {
       if (dependency.ownerToken != token || dependency.id.toInt() == 0
@@ -1162,6 +1172,7 @@ class Document {
     var featureId = new FeatureId(nextId);
     nextId++;
     feature.attach(this, featureId, token);
+    if (feature.group == "") feature.group = currentGroup;
     features.push(feature);
     byId.set(featureId.toInt(), feature);
     return feature;
@@ -1315,6 +1326,39 @@ class Document {
   public function restoreOutputSelection(value:Null<Feature>):Void selectedOutput = value;
 
   /** Without an explicit selection, the last feature remains the primary output. */
+  /**
+   * Show the history as it stood after feature `index`, or all of it with -1 (also what the last index means). Features
+   * after the marker keep their last shapes and are not evaluated, so call `recompute` afterwards. Edits made while
+   * rolled back mark their dependents dirty as usual and are evaluated once the marker moves past them. This is not a
+   * document edit: it is not recorded in history and not saved.
+   */
+  public function rollTo(index:Int):Void {
+    ensureOpen();
+    if (activeTransaction != null) throw new ParametricError("the timeline cannot move inside a transaction");
+    if (index < -1 || index >= features.length) throw new ParametricError("rollback index is out of range");
+    rollbackIndex = index == features.length - 1 ? -1 : index;
+  }
+
+  /** The feature a view shows: the output, or while rolled back the last active feature at or before the marker. */
+  public function displayedFeature():Null<Feature> {
+    ensureOpen();
+    if (rollbackIndex < 0) return outputFeatureOrNull();
+    var index = rollbackIndex;
+    while (index >= 0) {
+      if (features[index].active) return features[index];
+      index--;
+    }
+    return null;
+  }
+
+  /** The shape of `displayedFeature`; it must have been evaluated. */
+  public function displayedShape():Shape {
+    var feature = displayedFeature();
+    var shape = feature == null ? null : feature.currentShape();
+    if (shape == null) throw new ParametricError("displayed feature has not been evaluated");
+    return shape;
+  }
+
   public function outputFeatureOrNull():Null<Feature> {
     ensureOpen();
     if (selectedOutput != null && selectedOutput.active) return selectedOutput;
@@ -1798,7 +1842,8 @@ class Document {
     var order:Array<Feature> = [];
     var visiting = new Map<Int, Bool>();
     var visited = new Map<Int, Bool>();
-    for (feature in features) if (feature.active) visit(feature, visiting, visited, order);
+    var limit = rollbackIndex < 0 ? features.length : rollbackIndex + 1;
+    for (index in 0...limit) if (features[index].active) visit(features[index], visiting, visited, order);
     return order;
   }
 

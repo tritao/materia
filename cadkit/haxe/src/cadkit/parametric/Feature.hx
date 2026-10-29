@@ -15,6 +15,9 @@ class Feature {
   public var id(default, null):FeatureId;
   public var dirty:Bool;
   public var active(default, null):Bool;
+  /** Authoring metadata for history views; empty when unset. Saved with the document, not part of evaluation. */
+  public var label:String = "";
+  public var group:String = "";
   public var shape(default, null):Null<Shape>;
   public var provenance(default, null):Null<Operation>;
   public var document(default, null):Null<Document>;

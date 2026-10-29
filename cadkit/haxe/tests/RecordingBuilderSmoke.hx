@@ -1,10 +1,13 @@
 import cadkit.modeling.Vector;
+import cadkit.parametric.Document;
+import cadkit.parametric.Feature;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.features.BoxFeature;
 import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.recording.DocumentBuilder;
+import cadkit.parametric.TimelineModel;
 
 class RecordingBuilderSmoke {
   static function check(value:Bool, message:String):Void {
@@ -139,5 +142,74 @@ class RecordingBuilderSmoke {
       closedRejected = true;
     }
     check(closedRejected, "failed builder cleanup");
+    timeline();
+  }
+
+  /** Labels, groups, plain-number dimensions and face ownership through a cut. */
+  static function timeline():Void {
+    var document = DocumentBuilder.build(function(builder) {
+      var size = builder.length("block", 10);
+      var body = builder.label(builder.box(size, size, size), "Block");
+      var cut:Feature = null;
+      builder.group("Holes", function() {
+        var tool = builder.label(builder.translate(builder.label(builder.cylinder(2.0, 12.0), "Drill"), 5, 5, -1), "Drill placed");
+        cut = builder.label(builder.subtract(body, tool), "Drill the block");
+      });
+      builder.output(cut);
+    }
+    );
+    check(document.namedParameters().length == 1, "plain numbers add no named parameters");
+    var rows = TimelineModel.of(document);
+    check(rows.length == 4, "one timeline row per feature");
+    check(rows[0].label == "Block" && rows[0].group == "" && rows[0].parent == -1, "base step is top level");
+    check(rows[1].group == "Holes" && rows[1].parent == rows[3].id, "tool belongs to the cut that applies it");
+    check(rows[2].parent == rows[3].id, "placed tool belongs to the cut");
+    check(rows[3].label == "Drill the block" && rows[3].parent == -1, "cut is a top-level step");
+    check(rows[3].faces.length == 1, "the cut owns the bore wall");
+    check(rows[0].faces.length == 6, "the block keeps its six faces");
+    var seen = 0;
+    for (row in rows) seen += row.faces.length;
+    check(seen == document.result().subshapeCount(CadKit.ShapeKind.Face), "every output face has one owner");
+    var reloaded = DocumentCodec.decode(DocumentCodec.encode(document));
+    var reloadedRows = TimelineModel.of(reloaded);
+    check(reloadedRows[3].label == "Drill the block" && reloadedRows[1].group == "Holes", "labels and groups survive a reload");
+    reloaded.close();
+    rollback(document);
+    document.close();
+  }
+
+  static function close(actual:Float, expected:Float):Void {
+    check(Math.abs(actual - expected) < 1e-3, "rollback volume " + actual + " / " + expected);
+  }
+
+  /** The marker leaves later steps out of recompute, shows the earlier shape, and is view state only. */
+  static function rollback(document:Document):Void {
+    close(document.result().volume(), 1000 - Math.PI * 4 * 10);
+    document.rollTo(0);
+    check(document.rollbackIndex == 0, "marker set");
+    document.recompute();
+    close(document.displayedShape().volume(), 1000);
+    var shown = document.displayedFeature();
+    if (shown == null) throw "a feature is shown";
+    check(shown.label == "Block", "the block is shown");
+    var rows = TimelineModel.of(document);
+    check(!rows[0].rolledBack && rows[1].rolledBack && rows[3].rolledBack, "rows after the marker are rolled back");
+    check(rows[0].faces.length == 6 && rows[3].faces.length == 0, "faces follow the shown shape");
+    // An edit while rolled back is evaluated once the marker passes it.
+    document.parameter("block").set(12);
+    document.recompute();
+    close(document.displayedShape().volume(), 1728);
+    var rejected = false;
+    try document.add(new cadkit.parametric.features.BoxFeature(1, 1, 1)) catch (error:ParametricError) rejected = true;
+    check(rejected, "features cannot be added while rolled back");
+    document.rollTo(-1);
+    document.recompute();
+    close(document.result().volume(), 1728 - Math.PI * 4 * 11);
+    check(document.rollbackIndex == -1 && !TimelineModel.of(document)[3].rolledBack, "marker cleared");
+    document.rollTo(document.featureCount() - 1);
+    check(document.rollbackIndex == -1, "the last index means the whole history");
+    var outOfRange = false;
+    try document.rollTo(99) catch (error:ParametricError) outOfRange = true;
+    check(outOfRange, "marker range is checked");
   }
 }
