@@ -13,6 +13,20 @@ not models: one world holds several robots, mechanisms and the environment.
   C ABI in `native/include/collisionkit.h`. coal is vendored in
   `native/vendor/coal` (see `native/THIRD_PARTY.md`).
 
+## Layers
+
+- `CollisionWorld`: the interface queries run against. Bodies, shapes, rules and margins are set one call at a time.
+- `CollisionDescription`: the same content as plain data (`DescribedBody`, `DescribedObject`, `DescribedRule`,
+  `DescribedArticulation`), plus margin classes, held-contact policy for grasped parts, and the assumptions the geometry
+  makes. Geometry sources add to it; `append` and `copy` combine and duplicate descriptions.
+- `CollisionDescription.build(world)` puts a description into a world and returns a `CollisionBuild`: the world's ids for
+  every described body and object, the layout errors found at the references, and the operations that change a live
+  build (`transferBody` for a grasp or placement, contact windows). The build keeps its own copy of the description.
+- `collisionkit.kinematics.ModelBodies` binds a KinematicsKit model to a description and poses its bodies from a
+  kinematic state.
+- `CollisionBounds` gives a shape's bounds after a pose and its reach from its own origin; `CollisionPose` converts to
+  and from KinematicsKit's `Transform`.
+
 Rigid, adjacent and closure pairs of a model come from KinematicsKit
 (`kinematicskit.KinematicBodyPairs`); the caller turns them into rules.
 
