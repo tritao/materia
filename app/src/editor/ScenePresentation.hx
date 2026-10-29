@@ -212,8 +212,9 @@ import nativekit.scene.ChangeSet;
       if (workerVisual == null) selection.add(owner.runtimeFor(selected.id).node, selectedMaterial);
       else for (node in workerVisual.character.model.primitiveNodes) selection.add(node, selectedMaterial);
     }
+    for (node in sourceFaces.texturedNodes(owner, cosmeticThreads)) selection.add(node, selectionMaterial);
     view.applySelection(selection, selectionMaterial);
-    sourceFaces.apply(owner, view);
+    sourceFaces.apply(owner, view, cosmeticThreads);
     var highlightMaterial = hoverMaterial;
     // A hidden object shows no hover: its face overlay is forced visible in this view, so it would float where the object was.
     if (hoveredId != null && !owner.isVisible(hoveredId)) {
@@ -223,7 +224,17 @@ import nativekit.scene.ChangeSet;
     var faceHoverNode = hoveredId == null
       || hoveredFaceIndex == null || hoveredFaceIndex < 0 ? null : faceHoverNodes.get(hoveredId);
     var faceHoverShown = faceHoverNode != null && faceHoverIndexes.get(hoveredId) == hoveredFaceIndex;
-    if (faceHoverShown) {
+    // A face drawn with a texture (a thread, a knurl, a scale) is highlighted through its own overlay, so the pattern stays on it;
+    // a plain highlight face drawn over it would hide the texture.
+    var detailed:Null<NodeId> = hoveredId == null
+      || hoveredFaceIndex == null || hoveredFaceIndex < 0 || !cosmeticThreads ? null : threads.faceNode(
+        hoveredId,
+        hoveredFaceIndex
+      );
+    if (detailed != null) {
+      faceHoverShown = false;
+      view.applyHoverNodes([detailed], highlightMaterial);
+    } else if (faceHoverShown) {
       // The face node is hidden in the scene and shown only in this presentation view.
       view.setVisibility(faceHoverNode, true);
       view.applyHover(faceHoverNode, highlightMaterial);

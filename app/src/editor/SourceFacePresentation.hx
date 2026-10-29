@@ -85,10 +85,27 @@ private typedef SourceFaceEntry = {id:String, snapshot:String, node:NodeId, face
     for (entry in entries) if (entry.node.equals(node)) return entry.face;
     return -1;
   }
-  public function apply(owner:EditorScene, view:SceneView):Void {
+  /**
+   * The textured overlays of the selected source faces: a face drawn with a pattern (a knurl, a scale, a thread) is selected by
+   * tinting that overlay, because a plain selection face drawn over it would hide the pattern.
+   */
+  public function texturedNodes(owner:EditorScene, cosmetic:Bool):Array<NodeId> {
+    var result:Array<NodeId> = [];
+    if (!cosmetic) return result;
+    for (key in active) {
+      var entry = entries.get(key);
+      if (entry == null || entry.face < 0 || !owner.isVisible(entry.id)) continue;
+      var node = owner.presentation.threads.faceNode(entry.id, entry.face);
+      if (node != null) result.push(node);
+    }
+    return result;
+  }
+
+  public function apply(owner:EditorScene, view:SceneView, cosmetic:Bool = false):Void {
     for (key in active) {
       var entry = entries.get(key);
       if (entry == null) continue;
+      if (cosmetic && entry.face >= 0 && owner.presentation.threads.faceNode(entry.id, entry.face) != null) continue;
       // The overlay is forced visible in this view, so a hidden owner must keep it from showing: it would float where the part was.
       if (!owner.isVisible(entry.id)) continue;
       view.setPose(entry.node, owner.info(entry.id).worldTransform());

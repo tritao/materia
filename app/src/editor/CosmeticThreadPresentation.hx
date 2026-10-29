@@ -29,6 +29,7 @@ private typedef ThreadNode = {
   var geometry:Geometry;
   var material:Material;
   var textureKey:String;
+  var faceIndex:Int;
 }
 private typedef ThreadGroup = {
   var source:GeometryData;
@@ -114,7 +115,13 @@ private typedef ThreadGroup = {
           transaction.setMaterial(node, material);
           transaction.commit();
           owner.bridge.mapNode(node, item.id);
-          nodes.push({node: node, geometry: geometry, material: material, textureKey: key});
+          nodes.push({
+            node: node,
+            geometry: geometry,
+            material: material,
+            textureKey: key,
+            faceIndex: thread.source.faceIndex
+          });
         }
         // Knurling and scales: the same overlay, with texture coordinates made from the face's own axis.
         for (detail in cad.details) {
@@ -148,7 +155,13 @@ private typedef ThreadGroup = {
           transaction.setMaterial(node, material);
           transaction.commit();
           owner.bridge.mapNode(node, item.id);
-          nodes.push({node: node, geometry: geometry, material: material, textureKey: key});
+          nodes.push({
+            node: node,
+            geometry: geometry,
+            material: material,
+            textureKey: key,
+            faceIndex: detail.source.faceIndex
+          });
         }
         groups.set(item.id, {source: cad, parent: parentKey, appearance: appearance, nodes: nodes});
         changed = true;
@@ -164,6 +177,14 @@ private typedef ThreadGroup = {
       changed = true;
     }
     if (changed) owner.publish(null, false);
+  }
+
+  /** The overlay that textures face `faceIndex` of object `id` (a thread or a surface detail), or null when that face has none. */
+  public function faceNode(id:String, faceIndex:Int):Null<NodeId> {
+    var group = groups.get(id);
+    if (group == null) return null;
+    for (entry in group.nodes) if (entry.faceIndex == faceIndex) return entry.node;
+    return null;
   }
 
   public function nodesFor(id:String):Array<NodeId> {
