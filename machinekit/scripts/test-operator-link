@@ -17,14 +17,14 @@ if rustup target list --installed 2>/dev/null | grep -qx thumbv7em-none-eabihf; 
 else
 	echo "skipping the MCU build: thumbv7em-none-eabihf is not installed" >&2
 fi
-# Pendant firmware skeleton for the bench chip and the pendant's own chip, when their targets are installed.
+# Pendant firmware skeleton for the bench chip and the pendant's own chip (H503), when their targets are installed.
 firmware="machinekit/pendant_firmware/Cargo.toml"
 installed="$(rustup target list --installed 2>/dev/null || true)"
 if grep -qx thumbv7em-none-eabihf <<<"$installed"; then
 	cargo build --offline --release --manifest-path "$firmware" --target thumbv7em-none-eabihf --features nucleo-g474
 fi
-if grep -qx thumbv6m-none-eabi <<<"$installed"; then
-	cargo build --offline --release --manifest-path "$firmware" --target thumbv6m-none-eabi --features g0b1
+if grep -qx thumbv8m.main-none-eabihf <<<"$installed"; then
+	cargo build --offline --release --manifest-path "$firmware" --target thumbv8m.main-none-eabihf --features h503
 else
-	echo "skipping the G0B1 firmware build: thumbv6m-none-eabi is not installed" >&2
+	echo "skipping the H503 firmware build: thumbv8m.main-none-eabihf is not installed" >&2
 fi
