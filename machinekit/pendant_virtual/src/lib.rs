@@ -14,9 +14,45 @@ pub struct PendantVirtual {
     core: PendantCore,
     frame: [u8; 8],
     controller: Option<Controller>,
+    /// The controls and the time of the last tick: what the pendant held while the simulator was not looking.
+    last: Option<(u32, Inputs)>,
 }
 
+/// A simulator that ticks once per rendered frame stops the pendant's heartbeat whenever nothing is redrawn, and the controller
+/// would end the lease (and want the keys released). So the time between ticks is simulated at the heartbeat's period with the
+/// controls as they were, up to this much.
+const CATCH_UP_MS: u32 = 5_000;
+
 impl PendantVirtual {
+    /// Runs one tick, first replaying the heartbeats the pendant would have sent since the last one with the controls it held.
+    fn tick(&mut self, now_ms: u32, inputs: &Inputs) -> Option<[u8; 8]> {
+        if let Some((from, held)) = self.last {
+            let gap = now_ms.wrapping_sub(from);
+            if gap as i32 > PendantCore::STATE_PERIOD_MS as i32 {
+                let mut at = from.wrapping_add(PendantCore::STATE_PERIOD_MS);
+                if gap > CATCH_UP_MS {
+                    at = now_ms.wrapping_sub(CATCH_UP_MS);
+                }
+                while now_ms.wrapping_sub(at) as i32 > 0 && now_ms.wrapping_sub(at) >= PendantCore::STATE_PERIOD_MS {
+                    let heartbeat = self.core.tick(at, &held);
+                    if let Some(controller) = self.controller.as_mut() {
+                        controller.step(at, heartbeat, &mut self.core);
+                    }
+                    at = at.wrapping_add(PendantCore::STATE_PERIOD_MS);
+                }
+            }
+        }
+        self.last = Some((now_ms, *inputs));
+        let heartbeat = self.core.tick(now_ms, inputs);
+        if let Some(payload) = heartbeat {
+            self.frame = payload;
+        }
+        if let Some(controller) = self.controller.as_mut() {
+            controller.step(now_ms, heartbeat, &mut self.core);
+        }
+        heartbeat
+    }
+
     fn pixels(&self, now_ms: u32, out: &mut [u8]) {
         if self.core.display_power(now_ms) == DisplayPower::Off {
             out.fill(0);
@@ -63,7 +99,7 @@ pub unsafe extern "C" fn pendant_virtual_create(now_ms: u32, out_pendant: *mut H
         return ERROR_ARGUMENT;
     }
     let Ok(mut pendants) = PENDANTS.lock() else { return ERROR_HANDLE };
-    pendants.push(Some(PendantVirtual { core: PendantCore::new(now_ms).without_debounce(), frame: [0; 8], controller: None }));
+    pendants.push(Some(PendantVirtual { core: PendantCore::new(now_ms).without_debounce(), frame: [0; 8], controller: None, last: None }));
     *out_pendant = Handle { id: pendants.len() as u32 };
     OK
 }
@@ -82,16 +118,7 @@ pub extern "C" fn pendant_virtual_tick(
     pendant: Handle, now_ms: u32, wheel_counts: u16, position: u8, step: u8, keys: u8, wheel_enable: u8, chain_closed: u8,
 ) -> i32 {
     let inputs = Inputs { wheel_counts, position, step, keys, wheel_enable: wheel_enable != 0, chain_closed: chain_closed != 0 };
-    code(with(pendant, |p| {
-        let heartbeat = p.core.tick(now_ms, &inputs);
-        if let Some(payload) = heartbeat {
-            p.frame = payload;
-        }
-        if let Some(controller) = p.controller.as_mut() {
-            controller.step(now_ms, heartbeat, &mut p.core);
-        }
-        heartbeat.is_some() as i32
-    }))
+    code(with(pendant, |p| p.tick(now_ms, &inputs).is_some() as i32))
 }
 
 /// Splits length-prefixed records (one length byte, then that many bytes), as the Haxe side packs them.
@@ -398,6 +425,32 @@ mod tests {
         // The simulated switches do not bounce, so there is no settling time before a change counts.
         unsafe { pendant_virtual_tick(p, now, 0, 3, 0, 0, 1, 1) };
         assert_ne!(sum(now), before);
+        pendant_virtual_destroy(p);
+    }
+
+    #[test]
+    fn a_gap_between_ticks_does_not_lose_the_lease() {
+        let (profile, reasons, labels) = vector("hobber");
+        let p = create();
+        unsafe {
+            pendant_virtual_attach_controller(p, 0, profile.as_ptr(), profile.len() as u32, reasons.as_ptr(), reasons.len() as u32, labels.as_ptr(), labels.len() as u32);
+        }
+        let sum = |now| {
+            let mut sum = 0u32;
+            unsafe { pendant_virtual_checksum(p, now, &mut sum) };
+            sum
+        };
+        // An axis selected and the wheel enabled, held for four seconds of editor frames.
+        let mut now = 0u32;
+        while now < 4_000 {
+            unsafe { pendant_virtual_tick(p, now, 0, 5, 0, 0, 1, 1) };
+            now += 16;
+        }
+        let steady = sum(now);
+        // The editor then draws nothing for three seconds: the pendant kept sending its heartbeat meanwhile.
+        now += 3_000;
+        unsafe { pendant_virtual_tick(p, now, 0, 5, 0, 0, 1, 1) };
+        assert_eq!(sum(now), steady, "no LEASE LOST");
         pendant_virtual_destroy(p);
     }
 }
