@@ -197,7 +197,11 @@ private typedef ThreadGroup = {
     if (changed) owner.publish(null, false);
   }
 
-  /** A display's quad with a dark glass material that glows with its picture; null when no live source is known for it. */
+  /**
+   * A display's quad with a dark glass material that glows with its picture; null when no live source is known for it. The
+   * picture is also its base-colour texture (the base colour is black, so it adds nothing), which is what a hover or selection
+   * highlight keeps drawing.
+   */
   function displayNode(owner:EditorScene,
     id:String, kind:String, parent:NodeId, detail:CadDetailGeometry):Null<ThreadNode> {
     var source = LiveDisplays.create(detail.source.source);
@@ -215,8 +219,11 @@ private typedef ThreadGroup = {
     var material = owner.scene.createMaterial();
     owner.scene.setMaterialData(
       material,
-      new MaterialData().setBaseColor(0.0,
-      0.0, 0.0).setRoughness(0.25).setMetallic(0.0).setEmissive(1.0, 1.0, 1.0).setEmissiveTexture(texture)
+      new MaterialData().setBaseColor(0.0, 0.0, 0.0).setRoughness(0.25).setMetallic(0.0).setEmissive(1.0,
+      1.0, 1.0).setEmissiveTexture(texture).setBaseColorTexture(
+        texture,
+        sampler
+      )
     );
     var transaction = owner.scene.beginTransaction();
     var node = transaction.createNode();
