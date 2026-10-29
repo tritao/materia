@@ -77,9 +77,9 @@ def inspect_interaction(directory, cycles):
     if warm[-1]["workspaceListeners"] > 3:
         failures.append("workspace has more than three retained listeners")
     # Leaks show up as the counts above changing after warmup. This is only a sanity bound on the steady-state
-    # count, which was 63 on 2026-09-29 with the demo scene and inspector open.
-    if warm[-1]["state"]["resources"] > 128:
-        failures.append("more than 128 widget resources remain mounted")
+    # count, which was 63 on 2026-09-29 and 148 on 2026-10-29, after the editor grew from 9 to 14 dock panels.
+    if warm[-1]["state"]["resources"] > 200:
+        failures.append("more than 200 widget resources remain mounted")
 
     action_times = {row["cycle"] + 1: row["timeSeconds"] for row in actions
                     if row.get("action") == "hierarchy"}
