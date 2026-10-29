@@ -865,6 +865,37 @@ class ProjectKitTests {
     detail.direction = [1, 0, 0];
     rejects(function() SceneArtifact.encode(data), "a surface detail frame must have perpendicular axes");
     detail.direction = [0, 0, 1];
+    // A live display on a planar face rides the same way: a size and the source that fills it.
+    var display:materia.project.SurfaceDetailRenderData = {
+      faceName: "glass:box.+z",
+      faceIndex: 7,
+      kind: materia.project.SurfaceDetailRenderData.SurfaceDetailKinds.DISPLAY,
+      origin: [0, 0, -3],
+      xDirection: [1, 0, 0],
+      direction: [0, 0, 1],
+      length: 29.49,
+      radius: 28.505,
+      count: 2,
+      depth: 0.0,
+      numberedEvery: 0,
+      surface: 29.49,
+      radiusEnd: 28.505,
+      width: 57.01,
+      height: 29.49,
+      source: "pendant-oled"
+    };
+    data.parts[0].details = [display];
+    var shown = SceneArtifact.decodeView(SceneArtifact.encode(data)).parts[0].details;
+    check(
+      shown != null && shown.length == 1 && shown[0].kind == materia.project.SurfaceDetailRenderData.SurfaceDetailKinds.DISPLAY
+      && shown[0].width == 57.01 && shown[0].height == 29.49 && shown[0].source == "pendant-oled",
+      "a display round trips with its size and source"
+    );
+    display.source = "";
+    rejects(function() SceneArtifact.encode(data), "a display needs a source");
+    display.source = "pendant-oled";
+    display.width = 0;
+    rejects(function() SceneArtifact.encode(data), "a display needs a positive size");
     data.parts[0].details = new Array<materia.project.SurfaceDetailRenderData>();
     SceneScrewTests.namedFace(data, thread);
     data.parts[0].threads = new Array<materia.project.ThreadRenderData>();

@@ -31,7 +31,7 @@ class PushButton extends HmiPart {
     R.length("nutThickness", 2.5),
     R.length("bodyDiameter", 24),
     R.length("behindDepth", 25),
-    R.length("pressTravel", 1.5),
+    R.length("pressTravel", 1),
     R.scalar("massGrams", 8, 1)
   ];
 
@@ -63,7 +63,7 @@ class PushButton extends HmiPart {
       "the cap is smaller than the bezel and the bezel fits its keep-out"
     );
     require(n("capHeight") > n("bezelHeight"), "the cap stands above the bezel");
-    require(n("pressTravel") <= n("bezelHeight"), "the cap stays in its bezel through its travel");
+    require(n("pressTravel") < n("bezelHeight"), "the cap stays in its bezel through its travel");
     require(
       n("barrelDiameter") < n("bezelDiameter") && n("barrelDiameter") < n("nutDiameter"),
       "the barrel passes through bezel and nut"
