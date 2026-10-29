@@ -60,7 +60,7 @@ import robotkit.execution.ExecutionPlanSubmission;
 import robotkit.device.DeviceBinding;
 import robotkit.device.DeviceLayout;
 import motionkit.trajectory.PlanDiagnostic;
-import haxeon.platform.NativeKitRuntime;
+import haxeon.platform.Runtime;
 import processkit.moonraker.MoonrakerStatus;
 import processkit.testing.FakeMoonrakerServer;
 import machinekit.printing.KlipperConfig;
@@ -1500,7 +1500,7 @@ typedef CubeRun = {
     session.openGeneratedProject(generated, manifest);
     var job = session.printJob, definition = session.projectAssemblyDefinition;
     if (job == null || definition == null) throw "the printer project has no print to send";
-    var runtime = NativeKitRuntime.start();
+    var runtime = Runtime.start();
     var fake = FakeMoonrakerServer.start(runtime, 36292);
     var link = new PrinterLink(runtime.events);
     var seen:Array<MoonrakerStatus> = [];

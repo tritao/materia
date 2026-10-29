@@ -301,7 +301,7 @@ class EnclosureRuntimeTests {
         "Returning to Simulate restores the inspection dock"
       );
       editor.switchMode(app.EditorMode.Design);
-      var cameraHost = new haxeon.ui.host.UiHostContext(fonts, new haxeon.platform.NativeKitEvents(), function() {
+      var cameraHost = new haxeon.ui.host.UiHostContext(fonts, new haxeon.platform.event.EventPump(), function() {
       }, function() {
       }
       );

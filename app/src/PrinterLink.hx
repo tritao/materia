@@ -32,9 +32,9 @@ class PrinterLink {
   var installer:Null<ConfigInstaller> = null;
   var clock = 0.0;
 
-  final events:Null<haxeon.platform.NativeKitEvents>;
+  final events:Null<haxeon.platform.event.EventPump>;
 
-  public function new(?events:haxeon.platform.NativeKitEvents) {
+  public function new(?events:haxeon.platform.event.EventPump) {
     this.events = events;
   }
 

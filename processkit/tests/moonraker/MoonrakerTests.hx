@@ -1,8 +1,7 @@
 import haxe.Json;
 import haxe.io.Bytes;
-import haxeon.platform.NativeKitEventBytes;
-import haxeon.platform.NativeKitEventValue;
-import haxeon.platform.NativeKitRuntime;
+import haxeon.platform.event.PlatformEvent;
+import haxeon.platform.Runtime;
 import nativekit.ffi.NativeKitTypes;
 import processkit.moonraker.HttpFrames;
 import processkit.moonraker.ConfigInstaller;
@@ -13,7 +12,7 @@ import processkit.moonraker.MoonrakerStatus;
 import processkit.moonraker.Sha1;
 import processkit.moonraker.WebSocketFrames;
 import processkit.testing.FakeMoonrakerServer;
-import haxeon.platform.NativeTransport;
+import haxeon.platform.interop.TransportInterop;
 
 /**
  * The Moonraker client against a fake server on a real socket: the HTTP and WebSocket framing, the status it reads
@@ -273,7 +272,7 @@ class MoonrakerTests {
   }
 
   static function conversation():Void {
-    var runtime = NativeKitRuntime.start();
+    var runtime = Runtime.start();
     var fake = FakeMoonrakerServer.start(runtime, 36291);
     var client = new MoonrakerClient("127.0.0.1", 36291, runtime.events, 0.5);
     var socket = new MoonrakerSocket("127.0.0.1", 36291, runtime.events, 0.5);

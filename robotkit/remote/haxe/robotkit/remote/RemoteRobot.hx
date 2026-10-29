@@ -19,7 +19,7 @@ import trajectorykit.validation.ValidationGuarantee;
 
 import RobotKitRuntime;
 import nativekit.ffi.NativeKit;
-import haxeon.platform.NativeKitEvents;
+import haxeon.platform.event.EventPump;
 import haxe.Int64;
 import robotkit.client.RobotClient;
 import robotkit.protocol.CameraFrameData;
@@ -34,7 +34,7 @@ class RemoteRobot implements Robot {
   final bulkClient:RobotClient;
   var connectionHost:String;
   var connectionPort:Int;
-  var connectionEvents:Null<NativeKitEvents>;
+  var connectionEvents:Null<EventPump>;
   var bulkStarted:Bool = false;
   var currentSnapshot:RobotSnapshot;
   var currentFault:Null<RobotFault> = null;
@@ -90,7 +90,7 @@ class RemoteRobot implements Robot {
   }
 
   /** Connects this adapter using the host's event pump. */
-  public function connect(host:String, port:Int, events:NativeKitEvents):Void {
+  public function connect(host:String, port:Int, events:EventPump):Void {
     connectionHost = host;
     connectionPort = port;
     connectionEvents = events;

@@ -3,13 +3,13 @@ package tests;
 import haxe.Int64;
 import nativekit.ffi.NativeKit;
 import RobotKitRuntime;
-import haxeon.platform.NativeKitRuntime;
+import haxeon.platform.Runtime;
 import robotkit.client.RobotClient;
 
 /** Exercises controller leases, observer fanout, and reconnect sessions. */
 class RobotSessionIntegration {
   public static function runDevice(host:String, port:Int):Void {
-    var runtime = NativeKitRuntime.start();
+    var runtime = Runtime.start();
     var first = new RobotClient("device-controller", "controller", IntegrationCredentials.controller());
     var second = new RobotClient("device-reconnect", "controller", IntegrationCredentials.controller());
     var failure:Dynamic = null;
@@ -73,7 +73,7 @@ class RobotSessionIntegration {
   }
 
   public static function runLeaseTimeout(host:String, port:Int):Void {
-    var runtime = NativeKitRuntime.start();
+    var runtime = Runtime.start();
     var controller = new RobotClient("silent-controller", "controller", IntegrationCredentials.controller());
     var replacement = new RobotClient("replacement-controller", "controller", IntegrationCredentials.controller());
     var failure:Dynamic = null;
@@ -226,7 +226,7 @@ class RobotSessionIntegration {
   public static function runLocalOwner(host:String, port:Int):Void {
     var first = new RobotClient("denied-controller", "controller", IntegrationCredentials.controller());
     var observer = new RobotClient("local-observer", "observer", IntegrationCredentials.observer());
-    var runtime = NativeKitRuntime.start();
+    var runtime = Runtime.start();
     var failure:Dynamic = null;
     try {
       first.connectWithEvents(host, port, runtime.events);
@@ -262,7 +262,7 @@ class RobotSessionIntegration {
   public static function run(host:String, port:Int):Void {
     var observer = new RobotClient("observer", "observer", IntegrationCredentials.observer());
     var controller = new RobotClient("controller", "controller", IntegrationCredentials.controller());
-    var runtime = NativeKitRuntime.start();
+    var runtime = Runtime.start();
     var observerState = false;
     observer.stateListener = function(_) observerState = true;
     var failure:Dynamic = null;

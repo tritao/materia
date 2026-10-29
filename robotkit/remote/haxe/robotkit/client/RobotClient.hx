@@ -2,10 +2,10 @@ package robotkit.client;
 import nativekit.ffi.NativeKitTypes;
 
 import nativekit.ffi.NativeKit;
-import haxeon.platform.NativeKitEventValue;
-import haxeon.platform.NativeKitEvents;
-import haxeon.platform.NativeKitEvents.NativeKitEventSubscription;
-import haxeon.platform.NativeKitRuntime;
+import haxeon.platform.event.PlatformEvent;
+import haxeon.platform.event.EventPump;
+import haxeon.platform.event.EventSubscription;
+import haxeon.platform.Runtime;
 import haxe.Int64;
 import robotkit.protocol.ControlHeartbeat;
 import robotkit.protocol.Fault;
@@ -28,7 +28,7 @@ import robotkit.protocol.Stop;
 import robotkit.protocol.StreamSubscription;
 import robotkit.protocol.PlanSubmission;
 import robotkit.protocol.PathControl;
-import haxeon.platform.NativeTransport;
+import haxeon.platform.interop.TransportInterop;
 
 /**
  * Typed editor/CLI client for the RobotKit process boundary.
@@ -58,11 +58,11 @@ class RobotClient {
   public var sensorMaxRateHz:Float = 0.0;
   public var cameraMaxRateHz:Float = 0.0;
 
-  var nativeRuntime:Null<NativeKitRuntime> = null;
-  var eventPump:Null<NativeKitEvents> = null;
+  var nativeRuntime:Null<Runtime> = null;
+  var eventPump:Null<EventPump> = null;
   var owned:Null<OwnedTransportHandle> = null;
   var transport:Null<TransportHandle> = null;
-  var subscription:Null<NativeKitEventSubscription> = null;
+  var subscription:Null<EventSubscription> = null;
   var stream = new RobotFrameStream();
   var sessionId:Int64 = Int64.ofInt(0);
   var commandSequence:Int64 = Int64.ofInt(0);
@@ -108,10 +108,10 @@ class RobotClient {
     capabilities = null;
     latestState = null;
     lastFault = null;
-    var runtime = NativeKitRuntime.start();
+    var runtime = Runtime.start();
     var connection:Null<OwnedTransportHandle> = null;
     try {
-      var connectedTransport = NativeTransport.connect(host, port);
+      var connectedTransport = TransportInterop.connect(host, port);
       connection = connectedTransport;
       nativeRuntime = runtime;
       eventPump = runtime.events;
@@ -136,7 +136,7 @@ class RobotClient {
    * This keeps the editor's single NativeKit initialization and event loop
    * authoritative while retaining the same typed client API.
    */
-  public function connectWithEvents(host:String, port:Int, events:NativeKitEvents):Void {
+  public function connectWithEvents(host:String, port:Int, events:EventPump):Void {
     requireCredentials();
     if (events == null) throw "RobotKit client requires a NativeKit event pump";
     if (subscription != null || nativeRuntime != null || owned != null) throw "RobotKit client is already connected";
@@ -155,7 +155,7 @@ class RobotClient {
     lastFault = null;
     var connection:Null<OwnedTransportHandle> = null;
     try {
-      var connectedTransport = NativeTransport.connect(host, port);
+      var connectedTransport = TransportInterop.connect(host, port);
       connection = connectedTransport;
       eventPump = events;
       owned = connectedTransport;
@@ -323,7 +323,7 @@ class RobotClient {
     if (runtime != null) runtime.dispose();
   }
 
-  function onEvent(value:NativeKitEventValue):Void {
+  function onEvent(value:PlatformEvent):Void {
     switch value {
       case Raw(kind, source, _, _, _, _, _):
         var currentTransport = transport;
@@ -393,7 +393,7 @@ class RobotClient {
 
   function receive(currentTransport:TransportHandle):Void {
     while (true) {
-      var data = NativeTransport.receive(currentTransport);
+      var data = TransportInterop.receive(currentTransport);
       if (data.length == 0) return;
       for (frame in stream.push(data)) handleFrame(frame);
     }
@@ -490,6 +490,6 @@ class RobotClient {
   function send(frame:RobotFrame):Void {
     var currentTransport = transport;
     if (currentTransport == null) throw "RobotKit client is not connected";
-    NativeTransport.send(currentTransport, frame.encode());
+    TransportInterop.send(currentTransport, frame.encode());
   }
 }

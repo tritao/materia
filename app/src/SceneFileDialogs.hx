@@ -1,11 +1,13 @@
 package app;
 
-import haxeon.platform.NativeKitEventValue.NativeKitResource;
+import haxeon.platform.NativeKitError;
+import haxeon.platform.async.Outcome;
+import haxeon.platform.resource.Resource;
 
 import haxeon.ui.host.DesktopUiHostContext;
 import nativekit.ffi.NativeKit;
 import nativekit.ffi.NativeKitTypes;
-import haxeon.platform.NativeKitEventValue;
+import haxeon.platform.event.PlatformEvent;
 import haxe.io.Bytes;
 
 /**
@@ -14,7 +16,9 @@ import haxe.io.Bytes;
  */
 class SceneFileDialogs {
   final host:DesktopUiHostContext;
-  var request:Null<haxe.Int64> = null;
+  /** Cancels and stops observing the chooser in flight; the ticket tells a stale completion from the current one. */
+  var stopPending:Null<Void -> Void> = null;
+  var ticket = 0;
 
   public function new(host:DesktopUiHostContext) this.host = host;
 
@@ -59,16 +63,28 @@ class SceneFileDialogs {
         parent,
         options
       );
-    request = id;
-    host.events.requests.track(id, function(event) {
-      request = null;
-      switch (event) {
-        case Resources(_, _, result, accepted, items):
-          if (result != Result.Ok) {
-            complete(null, "The file chooser failed: " + Std.string(result));
-            return;
-          }
-          if (!accepted || items.length == 0) {
+    var future = host.events.requests.trackNative(id, function(event:PlatformEvent):Outcome<Array<Resource>> {
+      return switch (event) {
+        case Resources(EventKind.DialogResourcesComplete, _, result, accepted, items):
+          if (result == Result.ErrorCancelled) Outcome.Cancelled;
+          else if (result != Result.Ok) Outcome.Failure(new NativeKitError(result, "SceneFileDialogs.choose", null));
+          else if (!accepted) Outcome.Cancelled;
+          else Outcome.Success(items);
+        default:
+          throw "Unexpected file chooser response";
+      }
+    }, function() NativeKit.nk_dialog_cancel_checked(id));
+    var mine = ++ticket;
+    stopPending = function() {
+      future.cancel();
+      future.stopObserving();
+    };
+    future.onComplete(function(outcome) {
+      if (mine != ticket) return;
+      stopPending = null;
+      switch (outcome) {
+        case Success(items):
+          if (items.length == 0) {
             complete(null, null);
             return;
           }
@@ -84,11 +100,12 @@ class SceneFileDialogs {
             return;
           }
           complete(path, null);
-        default:
-          complete(null, "Unexpected file chooser response");
+        case Cancelled | Stopped:
+          complete(null, null);
+        case Failure(error):
+          complete(null, "The file chooser failed: " + error.message);
       }
-    }
-    );
+    });
   }
 
   #if wasm
@@ -99,7 +116,7 @@ class SceneFileDialogs {
    */
   function browserFile(
     save:Bool,
-    item:NativeKitResource,
+    item:Resource,
     suggestedName:Null<String>,
     complete:Null<String> -> Null<String> -> Void
   ):Void {
@@ -111,15 +128,26 @@ class SceneFileDialogs {
     }
     var resource = new haxeon.platform.resource.Resource(item.uri, null, item.displayName).nativeValue();
     var id = NativeKit.nk_resource_load_async_checked(resource);
-    request = id;
-    host.events.requests.track(id, function(event) {
-      request = null;
-      switch (event) {
+    var future = host.events.requests.trackNative(id, function(event:PlatformEvent):Outcome<Bytes> {
+      return switch (event) {
         case Raw(kind, _, _, result, _, _, data) if (kind == EventKind.ResourceDataComplete):
-          if (result != Result.Ok) {
-            complete(null, "Could not read the chosen file: " + Std.string(result));
-            return;
-          }
+          if (result == Result.ErrorCancelled) Outcome.Cancelled;
+          else if (result != Result.Ok) Outcome.Failure(new NativeKitError(result, "SceneFileDialogs.read", null));
+          else Outcome.Success(data);
+        default:
+          throw "Unexpected file read response";
+      }
+    }, function() Resource.cancelLoad(id));
+    var mine = ++ticket;
+    stopPending = function() {
+      future.cancel();
+      future.stopObserving();
+    };
+    future.onComplete(function(outcome) {
+      if (mine != ticket) return;
+      stopPending = null;
+      switch (outcome) {
+        case Success(data):
           try {
             if (ProjectSourceLoader.isPrebuilt(path)) path = BrowserFiles.storeArtifact(item.displayName, data);
             else BrowserFiles.store(path, data);
@@ -128,20 +156,22 @@ class SceneFileDialogs {
             return;
           }
           complete(path, null);
-        default:
-          complete(null, "Unexpected file read response");
+        case Cancelled | Stopped:
+          complete(null, null);
+        case Failure(error):
+          complete(null, "Could not read the chosen file: " + error.message);
       }
-    }
-    );
+    });
   }
   #end
 
   public function dispose():Void {
-    var id = request;
-    if (id == null) return;
-    host.events.requests.cancel(id);
-    NativeKit.nk_dialog_cancel(id);
-    request = null;
+    var stop = stopPending;
+    if (stop == null) return;
+    // Cancel the native dialog, then stop observing so a late completion never reaches the caller.
+    ticket++;
+    stopPending = null;
+    stop();
   }
 
   public static function localPath(uri:String):String {

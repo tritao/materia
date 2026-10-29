@@ -458,7 +458,7 @@ import materia.assembly.AssemblyFrames;
     try {
       session.openGeneratedProject(app.ProjectSourceLoader.load(path), path);
       editor.documentChanged();
-      var host = new haxeon.ui.host.UiHostContext(fonts, new haxeon.platform.NativeKitEvents(), function() {
+      var host = new haxeon.ui.host.UiHostContext(fonts, new haxeon.platform.event.EventPump(), function() {
       }, function() {
       }
       );

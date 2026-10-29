@@ -13,7 +13,7 @@ import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
 import nativekit.scene.GeometryData;
 import haxeon.ui.LayoutFrame;
-import haxeon.platform.NativeKitEvents;
+import haxeon.platform.event.EventPump;
 import app.ProjectDocumentSession;
 import app.SceneCodec;
 import app.SensorConfiguration;
@@ -1662,7 +1662,7 @@ import materia.project.MaterialLibrary;
     FileSystem.createDirectory(directory);
     var app = new ReferenceEditorApp(fonts, directory + "/workspace.json");
     var requests = 0;
-    var host = new UiHostContext(fonts, new NativeKitEvents(), function() {
+    var host = new UiHostContext(fonts, new EventPump(), function() {
     }, function() requests++);
     var viewport = new EditorPerspectiveViewport("scene-perspective", app.scene, host);
     app.perspectiveViewport = viewport;
@@ -1787,7 +1787,7 @@ import materia.project.MaterialLibrary;
   static function perspectiveHoverInput():Void {
     var scene = new EditorScene();
     var frameRequests = 0;
-    var host = new UiHostContext(null, new NativeKitEvents(), function() {
+    var host = new UiHostContext(null, new EventPump(), function() {
     }, function() {
       frameRequests++;
     }

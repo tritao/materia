@@ -16,8 +16,8 @@ class HxiNativeKitSceneMain {
     compiler.addSourceRoot(scenekitRoot + "/scene_render/bindings/haxe");
     compiler.addSourceRoot(scenekitRoot + "/scene_interaction/bindings/haxe");
     compiler.update(
-      "haxeon/platform/NativeKitWindow.hx",
-      File.getContent(haxeonRoot + "/packages/platform/src/haxeon/platform/NativeKitWindow.hx")
+      "haxeon/platform/Window.hx",
+      File.getContent(haxeonRoot + "/packages/platform/src/haxeon/platform/Window.hx")
     );
     compiler.addFfiProjection(
       "NativeKit.hxmap",
@@ -51,8 +51,8 @@ import NativeKitSceneInteraction;
 import nativekit.ffi.NativeKitGpu;
 import nativekit.ffi.NativeKit;
 import nativekit.ffi.NativeKitTypes;
-import haxeon.platform.NativeKitEventValue;
-import haxeon.platform.NativeKitRuntime;
+import haxeon.platform.event.PlatformEvent;
+import haxeon.platform.Runtime;
 import nativekit.scene.Scene;
 import nativekit.scene.SceneView;
 import nativekit.scene.SceneViewPolicy;
@@ -453,7 +453,7 @@ class Main {
 			restoredSnapshot = scene.snapshot();
 		sceneRenderer.render(restoredSnapshot, view, restoredChanges);
 
-		var realRuntime = NativeKitRuntime.start(),
+		var realRuntime = Runtime.start(),
 			windowOptions = new WindowOptions();
 		windowOptions.set_width(64);
 		windowOptions.set_height(64);

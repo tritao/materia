@@ -138,7 +138,7 @@ Upstream formats and assumptions:
 ## Moonraker networking
 
 `MoonrakerClient(host, port, events, timeout, secure)` uses NativeKit HTTP; `MoonrakerSocket` uses its WebSocket message
-transport at `/websocket`. Pass the same `NativeKitEvents` that the application owns and drain it every frame, then call
+transport at `/websocket`. Pass the same `EventPump` that the application owns and drain it every frame, then call
 `poll(now)` on the clients. Client callbacks run from `poll`, after native response data has been copied into managed memory.
 Closing disposes event subscriptions and native handles and suppresses late completions. Reconnect by creating new clients.
 The optional `secure` flag selects HTTPS/WSS with normal certificate verification; it defaults to plain HTTP/WS for Klipper's

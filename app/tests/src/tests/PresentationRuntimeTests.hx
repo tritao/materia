@@ -121,7 +121,7 @@ import sys.FileSystem;
     File.saveBytes(source, SceneArtifact.encode(artifact));
     var session = new ProjectDocumentSession(null, false);
     session.openGeneratedProject(new ProjectArtifactLoader().load(File.getBytes(source)), source);
-    var host = new haxeon.ui.host.UiHostContext(null, new haxeon.platform.NativeKitEvents(), () -> {}, () -> {});
+    var host = new haxeon.ui.host.UiHostContext(null, new haxeon.platform.event.EventPump(), () -> {}, () -> {});
     var viewport = new EditorPerspectiveViewport("presentation-test", session.scene, host);
     var dock = new EditorPerspectiveViewport("presentation-dock-test", session.scene, host);
     function bind(view:EditorPerspectiveViewport, readOnly:Bool = false):Void {

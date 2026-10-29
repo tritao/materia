@@ -1,6 +1,6 @@
 package tests;
 
-import haxeon.platform.NativeKitRuntime;
+import haxeon.platform.Runtime;
 import haxe.Int64;
 import materia.automation.facility.Charger;
 import materia.automation.facility.Facility;
@@ -75,7 +75,7 @@ class AutomationTests {
   static var assertions = 0;
 
   static function main():Void {
-    var nativeRuntime = NativeKitRuntime.start();
+    var nativeRuntime = Runtime.start();
     var world = new RobotWorld();
     var robotDefinition = configuredMobileRobotModel();
     var robotModel = robotDefinition.model;

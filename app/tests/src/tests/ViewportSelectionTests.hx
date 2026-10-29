@@ -6,7 +6,7 @@ import app.EditorPerspectiveViewport;
 import haxeon.ui.*;
 import haxeon.ui.core.*;
 import haxeon.ui.host.UiHostContext;
-import haxeon.platform.NativeKitEvents;
+import haxeon.platform.event.EventPump;
 import haxeon.ui.widgets.collections.TreeView;
 
 @:access(tests.SceneVisibilityTests) @:access(app.EditorPerspectiveViewport) class ViewportSelectionTests {
@@ -28,7 +28,7 @@ import haxeon.ui.widgets.collections.TreeView;
     var definition = SceneVisibilityTests.definition();
     for (occurrence in definition.occurrences) occurrence.includePath = "machine/axes/tooling";
     var scene = new EditorScene(data), tree = new EditorSceneTree(scene, definition);
-    var host = new UiHostContext(null, new NativeKitEvents(), function() {
+    var host = new UiHostContext(null, new EventPump(), function() {
     }, function() {
     }
     );

@@ -7,7 +7,7 @@ import nativekit.ffi.NativeKitTypes;
 import robotkit.protocol.RobotFrame;
 import robotkit.protocol.RobotMessageType;
 import robotkit.protocol.StreamSubscription;
-import haxeon.platform.NativeTransport;
+import haxeon.platform.interop.TransportInterop;
 
 /** The sole outbound RKF1 family classification. New families register here. */
 class OutboundPolicy {
@@ -58,7 +58,7 @@ class OutboundScheduler {
 
   public function new(transport:TransportHandle, ?budgetBytes:Int = 0) {
     this.transport = transport;
-    var capacity = Int64.toInt(NativeTransport.sendQueue(transport).capacity);
+    var capacity = Int64.toInt(TransportInterop.sendQueue(transport).capacity);
     capacityBytes = capacity;
     this.budgetBytes = budgetBytes == 0 ? Std.int(capacity / 2) : budgetBytes;
     if (capacity <= MIN_ESSENTIAL_RESERVE || this.budgetBytes <= 0 || this.budgetBytes
@@ -189,7 +189,7 @@ class OutboundScheduler {
         nextKey++;
         continue;
       }
-      var queue = NativeTransport.sendQueue(transport);
+      var queue = TransportInterop.sendQueue(transport);
       var frameBytes = RobotFrame.HEADER_BYTES + slot.frame.payload.length;
       for (attachment in slot.frame.attachments) frameBytes += 4 + attachment.length;
       if (frameBytes > capacityBytes - MIN_ESSENTIAL_RESERVE) {
@@ -209,7 +209,7 @@ class OutboundScheduler {
         nextKey++;
         continue;
       }
-      var result = NativeTransport.sendStatus(transport, slot.frame.encode());
+      var result = TransportInterop.sendStatus(transport, slot.frame.encode());
       if (result == QUEUE_FULL) {
         nextKey++;
         continue;

@@ -5,8 +5,8 @@ import haxe.io.Bytes;
 import haxe.io.BytesBuffer;
 import nativekit.ffi.NativeKitTypes;
 import haxe.Int64;
-import haxeon.platform.NativeKitEvents;
-import haxeon.platform.NativeKitEvents.NativeKitEventSubscription;
+import haxeon.platform.event.EventPump;
+import haxeon.platform.event.EventSubscription;
 import nativekit.ffi.NativeKitNet;
 import nativekit.ffi.NativeKitNetTypes;
 import processkit.moonraker.HttpResponse;
@@ -32,7 +32,7 @@ private class Pending {
  */
 class MoonrakerClient {
   final transport:OwnedHttpClientHandle;
-  final subscription:NativeKitEventSubscription;
+  final subscription:EventSubscription;
   final secure:Bool;
   var requestId = Int64.ofInt(0);
   var completed:Null<HttpResponse> = null;
@@ -48,7 +48,7 @@ class MoonrakerClient {
   /** Application body bytes submitted (wire headers are owned by the HTTP backend). */
   public var sentBytes(default, null) = 0;
 
-  public function new(host:String, port:Int, events:NativeKitEvents, timeout:Float = 2.0, secure:Bool = false) {
+  public function new(host:String, port:Int, events:EventPump, timeout:Float = 2.0, secure:Bool = false) {
     if (!Math.isFinite(timeout) || timeout <= 0.0) throw "Invalid Moonraker timeout";
     this.host = host;
     this.port = port;

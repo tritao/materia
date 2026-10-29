@@ -3,7 +3,7 @@ package tests;
 import app.EditorScene;
 import app.EditorPerspectiveViewport;
 import nativekit.scene.SceneView;
-import haxeon.platform.NativeKitEvents;
+import haxeon.platform.event.EventPump;
 import haxeon.ui.LayoutAxis;
 import haxeon.ui.LayoutFrame;
 import haxeon.ui.LayoutStyle;
@@ -59,7 +59,7 @@ import haxeon.ui.widgets.layout.Spacer;
       blue: 0.5,
       visible: true
     }]);
-    var host = new UiHostContext(null, new NativeKitEvents(), function() {
+    var host = new UiHostContext(null, new EventPump(), function() {
     }, function() {
     }
     );
@@ -156,7 +156,7 @@ import haxeon.ui.widgets.layout.Spacer;
       blue: 0.5,
       visible: true
     }]);
-    var host = new UiHostContext(null, new NativeKitEvents(), function() {
+    var host = new UiHostContext(null, new EventPump(), function() {
     }, function() {
     }
     );
