@@ -114,12 +114,12 @@ class PushButton extends HmiPart {
 
   /**
    * The cap slides in the bezel by `pressTravel` and clicks at its two ends: released at 0, pressed at the end of its travel.
-   * It is a momentary button, so a simulator reads "pressed" while the cap is there.
+   * It is a momentary button: its spring returns it to 0 when released, so a simulator reads "pressed" only while it is held.
    */
   override public function joints():Array<DeviceJointSpec> {
     var travel = n("pressTravel");
     var limits:AssemblyJointLimits = {lower: -travel,
-      upper: 0.0, velocity: null, effort: null, detents: [-travel, 0.0]};
+      upper: 0.0, velocity: null, effort: null, detents: [-travel, 0.0], rest: 0.0};
     return [new DeviceJointSpec("press", Prismatic, "bezel", "cap", limits, 0.0)];
   }
 

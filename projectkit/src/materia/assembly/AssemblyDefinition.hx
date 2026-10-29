@@ -78,6 +78,11 @@ enum abstract AssemblyMateKind(String) from String to String {
 	 * detented joint only at one of them unless the user asks for free motion (see `JointDetents`).
 	 */
   @:id(9) @:optional var detents:Null<ReadOnlyArray<Float>>;
+  /**
+	 * The position a spring returns the joint to when nothing holds it (a momentary push button), in the joint's units. A drag
+	 * that ends leaves the joint here, so what the joint did is what it read while held, not a state that is saved.
+	 */
+  @:id(10) @:optional var rest:Null<Float>;
 }
 
 /** Connectors belong to a reusable component definition, not an occurrence. */

@@ -145,6 +145,7 @@ class MechanicalAssembly {
       defaultValue: joint.defaultValue
     };
     if (joint.limits.detents != null) copy.limits.detents = [for (value in joint.limits.detents) value];
+    if (joint.limits.rest != null) copy.limits.rest = joint.limits.rest;
     if (joint.limits.assumptions != null
       && joint.limits.assumptions.length > 0) copy.limits.assumptions = [for (value in joint.limits.assumptions) {
       quantity:value.quantity, label:value.label

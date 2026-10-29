@@ -1325,6 +1325,7 @@ class ProjectDocumentSession {
       after:Null<AssemblyStateRecord>
     ):Bool {
     assemblyDragPreview = null;
+    if (after != null) after = springsReleased(after);
     if (after == null || sameAssemblyState(before, after)) {
       applyAssemblyStateRecord(before);
       return false;
@@ -1341,6 +1342,21 @@ class ProjectDocumentSession {
       false
     ));
     return true;
+  }
+
+  /** `state` with each spring-loaded joint (a momentary button) back at its rest position. */
+  function springsReleased(state:AssemblyStateRecord):AssemblyStateRecord {
+    var definition = projectAssemblyDefinition;
+    if (definition == null) return state;
+    var rests:Map<String, Float> = [];
+    for (joint in definition.joints) if (joint.limits.rest != null) rests.set(joint.id, joint.limits.rest);
+    if (!rests.keys().hasNext()) return state;
+    return {
+      schemaVersion: state.schemaVersion,
+      definition: state.definition,
+      jointCoordinates: [for (c in state.jointCoordinates) rests.exists(c.joint) ? {joint: c.joint, value: rests.get(c.joint)} : c],
+      rootPoses: state.rootPoses
+    };
   }
 
   /** Select whether a tree coordinate is driven by the user or solved from loop closures. */
