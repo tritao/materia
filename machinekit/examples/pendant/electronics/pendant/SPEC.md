@@ -20,7 +20,7 @@ them. Every review is pending; the specification, parts, connector, LED supply a
 | keys | seven 4-way key headers (contact, 0 V, LED supply, LED cathode), pull-ups, ESD, ULN2003A for the seven LEDs |
 | reserved | not fitted: the enabling switch's header and ESD (pull-ups fitted), the membrane keypad's 13-way header and ESD; the keypad ID pull-up fitted |
 | oled | the OLED's 8-way header (I2C mode, CS and DC low: address 0x3C), I2C pull-ups, reset pull-up |
-| prog | Tag-Connect TC2030 pads (SWD, NRST), BOOT0 test pad, the bench-only USB-C footprint (not fitted) with USB test pads |
+| prog | Tag-Connect TC2030 pads (SWD, NRST), BOOT0 test pad, bench-only USB pads (D+, D-, 0 V; no connector) |
 
 **Pin table.** `pendant.pins.json` assigns every port pin of the MCU (38 nets, 11 free). The circuit wires the MCU from it,
 `checks.py` proves the netlist follows it, and the firmware's `build.rs` generates its pin module from it (pcbkit PLAN W5).

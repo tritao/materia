@@ -59,7 +59,7 @@
     "PA11": {
       "net": "USB_DM",
       "function": "USB_DM (AF10)",
-      "note": "bench only: test pad and the unfitted USB-C footprint"
+      "note": "bench only: a test pad (no connector)"
     },
     "PA12": {
       "net": "USB_DP",

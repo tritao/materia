@@ -49,7 +49,6 @@ L_6045 = "Inductor_SMD:L_Sunlord_SWPA6045S"
 RPACK4 = "Resistor_SMD:R_Array_Convex_4x0603"
 LGA16 = "pcbkit_parts:Chipanalog_LGA-16_4.65x5.2mm_P0.65mm"
 TC2030 = "Connector:Tag-Connect_TC2030-IDC-NL_2x03_P1.27mm_Vertical"
-USB_C = "Connector_USB:USB_C_Receptacle_GCT_USB4105-xx-A_16P_TopMnt_Horizontal"
 
 
 def jst_ph(n):
@@ -105,7 +104,7 @@ def build(out_dir=HERE, refs_path=None):
     root = {name: b.net(name) for name in rails}
     for name in rails:
         root[name].drive = POWER
-    for name in ("CAN_H", "CAN_L", "SHIELD", "ESTOP_SENSE_IN", "ESTOP_SENSE_REF", "NRST", "BOOT0", "USB_VBUS"):
+    for name in ("CAN_H", "CAN_L", "SHIELD", "ESTOP_SENSE_IN", "ESTOP_SENSE_REF", "NRST", "BOOT0"):
         root[name] = b.net(name)
     for name in pinassign.assigned(pins).values():
         root[name] = b.net(name)
@@ -135,7 +134,7 @@ def build(out_dir=HERE, refs_path=None):
             "Connector_Generic_MountingPin",
             f"Conn_01x{n:02d}_MountingPin",
             local,
-            value=HEADERS[n][1] if n in HEADERS else f"PH 2 mm {n}-way",
+            value=f"PH 2 mm {n}-way, reserved" if fit else HEADERS[n][1],
             footprint=jst_ph(n),
             lcsc=None if fit else HEADERS[n][0],
             fit=fit,
@@ -389,7 +388,7 @@ def build(out_dir=HERE, refs_path=None):
         r("r_scl", "4.7k", R_4K7, root["I2C1_SCL"], v3)
         r("r_res", "10k", R_10K, root["OLED_RES"], v3)
 
-    # ---------------------------------------------------------------- programming (SWD) and the bench-only USB
+    # ---------------------------------------------------------------- programming (SWD) and the bench-only USB pads
     with b.sheet("prog"):
         swd = b.part(
             "Connector", "Conn_ARM_SWD_TagConnect_TC2030-NL", "j_swd", value="TC2030-IDC-NL", footprint=TC2030, fit="not-fitted"
@@ -402,23 +401,11 @@ def build(out_dir=HERE, refs_path=None):
         nc(swd, "6")
         tp = b.part("Connector", "TestPoint", "tp_boot0", value="BOOT0", footprint=TP, fit="hand-fitted")
         root["BOOT0"] += tp[1]
-        usb = b.part("Connector", "USB_C_Receptacle_USB2.0_16P", "j_usb", value="USB-C", footprint=USB_C, fit="not-fitted")
-        for pin in ("A4", "A9", "B4", "B9"):
-            root["USB_VBUS"] += usb.p[pin]
-        root["USB_DP"] += usb.p["A6"], usb.p["B6"]
-        root["USB_DM"] += usb.p["A7"], usb.p["B7"]
-        gnd += usb.p["A1"], usb.p["B1"], usb.p["A12"], usb.p["B12"], usb.p["SH"]
-        nc(usb, "A8", "B8")
-        cc1, cc2 = b.net("cc1"), b.net("cc2")
-        cc1 += usb.p["A5"]
-        cc2 += usb.p["B5"]
-        r("r_cc1", "5.1k", None, cc1, gnd, fit="not-fitted")
-        r("r_cc2", "5.1k", None, cc2, gnd, fit="not-fitted")
-        d_usb = b.part("Device", "D_Schottky", "d_usb", value="SS14", footprint=D_SMA, fit="not-fitted")
-        root["USB_VBUS"] += d_usb["A"]
-        v5 += d_usb["K"]
-        for net in ("USB_DM", "USB_DP"):
-            tp = b.part("Connector", "TestPoint", "tp_" + net.lower(), value=net, footprint=TP, fit="hand-fitted")
+        # USB is for the bench only: pads for D+, D- and 0 V, no connector (every USB connector at JLCPCB is an extended
+        # part, a fee per order for a part no field unit uses). The bench pendant runs from its 24 V supply.
+        for net in ("USB_DM", "USB_DP", "GND"):
+            local = "tp_usb_gnd" if net == "GND" else "tp_" + net.lower()
+            tp = b.part("Connector", "TestPoint", local, value="USB 0V" if net == "GND" else net, footprint=TP, fit="hand-fitted")
             root[net] += tp[1]
 
     # ---------------------------------------------------------------- the four mounting holes the case's standoffs take
@@ -486,7 +473,6 @@ def build(out_dir=HERE, refs_path=None):
         "LED_SUPPLY": "led_supply",
         "power/sw": "switching",
         "power/cb": "switching",
-        "USB_VBUS": "logic_5v",
         "CAN_GND": "can_power",
         "CAN_V5ISO": "can_power",
         "CAN_H": "can_signal",

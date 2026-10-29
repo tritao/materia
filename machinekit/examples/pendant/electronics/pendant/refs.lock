@@ -77,14 +77,11 @@
     "power/r_led_5v": "R6",
     "power/u_buck": "U1",
     "power/u_ldo": "U2",
-    "prog/d_usb": "D6",
     "prog/j_swd": "J16",
-    "prog/j_usb": "J17",
-    "prog/r_cc1": "R22",
-    "prog/r_cc2": "R23",
     "prog/tp_boot0": "TP1",
     "prog/tp_usb_dm": "TP2",
     "prog/tp_usb_dp": "TP3",
+    "prog/tp_usb_gnd": "TP4",
     "reserved/j_enable": "J13",
     "reserved/j_keypad": "J14",
     "reserved/r_keypad_id": "R18",
@@ -116,7 +113,11 @@
     "wheel/u_esd": "U6"
   },
   "retired": {
+    "D6": "prog/d_usb",
+    "J17": "prog/j_usb",
     "J3": "selectors/j_axis_a",
-    "J4": "selectors/j_axis_b"
+    "J4": "selectors/j_axis_b",
+    "R22": "prog/r_cc1",
+    "R23": "prog/r_cc2"
   }
 }

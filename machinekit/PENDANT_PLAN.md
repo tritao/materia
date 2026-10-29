@@ -399,7 +399,7 @@ Notes for the parts review:
 - **Field updates: over CAN-FD through the cable**, pushed by the cabinet controller, with the case closed. Either ST's
   ROM bootloader (the H5 system bootloader; whether it offers FDCAN on the H503 is to confirm in AN2606) entered on command
   by the running firmware, or a small bootloader of ours in flash that checks the image before switching to it. Open.
-- **USB:** PA11/PA12 on test pads and an unfitted USB-C footprint, for the bench only; no opening in the case.
+- **USB:** PA11/PA12 and 0 V on test pads, for the bench only; no connector (every USB connector at JLCPCB is an extended part, a fee per order for a part no field unit uses, and a USB-C's shell legs would come through on the face side) and no opening in the case. The bench pendant runs from its 24 V supply.
 
 **Steps:**
 

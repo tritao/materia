@@ -149,7 +149,6 @@
         "SWDIO",
         "USB_DM",
         "USB_DP",
-        "USB_VBUS",
         "WHEEL_A",
         "WHEEL_B",
         "mcu/vcap1",
@@ -158,8 +157,6 @@
         "power/en",
         "power/fb",
         "power/sw",
-        "prog/cc1",
-        "prog/cc2",
         "selectors/chain",
         "wheel/in_a",
         "wheel/in_b"
@@ -327,7 +324,6 @@
     "SWDIO": "logic_signal",
     "USB_DM": "logic_signal",
     "USB_DP": "logic_signal",
-    "USB_VBUS": "logic_5v",
     "WHEEL_A": "wheel_signal",
     "WHEEL_B": "wheel_signal",
     "can/term_mid": "can_signal",
@@ -338,8 +334,6 @@
     "power/en": "logic_signal",
     "power/fb": "logic_signal",
     "power/sw": "switching",
-    "prog/cc1": "logic_signal",
-    "prog/cc2": "logic_signal",
     "selectors/chain": "logic_signal",
     "wheel/in_a": "logic_signal",
     "wheel/in_b": "logic_signal"
@@ -556,7 +550,7 @@
       }
     }
   },
-  "netlist_hash": "sha256:3e4419c28bc87a4169dec4d2fa86e2cb48e5955da2088f0a6e97ba9ed40b2bab",
+  "netlist_hash": "sha256:b534723ab97141fb0236b6a6fafaa8cd95f0eba87083784e229f9bb5837015af",
   "placement": {
     "anchors": {
       "cable/j_cable": {

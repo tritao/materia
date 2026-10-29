@@ -103,7 +103,7 @@
     },
     {
       "id": "REQ-PENDANT-PROGRAM-1",
-      "text": "Program and debug over SWD on a Tag-Connect footprint, with BOOT0 able to force the ROM bootloader; USB only as bench pads and an unfitted connector.",
+      "text": "Program and debug over SWD on a Tag-Connect footprint, with BOOT0 able to force the ROM bootloader; USB only as bench pads (D+, D-, 0 V), no connector.",
       "source": {
         "file": "machinekit/PENDANT_PLAN.md",
         "revision": "f60fbad5fa355be6654b9f7b1725a6700b8c46b3",
@@ -223,7 +223,7 @@
     {
       "id": "check:programming",
       "kind": "check",
-      "text": "Tag-Connect SWD footprint on PA13/PA14/NRST/3.3 V/GND, BOOT0 pull-down and test pad, USB pads and the unfitted USB-C footprint",
+      "text": "Tag-Connect SWD footprint on PA13/PA14/NRST/3.3 V/GND, BOOT0 pull-down and test pad, USB pads for D+, D- and 0 V",
       "source": {
         "file": "machinekit/examples/pendant/electronics/pendant/checks.py",
         "where": "planned: programming"

@@ -1374,30 +1374,6 @@
       (component_classes)
       (tstamps "c2b3154b-b69a-5ea0-aa0f-71317cbddb04"))
     (comp
-      (ref "D6")
-      (value "SS14")
-      (description "Schottky diode")
-      (footprint "Diode_SMD:D_SMA")
-      (fields
-        (field
-          (name "Fit") "not-fitted")
-        (field
-          (name "Description") "Schottky diode")
-        (field
-          (name "Footprint") "Diode_SMD:D_SMA")
-        (field
-          (name "Datasheet"))
-        (field
-          (name "SKiDL Tag") "prog/d_usb"))
-      (libsource
-        (lib "Device")
-        (part "D_Schottky"))
-      (sheetpath
-        (names "/prog/")
-        (tstamps "/ec62db01-334f-5bb7-bf26-d6833487c897/"))
-      (component_classes)
-      (tstamps "ee6e8e19-fdb7-5ef4-994a-0f0d05942192"))
-    (comp
       (ref "F1")
       (value "1812L050/60GR")
       (description "Resettable fuse, polymeric positive temperature coefficient")
@@ -1615,7 +1591,7 @@
       (tstamps "d1d833df-2531-5aae-b8c4-6c41ae24b8de"))
     (comp
       (ref "J13")
-      (value "PH 2 mm 5-way")
+      (value "PH 2 mm 5-way, reserved")
       (description "Generic connectable mounting pin connector, single row, 01x05, script generated (kicad-library-utils/schlib/autogen/connector/)")
       (footprint "Connector_JST:JST_PH_S5B-PH-SM4-TB_1x05-1MP_P2.00mm_Horizontal")
       (fields
@@ -1639,7 +1615,7 @@
       (tstamps "c080e684-068e-59ae-88d1-f61e787ed3ab"))
     (comp
       (ref "J14")
-      (value "Megastar ZX-PH2.0-WT13P")
+      (value "PH 2 mm 13-way, reserved")
       (description "Generic connectable mounting pin connector, single row, 01x13, script generated (kicad-library-utils/schlib/autogen/connector/)")
       (footprint "Connector_JST:JST_PH_S13B-PH-SM4-TB_1x13-1MP_P2.00mm_Horizontal")
       (fields
@@ -1709,30 +1685,6 @@
         (tstamps "/ec62db01-334f-5bb7-bf26-d6833487c897/"))
       (component_classes)
       (tstamps "66ec7e0f-803e-53a0-8e6b-c50900f66fc7"))
-    (comp
-      (ref "J17")
-      (value "USB-C")
-      (description "USB 2.0-only 16P Type-C Receptacle connector")
-      (footprint "Connector_USB:USB_C_Receptacle_GCT_USB4105-xx-A_16P_TopMnt_Horizontal")
-      (fields
-        (field
-          (name "Fit") "not-fitted")
-        (field
-          (name "Description") "USB 2.0-only 16P Type-C Receptacle connector")
-        (field
-          (name "Footprint") "Connector_USB:USB_C_Receptacle_GCT_USB4105-xx-A_16P_TopMnt_Horizontal")
-        (field
-          (name "Datasheet") "https://www.usb.org/sites/default/files/documents/usb_type-c.zip")
-        (field
-          (name "SKiDL Tag") "prog/j_usb"))
-      (libsource
-        (lib "Connector")
-        (part "USB_C_Receptacle_USB2.0_16P"))
-      (sheetpath
-        (names "/prog/")
-        (tstamps "/ec62db01-334f-5bb7-bf26-d6833487c897/"))
-      (component_classes)
-      (tstamps "46c970a3-e807-5902-bc2d-ec85f2bf8cf8"))
     (comp
       (ref "J18")
       (value "Megastar ZX-PH2.0-WT13P")
@@ -2262,54 +2214,6 @@
       (component_classes)
       (tstamps "7282f541-74a6-58e1-9bfa-86629b4cdb27"))
     (comp
-      (ref "R22")
-      (value "5.1k")
-      (description "Resistor")
-      (footprint "Resistor_SMD:R_0603_1608Metric")
-      (fields
-        (field
-          (name "Fit") "not-fitted")
-        (field
-          (name "Description") "Resistor")
-        (field
-          (name "Footprint") "Resistor_SMD:R_0603_1608Metric")
-        (field
-          (name "Datasheet"))
-        (field
-          (name "SKiDL Tag") "prog/r_cc1"))
-      (libsource
-        (lib "Device")
-        (part "R"))
-      (sheetpath
-        (names "/prog/")
-        (tstamps "/ec62db01-334f-5bb7-bf26-d6833487c897/"))
-      (component_classes)
-      (tstamps "78b793f7-1102-5b63-b26a-c67bed686d7a"))
-    (comp
-      (ref "R23")
-      (value "5.1k")
-      (description "Resistor")
-      (footprint "Resistor_SMD:R_0603_1608Metric")
-      (fields
-        (field
-          (name "Fit") "not-fitted")
-        (field
-          (name "Description") "Resistor")
-        (field
-          (name "Footprint") "Resistor_SMD:R_0603_1608Metric")
-        (field
-          (name "Datasheet"))
-        (field
-          (name "SKiDL Tag") "prog/r_cc2"))
-      (libsource
-        (lib "Device")
-        (part "R"))
-      (sheetpath
-        (names "/prog/")
-        (tstamps "/ec62db01-334f-5bb7-bf26-d6833487c897/"))
-      (component_classes)
-      (tstamps "f7451a43-3198-5fc2-bcdd-7f790284f4ee"))
-    (comp
       (ref "R3")
       (value "49.9k")
       (description "Resistor")
@@ -2717,6 +2621,30 @@
         (tstamps "/ec62db01-334f-5bb7-bf26-d6833487c897/"))
       (component_classes)
       (tstamps "57b29b2d-fc1c-576f-b9e7-2234472243ff"))
+    (comp
+      (ref "TP4")
+      (value "USB 0V")
+      (description "test point")
+      (footprint "TestPoint:TestPoint_Pad_D1.5mm")
+      (fields
+        (field
+          (name "Fit") "hand-fitted")
+        (field
+          (name "Description") "test point")
+        (field
+          (name "Footprint") "TestPoint:TestPoint_Pad_D1.5mm")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "prog/tp_usb_gnd"))
+      (libsource
+        (lib "Connector")
+        (part "TestPoint"))
+      (sheetpath
+        (names "/prog/")
+        (tstamps "/ec62db01-334f-5bb7-bf26-d6833487c897/"))
+      (component_classes)
+      (tstamps "c5fa527f-e466-5dd5-9b3b-400ccf64fb78"))
     (comp
       (ref "U1")
       (value "LMR51606XDBVR")
@@ -3563,10 +3491,6 @@
         (pin "1")
         (pintype "passive"))
       (node
-        (ref "D6")
-        (pin "1")
-        (pintype "passive"))
-      (node
         (ref "J2")
         (pin "1")
         (pintype "passive"))
@@ -4299,26 +4223,6 @@
         (pin "5")
         (pintype "power_in"))
       (node
-        (ref "J17")
-        (pin "A1")
-        (pintype "passive"))
-      (node
-        (ref "J17")
-        (pin "A12")
-        (pintype "passive"))
-      (node
-        (ref "J17")
-        (pin "B1")
-        (pintype "passive"))
-      (node
-        (ref "J17")
-        (pin "B12")
-        (pintype "passive"))
-      (node
-        (ref "J17")
-        (pin "SH")
-        (pintype "passive"))
-      (node
         (ref "J18")
         (pin "1")
         (pintype "passive"))
@@ -4355,20 +4259,16 @@
         (pin "2")
         (pintype "passive"))
       (node
-        (ref "R22")
-        (pin "2")
-        (pintype "passive"))
-      (node
-        (ref "R23")
-        (pin "2")
-        (pintype "passive"))
-      (node
         (ref "R4")
         (pin "2")
         (pintype "passive"))
       (node
         (ref "R7")
         (pin "2")
+        (pintype "passive"))
+      (node
+        (ref "TP4")
+        (pin "1")
         (pintype "passive"))
       (node
         (ref "U1")
@@ -5183,14 +5083,6 @@
       (name "USB_DM")
       (class "Default")
       (node
-        (ref "J17")
-        (pin "A7")
-        (pintype "bidirectional"))
-      (node
-        (ref "J17")
-        (pin "B7")
-        (pintype "bidirectional"))
-      (node
         (ref "TP2")
         (pin "1")
         (pintype "passive"))
@@ -5203,14 +5095,6 @@
       (name "USB_DP")
       (class "Default")
       (node
-        (ref "J17")
-        (pin "A6")
-        (pintype "bidirectional"))
-      (node
-        (ref "J17")
-        (pin "B6")
-        (pintype "bidirectional"))
-      (node
         (ref "TP3")
         (pin "1")
         (pintype "passive"))
@@ -5220,30 +5104,6 @@
         (pintype "bidirectional")))
     (net
       (code 78)
-      (name "USB_VBUS")
-      (class "Default")
-      (node
-        (ref "D6")
-        (pin "2")
-        (pintype "passive"))
-      (node
-        (ref "J17")
-        (pin "A4")
-        (pintype "passive"))
-      (node
-        (ref "J17")
-        (pin "A9")
-        (pintype "passive"))
-      (node
-        (ref "J17")
-        (pin "B4")
-        (pintype "passive"))
-      (node
-        (ref "J17")
-        (pin "B9")
-        (pintype "passive")))
-    (net
-      (code 79)
       (name "WHEEL_A")
       (class "Default")
       (node
@@ -5263,7 +5123,7 @@
         (pin "1")
         (pintype "passive")))
     (net
-      (code 80)
+      (code 79)
       (name "WHEEL_B")
       (class "Default")
       (node
@@ -5283,7 +5143,7 @@
         (pin "3")
         (pintype "passive")))
     (net
-      (code 81)
+      (code 80)
       (name "can/term_mid")
       (class "Default")
       (node
@@ -5299,7 +5159,7 @@
         (pin "1")
         (pintype "passive")))
     (net
-      (code 82)
+      (code 81)
       (name "estop/led_a")
       (class "Default")
       (node
@@ -5319,7 +5179,7 @@
         (pin "1")
         (pintype "passive")))
     (net
-      (code 83)
+      (code 82)
       (name "mcu/vcap1")
       (class "Default")
       (node
@@ -5331,7 +5191,7 @@
         (pin "30")
         (pintype "power_out")))
     (net
-      (code 84)
+      (code 83)
       (name "mcu/vcap2")
       (class "Default")
       (node
@@ -5343,7 +5203,7 @@
         (pin "62")
         (pintype "power_out")))
     (net
-      (code 85)
+      (code 84)
       (name "power/cb")
       (class "Default")
       (node
@@ -5355,7 +5215,7 @@
         (pin "1")
         (pintype "passive")))
     (net
-      (code 86)
+      (code 85)
       (name "power/en")
       (class "Default")
       (node
@@ -5371,7 +5231,7 @@
         (pin "4")
         (pintype "input")))
     (net
-      (code 87)
+      (code 86)
       (name "power/fb")
       (class "Default")
       (node
@@ -5387,7 +5247,7 @@
         (pin "3")
         (pintype "input")))
     (net
-      (code 88)
+      (code 87)
       (name "power/sw")
       (class "Default")
       (node
@@ -5403,31 +5263,7 @@
         (pin "6")
         (pintype "power_out")))
     (net
-      (code 89)
-      (name "prog/cc1")
-      (class "Default")
-      (node
-        (ref "J17")
-        (pin "A5")
-        (pintype "bidirectional"))
-      (node
-        (ref "R22")
-        (pin "1")
-        (pintype "passive")))
-    (net
-      (code 90)
-      (name "prog/cc2")
-      (class "Default")
-      (node
-        (ref "J17")
-        (pin "B5")
-        (pintype "bidirectional"))
-      (node
-        (ref "R23")
-        (pin "1")
-        (pintype "passive")))
-    (net
-      (code 91)
+      (code 88)
       (name "selectors/chain")
       (class "Default")
       (node
@@ -5439,7 +5275,7 @@
         (pin "9")
         (pintype "output")))
     (net
-      (code 92)
+      (code 89)
       (name "wheel/in_a")
       (class "Default")
       (node
@@ -5451,7 +5287,7 @@
         (pin "1")
         (pintype "input")))
     (net
-      (code 93)
+      (code 90)
       (name "wheel/in_b")
       (class "Default")
       (node
