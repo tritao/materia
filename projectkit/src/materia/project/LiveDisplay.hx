@@ -45,6 +45,9 @@ interface LiveDisplaySource {
    * `inputs` are the model's joints, which the source reads through the bindings of its `LiveDisplayConfig`.
    */
   public function advance(nowMs:Int, inputs:LiveInputs):Null<Bytes>;
+
+  /** The display is gone from the scene; the source gives up what it shares with others. Called once. */
+  public function release():Void;
 }
 
 /** The drivers the editor can attach to a display, by the source name a model gives it (`SurfaceDetail.Display`). */

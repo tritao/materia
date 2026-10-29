@@ -105,8 +105,33 @@ class VirtualPendantTests {
     check(blank != null && brightest(blank) == 0, "blank after a minute idle");
   }
 
+  /** Every output of one pendant shares one simulation, which stops with its last user. */
+  static function checkSharedDevice():Void {
+    var bindings = new Map<String, String>();
+    for (binding in machinekit.pendant.ReferencePendant.displayBindings()) bindings.set(binding.signal, binding.joint);
+    var config = new materia.project.LiveDisplay.LiveDisplayConfig(
+      PendantDisplaySignals.SOURCE,
+      machinekit.pendant.ReferencePendant.PROFILE,
+      bindings
+    );
+    var before = machinekit.operator.PendantDevice.active();
+    var a = new machinekit.operator.PendantDisplayDriver(config);
+    var b = new machinekit.operator.PendantDisplayDriver(config);
+    check(machinekit.operator.PendantDevice.active() == before + 1, "two outputs of one pendant run one simulation");
+    var inputs = restingInputs();
+    var pa = a.advance(100, inputs);
+    var pb = b.advance(100, inputs);
+    check(pa != null && pb != null && pa.compare(pb) == 0, "both see the same picture");
+    a.release();
+    check(machinekit.operator.PendantDevice.active() == before + 1, "it keeps running for the one left");
+    b.release();
+    b.release();
+    check(machinekit.operator.PendantDevice.active() == before, "it stops with its last user, and a repeated release counts once");
+  }
+
   static function main():Void {
     checkModelDisplay();
+    checkSharedDevice();
     checkDriverTimeline();
     var pendant = new VirtualPendant(0);
     var pixels = pendant.pixels(0);

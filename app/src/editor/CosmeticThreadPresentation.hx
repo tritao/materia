@@ -345,6 +345,7 @@ private typedef ThreadGroup = {
       entry.material.dispose();
       var live = entry.live;
       if (live != null) {
+        live.source.release();
         live.texture.dispose();
         live.image.dispose();
         continue;
