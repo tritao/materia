@@ -25,6 +25,16 @@ class PendantOledSource implements LiveDisplaySource {
   static inline var AXIS:String = "selectors/axis/position";
   static inline var STEP:String = "selectors/step/position";
   static inline var WHEEL:String = "jog/wheel/encoder";
+  static inline var WHEEL_ENABLE:String = "jog/wheel-enable/press";
+  /** The keys in the order of PENDANT_STATE's button bits: Start, Hold, Stop, F1, F2, F3. */
+  static final KEYS:Array<String> = [
+    "cycle-keys/start/press",
+    "cycle-keys/hold/press",
+    "cycle-keys/stop/press",
+    "function-keys/f1/press",
+    "function-keys/f2/press",
+    "function-keys/f3/press"
+  ];
   /** The 100 PPR wheel, read in quadrature. */
   static inline var COUNTS_PER_TURN:Int = 400;
 
@@ -43,7 +53,17 @@ class PendantOledSource implements LiveDisplaySource {
 
   public function advance(nowMs:Int, controls:LiveControls):Null<Bytes> {
     var counts = Math.round(controls.position(WHEEL) / 360 * COUNTS_PER_TURN);
-    pendant.tick(nowMs, counts, controls.detentIndex(AXIS), controls.detentIndex(STEP), 0, true, true);
+    var keys = 0;
+    for (bit in 0...KEYS.length) if (controls.pressed(KEYS[bit])) keys |= 1 << bit;
+    pendant.tick(
+      nowMs,
+      counts,
+      controls.detentIndex(AXIS),
+      controls.detentIndex(STEP),
+      keys,
+      controls.pressed(WHEEL_ENABLE),
+      true
+    );
     var power = pendant.displayPower(nowMs);
     var checksum = pendant.checksum(nowMs);
     if (started && power == lastPower && checksum == lastChecksum) return null;

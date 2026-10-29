@@ -196,7 +196,7 @@ class PendantTests {
       ids.indexOf(id) >= 0,
       "Missing member " + id + " in " + ids.join(", ")
     );
-    check(ids.length == 88, "Eighty-eight members, thirty-three of them hardware: " + ids.length);
+    check(ids.length == 95, "Ninety-five members, thirty-three of them hardware: " + ids.length);
     check(
       ids.indexOf("fasteners/display-frame") >= 0 && ids.indexOf("fasteners/display-screw-4") >= 0,
       "The display's frame hardware"
@@ -220,13 +220,13 @@ class PendantTests {
     var joints = assembly.derived().definition.joints;
     var encoders = [for (j in joints) if (j.id == "jog/wheel/encoder") j];
     check(
-      joints.length == 5 && encoders.length == 1,
-      "Five joints: the wheel's free encoder, two clicking knobs and a fixed pointer on each knob: "
+      joints.length == 12 && encoders.length == 1,
+      "Twelve joints: the wheel's free encoder, two clicking knobs and a fixed pointer on each knob, and a press on each of the seven keys: "
       + [for (j in joints) j.id].join(", ")
     );
     // The switches click: each knob joint is limited between end stops and has a detent at every position, 30 degrees apart.
     var detentCounts:Map<String, Int> = [];
-    for (j in joints) if (j.limits.detents != null) {
+    for (j in joints) if (j.limits.detents != null && StringTools.endsWith(j.id, "/position")) {
       detentCounts.set(j.id, j.limits.detents.length);
       var list:Array<Float> = cast j.limits.detents;
       var upper = j.limits.upper, lower = j.limits.lower;
@@ -242,6 +242,17 @@ class PendantTests {
       "Twelve axis and three step positions: " + [for (k in detentCounts.keys()) k].join(", ")
     );
     check(encoders.length == 1 && encoders[0].limits.detents == null, "The hand wheel's encoder stays free");
+    // Each key's cap slides along its axis between released (0) and pressed (the end of its travel), clicking at both.
+    var presses = [for (j in joints) if (StringTools.endsWith(j.id, "/press")) j];
+    check(presses.length == 7, "A press joint on each of the seven keys: " + presses.length);
+    for (j in presses) {
+      var list:Array<Float> = j.limits.detents == null ? [] : cast j.limits.detents;
+      check(
+        j.type == "prismatic" && list.length == 2 && j.limits.upper == 0.0 && j.limits.lower != null
+        && Math.abs(list[0] - j.limits.lower) < 1e-9 && list[1] == 0.0 && j.limits.lower < 0.0,
+        "Key press travel and detents: " + j.id
+      );
+    }
     var knobLimits = [for (j in joints) if (j.id == "selectors/axis/position") j.limits][0];
     // The pitch and the first position are the part's: ten positions 10 degrees apart starting at -45 leave 90 degrees of travel.
     var narrow = new RotarySwitch(new machinekit.component.ComponentValues().setInteger("positions", 10).setNumber(

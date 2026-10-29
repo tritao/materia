@@ -4,6 +4,7 @@ import cadkit.modeling.Footprint;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.*;
+import materia.assembly.AssemblyDefinition.AssemblyJointLimits;
 import machinekit.component.ComponentRecipeSupport as R;
 
 /**
@@ -30,6 +31,7 @@ class PushButton extends HmiPart {
     R.length("nutThickness", 2.5),
     R.length("bodyDiameter", 24),
     R.length("behindDepth", 25),
+    R.length("pressTravel", 1.5),
     R.scalar("massGrams", 8, 1)
   ];
 
@@ -53,6 +55,7 @@ class PushButton extends HmiPart {
       "nutThickness",
       "bodyDiameter",
       "behindDepth",
+      "pressTravel",
       "massGrams"
     ]);
     require(
@@ -60,6 +63,7 @@ class PushButton extends HmiPart {
       "the cap is smaller than the bezel and the bezel fits its keep-out"
     );
     require(n("capHeight") > n("bezelHeight"), "the cap stands above the bezel");
+    require(n("pressTravel") <= n("bezelHeight"), "the cap stays in its bezel through its travel");
     require(
       n("barrelDiameter") < n("bezelDiameter") && n("barrelDiameter") < n("nutDiameter"),
       "the barrel passes through bezel and nut"
@@ -108,6 +112,17 @@ class PushButton extends HmiPart {
   function behindFace():Float return n("behindDepth");
   function rearBody():Footprint return Circle(n("bodyDiameter"));
 
+  /**
+   * The cap slides in the bezel by `pressTravel` and clicks at its two ends: released at 0, pressed at the end of its travel.
+   * It is a momentary button, so a simulator reads "pressed" while the cap is there.
+   */
+  override public function joints():Array<DeviceJointSpec> {
+    var travel = n("pressTravel");
+    var limits:AssemblyJointLimits = {lower: -travel,
+      upper: 0.0, velocity: null, effort: null, detents: [-travel, 0.0]};
+    return [new DeviceJointSpec("press", Prismatic, "bezel", "cap", limits, 0.0)];
+  }
+
   /** A metal barrel and nut, the grey rear body and the coloured cap and bezel in front. */
   override public function bodies():Null<Array<DeviceBodySpec>> {
     var t = n("panelThickness"), nut = n("nutThickness");
@@ -119,18 +134,16 @@ class PushButton extends HmiPart {
     }
     ), new DeviceBodySpec("body", "push button rear body", "ABS grey", function() {
       return Solids.named(Part.cylinderSpan(n("bodyDiameter") / 2, -n("behindDepth"), -t - nut), "body");
-    }, terminalPorts()), new DeviceBodySpec("cap", "push button cap", materialSpec(), function() {
-      var b = n("bezelDiameter") / 2, c = n("capDiameter") / 2, bh = n("bezelHeight"), top = n("capHeight");
+    }, terminalPorts()), new DeviceBodySpec("bezel", "push button bezel", materialSpec(), function() {
+      var b = n("bezelDiameter") / 2, hole = n("capDiameter") / 2, bh = n("bezelHeight");
+      return Solids.named(Part.revolve([{r: hole, z: 0.0}, {r: b, z: 0.0}, {r: b, z: bh}, {r: hole, z: bh}]), "bezel");
+    }
+    ), new DeviceBodySpec("cap", "push button cap", materialSpec(), function() {
+      // The cap stands clear of the barrel by its travel (no more than the bezel is deep, so it stays in the bezel), and sinks as it is pressed.
+      var c = n("capDiameter") / 2, top = n("capHeight"), rest = n("pressTravel");
       return Solids.named(
-        Part.revolve([
-          {r: 0.0, z: 0.0},
-          {r: b, z: 0.0},
-          {r: b, z: bh},
-          {r: c, z: bh},
-          {r: c, z: top - 1.2},
-          {r: c - 1.2, z: top},
-          {r: 0.0, z: top}
-        ]),
+        Part.revolve([{r: 0.0,
+        z: rest}, {r: c, z: rest}, {r: c, z: top - 1.2}, {r: c - 1.2, z: top}, {r: 0.0, z: top}]),
         "cap"
       );
     }

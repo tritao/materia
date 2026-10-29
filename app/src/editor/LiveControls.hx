@@ -16,6 +16,13 @@ class LiveControls {
     return axis == null ? 0.0 : axis.value;
   }
 
+  /** True when a momentary button's joint is in the lower half of its travel; false for a joint the model lacks. */
+  public function pressed(id:String):Bool {
+    var axis = axes.get(id);
+    if (axis == null || axis.minimum == null || axis.maximum == null) return false;
+    return axis.value < (axis.minimum + axis.maximum) / 2;
+  }
+
   /** Which of a clicking joint's positions it is at (0 for the first); 0 for a joint without detents. */
   public function detentIndex(id:String):Int {
     var axis = axes.get(id);
