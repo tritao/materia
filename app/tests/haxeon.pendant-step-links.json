@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "package": {
+    "name": "pendant-step-link-tests"
+  },
+  "entry": "tests.PendantStepLinkTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "app": {
+      "path": ".."
+    }
+  },
+  "target": "host",
+  "outputDir": "../build/pendant-step-links"
+}

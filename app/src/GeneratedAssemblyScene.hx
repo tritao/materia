@@ -9,6 +9,8 @@ import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
 typedef GeneratedAssemblyScene = {
   @:optional var sourceMap:materia.project.SceneSourceMap;
   @:optional var navigation:Array<materia.project.SceneSourceMap.SceneNavigation>;
+  /** The recorded steps of parts a viewer can roll back; the part's scene object keeps its static geometry otherwise. */
+  @:optional var histories:Array<materia.project.SceneArtifact.SceneArtifactHistory>;
   @:optional var projectVariant:String;
   /** Legacy source jobs retain their original saved identifier. */
   @:optional var projectJob:String;

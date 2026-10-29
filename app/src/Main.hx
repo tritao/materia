@@ -1101,7 +1101,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
           "scene.create-sheet-flange",
           "scene.add-face-hole",
           "scene.create-pocket",
-          "scene.create-vertical-fillet"
+          "scene.create-vertical-fillet",
+          "scene.roll-back-to-feature",
+          "scene.roll-forward"
         ]
       );
       addSection("Import", ObjectKindRegistry.addMenuCommands("Import"));

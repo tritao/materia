@@ -38,7 +38,12 @@ class CadSceneGeometry {
     }
   }
 
-  public static function fromMesh(mesh:Mesh, ?source:Shape):GeometryData {
+  /**
+   * `origin`, when given, is the point the geometry is expressed about (a project part is centred on its full bounds, so
+   * an earlier, smaller shape of it must use the same point), and `scale` converts model units to metres.
+   */
+  public static function fromMesh(mesh:Mesh,
+    ?source:Shape, ?origin:Array<Float>, scale:Float = METRES_PER_MILLIMETRE):GeometryData {
     var minimum = [1e300, 1e300, 1e300], maximum = [-1e300, -1e300, -1e300];
     if (mesh.vertexCount <= 0
       || mesh.vertices.length != mesh.vertexCount * 24) throw "CadKit returned an inconsistent tessellation";
@@ -57,15 +62,25 @@ class CadSceneGeometry {
         maximum[axis] = Math.max(maximum[axis], sourceMaximum[axis]);
       }
     }
-    var part:materia.project.SceneArtifact.SceneArtifactPart = {threads: source
-      == null ? [] : Threads.renderData(source), details : source == null ? [] : cadkit.threads.Details.renderData(source), closed : source != null && source.hasSolidBoundary(),
+    var part:materia.project.SceneArtifact.SceneArtifactPart = {threads: source == null
+      ? [] : Threads.renderData(source), details : source == null ? [] : cadkit.threads.Details.renderData(source),
+      closed : source != null && source.hasSolidBoundary(),
       id : "cad", name : "cad", red : 0.7, green : 0.7, blue : 0.7, vertexCount : mesh.vertexCount,
       indexCount : mesh.indexCount, vertices : mesh.vertices, normals : mesh.normals, indices : mesh.indices,
       edgeSegments : mesh.edgeSegments, edgeIds : mesh.edgeIds, faceRanges : [for (range in mesh.faceRanges) {
       faceIndex:range.faceIndex, firstIndex:range.firstIndex, indexCount:range.indexCount
     }
     ]};
-    return CadPreviewGeometry.fromArtifact(part, minimum, maximum, METRES_PER_MILLIMETRE, false, true);
+    return origin == null ? CadPreviewGeometry.fromArtifact(part,
+      minimum, maximum, scale, false, true) : CadPreviewGeometry.fromArtifact(
+        part,
+        minimum,
+        maximum,
+        scale,
+        true,
+        false,
+        origin
+      );
   }
 
 }

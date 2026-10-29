@@ -341,6 +341,7 @@ class ProjectDocumentSession {
     presentationGeometryFingerprint = generated.presentationGeometryFingerprint
       == null ? "" : generated.presentationGeometryFingerprint;
     scene.sourceMap = generated.sourceMap;
+    registerHistories(generated);
     navigation = generated.navigation;
     generatedPresentation = generated.presentation;
     var presentationDefinition = generated.assemblyDefinition;
@@ -349,6 +350,19 @@ class ProjectDocumentSession {
       generatedPresentation,
       authoredPresentation
     );
+  }
+
+  /** Remember each part's recorded steps with the frame of its static geometry, so it can be rolled back later. */
+  function registerHistories(generated:GeneratedAssemblyScene):Void {
+    scene.histories.clear();
+    var histories = generated.histories, definition = generated.assemblyDefinition;
+    if (histories == null || definition == null) return;
+    var flat = materia.assembly.AssemblyDefinitionFlattener.flattenView(definition);
+    for (history in histories) for (occurrence in flat.occurrences) {
+      if (occurrence.id != history.occurrence) continue;
+      var centre = generated.localCentersByDefinition.get(occurrence.definition);
+      if (centre != null) scene.histories.register("project:" + occurrence.id, history.document, centre, generated.metresPerUnit);
+    }
   }
 
   /** Open generated geometry while retaining its source manifest. */
@@ -532,6 +546,7 @@ class ProjectDocumentSession {
     presentationGeometryFingerprint = generated.presentationGeometryFingerprint
       == null ? "" : generated.presentationGeometryFingerprint;
     scene.sourceMap = generated.sourceMap;
+    registerHistories(generated);
     navigation = generated.navigation;
     generatedPresentation = generated.presentation;
     var presentationDefinition = generated.assemblyDefinition;
@@ -1515,6 +1530,7 @@ class ProjectDocumentSession {
     projectVariant = null;
     projectJob = null;
     scene.sourceMap = null;
+    scene.histories.clear();
     navigation = null;
     presentation = null;
     generatedPresentation = null;
@@ -1631,6 +1647,7 @@ class ProjectDocumentSession {
     presentationGeometryFingerprint = generated.presentationGeometryFingerprint
       == null ? "" : generated.presentationGeometryFingerprint;
     scene.sourceMap = generated.sourceMap;
+    registerHistories(generated);
     navigation = generated.navigation;
     generatedPresentation = generated.presentation;
     presentation = nextPresentation;

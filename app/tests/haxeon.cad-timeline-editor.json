@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "package": {
+    "name": "cad-timeline-editor-tests"
+  },
+  "entry": "tests.CadTimelineEditorTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "app": {
+      "path": ".."
+    }
+  },
+  "target": "host",
+  "outputDir": "../build/cad-timeline-editor"
+}

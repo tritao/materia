@@ -178,6 +178,8 @@ class ObjectKindRegistry {
   public function commands(scene:EditorScene, id:String):Array<String> {
     var result:Array<String> = [];
     if (kind == "cad-part") {
+      if (scene.canRollBackToSelectedFeature()) result.push("scene.roll-back-to-feature");
+      if (scene.canRollForward()) result.push("scene.roll-forward");
       if (scene.canCreateSketch()) result.push("scene.create-sketch");
       if (scene.canCreateFaceSketch()) result.push("scene.create-face-sketch");
       if (scene.canCreateExtrusion()) {

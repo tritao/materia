@@ -17,16 +17,17 @@ class PortableCadGeometry {
     minimum:Array<Float>,
     maximum:Array<Float>,
     scale:Float,
-    centered:Bool = true
+    centered:Bool = true,
+    ?origin:Array<Float>
   ):PreparedCadGeometry {
     if (!finite(scale) || scale <= 0 || part.vertexCount <= 0 || part.indexCount <= 0 || part.indexCount % 3 != 0
       || part.vertices.length != part.vertexCount * 24 || part.normals.length != part.vertexCount * 24
       || part.indices.length != part.indexCount * 4) throw "CAD mesh has inconsistent streams";
     var positions = Bytes.alloc(part.vertexCount * 12);
     var normals = Bytes.alloc(part.vertexCount * 12);
-    var centerX = centered ? (minimum[0] + maximum[0]) * 0.5 : 0.0;
-    var centerY = centered ? (minimum[1] + maximum[1]) * 0.5 : 0.0;
-    var centerZ = centered ? (minimum[2] + maximum[2]) * 0.5 : 0.0;
+    var centerX = origin != null ? origin[0] : centered ? (minimum[0] + maximum[0]) * 0.5 : 0.0;
+    var centerY = origin != null ? origin[1] : centered ? (minimum[1] + maximum[1]) * 0.5 : 0.0;
+    var centerZ = origin != null ? origin[2] : centered ? (minimum[2] + maximum[2]) * 0.5 : 0.0;
     for (index in 0...part.vertexCount) {
       var source = index * 24, target = index * 12;
       var x = (part.vertices.getDouble(source) - centerX) * scale;

@@ -15,9 +15,17 @@ class CadPreviewGeometry {
     maximum:Array<Float>,
     scale:Float,
     centered:Bool = true,
-    includeTopology:Bool = false
+    includeTopology:Bool = false,
+    ?origin:Array<Float>
   ):GeometryData {
-    return fromPrepared(part, prepare(part, minimum, maximum, scale, centered), scale, centered, includeTopology);
+    return fromPrepared(
+      part,
+      prepare(part, minimum, maximum, scale, centered, origin),
+      scale,
+      centered,
+      includeTopology,
+      origin
+    );
   }
 
   /** The expensive per-vertex conversion is independent of native geometry ownership. */
@@ -26,9 +34,10 @@ class CadPreviewGeometry {
     minimum:Array<Float>,
     maximum:Array<Float>,
     scale:Float,
-    centered:Bool = true
+    centered:Bool = true,
+    ?origin:Array<Float>
   ):PreparedCadGeometry {
-    return PortableCadGeometry.prepare(part, minimum, maximum, scale, centered);
+    return PortableCadGeometry.prepare(part, minimum, maximum, scale, centered, origin);
   }
 
   /** Reconstruct fresh native geometry from portable streams and the validated source artifact. */
@@ -37,15 +46,16 @@ class CadPreviewGeometry {
     prepared:PreparedCadGeometry,
     scale:Float,
     centered:Bool = true,
-    includeTopology:Bool = false
+    includeTopology:Bool = false,
+    ?origin:Array<Float>
   ):GeometryData {
     var minimum = prepared.minimum, maximum = prepared.maximum;
     if (prepared.positions.length != part.vertexCount * 12
       || prepared.normals.length != part.vertexCount * 12) throw "Prepared CAD streams have invalid sizes";
     var positions = prepared.positions, normals = prepared.normals;
-    var centerX = centered ? (minimum[0] + maximum[0]) * 0.5 : 0.0;
-    var centerY = centered ? (minimum[1] + maximum[1]) * 0.5 : 0.0;
-    var centerZ = centered ? (minimum[2] + maximum[2]) * 0.5 : 0.0;
+    var centerX = origin != null ? origin[0] : centered ? (minimum[0] + maximum[0]) * 0.5 : 0.0;
+    var centerY = origin != null ? origin[1] : centered ? (minimum[1] + maximum[1]) * 0.5 : 0.0;
+    var centerZ = origin != null ? origin[2] : centered ? (minimum[2] + maximum[2]) * 0.5 : 0.0;
     var geometry = new CadGeometryData(part.threads, [centerX, centerY, centerZ], scale, part.details);
     geometry.setClosed(part.closed == true);
     if (includeTopology) for (index in 0...part.vertexCount) {

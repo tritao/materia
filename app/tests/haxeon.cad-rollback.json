@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "package": {
+    "name": "cad-rollback-tests"
+  },
+  "entry": "tests.CadRollbackTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "app": {
+      "path": ".."
+    }
+  },
+  "target": "host",
+  "outputDir": "../build/cad-rollback"
+}

@@ -10,6 +10,9 @@ import nativekit.scene.GeometryData;
 /** Generic authored CAD document adapter, including a valid featureless starting state. */
 class CadPartModel implements CadSessionModel {
   public final document:Document;
+  /** A project part's recorded history shows about the part's own centre and in the project's units; see `decodeHistory`. */
+  var historyOrigin:Null<Array<Float>> = null;
+  var historyScale:Float = CadSceneGeometry.METRES_PER_MILLIMETRE;
   var lastTessellationSeconds:Float = 0;
   var lastGeometryConversionSeconds:Float = 0;
 
@@ -21,6 +24,14 @@ class CadPartModel implements CadSessionModel {
   public static function createEmpty():CadPartModel return new CadPartModel(new Document());
 
   public static function decode(graph:String):CadPartModel return new CadPartModel(DocumentCodec.decode(graph));
+
+  /** The recorded steps of a project part, shown in the frame of that part's static geometry: `origin` and `scale`. */
+  public static function decodeHistory(graph:String, origin:Array<Float>, scale:Float):CadPartModel {
+    var model = decode(graph);
+    model.historyOrigin = origin;
+    model.historyScale = scale;
+    return model;
+  }
 
   public function getDocument():Document return document;
 
@@ -40,7 +51,7 @@ class CadPartModel implements CadSessionModel {
     }
     var conversionStarted = Sys.time();
     try {
-      var result = CadSceneGeometry.fromMesh(mesh, source);
+      var result = CadSceneGeometry.fromMesh(mesh, source, historyOrigin, historyScale);
       lastGeometryConversionSeconds = Sys.time() - conversionStarted;
       return result;
     } catch (error:Dynamic) {
@@ -59,9 +70,9 @@ class CadPartModel implements CadSessionModel {
   public function geometryConversionSeconds():Float return lastGeometryConversionSeconds;
 
   public function sceneDimensions():CadModelDimensions {
-    var output = document.outputFeatureOrNull();
-    if (output == null || output.currentShape() == null) return {width: 0.05, height: 0.05, depth: 0.01};
-    var bounds = collisionBoundsFor(document.result());
+    var shown = document.displayedFeature();
+    if (shown == null || shown.currentShape() == null) return {width: 0.05, height: 0.05, depth: 0.01};
+    var bounds = collisionBoundsFor(document.displayedShape());
     return {
       width: Math.max(bounds.halfExtents.x * 2, 0.000001),
       height: Math.max(bounds.halfExtents.y * 2, 0.000001),
@@ -75,13 +86,14 @@ class CadPartModel implements CadSessionModel {
   public function featureNames():Array<String> return [for (index in 0
     ...document.featureCount()) if (document.featureAt(index).active) document.featureAt(index).serializationType()];
 
+  /** Face numbers belong to the shape on screen, which is the earlier one while the timeline is rolled back. */
   public function faceFingerprint(index:Int):TopologyFingerprint return CadModelTopology.faceFingerprint(
-    document.result(),
+    document.displayedShape(),
     index
   );
 
   public function remapFace(fingerprint:TopologyFingerprint):Int return CadModelTopology.remapFace(
-    document.result(),
+    document.displayedShape(),
     fingerprint
   );
 

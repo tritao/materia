@@ -184,6 +184,7 @@ class ProjectArtifactLoader {
       objects: records,
       sourceMap: project == null ? null : project.sources,
       navigation : project == null ? null : project.navigation,
+      histories : project == null ? null : project.histories,
       presentation : artifact.presentation,
       presentationGeometryFingerprint : materia.presentation.PresentationGeometry.fingerprint(artifact),
       projectVariant : project == null ? null : project.variant,

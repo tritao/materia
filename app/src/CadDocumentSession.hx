@@ -66,7 +66,7 @@ class CadDocumentSession {
     if (model == null) throw "CAD document sessions require a model";
     this.model = model;
     document = model.getDocument();
-    var output = document.outputFeatureOrNull();
+    var output = document.displayedFeature();
     if (output != null && output.currentShape() != null) publishCurrent(beginEvaluation());
   }
 
@@ -156,7 +156,7 @@ class CadDocumentSession {
       edit(this);
       authored = true;
       ensureEvaluationCurrent(ticket);
-      var output = document.outputFeatureOrNull();
+      var output = document.displayedFeature();
       if (output == null || output.currentShape() == null) publishEmpty(ticket);
       else publishCurrent(ticket);
       document.evaluationCancellationCheck = previousCancellationCheck;
@@ -171,6 +171,31 @@ class CadDocumentSession {
           document.clearHistory();
         } catch (_:Dynamic) {
         }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Show the history after feature `index` (-1 for all of it) and publish that shape. The marker is view state, so it
+   * is not an authored edit: nothing enters history, and a failure restores the previous marker.
+   */
+  public function rollTo(index:Int):Void {
+    ensureOpen();
+    var previous = document.rollbackIndex;
+    var ticket = beginEvaluation();
+    try {
+      document.rollTo(index);
+      document.recompute();
+      ensureEvaluationCurrent(ticket);
+      var shown = document.displayedFeature();
+      if (shown == null || shown.currentShape() == null) publishEmpty(ticket);
+      else publishCurrent(ticket);
+      diagnostics = [];
+    } catch (error:Dynamic) {
+      diagnostics = [Std.string(error)];
+      document.rollTo(previous);
+      try document.recompute() catch (_:Dynamic) {
       }
       throw error;
     }
@@ -237,7 +262,7 @@ class CadDocumentSession {
     var nextCollisionBounds:Null<CadCollisionBounds> = null;
     try {
       ensureEvaluationCurrent(ticket);
-      var source = document.result();
+      var source = document.displayedShape();
       var sheetOutput = Std.downcast(document.outputFeatureOrNull(), SheetFeature);
       var candidate:Shape;
       if (sheetFlatView && sheetOutput != null) {

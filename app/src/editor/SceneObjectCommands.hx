@@ -7,6 +7,12 @@ import haxeon.ui.core.UiModifier;
 
 /** Object and CAD editing command registrations. */
 @:access(app.Main.ReferenceEditorApp) class SceneObjectCommands {
+  /** The step row selected in the tree (`occurrence#featureId`), or null when something else is. */
+  static function selectedStep(app:ReferenceEditorApp):Null<String> {
+    var key = app.treeModel == null ? null : app.treeModel.selectionKey();
+    return key != null && StringTools.startsWith(key, "source:") ? key.substr("source:".length) : null;
+  }
+
   public static function install(app:ReferenceEditorApp):Void {
     app.commands.register(new Command("scene.create", "Add rectangle", function() {
       app.scene.createRectangle();
@@ -56,6 +62,18 @@ import haxeon.ui.core.UiModifier;
         );
       }, null, function() return app.files != null && app.scene.selectedSheetFeature() != null));
     }
+    app.commands.register(new Command("scene.roll-back-to-feature", "Roll back to selected feature", function() {
+      var step = selectedStep(app);
+      app.runSceneEdit("Could not roll back", function() return step != null
+        && app.scene.canRollBackToStep(step) ? app.scene.rollBackToStep(step) : app.scene.rollBackToSelectedFeature());
+    }, null, function() {
+      var step = selectedStep(app);
+      return (step != null && app.scene.canRollBackToStep(step)) || app.scene.canRollBackToSelectedFeature();
+    }));
+    app.commands.register(new Command("scene.roll-forward", "Roll forward to the end", function() {
+      app.runSceneEdit("Could not roll forward", function() return app.scene.isHistoryRolledBack(app.scene.selectedId)
+        ? app.scene.rollHistoryForward(app.scene.selectedId) : app.scene.rollForward());
+    }, null, function() return app.scene.isHistoryRolledBack(app.scene.selectedId) || app.scene.canRollForward()));
     app.commands.register(new Command("scene.create-face-sketch", "Sketch on selected face", function() {
       app.runSceneEdit("Could not create face sketch", function() app.scene.createFaceSketch());
     }, null, function() return app.canEditObjects() && app.scene.canCreateFaceSketch()));

@@ -305,6 +305,8 @@ class EditorScene {
   public var onSelectionChanged:Null<Void -> Void> = null;
   /** Optional hierarchy selection, including members of a selected assembly group. */
   public var sourceMap:Null<materia.project.SceneSourceMap> = null;
+  /** Recorded histories of generated parts; rolling one back swaps that part's geometry and step rows. */
+  public final histories:app.editor.PartHistories = new app.editor.PartHistories();
   public var sourceSelection:Null<Void -> Array<materia.project.SceneSourceMap.SceneSourceFeature>> = null;
   public var selectionObjects:Null<Void -> Array<String>> = null;
   var disposed:Bool = false;
@@ -2119,12 +2121,111 @@ class EditorScene {
     return item == null || !isCadKind(item.kind) ? 0 : requireCadSession(id).document.featureCount();
   }
 
+  /** A tree row's text: the feature's label (or its type), led by its group; suppressed and rolled-back steps say so. */
   public function cadFeatureNameAt(id:String, index:Int):String {
     var item = object(id);
     if (item == null || !isCadKind(item.kind)) return "Feature";
-    var feature = requireCadSession(id).document.featureAt(index);
-    var name = feature.serializationType();
-    return feature.active ? name : "Inactive · " + name;
+    var document = requireCadSession(id).document;
+    var feature = document.featureAt(index);
+    var name = feature.label != "" ? feature.label : feature.serializationType();
+    if (feature.group != "") name = feature.group + " · " + name;
+    if (!feature.active) return "Inactive · " + name;
+    return document.rollbackIndex >= 0 && index > document.rollbackIndex ? "Rolled back · " + name : name;
+  }
+
+  /** The history row selected in the tree for CAD object `id`, or -1. */
+  function selectedCadFeatureIndex(id:String):Int {
+    if (selectedId != id || selectedFeatureKey == null) return -1;
+    var marker = selectedFeatureKey.indexOf(":feature:");
+    if (marker < 0 || selectedFeatureKey.substr(0, marker) != id) return -1;
+    var index = Std.parseInt(selectedFeatureKey.substr(marker + 9));
+    var count = requireCadSession(id).document.featureCount();
+    return index == null || index < 0 || index >= count ? -1 : index;
+  }
+
+  /** A generated part's step, from its source id (`occurrence#featureId`): the scene object and the document feature. */
+  function historyStep(sourceId:String):Null<{object:String, occurrence:String, featureId:Int}> {
+    var map = sourceMap;
+    if (map == null) return null;
+    for (feature in map.features) {
+      if (feature.id != sourceId) continue;
+      var objectId = "project:" + feature.occurrence, hash = sourceId.lastIndexOf("#");
+      var featureId = hash < 0 ? null : Std.parseInt(sourceId.substr(hash + 1));
+      if (featureId == null || !histories.has(objectId) || object(objectId) == null) return null;
+      return {object: objectId, occurrence: feature.occurrence, featureId: featureId};
+    }
+    return null;
+  }
+
+  /** Whether the generated part owning step `sourceId` can be shown as it stood after that step. */
+  public function canRollBackToStep(sourceId:String):Bool {
+    var step = historyStep(sourceId);
+    if (step == null) return false;
+    var index = histories.featureIndex(step.object, step.featureId);
+    return index >= 0 && index != histories.shownIndex(step.object);
+  }
+
+  /** Show the part as it stood after step `sourceId`. View state: no undo entry, nothing saved. */
+  public function rollBackToStep(sourceId:String):Bool {
+    var step = historyStep(sourceId);
+    if (step == null || !canRollBackToStep(sourceId)) return false;
+    histories.session(step.object).rollTo(histories.featureIndex(step.object, step.featureId));
+    showHistory(step.object, step.occurrence);
+    return true;
+  }
+
+  /** Whether the generated part behind scene object `objectId` is rolled back. */
+  public function isHistoryRolledBack(objectId:String):Bool return histories.has(objectId)
+    && histories.session(objectId).document.rollbackIndex >= 0;
+
+  public function rollHistoryForward(objectId:String):Bool {
+    if (!isHistoryRolledBack(objectId)) return false;
+    histories.session(objectId).rollTo(-1);
+    showHistory(objectId, objectId.substr("project:".length));
+    return true;
+  }
+
+  function showHistory(objectId:String, occurrence:String):Void {
+    var session = histories.session(objectId);
+    faceHoverIndexes.remove(objectId);
+    setGeometryData(runtimeFor(objectId).geometry, session.geometry());
+    if (selectedId == objectId) clearSelectedCadFace();
+    var map = sourceMap;
+    if (map != null) histories.restyleSteps(objectId, occurrence, map);
+    publish();
+  }
+
+  /** A history row other than the one the view already ends at is selected. */
+  public function canRollBackToSelectedFeature():Bool {
+    var item = object(selectedId);
+    if (item == null || item.kind != "cad-part" || activeSketchEdit != null) return false;
+    var index = selectedCadFeatureIndex(selectedId);
+    if (index < 0) return false;
+    var document = requireCadSession(selectedId).document;
+    return index != (document.rollbackIndex < 0 ? document.featureCount() - 1 : document.rollbackIndex);
+  }
+
+  /** Show the part as it stood after the selected feature. View state: it adds nothing to undo history and is not saved. */
+  public function rollBackToSelectedFeature():Bool {
+    if (!canRollBackToSelectedFeature()) return false;
+    var id = selectedId;
+    requireCadSession(id).rollTo(selectedCadFeatureIndex(id));
+    syncCadSession(id);
+    return true;
+  }
+
+  public function canRollForward():Bool {
+    var item = object(selectedId);
+    return item != null && item.kind == "cad-part" && activeSketchEdit == null
+      && requireCadSession(selectedId).document.rollbackIndex >= 0;
+  }
+
+  public function rollForward():Bool {
+    if (!canRollForward()) return false;
+    var id = selectedId;
+    requireCadSession(id).rollTo(-1);
+    syncCadSession(id);
+    return true;
   }
 
   public function canBeginSelectedSketchEdit():Bool {
@@ -3547,6 +3648,7 @@ class EditorScene {
     if (disposed) return;
     disposed = true;
     cadDisplayGeometry.clear();
+    histories.clear();
     presentation.sourceFaces.dispose(this);
     presentation.threads.dispose(this);
     for (visual in workerVisuals) visual.dispose(scene, false);

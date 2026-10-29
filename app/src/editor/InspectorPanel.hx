@@ -354,6 +354,13 @@ import haxeon.ui.widgets.text.TextField;
               IconName.Save
             )
           ));
+        case "scene.roll-back-to-feature":
+          rows.push(new KeyedView(
+            "roll-back-to-feature",
+            sceneAction("roll-back-to-feature", commandId, "Roll back to here", IconName.Undo)
+          ));
+        case "scene.roll-forward":
+          rows.push(new KeyedView("roll-forward", sceneAction("roll-forward", commandId, "Roll forward", IconName.Redo)));
         case "scene.create-pocket":
           rows.push(new KeyedView("create-pocket", sceneAction("create-pocket", commandId, "Pocket", IconName.Plus)));
         case "scene.create-vertical-fillet":
