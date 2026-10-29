@@ -89,6 +89,8 @@ private typedef SourceFaceEntry = {id:String, snapshot:String, node:NodeId, face
     for (key in active) {
       var entry = entries.get(key);
       if (entry == null) continue;
+      // The overlay is forced visible in this view, so a hidden owner must keep it from showing: it would float where the part was.
+      if (!owner.isVisible(entry.id)) continue;
       view.setPose(entry.node, owner.info(entry.id).worldTransform());
       view.setVisibility(entry.node, true);
       view.setDiagnosticTint(entry.node, owner.selectionMaterial);
