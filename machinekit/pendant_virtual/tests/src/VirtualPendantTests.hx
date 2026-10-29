@@ -61,8 +61,48 @@ class VirtualPendantTests {
     check(found == 1, "the display module has a glass body");
   }
 
+  /** A model whose joints are all at rest, as a display driver reads them. */
+  static function restingInputs():materia.project.LiveDisplay.LiveInputs {
+    return new RestingInputs();
+  }
+
+  static function brightest(rgba:Bytes):Int {
+    var most = 0;
+    for (i in 0...Std.int(rgba.length / 4)) most = Std.int(Math.max(most, rgba.get(i * 4 + 2)));
+    return most;
+  }
+
+  /** The display driver follows the pendant's own timeline: labels arrive, then it dims and blanks, whenever it is next called. */
+  static function checkDriverTimeline():Void {
+    var bindings = new Map<String, String>();
+    for (binding in machinekit.pendant.ReferencePendant.displayBindings()) bindings.set(binding.signal, binding.joint);
+    var config = new materia.project.LiveDisplay.LiveDisplayConfig(
+      PendantDisplaySignals.SOURCE,
+      machinekit.pendant.ReferencePendant.PROFILE,
+      bindings
+    );
+    var driver = new machinekit.operator.PendantDisplayDriver(config);
+    var inputs = restingInputs();
+    var first = driver.advance(0, inputs);
+    check(first != null && first.length == 128 * 64 * 4, "the driver draws a first picture");
+    var now = 0;
+    var changes = 0;
+    while (now < 3000) {
+      now += 16;
+      if (driver.advance(now, inputs) != null) changes++;
+    }
+    check(changes >= 3, "the link comes up and the labels arrive while it runs: " + changes + " pictures");
+    check(driver.advance(3000, inputs) == null, "nothing changes while nothing happens");
+    // The editor draws nothing for a while: the next call finds the display dimmed, and later blank.
+    var dimmed = driver.advance(15000, inputs);
+    check(dimmed != null && brightest(dimmed) > 0 && brightest(dimmed) < 120, "dimmed after ten seconds idle");
+    var blank = driver.advance(70000, inputs);
+    check(blank != null && brightest(blank) == 0, "blank after a minute idle");
+  }
+
   static function main():Void {
     checkModelDisplay();
+    checkDriverTimeline();
     var pendant = new VirtualPendant(0);
     var pixels = pendant.pixels(0);
     check(pixels.length == VirtualPendant.WIDTH * VirtualPendant.HEIGHT, "the OLED is 128x64");
@@ -100,4 +140,16 @@ class VirtualPendantTests {
     linked.close();
     trace("virtual pendant tests passed");
   }
+}
+
+/** Every joint at rest: nothing pressed, every position the first. */
+private class RestingInputs implements materia.project.LiveDisplay.LiveInputs {
+  public function new() {
+  }
+
+  public function position(joint:String):Float return 0.0;
+
+  public function detentIndex(joint:String):Int return 0;
+
+  public function pressed(joint:String):Bool return false;
 }

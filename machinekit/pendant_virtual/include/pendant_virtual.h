@@ -57,9 +57,11 @@ typedef struct pendant_virtual_handle { uint32_t id; } pendant_virtual_handle PV
 PV_API int32_t pendant_virtual_create(uint32_t now_ms, pendant_virtual_handle *out_pendant PV_OUT PV_OWNED);
 PV_API void pendant_virtual_destroy(pendant_virtual_handle pendant);
 
-/* Reads the controls. position: 0 OFF, 1..11; step: 0..2 for x1, x10, x100; keys: bits 0..5 Start, Hold, Stop, F1, F2, F3;
- * wheel_counts is the free-running quadrature count. Returns 1 when a PENDANT_STATE frame is due (every 10 ms; read it with
- * pendant_virtual_frame), else 0. */
+/* Advances the pendant to now_ms with the controls as given. The pendant runs on its own timeline, one PENDANT_STATE frame every
+ * 10 ms: the time since the last call is replayed at that period with the controls as they were then (at most five seconds), so a
+ * caller that ticks irregularly, such as once per rendered frame, still gives the controller the heartbeat it needs to hold the lease.
+ * position: 0 OFF, 1..11; step: 0..2 for x1, x10, x100; keys: bits 0..5 Start, Hold, Stop, F1, F2, F3; wheel_counts is the
+ * free-running quadrature count. Returns 1 when a frame was due at now_ms (read it with pendant_virtual_frame), else 0. */
 PV_API int32_t pendant_virtual_tick(pendant_virtual_handle pendant, uint32_t now_ms, uint16_t wheel_counts,
     uint8_t position, uint8_t step, uint8_t keys, uint8_t wheel_enable, uint8_t chain_closed);
 

@@ -38,11 +38,10 @@ interface LiveDisplaySource {
   public function width():Int;
   public function height():Int;
 
-  /** True while the source has more to draw soon without anything changing in the model, so the editor keeps asking for frames. */
-  public function busy():Bool;
-
   /**
-   * RGBA8, `width() * height() * 4` bytes, when the picture changed since the last call, else null. `nowMs` is the editor clock;
+   * RGBA8, `width() * height() * 4` bytes, when the picture changed since the last call, else null. The editor calls this every
+   * loop iteration, so a source whose picture changes with time (a dimming display, labels that arrive over time) is found out
+   * when it changes. `nowMs` is the editor clock;
    * `inputs` are the model's joints, which the source reads through the bindings of its `LiveDisplayConfig`.
    */
   public function advance(nowMs:Int, inputs:LiveInputs):Null<Bytes>;

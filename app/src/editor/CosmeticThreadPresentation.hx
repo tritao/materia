@@ -273,7 +273,6 @@ private typedef ThreadGroup = {
       var live = entry.live;
       if (live == null) continue;
       var rgba = live.source.advance(nowMs, controls);
-      if (live.source.busy()) changed = true;
       if (rgba == null) continue;
       // The picture is the image's new content. Publishing the node is how the editor tells the renderer a scene resource changed: it
       // refreshes the presentation snapshot the viewport draws from and marks the scene visually changed.
