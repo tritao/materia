@@ -1,8 +1,6 @@
 import cadkit.modeling.Vector;
-import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.ParametricError;
-import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.features.BoxFeature;
 import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.SketchFeature;

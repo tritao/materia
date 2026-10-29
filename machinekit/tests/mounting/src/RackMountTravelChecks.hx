@@ -5,7 +5,6 @@ import machinekit.assembly.PosedParts.PartBox;
 import machinekit.gantry.Gantry;
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyDefinition.KinematicJoint;
-import materia.assembly.AssemblyRecord.AssemblyFrame;
 import cadkit.modeling.Part;
 
 private typedef TravelPart = {

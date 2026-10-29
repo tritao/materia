@@ -16,7 +16,6 @@ import nativekit.scene.SamplerData;
 import nativekit.scene.NodeId;
 import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
-import materia.project.ThreadSpecData;
 
 private typedef ThreadTextures = {
   var color:Texture;

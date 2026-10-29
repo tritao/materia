@@ -81,7 +81,6 @@ import cadkit.parametric.InstanceElement;
 import cadkit.parametric.ElementKind;
 import cadkit.parametric.TypedProperty;
 import cadkit.parametric.PersistentReference;
-import cadkit.parametric.Relationship;
 import cadkit.parametric.RelationshipId;
 
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
