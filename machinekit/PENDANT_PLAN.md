@@ -386,9 +386,18 @@ Notes for the parts review:
   the set small: for example one size for each key (contact and LED, 4 pins), one for the wheel and step switch (4 pins),
   one for the axis switch (13 pins, if PH makes it in SMD) and one for the M12 pigtail (8 pins).
 - **To measure on the bought parts:** the button LEDs' voltage and current, the wheel's current and output type.
-- **Programming:** SWD on test pads (a Tag-Connect footprint needs no part); USB on the H503 for updates can stay pads
-  until a connector is wanted.
+- **Programming:** see "Programming and updates" below.
 - **Still to check on the H503 datasheet:** which pins are 5 V tolerant.
+
+**Programming and updates (decided 2026-10-29).** The pendant's only external connection is the M12 cable, so:
+
+- **Development and bench: SWD.** A Tag-Connect TC2030 footprint (pads only, no part) on SWDIO/SWCLK (PA13/PA14), NRST and
+  3.3 V/GND, for a debug probe (ST-LINK or any probe-rs probe; `probe-rs run`). BOOT0 has a pull-down and a test pad, so the
+  ROM bootloader can be forced if the firmware is broken.
+- **Field updates: over CAN-FD through the cable**, pushed by the cabinet controller, with the case closed. Either ST's
+  ROM bootloader (the H5 system bootloader; whether it offers FDCAN on the H503 is to confirm in AN2606) entered on command
+  by the running firmware, or a small bootloader of ours in flash that checks the image before switching to it. Open.
+- **USB:** PA11/PA12 on test pads and an unfitted USB-C footprint, for the bench only; no opening in the case.
 
 **Steps:**
 
