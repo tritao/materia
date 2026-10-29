@@ -354,6 +354,37 @@ Reserved for the later membrane keypad zone:
 - **Connector:** a keypad connector footprint beside the button harness, unfitted in v1 (a stock 4 x 4 keypad has a 2.54 mm
   8-pin tail; a custom membrane usually a flat-flex tail, chosen with the keypad), with ESD protection on the matrix lines.
 
+**Board v1 parts (proposed 2026-10-29, for the parts review).** From the JLCPCB catalogue snapshot of 2026-10-23 (USD at 1–9
+pieces); the trial board's locked parts are reused where they fit. Every pick is pending until the parts review.
+
+| Function | Part | LCSC | Tier | Price | Why |
+|---|---|---|---|---:|---|
+| MCU | STM32H503RBT6 | C6807804 | ext | 3.70 | decided |
+| Isolated CAN-FD | CA-IS2062A | C22438481 | ext | 1.64 | datasheet read: ISO 11898-2:2016, FD to 5 Mbps, built-in isolated 5 V from a 5 V supply, logic 2.5–5.5 V, 2.5 kVrms, bus ±42 V; preliminary datasheet, certifications pending |
+| CAN bus ESD | PESD2CAN | C284078 | ext | 0.05 | 24 V standoff, bus side |
+| HSE crystal | 16 MHz 3225 (X322516MLB4SI) | C13738 | basic | 0.09 | FDCAN and USB clocks through the PLL |
+| 24 V entry fuse | 1812L050/60GR PTC | C19078719 | ext | — | trial part, 60 V |
+| Reverse protection | M7 diode | C95872 | basic | — | trial part; about 1 V drop is fine at 24 V |
+| Surge | SMBJ30CA | C19077585 | pref | — | trial part |
+| 24 V to 5 V | TPS54360DDAR (60 V buck) | C44377 | ext | 0.72 | rated above the TVS's clamping voltage (about 48 V at peak surge); the basic XL1509-5.0 (C61063, $0.25) is rated only to 40 V |
+| 5 V to 3.3 V | XC6206P332MR-G (200 mA LDO) | C5446 | basic | 0.14 | MCU and logic need well under 100 mA |
+| Wheel phases | SN74LVC2G17DBVR (Schmitt buffer at 3.3 V, 5 V-tolerant inputs) | C7394037 | ext | 0.05 | the wheel's 5 V outputs, whatever the pins' tolerance |
+| Selectors | 2 x 74HC165 | C5613 | pref | 0.11 | decided |
+| Key LEDs | ULN2003ADR (7 channels) | C7512 | basic | 0.15 | one part for the 7 LEDs, from the LED supply the buttons need (12 or 24 V LEDs with their own resistor, to be measured) |
+| Input ESD | SRV05-4 (4 channels) | C85364 | pref | 0.20 | on the lines that leave the board: keys, selectors, enabling channels |
+| E-stop read-back | `din_type3` block (LTV-817S, C109227 basic) | — | — | — | the trial's 24 V input block, if the loop runs at 24 V |
+| Harness connectors | JST PH 2 mm, SMD side entry (S*B-PH-SM4-TB) | e.g. C265101 (3 pin) | ext | 0.22–0.27 | low (about 5.5 mm), wires leave parallel to the board, and SMD so no leads stand out on the face side, which has about 1 mm under the buttons (pcbkit's tail check, E2) |
+
+Notes for the parts review:
+
+- **Connector sizes cost setup fees.** Each different connector size is another extended part (about $3 per order). Keep
+  the set small: for example one size for each key (contact and LED, 4 pins), one for the wheel and step switch (4 pins),
+  one for the axis switch (13 pins, if PH makes it in SMD) and one for the M12 pigtail (8 pins).
+- **To measure on the bought parts:** the button LEDs' voltage and current, the wheel's current and output type.
+- **Programming:** SWD on test pads (a Tag-Connect footprint needs no part); USB on the H503 for updates can stay pads
+  until a connector is wanted.
+- **Still to check on the H503 datasheet:** which pins are 5 V tolerant.
+
 **Steps:**
 
 | Step | Work |
