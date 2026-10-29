@@ -41,9 +41,8 @@ class PendantDevice {
     this.key = key;
     this.config = config;
     pendant = new VirtualPendant(0);
-    var profile = ReferenceOperatorProfiles.named(config.profile);
+    var profile = OperatorProfileCodec.decode(Bytes.ofString(config.profile));
     this.profile = profile;
-    if (profile == null) throw 'The pendant display has no operator profile called "${config.profile}"';
     var compiled = PendantCompiler.compile(profile, [1, 10, 100], 50, 250);
     pendant.attachController(0, compiled.profile, compiled.reasons, compiled.labels);
   }

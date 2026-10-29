@@ -46,7 +46,7 @@ class SurfaceDetailKinds {
   @:id(15) var height:Float;
   /** What drives a display (the editor chooses a live source by this name); empty for the other kinds. */
   @:id(16) var source:String;
-  /** The operator profile (by name) a display's driver serves; empty when the driver needs none. */
+  /** The operator profile a display's driver serves, as the driver reads it (a pendant's is `OperatorProfileCodec` JSON); empty when the driver needs none. */
   @:id(17) var profile:String;
   /** Which joint feeds each signal of the driver; empty for the other kinds. */
   @:id(18) var bindings:Array<DisplayBindingData>;

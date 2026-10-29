@@ -2,7 +2,7 @@
   "version": 1,
   "package": {"name": "machinekit-pendant-attach-tests"},
   "entry": "PendantAttachTests",
-  "sourceRoots": ["src", "../examples/xyz-stage"],
+  "sourceRoots": ["src", "../examples/xyz-stage", "../examples/linear-stage"],
   "dependencies": {"machinekit": {"path": ".."}},
   "target": "host",
   "outputDir": "build/pendant-attach"

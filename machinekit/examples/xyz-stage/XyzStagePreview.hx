@@ -8,14 +8,12 @@ class XyzStagePreview {
   public static function stage():Bytes return SceneArtifact.encode(AssemblyPreview.scene(new XyzStage(), "xyz-stage"));
 
   /**
-   * The stage with a jog pendant beside it, lying on the bench face up: its operator profile is the plain XYZ one and its wheel jogs
-   * the stage's joints. `savedDocument` is the pendant case's recipe as the editor last saved it.
+   * The stage with a jog pendant beside it, lying on the bench face up: its operator profile is derived from the stage's joints and its
+   * wheel jogs them. `savedDocument` is the pendant case's recipe as the editor last saved it.
    */
   public static function withPendant(?savedDocument:String):Bytes {
-    return SceneArtifact.encode(PendantScene.attach(new XyzStage(), PROFILE, materia.assembly.AssemblyFrames.translation(-150, 75, 50), savedDocument));
+    return SceneArtifact.encode(PendantScene.attach(new XyzStage(), materia.assembly.AssemblyFrames.translation(-150, 75, 50), savedDocument));
   }
-
-  public static inline var PROFILE:String = "xyz";
 
   public static function main():Void {
     var problems = new XyzStage().check();

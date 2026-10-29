@@ -1,0 +1,31 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Linear stage",
+	"defaultEntrypoint": "stage",
+	"defaultVariant": "stage",
+	"variants": [
+		{"id": "stage", "label": "Stage", "entrypoint": "stage", "kind": "configuration", "summary": "The table-top Linear stage."},
+		{"id": "with-pendant", "label": "Stage with jog pendant", "entrypoint": "with-pendant", "kind": "configuration", "summary": "The stage with a jog pendant beside it: pick axis 1, hold the wheel-enable key and turn the wheel."}
+	],
+	"build": {
+		"system": "haxeon",
+		"manifest": "haxeon.json"
+	},
+	"entrypoints": {
+		"stage": {
+			"kind": "cad-preview",
+			"module": "LinearStagePreview",
+			"function": "stage",
+			"cache": {"inputs": []}
+		},
+		"with-pendant": {
+			"kind": "cad-preview",
+			"documentInput": true,
+			"reconcilesSavedRecipe": true,
+			"module": "LinearStagePreview",
+			"function": "withPendant",
+			"cache": {"inputs": []}
+		}
+	}
+}

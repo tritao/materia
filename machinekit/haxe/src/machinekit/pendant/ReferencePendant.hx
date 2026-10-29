@@ -54,12 +54,6 @@ class ReferencePendant {
     );
   }
 
-  /**
-   * The operator profile the simulated display serves. A pendant belongs to a machine and should take that machine's profile; until a
-   * layout is built for one, the hobber's stands in.
-   */
-  public static inline var PROFILE:String = "hobber";
-
   /** The joint of `joint` on the part `part`, as the assembly names it: its group, the part, then the joint. */
   public static function jointId(part:String, joint:String, prefix:String = ""):String {
     for (group in groups()) if (group.members.indexOf(part) >= 0) return prefix + group.id + "/" + part + "/" + joint;

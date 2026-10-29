@@ -1,0 +1,27 @@
+{
+	"version": 1,
+	"package": {
+		"name": "machinekit-linear-stage-example"
+	},
+	"entry": "LinearStagePreview",
+	"sources": [
+		"LinearStage.hx",
+		"LinearStagePreview.hx"
+	],
+	"sourceRoots": [
+		"."
+	],
+	"dependencies": {
+		"projectkit": {
+			"path": "../../../projectkit"
+		},
+		"cadkit": {
+			"path": "../../../cadkit"
+		},
+		"machinekit": {
+			"path": "../../"
+		}
+	},
+	"target": "host",
+	"outputDir": "build"
+}

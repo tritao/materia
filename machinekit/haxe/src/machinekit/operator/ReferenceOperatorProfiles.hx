@@ -7,30 +7,6 @@ class ReferenceOperatorProfiles {
     p[1]
   )];
 
-  /** The profile called `name` ("drill-tap", "hobber" or "xyz"), or null. */
-  public static function named(name:String):Null<OperatorProfile> return switch name {
-    case "drill-tap":
-      drillTap();
-    case "hobber":
-      hobber();
-    case "xyz":
-      xyz();
-    case _:
-      null;
-  };
-
-  /** Three linear axes, X, Y and Z, and nothing else: a stage or any plain Cartesian machine. */
-  public static function xyz():OperatorProfile return new OperatorProfile(
-    "xyz",
-    axes([["x", "X"], ["y", "Y"], ["z", "Z"]]),
-    ["x", "y", "z", null, null, null, null, null, null, null, null],
-    [new OperatorKey(Unused, ""), new OperatorKey(Unused, ""), new OperatorKey(Unused, "")],
-    [Jog],
-    false,
-    false,
-    []
-  );
-
   public static function drillTap():OperatorProfile return new OperatorProfile(
     "drill-tap",
     axes([["x", "X"], ["y", "Y"], ["z", "Z"], ["a", "A"], ["spindle", "Spindle"]]),

@@ -38,7 +38,7 @@ class VirtualPendantTests {
       var d = details[0];
       check(d.kind == materia.project.SurfaceDetailRenderData.SurfaceDetailKinds.DISPLAY, "it is a display");
       check(d.source == PendantDisplaySignals.SOURCE, "it names the pendant OLED source");
-      check(d.profile == machinekit.pendant.ReferencePendant.PROFILE, "it names its operator profile");
+      check(d.profile == machinekit.pendant.PendantMachine.reference().profile, "it names its operator profile");
       check(Math.abs(d.width - 57.01) < 1e-6 && Math.abs(d.height - 29.49) < 1e-6, "the active area's size");
       // x to the right and z toward the operator, so y is up; the active area is centred on the module's origin.
       check(Math.abs(d.xDirection[0] - 1) < 1e-9 && Math.abs(d.direction[2] - 1) < 1e-9, "the picture reads upright");
@@ -79,7 +79,7 @@ class VirtualPendantTests {
     for (binding in machinekit.pendant.ReferencePendant.displayBindings()) bindings.set(binding.signal, binding.joint);
     var config = new materia.project.LiveDisplay.LiveDisplayConfig(
       PendantDisplaySignals.SOURCE,
-      machinekit.pendant.ReferencePendant.PROFILE,
+      machinekit.pendant.PendantMachine.reference().profile,
       bindings
     );
     var driver = new machinekit.operator.PendantDisplayDriver(config);
@@ -111,7 +111,7 @@ class VirtualPendantTests {
     for (binding in machinekit.pendant.ReferencePendant.displayBindings()) bindings.set(binding.signal, binding.joint);
     var config = new materia.project.LiveDisplay.LiveDisplayConfig(
       PendantDisplaySignals.SOURCE,
-      machinekit.pendant.ReferencePendant.PROFILE,
+      machinekit.pendant.PendantMachine.reference().profile,
       bindings
     );
     var before = machinekit.operator.PendantDevice.active();
@@ -135,7 +135,7 @@ class VirtualPendantTests {
     for (binding in machinekit.pendant.ReferencePendant.displayBindings()) bindings.set(binding.signal, binding.joint);
     var config = new materia.project.LiveDisplay.LiveDisplayConfig(
       PendantDisplaySignals.LED_SOURCE,
-      machinekit.pendant.ReferencePendant.PROFILE,
+      machinekit.pendant.PendantMachine.reference().profile,
       bindings,
       PendantDisplaySignals.STOP
     );
@@ -167,7 +167,7 @@ class VirtualPendantTests {
     bindings.set(PendantDisplaySignals.jog("x"), "machine/x");
     var config = new materia.project.LiveDisplay.LiveDisplayConfig(
       PendantDisplaySignals.SOURCE,
-      machinekit.pendant.ReferencePendant.PROFILE,
+      machinekit.pendant.PendantMachine.reference().profile,
       bindings
     );
     var driver = new machinekit.operator.PendantDisplayDriver(config);

@@ -21,15 +21,17 @@ class PendantScene {
 
   /**
    * The pendant of a machine: `machine` is the scene's root and the pendant is included in it under `PendantMachine.ACCESSORY` at
-   * `pose`, serving the machine's operator profile and jogging its joints (see `PendantMachine.attachedTo`).
+   * `pose`, serving `operator` (or, without one, the profile derived from the machine's joints) and jogging the machine's joints
+   * (see `PendantMachine.attachedTo`).
    */
   public static function attach(
     root:MachineAssembly,
-    profile:String,
     pose:AssemblyFrame,
-    ?savedDocument:String
+    ?savedDocument:String,
+    ?operator:machinekit.operator.OperatorProfile,
+    ?axisJoints:Map<String, String>
   ):SceneArtifactData {
-    return build(savedDocument, PendantMachine.attachedTo(root, profile), root, pose);
+    return build(savedDocument, PendantMachine.attachedTo(root, operator, axisJoints), root, pose);
   }
 
   /** The pendant alone, or (with `root` and `pose`) included in the machine `root`; `machine` says whose pendant it is. */
