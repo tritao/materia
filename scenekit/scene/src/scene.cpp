@@ -2557,6 +2557,7 @@ nkscene_result NKS_CALL nkscene_image_set_data(nkscene_scene scene, nkscene_imag
     resource->data.resize(data->data_size);
     if (!resource->data.empty())
         std::memcpy(resource->data.data(), data->data, resource->data.size());
+    owner->publish();
     return NKS_OK;
 }
 
@@ -2595,6 +2596,7 @@ nkscene_result NKS_CALL nkscene_texture_set_data(nkscene_scene scene, nkscene_te
         return NKS_ERROR_STALE_ID;
     auto &resource = owner->texture_store().create({texture.value});
     resource.image = {data->image.value};
+    owner->publish();
     return NKS_OK;
 }
 
@@ -2641,6 +2643,7 @@ nkscene_result NKS_CALL nkscene_sampler_set_data(nkscene_scene scene, nkscene_sa
     resource.wrap_v = static_cast<nkscene::SamplerWrap>(data->wrap_v);
     resource.wrap_w = static_cast<nkscene::SamplerWrap>(data->wrap_w);
     resource.max_anisotropy = data->max_anisotropy;
+    owner->publish();
     return NKS_OK;
 }
 

@@ -220,14 +220,7 @@ private typedef ThreadGroup = {
     var geometry = owner.scene.createGeometry();
     owner.scene.setGeometryData(geometry, LiveDisplayMesh.build(detail));
     var material = owner.scene.createMaterial();
-    owner.scene.setMaterialData(
-      material,
-      new MaterialData().setBaseColor(0.0, 0.0, 0.0).setRoughness(0.25).setMetallic(0.0).setEmissive(2.0,
-      2.0, 2.0).setEmissiveTexture(texture).setBaseColorTexture(
-        texture,
-        sampler
-      )
-    );
+    owner.scene.setMaterialData(material, displayMaterial(texture));
     var transaction = owner.scene.beginTransaction();
     var node = transaction.createNode();
     transaction.setName(node, "Display " + detail.source.faceName);
@@ -246,6 +239,15 @@ private typedef ThreadGroup = {
       faceIndex: detail.source.faceIndex,
       live: {source: source, image: image, texture: texture}
     };
+  }
+
+  /** Dark glass that glows with `texture`; it is also the base-colour texture (see `displayNode`). */
+  function displayMaterial(texture:Texture):MaterialData {
+    return new MaterialData().setBaseColor(0.0, 0.0, 0.0).setRoughness(0.25).setMetallic(0.0).setEmissive(2.0,
+      2.0, 2.0).setEmissiveTexture(texture).setBaseColorTexture(
+        texture,
+        sampler
+      );
   }
 
   static function picture(source:LiveDisplaySource, rgba:haxe.io.Bytes):ImageData {
@@ -273,10 +275,10 @@ private typedef ThreadGroup = {
       var rgba = live.source.advance(nowMs, controls);
       if (live.source.busy()) changed = true;
       if (rgba == null) continue;
+      // The picture is the image's new content. Publishing the node is how the editor tells the renderer a scene resource changed: it
+      // refreshes the presentation snapshot the viewport draws from and marks the scene visually changed.
       owner.scene.setImageData(live.image, picture(live.source, rgba));
-      // The viewport redraws only for a new scene revision; a changed picture is one, and the renderer picks up new image data when the scene is refreshed.
-      owner.requireRenderRefresh();
-      owner.markVisualChanged();
+      owner.publishRuntimeNodes([entry.node]);
       changed = true;
     }
     return changed;
