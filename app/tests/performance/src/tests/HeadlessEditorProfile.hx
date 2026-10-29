@@ -57,6 +57,14 @@ private typedef InputProbe = {
 
 /** Replays real editor input through UiContext without a window or X server. */
 @:access(app.EditorScene) class HeadlessEditorProfile {
+
+  /** A NUL-terminated copy of `value`: the natives below read a `const char *`, and `Bytes.ofString` has no terminator. */
+  static function cString(value:String):hl.Bytes {
+    var text = haxe.io.Bytes.ofString(value);
+    var terminated = haxe.io.Bytes.alloc(text.length + 1);
+    terminated.blit(0, text, 0, text.length);
+    return terminated.getData();
+  }
   static var profileSpans = false;
   static var frameGc = FrameGcScheduler.fromEnvironment();
   static var idleSeconds = 0.0;
@@ -184,14 +192,14 @@ private typedef InputProbe = {
       );
       if (censusInterval > 0) {
         hl.Gc.censusStop();
-        hl.Gc.censusDump(cast haxe.io.Bytes.ofString(output + "/census.json").getData());
+        hl.Gc.censusDump(cString(output + "/census.json"));
       }
       if (heapDumpPath != null) {
         frames.resize(0);
         actions.resize(0);
         retained.resize(0);
         hl.Gc.major();
-        hl.Gc.dump(cast haxe.io.Bytes.ofString(heapDumpPath).getData());
+        hl.Gc.dump(cString(heapDumpPath));
       }
     } catch (error:Dynamic) {
       editor.dispose();
