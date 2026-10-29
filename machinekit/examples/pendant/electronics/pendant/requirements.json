@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "board": "pendant",
+  "requirements": [
+    {
+      "id": "REQ-SPEC-1",
+      "text": "Replace the bootstrap with sourced product requirements before designing the board.",
+      "source": {
+        "placeholder": "New-board bootstrap: product requirements have not been defined or reviewed"
+      },
+      "verified_by": [
+        "check:skeleton"
+      ]
+    }
+  ],
+  "verifications": [
+    {
+      "id": "check:skeleton",
+      "kind": "check",
+      "text": "Refuse an unfinished new-board skeleton",
+      "source": {
+        "file": "machinekit/examples/pendant/electronics/pendant/checks.py",
+        "where": "unfinished"
+      }
+    }
+  ]
+}

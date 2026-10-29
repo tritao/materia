@@ -1,0 +1,188 @@
+{
+  "barriers": {},
+  "board": "pendant",
+  "domains": {},
+  "net_class_of": {},
+  "net_classes": {},
+  "netlist_hash": "sha256:4b78539d56e57ba18295ac46ad32f315ed541248c92b61714aaa867fe081107e",
+  "placement": {
+    "anchors": {},
+    "groups": {},
+    "keepouts": {},
+    "modules": {},
+    "outline": null,
+    "page": null,
+    "references": {},
+    "regions": {},
+    "repeats": {},
+    "rules": {
+      "courtyard_clearance_mm": {
+        "source": {
+          "placeholder": "design rule: courtyards of two parts keep at least 0.25 mm (IPC-7351B adds 0.25 mm courtyard excess at density level B; this is the gap between two courtyards, so pads of neighbours are about 0.75 mm apart)"
+        },
+        "value": 0.25
+      },
+      "decoupling": {},
+      "decoupling_max_mm": {
+        "source": {
+          "placeholder": "design rule: a decoupling capacitor's supply pad is at most 2.5 mm (pad edge to pad edge) from the pin it serves; SPEC 8 allows 3 mm, the placer keeps 0.5 mm of margin"
+        },
+        "value": 2.5
+      },
+      "density": {},
+      "edge_margin_mm": {
+        "source": {
+          "placeholder": "design rule: courtyards keep 0.5 mm from the board edge (JLCPCB needs copper 0.2 mm from the routed edge, capabilities page)"
+        },
+        "value": 0.5
+      },
+      "flows": {},
+      "hardware": {},
+      "heights": {},
+      "ic_clearance_mm": {
+        "source": {
+          "placeholder": "design rule: no extra room around ICs (courtyard_clearance_mm applies); a board that needs escape routing raises it"
+        },
+        "value": 0.25
+      },
+      "near": {},
+      "protection": {},
+      "thermal": {}
+    }
+  },
+  "power_sources": {},
+  "roles": {},
+  "routing": {
+    "copper_um": {
+      "inner": {
+        "source": {
+          "url": "https://jlcpcb.com/capabilities/pcb-capabilities",
+          "where": "JLCPCB 4-layer inner copper 0.5 oz (the stackup of the board file: 15.2 um)"
+        },
+        "value": 15.2
+      },
+      "outer": {
+        "source": {
+          "url": "https://jlcpcb.com/capabilities/pcb-capabilities",
+          "where": "JLCPCB 4-layer, 1 oz outer copper (35 um finished); the stackup of the board file"
+        },
+        "value": 35
+      }
+    },
+    "limits": {
+      "analog_keepaway_mm": {
+        "source": {
+          "placeholder": "design rule (SPEC 8: the analog output routes away from the STEP / DIR pairs): 3 mm edge to edge between an analog-class track and a differential pair"
+        },
+        "value": 3.0
+      },
+      "decoupling_link_mm": {
+        "source": {
+          "placeholder": "design rule: the track from a decoupling capacitor's supply pad to its IC pin is at most 6 mm long (0.2 mm of the 0.4 mm / 3 mm placement distance plus the fan-out)"
+        },
+        "value": 6.0
+      },
+      "decoupling_via_mm": {
+        "source": {
+          "placeholder": "design rule: the via that takes a decoupling capacitor's ground pad to the plane is at most 2.5 mm from the pad"
+        },
+        "value": 2.5
+      },
+      "pair_coupled": {
+        "source": {
+          "placeholder": "design rule: at least 80 % of a pair's length runs at its gap (the rest is the fan-out at the ends)"
+        },
+        "value": 0.8
+      },
+      "pair_skew_mm": {
+        "source": {
+          "placeholder": "design rule: the two tracks of a differential pair differ by at most 2 mm (13 ps at 6.7 ps/mm; a 10 Mbit/s driver has 20 ns edges)"
+        },
+        "value": 2.0
+      }
+    },
+    "pairs": {},
+    "pours": {},
+    "power": {
+      "big_via_from_a": {
+        "source": {
+          "placeholder": "design rule: a class that carries 0.5 A or more uses the large via, the others the signal via"
+        },
+        "value": 0.5
+      },
+      "inner_max_width_mm": {
+        "source": {
+          "placeholder": "design rule: a class that needs more than 0.8 mm on the inner copper stays on the outer layers"
+        },
+        "value": 0.8
+      },
+      "margin": {
+        "source": {
+          "placeholder": "design rule: 1.5 x the IPC-2221 width (the formulas are for a free-standing track and carry a +-10 % scatter)"
+        },
+        "value": 1.5
+      },
+      "min_width_mm": {
+        "source": {
+          "placeholder": "design rule: power and ground links at least 0.3 mm (1.5 x the signal width: less drop, a via fits on the track)"
+        },
+        "value": 0.3
+      },
+      "rise_k": {
+        "source": {
+          "url": "https://www.ipc.org/TOC/IPC-2221B.pdf",
+          "where": "IPC-2221B 6.2: the allowed temperature rise of a track, 10 K (design value)"
+        },
+        "value": 10
+      },
+      "via_diameter_mm": {
+        "source": {
+          "placeholder": "design rule: 0.6 mm / 0.3 mm drill vias for power (JLCPCB minimum 0.25 / 0.15 mm)"
+        },
+        "value": 0.6
+      },
+      "via_drill_mm": {
+        "source": {
+          "placeholder": "design rule: 0.3 mm drill"
+        },
+        "value": 0.3
+      }
+    },
+    "signal": {
+      "clearance_mm": {
+        "source": {
+          "placeholder": "design rule: 0.15 mm spacing (JLCPCB minimum 0.09 mm, capabilities page)"
+        },
+        "value": 0.15
+      },
+      "via_diameter_mm": {
+        "source": {
+          "placeholder": "design rule: 0.4 mm / 0.2 mm drill vias (JLCPCB 4-layer minimum 0.25 / 0.15 mm, capabilities page: a ring of 0.1 mm)"
+        },
+        "value": 0.4
+      },
+      "via_drill_mm": {
+        "source": {
+          "placeholder": "design rule: 0.2 mm drill (JLCPCB 4-layer minimum 0.15 mm)"
+        },
+        "value": 0.2
+      },
+      "width_mm": {
+        "source": {
+          "placeholder": "design rule: 0.2 mm signal tracks (JLCPCB minimum 0.09 mm; 0.2 mm keeps yield and leaves room between 1.27 mm pitch pads)"
+        },
+        "value": 0.2
+      }
+    }
+  },
+  "schema": 1,
+  "traceability": [],
+  "waivers": [],
+  "workflow": {
+    "decisions": "machinekit/examples/pendant/electronics/pendant/decisions.json",
+    "netlist": "machinekit/examples/pendant/electronics/pendant/pendant.net",
+    "parts_lock": "machinekit/examples/pendant/electronics/pendant/parts.lock.json",
+    "requirements": "machinekit/examples/pendant/electronics/pendant/requirements.json",
+    "schema": 1
+  }
+}

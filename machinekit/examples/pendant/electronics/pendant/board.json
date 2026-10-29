@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "commands": {
+    "check": "checks.py",
+    "status": "project.py",
+    "place": "layout/place.py",
+    "route": "layout/route.py",
+    "export": "export_draft.py"
+  }
+}

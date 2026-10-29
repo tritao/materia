@@ -1,0 +1,9 @@
+# By-products of the circuit build and KiCad; the board file, project and records are tracked.
+*.log
+*.erc
+*_sklib.py
+*.kicad_prl
+*-backups/
+fp-info-cache
+~*.lck
+__pycache__/

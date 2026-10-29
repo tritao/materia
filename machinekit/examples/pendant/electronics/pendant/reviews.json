@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "board": "pendant",
+  "reviews": {
+    "spec": {
+      "schema": 1,
+      "scope": "spec",
+      "status": "pending",
+      "by": null,
+      "date": null,
+      "hash": null,
+      "evidence": null,
+      "notes": ""
+    },
+    "parts": {
+      "schema": 1,
+      "scope": "parts",
+      "status": "pending",
+      "by": null,
+      "date": null,
+      "hash": null,
+      "evidence": null,
+      "notes": ""
+    },
+    "mechanical": {
+      "schema": 1,
+      "scope": "mechanical",
+      "status": "pending",
+      "by": null,
+      "date": null,
+      "hash": null,
+      "evidence": null,
+      "notes": ""
+    },
+    "floorplan": {
+      "schema": 1,
+      "scope": "floorplan",
+      "status": "pending",
+      "by": null,
+      "date": null,
+      "hash": null,
+      "evidence": null,
+      "notes": ""
+    },
+    "placement": {
+      "schema": 1,
+      "scope": "placement",
+      "status": "pending",
+      "by": null,
+      "date": null,
+      "hash": null,
+      "evidence": null,
+      "notes": ""
+    },
+    "routing": {
+      "schema": 1,
+      "scope": "routing",
+      "status": "pending",
+      "by": null,
+      "date": null,
+      "hash": null,
+      "evidence": null,
+      "notes": ""
+    },
+    "export": {
+      "schema": 1,
+      "scope": "export",
+      "status": "pending",
+      "by": null,
+      "date": null,
+      "hash": null,
+      "evidence": null,
+      "notes": ""
+    }
+  }
+}

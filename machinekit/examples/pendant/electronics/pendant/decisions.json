@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "board": "pendant",
+  "decisions": [
+    {
+      "id": "DEC-SPEC",
+      "question": "What are this board's sourced functional and mechanical requirements?",
+      "options": [
+        "Define and review the product requirements"
+      ],
+      "choice": null,
+      "rationale": "Bootstrap only; no circuit, process or mechanical proposal is approved.",
+      "decided_by": null,
+      "date": null,
+      "affects": [
+        "REQ-SPEC-1"
+      ],
+      "status": "open",
+      "blocks": [
+        "spec",
+        "export",
+        "order"
+      ],
+      "source": {
+        "placeholder": "New-board bootstrap: product requirements have not been defined or reviewed"
+      }
+    }
+  ],
+  "reviews": {}
+}
