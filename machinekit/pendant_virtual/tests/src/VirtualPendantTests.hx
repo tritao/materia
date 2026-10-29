@@ -48,7 +48,8 @@ class VirtualPendantTests {
         PendantDisplaySignals.AXIS,
         PendantDisplaySignals.STEP,
         PendantDisplaySignals.WHEEL,
-        PendantDisplaySignals.WHEEL_ENABLE
+        PendantDisplaySignals.WHEEL_ENABLE,
+        PendantDisplaySignals.ESTOP
       ].concat(PendantDisplaySignals.keys());
       check(d.bindings.length == expected.length, "every signal is bound: " + d.bindings.length);
       for (binding in d.bindings) {
@@ -93,6 +94,10 @@ class VirtualPendantTests {
     }
     check(changes >= 3, "the link comes up and the labels arrive while it runs: " + changes + " pictures");
     check(driver.advance(3000, inputs) == null, "nothing changes while nothing happens");
+    // Pushing the E-stop's head opens the chain the pendant reads back, and it says so; releasing it clears the alert.
+    var stopped = driver.advance(3010, new PressedInputs(bindings.get(PendantDisplaySignals.ESTOP)));
+    check(stopped != null, "pushing the E-stop changes the picture");
+    check(driver.advance(3020, inputs) != null, "releasing the E-stop changes it back");
     // The editor draws nothing for a while: the next call finds the display dimmed, and later blank.
     var dimmed = driver.advance(15000, inputs);
     check(dimmed != null && brightest(dimmed) > 0 && brightest(dimmed) < 120, "dimmed after ten seconds idle");
@@ -152,4 +157,16 @@ private class RestingInputs implements materia.project.LiveDisplay.LiveInputs {
   public function detentIndex(joint:String):Int return 0;
 
   public function pressed(joint:String):Bool return false;
+}
+
+/** Every joint at rest except one that is pressed. */
+private class PressedInputs extends RestingInputs {
+  final joint:String;
+
+  public function new(joint:String) {
+    super();
+    this.joint = joint;
+  }
+
+  override public function pressed(id:String):Bool return id == joint;
 }

@@ -7,6 +7,7 @@ import cadkit.modeling.StrokeText;
 import cadkit.modeling.Vector;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as R;
+import materia.assembly.AssemblyDefinition.AssemblyJointLimits;
 
 /**
  * A 22 mm twist-release emergency stop (XB2-ES542 style): a mushroom head on a collar, the stem through the
@@ -28,6 +29,7 @@ class EmergencyStop extends HmiPart {
     R.length("collarDiameter", 30),
     R.length("collarHeight", 9),
     R.length("headHeight", 22),
+    R.length("pressTravel", 4),
     R.length("panelHole", 22.3),
     R.length("panelThickness", 3),
     R.length("nutDiameter", 30),
@@ -56,6 +58,7 @@ class EmergencyStop extends HmiPart {
       "collarDiameter",
       "collarHeight",
       "headHeight",
+      "pressTravel",
       "panelHole",
       "panelThickness",
       "nutDiameter",
@@ -72,6 +75,7 @@ class EmergencyStop extends HmiPart {
       n("collarDiameter") < n("headDiameter") && n("panelHole") < n("collarDiameter"),
       "the head is wider than its collar and the collar wider than the opening"
     );
+    require(n("pressTravel") + 1 < n("collarHeight"), "the collar stands taller than the head's travel");
     require(count("blocks") >= 1 && count("blocks") <= 3, "one to three contact blocks");
     require(
       n("blockThickness") * count("blocks") <= n("baseDepth") + 1e-9 && n("blockWidth") <= n("baseWidth"),
@@ -111,6 +115,17 @@ class EmergencyStop extends HmiPart {
   function rearBody():Footprint return Rect(n("baseWidth"), n("baseDepth"));
 
   /**
+   * The head is pushed in by `pressTravel` and latches there until it is twisted out: released at 0, pushed at the end of its travel.
+   * It latches (no rest position), and a pushed head opens the contacts, so a simulator reads the chain as open while it is in.
+   */
+  override public function joints():Array<DeviceJointSpec> {
+    var travel = n("pressTravel");
+    var limits:AssemblyJointLimits = {lower: -travel,
+      upper: 0.0, velocity: null, effort: null, detents: [-travel, 0.0]};
+    return [new DeviceJointSpec("press", Prismatic, "operator", "head", limits, 0.0)];
+  }
+
+  /**
    * The grey operator (stem and latching base), the stainless ring nut, the dark contact blocks that carry the NC contacts, and
    * the red mushroom head on its collar.
    */
@@ -121,6 +136,7 @@ class EmergencyStop extends HmiPart {
       var base = RoundedRectangle.box(n("baseWidth"), n("baseDepth"), 3.0, -t - nut - n("baseLength"), -t - nut);
       return Solids.union([
         Solids.named(Part.cylinderSpan(n("panelHole") / 2, -t - nut, 0.0), "stem"),
+        Solids.named(Part.cylinderSpan(postRadius(), -1.0, postTop()), "post"),
         Solids.named(base, "base")
       ]);
     }
@@ -178,24 +194,33 @@ class EmergencyStop extends HmiPart {
       return Solids.union(pieces);
     }
     ), new DeviceBodySpec("head", "emergency stop mushroom head", materialSpec(), function() {
-      var above = aboveFace(), c = n("collarHeight"), h = n("headDiameter") / 2;
+      // Drawn released: the collar's foot stands `pressTravel` above the panel and reaches it when the head is pushed in. The head is
+      // hollow underneath and slides over the operator's post, on its wall, at both ends of the travel.
+      var above = aboveFace(), c = n("collarHeight"), h = n("headDiameter") / 2, travel = n("pressTravel");
+      var post = postRadius();
       return Solids.named(
         Part.revolve([
-          {r: 0.0, z: 0.0},
-          {r: n("collarDiameter") / 2, z: 0.0},
+          {r: post, z: travel},
+          {r: n("collarDiameter") / 2, z: travel},
           {r: n("collarDiameter") / 2, z: c},
           {r: h - 1.5, z: c + 1.5},
           {r: h, z: c + 4.0},
           {r: h, z: above - 3.0},
           {r: h - 3.0, z: above - 0.6},
           {r: h - 8.0, z: above},
-          {r: 0.0, z: above}
+          {r: 0.0, z: above},
+          {r: 0.0, z: postTop() + travel + 1.0},
+          {r: post, z: postTop() + travel + 1.0}
         ]),
         "head"
       );
     }
     )];
   }
+
+  /** The post the head slides over: a little narrower than the opening, and as tall as the head's travel plus the length it stays engaged. */
+  function postRadius():Float return n("panelHole") / 2 - 1.0;
+  function postTop():Float return n("pressTravel") + 3.0;
 
   /** Where each block's four terminal screws sit on its rear face, from the block's centre. */
   function terminalSpots():Array<{x:Float, y:Float}> return [for (sx in [-1.0, 1.0]) for (sy in [-1.0, 1.0]) {

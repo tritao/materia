@@ -52,7 +52,8 @@ class PendantDisplayDriver implements LiveDisplaySource {
     // by one and the display dimming and blanking happen at their times whenever this is next called; the picture is returned when
     // it differs from the last one.
     pendant.takeJog();
-    pendant.tick(nowMs, counts, axis, step, keys, enabled, true);
+    var chainClosed = !inputs.pressed(config.joint(PendantDisplaySignals.ESTOP));
+    pendant.tick(nowMs, counts, axis, step, keys, enabled, chainClosed);
     var power = pendant.displayPower(nowMs);
     var checksum = pendant.checksum(nowMs);
     if (started && power == lastPower && checksum == lastChecksum) return null;

@@ -15,6 +15,8 @@ class PendantDisplaySignals {
   /** The hand wheel's rotation; 400 counts per turn. */
   public static inline var WHEEL:String = "wheel";
   public static inline var WHEEL_ENABLE:String = "wheel-enable";
+  /** The E-stop's head: pushed in, the chain is open. The pendant only reads it back; the chain itself is hard wired. */
+  public static inline var ESTOP:String = "estop";
   public static inline var START:String = "start";
   public static inline var HOLD:String = "hold";
   public static inline var STOP:String = "stop";
