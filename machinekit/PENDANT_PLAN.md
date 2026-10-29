@@ -71,8 +71,8 @@ legends are the only machine-specific part.
 
 - **Fixed and physical:** E-stop, enabling switch, the wheel, and the two selectors. Start, Hold and Stop stay physical buttons at
   first, because they are the keys a hand finds by feel.
-- **Keypad zone:** a block of 10 to 12 keys (a stock matrix membrane keypad or a PCB with domes) replaces F1 to F3 and the
-  wheel-enable key, under a printed overlay in a shallow recess in the plate's face, with a gasket for sealing.
+- **Keypad zone:** a block of 10 to 12 keys (a stock matrix membrane keypad or a PCB with domes) replaces F1 to F3, under a
+  printed overlay in a shallow recess in the plate's face, with a gasket for sealing.
 - **Selector ring legends** move onto the overlay, so the 12-position axis switch prints the machine's axis names (X, Y, Z, A ...)
   instead of plain numbers.
 - **One source for legends.** The operator profile already names each key's function per machine. The overlay artwork (SVG, from
@@ -83,7 +83,10 @@ legends are the only machine-specific part.
 - **Bench path:** a stock 4 x 4 matrix membrane keypad with overlays printed on adhesive polyester needs no tooling for the first
   unit. A custom membrane or dome PCB comes later if the layout settles.
 - **Costs and risks:** worse with gloves than metal buttons; the overlay wears and must be replaceable; the recess needs a seal.
-  Keep the keypad zone to non-safety functions.
+  Keep the keypad zone to non-safety functions: the wheel-enable key, which is held to jog, stays a physical button
+  (decided 2026-10-29). A membrane matrix has no diodes, so three keys held at once can read as a fourth; the firmware
+  rejects combinations it cannot resolve (two at once is fine). A dome-switch keypad PCB can carry diodes.
+- **Board v1 reserves it** (see "Board v1 pin budget"), so the keypad is a connector change, not a redesign.
 - **Work in the repo when it is taken up:** a `KeypadOverlay` panel part (cutout, recess, ID), overlay artwork generated from
   the profile, a keypad zone in `ReferencePendant`, and the ID check in the operator profile and its digest.
 
@@ -321,6 +324,36 @@ with a content hash so pcbkit marks the board stale when the case changes):
 | Connector access: low-profile, top-entry parts on the back side; latches reachable with the board in place | the stack above |
 | Frame: the case plan (origin at the face centre, y up, seen from the face) to the board frame (top-left origin, y down, seen from the PCB's top side) | stated, mirrored per the component-side decision |
 | Status: every value from an assumed part is a placeholder until the part is measured | the part sources |
+
+**Board v1 pin budget** (STM32H503RBT6, 49 I/O; assigned in EN4 from the datasheet's alternate-function table):
+
+| Function | Pins |
+|---|---:|
+| Axis switch (one-hot) | 12 |
+| Step switch | 3 |
+| Keys (contacts) | 7 |
+| Key LEDs | 7 |
+| Wheel encoder (timer channels) | 2 |
+| I2C (OLED, keypad ID) | 2 |
+| FDCAN TX/RX | 2 |
+| E-stop read-back | 1 |
+| Enabling switch (reserved) | 4 |
+| HSE crystal | 2 |
+| SWD | 2 |
+| USB | 2 |
+| **Total** | **46** |
+
+Reserved for the later membrane keypad zone:
+
+- **Matrix group:** the contacts and LEDs of F1, F2, F3 and one more key sit on 8 plain GPIO, able to act as a 4 x 4 matrix's
+  rows (outputs) and columns (inputs with pull-ups and interrupts) and not needed by any alternate function. The keypad
+  variant reuses those 8 pins; it has no key LEDs.
+- **ID:** one ADC-capable pin (a resistor ID) and the I2C bus (a small memory on the keypad tail) both reach the keypad
+  connector, so either ID method works. With the ADC pin the budget is 47 of 49.
+- **Connector:** a keypad connector footprint beside the button harness, unfitted in v1 (a stock 4 x 4 keypad has a 2.54 mm
+  8-pin tail; a custom membrane usually a flat-flex tail, chosen with the keypad), with ESD protection on the matrix lines.
+- **Margin:** if more pins are needed, the axis and step switches (15 inputs) move to two 74HC165 (C5613, preferred) on
+  3 pins, which frees about 12.
 
 **Steps:**
 
