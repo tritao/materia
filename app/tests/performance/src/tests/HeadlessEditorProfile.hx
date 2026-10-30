@@ -293,7 +293,8 @@ private typedef InputProbe = {
       }
       var dirty = editor.ui.isDirty();
       submit(editor, frame, frames, name);
-      var bytes = hl.Gc.totalAllocated() - before;
+      // Up to the end of the frame: the harness's own timeline record is not the UI's allocation.
+      var bytes = lastFrameAllocatedAt - before;
       if (!results.exists(name)) {
         results.set(name, []);
         dirtyCounts.set(name, 0);
@@ -797,6 +798,9 @@ private typedef InputProbe = {
     );
   }
 
+  /** The allocation counter as the last frame ended, before the timeline record for it was serialized. */
+  static var lastFrameAllocatedAt = 0.0;
+
   static function submit(
     editor:ReferenceEditorApp,
     frame:LayoutFrame,
@@ -814,6 +818,7 @@ private typedef InputProbe = {
     frameGc.beginFrame();
     editor.submit(frame);
     frameGc.endFrame();
+    lastFrameAllocatedAt = hl.Gc.totalAllocated();
     editor.ui.buildContext.buildProbe = null;
     var elapsed = Sys.time() - started;
     if (profileSpans && input != null) haxeon.ProfileSpan.end("tab/" + actionName + "/frame");
