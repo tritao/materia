@@ -18,5 +18,5 @@
     }
   },
   "target": "host",
-  "outputDir": "../build/visibility-tests"
+  "outputDir": "../build/selection-tests"
 }
