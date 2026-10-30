@@ -86,7 +86,11 @@ class InstanceElement extends Element {
   public function restoreOverride(name:String, value:Dynamic):Void {
     if (value == null) overrides.remove(name);
     else overrides.set(name, value);
+    document.metadataChanged();
   }
 
-  public function restoreDefinitionId(value:DefinitionId):Void definitionId = value;
+  public function restoreDefinitionId(value:DefinitionId):Void {
+    definitionId = value;
+    document.metadataChanged();
+  }
 }

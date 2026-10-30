@@ -36,6 +36,7 @@ class Relationship {
   public function restoreEndpoints(source:ElementReference, target:ElementReference):Void {
     this.source = source;
     this.target = target;
+    document.metadataChanged();
   }
 
   public function property(name:String):Null<TypedProperty> return propertyValues.get(name);
@@ -50,6 +51,7 @@ class Relationship {
   public function restoreProperty(name:String, value:Null<TypedProperty>):Void {
     if (value == null) propertyValues.remove(name);
     else propertyValues.set(name, value);
+    document.metadataChanged();
   }
 
   public function setProperty(value:TypedProperty):Void document.setRelationshipProperty(this, value);

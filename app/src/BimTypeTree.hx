@@ -19,14 +19,10 @@ class BimTypeTree implements TreeViewModel {
   public static inline var InstancePrefix:String = "bim:type-instance:";
 
   public final model:BimDocument;
-  private var lastSignature:Null<String>;
-  private var viewRevision:Int;
 
   public function new(model:BimDocument) {
     if (model == null) throw "BIM type tree needs a document";
     this.model = model;
-    lastSignature = null;
-    viewRevision = 1;
   }
 
   public function rootCount():Int return definitions().length;
@@ -81,15 +77,7 @@ class BimTypeTree implements TreeViewModel {
     return tooltip;
   }
 
-  public function revision():Int {
-    var next = signature();
-    if (lastSignature == null) lastSignature = next;
-    else if (lastSignature != next) {
-      lastSignature = next;
-      viewRevision++;
-    }
-    return viewRevision;
-  }
+  public function revision():Int return model.cad.metadataRevision;
 
   public function definitionIdForKey(key:String):Null<String> {
     if (key == null || !StringTools.startsWith(key, DefinitionPrefix)) return null;
@@ -149,18 +137,4 @@ class BimTypeTree implements TreeViewModel {
 
   private function definitionKey(definition:Definition):String return DefinitionPrefix + definition.id.value;
 
-  private function signature():String {
-    var result = new StringBuf();
-    for (definition in definitions()) {
-      result.add(definition.id.value);
-      result.add("|");
-      result.add(definition.name);
-      result.add("|");
-      result.add(definition.revision);
-      result.add("|");
-      result.add(instanceCount(definition));
-      result.add(";");
-    }
-    return result.toString();
-  }
 }

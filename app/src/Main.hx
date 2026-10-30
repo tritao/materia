@@ -2233,16 +2233,24 @@ class ReferenceEditorApp implements DesktopUiApplication {
     result.register(new DockPanelDescriptor("mission", "Mission", true, true, IconName.Activity));
     result.register(new DockPanelDescriptor("cnc", "CNC", true, true, IconName.Terminal));
 
-    // The panels without observing are rebuilt on every full frame, because their builds are not pure reads: the BIM editor shows
-    // element properties that have no revision, machine control pushes state into the GPU viewport and keeps gesture and draft
-    // state, and the mission and CNC panels follow a running program by scrolling from inside the build.
+    // The panels without observing are rebuilt on every full frame, because their builds are not pure reads: machine control
+    // pushes state into the GPU viewport and keeps gesture and draft state, and the mission and CNC panels follow a running
+    // program by scrolling from inside the build.
     workspacePanelContents = [DockPanelContent.observing(
       "start",
       function(context) return StartPanel.build(this, context),
       function(context, width) return StartPanel.build(this, context, width)
-    ), DockPanelContent.observing("hierarchy", function(context) return HierarchyPanel.build(this, context)), new DockPanelContent(
+    ), DockPanelContent.observing("hierarchy", function(context) return HierarchyPanel.build(this, context)), DockPanelContent.observing(
       "bim",
-      function(_) return bimEditor
+      function(context) {
+        var editor = bimEditor;
+        context.observeBool(() -> bimEditor == editor);
+        return editor;
+      }, function(context, width) {
+        var editor = bimEditor;
+        context.observeBool(() -> bimEditor == editor);
+        return editor.atWidth(width);
+      }
     ), DockPanelContent.observing("perspective", function(context) {
       observePerspective(context);
       return perspectivePanel();

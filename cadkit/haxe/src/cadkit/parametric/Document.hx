@@ -65,6 +65,15 @@ class Document {
   public final lengthUnit:String;
   public final metresPerUnit:Float;
 
+  /** Monotonic invalidation for element/definition/relationship membership and metadata, including history restoration. */
+  public var metadataRevision(default, null):Int = 0;
+
+  @:allow(cadkit.parametric.Element)
+  @:allow(cadkit.parametric.Definition)
+  @:allow(cadkit.parametric.InstanceElement)
+  @:allow(cadkit.parametric.Relationship)
+  function metadataChanged():Void metadataRevision++;
+
   private final elements:Array<Element>;
   private var elementsById:Map<String, Element>;
   private var issuedElementIds:Map<String, Bool>;
@@ -237,6 +246,7 @@ class Document {
       != (subgraph != null)) throw new ParametricError("feature subgraph recipe and graph payload do not match");
     var result = new Definition(this, id, name, recipe, inputs, outputs, subgraph);
     definitions.push(result);
+    metadataChanged();
     definitionsById.set(id.value, result);
     issuedDefinitionIds.set(id.value, true);
     return result;
@@ -244,12 +254,14 @@ class Document {
 
   public function restoreDefinitionRemoval(definition:Definition):Void {
     definitions.remove(definition);
+    metadataChanged();
     definitionsById.remove(definition.id.value);
   }
 
   public function restoreDefinitionInsertion(definition:Definition, index:Int):Void {
     if (definitionsById.exists(definition.id.value)) throw new ParametricError("definition is already registered");
     definitions.insert(index, definition);
+    metadataChanged();
     definitionsById.set(definition.id.value, definition);
   }
 
@@ -577,6 +589,7 @@ class Document {
       + id.value);
     var result = new Element(this, id, name, "geometry", output);
     elements.push(result);
+    metadataChanged();
     elementsById.set(id.value, result);
     issuedElementIds.set(id.value, true);
     return result;
@@ -622,6 +635,7 @@ class Document {
       .exists(id.value)) throw new ParametricError("duplicate or previously issued relationship ID: " + id.value);
     var result = new Relationship(this, id, typeName, source, target);
     relationships.push(result);
+    metadataChanged();
     relationshipsById.set(id.value, result);
     issuedRelationshipIds.set(id.value, true);
     return result;
@@ -676,6 +690,7 @@ class Document {
     validateRelationshipEndpoint(relationship.target);
     var insertion = index < 0 ? 0 : (index > relationships.length ? relationships.length : index);
     relationships.insert(insertion, relationship);
+    metadataChanged();
     relationshipsById.set(relationship.id.value, relationship);
     for (property in relationship.properties()) validatePropertyReferences(property);
   }
@@ -683,6 +698,7 @@ class Document {
   public function restoreRelationshipRemoval(relationship:Relationship):Void {
     validateOwnedRelationship(relationship);
     relationships.remove(relationship);
+    metadataChanged();
     relationshipsById.remove(relationship.id.value);
   }
 
@@ -782,6 +798,7 @@ class Document {
     if (issuedElementIds.exists(result
       .id.value)) throw new ParametricError("duplicate or previously issued element ID: " + result.id.value);
     elements.push(result);
+    metadataChanged();
     elementsById.set(result.id.value, result);
     issuedElementIds.set(result.id.value, true);
   }
@@ -973,6 +990,7 @@ class Document {
       + element.id.value);
     var insertion = index < 0 ? 0 : (index > elements.length ? elements.length : index);
     elements.insert(insertion, element);
+    metadataChanged();
     elementsById.set(element.id.value, element);
     datumChanged(element);
   }
@@ -983,6 +1001,7 @@ class Document {
     datumChanged(element);
     element.clearPlacedShape();
     elements.remove(element);
+    metadataChanged();
     elementsById.remove(element.id.value);
   }
 
@@ -1749,6 +1768,7 @@ class Document {
     afterRecompute = null;
     selectedOutput = null;
     closed = true;
+    metadataChanged();
   }
 
   public function recordParameterChange(parameter:Parameter, oldValue:Float):Void {

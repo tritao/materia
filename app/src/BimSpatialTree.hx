@@ -17,14 +17,10 @@ class BimSpatialTree implements TreeViewModel {
   public static inline var ElementPrefix:String = "bim:element:";
 
   public final model:BimDocument;
-  private var knownSignature:Null<String>;
-  private var viewRevision:Int;
 
   public function new(model:BimDocument) {
     if (model == null) throw "BIM spatial tree needs a document";
     this.model = model;
-    knownSignature = null;
-    viewRevision = 1;
   }
 
   public function rootCount():Int return projects().length;
@@ -83,15 +79,7 @@ class BimSpatialTree implements TreeViewModel {
     return tooltip;
   }
 
-  public function revision():Int {
-    var next = signature();
-    if (knownSignature == null) knownSignature = next;
-    else if (knownSignature != next) {
-      knownSignature = next;
-      viewRevision++;
-    }
-    return viewRevision;
-  }
+  public function revision():Int return model.cad.metadataRevision;
 
   public function elementIdForKey(nodeKey:String):Null<ElementId> {
     if (nodeKey == null || !StringTools.startsWith(nodeKey, ElementPrefix)) return null;
@@ -145,24 +133,4 @@ class BimSpatialTree implements TreeViewModel {
 
   private function key(id:ElementId):String return ElementPrefix + id.value;
 
-  private function signature():String {
-    var result = new StringBuf();
-    for (element in model.cad.allElements()) {
-      result.add(element.id.value);
-      result.add("|");
-      result.add(element.name);
-      result.add("|");
-      result.add(bimClass(element));
-      result.add(";");
-    }
-    for (relationship in model.cad.allRelationships()) {
-      result.add(relationship.typeName);
-      result.add("|");
-      result.add(relationship.source.elementId.value);
-      result.add("|");
-      result.add(relationship.target.elementId.value);
-      result.add(";");
-    }
-    return result.toString();
-  }
 }

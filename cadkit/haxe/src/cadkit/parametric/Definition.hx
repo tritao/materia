@@ -77,6 +77,7 @@ class Definition {
   public function restoreProperty(name:String, value:Null<TypedProperty>):Void {
     if (value == null) propertyValues.remove(name);
     else propertyValues.set(name, value);
+    document.metadataChanged();
   }
 
   public function setProperty(value:TypedProperty):Void document.setDefinitionProperty(this, value);
@@ -117,12 +118,17 @@ class Definition {
   public function restoreEditedMarker(name:String, editedByUser:Bool):Void {
     var value = input(name);
     value.restore(value.defaultValue, editedByUser);
+    document.metadataChanged();
   }
 
   public function restoreDefault(name:String, value:Dynamic, revision:Int, editedByUser:Bool):Void {
     input(name).restore(value, editedByUser);
     this.revision = revision;
+    document.metadataChanged();
   }
 
-  public function restoreRevision(value:Int):Void revision = value;
+  public function restoreRevision(value:Int):Void {
+    revision = value;
+    document.metadataChanged();
+  }
 }

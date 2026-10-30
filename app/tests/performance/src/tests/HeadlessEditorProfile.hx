@@ -275,6 +275,121 @@ private typedef InputProbe = {
     if (editor.workspace.activePanelId != panel) throw "Panel did not activate: " + panel;
   }
 
+  static function runBimFlowsScenario(editor:ReferenceEditorApp, frame:LayoutFrame, cycles:Int, frames:Array<String>):Void {
+    var model = editor.session.bim;
+    var project = model.createProject("Retention BIM project");
+    var site = model.createSite("Retention BIM site", project.id);
+    var building = model.createBuilding("Retention BIM building", site.id);
+    var storey = model.createStorey("Retention BIM storey", building.id);
+    var definition = model.createWindowDefinition("Retention BIM type", 1000, 1200, 80, 200);
+    var instance = model.createWindow("Retention BIM window", definition);
+    model.addToStorey(storey.id, instance.id);
+    function select(key:String):Void {
+      var root = editor.ui.root, row:Null<RenderNode> = null;
+      if (root != null) root.walk(function(node) {
+        if (node.semantics != null && node.semantics.role == AccessibilityRole.TreeItem && node.semantics.label == key) row = node;
+      });
+      var target = row;
+      if (target == null || target.resolved == null) throw "BIM tree row is unavailable: " + key;
+      var bounds = target.resolved.clippedViewportBounds();
+      if (bounds.width <= 0 || bounds.height <= 0) throw "BIM tree row is outside its viewport: " + key;
+      var x = bounds.x + bounds.width * 0.75, y = bounds.y + bounds.height * 0.5;
+      var path = editor.ui.events.hitTestPath(x, y);
+      var hit = false;
+      for (node in path) if (node.id.value == target.id.value) hit = true;
+      if (!hit) throw "BIM row hit-test differs from its resolved bounds: " + key + " at " + x + "," + y
+        + " path=" + [for (node in path) node.styleKey + ":" + (node.semantics == null ? "" : node.semantics.label)].join("/");
+      editor.ui.pointerDown(x, y, 0);
+      editor.ui.pointerUp(x, y, 0);
+    }
+    function value(label:String):Null<String> {
+      var root = editor.ui.root, result:Null<String> = null;
+      if (root != null) root.walk(function(node) {
+        var semantics = node.semantics;
+        if (semantics != null && semantics.label == label && semantics.value != null) result = semantics.value;
+      });
+      return result;
+    }
+    function number(label:String):Float {
+      var text = value(label);
+      if (text == null) throw "BIM numeric control is not visible: " + label;
+      return Std.parseFloat(text);
+    }
+    function step(action:String, cycle:Int):Void {
+      editor.invalidateView();
+      submit(editor, frame, frames, action, cycle);
+    }
+    var previousLayout = editor.workspace.root;
+    editor.workspace.setRoot(DockNode.Panel("bim"));
+    showPanel(editor, frame, frames, "bim");
+    for (cycle in 0...cycles) {
+      select(app.BimSpatialTree.ElementPrefix + project.id.value);
+      step("bim-select-project", cycle);
+      if (value("Name") != project.name) throw "BIM spatial selection did not open the inspector: " + value("Name") + " expected " + project.name;
+      editor.ui.key(UiEventKind.KeyDown, UiKey.Left);
+      editor.ui.key(UiEventKind.KeyUp, UiKey.Left);
+      step("bim-collapse", cycle);
+      if (showsText(editor, site.name)) throw "BIM tree did not retain its collapsed branch";
+      editor.ui.key(UiEventKind.KeyDown, UiKey.Right);
+      editor.ui.key(UiEventKind.KeyUp, UiKey.Right);
+      step("bim-expand", cycle);
+      if (!showsText(editor, site.name)) throw "BIM tree did not rebuild its expanded branch";
+      project.rename("Retention BIM project " + cycle);
+      step("bim-rename", cycle);
+      if (value("Name") != project.name) throw "BIM inspector did not observe a rename";
+      if (!model.undo()) throw "BIM rename undo is missing";
+      step("bim-undo", cycle);
+      if (value("Name") != project.name) throw "BIM inspector did not observe undo";
+      if (!model.redo()) throw "BIM rename redo is missing";
+      step("bim-redo", cycle);
+      if (value("Name") != project.name) throw "BIM inspector did not observe redo";
+      project.setProperty(cadkit.parametric.TypedProperty.text("retention.note", "Note " + cycle));
+      step("bim-add-property", cycle);
+      if (value("retention.note") != "Note " + cycle) throw "BIM inspector did not observe a new property";
+      project.removeProperty("retention.note");
+      step("bim-remove-property", cycle);
+      if (showsText(editor, "retention.note")) throw "BIM inspector retained a removed property";
+      project.setProperty(cadkit.parametric.TypedProperty.integer("retention.note", cycle));
+      step("bim-property-schema", cycle);
+      if (number("retention.note") != cycle) throw "BIM inspector did not observe the replacement property schema";
+      click(editor, "bim-model-editor:mode:types", false);
+      step("bim-types", cycle);
+      select(app.BimTypeTree.DefinitionPrefix + definition.id.value);
+      step("bim-select-type", cycle);
+      var previousRevision = definition.revision;
+      definition.setDefault("width", 1100 + cycle);
+      step("bim-type-default", cycle);
+      if (number("width (mm)") != 1100 + cycle) throw "BIM type inspector ignored its default";
+      definition.restoreDefault("width", 1000, previousRevision, false);
+      step("bim-type-restore", cycle);
+      if (number("width (mm)") != 1000) throw "BIM metadata revision repeated after restoring a definition revision";
+      select(app.BimTypeTree.InstancePrefix + instance.id.value);
+      step("bim-select-instance", cycle);
+      instance.setOverride("width", 900 + cycle);
+      step("bim-instance-override", cycle);
+      if (number("width (mm)") != 900 + cycle) throw "BIM instance inspector ignored its override";
+      instance.rename("Retention BIM window " + cycle);
+      step("bim-instance-label", cycle);
+      if (!showsText(editor, instance.name)) throw "BIM type tree ignored an instance rename";
+      click(editor, "bim-model-editor:mode:spatial", false);
+      step("bim-spatial", cycle);
+      // Fitted inspector labels may publish text feedback after layout.
+      step("bim-settled", cycle);
+      var root = editor.ui.root;
+      var before = root == null ? null : findByStyleKey(root, "bim-model-editor:mode:types", false);
+      if (before == null) throw "BIM retention target is missing";
+      step("bim-unchanged", cycle);
+      root = editor.ui.root;
+      if (editor.ui.verifyRetentionEvery == 0 && (root == null || findByStyleKey(root, "bim-model-editor:mode:types", false) != before))
+        throw "Unchanged BIM editor was rebuilt";
+      frame.width = cycle % 2 == 0 ? 500 : 1320;
+      step("bim-resize", cycle);
+    }
+    frame.width = 1320;
+    editor.workspace.setRoot(previousLayout);
+    step("bim-layout-restored", cycles);
+  }
+
   /**
    * Dock panels that are retained by what they observe, with the inputs each shows changing between frames that do not touch the
    * scene: the Start page's loading, failure, search, category and recent files. With HAXEON_UI_VERIFY_RETENTION=1 every frame is
@@ -288,6 +403,7 @@ private typedef InputProbe = {
     frames:Array<String>,
     actions:Array<String>
   ):Void {
+    runBimFlowsScenario(editor, frame, cycles, frames);
     // A camera panel needs no generated machine to exercise its headless presentation transitions.
     showPanel(editor, frame, frames, "inspection-camera");
     var noAssembly = "Open an assembly to inspect its views.";
@@ -475,6 +591,9 @@ private typedef InputProbe = {
     app.editor.ExampleCatalog.open(editor, gallery);
     // The example plays in real time; the scenario steps it by hand.
     editor.simulation.stop();
+    showPanel(editor, frame, frames, "bim");
+    if (!showsText(editor, "Select a BIM object or type.") || showsText(editor, "Retention BIM"))
+      throw "BIM dock retained a replaced document";
     showPanel(editor, frame, frames, "telemetry");
     if (textStarting(editor, "Physics step") == null) throw "Telemetry does not show the physics step";
     var seen:Map<String, Bool> = new Map();

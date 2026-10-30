@@ -47,7 +47,11 @@ class Element {
     return placedShape;
   }
 
-  public function restoreName(value:String):Void name = value;
+  public function restoreName(value:String):Void {
+    if (name == value) return;
+    name = value;
+    document.metadataChanged();
+  }
 
   public function property(name:String):Null<TypedProperty> return propertyValues.get(name);
 
@@ -61,6 +65,7 @@ class Element {
   public function restoreProperty(name:String, value:Null<TypedProperty>):Void {
     if (value == null) propertyValues.remove(name);
     else propertyValues.set(name, value);
+    document.metadataChanged();
   }
 
   public function setProperty(value:TypedProperty):Void document.setElementProperty(this, value);

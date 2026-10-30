@@ -40,7 +40,6 @@ class BimModelEditor implements View {
   public var showingTypes(default, null):Bool;
   private var selectedElementId:Null<String>;
   private var selectedDefinitionId:Null<String>;
-  private var panelWidth:Float = 0.0;
   private static inline final COMPACT_WIDTH:Float = 620.0;
 
   public function new(key:String, model:BimDocument, ?projectDocument:EditorDocument, ?applyEdit:BimProjectEdit) {
@@ -66,8 +65,16 @@ class BimModelEditor implements View {
     selectedElementId = null;
   }
 
-  public function build(context:BuildContext):RenderNode {
-    var compact = panelWidth < COMPACT_WIDTH;
+  public function atWidth(width:Float):View return new BimEditorWidthView(this, width);
+
+  public function build(context:BuildContext):RenderNode return buildAtWidth(context, context.viewportWidth);
+
+  public function buildAtWidth(context:BuildContext, width:Float):RenderNode {
+    context.observeInt(() -> model.cad.metadataRevision);
+    context.observeBool(() -> showingTypes);
+    context.observeString(() -> selectedElementId);
+    context.observeString(() -> selectedDefinitionId);
+    var compact = width < COMPACT_WIDTH;
     var toolbarStyle = new LayoutStyle();
     toolbarStyle.width = LayoutAxis.grow();
     toolbarStyle.childGap = 4.0;
@@ -110,6 +117,7 @@ class BimModelEditor implements View {
       }
       );
     }
+    tree.selectionProvider = showingTypes ? selectedTypeKey : selectedSpatialKey;
     var inspector = buildInspector();
     var inspectorStyle = new LayoutStyle();
     inspectorStyle.width = LayoutAxis.grow();
@@ -133,13 +141,6 @@ class BimModelEditor implements View {
     rootStyle.clipHorizontal = true;
     var root = new Column(key,
       [new KeyedView("mode", toolbar), new KeyedView("content", content)], rootStyle).build(context);
-    root.onResolved(function(geometry) {
-      if ((panelWidth < COMPACT_WIDTH) != (geometry.width < COMPACT_WIDTH)) {
-        panelWidth = geometry.width;
-        context.commands.refresh();
-      } else panelWidth = geometry.width;
-    }
-    );
     return root;
   }
 
@@ -191,28 +192,23 @@ class BimModelEditor implements View {
     return result;
   }
 
-  private function selectedSpatialKey():Null<String> {
-    if (selectedElementId != null) {
-      var candidate = BimSpatialTree.ElementPrefix + selectedElementId;
-      if (model.cad.findElement(new ElementId(selectedElementId)) != null) return candidate;
-    }
-    return spatialTree.rootCount() == 0 ? null : spatialTree.rootKeyAt(0);
-  }
+  private function selectedSpatialKey():Null<String> return selectedElementId == null ? null : BimSpatialTree.ElementPrefix + selectedElementId;
 
-  private function selectedTypeKey():Null<String> {
-    if (selectedDefinitionId != null) {
-      var candidate = BimTypeTree.DefinitionPrefix + selectedDefinitionId;
-      if (findDefinition(selectedDefinitionId) != null) return candidate;
-    }
-    if (selectedElementId != null) {
-      var candidate = BimTypeTree.InstancePrefix + selectedElementId;
-      if (model.cad.findElement(new ElementId(selectedElementId)) != null) return candidate;
-    }
-    return typeTree.rootCount() == 0 ? null : typeTree.rootKeyAt(0);
-  }
+  private function selectedTypeKey():Null<String> return selectedDefinitionId != null ? BimTypeTree.DefinitionPrefix + selectedDefinitionId
+    : selectedElementId == null ? null : BimTypeTree.InstancePrefix + selectedElementId;
 
   private function findDefinition(id:String):Null<Definition> {
     for (definition in model.cad.allDefinitions()) if (definition.id.value == id) return definition;
     return null;
   }
+}
+
+private class BimEditorWidthView implements View {
+  final editor:BimModelEditor;
+  final width:Float;
+  public function new(editor:BimModelEditor, width:Float) {
+    this.editor = editor;
+    this.width = width;
+  }
+  public function build(context:BuildContext):RenderNode return editor.buildAtWidth(context, width);
 }
