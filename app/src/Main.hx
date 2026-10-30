@@ -1031,12 +1031,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var shell = new AppShell(
       "reference-editor-shell",
       new Stack("overlay-host", layers),
-      new RetainedView("editor-top-bar", function(_) return topBar(), function() return topBarRevisionKey()),
+      // No hand-written key: what the toolbar shows is read through context.observe*, and its command buttons observe their commands.
+      new RetainedView("editor-top-bar", function(context) return topBar(context)),
       null,
       null,
       shellStyle,
       null,
-      new RetainedView("editor-status-bar", function(_) return statusBar(), function() return statusBarRevisionKey())
+      new RetainedView("editor-status-bar", function(context) return statusBar(context))
     );
     var windowLayers:Array<StackChild> = [new StackChild(
       "shell",
@@ -1780,7 +1781,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   /** Two tiers: file and document actions above, mode and simulation controls below. */
-  function topBar():View {
+  function topBar(context:haxeon.ui.core.BuildContext):View {
+    context.observeString(() -> Std.string(toolbarDensity));
     var compact = toolbarDensity != Full;
     var stack = new LayoutStyle();
     stack.width = LayoutAxis.grow();
@@ -1794,9 +1796,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
     return new Column(
       "editor-toolbar",
       [
-        new KeyedView("file", fileBar(compact)),
+        new KeyedView("file", fileBar(context, compact)),
         new KeyedView("divider", divider),
-        new KeyedView("context", contextBar(compact))
+        new KeyedView("context", contextBar(context, compact))
       ],
       stack
     );
@@ -1813,7 +1815,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     return style;
   }
 
-  function fileBar(compact:Bool):View {
+  function fileBar(context:haxeon.ui.core.BuildContext, compact:Bool):View {
     var minimal = toolbarDensity == Minimal;
     var titleStyle = new LayoutStyle();
     titleStyle.width = LayoutAxis.fixed(compact ? 72.0 : 84.0);
@@ -1829,7 +1831,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     }
     items.push(new KeyedView(
       "status",
-      new app.editor.DocumentPathLabel(app.editor.DocumentPathLabel.documentPath(session))
+      new app.editor.DocumentPathLabel(context.observeString(() -> app.editor.DocumentPathLabel.documentPath(session)))
     ));
     var more = new Button(compact ? "" : "More", null, function() {
       toolbarMenuVisible = !toolbarMenuVisible;
@@ -1838,13 +1840,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
     more.variant = ButtonVariant.Secondary;
     more.leadingIcon = IconName.ChevronDown;
     more.accessibilityLabel = "More editor actions";
-    more.selected = toolbarMenuVisible;
+    more.selected = context.observeBool(() -> toolbarMenuVisible);
     items.push(new KeyedView("more", more));
     return new Row("editor-file-bar", items, toolbarRowStyle(FILE_BAR_HEIGHT, appearance.toolbar));
   }
 
   // The mode strip is tinted while a simulation is active, so the non-editing state is obvious.
-  function contextBar(compact:Bool):View {
+  function contextBar(context:haxeon.ui.core.BuildContext, compact:Bool):View {
+    context.observeString(projectLoadingRevisionKey);
     var loading = projectLoadingStatus(), failure = projectLoadingFailure();
     if (loading != null || failure != null) {
       var items:Array<KeyedView> = [];
@@ -1884,14 +1887,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var items:Array<KeyedView> = [
       new KeyedView("modes", modeSwitcher(compact)),
       new KeyedView("space", new Spacer("context-space", LayoutAxis.grow(), LayoutAxis.fixed(1.0))),
-      new KeyedView("transport", transportGroup(compact)),
+      new KeyedView("transport", transportGroup(context, compact)),
       new KeyedView("space-end", new Spacer("context-space-end", LayoutAxis.grow(), LayoutAxis.fixed(1.0))),
       new KeyedView("frame", toolbarAction("toolbar-frame", "scene.frame-selected", "Frame", IconName.Inspect, compact))
     ];
     return new Row(
       "editor-context-bar",
       items,
-      toolbarRowStyle(CONTEXT_BAR_HEIGHT, simulation.isActive() ? appearance.toolbarSimulating : appearance.toolbar)
+      toolbarRowStyle(CONTEXT_BAR_HEIGHT, context.observeBool(simulation.isActive) ? appearance.toolbarSimulating : appearance.toolbar)
     );
   }
 
@@ -1916,12 +1919,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   /** Play/Pause, Step, Reset, and return-to-design controls for the shared simulation. */
-  function transportGroup(compact:Bool):View {
+  function transportGroup(context:haxeon.ui.core.BuildContext, compact:Bool):View {
     var style = new LayoutStyle();
     style.direction = LayoutDirection.LeftToRight;
     style.childAlignY = LayoutAlignmentY.Center;
     style.childGap = 4.0;
-    if (simulationStop != null) return new Row(
+    if (context.observeBool(() -> simulationStop != null)) return new Row(
       "editor-transport",
       [
         new KeyedView(
@@ -1936,6 +1939,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       style
     );
     var pending = simulationBuild;
+    context.observeString(() -> simulationBuild == null ? null : simulationBuild.control.currentPhase());
     if (pending != null) {
       var cancel = new Button("Cancel", null, cancelSimulationBuild, "simulation-build-cancel");
       cancel.variant = ButtonVariant.Secondary;
@@ -1960,7 +1964,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         style
       );
     }
-    var running = simulation.isRunning();
+    var running = context.observeBool(simulation.isRunning);
     // Labels appear when the bar has room; every button always explains itself on hover.
     var items:Array<KeyedView> = [new KeyedView(
       "play-pause",
@@ -2018,7 +2022,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         compact
       )
     ));
-    if (!compact) items.push(new KeyedView("state", simulationStateChip()));
+    if (!compact) items.push(new KeyedView("state", simulationStateChip(context)));
     return new Row("editor-transport", items, style);
   }
 
@@ -2037,14 +2041,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   /** Current simulation state as a chip that cannot be mistaken for a button label. */
-  function simulationStateChip():View {
+  function simulationStateChip(context:haxeon.ui.core.BuildContext):View {
     var tokens = appearance.theme.tokens;
-    var active = simulation.isActive();
-    var mission = simulation.missionPlayer();
-    var missionFailed = mission != null && mission.failure != null;
-    var text = simulationStateLabel();
+    var active = context.observeBool(simulation.isActive);
+    var missionFailed = context.observeBool(() -> {
+      var mission = simulation.missionPlayer();
+      return mission != null && mission.failure != null;
+    });
+    var text = context.observeString(simulationStateLabel);
     var dotColor = missionFailed
-      ? tokens.danger : simulation.isRunning() ? tokens.success : active ? tokens.warning : tokens.textSecondary;
+      ? tokens.danger : context.observeBool(simulation.isRunning) ? tokens.success : active ? tokens.warning : tokens.textSecondary;
     var chip = new LayoutStyle();
     chip.direction = LayoutDirection.LeftToRight;
     chip.childAlignY = LayoutAlignmentY.Center;
@@ -2073,50 +2079,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     return simulation.isActive() && simulation.pending(sensors, scene) ? text + " · rebuild pending" : text;
   }
 
-  static final topBarCommands:Array<String> = [
-    "editor.new",
-    "editor.open",
-    "editor.save",
-    "editor.undo",
-    "editor.redo",
-    "editor.mode.design",
-    "editor.mode.simulate",
-    "sim.play",
-    "sim.pause",
-    "sim.step",
-    "sim.reset",
-    "sim.stop",
-    "scene.frame-selected"
-  ];
-
-  static final topBarKey:haxeon.ui.core.KeyHash = new haxeon.ui.core.KeyHash();
-
-  /**
-   * Everything the top bar shows. The command registry's revision is not part of it: the dock and most edits refresh the
-   * registry, which rebuilt the toolbar on every tab switch. What the toolbar reads from commands is their presence and
-   * enabled and checked states, hashed here; command predicates change without a refresh anyway (for example after selection).
-   */
-  function topBarRevisionKey():String {
-    var hash = topBarKey.reset();
-    for (id in topBarCommands) {
-      var command = commands.get(id);
-      hash.addInt(command == null ? -1 : (command.isEnabled(ui.commandContext) ? 1 : 0) | (command.isChecked(ui.commandContext) ? 2 : 0));
-    }
-    var mission = simulation.missionPlayer();
-    var pending = simulationBuild;
-    hash.addString(app.editor.DocumentPathLabel.documentPath(session)).addBool(simulation.isActive())
-      .addBool(simulation.isRunning()).addBool(mission != null && mission.failure != null).addString(simulationStateLabel())
-      .addBool(simulationStop != null).addString(pending == null ? null : pending.control.currentPhase())
-      .addString(Std.string(toolbarDensity)).addBool(toolbarMenuVisible).addString(projectLoadingRevisionKey());
-    return hash.a + ":" + hash.b;
-  }
-
-  function statusBarRevisionKey():String {
-    return "left=" + statusSelectionLabel() + ":right=" + statusRuntimeLabel()
-      + ":grid=" + gridSpacing + ":snap=" + gridSnapEnabled + ":mates=" + Std.string(session.assemblyMateStatus())
-      + ":mateProblem=" + (session.assemblyMateProblem != null) + ":error=" + (simulation.error != null);
-  }
-
   // The viewport also consumes simulation poses, so its dependencies include presentation revisions.
   /** Adds everything the perspective panel's retained tree depends on to `hash`. */
   function perspectiveRevisionHash(hash:KeyHash):Void {
@@ -2129,7 +2091,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       .addString(Std.string(session.assemblyMateStatus()));
   }
 
-  function statusBar():View {
+  function statusBar(context:haxeon.ui.core.BuildContext):View {
     var style = new LayoutStyle();
     style.width = LayoutAxis.grow();
     style.height = LayoutAxis.fixed(STATUS_HEIGHT);
@@ -2139,37 +2101,38 @@ class ReferenceEditorApp implements DesktopUiApplication {
     style.padding = new Insets(10.0, 3.0, 10.0, 3.0);
     style.background = appearance.toolbar;
 
-    var left = statusSelectionLabel();
-    var right = statusRuntimeLabel();
+    var left = context.observeString(statusSelectionLabel);
+    var right = context.observeString(statusRuntimeLabel);
+    var narrow = context.observeBool(() -> viewportWidth < 700.0), wide = context.observeBool(() -> viewportWidth >= 900.0);
     var items:Array<KeyedView> = [
       new KeyedView(
         "selection",
         new Text(
-          shortenLabel(left, viewportWidth < 700.0 ? 20 : 48),
+          shortenLabel(left, narrow ? 20 : 48),
           null,
-          simulation.error == null ? appearance.theme.tokens.textSecondary : appearance.theme.tokens.danger,
+          context.observeBool(() -> simulation.error == null) ? appearance.theme.tokens.textSecondary : appearance.theme.tokens.danger,
           TextStyleOverride.text(12.0)
         )
       ),
       new KeyedView("space", new Spacer("status-space", LayoutAxis.grow(), LayoutAxis.fixed(1.0)))
     ];
-    var mates = session.assemblyMateStatus();
+    var mates = context.observeString(() -> session.assemblyMateStatus());
     if (mates != null) {
-      var trouble = StringTools.startsWith(mates, "Mates conflict") || session.assemblyMateProblem != null;
+      var trouble = StringTools.startsWith(mates, "Mates conflict") || context.observeBool(() -> session.assemblyMateProblem != null);
       items.push(new KeyedView(
         "mates",
         new Text(
-          shortenLabel(mates, viewportWidth < 900.0 ? 32 : 72),
+          shortenLabel(mates, wide ? 72 : 32),
           null,
           trouble ? appearance.theme.tokens.danger : appearance.theme.tokens.textSecondary,
           TextStyleOverride.text(12.0)
         )
       ));
     }
-    if (viewportWidth >= 900.0) items.push(new KeyedView(
+    if (wide) items.push(new KeyedView(
       "grid",
       new Text(
-        "Grid " + gridSpacingLabel() + " m · Snap " + (gridSnapEnabled ? "On" : "Off"),
+        context.observeString(() -> "Grid " + gridSpacingLabel() + " m · Snap " + (gridSnapEnabled ? "On" : "Off")),
         null,
         appearance.theme.tokens.textSecondary,
         TextStyleOverride.text(12.0)
