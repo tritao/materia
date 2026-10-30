@@ -6,6 +6,7 @@ import haxeon.ui.Insets;
 import haxeon.ui.LayoutAxis;
 import haxeon.ui.LayoutStyle;
 import haxeon.ui.core.View;
+import haxeon.ui.core.BuildContext;
 import haxeon.ui.widgets.KeyedView;
 import haxeon.ui.widgets.controls.Button;
 import haxeon.ui.widgets.controls.Checkbox;
@@ -60,24 +61,38 @@ import haxeon.ui.widgets.text.TextField;
   }
   static function number(value:Float):String return Std.string(Math.fround(value * 1000) / 1000);
 
-  public function build(app:ReferenceEditorApp):View {
-    app.configurePresentationViewport();
+  /** Synchronize gesture ownership before testing retained dependencies. Viewport setup belongs to the document lifecycle. */
+  public function update(app:ReferenceEditorApp):Void {
     if (generation != app.session.generation) {
       cancelGesture();
       generation = app.session.generation;
       drafts.clear();
+      freeAxes.clear();
       error = null;
     }
+    if (app.simulation.isActive() || app.session.scriptOwnership != null || app.documents.blocked()) cancelGesture();
+  }
+
+  public function build(app:ReferenceEditorApp, context:BuildContext):View {
+    context.observeInt(() -> app.session.generation);
+    context.observeInt(() -> app.session.document.revision);
+    var definition = app.session.projectAssemblyDefinition, state = app.session.liveAssemblyState;
+    context.observeBool(() -> app.session.projectAssemblyDefinition == definition);
+    context.observeBool(() -> app.session.liveAssemblyState == state);
+    var motion = app.session.machineMotion;
+    context.observeBool(() -> app.session.machineMotion == motion);
     var axes = MachineControlModel.axes(app.session);
-    var editable = !app.simulation.isActive() && app.session.scriptOwnership == null && !app.documents.blocked();
-    if (!editable) cancelGesture();
+    var active = context.observeBool(app.simulation.isActive);
+    var owned = context.observeBool(() -> app.session.scriptOwnership != null);
+    var blocked = context.observeBool(app.documents.blocked);
+    var editable = !active && !owned && !blocked;
     var style = new LayoutStyle();
     style.width = LayoutAxis.grow();
     style.childGap = 8;
     style.padding = new Insets(12, 12, 12, 12);
     var rows:Array<KeyedView> = [new KeyedView("heading", app.sectionHeading("MACHINE CONTROL"))];
-    var guardPanel = app.simulation.isActive()
-      ? EnclosureGuardPanel.build(app.simulation) : EnclosureGuardPanel.preview(app.session, editable, (
+    var guardPanel = active
+      ? EnclosureGuardPanel.build(app.simulation, context) : EnclosureGuardPanel.preview(app.session, editable, (
         id,
         value
       ) -> {try {
@@ -97,7 +112,19 @@ import haxeon.ui.widgets.text.TextField;
     });
     if (guardPanel != null) rows.push(new KeyedView("enclosure-guard", guardPanel));
     var viewport = app.perspectiveViewport;
+    context.observeBool(() -> app.perspectiveViewport == viewport);
+    if (viewport != null) context.observeBool(viewport.sectionActive);
     var cup = app.simulation.hobbingPlayer();
+    context.observeBool(() -> app.simulation.hobbingPlayer() == cup);
+    if (cup != null) {
+      context.observeBool(() -> cup.handling != null);
+      context.observeString(() -> cup.scenario);
+      context.observeBool(() -> cup.cutStarted);
+      context.observeBool(() -> cup.cutCompleted);
+      context.observeBool(() -> cup.completed);
+      context.observeString(() -> cup.handling == null ? null : cup.handling.inspection);
+      context.observeString(() -> cup.handling == null ? null : cup.handling.phase);
+    }
     var machineMotion = app.session.machineMotion;
     var cupId = machineMotion == null || machineMotion.hobbing == null ? null : machineMotion.hobbing.stock;
     if (cup != null && cup.handling != null && (cup.scenario == null || cup.scenario == "loading")) {
@@ -356,7 +383,7 @@ import haxeon.ui.widgets.text.TextField;
             at = i;
           }
           var onDetent = nearest < 1e-3;
-          var free = freeAxes.exists(id);
+          var free = context.observeBool(() -> freeAxes.exists(id));
           controls.push(new KeyedView(
             "detents",
             new Text(onDetent ? "Position " + (at + 1) + " of " + axis.detents.length : "Between positions "
@@ -374,7 +401,7 @@ import haxeon.ui.widgets.text.TextField;
         }
         var field = new TextField(
           "machine-axis-value:" + id,
-          drafts.exists(id) ? drafts.get(id) : position,
+          context.observeString(() -> drafts.get(id)) ?? position,
           value -> drafts.set(id, value)
         );
         field.label = rotary ? title + " (deg)" : "Position (" + axis.unit + ")";
@@ -454,6 +481,7 @@ import haxeon.ui.widgets.text.TextField;
         new Text('$linked linked or closure joints follow automatically.')
       ));
     }
+    context.observeString(() -> error);
     if (error != null) rows.push(new KeyedView("error", new Text(error)));
     var fill = ReferenceEditorApp.fillStyle();
     fill.background = app.appearance.theme.tokens.surface;

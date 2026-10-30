@@ -8,6 +8,10 @@ import robotkit.world.RobotWorld;
 
 /** Real assembly, native runtime switches and velocity snapshots; no substituted guard feedback. */
 class EnclosureRuntimeTests {
+  static function panelView(panel:app.editor.MachineControlPanel, editor:app.Main.ReferenceEditorApp):haxeon.ui.core.View {
+    panel.update(editor);
+    return panel.build(editor, editor.ui.buildContext);
+  }
   static var checks = 0;
   static function check(ok:Bool, why:String):Void {
     checks++;
@@ -250,7 +254,7 @@ class EnclosureRuntimeTests {
         null,
         true
       );
-      var panel = app.editor.EnclosureGuardPanel.build(simulation);
+      var panel = app.editor.EnclosureGuardPanel.build(simulation, editor.ui.buildContext);
       check(panel != null, "Runtime exposes operator guard controls");
       var tree = editor.ui.submit(panel, new haxeon.ui.LayoutFrame(900, 600));
       check(
@@ -501,7 +505,7 @@ class EnclosureRuntimeTests {
       );
       mainCamera.dispose();
       var machinePanel = new app.editor.MachineControlPanel(), frame = new haxeon.ui.LayoutFrame(900, 1600);
-      tree = editor.ui.submit(machinePanel.build(editor), frame);
+      tree = editor.ui.submit(panelView(machinePanel, editor), frame);
       check(
         has(tree, "ENCLOSURE · DESIGN PREVIEW") && has(tree, "Open door") && has(tree, "Close door"),
         "Door controls exist before Play"
@@ -512,7 +516,7 @@ class EnclosureRuntimeTests {
       );
       var history = editor.session.document.history.undoCount;
       function click(label:String):Void {
-        var root = editor.ui.submit(machinePanel.build(editor), frame), node = find(root, label);
+        var root = editor.ui.submit(panelView(machinePanel, editor), frame), node = find(root, label);
         if (node == null) throw 'Missing preview action $label';
         var b = node.globalBounds();
         editor.ui.pointerDown(b.x + b.width / 2, b.y + b.height / 2, 0);
@@ -540,7 +544,7 @@ class EnclosureRuntimeTests {
       );
       var previewGuard = previewSimulation.enclosureController();
       if (previewGuard == null) throw "Missing preview-transition guard";
-      var paused = app.editor.EnclosureGuardPanel.build(previewSimulation);
+      var paused = app.editor.EnclosureGuardPanel.build(previewSimulation, editor.ui.buildContext);
       if (paused == null) throw "Missing paused controls";
       check(
         has(editor.ui.submit(paused, frame), "Resume simulation"),
@@ -578,7 +582,7 @@ class EnclosureRuntimeTests {
       );
       check(!editor.simulation.isActive(), "Preview never starts simulation");
       check(
-        has(editor.ui.submit(machinePanel.build(editor), frame), "ENCLOSURE · DESIGN PREVIEW"),
+        has(editor.ui.submit(panelView(machinePanel, editor), frame), "ENCLOSURE · DESIGN PREVIEW"),
         "Preview remains available after repeated actions"
       );
       editor.dispose();

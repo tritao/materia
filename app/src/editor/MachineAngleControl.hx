@@ -67,9 +67,13 @@ class MachineAngleControl implements View {
     var delta = (to - from) % 360;
     return delta > 180 ? delta - 360 : delta < -180 ? delta + 360 : delta;
   }
-  public function build(context:BuildContext):RenderNode return context.withScope(new Key(key),
-    () -> {var node = new RenderNode(
-      context.id("angle"),
+  public function build(context:BuildContext):RenderNode return context.withScope(new Key(key), () -> {
+    var nodeId = context.id("angle");
+    return context.selfUpdating(nodeId, () -> buildControl(context, nodeId));
+  });
+  function buildControl(context:BuildContext, nodeId:haxeon.ui.core.WidgetId):RenderNode {
+    var node = new RenderNode(
+      nodeId,
       LayoutVisualKind.Custom,
       style
     );
@@ -93,22 +97,18 @@ class MachineAngleControl implements View {
     next = Math.fround(next * 10000) / 10000;
     if (next == value) return;
     value = next;
-    var displayed = wrapped ? app.MachineControlModel.wrapDegrees(value) : value;
-    semantics.numericValue = displayed;
-    semantics.value = Std.string(displayed) + " degrees";
-    if (!wrapped && minimum == null) semantics.numericMinimum = value - 360;
-    if (!wrapped && maximum == null) semantics.numericMaximum = value + 360;
-    refresh.update(value);
+    if (context.requestPatch(nodeId)) refresh.updateQuietly(value);
+    else refresh.update(value);
     change(value);
   };
   var point = function(event:UiEvent): {x: Float, y: Float} {
-    var bounds = node.resolved;
+    var bounds = RenderNode.latest(node).resolved;
     if (bounds == null) return {x: 0.0, y: 0.0};
     var p = bounds.viewportToLayout(event.x, event.y);
     return {x: p.x - bounds.x, y: p.y - bounds.y};
   };
   var move = function(event:UiEvent) {
-    var state:AngleDrag = drag.value, bounds = node.resolved;
+    var state:AngleDrag = drag.value, bounds = RenderNode.latest(node).resolved;
     if (!state.active || bounds == null || !enabled) return;
     var p = point(event), fine = (event.modifiers & UiModifier.Shift) != 0 ? 0.1 : 1.0;
     var angle = Math.atan2(p.x - bounds.width / 2, bounds.height / 2 - p.y) * 180 / Math.PI;
@@ -116,12 +116,12 @@ class MachineAngleControl implements View {
     var next = value + delta * fine;
     // A centre crossing has no reliable angular direction.
     if (!dial || Math.pow(p.x - bounds.width / 2, 2) + Math.pow(p.y - bounds.height / 2, 2) > 16) emit(next);
-    drag.update({active: true, x: p.x, angle: angle, value: value});
+    drag.updateQuietly({active: true, x: p.x, angle: angle, value: value});
   };
   node.on(UiEventKind.PointerDown, event -> {if (!enabled || event.button != 0) return;
   begin(event);
   if (event.defaultPrevented) return;
-  var bounds = node.resolved;
+  var bounds = RenderNode.latest(node).resolved;
   if (bounds == null) return;
   var p = point(event), angle = Math.atan2(p.x - bounds.width / 2, bounds.height / 2 - p.y) * 180 / Math.PI;
   event.capturePointer();
@@ -132,19 +132,19 @@ class MachineAngleControl implements View {
     value,
     angle
   ));
-  drag.update({active: true, x: p.x, angle: angle, value: value});
+  drag.updateQuietly({active: true, x: p.x, angle: angle, value: value});
   event.preventDefault();
   });
   node.on(UiEventKind.PointerMove, move);
   node.on(UiEventKind.PointerUp, event -> {var state: AngleDrag = drag.value;
   if (event.button != 0 || !state.active) return;
   move(event);
-  drag.update({active: false, x: 0.0, angle: 0.0, value: value});
+  drag.updateQuietly({active: false, x: 0.0, angle: 0.0, value: value});
   finish(true);
   });
   node.on(UiEventKind.PointerCancel, _ -> {var state: AngleDrag = drag.value;
   if (!state.active) return;
-  drag.update({active: false, x: 0.0, angle: 0.0, value: value});
+  drag.updateQuietly({active: false, x: 0.0, angle: 0.0, value: value});
   finish(false);
   });
   node.on(UiEventKind.KeyDown, event -> {if (!enabled) return;
@@ -204,5 +204,5 @@ class MachineAngleControl implements View {
   }
   }, "angle:" + value + ":" + enabled);
   return node;
-  });
+  }
 }

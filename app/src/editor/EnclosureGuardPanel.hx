@@ -4,6 +4,7 @@ import app.ApplicationSimulation;
 import haxeon.ui.LayoutAxis;
 import haxeon.ui.LayoutStyle;
 import haxeon.ui.core.View;
+import haxeon.ui.core.BuildContext;
 import haxeon.ui.widgets.KeyedView;
 import haxeon.ui.widgets.controls.Button;
 import haxeon.ui.widgets.layout.Column;
@@ -46,9 +47,19 @@ class EnclosureGuardPanel {
     );
   }
 
-  public static function build(simulation:ApplicationSimulation):Null<View> {
+  public static function build(simulation:ApplicationSimulation, context:BuildContext):Null<View> {
     var guard = simulation.enclosureController();
+    context.observeBool(() -> simulation.enclosureController() == guard);
     if (guard == null) return null;
+    context.observeString(() -> guard.status().message);
+    context.observeString(() -> guard.status().doorMessage);
+    context.observeString(() -> guard.status().motionMessage);
+    context.observeBool(() -> guard.status().canOpen);
+    context.observeBool(() -> guard.status().canClose);
+    context.observeBool(() -> guard.status().canStartCut);
+    context.observeBool(() -> guard.status().canReset);
+    context.observeBool(() -> guard.status().canResume);
+    context.observeBool(() -> guard.status().canResetSimulation);
     var s = guard.status(), style = new LayoutStyle();
     style.width = LayoutAxis.grow();
     style.childGap = 6;

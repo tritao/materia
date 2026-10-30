@@ -8,6 +8,10 @@ import materia.assembly.AssemblyFrames;
 
 @:access(app
   .Main.ReferenceEditorApp) @:access(app.ProjectDocumentSession) @:access(app.EditorScene) class MachineControlTests {
+  static function panelView(panel:app.editor.MachineControlPanel, editor:app.Main.ReferenceEditorApp):haxeon.ui.core.View {
+    panel.update(editor);
+    return panel.build(editor, editor.ui.buildContext);
+  }
   static var checks = 0;
   static function check(ok:Bool, message:String):Void {
     checks++;
@@ -237,6 +241,7 @@ import materia.assembly.AssemblyFrames;
       ui.pointerDown(px(350), py(350), 0);
       ui.pointerMove(px(10), py(10));
       near(value(), 370, "dial crosses zero without jumping a turn");
+      root = ui.submit(control(true), frame);
       near(angleSemantics(root).numericValue, 10, "dial exposes wrapped orientation while coordinates keep turns");
       near(angleSemantics(root).numericMinimum, 0, "continuous dial starts at zero degrees");
       near(angleSemantics(root).numericMaximum, 360, "continuous dial exposes a full circle");
@@ -289,6 +294,7 @@ import materia.assembly.AssemblyFrames;
       ui.focusWidget(root.id);
       ui.key(haxeon.ui.core.UiEventKind.KeyDown, haxeon.ui.core.UiKey.Right);
       near(value(), 0, "keyboard crosses zero without adding a reverse revolution");
+      root = ui.submit(control(false), frame);
       near(angleSemantics(root).numericValue, 0, "keyboard wraps displayed orientation at zero");
       ui.dispose();
       fonts.dispose();
@@ -299,6 +305,54 @@ import materia.assembly.AssemblyFrames;
       session.dispose();
       throw error;
     }
+  }
+  static function retainedControls():Void {
+    var fonts = haxeon.ui.FontCollection.create();
+    var frame = new haxeon.ui.LayoutFrame(256, 100);
+    for (angular in [false, true]) {
+      var ui = new haxeon.ui.core.UiContext(null, fonts), value = 0.0, calls = 0, begins = 0, finishes = 0;
+      var decoration = haxeon.ui.Color.rgba(0.2, 0.3, 0.4, 1);
+      function view():haxeon.ui.core.View return new DecoratedMachineControl(context -> {
+        var control:haxeon.ui.core.View = angular
+          ? new app.editor.MachineAngleControl("retained-angle", "Angle", value, false, next -> value = next,
+            _ -> begins++, _ -> finishes++)
+          : new app.editor.MachineControlSlider("retained-slider", "Position", value, -100, 100, 1,
+            next -> value = next, _ -> begins++, _ -> finishes++);
+        var node = control.build(context);
+        node.layout.style.background = decoration;
+        node.on(haxeon.ui.core.UiEventKind.KeyDown, _ -> calls++);
+        node.onPaint((canvas, bounds) -> {}, "caller-paint");
+        return node;
+      });
+      var root = ui.submitCached(view, frame, "machine-control");
+      for (i in 0...3) {
+        var before = root;
+        ui.focusWidget(root.id);
+        ui.key(haxeon.ui.core.UiEventKind.KeyDown, haxeon.ui.core.UiKey.Right);
+        ui.key(haxeon.ui.core.UiEventKind.KeyUp, haxeon.ui.core.UiKey.Right);
+        root = ui.submitCached(view, frame, "machine-control");
+        check(root == before, "self-updating machine control keeps its node");
+        near(angleSemantics(root).numericValue, i + 1, "self-updating machine control refreshes semantics");
+        check(root.layout.style.background == decoration && calls == i + 1, "machine control preserves caller style and listener");
+        check(ui.verifyRetention(view, frame) == null, "self-updating machine control matches fresh build");
+        var mounted = ui.root;
+        if (mounted == null) throw "Machine control verification lost its root";
+        root = mounted;
+      }
+      var bounds = root.globalBounds(), x = bounds.x + 30, y = bounds.y + bounds.height / 2;
+      ui.pointerDown(x, y, 0);
+      root = ui.submitCached(view, frame, "machine-control");
+      var before = root;
+      ui.pointerMove(x + 10, y);
+      root = ui.submitCached(view, frame, "machine-control");
+      check(root == before, "machine gesture patches its retained node");
+      ui.pointerUp(x + 10, y, 0);
+      root = ui.submitCached(view, frame, "machine-control");
+      check(begins == 1 && finishes == 1, "machine gesture caller boundaries survive reconciliation exactly once");
+      check(ui.verifyRetention(view, frame) == null, "retained machine gesture matches fresh build");
+      ui.dispose();
+    }
+    fonts.dispose();
   }
   static function orientationEntry():Void {
     var session = fixture("mm"), id = "spindle/rotor-turn";
@@ -349,16 +403,16 @@ import materia.assembly.AssemblyFrames;
     try {
       editor.documentChanged();
       MachineControlModel.set(session, "spindle/rotor-turn", 350, true);
-      var root = editor.ui.submit(panel.build(editor), frame), field = findControl(root, "Spindle rotation (deg)");
+      var root = editor.ui.submit(panelView(panel, editor), frame), field = findControl(root, "Spindle rotation (deg)");
       if (field == null) throw "Missing spindle angle field";
       check(angleSemantics(field).value == "350", "pane shows normalized starting angle");
       check(editor.ui.accessibilityAction(field.id.value, 4, "450", 0, 0, 0), "angle field accepts numeric input");
-      root = editor.ui.submit(panel.build(editor), frame);
+      root = editor.ui.submit(panelView(panel, editor), frame);
       field = findControl(root, "Spindle rotation (deg)");
       if (field == null) throw "Missing edited angle field";
       editor.ui.focusWidget(field.id);
       editor.ui.key(haxeon.ui.core.UiEventKind.KeyDown, haxeon.ui.core.UiKey.Enter);
-      root = editor.ui.submit(panel.build(editor), frame);
+      root = editor.ui.submit(panelView(panel, editor), frame);
       field = findControl(root, "Spindle rotation (deg)");
       if (field == null) throw "Missing applied angle field";
       check(angleSemantics(field).value == "90", "Enter normalizes 450 degrees to 90 in the visible field");
@@ -368,12 +422,12 @@ import materia.assembly.AssemblyFrames;
         "pane keeps the nearest continuous coordinate"
       );
       session.document.undo();
-      root = editor.ui.submit(panel.build(editor), frame);
+      root = editor.ui.submit(panelView(panel, editor), frame);
       field = findControl(root, "Spindle rotation (deg)");
       if (field == null) throw "Missing undo angle field";
       check(angleSemantics(field).value == "350", "undo restores the displayed orientation");
       MachineControlModel.set(session, "spindle/rotor-turn", 359.9999, true);
-      root = editor.ui.submit(panel.build(editor), frame);
+      root = editor.ui.submit(panelView(panel, editor), frame);
       field = findControl(root, "Spindle rotation (deg)");
       if (field == null) throw "Missing rounded angle field";
       check(angleSemantics(field).value == "0", "rounding at the wrap never displays 360");
@@ -395,7 +449,7 @@ import materia.assembly.AssemblyFrames;
     );
     session.openGeneratedProject(generated, path);
     editor.documentChanged();
-    editor.ui.submit(panel.build(editor), frame);
+    editor.ui.submit(panelView(panel, editor), frame);
     try {
       for (axis in MachineControlModel.axes(session)) if (axis.follows == null) {
         var samples:Array<Float> = [], layouts:Array<Float> = [], start = axis.value;
@@ -408,7 +462,7 @@ import materia.assembly.AssemblyFrames;
           var began = Sys.time();
           edit.update(MachineControlModel.nativePosition(session, axis.id, value, true));
           var updated = Sys.time();
-          editor.ui.submit(panel.build(editor), frame);
+          editor.ui.submit(panelView(panel, editor), frame);
           if (i >= 10) {
             samples.push((updated - began) * 1000);
             layouts.push((Sys.time() - began) * 1000);
@@ -420,7 +474,7 @@ import materia.assembly.AssemblyFrames;
         var began = Sys.time();
         MachineControlModel.set(session, axis.id, high, true);
         editor.documentChanged();
-        editor.ui.submit(panel.build(editor), frame);
+        editor.ui.submit(panelView(panel, editor), frame);
         var apply = (Sys.time() - began) * 1000;
         session.document.undo();
         trace('Machine response ${axis.id}: preview median=${samples[50]}ms p95=${samples[95]}ms max=${samples[99]}ms; including panel layout p95=${layouts[95]}ms; numeric apply and layout=${apply}ms');
@@ -478,7 +532,7 @@ import materia.assembly.AssemblyFrames;
           parts: ["pistonRod", "piston"]
         }
       ]) {
-        var sectionRoot = editor.ui.submit(panel.build(editor), frame), inspect = findControl(
+        var sectionRoot = editor.ui.submit(panelView(panel, editor), frame), inspect = findControl(
           sectionRoot,
           "Inspect " + test.id
         );
@@ -495,7 +549,7 @@ import materia.assembly.AssemblyFrames;
         );
         var before = [for (part in test.parts) nativePose(session.scene, "spindle/" + part)];
         var visual = session.scene.visualRevision, history = session.document.history.undoCount;
-        var root = editor.ui.submit(panel.build(editor), frame), control = findControl(root, test.label);
+        var root = editor.ui.submit(panelView(panel, editor), frame), control = findControl(root, test.label);
         if (control == null) throw "Missing machine control: " + test.label;
         var bounds = control.globalBounds(), x = bounds.x + 10, y = bounds.y + bounds.height / 2;
         var rotary = test.id == "spindle/rotor-turn";
@@ -503,7 +557,7 @@ import materia.assembly.AssemblyFrames;
         editor.ui.pointerDown(x, y, 0);
         var end = rotary ? x + 47 : bounds.x + 10 + (bounds.width - 20) * 0.8;
         editor.ui.pointerMove(end, y);
-        editor.ui.submit(panel.build(editor), frame);
+        editor.ui.submit(panelView(panel, editor), frame);
         editor.ui.pointerUp(end, y, 0);
         check(session.scene.visualRevision > visual, "spindle gesture invalidates rendered scene: " + test.id);
         check(session.document.history.undoCount == history + 1, "spindle pane gesture records one edit: " + test.id);
@@ -529,7 +583,7 @@ import materia.assembly.AssemblyFrames;
           for (j in 0...16) near(restored[j], before[i][j], "undo restores native spindle transform");
         }
       }
-      var closeRoot = editor.ui.submit(panel.build(editor), frame), close = findControl(closeRoot, "Close section");
+      var closeRoot = editor.ui.submit(panelView(panel, editor), frame), close = findControl(closeRoot, "Close section");
       if (close == null) throw "Missing close section action";
       var closeBounds = close.globalBounds();
       editor.ui.pointerDown(closeBounds.x + 8, closeBounds.y + 8, 0);
@@ -732,6 +786,7 @@ import materia.assembly.AssemblyFrames;
     posePersistenceChecks();
     sliderRouting();
     angleRouting();
+    retainedControls();
     orientationEntry();
     orientationPanel();
     near(MachineControlModel.parsePosition(" -1.25e2 "), -125, "numeric entry accepts scientific notation");
@@ -741,4 +796,10 @@ import materia.assembly.AssemblyFrames;
     trace('MachineControlTests passed ($checks checks)');
     return 0;
   }
+}
+
+private class DecoratedMachineControl implements haxeon.ui.core.View {
+  final buildControl:haxeon.ui.core.BuildContext->haxeon.ui.core.RenderNode;
+  public function new(buildControl:haxeon.ui.core.BuildContext->haxeon.ui.core.RenderNode) this.buildControl = buildControl;
+  public function build(context:haxeon.ui.core.BuildContext):haxeon.ui.core.RenderNode return buildControl(context);
 }
