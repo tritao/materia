@@ -142,6 +142,10 @@ Three scripts catch what the tests of one kit do not:
   `BuildContext.hx`, and a longer string literal). On a difference it decodes both with `hldump`. About 4 minutes per edit.
 - `app/tools/check-editor-performance.py --budgets` runs the headless scenarios and holds each action's median frame time
   and allocation to the ceilings in `budgets.json`. Time ceilings are loose (machines differ), allocation ceilings tight.
+  It then runs `app/tools/check-ui-retention.py` (skip with `--no-retention`), which repeats the scenarios with
+  `HAXEON_UI_VERIFY_RETENTION=1`: every frame that did work is compared with a fresh build of the view, and nodes changed
+  between frames without `willEditRetained` are reported. Cheap frames are only worth having if they show the right UI.
+  Interaction allocation is the UI's own, from input to the end of the frame, without the harness's records.
   `--budgets --measure` prints the measured values, to set a budget after a deliberate change. The older default mode
   checks for leaks and unbounded growth.
 

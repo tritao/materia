@@ -135,6 +135,7 @@ def run(command):
 
 
 BUDGETS = ROOT / "app/tests/performance/budgets.json"
+RETENTION = ROOT / "app/tools/check-ui-retention.py"
 
 
 def action_medians(directory):
@@ -152,6 +153,13 @@ def action_medians(directory):
         medians[action] = {"frameMs": round(statistics.median(times), 2), "frames": len(frames)}
         if allocations:
             medians[action]["allocKiB"] = round(statistics.median(allocations), 1)
+    # The interaction scenario measures each action's allocation itself, from input to the end of the frame, without the
+    # harness's own records; its frames carry no per-frame allocation.
+    interaction = directory / "interaction.json"
+    if interaction.exists():
+        for entry in json.loads(interaction.read_text()):
+            if entry["action"] in medians:
+                medians[entry["action"]]["allocKiB"] = round(entry["medianBytes"] / 1024, 1)
     return medians
 
 
@@ -204,6 +212,8 @@ def main():
     parser.add_argument("--budgets", action="store_true", help="check the per-scenario budgets in app/tests/performance/budgets.json")
     parser.add_argument("--measure", action="store_true", help="with --budgets: print measured values instead of failing")
     parser.add_argument("--scenario", action="append", help="with --budgets: only these scenarios")
+    parser.add_argument("--no-retention", action="store_true",
+                        help="with --budgets: skip check-ui-retention.py (retained UI compared with fresh builds)")
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--capture", action="append", type=Path,
                         help="inspect an existing interaction capture; may be repeated")
@@ -218,6 +228,10 @@ def main():
             print(json.dumps(result if args.measure else {key: value for key, value in result.items() if key != "measured"},
                              sort_keys=True))
         failures = [failure for result in results for failure in result["failures"]]
+        # Correctness of the same retention the budgets depend on: every frame compared with a fresh build.
+        if not args.measure and not args.no_retention and \
+                subprocess.run([sys.executable, str(RETENTION), "--skip-build"], cwd=ROOT).returncode != 0:
+            failures.append("retained UI differs from a fresh build (see check-ui-retention.py above)")
         if failures and not args.measure:
             for failure in failures:
                 print("  " + failure, file=sys.stderr)
