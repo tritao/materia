@@ -17,7 +17,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE = ROOT / "app/tools/profile-editor.py"
-SCENARIOS = ["interaction", "tab-matrix", "dock-drag", "inspector-edits", "inspector-flows", "selection-stress", "tab-inspector",
+SCENARIOS = ["interaction", "tab-matrix", "dock-drag", "inspector-edits", "inspector-flows", "panel-flows", "selection-stress", "tab-inspector",
     "primitives"]
 
 

@@ -5,6 +5,7 @@ import haxeon.ui.LayoutAxis;
 import haxeon.ui.LayoutAlignmentY;
 import haxeon.ui.LayoutStyle;
 import haxeon.ui.TextWrap;
+import haxeon.ui.core.BuildContext;
 import haxeon.ui.core.TextStyleOverride;
 import haxeon.ui.core.View;
 import haxeon.ui.theme.ThemeTokens;
@@ -19,8 +20,13 @@ import haxeon.ui.widgets.text.Text;
 
 /** Project scene selection; this view has no mission progress or playback controls. */
 class ProjectVariantView {
-  public static function build(controller:ProjectVariantController, tokens:ThemeTokens, key:String):View {
+  /**
+   * With a `context` the controller's state is observed, so a dock panel built from this view is retained until the state
+   * changes; the viewport card passes none and is rebuilt with its panel.
+   */
+  public static function build(controller:ProjectVariantController, tokens:ThemeTokens, key:String, ?context:BuildContext):View {
     var state = controller.snapshot(), rows:Array<KeyedView> = [];
+    if (context != null) context.observeString(function() return stateKey(controller.snapshot()));
     for (group in ["configuration", "study", "job"]) {
       var variants = state.variants.filter(v -> v.kind == group);
       if (variants.length == 0) continue;
@@ -87,5 +93,12 @@ class ProjectVariantView {
     style.width = LayoutAxis.grow();
     style.childGap = 6;
     return new Column(key, rows, style);
+  }
+
+  /** Everything the view shows of a state; its variants are listed by id, label and kind. */
+  static function stateKey(state:app.ProjectVariantController.ProjectVariantState):String {
+    return [for (variant in state.variants) variant.id + "\t" + variant.label + "\t" + variant.kind].join("\n") + "|" + state.selected
+      + "|" + state.summary + "|" + state.switchAllowed + "|" + state.simulationActive + "|" + state.loading + "|" + state.status
+      + "|" + state.error;
   }
 }

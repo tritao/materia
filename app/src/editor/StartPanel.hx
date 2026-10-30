@@ -12,6 +12,7 @@ import haxeon.ui.LayoutDirection;
 import haxeon.ui.LayoutStyle;
 import haxeon.ui.LayoutWrapMode;
 import haxe.io.Path as StartPath;
+import haxeon.ui.core.BuildContext;
 import haxeon.ui.core.TextStyleOverride;
 import haxeon.ui.core.View;
 import haxeon.ui.icons.IconName;
@@ -32,8 +33,17 @@ import sys.FileSystem;
 @:access(app.Main.ReferenceEditorApp) class StartPanel {
   static inline var CARD_WIDTH:Float = 250.0;
 
-  public static function build(app:ReferenceEditorApp, width:Float = 1000.0):View {
+  /**
+   * Retained by what it observes (DockPanelContent.observing): what is loading and how far, the recent files that still exist,
+   * the examples that can open here and the search and category choice. Opening is allowed only while nothing loads and the
+   * document is not blocked, which the example and recent cards show as enabled.
+   */
+  public static function build(app:ReferenceEditorApp, context:BuildContext, width:Float = 1000.0):View {
     var tokens = app.appearance.theme.tokens;
+    context.observeString(function() return app.startLoading == null ? null : app.startLoading.id);
+    context.observeString(app.projectLoadingRevisionKey);
+    context.observeString(function() return app.startFailure);
+    var interactive = context.observeBool(function() return app.startLoading == null && !app.documents.blocked());
     var rows:Array<KeyedView> = [new KeyedView(
       "title",
       new Text("Start", null, tokens.text, TextStyleOverride.text(22.0))
@@ -75,15 +85,14 @@ import sys.FileSystem;
 
     rows.push(new KeyedView("recent-heading", app.sectionHeading("RECENT FILES")));
     var recentCards:Array<KeyedView> = [];
-    for (path in app.preferences.recent) {
-      if (!FileSystem.exists(path)) continue;
-      if (recentCards.length >= 3) break;
+    var recent = context.observeString(function() return recentFiles(app).join("\n"));
+    for (path in recent == "" ? [] : recent.split("\n")) {
       var target = path;
       recentCards.push(new KeyedView("recent:" + path,
         card(app, StartPath.withoutDirectory(path), IconName.NewFile, [shorten(
           StartPath.directory(path),
           34
-        )], null, function() {
+        )], null, interactive, function() {
         app.requestOpenPath(target);
       }
       )));
@@ -103,6 +112,10 @@ import sys.FileSystem;
 
     rows.push(new KeyedView("examples-heading", app.sectionHeading("EXAMPLES")));
     var browser = app.startExamples;
+    context.observeString(function() return browser.query);
+    context.observeString(function() return browser.category);
+    // The catalogue entries that can open here: files that exist and scripts that are registered.
+    context.observeString(function() return [for (entry in ExampleCatalog.available()) entry.id].join(","));
     var available = ExampleCatalog.available();
     rows.push(new KeyedView("search", new SearchField("start-example-search", browser.query, function(value) {
       browser.search(value);
@@ -152,7 +165,7 @@ import sys.FileSystem;
         if (grouped) groupedFamilies.push(family);
         else {
           var entry = family.examples[0];
-          singles.push(new KeyedView(entry.id, exampleCard(app, family, entry, cardWidth, false)));
+          singles.push(new KeyedView(entry.id, exampleCard(app, family, entry, cardWidth, false, interactive)));
         }
       }
       if (singles.length > 0) rows.push(new KeyedView(
@@ -166,7 +179,7 @@ import sys.FileSystem;
         ));
         var variants = [for (entry in family.examples) new KeyedView(
           entry.id,
-          exampleCard(app, family, entry, cardWidth, true)
+          exampleCard(app, family, entry, cardWidth, true, interactive)
         )];
         rows.push(new KeyedView("family:" + family.id, cardGrid("family:" + family.id, variants, columns)));
       }
@@ -189,8 +202,9 @@ import sys.FileSystem;
       }, "start-clear-filters")));
     }
 
+    var showAtStartup = context.observeBool(function() return app.preferences.showStartPage);
     rows.push(new KeyedView("startup", new Checkbox("start-show-at-startup",
-      "Show this page at startup", app.preferences.showStartPage, function(value) {
+      "Show this page at startup", showAtStartup, function(value) {
       app.preferences.setShowStartPage(value);
       app.invalidateView();
     }
@@ -200,6 +214,17 @@ import sys.FileSystem;
     var scrollStyle = ReferenceEditorApp.fillStyle();
     scrollStyle.background = tokens.surface;
     return new ScrollView("start-scroll", content, scrollStyle);
+  }
+
+  /** The first few recent files that still exist. */
+  static function recentFiles(app:ReferenceEditorApp):Array<String> {
+    var result:Array<String> = [];
+    for (path in app.preferences.recent) {
+      if (!FileSystem.exists(path)) continue;
+      if (result.length >= 3) break;
+      result.push(path);
+    }
+    return result;
   }
 
   static function exampleBadge(entry:ExampleEntry):String {
@@ -215,7 +240,8 @@ import sys.FileSystem;
     family:ExampleFamily,
     entry:ExampleEntry,
     width:Float,
-    variant:Bool
+    variant:Bool,
+    enabled:Bool
   ):View {
     var tokens = app.appearance.theme.tokens;
     var title = variant ? ExampleBrowser.variantTitle(entry) : entry.title;
@@ -255,7 +281,7 @@ import sys.FileSystem;
     var button = new Button(title, style, function() app.requestExample(entry), "start-open-example:" + entry.id);
     button.variant = ButtonVariant.Secondary;
     button.accessibilityLabel = "Open " + entry.title;
-    button.enabled = app.startLoading == null && !app.documents.blocked();
+    button.enabled = enabled;
     button.labelView = new Column(
       "example-content:" + entry.id,
       [
@@ -362,12 +388,13 @@ import sys.FileSystem;
     icon:IconName,
     lines:Array<String>,
     tag:Null<String>,
+    enabled:Bool,
     onClick:Void -> Void
   ):View {
     var button = new Button(shorten(title, 28), null, onClick, "card-button:" + title);
     button.leadingIcon = icon;
     button.variant = ButtonVariant.Secondary;
-    button.enabled = app.startLoading == null && !app.documents.blocked();
+    button.enabled = enabled;
     var rows = [new KeyedView("action", button)].concat(description(app, title, lines, tag));
     return new Column("card:" + title, rows, cardStyle(app));
   }

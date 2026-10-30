@@ -2226,10 +2226,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
     result.register(new DockPanelDescriptor("mission", "Mission", true, true, IconName.Activity));
     result.register(new DockPanelDescriptor("cnc", "CNC", true, true, IconName.Terminal));
 
-    workspacePanelContents = [new DockPanelContent(
+    // The panels without observing are rebuilt on every full frame, because their builds are not pure reads: the BIM editor shows
+    // element properties that have no revision, the inspection camera and machine control push state into GPU viewports and
+    // keep gesture and draft state, and the mission and CNC panels follow a running program by scrolling from inside the build.
+    workspacePanelContents = [DockPanelContent.observing(
       "start",
-      function(_) return StartPanel.build(this),
-      function(_, width) return StartPanel.build(this, width)
+      function(context) return StartPanel.build(this, context),
+      function(context, width) return StartPanel.build(this, context, width)
     ), DockPanelContent.observing("hierarchy", function(context) return HierarchyPanel.build(this, context)), new DockPanelContent(
       "bim",
       function(_) return bimEditor
@@ -2247,17 +2250,18 @@ class ReferenceEditorApp implements DesktopUiApplication {
         function(_) return machineControlPanel.build(this)
       ), DockPanelContent.observing("inspector", function(context) return InspectorPanel.build(this, context)),
       DockPanelContent.observing("sensors", function(context) return SensorPanel.build(this, context)),
-      DockPanelContent.observing("console", function(context) return consolePanel(context)), new DockPanelContent(
+      DockPanelContent.observing("console", function(context) return consolePanel(context)), DockPanelContent.observing(
       "telemetry",
-      function(_) return telemetry.build(
-        framePresentation,
+      function(context) return telemetry.build(
+        context,
+        function() return framePresentation,
         appearance.theme.tokens.surface,
         appearance.theme.tokens.textSecondary,
         simulation
       )
-    ), new DockPanelContent(
+    ), DockPanelContent.observing(
       "project",
-      function(_) return app.editor.ProjectVariantView.build(projectVariants, appearance.theme.tokens, "project-panel")
+      function(context) return app.editor.ProjectVariantView.build(projectVariants, appearance.theme.tokens, "project-panel", context)
     ), new DockPanelContent("mission",
       function(_) return missionPanel.build(missionController, appearance.theme.tokens, function() {
       workspace.open("cnc", "inspector");

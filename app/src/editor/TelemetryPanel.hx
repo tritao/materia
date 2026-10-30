@@ -3,6 +3,7 @@ package app.editor;
 import app.ApplicationPresentationSnapshot;
 import app.ApplicationSimulation;
 import haxeon.ui.Color;
+import haxeon.ui.core.BuildContext;
 import haxeon.ui.Insets;
 import haxeon.ui.LayoutAxis;
 import haxeon.ui.LayoutStyle;
@@ -34,9 +35,13 @@ class TelemetryPanel {
     model.addSeries(gpuTime);
   }
 
-  /** Colours come from the caller on every build so a theme switch reaches this panel. */
+  /**
+   * Colours come from the caller on every build so a theme switch reaches this panel. The rest is read through the context, at
+   * the place it is shown: the physics snapshot (`frame` gives the current one) and the human workers' progress and signals.
+   */
   public function build(
-    frame:Null<ApplicationPresentationSnapshot>,
+    context:BuildContext,
+    frame:Void->Null<ApplicationPresentationSnapshot>,
     surface:Color,
     textSecondary:Color,
     ?simulation:ApplicationSimulation
@@ -47,8 +52,11 @@ class TelemetryPanel {
     var plotStyle = fillStyle();
     plotStyle.height = LayoutAxis.grow();
     var plot = new PlotView("frame-telemetry", model, plotStyle, "Frame telemetry");
-    var physicsStatus = frame == null ? "Physics snapshot unavailable"
-      : "Physics step " + frame.revision + " · time " + Std.string(frame.simulationTime) + " s";
+    var physicsStatus = context.observeString(function() {
+      var snapshot = frame();
+      return snapshot == null ? "Physics snapshot unavailable"
+        : "Physics step " + snapshot.revision + " · time " + Std.string(snapshot.simulationTime) + " s";
+    });
     var rows:Array<KeyedView> = [
       new KeyedView("heading", new Text("TELEMETRY", null, textSecondary, TextStyleOverride.text(11.0, 0.8))),
       new KeyedView("plot", plot),
@@ -58,30 +66,44 @@ class TelemetryPanel {
       ),
       new KeyedView("physics-revision", new Text(physicsStatus))
     ];
-    if (simulation != null) for (id in simulation.humanWorkerIds()) {
-      var worker = simulation.humanWorker(id);
-      var signals = simulation.humanSignals(id);
-      var step = worker == null ? null : worker.currentStep();
-      var failure = worker == null ? null : worker.currentJobFailure();
-      var warnings = simulation.humanWarnings(id);
-      rows.push(new KeyedView(
-        "worker-" + id,
-        new Text(id + " · step " + (step == null ? "done" : Std.string(step + 1)) + (failure
-        == null ? "" : " · " + failure) + (warnings.length == 0 ? "" : " · " + warnings.join("; ")))
-      ));
-      rows.push(new KeyedView(
-        "worker-zones-" + id,
-        new Text("Zones: " + (signals == null ? "—" : signals.zones.join(", ")))
-      ));
-      if (signals != null) for (robotId in simulation.simulatedRobotIds()) {
-        var distance = signals.separation.get(robotId);
-        if (distance != null) rows.push(new KeyedView(
-          "worker-separation-" + id + "-" + robotId,
-          new Text(robotId + " separation: " + Std.string(distance) + " m")
-        ));
+    if (simulation != null) {
+      var workers = context.observeString(function() return simulation.humanWorkerIds().join("\n"));
+      for (workerId in workers == "" ? [] : workers.split("\n")) {
+        var id = workerId;
+        rows.push(new KeyedView("worker-" + id, new Text(context.observeString(function() return workerLine(simulation, id)))));
+        rows.push(new KeyedView("worker-zones-" + id, new Text(context.observeString(function() return zonesLine(simulation, id)))));
+        var separations = context.observeString(function() return separationLines(simulation, id).join("\n"));
+        if (separations != "") for (line in separations.split("\n")) {
+          var robotId = line.substr(0, line.indexOf("\t"));
+          rows.push(new KeyedView("worker-separation-" + id + "-" + robotId, new Text(line.substr(line.indexOf("\t") + 1))));
+        }
       }
     }
     return new Column("telemetry-panel", rows, style);
+  }
+
+  static function workerLine(simulation:ApplicationSimulation, id:String):String {
+    var worker = simulation.humanWorker(id);
+    var step = worker == null ? null : worker.currentStep();
+    var failure = worker == null ? null : worker.currentJobFailure();
+    var warnings = simulation.humanWarnings(id);
+    return id + " · step " + (step == null ? "done" : Std.string(step + 1)) + (failure
+    == null ? "" : " · " + failure) + (warnings.length == 0 ? "" : " · " + warnings.join("; "));
+  }
+
+  static function zonesLine(simulation:ApplicationSimulation, id:String):String {
+    var signals = simulation.humanSignals(id);
+    return "Zones: " + (signals == null ? "—" : signals.zones.join(", "));
+  }
+
+  /** One line per simulated robot with a distance: its id, a tab, and the text shown. */
+  static function separationLines(simulation:ApplicationSimulation, id:String):Array<String> {
+    var signals = simulation.humanSignals(id), lines:Array<String> = [];
+    if (signals != null) for (robotId in simulation.simulatedRobotIds()) {
+      var distance = signals.separation.get(robotId);
+      if (distance != null) lines.push(robotId + "\t" + robotId + " separation: " + Std.string(distance) + " m");
+    }
+    return lines;
   }
 
   static function fillStyle():LayoutStyle {

@@ -72,7 +72,8 @@ private typedef InputProbe = {
       var scenario = Sys.args().length >= 3 && (Sys.args()[2] == "tab-inspector"
         || Sys.args()[2] == "inspector-edits" || Sys.args()[2] == "selection-stress" || Sys.args()[2] == "tab-matrix"
         || Sys.args()[2] == "architecture" || Sys.args()[2] == "primitives" || Sys.args()[2] == "noop"
-        || Sys.args()[2] == "interaction" || Sys.args()[2] == "dock-drag" || Sys.args()[2] == "inspector-flows")
+        || Sys.args()[2] == "interaction" || Sys.args()[2] == "dock-drag" || Sys.args()[2] == "inspector-flows"
+        || Sys.args()[2] == "panel-flows")
         ? Sys.args()[2] : "tab-inspector";
       if (Sys.args().length == 4 && scenario == "tab-inspector"
         && Sys.args()[2] != "tab-inspector") throw "Unknown headless scenario: " + Sys.args()[2];
@@ -110,6 +111,8 @@ private typedef InputProbe = {
         runDockDragScenario(editor, frame, frames, actions);
       } else if (scenario == "inspector-flows") {
         runInspectorFlowsScenario(editor, frame, cycles, frames, actions);
+      } else if (scenario == "panel-flows") {
+        runPanelFlowsScenario(editor, frame, output, cycles, frames, actions);
       } else if (scenario == "interaction") {
         runInteractionScenario(editor, frame, output, cycles, frames, actions);
       } else if (scenario == "noop") {
@@ -239,6 +242,130 @@ private typedef InputProbe = {
       submit(editor, frame, frames, "select-box", cycle);
       action(actions, "inspector-flows", cycle);
     }
+  }
+
+  /** Whether any text in the submitted UI contains `text`. */
+  static function showsText(editor:ReferenceEditorApp, text:String):Bool {
+    var root = editor.ui.root, found = false;
+    if (root != null) root.walk(function(node) {
+      if (node.layout.text != null && node.layout.text.indexOf(text) >= 0) found = true;
+    });
+    return found;
+  }
+
+  /** The first text in the submitted UI that starts with `prefix`, or null. */
+  static function textStarting(editor:ReferenceEditorApp, prefix:String):Null<String> {
+    var root = editor.ui.root, found:Null<String> = null;
+    if (root != null) root.walk(function(node) {
+      if (found == null && node.layout.text != null && StringTools.startsWith(node.layout.text, prefix)) found = node.layout.text;
+    });
+    return found;
+  }
+
+  /** Shows the dock panel in the tab group of the inspector, as the editor does when a command opens it. */
+  static function showPanel(editor:ReferenceEditorApp, frame:LayoutFrame, frames:Array<String>, panel:String):Void {
+    if (!editor.workspace.isOpen(panel)) editor.workspace.open(panel, "inspector");
+    editor.workspace.activate(panel);
+    editor.invalidateView();
+    submit(editor, frame, frames, "show:" + panel);
+    if (editor.workspace.activePanelId != panel) throw "Panel did not activate: " + panel;
+  }
+
+  /**
+   * Dock panels that are retained by what they observe, with the inputs each shows changing between frames that do not touch the
+   * scene: the Start page's loading, failure, search, category and recent files. With HAXEON_UI_VERIFY_RETENTION=1 every frame is
+   * also compared with a fresh build, and the checks here require the change to be on screen.
+   */
+  static function runPanelFlowsScenario(
+    editor:ReferenceEditorApp,
+    frame:LayoutFrame,
+    output:String,
+    cycles:Int,
+    frames:Array<String>,
+    actions:Array<String>
+  ):Void {
+    var recent = FileSystem.fullPath(output) + "/recent-file.materia";
+    // The bundled examples are found from the repository root, where the editor is launched.
+    var started = Sys.getCwd();
+    Sys.setCwd(FileSystem.fullPath(".."));
+    for (cycle in 0...cycles) {
+      showPanel(editor, frame, frames, "start");
+      var browser = editor.startExamples;
+      if (!showsText(editor, "EXAMPLES") || !showsText(editor, "Collaborative robots")) throw "The Start page does not list the examples";
+      // One input changes per frame, so a missing observation shows as a stale page.
+      browser.search("zzz no such example");
+      editor.invalidateView();
+      submit(editor, frame, frames, "start-search", cycle);
+      if (!showsText(editor, "No examples match")) throw "The Start page ignores the search text";
+      browser.search("");
+      editor.invalidateView();
+      submit(editor, frame, frames, "start-search-cleared", cycle);
+      browser.selectCategory("Welding");
+      editor.invalidateView();
+      submit(editor, frame, frames, "start-category", cycle);
+      if (showsText(editor, "Collaborative robots")) throw "The Start page ignores the category";
+      browser.selectCategory("All");
+      editor.invalidateView();
+      submit(editor, frame, frames, "start-category-all", cycle);
+      editor.startFailure = "Could not open the demonstration";
+      editor.invalidateView();
+      submit(editor, frame, frames, "start-failure", cycle);
+      if (!showsText(editor, "Could not open the demonstration")) throw "The Start page does not show a failure";
+      editor.startFailure = null;
+      editor.invalidateView();
+      submit(editor, frame, frames, "start-no-failure", cycle);
+      if (showsText(editor, "Could not open the demonstration")) throw "The Start page still shows a failure that was cleared";
+      editor.preferences.setShowStartPage(false);
+      editor.invalidateView();
+      submit(editor, frame, frames, "start-startup-off", cycle);
+      editor.preferences.setShowStartPage(true);
+      editor.invalidateView();
+      submit(editor, frame, frames, "start-startup-on", cycle);
+      File.saveContent(recent, "recent");
+      editor.preferences.addRecent(recent);
+      editor.invalidateView();
+      submit(editor, frame, frames, "start-recent", cycle);
+      if (!showsText(editor, "recent-file.materia")) throw "The Start page does not list a recent file";
+      FileSystem.deleteFile(recent);
+      editor.invalidateView();
+      submit(editor, frame, frames, "start-recent-gone", cycle);
+      if (showsText(editor, "recent-file.materia")) throw "The Start page lists a recent file that no longer exists";
+      editor.preferences.forgetRecent(recent);
+      // Nothing it observes changed: the page is reused.
+      editor.invalidateView();
+      submit(editor, frame, frames, "start-unchanged", cycle);
+      action(actions, "panel-flows", cycle);
+    }
+    // Telemetry follows the physics and the human workers of a running cell.
+    var gallery = app.editor.ExampleCatalog.find("worker-gallery");
+    if (gallery == null) throw "The worker gallery example is missing";
+    app.editor.ExampleCatalog.open(editor, gallery);
+    // The example plays in real time; the scenario steps it by hand.
+    editor.simulation.stop();
+    showPanel(editor, frame, frames, "telemetry");
+    if (textStarting(editor, "Physics step") == null) throw "Telemetry does not show the physics step";
+    var seen:Map<String, Bool> = new Map();
+    for (cycle in 0...cycles * 3) {
+      editor.simulation.step();
+      editor.invalidateView();
+      submit(editor, frame, frames, "telemetry-step", cycle);
+      seen.set(textStarting(editor, "Physics step"), true);
+      if (textStarting(editor, "Zones:") == null) throw "Telemetry does not show the human workers";
+    }
+    var distinct = [for (key in seen.keys()) key].length;
+    if (distinct < cycles) throw "Telemetry did not follow the physics step: " + distinct + " distinct values";
+    // The Project panel follows the variant controller: here a failure it reports, which only the panel shows.
+    showPanel(editor, frame, frames, "project");
+    if (!showsText(editor, "no source project variants")) throw "The Project panel does not say the scene has no variants";
+    editor.projectVariants.failure = "Could not load project variant: demonstration";
+    editor.invalidateView();
+    submit(editor, frame, frames, "project-failure");
+    if (!showsText(editor, "demonstration")) throw "The Project panel does not show the failure";
+    editor.projectVariants.dismissFailure();
+    editor.invalidateView();
+    submit(editor, frame, frames, "project-no-failure");
+    if (showsText(editor, "demonstration")) throw "The Project panel still shows a dismissed failure";
+    Sys.setCwd(started);
   }
 
   static function runInspectorEditScenario(
