@@ -85,7 +85,10 @@ def inspect_interaction(directory, cycles):
                     if row.get("action") == "hierarchy"}
     checkpoints = list(range(100, cycles + 1, 100))
     rss = {cycle: nearest_rss(memory, action_times[cycle]) for cycle in checkpoints}
-    growth_mib = (rss[cycles] - rss[100]) / MIB
+    # The heap grows to its collection threshold once and then holds. Since 2026-10-30 a cycle allocates far less, so that
+    # step reaches past cycle 100 (only about three collections in 500 cycles) and the total is taken from cycle 200; the
+    # window check below still covers 100 onwards and catches steady growth.
+    growth_mib = (rss[cycles] - rss[200]) / MIB
     if growth_mib > 32:
         failures.append(f"RSS grew {growth_mib:.1f} MiB after warmup (limit 32 MiB)")
     windows = [(rss[end] - rss[end - 100]) / MIB for end in checkpoints[1:]]

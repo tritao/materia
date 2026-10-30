@@ -34,13 +34,28 @@ class DocumentPathLabel implements View {
   root.focusable = true;
   root.semantics = new Semantics(AccessibilityRole.Text, "Document path", value);
   var interaction = context.state(context.id("interaction"), {hovered: false, focused: false});
-  var displayed = context.state(context.id("displayed"), value);
+  var resolved = context.resolveTextRole(TextRole.Body, TextStyleOverride.text(12));
+  var memo = context.resourceState(
+    context.id("measurement"),
+    function() return {
+      value: "",
+      width: -1.0,
+      result: "",
+      fullWidth: 0.0,
+      font: resolved.textStyle.font,
+      fontSize: resolved.textStyle.fontSize
+    },
+    _ -> {}
+  );
+  // What the last layout fitted for this path, or the full path until one has: building from an older path's text would
+  // show and announce it until the layout callback below corrected the node.
+  var shown = memo.value.value == value && memo.value.width >= 0.0 ? memo.value.result : value;
   var textStyle = new LayoutStyle();
   textStyle.width = LayoutAxis.grow();
   textStyle.clipHorizontal = true;
   var textOverride = TextStyleOverride.text(12);
   var inlineText = new Text(
-    displayed.value,
+    shown,
     textStyle,
     context.theme.tokens.textSecondary,
     TextStyleOverride.combine(textOverride, TextStyleOverride.paragraph(TextWrap.None))
@@ -93,19 +108,6 @@ class DocumentPathLabel implements View {
     event.stopPropagation();
   }
   });
-  var resolved = context.resolveTextRole(TextRole.Body, textOverride);
-  var memo = context.resourceState(
-    context.id("measurement"),
-    function() return {
-      value: "",
-      width: -1.0,
-      result: "",
-      fullWidth: 0.0,
-      font: resolved.textStyle.font,
-      fontSize: resolved.textStyle.fontSize
-    },
-    _ -> {}
-  );
   inlineText.onResolved(geometry -> {if (context.fonts == null) return;
   var available = Math.max(0.0, geometry.clippedViewportBounds().width), cache = memo.value;
   if (cache.value != value || cache.width != available
@@ -148,10 +150,12 @@ class DocumentPathLabel implements View {
     memo.updateQuietly(cache);
   }
   truncated = cache.result != value;
-  // The callback settles this same render node below; retained parents already show the new text.
-  if (displayed.value != cache.result) displayed.updateQuietly(cache.result);
+  // The fitted text changes this node in place: announced as an edit, so the next frame compares it, and with a new
+  // accessibility label, so what is read matches what is shown.
   if (inlineText.layout.text != cache.result) {
+    context.willEditRetained(inlineText);
     inlineText.layout.text = cache.result;
+    inlineText.semantics = new Semantics(AccessibilityRole.Text, cache.result);
     context.requestLayoutFeedback();
   }
   var bounds = root.globalBounds(), popupWidth = Math.min(
