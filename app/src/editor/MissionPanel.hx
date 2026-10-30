@@ -7,6 +7,8 @@ import haxeon.ui.Insets;
 import haxeon.ui.LayoutAxis;
 import haxeon.ui.LayoutStyle;
 import haxeon.ui.core.View;
+import haxeon.ui.core.BuildContext;
+import haxeon.ui.core.RenderNode;
 import haxeon.ui.theme.ThemeTokens;
 import haxeon.ui.widgets.KeyedView;
 import haxeon.ui.widgets.collections.ListView;
@@ -31,7 +33,38 @@ class MissionPanel {
   public function new() {
   }
 
+  /** Run before retained dependencies are checked; building only describes the current presentation. */
+  public function update(controller:MissionController):Void {
+    var mission = controller.currentMission(), nextGeneration = controller.generation();
+    if (mission != source || generation != nextGeneration) {
+      source = mission;
+      generation = nextGeneration;
+      selected = -1;
+      followed = -1;
+      following = true;
+      scroll.jumpTo(0, 0);
+      lastOffset = scroll.offsetY;
+    }
+    var active = controller.activeStep();
+    if (following && Math.abs(scroll.offsetY - lastOffset) > 0.5) {
+      following = false;
+      controller.requestRefresh();
+    }
+    if (following && active >= 0 && active != followed) {
+      scroll.jumpTo(0, Math.max(0, (active - 2) * ROW_HEIGHT));
+      followed = active;
+    }
+    lastOffset = scroll.offsetY;
+  }
+
   public function build(controller:MissionController, tokens:ThemeTokens, ?showProgram:Void -> Void):View {
+    return new MissionPanelView(this, controller, tokens, showProgram);
+  }
+
+  function describe(context:BuildContext, controller:MissionController, tokens:ThemeTokens, showProgram:Null<Void->Void>):View {
+    controller.observe(context);
+    context.observeInt(() -> selected);
+    context.observeBool(() -> following);
     var state = controller.snapshot();
     var mission = state.mission;
     var style = fill();
@@ -66,40 +99,33 @@ class MissionPanel {
       if (!state.hasWork) items.push(new KeyedView("empty", new Text("This project has no mission.")));
       return new Column("mission-panel", items, style);
     }
-    if (mission != source || generation != state.generation) {
-      source = mission;
-      generation = state.generation;
-      selected = -1;
-      followed = -1;
-      following = true;
-      scroll.jumpTo(0, 0);
-      lastOffset = scroll.offsetY;
-    }
     var progress = state.progress;
-    var active = progress == null
-      || progress.phase == "startup" || progress.phase == "complete" ? -1 : progress.stepIndex;
-    if (Math.abs(scroll.offsetY - lastOffset) > 0.5) following = false;
-    if (following && active >= 0 && active != followed) {
-      scroll.jumpTo(0, Math.max(0, (active - 2) * ROW_HEIGHT));
-      followed = active;
-    }
-    lastOffset = scroll.offsetY;
+    var active = controller.activeStep();
     if (!following) items.push(new KeyedView("follow", new Button("Follow current step", null, function() {
       following = true;
       followed = -1;
       selected = -1;
+      scroll.jumpTo(scroll.offsetX, scroll.offsetY);
+      lastOffset = scroll.offsetY;
+      controller.requestRefresh();
     }, "mission-follow")));
     model.show(mission, progress, tokens);
     var listStyle = fill();
     listStyle.clipVertical = true;
-    items.push(new KeyedView("steps",
-      new ListView("mission-steps", model, listStyle, scroll, 300.0, selected, function(index) {
+    var list = new ListView("mission-steps", model, listStyle, scroll, 300.0, selected, function(index) {
       selected = index;
       controller.inspectStep(index);
-    }
-    )));
+    });
+    list.selectionProvider = () -> selected;
+    list.onScroll = _ -> {
+      if (following) {
+        following = false;
+        controller.requestRefresh();
+      }
+    };
+    items.push(new KeyedView("steps", list));
     var detailIndex = selected >= 0 ? selected : active;
-    if (detailIndex >= 0) {
+    if (detailIndex >= 0 && detailIndex < mission.steps.length) {
       var step = mission.steps[detailIndex];
       items.push(new KeyedView(
         "detail",
@@ -172,4 +198,18 @@ private class MissionListModel implements ListViewModel {
       state == "Failed" ? tokens.danger : tokens.text
     );
   }
+}
+
+@:access(app.editor.MissionPanel) private class MissionPanelView implements View {
+  final panel:MissionPanel;
+  final controller:MissionController;
+  final tokens:ThemeTokens;
+  final showProgram:Null<Void->Void>;
+  public function new(panel:MissionPanel, controller:MissionController, tokens:ThemeTokens, showProgram:Null<Void->Void>) {
+    this.panel = panel;
+    this.controller = controller;
+    this.tokens = tokens;
+    this.showProgram = showProgram;
+  }
+  public function build(context:BuildContext):RenderNode return panel.describe(context, controller, tokens, showProgram).build(context);
 }

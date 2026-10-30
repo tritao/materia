@@ -975,6 +975,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function view(samplePresentation:Bool = true):View {
     if (!workspace.isOpen("machine-control")) machineControlPanel.cancelGesture();
     else if (samplePresentation) machineControlPanel.update(this);
+    if (samplePresentation && workspace.isOpen("mission")) missionPanel.update(missionController);
     if (componentLab != null) return componentLab.view(ui);
     if (samplePresentation || !simulation.isActive()) framePresentation = simulation.capturePresentationSnapshot();
     if (samplePresentation && (workspace.isOpen("inspection-camera") || inspectionCamera.overlay)) {
@@ -1270,6 +1271,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function submit(frame:LayoutFrame):RenderNode {
     if (workspace.isOpen("machine-control")) machineControlPanel.update(this);
     else machineControlPanel.cancelGesture();
+    if (workspace.isOpen("mission")) missionPanel.update(missionController);
     if (simulation.isActive()) framePresentation = simulation.capturePresentationSnapshot();
     var cameraVisible = workspace.isOpen("inspection-camera") || inspectionCamera.overlay;
     if (cameraVisible) inspectionCamera.update(this);
@@ -2113,6 +2115,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     context.observeBool(() -> toolbarMenuVisible);
     context.observeInt(() -> viewRevision);
     context.observeString(() -> Std.string(session.assemblyMateStatus()));
+    if (perspectiveViewport != null) context.observeBool(missionController.hasWork);
     if (context.observeBool(() -> inspectionCamera.overlay)) inspectionCamera.observe(this, context);
     context.observeBool(() -> viewportOptionsVisible);
     context.observeBool(() -> visibilityPopupVisible);
@@ -2236,7 +2239,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     result.register(new DockPanelDescriptor("mission", "Mission", true, true, IconName.Activity));
     result.register(new DockPanelDescriptor("cnc", "CNC", true, true, IconName.Terminal));
 
-    // Mission and CNC still follow a running program by scrolling from inside their builds.
+    // CNC still follows a running program by scrolling from inside its build.
     workspacePanelContents = [DockPanelContent.observing(
       "start",
       function(context) return StartPanel.build(this, context),
@@ -2281,7 +2284,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     ), DockPanelContent.observing(
       "project",
       function(context) return app.editor.ProjectVariantView.build(projectVariants, appearance.theme.tokens, "project-panel", context)
-    ), new DockPanelContent("mission",
+    ), DockPanelContent.observing("mission",
       function(_) return missionPanel.build(missionController, appearance.theme.tokens, function() {
       workspace.open("cnc", "inspector");
       workspace.activate("cnc");
@@ -2618,7 +2621,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new StackChild("scene", content, 0.0, 0.0, 0, LayoutAxis.grow(), LayoutAxis.grow()),
       new StackChild("view-angle", viewAngle, 10.0, 10.0, 1)
     ];
-    var missionState = missionController.snapshot(), variantState = projectVariants.snapshot();
+    var variantState = projectVariants.snapshot();
     var sceneControls:Array<KeyedView> = [];
     if (perspectiveViewport != null && perspectiveViewport.presentation != null) sceneControls.push(new KeyedView(
       "presentation",
@@ -2635,7 +2638,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       "project",
       app.editor.ProjectVariantView.build(projectVariants, appearance.theme.tokens, "viewport-project")
     ));
-    if (missionState.hasWork) sceneControls.push(new KeyedView("mission",
+    if (missionController.hasWork()) sceneControls.push(new KeyedView("mission",
       app.editor.MissionStatusView.build(missionController, appearance.theme.tokens, "viewport-mission", function() {
       workspace.open("mission", workspace.isOpen("sensors") ? "sensors" : "inspector");
       workspace.activate("mission");

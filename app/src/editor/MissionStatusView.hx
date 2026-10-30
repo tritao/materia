@@ -6,6 +6,8 @@ import haxeon.ui.LayoutStyle;
 import haxeon.ui.TextWrap;
 import haxeon.ui.core.TextStyleOverride;
 import haxeon.ui.core.View;
+import haxeon.ui.core.BuildContext;
+import haxeon.ui.core.RenderNode;
 import haxeon.ui.theme.ThemeTokens;
 import haxeon.ui.widgets.KeyedView;
 import haxeon.ui.widgets.controls.Button;
@@ -16,6 +18,10 @@ import haxeon.ui.widgets.text.Text;
 class MissionStatusView {
   public static function build(controller:MissionController,
     tokens:ThemeTokens, key:String, ?showSteps:Void -> Void):View {
+    return new MissionStatusContent(controller, tokens, key, showSteps);
+  }
+
+  static function describe(controller:MissionController, tokens:ThemeTokens, key:String, showSteps:Null<Void->Void>):View {
     var state = controller.snapshot();
     var rows:Array<KeyedView> = [];
     rows.push(new KeyedView(
@@ -51,5 +57,22 @@ class MissionStatusView {
     style.width = LayoutAxis.grow();
     style.childGap = 6.0;
     return new Column(key, rows, style);
+  }
+}
+
+@:access(app.editor.MissionStatusView) private class MissionStatusContent implements View {
+  final controller:MissionController;
+  final tokens:ThemeTokens;
+  final key:String;
+  final showSteps:Null<Void->Void>;
+  public function new(controller:MissionController, tokens:ThemeTokens, key:String, showSteps:Null<Void->Void>) {
+    this.controller = controller;
+    this.tokens = tokens;
+    this.key = key;
+    this.showSteps = showSteps;
+  }
+  public function build(context:BuildContext):RenderNode {
+    controller.observe(context);
+    return MissionStatusView.describe(controller, tokens, key, showSteps).build(context);
   }
 }

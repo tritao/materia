@@ -403,6 +403,7 @@ private typedef InputProbe = {
     frames:Array<String>,
     actions:Array<String>
   ):Void {
+    MissionRetention.run(editor.ui.buildContext.fonts, output, cycles, frames);
     MachineControlRetention.run(editor.ui.buildContext.fonts, output, cycles, frames);
     runBimFlowsScenario(editor, frame, cycles, frames);
     // A camera panel needs no generated machine to exercise its headless presentation transitions.

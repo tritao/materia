@@ -1187,12 +1187,19 @@ class MissionPlayer implements SessionMember {
     return "Step " + (stepIndex + 1) + " / " + mission.steps.length + " · " + mission.steps[stepIndex].kind;
   }
 
+  /** Allocation-free presentation inputs, shared by progress snapshots and retained views. */
+  public function progressPhase():String return failure != null ? "failed" : finished ? "complete"
+    : !homingComplete && homing != null ? "startup" : "executing";
+
+  public function startupAxis():Null<String> return !homingComplete && homing != null ? homing.homingAxis() : null;
+
+  public function startupPhase():Null<String> return homingComplete || homing == null ? null
+    : !homingStarted ? "waiting" : homing.homingStatus();
+
   /** Structured presentation state; startup is separate from the first authored step. */
   public function progress():MissionProgress {
-    var phase = failure != null ? "failed" : finished ? "complete" : !homingComplete
-      && homing != null ? "startup" : "executing";
     return {
-      phase: phase,
+      phase: progressPhase(),
       stepIndex: stepIndex,
       completedInLoop: finished ? mission.steps.length : stepIndex,
       loop : mission.loop == true ? Std.int(completed / mission.steps.length) + 1 : 1,
