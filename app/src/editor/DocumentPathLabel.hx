@@ -165,6 +165,7 @@ class DocumentPathLabel implements View {
   var popupX = Math.max(8 - bounds.x, Math.min(0, context.environment.width - 8 - bounds.x - popupWidth));
   var show = truncated && (interaction.value.hovered || interaction.value.focused);
   if (popupStyle.visible != show || popupStyle.width.value != popupWidth || popupStyle.positionX != popupX) {
+    context.willEditRetained(popup);
     popupStyle.visible = show;
     popupStyle.width = LayoutAxis.fixed(popupWidth);
     popupStyle.positionX = popupX;
