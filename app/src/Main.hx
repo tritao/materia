@@ -2212,14 +2212,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       "start",
       function(_) return StartPanel.build(this),
       function(_, width) return StartPanel.build(this, width)
-    ), new DockPanelContent(
-      "hierarchy",
-      function(_) return hierarchyPanel(),
-      null,
-      null,
-      function(hash) hash.addInt(scene.revision).addInt(scene.selectionRevision).addString(hierarchySearch)
-        .addInt(hierarchyExpansionRevision).addBool(simulation.isActive())
-    ), new DockPanelContent(
+    ), DockPanelContent.observing("hierarchy", function(context) return HierarchyPanel.build(this, context)), new DockPanelContent(
       "bim",
       function(_) return bimEditor
     ), new DockPanelContent("perspective", function(_) return perspectivePanel(), function(
@@ -2255,13 +2248,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       function(hash) hash.addInt(session.generation).addInt(session.document.revision).addInt(sensors.revision())
         .addString(sensors.robotId).addInt(sensors.selectedIndex).addInt(simulation.appliedRevision)
         .addBool(simulation.isActive()).addBool(simulation.isRunning())
-    ), new DockPanelContent(
-      "console",
-      function(_) return consolePanel(),
-      null,
-      function() return "log="
-      + consoleDocument.revision + ":stale=" + session.staleEdits().join("\n") + ":dark=" + appearance.dark
-    ), new DockPanelContent(
+    ), DockPanelContent.observing("console", function(context) return consolePanel(context)), new DockPanelContent(
       "telemetry",
       function(_) return telemetry.build(
         framePresentation,
@@ -2299,7 +2286,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     sensors.setReadOnlyRobots([for (id in world.robotIds()) if (simulatedIds.indexOf(id) < 0) id]);
   }
 
-  function hierarchyPanel():View return HierarchyPanel.build(this);
 
   function sceneAction(key:String, commandId:String, label:String, icon:Null<IconName>):CommandButton {
     var action = new CommandButton(key, commandId, commands);
@@ -2877,11 +2863,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function inspectorPanel():View return InspectorPanel.build(this);
 
-  function consolePanel():View {
+  /** Retained by what it observes; the log's text area observes its document. */
+  function consolePanel(context:haxeon.ui.core.BuildContext):View {
     var style = fillStyle();
     style.padding = new Insets(12.0, 12.0, 12.0, 12.0);
     style.background = appearance.theme.tokens.surface;
     var rows:Array<KeyedView> = [];
+    context.observeString(() -> session.staleEdits().join("\n"));
     var stale = session.staleEdits();
     if (stale.length > 0) {
       rows.push(new KeyedView("stale-heading", new Text("Stale project edits: " + stale.length)));

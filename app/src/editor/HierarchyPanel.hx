@@ -3,6 +3,7 @@ package app.editor;
 import app.Main.ReferenceEditorApp;
 import haxeon.ui.Insets;
 import haxeon.ui.LayoutStyle;
+import haxeon.ui.core.BuildContext;
 import haxeon.ui.core.TextStyleOverride;
 import haxeon.ui.core.View;
 import haxeon.ui.icons.IconName;
@@ -19,7 +20,12 @@ import haxeon.ui.widgets.text.Text;
 @:access(app.Main.ReferenceEditorApp) class HierarchyPanel {
   public static inline var SIMULATION_LOCK_HINT:String = "Simulation active. Press Design to edit.";
 
-  public static function build(app:ReferenceEditorApp):View {
+  /** Retained by what it observes (DockPanelContent.observing); the tree observes its own model. */
+  public static function build(app:ReferenceEditorApp, context:BuildContext):View {
+    var search = context.observeString(() -> app.hierarchySearch);
+    var selection = context.observeString(() -> app.treeModel.selectionKey());
+    // Expanding a row is reported by the tree through this counter.
+    context.observeInt(() -> app.hierarchyExpansionRevision);
     var addStyle = new LayoutStyle();
     addStyle.padding = new Insets(6.0, 8.0, 6.0, 8.0);
     addStyle.childGap = 5.0;
@@ -42,8 +48,8 @@ import haxeon.ui.widgets.text.Text;
     treeStyle.background = app.appearance.theme.tokens.surface;
     treeStyle.childGap = 6.0;
     var treeViewport = ReferenceEditorApp.fillStyle();
-    var tree = new TreeView(app.hierarchySearch == "" ? "scene-hierarchy" : "scene-hierarchy-filtered", app.treeModel,
-      treeViewport, app.treeModel.scrollController, 420.0, app.treeModel.selectionKey(), ["scene"], function(id) {
+    var tree = new TreeView(search == "" ? "scene-hierarchy" : "scene-hierarchy-filtered", app.treeModel,
+      treeViewport, app.treeModel.scrollController, 420.0, selection, ["scene"], function(id) {
       app.treeModel.selectKey(id);
       app.log("Selected " + id);
       app.invalidateView();
@@ -68,7 +74,7 @@ import haxeon.ui.widgets.text.Text;
     };
     tree.onItemRename = app.startRename;
     var rows:Array<KeyedView> = [new KeyedView("heading", app.sectionHeading("SCENE"))];
-    if (app.simulation.isActive()) rows.push(new KeyedView(
+    if (context.observeBool(app.simulation.isActive)) rows.push(new KeyedView(
       "simulation-hint",
       new Text(SIMULATION_LOCK_HINT, null, app.appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))
     ));
@@ -83,7 +89,7 @@ import haxeon.ui.widgets.text.Text;
         ],
         ReferenceEditorApp.actionRowStyle()
       )
-    ), new KeyedView("search", new SearchField("hierarchy-search", app.hierarchySearch, function(value) {
+    ), new KeyedView("search", new SearchField("hierarchy-search", search, function(value) {
       app.hierarchySearch = value;
       app.treeModel.setFilter(value);
       app.invalidateView();
