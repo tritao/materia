@@ -14,18 +14,28 @@ import haxeon.ui.widgets.controls.Select;
 import haxeon.ui.widgets.controls.SelectOption;
 import materia.project.MaterialLibrary;
 import app.editor.SheetWorkflowPanel;
+import haxeon.ui.core.BuildContext;
 import haxeon.ui.widgets.text.Text;
 import haxeon.ui.widgets.text.TextField;
 
 /** Selected-object inspector dock panel. */
 @:access(app.Main.ReferenceEditorApp) class InspectorPanel {
-  public static function build(app:ReferenceEditorApp):View {
+  /**
+   * Retained by what it observes (DockPanelContent.observing). The property inspector and the sheet and project panels read
+   * the scene, simulation and document deeply, so their revisions are observed as a whole; the inputs read here are observed
+   * where they are read.
+   */
+  public static function build(app:ReferenceEditorApp, context:BuildContext):View {
     var appearance = app.appearance;
     var scene = app.scene;
     var session = app.session;
     var simulation = app.simulation;
+    context.observeInt(() -> scene.revision);
+    context.observeInt(() -> scene.selectionRevision);
+    context.observeInt(() -> simulation.appliedRevision);
+    context.observeInt(() -> session.document.revision);
+    context.observeInt(() -> app.sceneInspector == null ? 0 : app.sceneInspector.contentRevision());
     var perspectiveViewport = app.perspectiveViewport;
-    var viewportWidth = app.viewportWidth;
     var fillStyle = function() return ReferenceEditorApp.fillStyle();
     var actionRowStyle = function() return ReferenceEditorApp.actionRowStyle();
     var sectionHeading = function(label:String) return app.sectionHeading(label);
@@ -40,11 +50,12 @@ import haxeon.ui.widgets.text.TextField;
     var style = fillStyle();
     style.padding = new Insets(10.0, 10.0, 10.0, 10.0);
     style.background = appearance.theme.tokens.surface;
-    var groupKey = app.treeModel.selectionKey();
+    var groupKey = context.observeString(() -> app.treeModel.selectionKey());
     var group = app.treeModel.groupInfo(groupKey);
     if (group != null) {
-      var editable = !app.documents.blocked();
-      var visibility = new Button(app.treeModel.visibilityState(groupKey).own ? "Hide assembly" : "Show assembly",
+      var editable = !context.observeBool(app.documents.blocked);
+      var shown = context.observeBool(() -> app.treeModel.visibilityState(groupKey).own);
+      var visibility = new Button(shown ? "Hide assembly" : "Show assembly",
         null, function() {
         if (!app.documents.blocked()) app.treeModel.toggleVisibility(groupKey);
       }
@@ -93,10 +104,12 @@ import haxeon.ui.widgets.text.TextField;
     }
     var inspector = app.sceneInspector;
     inspector.setStyle(style);
-    inspector.labelWidth = viewportWidth < 760.0 ? 56.0 : viewportWidth < 1180.0 ? 76.0 : 108.0;
+    var widthClass = context.observeInt(() -> app.viewportWidth < 760.0 ? 0 : app.viewportWidth < 1180.0 ? 1 : 2);
+    inspector.labelWidth = widthClass == 0 ? 56.0 : widthClass == 1 ? 76.0 : 108.0;
     var ownership = session.scriptOwnership;
-    inspector.enabled = ownership == null
-      && !simulation.isActive() && (perspectiveViewport == null || !perspectiveViewport.dragging());
+    context.observeBool(() -> session.scriptOwnership != null);
+    inspector.enabled = ownership == null && !context.observeBool(simulation.isActive)
+      && !context.observeBool(() -> app.perspectiveViewport != null && app.perspectiveViewport.dragging());
     var rows:Array<KeyedView> = [new KeyedView("heading", sectionHeading(selected.label))];
     if (simulation.isActive()) rows.push(new KeyedView(
       "simulation-hint",

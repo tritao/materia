@@ -72,7 +72,8 @@ private typedef InputProbe = {
       var scenario = Sys.args().length >= 3 && (Sys.args()[2] == "tab-inspector"
         || Sys.args()[2] == "inspector-edits" || Sys.args()[2] == "selection-stress" || Sys.args()[2] == "tab-matrix"
         || Sys.args()[2] == "architecture" || Sys.args()[2] == "primitives" || Sys.args()[2] == "noop"
-        || Sys.args()[2] == "interaction" || Sys.args()[2] == "dock-drag") ? Sys.args()[2] : "tab-inspector";
+        || Sys.args()[2] == "interaction" || Sys.args()[2] == "dock-drag" || Sys.args()[2] == "inspector-flows")
+        ? Sys.args()[2] : "tab-inspector";
       if (Sys.args().length == 4 && scenario == "tab-inspector"
         && Sys.args()[2] != "tab-inspector") throw "Unknown headless scenario: " + Sys.args()[2];
       var heapDumpPath = Sys.args().length == 4 ? Sys.args()[3] : Sys.args().length == 3
@@ -107,6 +108,8 @@ private typedef InputProbe = {
       if (censusInterval > 0) hl.Gc.censusStart(censusInterval);
       if (scenario == "dock-drag") {
         runDockDragScenario(editor, frame, frames, actions);
+      } else if (scenario == "inspector-flows") {
+        runInspectorFlowsScenario(editor, frame, cycles, frames, actions);
       } else if (scenario == "interaction") {
         runInteractionScenario(editor, frame, output, cycles, frames, actions);
       } else if (scenario == "noop") {
@@ -201,6 +204,41 @@ private typedef InputProbe = {
     }
     editor.dispose();
     fonts.dispose();
+  }
+
+  /**
+   * Inspector states that change without a scene revision: a sketch edit starting and ending, a part being created. The
+   * inspector must show them on the next frame; with HAXEON_UI_VERIFY_RETENTION=1 every frame is also compared with a fresh build.
+   */
+  static function runInspectorFlowsScenario(
+    editor:ReferenceEditorApp,
+    frame:LayoutFrame,
+    cycles:Int,
+    frames:Array<String>,
+    actions:Array<String>
+  ):Void {
+    click(editor, "inspector");
+    submit(editor, frame, frames, "setup:inspector");
+    var shows = function(key:String):Bool {
+      var root = editor.ui.root;
+      return root != null && findByStyleKey(root, key, false) != null;
+    };
+    for (cycle in 0...cycles) {
+      editor.commands.execute("scene.create-part");
+      submit(editor, frame, frames, "create-part", cycle);
+      if (!shows("create-constrained-sketch")) throw "The inspector does not offer a sketch for the new part";
+      editor.commands.execute("scene.create-sketch");
+      submit(editor, frame, frames, "create-sketch", cycle);
+      if (!editor.scene.hasActiveSketchEdit()) throw "The sketch edit did not start";
+      if (!shows("add-sketch-rectangle")) throw "The inspector does not show the sketch tools of the edit that started";
+      editor.commands.execute("scene.cancel-sketch");
+      submit(editor, frame, frames, "cancel-sketch", cycle);
+      if (shows("add-sketch-rectangle")) throw "The inspector still shows the sketch tools after the edit was cancelled";
+      editor.scene.select("box");
+      editor.commands.refresh();
+      submit(editor, frame, frames, "select-box", cycle);
+      action(actions, "inspector-flows", cycle);
+    }
   }
 
   static function runInspectorEditScenario(

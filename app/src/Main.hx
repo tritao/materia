@@ -37,7 +37,6 @@ import sys.FileSystem;
 import sys.io.File;
 import haxe.Json;
 import materia.sheet.SheetInventory;
-import haxeon.ui.core.KeyHash;
 import haxeon.ui.core.Command;
 import haxeon.ui.core.CommandContext;
 import haxeon.ui.core.CommandRegistry;
@@ -2081,14 +2080,33 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   // The viewport also consumes simulation poses, so its dependencies include presentation revisions.
   /** Adds everything the perspective panel's retained tree depends on to `hash`. */
-  function perspectiveRevisionHash(hash:KeyHash):Void {
-    var presentationRevision = framePresentation == null ? -1 : framePresentation.revision;
-    hash.addInt(sceneGeneration).addInt(scene.revision).addInt(scene.selectionRevision).addInt(simulation.appliedRevision)
-      .addBool(simulation.isActive()).addBool(simulation.isRunning()).addString(simulation.error == null ? "" : simulation.error)
-      .addString(Std.string(world.status())).addInt(presentationRevision).addFloat(gridSpacing).addBool(gridSnapEnabled)
-      .addString(session.hobbingScenario).addString(mode.id).addString(Std.string(toolbarDensity)).addBool(toolbarMenuVisible)
-      .addFloat(viewportWidth).addFloat(viewportHeight).addInt(viewRevision)
-      .addString(Std.string(session.assemblyMateStatus()));
+  /**
+   * What the perspective panel depends on. Its build pushes grid and simulation settings into the viewport, so reusing it is
+   * only right while none of these changed; they are observed here because the build reaches them through the viewport
+   * rather than reading each one where it is shown.
+   */
+  function observePerspective(context:haxeon.ui.core.BuildContext):Void {
+    context.observeInt(() -> sceneGeneration);
+    context.observeInt(() -> scene.revision);
+    context.observeInt(() -> scene.selectionRevision);
+    context.observeInt(() -> simulation.appliedRevision);
+    context.observeBool(simulation.isActive);
+    context.observeBool(simulation.isRunning);
+    context.observeString(() -> simulation.error);
+    context.observeString(() -> Std.string(world.status()));
+    context.observeInt(() -> framePresentation == null ? -1 : framePresentation.revision);
+    context.observeString(() -> gridSpacing + "|" + gridSnapEnabled + "|" + gridVisible + "|" + collisionsVisible + "|"
+      + collisionNearMillimetres + "|" + viewportWidth + "x" + viewportHeight);
+    context.observeString(() -> session.hobbingScenario);
+    context.observeString(() -> mode.id);
+    context.observeString(() -> Std.string(toolbarDensity));
+    context.observeBool(() -> toolbarMenuVisible);
+    context.observeInt(() -> viewRevision);
+    context.observeString(() -> Std.string(session.assemblyMateStatus()));
+    context.observeString(() -> inspectionCamera.presentationKey());
+    context.observeBool(() -> viewportOptionsVisible);
+    context.observeBool(() -> visibilityPopupVisible);
+    context.observeString(() -> perspectiveViewport == null ? "" : perspectiveViewport.presentationKey());
   }
 
   function statusBar(context:haxeon.ui.core.BuildContext):View {
@@ -2215,40 +2233,21 @@ class ReferenceEditorApp implements DesktopUiApplication {
     ), DockPanelContent.observing("hierarchy", function(context) return HierarchyPanel.build(this, context)), new DockPanelContent(
       "bim",
       function(_) return bimEditor
-    ), new DockPanelContent("perspective", function(_) return perspectivePanel(), function(
-      _,
-      width
-    ) return perspectivePanel(width),
-    // perspectivePanel() pushes grid and simulation settings into the viewport, so a hit may only skip it when
-    // none of its inputs changed: this key includes the current simulation presentation.
-    null,
-    function(hash) {
-      perspectiveRevisionHash(hash);
-      hash.addString(inspectionCamera.presentationKey()).addBool(gridVisible).addBool(viewportOptionsVisible)
-        .addBool(visibilityPopupVisible).addString(perspectiveViewport == null ? "" : perspectiveViewport.presentationKey())
-        .addBool(collisionsVisible).addFloat(collisionNearMillimetres);
+    ), DockPanelContent.observing("perspective", function(context) {
+      observePerspective(context);
+      return perspectivePanel();
+    }, function(context, width) {
+      observePerspective(context);
+      return perspectivePanel(width);
     }), new DockPanelContent(
         "inspection-camera",
         function(_) return inspectionCamera.build(this)
       ), new DockPanelContent(
         "machine-control",
         function(_) return machineControlPanel.build(this)
-      ), new DockPanelContent(
-        "inspector",
-        function(_) return inspectorPanel(),
-        null,
-        null,
-        function(hash) hash.addInt(scene.revision).addInt(scene.selectionRevision).addInt(simulation.appliedRevision)
-          .addBool(simulation.isActive()).addInt(sceneInspector == null ? 0 : sceneInspector.contentRevision())
-    ), new DockPanelContent(
-      "sensors",
-      function(_) return sensorPanel(),
-      null,
-      null,
-      function(hash) hash.addInt(session.generation).addInt(session.document.revision).addInt(sensors.revision())
-        .addString(sensors.robotId).addInt(sensors.selectedIndex).addInt(simulation.appliedRevision)
-        .addBool(simulation.isActive()).addBool(simulation.isRunning())
-    ), DockPanelContent.observing("console", function(context) return consolePanel(context)), new DockPanelContent(
+      ), DockPanelContent.observing("inspector", function(context) return InspectorPanel.build(this, context)),
+      DockPanelContent.observing("sensors", function(context) return SensorPanel.build(this, context)),
+      DockPanelContent.observing("console", function(context) return consolePanel(context)), new DockPanelContent(
       "telemetry",
       function(_) return telemetry.build(
         framePresentation,
@@ -2279,7 +2278,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     return result;
   }
 
-  function sensorPanel():View return SensorPanel.build(this);
 
   function updateReadOnlyRobots():Void {
     var simulatedIds = simulation.simulatedRobotIds();
@@ -2861,7 +2859,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
       );
   }
 
-  function inspectorPanel():View return InspectorPanel.build(this);
 
   /** Retained by what it observes; the log's text area observes its document. */
   function consolePanel(context:haxeon.ui.core.BuildContext):View {

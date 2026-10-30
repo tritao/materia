@@ -1,5 +1,6 @@
 package app.editor;
 
+import haxeon.ui.core.BuildContext;
 import app.ApplicationSimulation;
 import app.Main.ReferenceEditorApp;
 import app.ScriptOwnership;
@@ -20,7 +21,11 @@ import haxeon.ui.widgets.text.Text;
 
 /** Sensor dock panel and its script-owned controls. */
 @:access(app.Main.ReferenceEditorApp) class SensorPanel {
-  public static function build(app:ReferenceEditorApp):View {
+  /**
+   * Retained by what it observes (DockPanelContent.observing). The sensor model and the simulation are observed through
+   * their revisions; what the panel shows besides them (robots, script ownership, diagnostics, warnings) is observed here.
+   */
+  public static function build(app:ReferenceEditorApp, context:BuildContext):View {
     var appearance = app.appearance;
     var world = app.world;
     var simulation = app.simulation;
@@ -29,6 +34,27 @@ import haxeon.ui.widgets.text.Text;
     var sensors = app.sensors;
     var commands = app.commands;
     var viewportWidth = app.viewportWidth;
+    context.observeInt(() -> session.generation);
+    context.observeInt(() -> session.document.revision);
+    context.observeInt(() -> sensors.revision());
+    context.observeString(() -> sensors.robotId);
+    context.observeInt(() -> sensors.selectedIndex);
+    context.observeInt(() -> simulation.appliedRevision);
+    context.observeBool(simulation.isActive);
+    context.observeBool(simulation.isRunning);
+    context.observeString(() -> world.robotIds().join(",") + "|" + simulation.simulatedRobotIds().join(","));
+    context.observeBool(() -> simulation.pending(sensors, scene));
+    context.observeString(simulation.userBackendName);
+    context.observeString(() -> simulation.collisionWarnings.join("\n"));
+    context.observeString(() -> sensors.diagnostics().join("\n"));
+    context.observeBool(sensors.isEditable);
+    context.observeString(() -> {
+      var ownership = session.scriptOwnership;
+      return ownership == null ? null : ownership.reference + "|" + ownership.configurationVersion + "|"
+        + ownership.overridesEnabled + "|" + ownership.diagnostics.join("\n");
+    });
+    context.observeInt(() -> app.viewportWidth < 820.0 ? 0 : 1);
+    context.observeInt(() -> app.sensorInspector == null ? 0 : app.sensorInspector.contentRevision());
     var fillStyle = function() return ReferenceEditorApp.fillStyle();
     // The panel is dense with small buttons; give them a little more room than the app-wide defaults.
     var actionRowStyle = function() {
