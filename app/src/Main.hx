@@ -2089,23 +2089,26 @@ class ReferenceEditorApp implements DesktopUiApplication {
     "scene.frame-selected"
   ];
 
-  /** Command predicates can change without a registry refresh (for example after selection). */
-  function topBarCommandState():Int {
-    var result = 0;
+  static final topBarKey:haxeon.ui.core.KeyHash = new haxeon.ui.core.KeyHash();
+
+  /**
+   * Everything the top bar shows. The command registry's revision is not part of it: the dock and most edits refresh the
+   * registry, which rebuilt the toolbar on every tab switch. What the toolbar reads from commands is their presence and
+   * enabled and checked states, hashed here; command predicates change without a refresh anyway (for example after selection).
+   */
+  function topBarRevisionKey():String {
+    var hash = topBarKey.reset();
     for (id in topBarCommands) {
       var command = commands.get(id);
-      result = (result << 2) | (command != null && command.isEnabled(ui.commandContext) ? 1 : 0) | (command != null
-        && command.isChecked(ui.commandContext) ? 2 : 0);
+      hash.addInt(command == null ? -1 : (command.isEnabled(ui.commandContext) ? 1 : 0) | (command.isChecked(ui.commandContext) ? 2 : 0));
     }
-    return result;
-  }
-
-  function topBarRevisionKey():String {
     var mission = simulation.missionPlayer();
-    return "document=" + session.label() + ":commands=" + commands.revision + ":state=" + topBarCommandState()
-      + ":active=" + simulation.isActive() + ":running=" + simulation.isRunning() + ":failed=" + (mission != null
-      && mission.failure != null) + ":chip=" + simulationStateLabel() + ":density="
-      + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible + ":project-load=" + projectLoadingRevisionKey();
+    var pending = simulationBuild;
+    hash.addString(app.editor.DocumentPathLabel.documentPath(session)).addBool(simulation.isActive())
+      .addBool(simulation.isRunning()).addBool(mission != null && mission.failure != null).addString(simulationStateLabel())
+      .addBool(simulationStop != null).addString(pending == null ? null : pending.control.currentPhase())
+      .addString(Std.string(toolbarDensity)).addBool(toolbarMenuVisible).addString(projectLoadingRevisionKey());
+    return hash.a + ":" + hash.b;
   }
 
   function statusBarRevisionKey():String {
