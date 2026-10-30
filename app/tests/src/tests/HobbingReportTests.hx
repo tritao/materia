@@ -38,20 +38,20 @@ import haxeon.ui.host.*;
       .warnings.push("Coarse app diagnostic: profile inspected from pitch to tip only; full active profile unchecked");
     measured.extrapolation.push("Outside reference diameter scope");
     data.measurement = measured;
-    data.complete = true;
-    data.status = "Cycle complete";
-    data.seconds = 6.003;
-    data.syncArcsec = 0.004;
-    data.windows = 982;
-    data.poses = 421515;
-    data.buffered = 619;
-    data.stockKiB = 946;
-    data.cutting = 573;
-    data.radial = 209;
-    data.power = 2865;
-    data.hobTorque = 9.167;
-    data.tableTorque = 12.194;
-    data.materialBasis = "Assumed kc1.1=2400 N/mm², mc=0.25";
+    data.telemetry.complete = true;
+    data.telemetry.status = "Cycle complete";
+    data.telemetry.seconds = 6.003;
+    data.telemetry.syncArcsec = 0.004;
+    data.telemetry.windows = 982;
+    data.telemetry.poses = 421515;
+    data.telemetry.buffered = 619;
+    data.telemetry.stockKiB = 946;
+    data.telemetry.cutting = 573;
+    data.telemetry.radial = 209;
+    data.telemetry.power = 2865;
+    data.telemetry.hobTorque = 9.167;
+    data.telemetry.tableTorque = 12.194;
+    data.telemetry.materialBasis = "Assumed kc1.1=2400 N/mm², mc=0.25";
     return data;
   }
 
@@ -198,8 +198,8 @@ import haxeon.ui.host.*;
         charts(root).length == 0 && words(root).indexOf("Inspection pending") >= 0,
         "running report has honest pending state"
       );
-      empty.complete = true;
-      empty.inspectionFailure = "Missing tooth flank";
+      empty.telemetry.complete = true;
+      empty.telemetry.inspectionFailure = "Missing tooth flank";
       root = ui.submit(new HobbingGearReport(empty), frame);
       check(words(root).indexOf("Missing tooth flank") >= 0, "inspection failure stays visible");
       var measured = data.measurement;

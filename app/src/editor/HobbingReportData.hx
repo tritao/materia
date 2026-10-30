@@ -5,30 +5,14 @@ import gearkit.GearTrace;
 
 /** Presentation snapshot; numerical inspection and its qualification stay in GearKit. */
 class HobbingReportData {
-  public var status = "Cutting";
-  public var complete = false;
-  public var failure:Null<String>;
-  public var inspectionFailure:Null<String>;
-  public var seconds = 0.0;
-  public var syncArcsec = 0.0;
-  public var contacts = 0;
-  public var windows = 0;
-  public var poses = 0;
-  public var buffered = 0;
-  public var stockKiB = 0;
-  public var cutting = 0.0;
-  public var radial = 0.0;
-  public var power = 0.0;
-  public var hobTorque = 0.0;
-  public var tableTorque = 0.0;
-  public var materialBasis = "";
+  public final telemetry = new HobbingTelemetry();
   public var measurement:Null<GearMeasurement>;
 
   public function new() {
   }
 
   public function quality():String {
-    if (measurement == null) return complete ? "Inspection incomplete" : "Inspection pending";
+    if (measurement == null) return telemetry.complete ? "Inspection incomplete" : "Inspection pending";
     var grade = measurement.overallGrade;
     return (grade == null ? "Grade estimate incomplete or worse than 11" : 'Candidate grade $grade')
       + (measurement.isoClass == null ? " · ISO class not qualified" : ' · ISO class ${measurement.isoClass}');
@@ -67,4 +51,26 @@ class HobbingReportData {
     for (trace in traces) for (i in 0...trace
       .x.length) out.add('$kind,${trace.tooth},${trace.flank},${trace.x[i]},${trace.raw[i]},${trace.filtered[i]}\n');
   }
+}
+
+/** Reusable live readings, separate from the immutable inspection result. */
+@:structural class HobbingTelemetry {
+  public var status = "Cutting";
+  public var complete = false;
+  public var failure:Null<String>;
+  public var inspectionFailure:Null<String>;
+  public var seconds = 0.0;
+  public var syncArcsec = 0.0;
+  public var contacts = 0;
+  public var windows = 0;
+  public var poses = 0;
+  public var buffered = 0;
+  public var stockKiB = 0;
+  public var cutting = 0.0;
+  public var radial = 0.0;
+  public var power = 0.0;
+  public var hobTorque = 0.0;
+  public var tableTorque = 0.0;
+  public var materialBasis = "";
+  public function new() {}
 }

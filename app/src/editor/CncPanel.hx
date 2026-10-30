@@ -9,6 +9,11 @@ import haxeon.ui.LayoutAxis;
 import haxeon.ui.LayoutStyle;
 import haxeon.ui.core.TextStyleOverride;
 import haxeon.ui.core.View;
+import haxeon.ui.core.BuildContext;
+import haxeon.ui.core.RenderNode;
+import haxeon.ui.core.WidgetId;
+import haxeon.ui.core.Key;
+import haxeon.ui.LayoutVisualKind;
 import haxeon.ui.theme.ThemeTokens;
 import haxeon.ui.widgets.KeyedView;
 import haxeon.ui.widgets.collections.ListView;
@@ -36,28 +41,29 @@ class CncPanel {
   var errorDetails = false;
   var lastFailure:Null<String>;
 
+  final presentation = new CncPresentation();
+  final nextPresentation = new CncPresentation();
+  final report = new HobbingReportData();
+  final nextReport = new HobbingReportData();
+  var player:Null<app.ToolpathPlayer>;
+  var hobbing:Null<app.HobbingProgramPlayer>;
+  var bindingRevision = 0;
+  var patchContext:Null<BuildContext>;
+  var patchId:Null<WidgetId>;
+
   public function new() {
   }
 
-  /** `printer` is the line about a printer the editor is connected to (its state, progress and temperatures), if any. */
-  public function build(
-    simulation:ApplicationSimulation,
-    tokens:ThemeTokens,
-    ?printer:String,
-    ?project:ProjectDocumentSession
-  ):View {
-    var style = fill();
-    style.padding = new Insets(12.0, 12.0, 12.0, 12.0);
-    style.childGap = 8.0;
-    style.background = tokens.surface;
-    var hobbing = simulation.hobbingPlayer();
-    if (hobbing != null) {
-      return new HobbingGearReport(reportData(hobbing));
-    }
-    var player = simulation.toolpathPlayer();
+  function requestPatch():Void {
+    var context = patchContext, id = patchId;
+    if (context == null || id == null || !context.requestPatch(id)) bindingRevision++;
+  }
+
+  /** Sample execution and advance following before checking retained dependencies. */
+  public function update(simulation:ApplicationSimulation, ?project:ProjectDocumentSession):Void {
+    var nextPlayer = simulation.toolpathPlayer(), nextHobbing = simulation.hobbingPlayer();
     var cnc = project == null ? null : project.cncJob, print = project == null ? null : project.printJob;
-    var text = player
-      != null ? player.sourceLines().join("\n") : cnc != null ? cnc.source : print != null ? print.source : null;
+    var text = nextPlayer != null ? nextPlayer.sourceText() : cnc != null ? cnc.source : print != null ? print.source : null;
     var nextGeneration = project == null ? -1 : project.generation;
     if (source != text || generation != nextGeneration) {
       source = text;
@@ -66,10 +72,71 @@ class CncPanel {
       followedLine = 0;
       scroll.jumpTo(0, 0);
     }
+    var failure = nextPlayer == null ? null : nextPlayer.failure;
+    if (failure != lastFailure) {
+      lastFailure = failure;
+      errorDetails = false;
+    }
+    if (nextPlayer != null && nextPlayer.currentLine > 0 && nextPlayer.currentLine != followedLine) {
+      followedLine = nextPlayer.currentLine;
+      scroll.jumpTo(scroll.offsetX, Math.max(0.0, (followedLine - 4) * ROW_HEIGHT));
+    }
+    nextPresentation.source = text;
+    nextPresentation.generation = nextGeneration;
+    nextPresentation.print = print != null;
+    nextPresentation.running = simulation.isRunning();
+    nextPresentation.line = nextPlayer == null ? 0 : nextPlayer.currentLine;
+    nextPresentation.failure = failure;
+    nextPresentation.held = nextPlayer != null && nextPlayer.held();
+    nextPresentation.finished = nextPlayer != null && nextPlayer.finished();
+    nextPresentation.started = nextPlayer != null && nextPlayer.hasStarted();
+    nextPresentation.restart = nextPlayer != null && nextPlayer.canRestart();
+    nextPresentation.speed = nextPlayer == null ? 1 : nextPlayer.speedOverride;
+    nextPresentation.title = nextPlayer == null ? null : nextPlayer.title();
+    nextPresentation.detail = nextPlayer == null ? null : nextPlayer.statusDetail();
+    var changed = player != nextPlayer || hobbing != nextHobbing;
+    var mask = haxeon.Structural.changedMask(presentation, nextPresentation);
+    if (mask != 0) {
+      haxeon.Structural.assignChanged(presentation, presentation, nextPresentation);
+      changed = true;
+    }
+    if (nextHobbing != null) {
+      reportData(nextHobbing, nextReport);
+      var reportMask = haxeon.Structural.changedMask(report.telemetry, nextReport.telemetry);
+      if (report.measurement != nextReport.measurement) {
+        report.measurement = nextReport.measurement;
+        changed = true;
+      }
+      if (reportMask != 0) {
+        haxeon.Structural.assignChanged(report.telemetry, report.telemetry, nextReport.telemetry);
+        changed = true;
+      }
+    }
+    player = nextPlayer;
+    hobbing = nextHobbing;
+    if (changed) requestPatch();
+  }
+
+  /** Describe the last explicit update; `printer` supplies the connected device's current summary, if any. */
+  public function build(
+    simulation:ApplicationSimulation,
+    tokens:ThemeTokens,
+    ?printer:String
+  ):View {
+    return new CncPanelView(this, simulation, tokens, printer);
+  }
+
+  function describe(simulation:ApplicationSimulation, tokens:ThemeTokens, printer:Null<String>):View {
+    var style = fill();
+    style.padding = new Insets(12.0, 12.0, 12.0, 12.0);
+    style.childGap = 8.0;
+    style.background = tokens.surface;
+    if (hobbing != null) return new HobbingGearReport(report);
+    var player = this.player, text = source;
     var heading = new KeyedView(
       "heading",
       new Text(
-        player == null ? (print != null ? "PRINT PROGRAM" : "CNC PROGRAM") : player.title(),
+        player == null ? (presentation.print ? "PRINT PROGRAM" : "CNC PROGRAM") : presentation.title,
         null,
         tokens.textSecondary,
         TextStyleOverride.text(11.0, 0.8)
@@ -88,22 +155,13 @@ class CncPanel {
       }
       return new Column("cnc-panel", items, style);
     }
-    model.show(text ?? "", player.currentLine, tokens.selectionField);
-    // Follow the running line, keeping a few lines of context above it.
-    if (player.currentLine > 0 && player.currentLine != followedLine) {
-      followedLine = player.currentLine;
-      scroll.jumpTo(scroll.offsetX, Math.max(0.0, (player.currentLine - 4) * ROW_HEIGHT));
-    }
-    var held = player.held(), failure = player.failure;
-    if (failure != lastFailure) {
-      lastFailure = failure;
-      errorDetails = false;
-    }
+    model.show(text ?? "", presentation.line, tokens.selectionField);
+    var held = presentation.held, failure = presentation.failure;
     var problem = failure == null ? null : ProgramErrorMessage.fromFailure(failure);
-    var status = problem != null ? problem.title + (player.currentLine > 0 ? ' · line ${player.currentLine}'
-      : "") : (player.finished() ? "Completed" : !player.hasStarted() ? "Ready" : !simulation.isRunning()
-      ? "Paused" : held ? "Held" : "Running") + (player.currentLine > 0 ? ' · line ${player.currentLine}'
-      : "") + player.statusDetail() + ' · speed ${Math.round(player.speedOverride * 100)}%';
+    var status = problem != null ? problem.title + (presentation.line > 0 ? ' · line ${presentation.line}'
+      : "") : (presentation.finished ? "Completed" : !presentation.started ? "Ready" : !presentation.running
+      ? "Paused" : held ? "Held" : "Running") + (presentation.line > 0 ? ' · line ${presentation.line}'
+      : "") + presentation.detail + ' · speed ${Math.round(presentation.speed * 100)}%';
     var hold = new Button("Hold", null, () -> simulation.control(() -> player.hold()), "cnc-hold");
     hold.enabled = !held && failure == null;
     var resume = new Button("Resume", null, () -> simulation.control(() -> player.resume()), "cnc-resume");
@@ -112,14 +170,14 @@ class CncPanel {
       null, () -> {var line = selectedLine;
     if (line > 0) simulation.control(() -> player.restartFromLine(line));
     }, "cnc-restart");
-    restart.enabled = selectedLine > 0 && player.canRestart();
+    restart.enabled = selectedLine > 0 && presentation.restart;
     var buttonsStyle = new LayoutStyle();
     buttonsStyle.width = LayoutAxis.grow();
     buttonsStyle.childGap = 6.0;
     var speed = new Slider(
       "cnc-speed",
       "Speed override",
-      player.speedOverride,
+      presentation.speed,
       0.05,
       2.0,
       0.05,
@@ -147,7 +205,7 @@ class CncPanel {
       var details = new Button(
         errorDetails ? "Hide technical details" : "Technical details",
         null,
-        () -> errorDetails = !errorDetails,
+        () -> {errorDetails = !errorDetails; requestPatch();},
         "cnc-error-details"
       );
       items.push(new KeyedView(
@@ -166,31 +224,35 @@ class CncPanel {
   function programList():View {
     var style = fill();
     style.clipVertical = true;
-    return new ListView("cnc-gcode", model, style, scroll, 300.0, selectedLine - 1, index -> selectedLine = index + 1);
+    var list = new ListView("cnc-gcode", model, style, scroll, 300.0, selectedLine - 1, index -> {
+      selectedLine = index + 1;
+      requestPatch();
+    });
+    list.selectionProvider = () -> selectedLine - 1;
+    return list;
   }
 
-  static function reportData(player:app.HobbingProgramPlayer):HobbingReportData {
-    var data = new HobbingReportData(), stock = player.stock;
-    data.complete = player.completed;
-    data.failure = player.failure;
-    data.status = player.failure != null
+  static function reportData(player:app.HobbingProgramPlayer, data:HobbingReportData):Void {
+    var stock = player.stock;
+    data.telemetry.complete = player.completed;
+    data.telemetry.failure = player.failure;
+    data.telemetry.status = player.failure != null
       ? "Stopped" : player.handling != null ? player.handling.phase : player.completed ? "Cycle complete" : "Cutting";
-    data.seconds = player.elapsed;
-    data.syncArcsec = player.syncError * 648000 / Math.PI;
-    data.contacts = stock.collisions;
-    data.windows = stock.stream.passes;
-    data.poses = stock.stream.poses;
-    data.buffered = stock.stream.peakFrames;
-    data.stockKiB = Math.round(stock.maxBytes / 1024);
-    data.cutting = stock.forces.maxTangential;
-    data.radial = stock.forces.maxRadial;
-    data.power = stock.forces.maxPower;
-    data.hobTorque = stock.forces.maxHobTorque;
-    data.tableTorque = stock.forces.maxTableTorqueBound;
-    data.materialBasis = stock.forces.material.basis;
+    data.telemetry.seconds = player.elapsed;
+    data.telemetry.syncArcsec = player.syncError * 648000 / Math.PI;
+    data.telemetry.contacts = stock.collisions;
+    data.telemetry.windows = stock.stream.passes;
+    data.telemetry.poses = stock.stream.poses;
+    data.telemetry.buffered = stock.stream.peakFrames;
+    data.telemetry.stockKiB = Math.round(stock.maxBytes / 1024);
+    data.telemetry.cutting = stock.forces.maxTangential;
+    data.telemetry.radial = stock.forces.maxRadial;
+    data.telemetry.power = stock.forces.maxPower;
+    data.telemetry.hobTorque = stock.forces.maxHobTorque;
+    data.telemetry.tableTorque = stock.forces.maxTableTorqueBound;
+    data.telemetry.materialBasis = stock.forces.material.basis;
     data.measurement = stock.measurement;
-    data.inspectionFailure = stock.measurementFailure;
-    return data;
+    data.telemetry.inspectionFailure = stock.measurementFailure;
   }
 
   static function fill():LayoutStyle {
@@ -236,5 +298,49 @@ private class GcodeListModel implements ListViewModel {
     style.padding = new Insets(6.0, 2.0, 6.0, 2.0);
     if (index + 1 == running && tint != null) style.background = tint;
     return new Text(StringTools.lpad(Std.string(index + 1), " ", 5) + "  " + lines[index], style);
+  }
+}
+
+
+@:structural private class CncPresentation {
+  public var source:Null<String>;
+  public var generation = -1;
+  public var print = false;
+  public var running = false;
+  public var line = 0;
+  public var failure:Null<String>;
+  public var held = false;
+  public var finished = false;
+  public var started = false;
+  public var restart = false;
+  public var speed = 1.0;
+  public var title:Null<String>;
+  public var detail:Null<String>;
+  public function new() {}
+}
+
+@:access(app.editor.CncPanel) private class CncPanelView implements View {
+  final panel:CncPanel;
+  final simulation:ApplicationSimulation;
+  final tokens:ThemeTokens;
+  final printer:Null<String>;
+  public function new(panel:CncPanel, simulation:ApplicationSimulation, tokens:ThemeTokens, printer:Null<String>) {
+    this.panel = panel;
+    this.simulation = simulation;
+    this.tokens = tokens;
+    this.printer = printer;
+  }
+  public function build(context:BuildContext):RenderNode {
+    context.observeInt(() -> panel.bindingRevision);
+    return context.withScope(new Key("cnc-panel"), () -> {
+      var id = context.id("content");
+      panel.patchContext = context;
+      panel.patchId = id;
+      return context.selfUpdating(id, () -> {
+        var root = new RenderNode(id, LayoutVisualKind.Box, CncPanel.fill());
+        root.add(panel.describe(simulation, tokens, printer).build(context));
+        return root;
+      });
+    });
   }
 }

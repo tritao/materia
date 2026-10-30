@@ -403,6 +403,7 @@ private typedef InputProbe = {
     frames:Array<String>,
     actions:Array<String>
   ):Void {
+    CncRetention.run(editor.ui.buildContext.fonts, output, cycles, frames);
     MissionRetention.run(editor.ui.buildContext.fonts, output, cycles, frames);
     MachineControlRetention.run(editor.ui.buildContext.fonts, output, cycles, frames);
     runBimFlowsScenario(editor, frame, cycles, frames);

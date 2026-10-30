@@ -584,14 +584,38 @@ class PrintProgramPlayer extends ToolpathPlayer {
 
   public function heaterNames():Array<String> return [for (heater in job.heaters) heater.name];
 
+  var shownLayer = -1;
+  final shownTemperatures:Array<Int> = [];
+  final shownTargets:Array<Int> = [];
+  var shownStatusDetail = "";
+
   /** The program's G-code is a print: the panel shows its layer and temperatures. */
   override public function statusDetail():String {
-    var text = ' · layer $layer/$layerCount';
-    for (name in heaterNames()) {
-      var reading = readings.get(name);
-      if (reading != null) text += ' · $name ${Math.round(reading.celsius)}/${Math.round(reading.targetCelsius)} °C';
+    var changed = shownLayer != layer;
+    for (index in 0...job.heaters.length) {
+      var reading = readings.get(job.heaters[index].name);
+      var temperature = reading == null ? -2147483648 : Math.round(reading.celsius);
+      var target = reading == null ? -2147483648 : Math.round(reading.targetCelsius);
+      if (index >= shownTemperatures.length) {
+        shownTemperatures.push(temperature);
+        shownTargets.push(target);
+        changed = true;
+      } else if (shownTemperatures[index] != temperature || shownTargets[index] != target) {
+        shownTemperatures[index] = temperature;
+        shownTargets[index] = target;
+        changed = true;
+      }
     }
-    return text;
+    if (changed) {
+      shownLayer = layer;
+      var text = ' · layer $layer/$layerCount';
+      for (index in 0...job.heaters.length) if (shownTemperatures[index] != -2147483648) {
+        var name = job.heaters[index].name;
+        text += ' · $name ${shownTemperatures[index]}/${shownTargets[index]} °C';
+      }
+      shownStatusDetail = text;
+    }
+    return shownStatusDetail;
   }
 
   override public function title():String return "PRINT PROGRAM";

@@ -268,6 +268,9 @@ class ToolpathPlayer implements SessionMember {
   /** A finite program completed successfully; restarting clears the underlying motion state. */
   public function finished():Bool return !loop && started && motion.completed && !motion.running && failure == null;
 
+  /** The immutable source shared with retained program views. */
+  public function sourceText():String return source;
+
   /** The program's G-code, one entry per line. */
   public function sourceLines():Array<String> return source.split("\n");
 

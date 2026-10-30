@@ -976,6 +976,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (!workspace.isOpen("machine-control")) machineControlPanel.cancelGesture();
     else if (samplePresentation) machineControlPanel.update(this);
     if (samplePresentation && workspace.isOpen("mission")) missionPanel.update(missionController);
+    if (samplePresentation && workspace.isOpen("cnc")) cncPanel.update(simulation, session);
     if (componentLab != null) return componentLab.view(ui);
     if (samplePresentation || !simulation.isActive()) framePresentation = simulation.capturePresentationSnapshot();
     if (samplePresentation && (workspace.isOpen("inspection-camera") || inspectionCamera.overlay)) {
@@ -1272,6 +1273,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (workspace.isOpen("machine-control")) machineControlPanel.update(this);
     else machineControlPanel.cancelGesture();
     if (workspace.isOpen("mission")) missionPanel.update(missionController);
+    if (workspace.isOpen("cnc")) cncPanel.update(simulation, session);
     if (simulation.isActive()) framePresentation = simulation.capturePresentationSnapshot();
     var cameraVisible = workspace.isOpen("inspection-camera") || inspectionCamera.overlay;
     if (cameraVisible) inspectionCamera.update(this);
@@ -2239,7 +2241,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     result.register(new DockPanelDescriptor("mission", "Mission", true, true, IconName.Activity));
     result.register(new DockPanelDescriptor("cnc", "CNC", true, true, IconName.Terminal));
 
-    // CNC still follows a running program by scrolling from inside its build.
     workspacePanelContents = [DockPanelContent.observing(
       "start",
       function(context) return StartPanel.build(this, context),
@@ -2290,13 +2291,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
       workspace.activate("cnc");
       invalidateView();
     }
-    )), new DockPanelContent(
+    )), DockPanelContent.observing(
       "cnc",
-      function(_) return cncPanel.build(
+      function(context) return cncPanel.build(
         simulation,
         appearance.theme.tokens,
-        printerLink.connected() || printerLink.error != null ? printerLink.summary() : null,
-        session
+        context.observeString(() -> printerLink.connected() || printerLink.error != null ? printerLink.summary() : null)
       )
     )];
 

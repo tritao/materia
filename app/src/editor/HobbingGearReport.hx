@@ -26,15 +26,15 @@ class HobbingGearReport implements View {
     for (group in groups) warningCount += group.length;
     var rows:Array<KeyedView> = [];
     rows.push(text("heading", "HOBBING · GEAR REPORT", tokens.textSecondary));
-    rows.push(text("status", data.status, data.failure == null ? tokens.textPrimary : tokens.danger));
-    if (data.failure != null) rows.push(text("failure", data.failure, tokens.danger));
+    rows.push(text("status", data.telemetry.status, data.telemetry.failure == null ? tokens.textPrimary : tokens.danger));
+    if (data.telemetry.failure != null) rows.push(text("failure", data.telemetry.failure, tokens.danger));
     var summary:Array<KeyedView> = [
-      text("cycle", 'Cycle  ${n(data.seconds)} s', tokens.textPrimary),
-      text("sync", 'Sync error  ${n(data.syncArcsec)} arcsec', tokens.textPrimary),
-      text("contacts", 'Fixture contacts  ${data.contacts}', data.contacts > 0 ? tokens.danger : tokens.textPrimary),
+      text("cycle", 'Cycle  ${n(data.telemetry.seconds)} s', tokens.textPrimary),
+      text("sync", 'Sync error  ${n(data.telemetry.syncArcsec)} arcsec', tokens.textPrimary),
+      text("contacts", 'Fixture contacts  ${data.telemetry.contacts}', data.telemetry.contacts > 0 ? tokens.danger : tokens.textPrimary),
       text(
         "load",
-        'Estimated cutting load  ${Math.round(data.cutting)} N · ${Math.round(data.power)} W',
+        'Estimated cutting load  ${Math.round(data.telemetry.cutting)} N · ${Math.round(data.telemetry.power)} W',
         tokens.textSecondary
       )
     ];
@@ -47,8 +47,8 @@ class HobbingGearReport implements View {
           text("qualification", data.quality(), tokens.textPrimary),
           text(
             "reason",
-            data.measurement == null ? (data.inspectionFailure != null ? data.inspectionFailure
-      : data.complete ? "No inspection traces available." : "Profile and lead inspection runs when the cycle finishes.")
+            data.measurement == null ? (data.telemetry.inspectionFailure != null ? data.telemetry.inspectionFailure
+      : data.telemetry.complete ? "No inspection traces available." : "Profile and lead inspection runs when the cycle finishes.")
       : '$warningCount inspection warnings · qualification depends on sampling, coverage and assessment scope.',
       tokens.textSecondary
     )
@@ -108,16 +108,16 @@ class HobbingGearReport implements View {
       [
         text(
           "forces",
-          '${Math.round(data.cutting)} N cutting · ${Math.round(data.radial)} N radial · ${Math.round(data.power)} W',
+          '${Math.round(data.telemetry.cutting)} N cutting · ${Math.round(data.telemetry.radial)} N radial · ${Math.round(data.telemetry.power)} W',
           tokens.textPrimary
         ),
         text(
           "torques",
-          'B torque ${n(data.hobTorque)} Nm · C torque bound ${n(data.tableTorque)} Nm',
+          'B torque ${n(data.telemetry.hobTorque)} Nm · C torque bound ${n(data.telemetry.tableTorque)} Nm',
           tokens.textPrimary
         ),
         text("basis",
-      data.materialBasis, tokens.textSecondary),
+      data.telemetry.materialBasis, tokens.textSecondary),
       text(
         "limits",
         "Kienzle window estimates; effective edge width 1 mm assumed. Overlap summed; instantaneous peaks unresolved. Requires cutting-test calibration at the stated hardness.",
@@ -132,10 +132,10 @@ class HobbingGearReport implements View {
       "run-details",
       "Run details",
       [
-        text("windows", '${data.windows} gash windows · ${data.poses} poses', tokens.textPrimary),
+        text("windows", '${data.telemetry.windows} gash windows · ${data.telemetry.poses} poses', tokens.textPrimary),
         text(
           "memory",
-          'Peak ${data.buffered} buffered samples · ${data.stockKiB} KiB retained stock and force data',
+          'Peak ${data.telemetry.buffered} buffered samples · ${data.telemetry.stockKiB} KiB retained stock and force data',
           tokens.textSecondary
         )
       ],

@@ -972,8 +972,21 @@ class CncProgramPlayer extends ToolpathPlayer {
 
   override public function title():String return "CNC PROGRAM";
 
-  override public function statusDetail():String return ' · tool $loadedTool' + (spindleUtilization
-    > 0.0 ? ' · spindle ${Math.round(spindleUtilization * 1000) / 10}%' : "");
+  var shownToolNumber = -2147483648;
+  var shownSpindlePercent = -1;
+  var shownSpindleActive = false;
+  var shownStatusDetail = "";
+
+  override public function statusDetail():String {
+    var active = spindleUtilization > 0.0, percent = Math.round(spindleUtilization * 1000);
+    if (shownToolNumber != loadedTool || shownSpindlePercent != percent || shownSpindleActive != active) {
+      shownToolNumber = loadedTool;
+      shownSpindlePercent = percent;
+      shownSpindleActive = active;
+      shownStatusDetail = ' · tool $loadedTool' + (active ? ' · spindle ${percent / 10}%' : "");
+    }
+    return shownStatusDetail;
+  }
 
   /**
 	 * Restarts the program at G-code line `line`, or the first line after it that moves: the machine
