@@ -22,8 +22,8 @@
         "hover-other": {"frameMs": 3.5, "allocKiB": 23},
         "hover-field": {"frameMs": 3.5, "allocKiB": 40},
         "hover-away": {"frameMs": 3.5, "allocKiB": 46},
-        "type-char": {"frameMs": 3.5, "allocKiB": 27},
-        "type-backspace": {"frameMs": 3.5, "allocKiB": 26}
+        "type-char": {"frameMs": 3.5, "allocKiB": 19.8},
+        "type-backspace": {"frameMs": 3.5, "allocKiB": 19.9}
       }
     },
     "selection-stress": {
