@@ -337,10 +337,8 @@ import sys.FileSystem;
     return null;
   }
   static function scrollbarControls():Void {
-    var fonts = haxeon.ui.FontCollection.create(),
-      font = "haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf";
-    if (!FileSystem.exists(font)) font = "../../" + font;
-    fonts.add(font);
+    var fonts = haxeon.ui.FontCollection.create();
+    fonts.add(TestPaths.font());
     var records:Array<SceneObjectData> = [for (i in 0...40) {
       id:"row-" + i,
         label:"Object " + i + " with a long scene label", type:"rectangle", x:0.0, y:0.0, z:0.0, width:1.0, height:1.0,
@@ -430,7 +428,7 @@ import sys.FileSystem;
   }
   static function popupControls():Void {
     var fonts = haxeon.ui.FontCollection.create();
-    fonts.add("haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf");
+    fonts.add(TestPaths.font());
     var ui = new haxeon.ui.core.UiContext(null, fonts), scene = new EditorScene(data()), tree = new EditorSceneTree(
       scene,
       definition()
@@ -481,13 +479,8 @@ import sys.FileSystem;
     }
   }
   static function uiControls():Void {
-    var fonts = haxeon.ui.FontCollection.create(), font:Null<String> = null;
-    for (path in [
-      "haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
-      "../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"
-    ]) if (FileSystem.exists(path)) font = path;
-    if (font == null) throw "Missing visibility test font";
-    fonts.add(font);
+    var fonts = haxeon.ui.FontCollection.create();
+    fonts.add(TestPaths.font());
     var ui = new haxeon.ui.core.UiContext(null, fonts), scene = new EditorScene(data());
     var model = new EditorSceneTree(scene, definition());
     scene.select("project:other");
