@@ -355,7 +355,12 @@ bool joint_frame_matches_rest_pose(const nksim::BackendJointDesc &joint,
         rotate(normalize(Quat{child.rotation[0], child.rotation[1], child.rotation[2], child.rotation[3]}),
                joint.anchor_b));
     const auto delta = subtract(from_parent, from_child);
-    return std::sqrt(dot(delta, delta)) <= 1e-6;
+    // Body poses reach the backend through the scene's single-precision transforms, so a body far from the origin
+    // is only placed to within the spacing of floats at its distance (about 4e-6 at 50 m).
+    double magnitude = 1.0;
+    for (const auto &point : {from_parent, from_child, parent_position, child_position})
+        for (const auto coordinate : point) magnitude = std::max(magnitude, std::abs(coordinate));
+    return std::sqrt(dot(delta, delta)) <= 1e-6 * magnitude;
 }
 
 void write_pose(const Vec3 &position, const Quat &rotation, mjsBody &body) {

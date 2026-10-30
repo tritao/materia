@@ -3456,6 +3456,44 @@ void unstable_dynamics_reject_the_tick() {
     nkscene_scene_destroy(scene);
 }
 
+// Body poses arrive through single-precision scene transforms, so a joint far from the origin matches its bodies'
+// rest poses only to within the spacing of floats there.
+void joint_far_from_the_origin_matches_single_precision_poses() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto base_node = make_node(scene, 40.0137);
+    const auto arm_node = make_node(scene, 40.4168);
+
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 2;
+    world_desc.gravity[2] = 0.0;
+    nksim_world world = 0;
+    assert(nksim_world_create(&world_desc, &world) == NKSIM_OK);
+    const auto base = make_body(world, base_node, NKSIM_MOTION_STATIC, 0.0);
+    const auto arm = make_body(world, arm_node, NKSIM_MOTION_DYNAMIC, 1.0, make_box(world));
+
+    nksim_joint_desc joint_desc{};
+    joint_desc.struct_size = sizeof(joint_desc);
+    joint_desc.type = NKSIM_JOINT_REVOLUTE;
+    joint_desc.body_a = base;
+    joint_desc.body_b = arm;
+    joint_desc.axis_a[2] = 1.0;
+    // The floats nearest the two positions are 2.9e-6 further apart than the anchor says.
+    joint_desc.anchor_b[0] = -0.4031;
+    joint_desc.lower_limit = -0.6;
+    joint_desc.upper_limit = 0.6;
+    joint_desc.max_force = 20.0;
+    nksim_joint joint = 0;
+    assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
+    step_world(world, 2);
+
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 int main() {
     unstable_dynamics_reject_the_tick();
     pressure_limited_speed_source_carries_load_and_stalls_at_capacity();
@@ -3472,6 +3510,7 @@ int main() {
     surface_friction_decides_sliding();
     world_options_are_validated();
     revolute_joint_is_owned_by_nativekit();
+    joint_far_from_the_origin_matches_single_precision_poses();
     prismatic_joint_uses_mujoco_velocity_control();
     fixed_joint_rebuilds_and_can_be_removed();
     kinematic_scene_state_drives_mujoco();
