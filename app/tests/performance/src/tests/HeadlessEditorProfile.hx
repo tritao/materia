@@ -56,7 +56,11 @@ private typedef InputProbe = {
 }
 
 /** Replays real editor input through UiContext without a window or X server. */
-@:access(app.EditorScene) class HeadlessEditorProfile {
+@:access(app.EditorScene)
+@:access(app.ProjectDocumentSession)
+@:access(app.Main.ReferenceEditorApp)
+@:access(app.editor.InspectionCameraPanel)
+@:access(app.EditorPerspectiveViewport) class HeadlessEditorProfile {
 
   static var profileSpans = false;
   static var frameGc = FrameGcScheduler.fromEnvironment();
@@ -284,6 +288,135 @@ private typedef InputProbe = {
     frames:Array<String>,
     actions:Array<String>
   ):Void {
+    // A camera panel needs no generated machine to exercise its headless presentation transitions.
+    showPanel(editor, frame, frames, "inspection-camera");
+    var noAssembly = "Open an assembly to inspect its views.";
+    var noHost = "Inspection rendering requires the desktop GPU host.";
+    function cameraText(value:String):Null<RenderNode> {
+      var found:Null<RenderNode> = null;
+      var root = editor.ui.root;
+      if (root != null) root.walk(function(node) {
+        if (node.layout.text == value) found = node;
+      });
+      return found;
+    }
+    var originalPresentation = editor.session.presentation;
+    for (cycle in 0...cycles) {
+      editor.session.presentation = null;
+      editor.invalidateView();
+      submit(editor, frame, frames, "camera-no-assembly", cycle);
+      var before = cameraText(noAssembly);
+      if (before == null) throw "Inspection camera does not show the empty assembly state";
+      editor.invalidateView();
+      submit(editor, frame, frames, "camera-unchanged", cycle);
+      // Verification deliberately leaves its fresh reference tree mounted. Identity is checked by the normal replay.
+      if (editor.ui.verifyRetentionEvery == 0 && cameraText(noAssembly) != before)
+        throw "Unchanged inspection camera was rebuilt";
+      editor.session.presentation = {
+        schemaVersion: 1, definition: "camera-fixture", defaultView: "", views: [], explode: [], procedures: []
+      };
+      editor.invalidateView();
+      submit(editor, frame, frames, "camera-no-host", cycle);
+      if (cameraText(noHost) == null || cameraText(noAssembly) != null)
+        throw "Inspection camera did not observe the assembly presentation";
+    }
+    editor.session.presentation = originalPresentation;
+    // The host services can be exercised without creating a window or submitting GPU work.
+    var fonts = editor.ui.buildContext.fonts;
+    var host = @:privateAccess new haxeon.ui.host.DesktopUiHostContext(fonts,
+      new haxeon.platform.event.EventPump(), nativekit.ffi.NativeKitTypes.WindowHandle.invalid(),
+      nativekit.ffi.NativeKitTypes.SurfaceHandle.invalid(), () -> {}, () -> {});
+    var cameraEditor = new ReferenceEditorApp(fonts, output + "/camera-workspace.json", null, null, host, null, null, null, true);
+    try {
+      var definition:materia.assembly.AssemblyDefinition = {
+        schemaVersion: materia.assembly.AssemblyDefinitionCodec.VERSION, id: "camera-fixture", lengthUnit: "m",
+        definitions: [{id: "block", connectors: []}],
+        occurrences: [{id: "box", definition: "block", initialPose: materia.assembly.AssemblyFrames.identity()}], joints: []
+      };
+      cameraEditor.session.projectAssemblyDefinition = definition;
+      cameraEditor.session.presentation = materia.presentation.Presentations.assembled(definition);
+      cameraEditor.switchMode(app.EditorMode.Simulate);
+      cameraEditor.openInspectionCamera();
+      cameraEditor.ui.submit(cameraEditor.view(), frame);
+      if (!showsText(cameraEditor, "independent view")) throw "Standalone view did not initialize the inspection camera";
+      showPanel(cameraEditor, frame, frames, "inspection-camera");
+      if (!showsText(cameraEditor, "independent view")) throw "Inspection camera controls were not built";
+      for (cycle in 0...cycles) {
+        var viewport = cameraEditor.inspectionCamera.viewport;
+        if (viewport == null) throw "Inspection camera did not create its viewport";
+        click(cameraEditor, "inspection-views-disclosure", false);
+        submit(cameraEditor, frame, frames, "camera-disclosure", cycle);
+        if (viewport.presentationControlsExpanded != (cycle % 2 == 0))
+          throw "Inspection camera disclosure did not toggle";
+        click(cameraEditor, "inspection-zoom-in", false);
+        submit(cameraEditor, frame, frames, "camera-zoom", cycle);
+        var record = cameraEditor.session.presentation;
+        if (record == null) throw "Inspection camera fixture lost its presentation";
+        record.views[0].label = "Camera view " + cycle;
+        cameraEditor.invalidateView();
+        submit(cameraEditor, frame, frames, "camera-view-label", cycle);
+        if (!showsText(cameraEditor, "Camera view " + cycle)) throw "Inspection camera ignored its view label";
+        // The fitted Select label records its displayed text after layout; consume that feedback before isolating paint.
+        submit(cameraEditor, frame, frames, "camera-geometry-settled", cycle);
+        // A paint-only input must reconcile the image while preserving the surrounding controls.
+        var root = cameraEditor.ui.root;
+        var before = root == null ? null : findByStyleKey(root, "inspection-views-disclosure", false);
+        var imageId = viewport.paintNodeId;
+        if (root == null || before == null || imageId == null) throw "Inspection camera test targets are missing";
+        var imageBefore = root.find(imageId);
+        if (imageBefore == null) throw "Inspection camera image is missing";
+        viewport.setCollisions([new app.SceneCollision.SceneCollisionPair("box", "tower", -0.01 - cycle * 0.001,
+          [0, 0, 0], [0, 0, 0], true)]);
+        submit(cameraEditor, frame, frames, "camera-live-paint", cycle);
+        root = cameraEditor.ui.root;
+        if (cameraEditor.ui.verifyRetentionEvery == 0 && (root == null || root.find(imageId) != imageBefore
+          || findByStyleKey(root, "inspection-views-disclosure", false) != before))
+          throw "Live camera paint replaced its image or rebuilt its controls: cycle=" + cycle
+            + " image=" + (root != null && root.find(imageId) == imageBefore)
+            + " controls=" + (root != null && findByStyleKey(root, "inspection-views-disclosure", false) == before);
+        click(cameraEditor, "inspection-presentation", false);
+        submit(cameraEditor, frame, frames, "camera-overlay", cycle);
+        if (!cameraEditor.inspectionCamera.overlay || cameraEditor.workspace.isOpen("inspection-camera"))
+          throw "Inspection camera did not move into its overlay";
+        click(cameraEditor, "inspection-presentation", false);
+        submit(cameraEditor, frame, frames, "camera-redocked", cycle);
+        if (cameraEditor.inspectionCamera.overlay || cameraEditor.workspace.activePanelId != "inspection-camera")
+          throw "Inspection camera did not return to its dock";
+        submit(cameraEditor, frame, frames, "camera-redock-settled", cycle);
+        var beforeHidden = cameraEditor.ui.root;
+        var beforeHiddenId = viewport.paintNodeId;
+        var beforeHiddenImage = beforeHidden == null || beforeHiddenId == null ? null : beforeHidden.find(beforeHiddenId);
+        showPanel(cameraEditor, frame, frames, "sensors");
+        showPanel(cameraEditor, frame, frames, "inspection-camera");
+        // A cached image that read no pointer flags must still regain its self-updating registration.
+        var paintRoot = cameraEditor.ui.root;
+        var paintId = viewport.paintNodeId;
+        if (paintRoot == null || paintId == null) throw "Remounted inspection image is missing";
+        var mounted = paintRoot.find(paintId);
+        if (mounted == null || cameraEditor.ui.buildContext.updatingBuild(mounted) == null)
+          throw "Remounted inspection image lost its patch registration";
+        if (cameraEditor.ui.verifyRetentionEvery == 0 && mounted != beforeHiddenImage)
+          throw "Unchanged inspection image was rebuilt instead of remounted";
+        viewport.setCollisions([new app.SceneCollision.SceneCollisionPair("box", "tower", -0.03 - cycle * 0.001,
+          [0, 0, 0], [0, 0, 0], true)]);
+        submit(cameraEditor, frame, frames, "camera-remounted-paint", cycle);
+        paintRoot = cameraEditor.ui.root;
+        if (cameraEditor.ui.verifyRetentionEvery == 0 && (paintRoot == null || paintRoot.find(paintId) != mounted))
+          throw "Remounted inspection image was replaced on live paint";
+        showPanel(cameraEditor, frame, frames, "sensors");
+        viewport.setCollisions([new app.SceneCollision.SceneCollisionPair("box", "tower", -0.02 - cycle * 0.001,
+          [0, 0, 0], [0, 0, 0], true)]);
+        cameraEditor.workspace.activate("inspection-camera");
+        cameraEditor.invalidateView();
+        cameraEditor.ui.submit(cameraEditor.view(), frame);
+        if (!showsText(cameraEditor, "independent view")) throw "Standalone view did not remount the inspection camera";
+        submit(cameraEditor, frame, frames, "camera-public-remount", cycle);
+      }
+    } catch (error:Dynamic) {
+      cameraEditor.dispose();
+      throw error;
+    }
+    cameraEditor.dispose();
     var recent = FileSystem.fullPath(output) + "/recent-file.materia";
     // The bundled examples are found from the repository root, where the editor is launched.
     var started = Sys.getCwd();
@@ -1081,11 +1214,11 @@ private typedef InputProbe = {
     };
   }
 
-  static function click(editor:ReferenceEditorApp, key:String):ClickPhases {
+  static function click(editor:ReferenceEditorApp, key:String, ?tab:Bool):ClickPhases {
     var lookupStarted = Sys.time();
     var root = editor.ui.root;
     if (root == null) throw "UI tree is not ready";
-    var node = findByStyleKey(root, key, key.indexOf("editor:") != 0);
+    var node = findByStyleKey(root, key, tab == null ? key.indexOf("editor:") != 0 : tab);
     if (node == null || node.resolved == null) throw "Benchmark target is unavailable: " + key;
     var lookupDone = Sys.time();
     var bounds = node.resolved.clippedViewportBounds();

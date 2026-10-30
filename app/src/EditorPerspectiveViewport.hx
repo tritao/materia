@@ -664,30 +664,47 @@ class EditorPerspectiveViewport implements View {
     lightingRevision++;
   }
 
-  public function build(context:BuildContext):RenderNode {
-    return context.withScope(new Key(key), function() {
-      var node = new RenderNode(context.id("perspective"), LayoutVisualKind.Custom, style);
-      node.onResolved(function(geometry) {
-        updateViewportSize(geometry.width, geometry.height);
-      }
-      );
-      node.hitTestSelf = true;
-      node.focusable = true;
-      node.semantics = new Semantics(AccessibilityRole.Image, "Scene perspective GPU view");
-      revalidateHover();
-      updatePresentation();
-      node.onPaint(
-        paint,
-        "perspective:" + scene.visualRevision + ":" + runtimeRevision + ":" + (presentation
-        == null ? 0 : presentation.revision)
+  var paintContext:Null<BuildContext>;
+  var paintNodeId:Null<haxeon.ui.core.WidgetId>;
+  var submittedPaintKey:Null<String>;
+
+  /** True when the image is current or a patch is scheduled; false requires the owner to rebuild an unmounted binding. */
+  public function updateRetainedPaint():Bool {
+    updatePresentation();
+    if (submittedPaintKey == paintKey()) return true;
+    var context = paintContext, id = paintNodeId;
+    return context != null && id != null && context.requestPatch(id);
+  }
+
+  function paintKey():String return "perspective:" + scene.visualRevision + ":" + runtimeRevision + ":" + presentationRevision
+        + ":cosmetic:" + cosmeticThreadsVisible + ":overlays:" + overlaysVisible
         + ":" + sketchDragRevision + ":" + assemblyDragRevision + ":hover:" + hoverRevision + ":" + camera.revision
         + ":orbit:" + orbiting() + ":light:" + lightingRevision + ":aa:" + sampleCountRequested + ":" + renderedWidth
-        + "x" + renderedHeight + ":grid:" + gridVisible + ":" + gridStep + ":collisions:" + collisionRevision
-      );
-      installNavigation(node);
-      return node;
-    }
-    );
+        + "x" + renderedHeight + ":grid:" + gridVisible + ":" + gridStep + ":collisions:" + collisionRevision;
+
+  public function build(context:BuildContext):RenderNode {
+    return context.withScope(new Key(key), function() {
+      var id = context.id("perspective");
+      paintContext = context;
+      paintNodeId = id;
+      return context.selfUpdating(id, function() return buildViewport(id));
+    });
+  }
+
+  function buildViewport(id:haxeon.ui.core.WidgetId):RenderNode {
+    var node = new RenderNode(id, LayoutVisualKind.Custom, style);
+    node.onResolved(function(geometry) {
+      updateViewportSize(geometry.width, geometry.height);
+    });
+    node.hitTestSelf = true;
+    node.focusable = true;
+    node.semantics = new Semantics(AccessibilityRole.Image, "Scene perspective GPU view");
+    revalidateHover();
+    updatePresentation();
+    submittedPaintKey = paintKey();
+    node.onPaint(paint, submittedPaintKey);
+    installNavigation(node);
+    return node;
   }
 
   function updateViewportSize(width:Float, height:Float):Void {
@@ -1536,6 +1553,9 @@ class EditorPerspectiveViewport implements View {
   }
 
   public function dispose():Void {
+    paintContext = null;
+    paintNodeId = null;
+    submittedPaintKey = null;
     clearFlyKeys();
     if (surface != null) surface.dispose();
     surface = null;

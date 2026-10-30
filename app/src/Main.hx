@@ -972,11 +972,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   /** Build the shared view tree for one host frame. */
-  public function view():View {
+  public function view(samplePresentation:Bool = true):View {
     if (!workspace.isOpen("machine-control")) machineControlPanel.cancelGesture();
-    framePresentation = null;
     if (componentLab != null) return componentLab.view(ui);
-    framePresentation = simulation.capturePresentationSnapshot();
+    if (samplePresentation || !simulation.isActive()) framePresentation = simulation.capturePresentationSnapshot();
+    if (samplePresentation && (workspace.isOpen("inspection-camera") || inspectionCamera.overlay)) {
+      inspectionCamera.update(this);
+      inspectionCamera.requestPaintPatch();
+    }
     var workspaceView = new DockWorkspace("reference-workspace", workspace, workspacePanelContents);
     workspaceView.availableHeight = Math.max(0.0, viewportHeight - TOOLBAR_HEIGHT - STATUS_HEIGHT);
     var layers:Array<StackChild> = [new StackChild(
@@ -1264,11 +1267,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   /** Convenience entry point for a NativeKit host's layout phase. */
   public function submit(frame:LayoutFrame):RenderNode {
+    if (simulation.isActive()) framePresentation = simulation.capturePresentationSnapshot();
+    var cameraVisible = workspace.isOpen("inspection-camera") || inspectionCamera.overlay;
+    if (cameraVisible) inspectionCamera.update(this);
     if (perspectiveViewport != null) {
       perspectiveViewport.advanceNavigation(frame.deltaSeconds);
       if (perspectiveViewport.advancePresentation(frame.deltaSeconds)) invalidateView();
     }
     if (inspectionCamera.advancePresentation(frame.deltaSeconds)) invalidateView();
+    if (cameraVisible) inspectionCamera.requestPaintPatch();
     var selectionKey = scene.treeSelectionKey();
     if (selectionKey != lastRecordedSelection) {
       lastRecordedSelection = selectionKey;
@@ -1287,10 +1294,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
     // of the UI revision counters.
     if (componentLab != null || startLoading != null || simulationBuild != null
       || simulationStop != null || simulation.isActive() || externalWorldHasRobots) return ui.submit(
-        view(),
+        view(false),
         frame
       );
-    return ui.submitCached(function() return view(), frame, editorSubmitKey());
+    return ui.submitCached(function() return view(false), frame, editorSubmitKey());
   }
 
   /** Advance the character preview, then CAD preview refinement after a rendered frame. */
@@ -2103,7 +2110,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     context.observeBool(() -> toolbarMenuVisible);
     context.observeInt(() -> viewRevision);
     context.observeString(() -> Std.string(session.assemblyMateStatus()));
-    context.observeString(() -> inspectionCamera.presentationKey());
+    if (context.observeBool(() -> inspectionCamera.overlay)) inspectionCamera.observe(this, context);
     context.observeBool(() -> viewportOptionsVisible);
     context.observeBool(() -> visibilityPopupVisible);
     context.observeString(() -> perspectiveViewport == null ? "" : perspectiveViewport.presentationKey());
@@ -2227,8 +2234,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     result.register(new DockPanelDescriptor("cnc", "CNC", true, true, IconName.Terminal));
 
     // The panels without observing are rebuilt on every full frame, because their builds are not pure reads: the BIM editor shows
-    // element properties that have no revision, the inspection camera and machine control push state into GPU viewports and
-    // keep gesture and draft state, and the mission and CNC panels follow a running program by scrolling from inside the build.
+    // element properties that have no revision, machine control pushes state into the GPU viewport and keeps gesture and draft
+    // state, and the mission and CNC panels follow a running program by scrolling from inside the build.
     workspacePanelContents = [DockPanelContent.observing(
       "start",
       function(context) return StartPanel.build(this, context),
@@ -2242,9 +2249,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
     }, function(context, width) {
       observePerspective(context);
       return perspectivePanel(width);
-    }), new DockPanelContent(
+    }), DockPanelContent.observing(
         "inspection-camera",
-        function(_) return inspectionCamera.build(this)
+        function(context) {
+          inspectionCamera.observe(this, context);
+          return inspectionCamera.build(this);
+        }
       ), new DockPanelContent(
         "machine-control",
         function(_) return machineControlPanel.build(this)
