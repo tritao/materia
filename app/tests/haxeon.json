@@ -18,5 +18,5 @@
     }
   },
   "target": "host",
-  "outputDir": "../build"
+  "outputDir": "build"
 }
