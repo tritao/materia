@@ -483,6 +483,7 @@ def main():
                                                        "workload": {"scenario": args.scenario,
                                                                     "cycles": args.cycles if args.scenario else None,
                                                                     "renderUi": args.render_ui or os.environ.get("MATERIA_UI_RENDER") == "1",
+                                                                    "cpuAffinity": sorted(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None,
                                                                     "renderCostProbe": os.environ.get("HAXEON_UI_RENDER_COST") == "1",
                                                                     "layoutCostProbe": os.environ.get("HAXEON_UI_LAYOUT_COST") == "1"}},
                                                       indent=2) + "\n")

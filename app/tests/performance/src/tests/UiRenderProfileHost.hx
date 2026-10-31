@@ -61,6 +61,8 @@ class UiRenderProfileHost {
       surfaceOptions.minorVersion = 3;
       var nativeSurface = window.createSurface(surfaceOptions);
       var surface = Surface.fromNativeSurface(nativeSurface);
+      if (NativeKit.nk_window_activate(window.nativeHandle()) != Result.Ok)
+        throw "GPU profiling requires an activated window";
       var scale = NativeKit.nk_window_get_scale(window.nativeHandle());
       if (scale.status != Result.Ok || scale.out_scale <= 0.0) throw "GPU profiling requires a window scale";
       var size = NativeKit.nk_surface_get_framebuffer_size(nativeSurface.nativeHandle());
