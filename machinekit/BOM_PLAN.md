@@ -79,6 +79,46 @@ Bench mill (`new BenchMill()`) gives 107 members and 76 lines. Problems:
 
 ## Design
 
+## Design amendment (2026-10-31, after reviewing the uncommitted B1–B4 work)
+
+These replace the matching parts of "Design" and the phases. Where the plan and this section disagree, this section wins.
+
+### A1. Procurement kind and selection maturity are separate fields
+- `Procurement` is `Make(process)`, `Buy(manufacturer, mpn, standard)` or `NotSupplied`. Remove `Undecided`.
+- Maturity is a separate field on every line. It is taken from `EngineeringMetadata.ratingsBasis` (`Assumed` / `Catalog` / `Stated` / `Derived`) and is `Assumed` for every `AssumedCatalogComponent`.
+- An assumed servo is `Buy` + `Assumed` + a requirement. Choosing a vendor part changes maturity (and fills in the MPN). The kind stays `Buy`.
+- Delete the rule "Assumed component needs catalogue evidence before purchase". Replace it with: every `Assumed` line must carry a requirement.
+- **Requirements are structured, not prose:** a list of `{name, min?, max?, nominal?, unit}`, e.g. `peakTorque ≥ 3.8 N·m`, `busVoltage 400 V`, `shaftDiameter 19 mm`. Format values with `Dimension.format`, never `Std.string(Float)`. Each recipe that can be assumed declares which of its inputs or ratings form the requirement.
+
+### A2. Procurement is declared where the part is defined
+- Each recipe (`ComponentType`) declares its kind, and its requirement terms where relevant, next to its numbering. Non-recipe components declare it with the `ProcurementIntent` facet.
+- `ProcurementMapping`'s guesses (the `Std.isOfType` chains, the hardcoded `LinearRail`/`LinearRailBlock`/`ScrewSupportUnit` list, the `"GENERIC-"` prefix test, the free-text requirement) may be used once, as a migration aid that writes the declarations. Delete them before B7. The B7 gate requires every line's kind to come from a declaration.
+
+### A3. Part numbers are a pure function of recipe inputs
+- `ComponentType.numbered` takes `ComponentValues -> String`, not `MachineComponent -> String`. Use no `cast`: the number is computed from the same values the recipe builds from, so it is stable by construction and needs no geometry.
+- Non-recipe components keep a declared designation (B3).
+
+### A4. Fingerprint and released revision are separate
+- `BomRevision` stays as the **fingerprint**: a hash of the recipe key plus a per-recipe generator version, which the author bumps when a recipe's geometry code changes. It is not a hash of exported B-rep, which can change when OCCT changes.
+- A **release** is an explicit, committed record: part number, revision letter (`A`, `B`, …), the fingerprint it pins, and the date. Store it in one JSON file per machine (e.g. `machinekit/examples/<machine>/releases.json`, schema version 1).
+- Each export line carries `fingerprint`, plus `releasedRevision` and `releaseCurrent:Bool` when a release exists. Quotes (in the later sourcing layer) refer to released revisions.
+- Creating the first releases is not part of this plan. Only the mechanism, its schema and a test are.
+
+### A5. Quantity has a unit
+- A BOM line's quantity is `{value, unit}`, with unit one of `piece`, `m`, `m2`, `kg`, `l`.
+- Profiles, cable, hose and chain use length, plus a cut list (`cuts: [{length, count}]`) where pieces are cut from stock.
+- `enclosurePanel` becomes an ordinary line in `m2` with its construction as properties. Remove the special field.
+- Put this in the version 1 export now (B1). The format must not change shape later.
+
+### A6. The engineering BOM stays true to the model; procurement is a view
+- `BomDocument` keeps every modelled line, including `IncludedInPurchase` pieces (marked with their owner) and `NotSupplied` lines, in the subassembly tree.
+- The procurement view (whole purchase units, no not-supplied lines, quantities rolled up) is derived from it by a function and exported alongside it in the same file. It is never produced by dropping lines on the way in.
+
+### A7. Smaller items
+- `BomUse.kind` is an enum, not a string.
+- Keep Python to the gate comparison (`bom-gate-compare`). BOM behaviour is tested in haxeon tests; drop the other Python test and report scripts, or fold them into haxeon tests.
+
+
 **Identity and revision are separate.** A part number names *which part*
 it is, not its current dimensions:
 
@@ -128,6 +168,13 @@ and readers reject anything else. It contains:
 ## Phases
 
 ### B1 — Export and baseline
+- Done in this commit: the exporter and baseline cover 22 constructed examples.
+  Their procurement identities match the baseline. The full gate passed 11 of
+  24 shards, with no new failing shard or exception message against the baseline.
+  The machine-tending constructor currently rejects its stale reach certificate;
+  that separately owned certificate must not be regenerated here. The `lathe`
+  example currently contains only a plan, so there is no lathe assembly to
+  export. See `BOM_BASELINE.md` for the measurements and outstanding gate.
 - Add `MachineAssembly.bomDocument()` → the JSON above, at first with today's
   fields plus member paths and the subassembly tree.
 - Add a single entrypoint `machinekit/scripts/bom-export` that builds a named
@@ -138,6 +185,9 @@ and readers reject anything else. It contains:
   baseline lists each problem class with counts.
 
 ### B2 — Part-number rules and lint
+- The initial survey found three built-in defaults that cannot be constructed.
+  `ComponentType.keyFor` also rounds numeric inputs, so its key is not exact
+  as required by this plan. Keep both findings visible in the rollout.
 - Rules: `[A-Z0-9][A-Z0-9.\-x/]*`, ≤ 40 chars, no `null`, no unformatted
   floats, no `|`. Dimensions in names only through `Dimension.format`.
 - Add a lint check over every registered recipe's default part and every
@@ -152,6 +202,9 @@ and readers reject anything else. It contains:
 - Acceptance: all recipe-derived parts pass the lint.
 
 ### B3 — Made parts: drawing number + revision
+- Decision: use author-declared drawing numbers. A geometry-derived identity
+  would change when a drawing changes and would detach existing quotes; the
+  separate revision identifies that change instead.
 - `MachineComponent` gets an explicit drawing number for made parts, and
   constructors stop deriving identity from dimensions.
 - Revision = short hash of the recipe key, or of the exported B-rep for
@@ -183,6 +236,20 @@ and readers reject anything else. It contains:
 - Acceptance: bench mill's 26 brake lines become 1.
 
 ### B6 — Fasteners and other missing content
+- Survey: rail and motor classes expose some hole patterns, and
+  `SupportedSfu20Axis` explicitly installs screws. `Fastening` describes a
+  connection derived from an already present screw; generic assembly mates do
+  not declare fastener size, length, engagement or the corresponding hole
+  pattern. Deriving purchases for every bolted connection therefore needs a
+  broader assembly-interface redesign. Declare the bench-mill hardware from
+  its actual patterns in this phase; retain derivation as the long-term goal.
+- Bench-mill survey: the three axis motor plates currently place their four
+  holes at `bodyDiameter` pitch, while the assumed 400 W and 750 W servo
+  flanges use 50 mm and 70 mm pitch for 60 mm and 80 mm bodies respectively.
+  Their hole patterns therefore do not match. Correct the plates to use the
+  stated flange pattern before counting their fasteners. The spindle motor
+  has no declared flange pattern, so its shelf holes alone do not establish
+  a verified mounting fastener.
 - Survey how screws are represented today (`standard/SocketHeadCapScrew`,
   `HexBolt`, screwdriving `Fastening`, the supplier-fasteners examples).
   Then decide whether bolted connections derive their fasteners or
@@ -199,6 +266,10 @@ and readers reject anything else. It contains:
   tests. Example BOM exports are added to the test suite.
 
 ### B8 — Sourcing contract
+- Decision: move `SupplierOffer` and `SourcingPlan` fully into the sourcing
+  layer. Their supplier selection, prices, availability and review status are
+  sourcing data; a supplier SKU does not define the engineering part. Keep
+  catalogue manufacturer/MPN evidence in the engineering BOM when known.
 - Freeze the version 1 JSON and document it next to the exporter.
 - Decide whether `SupplierOffer`/`SourcingPlan` stay in machinekit as a
   thin "this part is this catalogue SKU" link, or move fully into the

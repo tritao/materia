@@ -87,7 +87,7 @@ class GearRackRun extends MachineComponent {
       familyId: source.familyId,
       manufacturingVariant: source.manufacturingVariant,
       manufacturingProcess: source.manufacturingProcess,
-      enclosurePanel: source.enclosurePanel
+      properties: source.properties, measure: source.measure, cuts: source.cuts
     };
   }
   override public function componentType():Null<ComponentType> return recipeType();

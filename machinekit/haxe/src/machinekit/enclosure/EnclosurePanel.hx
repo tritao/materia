@@ -63,7 +63,7 @@ class EnclosurePanel extends MachineComponent {
 
   override function get_bom():BomItem {
     var item = super.get_bom();
-    item.enclosurePanel = {
+    item.properties = {
       construction: construction.bomProperties(),
       widthMm: width,
       heightMm: height,

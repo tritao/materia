@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+"""Reject new failing shards or exception messages relative to a complete baseline."""
+import argparse
+from pathlib import Path
+import re
+import sys
+
+
+def results(summary):
+    records = {}
+    total = None
+    final = None
+    for line in summary.read_text().splitlines():
+        completed = re.fullmatch(r"GATE: (\d+)/(\d+) shards passed", line)
+        if completed:
+            if final is not None:
+                raise ValueError(f"{summary}: duplicate gate summary")
+            final = (int(completed.group(1)), int(completed.group(2)))
+            continue
+        match = re.match(r"^(PASS|FAIL) (\d+)/(\d+)(?:\s|$)", line)
+        if not match:
+            continue
+        status, index, count = match.group(1), int(match.group(2)), int(match.group(3))
+        if total is not None and total != count:
+            raise ValueError(f"{summary}: inconsistent shard count")
+        total = count
+        if index in records:
+            raise ValueError(f"{summary}: duplicate shard {index}")
+        records[index] = status
+    if total is None or set(records) != set(range(1, total + 1)) or final is None:
+        raise ValueError(f"{summary}: incomplete shard results")
+    if final != (sum(status == "PASS" for status in records.values()), total):
+        raise ValueError(f"{summary}: gate summary does not match shard results")
+    return records
+
+
+def exceptions(directory, index):
+    path = directory / f"shard-{index}.log"
+    messages = [line for line in path.read_text().splitlines() if line.startswith("Uncaught exception:")]
+    if not messages:
+        raise ValueError(f"{path}: failing shard has no exception message; inspect it manually")
+    return messages
+
+
+def compare(baseline, baseline_logs, candidate, candidate_logs):
+    before, after = results(baseline), results(candidate)
+    if set(before) != set(after):
+        raise ValueError("Baseline and candidate have different shard counts")
+    issues = []
+    for index, status in after.items():
+        if status != "FAIL":
+            continue
+        if before[index] != "FAIL":
+            issues.append(f"shard {index}: new failure")
+        elif exceptions(baseline_logs, index) != exceptions(candidate_logs, index):
+            issues.append(f"shard {index}: exception message changed")
+    return issues
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("baseline", type=Path)
+    parser.add_argument("baseline_logs", type=Path)
+    parser.add_argument("candidate", type=Path)
+    parser.add_argument("candidate_logs", type=Path)
+    args = parser.parse_args()
+    try:
+        issues = compare(args.baseline, args.baseline_logs, args.candidate, args.candidate_logs)
+    except (OSError, ValueError) as error:
+        print(error, file=sys.stderr)
+        return 2
+    if issues:
+        for issue in issues:
+            print(issue, file=sys.stderr)
+        return 1
+    print("No new failing shard or exception message")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

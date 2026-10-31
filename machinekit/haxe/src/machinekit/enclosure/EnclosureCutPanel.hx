@@ -73,7 +73,7 @@ class EnclosureCutPanel extends EnclosurePanel {
   }
   override function get_bom():BomItem {
     var item = super.get_bom();
-    var data:machinekit.component.BomItem.EnclosurePanelBom = item.enclosurePanel;
+    var data:machinekit.component.BomItem.BomProperties = item.properties;
     var removed = diameter > 0 ? Math.PI * diameter * diameter / 4 : openingWidth * openingHeight;
     data.areaM2 = (width * height - removed) * 1e-6;
     return item;

@@ -3126,7 +3126,11 @@ class MachineKitSmoke {
       PrinterKlipperTests.run();
       return;
     }
-    var everything = Shards.run([{name: "ControllerWiringTests.run", run: ControllerWiringTests.run, weight: 0.05}, {
+    var everything = Shards.run([{name: "ControllerWiringTests.run", run: () -> {
+      BomDocumentTests.run();
+      BomExampleTests.run();
+      ControllerWiringTests.run();
+    }, weight: 0.05}, {
       name: "OperatorProfileTests.run",
       run: OperatorProfileTests.run,
       weight: 0.05

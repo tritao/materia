@@ -327,7 +327,8 @@ class MachineAssemblyCodec {
         manufacturingProcess: entry.item.manufacturingProcess,
         typeId: entry.item.typeId,
         valuesKey: entry.item.valuesKey,
-        enclosurePanel: entry.item.enclosurePanel
+        properties: entry.item.properties,
+        measure: entry.item.measure, cuts: entry.item.cuts
       }, quantity:entry.quantity, mass:switch entry.mass {
         case Unknown:
           SavedBomMass.Unknown;

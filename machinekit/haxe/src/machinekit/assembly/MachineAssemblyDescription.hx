@@ -75,7 +75,9 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
   @:id(7) @:optional var familyId:String;
   @:id(8) @:optional var manufacturingVariant:String;
   @:id(9) @:optional var manufacturingProcess:String;
-  @:id(10) @:optional var enclosurePanel:machinekit.component.BomItem.EnclosurePanelBom;
+  @:id(10) @:optional var properties:machinekit.component.BomItem.BomProperties;
+  @:id(11) @:optional var measure:machinekit.component.BomItem.BomMeasure;
+  @:id(12) @:optional var cuts:Array<machinekit.component.BomItem.BomCut>;
 }
 
 @:wire enum SavedBomMass {

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+if [[ $# != 1 ]]; then
+  echo "Usage: $0 <machine>" >&2
+  exit 2
+fi
+machine=$1
+if [[ ! $machine =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+  echo "Invalid machine name: $machine" >&2
+  exit 2
+fi
+cd "$root"
+mkdir -p build/bom
+commit=$(git rev-parse HEAD)
+generated=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+native_root=${MATERIA_BOM_NATIVE_ROOT:-$root/machinekit/tests/build/host/native}
+if [[ ! -f "$native_root/cadkit/libcadkit-core.so" && ! -f "$native_root/cadkit/libcadkit-core.dylib" ]] || \
+   [[ ! -f "$native_root/collisionkit-native/libcollisionkit_core.so" && ! -f "$native_root/collisionkit-native/libcollisionkit_core.dylib" ]]; then
+  echo "Set MATERIA_BOM_NATIVE_ROOT to an existing MachineKit native build: $native_root" >&2
+  exit 1
+fi
+./haxeon/scripts/haxeon build --compiler-only --project machinekit/scripts/haxeon.bom-export.json
+native_paths=$(printf '%s:' "$native_root"/*/)
+export LD_LIBRARY_PATH="${native_paths}$root/haxeon/out:$root/haxeon/.tools/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export DYLD_LIBRARY_PATH="${native_paths}$root/haxeon/out:$root/haxeon/.tools/hashlink${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+exec "$root/haxeon/.tools/hashlink/hl" "$root/machinekit/build/bom-export/host/main.hl" \
+  "$machine" "$commit" "$generated" "$root/build/bom/$machine.json"

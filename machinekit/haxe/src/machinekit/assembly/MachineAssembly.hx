@@ -222,7 +222,9 @@ typedef MachineAssemblyMassProperties = {
     manufacturingVariant: item.manufacturingVariant,
     manufacturingProcess: item.manufacturingProcess,
     typeId: item.typeId,
-    valuesKey: item.valuesKey
+    valuesKey: item.valuesKey,
+    properties: Bom.copyPanel(item.properties),
+    measure: Bom.copyMeasure(item.measure), cuts: Bom.copyCuts(item.cuts)
   };
 
   // Mechanical -------------------------------------------------------------------------------
@@ -1040,6 +1042,33 @@ typedef MachineAssemblyMassProperties = {
   }
 
   public function billOfMaterials():Bom return AssemblyInventory.billOfMaterials(flat());
+
+  /** Snapshot the engineering tree and derive the procurement view from its occurrences. */
+  public function bomDocument(machineId:String, sourceCommit:String, generatedAt:String):BomDocument {
+    return new BomDocument(machineId, sourceCommit, generatedAt, bomTree(""));
+  }
+
+  function bomTree(prefix:String):BomDocument.BomAssemblyNode {
+    var node = new BomDocument.BomAssemblyNode(prefix);
+    for (id in mechanical.order) {
+      var path = prefix == "" ? id : prefix + "/" + id;
+      var member = mechanical.member(id);
+      if (member != null) {
+        var included = machinekit.component.IncludedInPurchase.of(member.component);
+        node.lines.push(BomDocument.occurrence(member.component.bom, Member, path, 1,
+          included == null ? null : included.ownerPartNumber));
+      } else {
+        var child = mechanical.requireSubassembly(id);
+        node.children.push(child.assembly.bomTree(path));
+      }
+    }
+    for (i in 0...inventory.items.length) {
+      var entry = inventory.items[i];
+      var path = (prefix == "" ? "" : prefix + "/") + "@inventory/" + i;
+      node.lines.push(BomDocument.occurrence(entry.item, Inventory, path, entry.quantity, null));
+    }
+    return node;
+  }
 
   /** Sum posed component masses; separately report BOM extras with no mass model. */
   public function massProperties(?state:AssemblyState):MachineAssemblyMassProperties return massPropertiesFromPoses(solvedPoses(state));

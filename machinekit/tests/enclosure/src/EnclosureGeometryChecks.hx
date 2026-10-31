@@ -37,7 +37,7 @@ class EnclosureGeometryChecks {
     var bom = new Bom();
     bom.addComponent(panel, 2);
     var lines = bom.lines();
-    var metadata:machinekit.component.BomItem.EnclosurePanelBom = lines[0].enclosurePanel;
+    var metadata:machinekit.component.BomItem.BomProperties = lines[0].properties;
     if (lines[0].quantity != 2 || metadata == null
       || metadata.construction.layers.length != 3) throw "Aggregate BOM lost layer metadata or quantity";
     var frame = new EnclosureFrame(1000, 600, 800);
@@ -51,11 +51,11 @@ class EnclosureGeometryChecks {
       description: panel.bom.description,
       quantity: 1,
       material: panel.bom.material,
-      enclosurePanel: metadata
+      properties: metadata
     };
     var savedAgain:machinekit.assembly.MachineAssemblyDescription.SavedBomItem =
       haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(saved));
-    var savedMetadata:machinekit.component.BomItem.EnclosurePanelBom = savedAgain.enclosurePanel;
+    var savedMetadata:machinekit.component.BomItem.BomProperties = savedAgain.properties;
     if (savedMetadata == null
       || savedMetadata.construction.layers.length != 3) throw "Saved BOM lost construction metadata";
     var model = new cadkit.modeling.AssemblyModel("mm");
