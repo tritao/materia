@@ -28,6 +28,23 @@ here. This plan ends at the export contract (B8).
   hardware a variant needs (dh-gripper uses it).
 - `SupplierCadComponent` pins vendor STEP files by hash.
 
+Added on main after the first survey (checked 2026-10-31):
+
+- `IncludedInPurchase` (component facet): marks a component as physically
+  part of another, separately listed purchase. `Bom.addComponent` skips it and
+  `lines()` throws if the owner part number is missing. Only
+  `PurchasedRotaryPart` uses it so far.
+- `AssumedCatalogComponent`: base class for unverified catalogue-class
+  placeholders (25 subclasses). Its part numbers are
+  `<ID>-ASSUMED-<12 hex of a values hash>`, stable but unreadable.
+- `EngineeringMetadata` (facet): `ratingsBasis`/`errorsBasis` of
+  Assumed/Catalog/Stated/Derived plus a `source`; Catalog requires a source.
+- `BomItem.enclosurePanel`: panel construction, size, area and mass for
+  laminated enclosure panels (sheet router).
+- `tools/suppliers/` (Python): `lcsccable.py` captures a supplier catalogue
+  with raw evidence and offline replay; `cable_assembly.py` emits a harness
+  BOM. This is the precedent for the sourcing layer's language and layout.
+
 Bench mill (`new BenchMill()`) gives 107 members and 76 lines. Problems:
 
 1. **Part numbers come in three kinds:**
@@ -90,11 +107,11 @@ overloaded as a part number.
 - `NotSupplied`: workpieces, cutting tools and fixtures, which are listed
   but excluded from the machine's procurement BOM.
 
-**Purchase units.** A component can declare that it is piece `k` of `n` of
-a purchase unit (`purchaseUnit: {partNumber, pieces}`). The BOM rolls the
-pieces up into whole units and rejects incomplete sets. Modelling splits,
-such as the brake sectors and any future multi-hull part, then never reach
-procurement. Kits sold as a set (an SFU screw with nut and BK/BF supports)
+**Purchase units use `IncludedInPurchase`.** One component of a bought unit
+carries the purchase line; every other piece (modelling splits such as the
+brake sectors, or real subparts that ship inside the unit) carries
+`IncludedInPurchase(owner)`. The BOM keeps only the owner line, and an
+included piece whose owner is absent is an error. No second mechanism. Kits sold as a set (an SFU screw with nut and BK/BF supports)
 are a sourcing concern: one quote covers several lines. They stay separate
 in the BOM.
 
@@ -129,6 +146,9 @@ and readers reject anything else. It contains:
 - `ComponentType` gets a readable `partNumber` per recipe (rails, screws,
   nuts, supports, couplings, belts, pulleys, motors, drives).
   `valuesKey` stays the exact key.
+- `AssumedCatalogComponent` part numbers become readable: id plus the
+  rating-defining inputs (e.g. `SERVO-ASSUMED-3.8NM-400V-19`), with the hash
+  only as the revision.
 - Acceptance: all recipe-derived parts pass the lint.
 
 ### B3 — Made parts: drawing number + revision
@@ -146,17 +166,20 @@ and readers reject anything else. It contains:
   the export.
 - Map existing data: `ManufacturingVariant` → `Make(process)`;
   standard parts (`standard/`, rails, bearings) → `Buy`;
-  `GENERIC-*` and "assumed" → `Undecided`, with a requirement string built
-  from the ratings the sizing code already checks against.
+  `AssumedCatalogComponent` subclasses, `GENERIC-*` parts and components
+  whose `EngineeringMetadata.ratingsBasis` is `Assumed` → `Undecided`, with a
+  requirement string built from the ratings the sizing code already checks
+  against. A `Catalog` basis with a source is evidence for `Buy`.
 - Workpiece, tooling and clamps → `NotSupplied`. `BenchMill`'s default
   workpiece flag stays for the preview; the procurement view excludes these
   lines.
 - The material field is exported only for Make lines.
 
 ### B5 — Purchase units
-- Add `purchaseUnit` to components, with rollup and completeness checks in
-  `Bom`.
-- Apply it to `ShaftBrakePart` and any other split parts B1 finds.
+- Apply `IncludedInPurchase` to `ShaftBrakePart` (hub carries the brake line,
+  disc and sectors are included) and any other split parts B1 finds.
+- Extend the check if B1 shows a need: every included piece's owner present
+  in the same assembly, not just somewhere in the BOM.
 - Acceptance: bench mill's 26 brake lines become 1.
 
 ### B6 — Fasteners and other missing content
@@ -180,8 +203,9 @@ and readers reject anything else. It contains:
 - Decide whether `SupplierOffer`/`SourcingPlan` stay in machinekit as a
   thin "this part is this catalogue SKU" link, or move fully into the
   sourcing layer.
-- The sourcing layer (separate plan) reads `build/bom/*.json` and reports
-  lines with no quote and quotes that are stale or orphaned.
+- The sourcing layer (separate plan, Python under `tools/suppliers/` next to
+  `lcsccable.py`) reads `build/bom/*.json` and reports lines with no quote and
+  quotes that are stale or orphaned.
 
 ## Open decisions
 
