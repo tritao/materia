@@ -40,9 +40,12 @@ def cpu_seconds(pid):
 def report_profiler_overhead(args, output, frames):
     """Reruns the scenario without the profiler, so a reader can tell how much of a profiled frame is the profiler."""
     baseline_dir = output / "baseline"
-    run = subprocess.run([sys.executable, str(Path(__file__).resolve()), "--scenario", args.scenario,
-                          "--cycles", str(args.cycles), "--no-profile", "--skip-build", "--no-baseline",
-                          "--output-dir", str(baseline_dir)], capture_output=True, text=True)
+    command = [sys.executable, str(Path(__file__).resolve()), "--scenario", args.scenario,
+               "--cycles", str(args.cycles), "--no-profile", "--skip-build", "--no-baseline",
+               "--output-dir", str(baseline_dir)]
+    if args.render_ui:
+        command.append("--render-ui")
+    run = subprocess.run(command, capture_output=True, text=True)
     timeline = baseline_dir / "frame-timeline.jsonl"
     if run.returncode or not timeline.exists():
         print("profiler overhead: baseline run failed; profiled times are not representative", file=sys.stderr)
@@ -89,6 +92,8 @@ def main():
                                                 "inspector-flows", "panel-flows"],
                         help="replay a headless UI interaction")
     parser.add_argument("--cycles", type=int, default=20, help="headless scenario cycles (default: 20)")
+    parser.add_argument("--render-ui", action="store_true",
+                        help="submit the scenario's UI through a temporary GPU window (requires a display)")
     parser.add_argument("--skip-build", action="store_true", help="reuse the compiled editor; still ensure the Release HashLink runtime")
     parser.add_argument("--compare", type=Path, metavar="CAPTURE",
                         help="after the run, compare it with an earlier capture directory (see profile-compare.py)")
@@ -121,6 +126,8 @@ def main():
         parser.error("--census requires a headless scenario")
     if args.heap_dump and args.scenario is None:
         parser.error("--heap-dump requires a headless scenario")
+    if args.render_ui and args.scenario not in ("interaction", "tab-matrix", "selection-stress"):
+        parser.error("--render-ui requires interaction, tab-matrix or selection-stress")
     output = (args.output_dir or APP / "build/profiles" / time.strftime("%Y%m%d-%H%M%S")).resolve()
     output.mkdir(parents=True, exist_ok=False)
     editor_args = args.editor_args[1:] if args.editor_args[:1] == ["--"] else args.editor_args
@@ -159,6 +166,8 @@ def main():
                     return build.returncode
         native_dirs = sorted({str(path.parent) for path in (APP / "build/host/native").rglob("*.so")})
         environment = os.environ.copy()
+        if args.render_ui:
+            environment["MATERIA_UI_RENDER"] = "1"
         if args.census is not None:
             environment["MATERIA_ALLOC_CENSUS"] = str(args.census)
         if args.scenario == "tab-matrix" and not args.no_profile:
@@ -168,7 +177,7 @@ def main():
              environment.get("LD_LIBRARY_PATH", "")])
         bytecode_name = "headless-profile.hl" if args.scenario is not None else "main.hl"
         shutil.copy2(binary, output / bytecode_name)
-        if args.scenario is not None:
+        if args.scenario is not None and environment.get("MATERIA_UI_RENDER") != "1":
             environment.pop("DISPLAY", None)
             environment.pop("WAYLAND_DISPLAY", None)
         with socket.socket() as reservation:
@@ -463,7 +472,8 @@ def main():
     for name, filename in (("heap", "heap.dump"), ("profile", "editor.hlpc"),
                            ("perfetto", "editor.perfetto.json"), ("memory", "memory.jsonl"),
                            ("frames", "frame-timeline.jsonl"), ("retained", "retained.jsonl"),
-                           ("spikes", "tab-spikes.json"),
+                           ("spikes", "tab-spikes.json"), ("render", "render-timeline.jsonl"),
+                           ("renderConfig", "render-timeline.jsonl.config.json"),
                            ("architecture", "architecture-summary.json")):
         if (output / filename).is_file():
             artifacts[name] = filename
@@ -471,7 +481,10 @@ def main():
                                                        "kind": "haxeon.capture",
                                                        "artifacts": artifacts,
                                                        "workload": {"scenario": args.scenario,
-                                                                    "cycles": args.cycles if args.scenario else None}},
+                                                                    "cycles": args.cycles if args.scenario else None,
+                                                                    "renderUi": args.render_ui or os.environ.get("MATERIA_UI_RENDER") == "1",
+                                                                    "renderCostProbe": os.environ.get("HAXEON_UI_RENDER_COST") == "1",
+                                                                    "layoutCostProbe": os.environ.get("HAXEON_UI_LAYOUT_COST") == "1"}},
                                                       indent=2) + "\n")
     print(f"capture={output}")
     if args.compare is not None:

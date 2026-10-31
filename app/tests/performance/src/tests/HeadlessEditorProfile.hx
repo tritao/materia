@@ -66,6 +66,7 @@ private typedef InputProbe = {
   static var frameGc = FrameGcScheduler.fromEnvironment();
   static var idleSeconds = 0.0;
   static var idleMarkMicros = 0.0;
+  static var renderHost:Null<UiRenderProfileHost> = null;
   static function main():Int {
     try {
       if (Sys.args().length < 2 || Sys.args().length
@@ -105,6 +106,11 @@ private typedef InputProbe = {
     var actions:Array<String> = [];
     var retained:Array<String> = [];
     try {
+      if (Sys.getEnv("MATERIA_UI_RENDER") == "1") {
+        if (scenario != "interaction" && scenario != "tab-matrix" && scenario != "selection-stress")
+          throw "GPU UI profiling supports interaction, tab-matrix and selection-stress";
+        renderHost = UiRenderProfileHost.create(1320, 900);
+      }
       submit(editor, frame, frames, "initial");
       // MATERIA_ALLOC_CENSUS=<bytes> counts every allocation by type and samples stacks once per that many bytes.
       var censusText = Sys.getEnv("MATERIA_ALLOC_CENSUS");
@@ -179,6 +185,7 @@ private typedef InputProbe = {
       File.saveContent(output + "/frame-timeline.jsonl", frames.join("\n") + "\n");
       File.saveContent(output + "/actions.jsonl", actions.join("\n") + "\n");
       File.saveContent(output + "/retained.jsonl", retained.join("\n") + "\n");
+      if (renderHost != null) renderHost.save(output + "/render-timeline.jsonl");
       File.saveContent(output + "/app-state.json", Json.stringify(editor.diagnosticState()));
       File.saveContent(
         output + "/frame-gc.json",
@@ -207,10 +214,12 @@ private typedef InputProbe = {
     } catch (error:Dynamic) {
       editor.dispose();
       fonts.dispose();
+      if (renderHost != null) renderHost.dispose();
       throw error;
     }
     editor.dispose();
     fonts.dispose();
+    if (renderHost != null) renderHost.dispose();
   }
 
   /**
@@ -1237,6 +1246,7 @@ private typedef InputProbe = {
     var started = Sys.time();
     frameGc.beginFrame();
     editor.submit(frame);
+    if (renderHost != null) renderHost.render(editor.ui, frame);
     frameGc.endFrame();
     lastFrameAllocatedAt = hl.Gc.totalAllocated();
     editor.ui.buildContext.buildProbe = null;
@@ -1305,6 +1315,7 @@ private typedef InputProbe = {
       styleChangedNodes : metrics.styleChangedNodes,
       subtrees : subtrees
     }));
+    if (renderHost != null) renderHost.record(actionName, cycle, started, elapsed, metrics);
     // The interaction is over; a real host would now be idle.
     if (input != null) {
       var idleStarted = Sys.time();
