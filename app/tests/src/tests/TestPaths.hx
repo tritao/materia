@@ -6,7 +6,8 @@ import sys.FileSystem;
  * Paths for the app tests from the repository root, wherever the suite was
  * started inside it: the nearest directory holding `app/src/Main.hx` at or
  * above the working directory. No test changes the working directory to find
- * its files.
+ * its files; tests of editor code that resolves paths from where the editor is
+ * launched run through `fromRepository`, which restores it.
  */
 class TestPaths {
   static var root:Null<String> = null;
@@ -16,6 +17,22 @@ class TestPaths {
 
   /** `relative` (from the repository root) as a path that opens from any working directory. */
   public static function of(relative:String):String return repository() + "/" + relative;
+
+  /**
+   * Runs `body` from the repository root, where the editor is launched and resolves example projects from
+   * (ExampleCatalog, ProjectLoadJob), and restores the working directory afterwards, also when `body` throws.
+   */
+  public static function fromRepository(body:Void->Void):Void {
+    var started = Sys.getCwd();
+    Sys.setCwd(repository());
+    try {
+      body();
+    } catch (error:Dynamic) {
+      Sys.setCwd(started);
+      throw error;
+    }
+    Sys.setCwd(started);
+  }
 
   public static function repository():String {
     if (root != null) return root;

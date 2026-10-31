@@ -1654,13 +1654,7 @@ import materia.project.MaterialLibrary;
 
   static function dockedNavigationInput():Void {
     var fonts = haxeon.ui.FontCollection.create();
-    var font:Null<String> = null;
-    for (candidate in [
-      "haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
-      "../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"
-    ]) if (FileSystem.exists(candidate)) font = candidate;
-    check(font != null, "navigation test font exists");
-    fonts.add(cast font);
+    fonts.add(TestPaths.font());
     var directory = "build/navigation-input-test-" + Std.string(Std.int(Sys.time()));
     FileSystem.createDirectory(directory);
     var app = new ReferenceEditorApp(fonts, directory + "/workspace.json");

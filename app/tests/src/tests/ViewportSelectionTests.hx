@@ -35,13 +35,8 @@ import haxeon.ui.widgets.collections.TreeView;
     var style = new LayoutStyle();
     style.width = LayoutAxis.grow();
     style.height = LayoutAxis.grow();
-    var fonts = FontCollection.create(), font:Null<String> = null;
-    for (candidate in [
-      "haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
-      "../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"
-    ]) if (sys.FileSystem.exists(candidate)) font = candidate;
-    if (font == null) throw "Missing selection test font";
-    fonts.add(font);
+    var fonts = FontCollection.create();
+    fonts.add(TestPaths.font());
     var viewport = new EditorPerspectiveViewport("selection-test", scene, host, style), ui = new UiContext(null, fonts);
     viewport.selectionTree = tree;
     var frame = new LayoutFrame(800, 600);

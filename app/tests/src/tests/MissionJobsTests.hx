@@ -26,7 +26,7 @@ import haxeon.ui.widgets.text.Text;
 
   public static function main():Int {
     try {
-      run();
+      TestPaths.fromRepository(run);
       Sys.println("Mission jobs: presets, persistence, shared views, failure and simulation lock passed");
       return 0;
     } catch (error:Dynamic) {
@@ -36,8 +36,6 @@ import haxeon.ui.widgets.text.Text;
   }
 
   static function run():Void {
-    var mainFile = FileSystem.fullPath(app.editor.WorkerAssetPath.resolve("app/src/Main.hx"));
-    Sys.setCwd(haxe.io.Path.directory(haxe.io.Path.directory(haxe.io.Path.directory(mainFile))));
     var manifest = app.editor.WorkerAssetPath.resolve("machinekit/examples/robot-welder/materia.project.json");
     var root:Dynamic = Json.parse(File.getContent(manifest));
     var jobs = ProjectJobs.decode(root);
@@ -80,7 +78,7 @@ import haxeon.ui.widgets.text.Text;
     var source = directory + "/materia.project.json";
     File.saveContent(source, Json.stringify(root));
     var fonts = haxeon.ui.FontCollection.create();
-    fonts.add("haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf");
+    fonts.add(TestPaths.font());
     var editor = new ReferenceEditorApp(fonts, directory + "/workspace.json", null, null, null, null, null, null, true);
     var generated:GeneratedAssemblyScene = {
       objects: editor.scene.records(),

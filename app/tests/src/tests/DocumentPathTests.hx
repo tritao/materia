@@ -32,11 +32,11 @@ import haxeon.ui.core.UiKey;
       var source = "/home/user/work/machines/hobber/no-guards-mechanical-preview.mtrg";
       editor.session.projectReference = source;
       check(DocumentPathLabel.documentPath(editor.session) == source, "generated scenes display their source path");
-      var root = editor.ui.submit(editor.fileBar(false), new LayoutFrame(1600, 36));
+      var root = editor.ui.submit(editor.fileBar(editor.ui.buildContext, false), new LayoutFrame(1600, 36));
       var path = find(root, "Document path");
       check(path.globalBounds().width > 600, "document path receives unused toolbar width");
       check(path.children[0].layout.text == source, "wide toolbar shows the complete path inline");
-      root = editor.ui.submit(editor.fileBar(true), new LayoutFrame(500, 36));
+      root = editor.ui.submit(editor.fileBar(editor.ui.buildContext, true), new LayoutFrame(500, 36));
       path = find(root, "Document path");
       var text = path.children[0].layout.text;
       check(text != null && StringTools.startsWith(text, "…"), "compact toolbar truncates by measured width");
@@ -54,10 +54,8 @@ import haxeon.ui.core.UiKey;
     }
   }
   public static function main():Int {
-    var fonts = haxeon.ui.FontCollection.create(),
-      path = "haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf";
-    if (!sys.FileSystem.exists(path)) path = "../../" + path;
-    fonts.add(path);
+    var fonts = haxeon.ui.FontCollection.create();
+    fonts.add(TestPaths.font());
     var ui = new UiContext(null, fonts);
     var value = "/home/user/work/machines/hobber/no-guards-mechanical-preview.mtrg";
     function submit(width:Float):RenderNode return ui.submit(new DocumentPathLabel(value), new LayoutFrame(width, 200));

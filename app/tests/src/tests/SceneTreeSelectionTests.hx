@@ -38,13 +38,8 @@ import sys.FileSystem;
     return 0;
   }
   public static function run():Void {
-    var fonts = FontCollection.create(), font:Null<String> = null;
-    for (path in [
-      "haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
-      "../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"
-    ]) if (FileSystem.exists(path)) font = path;
-    if (font == null) throw "Missing selection test font";
-    fonts.add(font);
+    var fonts = FontCollection.create();
+    fonts.add(TestPaths.font());
     var ui = new UiContext(null, fonts), data = SceneVisibilityTests.data();
     for (i in 0...80) {
       var record = SceneVisibilityTests.data()[0];

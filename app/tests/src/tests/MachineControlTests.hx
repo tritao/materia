@@ -391,9 +391,7 @@ import materia.assembly.AssemblyFrames;
   }
   static function orientationPanel():Void {
     var fonts = haxeon.ui.FontCollection.create();
-    var font = "haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf";
-    if (!sys.FileSystem.exists(font)) font = "../../" + font;
-    fonts.add(font);
+    fonts.add(TestPaths.font());
     var editor = new app.Main.ReferenceEditorApp(fonts, null, null, null, null, null, null, null, true);
     var session = fixture("mm",
       editor.session), panel = new app.editor.MachineControlPanel(), frame = new haxeon.ui.LayoutFrame(
@@ -441,7 +439,7 @@ import materia.assembly.AssemblyFrames;
   }
   static function responsiveness(path:String):Void {
     var generated = app.ProjectSourceLoader.load(path), fonts = haxeon.ui.FontCollection.create();
-    fonts.add("haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf");
+    fonts.add(TestPaths.font());
     var editor = new app.Main.ReferenceEditorApp(fonts, null, null, null, null, null, null, null, true);
     var session = editor.session, panel = new app.editor.MachineControlPanel(), frame = new haxeon.ui.LayoutFrame(
       320,
@@ -503,7 +501,7 @@ import materia.assembly.AssemblyFrames;
   }
   static function spindleView(path:String):Void {
     var fonts = haxeon.ui.FontCollection.create();
-    fonts.add("haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf");
+    fonts.add(TestPaths.font());
     var editor = new app.Main.ReferenceEditorApp(fonts, null, null, null, null, null, null, null, true);
     var session = editor.session, panel = new app.editor.MachineControlPanel(), frame = new haxeon.ui.LayoutFrame(
       360,
@@ -695,7 +693,7 @@ import materia.assembly.AssemblyFrames;
       MachineControlModel.set(session, "x", 75, true);
       check(!session.isDirty(), "travel after saving initial pose remains clean");
       // Ordinary saves serialize the initial pose, not the live preview.
-      session.projectReference = sys.FileSystem.fullPath("haxeon.json");
+      session.projectReference = TestPaths.of("app/tests/haxeon.json");
       session.projectBaseline = session.scene.recordsForSave();
       var saved = session.projectSaveData("/tmp/materia-pose-persistence.materia");
       var definition = session.projectAssemblyDefinition;

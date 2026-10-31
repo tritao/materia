@@ -114,7 +114,7 @@ import haxeon.ui.host.*;
     check(csv[0] == "trace,tooth,flank,position_mm,raw_um,filtered_um", "CSV labels raw and filtered units");
     check(data.csv().indexOf("lead,1,1,") >= 0, "CSV includes teeth beyond plot preview");
     var fonts = FontCollection.create();
-    fonts.add("haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf");
+    fonts.add(TestPaths.font());
     var ui = new UiContext(null, fonts), frame = new LayoutFrame(507, 900);
     try {
       var root = ui.submit(new HobbingGearReport(data), frame), text = words(root), plots = charts(root);

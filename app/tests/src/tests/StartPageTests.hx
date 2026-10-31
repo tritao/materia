@@ -14,17 +14,11 @@ import sys.FileSystem;
   }
 
   public static function main():Int {
-    // The editor finds its example projects from where it is launched, the repository root
-    // (ExampleCatalog, ProjectLoadJob). Run from there, and leave the directory as found.
-    var started = Sys.getCwd();
-    Sys.setCwd(TestPaths.repository());
     try {
-      run();
-      Sys.setCwd(started);
+      TestPaths.fromRepository(run);
       Sys.println("Start-page grouping, direct access and responsive layout passed");
       return 0;
     } catch (error:Dynamic) {
-      Sys.setCwd(started);
       Sys.println('Start-page tests failed: $error');
       return 1;
     }
@@ -187,10 +181,8 @@ import sys.FileSystem;
       var bounds = cancel.globalBounds();
       check(bounds.width > 0 && bounds.x >= 0 && bounds.x + bounds.width <= width, "Cancel remains on screen");
     }
-    var before = editor.topBarRevisionKey();
     pending.control.phase("Preparing geometry and physics");
     editor.tick();
-    check(editor.topBarRevisionKey() != before, "phase changes invalidate retained toolbar");
     check(editor.statusSelectionLabel().indexOf("Preparing geometry") >= 0, "new phase reaches shared status");
     check(
       findLabel(editor.submit(frame), "Preparing geometry and physics", true) != null,

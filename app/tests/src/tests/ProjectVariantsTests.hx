@@ -30,7 +30,7 @@ import materia.project.SceneArtifact;
   }
   public static function main():Int {
     try {
-      run();
+      TestPaths.fromRepository(run);
       Sys
         .println("Project variants: schema, configuration UI, switching, persistence, artifact roundtrip and legacy migration passed");
       return 0;
@@ -40,8 +40,6 @@ import materia.project.SceneArtifact;
     }
   }
   static function run():Void {
-    var mainFile = FileSystem.fullPath(app.editor.WorkerAssetPath.resolve("app/src/Main.hx"));
-    Sys.setCwd(haxe.io.Path.directory(haxe.io.Path.directory(haxe.io.Path.directory(mainFile))));
     var source = app.editor.WorkerAssetPath.resolve("app/tests/fixtures/project-variants/materia.project.json");
     var root:Dynamic = Json.parse(File.getContent(source));
     check(ProjectVariants.decode(root).length == 4, "variants decode with legacy scene compatibility");
