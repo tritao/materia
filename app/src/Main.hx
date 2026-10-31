@@ -971,18 +971,31 @@ class ReferenceEditorApp implements DesktopUiApplication {
     shortcutBindings = new ShortcutBindings(commands, preferences.store);
   }
 
-  /** Build the shared view tree for one host frame. */
-  public function view(samplePresentation:Bool = true):View {
-    if (!workspace.isOpen("machine-control")) machineControlPanel.cancelGesture();
-    else if (samplePresentation) machineControlPanel.update(this);
-    if (samplePresentation && workspace.isOpen("mission")) missionPanel.update(missionController);
-    if (samplePresentation && workspace.isOpen("cnc")) cncPanel.update(simulation, session);
-    if (componentLab != null) return componentLab.view(ui);
-    if (samplePresentation || !simulation.isActive()) framePresentation = simulation.capturePresentationSnapshot();
-    if (samplePresentation && (workspace.isOpen("inspection-camera") || inspectionCamera.overlay)) {
-      inspectionCamera.update(this);
-      inspectionCamera.requestPaintPatch();
+  /**
+   * The per-frame update step, run before a build: samples live simulation state into the panels and the inspection
+   * camera and advances viewport animation. Builds only read what it leaves.
+   */
+  public function updatePresentation(deltaSeconds:Float):Void {
+    if (workspace.isOpen("machine-control")) machineControlPanel.update(this);
+    else machineControlPanel.cancelGesture();
+    if (workspace.isOpen("mission")) missionPanel.update(missionController);
+    if (workspace.isOpen("cnc")) cncPanel.update(simulation, session);
+    if (simulation.isActive()) framePresentation = simulation.capturePresentationSnapshot();
+    var cameraVisible = workspace.isOpen("inspection-camera") || inspectionCamera.overlay;
+    if (cameraVisible) inspectionCamera.update(this);
+    if (perspectiveViewport != null) {
+      perspectiveViewport.advanceNavigation(deltaSeconds);
+      if (perspectiveViewport.advancePresentation(deltaSeconds)) invalidateView();
     }
+    if (inspectionCamera.advancePresentation(deltaSeconds)) invalidateView();
+    if (cameraVisible) inspectionCamera.requestPaintPatch();
+  }
+
+  /** Build the shared view tree for one host frame, after `updatePresentation`. */
+  public function view():View {
+    if (componentLab != null) return componentLab.view(ui);
+    // An idle simulation's snapshot changes only with the scene, so it is refreshed when a build runs rather than every frame.
+    if (!simulation.isActive()) framePresentation = simulation.capturePresentationSnapshot();
     var workspaceView = new DockWorkspace("reference-workspace", workspace, workspacePanelContents);
     workspaceView.availableHeight = Math.max(0.0, viewportHeight - TOOLBAR_HEIGHT - STATUS_HEIGHT);
     var layers:Array<StackChild> = [new StackChild(
@@ -1270,19 +1283,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   /** Convenience entry point for a NativeKit host's layout phase. */
   public function submit(frame:LayoutFrame):RenderNode {
-    if (workspace.isOpen("machine-control")) machineControlPanel.update(this);
-    else machineControlPanel.cancelGesture();
-    if (workspace.isOpen("mission")) missionPanel.update(missionController);
-    if (workspace.isOpen("cnc")) cncPanel.update(simulation, session);
-    if (simulation.isActive()) framePresentation = simulation.capturePresentationSnapshot();
-    var cameraVisible = workspace.isOpen("inspection-camera") || inspectionCamera.overlay;
-    if (cameraVisible) inspectionCamera.update(this);
-    if (perspectiveViewport != null) {
-      perspectiveViewport.advanceNavigation(frame.deltaSeconds);
-      if (perspectiveViewport.advancePresentation(frame.deltaSeconds)) invalidateView();
-    }
-    if (inspectionCamera.advancePresentation(frame.deltaSeconds)) invalidateView();
-    if (cameraVisible) inspectionCamera.requestPaintPatch();
+    updatePresentation(frame.deltaSeconds);
     var selectionKey = scene.treeSelectionKey();
     if (selectionKey != lastRecordedSelection) {
       lastRecordedSelection = selectionKey;
@@ -1301,10 +1302,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
     // of the UI revision counters.
     if (componentLab != null || startLoading != null || simulationBuild != null
       || simulationStop != null || simulation.isActive() || externalWorldHasRobots) return ui.submit(
-        view(false),
+        view(),
         frame
       );
-    return ui.submitCached(function() return view(false), frame, editorSubmitKey());
+    return ui.submitCached(view, frame, editorSubmitKey());
   }
 
   /** Advance the character preview, then CAD preview refinement after a rendered frame. */
@@ -2245,13 +2246,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       "start",
       function(context) return StartPanel.build(this, context),
       function(context, width) return StartPanel.build(this, context, width)
-    ), DockPanelContent.observing("hierarchy", function(context) return HierarchyPanel.build(this, context)), DockPanelContent.observing(
+    ), DockPanelContent.observing("hierarchy", function(context) return HierarchyPanel.build(this, context)), DockPanelContent.observingWithWidth(
       "bim",
-      function(context) {
-        var editor = bimEditor;
-        context.observeBool(() -> bimEditor == editor);
-        return editor;
-      }, function(context, width) {
+      function(context, width) {
         var editor = bimEditor;
         context.observeBool(() -> bimEditor == editor);
         return editor.atWidth(width);

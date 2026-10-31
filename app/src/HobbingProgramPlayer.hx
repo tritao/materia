@@ -34,6 +34,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   public var stock(default, null):HobbingStock;
   public var failure(default, null):Null<String> = null;
   public var completed(default, null):Bool = false;
+  var ownStatusRevision = 0;
   public var elapsed(default, null):Float = 0;
   public var syncError(default, null):Float = 0;
   final config:SceneArtifactHobbing;
@@ -199,7 +200,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   }
   public function selectScenario(id:Null<String>):Void {
     if (id != null && ["idle", "cutting", "loading"].indexOf(id) < 0) throw "Unknown hobbing scenario";
-    scenario = id;
+    setScenario(id);
     scenarioStage = id == "idle" ? "idle" : "waiting";
     scenarioAccess = false;
     parkStarted = false;
@@ -312,7 +313,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
       if (scenarioStage == "loading") {
         if (handling.load(handlingClock)) scenarioStage = "closing-cut";
       } else if (handling.unload(handlingClock)) {
-        completed = true;
+        setCompleted(true);
         scenarioStage = "completed";
       }
       return;
@@ -350,18 +351,18 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
         startTime = now;
         motion.run(program);
         started = true;
-        cutStarted = true;
+        setCutStarted(true);
       }
       if (!cutCompleted) {
         if (handling != null) handling.cutting();
         motion.update(session.fixedTimestep());
         failure = motion.failure;
         if (motion.completed) {
-          cutCompleted = true;
+          setCutCompleted(true);
           elapsed = now - startTime;
           stock.finish(elapsed, syncError);
           if (handling == null || scenario == "cutting") {
-            completed = true;
+            setCompleted(true);
             scenarioStage = "completed";
             return;
           }
@@ -386,7 +387,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
           unloadStart = handlingClock;
           if (scenario == "loading") scenarioStage = "opening-unload";
         }
-      } else if (handling != null) completed = handling.unload(handlingClock - unloadStart);
+      } else if (handling != null) setCompleted(handling.unload(handlingClock - unloadStart));
     } catch (e:Dynamic) {
       failure = Std.string(e);
       motion.abort();
@@ -527,10 +528,10 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     stock = new HobbingStock(config, centerMetres);
     motion = newMotion();
     started = false;
-    cutStarted = false;
-    cutCompleted = false;
+    setCutStarted(false);
+    setCutCompleted(false);
     headRetracted = false;
-    completed = false;
+    setCompleted(false);
     failure = null;
     syncError = 0;
     elapsed = 0;
@@ -552,5 +553,23 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     disposed = true;
     simulation.removeStepObserver(observerId);
     stock.dispose();
+  }
+  /** Advances when the scenario, cut progress or handling status changes, so a status display can observe one number. */
+  public function statusRevision():Int return ownStatusRevision + (handling == null ? 0 : handling.statusRevision);
+  function setScenario(value:Null<String>):Void {
+    if (scenario != value) ownStatusRevision++;
+    scenario = value;
+  }
+  function setCutStarted(value:Bool):Void {
+    if (cutStarted != value) ownStatusRevision++;
+    cutStarted = value;
+  }
+  function setCutCompleted(value:Bool):Void {
+    if (cutCompleted != value) ownStatusRevision++;
+    cutCompleted = value;
+  }
+  function setCompleted(value:Bool):Void {
+    if (completed != value) ownStatusRevision++;
+    completed = value;
   }
 }

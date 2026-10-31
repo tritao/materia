@@ -14,6 +14,8 @@ class HobbingHandling {
   public final frontApproachMm:Float;
   public final loadingLiftMm:Float;
   public var inspection(default, null) = "sequence";
+  /** Advances when `phase` or `inspection` changes, so a status display can observe one number. */
+  public var statusRevision(default, null) = 0;
   public function new(frontApproachMm:Float = 0, loadingLiftMm:Float = LIFT_MM) {
     if (!Math.isFinite(frontApproachMm)
       || frontApproachMm < 0 || !Math.isFinite(loadingLiftMm) || loadingLiftMm <= 0) throw "Invalid loading envelope";
@@ -29,22 +31,22 @@ class HobbingHandling {
   public function load(seconds:Float):Bool {
     if (frontApproachMm > 0) {
       if (seconds < 1) {
-        phase = "Blank in front of machine";
+        setPhase("Blank in front of machine");
         frontMm = frontApproachMm;
         liftMm = loadingLiftMm;
         clamp = 0;
       } else if (seconds < 2.5) {
-        phase = "Transferring cup from front";
+        setPhase("Transferring cup from front");
         frontMm = frontApproachMm * (1 - smooth((seconds - 1) / 1.5));
         liftMm = loadingLiftMm;
         clamp = 0;
       } else if (seconds < 3) {
-        phase = "Seating cup vertically";
+        setPhase("Seating cup vertically");
         frontMm = 0;
         liftMm = loadingLiftMm * (1 - smooth((seconds - 2.5) / 0.5));
         clamp = 0;
       } else {
-        phase = "Expanding sleeve (illustrative)";
+        setPhase("Expanding sleeve (illustrative)");
         frontMm = 0;
         liftMm = 0;
         clamp = smooth(seconds - 3);
@@ -52,28 +54,28 @@ class HobbingHandling {
       return seconds >= LOAD_SECONDS;
     }
     if (seconds < 1) {
-      phase = "Blank above mandrel";
+      setPhase("Blank above mandrel");
       liftMm = loadingLiftMm;
       clamp = 0;
     } else if (seconds < 3) {
-      phase = "Lowering cup";
+      setPhase("Lowering cup");
       liftMm = loadingLiftMm * (1 - smooth((seconds - 1) / 2));
       clamp = 0;
     } else {
-      phase = "Expanding sleeve (illustrative)";
+      setPhase("Expanding sleeve (illustrative)");
       liftMm = 0;
       clamp = smooth(seconds - 3);
     }
     return seconds >= LOAD_SECONDS;
   }
   public function cutting():Void {
-    phase = "Clamped / cutting";
+    setPhase("Clamped / cutting");
     liftMm = 0;
     frontMm = 0;
     clamp = 1;
   }
   public function retracting():Void {
-    phase = "Retracting head before release";
+    setPhase("Retracting head before release");
     liftMm = 0;
     frontMm = 0;
     clamp = 1;
@@ -81,17 +83,17 @@ class HobbingHandling {
   public function unload(seconds:Float):Bool {
     if (frontApproachMm > 0) {
       if (seconds < 1) {
-        phase = "Releasing sleeve (illustrative)";
+        setPhase("Releasing sleeve (illustrative)");
         frontMm = 0;
         liftMm = 0;
         clamp = 1 - smooth(seconds);
       } else if (seconds < 1.5) {
-        phase = "Clearing mandrel vertically";
+        setPhase("Clearing mandrel vertically");
         frontMm = 0;
         liftMm = loadingLiftMm * smooth((seconds - 1) / 0.5);
         clamp = 0;
       } else {
-        phase = seconds < UNLOAD_SECONDS ? "Transferring finished cup to front" : "Finished cup";
+        setPhase(seconds < UNLOAD_SECONDS ? "Transferring finished cup to front" : "Finished cup");
         frontMm = frontApproachMm * smooth((seconds - 1.5) / 2.5);
         liftMm = loadingLiftMm;
         clamp = 0;
@@ -99,11 +101,11 @@ class HobbingHandling {
       return seconds >= UNLOAD_SECONDS;
     }
     if (seconds < 1) {
-      phase = "Releasing sleeve (illustrative)";
+      setPhase("Releasing sleeve (illustrative)");
       liftMm = 0;
       clamp = 1 - smooth(seconds);
     } else {
-      phase = seconds < UNLOAD_SECONDS ? "Lifting finished cup" : "Finished cup";
+      setPhase(seconds < UNLOAD_SECONDS ? "Lifting finished cup" : "Finished cup");
       liftMm = loadingLiftMm * smooth((seconds - 1) / 3);
       clamp = 0;
     }
@@ -111,7 +113,12 @@ class HobbingHandling {
   }
   public function inspect(mode:String):Void {
     if (["sequence", "blank", "clamped", "finished"].indexOf(mode) < 0) throw "Unknown cup inspection view";
+    if (inspection != mode) statusRevision++;
     inspection = mode;
+  }
+  function setPhase(value:String):Void {
+    if (phase != value) statusRevision++;
+    phase = value;
   }
   public function displayedLift():Float return inspection == "blank"
     || inspection == "finished" ? loadingLiftMm : inspection == "clamped" ? 0 : liftMm;

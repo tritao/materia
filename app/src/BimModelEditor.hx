@@ -30,7 +30,7 @@ import haxeon.ui.widgets.collections.TreeView;
 import haxeon.ui.widgets.scroll.ScrollView;
 
 /** Reusable editor surface combining spatial/type trees with the generic inspector. */
-class BimModelEditor implements View {
+class BimModelEditor {
   public final key:String;
   public final model:BimDocument;
   final projectDocument:Null<EditorDocument>;
@@ -65,11 +65,10 @@ class BimModelEditor implements View {
     selectedElementId = null;
   }
 
+  /** The editor laid out for `width`, its dock pane's width: narrow panes stack the tree above the inspector. */
   public function atWidth(width:Float):View return new BimEditorWidthView(this, width);
 
-  public function build(context:BuildContext):RenderNode return buildAtWidth(context, context.viewportWidth);
-
-  public function buildAtWidth(context:BuildContext, width:Float):RenderNode {
+  public function build(context:BuildContext, width:Float):RenderNode {
     context.observeInt(() -> model.cad.metadataRevision);
     context.observeBool(() -> showingTypes);
     context.observeString(() -> selectedElementId);
@@ -210,5 +209,5 @@ private class BimEditorWidthView implements View {
     this.editor = editor;
     this.width = width;
   }
-  public function build(context:BuildContext):RenderNode return editor.buildAtWidth(context, width);
+  public function build(context:BuildContext):RenderNode return editor.build(context, width);
 }

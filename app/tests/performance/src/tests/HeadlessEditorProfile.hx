@@ -465,6 +465,7 @@ private typedef InputProbe = {
       cameraEditor.session.presentation = materia.presentation.Presentations.assembled(definition);
       cameraEditor.switchMode(app.EditorMode.Simulate);
       cameraEditor.openInspectionCamera();
+      cameraEditor.updatePresentation(0.0);
       cameraEditor.ui.submit(cameraEditor.view(), frame);
       if (!showsText(cameraEditor, "independent view")) throw "Standalone view did not initialize the inspection camera";
       showPanel(cameraEditor, frame, frames, "inspection-camera");
@@ -536,6 +537,7 @@ private typedef InputProbe = {
           [0, 0, 0], [0, 0, 0], true)]);
         cameraEditor.workspace.activate("inspection-camera");
         cameraEditor.invalidateView();
+        cameraEditor.updatePresentation(0.0);
         cameraEditor.ui.submit(cameraEditor.view(), frame);
         if (!showsText(cameraEditor, "independent view")) throw "Standalone view did not remount the inspection camera";
         submit(cameraEditor, frame, frames, "camera-public-remount", cycle);

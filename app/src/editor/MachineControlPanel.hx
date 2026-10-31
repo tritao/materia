@@ -116,15 +116,7 @@ import haxeon.ui.widgets.text.TextField;
     if (viewport != null) context.observeBool(viewport.sectionActive);
     var cup = app.simulation.hobbingPlayer();
     context.observeBool(() -> app.simulation.hobbingPlayer() == cup);
-    if (cup != null) {
-      context.observeBool(() -> cup.handling != null);
-      context.observeString(() -> cup.scenario);
-      context.observeBool(() -> cup.cutStarted);
-      context.observeBool(() -> cup.cutCompleted);
-      context.observeBool(() -> cup.completed);
-      context.observeString(() -> cup.handling == null ? null : cup.handling.inspection);
-      context.observeString(() -> cup.handling == null ? null : cup.handling.phase);
-    }
+    if (cup != null) context.observeInt(cup.statusRevision);
     var machineMotion = app.session.machineMotion;
     var cupId = machineMotion == null || machineMotion.hobbing == null ? null : machineMotion.hobbing.stock;
     if (cup != null && cup.handling != null && (cup.scenario == null || cup.scenario == "loading")) {

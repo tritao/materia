@@ -1583,7 +1583,10 @@ import materia.project.MaterialLibrary;
 
   static function chromeRetention(app:ReferenceEditorApp, frame:LayoutFrame):Void {
     // Force full submissions, as a live simulation does, rather than testing the outer submit cache.
-    function submit():haxeon.ui.core.RenderNode return app.ui.submit(app.view(), frame);
+    function submit():haxeon.ui.core.RenderNode {
+      app.updatePresentation(0.0);
+      return app.ui.submit(app.view(), frame);
+    }
     app.scene.createRectangle();
     check(
       app.simulation.rebuild(app.sensors, app.scene, app.session),
