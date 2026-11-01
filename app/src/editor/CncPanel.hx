@@ -3,6 +3,8 @@ package app.editor;
 import app.ApplicationSimulation;
 import app.ProgramErrorMessage;
 import app.ProjectDocumentSession;
+import Diffable;
+import Equatable;
 import haxeon.ui.Color;
 import haxeon.ui.Insets;
 import haxeon.ui.LayoutAxis;
@@ -95,20 +97,20 @@ class CncPanel {
     nextPresentation.title = nextPlayer == null ? null : nextPlayer.title();
     nextPresentation.detail = nextPlayer == null ? null : nextPlayer.statusDetail();
     var changed = player != nextPlayer || hobbing != nextHobbing;
-    var mask = haxeon.Structural.changedMask(presentation, nextPresentation);
+    var mask = haxeon.Diff.mask(presentation, nextPresentation);
     if (mask != 0) {
-      haxeon.Structural.assignChanged(presentation, presentation, nextPresentation);
+      haxeon.Diff.apply(presentation, presentation, nextPresentation);
       changed = true;
     }
     if (nextHobbing != null) {
       reportData(nextHobbing, nextReport);
-      var reportMask = haxeon.Structural.changedMask(report.telemetry, nextReport.telemetry);
+      var reportMask = haxeon.Diff.mask(report.telemetry, nextReport.telemetry);
       if (report.measurement != nextReport.measurement) {
         report.measurement = nextReport.measurement;
         changed = true;
       }
       if (reportMask != 0) {
-        haxeon.Structural.assignChanged(report.telemetry, report.telemetry, nextReport.telemetry);
+        haxeon.Diff.apply(report.telemetry, report.telemetry, nextReport.telemetry);
         changed = true;
       }
     }
@@ -302,7 +304,7 @@ private class GcodeListModel implements ListViewModel {
 }
 
 
-@:structural private class CncPresentation {
+private class CncPresentation implements Equatable, Diffable {
   public var source:Null<String>;
   public var generation = -1;
   public var print = false;

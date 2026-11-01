@@ -2,6 +2,8 @@ package app.editor;
 
 import gearkit.GearMeasurement;
 import gearkit.GearTrace;
+import Diffable;
+import Hashable;
 
 /** Presentation snapshot; numerical inspection and its qualification stay in GearKit. */
 class HobbingReportData {
@@ -54,7 +56,7 @@ class HobbingReportData {
 }
 
 /** Reusable live readings, separate from the immutable inspection result. */
-@:structural class HobbingTelemetry {
+class HobbingTelemetry implements Hashable, Diffable {
   public var status = "Cutting";
   public var complete = false;
   public var failure:Null<String>;
