@@ -25,10 +25,10 @@ class EditorAppearance {
       1.0
     );
 
-    theme.body.textStyle.fontSize = 14.0;
-    theme.label.textStyle.fontSize = 13.0;
-    theme.caption.textStyle.fontSize = 12.0;
-    theme.button.textStyle.fontSize = 13.0;
+    theme.body.textStyle = theme.body.textStyle.withFontSize(14.0);
+    theme.label.textStyle = theme.label.textStyle.withFontSize(13.0);
+    theme.caption.textStyle = theme.caption.textStyle.withFontSize(12.0);
+    theme.button.textStyle = theme.button.textStyle.withFontSize(13.0);
     theme.refreshStyles();
   }
 

@@ -43,8 +43,8 @@ class CncPanel {
   var errorDetails = false;
   var lastFailure:Null<String>;
 
-  final presentation = new CncPresentation();
-  final nextPresentation = new CncPresentation();
+  var presentation = new CncPresentation();
+  var nextPresentation = new CncPresentation();
   final report = new HobbingReportData();
   final nextReport = new HobbingReportData();
   var player:Null<app.ToolpathPlayer>;
@@ -304,21 +304,35 @@ private class GcodeListModel implements ListViewModel {
 }
 
 
-private class CncPresentation implements Equatable, Diffable {
+private struct CncPresentation : Equatable, Diffable {
   public var source:Null<String>;
-  public var generation = -1;
-  public var print = false;
-  public var running = false;
-  public var line = 0;
+  public var generation:Int;
+  public var print:Bool;
+  public var running:Bool;
+  public var line:Int;
   public var failure:Null<String>;
-  public var held = false;
-  public var finished = false;
-  public var started = false;
-  public var restart = false;
-  public var speed = 1.0;
+  public var held:Bool;
+  public var finished:Bool;
+  public var started:Bool;
+  public var restart:Bool;
+  public var speed:Float;
   public var title:Null<String>;
   public var detail:Null<String>;
-  public function new() {}
+  public function new() {
+    source = null;
+    generation = -1;
+    print = false;
+    running = false;
+    line = 0;
+    failure = null;
+    held = false;
+    finished = false;
+    started = false;
+    restart = false;
+    speed = 1.0;
+    title = null;
+    detail = null;
+  }
 }
 
 @:access(app.editor.CncPanel) private class CncPanelView implements View {
