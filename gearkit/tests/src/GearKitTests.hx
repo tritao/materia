@@ -36,6 +36,7 @@ class GearKitTests {
     ToothDesignInputTests.run();
     FormInterfaceTests.run();
     KinematicsTests.run();
+    EnvelopeTests.run();
     Sys.println('GearKitTests: $assertions assertions passed');
   }
 }

@@ -226,6 +226,21 @@ until TD5 measures where the derived circular spline interferes.
   against a `3 (w0/rn)^2` bound, not 1e-9.
 - Cosine numerics against the closed form: 1.4e-16.
 
+## TD4 notes
+
+- `CircularSplineEnvelope` sweeps one tooth boundary (exact chord-circle crossings, 400 radii,
+  2400 time steps, then twice that) and keeps the largest angular extent per radius within half a
+  circular pitch of the space axis. `SweptSpace` is the result, a sampled tooth space with a
+  deviation bound (4 x the coarse-to-fine difference; the factor is a measured allowance, since
+  re-sweep penetration reached 3.6 x the raw difference).
+- **Deviation from the plan:** the contact-condition refinement (`n.v_rel = 0`) is not done; the
+  swept union is refined by resolution instead. `SweptSpace` is a sampled space profile, not yet a
+  `ToothForm` with root and tip blends (that fit belongs to TD8).
+- Measured: rigid-limit envelope (rolling pinion, no deformation) matches the standard internal
+  involute space to 1.1e-6 mm; D1 re-sweep penetration 0.20 um against a 0.69 um bound; D3 (30 deg,
+  kappa 1) 0.35 um against 1.21 um.
+- Circular-spline nominal radii are assumed full depth: tip `r_pc - m`, root `r_pc + 1.25 m`.
+
 ## Steps
 
 ### Phase A: forms and kinematics
@@ -361,7 +376,7 @@ TD0 ── TD1 ── TD2 ──┐
 | TD1 | done | Tooth design: tooth-form interface (TD1) |
 | TD2 | blocked: Liu 2025 arc geometry (meaning of c1/e1/c2/e2, tangent construction, blends) is not in the repo notes and the open-access MDPI full text refused automated download (HTTP 403); implement once the equations are supplied | |
 | TD3 | done, except Resal cam: blocked (Resal curve equation, Gravagno 2016, not read); cosine, ellipse, four-roller implemented | Tooth design: deformation kinematics (TD3) |
-| TD4 | planned | |
+| TD4 | done for involute forms (D1, D3); not fitted to a full `Sampled` ToothForm (root/tip blends), and no contact-condition refinement: accuracy is by convergence | Tooth design: circular-spline envelope (TD4) |
 | TD5 | planned | |
 | TD6 | planned | |
 | TD7 | planned | |
