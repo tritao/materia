@@ -129,13 +129,10 @@ class LinearRail extends MachineComponent {
     > return [for (index in 0...holePositions.length) connector('mount${index+1}')];
 
   public function mountingThread():cadkit.threads.ThreadSpec {
-    var parts = spec.railMountScrew.split("x");
-    // Profile producers declare either a size or a size plus catalogue length.
-    // The placed stack selects the actual length; only its thread is used here.
-    if (parts.length < 1 || parts.length > 2 || (parts.length == 2
-      && !~/^[0-9]+([.][0-9]+)?$/.match(parts[1]))) throw "Invalid rail mounting screw catalogue token: "
-      + spec.railMountScrew;
-    var screw = machinekit.standard.SocketHeadCapScrew.catalog().get(parts[0]);
+    var mounting = spec.railMountScrew;
+    if (mounting == null || mounting.size == null || !Math.isFinite(mounting.length)
+      || mounting.length <= 0) throw "Invalid rail mounting screw";
+    var screw = machinekit.standard.SocketHeadCapScrew.catalog().get(mounting.size);
     return machinekit.standard.FastenerThreads.metric(screw.diameter, screw.pitch).mating();
   }
 

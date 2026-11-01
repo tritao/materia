@@ -290,3 +290,32 @@ The 22 exportable machines contain 1,004 procurement lines; 350 are Assumed and 
 | sheet-router | 141 | 41 | 45 |
 | track-arm | 47 | 19 | 16 |
 | xyz-stage | 41 | 7 | 27 |
+
+## B6 declared content measurement
+
+The 22 exportable machines contain 1,022 procurement lines; 362 are Assumed and 343 lack fingerprints. The bench mill has 55 lines, including 48 M4x16 rail screws, eight M5x12 and four M6x12 motor screws. Its cable and lubrication declarations are provisional as described in the plan. The existing tending certificate failure now reports a different current input fingerprint because the motor-plate geometry changed. The full gate passed 11/24 shards with no new failing shard. Shards 16 and 23 differ from baseline only in that disclosed fingerprint; the certificate was not regenerated.
+
+| Machine | Procurement lines | Assumed | Fingerprint unavailable |
+| --- | ---: | ---: | ---: |
+| bench-mill | 55 | 18 | 4 |
+| cnc-router | 37 | 8 | 20 |
+| cobot-arm | 22 | 15 | 13 |
+| corexy-plotter | 16 | 3 | 9 |
+| corexy-printer | 53 | 17 | 23 |
+| enclosed-bench-mill | 92 | 29 | 5 |
+| flexspline-hobber | 70 | 38 | 0 |
+| gantry-picker | 60 | 10 | 40 |
+| gantry-welder | 73 | 15 | 53 |
+| linear-stage | 11 | 2 | 1 |
+| mobile-base | 11 | 6 | 6 |
+| mobile-base-cell | 42 | 19 | 8 |
+| mobile-welder | 43 | 22 | 16 |
+| overhead-arm | 74 | 20 | 28 |
+| picking-station | 7 | 3 | 1 |
+| press-brake | 31 | 25 | 12 |
+| robot-arm | 30 | 13 | 1 |
+| robot-screwdriver | 33 | 16 | 5 |
+| robot-welder | 33 | 16 | 10 |
+| sheet-router | 141 | 41 | 45 |
+| track-arm | 47 | 19 | 16 |
+| xyz-stage | 41 | 7 | 27 |

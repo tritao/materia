@@ -71,7 +71,9 @@ def generated():
                   blockWidth=float(r[4]),blockHeight=float(r[1]),blockLength=float(r[9]),
                   blockHoleSpacingAlong=float(r[7]),blockHoleSpacingAcross=float(r[5]),blockMountThread=thread[0])
         if len(thread)==2:vals['blockMountThreadDepth']=float(thread[1])
-        vals.update(railHolePitch=float(t[9]),railEndMargin=float(t[10]),railMountScrew=t[11],
+        screw_size, screw_length = t[11].split('x')
+        vals.update(railHolePitch=float(t[9]),railEndMargin=float(t[10]),
+                  railMountScrew=dict(size=screw_size, length=float(screw_length)),
                   railBore=dict(through=float(t[8]),counterbore=float(t[6]),depth=float(t[7])),
                   blockMassKg=float(r[29+i]),railMassKgPerMetre=float(t[12]),
                   ratings=[dict(source='Vallder',reference=m['source_url'],dynamicLoad=round(float(r[24+i])*1000,6),

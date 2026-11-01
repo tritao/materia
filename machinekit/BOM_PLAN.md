@@ -400,7 +400,7 @@ and readers reject anything else. It contains:
 - The material field is exported only for Make lines.
 
 ### B5 — Purchase units
-- Done in this commit. The 22 exportable examples have 1,004 procurement
+- Done in `f92e86ef4`. The 22 exportable examples have 1,004 procurement
   lines; the bench mill has 46, including one brake purchase. The full gate
   passed 11/24 shards with no new failing shard or exception message.
 - A shaft brake's hub owns the purchase; its disc and convex collision sectors
@@ -421,20 +421,56 @@ and readers reject anything else. It contains:
 - Acceptance: bench mill's 26 brake lines become 1.
 
 ### B6 — Fasteners and other missing content
-- Survey: rail and motor classes expose some hole patterns, and
-  `SupportedSfu20Axis` explicitly installs screws. `Fastening` describes a
-  connection derived from an already present screw; generic assembly mates do
-  not declare fastener size, length, engagement or the corresponding hole
-  pattern. Deriving purchases for every bolted connection therefore needs a
-  broader assembly-interface redesign. Declare the bench-mill hardware from
-  its actual patterns in this phase; retain derivation as the long-term goal.
-- Bench-mill survey: the three axis motor plates currently place their four
-  holes at `bodyDiameter` pitch, while the assumed 400 W and 750 W servo
-  flanges use 50 mm and 70 mm pitch for 60 mm and 80 mm bodies respectively.
-  Their hole patterns therefore do not match. Correct the plates to use the
-  stated flange pattern before counting their fasteners. The spindle motor
+- Done in this commit. The 22 exportable machines have 1,022 procurement
+  lines, including 55 for the bench mill. The gate passed 11/24 shards with no
+  new failing shard; the existing tending-certificate failures in shards 16
+  and 23 differ only in the disclosed current input fingerprint.
+- The reference mill declares one ISO 4762 M4x16 screw for each HGR15 rail
+  mounting position. Its two 400 W motor flanges use four M5x12 screws each;
+  the 750 W flange uses four M6x12 screws. Six millimetres of each screw engage
+  the eight-millimetre motor plate. The plate's hole centres come from the
+  stated flange, and its centre bore clears the flange pilot. Tapped holes are
+  represented by their nominal major-diameter envelopes; the fabrication
+  drawing still needs thread and tolerance callouts.
+- The corrected motor plates change the tending reach study's current input
+  fingerprint from `4b793a015e84eb25ab7624a49f30b28fd06322ddfb97905fd50d40a37c18d1f1`
+  to `23389d61f8286d00696fcd4eb01ee0b1c29942346ab2e0392a6ced2fb62a27c2`.
+  The existing certificate was already stale; it has not been regenerated.
+- The bare mill has no enclosure; the enclosed mill already lists its panels.
+  The bare mill declares three assumed cable chains, flexible power and encoder
+  cable, a manual pump/distribution set and an initial litre of ISO VG 68 way
+  oil. Cable cuts use Manhattan distance between modeled endpoints, the sum
+  of axis travels and 500 mm allowance, rounded up to 100 mm. These are
+  conservative planning lengths, not a verified route. Cable conductor size,
+  encoder pinout, chain mounting, lubrication tubing and fitting sizes still
+  require design before ordering.
+- Fastener survey: rail hole positions and the catalogue screw size and length
+  can establish rail screw count and candidate screws. Motor flange hole
+  coordinates, clearances and flange thickness establish the motor pattern and
+  grip. Bolted connectors can locate a potential joint. `SupportedSfu20Axis`
+  already installs screws, while screwdriving `Fastening` describes a
+  connection from a screw that already exists. Generic mates do not identify
+  which connectors form a bolted pattern, the receiving thread, grip stack,
+  required engagement, head clearance, washers or selected screw standard and
+  property class. They therefore cannot determine a complete purchase safely.
+  B6 declares rail and motor screws from their modeled patterns, rather than
+  inferring a fastener from every fixed mate.
+- The rail catalogue now stores mounting screw size and length separately;
+  its HIWIN source generator emits the same structured values. The generator's
+  existing byte-for-byte `--check` was already failing before this change
+  because its unformatted output differs from the formatted checked-in file.
+- The previous axis motor plates placed their four holes at `bodyDiameter`
+  pitch, while the assumed 400 W and 750 W flanges use 50 mm and 70 mm pitch.
+  The plates now use the stated flange patterns. The spindle motor
   has no declared flange pattern, so its shelf holes alone do not establish
   a verified mounting fastener.
+- Follow-up phase F1, after this BOM plan: extend bolted joints with explicit
+  pattern correspondence, receiving threads, grip and engagement, head and
+  washer clearances, and fastener standard/property class; validate those
+  against the connected components and derive purchase quantities and lengths
+  from the validated joints. Replace the B6 declarations only when that
+  derivation covers the mill's rail and motor connections, with tests for
+  missing data, incompatible patterns and duplicate counting.
 - Survey how screws are represented today (`standard/SocketHeadCapScrew`,
   `HexBolt`, screwdriving `Fastening`, the supplier-fasteners examples).
   Then decide whether bolted connections derive their fasteners or

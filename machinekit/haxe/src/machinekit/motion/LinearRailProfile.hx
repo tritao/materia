@@ -30,6 +30,12 @@ typedef LinearRailBore = {
   var depth:Float;
 }
 
+/** Catalogue mounting screw designation and nominal length in millimetres. */
+typedef LinearRailMountScrew = {
+  var size:String;
+  var length:Float;
+}
+
 /**
  * A profile-rail carriage and the rail it runs on, in mm and kg. `designation` names the carriage (HGH15CA, MGN12C)
  * and `rail` the rail (HGR15R, MGNR12R); every carriage on one rail repeats that rail's fields.
@@ -53,8 +59,8 @@ typedef LinearRailProfileSpec = {
   @:optional var blockMountThreadDepth:Float;
   var railHolePitch:Float;
   var railEndMargin:Float;
-  /** Rail mounting bolt from the rail table, size and length, e.g. "M4x16". */
-  var railMountScrew:String;
+  /** Rail mounting screw from the rail table. */
+  var railMountScrew:LinearRailMountScrew;
   var railBore:LinearRailBore;
   /** Datasheet masses: one carriage, and the rail per metre of length. */
   var blockMassKg:Float;

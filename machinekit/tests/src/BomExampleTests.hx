@@ -45,6 +45,34 @@ class BomExampleTests {
       var owner = brakes[0].item.partNumber;
       var included = countIncluded(document.assembly, owner);
       if (included != 27) throw 'The brake engineering tree must retain its disc and sectors, got $included';
+      var railHoles = 0;
+      for (entry in machine.components()) if (Std.isOfType(entry.component, machinekit.motion.LinearRail)) {
+        var rail:machinekit.motion.LinearRail = cast entry.component;
+        railHoles += rail.holePositions.length;
+      }
+      if (quantity(document, "ISO4762-M4x16") != railHoles || railHoles == 0
+        || quantity(document, "ISO4762-M5x12") != 8 || quantity(document, "ISO4762-M6x12") != 4)
+        throw "Bench mill fasteners must match the rail and motor flange patterns";
+      var mill:BenchMill = cast machine;
+      for (drive in mill.axisDrives) {
+        var id = 'motor${drive.spec.id.toUpperCase()}Plate';
+        var matches = [for (entry in machine.components()) if (entry.id == id) entry.component];
+        if (matches.length != 1 || !Std.isOfType(matches[0], BenchMill.MillMotorPlate)) throw 'Missing $id';
+        var plate:BenchMill.MillMotorPlate = cast matches[0];
+        var motorFlange = drive.motor.mounting();
+        if (plate.flange == null || motorFlange == null || plate.flange.holeDiameter != motorFlange.holeDiameter
+          || haxe.Json.stringify(plate.flange.holes) != haxe.Json.stringify(motorFlange.holes))
+          throw 'Motor plate $id must use its motor flange pattern';
+      }
+      var power = [for (line in document.procurement) if (line.item.partNumber == "MILL-POWER-CABLE-4C-400V-ASSUMED") line];
+      var encoder = [for (line in document.procurement) if (line.item.partNumber == "MILL-ENCODER-CABLE-ASSUMED") line];
+      var chains = [for (line in document.procurement) if (StringTools.startsWith(line.item.partNumber, "CHAIN-ASSUMED-")) line];
+      var chainCuts = 0;
+      for (line in chains) for (cut in line.item.cuts) chainCuts += cut.count;
+      if (power.length != 1 || power[0].item.quantity.unit != "m" || power[0].item.cuts.length != 4
+        || encoder.length != 1 || encoder[0].item.quantity.unit != "m" || encoder[0].item.cuts.length != 3
+        || chainCuts != 3 || quantity(document, "MILL-MANUAL-LUBRICATION-15-OUTLET-ASSUMED") != 1)
+        throw "The mill must declare its cable cuts, three chains and lubrication set";
     }
     if (name == "robot-welder") {
       var workpiece = findUse(document.assembly, "work/basePlate");
@@ -85,6 +113,11 @@ class BomExampleTests {
       if (found != null) return found;
     }
     return null;
+  }
+
+  static function quantity(document:machinekit.assembly.BomDocument, number:String):Float {
+    for (line in document.procurement) if (line.item.partNumber == number) return line.item.quantity.value;
+    return 0;
   }
 
   static function countIncluded(node:machinekit.assembly.BomDocument.BomAssemblyNode, owner:String):Int {

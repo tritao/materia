@@ -3,6 +3,9 @@ import machinekit.assembly.Transmission;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
+import machinekit.component.ComponentValues;
+import machinekit.component.BomItem.BomCut;
+import machinekit.component.Procurement.ProcurementCodec;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.milling.MillCasting.MillBase;
@@ -18,7 +21,10 @@ import machinekit.motion.BallNut;
 import machinekit.motion.ScrewSupportUnit;
 import machinekit.motion.LinearRail;
 import machinekit.motion.LinearRailBlock;
+import machinekit.motion.CableChain;
 import machinekit.motion.ServoMotor;
+import machinekit.motion.MotorFlange;
+import machinekit.standard.SocketHeadCapScrew;
 import machinekit.motion.ShaftBrakePart;
 import machinekit.motion.MotorDriver;
 import machinekit.power.ThreePhaseRectifier;
@@ -83,6 +89,8 @@ class BenchMill extends MachineAssembly {
   public final gaugeZero:AssemblyFrame;
   final zeroPoses = new Map<String, AssemblyFrame>();
   final overtravel = new Map<String, Float>();
+  final powerCableCuts:Array<BomCut> = [];
+  final encoderCableCuts:Array<BomCut> = [];
 
   public function new(withVise:Bool = false, includeWorkpiece:Bool = true) {
     super();
@@ -113,6 +121,7 @@ class BenchMill extends MachineAssembly {
       var name = side < 0 ? "Left" : "Right";
       var guide = LinearRail.metric(RAIL, yRailLength);
       yRails.push(guide);
+      declareRailFasteners(guide);
       attach(
         'railY$name',
         guide,
@@ -139,6 +148,7 @@ class BenchMill extends MachineAssembly {
       var name = side < 0 ? "Front" : "Back";
       var guide = LinearRail.metric(RAIL, xRailLength);
       xRails.push(guide);
+      declareRailFasteners(guide);
       attach(
         'railX$name',
         guide,
@@ -168,6 +178,7 @@ class BenchMill extends MachineAssembly {
       var name = side < 0 ? "Left" : "Right";
       var guide = LinearRail.metric(RAIL, zRailLength);
       zRails.push(guide);
+      declareRailFasteners(guide);
       attach(
         'railZ$name',
         guide,
@@ -365,6 +376,8 @@ class BenchMill extends MachineAssembly {
       "base"
     );
     connectPorts("spindle-power", "powerSupply", "power4", spindleDriver, "power");
+    powerCableCuts.push(cableCut(zeroPose("spindleMotor"), zeroPose(spindleDriver), 0));
+    declareServices();
     addMotor(
       "spindleMotor",
       "spindle-motor-turn",
@@ -381,6 +394,53 @@ class BenchMill extends MachineAssembly {
   }
 
   /** Each drive reads its lead and bearing boundary from its screw, nut and support parts. */
+  function declareRailFasteners(rail:LinearRail):Void {
+    var screw = rail.spec.railMountScrew;
+    if (screw == null || screw.size == null || !Math.isFinite(screw.length)
+      || screw.length <= 0) throw "Rail must declare its mounting screw size and length";
+    addBomItem(SocketHeadCapScrew.metric(screw.size, screw.length).bom, rail.holePositions.length);
+  }
+
+  /** Conservative routing allowance until the actual cable paths are designed. */
+  function cableCut(motor:AssemblyFrame, driver:AssemblyFrame, extra:Float):BomCut {
+    var travel = 0.0;
+    for (axis in specs) travel += axis.upper - axis.lower;
+    var distance = Math.abs(motor.x - driver.x) + Math.abs(motor.y - driver.y) + Math.abs(motor.z - driver.z);
+    return {length:Math.ceil((distance + travel + extra + 500) / 100) / 10, count:1};
+  }
+
+  function declareServices():Void {
+    for (axis in specs) {
+      var chain = new CableChain(new ComponentValues().setNumber("travel", axis.upper - axis.lower));
+      var metres = Math.ceil(chain.developedLength()) / 1000;
+      var item = chain.bom;
+      item.measure = {value:metres, unit:"m"};
+      item.cuts = [{length:metres, count:1}];
+      addBomItem(item);
+    }
+    var powerLength = 0.0, encoderLength = 0.0;
+    for (cut in powerCableCuts) powerLength += cut.length * cut.count;
+    for (cut in encoderCableCuts) encoderLength += cut.length * cut.count;
+    addBomItem({partNumber:"MILL-POWER-CABLE-4C-400V-ASSUMED", description:"Assumed continuous-flex motor power cable",
+      quantity:1, material:null, procurement:Buy(null, null, null), maturity:"Assumed",
+      requirements:[ProcurementCodec.requirement("ratedVoltage", "V", 400),
+        ProcurementCodec.requirement("cores", "1", null, null, 4), ProcurementCodec.choice("service", "continuous flex")],
+      measure:{value:powerLength, unit:"m"}, cuts:powerCableCuts});
+    addBomItem({partNumber:"MILL-ENCODER-CABLE-ASSUMED", description:"Assumed shielded continuous-flex encoder cable",
+      quantity:1, material:null, procurement:Buy(null, null, null), maturity:"Assumed",
+      requirements:[ProcurementCodec.choice("signal", "incremental encoder"),
+        ProcurementCodec.choice("shield", "shielded"), ProcurementCodec.choice("service", "continuous flex")],
+      measure:{value:encoderLength, unit:"m"}, cuts:encoderCableCuts});
+    addBomItem({partNumber:"MILL-MANUAL-LUBRICATION-15-OUTLET-ASSUMED", description:"Assumed manual way-oil pump and distribution set",
+      quantity:1, material:null, procurement:Buy(null, null, null), maturity:"Assumed",
+      requirements:[ProcurementCodec.requirement("outlets", "1", 15),
+        ProcurementCodec.choice("lubricant", "ISO VG 68 way oil"), ProcurementCodec.choice("operation", "manual")]});
+    addBomItem({partNumber:"MILL-WAY-OIL-ISO-VG68", description:"ISO VG 68 way oil, initial fill",
+      quantity:1, material:null, procurement:Buy(null, null, "ISO 3448"), maturity:"Assumed",
+      requirements:[ProcurementCodec.requirement("viscosityGrade", "1", null, null, 68)],
+      measure:{value:1, unit:"l"}});
+  }
+
   function driveScrew(
     spec:MillAxisSpec,
     parent:String,
@@ -481,8 +541,14 @@ class BenchMill extends MachineAssembly {
       );
     }
     var couplingStart = shaftLength - coupling.length / 2;
-    var plateBore = couplingStart < plateThickness ? coupling.outerDiameter : motor.rating.shaftDiameter;
-    var motorPlate = new MillMotorPlate("MILL-" + spec.id.toUpperCase() + "-MOTOR-PLATE", motor.rating.bodyDiameter + 20, plateThickness, plateBore);
+    var flange = motor.mounting();
+    if (flange == null || flange.holes.length != 4) throw "Axis motor needs its declared four-hole flange";
+    var plateBore = Math.max(flange.pilotDiameter,
+      couplingStart < plateThickness ? coupling.outerDiameter : motor.rating.shaftDiameter);
+    var motorPlate = new MillMotorPlate("MILL-" + spec.id.toUpperCase() + "-MOTOR-PLATE", motor.rating.bodyDiameter + 20, plateThickness, plateBore, flange);
+    var motorScrew = flange.holeDiameter == 5.5 ? "M5" : flange.holeDiameter == 6.6 ? "M6" : null;
+    if (motorScrew == null) throw "Axis motor flange has no reviewed mounting screw";
+    addBomItem(SocketHeadCapScrew.metric(motorScrew, 12).bom, flange.holes.length);
     if (spec.id == "y") {
       var footZ = start[2] + near.connector("mount").frame.y;
       for (end in 0...2) {
@@ -561,6 +627,8 @@ class BenchMill extends MachineAssembly {
       AssemblyFrames.translation(-190 + index * 65, base.depth / 2 - 30, 0),
       "base"
     );
+    powerCableCuts.push(cableCut(motorPose, zeroPose(driver), 0));
+    encoderCableCuts.push(cableCut(motorPose, zeroPose(driver), motor.rating.bodyLength));
     connectPorts(driver + "-power", "powerSupply", 'power$index', driver, "power");
     addMotor(motorId, id + "-turn", motorId, driver);
     if (brake != null) bindMotorBrake(motorId, motorId + "Brake-shell-0", "zBrake.release", "zBrake.released", 250, 30);
@@ -781,8 +849,11 @@ private class MillMotorPlate extends MachineComponent {
   public final width:Float;
   public final thickness:Float;
   final bore:Float;
-  public function new(drawing:String, width:Float, thickness:Float, bore:Float) {
-    super('MILL-MOTOR-PLATE-$width-$thickness-$bore', "Mill motor mounting plate", "steel", true);
+  public final flange:Null<MotorFlange>;
+  public function new(drawing:String, width:Float, thickness:Float, bore:Float, ?flange:MotorFlange) {
+    super('MILL-MOTOR-PLATE-$width-$thickness-$bore', flange == null ? "Mill motor mounting plate"
+      : flange.holeDiameter == 5.5 ? "Mill motor mounting plate with M5 tapped holes"
+      : "Mill motor mounting plate with M6 tapped holes", "steel", true);
     declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(machinekit.component.Procurement.Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
@@ -790,21 +861,30 @@ private class MillMotorPlate extends MachineComponent {
     this.width = width;
     this.thickness = thickness;
     this.bore = bore;
+    this.flange = flange;
   }
-  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
-    [drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(width),
-      machinekit.component.ComponentNumberKey.encode(thickness), machinekit.component.ComponentNumberKey.encode(bore)].join("|"), 1);
+  override public function revisionFingerprint():Null<String> {
+    var inputs = [drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(width),
+      machinekit.component.ComponentNumberKey.encode(thickness), machinekit.component.ComponentNumberKey.encode(bore)];
+    if (flange != null) {
+      inputs.push(machinekit.component.ComponentNumberKey.encode(flange.holeDiameter));
+      for (hole in flange.holes) inputs.push(machinekit.component.ComponentNumberKey.encode(hole.x) + ","
+        + machinekit.component.ComponentNumberKey.encode(hole.y));
+    }
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var body = Part.box(width, width, thickness).translated(new Vector(0, 0, 0));
-    var holes = [Part.cylinderSpan(bore / 2 + 1, -1, thickness + 1)];
-    for (x in [-1, 1]) for (y in [-1, 1]) holes.push(Part.cylinderSpan(
-      3.3,
-      -1,
-      thickness + 1,
-      x * (width / 2 - 10),
-      y * (width / 2 - 10)
-    ));
+    var holes = [Part.cylinderSpan(bore / 2 + (flange == null ? 1 : 0.1), -1, thickness + 1)];
+    if (flange == null) {
+      for (x in [-1, 1]) for (y in [-1, 1]) holes.push(Part.cylinderSpan(
+        3.3, -1, thickness + 1, x * (width / 2 - 10), y * (width / 2 - 10)));
+    } else {
+      var threadDiameter = flange.holeDiameter == 5.5 ? 5.0 : flange.holeDiameter == 6.6 ? 6.0 : 0.0;
+      if (threadDiameter == 0) throw "Axis motor flange has no reviewed tapped hole";
+      for (point in flange.holes) holes.push(Part.cylinderSpan(threadDiameter / 2, -1, thickness + 1, point.x, point.y));
+    }
     return Solids.cut(Solids.named(body, "plate"), holes);
   }
 }
