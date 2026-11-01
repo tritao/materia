@@ -30,7 +30,7 @@ class GearSpec {
     if (!Math.isFinite(faceWidth) || faceWidth <= 0) throw "gear face width must be finite and positive";
     if (form == null) throw "gear needs a tooth form";
     if (!Math.isFinite(profileShift)
-      || profileShift <= -1 || profileShift >= 1) throw "profile shift must be finite and strictly between -1 and 1";
+      || profileShift <= -2 || profileShift >= 2) throw "profile shift must be finite and strictly between -2 and 2";
     var corner = cutterTipRadius == null ? 0.38 * module : cutterTipRadius;
     var tip = tipFilletRadius == null ? 0.05 * module : tipFilletRadius;
     if (!Math.isFinite(corner)

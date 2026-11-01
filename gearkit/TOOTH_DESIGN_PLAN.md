@@ -458,7 +458,9 @@ haxeon run --project gearkit/studies/tooth-design/haxeon.json
 
 It prints one line per case (about 40 s, plus the fixed-circular-spline study below, about 6 min). The fixed-circular-spline
 study (TD11) alone runs by giving the built program the argument `fixed`
-(`hl gearkit/studies/tooth-design/build/host/main.hl fixed`, with the same `LD_LIBRARY_PATH`). The meshing assertions that guard the analysis stay in `gearkit/tests`
+(`hl gearkit/studies/tooth-design/build/host/main.hl fixed`, with the same `LD_LIBRARY_PATH`). The modified-involute study (TD12)
+is `ModifiedInvoluteStudy`, run as `main.hl mod-hob|mod-nominal|mod-search|mod-detail "<variant>"...` with a variant written
+`ha=0.8,x=0,tip=c20x120,cha=0.6,ctip=d` (see TD12 notes; `SAMPLES=24` in the environment changes the angle count). The meshing assertions that guard the analysis stay in `gearkit/tests`
 (`MeshingTests`, with `ToothDesigns` as their fixture).
 
 ## TD11 notes: meshing against a fixed circular spline
@@ -673,6 +675,154 @@ step that gives tolerance windows and real engagement); the generated root troch
 `CircularSpline` profile (the profile is ready to be read through `ToothProfile`); deleting `FourRollerCam`. None blocked this
 work. A two-zone eccentricity study and a nominal-involute-circular-spline comparison of the cams are the first uses.
 
+## TD12 notes: can a modified involute flexspline mesh? (catalogue hob against the D2 tooth)
+
+Question: can the flexspline stay an involute that a standard 20 deg rack hob cuts (shortened tooth, profile shift, tip relief), or must
+it be the double-circular-arc (D2) tooth with its own hob? Branch `tooth-involute-mod`. **All numbers are model output on the same footing
+as TD11: unloaded, rigid teeth, one rotational degree of freedom, cosine cam, cam amplitude error +-2 um, 12 wave-generator angles over
+one circular pitch (24 and 48 give the same TE and backlash for the best point: 0.31 arcsec, 9.7 um). The cam-to-flexspline mapping error
+is about 3 um, as in TD11, so differences of a few um in backlash are not resolved. No loaded contact, no root stress.** m 0.3, Z 200/202,
+backlash is at the 30.3 mm pitch circle, negative is overlap.
+
+### New form parameters (general, in `gearkit`)
+
+- `Involute(pressureAngle, addendumFactor = 1.0, ?tipRelief)`: `addendumFactor` is the addendum in modules before shift (the blank outside
+  diameter; the dedendum 1.25 m, the rack and the hob are unchanged). `TipRelief(amount, length, exponent = 1)`: material removed along the flank
+  normal, 0 at `length` (radial mm) below the tip circle, `amount` at the tip circle, growing as the `exponent` power (1 linear, 2 near-circular);
+  works for external and internal teeth; the tip rounding is re-solved tangent to the relieved flank (`InvoluteProfile`).
+- Profile shift was already a `GearSpec` input; its bound is widened from (-1, 1) to (-2, 2) (pointed or undercut teeth are still rejected by the
+  profile's own checks). `StrainWaveInput` takes `addendumFactor`, `profileShift`, `tipRelief` (involute only); `CircularSpline.involute` takes
+  `addendumFactor` and `tipRelief`. A larger tip rounding was already `GearSpec.tipFilletRadius`.
+- `StrainWavePair.circularTipRadius` stays the nominal full-depth circular-spline tip (pitch - 1 m) for any involute flexspline, whatever its
+  own addendum or shift (it was `pitch - flexspline addendum`, which is the same number for the default).
+- **Identity**: the defaults reproduce today's D1 exactly. The hobber probe (outline, rack flank, corner and root samples, `HobDesign`, cutter
+  region and rake face, `GearInspection` and `GearMeasurement` on synthetic rings, for the reference, demo, comparison, shifted and internal
+  gears; 852 364 bytes of double bit patterns) is byte-identical against `c403f7b75`; the flexspline supplier package JSON md5 is
+  `017ec06361ce3f4663e9ee765544712f`, unchanged. Gearkit tests: GeometryTests 1 034 568, MetrologyTests 246, FormInterfaceTests 3 570 and the rest
+  unchanged; `InvoluteVariantTests` adds 40 (shortened tip radius and unchanged flank, shift past one module, relief amount and derivative
+  against finite differences, tip rounding tangent to the relieved flank, hobbability, rack straightness).
+
+### The hob (`ConjugateRack` / `HobCheck` on the variants)
+
+| Flexspline | Rack flank | Flank heights above the datum | Datum half-thickness | Hobbable |
+|---|---|---|---|---|
+| ha 0.8, x 0, rounding 0.05 m (any ha, any x, any rounding) | straight 20 deg, deviation 0.00 um | -1.0 to 0.47..0.94 m (up to the tip) | 0.2356 mm = pi m / 4 | yes (`HobCheck` none, no root fold) |
+| ha 0.8, x 0, relief 20 um over 0.12 mm (0.4 m) | straight 20 deg up to 0.40 m, then relieved, at most 20 um from the line at the top (0.77 m) | -1.0 to 0.77 m | 0.2356 mm below the relief | yes |
+| ha 1.0, relief 30 um over 0.24 mm | straight up to 0.21 m, up to 31 um off the line at the top | -1.0 to 0.96 m | 0.2356 mm below the relief | yes |
+
+- **Shift is the hob infeed and the addendum is the blank outside diameter: both are catalogue operations on a catalogue 20 deg rack hob (m 0.3,
+  tip corner 0.38 m, tooth depth 1.25 m).** Shift 0 to 1.5 and ha 0.6 to 1.0 all give the same straight rack (the height range changes, the
+  line does not). A plain larger tip rounding is also a straight rack. The maximum hob corner radius stays 0.472 m and the flexspline root
+  fillet is unchanged: minimum radius 116 um (0.39 m), against 113 um for D2s.
+- **Tip relief is not a catalogue hob.** The relieved part of the tooth tip is cut by the lower flank at the root of the hob tooth, so the hob
+  needs that flank region ground off the 20 deg line by 10 to 30 um over the last 0.1 to 0.24 mm: a protuberance / tip-relief (Kopfruecknahme) hob,
+  an order option of a hob maker, not a catalogue item; availability and cost were not checked. `HobCheck` accepts the relieved tooth.
+
+### Search (flexspline variants, 12 angles, amplitude 0)
+
+Criteria: positive backlash (small), flank contact (at least 3 teeth), no tip-edge contact (mean tip-edge teeth below 1), low TE. Grid:
+ha 0.6 / 0.7 / 0.8 / 1.0, x 0 / 0.5 / 1.0 / 1.5, tip: rounding 0.05 m (default), rounding 0.15 m, linear relief 20 um over 0.12 mm.
+(i) derived spline at kappa_d 1.0 and 1.1, flexspline kappa_d - 0.1 and - 0.05; (ii) nominal involute 202 spline with the same addendum factor and tip
+treatment, shift x + 0.05 or x + 0.15 ("delta" thins the spline tooth, opening 2 delta m tan 20 deg of backlash), flexspline kappa 0.9 / 1.0 / 1.1.
+Best row per cell:
+
+| ha | x | Tip | (i) derived spline | (ii) nominal involute spline |
+|---|---|---|---|---|
+| 0.6 | 0 | rounding 0.05 / 0.15 m | overlap (25 / 13 um) | tip edges only (8.7 teeth), TE 0.3 |
+| 0.6 | 0 | relief 20 um | tip edges (1.3) TE 0.02, bl 10.9 | **pass** kappa 0.9: TE 0.17, bl 25.8, 13 flank |
+| 0.6 | 0.5, 1.0, 1.5 | relief 20 um | **pass** TE 0.02, bl 11 to 12, 10.5 to 11 flank | spline cannot be built (internal rack limit) |
+| 0.6 | 1.0, 1.5 | rounding 0.05 / 0.15 m | tip edges (3.5 to 4.3), TE 2.9 / 0.02 | cannot be built |
+| 0.7 | 0 | relief 20 um | overlap (21 um) | **pass** kappa 0.9: TE 0.17, bl 25.7, 13 flank |
+| 0.7 | 1.5 | relief 20 um | tip edges (3.5) TE 2.9 | cannot be built |
+| 0.8 | 0 | relief 20 um | overlap (34 um) | **pass** kappa 1.0: TE 0.31, bl 9.7, 9.8 flank |
+| 0.8 | 0 | rounding 0.05 / 0.15 m | overlap (34 / 33 um) | tip edges only (7.7 teeth) |
+| 0.7, 0.8 | 0.5 to 1.5 | any | overlap 7 to 51 um (one tip-edge row) | cannot be built |
+| 1.0 | any | rounding | overlap 57 to 72 um | overlap 47 to 62 um (x 0) |
+| 1.0 | 0 | relief 20 um | overlap 66 um | overlap 6 um (spline ha equal to the flexspline's) |
+| 1.0 | 0.5 to 1.5 | any | overlap 59 to 78 um | cannot be built |
+
+- **Profile shift does not help.** Positive shift on the flexspline neither removes the overlap nor opens a flank window by itself (the (i) passes at
+  x 0.5 to 1.5 are the same ha 0.6 relief case as at x 0), and the nominal involute spline cannot follow it: the internal rack-limit root rule rejects
+  a spline shift above about 0.3, and its root fillet shrinks as the shift rises (minimum radius 75 um at -0.15, 56 um at 0, 49 um at +0.05, 34 um
+  at +0.15, 16 um at +0.25, 7 um at +0.3 for the 0.38 m corner, each against 116 um on the flexspline). x = 0 is the sensible choice; a mild
+  negative shift on the spline buys fillet room. Giving flexspline and spline the same shift (x -0.2, +0.1, +0.2 with the spline at x + 0.05)
+  reproduces the x 0 numbers to 0.1 um, as the standard-centre-distance argument says.
+- **Without relief nothing passes**: every rounding-only row (0.05 to 0.7 m, any ha, any spline) has 7 to 9 teeth touching on the tip edge and
+  at most 2 on the flank, or overlaps. The shortened tooth removes the overlap against a nominal involute spline (TE 0.3, bl 10) but the contact is
+  still the flexspline tip edge on the spline flank.
+- **Tip relief is what turns the tip-edge contact into flank contact**, at 20 um over 0.12 mm (smaller amounts do not: 5 um still has 2 tip-edge
+  teeth and TE 13 arcsec at ha 0.8; 10 um passes at ha 0.8; 30 um over 0.24 mm passes at ha 1.0). Linear and quadratic profiles behave alike
+  at ha 0.8; at ha 1.0 the quadratic is worse (30 um over 0.12 mm: TE 4.0 arcsec against 0.3 for the linear).
+- **Nominal spline (ii), the shaper-cut option, is a rule on the tooth heights.** With 20 um relief on the flexspline and flexspline kappa 1.0,
+  delta 0.05, the pair passes whenever ha_flex + ha_spline <= 1.6 (0.6 + 1.0, 0.7 + 0.9, 0.8 + 0.8, 0.9 + 0.7, 1.0 + 0.6 pass; 0.7 + 1.0, 0.8 + 0.9,
+  0.9 + 0.8, 1.0 + 0.7 overlap by 4 to 9 um): the tip-to-tip clearance at the minor axis, (2 - ha_flex - ha_spline) m, has to cover the 0.12 mm
+  relief length. Relief on the spline as well is not needed (its plain 0.05 m rounding passes at ha_spline 0.5 to 0.7 with a relieved flexspline).
+  The flexspline can stay full height if the spline is shortened to 0.5 to 0.6 and the relief is 30 um over 0.24 mm.
+- **Derived spline (i) is fragile and depends on an assumption.** It passes only at design kappa 1.1 (flexspline 1.05; ha at most 0.7) and 1.2
+  (flexspline 1.10 or 1.15; ha at most 0.8), always with relief, and never at design kappa 0.9 or 1.0; the derived tooth is trimmed at the assumed nominal full-depth spline tip (pitch - 1 m, 30.0 mm), which
+  cuts off the long tip formed by the flexspline's tip-edge envelope. It is also the custom EDM or wire spline, so it has no catalogue-cutter
+  advantage.
+
+### Best points, with the cam amplitude error (-2 / 0 / +2 um)
+
+Flank / tip are mean teeth within 1 um of contact at the drive-flank position. D2s from TD11 for comparison. The flexspline's relief is
+linear, amount at the tip circle over a radial length.
+
+| Case | Flexspline | Spline | Kappa | TE p-p, arcsec | Backlash, um | Flank / tip teeth |
+|---|---|---|---|---|---|---|
+| D2s (TD11 best) | D2s | derived kd 1.0 | 0.95 | 0.14 / 0.15 / 0.17 | 7.2 / 6.5 / 5.7 | 13.3 / 0 |
+| N1 | ha 0.8, x 0, relief 20 um / 0.12 mm | nominal involute, ha 0.6, x +0.05 | 1.0 | 0.30 / 0.31 / 0.32 | 11.0 / 9.7 / 8.5 | 10.0 / 0 |
+| N2 | ha 0.7, x 0, relief 20 um / 0.12 mm | nominal, ha 0.6, x +0.05 | 1.0 | 0.30 / 0.30 / 0.31 | 11.1 / 9.9 / 8.6 | 10.3 / 0 |
+| N3 | ha 0.6, x 0, relief 20 um / 0.12 mm | nominal, ha 0.6, x +0.05 | 1.0 | 0.28 / 0.29 / 0.29 | 11.3 / 10.0 / 8.7 | 10.3 / 0 |
+| N3' | same | same | 0.9 | 0.15 / 0.17 / 0.18 | 26.6 / 25.8 / 25.0 | 13.5 / 0 |
+| N4 | ha 1.0, x 0, relief 30 um / 0.24 mm | nominal, ha 0.5, x +0.05 | 1.0 | 0.28 / 0.28 / 0.29 | 11.3 / 10.0 / 8.7 | 10.3 / 0 |
+| N5 | ha 0.8, x 0, relief 10 um / 0.12 mm | nominal, ha 0.6, x +0.05 | 1.0 | 0.30 / 0.32 / 0.32 | 11.0 / 9.7 / 8.5 | 10.0 / 0 |
+| I1 | ha 0.6, x 0, relief 30 um / 0.12 mm | derived kd 1.1 | 1.05 | 0.03 / 0.02 / 0.02 | 12.3 / 10.9 / 9.5 | 11.0 / 0 |
+| I2 | ha 0.6, x 1.5, relief 20 um / 0.12 mm | derived kd 1.1 | 1.05 | 0.02 / 0.02 / 0.02 | 13.3 / 11.8 / 10.3 | 10.5 / 0 |
+| I3 | ha 0.7, x 1.0, relief 30 um / 0.24 mm | derived kd 1.2 | 1.15 | 0.02 / 0.02 / 0.02 | 14.5 / 12.9 / 11.2 | 9.3 / 0 |
+| control | ha 0.8, x 0, rounding 0.5 m (no relief) | nominal, ha 0.6, x +0.05 | 1.0 | 0.31 | 9.6 | 1.5 / 8.5 (tip edges) |
+| control | full-depth D1 | nominal full-depth (TD11) | 1.0 | 28.3 | -216.8 | 0 / 2 (overlap) |
+
+- The nominal-spline backlash falls about 0.6 to 0.7 um per um of cam amplitude (11.0 to 8.5 for +-2 um), as for D2s, and about 20 um per 0.1 of
+  kappa; delta sets it (10 um per 0.05, i.e. 2 delta m tan 20 deg) and the window moves with it: delta 0.05 passes kappa 0.9 (ha 0.6) to 1.0, delta
+  0.15 passes 0.9 to 1.1 and delta 0.25 passes up to 1.2 (backlash 8 um there), at 0.17 to 0.5 arcsec. Kappa 0.8 gives flank contact on only 3 to 7 teeth
+  and TE 3 to 5 arcsec; kappa above the window overlaps by 11 um (delta 0.05 at kappa 1.1).
+- TE: the nominal involute pair is about twice D2s's TE (0.3 against 0.15 arcsec at kappa 1.0; 0.17 at kappa 0.9) and has fewer flank teeth
+  (10 against 13). Both are well below the 2 to 34 arcsec of the unmodified D1.
+
+### Tooth room at the best points
+
+| Gear | Tip circle radius | Tip land (thickness) | Tooth thickness at the pitch circle | Root fillet, minimum radius (0.38 m corner) | Note |
+|---|---|---|---|---|---|
+| Flexspline ha 0.8, relief 20 um | 30.24 mm | 233 um (0.78 m) | 1.571 m | 116 um (0.39 m) | not pointed; tip land is wider than D1's 227 um because the tip is lower |
+| Flexspline ha 0.6, x 1.5 | 30.63 mm | 252 um (0.84 m) | 2.66 m | 115 um | space at the pitch circle 0.48 m; root land 0.129 m |
+| Flexspline ha 1.0, relief 30 um / 0.24 mm | 30.30 mm | 165 um (0.55 m) | 1.571 m | 116 um | the thinnest tip of the set, still blunt |
+| Nominal spline ha 0.6, x +0.05 | 30.135 mm | 320 um (1.07 m) | 1.534 m | 49 um (0.16 m) | tooth height 1.85 m; fillet from the rack-limit construction, not a pinion shaper |
+| Nominal spline ha 0.5, x +0.05 | 30.165 mm | 341 um (1.14 m) | 1.534 m | 49 um | |
+| D2s (TD5) | | | | 113 um (0.38 m) | |
+
+Large positive shift does not point the tooth here (the tip rounds off before that; the shifted flexspline stays 250 um at the tip at x 1.5), but it
+thickens the tooth to 2.66 m and leaves a 0.48 m space, which no spline of 202 teeth can take in this model. The spline root is the weak point: the
+49 um fillet is a third of the flexspline's and D2s's; a pinion-shaped cutter would make a different root and was not modelled.
+
+### Conclusions
+
+- **As far as this rigid unloaded model says, a modified involute flexspline with a nominal involute internal spline does mesh properly**: 10 teeth
+  in flank contact, no tip-edge contact, 8.5 to 11 um backlash for +-2 um, TE 0.3 arcsec (D2s: 13 teeth, 6.5 um, 0.15 arcsec), at flexspline kappa 1.0
+  and a spline shift of +0.05. Two modifications make it so, and neither is a profile shift: (1) tip relief on the flexspline, 20 um over 0.12 mm (10 um
+  at ha 0.8; 30 um over 0.24 mm at full height), without which every variant touches on tip edges or overlaps; (2) a shortened spline tooth so that
+  ha_flex + ha_spline <= 1.6 (the spline at 0.5 to 0.6 m addendum if the flexspline stays full height). Shift is not needed (and the spline cannot
+  take more than about +0.3).
+- **Hob verdict.** Shift, tooth height and tip rounding keep the rack a standard straight 20 deg flank at pi m / 4 on a catalogue hob. The tip relief
+  that the mesh needs does not: it needs a hob whose root flank is ground 20 um off the 20 deg line over the last 0.4 m of height (a tip-relief /
+  protuberance hob), and the spline needs a shaper cutter (or wire) for the shortened tooth at +0.05 shift, which is a custom cutter either way. So the
+  choice is not "catalogue hob against a special hob": it is a hob with an ordinary-looking 20 deg flank plus a tip-relief option, against a D2 hob with
+  a curved flank and a different tooth depth. A catalogue hob with no relief does not mesh in this model.
+- Not supported by this model, and the next tests: loaded contact (an involute flank contact between a convex and a concave flank has a smaller
+  contact radius than D2's conformal arcs; the flexspline will comply at the 10 to 30 um overlaps that separate these cases), the spline root and a
+  pinion-shaper cutter, the real relief form a hob can produce, kappa and centre-distance tolerance windows (the window here is 0.1 in kappa per spline
+  shift), and the 3 um cam mapping error.
+
 ## Steps
 
 ### Phase A: forms and kinematics
@@ -822,6 +972,7 @@ TD0 ── TD1 ── TD2 ──┐
 | TD4 | done for involute forms (D1, D3); not fitted to a full `Sampled` ToothForm (root/tip blends), and no contact-condition refinement: accuracy is by convergence | Tooth design: circular-spline envelope (TD4) |
 | TD5 | done for D1, D2, D3, D4 (unloaded kinematic), metric corrected 2026-11-01: flank engagement and tip edge contact are reported apart. D1 kappa 1 flank 1.6 % (tip edge 46.5 %); D2s 16.3 %; D3 0 %. Root and minor-tip clearances are arithmetic on the assumed circular-spline radii, transmission error is zero by construction, and cam differences of a few um are inside model error (see TD5 notes) | Tooth design: meshing analysis and D1/D3 comparison (TD5); Tooth design: double-circular-arc form (TD2) (D2 comparison) |
 | TD11 | done 2026-11-01 (branch `tooth-mesh`, unloaded rigid kinematic): `CircularSpline` / `SampledInternalProfile` (derived tooth with deviation bound, or nominal involute) and `FixedMesh` (drive and reverse contact rotation, transmission error, backlash, flank or tip-edge contact). Rigid limit: TE below 0.0001 arcsec, backlash within 0.0002 arcsec of the analytic value; self-consistency within the sweep bound (zero by construction); uniform rotation exact; runout and centre-distance amplitudes within 0.4 % and 0.01 %. Study: a spline fits only its design state (kappa 1.1 overlaps 41 to 100 um, 2 um amplitude error overlaps D1 8 to 14 um); no cam ranking is supported (see TD11 notes). Root is an assumed radial wall, tip a sharp corner; loaded contact not done | Tooth design: the circular spline as a concrete internal tooth (TD11); Tooth design: fixed-circular-spline mesh solver (TD11); Tooth design: fixed-spline study and plan (TD11); Tooth design: design-kappa sweep for the fixed-spline study (TD11) |
+| TD12 | done 2026-11-01 (branch `tooth-involute-mod`, unloaded rigid kinematic): involute addendum factor and `TipRelief`, shift bound widened to 2; study of shortened / shifted / relieved involute flexsplines against derived and nominal involute splines. A nominal involute spline meshes with flank contact (TE 0.3 arcsec, backlash 10 um, 10 flank teeth, +-2 um 8.5 to 11 um) only with tip relief on the flexspline and ha_flex + ha_spline <= 1.6; shift does not help; without relief every variant touches on tip edges. Relief needs a non-catalogue hob; see TD12 notes | Involute form: addendum factor, tip relief and shift up to two modules; Tooth design: modified-involute study (TD12) |
 | TD6 | planned | |
 | TD7 | planned | |
 | TD8 | planned | |
