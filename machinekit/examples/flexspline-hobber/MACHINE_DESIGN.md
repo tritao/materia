@@ -195,15 +195,31 @@ Open decisions:
    booster in the fixture that supplies the 10 MPa (15 MPa maximum) sleeve
    pressure. Pressure is regulated so the 0.6 mm cup wall is not distorted
    (≤ 2 µm). The union carries 2-3 air passages: clamp, unclamp or spring return,
-   and an air seat check that confirms the cup is seated before cutting. Low drag
+   and possibly a seat check. The seat check cannot use air holes in the 0.3 mm
+   stop land; the method (air through the sleeve clearance before clamping, or a
+   sensor at the closed end) is left to the mandrel maker. Low drag
    torque is a requirement, because seal drag is a table ripple source. A manual
    screw-piston mandrel is ruled out by robot loading; a 100 bar hydraulic union
    would add drag. The sleeve is sized from the cup bore (Ø58.05, 0.025 mm
    collapsed radial clearance), as `FlexsplineHobber` already builds it; "OD 59"
-   in PARTS.md is only the generic recipe default. The mandrel request does not need the table drawing:
+   in PARTS.md is only the generic recipe default. **Open model issue:** the
+   `ExpandingMandrel` default expansion (0.05 mm diametral) equals the nominal
+   loading gap, so it cannot also absorb bore tolerance or provide grip; the
+   supplier sizes sleeve and expansion for the real bore, and the model should take
+   their values. Bore specification for the flexspline drawing (2026-11-01):
+   Ø58.05 H5 honed after hardening, roundness and cylindricity 0.003 mm over the
+   clamped length, Ra 0.8 (0.4 preferred), only an edge break (≤ 0.1 mm) at the
+   open-end bore edge because the cup seats there on the 0.3 mm land (the loading
+   lead-in is on the mandrel nose), seating face flatness 0.002 mm and
+   perpendicularity to the bore 0.003 mm. The teeth are cut while the cup is
+   clamped, so clamping expansion springs back as tooth error: contact pressure
+   is limited to what the cutting torque needs (below 5 N·m).
+   The mandrel request does not need the table drawing:
    the maker uses its standard flange and we make the adapter. Below the seat the
    mandrel and fixture must stay inside the swept-hob keep-out (0.3 mm clearance),
-   which `supplier-packages/mandrel_package.py` computes and draws. The union
+   which `supplier-packages/mandrel_package.py` computes from the CAM job's hob
+   travel (centre 7.49 mm below the seat); a supplier's STEP must still be checked
+   in the model for the arbor and outboard support. The union
    choice waits for the table's bore drawing (to ask Demat).
 7. **Built-up table option.** If `RotaryTable` replaces the purchase, it needs a modular ring
    encoder, about 100 mm bore, two heads, absolute, BiSS-C. One set is quoted in the same RFQ (see `../../STRAIN_WAVE_RESEARCH.md`).

@@ -12,9 +12,11 @@ Writes, into the output directory:
 Usage: mandrel_package.py <supplier-package.json> <output-dir>
 
 The keep-out is the swept hob body (a cylinder of the hob's outside diameter and
-length) at full cutting depth, for every hob centre height from KEEPOUT_FEED_BELOW
-below the seat upwards and every swivel angle within the exported range. The cup
-turns, so the envelope is the minimum radial distance from the work axis.
+length) at full cutting depth, for every hob centre height the CAM job reaches
+(hobCentreZMin upwards: engagement overrun plus axial clearance) and every swivel
+angle within the exported range. The cup turns, so the envelope is the minimum radial
+distance from the work axis. It covers the hob only: arbor, outboard support and the
+rest of the head are checked in the machine model's collision audit.
 """
 import html
 import json
@@ -26,13 +28,18 @@ import sys
 from datetime import date
 
 COMPANY = "Materia Expedita, Rua das Oficinas Municipais 15, 2450-060 Nazare, Portugal"
-KEEPOUT_FEED_BELOW = 2.0   # hob centre may travel this far below the seat (overrun margin)
 KEEPOUT_CLEARANCE = 0.3    # minimum radial clearance from the swept hob to the mandrel/fixture
-# Proposed workpiece bore specification (Materia's flexspline drawing must match).
-BORE_TOLERANCE = "H6"
+# Workpiece bore and seat specification (Materia's flexspline drawing must match).
+# H5 keeps bore tolerance + loading clearance within a practical sleeve expansion; the
+# open-end bore edge only gets an edge break because the cup seats on a 0.3 mm land
+# there, so the loading lead-in belongs on the mandrel nose.
+BORE_TOLERANCE = "H5"
 BORE_ROUNDNESS = 0.003
+BORE_CYLINDRICITY = 0.003
 BORE_RA = 0.8
-ENTRY_CHAMFER = "0.3 × 30°"
+BORE_EDGE = "edge break ≤ 0.1 mm (no chamfer: it would remove the seating contact)"
+SEAT_FLATNESS = 0.002
+SEAT_PERPENDICULARITY = 0.003
 
 
 def keepout(d, z_step=0.25):
@@ -55,7 +62,7 @@ def keepout(d, z_step=0.25):
                     dz = t * s + rho * math.sin(ph) * c
                     samples.append((dz, math.hypot(x, y)))
     samples.sort()
-    zc_min = -KEEPOUT_FEED_BELOW
+    zc_min = w["hobCentreZMin"]
     profile = []
     z = 0.0
     while True:
@@ -176,8 +183,11 @@ def sheet(d, profile, shapes):
                  for z, r in profile if abs(z - round(z)) < 1e-9 and (round(z) % 2 == 0 or z > -4)]
     part = [
         ("Workpiece", "Flexspline of a strain wave gear: one-piece thin-walled steel cup, open end down on the seat"),
-        ("Clamping bore", f"Ø{w['cupBore']:.2f} {BORE_TOLERANCE}, roundness {BORE_ROUNDNESS} mm, Ra {BORE_RA} µm, "
-                          f"entry chamfer {ENTRY_CHAMFER}"),
+        ("Clamping bore", f"Ø{w['cupBore']:.2f} {BORE_TOLERANCE}, honed after hardening; roundness {BORE_ROUNDNESS} mm, "
+                          f"cylindricity {BORE_CYLINDRICITY} mm over the clamped length, Ra {BORE_RA} µm (0.4 preferred)"),
+        ("Bore edge at the open end", BORE_EDGE),
+        ("Seating end face", f"Open-end face: flatness {SEAT_FLATNESS} mm, perpendicular to the bore within "
+                             f"{SEAT_PERPENDICULARITY} mm"),
         ("Bore depth", f"{w['cupHeight'] - w['cupEnd']:.0f} mm (closed end plate {w['cupEnd']:.0f} mm)"),
         ("Outside", f"Ø{w['cupBlankOutside']:.0f} over the tooth band before hobbing; body Ø{w['cupBodyOutside']:.2f}"),
         ("After hobbing", f"tip Ø{g['tipDiameter']:.2f}, root Ø{g['rootDiameter']:.2f}; module {g['module']}, "
@@ -189,26 +199,34 @@ def sheet(d, profile, shapes):
     req = [
         ("Clamping principle", "Expanding mandrel in the bore under the tooth band. Hydraulic expansion sleeve "
                                "preferred; precision mechanical expansion acceptable: please propose"),
-        ("Sleeve", f"Ø{w['sleeveOutside']:.2f} unclamped ({(w['cupBore'] - w['sleeveOutside']) / 2:.3f} mm radial "
-                   f"loading clearance), clamping length {w['sleeveLength']:.0f} mm from the seat"),
+        ("Sleeve", f"Clamping length {w['sleeveLength']:.0f} mm from the seat. Please size the sleeve and its "
+                   f"expansion for the {BORE_TOLERANCE} bore with clearance for robot loading (our layout assumes "
+                   f"about {(w['cupBore'] - w['sleeveOutside']) / 2:.3f} mm radial; less is acceptable), with a "
+                   "lead-in chamfer on the mandrel nose"),
         ("Axial location", f"Hardened, ground stop land, Ø{w['stopDiameter']:.2f} maximum (the hob passes "
                            "just outside it); axial pull-down onto the land during clamping preferred"),
         ("Hob keep-out", "Below the seat the mandrel and its base must stay inside the keep-out boundary "
-                         "(table below, mandrel-section.dxf, hob-keepout.csv)"),
+                         "(table below, mandrel-section.dxf, hob-keepout.csv). Please send a STEP model of "
+                         "your proposal so we can check it in our machine model"),
         ("Height", f"Mandrel top about {w['protrusionAboveSeat']:.0f} mm above the seat (30 mm maximum). "
                    f"Seat {w['seatAboveTableFace']:.0f} mm above the rotary table face: your mandrel plus our "
                    "adapter fill this; please state your height from mounting face to seat"),
         ("Concentricity", "Clamped bore runout ≤ 0.005 mm TIR (target 0.003); stop land face runout ≤ 0.003 mm"),
-        ("Part distortion", f"Radial deformation of the {w['cupWall']} mm wall at the teeth ≤ 0.002 mm: "
-                            "clamping force limited/regulated"),
+        ("Part distortion", f"The teeth are cut while the part is clamped, so any elastic expansion of the "
+                            f"{w['cupWall']} mm wall springs back as tooth error: radial deformation at the teeth "
+                            "≤ 0.002 mm. Use only the pressure needed for the cutting torque (below 5 N·m), "
+                            "regulated. Please state the contact pressure and the resulting part expansion"),
         ("Loads", "Gear hobbing, module 0.3: cutting forces below 50 N, torque below 5 N·m; up to 300 rpm"),
         ("Actuation (preferred)", "6 bar air through a rotary union in the table's Ø40 mm centre bore, "
                                   "air-to-hydraulic booster in the mandrel"),
         ("Actuation (alternative)", "Draw-bar or push-rod through the Ø40 mm table bore, cylinder under the "
                                     "table: please propose if this is your standard"),
         ("Air interface", "Supply arrives centrally from below; ports on the base face within a Ø30 mm circle: "
-                          "clamp, unclamp (or spring return), seat check"),
-        ("Seat check", "Air-gauge holes in the stop land; we read the back-pressure with a pressure switch"),
+                          "clamp, unclamp (or spring return), seat check if air-based"),
+        ("Seat check", "Confirm the part is seated before cutting. The stop land is only 0.3 mm wide, so "
+                       "air-gauge holes cannot be in it: please propose a method (for example air through the "
+                       "sleeve clearance before clamping, or a sensor at the closed end); we read a pressure or "
+                       "switch signal"),
         ("Mounting", "Your standard base flange and centring; we make the adapter to the rotary table"),
         ("Environment", "Neat cutting oil and fine chips: please describe sealing and wipers"),
         ("Inspection", "Runout report with the mandrel, measured on a Ø58.05 master ring"),
@@ -216,8 +234,11 @@ def sheet(d, profile, shapes):
         ("Quantity", "1 complete mandrel and 1 spare sleeve"),
     ]
     sweep = (f"Keep-out: swept hob body Ø{d['hob']['outsideDiameter']:.0f} × {d['hob']['length']:.0f} mm at full depth "
-             f"(tip on the root circle), hob centre down to {KEEPOUT_FEED_BELOW} mm below the seat, swivel "
-             f"±{w['swivelRangeDeg']:.0f}°, minimum clearance {KEEPOUT_CLEARANCE} mm. Red: swept hob; dashed: mandrel limit.")
+             f"(tip on the root circle), hob centre down to {-w['hobCentreZMin']:.2f} mm below the seat (cutting "
+             f"overrun plus {w['camClearance']:.0f} mm clearance, from our CAM program), swivel "
+             f"±{w['swivelRangeDeg']:.0f}°, minimum clearance {KEEPOUT_CLEARANCE} mm. Red: swept hob; dashed: mandrel "
+             f"limit. The keep-out covers the hob; we check the arbor and support bracket against your design in our "
+             f"machine model, so please send a STEP model with the quote.")
     return f"""<!doctype html><html><head><meta charset="utf-8"><title>Expanding mandrel data sheet</title>
 <style>
  @page {{ size: A4; margin: 14mm; }}

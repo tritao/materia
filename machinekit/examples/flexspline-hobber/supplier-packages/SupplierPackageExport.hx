@@ -2,6 +2,8 @@ import gearkit.ConjugateRack;
 import gearkit.GearSpec;
 import gearkit.HobDesign;
 import gearkit.ToothProfile;
+import camkit.HobbingJob;
+import camkit.HobbingSettings;
 
 /** Writes the data behind the supplier packages for the reference flexspline: the
     exact generating rack and hob design that FlexsplineHobber cuts with, the target
@@ -49,6 +51,17 @@ class SupplierPackageExport {
     var tipHeight = -rack.cornerSamples()[0].y;
     var bore = 2 * (spec.rootRadius() - WALL);
     var sleeveLength = Math.max(16, FACE + 8);
+    // The hob's axial travel comes from the same CAM job the hobber runs: the pass
+    // Z range (centre height, seat = face bottom = 0) includes the engagement
+    // overrun and axial clearance. The blank is the physical cup blank.
+    var settings = new HobbingSettings();
+    settings.blankOuterRadius = CUP_BLANK_OUTSIDE / 2;
+    var job = new HobbingJob(spec, hob, LENGTH, settings);
+    var zMin = Math.POSITIVE_INFINITY, zMax = Math.NEGATIVE_INFINITY;
+    for (p in job.passes) {
+      zMin = Math.min(zMin, Math.min(p.zStart, p.zEnd));
+      zMax = Math.max(zMax, Math.max(p.zStart, p.zEnd));
+    }
     var data = {
       source: "materia machinekit/examples/flexspline-hobber (gearkit ConjugateRack + HobDesign)",
       units: "mm, degrees",
@@ -99,7 +112,11 @@ class SupplierPackageExport {
         stopDiameter: bore + 2 * RIM_LAND,
         protrusionAboveSeat: sleeveLength + 2,
         seatAboveTableFace: WORK_DATUM - TABLE_FACE,
-        swivelRangeDeg: SWIVEL_DEG
+        swivelRangeDeg: SWIVEL_DEG,
+        hobCentreZMin: zMin,
+        hobCentreZMax: zMax,
+        camClearance: settings.clearance,
+        camFeedPerRev: settings.feedPerRevolution
       },
       // Closed normal-section cutter tooth: x across the tooth (centred), y = height
       // above the pitch line of the generated gear (hob tip is the most negative y).
