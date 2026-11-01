@@ -2,6 +2,9 @@ package gearkit;
 
 /** Involute tooth form of a rack-generated spur gear: full depth, addendum 1.0 m, dedendum 1.25 m. */
 class Involute implements ToothForm {
+  /** Dedendum in modules, before profile shift. */
+  public static final DEDENDUM = 1.25;
+
   final angle:Float;
 
   public function new(pressureAngle:Float) {
@@ -13,7 +16,7 @@ class Involute implements ToothForm {
   public function name():String return "involute";
   public function pressureAngle():Float return angle;
   public function addendum(module:Float):Float return module;
-  public function dedendum(module:Float):Float return 1.25 * module;
+  public function dedendum(module:Float):Float return DEDENDUM * module;
 
   public function pitchToothThickness(spec:GearSpec):Float return Math.PI
     * spec.module / 2 + spec.sign() * 2 * spec.profileShift * spec.module * Math.tan(angle);

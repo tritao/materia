@@ -265,7 +265,8 @@ Deviations from the printed equations:
   `rn +/- w0`, minus their mean radius so the ring keeps its length (needed for `v` to close).
 - **Assumed:** the four-roller is a four-arc oval (lobe arc radius = half the minor semi-axis,
   larger arc on the minor axis, tangent at the join); no roller geometry was sourced. The neutral
-  radius in tests (29.7 mm) assumes a 0.6 mm wall (0.01 m Z_f) under the root of D1.
+  radius in tests (29.325 mm, the one `StrainWavePair` builds for D1) is the root circle (29.625 mm) less half an assumed
+  0.6 mm wall (0.01 m Z_f). An earlier version used 29.7 mm, above D1's root; it is corrected.
 - "Neutral-line length preserved to 1e-9" is tested as the linear inextensibility condition
   `w + dv/dphi = 0` (measured 7e-13) and closure of `v` (1.4e-14). The exact arc length of the
   deformed line differs from `2 pi rn` at second order in `w0/rn` (about 1e-4 for D1); tested

@@ -1,3 +1,4 @@
+import gearkit.StrainWavePair;
 import gearkit.StrainWaveInput;
 
 class ToothDesignInputTests {
@@ -49,7 +50,7 @@ class ToothDesignInputTests {
     rejects(() -> new StrainWaveInput("x", "involute", 0.3, 200, 202, Math.NaN, "cosine", 0.35), "kappa");
     rejects(() -> new StrainWaveInput("x", "involute", 0, 200, 202, 1, "cosine", 0.35), "module");
     rejects(() -> new StrainWaveInput("x", "involute", 0.3, 10, 12, 1, "cosine", 0.35), "twenty teeth");
-    rejects(() -> new StrainWaveInput("x", "involute", 0.3, 200, 202, 1, "triangle", 0.35), "cam");
+    rejects(() -> new StrainWavePair(new StrainWaveInput("x", "involute", 0.3, 200, 202, 1, "triangle", 0.35)), "unknown cam");
     rejects(() -> new StrainWaveInput("x", "spiral", 0.3, 200, 202, 1, "cosine", 0.35), "tooth form");
     rejects(() -> new StrainWaveInput("x", "involute", 0.3, 200, 202, 1, "cosine"), "pressure angle");
     rejects(() -> new StrainWaveInput("x", "involute", 0.3, 200, 202, 1, "cosine", Math.PI / 2), "pressure angle");

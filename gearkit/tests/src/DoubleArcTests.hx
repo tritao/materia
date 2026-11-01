@@ -122,7 +122,6 @@ class DoubleArcTests {
     var o = p.outline(24);
     check(proper(o), '$label outline has no self-intersection');
     check(Math.atan2(tp.x, tp.y) > 0, '$label tip land has positive thickness');
-    near(Math.atan2(r.x, r.y), Math.atan2(r.x, r.y), 0, "x");
     check(Math.atan2(r.x, r.y) < Math.PI / spec.teeth, '$label root floor positive');
   }
 

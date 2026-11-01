@@ -32,7 +32,6 @@ class DoubleArcProfile implements ToothProfile {
     this.spec = spec;
     f = form;
     rp = spec.pitchRadius();
-    form.validate(spec);
     // Root blend, circle tangent to the dedendum line (centre y = -hf + rho) and inside circle 2.
     rho = spec.cutterTipRadius;
     rcy = -f.hf + rho;
@@ -103,40 +102,40 @@ class DoubleArcProfile implements ToothProfile {
   }
 
   public function flank(t:Float):Point2 {
-    unit(t);
+    ToothOutline.checkParameter(t);
     return flankAtRadius(rootJoinRadius() + t * (tipJoinRadius() - rootJoinRadius()));
   }
 
   /** Derivative w.r.t. radius, towards increasing radius. */
   public function flankDerivative(t:Float):Point2 {
-    unit(t);
+    ToothOutline.checkParameter(t);
     var y = rootJoinY + t * (tipJoinY - rootJoinY);
     return wrapD(f.xAt(y), y, f.dxdyAt(y), 1);
   }
 
   /** t=0: join on the concave arc; t=1: dedendum circle, both tangent. */
   public function rootFillet(t:Float):Point2 {
-    unit(t);
+    ToothOutline.checkParameter(t);
     var a = rStart + t * rSweep;
     return wrap(rcx + rho * Math.cos(a), rcy + rho * Math.sin(a));
   }
 
   public function rootDerivative(t:Float):Point2 {
-    unit(t);
+    ToothOutline.checkParameter(t);
     var a = rStart + t * rSweep;
     return wrapD(rcx + rho * Math.cos(a), rcy + rho * Math.sin(a), -rho * rSweep * Math.sin(a), rho * rSweep * Math.cos(a));
   }
 
   /** t=0: join on the convex arc; t=1: addendum circle, both tangent. */
   public function tipFillet(t:Float):Point2 {
-    unit(t);
+    ToothOutline.checkParameter(t);
     if (tau <= 0) return wrap(f.ax, f.ha);
     var a = tStart + t * tSweep;
     return wrap(tcx + tau * Math.cos(a), tcy + tau * Math.sin(a));
   }
 
   public function tipDerivative(t:Float):Point2 {
-    unit(t);
+    ToothOutline.checkParameter(t);
     if (tau <= 0) return new Point2(0, 0);
     var a = tStart + t * tSweep;
     return wrapD(tcx + tau * Math.cos(a), tcy + tau * Math.sin(a), -tau * tSweep * Math.sin(a), tau * tSweep * Math.cos(a));
@@ -144,23 +143,9 @@ class DoubleArcProfile implements ToothProfile {
 
   public function regionAt(radius:Float):ToothRegion return ToothOutline.regionAt(this, radius);
 
-  public function evaluationRange():GearEvaluationRange {
-    var lo = rootJoinRadius(), hi = tipJoinRadius();
-    var result = spec.evaluation;
-    if (result == null) return new GearEvaluationRange(lo, hi, 0, spec.faceWidth);
-    if (result.radiusMin < lo || result.radiusMax > hi || result.axialMax
-      > spec.faceWidth) throw "evaluation window must lie on the unrounded flank and within the face";
-    return result;
-  }
+  public function evaluationRange():GearEvaluationRange return ToothOutline.evaluationRange(spec, rootJoinRadius(), tipJoinRadius());
 
-  public function outline(samples:Int):Array<Point2> {
-    if (samples < 4) throw "profile needs at least four samples per segment";
-    var side:Array<Point2> = [];
-    for (i in 0...samples + 1) side.push(rootFillet(1 - i / samples));
-    for (i in 1...samples + 1) side.push(flank(i / samples));
-    for (i in 1...samples + 1) side.push(tipFillet(i / samples));
-    return ToothOutline.close(spec, side, samples);
-  }
+  public function outline(samples:Int):Array<Point2> return ToothOutline.of(this, samples);
 
   public function halfAngleAt(radius:Float):Float {
     var y = yAtRadius(radius);
@@ -181,9 +166,5 @@ class DoubleArcProfile implements ToothProfile {
     var d = wrapD(x, y, f.dxdyAt(y), 1), len = d.radius();
     // unit normal (d.y, -d.x)/len dotted with the tangential direction (cos a, -sin a)
     return r * Math.abs((d.y * Math.cos(a) + d.x * Math.sin(a)) / len);
-  }
-
-  static function unit(t:Float):Void {
-    if (!Math.isFinite(t) || t < 0 || t > 1) throw "curve parameter must be in [0, 1]";
   }
 }

@@ -20,7 +20,7 @@ class InvoluteProfile implements ToothProfile {
     this.spec = spec;
     var a = spec.form.pressureAngle(), rho = spec.cutterTipRadius;
     half = spec.pitchToothThickness() / 2;
-    depth = spec.module * (1.25 - spec.sign() * spec.profileShift);
+    depth = spec.module * (Involute.DEDENDUM - spec.sign() * spec.profileShift);
     cornerV = -depth + rho;
     cornerU = half + depth * Math.tan(a) + rho * (1 / Math.cos(a) - Math.tan(a));
     if (cornerU >= Math.PI * spec.module / 2) throw "rack corner leaves no cutter tip land";
@@ -95,7 +95,7 @@ class InvoluteProfile implements ToothProfile {
   }
 
   public function flank(t:Float):Point2 {
-    unit(t);
+    ToothOutline.checkParameter(t);
     return flankAtRadius(rootJoinR + t * (tipJoinR - rootJoinR));
   }
 
@@ -111,7 +111,7 @@ class InvoluteProfile implements ToothProfile {
 
   /** t=0: involute join; t=1: root circle, both tangent. This is not a circular blend. */
   public function rootFillet(t:Float):Point2 {
-    unit(t);
+    ToothOutline.checkParameter(t);
     var beta = spec.form.pressureAngle() + t * (Math.PI / 2 - spec.form.pressureAngle());
     var v = cornerV - spec.cutterTipRadius * Math.sin(beta);
     var u = spec.sign() * (cornerU - spec.cutterTipRadius * Math.cos(beta));
@@ -121,7 +121,7 @@ class InvoluteProfile implements ToothProfile {
   }
 
   public function rootDerivative(t:Float):Point2 {
-    unit(t);
+    ToothOutline.checkParameter(t);
     var beta = spec.form.pressureAngle() + t * (Math.PI / 2 - spec.form.pressureAngle());
     var sn = Math.sin(beta), cs = Math.cos(beta), rho = spec.cutterTipRadius;
     var v = cornerV - rho * sn, dv = -rho * cs;
@@ -135,39 +135,22 @@ class InvoluteProfile implements ToothProfile {
 
   /** Circular tip rounding from flank join to the tip-circle land. */
   public function tipFillet(t:Float):Point2 {
-    unit(t);
+    ToothOutline.checkParameter(t);
     var angle = tipArcStart + t * tipArcSweep, rho = spec.tipFilletRadius;
     return new Point2(tipCentre.x + rho * Math.cos(angle), tipCentre.y + rho * Math.sin(angle));
   }
 
   public function tipDerivative(t:Float):Point2 {
-    unit(t);
+    ToothOutline.checkParameter(t);
     var angle = tipArcStart + t * tipArcSweep;
     return new Point2(-Math.sin(angle), Math.cos(angle)).scaled(spec.tipFilletRadius * tipArcSweep);
   }
 
   public function regionAt(radius:Float):ToothRegion return ToothOutline.regionAt(this, radius);
 
-  public function evaluationRange():GearEvaluationRange {
-    var lo = Math.min(rootJoinR, tipJoinR), hi = Math.max(rootJoinR, tipJoinR);
-    var result = spec.evaluation;
-    if (result == null) return new GearEvaluationRange(lo, hi, 0, spec.faceWidth);
-    if (result.radiusMin < lo || result.radiusMax > hi || result.axialMax
-      > spec.faceWidth) throw "evaluation window must lie on the unrounded flank and within the face";
-    return result;
-  }
+  public function evaluationRange():GearEvaluationRange return ToothOutline.evaluationRange(
+    spec, Math.min(rootJoinR, tipJoinR), Math.max(rootJoinR, tipJoinR));
 
   /** Closed polygon of one pitch, including root and tip lands. Mirror for the left flank. */
-  public function outline(samples:Int):Array<Point2> {
-    if (samples < 4) throw "profile needs at least four samples per segment";
-    var side:Array<Point2> = [];
-    for (i in 0...samples + 1) side.push(rootFillet(1 - i / samples));
-    for (i in 1...samples + 1) side.push(flank(i / samples));
-    for (i in 1...samples + 1) side.push(tipFillet(i / samples));
-    return ToothOutline.close(spec, side, samples);
-  }
-
-  static function unit(t:Float):Void {
-    if (!Math.isFinite(t) || t < 0 || t > 1) throw "curve parameter must be in [0, 1]";
-  }
+  public function outline(samples:Int):Array<Point2> return ToothOutline.of(this, samples);
 }

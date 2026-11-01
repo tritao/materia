@@ -28,8 +28,9 @@ class KinematicsTests {
     check(error.indexOf(fragment) >= 0, 'expected "$fragment", got "$error"');
   }
 
-  /** The reference flexspline D1: neutral line 0.3 mm under the root of m 0.3, Z 200 (assumed wall 0.6 mm). */
-  static final RN = 29.7;
+  /** The reference flexspline D1's neutral radius as `StrainWavePair` builds it: the root circle (29.625 mm) less half the
+      assumed 0.6 mm wall (0.01 m Z_f). */
+  static final RN = 29.325;
   static final W0 = 0.3;
 
   public static function run():Void {

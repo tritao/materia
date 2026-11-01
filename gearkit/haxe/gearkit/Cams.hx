@@ -1,6 +1,6 @@
 package gearkit;
 
-/** Cam lookup by the names `StrainWaveInput.CAMS` allows. */
+/** Cam lookup by name: cosine, ellipse, four-roller, resal. */
 class Cams {
   public static function make(name:String, neutralRadius:Float, w0:Float):Cam {
     return switch name {

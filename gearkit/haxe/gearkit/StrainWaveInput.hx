@@ -1,12 +1,12 @@
 package gearkit;
 
 /** Inputs of one strain-wave tooth design (TOOTH_DESIGN_PLAN.md, TD-D1): tooth counts, module,
-    deflection coefficient, cam, and the flexspline tooth form by name. Lengths in mm, angles in
+    deflection coefficient, cam, and the flexspline tooth form by name. The cam name is resolved by `Cams.make` when
+    a `StrainWavePair` is built. Lengths in mm, angles in
     radians. The deformation is `w0 = kappa * module * (circularTeeth - flexTeeth) / 2`. Validation
     here covers only the inputs; whether the resulting pair meshes is the meshing analysis's job. */
 class StrainWaveInput {
   public static final FORMS = ["involute", "double-circular-arc"];
-  public static final CAMS = ["cosine", "ellipse", "four-roller", "resal"];
 
   public final name:String;
   public final form:String;
@@ -29,7 +29,6 @@ class StrainWaveInput {
     ?pressureAngle:Float
   ) {
     if (FORMS.indexOf(form) < 0) throw 'tooth form "$form" is not one of ${FORMS.join(", ")}';
-    if (CAMS.indexOf(cam) < 0) throw 'cam "$cam" is not one of ${CAMS.join(", ")}';
     if (!Math.isFinite(module) || module <= 0) throw "module must be finite and positive";
     if (flexTeeth < 20) throw "flexspline needs at least twenty teeth";
     if (circularTeeth - flexTeeth != 2) throw "circular spline must have exactly two more teeth than the flexspline (two-lobe cam)";
