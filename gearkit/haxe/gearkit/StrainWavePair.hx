@@ -2,7 +2,7 @@ package gearkit;
 
 /** A flexspline and its wave-generator kinematics built from a `StrainWaveInput`, with the
     circular-spline tooth space derived from them (TOOTH_DESIGN_PLAN.md TD-D1, TD-D3).
-    Only the involute form exists so far; the double-circular-arc form waits on TD2.
+    The double-circular-arc form is Liu 2025's optimum scaled to the input module (`DoubleCircularArc.liu`).
     **Assumed:** wall under the root `0.01 m Z_f` (so the neutral line is half a wall below the
     root circle), face width 8 mm (the analysis is planar). */
 class StrainWavePair {
@@ -15,11 +15,15 @@ class StrainWavePair {
   var cached:Null<SweptSpace>;
 
   public function new(input:StrainWaveInput, ?cutterTipRadius:Float, ?tipFilletRadius:Float) {
-    if (input.form != "involute") throw 'tooth form "${input.form}" is not implemented yet (TD2)';
     this.input = input;
-    var angle = input.pressureAngle;
-    if (angle == null) throw "involute design without a pressure angle";
-    flex = new GearSpec(input.module, input.flexTeeth, 8, new Involute(angle), false, 0, cutterTipRadius, tipFilletRadius);
+    var form:ToothForm;
+    if (input.form == "involute") {
+      var angle = input.pressureAngle;
+      if (angle == null) throw "involute design without a pressure angle";
+      form = new Involute(angle);
+    } else if (input.form == "double-circular-arc") form = DoubleCircularArc.liu(input.module);
+    else throw 'tooth form "${input.form}" is not implemented';
+    flex = new GearSpec(input.module, input.flexTeeth, 8, form, false, 0, cutterTipRadius, tipFilletRadius);
     profile = flex.profile();
     wall = 0.01 * input.module * input.flexTeeth;
     var rn = flex.rootRadius() - wall / 2;
@@ -28,9 +32,10 @@ class StrainWavePair {
   }
 
   public function circularPitchRadius():Float return input.circularPitchRadius();
-  /** Nominal circular-spline tip (inner) and root (outer) radii, full-depth: pitch -/+ one and 1.25 modules. */
-  public function circularTipRadius():Float return circularPitchRadius() - input.module;
-  public function circularRootRadius():Float return circularPitchRadius() + 1.25 * input.module;
+  /** Nominal circular-spline tip (inner) and root (outer) radii (assumed): pitch -/+ the flexspline form's own
+      addendum and dedendum (1 and 1.25 modules for an involute). */
+  public function circularTipRadius():Float return circularPitchRadius() - flex.form.addendum(input.module);
+  public function circularRootRadius():Float return circularPitchRadius() + flex.form.dedendum(input.module);
 
   /** Open tooth boundary in the tooth frame: one pitch of outline without the closing chord. */
   public function boundary(samples:Int):Array<Point2> {

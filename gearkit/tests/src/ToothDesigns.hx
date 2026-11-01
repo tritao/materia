@@ -11,6 +11,10 @@ class ToothDesigns {
   /** D2, Liu 2025 defaults: double-circular-arc, m 0.5, 100/102, w0 0.5 (so kappa 1). */
   public static function d2():StrainWaveInput return new StrainWaveInput("D2", "double-circular-arc", 0.5, 100, 102, 0.5 / 0.5, "cosine");
 
+  /** D2 scaled to our gear: the same arc shape (every length times 0.3 / 0.5), m 0.3, 200/202. */
+  public static function d2Scaled(kappa:Float = 1.0):StrainWaveInput return new StrainWaveInput(
+    "D2s", "double-circular-arc", 0.3, 200, 202, kappa, "cosine");
+
   /** D3, involute 30 deg, m 0.3, 200/202; kappa swept 0.8 to 1.2. */
   public static function d3(kappa:Float = 1.0):StrainWaveInput return new StrainWaveInput(
     "D3", "involute", 0.3, 200, 202, kappa, "cosine", 30 * DEG);

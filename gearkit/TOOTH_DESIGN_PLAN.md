@@ -212,6 +212,52 @@ D1 to D4 are written as inputs in `gearkit/tests/src/ToothDesigns.hx` (`StrainWa
 `gearkit/haxe/gearkit`), validated by `ToothDesignInputTests`. **D4's kappa (2.0) is assumed**
 until TD5 measures where the derived circular spline interferes.
 
+## TD2 notes: double-circular-arc form
+
+Code: `DoubleCircularArc` (the flat construction, validity, `liu(module)`), `DoubleArcProfile` (wrapping,
+blends, `ToothProfile`), tests in `DoubleArcTests`. Source: Liu et al. 2025, *Machines* 13, 535, section 2.1,
+rebuilt from the definitions (Figs 2-3), not from the printed equations.
+
+Construction (flat frame, x from the tooth axis, y from the **pitch line**, so `ds` cancels):
+O1 = (-c1, -e1), O2 = (pi m/2 + c2, e2); addendum line y = ha, dedendum line y = -hf. The common tangent is the
+internal tangent: with outward normal n = (cos d, sin d) at B, (O2 - O1).n = r1 + r2, so d = angle(O1->O2) +
+acos((r1+r2)/D). B = O1 + r1 n, C = O2 - r2 n. A = (-c1 + r1 cos a, ha) with sin a = (ha+e1)/r1; D =
+(x2 - r2 cos b, -hf) with sin b = (e2+hf)/r2. The flank is monotone in y, x grows towards the root.
+Checked in `DoubleArcTests`: B, C on their circles, tangent perpendicular to O1B and O2C, slope continuity at B
+and C (1e-9), C0 at B and C, A and D on their lines, pitch-line crossing on BC.
+
+Deviations from the printed equations:
+- Eq 4: `x1` in y_BC should be `y1`, and the (l - l1) term is subtracted in y: y_BC = r1 sin d + y1 - (l-l1) cos d
+  (the tangent runs downward). x_BC as printed is right.
+- Eq 6: y_CD printed with `r1 sin d` and a `+ r2(..)`; correct is x = x2 - r2 cos(d + (l-l2)/r2),
+  y = y2 - r2 sin(d + (l-l2)/r2).
+- Eq 11 (d = eps + sigma) is **correct** when sigma is the angle of O1->O2 (positive when O2 is above O1) and
+  eps = acos((r1+r2)/D). The other root (sigma - eps) is the crossing tangent with B below C (h1 < 0) and is
+  rejected. The printed sigma = arctan((y1-y2)/(x1-x2)) has the same ratio as (y2-y1)/(x2-x1), so it agrees.
+- Eqs 2, 3, 5, 7, 12, 13: no change (l1 = r1 (alpha - d), h1 = yB - yC).
+- **Table 2 swaps c2 and e2** relative to Table 1: it lists c2 = 0.1344, e2 = 0.3299, but Table 1 gives c2 in
+  [0.329, 0.331] and e2 in [0.130, 0.140]. Used: c2 = 0.32994565, e2 = 0.13439061 (unswapped). Parameter set:
+  r1 0.68517449, c1 0.33183981, e1 0.15535155, r2 0.78482551, c2 0.32994565, e2 0.13439061, ha 0.29316387,
+  hf 0.35425825 (m 0.5). With these: d = 16.448 deg, alpha 40.89, beta 38.51, h1 0.1265 mm, A half-thickness
+  0.1861, D at x 0.5012, tooth thickness on the pitch line 0.6734 of pi m = 1.5708 (the tooth is thin, the space wide).
+- The paper gives no root or tip blend. **Assumed:** circular blends, internally tangent to the arc and the
+  dedendum/addendum line. Root radius = `GearSpec.cutterTipRadius` (default 0.38 m), tip radius =
+  `tipFilletRadius` (0.05 m). This is not a generated trochoid.
+- **Assumed wrapping:** the flat profile is wrapped on the **pitch circle** (radius Rp + y, angle x/Rp) so the
+  angular pitch is exactly 2 pi/Z. The paper puts XR tangent to the neutral layer; wrapping there makes the
+  pitch inconsistent with Z (4 % at Z 100). The effect on the shape is about 1 % of tooth height.
+- Pressure angle of the form = d (16.45 deg), the flank angle where the pitch line crosses BC.
+  Profile shift and internal gears are rejected. Parameters belong to one module; `liu(m)` scales every length by
+  m / 0.5 (the shape in module units is the paper's), and a gear of another module is rejected.
+- Validity (each throws naming the parameter): ha/hf too large for the arcs, overlapping arcs (no tangent),
+  tangent not running downward, pointed tip (c1, r1, e1, ha), D past mid-space (c2, r2, e2, hf), blend radii
+  that do not fit (cutterTipRadius, tipFilletRadius).
+- Scaled to m 0.3, Z 200 the set is geometrically valid (the shape is scale invariant). Largest circular root
+  fillet that fits: 0.743 m.
+- Circular-spline nominal tip and root (assumed) are now pitch -/+ the flexspline form's own addendum and
+  dedendum: 0.586 m / 0.708 m for D2, unchanged (1.0 / 1.25 m) for involutes.
+- `ToothOutline.close` was factored out of `InvoluteProfile.outline` (identical output; GeometryTests unchanged).
+
 ## TD3 notes
 
 - Cams (`gearkit/haxe/gearkit/*Cam.hx`, `WaveDeformation`, `StrainWaveKinematics`): `w0` is the
@@ -279,8 +325,60 @@ back from the nominal tip for the derived tooth to be 0.05 m thick.
   circular spline derived for each kappa, every tooth touches an envelope point, so the fraction
   depends on the threshold: it measures how closely the other teeth follow the envelope, an
   upper bound on real engagement. Do not compare these percentages with published (loaded) figures.
-- Not done: D2 (TD2 blocked), a fixed standard circular-spline tooth instead of the derived one,
+- Not done: a fixed standard circular-spline tooth instead of the derived one,
   loaded meshing, root stress.
+
+### D2 (double-circular-arc) against D1 and D3
+
+`D2s` = Liu's arcs scaled to m 0.3, Z 200/202; `D2` = the unscaled paper case (m 0.5, Z 100/102, w0 0.5). Both are
+valid. Same assumptions and thresholds as above, root fillet 0.38 m for D2 (circular, assumed).
+
+| Case | kappa | Interference | Root clr | Tip-tip clr (minor axis) | Engaged 5 um / 20 um | Contact zone | Root fillet R |
+|---|---|---|---|---|---|---|---|
+| D2s | 0.8 | no | 97 um | 188 um | 57 % / 57 % | +-51 deg | 0.113 mm |
+| D2s | 1.0 | no | 37 um | 248 um | 17.5 % / 42 % | +-16 deg | 0.113 mm |
+| D2s | 1.1 | no | 7 um | 278 um | 12 % / 24 % | +-11 deg | 0.113 mm |
+| D2s | 1.2 | yes (root bottoming) | -23 um | 308 um | 14.5 % / 22 % | +-13 deg | 0.113 mm |
+| D2 (paper) | 1.0 | no | 61 um | 414 um | 16 % / 36 % | +-14 deg | 0.186 mm |
+| D2 (paper) | 1.2 | yes | -39 um | 514 um | 12 % / 18 % | +-11 deg | 0.186 mm |
+
+- D2 is shorter (addendum 0.586 m, dedendum 0.708 m), so its root clearance is hf - ha = 0.122 m (37 um) at kappa 1
+  and it bottoms above kappa about 1.12; it never has tip-tip interference (minor-axis tips clear by 190 to 310 um).
+  Its usable kappa window is therefore below about 1.1, where D1 needs kappa >= 1 and D3 >= 1.
+- Engaged fraction at kappa 1: D1 48 % / 86 %, D3 22 % / 35 %, D2s 17.5 % / 42 % (5 um / 20 um). D2 sits between D1
+  and D3 at 20 um and below both at 5 um. **The plan's expectation that D2 engages more than D1 is not borne out**
+  in this unloaded, zero-backlash model; the paper's advantage is for loaded, backlash-bearing contact, which
+  this model does not represent. Do not read the percentages as the published ~30 %.
+- Backlash/clearance along the mesh: with the derived (conjugate) circular spline the clearance is zero on the
+  envelope by construction; the engaged fractions above are how many teeth stay within 5 / 20 um of it.
+- Fillet: D2's root fillet is a design choice here (circular, equal to the hob corner radius). The geometric
+  maximum is 0.743 m (D1's trochoid reaches 0.472 m at 20 deg, D3 0.11 m at 30 deg), so D2 allows the largest fillet.
+
+### Hob implications for D2 (rack recovered by `ConjugateRack` from the D2s tooth)
+
+`ToothStudy.hobStudy` prints these; rack heights are in module units, flank angle from the tooth axis.
+
+| Rack | Flank | Datum half-thickness | Tooth depth below datum | Tip corner radius (curvature) |
+|---|---|---|---|---|
+| D1 reference hob | straight 20 deg | 0.2356 mm | 1.25 m | 0.114 mm (0.38 m) |
+| D3 | straight 30 deg | 0.2356 mm | 1.25 m | 0.030 mm |
+| D2s | curved, 29.5 / 16.4 / 38.4 deg (low end / pitch / root end) | 0.202 mm | 0.709 m | 0.112 to 0.113 mm |
+
+- **Verdict: D2 can be hobbed, but not with the existing hob.** `HobCheck.problem` returns none, the rack has no root fold
+  and no flank reversal, and a `HobDesign` builds. The hob needs its own profile.
+- Flank: the conjugate rack flank is gently curved. The best straight line is 23.5 deg and stays within +-8.8 um of it;
+  a straight 20 deg flank stays within +-13.5 um, but only when placed at a datum half-thickness of 0.1927 mm. The
+  reference hob (20 deg, 0.2356 mm) differs from the D2 rack flank by up to 56 um as it stands. A straight-flank
+  hob ground to about 23.5 deg with the right thickness would approximate D2 to about 9 um (profile form error, to be set against
+  the class 5 to 6 target); a form-ground hob follows it exactly.
+- Depth and thickness: D2's tooth is 0.709 m deep against the reference hob's 1.25 m, and its pitch-line tooth is
+  0.404 mm (vs 0.471 mm): the hob tooth must be 14 % fatter on the datum. Sinking the reference hob to fix the
+  thickness (about 0.12 mm) would cut the root about 0.4 m too deep.
+- Corner: the hob tip corner radius needed to cut a circular root fillet of radius rho is about rho (0.112 mm for
+  0.38 m). So the reference hob's 0.38 m corner radius is the right order and would cut a root fillet near 0.38 m,
+  but its exact trochoid shape (not circular) was not computed. Any corner up to 0.7 m is hobbable (no fold).
+- Not checked: the real hob's relief and gash, and the trochoidal root actually generated by a given corner.
+
 
 ## Steps
 
@@ -415,10 +513,10 @@ TD0 ── TD1 ── TD2 ──┐
 |---|---|---|
 | TD0 | done | Tooth design: baseline and test-design inputs (TD0) |
 | TD1 | done | Tooth design: tooth-form interface (TD1) |
-| TD2 | blocked: Liu 2025 arc geometry (meaning of c1/e1/c2/e2, tangent construction, blends) is not in the repo notes and the open-access MDPI full text refused automated download (HTTP 403); implement once the equations are supplied | |
+| TD2 | done: `DoubleCircularArc` / `DoubleArcProfile` (flat construction rebuilt from the definitions, wrapped on the pitch circle; circular root and tip blends assumed); deviations from the paper in the TD2 notes | Tooth design: double-circular-arc form (TD2) |
 | TD3 | done, except Resal cam: blocked (Resal curve equation, Gravagno 2016, not read); cosine, ellipse, four-roller implemented | Tooth design: deformation kinematics (TD3) |
 | TD4 | done for involute forms (D1, D3); not fitted to a full `Sampled` ToothForm (root/tip blends), and no contact-condition refinement: accuracy is by convergence | Tooth design: circular-spline envelope (TD4) |
-| TD5 | partial: involute forms (D1, D3, D4) only; D2 comparisons blocked on TD2; "engaged fraction rises with kappa" not borne out (measured fall, see TD5 notes) | Tooth design: meshing analysis and D1/D3 comparison (TD5) |
+| TD5 | done for D1, D2, D3, D4 (unloaded kinematic); "engaged fraction rises with kappa" not borne out (measured fall) and "D2 engages more than D1" not borne out (D2 engages fewer, see TD5 notes) | Tooth design: meshing analysis and D1/D3 comparison (TD5); Tooth design: double-circular-arc form (TD2) (D2 comparison) |
 | TD6 | planned | |
 | TD7 | planned | |
 | TD8 | planned | |

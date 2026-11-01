@@ -39,6 +39,22 @@ class MeshingTests {
     check(r1.rootClearance > 0 && r1.minorTipClearance >= -r1.fitBound, "D1 radial clearances");
     check(HobCheck.problem(d1.flex) == null, "D1 is hobbable");
 
+    // D2 (Liu 2025 optimum): the unscaled paper case and the same shape scaled to our gear, both free of interference.
+    for (input in [ToothDesigns.d2(), ToothDesigns.d2Scaled()]) {
+      var pair = new StrainWavePair(input);
+      var r = MeshingAnalysis.run(pair, THRESHOLD);
+      var hob = HobCheck.problem(pair.flex);
+      Sys.println('  ' + row(r, hob));
+      check(r.interference.length == 0, '${input.name} has no interference: ${r.interference}');
+      check(r.penetration <= r.fitBound, '${input.name} penetration within the fit bound');
+      check(r.engagedFraction > 0 && r.engagedFraction < 1, '${input.name} engaged fraction in (0, 1)');
+      check(r.rootClearance > 0 && r.minorTipClearance > 0, '${input.name} radial clearances');
+      check(hob == null, '${input.name} is hobbable: $hob');
+    }
+    // D2 bottoms in the root above kappa ~1.12 (root clearance hf - ha = 0.122 m); named as kappa too large.
+    var d2hi = MeshingAnalysis.run(new StrainWavePair(ToothDesigns.d2Scaled(1.2)), THRESHOLD, 16);
+    check(d2hi.interference.length > 0 && d2hi.interference[0].indexOf("kappa too large") >= 0, "D2 at kappa 1.2 is refused, naming kappa");
+
     // D4: a deliberately bad design is refused, naming kappa, with tooth index and wave-generator angle.
     var d4 = new StrainWavePair(ToothDesigns.d4());
     var r4 = MeshingAnalysis.run(d4, THRESHOLD);
