@@ -74,7 +74,11 @@ class PneumaticCylinder extends MachineComponent implements CylinderSpec {
     if (!(value >= 0) || !Math.isFinite(value)) throw "Cylinder pressure must be finite and nonnegative";
     return value;
   }
-  public function movingRod():PneumaticCylinderRod return new PneumaticCylinderRod(rod, stroke + stemLength);
+  public function movingRod():PneumaticCylinderRod {
+    var part = new PneumaticCylinderRod(rod, stroke + stemLength);
+    part.includedInPurchase(bom.partNumber);
+    return part;
+  }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.named(Solids.building([],
     parts -> {parts.push(Solids.named(

@@ -8,6 +8,7 @@ import machinekit.component.ComponentValues;
 import machinekit.component.Dimension;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.MachineComponent;
+import machinekit.component.IncludedInPurchase;
 import machinekit.component.Solids;
 
 /** Assumed 4 N m spring-applied shaft brake. The hub and disc rotate with the motor;
@@ -34,7 +35,9 @@ class ShaftBrakePart extends MachineComponent implements MotorBrakeSpec {
         role
       ) || ((role == "hub"
       || role == "disc") && sector != 0)) throw "Shaft brake needs a positive bore and a valid part role/sector";
-    super('SHAFT-BRAKE-4NM-$bore-$role-$sector', "Assumed spring-applied shaft brake " + role, "steel");
+    super('SHAFT-BRAKE-4NM-$bore-$role-$sector', role == "hub" ? "Assumed spring-applied shaft brake"
+      : "Assumed spring-applied shaft brake " + role, "steel");
+    if (role != "hub") addFacet(new IncludedInPurchase(purchaseNumber(bore)));
     addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
       .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.bore = bore;
@@ -62,6 +65,8 @@ class ShaftBrakePart extends MachineComponent implements MotorBrakeSpec {
     }
     return count;
   }
+
+  public static function purchaseNumber(bore:Float):String return 'BRAKE-ASSUMED-4NM-B${Dimension.format(bore)}';
 
   public function holdingTorque():Float return 4;
   public function releaseDelaySeconds():Float return 0.05;
@@ -129,7 +134,8 @@ class ShaftBrakePart extends MachineComponent implements MotorBrakeSpec {
         ComponentRecipeSupport.count("sector", 0)
       ],
       values -> new ShaftBrakePart(values.number("bore"), values.token("role"), values.integer("sector"))
-    ).numbered(v -> 'BRAKE-ASSUMED-4NM-B${Dimension.format(v.number("bore"))}-${v.token("role").toUpperCase()}-${v.integer("sector")}')
+    ).numbered(v -> v.token("role") == "hub" ? purchaseNumber(v.number("bore"))
+      : '${purchaseNumber(v.number("bore"))}-${v.token("role").toUpperCase()}-${v.integer("sector")}')
       .procured(_ -> Buy(null, null, null)).requiring(v -> [
         machinekit.component.Procurement.ProcurementCodec.requirement("bore", "mm", null, null, v.number("bore")),
         machinekit.component.Procurement.ProcurementCodec.requirement("holdingTorque", "N m", 4)

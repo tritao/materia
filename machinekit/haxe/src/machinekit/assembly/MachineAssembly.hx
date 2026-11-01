@@ -207,6 +207,11 @@ typedef MachineAssemblyMassProperties = {
     if (recipe == null) return component;
     var result = recipe.create(component.values());
     result.setMaterial(component.materialSpec());
+    var included = machinekit.component.IncludedInPurchase.of(component);
+    var copiedIncluded = machinekit.component.IncludedInPurchase.of(result);
+    if (included != null && copiedIncluded == null) result.includedInPurchase(included.ownerPartNumber);
+    else if (included != null && copiedIncluded != null && included.ownerPartNumber != copiedIncluded.ownerPartNumber)
+      throw 'Conflicting purchase owner while copying "${component.designation}"';
     var collision = machinekit.component.CollisionHullFacet.of(component);
     if (collision != null && machinekit.component.CollisionHullFacet.of(result)
       == null) @:privateAccess result.addFacet(new machinekit.component.CollisionHullFacet(collision.hulls));

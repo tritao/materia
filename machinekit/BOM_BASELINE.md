@@ -261,3 +261,32 @@ Strict export requires procurement intent and maturity on every engineering line
 | sheet-router | 143 | 75 | 68 | 43 | 45 |
 
 Across these machines, B4 has 1,076 procurement lines: 516 Make and 560 Buy. Of those lines, 422 are Assumed and 345 lack fingerprints. Workpieces, tools and clamps remain in the engineering tree as NotSupplied. The full gate passed 11/24 shards; comparison found no new failing shard or exception message.
+
+## B5 purchase-unit measurement
+
+The 22 exportable machines contain 1,004 procurement lines; 350 are Assumed and 335 lack fingerprints. The engineering tree retains each included piece with its local purchase owner. The bench mill has one brake line and 27 included brake pieces, down from 28 procurement lines for its brake in B4. The full gate passed 11/24 shards, with no new failing shard or exception message.
+
+| Machine | Procurement lines | Assumed | Fingerprint unavailable |
+| --- | ---: | ---: | ---: |
+| bench-mill | 46 | 12 | 0 |
+| cnc-router | 37 | 8 | 20 |
+| cobot-arm | 22 | 15 | 13 |
+| corexy-plotter | 16 | 3 | 9 |
+| corexy-printer | 53 | 17 | 23 |
+| enclosed-bench-mill | 83 | 23 | 1 |
+| flexspline-hobber | 70 | 38 | 0 |
+| gantry-picker | 60 | 10 | 40 |
+| gantry-welder | 73 | 15 | 53 |
+| linear-stage | 11 | 2 | 1 |
+| mobile-base | 11 | 6 | 6 |
+| mobile-base-cell | 42 | 19 | 8 |
+| mobile-welder | 43 | 22 | 16 |
+| overhead-arm | 74 | 20 | 28 |
+| picking-station | 7 | 3 | 1 |
+| press-brake | 31 | 25 | 12 |
+| robot-arm | 30 | 13 | 1 |
+| robot-screwdriver | 33 | 16 | 5 |
+| robot-welder | 33 | 16 | 10 |
+| sheet-router | 141 | 41 | 45 |
+| track-arm | 47 | 19 | 16 |
+| xyz-stage | 41 | 7 | 27 |

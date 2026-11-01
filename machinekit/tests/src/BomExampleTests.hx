@@ -26,6 +26,9 @@ class BomExampleTests {
     check("bench-mill", new BenchMill());
     check("cnc-router", new CncRouter());
     check("robot-welder", new WeldingCell());
+    check("cobot-arm", new machinekit.robotics.CobotArm(machinekit.robotics.CobotClass.Reach850));
+    check("press-brake", new PressBrake());
+    check("robot-screwdriver", new ScrewdrivingCell());
     check("flexspline-hobber", new FlexsplineHobber());
   }
 
@@ -35,13 +38,29 @@ class BomExampleTests {
     if (json.schema != "machinekit.bom" || json.version != 1 || json.machineId != name
       || json.sourceCommit != "test-commit" || json.assembly.path != "") throw 'Invalid $name BOM document';
     if (document.procurement.length == 0) throw 'Empty $name BOM';
+    if (name == "bench-mill") {
+      var brakes = [for (line in document.procurement) if (StringTools.startsWith(line.item.partNumber, "BRAKE-ASSUMED-4NM-")) line];
+      if (brakes.length != 1 || brakes[0].item.quantity.value != 1)
+        throw "The bench mill shaft brake must be one purchased unit";
+      var owner = brakes[0].item.partNumber;
+      var included = countIncluded(document.assembly, owner);
+      if (included != 27) throw 'The brake engineering tree must retain its disc and sectors, got $included';
+    }
     if (name == "robot-welder") {
       var workpiece = findUse(document.assembly, "work/basePlate");
       if (workpiece == null || workpiece.procurement == null || workpiece.procurement.kind != "NotSupplied")
         throw "The weldment workpiece must remain in the engineering BOM as not supplied";
       for (line in document.procurement) if (line.item.partNumber == workpiece.partNumber)
         throw "The weldment workpiece must not appear in the procurement view";
+      if (countIncludedPrefix(document.assembly, "WELD-TORCH-") != 2)
+        throw "The torch neck and nozzle must be included in the torch purchase";
     }
+    if (name == "cobot-arm" && countIncludedPrefix(document.assembly, "COBOT-ASSUMED-") != 6)
+      throw "Each cobot gearhead must be included in its joint purchase";
+    if (name == "press-brake" && countIncludedPrefix(document.assembly, "HYD-CYL-") != 2)
+      throw "The hydraulic cylinder rods must be included in their cylinder purchases";
+    if (name == "robot-screwdriver" && countIncludedPrefix(document.assembly, "CUSTOM-SCREWDRIVER-MOTOR-GEARBOX-") != 2)
+      throw "The screwdriver slide and carrier must be included in its purchase";
     if (name == "cnc-router") {
       var yBracket = [for (line in document.procurement)
         if (line.item.partNumber == "BRACKET-HOME-SWITCH-BRACKET-Y") line];
@@ -66,5 +85,19 @@ class BomExampleTests {
       if (found != null) return found;
     }
     return null;
+  }
+
+  static function countIncluded(node:machinekit.assembly.BomDocument.BomAssemblyNode, owner:String):Int {
+    var count = 0;
+    for (line in node.lines) if (line.item.includedIn == owner) count++;
+    for (child in node.children) count += countIncluded(child, owner);
+    return count;
+  }
+
+  static function countIncludedPrefix(node:machinekit.assembly.BomDocument.BomAssemblyNode, prefix:String):Int {
+    var count = 0;
+    for (line in node.lines) if (line.item.includedIn != null && StringTools.startsWith(line.item.includedIn, prefix)) count++;
+    for (child in node.children) count += countIncludedPrefix(child, prefix);
+    return count;
   }
 }

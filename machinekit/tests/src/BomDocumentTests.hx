@@ -151,5 +151,23 @@ class BomDocumentTests {
     var rejected = false;
     try orphan.bomDocument("orphan", "abc", "2026-01-01T00:00:00Z") catch (_:Dynamic) rejected = true;
     if (!rejected) throw "Missing purchase owner must fail BOM export";
+    var split = new MachineAssembly(), withOwner = new MachineAssembly(), withoutOwner = new MachineAssembly();
+    withOwner.addComponent("owner", new BomTestPart());
+    withoutOwner.addComponent("piece", new BomIncludedPart("TEST-PART"));
+    split.include("ownerAssembly", withOwner);
+    split.include("orphanAssembly", withoutOwner);
+    var crossAssemblyRejected = false;
+    try split.bomDocument("split", "abc", "2026-01-01T00:00:00Z") catch (_:Dynamic) crossAssemblyRejected = true;
+    if (!crossAssemblyRejected) throw "A purchase in another assembly cannot satisfy an orphan";
+    var cylinder = new machinekit.pneumatic.PneumaticCylinder("ISO6432", 16, 20, 100);
+    var cylinderAssembly = new MachineAssembly();
+    cylinderAssembly.addComponent("cylinder", cylinder);
+    cylinderAssembly.addComponent("rod", cylinder.movingRod());
+    var copiedCylinder = new MachineAssembly();
+    copiedCylinder.include("cylinderAssembly", cylinderAssembly);
+    var cylinderDoc = copiedCylinder.bomDocument("cylinder", "abc", "2026-01-01T00:00:00Z");
+    if (cylinderDoc.procurement.length != 1 || cylinderDoc.assembly.children[0].lines.length != 2
+      || cylinderDoc.assembly.children[0].lines[1].item.includedIn != cylinder.bom.partNumber)
+      throw "A cylinder rod must remain included after an assembly snapshot";
   }
 }

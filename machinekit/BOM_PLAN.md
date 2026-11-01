@@ -324,7 +324,7 @@ and readers reject anything else. It contains:
   and changes its revision (a test).
 
 ### B4 — Procurement kind
-- Done in this commit. The 22 exportable examples contain 1,076 procurement lines: 516 Make and
+- Done in `dfdbe0edf`. The 22 exportable examples contain 1,076 procurement lines: 516 Make and
   560 Buy. Their engineering trees retain NotSupplied lines. The export
   requires intent and maturity on every line, and structured selection terms
   on every Assumed line. The gate passed 11/24 shards, with no new failing
@@ -354,24 +354,24 @@ and readers reject anything else. It contains:
   not its measurement range; selection still needs that range.
 - The press-brake light curtain has no safety rating, and its hydraulic
   cylinder, valve, manifold and hose models do not state pressure ratings.
-  Those values are still needed for selection. The separately modeled cylinder
-  rods also need purchase-boundary treatment in B5.
+  Those values are still needed for selection. B5 includes the modeled cylinder
+  rods in their cylinder purchases.
 - The picking indicator lacks an electrical interface specification, and the
   adjustable foot lacks a load rating. Both remain assumed purchases requiring
   those inputs before supplier selection.
 - `CobotJoint` describes an integrated motor and gearhead, while `CobotArm`
-  also models each gearhead as a member. B5 must declare that purchase boundary
-  before counting the resulting procurement lines as complete.
-- Pneumatic cylinder rods are separate model members; their purchase boundary
-  with the cylinder also needs an explicit B5 declaration. The modeled valve
+  also models each gearhead as a member. B5 includes each gearhead with its
+  joint purchase.
+- Pneumatic cylinder rods are separate model members included in the cylinder
+  purchase in B5. The modeled valve
   has no coil-voltage rating, which remains needed for selecting a real valve.
 - The welding torch, neck and nozzle are modeled separately for collision;
-  B5 must determine which ship together before counting purchase units. The
+  B5 includes the neck and initial nozzle with the torch purchase. The
   magnetic return clamp follows the plan's NotSupplied treatment of clamps.
   The torch model does not state a current rating, so selection still needs
   that rating from the welding design.
 - The screwdriver's powered body, feed slide and rotating nose are separate
-  model members. B5 must establish whether they form one purchased tool unit;
+  model members. B5 treats them as one purchased tool unit;
   its replaceable bit and workholding fixture are user-supplied.
 - A manufacturing family's selected variant supplies its Make process. Cast
   inserts use their declared fabricated or catalogue origin to choose Make or
@@ -400,6 +400,20 @@ and readers reject anything else. It contains:
 - The material field is exported only for Make lines.
 
 ### B5 — Purchase units
+- Done in this commit. The 22 exportable examples have 1,004 procurement
+  lines; the bench mill has 46, including one brake purchase. The full gate
+  passed 11/24 shards with no new failing shard or exception message.
+- A shaft brake's hub owns the purchase; its disc and convex collision sectors
+  remain visible as included engineering pieces. The purchase number names the
+  brake and bore rather than a sector.
+- A cylinder includes its modeled rod, a cobot joint includes its modeled
+  gearhead, and the initial torch neck and nozzle ship with the torch. The
+  screwdriver's powered body includes its feed slide and rotating nose; its
+  purchase requirements also state the feed stroke and spring rate. The bit
+  remains user-supplied.
+- A purchase owner must occur in the same assembly as each included piece.
+  Assembly snapshots retain explicitly assigned purchase ownership so recipe
+  reconstruction cannot turn included geometry back into a purchase.
 - Apply `IncludedInPurchase` to `ShaftBrakePart` (hub carries the brake line,
   disc and sectors are included) and any other split parts B1 finds.
 - Extend the check if B1 shows a need: every included piece's owner present

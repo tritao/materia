@@ -105,6 +105,7 @@ class CobotArm extends MachineAssembly {
         }
       }
       var gearboxId = 'gearbox${i + 1}';
+      modules[i].gearbox.includedInPurchase(modules[i].bom.partNumber);
       addComponent(gearboxId, modules[i].gearbox);
       addMate('$gearboxId-mount', "fixed", moduleId, "gearheadSeat", gearboxId, "input");
     }

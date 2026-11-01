@@ -134,10 +134,21 @@ class BomDocument {
 
   /** Roll up whole purchases from the retained engineering occurrences. */
   public static function procurementView(root:BomAssemblyNode):Array<BomDocumentLine> {
+    validatePurchaseOwners(root);
     var order:Array<BomDocumentLine> = [], byNumber:Map<String, BomDocumentLine> = [], owners:Array<String> = [];
     collect(root, order, byNumber, owners);
     for (owner in owners) if (!byNumber.exists(owner)) throw 'Included purchase owner missing from BOM: $owner';
     return order;
+  }
+
+  /** A repeated part number in another subassembly cannot satisfy an orphan. */
+  static function validatePurchaseOwners(node:BomAssemblyNode):Void {
+    var local:Map<String, Bool> = [];
+    for (line in node.lines) if (line.item.includedIn == null
+      && line.item.procurement != null && line.item.procurement.kind != "NotSupplied") local.set(line.item.partNumber, true);
+    for (line in node.lines) if (line.item.includedIn != null && !local.exists(line.item.includedIn))
+      throw 'Included purchase owner missing from assembly "${node.path}": ${line.item.includedIn}';
+    for (child in node.children) validatePurchaseOwners(child);
   }
 
   static function collect(node:BomAssemblyNode, order:Array<BomDocumentLine>, byNumber:Map<String, BomDocumentLine>,

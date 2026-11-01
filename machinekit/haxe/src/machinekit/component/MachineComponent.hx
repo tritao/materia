@@ -47,6 +47,12 @@ class MachineComponent {
     cachedBom = null;
   }
 
+  /** Declare that this modeled piece is supplied with another purchase. */
+  public function includedInPurchase(ownerPartNumber:String):Void {
+    if (IncludedInPurchase.of(this) != null) throw 'Duplicate purchase owner on "$designation"';
+    addFacet(new IncludedInPurchase(ownerPartNumber));
+  }
+
   public final designation:String;
   /** Author-declared drawing identity, independent of the scene designation. */
   public var drawingNumber(default, null):Null<String>;

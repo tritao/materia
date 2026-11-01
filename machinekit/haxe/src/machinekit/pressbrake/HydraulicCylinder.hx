@@ -72,8 +72,11 @@ class HydraulicCylinder extends MachineComponent implements CylinderSpec {
     if (!Math.isFinite(value) || value < 0) throw "Hydraulic pressure must be finite and nonnegative";
     return value;
   }
-  public function movingRod():HydraulicCylinderRod return new HydraulicCylinderRod(rod,
-    stroke + capLength + stemLength);
+  public function movingRod():HydraulicCylinderRod {
+    var part = new HydraulicCylinderRod(rod, stroke + capLength + stemLength);
+    part.includedInPurchase(bom.partNumber);
+    return part;
+  }
   override public function hasGeometry():Bool return true;
   /** The barrel between its two end caps, bored for the piston and the rod bearing. Envelope detail keeps a plain barrel, which also sets the mass. */
   override public function geometry(detail:ComponentDetail = Preview):Part {

@@ -10,7 +10,8 @@ class ScrewdriverHousing extends MachineComponent {
   public final length:Float;
   public final radius:Float;
 
-  public function new(name:String, length:Float, radius:Float, powered:Bool = false, ?maxTorque:Float, ?maxSpeed:Float) {
+  public function new(name:String, length:Float, radius:Float, powered:Bool = false, ?maxTorque:Float, ?maxSpeed:Float,
+    ?strokeMm:Float, ?springRate:Float) {
     if (!Math.isFinite(length) || length <= 0
       || !Math.isFinite(radius) || radius <= 0) throw "Screwdriver body needs finite positive dimensions";
     super("CUSTOM-" + StringTools.replace(name.toUpperCase(), " ", "-"), name, "aluminium 6061", true);
@@ -19,6 +20,8 @@ class ScrewdriverHousing extends MachineComponent {
       machinekit.component.Procurement.ProcurementCodec.requirement("radius", "mm", null, null, radius)];
     if (maxTorque != null) terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("maxTorque", "N m", maxTorque));
     if (maxSpeed != null) terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("maxSpeed", "rad/s", maxSpeed));
+    if (strokeMm != null) terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("stroke", "mm", null, null, strokeMm));
+    if (springRate != null) terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("springRate", "N/mm", springRate));
     addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), terms));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
