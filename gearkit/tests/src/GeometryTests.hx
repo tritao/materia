@@ -53,12 +53,12 @@ class GeometryTests {
       );
     }
     for (p in rack.flankSamples()) {
-      var expected = Math.PI * spec.module / 4 - p.y * Math.tan(spec.pressureAngle);
+      var expected = Math.PI * spec.module / 4 - p.y * Math.tan(spec.form.pressureAngle());
       rackError = Math.max(rackError, Math.abs(p.x - expected));
       near(p.x, expected, 1e-9, "numerical envelope is a straight basic rack");
     }
     // Recover the cutter-tip circle independently of the original profile's corner centre.
-    var rho = spec.cutterTipRadius, alpha = spec.pressureAngle;
+    var rho = spec.cutterTipRadius, alpha = spec.form.pressureAngle();
     var cx = Math.PI
       * spec.module / 4 + 1.25 * spec.module * Math.tan(alpha) + rho * (1 / Math.cos(alpha) - Math.tan(alpha));
     var cy = -1.25 * spec.module + rho;
@@ -73,7 +73,7 @@ class GeometryTests {
     for (i in 0...101) {
       var y = ymin + (ymax - ymin) * (i + 0.37) / 101;
       var p = rack.envelopeAt(spec, y), r = p.radius();
-      var alphaR = Math.acos(spec.baseRadius() / r);
+      var alphaR = Math.acos(Involute.baseRadius(spec) / r);
       var expectedAngle = spec.pitchToothThickness()
         / spec.pitchDiameter() + spec.sign() * (Math.tan(alpha) - alpha - Math.tan(alphaR) + alphaR);
       var oracle = new Point2(r * Math.sin(expectedAngle), r * Math.cos(expectedAngle));
@@ -98,7 +98,7 @@ class GeometryTests {
     var range = spec.evaluationRange();
     near(range.radiusMin, Math.min(profile.rootJoinRadius(), profile.tipJoinRadius()), 1e-12, "default radial range");
     near(range.axialMax, spec.faceWidth, 0, "default axial range");
-    rejects(() -> {profile.flankAtRadius(spec.baseRadius() * 0.99);
+    rejects(() -> {profile.flankAtRadius(Involute.baseRadius(spec) * 0.99);
     }, "outside");
     rejects(() -> {profile.rootFillet(Math.NaN);
     }, "parameter");

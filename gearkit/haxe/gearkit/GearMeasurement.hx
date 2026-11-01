@@ -115,7 +115,7 @@ class GearMeasurement {
       for (t in 0...s.teeth) out.thickness.push(nominalWidth
         + (measured[2 * t + 1] - measured[2 * t]) * cfg.measurementRadius);
       if (Std.isOfType(p, InvoluteProfile)) {
-        var rb = s.baseRadius();
+        var rb = Involute.baseRadius(s);
         // Annex E.5: reconstruct nominal-base-circle involutes through pitch probings,
         // offset each by the virtual ball radius, then intersect in each tooth space.
         var a = Math.acos(rb / cfg.measurementRadius), delta = Math.PI / s.teeth - h;

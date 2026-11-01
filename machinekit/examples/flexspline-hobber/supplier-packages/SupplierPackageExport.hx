@@ -72,7 +72,7 @@ class SupplierPackageExport {
         pressureAngleDeg: PRESSURE_DEG,
         profileShift: spec.profileShift,
         pitchDiameter: spec.pitchDiameter(),
-        baseDiameter: 2 * spec.baseRadius(),
+        baseDiameter: 2 * Involute.baseRadius(spec),
         tipDiameter: 2 * spec.tipRadius(),
         rootDiameter: 2 * spec.rootRadius(),
         pitchToothThickness: spec.pitchToothThickness(),

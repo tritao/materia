@@ -109,7 +109,7 @@ class HobbingTests {
         "generated tooth crosses the profile circle"
       );
       var p = profile.flankAtRadius(radius), truth = Math.atan2(p.x, p.y);
-      var error = (circle[0].hi - truth) * profile.gearSpec().baseRadius();
+      var error = (circle[0].hi - truth) * Involute.baseRadius(profile.gearSpec());
       min = Math.min(min, error);
       max = Math.max(max, error);
       check(circle[0].hiPass >= 0, "flank keeps the actual gash pass source");
@@ -132,7 +132,7 @@ class HobbingTests {
         radius += p.radius;
       }
       radius /= group.length;
-      var rho = Math.sqrt(radius * radius - spec.baseRadius() * spec.baseRadius());
+      var rho = Math.sqrt(radius * radius - Involute.baseRadius(spec) * Involute.baseRadius(spec));
       ratios += (high - low) / (rho * dC * dC / 8);
       complete++;
     }
@@ -141,7 +141,7 @@ class HobbingTests {
     check(ratio > 0.75 && ratio < 1.25, "sampled facet depth agrees with local curvature oracle");
     function roll(radius:Float):Float {
       var p = profile.flankAtRadius(radius);
-      return Math.atan2(p.x, p.y) - Math.acos(spec.baseRadius() / radius);
+      return Math.atan2(p.x, p.y) - Math.acos(Involute.baseRadius(spec) / radius);
     }
     var expectedSpan = Math.abs(roll(stock.grid.radius(0)) - roll(stock.grid.radius(stock.grid.radialCount - 1))) / dC;
     check(
@@ -215,7 +215,7 @@ class HobbingTests {
           break;
         }
         check(boundary > 0, "feed flank is present");
-        var error = (boundary - center - Math.PI / 80) * 20 * Math.cos(spec.pressureAngle);
+        var error = (boundary - center - Math.PI / 80) * 20 * Math.cos(spec.form.pressureAngle());
         low = Math.min(low, error);
         high = Math.max(high, error);
       }
@@ -225,7 +225,7 @@ class HobbingTests {
     }
     // Guba, Huesemann, Karpuschewski (2020), Eq.1, doi:10.1016/j.cirpj.2020.06.005.
     // Outside-diameter formula is an approximation; the swept flank cuts at its actual radius.
-    var oracle = job.feed * job.feed * Math.sin(spec.pressureAngle) / (4 * hob.outsideDiameter);
+    var oracle = job.feed * job.feed * Math.sin(spec.form.pressureAngle()) / (4 * hob.outsideDiameter);
     check(
       (maximum - minimum) / oracle > 0.8 && (maximum - minimum) / oracle < 1.2,
       "feed marks agree with outside-diameter oracle"

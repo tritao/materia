@@ -245,13 +245,14 @@ class HobberEnclosurePreview {
     scenarios:Bool = false
   ):materia.project.SceneArtifact.SceneArtifactData {
     var scene = AssemblyPreview.scene(assembly, "hobber-enclosed");
+    var pressureAngle = machine.spec.form.pressureAngle();
     if (scene.machineMotion == null) scene.machineMotion = {belts: []};
     var axes = ["machine/X", "machine/Y", "machine/Z", "machine/swivel/A", "machine/spindle/B", "machine/table/C"];
     scene.machineMotion.hobbing = {
       module: machine.spec.module,
       teeth: machine.spec.teeth,
       width: machine.spec.faceWidth,
-      pressureAngle: machine.spec.pressureAngle,
+      pressureAngle: pressureAngle,
       starts: machine.hob.design.starts,
       gashes: machine.hob.design.gashes,
       outside: 32,

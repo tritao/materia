@@ -82,7 +82,7 @@ class FormInterfaceTests {
       same(opaque.tipRadius(), plain.tipRadius(), "tip radius");
       same(opaque.rootRadius(), plain.rootRadius(), "root radius");
       same(opaque.pitchToothThickness(), plain.pitchToothThickness(), "pitch tooth thickness");
-      same(opaque.pressureAngle, plain.pressureAngle, "pressure angle");
+      same(opaque.form.pressureAngle(), plain.form.pressureAngle(), "pressure angle");
       var pp = plain.profile(), op = opaque.profile();
       samePoints(op.outline(64), pp.outline(64), "outline");
       var rackP = ConjugateRack.of(pp, 128), rackO = ConjugateRack.of(op, 128);
@@ -120,7 +120,7 @@ class FormInterfaceTests {
     try new GearSpec(0.3, 200, 8, null) catch (e:Dynamic) rejected = Std.string(e);
     check(rejected.indexOf("tooth form") >= 0, "a gear needs a tooth form");
     rejected = "";
-    try new GearSpec(0.3, 200, 8, new OpaqueForm(new Involute(alpha))).baseRadius() catch (e:Dynamic) rejected = Std.string(e);
+    try Involute.baseRadius(new GearSpec(0.3, 200, 8, new OpaqueForm(new Involute(alpha)))) catch (e:Dynamic) rejected = Std.string(e);
     check(rejected.indexOf("no base circle") >= 0, "base circle only exists for involute forms");
     Sys.println('FormInterfaceTests: $assertions assertions passed');
   }

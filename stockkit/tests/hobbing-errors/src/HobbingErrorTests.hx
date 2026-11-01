@@ -258,7 +258,7 @@ class HobbingErrorTests {
     }));
     Sys.stdout().flush();
     check(
-      reports[1].value("Fbeta") > reports[0].value("Fbeta") + 0.25 * 20 * Math.sin(spec.pressureAngle),
+      reports[1].value("Fbeta") > reports[0].value("Fbeta") + 0.25 * 20 * Math.sin(spec.form.pressureAngle()),
       "physical 20 um radial recession at one end exposes excess material in lead inspection"
     );
     near(
@@ -504,7 +504,7 @@ class HobbingErrorTests {
     }
     near(
       Math.sqrt(cs * cs + sn * sn),
-      e * 1000 * spec.pitchRadius() / spec.baseRadius(),
+      e * 1000 * spec.pitchRadius() / Involute.baseRadius(spec),
       0.02,
       "eccentric pitch first harmonic"
     );

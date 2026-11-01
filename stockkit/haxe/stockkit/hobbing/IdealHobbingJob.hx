@@ -27,7 +27,7 @@ class IdealHobbingJob {
   ) {
     if (spec.internal) throw "ideal hobbing driver supports external spur gears";
     if (Math.abs(spec.module - hob.rack.module) > 1e-12
-      || Math.abs(spec.pressureAngle - hob.rack.pressureAngle) > 1e-12) throw "hob and gear rack must match";
+      || Math.abs(spec.form.pressureAngle() - hob.rack.pressureAngle) > 1e-12) throw "hob and gear rack must match";
     for (v in [rpm, workTurns, feed, zStart, shift]) if (!Math.isFinite(v)) throw "job values must be finite";
     if (rpm <= 0 || workTurns <= 0) throw "job speed and turns must be positive";
     this.spec = spec;

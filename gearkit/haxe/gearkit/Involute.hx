@@ -18,10 +18,15 @@ class Involute implements ToothForm {
   public function pitchToothThickness(spec:GearSpec):Float return Math.PI
     * spec.module / 2 + spec.sign() * 2 * spec.profileShift * spec.module * Math.tan(angle);
 
-  public function baseRadius(spec:GearSpec):Float return spec.pitchRadius() * Math.cos(angle);
+  /** Base circle radius of an involute gear. Other forms have no base circle and are rejected. */
+  public static function baseRadius(spec:GearSpec):Float {
+    var involute = Std.downcast(spec.form, Involute);
+    if (involute == null) throw 'tooth form "${spec.form.name()}" has no base circle';
+    return spec.pitchRadius() * Math.cos(involute.angle);
+  }
 
   public function validate(spec:GearSpec):Void {
-    if (spec.tipRadius() <= baseRadius(spec)) throw "gear root must be positive and tooth tip must lie above the base circle";
+    if (spec.tipRadius() <= spec.pitchRadius() * Math.cos(angle)) throw "gear tooth tip must lie above the base circle";
   }
 
   public function profile(spec:GearSpec):ToothProfile return new InvoluteProfile(spec);

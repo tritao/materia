@@ -43,7 +43,7 @@ class ConjugateRack {
     }
     flank.sort((a, b) -> a.y < b.y ? -1 : a.y > b.y ? 1 : 0);
     corner.sort((a, b) -> a.y < b.y ? -1 : a.y > b.y ? 1 : 0);
-    return new ConjugateRack(profile.gearSpec().module, profile.gearSpec().pressureAngle, flank, corner, root);
+    return new ConjugateRack(profile.gearSpec().module, profile.gearSpec().form.pressureAngle(), flank, corner, root);
   }
 
   /** Solve the envelope equation n·v=0 by bisection; no involute/rack formula shortcut.
@@ -87,7 +87,7 @@ class ConjugateRack {
   /** Re-envelope the recovered rack at a normal-plane height onto a new gear.
       This uses the sample slope, not the target gear's involute formula. */
   public function envelopeAt(spec:GearSpec, height:Float):Point2 {
-    if (Math.abs(spec.module - module) > 1e-12 || Math.abs(spec.pressureAngle - pressureAngle)
+    if (Math.abs(spec.module - module) > 1e-12 || Math.abs(spec.form.pressureAngle() - pressureAngle)
       > 1e-12) throw "rack and target gear must have the same module and pressure angle";
     var segment = segmentAt(height), a = flankPoints[segment], b = flankPoints[segment + 1];
     var slope = (b.x - a.x) / (b.y - a.y);

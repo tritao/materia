@@ -54,7 +54,7 @@ class HobbingStock {
       Math.min(1, (distance - stock.grid.radiusMax) / (config.outside / 2)))) + Math.abs(hob.rake) + 0.01;
     stream = new HobbingStream(stock, sweep, Math.min(Math.PI / 2 - 1e-6, half));
     // HB10 assumed effective edge width; changing it requires force calibration.
-    forces = new HobbingForces(stock, spec.pitchRadius(), spec.pressureAngle, 1);
+    forces = new HobbingForces(stock, spec.pitchRadius(), spec.form.pressureAngle(), 1);
     stream.onPass = (pass, start, end) -> {forces.afterPass(pass, start, end, config.outside / 2);
     };
     preview = new RingPreviewWorker(stock);

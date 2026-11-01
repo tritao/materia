@@ -258,7 +258,7 @@ class FlexsplineHobberChecks {
     var grid = stockkit.ring.RingStock.fromGearBlank(spec, 0.6, 0.1, 0.2);
     var passes = motion.schedule(grid.grid);
     grid.dispose();
-    var force = 100 * Math.tan(spec.pressureAngle);
+    var force = 100 * Math.tan(spec.form.pressureAngle());
     var rows:Array<{factor:Float, thicknessChangeUm:Float, profileUm:Float}> = [];
     var inspection = new gearkit.GearInspection(spec, spec.pitchRadius());
     var baseline = new stockkit.hobbing.errors.HobbingErrorJob(
@@ -370,7 +370,7 @@ class FlexsplineHobberChecks {
       );
       var mean = ring.deflection(meanForceBound) * 1000, variation = ring.deflection(rangeForceBound) * 1000;
       var profile = 2 * variation,
-        pitch = 2 * Math.tan(s.pressureAngle) * variation, thickness = 2 * Math.tan(s.pressureAngle) * mean;
+        pitch = 2 * Math.tan(s.form.pressureAngle()) * variation, thickness = 2 * Math.tan(s.form.pressureAngle()) * mean;
       rows.push({
         factor: factor,
         supportNPerMm: support,
@@ -388,10 +388,10 @@ class FlexsplineHobberChecks {
       });
     }
     var requiredTotal = Math.max(
-      meanForceBound * 1000 * 2 * Math.tan(s.pressureAngle) / thicknessTolerance,
+      meanForceBound * 1000 * 2 * Math.tan(s.form.pressureAngle()) / thicknessTolerance,
       Math.max(
         rangeForceBound * 2000 / profileBudget,
-        rangeForceBound * 1000 * 2 * Math.tan(s.pressureAngle) / pitchBudget
+        rangeForceBound * 1000 * 2 * Math.tan(s.form.pressureAngle()) / pitchBudget
       )
     );
     var required = Math.max(0, requiredTotal - bare.ringStiffness);

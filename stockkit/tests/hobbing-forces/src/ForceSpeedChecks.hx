@@ -46,7 +46,7 @@ class ForceSpeedChecks {
     var sweep = new HobbingSweep(hob, -10, 10, tol), loads = new HobbingForces(
       stock,
       spec.pitchRadius(),
-      spec.pressureAngle,
+      spec.form.pressureAngle(),
       1
     );
     var history = new HobbingForceHistory(), started = Sys.time();

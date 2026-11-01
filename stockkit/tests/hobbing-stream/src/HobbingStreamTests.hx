@@ -23,7 +23,7 @@ class HobbingStreamTests {
     oracle.setThreads(1);
     var half = Math.acos((ideal.centerDistance - grid.radiusMax) / 16) + 0.01;
     var stream = new HobbingStream(actual, sweep, half), frames:Array<HobbingKeyframe> = [];
-    var forces = new HobbingForces(actual, spec.pitchRadius(), spec.pressureAngle, 1);
+    var forces = new HobbingForces(actual, spec.pitchRadius(), spec.form.pressureAngle(), 1);
     stream.onPass = (pass, start, end) -> {forces.afterPass(pass, start, end, 16);
     };
     try {

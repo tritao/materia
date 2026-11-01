@@ -18,7 +18,7 @@ class InvoluteProfile implements ToothProfile {
 
   public function new(spec:GearSpec) {
     this.spec = spec;
-    var a = spec.pressureAngle, rho = spec.cutterTipRadius;
+    var a = spec.form.pressureAngle(), rho = spec.cutterTipRadius;
     half = spec.pitchToothThickness() / 2;
     depth = spec.module * (1.25 - spec.sign() * spec.profileShift);
     cornerV = -depth + rho;
@@ -30,7 +30,7 @@ class InvoluteProfile implements ToothProfile {
     if (spec.internal && rho * spec.pitchRadius() <= cornerV * vJoin / Math.pow(Math.sin(a),
       3)) throw "internal rack-limit root is undercut; use more teeth, less shift or a pinion-shaped cutter";
     rootJoinR = rootFillet(0).radius();
-    var rb = spec.baseRadius(), rt = spec.tipRadius(), radius = spec.tipFilletRadius;
+    var rb = Involute.baseRadius(spec), rt = spec.tipRadius(), radius = spec.tipFilletRadius;
     var rc = rt - spec.sign() * radius;
     if (rc <= rb) throw "tip fillet centre lies below the base circle";
     var roll = spec.sign() * radius + Math.sqrt(rc * rc - rb * rb);
@@ -61,24 +61,24 @@ class InvoluteProfile implements ToothProfile {
 
   /** Half the tooth's angular thickness at `radius` on the active involute (radians). */
   public function halfAngleAt(radius:Float):Float {
-    var a = Math.acos(spec.baseRadius() / radius);
+    var a = Math.acos(Involute.baseRadius(spec) / radius);
     return spec.pitchToothThickness()
-      / (2 * spec.pitchRadius()) + spec.sign() * (Math.tan(spec.pressureAngle) - spec.pressureAngle - Math.tan(a) + a);
+      / (2 * spec.pitchRadius()) + spec.sign() * (Math.tan(spec.form.pressureAngle()) - spec.form.pressureAngle() - Math.tan(a) + a);
   }
 
   /** Roll length from the base circle; the involute's natural profile abscissa. */
   public function profileCoordinate(radius:Float):Float {
-    var rb = spec.baseRadius();
+    var rb = Involute.baseRadius(spec);
     return Math.sqrt(Math.max(0, radius * radius - rb * rb));
   }
 
   public function radiusAtCoordinate(u:Float):Float {
-    var rb = spec.baseRadius();
+    var rb = Involute.baseRadius(spec);
     return Math.sqrt(rb * rb + u * u);
   }
 
   /** Angular error times this gives the flank-normal error: the base radius. */
-  public function normalLever(radius:Float):Float return spec.baseRadius();
+  public function normalLever(radius:Float):Float return Involute.baseRadius(spec);
 
   /** Exact active involute. Radius outside the unrounded flank is rejected. */
   public function flankAtRadius(radius:Float):Point2 {
@@ -89,8 +89,8 @@ class InvoluteProfile implements ToothProfile {
   }
 
   function involuteAtRadius(radius:Float):Point2 {
-    var alpha = Math.acos(Math.min(1, spec.baseRadius() / radius));
-    var theta = half / spec.pitchRadius() + spec.sign() * (involute(spec.pressureAngle) - involute(alpha));
+    var alpha = Math.acos(Math.min(1, Involute.baseRadius(spec) / radius));
+    var theta = half / spec.pitchRadius() + spec.sign() * (involute(spec.form.pressureAngle()) - involute(alpha));
     return new Point2(radius * Math.sin(theta), radius * Math.cos(theta));
   }
 
@@ -102,7 +102,7 @@ class InvoluteProfile implements ToothProfile {
   /** Derivative w.r.t. radius, oriented towards increasing radius for either gear kind. */
   public function flankDerivative(t:Float):Point2 {
     var p = flank(t), radius = p.radius(), theta = Math.atan2(p.x, p.y);
-    var tangent = Math.sqrt(radius * radius / (spec.baseRadius() * spec.baseRadius()) - 1);
+    var tangent = Math.sqrt(radius * radius / (Involute.baseRadius(spec) * Involute.baseRadius(spec)) - 1);
     return new Point2(
       Math.sin(theta) - spec.sign() * tangent * Math.cos(theta),
       Math.cos(theta) + spec.sign() * tangent * Math.sin(theta)
@@ -112,7 +112,7 @@ class InvoluteProfile implements ToothProfile {
   /** t=0: involute join; t=1: root circle, both tangent. This is not a circular blend. */
   public function rootFillet(t:Float):Point2 {
     unit(t);
-    var beta = spec.pressureAngle + t * (Math.PI / 2 - spec.pressureAngle);
+    var beta = spec.form.pressureAngle() + t * (Math.PI / 2 - spec.form.pressureAngle());
     var v = cornerV - spec.cutterTipRadius * Math.sin(beta);
     var u = spec.sign() * (cornerU - spec.cutterTipRadius * Math.cos(beta));
     var x = spec.sign() * v * Math.cos(beta) / Math.sin(beta);
@@ -122,7 +122,7 @@ class InvoluteProfile implements ToothProfile {
 
   public function rootDerivative(t:Float):Point2 {
     unit(t);
-    var beta = spec.pressureAngle + t * (Math.PI / 2 - spec.pressureAngle);
+    var beta = spec.form.pressureAngle() + t * (Math.PI / 2 - spec.form.pressureAngle());
     var sn = Math.sin(beta), cs = Math.cos(beta), rho = spec.cutterTipRadius;
     var v = cornerV - rho * sn, dv = -rho * cs;
     var u = spec.sign() * (cornerU - rho * cs), du = spec.sign() * rho * sn;
@@ -130,7 +130,7 @@ class InvoluteProfile implements ToothProfile {
     var dx = spec.sign() * (dv * cs / sn - v / (sn * sn));
     var q = spec.sign() * spec.pitchRadius(), phi = (x - u) / q, dphi = (dx - du) / q;
     return new Point2(dx - dphi * (q + v),
-      dv + dphi * x).rotated(phi).scaled(spec.sign() * (Math.PI / 2 - spec.pressureAngle));
+      dv + dphi * x).rotated(phi).scaled(spec.sign() * (Math.PI / 2 - spec.form.pressureAngle()));
   }
 
   /** Circular tip rounding from flank join to the tip-circle land. */

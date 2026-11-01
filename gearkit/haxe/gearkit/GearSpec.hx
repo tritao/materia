@@ -8,8 +8,6 @@ class GearSpec {
   public final teeth:Int;
   public final faceWidth:Float;
   public final form:ToothForm;
-  /** The form's nominal pressure angle, which a hob's rack must match. */
-  public final pressureAngle:Float;
   public final internal:Bool;
   public final profileShift:Float;
   public final cutterTipRadius:Float;
@@ -44,13 +42,12 @@ class GearSpec {
     this.teeth = teeth;
     this.faceWidth = faceWidth;
     this.form = form;
-    this.pressureAngle = form.pressureAngle();
     this.internal = internal;
     this.profileShift = profileShift;
     this.cutterTipRadius = corner;
     this.tipFilletRadius = tip;
     this.evaluation = evaluation;
-    if (rootRadius() <= 0) throw "gear root must be positive and tooth tip must lie above the base circle";
+    if (rootRadius() <= 0) throw "gear root radius must be positive";
     form.validate(this);
     if (pitchToothThickness() <= 0
       || pitchToothThickness() >= Math.PI * module) throw "profile shift leaves no tooth or tooth space";
@@ -59,12 +56,6 @@ class GearSpec {
   public function sign():Float return internal ? -1.0 : 1.0;
   public function pitchDiameter():Float return module * teeth;
   public function pitchRadius():Float return pitchDiameter() / 2;
-  /** Involute forms only; other forms have no base circle. */
-  public function baseRadius():Float {
-    var involute = Std.downcast(form, Involute);
-    if (involute == null) throw 'tooth form "${form.name()}" has no base circle';
-    return involute.baseRadius(this);
-  }
   public function tipRadius():Float return pitchRadius() + sign() * form.addendum(module) + profileShift * module;
   public function rootRadius():Float return pitchRadius() - sign() * form.dedendum(module) + profileShift * module;
   public function pitchToothThickness():Float return form.pitchToothThickness(this);

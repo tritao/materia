@@ -129,7 +129,7 @@ class Hob extends MachineComponent {
       target.faceWidth
     ).setNumber(
       "pressureAngle",
-      target.pressureAngle
+      target.form.pressureAngle()
     ).setNumber(
       "profileShift",
       target.profileShift

@@ -50,9 +50,9 @@ class MetrologyTests {
     check(perfect.isoClass == 1, 'perfect gear class 1: ${perfect.warnings}');
     for (k in Iso1328.parameters) near(perfect.value(k), 0, 1e-6, 'perfect $k');
     for (w in perfect.thickness) near(w, s.pitchToothThickness(), 1e-10, "circular tooth thickness");
-    var delta = Math.PI / (2 * s.teeth), q = s.pitchRadius() * Math.sin(delta) / Math.cos(s.pressureAngle + delta);
+    var delta = Math.PI / (2 * s.teeth), q = s.pitchRadius() * Math.sin(delta) / Math.cos(s.form.pressureAngle() + delta);
     var ballCentre = Math.sqrt(s.pitchRadius()
-      * s.pitchRadius() + q * q + 2 * s.pitchRadius() * q * Math.sin(s.pressureAngle));
+      * s.pitchRadius() + q * q + 2 * s.pitchRadius() * q * Math.sin(s.form.pressureAngle()));
     for (v in perfect.dimensionsOverBalls) near(
       v,
       2 * ballCentre + 2 * q,
@@ -78,7 +78,7 @@ class MetrologyTests {
       ) / s.teeth;
       near(
         Math.sqrt(cs * cs + sn * sn),
-        5 * s.pitchRadius() / s.baseRadius(),
+        5 * s.pitchRadius() / Involute.baseRadius(s),
         0.005,
         "eccentric pitch first-harmonic amplitude"
       );
@@ -170,7 +170,7 @@ class SyntheticGearRings implements GearRings {
   public function radii():Array<Float> return rr.copy();
   public function axialPositions():Array<Float> return zz.copy();
   public function boundaries(r:Int, z:Int):Array<Float> {
-    var tau = 2 * Math.PI, rb = s.baseRadius();
+    var tau = 2 * Math.PI, rb = Involute.baseRadius(s);
     if (!byRadius.exists(r)) {
       var ends:Array<Float> = [];
       for (t in 0...s.teeth) for (f in 0...2) {
@@ -178,7 +178,7 @@ class SyntheticGearRings implements GearRings {
         function point(rho:Float):Array<Float> {
           var alpha = Math.acos(rb / rho);
           var h = s.pitchToothThickness() / (2
-            * s.pitchRadius()) + s.sign() * (Math.tan(s.pressureAngle) - s.pressureAngle - Math.tan(alpha) + alpha);
+            * s.pitchRadius()) + s.sign() * (Math.tan(s.form.pressureAngle()) - s.form.pressureAngle() - Math.tan(alpha) + alpha);
           // Independent of the profile interface: involute roll length from the base circle.
           function roll(r:Float):Float return Math.sqrt(Math.max(0, r * r - rb * rb));
           var u = roll(rho), start = roll(control), tip = roll(s.tipRadius());
