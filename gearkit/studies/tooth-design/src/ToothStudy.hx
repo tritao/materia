@@ -251,6 +251,11 @@ class ToothStudy {
   }
 
   public static function main():Void {
+    var args = Sys.args();
+    if (args.length > 0 && args[0].substr(0, 4) == "mod-") {
+      ModifiedInvoluteStudy.run(args[0], args.slice(1));
+      return;
+    }
     if (Sys.args().indexOf("sweep") >= 0) {
       sweepStudy();
       return;
