@@ -241,6 +241,47 @@ until TD5 measures where the derived circular spline interferes.
   kappa 1) 0.35 um against 1.21 um.
 - Circular-spline nominal radii are assumed full depth: tip `r_pc - m`, root `r_pc + 1.25 m`.
 
+## TD5 notes and the D1 / D3 comparison
+
+`MeshingAnalysis` scans one circular pitch of wave-generator angle (24 or 48 samples; the ring state
+repeats every pitch) with every flexspline tooth against the derived circular spline
+(`SweptSpace`). Run with `ToothStudy` in `gearkit/tests`. **All numbers below are model output:
+unloaded, kinematic, rigid teeth, zero-backlash conjugate circular spline.** Assumptions: full-depth
+teeth (addendum 1.0 m, dedendum 1.25 m) on both gears and a nominal full-depth circular spline
+(tip `r_pc - m`, root `r_pc + 1.25 m`); neutral line half a wall (0.01 m Z_f) under the root;
+contact threshold 5 um (and 20 um); thinnest acceptable circular-spline tooth 0.05 m.
+
+m 0.3, Z 200/202, cosine cam. "CS tip trim" is how far the circular-spline tooth tip must be cut
+back from the nominal tip for the derived tooth to be 0.05 m thick.
+
+| Case | kappa | Interference | Root clr | Tip-tip clr (minor axis) | CS tip trim | Engaged 5 um / 20 um | Root fillet R min | Hobbable |
+|---|---|---|---|---|---|---|---|---|
+| D1 20 deg, hob corner 0.38 m | 0.8 | yes (tips meet) | 135 um | -60 um | 88 um | 84 % / 84 % | 0.116 mm | yes |
+| D1 | 1.0 | no | 75 um | 0 | 28 um | 48 % / 86 % | 0.116 mm | yes |
+| D1 | 1.1 | no | 45 um | 30 um | 0 | 33 % / 50 % | 0.116 mm | yes |
+| D1 | 1.2 | no | 15 um | 60 um | 0 | 24 % / 36 % | 0.116 mm | yes |
+| D3 30 deg, hob corner 0.1 m | 0.8 | yes | 135 um | -60 um | 68 um | 54 % / 92 % | 0.034 mm | yes |
+| D3 | 0.9 | yes | 105 um | -30 um | 37 um | 35 % / 52 % | 0.034 mm | yes |
+| D3 | 1.0 | no | 75 um | 0 | 8 um | 23 % / 35 % | 0.034 mm | yes |
+| D3 | 1.1 | no | 45 um | 30 um | 0 | 10 % / 17 % | 0.034 mm | yes |
+| D3 | 1.2 | no | 15 um | 60 um | 0 | 12 % / 18 % | 0.034 mm | yes |
+
+- D3 with the reference hob's 0.38 m corner radius cannot be cut: "rack corner leaves no cutter tip
+  land". At full depth the largest corner radius is 0.47 m at 20 deg but 0.11 m at 30 deg
+  (0.033 mm at m 0.3), so the root fillet of a 30 deg flexspline is about 3.5 times smaller.
+  At the same 0.1 m corner radius, 20 and 30 deg have the same root fillet.
+- Both forms are interference-free for kappa 1.0 to 1.2 and interfere below 1 (tooth tip meets
+  circular-spline tooth tip at the minor axis) because the tooth depth is 1.0 m; kappa above 1.25
+  bottoms in the root (D4, kappa 2: tips 225 um past the root, tooth 0, wave generator 0.0039 rad).
+  The usable kappa window is set by tooth depth, not by pressure angle.
+- Engaged fraction is much higher for 20 deg than 30 deg at every kappa and falls as kappa rises
+  for both. The plan expected a rise with kappa; this model does not give one. With the
+  circular spline derived for each kappa, every tooth touches an envelope point, so the fraction
+  depends on the threshold: it measures how closely the other teeth follow the envelope, an
+  upper bound on real engagement. Do not compare these percentages with published (loaded) figures.
+- Not done: D2 (TD2 blocked), a fixed standard circular-spline tooth instead of the derived one,
+  loaded meshing, root stress.
+
 ## Steps
 
 ### Phase A: forms and kinematics
@@ -377,7 +418,7 @@ TD0 ── TD1 ── TD2 ──┐
 | TD2 | blocked: Liu 2025 arc geometry (meaning of c1/e1/c2/e2, tangent construction, blends) is not in the repo notes and the open-access MDPI full text refused automated download (HTTP 403); implement once the equations are supplied | |
 | TD3 | done, except Resal cam: blocked (Resal curve equation, Gravagno 2016, not read); cosine, ellipse, four-roller implemented | Tooth design: deformation kinematics (TD3) |
 | TD4 | done for involute forms (D1, D3); not fitted to a full `Sampled` ToothForm (root/tip blends), and no contact-condition refinement: accuracy is by convergence | Tooth design: circular-spline envelope (TD4) |
-| TD5 | planned | |
+| TD5 | partial: involute forms (D1, D3, D4) only; D2 comparisons blocked on TD2; "engaged fraction rises with kappa" not borne out (measured fall, see TD5 notes) | Tooth design: meshing analysis and D1/D3 comparison (TD5) |
 | TD6 | planned | |
 | TD7 | planned | |
 | TD8 | planned | |
