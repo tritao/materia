@@ -31,10 +31,10 @@ class GearMeasurement {
   }
 
   public static function fromRings(rings:GearRings, s:GearSpec, ?inspection:GearInspection):GearMeasurement {
-    var assumed = inspection == null, p = new ToothProfile(s), rb = s.baseRadius();
+    var assumed = inspection == null, p = s.profile();
     if (inspection == null) inspection = new GearInspection(
       s,
-      p.rootJoinRadius + s.sign() * 0.01 * Math.abs(p.tipJoinRadius - p.rootJoinRadius)
+      p.rootJoinRadius() + s.sign() * 0.01 * Math.abs(p.tipJoinRadius() - p.rootJoinRadius())
     );
     if (inspection.spec != s) throw "inspection settings belong to another GearSpec";
     var out = new GearMeasurement(s, inspection), cfg = inspection;
@@ -45,11 +45,7 @@ class GearMeasurement {
     validateAxis(rs, "radius");
     validateAxis(zs, "axial");
     var cache:Map<String, Array<Float>> = [];
-    function half(r:Float):Float {
-      var a = Math.acos(rb / r);
-      return s.pitchToothThickness()
-        / (2 * s.pitchRadius()) + s.sign() * (Math.tan(s.pressureAngle) - s.pressureAngle - Math.tan(a) + a);
-    }
+    function half(r:Float):Float return p.halfAngleAt(r);
     function errors(ri:Int, zi:Int):Array<Float> {
       var key = ri + ":" + zi;
       if (cache.exists(key)) return cache.get(key);
@@ -92,11 +88,11 @@ class GearMeasurement {
       cache.set(key, found);
       return found;
     }
-    var rolls = [for (r in rs) GearInspection.roll(r, rb)];
+    var rolls = [for (r in rs) p.profileCoordinate(r)];
     function at(r:Float, z:Float):Array<Float> {
       var ir = bracket(rs, r), iz = bracket(zs, z);
       var jr = rs.length == 1 ? ir : ir + 1, jz = zs.length == 1 ? iz : iz + 1;
-      var roll = GearInspection.roll(r, rb), fr = ir == jr ? 0 : (roll - rolls[ir]) / (rolls[jr] - rolls[ir]);
+      var roll = p.profileCoordinate(r), fr = ir == jr ? 0 : (roll - rolls[ir]) / (rolls[jr] - rolls[ir]);
       var fz = iz == jz ? 0 : (z - zs[iz]) / (zs[jz] - zs[iz]);
       var aa = errors(ir, iz), ba = errors(jr, iz), ab = errors(ir, jz), bb = errors(jr, jz);
       return [for (k in 0...aa.length)(aa[k]
@@ -118,48 +114,52 @@ class GearMeasurement {
       var h = half(cfg.measurementRadius), nominalWidth = 2 * h * cfg.measurementRadius;
       for (t in 0...s.teeth) out.thickness.push(nominalWidth
         + (measured[2 * t + 1] - measured[2 * t]) * cfg.measurementRadius);
-      // Annex E.5: reconstruct nominal-base-circle involutes through pitch probings,
-      // offset each by the virtual ball radius, then intersect in each tooth space.
-      var a = Math.acos(rb / cfg.measurementRadius), delta = Math.PI / s.teeth - h;
-      var ball = cfg.measurementRadius * Math.sin(delta) / Math.cos(a + s.sign() * delta);
-      if (ball <= 0 || !Math.isFinite(ball)) throw "virtual runout probe cannot contact both flanks";
-      out.ballDiameter = 2 * ball;
-      var invM = Math.tan(a) - a;
-      for (t in 0...s.teeth) {
-        var gap = 2 * delta + measured[2 * ((t + 1) % s.teeth)] - measured[2 * t + 1];
-        var target = invM + s.sign() * (ball / rb - gap / 2);
-        if (target < 0) throw "runout involute intersection below base circle";
-        var lo = 0.0, hi = Math.PI / 2 - 1e-8;
-        for (_ in 0...64) {
-          var mid = (lo + hi) / 2;
-          if (Math.tan(mid) - mid < target) lo = mid;
-          else hi = mid;
+      if (Std.isOfType(p, InvoluteProfile)) {
+        var rb = s.baseRadius();
+        // Annex E.5: reconstruct nominal-base-circle involutes through pitch probings,
+        // offset each by the virtual ball radius, then intersect in each tooth space.
+        var a = Math.acos(rb / cfg.measurementRadius), delta = Math.PI / s.teeth - h;
+        var ball = cfg.measurementRadius * Math.sin(delta) / Math.cos(a + s.sign() * delta);
+        if (ball <= 0 || !Math.isFinite(ball)) throw "virtual runout probe cannot contact both flanks";
+        out.ballDiameter = 2 * ball;
+        var invM = Math.tan(a) - a;
+        for (t in 0...s.teeth) {
+          var gap = 2 * delta + measured[2 * ((t + 1) % s.teeth)] - measured[2 * t + 1];
+          var target = invM + s.sign() * (ball / rb - gap / 2);
+          if (target < 0) throw "runout involute intersection below base circle";
+          var lo = 0.0, hi = Math.PI / 2 - 1e-8;
+          for (_ in 0...64) {
+            var mid = (lo + hi) / 2;
+            if (Math.tan(mid) - mid < target) lo = mid;
+            else hi = mid;
+          }
+          var centreRadius = rb / Math.cos((lo + hi) / 2);
+          out.radialMeasurements.push(centreRadius);
+          var centreAngle = Math.PI
+            / 2 + (t + 0.5) * 2 * Math.PI / s.teeth + (measured[2 * ((t + 1) % s.teeth)] + measured[2 * t + 1]) / 2;
+          out.ballCentres.push(new Point2(centreRadius * Math.cos(centreAngle), centreRadius * Math.sin(centreAngle)));
         }
-        var centreRadius = rb / Math.cos((lo + hi) / 2);
-        out.radialMeasurements.push(centreRadius);
-        var centreAngle = Math.PI
-          / 2 + (t + 0.5) * 2 * Math.PI / s.teeth + (measured[2 * ((t + 1) % s.teeth)] + measured[2 * t + 1]) / 2;
-        out.ballCentres.push(new Point2(centreRadius * Math.cos(centreAngle), centreRadius * Math.sin(centreAngle)));
-      }
-      for (t in 0...s.teeth) {
-        var a = out.ballCentres[t], b = out.ballCentres[(t + Std.int(s.teeth / 2)) % s.teeth];
-        out.dimensionsOverBalls.push(Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2)) + s.sign() * 2 * ball);
-      }
-      out.values.set("Fr", range(out.radialMeasurements) * 1000);
+        for (t in 0...s.teeth) {
+          var a = out.ballCentres[t], b = out.ballCentres[(t + Std.int(s.teeth / 2)) % s.teeth];
+          out.dimensionsOverBalls.push(Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2)) + s.sign() * 2 * ball);
+        }
+        out.values.set("Fr", range(out.radialMeasurements) * 1000);
+      } else out.warnings.push("Runout reconstruction (Annex E.5) is defined for involute teeth only; Fr not measured");
     } else out.warnings.push("Pitch/thickness/runout circle or axial position not covered");
     var rlo = Math.min(cfg.controlRadius, cfg.tipFormRadius), rhi = Math.max(cfg.controlRadius, cfg.tipFormRadius);
     if (covers(rs, rlo, rhi) && covers(zs, cfg.profileZ, cfg.profileZ)) {
       var amin = Math.min(cfg.rollStart, cfg.rollEnd), amax = Math.max(cfg.rollStart, cfg.rollEnd);
       for (u in rolls) if (u >= amin && u <= amax) out.profileSourcePoints++;
-      var rtip = GearInspection.roll(cfg.tipFormRadius, rb), start = Math.min(cfg.rollStart, rtip), end = Math.max(
+      var rtip = p.profileCoordinate(cfg.tipFormRadius), start = Math.min(cfg.rollStart, rtip), end = Math.max(
         cfg.rollStart,
         rtip
       );
       var count = Std.int(Math.max(151, out.profileSourcePoints + 2));
       var xs = [for (i in 0...count) start + (end - start) * i / (count - 1)];
-      var data = [for (u in xs) at(Math.sqrt(rb * rb + u * u), cfg.profileZ)];
+      var data = [for (u in xs) at(p.radiusAtCoordinate(u), cfg.profileZ)];
+      var levers = [for (u in xs) p.normalLever(p.radiusAtCoordinate(u))];
       for (t in 0...s.teeth) for (f in 0...2) {
-        var ys = [for (v in data) v[2 * t + f] * (f == 0 ? -1 : 1) * rb * 1000];
+        var ys = [for (k in 0...data.length) data[k][2 * t + f] * (f == 0 ? -1 : 1) * levers[k] * 1000];
         var trace = new GearTrace(t, f, xs, ys, cfg.profileCutoff, amin, amax, cfg.rollTip - cfg.rollStart);
         out.profiles.push(trace);
         out.maximum("Falpha", trace.total);
@@ -179,8 +179,9 @@ class GearMeasurement {
       var count = Std.int(Math.max(151, out.helixSourcePoints + 2));
       var xs = [for (i in 0...count) usable[0] + (usable[usable.length - 1] - usable[0]) * i / (count - 1)];
       var data = [for (z in xs) at(cfg.measurementRadius, z)];
+      var lever = p.normalLever(cfg.measurementRadius);
       for (t in 0...s.teeth) for (f in 0...2) {
-        var ys = [for (v in data) v[2 * t + f] * (f == 0 ? -1 : 1) * rb * 1000];
+        var ys = [for (v in data) v[2 * t + f] * (f == 0 ? -1 : 1) * lever * 1000];
         var trace = new GearTrace(t, f, xs, ys, cfg.helixCutoff, cfg.axialStart, cfg.axialEnd, s.faceWidth);
         out.helices.push(trace);
         out.maximum("Fbeta", trace.total);

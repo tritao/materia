@@ -1,9 +1,9 @@
 import gearkit.ConjugateRack;
 import gearkit.GearEvaluationRange;
 import gearkit.GearSpec;
+import gearkit.Involute;
 import gearkit.HobDesign;
 import gearkit.Point2;
-import gearkit.ToothProfile;
 
 class GeometryTests {
   static var assertions = 0;
@@ -30,7 +30,7 @@ class GeometryTests {
   static function tangentCircle(p:Point2):Point2 return new Point2(p.y, -p.x);
 
   static function profileChecks(spec:GearSpec):Void {
-    var profile = new ToothProfile(spec), rack = ConjugateRack.of(profile);
+    var profile = spec.profile(), rack = ConjugateRack.of(profile);
     var root = profile.rootFillet(1), rootJoin = profile.rootFillet(0);
     near(root.radius(), spec.rootRadius(), 1e-11, "root circle");
     near(rootJoin.distance(profile.flank(0)), 0, 1e-11, "root/involute continuity");
@@ -88,7 +88,7 @@ class GeometryTests {
       'recovered rack root height: internal=${spec.internal}, shift=${spec.profileShift}, m=${spec.module}'
     );
     for (p in rootSamples) check(p.x > 0, "rack root blend leaves a gear tip land");
-    var outline = profile.outline();
+    var outline = profile.outline(64);
     check(outline.length > 100, "complete tooth outline includes lands and fillets");
     near(outline[0].distance(outline[outline.length - 1]), 0, 0, "closed outline");
     for (p in outline) {
@@ -96,7 +96,7 @@ class GeometryTests {
       check(Math.abs(Math.atan2(p.x, p.y)) <= Math.PI / spec.teeth + 1e-12, "outline stays within one pitch");
     }
     var range = spec.evaluationRange();
-    near(range.radiusMin, Math.min(profile.rootJoinRadius, profile.tipJoinRadius), 1e-12, "default radial range");
+    near(range.radiusMin, Math.min(profile.rootJoinRadius(), profile.tipJoinRadius()), 1e-12, "default radial range");
     near(range.axialMax, spec.faceWidth, 0, "default axial range");
     rejects(() -> {profile.flankAtRadius(spec.baseRadius() * 0.99);
     }, "outside");
@@ -108,7 +108,7 @@ class GeometryTests {
 
   static function hobChecks():Void {
     var alpha = 20 * Math.PI / 180;
-    var profile = new ToothProfile(new GearSpec(0.3, 200, 8, alpha));
+    var profile = (new GearSpec(0.3, 200, 8, new Involute(alpha))).profile();
     var rack = ConjugateRack.of(profile);
     for (starts in [1, 2, 3]) for (rake in [0.0, 0.12, -0.12]) {
       var hob = new HobDesign(rack, starts, 32, 12, rake);
@@ -175,49 +175,49 @@ class GeometryTests {
   public static function run():Void {
     var alpha = 20 * Math.PI / 180;
     for (internal in [false, true]) for (shift in [-0.2, 0.0, 0.3]) {
-      profileChecks(new GearSpec(0.3, internal ? 240 : 200, 8, alpha, internal, shift));
-      profileChecks(new GearSpec(1, internal ? 240 : 40, 10, alpha, internal, shift));
+      profileChecks(new GearSpec(0.3, internal ? 240 : 200, 8, new Involute(alpha), internal, shift));
+      profileChecks(new GearSpec(1, internal ? 240 : 40, 10, new Involute(alpha), internal, shift));
     }
-    profileChecks(new GearSpec(0.5, 100, 15, alpha));
-    profileChecks(new GearSpec(0.3, 200, 8, 25 * Math.PI / 180, false, 0, 0.075));
-    profileChecks(new GearSpec(0.3, 202, 8, alpha, true));
-    rejects(() -> {new ToothProfile(new GearSpec(1, 40, 10, alpha, true));
+    profileChecks(new GearSpec(0.5, 100, 15, new Involute(alpha)));
+    profileChecks(new GearSpec(0.3, 200, 8, new Involute(25 * Math.PI / 180), false, 0, 0.075));
+    profileChecks(new GearSpec(0.3, 202, 8, new Involute(alpha), true));
+    rejects(() -> {(new GearSpec(1, 40, 10, new Involute(alpha), true)).profile();
     }, "internal rack-limit root");
     // The same recovered rack must generate a different tooth count and profile shift.
-    var source = new GearSpec(0.3, 200, 8, alpha);
-    var common = ConjugateRack.of(new ToothProfile(source));
+    var source = new GearSpec(0.3, 200, 8, new Involute(alpha));
+    var common = ConjugateRack.of(source.profile());
     for (internal in [false, true]) {
-      var target = new GearSpec(0.3, 240, 8, alpha, internal, 0.1);
-      var tooth = new ToothProfile(target), points = common.flankSamples();
+      var target = new GearSpec(0.3, 240, 8, new Involute(alpha), internal, 0.1);
+      var tooth = target.profile(), points = common.flankSamples();
       for (i in 1...50) {
         var y = points[0].y + (points[points.length - 1].y - points[0].y) * i / 50;
         var p = common.envelopeAt(target, y);
         near(p.distance(tooth.flankAtRadius(p.radius())), 0, 1e-6, "common rack generates another gear");
       }
     }
-    var sharp = new ToothProfile(new GearSpec(0.3, 200, 8, alpha, false, 0, null, 0));
+    var sharp = (new GearSpec(0.3, 200, 8, new Involute(alpha), false, 0, null, 0)).profile();
     var sharpRack = ConjugateRack.of(sharp);
     var sharpRoot = sharpRack.rootSamples();
     near(sharpRoot[sharpRoot.length - 1].y, 0.3, 1e-10, "sharp tip normal cone gives full rack height");
     near(new HobDesign(sharpRack, 1, 32, 12).rootHeight, 0.3, 1e-10, "sharp tip hob root height");
-    var folded = ConjugateRack.of(new ToothProfile(new GearSpec(0.3, 202, 8, alpha, true)));
+    var folded = ConjugateRack.of((new GearSpec(0.3, 202, 8, new Involute(alpha), true)).profile());
     check(folded.hasRootFold, "internal tip rounding exposes a folded conjugate cutter root");
     rejects(() -> {new HobDesign(folded, 1, 32, 12);
     }, "cutter root folds");
     hobChecks();
-    rejects(() -> {new ToothProfile(new GearSpec(1, 8, 8, alpha));
+    rejects(() -> {(new GearSpec(1, 8, 8, new Involute(alpha))).profile();
     }, "undercut");
-    rejects(() -> {new GearSpec(1, 40, 10, alpha, false, Math.NaN);
+    rejects(() -> {new GearSpec(1, 40, 10, new Involute(alpha), false, Math.NaN);
     }, "shift");
-    rejects(() -> {new GearSpec(1, 40, 10, alpha, false, 0, -1);
+    rejects(() -> {new GearSpec(1, 40, 10, new Involute(alpha), false, 0, -1);
     }, "cutter tip");
-    rejects(() -> {new GearSpec(1, 40, 10, alpha, false, 0, null, -1);
+    rejects(() -> {new GearSpec(1, 40, 10, new Involute(alpha), false, 0, null, -1);
     }, "tip fillet");
     var range = new GearEvaluationRange(29.9, 30.1, 0.4, 7.6);
-    var spec = new GearSpec(0.3, 200, 8, alpha, false, 0, null, null, range);
+    var spec = new GearSpec(0.3, 200, 8, new Involute(alpha), false, 0, null, null, range);
     near(spec.evaluationRange().axialMin, 0.4, 0, "explicit evaluation range");
     rejects(() -> {new GearSpec(0.3,
-      200, 8, alpha, false, 0, null, null, new GearEvaluationRange(29.9, 30.1, 0, 9)).evaluationRange();
+      200, 8, new Involute(alpha), false, 0, null, null, new GearEvaluationRange(29.9, 30.1, 0, 9)).evaluationRange();
     }, "evaluation window");
     Sys
       .println('GeometryTests: $assertions assertions passed; rack error $rackError mm; re-envelope error $envelopeError mm');

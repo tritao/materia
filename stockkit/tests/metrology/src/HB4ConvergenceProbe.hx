@@ -7,8 +7,8 @@ import stockkit.hobbing.errors.*;
 /** Diagnostic only: exact reference circles and schedule, with full original tool/probes. */
 class HB4ConvergenceProbe {
   public static function run():Void {
-    var spec = new GearSpec(0.3, 200, 8, 20 * Math.PI / 180), profile = new ToothProfile(spec);
-    var lo = profile.rootJoinRadius + 0.002, hi = profile.tipJoinRadius - 0.002;
+    var spec = new GearSpec(0.3, 200, 8, new Involute(20 * Math.PI / 180)), profile = spec.profile();
+    var lo = profile.rootJoinRadius() + 0.002, hi = profile.tipJoinRadius() - 0.002;
     var grid = new RingGrid(lo, hi, -0.02, 8.02, (hi - lo) / 185, 0.04);
     var cfg = new GearInspection(spec, lo + 0.015 * (hi - lo), null, 4, 4, hi - 0.015 * (hi - lo));
     var cross = InspectionRingStock.create(grid, cfg);

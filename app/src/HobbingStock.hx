@@ -43,8 +43,8 @@ class HobbingStock {
   public function new(config:SceneArtifactHobbing, centerMetres:Array<Float>) {
     this.config = config;
     this.centerMetres = centerMetres.copy();
-    spec = new GearSpec(config.module, config.teeth, config.width, config.pressureAngle);
-    hob = new HobDesign(ConjugateRack.of(new ToothProfile(spec)), config.starts, config.outside, config.gashes);
+    spec = new GearSpec(config.module, config.teeth, config.width, new Involute(config.pressureAngle));
+    hob = new HobDesign(ConjugateRack.of(spec.profile()), config.starts, config.outside, config.gashes);
     stock = RingStock.fromGearBlank(spec, config.wall, config.radialStep, config.axialStep);
     stock.setThreads(1);
     var span = Std.int(Math.ceil(config.length / (2 * hob.axialPitch))) + 2;

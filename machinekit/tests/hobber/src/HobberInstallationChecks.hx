@@ -1,6 +1,7 @@
 import materia.assembly.AssemblyFrames as F;
 import machinekit.hobbing.FloatingRadialBearing;
 import gearkit.GearSpec;
+import gearkit.Involute;
 import stockkit.hobbing.HobbingAxes;
 
 /** Nominal installation checks, separate from fits, tool retention and cutting accuracy. */
@@ -86,7 +87,7 @@ class HobberInstallationChecks {
     var rows:Array<Dynamic> = [];
     for (reference in [false, true]) {
       var machine = reference ? new FlexsplineHobber() : new FlexsplineHobber(
-        new GearSpec(1, 40, 4, 20 * Math.PI / 180),
+        new GearSpec(1, 40, 4, new Involute(20 * Math.PI / 180)),
         4
       );
       var state = FlexsplineHobberPreview.inspectionState(machine), arbor = machine.spindle.arbor, hob = machine.hob;

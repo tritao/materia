@@ -10,8 +10,8 @@ class HobbingErrorTests {
   }
   static function near(a:Float, b:Float, tol:Float, label:String):Void check(Math.abs(a - b) <= tol, '$label: $a / $b');
   static function physical(tolerance:Float = 0.0001, threads:Int = 4):Void {
-    var spec = new GearSpec(1, 20, 2, 20 * Math.PI / 180), hob = new HobDesign(
-      ConjugateRack.of(new ToothProfile(spec)),
+    var spec = new GearSpec(1, 20, 2, new Involute(20 * Math.PI / 180)), hob = new HobDesign(
+      ConjugateRack.of(spec.profile()),
       1,
       32,
       4
@@ -70,8 +70,8 @@ class HobbingErrorTests {
     Sys.println('Physical hobbing errors: $checks assertions passed');
   }
   static function knotParity():Void {
-    var spec = new GearSpec(1, 20, 2, 20 * Math.PI / 180), hob = new HobDesign(
-      ConjugateRack.of(new ToothProfile(spec)),
+    var spec = new GearSpec(1, 20, 2, new Involute(20 * Math.PI / 180)), hob = new HobDesign(
+      ConjugateRack.of(spec.profile()),
       1,
       32,
       4
@@ -128,8 +128,8 @@ class HobbingErrorTests {
     Sys.println('Motion knot parity: $checks assertions passed');
   }
   static function crossParity():Void {
-    var spec = new GearSpec(1, 20, 2, 20 * Math.PI / 180), hob = new HobDesign(
-      ConjugateRack.of(new ToothProfile(spec)),
+    var spec = new GearSpec(1, 20, 2, new Involute(20 * Math.PI / 180)), hob = new HobDesign(
+      ConjugateRack.of(spec.profile()),
       1,
       32,
       4
@@ -209,8 +209,8 @@ class HobbingErrorTests {
     Sys.println('Inspection cross parity: $checks assertions passed');
   }
   static function faceEnds():Void {
-    var spec = new GearSpec(1, 20, 2, 20 * Math.PI / 180), hob = new HobDesign(
-      ConjugateRack.of(new ToothProfile(spec)),
+    var spec = new GearSpec(1, 20, 2, new Involute(20 * Math.PI / 180)), hob = new HobDesign(
+      ConjugateRack.of(spec.profile()),
       1,
       32,
       4
@@ -346,8 +346,8 @@ class HobbingErrorTests {
       .println('Face-end inspection: $checks assertions passed; baseline Fbeta=${reports[0].value("Fbeta")} um; end-excess Fbeta=${reports[1].value("Fbeta")} um');
   }
   static function multiConvergence():Void {
-    var spec = new GearSpec(1, 20, 2, 20 * Math.PI / 180), hob = new HobDesign(
-      ConjugateRack.of(new ToothProfile(spec)),
+    var spec = new GearSpec(1, 20, 2, new Involute(20 * Math.PI / 180)), hob = new HobDesign(
+      ConjugateRack.of(spec.profile()),
       1,
       32,
       4
@@ -475,8 +475,8 @@ class HobbingErrorTests {
     var shape = HobbingErrorSource.profile("hob", 0.001, 1), warp = shape.warp;
     if (warp == null) throw "missing profile waveform";
     near(warp(new Point3(16, 0, 0.25)).x, 16.001, 1e-12, "profile warp modifies rake geometry before cutting");
-    var toolSpec = new GearSpec(1, 40, 4, 20 * Math.PI / 180), design = new HobDesign(
-      ConjugateRack.of(new ToothProfile(toolSpec)),
+    var toolSpec = new GearSpec(1, 40, 4, new Involute(20 * Math.PI / 180)), design = new HobDesign(
+      ConjugateRack.of(toolSpec.profile()),
       1,
       32,
       4
@@ -491,8 +491,8 @@ class HobbingErrorTests {
       "measured runtime sync is injected without an ideal reconstruction"
     );
     // Independent translated involutes test HB4's expected eccentricity signature.
-    var spec = new GearSpec(1, 40, 4, 20 * Math.PI / 180), profile = new ToothProfile(spec);
-    var control = profile.rootJoinRadius + 0.01 * (profile.tipJoinRadius - profile.rootJoinRadius);
+    var spec = new GearSpec(1, 40, 4, new Involute(20 * Math.PI / 180)), profile = spec.profile();
+    var control = profile.rootJoinRadius() + 0.01 * (profile.tipJoinRadius() - profile.rootJoinRadius());
     var inspection = new GearInspection(spec, control, null, null, null, null, 0, 0);
     var measured = GearMeasurement.fromRings(new SyntheticGearRings(spec, control, e, 0, 0, 65, 65), spec, inspection);
     near(measured.value("Fr"), 2 * e * 1000, 0.1, "translated involutes Fr=2e");

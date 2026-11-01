@@ -29,21 +29,21 @@ class ConjugateRack {
     var flank:Array<Point2> = [], corner:Array<Point2> = [], root:Array<Point2> = [];
     for (i in 0...samples + 1) {
       var t = i / samples;
-      flank.push(contact(profile.spec, profile.flank(t), profile.flankDerivative(t)));
-      corner.push(contact(profile.spec, profile.rootFillet(t), profile.rootDerivative(t)));
-      if (profile.spec.tipFilletRadius > 0) {
-        root.push(contact(profile.spec, profile.tipFillet(t), profile.tipDerivative(t)));
+      flank.push(contact(profile.gearSpec(), profile.flank(t), profile.flankDerivative(t)));
+      corner.push(contact(profile.gearSpec(), profile.rootFillet(t), profile.rootDerivative(t)));
+      if (profile.gearSpec().tipFilletRadius > 0) {
+        root.push(contact(profile.gearSpec(), profile.tipFillet(t), profile.tipDerivative(t)));
       } else {
         // A sharp tip has a normal cone: its stationary point sweeps the cutter-root blend.
         var p = profile.flank(1), d = profile.flankDerivative(1);
-        var end = new Point2(-profile.spec.sign() * p.y, profile.spec.sign() * p.x);
+        var end = new Point2(-profile.gearSpec().sign() * p.y, profile.gearSpec().sign() * p.x);
         var sweep = Math.atan2(d.x * end.y - d.y * end.x, d.x * end.x + d.y * end.y);
-        root.push(contact(profile.spec, p, d.rotated(t * sweep)));
+        root.push(contact(profile.gearSpec(), p, d.rotated(t * sweep)));
       }
     }
     flank.sort((a, b) -> a.y < b.y ? -1 : a.y > b.y ? 1 : 0);
     corner.sort((a, b) -> a.y < b.y ? -1 : a.y > b.y ? 1 : 0);
-    return new ConjugateRack(profile.spec.module, profile.spec.pressureAngle, flank, corner, root);
+    return new ConjugateRack(profile.gearSpec().module, profile.gearSpec().pressureAngle, flank, corner, root);
   }
 
   /** Solve the envelope equation n·v=0 by bisection; no involute/rack formula shortcut.

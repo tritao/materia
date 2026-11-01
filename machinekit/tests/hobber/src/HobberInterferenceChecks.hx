@@ -1,6 +1,7 @@
 import machinekit.assembly.PosedParts;
 import cadkit.modeling.AssemblyModel;
 import gearkit.GearSpec;
+import gearkit.Involute;
 
 /** Exact solids, including fixed neighbours and contacts suppressed in the interactive scene. */
 class HobberInterferenceChecks {
@@ -16,7 +17,7 @@ class HobberInterferenceChecks {
     var castingOnly = Sys.args().indexOf("bed-casting") >= 0;
     var reference = Sys.args().indexOf("reference") >= 0, sweep = Sys.args().indexOf("sweep") >= 0;
     var machine = reference ? new FlexsplineHobber() : new FlexsplineHobber(
-      new GearSpec(1, 40, 4, 20 * Math.PI / 180),
+      new GearSpec(1, 40, 4, new Involute(20 * Math.PI / 180)),
       4
     );
     var model = new AssemblyModel("mm");

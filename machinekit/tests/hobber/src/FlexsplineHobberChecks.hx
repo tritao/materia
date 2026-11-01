@@ -5,6 +5,7 @@ import machinekit.assembly.PosedParts;
 import machinekit.hobbing.*;
 import stockkit.hobbing.HobbingAxes;
 import gearkit.GearSpec;
+import gearkit.Involute;
 
 class FlexsplineHobberChecks {
   static var assertions = 0;
@@ -238,7 +239,7 @@ class FlexsplineHobberChecks {
       throw e;
     }
     parts.close();
-    for (s in [new GearSpec(1, 40, 10, 20 * Math.PI / 180), new GearSpec(0.5, 100, 15, 20 * Math.PI / 180)]) {
+    for (s in [new GearSpec(1, 40, 10, new Involute(20 * Math.PI / 180)), new GearSpec(0.5, 100, 15, new Involute(20 * Math.PI / 180))]) {
       var other = new FlexsplineHobber(s),
         depth = s.pitchRadius() + other.hob.design.pitchDiameter / 2 + s.profileShift * s.module;
       check(
@@ -251,8 +252,8 @@ class FlexsplineHobberChecks {
   /** Small physical integration fixture, separate from reference-budget acceptance. */
   static function wallCuts():Void {
     var machine = new FlexsplineHobber(), support = new MandrelRadialSupport(machine.mandrel, machine.spec.faceWidth);
-    var spec = new GearSpec(1, 20, 2, 20 * Math.PI / 180);
-    var hob = new gearkit.HobDesign(gearkit.ConjugateRack.of(new gearkit.ToothProfile(spec)), 1, 32, 4);
+    var spec = new GearSpec(1, 20, 2, new Involute(20 * Math.PI / 180));
+    var hob = new gearkit.HobDesign(gearkit.ConjugateRack.of(spec.profile()), 1, 32, 4);
     var motion = new stockkit.hobbing.IdealHobbingJob(spec, hob, 3000, 1.1, 0, 1);
     var grid = stockkit.ring.RingStock.fromGearBlank(spec, 0.6, 0.1, 0.2);
     var passes = motion.schedule(grid.grid);

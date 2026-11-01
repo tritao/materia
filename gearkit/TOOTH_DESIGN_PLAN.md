@@ -344,8 +344,8 @@ TD0 ── TD1 ── TD2 ──┐
 | Step | State | Commits |
 |---|---|---|
 | TD0 | done | Tooth design: baseline and test-design inputs (TD0) |
-| TD1 | planned | |
-| TD2 | planned | |
+| TD1 | done | Tooth design: tooth-form interface (TD1) |
+| TD2 | blocked: Liu 2025 arc geometry (meaning of c1/e1/c2/e2, tangent construction, blends) is not in the repo notes and the open-access MDPI full text refused automated download (HTTP 403); implement once the equations are supplied | |
 | TD3 | planned | |
 | TD4 | planned | |
 | TD5 | planned | |

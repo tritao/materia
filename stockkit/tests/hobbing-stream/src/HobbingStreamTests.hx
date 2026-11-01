@@ -5,8 +5,8 @@ import stockkit.hobbing.*;
 import stockkit.hobbing.forces.*;
 class HobbingStreamTests {
   public static function main():Void {
-    var spec = new GearSpec(1, 40, 2, 20 * Math.PI / 180), hob = new HobDesign(
-      ConjugateRack.of(new ToothProfile(spec)),
+    var spec = new GearSpec(1, 40, 2, new Involute(20 * Math.PI / 180)), hob = new HobDesign(
+      ConjugateRack.of(spec.profile()),
       1,
       32,
       4

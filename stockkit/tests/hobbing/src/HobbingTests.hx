@@ -1,5 +1,5 @@
 import gearkit.GearSpec;
-import gearkit.ToothProfile;
+import gearkit.Involute;
 import gearkit.ConjugateRack;
 import gearkit.HobDesign;
 import stockkit.ring.RingGrid;
@@ -88,9 +88,9 @@ class HobbingTests {
   }
 
   static function profileCase(gashes:Int, starts:Int = 1):ProfileResult {
-    var spec = new GearSpec(1, 40, 10, 20 * Math.PI / 180), profile = new ToothProfile(spec);
+    var spec = new GearSpec(1, 40, 10, new Involute(20 * Math.PI / 180)), profile = spec.profile();
     var hob = new HobDesign(ConjugateRack.of(profile), starts, 32, gashes);
-    var rlo = profile.rootJoinRadius + 0.02, rhi = profile.tipJoinRadius - 0.02;
+    var rlo = profile.rootJoinRadius() + 0.02, rhi = profile.tipJoinRadius() - 0.02;
     var stock = RingStock.annulus(new RingGrid(rlo, rhi, -0.000001, 0.000001, (rhi - rlo) / 192, 1));
     var job = new IdealHobbingJob(spec, hob, 3000, 1.1), sweep = new HobbingSweep(
       hob,
@@ -109,7 +109,7 @@ class HobbingTests {
         "generated tooth crosses the profile circle"
       );
       var p = profile.flankAtRadius(radius), truth = Math.atan2(p.x, p.y);
-      var error = (circle[0].hi - truth) * profile.spec.baseRadius();
+      var error = (circle[0].hi - truth) * profile.gearSpec().baseRadius();
       min = Math.min(min, error);
       max = Math.max(max, error);
       check(circle[0].hiPass >= 0, "flank keeps the actual gash pass source");
@@ -166,8 +166,8 @@ class HobbingTests {
     throw 'missing generated tooth at $center';
   }
   static function referenceCase():Void {
-    var spec = new GearSpec(0.3, 200, 8, 20 * Math.PI / 180);
-    var hob = new HobDesign(ConjugateRack.of(new ToothProfile(spec)), 1, 32, 12);
+    var spec = new GearSpec(0.3, 200, 8, new Involute(20 * Math.PI / 180));
+    var hob = new HobDesign(ConjugateRack.of(spec.profile()), 1, 32, 12);
     var stock = RingStock.annulus(new RingGrid(29.925, 30.075, -0.000001, 0.000001, 0.05, 1));
     var job = new IdealHobbingJob(spec,
       hob, 3000, 1.1), sweep = new HobbingSweep(hob, -8, 8, 0.00005), began = Sys.time();
@@ -198,8 +198,8 @@ class HobbingTests {
     stock.dispose();
   }
   static function feedCase():Void {
-    var spec = new GearSpec(1, 40, 10, 20 * Math.PI / 180);
-    var hob = new HobDesign(ConjugateRack.of(new ToothProfile(spec)), 1, 32, 12);
+    var spec = new GearSpec(1, 40, 10, new Involute(20 * Math.PI / 180));
+    var hob = new HobDesign(ConjugateRack.of(spec.profile()), 1, 32, 12);
     var stock = RingStock.annulus(new RingGrid(19.9999, 20.0001, 0, 2, 1, 0.4));
     var job = new IdealHobbingJob(spec,
       hob, 3000, 3, 2, -2), sweep = new HobbingSweep(hob, -4, 4, 0.00005), began = Sys.time();

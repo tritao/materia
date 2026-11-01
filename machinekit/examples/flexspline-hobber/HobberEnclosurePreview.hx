@@ -318,7 +318,7 @@ class HobberEnclosurePreview {
     return scene;
   }
   public static function unified():materia.project.SceneArtifact.SceneArtifactData {
-    var machine = new FlexsplineHobber(new gearkit.GearSpec(1, 40, 4, 20 * Math.PI / 180), 4, true);
+    var machine = new FlexsplineHobber(new gearkit.GearSpec(1, 40, 4, new gearkit.Involute(20 * Math.PI / 180)), 4, true);
     var fitted = assembled(machine);
     return runtimeScene(fitted.assembly, machine, fitted.shell.layout.stroke, true);
   }

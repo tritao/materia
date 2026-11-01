@@ -24,9 +24,9 @@ class HobGeometryTests {
   }
   public static function run():Void {
     var reference = Sys.args().indexOf("reference") >= 0, short = Sys.args().indexOf("short") >= 0;
-    var spec = reference ? new GearSpec(0.3, 200, 8, 20 * Math.PI / 180) : new GearSpec(1, 40, 4, 20 * Math.PI / 180);
+    var spec = reference ? new GearSpec(0.3, 200, 8, new Involute(20 * Math.PI / 180)) : new GearSpec(1, 40, 4, new Involute(20 * Math.PI / 180));
     var starts = Sys.args().indexOf("two-start") >= 0 ? 2 : 1, rake = Sys.args().indexOf("rake") >= 0 ? 0.12 : 0.0;
-    var design = new HobDesign(ConjugateRack.of(new ToothProfile(spec)), starts, 32, reference ? 12 : 4, rake);
+    var design = new HobDesign(ConjugateRack.of(spec.profile()), starts, 32, reference ? 12 : 4, rake);
     var hob = Hob.fromDesign(design, spec, short ? 8 : 40, 16, true);
     if (Sys.args().indexOf("keyed") >= 0) hob = new Hob(hob.values().copy().setNumber("keywayWidth", 5));
     for (g in 0...design.gashes) for (thread in 0...design.starts) for (turn in [-1, 0, 1]) {

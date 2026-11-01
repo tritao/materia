@@ -4,6 +4,7 @@ import machinekit.hobbing.HobberXLayout;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import gearkit.GearSpec;
+import gearkit.Involute;
 
 /** Actual hollow cup + assumed front gripper against every installed neighbour.
     Continuous head corridor/all-A proof is provided by HobberLoadingSizing. */
@@ -15,7 +16,7 @@ class HobberLoadingChecks {
   }
   public static function run():Void {
     var count = 0;
-    for (spec in [new GearSpec(0.5, 48, 20, 20 * Math.PI / 180), new GearSpec(0.5, 278, 20, 20 * Math.PI / 180)]) {
+    for (spec in [new GearSpec(0.5, 48, 20, new Involute(20 * Math.PI / 180)), new GearSpec(0.5, 278, 20, new Involute(20 * Math.PI / 180))]) {
       var machine = new FlexsplineHobber(spec), model = new cadkit.modeling.AssemblyModel("mm");
       machine.addTo(model, "");
       var state = model.initialState();

@@ -24,8 +24,8 @@ class HobbingForceTests {
     return value;
   }
   static function referenceSweep(full:Bool = false):Void {
-    var spec = new GearSpec(0.3, 200, 8, 20 * Math.PI / 180);
-    var hob = new HobDesign(ConjugateRack.of(new ToothProfile(spec)), 1, 32, 12);
+    var spec = new GearSpec(0.3, 200, 8, new Involute(20 * Math.PI / 180));
+    var hob = new HobDesign(ConjugateRack.of(spec.profile()), 1, 32, 12);
     var cam = new camkit.HobbingJob(spec, hob, 40), path = cam.passes[0];
     var job = new IdealHobbingJob(spec, hob, cam.rpm, full ? path.revolutions : 0.01, 0.5, full ? path.zStart : 4);
     var threads = forceThreads(), tolerance = forceTolerance();
@@ -124,8 +124,8 @@ class HobbingForceTests {
     stock.dispose();
   }
   static function quickCut():Void {
-    var spec = new GearSpec(0.3, 40, 1, 20 * Math.PI / 180), hob = new HobDesign(
-      ConjugateRack.of(new ToothProfile(spec)),
+    var spec = new GearSpec(0.3, 40, 1, new Involute(20 * Math.PI / 180)), hob = new HobDesign(
+      ConjugateRack.of(spec.profile()),
       1,
       32,
       4

@@ -114,8 +114,8 @@ class ForceSpeedChecks {
     return true;
   }
   public static function run(threadsOnly:Bool = false):Void {
-    var spec = new GearSpec(0.3, 200, 8, 20 * Math.PI / 180), hob = new HobDesign(
-      ConjugateRack.of(new ToothProfile(spec)),
+    var spec = new GearSpec(0.3, 200, 8, new Involute(20 * Math.PI / 180)), hob = new HobDesign(
+      ConjugateRack.of(spec.profile()),
       1,
       32,
       12
