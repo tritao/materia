@@ -7,7 +7,7 @@ class Cams {
       case "cosine": new CosineCam(w0);
       case "ellipse": new EllipseCam(neutralRadius, w0);
       case "four-roller": new FourRollerCam(neutralRadius, w0);
-      case "resal": throw "cam \"resal\" is not implemented: the Resal curve equation (Gravagno 2016) has not been read";
+      case "resal": new ResalCam(w0);
       default: throw 'unknown cam "$name"';
     };
   }

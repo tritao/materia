@@ -272,6 +272,30 @@ Deviations from the printed equations:
   against a `3 (w0/rn)^2` bound, not 1e-9.
 - Cosine numerics against the closed form: 1.4e-16.
 
+### Resal cam and the cam comparison
+
+- `ResalCam`: Gravagno, Mucino, Pennestri 2016, eq 18 (the extracted text garbles the fraction; the form used is
+  `u = delta (1/pi - theta sin theta/4 - cos theta/4) / (1/pi - pi/8)`, theta from the minor axis, rollers at +-pi/2,
+  checked by its zero mean and `u(pi/2) = delta`). Cam convention: delta = w0, theta = (phi mod pi) - pi/2. Tests:
+  `w(0) = w0`, minor axis -0.918 w0, zero slope at both axes, mean zero (1e-12), even, period pi, slope matches
+  the derivative, and the general inextensibility/closure checks all pass.
+- TD5 cam comparison (`ToothStudy.camStudy`, kappa 1, own derived circular spline, so transmission error is zero
+  by construction and only the engagement and clearances differ):
+
+| Cam | D1 minor-tip clr | D1 engaged 5 / 20 um | D2s minor-tip clr | D2s engaged 5 / 20 um | max abs w difference from cosine |
+|---|---|---|---|---|---|
+| cosine | 0 | 48 % / 86 % | 248 um | 17.5 % / 42 % | 0 |
+| ellipse | -4.6 um (touch) | 48 % / 85.5 % | 244 um | 17.3 % / 41 % | 4.6 um |
+| Resal | -24.5 um (touch) | 48 % / 85 % | 224 um | 15.9 % / 40 % | 24.5 um |
+| four-roller | -127 um | 43 % / 59 % | 121 um | 5 % / 44 % | 127 um |
+
+  The Resal and ellipse cams give nearly the cosine engagement; the Resal minor axis is pulled in 0.918 w0, so the
+  D1 tips (zero margin at kappa 1) touch at the minor axis, which D2's shorter teeth absorb. Gravagno's kinematic
+  error (transmission-ratio error) is **not modelled** here; it needs a fixed circular spline meshing with the cam.
+  Gravagno's finding (Resal, ellipse, two-conjugate-arc lowest error; the dwell "caterpillar" cams, cycloidal,
+  3-4-5 and 8th-degree polynomial, trade slightly higher error for more contact) is noted: **dwell cams are a possible
+  later TD**, not implemented.
+
 ## TD4 notes
 
 - `CircularSplineEnvelope` sweeps one tooth boundary (exact chord-circle crossings, 400 radii,
@@ -514,7 +538,7 @@ TD0 ── TD1 ── TD2 ──┐
 | TD0 | done | Tooth design: baseline and test-design inputs (TD0) |
 | TD1 | done | Tooth design: tooth-form interface (TD1) |
 | TD2 | done: `DoubleCircularArc` / `DoubleArcProfile` (flat construction rebuilt from the definitions, wrapped on the pitch circle; circular root and tip blends assumed); deviations from the paper in the TD2 notes | Tooth design: double-circular-arc form (TD2) |
-| TD3 | done, except Resal cam: blocked (Resal curve equation, Gravagno 2016, not read); cosine, ellipse, four-roller implemented | Tooth design: deformation kinematics (TD3) |
+| TD3 | done: cosine, ellipse, four-roller, Resal (Gravagno 2016 eq 18) | Tooth design: deformation kinematics (TD3) |
 | TD4 | done for involute forms (D1, D3); not fitted to a full `Sampled` ToothForm (root/tip blends), and no contact-condition refinement: accuracy is by convergence | Tooth design: circular-spline envelope (TD4) |
 | TD5 | done for D1, D2, D3, D4 (unloaded kinematic); "engaged fraction rises with kappa" not borne out (measured fall) and "D2 engages more than D1" not borne out (D2 engages fewer, see TD5 notes) | Tooth design: meshing analysis and D1/D3 comparison (TD5); Tooth design: double-circular-arc form (TD2) (D2 comparison) |
 | TD6 | planned | |

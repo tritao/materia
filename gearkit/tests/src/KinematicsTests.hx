@@ -4,6 +4,8 @@ import gearkit.CosineCam;
 import gearkit.EllipseCam;
 import gearkit.FourRollerCam;
 import gearkit.Point2;
+import gearkit.Quadrature;
+import gearkit.ResalCam;
 import gearkit.StrainWaveKinematics;
 import gearkit.WaveDeformation;
 
@@ -35,8 +37,9 @@ class KinematicsTests {
     for (cam in cams()) general(cam);
     fourRollerArcs();
     poses();
-    for (n in ["cosine", "ellipse", "four-roller"]) check(Cams.make(n, RN, W0).name() == n, 'cam $n by name');
-    rejects(() -> Cams.make("resal", RN, W0), "not implemented");
+    for (n in ["cosine", "ellipse", "four-roller", "resal"]) check(Cams.make(n, RN, W0).name() == n, 'cam $n by name');
+    resal();
+    rejects(() -> new ResalCam(0), "amplitude");
     rejects(() -> Cams.make("triangle", RN, W0), "unknown cam");
     rejects(() -> new CosineCam(0), "amplitude");
     rejects(() -> new EllipseCam(0.2, 0.3), "neutral radius");
@@ -44,7 +47,7 @@ class KinematicsTests {
     Sys.println('KinematicsTests: $assertions assertions passed; closed form ${worstClosedForm}; inextensibility ${worstInextensible}; closure ${worstClosure}');
   }
 
-  static function cams():Array<Cam> return [new CosineCam(W0), new EllipseCam(RN, W0), new FourRollerCam(RN, W0)];
+  static function cams():Array<Cam> return [new CosineCam(W0), new EllipseCam(RN, W0), new FourRollerCam(RN, W0), new ResalCam(W0)];
 
   /** The numerical v and mu of the cosine cam equal the closed form to 1e-12. */
   static function cosine():Void {
@@ -57,6 +60,31 @@ class KinematicsTests {
       near(d.v(phi), v, 1e-12, "cosine v closed form");
       near(d.mu(phi), mu, 1e-12, "cosine mu closed form");
     }
+  }
+
+  /** Gravagno 2016 eq 18: values, zero mean, symmetry, flat at both axes. */
+  static function resal():Void {
+    var c = new ResalCam(W0), pi = Math.PI;
+    near(c.w(0), W0, 1e-15, "resal w(0) = w0 at the rollers");
+    near(c.w(pi), W0, 1e-15, "resal w(pi)");
+    near(c.w(pi / 2), -W0 * (1 / pi - 0.25) / (pi / 8 - 1 / pi), 1e-15, "resal minor-axis value");
+    near(c.w(pi / 2) / W0, -0.9180, 5e-4, "resal minor axis is about -0.918 w0");
+    near(c.dw(0), 0, 1e-15, "resal dw at the major axis");
+    near(c.dw(pi / 2), 0, 1e-15, "resal dw at the minor axis");
+    near(c.dw(pi - 1e-9), 0, 1e-8, "resal dw just before pi");
+    var mean = Quadrature.integrate(x -> c.w(x), 0, pi, [], 1e-3) / pi;
+    near(mean, 0, 1e-12, "resal mean is zero");
+    for (i in 0...60) {
+      var phi = 0.0211 * i + 0.004;
+      near(c.w(-phi), c.w(phi), 1e-14, "resal even about the major axis");
+      near(c.w(pi - phi), c.w(phi), 1e-14, "resal even about the minor axis");
+      near(c.w(phi + pi), c.w(phi), 1e-14, "resal period pi");
+      near(c.dw(-phi), -c.dw(phi), 1e-14, "resal dw odd");
+      var h = 1e-6;
+      near((c.w(phi + h) - c.w(phi - h)) / (2 * h), c.dw(phi), 1e-7, "resal dw is the derivative of w");
+    }
+    // Different from the cosine: not symmetric about its own mean.
+    check(Math.abs(c.w(pi / 2) + W0) > 0.05 * W0, "resal is not a cosine");
   }
 
   static function general(cam:Cam):Void {

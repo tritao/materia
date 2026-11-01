@@ -145,6 +145,26 @@ class ToothStudy {
     Sys.println('  D1 rack flank against the D2s rack flank over the common heights ($n samples): largest x difference ${f(worst * 1000, 1)} um at height ${f(worstY / m, 3)} m (as cut, no offset)');
   }
 
+  /** Cam comparison: each cam with its own derived circular spline (so transmission error is zero by construction;
+      the cam's effect shows as how closely the other teeth follow the envelope). */
+  static function camStudy():Void {
+    var deg = ToothDesigns.DEG;
+    for (base in ["D1", "D2s"]) for (cam in ["cosine", "ellipse", "four-roller", "resal"]) {
+      var input = base == "D1" ? new StrainWaveInput("D1", "involute", 0.3, 200, 202, 1.0, cam, 20 * deg) : new StrainWaveInput("D2s", "double-circular-arc", 0.3, 200, 202, 1.0, cam);
+      var pair = new StrainWavePair(input);
+      var r = MeshingAnalysis.run(pair, 0.005, 24), r20 = MeshingAnalysis.run(pair, 0.02, 24);
+      var worstW = 0.0, worstDw = 0.0, ref = new gearkit.CosineCam(input.w0());
+      for (i in 0...181) {
+        var phi = Math.PI * i / 180;
+        worstW = Math.max(worstW, Math.abs(pair.cam.w(phi) - ref.w(phi)));
+        worstDw = Math.max(worstDw, Math.abs(pair.cam.dw(phi) - ref.dw(phi)));
+      }
+      Sys.println('  cam $base ${cam}: interference ${r.interference.length == 0 ? "no" : "YES"}, rootClr ${f(r.rootClearance * 1000, 1)} um, minorTipClr ${f(r.minorTipClearance * 1000, 1)} um, '
+        + 'engaged(5um) ${f(r.engagedFraction * 100, 1)}%, engaged(20um) ${f(r20.engagedFraction * 100, 1)}%, zone(5um) +-${f(r.contactZone * 180 / Math.PI, 0)} deg, '
+        + 'max |w - cosine w| ${f(worstW * 1000, 1)} um, max |dw - cosine dw| ${f(worstDw * 1000, 1)} um/rad');
+    }
+  }
+
   public static function run():Void {
     var m = 0.3, deg = ToothDesigns.DEG;
     var max20 = HobCheck.maxCutterTipRadius(r -> {
@@ -171,6 +191,7 @@ class ToothStudy {
     for (k in [0.8, 1.0, 1.1, 1.2]) cases.push({label: "D2s DCA rho 0.38m", input: ToothDesigns.d2Scaled(k), rho: null});
     for (k in [0.8, 1.0, 1.2]) cases.push({label: "D2 DCA(paper m 0.5) rho 0.38m", input: new StrainWaveInput("D2", "double-circular-arc", 0.5, 100, 102, k, "cosine"), rho: null});
     hobStudy();
+    camStudy();
     for (c in cases) {
       var pair = new StrainWavePair(c.input, c.rho);
       var r = MeshingAnalysis.run(pair, 0.005, 24);
