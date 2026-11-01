@@ -212,6 +212,20 @@ D1 to D4 are written as inputs in `gearkit/tests/src/ToothDesigns.hx` (`StrainWa
 `gearkit/haxe/gearkit`), validated by `ToothDesignInputTests`. **D4's kappa (2.0) is assumed**
 until TD5 measures where the derived circular spline interferes.
 
+## TD3 notes
+
+- Cams (`gearkit/haxe/gearkit/*Cam.hx`, `WaveDeformation`, `StrainWaveKinematics`): `w0` is the
+  major-axis radial displacement. Ellipse and four-roller are physical polar profiles with semi-axes
+  `rn +/- w0`, minus their mean radius so the ring keeps its length (needed for `v` to close).
+- **Assumed:** the four-roller is a four-arc oval (lobe arc radius = half the minor semi-axis,
+  larger arc on the minor axis, tangent at the join); no roller geometry was sourced. The neutral
+  radius in tests (29.7 mm) assumes a 0.6 mm wall (0.01 m Z_f) under the root of D1.
+- "Neutral-line length preserved to 1e-9" is tested as the linear inextensibility condition
+  `w + dv/dphi = 0` (measured 7e-13) and closure of `v` (1.4e-14). The exact arc length of the
+  deformed line differs from `2 pi rn` at second order in `w0/rn` (about 1e-4 for D1); tested
+  against a `3 (w0/rn)^2` bound, not 1e-9.
+- Cosine numerics against the closed form: 1.4e-16.
+
 ## Steps
 
 ### Phase A: forms and kinematics
@@ -346,7 +360,7 @@ TD0 ── TD1 ── TD2 ──┐
 | TD0 | done | Tooth design: baseline and test-design inputs (TD0) |
 | TD1 | done | Tooth design: tooth-form interface (TD1) |
 | TD2 | blocked: Liu 2025 arc geometry (meaning of c1/e1/c2/e2, tangent construction, blends) is not in the repo notes and the open-access MDPI full text refused automated download (HTTP 403); implement once the equations are supplied | |
-| TD3 | planned | |
+| TD3 | done, except Resal cam: blocked (Resal curve equation, Gravagno 2016, not read); cosine, ellipse, four-roller implemented | Tooth design: deformation kinematics (TD3) |
 | TD4 | planned | |
 | TD5 | planned | |
 | TD6 | planned | |
