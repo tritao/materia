@@ -4,6 +4,7 @@ import cadkit.modeling.Part;
 import machinekit.component.MachineComponent;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
+import machinekit.component.Dimension;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentRecipeSupport as P;
 import materia.assembly.AssemblyFrames as F;
@@ -26,7 +27,8 @@ class ToolingPin extends MachineComponent {
       false,
       null,
       false
-    );
+    ).numbered(v -> 'TOOL-PIN-${Dimension.format(v.number("diameter"))}x${Dimension.format(v.number("length"))}'
+      + (v.number("headDiameter") == 0 ? "" : '-H${Dimension.format(v.number("headDiameter"))}x${Dimension.format(v.number("headLength"))}'));
     return recipe;
   }
   public function new(?input:ComponentValues) {

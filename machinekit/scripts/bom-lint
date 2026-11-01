@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+cd "$root"
+native_root=${MATERIA_BOM_NATIVE_ROOT:-$root/machinekit/tests/build/host/native}
+if [[ ! -d "$native_root" ]]; then
+  echo "Set MATERIA_BOM_NATIVE_ROOT to an existing MachineKit native build: $native_root" >&2
+  exit 1
+fi
+./haxeon/scripts/haxeon build --compiler-only --project machinekit/scripts/haxeon.bom-lint.json
+native_paths=$(printf '%s:' "$native_root"/*/)
+export LD_LIBRARY_PATH="${native_paths}$root/haxeon/out:$root/haxeon/.tools/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export DYLD_LIBRARY_PATH="${native_paths}$root/haxeon/out:$root/haxeon/.tools/hashlink${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+exec "$root/haxeon/.tools/hashlink/hl" "$root/machinekit/build/bom-lint/host/main.hl" "$@"

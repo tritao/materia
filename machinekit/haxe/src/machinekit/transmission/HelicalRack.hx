@@ -41,7 +41,9 @@ class HelicalRack extends AssumedCatalogComponent {
       "machinekit.transmission.helical-rack",
       inputs(),
       v -> new HelicalRack(v)
-    );
+    ).numbered(v -> 'RACK-ASSUMED-M${Dimension.format(v.number("normalModule"))}-${v.integer("teeth")}T-'
+        + 'W${Dimension.format(v.number("faceWidth"))}-H${Dimension.format(v.number("helixAngle"))}-'
+        + v.token("hand").substr(0, 1).toUpperCase());
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

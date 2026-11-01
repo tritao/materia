@@ -45,7 +45,7 @@ class ToolingSourceCasting extends MachineComponent {
           inserts: []
         })
       )
-    );
+    ).numbered(v -> 'CASTING-${ToolingCodec.decodeInput(v.token("source")).id.toUpperCase()}');
     return recipe;
   }
 

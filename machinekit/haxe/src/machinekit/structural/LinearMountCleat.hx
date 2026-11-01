@@ -44,7 +44,7 @@ class LinearMountCleat extends MachineComponent {
       false,
       null,
       false
-    );
+    ).numbered(v -> 'LINEAR-MOUNT-CLEAT-H${Dimension.format(v.number("height"))}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

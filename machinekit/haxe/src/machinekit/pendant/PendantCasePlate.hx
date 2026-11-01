@@ -50,7 +50,7 @@ class PendantCasePlate extends PanelSolid {
         false,
         null,
         false
-      );
+      ).numbered(_ -> "PENDANT-PLATE");
     }
     return recipe;
   }

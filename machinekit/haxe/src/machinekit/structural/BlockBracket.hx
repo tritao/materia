@@ -68,7 +68,7 @@ class BlockBracket extends MachineComponent {
       ],
       v -> new BlockBracket(v.token("label"), readBlocks(v.token("blocks"))),
       true
-    );
+    ).numbered(v -> 'BRACKET-${v.token("label").toUpperCase().split(" ").join("-")}');
     return recipe;
   }
   override public function componentType():Null<machinekit.component.ComponentType> return recipeType();

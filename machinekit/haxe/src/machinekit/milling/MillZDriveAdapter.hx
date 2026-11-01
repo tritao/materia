@@ -32,7 +32,7 @@ class MillZDriveAdapter extends MachineComponent {
       "machinekit.milling.z-drive-adapter",
       parameters(),
       v -> new MillZDriveAdapter(v)
-    );
+    ).numbered(_ -> "MILL-Z-DRIVE-ADAPTER");
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

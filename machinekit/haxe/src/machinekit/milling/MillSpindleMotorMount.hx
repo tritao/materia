@@ -18,7 +18,7 @@ class MillSpindleMotorMount extends MachineComponent {
       "machinekit.milling.spindle-motor-mount",
       parameters(),
       v -> new MillSpindleMotorMount(v)
-    );
+    ).numbered(_ -> "MILL-SPINDLE-MOTOR-CARRIER");
     return recipe;
   }
   public function new(?v:ComponentValues) {

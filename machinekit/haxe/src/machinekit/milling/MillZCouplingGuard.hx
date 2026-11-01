@@ -16,7 +16,7 @@ class MillZCouplingGuard extends MachineComponent {
       "machinekit.milling.z-coupling-guard",
       parameters(),
       v -> new MillZCouplingGuard(v)
-    );
+    ).numbered(_ -> "MILL-Z-COUPLING-GUARD");
     return recipe;
   }
   public function new(?values:ComponentValues) {

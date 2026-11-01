@@ -114,7 +114,8 @@ class SfuDrawingScrew extends LeadScrew {
       "machinekit.motion.sfu-drawing-screw",
       [P.choice("model", models(), "SFU2005"), P.length("length", 500), P.length("raceRootDiameter", 16)],
       v -> new SfuDrawingScrew(v.token("model"), v.number("length"), v.number("raceRootDiameter"))
-    );
+    ).numbered(v -> v.token("model") + "-DRAWING-L" + Dimension.format(v.number("length"))
+      + "-R" + Dimension.format(v.number("raceRootDiameter")));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return drawingRecipeType();

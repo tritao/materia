@@ -200,6 +200,9 @@ class RadialPinionAssembly {
       ).setToken(
         "holes",
         InsertHoles.fromNeutral(drilling)
+      ).setToken(
+        "partId",
+        "PINION-" + hostId
       ))
     );
   }

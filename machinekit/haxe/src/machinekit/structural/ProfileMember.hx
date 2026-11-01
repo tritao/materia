@@ -54,7 +54,8 @@ class ProfileMember extends MachineComponent {
       ),
       v.number("length")
     );
-    });
+    }).numbered(v -> '${v.token("system")}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("height"))}-L${Dimension.format(v.number("length"))}'
+      + materialSuffix(v));
     return tslotRecipe;
   }
 
@@ -67,9 +68,16 @@ class ProfileMember extends MachineComponent {
         ComponentRecipeSupport.length("length", 100)
       ],
       v -> new ProfileMember(DrawingExtrusionProfile.fromText(v.token("section")), v.number("length"))
-    );
+    ).numbered(v -> {
+      var bounds = DrawingExtrusionProfile.fromText(v.token("section")).sectionBounds();
+      return 'DRAWN-SECTION-${Dimension.format(bounds.maxX - bounds.minX)}x${Dimension.format(bounds.maxY - bounds.minY)}-L${Dimension.format(v.number("length"))}'
+        + materialSuffix(v);
+    });
     return drawingRecipe;
   }
+
+  static function materialSuffix(v:ComponentValues):String return v.token("material") == "steel" ? ""
+    : "-" + materia.project.MaterialLibrary.fromSpec(v.token("material")).toUpperCase();
 
   override public function componentType():Null<ComponentType> {
     if (Std.isOfType(profile, DrawingExtrusionProfile)) return drawingRecipeType();
@@ -123,7 +131,7 @@ class ProfileMember extends MachineComponent {
 /** Saved values retain section geometry; identity keys use a compact digest of that payload. */
 private class ProfileMemberRecipeType extends ComponentType {
   public function new(id:String, inputs:Array<ComponentParameter>, build:ComponentValues -> MachineComponent) {
-    super(id, inputs, build, true);
+    super(id, inputs, build, true, true);
   }
   function compact(values:ComponentValues):ComponentValues {
     var result = resolve(values);
@@ -136,6 +144,4 @@ private class ProfileMemberRecipeType extends ComponentType {
   }
   override public function key(values:ComponentValues):String return super.key(compact(values));
   override public function bomKey(values:ComponentValues):String return super.bomKey(compact(values));
-  override public function partNumber(component:MachineComponent):String return component.designation
-    + (component.materialSpec() == "steel" ? "" : "-M" + component.materialId);
 }

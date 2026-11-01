@@ -4,6 +4,7 @@ import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
+import machinekit.component.Dimension;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
@@ -89,7 +90,7 @@ class SlideInSlotNut extends MachineComponent {
         v.number("ridgeHeight"),
         v.token("size")
       )
-    );
+    ).numbered(v -> 'SLIDE-${v.token("size")}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("length"))}x${Dimension.format(v.number("height"))}-R${Dimension.format(v.number("ridgeWidth"))}x${Dimension.format(v.number("ridgeHeight"))}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

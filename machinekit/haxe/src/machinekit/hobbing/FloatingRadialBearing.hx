@@ -18,7 +18,7 @@ class FloatingRadialBearing extends MachineComponent {
       "machinekit.hobbing.floating-radial-bearing",
       parameters(),
       v -> new FloatingRadialBearing(v)
-    );
+    ).numbered(v -> 'FLOAT-BRG-ASSUMED-${Dimension.format(v.number("bore"))}x${Dimension.format(v.number("outside"))}x${Dimension.format(v.number("height"))}');
     return recipe;
   }
   public function new(?values:ComponentValues) {

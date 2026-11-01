@@ -168,7 +168,7 @@ and readers reject anything else. It contains:
 ## Phases
 
 ### B1 — Export and baseline
-- Done in this commit: the exporter and baseline cover 22 constructed examples.
+- Done in `d8e2de07f`: the exporter and baseline cover 22 constructed examples.
   Their procurement identities match the baseline. The full gate passed 11 of
   24 shards, with no new failing shard or exception message against the baseline.
   The machine-tending constructor currently rejects its stale reach certificate;
@@ -185,6 +185,91 @@ and readers reject anything else. It contains:
   baseline lists each problem class with counts.
 
 ### B2 — Part-number rules and lint
+- Done in this commit: 212 constructible recipe defaults and all recipe-derived
+  numbers in 22 machine exports pass lint; three defaults require source inputs.
+  The full gate passed 11/24 shards with no new shard or exception message.
+  The measurements and remaining non-recipe invalid counts are in
+  `BOM_BASELINE.md`.
+- Decision: the current enclosure recipes identify panel construction, blank
+  dimensions and any opening in the number. This keeps different cut panels
+  distinct while the recipes lack an author-declared drawing identifier; B3
+  must supply that identifier for released made parts.
+- The generic robot housing, pedestal, end-effector plate and wrist fork
+  recipes likewise still number their dimensions. They need author-declared
+  drawing identifiers in B3 before their numbers can survive design edits.
+- Generic motor plates and carriages also need author-declared drawing IDs in
+  B3. Their B2 numbers describe interfaces and dimensions, and the full recipe
+  key detects differing inputs within a bill.
+- Tooling panel and volume numbers use their existing plan IDs in B2. Those
+  IDs are scoped to a plan, so B3 must establish globally distinct drawing
+  identities before release records can safely refer to them.
+- The required-input casting, insert and cassette recipes retain their
+  required source data. Their representative instances are checked without
+  inventing defaults; their current source labels also need drawing-identity
+  review in B3.
+- Cast inserts accept a recipe-level part ID so a foundation can carry its
+  existing member IDs into numbering. The hobber qualifies those IDs by bed or
+  column because both foundations use names such as `railLeft`.
+- The drawing-section member's B2 number states only its bounds and cut
+  length; different contours can share those bounds. Its exact recipe key
+  prevents combining them in one bill, but B3 must add an author-declared
+  section identity before bills from different machines can be compared.
+- Home-switch brackets now carry their axis ID in their label, and linear
+  mount receiver numbers include stock dimensions. Without those distinctions,
+  different parts in the same machine collide during procurement roll-up.
+- Fabricated rack tubes and their host pads carry their source member IDs in
+  the recipe because equal-sized parts can have different drilling patterns.
+  Other cut tubes use stock dimensions; B3 must establish globally distinct
+  drawing identities for fabricated members.
+- Stepped-shaft numbers describe section stock and feature counts until B3
+  supplies author-declared drawing IDs. Different features can share those
+  numbers; their exact recipe keys prevent merging them in a bill. The
+  sheet-router service table has its own provisional drawing name.
+- Power-supply numbers omit the trailing regenerative-power unit to keep the
+  sheet-router rating within 40 characters; recipe values retain the units.
+- Decision: ZPP engineering member numbers identify the supplier model and
+  modeled role, without embedding a CAD file hash. `AR155_I` is written as
+  `AR155-I` in the internal number to meet the character rule; the exact
+  supplier model belongs in the later manufacturer part-number field.
+- Decision: retain the generic lead-screw nut's selected material in its
+  identity when it differs from bronze. The sheet router uses a steel ball
+  nut, and the material is a purchase distinction, not a drawing-only input.
+- For recipes whose number does not already declare material, an edited
+  material adds the material library ID to the number. This preserves distinct
+  purchase identities for the material variants supported by the recipe API;
+  recipes with a material-specific number declare that fact themselves.
+- Decision: gearbox numbers also distinguish a selected material from the
+  recipe's aluminium default. Cobot joints use a steel mass allocation for
+  some gearheads; the number must not silently identify it as aluminium.
+- Decision: where a mill recipe already declares a fixed design name, use
+  that name for its recipe number. The exact recipe key still distinguishes
+  changed geometry; B3 adds the corresponding fingerprint and release state.
+- Decision: the end mill model gives stickout but no overall tool length.
+  Keep stickout in its assumed requirement identity until a specified tool
+  length can establish that different installed reaches use the same purchase.
+- Multiple block profile recipes identify the same rail stock but retain
+  different full recipe keys. B2 includes the block profile in rail
+  their internal numbers to satisfy the existing recipe identity contract.
+  B3 must separate the purchased rail specification from the block profile
+  so equal rail stock can roll up without losing exact recipe inputs.
+- Decision: a routed belt's purchase key contains its profile, derived tooth
+  count, width and stated belt properties, while its geometry key retains the
+  pulley layout. Different layouts can therefore order the same belt without
+  losing the exact inputs needed to cache its model.
+- Replication layers and nut cassettes exclude source-only hole and connector
+  labels from their purchase keys, while preserving exact physical dimensions
+  and station coordinates; their complete recipe keys retain the source data.
+  Rack receivers currently retain separate section IDs because their derived
+  local coordinates contain floating-point differences. B3 must establish
+  stable drawing identities and resolve repeated receiver definitions without
+  rounding away real geometry changes.
+  A cleat's transverse height uses the first rack section frame: subsequent
+  sections translate along the receiver axis and cannot change that height.
+  This avoids introducing floating-point noise from unrelated translation.
+- Decision: decimal lint checks dimension-like fields rather than every
+  dotted numeric segment. Catalogue identifiers such as `10.08.02.00203`
+  are not decimal dimensions; authors still format dimension inputs with
+  `Dimension.format` when defining each number.
 - The initial survey found three built-in defaults that cannot be constructed.
   `ComponentType.keyFor` also rounds numeric inputs, so its key is not exact
   as required by this plan. Keep both findings visible in the rollout.

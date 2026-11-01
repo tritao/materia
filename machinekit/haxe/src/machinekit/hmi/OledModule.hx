@@ -118,7 +118,8 @@ class OledModule extends HmiPart {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.hmi.oled-module", inputs(), v -> new OledModule(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.hmi.oled-module", inputs(), v -> new OledModule(v))
+      .numbered(v -> "WAVESHARE-25742");
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

@@ -17,7 +17,7 @@ class MillYDriveSeat extends MachineComponent {
       "machinekit.milling.hzmotion-y-drive-seat",
       [P.flag("floating", false)],
       v -> new MillYDriveSeat(v.boolean("floating"))
-    );
+    ).numbered(v -> v.boolean("floating") ? "MILL-Y-BF12-SEAT" : "MILL-Y-BK12-C-SEAT");
     return recipe;
   }
   public function new(floating:Bool = false) {

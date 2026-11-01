@@ -17,7 +17,7 @@ class SwivelHousing extends MachineComponent {
       "machinekit.hobbing.swivel-housing",
       parameters(),
       v -> new SwivelHousing(v)
-    );
+    ).numbered(_ -> "SWIVEL-HOUSING");
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

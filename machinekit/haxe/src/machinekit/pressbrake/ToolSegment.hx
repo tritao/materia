@@ -85,6 +85,12 @@ class ToolSegment extends MachineComponent {
         throw 'Unknown tool horn "$value"';
     };
     return new ToolSegment(ToolProfiles.fromCatalogue(values.token("profile")), values.number("length"), horn);
+    }).numbered(v -> {
+      var profile = v.token("profile");
+      if (StringTools.startsWith(profile, "reference-")) profile = profile.substr("reference-".length);
+      var horn = v.token("horn");
+      var end = horn == "None" ? "" : '-${horn == "Left" ? "L" : "R"}${Dimension.format(v.number("reliefLength"))}x${Dimension.format(v.number("remainingHeight"))}';
+      return 'TOOL-${profile.toUpperCase()}-L${Dimension.format(v.number("length"))}$end';
     });
     return recipe;
   }

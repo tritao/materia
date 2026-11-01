@@ -41,7 +41,8 @@ class ToolHolder extends AssumedCatalogComponent {
     addConnector("collet", Mount, Solids.axial(0, 0, -n("gaugeLength") + n("colletSeatLength")));
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.routing.tool-holder", inputs(), v -> new ToolHolder(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.routing.tool-holder", inputs(), v -> new ToolHolder(v))
+      .numbered(v -> 'ISO30-ER32-HOLDER-ASSUMED-L${Dimension.format(v.number("gaugeLength"))}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

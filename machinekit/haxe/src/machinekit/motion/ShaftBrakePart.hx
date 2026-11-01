@@ -5,6 +5,7 @@ import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
+import machinekit.component.Dimension;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
@@ -126,7 +127,7 @@ class ShaftBrakePart extends MachineComponent implements MotorBrakeSpec {
         ComponentRecipeSupport.count("sector", 0)
       ],
       values -> new ShaftBrakePart(values.number("bore"), values.token("role"), values.integer("sector"))
-    );
+    ).numbered(v -> 'BRAKE-ASSUMED-4NM-B${Dimension.format(v.number("bore"))}-${v.token("role").toUpperCase()}-${v.integer("sector")}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

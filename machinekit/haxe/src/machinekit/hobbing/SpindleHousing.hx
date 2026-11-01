@@ -17,7 +17,7 @@ class SpindleHousing extends MachineComponent {
       "machinekit.hobbing.spindle-housing",
       parameters(),
       v -> new SpindleHousing(v)
-    );
+    ).numbered(_ -> "HOB-SPINDLE-HOUSING");
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

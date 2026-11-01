@@ -74,7 +74,8 @@ class LimitSwitch extends MachineComponent implements SwitchPart {
       "machinekit.motion.limit-switch",
       [ComponentRecipeSupport.catalog("designation", catalog(), "GENERIC-ROLLER-MICROSWITCH")],
       v -> new LimitSwitch(v.token("designation"))
-    );
+    ).numbered(v -> StringTools.startsWith(v.token("designation"), "GENERIC-")
+      ? "SWITCH-ASSUMED-" + v.token("designation").substr("GENERIC-".length) : v.token("designation"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

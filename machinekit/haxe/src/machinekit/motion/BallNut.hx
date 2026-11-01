@@ -107,7 +107,7 @@ class BallNut extends LeadScrewNut {
       "machinekit.motion.ball-nut",
       [ComponentRecipeSupport.flag("preloaded", true)],
       v -> new BallNut(v.boolean("preloaded"))
-    );
+    ).numbered(v -> v.boolean("preloaded") ? "SFU1605-NUT-PRELOAD" : "SFU1605-NUT-NO-PRELOAD");
     return ballRecipe;
   }
   override public function componentType():Null<ComponentType> return ballRecipeType();

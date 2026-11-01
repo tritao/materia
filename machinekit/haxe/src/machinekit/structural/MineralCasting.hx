@@ -41,7 +41,7 @@ class MineralCasting extends MachineComponent {
       false,
       null,
       false
-    );
+    ).numbered(v -> 'MINERAL-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}');
     return recipe;
   }
 

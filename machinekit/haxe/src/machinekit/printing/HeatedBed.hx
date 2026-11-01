@@ -85,7 +85,7 @@ class HeatedBed extends MachineComponent {
       "machinekit.printing.heated-bed",
       [ComponentRecipeSupport.catalog("designation", catalog(), "BED-ALU-235-24V-300W")],
       v -> new HeatedBed(v.token("designation"))
-    );
+    ).numbered(v -> v.token("designation"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

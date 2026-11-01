@@ -20,7 +20,7 @@ class RotaryEncoderRing extends MachineComponent implements machinekit.motion.En
       "machinekit.motion.rotary-encoder-ring",
       parameters(),
       v -> new RotaryEncoderRing(v)
-    );
+    ).numbered(v -> 'ENCODER-ASSUMED-${v.integer("countsPerRevolution")}CPR-${Dimension.format(v.number("bore"))}B');
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

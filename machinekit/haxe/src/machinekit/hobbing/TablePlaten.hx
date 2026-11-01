@@ -21,7 +21,7 @@ class TablePlaten extends MachineComponent {
       "machinekit.hobbing.table-platen",
       parameters(),
       v -> new TablePlaten(v)
-    );
+    ).numbered(_ -> "HOBBER-TABLE-PLATEN");
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

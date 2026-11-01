@@ -29,7 +29,7 @@ class DigitalSensor extends MachineComponent {
       "machinekit.control.digital-sensor",
       [ComponentRecipeSupport.choice("kind", ["reed", "presence", "scanner"], "reed")],
       v -> new DigitalSensor(v.token("kind"))
-    );
+    ).numbered(v -> 'SENSOR-ASSUMED-${v.token("kind").toUpperCase()}');
     return recipe;
   }
 

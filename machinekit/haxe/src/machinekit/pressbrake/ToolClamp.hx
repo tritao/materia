@@ -68,7 +68,7 @@ class ToolClamp extends MachineComponent {
         throw 'Unknown tool clamp mode "$value"';
     };
     return new ToolClamp(mode, v.number("width"), v.number("depth"), v.number("height"));
-    });
+    }).numbered(v -> 'TOOL-CLAMP-${v.token("mode").toUpperCase()}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}');
     return recipe;
   }
 

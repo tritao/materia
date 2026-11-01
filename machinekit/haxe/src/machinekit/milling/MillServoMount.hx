@@ -23,7 +23,7 @@ class MillServoMount extends MachineComponent {
       "machinekit.milling.servo-mount",
       parameters(),
       v -> new MillServoMount(v)
-    );
+    ).numbered(_ -> "MILL-SERVO-MOUNT");
     return recipe;
   }
 

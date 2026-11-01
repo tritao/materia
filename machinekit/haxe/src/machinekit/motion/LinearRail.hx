@@ -204,7 +204,11 @@ class LinearRail extends MachineComponent {
       false,
       false,
       ["geometry"]
-    );
+    ).numbered(v -> {
+      var profile = v.token("profile");
+      var rail = LinearRailSystem.catalog().get(profile).rail;
+      return rail + "-" + Dimension.format(v.number("length")) + "-" + profile;
+    });
     return recipeTypeCache;
   }
 

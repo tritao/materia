@@ -329,7 +329,7 @@ class Pedestal extends MachineComponent {
           cablePathDiameter: v.number("cablePathDiameter")
         }
       )
-    );
+    ).numbered(v -> 'PEDESTAL-F${Dimension.format(v.number("flangePitchCircle"))}-D${Dimension.format(v.number("columnDiameter"))}-L${Dimension.format(v.number("height"))}');
     return recipeTypeCache;
   }
 

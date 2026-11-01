@@ -4,6 +4,7 @@ import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
+import machinekit.component.Dimension;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.Solids;
 import machinekit.motion.ServoMotor;
@@ -67,7 +68,7 @@ class GearedArmJoint extends ArmJoint {
           ServoMotor.basisFromToken(v.token("servoBasis"))
         )
       )
-    );
+    ).numbered(v -> 'ARM-JOINT-${Dimension.format(v.number("diameter"))}x${Dimension.format(v.number("length"))}-P${Dimension.format(v.number("pocketDiameter"))}x${Dimension.format(v.number("pocketLength"))}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

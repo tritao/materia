@@ -5,6 +5,7 @@ import machinekit.fluid.PressureSource;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
+import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 
@@ -55,7 +56,7 @@ class HydraulicSupply extends MachineComponent implements PressureSource {
       "machinekit.pressbrake.hydraulic-supply",
       [new machinekit.component.ComponentParameter("pressurePa", Scalar, Number(0), "Pa", 0)],
       v -> new HydraulicSupply(v.number("pressurePa"))
-    );
+    ).numbered(v -> 'HYD-SUPPLY-ASSUMED-${Dimension.format(v.number("pressurePa"))}PA');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

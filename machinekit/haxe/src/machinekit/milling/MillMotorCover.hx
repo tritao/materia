@@ -20,7 +20,7 @@ class MillMotorCover extends MachineComponent {
       "machinekit.milling.motor-cover",
       parameters(),
       v -> new MillMotorCover(v)
-    );
+    ).numbered(_ -> "MILL-MOTOR-HOOD");
     return recipe;
   }
   public function new(?values:ComponentValues) {

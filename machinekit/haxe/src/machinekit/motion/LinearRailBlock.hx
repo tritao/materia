@@ -186,7 +186,7 @@ class LinearRailBlock extends MachineComponent {
       true,
       false,
       ["geometry"]
-    );
+    ).numbered(v -> v.token("profile"));
     return recipeTypeCache;
   }
 

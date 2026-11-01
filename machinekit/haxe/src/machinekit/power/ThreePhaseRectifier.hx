@@ -4,6 +4,7 @@ import machinekit.motion.PowerSupply;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
 
 /** Assumed three-phase rectifier with a capacitor bus and integrated regenerative shunt.
  * Line voltage is phase-to-phase RMS. The nominal unloaded bus is its peak;
@@ -50,7 +51,9 @@ class ThreePhaseRectifier extends PowerSupply {
         v.number("depth"),
         v.number("regenerativePower")
       )
-    );
+    ).numbered(v -> 'RECT-ASSUMED-${Dimension.format(v.number("lineVoltage"))}V-'
+      + '${Dimension.format(v.number("frequency"))}HZ-${Dimension.format(v.number("current"))}A-'
+      + '${v.integer("outlets")}O-${Dimension.format(v.number("regenerativePower"))}W');
     return rectifierRecipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

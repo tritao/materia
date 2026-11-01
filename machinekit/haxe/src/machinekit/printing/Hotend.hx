@@ -98,7 +98,7 @@ class Hotend extends MachineComponent {
       "machinekit.printing.hotend",
       [ComponentRecipeSupport.catalog("designation", catalog(), "GENERIC-V6-STYLE")],
       v -> new Hotend(v.token("designation"))
-    );
+    ).numbered(v -> v.token("designation"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

@@ -161,8 +161,14 @@ class ServoMotor extends MachineComponent implements MotorDrive {
       )],
       v -> model(v.token("designation")),
       true
-    );
+    ).numbered(partNumberFor);
     return namedRecipe;
+  }
+
+  /** The same assumed motor has one identity across its housing representations. */
+  public static function partNumberFor(v:machinekit.component.ComponentValues):String {
+    var model = v.token("designation");
+    return StringTools.startsWith(model, "GENERIC-") ? "SERVO-ASSUMED-" + model.substr("GENERIC-".length) : model;
   }
 
   /** Named generic or Leadshine servo. Vendor rows retain their catalog provenance. */

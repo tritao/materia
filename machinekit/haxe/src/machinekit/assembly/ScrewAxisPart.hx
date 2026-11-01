@@ -145,7 +145,7 @@ class ScrewAxisPart extends MachineComponent {
         )
       ),
       true
-    );
+    ).numbered(v -> 'TWIN-RAIL-SCREW-${v.token("kind").toUpperCase()}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

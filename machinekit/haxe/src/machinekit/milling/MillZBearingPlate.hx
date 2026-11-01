@@ -30,7 +30,7 @@ class MillZBearingPlate extends MachineComponent {
       "machinekit.milling.z-bearing-plate",
       parameters(),
       v -> new MillZBearingPlate(v)
-    );
+    ).numbered(_ -> "MILL-Z-BEARING-PLATE");
     return recipe;
   }
   public function new(?values:ComponentValues) {

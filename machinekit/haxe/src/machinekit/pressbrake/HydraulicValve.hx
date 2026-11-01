@@ -52,7 +52,7 @@ class HydraulicValve extends MachineComponent implements ValveSpec {
       "machinekit.pressbrake.hydraulic-valve",
       [],
       _ -> new HydraulicValve()
-    );
+    ).numbered(_ -> "HYD-VALVE-ASSUMED-4/3-CLOSED");
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

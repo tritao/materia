@@ -194,6 +194,9 @@ class MillLiftingPattern {
       "label",
       "foundation lifting connection"
     ).setToken(
+      "partId",
+      "MILL-LIFT-ONE"
+    ).setToken(
       "finish",
       materia.casting.InsertSpec.InsertFinish.AsSupplied
     ));

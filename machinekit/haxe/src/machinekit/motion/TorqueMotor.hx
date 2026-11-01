@@ -28,7 +28,7 @@ class TorqueMotor extends MachineComponent implements machinekit.motion.MotorDri
       "machinekit.motion.torque-motor",
       parameters(),
       v -> new TorqueMotor(v)
-    );
+    ).numbered(v -> 'TORQUE-MOTOR-ASSUMED-${Dimension.format(v.number("continuousTorque"))}NM-${Dimension.format(v.number("peakTorque"))}NM');
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

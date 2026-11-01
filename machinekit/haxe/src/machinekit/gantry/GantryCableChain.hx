@@ -62,7 +62,8 @@ class GantryCableChain extends MachineComponent {
         v.token("axis"),
         v.number("positionOffset")
       );
-      });
+      }, false, false, ["fixedHost", "movingHost", "axis", "positionOffset"])
+        .numbered(CableChain.partNumber);
     }
     return recipe;
   }

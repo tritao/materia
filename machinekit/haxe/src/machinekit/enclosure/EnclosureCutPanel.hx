@@ -5,6 +5,7 @@ import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
+import machinekit.component.Dimension;
 import machinekit.component.ComponentRecipeSupport as R;
 import machinekit.component.Solids;
 import machinekit.component.CollisionHullFacet;
@@ -105,7 +106,11 @@ class EnclosureCutPanel extends EnclosurePanel {
       false,
       null,
       false
-    );
+    ).numbered(v -> {
+      var opening = v.number("diameter") > 0 ? 'D${Dimension.format(v.number("diameter"))}'
+        : 'R${Dimension.format(v.number("openingWidth"))}x${Dimension.format(v.number("openingHeight"))}';
+      return '${EnclosurePanel.numberFor(v)}-$opening-X${Dimension.format(v.number("openingX"))}-Z${Dimension.format(v.number("openingZ"))}';
+    });
     return cutRecipe;
   }
   override public function componentType():Null<ComponentType> return cutRecipeType();

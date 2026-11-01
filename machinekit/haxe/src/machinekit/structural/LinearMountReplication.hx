@@ -28,7 +28,12 @@ class LinearMountReplication extends MachineComponent {
       false,
       null,
       false
-    );
+    ).numbered(v -> 'LM-REPLICATION-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("length"))}x${Dimension.format(v.number("thickness"))}').purchaseKeyed(v -> {
+      var holes = InsertHoles.records(v.token("holes"));
+      for (i in 0...holes.length) holes[i].id = Std.string(i);
+      return [ComponentNumberKey.encode(v.number("width")), ComponentNumberKey.encode(v.number("length")),
+        ComponentNumberKey.encode(v.number("thickness")), InsertHoles.fromNeutral(holes), v.token("reference")].join("|");
+    });
     return recipe;
   }
   public function new(?overrides:ComponentValues) {

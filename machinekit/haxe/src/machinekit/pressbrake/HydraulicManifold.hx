@@ -41,7 +41,7 @@ class HydraulicManifold extends MachineComponent {
       "machinekit.pressbrake.hydraulic-manifold",
       [new machinekit.component.ComponentParameter("outlets", Count, Integer(2), null, 1, 64)],
       v -> new HydraulicManifold(v.integer("outlets"))
-    );
+    ).numbered(v -> 'HYD-MANIFOLD-ASSUMED-${v.integer("outlets")}OUT');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

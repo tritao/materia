@@ -5,6 +5,7 @@ import machinekit.fluid.CylinderSpec;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
+import machinekit.component.Dimension;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
@@ -93,7 +94,7 @@ class PneumaticCylinder extends MachineComponent implements CylinderSpec {
         new machinekit.component.ComponentParameter("ratedSpeed", Scalar, Number(300), "mm/s", 0)
       ],
       v -> new PneumaticCylinder(v.token("family"), v.number("bore"), v.number("stroke"), v.number("ratedSpeed"))
-    );
+    ).numbered(v -> '${v.token("family")}-${Dimension.format(v.number("bore"))}x${Dimension.format(v.number("stroke"))}-ASSUMED-${Dimension.format(v.number("ratedSpeed"))}MMS');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

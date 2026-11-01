@@ -33,6 +33,7 @@ class CastInsert extends MachineComponent {
     P.length("positionTolerance", 0.01),
     P.requiredChoice("role", materia.casting.InsertSpec.InsertRoles.tokens()),
     P.text("label", "rail seat"),
+    P.text("partId", ""),
     P.choice(
       "finish",
       materia.casting.InsertSpec.InsertFinishes.tokens(),
@@ -50,7 +51,10 @@ class CastInsert extends MachineComponent {
       null,
       false,
       new ComponentValues().setToken("role", InsertRole.GenericMount)
-    );
+    ).numbered(v -> {
+      var id = v.token("partId");
+      return 'CAST-INSERT-${(id == "" ? v.token("label") : id).toUpperCase().split(" ").join("-")}';
+    });
     return recipe;
   }
 

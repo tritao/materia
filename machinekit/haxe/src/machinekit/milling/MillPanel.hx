@@ -4,6 +4,7 @@ import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
+import machinekit.component.Dimension;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
@@ -48,8 +49,10 @@ class MillPanel extends MachineComponent {
         ComponentRecipeSupport.length("depth", 2),
         ComponentRecipeSupport.length("height", 100)
       ],
-      v -> new MillPanel(v.number("width"), v.number("depth"), v.number("height"))
-    );
+      v -> new MillPanel(v.number("width"), v.number("depth"), v.number("height")),
+      false,
+      true
+    ).numbered(v -> 'MILL-PANEL-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}-${materia.project.MaterialLibrary.fromSpec(v.token("material")).toUpperCase()}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

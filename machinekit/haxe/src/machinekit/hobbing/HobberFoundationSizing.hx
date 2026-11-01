@@ -77,6 +77,9 @@ class HobberFoundationSizing {
       "label",
       "foundation lifting connection"
     ).setToken(
+      "partId",
+      "HOBBER-LIFT-ONE"
+    ).setToken(
       "finish",
       materia.casting.InsertSpec.InsertFinish.AsSupplied
     ));
@@ -145,6 +148,9 @@ class HobberFoundationSizing {
       ).setToken(
         "label",
         "two-point column lifting plate"
+      ).setToken(
+        "partId",
+        "HOBBER-COLUMN-LIFT-TWO"
       ).setToken(
         "finish",
         materia.casting.InsertSpec.InsertFinish.AsSupplied

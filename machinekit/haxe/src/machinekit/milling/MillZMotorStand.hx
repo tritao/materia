@@ -28,7 +28,7 @@ class MillZMotorStand extends MachineComponent {
       "machinekit.milling.z-motor-stand",
       parameters(),
       v -> new MillZMotorStand(v)
-    );
+    ).numbered(_ -> "MILL-Z-MOTOR-STAND");
     return recipe;
   }
   public function new(?values:ComponentValues) {

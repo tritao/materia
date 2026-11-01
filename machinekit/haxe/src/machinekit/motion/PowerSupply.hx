@@ -91,7 +91,9 @@ class PowerSupply extends MachineComponent implements ElectricalSource {
         v.number("depth"),
         v.number("regenerativePower")
       )
-    );
+    ).numbered(v -> 'PSU-ASSUMED-${Dimension.format(v.number("voltage"))}V${Dimension.format(v.number("current"))}A-'
+      + '${Dimension.format(v.number("width"))}x${Dimension.format(v.number("height"))}x${Dimension.format(v.number("depth"))}-'
+      + '${v.integer("outlets")}O-${Dimension.format(v.number("regenerativePower"))}');
     return recipe;
   }
 

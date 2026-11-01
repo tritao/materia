@@ -756,7 +756,7 @@ class AxisBuilder extends MachineAssembly {
     var blocks = switchBracket(switchBox, normal, host);
     var corner = blocks[0].min;
     var id = "home" + suffix, mount = id + "Mount";
-    attach(mount, new machinekit.structural.BlockBracket("Home switch bracket", [for (block in blocks) {
+    attach(mount, new machinekit.structural.BlockBracket("Home switch bracket " + axis.id, [for (block in blocks) {
       min:[for (i in 0...3) block.min[i] - corner[i]], max:[for (i in 0...3) block.max[i] - corner[i]]
     }
     ]), AssemblyFrames.translation(corner[0], corner[1], corner[2]), fixed);

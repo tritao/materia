@@ -81,7 +81,8 @@ class PushButton extends HmiPart {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.hmi.push-button", inputs(), v -> new PushButton(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.hmi.push-button", inputs(), v -> new PushButton(v))
+      .numbered(v -> 'PUSHBUTTON-ASSUMED-${v.token("colour").toUpperCase()}-${v.boolean("illuminated") ? "LIT" : "UNLIT"}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

@@ -170,7 +170,14 @@ class ZppComponent extends MachineComponent {
       false,
       null,
       false
-    );
+    ).numbered(v -> {
+      var member = v.token("role");
+      var product = member == "plate96" ? "TS96-155" : member == "stud96" ? "PS20F"
+        : member == "stud-link96" ? "TS96-M10-LINK" : member == "stud-link" ? "TS52-M8-LINK"
+        : StringTools.startsWith(member, "ar-") ? "AR155-I" : member == "plate" ? "TS52-108"
+        : member == "stud" ? "PS16F" : "CV15075";
+      return 'ZPP-$product-${member.toUpperCase()}';
+    });
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

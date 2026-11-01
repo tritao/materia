@@ -110,7 +110,7 @@ class FlangeBearingHousing extends MachineComponent {
         DeepGrooveBearing.metric(v.token("bearing"), v.boolean("shielded")),
         ComponentRecipeSupport.fit(v.token("fit"))
       )
-    );
+    ).numbered(v -> 'FLANGE-HOUSING-${v.token("bearing")}-${v.token("fit").toUpperCase()}');
     return recipeTypeCache;
   }
 

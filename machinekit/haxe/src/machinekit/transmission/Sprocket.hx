@@ -169,7 +169,7 @@ class Sprocket extends MachineComponent {
         ComponentRecipeSupport.catalog("chain", Sprocket.chainCatalog(), "ANSI25")
       ],
       v -> Sprocket.forChain(v.token("chain"), v.integer("teeth"), v.number("boreDiameter"), v.number("thickness"))
-    );
+    ).numbered(v -> 'SPROCKET-${v.token("chain")}-${v.integer("teeth")}T-B${Dimension.format(v.number("boreDiameter"))}-W${Dimension.format(v.number("thickness"))}');
     return chainRecipeTypeCache;
   }
 
@@ -192,7 +192,8 @@ class Sprocket extends MachineComponent {
         v.number("thickness"),
         v.number("rollerDiameter")
       )
-    );
+    ).numbered(v -> 'SPROCKET-ASSUMED-P${Dimension.format(v.number("pitch"))}-${v.integer("teeth")}T-'
+      + 'B${Dimension.format(v.number("boreDiameter"))}-W${Dimension.format(v.number("thickness"))}-R${Dimension.format(v.number("rollerDiameter"))}');
     return genericRecipeTypeCache;
   }
 

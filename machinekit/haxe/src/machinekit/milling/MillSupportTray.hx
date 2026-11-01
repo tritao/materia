@@ -20,7 +20,7 @@ class MillSupportTray extends MachineComponent {
       "machinekit.milling.support-tray",
       parameters(),
       v -> new MillSupportTray(v)
-    );
+    ).numbered(_ -> "MILL-SUPPORT-TRAY");
     return recipe;
   }
   public function new(?overrides:ComponentValues) {

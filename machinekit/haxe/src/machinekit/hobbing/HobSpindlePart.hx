@@ -13,7 +13,7 @@ class HobSpindlePart extends MachineComponent {
       "machinekit.hobbing.spindle-part",
       EngineeringMetadata.parameters().concat([P.text("role", "shaft")]),
       v -> new HobSpindlePart(v.token("role"), v)
-    );
+    ).numbered(v -> 'HOB-SPINDLE-${v.token("role").toUpperCase()}');
     return recipe;
   }
   public function new(role:String, ?overrides:ComponentValues) {

@@ -162,8 +162,11 @@ class LinearRackMount {
       var localRun = F.compose(F.inverse(frame), placed);
       var sectionConnectors = source.connectors.filter(c -> StringTools.startsWith(c.name,
         'section${sectionIndex+1}-'));
+      // Section translation is along the receiver's Y axis. Use the first
+      // section frame for the common transverse height, avoiding cancellation
+      // from a large along-axis translation in later sections.
       var hostLocal = F.transformPoint(
-        F.inverse(frame),
+        F.inverse(F.compose(placed, F.inverse(localRack))),
         hostFace.x + 4 * up.x,
         hostFace.y + 4 * up.y,
         hostFace.z + 4 * up.z
@@ -248,7 +251,7 @@ class LinearRackMount {
       ).setToken(
         "holes",
         InsertHoles.fromNeutral(holes)
-      ));
+      ).setToken("partId", prefix + "Receiver"));
       var receiverId = prefix + "Receiver";
       attach(receiverId, receiver, frame, prefix + "Cleat1");
       // One side-wall window per section. Feed the covered cassettes
@@ -460,7 +463,8 @@ class LinearRackMount {
       tube.profile.height,
       tube.profile.wall,
       tube.length,
-      tubeDrilling
+      tubeDrilling,
+      "RACK-" + tubeId
     );
     builder.replaceComponent(tubeId, drilledTube);
     if (pad != null) builder.replaceComponent(
@@ -474,6 +478,9 @@ class LinearRackMount {
       ).setToken(
         "holes",
         InsertHoles.fromNeutral(padDrilling)
+      ).setToken(
+        "partId",
+        "RACK-" + host
       ))
     );
     for (name in members) {

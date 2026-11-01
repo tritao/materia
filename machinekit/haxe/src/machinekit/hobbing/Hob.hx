@@ -40,7 +40,8 @@ class Hob extends MachineComponent {
   ]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.hobbing.hob", parameters(), v -> new Hob(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.hobbing.hob", parameters(), v -> new Hob(v))
+      .numbered(v -> 'HOB-ASSUMED-M${Dimension.format(v.number("module"))}-D${Dimension.format(v.number("outside"))}-B${Dimension.format(v.number("bore"))}-${v.integer("starts")}S-${v.integer("gashes")}G');
     return recipe;
   }
   public function new(?overrides:ComponentValues) {

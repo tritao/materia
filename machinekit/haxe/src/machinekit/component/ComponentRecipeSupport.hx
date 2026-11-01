@@ -82,6 +82,12 @@ class ComponentRecipeSupport {
     v.token("family") == "Ball" ? v.number("raceRootDiameter") : null
   );
 
+  /** Compact thread identity including the explicit ball-race root when present. */
+  public static function threadPartNumber(v:ComponentValues):String {
+    var result = thread(v).designation;
+    return v.token("family") == "Ball" ? result + "-R" + Dimension.format(v.number("raceRootDiameter")) : result;
+  }
+
   public static function threadValues(t:LeadScrewThread):ComponentValues return new ComponentValues().setToken(
     "family",
     Std.string(t.family)

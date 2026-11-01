@@ -72,7 +72,7 @@ class Extruder extends MachineComponent {
       "machinekit.printing.extruder",
       [ComponentRecipeSupport.catalog("designation", catalog(), "GEARED-HOB-7.3")],
       v -> new Extruder(v.token("designation"))
-    );
+    ).numbered(v -> v.token("designation"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

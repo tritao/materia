@@ -33,7 +33,8 @@ class ToolRack extends AssumedCatalogComponent {
     addPort({name: "cover_air", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.routing.tool-rack", inputs(), v -> new ToolRack(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.routing.tool-rack", inputs(), v -> new ToolRack(v))
+      .numbered(_ -> "ROUTER-TOOL-RACK");
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

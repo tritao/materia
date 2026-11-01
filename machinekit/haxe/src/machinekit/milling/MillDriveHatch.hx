@@ -17,7 +17,7 @@ class MillDriveHatch extends MachineComponent {
       "machinekit.milling.drive-service-hatch",
       parameters(),
       v -> new MillDriveHatch(v)
-    );
+    ).numbered(_ -> "MILL-Y-DRIVE-HATCH");
     return recipe;
   }
   public function new(?values:ComponentValues) {

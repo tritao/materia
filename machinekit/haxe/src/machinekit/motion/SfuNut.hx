@@ -65,7 +65,7 @@ class SfuNut extends LeadScrewNut {
       "machinekit.motion.sfu-nut",
       [P.choice("model", SfuFamilyData.nutModels(), "SFU1605"), P.length("raceRootDiameter", 13)],
       v -> new SfuNut(v.token("model"), v.number("raceRootDiameter"))
-    );
+    ).numbered(v -> v.token("model") + "-NUT-R" + Dimension.format(v.number("raceRootDiameter")));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return familyRecipeType();

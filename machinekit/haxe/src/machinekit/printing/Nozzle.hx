@@ -61,7 +61,7 @@ class Nozzle extends MachineComponent {
       "machinekit.printing.nozzle",
       [ComponentRecipeSupport.catalog("designation", catalog(), "BRASS-M6-0.4")],
       v -> new Nozzle(v.token("designation"))
-    );
+    ).numbered(v -> v.token("designation"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

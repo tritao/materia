@@ -4,6 +4,7 @@ import cadkit.modeling.Part;
 import machinekit.component.MachineComponent;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
+import machinekit.component.Dimension;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentRecipeSupport as P;
 import materia.assembly.AssemblyFrames as F;
@@ -48,7 +49,8 @@ class ToolingBlock extends MachineComponent {
   ];
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.tooling.block", parameters(), v -> new ToolingBlock(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.tooling.block", parameters(), v -> new ToolingBlock(v), false, true)
+      .numbered(v -> 'TOOL-BLOCK-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}-${materia.project.MaterialLibrary.fromSpec(v.token("material")).toUpperCase()}');
     return recipe;
   }
 

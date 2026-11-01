@@ -241,7 +241,12 @@ class RobotFlange extends MachineComponent {
       "machinekit.robotics.robot-flange",
       [ComponentRecipeSupport.length("pitchCircleDiameter", 40), ComponentRecipeSupport.count("boltCount", 4)],
       v -> new RobotFlange(v.number("pitchCircleDiameter"), v.integer("boltCount"))
-    );
+    ).numbered(v -> {
+      var spec = catalog().get(Dimension.format(v.number("pitchCircleDiameter")));
+      var count = v.integer("boltCount");
+      var size = '${Dimension.format(spec.pitchCircle)}-$count-${spec.screw}';
+      return count == spec.boltCount ? 'ISO9409-STYLE-$size' : 'FLANGE-$size';
+    });
     return recipeTypeCache;
   }
 

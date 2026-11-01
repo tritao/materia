@@ -44,7 +44,7 @@ class MillFixtureAdapter extends MachineComponent {
       "machinekit.milling.fixture-adapter",
       [P.length("height", 20), P.choice("pattern", ["82-square", "128-square"], "82-square")],
       v -> new MillFixtureAdapter(v.number("height"), v.token("pattern") == "128-square")
-    );
+    ).numbered(v -> v.token("pattern") == "128-square" ? "MILL-FIXTURE-ADAPTER-128" : "MILL-FIXTURE-ADAPTER-82");
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

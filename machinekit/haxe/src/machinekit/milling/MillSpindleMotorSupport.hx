@@ -16,7 +16,7 @@ class MillSpindleMotorSupport extends MachineComponent {
       "machinekit.milling.spindle-motor-support",
       [P.length("height", 27)],
       v -> new MillSpindleMotorSupport(v.number("height"))
-    );
+    ).numbered(_ -> "MILL-SPINDLE-MOTOR-SUPPORT");
     return recipe;
   }
   public function new(height:Float) {

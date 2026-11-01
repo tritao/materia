@@ -75,7 +75,7 @@ class OffsetGripperFinger extends MachineComponent {
         false,
         null,
         false
-      );
+      ).numbered(v -> 'OFFSET-FINGER-${v.token("side") == "left" ? "L" : "R"}-${v.token("variant").toUpperCase()}');
       familyCache = new ComponentFamily(recipe.id, OffsetFingerSpec.INTERFACE_ID, recipe, variants());
     }
     return familyCache;

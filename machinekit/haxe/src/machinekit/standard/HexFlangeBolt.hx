@@ -99,7 +99,7 @@ class HexFlangeBolt extends MachineComponent implements ScrewFastener {
     if (propertyClass != Steel88
       && propertyClass != Steel109) throw "ISO 4162 component requires property class 8.8 or 10.9";
     super(
-      "ISO4162-F-full-head-" + spec.size + "x" + Dimension.format(length) + "-" + PropertyClasses.token(propertyClass),
+      "ISO4162-F-FULL-HEAD-" + spec.size + "x" + Dimension.format(length) + "-" + PropertyClasses.token(propertyClass),
       "Full-form hex flange bolt " + spec.size + "x" + Dimension.format(length),
       PropertyClasses.material(propertyClass),
       false

@@ -19,7 +19,7 @@ class TableHousing extends MachineComponent {
       "machinekit.hobbing.table-housing",
       parameters(),
       v -> new TableHousing(v)
-    );
+    ).numbered(_ -> "HOBBER-TABLE-HOUSING");
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

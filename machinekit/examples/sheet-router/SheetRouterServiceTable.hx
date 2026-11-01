@@ -16,7 +16,7 @@ class SheetRouterServiceTable extends machinekit.routing.VacuumTable {
       "sheet-router-service-table",
       machinekit.routing.VacuumTable.recipeType().parameters(),
       v -> new SheetRouterServiceTable(v)
-    );
+    ).numbered(_ -> "SHEET-ROUTER-SERVICE-TABLE");
     return serviceRecipe;
   }
   override public function geometry(detail:ComponentDetail = Preview):Part {

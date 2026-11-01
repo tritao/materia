@@ -3,6 +3,7 @@ package machinekit.motion;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
 import cadkit.threads.ThreadedFace.ThreadStart;
 
 /** Generic SFU1605 screw. Race root and efficiency are assumed reference values.
@@ -137,7 +138,8 @@ class BallScrew extends LeadScrew {
         ComponentRecipeSupport.flag("ground", false)
       ],
       v -> new BallScrew(v.number("length"), v.number("inputJournalLength"), v.boolean("ground"))
-    );
+    ).numbered(v -> 'SFU1605-L${Dimension.format(v.number("length"))}-J${Dimension.format(v.number("inputJournalLength"))}-'
+      + (v.boolean("ground") ? "GROUND" : "UNSPEC"));
     return ballRecipe;
   }
   override public function componentType():Null<ComponentType> return ballRecipeType();

@@ -76,12 +76,13 @@ class FoundationLayout {
     h:Float,
     pose:AssemblyFrame,
     openings:Array<String>,
-    holes:String
+    holes:String,
+    scope:String = "bed"
   ):InsertLocation {
     return {
       id: id,
       part: new CastInsert(CastInsert.precastHoles(
-        CastInsert.boxValues(w, d, h).setToken("role", role).setToken("label", label).setToken(
+        CastInsert.boxValues(w, d, h).setToken("role", role).setToken("label", label).setToken("partId", "HOBBER-" + scope + "-" + id).setToken(
           "finish",
           GroundAfterCasting
         ),
@@ -448,7 +449,8 @@ class FoundationLayout {
       h,
       F.translation(x, y, z),
       openings,
-      holes
+      holes,
+      kind
     ));
     var none = InsertHoles.fromNeutral([]);
     if (kind == "bed") {
@@ -528,7 +530,8 @@ class FoundationLayout {
         20,
         F.fromRotationMatrix(0, -40, 10, [1.0, 0, 0, 0, -1, 0, 0, 0, -1]),
         ["body.z-min"],
-        fixtureHoles(20)
+        fixtureHoles(20),
+        "column"
       ));
       for (side in [-1, 1]) out.push(boxInsert(
         side < 0 ? "railLeft" : "railRight",
@@ -539,7 +542,8 @@ class FoundationLayout {
         20,
         F.fromRotationMatrix(side * 145, 90, 245, [1.0, 0, 0, 0, 0, 1, 0, -1, 0]),
         ["body.y-max"],
-        none
+        none,
+        "column"
       ));
       out.push(boxInsert(
         "driveSeat",
@@ -550,7 +554,8 @@ class FoundationLayout {
         20,
         F.fromRotationMatrix(0, HobberZLayout.SEAT_COLUMN_Y, 250, [-1.0, 0, 0, 0, 0, 1, 0, 1, 0]),
         [],
-        fixtureHoles(20)
+        fixtureHoles(20),
+        "column"
       ));
       for (side in [-1, 1]) add(
         side < 0 ? "liftLeft" : "liftRight",

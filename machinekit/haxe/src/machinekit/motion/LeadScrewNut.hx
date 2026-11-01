@@ -253,8 +253,23 @@ class LeadScrewNut extends MachineComponent {
         v.integer("boltCount"),
         v.boolean("flanged"),
         parseKind(v.token("kind"))
-      )
-    );
+      ),
+      false,
+      true
+    ).numbered(v -> {
+      var kind = switch v.token("kind") {
+        case "PlainBronze": "PLAIN";
+        case "AntiBacklash": "ANTI";
+        case "BallNut": "BALL";
+        case "PreloadedBallNut": "PRELOAD";
+        case _: throw "Unknown lead screw nut kind";
+      };
+      var material = v.token("material");
+      return 'NUT-${ComponentRecipeSupport.threadPartNumber(v)}-$kind-${v.integer("boltCount")}'
+        + (v.boolean("flanged") ? "F" : "N")
+        + (material == "bronze" ? "" : material == "steel" ? "-STEEL"
+          : "-" + materia.project.MaterialLibrary.fromSpec(material).toUpperCase());
+    });
     return recipeTypeCache;
   }
 

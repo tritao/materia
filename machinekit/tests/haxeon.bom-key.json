@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "package": { "name": "machinekit-bom-key-tests" },
+  "entry": "PartNumberKeyTests",
+  "sources": ["src/PartNumberKeyTests.hx"],
+  "sourceRoots": ["src"],
+  "dependencies": { "machinekit": { "path": ".." } },
+  "target": "host",
+  "outputDir": "../build/bom-key-test"
+}

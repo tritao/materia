@@ -24,7 +24,7 @@ class Rke92VisePart extends MachineComponent {
       "machinekit.milling.rke92-reference-part",
       parameters(),
       v -> new Rke92VisePart(v.token("role"), v.number("depth"))
-    );
+    ).numbered(v -> 'RKE92-REFERENCE-${v.token("role").toUpperCase()}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

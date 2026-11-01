@@ -56,7 +56,9 @@ class AtcSpindle extends AssumedCatalogComponent {
     addPort({name: "motor", kind: ElectricalPower, role: Consumer, iface: Plug("3-phase-PE", 4), required: true});
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.routing.atc-spindle", inputs(), v -> new AtcSpindle(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.routing.atc-spindle", inputs(), v -> new AtcSpindle(v))
+      .numbered(v -> 'ATC-SPINDLE-ASSUMED-${Dimension.format(v.number("power"))}W-'
+          + '${Dimension.format(v.number("maxRpm"))}RPM');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

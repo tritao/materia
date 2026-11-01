@@ -59,7 +59,7 @@ class Bushing extends MachineComponent {
         ComponentRecipeSupport.length("length", 10)
       ],
       v -> new Bushing(v.number("boreDiameter"), v.number("outerDiameter"), v.number("length"))
-    );
+    ).numbered(v -> 'BUSHING-${Dimension.format(v.number("boreDiameter"))}x${Dimension.format(v.number("outerDiameter"))}x${Dimension.format(v.number("length"))}');
     return recipeTypeCache;
   }
 

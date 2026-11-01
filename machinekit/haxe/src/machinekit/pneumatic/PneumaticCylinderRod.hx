@@ -39,7 +39,7 @@ class PneumaticCylinderRod extends MachineComponent {
       "machinekit.pneumatic.cylinder-rod",
       [ComponentRecipeSupport.length("diameter", 10), ComponentRecipeSupport.length("length", 115)],
       v -> new PneumaticCylinderRod(v.number("diameter"), v.number("length"))
-    );
+    ).numbered(v -> 'PNEUMATIC-ROD-${machinekit.component.Dimension.format(v.number("diameter"))}x${machinekit.component.Dimension.format(v.number("length"))}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

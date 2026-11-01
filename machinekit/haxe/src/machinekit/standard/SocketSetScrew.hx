@@ -37,7 +37,7 @@ class SocketSetScrew extends MachineComponent {
       false,
       null,
       false
-    );
+    ).numbered(v -> 'ISO4026-${FastenerThreads.metric(v.number("diameter"), v.number("pitch")).designation}x${Dimension.format(v.number("length"))}');
     return recipe;
   }
 

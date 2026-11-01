@@ -201,7 +201,7 @@ class MillCasting extends MachineComponent {
       "machinekit.milling.casting",
       [ComponentRecipeSupport.choice("kind", ["Base", "Column", "Saddle", "Table", "Head"], "Base")],
       v -> new MillCasting(parse(v.token("kind")))
-    );
+    ).numbered(v -> 'MILL-${v.token("kind").toUpperCase()}');
     return castingRecipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

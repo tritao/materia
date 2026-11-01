@@ -87,7 +87,7 @@ class SolenoidValve extends MachineComponent implements ValveSpec {
         ComponentRecipeSupport.choice("normalOutlet", ["A", "B"], "B")
       ],
       v -> new SolenoidValve(v.token("solenoids") == "double", v.token("normalOutlet") == "A")
-    );
+    ).numbered(v -> 'VALVE-ASSUMED-5/2-${v.token("solenoids").toUpperCase()}-N${v.token("normalOutlet")}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

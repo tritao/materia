@@ -16,7 +16,7 @@ class MillBeltMotorPlate extends MachineComponent {
         "ELM2H-0400LA60F"
       )],
       v -> new MillBeltMotorPlate(v.token("motor"))
-    );
+    ).numbered(v -> 'MILL-X-RETURN-PLATE-${v.token("motor")}');
     return recipe;
   }
   public final motor:String;

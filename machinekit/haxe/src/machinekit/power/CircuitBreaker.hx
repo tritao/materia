@@ -36,7 +36,9 @@ class CircuitBreaker extends AssumedCatalogComponent {
       "machinekit.power.circuit-breaker",
       inputs(),
       v -> new CircuitBreaker(v)
-    );
+    ).numbered(v -> 'BREAKER-ASSUMED-${Dimension.format(v.number("ratedCurrent"))}A-'
+      + '${Dimension.format(v.number("ratedVoltage"))}V-${Dimension.format(v.number("breakingCapacity"))}A-'
+      + '${v.integer("poles")}P');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

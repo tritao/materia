@@ -33,7 +33,10 @@ class Contactor extends AssumedCatalogComponent {
     addPort({name: "coil", kind: ElectricalPower, role: Consumer, iface: Plug("24V", 2), required: true});
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.power.contactor", inputs(), v -> new Contactor(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.power.contactor", inputs(), v -> new Contactor(v))
+      .numbered(v -> 'CONTACTOR-ASSUMED-${Dimension.format(v.number("ratedCurrent"))}A-'
+        + '${Dimension.format(v.number("ratedVoltage"))}V-${Dimension.format(v.number("coilVoltage"))}V-'
+        + '${v.integer("poles")}P');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

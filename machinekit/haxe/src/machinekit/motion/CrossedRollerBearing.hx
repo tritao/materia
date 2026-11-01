@@ -21,7 +21,7 @@ class CrossedRollerBearing extends MachineComponent {
       "machinekit.motion.crossed-roller-bearing",
       parameters(),
       v -> new CrossedRollerBearing(v)
-    );
+    ).numbered(v -> 'CR-BEARING-ASSUMED-${Dimension.format(v.number("bore"))}x${Dimension.format(v.number("outside"))}x${Dimension.format(v.number("height"))}-${v.token("precisionClass")}');
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

@@ -93,7 +93,7 @@ class MotorAdapterPlate extends MachineComponent {
       [P.choice("model", models(), "KK86-80EP-adapter")],
       v -> new MotorAdapterPlate(v.token("model")),
       true
-    );
+    ).numbered(v -> 'HZMOTION-${v.token("model").toUpperCase()}');
     return recipe;
   }
 

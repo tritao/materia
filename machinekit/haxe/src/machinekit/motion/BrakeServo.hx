@@ -25,7 +25,9 @@ class BrakeServo extends AssumedCatalogComponent {
     addConnector("shaftEnd", Axis, Solids.axial(0, 0, motor.rating.shaftLength));
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.motion.brake-servo", inputs(), v -> new BrakeServo(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.motion.brake-servo", inputs(), v -> new BrakeServo(v))
+      .numbered(v -> 'SERVO-BRAKE-ASSUMED-${v.token("power")}W-'
+          + '${Dimension.format(v.number("brakeTorque"))}NM-${Dimension.format(v.number("brakeLength"))}MM');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

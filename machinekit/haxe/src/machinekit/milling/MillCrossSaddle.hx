@@ -41,7 +41,7 @@ class MillCrossSaddle extends MachineComponent {
       "machinekit.milling.cross-saddle",
       parameters(),
       v -> new MillCrossSaddle(v)
-    );
+    ).numbered(_ -> "MILL-CROSS-SADDLE");
     return recipe;
   }
 

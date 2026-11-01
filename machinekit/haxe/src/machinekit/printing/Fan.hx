@@ -70,7 +70,7 @@ class Fan extends MachineComponent {
       "machinekit.printing.fan",
       [ComponentRecipeSupport.catalog("designation", catalog(), "FAN-4010-24V")],
       v -> new Fan(v.token("designation"))
-    );
+    ).numbered(v -> v.token("designation"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this, Fan) ? recipeType() : null;

@@ -19,6 +19,8 @@ class ComponentType {
   final materialInDesignation:Bool;
   final defaultMaterial:String;
   final bomExcludedInputs:Array<String>;
+  var numberFor:Null<ComponentValues -> String>;
+  var purchaseKeyFor:Null<ComponentValues -> String>;
 
   /** Most mass properties kept per recipe; past it the memo is emptied and each is computed again on its next use. */
   static inline final MASS_MEMO_LIMIT = 1024;
@@ -83,6 +85,20 @@ class ComponentType {
 
   public function parameters():Array<ComponentParameter> return inputs.copy();
 
+  /** Declare the catalogue or drawing identity for this recipe. */
+  public function numbered(number:ComponentValues -> String):ComponentType {
+    if (number == null || numberFor != null) throw 'Part number already defined for "$id"';
+    numberFor = number;
+    return this;
+  }
+
+  /** Declare a purchase configuration when placement inputs differ from the purchased item. */
+  public function purchaseKeyed(key:ComponentValues -> String):ComponentType {
+    if (key == null || purchaseKeyFor != null) throw 'Purchase key already defined for "$id"';
+    purchaseKeyFor = key;
+    return this;
+  }
+
   public function label():String {
     var words = id.split(".").pop().split("-").join(" ");
     return words.substr(0, 1).toUpperCase() + words.substr(1);
@@ -137,7 +153,8 @@ class ComponentType {
   }
 
   /** BOM identity omits recipe inputs that only place or route a physical part. */
-  public function bomKey(values:ComponentValues):String return keyFor(values, true);
+  public function bomKey(values:ComponentValues):String return purchaseKeyFor == null
+    ? keyFor(values, true) : id + "|" + purchaseKeyFor(resolve(values));
 
   function keyFor(values:ComponentValues, bom:Bool):String {
     var parts:Array<String> = [];
@@ -156,16 +173,7 @@ class ComponentType {
         case Unset:
           "unset";
         case Number(number):
-          switch input.type {
-            case Scalar:
-              Std.string(Math.fround(number * 1e9) / 1e9);
-            case Length:
-              Dimension.format(number);
-            case Angle:
-              Std.string(Math.fround(number * 1e9) / 1e9);
-            default:
-              Std.string(number);
-          };
+          ComponentNumberKey.encode(number);
         case Integer(value):
           Std.string(value);
         case Boolean(value):
@@ -180,9 +188,17 @@ class ComponentType {
     return id + "|" + parts.join("|");
   }
 
-  /** The designation stays the part number while the material is the one these inputs give by themselves. */
-  public function partNumber(component:MachineComponent):String return keepDesignation && (materialInDesignation
-    || component.materialSpec() == naturalMaterial(component)) ? component.designation : key(valuesOf(component));
+  /** Keep authored numbers stable and distinguish an independently edited material. */
+  public function partNumber(component:MachineComponent):String {
+    if (numberFor != null) {
+      var number = numberFor(resolve(valuesOf(component)));
+      if (!materialInDesignation && component.materialSpec() != naturalMaterial(component))
+        number += "-" + MaterialLibrary.fromSpec(component.materialSpec()).toUpperCase();
+      return number;
+    }
+    return keepDesignation && (materialInDesignation
+      || component.materialSpec() == naturalMaterial(component)) ? component.designation : key(valuesOf(component));
+  }
 
   function naturalMaterial(component:MachineComponent):String {
     if (component.materialSpec() == defaultMaterial) return defaultMaterial;

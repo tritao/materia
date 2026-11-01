@@ -35,7 +35,10 @@ class Vfd extends AssumedCatalogComponent {
     });
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.power.vfd", inputs(), v -> new Vfd(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.power.vfd", inputs(), v -> new Vfd(v))
+      .numbered(v -> 'VFD-ASSUMED-${Dimension.format(v.number("power"))}W-${Dimension.format(v.number("inputVoltage"))}V-'
+        + '${Dimension.format(v.number("outputCurrent"))}A-${Dimension.format(v.number("maxFrequency"))}HZ-'
+        + (v.boolean("sto") ? "STO" : "NO-STO"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

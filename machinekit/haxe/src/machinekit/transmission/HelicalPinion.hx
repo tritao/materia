@@ -45,7 +45,9 @@ class HelicalPinion extends AssumedCatalogComponent {
       "machinekit.transmission.helical-pinion",
       inputs(),
       v -> new HelicalPinion(v)
-    );
+    ).numbered(v -> 'PIN-ASSUMED-M${Dimension.format(v.number("normalModule"))}-${v.integer("teeth")}T-'
+        + 'B${Dimension.format(v.number("bore"))}-H${Dimension.format(v.number("helixAngle"))}-'
+        + v.token("hand").substr(0, 1).toUpperCase());
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

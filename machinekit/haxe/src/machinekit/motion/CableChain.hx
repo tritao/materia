@@ -28,9 +28,13 @@ class CableChain extends AssumedCatalogComponent {
     addConnector("moving", Mount, movingFrame(n("travel") / 2));
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.motion.cable-chain", inputs(), v -> new CableChain(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.motion.cable-chain", inputs(), v -> new CableChain(v))
+      .numbered(partNumber);
     return recipe;
   }
+  public static function partNumber(v:ComponentValues):String
+    return 'CHAIN-ASSUMED-${Dimension.format(v.number("innerWidth"))}x${Dimension.format(v.number("innerHeight"))}-'
+      + 'R${Dimension.format(v.number("bendRadius"))}-L${Dimension.format(v.number("travel") / 2 + Math.PI * v.number("bendRadius"))}';
   override public function componentType():Null<ComponentType> return recipeType();
   override public function geometry(detail:ComponentDetail = Preview):Part return geometryAt(n("travel") / 2, detail);
 

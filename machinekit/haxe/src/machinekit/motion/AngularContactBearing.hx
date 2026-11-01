@@ -22,7 +22,7 @@ class AngularContactBearing extends MachineComponent {
       "machinekit.motion.angular-contact-bearing",
       parameters(),
       v -> new AngularContactBearing(v)
-    );
+    ).numbered(v -> 'AC-BEARING-ASSUMED-${Dimension.format(v.number("bore"))}x${Dimension.format(v.number("outside"))}x${Dimension.format(v.number("height"))}-${v.token("precisionClass")}');
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

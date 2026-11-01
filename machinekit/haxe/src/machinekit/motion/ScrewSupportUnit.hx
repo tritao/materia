@@ -364,7 +364,7 @@ class ScrewSupportUnit extends MachineComponent {
       true,
       false,
       ["geometry"]
-    );
+    ).numbered(v -> v.token("model"));
     return supportRecipe;
   }
 

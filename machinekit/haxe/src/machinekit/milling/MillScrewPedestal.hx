@@ -20,7 +20,7 @@ class MillScrewPedestal extends MachineComponent {
       "machinekit.milling.screw-pedestal",
       parameters(),
       v -> new MillScrewPedestal(v)
-    );
+    ).numbered(_ -> "MILL-SCREW-PEDESTAL");
     return recipe;
   }
 

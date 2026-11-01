@@ -14,7 +14,7 @@ class Bt30SpindleMotor extends ServoMotor {
       "machinekit.milling.bt30-spindle-motor-study",
       [],
       v -> new Bt30SpindleMotor()
-    );
+    ).numbered(_ -> "BT30-MOTOR-ASSUMED-2200W-8000RPM");
     return recipe;
   }
   public function new() {

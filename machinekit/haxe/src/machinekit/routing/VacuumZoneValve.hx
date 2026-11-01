@@ -31,7 +31,8 @@ class VacuumZoneValve extends AssumedCatalogComponent {
       "machinekit.routing.vacuum-zone-valve",
       inputs(),
       v -> new VacuumZoneValve(v)
-    );
+    ).numbered(v -> 'VAC-VALVE-ASSUMED-${Dimension.format(v.number("bore"))}MM-'
+        + '${Dimension.format(v.number("ratedVacuum"))}PA-${Dimension.format(v.number("flow"))}M3H');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

@@ -70,7 +70,8 @@ class RotarySwitch extends HmiPart {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.hmi.rotary-switch", inputs(), v -> new RotarySwitch(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.hmi.rotary-switch", inputs(), v -> new RotarySwitch(v))
+      .numbered(v -> 'ROTARY-SWITCH-ASSUMED-${v.integer("positions")}POS');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

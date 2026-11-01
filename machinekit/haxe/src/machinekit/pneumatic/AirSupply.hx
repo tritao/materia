@@ -5,6 +5,7 @@ import machinekit.fluid.PressureSource;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
+import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 
@@ -41,7 +42,7 @@ class AirSupply extends MachineComponent implements PressureSource {
       "machinekit.pneumatic.air-supply",
       [new machinekit.component.ComponentParameter("pressurePa", Scalar, Number(600000), "Pa", 0)],
       v -> new AirSupply(v.number("pressurePa"))
-    );
+    ).numbered(v -> 'AIR-FRL-ASSUMED-${Dimension.format(v.number("pressurePa"))}PA');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

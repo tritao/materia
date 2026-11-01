@@ -8,6 +8,7 @@ import machinekit.component.ComponentValue;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
+import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.power.DcVoltage;
@@ -83,7 +84,7 @@ class ThermistorInput extends MachineComponent {
         v.number("depth"),
         v.number("height")
       )
-    );
+    ).numbered(v -> 'NTC-ADC-ASSUMED-${v.integer("channels")}CH-${Dimension.format(v.number("pullupOhm"))}R-${Dimension.format(v.number("referenceVolts"))}V');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

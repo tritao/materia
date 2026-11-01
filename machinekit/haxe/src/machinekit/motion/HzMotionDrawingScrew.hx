@@ -131,7 +131,7 @@ class HzMotionDrawingScrew extends LeadScrew {
       "machinekit.motion.hzmotion-bk12-screw-end-study",
       [P.length("length", 400), P.choice("endProfile", ["BK12", "BK15"], "BK12")],
       v -> new HzMotionDrawingScrew(v.number("length"), v.token("endProfile"))
-    );
+    ).numbered(v -> 'HZMOTION-DRAWING-${v.token("endProfile")}-L${Dimension.format(v.number("length"))}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

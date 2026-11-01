@@ -20,7 +20,7 @@ class MillYNutBridge extends MachineComponent {
       "machinekit.milling.y-nut-bridge",
       parameters(),
       v -> new MillYNutBridge(v)
-    );
+    ).numbered(_ -> "MILL-Y-NUT-BRIDGE");
     return recipe;
   }
   public function new(?values:ComponentValues) {

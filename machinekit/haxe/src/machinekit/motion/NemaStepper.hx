@@ -563,7 +563,7 @@ class NemaStepper extends MachineComponent implements MotorDrive {
         ComponentRecipeSupport.length("bodyLength", 48)
       ],
       v -> NemaStepper.frame(Std.parseInt(v.token("frame")), v.number("bodyLength"))
-    );
+    ).numbered(v -> 'STEPPER-ASSUMED-NEMA${v.token("frame")}-L${Dimension.format(v.number("bodyLength"))}');
     return genericRecipeTypeCache;
   }
 

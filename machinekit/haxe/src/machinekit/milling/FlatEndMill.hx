@@ -21,7 +21,7 @@ class FlatEndMill extends MachineComponent {
       "machinekit.milling.flat-end-mill",
       parameters(),
       v -> new FlatEndMill(v)
-    );
+    ).numbered(v -> 'ENDMILL-ASSUMED-D${Dimension.format(v.number("diameter"))}-F${Dimension.format(v.number("fluteLength"))}-S${Dimension.format(v.number("stickout"))}');
     return recipe;
   }
   public function new(?values:ComponentValues) {

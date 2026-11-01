@@ -64,7 +64,8 @@ class GaugeFinger extends MachineComponent {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.pressbrake.gauge-finger", [], _ -> new GaugeFinger());
+    if (recipe == null) recipe = new ComponentType("machinekit.pressbrake.gauge-finger", [], _ -> new GaugeFinger())
+      .numbered(_ -> "PRESS-GAUGE-FINGER-ASSUMED");
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

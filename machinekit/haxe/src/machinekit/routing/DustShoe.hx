@@ -57,7 +57,8 @@ class DustShoe extends AssumedCatalogComponent {
     addPort({name: "lift_air", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.routing.dust-shoe", inputs(), v -> new DustShoe(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.routing.dust-shoe", inputs(), v -> new DustShoe(v))
+      .numbered(_ -> "ROUTER-DUST-SHOE");
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

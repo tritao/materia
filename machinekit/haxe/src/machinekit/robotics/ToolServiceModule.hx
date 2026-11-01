@@ -166,7 +166,7 @@ class ToolServiceModule extends MachineComponent {
         v.integer("outlets")
       ),
       true
-    );
+    ).numbered(v -> 'TOOL-SVC-ASSUMED-${machinekit.component.Dimension.format(v.number("voltage"))}V-${machinekit.component.Dimension.format(v.number("totalCurrent"))}A-${machinekit.component.Dimension.format(v.number("branchCurrent"))}A-${v.integer("pins")}P-${v.integer("outlets")}O');
     return recipe;
   }
   override public function componentType():Null<machinekit.component.ComponentType> return recipeType();

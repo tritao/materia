@@ -84,7 +84,7 @@ class Thermistor extends MachineComponent {
       "machinekit.printing.thermistor",
       [ComponentRecipeSupport.catalog("designation", catalog(), "NTC-100K-B3950")],
       v -> new Thermistor(v.token("designation"))
-    );
+    ).numbered(v -> v.token("designation"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

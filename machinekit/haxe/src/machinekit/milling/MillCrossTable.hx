@@ -31,7 +31,7 @@ class MillCrossTable extends MachineComponent {
         v.number("ribWidth"),
         v.boolean("nutSeat")
       )
-    );
+    ).numbered(_ -> "MILL-CROSS-TABLE");
     return recipe;
   }
 

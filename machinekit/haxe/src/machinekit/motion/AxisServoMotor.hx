@@ -17,6 +17,13 @@ class AxisServoMotor extends ServoMotor {
     source = selected;
   }
   override public function mounting():Null<MotorFlange> return source.mounting();
+  /** The flange is another model of the selected motor, not a separate purchase. */
+  override function get_bom():BomItem {
+    var item = super.get_bom(), purchased = source.bom;
+    item.typeId = purchased.typeId;
+    item.valuesKey = purchased.valuesKey;
+    return item;
+  }
   override public function geometry(detail:ComponentDetail =
     Preview):Part return withInterface(source.geometry(detail));
 
@@ -51,7 +58,7 @@ class AxisServoMotor extends ServoMotor {
       "machinekit.motion.axis-servo-motor",
       [P.choice("designation", [for (row in ServoMotor.ratings()) row.designation], "GENERIC-HV-SERVO-750W")],
       v -> new AxisServoMotor(v.token("designation"))
-    );
+    ).numbered(ServoMotor.partNumberFor);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

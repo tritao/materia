@@ -18,7 +18,7 @@ class BallScrewRetainer extends MachineComponent {
       "machinekit.motion.ballscrew-retainer",
       [],
       _ -> new BallScrewRetainer()
-    );
+    ).numbered(_ -> "BALLSCREW-D12-RETAINER-ASSUMED");
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

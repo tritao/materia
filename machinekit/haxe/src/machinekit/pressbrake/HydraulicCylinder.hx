@@ -122,7 +122,7 @@ class HydraulicCylinder extends MachineComponent implements CylinderSpec {
         v.number("capLength"),
         v.number("stemLength")
       )
-    );
+    ).numbered(v -> 'HYD-CYL-ASSUMED-${machinekit.component.Dimension.format(v.number("bore"))}x${machinekit.component.Dimension.format(v.number("rod"))}x${machinekit.component.Dimension.format(v.number("stroke"))}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

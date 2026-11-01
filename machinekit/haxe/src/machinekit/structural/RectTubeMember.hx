@@ -4,6 +4,7 @@ import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
+import machinekit.component.Dimension;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
@@ -13,15 +14,17 @@ class RectTubeMember extends MachineComponent {
   public final profile:RectTube;
   public final length:Float;
   public final drilling:Array<materia.casting.InsertHole>;
+  public final partId:String;
   static var recipe:Null<ComponentType>;
 
-  public function new(width:Float, depth:Float, wall:Float, length:Float, ?holes:Array<materia.casting.InsertHole>) {
+  public function new(width:Float, depth:Float, wall:Float, length:Float, ?holes:Array<materia.casting.InsertHole>, ?partId:String) {
     if (!Math.isFinite(width + depth + wall + length)
       || !(length > 0)) throw "Tube member needs finite positive dimensions";
     var section = new RectTube(width, depth, wall);
     super('${section.designation}-L$length', "Cut rectangular structural tube", "steel");
     profile = section;
     this.length = length;
+    this.partId = partId == null ? "" : partId;
     drilling = holes == null ? [] : InsertHoles.records(InsertHoles.fromNeutral(holes));
     for (hole in drilling) {
       var axis = materia.assembly.AssemblyFrames.transformVector(hole.frame, 0, 0, 1);
@@ -56,16 +59,20 @@ class RectTubeMember extends MachineComponent {
         ComponentRecipeSupport.length("depth", 30),
         ComponentRecipeSupport.length("wall", 2),
         ComponentRecipeSupport.length("length", 750),
-        ComponentRecipeSupport.text("holes", InsertHoles.fromNeutral([]))
+        ComponentRecipeSupport.text("holes", InsertHoles.fromNeutral([])),
+        ComponentRecipeSupport.text("partId", "")
       ],
       v -> new RectTubeMember(
         v.number("width"),
         v.number("depth"),
         v.number("wall"),
         v.number("length"),
-        InsertHoles.records(v.token("holes"))
+        InsertHoles.records(v.token("holes")),
+        v.token("partId")
       )
-    );
+    ).numbered(v -> v.token("partId") != "" ? 'TUBE-${v.token("partId").toUpperCase()}'
+      : 'TUBE-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("wall"))}-L${Dimension.format(v.number("length"))}'
+        + (InsertHoles.records(v.token("holes")).length == 0 ? "" : "-DRILLED"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
@@ -85,5 +92,8 @@ class RectTubeMember extends MachineComponent {
     ).setToken(
       "holes",
       InsertHoles.fromNeutral(drilling)
+    ).setToken(
+      "partId",
+      partId
     );
 }

@@ -140,7 +140,8 @@ class TimingPulley extends MachineComponent {
         v.number("boreDiameter"),
         v.number("thickness")
       )
-    );
+    ).numbered(v -> 'PULLEY-${v.token("profile")}-${v.integer("teeth")}T-'
+      + 'B${Dimension.format(v.number("boreDiameter"))}-W${Dimension.format(v.number("thickness"))}');
     return standardRecipeTypeCache;
   }
 
@@ -163,7 +164,9 @@ class TimingPulley extends MachineComponent {
         v.number("boreDiameter"),
         v.number("thickness")
       )
-    );
+    ).numbered(v -> 'PULLEY-${v.token("family")}-P${Dimension.format(v.number("pitch"))}-'
+      + 'D${Dimension.format(v.number("pitchLineDifferential"))}-${v.integer("teeth")}T-'
+      + 'B${Dimension.format(v.number("boreDiameter"))}-W${Dimension.format(v.number("thickness"))}');
     return customRecipeTypeCache;
   }
 

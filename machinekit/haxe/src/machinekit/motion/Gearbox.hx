@@ -105,8 +105,14 @@ class Gearbox extends MachineComponent {
         v.token("basis") == "assumed",
         v.number("inputInertia"),
         v.token("inertiaBasis") == "assumed"
-      )
-    );
+      ),
+      false,
+      true
+    ).numbered(v -> 'GEARBOX-${Dimension.format(v.number("ratio"))}-${Dimension.format(v.number("efficiency"))}-'
+      + '${Dimension.format(v.number("diameter"))}x${Dimension.format(v.number("length"))}-B${Dimension.format(v.number("bore"))}-'
+      + v.token("basis").toUpperCase()
+      + (v.token("material") == "aluminium 6061" ? "" : v.token("material") == "steel" ? "-STL"
+        : "-" + materia.project.MaterialLibrary.fromSpec(v.token("material")).toUpperCase()));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

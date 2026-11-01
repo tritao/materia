@@ -46,7 +46,9 @@ class PlanetaryReducer extends AssumedCatalogComponent {
       "machinekit.motion.planetary-reducer",
       inputs(),
       v -> new PlanetaryReducer(v)
-    );
+    ).numbered(v -> 'PLANETARY-ASSUMED-${Dimension.format(v.number("ratio"))}R-'
+        + '${Dimension.format(v.number("ratedOutputTorque"))}NM-'
+        + '${Dimension.format(v.number("backlash"))}AM-${Dimension.format(v.number("bore"))}B');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

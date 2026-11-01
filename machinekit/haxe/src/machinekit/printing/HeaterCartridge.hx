@@ -76,7 +76,7 @@ class HeaterCartridge extends MachineComponent {
       "machinekit.printing.heater-cartridge",
       [ComponentRecipeSupport.catalog("designation", catalog(), "CARTRIDGE-6x20-24V-40W")],
       v -> new HeaterCartridge(v.token("designation"))
-    );
+    ).numbered(v -> v.token("designation"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

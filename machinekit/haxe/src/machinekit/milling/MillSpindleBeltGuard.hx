@@ -16,7 +16,7 @@ class MillSpindleBeltGuard extends MachineComponent {
       "machinekit.milling.spindle-belt-guard",
       [P.flag("centered", false)],
       v -> new MillSpindleBeltGuard(v)
-    );
+    ).numbered(_ -> "MILL-SPINDLE-BELT-GUARD");
     return recipe;
   }
   public function new(?v:ComponentValues) {

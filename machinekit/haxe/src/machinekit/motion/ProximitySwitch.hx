@@ -78,7 +78,8 @@ class ProximitySwitch extends MachineComponent implements SwitchPart {
       "machinekit.motion.proximity-switch",
       [ComponentRecipeSupport.catalog("designation", catalog(), "GENERIC-INDUCTIVE-M8")],
       v -> new ProximitySwitch(v.token("designation"))
-    );
+    ).numbered(v -> StringTools.startsWith(v.token("designation"), "GENERIC-")
+      ? "SWITCH-ASSUMED-" + v.token("designation").substr("GENERIC-".length) : v.token("designation"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

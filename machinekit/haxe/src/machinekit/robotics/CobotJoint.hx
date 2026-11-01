@@ -139,7 +139,7 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
         v.boolean("wristStator"),
         v.boolean("wristRotor")
       )
-    );
+    ).numbered(v -> 'COBOT-ASSUMED-S${Std.int(v.number("size"))}-${machinekit.component.Dimension.format(v.number("speedDegrees"))}DPS-P${machinekit.component.Dimension.format(v.number("inputPilotDepth"))}-${v.boolean("wristStator") ? "S" : "N"}${v.boolean("wristRotor") ? "R" : "N"}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return moduleRecipeType();

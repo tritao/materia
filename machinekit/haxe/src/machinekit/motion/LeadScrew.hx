@@ -172,7 +172,7 @@ class LeadScrew extends MachineComponent {
       "machinekit.motion.lead-screw",
       ComponentRecipeSupport.threadParameters().concat([ComponentRecipeSupport.length("length", 100)]),
       v -> new LeadScrew(ComponentRecipeSupport.thread(v), v.number("length"))
-    );
+    ).numbered(v -> 'SCREW-${ComponentRecipeSupport.threadPartNumber(v)}-L${Dimension.format(v.number("length"))}');
     return recipeTypeCache;
   }
 

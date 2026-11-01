@@ -29,7 +29,8 @@ class MillZHead extends MachineComponent {
     P.length("wall", 12)
   ];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.milling.z-head", parameters(), v -> new MillZHead(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.milling.z-head", parameters(), v -> new MillZHead(v))
+      .numbered(_ -> "MILL-Z-RIBBED-HEAD");
     return recipe;
   }
   public function new(?values:ComponentValues) {

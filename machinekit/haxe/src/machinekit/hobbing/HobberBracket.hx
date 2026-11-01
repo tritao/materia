@@ -20,7 +20,7 @@ class HobberBracket extends MachineComponent {
       "machinekit.hobbing.hobber-bracket",
       parameters(),
       v -> new HobberBracket(v)
-    );
+    ).numbered(_ -> "HOBBER-BRACKET");
     return recipe;
   }
   public function new(?values:ComponentValues) {

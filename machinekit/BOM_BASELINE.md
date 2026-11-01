@@ -1,25 +1,18 @@
 # BOM baseline
 
-Baseline revision: `d7d644702` (before B1). The full gate was started through
-`heavy-run`; results and per-machine measurements will be recorded here when
-that run and the B1 exporter finish.
+Baseline revision: `d7d644702` (before B1). The full gate ran through
+`heavy-run`.
 
 The B0 survey in `BOM_PLAN.md` reports 107 members and 76 BOM lines for the
-bench mill. This is a survey figure, not yet an exporter measurement. It
-identified recipe keys and raw dimensions in part numbers, 26 brake lines for
-one purchase, missing procurement classifications and fasteners, and included
-workpiece/tooling. Counts for each problem class and the other machines are
-pending measurement.
+bench mill. That survey identified recipe keys and raw dimensions in part
+numbers, 26 brake lines for one purchase, missing procurement classifications
+and fasteners, and included workpiece/tooling. The measurements below cover the
+exportable machines.
 
 ## Starting gate
 
 The examples and smoke suite built successfully against the prebuilt OCCT
 provider. The complete run passed 11 of 24 shards. Results:
-
-The amended B1 gate also passed 11 of 24 shards; comparison found no new
-failing shard or exception message. All 22 examples that exported at baseline
-exported in the amended shape with the same procurement part numbers. The
-bench mill and sheet router also retained their baseline line quantities.
 
 | Shard | Result |
 | --- | --- |
@@ -47,6 +40,11 @@ bench mill and sheet router also retained their baseline line quantities.
 | 22 | Fail: `Axis assembly has no member "rackFoot0" yet` |
 | 23 | Fail: same stale tending reach certificate message as shard 16. |
 | 24 | Pass: `FastenerThreadTests.run` and eight other groups. |
+
+The amended B1 gate also passed 11 of 24 shards; comparison found no new
+failing shard or exception message. All 22 examples that exported at baseline
+exported in the amended shape with the same procurement part numbers. The
+bench mill and sheet router also retained their baseline line quantities.
 
 ## Initial exported lines
 
@@ -121,6 +119,42 @@ which 166 had invalid part numbers. Three further defaults could not be
 constructed: `cast-in-steel-insert` needs `role`, `linear-mount-nut-cassette`
 needs a mounted-element source identity, and `source-casting` needs `source`.
 They remain visible in the report instead of being counted as passing.
+
+The B2 recipe report checked the same 212 constructible defaults and found
+zero invalid part numbers. Those three recipes still require explicit inputs;
+focused Haxe tests check a representative instance of each.
+
+The B2 report measured all 22 exportable machines. The lint-invalid column
+counts procurement lines failing the part-number rules; remaining invalid
+lines are non-recipe members. The lint also checked engineering occurrences
+and found no invalid recipe-derived numbers.
+Across the 22 machines, procurement lines fell from 1,221 to 1,141 and
+lint-invalid lines from 872 to 242. These are line counts, not quantities.
+
+| Machine | Initial lines | Initial lint invalid | B2 lines | B2 lint invalid |
+| --- | ---: | ---: | ---: | ---: |
+| bench-mill | 76 | 60 | 76 | 13 |
+| cnc-router | 40 | 24 | 40 | 10 |
+| cobot-arm | 26 | 17 | 25 | 6 |
+| corexy-plotter | 17 | 10 | 17 | 5 |
+| corexy-printer | 55 | 37 | 54 | 14 |
+| enclosed-bench-mill | 114 | 97 | 114 | 13 |
+| flexspline-hobber | 74 | 60 | 76 | 0 |
+| gantry-picker | 62 | 49 | 62 | 33 |
+| gantry-welder | 83 | 52 | 83 | 38 |
+| linear-stage | 11 | 5 | 11 | 0 |
+| mobile-base | 11 | 3 | 11 | 1 |
+| mobile-base-cell | 48 | 26 | 48 | 1 |
+| mobile-welder | 53 | 26 | 53 | 6 |
+| overhead-arm | 76 | 57 | 76 | 23 |
+| picking-station | 7 | 0 | 7 | 0 |
+| press-brake | 37 | 27 | 37 | 9 |
+| robot-arm | 32 | 23 | 32 | 0 |
+| robot-screwdriver | 38 | 24 | 38 | 4 |
+| robot-welder | 43 | 21 | 43 | 2 |
+| sheet-router | 224 | 190 | 144 | 34 |
+| track-arm | 53 | 31 | 53 | 8 |
+| xyz-stage | 41 | 33 | 41 | 22 |
 
 ## Initial content signals
 

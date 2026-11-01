@@ -22,7 +22,7 @@ class OutboardSupport extends MachineComponent {
       "machinekit.hobbing.outboard-support",
       parameters(),
       v -> new OutboardSupport(v)
-    );
+    ).numbered(_ -> "HOB-OUTBOARD-SUPPORT");
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

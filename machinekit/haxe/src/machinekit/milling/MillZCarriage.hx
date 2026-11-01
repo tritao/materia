@@ -32,7 +32,7 @@ class MillZCarriage extends MachineComponent {
       "machinekit.milling.z-carriage",
       parameters(),
       v -> new MillZCarriage(v)
-    );
+    ).numbered(_ -> "MILL-Z-CARRIAGE");
     return recipe;
   }
   public static function selectedNut(model:String):machinekit.motion.LeadScrewNut return model

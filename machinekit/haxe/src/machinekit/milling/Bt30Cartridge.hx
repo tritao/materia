@@ -16,7 +16,7 @@ class Bt30Cartridge extends MachineComponent {
       "machinekit.milling.bt30-cartridge-study",
       [],
       v -> new Bt30Cartridge()
-    );
+    ).numbered(_ -> "BT30-CARTRIDGE-ASSUMED-D90");
     return recipe;
   }
   public function new() {

@@ -28,7 +28,8 @@ class BrakeResistor extends AssumedCatalogComponent {
       "machinekit.power.brake-resistor",
       inputs(),
       v -> new BrakeResistor(v)
-    );
+    ).numbered(v -> 'BRK-RESISTOR-ASSUMED-${Dimension.format(v.number("resistance"))}OHM-'
+      + '${Dimension.format(v.number("continuousPower"))}W-${Dimension.format(v.number("pulseEnergy"))}J');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

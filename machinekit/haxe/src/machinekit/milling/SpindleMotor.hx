@@ -43,7 +43,7 @@ class SpindleMotor extends ServoMotor {
       "machinekit.milling.spindle-motor",
       [machinekit.component.ComponentRecipeSupport.flag("highVoltage", false)],
       v -> new SpindleMotor(v.boolean("highVoltage"))
-    );
+    ).numbered(v -> v.boolean("highVoltage") ? "SPINDLE-MOTOR-ASSUMED-1100W-HV" : "SPINDLE-MOTOR-ASSUMED-1100W-LV");
     return spindleMotorRecipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

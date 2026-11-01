@@ -41,8 +41,12 @@ class ControlCabinet extends AssumedCatalogComponent {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.control.control-cabinet",
       inputs(),
-      v -> new ControlCabinet(v)
-    );
+      v -> new ControlCabinet(v),
+      false,
+      false,
+      ["inputs", "outputs", "analogOutputs"]
+    ).numbered(v -> 'CABINET-ASSUMED-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x'
+      + '${Dimension.format(v.number("height"))}-${v.integer("dinRows")}R');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

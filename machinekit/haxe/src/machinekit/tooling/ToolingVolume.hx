@@ -34,7 +34,10 @@ class ToolingVolume extends MachineComponent {
 
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.tooling.volume",
-      parameters(), v -> new ToolingVolume(v));
+      parameters(), v -> new ToolingVolume(v)).numbered(v -> {
+        var volume = MoldVolumeRecords.snapshot(haxe.Json.parse(v.token("volume")));
+        return 'MOLD-${volume.id.toUpperCase()}';
+      });
     return recipe;
   }
 

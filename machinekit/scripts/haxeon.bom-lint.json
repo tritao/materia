@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "package": { "name": "machinekit-bom-lint" },
+  "entry": "BomLintReport",
+  "sources": ["BomLintReport.hx"],
+  "sourceRoots": ["."],
+  "dependencies": { "machinekit": { "path": ".." } },
+  "target": "host",
+  "outputDir": "../build/bom-lint"
+}

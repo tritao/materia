@@ -26,7 +26,8 @@ class ToolLengthSetter extends AssumedCatalogComponent {
       "machinekit.routing.tool-length-setter",
       inputs(),
       v -> new ToolLengthSetter(v)
-    );
+    ).numbered(v -> 'TOOL-SETTER-ASSUMED-${Dimension.format(v.number("diameter"))}x${Dimension.format(v.number("height"))}-'
+        + 'S${Dimension.format(v.number("stroke"))}-R${Dimension.format(v.number("repeatability"))}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

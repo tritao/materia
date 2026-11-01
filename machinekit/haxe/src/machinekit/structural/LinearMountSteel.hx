@@ -23,6 +23,7 @@ class LinearMountSteel extends MachineComponent {
   final lineage:Array<InsertMountHoleRequirement>;
 
   static function inputs():Array<ComponentParameter> return [
+    P.text("partId", ""),
     P.length("width", 28),
     P.length("length", 500),
     P.choice("stock", ["C45", "weldable-mild-steel"], "C45"),
@@ -44,7 +45,7 @@ class LinearMountSteel extends MachineComponent {
       false,
       null,
       false
-    );
+    ).numbered(v -> v.token("partId") != "" ? 'LM-${v.token("partId").toUpperCase()}' : 'LM-${v.token("stock") == "C45" ? "C45" : "MILD"}-${v.token("role").toUpperCase()}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("length"))}x${Dimension.format(v.number("thickness"))}');
     return recipe;
   }
 

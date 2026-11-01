@@ -585,8 +585,26 @@ class TimingBelt extends MachineComponent {
         v.number("cordRigidity"),
         v.number("dampingRatio")
       )
-    );
+    ).numbered(v -> 'BELT-${v.token("profile")}-${pairToothCount(v)}T-W${Dimension.format(v.number("width"))}')
+      .purchaseKeyed(v -> 'profile:${v.token("profile")}|teeth:${pairToothCount(v)}|'
+        + 'width:${machinekit.component.ComponentNumberKey.encode(v.number("width"))}|'
+        + 'cord:${machinekit.component.ComponentNumberKey.encode(v.number("cordRigidity"))}|'
+        + 'damping:${machinekit.component.ComponentNumberKey.encode(v.number("dampingRatio"))}');
     return pairRecipeTypeCache;
+  }
+
+  /** Tooth count of the two-pulley pitch loop, calculated without constructing CAD geometry. */
+  static function pairToothCount(v:ComponentValues):Int {
+    var pitch = TimingPulley.profileDimensions(ComponentRecipeSupport.profile(v.token("profile"))).pitch;
+    var first = pitch * v.integer("driverTeeth") / (2 * Math.PI);
+    var second = pitch * v.integer("idlerTeeth") / (2 * Math.PI);
+    var centre = v.number("centreDistance"), delta = second - first;
+    if (!(centre > Math.abs(delta))) throw "Timing belt pulleys are too close";
+    var length = 2 * Math.sqrt(centre * centre - delta * delta) + Math.PI * (first + second)
+      + 2 * delta * Math.asin(delta / centre);
+    var teeth = Math.round(length / pitch);
+    if (teeth < 1) throw "Timing belt is shorter than one tooth";
+    return teeth;
   }
 
   override public function componentType():Null<ComponentType> return pair == null ? null : pairRecipeType();

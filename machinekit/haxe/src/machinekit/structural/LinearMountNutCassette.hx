@@ -51,7 +51,12 @@ class LinearMountNutCassette extends MachineComponent {
         "stations",
         '[{"connector":"metadata-example","x":0,"y":0}]'
       )
-    );
+    ).numbered(v -> 'NUT-CASSETTE-${v.token("size")}-${v.token("layout").toUpperCase()}').purchaseKeyed(v -> {
+      var rows:Array<Dynamic> = haxe.Json.parse(v.token("stations"));
+      var coordinates = [for (row in rows) ComponentNumberKey.encode(row.x) + "," + ComponentNumberKey.encode(row.y)];
+      return [ComponentNumberKey.encode(v.number("length")), ComponentNumberKey.encode(v.number("width")),
+        v.token("size"), v.token("layout"), coordinates.join(";")].join("|");
+    });
     return recipe;
   }
   public function new(?overrides:ComponentValues) {

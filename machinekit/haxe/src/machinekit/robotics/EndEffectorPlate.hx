@@ -192,7 +192,7 @@ class EndEffectorPlate extends MachineComponent {
         v.integer("toolBoltCount"),
         v.token("toolMountScrew")
       )
-    );
+    ).numbered(v -> 'EOAT-${Dimension.format(v.number("flangePitchCircle"))}-${v.integer("flangeBoltCount")}-${Dimension.format(v.number("thickness"))}-${Dimension.format(v.number("toolBoltCircleDiameter"))}-${v.integer("toolBoltCount")}${v.token("toolMountScrew")}');
     return recipeTypeCache;
   }
 

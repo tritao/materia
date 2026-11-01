@@ -36,8 +36,25 @@ class LevelingFoot extends AssumedCatalogComponent {
       "machinekit.structural.leveling-foot",
       parameters(),
       v -> new LevelingFoot(v)
-    );
+    ).numbered(v -> partNumber(LevelingFootCodec.decode(v.token("part"))));
     return recipe;
+  }
+
+  static function partNumber(part:LevelingFootSpec):String return switch part {
+    case Foot(d, _, thread, bottom, top, _, _, _):
+      'FOOT-ASSUMED-${thread.designation}-D${Dimension.format(d)}-L${Dimension.format(top - bottom)}';
+    case Pad(d, h):
+      'FOOT-PAD-ASSUMED-${Dimension.format(d)}x${Dimension.format(h)}';
+    case Screw(thread, length, _):
+      'FOOT-SCREW-ASSUMED-${thread.designation}-L${Dimension.format(length)}';
+    case Plate(w, d, h, bore):
+      'FOOT-PLATE-ASSUMED-${Dimension.format(w)}x${Dimension.format(d)}x${Dimension.format(h)}-D${Dimension.format(bore)}';
+    case Nut(profile, h, thread):
+      var shape = switch profile {
+        case Round(d): 'R${Dimension.format(d)}';
+        case Hexagon(af): 'H${Dimension.format(af)}';
+      };
+      'FOOT-NUT-ASSUMED-${thread.designation}-${shape}x${Dimension.format(h)}';
   }
 
   public static function of(spec:LevelingFootSpec):LevelingFoot return new LevelingFoot(new ComponentValues().setToken(

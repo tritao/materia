@@ -94,7 +94,8 @@ class EmergencyStop extends HmiPart {
 
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.hmi.emergency-stop",
-      inputs(), v -> new EmergencyStop(v));
+      inputs(), v -> new EmergencyStop(v)).numbered(v -> v.token("model") == "CUSTOM"
+        ? 'ESTOP-ASSUMED-${v.integer("blocks")}NC' : '${v.token("model")}-${v.integer("blocks")}NC');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

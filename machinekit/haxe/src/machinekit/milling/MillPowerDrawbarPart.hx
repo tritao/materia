@@ -30,7 +30,7 @@ class MillPowerDrawbarPart extends MachineComponent {
       "machinekit.milling.power-drawbar-study-part",
       parameters(),
       v -> new MillPowerDrawbarPart(v)
-    );
+    ).numbered(v -> 'BT30-STUDY-${v.token("role").toUpperCase()}');
     return recipe;
   }
   public function new(?values:ComponentValues) {

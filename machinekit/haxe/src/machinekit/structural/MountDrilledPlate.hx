@@ -10,17 +10,20 @@ import machinekit.gantry.GantryParts.GantryPlate;
 class MountDrilledPlate extends GantryPlate {
   static var recipe:Null<ComponentType>;
   final drilling:Array<materia.casting.InsertHole>;
+  final partId:String;
   static function inputs():Array<ComponentParameter> return [
     P.length("width", 100),
     P.length("depth", 500),
     P.length("height", 12),
     P.text("holes", InsertHoles.fromNeutral([])),
-    P.text("hostMaterial", "steel")
+    P.text("hostMaterial", "steel"),
+    P.text("partId", "")
   ];
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(inputs(), overrides, false);
     super("clearance-drilled host pad", v.number("width"), v.number("depth"), v.number("height"));
     setMaterial(v.token("hostMaterial"));
+    partId = v.token("partId");
     drilling = InsertHoles.records(v.token("holes"));
     for (h in drilling) {
       if (h.thread != null) MountHostThreads.validate(h, v.token("hostMaterial"), height);
@@ -39,7 +42,8 @@ class MountDrilledPlate extends GantryPlate {
       false,
       null,
       false
-    );
+    ).numbered(v -> v.token("partId") != "" ? 'HOST-PAD-${v.token("partId").toUpperCase()}'
+      : 'HOST-PAD-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}-${materia.project.MaterialLibrary.fromSpec(v.token("hostMaterial")).toUpperCase()}');
     return recipe;
   }
   public function holes():Array<materia.casting.InsertHole
@@ -57,6 +61,9 @@ class MountDrilledPlate extends GantryPlate {
   ).setToken(
     "hostMaterial",
     materialSpec()
+  ).setToken(
+    "partId",
+    partId
   );
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
     Part.box(width, depth, height),

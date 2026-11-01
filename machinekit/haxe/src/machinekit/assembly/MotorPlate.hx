@@ -168,7 +168,8 @@ class MotorPlate extends MachineComponent {
       holeDiameter: v.number("profileHoleDiameter")
     };
     return new MotorPlate(namedMotor(v.token("motor")), v.number("thickness"), v.number("margin"), mount);
-    });
+    }).numbered(v -> 'MOTOR-PLATE-${v.token("motor")}-T${Dimension.format(v.number("thickness"))}'
+      + (v.token("profileSystem") == "None" ? "" : '-${v.token("profileSystem")}'));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return motorModel() != null ? recipeType() : null;

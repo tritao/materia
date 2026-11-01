@@ -3129,6 +3129,7 @@ class MachineKitSmoke {
     var everything = Shards.run([{name: "ControllerWiringTests.run", run: () -> {
       BomDocumentTests.run();
       BomExampleTests.run();
+      PartNumberKeyTests.run();
       ControllerWiringTests.run();
     }, weight: 0.05}, {
       name: "OperatorProfileTests.run",

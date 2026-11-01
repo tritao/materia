@@ -45,7 +45,7 @@ class HydraulicCylinderRod extends MachineComponent {
       "machinekit.pressbrake.hydraulic-cylinder-rod",
       [ComponentRecipeSupport.length("diameter", 100), ComponentRecipeSupport.length("length", 190)],
       v -> new HydraulicCylinderRod(v.number("diameter"), v.number("length"))
-    );
+    ).numbered(v -> 'HYDRAULIC-ROD-${Dimension.format(v.number("diameter"))}x${Dimension.format(v.number("length"))}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

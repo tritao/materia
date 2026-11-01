@@ -36,7 +36,7 @@ class SpindleCartridge extends MachineComponent {
       "machinekit.milling.spindle-cartridge",
       [],
       v -> new SpindleCartridge()
-    );
+    ).numbered(_ -> "SPINDLE-CARTRIDGE-ASSUMED-ER20-D70");
     return spindleRecipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
@@ -109,7 +109,7 @@ class Er20Holder extends MachineComponent {
       "machinekit.milling.er20-holder",
       [],
       v -> new Er20Holder()
-    );
+    ).numbered(_ -> "HOLDER-ASSUMED-ER20-D6");
     return holderRecipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

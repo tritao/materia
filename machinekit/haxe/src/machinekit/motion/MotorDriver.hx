@@ -173,7 +173,7 @@ class MotorDriver extends MachineComponent {
     super(
       '$designation-${Dimension.format(current.amps())}A-M$microsteps' + (statedVoltage
       == null ? "-WIRED" : '-${Dimension.format(statedVoltage.volts())}V'),
-      '$designation motor driver, ${Dimension.format(current.amps())} A rms',
+      '$designation motor driver, ${Dimension.format(row.maximumCurrent)} A rms maximum',
       "aluminium 6061"
     );
     this.rating = row;
@@ -215,8 +215,15 @@ class MotorDriver extends MachineComponent {
         new machinekit.power.PhaseRmsCurrent(v.number("current")),
         v.integer("microsteps"),
         v.boolean("wiredSupply") ? null : new machinekit.power.DcVoltage(v.number("voltage"))
-      )
-    );
+      ),
+      false,
+      false,
+      ["current", "microsteps", "wiredSupply", "voltage"]
+    ).numbered(v -> {
+      var model = v.token("designation");
+      return StringTools.startsWith(model, "GENERIC-")
+        ? "DRIVER-ASSUMED-" + model.substr("GENERIC-".length) : model;
+    });
     return recipe;
   }
 

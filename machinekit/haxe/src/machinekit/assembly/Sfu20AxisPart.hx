@@ -115,7 +115,7 @@ class Sfu20AxisPart extends MachineComponent {
       true,
       false,
       ["travel"]
-    );
+    ).numbered(v -> 'SFU20-AXIS-${v.token("kind").toUpperCase()}');
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

@@ -113,7 +113,8 @@ class HandWheel extends HmiPart {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.hmi.hand-wheel", inputs(), v -> new HandWheel(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.hmi.hand-wheel", inputs(), v -> new HandWheel(v))
+      .numbered(v -> v.token("model") == "CUSTOM" ? 'HANDWHEEL-ASSUMED-${v.integer("scaleDivisions")}DIV' : v.token("model"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

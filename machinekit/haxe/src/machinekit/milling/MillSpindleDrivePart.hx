@@ -60,14 +60,14 @@ class MillSpindleDrivePart extends MachineComponent {
         "machinekit.milling.spindle-drive-study-guard",
         parameters("guard"),
         v -> new MillSpindleDrivePart(v)
-      );
+      ).numbered(v -> 'MILL-SPINDLE-DRIVE-${v.token("role").toUpperCase()}');
       return guardRecipe;
     }
     if (recipe == null) recipe = new ComponentType(
       "machinekit.milling.spindle-drive-study-part",
       parameters(),
       v -> new MillSpindleDrivePart(v)
-    );
+    ).numbered(v -> 'MILL-SPINDLE-DRIVE-${v.token("role").toUpperCase()}');
     return recipe;
   }
   public function new(?v:ComponentValues) {

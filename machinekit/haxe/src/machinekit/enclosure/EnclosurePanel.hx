@@ -6,6 +6,7 @@ import machinekit.component.MachineComponent;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
+import machinekit.component.Dimension;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.BomItem;
 import machinekit.component.Solids;
@@ -86,9 +87,11 @@ class EnclosurePanel extends MachineComponent {
       false,
       null,
       false
-    );
+    ).numbered(numberFor);
     return recipe;
   }
+  public static function numberFor(v:ComponentValues):String
+    return 'P-${v.token("construction").toUpperCase()}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("height"))}';
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setNumber("width", width).setNumber(
     "height",

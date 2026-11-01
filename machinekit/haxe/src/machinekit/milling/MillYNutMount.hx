@@ -36,7 +36,7 @@ class MillYNutMount extends MachineComponent {
       "machinekit.milling.y-nut-mount",
       parameters(),
       v -> new MillYNutMount(v)
-    );
+    ).numbered(_ -> "MILL-Y-NUT-MOUNT");
     return recipe;
   }
   public function new(?v:ComponentValues) {

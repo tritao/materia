@@ -17,7 +17,7 @@ class MillBallNutBracket extends MachineComponent {
       "machinekit.milling.ball-nut-bracket",
       parameters(),
       v -> new MillBallNutBracket(v)
-    );
+    ).numbered(_ -> "MILL-BALL-NUT-BRACKET");
     return recipe;
   }
 

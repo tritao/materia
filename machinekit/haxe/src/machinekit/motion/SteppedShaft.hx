@@ -421,7 +421,14 @@ class SteppedShaft extends MachineComponent {
       ],
       v -> SteppedShaft.fromRecipe(v),
       true
-    );
+    ).numbered(v -> {
+      var sections:Array<Dynamic> = Json.parse(v.token("sections"));
+      var sizes = [for (section in sections) Dimension.format(section.diameter) + "x" + Dimension.format(section.length)];
+      var grooves:Array<Dynamic> = Json.parse(v.token("grooves"));
+      var keyways:Array<Dynamic> = Json.parse(v.token("keyways"));
+      return "SHAFT-" + sizes.join("-") + (grooves.length == 0 ? "" : "-G" + grooves.length)
+        + (keyways.length == 0 ? "" : "-K" + keyways.length);
+    });
     return recipeTypeCache;
   }
 

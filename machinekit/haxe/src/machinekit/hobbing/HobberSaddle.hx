@@ -40,7 +40,7 @@ class HobberSaddle extends MachineComponent {
       "machinekit.hobbing.saddle",
       parameters(),
       v -> new HobberSaddle(v.token("design"), v)
-    );
+    ).numbered(v -> 'HOBBER-${v.token("design").toUpperCase()}');
     return recipe;
   }
   public function new(design:String, ?values:ComponentValues) {

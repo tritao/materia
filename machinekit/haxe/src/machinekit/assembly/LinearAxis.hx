@@ -103,7 +103,8 @@ class Carriage extends MachineComponent {
         v.boolean("hasRailMount") ? v.number("railMountY") : null
       ),
       true
-    );
+    ).numbered(v -> 'CARRIAGE-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("length"))}-D${Dimension.format(v.number("boreDiameter"))}-'
+      + ComponentRecipeSupport.threadPartNumber(v));
     return recipeTypeCache;
   }
 
