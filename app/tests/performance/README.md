@@ -290,8 +290,8 @@ What changed, in the order it paid:
   three empty arrays it then overwrote and copied the rule list (about 290 forks per tab switch).
 - One-name class and tag arrays (`["row"]`) are interned in `StyleTarget.shared` instead of copied by both `StyleTarget` and
   `RenderNode.setStyleIdentity`.
-- Cache keys of dock panes, dock panels and `RetainedView` are `KeyHash` lanes, not concatenated strings; four app panels
-  (`hierarchy`, `perspective`, `inspector`, `sensors`) hash their inputs through `DockPanelContent.cacheKeyHash`.
+- Cache keys of dock panes and `RetainedView` are `KeyHash` lanes, not concatenated strings. The signals migration removed
+  the dock panels' hand-written `cacheKeyHash`; opted-in panels now reuse tracked signal reads and explicit `observe*` inputs.
 - `TextRoleStyle.toOverride` keeps its last override while the role is unchanged.
 - A `LayoutNode` allocates its text and paragraph styles when it shows text; the encoder and the layout diff read a shared
   default through `peekTextStyle` and `peekParagraphStyle`.

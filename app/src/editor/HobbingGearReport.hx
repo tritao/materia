@@ -141,7 +141,8 @@ class HobbingGearReport implements View {
       ],
       tokens
     );
-    if (measured != null) samples(context, rows, tokens);
+    var synchronizeSamples:Null<Void->Void> = null;
+    if (measured != null) synchronizeSamples = samples(context, rows, tokens);
     var content = flow();
     content.padding = new Insets(12, 12, 28, 12);
     content.childGap = 10;
@@ -156,6 +157,7 @@ class HobbingGearReport implements View {
       wide.update(next);
       context.requestLayoutFeedback();
     }
+    if (synchronizeSamples != null) synchronizeSamples();
     });
     return root;
   }
@@ -181,16 +183,21 @@ class HobbingGearReport implements View {
     if (expanded.value) rows.push(new KeyedView("details-" + id, new Column("details-" + id, children, card(tokens))));
   }
 
-  function samples(context:BuildContext, rows:Array<KeyedView>, tokens:ThemeTokens):Void {
+  function samples(context:BuildContext, rows:Array<KeyedView>, tokens:ThemeTokens):Void->Void {
     var expanded = context.state(context.id("samples-expanded"), false);
     var page = context.state(context.id("samples-page"), 0);
     var copied = context.state(context.id("samples-copied"), false);
     var source = context.state(context.id("sample-source"), data.measurement);
-    if (source.value != data.measurement) {
-      source.update(data.measurement);
-      copied.update(false);
-      page.update(0);
-    }
+    var sourceChanged = source.value != data.measurement;
+    var copiedValue = sourceChanged ? false : copied.value;
+    var pageValue = sourceChanged ? 0 : page.value;
+    var synchronize = function() {
+      if (source.value != data.measurement) {
+        source.update(data.measurement);
+        copied.update(false);
+        page.update(0);
+      }
+    };
     rows.push(new KeyedView(
       "toggle-samples",
       new ReportDisclosure(
@@ -201,9 +208,9 @@ class HobbingGearReport implements View {
         "toggle-samples"
       )
     ));
-    if (!expanded.value) return;
+    if (!expanded.value) return synchronize;
     var children:Array<KeyedView> = [];
-    children.push(new KeyedView("copy", new Button(copied.value ? "Copied CSV" : "Copy all samples as CSV",
+    children.push(new KeyedView("copy", new Button(copiedValue ? "Copied CSV" : "Copy all samples as CSV",
       flow(), () -> {context.clipboard.writeText(data.csv());
     copied.update(true);
     }, "copy-samples")));
@@ -213,7 +220,7 @@ class HobbingGearReport implements View {
       tokens.textSecondary
     ));
     var measured = data.measurement;
-    if (measured == null) return;
+    if (measured == null) return synchronize;
     var records:Array<{kind:String, trace:GearTrace, index:Int}> = [];
     for (kind in ["Profile", "Lead"]) for (trace in (kind == "Profile" ? measured.profiles : measured.helices).slice(
       0,
@@ -224,7 +231,7 @@ class HobbingGearReport implements View {
       index : i
     });
     var pages = Std.int(Math.max(1,
-      Math.ceil(records.length / 24))), current = Std.int(Math.min(page.value, pages - 1));
+      Math.ceil(records.length / 24))), current = Std.int(Math.min(pageValue, pages - 1));
     children.push(text(
       "page-label",
       'Page ${current+1} / $pages · ${records.length} preview samples',
@@ -255,6 +262,7 @@ class HobbingGearReport implements View {
       new Row("sample-pages", [new KeyedView("previous", previous), new KeyedView("next", next)], flow())
     ));
     rows.push(new KeyedView("samples", new Column("sample-table", children, card(tokens))));
+    return synchronize;
   }
 
   static function sampleRow(id:String, cells:Array<String>, color:Color):View {

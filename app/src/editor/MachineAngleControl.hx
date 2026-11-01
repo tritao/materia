@@ -97,8 +97,7 @@ class MachineAngleControl implements View {
     next = Math.fround(next * 10000) / 10000;
     if (next == value) return;
     value = next;
-    if (context.requestPatch(nodeId)) refresh.updateQuietly(value);
-    else refresh.update(value);
+    if (!context.requestPatch(nodeId)) refresh.update(value);
     change(value);
   };
   var point = function(event:UiEvent): {x: Float, y: Float} {
@@ -116,7 +115,7 @@ class MachineAngleControl implements View {
     var next = value + delta * fine;
     // A centre crossing has no reliable angular direction.
     if (!dial || Math.pow(p.x - bounds.width / 2, 2) + Math.pow(p.y - bounds.height / 2, 2) > 16) emit(next);
-    drag.updateQuietly({active: true, x: p.x, angle: angle, value: value});
+    drag.update({active: true, x: p.x, angle: angle, value: value});
   };
   node.on(UiEventKind.PointerDown, event -> {if (!enabled || event.button != 0) return;
   begin(event);
@@ -132,19 +131,19 @@ class MachineAngleControl implements View {
     value,
     angle
   ));
-  drag.updateQuietly({active: true, x: p.x, angle: angle, value: value});
+  drag.update({active: true, x: p.x, angle: angle, value: value});
   event.preventDefault();
   });
   node.on(UiEventKind.PointerMove, move);
   node.on(UiEventKind.PointerUp, event -> {var state: AngleDrag = drag.value;
   if (event.button != 0 || !state.active) return;
   move(event);
-  drag.updateQuietly({active: false, x: 0.0, angle: 0.0, value: value});
+  drag.update({active: false, x: 0.0, angle: 0.0, value: value});
   finish(true);
   });
   node.on(UiEventKind.PointerCancel, _ -> {var state: AngleDrag = drag.value;
   if (!state.active) return;
-  drag.updateQuietly({active: false, x: 0.0, angle: 0.0, value: value});
+  drag.update({active: false, x: 0.0, angle: 0.0, value: value});
   finish(false);
   });
   node.on(UiEventKind.KeyDown, event -> {if (!enabled) return;

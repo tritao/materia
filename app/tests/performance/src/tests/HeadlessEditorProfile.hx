@@ -715,13 +715,11 @@ private typedef InputProbe = {
     var measure = function(name:String, input:Void -> Void) {
       if (only != null && only.length > 0 && only.split(",").indexOf(name) < 0) return;
       var before = hl.Gc.totalAllocated();
-      var stateRevision = editor.ui.stateStore.revision;
+      var reactiveVersion = haxeon.ui.core.ReactiveRuntime.version;
       input();
-      if (Sys.getEnv("MATERIA_TRACE_STATE") == "1" && !results.exists(name)) {
-        var changed = editor.ui.stateStore.idsChangedSince(stateRevision);
-        Sys.println("state-changes " + name
-          + ": " + [for (id in changed) editor.ui.stateStore.describe(new haxeon.ui.core.WidgetId(id))].join(" | "));
-      }
+      if (Sys.getEnv("MATERIA_TRACE_STATE") == "1" && !results.exists(name)
+        && haxeon.ui.core.ReactiveRuntime.version != reactiveVersion)
+        Sys.println("reactive input " + name + " wrote a signal or State");
       var dirty = editor.ui.isDirty();
       submit(editor, frame, frames, name);
       // Up to the end of the frame: the harness's own timeline record is not the UI's allocation.
