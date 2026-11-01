@@ -9,8 +9,9 @@ import materia.assembly.AssemblyDefinition.AssemblyJointType;
 
 /** B spindle cartridge driven by a standard flanged servo through a coupling.
     Coordinates are along the spindle from the housing rear datum (z = 0), the tool face at 180:
-    motor face at -70 on a bell adapter, coupling -55..-10, floating rear 6205 at 0..15, master
-    encoder ring at 18, opposed angular-contact pair 129..163, nose 170..180. The arbor's
+    motor face at -70 on a bell adapter, coupling -55..-10, floating rear 6205 at 0..15, opposed
+    angular-contact pair 129..163, nose 170..180. The servo's own absolute encoder is the B master
+    (electronic-gearbox) encoder, drawn as a shaft-encoder envelope on the motor's rear. The arbor's
     flange is held by four M4 screws on a 32 mm PCD (no drawbar); two pins carry torque.
     The coupling is a sleeve envelope standing in for a balanced torsionally stiff
     bellows/disc coupling. Fits, preload, balance and sealing remain manufacturing design. */
@@ -23,13 +24,15 @@ class HobSpindle extends MachineAssembly {
   public static inline final SHAFT_STUB = 20.0;
   public static inline final SHAFT_REAR = -30.0;
   public static inline final ARBOR_SCREW_PCD = 32.0;
+  /** Cartridge speed rating, below the servo's 5000 rpm; the reference cut runs near 3000 rpm. */
+  public static inline final MAX_RPM = 4000.0;
   public final motor:ServoMotor;
   public final coupling:ShaftCoupling;
   public final frontBearing:AngularContactBearing;
   public final rearBearing:AngularContactBearing;
   public final tailBearing:DeepGrooveBearing;
   public final arbor:HobArbor;
-  public final encoder:RotaryEncoderRing;
+  public final encoder:ShaftEncoder;
   public function new(?motor:ServoMotor, ?arbor:HobArbor) {
     super();
     this.motor = motor == null ? ServoMotor.model(MOTOR) : motor;
@@ -43,20 +46,17 @@ class HobSpindle extends MachineAssembly {
     frontBearing = new AngularContactBearing();
     rearBearing = new AngularContactBearing();
     tailBearing = DeepGrooveBearing.metric("6205", false);
-    encoder = new RotaryEncoderRing(new ComponentValues().setNumber("outside", 62).setNumber("bore", 40).setNumber(
-      "height",
-      6
-    ).setInteger(
-      "countsPerRevolution",
-      1048576
-    ));
+    encoder = new ShaftEncoder(this.motor.rating.encoderCounts, true);
     addComponent("housing", new SpindleHousing());
     attach("motorAdapter", new HobSpindlePart("motorAdapter"), 0);
     addComponent("motor", this.motor);
     addMemberConnector("housing", "motorSeat", Solids.axial(0, 0, MOTOR_FACE));
     addMate("motor-mount", Fixed, "housing", "motorSeat", "motor", "mountFace");
     attach("frontBearing", frontBearing, 146);
-    attach("encoder", encoder, 18);
+    addComponent("encoder", encoder);
+    addMemberConnector("housing", "encoderSeat", materia.assembly.AssemblyFrames.alongY(0, 0,
+      MOTOR_FACE - face.bodyLength, 0, 0, -1));
+    addMate("encoder-mount", Fixed, "housing", "encoderSeat", "encoder", "mount");
     addComponent("rearBearing", rearBearing);
     addMemberConnector("housing", "rearBearingSeat", materia.assembly.AssemblyFrames.alongY(0, 0, 146, 0, 0, -1));
     addMate("rearBearing-mount", Fixed, "housing", "rearBearingSeat", "rearBearing", "mount");
@@ -78,12 +78,11 @@ class HobSpindle extends MachineAssembly {
       {
         lower: null,
         upper: null,
-        velocity: this.motor.rating.maxSpeed,
+        velocity: maxSpeed(),
         effort: this.motor.rating.peakTorque,
-        assumptions: this.motor.ratingsBasis == Assumed ? [
-          {quantity : "speed limit", label : "assumed servo rating"},
-          {quantity : "effort limit", label : "assumed peak servo torque"}
-        ] : null
+        assumptions: [{quantity : "speed limit", label : "assumed 4000 rpm cartridge rating"}].concat(
+          this.motor.ratingsBasis == Assumed ? [{quantity : "effort limit", label : "assumed peak servo torque"}] : []
+        )
       }
     );
     // Rotating with the shaft: the motor's own shaft and the coupling joining it to the stub.
@@ -133,6 +132,8 @@ class HobSpindle extends MachineAssembly {
     addMemberConnector("housing", id + "Seat", materia.assembly.AssemblyFrames.alongY(x, y, z, 0, 0, direction));
     addMate(id + "-mount", Fixed, "housing", id + "Seat", id, "head");
   }
+  /** B speed limit: the lower of the servo's maximum and the cartridge rating. */
+  public function maxSpeed():Float return Math.min(motor.rating.maxSpeed, MAX_RPM * 2 * Math.PI / 60);
   public function interfaceName():String return "ASSUMED-TF20";
   /** Direct coupling: joint torque equals motor torque. */
   public function jointTorque(motorTorque:Float):Float return motorTorque;

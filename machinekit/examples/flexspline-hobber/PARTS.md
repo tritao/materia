@@ -43,9 +43,10 @@ and empty verified-field lists.
 - `HobSpindle extends MachineAssembly`: steel housing, assumed 1 kW 80-frame servo
   (`GENERIC-HV-SERVO-1000W`, envelope of the quoted Leadshine ELM2H-1000LA80F) on a
   bell adapter, coupling, floating rear 6205, opposed angular-contact
-  pair, shaft, bolted gland, locknut, master encoder ring, removable arbor and its
+  pair, shaft, bolted gland, locknut, removable arbor and its
   four screws, and the gland and adapter screws.
-  B's limits come from the servo (1 kW, 3000 rpm rated, 5000 rpm maximum). The two
+  B's torque comes from the servo (1 kW, 3000 rpm rated) and its speed limit from the
+  4000 rpm cartridge rating; the servo's own absolute encoder is the B master. The two
   angular-contact bearings remain two instances of the same BOM item; opposing
   orientation is a placement, not another bearing model. Exposes `mount`,
   `gaugeLine`, `hobCentre`. B is continuous.

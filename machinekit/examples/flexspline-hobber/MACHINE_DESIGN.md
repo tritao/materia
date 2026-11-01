@@ -157,7 +157,7 @@ Procurement requirements for position feedback. None is selected or commissioned
 | Z | Same, ML ≈ 240 mm | ±5 µm/m; spur parts, so scale error barely reaches the gear | same RFQ |
 | Y | Same, ML ≈ 70 mm | ±5–10 µm/m; same model as Z for spares | same RFQ |
 | C | Table's own angle encoder | Purchased table, ±5″ positioning / ±2″ repeatability; protocol must match the C drive | uncommissioned |
-| B | Spindle master encoder ring (servo encoder candidate) | ≥ 2¹⁶ counts/rev, up to 5000 rpm, deterministic latching | with drive selection |
+| B | Spindle servo's own absolute encoder (master) | ≥ 2¹⁶ counts/rev (model 2¹⁷), up to 4000 rpm, deterministic latching and low, fixed latency | with drive selection |
 | X/Y/Z/A motors | Servo motor encoders | Standard | with drive selection |
 
 Why X matters most: radial error changes tooth thickness by ≈ 2·tan 20°·ΔX ≈ 0.73·ΔX.
@@ -381,7 +381,6 @@ kinematics are unchanged.
 | Coupling | −55 to −10, motor Ø19 to shaft stub Ø20; envelope for a balanced bellows/disc coupling |
 | Shaft stub | Ø20, −30–0 |
 | Floating rear bearing | 6205 (25 × 52 × 15) at 0–15 in a Ø52 bore |
-| Master encoder ring | 18–24 in the Ø62 bore |
 | Opposed bearing pair | 129–146 and 146–163; Ø25 journals, Ø62 housing seats |
 | Outer-ring retention | Housing shoulder at 129; bolted front gland: Ø62 spigot 163–180, Ø80 flange 180–186, 4 × M4 on Ø72 |
 | Inner-ring retention | Shaft shoulder at 163; catalogue precision locknut M25 × 1.5 (KM5 size, Ø38 × 7) at 122–129, in a Ø44 housing shoulder bore |
@@ -397,7 +396,7 @@ front. Assembly sequence: slide the matched pair onto the shaft from its rear
 against the shaft shoulder and tighten the rear locknut; fit the shaft and pair
 from the front against the housing shoulder and bolt the front gland, its spigot
 ground at assembly to clamp the outer rings; fit the
-rear 6205 over the journal into its floating bore; fit the encoder ring; mount the
+rear 6205 over the journal into its floating bore; mount the
 bell adapter, coupling and servo; fit the arbor and its four screws.
 
 A bought cartridge to this interface is being quoted as an alternative to making
@@ -406,9 +405,12 @@ STEP, exact sections and the specified tolerances) from this model. Bearing enve
 helices, fits, preload, screw torque, pin strength, balance, sealing and grinding
 tolerances remain manufacturing design requirements; the CAD does not qualify them.
 Simultaneous taper/face contact must be specified and verified during manufacture.
-The existing runout assumptions are retained, not requalified. The ring encoder is
-kept as the B master encoder; the servo's own 23-bit encoder may replace it once
-the drive's master-output latency is confirmed.
+The existing runout assumptions are retained, not requalified. The B master
+(electronic-gearbox) encoder is the servo's own absolute encoder through the
+torsionally stiff coupling: coupling wind-up and encoder error reach the table
+divided by the tooth count, so the requirement is the drive's position latency, not
+an extra ring encoder. The cartridge is rated 4000 rpm, which limits B below the
+servo's 5000 rpm.
 
 Before HB-D11, the original direct-motor cartridge added 1.086 kg: total mass 425.297 kg; moving X/Y/Z masses
 132.064 / 14.574 / 41.603 kg. Continuous thrust margins under the existing assumed

@@ -172,7 +172,13 @@ class HobberPartTests {
     check(spindle.motor.rating.designation == HobSpindle.MOTOR && spindle.motor.ratingsBasis == Assumed,
       "spindle is driven by the assumed 1 kW servo");
     near(spindle.motor.rating.ratedTorque * spindle.motor.rating.ratedSpeed, 1000, 1e-9, "spindle servo is 1 kW");
-    near(spindle.motor.rating.maxSpeed, 5000 * 2 * Math.PI / 60, 1e-9, "B speed limit is the servo's 5000 rpm");
+    near(spindle.maxSpeed(), 4000 * 2 * Math.PI / 60, 1e-9, "B speed limit is the 4000 rpm cartridge rating");
+    check(
+      spindle.definition().joints.filter(j -> j.id == "B")[0].limits.velocity == spindle.maxSpeed(),
+      "B joint carries the cartridge speed limit"
+    );
+    check(spindle.encoder.countsPerRevolution == spindle.motor.rating.encoderCounts && spindle.encoder.absolute,
+      "B master is the servo's own absolute encoder");
     near(spindle.jointTorque(2), 2, 0, "coupling gives a 1:1 spindle drive");
     check(
       spindle.coupling.boreA == spindle.motor.rating.shaftDiameter && spindle.coupling.boreB == HobSpindle.SHAFT_STUB,

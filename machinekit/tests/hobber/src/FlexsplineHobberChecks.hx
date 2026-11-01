@@ -527,7 +527,7 @@ class FlexsplineHobberChecks {
     var cTorque = c.continuousTorque
       * reserve - c.number("sealDrag") - c.number("sealDragRipple") - c.number("coggingTorque");
     check(
-      cam.rpm * 2 * Math.PI / 60 <= b.maxSpeed && cam.tableRpm * 2 * Math.PI / 60 <= c.maxSpeed,
+      cam.rpm * 2 * Math.PI / 60 <= machine.spindle.maxSpeed() && cam.tableRpm * 2 * Math.PI / 60 <= c.maxSpeed,
       "reference process speeds within installed limits"
     );
     check(

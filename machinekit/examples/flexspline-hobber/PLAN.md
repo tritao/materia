@@ -348,7 +348,7 @@ they neither implement HB7 nor establish an ISO grade.
 | Single-cut feed time | (8 + 2 × 4.599 engagement overrun + 2 × 1 clearance) mm / 0.5 → 38.396 rev → 154.398 s nominal (154.408 s planned) | HB8 cylinder envelope and MotionKit S-curve; excludes positioning/settling |
 | Feed-mark depth | δ ≈ f²·sin α/(4·d_a0) ≈ 0.7 µm | standard hobbing estimate, check |
 | Cutting force | tens of N | GE15FRplus paper |
-| Hob spindle | coupled 1 kW 80-frame servo, 5000 rpm max (revised 2026-11-01; quoting Leadshine ELM2H-1000LA80F) | assumed |
+| Hob spindle | coupled 1 kW 80-frame servo, cartridge rated 4000 rpm (revised 2026-11-01; quoting Leadshine ELM2H-1000LA80F) | assumed |
 | Table encoder | ≥ 2²³ counts/rev (0.15″), accuracy ±2″ ≈ 0.3 µm at r 30 | assumed |
 | Table bearing runout | radial and axial ≤ 2 µm | assumed, crossed-roller precision class |
 | Mandrel runout | 3–5 µm → Fr contribution ≈ 2e = 6–10 µm | EMAG flexspline page |

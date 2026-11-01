@@ -49,7 +49,7 @@ PARTS = {
                                                     "Ra 0.2. Finish-grind in its own bearings preferred"),
             (None, None, "Drive pins", "2 × Ø4 m6 dowels pressed on Ø28 PCD (on the section plane), 2 mm proud"),
             (None, None, "Arbor screw holes", "4 × M4 × 10 deep on Ø32 PCD, at 45° to the pins"),
-            (None, None, "Balance", "Rotor (shaft, coupling hub, arbor) G1 at 5000 rpm"),
+            (None, None, "Balance", "Rotor (shaft, coupling hub, arbor) G1 at 4000 rpm"),
         ]),
     "housing": dict(
         drawing="HS-02", title="Spindle housing", qty="1",
@@ -58,7 +58,7 @@ PARTS = {
         rows=[
             (52, (0, 15), "Rear bearing bore, 6205 floating", "Ø52 H6 (+0.019/0) for axial float; coaxial to A "
                                                              "within 0.004; Ra 0.8"),
-            (62, (15, 120), "Encoder ring space", "Ø62, ISO 2768-m"),
+            (62, (15, 120), "Clearance bore", "Ø62, ISO 2768-m"),
             (44, (120, 129), "Shoulder bore", "Ø44, ISO 2768-m (clears the Ø38 locknut)"),
             (62, (129, 163), "Front bearing bore (datum A)", "Ø62 JS5 (±0.0065); roundness 0.002; cylindricity "
                                                              "0.002; Ra 0.4"),
@@ -113,11 +113,11 @@ PARTS = {
         ]),
 }
 BOUGHT = {
-    "motor": "Servo motor 1 kW, 80 frame, Ø19 × 35 shaft (Leadshine ELM2H-1000LA80F or equivalent); supplied by us",
+    "motor": "Servo motor 1 kW, 80 frame, Ø19 × 35 shaft (Leadshine ELM2H-1000LA80F or equivalent); its built-in "
+             "absolute encoder is the master encoder; supplied by us",
     "frontBearing": "Angular-contact bearing 7305 size (25 × 62 × 17), P4, 25° contact; matched pair, back to back",
     "rearBearing": "Angular-contact bearing 7305 size (25 × 62 × 17), P4, 25° contact; matched pair, back to back",
     "tailBearing": "Deep groove ball bearing 6205 (25 × 52 × 15), P5 or better; floating",
-    "encoder": "Hollow ring encoder about Ø62 × 6 (master encoder); supplied by us",
     "coupling": "Bellows or disc coupling, Ø19 to Ø20, about Ø36 × 45, balanced, torsionally stiff",
     "arborScrew": "Socket head cap screw M4 × 10, 12.9 (arbor flange)",
     "glandScrew": "Socket head cap screw M4 × 12 (gland)",
@@ -134,7 +134,7 @@ GENERAL = [
 ]
 REQUIREMENTS = [
     ("Function", "Hob spindle for a gear hobbing machine, module 0.3, ISO class 5-6"),
-    ("Speed", "up to 5000 rpm; reference cutting 3000 rpm; about 1 kW"),
+    ("Speed", "up to 4000 rpm; normally 2000-3000 rpm; about 1 kW"),
     ("Running accuracy", "radial runout at the arbor taper and axial runout at the nose face ≤ 0.002 mm TIR"),
     ("Bearings", "front: matched P4 angular-contact pair 7305 size (25 × 62 × 17), back to back, light "
                  "preload; rear: 6205 floating; grease for life"),
@@ -244,7 +244,7 @@ def member(data, mid):
 def check_layout(data):
     """The fixed specifications above assume these member positions; fail if the model moved them."""
     lay = data["layout"]
-    expect = {"tailBearing": 0.0, "frontBearing": 146.0, "rearBearing": 146.0, "encoder": 18.0,
+    expect = {"tailBearing": 0.0, "frontBearing": 146.0, "rearBearing": 146.0,
               "arbor": lay["toolFace"], "motor": lay["motorFace"], "coupling": lay["couplingStart"]}
     for mid, z in expect.items():
         got = member(data, mid)["position"][2]
@@ -266,7 +266,7 @@ def pages(data):
     bought, seen = [], {}
     for m in data["members"]:
         mid = m["id"].rstrip("0123456789")
-        if m["id"] in made_ids or mid == "motorShaft":
+        if m["id"] in made_ids or mid in ("motorShaft", "encoder"):
             continue
         if mid not in BOUGHT:
             sys.exit(f"no supplier description for bought member {m['id']}")

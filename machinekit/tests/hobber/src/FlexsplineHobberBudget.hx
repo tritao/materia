@@ -58,8 +58,7 @@ class FlexsplineHobberBudget {
         if (i > 0 && rows[i][0] <= rows[i - 1][0]) throw "history times must increase";
       }
     }
-    if (inputs.masterCounts != machine.spindle
-      .encoder.parameterCount("countsPerRevolution")) throw "sync trace master encoder differs from installed part";
+    if (inputs.masterCounts != machine.spindle.encoder.countsPerRevolution) throw "sync trace master encoder differs from installed part";
     var support = FlexsplineHobberChecks.installedSupport(machine);
     if (!support.supportsRim) throw "reference sleeve does not support tooth band";
     var wall = new RingCompliance(
