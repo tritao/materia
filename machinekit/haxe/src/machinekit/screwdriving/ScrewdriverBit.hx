@@ -128,6 +128,22 @@ class ScrewdriverBit extends MachineComponent {
     case Slot(size):
       {kind: "slot", size: Std.string(size)};
   };
+  function driveNumber(exact:Bool):String return switch drive {
+    case HexSocket(size): "HX" + (exact ? machinekit.component.ComponentNumberKey.encode(size) : machinekit.component.Dimension.format(size));
+    case Hexalobular(size): "TX" + size.toUpperCase();
+    case Cross(size): "PH" + size;
+    case HexHead(size): "HH" + (exact ? machinekit.component.ComponentNumberKey.encode(size) : machinekit.component.Dimension.format(size));
+    case Slot(size): "SL" + (exact ? machinekit.component.ComponentNumberKey.encode(size) : machinekit.component.Dimension.format(size));
+  };
+  override function get_bom():machinekit.component.BomItem {
+    var item = super.get_bom();
+    item.partNumber = 'BIT-${driveNumber(false)}-L${machinekit.component.Dimension.format(length)}-R${machinekit.component.Dimension.format(sleeveRadius)}'
+      + (fitClearance == 0 ? "" : '-C${machinekit.component.Dimension.format(fitClearance)}');
+    return item;
+  }
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    ["screwdriver-bit", materialSpec(), driveNumber(true), machinekit.component.ComponentNumberKey.encode(length),
+      machinekit.component.ComponentNumberKey.encode(sleeveRadius), machinekit.component.ComponentNumberKey.encode(fitClearance)].join("|"), 1);
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     // Hex socket bits retain their actual across-flats tip. Symbolic drives use

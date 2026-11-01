@@ -15,7 +15,7 @@ class PickingStation {
   public function new(?config:PickingStationConfig) {
     this.config = config == null ? PickingStationConfig.defaults() : config;
     rack = new StorageRack(this.config);
-    bench = new OperatorBench(this.config.benchWidth, this.config.benchDepth, this.config.benchHeight);
+    bench = new OperatorBench("PICK-STATION-OPERATOR-BENCH", this.config.benchWidth, this.config.benchDepth, this.config.benchHeight);
     benchX = this.config.rackWidth / 2 + this.config.benchWidth / 2 + 180;
   }
 

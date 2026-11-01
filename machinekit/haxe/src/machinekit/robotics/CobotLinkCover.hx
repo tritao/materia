@@ -13,7 +13,7 @@ class CobotLinkCover extends MachineComponent {
   public final length:Float;
   public final width:Float;
   public final gasket:Bool;
-  public function new(length:Float, width:Float, gasket:Bool = false) {
+  public function new(drawing:String, length:Float, width:Float, gasket:Bool = false) {
     if (!Math.isFinite(length) || !Math.isFinite(width)
       || length < 40 || width < 30) throw "Link service cover has no room for its opening and four fasteners";
     super(
@@ -22,6 +22,7 @@ class CobotLinkCover extends MachineComponent {
       gasket ? "nitrile rubber NBR" : "aluminium 6061",
       true
     );
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make(gasket ? "gasket cutting" : "CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
@@ -40,6 +41,12 @@ class CobotLinkCover extends MachineComponent {
     y * (width / 2 - 4),
     0
   )];
+  override public function revisionFingerprint():Null<String> {
+    if (drawingNumber == null) return null;
+    return machinekit.component.BomRevision.fingerprint([drawingNumber, materialSpec(),
+      machinekit.component.ComponentNumberKey.encode(length), machinekit.component.ComponentNumberKey.encode(width),
+      gasket ? "gasket" : "cover"].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var body = CobotArmLink.roundedPlate(length, width, gasket ? GAP : THICKNESS, 4, gasket ? 0 : GAP);

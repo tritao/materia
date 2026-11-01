@@ -698,6 +698,7 @@ class AxisBuilder extends MachineAssembly {
 	 * Returns the switch's member id, `home<suffix>`.
 	 */
   public function addHomeSwitch(
+    drawingNamespace:String,
     axis:AxisSpec,
     suffix:String,
     fixed:String,
@@ -719,7 +720,7 @@ class AxisBuilder extends MachineAssembly {
     if (!Math.isFinite(room) || room <= 4 * contact
       .switchRepeatability()) throw 'Home switch of axis ${axis.id}: its uncertainty does not fit the guide overtravel';
     var trigger = "homeTrigger" + suffix;
-    var flag = new machinekit.gantry.GantryParts.GantryPlate("Home flag " + suffix, size[0], size[1], size[2]);
+    var flag = new machinekit.gantry.GantryParts.GantryPlate(drawingNamespace + "-HOME-" + suffix.toUpperCase(), "Home flag " + suffix, size[0], size[1], size[2]);
     if (inductive) flag.setMaterial("steel");
     attach(trigger, flag, AssemblyFrames.translation(point[0], point[1], point[2] - size[2] / 2), moving);
     var half = 0.0;

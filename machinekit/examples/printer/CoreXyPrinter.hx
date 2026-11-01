@@ -167,7 +167,7 @@ class CoreXyPrinter extends AxisBuilder {
     var baseDepth = REAR_Y - FRONT_Y - 20;
     place(
       "basePlate",
-      new GantryPlate("Base plate", 2 * (RAIL_X - 10), baseDepth, 6),
+      new GantryPlate("PRINTER-BASE", "Base plate", 2 * (RAIL_X - 10), baseDepth, 6),
       AssemblyFrames.translation(0, (FRONT_Y + REAR_Y) / 2, 20)
     );
 
@@ -196,7 +196,7 @@ class CoreXyPrinter extends AxisBuilder {
     var bracketHeight = 6.0;
     attach(
       "bracketLeft",
-      new GantryPlate("Gantry bracket", 72, 36, bracketHeight),
+      new GantryPlate("PRINTER-GANTRY-BRACKET", "Gantry bracket", 72, 36, bracketHeight),
       AssemblyFrames.translation(-RAIL_X + 15, gy, blockTop),
       "blockYLeft"
     );
@@ -210,7 +210,7 @@ class CoreXyPrinter extends AxisBuilder {
     );
     attach(
       "bracketRight",
-      new GantryPlate("Gantry bracket", 72, 36, bracketHeight),
+      new GantryPlate("PRINTER-GANTRY-BRACKET", "Gantry bracket", 72, 36, bracketHeight),
       AssemblyFrames.translation(RAIL_X - 15, gy, blockTop),
       "crossbar"
     );
@@ -260,7 +260,7 @@ class CoreXyPrinter extends AxisBuilder {
       var plate = 'motorPlate${entry.id}';
       attach(
         plate,
-        new GantryPlate("Motor plate", 60, 60, 6),
+        new GantryPlate("PRINTER-MOTOR-PLATE", "Motor plate", 60, 60, 6),
         AssemblyFrames.translation(entry.x, REAR_Y - 5, RING_TOP),
         "crossTopRear"
       );
@@ -288,7 +288,7 @@ class CoreXyPrinter extends AxisBuilder {
           parent = '${id}Pin';
           attach(
             parent,
-            new GantryIdlerPin(motor.variant.shaftDiameter, pinLength),
+            new GantryIdlerPin("PRINTER-IDLER-PIN", motor.variant.shaftDiameter, pinLength),
             AssemblyFrames.translation(wrap.x, wrap.y, RING_TOP),
             w == 2 ? "crossTopFront" : "crossTopRear"
           );
@@ -309,7 +309,7 @@ class CoreXyPrinter extends AxisBuilder {
         var bracket = wrap.x < 0 ? "bracketLeft" : "bracketRight";
         attach(
           pin,
-          new GantryIdlerPin(motor.variant.shaftDiameter, level + BELT_WIDTH + 2 - (blockTop + bracketHeight)),
+          new GantryIdlerPin("PRINTER-CORNER-IDLER-" + letter, motor.variant.shaftDiameter, level + BELT_WIDTH + 2 - (blockTop + bracketHeight)),
           AssemblyFrames.translation(wrap.x, wrap.y, blockTop + bracketHeight),
           bracket
         );
@@ -341,14 +341,14 @@ class CoreXyPrinter extends AxisBuilder {
     var plateY = blockFront - 3;
     attach(
       "carriagePlate",
-      new GantryPlate("Carriage plate", 30, 6, plateHeight),
+      new GantryPlate("PRINTER-CARRIAGE", "Carriage plate", 30, 6, plateHeight),
       AssemblyFrames.translation(xc, plateY, plateBase),
       "blockX"
     );
     var padBase = plateBase + plateHeight, padTop = levelA + BELT_WIDTH + 2;
     attach(
       "clamp",
-      new GantryPlate("Belt clamp", 24, 9, padTop - padBase),
+      new GantryPlate("PRINTER-BELT-CLAMP", "Belt clamp", 24, 9, padTop - padBase),
       AssemblyFrames.translation(xc, blockFront - 4.5, padBase),
       "carriagePlate"
     );
@@ -382,7 +382,7 @@ class CoreXyPrinter extends AxisBuilder {
     var mountZ = blockBottom + blockHeight + hotend.spec.heatsinkLength - 12;
     attach(
       "toolheadMount",
-      new GantryPlate("Hotend mount", 30, plateY - 3 - (ny - 13), 20),
+      new GantryPlate("PRINTER-HOTEND-MOUNT", "Hotend mount", 30, plateY - 3 - (ny - 13), 20),
       AssemblyFrames.translation(nx, (plateY - 3 + ny - 13) / 2, mountZ),
       "carriagePlate"
     );
@@ -454,7 +454,7 @@ class CoreXyPrinter extends AxisBuilder {
     var distance = (pinion.pitchDiameter + bigGear.pitchDiameter) / 2;
     attach(
       "extruderMountPlate",
-      new GantryPlate("Extruder mount", 42, plateFront - (ny + 11), spec.height),
+      new GantryPlate("PRINTER-EXTRUDER-MOUNT", "Extruder mount", 42, plateFront - (ny + 11), spec.height),
       AssemblyFrames.translation(nx, (plateFront + ny + 11) / 2, zE - spec.height / 2),
       "carriagePlate"
     );
@@ -533,19 +533,19 @@ class CoreXyPrinter extends AxisBuilder {
     var wingWidth = 40.0, wingDepth = 70.0, wingRear = postFront - railSpec.blockHeight;
     attach(
       "wingLeft",
-      new GantryPlate("Bed wing", wingWidth, wingDepth, 8),
+      new GantryPlate("PRINTER-BED-WING", "Bed wing", wingWidth, wingDepth, 8),
       AssemblyFrames.translation(-RAIL_X, wingRear - wingDepth / 2, carrierBottom),
       "blockZLeft"
     );
     attach(
       "carrier",
-      new GantryPlate("Bed carrier", 360, 300, 8),
+      new GantryPlate("PRINTER-BED-CARRIER", "Bed carrier", 360, 300, 8),
       AssemblyFrames.translation(0, -10, carrierBottom),
       "wingLeft"
     );
     attach(
       "wingRight",
-      new GantryPlate("Bed wing", wingWidth, wingDepth, 8),
+      new GantryPlate("PRINTER-BED-WING", "Bed wing", wingWidth, wingDepth, 8),
       AssemblyFrames.translation(RAIL_X, wingRear - wingDepth / 2, carrierBottom),
       "carrier"
     );
@@ -557,7 +557,7 @@ class CoreXyPrinter extends AxisBuilder {
     );
     attach(
       "bedSupport",
-      new GantryPlate("Bed support", 250, 250, 6),
+      new GantryPlate("PRINTER-BED-SUPPORT", "Bed support", 250, 250, 6),
       AssemblyFrames.translation(0, 0, supportBottom),
       "carrier"
     );
@@ -618,6 +618,7 @@ class CoreXyPrinter extends AxisBuilder {
     blockTop:Float
   ):Void {
     addHomeSwitch(
+      "PRINTER",
       xSpec,
       "X",
       "crossbar",
@@ -629,6 +630,7 @@ class CoreXyPrinter extends AxisBuilder {
       [0.0, 1, 0]
     );
     addHomeSwitch(
+      "PRINTER",
       ySpec,
       "Y",
       "sideTopLeft",
@@ -644,6 +646,7 @@ class CoreXyPrinter extends AxisBuilder {
     // away from the nozzle is also why a probe at the nozzle cannot be the home switch: it would trip inside
     // the travel, and a home switch must trip beyond it, in the room before the end stop.
     addHomeSwitch(
+      "PRINTER",
       zSpec,
       "Z",
       "basePlate",
@@ -661,7 +664,7 @@ class CoreXyPrinter extends AxisBuilder {
     var face = NOZZLE_Z + PROBE_FACE_ABOVE_TIP;
     attach(
       "probeMount",
-      new GantryPlate("Probe mount", 30, 20, 6),
+      new GantryPlate("PRINTER-PROBE-MOUNT", "Probe mount", 30, 20, 6),
       AssemblyFrames.translation(nx + PROBE_X - 5, ny + PROBE_Y, face + probe.spec.length - 6),
       "toolheadMount"
     );

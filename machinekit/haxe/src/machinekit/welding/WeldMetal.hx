@@ -41,6 +41,10 @@ class WeldMetal extends MachineComponent {
     return carriers[0];
   }
 
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    return machinekit.component.BomRevision.fingerprint(["WeldMetal", materialSpec(), number(SIZE)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(SIZE, SIZE, SIZE);

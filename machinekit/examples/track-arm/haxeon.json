@@ -5,6 +5,7 @@
   },
   "entry": "TrackArmPreview",
   "sources": [
+    "../../haxe/src/machinekit/welding/WeldingServiceStock.hx",
     "TrackArm.hx",
     "TrackArmPreview.hx",
     "../robot-arm/RobotArm.hx",

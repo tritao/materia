@@ -41,6 +41,17 @@ class GasCylinder extends MachineComponent {
     declareMass(75, new Vector(0, 0, 0.4 * HEIGHT));
   }
 
+  override function get_bom():machinekit.component.BomItem {
+    var item = super.get_bom();
+    item.partNumber = 'GAS-CYLINDER-50L-${mixture.toUpperCase().split(" ").join("-").split("/").join("-")}';
+    return item;
+  }
+
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    ["welding-gas-cylinder", mixture, machinekit.component.ComponentNumberKey.encode(DIAMETER),
+      machinekit.component.ComponentNumberKey.encode(BOTTLE_HEIGHT), machinekit.component.ComponentNumberKey.encode(HEIGHT),
+      machinekit.component.ComponentNumberKey.encode(REGULATOR_DIAMETER)].join("|"), 1);
+
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.union([

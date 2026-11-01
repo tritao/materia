@@ -459,6 +459,9 @@ class LinearAxis extends MachineAssembly {
     var lengthText = Dimension.format(length);
     return {
       partNumber: '${rail.designation}-L$lengthText',
+      fingerprint: machinekit.component.BomRevision.fingerprint(["linear-axis-rail", "steel",
+        machinekit.component.ComponentNumberKey.encode(rail.width), machinekit.component.ComponentNumberKey.encode(rail.height),
+        machinekit.component.ComponentNumberKey.encode(rail.wall), machinekit.component.ComponentNumberKey.encode(length)].join("|"), 1),
       description: '${rail.description}, $lengthText mm long',
       quantity: 1,
       material: "steel",

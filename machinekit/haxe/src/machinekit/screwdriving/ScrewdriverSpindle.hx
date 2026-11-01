@@ -28,7 +28,8 @@ class ScrewdriverSpindle extends MachineAssembly {
         maxTorque,
         maxSpeed,
         strokeMm,
-        springRate
+        springRate,
+        'SDRV-${machinekit.component.Dimension.format(maxTorque)}NM-${machinekit.component.Dimension.format(maxSpeed)}RPS-S${machinekit.component.Dimension.format(strokeMm)}-K${machinekit.component.Dimension.format(springRate)}'
       );
     addComponent("body", body);
     // At full feed extension keep 1 mm beyond the arm planner's 5 mm tool clearance.

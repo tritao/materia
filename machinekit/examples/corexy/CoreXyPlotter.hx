@@ -23,7 +23,7 @@ class PlotterBlock extends MachineComponent {
   public final depth:Float;
   public final height:Float;
 
-  public function new(width:Float, depth:Float, height:Float, material:String, name:String) {
+  public function new(drawing:String, width:Float, depth:Float, height:Float, material:String, name:String) {
     if (!(width > 0) || !(depth > 0) || !(height > 0)) throw "Plotter block needs positive dimensions";
     super(
       '${name.toUpperCase()}-${Dimension.format(width)}x${Dimension.format(depth)}x${Dimension.format(height)}',
@@ -31,6 +31,7 @@ class PlotterBlock extends MachineComponent {
       material,
       true
     );
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
@@ -39,6 +40,10 @@ class PlotterBlock extends MachineComponent {
     this.height = height;
   }
 
+  override public function revisionFingerprint():Null<String> {
+    if (drawingNumber == null) return null;
+    return machinekit.component.BomRevision.fingerprint([drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(width), machinekit.component.ComponentNumberKey.encode(depth), machinekit.component.ComponentNumberKey.encode(height)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(width, depth, height);
@@ -49,7 +54,7 @@ class PlotterPin extends MachineComponent {
   public final diameter:Float;
   public final length:Float;
 
-  public function new(diameter:Float, length:Float, name:String, material:String = "steel", notSupplied:Bool = false) {
+  public function new(drawing:Null<String>, diameter:Float, length:Float, name:String, material:String = "steel", notSupplied:Bool = false) {
     if (!(diameter > 0) || !(length > 0)) throw "Plotter pin needs a positive diameter and length";
     super(
       '${name.toUpperCase().split(" ").join("-")}-D${Dimension.format(diameter)}-L${Dimension.format(length)}',
@@ -57,6 +62,7 @@ class PlotterPin extends MachineComponent {
       material,
       true
     );
+    if (drawing != null) declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(notSupplied ? NotSupplied : Make("turning")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
@@ -65,6 +71,9 @@ class PlotterPin extends MachineComponent {
     addConnector("tip", ConnectorRole.Axis, Solids.axial(0, 0, 0));
   }
 
+  override public function revisionFingerprint():Null<String> {
+    return machinekit.component.BomRevision.fingerprint([drawingNumber == null ? "PlotterPin" : drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(diameter), machinekit.component.ComponentNumberKey.encode(length)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.cylinderSpan(
@@ -145,7 +154,7 @@ class CoreXyPlotter extends AxisBuilder {
 
     place(
       "base",
-      new PlotterBlock(BASE_WIDTH, BASE_DEPTH, BASE_TOP, "aluminium 6061", "Base plate"),
+      new PlotterBlock("PLOTTER-BASE", BASE_WIDTH, BASE_DEPTH, BASE_TOP, "aluminium 6061", "Base plate"),
       AssemblyFrames.translation(0, 0, 0)
     );
     var railTop = BASE_TOP + railSpec.railHeight;
@@ -208,7 +217,7 @@ class CoreXyPlotter extends AxisBuilder {
           parent = '${id}Pin';
           attach(
             parent,
-            new PlotterPin(motor.variant.shaftDiameter, pinLength, "Idler pin"),
+            new PlotterPin("PLOTTER-FRAME-IDLER-PIN", motor.variant.shaftDiameter, pinLength, "Idler pin"),
             AssemblyFrames.translation(wrap.x, wrap.y, BASE_TOP),
             "base"
           );
@@ -232,20 +241,20 @@ class CoreXyPlotter extends AxisBuilder {
     );
     attach(
       "bracketLeft",
-      new PlotterBlock(80, 36, 6, "aluminium 6061", "Gantry bracket"),
+      new PlotterBlock("PLOTTER-GANTRY-BRACKET", 80, 36, 6, "aluminium 6061", "Gantry bracket"),
       AssemblyFrames.translation(-95, 0, bracketBase),
       "blockYLeft"
     );
     var barHeight = 20.0;
     attach(
       "crossbar",
-      new PlotterBlock(190, 20, barHeight, "aluminium 6061", "Gantry crossbar"),
+      new PlotterBlock("PLOTTER-GANTRY-CROSSBAR", 190, 20, barHeight, "aluminium 6061", "Gantry crossbar"),
       AssemblyFrames.translation(0, 20, bracketBase),
       "bracketLeft"
     );
     attach(
       "bracketRight",
-      new PlotterBlock(80, 36, 6, "aluminium 6061", "Gantry bracket"),
+      new PlotterBlock("PLOTTER-GANTRY-BRACKET", 80, 36, 6, "aluminium 6061", "Gantry bracket"),
       AssemblyFrames.translation(95, 0, bracketBase),
       "crossbar"
     );
@@ -263,7 +272,7 @@ class CoreXyPlotter extends AxisBuilder {
         var pin = '${id}Pin';
         attach(
           pin,
-          new PlotterPin(motor.variant.shaftDiameter, pinLength - (bracketBase + 6 - BASE_TOP), "Idler pin"),
+          new PlotterPin("PLOTTER-GANTRY-IDLER-PIN", motor.variant.shaftDiameter, pinLength - (bracketBase + 6 - BASE_TOP), "Idler pin"),
           AssemblyFrames.translation(wrap.x, wrap.y, bracketBase + 6),
           wrap.x < 0 ? "bracketLeft" : "bracketRight"
         );
@@ -293,7 +302,7 @@ class CoreXyPlotter extends AxisBuilder {
     var plateBase = bracketBase - 2, plateHeight = levelB - 3 - plateBase;
     attach(
       "carriagePlate",
-      new PlotterBlock(40, 6, plateHeight, "aluminium 6061", "Carriage plate"),
+      new PlotterBlock("PLOTTER-CARRIAGE", 40, 6, plateHeight, "aluminium 6061", "Carriage plate"),
       AssemblyFrames.translation(0, blockFront - 3, plateBase),
       "blockX"
     );
@@ -302,7 +311,7 @@ class CoreXyPlotter extends AxisBuilder {
     var padTop = levelA + BELT_WIDTH + 2;
     attach(
       "clamp",
-      new PlotterBlock(24, 9, padTop - padBase, "aluminium 6061", "Belt clamp"),
+      new PlotterBlock("PLOTTER-BELT-CLAMP", 24, 9, padTop - padBase, "aluminium 6061", "Belt clamp"),
       AssemblyFrames.translation(0, blockFront - 4.5, padBase),
       "carriagePlate"
     );
@@ -331,7 +340,7 @@ class CoreXyPlotter extends AxisBuilder {
     var penLength = padBase - PEN_BASE;
     attach(
       "pen",
-      new PlotterPin(8, penLength, "Pen", "plastic", true),
+      new PlotterPin(null, 8, penLength, "Pen", "plastic", true),
       AssemblyFrames.translation(0, blockFront - 6 - 4, PEN_BASE),
       "carriagePlate"
     );

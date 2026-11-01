@@ -81,6 +81,11 @@ class WireFeeder extends MachineComponent {
     declareMass(14, new Vector(0, 0, height / 2));
   }
 
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    var inputs = ["WireFeeder", materialSpec(), number(width), number(length), number(height), number(wireDiameterMm), number(maxSpeedMPerMin), number(depositionEfficiency)];
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(width, length, height);

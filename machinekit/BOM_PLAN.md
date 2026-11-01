@@ -421,7 +421,7 @@ and readers reject anything else. It contains:
 - Acceptance: bench mill's 26 brake lines become 1.
 
 ### B6 — Fasteners and other missing content
-- Done in this commit. The 22 exportable machines have 1,022 procurement
+- Done in `1163f9c94`. The 22 exportable machines have 1,022 procurement
   lines, including 55 for the bench mill. The gate passed 11/24 shards with no
   new failing shard; the existing tending-certificate failures in shards 16
   and 23 differ only in the disclosed current input fingerprint.
@@ -482,9 +482,46 @@ and readers reject anything else. It contains:
   and rail bolt patterns.
 
 ### B7 — Rollout and hard gate
+- Done in this phase commit. The full gate passed 11/24 shards with no new
+  failure or exception compared with B6. The only differences from the
+  untouched baseline remain the accepted tending input fingerprints in shards
+  16 and 23.
+- Measurement: the 22 exportable machines have 1,058 procurement lines,
+  including 380 Assumed lines. All procurement lines and 3,798 engineering
+  occurrences have fingerprints. Part-number lint reports no invalid
+  engineering or procurement lines.
+  Three recipes cannot be constructed from default values. Machine tending
+  remains blocked by the existing stale reach certificate.
+- Made, code-only parts receive an authored drawing number at construction.
+  Assembly builders pass their design namespace and part role; they do not
+  assign numbers by inspecting component types. Export rejects an undrawn
+  made occurrence and reports its complete assembly path.
+- Gantry-generated made plates use a short, author-declared machine design
+  namespace and their authored member role as a drawing number. That identity
+  does not change when dimensions move and does not collide across different
+  reference machines. Their fingerprints include exact plate, bore, motor
+  interface and section inputs as applicable. Reusing a drawing across roles
+  requires an explicitly shared drawing rather than a geometry-derived number.
+- Cobot cover, gasket, tool-housing and wrist-rotor drawings similarly use
+  the authored reach-class namespace and member role. Their fingerprints use
+  exact dimensions and the relevant joint or flange fingerprints.
+- Pinion-carrier purchase numbers identify the machine design and axis. X and
+  Y carriers can have different mounting inputs even when their motor faces
+  and visible axial dimensions match; the two equivalent Y carriers share
+  a number. Their fingerprints retain the complete recipe and motor inputs.
+- The sheet-router weldment receives its exact design inputs and generator
+  version from its builder. Individual frame members fingerprint their section,
+  length and end cuts without treating installed position as a part revision.
+- Welding service leads are individual assumed purchases with typed lengths,
+  conductor area or core count where modeled. Their fingerprints use those
+  inputs; pressure ratings, terminations and other unspecified details remain
+  selection work for sourcing.
 - Bring every example machine through B2–B6.
-- Lint and procurement checks become hard failures in the machinekit
-  tests. Example BOM exports are added to the test suite.
+- The CNC-router belt and folded-Z configurations also run through the BOM
+  checks. Their axle and plates have explicit drawings and manufacturing
+  declarations, so choosing either modeled drive does not leave bare parts.
+- Lint, fingerprint presence and procurement checks become hard failures in
+  the machinekit tests. Example BOM exports are added to the test suite.
 
 ### B8 — Sourcing contract
 - Decision: move `SupplierOffer` and `SourcingPlan` fully into the sourcing
@@ -492,17 +529,15 @@ and readers reject anything else. It contains:
   sourcing data; a supplier SKU does not define the engineering part. Keep
   catalogue manufacturer/MPN evidence in the engineering BOM when known.
 - Freeze the version 1 JSON and document it next to the exporter.
-- Decide whether `SupplierOffer`/`SourcingPlan` stay in machinekit as a
-  thin "this part is this catalogue SKU" link, or move fully into the
-  sourcing layer.
 - The sourcing layer (separate plan, Python under `tools/suppliers/` next to
   `lcsccable.py`) reads `build/bom/*.json` and reports lines with no quote and
   quotes that are stale or orphaned.
 
-## Open decisions
+## Recorded decisions
 
-1. Made-part numbers: author-declared drawing numbers (proposed) versus
-   descriptive names built from dimensions.
-2. Fasteners: derived from bolted connections versus declared per assembly
-   (B6 survey decides).
-3. `SourcingPlan`: keep a thin SKU link in machinekit, or move it out (B8).
+1. Made parts use author-declared drawing numbers. Their fingerprints change
+   with the design inputs without changing the drawing number.
+2. The bench mill declares fasteners from modeled patterns in B6. The F1
+   follow-up will derive them from validated fastening interfaces.
+3. B8 moves `SourcingPlan` and `SupplierOffer` to the sourcing layer; its
+   implementation remains pending.

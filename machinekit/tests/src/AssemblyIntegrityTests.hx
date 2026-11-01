@@ -45,10 +45,10 @@ class AssemblyIntegrityTests {
   /** A plate on a plate, `lift` mm above (negative: sunk into) the lower one's top. */
   static function stack(lift:Float, baseZ:Float = 0):AxisBuilder {
     var builder = new AxisBuilder();
-    builder.place("base", new GantryPlate("Integrity base", 100, 100, 10), AssemblyFrames.translation(0, 0, baseZ));
+    builder.place("base", new GantryPlate("TEST-INTEGRITY-BASE", "Integrity base", 100, 100, 10), AssemblyFrames.translation(0, 0, baseZ));
     builder.attach(
       "top",
-      new GantryPlate("Integrity top", 50, 50, 10),
+      new GantryPlate("TEST-INTEGRITY-TOP", "Integrity top", 50, 50, 10),
       AssemblyFrames.translation(0, 0, baseZ + 10 + lift),
       "base"
     );
@@ -92,7 +92,7 @@ class AssemblyIntegrityTests {
       );
       if (withStop) builder.attach(
         "stop",
-        new GantryPlate("Integrity stop", 20, 30, 20),
+        new GantryPlate("TEST-INTEGRITY-STOP", "Integrity stop", 20, 30, 20),
         AssemblyFrames.translation(170, 0, 0),
         "rail"
       );
@@ -112,6 +112,7 @@ class AssemblyIntegrityTests {
     var rail = LinearRail.metric("MGN12C", 300);
     // The seat is where the rail's base sits: on the plate's top, +Y (a connector's axis) up, +Z along the rail.
     var plate = new SeatedPlate(
+      "TEST-SEATED-PLATE",
       400,
       100,
       10,
@@ -193,6 +194,7 @@ class AssemblyIntegrityTests {
       builder.place(
         "rackFixture",
         new machinekit.gantry.GantryParts.GantryPlate(
+          "TEST-RACK-FIXTURE",
           "anchored rack test fixture",
           rack.length + 2 * Math.PI * rack.moduleSize,
           8,

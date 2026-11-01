@@ -41,12 +41,13 @@ class OverheadArm extends Gantry {
       200,
       1400,
       650
-    ));
+    ), "OHA");
     arm = new RobotArm(false, null, machinekit.robotics.IndustrialArmClass.Reach900, true);
     var flange:machinekit.robotics.RobotFlange = cast component("flange");
     attach(
       "armAdapter",
       new GantryBoredBracket(
+        "OHA-ARM-ADAPTER",
         "overhead arm adapter",
         360,
         360,

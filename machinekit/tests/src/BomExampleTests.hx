@@ -18,22 +18,61 @@ class BomExampleTests {
       if (item.procurement == null || item.maturity == null)
         throw 'Picking station recipe is missing procurement intent: ${recipe.id}';
     }
-    var pressBlock = new PressBrake.PressBlock("test bed", 100, 80, 60).bom;
+    var weldingLead = machinekit.welding.WeldingServiceStock.powerLead(false, 3, 35);
+    var revisedLead = machinekit.welding.WeldingServiceStock.powerLead(false, 4, 35);
+    var weldingTerms = weldingLead.requirements;
+    if (weldingLead.maturity != "Assumed" || weldingTerms == null || weldingTerms.length != 2
+      || weldingLead.fingerprint == null || weldingLead.fingerprint == revisedLead.fingerprint)
+      throw "Welding leads need structured selection dimensions and a fingerprint";
+    var pack = machinekit.welding.WeldingServiceStock.torchPack("ROBOT", 1.5);
+    var packTerms = pack.requirements;
+    if (packTerms == null || packTerms.length != 5)
+      throw "A torch pack must declare each modeled service separately";
+    var pressBlock = new PressBrake.PressBlock("TEST-PRESS-BED", "test bed", 100, 80, 60).bom;
     var curtain = new PressBrake.PressLightCurtain().bom;
     if (pressBlock.procurement == null || pressBlock.maturity != "Assumed" || pressBlock.requirements == null
       || pressBlock.requirements.length != 3 || curtain.procurement == null || curtain.maturity != "Assumed")
       throw "Press-brake reference parts must declare their selection inputs";
     check("bench-mill", new BenchMill());
     check("cnc-router", new CncRouter());
+    check("cnc-router-belt", new CncRouter(true));
+    check("cnc-router-folded-z", new CncRouter(false, true));
     check("robot-welder", new WeldingCell());
     check("cobot-arm", new machinekit.robotics.CobotArm(machinekit.robotics.CobotClass.Reach850));
     check("press-brake", new PressBrake());
     check("robot-screwdriver", new ScrewdrivingCell());
+    check("enclosed-bench-mill", new EnclosedBenchMill());
+    check("mobile-welder", new MobileWelderCell());
+    check("robot-arm", new RobotArm());
+    check("mobile-base", new MobileBase());
+    check("mobile-base-cell", new MobileBaseCell());
+    check("gantry-picker", new GantryPicker());
+    check("gantry-welder", new GantryWelder());
+    check("track-arm", new TrackWelder());
+    check("overhead-arm", new OverheadArm());
+    check("xyz-stage", new XyzStage());
+    check("linear-stage", LinearStage.axis());
+    check("picking-station", new pickingstation.PickingStation().assembly());
+    check("corexy-plotter", new CoreXyPlotter());
+    check("corexy-printer", new CoreXyPrinter());
+    check("sheet-router", new SheetRouter());
     check("flexspline-hobber", new FlexsplineHobber());
+  }
+
+  static function checkNumbers(machine:String, node:machinekit.assembly.BomDocument.BomAssemblyNode):Void {
+    for (line in node.lines) {
+      if (line.item.fingerprint == null)
+        throw '$machine BOM at ${line.uses[0].path}: missing fingerprint for ${line.item.partNumber}';
+      var problems = machinekit.component.PartNumberLint.problems(line.item.partNumber);
+      if (problems.length != 0)
+        throw '$machine BOM at ${line.uses[0].path}: ${line.item.partNumber}: ${problems.join(", ")}';
+    }
+    for (child in node.children) checkNumbers(machine, child);
   }
 
   static function check(name:String, machine:MachineAssembly):Void {
     var document = machine.bomDocument(name, "test-commit", "2026-01-01T00:00:00Z");
+    checkNumbers(name, document.assembly);
     var json:Dynamic = haxe.Json.parse(haxe.Json.stringify(document));
     if (json.schema != "machinekit.bom" || json.version != 1 || json.machineId != name
       || json.sourceCommit != "test-commit" || json.assembly.path != "") throw 'Invalid $name BOM document';
@@ -71,7 +110,7 @@ class BomExampleTests {
       for (line in chains) for (cut in line.item.cuts) chainCuts += cut.count;
       if (power.length != 1 || power[0].item.quantity.unit != "m" || power[0].item.cuts.length != 4
         || encoder.length != 1 || encoder[0].item.quantity.unit != "m" || encoder[0].item.cuts.length != 3
-        || chainCuts != 3 || quantity(document, "MILL-MANUAL-LUBRICATION-15-OUTLET-ASSUMED") != 1)
+        || chainCuts != 3 || quantity(document, "MILL-LUBE-15-OUT-ASSUMED") != 1)
         throw "The mill must declare its cable cuts, three chains and lubrication set";
     }
     if (name == "robot-welder") {
@@ -87,8 +126,15 @@ class BomExampleTests {
       throw "Each cobot gearhead must be included in its joint purchase";
     if (name == "press-brake" && countIncludedPrefix(document.assembly, "HYD-CYL-") != 2)
       throw "The hydraulic cylinder rods must be included in their cylinder purchases";
-    if (name == "robot-screwdriver" && countIncludedPrefix(document.assembly, "CUSTOM-SCREWDRIVER-MOTOR-GEARBOX-") != 2)
-      throw "The screwdriver slide and carrier must be included in its purchase";
+    if (name == "robot-screwdriver") {
+      var body = findUse(document.assembly, "arm/tool/driver/body");
+      var slide = findUse(document.assembly, "arm/tool/driver/slide");
+      var carrier = findUse(document.assembly, "arm/tool/driver/carrier");
+      if (body == null || slide == null || carrier == null) throw "Missing screwdriver body, slide or carrier";
+      if (slide.includedIn != body.partNumber || carrier.includedIn != body.partNumber
+        || countIncludedPrefix(document.assembly, body.partNumber) != 2)
+        throw "The screwdriver slide and carrier must be included in its purchase";
+    }
     if (name == "cnc-router") {
       var yBracket = [for (line in document.procurement)
         if (line.item.partNumber == "BRACKET-HOME-SWITCH-BRACKET-Y") line];

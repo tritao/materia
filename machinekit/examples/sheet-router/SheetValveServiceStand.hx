@@ -9,6 +9,7 @@ import machinekit.structural.RectTube;
 /** Purchased floor service-rack envelope; detachable valve clamps are removed for withdrawal. */
 class SheetValveServiceStand extends MachineComponent {
   final frame:FrameAssembly;
+  final stations:Array<Float>;
   final ids:Array<String> = [];
   public function new(x:Float, ys:Array<Float>) {
     super("SHEET-VALVE-SERVICE-RACK", "Assumed floor valve service rack", "steel", false);
@@ -17,6 +18,7 @@ class SheetValveServiceStand extends MachineComponent {
       ProcurementCodec.requirement("height", "mm", null, null, 470)
     ]));
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Assumed")));
+    stations = ys.copy();
     frame = new FrameAssembly();
     var tube = new RectTube(25, 25, 2);
     function member(id:String, a:Array<Float>, b:Array<Float>):Void {
@@ -40,6 +42,11 @@ class SheetValveServiceStand extends MachineComponent {
       member('arch${i}b', [x, y + 80, barZ], [x, y + 80, 470]);
       member('arch${i}top', [x, y - 80, 470], [x, y + 80, 470]);
     }
+  }
+  override public function revisionFingerprint():Null<String> {
+    var inputs = ["SheetValveServiceStand", materialSpec()];
+    for (station in stations) inputs.push(ComponentNumberKey.encode(station - stations[0]));
+    return BomRevision.fingerprint(inputs.join("|"), 1);
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {

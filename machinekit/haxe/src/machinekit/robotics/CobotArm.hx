@@ -21,6 +21,16 @@ class CobotArm extends MachineAssembly {
   public final toolFlange:RobotFlange;
   public final tool:Null<EndEffector>;
 
+  function drawing(role:String):String {
+    var namespace = switch cls {
+      case Reach500: "CB500";
+      case Reach850: "CB850";
+      case Reach900: "CB900";
+      case Reach1300: "CB1300";
+    };
+    return namespace + "-" + role.toUpperCase();
+  }
+
   public function new(cls:CobotClass, ?armTool:ArmTool) {
     super();
     this.cls = cls;
@@ -44,23 +54,27 @@ class CobotArm extends MachineAssembly {
     for (i in 0...6) {
       var nextRadius = i < 5 ? modules[i + 1].diameter / 2 : toolFlange.flangeDiameter / 2;
       var d = reference.d[i] - (i == 5 ? toolFlange.thickness : 0);
+      var linkId = 'link${i + 1}';
       var link:MachineComponent = i == 0 || i == 3 || i == 4 ? new CobotWristLink(
+        drawing(linkId),
         d,
         reference.alpha[i],
         modules[i],
         modules[i + 1]
       ) : i == 5 ? new CobotToolLink(
+        drawing(linkId),
         reference.d[i],
         modules[i],
         toolFlange
       ) : new CobotArmLink(
+        drawing(linkId),
         reference.a[i],
         d,
         modules[i],
         modules[i + 1]
       );
       links.push(link);
-      var linkId = 'link${i + 1}', jointId = 'j${i + 1}', moduleId = 'joint${i + 1}';
+      var jointId = 'j${i + 1}', moduleId = 'joint${i + 1}';
       addComponent(linkId, link);
       addMateOnAxis(
         jointId,
@@ -83,7 +97,7 @@ class CobotArm extends MachineAssembly {
       }
       {
         var rotorId = i == 0 ? "shoulderRotor" : i < 3 ? 'armRotor${i + 1}' : 'wristRotor${i + 1}';
-        addComponent(rotorId, new CobotWristRotor(modules[i], i == 5 ? CobotToolLink.CLOCKING : 0));
+        addComponent(rotorId, new CobotWristRotor(drawing(rotorId), modules[i], i == 5 ? CobotToolLink.CLOCKING : 0));
         addMate('$rotorId-mount', "fixed", linkId, "start", rotorId, "face");
       }
       for (side in (i == 5 ? ["input"] : ["input", "output"])) for (bolt in 1...CobotWristMount.COUNT + 1) {
@@ -94,8 +108,8 @@ class CobotArm extends MachineAssembly {
       if (i == 1 || i == 2) {
         var shell:CobotArmLink = cast link;
         var coverId = 'linkCover${i + 1}', gasketId = 'linkGasket${i + 1}';
-        addComponent(coverId, new CobotLinkCover(shell.serviceLength, shell.serviceWidth));
-        addComponent(gasketId, new CobotLinkCover(shell.serviceLength, shell.serviceWidth, true));
+        addComponent(coverId, new CobotLinkCover(drawing(coverId), shell.serviceLength, shell.serviceWidth));
+        addComponent(gasketId, new CobotLinkCover(drawing(gasketId), shell.serviceLength, shell.serviceWidth, true));
         addMate('$coverId-mount', "fixed", linkId, "service", coverId, "back");
         addMate('$gasketId-mount', "fixed", linkId, "service", gasketId, "back");
         for (bolt in 1...5) {

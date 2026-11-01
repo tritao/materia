@@ -16,6 +16,6 @@ class XyzStage extends Gantry {
 
   public function new() {
     var screw:GantryDrive = Screw(new LeadScrewThread(MetricTrapezoidal, 12, 3));
-    super(new GantrySpec(TRAVEL_X, TRAVEL_Y, TRAVEL_Z, screw, screw, screw, false, "MGN12C", 17, "HFS5-4040", "HFS5-4040", true));
+    super(new GantrySpec(TRAVEL_X, TRAVEL_Y, TRAVEL_Z, screw, screw, screw, false, "MGN12C", 17, "HFS5-4040", "HFS5-4040", true), "XYZ");
   }
 }

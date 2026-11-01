@@ -74,6 +74,12 @@ class BatteryPack extends MachineComponent implements ElectricalSource {
       regenerativePower: capacityWh * 0.25
     };
   }
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    var inputs = ["BatteryPack", materialSpec(), number(nominalVolts), number(capacityWh), number(length), number(width), number(height), number(massKg)];
+    inputs.push(Std.string(outlets));
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(length, width, height);
 }

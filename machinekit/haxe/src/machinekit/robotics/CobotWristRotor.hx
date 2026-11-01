@@ -13,8 +13,9 @@ import machinekit.component.Solids;
 class CobotWristRotor extends MachineComponent {
   public final module:CobotJoint;
   public final clocking:Float;
-  public function new(module:CobotJoint, clocking:Float = 0) {
+  public function new(drawing:String, module:CobotJoint, clocking:Float = 0) {
     super('COBOT-WRIST-ROTOR-${module.size}-C${clocking}', "Rotating wrist output flange", "aluminium 6061", true);
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining"), [
       machinekit.component.Procurement.ProcurementCodec.requirement("moduleSize", "1", null, null, module.size),
       machinekit.component.Procurement.ProcurementCodec.requirement("clocking", "rad", null, null, clocking)
@@ -24,6 +25,11 @@ class CobotWristRotor extends MachineComponent {
     this.module = module;
     this.clocking = clocking;
     addConnector("face", Mount, Solids.axial(0, 0, 0));
+  }
+  override public function revisionFingerprint():Null<String> {
+    if (drawingNumber == null || module.bom.fingerprint == null) return null;
+    return machinekit.component.BomRevision.fingerprint([drawingNumber, materialSpec(), module.bom.fingerprint,
+      machinekit.component.ComponentNumberKey.encode(clocking)].join("|"), 1);
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {

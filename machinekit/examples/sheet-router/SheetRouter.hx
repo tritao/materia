@@ -26,7 +26,7 @@ class SheetRouter extends Gantry {
   public final base:WeldedFrame;
   public function new(?layout:SheetRouterSpec) {
     var chosen = layout == null ? new SheetRouterSpec() : layout;
-    super(chosen.gantry());
+    super(chosen.gantry(), "SRT");
     routerSpec = chosen;
     homeAfter("y", ["z", "x"]);
     bindMotorBrake("motorZ", "motorZ", "sheet-router/z-brake.release", "sheet-router/z-brake.released", 250, 100);
@@ -36,7 +36,7 @@ class SheetRouter extends Gantry {
     spindle = new AtcSpindle();
     var reach = spindle.n("diameter") / 2 + 18;
     gaugeZero = F.translation(flangeZero.x, flangeZero.y - reach, flangeZero.z - 240);
-    attach("spindleMount", new SheetSpindleSaddle(spindle.n("diameter"), reach), gaugeZero, "zCarriage");
+    attach("spindleMount", new SheetSpindleSaddle("SRT-SPINDLE-SADDLE", spindle.n("diameter"), reach), gaugeZero, "zCarriage");
     attach("spindle", spindle, gaugeZero, "spindleMount");
     attach(
       "spindleRelease",
@@ -74,7 +74,7 @@ class SheetRouter extends Gantry {
     for (side in 0...2) for (end in 0...4) {
       var x = side == 0 ? left : right, y = end == 3 ? 1575 : front + (back - front) * end / 2;
       attach('foot${side}${end}', foot, F.translation(x, y, 0), "base");
-      attach('footCap${side}${end}', new SheetFootCap(), F.translation(x, y, 88), "base");
+      attach('footCap${side}${end}', new SheetFootCap("SRT-FOOT-CAP"), F.translation(x, y, 88), "base");
     }
     attach("vacuumTable", table, F.translation(chosen.workX / 2, gaugeZero.y + chosen.workY / 2, bedBottom), "base");
     attach(
@@ -104,10 +104,10 @@ class SheetRouter extends Gantry {
       );
     }
     attach("vacuumBlower", new VacuumBlower(), F.translation(right + 300, (front + back) / 2, 0), "base");
-    attach("vacuumHeader", new SheetVacuumHeader(4), F.translation(right + 400, (front + back) / 2 + 600, 100), "base");
+    attach("vacuumHeader", new SheetVacuumHeader("SRT-VACUUM-HEADER-4", 4), F.translation(right + 400, (front + back) / 2 + 600, 100), "base");
     attach(
       "leftVacuumHeader",
-      new SheetVacuumHeader(3),
+      new SheetVacuumHeader("SRT-VACUUM-HEADER-3", 3),
       F.translation(left - 500, (front + back) / 2 + 600, 100),
       "base"
     );
@@ -128,7 +128,7 @@ class SheetRouter extends Gantry {
     // pockets' 330 mm overhang; do not widen the solid plinth.
     attach(
       "rackSupport",
-      new GantryPlate("rack support", 880, 180, rackPose.z - bedBottom),
+      new GantryPlate("SRT-RACK-SUPPORT", "rack support", 880, 180, rackPose.z - bedBottom),
       F.translation(rackPose.x, rackPose.y, bedBottom),
       "base"
     );
@@ -146,14 +146,14 @@ class SheetRouter extends Gantry {
       attach('fork${i+1}', new ToolFork(), pose, "toolRack");
       attach(
         'forkRiser${i+1}',
-        new GantryPlate("fork riser", 80, 12, pose.z - rackPose.z - rack.n("height")),
+        new GantryPlate("SRT-FORK-RISER", "fork riser", 80, 12, pose.z - rackPose.z - rack.n("height")),
         F.translation(pose.x, rackPose.y - rack.n("depth") / 2 + 6, rackPose.z + rack.n("height")),
         "toolRack"
       );
     }
     attach(
       "setterPad",
-      new GantryPlate("setter pedestal", 100, 100, boardTop - bedBottom),
+      new GantryPlate("SRT-SETTER-PEDESTAL", "setter pedestal", 100, 100, boardTop - bedBottom),
       F.translation(100, rackPose.y - 220, bedBottom),
       "base"
     );
@@ -178,7 +178,7 @@ class SheetRouter extends Gantry {
       rackPose.z + rack.n("forkHeight") + 60,
       zeroPose("frameBack").z + spec.frameSection().height / 2 + 5
     );
-    var cover = new SheetRouterAtcCover(rack.parameterCount("pockets") * rack.n("pitch") + 20);
+    var cover = new SheetRouterAtcCover("SRT-ATC-COVER", rack.parameterCount("pockets") * rack.n("pitch") + 20);
     lift(
       "rackCoverLift",
       "rackCover",
@@ -274,10 +274,10 @@ class SheetRouter extends Gantry {
       along
     );
     attach(c, cylinder, body, parent);
-    if (joint == "shoeLift") attach(joint + "Bracket", new SheetShoeLiftBracket(), pose, id);
+    if (joint == "shoeLift") attach(joint + "Bracket", new SheetShoeLiftBracket("SRT-SHOE-LIFT-BRACKET"), pose, id);
     else attach(
       joint + "Bracket",
-      new GantryPlate("lift rod bracket", 80, 20, anchorZ),
+      new GantryPlate("SRT-LIFT-ROD-BRACKET", "lift rod bracket", 80, 20, anchorZ),
       F.translation(pose.x + anchorX, pose.y, pose.z),
       id
     );
@@ -318,7 +318,7 @@ class SheetRouter extends Gantry {
       ?cuts:Array<SheetChainBox>
     ):Void attach(
       id,
-      new SheetChainSupport(id, boxes, end, cuts),
+      new SheetChainSupport("SRT-" + id.toUpperCase(), id, boxes, end, cuts),
       F.identity(),
       parent
     );
@@ -457,7 +457,8 @@ class SheetRouter extends Gantry {
         legSize: 5
       });
     }
-    return new WeldedFrame('sheet-router-${routerSpec.workY}', frame, ids, [], welds);
+    return new WeldedFrame("SRT-BASE-FRAME", 'sheet-router-${routerSpec.workY}', frame, ids, [], welds,
+      [left, right, front, back, top, bed, workOrigin.y, routerSpec.workY], 1);
   }
   /** Axis coordinate needed to bring the spindle gauge to a world position. */
   public function gaugeCoordinates(world:AssemblyFrame):Array<Float> return [
@@ -476,16 +477,30 @@ class SheetRouterTool extends MachineComponent {
     this.length = length;
     addConnector("tip", Axis, F.translation(0, 0, -length));
   }
+  override function get_bom():BomItem {
+    var item = super.get_bom();
+    item.partNumber = "REFERENCE-ROUTER-TOOL-" + Dimension.format(length);
+    return item;
+  }
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    return machinekit.component.BomRevision.fingerprint(["SheetRouterTool", materialSpec(), number(length)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.cylinderSpan(6, -length, 0);
 }
 
 /** Offset lifting bracket passes below the moving plate and outside its side boxes. */
 class SheetShoeLiftBracket extends MachineComponent {
-  public function new() {
+  public function new(drawing:String) {
     super("SHEET-SHOE-OFFSET-LIFT", "Offset shoe lift bracket", "steel", true);
+    declareDrawingNumber(drawing);
     addFacet(new ProcurementIntent(Make("welding and machining")));
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
+  }
+  override public function revisionFingerprint():Null<String> {
+    var inputs = [drawingNumber, materialSpec()];
+    return BomRevision.fingerprint(inputs.join("|"), 1);
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.building([],
@@ -506,13 +521,18 @@ class SheetShoeLiftBracket extends MachineComponent {
 class SheetSpindleSaddle extends MachineComponent {
   public final diameter:Float;
   public final reach:Float;
-  public function new(diameter:Float, reach:Float) {
+  public function new(drawing:String, diameter:Float, reach:Float) {
     super('SHEET-SPINDLE-SADDLE-$diameter-$reach', "Two-level spindle clamp saddle", "aluminium 6061", true);
+    declareDrawingNumber(drawing);
     addFacet(new ProcurementIntent(Make("machining")));
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
     this.diameter = diameter;
     this.reach = reach;
     for (x in [-50.0, 50.0]) for (z in [110.0, 230.0]) addConnector('mount$x-$z', Mount, F.translation(x, reach, z));
+  }
+  override public function revisionFingerprint():Null<String> {
+    var inputs = [drawingNumber, materialSpec(), ComponentNumberKey.encode(diameter), ComponentNumberKey.encode(reach)];
+    return BomRevision.fingerprint(inputs.join("|"), 1);
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.building([],
@@ -557,8 +577,9 @@ class SheetSpindleSaddle extends MachineComponent {
 /** Assumed common vacuum header; zone isolation stays in the six separate valves. */
 class SheetVacuumHeader extends MachineComponent {
   public final outletXs:Array<Float>;
-  public function new(branches:Int = 6) {
+  public function new(drawing:String, branches:Int = 6) {
     super('SHEET-VACUUM-HEADER-$branches', '$branches-branch vacuum distribution header', "aluminium 6061", true);
+    declareDrawingNumber(drawing);
     addFacet(new ProcurementIntent(Make("machining")));
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
     outletXs = branches == 4 ? [-200.0,
@@ -571,6 +592,11 @@ class SheetVacuumHeader extends MachineComponent {
       addBridge("input", 'out$i');
     }
   }
+  override public function revisionFingerprint():Null<String> {
+    var inputs = [drawingNumber, materialSpec()];
+    for (x in outletXs) inputs.push(ComponentNumberKey.encode(x));
+    return BomRevision.fingerprint(inputs.join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var tools = [Part.cylinderAlong(30, new Vector(-235, 0, 50), new Vector(1, 0, 0), 486)];
@@ -581,10 +607,15 @@ class SheetVacuumHeader extends MachineComponent {
 
 /** Nominal M20 threaded leg cap: bore is the semantic thread's major-diameter envelope. */
 class SheetFootCap extends MachineComponent {
-  public function new() {
+  public function new(drawing:String) {
     super("SHEET-LEG-CAP-M20", "Assumed M20 threaded leg cap", "steel", true);
+    declareDrawingNumber(drawing);
     addFacet(new ProcurementIntent(Make("machining")));
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
+  }
+  override public function revisionFingerprint():Null<String> {
+    var inputs = [drawingNumber, materialSpec()];
+    return BomRevision.fingerprint(inputs.join("|"), 1);
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
@@ -606,14 +637,22 @@ typedef SheetChainBox = {
 class SheetChainSupport extends MachineComponent {
   final boxes:Array<SheetChainBox>;
   final cuts:Array<SheetChainBox>;
-  public function new(id:String, boxes:Array<SheetChainBox>, end:AssemblyFrame, ?cuts:Array<SheetChainBox>) {
+  public function new(drawing:String, id:String, boxes:Array<SheetChainBox>, end:AssemblyFrame, ?cuts:Array<SheetChainBox>) {
     super("SHEET-" + id, "Cable-chain support " + id, "steel", true);
+    declareDrawingNumber(drawing);
     addFacet(new ProcurementIntent(Make("welding and machining")));
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
     this.boxes = boxes;
     this.cuts = cuts == null ? [] : cuts;
     for (box in boxes) if (box.w <= 0 || box.d <= 0 || box.h <= 0) throw "Invalid chain support dimensions";
     addConnector("chain", Mount, end);
+  }
+  override public function revisionFingerprint():Null<String> {
+    var inputs = [drawingNumber, materialSpec()];
+    for (box in boxes) for (v in [box.x, box.y, box.z, box.w, box.d, box.h]) inputs.push(ComponentNumberKey.encode(v));
+    inputs.push("cuts");
+    for (box in cuts) for (v in [box.x, box.y, box.z, box.w, box.d, box.h]) inputs.push(ComponentNumberKey.encode(v));
+    return BomRevision.fingerprint(inputs.join("|"), 1);
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.building([],

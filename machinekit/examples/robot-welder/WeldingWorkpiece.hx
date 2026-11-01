@@ -13,6 +13,7 @@ import machinekit.welding.Weldment;
 class FrameMemberComponent extends MachineComponent {
   final frame:FrameAssembly;
   final memberName:String;
+  final profile:RectTube;
 
   public function new(frame:FrameAssembly, memberName:String, profile:RectTube) {
     super(
@@ -26,7 +27,14 @@ class FrameMemberComponent extends MachineComponent {
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.frame = frame;
     this.memberName = memberName;
+    this.profile = profile;
     addConnector("origin", Mount, Solids.axial(0, 0, 0));
+  }
+
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    return machinekit.component.BomRevision.fingerprint(["FrameMember", materialSpec(), number(profile.width),
+      number(profile.height), number(profile.wall), number(frame.length(memberName)), frame.cutRevisionKey(memberName)].join("|"), 1);
   }
 
   override public function hasGeometry():Bool return true;

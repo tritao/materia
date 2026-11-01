@@ -21,7 +21,7 @@ class MountDrilledPlate extends GantryPlate {
   ];
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(inputs(), overrides, false);
-    super("clearance-drilled host pad", v.number("width"), v.number("depth"), v.number("height"));
+    super(null, "clearance-drilled host pad", v.number("width"), v.number("depth"), v.number("height"));
     addFacet(new EngineeringMetadata(new ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     setMaterial(v.token("hostMaterial"));

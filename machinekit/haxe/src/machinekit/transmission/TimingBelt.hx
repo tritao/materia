@@ -528,6 +528,12 @@ class TimingBelt extends MachineComponent {
     return target.assign(last.endX, last.endY, last.dx, last.dy);
   }
 
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    var inputs = [TimingPulley.profileDimensions(beltProfile).name, materialSpec(), number(pitch), number(width),
+      number(thickness), Std.string(teeth), number(statedCordRigidity), number(statedDampingRatio)];
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {

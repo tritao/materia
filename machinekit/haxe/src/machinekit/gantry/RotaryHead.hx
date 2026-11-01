@@ -5,6 +5,7 @@ import machinekit.assembly.MachineAssembly;
 import machinekit.gantry.GantryParts.GantryPlate;
 import machinekit.gantry.GantryParts.GantryBoredBracket;
 import machinekit.gantry.GantryParts.GantryIdlerPin;
+import machinekit.component.MachineComponent;
 import machinekit.motion.ServoMotor;
 import machinekit.motion.Gearbox;
 import machinekit.robotics.RobotFlange;
@@ -46,6 +47,8 @@ class RotaryHead extends AxisBuilder {
   public static inline var A_REACH:Float = 70;
   public static inline var A_STOP_TOP:Float = 210;
 
+  function drawing(role:String):String return (hasTilt ? "CAHEAD" : "CHEAD") + "-" + role.toUpperCase();
+
   public function new(hasTilt:Bool = false, cCableWrap:Float = Math.PI, aCableWrap:Float = Math.PI / 2) {
     super();
     for (value in [cCableWrap, aCableWrap]) if (!Math.isFinite(value) || value <= 0
@@ -65,20 +68,20 @@ class RotaryHead extends AxisBuilder {
     ) : C_OUTPUT + flange.thickness + flange.pilotHeight;
     place(
       "mount",
-      new GantryBoredBracket("rotary head mount", 100, 80, 8, AssemblyFrames.identity(), flange.pilotDiameter + 0.5),
+      new GantryBoredBracket(drawing("mount"), "rotary head mount", 100, 80, 8, AssemblyFrames.identity(), flange.pilotDiameter + 0.5),
       AssemblyFrames.identity()
     );
     addMemberConnector("mount", "mount", machinekit.component.Solids.axial(0, 0, 0));
     exposeConnector("mount", "mount", "mount");
     for (side in [-1, 1]) attach(
       side < 0 ? "supportLeft" : "supportRight",
-      new GantryPlate("head motor support", 20, 80, 77),
+      new GantryPlate(drawing("support"), "head motor support", 20, 80, 77),
       AssemblyFrames.translation(side * 40, 0, 8),
       "mount"
     );
     attach(
       "motorPlate",
-      new GantryBoredBracket("head motor plate", 100, 80, 8, AssemblyFrames.identity(), 10.5),
+      new GantryBoredBracket(drawing("motorPlate"), "head motor plate", 100, 80, 8, AssemblyFrames.identity(), 10.5),
       AssemblyFrames.translation(0, 0, 85),
       "supportLeft"
     );
@@ -88,7 +91,7 @@ class RotaryHead extends AxisBuilder {
       "c",
       "cGearbox",
       "cShaft",
-      new GantryIdlerPin(10, 18),
+      new GantryIdlerPin(drawing("cShaft"), 10, 18),
       AssemblyFrames.translation(0, 0, C_OUTPUT),
       {x: 0, y: 0, z: 1},
       cCableWrap,
@@ -111,7 +114,7 @@ class RotaryHead extends AxisBuilder {
   function buildTilt(cableWrap:Float):Void {
     attach(
       "forkBase",
-      new GantryPlate("rotary fork base", 252, 180, 8),
+      new GantryPlate(drawing("forkBase"), "rotary fork base", 252, 180, 8),
       AssemblyFrames.translation(0, 0, C_OUTPUT),
       "cShaft"
     );
@@ -119,7 +122,7 @@ class RotaryHead extends AxisBuilder {
     var bearing = DeepGrooveBearing.metric("6000");
     for (side in [-1, 1]) attach(
       side < 0 ? "forkLeft" : "forkRight",
-      new GantryBoredBracket("rotary fork arm", 12, 180, 149, axisFrame, side < 0 ? 10.5 : bearing.outside),
+      new GantryBoredBracket(drawing(side < 0 ? "forkLeft" : "forkRight"), "rotary fork arm", 12, 180, 149, axisFrame, side < 0 ? 10.5 : bearing.outside),
       AssemblyFrames.translation(side * 120, 0, C_OUTPUT + 8),
       "forkBase"
     );
@@ -140,7 +143,7 @@ class RotaryHead extends AxisBuilder {
     );
     for (side in [-1, 1]) attach(
       side < 0 ? "aStopNegative" : "aStopPositive",
-      new GantryPlate("A hard stop", 252, 40, 10),
+      new GantryPlate(drawing("aStop"), "A hard stop", 252, 40, 10),
       AssemblyFrames.translation(0, side * 70, A_STOP_TOP - 10),
       "forkBase"
     );
@@ -148,7 +151,7 @@ class RotaryHead extends AxisBuilder {
       "a",
       "aGearbox",
       "aShaft",
-      new GantryIdlerPin(10, 208),
+      new GantryIdlerPin(drawing("aShaft"), 10, 208),
       orient(-74, 0, A_AXIS, [0.0, 0, 1], [1.0, 0, 0]),
       {x: 1, y: 0, z: 0},
       cableWrap,
@@ -159,6 +162,7 @@ class RotaryHead extends AxisBuilder {
     attach(
       "aStem",
       new GantryBoredBracket(
+        drawing("aStem"),
         "A flange stem",
         40,
         20,

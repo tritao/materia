@@ -51,6 +51,10 @@ class WorkClamp extends MachineComponent {
     declareMass(2.4, new Vector(0, 0, 0.4 * height));
   }
 
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    return machinekit.component.BomRevision.fingerprint(["WorkClamp", materialSpec(), number(ratedCurrentA), number(width), number(depth), number(height)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(width, depth, height);

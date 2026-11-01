@@ -15,6 +15,7 @@ import machinekit.component.Solids;
  * CAD frame: the nozzle's base at the origin, the tip pointing along +Z. Connector `base`.
  */
 class WeldingTorchNozzle extends MachineComponent {
+  final bendDegrees:Float;
   public function new(bendDegrees:Float = 45) {
     super(
       'WELD-TORCH-NOZZLE-${Dimension.format(bendDegrees)}DEG',
@@ -28,9 +29,13 @@ class WeldingTorchNozzle extends MachineComponent {
     ]));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    this.bendDegrees = bendDegrees;
     addConnector("base", Mount, Solids.axial(0, 0, 0));
     declareMass(WeldingTorch.NOZZLE_MASS, new Vector(0, 0, 0.5 * WeldingTorch.NOZZLE_LENGTH));
   }
+
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    ["WeldingTorchNozzle", materialSpec(), machinekit.component.ComponentNumberKey.encode(bendDegrees)].join("|"), 1);
 
   override public function hasGeometry():Bool return true;
 

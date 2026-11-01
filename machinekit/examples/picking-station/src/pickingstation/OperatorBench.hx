@@ -20,7 +20,7 @@ class OperatorBench extends MachineComponent {
   final frameAssembly:FrameAssembly;
   final frameMembers:Array<String>;
 
-  public function new(width:Float = 900, depth:Float = 600, height:Float = 850, worktopThickness:Float = 18) {
+  public function new(drawing:String, width:Float = 900, depth:Float = 600, height:Float = 850, worktopThickness:Float = 18) {
     if (!positive(width) || !positive(depth) || !positive(height)
       || !positive(worktopThickness)) throw "Operator bench dimensions must be finite and positive";
     if (worktopThickness >= height) throw "Bench worktop is thicker than its height";
@@ -37,6 +37,7 @@ class OperatorBench extends MachineComponent {
       'Operator bench with extrusion frame, sheet worktop, and screen mount',
       "aluminium 6061"
     );
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("extrusion cutting and assembly")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
@@ -48,6 +49,10 @@ class OperatorBench extends MachineComponent {
   }
   ];
 
+  override public function revisionFingerprint():Null<String> {
+    if (drawingNumber == null) return null;
+    return machinekit.component.BomRevision.fingerprint([drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(width), machinekit.component.ComponentNumberKey.encode(depth), machinekit.component.ComponentNumberKey.encode(height), machinekit.component.ComponentNumberKey.encode(worktopThickness)].join("|"), 1);
+  }
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var ownedParts:Array<Part> = [];
     return Solids.building(ownedParts, tracked -> {var parts: Array<Part> = [];

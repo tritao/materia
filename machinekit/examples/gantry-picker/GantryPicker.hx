@@ -51,7 +51,7 @@ class GantryPicker extends Gantry {
       100,
       50,
       headKind == GantryHead.None ? 60 : 60 + BOX_WIDTH * (Math.sqrt(2) - 1) / 2
-    ));
+    ), "GPK");
     var flange:RobotFlange = head == null ? cast component("flange") : head.flange;
     tool = new SuctionTool(flange);
     include("tool", tool);
@@ -104,6 +104,11 @@ class PickerTable extends MachineComponent {
     this.depth = depth;
     this.height = height;
   }
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    var inputs = ["PickerTable", materialSpec(), number(width), number(depth), number(height)];
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     return Solids.building([], owned -> {var parts: Array<Part> = [];
@@ -146,6 +151,17 @@ class PickerBlock extends MachineComponent {
     this.height = height;
     addConnector("base", machinekit.component.ConnectorRole.Mount, Solids.axial(0, 0, 0));
     addConnector("top", machinekit.component.ConnectorRole.Mount, Solids.axial(0, 0, height));
+  }
+  override function get_bom():machinekit.component.BomItem {
+    var item = super.get_bom();
+    item.partNumber = "PICKER-" + StringTools.replace(description.toUpperCase(), " ", "-") + "-"
+      + Dimension.format(width) + "x" + Dimension.format(depth) + "x" + Dimension.format(height);
+    return item;
+  }
+  override public function revisionFingerprint():Null<String> {
+    return machinekit.component.BomRevision.fingerprint([materialSpec(),
+      machinekit.component.ComponentNumberKey.encode(width), machinekit.component.ComponentNumberKey.encode(depth),
+      machinekit.component.ComponentNumberKey.encode(height)].join("|"), 1);
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(width, depth, height);

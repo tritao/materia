@@ -36,25 +36,35 @@ class WeldedFrame extends MachineComponent {
   public final members:Array<String>;
   public final seats:Array<FrameSeat>;
   public final welds:Array<FrameWeld>;
+  final revisionInputs:Array<Float>;
+  final generatorVersion:Int;
 
   public function new(
+    drawing:String,
     name:String,
     frame:FrameAssembly,
     members:Array<String>,
     seats:Array<FrameSeat>,
     welds:Array<FrameWeld>,
+    revisionInputs:Array<Float>,
+    generatorVersion:Int,
     material:String = "steel"
   ) {
+    if (revisionInputs == null || revisionInputs.length == 0 || generatorVersion < 1)
+      throw "Welded frame needs its design inputs and generator version";
     if (members.length == 0) throw 'Welded frame "$name" needs members';
     for (weld in welds) for (id in [weld.a,
       weld.b]) if (members.indexOf(id) < 0) throw 'Weld of "$name" names "$id", which is not a member';
     super('WELDED-FRAME-${name.toUpperCase().split(" ").join("-")}', 'Welded frame: $name', material, true);
+    declareDrawingNumber(drawing);
     addFacet(new ProcurementIntent(Make("welding")));
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
     this.frame = frame;
     this.members = members.copy();
     this.seats = seats.copy();
     this.welds = welds.copy();
+    this.revisionInputs = revisionInputs.copy();
+    this.generatorVersion = generatorVersion;
     for (seat in seats) addConnector(seat.name, Mount, seat.frame);
   }
 
@@ -88,6 +98,12 @@ class WeldedFrame extends MachineComponent {
     var bounds = part.shape.bounds(), low = bounds.get_min(), high = bounds.get_max();
     part.close();
     return {min: [low.get_x(), low.get_y(), low.get_z()], max: [high.get_x(), high.get_y(), high.get_z()]};
+  }
+
+  override public function revisionFingerprint():Null<String> {
+    var inputs = [drawingNumber, materialSpec()];
+    for (value in revisionInputs) inputs.push(ComponentNumberKey.encode(value));
+    return BomRevision.fingerprint(inputs.join("|"), generatorVersion);
   }
 
   override public function hasGeometry():Bool return true;

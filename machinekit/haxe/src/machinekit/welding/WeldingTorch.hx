@@ -93,6 +93,11 @@ class WeldingTorch extends MachineComponent {
   /** Direction the wire leaves the torch in, in the torch's frame. */
   public function wireDirection():Vector return new Vector(Math.sin(bendRadians()), 0, Math.cos(bendRadians()));
 
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    var inputs = ["WeldingTorch", materialSpec(), number(bendDegrees)];
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {

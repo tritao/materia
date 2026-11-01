@@ -43,6 +43,7 @@ class AxisBuilderChecks {
     builder.place(
       "rackFixture",
       new machinekit.gantry.GantryParts.GantryPlate(
+          "TEST-RACK-FIXTURE",
         "anchored rack test fixture",
         rack.length + 2 * Math.PI * rack.moduleSize,
         8,

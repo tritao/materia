@@ -37,6 +37,10 @@ class WeldingTorchNeck extends MachineComponent {
     declareMass(WeldingTorch.NECK_MASS, new Vector(0, 0, 0.5 * WeldingTorch.NECK_LENGTH));
   }
 
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    return machinekit.component.BomRevision.fingerprint(["WeldingTorchNeck", materialSpec(), number(bendDegrees)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {

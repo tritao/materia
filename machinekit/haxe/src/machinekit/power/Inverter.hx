@@ -65,6 +65,10 @@ class Inverter extends MachineComponent {
       || outputWatts < 0 || outputWatts > continuousWatts) throw "Inverter demand exceeds its continuous rating";
     return outputWatts / efficiency;
   }
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    return machinekit.component.BomRevision.fingerprint(["Inverter", materialSpec(), number(inputVolts), number(outputVolts), number(continuousWatts), number(efficiency), number(length), number(width), number(height), number(massKg)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(length, width, height);
 }

@@ -29,6 +29,7 @@ class SeatedPlate extends MachineComponent {
   public final seats:Array<PlateSeat>;
 
   public function new(
+    drawing:String,
     length:Float,
     width:Float,
     thickness:Float,
@@ -51,6 +52,7 @@ class SeatedPlate extends MachineComponent {
       material,
       true
     );
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
@@ -98,6 +100,18 @@ class SeatedPlate extends MachineComponent {
 
   /** Seat frame on the underside at (x, y), facing up like the parts hung from it. */
   public static function underneath(x:Float, y:Float):AssemblyFrame return Solids.axial(x, y, 0);
+
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    var inputs = [drawingNumber, materialSpec(), number(length), number(width), number(thickness)];
+    for (seat in seats) {
+      inputs.push(seat.name);
+      inputs.push(machinekit.gantry.GantryParts.GantryPlate.frameKey(seat.frame));
+      for (hole in seat.holes) for (value in [hole.x, hole.y, hole.diameter]) inputs.push(number(value));
+    }
+    for (slot in slots) for (value in [slot.x, slot.y, slot.length, slot.width]) inputs.push(number(value));
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
+  }
 
   override public function hasGeometry():Bool return true;
 

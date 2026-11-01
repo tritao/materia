@@ -42,31 +42,23 @@ class TrackWelder extends machinekit.gantry.LinearTrack {
     addComponent("source", source, AssemblyFrames.translation(-800, 100, 0));
     addComponent("feeder", feeder, AssemblyFrames.translation(-700, 300, 0));
     addComponent("cylinder", cylinder, AssemblyFrames.translation(-800, 500, 0));
-    function line(partNumber:String, description:String):BomItem return {
-      partNumber: partNumber,
-      description: description,
-      quantity: 1,
-      material: null,
-      procurement: Buy(null, null, null),
-      maturity: "Stated"
-    };
-    connectPorts("gas-hose", "cylinder", "gas", "source", "gas", line("HOSE-GAS-6M", "Shielding gas hose, 6 m"));
+    connectPorts("gas-hose", "cylinder", "gas", "source", "gas", machinekit.welding.WeldingServiceStock.gasHose(6));
     connectPorts(
       "weld-cable",
       "source",
       "weldPositive",
       "feeder",
       "power",
-      line("CABLE-WELD-35-6M", "Weld cable 35 mm², 6 m")
+      machinekit.welding.WeldingServiceStock.powerLead(false, 6, 35)
     );
-    connectPorts("feeder-gas", "source", "gasOut", "feeder", "gas", line("HOSE-GAS-6M", "Shielding gas hose, 6 m"));
+    connectPorts("feeder-gas", "source", "gasOut", "feeder", "gas", machinekit.welding.WeldingServiceStock.gasHose(6));
     connectPorts(
       "feeder-control",
       "source",
       "feederControl",
       "feeder",
       "control",
-      line("CABLE-CONTROL-12-6M", "Welder control cable, 12 core, 6 m")
+      machinekit.welding.WeldingServiceStock.controlLead(6, 12)
     );
     connectPorts(
       "work-lead",
@@ -74,13 +66,13 @@ class TrackWelder extends machinekit.gantry.LinearTrack {
       "weldNegative",
       "clamp",
       "lead",
-      line("CABLE-WORK-35-6M", "Work lead 35 mm², 6 m")
+      machinekit.welding.WeldingServiceStock.powerLead(true, 6, 35)
     );
     connectPorts("torch-power", "feeder", "torchPower", "arm/tool/torch", "power");
     connectPorts("torch-gas", "feeder", "torchGas", "arm/tool/torch", "gas");
     connectPorts("torch-wire", "feeder", "torchWire", "arm/tool/torch", "wire");
     connectPorts("torch-control", "feeder", "torchControl", "arm/tool/torch", "control");
-    addBomItem(line("HOSEPACK-TRACK-6M", "Torch hose pack, 6 m: power, gas, wire liner and control"));
+    addBomItem(machinekit.welding.WeldingServiceStock.torchPack("TRACK", 6));
     // The power source takes mains power and the gantry controller.
     exposePort("mains", "source", "mains");
     exposePort("control", "source", "control");

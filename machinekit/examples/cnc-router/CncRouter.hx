@@ -59,6 +59,20 @@ class ExtrusionMember extends MachineComponent {
     this.length = length;
   }
 
+  override public function revisionFingerprint():Null<String> {
+    if (profile.sectionVariantId != null) return null;
+    var number = machinekit.component.ComponentNumberKey.encode;
+    var inputs = [profile.designation, materialSpec(), number(length), number(profile.size), number(profile.height),
+      number(profile.slotWidth), number(profile.slotDepth), number(profile.throatDepth), number(profile.tWidth),
+      number(profile.headDepth), number(profile.boreDiameter)];
+    for (face in 0...4) {
+      inputs.push("face" + face);
+      for (slot in profile.slotPositions(face)) inputs.push(number(slot));
+    }
+    inputs.push("bores");
+    for (bore in profile.boreCentres()) { inputs.push(number(bore.x)); inputs.push(number(bore.y)); }
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -78,6 +92,7 @@ class RouterPlate extends MachineComponent {
   public final motorFace:Null<AssemblyFrame>;
 
   public function new(
+    drawing:Null<String>,
     width:Float,
     depth:Float,
     height:Float,
@@ -96,6 +111,7 @@ class RouterPlate extends MachineComponent {
       material,
       true
     );
+    if (drawing != null) declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(workpiece ? NotSupplied : Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
@@ -104,6 +120,25 @@ class RouterPlate extends MachineComponent {
     this.height = height;
     this.motor = motor;
     this.motorFace = motorFace;
+  }
+
+  override function get_bom():machinekit.component.BomItem {
+    var item = super.get_bom();
+    if (drawingNumber == null) item.partNumber = "STOCK-" + StringTools.replace(description.toUpperCase(), " ", "-")
+      + "-" + Dimension.format(width) + "x" + Dimension.format(depth) + "x" + Dimension.format(height);
+    return item;
+  }
+
+  override public function revisionFingerprint():Null<String> {
+    var key = machinekit.component.ComponentNumberKey.encode;
+    var inputs = [drawingNumber == null ? "RouterStock" : drawingNumber, materialSpec(), key(width), key(depth), key(height)];
+    if (motor != null && motorFace != null) {
+      var motorRevision = motor.bom.fingerprint;
+      if (motorRevision == null) return null;
+      inputs.push(motorRevision);
+      inputs.push(machinekit.gantry.GantryParts.GantryPlate.frameKey(motorFace));
+    }
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
   }
 
   override public function hasGeometry():Bool return true;
@@ -127,9 +162,17 @@ class RouterPlate extends MachineComponent {
 /** Bearing seat at the top of the Z carriage, bored for the screw's 6000 bearing. */
 class FoldedZBearingPlate extends MachineComponent {
   public final holeY:Float;
-  public function new(holeY:Float) {
+  public function new(drawing:String, holeY:Float) {
     super("FOLDED-Z-BEARING-PLATE", "Folded Z screw bearing plate", "aluminium 6061", true);
+    declareDrawingNumber(drawing);
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.holeY = holeY;
+  }
+  override public function revisionFingerprint():Null<String> {
+    var inputs = [drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(holeY)];
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -146,11 +189,22 @@ class FoldedZMotorPlate extends MachineComponent {
   public final motor:NemaStepper;
   public final x:Float;
   public final y:Float;
-  public function new(motor:NemaStepper, x:Float, y:Float) {
+  public function new(drawing:String, motor:NemaStepper, x:Float, y:Float) {
     super("FOLDED-Z-MOTOR-PLATE", "Folded Z motor plate", "aluminium 6061", true);
+    declareDrawingNumber(drawing);
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.motor = motor;
     this.x = x;
     this.y = y;
+  }
+  override public function revisionFingerprint():Null<String> {
+    var inputs = [drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(x), machinekit.component.ComponentNumberKey.encode(y)];
+    var motorRevision = motor.bom.fingerprint;
+    if (motorRevision == null) return null;
+    inputs.push(motorRevision);
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -183,7 +237,7 @@ class FoldedZMotorPlate extends MachineComponent {
 class YNutBracket extends MachineComponent {
   public final side:Int;
 
-  public function new(side:Int) {
+  public function new(drawing:String, side:Int) {
     if (side != 1 && side != -1) throw "Nut bracket side must be 1 or -1";
     super(
       'YNUT-BRACKET-${side > 0 ? "R" : "L"}',
@@ -194,9 +248,12 @@ class YNutBracket extends MachineComponent {
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    declareDrawingNumber(drawing);
     this.side = side;
   }
 
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    [drawingNumber, materialSpec(), Std.string(side)].join("|"), 1);
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -210,13 +267,16 @@ class YNutBracket extends MachineComponent {
 
 /** Block on the back of the X carriage plate that carries the X lead nut between the gantry beams. */
 class XNutBracket extends MachineComponent {
-  public function new() {
+  public function new(drawing:String) {
     super("XNUT-BRACKET", "X lead-nut bracket", "aluminium 6061", true);
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
   }
 
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    [drawingNumber, materialSpec()].join("|"), 1);
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -239,17 +299,23 @@ class XBeltBracket extends MachineComponent {
   public final far:Float;
   public final strandZ:Float;
 
-  public function new(far:Float, strandZ:Float) {
+  public function new(drawing:String, far:Float, strandZ:Float) {
     super(
       'XBELT-BRACKET-F${Dimension.format(far)}-Z${Dimension.format(strandZ)}',
       "X belt clamp bracket",
       "aluminium 6061",
       true
     );
+    declareDrawingNumber(drawing);
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.far = far;
     this.strandZ = strandZ;
   }
 
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    [drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(far), machinekit.component.ComponentNumberKey.encode(strandZ)].join("|"), 1);
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part
@@ -266,7 +332,7 @@ class YBeltBracket extends MachineComponent {
   public final side:Int;
   public final upperZ:Float;
 
-  public function new(side:Int, upperZ:Float) {
+  public function new(drawing:String, side:Int, upperZ:Float) {
     if (side != 1 && side != -1) throw "Belt bracket side must be 1 or -1";
     super(
       'YBELT-BRACKET-${side > 0 ? "R" : "L"}-Z${Dimension.format(upperZ)}',
@@ -274,10 +340,16 @@ class YBeltBracket extends MachineComponent {
       "aluminium 6061",
       true
     );
+    declareDrawingNumber(drawing);
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.side = side;
     this.upperZ = upperZ;
   }
 
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    [drawingNumber, materialSpec(), Std.string(side), machinekit.component.ComponentNumberKey.encode(upperZ)].join("|"), 1);
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -294,7 +366,7 @@ class BeltAxle extends MachineComponent {
   public final diameter:Float;
   public final length:Float;
 
-  public function new(diameter:Float, length:Float) {
+  public function new(drawing:String, diameter:Float, length:Float) {
     if (!(diameter > 0) || !(length > 0)) throw "Belt axle needs a positive diameter and length";
     super(
       'AXLE-D${Dimension.format(diameter)}-L${Dimension.format(length)}',
@@ -302,10 +374,18 @@ class BeltAxle extends MachineComponent {
       "steel",
       true
     );
+    declareDrawingNumber(drawing);
+    addFacet(new machinekit.component.ProcurementIntent(Make("turning")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.diameter = diameter;
     this.length = length;
   }
 
+  override public function revisionFingerprint():Null<String> {
+    var inputs = [drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(diameter), machinekit.component.ComponentNumberKey.encode(length)];
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.cylinderSpan(
@@ -321,13 +401,14 @@ class SpindleClamp extends MachineComponent {
   /** Distance from the spindle axis back to the Z plate's front face. */
   public final reach:Float;
 
-  public function new(spindleDiameter:Float, reach:Float) {
+  public function new(drawing:String, spindleDiameter:Float, reach:Float) {
     super(
       'SPINDLE-CLAMP-D${Dimension.format(spindleDiameter)}',
       'Spindle clamp for a ${Dimension.format(spindleDiameter)} mm spindle',
       "aluminium 6061",
       true
     );
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
@@ -335,6 +416,8 @@ class SpindleClamp extends MachineComponent {
     this.reach = reach;
   }
 
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    [drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(spindleDiameter), machinekit.component.ComponentNumberKey.encode(reach)].join("|"), 1);
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -369,6 +452,10 @@ class RouterSpindle extends MachineComponent {
     addConnector("nose", Mount, Solids.axial(0, 0, 0));
   }
 
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    ["RouterSpindle", materialSpec(), machinekit.component.ComponentNumberKey.encode(DIAMETER),
+      machinekit.component.ComponentNumberKey.encode(NUT_LENGTH), machinekit.component.ComponentNumberKey.encode(BODY_LENGTH),
+      "ER11"].join("|"), 1);
   override public function hasGeometry():Bool return true;
 
   /** `cutter` in this spindle: the collet nut above the nose rides with the tool, in metres. */
@@ -420,6 +507,10 @@ class EndMill extends MachineComponent {
     (stickout - fluteLength) / 1000
   );
 
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    return machinekit.component.BomRevision.fingerprint(["EndMill", materialSpec(), number(diameter), number(fluteLength), number(stickout)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -484,7 +575,7 @@ class Standoff extends MachineComponent {
   public final length:Float;
   public final bore:Float;
 
-  public function new(diameter:Float, length:Float, bore:Float) {
+  public function new(drawing:String, diameter:Float, length:Float, bore:Float) {
     if (!(bore > 0)
       || !(diameter > bore) || !(length > 0)) throw "Standoff needs a bore inside a positive diameter and length";
     super(
@@ -493,6 +584,7 @@ class Standoff extends MachineComponent {
       "aluminium 6061",
       true
     );
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("turning")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
@@ -501,6 +593,8 @@ class Standoff extends MachineComponent {
     this.bore = bore;
   }
 
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    [drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(diameter), machinekit.component.ComponentNumberKey.encode(length), machinekit.component.ComponentNumberKey.encode(bore)].join("|"), 1);
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -525,6 +619,10 @@ class ToeClamp extends MachineComponent {
     this.stockHeight = stockHeight;
   }
 
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    return machinekit.component.BomRevision.fingerprint(["ToeClamp", materialSpec(), number(stockHeight)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -667,6 +765,7 @@ class CncRouter extends AxisBuilder {
       place(
         'motorPlateY$name',
         new RouterPlate(
+          "CNC-MOTOR-PLATE-Y-" + name.toUpperCase(),
           66,
           8,
           62,
@@ -691,12 +790,12 @@ class CncRouter extends AxisBuilder {
     );
     place(
       "spoilboard",
-      new RouterPlate(inner - 10, FRAME_LENGTH - 40, SPOILBOARD_TOP - 40, "birch plywood", "Spoilboard"),
+      new RouterPlate("CNC-SPOILBOARD", inner - 10, FRAME_LENGTH - 40, SPOILBOARD_TOP - 40, "birch plywood", "Spoilboard"),
       AssemblyFrames.translation(0, 0, 40)
     );
     place(
       "stock",
-      new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Stock", null, null, true),
+      new RouterPlate(null, STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Stock", null, null, true),
       AssemblyFrames.translation(0, 0, SPOILBOARD_TOP)
     );
     var clamp = new ToeClamp(STOCK_HEIGHT);
@@ -727,7 +826,7 @@ class CncRouter extends AxisBuilder {
       );
     }
     var uprightTop = railTop + railSpec.blockHeight - railSpec.railHeight;
-    var upright = new RouterPlate(12, 100, 200, "aluminium 6061", "Gantry upright");
+    var upright = new RouterPlate("CNC-UPRIGHT-LEFT", 12, 100, 200, "aluminium 6061", "Gantry upright");
     attach("uprightLeft", upright, AssemblyFrames.translation(-SIDE_X, yb, uprightTop), "blockYLeft");
     var beamLength = 2 * (SIDE_X - 6);
     var beamZ = [233.0, 163];
@@ -749,7 +848,8 @@ class CncRouter extends AxisBuilder {
     var motorXPose = AxisBuilder.orient(outside, yb, X_SCREW_Z, up, [-1, 0, 0]);
     attach(
       "uprightRight",
-      belts ? new RouterPlate(12, 100, 200, "aluminium 6061", "Gantry upright") : new RouterPlate(
+      belts ? new RouterPlate("CNC-UPRIGHT-RIGHT", 12, 100, 200, "aluminium 6061", "Gantry upright") : new RouterPlate(
+        "CNC-UPRIGHT-RIGHT",
         12,
         100,
         200,
@@ -770,13 +870,13 @@ class CncRouter extends AxisBuilder {
     if (belts) {
       for (side in [-1, 1]) attach(
         'beltBracketY${side < 0 ? "Left" : "Right"}',
-        new YBeltBracket(side, Y_SCREW_Z + beltRadius()),
+        new YBeltBracket((side < 0 ? "CNC-Y-BELT-BRACKET-LEFT" : "CNC-Y-BELT-BRACKET-RIGHT"), side, Y_SCREW_Z + beltRadius()),
         AssemblyFrames.translation(side * SIDE_X, yb, 0),
         side < 0 ? "uprightLeft" : "uprightRight"
       );
     } else {
-      attach("nutBracketYLeft", new YNutBracket(-1), AssemblyFrames.translation(-SIDE_X, yb, 0), "uprightLeft");
-      attach("nutBracketYRight", new YNutBracket(1), AssemblyFrames.translation(SIDE_X, yb, 0), "uprightRight");
+      attach("nutBracketYLeft", new YNutBracket("CNC-Y-NUT-BRACKET-LEFT", -1), AssemblyFrames.translation(-SIDE_X, yb, 0), "uprightLeft");
+      attach("nutBracketYRight", new YNutBracket("CNC-Y-NUT-BRACKET-RIGHT", 1), AssemblyFrames.translation(SIDE_X, yb, 0), "uprightRight");
     }
     var front = [0.0, -1, 0];
     var railX = 2 * (SIDE_X - 20);
@@ -821,7 +921,7 @@ class CncRouter extends AxisBuilder {
     var xPlateBottom = 128.0, xPlateHeight = 140.0;
     attach(
       "xPlate",
-      new RouterPlate(120, plateThickness, xPlateHeight, "aluminium 6061", "X carriage plate"),
+      new RouterPlate("CNC-X-CARRIAGE", 120, plateThickness, xPlateHeight, "aluminium 6061", "X carriage plate"),
       AssemblyFrames.translation(xc, blockFace - plateThickness / 2, xPlateBottom),
       "blockXUpper"
     );
@@ -833,11 +933,11 @@ class CncRouter extends AxisBuilder {
     );
     if (belts) attach(
       "beltBracketX",
-      new XBeltBracket(BELT_FAR_X(shaft), X_SCREW_Z - beltRadius()),
+      new XBeltBracket("CNC-X-BELT-BRACKET", BELT_FAR_X(shaft), X_SCREW_Z - beltRadius()),
       AssemblyFrames.translation(xc, yb, 0),
       "xPlate"
     );
-    else attach("nutBracketX", new XNutBracket(), AssemblyFrames.translation(xc, yb, 0), "xPlate");
+    else attach("nutBracketX", new XNutBracket("CNC-X-NUT-BRACKET"), AssemblyFrames.translation(xc, yb, 0), "xPlate");
     var xPlateFront = blockFace - plateThickness;
     var railZFace = xPlateFront - railSpec.railHeight;
     var railZ = xPlateHeight;
@@ -864,6 +964,7 @@ class CncRouter extends AxisBuilder {
       attach(
         "motorBracketZ",
         new RouterPlate(
+          "CNC-Z-MOTOR-BRACKET",
           70,
           49,
           8,
@@ -875,7 +976,7 @@ class CncRouter extends AxisBuilder {
         bracketPose,
         "xPlate"
       );
-      var standoff = new Standoff(8, zFace - bracketTop, motorY.mountScrew(10).clearanceDiameter(ClearanceFit.Medium));
+      var standoff = new Standoff("CNC-Z-MOTOR-STANDOFF", 8, zFace - bracketTop, motorY.mountScrew(10).clearanceDiameter(ClearanceFit.Medium));
       var corner = 1;
       for (bolt in motorY.boltPattern()) {
         var at = AssemblyFrames.transformPoint(motorZPose, bolt.x, bolt.y, 0);
@@ -906,7 +1007,7 @@ class CncRouter extends AxisBuilder {
     var zPlateBottom = zBlock - 50;
     attach(
       "zPlate",
-      new RouterPlate(120, plateThickness, 75, "aluminium 6061", "Z plate"),
+      new RouterPlate("CNC-Z-PLATE", 120, plateThickness, 75, "aluminium 6061", "Z plate"),
       AssemblyFrames.translation(xc, zBlockFace - plateThickness / 2, zPlateBottom),
       "blockZLeft"
     );
@@ -920,7 +1021,7 @@ class CncRouter extends AxisBuilder {
     var reach = (zBlockFace - plateThickness) - toolY;
     attach(
       "spindleClamp",
-      new SpindleClamp(RouterSpindle.DIAMETER, reach),
+      new SpindleClamp("CNC-SPINDLE-CLAMP", RouterSpindle.DIAMETER, reach),
       AssemblyFrames.translation(xc, toolY, zPlateBottom + 5),
       "zPlate"
     );
@@ -943,6 +1044,7 @@ class CncRouter extends AxisBuilder {
     }
     // Independent Y contacts support squaring; Z homes upward before lateral travel.
     addHomeSwitch(
+      "CNC",
       specs[1],
       "YLeft",
       "sideLeft",
@@ -956,6 +1058,7 @@ class CncRouter extends AxisBuilder {
       (belts ? "pulley" : "screw") + "YLeft-turn"
     );
     addHomeSwitch(
+      "CNC",
       specs[1],
       "YRight",
       "sideRight",
@@ -972,6 +1075,7 @@ class CncRouter extends AxisBuilder {
     // Put the X contact in the gap behind its plate and ahead of the beam.
     // A contact in front of X lies inside the independent Z plate's sweep.
     addHomeSwitch(
+      "CNC",
       specs[0],
       "X",
       "beamUpper",
@@ -985,6 +1089,7 @@ class CncRouter extends AxisBuilder {
       (belts ? "pulleyX-turn" : "screwX-turn")
     );
     addHomeSwitch(
+      "CNC",
       specs[2],
       "Z",
       "xPlate",
@@ -1026,11 +1131,11 @@ class CncRouter extends AxisBuilder {
     var centre = (low + high) / 2, offsetX = 70.0, offsetY = -Math.sqrt(centre * centre - offsetX * offsetX);
     var loop = TimingBelt.twoPulley(GT2, driverTeeth, motorTeeth, centre, BELT_WIDTH);
     var bearing = DeepGrooveBearing.metric("6000");
-    attach("motorBracketZ", new FoldedZBearingPlate(screwY - bracketPose.y), bracketPose, "xPlate");
+    attach("motorBracketZ", new FoldedZBearingPlate("CNC-FOLDED-Z-BEARING", screwY - bracketPose.y), bracketPose, "xPlate");
     attach("bearingZ", bearing, AssemblyFrames.translation(xc, screwY, bracketPose.z), "motorBracketZ");
     attach(
       "foldedMotorPlateZ",
-      new FoldedZMotorPlate(motor, offsetX, offsetY),
+      new FoldedZMotorPlate("CNC-FOLDED-Z-MOTOR", motor, offsetX, offsetY),
       AssemblyFrames.translation(xc, screwY, bracketTop),
       "motorBracketZ"
     );
@@ -1224,6 +1329,7 @@ class CncRouter extends AxisBuilder {
     attach(
       "motorPlateX",
       new RouterPlate(
+        "CNC-MOTOR-PLATE-X",
         60,
         BELT_PLATE,
         64,
@@ -1256,10 +1362,10 @@ class CncRouter extends AxisBuilder {
         plateY,
         plateZ
       );
-    attach("idlerPlateX", new RouterPlate(60, BELT_PLATE, 64, "aluminium 6061", "Idler plate"), plate, "beamUpper");
+    attach("idlerPlateX", new RouterPlate("CNC-IDLER-PLATE-X", 60, BELT_PLATE, 64, "aluminium 6061", "Idler plate"), plate, "beamUpper");
     attach(
       "axleX",
-      new BeltAxle(motorY.variant.shaftDiameter, shaft - BELT_PLATE),
+      new BeltAxle("CNC-BELT-AXLE", motorY.variant.shaftDiameter, shaft - BELT_PLATE),
       AxisBuilder.orient(-xm, yb + 20, X_SCREW_Z, up, [0, -1, 0]),
       "idlerPlateX"
     );
@@ -1278,6 +1384,7 @@ class CncRouter extends AxisBuilder {
     place(
       'motorPlateY$name',
       new RouterPlate(
+        "CNC-BELT-MOTOR-PLATE-Y-" + name.toUpperCase(),
         BELT_PLATE,
         60,
         60,
@@ -1309,10 +1416,10 @@ class CncRouter extends AxisBuilder {
         -end,
         0
       );
-    place('idlerPlateY$name', new RouterPlate(BELT_PLATE, 60, 60, "aluminium 6061", "Idler plate"), plate);
+    place('idlerPlateY$name', new RouterPlate("CNC-IDLER-PLATE-Y", BELT_PLATE, 60, 60, "aluminium 6061", "Idler plate"), plate);
     attach(
       'axleY$name',
-      new BeltAxle(motorY.variant.shaftDiameter, shaft - BELT_PLATE),
+      new BeltAxle("CNC-BELT-AXLE", motorY.variant.shaftDiameter, shaft - BELT_PLATE),
       AxisBuilder.orient(sign * (inner + shaft - BELT_PLATE), -end, Y_SCREW_Z, up, [-sign, 0, 0]),
       'idlerPlateY$name'
     );

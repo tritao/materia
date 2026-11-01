@@ -148,6 +148,17 @@ class FrameAssembly {
   }
 
   /** Stock length between the mitre long points; square and coped ends remain node-to-node. */
+  /** Exact end-cut inputs for a member's manufacturing revision. */
+  public function cutRevisionKey(name:String):String {
+    var member = find(name);
+    function key(cut:FrameEndCut):String return switch cut {
+      case Square: "square";
+      case Mitre(setback): "mitre:" + machinekit.component.ComponentNumberKey.encode(setback);
+      case Cope(setback): "cope:" + machinekit.component.ComponentNumberKey.encode(setback);
+    };
+    return key(member.startCut) + "|" + key(member.endCut);
+  }
+
   public function cutLength(name:String):Float {
     var m = find(name);
     return length(name) + mitreLongPoint(m.profile, m.startCut) + mitreLongPoint(m.profile, m.endCut);

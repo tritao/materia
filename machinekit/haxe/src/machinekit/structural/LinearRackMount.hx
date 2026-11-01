@@ -110,6 +110,7 @@ class LinearRackMount {
       var depth = 5 * Math.ceil(Math.max(pad.depth, 2 * (Math.max(Math.abs(p0.y), Math.abs(p1.y)) + 2)) / 5);
       if (depth > pad.depth) {
         var widened = new machinekit.gantry.GantryParts.GantryPlate(
+          pad.drawingNumber,
           "extended rail/rack datum pad",
           pad.width,
           depth,

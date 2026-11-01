@@ -43,6 +43,7 @@ class Gantry extends AxisBuilder {
   static inline var MOTOR_PLATE_THICKNESS:Float = 6;
   static inline var DRIVE_CLEARANCE:Float = 3;
   public final spec:GantrySpec;
+  public final drawingNamespace:String;
   public final axes:Array<AxisSpec>;
   public final flangeZero:AssemblyFrame;
   public final railMargin:Float;
@@ -51,9 +52,10 @@ class Gantry extends AxisBuilder {
   var driverIndex:Int = 0;
 
   public final rackMounts:Map<String, machinekit.assembly.RackMount> = [];
-  public function new(spec:GantrySpec) {
+  public function new(spec:GantrySpec, drawingNamespace:String = "GANTRY") {
     super();
     this.spec = spec;
+    this.drawingNamespace = drawingNamespace;
     head = switch spec.head {
       case None:
         null;
@@ -153,7 +155,7 @@ class Gantry extends AxisBuilder {
     for (side in [-1, 1]) {
       var name = side < 0 ? "Left" : "Right", x = side < 0 ? left : right;
       if (spec.railPadHeight > 0) {
-        var pad = new GantryPlate("rail pad", frame.size, spec.travelY + 2 * railMargin, spec.railPadHeight);
+        var pad = new GantryPlate(drawing("railPadY" + name), "rail pad", frame.size, spec.travelY + 2 * railMargin, spec.railPadHeight);
         pad.setMaterial("steel");
         attach(
           'railPadY$name',
@@ -184,7 +186,7 @@ class Gantry extends AxisBuilder {
       spec.driveFootprint("y", 60),
       spec.yBlockSpacing + guideY.blockLength
     );
-    var footPlate = new GantryPlate("beam foot", spec.driveFootprint("y", 60), footDepth, spec.beamFootThickness);
+    var footPlate = new GantryPlate(drawing("beamFoot"), "beam foot", spec.driveFootprint("y", 60), footDepth, spec.beamFootThickness);
     if (spec.beamFootMaterial != null) footPlate.setMaterial(spec.beamFootMaterial);
     attach("beamFootLeft", footPlate, AssemblyFrames.translation(left, 0, feetZ), "blockYLeft");
     var beamZ = feetZ + spec.beamFootThickness + beam.height / 2;
@@ -194,7 +196,7 @@ class Gantry extends AxisBuilder {
       AxisBuilder.orient(left - endAllowance, 0, beamZ, up, alongX),
       "beamFootLeft"
     );
-    var rightFootPlate = new GantryPlate("beam foot", spec.driveFootprint("y", 60), footDepth, spec.beamFootThickness);
+    var rightFootPlate = new GantryPlate(drawing("beamFoot"), "beam foot", spec.driveFootprint("y", 60), footDepth, spec.beamFootThickness);
     if (spec.beamFootMaterial != null) rightFootPlate.setMaterial(spec.beamFootMaterial);
     attach("beamFootRight", rightFootPlate, AssemblyFrames.translation(right, 0, feetZ), "beam");
     attach(
@@ -254,7 +256,7 @@ class Gantry extends AxisBuilder {
       );
       attach(
         "xCarriage",
-        new GantryPlate("X carriage", plateWidth, top - bottom, layout.carriageThickness),
+        new GantryPlate(drawing("xCarriage"), "X carriage", plateWidth, top - bottom, layout.carriageThickness),
         orient(0, plateY, (bottom + top) / 2, [0.0, 0, 1], [0.0, -1, 0]),
         "blockX"
       );
@@ -302,11 +304,13 @@ class Gantry extends AxisBuilder {
       );
       var zWidth = layout.zRailSpacing + guide.railWidth + 40;
       var zPlate:GantryPlate = layout.zRibDepth == null ? new GantryPlate(
+        drawing("zCarriage"),
         "Z carriage",
         zWidth,
         columnLength,
         layout.movingThickness
       ) : new GantryStiffenedPlate(
+        drawing("zCarriage"),
         zWidth,
         columnLength,
         layout.movingThickness,
@@ -348,7 +352,7 @@ class Gantry extends AxisBuilder {
       // The Z column is in front of the beam, joined by the carriage's top plate.
       attach(
         "xCarriage",
-        new GantryPlate("X carriage", spec.driveFootprint("x", 80), -columnY + 80, 12),
+        new GantryPlate(drawing("xCarriage"), "X carriage", spec.driveFootprint("x", 80), -columnY + 80, 12),
         AssemblyFrames.translation(0, columnY / 2, xPlateZ),
         "blockX"
       );
@@ -380,7 +384,7 @@ class Gantry extends AxisBuilder {
       var carriageDrop = carriageHeight - guide.blockHoleSpacingAlong / 2 - 3;
       attach(
         "zCarriage",
-        new GantryPlate("Z carriage", spec.driveFootprint("z", 80), 8 + toolReach, carriageHeight),
+        new GantryPlate(drawing("zCarriage"), "Z carriage", spec.driveFootprint("z", 80), 8 + toolReach, carriageHeight),
         AssemblyFrames.translation(0, zPlateY - toolReach / 2, xPlateZ - railMargin - carriageDrop),
         "blockZ"
       );
@@ -493,6 +497,8 @@ class Gantry extends AxisBuilder {
     homeAfter("y", ["z"]);
     if (spec.cableChain != null) buildCableChains();
   }
+
+  function drawing(role:String):String return drawingNamespace + "-" + role.toUpperCase();
 
   public final cableChainBindings:Array<{
     axis:String,
@@ -618,7 +624,7 @@ class Gantry extends AxisBuilder {
         // Rack supports stay outboard; the sensor and offset flag use
         // the opposite face, with a short integral attachment tab.
         point[outboardAxis] = (sign < 0 ? bounds.max[outboardAxis] : bounds.min[outboardAxis]) - sign * 27;
-        customTrigger = new GantrySwitchTrigger(dimensions[0], dimensions[1], dimensions[2], 20, 6, sign * 17, 0);
+        customTrigger = new GantrySwitchTrigger(drawing("switchTrigger" + suffix), dimensions[0], dimensions[1], dimensions[2], 20, 6, sign * 17, 0);
       }
     }
     // Z workpieces rise in front of the column. Keep the fixed switches
@@ -645,6 +651,7 @@ class Gantry extends AxisBuilder {
         var bridgeWidth = bounds.min[0] + 3 - (point[0] - dimensions[0] / 2);
         var bridgeDepth = column.min[1] - bounds.max[1];
         customTrigger = new GantrySwitchTrigger(
+          drawing("switchTrigger" + suffix),
           dimensions[0],
           dimensions[1],
           dimensions[2],
@@ -657,6 +664,7 @@ class Gantry extends AxisBuilder {
     }
 
     var target:MachineComponent = customTrigger == null ? new GantryPlate(
+      drawing("switchTrigger" + suffix),
       "switch trigger",
       dimensions[0],
       dimensions[1],
@@ -811,6 +819,7 @@ class Gantry extends AxisBuilder {
     attach(
       id,
       new GantryBoredBracket(
+        drawing(id),
         id,
         hi[0] - lo[0],
         hi[1] - lo[1],
@@ -924,6 +933,7 @@ class Gantry extends AxisBuilder {
       "Z") ? "z" : StringTools.startsWith(id, "motorY") ? "y" : "x"), mount = AxisMotor.of(motor);
     var plateSize = Math.max(mount.face + 12, clearanceDiameter == null ? 0 : clearanceDiameter + 10);
     var plate = new GantryPlate(
+      drawing(id + "Plate"),
       "motor mount",
       plateSize,
       plateSize,
@@ -997,6 +1007,7 @@ class Gantry extends AxisBuilder {
       attach(
         id,
         new GantryMotorSupport(
+          drawing(id),
           id,
           width,
           depth,
@@ -1035,6 +1046,7 @@ class Gantry extends AxisBuilder {
     attach(
       id,
       new GantryMotorSupport(
+        drawing(id),
         id,
         max[0] - min[0],
         max[1] - min[1],
@@ -1098,6 +1110,7 @@ class Gantry extends AxisBuilder {
     attach(
       id,
       new GantryMotorSupport(
+        drawing(id),
         id,
         max[0] - min[0],
         max[1] - min[1],
@@ -1158,7 +1171,7 @@ class Gantry extends AxisBuilder {
     }
     attach(
       id,
-      new GantryPlate("drive support bracket", width, depth, height),
+      new GantryPlate(drawing(id), "drive support bracket", width, depth, height),
       AssemblyFrames.translation(x, y, z),
       parent
     );
@@ -1297,7 +1310,7 @@ class Gantry extends AxisBuilder {
           var bracketId = screwId + "FixedBracket";
           attach(
             bracketId,
-            new GantryPlate("fixed bearing bracket", unit.width, thickness, bracketLength),
+            new GantryPlate(drawing(bracketId), "fixed bearing bracket", unit.width, thickness, bracketLength),
             bracketPose,
             motorId + "Plate"
           );
@@ -1311,7 +1324,7 @@ class Gantry extends AxisBuilder {
             );
             attach(
               bracketId + "Riser",
-              new GantryPlate("fixed bearing riser", unit.width, drop, unit.length),
+              new GantryPlate(drawing(bracketId + "Riser"), "fixed bearing riser", unit.width, drop, unit.length),
               riser,
               bracketId
             );
@@ -1321,7 +1334,7 @@ class Gantry extends AxisBuilder {
         var nut:LeadScrewNut = cast component(screwId + "Nut");
         var faceDistance = nut.bodyLength + nut.flangeThickness;
         var nutFace = point(faceDistance);
-        var mount = new GantryNutMount(nut);
+        var mount = new GantryNutMount(drawing(screwId + "NutMount"), nut);
         var size = mount.size;
         var localX = [
           transverse[1] * direction[2] - transverse[2] * direction[1],
@@ -1389,12 +1402,12 @@ class Gantry extends AxisBuilder {
             transverse,
             normal
           );
-        var plate = new GantryPlate("idler mount", 60, 60, 6);
+        var plate = new GantryPlate(drawing(idlerId + "Plate"), "idler mount", 60, 60, 6);
         var support = supportMotor(idlerId + "Support", fixed, plate, mount, motor);
         attach(idlerId + "Plate", plate, mount, support);
         attach(
           idlerId + "Pin",
-          new GantryIdlerPin(AxisMotor.of(motor).shaftDiameter, width),
+          new GantryIdlerPin(drawing(idlerId + "Pin"), AxisMotor.of(motor).shaftDiameter, width),
           AxisBuilder.orient(end[0], end[1], end[2], transverse, normal),
           idlerId + "Plate"
         );
@@ -1414,7 +1427,7 @@ class Gantry extends AxisBuilder {
         );
         attach(
           clampId,
-          new GantryBeltClamp(width, belt.thickness),
+          new GantryBeltClamp(drawing(clampId), width, belt.thickness),
           {x: clampPoint.x, y: clampPoint.y, z: clampPoint.z, qx: plane.qx, qy: plane.qy, qz: plane.qz, qw: plane.qw},
           clampParent
         );
@@ -1485,6 +1498,8 @@ class Gantry extends AxisBuilder {
           ) : hostPose;
           machinekit.transmission.RadialPinionAssembly.build(
             this,
+            drawingNamespace,
+            drawingNamespace + "-PINION-" + axis.id.toUpperCase() + "-CARRIER",
             "pinion" + suffix,
             motorId,
             moving,

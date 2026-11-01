@@ -38,5 +38,7 @@ class ScrewdriverCarrier extends MachineComponent {
     ));
   }
   override public function hasGeometry():Bool return true;
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    ["screwdriver-carrier", materialSpec(), "radius=8", "length=15"].join("|"), 1);
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.cylinderSpan(8, 0, 15);
 }

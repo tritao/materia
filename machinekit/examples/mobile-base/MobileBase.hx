@@ -38,6 +38,7 @@ class MotorBracket extends MachineComponent {
   public final holeDiameter:Float = 5.5;
 
   public function new(
+    drawing:String,
     motor:NemaStepper,
     width:Float,
     below:Float,
@@ -55,6 +56,7 @@ class MotorBracket extends MachineComponent {
       "aluminium 6061",
       true
     );
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
@@ -72,6 +74,13 @@ class MotorBracket extends MachineComponent {
   /** Centre of the flange's bolt line, along the motor axis from the bracket's inner face. */
   public function flangeHoleZ():Float return (thickness - flangeDepth) / 2;
 
+  override public function revisionFingerprint():Null<String> {
+    var motorRevision = motor.bom.fingerprint;
+    if (motorRevision == null) return null;
+    var number = machinekit.component.ComponentNumberKey.encode;
+    return machinekit.component.BomRevision.fingerprint([drawingNumber, materialSpec(), motorRevision, number(width),
+      number(below), number(above), number(thickness), number(flangeDepth), number(flangeThickness)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -128,6 +137,11 @@ class TubePost extends MachineComponent {
     addConnector("top", Mount, Solids.axial(0, 0, length));
   }
 
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    return machinekit.component.BomRevision.fingerprint(["TubePost", materialSpec(), number(profile.width),
+      number(profile.height), number(profile.wall), number(length)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -165,6 +179,12 @@ class LidarPuck extends MachineComponent {
     addFacet(new machinekit.sensing.PlanarScannerFacet("scan", RAYS, RANGE, RATE));
   }
 
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    var inputs = ["LidarPuck", materialSpec(), number(DIAMETER), number(HEIGHT), number(SCAN_HEIGHT),
+      Std.string(RAYS), number(RANGE), number(RATE)];
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -305,14 +325,14 @@ class MobileBase extends MachineAssembly {
     wheel = new DriveWheel(WHEEL_DIAMETER, WHEEL_WIDTH, motor.variant.shaftDiameter, 40, WHEEL_HUB_LENGTH);
     caster = new CasterWheel(75, 25, BASE_Z, 30, 60);
     var axleZ = wheel.radius;
-    bracket = new MotorBracket(motor, 80, axleZ - 40, BASE_Z - axleZ, BRACKET_THICKNESS, 40, 5);
+    bracket = new MotorBracket("MOBILE-MOTOR-BRACKET", motor, 80, axleZ - 40, BASE_Z - axleZ, BRACKET_THICKNESS, 40, 5);
     post = new TubePost(new RectTube(40, 40, 3), DECK_Z - BASE_Z - BASE_THICKNESS);
 
     for (slot in wheelSlots()) if (width / 2 - Math.abs(slot.y) - slot.width / 2
       < MINIMUM_WEB) throw "Base plate needs its minimum wheel-slot web";
     addComponent(
       "basePlate",
-      new SeatedPlate(length, width, BASE_THICKNESS, "Base plate", baseSeats(), wheelSlots()),
+      new SeatedPlate("MOBILE-BASE-PLATE", length, width, BASE_THICKNESS, "Base plate", baseSeats(), wheelSlots()),
       AssemblyFrames.translation(0, 0, BASE_Z)
     );
 
@@ -379,7 +399,7 @@ class MobileBase extends MachineAssembly {
       addMate('post${corner.name}-mount', "fixed", "basePlate", 'post${corner.name}', 'post${corner.name}', "base");
     }
     // The deck rests on all four posts; one carries it in the mate tree.
-    addComponent("deck", new SeatedPlate(length, width, DECK_THICKNESS, "Deck", deckSeats()));
+    addComponent("deck", new SeatedPlate("MOBILE-DECK", length, width, DECK_THICKNESS, "Deck", deckSeats()));
     addMate("deck-mount", "fixed", "postFrontLeft", "top", "deck", "postFrontLeft");
     addComponent("lidar", lidar);
     addMate("lidar-mount", "fixed", "deck", "lidar", "lidar", "base");

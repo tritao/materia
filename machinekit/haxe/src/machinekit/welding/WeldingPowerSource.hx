@@ -82,6 +82,11 @@ class WeldingPowerSource extends MachineComponent {
     declareMass(55, new Vector(0, 0, 0.4 * height));
   }
 
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    var inputs = ["WeldingPowerSource", materialSpec(), number(width), number(depth), number(height), number(maxCurrentA), number(efficiency)];
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(width, depth, height);

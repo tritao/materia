@@ -131,6 +131,20 @@ private class ScrewdrivingDatumStop extends ArmBlock {
       .DATUM_BEVEL_DROP) throw "Screwdriver datum stop is too small for its chamfered reference face";
     this.innerX = innerX;
   }
+  override function get_bom():machinekit.component.BomItem {
+    var item = super.get_bom();
+    item.partNumber = "WORK-FIXTURE-" + machinekit.component.Dimension.format(width) + "x"
+      + machinekit.component.Dimension.format(depth) + "x" + machinekit.component.Dimension.format(height)
+      + (innerX ? "-X" : "-Y");
+    return item;
+  }
+  override public function revisionFingerprint():Null<String> {
+    var parent = super.revisionFingerprint();
+    if (parent == null) return null;
+    return machinekit.component.BomRevision.fingerprint([parent, Std.string(innerX),
+      machinekit.component.ComponentNumberKey.encode(ScrewdrivingCell.DATUM_BEVEL_RUN),
+      machinekit.component.ComponentNumberKey.encode(ScrewdrivingCell.DATUM_BEVEL_DROP)].join("|"), 1);
+  }
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var block = Part.box(width, depth, height);
     var plane = innerX ? new Plane(new Vector(0, depth / 2, 0), Vector.X(), new Vector(0, -1, 0)) : new Plane(

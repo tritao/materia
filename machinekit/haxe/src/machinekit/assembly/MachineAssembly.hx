@@ -1065,7 +1065,12 @@ typedef MachineAssemblyMassProperties = {
       var member = mechanical.member(id);
       if (member != null) {
         var included = machinekit.component.IncludedInPurchase.of(member.component);
-        node.lines.push(BomDocument.occurrence(member.component.bom, Member, path, 1,
+        var item = member.component.bom;
+        if (item.typeId == null && member.component.drawingNumber == null) switch item.procurement {
+          case Make(_): throw 'Made component at "$path" requires a drawing number';
+          default:
+        }
+        node.lines.push(BomDocument.occurrence(item, Member, path, 1,
           included == null ? null : included.ownerPartNumber));
       } else {
         var child = mechanical.requireSubassembly(id);

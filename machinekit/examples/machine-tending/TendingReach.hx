@@ -687,7 +687,7 @@ class TendingReach {
     // Select the real width-compatible pinch from the stock's planar faces and collision hull.
     // Approach from above so the fingers pass through the blank while the jaws close on X,
     // clear of the vise's Y-axis clamping faces. The target TCP is the underside fingertip plane.
-    var stock = new RouterPlate(
+    var stock = new RouterPlate(null,
       BenchMill.STOCK_WIDTH,
       BenchMill.STOCK_DEPTH,
       BenchMill.STOCK_HEIGHT,

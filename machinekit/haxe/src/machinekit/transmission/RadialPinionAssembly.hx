@@ -22,6 +22,8 @@ class RadialPinionAssembly {
   public static function upperAngle():Float return Math.asin(0.5 / ARM);
   public static function build(
     builder:AxisBuilder,
+    drawingNamespace:String,
+    carrierPurchaseNumber:String,
     id:String,
     motorId:String,
     hostId:String,
@@ -47,7 +49,7 @@ class RadialPinionAssembly {
       || Math.abs(centre.y) > 1e-6) throw "Pivot carrier does not meet the pinion shaft";
     var contact = F.transformPoint(inverse, hostFace.x, hostFace.y, hostFace.z);
     if (topMount && Math.abs(contact.y - 24) > 1e-6) throw "Y anchor requires the declared foot top 24 mm above shaft";
-    var carrier = new RadialPinionCarrier(motor, spec, centre.z), anchor = new PinionPivotAnchor(contact.z, topMount);
+    var carrier = new RadialPinionCarrier(carrierPurchaseNumber, motor, spec, centre.z), anchor = new PinionPivotAnchor(drawingNamespace + "-" + id.toUpperCase() + "-ANCHOR", contact.z, topMount);
     var anchorId = id + "Anchor", carrierId = id + "Preload";
     builder.attach(anchorId, anchor, frame, hostId);
     builder.hang(carrierId, carrier, frame, anchorId);
@@ -86,7 +88,7 @@ class RadialPinionAssembly {
     put("PivotThrustFront", new Bushing(10.1, 22, 0.99), F.translation(0, 0, -1), anchorId);
     put("PivotThrustRear", new Bushing(10.1, 22, 0.99), F.translation(0, 0, 15.01), anchorId);
     var springAxis = AxisBuilder.orient(-56, -29, 7.5, [1.0, 0, 0], [0.0, 1, 0]);
-    put("SpringAdjuster", new PinionPreloadAdjuster(), springAxis, anchorId);
+    put("SpringAdjuster", new PinionPreloadAdjuster("PINION-SPRING-ADJUSTER"), springAxis, anchorId);
     put(
       "SpringAdjusterWasher",
       FlatWasher.metric("M10"),
@@ -101,7 +103,7 @@ class RadialPinionAssembly {
     );
     put("SpringPack",
       new PinionDiscSpringPack(), AxisBuilder.orient(-56, -25, 7.5, [1.0, 0, 0], [0.0, 1, 0]), anchorId);
-    put("SpringCup", new PinionSpringCup(), AxisBuilder.orient(-56, -13, 7.5, [1.0, 0, 0], [0.0, 1, 0]), carrierId);
+    put("SpringCup", new PinionSpringCup("PINION-SPRING-CUP"), AxisBuilder.orient(-56, -13, 7.5, [1.0, 0, 0], [0.0, 1, 0]), carrierId);
     var upperTip = (10 - 56 * Math.sin(lowerAngle())) / Math.cos(lowerAngle()) + 3 * Math.abs(Math.tan(lowerAngle()));
     var lowerTip = (-10 - 56 * Math.sin(upperAngle())) / Math.cos(upperAngle()) - 3 * Math.abs(Math.tan(upperAngle()));
     put(

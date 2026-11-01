@@ -21,6 +21,10 @@ class PrintedPart extends MachineComponent {
     addConnector("origin", Face, Solids.axial(0, 0, 0));
   }
 
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    return machinekit.component.BomRevision.fingerprint(["PrintedPart", materialSpec(), number(MARKER)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.named(

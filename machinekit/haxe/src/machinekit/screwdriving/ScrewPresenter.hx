@@ -15,8 +15,8 @@ class ScrewPresenter extends MachineAssembly {
   public function new(screw:SocketHeadCapScrew, fieldHead:Bool = false) {
     super();
     this.screw = screw;
-    addComponent("nest", new PresenterNest(screw));
-    addComponent("escapement", new PresenterGate());
+    addComponent("nest", new PresenterNest(screw, "SCREW-PRESENTER-NEST"));
+    addComponent("escapement", new PresenterGate("SCREW-PRESENTER-GATE"));
     addMateOnAxis(
       "escapement-slide",
       "prismatic",
@@ -49,13 +49,14 @@ private class PresenterNest extends MachineComponent {
   static inline var BORE_FLOOR:Float = 14;
   final height:Float;
 
-  public function new(screw:SocketHeadCapScrew) {
+  public function new(screw:SocketHeadCapScrew, drawing:String) {
     super(
       "CUSTOM-SCREW-PRESENTER-NEST-" + screw.designation,
       "Hand-loaded screw presenter nest",
       "aluminium 6061",
       true
     );
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
@@ -76,6 +77,9 @@ private class PresenterNest extends MachineComponent {
       [-radius, radius, BORE_FLOOR, radius, 25.0, height]
     ]));
   }
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    [drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(screw.diameter),
+      machinekit.component.ComponentNumberKey.encode(screw.length)].join("|"), 1);
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
     Part.box(50, 50, height),
@@ -84,14 +88,17 @@ private class PresenterNest extends MachineComponent {
   function boreRadius():Float return screw.diameter / 2 + 0.3;
 }
 private class PresenterGate extends MachineComponent {
-  public function new() {
+  public function new(drawing:String) {
     super("CUSTOM-SCREW-PRESENTER-GATE", "Presenter escapement", "steel", true);
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("mount", Mount, AssemblyFrames.translation(0, 0, 0));
     addPort({name: "control", kind: Signal, role: Consumer, iface: ScrewdrivingInterfaces.control(), required: true});
   }
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    ["screw-presenter-gate", materialSpec(), "10x20x5"].join("|"), 1);
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(10, 20, 5);
 }

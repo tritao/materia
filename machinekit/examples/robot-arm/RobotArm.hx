@@ -56,6 +56,11 @@ class ArmTable extends MachineComponent {
     addConnector("base", Mount, Solids.axial(0, 0, 0));
   }
 
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    var inputs = ["ArmTable", materialSpec(), number(width), number(depth), number(height), number(thickness)];
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -94,6 +99,17 @@ class ArmBlock extends MachineComponent {
     addConnector("top", Mount, Solids.axial(0, 0, height));
   }
 
+  override function get_bom():machinekit.component.BomItem {
+    var item = super.get_bom();
+    item.partNumber = "WORK-" + StringTools.replace(description.toUpperCase(), " ", "-") + "-"
+      + Dimension.format(width) + "x" + Dimension.format(depth) + "x" + Dimension.format(height);
+    return item;
+  }
+  override public function revisionFingerprint():Null<String> {
+    return machinekit.component.BomRevision.fingerprint([materialSpec(),
+      machinekit.component.ComponentNumberKey.encode(width), machinekit.component.ComponentNumberKey.encode(depth),
+      machinekit.component.ComponentNumberKey.encode(height)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(width, depth, height);

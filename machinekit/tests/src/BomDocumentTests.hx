@@ -5,6 +5,16 @@ import machinekit.component.IncludedInPurchase;
 private class BomTestPart extends MachineComponent {
   public function new() {
     super("TEST-PART", "Test part", "steel");
+    declareDrawingNumber("TEST-PART");
+    addFacet(new machinekit.component.ProcurementIntent(Make("machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
+  }
+}
+
+private class BomUndrawnPart extends MachineComponent {
+  public function new() {
+    super("UNDRAWN", "Undrawn part", "steel", true);
     addFacet(new machinekit.component.ProcurementIntent(Make("machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
@@ -24,6 +34,12 @@ private class BomIncludedPart extends MachineComponent {
 class BomDocumentTests {
   public static function main():Void run();
   public static function run():Void {
+    var undrawn = new MachineAssembly(), nestedUndrawn = new MachineAssembly();
+    nestedUndrawn.addComponent("bracket", new BomUndrawnPart());
+    undrawn.include("axis", nestedUndrawn);
+    var drawingError = "";
+    try undrawn.bomDocument("test", "abc", "2026-01-01T00:00:00Z") catch (error:Dynamic) drawingError = Std.string(error);
+    if (drawingError.indexOf("axis/bracket") < 0) throw "Missing drawing must identify its assembly path";
     var child = new MachineAssembly();
     var source = new machinekit.standard.Bushing(8, 12, 10);
     var fingerprint = source.bom.fingerprint;

@@ -80,6 +80,21 @@ class FlangeTappedPlate extends MachineComponent {
     addFacet(new machinekit.component.CollisionHullFacet(pieces));
   }
 
+  override function get_bom():machinekit.component.BomItem {
+    var item = super.get_bom();
+    item.partNumber = "FIX-TAP-" + thread.designation.toUpperCase() + "-W" + Dimension.format(width)
+      + "-T" + Dimension.format(thickness) + "-D" + Dimension.format(tapDepth) + "-X" + Dimension.format(holeShift);
+    return item;
+  }
+  override public function revisionFingerprint():Null<String> {
+    var housingRevision = housing.bom.fingerprint, screwRevision = screw.bom.fingerprint;
+    if (housingRevision == null || screwRevision == null) return null;
+    var number = machinekit.component.ComponentNumberKey.encode;
+    return machinekit.component.BomRevision.fingerprint(["FlangeTappedPlate", materialSpec(), housingRevision,
+      screwRevision, number(width), number(thickness), number(tapDepth), number(holeShift), thread.designation,
+      number(thread.majorDiameter), number(thread.pitch), Std.string(thread.starts), Std.string(thread.hand),
+      Std.string(thread.profile), thread.toleranceClass, number(screw.spec.tapDrill)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var body = Part.box(width, width, thickness);

@@ -100,7 +100,7 @@ class FixtureExport {
       toolA: toolState.worldConnector("tool/gripperA/body", "tcp"),
       toolB: toolState.worldConnector("tool/gripperB/body", "tcp")
     };
-    var stock = new RouterPlate(
+    var stock = new RouterPlate(null,
       BenchMill.STOCK_WIDTH,
       BenchMill.STOCK_DEPTH,
       BenchMill.STOCK_HEIGHT,

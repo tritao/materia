@@ -38,7 +38,7 @@ class CobotArmLink extends MachineComponent {
   final end:Vector;
   final span:Float;
 
-  public function new(a:Float, d:Float, previous:CobotJoint, next:CobotJoint) {
+  public function new(drawing:String, a:Float, d:Float, previous:CobotJoint, next:CobotJoint) {
     var nextRadius = next.diameter / 2;
     if (!Math.isFinite(a) || !Math.isFinite(d) || a >= 0
       || nextRadius <= 0) throw "Arm bridge needs finite parallel-axis dimensions and a positive next housing radius";
@@ -48,6 +48,7 @@ class CobotArmLink extends MachineComponent {
       "aluminium 6061",
       true
     );
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining"), [
       machinekit.component.Procurement.ProcurementCodec.requirement("axisOffsetA", "mm", null, null, a),
       machinekit.component.Procurement.ProcurementCodec.requirement("axisOffsetD", "mm", null, null, d),
@@ -319,6 +320,12 @@ class CobotArmLink extends MachineComponent {
     return hulls;
   }
 
+  override public function revisionFingerprint():Null<String> {
+    var inputRevision = input.bom.fingerprint, outputRevision = output.bom.fingerprint;
+    if (inputRevision == null || outputRevision == null) return null;
+    return machinekit.component.BomRevision.fingerprint([drawingNumber, materialSpec(), inputRevision, outputRevision,
+      machinekit.gantry.GantryParts.GantryPlate.frameKey(seat)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var pieces = outerPieces();

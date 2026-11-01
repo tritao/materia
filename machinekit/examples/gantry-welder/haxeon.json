@@ -5,6 +5,7 @@
 	},
 	"entry": "GantryWelderPreview",
 	"sources": [
+    "../../haxe/src/machinekit/welding/WeldingServiceStock.hx",
 		"GantryWelder.hx",
 		"GantryWelderPreview.hx",
 		"../robot-welder/ArmWeldingTool.hx",

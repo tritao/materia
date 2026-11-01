@@ -28,7 +28,7 @@ class CobotWristLink extends MachineComponent {
   final axis:Vector;
   final route:Array<Vector>;
 
-  public function new(d:Float, alpha:Float, input:CobotJoint, output:CobotJoint) {
+  public function new(drawing:String, d:Float, alpha:Float, input:CobotJoint, output:CobotJoint) {
     if (!Math.isFinite(d) || !Math.isFinite(alpha) || Math.abs(Math.abs(alpha) - Math.PI / 2)
       > 1e-9) throw "Wrist elbow needs a finite offset and perpendicular module axes";
     var length = d - input.length;
@@ -41,6 +41,7 @@ class CobotWristLink extends MachineComponent {
       "aluminium 6061",
       true
     );
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining"), [
       machinekit.component.Procurement.ProcurementCodec.requirement("offset", "mm", null, null, d),
       machinekit.component.Procurement.ProcurementCodec.requirement("angle", "rad", null, null, alpha),
@@ -78,6 +79,12 @@ class CobotWristLink extends MachineComponent {
     ];
   }
 
+  override public function revisionFingerprint():Null<String> {
+    var inputRevision = input.bom.fingerprint, outputRevision = output.bom.fingerprint;
+    if (inputRevision == null || outputRevision == null) return null;
+    return machinekit.component.BomRevision.fingerprint([drawingNumber, materialSpec(), inputRevision, outputRevision,
+      machinekit.gantry.GantryParts.GantryPlate.frameKey(seat)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   /** Broad elbow before the saddle is relieved. The end caps remain solid. */

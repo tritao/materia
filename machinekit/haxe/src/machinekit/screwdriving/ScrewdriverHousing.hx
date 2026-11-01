@@ -9,9 +9,11 @@ import machinekit.component.Solids;
 class ScrewdriverHousing extends MachineComponent {
   public final length:Float;
   public final radius:Float;
+  final purchaseNumber:Null<String>;
+  final powered:Bool;
 
   public function new(name:String, length:Float, radius:Float, powered:Bool = false, ?maxTorque:Float, ?maxSpeed:Float,
-    ?strokeMm:Float, ?springRate:Float) {
+    ?strokeMm:Float, ?springRate:Float, ?purchaseNumber:String) {
     if (!Math.isFinite(length) || length <= 0
       || !Math.isFinite(radius) || radius <= 0) throw "Screwdriver body needs finite positive dimensions";
     super("CUSTOM-" + StringTools.replace(name.toUpperCase(), " ", "-"), name, "aluminium 6061", true);
@@ -27,6 +29,8 @@ class ScrewdriverHousing extends MachineComponent {
       .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.length = length;
     this.radius = radius;
+    this.powered = powered;
+    this.purchaseNumber = purchaseNumber;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("end", Mount, Solids.axial(0, 0, length));
     if (powered) addPort({
@@ -43,6 +47,14 @@ class ScrewdriverHousing extends MachineComponent {
     addBridge("control", "bitControl");
     addBridge("vacuum", "bitVacuum");
   }
+  override function get_bom():machinekit.component.BomItem {
+    var item = super.get_bom();
+    if (purchaseNumber != null) item.partNumber = purchaseNumber;
+    return item;
+  }
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    ["screwdriver-housing", materialSpec(), machinekit.component.ComponentNumberKey.encode(length),
+      machinekit.component.ComponentNumberKey.encode(radius), powered ? "powered" : "slide"].join("|"), 1);
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.cylinderSpan(radius, 0, length);
 }

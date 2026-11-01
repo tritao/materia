@@ -6,6 +6,7 @@ import machinekit.assembly.MachineAssembly;
 import machinekit.gantry.GantryParts.GantryExtrusion;
 import machinekit.gantry.GantryParts.GantryPlate;
 import machinekit.gantry.GantryParts.GantryBoredBracket;
+import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.motion.LinearRail;
 import machinekit.motion.LinearRailBlock;
@@ -45,6 +46,8 @@ class LinearTrack extends AxisBuilder {
     "microsteps"
   ];
 
+  function drawing(role:String):String return "TRK" + "-" + role.toUpperCase();
+
   public function new(travel:Float = 3000, initial:Float = 0) {
     super();
     if (!Math.isFinite(travel) || travel <= 0 || !Math.isFinite(initial) || initial < 0
@@ -63,7 +66,7 @@ class LinearTrack extends AxisBuilder {
       new GantryExtrusion(frame, length), AxisBuilder.orient(start, 170, 40, up, along), "frameLeft");
     for (end in [0, 1]) attach(
       'frameEnd$end',
-      new GantryPlate("track end", 80, 420, 40),
+      new GantryPlate(drawing("frameEnd"), "track end", 80, 420, 40),
       AssemblyFrames.translation(end == 0 ? start - 40 : start + length + 40, 0, 0),
       "frameLeft"
     );
@@ -85,7 +88,7 @@ class LinearTrack extends AxisBuilder {
     var carriageBottom = railTop + guide.blockHeight - guide.railHeight;
     attach(
       "carriage",
-      new GantryPlate("track carriage", 520, 560, 25),
+      new GantryPlate(drawing("carriage"), "track carriage", 520, 560, 25),
       AssemblyFrames.translation(0, 0, carriageBottom),
       "blockLeftRear"
     );
@@ -105,6 +108,7 @@ class LinearTrack extends AxisBuilder {
     attach(
       "armAdapter",
       new GantryBoredBracket(
+        drawing("armAdapter"),
         "track arm adapter",
         280,
         280,
@@ -127,13 +131,14 @@ class LinearTrack extends AxisBuilder {
     // Two side struts leave the pinion's complete swept disc clear.
     for (side in [-1, 1]) attach(
       side < 0 ? "motorSupportLeft" : "motorSupportRight",
-      new GantryPlate("track motor strut", 20, 36, 12),
+      new GantryPlate(drawing("motorSupport"), "track motor strut", 20, 36, 12),
       AssemblyFrames.translation(side * 38, -292, carriageBottom - 12),
       "carriage"
     );
     attach(
       "motorPlate",
       new GantryPlate(
+        drawing("motorPlate"),
         "track motor mount",
         motor.spec.face + 12,
         motor.spec.face + 12,

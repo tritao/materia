@@ -281,6 +281,7 @@ class EnclosedBenchMill extends MachineAssembly {
     );
     var hose:BomItem = {
       partNumber: "REF-PNEU-HOSE-6MM",
+      fingerprint: machinekit.component.BomRevision.fingerprint("pneumatic-hose|6mm|polyurethane-PU", 1),
       description: "Assumed 6 mm polyurethane air hose",
       quantity: 1,
       material: "polyurethane PU",

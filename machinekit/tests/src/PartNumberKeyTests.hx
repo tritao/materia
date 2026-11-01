@@ -27,6 +27,20 @@ private class NumberedTestPart extends MachineComponent {
 class PartNumberKeyTests {
   public static function main():Void run();
   public static function run():Void {
+    var plate = new machinekit.gantry.GantryParts.GantryPlate("TEST-MOTORXPLATE", "test motor mount", 80, 80, 6);
+    var changedPlate = new machinekit.gantry.GantryParts.GantryPlate("TEST-MOTORXPLATE", "test motor mount", 81, 80, 6);
+    var otherDesign = new machinekit.gantry.GantryParts.GantryPlate("OTHER-MOTORXPLATE", "test motor mount", 80, 80, 6);
+    if (plate.bom.partNumber != changedPlate.bom.partNumber || plate.bom.fingerprint == null
+      || plate.bom.fingerprint == changedPlate.bom.fingerprint || plate.bom.partNumber == otherDesign.bom.partNumber)
+      throw "A gantry drawing must be stable across dimensions and scoped to its design";
+    var cover = new machinekit.robotics.CobotLinkCover("CB850-LINKCOVER2", 100, 40), changedCover = new machinekit.robotics.CobotLinkCover("CB850-LINKCOVER2", 101, 40);
+    if (cover.bom.partNumber != changedCover.bom.partNumber || cover.bom.fingerprint == null
+      || cover.bom.fingerprint == changedCover.bom.fingerprint)
+      throw "A cobot cover drawing must retain its number when its geometry changes";
+    var nozzle = new machinekit.welding.WeldingTorchNozzle(45);
+    var changedNozzle = new machinekit.welding.WeldingTorchNozzle(46);
+    if (nozzle.bom.fingerprint == null || nozzle.bom.fingerprint == changedNozzle.bom.fingerprint)
+      throw "Included torch pieces must fingerprint their selection inputs";
     var a = new NumberedTestPart(10), b = new NumberedTestPart(10.0001);
     if (a.bom.partNumber != "PART-10" || b.bom.partNumber != "PART-10")
       throw "Part numbers must be derived from resolved recipe values";

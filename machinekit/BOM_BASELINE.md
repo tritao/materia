@@ -94,7 +94,7 @@ workpiece/tooling requires a manual survey and is not inferred from these counts
 
 The bench-mill export contains 28 shaft-brake component lines: 26 sectors,
 one hub and one disc. These are one assumed purchase. The B0 description's
-26 lines counts the sectors only. Final counts are pending. The lathe directory contains a plan but no machine
+26 lines counts the sectors only. B5 records the resulting single purchase line. The lathe directory contains a plan but no machine
 implementation. The machine-tending export could not be measured: constructing
 `TendingControllers` rejects its stale reach certificate (certified input
 `a0ea47c5…`, current input `4b793a01…`). The certificate is owned by a separate
@@ -319,3 +319,43 @@ The 22 exportable machines contain 1,022 procurement lines; 362 are Assumed and 
 | sheet-router | 141 | 41 | 45 |
 | track-arm | 47 | 19 | 16 |
 | xyz-stage | 41 | 7 | 27 |
+
+## B7 rollout measurement
+
+The 22 exportable machines contain 1,058 procurement lines, including 380
+Assumed lines. None of the procurement lines or 3,798 engineering
+occurrences lacks a fingerprint. Part-number lint found no invalid engineering
+occurrences or procurement lines; 212
+constructible default recipes passed lint and three recipes have no valid
+default construction. The reference bench mill has 55 procurement lines.
+The machine-tending export still stops at its stale reach certificate.
+The full B7 gate passed 11/24 shards and matched all B6 failure messages.
+Compared with the untouched baseline, only the accepted tending input
+fingerprints in shards 16 and 23 differ.
+Assumed selection terms describe known inputs; unrated hoses, terminations,
+and other unmodeled details still require engineering selection.
+
+| Machine | Procurement lines | Assumed | Fingerprint unavailable |
+| --- | ---: | ---: | ---: |
+| bench-mill | 55 | 18 | 0 |
+| cnc-router | 38 | 8 | 0 |
+| cobot-arm | 25 | 18 | 0 |
+| corexy-plotter | 16 | 3 | 0 |
+| corexy-printer | 53 | 17 | 0 |
+| enclosed-bench-mill | 92 | 29 | 0 |
+| flexspline-hobber | 70 | 38 | 0 |
+| gantry-picker | 74 | 10 | 0 |
+| gantry-welder | 84 | 20 | 0 |
+| linear-stage | 11 | 2 | 0 |
+| mobile-base | 11 | 6 | 0 |
+| mobile-base-cell | 42 | 19 | 0 |
+| mobile-welder | 43 | 22 | 0 |
+| overhead-arm | 76 | 20 | 0 |
+| picking-station | 7 | 3 | 0 |
+| press-brake | 31 | 25 | 0 |
+| robot-arm | 30 | 13 | 0 |
+| robot-screwdriver | 33 | 16 | 0 |
+| robot-welder | 33 | 21 | 0 |
+| sheet-router | 142 | 41 | 0 |
+| track-arm | 47 | 24 | 0 |
+| xyz-stage | 45 | 7 | 0 |

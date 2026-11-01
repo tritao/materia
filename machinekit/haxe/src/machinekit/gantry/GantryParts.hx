@@ -39,6 +39,20 @@ class GantryExtrusion extends MachineComponent {
     this.profile = profile;
     this.length = length;
   }
+  override public function revisionFingerprint():Null<String> {
+    if (profile.sectionVariantId != null) return null;
+    var number = machinekit.component.ComponentNumberKey.encode;
+    var inputs = [profile.designation, materialSpec(), number(length), number(profile.size), number(profile.height),
+      number(profile.slotWidth), number(profile.slotDepth), number(profile.throatDepth), number(profile.tWidth),
+      number(profile.headDepth), number(profile.boreDiameter)];
+    for (face in 0...4) {
+      inputs.push("face" + face);
+      for (slot in profile.slotPositions(face)) inputs.push(number(slot));
+    }
+    inputs.push("bores");
+    for (bore in profile.boreCentres()) { inputs.push(number(bore.x)); inputs.push(number(bore.y)); }
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     if (detail == Envelope) return Part.box(profile.size, profile.height, length);
@@ -54,6 +68,7 @@ class GantryPlate extends MachineComponent {
   public final motor:Null<MachineComponent>;
   public final motorFace:Null<AssemblyFrame>;
   public function new(
+    drawing:Null<String>,
     name:String,
     width:Float,
     depth:Float,
@@ -80,6 +95,7 @@ class GantryPlate extends MachineComponent {
       "aluminium 6061",
       true
     );
+    if (drawing != null) declareDrawingNumber(drawing);
     if (Std.isExactType(this, GantryPlate)) {
       addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
       addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
@@ -90,6 +106,20 @@ class GantryPlate extends MachineComponent {
     this.height = height;
     this.motor = motor;
     this.motorFace = motorFace;
+  }
+  public static function number(value:Float):String return machinekit.component.ComponentNumberKey.encode(value);
+  public static function frameKey(frame:AssemblyFrame):String return [number(frame.x), number(frame.y), number(frame.z),
+    number(frame.qx), number(frame.qy), number(frame.qz), number(frame.qw)].join(",");
+  override public function revisionFingerprint():Null<String> {
+    if (drawingNumber == null) return null;
+    var values = [drawingNumber, materialSpec(), number(width), number(depth), number(height)];
+    if (motor != null && motorFace != null) {
+      var motorRevision = motor.bom.fingerprint;
+      if (motorRevision == null) return null;
+      values.push(motorRevision);
+      values.push(frameKey(motorFace));
+    }
+    return machinekit.component.BomRevision.fingerprint(values.join("|"), 1);
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -118,8 +148,9 @@ class GantryStiffenedPlate extends GantryPlate {
   public final ribDepth:Float;
   public final ribWidth:Float;
   public final ribWall:Float;
-  public function new(width:Float, depth:Float, height:Float, ribDepth:Float, ribWidth:Float, ribWall:Float) {
+  public function new(drawing:String, width:Float, depth:Float, height:Float, ribDepth:Float, ribWidth:Float, ribWall:Float) {
     super(
+      drawing,
       "Z carriage side boxes "
       + Dimension.format(ribWidth) + "x" + Dimension.format(ribDepth) + "x" + Dimension.format(ribWall),
       width,
@@ -134,6 +165,11 @@ class GantryStiffenedPlate extends GantryPlate {
     this.ribDepth = ribDepth;
     this.ribWidth = ribWidth;
     this.ribWall = ribWall;
+  }
+  override public function revisionFingerprint():Null<String> {
+    var parent = super.revisionFingerprint();
+    if (parent == null) return null;
+    return machinekit.component.BomRevision.fingerprint([parent, number(ribDepth), number(ribWidth), number(ribWall)].join("|"), 1);
   }
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.building([],
     parts -> {parts.push(Part.box(
@@ -162,7 +198,7 @@ class GantryStiffenedPlate extends GantryPlate {
 class GantryIdlerPin extends MachineComponent {
   public final diameter:Float;
   public final length:Float;
-  public function new(diameter:Float, length:Float) {
+  public function new(drawing:String, diameter:Float, length:Float) {
     if (!Math.isFinite(diameter)
       || !Math.isFinite(length) || diameter <= 0 || length <= 0) throw "Idler pin dimensions must be positive";
     super(
@@ -171,11 +207,16 @@ class GantryIdlerPin extends MachineComponent {
       "steel",
       true
     );
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("turning")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.diameter = diameter;
     this.length = length;
+  }
+  override public function revisionFingerprint():Null<String> {
+    if (drawingNumber == null) return null;
+    return machinekit.component.BomRevision.fingerprint([drawingNumber, materialSpec(), GantryPlate.number(diameter), GantryPlate.number(length)].join("|"), 1);
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.cylinderSpan(
@@ -189,7 +230,7 @@ class GantryIdlerPin extends MachineComponent {
 class GantryBeltClamp extends MachineComponent {
   public final beltWidth:Float;
   public final bandThickness:Float;
-  public function new(beltWidth:Float, bandThickness:Float) {
+  public function new(drawing:String, beltWidth:Float, bandThickness:Float) {
     for (value in [beltWidth,
       bandThickness]) if (!Math.isFinite(value) || value <= 0) throw "Belt clamp dimensions must be positive";
     super(
@@ -198,6 +239,7 @@ class GantryBeltClamp extends MachineComponent {
       "aluminium 6061",
       true
     );
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
@@ -205,6 +247,10 @@ class GantryBeltClamp extends MachineComponent {
     this.bandThickness = bandThickness;
     // The path is defined on the belt's lower face; the jaw is centred on its width.
     addConnector("belt", machinekit.component.ConnectorRole.Mount, AssemblyFrames.translation(0, 0, -beltWidth / 2));
+  }
+  override public function revisionFingerprint():Null<String> {
+    if (drawingNumber == null) return null;
+    return machinekit.component.BomRevision.fingerprint([drawingNumber, materialSpec(), GantryPlate.number(beltWidth), GantryPlate.number(bandThickness)].join("|"), 1);
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -228,13 +274,19 @@ class GantryNutMount extends MachineComponent {
   public final nut:LeadScrewNut;
   public final size:Float;
   public static inline var THICKNESS:Float = 6;
-  public function new(nut:LeadScrewNut) {
+  public function new(drawing:String, nut:LeadScrewNut) {
     super("GANTRY-NUT-MOUNT-" + nut.designation, "Gantry screw nut mounting plate", "aluminium 6061", true);
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.nut = nut;
     size = nut.flangeDiameter + 8;
+  }
+  override public function revisionFingerprint():Null<String> {
+    if (drawingNumber == null || nut.bom.fingerprint == null) return null;
+    return machinekit.component.BomRevision.fingerprint([drawingNumber, materialSpec(), nut.bom.fingerprint,
+      GantryPlate.number(size), GantryPlate.number(THICKNESS)].join("|"), 1);
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -259,6 +311,7 @@ class GantryBoredBracket extends GantryPlate {
   public final clearanceDiameter:Float;
   public final sections:Array<Array<Float>>;
   public function new(
+    drawing:Null<String>,
     name:String,
     width:Float,
     depth:Float,
@@ -268,7 +321,7 @@ class GantryBoredBracket extends GantryPlate {
     ?sections:Array<Array<Float>>
   ) {
     if (!Math.isFinite(clearanceDiameter) || clearanceDiameter <= 0) throw "Bracket needs a positive bore diameter";
-    super(name + "-BORE" + Dimension.format(clearanceDiameter), width, depth, height);
+    super(drawing, name + "-BORE" + Dimension.format(clearanceDiameter), width, depth, height);
     if (Std.isExactType(this, GantryBoredBracket)) {
       addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
       addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
@@ -285,6 +338,13 @@ class GantryBoredBracket extends GantryPlate {
       for (value in section) if (!Math.isFinite(value)) throw "Bracket bounds must be finite";
       for (axis in 0...3) if (section[axis + 3] <= section[axis]) throw "Bracket section must have positive volume";
     }
+  }
+  override public function revisionFingerprint():Null<String> {
+    var parent = super.revisionFingerprint();
+    if (parent == null) return null;
+    var inputs = [parent, frameKey(boreFace), number(clearanceDiameter)];
+    for (section in sections) for (value in section) inputs.push(number(value));
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
   }
   override public function geometry(detail:ComponentDetail = Preview):Part {
     return Solids.building([], owned -> {var parts: Array<Part> = [];
@@ -320,6 +380,7 @@ class GantryMotorSupport extends GantryBoredBracket {
   public final mountedMotor:MachineComponent;
   public final shaftFace:AssemblyFrame;
   public function new(
+    drawing:Null<String>,
     name:String,
     width:Float,
     depth:Float,
@@ -333,7 +394,7 @@ class GantryMotorSupport extends GantryBoredBracket {
       == null ? machinekit.motion.AxisMotor.of(motor).shaftDiameter + 0.5 : clearanceDiameter;
     if (!Math.isFinite(bore) || bore
       < machinekit.motion.AxisMotor.of(motor).shaftDiameter + 0.5) throw "Motor support clearance must cover its shaft";
-    super(name, width, depth, height, shaftFace, bore, sections);
+    super(drawing, name, width, depth, height, shaftFace, bore, sections);
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
@@ -352,6 +413,7 @@ class GantrySwitchTrigger extends MachineComponent {
   final bridgeX:Float;
   final bridgeY:Float;
   public function new(
+    drawing:String,
     width:Float,
     depth:Float,
     height:Float,
@@ -366,6 +428,7 @@ class GantrySwitchTrigger extends MachineComponent {
       "steel",
       true
     );
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
@@ -378,6 +441,12 @@ class GantrySwitchTrigger extends MachineComponent {
     this.bridgeY = bridgeY;
     for (value in [width, depth, height,
       bridgeWidth, bridgeDepth]) if (value <= 0 || !Math.isFinite(value)) throw "Invalid stepped switch trigger";
+  }
+  override public function revisionFingerprint():Null<String> {
+    if (drawingNumber == null) return null;
+    var inputs = [drawingNumber, materialSpec()];
+    for (value in [width, depth, height, bridgeWidth, bridgeDepth, bridgeX, bridgeY]) inputs.push(GantryPlate.number(value));
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {

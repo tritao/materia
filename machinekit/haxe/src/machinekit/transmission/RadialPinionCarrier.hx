@@ -10,10 +10,11 @@ import materia.assembly.AssemblyFrames as F;
  * Z along the shaft. The motor's own flange supplies every pilot/bolt cutout.
  * Spring/reducer ratings remain assumptions inherited from the design spec. */
 class RadialPinionCarrier extends PreloadedPinionMount {
+  public final purchaseNumber:String;
   public final motor:MachineComponent;
   public final axialCentre:Float;
   public static inline final THICKNESS = 15.0;
-  public function new(motor:MachineComponent, spec:PreloadedPinionMount, axialCentre:Float) {
+  public function new(purchaseNumber:String, motor:MachineComponent, spec:PreloadedPinionMount, axialCentre:Float) {
     super(spec.values().setToken("layout",
       "radial-fork").setNumber("leverArm", 80).setNumber("springArm", 56).setNumber(
         "thickness",
@@ -24,6 +25,7 @@ class RadialPinionCarrier extends PreloadedPinionMount {
       ));
     if (axialCentre <= THICKNESS) throw "Pinion must lie beyond the motor carrier";
     addFacet(new ProcurementIntent(Buy(null, null, null), PreloadedPinionMount.recipeType().requirements(values())));
+    this.purchaseNumber = purchaseNumber;
     this.motor = motor;
     this.axialCentre = axialCentre;
     setMaterial("steel C45");
@@ -32,6 +34,17 @@ class RadialPinionCarrier extends PreloadedPinionMount {
     addConnector("springCup", Mount, F.translation(-56, -10, 7.5));
   }
   override public function componentType():Null<ComponentType> return null;
+  override function get_bom():BomItem {
+    var item = super.get_bom();
+    item.partNumber = purchaseNumber;
+    return item;
+  }
+  override public function revisionFingerprint():Null<String> {
+    var motorRevision = motor.bom.fingerprint;
+    if (motorRevision == null) return null;
+    return BomRevision.fingerprint([PreloadedPinionMount.recipeType().bomKey(values()), motorRevision,
+      ComponentNumberKey.encode(axialCentre)].join("|"), 1);
+  }
   /** Canonical boxes; the concentric r14 boss and r7 through bore are separate. */
   public function stockRegions():Array<Array<Float>> {
     var size = AxisMotor.of(motor).face + 12;

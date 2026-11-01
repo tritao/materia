@@ -198,7 +198,7 @@ class ProcurementTests {
       || cobotJoint.maturity != "Assumed" || cobotJoint.requirements == null
       || [for (term in cobotJoint.requirements) if (term.name == "ratedOutputTorque" && term.min == "56") term].length != 1)
       throw "A cobot joint must carry its assumed output rating";
-    var wristRotor = new machinekit.robotics.CobotWristRotor(new machinekit.robotics.CobotJoint(2)).bom;
+    var wristRotor = new machinekit.robotics.CobotWristRotor("TEST-WRIST-ROTOR", new machinekit.robotics.CobotJoint(2)).bom;
     if (wristRotor.procurement == null || ProcurementCodec.document(wristRotor.procurement).kind != "Make"
       || wristRotor.maturity != "Assumed" || wristRotor.requirements == null || wristRotor.requirements.length != 2)
       throw "An assumed wrist rotor must declare its manufacturing requirements";

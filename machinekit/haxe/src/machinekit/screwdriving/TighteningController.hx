@@ -41,6 +41,12 @@ class TighteningController extends MachineComponent {
     });
     addFacet(new TighteningSupplyFacet(programs == null ? [1, 2, 3, 4] : programs, controlInterface));
   }
+  override public function revisionFingerprint():Null<String> {
+    var supply = TighteningSupplyFacet.of(this);
+    if (supply == null) return null;
+    return machinekit.component.BomRevision.fingerprint(["TighteningController", materialSpec(),
+      Std.string(supply.controlInterface), supply.programs.join(",")].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(250, 200, 400);
 }

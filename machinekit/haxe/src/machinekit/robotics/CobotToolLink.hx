@@ -24,8 +24,13 @@ class CobotToolLink extends MachineComponent {
   public final flange:RobotFlange;
   public final inputRadius:Float;
   public final outputRadius:Float;
+  override public function revisionFingerprint():Null<String> {
+    if (drawingNumber == null || module.bom.fingerprint == null || flange.bom.fingerprint == null) return null;
+    return machinekit.component.BomRevision.fingerprint([drawingNumber, materialSpec(), module.bom.fingerprint,
+      flange.bom.fingerprint, machinekit.component.ComponentNumberKey.encode(length)].join("|"), 1);
+  }
 
-  public function new(d:Float, module:CobotJoint, flange:RobotFlange) {
+  public function new(drawing:String, d:Float, module:CobotJoint, flange:RobotFlange) {
     var length = d - module.length - flange.thickness;
     if (!Math.isFinite(length) || length <= CobotWristLink.HUB_DEPTH
       + END_DEPTH + 2 * WALL) throw "Tool housing needs room for its mounting faces and hollow shell";
@@ -35,6 +40,7 @@ class CobotToolLink extends MachineComponent {
       "aluminium 6061",
       true
     );
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining"), [
       machinekit.component.Procurement.ProcurementCodec.requirement("offset", "mm", null, null, d),
       machinekit.component.Procurement.ProcurementCodec.requirement("moduleSize", "1", null, null, module.size),

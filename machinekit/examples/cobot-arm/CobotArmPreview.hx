@@ -246,11 +246,12 @@ class CobotArmChecks {
     outside.close();
     if (escapedVolume > 1e-3) throw "Tool housing preview must fit inside its collision envelope";
     var toolRejected = false;
-    try new CobotToolLink(arm.modules[5].length + arm.toolFlange.thickness,
+    try new CobotToolLink("TEST-COBOT-TOOL", arm.modules[5].length + arm.toolFlange.thickness,
       arm.modules[5], arm.toolFlange) catch (_:Dynamic) toolRejected = true;
     if (!toolRejected) throw "An undersized tool housing must fail before constructing geometry";
     var rejected = false;
     try new CobotWristLink(
+      "TEST-COBOT-WRIST",
       arm.modules[4].length + arm.modules[5].diameter / 2,
       -Math.PI / 2,
       arm.modules[4],

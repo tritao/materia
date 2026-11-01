@@ -81,6 +81,12 @@ class BatteryCharger extends MachineComponent {
     declareMass(massKg, new Vector(0, 0, height / 2));
   }
 
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    var inputs = ["BatteryCharger", materialSpec(), number(nominalVolts), number(outputWatts), number(length), number(width), number(height), number(massKg), number(dockPositionToleranceMm), number(dockHeadingToleranceRad)];
+    inputs.push(machinekit.gantry.GantryParts.GantryPlate.frameKey(dockApproach));
+    return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(length, width, height);
 }

@@ -2,7 +2,7 @@
   "version": 1,
   "package": { "name": "machinekit-bom-lint" },
   "entry": "BomLintReport",
-  "sources": ["BomLintReport.hx"],
+  "sources": ["BomLintReport.hx", "../haxe/src/machinekit/component/PartNumberLint.hx"],
   "sourceRoots": ["."],
   "dependencies": { "machinekit": { "path": ".." } },
   "target": "host",

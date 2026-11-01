@@ -10,11 +10,14 @@ import machinekit.component.Procurement.ProcurementCodec;
 class PinionPreloadAdjuster extends MachineComponent {
   public static inline final WRENCH_AF = 20.0;
   public static inline final HEAD_HEIGHT = 4.0;
-  public function new() {
+  public function new(drawing:String) {
     super("PINION-SPRING-ADJUSTER-M10X1.5", "M10 pinion spring seat adjuster", "steel C45");
+    declareDrawingNumber(drawing);
     addFacet(new ProcurementIntent(Make("machining")));
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
   }
+  override public function revisionFingerprint():Null<String> return BomRevision.fingerprint(
+    [drawingNumber, materialSpec()].join("|"), 1);
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var stem = Solids.named(Part.cylinderSpan(5, -30, 0), "stem");
@@ -51,6 +54,13 @@ class PinionDiscSpringPack extends MachineComponent {
     ]));
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Assumed")));
   }
+  override function get_bom():BomItem {
+    var item = super.get_bom();
+    item.partNumber = "PINION-DISC-PACK-ASSUMED-" + Dimension.format(loadedHeight);
+    return item;
+  }
+  override public function revisionFingerprint():Null<String> return BomRevision.fingerprint(
+    ["PINION-DISC-PACK", materialSpec(), ComponentNumberKey.encode(loadedHeight)].join("|"), 1);
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
     Part.cylinder(11, loadedHeight),
@@ -61,11 +71,14 @@ class PinionDiscSpringPack extends MachineComponent {
 /** Upper spring cup fixed to the carrier's rear lug. The centre clears the
  * adjuster's guide pilot, so it does not bypass the spring's axial compliance. */
 class PinionSpringCup extends MachineComponent {
-  public function new() {
+  public function new(drawing:String) {
     super("PINION-SPRING-CUP-24X3", "Machined pinion spring cup", "steel C45");
+    declareDrawingNumber(drawing);
     addFacet(new ProcurementIntent(Make("machining")));
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
   }
+  override public function revisionFingerprint():Null<String> return BomRevision.fingerprint(
+    [drawingNumber, materialSpec()].join("|"), 1);
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
     Part.cylinder(12, 3),

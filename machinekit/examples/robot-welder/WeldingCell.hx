@@ -79,31 +79,23 @@ class WeldingCell extends MachineAssembly {
     addComponent("clamp", clamp);
     addMate("clamp-mate", "fixed", "work/basePlate", "clampSeat", "clamp", "contact");
 
-    function line(partNumber:String, description:String):BomItem return {
-      partNumber: partNumber,
-      description: description,
-      quantity: 1,
-      material: null,
-      procurement: Buy(null, null, null),
-      maturity: "Stated"
-    };
-    connectPorts("gas-hose", "cylinder", "gas", "source", "gas", line("HOSE-GAS-3M", "Shielding gas hose, 3 m"));
+    connectPorts("gas-hose", "cylinder", "gas", "source", "gas", machinekit.welding.WeldingServiceStock.gasHose(3));
     connectPorts(
       "weld-cable",
       "source",
       "weldPositive",
       "feeder",
       "power",
-      line("CABLE-WELD-35-3M", "Weld cable 35 mm², 3 m")
+      machinekit.welding.WeldingServiceStock.powerLead(false, 3, 35)
     );
-    connectPorts("feeder-gas", "source", "gasOut", "feeder", "gas", line("HOSE-GAS-3M", "Shielding gas hose, 3 m"));
+    connectPorts("feeder-gas", "source", "gasOut", "feeder", "gas", machinekit.welding.WeldingServiceStock.gasHose(3));
     connectPorts(
       "feeder-control",
       "source",
       "feederControl",
       "feeder",
       "control",
-      line("CABLE-CONTROL-12-3M", "Welder control cable, 12 core, 3 m")
+      machinekit.welding.WeldingServiceStock.controlLead(3, 12)
     );
     connectPorts(
       "work-lead",
@@ -111,13 +103,13 @@ class WeldingCell extends MachineAssembly {
       "weldNegative",
       "clamp",
       "lead",
-      line("CABLE-WORK-35-3M", "Work lead 35 mm², 3 m")
+      machinekit.welding.WeldingServiceStock.powerLead(true, 3, 35)
     );
     connectPorts("torch-power", "feeder", "torchPower", "arm/tool/torch", "power");
     connectPorts("torch-gas", "feeder", "torchGas", "arm/tool/torch", "gas");
     connectPorts("torch-wire", "feeder", "torchWire", "arm/tool/torch", "wire");
     connectPorts("torch-control", "feeder", "torchControl", "arm/tool/torch", "control");
-    addBomItem(line("HOSEPACK-ROBOT-1.5M", "Torch hose pack, 1.5 m: power, gas, wire liner and control"));
+    addBomItem(machinekit.welding.WeldingServiceStock.torchPack("ROBOT", 1.5));
     // The power source takes the wall and the robot's controller.
     exposePort("mains", "source", "mains");
     exposePort("control", "source", "control");

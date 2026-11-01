@@ -30,6 +30,10 @@ class RoomBlock extends MachineComponent {
     addConnector("base", Mount, Solids.axial(0, 0, 0));
   }
 
+  override public function revisionFingerprint():Null<String> {
+    var number = machinekit.component.ComponentNumberKey.encode;
+    return machinekit.component.BomRevision.fingerprint(["RoomBlock", materialSpec(), number(length), number(width), number(height)].join("|"), 1);
+  }
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(length, width, height);

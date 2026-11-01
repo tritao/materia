@@ -13,9 +13,10 @@ class PinionPivotAnchor extends MachineComponent {
   public final hostZ:Float;
   public final topMount:Bool;
   public final bores:Array<{id:String, frame:AssemblyFrame, diameter:Float, depth:Float}>;
-  public function new(hostZ:Float, topMount:Bool) {
+  public function new(drawing:String, hostZ:Float, topMount:Bool) {
     if (!Math.isFinite(hostZ) || hostZ < 55) throw "Pivot anchor needs a declared host beyond its clevis";
     super('PINION-PIVOT-ANCHOR-' + hostZ + '-' + topMount, "Machined pinion pivot anchor", "steel C45");
+    declareDrawingNumber(drawing);
     addFacet(new ProcurementIntent(Make("machining")));
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
     lockManufacturingMaterial("steel C45");
@@ -59,6 +60,10 @@ class PinionPivotAnchor extends MachineComponent {
       depth : 8.0
     });
     for (bore in bores) addConnector(bore.id, Mount, bore.frame);
+  }
+  override public function revisionFingerprint():Null<String> {
+    if (drawingNumber == null) return null;
+    return machinekit.component.BomRevision.fingerprint([drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(hostZ), Std.string(topMount)].join("|"), 1);
   }
   override public function hasGeometry():Bool return true;
   /** Canonical box bounds x0,x1,y0,y1,z0,z1, shared by CAD and local FE. */

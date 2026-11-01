@@ -221,7 +221,7 @@ class BenchMill extends MachineAssembly {
       if (includeWorkpiece) {
         attach(
           "stock",
-          new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank", null, null, true),
+          new RouterPlate(null, STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank", null, null, true),
           AssemblyFrames.translation(tableX, saddleY, tableTop),
           "table"
         );
@@ -254,7 +254,7 @@ class BenchMill extends MachineAssembly {
       addMate("vise-mount", "fixed", "table", "to-vise/body", "vise/body", "attach-vise/body");
       if (includeWorkpiece) attach(
         "stock",
-        new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank", null, null, true),
+        new RouterPlate(null, STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank", null, null, true),
         AssemblyFrames.compose(zeroPose("vise/body"), installedVise.seat),
         "vise/body"
       );
@@ -422,20 +422,24 @@ class BenchMill extends MachineAssembly {
     for (cut in powerCableCuts) powerLength += cut.length * cut.count;
     for (cut in encoderCableCuts) encoderLength += cut.length * cut.count;
     addBomItem({partNumber:"MILL-POWER-CABLE-4C-400V-ASSUMED", description:"Assumed continuous-flex motor power cable",
+      fingerprint:machinekit.component.BomRevision.fingerprint("flex-power|400V|4-core|continuous-flex", 1),
       quantity:1, material:null, procurement:Buy(null, null, null), maturity:"Assumed",
       requirements:[ProcurementCodec.requirement("ratedVoltage", "V", 400),
         ProcurementCodec.requirement("cores", "1", null, null, 4), ProcurementCodec.choice("service", "continuous flex")],
       measure:{value:powerLength, unit:"m"}, cuts:powerCableCuts});
     addBomItem({partNumber:"MILL-ENCODER-CABLE-ASSUMED", description:"Assumed shielded continuous-flex encoder cable",
+      fingerprint:machinekit.component.BomRevision.fingerprint("encoder|shielded|continuous-flex", 1),
       quantity:1, material:null, procurement:Buy(null, null, null), maturity:"Assumed",
       requirements:[ProcurementCodec.choice("signal", "incremental encoder"),
         ProcurementCodec.choice("shield", "shielded"), ProcurementCodec.choice("service", "continuous flex")],
       measure:{value:encoderLength, unit:"m"}, cuts:encoderCableCuts});
-    addBomItem({partNumber:"MILL-MANUAL-LUBRICATION-15-OUTLET-ASSUMED", description:"Assumed manual way-oil pump and distribution set",
+    addBomItem({partNumber:"MILL-LUBE-15-OUT-ASSUMED", description:"Assumed manual way-oil pump and distribution set",
+      fingerprint:machinekit.component.BomRevision.fingerprint("manual-way-oil|15-outlets|ISO-VG-68", 1),
       quantity:1, material:null, procurement:Buy(null, null, null), maturity:"Assumed",
       requirements:[ProcurementCodec.requirement("outlets", "1", 15),
         ProcurementCodec.choice("lubricant", "ISO VG 68 way oil"), ProcurementCodec.choice("operation", "manual")]});
     addBomItem({partNumber:"MILL-WAY-OIL-ISO-VG68", description:"ISO VG 68 way oil, initial fill",
+      fingerprint:machinekit.component.BomRevision.fingerprint("ISO-3448|viscosity-grade-68", 1),
       quantity:1, material:null, procurement:Buy(null, null, "ISO 3448"), maturity:"Assumed",
       requirements:[ProcurementCodec.requirement("viscosityGrade", "1", null, null, 68)],
       measure:{value:1, unit:"l"}});

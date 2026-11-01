@@ -42,7 +42,7 @@ class PressBlock extends MachineComponent {
   public final width:Float;
   public final depth:Float;
   public final height:Float;
-  public function new(name:String, width:Float, depth:Float, height:Float) {
+  public function new(drawing:String, name:String, width:Float, depth:Float, height:Float) {
     for (value in [width,
       depth, height]) if (!Math.isFinite(value) || value <= 0) throw "Invalid press block dimensions";
     super(
@@ -51,6 +51,7 @@ class PressBlock extends MachineComponent {
       "steel",
       true
     );
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("steel fabrication and machining"), [
       machinekit.component.Procurement.ProcurementCodec.requirement("width", "mm", null, null, width),
       machinekit.component.Procurement.ProcurementCodec.requirement("depth", "mm", null, null, depth),
@@ -62,6 +63,10 @@ class PressBlock extends MachineComponent {
     this.depth = depth;
     this.height = height;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
+  }
+  override public function revisionFingerprint():Null<String> {
+    if (drawingNumber == null) return null;
+    return machinekit.component.BomRevision.fingerprint([drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(width), machinekit.component.ComponentNumberKey.encode(depth), machinekit.component.ComponentNumberKey.encode(height)].join("|"), 1);
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.named(
@@ -79,7 +84,7 @@ class PressSideFrame extends MachineComponent {
   public final throat:Float;
   public final bedHeight:Float;
   public final openHeight:Float;
-  public function new(thickness:Float, throat:Float, bedHeight:Float, openHeight:Float) {
+  public function new(drawing:String, thickness:Float, throat:Float, bedHeight:Float, openHeight:Float) {
     for (value in [thickness, throat,
       bedHeight, openHeight]) if (!Math.isFinite(value) || value <= 0) throw "Invalid press side-frame dimensions";
     if (throat >= rearOffset + depth / 2
@@ -90,6 +95,7 @@ class PressSideFrame extends MachineComponent {
       "steel",
       true
     );
+    declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("steel fabrication and machining"), [
       machinekit.component.Procurement.ProcurementCodec.requirement("thickness", "mm", null, null, thickness),
       machinekit.component.Procurement.ProcurementCodec.requirement("throat", "mm", null, null, throat),
@@ -105,6 +111,10 @@ class PressSideFrame extends MachineComponent {
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("throat", Face, Solids.axial(0, throat, bedHeight));
   }
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    [drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(thickness),
+      machinekit.component.ComponentNumberKey.encode(throat), machinekit.component.ComponentNumberKey.encode(bedHeight),
+      machinekit.component.ComponentNumberKey.encode(openHeight)].join("|"), 1);
   override public function hasGeometry():Bool return true;
   /** Exact boxes preserve the same open throat cut from the CAD side plate. */
   public function collisionBoxes():Array<PressEnvelope> {
@@ -142,6 +152,8 @@ class PressLightCurtain extends MachineComponent {
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "clear", kind: Signal, role: Supply, iface: Plug("generic", 3), required: false});
   }
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    ["PressLightCurtain", materialSpec(), "600mm", "clear"].join("|"), 1);
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.named(
     Part.box(30, 30, 600),
@@ -233,19 +245,19 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
       machinekit.pressbrake.ToolProfiles.height(station.dies.profile)
     );
     gaugeBaseHeight = bedHeight + minimumDie;
-    place("bed", new PressBlock("Press bed", bedLength, 180, 200), at(0, 0, bedHeight - 200));
+    place("bed", new PressBlock("PRESS-BED", "Press bed", bedLength, 180, 200), at(0, 0, bedHeight - 200));
     addMemberConnector("bed", "left", at(-bedLength / 2, 0, 200));
     addMemberConnector("bed", "right", at(bedLength / 2, 0, 200));
     for (side in [-1, 1]) {
       var name = side < 0 ? "Left" : "Right", guide = 'guide$name';
       var x = side * (bedLength / 2 + 25);
-      var frame = new PressSideFrame(50, throat, bedHeight, openHeight);
+      var frame = new PressSideFrame("PRESS-SIDE-FRAME", 50, throat, bedHeight, openHeight);
       frameVolumes.push({member: 'frame$name', boxes: frame.collisionBoxes()});
       fixed('frame$name', frame, at(x, 0, 0), "bed");
       slide(
         side < 0 ? "Y1" : "Y2",
         guide,
-        new PressBlock("Ram guide", 40, 100, 160),
+        new PressBlock("PRESS-RAM-GUIDE", "Ram guide", 40, 100, 160),
         at(x, -160, bedHeight + openHeight),
         'frame$name',
         {x : 0, y : 0, z : -1},
@@ -274,6 +286,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
     fixed("ramValve", new HydraulicValve(), at(500, 350, 740), "bed");
     var hose:machinekit.component.BomItem = {
       partNumber: "ASSUMED-HYDRAULIC-G1/2-HOSE",
+      fingerprint: machinekit.component.BomRevision.fingerprint("hydraulic-hose|G1/2", 1),
       description: "Assumed G1/2 hydraulic hose assembly",
       quantity: 1,
       material: null,
@@ -303,10 +316,10 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
       0.1
     );
     addSwitch("ram-bottom", "Y1", {lower: stroke - 0.1, upper: stroke + 0.1, velocity: null, effort: null}, 0.1);
-    fixed("ram", new PressBlock("Ram beam", bedLength, 100, 220), at(0, 0, bedHeight + openHeight), "guideLeft");
+    fixed("ram", new PressBlock("PRESS-RAM", "Ram beam", bedLength, 100, 220), at(0, 0, bedHeight + openHeight), "guideLeft");
     for (side in [-1, 1]) fixed(
       side < 0 ? "ramBracketLeft" : "ramBracketRight",
-      new PressBlock("Ram guide bracket", 160, 180, 80),
+      new PressBlock("PRESS-RAM-GUIDE-BRACKET", "Ram guide bracket", 160, 180, 80),
       at(side * 750, -80, bedHeight + openHeight + 80),
       "ram"
     );
@@ -315,7 +328,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
     addMemberConnector("ram", "tool-mount", at(0, 0, 0));
     fixed(
       "torsionBar",
-      new PressBlock("Torsion bar", bedLength + 50, 30, 30),
+      new PressBlock("PRESS-TORSION-BAR", "Torsion bar", bedLength + 50, 30, 30),
       at(0, -160, bedHeight + openHeight + 100),
       "ram"
     );
@@ -323,7 +336,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
     for (side in [-1, 1]) {
       fixed(
         side < 0 ? "supportLeft" : "supportRight",
-        new PressBlock("Front sheet support", 80, 300, 20),
+        new PressBlock("PRESS-FRONT-SHEET-SUPPORT", "Front sheet support", 80, 300, 20),
         at(side * 450, -240, bedHeight - 20),
         "bed"
       );
@@ -340,7 +353,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
     slide(
       "depth",
       "depthStop",
-      new PressBlock("Mechanical depth stop", 100, 80, 40),
+      new PressBlock("PRESS-DEPTH-STOP", "Mechanical depth stop", 100, 80, 40),
       at(0, 300, bedHeight + openHeight),
       "bed",
       {x: 0, y: 0, z: -1},
@@ -361,7 +374,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
     slide(
       "X",
       "gaugeX",
-      new PressBlock("Backgauge carriage", gaugeWidth, 80, 60),
+      new PressBlock("PRESS-BACKGAUGE-CARRIAGE", "Backgauge carriage", gaugeWidth, 80, 60),
       at(0, 0, 660),
       "bed",
       {x: 0, y: 1, z: 0},
@@ -415,7 +428,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
       slide(
         "R",
         "gaugeR",
-        new PressBlock("Backgauge lift", gaugeWidth, 40, 40),
+        new PressBlock("PRESS-BACKGAUGE-LIFT", "Backgauge lift", gaugeWidth, 40, 40),
         at(0, 40, gaugeBaseHeight - 40),
         "gaugeX",
         {x: 0, y: 0, z: 1},
