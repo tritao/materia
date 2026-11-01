@@ -20,10 +20,10 @@ class StrainWavePair {
     if (input.form == "involute") {
       var angle = input.pressureAngle;
       if (angle == null) throw "involute design without a pressure angle";
-      form = new Involute(angle);
+      form = new Involute(angle, input.addendumFactor, input.tipRelief);
     } else if (input.form == "double-circular-arc") form = DoubleCircularArc.liu(input.module);
     else throw 'tooth form "${input.form}" is not implemented';
-    flex = new GearSpec(input.module, input.flexTeeth, 8, form, false, 0, cutterTipRadius, tipFilletRadius);
+    flex = new GearSpec(input.module, input.flexTeeth, 8, form, false, input.profileShift, cutterTipRadius, tipFilletRadius);
     profile = flex.profile();
     wall = 0.01 * input.module * input.flexTeeth;
     var rn = flex.rootRadius() - wall / 2;
@@ -32,9 +32,13 @@ class StrainWavePair {
   }
 
   public function circularPitchRadius():Float return input.circularPitchRadius();
-  /** Nominal circular-spline tip (inner) and root (outer) radii (assumed): pitch -/+ the flexspline form's own
-      addendum and dedendum (1 and 1.25 modules for an involute). */
-  public function circularTipRadius():Float return circularPitchRadius() - flex.form.addendum(input.module);
+  /** Nominal circular-spline tip (inner) and root (outer) radii (assumed): pitch -/+ the addendum and dedendum of the
+      nominal full-depth mate (1 and 1.25 modules for an involute, whatever the flexspline's own addendum or shift), or
+      the flexspline form's own for a form that defines them. */
+  public function circularTipRadius():Float {
+    var inv = Std.isOfType(flex.form, Involute);
+    return circularPitchRadius() - (inv ? input.module : flex.form.addendum(input.module));
+  }
   public function circularRootRadius():Float return circularPitchRadius() + flex.form.dedendum(input.module);
 
   /** Open tooth boundary in the tooth frame: one pitch of outline without the closing chord. */

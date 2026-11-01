@@ -34,6 +34,7 @@ class GearKitTests {
     GeometryTests.run();
     MetrologyTests.run();
     ToothDesignInputTests.run();
+    InvoluteVariantTests.run();
     FormInterfaceTests.run();
     DoubleArcTests.run();
     KinematicsTests.run();

@@ -17,6 +17,11 @@ class StrainWaveInput {
   public final cam:String;
   /** Involute pressure angle; null for forms that define their own flank. */
   public final pressureAngle:Null<Float>;
+  /** Involute flexspline tooth variants (defaults: full-depth, unshifted, no relief): addendum in modules, profile shift in
+      modules, tip relief. Only the involute form takes them. */
+  public final addendumFactor:Float;
+  public final profileShift:Float;
+  public final tipRelief:Null<TipRelief>;
 
   public function new(
     name:String,
@@ -26,7 +31,10 @@ class StrainWaveInput {
     circularTeeth:Int,
     kappa:Float,
     cam:String,
-    ?pressureAngle:Float
+    ?pressureAngle:Float,
+    addendumFactor:Float = 1.0,
+    profileShift:Float = 0,
+    ?tipRelief:TipRelief
   ) {
     if (FORMS.indexOf(form) < 0) throw 'tooth form "$form" is not one of ${FORMS.join(", ")}';
     if (!Math.isFinite(module) || module <= 0) throw "module must be finite and positive";
@@ -37,6 +45,8 @@ class StrainWaveInput {
       if (pressureAngle == null || !Math.isFinite(pressureAngle) || pressureAngle <= 0
         || pressureAngle >= Math.PI / 2) throw "involute pressure angle must be between zero and pi/2 radians";
     } else if (pressureAngle != null) throw 'tooth form "$form" defines its own flank; pressure angle is not an input';
+    if (form != "involute" && (addendumFactor != 1.0 || profileShift != 0
+      || tipRelief != null)) throw 'tooth form "$form" defines its own tooth height, shift and tip; they are not inputs';
     this.name = name;
     this.form = form;
     this.module = module;
@@ -45,6 +55,9 @@ class StrainWaveInput {
     this.kappa = kappa;
     this.cam = cam;
     this.pressureAngle = pressureAngle;
+    this.addendumFactor = addendumFactor;
+    this.profileShift = profileShift;
+    this.tipRelief = tipRelief;
   }
 
   /** Radial deflection amplitude of the flexspline neutral line, mm. */

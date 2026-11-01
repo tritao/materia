@@ -69,7 +69,8 @@ class CircularSpline {
     return new CircularSpline(label, spec.profile(), space.deviationBound);
   }
 
-  /** A nominal involute internal gear: module, teeth, pressure angle, profile shift (positive thins the teeth). */
+  /** A nominal involute internal gear: module, teeth, pressure angle, profile shift (positive thins the teeth), then the
+      shaper-cutter corner and tip rounding radii, the addendum in modules (shortened teeth) and tip relief. */
   public static function involute(
     label:String,
     module:Float,
@@ -77,9 +78,11 @@ class CircularSpline {
     pressureAngle:Float,
     profileShift:Float = 0,
     ?cutterTipRadius:Float,
-    ?tipFilletRadius:Float
+    ?tipFilletRadius:Float,
+    addendumFactor:Float = 1.0,
+    ?tipRelief:TipRelief
   ):CircularSpline {
-    var spec = new GearSpec(module, teeth, 8, new Involute(pressureAngle), true, profileShift, cutterTipRadius, tipFilletRadius);
+    var spec = new GearSpec(module, teeth, 8, new Involute(pressureAngle, addendumFactor, tipRelief), true, profileShift, cutterTipRadius, tipFilletRadius);
     return new CircularSpline(label, spec.profile(), 0);
   }
 
