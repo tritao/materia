@@ -20,16 +20,4 @@ class HobCheck {
     }
     return null;
   }
-
-  /** Largest cutter tip radius (mm) for which the profile still has a cutter land, by bisection on whether the profile builds. */
-  public static function maxCutterTipRadius(make:Float -> ToothProfile, module:Float):Float {
-    var lo = 0.0, hi = 0.99 * module;
-    for (_ in 0...40) {
-      var mid = (lo + hi) / 2, ok = true;
-      try make(mid) catch (e:Dynamic) ok = false;
-      if (ok) lo = mid;
-      else hi = mid;
-    }
-    return lo;
-  }
 }

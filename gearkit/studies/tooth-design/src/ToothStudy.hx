@@ -9,10 +9,30 @@ import gearkit.StrainWaveInput;
 import gearkit.StrainWavePair;
 import gearkit.ToothProfile;
 
-/** The D1 (involute 20 deg) against D3 (involute 30 deg, kappa 0.8 to 1.2) comparison that decides
-    which pressure angle to order a hob for. Prints a table; every number is model output (unloaded,
+/** The D1 (involute 20 deg) against D3 (involute 30 deg, kappa 0.8 to 1.2) and D2 (double-circular-arc)
+    comparison, with the cam comparison and the hob implications of D2. A study, not a test: run on its own
+    (`gearkit/TOOTH_DESIGN_PLAN.md`, "Running the tooth study"). Prints a table; every number is model output (unloaded,
     kinematic, zero-backlash envelope circular spline), not a measurement. */
 class ToothStudy {
+  static final DEG = Math.PI / 180;
+
+  static function d2Scaled(kappa:Float):StrainWaveInput return new StrainWaveInput(
+    "D2s", "double-circular-arc", 0.3, 200, 202, kappa, "cosine");
+
+  static function d3(kappa:Float):StrainWaveInput return new StrainWaveInput("D3", "involute", 0.3, 200, 202, kappa, "cosine", 30 * DEG);
+
+  /** Largest cutter tip radius (mm) for which the profile still has a cutter land, by bisection on whether the profile builds. */
+  static function maxCutterTipRadius(make:Float -> ToothProfile, module:Float):Float {
+    var lo = 0.0, hi = 0.99 * module;
+    for (_ in 0...40) {
+      var mid = (lo + hi) / 2, ok = true;
+      try make(mid) catch (e:Dynamic) ok = false;
+      if (ok) lo = mid;
+      else hi = mid;
+    }
+    return lo;
+  }
+
   static function f(x:Float, digits:Int = 3):String {
     var k = Math.pow(10, digits);
     return Std.string(Math.round(x * k) / k);
@@ -97,7 +117,7 @@ class ToothStudy {
   static function rackReport(label:String, spec:GearSpec):Void {
     var m = spec.module, rack = ConjugateRack.of(spec.profile(), 256), fl = rack.flankSamples(), corner = rack.cornerSamples();
     var yLo = fl[0].y, yHi = fl[fl.length - 1].y;
-    var slope20 = -Math.tan(20 * ToothDesigns.DEG), best = bestSlope(fl);
+    var slope20 = -Math.tan(20 * DEG), best = bestSlope(fl);
     // Flank angle (from the tooth axis) at the ends and at the pitch datum.
     function angleAt(y:Float):Float {
       var h = 1e-4 * m, a = rack.flankAt(Math.max(yLo, y - h)), b = rack.flankAt(Math.min(yHi, y + h));
@@ -113,14 +133,14 @@ class ToothStudy {
   }
 
   static function hobStudy():Void {
-    var m = 0.3, deg = ToothDesigns.DEG;
+    var m = 0.3, deg = DEG;
     var d1 = new GearSpec(m, 200, 8, new Involute(20 * deg));
     var d3 = new GearSpec(m, 200, 8, new Involute(30 * deg), false, 0, 0.1 * m);
     var d2 = new GearSpec(m, 200, 8, DoubleCircularArc.liu(m));
     rackReport("D1 20deg corner 0.38m", d1);
     rackReport("D3 30deg corner 0.10m", d3);
     rackReport("D2s DCA root fillet 0.38m", d2);
-    var maxFillet = HobCheck.maxCutterTipRadius(r -> new GearSpec(m, 200, 8, DoubleCircularArc.liu(m), false, 0, r).profile(), m);
+    var maxFillet = maxCutterTipRadius(r -> new GearSpec(m, 200, 8, DoubleCircularArc.liu(m), false, 0, r).profile(), m);
     Sys.println('  D2s largest circular root fillet that fits: ${f(maxFillet)} mm (${f(maxFillet / m)} m); D1 trochoid 0.472 m, D3 0.110 m (same test)');
     for (rf in [0.1, 0.2, 0.38, 0.6, 0.7]) {
       var spec = new GearSpec(m, 200, 8, DoubleCircularArc.liu(m), false, 0, rf * m);
@@ -148,7 +168,7 @@ class ToothStudy {
   /** Cam comparison: each cam with its own derived circular spline (so transmission error is zero by construction;
       the cam's effect shows as how closely the other teeth follow the envelope). */
   static function camStudy():Void {
-    var deg = ToothDesigns.DEG;
+    var deg = DEG;
     for (base in ["D1", "D2s"]) for (cam in ["cosine", "ellipse", "four-roller", "resal"]) {
       var input = base == "D1" ? new StrainWaveInput("D1", "involute", 0.3, 200, 202, 1.0, cam, 20 * deg) : new StrainWaveInput("D2s", "double-circular-arc", 0.3, 200, 202, 1.0, cam);
       var pair = new StrainWavePair(input);
@@ -165,30 +185,30 @@ class ToothStudy {
     }
   }
 
-  public static function run():Void {
-    var m = 0.3, deg = ToothDesigns.DEG;
-    var max20 = HobCheck.maxCutterTipRadius(r -> {
+  public static function main():Void {
+    var m = 0.3, deg = DEG;
+    var max20 = maxCutterTipRadius(r -> {
       return new GearSpec(m, 200, 8, new Involute(20 * deg), false, 0, r).profile();
     }, m);
-    var max30 = HobCheck.maxCutterTipRadius(r -> {
+    var max30 = maxCutterTipRadius(r -> {
       return new GearSpec(m, 200, 8, new Involute(30 * deg), false, 0, r).profile();
     }, m);
     Sys.println('  largest hob corner radius that leaves a cutter land (m 0.3, Z 200, full depth): 20 deg ${f(max20)} mm (${f(max20 / m)} m), 30 deg ${f(max30)} mm (${f(max30 / m)} m)');
     var rho30 = 0.9 * max30;
     var cases:Array<{label:String, input:StrainWaveInput, rho:Null<Float>}> = [];
     for (k in [0.8, 1.0, 1.1, 1.2]) cases.push({label: "D1 20deg rho 0.38m", input: new StrainWaveInput("D1", "involute", m, 200, 202, k, "cosine", 20 * deg), rho: null});
-    for (k in [0.8, 0.9, 1.0, 1.1, 1.2]) cases.push({label: 'D3 30deg rho ${f(rho30 / m, 2)}m', input: ToothDesigns.d3(k), rho: rho30});
+    for (k in [0.8, 0.9, 1.0, 1.1, 1.2]) cases.push({label: 'D3 30deg rho ${f(rho30 / m, 2)}m', input: d3(k), rho: rho30});
     // Same hob corner radius on both angles, so the angle is the only difference.
     for (k in [1.0, 1.1]) cases.push({label: 'D1 20deg rho ${f(rho30 / m, 2)}m', input: new StrainWaveInput("D1", "involute", m, 200, 202, k, "cosine", 20 * deg), rho: rho30});
     // The default 0.38 m hob corner radius (the reference hob's) cannot cut 30 deg at full depth.
     try {
-      new StrainWavePair(ToothDesigns.d3(1.0));
+      new StrainWavePair(d3(1.0));
       Sys.println("  D3 30deg with the default 0.38 m corner radius: builds");
     } catch (e:Dynamic) {
       Sys.println('  D3 30deg with the default 0.38 m corner radius: ${Std.string(e)}');
     }
     // D2, double-circular-arc (Liu 2025 optimum). "D2s" is the shape scaled to m 0.3 / 200 teeth; "D2" is the unscaled paper case.
-    for (k in [0.8, 1.0, 1.1, 1.2]) cases.push({label: "D2s DCA rho 0.38m", input: ToothDesigns.d2Scaled(k), rho: null});
+    for (k in [0.8, 1.0, 1.1, 1.2]) cases.push({label: "D2s DCA rho 0.38m", input: d2Scaled(k), rho: null});
     for (k in [0.8, 1.0, 1.2]) cases.push({label: "D2 DCA(paper m 0.5) rho 0.38m", input: new StrainWaveInput("D2", "double-circular-arc", 0.5, 100, 102, k, "cosine"), rho: null});
     hobStudy();
     camStudy();
