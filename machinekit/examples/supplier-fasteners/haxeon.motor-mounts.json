@@ -2,6 +2,7 @@
   "version": 1,
   "package": {"name": "machinekit-motor-mount-checks"},
   "entry": "MotorMountChecks",
+  "sources": ["MotorMountChecks.hx", "SourcingDocuments.hx"],
   "sourceRoots": ["."],
   "dependencies": {
     "materia-sourcing": { "path": "../../../tools/suppliers" },"machinekit": {"path": "../.."}},

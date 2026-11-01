@@ -4,6 +4,7 @@
     "name": "configurable-axis-checks"
   },
   "entry": "ConfigurableAxisChecks",
+  "sources": ["ConfigurableAxisChecks.hx", "SourcingDocuments.hx"],
   "sourceRoots": [
     "."
   ],

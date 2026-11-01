@@ -294,10 +294,13 @@ prices and source URLs. Different wall/cavity variants remain distinct parts.
 The built-in registry includes `machinekit.structural.tslot-member` (system,
 width, height, length, optional embedded section and material) and
 `machinekit.structural.drawing-profile-member` (section, length and material).
-Both use the normal assembly/document save and reload paths. Section payloads
-contain only validated dimensions, loops, circles and area; supplier metadata
-and cache paths are omitted. Geometry/BOM keys use a compact section digest
-rather than the full JSON payload. Non-default materials get distinct BOM
+Both use the normal assembly/document save and reload paths. Section payloads contain a required author-declared `section_id` alongside
+validated dimensions, loops, circles and area; supplier metadata and cache
+paths are omitted. The ID is a BOM-lint-valid token of at most 12 characters.
+Use a different ID for each section design, and keep the ID when revising
+that design. The purchase number uses the ID; geometry and BOM keys also
+include a digest of the canonical section so a revision changes its
+fingerprint. Non-default materials get distinct BOM
 part numbers. Invalid payloads or section/family dimension mismatches are
 rejected. Legacy/custom profiles outside these supported recipes retain their
 previous code-only behavior.

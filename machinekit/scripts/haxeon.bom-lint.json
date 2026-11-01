@@ -3,6 +3,8 @@
   "package": { "name": "machinekit-bom-lint" },
   "entry": "BomLintReport",
   "sources": [
+    "../haxe/src/machinekit/structural/DrawingExtrusionProfile.hx",
+    "../haxe/src/machinekit/structural/ProfileMember.hx",
     "../haxe/src/machinekit/bomschema/BomV1.hx",
     "../haxe/src/machinekit/component/BomJson.hx","BomLintReport.hx", "../haxe/src/machinekit/component/PartNumberLint.hx"],
   "sourceRoots": ["."],

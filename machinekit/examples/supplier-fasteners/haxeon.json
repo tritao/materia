@@ -2,6 +2,15 @@
   "version": 1,
   "package": {"name": "machinekit-supplier-fasteners"},
   "entry": "SupplierFasteners",
+  "sources": [
+    "SupplierFasteners.hx",
+    "SourcingChecks.hx",
+    "SourcingDocuments.hx",
+    "ProfileRecipeChecks.hx",
+    "TSlotFamilyChecks.hx",
+    "../../haxe/src/machinekit/structural/DrawingExtrusionProfile.hx",
+    "../../haxe/src/machinekit/structural/ProfileMember.hx"
+  ],
   "sourceRoots": ["."],
   "dependencies": {
     "materia-sourcing": { "path": "../../../tools/suppliers" },"machinekit": {"path": "../.."}},

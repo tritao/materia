@@ -9,7 +9,10 @@ import zipfile
 
 from vallder import DEFAULT_OUTPUT, write_json
 
-SECTIONS = {5250: (30,30),5263:(40,40),5279:(40,80),5295:(80,80),5308:(180,20)}
+# These author-declared section IDs identify the measured designs, not supplier SKUs.
+SECTIONS = {5250: ((30,30), "REF-S30"), 5263: ((40,40), "REF-S40"),
+            5279: ((40,80), "REF-S40x80"), 5295: ((80,80), "REF-S80"),
+            5308: ((180,20), "REF-P180x20")}
 
 
 def profile_family(dimensions):
@@ -126,7 +129,7 @@ def main(output):
     inventory=json.loads((output/"cad/inventory.json").read_text())
     profiles=[]
     families,offers=[],[]
-    for product_id,dimensions in SECTIONS.items():
+    for product_id,(dimensions,section_id) in SECTIONS.items():
         product=next(p for p in catalog["products"] if p["supplier_product_id"]==product_id)
         sources=[d for d in inventory["downloads"] if any(r["product_id"]==product_id for r in d["references"])]
         candidates=[d for d in sources if d.get("format")=="zip" and len(d.get("members",[]))==1 and
@@ -161,7 +164,7 @@ def main(output):
                        "url":product["url"],"price_basis":"per_metre","price":product["price"],
                        "availability":product["availability"],"source":product["source"],
                        "cut_length_quote_required":True,"compatibility_verified":False})
-        profiles.append({"supplier_id":"vallder","product_id":product_id,"sku":product["sku"],
+        profiles.append({"section_id":section_id,"supplier_id":"vallder","product_id":product_id,"sku":product["sku"],
             "family_id":family["id"],"system_id":family["system_id"],"profile_kind":family["kind"],
             "name":product["name"],"source_url":download["url"],"source_sha256":hashlib.sha256(section).hexdigest(),
             "archive_sha256":download["sha256"],"archive_member":name,"dimensions_mm":dimensions,

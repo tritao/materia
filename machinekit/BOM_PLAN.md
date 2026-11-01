@@ -211,10 +211,9 @@ and readers reject anything else. It contains:
 - Cast inserts accept a recipe-level part ID so a foundation can carry its
   existing member IDs into numbering. The hobber qualifies those IDs by bed or
   column because both foundations use names such as `railLeft`.
-- The drawing-section member's B2 number states only its bounds and cut
-  length; different contours can share those bounds. Its exact recipe key
-  prevents combining them in one bill, but B3 must add an author-declared
-  section identity before bills from different machines can be compared.
+- The B2 drawing-section number used only bounds and cut length. The declared
+  extrusion-section identity follow-up below replaces it with an author ID;
+  canonical geometry remains in the fingerprint.
 - Home-switch brackets now carry their axis ID in their label, and linear
   mount receiver numbers include stock dimensions. Without those distinctions,
   different parts in the same machine collide during procurement roll-up.
@@ -524,7 +523,7 @@ and readers reject anything else. It contains:
   the machinekit tests. Example BOM exports are added to the test suite.
 
 ### B8 — Sourcing contract
-- Done in this phase commit. The full gate passed 11/24 shards, with no new
+- Done in `6479b4072`. The full gate passed 11/24 shards, with no new
   failing shard or exception message compared with B7. Focused schema,
   sourcing, supplier-axis and BOM example checks passed.
 - The existing Haxe offer helper moves to the separate `materia-sourcing`
@@ -549,15 +548,46 @@ and readers reject anything else. It contains:
   layer. Their supplier selection, prices, availability and review status are
   sourcing data; a supplier SKU does not define the engineering part. Keep
   catalogue manufacturer/MPN evidence in the engineering BOM when known.
-- Open finding: drawn extrusion sections with different contours but equal
-  bounds and cut length can still share a part number. The existing supplier
-  `ProfileRecipeChecks` catches this and fails before that demo's sourcing
-  step. It needs an author-declared section identity, as noted in B2; the
-  22-machine export measurements do not establish that cross-machine case.
 - Freeze the version 1 JSON and document it next to the exporter.
 - The sourcing layer (separate plan, Python under `tools/suppliers/` next to
   `lcsccable.py`) reads `build/bom/*.json` and reports lines with no quote and
   quotes that are stale or orphaned.
+
+
+## Declared extrusion-section identity follow-up
+
+Done in this follow-up commit. The full gate passed 11/24 shards with no new
+failing shard or exception message compared with B8.
+
+Drawn sections require a BOM-lint-valid author-declared `section_id`, saved
+with the validated section geometry. IDs are limited to 12 characters to
+leave space in the 40-character purchase number for cut length and material.
+Different designs need distinct IDs; revisions of one design retain its ID
+and change its fingerprint. Drawing
+and measured T-slot purchase numbers use the ID and cut length. Canonical
+section geometry remains in the recipe and fingerprint key, and supplier
+SKUs and URLs remain outside it. The extracted reference sections have
+explicit IDs in `tools/suppliers/profile_sections.py`.
+
+The full gate builds examples and runs the smoke suite in shards. Its smoke
+suite does not run the supplier-fasteners example or its profile, sourcing,
+slot-hardware, motor-mount and supplier-axis entrypoints, nor the hobber tray
+BOM entrypoint. Run these BOM-relevant entrypoints directly in addition to
+the gate; compilation by `build-examples` is not runtime coverage. The
+profile checks retain the distinct-variant assertion and also verify stable
+numbers with changed fingerprints, required IDs and section serialization.
+
+Runtime verification: the supplier-fasteners example passed with 36 generator
+configurations and 72 occurrences; `ProfileRecipeChecks`, `SourcingChecks`,
+`SlotHardwareChecks` (all 7 recipes and 22 measured slots),
+`MotorMountChecks --supplier-cad` (4 variants), `SupportedSfu20AxisChecks`
+(155 checks), `ConfigurableAxisChecks` (656 checks),
+`VallderCatalogAxisChecks` (247 checks), and the hobber tray BOM passed.
+The standalone BOM document, example and part-number key projects passed.
+These checks use their individual `haxeon*.json` projects and separate output
+paths; the configurable and Vallder projects share an output path and must be
+built and run sequentially. The reference section extractor's existing Python
+unit tests also passed.
 
 ## Recorded decisions
 

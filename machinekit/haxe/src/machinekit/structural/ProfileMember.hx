@@ -57,8 +57,13 @@ class ProfileMember extends MachineComponent {
       ),
       v.number("length")
     );
-    }).numbered(v -> '${v.token("system")}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("height"))}-L${Dimension.format(v.number("length"))}'
-      + materialSuffix(v)).procured(_ -> Buy(null, null, null));
+    }).numbered(v -> {
+      var section = v.optionalToken("section");
+      var prefix = section == null
+        ? '${v.token("system")}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("height"))}'
+        : 'TS-${DrawingExtrusionProfile.fromText(section).sectionId}';
+      return '$prefix-L${Dimension.format(v.number("length"))}' + materialSuffix(v);
+    }).procured(_ -> Buy(null, null, null));
     return tslotRecipe;
   }
 
@@ -72,9 +77,8 @@ class ProfileMember extends MachineComponent {
       ],
       v -> new ProfileMember(DrawingExtrusionProfile.fromText(v.token("section")), v.number("length"))
     ).numbered(v -> {
-      var bounds = DrawingExtrusionProfile.fromText(v.token("section")).sectionBounds();
-      return 'DRAWN-SECTION-${Dimension.format(bounds.maxX - bounds.minX)}x${Dimension.format(bounds.maxY - bounds.minY)}-L${Dimension.format(v.number("length"))}'
-        + materialSuffix(v);
+      var section = DrawingExtrusionProfile.fromText(v.token("section"));
+      return 'DRAWN-${section.sectionId}-L${Dimension.format(v.number("length"))}' + materialSuffix(v);
     }).procured(_ -> Buy(null, null, null));
     return drawingRecipe;
   }
@@ -149,7 +153,8 @@ private class ProfileMemberRecipeType extends ComponentType {
     var result = resolve(values);
     switch result.get("section") {
       case Token(text):
-        result.setToken("section", DrawingExtrusionProfile.fromText(text).profileDesignation());
+        var drawing = DrawingExtrusionProfile.fromText(text);
+        result.setToken("section", drawing.sectionId + ":" + drawing.geometryIdentity());
       default:
     }
     return result;

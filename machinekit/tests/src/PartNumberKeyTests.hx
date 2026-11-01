@@ -445,7 +445,7 @@ class PartNumberKeyTests {
     if (pendantPlate != "PENDANT-PLATE" || PartNumberLint.problems(pendantPlate).length != 0)
       throw 'Pendant plate identity: $pendantPlate';
     var drawnProfile = machinekit.structural.ProfileMember.drawingRecipeType().create().bom.partNumber;
-    if (drawnProfile != "DRAWN-SECTION-20x20-L100" || PartNumberLint.problems(drawnProfile).length != 0)
+    if (drawnProfile != "DRAWN-REF-S20-L100" || PartNumberLint.problems(drawnProfile).length != 0)
       throw 'Drawing-profile identity: $drawnProfile';
     var slotProfile = machinekit.structural.ProfileMember.tslotRecipeType();
     var steelProfile = slotProfile.create().bom.partNumber;

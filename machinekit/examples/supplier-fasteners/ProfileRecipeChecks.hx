@@ -93,6 +93,7 @@ class ProfileRecipeChecks {
     var changedLength = type.create(values.copy().setNumber("length", 200));
     var changedMaterial = type.create(values.copy().setToken("material", "steel"));
     var changedSection:Dynamic = haxe.Json.parse(drawing.sectionText());
+    changedSection.section_id = "TEST-ROUND";
     changedSection.circles = [{x: 0, y: 0, radius: 2}];
     changedSection.area_mm2 = 400 - Math.PI * 4;
     var otherVariant = type.create(values.copy().setToken("section", haxe.Json.stringify(changedSection)));
@@ -104,6 +105,20 @@ class ProfileRecipeChecks {
       otherVariant.bom.partNumber != plate.bom.partNumber && otherVariant.geometryKey() != plate.geometryKey(),
       "Different section variants retain distinct BOM and geometry identities"
     );
+    var sameIdChanged:Dynamic = haxe.Json.parse(haxe.Json.stringify(changedSection));
+    sameIdChanged.section_id = drawing.sectionId;
+    var updated = type.create(values.copy().setToken("section", haxe.Json.stringify(sameIdChanged)));
+    check(updated.bom.partNumber == plate.bom.partNumber && updated.bom.fingerprint != plate.bom.fingerprint
+      && updated.geometryKey() != plate.geometryKey(),
+      "A revised section keeps its declared number and changes its fingerprint and geometry key");
+    check(haxe.Json.parse(drawing.sectionText()).section_id == drawing.sectionId,
+      "Declared section identity survives section serialization");
+    var missingId:Dynamic = haxe.Json.parse(drawing.sectionText());
+    Reflect.deleteField(missingId, "section_id");
+    check(rejected(() -> new DrawingExtrusionProfile(missingId)), "Missing section identity is rejected");
+    var invalidId:Dynamic = haxe.Json.parse(drawing.sectionText());
+    invalidId.section_id = "invalid id";
+    check(rejected(() -> new DrawingExtrusionProfile(invalidId)), "Invalid section identity is rejected");
     check(
       rejected(() -> ProfileMember.drawingRecipeType().create(new ComponentValues().setToken("section", "{}"))),
       "Malformed saved section rejected before CAD execution"
@@ -141,6 +156,7 @@ class ProfileRecipeChecks {
     // Synthetic section isolates optional-text recipe persistence from the supplier cache.
     var emptyCircles:Array<Dynamic> = [];
     var section:Dynamic = {
+      section_id: "TEST-40",
       dimensions_mm: [40, 40],
       loops: [[[-20, -20, 0], [20, -20, 0], [20, 20, 0], [-20, 20, 0]]],
       circles: emptyCircles,
@@ -151,6 +167,27 @@ class ProfileRecipeChecks {
       250,
       "aluminium 6061"
     );
+    var anotherSection:Dynamic = haxe.Json.parse(haxe.Json.stringify(section));
+    anotherSection.section_id = "TEST-40-B";
+    anotherSection.circles = [{x: 0, y: 0, radius: 2}];
+    anotherSection.area_mm2 = 1600 - Math.PI * 4;
+    var otherConfigured = new ProfileMember(
+      TSlotExtrusion.forSystem("TSLOT-40-SLOT8", 40, 40, new DrawingExtrusionProfile(anotherSection)),
+      250, "aluminium 6061");
+    check(configured.bom.partNumber != otherConfigured.bom.partNumber
+      && configured.geometryKey() != otherConfigured.geometryKey(),
+      "Declared T-slot section variants retain distinct BOM and geometry identities");
+    check(machinekit.component.PartNumberLint.problems(configured.bom.partNumber).length == 0
+      && machinekit.component.PartNumberLint.problems(otherConfigured.bom.partNumber).length == 0,
+      "Declared section part numbers meet BOM lint");
+    anotherSection.section_id = "TEST-40";
+    var revisedConfigured = new ProfileMember(
+      TSlotExtrusion.forSystem("TSLOT-40-SLOT8", 40, 40, new DrawingExtrusionProfile(anotherSection)),
+      250, "aluminium 6061");
+    check(configured.bom.partNumber == revisedConfigured.bom.partNumber
+      && configured.bom.fingerprint != revisedConfigured.bom.fingerprint
+      && configured.geometryKey() != revisedConfigured.geometryKey(),
+      "Revising a declared T-slot section changes its fingerprint and geometry key, not its part number");
     var document = new Document();
     var instance = document.createInstance(
       "Profile",

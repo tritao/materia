@@ -2,6 +2,12 @@
   "version": 1,
   "package": {"name": "machinekit-slot-hardware-checks"},
   "entry": "SlotHardwareChecks",
+  "sources": [
+    "SlotHardwareChecks.hx",
+    "SourcingDocuments.hx",
+    "../../haxe/src/machinekit/structural/DrawingExtrusionProfile.hx",
+    "../../haxe/src/machinekit/structural/ProfileMember.hx"
+  ],
   "sourceRoots": ["."],
   "dependencies": {
     "materia-sourcing": { "path": "../../../tools/suppliers" },"machinekit": {"path": "../.."}},

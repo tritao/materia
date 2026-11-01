@@ -13,8 +13,10 @@ import machinekit.structural.FrameAssembly.StructuralProfile;
 class DrawingExtrusionProfile implements StructuralProfile {
   final section:Dynamic;
   final configurationHash:String;
+  public final sectionId:String;
   public function new(section:Dynamic) {
     this.section = validatedSection(section);
+    this.sectionId = this.section.section_id;
     // Geometry identity excludes supplier, price, download URL and other provenance fields.
     var geometryText = haxe.Json.stringify({
       loops: this.section.loops,
@@ -26,7 +28,7 @@ class DrawingExtrusionProfile implements StructuralProfile {
     for (i in 0...digest.length) hex.add(StringTools.hex(digest.get(i), 2).toLowerCase());
     configurationHash = hex.toString();
   }
-  /** Geometry only, embedded in recipe assemblies; no download paths or supplier metadata. */
+  /** Declared identity and geometry for portable recipes; excludes supplier metadata. */
   public function sectionText():String {
     var text = haxe.Json.stringify(section);
     if (text.length > 4000000) throw "Drawing section payload exceeds portable recipe limit";
@@ -36,7 +38,7 @@ class DrawingExtrusionProfile implements StructuralProfile {
     if (text == null || text.length > 4000000) throw "Invalid drawing section payload size";
     return new DrawingExtrusionProfile(haxe.Json.parse(text));
   }
-  public static function defaultSectionText():String return '{"dimensions_mm":[20,20],"loops":[[[-10,-10,0],[10,-10,0],[10,10,0],[-10,10,0]]],"circles":[],"area_mm2":400}';
+  public static function defaultSectionText():String return '{"section_id":"REF-S20","dimensions_mm":[20,20],"loops":[[[-10,-10,0],[10,-10,0],[10,10,0],[-10,10,0]]],"circles":[],"area_mm2":400}';
 
   static function number(raw:Dynamic):Float {
     if ((!Std.isOfType(raw, Float) && !Std.isOfType(raw,
@@ -49,6 +51,10 @@ class DrawingExtrusionProfile implements StructuralProfile {
   }
   static function validatedSection(raw:Dynamic):Dynamic {
     if (raw == null) throw "Missing drawing section";
+    var id:Dynamic = Reflect.field(raw, "section_id");
+    if (!Std.isOfType(id, String) || id.length > 12
+      || machinekit.component.PartNumberLint.problems(id).length != 0)
+      throw "Drawing section requires a lint-valid section_id of at most 12 characters";
     var dims = array(raw.dimensions_mm);
     if (dims.length != 2 || number(dims[0]) <= 0 || number(dims[1]) <= 0) throw "Invalid drawing section dimensions";
     var dimensions:Array<Float> = [number(dims[0]), number(dims[1])];
@@ -83,9 +89,11 @@ class DrawingExtrusionProfile implements StructuralProfile {
     }
     var area = number(raw.area_mm2);
     if (area <= 0 || area > dimensions[0] * dimensions[1] + 0.01) throw "Invalid drawing section area";
-    return {dimensions_mm: dimensions, loops: loops, circles: circles, area_mm2: area};
+    return {section_id: id, dimensions_mm: dimensions, loops: loops, circles: circles, area_mm2: area};
   }
-  public function profileDesignation():String return "DRAWING-" + configurationHash;
+  public function profileDesignation():String return "DRAWING-" + sectionId;
+  /** Canonical geometry participates in revision keys, independently of the declared identity. */
+  public function geometryIdentity():String return configurationHash;
   public function profileDescription():String return "Drawing-derived extrusion; interfaces unqualified";
   public function sectionBounds():SectionBounds {
     var dimensions:Array<Float> = section.dimensions_mm;

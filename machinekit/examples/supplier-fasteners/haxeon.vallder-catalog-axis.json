@@ -4,6 +4,7 @@
     "name": "configurable-axis-checks"
   },
   "entry": "VallderCatalogAxisChecks",
+  "sources": ["VallderCatalogAxisChecks.hx", "SourcingDocuments.hx"],
   "sourceRoots": [
     "."
   ],

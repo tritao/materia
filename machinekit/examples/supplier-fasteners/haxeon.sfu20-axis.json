@@ -4,6 +4,7 @@
     "name": "configurable-axis-checks"
   },
   "entry": "SupportedSfu20AxisChecks",
+  "sources": ["SupportedSfu20AxisChecks.hx", "SourcingDocuments.hx"],
   "sourceRoots": [
     "."
   ],

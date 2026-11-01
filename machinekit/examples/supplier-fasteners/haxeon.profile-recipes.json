@@ -2,6 +2,11 @@
   "version": 1,
   "package": {"name": "machinekit-profile-recipe-checks"},
   "entry": "ProfileRecipeChecks",
+  "sources": [
+    "ProfileRecipeChecks.hx",
+    "../../haxe/src/machinekit/structural/DrawingExtrusionProfile.hx",
+    "../../haxe/src/machinekit/structural/ProfileMember.hx"
+  ],
   "sourceRoots": ["."],
   "dependencies": {"machinekit": {"path": "../.."}},
   "target": "host",

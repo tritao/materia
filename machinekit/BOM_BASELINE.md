@@ -378,7 +378,7 @@ to supplier-example recipes exposed by this path.
 The full B8 gate passed 11/24 shards, with no new failing shard or exception
 message compared with B7. Compared with the untouched baseline, only the
 previously accepted tending input fingerprints in shards 16 and 23 differ.
-The standalone BOM example test passed. An existing supplier-demo profile
-check fails because different drawn contours with equal bounds and length can
-share a part number; that cross-machine identity case is not covered by the
-22-machine count above.
+The standalone BOM example test passed. The later declared-section identity
+follow-up addresses the supplier-demo drawn-profile collision found during B8.
+Its full gate passed 11/24 shards with no new failing shard or exception
+message compared with B8; its direct runtime results are recorded in the plan.

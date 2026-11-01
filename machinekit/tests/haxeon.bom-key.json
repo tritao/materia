@@ -5,6 +5,8 @@
   },
   "entry": "PartNumberKeyTests",
   "sources": [
+    "../haxe/src/machinekit/structural/DrawingExtrusionProfile.hx",
+    "../haxe/src/machinekit/structural/ProfileMember.hx",
     "src/PartNumberKeyTests.hx",
     "../haxe/src/machinekit/assembly/BomDocument.hx",
     "../haxe/src/machinekit/component/ComponentNumberKey.hx",
