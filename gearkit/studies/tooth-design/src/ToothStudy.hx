@@ -1,8 +1,12 @@
+import gearkit.CircularSpline;
 import gearkit.ConjugateRack;
 import gearkit.DoubleCircularArc;
+import gearkit.FixedMesh;
+import gearkit.FixedMeshReport;
 import gearkit.GearSpec;
 import gearkit.HobCheck;
 import gearkit.Involute;
+import gearkit.MeshErrors;
 import gearkit.MeshingAnalysis;
 import gearkit.Point2;
 import gearkit.StrainWaveInput;
@@ -185,7 +189,41 @@ class ToothStudy {
     }
   }
 
+  /** Fixed-circular-spline study (TD11): the circular spline is derived once, from the cosine cam at kappa 1, and every other cam,
+      kappa and cam amplitude error is meshed against it. One circular pitch of wave-generator angle is a full period. */
+  static function fixedStudy():Void {
+    var deg = DEG, samples = 24;
+    Sys.println("  fixed circular spline study: TE = drive-flank contact rotation about its mean; backlash = drive minus reverse rotation (negative = overlap, i.e. interference); "
+      + 'arcsec at the flexspline, um at the circular-spline pitch circle (R = 30.3 mm); $samples wave-generator angles over one circular pitch; flank / tip = teeth within 1 um at the drive-flank position, mean (max)');
+    for (base in ["D1", "D2s"]) {
+      function make(kappa:Float, cam:String):StrainWaveInput return base == "D1"
+        ? new StrainWaveInput("D1", "involute", 0.3, 200, 202, kappa, cam, 20 * deg)
+        : new StrainWaveInput("D2s", "double-circular-arc", 0.3, 200, 202, kappa, cam);
+      var t0 = Sys.time();
+      var spline = CircularSpline.derived('$base cosine kappa 1', new StrainWavePair(make(1.0, "cosine")));
+      Sys.println('  circular spline $base cosine kappa 1: tip radius ${f(spline.tipRadius, 4)} mm, root circle ${f(spline.rootRadius, 4)} mm, sweep deviation bound ${f(spline.deviationBound * 1000, 2)} um, built in ${f(Sys.time() - t0, 1)} s');
+      for (cam in ["cosine", "ellipse", "resal"]) for (kappa in [0.9, 1.0, 1.1]) for (amp in [-0.002, 0.0, 0.002]) {
+        var t1 = Sys.time();
+        var r = FixedMesh.run(spline, new StrainWavePair(make(kappa, cam)), new MeshErrors(amp), samples);
+        var rp = 0.3 * 202 / 2, um = rp * 1000;
+        var issues = [];
+        if (r.rootBottoming > 1e-6) issues.push('root ${f(r.rootBottoming * 1000, 1)} um');
+        if (r.radialOverlap > 1e-6) issues.push('tip overlap ${f(r.radialOverlap * 1000, 1)} um');
+        if (r.backlashMin < 0) issues.push('negative free range');
+        if (r.unresolved > 0) issues.push('${r.unresolved} unresolved');
+        Sys.println('  $base cs, flex $cam kappa $kappa amp ${f(amp * 1000, 0)} um: TE p-p ${f(r.tePeakToPeakArcsec(), 2)}", mean drive ${f(r.meanDrive * FixedMeshReport.ARCSEC, 1)}", '
+          + 'backlash mean ${f(r.backlashMeanArcsec(), 1)}" (${f(r.backlashMean * um, 1)} um; min ${f(r.backlashMin * um, 1)}, max ${f(r.backlashMax * um, 1)}), '
+          + 'flank ${f(r.meanFlankContacts, 1)} (${r.maxFlankContacts}), tip edge ${f(r.meanTipContacts, 1)} (${r.maxTipContacts}), first contact flank ${f(r.firstContactFlank * 100, 0)}% / tip ${f(r.firstContactTip * 100, 0)}%, '
+          + 'interference: ${issues.length == 0 ? "none" : issues.join(", ")} [${f(Sys.time() - t1, 1)} s]');
+      }
+    }
+  }
+
   public static function main():Void {
+    if (Sys.args().indexOf("fixed") >= 0) {
+      fixedStudy();
+      return;
+    }
     var m = 0.3, deg = DEG;
     var max20 = maxCutterTipRadius(r -> {
       return new GearSpec(m, 200, 8, new Involute(20 * deg), false, 0, r).profile();
@@ -212,6 +250,7 @@ class ToothStudy {
     for (k in [0.8, 1.0, 1.2]) cases.push({label: "D2 DCA(paper m 0.5) rho 0.38m", input: new StrainWaveInput("D2", "double-circular-arc", 0.5, 100, 102, k, "cosine"), rho: null});
     hobStudy();
     camStudy();
+    fixedStudy();
     for (c in cases) {
       var pair = new StrainWavePair(c.input, c.rho);
       var r = MeshingAnalysis.run(pair, 0.005, 24);
