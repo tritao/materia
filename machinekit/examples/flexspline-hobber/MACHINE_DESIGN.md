@@ -157,7 +157,7 @@ Procurement requirements for position feedback. None is selected or commissioned
 | Z | Same, ML ≈ 240 mm | ±5 µm/m; spur parts, so scale error barely reaches the gear | same RFQ |
 | Y | Same, ML ≈ 70 mm | ±5–10 µm/m; same model as Z for spares | same RFQ |
 | C | Table's own angle encoder | Purchased table, ±5″ positioning / ±2″ repeatability; protocol must match the C drive | uncommissioned |
-| B | Direct spindle motor encoder | ≥ 2¹⁶ counts/rev, rated 8000 rpm, deterministic latching | with drive selection |
+| B | Spindle master encoder ring (servo encoder candidate) | ≥ 2¹⁶ counts/rev, up to 5000 rpm, deterministic latching | with drive selection |
 | X/Y/Z/A motors | Servo motor encoders | Standard | with drive selection |
 
 Why X matters most: radial error changes tooth thickness by ≈ 2·tan 20°·ΔX ≈ 0.73·ΔX.
@@ -359,42 +359,58 @@ fastener selections and tightening procedures still need manufacturing drawings;
 this layout check is not structural or mould-process qualification.
 
 
-### Hob spindle cartridge (2026-10-19)
+### Hob spindle cartridge (revised 2026-11-01: coupled servo)
 
-The former arbor-at-an-empty-gauge-line model is replaced with a cartridge load
-path: hob → removable arbor → taper and face → hollow spindle shaft → opposed
-angular-contact pair → stepped housing → Y saddle. The outboard bearing remains
-radially supporting and axially floating. This is an **assumed custom TF20**
-interface, not an HSK-E25 claim. All dimensions below are assumed, in millimetres,
-measured along the spindle from the housing rear datum; the tool face stays at
-180, so the cutting geometry and work-frame kinematics are unchanged.
+Load path: hob → removable arbor → taper and face → spindle shaft → opposed
+angular-contact pair → stepped steel housing → Y saddle. B is driven by a standard
+80-frame servo through a coupling behind the housing, replacing the earlier assumed
+hollow direct motor. The model uses the assumed `GENERIC-HV-SERVO-1000W` (1 kW,
+3.18 N m, 3000/5000 rpm) in the envelope and hole pattern of the Leadshine
+ELM2H-1000LA80F being quoted; the catalogue Leadshine row has no published winding
+constants, which the drive check requires. The CAM job's reference speed is 2984 rpm (300 m/min on Ø32), inside
+the servo's rated speed. The outboard bearing remains radially supporting and
+axially floating. This is an **assumed custom TF20** interface, not an HSK-E25
+claim. Dimensions are assumed, in millimetres, along the spindle from the housing
+rear datum; the tool face stays at 180, so the cutting geometry and work-frame
+kinematics are unchanged.
 
 | Feature | Axial interval / dimensions |
 | --- | --- |
-| Motor envelope | 20–120; Ø25 bore on spindle shaft |
+| Housing | Steel, Ø80 g6 outside (a standard spindle-clamp size), 0–180, held by the Y saddle's front ring and rear open C bracket |
+| Servo | Face at −70 on a bell adapter: Ø80 front flange (−8–0, 4 × M4 to the housing), Ø64 tube with two coupling windows, 90 mm square rear flange (4 × M6 on Ø90), Ø70 pilot recess |
+| Coupling | −55 to −10, motor Ø19 to shaft stub Ø20; envelope for a balanced bellows/disc coupling |
+| Shaft stub | Ø20, −30–0 |
+| Floating rear bearing | 6205 (25 × 52 × 15) at 0–15 in a Ø52 bore |
+| Master encoder ring | 18–24 in the Ø62 bore |
 | Opposed bearing pair | 129–146 and 146–163; Ø25 journals, Ø62 housing seats |
-| Outer-ring retention | Housing shoulder at 129; removable threaded gland at 163–180 |
-| Inner-ring retention | Shaft shoulder at 163; shaft locknut at 123–129 |
-| Spindle nose | Ø40, 170–180; removable gland clearance bore Ø42 |
-| Taper engagement | 160–180; Ø16 small end, Ø20 large end |
+| Outer-ring retention | Housing shoulder at 129; bolted front gland: Ø62 spigot 163–180, Ø80 flange 180–186, 4 × M4 on Ø72 |
+| Inner-ring retention | Shaft shoulder at 163; catalogue precision locknut M25 × 1.5 (KM5 size, Ø38 × 7) at 122–129, in a Ø44 housing shoulder bore |
+| Spindle nose | Ø40, 170–180; gland bore Ø42 (1 mm labyrinth gap) |
+| Taper engagement | 160–180; Ø16 small end, Ø20 large end (1:5) |
 | Arbor face flange | Ø40 × 4, starting at unchanged gauge face 180 |
+| Arbor retention | Four M4 × 10 socket screws on Ø32 PCD, at 45° to the pins |
 | Torque transmission | Two Ø4 axial pins on Ø28 PCD; 2 mm engagement in flange |
-| Drawbar | Ø6 shank through hollow shaft, head on rear face; 12 mm engagement into arbor |
 
-The taper locates radially, face contact locates axially, the drawbar holds both
-contacts closed, and the pins transmit torque. Assembly sequence: fit the motor in the rear housing bore; slide the matched
-bearing pair onto the shaft from its rear against the shaft shoulder, then fit
-and tighten the rear locknut. Fit the shaft/pair from the front against the housing shoulder, slide the Ø42-bore front gland over the Ø40 nose and secure it, then insert
-the arbor and tighten the drawbar from the rear. Access to the rear drawbar must
-remain available. The BOM lists shaft, drawbar, gland and locknut separately.
+The taper locates radially, the face locates axially, and the four flange screws
+hold both contacts closed; there is no drawbar, so the arbor changes from the
+front. Assembly sequence: slide the matched pair onto the shaft from its rear
+against the shaft shoulder and tighten the rear locknut; fit the shaft and pair
+from the front against the housing shoulder and bolt the front gland, its spigot
+ground at assembly to clamp the outer rings; fit the
+rear 6205 over the journal into its floating bore; fit the encoder ring; mount the
+bell adapter, coupling and servo; fit the arbor and its four screws.
 
-Bearing envelopes do not resolve individual races. Thread helices, fits, preload,
-drawbar tightening force, pin strength, balance, sealing and grinding tolerances
-remain manufacturing design requirements; the CAD does not qualify them. In
-particular, simultaneous taper/face contact must be specified and verified during
-manufacture. The existing runout assumptions are retained, not requalified.
+A bought cartridge to this interface is being quoted as an alternative to making
+it (2026-11-01); `supplier-packages/spindle/` generates the drawing package (per-part
+STEP, exact sections and the specified tolerances) from this model. Bearing envelopes do not resolve individual races. Thread
+helices, fits, preload, screw torque, pin strength, balance, sealing and grinding
+tolerances remain manufacturing design requirements; the CAD does not qualify them.
+Simultaneous taper/face contact must be specified and verified during manufacture.
+The existing runout assumptions are retained, not requalified. The ring encoder is
+kept as the B master encoder; the servo's own 23-bit encoder may replace it once
+the drive's master-output latency is confirmed.
 
-Before HB-D11, the cartridge added 1.086 kg: total mass 425.297 kg; moving X/Y/Z masses
+Before HB-D11, the original direct-motor cartridge added 1.086 kg: total mass 425.297 kg; moving X/Y/Z masses
 132.064 / 14.574 / 41.603 kg. Continuous thrust margins under the existing assumed
 demand are X 885.968 N, Y 907.722 N, Z 1531.207 N. Guide-to-hob offsets and bed
 footprint were unchanged by that cartridge change; current masses are in the HB-D11 table above.

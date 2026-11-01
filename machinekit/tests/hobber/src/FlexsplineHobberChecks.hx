@@ -522,8 +522,8 @@ class FlexsplineHobberChecks {
       validated,
       settings
     );
-    var b = machine.spindle.motor, c = machine.tableSpec;
-    var bTorque = b.continuousTorque * reserve, bPower = b.continuousTorque * b.ratedSpeed * reserve;
+    var b = machine.spindle.motor.rating, c = machine.tableSpec;
+    var bTorque = b.ratedTorque * reserve, bPower = b.ratedTorque * b.ratedSpeed * reserve;
     var cTorque = c.continuousTorque
       * reserve - c.number("sealDrag") - c.number("sealDragRipple") - c.number("coggingTorque");
     check(

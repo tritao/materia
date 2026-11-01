@@ -29,7 +29,7 @@ class HobberPartTests {
     new CrossedRollerBearing(),
     new RotaryEncoderRing(),
     new HobSpindlePart("shaft"),
-    new HobSpindlePart("drawbar"),
+    new HobSpindlePart("motorAdapter"),
     new HobSpindlePart("bearingRetainer"),
     new HobSpindlePart("bearingLocknut"),
     new FlexsplineCupBlank(),
@@ -169,14 +169,18 @@ class HobberPartTests {
       edited.definition().joints.filter(j -> j.id == "C")[0].limits.effort == 42,
       "edited motor changes derived C limit"
     );
-    near(spindle.motor.continuousTorque * spindle.motor.ratedSpeed, 1500, 1e-8, "spindle continuous mechanical power");
-    near(spindle.motor.maxSpeed, 8000 * 2 * Math.PI / 60, 1e-9, "spindle 8000 rpm limit");
-    var winding = spindle.motor.electricalRating();
-    if (winding == null) throw "spindle winding absent";
-    var current = spindle.motor.continuousTorque / winding.torqueConstant;
+    check(spindle.motor.rating.designation == HobSpindle.MOTOR && spindle.motor.ratingsBasis == Assumed,
+      "spindle is driven by the assumed 1 kW servo");
+    near(spindle.motor.rating.ratedTorque * spindle.motor.rating.ratedSpeed, 1000, 1e-9, "spindle servo is 1 kW");
+    near(spindle.motor.rating.maxSpeed, 5000 * 2 * Math.PI / 60, 1e-9, "B speed limit is the servo's 5000 rpm");
+    near(spindle.jointTorque(2), 2, 0, "coupling gives a 1:1 spindle drive");
     check(
-      3 * current * current * winding.phaseResistance < 0.05 * 1500,
-      "spindle assumed winding has coherent rated copper loss"
+      spindle.coupling.boreA == spindle.motor.rating.shaftDiameter && spindle.coupling.boreB == HobSpindle.SHAFT_STUB,
+      "coupling joins the motor shaft to the spindle stub"
+    );
+    check(
+      HobSpindle.MOTOR_FACE + spindle.motor.rating.shaftLength >= HobSpindle.COUPLING_START + 15,
+      "motor shaft engages its half of the coupling"
     );
     check(spindle.frontBearing != spindle.rearBearing, "spindle has two bearing instances");
     check(
@@ -190,7 +194,10 @@ class HobberPartTests {
       "B drives shaft; arbor is retained to its tool face"
     );
     var cartridgePoses = spindle.solvedPoses();
-    for (id in ["shaft", "drawbar", "bearingRetainer", "bearingLocknut"]) check(
+    for (id in [
+      "shaft", "motorAdapter", "motor", "motorShaft", "coupling", "tailBearing", "bearingRetainer", "bearingLocknut",
+      "arborScrew1", "arborScrew4", "glandScrew1", "adapterScrew4"
+    ]) check(
       cartridgePoses.exists(id),
       "cartridge load-path part present: " + id
     );

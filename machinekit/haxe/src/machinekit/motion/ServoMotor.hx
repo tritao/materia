@@ -36,7 +36,7 @@ typedef ServoRating = {
  * through a `Gearbox`.
  *
  * The named ratings are generic: round numbers in the range of the 3000 rpm AC servo families made at 50,
- * 100, 200, 400 and 750 W (rated torque is power over 3000 rpm, peak three times that, 5000 rpm at most, a little
+ * 100, 200, 400, 750 and 1000 W (rated torque is power over 3000 rpm, peak three times that, 5000 rpm at most, a little
  * under 20 bits' worth of encoder). They are assumptions, not a vendor's datasheet.
  * CAD frame: mounting face at z=0, body toward -Z, shaft along +Z. Connectors: `mountFace`, `shaftAxis`.
  */
@@ -113,7 +113,9 @@ class ServoMotor extends MachineComponent implements MotorDrive {
         generic("GENERIC-SERVO-100W", 100, 5.0e-6, 40, 85, 8, 20),
         generic("GENERIC-SERVO-200W", 200, 2.5e-5, 60, 100, 14, 30),
         generic("GENERIC-SERVO-400W", 400, 5.0e-5, 60, 130, 14, 30),
-        generic("GENERIC-SERVO-750W", 750, 1.2e-4, 80, 145, 19, 35)
+        generic("GENERIC-SERVO-750W", 750, 1.2e-4, 80, 145, 19, 35),
+        // 80-frame envelope and inertia of a Leadshine ELM2H-1000LA80F class motor.
+        generic("GENERIC-SERVO-1000W", 1000, 2.0e-4, 80, 104, 19, 35)
       ];
       // Distinct saved designations preserve the selected winding on reconstruction.
       var baseRows = table.copy();
@@ -293,6 +295,12 @@ class ServoMotor extends MachineComponent implements MotorDrive {
       pilot = 50;
       pitch = 50;
       hole = 5.5;
+    } else if (StringTools.endsWith(designation, "1000W")) {
+      // Common 80-frame pattern: four holes on a 90 mm PCD (63.64 mm square pitch), as Leadshine ELM2H-1000.
+      face = 80;
+      pilot = 70;
+      pitch = 90 / Math.sqrt(2);
+      hole = 6.6;
     } else if (StringTools.endsWith(designation, "750W")) {
       face = 80;
       pilot = 70;
