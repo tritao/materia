@@ -110,7 +110,7 @@ Surveyed 2026-10-17 on branch `flexspline-hobber` (6caeb51f3).
   - penetration (interference);
   - contact status (clearance under a threshold);
   - and the contact point positions.
-- Summary: engaged-tooth fraction, backlash distribution, the contact zone in angle around the
+- Summary: flank-engaged and tip-edge-contact fractions (apart; tip contact is not engagement), backlash distribution, the contact zone in angle around the
   major axis, and interference count (must be zero).
 - Loaded meshing is later. Torque deflects the flexspline and changes the engagement; that needs
   a compliance model.
@@ -146,7 +146,7 @@ paper.**
 **TD-D7. Design search is small, deterministic and transparent.**
 - Search a few parameters (`κ`, cam type, and arc radii and offsets for double-circular-arc)
   with a grid then Nelder–Mead. Seeds are fixed.
-- Objectives: maximise engaged-tooth fraction and backlash uniformity, and maximise root fillet
+- Objectives: maximise flank-engaged fraction and backlash uniformity, and maximise root fillet
   radius, under the TD-D5 constraints.
 - Every candidate's metrics are reported, so a person can see the trade-off rather than only the
   winner.
@@ -279,22 +279,30 @@ Deviations from the printed equations:
   checked by its zero mean and `u(pi/2) = delta`). Cam convention: delta = w0, theta = (phi mod pi) - pi/2. Tests:
   `w(0) = w0`, minor axis -0.918 w0, zero slope at both axes, mean zero (1e-12), even, period pi, slope matches
   the derivative, and the general inextensibility/closure checks all pass.
-- TD5 cam comparison (`ToothStudy.camStudy`, kappa 1, own derived circular spline, so transmission error is zero
-  by construction and only the engagement and clearances differ):
+- TD5 cam comparison (`ToothStudy.camStudy`, kappa 1, each cam with its own derived circular spline). **Transmission
+  error is zero by construction and is not measured**: every cam gets a circular spline derived from its own motion, so
+  no cam can show a ratio error against a fixed one. Only clearances and how closely the other teeth follow that
+  envelope differ. Flank = teeth whose closest point to the circular spline (within 5 / 20 um) is on the working
+  flank; tip = tip edge contact (closest point on the tip blend or land), reported apart, not as engagement:
 
-| Cam | D1 minor-tip clr | D1 engaged 5 / 20 um | D2s minor-tip clr | D2s engaged 5 / 20 um | max abs w difference from cosine |
-|---|---|---|---|---|---|
-| cosine | 0 | 48 % / 86 % | 248 um | 17.5 % / 42 % | 0 |
-| ellipse | -4.6 um (touch) | 48 % / 85.5 % | 244 um | 17.3 % / 41 % | 4.6 um |
-| Resal | -24.5 um (touch) | 48 % / 85 % | 224 um | 15.9 % / 40 % | 24.5 um |
-| four-roller | -127 um | 43 % / 59 % | 121 um | 5 % / 44 % | 127 um |
+| Cam | D1 minor-tip clr | D1 flank 5 / 20 um | D1 tip edge 5 / 20 um | D2s minor-tip clr | D2s flank 5 / 20 um | D2s tip edge 5 / 20 um | max abs w difference from cosine |
+|---|---|---|---|---|---|---|---|
+| cosine | 0 | 1.6 % / 19.9 % | 46.5 % / 65.9 % | 248 um | 16.3 % / 40.7 % | 1.2 % / 1.2 % | 0 |
+| ellipse | -4.6 um | 1.6 % / 19.8 % | 46.5 % / 65.7 % | 244 um | 16.1 % / 40.2 % | 1.2 % / 1.2 % | 4.6 um |
+| Resal | -24.5 um | 1.5 % / 21.7 % | 46.5 % / 63.5 % | 224 um | 14.6 % / 38.7 % | 1.3 % / 1.3 % | 24.5 um |
+| four-roller | -127 um | 2.8 % / 19.3 % | 39.9 % / 40.0 % | 121 um | 2.8 % / 40.3 % | 2.3 % / 3.4 % | 127 um |
 
-  The Resal and ellipse cams give nearly the cosine engagement; the Resal minor axis is pulled in 0.918 w0, so the
-  D1 tips (zero margin at kappa 1) touch at the minor axis, which D2's shorter teeth absorb. Gravagno's kinematic
-  error (transmission-ratio error) is **not modelled** here; it needs a fixed circular spline meshing with the cam.
-  Gravagno's finding (Resal, ellipse, two-conjugate-arc lowest error; the dwell "caterpillar" cams, cycloidal,
-  3-4-5 and 8th-degree polynomial, trade slightly higher error for more contact) is noted: **dwell cams are a possible
-  later TD**, not implemented.
+  What these numbers can and cannot say:
+  - **Cam differences of a few um are inside model error.** `ShapedCam` maps the cam to the neutral line by taking the
+    radius at the deformed angle as `w` at the material angle. That drops a second-order term of order
+    `w0^2 / r_n` (0.09 / 29.3, about 3 um for D1). So the ellipse "interference" of -4.6 um at the D1 minor axis is not
+    a result; neither is the 0 to 3 point spread among cosine, ellipse and Resal engagement. The Resal minor axis
+    (-24.5 um) is outside that error but is arithmetic on the assumed circular-spline tip circle (below), not a mesh
+    result. Nothing here ranks cosine, ellipse and Resal.
+  - **The four-roller geometry is unsourced.** It is an assumed four-arc oval (see TD3 notes); no roller layout was taken
+    from a source. Its -127 um and its different engagement describe that assumed shape only.
+  - Gravagno's kinematic error (transmission-ratio error) is not modelled; it needs a fixed circular spline meshing with
+    the cam. Dwell "caterpillar" cams (cycloidal, 3-4-5, 8th-degree polynomial) are a possible later TD, not implemented.
 
 ## TD4 notes
 
@@ -315,26 +323,44 @@ Deviations from the printed equations:
 
 `MeshingAnalysis` scans one circular pitch of wave-generator angle (24 or 48 samples; the ring state
 repeats every pitch) with every flexspline tooth against the derived circular spline
-(`SweptSpace`). Run with `ToothStudy` in `gearkit/tests`. **All numbers below are model output:
+(`SweptSpace`). Run with `ToothStudy` (see "Running the tooth study" below). **All numbers below are model output:
 unloaded, kinematic, rigid teeth, zero-backlash conjugate circular spline.** Assumptions: full-depth
 teeth (addendum 1.0 m, dedendum 1.25 m) on both gears and a nominal full-depth circular spline
 (tip `r_pc - m`, root `r_pc + 1.25 m`); neutral line half a wall (0.01 m Z_f) under the root;
 contact threshold 5 um (and 20 um); thinnest acceptable circular-spline tooth 0.05 m.
 
-m 0.3, Z 200/202, cosine cam. "CS tip trim" is how far the circular-spline tooth tip must be cut
-back from the nominal tip for the derived tooth to be 0.05 m thick.
+**Which numbers are meshing results, and which are not.**
+- The root clearance `(1.25 - kappa) m` (`rRoot - reach`) and the minor-axis tip clearance `(kappa - 1) m`
+  (`rTip - minorTip`) are **arithmetic on the assumed nominal circular-spline radii** (`MeshingAnalysis`, using
+  `StrainWavePair.circularTipRadius` / `circularRootRadius`). They restate the tooth depth against the assumed
+  circle; they are not meshing results. The derived circular spline is built from the flexspline's own motion, so it
+  cannot disagree with that motion.
+- **Transmission error is zero by construction and is not measured**: the circular spline is derived from each
+  flexspline-and-cam pair. A fixed circular spline meshing with a cam is needed to measure it (the planned fixed-circular-spline redesign, not done).
+- The engagement metric (changed 2026-11-01). The first version counted a tooth as engaged when any outline point was
+  within the threshold, which includes the tip rounding and the tip land. That reported 48 % for D1 at kappa 1, but
+  it was almost entirely tip edge contact. Each sample point is now classified by region (`ToothProfile.regionAt`:
+  flank strictly between the root join and the tip-blend start; tip = tip blend and land; root blend), and a tooth
+  within the threshold is attributed to the region of its closest point. **Flank engaged** and **tip edge contact**
+  are reported apart; tip contact is edge contact, not engagement. The attribution matters: counting every tooth with
+  any flank point within 5 um (joins excluded) gives 32 % for D1 at kappa 1, because flank points a few samples below
+  the edge lie within 5 um of the edge's own trace.
 
-| Case | kappa | Interference | Root clr | Tip-tip clr (minor axis) | CS tip trim | Engaged 5 um / 20 um | Root fillet R min | Hobbable |
-|---|---|---|---|---|---|---|---|---|
-| D1 20 deg, hob corner 0.38 m | 0.8 | yes (tips meet) | 135 um | -60 um | 88 um | 84 % / 84 % | 0.116 mm | yes |
-| D1 | 1.0 | no | 75 um | 0 | 28 um | 48 % / 86 % | 0.116 mm | yes |
-| D1 | 1.1 | no | 45 um | 30 um | 0 | 33 % / 50 % | 0.116 mm | yes |
-| D1 | 1.2 | no | 15 um | 60 um | 0 | 24 % / 36 % | 0.116 mm | yes |
-| D3 30 deg, hob corner 0.1 m | 0.8 | yes | 135 um | -60 um | 68 um | 54 % / 92 % | 0.034 mm | yes |
-| D3 | 0.9 | yes | 105 um | -30 um | 37 um | 35 % / 52 % | 0.034 mm | yes |
-| D3 | 1.0 | no | 75 um | 0 | 8 um | 23 % / 35 % | 0.034 mm | yes |
-| D3 | 1.1 | no | 45 um | 30 um | 0 | 10 % / 17 % | 0.034 mm | yes |
-| D3 | 1.2 | no | 15 um | 60 um | 0 | 12 % / 18 % | 0.034 mm | yes |
+m 0.3, Z 200/202, cosine cam. "CS tip trim" is how far the circular-spline tooth tip must be cut
+back from the nominal tip for the derived tooth to be 0.05 m thick. Minimum clearance on both flank and tip is
+0 to -0.2 um (inside the 0.7 um fit bound) in every interference-free row, by construction.
+
+| Case | kappa | Interference | Root clr | Tip-tip clr (minor axis) | CS tip trim | Flank engaged 5 um / 20 um | Tip edge contact 5 um / 20 um | Root fillet R min | Hobbable |
+|---|---|---|---|---|---|---|---|---|---|
+| D1 20 deg, hob corner 0.38 m | 0.8 | yes (tips meet) | 135 um | -60 um | 88 um | 0 % / 0 % | 84.3 % / 84.4 % | 0.116 mm | yes |
+| D1 | 1.0 | no | 75 um | 0 | 28 um | 1.6 % / 19.9 % | 46.5 % / 65.9 % | 0.116 mm | yes |
+| D1 | 1.1 | no | 45 um | 30 um | 0 | 10.8 % / 19.3 % | 22.6 % / 31 % | 0.116 mm | yes |
+| D1 | 1.2 | no | 15 um | 60 um | 0 | 11.7 % / 22.8 % | 12.6 % / 12.7 % | 0.116 mm | yes |
+| D3 30 deg, hob corner 0.1 m | 0.8 | yes | 135 um | -60 um | 68 um | 1.3 % / 21 % | 52.5 % / 71 % | 0.034 mm | yes |
+| D3 | 0.9 | yes | 105 um | -30 um | 37 um | 0 % / 4.8 % | 35 % / 46.6 % | 0.034 mm | yes |
+| D3 | 1.0 | no | 75 um | 0 | 8 um | 0 % / 2.2 % | 22.5 % / 33 % | 0.034 mm | yes |
+| D3 | 1.1 | no | 45 um | 30 um | 0 | 9.1 % / 15.9 % | 1.1 % / 1.1 % | 0.034 mm | yes |
+| D3 | 1.2 | no | 15 um | 60 um | 0 | 10.1 % / 16.4 % | 1.8 % / 1.8 % | 0.034 mm | yes |
 
 - D3 with the reference hob's 0.38 m corner radius cannot be cut: "rack corner leaves no cutter tip
   land". At full depth the largest corner radius is 0.47 m at 20 deg but 0.11 m at 30 deg
@@ -343,40 +369,55 @@ back from the nominal tip for the derived tooth to be 0.05 m thick.
 - Both forms are interference-free for kappa 1.0 to 1.2 and interfere below 1 (tooth tip meets
   circular-spline tooth tip at the minor axis) because the tooth depth is 1.0 m; kappa above 1.25
   bottoms in the root (D4, kappa 2: tips 225 um past the root, tooth 0, wave generator 0.0039 rad).
-  The usable kappa window is set by tooth depth, not by pressure angle.
-- Engaged fraction is much higher for 20 deg than 30 deg at every kappa and falls as kappa rises
-  for both. The plan expected a rise with kappa; this model does not give one. With the
-  circular spline derived for each kappa, every tooth touches an envelope point, so the fraction
-  depends on the threshold: it measures how closely the other teeth follow the envelope, an
-  upper bound on real engagement. Do not compare these percentages with published (loaded) figures.
+  **This window follows from the assumed nominal circular-spline radii** (see above): it restates tooth depth
+  against the assumed circle, so it is arithmetic, not a meshing finding.
+- **Flank engagement is small and rises with kappa for the involute forms.** At kappa 1 the D1 flank is engaged for
+  1.6 % of teeth (5 um) and the D3 flank for 0 %, while 46.5 % (D1) and 22.5 % (D3) of teeth touch only with the tip
+  edge. At kappa 1.1 and 1.2 flank engagement is 9 to 12 % for both and tip edge contact falls. The earlier claim that
+  engagement falls as kappa rises, and that 20 deg engages far more than 30 deg, came from counting tip edge contact;
+  with the flank counted alone it is not supported. At 20 um the D1 flank figure is 20 % at kappa 1 and 23 % at 1.2
+  and D3 2 % at kappa 1, so the pressure-angle difference at kappa 1 is small in absolute terms and sensitive to the
+  threshold. Do not compare any of these percentages with published (loaded) figures: the derived circular spline
+  makes every tooth pass through its envelope, so the flank fraction measures how closely the other teeth follow
+  the envelope (an upper bound on real unloaded engagement), not load sharing.
+- **No pressure-angle recommendation follows from engagement.** D1 is the pick for other reasons: the reference hob is
+  a catalogue hob, the involute has direct metrology (the base circle and involute traces; the hobber's Fr and flank
+  grading exist for it), and it has the larger root-fillet room (0.472 m against 0.11 m at 30 deg). It is not the pick
+  because it "engages more".
 - Not done: a fixed standard circular-spline tooth instead of the derived one,
   loaded meshing, root stress.
 
 ### D2 (double-circular-arc) against D1 and D3
 
 `D2s` = Liu's arcs scaled to m 0.3, Z 200/202; `D2` = the unscaled paper case (m 0.5, Z 100/102, w0 0.5). Both are
-valid. Same assumptions and thresholds as above, root fillet 0.38 m for D2 (circular, assumed).
+valid. Same assumptions, thresholds and metric as above, root fillet 0.38 m for D2 (circular, assumed).
 
-| Case | kappa | Interference | Root clr | Tip-tip clr (minor axis) | Engaged 5 um / 20 um | Contact zone | Root fillet R |
-|---|---|---|---|---|---|---|---|
-| D2s | 0.8 | no | 97 um | 188 um | 57 % / 57 % | +-51 deg | 0.113 mm |
-| D2s | 1.0 | no | 37 um | 248 um | 17.5 % / 42 % | +-16 deg | 0.113 mm |
-| D2s | 1.1 | no | 7 um | 278 um | 12 % / 24 % | +-11 deg | 0.113 mm |
-| D2s | 1.2 | yes (root bottoming) | -23 um | 308 um | 14.5 % / 22 % | +-13 deg | 0.113 mm |
-| D2 (paper) | 1.0 | no | 61 um | 414 um | 16 % / 36 % | +-14 deg | 0.186 mm |
-| D2 (paper) | 1.2 | yes | -39 um | 514 um | 12 % / 18 % | +-11 deg | 0.186 mm |
+| Case | kappa | Interference | Root clr | Tip-tip clr (minor axis) | Flank engaged 5 um / 20 um | Tip edge contact 5 um / 20 um | Min clr flank / tip | Flank zone | Root fillet R |
+|---|---|---|---|---|---|---|---|---|---|
+| D2s | 0.8 | no | 97 um | 188 um | 48.8 % / 48.8 % | 7.8 % / 7.9 % | 0 / -0.1 um | +-50 deg | 0.113 mm |
+| D2s | 1.0 | no | 37 um | 248 um | 16.3 % / 40.7 % | 1.2 % / 1.2 % | 0 / -0.1 um | +-16 deg | 0.113 mm |
+| D2s | 1.1 | no | 7 um | 278 um | 10.9 % / 22.7 % | 1.0 % / 1.0 % | 0 / -0.1 um | +-11 deg | 0.113 mm |
+| D2s | 1.2 | yes (root bottoming) | -23 um | 308 um | 2.7 % / 10.3 % | 11.8 % / 11.8 % | -12.9 / -23.3 um | +-13 deg | 0.113 mm |
+| D2 (paper) | 0.8 | no | 161 um | 314 um | 47.8 % / 47.8 % | 8.4 % / 8.8 % | 0 / -0.1 um | +-50 deg | 0.186 mm |
+| D2 (paper) | 1.0 | no | 61 um | 414 um | 14.2 % / 34.7 % | 1.8 % / 1.8 % | 0 / -0.1 um | +-14 deg | 0.186 mm |
+| D2 (paper) | 1.2 | yes | -39 um | 514 um | 0.5 % / 6.5 % | 11.9 % / 11.9 % | -21.5 / -38.9 um | +-11 deg | 0.186 mm |
 
 - D2 is shorter (addendum 0.586 m, dedendum 0.708 m), so its root clearance is hf - ha = 0.122 m (37 um) at kappa 1
   and it bottoms above kappa about 1.12; it never has tip-tip interference (minor-axis tips clear by 190 to 310 um).
-  Its usable kappa window is therefore below about 1.1, where D1 needs kappa >= 1 and D3 >= 1.
-- Engaged fraction at kappa 1: D1 48 % / 86 %, D3 22 % / 35 %, D2s 17.5 % / 42 % (5 um / 20 um). D2 sits between D1
-  and D3 at 20 um and below both at 5 um. **The plan's expectation that D2 engages more than D1 is not borne out**
-  in this unloaded, zero-backlash model; the paper's advantage is for loaded, backlash-bearing contact, which
-  this model does not represent. Do not read the percentages as the published ~30 %.
+  Both clearances are arithmetic on the assumed nominal circular-spline radii (see TD5 notes), not meshing results:
+  they are the form's own tooth depth restated.
+- Flank engagement at kappa 1 (5 um / 20 um): D2s 16.3 % / 40.7 %, D2 (paper) 14.2 % / 34.7 %, against D1 1.6 % / 19.9 %
+  and D3 0 % / 2.2 %. The D2 flank is engaged for roughly ten times as many teeth as the D1 flank at 5 um in this
+  unloaded, zero-backlash model, and its tooth tip is almost never the contact (1 to 2 %); D1 and D3 touch mostly
+  with the tip edge. This is a statement about how closely the other teeth follow the derived envelope in a
+  kinematic model, not a load-sharing result, and not the published ~30 % (loaded). The earlier "D2 engages fewer
+  teeth than D1" came from tip edge contact and is withdrawn.
 - Backlash/clearance along the mesh: with the derived (conjugate) circular spline the clearance is zero on the
-  envelope by construction; the engaged fractions above are how many teeth stay within 5 / 20 um of it.
+  envelope by construction; the fractions above are how many teeth stay within 5 / 20 um of it.
 - Fillet: D2's root fillet is a design choice here (circular, equal to the hob corner radius). The geometric
   maximum is 0.743 m (D1's trochoid reaches 0.472 m at 20 deg, D3 0.11 m at 30 deg), so D2 allows the largest fillet.
+- D2's curved flank cannot be cut with the existing hob (next section), so the choice between D1 and D2 is a
+  hob and metrology choice as much as a meshing one. Meshing evidence here is kinematic and unloaded only.
 
 ### Hob implications for D2 (rack recovered by `ConjugateRack` from the D2s tooth)
 
@@ -456,8 +497,8 @@ valid. Same assumptions and thresholds as above, root fillet 0.38 m for D2 (circ
 - Tests:
   - D1 and D2 have zero interference;
   - D4 is reported with the tooth index and wave-generator angle where interference occurs;
-  - the engaged fraction rises monotonically with κ over a feasible range;
-  - D2 engages more teeth than D1 at equal module scaling (stated margin, plausibility only).
+  - flank-engaged and tip-edge-contact fractions are reported apart, with the minimum clearance of each region;
+  - no ordering claim (rise with κ, or D2 above D1) is asserted: the measured values are in the TD5 notes, and they are unloaded kinematic numbers.
 
 **TD6. Design rules and manufacturability (TD-D5).**
 - Backlash, clearance, tip thickness, fillet, hobbability, internal generation and the bending
@@ -540,7 +581,7 @@ TD0 ── TD1 ── TD2 ──┐
 | TD2 | done: `DoubleCircularArc` / `DoubleArcProfile` (flat construction rebuilt from the definitions, wrapped on the pitch circle; circular root and tip blends assumed); deviations from the paper in the TD2 notes | Tooth design: double-circular-arc form (TD2) |
 | TD3 | done: cosine, ellipse, four-roller, Resal (Gravagno 2016 eq 18) | Tooth design: deformation kinematics (TD3) |
 | TD4 | done for involute forms (D1, D3); not fitted to a full `Sampled` ToothForm (root/tip blends), and no contact-condition refinement: accuracy is by convergence | Tooth design: circular-spline envelope (TD4) |
-| TD5 | done for D1, D2, D3, D4 (unloaded kinematic); "engaged fraction rises with kappa" not borne out (measured fall) and "D2 engages more than D1" not borne out (D2 engages fewer, see TD5 notes) | Tooth design: meshing analysis and D1/D3 comparison (TD5); Tooth design: double-circular-arc form (TD2) (D2 comparison) |
+| TD5 | done for D1, D2, D3, D4 (unloaded kinematic), metric corrected 2026-11-01: flank engagement and tip edge contact are reported apart. D1 kappa 1 flank 1.6 % (tip edge 46.5 %); D2s 16.3 %; D3 0 %. Root and minor-tip clearances are arithmetic on the assumed circular-spline radii, transmission error is zero by construction, and cam differences of a few um are inside model error (see TD5 notes) | Tooth design: meshing analysis and D1/D3 comparison (TD5); Tooth design: double-circular-arc form (TD2) (D2 comparison) |
 | TD6 | planned | |
 | TD7 | planned | |
 | TD8 | planned | |

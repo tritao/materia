@@ -146,6 +146,8 @@ class InvoluteProfile implements ToothProfile {
     return new Point2(-Math.sin(angle), Math.cos(angle)).scaled(spec.tipFilletRadius * tipArcSweep);
   }
 
+  public function regionAt(radius:Float):ToothRegion return ToothOutline.regionAt(this, radius);
+
   public function evaluationRange():GearEvaluationRange {
     var lo = Math.min(rootJoinR, tipJoinR), hi = Math.max(rootJoinR, tipJoinR);
     var result = spec.evaluation;

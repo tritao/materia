@@ -19,6 +19,9 @@ interface ToothProfile {
   function rootDerivative(t:Float):Point2;
   function tipFillet(t:Float):Point2;
   function tipDerivative(t:Float):Point2;
+  /** Region of a point at `radius` on this tooth: `Root` up to the root join, `Flank` strictly between
+      the joins, `Tip` from the tip join on (the tip blend and land); join points belong to the blends. */
+  function regionAt(radius:Float):ToothRegion;
   function evaluationRange():GearEvaluationRange;
   /** Closed polygon of one pitch, including root and tip lands. Mirror for the left flank. */
   function outline(samples:Int):Array<Point2>;

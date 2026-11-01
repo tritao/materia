@@ -3,6 +3,15 @@ package gearkit;
 /** The closed one-pitch polygon shared by the tooth profiles. `side` is the right-hand boundary in
     order: root circle point, root blend to the flank join, flank, tip blend to the tip circle. */
 class ToothOutline {
+  /** Region of a point at `radius` on the tooth: flank strictly between the two join radii, root blend up to
+      the root join, tip (blend and land) from the tip join on, whatever the gear kind. The join points
+      themselves belong to the blends (to 1e-9 mm, so outline points built at a join classify consistently). */
+  public static function regionAt(profile:ToothProfile, radius:Float):ToothRegion {
+    var sign = profile.gearSpec().sign(), rootJoin = profile.rootJoinRadius();
+    var along = sign * (radius - rootJoin), span = sign * (profile.tipJoinRadius() - rootJoin);
+    return along <= 1e-9 ? Root : along >= span - 1e-9 ? Tip : Flank;
+  }
+
   public static function close(spec:GearSpec, side:Array<Point2>, samples:Int):Array<Point2> {
     var result:Array<Point2> = [];
     var pitchHalf = Math.PI / spec.teeth;

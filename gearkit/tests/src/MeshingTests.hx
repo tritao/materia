@@ -25,7 +25,8 @@ class MeshingTests {
     return '${r.name}: rootClr ${f(r.rootClearance * 1000, 1)} um, minorTipClr ${f(r.minorTipClearance * 1000, 1)} um, '
       + 'derivedTip ${f(r.derivedTipRadius, 4)}, '
       + 'penetration ${f(r.penetration * 1000, 2)} um (bound ${f(r.fitBound * 1000, 2)}), '
-      + 'engaged ${f(r.engagedFraction * 100, 1)}% (max ${r.maxEngaged}, zone +-${f(r.contactZone * 180 / Math.PI, 1)} deg), '
+      + 'flank engaged ${f(r.flankEngagedFraction * 100, 1)}% (max ${r.maxFlankEngaged}, zone +-${f(r.contactZone * 180 / Math.PI, 1)} deg, min clr ${f(r.minFlankClearance * 1000, 1)} um), '
+      + 'tip edge contact ${f(r.tipContactFraction * 100, 1)}% (max ${r.maxTipContact}, min clr ${f(r.minTipClearance * 1000, 1)} um), '
       + 'interference ${r.interference.length == 0 ? "no" : "YES"}, hobbable ${hob == null ? "yes" : "NO"}';
   }
 
@@ -35,7 +36,7 @@ class MeshingTests {
     Sys.println('  ' + row(r1, HobCheck.problem(d1.flex)));
     check(r1.interference.length == 0, 'D1 has no interference: ${r1.interference}');
     check(r1.penetration <= r1.fitBound, "D1 penetration within the fit bound");
-    check(r1.engagedFraction > 0 && r1.engagedFraction < 1, "D1 engaged fraction in (0, 1)");
+    check(r1.flankEngagedFraction > 0 && r1.flankEngagedFraction < 1, "D1 flank engaged fraction in (0, 1)");
     check(r1.rootClearance > 0 && r1.minorTipClearance >= -r1.fitBound, "D1 radial clearances");
     check(HobCheck.problem(d1.flex) == null, "D1 is hobbable");
 
@@ -47,7 +48,7 @@ class MeshingTests {
       Sys.println('  ' + row(r, hob));
       check(r.interference.length == 0, '${input.name} has no interference: ${r.interference}');
       check(r.penetration <= r.fitBound, '${input.name} penetration within the fit bound');
-      check(r.engagedFraction > 0 && r.engagedFraction < 1, '${input.name} engaged fraction in (0, 1)');
+      check(r.flankEngagedFraction > 0 && r.flankEngagedFraction < 1, '${input.name} flank engaged fraction in (0, 1)');
       check(r.rootClearance > 0 && r.minorTipClearance > 0, '${input.name} radial clearances');
       check(hob == null, '${input.name} is hobbable: $hob');
     }
@@ -65,12 +66,12 @@ class MeshingTests {
     check(r4.penetrationTooth >= 0 && r4.penetration > 0, "D4 reports where it interferes");
     check(r4.interference[0].indexOf("tooth " + r4.penetrationTooth) >= 0, "D4 reports the tooth index");
 
-    // Engaged fraction versus kappa for D1 (informational: the plan expected it to rise; see TOOTH_DESIGN_PLAN.md).
+    // Flank engagement and tip edge contact versus kappa for D1 (informational; see TOOTH_DESIGN_PLAN.md).
     for (k in [1.0, 1.1, 1.2]) {
       var input = new StrainWaveInput("D1k", "involute", 0.3, 200, 202, k, "cosine", 20 * ToothDesigns.DEG);
       var r = MeshingAnalysis.run(new StrainWavePair(input), THRESHOLD, 16);
-      Sys.println('    D1 kappa $k: engaged ${f(r.engagedFraction * 100, 1)}%, rootClr ${f(r.rootClearance * 1000, 1)} um, derivedTip ${f(r.derivedTipRadius, 4)}');
-      check(r.interference.length == 0 && r.engagedFraction > 0.1 && r.engagedFraction < 1, 'D1 at kappa $k meshes');
+      Sys.println('    D1 kappa $k: flank engaged ${f(r.flankEngagedFraction * 100, 1)}%, tip edge ${f(r.tipContactFraction * 100, 1)}%, rootClr ${f(r.rootClearance * 1000, 1)} um, derivedTip ${f(r.derivedTipRadius, 4)}');
+      check(r.interference.length == 0 && r.flankEngagedFraction > 0 && r.flankEngagedFraction < 1, 'D1 at kappa $k meshes');
     }
     Sys.println('MeshingTests: $assertions assertions passed');
   }

@@ -160,7 +160,7 @@ class ToothStudy {
         worstDw = Math.max(worstDw, Math.abs(pair.cam.dw(phi) - ref.dw(phi)));
       }
       Sys.println('  cam $base ${cam}: interference ${r.interference.length == 0 ? "no" : "YES"}, rootClr ${f(r.rootClearance * 1000, 1)} um, minorTipClr ${f(r.minorTipClearance * 1000, 1)} um, '
-        + 'engaged(5um) ${f(r.engagedFraction * 100, 1)}%, engaged(20um) ${f(r20.engagedFraction * 100, 1)}%, zone(5um) +-${f(r.contactZone * 180 / Math.PI, 0)} deg, '
+        + 'flank(5um) ${f(r.flankEngagedFraction * 100, 1)}%, flank(20um) ${f(r20.flankEngagedFraction * 100, 1)}%, tip edge(5um) ${f(r.tipContactFraction * 100, 1)}%, tip edge(20um) ${f(r20.tipContactFraction * 100, 1)}%, min clr flank ${f(r.minFlankClearance * 1000, 1)} / tip ${f(r.minTipClearance * 1000, 1)} um, zone(5um) +-${f(r.contactZone * 180 / Math.PI, 0)} deg, '
         + 'max |w - cosine w| ${f(worstW * 1000, 1)} um, max |dw - cosine dw| ${f(worstDw * 1000, 1)} um/rad');
     }
   }
@@ -199,7 +199,7 @@ class ToothStudy {
       var hob = HobCheck.problem(pair.flex);
       Sys.println('  ${c.label} kappa ${c.input.kappa}: '
         + 'interference ${r.interference.length == 0 ? "no" : "YES"}, rootClr ${f(r.rootClearance * 1000, 1)} um, minorTipClr ${f(r.minorTipClearance * 1000, 1)} um, '
-        + 'CS tip trim ${f((r.derivedTipRadius - pair.circularTipRadius()) * 1000, 1)} um, engaged(5um) ${f(r.engagedFraction * 100, 1)}%, engaged(20um) ${f(r20.engagedFraction * 100, 1)}%, zone(5um) +-${f(r.contactZone * 180 / Math.PI, 0)} deg, '
+        + 'CS tip trim ${f((r.derivedTipRadius - pair.circularTipRadius()) * 1000, 1)} um, flank(5um) ${f(r.flankEngagedFraction * 100, 1)}%, flank(20um) ${f(r20.flankEngagedFraction * 100, 1)}%, tip edge(5um) ${f(r.tipContactFraction * 100, 1)}%, tip edge(20um) ${f(r20.tipContactFraction * 100, 1)}%, min clr flank ${f(r.minFlankClearance * 1000, 1)} / tip ${f(r.minTipClearance * 1000, 1)} um, zone(5um) +-${f(r.contactZone * 180 / Math.PI, 0)} deg, '
         + 'rootFilletRmin ${f(minRootCurvatureRadius(pair.profile), 4)} mm, tipLand ${f(tipLand(pair.profile), 4)} mm, hobbable ${hob == null ? "yes" : "NO " + hob}');
     }
   }

@@ -10,6 +10,7 @@ import gearkit.Iso1328;
 import gearkit.Point2;
 import gearkit.ToothForm;
 import gearkit.ToothProfile;
+import gearkit.ToothRegion;
 
 /** Hides an involute behind the bare ToothForm/ToothProfile interfaces, so any code that
     sneaks in an involute assumption (a downcast, a base circle) fails on it. */
@@ -47,6 +48,7 @@ class OpaqueProfile implements ToothProfile {
   public function rootDerivative(t:Float):Point2 return p.rootDerivative(t);
   public function tipFillet(t:Float):Point2 return p.tipFillet(t);
   public function tipDerivative(t:Float):Point2 return p.tipDerivative(t);
+  public function regionAt(radius:Float):ToothRegion return p.regionAt(radius);
   public function evaluationRange():GearEvaluationRange return p.evaluationRange();
   public function outline(samples:Int):Array<Point2> return p.outline(samples);
   public function halfAngleAt(radius:Float):Float return p.halfAngleAt(radius);

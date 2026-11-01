@@ -20,14 +20,24 @@ class MeshingReport {
   public var penetrationTooth:Int = -1;
   public var penetrationAngle:Float = 0;
   public var penetrationSection:Float = 0;
-  /** Smallest clearance seen over the scan (negative = penetration). */
+  /** Smallest clearance seen over the scan, any region (negative = penetration). */
   public var minClearance:Float = 0;
+  /** Smallest clearance seen over the scan by region of the tooth: the working flank, the tip (blend and land) and the
+      root blend. Infinite when no point of the region was in range. */
+  public var minFlankClearance:Float = Math.POSITIVE_INFINITY;
+  public var minTipClearance:Float = Math.POSITIVE_INFINITY;
+  public var minRootBlendClearance:Float = Math.POSITIVE_INFINITY;
   public var contactThreshold:Float = 0;
-  /** Mean over the scan of (teeth with clearance <= threshold) / flexspline teeth. */
-  public var engagedFraction:Float = 0;
-  public var meanEngaged:Float = 0;
-  public var maxEngaged:Int = 0;
-  /** Largest section angle from the major axis at which a tooth is in contact. */
+  /** Flank engagement: mean over the scan of (teeth within the threshold whose closest point is on the flank) / flexspline teeth. */
+  public var flankEngagedFraction:Float = 0;
+  public var meanFlankEngaged:Float = 0;
+  public var maxFlankEngaged:Int = 0;
+  /** Tip edge contact: the same count for teeth whose closest point is on the tip blend or land. This is the tooth tip touching the circular
+      spline, not flank engagement, and carries no load path of its own. */
+  public var tipContactFraction:Float = 0;
+  public var meanTipContact:Float = 0;
+  public var maxTipContact:Int = 0;
+  /** Largest section angle from the major axis at which a tooth is flank-engaged. */
   public var contactZone:Float = 0;
   public var fitBound:Float = 0;
   /** Each entry names the parameter that causes the interference. Empty = none. */

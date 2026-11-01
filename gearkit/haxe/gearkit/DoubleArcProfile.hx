@@ -142,6 +142,8 @@ class DoubleArcProfile implements ToothProfile {
     return wrapD(tcx + tau * Math.cos(a), tcy + tau * Math.sin(a), -tau * tSweep * Math.sin(a), tau * tSweep * Math.cos(a));
   }
 
+  public function regionAt(radius:Float):ToothRegion return ToothOutline.regionAt(this, radius);
+
   public function evaluationRange():GearEvaluationRange {
     var lo = rootJoinRadius(), hi = tipJoinRadius();
     var result = spec.evaluation;
