@@ -7,7 +7,7 @@ import machinekit.structural.SlideInSlotNut;
 import machinekit.structural.DrawingExtrusionProfile;
 import machinekit.structural.TSlotExtrusion;
 import machinekit.assembly.MachineAssembly;
-import machinekit.component.SourcingPlan;
+import sourcing.SourcingPlan;
 
 /** Exact section/envelope intersections. A collision is inconclusive where chamfers
  * are unspecified; a clear position does not qualify bearing contact or tolerances. */
@@ -52,7 +52,7 @@ class SlotHardwareChecks {
         taxBasis: variant.price.tax_basis,
         inStock: variant.availability.is_in_stock == true,
         compatibilityVerified: false
-      });
+      }, SourcingPlan.find(SourcingDocuments.procurement(assembly), nut.bom.partNumber));
       shape.close();
     }
     var saved = assembly.encode(), reloaded = MachineAssembly.decode(saved);
@@ -63,10 +63,13 @@ class SlotHardwareChecks {
     );
     check(saved.indexOf("vallder") < 0, "Nut assembly geometry has no supplier dependency");
     sys.io.File.saveContent(dir + "slot-nuts.assembly.json", saved);
-    sys.io.File.saveContent(
-      dir + "slot-nuts.bom.json",
-      haxe.Json.stringify(plan.lines(assembly.billOfMaterials()), null, "  ")
-    );
+    var procurement = SourcingDocuments.procurement(assembly);
+    for (line in procurement) {
+      var intent = line.item.procurement;
+      check(intent != null && intent.kind == "Buy" && line.item.maturity == "Assumed"
+        && line.item.requirements.length == 6, "Slot nut exports purchase intent and dimensional requirements");
+    }
+    sys.io.File.saveContent(dir + "slot-nuts.bom.json", haxe.Json.stringify(plan.lines(procurement), null, "  "));
     if (Sys.args().indexOf("--recipes-only") >= 0) {
       trace('Slot nut geometry and assembly checks passed: ${recipes.length} recipes');
       return;

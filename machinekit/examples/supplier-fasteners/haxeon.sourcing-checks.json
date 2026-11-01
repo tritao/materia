@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "package": { "name": "machinekit-sourcing-checks" },
+  "entry": "SourcingChecks",
+  "sources": ["../../haxe/src/machinekit/standard/FinePitchNut.hx", "../../haxe/src/machinekit/motion/MotorMount.hx", "../../haxe/src/machinekit/component/BomJson.hx", "SourcingChecks.hx"],
+  "sourceRoots": ["."],
+  "dependencies": {
+    "machinekit": { "path": "../.." },
+    "materia-sourcing": { "path": "../../../tools/suppliers" }
+  },
+  "target": "host",
+  "outputDir": "../../../build/suppliers/sourcing-checks"
+}

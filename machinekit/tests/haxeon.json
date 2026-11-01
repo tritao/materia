@@ -2,7 +2,9 @@
 	"version": 1,
 	"package": { "name": "machinekit-tests" },
 	"entry": "MachineKitSmoke",
-	"sources": [
+	"sources": ["../haxe/src/machinekit/assembly/ScrewAxisPart.hx", "../haxe/src/machinekit/assembly/ScrewAxisCoupling.hx", "../haxe/src/machinekit/assembly/Sfu20AxisPart.hx", "../haxe/src/machinekit/motion/DsgNutHousing.hx", "../haxe/src/machinekit/motion/MotorMount.hx", "../haxe/src/machinekit/motion/SfuNut.hx", "../haxe/src/machinekit/standard/FinePitchNut.hx", "../haxe/src/machinekit/structural/SlideInSlotNut.hx",
+    "../haxe/src/machinekit/bomschema/BomV1.hx",
+    "../haxe/src/machinekit/component/BomJson.hx",
     "../examples/mobile-base/MobileBaseCell.hx",
     "../examples/robot-welder/WeldingWorkpiece.hx",
     "../haxe/src/machinekit/printing/PrintedPart.hx",

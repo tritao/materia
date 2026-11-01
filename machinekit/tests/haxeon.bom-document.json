@@ -5,6 +5,8 @@
   },
   "entry": "BomDocumentTests",
   "sources": [
+    "../haxe/src/machinekit/bomschema/BomV1.hx",
+    "../haxe/src/machinekit/component/BomJson.hx",
     "src/BomDocumentTests.hx",
     "../haxe/src/machinekit/assembly/BomDocument.hx",
     "../haxe/src/machinekit/component/ComponentNumberKey.hx",

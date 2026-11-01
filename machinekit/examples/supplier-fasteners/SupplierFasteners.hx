@@ -1,5 +1,5 @@
 import machinekit.assembly.MachineAssembly;
-import machinekit.component.SourcingPlan;
+import sourcing.SourcingPlan;
 import machinekit.standard.SocketHeadCapScrew;
 import materia.assembly.AssemblyFrames;
 import cadkit.Shape;
@@ -83,8 +83,8 @@ class SupplierFasteners {
         taxBasis: mapping.price.tax_basis,
         inStock: mapping.availability.is_in_stock == true,
         compatibilityVerified: false
-      });
-      plan.select(screw.bom.partNumber, offerId);
+      }, SourcingPlan.find(SourcingDocuments.procurement(assembly), screw.bom.partNumber));
+      plan.select(SourcingPlan.find(SourcingDocuments.procurement(assembly), screw.bom.partNumber), offerId);
       geometry.push({
         partNumber: screw.bom.partNumber,
         typeId: mapping.type_id,
@@ -104,7 +104,7 @@ class SupplierFasteners {
     }
     var bom = assembly.billOfMaterials();
     for (line in bom.lines()) if (line.quantity != 2) throw "Expected two occurrences per engineering part";
-    var sourced = plan.lines(bom);
+    var sourced = plan.lines(SourcingDocuments.procurement(assembly));
     for (line in sourced) if (line.status != "review_required") throw "Unreviewed offer qualified unexpectedly";
     save(output + "/geometry.json", geometry);
     save(output + "/engineering-bom.json", bom.lines());
@@ -177,7 +177,7 @@ class SupplierFasteners {
           taxBasis: offer.price.tax_basis,
           inStock: offer.availability.is_in_stock == true,
           compatibilityVerified: false
-        });
+        }, SourcingPlan.find(SourcingDocuments.procurement(profileAssembly), member.bom.partNumber));
       }
       var bounds = shape.shape.bounds(), low = bounds.get_min(), high = bounds.get_max();
       if (Math.abs(high.get_x() - low.get_x() - dimensions[0]) > 0.02 || Math.abs(high.get_y()
@@ -217,7 +217,7 @@ class SupplierFasteners {
       b.close();
     }
     sys.io.File.saveContent(output + "/profiles.assembly.json", savedProfiles);
-    var profileLines = profilePlan.lines(profileAssembly.billOfMaterials());
+    var profileLines = profilePlan.lines(SourcingDocuments.procurement(profileAssembly));
     for (line in profileLines) if (line.selected != null || line.offers.length != 1 || line.estimatedLinePriceMinor
       != null) throw "Profile sourcing must remain optional and require a cut-length quote";
     save(output + "/profile-sourcing-bom.json", profileLines);

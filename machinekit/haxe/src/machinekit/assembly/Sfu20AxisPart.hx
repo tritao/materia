@@ -19,6 +19,8 @@ class Sfu20AxisPart extends MachineComponent {
       "SFU20 axis " + kind,
       "aluminium 6061"
     );
+    addFacet(new EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.kind = kind;
     this.layout = layout;
   }
@@ -115,7 +117,8 @@ class Sfu20AxisPart extends MachineComponent {
       true,
       false,
       ["travel"]
-    ).numbered(v -> 'SFU20-AXIS-${v.token("kind").toUpperCase()}');
+    ).numbered(v -> 'SFU20-AXIS-${v.token("kind").toUpperCase()}')
+      .procured(_ -> Make("CNC machining"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

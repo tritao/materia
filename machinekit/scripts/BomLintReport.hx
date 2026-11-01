@@ -29,9 +29,7 @@ class BomLintReport {
     }
     Sys.println('recipes: $checked checked, $bad invalid, $unavailable defaults unavailable');
     for (path in Sys.args()) {
-      var doc:Dynamic = haxe.Json.parse(sys.io.File.getContent(path));
-      if (doc.schema != "machinekit.bom" || doc.version != 1) throw 'Unsupported BOM schema: $path';
-      if (doc.assembly == null || doc.procurement == null) throw 'Incomplete BOM schema: $path';
+      var doc:Dynamic = machinekit.component.BomJson.parse(sys.io.File.getContent(path));
       var engineering = new LintCounts();
       lintNode(doc.assembly, path, engineering);
       var lines:Array<Dynamic> = doc.procurement;

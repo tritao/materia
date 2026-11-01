@@ -23,7 +23,7 @@ class ScrewAxisCoupling extends ShaftCoupling {
       [ComponentRecipeSupport.length("motorShaftLength", 20.6)],
       v -> new ScrewAxisCoupling(v.number("motorShaftLength")),
       true
-    );
+    ).procured(_ -> Buy(null, null, null));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return axisRecipeType();

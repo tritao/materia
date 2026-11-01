@@ -22,6 +22,8 @@ class FinePitchNut extends MachineComponent {
       "Fine-pitch retaining nut (explicit dimensions)",
       "steel 8"
     );
+    addFacet(new EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.diameter = diameter;
     this.pitch = pitch;
     this.acrossFlats = acrossFlats;
@@ -50,7 +52,12 @@ class FinePitchNut extends MachineComponent {
       [P.length("diameter", 15), P.length("pitch", 1), P.length("acrossFlats", 22), P.length("height", 6)],
       v -> new FinePitchNut(v.number("diameter"), v.number("pitch"), v.number("acrossFlats"), v.number("height")),
       true
-    );
+    ).procured(_ -> Buy(null, null, null)).requiring(v -> {
+      var terms = [for (name in ["diameter", "pitch", "acrossFlats", "height"])
+        machinekit.component.Procurement.ProcurementCodec.requirement(name, "mm", null, null, v.number(name))];
+      terms.push(machinekit.component.Procurement.ProcurementCodec.choice("propertyClass", "8"));
+      return terms;
+    });
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

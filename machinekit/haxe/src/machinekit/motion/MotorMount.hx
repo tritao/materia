@@ -256,6 +256,8 @@ class MotorMount extends MachineComponent {
       '${s.maker} $model motor mount',
       "unspecified"
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Catalog").setToken("errorsBasis", "Assumed").setToken("source", s.reference)));
     lockManufacturingMaterial("unspecified");
     spec = s;
     this.drawing = drawing;
@@ -483,7 +485,7 @@ class MotorMount extends MachineComponent {
     // A revision belongs to one maker's tables; the default follows the model.
     if ((rbkModels().indexOf(model) >= 0) != (revision == "vallder-rbk-v1")) revision = defaultRevision(model);
     return new MotorMount(model, revision, v.token("geometry"), v.token("bearingGrade"));
-    }, true, false, ["geometry"], false);
+    }, true, false, ["geometry"], false).procured(_ -> Buy(null, null, null));
     return recipe;
   }
 

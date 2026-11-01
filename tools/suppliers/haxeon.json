@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "package": {
+    "name": "materia-sourcing"
+  },
+  "sources": [
+    "haxe/src/sourcing/SourcingPlan.hx",
+    "haxe/src/sourcing/SupplierOffer.hx",
+    "../../machinekit/haxe/src/machinekit/bomschema/BomV1.hx"
+  ],
+  "sourceRoots": [
+    "haxe/src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../../machinekit"
+    }
+  },
+  "target": "host"
+}

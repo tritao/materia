@@ -10,7 +10,7 @@ import machinekit.document.MachineKitDocuments;
 import machinekit.document.MachineKitRecipes;
 import materia.assembly.AssemblyFrames;
 import machinekit.component.SupplierRecipeLibrary;
-import machinekit.component.SourcingPlan;
+import sourcing.SourcingPlan;
 
 class MotorMountChecks {
   static function check(ok:Bool, message:String):Void {
@@ -196,11 +196,11 @@ class MotorMountChecks {
         taxBasis: variant.price.tax_basis,
         inStock: variant.availability.is_in_stock == true,
         compatibilityVerified: false
-      });
+      }, SourcingPlan.find(SourcingDocuments.procurement(assembly), part.bom.partNumber));
       count++;
     }
     check(count == 4, "Four RBK variant bindings checked");
-    var lines = plan.lines(assembly.billOfMaterials());
+    var lines = plan.lines(SourcingDocuments.procurement(assembly));
     for (line in lines) check(line.selected == null && line.offers.length == 1, "Supplier choice remains optional");
     sys.io.File.saveContent(dir + "supplier-motor-mounts.bom.json", haxe.Json.stringify(lines, null, "  "));
     sys.io.File.saveContent(dir + "supplier-motor-mounts.assembly.json", assembly.encode());

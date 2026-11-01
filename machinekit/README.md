@@ -503,7 +503,10 @@ The fabrication and coupling recipes are registered in `MachineKitComponents.sta
 selected components, geometry dimensions, travel limits, and lead coupling. The old
 `RbkSfuAxis` example retains its original part identities and legacy recipes.
 
-Purchasing remains optional through `SourcingPlan.lines(axis.billOfMaterials())`.
+The separate `materia-sourcing` package provides the existing optional
+`sourcing.SourcingPlan.lines(document.procurement)` helper, where `document`
+is a version-one JSON export parsed by `BomJson.parse`. Machine BOM
+JSON version 1 is documented in [BOM_SCHEMA.md](scripts/BOM_SCHEMA.md).
 Changing an offer does not replace a component or establish mechanical compatibility.
 Select another engineering component explicitly, then validate the new installation.
 

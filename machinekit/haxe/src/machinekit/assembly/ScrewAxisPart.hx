@@ -28,6 +28,8 @@ class ScrewAxisPart extends MachineComponent {
       "Twin rail screw axis " + kind,
       "aluminium 6061"
     );
+    addFacet(new EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.kind = kind;
     this.revision = revision;
     this.layout = layout;
@@ -145,7 +147,8 @@ class ScrewAxisPart extends MachineComponent {
         )
       ),
       true
-    ).numbered(v -> 'TWIN-RAIL-SCREW-${v.token("kind").toUpperCase()}');
+    ).numbered(v -> 'TWIN-RAIL-SCREW-${v.token("kind").toUpperCase()}')
+      .procured(_ -> Make("CNC machining"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

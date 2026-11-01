@@ -27,7 +27,7 @@ typedef AxisHardware = {
 }
 
 /** Reusable purchased-support twin-rail axis for the checked RBK12/SFU16/HGR15 interface.
- * Component selection and fabrication layout are explicit inputs; purchasing stays in SourcingPlan.
+ * Component selection and fabrication layout are explicit inputs; supplier selection stays in the separate sourcing layer.
  * Unlike the generic LinearAxis rod/rail envelope, this template includes the actual support stack
  * and installation hardware. The supplier CAD's 0.5 mm stack discrepancy is retained.
  */

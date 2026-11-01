@@ -411,8 +411,8 @@ study, not a full moving-machine or structural qualification.
 ## M6 tray-anchor sourcing shortlist
 
 Supplier candidates and enquiry leads are saved in [tray-anchor-sourcing.json](tray-anchor-sourcing.json).
-Its `offers` use the existing `SupplierOffer` fields for later loading into
-`SourcingPlan`; no selection is made and the candidate requirement is not yet
+Its `offers` use the existing `sourcing.SupplierOffer` fields for later loading into
+`sourcing.SourcingPlan`; no selection is made and the candidate requirement is not yet
 an installed engineering BOM item. Prices and final quantity are unknown.
 Stock is unverified, not confirmed unavailable. PFEIFER M6 × 40 stainless
 05.250.064.040 and COM Maleniec M6 × 40 galvanised k1110zn are documented
@@ -521,7 +521,7 @@ and nine metres of gasket tape (7.07 m net plus allowance, rounded up).
 Quantities are engineering requirements, not supplier pack counts.
 
 `HobberTrayBom` loads these requirements through the existing `Bom` and
-`SourcingPlan` classes. Compile/run `haxeon.tray-bom.json` to export
+`sourcing.SourcingPlan` classes. Compile/run `haxeon.tray-bom.json` to export
 `build/tray-mounting/tray-bom.csv` and `tray-bom-sourced.json` with units,
 review status, candidate SKUs, URLs and supplier notes. It checks unique item
 identities, hardware quantities, gasket quantity and supplier-to-BOM mappings.

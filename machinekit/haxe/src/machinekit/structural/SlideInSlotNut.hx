@@ -35,6 +35,8 @@ class SlideInSlotNut extends MachineComponent {
       "Dimension-driven slide-in slot nut; fit requires review",
       "steel"
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.width = width;
     this.length = length;
     this.height = height;
@@ -90,7 +92,13 @@ class SlideInSlotNut extends MachineComponent {
         v.number("ridgeHeight"),
         v.token("size")
       )
-    ).numbered(v -> 'SLIDE-${v.token("size")}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("length"))}x${Dimension.format(v.number("height"))}-R${Dimension.format(v.number("ridgeWidth"))}x${Dimension.format(v.number("ridgeHeight"))}');
+    ).numbered(v -> 'SLIDE-${v.token("size")}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("length"))}x${Dimension.format(v.number("height"))}-R${Dimension.format(v.number("ridgeWidth"))}x${Dimension.format(v.number("ridgeHeight"))}')
+      .procured(_ -> Buy(null, null, null)).requiring(v -> {
+        var terms = [machinekit.component.Procurement.ProcurementCodec.choice("thread", v.token("size"))];
+        for (name in ["width", "length", "height", "ridgeWidth", "ridgeHeight"])
+          terms.push(machinekit.component.Procurement.ProcurementCodec.requirement(name, "mm", null, null, v.number(name)));
+        return terms;
+      });
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

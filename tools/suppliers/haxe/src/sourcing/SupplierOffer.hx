@@ -1,4 +1,4 @@
-package machinekit.component;
+package sourcing;
 
 /** One sourcing option for an engineering BOM part. Prices are snapshot minor units.
  * A nominal geometric match must retain compatibilityVerified=false until reviewed.

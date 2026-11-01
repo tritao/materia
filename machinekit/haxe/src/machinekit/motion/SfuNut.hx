@@ -27,6 +27,8 @@ class SfuNut extends LeadScrewNut {
         mountScrew: s.mount
       }
     );
+    addFacet(new EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     spec = s;
     setMaterial("steel");
   }
@@ -65,7 +67,8 @@ class SfuNut extends LeadScrewNut {
       "machinekit.motion.sfu-nut",
       [P.choice("model", SfuFamilyData.nutModels(), "SFU1605"), P.length("raceRootDiameter", 13)],
       v -> new SfuNut(v.token("model"), v.number("raceRootDiameter"))
-    ).numbered(v -> v.token("model") + "-NUT-R" + Dimension.format(v.number("raceRootDiameter")));
+    ).numbered(v -> v.token("model") + "-NUT-R" + Dimension.format(v.number("raceRootDiameter")))
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["model", "raceRootDiameter"]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return familyRecipeType();

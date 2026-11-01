@@ -76,7 +76,7 @@ race-root or blind-thread-depth inputs where the drawing does not establish them
 Editor recipe defaults are modelling assumptions (13 mm root for the default 16 mm
 nut, 16 mm for the default 20 mm screw, 10 mm blind threads); they remain editable
 and are persisted. Supplier bindings deliberately do not fill those missing inputs.
-SourcingPlan adds optional offers without changing the engineering BOM. Stock
+The separate sourcing package adds optional offers without changing the engineering BOM. Stock
 length pricing requires a quote; no piece price or availability is invented.
 
 DSG geometry uses Y=0 as the base and +Z as the shaft. Nut flange contact is at Z=0;

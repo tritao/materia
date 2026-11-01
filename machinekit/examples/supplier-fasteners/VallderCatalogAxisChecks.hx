@@ -1,3 +1,5 @@
+import sourcing.SupplierOffer;
+import sourcing.SourcingPlan;
 import machinekit.assembly.*;
 import machinekit.component.*;
 import machinekit.motion.*;
@@ -51,6 +53,7 @@ class VallderCatalogAxisChecks {
       false
     );
     var axis = new TwinRailScrewAxis(layout, selected);
+    check(SourcingDocuments.procurement(axis).length > 0, "Axis exports a version-one procurement view");
     axis.validate();
     var saved = axis.encode(), loaded = MachineAssembly.decode(saved, registry), before = bom(axis);
     check(before == bom(loaded), "Catalog axis BOM survives persistence");
@@ -84,10 +87,10 @@ class VallderCatalogAxisChecks {
         inStock: false,
         compatibilityVerified: false
       };
-      plan.add(offer);
-      plan.select(offer.partNumber, offer.id);
+      plan.add(offer, SourcingPlan.find(SourcingDocuments.procurement(axis), offer.partNumber));
+      plan.select(SourcingPlan.find(SourcingDocuments.procurement(axis), offer.partNumber), offer.id);
     }
-    var sourcing = plan.lines(axis.billOfMaterials());
+    var sourcing = plan.lines(SourcingDocuments.procurement(axis));
     check(before == bom(axis), "Optional supplier selection preserves engineering BOM");
     var count = 0;
     for (line in sourcing) if (line.selected != null) {

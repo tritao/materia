@@ -4,7 +4,7 @@
     "name": "machinekit-bom-export"
   },
   "entry": "BomExport",
-  "sources": [
+  "sources": ["../haxe/src/machinekit/assembly/ScrewAxisPart.hx", "../haxe/src/machinekit/assembly/ScrewAxisCoupling.hx", "../haxe/src/machinekit/assembly/Sfu20AxisPart.hx", "../haxe/src/machinekit/motion/DsgNutHousing.hx", "../haxe/src/machinekit/motion/MotorMount.hx", "../haxe/src/machinekit/motion/SfuNut.hx", "../haxe/src/machinekit/standard/FinePitchNut.hx", "../haxe/src/machinekit/structural/SlideInSlotNut.hx",
     "../haxe/src/machinekit/printing/PrintedPart.hx",
     "../haxe/src/machinekit/structural/FrameAssembly.hx",
     "../haxe/src/machinekit/welding/WeldMetal.hx",
@@ -154,7 +154,6 @@
     "../examples/flexspline-hobber/HobberSocketFixture.hx",
     "../examples/flexspline-hobber/HobberSocketFixtureSetup.hx",
     "../examples/flexspline-hobber/HobberTrayAnchorStudy.hx",
-    "../examples/flexspline-hobber/HobberTrayBom.hx",
     "../examples/flexspline-hobber/HobberTrayClearanceStudy.hx",
     "../examples/flexspline-hobber/HobberTrayMountingStudy.hx",
     "../examples/flexspline-hobber/HobberTrayMounts.hx",

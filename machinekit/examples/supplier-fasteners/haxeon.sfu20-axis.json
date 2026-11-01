@@ -8,6 +8,7 @@
     "."
   ],
   "dependencies": {
+    "materia-sourcing": { "path": "../../../tools/suppliers" },
     "machinekit": {
       "path": "../.."
     }

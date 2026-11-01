@@ -3,7 +3,8 @@
   "package": {"name": "machinekit-motor-mount-checks"},
   "entry": "MotorMountChecks",
   "sourceRoots": ["."],
-  "dependencies": {"machinekit": {"path": "../.."}},
+  "dependencies": {
+    "materia-sourcing": { "path": "../../../tools/suppliers" },"machinekit": {"path": "../.."}},
   "target": "host",
   "outputDir": "../../../build/suppliers/motor-mount-checks"
 }

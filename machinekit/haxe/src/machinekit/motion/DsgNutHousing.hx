@@ -25,6 +25,8 @@ class DsgNutHousing extends MachineComponent {
       "DSG SFU nut housing " + model,
       "unspecified"
     );
+    addFacet(new EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     spec = s;
     this.baseThreadDepth = baseThreadDepth;
     this.flangeThreadDepth = flangeThreadDepth;
@@ -107,7 +109,8 @@ class DsgNutHousing extends MachineComponent {
       false,
       null,
       false
-    );
+    ).procured(_ -> Buy(null, null, null))
+      .requiringInputs(["model", "baseThreadDepth", "flangeThreadDepth"]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return familyRecipeType();

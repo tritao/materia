@@ -1,3 +1,4 @@
+import sourcing.SourcingPlan;
 import machinekit.assembly.*;
 import machinekit.component.*;
 import machinekit.motion.*;
@@ -81,6 +82,7 @@ class ConfigurableAxisChecks {
     var layout = new ScrewAxisLayout(300, 500, 400, 160);
     var selected = RbkSfuAxis.componentsFor(layout);
     var axis = new TwinRailScrewAxis(layout, selected);
+    check(SourcingDocuments.procurement(axis).length > 0, "Axis exports a version-one procurement view");
     axis.validate();
     Sys.println("Second configuration assembled and validated");
     var saved = axis.encode(), loaded = MachineAssembly.decode(saved, MachineKitComponents.standard());
@@ -135,7 +137,7 @@ class ConfigurableAxisChecks {
     }
     rejects(() -> axis.setTravel(state, 301), "Configured travel bounds enforced");
     // Supplier offers are optional and cannot change the engineering BOM.
-    var sourcing = new SourcingPlan(), before = bom(axis), lines = sourcing.lines(axis.billOfMaterials());
+    var sourcing = new SourcingPlan(), before = bom(axis), lines = sourcing.lines(SourcingDocuments.procurement(axis));
     check(
       lines.length > 0 && lines[0].status == "unselected" && before == bom(axis),
       "Sourcing remains optional and separate"
@@ -165,7 +167,7 @@ class ConfigurableAxisChecks {
     );
     sys.io.File.saveContent(
       output + "stepperonline-300.sourcing.json",
-      haxe.Json.stringify(new SourcingPlan().lines(candidate.billOfMaterials()), null, "  ")
+      haxe.Json.stringify(new SourcingPlan().lines(SourcingDocuments.procurement(candidate)), null, "  ")
     );
     var secondScene = AssemblyPreview.scene(secondLoaded,
       "stepperonline-300-axis"), secondDefinition = secondScene.assemblyDefinition;

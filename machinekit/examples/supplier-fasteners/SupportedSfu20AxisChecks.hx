@@ -1,3 +1,5 @@
+import sourcing.SupplierOffer;
+import sourcing.SourcingPlan;
 import machinekit.assembly.*;
 import machinekit.component.*;
 import machinekit.motion.*;
@@ -39,6 +41,7 @@ class SupportedSfu20AxisChecks {
       "Travel range does not split identical fabrication BOM items"
     );
     var axis = new SupportedSfu20Axis();
+    check(SourcingDocuments.procurement(axis).length > 0, "Axis exports a version-one procurement view");
     axis.validate();
     var registry = MachineKitComponents.standard(), saved = axis.encode(), loaded = MachineAssembly.decode(
       saved,
@@ -141,8 +144,8 @@ class SupportedSfu20AxisChecks {
         inStock: false,
         compatibilityVerified: false
       };
-      plan.add(offer);
-      plan.select(offer.partNumber, offer.id);
+      plan.add(offer, SourcingPlan.find(SourcingDocuments.procurement(loaded), offer.partNumber));
+      plan.select(SourcingPlan.find(SourcingDocuments.procurement(loaded), offer.partNumber), offer.id);
     }
     check(bom(loaded) == bom(axis), "Sourcing preserves engineering BOM");
     var scene = AssemblyPreview.scene(loaded,
@@ -163,7 +166,7 @@ class SupportedSfu20AxisChecks {
     );
     sys.io.File.saveContent(
       output + "sfu20-axis.sourcing.json",
-      haxe.Json.stringify(plan.lines(loaded.billOfMaterials()), null, "  ")
+      haxe.Json.stringify(plan.lines(SourcingDocuments.procurement(loaded)), null, "  ")
     );
     var exportCache = new PosedParts(), parts:Array<Part> = [], shapes:Array<Shape> = [];
     try {

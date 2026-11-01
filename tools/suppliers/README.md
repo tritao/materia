@@ -358,16 +358,21 @@ standard or supplier qualification. Sources and prices retain
 their original page-fetch timestamps. The example uses fixed demonstration
 quantities; it does not prescribe an actual machine purchase.
 
-`machinekit.component.SourcingPlan` is reusable for other BOMs and suppliers:
-add `SupplierOffer` records keyed to an existing BOM `partNumber`, optionally
-select an offer, then export `plan.lines(bom)`. Without a selection, the line
+`sourcing.SourcingPlan` in the separate `materia-sourcing` Haxe package is
+reusable for other BOMs and suppliers:
+parse a version-one JSON document with `BomJson.parse`, add `SupplierOffer`
+records against its procurement items, optionally select an offer, then export
+`plan.lines(document.procurement)`. Offers and selections are keyed by part
+number, fingerprint and released revision. Without a selection, the line
 remains `unselected`. Multiple offers do not duplicate engineering BOM lines.
 An unverified selection remains `review_required`, and a verified out-of-stock
 offer is `unavailable`. Clear the selection to return to an unsourced requirement.
 Compatibility verification is an explicit caller-supplied fact; this module
 does not infer it from product names or price. Estimates retain their currency
 and tax basis per line and are not summed across currencies. Persist selections
-separately from the assembly; the assembly codec and BOM schema are unchanged.
+separately from the assembly. The helper reads the version-one procurement
+view and does not implement the later RFQ layer.
+The export contract is documented in [BOM_SCHEMA.md](../../machinekit/scripts/BOM_SCHEMA.md).
 
 The example also runs sourcing checks for optional selection, multiple suppliers,
 SKU-to-part mismatches, stock status, integer price calculations, defensive

@@ -359,3 +359,26 @@ and other unmodeled details still require engineering selection.
 | sheet-router | 142 | 41 | 0 |
 | track-arm | 47 | 24 | 0 |
 | xyz-stage | 45 | 7 | 0 |
+
+## B8 contract check
+
+All 22 machines were re-exported: the B7 per-machine counts above remain
+unchanged, with 1,058 procurement lines, 380 Assumed lines and 3,798
+engineering occurrences. No procurement line or engineering occurrence
+lacked a fingerprint or had an invalid part number. The lint checked 212
+constructible default recipes with zero invalid numbers; three defaults were
+unavailable. The bench mill has 55 procurement lines.
+
+The v1 reader and raw-export field-set tests reject unsupported versions and
+accidental schema changes. Supplier checks consume the parsed procurement
+view, with offers and selections bound to part number, fingerprint and
+released revision. B8 also adds missing procurement and maturity declarations
+to supplier-example recipes exposed by this path.
+
+The full B8 gate passed 11/24 shards, with no new failing shard or exception
+message compared with B7. Compared with the untouched baseline, only the
+previously accepted tending input fingerprints in shards 16 and 23 differ.
+The standalone BOM example test passed. An existing supplier-demo profile
+check fails because different drawn contours with equal bounds and length can
+share a part number; that cross-machine identity case is not covered by the
+22-machine count above.

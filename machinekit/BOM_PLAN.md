@@ -3,7 +3,7 @@
 Goal: every machine produces a bill of materials that someone could buy and
 build from. Each line is a real purchasable or manufacturable unit with a
 stable, readable part number. Each line says whether it is made, bought or
-still undecided. The BOM leaves the code as a versioned JSON file that a
+not supplied, and records selection maturity separately. The BOM leaves the code as a versioned JSON file that a
 separate sourcing layer (vendors, RFQs, quotes) reads without knowing
 anything about haxeon.
 
@@ -482,7 +482,7 @@ and readers reject anything else. It contains:
   and rail bolt patterns.
 
 ### B7 — Rollout and hard gate
-- Done in this phase commit. The full gate passed 11/24 shards with no new
+- Done in `fa1f1534f`. The full gate passed 11/24 shards with no new
   failure or exception compared with B6. The only differences from the
   untouched baseline remain the accepted tending input fingerprints in shards
   16 and 23.
@@ -524,10 +524,36 @@ and readers reject anything else. It contains:
   the machinekit tests. Example BOM exports are added to the test suite.
 
 ### B8 — Sourcing contract
+- Done in this phase commit. The full gate passed 11/24 shards, with no new
+  failing shard or exception message compared with B7. Focused schema,
+  sourcing, supplier-axis and BOM example checks passed.
+- The existing Haxe offer helper moves to the separate `materia-sourcing`
+  package under `tools/suppliers`. Sourcing reads the exported v1 document
+  only, using procurement lines keyed by part number and fingerprint or
+  released revision. RFQ and quotation workflows remain out of scope.
+  Shared wire types live in the independent `machinekit.bomschema` namespace,
+  alongside their owning exporter, so the schema has one canonical version.
+  The sourcing package imports only those wire types; its project still
+  depends on the MachineKit package that publishes them.
+- `BomJson.parse` rejects non-v1 BOM envelopes. Contract tests pin the v1
+  document, line, item, quantity, use, procurement and requirement fields.
+  `machinekit/scripts/BOM_SCHEMA.md` defines the export and release records.
+- The public bench-mill export retains the B7 engineering and procurement
+  views, with 55 procurement lines and no invalid part numbers. Re-exporting
+  all 22 machines measured 1,058 procurement lines, 380
+  Assumed lines and 3,798 engineering occurrences; no line or occurrence
+  had an invalid part number or lacked a fingerprint. Supplier-example
+  recipes also gain missing purchase or manufacturing intent and maturity
+  so their JSON exports can be sourced.
 - Decision: move `SupplierOffer` and `SourcingPlan` fully into the sourcing
   layer. Their supplier selection, prices, availability and review status are
   sourcing data; a supplier SKU does not define the engineering part. Keep
   catalogue manufacturer/MPN evidence in the engineering BOM when known.
+- Open finding: drawn extrusion sections with different contours but equal
+  bounds and cut length can still share a part number. The existing supplier
+  `ProfileRecipeChecks` catches this and fails before that demo's sourcing
+  step. It needs an author-declared section identity, as noted in B2; the
+  22-machine export measurements do not establish that cross-machine case.
 - Freeze the version 1 JSON and document it next to the exporter.
 - The sourcing layer (separate plan, Python under `tools/suppliers/` next to
   `lcsccable.py`) reads `build/bom/*.json` and reports lines with no quote and
@@ -539,5 +565,4 @@ and readers reject anything else. It contains:
    with the design inputs without changing the drawing number.
 2. The bench mill declares fasteners from modeled patterns in B6. The F1
    follow-up will derive them from validated fastening interfaces.
-3. B8 moves `SourcingPlan` and `SupplierOffer` to the sourcing layer; its
-   implementation remains pending.
+3. B8 moves `SourcingPlan` and `SupplierOffer` to the sourcing layer.

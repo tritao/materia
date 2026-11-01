@@ -32,6 +32,12 @@ private class BomIncludedPart extends MachineComponent {
 }
 
 class BomDocumentTests {
+  static function expectFields(value:Dynamic, expected:Array<String>, label:String):Void {
+    var actual = Reflect.fields(value);
+    actual.sort(Reflect.compare);
+    expected.sort(Reflect.compare);
+    if (actual.join(",") != expected.join(",")) throw 'BOM v1 $label fields changed';
+  }
   public static function main():Void run();
   public static function run():Void {
     var undrawn = new MachineAssembly(), nestedUndrawn = new MachineAssembly();
@@ -117,8 +123,40 @@ class BomDocumentTests {
       throw "Exported panel metadata must not mutate the assembly";
     var newHeat = newPanel.construction.qualifications.heatLimitC;
     if (newHeat == null || newHeat.value != 80) throw "Exported qualification must not mutate the assembly";
-    var parsed:Dynamic = haxe.Json.parse(haxe.Json.stringify(doc));
-    if (parsed.schema != "machinekit.bom" || parsed.version != 1) throw "BOM JSON";
+    var json = haxe.Json.stringify(doc);
+    var parsed = machinekit.component.BomJson.parse(json);
+    if (parsed.schema != "machinekit.bom" || parsed.version != 1
+      || parsed.procurement[0].item.partNumber != doc.procurement[0].item.partNumber)
+      throw "BOM JSON reader";
+    // Inspect the raw export: the typed reader deliberately copies known fields.
+    var raw:Dynamic = haxe.Json.parse(json);
+    expectFields(raw, ["schema", "version", "machineId", "sourceCommit", "generatedAt", "assembly", "procurement"], "document");
+    expectFields(raw.assembly, ["path", "lines", "children"], "assembly");
+    var parsedLines:Array<Dynamic> = raw.procurement;
+    var parsedLine:Dynamic = parsedLines[0];
+    expectFields(parsedLine, ["item", "uses"], "line");
+    expectFields(parsedLine.item, ["partNumber", "description", "quantity", "material", "typeId", "valuesKey",
+      "familyId", "manufacturingVariant", "manufacturingProcess", "properties", "cuts", "includedIn",
+      "procurement", "maturity", "requirements", "fingerprint", "releasedRevision", "releaseCurrent"], "item");
+    expectFields(parsedLine.item.quantity, ["value", "unit"], "quantity");
+    expectFields(parsedLine.item.procurement, ["kind", "process", "manufacturer", "mpn", "standard"], "procurement");
+    var parsedUses:Array<Dynamic> = parsedLine.uses;
+    expectFields(parsedUses[0], ["kind", "path", "quantity"], "use");
+    var requirementJson:Dynamic = haxe.Json.parse(haxe.Json.stringify(
+      machinekit.component.Procurement.ProcurementCodec.requirement("length", "mm", null, null, 1)));
+    expectFields(requirementJson, ["name", "min", "max", "nominal", "unit"], "requirement");
+    for (invalid in [
+      '{"schema":"machinekit.bom","version":0,"assembly":{},"procurement":[]}',
+      '{"schema":"machinekit.bom","assembly":{},"procurement":[]}',
+      '{"schema":"machinekit.bom","version":"1","assembly":{},"procurement":[]}',
+      '{"schema":"machinekit.bom","version":2,"assembly":{},"procurement":[]}',
+      '{"schema":"other","version":1,"assembly":{},"procurement":[]}',
+      '{"schema":"machinekit.bom","version":1,"assembly":{}}'
+    ]) {
+      var rejectedSchema = false;
+      try machinekit.component.BomJson.parse(invalid) catch (_:Dynamic) rejectedSchema = true;
+      if (!rejectedSchema) throw "BOM reader must reject unsupported or incomplete envelopes";
+    }
     doc.assembly.children[0].lines[2].item.procurement = {
       kind: "NotSupplied", process: null, manufacturer: null, mpn: null, standard: null
     };
