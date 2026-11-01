@@ -185,7 +185,7 @@ and readers reject anything else. It contains:
   baseline lists each problem class with counts.
 
 ### B2 — Part-number rules and lint
-- Done in this commit: 212 constructible recipe defaults and all recipe-derived
+- Done in `4f87b4bb0`: 212 constructible recipe defaults and all recipe-derived
   numbers in 22 machine exports pass lint; three defaults require source inputs.
   The full gate passed 11/24 shards with no new shard or exception message.
   The measurements and remaining non-recipe invalid counts are in
@@ -287,13 +287,36 @@ and readers reject anything else. It contains:
 - Acceptance: all recipe-derived parts pass the lint.
 
 ### B3 — Made parts: drawing number + revision
+- Done in this commit: bench-mill drawing identities and fingerprint/release
+  records are tested; 22 example exports contain 1,143 procurement lines,
+  including 399 code-only lines with unavailable fingerprints. The full gate
+  passed 11/24 shards with no new shard or exception message.
+- A made part declares its drawing number separately from its scene
+  designation. Scene artifacts use the designation for geometry and display;
+  BOM identity uses the drawing number. This keeps procurement identity
+  stable without changing the existing tending-study scene inputs.
+- The X- and Y-axis motor plates have separate drawing numbers even though
+  their current dimensions match: their axis-specific designs may change
+  independently. Their fingerprints record the actual current dimensions.
+- Code-only components without declared revision inputs report a null
+  fingerprint rather than a hash that falsely claims to cover their geometry.
+  The bench-mill brackets, plates and nut adapters declare their exact inputs;
+  B7 must finish declarations for the remaining code-only parts.
+- Release records are ordered per part in each machine's version-one file;
+  the last record is the latest issue. Dates must be chronological and a
+  part/revision pair may appear only once. Missing release files mean no
+  released revision; stale fingerprints remain visible as `releaseCurrent: false`.
+- A recipe fingerprint hashes its exact purchase key and generator version.
+  The full geometry cache key still retains placement and routing inputs. This
+  keeps the fingerprint of a purchased belt or rail independent of how it is
+  placed, while preserving every input that defines the purchased part.
 - Decision: use author-declared drawing numbers. A geometry-derived identity
   would change when a drawing changes and would detach existing quotes; the
   separate revision identifies that change instead.
 - `MachineComponent` gets an explicit drawing number for made parts, and
   constructors stop deriving identity from dimensions.
-- Revision = short hash of the recipe key, or of the exported B-rep for
-  parts without a recipe.
+- Fingerprint the declared purchase inputs and generator version; released
+  revision letters are explicit records, as specified in A4.
 - Fix the bench mill's brackets, plates and nut adapters first, then the
   rest of the 104 interpolating constructors as part of B7.
 - Acceptance: changing a bench-mill bracket dimension keeps its part number

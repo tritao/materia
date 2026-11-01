@@ -4,6 +4,11 @@ import machinekit.assembly.MachineAssembly;
 class BomExampleTests {
   public static function main():Void run();
   public static function run():Void {
+    var bracket = new BenchMill.MillDriveBox("MILL-TEST-BRACKET", 20, 30, 10);
+    var revised = new BenchMill.MillDriveBox("MILL-TEST-BRACKET", 20, 30, 10.001);
+    if (bracket.bom.partNumber != revised.bom.partNumber || bracket.bom.fingerprint == null
+      || bracket.bom.fingerprint == revised.bom.fingerprint)
+      throw "A bracket geometry change must preserve its drawing number and change its fingerprint";
     check("bench-mill", new BenchMill());
     check("cnc-router", new CncRouter());
     check("robot-welder", new WeldingCell());

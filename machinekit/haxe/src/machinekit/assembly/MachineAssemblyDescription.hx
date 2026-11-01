@@ -78,6 +78,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
   @:id(10) @:optional var properties:machinekit.component.BomItem.BomProperties;
   @:id(11) @:optional var measure:machinekit.component.BomItem.BomMeasure;
   @:id(12) @:optional var cuts:Array<machinekit.component.BomItem.BomCut>;
+  @:id(13) @:optional var fingerprint:String;
 }
 
 @:wire enum SavedBomMass {

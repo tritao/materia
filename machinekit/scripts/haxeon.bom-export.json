@@ -219,7 +219,9 @@
     "../examples/xyz-stage/XyzStage.hx",
     "../examples/xyz-stage/XyzStagePreview.hx",
     "../examples/linear-stage/LinearStage.hx",
-    "../examples/linear-stage/LinearStagePreview.hx"
+    "../examples/linear-stage/LinearStagePreview.hx",
+    "../haxe/src/machinekit/component/BomRevision.hx",
+    "../haxe/src/machinekit/component/BomReleases.hx"
   ],
   "sourceRoots": [
     ".",

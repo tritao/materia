@@ -22,6 +22,7 @@ class AxisServoMotor extends ServoMotor {
     var item = super.get_bom(), purchased = source.bom;
     item.typeId = purchased.typeId;
     item.valuesKey = purchased.valuesKey;
+    item.fingerprint = purchased.fingerprint;
     return item;
   }
   override public function geometry(detail:ComponentDetail =

@@ -47,6 +47,8 @@ class MachineComponent {
   }
 
   public final designation:String;
+  /** Author-declared drawing identity, independent of the scene designation. */
+  public var drawingNumber(default, null):Null<String>;
   /** Physical material changes go through setMaterial, so mechanically typed parts can enforce their class. */
   public var materialId(default, null):String;
   /** True when this component was built from explicit, non-catalog specifications. */
@@ -87,6 +89,14 @@ class MachineComponent {
     this.description = description;
   }
 
+  /** A made part declares its drawing identity once, independently of geometry. */
+  function declareDrawingNumber(number:String):Void {
+    if (number == null || StringTools.trim(number) == "" || drawingNumber != null)
+      throw "A drawing number must be declared once and cannot be empty";
+    drawingNumber = number;
+    cachedBom = null;
+  }
+
   public static function customDesignation(designation:String):String return StringTools.startsWith(
     designation,
     "CUSTOM-"
@@ -115,12 +125,13 @@ class MachineComponent {
     var recipe = type;
     var valuesKey = recipe == null ? null : recipe.bomKey(values());
     cachedBom = {
-      partNumber: recipe == null ? designation : recipe.partNumber(this),
+      partNumber: recipe == null ? (drawingNumber == null ? designation : drawingNumber) : recipe.partNumber(this),
       description : description,
       quantity : 1,
       material : MaterialLibrary.require(materialId).physical.spec,
       typeId : recipe == null ? null : recipe.id,
-      valuesKey : valuesKey
+      valuesKey : valuesKey,
+      fingerprint : recipe == null ? revisionFingerprint() : BomRevision.fingerprint(recipe.bomKey(values()), recipe.generatorVersion)
     };
     if (recipe != null && recipe.manufacturingFamily != null) {
       var family = recipe.manufacturingFamily;
@@ -131,6 +142,9 @@ class MachineComponent {
     }
     return cachedBom;
   }
+
+  /** Code-only components override this when their generator inputs are declared. */
+  public function revisionFingerprint():Null<String> return null;
 
   /**
 	 * How this part is best looked at on its own, when its shape alone does not say (see `ComponentView.derive`);

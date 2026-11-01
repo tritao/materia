@@ -223,6 +223,7 @@ typedef MachineAssemblyMassProperties = {
     manufacturingProcess: item.manufacturingProcess,
     typeId: item.typeId,
     valuesKey: item.valuesKey,
+    fingerprint: item.fingerprint,
     properties: Bom.copyPanel(item.properties),
     measure: Bom.copyMeasure(item.measure), cuts: Bom.copyCuts(item.cuts)
   };
@@ -1044,8 +1045,9 @@ typedef MachineAssemblyMassProperties = {
   public function billOfMaterials():Bom return AssemblyInventory.billOfMaterials(flat());
 
   /** Snapshot the engineering tree and derive the procurement view from its occurrences. */
-  public function bomDocument(machineId:String, sourceCommit:String, generatedAt:String):BomDocument {
-    return new BomDocument(machineId, sourceCommit, generatedAt, bomTree(""));
+  public function bomDocument(machineId:String, sourceCommit:String, generatedAt:String,
+    ?releases:machinekit.component.BomReleases):BomDocument {
+    return new BomDocument(machineId, sourceCommit, generatedAt, bomTree(""), releases);
   }
 
   function bomTree(prefix:String):BomDocument.BomAssemblyNode {

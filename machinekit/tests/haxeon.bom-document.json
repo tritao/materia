@@ -1,10 +1,22 @@
 {
   "version": 1,
-  "package": { "name": "machinekit-bom-document-tests" },
+  "package": {
+    "name": "machinekit-bom-document-tests"
+  },
   "entry": "BomDocumentTests",
-  "sources": ["src/BomDocumentTests.hx"],
-  "sourceRoots": ["src"],
-  "dependencies": { "machinekit": { "path": ".." } },
+  "sources": [
+    "src/BomDocumentTests.hx",
+    "../haxe/src/machinekit/component/BomRevision.hx",
+    "../haxe/src/machinekit/component/BomReleases.hx"
+  ],
+  "sourceRoots": [
+    "src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": ".."
+    }
+  },
   "target": "host",
   "outputDir": "../build/bom-test"
 }

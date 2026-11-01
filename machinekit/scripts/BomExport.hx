@@ -15,7 +15,10 @@ class BomExport {
     var args = Sys.args();
     if (args.length != 4) throw "Expected machine, source commit, generation time and output path";
     var machine = build(args[0]);
-    sys.io.File.saveContent(args[3], haxe.Json.stringify(machine.bomDocument(args[0], args[1], args[2]), null, "  ") + "\n");
+    var releasePath = "machinekit/examples/" + args[0] + "/releases.json";
+    var releases = sys.FileSystem.exists(releasePath)
+      ? machinekit.component.BomReleases.parse(sys.io.File.getContent(releasePath)) : null;
+    sys.io.File.saveContent(args[3], haxe.Json.stringify(machine.bomDocument(args[0], args[1], args[2], releases), null, "  ") + "\n");
   }
 
   /** The names supported by the command and by example-BOM validation. */

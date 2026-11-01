@@ -17,6 +17,37 @@ class BomDocumentTests {
   public static function main():Void run();
   public static function run():Void {
     var child = new MachineAssembly();
+    var source = new machinekit.standard.Bushing(8, 12, 10);
+    var fingerprint = source.bom.fingerprint;
+    if (fingerprint == null) throw "Recipe fingerprint is missing";
+    var releases = machinekit.component.BomReleases.parse(haxe.Json.stringify({version:1, releases:[
+      {partNumber:source.bom.partNumber, revision:"A", fingerprint:fingerprint, date:"2026-01-02"}
+    ]}));
+    var releasedAssembly = new MachineAssembly();
+    releasedAssembly.addComponent("bushing", source);
+    var nested = new MachineAssembly();
+    nested.addBomItem(source.bom, 2);
+    releasedAssembly.include("nested", nested);
+    var released = releasedAssembly.bomDocument("released", "abc", "2026-01-03T00:00:00Z", releases);
+    if (released.procurement[0].item.fingerprint != fingerprint || released.procurement[0].item.releasedRevision != "A"
+      || released.procurement[0].item.releaseCurrent != true || released.assembly.lines[0].item.releaseCurrent != true
+      || released.procurement[0].item.quantity.value != 3 || released.assembly.children[0].lines[0].item.fingerprint != fingerprint)
+      throw "Current release must be visible in engineering and procurement";
+    var stale = machinekit.component.BomReleases.parse(haxe.Json.stringify({version:1, releases:[
+      {partNumber:source.bom.partNumber, revision:"A", fingerprint:StringTools.lpad("", "0", 64), date:"2026-01-02"}
+    ]}));
+    if (releasedAssembly.bomDocument("released", "abc", "2026-01-03T00:00:00Z", stale).procurement[0].item.releaseCurrent != false)
+      throw "A release pinned to another fingerprint must be stale";
+    var history = machinekit.component.BomReleases.parse(haxe.Json.stringify({version:1, releases:[
+      {partNumber:source.bom.partNumber, revision:"A", fingerprint:StringTools.lpad("", "0", 64), date:"2026-01-02"},
+      {partNumber:source.bom.partNumber, revision:"B", fingerprint:fingerprint, date:"2026-01-03"}
+    ]}));
+    var latest = releasedAssembly.bomDocument("released", "abc", "2026-01-03T00:00:00Z", history).procurement[0].item;
+    if (latest.releasedRevision != "B" || latest.releaseCurrent != true)
+      throw "The latest issued release must determine the exported revision";
+    var releaseRejected = false;
+    try machinekit.component.BomReleases.parse('{"version":2,"releases":[]}') catch (_:Dynamic) releaseRejected = true;
+    if (!releaseRejected) throw "Unknown release schema versions must be rejected";
     child.addComponent("first", new BomTestPart());
     child.addBomItem(new BomTestPart().bom, 2);
     child.addBomItem({partNumber: "WIRE", description: "Wire", quantity: 2, material: null}, 3);

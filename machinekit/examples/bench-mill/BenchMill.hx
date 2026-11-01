@@ -314,13 +314,13 @@ class BenchMill extends MachineAssembly {
     var shelfBottom = motorFaceZ - 8;
     attach(
       "spindleMotorShelf",
-      new MillMotorPlate(spindleDrive.rating.bodyDiameter + 20, 8, motorPulley.outsideDiameter + 2),
+      new MillMotorPlate("MILL-SPINDLE-MOTOR-SHELF", spindleDrive.rating.bodyDiameter + 20, 8, motorPulley.outsideDiameter + 2),
       AssemblyFrames.translation(150, spindleY, shelfBottom),
       "head"
     );
     attach(
       "spindleMotorRiser",
-      new MillDriveBox(20, 100, shelfBottom - headZ - head.height),
+      new MillDriveBox("MILL-SPINDLE-MOTOR-RISER", 20, 100, shelfBottom - headZ - head.height),
       AssemblyFrames.translation(head.width / 2, spindleY + 5, headZ + head.height),
       "head"
     );
@@ -482,7 +482,7 @@ class BenchMill extends MachineAssembly {
     }
     var couplingStart = shaftLength - coupling.length / 2;
     var plateBore = couplingStart < plateThickness ? coupling.outerDiameter : motor.rating.shaftDiameter;
-    var motorPlate = new MillMotorPlate(motor.rating.bodyDiameter + 20, plateThickness, plateBore);
+    var motorPlate = new MillMotorPlate("MILL-" + spec.id.toUpperCase() + "-MOTOR-PLATE", motor.rating.bodyDiameter + 20, plateThickness, plateBore);
     if (spec.id == "y") {
       var footZ = start[2] + near.connector("mount").frame.y;
       for (end in 0...2) {
@@ -491,7 +491,7 @@ class BenchMill extends MachineAssembly {
           == 0 ? BallScrew.INPUT_JOURNAL_LENGTH - near.length / 2 : length - BallScrew.JOURNAL_LENGTH / 2;
         attach(
           id + 'Stand$end',
-          new MillDriveBox(unit.width, unit.length, footZ - base.height),
+          new MillDriveBox(end == 0 ? "MILL-Y-STAND-FIXED" : "MILL-Y-STAND-FLOATING", unit.width, unit.length, footZ - base.height),
           AssemblyFrames.translation(start[0], start[1] + offset, base.height),
           parent
         );
@@ -500,7 +500,7 @@ class BenchMill extends MachineAssembly {
       var front = -base.depth / 2;
       attach(
         motorId + "Bridge",
-        new MillDriveBox(motorPlate.width, front - motorPose.y, plateBottom - base.height + 10),
+        new MillDriveBox("MILL-Y-MOTOR-BRIDGE", motorPlate.width, front - motorPose.y, plateBottom - base.height + 10),
         AssemblyFrames.translation(0, (front + motorPose.y) / 2, base.height - 10),
         parent
       );
@@ -511,7 +511,7 @@ class BenchMill extends MachineAssembly {
         var slot = side < 0 ? motorPose.x + saddle.width / 2 + reach / 2 + motorPlate.thickness / 2 : null;
         attach(
           id + (side < 0 ? "NearBridge" : "FarBridge"),
-          new MillDriveBox(reach, 80, 10, slot, motorPlate.thickness),
+          new MillDriveBox(side < 0 ? "MILL-X-BRIDGE-NEAR" : "MILL-X-BRIDGE-FAR", reach, 80, 10, slot, motorPlate.thickness),
           AssemblyFrames.translation(side * (saddle.width / 2 + reach / 2), start[1], footZ - 10),
           parent
         );
@@ -524,7 +524,7 @@ class BenchMill extends MachineAssembly {
         var footX = start[0] + unit.connector("mount").frame.y;
         attach(
           id + 'Stand$end',
-          new MillDriveBox(footX - column.width / 2, unit.width, unit.length),
+          new MillDriveBox(end == 0 ? "MILL-Z-STAND-FIXED" : "MILL-Z-STAND-FLOATING", footX - column.width / 2, unit.width, unit.length),
           AssemblyFrames.translation((footX + column.width / 2) / 2, start[1], start[2] - offset - unit.length / 2),
           parent
         );
@@ -534,7 +534,7 @@ class BenchMill extends MachineAssembly {
       var top = zeroPose(parent).z + column.height;
       attach(
         motorId + "Post",
-        new MillDriveBox(20, 20, motorPose.z - motorPlate.thickness - top),
+        new MillDriveBox("MILL-Z-MOTOR-POST", 20, 20, motorPose.z - motorPlate.thickness - top),
         AssemblyFrames.translation(column.width / 2 - 10, start[1] + motorPlate.width / 2 - 10, top),
         parent
       );
@@ -743,20 +743,26 @@ class BenchMill extends MachineAssembly {
 }
 
 /** Designed flat bracket bodies; source placement derives from the supported shaft and casting. */
-private class MillDriveBox extends MachineComponent {
+class MillDriveBox extends MachineComponent {
   final width:Float;
   final depth:Float;
   final height:Float;
   final slot:Null<Float>;
   final slotWidth:Float;
-  public function new(width:Float, depth:Float, height:Float, ?slot:Float, slotWidth:Float = 0) {
+  public function new(drawing:String, width:Float, depth:Float, height:Float, ?slot:Float, slotWidth:Float = 0) {
     super('MILL-BRACKET-$width-$depth-$height-$slot-$slotWidth', "Mill drive support bracket", "steel", true);
+    declareDrawingNumber(drawing);
     this.width = width;
     this.depth = depth;
     this.height = height;
     this.slot = slot;
     this.slotWidth = slotWidth;
   }
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    [drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(width),
+      machinekit.component.ComponentNumberKey.encode(depth), machinekit.component.ComponentNumberKey.encode(height),
+      slot == null ? "none" : machinekit.component.ComponentNumberKey.encode(slot),
+      machinekit.component.ComponentNumberKey.encode(slotWidth)].join("|"), 1);
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var body = Solids.named(Part.box(width, depth, height), "bracket");
@@ -772,12 +778,16 @@ private class MillMotorPlate extends MachineComponent {
   public final width:Float;
   public final thickness:Float;
   final bore:Float;
-  public function new(width:Float, thickness:Float, bore:Float) {
+  public function new(drawing:String, width:Float, thickness:Float, bore:Float) {
     super('MILL-MOTOR-PLATE-$width-$thickness-$bore', "Mill motor mounting plate", "steel", true);
+    declareDrawingNumber(drawing);
     this.width = width;
     this.thickness = thickness;
     this.bore = bore;
   }
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    [drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(width),
+      machinekit.component.ComponentNumberKey.encode(thickness), machinekit.component.ComponentNumberKey.encode(bore)].join("|"), 1);
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var body = Part.box(width, width, thickness).translated(new Vector(0, 0, 0));
@@ -800,10 +810,14 @@ private class MillNutBracket extends MachineComponent {
   final mountRise:Float;
   public function new(nut:BallNut, axis:String, mountRise:Float) {
     super('MILL-NUT-BRACKET-${nut.designation}-$axis-$mountRise', "Ball-nut flange adapter", "steel", true);
+    declareDrawingNumber("MILL-NUT-BRACKET-" + axis.toUpperCase());
     this.nut = nut;
     this.axis = axis;
     this.mountRise = mountRise;
   }
+  override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
+    [drawingNumber, materialSpec(), axis, machinekit.component.ComponentNumberKey.encode(mountRise),
+      machinekit.motion.BallNut.recipeType().key(nut.values())].join("|"), 1);
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var radius = nut.flangeDiameter / 2 + (axis == "y" ? 11 : 1);

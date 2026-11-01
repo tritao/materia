@@ -75,13 +75,15 @@ class BomDocument {
   public final assembly:BomAssemblyNode;
   public final procurement:Array<BomDocumentLine>;
 
-  public function new(machineId:String, sourceCommit:String, generatedAt:String, assembly:BomAssemblyNode) {
+  public function new(machineId:String, sourceCommit:String, generatedAt:String, assembly:BomAssemblyNode,
+    ?releases:machinekit.component.BomReleases) {
     if (machineId == null || machineId == "" || sourceCommit == null || sourceCommit == ""
       || generatedAt == null || generatedAt == "") throw "BOM provenance is required";
     this.machineId = machineId;
     this.sourceCommit = sourceCommit;
     this.generatedAt = generatedAt;
     this.assembly = assembly;
+    if (releases != null) applyReleases(assembly, releases);
     this.procurement = procurementView(assembly);
   }
 
@@ -114,8 +116,19 @@ class BomDocument {
       material:item.material, typeId:item.typeId, valuesKey:item.valuesKey, familyId:item.familyId,
       manufacturingVariant:item.manufacturingVariant, manufacturingProcess:item.manufacturingProcess,
       properties:properties, cuts:cuts, includedIn:owner, procurement:null, maturity:null, requirements:[],
-      fingerprint:null, releasedRevision:null, releaseCurrent:null},
+      fingerprint:item.fingerprint, releasedRevision:null, releaseCurrent:null},
       uses:[{kind:kind, path:path, quantity:{value:amount, unit:unit}}]};
+  }
+
+  static function applyReleases(node:BomAssemblyNode, releases:machinekit.component.BomReleases):Void {
+    for (line in node.lines) {
+      var release = releases.find(line.item.partNumber);
+      if (release != null) {
+        line.item.releasedRevision = release.revision;
+        line.item.releaseCurrent = line.item.fingerprint != null && line.item.fingerprint == release.fingerprint;
+      }
+    }
+    for (child in node.children) applyReleases(child, releases);
   }
 
   /** Roll up whole purchases from the retained engineering occurrences. */

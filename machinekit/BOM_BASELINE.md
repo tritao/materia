@@ -156,6 +156,46 @@ lint-invalid lines from 872 to 242. These are line counts, not quantities.
 | track-arm | 53 | 31 | 53 | 8 |
 | xyz-stage | 41 | 33 | 41 | 22 |
 
+
+## B3 bench-mill measurement
+
+Across the 22 exportable machines, B3 produced 1,143 procurement lines;
+399 have no fingerprint because their code-only revision inputs remain
+undeclared. Recipe-derived procurement lines all have fingerprints.
+
+| Machine | B3 lines | Fingerprint unavailable |
+| --- | ---: | ---: |
+| bench-mill | 77 | 3 |
+| cnc-router | 40 | 23 |
+| cobot-arm | 25 | 13 |
+| corexy-plotter | 17 | 10 |
+| corexy-printer | 54 | 24 |
+| enclosed-bench-mill | 115 | 3 |
+| flexspline-hobber | 76 | 0 |
+| gantry-picker | 62 | 42 |
+| gantry-welder | 83 | 63 |
+| linear-stage | 11 | 1 |
+| mobile-base-cell | 48 | 14 |
+| mobile-base | 11 | 6 |
+| mobile-welder | 53 | 26 |
+| overhead-arm | 76 | 30 |
+| picking-station | 7 | 1 |
+| press-brake | 37 | 12 |
+| robot-arm | 32 | 3 |
+| robot-screwdriver | 38 | 10 |
+| robot-welder | 43 | 20 |
+| sheet-router | 144 | 46 |
+| track-arm | 53 | 22 |
+| xyz-stage | 41 | 27 |
+
+The bench-mill export has 77 procurement lines, compared with 76 at B2.
+The X- and Y-axis motor plates now have separate drawing identities; their
+previous dimension-derived number combined them.
+Three procurement lines have no fingerprint: the end mill, bearing-block
+blank and toe clamp are code-only entries without declared revision inputs.
+The remaining 74 have fingerprints. These counts precede purchase-boundary
+and supplied-equipment changes in later phases.
+
 ## Initial content signals
 
 These are counts of lines, not an assessment of completeness. Fastener lines

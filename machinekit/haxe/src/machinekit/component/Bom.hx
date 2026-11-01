@@ -29,6 +29,7 @@ class Bom {
           manufacturingProcess: item.manufacturingProcess,
           typeId: item.typeId,
           valuesKey: item.valuesKey,
+          fingerprint: item.fingerprint,
           properties: copyPanel(item.properties),
           measure: copyMeasure(item.measure), cuts: copyCuts(item.cuts)
         }
@@ -36,7 +37,7 @@ class Bom {
       order.push(item.partNumber);
     } else {
       if (existing.description != item.description
-        || existing.material != item.material || existing.typeId != item.typeId || existing.valuesKey != item.valuesKey
+        || existing.material != item.material || existing.typeId != item.typeId || existing.valuesKey != item.valuesKey || existing.fingerprint != item.fingerprint
         || haxe.Json.stringify(existing.properties) != haxe.Json.stringify(item.properties)
         || haxe.Json.stringify(existing.measure) != haxe.Json.stringify(item.measure)
         || haxe.Json.stringify(existing.cuts) != haxe.Json.stringify(item.cuts) || existing.familyId
@@ -70,6 +71,7 @@ class Bom {
         manufacturingProcess: item.manufacturingProcess,
         typeId: item.typeId,
         valuesKey: item.valuesKey,
+        fingerprint: item.fingerprint,
         properties: copyPanel(item.properties),
         measure: copyMeasure(item.measure), cuts: copyCuts(item.cuts)
       });

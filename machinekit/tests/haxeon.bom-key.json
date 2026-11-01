@@ -1,10 +1,22 @@
 {
   "version": 1,
-  "package": { "name": "machinekit-bom-key-tests" },
+  "package": {
+    "name": "machinekit-bom-key-tests"
+  },
   "entry": "PartNumberKeyTests",
-  "sources": ["src/PartNumberKeyTests.hx"],
-  "sourceRoots": ["src"],
-  "dependencies": { "machinekit": { "path": ".." } },
+  "sources": [
+    "src/PartNumberKeyTests.hx",
+    "../haxe/src/machinekit/component/BomRevision.hx",
+    "../haxe/src/machinekit/component/BomReleases.hx"
+  ],
+  "sourceRoots": [
+    "src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": ".."
+    }
+  },
   "target": "host",
   "outputDir": "../build/bom-key-test"
 }

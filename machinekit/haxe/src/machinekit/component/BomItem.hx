@@ -29,6 +29,7 @@ typedef BomItem = {
   var ?manufacturingProcess:String;
   var ?typeId:String;
   var ?valuesKey:String;
+  var ?fingerprint:String;
   var ?properties:BomProperties;
   var ?measure:BomMeasure;
   var ?cuts:Array<BomCut>;

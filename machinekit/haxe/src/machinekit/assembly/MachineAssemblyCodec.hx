@@ -327,6 +327,7 @@ class MachineAssemblyCodec {
         manufacturingProcess: entry.item.manufacturingProcess,
         typeId: entry.item.typeId,
         valuesKey: entry.item.valuesKey,
+        fingerprint: entry.item.fingerprint,
         properties: entry.item.properties,
         measure: entry.item.measure, cuts: entry.item.cuts
       }, quantity:entry.quantity, mass:switch entry.mass {

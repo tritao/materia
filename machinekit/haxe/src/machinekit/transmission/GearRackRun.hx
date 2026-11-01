@@ -84,6 +84,7 @@ class GearRackRun extends MachineComponent {
       material: source.material,
       typeId: source.typeId,
       valuesKey: source.valuesKey,
+      fingerprint: source.fingerprint,
       familyId: source.familyId,
       manufacturingVariant: source.manufacturingVariant,
       manufacturingProcess: source.manufacturingProcess,

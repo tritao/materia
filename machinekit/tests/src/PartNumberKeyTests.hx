@@ -32,6 +32,12 @@ class PartNumberKeyTests {
       throw "Part numbers must be derived from resolved recipe values";
     if (a.bom.valuesKey == b.bom.valuesKey || a.geometryKey(Preview) == b.geometryKey(Preview))
       throw "Recipe keys must preserve changes below display precision";
+    if (a.bom.fingerprint == null || a.bom.fingerprint == b.bom.fingerprint)
+      throw "Recipe fingerprints must change with exact geometry inputs";
+    var revision = machinekit.component.BomRevision.fingerprint("test-key", 1);
+    if (revision == machinekit.component.BomRevision.fingerprint("test-key", 2)
+      || revision != machinekit.component.BomRevision.fingerprint("test-key", 1))
+      throw "Generator versions must change stable fingerprints";
     if (PartNumberLint.problems(a.bom.partNumber).length != 0
       || PartNumberLint.problems("test|size:10").length == 0
       || PartNumberLint.problems("PART-null").length == 0

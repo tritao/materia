@@ -19,6 +19,7 @@ class ComponentType {
   final materialInDesignation:Bool;
   final defaultMaterial:String;
   final bomExcludedInputs:Array<String>;
+  public var generatorVersion(default, null):Int = 1;
   var numberFor:Null<ComponentValues -> String>;
   var purchaseKeyFor:Null<ComponentValues -> String>;
 
@@ -89,6 +90,13 @@ class ComponentType {
   public function numbered(number:ComponentValues -> String):ComponentType {
     if (number == null || numberFor != null) throw 'Part number already defined for "$id"';
     numberFor = number;
+    return this;
+  }
+
+  /** Increment when the generator changes geometry without an input change. */
+  public function versioned(version:Int):ComponentType {
+    if (version < 1) throw 'Invalid geometry generator version for "$id"';
+    generatorVersion = version;
     return this;
   }
 
