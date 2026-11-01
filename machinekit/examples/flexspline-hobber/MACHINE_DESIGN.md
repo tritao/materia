@@ -147,6 +147,56 @@ reference cycle-time acceptance. Frozen HB4/HB11 cuts use their original layout
 and remain separate evidence. Structural/modal analysis, spindle/mandrel sag,
 thermal behaviour and detailed manufacturing release remain open plan items.
 
+## Feedback and drive requirements (open, 2026-11-01)
+
+Procurement requirements for position feedback. None is selected or commissioned.
+
+| Axis | Feedback | Requirement | Status |
+|---|---|---|---|
+| X | Sealed absolute linear scale, ML ≈ 140 mm | ±3 µm/m, ≤ 0.1 µm, BiSS-C, slim, air purge | RFQ drafted (Changchun Yuheng JFT series) |
+| Z | Same, ML ≈ 240 mm | ±5 µm/m; spur parts, so scale error barely reaches the gear | same RFQ |
+| Y | Same, ML ≈ 70 mm | ±5–10 µm/m; same model as Z for spares | same RFQ |
+| C | Table's own angle encoder | Purchased table, ±5″ positioning / ±2″ repeatability; protocol must match the C drive | uncommissioned |
+| B | Direct spindle motor encoder | ≥ 2¹⁶ counts/rev, rated 8000 rpm, deterministic latching | with drive selection |
+| X/Y/Z/A motors | Servo motor encoders | Standard | with drive selection |
+
+Why X matters most: radial error changes tooth thickness by ≈ 2·tan 20°·ΔX ≈ 0.73·ΔX.
+Its repeatability and thermal stability matter more than absolute accuracy.
+
+Open decisions:
+
+1. **Drive selection, X/Y/Z.** Each drive needs a second encoder input for full closed loop
+   that accepts BiSS-C. The motor encoder closes the velocity loop and the scale closes position.
+   Avoid EnDat-only or vendor-locked protocols. Without this input, the scales cannot be used.
+2. **Drive selection, B.** The B drive must report the master position with a deterministic,
+   EtherCAT distributed-clock timestamp every cycle. C then extrapolates it with feedforward.
+   B encoder *accuracy* is attenuated at C by `starts/teeth` (1/200 for the reference part:
+   a 40″ B error is 0.2″, ≈ 0.03 µm at r 30 mm). Timing is not attenuated: at 3000 rpm,
+   1 µs of unknown delay is ≈ 65″ at B (≈ 0.3″ at C). An uncompensated 1 ms delay is the
+   47 µm case in PLAN.md. Spindle accuracy limits are hob/arbor runout, bearing preload and
+   thermal growth (HB14), not the encoder.
+3. **C drive and protocol.** The table encoder protocol must match the C drive. The design's own
+   screen is limited by assumed 0.1 % once-per-revolution table speed ripple, which must be
+   ≤ 0.0317 %. Raise this with the table vendor; better scales do not fix it.
+4. **Scale purge air.** Branch from the 6 bar clamp supply: regulator (≈ 1 bar), coalescing
+   and fine filters, and a dryer, to ISO 8573-1 class 1:4:1 (oil-free). Then a distribution block
+   to the X/Y/Z scales. Optionally add a pressure switch as a cut-permission interlock.
+   Not yet a service port.
+5. **Hob drive (decided 2026-11-01).** The hob has a Ø16 H5 plain bore with one end
+   drive slot (face key, DIN 138, supplier-standard dimensions) and is axially
+   clamped on the arbor. The arbor collar therefore needs a matching drive dog. The
+   model only has the optional longitudinal keyway (`Hob.fromDesign(.., keyed)`), so
+   the dog is not modelled yet. The plain bore keeps the arbor runout budget (2 µm);
+   the slot gives positive, repeatable drive, so a slipping hob cannot silently
+   break the B/C gearing. A shank-type hob, which removes the arbor stack, is the
+   later route for class 3. The supplier package is built by `hob-package/`.
+6. **Built-up table option.** If `RotaryTable` replaces the purchase, it needs a modular ring
+   encoder, about 100 mm bore, two heads, absolute, BiSS-C. One set is quoted in the same RFQ (see `../../STRAIN_WAVE_RESEARCH.md`).
+
+The RFQ was sent to sales@yu-heng.cn on 2026-11-01. It requests a quote for the three
+scales and one ring-encoder set; the text is kept outside the repository, in
+`materia-cache/claude-scratch/emails/yuheng-quote-request.txt`.
+
 ## Heavy plinth acceptance (HB-D11)
 
 The casting is 835.58 kg; the base assembly is 859.22 kg and the complete machine

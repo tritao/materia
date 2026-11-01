@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "flexspline-hob-package-export"},
+  "entry": "HobPackageExport",
+  "sourceRoots": ["."],
+  "dependencies": {"gearkit": {"path": "../../../../gearkit"}},
+  "target": "host",
+  "outputDir": "build"
+}
