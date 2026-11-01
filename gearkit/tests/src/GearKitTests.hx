@@ -32,6 +32,7 @@ class GearKitTests {
     rejects(() -> new GearSpec(1e308, 200, 8, alpha));
     GeometryTests.run();
     MetrologyTests.run();
+    ToothDesignInputTests.run();
     Sys.println('GearKitTests: $assertions assertions passed');
   }
 }

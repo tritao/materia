@@ -193,6 +193,25 @@ units) are compared only as plausibility, with the source and the load condition
 | Flexspline steel fatigue strain limit | to be sourced | 40CrNiMo, check |
 | Liu 2025 defaults | m 0.5, Z_f 100, Z_c 102, w₀ 0.5, r₁ 0.685, c₁ 0.332, e₁ 0.155, r₂ 0.785, c₂ 0.330, e₂ 0.134 | Liu et al., *Machines* 13 (2025) 535 |
 
+## Baseline (TD0)
+
+Recorded 2026-11-01 on `main` 6e041094c, worktree `tooth-design`, toolchain from the main
+checkout (`haxeon build --compiler-only`; the worktree's submodule directories are symlinks to the
+main checkout's). Run with the main checkout's `app/build/host/native/*` on `LD_LIBRARY_PATH`.
+
+| Gate | Baseline |
+|---|---|
+| gearkit suite (`gearkit/tests`) | green: GeometryTests 1034568 assertions (rack error 1.32e-14 mm, re-envelope 2.51e-14 mm), MetrologyTests 246, GearKitTests 18 |
+| hob rack output (`supplier-packages`, 1543 rack points) | JSON md5 `017ec06361ce3f4663e9ee765544712f` |
+| stockkit ring / metrology / hobbing-stream / hobbing-errors / hobbing-forces | green (345 / 11 assertions / HB3 difference 0 um / 24 / 27 assertions) |
+| camkit `tests/hobbing` | fails at HobbingCamTests.hx:219 ("Motion program op 1: Null access", motionkit `ProgramCompiler`) on unchanged main too; pre-existing, environment (native motionkit library) |
+| `app/tests` | does not compile on unchanged main with this toolchain (`State.updateQuietly` unknown): the app source is ahead of the committed haxeon submodule; pre-existing |
+| machinekit `tests/hobbing`, `tests/hobber` | compile; full runs stop on the known "Collision hulls disagree with recipe" save/load bug (pre-existing, not chased) |
+
+D1 to D4 are written as inputs in `gearkit/tests/src/ToothDesigns.hx` (`StrainWaveInput` in
+`gearkit/haxe/gearkit`), validated by `ToothDesignInputTests`. **D4's kappa (2.0) is assumed**
+until TD5 measures where the derived circular spline interferes.
+
 ## Steps
 
 ### Phase A: forms and kinematics
@@ -324,7 +343,7 @@ TD0 ── TD1 ── TD2 ──┐
 
 | Step | State | Commits |
 |---|---|---|
-| TD0 | planned | |
+| TD0 | done | Tooth design: baseline and test-design inputs (TD0) |
 | TD1 | planned | |
 | TD2 | planned | |
 | TD3 | planned | |
