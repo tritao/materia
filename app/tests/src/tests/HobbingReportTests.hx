@@ -16,7 +16,7 @@ import haxeon.ui.host.*;
 
   /** Synthetic traces exercise the UI without running or claiming a qualified cut. */
   public static function fixture():HobbingReportData {
-    var data = new HobbingReportData(), spec = new GearSpec(1, 40, 10, 20 * Math.PI / 180);
+    var data = new HobbingReportData(), spec = new GearSpec(1, 40, 10, new Involute(20 * Math.PI / 180));
     var measured = new GearMeasurement(spec, new GearInspection(spec, spec.pitchRadius()));
     for (tooth in 0...2) for (flank in 0...2) {
       var x = [for (i in 0...40) i / 4.0], y = [for (i in 0...40) 5 + flank * 2 + Math.sin(i / 6.0) + tooth];

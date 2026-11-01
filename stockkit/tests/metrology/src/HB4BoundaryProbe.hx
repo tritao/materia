@@ -32,7 +32,7 @@ class HB4BoundaryProbe {
     }
     ], source:raw.source};
     var spec = new GearSpec(0.3, 200,
-      8, 20 * Math.PI / 180), p = new ToothProfile(spec), lo = p.rootJoinRadius + 0.002, hi = p.tipJoinRadius - 0.002;
+      8, new Involute(20 * Math.PI / 180)), p = spec.profile(), lo = p.rootJoinRadius() + 0.002, hi = p.tipJoinRadius() - 0.002;
     var original = new RingGrid(lo, hi, -0.02, 8.02, (hi - lo) / 185, 0.04);
     var hob = new HobDesign(ConjugateRack.of(p), 1, 32, 12), motion = new IdealHobbingJob(spec, hob, 3000, 1.1, 0, 4);
     var grid = new RingGrid(input.radialLow, input.radialHigh, input.zLow, input.zHigh, 1, 1);

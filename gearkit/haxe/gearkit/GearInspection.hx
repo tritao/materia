@@ -28,21 +28,21 @@ class GearInspection {
     ?helixCutoff:Float
   ) {
     spec = s;
-    var p = new ToothProfile(s), rb = s.baseRadius();
+    var p = s.profile();
     this.controlRadius = controlRadius;
     this.tipFormRadius = tipFormRadius == null ? s.tipRadius() - s.sign() * s.tipFilletRadius : tipFormRadius;
     this.measurementRadius = measurementRadius == null ? s.pitchRadius() : measurementRadius;
     this.pitchZ = pitchZ == null ? s.faceWidth / 2 : pitchZ;
     this.profileZ = profileZ == null ? s.faceWidth / 2 : profileZ;
-    var lo = Math.min(p.rootJoinRadius, p.tipJoinRadius), hi = Math.max(p.rootJoinRadius, p.tipJoinRadius);
+    var lo = Math.min(p.rootJoinRadius(), p.tipJoinRadius()), hi = Math.max(p.rootJoinRadius(), p.tipJoinRadius());
     for (r in [controlRadius, this.tipFormRadius, this.measurementRadius]) if (!Math.isFinite(r)
-      || r < lo || r > hi) throw "inspection radius is outside the unrounded involute";
+      || r < lo || r > hi) throw "inspection radius is outside the unrounded flank";
     if (s.sign() * (this.tipFormRadius - controlRadius) <= 0) throw "profile control must precede tip form";
     for (z in [this.pitchZ,
       this.profileZ]) if (!Math.isFinite(z) || z < 0 || z > s.faceWidth) throw "inspection Z outside face";
-    rollStart = roll(controlRadius, rb);
-    rollTip = roll(s.tipRadius(), rb);
-    rollEnd = rollStart + 0.95 * (roll(this.tipFormRadius, rb) - rollStart);
+    rollStart = p.profileCoordinate(controlRadius);
+    rollTip = p.profileCoordinate(s.tipRadius());
+    rollEnd = rollStart + 0.95 * (p.profileCoordinate(this.tipFormRadius) - rollStart);
     var trim = Math.min(0.05 * s.faceWidth, s.module);
     axialStart = trim;
     axialEnd = s.faceWidth - trim;
@@ -54,5 +54,4 @@ class GearInspection {
     if (this.profileCutoff > pc || this.helixCutoff > Math.max(s.faceWidth / 30,
       pc)) throw "filter cutoff exceeds ISO recommended maximum";
   }
-  public static function roll(r:Float, rb:Float):Float return Math.sqrt(Math.max(0, r * r - rb * rb));
 }

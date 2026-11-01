@@ -46,6 +46,7 @@
 __pycache__/
 
 /gearkit/tests/build/
+/gearkit/studies/tooth-design/build/
 
 /stockkit/tests/ring/build/
 

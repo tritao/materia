@@ -42,9 +42,9 @@ class FlexsplineHobber extends MachineAssembly {
     ?rotaryAxis:machinekit.motion.PrecisionRotaryAxis
   ) {
     super();
-    this.spec = spec == null ? new GearSpec(0.3, 200, 8, 20 * Math.PI / 180) : spec;
+    this.spec = spec == null ? new GearSpec(0.3, 200, 8, new Involute(20 * Math.PI / 180)) : spec;
     if (this.spec.internal) throw "external hobbing machine requires external gear";
-    var profile = new ToothProfile(this.spec);
+    var profile = this.spec.profile();
     hob = Hob.fromDesign(new HobDesign(ConjugateRack.of(profile),
       1, 32, gashes), this.spec, 40, 16, false, detailedHob);
     bed = new MineralCastBed();

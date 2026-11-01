@@ -76,9 +76,10 @@ requirement for the sheet stock planner.
 ### Gears: teeth as exact profiles
 
 GearKit describes a spur gear by its tooth system: module, tooth count,
-pressure angle, profile shift, internal or external, and the cutter and tip
-radii. From that it computes the analytic involute flank, the trochoidal root
-fillet and the tip rounding (`ToothProfile`). It recovers the generating rack
+tooth form (`ToothForm`; today `Involute`, with its pressure angle), profile
+shift, internal or external, and the cutter and tip radii. From that it
+computes the flank, the trochoidal root fillet and the tip rounding
+(`ToothProfile`, from `GearSpec.profile()`). It recovers the generating rack
 from a tooth (`ConjugateRack`) and designs a hob from that rack
 (`HobDesign`). Its metrology side grades a cut gear: it reads ring-shaped stock
 through a small read interface and reports ISO 1328 deviations and an error

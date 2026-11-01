@@ -31,7 +31,7 @@ class EnclosureRuntimeTests {
     EnclosureGuardStatusTests.run();
     Sys.println("Building fitted guarded hobber");
     Sys.stdout().flush();
-    var machine = new FlexsplineHobber(new gearkit.GearSpec(1, 40, 4, 20 * Math.PI / 180), 4);
+    var machine = new FlexsplineHobber(new gearkit.GearSpec(1, 40, 4, new gearkit.Involute(20 * Math.PI / 180)), 4);
     var fitted = HobberEnclosurePreview.assembled(machine);
     var data = HobberEnclosurePreview.runtimeScene(fitted.assembly, machine, fitted.shell.layout.stroke);
     var artifact = SceneArtifact.decode(SceneArtifact.encode(data));

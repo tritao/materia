@@ -24,15 +24,15 @@ class HobbingForceTests {
     return value;
   }
   static function referenceSweep(full:Bool = false):Void {
-    var spec = new GearSpec(0.3, 200, 8, 20 * Math.PI / 180);
-    var hob = new HobDesign(ConjugateRack.of(new ToothProfile(spec)), 1, 32, 12);
+    var spec = new GearSpec(0.3, 200, 8, new Involute(20 * Math.PI / 180));
+    var hob = new HobDesign(ConjugateRack.of(spec.profile()), 1, 32, 12);
     var cam = new camkit.HobbingJob(spec, hob, 40), path = cam.passes[0];
     var job = new IdealHobbingJob(spec, hob, cam.rpm, full ? path.revolutions : 0.01, 0.5, full ? path.zStart : 4);
     var threads = forceThreads(), tolerance = forceTolerance();
     var stock = RingStock.fromGearBlank(spec, 0.6, 0.05, 1);
     stock.setThreads(threads);
     var sweep = new HobbingSweep(hob, -10, 10, tolerance);
-    var load = new HobbingForces(stock, spec.pitchRadius(), spec.pressureAngle, 1);
+    var load = new HobbingForces(stock, spec.pitchRadius(), spec.form.pressureAngle(), 1);
     var initial = RingStock.annulus(stock.grid), history = new HobbingForceHistory(), started = Sys.time();
     try {
       var passes = job.schedule(stock.grid);
@@ -51,7 +51,7 @@ class HobbingForceTests {
       var stats = history.statistics(0, job.duration);
       near(
         stats.radialMeanN,
-        load.energy / (cam.rpm * 2 * Math.PI / 60 * 0.016 * job.duration) * Math.tan(spec.pressureAngle),
+        load.energy / (cam.rpm * 2 * Math.PI / 60 * 0.016 * job.duration) * Math.tan(spec.form.pressureAngle()),
         "radial time integral agrees with chip energy at constant cutting speed"
       );
       var historyPath = full ? Sys.getEnv("HOBBER_FORCE_HISTORY") : null;
@@ -124,8 +124,8 @@ class HobbingForceTests {
     stock.dispose();
   }
   static function quickCut():Void {
-    var spec = new GearSpec(0.3, 40, 1, 20 * Math.PI / 180), hob = new HobDesign(
-      ConjugateRack.of(new ToothProfile(spec)),
+    var spec = new GearSpec(0.3, 40, 1, new Involute(20 * Math.PI / 180)), hob = new HobDesign(
+      ConjugateRack.of(spec.profile()),
       1,
       32,
       4
@@ -138,7 +138,7 @@ class HobbingForceTests {
     var stock = RingStock.fromGearBlank(spec, 0.6, 0.075, 0.5);
     stock.setThreads(threads);
     var initial = RingStock.annulus(stock.grid), sweep = new HobbingSweep(hob, -10, 10, 0.0001);
-    var loads = new HobbingForces(stock, spec.pitchRadius(), spec.pressureAngle, 1);
+    var loads = new HobbingForces(stock, spec.pitchRadius(), spec.form.pressureAngle(), 1);
     try {
       for (pass in motion.schedule(stock.grid)) {
         sweep.cutPass(stock, motion.axesAt, pass, sweep.tolerance / 16);

@@ -11,17 +11,17 @@ class RingMetrologyTests {
     if (!ok) throw msg;
   }
   public static function run():Void {
-    var spec = new GearSpec(0.5, 100, 10, 20 * Math.PI / 180), p = new ToothProfile(spec);
+    var spec = new GearSpec(0.5, 100, 10, new Involute(20 * Math.PI / 180)), p = spec.profile();
     var grid = new RingGrid(
-      p.rootJoinRadius + 0.00001,
-      p.tipJoinRadius - 0.00001,
+      p.rootJoinRadius() + 0.00001,
+      p.tipJoinRadius() - 0.00001,
       -0.025,
       10.025,
-      (p.tipJoinRadius - p.rootJoinRadius) / 181,
+      (p.tipJoinRadius() - p.rootJoinRadius()) / 181,
       0.05
     );
     var stock = RingGearTarget.create(grid, spec);
-    var cfg = new GearInspection(spec, p.rootJoinRadius + 0.02 * (p.tipJoinRadius - p.rootJoinRadius));
+    var cfg = new GearInspection(spec, p.rootJoinRadius() + 0.02 * (p.tipJoinRadius() - p.rootJoinRadius()));
     var report = GearMeasurement.fromRings(stock, spec, cfg);
     check(report.isoClass == 1, 'native ideal gear numerical class 1: ${report.warnings}');
     for (k in Iso1328.parameters) check(report.value(k) < 1e-6, 'native perfect $k');
@@ -36,8 +36,8 @@ class RingMetrologyTests {
       Source spacing resolves 150 profile samples and 5*b/cutoff axial samples.
       The standard excludes module 0.3, so this must report extrapolated grades. */
   static function reference():Void {
-    var spec = new GearSpec(0.3, 200, 8, 20 * Math.PI / 180), p = new ToothProfile(spec);
-    var lo = p.rootJoinRadius + 0.002, hi = p.tipJoinRadius - 0.002;
+    var spec = new GearSpec(0.3, 200, 8, new Involute(20 * Math.PI / 180)), p = spec.profile();
+    var lo = p.rootJoinRadius() + 0.002, hi = p.tipJoinRadius() - 0.002;
     var grid = new RingGrid(lo, hi, -0.02, 8.02, (hi - lo) / 185, 0.04);
     var stock = RingStock.annulus(grid);
     stock.setThreads(8);

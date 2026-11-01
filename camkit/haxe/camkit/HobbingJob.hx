@@ -36,7 +36,7 @@ class HobbingJob {
   ) {
     if (spec == null || hob == null) throw "Hobbing needs a gear and hob";
     if (spec.internal) throw "HobbingJob supports external spur gears";
-    if (Math.abs(spec.module - hob.rack.module) > 1e-12 || Math.abs(spec.pressureAngle - hob.rack.pressureAngle)
+    if (Math.abs(spec.module - hob.rack.module) > 1e-12 || Math.abs(spec.form.pressureAngle() - hob.rack.pressureAngle)
       > 1e-12) throw "Hob and target gear need matching normal module and pressure angle";
     this.settings = settings == null ? new HobbingSettings() : settings.copy();
     var s = this.settings;

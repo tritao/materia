@@ -1,7 +1,7 @@
 import gearkit.ConjugateRack;
 import gearkit.GearSpec;
+import gearkit.Involute;
 import gearkit.HobDesign;
-import gearkit.ToothProfile;
 import camkit.HobbingJob;
 import camkit.HobbingSettings;
 
@@ -44,8 +44,8 @@ class SupplierPackageExport {
   static function main() {
     var args = Sys.args();
     if (args.length != 1) throw "usage: hl main.hl <output.json>";
-    var spec = new GearSpec(MODULE, TEETH, FACE, PRESSURE_DEG * Math.PI / 180);
-    var rack = ConjugateRack.of(new ToothProfile(spec), 256);
+    var spec = new GearSpec(MODULE, TEETH, FACE, new Involute(PRESSURE_DEG * Math.PI / 180));
+    var rack = ConjugateRack.of(spec.profile(), 256);
     var hob = new HobDesign(rack, STARTS, OUTSIDE, GASHES);
     var region = rack.cutterRegion(hob.rootHeight);
     var tipHeight = -rack.cornerSamples()[0].y;
@@ -72,7 +72,7 @@ class SupplierPackageExport {
         pressureAngleDeg: PRESSURE_DEG,
         profileShift: spec.profileShift,
         pitchDiameter: spec.pitchDiameter(),
-        baseDiameter: 2 * spec.baseRadius(),
+        baseDiameter: 2 * Involute.baseRadius(spec),
         tipDiameter: 2 * spec.tipRadius(),
         rootDiameter: 2 * spec.rootRadius(),
         pitchToothThickness: spec.pitchToothThickness(),

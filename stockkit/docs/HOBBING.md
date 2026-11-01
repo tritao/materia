@@ -8,8 +8,8 @@ X is centre distance; Y is shift along the hob axis; Z is head height. The frame
 hob from -Y by A, rotates it by B, then applies inverse C into the work frame.
 
 ```haxe
-var spec = new gearkit.GearSpec(0.3, 200, 8, 20 * Math.PI / 180);
-var hob = new gearkit.HobDesign(gearkit.ConjugateRack.of(new gearkit.ToothProfile(spec)), 1, 32, 12);
+var spec = new gearkit.GearSpec(0.3, 200, 8, new gearkit.Involute(20 * Math.PI / 180));
+var hob = new gearkit.HobDesign(gearkit.ConjugateRack.of(spec.profile()), 1, 32, 12);
 // Fast transverse slice with three measuring circles around the 30 mm pitch radius.
 var stock = stockkit.ring.RingStock.annulus(new stockkit.ring.RingGrid(29.925, 30.075, 3.999999, 4.000001, 0.05, 1));
 var job = new stockkit.hobbing.IdealHobbingJob(spec, hob, 3000, 1.1, 0, 4);

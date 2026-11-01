@@ -106,8 +106,8 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     var component = definition.occurrences.filter(o -> o.id == config.stock)[0].definition;
     var c = project.assemblyPreviewCenter(component);
     centerMetres = c == null ? [0.0, 0, 0] : [for (value in c) value * project.assemblyUnitMetres()];
-    var spec = new GearSpec(config.module, config.teeth, config.width, config.pressureAngle);
-    var hob = new HobDesign(ConjugateRack.of(new ToothProfile(spec)), config.starts, config.outside, config.gashes);
+    var spec = new GearSpec(config.module, config.teeth, config.width, new Involute(config.pressureAngle));
+    var hob = new HobDesign(ConjugateRack.of(spec.profile()), config.starts, config.outside, config.gashes);
     var settings = new HobbingSettings();
     settings.feedPerRevolution = config.feed;
     settings.cuttingSpeed = config.cuttingSpeed;

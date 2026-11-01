@@ -1,5 +1,5 @@
 import gearkit.GearSpec;
-import gearkit.ToothProfile;
+import gearkit.Involute;
 import stockkit.ring.RingStock;
 import stockkit.ring.RingGrid;
 import stockkit.ring.RingCut;
@@ -89,8 +89,8 @@ class RingStockTests {
   static function gearChecks():Void {
     var alpha = 20 * Math.PI / 180;
     for (internal in [false, true]) for (shift in [-0.2, 0.0, 0.2]) {
-      var spec = new GearSpec(0.3, internal ? 202 : 200, 8, alpha, internal, shift);
-      var profile = new ToothProfile(spec);
+      var spec = new GearSpec(0.3, internal ? 202 : 200, 8, new Involute(alpha), internal, shift);
+      var profile = spec.profile();
       var blank = RingStock.fromGearBlank(spec, 0.6, 0.06, 4);
       var ideal = RingGearTarget.create(blank.grid, spec);
       var checkIdeal = ideal.compare(spec);
@@ -117,8 +117,8 @@ class RingStockTests {
       blank.dispose();
     }
     // Exercise circles that cross both root and tip fillets, not only the active involute.
-    var spec = new GearSpec(1, 40, 10, alpha);
-    var p = new ToothProfile(spec);
+    var spec = new GearSpec(1, 40, 10, new Involute(alpha));
+    var p = spec.profile();
     for (root in [false, true]) {
       var sample = root ? p.rootFillet(0.45) : p.tipFillet(0.45), radius = sample.radius();
       var grid = new RingGrid(radius - 0.00001, radius + 0.00001, 0, 10, 1, 10);
@@ -128,7 +128,7 @@ class RingStockTests {
       target.dispose();
     }
     var faceGrid = new RingGrid(19.99, 20.01, -1, 3, 1, 1);
-    var shortGear = RingGearTarget.create(faceGrid, new GearSpec(1, 40, 2, alpha));
+    var shortGear = RingGearTarget.create(faceGrid, new GearSpec(1, 40, 2, new Involute(alpha)));
     check(
       shortGear.circle(0, 0).length == 0 && shortGear.circle(0, 3).length == 0,
       "target excludes circles outside face"

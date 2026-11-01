@@ -5,6 +5,7 @@ import machinekit.component.MachineComponent;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import gearkit.GearSpec;
+import gearkit.Involute;
 
 /** Geometry-derived, conservative loading corridors. mm, work radial X towards column.
     The robot is on -X. Y parks at zero; B stopped. A remains anywhere +/-15 deg.
@@ -157,8 +158,8 @@ class HobberLoadingSizing {
   }
   public static function run():Void {
     var rows:Array<Dynamic> = [];
-    for (spec in [new GearSpec(0.5, 48, 20, 20 * Math.PI / 180),
-      new GearSpec(0.5, 278, 20, 20 * Math.PI / 180)]) rows.push(measure(new FlexsplineHobber(spec)));
+    for (spec in [new GearSpec(0.5, 48, 20, new Involute(20 * Math.PI / 180)),
+      new GearSpec(0.5, 278, 20, new Involute(20 * Math.PI / 180))]) rows.push(measure(new FlexsplineHobber(spec)));
     var frontMax = 0.0, topMax = 0.0;
     for (row in rows) for (result in (cast row.results:Array<Dynamic>)) {
       var limit = result.direction
