@@ -189,8 +189,23 @@ Open decisions:
    the dog is not modelled yet. The plain bore keeps the arbor runout budget (2 µm);
    the slot gives positive, repeatable drive, so a slipping hob cannot silently
    break the B/C gearing. A shank-type hob, which removes the arbor stack, is the
-   later route for class 3. The supplier package is built by `hob-package/`.
-6. **Built-up table option.** If `RotaryTable` replaces the purchase, it needs a modular ring
+   later route for class 3. The supplier packages are built by `supplier-packages/`.
+6. **Mandrel actuation (decided 2026-11-01).** The expanding mandrel is actuated
+   by 6 bar air through a rotary union in the C bore, driving an air-to-oil
+   booster in the fixture that supplies the 10 MPa (15 MPa maximum) sleeve
+   pressure. Pressure is regulated so the 0.6 mm cup wall is not distorted
+   (≤ 2 µm). The union carries 2-3 air passages: clamp, unclamp or spring return,
+   and an air seat check that confirms the cup is seated before cutting. Low drag
+   torque is a requirement, because seal drag is a table ripple source. A manual
+   screw-piston mandrel is ruled out by robot loading; a 100 bar hydraulic union
+   would add drag. The sleeve is sized from the cup bore (Ø58.05, 0.025 mm
+   collapsed radial clearance), as `FlexsplineHobber` already builds it; "OD 59"
+   in PARTS.md is only the generic recipe default. The mandrel request does not need the table drawing:
+   the maker uses its standard flange and we make the adapter. Below the seat the
+   mandrel and fixture must stay inside the swept-hob keep-out (0.3 mm clearance),
+   which `supplier-packages/mandrel_package.py` computes and draws. The union
+   choice waits for the table's bore drawing (to ask Demat).
+7. **Built-up table option.** If `RotaryTable` replaces the purchase, it needs a modular ring
    encoder, about 100 mm bore, two heads, absolute, BiSS-C. One set is quoted in the same RFQ (see `../../STRAIN_WAVE_RESEARCH.md`).
 
 The RFQ was sent to sales@yu-heng.cn on 2026-11-01. It requests a quote for the three

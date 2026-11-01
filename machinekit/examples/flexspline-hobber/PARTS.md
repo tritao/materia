@@ -57,8 +57,10 @@ and empty verified-field lists.
   relief and an optional keyway. Its display is tessellated from the fused solid;
   the lightweight blank remains available. Cutting uses the unchanged rake regions.
   See [HOB_GEOMETRY.md](HOB_GEOMETRY.md) for assumptions and accuracy limits.
-- `ExpandingMandrel`: OD 59, bore 12, length 50 mm, work shoulder at 30 mm, expansion
-  0.05 mm, operating/maximum pressures 10/15 MPa. Eccentricity amplitude is 0.004 mm
+- `ExpandingMandrel`: recipe defaults OD 59, bore 12, length 50 mm, work shoulder at 30 mm,
+  expansion 0.05 mm, operating/maximum pressures 10/15 MPa. `FlexsplineHobber` sizes its
+  instance from the cup: OD 2 × (root radius − 0.6) − 0.05 (Ø58.00 for the reference part),
+  stop land Ø58.65, sleeve max(16, face + 8) from the seat and top 2 mm above the sleeve. Eccentricity amplitude is 0.004 mm
   and clamping distortion bound 0.002 mm. The expansion is a capacity, not a solved
   deformation or hydraulic circuit. Other cup bores require another recipe size.
 - `SwivelHead extends MachineAssembly`: direct servo, crossed-roller support, housing,

@@ -1,14 +1,14 @@
 import gearkit.ConjugateRack;
 import gearkit.GearSpec;
 import gearkit.HobDesign;
-import gearkit.Point2;
 import gearkit.ToothProfile;
 
-/** Writes the supplier hob package data for the reference flexspline: the exact
-    generating rack and hob design that FlexsplineHobber cuts with, plus the target
-    gear. hob_package.py turns the JSON into the data sheets, DXF and CSV.
+/** Writes the data behind the supplier packages for the reference flexspline: the
+    exact generating rack and hob design that FlexsplineHobber cuts with, the target
+    gear, and the workholding (cup and expanding mandrel) derived from the same gear.
+    hob_package.py and mandrel_package.py turn the JSON into data sheets and drawings.
     Usage: hl main.hl <output.json> */
-class HobPackageExport {
+class SupplierPackageExport {
   // FlexsplineHobber defaults (FlexsplineHobber.hx): GearSpec(0.3, 200, 8, 20 deg),
   // HobDesign(rack, 1 start, 32 mm OD, 12 gashes), Hob.fromDesign(.., 40 mm long, 16 mm bore).
   static inline final MODULE = 0.3;
@@ -23,6 +23,21 @@ class HobPackageExport {
   // HOB_GEOMETRY.md defaults for the detailed hob.
   static inline final TIP_RELIEF_DEG = 3.0;
   static inline final LAND_FRACTION = 0.6;
+  // Workholding, as FlexsplineHobber builds it: cup wall 0.6 mm under the root,
+  // 0.05 mm diametral loading clearance, 0.3 mm radial rim-support land, sleeve
+  // max(16, face + 8) long from the seat, mandrel 2 mm above the sleeve end.
+  static inline final WALL = 0.6;
+  static inline final CLEARANCE = 0.05;
+  static inline final RIM_LAND = 0.3;
+  // Work datum (tooth band) z = 363 mm in the machine; table face FoundationLayout.TABLE_FACE = 228 mm.
+  static inline final WORK_DATUM = 363.0;
+  static inline final TABLE_FACE = 228.0;
+  // FlexsplineCupBlank defaults: blank OD 62 over the band, 40 mm tall, 2 mm closed end.
+  static inline final CUP_BLANK_OUTSIDE = 62.0;
+  static inline final CUP_HEIGHT = 40.0;
+  static inline final CUP_END = 2.0;
+  // A swivel mechanism range (PARTS.md SwivelHead, layout check range) for the keep-out sweep.
+  static inline final SWIVEL_DEG = 15.0;
 
   static function main() {
     var args = Sys.args();
@@ -32,6 +47,8 @@ class HobPackageExport {
     var hob = new HobDesign(rack, STARTS, OUTSIDE, GASHES);
     var region = rack.cutterRegion(hob.rootHeight);
     var tipHeight = -rack.cornerSamples()[0].y;
+    var bore = 2 * (spec.rootRadius() - WALL);
+    var sleeveLength = Math.max(16, FACE + 8);
     var data = {
       source: "materia machinekit/examples/flexspline-hobber (gearkit ConjugateRack + HobDesign)",
       units: "mm, degrees",
@@ -68,6 +85,21 @@ class HobPackageExport {
         dedendum: hob.rootHeight,
         toothDepth: tipHeight + hob.rootHeight,
         tipRadius: spec.cutterTipRadius
+      },
+      workholding: {
+        cupBore: bore,
+        cupWall: WALL,
+        cupBodyOutside: 2 * spec.rootRadius(),
+        cupBlankOutside: CUP_BLANK_OUTSIDE,
+        cupHeight: CUP_HEIGHT,
+        cupEnd: CUP_END,
+        toothBand: FACE,
+        sleeveOutside: bore - CLEARANCE,
+        sleeveLength: sleeveLength,
+        stopDiameter: bore + 2 * RIM_LAND,
+        protrusionAboveSeat: sleeveLength + 2,
+        seatAboveTableFace: WORK_DATUM - TABLE_FACE,
+        swivelRangeDeg: SWIVEL_DEG
       },
       // Closed normal-section cutter tooth: x across the tooth (centred), y = height
       // above the pitch line of the generated gear (hob tip is the most negative y).

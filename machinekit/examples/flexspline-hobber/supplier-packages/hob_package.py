@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the supplier hob package from HobPackageExport's JSON.
+"""Build the supplier hob package from SupplierPackageExport's JSON.
 
 Writes, into the output directory:
   hob-rack-profile.csv   normal-section cutter tooth points (mm)
