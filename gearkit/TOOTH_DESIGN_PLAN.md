@@ -604,6 +604,69 @@ What this table does and does not say:
 - Not supported by this model: any claim that one cam or form has lower real transmission error. The flexspline here is rigid
   except for its kinematic poses and has one rigid degree of freedom (the rotation); a real one yields.
 
+### TD11 follow-up: design-kappa sweep and a nominal involute spline
+
+The first study derived both splines only at kappa 1. This one derives each at a design kappa kd (0.9, 1.0, 1.1, 1.2) and runs
+it with flexspline kappa kd - 0.1, kd - 0.05 and kd, each at cam amplitude error -2 / 0 / +2 um (cosine cam, `ToothStudy.sweepStudy`;
+run with the argument `sweep`, about 9 min). **To keep the grid short it uses 12 wave-generator angles over one circular pitch**
+(the first study used 24; the D1 kappa-1 matched case moves from 5.5 to 5.2 arcsec between 24 and 12 angles, so TE values are good
+to about 0.3 arcsec for the tip-edge cases and to under 0.05 arcsec for the D2s flank cases). D2s kd 1.2 is omitted: D2s
+bottoms in the root above about kappa 1.12, so its spline root is the reach, not a valid design. The last block is the nominal involute
+internal spline (`CircularSpline.involute`, 202 teeth, 20 deg, no shift, full-depth: independent origin, the spline a catalogue shaper
+cutter would make) run with D1 at kappa 0.9 / 1.0 / 1.1. Backlash is at the 30.3 mm pitch circle, negative is overlap. The
+matched rows (flex kappa = kd) at 0 um are the self-consistency case, zero by construction within the sweep bound, and not results.
+All the caveats of the first study apply (unloaded, rigid, one rotational degree of freedom, assumed radial root wall and sharp tip,
+tip-edge contacts read 5 to 6 times larger as an angle than a flank contact of the same normal gap, no cam ranking).
+
+| Circular spline | Design kappa | Flex kappa | TE p-p, arcsec (-2 / 0 / +2 um) | Backlash, um (-2 / 0 / +2 um) | Flank / tip-edge teeth at 0 um (mean) | Interference at 0 um |
+|---|---|---|---|---|---|---|
+| D1 cosine | 0.9 | 0.8 | 16.14 / 17.01 / 17.02 | -110.5 / -104.6 / -98.6 | 0 / 4 | tip overlap 13.4, overlap |
+| D1 cosine | 0.9 | 0.85 | 12.91 / 11.43 / 10.75 | -64.5 / -57.8 / -50.7 | 0 / 3.8 | overlap |
+| D1 cosine | 0.9 | 0.9 | 2.77 / 5.43 / 2.59 | -8 / -1.4 / -15.2 | 0 / 60.8 | self-consistency (not a result); overlap |
+| D1 cosine | 1 | 0.9 | 9.58 / 11.26 / 13.69 | -111.1 / -105.2 / -99 | 0 / 3.2 | tip overlap 25.2, overlap |
+| D1 cosine | 1 | 0.95 | 13.46 / 13 / 12.17 | -63.7 / -56.9 / -49.9 | 0 / 3.8 | overlap |
+| D1 cosine | 1 | 1 | 3.12 / 5.21 / 2.28 | -8 / -1.3 / -14.1 | 0 / 39.5 | self-consistency (not a result); overlap |
+| D1 cosine | 1.1 | 1 | 10.87 / 9.81 / 9.21 | -111.4 / -105.7 / -99.8 | 0 / 2.7 | tip overlap 11, overlap |
+| D1 cosine | 1.1 | 1.05 | 9.83 / 9.44 / 8.99 | -64.6 / -57.7 / -50.6 | 0 / 3.2 | overlap |
+| D1 cosine | 1.1 | 1.1 | 3.05 / 5.8 / 2.05 | -7.8 / -1.3 / -13.6 | 3 / 26.2 | self-consistency (not a result); overlap |
+| D1 cosine | 1.2 | 1.1 | 25.06 / 24.34 / 21.55 | -105.1 / -97 / -89.2 | 0 / 2 | overlap |
+| D1 cosine | 1.2 | 1.15 | 13.43 / 11.8 / 10.12 | -50.4 / -44 / -37.7 | 0 / 2.2 | overlap |
+| D1 cosine | 1.2 | 1.2 | 1.64 / 5.52 / 2.34 | -5.4 / -1.3 / -13.7 | 5.5 / 13.7 | self-consistency (not a result); overlap |
+| D2s cosine | 0.9 | 0.8 | 3.13 / 3.22 / 3.11 | -28.4 / -26.4 / -24.4 | 8.7 / 0 | overlap |
+| D2s cosine | 0.9 | 0.85 | 1.77 / 1.69 / 1.44 | -14.4 / -12.7 / -10.9 | 10.2 / 0 | overlap |
+| D2s cosine | 0.9 | 0.9 | 0.47 / 4.5 / 1.98 | -1.6 / -0.7 / -15 | 45.8 / 6.5 | self-consistency (not a result); overlap |
+| D2s cosine | 1 | 0.9 | 0.12 / 0.04 / 0.06 | 10.3 / 10.3 / 10.1 | 22.7 / 0 | none |
+| D2s cosine | 1 | 0.95 | 0.14 / 0.15 / 0.17 | 7.2 / 6.5 / 5.7 | 13.3 / 0 | none |
+| D2s cosine | 1 | 1 | 0.18 / 4.43 / 1.85 | 1 / -0.7 / -14.1 | 5.3 / 4.7 | self-consistency (not a result); overlap |
+| D2s cosine | 1.1 | 1 | 0.2 / 0.24 / 0.22 | 18.3 / 17.3 / 16.3 | 10.8 / 0 | none |
+| D2s cosine | 1.1 | 1.05 | 0.28 / 0.29 / 0.29 | 10.4 / 9.2 / 8.1 | 9.7 / 0 | none |
+| D2s cosine | 1.1 | 1.1 | 0.21 / 4.56 / 2.05 | 1.3 / -0.7 / -13.8 | 3.5 / 3.5 | self-consistency (not a result); overlap |
+| nominal involute 202 | - | 0.9 | 3.99 / 29.23 / 31.22 | -299.1 / -294.4 / -288.6 | 0 / 2.2 | tip overlap 75.3, overlap |
+| nominal involute 202 | - | 1 | 29.66 / 28.3 / 34.21 | -221.6 / -216.8 / -211.8 | 0 / 2 | tip overlap 43, overlap |
+| nominal involute 202 | - | 1.1 | 34.56 / 34.39 / 34.21 | -154 / -149.8 / -145.6 | 0 / 2 | tip overlap 33, overlap |
+
+Best operating point per form (flank contact, small positive backlash, lowest TE, least sensitivity to +-2 um), from this grid only:
+- **D2s: spline kd 1.0, flexspline kappa 0.95.** Backlash 6.5 um (5.7 to 7.2 over +-2 um), TE 0.15 arcsec p-p (0.14 to 0.17),
+  13 teeth in flank contact, no tip-edge contact, no interference. The whole family with flex kappa 0.05 to 0.1 below kd
+  (kd 1.0 and 1.1) behaves alike: positive backlash that falls by about 0.4 um per um of amplitude, TE 0.04 to 0.4 arcsec, 10 to 23
+  flank teeth. kd 1.0 / 0.90 has the lowest TE (0.04) and most contact (22.7) but 10 um of backlash; kd 1.1 / 1.05 has 9 um and 10
+  teeth. Running at kd itself (flex kappa = kd) is the self-consistency case: with +2 um it overlaps by 14 um and the TE jumps to
+  2 to 4.6 arcsec, so a D2s spline needs its flexspline at least 0.05 shallower than it was cut for, or an amplitude margin. A
+  spline cut at 0.9 overlaps at all three flex kappas (it was cut with tips meeting); one cut at 1.2 is not valid.
+- **D1: no operating point meets the brief.** With flex kappa below kd the D1 flexspline overlaps by 38 to 112 um in every row (tip
+  edges meet tip edges at the minor axis because the spline tip was cut for kd), with 2 to 4 teeth touching, none on a flank. At kd
+  the mesh is the self-consistency case and rests on tip edges (flank contact appears only at kd 1.1 and 1.2: 3 and 5.5 teeth,
+  still beside 14 to 26 tip-edge teeth), and +-2 um gives 5 to 8 um (-2 um) or 14 um (+2 um) of overlap. The least bad D1 row is kd 1.2
+  matched (flank 5.5, tip 13.7, the lowest +-2 um overlaps, 5.4 and 13.7 um); it is not a point with backlash.
+- **Nominal involute spline with the D1 flexspline: overlaps everywhere** (150 to 300 um at kappa 0.9 to 1.1, tip overlap 33 to 139 um,
+  TE 4 to 34 arcsec, tip-edge contact only). The standard full-depth internal spline does not accept the deformed D1 flexspline
+  at these kappas in this rigid model, in line with the rigid-limit result that a 200/202 full-depth involute pair interferes
+  away from the mesh zone. A shaper-cut standard spline would need shortened teeth or a profile shift, and the compliant
+  model, to say more; the model here does not support a conclusion on it beyond "does not mesh rigidly".
+- None of this ranks D1 against D2s as forms: D2s has the flank-contact, positive-backlash window because its spline
+  is a swept envelope of a flank-contact tooth, and D1's envelope is made by tip edges (TD5: 46.5 % tip edge). It says what the
+  rigid kinematic model of each derived spline accepts.
+
 **Out of scope, next steps.** Loaded and compliant contact (the flexspline will comply at these um-scale overlaps; this is the
 step that gives tolerance windows and real engagement); the generated root trochoid and tip rounding of the circular spline
 (replacing the radial wall and the sharp tip); the `StrainWaveDesign` refactor; EDM and shaper output and metrology from the
@@ -758,7 +821,7 @@ TD0 ── TD1 ── TD2 ──┐
 | TD3 | done: cosine, ellipse, four-roller, Resal (Gravagno 2016 eq 18) | Tooth design: deformation kinematics (TD3) |
 | TD4 | done for involute forms (D1, D3); not fitted to a full `Sampled` ToothForm (root/tip blends), and no contact-condition refinement: accuracy is by convergence | Tooth design: circular-spline envelope (TD4) |
 | TD5 | done for D1, D2, D3, D4 (unloaded kinematic), metric corrected 2026-11-01: flank engagement and tip edge contact are reported apart. D1 kappa 1 flank 1.6 % (tip edge 46.5 %); D2s 16.3 %; D3 0 %. Root and minor-tip clearances are arithmetic on the assumed circular-spline radii, transmission error is zero by construction, and cam differences of a few um are inside model error (see TD5 notes) | Tooth design: meshing analysis and D1/D3 comparison (TD5); Tooth design: double-circular-arc form (TD2) (D2 comparison) |
-| TD11 | done 2026-11-01 (branch `tooth-mesh`, unloaded rigid kinematic): `CircularSpline` / `SampledInternalProfile` (derived tooth with deviation bound, or nominal involute) and `FixedMesh` (drive and reverse contact rotation, transmission error, backlash, flank or tip-edge contact). Rigid limit: TE below 0.0001 arcsec, backlash within 0.0002 arcsec of the analytic value; self-consistency within the sweep bound (zero by construction); uniform rotation exact; runout and centre-distance amplitudes within 0.4 % and 0.01 %. Study: a spline fits only its design state (kappa 1.1 overlaps 41 to 100 um, 2 um amplitude error overlaps D1 8 to 14 um); no cam ranking is supported (see TD11 notes). Root is an assumed radial wall, tip a sharp corner; loaded contact not done | Tooth design: the circular spline as a concrete internal tooth (TD11); Tooth design: fixed-circular-spline mesh solver (TD11); Tooth design: fixed-spline study and plan (TD11) |
+| TD11 | done 2026-11-01 (branch `tooth-mesh`, unloaded rigid kinematic): `CircularSpline` / `SampledInternalProfile` (derived tooth with deviation bound, or nominal involute) and `FixedMesh` (drive and reverse contact rotation, transmission error, backlash, flank or tip-edge contact). Rigid limit: TE below 0.0001 arcsec, backlash within 0.0002 arcsec of the analytic value; self-consistency within the sweep bound (zero by construction); uniform rotation exact; runout and centre-distance amplitudes within 0.4 % and 0.01 %. Study: a spline fits only its design state (kappa 1.1 overlaps 41 to 100 um, 2 um amplitude error overlaps D1 8 to 14 um); no cam ranking is supported (see TD11 notes). Root is an assumed radial wall, tip a sharp corner; loaded contact not done | Tooth design: the circular spline as a concrete internal tooth (TD11); Tooth design: fixed-circular-spline mesh solver (TD11); Tooth design: fixed-spline study and plan (TD11); Tooth design: design-kappa sweep for the fixed-spline study (TD11) |
 | TD6 | planned | |
 | TD7 | planned | |
 | TD8 | planned | |

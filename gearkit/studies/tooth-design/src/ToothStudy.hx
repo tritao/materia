@@ -219,7 +219,42 @@ class ToothStudy {
     }
   }
 
+  static function sweepRow(tag:String, spline:CircularSpline, flex:StrainWaveInput, amp:Float, samples:Int):Void {
+    var t1 = Sys.time();
+    var r = FixedMesh.run(spline, new StrainWavePair(flex), new MeshErrors(amp), samples);
+    var um = 0.3 * 202 / 2 * 1000, issues = [];
+    if (r.rootBottoming > 1e-6) issues.push('root ${f(r.rootBottoming * 1000, 1)}');
+    if (r.radialOverlap > 1e-6) issues.push('tip overlap ${f(r.radialOverlap * 1000, 1)}');
+    if (r.backlashMin < 0) issues.push('overlap');
+    if (r.unresolved > 0) issues.push('${r.unresolved} unresolved');
+    Sys.println('  SWEEP $tag flexK ${flex.kappa} amp ${f(amp * 1000, 0)}: TE ${f(r.tePeakToPeakArcsec(), 2)} | backlash ${f(r.backlashMean * um, 1)} (min ${f(r.backlashMin * um, 1)}) | flank ${f(r.meanFlankContacts, 1)} tip ${f(r.meanTipContacts, 1)} | ${issues.length == 0 ? "none" : issues.join(", ")} [${f(Sys.time() - t1, 1)} s]');
+  }
+
+  /** Design-kappa sweep: splines derived at kappa_d, run with kappa_d - 0.1, - 0.05 and 0, each at -2 / 0 / +2 um; plus a nominal involute spline against D1. */
+  static function sweepStudy():Void {
+    var deg = DEG, samples = 12;
+    for (base in ["D1", "D2s"]) {
+      function make(kappa:Float):StrainWaveInput return base == "D1"
+        ? new StrainWaveInput("D1", "involute", 0.3, 200, 202, kappa, "cosine", 20 * deg)
+        : new StrainWaveInput("D2s", "double-circular-arc", 0.3, 200, 202, kappa, "cosine");
+      for (kd in [0.9, 1.0, 1.1, 1.2]) {
+        var spline:Null<CircularSpline> = null;
+        try spline = CircularSpline.derived('$base kd $kd', new StrainWavePair(make(kd))) catch (e:Dynamic) Sys.println('  SWEEP $base kd $kd: not derivable: ${Std.string(e)}');
+        if (spline == null) continue;
+        for (dk in [0.1, 0.05, 0.0]) for (amp in [-0.002, 0.0, 0.002]) {
+          try sweepRow('$base kd $kd', spline, make(kd - dk), amp, samples) catch (e:Dynamic) Sys.println('  SWEEP $base kd $kd flexK ${kd - dk}: ${Std.string(e)}');
+        }
+      }
+    }
+    var nominal = CircularSpline.involute("nominal involute 202", 0.3, 202, 20 * deg);
+    for (k in [0.9, 1.0, 1.1]) for (amp in [-0.002, 0.0, 0.002]) sweepRow("nominal", nominal, new StrainWaveInput("D1", "involute", 0.3, 200, 202, k, "cosine", 20 * deg), amp, samples);
+  }
+
   public static function main():Void {
+    if (Sys.args().indexOf("sweep") >= 0) {
+      sweepStudy();
+      return;
+    }
     if (Sys.args().indexOf("fixed") >= 0) {
       fixedStudy();
       return;
