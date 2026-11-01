@@ -1,6 +1,7 @@
 package machinekit.structural;
 
 import cadkit.modeling.Part;
+import machinekit.component.*;
 import machinekit.component.ComponentDetail;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
@@ -48,6 +49,8 @@ class WeldedFrame extends MachineComponent {
     for (weld in welds) for (id in [weld.a,
       weld.b]) if (members.indexOf(id) < 0) throw 'Weld of "$name" names "$id", which is not a member';
     super('WELDED-FRAME-${name.toUpperCase().split(" ").join("-")}', 'Welded frame: $name', material, true);
+    addFacet(new ProcurementIntent(Make("welding")));
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
     this.frame = frame;
     this.members = members.copy();
     this.seats = seats.copy();

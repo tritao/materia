@@ -22,7 +22,17 @@ class AngularContactBearing extends MachineComponent {
       "machinekit.motion.angular-contact-bearing",
       parameters(),
       v -> new AngularContactBearing(v)
-    ).numbered(v -> 'AC-BEARING-ASSUMED-${Dimension.format(v.number("bore"))}x${Dimension.format(v.number("outside"))}x${Dimension.format(v.number("height"))}-${v.token("precisionClass")}');
+    ).numbered(v -> 'AC-BEARING-ASSUMED-${Dimension.format(v.number("bore"))}x${Dimension.format(v.number("outside"))}x${Dimension.format(v.number("height"))}-${v.token("precisionClass")}')
+      .procured(_ -> Buy(null, null, null)).requiring(v -> [
+        machinekit.component.Procurement.ProcurementCodec.requirement("bore", "mm", null, null, v.number("bore")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("outside", "mm", null, null, v.number("outside")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, v.number("height")),
+        machinekit.component.Procurement.ProcurementCodec.choice("precisionClass", v.token("precisionClass")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("contactAngle", "rad", null, null, v.number("contactAngle")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("radialRunout", "um", null, v.number("radialRunout") * 1000),
+        machinekit.component.Procurement.ProcurementCodec.requirement("axialRunout", "um", null, v.number("axialRunout") * 1000),
+        machinekit.component.Procurement.ProcurementCodec.requirement("momentStiffness", "N m/rad", v.number("momentStiffness"))
+      ]);
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

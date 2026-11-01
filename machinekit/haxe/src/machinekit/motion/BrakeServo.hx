@@ -27,7 +27,14 @@ class BrakeServo extends AssumedCatalogComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.motion.brake-servo", inputs(), v -> new BrakeServo(v))
       .numbered(v -> 'SERVO-BRAKE-ASSUMED-${v.token("power")}W-'
-          + '${Dimension.format(v.number("brakeTorque"))}NM-${Dimension.format(v.number("brakeLength"))}MM');
+          + '${Dimension.format(v.number("brakeTorque"))}NM-${Dimension.format(v.number("brakeLength"))}MM').procured(_ -> Buy(null, null, null)).requiring(v -> {
+        var req = machinekit.component.Procurement.ProcurementCodec.requirement;
+        return [req("power", "W", Std.parseFloat(v.token("power"))),
+          req("brakeLength", "mm", null, null, v.number("brakeLength")),
+          req("brakeTorque", "N m", v.number("brakeTorque")),
+          req("releaseDelay", "s", null, v.number("releaseDelay")),
+          req("applicationDelay", "s", null, v.number("applicationDelay"))];
+      });
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

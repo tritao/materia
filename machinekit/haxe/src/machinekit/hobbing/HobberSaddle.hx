@@ -40,7 +40,9 @@ class HobberSaddle extends MachineComponent {
       "machinekit.hobbing.saddle",
       parameters(),
       v -> new HobberSaddle(v.token("design"), v)
-    ).numbered(v -> 'HOBBER-${v.token("design").toUpperCase()}');
+    ).numbered(v -> 'HOBBER-${v.token("design").toUpperCase()}')
+      .procured(_ -> Make("steel fabrication and machining"))
+      .requiringInputs(["design", "tableFaceDiameter", "tableHousingDiameter", "tableFaceHeight", "tableSeatHeight"]);
     return recipe;
   }
   public function new(design:String, ?values:ComponentValues) {
@@ -54,6 +56,8 @@ class HobberSaddle extends MachineComponent {
       false,
       v
     );
+    addFacet(new EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     designId = design;
     addConnector("datum", Mount, F.identity());
     if (["GE-X-carriage",

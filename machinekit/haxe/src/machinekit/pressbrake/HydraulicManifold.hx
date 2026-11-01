@@ -14,6 +14,8 @@ class HydraulicManifold extends MachineComponent {
   public function new(outlets:Int) {
     if (outlets < 1 || outlets > 64) throw "Hydraulic manifold needs 1 to 64 outlets";
     super('HYDRAULIC-MANIFOLD-$outlets', 'Assumed $outlets-outlet hydraulic distribution block', "steel", true);
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.outlets = outlets;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "input", kind: Hydraulic, role: Consumer, iface: Thread("G1/2"), required: true});
@@ -41,7 +43,10 @@ class HydraulicManifold extends MachineComponent {
       "machinekit.pressbrake.hydraulic-manifold",
       [new machinekit.component.ComponentParameter("outlets", Count, Integer(2), null, 1, 64)],
       v -> new HydraulicManifold(v.integer("outlets"))
-    ).numbered(v -> 'HYD-MANIFOLD-ASSUMED-${v.integer("outlets")}OUT');
+    ).numbered(v -> 'HYD-MANIFOLD-ASSUMED-${v.integer("outlets")}OUT').procured(_ -> Buy(null, null, null)).requiring(v -> [
+      machinekit.component.Procurement.ProcurementCodec.requirement("outlets", "1", v.integer("outlets")),
+      machinekit.component.Procurement.ProcurementCodec.choice("portThread", "G1/2")
+    ]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

@@ -53,6 +53,8 @@ class OffsetGripperFinger extends MachineComponent {
       "Offset gripper finger, " + definition.process,
       definition.material
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     spec = new OffsetFingerSpec(left);
     variant = definition;
     addConnector("mount", Mount, AssemblyFrames.translation(spec.mountX, OffsetFingerSpec.MOUNT_Y, spec.mountZ));
@@ -75,7 +77,8 @@ class OffsetGripperFinger extends MachineComponent {
         false,
         null,
         false
-      ).numbered(v -> 'OFFSET-FINGER-${v.token("side") == "left" ? "L" : "R"}-${v.token("variant").toUpperCase()}');
+      ).numbered(v -> 'OFFSET-FINGER-${v.token("side") == "left" ? "L" : "R"}-${v.token("variant").toUpperCase()}')
+        .procured(v -> Make(lookup(v.token("variant")).process));
       familyCache = new ComponentFamily(recipe.id, OffsetFingerSpec.INTERFACE_ID, recipe, variants());
     }
     return familyCache;

@@ -6,6 +6,11 @@
   "entry": "PartNumberKeyTests",
   "sources": [
     "src/PartNumberKeyTests.hx",
+    "../haxe/src/machinekit/assembly/BomDocument.hx",
+    "../haxe/src/machinekit/component/ComponentNumberKey.hx",
+    "../haxe/src/machinekit/component/PartNumberLint.hx",
+    "../haxe/src/machinekit/component/Procurement.hx",
+    "../haxe/src/machinekit/component/ProcurementIntent.hx",
     "../haxe/src/machinekit/component/BomRevision.hx",
     "../haxe/src/machinekit/component/BomReleases.hx"
   ],

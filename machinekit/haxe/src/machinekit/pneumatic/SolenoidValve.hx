@@ -28,6 +28,8 @@ class SolenoidValve extends MachineComponent implements ValveSpec {
       "aluminium 6061",
       true
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.doubleSolenoid = doubleSolenoid;
     this.normallyToA = normallyToA;
     bodyWidth = doubleSolenoid ? 100 : 80;
@@ -87,7 +89,13 @@ class SolenoidValve extends MachineComponent implements ValveSpec {
         ComponentRecipeSupport.choice("normalOutlet", ["A", "B"], "B")
       ],
       v -> new SolenoidValve(v.token("solenoids") == "double", v.token("normalOutlet") == "A")
-    ).numbered(v -> 'VALVE-ASSUMED-5/2-${v.token("solenoids").toUpperCase()}-N${v.token("normalOutlet")}');
+    ).numbered(v -> 'VALVE-ASSUMED-5/2-${v.token("solenoids").toUpperCase()}-N${v.token("normalOutlet")}')
+      .procured(_ -> Buy(null, null, null)).requiring(v -> [
+        machinekit.component.Procurement.ProcurementCodec.choice("configuration", "5/2"),
+        machinekit.component.Procurement.ProcurementCodec.choice("solenoids", v.token("solenoids")),
+        machinekit.component.Procurement.ProcurementCodec.choice("normalOutlet", v.token("normalOutlet")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("tubeOutsideDiameter", "mm", null, null, 6)
+      ]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

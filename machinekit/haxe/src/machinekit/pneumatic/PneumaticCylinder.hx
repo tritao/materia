@@ -38,6 +38,8 @@ class PneumaticCylinder extends MachineComponent implements CylinderSpec {
     if (index < 0 || !(stroke > 0) || !(ratedSpeed > 0)
       || !Math.isFinite(stroke + ratedSpeed)) throw "Cylinder needs a catalogue bore, finite positive stroke and speed";
     super('$family-${bore}x$stroke', "Reference double-acting pneumatic cylinder", "aluminium 6061", true);
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.family = family;
     this.bore = bore;
     this.rod = rods[index];
@@ -94,7 +96,8 @@ class PneumaticCylinder extends MachineComponent implements CylinderSpec {
         new machinekit.component.ComponentParameter("ratedSpeed", Scalar, Number(300), "mm/s", 0)
       ],
       v -> new PneumaticCylinder(v.token("family"), v.number("bore"), v.number("stroke"), v.number("ratedSpeed"))
-    ).numbered(v -> '${v.token("family")}-${Dimension.format(v.number("bore"))}x${Dimension.format(v.number("stroke"))}-ASSUMED-${Dimension.format(v.number("ratedSpeed"))}MMS');
+    ).numbered(v -> '${v.token("family")}-${Dimension.format(v.number("bore"))}x${Dimension.format(v.number("stroke"))}-ASSUMED-${Dimension.format(v.number("ratedSpeed"))}MMS')
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["family", "bore", "stroke"], ["ratedSpeed"]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

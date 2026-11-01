@@ -51,6 +51,8 @@ class ArmLink extends MachineComponent {
       || !(diameter > 2 * wall)) throw "Arm link needs a wall thinner than its radius and length";
     var text = '${Dimension.format(diameter)}x${Dimension.format(length)}';
     super('ARM-LINK-D$text-W${Dimension.format(wall)}', 'Arm link tube, $text mm', "aluminium 6061", true);
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.length = length;
     this.diameter = diameter;
     this.wall = wall;
@@ -123,7 +125,7 @@ class ArmLink extends MachineComponent {
         v.number("endJointLength")
       ),
       true
-    );
+    ).procured(_ -> Make("CNC machining"));
     return recipeTypeCache;
   }
 

@@ -41,6 +41,8 @@ class DriveWheel extends MachineComponent {
       "polyurethane PU",
       true
     );
+    if (Std.isExactType(this, DriveWheel)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.diameter = diameter;
     this.width = width;
     this.boreDiameter = boreDiameter;
@@ -72,7 +74,8 @@ class DriveWheel extends MachineComponent {
         v.number("hubLength")
       ),
       true
-    );
+    ).procured(_ -> Buy(null, null, null))
+      .requiringInputs(["diameter", "width", "boreDiameter", "hubDiameter", "hubLength", "material"]);
     return recipeTypeCache;
   }
 

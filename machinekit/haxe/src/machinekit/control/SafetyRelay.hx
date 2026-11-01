@@ -52,7 +52,7 @@ class SafetyRelay extends AssumedCatalogComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.control.safety-relay",
       inputs(), v -> new SafetyRelay(v)).numbered(v -> 'SAFETY-RELAY-ASSUMED-${Dimension.format(v.number("supplyVoltage"))}V-'
-        + '${Dimension.format(v.number("stopDelay"))}S-${v.integer("immediateContacts")}I-${v.integer("delayedContacts")}D');
+        + '${Dimension.format(v.number("stopDelay"))}S-${v.integer("immediateContacts")}I-${v.integer("delayedContacts")}D').procured(_ -> Buy(null, null, null)).requiringInputs(["supplyVoltage"], ["immediateContacts", "delayedContacts"], ["stopDelay"]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

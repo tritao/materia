@@ -53,7 +53,13 @@ class ThreePhaseRectifier extends PowerSupply {
       )
     ).numbered(v -> 'RECT-ASSUMED-${Dimension.format(v.number("lineVoltage"))}V-'
       + '${Dimension.format(v.number("frequency"))}HZ-${Dimension.format(v.number("current"))}A-'
-      + '${v.integer("outlets")}O-${Dimension.format(v.number("regenerativePower"))}W');
+      + '${v.integer("outlets")}O-${Dimension.format(v.number("regenerativePower"))}W')
+      .procured(_ -> Buy(null, null, null)).requiring(v -> {
+        var req = machinekit.component.Procurement.ProcurementCodec.requirement;
+        return [req("lineVoltage", "V", null, null, v.number("lineVoltage")),
+          req("frequency", "Hz", null, null, v.number("frequency")), req("current", "A", v.number("current")),
+          req("outlets", "count", v.integer("outlets")), req("regenerativePower", "W", v.number("regenerativePower"))];
+      });
     return rectifierRecipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

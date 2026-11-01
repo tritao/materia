@@ -104,6 +104,8 @@ class HexFlangeBolt extends MachineComponent implements ScrewFastener {
       PropertyClasses.material(propertyClass),
       false
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Catalog").setToken("errorsBasis", "Assumed").setToken("source", "ISO 4162")));
     this.spec = spec;
     this.length = length;
     this.propertyClass = propertyClass;
@@ -183,7 +185,7 @@ class HexFlangeBolt extends MachineComponent implements ScrewFastener {
       true,
       null,
       false
-    );
+    ).procured(_ -> Buy(null, null, "ISO 4162"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

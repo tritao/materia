@@ -63,6 +63,8 @@ class ProximitySwitch extends MachineComponent implements SwitchPart {
   public function new(designation:String = "GENERIC-INDUCTIVE-M8") {
     var row = catalog().get(designation);
     super(designation, "Assumed generic inductive proximity switch", "steel");
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     spec = row;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("face", Face, Solids.axial(0, 0, row.length));
@@ -79,7 +81,14 @@ class ProximitySwitch extends MachineComponent implements SwitchPart {
       [ComponentRecipeSupport.catalog("designation", catalog(), "GENERIC-INDUCTIVE-M8")],
       v -> new ProximitySwitch(v.token("designation"))
     ).numbered(v -> StringTools.startsWith(v.token("designation"), "GENERIC-")
-      ? "SWITCH-ASSUMED-" + v.token("designation").substr("GENERIC-".length) : v.token("designation"));
+      ? "SWITCH-ASSUMED-" + v.token("designation").substr("GENERIC-".length) : v.token("designation"))
+      .procured(_ -> Buy(null, null, null)).requiring(v -> {
+        var row = catalog().get(v.token("designation"));
+        return [machinekit.component.Procurement.ProcurementCodec.requirement("diameter", "mm", null, null, row.diameter),
+          machinekit.component.Procurement.ProcurementCodec.requirement("sensingDistance", "mm", row.sensingDistance),
+          machinekit.component.Procurement.ProcurementCodec.requirement("hysteresis", "mm", null, row.hysteresis),
+          machinekit.component.Procurement.ProcurementCodec.requirement("repeatability", "mm", null, row.repeatability)];
+      });
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

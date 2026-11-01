@@ -17,6 +17,8 @@ class SpindleCartridge extends MachineComponent {
 
   public function new() {
     super("SPINDLE-ER20-D70", "ER20 spindle cartridge (assumed envelope)", "steel");
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("gaugeLine", Axis, Solids.axial(0, 0, 0));
     addConnector("nose", Mount, Solids.axial(0, 0, 0));
     addConnector("mount", Mount, Solids.axial(0, 0, 30));
@@ -36,7 +38,12 @@ class SpindleCartridge extends MachineComponent {
       "machinekit.milling.spindle-cartridge",
       [],
       v -> new SpindleCartridge()
-    ).numbered(_ -> "SPINDLE-CARTRIDGE-ASSUMED-ER20-D70");
+    ).numbered(_ -> "SPINDLE-CARTRIDGE-ASSUMED-ER20-D70")
+      .procured(_ -> Buy(null, null, null)).requiring(_ -> [
+        machinekit.component.Procurement.ProcurementCodec.choice("collet", "ER20"),
+        machinekit.component.Procurement.ProcurementCodec.requirement("bodyDiameter", "mm", null, null, DIAMETER),
+        machinekit.component.Procurement.ProcurementCodec.requirement("maximumSpeed", "rpm", MAX_RPM)
+      ]);
     return spindleRecipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
@@ -52,6 +59,8 @@ class Er20Holder extends MachineComponent {
   public static inline var BORE_DIAMETER:Float = 6;
   public function new() {
     super("HOLDER-ER20-D6", "ER20 holder, 6 mm collet (assumed envelope)", "steel");
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("gaugeLine", Mount, Solids.axial(0, 0, 0));
     addConnector("tool", Axis, Solids.axial(0, 0, 0));
   }
@@ -109,7 +118,10 @@ class Er20Holder extends MachineComponent {
       "machinekit.milling.er20-holder",
       [],
       v -> new Er20Holder()
-    ).numbered(_ -> "HOLDER-ASSUMED-ER20-D6");
+    ).numbered(_ -> "HOLDER-ASSUMED-ER20-D6").procured(_ -> NotSupplied).requiring(_ -> [
+      machinekit.component.Procurement.ProcurementCodec.choice("collet", "ER20"),
+      machinekit.component.Procurement.ProcurementCodec.requirement("toolDiameter", "mm", null, null, BORE_DIAMETER)
+    ]);
     return holderRecipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

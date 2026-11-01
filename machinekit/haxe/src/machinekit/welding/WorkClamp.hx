@@ -34,6 +34,12 @@ class WorkClamp extends MachineComponent {
       "steel",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(NotSupplied, [
+      machinekit.component.Procurement.ProcurementCodec.choice("contact", "magnetic"),
+      machinekit.component.Procurement.ProcurementCodec.requirement("current", "A", ratedCurrentA)
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.ratedCurrentA = ratedCurrentA;
     this.width = width;
     this.depth = depth;

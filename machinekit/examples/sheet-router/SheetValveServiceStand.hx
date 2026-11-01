@@ -1,4 +1,6 @@
 import cadkit.modeling.Part;
+import machinekit.component.*;
+import machinekit.component.Procurement.ProcurementCodec;
 import machinekit.component.MachineComponent;
 import machinekit.component.ComponentDetail;
 import machinekit.structural.FrameAssembly;
@@ -10,6 +12,11 @@ class SheetValveServiceStand extends MachineComponent {
   final ids:Array<String> = [];
   public function new(x:Float, ys:Array<Float>) {
     super("SHEET-VALVE-SERVICE-RACK", "Assumed floor valve service rack", "steel", false);
+    addFacet(new ProcurementIntent(Buy(null, null, null), [
+      ProcurementCodec.requirement("length", "mm", null, null, ys[ys.length - 1] - ys[0] + 200),
+      ProcurementCodec.requirement("height", "mm", null, null, 470)
+    ]));
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Assumed")));
     frame = new FrameAssembly();
     var tube = new RectTube(25, 25, 2);
     function member(id:String, a:Array<Float>, b:Array<Float>):Void {

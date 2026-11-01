@@ -41,6 +41,14 @@ class ArmTable extends MachineComponent {
       "steel",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("width", "mm", null, null, width),
+      machinekit.component.Procurement.ProcurementCodec.requirement("depth", "mm", null, null, depth),
+      machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, height),
+      machinekit.component.Procurement.ProcurementCodec.choice("material", "steel")
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.width = width;
     this.depth = depth;
     this.height = height;
@@ -68,7 +76,7 @@ class ArmBlock extends MachineComponent {
   public final depth:Float;
   public final height:Float;
 
-  public function new(width:Float, depth:Float, height:Float, material:String, name:String) {
+  public function new(width:Float, depth:Float, height:Float, material:String, name:String, notSupplied:Bool = false) {
     if (!(width > 0) || !(depth > 0) || !(height > 0)) throw "Block needs positive dimensions";
     super(
       '${name.toUpperCase()}-${Dimension.format(width)}x${Dimension.format(depth)}x${Dimension.format(height)}',
@@ -76,6 +84,9 @@ class ArmBlock extends MachineComponent {
       material,
       true
     );
+    if (notSupplied) addFacet(new machinekit.component.ProcurementIntent(NotSupplied));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.width = width;
     this.depth = depth;
     this.height = height;
@@ -263,12 +274,12 @@ class RobotArm extends MachineAssembly {
   function addCell():Void {
     function at(x:Float, y:Float, z:Float):AssemblyFrame return AssemblyFrames.translation(x, y, z);
     addComponent("table", new ArmTable(800, 500, TABLE_TOP), at(0, TABLE_CENTRE_Y, 0));
-    var pad = new ArmBlock(WORKPIECE_WIDTH + 20, WORKPIECE_WIDTH + 20, PAD_HEIGHT, "rubber", "Pad");
+    var pad = new ArmBlock(WORKPIECE_WIDTH + 20, WORKPIECE_WIDTH + 20, PAD_HEIGHT, "rubber", "Pad", true);
     addComponent("padPick", pad, at(PICK_X, WORK_Y, TABLE_TOP));
     addComponent("padPlace", pad, at(PLACE_X, WORK_Y, TABLE_TOP));
     addComponent(
       "workpiece",
-      new ArmBlock(WORKPIECE_WIDTH, WORKPIECE_WIDTH, WORKPIECE_HEIGHT, "birch plywood", "Workpiece"),
+      new ArmBlock(WORKPIECE_WIDTH, WORKPIECE_WIDTH, WORKPIECE_HEIGHT, "birch plywood", "Workpiece", true),
       at(PICK_X, WORK_Y, TABLE_TOP + PAD_HEIGHT)
     );
   }

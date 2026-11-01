@@ -37,7 +37,8 @@ class SocketSetScrew extends MachineComponent {
       false,
       null,
       false
-    ).numbered(v -> 'ISO4026-${FastenerThreads.metric(v.number("diameter"), v.number("pitch")).designation}x${Dimension.format(v.number("length"))}');
+    ).numbered(v -> 'ISO4026-${FastenerThreads.metric(v.number("diameter"), v.number("pitch")).designation}x${Dimension.format(v.number("length"))}')
+      .procured(_ -> Buy(null, null, "ISO 4026"));
     return recipe;
   }
 
@@ -95,6 +96,8 @@ class SocketSetScrew extends MachineComponent {
       false,
       values
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Catalog").setToken("errorsBasis", "Assumed").setToken("source", "ISO 4026")));
     addConnector("drive", Face, Solids.axial(0, 0, 0));
     addConnector("tip", Face, Solids.axial(0, 0, -length));
   }

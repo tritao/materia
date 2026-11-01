@@ -59,6 +59,8 @@ class LimitSwitch extends MachineComponent implements SwitchPart {
   public function new(designation:String = "GENERIC-ROLLER-MICROSWITCH") {
     var row = catalog().get(designation);
     super(designation, "Assumed generic roller micro-switch", "plastic");
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     spec = row;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("trip", Face, Solids.axial(row.width * 0.4, 0, row.depth + row.rollerDiameter - row.pretravel));
@@ -75,7 +77,14 @@ class LimitSwitch extends MachineComponent implements SwitchPart {
       [ComponentRecipeSupport.catalog("designation", catalog(), "GENERIC-ROLLER-MICROSWITCH")],
       v -> new LimitSwitch(v.token("designation"))
     ).numbered(v -> StringTools.startsWith(v.token("designation"), "GENERIC-")
-      ? "SWITCH-ASSUMED-" + v.token("designation").substr("GENERIC-".length) : v.token("designation"));
+      ? "SWITCH-ASSUMED-" + v.token("designation").substr("GENERIC-".length) : v.token("designation"))
+      .procured(_ -> Buy(null, null, null)).requiring(v -> {
+        var row = catalog().get(v.token("designation"));
+        return [machinekit.component.Procurement.ProcurementCodec.choice("actuator", "roller"),
+          machinekit.component.Procurement.ProcurementCodec.requirement("pretravel", "mm", null, row.pretravel),
+          machinekit.component.Procurement.ProcurementCodec.requirement("hysteresis", "mm", null, row.hysteresis),
+          machinekit.component.Procurement.ProcurementCodec.requirement("repeatability", "mm", null, row.repeatability)];
+      });
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

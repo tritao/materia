@@ -9,6 +9,20 @@ class BomExampleTests {
     if (bracket.bom.partNumber != revised.bom.partNumber || bracket.bom.fingerprint == null
       || bracket.bom.fingerprint == revised.bom.fingerprint)
       throw "A bracket geometry change must preserve its drawing number and change its fingerprint";
+    var lidar = new MobileBase.LidarPuck().bom;
+    if (lidar.maturity != "Assumed" || lidar.requirements == null
+      || [for (term in lidar.requirements) if (term.name == "range" && term.min == "6") term].length != 1)
+      throw "The mobile lidar must carry its assumed range";
+    for (recipe in pickingstation.PickingStationRecipes.all()) {
+      var item = recipe.create().bom;
+      if (item.procurement == null || item.maturity == null)
+        throw 'Picking station recipe is missing procurement intent: ${recipe.id}';
+    }
+    var pressBlock = new PressBrake.PressBlock("test bed", 100, 80, 60).bom;
+    var curtain = new PressBrake.PressLightCurtain().bom;
+    if (pressBlock.procurement == null || pressBlock.maturity != "Assumed" || pressBlock.requirements == null
+      || pressBlock.requirements.length != 3 || curtain.procurement == null || curtain.maturity != "Assumed")
+      throw "Press-brake reference parts must declare their selection inputs";
     check("bench-mill", new BenchMill());
     check("cnc-router", new CncRouter());
     check("robot-welder", new WeldingCell());
@@ -21,6 +35,13 @@ class BomExampleTests {
     if (json.schema != "machinekit.bom" || json.version != 1 || json.machineId != name
       || json.sourceCommit != "test-commit" || json.assembly.path != "") throw 'Invalid $name BOM document';
     if (document.procurement.length == 0) throw 'Empty $name BOM';
+    if (name == "robot-welder") {
+      var workpiece = findUse(document.assembly, "work/basePlate");
+      if (workpiece == null || workpiece.procurement == null || workpiece.procurement.kind != "NotSupplied")
+        throw "The weldment workpiece must remain in the engineering BOM as not supplied";
+      for (line in document.procurement) if (line.item.partNumber == workpiece.partNumber)
+        throw "The weldment workpiece must not appear in the procurement view";
+    }
     if (name == "cnc-router") {
       var yBracket = [for (line in document.procurement)
         if (line.item.partNumber == "BRACKET-HOME-SWITCH-BRACKET-Y") line];
@@ -35,5 +56,15 @@ class BomExampleTests {
       }
       if (Math.abs(total - line.item.quantity.value) > 0.00000001) throw 'BOM use quantity mismatch in $name';
     }
+  }
+
+  static function findUse(node:machinekit.assembly.BomDocument.BomAssemblyNode,
+    path:String):Null<machinekit.assembly.BomDocument.BomDocumentItem> {
+    for (line in node.lines) for (use in line.uses) if (use.path == path) return line.item;
+    for (child in node.children) {
+      var found = findUse(child, path);
+      if (found != null) return found;
+    }
+    return null;
   }
 }

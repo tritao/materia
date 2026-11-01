@@ -83,6 +83,9 @@ class ScrewSupportUnit extends MachineComponent {
       '${fixed ? "Fixed" : "Floating"} screw support $model, ${machinekit.component.Dimension.format(s.bore)} mm journal, ${s.bearing}',
       "steel"
     );
+    if (s.sources.length > 0) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Catalog").setToken("errorsBasis", "Assumed")
+      .setToken("source", s.sources[0].reference)));
     spec = s;
     this.drawing = drawing;
     boreDiameter = s.bore;
@@ -364,7 +367,7 @@ class ScrewSupportUnit extends MachineComponent {
       true,
       false,
       ["geometry"]
-    ).numbered(v -> v.token("model"));
+    ).numbered(v -> v.token("model")).procured(_ -> Buy(null, null, null));
     return supportRecipe;
   }
 

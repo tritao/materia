@@ -35,6 +35,8 @@ class ThermistorInput extends MachineComponent {
       "Controller thermistor ADC front end (assumed ideal reference and envelope)",
       "plastic"
     );
+    if (Std.isExactType(this, ThermistorInput)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.pullupOhm = pullupOhm;
     this.reference = reference;
     this.channels = channels;
@@ -84,7 +86,8 @@ class ThermistorInput extends MachineComponent {
         v.number("depth"),
         v.number("height")
       )
-    ).numbered(v -> 'NTC-ADC-ASSUMED-${v.integer("channels")}CH-${Dimension.format(v.number("pullupOhm"))}R-${Dimension.format(v.number("referenceVolts"))}V');
+    ).numbered(v -> 'NTC-ADC-ASSUMED-${v.integer("channels")}CH-${Dimension.format(v.number("pullupOhm"))}R-${Dimension.format(v.number("referenceVolts"))}V')
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["pullupOhm", "referenceVolts"], ["channels"]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

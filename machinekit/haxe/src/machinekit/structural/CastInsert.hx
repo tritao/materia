@@ -7,6 +7,7 @@ import materia.casting.InsertSpec.InsertRole;
 import materia.casting.CastingSolid;
 import materia.casting.InsertSpec.InsertBody;
 import materia.casting.InsertSpec.InsertBodyCodec;
+import materia.casting.InsertOrigin;
 
 /** Cast-in steel design envelope; local +Z is the finished mounting-plane normal. */
 class CastInsert extends MachineComponent {
@@ -54,6 +55,27 @@ class CastInsert extends MachineComponent {
     ).numbered(v -> {
       var id = v.token("partId");
       return 'CAST-INSERT-${(id == "" ? v.token("label") : id).toUpperCase().split(" ").join("-")}';
+    }).procured(v -> {
+      var body = InsertBodyCodec.decode(v.token("body"));
+      var holes = InsertHoles.records(v.token("holes"));
+      var origin = materia.casting.InsertOrigin.InsertOriginCodec.snapshot(haxe.Json.parse(v.token("origin")), body, holes);
+      return switch origin {
+        case Fabricated(_): Make("machined steel");
+        case Catalogue(product): Buy(product.manufacturer, product.reference, null);
+      };
+    }).requiring(v -> {
+      var body = InsertBodyCodec.decode(v.token("body"));
+      var terms = [machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, InsertBodyCodec.height(body)),
+        machinekit.component.Procurement.ProcurementCodec.requirement("positionTolerance", "mm", null, v.number("positionTolerance")),
+        machinekit.component.Procurement.ProcurementCodec.choice("stockMaterial", v.token("stockMaterial"))];
+      switch InsertBodyCodec.mouth(body) {
+        case Box(width, depth, _):
+          terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("width", "mm", null, null, width));
+          terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("depth", "mm", null, null, depth));
+        case Cylinder(diameter, _):
+          terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("diameter", "mm", null, null, diameter));
+      }
+      return terms;
     });
     return recipe;
   }
@@ -109,6 +131,13 @@ class CastInsert extends MachineComponent {
       false,
       v
     );
+    var basis = switch origin {
+      case Fabricated(_): "Stated";
+      case Catalogue(product): product.geometryBasis == NominalStudy ? "Assumed" : "Catalog";
+    };
+    var source = switch origin { case Fabricated(_): ""; case Catalogue(product): product.document; };
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", basis).setToken("errorsBasis", "Assumed").setToken("source", source)));
     var stock = switch materia.casting.InsertSpec.InsertBodyCodec.mouth(body) {
       case Box(width, depth, height):
         {width: width, depth: depth, height: height};

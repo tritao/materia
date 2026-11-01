@@ -21,6 +21,9 @@ class FrameMemberComponent extends MachineComponent {
       "steel",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(NotSupplied));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.frame = frame;
     this.memberName = memberName;
     addConnector("origin", Mount, Solids.axial(0, 0, 0));
@@ -63,8 +66,8 @@ class WeldingWorkpiece extends MachineAssembly {
     super();
     this.uprightLength = uprightLength;
     this.tubeSize = tubeSize;
-    addComponent("basePlate", new ArmBlock(PLATE_LENGTH, PLATE_WIDTH, PLATE_THICKNESS, "steel", "Base plate"));
-    addComponent("upright", new ArmBlock(uprightLength, UPRIGHT_THICKNESS, UPRIGHT_HEIGHT, "steel", "Upright"));
+    addComponent("basePlate", new ArmBlock(PLATE_LENGTH, PLATE_WIDTH, PLATE_THICKNESS, "steel", "Base plate", true));
+    addComponent("upright", new ArmBlock(uprightLength, UPRIGHT_THICKNESS, UPRIGHT_HEIGHT, "steel", "Upright", true));
     addMate("upright-mate", "fixed", "basePlate", "top", "upright", "base");
     // The weld metal rides on the workpiece, at its origin, and carries the bead the welder lays.
     addComponent("weldMetal", new WeldMetal());

@@ -57,6 +57,14 @@ class BatteryCharger extends MachineComponent {
       "painted steel",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("outputVoltage", "V", null, null, nominalVolts),
+      machinekit.component.Procurement.ProcurementCodec.requirement("outputPower", "W", outputWatts),
+      machinekit.component.Procurement.ProcurementCodec.requirement("dockPositionTolerance", "mm", null, dockPositionToleranceMm),
+      machinekit.component.Procurement.ProcurementCodec.requirement("dockHeadingTolerance", "rad", null, dockHeadingToleranceRad)
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.nominalVolts = nominalVolts;
     this.outputWatts = outputWatts;
     this.length = length;

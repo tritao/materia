@@ -60,6 +60,8 @@ class Carriage extends MachineComponent {
       'Lead-screw carriage ${widthText}x${widthText}x$lengthText',
       "aluminium 6061"
     );
+    if (Std.isExactType(this, Carriage)) addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.boreDiameter = boreDiameter;
     this.width = width;
     this.length = length;
@@ -104,7 +106,7 @@ class Carriage extends MachineComponent {
       ),
       true
     ).numbered(v -> 'CARRIAGE-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("length"))}-D${Dimension.format(v.number("boreDiameter"))}-'
-      + ComponentRecipeSupport.threadPartNumber(v));
+      + ComponentRecipeSupport.threadPartNumber(v)).procured(_ -> Make("CNC machining"));
     return recipeTypeCache;
   }
 
@@ -459,7 +461,16 @@ class LinearAxis extends MachineAssembly {
       partNumber: '${rail.designation}-L$lengthText',
       description: '${rail.description}, $lengthText mm long',
       quantity: 1,
-      material: "steel"
+      material: "steel",
+      procurement: Buy(null, null, null),
+      maturity: "Stated",
+      requirements: [
+        machinekit.component.Procurement.ProcurementCodec.requirement("width", "mm", null, null, rail.width),
+        machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, rail.height),
+        machinekit.component.Procurement.ProcurementCodec.requirement("wall", "mm", null, null, rail.wall),
+        machinekit.component.Procurement.ProcurementCodec.requirement("length", "mm", null, null, length),
+        machinekit.component.Procurement.ProcurementCodec.choice("material", "steel")
+      ]
     };
   }
 

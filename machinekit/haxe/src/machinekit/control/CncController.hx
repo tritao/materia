@@ -25,7 +25,8 @@ class CncController extends ControllerCabinet {
         ComponentRecipeSupport.count("valves", 8)
       ],
       v -> new CncController(v.integer("axes"), v.integer("inputs"), v.integer("outputs"), v.integer("valves"))
-    ).numbered(v -> 'CNC-CTRL-ASSUMED-${v.integer("axes")}A-${v.integer("inputs")}I-${v.integer("outputs")}O-${v.integer("valves")}V');
+    ).numbered(v -> 'CNC-CTRL-ASSUMED-${v.integer("axes")}A-${v.integer("inputs")}I-${v.integer("outputs")}O-${v.integer("valves")}V')
+      .procured(_ -> Buy(null, null, null)).requiringInputs([], ["axes", "inputs", "outputs", "valves"]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

@@ -47,6 +47,8 @@ class RackFrame extends MachineComponent {
       '2020 T-slot extrusion storage rack frame',
       "aluminium 6061"
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
   }
 
   public function cutList():Array<CutListLine> return assembly.cutList();

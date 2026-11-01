@@ -173,6 +173,9 @@ class PickingStationPanel extends MachineComponent {
 
   public function new(partId:String, width:Float, height:Float, thickness:Float) {
     super('SHEET-${partId}-${width}x${height}', 'Finished flat panel $partId', "birch plywood");
+    addFacet(new machinekit.component.ProcurementIntent(NotSupplied));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.partId = partId;
     this.width = width;
     this.height = height;

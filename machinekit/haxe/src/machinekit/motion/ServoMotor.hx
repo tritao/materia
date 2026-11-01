@@ -161,8 +161,28 @@ class ServoMotor extends MachineComponent implements MotorDrive {
       )],
       v -> model(v.token("designation")),
       true
-    ).numbered(partNumberFor);
+    ).numbered(partNumberFor).procured(procurementFor).requiring(requirementsFor);
     return namedRecipe;
+  }
+
+  /** Selection data comes from the same rating row used by the motor. */
+  public static function requirementsFor(v:machinekit.component.ComponentValues):Array<machinekit.component.Procurement.ProcurementRequirement> {
+    for (row in ratings()) if (row.designation == v.token("designation")) return requirementsForRating(row);
+    throw 'Unknown servo rating "${v.token("designation")}"';
+  }
+
+  public static function requirementsForRating(row:ServoRating):Array<machinekit.component.Procurement.ProcurementRequirement> {
+    var req = machinekit.component.Procurement.ProcurementCodec.requirement;
+    return [req("ratedTorque", "N m", row.ratedTorque), req("peakTorque", "N m", row.peakTorque),
+      req("ratedSpeed", "rad/s", row.ratedSpeed), req("maxSpeed", "rad/s", row.maxSpeed),
+      req("encoderResolution", "count/rev", row.encoderCounts),
+      req("shaftDiameter", "mm", null, null, row.shaftDiameter),
+      req("shaftLength", "mm", row.shaftLength)];
+  }
+
+  public static function procurementFor(v:machinekit.component.ComponentValues):machinekit.component.Procurement {
+    var name = v.token("designation");
+    return LeadshineServo.catalog().exists(name) ? Buy("Leadshine", name, null) : Buy(null, null, null);
   }
 
   /** The same assumed motor has one identity across its housing representations. */
@@ -228,6 +248,15 @@ class ServoMotor extends MachineComponent implements MotorDrive {
     super(rating.designation, 'Servo motor, ${Dimension.format(rating.peakTorque)} N m peak', "aluminium 6061", true);
     this.rating = rating;
     this.ratingsBasis = ratingsBasis;
+    switch ratingsBasis {
+      case Assumed | Stated | Derived:
+        var basis = Std.string(ratingsBasis);
+        addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+          .setToken("ratingsBasis", basis).setToken("errorsBasis", basis).setToken("source", "")));
+      default:
+    }
+    if (Std.isExactType(this, ServoMotor)) addFacet(new machinekit.component.ProcurementIntent(
+      Buy(null, null, null), requirementsForRating(rating)));
     addConnector("mountFace", Mount, Solids.axial(0, 0, 0));
     addConnector("shaftAxis", Axis, Solids.axial(0, 0, 0));
     addConnector("shaftEnd", Axis, Solids.axial(0, 0, rating.shaftLength));

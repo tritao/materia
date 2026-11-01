@@ -45,6 +45,16 @@ class ExtrusionMember extends MachineComponent {
       "aluminium 6061",
       true
     );
+    var terms = [
+      machinekit.component.Procurement.ProcurementCodec.requirement("width", "mm", null, null, profile.size),
+      machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, profile.height),
+      machinekit.component.Procurement.ProcurementCodec.requirement("slotWidth", "mm", null, null, profile.slotWidth),
+      machinekit.component.Procurement.ProcurementCodec.requirement("length", "mm", null, null, length)
+    ];
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), terms));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", profile.family == null ? "Assumed" : "Stated")
+      .setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.profile = profile;
     this.length = length;
   }
@@ -74,7 +84,8 @@ class RouterPlate extends MachineComponent {
     material:String,
     name:String,
     ?motor:NemaStepper,
-    ?motorFace:AssemblyFrame
+    ?motorFace:AssemblyFrame,
+    workpiece:Bool = false
   ) {
     if (!(width > 0) || !(depth > 0) || !(height > 0)) throw "Plate needs positive dimensions";
     if ((motor == null) != (motorFace == null)) throw "A motor mount needs both the motor and where its face sits";
@@ -85,6 +96,9 @@ class RouterPlate extends MachineComponent {
       material,
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(workpiece ? NotSupplied : Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.width = width;
     this.depth = depth;
     this.height = height;
@@ -177,6 +191,9 @@ class YNutBracket extends MachineComponent {
       "aluminium 6061",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.side = side;
   }
 
@@ -195,6 +212,9 @@ class YNutBracket extends MachineComponent {
 class XNutBracket extends MachineComponent {
   public function new() {
     super("XNUT-BRACKET", "X lead-nut bracket", "aluminium 6061", true);
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
   }
 
   override public function hasGeometry():Bool return true;
@@ -308,6 +328,9 @@ class SpindleClamp extends MachineComponent {
       "aluminium 6061",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.spindleDiameter = spindleDiameter;
     this.reach = reach;
   }
@@ -337,6 +360,12 @@ class RouterSpindle extends MachineComponent {
 
   public function new() {
     super("SPINDLE-D52-ER11", "Router spindle, 52 mm, ER11 collet", "steel", true);
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("diameter", "mm", null, null, 52),
+      machinekit.component.Procurement.ProcurementCodec.choice("collet", "ER11")
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("nose", Mount, Solids.axial(0, 0, 0));
   }
 
@@ -376,6 +405,9 @@ class EndMill extends MachineComponent {
       "steel",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(NotSupplied));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.diameter = diameter;
     this.fluteLength = fluteLength;
     this.stickout = stickout;
@@ -461,6 +493,9 @@ class Standoff extends MachineComponent {
       "aluminium 6061",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("turning")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.diameter = diameter;
     this.length = length;
     this.bore = bore;
@@ -484,6 +519,9 @@ class ToeClamp extends MachineComponent {
 
   public function new(stockHeight:Float) {
     super('TOE-CLAMP-H${Dimension.format(stockHeight)}', "Step clamp", "steel", true);
+    addFacet(new machinekit.component.ProcurementIntent(NotSupplied));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.stockHeight = stockHeight;
   }
 
@@ -658,7 +696,7 @@ class CncRouter extends AxisBuilder {
     );
     place(
       "stock",
-      new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Stock"),
+      new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Stock", null, null, true),
       AssemblyFrames.translation(0, 0, SPOILBOARD_TOP)
     );
     var clamp = new ToeClamp(STOCK_HEIGHT);

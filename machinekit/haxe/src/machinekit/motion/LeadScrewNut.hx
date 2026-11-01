@@ -94,6 +94,20 @@ class LeadScrewNut extends MachineComponent {
       'Lead screw nut, ${thread.designation}, $leadText mm lead',
       "bronze"
     );
+    if (Std.isExactType(this, LeadScrewNut)) {
+      addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+        .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+      if (dimensions != null) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
+        machinekit.component.Procurement.ProcurementCodec.choice("family", Std.string(thread.family)),
+        machinekit.component.Procurement.ProcurementCodec.requirement("screwDiameter", "mm", null, null, screwDiameter),
+        machinekit.component.Procurement.ProcurementCodec.requirement("pitch", "mm", null, null, thread.pitch),
+        machinekit.component.Procurement.ProcurementCodec.requirement("starts", "1", null, null, thread.starts),
+        machinekit.component.Procurement.ProcurementCodec.choice("hand", Std.string(thread.hand)),
+        machinekit.component.Procurement.ProcurementCodec.choice("kind", Std.string(kind)),
+        machinekit.component.Procurement.ProcurementCodec.requirement("bodyDiameter", "mm", null, null, dimensions.bodyDiameter),
+        machinekit.component.Procurement.ProcurementCodec.requirement("bodyLength", "mm", null, null, dimensions.bodyLength)
+      ]));
+    }
     this.thread = thread;
     this.screwDiameter = screwDiameter;
     this.lead = lead;
@@ -269,7 +283,8 @@ class LeadScrewNut extends MachineComponent {
         + (v.boolean("flanged") ? "F" : "N")
         + (material == "bronze" ? "" : material == "steel" ? "-STEEL"
           : "-" + materia.project.MaterialLibrary.fromSpec(material).toUpperCase());
-    });
+    }).procured(_ -> Buy(null, null, null))
+      .requiringInputs(["family", "screwDiameter", "pitch", "starts", "hand", "kind", "boltCount", "flanged"]);
     return recipeTypeCache;
   }
 

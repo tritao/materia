@@ -92,6 +92,10 @@ class ParallelKey extends MachineComponent {
       "steel C45",
       codeOnly
     );
+    if (codeOnly) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null)));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", codeOnly ? "Stated" : "Catalog").setToken("errorsBasis", "Assumed")
+      .setToken("source", codeOnly ? "" : "DIN 6885-1")));
     this.spec = spec;
     this.length = length;
     addConnector("seat", Face, Solids.axial(0, 0, length / 2));
@@ -125,7 +129,7 @@ class ParallelKey extends MachineComponent {
       ],
       v -> ParallelKey.metric(v.token("size"), v.number("length")),
       true
-    );
+    ).procured(_ -> Buy(null, null, "DIN 6885-1"));
     return recipeTypeCache;
   }
 

@@ -29,8 +29,8 @@ class TrackWelder extends machinekit.gantry.LinearTrack {
     addComponent("table", new ArmTable(3500, 500, top), AssemblyFrames.translation(1500, RobotArm.TABLE_CENTRE_Y, 0));
     addMemberConnector("table", "workSeat", Solids.axial(0, 0, top));
     var work = new MachineAssembly();
-    work.addComponent("basePlate", new ArmBlock(3000, 180, 10, "steel", "Long base plate"));
-    work.addComponent("upright", new ArmBlock(2600, 8, 80, "steel", "Long upright"));
+    work.addComponent("basePlate", new ArmBlock(3000, 180, 10, "steel", "Long base plate", true));
+    work.addComponent("upright", new ArmBlock(2600, 8, 80, "steel", "Long upright", true));
     work.addMate("upright-mate", "fixed", "basePlate", "top", "upright", "base");
     work.addComponent("weldMetal", new WeldMetal());
     work.addMate("metal-mate", "fixed", "basePlate", "base", "weldMetal", "base");
@@ -46,7 +46,9 @@ class TrackWelder extends machinekit.gantry.LinearTrack {
       partNumber: partNumber,
       description: description,
       quantity: 1,
-      material: null
+      material: null,
+      procurement: Buy(null, null, null),
+      maturity: "Stated"
     };
     connectPorts("gas-hose", "cylinder", "gas", "source", "gas", line("HOSE-GAS-6M", "Shielding gas hose, 6 m"));
     connectPorts(

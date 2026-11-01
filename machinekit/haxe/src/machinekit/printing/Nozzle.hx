@@ -48,6 +48,8 @@ class Nozzle extends MachineComponent {
   public function new(designation:String = "BRASS-M6-0.4") {
     var row = catalog().get(designation);
     super(designation, 'Nozzle, ${Std.string(row.orifice)} mm', "brass");
+    if (Std.isExactType(this, Nozzle)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     spec = row;
     addConnector("tip", Face, Solids.axial(0, 0, 0));
     addConnector("mount", Mount, Solids.axial(0, 0, row.coneHeight + row.hexHeight));
@@ -61,7 +63,12 @@ class Nozzle extends MachineComponent {
       "machinekit.printing.nozzle",
       [ComponentRecipeSupport.catalog("designation", catalog(), "BRASS-M6-0.4")],
       v -> new Nozzle(v.token("designation"))
-    ).numbered(v -> v.token("designation"));
+    ).numbered(v -> v.token("designation")).procured(_ -> Buy(null, null, null)).requiring(v -> {
+      var row = catalog().get(v.token("designation"));
+      return [machinekit.component.Procurement.ProcurementCodec.requirement("orifice", "mm", null, null, row.orifice),
+        machinekit.component.Procurement.ProcurementCodec.choice("thread", "M6"),
+        machinekit.component.Procurement.ProcurementCodec.choice("material", "brass")];
+    });
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

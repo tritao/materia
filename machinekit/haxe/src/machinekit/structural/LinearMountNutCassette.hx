@@ -56,7 +56,7 @@ class LinearMountNutCassette extends MachineComponent {
       var coordinates = [for (row in rows) ComponentNumberKey.encode(row.x) + "," + ComponentNumberKey.encode(row.y)];
       return [ComponentNumberKey.encode(v.number("length")), ComponentNumberKey.encode(v.number("width")),
         v.token("size"), v.token("layout"), coordinates.join(";")].join("|");
-    });
+    }).procured(_ -> Make("machining"));
     return recipe;
   }
   public function new(?overrides:ComponentValues) {
@@ -91,6 +91,7 @@ class LinearMountNutCassette extends MachineComponent {
       || Math.abs(stations[0].y) < 18)) throw "Compact cassette requires the opposed two-bolt cleat pattern";
     v.setToken("stations", haxe.Json.stringify(stations));
     super("LINEAR-MOUNT-NUT-CASSETTE", "Removable M6 mount nut cassette", "steel C45", false, v);
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
     lockManufacturingMaterial("steel C45");
     var stock = {x: -width / 2, y: -length / 2, z: 0.0, width: width, depth: length, height: height};
     for (hole in serviceThreads()) materia.casting.InsertStages.validateServiceHole(hole, stock);

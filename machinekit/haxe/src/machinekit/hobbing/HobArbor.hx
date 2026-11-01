@@ -20,7 +20,7 @@ class HobArbor extends MachineComponent {
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.hobbing.hob-arbor", parameters(), v -> new HobArbor(v))
-      .numbered(_ -> "HOB-ARBOR-TF20");
+      .numbered(_ -> "HOB-ARBOR-TF20").procured(_ -> NotSupplied).requiringInputs(["outside", "bore", "height", "hobSeatLength", "supportDiameter"]);
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

@@ -283,7 +283,13 @@ class EnclosedBenchMill extends MachineAssembly {
       partNumber: "REF-PNEU-HOSE-6MM",
       description: "Assumed 6 mm polyurethane air hose",
       quantity: 1,
-      material: "polyurethane PU"
+      material: "polyurethane PU",
+      procurement: Buy(null, null, null),
+      maturity: "Assumed",
+      requirements: [
+        machinekit.component.Procurement.ProcurementCodec.requirement("outerDiameter", "mm", null, null, 6),
+        machinekit.component.Procurement.ProcurementCodec.choice("material", "polyurethane PU")
+      ]
     };
     connectPorts("supply-to-manifold", "airSupply", "air", "airManifold", "input", hose);
     connectPorts("manifold-to-door-valve", "airManifold", "out1", "doorValve", "P", hose);

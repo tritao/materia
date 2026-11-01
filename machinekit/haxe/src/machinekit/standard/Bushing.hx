@@ -1,5 +1,6 @@
 package machinekit.standard;
 
+import machinekit.component.*;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.ComponentValue.*;
@@ -33,6 +34,7 @@ class Bushing extends MachineComponent {
     if (!(len > 0)) throw "Bushing needs a positive length";
     var size = '${Dimension.format(boreDiameter)}x${Dimension.format(od)}x${Dimension.format(len)}';
     super('BUSHING-$size', 'Plain bushing $size', "bronze");
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
     this.boreDiameter = boreDiameter;
     this.outerDiameter = od;
     this.length = len;
@@ -59,7 +61,7 @@ class Bushing extends MachineComponent {
         ComponentRecipeSupport.length("length", 10)
       ],
       v -> new Bushing(v.number("boreDiameter"), v.number("outerDiameter"), v.number("length"))
-    ).numbered(v -> 'BUSHING-${Dimension.format(v.number("boreDiameter"))}x${Dimension.format(v.number("outerDiameter"))}x${Dimension.format(v.number("length"))}');
+    ).numbered(v -> 'BUSHING-${Dimension.format(v.number("boreDiameter"))}x${Dimension.format(v.number("outerDiameter"))}x${Dimension.format(v.number("length"))}').procured(_ -> Make("turning"));
     return recipeTypeCache;
   }
 

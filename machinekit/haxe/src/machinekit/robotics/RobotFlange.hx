@@ -116,6 +116,8 @@ class RobotFlange extends MachineComponent {
       : 'Robot flange $size (non-standard ISO 9409-1 bolt count)',
       "steel"
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.spec = spec;
     this.boltCount = count;
     mountScrew = spec.screw;
@@ -246,6 +248,15 @@ class RobotFlange extends MachineComponent {
       var count = v.integer("boltCount");
       var size = '${Dimension.format(spec.pitchCircle)}-$count-${spec.screw}';
       return count == spec.boltCount ? 'ISO9409-STYLE-$size' : 'FLANGE-$size';
+    }).procured(_ -> Make("CNC machining")).requiring(v -> {
+      var spec = catalog().get(Dimension.format(v.number("pitchCircleDiameter")));
+      return [
+        machinekit.component.Procurement.ProcurementCodec.requirement("pitchCircleDiameter", "mm", null, null, spec.pitchCircle),
+        machinekit.component.Procurement.ProcurementCodec.requirement("boltCount", "1", null, null, v.integer("boltCount")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("pilotDiameter", "mm", null, null, spec.pilotDiameter),
+        machinekit.component.Procurement.ProcurementCodec.requirement("pinDiameter", "mm", null, null, spec.pinDiameter),
+        machinekit.component.Procurement.ProcurementCodec.choice("mountScrew", spec.screw)
+      ];
     });
     return recipeTypeCache;
   }

@@ -18,6 +18,8 @@ class HydraulicSupply extends MachineComponent implements PressureSource {
   public function new(pressurePa:Float) {
     if (!Math.isFinite(pressurePa) || pressurePa < 0) throw "Hydraulic supply pressure must be finite and nonnegative";
     super('HYDRAULIC-SUPPLY-$pressurePa', "Assumed regulated hydraulic service", "steel", true);
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.pressurePa = pressurePa;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "P", kind: Hydraulic, role: Supply, iface: Thread("G1/2"), required: false});
@@ -56,7 +58,11 @@ class HydraulicSupply extends MachineComponent implements PressureSource {
       "machinekit.pressbrake.hydraulic-supply",
       [new machinekit.component.ComponentParameter("pressurePa", Scalar, Number(0), "Pa", 0)],
       v -> new HydraulicSupply(v.number("pressurePa"))
-    ).numbered(v -> 'HYD-SUPPLY-ASSUMED-${Dimension.format(v.number("pressurePa"))}PA');
+    ).numbered(v -> 'HYD-SUPPLY-ASSUMED-${Dimension.format(v.number("pressurePa"))}PA')
+      .procured(_ -> Buy(null, null, null)).requiring(v -> [
+        machinekit.component.Procurement.ProcurementCodec.requirement("pressure", "Pa", v.number("pressurePa")),
+        machinekit.component.Procurement.ProcurementCodec.choice("portThread", "G1/2")
+      ]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

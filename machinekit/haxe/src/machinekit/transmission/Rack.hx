@@ -77,6 +77,8 @@ class Rack extends MachineComponent {
     var designation = 'RACK-M$moduleText-${teethCount}T${backlash == 0 ? "" : "-B" + Dimension.format(backlash)}';
     var description = 'Rack module $moduleText, ${teethCount} teeth';
     super(designation, description, "steel");
+    if (Std.isExactType(this, Rack)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.moduleSize = moduleSize;
     this.teethCount = teethCount;
     this.faceWidth = faceWidth;
@@ -145,7 +147,8 @@ class Rack extends MachineComponent {
         v.number("backlash")
       ),
       true
-    );
+    ).procured(_ -> Buy(null, null, null))
+      .requiringInputs(["moduleSize", "teethCount", "faceWidth", "pressureAngle", "barHeight", "material"], [], ["backlash"]);
     return recipeTypeCache;
   }
 

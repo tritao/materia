@@ -35,6 +35,8 @@ class StorageBin extends MachineComponent {
       'BIN-${fmt(width)}x${fmt(depth)}x${fmt(height)}',
       'Open-top storage bin ${fmt(width)} x ${fmt(depth)} x ${fmt(height)} mm'
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("base", ConnectorRole.Mount, Solids.axial(0, 0, 0));
     addConnector("pick", ConnectorRole.Face, Solids.axial(0, -depth / 2, height));
   }

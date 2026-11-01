@@ -30,7 +30,7 @@ class VacuumBlower extends AssumedCatalogComponent {
       inputs(),
       v -> new VacuumBlower(v)
     ).numbered(v -> 'VAC-BLOWER-ASSUMED-${Dimension.format(v.number("power"))}W-'
-        + '${Dimension.format(v.number("freeFlow"))}M3H-${Dimension.format(v.number("shutoffPressure"))}PA');
+        + '${Dimension.format(v.number("freeFlow"))}M3H-${Dimension.format(v.number("shutoffPressure"))}PA').procured(_ -> Buy(null, null, null)).requiringInputs(["portDiameter"], ["power", "freeFlow", "shutoffPressure"], []);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

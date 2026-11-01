@@ -41,7 +41,8 @@ class MineralCasting extends MachineComponent {
       false,
       null,
       false
-    ).numbered(v -> 'MINERAL-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}');
+    ).numbered(v -> 'MINERAL-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}')
+      .procured(_ -> Make("mineral casting"));
     return recipe;
   }
 
@@ -73,6 +74,8 @@ class MineralCasting extends MachineComponent {
     if (v.number("cornerChamfer") < 0 || 2 * v.number("cornerChamfer") >= Math.min(v.number("width"),
       v.number("depth"))) throw "Casting chamfer consumes body";
     super("MINERAL-CASTING", "Mineral casting (purchase by casting mass, kg)", "mineral cast", false, v);
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     features = cuts;
     envelope = CastingEnvelope.build(
       v.number("width"),

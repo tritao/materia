@@ -22,6 +22,8 @@ class MountDrilledPlate extends GantryPlate {
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(inputs(), overrides, false);
     super("clearance-drilled host pad", v.number("width"), v.number("depth"), v.number("height"));
+    addFacet(new EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     setMaterial(v.token("hostMaterial"));
     partId = v.token("partId");
     drilling = InsertHoles.records(v.token("holes"));
@@ -43,7 +45,8 @@ class MountDrilledPlate extends GantryPlate {
       null,
       false
     ).numbered(v -> v.token("partId") != "" ? 'HOST-PAD-${v.token("partId").toUpperCase()}'
-      : 'HOST-PAD-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}-${materia.project.MaterialLibrary.fromSpec(v.token("hostMaterial")).toUpperCase()}');
+      : 'HOST-PAD-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}-${materia.project.MaterialLibrary.fromSpec(v.token("hostMaterial")).toUpperCase()}')
+      .procured(_ -> Make("CNC machining"));
     return recipe;
   }
   public function holes():Array<materia.casting.InsertHole

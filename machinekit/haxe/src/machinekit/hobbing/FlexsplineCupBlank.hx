@@ -21,7 +21,8 @@ class FlexsplineCupBlank extends MachineComponent {
       "machinekit.hobbing.flexspline-cup-blank",
       parameters(),
       v -> new FlexsplineCupBlank(v)
-    ).numbered(_ -> "FLEXSPLINE-CUP-BLANK");
+    ).numbered(_ -> "FLEXSPLINE-CUP-BLANK").procured(_ -> NotSupplied)
+      .requiringInputs(["outside", "bore", "bodyOutside", "bandWidth", "height", "endThickness"]);
     return recipe;
   }
   public function new(?overrides:ComponentValues) {

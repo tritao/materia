@@ -58,7 +58,7 @@ class VacuumTable extends AssumedCatalogComponent {
   }
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.routing.vacuum-table",
-      inputs(), v -> new VacuumTable(v)).numbered(_ -> "ROUTER-VACUUM-TABLE");
+      inputs(), v -> new VacuumTable(v)).numbered(_ -> "ROUTER-VACUUM-TABLE").procured(_ -> Buy(null, null, null)).requiringInputs(["width", "length", "height", "columns", "rows", "zonePortDiameter"], [], []);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

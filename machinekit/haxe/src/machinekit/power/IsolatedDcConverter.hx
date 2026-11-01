@@ -22,6 +22,13 @@ class IsolatedDcConverter extends PowerSupply {
     if (!Math.isFinite(inputVolts) || inputVolts <= 0 || !Math.isFinite(efficiency) || efficiency <= 0
       || efficiency > 1 || !Math.isFinite(massKg) || massKg <= 0) throw "Invalid isolated DC converter ratings";
     super(new DcVoltage(outputVolts), new DcCurrent(outputAmps), outlets, width, height, depth, regenerativePower);
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("inputVoltage", "V", null, null, inputVolts),
+      machinekit.component.Procurement.ProcurementCodec.requirement("outputVoltage", "V", null, null, outputVolts),
+      machinekit.component.Procurement.ProcurementCodec.requirement("outputCurrent", "A", outputAmps),
+      machinekit.component.Procurement.ProcurementCodec.requirement("outlets", "1", outlets),
+      machinekit.component.Procurement.ProcurementCodec.requirement("regenerativePower", "W", regenerativePower)
+    ]));
     this.inputVolts = inputVolts;
     this.efficiency = efficiency;
     addPort({name: "dc", kind: ElectricalPower, role: Consumer, iface: Unspecified, required: true});

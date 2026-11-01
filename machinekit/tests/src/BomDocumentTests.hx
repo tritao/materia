@@ -3,13 +3,21 @@ import machinekit.component.MachineComponent;
 import machinekit.component.IncludedInPurchase;
 
 private class BomTestPart extends MachineComponent {
-  public function new() super("TEST-PART", "Test part", "steel");
+  public function new() {
+    super("TEST-PART", "Test part", "steel");
+    addFacet(new machinekit.component.ProcurementIntent(Make("machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
+  }
 }
 
 private class BomIncludedPart extends MachineComponent {
   public function new(owner:String) {
     super("INCLUDED-PIECE", "Included piece", "steel");
     addFacet(new IncludedInPurchase(owner));
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null)));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
   }
 }
 
@@ -50,8 +58,11 @@ class BomDocumentTests {
     if (!releaseRejected) throw "Unknown release schema versions must be rejected";
     child.addComponent("first", new BomTestPart());
     child.addBomItem(new BomTestPart().bom, 2);
-    child.addBomItem({partNumber: "WIRE", description: "Wire", quantity: 2, material: null}, 3);
+    child.addBomItem({partNumber: "WIRE", description: "Wire", quantity: 2, material: null,
+      procurement:Buy(null, null, null), maturity:"Stated"}, 3);
     var originalPanel = new machinekit.enclosure.EnclosurePanel(100, 200).bom;
+    originalPanel.procurement = Buy(null, null, null);
+    originalPanel.maturity = "Stated";
     var sourcePanel = originalPanel.properties;
     if (sourcePanel == null) throw "Panel metadata missing";
     var heat:machinekit.enclosure.LaminatedPanel.PanelProperty = {value: 80, basis: Assumed, source: "test"};
@@ -101,7 +112,8 @@ class BomDocumentTests {
 
     var stock = new MachineAssembly();
     var cable:machinekit.component.BomItem = {partNumber:"CABLE", description:"Cable", quantity:1,
-      material:null, measure:{value:2.5, unit:"m"}, cuts:[{length:1.2, count:2}]};
+      material:null, procurement:Buy(null, null, null), maturity:"Stated",
+      measure:{value:2.5, unit:"m"}, cuts:[{length:1.2, count:2}]};
     stock.addBomItem(cable, 2);
     var stockDoc = stock.bomDocument("stock", "abc", "2026-01-01T00:00:00Z");
     var stockLine = stockDoc.procurement[0].item;
@@ -114,7 +126,7 @@ class BomDocumentTests {
       throw "Exported stock quantities must be snapshots";
     var invalid = new MachineAssembly();
     invalid.addBomItem({partNumber:"BAD", description:"Bad cut", quantity:1, material:null,
-      measure:{value:1, unit:"m"}, cuts:[{length:2, count:1}]});
+      procurement:Buy(null, null, null), maturity:"Stated", measure:{value:1, unit:"m"}, cuts:[{length:2, count:1}]});
     var invalidRejected = false;
     try invalid.bomDocument("bad", "abc", "2026-01-01T00:00:00Z") catch (_:Dynamic) invalidRejected = true;
     if (!invalidRejected) throw "Cuts cannot exceed the ordered stock length";

@@ -31,6 +31,8 @@ class ShelfAssembly extends MachineComponent {
     this.thickness = thickness;
     this.inclinationDegrees = inclinationDegrees;
     super('SHELF-${fmt(width)}x${fmt(depth)}', 'Sheet shelf with supports and retaining lip', "birch plywood");
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("support", ConnectorRole.Mount, Solids.axial(0, 0, 0));
   }
 

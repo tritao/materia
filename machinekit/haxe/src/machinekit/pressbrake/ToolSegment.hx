@@ -40,6 +40,9 @@ class ToolSegment extends MachineComponent {
       == null ? "" : '-${horn.end}-${Dimension.format(horn.reliefLength)}x${Dimension.format(horn.remainingHeight)}';
     super('TOOL-$profileId-${Dimension.format(length)}$hornId', "Reference press-brake tooling segment", "steel", true);
     catalogueProfile = ToolProfiles.catalogueId(profile);
+    if (catalogueProfile == null) addFacet(new machinekit.component.ProcurementIntent(NotSupplied));
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.profile = profile;
     this.length = length;
     this.horn = horn;
@@ -91,7 +94,7 @@ class ToolSegment extends MachineComponent {
       var horn = v.token("horn");
       var end = horn == "None" ? "" : '-${horn == "Left" ? "L" : "R"}${Dimension.format(v.number("reliefLength"))}x${Dimension.format(v.number("remainingHeight"))}';
       return 'TOOL-${profile.toUpperCase()}-L${Dimension.format(v.number("length"))}$end';
-    });
+    }).procured(_ -> NotSupplied);
     return recipe;
   }
 

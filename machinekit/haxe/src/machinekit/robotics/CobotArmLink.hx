@@ -48,6 +48,14 @@ class CobotArmLink extends MachineComponent {
       "aluminium 6061",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining"), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("axisOffsetA", "mm", null, null, a),
+      machinekit.component.Procurement.ProcurementCodec.requirement("axisOffsetD", "mm", null, null, d),
+      machinekit.component.Procurement.ProcurementCodec.requirement("inputModuleSize", "1", null, null, previous.size),
+      machinekit.component.Procurement.ProcurementCodec.requirement("outputModuleSize", "1", null, null, next.size)
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     span = -a;
     input = previous;
     output = next;

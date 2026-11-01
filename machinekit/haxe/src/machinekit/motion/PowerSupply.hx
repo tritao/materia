@@ -46,6 +46,8 @@ class PowerSupply extends MachineComponent implements ElectricalSource {
       'DC supply, ${Dimension.format(voltage.volts())} V, ${Dimension.format(current.amps())} A',
       "aluminium 6061"
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.voltage = voltage;
     this.current = current;
     this.regenerativePower = regenerativePower;
@@ -93,7 +95,12 @@ class PowerSupply extends MachineComponent implements ElectricalSource {
       )
     ).numbered(v -> 'PSU-ASSUMED-${Dimension.format(v.number("voltage"))}V${Dimension.format(v.number("current"))}A-'
       + '${Dimension.format(v.number("width"))}x${Dimension.format(v.number("height"))}x${Dimension.format(v.number("depth"))}-'
-      + '${v.integer("outlets")}O-${Dimension.format(v.number("regenerativePower"))}');
+      + '${v.integer("outlets")}O-${Dimension.format(v.number("regenerativePower"))}')
+      .procured(_ -> Buy(null, null, null)).requiring(v -> {
+        var req = machinekit.component.Procurement.ProcurementCodec.requirement;
+        return [req("voltage", "V", null, null, v.number("voltage")), req("current", "A", v.number("current")),
+          req("outlets", "count", v.integer("outlets")), req("regenerativePower", "W", v.number("regenerativePower"))];
+      });
     return recipe;
   }
 

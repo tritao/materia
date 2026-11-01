@@ -34,7 +34,7 @@ class ToolRack extends AssumedCatalogComponent {
   }
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.routing.tool-rack", inputs(), v -> new ToolRack(v))
-      .numbered(_ -> "ROUTER-TOOL-RACK");
+      .numbered(_ -> "ROUTER-TOOL-RACK").procured(_ -> Buy(null, null, null)).requiringInputs(["pitch", "depth", "height"], ["pockets", "coverStroke"], []);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

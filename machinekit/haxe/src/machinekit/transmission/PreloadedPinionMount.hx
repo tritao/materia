@@ -68,7 +68,7 @@ class PreloadedPinionMount extends AssumedCatalogComponent {
       "machinekit.transmission.preloaded-pinion-mount",
       inputs(),
       v -> new PreloadedPinionMount(v)
-    ).numbered(v -> 'PIN-MOUNT-ASSUMED-${v.token("layout").toUpperCase()}-${Dimension.format(v.number("springForce"))}N');
+    ).numbered(v -> 'PIN-MOUNT-ASSUMED-${v.token("layout").toUpperCase()}-${Dimension.format(v.number("springForce"))}N').procured(_ -> Buy(null, null, null)).requiringInputs(["layout", "hingeBore", "shaftClearance"], ["springForce", "springRate", "stroke"], []);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

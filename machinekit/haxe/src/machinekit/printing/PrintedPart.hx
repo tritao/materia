@@ -15,6 +15,9 @@ class PrintedPart extends MachineComponent {
 
   public function new() {
     super("PRINTED-PART", "The part being printed", "plastic", true);
+    addFacet(new machinekit.component.ProcurementIntent(NotSupplied));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("origin", Face, Solids.axial(0, 0, 0));
   }
 

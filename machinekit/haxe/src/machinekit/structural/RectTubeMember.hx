@@ -22,6 +22,8 @@ class RectTubeMember extends MachineComponent {
       || !(length > 0)) throw "Tube member needs finite positive dimensions";
     var section = new RectTube(width, depth, wall);
     super('${section.designation}-L$length', "Cut rectangular structural tube", "steel");
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     profile = section;
     this.length = length;
     this.partId = partId == null ? "" : partId;
@@ -72,7 +74,9 @@ class RectTubeMember extends MachineComponent {
       )
     ).numbered(v -> v.token("partId") != "" ? 'TUBE-${v.token("partId").toUpperCase()}'
       : 'TUBE-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("wall"))}-L${Dimension.format(v.number("length"))}'
-        + (InsertHoles.records(v.token("holes")).length == 0 ? "" : "-DRILLED"));
+        + (InsertHoles.records(v.token("holes")).length == 0 ? "" : "-DRILLED"))
+      .procured(v -> InsertHoles.records(v.token("holes")).length == 0
+        ? Buy(null, null, null) : Make("cutting and drilling"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

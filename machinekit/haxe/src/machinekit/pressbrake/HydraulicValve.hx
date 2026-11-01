@@ -16,6 +16,8 @@ class HydraulicValve extends MachineComponent implements ValveSpec {
   static var recipe:Null<ComponentType>;
   public function new() {
     super("HYDRAULIC-VALVE-CLOSED-CENTRE", "Assumed closed-centre hydraulic valve block", "steel", true);
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "P", kind: Hydraulic, role: Consumer, iface: Thread("G1/2"), required: true});
     addPort({name: "T", kind: Hydraulic, role: Supply, iface: Thread("G1/2"), required: false});
@@ -52,7 +54,11 @@ class HydraulicValve extends MachineComponent implements ValveSpec {
       "machinekit.pressbrake.hydraulic-valve",
       [],
       _ -> new HydraulicValve()
-    ).numbered(_ -> "HYD-VALVE-ASSUMED-4/3-CLOSED");
+    ).numbered(_ -> "HYD-VALVE-ASSUMED-4/3-CLOSED").procured(_ -> Buy(null, null, null)).requiring(_ -> [
+      machinekit.component.Procurement.ProcurementCodec.choice("configuration", "4/3 closed centre"),
+      machinekit.component.Procurement.ProcurementCodec.choice("portThread", "G1/2"),
+      machinekit.component.Procurement.ProcurementCodec.requirement("coilVoltage", "V", null, null, 24)
+    ]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

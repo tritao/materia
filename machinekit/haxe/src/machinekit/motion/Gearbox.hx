@@ -48,6 +48,9 @@ class Gearbox extends MachineComponent {
       'Gearbox, ${Dimension.format(ratio)}:1',
       "aluminium 6061"
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", assumed ? "Assumed" : "Stated")
+      .setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.ratio = ratio;
     this.efficiency = efficiency;
     this.diameter = diameter;
@@ -112,7 +115,8 @@ class Gearbox extends MachineComponent {
       + '${Dimension.format(v.number("diameter"))}x${Dimension.format(v.number("length"))}-B${Dimension.format(v.number("bore"))}-'
       + v.token("basis").toUpperCase()
       + (v.token("material") == "aluminium 6061" ? "" : v.token("material") == "steel" ? "-STL"
-        : "-" + materia.project.MaterialLibrary.fromSpec(v.token("material")).toUpperCase()));
+        : "-" + materia.project.MaterialLibrary.fromSpec(v.token("material")).toUpperCase()))
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["ratio", "diameter", "length", "bore"], ["efficiency"]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

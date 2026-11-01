@@ -35,6 +35,8 @@ class ShaftBrakePart extends MachineComponent implements MotorBrakeSpec {
       ) || ((role == "hub"
       || role == "disc") && sector != 0)) throw "Shaft brake needs a positive bore and a valid part role/sector";
     super('SHAFT-BRAKE-4NM-$bore-$role-$sector', "Assumed spring-applied shaft brake " + role, "steel");
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.bore = bore;
     this.role = role;
     this.sector = sector;
@@ -127,7 +129,11 @@ class ShaftBrakePart extends MachineComponent implements MotorBrakeSpec {
         ComponentRecipeSupport.count("sector", 0)
       ],
       values -> new ShaftBrakePart(values.number("bore"), values.token("role"), values.integer("sector"))
-    ).numbered(v -> 'BRAKE-ASSUMED-4NM-B${Dimension.format(v.number("bore"))}-${v.token("role").toUpperCase()}-${v.integer("sector")}');
+    ).numbered(v -> 'BRAKE-ASSUMED-4NM-B${Dimension.format(v.number("bore"))}-${v.token("role").toUpperCase()}-${v.integer("sector")}')
+      .procured(_ -> Buy(null, null, null)).requiring(v -> [
+        machinekit.component.Procurement.ProcurementCodec.requirement("bore", "mm", null, null, v.number("bore")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("holdingTorque", "N m", 4)
+      ]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

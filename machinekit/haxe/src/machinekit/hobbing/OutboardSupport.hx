@@ -22,7 +22,8 @@ class OutboardSupport extends MachineComponent {
       "machinekit.hobbing.outboard-support",
       parameters(),
       v -> new OutboardSupport(v)
-    ).numbered(_ -> "HOB-OUTBOARD-SUPPORT");
+    ).numbered(_ -> "HOB-OUTBOARD-SUPPORT").procured(_ -> Make("CNC machining"))
+      .requiringInputs(["width", "depth", "height", "seatDiameter", "shaftDiameter"], ["radialStiffness"]);
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

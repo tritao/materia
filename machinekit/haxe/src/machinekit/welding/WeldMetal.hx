@@ -20,6 +20,9 @@ class WeldMetal extends MachineComponent {
 
   public function new() {
     super("WELD-METAL-ER70S-6", "Weld metal, ER70S-6 steel wire deposited along the seams", "steel", true);
+    addFacet(new machinekit.component.ProcurementIntent(NotSupplied));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("base", Mount, Solids.axial(0, 0, 0));
     declareMass(7.85e-6, new Vector(0, 0, SIZE / 2));
   }

@@ -8,7 +8,10 @@
     "SheetRouter.hx",
     "SheetRouterSpec.hx",
     "SheetRouterPreview.hx",
-    "SheetRouterSizing.hx"
+    "SheetRouterSizing.hx",
+    "SheetRouterAtcCover.hx",
+    "SheetRouterServiceTable.hx",
+    "SheetValveServiceStand.hx"
   ],
   "sourceRoots": [
     "."

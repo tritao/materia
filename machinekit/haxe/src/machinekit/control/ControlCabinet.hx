@@ -46,7 +46,7 @@ class ControlCabinet extends AssumedCatalogComponent {
       false,
       ["inputs", "outputs", "analogOutputs"]
     ).numbered(v -> 'CABINET-ASSUMED-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x'
-      + '${Dimension.format(v.number("height"))}-${v.integer("dinRows")}R');
+      + '${Dimension.format(v.number("height"))}-${v.integer("dinRows")}R').procured(_ -> Buy(null, null, null)).requiringInputs(["width", "depth", "height"], ["dinRows"], []);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

@@ -19,6 +19,8 @@ class DigitalSensor extends MachineComponent {
   public function new(kind:String = "reed") {
     if (kind != "reed" && kind != "presence" && kind != "scanner") throw 'Unknown digital sensor kind "$kind"';
     super('DIGITAL-SENSOR-${kind.toUpperCase()}', '$kind digital sensor', "plastic", true);
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.kind = kind;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "signal", kind: Signal, role: Supply, iface: Unspecified, required: true});
@@ -29,7 +31,8 @@ class DigitalSensor extends MachineComponent {
       "machinekit.control.digital-sensor",
       [ComponentRecipeSupport.choice("kind", ["reed", "presence", "scanner"], "reed")],
       v -> new DigitalSensor(v.token("kind"))
-    ).numbered(v -> 'SENSOR-ASSUMED-${v.token("kind").toUpperCase()}');
+    ).numbered(v -> 'SENSOR-ASSUMED-${v.token("kind").toUpperCase()}')
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["kind"]);
     return recipe;
   }
 

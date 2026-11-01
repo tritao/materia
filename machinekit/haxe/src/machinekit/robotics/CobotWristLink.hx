@@ -41,6 +41,14 @@ class CobotWristLink extends MachineComponent {
       "aluminium 6061",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining"), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("offset", "mm", null, null, d),
+      machinekit.component.Procurement.ProcurementCodec.requirement("angle", "rad", null, null, alpha),
+      machinekit.component.Procurement.ProcurementCodec.requirement("inputModuleSize", "1", null, null, input.size),
+      machinekit.component.Procurement.ProcurementCodec.requirement("outputModuleSize", "1", null, null, output.size)
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.input = input;
     this.output = output;
     radius = Math.min(input.diameter, output.diameter) * 0.42;

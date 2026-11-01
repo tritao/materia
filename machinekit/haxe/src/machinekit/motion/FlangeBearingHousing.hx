@@ -41,6 +41,8 @@ class FlangeBearingHousing extends MachineComponent {
     var edge = Math.max(wall / 2, SocketHeadCapScrew.catalog().get(mountScrew).headDiameter / 2 + 1);
     var face = boltSpacing + 2 * edge;
     super('PILLOWBLOCK-${bearing.designation}', 'Flange bearing housing for ${bearing.designation}', "cast iron");
+    if (Std.isExactType(this, FlangeBearingHousing)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.bearing = bearing;
     this.face = face;
     this.depth = depth;
@@ -110,7 +112,8 @@ class FlangeBearingHousing extends MachineComponent {
         DeepGrooveBearing.metric(v.token("bearing"), v.boolean("shielded")),
         ComponentRecipeSupport.fit(v.token("fit"))
       )
-    ).numbered(v -> 'FLANGE-HOUSING-${v.token("bearing")}-${v.token("fit").toUpperCase()}');
+    ).numbered(v -> 'FLANGE-HOUSING-${v.token("bearing")}-${v.token("fit").toUpperCase()}')
+      .procured(_ -> Make("casting and machining"));
     return recipeTypeCache;
   }
 

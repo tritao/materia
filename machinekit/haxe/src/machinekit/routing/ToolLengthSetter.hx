@@ -27,7 +27,7 @@ class ToolLengthSetter extends AssumedCatalogComponent {
       inputs(),
       v -> new ToolLengthSetter(v)
     ).numbered(v -> 'TOOL-SETTER-ASSUMED-${Dimension.format(v.number("diameter"))}x${Dimension.format(v.number("height"))}-'
-        + 'S${Dimension.format(v.number("stroke"))}-R${Dimension.format(v.number("repeatability"))}');
+        + 'S${Dimension.format(v.number("stroke"))}-R${Dimension.format(v.number("repeatability"))}').procured(_ -> Buy(null, null, null)).requiringInputs(["diameter", "height"], ["stroke"], ["repeatability"]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

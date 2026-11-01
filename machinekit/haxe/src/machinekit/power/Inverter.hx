@@ -37,6 +37,15 @@ class Inverter extends MachineComponent {
       "aluminium 6061",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("inputVoltage", "V", null, null, inputVolts),
+      machinekit.component.Procurement.ProcurementCodec.requirement("outputVoltage", "V", null, null, outputVolts),
+      machinekit.component.Procurement.ProcurementCodec.requirement("continuousPower", "W", continuousWatts),
+      machinekit.component.Procurement.ProcurementCodec.choice("waveform", "pure sine"),
+      machinekit.component.Procurement.ProcurementCodec.choice("phase", "single")
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.inputVolts = inputVolts;
     this.outputVolts = outputVolts;
     this.continuousWatts = continuousWatts;

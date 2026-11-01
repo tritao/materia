@@ -124,7 +124,7 @@ it is, not its current dimensions:
 
 - **Made parts** get a stable, author-declared drawing number, for example
   `MILL-MOTOR-PLATE-Z`. They also get a revision fingerprint: a hash of
-  the recipe key or the exported geometry.
+  the recipe key and its generator version.
 - **Bought parts** get a catalogue-style number built from their
   standardised parameters, for example `HGR15-R420` and `HGH15CA`, plus
   manufacturer and MPN once one is chosen.
@@ -141,17 +141,18 @@ overloaded as a part number.
   material. This links to `ManufacturingVariant` where a family exists.
 - `Buy`: catalogue item. Optional manufacturer/MPN, and a standard
   reference (ISO 4762, DIN 625, …).
-- `Undecided(requirement)`: placeholder with the spec it must meet, for
-  example "servo, ≥3.8 N·m peak, 400 V bus, 19 mm shaft". This is what an
-  RFQ asks vendors to propose against.
 - `NotSupplied`: workpieces, cutting tools and fixtures, which are listed
   but excluded from the machine's procurement BOM.
+
+Each line also has an engineering maturity. Assumed lines carry structured
+requirements for selection, such as peak torque, bus voltage and shaft size.
 
 **Purchase units use `IncludedInPurchase`.** One component of a bought unit
 carries the purchase line; every other piece (modelling splits such as the
 brake sectors, or real subparts that ship inside the unit) carries
-`IncludedInPurchase(owner)`. The BOM keeps only the owner line, and an
-included piece whose owner is absent is an error. No second mechanism. Kits sold as a set (an SFU screw with nut and BK/BF supports)
+`IncludedInPurchase(owner)`. The engineering tree retains each piece; the
+procurement view keeps only the owner line. An included piece whose owner is
+absent is an error. No second mechanism. Kits sold as a set (an SFU screw with nut and BK/BF supports)
 are a sourcing concern: one quote covers several lines. They stay separate
 in the BOM.
 
@@ -160,9 +161,9 @@ and readers reject anything else. It contains:
 
 - machine id, source commit, and generation time;
 - the subassembly tree;
-- the rolled-up procurement lines (kind, part number, revision,
-  description, quantity, material and process for Make, requirement for
-  Undecided);
+- the rolled-up procurement lines (kind, maturity, structured requirements,
+  part number, fingerprint and release, description, quantity, and material
+  and process for Make);
 - where each line is used (member paths).
 
 ## Phases
@@ -287,7 +288,7 @@ and readers reject anything else. It contains:
 - Acceptance: all recipe-derived parts pass the lint.
 
 ### B3 — Made parts: drawing number + revision
-- Done in this commit: bench-mill drawing identities and fingerprint/release
+- Done in `ad91da408`: bench-mill drawing identities and fingerprint/release
   records are tested; 22 example exports contain 1,143 procurement lines,
   including 399 code-only lines with unavailable fingerprints. The full gate
   passed 11/24 shards with no new shard or exception message.
@@ -323,14 +324,76 @@ and readers reject anything else. It contains:
   and changes its revision (a test).
 
 ### B4 — Procurement kind
+- Done in this commit. The 22 exportable examples contain 1,076 procurement lines: 516 Make and
+  560 Buy. Their engineering trees retain NotSupplied lines. The export
+  requires intent and maturity on every line, and structured selection terms
+  on every Assumed line. The gate passed 11/24 shards, with no new failing
+  shard or exception message against the untouched baseline.
+- Procurement intent and structured numeric requirements are declared on
+  recipes, or on a `ProcurementIntent` facet for code-only components.
+  Selection maturity remains separate and comes from existing engineering
+  metadata; any temporary migration mapping must be removed in B7.
+- The bench mill's ER20 holder, cutter, workpiece and workholding clamps
+  are user tooling, so their engineering occurrences are `NotSupplied`.
+  Router plates are used for both machine structure and stock: the constructor
+  marks stock explicitly, while other plates declare a fabrication process.
+- Cabinet I/O counts describe connected equipment, not the cabinet purchase;
+  its selection requirements cover its dimensions and DIN rows. Named stepper
+  motors with sourced ratings use their catalogue model; the pancake motor's
+  assumed ratings and the OpenBuilds geometry reference remain `Assumed`.
+  A geometry reference alone does not identify a manufacturer part. Generic
+  motors carry their frame and body length as selection requirements.
+- Digital sensors declare the function currently modeled. In particular, the
+  scanner model does not state a safety rating, so that information still has
+  to be established before selecting a safety scanner.
+- The router's 52 mm ER11 spindle model states neither power nor speed; its
+  Buy requirements retain the known interface and leave those ratings open.
+- The mobile base's modeled drive wheel and caster state their dimensions but
+  not a load rating; wheel selection still needs that engineering input.
+- The generic inline vacuum sensor states its connection and signal type but
+  not its measurement range; selection still needs that range.
+- The press-brake light curtain has no safety rating, and its hydraulic
+  cylinder, valve, manifold and hose models do not state pressure ratings.
+  Those values are still needed for selection. The separately modeled cylinder
+  rods also need purchase-boundary treatment in B5.
+- The picking indicator lacks an electrical interface specification, and the
+  adjustable foot lacks a load rating. Both remain assumed purchases requiring
+  those inputs before supplier selection.
+- `CobotJoint` describes an integrated motor and gearhead, while `CobotArm`
+  also models each gearhead as a member. B5 must declare that purchase boundary
+  before counting the resulting procurement lines as complete.
+- Pneumatic cylinder rods are separate model members; their purchase boundary
+  with the cylinder also needs an explicit B5 declaration. The modeled valve
+  has no coil-voltage rating, which remains needed for selecting a real valve.
+- The welding torch, neck and nozzle are modeled separately for collision;
+  B5 must determine which ship together before counting purchase units. The
+  magnetic return clamp follows the plan's NotSupplied treatment of clamps.
+  The torch model does not state a current rating, so selection still needs
+  that rating from the welding design.
+- The screwdriver's powered body, feed slide and rotating nose are separate
+  model members. B5 must establish whether they form one purchased tool unit;
+  its replaceable bit and workholding fixture are user-supplied.
+- A manufacturing family's selected variant supplies its Make process. Cast
+  inserts use their declared fabricated or catalogue origin to choose Make or
+  Buy, retaining the catalogue manufacturer and reference when supplied. A
+  nominal-study exterior remains Assumed even for a named catalogue product.
+  Deposited weld metal and the modeled welding stock belong to the workpiece,
+  so they are not purchases for the machine; the work table remains a purchased
+  cell item.
+- The purchased rotary table's maturity follows its torque, speed and load
+  rating bases; its provisional mounting envelope is not promoted to catalogue
+  evidence. Fine bearing runout is expressed in micrometres and ring-encoder
+  angular accuracy in arcseconds to retain meaningful formatted values.
+- Existing welding service lines explicitly declare Buy intent; B6 will express
+  stock sold by length with cut lists and keep complete hose packs as units.
+  Stock hose keeps its catalogue maker and reference, while custom hose states
+  its tube and service requirements.
 - Add `procurement` to `BomItem`. It is required. Components without it fail
   the export.
-- Map existing data: `ManufacturingVariant` → `Make(process)`;
-  standard parts (`standard/`, rails, bearings) → `Buy`;
-  `AssumedCatalogComponent` subclasses, `GENERIC-*` parts and components
-  whose `EngineeringMetadata.ratingsBasis` is `Assumed` → `Undecided`, with a
-  requirement string built from the ratings the sizing code already checks
-  against. A `Catalog` basis with a source is evidence for `Buy`.
+- Declare `Make`, `Buy` or `NotSupplied` at each recipe or code-only component.
+  Assumed maturity is independent of that choice and requires structured
+  selection requirements. A catalogue basis needs a source; a geometry
+  reference alone does not establish a purchasable manufacturer part.
 - Workpiece, tooling and clamps → `NotSupplied`. `BenchMill`'s default
   workpiece flag stays for the preview; the procurement view excludes these
   lines.

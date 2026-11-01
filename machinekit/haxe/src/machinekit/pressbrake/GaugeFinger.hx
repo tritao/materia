@@ -32,6 +32,8 @@ class GaugeFinger extends MachineComponent {
 
   public function new() {
     super("PRESS-GAUGE-FINGER", "Assumed gravity-return backgauge contact finger", "steel", true);
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("mount", Mount, Solids.axial(0, PIVOT_DEPTH_MM, -DATUM_HEIGHT_MM));
     addConnector("contact", Face, Solids.axial(0, 0, 0));
     addPort({name: "contact", kind: Signal, role: Supply, iface: Plug("generic", 3), required: false});
@@ -65,7 +67,11 @@ class GaugeFinger extends MachineComponent {
 
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.pressbrake.gauge-finger", [], _ -> new GaugeFinger())
-      .numbered(_ -> "PRESS-GAUGE-FINGER-ASSUMED");
+      .numbered(_ -> "PRESS-GAUGE-FINGER-ASSUMED").procured(_ -> Make("CNC machining")).requiring(_ -> [
+        machinekit.component.Procurement.ProcurementCodec.requirement("width", "mm", null, null, WIDTH_MM),
+        machinekit.component.Procurement.ProcurementCodec.requirement("depth", "mm", null, null, DEPTH_MM),
+        machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, HEIGHT_MM)
+      ]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

@@ -33,6 +33,8 @@ class ArmWristFork extends MachineComponent {
       "aluminium 6061",
       true
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.length = length;
     this.span = span;
     this.wall = wall;
@@ -51,7 +53,8 @@ class ArmWristFork extends MachineComponent {
         ComponentRecipeSupport.length("depth", 24)
       ],
       v -> new ArmWristFork(v.number("length"), v.number("span"), v.number("wall"), v.number("depth"))
-    ).numbered(v -> 'ARM-FORK-${Dimension.format(v.number("length"))}x${Dimension.format(v.number("span"))}-W${Dimension.format(v.number("wall"))}-D${Dimension.format(v.number("depth"))}');
+    ).numbered(v -> 'ARM-FORK-${Dimension.format(v.number("length"))}x${Dimension.format(v.number("span"))}-W${Dimension.format(v.number("wall"))}-D${Dimension.format(v.number("depth"))}')
+      .procured(_ -> Make("CNC machining")).requiringInputs(["length", "span", "wall", "depth"]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

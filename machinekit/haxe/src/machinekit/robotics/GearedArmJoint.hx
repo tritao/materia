@@ -36,6 +36,8 @@ class GearedArmJoint extends ArmJoint {
       "-POCKET-" + machinekit.component.Dimension.format(pocketDiameter)
       + "x" + machinekit.component.Dimension.format(pocketLength)
     );
+    if (Std.isExactType(this, GearedArmJoint)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.pocketDiameter = pocketDiameter;
     this.pocketLength = pocketLength;
     addConnector("gearbox", Mount, Solids.axial(0, 0, 0.5));
@@ -68,7 +70,8 @@ class GearedArmJoint extends ArmJoint {
           ServoMotor.basisFromToken(v.token("servoBasis"))
         )
       )
-    ).numbered(v -> 'ARM-JOINT-${Dimension.format(v.number("diameter"))}x${Dimension.format(v.number("length"))}-P${Dimension.format(v.number("pocketDiameter"))}x${Dimension.format(v.number("pocketLength"))}');
+    ).numbered(v -> 'ARM-JOINT-${Dimension.format(v.number("diameter"))}x${Dimension.format(v.number("length"))}-P${Dimension.format(v.number("pocketDiameter"))}x${Dimension.format(v.number("pocketLength"))}')
+      .procured(_ -> Make("CNC machining"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

@@ -29,7 +29,7 @@ class BrakeResistor extends AssumedCatalogComponent {
       inputs(),
       v -> new BrakeResistor(v)
     ).numbered(v -> 'BRK-RESISTOR-ASSUMED-${Dimension.format(v.number("resistance"))}OHM-'
-      + '${Dimension.format(v.number("continuousPower"))}W-${Dimension.format(v.number("pulseEnergy"))}J');
+      + '${Dimension.format(v.number("continuousPower"))}W-${Dimension.format(v.number("pulseEnergy"))}J').procured(_ -> Buy(null, null, null)).requiringInputs(["resistance"], ["continuousPower", "pulseEnergy"], []);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

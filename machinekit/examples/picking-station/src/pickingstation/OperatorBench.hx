@@ -37,6 +37,9 @@ class OperatorBench extends MachineComponent {
       'Operator bench with extrusion frame, sheet worktop, and screen mount',
       "aluminium 6061"
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("extrusion cutting and assembly")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
   }
 
   public function frameCutList():Array<CutListLine> return frameAssembly.cutList();

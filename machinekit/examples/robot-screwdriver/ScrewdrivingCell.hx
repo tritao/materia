@@ -89,7 +89,7 @@ class ScrewdrivingCell extends MachineAssembly {
         work.plate.width,
         fixtureHeight,
         "steel",
-        "Fixture"
+        "Fixture", true
       );
       addComponent(name, fixture);
       addMemberConnector("table", name, Solids.axial(workX + side * stop, 20, RobotArm.TABLE_TOP));
@@ -126,7 +126,7 @@ class ScrewdrivingCell extends MachineAssembly {
 private class ScrewdrivingDatumStop extends ArmBlock {
   final innerX:Bool;
   public function new(width:Float, depth:Float, height:Float, material:String, name:String, innerX:Bool) {
-    super(width, depth, height, material, name);
+    super(width, depth, height, material, name, true);
     if (width <= ScrewdrivingCell.DATUM_BEVEL_RUN || height <= ScrewdrivingCell
       .DATUM_BEVEL_DROP) throw "Screwdriver datum stop is too small for its chamfered reference face";
     this.innerX = innerX;

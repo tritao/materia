@@ -24,5 +24,6 @@ class AssumedCatalogComponent extends MachineComponent {
   public function require(ok:Bool, message:String):Void {
     if (!ok) throw designation + ": " + message;
   }
+  override public function engineeringMaturity():Null<ValueBasis> return ratingsBasis;
   override public function hasGeometry():Bool return true;
 }

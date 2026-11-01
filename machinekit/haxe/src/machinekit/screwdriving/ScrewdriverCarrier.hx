@@ -12,6 +12,13 @@ class ScrewdriverCarrier extends MachineComponent {
   public function new(bit:ScrewdriverBit, maxTorque:Float, maxSpeed:Float, strokeMm:Float, springRate:Float) {
     if (bit == null) throw "Screwdriver carrier needs its fitted bit";
     super("CUSTOM-SCREWDRIVER-CARRIER", "Rotating screwdriver nose", "steel", true);
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("maxTorque", "N m", maxTorque),
+      machinekit.component.Procurement.ProcurementCodec.requirement("maxSpeed", "rad/s", maxSpeed),
+      machinekit.component.Procurement.ProcurementCodec.requirement("stroke", "mm", null, null, strokeMm)
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.bit = bit;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("bit", Mount, Solids.axial(0, 0, 15));

@@ -61,6 +61,9 @@ class PushInFitting extends MachineComponent {
   public function new(designation:String) {
     var row = catalog().get(designation);
     super(row.designation, '${row.maker} ${row.label} vacuum fitting', "brass");
+    if (Std.isExactType(this, PushInFitting)) addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Catalog").setToken("errorsBasis", "Assumed")
+      .setToken("source", catalog().metadata(designation).source)));
     this.spec = row;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "hose", kind: Vacuum, role: Consumer, iface: PushIn(row.tubeOdMm), required: true});
@@ -79,7 +82,7 @@ class PushInFitting extends MachineComponent {
       [ComponentRecipeSupport.catalog("designation", PushInFitting.catalog(), "10.08.02.00203")],
       v -> new PushInFitting(v.token("designation")),
       true
-    );
+    ).procured(v -> {var row = catalog().get(v.token("designation")); return Buy(row.maker, row.designation, null);});
     return recipeTypeCache;
   }
 

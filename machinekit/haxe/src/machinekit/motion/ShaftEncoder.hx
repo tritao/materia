@@ -47,6 +47,8 @@ class ShaftEncoder extends MachineComponent implements EncoderPart {
     this.hasIndex = hasIndex;
     this.bodyDiameter = bodyDiameter;
     this.bodyLength = bodyLength;
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("axis", Axis, Solids.axial(0, 0, 0));
   }
@@ -71,7 +73,13 @@ class ShaftEncoder extends MachineComponent implements EncoderPart {
         v.number("bodyLength")
       ),
       true
-    );
+    ).procured(_ -> Buy(null, null, null)).requiring(v -> [
+      machinekit.component.Procurement.ProcurementCodec.requirement("resolution", "count/rev", v.number("countsPerRevolution")),
+      machinekit.component.Procurement.ProcurementCodec.choice("absolute", v.boolean("absolute") ? "true" : "false"),
+      machinekit.component.Procurement.ProcurementCodec.choice("index", v.boolean("index") ? "true" : "false"),
+      machinekit.component.Procurement.ProcurementCodec.requirement("bodyDiameter", "mm", null, null, v.number("bodyDiameter")),
+      machinekit.component.Procurement.ProcurementCodec.requirement("bodyLength", "mm", null, null, v.number("bodyLength"))
+    ]);
     return recipeTypeCache;
   }
 

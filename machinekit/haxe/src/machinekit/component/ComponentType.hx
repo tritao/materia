@@ -1,6 +1,7 @@
 package machinekit.component;
 
 import machinekit.component.ComponentValue.*;
+import machinekit.component.ComponentParameterType.*;
 import materia.project.MaterialLibrary;
 
 /** Stable recipe for one kind of single part. */
@@ -22,6 +23,8 @@ class ComponentType {
   public var generatorVersion(default, null):Int = 1;
   var numberFor:Null<ComponentValues -> String>;
   var purchaseKeyFor:Null<ComponentValues -> String>;
+  var procurementFor:Null<ComponentValues -> Procurement>;
+  var requirementsFor:Null<ComponentValues -> Array<machinekit.component.Procurement.ProcurementRequirement>>;
 
   /** Most mass properties kept per recipe; past it the memo is emptied and each is computed again on its next use. */
   static inline final MASS_MEMO_LIMIT = 1024;
@@ -106,6 +109,70 @@ class ComponentType {
     purchaseKeyFor = key;
     return this;
   }
+
+  /** Declare the procurement decision next to the recipe's identity. */
+  public function procured(intent:ComponentValues -> Procurement):ComponentType {
+    if (intent == null || procurementFor != null) throw 'Procurement already defined for "$id"';
+    procurementFor = intent;
+    return this;
+  }
+
+  /** Declare the numeric inputs or ratings used to select an assumed purchase. */
+  public function requiring(terms:ComponentValues -> Array<machinekit.component.Procurement.ProcurementRequirement>):ComponentType {
+    if (terms == null || requirementsFor != null) throw 'Requirements already defined for "$id"';
+    requirementsFor = terms;
+    return this;
+  }
+
+  /** Select the recipe's explicit numeric requirements and their bounds. */
+  public function requiringInputs(nominal:Array<String>, ?minimum:Array<String>, ?maximum:Array<String>):ComponentType {
+    var selected:Array<{parameter:ComponentParameter, bound:String}> = [];
+    var seen:Map<String, Bool> = [];
+    function append(names:Null<Array<String>>, bound:String):Void {
+      if (names == null) return;
+      for (name in names) {
+        if (seen.exists(name)) throw 'Duplicate requirement input "$name" for "$id"';
+        seen.set(name, true);
+        var found:Null<ComponentParameter> = null;
+        for (parameter in inputs) if (parameter.name == name) found = parameter;
+        if (found == null) throw 'Unknown requirement input "$name" for "$id"';
+        switch found.type {
+          case Scalar | Length | Angle | Count:
+          case Choice(_) | Bool if (bound == "nominal"):
+          default: throw 'Requirement input "$name" has an unsupported type or bound';
+        }
+        selected.push({parameter:found, bound:bound});
+      }
+    }
+    append(nominal, "nominal"); append(minimum, "min"); append(maximum, "max");
+    if (selected.length == 0) throw 'No requirement inputs declared for "$id"';
+    return requiring(v -> [for (selection in selected) {
+      var parameter = selection.parameter;
+      var unit = parameter.unit == null ? "count" : parameter.unit;
+      switch v.get(parameter.name) {
+        case Token(value): Procurement.ProcurementCodec.choice(parameter.name, value);
+        case Boolean(value): Procurement.ProcurementCodec.choice(parameter.name, value ? "true" : "false");
+        case Number(value):
+          switch selection.bound {
+            case "min": Procurement.ProcurementCodec.requirement(parameter.name, unit, value);
+            case "max": Procurement.ProcurementCodec.requirement(parameter.name, unit, null, value);
+            default: Procurement.ProcurementCodec.requirement(parameter.name, unit, null, null, value);
+          }
+        case Integer(value):
+          switch selection.bound {
+            case "min": Procurement.ProcurementCodec.requirement(parameter.name, unit, value);
+            case "max": Procurement.ProcurementCodec.requirement(parameter.name, unit, null, value);
+            default: Procurement.ProcurementCodec.requirement(parameter.name, unit, null, null, value);
+          }
+        default: throw 'Missing requirement input "${parameter.name}"';
+      }
+    }]);
+  }
+
+  public function procurement(values:ComponentValues):Null<Procurement> return procurementFor == null
+    ? null : procurementFor(resolve(values));
+  public function requirements(values:ComponentValues):Array<machinekit.component.Procurement.ProcurementRequirement> return requirementsFor == null
+    ? [] : requirementsFor(resolve(values));
 
   public function label():String {
     var words = id.split(".").pop().split("-").join(" ");

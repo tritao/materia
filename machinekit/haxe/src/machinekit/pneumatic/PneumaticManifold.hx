@@ -17,6 +17,8 @@ class PneumaticManifold extends MachineComponent {
   public function new(outlets:Int) {
     if (outlets < 1) throw "Pneumatic manifold needs at least one outlet";
     super('MANIFOLD-$outlets', 'Generic $outlets-outlet pneumatic manifold', "aluminium 6061", true);
+    if (Std.isExactType(this, PneumaticManifold)) addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.outlets = outlets;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "input", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
@@ -34,7 +36,10 @@ class PneumaticManifold extends MachineComponent {
       [ComponentRecipeSupport.count("outlets", 2)],
       v -> new PneumaticManifold(v.integer("outlets")),
       true
-    );
+    ).procured(_ -> Buy(null, null, null)).requiring(v -> [
+      machinekit.component.Procurement.ProcurementCodec.requirement("outlets", "1", v.integer("outlets")),
+      machinekit.component.Procurement.ProcurementCodec.requirement("tubeOutsideDiameter", "mm", null, null, 6)
+    ]);
     return recipeTypeCache;
   }
 

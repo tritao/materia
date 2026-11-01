@@ -73,6 +73,8 @@ class Hotend extends MachineComponent {
   public function new(designation:String = "GENERIC-V6-STYLE") {
     var row = catalog().get(designation);
     super(designation, "Hotend heatsink and heater block", "aluminium 6061");
+    if (Std.isExactType(this, Hotend)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     spec = row;
     addConnector("nozzleSeat", Mount, Solids.axial(0, 0, 0));
     addConnector("filamentEntry", Axis, Solids.axial(0, 0, row.blockHeight + row.heatsinkLength));
@@ -98,7 +100,12 @@ class Hotend extends MachineComponent {
       "machinekit.printing.hotend",
       [ComponentRecipeSupport.catalog("designation", catalog(), "GENERIC-V6-STYLE")],
       v -> new Hotend(v.token("designation"))
-    ).numbered(v -> v.token("designation"));
+    ).numbered(v -> v.token("designation")).procured(_ -> Buy(null, null, null)).requiring(v -> {
+      var row = catalog().get(v.token("designation"));
+      return [machinekit.component.Procurement.ProcurementCodec.requirement("heatsinkDiameter", "mm", null, null, row.heatsinkDiameter),
+        machinekit.component.Procurement.ProcurementCodec.requirement("maxTemperature", "C", row.maxTemperature),
+        machinekit.component.Procurement.ProcurementCodec.requirement("volumetricFlow", "mm3/s", row.maxVolumetricFlow)];
+    });
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

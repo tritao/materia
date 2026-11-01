@@ -23,7 +23,7 @@ class Collet extends AssumedCatalogComponent {
   }
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.routing.collet", inputs(), v -> new Collet(v))
-      .numbered(v -> 'COLLET-ASSUMED-ER32-${Dimension.format(v.number("toolDiameter"))}MM');
+      .numbered(v -> 'COLLET-ASSUMED-ER32-${Dimension.format(v.number("toolDiameter"))}MM').procured(_ -> Buy(null, null, null)).requiringInputs(["diameter", "length", "toolDiameter"], [], []);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

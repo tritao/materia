@@ -32,7 +32,7 @@ class VacuumZoneValve extends AssumedCatalogComponent {
       inputs(),
       v -> new VacuumZoneValve(v)
     ).numbered(v -> 'VAC-VALVE-ASSUMED-${Dimension.format(v.number("bore"))}MM-'
-        + '${Dimension.format(v.number("ratedVacuum"))}PA-${Dimension.format(v.number("flow"))}M3H');
+        + '${Dimension.format(v.number("ratedVacuum"))}PA-${Dimension.format(v.number("flow"))}M3H').procured(_ -> Buy(null, null, null)).requiringInputs(["bore"], ["ratedVacuum", "flow"], []);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

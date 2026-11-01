@@ -21,7 +21,8 @@ class TablePlaten extends MachineComponent {
       "machinekit.hobbing.table-platen",
       parameters(),
       v -> new TablePlaten(v)
-    ).numbered(_ -> "HOBBER-TABLE-PLATEN");
+    ).numbered(_ -> "HOBBER-TABLE-PLATEN").procured(_ -> Make("CNC machining"))
+      .requiringInputs(["outside", "bore", "height", "faceBoltPcd"]);
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

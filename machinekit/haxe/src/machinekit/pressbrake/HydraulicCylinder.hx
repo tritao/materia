@@ -37,6 +37,8 @@ class HydraulicCylinder extends MachineComponent implements CylinderSpec {
       "steel",
       true
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.bore = bore;
     this.rod = rod;
     this.stroke = stroke;
@@ -122,7 +124,8 @@ class HydraulicCylinder extends MachineComponent implements CylinderSpec {
         v.number("capLength"),
         v.number("stemLength")
       )
-    ).numbered(v -> 'HYD-CYL-ASSUMED-${machinekit.component.Dimension.format(v.number("bore"))}x${machinekit.component.Dimension.format(v.number("rod"))}x${machinekit.component.Dimension.format(v.number("stroke"))}');
+    ).numbered(v -> 'HYD-CYL-ASSUMED-${machinekit.component.Dimension.format(v.number("bore"))}x${machinekit.component.Dimension.format(v.number("rod"))}x${machinekit.component.Dimension.format(v.number("stroke"))}')
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["bore", "rod", "stroke"]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

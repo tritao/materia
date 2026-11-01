@@ -24,6 +24,8 @@ class HydraulicCylinderRod extends MachineComponent {
       "steel",
       true
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.diameter = diameter;
     this.length = length;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
@@ -45,7 +47,8 @@ class HydraulicCylinderRod extends MachineComponent {
       "machinekit.pressbrake.hydraulic-cylinder-rod",
       [ComponentRecipeSupport.length("diameter", 100), ComponentRecipeSupport.length("length", 190)],
       v -> new HydraulicCylinderRod(v.number("diameter"), v.number("length"))
-    ).numbered(v -> 'HYDRAULIC-ROD-${Dimension.format(v.number("diameter"))}x${Dimension.format(v.number("length"))}');
+    ).numbered(v -> 'HYDRAULIC-ROD-${Dimension.format(v.number("diameter"))}x${Dimension.format(v.number("length"))}')
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["diameter", "length"]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

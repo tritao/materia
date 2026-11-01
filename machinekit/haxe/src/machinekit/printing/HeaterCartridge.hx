@@ -58,6 +58,8 @@ class HeaterCartridge extends MachineComponent {
       'Heater cartridge, ${Std.string(Math.round(row.volts))} V, ${Std.string(Math.round(row.watts))} W',
       "steel"
     );
+    if (Std.isExactType(this, HeaterCartridge)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     spec = row;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "power", kind: ElectricalPower, role: Consumer, iface: Unspecified, required: false});
@@ -76,7 +78,14 @@ class HeaterCartridge extends MachineComponent {
       "machinekit.printing.heater-cartridge",
       [ComponentRecipeSupport.catalog("designation", catalog(), "CARTRIDGE-6x20-24V-40W")],
       v -> new HeaterCartridge(v.token("designation"))
-    ).numbered(v -> v.token("designation"));
+    ).numbered(v -> v.token("designation")).procured(_ -> Buy(null, null, null)).requiring(v -> {
+      var row = catalog().get(v.token("designation"));
+      return [machinekit.component.Procurement.ProcurementCodec.requirement("diameter", "mm", null, null, row.diameter),
+        machinekit.component.Procurement.ProcurementCodec.requirement("length", "mm", null, null, row.length),
+        machinekit.component.Procurement.ProcurementCodec.requirement("voltage", "V", null, null, row.volts),
+        machinekit.component.Procurement.ProcurementCodec.requirement("power", "W", row.watts),
+        machinekit.component.Procurement.ProcurementCodec.requirement("maxTemperature", "C", row.maxTemperature)];
+    });
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

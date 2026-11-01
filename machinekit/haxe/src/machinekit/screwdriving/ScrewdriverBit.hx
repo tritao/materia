@@ -30,6 +30,9 @@ class ScrewdriverBit extends MachineComponent {
       "steel",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(NotSupplied));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.drive = drive;
     this.length = length;
     this.sleeveRadius = sleeveRadius;

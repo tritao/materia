@@ -36,8 +36,33 @@ class LevelingFoot extends AssumedCatalogComponent {
       "machinekit.structural.leveling-foot",
       parameters(),
       v -> new LevelingFoot(v)
-    ).numbered(v -> partNumber(LevelingFootCodec.decode(v.token("part"))));
+    ).numbered(v -> partNumber(LevelingFootCodec.decode(v.token("part"))))
+      .procured(_ -> Buy(null, null, null)).requiring(v -> requirementsFor(LevelingFootCodec.decode(v.token("part"))));
     return recipe;
+  }
+
+  static function requirementsFor(part:LevelingFootSpec):Array<machinekit.component.Procurement.ProcurementRequirement> {
+    var req = machinekit.component.Procurement.ProcurementCodec.requirement;
+    return switch part {
+      case Foot(d, _, thread, bottom, top, _, _, _):
+        [req("padDiameter", "mm", null, null, d), req("threadDiameter", "mm", null, null, thread.majorDiameter),
+          req("threadPitch", "mm", null, null, thread.pitch), req("stemLength", "mm", top - bottom)];
+      case Pad(d, h):
+        [req("diameter", "mm", null, null, d), req("height", "mm", null, null, h)];
+      case Screw(thread, length, _):
+        [req("threadDiameter", "mm", null, null, thread.majorDiameter),
+          req("threadPitch", "mm", null, null, thread.pitch), req("length", "mm", null, null, length)];
+      case Plate(w, d, h, bore):
+        [req("width", "mm", null, null, w), req("depth", "mm", null, null, d),
+          req("height", "mm", null, null, h), req("bore", "mm", null, null, bore)];
+      case Nut(profile, h, thread):
+        var size = switch profile { case Round(d): d; case Hexagon(af): af; };
+        var shape = switch profile { case Round(_): "round"; case Hexagon(_): "hexagon"; };
+        [machinekit.component.Procurement.ProcurementCodec.choice("profile", shape),
+          req("size", "mm", null, null, size), req("height", "mm", null, null, h),
+          req("threadDiameter", "mm", null, null, thread.majorDiameter),
+          req("threadPitch", "mm", null, null, thread.pitch)];
+    };
   }
 
   static function partNumber(part:LevelingFootSpec):String return switch part {

@@ -51,6 +51,13 @@ class PressBlock extends MachineComponent {
       "steel",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("steel fabrication and machining"), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("width", "mm", null, null, width),
+      machinekit.component.Procurement.ProcurementCodec.requirement("depth", "mm", null, null, depth),
+      machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, height)
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.width = width;
     this.depth = depth;
     this.height = height;
@@ -83,6 +90,14 @@ class PressSideFrame extends MachineComponent {
       "steel",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("steel fabrication and machining"), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("thickness", "mm", null, null, thickness),
+      machinekit.component.Procurement.ProcurementCodec.requirement("throat", "mm", null, null, throat),
+      machinekit.component.Procurement.ProcurementCodec.requirement("bedHeight", "mm", null, null, bedHeight),
+      machinekit.component.Procurement.ProcurementCodec.requirement("openHeight", "mm", null, null, openHeight)
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.thickness = thickness;
     this.throat = throat;
     this.bedHeight = bedHeight;
@@ -118,6 +133,12 @@ class PressSideFrame extends MachineComponent {
 class PressLightCurtain extends MachineComponent {
   public function new() {
     super("PRESS-LIGHT-CURTAIN", "Assumed light curtain interface", "aluminium 6061", true);
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, 600),
+      machinekit.component.Procurement.ProcurementCodec.choice("signal", "clear")
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "clear", kind: Signal, role: Supply, iface: Plug("generic", 3), required: false});
   }
@@ -255,7 +276,10 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
       partNumber: "ASSUMED-HYDRAULIC-G1/2-HOSE",
       description: "Assumed G1/2 hydraulic hose assembly",
       quantity: 1,
-      material: null
+      material: null,
+      procurement: Buy(null, null, null),
+      maturity: "Assumed",
+      requirements: [machinekit.component.Procurement.ProcurementCodec.choice("thread", "G1/2")]
     };
     connectPorts("hydraulic-feed", "hydraulicSupply", "P", "ramValve", "P", hose);
     connectPorts("hydraulic-return", "ramValve", "T", "hydraulicSupply", "T", hose);

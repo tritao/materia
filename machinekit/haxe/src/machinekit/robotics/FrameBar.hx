@@ -23,6 +23,8 @@ class FrameBar extends MachineComponent {
       "aluminium 6061",
       true
     );
+    if (Std.isExactType(this, FrameBar)) addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.width = width;
     this.depth = depth;
     this.length = length;
@@ -42,7 +44,7 @@ class FrameBar extends MachineComponent {
       ],
       v -> new FrameBar(v.number("width"), v.number("depth"), v.number("length")),
       true
-    );
+    ).procured(_ -> Make("cutting and machining"));
     return recipeTypeCache;
   }
 

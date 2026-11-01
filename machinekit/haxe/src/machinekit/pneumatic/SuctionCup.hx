@@ -158,6 +158,9 @@ class SuctionCup extends MachineComponent {
       "rubber",
       row == null
     );
+    if (Std.isExactType(this, SuctionCup)) addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", row == null ? "Assumed" : "Catalog").setToken("errorsBasis", "Assumed")
+      .setToken("source", row == null ? "" : catalog().metadata(row.designation).source)));
     this.row = row;
     this.diameter = diameter;
     this.height = height;
@@ -206,7 +209,20 @@ class SuctionCup extends MachineComponent {
       v.optionalNumber("effectiveAreaMm2"),
       v.optionalNumber("ratedMomentNm"),
       ComponentRecipeSupport.interfaceFrom(v, "vacuumInterface")
-    ), true);
+    ), true).procured(v -> {
+      var model = v.token("model");
+      if (model == CUSTOM) return Buy(null, null, null);
+      var row = catalog().get(model);
+      return Buy(row.maker, row.designation, null);
+    }).requiring(v -> {
+      if (v.token("model") != CUSTOM) return [];
+      var terms = [machinekit.component.Procurement.ProcurementCodec.requirement("diameter", "mm", null, null, v.number("diameter")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, v.number("height"))];
+      var area = v.optionalNumber("effectiveAreaMm2"), moment = v.optionalNumber("ratedMomentNm");
+      if (area != null) terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("effectiveArea", "mm2", area));
+      if (moment != null) terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("ratedMoment", "N m", moment));
+      return terms.concat(machinekit.component.Procurement.ProcurementCodec.port("vacuum", ComponentRecipeSupport.interfaceFrom(v, "vacuumInterface")));
+    });
     return recipeTypeCache;
   }
 

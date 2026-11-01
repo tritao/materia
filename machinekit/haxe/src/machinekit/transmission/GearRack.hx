@@ -29,6 +29,7 @@ class GearRack extends MachineComponent {
   public function new(?values:ComponentValues) {
     var v = P.resolve(inputs(), values), s = GearRackCatalog.catalog().get(v.token("designation"));
     super("ATLANTA-" + s.designation, "ATLANTA HPR helical rack " + s.designation, "steel", true, v);
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("ratingsBasis", "Catalog").setToken("source", GearRackCatalog.SOURCE)));
     spec = s;
     // Like LinearRail, mount connectors lie on the screw-entry face and
     // point out of the part. Counterbores start at x=0; receiver steel is
@@ -74,7 +75,7 @@ class GearRack extends MachineComponent {
       v -> new GearRack(v),
       true,
       false
-    );
+    ).procured(v -> Buy("ATLANTA", v.token("designation"), null));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

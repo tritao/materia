@@ -23,6 +23,9 @@ class AxisServoMotor extends ServoMotor {
     item.typeId = purchased.typeId;
     item.valuesKey = purchased.valuesKey;
     item.fingerprint = purchased.fingerprint;
+    item.procurement = purchased.procurement;
+    item.maturity = purchased.maturity;
+    item.requirements = machinekit.component.Procurement.ProcurementCodec.copyRequirements(purchased.requirements);
     return item;
   }
   override public function geometry(detail:ComponentDetail =
@@ -59,7 +62,7 @@ class AxisServoMotor extends ServoMotor {
       "machinekit.motion.axis-servo-motor",
       [P.choice("designation", [for (row in ServoMotor.ratings()) row.designation], "GENERIC-HV-SERVO-750W")],
       v -> new AxisServoMotor(v.token("designation"))
-    ).numbered(ServoMotor.partNumberFor);
+    ).numbered(ServoMotor.partNumberFor).procured(ServoMotor.procurementFor).requiring(ServoMotor.requirementsFor);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

@@ -29,6 +29,8 @@ class BallScrew extends LeadScrew {
   public final ground:Bool;
   public function new(length:Float, inputJournalLength:Float = INPUT_JOURNAL_LENGTH, ground:Bool = false) {
     super(race(), length);
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.inputJournalLength = inputJournalLength;
     this.ground = ground;
     if (!Math.isFinite(inputJournalLength)
@@ -139,7 +141,13 @@ class BallScrew extends LeadScrew {
       ],
       v -> new BallScrew(v.number("length"), v.number("inputJournalLength"), v.boolean("ground"))
     ).numbered(v -> 'SFU1605-L${Dimension.format(v.number("length"))}-J${Dimension.format(v.number("inputJournalLength"))}-'
-      + (v.boolean("ground") ? "GROUND" : "UNSPEC"));
+      + (v.boolean("ground") ? "GROUND" : "UNSPEC")).procured(_ -> Buy(null, null, null)).requiring(v -> [
+        machinekit.component.Procurement.ProcurementCodec.requirement("diameter", "mm", null, null, 16),
+        machinekit.component.Procurement.ProcurementCodec.requirement("lead", "mm", null, null, 5),
+        machinekit.component.Procurement.ProcurementCodec.requirement("length", "mm", null, null, v.number("length")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("inputJournalLength", "mm", null, null, v.number("inputJournalLength")),
+        machinekit.component.Procurement.ProcurementCodec.choice("ground", v.boolean("ground") ? "true" : "false")
+      ]);
     return ballRecipe;
   }
   override public function componentType():Null<ComponentType> return ballRecipeType();

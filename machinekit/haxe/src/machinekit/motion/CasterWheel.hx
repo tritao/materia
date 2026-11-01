@@ -46,6 +46,8 @@ class CasterWheel extends MachineComponent {
       "painted steel",
       true
     );
+    if (Std.isExactType(this, CasterWheel)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.wheelDiameter = wheelDiameter;
     this.wheelWidth = wheelWidth;
     this.height = height;
@@ -81,7 +83,8 @@ class CasterWheel extends MachineComponent {
         v.number("plateSize")
       ),
       true
-    );
+    ).procured(_ -> Buy(null, null, null))
+      .requiringInputs(["wheelDiameter", "wheelWidth", "height", "trail", "plateSize"]);
     return recipeTypeCache;
   }
 

@@ -34,6 +34,8 @@ class MillCasting extends MachineComponent {
 
   public function new(kind:MillCastingKind) {
     super('MILL-${Std.string(kind).toUpperCase()}', 'Bench mill ${Std.string(kind).toLowerCase()}', "cast iron");
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.kind = kind;
     var dims = switch kind {
       case Base:
@@ -201,7 +203,8 @@ class MillCasting extends MachineComponent {
       "machinekit.milling.casting",
       [ComponentRecipeSupport.choice("kind", ["Base", "Column", "Saddle", "Table", "Head"], "Base")],
       v -> new MillCasting(parse(v.token("kind")))
-    ).numbered(v -> 'MILL-${v.token("kind").toUpperCase()}');
+    ).numbered(v -> 'MILL-${v.token("kind").toUpperCase()}')
+      .procured(_ -> Make("casting and CNC machining"));
     return castingRecipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

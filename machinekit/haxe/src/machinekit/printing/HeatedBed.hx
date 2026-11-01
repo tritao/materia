@@ -70,6 +70,8 @@ class HeatedBed extends MachineComponent {
       'Heated bed, ${Std.string(Math.round(row.width))} mm, ${Std.string(Math.round(row.volts))} V, ${Std.string(Math.round(row.watts))} W',
       "aluminium 6061"
     );
+    if (Std.isExactType(this, HeatedBed)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     spec = row;
     addConnector("surface", Face, Solids.axial(0, 0, 0));
     addConnector("mount", Mount, Solids.axial(0, 0, -row.plateThickness - row.padThickness));
@@ -85,7 +87,14 @@ class HeatedBed extends MachineComponent {
       "machinekit.printing.heated-bed",
       [ComponentRecipeSupport.catalog("designation", catalog(), "BED-ALU-235-24V-300W")],
       v -> new HeatedBed(v.token("designation"))
-    ).numbered(v -> v.token("designation"));
+    ).numbered(v -> v.token("designation")).procured(_ -> Buy(null, null, null)).requiring(v -> {
+      var row = catalog().get(v.token("designation"));
+      return [machinekit.component.Procurement.ProcurementCodec.requirement("width", "mm", null, null, row.width),
+        machinekit.component.Procurement.ProcurementCodec.requirement("depth", "mm", null, null, row.depth),
+        machinekit.component.Procurement.ProcurementCodec.requirement("voltage", "V", null, null, row.volts),
+        machinekit.component.Procurement.ProcurementCodec.requirement("power", "W", row.watts),
+        machinekit.component.Procurement.ProcurementCodec.requirement("maxTemperature", "C", row.maxTemperature)];
+    });
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

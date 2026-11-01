@@ -230,3 +230,34 @@ whole category is absent.
 | sheet-router | 15 | 6 | 6 | 0 | 0 | 1 |
 | track-arm | 0 | 7 | 0 | 0 | 0 | 8 |
 | xyz-stage | 0 | 0 | 0 | 0 | 0 | 0 |
+
+## B4 procurement classification
+
+Strict export requires procurement intent and maturity on every engineering line; assumed lines also require structured selection terms. The 22 exportable machines are measured below. The pre-existing machine-tending certificate prevents export.
+
+| Machine | Procurement lines | Make | Buy | Assumed | Fingerprint unavailable |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| bench-mill | 73 | 24 | 49 | 39 | 0 |
+| cnc-router | 37 | 19 | 18 | 8 | 20 |
+| cobot-arm | 25 | 15 | 10 | 18 | 13 |
+| corexy-plotter | 16 | 7 | 9 | 3 | 9 |
+| corexy-printer | 53 | 22 | 31 | 17 | 23 |
+| enclosed-bench-mill | 112 | 49 | 63 | 52 | 1 |
+| flexspline-hobber | 70 | 36 | 34 | 38 | 0 |
+| gantry-picker | 60 | 36 | 24 | 10 | 40 |
+| gantry-welder | 75 | 40 | 35 | 17 | 55 |
+| linear-stage | 11 | 2 | 9 | 2 | 1 |
+| mobile-base | 11 | 3 | 8 | 6 | 6 |
+| mobile-base-cell | 42 | 19 | 23 | 19 | 8 |
+| mobile-welder | 45 | 18 | 27 | 24 | 18 |
+| overhead-arm | 74 | 42 | 32 | 20 | 28 |
+| picking-station | 7 | 3 | 4 | 3 | 1 |
+| press-brake | 32 | 11 | 21 | 26 | 12 |
+| robot-arm | 30 | 16 | 14 | 13 | 1 |
+| robot-screwdriver | 35 | 18 | 17 | 18 | 7 |
+| robot-welder | 35 | 15 | 20 | 18 | 12 |
+| track-arm | 49 | 22 | 27 | 21 | 18 |
+| xyz-stage | 41 | 24 | 17 | 7 | 27 |
+| sheet-router | 143 | 75 | 68 | 43 | 45 |
+
+Across these machines, B4 has 1,076 procurement lines: 516 Make and 560 Buy. Of those lines, 422 are Assumed and 345 lack fingerprints. Workpieces, tools and clamps remain in the engineering tree as NotSupplied. The full gate passed 11/24 shards; comparison found no new failing shard or exception message.

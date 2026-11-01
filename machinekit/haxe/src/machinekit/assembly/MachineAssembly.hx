@@ -224,6 +224,9 @@ typedef MachineAssemblyMassProperties = {
     typeId: item.typeId,
     valuesKey: item.valuesKey,
     fingerprint: item.fingerprint,
+    procurement: item.procurement,
+    maturity: item.maturity,
+    requirements: machinekit.component.Procurement.ProcurementCodec.copyRequirements(item.requirements),
     properties: Bom.copyPanel(item.properties),
     measure: Bom.copyMeasure(item.measure), cuts: Bom.copyCuts(item.cuts)
   };

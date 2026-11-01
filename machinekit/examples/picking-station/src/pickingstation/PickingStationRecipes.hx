@@ -36,7 +36,7 @@ class PickingStationRecipes {
             v.number("shelfSpacing")
           ),
           true
-        ),
+        ).procured(_ -> Make("extrusion cutting and assembly")),
         new ComponentType(
           "pickingstation.shelf",
           [
@@ -52,13 +52,13 @@ class PickingStationRecipes {
             v.number("inclinationDegrees")
           ),
           true
-        ),
+        ).procured(_ -> Make("wood cutting and assembly")),
         new ComponentType(
           "pickingstation.bin",
           [length("width", 220), length("depth", 300), length("height", 180), length("wallThickness", 3)],
           v -> new StorageBin(v.number("width"), v.number("depth"), v.number("height"), v.number("wallThickness")),
           true
-        ),
+        ).procured(_ -> Buy(null, null, null)).requiringInputs(["width", "depth", "height", "wallThickness"]),
         new ComponentType(
           "pickingstation.indicator",
           [length("width", 70), length("depth", 24), length("height", 48), length("confirmationDiameter", 18)],
@@ -69,13 +69,13 @@ class PickingStationRecipes {
             v.number("confirmationDiameter")
           ),
           true
-        ),
+        ).procured(_ -> Buy(null, null, null)).requiringInputs(["width", "depth", "height", "confirmationDiameter"]),
         new ComponentType(
           "pickingstation.adjustable-foot",
           [length("diameter", 35), length("height", 25)],
           v -> new AdjustableFoot(v.number("diameter"), v.number("height")),
           true
-        )
+        ).procured(_ -> Buy(null, null, null)).requiringInputs(["diameter", "height"])
       ];
       for (type in types) MachineKitComponents.defaultRegistry().register(type);
     }

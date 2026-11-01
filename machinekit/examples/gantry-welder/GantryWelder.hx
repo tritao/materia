@@ -88,7 +88,7 @@ class GantryWelder extends machinekit.gantry.Gantry {
     var stop = WeldingWorkpiece.PLATE_WIDTH / 2 + FIXTURE_SIZE / 2;
     addMemberConnector("table", "fixtureNearSeat", Solids.axial(WORK_X - 600, seatY - stop, TABLE_TOP));
     addMemberConnector("table", "fixtureFarSeat", Solids.axial(WORK_X - 600, seatY + stop, TABLE_TOP));
-    var fixture = new ArmBlock(WeldingWorkpiece.PLATE_LENGTH, FIXTURE_SIZE, FIXTURE_SIZE, "steel", "Fixture");
+    var fixture = new ArmBlock(WeldingWorkpiece.PLATE_LENGTH, FIXTURE_SIZE, FIXTURE_SIZE, "steel", "Fixture", true);
     addComponent("fixtureNear", fixture);
     addComponent("fixtureFar", fixture);
     addMate("fixture-near-mate", "fixed", "table", "fixtureNearSeat", "fixtureNear", "base");
@@ -104,7 +104,9 @@ class GantryWelder extends machinekit.gantry.Gantry {
       partNumber: partNumber,
       description: description,
       quantity: 1,
-      material: null
+      material: null,
+      procurement: Buy(null, null, null),
+      maturity: "Stated"
     };
     connectPorts("gas-hose", "cylinder", "gas", "source", "gas", line("HOSE-GAS-3M", "Shielding gas hose, 3 m"));
     connectPorts(

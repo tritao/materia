@@ -16,6 +16,8 @@ class AirSupply extends MachineComponent implements PressureSource {
   public function new(pressurePa:Float = 600000) {
     if (!(pressurePa > 0) || !Math.isFinite(pressurePa)) throw "Air supply needs finite positive pressure";
     super('AIR-FRL-$pressurePa', "Reference regulated air supply", "aluminium 6061", true);
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.pressurePa = pressurePa;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "air", kind: Pneumatic, role: Supply, iface: PushIn(6), required: false});
@@ -42,7 +44,11 @@ class AirSupply extends MachineComponent implements PressureSource {
       "machinekit.pneumatic.air-supply",
       [new machinekit.component.ComponentParameter("pressurePa", Scalar, Number(600000), "Pa", 0)],
       v -> new AirSupply(v.number("pressurePa"))
-    ).numbered(v -> 'AIR-FRL-ASSUMED-${Dimension.format(v.number("pressurePa"))}PA');
+    ).numbered(v -> 'AIR-FRL-ASSUMED-${Dimension.format(v.number("pressurePa"))}PA')
+      .procured(_ -> Buy(null, null, null)).requiring(v -> [
+        machinekit.component.Procurement.ProcurementCodec.requirement("pressure", "Pa", v.number("pressurePa")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("tubeOutsideDiameter", "mm", null, null, 6)
+      ]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

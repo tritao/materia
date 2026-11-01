@@ -26,6 +26,16 @@ class GantryExtrusion extends MachineComponent {
       "aluminium 6061",
       true
     );
+    var terms = [
+      machinekit.component.Procurement.ProcurementCodec.requirement("width", "mm", null, null, profile.size),
+      machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, profile.height),
+      machinekit.component.Procurement.ProcurementCodec.requirement("slotWidth", "mm", null, null, profile.slotWidth),
+      machinekit.component.Procurement.ProcurementCodec.requirement("length", "mm", null, null, length)
+    ];
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), terms));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", profile.family == null ? "Assumed" : "Stated")
+      .setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.profile = profile;
     this.length = length;
   }
@@ -70,6 +80,11 @@ class GantryPlate extends MachineComponent {
       "aluminium 6061",
       true
     );
+    if (Std.isExactType(this, GantryPlate)) {
+      addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+      addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+        .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    }
     this.width = width;
     this.depth = depth;
     this.height = height;
@@ -111,6 +126,9 @@ class GantryStiffenedPlate extends GantryPlate {
       depth,
       height
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("welding and machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     for (v in [ribDepth, ribWidth, ribWall]) if (!Math.isFinite(v) || v <= 0) throw "Invalid Z stiffener dimensions";
     if (2 * ribWall >= Math.min(ribDepth, ribWidth) || 2 * ribWidth >= width) throw "Z stiffener walls consume section";
     this.ribDepth = ribDepth;
@@ -153,6 +171,9 @@ class GantryIdlerPin extends MachineComponent {
       "steel",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("turning")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.diameter = diameter;
     this.length = length;
   }
@@ -177,6 +198,9 @@ class GantryBeltClamp extends MachineComponent {
       "aluminium 6061",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.beltWidth = beltWidth;
     this.bandThickness = bandThickness;
     // The path is defined on the belt's lower face; the jaw is centred on its width.
@@ -206,6 +230,9 @@ class GantryNutMount extends MachineComponent {
   public static inline var THICKNESS:Float = 6;
   public function new(nut:LeadScrewNut) {
     super("GANTRY-NUT-MOUNT-" + nut.designation, "Gantry screw nut mounting plate", "aluminium 6061", true);
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.nut = nut;
     size = nut.flangeDiameter + 8;
   }
@@ -242,6 +269,11 @@ class GantryBoredBracket extends GantryPlate {
   ) {
     if (!Math.isFinite(clearanceDiameter) || clearanceDiameter <= 0) throw "Bracket needs a positive bore diameter";
     super(name + "-BORE" + Dimension.format(clearanceDiameter), width, depth, height);
+    if (Std.isExactType(this, GantryBoredBracket)) {
+      addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+      addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+        .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    }
     this.boreFace = boreFace;
     this.clearanceDiameter = clearanceDiameter;
     this.sections = sections == null ? [[-width / 2,
@@ -302,6 +334,9 @@ class GantryMotorSupport extends GantryBoredBracket {
     if (!Math.isFinite(bore) || bore
       < machinekit.motion.AxisMotor.of(motor).shaftDiameter + 0.5) throw "Motor support clearance must cover its shaft";
     super(name, width, depth, height, shaftFace, bore, sections);
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     mountedMotor = motor;
     this.shaftFace = shaftFace;
   }
@@ -331,6 +366,9 @@ class GantrySwitchTrigger extends MachineComponent {
       "steel",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.width = width;
     this.depth = depth;
     this.height = height;

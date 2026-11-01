@@ -20,7 +20,7 @@ class MillSupportTray extends MachineComponent {
       "machinekit.milling.support-tray",
       parameters(),
       v -> new MillSupportTray(v)
-    ).numbered(_ -> "MILL-SUPPORT-TRAY");
+    ).numbered(_ -> "MILL-SUPPORT-TRAY").procured(_ -> Make("sheet cutting and machining"));
     return recipe;
   }
   public function new(?overrides:ComponentValues) {
@@ -36,6 +36,8 @@ class MillSupportTray extends MachineComponent {
       false,
       v
     );
+    addFacet(new EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function hasGeometry():Bool return true;

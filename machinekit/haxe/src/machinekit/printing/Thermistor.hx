@@ -61,6 +61,8 @@ class Thermistor extends MachineComponent {
       'NTC thermistor, ${Std.string(Math.round(row.ohmsAt25 / 1000))}k beta ${Std.string(Math.round(row.beta))}',
       "plastic"
     );
+    if (Std.isExactType(this, Thermistor)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     spec = row;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("sense", Face, Solids.axial(0, 0, row.length));
@@ -84,7 +86,12 @@ class Thermistor extends MachineComponent {
       "machinekit.printing.thermistor",
       [ComponentRecipeSupport.catalog("designation", catalog(), "NTC-100K-B3950")],
       v -> new Thermistor(v.token("designation"))
-    ).numbered(v -> v.token("designation"));
+    ).numbered(v -> v.token("designation")).procured(_ -> Buy(null, null, null)).requiring(v -> {
+      var row = catalog().get(v.token("designation"));
+      return [machinekit.component.Procurement.ProcurementCodec.requirement("resistanceAt25C", "ohm", null, null, row.ohmsAt25),
+        machinekit.component.Procurement.ProcurementCodec.requirement("beta", "K", null, null, row.beta),
+        machinekit.component.Procurement.ProcurementCodec.requirement("maxTemperature", "C", row.maxTemperature)];
+    });
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

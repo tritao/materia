@@ -21,6 +21,9 @@ class RoomBlock extends MachineComponent {
       material,
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(NotSupplied));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.length = length;
     this.width = width;
     this.height = height;
@@ -107,7 +110,7 @@ class MobileBaseCell extends MachineAssembly {
         RobotArm.WORKPIECE_WIDTH,
         RobotArm.WORKPIECE_HEIGHT,
         "birch plywood",
-        "Workpiece"
+        "Workpiece", true
       ),
       AssemblyFrames.translation(seat.x, seat.y, TABLE_TOP)
     );

@@ -3130,6 +3130,7 @@ class MachineKitSmoke {
       BomDocumentTests.run();
       BomExampleTests.run();
       PartNumberKeyTests.run();
+      ProcurementTests.run();
       ControllerWiringTests.run();
     }, weight: 0.05}, {
       name: "OperatorProfileTests.run",

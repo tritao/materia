@@ -54,6 +54,8 @@ class ShaftCoupling extends MachineComponent {
     var a = Dimension.format(boreA),
       b = Dimension.format(boreB), size = '${Dimension.format(od)}x${Dimension.format(len)}';
     super('COUPLING-${a}x$b-$size', 'Shaft coupling $a to $b mm, $size', "aluminium 6061");
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.boreA = boreA;
     this.boreB = boreB;
     this.outerDiameter = od;
@@ -98,7 +100,7 @@ class ShaftCoupling extends MachineComponent {
         ShaftCoupling.setScrewsFromText(v.token("setScrews"))
       ),
       true
-    );
+    ).procured(_ -> Buy(null, null, null));
     return recipeTypeCache;
   }
 

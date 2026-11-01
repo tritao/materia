@@ -30,6 +30,8 @@ class BallNut extends LeadScrewNut {
         mountScrew : "M5"
       }
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.preloaded = preloaded;
     setMaterial("steel");
     addConnector(
@@ -107,7 +109,12 @@ class BallNut extends LeadScrewNut {
       "machinekit.motion.ball-nut",
       [ComponentRecipeSupport.flag("preloaded", true)],
       v -> new BallNut(v.boolean("preloaded"))
-    ).numbered(v -> v.boolean("preloaded") ? "SFU1605-NUT-PRELOAD" : "SFU1605-NUT-NO-PRELOAD");
+    ).numbered(v -> v.boolean("preloaded") ? "SFU1605-NUT-PRELOAD" : "SFU1605-NUT-NO-PRELOAD")
+      .procured(_ -> Buy(null, null, null)).requiring(v -> [
+        machinekit.component.Procurement.ProcurementCodec.requirement("screwDiameter", "mm", null, null, 16),
+        machinekit.component.Procurement.ProcurementCodec.requirement("lead", "mm", null, null, 5),
+        machinekit.component.Procurement.ProcurementCodec.choice("preloaded", v.boolean("preloaded") ? "true" : "false")
+      ]);
     return ballRecipe;
   }
   override public function componentType():Null<ComponentType> return ballRecipeType();

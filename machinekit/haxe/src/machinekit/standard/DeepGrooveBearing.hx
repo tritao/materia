@@ -116,6 +116,10 @@ class DeepGrooveBearing extends MachineComponent {
       "bearing steel",
       codeOnly
     );
+    if (codeOnly) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null)));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", codeOnly ? "Stated" : "Catalog").setToken("errorsBasis", "Assumed")
+      .setToken("source", codeOnly ? "" : "ISO 15")));
     this.spec = spec;
     this.shielded = shielded;
     addConnector("front", Face, Solids.axial(0, 0, 0));
@@ -250,7 +254,7 @@ class DeepGrooveBearing extends MachineComponent {
       ],
       v -> DeepGrooveBearing.metric(v.token("designation"), v.boolean("shielded")),
       true
-    );
+    ).procured(_ -> Buy(null, null, "ISO 15"));
     return recipeTypeCache;
   }
 

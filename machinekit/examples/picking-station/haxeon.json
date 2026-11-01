@@ -2,7 +2,7 @@
 	"version": 1,
 	"package": { "name": "machinekit-picking-station-example" },
 	"entry": "PickingStationWorkflow",
-	"sources": ["PickingStationDesign.hx", "PickingStationPreview.hx", "PickingStationWorkflow.hx", "PickingStationChecks.hx", "PickingStationUiExtension.hx"],
+	"sources": ["PickingStationDesign.hx", "PickingStationPreview.hx", "PickingStationWorkflow.hx", "PickingStationChecks.hx", "PickingStationUiExtension.hx", "src/pickingstation/PickingStationRecipes.hx", "src/pickingstation/RackFrame.hx", "src/pickingstation/ShelfAssembly.hx", "src/pickingstation/StorageBin.hx", "src/pickingstation/PickIndicator.hx", "src/pickingstation/AdjustableFoot.hx", "src/pickingstation/OperatorBench.hx"],
 	"sourceRoots": ["src", "."],
 	"dependencies": {
 		"projectkit": { "path": "../../../projectkit" },

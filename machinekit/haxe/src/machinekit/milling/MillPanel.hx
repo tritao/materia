@@ -20,6 +20,8 @@ class MillPanel extends MachineComponent {
     if (!(width > 0) || !(depth > 0)
       || !(height > 0) || !Math.isFinite(width + depth + height)) throw "Mill panel needs finite positive dimensions";
     super('MILL-PANEL-${width}x${depth}x${height}-$material', "Fabricated mill panel", material);
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.width = width;
     this.depth = depth;
     this.height = height;
@@ -52,7 +54,8 @@ class MillPanel extends MachineComponent {
       v -> new MillPanel(v.number("width"), v.number("depth"), v.number("height")),
       false,
       true
-    ).numbered(v -> 'MILL-PANEL-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}-${materia.project.MaterialLibrary.fromSpec(v.token("material")).toUpperCase()}');
+    ).numbered(v -> 'MILL-PANEL-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}-${materia.project.MaterialLibrary.fromSpec(v.token("material")).toUpperCase()}')
+      .procured(_ -> Make("cutting and machining"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

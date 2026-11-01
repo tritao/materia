@@ -210,7 +210,7 @@ class BenchMill extends MachineAssembly {
       if (includeWorkpiece) {
         attach(
           "stock",
-          new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank"),
+          new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank", null, null, true),
           AssemblyFrames.translation(tableX, saddleY, tableTop),
           "table"
         );
@@ -243,7 +243,7 @@ class BenchMill extends MachineAssembly {
       addMate("vise-mount", "fixed", "table", "to-vise/body", "vise/body", "attach-vise/body");
       if (includeWorkpiece) attach(
         "stock",
-        new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank"),
+        new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank", null, null, true),
         AssemblyFrames.compose(zeroPose("vise/body"), installedVise.seat),
         "vise/body"
       );
@@ -752,6 +752,9 @@ class MillDriveBox extends MachineComponent {
   public function new(drawing:String, width:Float, depth:Float, height:Float, ?slot:Float, slotWidth:Float = 0) {
     super('MILL-BRACKET-$width-$depth-$height-$slot-$slotWidth', "Mill drive support bracket", "steel", true);
     declareDrawingNumber(drawing);
+    addFacet(new machinekit.component.ProcurementIntent(machinekit.component.Procurement.Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.width = width;
     this.depth = depth;
     this.height = height;
@@ -781,6 +784,9 @@ private class MillMotorPlate extends MachineComponent {
   public function new(drawing:String, width:Float, thickness:Float, bore:Float) {
     super('MILL-MOTOR-PLATE-$width-$thickness-$bore', "Mill motor mounting plate", "steel", true);
     declareDrawingNumber(drawing);
+    addFacet(new machinekit.component.ProcurementIntent(machinekit.component.Procurement.Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.width = width;
     this.thickness = thickness;
     this.bore = bore;
@@ -811,6 +817,9 @@ private class MillNutBracket extends MachineComponent {
   public function new(nut:BallNut, axis:String, mountRise:Float) {
     super('MILL-NUT-BRACKET-${nut.designation}-$axis-$mountRise', "Ball-nut flange adapter", "steel", true);
     declareDrawingNumber("MILL-NUT-BRACKET-" + axis.toUpperCase());
+    addFacet(new machinekit.component.ProcurementIntent(machinekit.component.Procurement.Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.nut = nut;
     this.axis = axis;
     this.mountRise = mountRise;

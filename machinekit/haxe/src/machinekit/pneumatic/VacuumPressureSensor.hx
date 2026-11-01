@@ -16,6 +16,8 @@ class VacuumPressureSensor extends MachineComponent {
   public function new(tubeOdMm:Float = 4) {
     if (!Math.isFinite(tubeOdMm) || tubeOdMm <= 0) throw "Vacuum pressure sensor needs a positive tube diameter";
     super('VACUUM-PRESSURE-SENSOR-${tubeOdMm}', "Generic inline vacuum pressure sensor", "plastic", true);
+    if (Std.isExactType(this, VacuumPressureSensor)) addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addPort({name: "vacuumIn", kind: Vacuum, role: Consumer, iface: PushIn(tubeOdMm), required: true});
     addPort({name: "vacuumOut", kind: Vacuum, role: Supply, iface: PushIn(tubeOdMm), required: false});
@@ -32,7 +34,10 @@ class VacuumPressureSensor extends MachineComponent {
       [ComponentRecipeSupport.length("tubeOdMm", 4)],
       v -> new VacuumPressureSensor(v.number("tubeOdMm")),
       true
-    );
+    ).procured(_ -> Buy(null, null, null)).requiring(v -> [
+      machinekit.component.Procurement.ProcurementCodec.requirement("tubeOutsideDiameter", "mm", null, null, v.number("tubeOdMm")),
+      machinekit.component.Procurement.ProcurementCodec.choice("output", "analog-vacuum-kpa")
+    ]);
     return recipeTypeCache;
   }
 

@@ -66,6 +66,10 @@ class FlatWasher extends MachineComponent {
     var customName =
       '${spec.size}-ID${Dimension.format(spec.innerDiameter)}-OD${Dimension.format(spec.outerDiameter)}-T${Dimension.format(spec.thickness)}';
     super(codeOnly ? customDesignation(customName) : designation, 'Flat washer ${spec.size}', "steel", codeOnly);
+    if (codeOnly) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null)));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", codeOnly ? "Stated" : "Catalog").setToken("errorsBasis", "Assumed")
+      .setToken("source", codeOnly ? "" : "ISO 7089")));
     this.spec = spec;
     addConnector("front", Face, Solids.axial(0, 0, 0));
     addConnector("axis", Axis, Solids.axial(0, 0, spec.thickness / 2));
@@ -95,7 +99,7 @@ class FlatWasher extends MachineComponent {
       [ComponentRecipeSupport.catalog("size", FlatWasher.catalog(), "M5")],
       v -> FlatWasher.metric(v.token("size")),
       true
-    );
+    ).procured(_ -> Buy(null, null, "ISO 7089"));
     return recipeTypeCache;
   }
 

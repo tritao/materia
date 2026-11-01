@@ -23,7 +23,8 @@ class PurchasedRotaryPart extends MachineComponent implements MotorDrive impleme
       parameters(),
       v -> new PurchasedRotaryPart(v),
       true
-    );
+    ).procured(v -> v.token("variant") == "adapter" ? Make("steel machining") : Buy(null, null, null))
+      .requiringInputs(["faceDiameter", "bore"], ["continuousTorque", "peakTorque", "ratedSpeed", "maxSpeed", "loadCapacity"]);
     return recipe;
   }
   public function new(?overrides:ComponentValues) {
@@ -40,6 +41,13 @@ class PurchasedRotaryPart extends MachineComponent implements MotorDrive impleme
       false,
       v
     );
+    var catalogueRatings = true;
+    for (name in ["continuousTorque", "peakTorque", "ratedSpeed", "maxSpeed", "loadCapacity"])
+      if (v.token(name + "Basis") != "Catalog") catalogueRatings = false;
+    addFacet(new EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", variant == "adapter" ? "Stated" : catalogueRatings ? "Catalog" : "Assumed")
+      .setToken("errorsBasis", "Assumed")
+      .setToken("source", catalogueRatings ? v.token("continuousTorqueReason") : "")));
     var height = variant == "body" ? axis.number("height") - axis.number("faceThickness")
       : variant == "rotor" ? axis.number("faceThickness") : v.number("adapterHeight");
     if (height <= 0

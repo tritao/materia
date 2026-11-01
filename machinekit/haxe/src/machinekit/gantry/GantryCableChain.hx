@@ -34,6 +34,7 @@ class GantryCableChain extends MachineComponent {
         positionOffset
       )
     );
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Assumed")));
     chain.movingFrame(positionOffset);
     this.positionOffset = positionOffset;
     this.chain = chain;
@@ -63,7 +64,11 @@ class GantryCableChain extends MachineComponent {
         v.number("positionOffset")
       );
       }, false, false, ["fixedHost", "movingHost", "axis", "positionOffset"])
-        .numbered(CableChain.partNumber);
+        .numbered(CableChain.partNumber).procured(_ -> Buy(null, null, null)).requiring(v -> {
+          var cv = new ComponentValues();
+          for (p in CableChain.recipeType().parameters()) if (v.get(p.name) != null) cv.set(p.name, v.get(p.name));
+          return CableChain.recipeType().requirements(cv);
+        });
     }
     return recipe;
   }

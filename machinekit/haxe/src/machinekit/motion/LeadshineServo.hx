@@ -131,6 +131,9 @@ class LeadshineServo extends ServoMotor {
       Catalog
     );
     this.spec = spec;
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Catalog").setToken("errorsBasis", "Assumed")
+      .setToken("source", spec.designation == "ELM2L-1500LA100FT-H MS1AE" ? MS1AE_SOURCE : SOURCE)));
     var i = 1;
     for (p in boltPattern()) addConnector('bolt${i++}', Mount, Solids.axial(p.x, p.y, 0));
     addConnector("pilot", Mount, Solids.axial(0, 0, spec.pilotHeight));

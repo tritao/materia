@@ -40,6 +40,8 @@ class SfuDrawingScrew extends LeadScrew {
       length,
       "SFU-DRAWING-" + model + "-L" + Dimension.format(length)
     );
+    addFacet(new EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.model = model;
     fixedEnd = end;
     floatingEnd = floatEnd;
@@ -115,7 +117,8 @@ class SfuDrawingScrew extends LeadScrew {
       [P.choice("model", models(), "SFU2005"), P.length("length", 500), P.length("raceRootDiameter", 16)],
       v -> new SfuDrawingScrew(v.token("model"), v.number("length"), v.number("raceRootDiameter"))
     ).numbered(v -> v.token("model") + "-DRAWING-L" + Dimension.format(v.number("length"))
-      + "-R" + Dimension.format(v.number("raceRootDiameter")));
+      + "-R" + Dimension.format(v.number("raceRootDiameter")))
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["model", "length", "raceRootDiameter"]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return drawingRecipeType();

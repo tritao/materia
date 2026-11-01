@@ -17,7 +17,7 @@ class SwivelHousing extends MachineComponent {
       "machinekit.hobbing.swivel-housing",
       parameters(),
       v -> new SwivelHousing(v)
-    ).numbered(_ -> "SWIVEL-HOUSING");
+    ).numbered(_ -> "SWIVEL-HOUSING").procured(_ -> Make("CNC machining")).requiringInputs(["outside", "bore", "height"]);
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

@@ -59,6 +59,8 @@ class Fan extends MachineComponent {
       '${row.blower ? "Blower" : "Fan"}, ${Std.string(Math.round(row.width))} x ${Std.string(Math.round(row.height))} mm, ${Std.string(Math.round(row.volts))} V',
       "plastic"
     );
+    if (Std.isExactType(this, Fan)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     spec = row;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     if (row.blower) addConnector("outlet", Face, Solids.axial(row.width / 2, 0, row.height / 2));
@@ -70,7 +72,14 @@ class Fan extends MachineComponent {
       "machinekit.printing.fan",
       [ComponentRecipeSupport.catalog("designation", catalog(), "FAN-4010-24V")],
       v -> new Fan(v.token("designation"))
-    ).numbered(v -> v.token("designation"));
+    ).numbered(v -> v.token("designation")).procured(_ -> Buy(null, null, null)).requiring(v -> {
+      var row = catalog().get(v.token("designation"));
+      return [machinekit.component.Procurement.ProcurementCodec.choice("kind", row.blower ? "blower" : "fan"),
+        machinekit.component.Procurement.ProcurementCodec.requirement("width", "mm", null, null, row.width),
+        machinekit.component.Procurement.ProcurementCodec.requirement("depth", "mm", null, null, row.depth),
+        machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, row.height),
+        machinekit.component.Procurement.ProcurementCodec.requirement("voltage", "V", null, null, row.volts)];
+    });
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this, Fan) ? recipeType() : null;

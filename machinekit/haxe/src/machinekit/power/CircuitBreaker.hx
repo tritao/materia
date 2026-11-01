@@ -38,7 +38,7 @@ class CircuitBreaker extends AssumedCatalogComponent {
       v -> new CircuitBreaker(v)
     ).numbered(v -> 'BREAKER-ASSUMED-${Dimension.format(v.number("ratedCurrent"))}A-'
       + '${Dimension.format(v.number("ratedVoltage"))}V-${Dimension.format(v.number("breakingCapacity"))}A-'
-      + '${v.integer("poles")}P');
+      + '${v.integer("poles")}P').procured(_ -> Buy(null, null, null)).requiringInputs(["ratedVoltage", "poles"], ["ratedCurrent", "breakingCapacity"], []);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

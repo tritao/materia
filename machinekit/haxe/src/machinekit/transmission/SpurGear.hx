@@ -94,6 +94,8 @@ class SpurGear extends MachineComponent {
     var description =
       'Spur gear module $moduleText, ${teeth} teeth${profileShift == 0 ? "" : ", profile shift ${Dimension.format(profileShift)}"}${backlash == 0 ? "" : ", backlash ${Dimension.format(backlash)} mm"}';
     super(designation, description, "steel");
+    if (Std.isExactType(this, SpurGear)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.moduleSize = moduleSize;
     this.teeth = teeth;
     this.pressureAngle = pressureAngle;
@@ -214,7 +216,7 @@ class SpurGear extends MachineComponent {
         v.number("boreDiameter")
       ),
       true
-    );
+    ).procured(_ -> Make("gear hobbing and machining"));
     return recipeTypeCache;
   }
 

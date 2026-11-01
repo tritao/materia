@@ -117,6 +117,9 @@ class RoutedHose extends MachineComponent {
       material,
       codeOnly
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", stockRow == null ? "Assumed" : "Catalog").setToken("errorsBasis", "Assumed")
+      .setToken("source", stockRow == null ? "" : catalog().metadata(stockRow.designation).source)));
     this.route = copied;
     this.stockRow = stockRow;
     this.outerDiameterMm = outerDiameterMm;
@@ -236,7 +239,22 @@ class RoutedHose extends MachineComponent {
         "polyurethane PU",
         false
       );
-    }, true, false, ["route"]);
+    }, true, false, ["route"]).procured(v -> {
+      var selected = v.token("stock");
+      if (selected == CUSTOM) return Buy(null, null, null);
+      var row = catalog().get(selected);
+      return Buy(row.maker, row.designation, null);
+    }).requiring(v -> {
+      var selected = v.token("stock"), row = selected == CUSTOM ? null : catalog().get(selected);
+      return [
+        machinekit.component.Procurement.ProcurementCodec.requirement("outerDiameter", "mm", null, null,
+          row == null ? v.number("outerDiameterMm") : row.outerDiameterMm),
+        machinekit.component.Procurement.ProcurementCodec.requirement("innerDiameter", "mm", null, null,
+          row == null ? v.number("innerDiameterMm") : row.innerDiameterMm),
+        machinekit.component.Procurement.ProcurementCodec.choice("service", v.token("service")),
+        machinekit.component.Procurement.ProcurementCodec.choice("material", row == null ? v.token("material") : row.material)
+      ];
+    });
     return recipeTypeCache;
   }
 

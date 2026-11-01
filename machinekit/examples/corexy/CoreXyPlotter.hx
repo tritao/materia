@@ -31,6 +31,9 @@ class PlotterBlock extends MachineComponent {
       material,
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.width = width;
     this.depth = depth;
     this.height = height;
@@ -46,7 +49,7 @@ class PlotterPin extends MachineComponent {
   public final diameter:Float;
   public final length:Float;
 
-  public function new(diameter:Float, length:Float, name:String, material:String = "steel") {
+  public function new(diameter:Float, length:Float, name:String, material:String = "steel", notSupplied:Bool = false) {
     if (!(diameter > 0) || !(length > 0)) throw "Plotter pin needs a positive diameter and length";
     super(
       '${name.toUpperCase().split(" ").join("-")}-D${Dimension.format(diameter)}-L${Dimension.format(length)}',
@@ -54,6 +57,9 @@ class PlotterPin extends MachineComponent {
       material,
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(notSupplied ? NotSupplied : Make("turning")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.diameter = diameter;
     this.length = length;
     addConnector("tip", ConnectorRole.Axis, Solids.axial(0, 0, 0));
@@ -325,7 +331,7 @@ class CoreXyPlotter extends AxisBuilder {
     var penLength = padBase - PEN_BASE;
     attach(
       "pen",
-      new PlotterPin(8, penLength, "Pen", "plastic"),
+      new PlotterPin(8, penLength, "Pen", "plastic", true),
       AssemblyFrames.translation(0, blockFront - 6 - 4, PEN_BASE),
       "carriagePlate"
     );

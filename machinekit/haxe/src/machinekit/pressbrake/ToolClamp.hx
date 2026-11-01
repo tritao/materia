@@ -27,6 +27,8 @@ class ToolClamp extends MachineComponent {
       "steel",
       true
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.mode = mode;
     this.width = width;
     this.depth = depth;
@@ -68,7 +70,7 @@ class ToolClamp extends MachineComponent {
         throw 'Unknown tool clamp mode "$value"';
     };
     return new ToolClamp(mode, v.number("width"), v.number("depth"), v.number("height"));
-    }).numbered(v -> 'TOOL-CLAMP-${v.token("mode").toUpperCase()}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}');
+    }).numbered(v -> 'TOOL-CLAMP-${v.token("mode").toUpperCase()}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}').procured(_ -> NotSupplied);
     return recipe;
   }
 

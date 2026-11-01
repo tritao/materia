@@ -17,7 +17,7 @@ class SpindleHousing extends MachineComponent {
       "machinekit.hobbing.spindle-housing",
       parameters(),
       v -> new SpindleHousing(v)
-    ).numbered(_ -> "HOB-SPINDLE-HOUSING");
+    ).numbered(_ -> "HOB-SPINDLE-HOUSING").procured(_ -> Make("CNC machining")).requiringInputs(["outside", "bore", "height"]);
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

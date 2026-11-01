@@ -47,7 +47,7 @@ class HelicalPinion extends AssumedCatalogComponent {
       v -> new HelicalPinion(v)
     ).numbered(v -> 'PIN-ASSUMED-M${Dimension.format(v.number("normalModule"))}-${v.integer("teeth")}T-'
         + 'B${Dimension.format(v.number("bore"))}-H${Dimension.format(v.number("helixAngle"))}-'
-        + v.token("hand").substr(0, 1).toUpperCase());
+        + v.token("hand").substr(0, 1).toUpperCase()).procured(_ -> Buy(null, null, null)).requiringInputs(["normalModule", "teeth", "faceWidth", "helixAngle", "pressureAngle", "hand", "bore"], [], ["backlash"]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

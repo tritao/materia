@@ -29,7 +29,7 @@ class CableChain extends AssumedCatalogComponent {
   }
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.motion.cable-chain", inputs(), v -> new CableChain(v))
-      .numbered(partNumber);
+      .numbered(partNumber).procured(_ -> Buy(null, null, null)).requiringInputs(["bendRadius", "innerWidth", "innerHeight"], ["travel", "fillArea"], []);
     return recipe;
   }
   public static function partNumber(v:ComponentValues):String

@@ -36,6 +36,15 @@ class BatteryPack extends MachineComponent implements ElectricalSource {
       "plastic",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("nominalVoltage", "V", null, null, nominalVolts),
+      machinekit.component.Procurement.ProcurementCodec.requirement("capacity", "Wh", capacityWh),
+      machinekit.component.Procurement.ProcurementCodec.requirement("continuousCurrent", "A", capacityWh / nominalVolts),
+      machinekit.component.Procurement.ProcurementCodec.requirement("regenerativePower", "W", capacityWh * 0.25),
+      machinekit.component.Procurement.ProcurementCodec.requirement("outlets", "1", outlets)
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.nominalVolts = nominalVolts;
     this.capacityWh = capacityWh;
     this.length = length;

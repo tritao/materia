@@ -33,7 +33,8 @@ class LinearMountReplication extends MachineComponent {
       for (i in 0...holes.length) holes[i].id = Std.string(i);
       return [ComponentNumberKey.encode(v.number("width")), ComponentNumberKey.encode(v.number("length")),
         ComponentNumberKey.encode(v.number("thickness")), InsertHoles.fromNeutral(holes), v.token("reference")].join("|");
-    });
+    }).procured(_ -> Make("casting replication compound"))
+      .requiringInputs(["width", "length", "thickness"], [], []);
     return recipe;
   }
   public function new(?overrides:ComponentValues) {
@@ -53,6 +54,7 @@ class LinearMountReplication extends MachineComponent {
     }
     super("LINEAR-MOUNT-REPLICATION",
       "Unqualified replication study layer", "replication compound (assumed)", false, v);
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Assumed")));
     lockManufacturingMaterial("replication compound (assumed)");
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("top", Mount, Solids.axial(0, 0, thickness));

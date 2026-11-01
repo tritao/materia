@@ -14,7 +14,7 @@ class MandrelSleeve extends MachineComponent {
       "machinekit.hobbing.mandrel-sleeve",
       parameters(),
       v -> new MandrelSleeve(v)
-    ).numbered(_ -> "MANDREL-SLEEVE");
+    ).numbered(_ -> "MANDREL-SLEEVE").procured(_ -> NotSupplied).requiringInputs(["outside", "wall", "height"]);
     return recipe;
   }
   public function new(?overrides:ComponentValues) {

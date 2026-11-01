@@ -55,6 +55,8 @@ class Extruder extends MachineComponent {
   public function new(designation:String = "GEARED-HOB-7.3") {
     var row = catalog().get(designation);
     super(designation, 'Geared extruder, ${Std.string(row.hobDiameter)} mm hob', "aluminium 6061");
+    if (Std.isExactType(this, Extruder)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     spec = row;
     addConnector("filamentGrip", Axis, Solids.axial(0, 0, 0));
     addConnector("driveShaft", Axis, Solids.axial(row.hobDiameter / 2, 0, 0));
@@ -72,7 +74,11 @@ class Extruder extends MachineComponent {
       "machinekit.printing.extruder",
       [ComponentRecipeSupport.catalog("designation", catalog(), "GEARED-HOB-7.3")],
       v -> new Extruder(v.token("designation"))
-    ).numbered(v -> v.token("designation"));
+    ).numbered(v -> v.token("designation")).procured(_ -> Buy(null, null, null)).requiring(v -> {
+      var row = catalog().get(v.token("designation"));
+      return [machinekit.component.Procurement.ProcurementCodec.requirement("hobDiameter", "mm", null, null, row.hobDiameter),
+        machinekit.component.Procurement.ProcurementCodec.requirement("filamentDiameter", "mm", null, null, row.filamentDiameter)];
+    });
     return recipe;
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

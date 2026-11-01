@@ -22,6 +22,9 @@ class CobotLinkCover extends MachineComponent {
       gasket ? "nitrile rubber NBR" : "aluminium 6061",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make(gasket ? "gasket cutting" : "CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.length = length;
     this.width = width;
     this.gasket = gasket;

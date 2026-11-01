@@ -30,6 +30,9 @@ typedef BomItem = {
   var ?typeId:String;
   var ?valuesKey:String;
   var ?fingerprint:String;
+  var ?procurement:Procurement;
+  var ?maturity:String;
+  var ?requirements:Array<machinekit.component.Procurement.ProcurementRequirement>;
   var ?properties:BomProperties;
   var ?measure:BomMeasure;
   var ?cuts:Array<BomCut>;

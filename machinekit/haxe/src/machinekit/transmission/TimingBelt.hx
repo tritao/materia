@@ -190,6 +190,13 @@ class TimingBelt extends MachineComponent {
       "rubber",
       pair == null
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    if (pair == null) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
+      machinekit.component.Procurement.ProcurementCodec.choice("profile", name),
+      machinekit.component.Procurement.ProcurementCodec.requirement("teeth", "1", null, null, count),
+      machinekit.component.Procurement.ProcurementCodec.requirement("width", "mm", null, null, width)
+    ]));
     this.beltProfile = beltProfile;
     this.pitch = pitch;
     this.width = width;
@@ -586,6 +593,12 @@ class TimingBelt extends MachineComponent {
         v.number("dampingRatio")
       )
     ).numbered(v -> 'BELT-${v.token("profile")}-${pairToothCount(v)}T-W${Dimension.format(v.number("width"))}')
+      .procured(_ -> Buy(null, null, null))
+      .requiring(v -> [
+        machinekit.component.Procurement.ProcurementCodec.choice("profile", v.token("profile")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("teeth", "1", null, null, pairToothCount(v)),
+        machinekit.component.Procurement.ProcurementCodec.requirement("width", "mm", null, null, v.number("width"))
+      ])
       .purchaseKeyed(v -> 'profile:${v.token("profile")}|teeth:${pairToothCount(v)}|'
         + 'width:${machinekit.component.ComponentNumberKey.encode(v.number("width"))}|'
         + 'cord:${machinekit.component.ComponentNumberKey.encode(v.number("cordRigidity"))}|'

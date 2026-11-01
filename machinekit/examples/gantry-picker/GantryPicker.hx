@@ -92,6 +92,14 @@ class PickerTable extends MachineComponent {
       "steel",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("width", "mm", null, null, width),
+      machinekit.component.Procurement.ProcurementCodec.requirement("depth", "mm", null, null, depth),
+      machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, height),
+      machinekit.component.Procurement.ProcurementCodec.choice("material", "steel")
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.width = width;
     this.depth = depth;
     this.height = height;
@@ -130,6 +138,9 @@ class PickerBlock extends MachineComponent {
       material,
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(NotSupplied));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.width = width;
     this.depth = depth;
     this.height = height;

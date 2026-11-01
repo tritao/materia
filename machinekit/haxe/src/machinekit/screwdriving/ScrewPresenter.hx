@@ -56,6 +56,9 @@ private class PresenterNest extends MachineComponent {
       "aluminium 6061",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.screw = screw;
     height = screw.length + 15;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
@@ -83,6 +86,9 @@ private class PresenterNest extends MachineComponent {
 private class PresenterGate extends MachineComponent {
   public function new() {
     super("CUSTOM-SCREW-PRESENTER-GATE", "Presenter escapement", "steel", true);
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("mount", Mount, AssemblyFrames.translation(0, 0, 0));
     addPort({name: "control", kind: Signal, role: Consumer, iface: ScrewdrivingInterfaces.control(), required: true});
   }

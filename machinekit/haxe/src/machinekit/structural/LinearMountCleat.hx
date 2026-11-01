@@ -25,6 +25,7 @@ class LinearMountCleat extends MachineComponent {
     height = v.number("height");
     if (!Math.isFinite(height) || height < 29 || height > 120) throw "Cleat web height must be 29..120 mm";
     super("LINEAR-MOUNT-CLEAT", "C45 discrete bolted mount cleat", "steel C45", false, v);
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
     lockManufacturingMaterial("steel C45");
     for (y in [-18.0, 18.0]) addConnector('base-' + y, Mount, Solids.axial(BOLT_X, y, BASE - 8 + 1.6));
     for (y in [-14.0, 14.0]) addConnector(
@@ -44,7 +45,7 @@ class LinearMountCleat extends MachineComponent {
       false,
       null,
       false
-    ).numbered(v -> 'LINEAR-MOUNT-CLEAT-H${Dimension.format(v.number("height"))}');
+    ).numbered(v -> 'LINEAR-MOUNT-CLEAT-H${Dimension.format(v.number("height"))}').procured(_ -> Make("machining"));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

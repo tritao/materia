@@ -193,6 +193,10 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
       material,
       codeOnly
     );
+    if (codeOnly) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null)));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", codeOnly ? "Stated" : "Catalog").setToken("errorsBasis", "Assumed")
+      .setToken("source", codeOnly ? "" : "ISO 4762")));
     this.spec = spec;
     this.length = length;
     this.propertyClass = propertyClass;
@@ -402,7 +406,7 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
       true,
       null,
       false
-    );
+    ).procured(_ -> Buy(null, null, "ISO 4762"));
     return recipeTypeCache;
   }
 

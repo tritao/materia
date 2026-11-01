@@ -13,6 +13,8 @@ class SheetRouterAtcCover extends MachineComponent {
   public final returnHeight:Float = 30;
   public function new(width:Float) {
     super('SHEET-ROUTER-COVER-$width', "Stiffened ATC rack cover", "steel", true);
+    addFacet(new ProcurementIntent(Make("sheet metal bending")));
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
     this.width = width;
   }
   override public function hasGeometry():Bool return true;

@@ -67,6 +67,11 @@ class LinearRailBlock extends MachineComponent {
       "steel",
       codeOnly
     );
+    if (codeOnly) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null)));
+    if (spec.ratings[0].source != null && StringTools.trim(spec.ratings[0].source).length > 0)
+      addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Catalog").setToken("errorsBasis", "Assumed")
+      .setToken("source", spec.ratings[0].source)));
     this.spec = spec;
     this.drawing = drawing;
     addConnector("rail", Axis, Solids.axial(0, 0, 0));
@@ -186,7 +191,7 @@ class LinearRailBlock extends MachineComponent {
       true,
       false,
       ["geometry"]
-    ).numbered(v -> v.token("profile"));
+    ).numbered(v -> v.token("profile")).procured(_ -> Buy(null, null, null));
     return recipeTypeCache;
   }
 

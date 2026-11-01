@@ -45,7 +45,8 @@ class LinearMountSteel extends MachineComponent {
       false,
       null,
       false
-    ).numbered(v -> v.token("partId") != "" ? 'LM-${v.token("partId").toUpperCase()}' : 'LM-${v.token("stock") == "C45" ? "C45" : "MILD"}-${v.token("role").toUpperCase()}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("length"))}x${Dimension.format(v.number("thickness"))}');
+    ).numbered(v -> v.token("partId") != "" ? 'LM-${v.token("partId").toUpperCase()}' : 'LM-${v.token("stock") == "C45" ? "C45" : "MILD"}-${v.token("role").toUpperCase()}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("length"))}x${Dimension.format(v.number("thickness"))}')
+      .procured(v -> Make(v.token("stock") == "C45" ? "CNC machining" : "steel fabrication and machining"));
     return recipe;
   }
 
@@ -93,6 +94,8 @@ class LinearMountSteel extends MachineComponent {
     v.setToken("mountingRequirements", haxe.Json.stringify(InsertMountHoleRequirements.records(lineage)));
     var material = v.token("stock") == "C45" ? "steel C45" : "mild steel sheet";
     super("LINEAR-MOUNT-STEEL", v.token("stock") + " linear-mount " + v.token("role"), material, false, v);
+    addFacet(new EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     lockManufacturingMaterial(material);
     addFacet(InsertHoles.facet(drilling, width, length, thickness));
     var compliance = LinearMountCompliance.decode(v.token("compliance"));

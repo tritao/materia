@@ -176,6 +176,8 @@ class MotorDriver extends MachineComponent {
       '$designation motor driver, ${Dimension.format(row.maximumCurrent)} A rms maximum',
       "aluminium 6061"
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.rating = row;
     this.current = current;
     this.microsteps = microsteps;
@@ -223,6 +225,15 @@ class MotorDriver extends MachineComponent {
       var model = v.token("designation");
       return StringTools.startsWith(model, "GENERIC-")
         ? "DRIVER-ASSUMED-" + model.substr("GENERIC-".length) : model;
+    }).procured(_ -> Buy(null, null, null)).requiring(v -> {
+      var row = catalog().get(v.token("designation"));
+      var req = machinekit.component.Procurement.ProcurementCodec.requirement;
+      var choice = machinekit.component.Procurement.ProcurementCodec.choice;
+      var terms = [choice("family", Std.string(row.family)), choice("control", Std.string(row.control)),
+        req("minimumVoltage", "V", null, row.minimumVoltage), req("maximumVoltage", "V", row.maximumVoltage),
+        req("maximumCurrent", "A rms", row.maximumCurrent)];
+      if (row.positionLoopRate > 0) terms.push(req("positionLoopRate", "Hz", row.positionLoopRate));
+      return terms;
     });
     return recipe;
   }

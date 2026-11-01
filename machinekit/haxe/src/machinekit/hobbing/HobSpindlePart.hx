@@ -13,7 +13,20 @@ class HobSpindlePart extends MachineComponent {
       "machinekit.hobbing.spindle-part",
       EngineeringMetadata.parameters().concat([P.text("role", "shaft")]),
       v -> new HobSpindlePart(v.token("role"), v)
-    ).numbered(v -> 'HOB-SPINDLE-${v.token("role").toUpperCase()}');
+    ).numbered(v -> 'HOB-SPINDLE-${v.token("role").toUpperCase()}').procured(_ -> Make("turning and machining"))
+      .requiring(v -> {
+        var role = v.token("role");
+        var dims = switch role {
+          case "shaft": [25.0, 180.0];
+          case "drawbar": [6.0, 172.0];
+          case "bearingRetainer": [62.0, 17.0];
+          case "bearingLocknut": [32.0, 6.0];
+          default: throw "unknown spindle cartridge part";
+        };
+        return [machinekit.component.Procurement.ProcurementCodec.choice("role", role),
+          machinekit.component.Procurement.ProcurementCodec.requirement("bodyDiameter", "mm", null, null, dims[0]),
+          machinekit.component.Procurement.ProcurementCodec.requirement("bodyLength", "mm", null, null, dims[1])];
+      });
     return recipe;
   }
   public function new(role:String, ?overrides:ComponentValues) {

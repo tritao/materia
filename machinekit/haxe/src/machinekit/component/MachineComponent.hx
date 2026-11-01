@@ -44,6 +44,7 @@ class MachineComponent {
     if (Std.isOfType(facet,
       CouplingFacet) && coupling() != null) throw 'Duplicate coupling capability on "$designation"';
     facetList.push(facet);
+    cachedBom = null;
   }
 
   public final designation:String;
@@ -124,6 +125,11 @@ class MachineComponent {
     if (cachedBom != null) return cachedBom;
     var recipe = type;
     var valuesKey = recipe == null ? null : recipe.bomKey(values());
+    var intent = ProcurementIntent.of(this);
+    var procurement = intent != null ? intent.value : recipe == null ? null : recipe.procurement(values());
+    var requirements = intent != null ? intent.requirements() : recipe == null ? [] : recipe.requirements(values());
+    var basis = engineeringMaturity();
+    var maturity:Null<String> = basis == null ? null : Std.string(basis);
     cachedBom = {
       partNumber: recipe == null ? (drawingNumber == null ? designation : drawingNumber) : recipe.partNumber(this),
       description : description,
@@ -131,7 +137,10 @@ class MachineComponent {
       material : MaterialLibrary.require(materialId).physical.spec,
       typeId : recipe == null ? null : recipe.id,
       valuesKey : valuesKey,
-      fingerprint : recipe == null ? revisionFingerprint() : BomRevision.fingerprint(recipe.bomKey(values()), recipe.generatorVersion)
+      fingerprint : recipe == null ? revisionFingerprint() : BomRevision.fingerprint(recipe.bomKey(values()), recipe.generatorVersion),
+      procurement : procurement,
+      maturity : maturity,
+      requirements : requirements
     };
     if (recipe != null && recipe.manufacturingFamily != null) {
       var family = recipe.manufacturingFamily;
@@ -141,6 +150,12 @@ class MachineComponent {
       cachedBom.manufacturingProcess = variant.process;
     }
     return cachedBom;
+  }
+
+  /** Rating maturity is supplied by engineering metadata when available. */
+  public function engineeringMaturity():Null<machinekit.transmission.ValueBasis> {
+    var metadata = EngineeringMetadata.of(this);
+    return metadata == null ? null : metadata.ratingsBasis;
   }
 
   /** Code-only components override this when their generator inputs are declared. */

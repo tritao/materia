@@ -118,6 +118,8 @@ class SteppedShaft extends MachineComponent {
       "Stepped shaft " + sizes.join(" / ") + detailDescription(resolvedDetail),
       "steel C45"
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.sections = sections.copy();
     this.namedFaces = resolvedFaces;
     totalLength = total;
@@ -428,7 +430,7 @@ class SteppedShaft extends MachineComponent {
       var keyways:Array<Dynamic> = Json.parse(v.token("keyways"));
       return "SHAFT-" + sizes.join("-") + (grooves.length == 0 ? "" : "-G" + grooves.length)
         + (keyways.length == 0 ? "" : "-K" + keyways.length);
-    });
+    }).procured(_ -> Make("turning and CNC machining"));
     return recipeTypeCache;
   }
 

@@ -274,6 +274,18 @@ class NemaStepper extends MachineComponent implements MotorDrive {
       null,
       codeOnly
     );
+    if (codeOnly) {
+      addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null)));
+      addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+        .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    } else if (ratingCatalog().exists(variant.designation) && variant.designation != "17HS08-1004S") {
+      addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+        .setToken("ratingsBasis", "Catalog").setToken("errorsBasis", "Assumed")
+        .setToken("source", variantCatalog().metadata(variant.designation).source)));
+    } else {
+      addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+        .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    }
     this.spec = spec;
     this.variant = variant;
     bodyLength = variant.bodyLength;
@@ -549,7 +561,21 @@ class NemaStepper extends MachineComponent implements MotorDrive {
       [ComponentRecipeSupport.catalog("model", NemaStepper.variantCatalog(), "17HS19-1684S1")],
       v -> NemaStepper.model(v.token("model")),
       true
-    );
+    ).procured(v -> v.token("model") == "OPENBUILDS-NEMA23-56"
+      ? Buy(null, null, null) : Buy("StepperOnline", v.token("model"), null)).requiring(v -> {
+      var model = v.token("model");
+      var part = variantCatalog().get(model);
+      var terms = [machinekit.component.Procurement.ProcurementCodec.choice("frame", 'NEMA${part.frame}'),
+        machinekit.component.Procurement.ProcurementCodec.requirement("bodyLength", "mm", null, null, part.bodyLength),
+        machinekit.component.Procurement.ProcurementCodec.requirement("shaftDiameter", "mm", null, null, part.shaftDiameter)];
+      if (ratingCatalog().exists(model)) {
+        var rating = ratingCatalog().get(model);
+        terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("holdingTorque", "N m", rating.holdingTorque));
+        terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("ratedCurrent", "A", null, null, rating.ratedCurrent));
+        terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("stepAngle", "deg", null, null, rating.stepAngle));
+      }
+      return terms;
+    });
     return namedRecipeTypeCache;
   }
 
@@ -563,7 +589,8 @@ class NemaStepper extends MachineComponent implements MotorDrive {
         ComponentRecipeSupport.length("bodyLength", 48)
       ],
       v -> NemaStepper.frame(Std.parseInt(v.token("frame")), v.number("bodyLength"))
-    ).numbered(v -> 'STEPPER-ASSUMED-NEMA${v.token("frame")}-L${Dimension.format(v.number("bodyLength"))}');
+    ).numbered(v -> 'STEPPER-ASSUMED-NEMA${v.token("frame")}-L${Dimension.format(v.number("bodyLength"))}')
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["frame", "bodyLength"]);
     return genericRecipeTypeCache;
   }
 

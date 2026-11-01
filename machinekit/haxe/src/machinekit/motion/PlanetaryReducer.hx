@@ -48,7 +48,7 @@ class PlanetaryReducer extends AssumedCatalogComponent {
       v -> new PlanetaryReducer(v)
     ).numbered(v -> 'PLANETARY-ASSUMED-${Dimension.format(v.number("ratio"))}R-'
         + '${Dimension.format(v.number("ratedOutputTorque"))}NM-'
-        + '${Dimension.format(v.number("backlash"))}AM-${Dimension.format(v.number("bore"))}B');
+        + '${Dimension.format(v.number("backlash"))}AM-${Dimension.format(v.number("bore"))}B').procured(_ -> Buy(null, null, null)).requiringInputs(["ratio", "bore"], ["ratedOutputTorque", "peakOutputTorque", "axialLoad", "radialLoad", "torsionalStiffness"], ["backlash"]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

@@ -58,7 +58,7 @@ class AtcSpindle extends AssumedCatalogComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.routing.atc-spindle", inputs(), v -> new AtcSpindle(v))
       .numbered(v -> 'ATC-SPINDLE-ASSUMED-${Dimension.format(v.number("power"))}W-'
-          + '${Dimension.format(v.number("maxRpm"))}RPM');
+          + '${Dimension.format(v.number("maxRpm"))}RPM').procured(_ -> Buy(null, null, null)).requiringInputs(["diameter", "taperDiameter", "taperLength", "airPressure"], ["power", "maxRpm", "clampForce"], ["minRpm"]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

@@ -15,6 +15,12 @@ class CobotWristRotor extends MachineComponent {
   public final clocking:Float;
   public function new(module:CobotJoint, clocking:Float = 0) {
     super('COBOT-WRIST-ROTOR-${module.size}-C${clocking}', "Rotating wrist output flange", "aluminium 6061", true);
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining"), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("moduleSize", "1", null, null, module.size),
+      machinekit.component.Procurement.ProcurementCodec.requirement("clocking", "rad", null, null, clocking)
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.module = module;
     this.clocking = clocking;
     addConnector("face", Mount, Solids.axial(0, 0, 0));

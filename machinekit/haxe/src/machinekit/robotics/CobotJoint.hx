@@ -63,6 +63,8 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
       Assumed
     );
     super(diameters[size], lengths[size], pockets[size], pocketLengths[size], null, servo);
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     motor = servo;
     // Assumed bulk mass allocation for the generic module, not vendor casing metallurgy.
     // Sizes 2/4 allocate more package mass to the housing; size 2 uses a lighter gearhead shell.
@@ -139,7 +141,19 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
         v.boolean("wristStator"),
         v.boolean("wristRotor")
       )
-    ).numbered(v -> 'COBOT-ASSUMED-S${Std.int(v.number("size"))}-${machinekit.component.Dimension.format(v.number("speedDegrees"))}DPS-P${machinekit.component.Dimension.format(v.number("inputPilotDepth"))}-${v.boolean("wristStator") ? "S" : "N"}${v.boolean("wristRotor") ? "R" : "N"}');
+    ).numbered(v -> 'COBOT-ASSUMED-S${Std.int(v.number("size"))}-${machinekit.component.Dimension.format(v.number("speedDegrees"))}DPS-P${machinekit.component.Dimension.format(v.number("inputPilotDepth"))}-${v.boolean("wristStator") ? "S" : "N"}${v.boolean("wristRotor") ? "R" : "N"}')
+      .procured(_ -> Buy(null, null, null)).requiring(v -> {
+        var index = Std.int(v.number("size"));
+        if (index < 0 || index > 4) throw "Invalid cobot module size";
+        var torque = [12.0, 28, 56, 150, 330][index];
+        return [machinekit.component.Procurement.ProcurementCodec.requirement("ratedOutputTorque", "N m", torque),
+          machinekit.component.Procurement.ProcurementCodec.requirement("peakOutputTorque", "N m", 2 * torque),
+          machinekit.component.Procurement.ProcurementCodec.requirement("maximumOutputSpeed", "deg/s", v.number("speedDegrees")),
+          machinekit.component.Procurement.ProcurementCodec.requirement("encoderResolution", "count/rev", 131072),
+          machinekit.component.Procurement.ProcurementCodec.requirement("inputPilotDepth", "mm", null, null, v.number("inputPilotDepth")),
+          machinekit.component.Procurement.ProcurementCodec.choice("wristStator", v.boolean("wristStator") ? "true" : "false"),
+          machinekit.component.Procurement.ProcurementCodec.choice("wristRotor", v.boolean("wristRotor") ? "true" : "false")];
+      });
     return recipe;
   }
   override public function componentType():Null<ComponentType> return moduleRecipeType();

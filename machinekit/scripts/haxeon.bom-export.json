@@ -220,6 +220,11 @@
     "../examples/xyz-stage/XyzStagePreview.hx",
     "../examples/linear-stage/LinearStage.hx",
     "../examples/linear-stage/LinearStagePreview.hx",
+    "../haxe/src/machinekit/assembly/BomDocument.hx",
+    "../haxe/src/machinekit/component/ComponentNumberKey.hx",
+    "../haxe/src/machinekit/component/PartNumberLint.hx",
+    "../haxe/src/machinekit/component/Procurement.hx",
+    "../haxe/src/machinekit/component/ProcurementIntent.hx",
     "../haxe/src/machinekit/component/BomRevision.hx",
     "../haxe/src/machinekit/component/BomReleases.hx"
   ],

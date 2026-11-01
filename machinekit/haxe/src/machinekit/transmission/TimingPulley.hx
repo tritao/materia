@@ -53,6 +53,8 @@ class TimingPulley extends MachineComponent {
       '${dimensions.name} timing pulley, $pitchText mm pitch, ${teeth} teeth',
       "aluminium 6061"
     );
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.beltProfile = beltProfile;
     this.pitch = pitch;
     this.pitchLineDifferential = pld;
@@ -141,7 +143,8 @@ class TimingPulley extends MachineComponent {
         v.number("thickness")
       )
     ).numbered(v -> 'PULLEY-${v.token("profile")}-${v.integer("teeth")}T-'
-      + 'B${Dimension.format(v.number("boreDiameter"))}-W${Dimension.format(v.number("thickness"))}');
+      + 'B${Dimension.format(v.number("boreDiameter"))}-W${Dimension.format(v.number("thickness"))}')
+      .procured(_ -> Buy(null, null, null));
     return standardRecipeTypeCache;
   }
 
@@ -166,7 +169,8 @@ class TimingPulley extends MachineComponent {
       )
     ).numbered(v -> 'PULLEY-${v.token("family")}-P${Dimension.format(v.number("pitch"))}-'
       + 'D${Dimension.format(v.number("pitchLineDifferential"))}-${v.integer("teeth")}T-'
-      + 'B${Dimension.format(v.number("boreDiameter"))}-W${Dimension.format(v.number("thickness"))}');
+      + 'B${Dimension.format(v.number("boreDiameter"))}-W${Dimension.format(v.number("thickness"))}')
+      .procured(_ -> Make("CNC machining"));
     return customRecipeTypeCache;
   }
 

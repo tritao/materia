@@ -328,6 +328,9 @@ class MachineAssemblyCodec {
         typeId: entry.item.typeId,
         valuesKey: entry.item.valuesKey,
         fingerprint: entry.item.fingerprint,
+        procurement: entry.item.procurement,
+        maturity: entry.item.maturity,
+        requirements: machinekit.component.Procurement.ProcurementCodec.copyRequirements(entry.item.requirements),
         properties: entry.item.properties,
         measure: entry.item.measure, cuts: entry.item.cuts
       }, quantity:entry.quantity, mass:switch entry.mass {

@@ -29,6 +29,9 @@ class ProfileMember extends MachineComponent {
     super('${profile.profileDesignation()}-L${Dimension.format(length)}', profile.profileDescription(), material);
     this.profile = profile;
     this.length = length;
+    if (!hasPortableRecipe(profile)) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null)));
+    addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("start", Mount, Solids.axial(0, 0, 0));
     addConnector("end", Mount, Solids.axial(0, 0, length));
   }
@@ -55,7 +58,7 @@ class ProfileMember extends MachineComponent {
       v.number("length")
     );
     }).numbered(v -> '${v.token("system")}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("height"))}-L${Dimension.format(v.number("length"))}'
-      + materialSuffix(v));
+      + materialSuffix(v)).procured(_ -> Buy(null, null, null));
     return tslotRecipe;
   }
 
@@ -72,7 +75,7 @@ class ProfileMember extends MachineComponent {
       var bounds = DrawingExtrusionProfile.fromText(v.token("section")).sectionBounds();
       return 'DRAWN-SECTION-${Dimension.format(bounds.maxX - bounds.minX)}x${Dimension.format(bounds.maxY - bounds.minY)}-L${Dimension.format(v.number("length"))}'
         + materialSuffix(v);
-    });
+    }).procured(_ -> Buy(null, null, null));
     return drawingRecipe;
   }
 
@@ -86,6 +89,15 @@ class ProfileMember extends MachineComponent {
       if (portableSlot(slot)) return tslotRecipeType();
     }
     return null;
+  }
+
+  static function hasPortableRecipe(profile:StructuralProfile):Bool {
+    if (Std.isOfType(profile, DrawingExtrusionProfile)) return true;
+    if (Std.isOfType(profile, TSlotExtrusion)) {
+      var slot:TSlotExtrusion = cast profile;
+      return portableSlot(slot);
+    }
+    return false;
   }
 
   override public function values():ComponentValues {

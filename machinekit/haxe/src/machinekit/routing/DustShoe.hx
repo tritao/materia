@@ -58,7 +58,7 @@ class DustShoe extends AssumedCatalogComponent {
   }
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.routing.dust-shoe", inputs(), v -> new DustShoe(v))
-      .numbered(_ -> "ROUTER-DUST-SHOE");
+      .numbered(_ -> "ROUTER-DUST-SHOE").procured(_ -> Buy(null, null, null)).requiringInputs(["spindleClearance", "hoseDiameter"], ["liftStroke"], []);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

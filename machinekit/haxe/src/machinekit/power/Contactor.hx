@@ -36,7 +36,7 @@ class Contactor extends AssumedCatalogComponent {
     if (recipe == null) recipe = new ComponentType("machinekit.power.contactor", inputs(), v -> new Contactor(v))
       .numbered(v -> 'CONTACTOR-ASSUMED-${Dimension.format(v.number("ratedCurrent"))}A-'
         + '${Dimension.format(v.number("ratedVoltage"))}V-${Dimension.format(v.number("coilVoltage"))}V-'
-        + '${v.integer("poles")}P');
+        + '${v.integer("poles")}P').procured(_ -> Buy(null, null, null)).requiringInputs(["ratedVoltage", "coilVoltage", "poles"], ["ratedCurrent"], []);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

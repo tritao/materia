@@ -78,6 +78,10 @@ class RetainingRing extends MachineComponent {
       "spring steel",
       codeOnly
     );
+    if (codeOnly) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null)));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", codeOnly ? "Stated" : "Catalog").setToken("errorsBasis", "Assumed")
+      .setToken("source", codeOnly ? "" : "DIN 471")));
     this.spec = spec;
     addConnector("seat", Axis, Solids.axial(0, 0, spec.thickness / 2));
   }
@@ -110,7 +114,7 @@ class RetainingRing extends MachineComponent {
       [ComponentRecipeSupport.catalog("shaft", RetainingRing.catalog(), "8")],
       v -> RetainingRing.forShaft(Std.parseFloat(v.token("shaft"))),
       true
-    );
+    ).procured(_ -> Buy(null, null, "DIN 471"));
     return recipeTypeCache;
   }
 

@@ -23,6 +23,7 @@ class RadialPinionCarrier extends PreloadedPinionMount {
         axialCentre - THICKNESS
       ));
     if (axialCentre <= THICKNESS) throw "Pinion must lie beyond the motor carrier";
+    addFacet(new ProcurementIntent(Buy(null, null, null), PreloadedPinionMount.recipeType().requirements(values())));
     this.motor = motor;
     this.axialCentre = axialCentre;
     setMaterial("steel C45");

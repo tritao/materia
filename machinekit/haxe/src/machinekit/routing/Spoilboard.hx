@@ -23,7 +23,13 @@ class Spoilboard extends AssumedCatalogComponent {
   }
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.routing.spoilboard", inputs(), v -> new Spoilboard(v))
-      .numbered(_ -> "ROUTER-SPOILBOARD");
+      .numbered(_ -> "ROUTER-SPOILBOARD").procured(_ -> Buy(null, null, null)).requiring(v -> {
+        var req = machinekit.component.Procurement.ProcurementCodec.requirement;
+        return [req("width", "mm", null, null, v.number("width")),
+          req("length", "mm", null, null, v.number("length")),
+          req("thickness", "mm", null, null, v.number("thickness")),
+          req("permeability", "um2", v.number("permeability") * 1000000)];
+      });
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

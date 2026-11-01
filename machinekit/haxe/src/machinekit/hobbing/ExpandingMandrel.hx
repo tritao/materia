@@ -41,7 +41,8 @@ class ExpandingMandrel extends MachineComponent {
       "machinekit.hobbing.expanding-mandrel",
       parameters(),
       v -> new ExpandingMandrel(v)
-    ).numbered(v -> 'MANDREL-ASSUMED-D${Dimension.format(v.number("outside"))}-E${Dimension.format(v.number("expansion"))}');
+    ).numbered(v -> 'MANDREL-ASSUMED-D${Dimension.format(v.number("outside"))}-E${Dimension.format(v.number("expansion"))}')
+      .procured(_ -> NotSupplied).requiringInputs(["outside", "bore", "height", "workSeat", "expansion"], ["clampingPressure", "maxPressure"]);
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

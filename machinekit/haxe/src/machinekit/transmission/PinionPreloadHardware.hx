@@ -3,6 +3,7 @@ package machinekit.transmission;
 import cadkit.modeling.Part;
 import cadkit.threads.ThreadedFace.ThreadStart;
 import machinekit.component.*;
+import machinekit.component.Procurement.ProcurementCodec;
 
 /** Machined spring adjuster, M10x1.5 stem. Threads have a nominal envelope;
  * the unverified disc-stack ratings are carried separately by the carrier spec. */
@@ -11,6 +12,8 @@ class PinionPreloadAdjuster extends MachineComponent {
   public static inline final HEAD_HEIGHT = 4.0;
   public function new() {
     super("PINION-SPRING-ADJUSTER-M10X1.5", "M10 pinion spring seat adjuster", "steel C45");
+    addFacet(new ProcurementIntent(Make("machining")));
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -41,6 +44,12 @@ class PinionDiscSpringPack extends MachineComponent {
       || loadedHeight < 11.5 || loadedHeight > 12.1375) throw "Disc pack outside assumed working range";
     super("PINION-DISC-PACK-ASSUMED-" + loadedHeight, "Assumed preloaded disc-spring pack", "spring steel");
     this.loadedHeight = loadedHeight;
+    addFacet(new ProcurementIntent(Buy(null, null, null), [
+      ProcurementCodec.requirement("outerDiameter", "mm", null, null, 22),
+      ProcurementCodec.requirement("innerDiameter", "mm", null, null, 10),
+      ProcurementCodec.requirement("loadedHeight", "mm", null, null, loadedHeight)
+    ]));
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Assumed")));
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
@@ -54,6 +63,8 @@ class PinionDiscSpringPack extends MachineComponent {
 class PinionSpringCup extends MachineComponent {
   public function new() {
     super("PINION-SPRING-CUP-24X3", "Machined pinion spring cup", "steel C45");
+    addFacet(new ProcurementIntent(Make("machining")));
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(

@@ -101,6 +101,9 @@ class VacuumGenerator extends MachineComponent {
       "aluminium 6061",
       row == null
     );
+    if (Std.isExactType(this, VacuumGenerator)) addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", row == null ? "Assumed" : "Catalog").setToken("errorsBasis", "Assumed")
+      .setToken("source", row == null ? "" : catalog().metadata(row.designation).source)));
     this.row = row;
     this.ratedVacuumKpa = ratedVacuumKpa;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
@@ -148,7 +151,19 @@ class VacuumGenerator extends MachineComponent {
       v.optionalNumber("ratedVacuumKpa"),
       ComponentRecipeSupport.interfaceFrom(v, "airInterface"),
       ComponentRecipeSupport.interfaceFrom(v, "vacuumInterface")
-    ), true);
+    ), true).procured(v -> {
+      var model = v.token("model");
+      if (model == CUSTOM) return Buy(null, null, null);
+      var row = catalog().get(model);
+      return Buy(row.maker, row.designation, null);
+    }).requiring(v -> {
+      if (v.token("model") != CUSTOM) return [];
+      var terms = machinekit.component.Procurement.ProcurementCodec.port("air", ComponentRecipeSupport.interfaceFrom(v, "airInterface"));
+      terms = terms.concat(machinekit.component.Procurement.ProcurementCodec.port("vacuum", ComponentRecipeSupport.interfaceFrom(v, "vacuumInterface")));
+      var rating = v.optionalNumber("ratedVacuumKpa");
+      if (rating != null) terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("ratedVacuum", "kPa", rating));
+      return terms;
+    });
     return recipeTypeCache;
   }
 

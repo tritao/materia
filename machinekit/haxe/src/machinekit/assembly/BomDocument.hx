@@ -20,20 +20,8 @@ enum abstract BomUnit(String) to String {
 
 typedef BomQuantity = { var value:Float; var unit:BomUnit; }
 typedef BomUse = { var kind:BomUseKind; var path:String; var quantity:BomQuantity; }
-typedef BomProcurement = {
-  var kind:String;
-  var process:Null<String>;
-  var manufacturer:Null<String>;
-  var mpn:Null<String>;
-  var standard:Null<String>;
-}
-typedef BomRequirement = {
-  var name:String;
-  var min:Null<String>;
-  var max:Null<String>;
-  var nominal:Null<String>;
-  var unit:String;
-}
+typedef BomProcurement = machinekit.component.Procurement.ProcurementData;
+typedef BomRequirement = machinekit.component.Procurement.ProcurementRequirement;
 
 typedef BomDocumentItem = {
   var partNumber:String;
@@ -111,11 +99,24 @@ class BomDocument {
       cuts.push({length:cut.length, count:cut.count * item.quantity * count});
     }
     if (cutLength > perItem + 0.000000001) throw "BOM cuts exceed the ordered length";
+    var requirements = machinekit.component.Procurement.ProcurementCodec.copyRequirements(item.requirements);
+    if (item.procurement == null) throw 'BOM item "${item.partNumber}" requires procurement intent';
+    if (item.maturity == null || StringTools.trim(item.maturity) == "")
+      throw 'BOM item "${item.partNumber}" requires engineering maturity';
+    if (item.maturity == "Assumed" && requirements.length == 0)
+      throw 'Assumed BOM item "${item.partNumber}" requires structured selection requirements';
+    var material = item.material;
+    switch item.procurement {
+      case Buy(_, _, _) | NotSupplied: material = null;
+      default:
+    }
     var quantity:BomQuantity = {value: amount, unit: unit};
     return {item: {partNumber:item.partNumber, description:item.description, quantity:quantity,
-      material:item.material, typeId:item.typeId, valuesKey:item.valuesKey, familyId:item.familyId,
+      material:material, typeId:item.typeId, valuesKey:item.valuesKey, familyId:item.familyId,
       manufacturingVariant:item.manufacturingVariant, manufacturingProcess:item.manufacturingProcess,
-      properties:properties, cuts:cuts, includedIn:owner, procurement:null, maturity:null, requirements:[],
+      properties:properties, cuts:cuts, includedIn:owner,
+      procurement:item.procurement == null ? null : machinekit.component.Procurement.ProcurementCodec.document(item.procurement),
+      maturity:item.maturity, requirements:requirements,
       fingerprint:item.fingerprint, releasedRevision:null, releaseCurrent:null},
       uses:[{kind:kind, path:path, quantity:{value:amount, unit:unit}}]};
   }
@@ -152,7 +153,7 @@ class BomDocument {
           valuesKey:item.valuesKey, familyId:item.familyId, manufacturingVariant:item.manufacturingVariant,
           manufacturingProcess:item.manufacturingProcess, properties:Bom.copyPanel(item.properties),
           cuts:[for (cut in item.cuts) {length:cut.length, count:cut.count}],
-          includedIn:null, procurement:item.procurement, maturity:item.maturity, requirements:item.requirements.copy(),
+          includedIn:null, procurement:item.procurement, maturity:item.maturity, requirements:machinekit.component.Procurement.ProcurementCodec.copyRequirements(item.requirements),
           fingerprint:item.fingerprint, releasedRevision:item.releasedRevision, releaseCurrent:item.releaseCurrent};
         var added:BomDocumentLine = {item:copy, uses:[for (use in line.uses) copyUse(use)]};
         byNumber.set(item.partNumber, added);

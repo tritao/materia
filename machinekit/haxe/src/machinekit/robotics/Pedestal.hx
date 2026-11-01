@@ -128,6 +128,8 @@ class Pedestal extends MachineComponent {
       + (hasDetails ? ", detailed base and services" : ""),
       "steel"
     );
+    if (Std.isExactType(this, Pedestal)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.flange = flange;
     this.height = height;
     this.columnDiameter = column;
@@ -329,7 +331,9 @@ class Pedestal extends MachineComponent {
           cablePathDiameter: v.number("cablePathDiameter")
         }
       )
-    ).numbered(v -> 'PEDESTAL-F${Dimension.format(v.number("flangePitchCircle"))}-D${Dimension.format(v.number("columnDiameter"))}-L${Dimension.format(v.number("height"))}');
+    ).numbered(v -> 'PEDESTAL-F${Dimension.format(v.number("flangePitchCircle"))}-D${Dimension.format(v.number("columnDiameter"))}-L${Dimension.format(v.number("height"))}')
+      .procured(_ -> Make("steel fabrication and machining"))
+      .requiringInputs(["flangePitchCircle", "flangeBoltCount", "height", "columnDiameter", "floorBoltCount", "baseThickness", "anchorCircleDiameter"]);
     return recipeTypeCache;
   }
 

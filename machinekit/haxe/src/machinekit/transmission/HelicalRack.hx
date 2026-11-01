@@ -43,7 +43,7 @@ class HelicalRack extends AssumedCatalogComponent {
       v -> new HelicalRack(v)
     ).numbered(v -> 'RACK-ASSUMED-M${Dimension.format(v.number("normalModule"))}-${v.integer("teeth")}T-'
         + 'W${Dimension.format(v.number("faceWidth"))}-H${Dimension.format(v.number("helixAngle"))}-'
-        + v.token("hand").substr(0, 1).toUpperCase());
+        + v.token("hand").substr(0, 1).toUpperCase()).procured(_ -> Buy(null, null, null)).requiringInputs(["normalModule", "teeth", "faceWidth", "helixAngle", "pressureAngle", "hand", "barHeight"], ["meshStiffness"], ["backlash"]);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

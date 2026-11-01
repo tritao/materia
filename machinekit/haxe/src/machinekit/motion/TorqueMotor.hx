@@ -28,7 +28,17 @@ class TorqueMotor extends MachineComponent implements machinekit.motion.MotorDri
       "machinekit.motion.torque-motor",
       parameters(),
       v -> new TorqueMotor(v)
-    ).numbered(v -> 'TORQUE-MOTOR-ASSUMED-${Dimension.format(v.number("continuousTorque"))}NM-${Dimension.format(v.number("peakTorque"))}NM');
+    ).numbered(v -> 'TORQUE-MOTOR-ASSUMED-${Dimension.format(v.number("continuousTorque"))}NM-${Dimension.format(v.number("peakTorque"))}NM')
+      .procured(_ -> Buy(null, null, null)).requiring(v -> [
+        machinekit.component.Procurement.ProcurementCodec.requirement("outside", "mm", null, null, v.number("outside")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("bore", "mm", null, null, v.number("bore")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, v.number("height")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("continuousTorque", "N m", v.number("continuousTorque")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("peakTorque", "N m", v.number("peakTorque")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("ratedSpeed", "rad/s", v.number("ratedSpeed")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("maxSpeed", "rad/s", v.number("maxSpeed")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("coggingTorque", "N mm", null, v.number("coggingTorque") * 1000)
+      ]);
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues

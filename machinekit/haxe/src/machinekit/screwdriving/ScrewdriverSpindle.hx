@@ -26,7 +26,9 @@ class ScrewdriverSpindle extends MachineAssembly {
         'Screwdriver motor gearbox ${machinekit.component.Dimension.format(maxTorque)}Nm-${machinekit.component.Dimension.format(maxSpeed)}radps',
         120,
         25,
-        true
+        true,
+        maxTorque,
+        maxSpeed
       )
     );
     // At full feed extension keep 1 mm beyond the arm planner's 5 mm tool clearance.

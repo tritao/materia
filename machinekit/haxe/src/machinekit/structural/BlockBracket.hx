@@ -32,6 +32,8 @@ class BlockBracket extends MachineComponent {
     var key = [for (block in blocks)[for (i in 0...3) Dimension.format(block.min[i])
       + ":" + Dimension.format(block.max[i])].join(",")].join(";");
     super('BRACKET-${name.toUpperCase().split(" ").join("-")}-${key}', name, material, true);
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.label = name;
     this.blocks = [for (block in blocks) {
       min:block.min.copy(), max:block.max.copy()
@@ -68,7 +70,8 @@ class BlockBracket extends MachineComponent {
       ],
       v -> new BlockBracket(v.token("label"), readBlocks(v.token("blocks"))),
       true
-    ).numbered(v -> 'BRACKET-${v.token("label").toUpperCase().split(" ").join("-")}');
+    ).numbered(v -> 'BRACKET-${v.token("label").toUpperCase().split(" ").join("-")}')
+      .procured(_ -> Make("CNC machining"));
     return recipe;
   }
   override public function componentType():Null<machinekit.component.ComponentType> return recipeType();

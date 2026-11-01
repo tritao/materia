@@ -72,6 +72,11 @@ class LinearRail extends MachineComponent {
       "steel",
       codeOnly
     );
+    if (codeOnly) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null)));
+    if (spec.ratings.length > 0 && spec.ratings[0].source != null && StringTools.trim(spec.ratings[0].source).length > 0)
+      addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Catalog").setToken("errorsBasis", "Assumed")
+      .setToken("source", spec.ratings[0].source)));
     this.spec = spec;
     this.length = length;
     this.drawing = drawing;
@@ -208,7 +213,7 @@ class LinearRail extends MachineComponent {
       var profile = v.token("profile");
       var rail = LinearRailSystem.catalog().get(profile).rail;
       return rail + "-" + Dimension.format(v.number("length")) + "-" + profile;
-    });
+    }).procured(_ -> Buy(null, null, null));
     return recipeTypeCache;
   }
 

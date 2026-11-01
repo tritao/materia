@@ -55,6 +55,9 @@ class MotorBracket extends MachineComponent {
       "aluminium 6061",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.motor = motor;
     this.width = width;
     this.below = below;
@@ -110,6 +113,15 @@ class TubePost extends MachineComponent {
       "aluminium 6061",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("width", "mm", null, null, profile.width),
+      machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, profile.height),
+      machinekit.component.Procurement.ProcurementCodec.requirement("wall", "mm", null, null, profile.wall),
+      machinekit.component.Procurement.ProcurementCodec.requirement("length", "mm", null, null, length),
+      machinekit.component.Procurement.ProcurementCodec.choice("material", "aluminium 6061")
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.profile = profile;
     this.length = length;
     addConnector("base", Mount, Solids.axial(0, 0, 0));
@@ -139,6 +151,15 @@ class LidarPuck extends MachineComponent {
 
   public function new() {
     super("LIDAR-D76-H70", "Planar scanning lidar", "plastic", true);
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("range", "m", RANGE),
+      machinekit.component.Procurement.ProcurementCodec.requirement("scanRate", "Hz", RATE),
+      machinekit.component.Procurement.ProcurementCodec.requirement("samplesPerScan", "1", RAYS),
+      machinekit.component.Procurement.ProcurementCodec.requirement("diameter", "mm", null, null, DIAMETER),
+      machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, HEIGHT)
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("base", Mount, Solids.axial(0, 0, 0));
     addConnector("scan", Mount, AssemblyFrames.translation(0, 0, SCAN_HEIGHT));
     addFacet(new machinekit.sensing.PlanarScannerFacet("scan", RAYS, RANGE, RATE));

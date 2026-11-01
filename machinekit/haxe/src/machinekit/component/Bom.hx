@@ -30,6 +30,9 @@ class Bom {
           typeId: item.typeId,
           valuesKey: item.valuesKey,
           fingerprint: item.fingerprint,
+          procurement: item.procurement,
+          maturity: item.maturity,
+          requirements: machinekit.component.Procurement.ProcurementCodec.copyRequirements(item.requirements),
           properties: copyPanel(item.properties),
           measure: copyMeasure(item.measure), cuts: copyCuts(item.cuts)
         }
@@ -37,7 +40,9 @@ class Bom {
       order.push(item.partNumber);
     } else {
       if (existing.description != item.description
-        || existing.material != item.material || existing.typeId != item.typeId || existing.valuesKey != item.valuesKey || existing.fingerprint != item.fingerprint
+        || existing.material != item.material || existing.typeId != item.typeId || existing.valuesKey != item.valuesKey || existing.fingerprint != item.fingerprint || existing.maturity != item.maturity
+        || haxe.Json.stringify(existing.procurement) != haxe.Json.stringify(item.procurement)
+        || haxe.Json.stringify(existing.requirements) != haxe.Json.stringify(machinekit.component.Procurement.ProcurementCodec.copyRequirements(item.requirements))
         || haxe.Json.stringify(existing.properties) != haxe.Json.stringify(item.properties)
         || haxe.Json.stringify(existing.measure) != haxe.Json.stringify(item.measure)
         || haxe.Json.stringify(existing.cuts) != haxe.Json.stringify(item.cuts) || existing.familyId
@@ -72,6 +77,9 @@ class Bom {
         typeId: item.typeId,
         valuesKey: item.valuesKey,
         fingerprint: item.fingerprint,
+        procurement: item.procurement,
+        maturity: item.maturity,
+        requirements: machinekit.component.Procurement.ProcurementCodec.copyRequirements(item.requirements),
         properties: copyPanel(item.properties),
         measure: copyMeasure(item.measure), cuts: copyCuts(item.cuts)
       });

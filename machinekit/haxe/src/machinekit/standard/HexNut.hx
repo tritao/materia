@@ -73,6 +73,10 @@ class HexNut extends MachineComponent {
     if (thread != null) customName +=
       '-P${Dimension.format((cast thread : ThreadSpec).pitch)}-S${(cast thread : ThreadSpec).starts}-${(cast thread : ThreadSpec).hand}-${(cast thread : ThreadSpec).profile}-${(cast thread : ThreadSpec).toleranceClass}';
     super(codeOnly ? customDesignation(customName) : designation, 'Hex nut ${spec.size}', "steel 8", codeOnly);
+    if (codeOnly) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null)));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", codeOnly ? "Stated" : "Catalog").setToken("errorsBasis", "Assumed")
+      .setToken("source", codeOnly ? "" : "ISO 4032")));
     this.spec = spec;
     this.thread = thread == null ? FastenerThreads.coarse(spec.diameter).mating() : cast thread;
     if (!this.thread.internal || Math.abs(this.thread.majorDiameter - spec.diameter)
@@ -126,7 +130,7 @@ class HexNut extends MachineComponent {
       [ComponentRecipeSupport.catalog("size", HexNut.catalog(), "M5")],
       v -> HexNut.metric(v.token("size")),
       true
-    );
+    ).procured(_ -> Buy(null, null, "ISO 4032"));
     return recipeTypeCache;
   }
 

@@ -22,7 +22,7 @@ class TrackArm extends LinearTrack {
       RobotArm.WORKPIECE_WIDTH + 20,
       RobotArm.PAD_HEIGHT,
       "rubber",
-      "track station"
+      "track station", true
     );
     for (station in [0, 1]) addComponent(
       station == 0 ? "padPick" : "padPlace",
@@ -36,7 +36,7 @@ class TrackArm extends LinearTrack {
         RobotArm.WORKPIECE_WIDTH,
         RobotArm.WORKPIECE_HEIGHT,
         "birch plywood",
-        "track workpiece"
+        "track workpiece", true
       ),
       AssemblyFrames.translation(RobotArm.PICK_X, RobotArm.WORK_Y, tableTop + RobotArm.PAD_HEIGHT)
     );

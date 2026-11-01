@@ -9,6 +9,13 @@ import machinekit.component.Solids;
 class TighteningController extends MachineComponent {
   public function new(?programs:Array<Int>, controlInterface:TighteningControlInterface = DiscreteIO) {
     super("CUSTOM-TIGHTENING-CONTROLLER", "Tightening controller cabinet", "steel", true);
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
+      machinekit.component.Procurement.ProcurementCodec.choice("controlInterface", Std.string(controlInterface)),
+      machinekit.component.Procurement.ProcurementCodec.requirement("inputVoltage", "V", null, null, 230),
+      machinekit.component.Procurement.ProcurementCodec.requirement("programs", "1", programs == null ? 4 : programs.length)
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("base", Mount, Solids.axial(0, 0, 0));
     addPort({
       name: "mains",

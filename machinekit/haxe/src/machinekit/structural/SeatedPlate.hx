@@ -51,6 +51,9 @@ class SeatedPlate extends MachineComponent {
       material,
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.length = length;
     this.width = width;
     this.thickness = thickness;

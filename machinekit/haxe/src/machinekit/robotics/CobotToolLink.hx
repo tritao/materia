@@ -35,6 +35,13 @@ class CobotToolLink extends MachineComponent {
       "aluminium 6061",
       true
     );
+    addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining"), [
+      machinekit.component.Procurement.ProcurementCodec.requirement("offset", "mm", null, null, d),
+      machinekit.component.Procurement.ProcurementCodec.requirement("moduleSize", "1", null, null, module.size),
+      machinekit.component.Procurement.ProcurementCodec.requirement("flangePitchCircle", "mm", null, null, flange.boltCircleDiameter)
+    ]));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.length = length;
     this.module = module;
     this.flange = flange;

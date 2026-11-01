@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-procurement-tests"
+  },
+  "entry": "ProcurementTests",
+  "sources": [
+    "src/ProcurementTests.hx",
+    "../haxe/src/machinekit/assembly/BomDocument.hx",
+    "../haxe/src/machinekit/component/BomReleases.hx",
+    "../haxe/src/machinekit/component/BomRevision.hx",
+    "../haxe/src/machinekit/component/ComponentNumberKey.hx",
+    "../haxe/src/machinekit/component/PartNumberLint.hx",
+    "../haxe/src/machinekit/component/Procurement.hx",
+    "../haxe/src/machinekit/component/ProcurementIntent.hx"
+  ],
+  "sourceRoots": [
+    "src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": ".."
+    }
+  },
+  "target": "host",
+  "outputDir": "../build/procurement-test"
+}

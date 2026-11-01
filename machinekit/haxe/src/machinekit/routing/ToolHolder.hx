@@ -42,7 +42,7 @@ class ToolHolder extends AssumedCatalogComponent {
   }
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.routing.tool-holder", inputs(), v -> new ToolHolder(v))
-      .numbered(v -> 'ISO30-ER32-HOLDER-ASSUMED-L${Dimension.format(v.number("gaugeLength"))}');
+      .numbered(v -> 'ISO30-ER32-HOLDER-ASSUMED-L${Dimension.format(v.number("gaugeLength"))}').procured(_ -> Buy(null, null, null)).requiringInputs(["gaugeDiameter", "taperLength", "flangeDiameter", "flangeThickness", "colletBore"], [], []);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

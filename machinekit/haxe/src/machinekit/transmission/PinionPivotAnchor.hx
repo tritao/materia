@@ -16,6 +16,8 @@ class PinionPivotAnchor extends MachineComponent {
   public function new(hostZ:Float, topMount:Bool) {
     if (!Math.isFinite(hostZ) || hostZ < 55) throw "Pivot anchor needs a declared host beyond its clevis";
     super('PINION-PIVOT-ANCHOR-' + hostZ + '-' + topMount, "Machined pinion pivot anchor", "steel C45");
+    addFacet(new ProcurementIntent(Make("machining")));
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
     lockManufacturingMaterial("steel C45");
     this.hostZ = hostZ;
     this.topMount = topMount;

@@ -10,10 +10,18 @@ class ScrewdriverHousing extends MachineComponent {
   public final length:Float;
   public final radius:Float;
 
-  public function new(name:String, length:Float, radius:Float, powered:Bool = false) {
+  public function new(name:String, length:Float, radius:Float, powered:Bool = false, ?maxTorque:Float, ?maxSpeed:Float) {
     if (!Math.isFinite(length) || length <= 0
       || !Math.isFinite(radius) || radius <= 0) throw "Screwdriver body needs finite positive dimensions";
     super("CUSTOM-" + StringTools.replace(name.toUpperCase(), " ", "-"), name, "aluminium 6061", true);
+    var terms = [machinekit.component.Procurement.ProcurementCodec.choice("kind", powered ? "powered screwdriver" : "feed slide"),
+      machinekit.component.Procurement.ProcurementCodec.requirement("length", "mm", null, null, length),
+      machinekit.component.Procurement.ProcurementCodec.requirement("radius", "mm", null, null, radius)];
+    if (maxTorque != null) terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("maxTorque", "N m", maxTorque));
+    if (maxSpeed != null) terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("maxSpeed", "rad/s", maxSpeed));
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), terms));
+    addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.length = length;
     this.radius = radius;
     addConnector("mount", Mount, Solids.axial(0, 0, 0));

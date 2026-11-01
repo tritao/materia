@@ -471,6 +471,8 @@ class SheetRouterTool extends MachineComponent {
   public final length:Float;
   public function new(length:Float) {
     super('REFERENCE-ROUTER-TOOL-$length', 'Longest assumed router tool envelope', 'steel', true);
+    addFacet(new ProcurementIntent(NotSupplied));
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
     this.length = length;
     addConnector("tip", Axis, F.translation(0, 0, -length));
   }
@@ -482,6 +484,8 @@ class SheetRouterTool extends MachineComponent {
 class SheetShoeLiftBracket extends MachineComponent {
   public function new() {
     super("SHEET-SHOE-OFFSET-LIFT", "Offset shoe lift bracket", "steel", true);
+    addFacet(new ProcurementIntent(Make("welding and machining")));
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.building([],
@@ -504,6 +508,8 @@ class SheetSpindleSaddle extends MachineComponent {
   public final reach:Float;
   public function new(diameter:Float, reach:Float) {
     super('SHEET-SPINDLE-SADDLE-$diameter-$reach', "Two-level spindle clamp saddle", "aluminium 6061", true);
+    addFacet(new ProcurementIntent(Make("machining")));
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
     this.diameter = diameter;
     this.reach = reach;
     for (x in [-50.0, 50.0]) for (z in [110.0, 230.0]) addConnector('mount$x-$z', Mount, F.translation(x, reach, z));
@@ -553,6 +559,8 @@ class SheetVacuumHeader extends MachineComponent {
   public final outletXs:Array<Float>;
   public function new(branches:Int = 6) {
     super('SHEET-VACUUM-HEADER-$branches', '$branches-branch vacuum distribution header', "aluminium 6061", true);
+    addFacet(new ProcurementIntent(Make("machining")));
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
     outletXs = branches == 4 ? [-200.0,
       -100.0, 50.0, 200.0] : [for (i in 0...branches) - 200.0 + 400.0 * i / (branches - 1)];
     addConnector("input", Mount, F.translation(250, 0, 50));
@@ -575,6 +583,8 @@ class SheetVacuumHeader extends MachineComponent {
 class SheetFootCap extends MachineComponent {
   public function new() {
     super("SHEET-LEG-CAP-M20", "Assumed M20 threaded leg cap", "steel", true);
+    addFacet(new ProcurementIntent(Make("machining")));
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
@@ -598,6 +608,8 @@ class SheetChainSupport extends MachineComponent {
   final cuts:Array<SheetChainBox>;
   public function new(id:String, boxes:Array<SheetChainBox>, end:AssemblyFrame, ?cuts:Array<SheetChainBox>) {
     super("SHEET-" + id, "Cable-chain support " + id, "steel", true);
+    addFacet(new ProcurementIntent(Make("welding and machining")));
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
     this.boxes = boxes;
     this.cuts = cuts == null ? [] : cuts;
     for (box in boxes) if (box.w <= 0 || box.d <= 0 || box.h <= 0) throw "Invalid chain support dimensions";

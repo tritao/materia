@@ -72,6 +72,8 @@ class EndEffectorPlate extends MachineComponent {
       + '$boltCircleText PCD',
       "aluminium 6061"
     );
+    if (Std.isExactType(this, EndEffectorPlate)) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.flange = flange;
     this.thickness = actualThickness;
     this.toolBoltCircleDiameter = actualBoltCircle;
@@ -192,7 +194,15 @@ class EndEffectorPlate extends MachineComponent {
         v.integer("toolBoltCount"),
         v.token("toolMountScrew")
       )
-    ).numbered(v -> 'EOAT-${Dimension.format(v.number("flangePitchCircle"))}-${v.integer("flangeBoltCount")}-${Dimension.format(v.number("thickness"))}-${Dimension.format(v.number("toolBoltCircleDiameter"))}-${v.integer("toolBoltCount")}${v.token("toolMountScrew")}');
+    ).numbered(v -> 'EOAT-${Dimension.format(v.number("flangePitchCircle"))}-${v.integer("flangeBoltCount")}-${Dimension.format(v.number("thickness"))}-${Dimension.format(v.number("toolBoltCircleDiameter"))}-${v.integer("toolBoltCount")}${v.token("toolMountScrew")}')
+      .procured(_ -> Make("CNC machining")).requiring(v -> [
+        machinekit.component.Procurement.ProcurementCodec.requirement("flangePitchCircle", "mm", null, null, v.number("flangePitchCircle")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("flangeBoltCount", "1", null, null, v.integer("flangeBoltCount")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("thickness", "mm", null, null, v.number("thickness")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("toolBoltCircleDiameter", "mm", null, null, v.number("toolBoltCircleDiameter")),
+        machinekit.component.Procurement.ProcurementCodec.requirement("toolBoltCount", "1", null, null, v.integer("toolBoltCount")),
+        machinekit.component.Procurement.ProcurementCodec.choice("toolMountScrew", v.token("toolMountScrew"))
+      ]);
     return recipeTypeCache;
   }
 

@@ -107,6 +107,18 @@ class LeadScrew extends MachineComponent {
       'Lead screw ${thread.designation}, ${Dimension.format(length)} mm long',
       "steel"
     );
+    if (Std.isExactType(this, LeadScrew)) {
+      addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+        .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+      if (designation != null) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
+        machinekit.component.Procurement.ProcurementCodec.choice("family", Std.string(thread.family)),
+        machinekit.component.Procurement.ProcurementCodec.requirement("diameter", "mm", null, null, thread.screwDiameter),
+        machinekit.component.Procurement.ProcurementCodec.requirement("pitch", "mm", null, null, thread.pitch),
+        machinekit.component.Procurement.ProcurementCodec.requirement("starts", "1", null, null, thread.starts),
+        machinekit.component.Procurement.ProcurementCodec.choice("hand", Std.string(thread.hand)),
+        machinekit.component.Procurement.ProcurementCodec.requirement("length", "mm", null, null, length)
+      ]));
+    }
     this.thread = thread;
     hasCustomDesignation = designation != null;
     totalLength = length;
@@ -172,7 +184,9 @@ class LeadScrew extends MachineComponent {
       "machinekit.motion.lead-screw",
       ComponentRecipeSupport.threadParameters().concat([ComponentRecipeSupport.length("length", 100)]),
       v -> new LeadScrew(ComponentRecipeSupport.thread(v), v.number("length"))
-    ).numbered(v -> 'SCREW-${ComponentRecipeSupport.threadPartNumber(v)}-L${Dimension.format(v.number("length"))}');
+    ).numbered(v -> 'SCREW-${ComponentRecipeSupport.threadPartNumber(v)}-L${Dimension.format(v.number("length"))}')
+      .procured(_ -> Buy(null, null, null))
+      .requiringInputs(["family", "screwDiameter", "pitch", "starts", "hand", "length"]);
     return recipeTypeCache;
   }
 

@@ -27,7 +27,7 @@ class ToolFork extends AssumedCatalogComponent {
   }
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.routing.tool-fork", inputs(), v -> new ToolFork(v))
-      .numbered(_ -> "ROUTER-TOOL-FORK");
+      .numbered(_ -> "ROUTER-TOOL-FORK").procured(_ -> Buy(null, null, null)).requiringInputs(["width", "depth", "thickness", "gripDiameter", "clearance"], [], []);
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();

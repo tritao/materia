@@ -36,6 +36,8 @@ class LinearScale extends MachineComponent implements EncoderPart {
       + (hasIndex ? " with reference mark" : ""),
       "aluminium 6061"
     );
+    if (Std.isExactType(this, LinearScale)) addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.length = length;
     this.countsPerMillimetre = countsPerMillimetre;
     this.absolute = absolute;
@@ -62,7 +64,12 @@ class LinearScale extends MachineComponent implements EncoderPart {
         v.boolean("index")
       ),
       true
-    );
+    ).procured(_ -> Buy(null, null, null)).requiring(v -> [
+      machinekit.component.Procurement.ProcurementCodec.requirement("length", "mm", null, null, v.number("length")),
+      machinekit.component.Procurement.ProcurementCodec.requirement("resolution", "count/mm", v.number("countsPerMillimetre")),
+      machinekit.component.Procurement.ProcurementCodec.choice("absolute", v.boolean("absolute") ? "true" : "false"),
+      machinekit.component.Procurement.ProcurementCodec.choice("index", v.boolean("index") ? "true" : "false")
+    ]);
     return recipeTypeCache;
   }
 
