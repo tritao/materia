@@ -39,6 +39,7 @@ class GearKitTests {
     KinematicsTests.run();
     EnvelopeTests.run();
     MeshingTests.run();
+    CircularSplineTests.run();
     Sys.println('GearKitTests: $assertions assertions passed');
   }
 }
