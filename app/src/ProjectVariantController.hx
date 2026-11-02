@@ -1,5 +1,7 @@
 package app;
 
+import Observable;
+
 import app.ProjectVariants.ProjectVariant;
 
 typedef ProjectVariantState = {
@@ -14,7 +16,7 @@ typedef ProjectVariantState = {
 }
 
 /** Prepares a replacement without disturbing the installed scene or its selection. */
-class ProjectVariantController {
+class ProjectVariantController implements Observable {
   final session:ProjectDocumentSession;
   final simulation:ApplicationSimulation;
   final requestChange:(Void -> Void) -> Void;
@@ -25,6 +27,9 @@ class ProjectVariantController {
   var variants:Array<ProjectVariant> = [];
   var failure:Null<String> = null;
   var loading:Null<ProjectLoadJob> = null;
+  var loadingPhase:String = "";
+  var loadingElapsedSeconds:Int = 0;
+  var loadingCancelling:Bool = false;
   var reference:Null<String>;
   var loadGeneration = -1;
   var loadingLabel = "";
@@ -45,15 +50,16 @@ class ProjectVariantController {
     this.installed = installed;
     this.blocked = blocked;
   }
+  public function update():Void sync();
+
   public function isLoading():Bool return loading != null;
   public function loadingStatus():Null<ProjectLoadingStatus> {
-    var task = loading;
-    if (task == null) return null;
+    if (loading == null) return null;
     return {
       title: "Opening " + loadingLabel,
-      phase: task.control.currentPhase(),
-      elapsedSeconds: Std.int(task.elapsedSeconds()),
-      cancelling: task.control.isCancelled()
+      phase: loadingPhase,
+      elapsedSeconds: loadingElapsedSeconds,
+      cancelling: loadingCancelling
     };
   }
   public function requestCancel():Void {
@@ -61,6 +67,7 @@ class ProjectVariantController {
     if (task == null) return;
     task.control.phase("Cancelling");
     task.control.cancel();
+    syncLoadingStatus();
     changed();
   }
   public function dismissFailure():Void {
@@ -77,7 +84,6 @@ class ProjectVariantController {
       ProjectVariants.read(path) catch (error:Dynamic) failure = Std.string(error);
   }
   public function snapshot():ProjectVariantState {
-    sync();
     var selected = session.projectVariant ?? session.projectJob, summary = "";
     for (variant in variants) if (variant.id == selected) summary = variant.summary;
     return {
@@ -88,7 +94,7 @@ class ProjectVariantController {
       simulationActive: simulation.isActive(),
       loading: loading != null,
       status: loading == null ? "" : "Opening "
-      + loadingLabel + " · " + loading.control.currentPhase() + " · " + Std.int(loading.elapsedSeconds()) + " s",
+      + loadingLabel + " · " + loadingPhase + " · " + loadingElapsedSeconds + " s",
       error : failure
     };
   }
@@ -119,6 +125,7 @@ class ProjectVariantController {
       targetSelection = target;
       for (variant in variants) if (variant.id == id) loadingLabel = variant.label;
       loading = new ProjectLoadJob(path, id);
+      syncLoadingStatus();
       changed();
     }
     );
@@ -126,12 +133,12 @@ class ProjectVariantController {
   public function tick():Void {
     var task = loading;
     if (task == null) return;
+    if (syncLoadingStatus()) changed();
     if (session.generation != loadGeneration) {
       cancel();
       return;
     }
     if (!task.isFinished()) {
-      changed();
       return;
     }
     loading = null;
@@ -154,7 +161,23 @@ class ProjectVariantController {
   public function cancel():Void {
     if (loading != null) loading.control.cancel();
     loading = null;
+    loadingPhase = "";
+    loadingElapsedSeconds = 0;
+    loadingCancelling = false;
     targetSelection = null;
     changed();
+  }
+
+  function syncLoadingStatus():Bool {
+    var task = loading;
+    var phase = task == null ? "" : task.control.currentPhase();
+    var elapsed = task == null ? 0 : Std.int(task.elapsedSeconds());
+    var cancelling = task != null && task.control.isCancelled();
+    if (phase == loadingPhase && elapsed == loadingElapsedSeconds && cancelling == loadingCancelling)
+      return false;
+    loadingPhase = phase;
+    loadingElapsedSeconds = elapsed;
+    loadingCancelling = cancelling;
+    return true;
   }
 }

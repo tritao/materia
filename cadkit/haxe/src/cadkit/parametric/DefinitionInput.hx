@@ -1,7 +1,9 @@
 package cadkit.parametric;
 
+import Observable;
+
 /** One editable definition input, stored in canonical units when numeric. */
-class DefinitionInput {
+class DefinitionInput implements Observable {
   public final name:String;
   public final kind:String;
   public final unit:String;

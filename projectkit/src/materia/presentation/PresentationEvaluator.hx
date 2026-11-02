@@ -1,18 +1,28 @@
 package materia.presentation;
 
+import Equatable;
+
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinitionFlattener;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.presentation.AssemblyPresentation;
 
-typedef PresentationCursor = {
-  var view:String;
-  var explode:Float;
-  var procedure:Null<String>;
+struct PresentationCursor : Equatable {
+  public final view:String;
+  public final explode:Float;
+  public final procedure:Null<String>;
   /** Completed step count; the following step is active. */
-  var step:Int;
-  var progress:Float;
+  public final step:Int;
+  public final progress:Float;
+
+  public function new(view:String, explode:Float, procedure:Null<String>, step:Int, progress:Float) {
+    this.view = view;
+    this.explode = explode;
+    this.procedure = procedure;
+    this.step = step;
+    this.progress = progress;
+  }
 }
 typedef PresentationFrame = {
   var view:String;
@@ -32,13 +42,8 @@ typedef PresentationFrame = {
 /** Stateless evaluation. Input poses and engineering records are never modified. */
 class PresentationEvaluator {
   public static function reset(value:AssemblyPresentation):PresentationCursor {
-    for (view in value.views) if (view.id == value.defaultView) return {
-      view: view.id,
-      explode: view.explode,
-      procedure: null,
-      step: 0,
-      progress: 0
-    };
+    for (view in value.views) if (view.id == value.defaultView)
+      return new PresentationCursor(view.id, view.explode, null, 0, 0);
     throw "Missing default presentation view";
   }
   public static function badge(evidence:MotionEvidence, fingerprint:String):String return switch evidence {

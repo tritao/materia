@@ -1,5 +1,7 @@
 package bimkit;
 
+import Observable;
+
 import bimkit.BimWindowDefinition;
 import bimkit.BimDoorDefinition;
 import bimkit.IfcExporter;
@@ -29,7 +31,7 @@ import cadkit.parametric.features.DefinitionOutputFeature;
 import cadkit.parametric.features.ToolCollectionFeature;
 
 /** BIM roles and hosting relationships layered over an ordinary CadKit document. */
-class BimDocument {
+class BimDocument implements Observable {
   public final cad:Document;
 
   private var beforeHookId:Int;

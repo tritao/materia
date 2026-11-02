@@ -15,6 +15,8 @@ import cadkit.parametric.DefinitionOutput;
 import cadkit.parametric.QuantityKind;
 import cadkit.parametric.TypedProperty;
 import haxeon.ui.core.CommandContext;
+import haxeon.ui.core.Dependencies;
+import haxeon.reactive.ReactiveRuntime;
 import haxeon.ui.editing.EditorDocument;
 import haxeon.ui.properties.PropertyBinding;
 import haxeon.ui.properties.PropertyDescriptor;
@@ -67,10 +69,10 @@ class BimEditorProjectionTests {
 
     var tree = new BimSpatialTree(model);
     check(
-      tree.rootCount() == 1 && tree.childCount(tree.rootKeyAt(0)) == 1,
+      tree.rootCount() == 1 && tree.childCount(tree.rootRange(0, 1)[0].key) == 1,
       "spatial tree projects Project → Site from aggregate relationships"
     );
-    var siteKey = tree.childKeyAt(tree.rootKeyAt(0), 0);
+    var siteKey = tree.childKeyAt(tree.rootRange(0, 1)[0].key, 0);
     var buildingKey = tree.childKeyAt(siteKey, 0);
     var storeyKey = tree.childKeyAt(buildingKey, 0);
     check(
@@ -81,14 +83,29 @@ class BimEditorProjectionTests {
       )) != null && tree.buildItem(storeyKey) != null,
       "spatial tree nests hosted openings under Walls while keeping containment in the Storey"
     );
-    var oldTreeRevision = tree.revision();
+    var elementDependencies = new Dependencies();
+    ReactiveRuntime.withTracking(elementDependencies, function() {
+      tree.rootCount();
+      tree.buildItem(BimSpatialTree.ElementPrefix + wall.id.value);
+    });
+    elementDependencies.markClean();
     wall.rename("Exterior Wall");
-    check(tree.revision() > oldTreeRevision, "tree projection revision follows persistent element names");
+    check(elementDependencies.dirty,
+      "element names invalidate only the tree fields that read them");
+
+    var membershipDependencies = new Dependencies();
+    var membershipDocument = new BimDocument();
+    var membershipTree = new BimSpatialTree(membershipDocument);
+    ReactiveRuntime.withTracking(membershipDependencies, function() membershipTree.rootCount());
+    membershipDependencies.markClean();
+    membershipDocument.createProject("Tracked Project");
+    check(membershipDependencies.dirty, "adding a project invalidates the tree's observable membership read");
+    membershipDocument.close();
 
     var typeTree = new BimTypeTree(model);
     check(
       typeTree.rootCount() == 1
-      && typeTree.childCount(typeTree.rootKeyAt(0)) == 2 && typeTree.buildItem(typeTree.rootKeyAt(0)) != null,
+      && typeTree.childCount(typeTree.rootRange(0, 1)[0].key) == 2 && typeTree.buildItem(typeTree.rootRange(0, 1)[0].key) != null,
       "type tree projects one reusable Window Type to its CadKit instances"
     );
     var editor = new BimModelEditor("bim-editor", model);

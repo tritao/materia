@@ -1,5 +1,7 @@
 package app;
 
+import Observable;
+
 import robotkit.collision.CollisionSceneBuilder;
 import cadbridge.CellCollisionSnapshot;
 import robotkit.collision.CollisionSceneBuilder.CollisionOwner;
@@ -333,7 +335,7 @@ private enum EnergyTransferStage {
  * dynamic layer, so `Navigator` replans round them, and `MotionGuard` slows the base for them and stops it
  * short, whatever the route says.
  */
-class MissionPlayer implements SessionMember {
+class MissionPlayer implements SessionMember implements Observable {
   /** Map cells, in metres: fine enough that a wall a tenth of a metre thick covers whole cells. */
   public static inline var RESOLUTION:Float = robotkit.navigation.FloorMap.DEFAULT_RESOLUTION;
   /** Room left round the obstacles' extent so the robot's own place is always on the map. */

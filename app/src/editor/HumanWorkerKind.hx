@@ -182,7 +182,7 @@ import haxeon.ui.properties.PropertyValue;
       new PropertyOption("both", "Both")
     ];
     result.push(new PropertyDescriptor(prefix + 'worker-step-$index-hand',
-      "Hand", PropertyType.Enum, function(_) return PropertyValue.Enum(Reflect.field(
+      "Hand", PropertyType.Enum, function() return PropertyValue.Enum(Reflect.field(
         parsed(scene, id).steps[index],
         "hand"
       )), function(
@@ -210,7 +210,7 @@ import haxeon.ui.properties.PropertyValue;
     options.step = 0.1;
     options.unit = "m";
     result.push(new PropertyDescriptor(prefix + 'worker-step-$index-$field-$axis',
-      axis == 0 ? "Point X" : axis == 1 ? "Point Y" : "Point Z", PropertyType.Float, function(_) {
+      axis == 0 ? "Point X" : axis == 1 ? "Point Y" : "Point Z", PropertyType.Float, function() {
       var step = parsed(scene, id).steps[index];
       var point:Array<Float> = field == "target" ? Reflect.field(Reflect.field(step,
         "target"), "point") : Reflect.field(
@@ -315,7 +315,7 @@ import haxeon.ui.properties.PropertyValue;
     var options = settings("Job");
     options.readOnly = true;
     return new PropertyDescriptor(key,
-      label, PropertyType.Text, function(_) return PropertyValue.Text(text()), function(
+      label, PropertyType.Text, function() return PropertyValue.Text(text()), function(
         _,
         _
       ) {
@@ -327,7 +327,7 @@ import haxeon.ui.properties.PropertyValue;
     var yawOptions = settings("Transform");
     yawOptions.unit = "°";
     yawOptions.step = 15.0;
-    result.push(new PropertyDescriptor(prefix + "worker-yaw", "Yaw", PropertyType.Float, function(_) {
+    result.push(new PropertyDescriptor(prefix + "worker-yaw", "Yaw", PropertyType.Float, function() {
       var item = scene.object(id);
       if (item == null) throw "Worker no longer exists";
       var q = item.rotation;
@@ -347,7 +347,7 @@ import haxeon.ui.properties.PropertyValue;
     }, yawOptions));
     var asset = settings("Worker");
     result.push(new PropertyDescriptor(prefix + "worker-asset",
-      "Character asset", PropertyType.Text, function(_) return PropertyValue.Text(current(
+      "Character asset", PropertyType.Text, function() return PropertyValue.Text(current(
         scene,
         id
       ).asset), function(
@@ -362,7 +362,7 @@ import haxeon.ui.properties.PropertyValue;
     for (record in scene.records()) if (record.id != id) {
       var zoneId = record.id;
       result.push(new PropertyDescriptor(prefix + "worker-zone-" + zoneId,
-        "Zone: " + record.label, PropertyType.Bool, function(_) return PropertyValue.Bool(current(
+        "Zone: " + record.label, PropertyType.Bool, function() return PropertyValue.Bool(current(
           scene,
           id
         ).zones.indexOf(zoneId) >= 0), function(
@@ -381,7 +381,7 @@ import haxeon.ui.properties.PropertyValue;
     for (zoneId in current(scene, id).zones) if (scene.object(zoneId) == null) {
       var missingId = zoneId;
       result.push(new PropertyDescriptor(prefix + "worker-missing-zone-" + missingId,
-        "Missing zone: " + missingId, PropertyType.Bool, function(_) return PropertyValue.Bool(true), function(
+        "Missing zone: " + missingId, PropertyType.Bool, function() return PropertyValue.Bool(true), function(
           _,
           value
         ) switch value {
@@ -413,7 +413,7 @@ import haxeon.ui.properties.PropertyValue;
     if (error != null) result.push(readOnly(prefix + "worker-error", "Job error", function() return error));
     if (spec == null) {
       result.push(new PropertyDescriptor(prefix + "worker-json",
-        "Job JSON", PropertyType.Text, function(_) return PropertyValue.Text(current(
+        "Job JSON", PropertyType.Text, function() return PropertyValue.Text(current(
           scene,
           id
         ).job), function(
@@ -429,7 +429,7 @@ import haxeon.ui.properties.PropertyValue;
     }
     var loop = settings("Job");
     result.push(new PropertyDescriptor(prefix + "worker-loop",
-      "Loop", PropertyType.Bool, function(_) return PropertyValue.Bool(parsed(
+      "Loop", PropertyType.Bool, function() return PropertyValue.Bool(parsed(
         scene,
         id
       ).loop), function(
@@ -448,7 +448,7 @@ import haxeon.ui.properties.PropertyValue;
       var stepSelect = settings("Job");
       stepSelect.minimum = 0;
       stepSelect.maximum = spec.steps.length - 1;
-      result.push(new PropertyDescriptor(prefix + "worker-step-index", "Selected step", PropertyType.Int, function(_) {
+      result.push(new PropertyDescriptor(prefix + "worker-step-index", "Selected step", PropertyType.Int, function() {
         var stored = selectedStep.get(id);
         return PropertyValue.Int(stored == null ? 0 : stored);
       }, function(_, value) switch value {
@@ -485,7 +485,7 @@ import haxeon.ui.properties.PropertyValue;
       name
     )];
     result.push(new PropertyDescriptor(prefix + 'worker-step-$index-action',
-      "Action", PropertyType.Enum, function(_) return PropertyValue.Enum(Reflect.field(
+      "Action", PropertyType.Enum, function() return PropertyValue.Enum(Reflect.field(
         parsed(scene, id).steps[index],
         "action"
       )), function(
@@ -503,7 +503,7 @@ import haxeon.ui.properties.PropertyValue;
       var mode = settings(category);
       mode.options = [new PropertyOption("object", "Object"), new PropertyOption("point", "Point")];
       result.push(new PropertyDescriptor(prefix + 'worker-step-$index-target-mode',
-        "Target type", PropertyType.Enum, function(_) return PropertyValue.Enum(Reflect.hasField(
+        "Target type", PropertyType.Enum, function() return PropertyValue.Enum(Reflect.hasField(
           Reflect.field(parsed(scene, id).steps[index], "target"),
           "object"
         ) ? "object" : "point"), function(
@@ -520,7 +520,7 @@ import haxeon.ui.properties.PropertyValue;
       }, mode));
       if (objectId != null) {
         result.push(new PropertyDescriptor(prefix + 'worker-step-$index-target-object',
-          "Target object", PropertyType.Enum, function(_) return PropertyValue.Enum(Reflect.field(
+          "Target object", PropertyType.Enum, function() return PropertyValue.Enum(Reflect.field(
             Reflect.field(parsed(scene, id).steps[index], "target"),
             "object"
           )), function(
@@ -540,7 +540,7 @@ import haxeon.ui.properties.PropertyValue;
             new PropertyOption("center", "Center")
           ];
           result.push(new PropertyDescriptor(prefix + 'worker-step-$index-anchor',
-            "Anchor", PropertyType.Enum, function(_) {
+            "Anchor", PropertyType.Enum, function() {
             var value:Null<String> = Reflect.field(Reflect.field(parsed(scene, id).steps[index], "target"), "anchor");
             return PropertyValue.Enum(value == null ? "center" : value);
           }, function(_, value) switch value {
@@ -562,7 +562,7 @@ import haxeon.ui.properties.PropertyValue;
       );
       if (action == "walkTo") {
         result.push(new PropertyDescriptor(prefix + 'worker-step-$index-via',
-          "Via points JSON", PropertyType.Text, function(_) {
+          "Via points JSON", PropertyType.Text, function() {
           var via:Dynamic = Reflect.field(parsed(scene, id).steps[index], "via");
           return PropertyValue.Text(via == null ? "[]" : haxe.Json.stringify(via));
         }, function(_, value) switch value {
@@ -578,7 +578,7 @@ import haxeon.ui.properties.PropertyValue;
       var chosen:String = Reflect.field(step, field);
       result.push(new PropertyDescriptor(prefix + 'worker-step-$index-$field',
         action == "pick" ? "Pick object" : "Place onto",
-        PropertyType.Enum, function(_) return PropertyValue.Enum(Reflect.field(
+        PropertyType.Enum, function() return PropertyValue.Enum(Reflect.field(
           parsed(scene, id).steps[index],
           field
         )), function(
@@ -607,7 +607,7 @@ import haxeon.ui.properties.PropertyValue;
       duration.minimum = 0;
       duration.step = 0.1;
       result.push(new PropertyDescriptor(prefix + 'worker-step-$index-seconds',
-        "Seconds", PropertyType.Float, function(_) return PropertyValue.Float(Reflect.field(
+        "Seconds", PropertyType.Float, function() return PropertyValue.Float(Reflect.field(
           parsed(scene, id).steps[index],
           "seconds"
         )), function(
@@ -623,7 +623,7 @@ import haxeon.ui.properties.PropertyValue;
       }, duration));
     }
     if (action == "playClip") result.push(new PropertyDescriptor(prefix + 'worker-step-$index-clip',
-      "Clip", PropertyType.Text, function(_) return PropertyValue.Text(Reflect.field(
+      "Clip", PropertyType.Text, function() return PropertyValue.Text(Reflect.field(
         parsed(scene, id).steps[index],
         "clip"
       )), function(

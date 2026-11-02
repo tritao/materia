@@ -1,14 +1,16 @@
 package cadkit.parametric;
 
+import Observable;
+
 /** Persistent typed edge between two document elements. */
-class Relationship {
+class Relationship implements Observable {
   public final document:Document;
   public final id:RelationshipId;
   public final typeName:String;
   public var source(default, null):ElementReference;
   public var target(default, null):ElementReference;
 
-  private final propertyValues:Map<String, TypedProperty>;
+  private var propertyValues:Map<String, TypedProperty>;
 
   public function new(
     document:Document,
@@ -36,7 +38,6 @@ class Relationship {
   public function restoreEndpoints(source:ElementReference, target:ElementReference):Void {
     this.source = source;
     this.target = target;
-    document.metadataChanged();
   }
 
   public function property(name:String):Null<TypedProperty> return propertyValues.get(name);
@@ -49,9 +50,10 @@ class Relationship {
 
   /** Internal document history and codec path. */
   public function restoreProperty(name:String, value:Null<TypedProperty>):Void {
-    if (value == null) propertyValues.remove(name);
-    else propertyValues.set(name, value);
-    document.metadataChanged();
+    var next = new Map<String, TypedProperty>();
+    for (key in propertyValues.keys()) if (key != name) next.set(key, propertyValues.get(key));
+    if (value != null) next.set(name, value);
+    propertyValues = next;
   }
 
   public function setProperty(value:TypedProperty):Void document.setRelationshipProperty(this, value);

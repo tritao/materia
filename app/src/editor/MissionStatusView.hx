@@ -72,7 +72,6 @@ class MissionStatusView {
     this.showSteps = showSteps;
   }
   public function build(context:BuildContext):RenderNode {
-    controller.observe(context);
     return MissionStatusView.describe(controller, tokens, key, showSteps).build(context);
   }
 }

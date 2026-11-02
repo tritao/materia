@@ -1,10 +1,12 @@
 package app;
 
+import Observable;
+
 import haxe.Json;
 import sys.io.File;
 
 /** Document workflow shared by commands, native close requests and confirmation UI. */
-class SceneDocumentController {
+class SceneDocumentController implements Observable {
   public final session:ProjectDocumentSession;
   final choosePath:Bool -> Null<String> -> (Null<String> -> Null<String> -> Void) -> Void;
   final changed:Void -> Void;

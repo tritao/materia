@@ -1,5 +1,7 @@
 package app;
 
+import Observable;
+
 import haxeon.ui.Path;
 
 import haxeon.ui.widgets.controls.Select;
@@ -129,7 +131,7 @@ class PendingReferenceChoice {
   }
 }
 
-class EditorScene {
+class EditorScene implements Observable {
   static function sameFinish(left:Null<Appearance>, right:Null<Appearance>):Bool {
     return Appearances.same(left, right);
   }
@@ -924,7 +926,7 @@ class EditorScene {
       viewSettings.category = "Sheet metal";
       viewSettings.recordHistory = false;
       result.push(new PropertyDescriptor(prefix + "sheet.flat-view", "Flat pattern",
-        PropertyType.Bool, function(_) return PropertyValue.Bool(requireCadSession(id).sheetFlatView), function(
+        PropertyType.Bool, function() return PropertyValue.Bool(requireCadSession(id).sheetFlatView), function(
           _,
           value
         ) {
@@ -947,7 +949,7 @@ class EditorScene {
       settings.category = "Sheet metal";
       settings.unit = entry.unit;
       settings.recordHistory = false;
-      result.push(new PropertyDescriptor(prefix + entry.name, entry.label, PropertyType.Float, function(_) {
+      result.push(new PropertyDescriptor(prefix + entry.name, entry.label, PropertyType.Float, function() {
         var current = requireCadSession(id).document.featureById(featureId);
         if (current == null) throw "The sheet feature is no longer available";
         return PropertyValue.Float(current.parameter(entry.name).value * scale);
@@ -2911,7 +2913,7 @@ class EditorScene {
     options.category = "Sketch draft";
     options.recordHistory = false;
     return new PropertyDescriptor(key, "Reference " + constraintId + " (measured)",
-      PropertyType.Bool, function(_) return PropertyValue.Bool(sketchConstraint(constraintId).reference), function(
+      PropertyType.Bool, function() return PropertyValue.Bool(sketchConstraint(constraintId).reference), function(
         _,
         value
       ) switch (value) {
@@ -2954,7 +2956,7 @@ class EditorScene {
         || (positive && number <= 0) ? (positive ? "Value must be finite and positive" : "Value must be finite") : null;
     };
     var descriptor = new PropertyDescriptor(key,
-      label, PropertyType.Float, function(_) return PropertyValue.Float(read()), function(
+      label, PropertyType.Float, function() return PropertyValue.Float(read()), function(
         _,
         value
       ) {
@@ -3017,7 +3019,7 @@ class EditorScene {
       return number == null || !validDimension(number) ? "Dimension must be finite and positive" : null;
     };
     var key = ["width", "height", "depth"][axis], label = ["Width", "Height", "Depth"][axis];
-    return new PropertyDescriptor(prefix + key, label, PropertyType.Float, function(_) {
+    return new PropertyDescriptor(prefix + key, label, PropertyType.Float, function() {
       var item = requiredObject(id);
       return PropertyValue.Float(axis == 0 ? item.width : axis == 1 ? item.height : item.depth);
     }, function(_, value) {
@@ -3060,7 +3062,7 @@ class EditorScene {
         && number <= 0)) return signed ? "Position must be finite" : "Dimension must be finite and positive";
       return null;
     };
-    return new PropertyDescriptor(prefix + name, label, PropertyType.Float, function(_) {
+    return new PropertyDescriptor(prefix + name, label, PropertyType.Float, function() {
       var values = cadPlateModel(id).parameters();
       return PropertyValue.Float(name == CadPlateModel.HOLE_DIAMETER
         ? values.holeDiameter : name == CadPlateModel.HOLE_X ? values.holeX : values.holeY);
@@ -3103,7 +3105,7 @@ class EditorScene {
       };
       return number == null || !Math.isFinite(number) || number <= 0 ? "Dimension must be finite and positive" : null;
     };
-    return new PropertyDescriptor(prefix + key, label, PropertyType.Float, function(_) {
+    return new PropertyDescriptor(prefix + key, label, PropertyType.Float, function() {
       return PropertyValue.Float(read(cadBracketModel(id)));
     }, function(_, value) {
       var number:Float = switch value {
@@ -3138,7 +3140,7 @@ class EditorScene {
       return number == null
         || !Math.isFinite(number) || number <= 0 ? "Extrusion depth must be finite and positive" : null;
     };
-    return new PropertyDescriptor(prefix + "extrusion-depth", "Extrusion depth", PropertyType.Float, function(_) {
+    return new PropertyDescriptor(prefix + "extrusion-depth", "Extrusion depth", PropertyType.Float, function() {
       var candidate = requireCadSession(id).document.featureById(featureId);
       if (candidate == null || !Std.isOfType(candidate,
         ExtrudeFeature)) throw "selected extrusion is no longer available";
@@ -3178,7 +3180,7 @@ class EditorScene {
       return number == null
         || !Math.isFinite(number) || number <= 0 ? "Fillet radius must be finite and positive" : null;
     };
-    return new PropertyDescriptor(prefix + "fillet-radius", "Fillet radius", PropertyType.Float, function(_) {
+    return new PropertyDescriptor(prefix + "fillet-radius", "Fillet radius", PropertyType.Float, function() {
       var candidate = requireCadSession(id).document.featureById(featureId);
       if (candidate == null || !Std.isOfType(candidate, FilletFeature)) throw "selected fillet is no longer available";
       var fillet:FilletFeature = cast candidate;
@@ -3207,7 +3209,7 @@ class EditorScene {
     var options = new PropertyDescriptorOptions();
     options.category = category;
     return new PropertyDescriptor(prefix + key,
-      label, PropertyType.Bool, function(_) return PropertyValue.Bool(read(requiredObject(id))), function(
+      label, PropertyType.Bool, function() return PropertyValue.Bool(read(requiredObject(id))), function(
         _,
         value
       ) switch value {
@@ -3241,7 +3243,7 @@ class EditorScene {
     options.unit = unit;
     options.step = 0.1;
     return new PropertyDescriptor(prefix + key,
-      label, PropertyType.Float, function(_) return PropertyValue.Float(read(requiredObject(id))), function(
+      label, PropertyType.Float, function() return PropertyValue.Float(read(requiredObject(id))), function(
         _,
         value
       ) {
@@ -3593,7 +3595,7 @@ class EditorScene {
     settings.step = 0.1;
     return new PropertyDescriptor(prefix + (axis == 0 ? "position-x" : "position-y"),
       axis == 0 ? "Position X" : "Position Y", PropertyType.Float,
-      function(_) return PropertyValue.Float(axis == 0 ? requiredObject(id).x : requiredObject(id).y), function(
+      function() return PropertyValue.Float(axis == 0 ? requiredObject(id).x : requiredObject(id).y), function(
         _,
         value
       ) {
@@ -3724,7 +3726,7 @@ class EditorScene {
 
 }
 
-class EditorSceneObject {
+class EditorSceneObject implements Observable {
   public final id:String;
   public var label:String;
   public var kind:String;

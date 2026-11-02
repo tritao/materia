@@ -39,12 +39,6 @@ class BimTypeTree implements TreeViewModel {
     return result;
   }
 
-  public function rootKeyAt(index:Int):String {
-    var values = definitions();
-    if (index < 0 || index >= values.length) throw "BIM type tree root index is out of range";
-    return definitionKey(values[index]);
-  }
-
   public function childCount(parentKey:String):Int return instances(parentKey).length;
 
   public function childKeyAt(parentKey:String, index:Int):String {
@@ -76,8 +70,6 @@ class BimTypeTree implements TreeViewModel {
     tooltip.showWhen = function() return text.truncated;
     return tooltip;
   }
-
-  public function revision():Int return model.cad.metadataRevision;
 
   public function definitionIdForKey(key:String):Null<String> {
     if (key == null || !StringTools.startsWith(key, DefinitionPrefix)) return null;

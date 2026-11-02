@@ -1,5 +1,7 @@
 package cadkit.parametric;
 
+import Observable;
+
 import cadkit.Operation;
 import cadkit.Shape;
 import cadkit.parametric.ChangeSet;
@@ -56,7 +58,7 @@ import cadkit.parametric.RelationshipChanges.RelationshipEndpointsChange;
 import cadkit.parametric.RelationshipChanges.RelationshipPropertyChange;
 
 /** Haxeon-owned parametric feature document. */
-class Document {
+class Document implements Observable {
   private static var nextToken:Int = 1;
 
   private var nextId:Int;
@@ -65,24 +67,16 @@ class Document {
   public final lengthUnit:String;
   public final metresPerUnit:Float;
 
-  /** Monotonic invalidation for element/definition/relationship membership and metadata, including history restoration. */
-  public var metadataRevision(default, null):Int = 0;
-
-  @:allow(cadkit.parametric.Element)
-  @:allow(cadkit.parametric.Definition)
-  @:allow(cadkit.parametric.InstanceElement)
-  @:allow(cadkit.parametric.Relationship)
-  function metadataChanged():Void metadataRevision++;
-
-  private final elements:Array<Element>;
+  /** Copy-on-write membership preserves observable reads across edits and history restoration. */
+  private var elements:Array<Element>;
   private var elementsById:Map<String, Element>;
   private var issuedElementIds:Map<String, Bool>;
   private final dimensions:Array<NamedParameter>;
-  private final definitions:Array<Definition>;
+  private var definitions:Array<Definition>;
   private var definitionsById:Map<String, Definition>;
   private final definitionCache:Map<String, Shape>;
   private final issuedDefinitionIds:Map<String, Bool>;
-  private final relationships:Array<Relationship>;
+  private var relationships:Array<Relationship>;
   private var relationshipsById:Map<String, Relationship>;
   private var issuedRelationshipIds:Map<String, Bool>;
 
@@ -245,24 +239,33 @@ class Document {
     if ((recipe == Definition.SubgraphRecipe)
       != (subgraph != null)) throw new ParametricError("feature subgraph recipe and graph payload do not match");
     var result = new Definition(this, id, name, recipe, inputs, outputs, subgraph);
-    definitions.push(result);
-    metadataChanged();
-    definitionsById.set(id.value, result);
+    var nextDefinitions = definitions.copy();
+    nextDefinitions.push(result);
+    definitions = nextDefinitions;
+    var nextDefinitionsById = copyStringMap(definitionsById);
+    nextDefinitionsById.set(id.value, result);
+    definitionsById = nextDefinitionsById;
     issuedDefinitionIds.set(id.value, true);
     return result;
   }
 
   public function restoreDefinitionRemoval(definition:Definition):Void {
-    definitions.remove(definition);
-    metadataChanged();
-    definitionsById.remove(definition.id.value);
+    var nextDefinitions = definitions.copy();
+    nextDefinitions.remove(definition);
+    definitions = nextDefinitions;
+    var nextDefinitionsById = copyStringMap(definitionsById);
+    nextDefinitionsById.remove(definition.id.value);
+    definitionsById = nextDefinitionsById;
   }
 
   public function restoreDefinitionInsertion(definition:Definition, index:Int):Void {
     if (definitionsById.exists(definition.id.value)) throw new ParametricError("definition is already registered");
-    definitions.insert(index, definition);
-    metadataChanged();
-    definitionsById.set(definition.id.value, definition);
+    var nextDefinitions = definitions.copy();
+    nextDefinitions.insert(index, definition);
+    definitions = nextDefinitions;
+    var nextDefinitionsById = copyStringMap(definitionsById);
+    nextDefinitionsById.set(definition.id.value, definition);
+    definitionsById = nextDefinitionsById;
   }
 
   public function definition(id:DefinitionId):Definition {
@@ -588,9 +591,12 @@ class Document {
     if (issuedElementIds.exists(id.value)) throw new ParametricError("duplicate or previously issued element ID: "
       + id.value);
     var result = new Element(this, id, name, "geometry", output);
-    elements.push(result);
-    metadataChanged();
-    elementsById.set(id.value, result);
+    var nextElements = elements.copy();
+    nextElements.push(result);
+    elements = nextElements;
+    var nextElementsById = copyStringMap(elementsById);
+    nextElementsById.set(id.value, result);
+    elementsById = nextElementsById;
     issuedElementIds.set(id.value, true);
     return result;
   }
@@ -634,9 +640,12 @@ class Document {
     if (issuedRelationshipIds
       .exists(id.value)) throw new ParametricError("duplicate or previously issued relationship ID: " + id.value);
     var result = new Relationship(this, id, typeName, source, target);
-    relationships.push(result);
-    metadataChanged();
-    relationshipsById.set(id.value, result);
+    var nextRelationships = relationships.copy();
+    nextRelationships.push(result);
+    relationships = nextRelationships;
+    var nextRelationshipsById = copyStringMap(relationshipsById);
+    nextRelationshipsById.set(id.value, result);
+    relationshipsById = nextRelationshipsById;
     issuedRelationshipIds.set(id.value, true);
     return result;
   }
@@ -689,17 +698,23 @@ class Document {
     validateRelationshipEndpoint(relationship.source);
     validateRelationshipEndpoint(relationship.target);
     var insertion = index < 0 ? 0 : (index > relationships.length ? relationships.length : index);
-    relationships.insert(insertion, relationship);
-    metadataChanged();
-    relationshipsById.set(relationship.id.value, relationship);
+    var nextRelationships = relationships.copy();
+    nextRelationships.insert(insertion, relationship);
+    relationships = nextRelationships;
+    var nextRelationshipsById = copyStringMap(relationshipsById);
+    nextRelationshipsById.set(relationship.id.value, relationship);
+    relationshipsById = nextRelationshipsById;
     for (property in relationship.properties()) validatePropertyReferences(property);
   }
 
   public function restoreRelationshipRemoval(relationship:Relationship):Void {
     validateOwnedRelationship(relationship);
-    relationships.remove(relationship);
-    metadataChanged();
-    relationshipsById.remove(relationship.id.value);
+    var nextRelationships = relationships.copy();
+    nextRelationships.remove(relationship);
+    relationships = nextRelationships;
+    var nextRelationshipsById = copyStringMap(relationshipsById);
+    nextRelationshipsById.remove(relationship.id.value);
+    relationshipsById = nextRelationshipsById;
   }
 
   public function setRelationshipEndpoints(relationship:Relationship,
@@ -797,9 +812,12 @@ class Document {
     validateElementName(result.name);
     if (issuedElementIds.exists(result
       .id.value)) throw new ParametricError("duplicate or previously issued element ID: " + result.id.value);
-    elements.push(result);
-    metadataChanged();
-    elementsById.set(result.id.value, result);
+    var nextElements = elements.copy();
+    nextElements.push(result);
+    elements = nextElements;
+    var nextElementsById = copyStringMap(elementsById);
+    nextElementsById.set(result.id.value, result);
+    elementsById = nextElementsById;
     issuedElementIds.set(result.id.value, true);
   }
 
@@ -989,9 +1007,12 @@ class Document {
       || elementsById.exists(element.id.value)) throw new ParametricError("cannot restore element: "
       + element.id.value);
     var insertion = index < 0 ? 0 : (index > elements.length ? elements.length : index);
-    elements.insert(insertion, element);
-    metadataChanged();
-    elementsById.set(element.id.value, element);
+    var nextElements = elements.copy();
+    nextElements.insert(insertion, element);
+    elements = nextElements;
+    var nextElementsById = copyStringMap(elementsById);
+    nextElementsById.set(element.id.value, element);
+    elementsById = nextElementsById;
     datumChanged(element);
   }
 
@@ -1000,9 +1021,12 @@ class Document {
     validateNoElementPropertyReferences(element);
     datumChanged(element);
     element.clearPlacedShape();
-    elements.remove(element);
-    metadataChanged();
-    elementsById.remove(element.id.value);
+    var nextElements = elements.copy();
+    nextElements.remove(element);
+    elements = nextElements;
+    var nextElementsById = copyStringMap(elementsById);
+    nextElementsById.remove(element.id.value);
+    elementsById = nextElementsById;
   }
 
   public function setElementProperty(target:Element, property:TypedProperty):Void {
@@ -1751,15 +1775,15 @@ class Document {
     features.resize(0);
     byId = new Map<Int, Feature>();
     dimensions.resize(0);
-    definitions.resize(0);
+    definitions = [];
     for (element in elements) element.clearPlacedShape();
-    relationships.resize(0);
+    relationships = [];
     relationshipsById = new Map<String, Relationship>();
     issuedRelationshipIds = new Map<String, Bool>();
     beforeHooks.resize(0);
     afterHooks.resize(0);
     for (shape in definitionCache) shape.close();
-    elements.resize(0);
+    elements = [];
     elementsById = new Map<String, Element>();
     issuedElementIds = new Map<String, Bool>();
     undoStack.resize(0);
@@ -1768,7 +1792,12 @@ class Document {
     afterRecompute = null;
     selectedOutput = null;
     closed = true;
-    metadataChanged();
+  }
+
+  private static function copyStringMap<V>(source:Map<String, V>):Map<String, V> {
+    var result = new Map<String, V>();
+    for (key in source.keys()) result.set(key, source.get(key));
+    return result;
   }
 
   public function recordParameterChange(parameter:Parameter, oldValue:Float):Void {

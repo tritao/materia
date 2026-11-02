@@ -1,10 +1,12 @@
 package cadkit.parametric;
 
+import Observable;
+
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.Feature;
 
 /** Validated scalar parameter owned by one feature. */
-class Parameter {
+class Parameter implements Observable {
   public final name:String;
   public final minimum:Float;
   public final integer:Bool;

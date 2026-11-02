@@ -1,9 +1,11 @@
 package app;
 
+import Observable;
+
 /** Presentation-only handling trajectory; realtime playback supplies wall time,
     deterministic stepping supplies the fixed timestep.
     Not a contact/gripper solver or a hydraulic deformation calculation. */
-class HobbingHandling {
+class HobbingHandling implements Observable {
   public static inline final LIFT_MM = 120.0;
   public static inline final LOAD_SECONDS = 4.0;
   public static inline final UNLOAD_SECONDS = 4.0;
@@ -14,8 +16,6 @@ class HobbingHandling {
   public final frontApproachMm:Float;
   public final loadingLiftMm:Float;
   public var inspection(default, null) = "sequence";
-  /** Advances when `phase` or `inspection` changes, so a status display can observe one number. */
-  public var statusRevision(default, null) = 0;
   public function new(frontApproachMm:Float = 0, loadingLiftMm:Float = LIFT_MM) {
     if (!Math.isFinite(frontApproachMm)
       || frontApproachMm < 0 || !Math.isFinite(loadingLiftMm) || loadingLiftMm <= 0) throw "Invalid loading envelope";
@@ -113,11 +113,9 @@ class HobbingHandling {
   }
   public function inspect(mode:String):Void {
     if (["sequence", "blank", "clamped", "finished"].indexOf(mode) < 0) throw "Unknown cup inspection view";
-    if (inspection != mode) statusRevision++;
     inspection = mode;
   }
   function setPhase(value:String):Void {
-    if (phase != value) statusRevision++;
     phase = value;
   }
   public function displayedLift():Float return inspection == "blank"

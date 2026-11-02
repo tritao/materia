@@ -1,6 +1,7 @@
 package app.editor;
 
 import app.Main.ReferenceEditorApp;
+import app.EditorScene.EditorSceneObject;
 import haxeon.ui.Insets;
 import haxeon.ui.core.TextStyleOverride;
 import haxeon.ui.core.View;
@@ -16,26 +17,18 @@ import haxeon.ui.widgets.controls.SelectOption;
 import materia.project.MaterialLibrary;
 import app.editor.SheetWorkflowPanel;
 import haxeon.ui.core.BuildContext;
+import haxeon.ui.core.RenderNode;
 import haxeon.ui.widgets.text.Text;
 import haxeon.ui.widgets.text.TextField;
 
 /** Selected-object inspector dock panel. */
 @:access(app.Main.ReferenceEditorApp) class InspectorPanel {
-  /**
-   * Retained by what it observes (DockPanelContent.observing). The property inspector and the sheet and project panels read
-   * the scene, simulation and document deeply, so their revisions are observed as a whole; the inputs read here are observed
-   * where they are read.
-   */
+  /** Retained by the observable fields read by the inspector, sheet, and project panels. */
   public static function build(app:ReferenceEditorApp, context:BuildContext):View {
     var appearance = app.appearance;
     var scene = app.scene;
     var session = app.session;
     var simulation = app.simulation;
-    context.observeInt(() -> scene.revision);
-    context.observeInt(() -> scene.selectionRevision);
-    context.observeInt(() -> simulation.appliedRevision);
-    context.observeInt(() -> session.document.revision);
-    context.observeInt(() -> app.sceneInspector == null ? 0 : app.sceneInspector.contentRevision());
     var perspectiveViewport = app.perspectiveViewport;
     var fillStyle = function() return ReferenceEditorApp.fillStyle();
     var actionRowStyle = function() return ReferenceEditorApp.actionRowStyle();
@@ -51,11 +44,11 @@ import haxeon.ui.widgets.text.TextField;
     var style = fillStyle();
     style.padding = new Insets(10.0, 10.0, 10.0, 10.0);
     style.background = appearance.theme.tokens.surface;
-    var groupKey = context.observeString(() -> app.treeModel.selectionKey());
+    var groupKey = app.treeModel.selectionKey();
     var group = app.treeModel.groupInfo(groupKey);
     if (group != null) {
-      var editable = !context.observeBool(app.documents.blocked);
-      var shown = context.observeBool(() -> app.treeModel.visibilityState(groupKey).own);
+      var editable = !app.documents.blocked();
+      var shown = app.treeModel.visibilityState(groupKey).own;
       var visibility = new Button(shown ? "Hide assembly" : "Show assembly",
         null, function() {
         if (!app.documents.blocked()) app.treeModel.toggleVisibility(groupKey);
@@ -93,7 +86,7 @@ import haxeon.ui.widgets.text.TextField;
     }
     if (app.sceneInspector == null || app.inspectorSelectionRevision != scene.selectionRevision) {
       var feature = scene.selectedFeatureKey;
-      var modelKey = session.generation + ":" + scene.revision + ":" + selected.id.length + ":" + selected.id + ":" +
+      var modelKey = session.generation + ":" + selected.id.length + ":" + selected.id + ":" +
         (feature == null ? "-1:" : feature.length + ":" + feature);
       var cached = app.inspectorModels.get(modelKey);
       if (cached == null || !cached.isPristine()) {
@@ -123,13 +116,12 @@ import haxeon.ui.widgets.text.TextField;
     }
     var inspector = app.sceneInspector;
     inspector.setStyle(style);
-    var widthClass = context.observeInt(() -> app.viewportWidth < 760.0 ? 0 : app.viewportWidth < 1180.0 ? 1 : 2);
+    var widthClass = app.viewportWidth < 760.0 ? 0 : app.viewportWidth < 1180.0 ? 1 : 2;
     inspector.labelWidth = widthClass == 0 ? 56.0 : widthClass == 1 ? 76.0 : 108.0;
     var ownership = session.scriptOwnership;
-    context.observeBool(() -> session.scriptOwnership != null);
-    inspector.enabled = ownership == null && !context.observeBool(simulation.isActive)
-      && !context.observeBool(() -> app.perspectiveViewport != null && app.perspectiveViewport.dragging());
-    var rows:Array<KeyedView> = [new KeyedView("heading", sectionHeading(selected.label))];
+    inspector.enabled = ownership == null && !simulation.isActive()
+      && !(app.perspectiveViewport != null && app.perspectiveViewport.dragging());
+    var rows:Array<KeyedView> = [new KeyedView("heading", new ObservableInspectorHeading(app, selected))];
     if (simulation.isActive()) rows.push(new KeyedView(
       "simulation-hint",
       new Text(
@@ -185,7 +177,7 @@ import haxeon.ui.widgets.text.TextField;
           new Select<String>("sheet-material-select", options, input.materialId, function(value) {
           input.materialId = value;
           input.kFactor = "";
-          app.commands.refresh();
+
         }
         )));
         entries.push({
@@ -288,11 +280,11 @@ import haxeon.ui.widgets.text.TextField;
       for (candidate in 0...pending.candidates.length) rows.push(new KeyedView("pending-choice-" + candidate,
         new Button("Use " + pending.candidates[candidate], null, function() {
         app.runSceneEdit("Could not apply the edit", function() app.scene.resolvePendingReferenceChoice(candidate));
-        app.commands.refresh();
+
       }, "pending-choice-" + candidate)));
       rows.push(new KeyedView("pending-choice-cancel", new Button("Keep the previous model", null, function() {
         app.scene.cancelPendingReferenceChoice();
-        app.commands.refresh();
+
       }, "pending-choice-cancel")));
     }
     // References that need a look (TN5): what each lost, with a button per element it could mean now.
@@ -308,7 +300,7 @@ import haxeon.ui.widgets.text.TextField;
             "Could not repair reference",
             function() app.scene.repairSelectedReference(referenceIndex, candidate)
           );
-          app.commands.refresh();
+
         }, "repair-reference-" + referenceIndex + "-" + candidate)));
       }
       if (issue.pickable) {
@@ -318,7 +310,7 @@ import haxeon.ui.widgets.text.TextField;
             "Could not repair reference",
             function() app.scene.repairSelectedReferenceWithPick(pickedIndex)
           );
-          app.commands.refresh();
+
         }, "repair-reference-" + pickedIndex + "-picked")));
       }
     }
@@ -442,8 +434,7 @@ import haxeon.ui.widgets.text.TextField;
     // is rebuilt in a fresh scope, preserving the previous reset-on-selection behavior for edited controls.
     rows.push(new KeyedView("properties", new RetainedVariants("scene-properties", Std.string(app.inspectorModelId),
       function(_) return inspector,
-      function() return scene.revision + ":" + session.document.revision + ":" + simulation.appliedRevision + ":" +
-        inspector.contentRevision() + ":" + inspector.labelWidth + ":" +
+      function() return inspector.labelWidth + ":" +
         inspector.enabled + ":" + inspector.stackedRows + ":" + inspector.searchQuery,
       4, true)));
     var sheetWorkflow = SheetWorkflowPanel.build(app);
@@ -453,4 +444,22 @@ import haxeon.ui.widgets.text.TextField;
     return new Column("inspector-panel", rows, style);
   }
 
+}
+
+/** Rebuilds only the title when the selected object's label changes. */
+@:access(app.Main.ReferenceEditorApp) private class ObservableInspectorHeading implements View {
+  final app:ReferenceEditorApp;
+  final selected:EditorSceneObject;
+
+  public function new(app:ReferenceEditorApp, selected:EditorSceneObject) {
+    this.app = app;
+    this.selected = selected;
+  }
+
+  public function build(context:BuildContext):RenderNode {
+    var id = context.id("heading-root");
+    return context.selfUpdating(id, function() return new Column("heading", [
+      new KeyedView("text", app.sectionHeading(selected.label))
+    ]).buildWithId(context, id), false);
+  }
 }

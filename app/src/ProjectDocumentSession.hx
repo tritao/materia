@@ -1,5 +1,7 @@
 package app;
 
+import Observable;
+
 import materia.presentation.AssemblyPresentation;
 import materia.presentation.PresentationEdits;
 import materia.presentation.PresentationEdits.AuthoredPresentation;
@@ -62,7 +64,7 @@ import nativekit.scene.GeometryData;
 import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
 
 /** Owns the current document; unsuccessful I/O leaves it and its history intact. */
-class ProjectDocumentSession {
+class ProjectDocumentSession implements Observable {
   public static inline var MAX_HISTORY_OPERATIONS:Int = 1000;
   public static inline var MAX_HISTORY_ESTIMATED_BYTES:Int = 64 * 1024 * 1024;
 
@@ -1013,7 +1015,7 @@ class ProjectDocumentSession {
     var label = mate.kind
       + ": " + mate.first + "." + mate.firstConnector + " ↔ " + mate.second + "." + mate.secondConnector;
     var id = mate.id;
-    return new PropertyDescriptor("assembly-mate:" + id, label, PropertyType.Bool, function(_) {
+    return new PropertyDescriptor("assembly-mate:" + id, label, PropertyType.Bool, function() {
       for (current in assemblyMates.mates) if (current.id == id) return PropertyValue.Bool(true);
       return PropertyValue.Bool(false);
     }, function(_, value) switch (value) {
@@ -1029,7 +1031,7 @@ class ProjectDocumentSession {
     options.category = "Assembly";
     options.recordHistory = false;
     return new PropertyDescriptor("assembly-dependent:" + jointId, "Solved by closures",
-      PropertyType.Bool, function(_) return PropertyValue.Bool(assemblyDependentJoints.exists(jointId)), function(
+      PropertyType.Bool, function() return PropertyValue.Bool(assemblyDependentJoints.exists(jointId)), function(
         _,
         value
       ) switch (value) {
@@ -1058,7 +1060,7 @@ class ProjectDocumentSession {
       default:
         "Joint coordinate must be finite";
     };
-    return new PropertyDescriptor("assembly-joint:" + jointId, jointId, PropertyType.Float, function(_) {
+    return new PropertyDescriptor("assembly-joint:" + jointId, jointId, PropertyType.Float, function() {
       var state = assemblyRuntime;
       if (state == null) throw "Assembly state is no longer available";
       return PropertyValue.Float(state.joint(jointId) * factor);

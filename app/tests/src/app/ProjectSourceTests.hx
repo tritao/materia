@@ -417,16 +417,14 @@ typedef CubeRun = {
       "Parts nodes are not selectable objects");
     check(!tree.initiallyExpanded("parts:toolFlange"), "Parts nodes start collapsed");
     session.scene.select("project:tool/cup");
-    tree.revision();
     check(
       tree.initiallyExpanded("parts:toolFlange") && !tree.initiallyExpanded("parts:pedestal"),
       "selecting a part opens the Parts node that holds it"
     );
-    var before = tree.revision();
     session.scene.select("project:turret");
     check(
-      tree.revision() != before && !tree.initiallyExpanded("parts:toolFlange"),
-      "selecting elsewhere closes it again and changes the model revision"
+      !tree.initiallyExpanded("parts:toolFlange"),
+      "the tree derives expansion directly from the current selection"
     );
   }
 

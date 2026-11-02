@@ -35,7 +35,7 @@ import haxeon.ui.core.Command;
     }
     function guarded(action:Void -> Void):Void -> Void return function() {
       try action() catch (error:Dynamic) app.log("Printer command rejected: " + Std.string(error));
-      app.commands.refresh();
+
       app.invalidateView();
     };
     app.commands.register(new Command(

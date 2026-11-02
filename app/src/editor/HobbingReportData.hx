@@ -1,12 +1,14 @@
 package app.editor;
 
+import Observable;
+
 import gearkit.GearMeasurement;
 import gearkit.GearTrace;
 import Diffable;
 import Hashable;
 
 /** Presentation snapshot; numerical inspection and its qualification stay in GearKit. */
-class HobbingReportData {
+class HobbingReportData implements Observable {
   public var telemetry = new HobbingTelemetry();
   public var measurement:Null<GearMeasurement>;
 

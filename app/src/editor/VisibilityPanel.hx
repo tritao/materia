@@ -24,7 +24,6 @@ class VisibilityPanel implements TreeViewModel {
       "scene",
       true
     )] : [];
-  public function rootKeyAt(index:Int):String return "scene";
   public function childCount(key:String):Int return tree.visibilityChildren(key).length;
   public function childKeyAt(key:String, index:Int):String return tree.visibilityChildren(key)[index];
   // Show primary assemblies on first open; deeper ownership remains independently expandable.
@@ -32,7 +31,6 @@ class VisibilityPanel implements TreeViewModel {
   public function estimatedExtent():Float return 32;
   public function extentIsUniform():Bool return true;
   public function extentAt(key:String):Float return 32;
-  public function revision():Int return tree.revision();
   public function buildItem(key:String):View {
     var state = tree.visibilityState(key), label = tree.visibilityLabel(key);
     var check = new Checkbox("visibility-check:" + key, label, state.shown, _ -> {tree.toggleVisibility(key);

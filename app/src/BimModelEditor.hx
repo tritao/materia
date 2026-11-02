@@ -1,5 +1,7 @@
 package app;
 
+import Observable;
+
 import haxeon.ui.properties.PropertyDescriptor;
 import haxeon.ui.widgets.controls.Select;
 
@@ -30,7 +32,7 @@ import haxeon.ui.widgets.collections.TreeView;
 import haxeon.ui.widgets.scroll.ScrollView;
 
 /** Reusable editor surface combining spatial/type trees with the generic inspector. */
-class BimModelEditor {
+class BimModelEditor implements Observable {
   public final key:String;
   public final model:BimDocument;
   final projectDocument:Null<EditorDocument>;
@@ -69,10 +71,6 @@ class BimModelEditor {
   public function atWidth(width:Float):View return new BimEditorWidthView(this, width);
 
   public function build(context:BuildContext, width:Float):RenderNode {
-    context.observeInt(() -> model.cad.metadataRevision);
-    context.observeBool(() -> showingTypes);
-    context.observeString(() -> selectedElementId);
-    context.observeString(() -> selectedDefinitionId);
     var compact = width < COMPACT_WIDTH;
     var toolbarStyle = new LayoutStyle();
     toolbarStyle.width = LayoutAxis.grow();
@@ -85,12 +83,12 @@ class BimModelEditor {
       ), new KeyedView("undo", new IconButton(key + ":undo", IconName.Undo, "Undo BIM", function() {
       if (projectDocument == null) model.undo();
       else projectDocument.undo();
-      context.commands.refresh();
+
     }
     )), new KeyedView("redo", new IconButton(key + ":redo", IconName.Redo, "Redo BIM", function() {
       if (projectDocument == null) model.redo();
       else projectDocument.redo();
-      context.commands.refresh();
+
     }
     ))], toolbarStyle);
     var treeStyle = new LayoutStyle();
@@ -103,7 +101,7 @@ class BimModelEditor {
         selectedDefinitionId = typeTree.definitionIdForKey(nodeKey);
         var instanceId = typeTree.instanceIdForKey(nodeKey);
         selectedElementId = instanceId;
-        context.commands.refresh();
+
       }
       );
     } else {
@@ -112,7 +110,7 @@ class BimModelEditor {
         var selectedId = spatialTree.elementIdForKey(nodeKey);
         selectedElementId = selectedId == null ? null : selectedId.value;
         selectedDefinitionId = null;
-        context.commands.refresh();
+
       }
       );
     }
@@ -147,7 +145,7 @@ class BimModelEditor {
     var result = new Button(label, null, function() {
       if (types) showTypeTree();
       else showSpatialTree();
-      context.commands.refresh();
+
     }, key + ":mode:" + label.toLowerCase());
     result.selected = showingTypes == types;
     result.variant = ButtonVariant.Secondary;

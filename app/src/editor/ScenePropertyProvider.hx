@@ -32,7 +32,7 @@ import haxeon.ui.properties.PropertyValue;
     var visibility = new PropertyDescriptorOptions();
     visibility.category = "Rendering";
     result.push(new PropertyDescriptor(prefix + "visible",
-      "Visible", PropertyType.Bool, function(_) return PropertyValue.Bool(scene.requiredObject(id).visible), function(
+      "Visible", PropertyType.Bool, function() return PropertyValue.Bool(scene.requiredObject(id).visible), function(
         _,
         value
       ) {
@@ -52,7 +52,7 @@ import haxeon.ui.properties.PropertyValue;
       default:
         "Name requires text";
     };
-    result.push(new PropertyDescriptor(prefix + "name", "Name", PropertyType.Text, function(_) {
+    result.push(new PropertyDescriptor(prefix + "name", "Name", PropertyType.Text, function() {
       var item = scene.object(id);
       if (item == null) throw "Unknown scene object: " + id;
       return PropertyValue.Text(item.label);
@@ -86,7 +86,7 @@ import haxeon.ui.properties.PropertyValue;
       EditorScene.encodeColour(initialColour.red, initialColour.green, initialColour.blue),
       [initialColour.red, initialColour.green, initialColour.blue]
     );
-    result.push(new PropertyDescriptor(prefix + "colour", "Colour", PropertyType.Text, function(_) {
+    result.push(new PropertyDescriptor(prefix + "colour", "Colour", PropertyType.Text, function() {
       var item = scene.requiredObject(id);
       return PropertyValue.Text(EditorScene.encodeColour(item.red, item.green, item.blue));
     }, function(_, value) {
@@ -119,7 +119,7 @@ import haxeon.ui.properties.PropertyValue;
       default:
         "Finish requires a preset";
     };
-    result.push(new PropertyDescriptor(prefix + "finish", "Finish", PropertyType.Enum, function(_) {
+    result.push(new PropertyDescriptor(prefix + "finish", "Finish", PropertyType.Enum, function() {
       var item = scene.requiredObject(id);
       var appearance = item.appearance;
       if (sourceFinish != null && EditorScene.sameFinish(appearance,
@@ -162,7 +162,7 @@ import haxeon.ui.properties.PropertyValue;
         return number == null || !EditorScene.validColour(number) ? "Value must be between 0 and 1" : null;
       };
       result.push(new PropertyDescriptor(prefix + field,
-        field == "metallic" ? "Metallic" : "Roughness", PropertyType.Float, function(_) {
+        field == "metallic" ? "Metallic" : "Roughness", PropertyType.Float, function() {
         var current = scene.requiredObject(id).appearance;
         if (current == null) current = Appearances.neutral();
         return PropertyValue.Float(field == "metallic" ? current.metallic : current.roughness);

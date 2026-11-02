@@ -57,7 +57,7 @@ class StockSimulationKind implements ObjectKindProvider {
         "Timeline position requires a whole number of moves";
     };
     result.push(new PropertyDescriptor(prefix + "stock-timeline", "Moves cut",
-      PropertyType.Int, function(_) return PropertyValue.Int(scene.stockSimulation(id).position()), function(
+      PropertyType.Int, function() return PropertyValue.Int(scene.stockSimulation(id).position()), function(
         _,
         value
       ) switch value {
@@ -79,7 +79,7 @@ class StockSimulationKind implements ObjectKindProvider {
         "Colour by operation or deviation";
     };
     result.push(new PropertyDescriptor(prefix + "stock-colouring", "Colour by",
-      PropertyType.Enum, function(_) return PropertyValue.Enum(scene.stockSimulation(id).colorBy), function(
+      PropertyType.Enum, function() return PropertyValue.Enum(scene.stockSimulation(id).colorBy), function(
         _,
         value
       ) switch value {
@@ -132,7 +132,7 @@ class StockSimulationKind implements ObjectKindProvider {
       id,
       label,
       PropertyType.Text,
-      function(_) return PropertyValue.Text(text()),
+      function() return PropertyValue.Text(text()),
       function(_, _) throw label + " is read-only",
       settings
     );

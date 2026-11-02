@@ -1,5 +1,7 @@
 package app.editor;
 
+import Observable;
+
 import app.Main.ReferenceEditorApp;
 import app.EditorPerspectiveViewport;
 import haxeon.ui.core.View;
@@ -13,9 +15,8 @@ import haxeon.ui.widgets.layout.SizedBox;
 import haxeon.ui.widgets.text.Text;
 
 /** One independent presentation cursor, hosted either in a dock or a picture-in-picture layer. */
-@:access(app.Main.ReferenceEditorApp) class InspectionCameraPanel {
+@:access(app.Main.ReferenceEditorApp) class InspectionCameraPanel implements Observable {
   public var overlay(default, null) = false;
-  var bindingRevision = 0;
   var viewport:Null<EditorPerspectiveViewport>;
   var generation = -1;
   var zoom = 1.0;
@@ -27,10 +28,7 @@ import haxeon.ui.widgets.text.Text;
   function setOverlay(value:Bool):Void {
     if (overlay == value) return;
     overlay = value;
-    bindingRevision++;
   }
-  public function presentationKey():String return overlay + ":" + generation + ":" + zoom + ":" + (viewport
-    == null ? "" : viewport.presentationKey());
   public function advancePresentation(seconds:Float):Bool return viewport != null
     && viewport.advancePresentation(seconds);
   public function dispose():Void {
@@ -45,7 +43,8 @@ import haxeon.ui.widgets.text.Text;
       generation = app.session.generation;
       zoom = 1;
     }
-    if (app.session.presentation == null || app.hostContext == null) return;
+    var presentation = app.session.presentation;
+    if (presentation == null || app.hostContext == null) return;
     if (viewport == null) {
       viewport = new EditorPerspectiveViewport("inspection-camera-view", app.scene, app.hostContext);
       viewport.setPlacementOptions(false, 0, false);
@@ -56,7 +55,7 @@ import haxeon.ui.widgets.text.Text;
       };
     }
     viewport.setPresentation(
-      app.session.presentation,
+      presentation,
       app.session.projectAssemblyDefinition,
       app.session.presentationCenters(),
       app.session.assemblyUnitMetres(),
@@ -64,7 +63,7 @@ import haxeon.ui.widgets.text.Text;
     );
     viewport.solvePresentationJoints = app.session.presentationJointPoses;
     viewport.presentationGeometryFingerprint = app.session.presentationGeometryFingerprint;
-    var frame = app.framePresentation;
+    var frame = app.currentFramePresentation();
     var active = app.simulation.isActive(), revision = frame == null ? 0 : frame.revision;
     if (simulationRevision != revision || simulationActive != active) {
       viewport.setSimulationState(active, frame == null ? [] : frame.environment, revision);
@@ -74,18 +73,8 @@ import haxeon.ui.widgets.text.Text;
     viewport.setSampleCount(app.antialiasing);
     viewport.setLightingPreset(app.lightingPreset);
   }
-  public function requestPaintPatch():Void {
-    if (viewport != null && !viewport.updateRetainedPaint()) bindingRevision++;
-  }
-  public function observe(app:ReferenceEditorApp, context:haxeon.ui.core.BuildContext):Void {
-    context.observeBool(() -> overlay);
-    context.observeInt(() -> bindingRevision);
-    context.observeBool(() -> app.session.presentation != null);
-    context.observeBool(() -> app.hostContext != null);
-    context.observeInt(() -> generation);
-    var current = viewport;
-    context.observeBool(() -> viewport == current);
-    if (current != null) PresentationControls.observe(current, context);
+  public function requestPaintPatch():Bool {
+    return viewport == null || viewport.updateRetainedPaint();
   }
   public function build(app:ReferenceEditorApp, inOverlay:Bool = false):View {
     var style = new LayoutStyle();

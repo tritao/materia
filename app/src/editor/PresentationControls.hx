@@ -15,55 +15,6 @@ import haxeon.ui.widgets.text.Text;
 
 /** Shared controls for the main viewport, dock and picture-in-picture. */
 class PresentationControls {
-  /** Observe the controls' data separately from the live image's camera and physics revisions. */
-  public static function observe(viewport:EditorPerspectiveViewport, context:haxeon.ui.core.BuildContext):Void {
-    context.observeBool(() -> viewport.presentation != null);
-    if (viewport.presentation == null) return;
-    function current():PresentationController {
-      var controller = viewport.presentation;
-      if (controller == null) throw "Presentation controls lost their controller while reading dependencies";
-      return controller;
-    }
-    context.observeBool(() -> viewport.presentationControlsExpanded);
-    context.observeBool(viewport.presentationOffsetEditing);
-    context.observeBool(viewport.presentationControlsEnabled);
-    var views = context.observeInt(() -> viewport.presentation == null ? 0 : current().record.views.length);
-    for (index in 0...views) {
-      context.observeString(() -> current().record.views[index].id);
-      context.observeString(() -> current().record.views[index].label);
-    }
-    var procedures = context.observeInt(() -> current().record.procedures.length);
-    for (index in 0...procedures) {
-      context.observeString(() -> current().record.procedures[index].id);
-      context.observeString(() -> current().record.procedures[index].label);
-    }
-    context.observeBool(() -> current().record.explode.length > 0);
-    context.observeString(() -> Std.string(current().cursor.explode));
-    context.observeString(() -> current().cursor.procedure);
-    context.observeInt(() -> current().cursor.step);
-    context.observeBool(() -> current().animating);
-    context.observeBool(() -> current().failedMovement());
-    context.observeInt(() -> {
-      var procedure = current().selectedProcedure();
-      return procedure == null ? -1 : procedure.steps.length;
-    });
-    context.observeString(() -> {
-      var frame = viewport.presentationFrame();
-      return frame == null ? current().cursor.view : frame.view;
-    });
-    context.observeString(() -> {
-      var frame = viewport.presentationFrame();
-      return frame == null || frame.activeStep == null ? null : frame.activeStep.title;
-    });
-    context.observeString(() -> {
-      var frame = viewport.presentationFrame();
-      return frame == null || frame.activeStep == null ? null : frame.activeStep.instruction;
-    });
-    context.observeString(() -> {
-      var frame = viewport.presentationFrame();
-      return frame == null ? null : frame.evidence;
-    });
-  }
   public static function build(
     viewport:EditorPerspectiveViewport,
     changed:Void -> Void,

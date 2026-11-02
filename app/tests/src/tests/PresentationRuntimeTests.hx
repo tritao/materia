@@ -66,15 +66,12 @@ import sys.FileSystem;
     var definition = artifact.assemblyDefinition;
     if (definition == null) throw "Missing assembly definition";
     var record = materia.presentation.Presentations.assembled(definition);
-    record.views.push({
-      id: "inside",
-      label: "See inside",
-      camera: record.views[0].camera,
-      visibility: [{select: {occurrence: "cover", subtree: false}, mode: Transparent}],
-      sections: [{occurrence: null, point: {x: 5, y: 5, z: 5}, normal: {x: 1, y: 1, z: 1}}],
-      explode: 0,
-      source: Generated("test")
-    });
+    record.views.push(new materia.presentation.AssemblyPresentation.PresentationView(
+      "inside", "See inside", record.views[0].camera,
+      [{select: {occurrence: "cover", subtree: false}, mode: Transparent}],
+      [{occurrence: null, point: {x: 5, y: 5, z: 5}, normal: {x: 1, y: 1, z: 1}}],
+      0, Generated("test")
+    ));
     record.explode = [{
       select: {occurrence: "cover", subtree: false},
       direction: {x: 0, y: 0, z: 1},
@@ -152,7 +149,11 @@ import sys.FileSystem;
     var fresh = viewport.presentationFrame();
     if (fresh == null) throw "Missing frame";
     var expected = signature(fresh);
+    var initialPaintKey = viewport.presentationKey();
     viewport.selectPresentationView("inside");
+    var selectedPaintKey = viewport.presentationKey();
+    check(selectedPaintKey != initialPaintKey && viewport.presentationKey() == selectedPaintKey,
+      "Replacing the presentation cursor invalidates the render once");
     var view = new nativekit.scene.SceneView();
     viewport.sectionView(view);
     check(

@@ -1,5 +1,7 @@
 package app.editor;
 
+import Observable;
+
 import app.editor.ExampleCatalog.ExampleEntry;
 
 typedef ExampleFamily = {
@@ -10,7 +12,7 @@ typedef ExampleFamily = {
 }
 
 /** Start-page navigation state and searchable groups; opening still uses the original catalogue entries. */
-class ExampleBrowser {
+class ExampleBrowser implements Observable {
   public static final categories = [
     "All",
     "Robotics & handling",

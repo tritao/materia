@@ -57,7 +57,7 @@ import haxeon.ui.core.UiModifier;
     app.commands.register(new Command("editor.discard-stale-edits", "Discard stale edits", function() {
       if (app.session.discardStaleEdits()) {
         app.log("Discarded stale project edits");
-        app.commands.refresh();
+
       }
     }, null, function() return !app.documents.blocked() && app.session.staleEdits().length > 0));
   }

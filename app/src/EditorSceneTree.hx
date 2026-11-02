@@ -219,8 +219,6 @@ import materia.assembly.AssemblyDefinition;
   var cachedSelectionKey:String = "";
   var filter:String = "";
   var filterRevision:Int = 0;
-  var revealed:String = "";
-  var revealSerial:Int = 0;
   public function setFilter(value:String):Void {
     var next = StringTools.trim(value == null ? "" : value).toLowerCase();
     if (next != filter) {
@@ -357,7 +355,6 @@ import materia.assembly.AssemblyDefinition;
       "scene",
       true
     )] : [];
-  public function rootKeyAt(index:Int):String return "scene";
   public function childCount(parentKey:String):Int {
     return visibleChildren(parentKey).length;
   }
@@ -431,13 +428,5 @@ import materia.assembly.AssemblyDefinition;
       );
     }
     return iconLabeledItem(key, "Scene", IconName.Hierarchy);
-  }
-  public function revision():Int {
-    var selected = selectionKey();
-    if (selected != revealed) {
-      revealed = selected;
-      revealSerial++;
-    }
-    return scene.revision + filterRevision * 1000000 + revealSerial;
   }
 }

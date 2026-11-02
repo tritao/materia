@@ -3,7 +3,7 @@ package cadkit.parametric;
 class InstanceElement extends Element {
   public var definitionId(default, null):DefinitionId;
 
-  private final overrides:Map<String, Dynamic>;
+  private var overrides:Map<String, Dynamic>;
 
   public function new(document:Document, id:ElementId, name:String, definitionId:DefinitionId) {
     super(document, id, name, ElementKind.Instance);
@@ -84,13 +84,13 @@ class InstanceElement extends Element {
   public function removeOverride(name:String):Void document.removeInstanceOverride(this, name);
 
   public function restoreOverride(name:String, value:Dynamic):Void {
-    if (value == null) overrides.remove(name);
-    else overrides.set(name, value);
-    document.metadataChanged();
+    var next = new Map<String, Dynamic>();
+    for (key in overrides.keys()) if (key != name) next.set(key, overrides.get(key));
+    if (value != null) next.set(name, value);
+    overrides = next;
   }
 
   public function restoreDefinitionId(value:DefinitionId):Void {
     definitionId = value;
-    document.metadataChanged();
   }
 }

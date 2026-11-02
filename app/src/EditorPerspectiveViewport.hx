@@ -1,7 +1,10 @@
 package app;
 
+import Observable;
+
 import materia.presentation.AssemblyPresentation;
 import materia.presentation.PresentationEvaluator.PresentationFrame;
+import materia.presentation.PresentationEvaluator.PresentationCursor;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinitionFlattener;
 import materia.assembly.AssemblyFrames;
@@ -39,7 +42,7 @@ import haxeon.ui.semantics.AccessibilityRole;
 import haxeon.ui.semantics.Semantics;
 
 /** Interactive SceneKit GPU viewport composited into the editor UI. */
-class EditorPerspectiveViewport implements View {
+class EditorPerspectiveViewport implements View implements Observable {
   var cosmeticThreadsVisible:Bool = true;
   /** The closest pairs drawn in the viewport; the toolbar counts all of them. */
   static inline var MAX_DRAWN_COLLISIONS:Int = 16;
@@ -82,6 +85,11 @@ class EditorPerspectiveViewport implements View {
   var presentationScale = 1.0;
   var presentationResult:Null<PresentationFrame>;
   var presentationRevision = "";
+  @:unobservable var presentationInputKey = "";
+  @:unobservable var presentationInputController:Null<PresentationController>;
+  @:unobservable var presentationInputCursor:Null<PresentationCursor>;
+  @:unobservable var presentationInputAnimating = false;
+  @:unobservable var presentationFrameSerial = 0;
   var presentationPoses:Array<SimulationPoseVisual> = [];
   var presentationPoseById:Map<String, SimulationPoseVisual> = [];
   var presentationCameraDirty = true;
@@ -343,12 +351,8 @@ class EditorPerspectiveViewport implements View {
     var pose = presentationPoseById.get(item.id);
     var center = pose == null ? [item.x, item.y, item.z] : pose.position;
     var factor = 0.5 / Math.tan(PerspectiveCamera.FOV_Y * Math.PI / 360) * 1.15 * Math.max(1, 1 / aspect());
-    var value:PresentationView = {
-      id: id,
-      label: label,
-      source: Authored,
-      explode: controller.cursor.explode,
-      camera: Anchored(
+    var value = new PresentationView(
+      id, label, Anchored(
         {occurrence: anchor, subtree: false},
         {
           x: (camera.targetX - center[0]) / presentationScale,
@@ -358,10 +362,8 @@ class EditorPerspectiveViewport implements View {
         camera.distance / factor / presentationScale,
         camera.yaw,
         camera.pitch
-      ),
-      visibility: selected.visibility,
-      sections: sourceSections(frame.sections)
-    };
+      ), selected.visibility, sourceSections(frame.sections), controller.cursor.explode, Authored
+    );
     if (selected.displayTransform != null) value.displayTransform = selected.displayTransform;
     return haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(value));
   }
@@ -378,9 +380,11 @@ class EditorPerspectiveViewport implements View {
       presentationPoseById.clear();
       return;
     }
-    var key = scene.visualRevision + ":"
-      + runtimeRevision + ":" + simulationActive + ":" + controller.revision + ":" + presentationGeometryFingerprint;
-    if (key == presentationRevision) return;
+    var cursor = controller.cursor, animating = controller.animating;
+    var key = scene.visualRevision + ":" + runtimeRevision + ":" + simulationActive
+      + ":" + presentationGeometryFingerprint;
+    if (key == presentationInputKey && controller == presentationInputController
+      && cursor == presentationInputCursor && animating == presentationInputAnimating) return;
     var flat = AssemblyDefinitionFlattener.flattenView(controller.definition);
     var solved = new Map<String, AssemblyFrame>();
     for (part in flat.occurrences) {
@@ -433,7 +437,11 @@ class EditorPerspectiveViewport implements View {
     }
     simulationTransforms.clear();
     simulationTransformCount = 0;
-    presentationRevision = key;
+    presentationInputKey = key;
+    presentationInputController = controller;
+    presentationInputCursor = cursor;
+    presentationInputAnimating = animating;
+    presentationRevision = key + ":" + ++presentationFrameSerial;
   }
   function displayPoses():Null<Array<SimulationPoseVisual>> {
     updatePresentation();
@@ -578,7 +586,7 @@ class EditorPerspectiveViewport implements View {
   var cursorInside:Bool = false;
   var cursorX:Float = 0.0;
   var cursorY:Float = 0.0;
-  var hoverSceneRevision:Int = -1;
+  @:unobservable var hoverSceneRevision:Int = -1;
   var objectDrag:Null<PerspectiveSceneDrag> = null;
   /** An IK drag of a joint-driven part: the pressed point follows a screen-parallel plane. */
   var assemblyDrag:Null<SceneAssemblyDrag> = null;
@@ -599,7 +607,7 @@ class EditorPerspectiveViewport implements View {
   var sampleCountApplied:Int = 0;
   var sampleCountEffective:Int = 1;
   var renderedSampleCount:Int = 0;
-  var runtimeRevision:Int = 0;
+  @:unobservable var runtimeRevision:Int = 0;
   var simulationPoses:Array<SimulationPoseVisual> = [];
   // Resolve each displayed pose once per simulation presentation, shared by clipping and framing.
   var simulationPoseById:Map<String, SimulationPoseVisual> = new Map();
@@ -653,10 +661,13 @@ class EditorPerspectiveViewport implements View {
   }
 
   /** Revision key for state that changes the retained viewport presentation. */
-  public function presentationKey():String return scene.visualRevision + ":" + camera.revision + ":" + lightingRevision
-    + ":" + sketchDragRevision + ":" + assemblyDragRevision + ":" + matePickRevision + ":" + (presentation
-    == null ? 0 : presentation.revision) + ":" + hoverRevision + ":orbit:"
-    + orbiting() + ":" + gridVisible + ":" + gridStep + ":" + sampleCountRequested + ":" + collisionRevision;
+  public function presentationKey():String {
+    updatePresentation();
+    return scene.visualRevision + ":" + camera.revision + ":" + lightingRevision
+      + ":" + sketchDragRevision + ":" + assemblyDragRevision + ":" + matePickRevision + ":"
+      + presentationRevision + ":" + hoverRevision + ":orbit:" + orbiting() + ":" + gridVisible
+      + ":" + gridStep + ":" + sampleCountRequested + ":" + collisionRevision;
+  }
 
   public function setLightingPreset(preset:Int):Void {
     if (preset < 0 || preset > 2 || preset == lightingPreset) return;
@@ -666,7 +677,14 @@ class EditorPerspectiveViewport implements View {
 
   var paintContext:Null<BuildContext>;
   var paintNodeId:Null<haxeon.ui.core.WidgetId>;
-  var submittedPaintKey:Null<String>;
+  @:unobservable var submittedPaintKey:Null<String>;
+  @:unobservable var submittedCameraRevision:Int = -1;
+
+  /** The native camera mutates in place, so its revision needs an explicit paint patch. */
+  public function requestCameraPaintPatch():Bool {
+    if (paintContext == null || paintNodeId == null) return true;
+    return submittedCameraRevision == camera.revision || updateRetainedPaint();
+  }
 
   /** True when the image is current or a patch is scheduled; false requires the owner to rebuild an unmounted binding. */
   public function updateRetainedPaint():Bool {
@@ -699,9 +717,9 @@ class EditorPerspectiveViewport implements View {
     node.hitTestSelf = true;
     node.focusable = true;
     node.semantics = new Semantics(AccessibilityRole.Image, "Scene perspective GPU view");
-    revalidateHover();
     updatePresentation();
     submittedPaintKey = paintKey();
+    submittedCameraRevision = camera.revision;
     node.onPaint(paint, submittedPaintKey);
     installNavigation(node);
     return node;
@@ -825,6 +843,7 @@ class EditorPerspectiveViewport implements View {
 
   /** Advance held-key motion once per host frame, independently of key repeat. */
   public function advanceNavigation(deltaSeconds:Float):Void {
+    revalidateHover();
     if (!flying()) return;
     var forward = flyAxis(UiKey.W, UiKey.S);
     var right = flyAxis(UiKey.D, UiKey.A);

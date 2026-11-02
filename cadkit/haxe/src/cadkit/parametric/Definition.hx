@@ -1,6 +1,8 @@
 package cadkit.parametric;
 
-class Definition {
+import Observable;
+
+class Definition implements Observable {
   public static inline var SubgraphRecipe:String = "cadkit.subgraph";
 
   public final document:Document;
@@ -14,7 +16,7 @@ class Definition {
   private final orderedInputs:Array<DefinitionInput>;
   private final outputsByName:Map<String, DefinitionOutput>;
   private final orderedOutputs:Array<DefinitionOutput>;
-  private final propertyValues:Map<String, TypedProperty>;
+  private var propertyValues:Map<String, TypedProperty>;
 
   public function new(
     document:Document,
@@ -75,9 +77,10 @@ class Definition {
 
   /** Internal document history and codec path. */
   public function restoreProperty(name:String, value:Null<TypedProperty>):Void {
-    if (value == null) propertyValues.remove(name);
-    else propertyValues.set(name, value);
-    document.metadataChanged();
+    var next = new Map<String, TypedProperty>();
+    for (key in propertyValues.keys()) if (key != name) next.set(key, propertyValues.get(key));
+    if (value != null) next.set(name, value);
+    propertyValues = next;
   }
 
   public function setProperty(value:TypedProperty):Void document.setDefinitionProperty(this, value);
@@ -118,17 +121,14 @@ class Definition {
   public function restoreEditedMarker(name:String, editedByUser:Bool):Void {
     var value = input(name);
     value.restore(value.defaultValue, editedByUser);
-    document.metadataChanged();
   }
 
   public function restoreDefault(name:String, value:Dynamic, revision:Int, editedByUser:Bool):Void {
     input(name).restore(value, editedByUser);
     this.revision = revision;
-    document.metadataChanged();
   }
 
   public function restoreRevision(value:Int):Void {
     revision = value;
-    document.metadataChanged();
   }
 }

@@ -1,5 +1,7 @@
 package app;
 
+import Observable;
+
 import haxeon.ui.widgets.text.Text;
 
 
@@ -20,7 +22,7 @@ import robotkit.model.Sensor;
 import robotkit.runtime.RobotRuntimeCompiler;
 
 /** Editable RobotKit sensor model used by Materia's sensor panel. */
-class SensorConfiguration {
+class SensorConfiguration implements Observable {
   var active:robotkit.model.RobotDefinition;
   public var model(get, never):RobotModel;
   public var profile(get, never):robotkit.profile.RobotProfile;
@@ -31,11 +33,6 @@ class SensorConfiguration {
   public var robotId(default, null):String = "materia/robot";
   var nextId:Int = 1;
   var empty:Bool = false;
-  var configurationRevision:Int = 0;
-  var physicsRevision:Int = 1;
-  var observedDocumentRevision:Int = -1;
-  var observedConfigurationRevision:Int = -1;
-  var observedPhysicsState:Null<String> = null;
   final configurations:Map<String, Dynamic> = new Map();
   final liveModels:Map<String, robotkit.model.RobotDefinition> = new Map();
   final selections:Map<String, Int> = new Map();
@@ -98,7 +95,6 @@ class SensorConfiguration {
       document.apply(new EditOperation("Add robot configuration", function() {
         empty = false;
         createDefault(id);
-        configurationRevision++;
       }, function() {
         configurations.remove(id);
         liveModels.remove(id);
@@ -110,7 +106,6 @@ class SensorConfiguration {
         active = previousDefinition;
         selectedIndex = previousSelection;
         empty = true;
-        configurationRevision++;
       }
       ));
       return true;
@@ -123,7 +118,6 @@ class SensorConfiguration {
         var activeId = robotId;
         createDefault(id);
         if (activeId != previousId && activeId != id) activate(activeId, configurations.get(activeId));
-        configurationRevision++;
       }, function() {
         var activeId = robotId;
         configurations.remove(id);
@@ -133,7 +127,6 @@ class SensorConfiguration {
         positions.remove(id);
         rotations.remove(id);
         if (activeId == id) activate(previousId, configurations.get(previousId));
-        configurationRevision++;
       }
       ));
       return true;
@@ -149,31 +142,6 @@ class SensorConfiguration {
     result.sort(Reflect.compare);
     return result;
   }
-  /** Changes only when simulation inputs change, even with a shared editor document. */
-  public function revision():Int {
-    if (observedDocumentRevision != document.revision || observedConfigurationRevision != configurationRevision) {
-      var current = physicsState();
-      if (observedPhysicsState != null && current != observedPhysicsState) physicsRevision++;
-      observedPhysicsState = current;
-      observedDocumentRevision = document.revision;
-      observedConfigurationRevision = configurationRevision;
-    }
-    return physicsRevision;
-  }
-
-  function physicsState():String {
-    var ids:Array<String> = [for (id in configurations.keys()) id];
-    for (id in liveModels.keys()) if (ids.indexOf(id) < 0) ids.push(id);
-    ids.sort(Reflect.compare);
-    var records:Array<Dynamic> = [];
-    for (id in ids) {
-      var live = liveModels.get(id);
-      var record = live == null ? configurations.get(id) : singleRecordFor(id, live);
-      records.push(withoutNames(haxe.Json.parse(haxe.Json.stringify(record))));
-    }
-    return haxe.Json.stringify({robots: records});
-  }
-
   static function withoutNames(value:Dynamic):Dynamic {
     if (value == null) return null;
     if (Std.isOfType(value, Array)) {
@@ -668,7 +636,7 @@ class SensorConfiguration {
     unit:Null<String>,
     step:Float
   ):PropertyDescriptor return new PropertyDescriptor(sensor.id + ":" + id,
-    label, PropertyType.Float, function(_) return PropertyValue.Float(read()), function(
+    label, PropertyType.Float, function() return PropertyValue.Float(read()), function(
       _,
       value
     ) switch value {
@@ -687,7 +655,7 @@ class SensorConfiguration {
   ));
   static function integer(sensor:Sensor, id:String, label:String, read:Void -> Int,
     write:Int -> Void, min:Int, max:Int):PropertyDescriptor return new PropertyDescriptor(sensor.id + ":" + id,
-    label, PropertyType.Int, function(_) return PropertyValue.Int(read()), function(
+    label, PropertyType.Int, function() return PropertyValue.Int(read()), function(
       _,
       value
     ) switch value {
@@ -708,7 +676,7 @@ class SensorConfiguration {
     var options = settings(category, null, null, null, 1);
     options.options = choices;
     return new PropertyDescriptor(sensor.id + ":" + id,
-      label, PropertyType.Enum, function(_) return PropertyValue.Enum(read()), function(
+      label, PropertyType.Enum, function() return PropertyValue.Enum(read()), function(
         _,
         value
       ) switch value {
@@ -728,7 +696,7 @@ class SensorConfiguration {
         "Text required";
     };
     return new PropertyDescriptor(sensor.id + ":" + id,
-      label, PropertyType.Text, function(_) return PropertyValue.Text(read()), function(
+      label, PropertyType.Text, function() return PropertyValue.Text(read()), function(
         _,
         value
       ) switch value {
@@ -742,7 +710,7 @@ class SensorConfiguration {
     var options = settings("Identity", null, null, null, 1);
     options.readOnly = true;
     return new PropertyDescriptor(sensor.id + ":" + id,
-      label, PropertyType.Text, function(_) return PropertyValue.Text(value), function(
+      label, PropertyType.Text, function() return PropertyValue.Text(value), function(
         _,
         _
       ) {

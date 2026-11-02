@@ -1,5 +1,7 @@
 package app;
 
+import Observable;
+
 import app.MissionPlayer.MissionProgress;
 import materia.project.SceneArtifact.SceneArtifactMission;
 
@@ -18,7 +20,7 @@ typedef MissionViewState = {
 }
 
 /** Runtime mission execution and progress. Project variants are managed separately. */
-class MissionController {
+class MissionController implements Observable {
   final session:ProjectDocumentSession;
   final simulation:ApplicationSimulation;
   final inspect:String -> Void;
@@ -72,38 +74,6 @@ class MissionController {
 
   /** Request a frame for view-local choices without changing execution. */
   public function requestRefresh():Void changed();
-
-  public function observe(context:haxeon.ui.core.BuildContext):Void {
-    context.observeInt(generation);
-    context.observeInt(() -> session.document.revision);
-    var authored = session.missions, job = session.cncJob;
-    context.observeBool(() -> session.missions == authored);
-    context.observeBool(() -> session.cncJob == job);
-    context.observeString(selectedProgram);
-    context.observeBool(simulation.isRunning);
-    var player = currentPlayer();
-    context.observeBool(() -> currentPlayer() == player);
-    if (player != null) {
-      context.observeString(player.progressPhase);
-      context.observeInt(() -> player.stepIndex);
-      context.observeInt(() -> player.completed);
-      context.observeString(() -> player.failure);
-      context.observeString(player.startupAxis);
-      context.observeString(player.startupPhase);
-    }
-    if (job != null && job.mission != null) {
-      var cnc = simulation.cncPlayer();
-      context.observeBool(() -> simulation.cncPlayer() == cnc);
-      if (cnc != null) {
-        context.observeString(() -> cnc.failure);
-        context.observeInt(() -> cnc.currentLine);
-        context.observeBool(cnc.finished);
-        context.observeBool(cnc.hasStarted);
-        context.observeBool(cnc.held);
-        context.observeString(cnc.statusDetail);
-      }
-    }
-  }
 
   public function snapshot():MissionViewState {
     // The one implicit controller of a scene without modelled controllers is "".

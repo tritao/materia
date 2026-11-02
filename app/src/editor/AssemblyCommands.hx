@@ -36,7 +36,7 @@ import haxeon.ui.core.Command;
       var viewport = app.perspectiveViewport;
       if (viewport == null) return;
       viewport.beginMatePick(new MatePickTool(app.session, kind));
-      app.commands.refresh();
+
     }, null, function() return app.canEditObjects() && app.perspectiveViewport != null && app.session.canMateFaces()));
   }
 }

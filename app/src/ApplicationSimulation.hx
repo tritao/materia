@@ -1,5 +1,7 @@
 package app;
 
+import Observable;
+
 import haxe.Int64;
 import materia.assembly.AssemblyFrames;
 import humankit.sim.HumanWorker;
@@ -58,7 +60,7 @@ private typedef AssemblyVisual = {
  * world: a SimKit session in which the robots, the environment props, and any
  * people take part.
  */
-class ApplicationSimulation {
+class ApplicationSimulation implements Observable {
   public static inline var DETERMINISTIC:Int = 0;
   public static inline var MUJOCO:Int = 1;
   public final world:RobotWorld;
@@ -158,7 +160,7 @@ class ApplicationSimulation {
   }
 
   public function pending(configuration:SensorConfiguration, scene:EditorScene):Bool return appliedDocumentRevision
-    != configuration.revision() || appliedEnvironmentRevision != scene.environmentRevision
+    != configuration.document.revision || appliedEnvironmentRevision != scene.environmentRevision
     || appliedBackend != backend || appliedTimestep != timestep || appliedParticipantRevision != participantRevision;
 
   /** Adds a participant to every session built from the next rebuild on. */
@@ -879,7 +881,7 @@ class ApplicationSimulation {
       refreshMembers();
       assemblyParts = candidateAssemblyParts;
       appliedRevision++;
-      appliedDocumentRevision = configuration.revision();
+      appliedDocumentRevision = configuration.document.revision;
       appliedEnvironmentRevision = scene.environmentRevision;
       appliedBackend = backend;
       appliedTimestep = timestep;

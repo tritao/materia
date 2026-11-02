@@ -1,5 +1,7 @@
 package materia.presentation;
 
+import Observable;
+
 import materia.assembly.AssemblyDefinition.AssemblyVector;
 import materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
 
@@ -38,18 +40,29 @@ import materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
   @:id(2) var point:AssemblyVector;
   @:id(3) var normal:AssemblyVector;
 }
-@:wire typedef PresentationView = {
-  @:id(1) var id:String;
-  @:id(2) var label:String;
-  @:id(3) var camera:ViewCamera;
-  @:id(4) var visibility:Array<VisibilityRule>;
-  @:id(5) var sections:Array<SectionPlane>;
-  @:id(6) var explode:Float;
-  @:id(7) @:optional var source:PresentationSource;
+@:wire class PresentationView implements Observable {
+  @:id(1) public var id:String;
+  @:id(2) public var label:String;
+  @:id(3) public var camera:ViewCamera;
+  @:id(4) public var visibility:Array<VisibilityRule>;
+  @:id(5) public var sections:Array<SectionPlane>;
+  @:id(6) public var explode:Float;
+  @:id(7) @:optional public var source:Null<PresentationSource>;
   /** Rigid display-world from assembly-world transform; absent means identity.
    * Engineering poses, mass, collision and motion evidence are unchanged.
    */
-  @:id(8) @:optional var displayTransform:materia.assembly.AssemblyRecord.AssemblyFrame;
+  @:id(8) @:optional public var displayTransform:Null<materia.assembly.AssemblyRecord.AssemblyFrame>;
+
+  public function new(id:String, label:String, camera:ViewCamera, visibility:Array<VisibilityRule>,
+    sections:Array<SectionPlane>, explode:Float, ?source:PresentationSource) {
+    this.id = id;
+    this.label = label;
+    this.camera = camera;
+    this.visibility = visibility;
+    this.sections = sections;
+    this.explode = explode;
+    this.source = source;
+  }
 }
 @:wire typedef ExplodeOffset = {
   @:id(1) var select:PartSelector;

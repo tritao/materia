@@ -20,12 +20,10 @@ import haxeon.ui.widgets.text.Text;
 @:access(app.Main.ReferenceEditorApp) class HierarchyPanel {
   public static inline var SIMULATION_LOCK_HINT:String = "Simulation active. Press Design to edit.";
 
-  /** Retained by what it observes (DockPanelContent.observing); the tree observes its own model. */
+  /** Retained by the observable scene and search fields; the tree tracks model fields for its own rows. */
   public static function build(app:ReferenceEditorApp, context:BuildContext):View {
-    var search = context.observeString(() -> app.hierarchySearch);
-    var selection = context.observeString(() -> app.treeModel.selectionKey());
-    // Expanding a row is reported by the tree through this counter.
-    context.observeInt(() -> app.hierarchyExpansionRevision);
+    var search = app.hierarchySearch;
+    var selection = app.treeModel.selectionKey();
     var addStyle = new LayoutStyle();
     addStyle.padding = new Insets(6.0, 8.0, 6.0, 8.0);
     addStyle.childGap = 5.0;
@@ -59,12 +57,8 @@ import haxeon.ui.widgets.text.Text;
       app.log("Framed " + id);
     }, null, null);
     app.treeModel.canChangeVisibility = function() return !app.documents.blocked();
-    app.treeModel.onVisibilityChanged = function() {
-      app.commands.refresh();
-      app.invalidateView();
-    };
+    app.treeModel.onVisibilityChanged = app.invalidateView;
     tree.onStateReady = app.treeModel.synchronizeSelection;
-    tree.onExpandedChanged = function(_, _) app.hierarchyExpansionRevision++;
     tree.onItemContextMenu = function(id, event) {
       app.treeModel.selectKey(id);
       app.hierarchyMenuX = Math.max(8.0, Math.min(app.viewportWidth - 228.0, event.x));
@@ -74,7 +68,7 @@ import haxeon.ui.widgets.text.Text;
     };
     tree.onItemRename = app.startRename;
     var rows:Array<KeyedView> = [new KeyedView("heading", app.sectionHeading("SCENE"))];
-    if (context.observeBool(app.simulation.isActive)) rows.push(new KeyedView(
+    if (app.simulation.isActive()) rows.push(new KeyedView(
       "simulation-hint",
       new Text(SIMULATION_LOCK_HINT, null, app.appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))
     ));

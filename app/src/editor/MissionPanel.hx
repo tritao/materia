@@ -1,5 +1,7 @@
 package app.editor;
 
+import Observable;
+
 import app.MissionController;
 import app.MissionStepPresentation;
 import materia.project.SceneArtifact.SceneArtifactMission;
@@ -19,7 +21,7 @@ import haxeon.ui.widgets.scroll.ScrollController;
 import haxeon.ui.widgets.text.Text;
 
 /** Read-only mission monitor. Execution stays on the shared simulation transport. */
-class MissionPanel {
+class MissionPanel implements Observable {
   public static inline final ROW_HEIGHT = 32.0;
   final scroll = new ScrollController();
   final model = new MissionListModel();
@@ -62,9 +64,6 @@ class MissionPanel {
   }
 
   function describe(context:BuildContext, controller:MissionController, tokens:ThemeTokens, showProgram:Null<Void->Void>):View {
-    controller.observe(context);
-    context.observeInt(() -> selected);
-    context.observeBool(() -> following);
     var state = controller.snapshot();
     var mission = state.mission;
     var style = fill();
@@ -158,7 +157,6 @@ private class MissionListModel implements ListViewModel {
   var mission:SceneArtifactMission;
   var progress:Null<app.MissionPlayer.MissionProgress>;
   var tokens:ThemeTokens;
-  var version = 0;
   var stateKey = "";
   public function new() {
   }
@@ -169,7 +167,6 @@ private class MissionListModel implements ListViewModel {
   ):Void {
     var nextKey = progress
       == null ? "ready" : progress.phase + ":" + progress.stepIndex + ":" + progress.completedInLoop;
-    if (this.mission != mission || this.tokens != tokens || stateKey != nextKey) version++;
     stateKey = nextKey;
     this.mission = mission;
     this.progress = progress;
@@ -182,7 +179,6 @@ private class MissionListModel implements ListViewModel {
   public function extentAt(index:Int):Float return MissionPanel.ROW_HEIGHT;
   public function extentRevisionAt(index:Int):Int return 0;
   public function totalExtent():Null<Float> return count() * MissionPanel.ROW_HEIGHT;
-  public function revision():Int return version;
   public function buildItem(index:Int):View {
     var state = progress == null ? "" : index < progress.completedInLoop ? "Done" : index == progress.stepIndex
       && progress.phase == "failed" ? "Failed" : index == progress.stepIndex

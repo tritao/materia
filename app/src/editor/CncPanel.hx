@@ -1,5 +1,7 @@
 package app.editor;
 
+import Observable;
+
 import app.ApplicationSimulation;
 import app.ProgramErrorMessage;
 import app.ProjectDocumentSession;
@@ -31,7 +33,7 @@ import haxeon.ui.widgets.text.Text;
  * The CNC dock panel: the running program's G-code with the executing line marked and followed,
  * feed hold and resume, restart from a chosen line, and a speed override.
  */
-class CncPanel {
+class CncPanel implements Observable {
   public static inline final ROW_HEIGHT = 20.0;
   final scroll = new ScrollController();
   final model = new GcodeListModel();
@@ -49,16 +51,14 @@ class CncPanel {
   final nextReport = new HobbingReportData();
   var player:Null<app.ToolpathPlayer>;
   var hobbing:Null<app.HobbingProgramPlayer>;
-  var bindingRevision = 0;
-  var patchContext:Null<BuildContext>;
-  var patchId:Null<WidgetId>;
+  final binding:CncPanelBuildBinding = new CncPanelBuildBinding();
 
   public function new() {
   }
 
   function requestPatch():Void {
-    var context = patchContext, id = patchId;
-    if (context == null || id == null || !context.requestPatch(id)) bindingRevision++;
+    var context = binding.context, id = binding.id;
+    if (context != null && id != null) context.requestPatch(id);
   }
 
   /** Sample execution and advance following before checking retained dependencies. */
@@ -99,7 +99,7 @@ class CncPanel {
     var changed = player != nextPlayer || hobbing != nextHobbing;
     var mask = haxeon.Diff.mask(presentation, nextPresentation);
     if (mask != 0) {
-      haxeon.Diff.apply(presentation, presentation, nextPresentation);
+      presentation = nextPresentation;
       changed = true;
     }
     if (nextHobbing != null) {
@@ -110,7 +110,7 @@ class CncPanel {
         changed = true;
       }
       if (reportMask != 0) {
-        haxeon.Diff.apply(report.telemetry, report.telemetry, nextReport.telemetry);
+        report.telemetry = nextReport.telemetry;
         changed = true;
       }
     }
@@ -271,13 +271,11 @@ private class GcodeListModel implements ListViewModel {
   var source:Null<String>;
   var running = 0;
   var tint:Null<Color> = null;
-  var version = 0;
 
   public function new() {
   }
 
   public function show(source:String, running:Int, tint:Color):Void {
-    if (source != this.source || running != this.running || tint != this.tint) version++;
     if (source != this.source) this.lines = source.split("\n");
     this.source = source;
     this.running = running;
@@ -291,7 +289,6 @@ private class GcodeListModel implements ListViewModel {
   public function extentAt(index:Int):Float return CncPanel.ROW_HEIGHT;
   public function extentRevisionAt(index:Int):Int return 0;
   public function totalExtent():Null<Float> return lines.length * CncPanel.ROW_HEIGHT;
-  public function revision():Int return version;
 
   public function buildItem(index:Int):View {
     var style = new LayoutStyle();
@@ -301,6 +298,12 @@ private class GcodeListModel implements ListViewModel {
     if (index + 1 == running && tint != null) style.background = tint;
     return new Text(StringTools.lpad(Std.string(index + 1), " ", 5) + "  " + lines[index], style);
   }
+}
+
+private class CncPanelBuildBinding {
+  public var context:Null<BuildContext>;
+  public var id:Null<WidgetId>;
+  public function new() {}
 }
 
 
@@ -347,11 +350,10 @@ private struct CncPresentation : Equatable, Diffable {
     this.printer = printer;
   }
   public function build(context:BuildContext):RenderNode {
-    context.observeInt(() -> panel.bindingRevision);
     return context.withScope(new Key("cnc-panel"), () -> {
       var id = context.id("content");
-      panel.patchContext = context;
-      panel.patchId = id;
+      panel.binding.context = context;
+      panel.binding.id = id;
       return context.selfUpdating(id, () -> {
         var root = new RenderNode(id, LayoutVisualKind.Box, CncPanel.fill());
         root.add(panel.describe(simulation, tokens, printer).build(context));

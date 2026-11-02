@@ -95,6 +95,7 @@ import haxeon.ui.widgets.text.Text;
     editor.session.openGeneratedProject(generated, source);
     editor.documentChanged();
     var controller = editor.projectVariants;
+    controller.update();
     check(controller.snapshot().selected == "single-seam", "controller reads installed selection");
     check(controller.snapshot().variants.length == 5, "controller exposes project jobs");
     var saved = directory + "/selected.materia";
@@ -130,7 +131,8 @@ import haxeon.ui.widgets.text.Text;
       editor.session.document == originalDocument && editor.session.projectJob == "single-seam",
       "failed job preserves document and selection"
     );
-    check(editor.simulation.rebuild(editor.sensors, editor.scene, editor.session), "simulation fixture builds");
+    check(editor.simulation.rebuild(editor.sensors, editor.scene, editor.session),
+      "simulation fixture builds: " + editor.simulation.error);
     check(!controller.snapshot().switchAllowed, "paused simulation locks job switching");
     controller.select("complete");
     check(!controller.isLoading(), "locked selection starts no build");

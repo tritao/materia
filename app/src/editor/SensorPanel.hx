@@ -21,10 +21,7 @@ import haxeon.ui.widgets.text.Text;
 
 /** Sensor dock panel and its script-owned controls. */
 @:access(app.Main.ReferenceEditorApp) class SensorPanel {
-  /**
-   * Retained by what it observes (DockPanelContent.observing). The sensor model and the simulation are observed through
-   * their revisions; what the panel shows besides them (robots, script ownership, diagnostics, warnings) is observed here.
-   */
+  /** Retained by the observable document, sensor, simulation, session, and world fields it reads. */
   public static function build(app:ReferenceEditorApp, context:BuildContext):View {
     var appearance = app.appearance;
     var world = app.world;
@@ -34,27 +31,11 @@ import haxeon.ui.widgets.text.Text;
     var sensors = app.sensors;
     var commands = app.commands;
     var viewportWidth = app.viewportWidth;
-    context.observeInt(() -> session.generation);
-    context.observeInt(() -> session.document.revision);
-    context.observeInt(() -> sensors.revision());
-    context.observeString(() -> sensors.robotId);
-    context.observeInt(() -> sensors.selectedIndex);
-    context.observeInt(() -> simulation.appliedRevision);
-    context.observeBool(simulation.isActive);
-    context.observeBool(simulation.isRunning);
-    context.observeString(() -> world.robotIds().join(",") + "|" + simulation.simulatedRobotIds().join(","));
-    context.observeBool(() -> simulation.pending(sensors, scene));
-    context.observeString(simulation.userBackendName);
-    context.observeString(() -> simulation.collisionWarnings.join("\n"));
-    context.observeString(() -> sensors.diagnostics().join("\n"));
-    context.observeBool(sensors.isEditable);
-    context.observeString(() -> {
-      var ownership = session.scriptOwnership;
-      return ownership == null ? null : ownership.reference + "|" + ownership.configurationVersion + "|"
-        + ownership.overridesEnabled + "|" + ownership.diagnostics.join("\n");
-    });
-    context.observeInt(() -> app.viewportWidth < 820.0 ? 0 : 1);
-    context.observeInt(() -> app.sensorInspector == null ? 0 : app.sensorInspector.contentRevision());
+    var ownership = session.scriptOwnership;
+    var pending = simulation.pending(sensors, scene);
+    var backend = simulation.userBackendName();
+    var warnings = simulation.collisionWarnings;
+    var editableSensors = sensors.isEditable();
     var fillStyle = function() return ReferenceEditorApp.fillStyle();
     // The panel is dense with small buttons; give them a little more room than the app-wide defaults.
     var actionRowStyle = function() {
@@ -114,22 +95,21 @@ import haxeon.ui.widgets.text.Text;
       button.selected = index == sensors.selectedIndex;
       rows.push(new KeyedView("sensor:" + sensor.id, button));
     }
-    var ownership = session.scriptOwnership;
     var addLidar = new Button("LiDAR", null, function() {
       sensors.add("lidar");
-      commands.refresh();
+
     }, "sensor-add-lidar");
     var addImu = new Button("IMU", null, function() {
       sensors.add("imu");
-      commands.refresh();
+
     }, "sensor-add-imu");
     var addCamera = new Button("Camera", null, function() {
       sensors.add("camera");
-      commands.refresh();
+
     }, "sensor-add-camera");
     var removeSensor = new Button("Remove", null, function() {
       sensors.removeSelected();
-      commands.refresh();
+
     }, "sensor-remove");
     addLidar.leadingIcon = IconName.Plus;
     addImu.leadingIcon = IconName.Plus;
@@ -187,21 +167,21 @@ import haxeon.ui.widgets.text.Text;
         );
         refreshScriptMaterialization("Physics backend override changed");
       } catch (error:Dynamic) log("Override rejected: " + Std.string(error));
-      commands.refresh();
+
     }, "sensor-backend-deterministic")), new KeyedView("mujoco", new Button("MuJoCo", null, function() {
       if (ownership == null) simulation.setBackend(ApplicationSimulation.MUJOCO);
       else try {
         ownership.setOverride(ScriptOwnership.SIMULATION_TARGET, "backend", "integer", ApplicationSimulation.MUJOCO);
         refreshScriptMaterialization("Physics backend override changed");
       } catch (error:Dynamic) log("Override rejected: " + Std.string(error));
-      commands.refresh();
+
     }, "sensor-backend-mujoco"))], actionRowStyle());
     var content:Array<KeyedView> = [
       new KeyedView("heading", sectionHeading("SENSORS")),
       new KeyedView(
         "apply-state",
         new Text(
-          simulation.pending(sensors, scene) ? "Pending changes · rebuild required" : "Configuration applied",
+          pending ? "Pending changes · rebuild required" : "Configuration applied",
           null,
           appearance.theme.tokens.textSecondary,
           TextStyleOverride.text(12.0)
@@ -220,7 +200,7 @@ import haxeon.ui.widgets.text.Text;
       ),
       new KeyedView("robots-heading", spacedHeading("ROBOTS")),
       new KeyedView("robots", new Column("sensor-robots", robotRows, listStyle())),
-      new KeyedView("backend-heading", spacedHeading("PHYSICS · " + simulation.userBackendName().toUpperCase())),
+      new KeyedView("backend-heading", spacedHeading("PHYSICS · " + backend.toUpperCase())),
       new KeyedView("backend-actions", backendActions),
       new KeyedView("devices-heading", spacedHeading("DEVICES")),
       new KeyedView("actions", actions),
@@ -228,9 +208,9 @@ import haxeon.ui.widgets.text.Text;
       new KeyedView("runtime-heading", spacedHeading("SIMULATION")),
       new KeyedView("runtime-actions", runtimeActions)
     ];
-    if (simulation.collisionWarnings.length > 0) content.push(new KeyedView(
+    if (warnings.length > 0) content.push(new KeyedView(
       "collision-warnings",
-      textLines("collision-warnings", simulation.collisionWarnings)
+      textLines("collision-warnings", warnings)
     ));
     if (ownership != null) {
       var overrideLabel = ownership.overridesEnabled ? "Disable overrides" : "Enable overrides";
@@ -243,7 +223,7 @@ import haxeon.ui.widgets.text.Text;
           documentChanged();
           log("Script reloaded; Apply/Rebuild restarts simulation");
         } catch (error:Dynamic) log("Script reload rejected; active simulation unchanged: " + Std.string(error));
-        commands.refresh();
+
       }, "script-reload")), new KeyedView("overrides", new Button(overrideLabel, null, function() {
         ownership.setOverridesEnabled(!ownership.overridesEnabled);
         refreshScriptMaterialization(ownership.overridesEnabled ? "Overrides enabled" : "Overrides disabled");
@@ -338,7 +318,7 @@ import haxeon.ui.widgets.text.Text;
         revertSensor.enabled = ownership.overridesEnabled;
         content.push(new KeyedView("sensor-revert", revertSensor));
       }
-      var editable = ownership == null;
+      var editable = ownership == null && editableSensors;
       var inspector = app.sensorInspector;
       if (inspector == null || app.sensorInspectorSensor != selected || app.sensorInspectorModel != sensors.model) {
         inspector = new PropertyInspector(

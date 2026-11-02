@@ -251,7 +251,7 @@ private typedef InputProbe = {
       submit(editor, frame, frames, "cancel-sketch", cycle);
       if (shows("add-sketch-rectangle")) throw "The inspector still shows the sketch tools after the edit was cancelled";
       editor.scene.select("box");
-      editor.commands.refresh();
+
       submit(editor, frame, frames, "select-box", cycle);
       action(actions, "inspector-flows", cycle);
     }
@@ -651,7 +651,7 @@ private typedef InputProbe = {
       if (cycle > 0) {
         var nextSelection = cycle % 2 == 0 ? "box" : "tower";
         editor.scene.select(nextSelection);
-        editor.commands.refresh();
+
         submit(editor, frame, frames, "selection", cycle);
         action(actions, "selection", cycle);
       }
@@ -715,11 +715,7 @@ private typedef InputProbe = {
     var measure = function(name:String, input:Void -> Void) {
       if (only != null && only.length > 0 && only.split(",").indexOf(name) < 0) return;
       var before = hl.Gc.totalAllocated();
-      var reactiveVersion = haxeon.ui.core.ReactiveRuntime.version;
       input();
-      if (Sys.getEnv("MATERIA_TRACE_STATE") == "1" && !results.exists(name)
-        && haxeon.ui.core.ReactiveRuntime.version != reactiveVersion)
-        Sys.println("reactive input " + name + " wrote a signal or State");
       var dirty = editor.ui.isDirty();
       submit(editor, frame, frames, name);
       // Up to the end of the frame: the harness's own timeline record is not the UI's allocation.
@@ -868,7 +864,7 @@ private typedef InputProbe = {
     submit(editor, frame, frames, "setup:inspector");
     for (cycle in 0...cycles) {
       editor.scene.select(cycle % 2 == 0 ? "tower" : "box");
-      editor.commands.refresh();
+
       submit(editor, frame, frames, "selection", cycle);
       action(actions, "selection", cycle);
     }

@@ -1,5 +1,7 @@
 package app;
 
+import Observable;
+
 import haxe.Int64;
 import camkit.*;
 import gearkit.*;
@@ -13,7 +15,7 @@ import motionkit.event.EventValue;
 import toolpathkit.motion.*;
 
 /** HB8 program executed through the ordinary plan runtime; cuts only measured after-step state. */
-class HobbingProgramPlayer implements SessionMember implements SimulationStepObserver {
+class HobbingProgramPlayer implements SessionMember implements SimulationStepObserver implements Observable {
   public var scenario(default, null):Null<String>;
   public var scenarioStage(default, null) = "waiting";
   var scenarioAccess = false;
@@ -34,7 +36,6 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   public var stock(default, null):HobbingStock;
   public var failure(default, null):Null<String> = null;
   public var completed(default, null):Bool = false;
-  var ownStatusRevision = 0;
   public var elapsed(default, null):Float = 0;
   public var syncError(default, null):Float = 0;
   final config:SceneArtifactHobbing;
@@ -554,22 +555,14 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     simulation.removeStepObserver(observerId);
     stock.dispose();
   }
-  /** Advances when the scenario, cut progress or handling status changes, so a status display can observe one number. */
-  public function statusRevision():Int return ownStatusRevision + (handling == null ? 0 : handling.statusRevision);
-  function setScenario(value:Null<String>):Void {
-    if (scenario != value) ownStatusRevision++;
-    scenario = value;
-  }
+  function setScenario(value:Null<String>):Void scenario = value;
   function setCutStarted(value:Bool):Void {
-    if (cutStarted != value) ownStatusRevision++;
     cutStarted = value;
   }
   function setCutCompleted(value:Bool):Void {
-    if (cutCompleted != value) ownStatusRevision++;
     cutCompleted = value;
   }
   function setCompleted(value:Bool):Void {
-    if (completed != value) ownStatusRevision++;
     completed = value;
   }
 }

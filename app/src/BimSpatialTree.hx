@@ -34,12 +34,6 @@ class BimSpatialTree implements TreeViewModel {
     return result;
   }
 
-  public function rootKeyAt(index:Int):String {
-    var values = projects();
-    if (index < 0 || index >= values.length) throw "BIM project tree root index is out of range";
-    return key(values[index].id);
-  }
-
   public function childCount(parentKey:String):Int return children(parentKey).length;
 
   public function childKeyAt(parentKey:String, index:Int):String {
@@ -78,8 +72,6 @@ class BimSpatialTree implements TreeViewModel {
     tooltip.showWhen = function() return text.truncated;
     return tooltip;
   }
-
-  public function revision():Int return model.cad.metadataRevision;
 
   public function elementIdForKey(nodeKey:String):Null<ElementId> {
     if (nodeKey == null || !StringTools.startsWith(nodeKey, ElementPrefix)) return null;

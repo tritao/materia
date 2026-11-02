@@ -1,11 +1,13 @@
 package app.editor;
 
+import Observable;
+
 import app.EditorScene;
 import cadkit.Shape;
 import cadkit.parametric.TopologyFingerprint;
 
 /** Selection state has its own revision, independent of scene content. */
-@:access(app.EditorScene) class SelectionModel {
+@:access(app.EditorScene) class SelectionModel implements Observable {
   public var selectedId:String = "box";
   public var selectedFeatureKey:Null<String> = null;
   public var selectedCadFaceIndex:Int = -1;

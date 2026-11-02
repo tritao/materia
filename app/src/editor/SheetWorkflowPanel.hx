@@ -80,7 +80,7 @@ import sys.io.AtomicFile;
     planningChildren.push(new KeyedView("plan-select",
       new Select<String>("sheet-plan-select", planOptions, selectedPlanId, function(value) {
       app.sheetPlanSelection = value;
-      app.commands.refresh();
+
     }
     )));
     var pieceOptions:Array<SelectOption<String>> = [];
@@ -99,7 +99,7 @@ import sys.io.AtomicFile;
     planningChildren.push(new KeyedView("source-select",
       new Select<String>("sheet-piece-select", pieceOptions, selectedPieceId, function(value) {
       app.sheetPieceSelection = value;
-      app.commands.refresh();
+
     }
     )));
     planningChildren.push(new KeyedView(
@@ -286,7 +286,7 @@ import sys.io.AtomicFile;
       rotationOptions.options = [new PropertyOption("0", "0°"), new PropertyOption("90", "90°")];
       properties.push(new PropertyDescriptor("sheet:" + selectedPlanId + ":placement:" + placementId + ":rotation",
         placementId + " rotation",
-        PropertyType.Enum, function(_) return PropertyValue.Enum(Std.string(placement.rotation)), function(
+        PropertyType.Enum, function() return PropertyValue.Enum(Std.string(placement.rotation)), function(
           _,
           value
         ) switch (value) {
@@ -296,7 +296,7 @@ import sys.io.AtomicFile;
             for (item in plan.placements) if (item.id == placementId) item.rotation = rotation;
           }
           );
-          app.commands.refresh();
+
         default:
           throw "Rotation requires a supported angle";
       }, rotationOptions));
@@ -395,7 +395,7 @@ import sys.io.AtomicFile;
         ));
       properties.push(new PropertyDescriptor("sheet:" + selectedPlanId + ":requirement:" + requirementId + ":material",
         requirementId + " material", PropertyType.Enum,
-        function(_) return PropertyValue.Enum(inventory.requirement(requirementId).materialId), function(
+        function() return PropertyValue.Enum(inventory.requirement(requirementId).materialId), function(
           _,
           value
         ) switch (value) {
@@ -495,7 +495,7 @@ import sys.io.AtomicFile;
     var result = new Button(label, null, function() {
       try {
         action();
-        app.commands.refresh();
+
       } catch (error:Dynamic) app.log("Sheet workflow: " + Std.string(error));
     }, key);
     result.enabled = enabled;
@@ -582,7 +582,7 @@ import sys.io.AtomicFile;
     options.step = step;
     options.unit = unit;
     return new PropertyDescriptor("sheet:" + planId + ":" + id,
-      label, PropertyType.Float, function(_) return PropertyValue.Float(read(inventory.plan(planId))), function(
+      label, PropertyType.Float, function() return PropertyValue.Float(read(inventory.plan(planId))), function(
         _,
         value
       ) {
@@ -595,7 +595,7 @@ import sys.io.AtomicFile;
           throw label + " requires a number";
       };
       inventory.editPlan(planId, function(plan) write(plan, number));
-      app.commands.refresh();
+
     }, options);
   }
 
@@ -648,7 +648,7 @@ import sys.io.AtomicFile;
     options.step = step;
     if (unit != "") options.unit = unit;
     return new PropertyDescriptor("sheet:requirement:" + id + ":" + field,
-      label, PropertyType.Float, function(_) return PropertyValue.Float(requirementValue(
+      label, PropertyType.Float, function() return PropertyValue.Float(requirementValue(
         inventory.requirement(id),
         field
       )), function(
@@ -665,7 +665,7 @@ import sys.io.AtomicFile;
       };
       if (field == "quantity" && number != Math.ffloor(number)) throw "Quantity must be a whole number";
       inventory.editRequirement(id, function(item) setRequirementValue(item, field, number));
-      app.commands.refresh();
+
     }, options);
   }
 

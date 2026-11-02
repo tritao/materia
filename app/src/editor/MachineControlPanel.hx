@@ -1,5 +1,7 @@
 package app.editor;
 
+import Observable;
+
 import app.Main.ReferenceEditorApp;
 import app.MachineControlModel;
 import haxeon.ui.Insets;
@@ -20,10 +22,10 @@ import haxeon.ui.widgets.text.Text;
 import haxeon.ui.widgets.text.TextField;
 
 /** Manual travel testing in design mode, independent of the selected component. */
-@:access(app.Main.ReferenceEditorApp) class MachineControlPanel {
-  final drafts:Map<String, String> = [];
+@:access(app.Main.ReferenceEditorApp) class MachineControlPanel implements Observable {
+  var drafts:Map<String, String> = [];
   /** Axes with detents that the user has set to turn freely instead of clicking into their positions. */
-  final freeAxes:Map<String, Bool> = [];
+  var freeAxes:Map<String, Bool> = [];
   final scroll = new ScrollController();
   var generation = -1;
   var error:Null<String>;
@@ -66,25 +68,20 @@ import haxeon.ui.widgets.text.TextField;
     if (generation != app.session.generation) {
       cancelGesture();
       generation = app.session.generation;
-      drafts.clear();
-      freeAxes.clear();
+      drafts = [];
+      freeAxes = [];
       error = null;
     }
     if (app.simulation.isActive() || app.session.scriptOwnership != null || app.documents.blocked()) cancelGesture();
   }
 
   public function build(app:ReferenceEditorApp, context:BuildContext):View {
-    context.observeInt(() -> app.session.generation);
-    context.observeInt(() -> app.session.document.revision);
     var definition = app.session.projectAssemblyDefinition, state = app.session.liveAssemblyState;
-    context.observeBool(() -> app.session.projectAssemblyDefinition == definition);
-    context.observeBool(() -> app.session.liveAssemblyState == state);
     var motion = app.session.machineMotion;
-    context.observeBool(() -> app.session.machineMotion == motion);
     var axes = MachineControlModel.axes(app.session);
-    var active = context.observeBool(app.simulation.isActive);
-    var owned = context.observeBool(() -> app.session.scriptOwnership != null);
-    var blocked = context.observeBool(app.documents.blocked);
+    var active = app.simulation.isActive();
+    var owned = app.session.scriptOwnership != null;
+    var blocked = app.documents.blocked();
     var editable = !active && !owned && !blocked;
     var style = new LayoutStyle();
     style.width = LayoutAxis.grow();
@@ -112,11 +109,7 @@ import haxeon.ui.widgets.text.TextField;
     });
     if (guardPanel != null) rows.push(new KeyedView("enclosure-guard", guardPanel));
     var viewport = app.perspectiveViewport;
-    context.observeBool(() -> app.perspectiveViewport == viewport);
-    if (viewport != null) context.observeBool(viewport.sectionActive);
     var cup = app.simulation.hobbingPlayer();
-    context.observeBool(() -> app.simulation.hobbingPlayer() == cup);
-    if (cup != null) context.observeInt(cup.statusRevision);
     var machineMotion = app.session.machineMotion;
     var cupId = machineMotion == null || machineMotion.hobbing == null ? null : machineMotion.hobbing.stock;
     if (cup != null && cup.handling != null && (cup.scenario == null || cup.scenario == "loading")) {
@@ -265,7 +258,7 @@ import haxeon.ui.widgets.text.TextField;
             editAxis = id;
             editOwner = app;
             pointer = {id: event.pointerId, x: event.x, y: event.y};
-            app.commands.refresh();
+
           } catch (failure:Dynamic) {
             error = Std.string(failure);
             event.preventDefault();
@@ -275,7 +268,7 @@ import haxeon.ui.widgets.text.TextField;
         };
         var finish = function(commit:Bool) {
           finishGesture(commit);
-          app.commands.refresh();
+
         };
 
         var rotary = axis.unit == "deg", wrapped = MachineControlModel.wrapsAngle(axis);
@@ -375,17 +368,16 @@ import haxeon.ui.widgets.text.TextField;
             at = i;
           }
           var onDetent = nearest < 1e-3;
-          var free = context.observeBool(() -> freeAxes.exists(id));
+          var free = freeAxes.exists(id);
           controls.push(new KeyedView(
             "detents",
             new Text(onDetent ? "Position " + (at + 1) + " of " + axis.detents.length : "Between positions "
             + (at + 1) + " and " + axis.detents.length + " · " + (free ? "turning freely" : "clicks to a position"))
           ));
-          var freeBox = new Checkbox("machine-axis-free:" + id, "Turn freely", free, on -> {if (on) freeAxes.set(
-            id,
-            true
-          );
-          else freeAxes.remove(id);
+          var freeBox = new Checkbox("machine-axis-free:" + id, "Turn freely", free, on -> {var next = copyFreeAxes(freeAxes);
+          if (on) next.set(id, true);
+          else next.remove(id);
+          freeAxes = next;
           app.invalidateView();
           });
           freeBox.enabled = editable;
@@ -393,8 +385,8 @@ import haxeon.ui.widgets.text.TextField;
         }
         var field = new TextField(
           "machine-axis-value:" + id,
-          context.observeString(() -> drafts.get(id)) ?? position,
-          value -> drafts.set(id, value)
+          drafts.get(id) ?? position,
+          value -> {var next = copyDrafts(drafts); next.set(id, value); drafts = next;}
         );
         field.label = rotary ? title + " (deg)" : "Position (" + axis.unit + ")";
         field.enabled = editable;
@@ -473,7 +465,6 @@ import haxeon.ui.widgets.text.TextField;
         new Text('$linked linked or closure joints follow automatically.')
       ));
     }
-    context.observeString(() -> error);
     if (error != null) rows.push(new KeyedView("error", new Text(error)));
     var fill = ReferenceEditorApp.fillStyle();
     fill.background = app.appearance.theme.tokens.surface;
@@ -484,5 +475,17 @@ import haxeon.ui.widgets.text.TextField;
       ScrollAxis.Vertical,
       scroll
     );
+  }
+
+  static function copyDrafts(source:Map<String, String>):Map<String, String> {
+    var result:Map<String, String> = new Map();
+    for (key in source.keys()) result.set(key, source.get(key));
+    return result;
+  }
+
+  static function copyFreeAxes(source:Map<String, Bool>):Map<String, Bool> {
+    var result:Map<String, Bool> = new Map();
+    for (key in source.keys()) result.set(key, source.get(key));
+    return result;
   }
 }

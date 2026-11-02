@@ -20,13 +20,8 @@ import haxeon.ui.widgets.text.Text;
 
 /** Project scene selection; this view has no mission progress or playback controls. */
 class ProjectVariantView {
-  /**
-   * With a `context` the controller's state is observed, so a dock panel built from this view is retained until the state
-   * changes; the viewport card passes none and is rebuilt with its panel.
-   */
-  public static function build(controller:ProjectVariantController, tokens:ThemeTokens, key:String, ?context:BuildContext):View {
+  public static function build(controller:ProjectVariantController, tokens:ThemeTokens, key:String):View {
     var state = controller.snapshot(), rows:Array<KeyedView> = [];
-    if (context != null) context.observeString(function() return stateKey(controller.snapshot()));
     for (group in ["configuration", "study", "job"]) {
       var variants = state.variants.filter(v -> v.kind == group);
       if (variants.length == 0) continue;

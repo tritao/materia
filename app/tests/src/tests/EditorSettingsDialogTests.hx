@@ -86,7 +86,8 @@ import sys.FileSystem;
 
     // Filtering narrows the tree; a filter with no match says so.
     panel(editor).setFilter("anti");
-    check(panel(editor).categories().join(",") == "editors/3d", "the filter narrows the categories");
+    var filteredCategories = panel(editor).categories().join(",");
+    check(filteredCategories == "editors/3d", "the filter narrows the categories: " + filteredCategories);
     panel(editor).setFilter("zzz");
     check(panel(editor).selectedCategory == null, "nothing matches");
     editor.submit(frame);

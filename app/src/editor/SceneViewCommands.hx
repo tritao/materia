@@ -64,7 +64,7 @@ import haxeon.ui.core.UiModifier;
     registerNudgeCommand(app, "scene.nudge-down-large", "Nudge down (large)", UiKey.Down, UiModifier.Shift, 0.0, -1.0);
     app.commands.register(new Command("scene.cancel-drag", "Cancel object drag", function() {
       app.cancelActiveDrag();
-      app.commands.refresh();
+
     }, new Shortcut(UiKey.Escape), function() return (app.perspectiveViewport != null
       && app.perspectiveViewport.dragging()) || app.scene.hasActiveSketchEdit()));
   }
@@ -88,7 +88,7 @@ import haxeon.ui.core.UiModifier;
     app.commands.register(new Command(id, label, function() {
       app.setAntialiasing(samples);
       app.log(label);
-      app.commands.refresh();
+
     }, null, function() return !app.documents.blocked() && app.perspectiveViewport != null
       && app.perspectiveViewport.supportsSamples(samples), function() return app.antialiasing == samples));
   }
@@ -104,7 +104,7 @@ import haxeon.ui.core.UiModifier;
   ):Void {
     app.commands.register(new Command(id, label, function() {
       app.scene.nudgeSelected(deltaX, deltaY);
-      app.commands.refresh();
+
     }, new Shortcut(key,
       modifiers), function() return app.canEditObjects() && app.scene.object(app.scene.selectedId) != null));
   }

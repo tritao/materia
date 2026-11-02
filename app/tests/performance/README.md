@@ -239,8 +239,8 @@ Scroll frames in the interaction scenario: 340 to 245 KiB (harness floor of abou
 - **Cache validation.** `RetainedView` and the dock caches compared every node's recorded hover, press and focus bits with the current ones. Structural nodes (`tab-strip`, `scroll-content`, `editor-content`) sit in the
   hovered chain but never record interaction state, so while the pointer rested inside a panel or a tab strip its cache could never validate and it rebuilt every frame. `RenderNode.recordsInteraction` (set when a widget assigns `states`)
   now limits the comparison to nodes that actually read interaction state.
-- **Self-updating widgets.** `BuildContext.selfUpdating(id, build)` records the scope, inherited style and text style a widget was built in. When the widget's own state changes it updates that state with
-  `State.updateQuietly` (no revision bump, so no ancestor cache is invalidated) and calls `requestPatch(id)`. `applyPatches()` runs after `beginFrame()` and before the root builds: it re-runs the builder, swaps the new node into the retained
+- **Self-updating widgets.** `BuildContext.selfUpdating(id, build)` records the scope, inherited style and text style a widget was built in. When the widget's own state changes, the signal invalidates only its readers and the widget calls
+  `requestPatch(id)`. `applyPatches()` runs after `beginFrame()` and before the root builds: it re-runs the builder, swaps the new node into the retained
   tree (`RenderNode.replaceWith`), claims no IDs (the retained walk claims them), and hands the frame comparison the replaced nodes as its priors. `TextField` is the first adopter.
 - **Verification.** The interaction scenario compares the tree after a patched keystroke with the tree after a forced full rebuild (hover and press flags excluded: the event dispatcher writes them onto live nodes).
 
@@ -290,8 +290,8 @@ What changed, in the order it paid:
   three empty arrays it then overwrote and copied the rule list (about 290 forks per tab switch).
 - One-name class and tag arrays (`["row"]`) are interned in `StyleTarget.shared` instead of copied by both `StyleTarget` and
   `RenderNode.setStyleIdentity`.
-- Cache keys of dock panes and `RetainedView` are `KeyHash` lanes, not concatenated strings. The signals migration removed
-  the dock panels' hand-written `cacheKeyHash`; opted-in panels now reuse tracked signal reads and explicit `observe*` inputs.
+- Cache keys of dock panes and `RetainedView` are `KeyHash` lanes, not concatenated strings. The reactive migration removed
+  the dock panels' hand-written `cacheKeyHash`; opted-in panels now reuse compiler-tracked signal and `Observable` reads.
 - `TextRoleStyle.toOverride` keeps its last override while the role is unchanged.
 - A `LayoutNode` allocates its text and paragraph styles when it shows text; the encoder and the layout diff read a shared
   default through `peekTextStyle` and `peekParagraphStyle`.

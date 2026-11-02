@@ -26,7 +26,7 @@ class StockSimulationTests {
 
   static function text(scene:EditorScene, label:String):String {
     for (descriptor in scene.properties()) if (descriptor.label
-      == label) return switch descriptor.readValue(scene.context()) {
+      == label) return switch descriptor.readValue() {
       case PropertyValue.Text(value):
         value;
       case PropertyValue.Int(value):

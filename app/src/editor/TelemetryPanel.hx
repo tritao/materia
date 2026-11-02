@@ -35,10 +35,7 @@ class TelemetryPanel {
     model.addSeries(gpuTime);
   }
 
-  /**
-   * Colours come from the caller on every build so a theme switch reaches this panel. The rest is read through the context, at
-   * the place it is shown: the physics snapshot (`frame` gives the current one) and the human workers' progress and signals.
-   */
+  /** Colours come from the caller on every build; worker and snapshot data is read from observable simulation fields. */
   public function build(
     context:BuildContext,
     frame:Void->Null<ApplicationPresentationSnapshot>,
@@ -52,11 +49,9 @@ class TelemetryPanel {
     var plotStyle = fillStyle();
     plotStyle.height = LayoutAxis.grow();
     var plot = new PlotView("frame-telemetry", model, plotStyle, "Frame telemetry");
-    var physicsStatus = context.observeString(function() {
-      var snapshot = frame();
-      return snapshot == null ? "Physics snapshot unavailable"
-        : "Physics step " + snapshot.revision + " · time " + Std.string(snapshot.simulationTime) + " s";
-    });
+    var snapshot = frame();
+    var physicsStatus = snapshot == null ? "Physics snapshot unavailable"
+      : "Physics step " + snapshot.revision + " · time " + Std.string(snapshot.simulationTime) + " s";
     var rows:Array<KeyedView> = [
       new KeyedView("heading", new Text("TELEMETRY", null, textSecondary, TextStyleOverride.text(11.0, 0.8))),
       new KeyedView("plot", plot),
@@ -67,13 +62,12 @@ class TelemetryPanel {
       new KeyedView("physics-revision", new Text(physicsStatus))
     ];
     if (simulation != null) {
-      var workers = context.observeString(function() return simulation.humanWorkerIds().join("\n"));
-      for (workerId in workers == "" ? [] : workers.split("\n")) {
+      for (workerId in simulation.humanWorkerIds()) {
         var id = workerId;
-        rows.push(new KeyedView("worker-" + id, new Text(context.observeString(function() return workerLine(simulation, id)))));
-        rows.push(new KeyedView("worker-zones-" + id, new Text(context.observeString(function() return zonesLine(simulation, id)))));
-        var separations = context.observeString(function() return separationLines(simulation, id).join("\n"));
-        if (separations != "") for (line in separations.split("\n")) {
+        rows.push(new KeyedView("worker-" + id, new Text(workerLine(simulation, id))));
+        rows.push(new KeyedView("worker-zones-" + id, new Text(zonesLine(simulation, id))));
+        var separations = separationLines(simulation, id);
+        if (separations.length > 0) for (line in separations) {
           var robotId = line.substr(0, line.indexOf("\t"));
           rows.push(new KeyedView("worker-separation-" + id + "-" + robotId, new Text(line.substr(line.indexOf("\t") + 1))));
         }

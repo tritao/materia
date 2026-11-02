@@ -27,23 +27,15 @@ import haxeon.ui.widgets.layout.Column;
 import haxeon.ui.widgets.layout.Row;
 import haxeon.ui.widgets.scroll.ScrollView;
 import haxeon.ui.widgets.text.Text;
-import sys.FileSystem;
 
 /** Start page dock panel: new document shortcuts, recent files, and bundled examples. */
 @:access(app.Main.ReferenceEditorApp) class StartPanel {
   static inline var CARD_WIDTH:Float = 250.0;
 
-  /**
-   * Retained by what it observes (DockPanelContent.observing): what is loading and how far, the recent files that still exist,
-   * the examples that can open here and the search and category choice. Opening is allowed only while nothing loads and the
-   * document is not blocked, which the example and recent cards show as enabled.
-   */
+  /** Opening is allowed only while nothing loads and the document is not blocked. */
   public static function build(app:ReferenceEditorApp, context:BuildContext, width:Float = 1000.0):View {
     var tokens = app.appearance.theme.tokens;
-    context.observeString(function() return app.startLoading == null ? null : app.startLoading.id);
-    context.observeString(app.projectLoadingRevisionKey);
-    context.observeString(function() return app.startFailure);
-    var interactive = context.observeBool(function() return app.startLoading == null && !app.documents.blocked());
+    var interactive = app.startLoading == null && !app.documents.blocked();
     var rows:Array<KeyedView> = [new KeyedView(
       "title",
       new Text("Start", null, tokens.text, TextStyleOverride.text(22.0))
@@ -85,8 +77,8 @@ import sys.FileSystem;
 
     rows.push(new KeyedView("recent-heading", app.sectionHeading("RECENT FILES")));
     var recentCards:Array<KeyedView> = [];
-    var recent = context.observeString(function() return recentFiles(app).join("\n"));
-    for (path in recent == "" ? [] : recent.split("\n")) {
+    var recent = recentFiles(app);
+    for (path in recent) {
       var target = path;
       recentCards.push(new KeyedView("recent:" + path,
         card(app, StartPath.withoutDirectory(path), IconName.NewFile, [shorten(
@@ -112,10 +104,6 @@ import sys.FileSystem;
 
     rows.push(new KeyedView("examples-heading", app.sectionHeading("EXAMPLES")));
     var browser = app.startExamples;
-    context.observeString(function() return browser.query);
-    context.observeString(function() return browser.category);
-    // The catalogue entries that can open here: files that exist and scripts that are registered.
-    context.observeString(function() return [for (entry in ExampleCatalog.available()) entry.id].join(","));
     var available = ExampleCatalog.available();
     rows.push(new KeyedView("search", new SearchField("start-example-search", browser.query, function(value) {
       browser.search(value);
@@ -202,7 +190,7 @@ import sys.FileSystem;
       }, "start-clear-filters")));
     }
 
-    var showAtStartup = context.observeBool(function() return app.preferences.showStartPage);
+    var showAtStartup = app.preferences.showStartPage;
     rows.push(new KeyedView("startup", new Checkbox("start-show-at-startup",
       "Show this page at startup", showAtStartup, function(value) {
       app.preferences.setShowStartPage(value);
@@ -220,7 +208,7 @@ import sys.FileSystem;
   static function recentFiles(app:ReferenceEditorApp):Array<String> {
     var result:Array<String> = [];
     for (path in app.preferences.recent) {
-      if (!FileSystem.exists(path)) continue;
+      if (!app.preferences.recentExists(path)) continue;
       if (result.length >= 3) break;
       result.push(path);
     }

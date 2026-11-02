@@ -51,7 +51,7 @@ class BimInspectorDescriptors {
     input:DefinitionInput, ?edit:BimProjectEdit):PropertyDescriptor {
     var options = inputOptions(input, "Instance Inputs");
     return new PropertyDescriptor("instance:" + instance.id.value + ":input:" + input.name,
-      input.name, inputType(input), function(_) return switch input.kind {
+      input.name, inputType(input), function() return switch input.kind {
       case TypedProperty.TypeBoolean:
         PropertyValue.Bool(instance.resolvedBoolean(input.name));
       case TypedProperty.TypeInteger:
@@ -90,7 +90,7 @@ class BimInspectorDescriptors {
     input:DefinitionInput, ?edit:BimProjectEdit):PropertyDescriptor {
     var options = inputOptions(input, "Type Inputs");
     return new PropertyDescriptor("definition:" + definition.id.value + ":input:" + input.name,
-      input.name, inputType(input), function(_) return switch input.kind {
+      input.name, inputType(input), function() return switch input.kind {
       case TypedProperty.TypeBoolean:
         PropertyValue.Bool(cast definition.input(input.name).defaultValue);
       case TypedProperty.TypeInteger:
@@ -190,7 +190,7 @@ class BimInspectorDescriptors {
     options.category = "Identity";
     options.recordHistory = false;
     return new PropertyDescriptor("element:" + element.id.value + ":name",
-      "Name", PropertyType.Text, function(_) return PropertyValue.Text(element.name), function(
+      "Name", PropertyType.Text, function() return PropertyValue.Text(element.name), function(
         _,
         value
       ) switch (value) {
@@ -240,7 +240,7 @@ class BimInspectorDescriptors {
     if (editorType == null) {
       options.readOnly = true;
       return new PropertyDescriptor(prefix + ":property:" + schema.name,
-        schema.name, PropertyType.Text, function(_) return PropertyValue.Text(display(schema)), function(
+        schema.name, PropertyType.Text, function() return PropertyValue.Text(display(schema)), function(
           _,
           _
         ) {
@@ -250,7 +250,7 @@ class BimInspectorDescriptors {
       prefix + ":property:" + schema.name,
       schema.name,
       editorType,
-      function(_) return editableValue(schema),
+      function() return editableValue(schema),
       function(_, value) write(edited(schema, value)),
       options
     );
@@ -330,7 +330,7 @@ class BimInspectorDescriptors {
     options.category = category;
     options.readOnly = true;
     options.recordHistory = false;
-    return new PropertyDescriptor(id, label, PropertyType.Text, function(_) return PropertyValue.Text(value), function(
+    return new PropertyDescriptor(id, label, PropertyType.Text, function() return PropertyValue.Text(value), function(
       _,
       _
     ) {

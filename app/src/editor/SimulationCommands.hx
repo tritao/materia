@@ -32,7 +32,7 @@ import haxeon.ui.core.UiModifier;
     }
     function transport(action:Void -> Void):Void -> Void return function() {
       action();
-      app.commands.refresh();
+
       app.invalidateView();
     };
     app.commands.register(new Command(

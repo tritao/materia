@@ -1,5 +1,7 @@
 package app;
 
+import Observable;
+
 import haxeon.ui.Path;
 
 import haxe.Json;
@@ -17,22 +19,27 @@ import sys.io.File;
  * settings dialog edits the same values. A preferences.json written by earlier builds
  * is imported once, when no settings file exists yet, and left in place for them.
  */
-class AppPreferences {
+class AppPreferences implements Observable {
   public static inline var MAX_RECENT:Int = 10;
   /** Samples per pixel for the 3D viewport's edges on a GPU that supports it. */
   public static inline var DEFAULT_ANTIALIASING:Int = haxeon.editor.ViewportLook.SampleCount;
   static inline var RECENT_STATE:String = "recent";
 
   public final store:SettingsStore;
-  public var showStartPage(get, never):Bool;
+  public var showStartPage(default, null):Bool;
   /** Samples per pixel for the 3D viewport; one means anti-aliasing is off. */
   public var antialiasing(get, never):Int;
-  public final recent:Array<String> = [];
+  public var recent:Array<String> = [];
+  final recentAvailability:Map<String, RecentAvailability> = new Map();
 
   public function new(file:String, ?legacyFile:String) {
     var imported = !FileSystem.exists(file) && legacyFile != null && FileSystem.exists(legacyFile);
     store = new SettingsStore(AppSettings.registry(), file);
     if (imported) importLegacy(legacyFile);
+    showStartPage = store.getBool(AppSettings.SHOW_START_PAGE);
+    store.onChanged(AppSettings.SHOW_START_PAGE, function(_) {
+      showStartPage = store.getBool(AppSettings.SHOW_START_PAGE);
+    });
     readRecent(store.getState(RECENT_STATE), recent);
   }
 
@@ -43,8 +50,6 @@ class AppPreferences {
       PreferencesPath.join([directory, "preferences.json"])
     );
   }
-
-  function get_showStartPage():Bool return store.getBool(AppSettings.SHOW_START_PAGE);
 
   function get_antialiasing():Int return store.getInt(AppSettings.ANTIALIASING);
 
@@ -57,14 +62,37 @@ class AppPreferences {
   public function addRecent(path:String):Void {
     if (path == null || path.length == 0) return;
     var absolute = FileSystem.exists(path) ? FileSystem.fullPath(path) : path;
-    recent.remove(absolute);
-    recent.unshift(absolute);
-    while (recent.length > MAX_RECENT) recent.pop();
-    store.setState(RECENT_STATE, recent.copy());
+    var next = recent.copy();
+    next.remove(absolute);
+    next.unshift(absolute);
+    while (next.length > MAX_RECENT) next.pop();
+    recent = next;
+    store.setState(RECENT_STATE, next.copy());
   }
 
   public function forgetRecent(path:String):Void {
-    if (recent.remove(path)) store.setState(RECENT_STATE, recent.copy());
+    var next = recent.copy();
+    if (next.remove(path)) {
+      recent = next;
+      store.setState(RECENT_STATE, next.copy());
+    }
+  }
+
+  /** File existence is external state; keep one tracked value per recent path. */
+  public function recentExists(path:String):Bool {
+    var state = recentAvailability.get(path);
+    if (state == null) {
+      state = new RecentAvailability(FileSystem.exists(path));
+      recentAvailability.set(path, state);
+    }
+    return state.exists;
+  }
+
+  public function refreshRecentAvailability():Void {
+    for (path in recent) {
+      var state = recentAvailability.get(path);
+      if (state != null) state.exists = FileSystem.exists(path);
+    }
   }
 
   /** Copies the paths that are strings, up to the recent-list limit. */
@@ -89,4 +117,9 @@ class AppPreferences {
     }
     );
   }
+}
+
+private class RecentAvailability implements Observable {
+  public var exists:Bool;
+  public function new(exists:Bool) this.exists = exists;
 }

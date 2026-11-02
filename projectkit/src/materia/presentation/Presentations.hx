@@ -14,10 +14,10 @@ class Presentations {
   ):AssemblyPresentation {
     var flat = AssemblyDefinitionFlattener.flattenView(definition);
     return {schemaVersion: PresentationCodec.VERSION, definition: definition.id, defaultView: "assembled",
-      views: [{id: "assembled", label: "Assembled", camera: Frame([for (part in flat.occurrences) {
+      views: [new materia.presentation.AssemblyPresentation.PresentationView("assembled", "Assembled", Frame([for (part in flat.occurrences) {
       occurrence:part.id, subtree:false
     }
     ], yaw,
-      pitch, 1.15), visibility:[], sections:[], explode:0, source:Generated(producer)}], explode:[], procedures:[]};
+      pitch, 1.15), [], [], 0, Generated(producer))], explode:[], procedures:[]};
   }
 }

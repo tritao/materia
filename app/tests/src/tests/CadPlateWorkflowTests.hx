@@ -88,7 +88,7 @@ class CadPlateWorkflowTests {
     );
     var row = [for (descriptor in scene.properties()) if (descriptor.label == "Reference height") descriptor];
     check(row.length == 1 && row[0].readOnly, "the reference height is shown read-only");
-    var shown = switch (row[0].readValue(scene.context())) {
+    var shown = switch (row[0].readValue()) {
       case PropertyValue.Float(value):
         value;
       default:
@@ -1153,7 +1153,7 @@ class CadPlateWorkflowTests {
     var transientOptions = new PropertyDescriptorOptions();
     transientOptions.recordHistory = false;
     var transientDescriptor = new PropertyDescriptor("test.transient",
-      "Transient", PropertyType.Float, function(_) return PropertyValue.Float(0), function(
+      "Transient", PropertyType.Float, function() return PropertyValue.Float(0), function(
         _,
         _
       ) {

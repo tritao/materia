@@ -1,5 +1,7 @@
 package cadkit.parametric;
 
+import Observable;
+
 import cadkit.Shape;
 import cadkit.parametric.Document;
 import cadkit.parametric.ElementId;
@@ -7,7 +9,7 @@ import cadkit.parametric.Feature;
 import cadkit.parametric.ParametricError;
 
 /** Persistent identity and metadata for one independently addressable document output. */
-class Element {
+class Element implements Observable {
   public final document:Document;
   public final id:ElementId;
   public final kind:String;
@@ -17,7 +19,7 @@ class Element {
   public var placementParent(default, null):Null<ElementReference>;
   public var placementDerived(default, null):Bool;
 
-  private final propertyValues:Map<String, TypedProperty>;
+  private var propertyValues:Map<String, TypedProperty>;
   private var committedOutput:Null<Feature>;
   private var directShape:Null<Shape>;
   private var placedShape:Null<Shape>;
@@ -50,7 +52,6 @@ class Element {
   public function restoreName(value:String):Void {
     if (name == value) return;
     name = value;
-    document.metadataChanged();
   }
 
   public function property(name:String):Null<TypedProperty> return propertyValues.get(name);
@@ -63,9 +64,10 @@ class Element {
 
   /** Internal document history and codec path. */
   public function restoreProperty(name:String, value:Null<TypedProperty>):Void {
-    if (value == null) propertyValues.remove(name);
-    else propertyValues.set(name, value);
-    document.metadataChanged();
+    var next = new Map<String, TypedProperty>();
+    for (key in propertyValues.keys()) if (key != name) next.set(key, propertyValues.get(key));
+    if (value != null) next.set(name, value);
+    propertyValues = next;
   }
 
   public function setProperty(value:TypedProperty):Void document.setElementProperty(this, value);

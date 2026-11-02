@@ -94,7 +94,7 @@ import materia.project.MaterialLibrary;
     scene.dispose();
   }
 
-  static function sensorRevisionSeparation():Void {
+  static function sensorDocumentChanges():Void {
     var sensors = new SensorConfiguration();
     var name:Null<haxeon.ui.properties.PropertyDescriptor> = null;
     var rate:Null<haxeon.ui.properties.PropertyDescriptor> = null;
@@ -103,26 +103,27 @@ import materia.project.MaterialLibrary;
       if (StringTools.endsWith(property.id, ":rate")) rate = property;
     }
     check(name != null && rate != null, "sensor properties are identified by id");
-    var before = sensors.revision();
+    var before = sensors.document.revision;
     check(
       new PropertyBinding(name, sensors.context()).apply(PropertyValue.Text("Renamed sensor"))
-      == PropertyEditResult.Applied && sensors.revision() == before,
-      "sensor rename does not require simulation rebuild"
+      == PropertyEditResult.Applied && sensors.document.revision > before,
+      "sensor rename is recorded in the shared document"
     );
+    before = sensors.document.revision;
     check(
       new PropertyBinding(rate,
-      sensors.context()).apply(PropertyValue.Float(12.0)) == PropertyEditResult.Applied && sensors.revision() > before,
-      "sensor acquisition change requires simulation rebuild"
+      sensors.context()).apply(PropertyValue.Float(12.0)) == PropertyEditResult.Applied && sensors.document.revision > before,
+      "sensor acquisition change is recorded in the shared document"
     );
     sensors.dispose();
 
     var shared = new haxeon.ui.editing.EditorDocument("shared");
     var sharedSensors = new SensorConfiguration(null, shared);
     var sharedScene = new EditorScene([], shared);
-    var sensorRevision = sharedSensors.revision();
+    var sensorRevision = shared.revision;
     check(
-      sharedScene.createRectangle() && sharedSensors.revision() == sensorRevision,
-      "scene edits in the shared document do not change sensor physics revision"
+      sharedScene.createRectangle() && shared.revision > sensorRevision,
+      "scene and sensor models share document change tracking"
     );
     sharedScene.dispose();
     sharedSensors.dispose();
@@ -1848,9 +1849,6 @@ import materia.project.MaterialLibrary;
       check(viewport.hoveredId() == "box", "perspective pointer hover resolves the object under the cursor");
       check(frameRequests == 1, "perspective pointer hover requests a repaint");
       check(viewport.presentationKey() != beforeKey, "perspective pointer hover changes the presentation cache key");
-      var beforeSubmitKey = ReferenceEditorApp.buildEditorSubmitKey(1, 2, 3, 4, 5, beforeKey);
-      var afterSubmitKey = ReferenceEditorApp.buildEditorSubmitKey(1, 2, 3, 4, 5, viewport.presentationKey());
-      check(beforeSubmitKey != afterSubmitKey, "perspective pointer hover invalidates the retained editor submission");
       var hoveredView = scene.configureRenderView(
         new SceneView(),
         viewport.camera.viewProjection(800.0 / 600.0),
@@ -1877,6 +1875,7 @@ import materia.project.MaterialLibrary;
       ui.events.pointerMove(400.0, 300.0);
       check(viewport.hoveredId() == "box", "the cursor is over the box again");
       scene.setVisible("box", false);
+      viewport.advanceNavigation(0.0);
       ui.submit(viewport, new LayoutFrame(800.0, 600.0));
       check(viewport.hoveredId() == null, "hiding the hovered part clears the hover without a pointer move");
       // Even if a stale hover id reaches the render view, a hidden object shows no hover highlight.
@@ -2093,16 +2092,16 @@ import materia.project.MaterialLibrary;
     packedPoseEditing();
     var emptyApp = new ReferenceEditorApp();
     check(emptyApp.scene.items().length == 0, "default launch starts with an empty scene");
-    var commandRevision = emptyApp.commands.revision;
+    var commandIds = emptyApp.commands.ids().join(",");
     var submitKey = emptyApp.editorSubmitKey();
     emptyApp.invalidateView();
     check(
-      emptyApp.editorSubmitKey() != submitKey && emptyApp.commands.revision == commandRevision,
-      "view-local invalidation leaves command availability revision unchanged"
+      emptyApp.editorSubmitKey() == submitKey && emptyApp.commands.ids().join(",") == commandIds,
+      "view-local invalidation preserves the stable submit key and command registry"
     );
     emptyApp.dispose();
     finishLibrarySelection();
-    sensorRevisionSeparation();
+    sensorDocumentChanges();
     revisionSeparation();
     appearanceArtifactRoundTrip();
     componentFinishReset();
@@ -2136,7 +2135,7 @@ import materia.project.MaterialLibrary;
         "perspective picking after framing"
       );
       var originalTarget = camera.targetX;
-      var originalRevision = tree.revision();
+      var originalRevision = scene.revision;
       var x = new PropertyBinding(property(scene.properties(), "position-x"), scene.context());
       check(x.apply(PropertyValue.Float(-2.5)) == PropertyEditResult.Applied, "position edit accepted");
       near(scene.info("box").localTransform().element(12), -2.5, "selected object moved");
@@ -2144,7 +2143,7 @@ import materia.project.MaterialLibrary;
       near(camera.targetX, originalTarget, "editing does not move camera");
       check(scene.pick(-2.5, 0) == "box", "picking follows edited geometry");
       check(scene.pick(-1.5, 0) == "scene", "old location no longer hit");
-      check(tree.revision() > originalRevision, "scene revision invalidates panels");
+      check(scene.revision > originalRevision, "scene content changes invalidate tracked tree reads");
       check(scene.document.isDirty && scene.document.canUndo, "edit recorded in document");
 
       scene.select("tower");

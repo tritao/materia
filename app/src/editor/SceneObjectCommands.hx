@@ -16,7 +16,7 @@ import haxeon.ui.core.UiModifier;
   public static function install(app:ReferenceEditorApp):Void {
     app.commands.register(new Command("scene.create", "Add rectangle", function() {
       app.scene.createRectangle();
-      app.commands.refresh();
+
     }, null, function() return app.canEditObjects() && app.scene.canCreate()));
     app.commands.register(new Command("scene.create-part", "Add empty CAD part", function() {
       app.runSceneEdit("Could not add CAD part", function() app.scene.createCadPart());
@@ -124,28 +124,28 @@ import haxeon.ui.core.UiModifier;
       try {
         app.scene.beginSelectedSketchEdit();
       } catch (error:Dynamic) app.log("Could not edit sketch: " + Std.string(error));
-      app.commands.refresh();
+
     }, null, function() return app.canEditObjects() && app.scene.canBeginSelectedSketchEdit()));
     app.commands.register(new Command("scene.repair-sketch-support-face",
       "Repair selected sketch support face", function() {
       app.runSceneEdit("Could not repair sketch support face", function() app.scene.repairSelectedSketchSupportFace());
-      app.commands.refresh();
+
     }, null, function() return app.canEditObjects() && app.scene.canRepairSelectedSketchSupportFace()));
     app.commands.register(new Command("scene.apply-sketch", "Apply sketch draft", function() {
       app.runSceneEdit("Could not apply sketch draft", function() app.scene.applySelectedSketchEdit());
-      app.commands.refresh();
+
     }, null, function() return app.canEditObjects() && app.scene.canApplySelectedSketchEdit()));
     app.commands.register(new Command("scene.cancel-sketch", "Cancel sketch draft", function() {
       app.scene.cancelSelectedSketchEdit();
-      app.commands.refresh();
+
     }, null, function() return app.scene.hasActiveSketchEdit()));
     app.commands.register(new Command("scene.add-sketch-rectangle", "Add starter rectangle to sketch", function() {
       app.runSceneEdit("Could not add sketch rectangle", function() app.scene.addSketchDraftRectangle());
-      app.commands.refresh();
+
     }, null, function() return app.canEditObjects() && app.scene.canAddSketchDraftRectangle()));
     app.commands.register(new Command("scene.clear-sketch-draft", "Clear sketch geometry", function() {
       app.runSceneEdit("Could not clear sketch", function() app.scene.clearSketchDraft());
-      app.commands.refresh();
+
     }, null, function() return app.canEditObjects() && app.scene.canClearSketchDraft()));
     app.commands.register(new Command("scene.import-step", "Import STEP part", function() {
       var chooser = app.files;
@@ -160,7 +160,7 @@ import haxeon.ui.core.UiModifier;
           app.scene.importStep(path);
           app.log("Imported STEP part: " + path);
         } catch (failure:Dynamic) app.log("STEP import failed: " + Std.string(failure));
-        app.commands.refresh();
+
       }
       );
     }, null, function() return app.canEditObjects() && app.files != null && app.scene.canCreate()));
@@ -180,7 +180,7 @@ import haxeon.ui.core.UiModifier;
           app.scene.exportSelectedCad(path);
           app.log("Exported STEP: " + path);
         } catch (failure:Dynamic) app.log("STEP export failed: " + Std.string(failure));
-        app.commands.refresh();
+
       }
       );
     }, null, function() {
@@ -194,7 +194,7 @@ import haxeon.ui.core.UiModifier;
       && app.scene.canCreate() && app.scene.object(app.scene.selectedId) != null));
     app.commands.register(new Command("scene.delete", "Delete", function() {
       app.scene.deleteSelected();
-      app.commands.refresh();
+
     }, null, function() return app.canEditObjects() && app.scene.object(app.scene.selectedId) != null));
   }
 }
