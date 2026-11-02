@@ -35,3 +35,6 @@ The constants in `SupplierPackageExport.hx` mirror the `FlexsplineHobber`,
 `FlexsplineCupBlank`, `FoundationLayout` and `HOB_GEOMETRY.md` values; change them
 together. Ordering requirements the model does not hold (accuracy class, bore
 tolerances, coating, material, inspection) live in the two Python scripts.
+
+The two mineral castings (base and column) with their cast-in steel inserts have their own
+package in `casting/` (STEP, JSON summary, drawings and checks; see its README).
