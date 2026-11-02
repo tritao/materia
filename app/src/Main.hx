@@ -774,6 +774,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final hostContext:Null<DesktopUiHostContext>;
   var sceneInspector:Null<PropertyInspector> = null;
   var inspectorSelectionRevision:Int = -1;
+  /** Bounded models for pristine selections whose retained presentation can safely be restored. */
+  final inspectorModels:Map<String, PropertyInspector> = new Map();
+  final inspectorModelIds:Map<String, Int> = new Map();
+  final inspectorModelOrder:Array<String> = [];
+  var nextInspectorModelId:Int = 1;
+  var inspectorModelId:Int = 0;
   /** Retained sensor inspector; its editors own drafts and validation state. */
   var sensorInspector:Null<PropertyInspector> = null;
   var sensorInspectorSensor:Dynamic = null;
@@ -3057,6 +3063,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
         configurePresentationViewport();
       }
       sceneInspector = null;
+      inspectorModels.clear();
+      inspectorModelIds.clear();
+      inspectorModelOrder.resize(0);
     }
     scene.onSelectionChanged = updateCommandContext;
     updateCommandContext();

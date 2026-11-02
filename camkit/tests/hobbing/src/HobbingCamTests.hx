@@ -25,13 +25,13 @@ class HobbingCamTests {
     check(error.indexOf(text) >= 0, 'expected $text, got $error');
   }
   static function make(spec:GearSpec):HobDesign return new HobDesign(
-    ConjugateRack.of(new ToothProfile(spec)),
+    ConjugateRack.of(spec.profile()),
     1,
     32,
     12
   );
   public static function main():Void {
-    var spec = new GearSpec(0.3, 200, 8, 20 * Math.PI / 180), hob = make(spec);
+    var spec = new GearSpec(0.3, 200, 8, new Involute(20 * Math.PI / 180)), hob = make(spec);
     var job = new HobbingJob(spec, hob, 40);
     near(job.rpm, 300000 / (Math.PI * 32), 1e-9, "cutting speed sets B rpm");
     near(job.tableRpm, job.rpm / 200, 1e-12, "starts/teeth sets work rpm");
@@ -111,21 +111,21 @@ class HobbingCamTests {
     near(crowned.crownAt(0), 0, 1e-12, "crown vanishes at ends");
     multi.crown = 0.03;
     near(crowned.crownAt(4), 0.02, 1e-12, "job snapshots mutable settings");
-    var faster = new HobbingJob(new GearSpec(0.3, 100, 8, 20 * Math.PI / 180), hob, 40);
+    var faster = new HobbingJob(new GearSpec(0.3, 100, 8, new Involute(20 * Math.PI / 180)), hob, 40);
     near(faster.tableRpm, 2 * job.tableRpm, 1e-12, "tooth count changes program gearing without rebuilding a machine");
-    var doubleHob = new HobDesign(ConjugateRack.of(new ToothProfile(spec)), 2, 32, 12);
+    var doubleHob = new HobDesign(ConjugateRack.of(spec.profile()), 2, 32, 12);
     var doubleStart = new HobbingJob(spec, doubleHob, 40);
     near(doubleStart.tableRpm, 2 * job.tableRpm, 1e-12, "multi-start hob sets work speed");
-    var shiftedSpec = new GearSpec(0.3, 200, 8, 20 * Math.PI / 180, false, 0.2);
+    var shiftedSpec = new GearSpec(0.3, 200, 8, new Involute(20 * Math.PI / 180), false, 0.2);
     near(
       new HobbingJob(shiftedSpec, hob, 40).passes[0].centreDistance,
       D + 0.06,
       1e-12,
       "profile shift changes finished radial setting"
     );
-    rejects(() -> {new HobbingJob(new GearSpec(0.3, 200, 8, 20 * Math.PI / 180, true), hob, 40);
+    rejects(() -> {new HobbingJob(new GearSpec(0.3, 200, 8, new Involute(20 * Math.PI / 180), true), hob, 40);
     }, "external spur");
-    rejects(() -> {new HobbingJob(new GearSpec(0.5, 200, 8, 20 * Math.PI / 180), hob, 40);
+    rejects(() -> {new HobbingJob(new GearSpec(0.5, 200, 8, new Involute(20 * Math.PI / 180)), hob, 40);
     }, "matching normal");
     multi.shifts = [0, 20];
     rejects(() -> {new HobbingJob(spec, hob, 40, multi);

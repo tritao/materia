@@ -42,9 +42,9 @@ class FlexsplineHobber extends MachineAssembly {
     ?rotaryAxis:machinekit.motion.PrecisionRotaryAxis
   ) {
     super();
-    this.spec = spec == null ? new GearSpec(0.3, 200, 8, 20 * Math.PI / 180) : spec;
+    this.spec = spec == null ? new GearSpec(0.3, 200, 8, new Involute(20 * Math.PI / 180)) : spec;
     if (this.spec.internal) throw "external hobbing machine requires external gear";
-    var profile = new ToothProfile(this.spec);
+    var profile = this.spec.profile();
     hob = Hob.fromDesign(new HobDesign(ConjugateRack.of(profile),
       1, 32, gashes), this.spec, 40, 16, false, detailedHob);
     bed = new MineralCastBed();
@@ -287,46 +287,8 @@ class FlexsplineHobber extends MachineAssembly {
       "Yplate",
       F.alongY(centre + 57, row, 363 + side * 60, -1, 0, 0)
     );
-    var rated = 4000 * 2 * Math.PI / 60;
-    var spindleMotor = new TorqueMotor(new ComponentValues().setNumber("outside", 62).setNumber("bore", 25).setNumber(
-      "height",
-      100
-    ).setNumber(
-      "continuousTorque",
-      1500 / rated
-    ).setNumber(
-      "peakTorque",
-      3000 / rated
-    ).setNumber(
-      "ratedSpeed",
-      rated
-    ).setNumber(
-      "maxSpeed",
-      8000 * 2 * Math.PI / 60
-    ).setNumber(
-      "rotorInertia",
-      0.0002
-    ).setNumber(
-      "coggingTorque",
-      0.003
-    ).setInteger(
-      "poleCount",
-      4
-    ).setInteger(
-      "coggingOrder",
-      12
-    ).setNumber(
-      "torqueConstant",
-      0.4
-    ).setNumber(
-      "backEmfConstant",
-      0.4 / Math.sqrt(3)
-    ).setNumber(
-      "phaseResistance",
-      0.25
-    ));
     spindle = new HobSpindle(
-      spindleMotor,
+      null,
       new HobArbor(new ComponentValues().setNumber("height", 175).setNumber("hobCentreOffset", 60).setNumber(
         "supportDiameter",
         15
@@ -336,7 +298,7 @@ class FlexsplineHobber extends MachineAssembly {
       ))
     );
     includeAt("spindle", spindle, F.fromRotationMatrix(centre, 240, 363, e0));
-    fixExisting("spindle-mount", "Yplate", "spindle/housing", F.alongY(centre + 45, 210, 363, 1, 0, 0));
+    fixExisting("spindle-mount", "Yplate", "spindle/housing", F.alongY(centre + 40, 210, 363, 1, 0, 0));
     fixAt("hob", hob, F.fromRotationMatrix(centre, 20, 363, e0), "spindle/arbor");
     fixAt(
       "outboard",

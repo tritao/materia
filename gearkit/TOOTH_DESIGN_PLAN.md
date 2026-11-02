@@ -110,7 +110,7 @@ Surveyed 2026-10-17 on branch `flexspline-hobber` (6caeb51f3).
   - penetration (interference);
   - contact status (clearance under a threshold);
   - and the contact point positions.
-- Summary: engaged-tooth fraction, backlash distribution, the contact zone in angle around the
+- Summary: flank-engaged and tip-edge-contact fractions (apart; tip contact is not engagement), backlash distribution, the contact zone in angle around the
   major axis, and interference count (must be zero).
 - Loaded meshing is later. Torque deflects the flexspline and changes the engagement; that needs
   a compliance model.
@@ -146,7 +146,7 @@ paper.**
 **TD-D7. Design search is small, deterministic and transparent.**
 - Search a few parameters (`κ`, cam type, and arc radii and offsets for double-circular-arc)
   with a grid then Nelder–Mead. Seeds are fixed.
-- Objectives: maximise engaged-tooth fraction and backlash uniformity, and maximise root fillet
+- Objectives: maximise flank-engaged fraction and backlash uniformity, and maximise root fillet
   radius, under the TD-D5 constraints.
 - Every candidate's metrics are reported, so a person can see the trade-off rather than only the
   winner.
@@ -192,6 +192,636 @@ units) are compared only as plausibility, with the source and the load condition
 | Engaged-tooth plausibility | ≈ 30 % for S-tooth and double-circular-arc units | Harmonic Drive and literature figures, load condition unstated |
 | Flexspline steel fatigue strain limit | to be sourced | 40CrNiMo, check |
 | Liu 2025 defaults | m 0.5, Z_f 100, Z_c 102, w₀ 0.5, r₁ 0.685, c₁ 0.332, e₁ 0.155, r₂ 0.785, c₂ 0.330, e₂ 0.134 | Liu et al., *Machines* 13 (2025) 535 |
+
+## Baseline (TD0)
+
+Recorded 2026-11-01 on `main` 6e041094c, worktree `tooth-design`, toolchain from the main
+checkout (`haxeon build --compiler-only`; the worktree's submodule directories are symlinks to the
+main checkout's). Run with the main checkout's `app/build/host/native/*` on `LD_LIBRARY_PATH`.
+
+| Gate | Baseline |
+|---|---|
+| gearkit suite (`gearkit/tests`) | green: GeometryTests 1034568 assertions (rack error 1.32e-14 mm, re-envelope 2.51e-14 mm), MetrologyTests 246, GearKitTests 18 |
+| hob rack output (`supplier-packages`, 1543 rack points) | JSON md5 `017ec06361ce3f4663e9ee765544712f` |
+| stockkit ring / metrology / hobbing-stream / hobbing-errors / hobbing-forces | green (345 / 11 assertions / HB3 difference 0 um / 24 / 27 assertions) |
+| camkit `tests/hobbing` | fails at HobbingCamTests.hx:219 ("Motion program op 1: Null access", motionkit `ProgramCompiler`) on unchanged main too; pre-existing, environment (native motionkit library) |
+| `app/tests` | does not compile on unchanged main with this toolchain (`State.updateQuietly` unknown): the app source is ahead of the committed haxeon submodule; pre-existing |
+| machinekit `tests/hobbing`, `tests/hobber` | compile; full runs stop on the known "Collision hulls disagree with recipe" save/load bug (pre-existing, not chased) |
+
+D1 to D4 are written as inputs in `gearkit/tests/src/ToothDesigns.hx` (`StrainWaveInput` in
+`gearkit/haxe/gearkit`), validated by `ToothDesignInputTests`. **D4's kappa (2.0) is assumed**
+until TD5 measures where the derived circular spline interferes.
+
+## TD2 notes: double-circular-arc form
+
+Code: `DoubleCircularArc` (the flat construction, validity, `liu(module)`), `DoubleArcProfile` (wrapping,
+blends, `ToothProfile`), tests in `DoubleArcTests`. Source: Liu et al. 2025, *Machines* 13, 535, section 2.1,
+rebuilt from the definitions (Figs 2-3), not from the printed equations.
+
+Construction (flat frame, x from the tooth axis, y from the **pitch line**, so `ds` cancels):
+O1 = (-c1, -e1), O2 = (pi m/2 + c2, e2); addendum line y = ha, dedendum line y = -hf. The common tangent is the
+internal tangent: with outward normal n = (cos d, sin d) at B, (O2 - O1).n = r1 + r2, so d = angle(O1->O2) +
+acos((r1+r2)/D). B = O1 + r1 n, C = O2 - r2 n. A = (-c1 + r1 cos a, ha) with sin a = (ha+e1)/r1; D =
+(x2 - r2 cos b, -hf) with sin b = (e2+hf)/r2. The flank is monotone in y, x grows towards the root.
+Checked in `DoubleArcTests`: B, C on their circles, tangent perpendicular to O1B and O2C, slope continuity at B
+and C (1e-9), C0 at B and C, A and D on their lines, pitch-line crossing on BC.
+
+Deviations from the printed equations:
+- Eq 4: `x1` in y_BC should be `y1`, and the (l - l1) term is subtracted in y: y_BC = r1 sin d + y1 - (l-l1) cos d
+  (the tangent runs downward). x_BC as printed is right.
+- Eq 6: y_CD printed with `r1 sin d` and a `+ r2(..)`; correct is x = x2 - r2 cos(d + (l-l2)/r2),
+  y = y2 - r2 sin(d + (l-l2)/r2).
+- Eq 11 (d = eps + sigma) is **correct** when sigma is the angle of O1->O2 (positive when O2 is above O1) and
+  eps = acos((r1+r2)/D). The other root (sigma - eps) is the crossing tangent with B below C (h1 < 0) and is
+  rejected. The printed sigma = arctan((y1-y2)/(x1-x2)) has the same ratio as (y2-y1)/(x2-x1), so it agrees.
+- Eqs 2, 3, 5, 7, 12, 13: no change (l1 = r1 (alpha - d), h1 = yB - yC).
+- **Table 2 swaps c2 and e2** relative to Table 1: it lists c2 = 0.1344, e2 = 0.3299, but Table 1 gives c2 in
+  [0.329, 0.331] and e2 in [0.130, 0.140]. Used: c2 = 0.32994565, e2 = 0.13439061 (unswapped). Parameter set:
+  r1 0.68517449, c1 0.33183981, e1 0.15535155, r2 0.78482551, c2 0.32994565, e2 0.13439061, ha 0.29316387,
+  hf 0.35425825 (m 0.5). With these: d = 16.448 deg, alpha 40.89, beta 38.51, h1 0.1265 mm, A half-thickness
+  0.1861, D at x 0.5012, tooth thickness on the pitch line 0.6734 of pi m = 1.5708 (the tooth is thin, the space wide).
+- The paper gives no root or tip blend. **Assumed:** circular blends, internally tangent to the arc and the
+  dedendum/addendum line. Root radius = `GearSpec.cutterTipRadius` (default 0.38 m), tip radius =
+  `tipFilletRadius` (0.05 m). This is not a generated trochoid.
+- **Assumed wrapping:** the flat profile is wrapped on the **pitch circle** (radius Rp + y, angle x/Rp) so the
+  angular pitch is exactly 2 pi/Z. The paper puts XR tangent to the neutral layer; wrapping there makes the
+  pitch inconsistent with Z (4 % at Z 100). The effect on the shape is about 1 % of tooth height.
+- Pressure angle of the form = d (16.45 deg), the flank angle where the pitch line crosses BC.
+  Profile shift and internal gears are rejected. Parameters belong to one module; `liu(m)` scales every length by
+  m / 0.5 (the shape in module units is the paper's), and a gear of another module is rejected.
+- Validity (each throws naming the parameter): ha/hf too large for the arcs, overlapping arcs (no tangent),
+  tangent not running downward, pointed tip (c1, r1, e1, ha), D past mid-space (c2, r2, e2, hf), blend radii
+  that do not fit (cutterTipRadius, tipFilletRadius).
+- Scaled to m 0.3, Z 200 the set is geometrically valid (the shape is scale invariant). Largest circular root
+  fillet that fits: 0.743 m.
+- Circular-spline nominal tip and root (assumed) are now pitch -/+ the flexspline form's own addendum and
+  dedendum: 0.586 m / 0.708 m for D2, unchanged (1.0 / 1.25 m) for involutes.
+- `ToothOutline.close` was factored out of `InvoluteProfile.outline` (identical output; GeometryTests unchanged).
+
+## TD3 notes
+
+- Cams (`gearkit/haxe/gearkit/*Cam.hx`, `WaveDeformation`, `StrainWaveKinematics`): `w0` is the
+  major-axis radial displacement. Ellipse and four-roller are physical polar profiles with semi-axes
+  `rn +/- w0`, minus their mean radius so the ring keeps its length (needed for `v` to close).
+- **Assumed:** the four-roller is a four-arc oval (lobe arc radius = half the minor semi-axis,
+  larger arc on the minor axis, tangent at the join); no roller geometry was sourced. The neutral
+  radius in tests (29.325 mm, the one `StrainWavePair` builds for D1) is the root circle (29.625 mm) less half an assumed
+  0.6 mm wall (0.01 m Z_f). An earlier version used 29.7 mm, above D1's root; it is corrected.
+- "Neutral-line length preserved to 1e-9" is tested as the linear inextensibility condition
+  `w + dv/dphi = 0` (measured 7e-13) and closure of `v` (1.4e-14). The exact arc length of the
+  deformed line differs from `2 pi rn` at second order in `w0/rn` (about 1e-4 for D1); tested
+  against a `3 (w0/rn)^2` bound, not 1e-9.
+- Cosine numerics against the closed form: 1.4e-16.
+
+### Resal cam and the cam comparison
+
+- `ResalCam`: Gravagno, Mucino, Pennestri 2016, eq 18 (the extracted text garbles the fraction; the form used is
+  `u = delta (1/pi - theta sin theta/4 - cos theta/4) / (1/pi - pi/8)`, theta from the minor axis, rollers at +-pi/2,
+  checked by its zero mean and `u(pi/2) = delta`). Cam convention: delta = w0, theta = (phi mod pi) - pi/2. Tests:
+  `w(0) = w0`, minor axis -0.918 w0, zero slope at both axes, mean zero (1e-12), even, period pi, slope matches
+  the derivative, and the general inextensibility/closure checks all pass.
+- TD5 cam comparison (`ToothStudy.camStudy`, kappa 1, each cam with its own derived circular spline). **Transmission
+  error is zero by construction and is not measured**: every cam gets a circular spline derived from its own motion, so
+  no cam can show a ratio error against a fixed one. Only clearances and how closely the other teeth follow that
+  envelope differ. Flank = teeth whose closest point to the circular spline (within 5 / 20 um) is on the working
+  flank; tip = tip edge contact (closest point on the tip blend or land), reported apart, not as engagement:
+
+| Cam | D1 minor-tip clr | D1 flank 5 / 20 um | D1 tip edge 5 / 20 um | D2s minor-tip clr | D2s flank 5 / 20 um | D2s tip edge 5 / 20 um | max abs w difference from cosine |
+|---|---|---|---|---|---|---|---|
+| cosine | 0 | 1.6 % / 19.9 % | 46.5 % / 65.9 % | 248 um | 16.3 % / 40.7 % | 1.2 % / 1.2 % | 0 |
+| ellipse | -4.6 um | 1.6 % / 19.8 % | 46.5 % / 65.7 % | 244 um | 16.1 % / 40.2 % | 1.2 % / 1.2 % | 4.6 um |
+| Resal | -24.5 um | 1.5 % / 21.7 % | 46.5 % / 63.5 % | 224 um | 14.6 % / 38.7 % | 1.3 % / 1.3 % | 24.5 um |
+| four-roller | -127 um | 2.8 % / 19.3 % | 39.9 % / 40.0 % | 121 um | 2.8 % / 40.3 % | 2.3 % / 3.4 % | 127 um |
+
+  What these numbers can and cannot say:
+  - **Cam differences of a few um are inside model error.** `ShapedCam` maps the cam to the neutral line by taking the
+    radius at the deformed angle as `w` at the material angle. That drops a second-order term of order
+    `w0^2 / r_n` (0.09 / 29.3, about 3 um for D1). So the ellipse "interference" of -4.6 um at the D1 minor axis is not
+    a result; neither is the 0 to 3 point spread among cosine, ellipse and Resal engagement. The Resal minor axis
+    (-24.5 um) is outside that error but is arithmetic on the assumed circular-spline tip circle (below), not a mesh
+    result. Nothing here ranks cosine, ellipse and Resal.
+  - **The four-roller geometry is unsourced.** It is an assumed four-arc oval (see TD3 notes); no roller layout was taken
+    from a source. Its -127 um and its different engagement describe that assumed shape only.
+  - Gravagno's kinematic error (transmission-ratio error) is not modelled here; it needs a fixed circular spline meshing
+    with the cam, which TD11 does (see "TD11 notes"). Dwell "caterpillar" cams (cycloidal, 3-4-5, 8th-degree polynomial) are a possible later TD, not implemented.
+
+## TD4 notes
+
+- `CircularSplineEnvelope` sweeps one tooth boundary (exact chord-circle crossings, 400 radii,
+  2400 time steps, then twice that) and keeps the largest angular extent per radius within half a
+  circular pitch of the space axis. `SweptSpace` is the result, a sampled tooth space with a
+  deviation bound (4 x the coarse-to-fine difference; the factor is a measured allowance, since
+  re-sweep penetration reached 3.6 x the raw difference).
+- **Deviation from the plan:** the contact-condition refinement (`n.v_rel = 0`) is not done; the
+  swept union is refined by resolution instead. `SweptSpace` is a sampled space profile, not yet a
+  `ToothForm` with root and tip blends (that fit belongs to TD8).
+- Measured: rigid-limit envelope (rolling pinion, no deformation) matches the standard internal
+  involute space to 1.1e-6 mm; D1 re-sweep penetration 0.20 um against a 0.69 um bound; D3 (30 deg,
+  kappa 1) 0.35 um against 1.21 um.
+- Circular-spline nominal radii are assumed full depth: tip `r_pc - m`, root `r_pc + 1.25 m`.
+
+## TD5 notes and the D1 / D3 comparison
+
+`MeshingAnalysis` scans one circular pitch of wave-generator angle (24 or 48 samples; the ring state
+repeats every pitch) with every flexspline tooth against the derived circular spline
+(`SweptSpace`). Run with `ToothStudy` (see "Running the tooth study" below). **All numbers below are model output:
+unloaded, kinematic, rigid teeth, zero-backlash conjugate circular spline.** Assumptions: full-depth
+teeth (addendum 1.0 m, dedendum 1.25 m) on both gears and a nominal full-depth circular spline
+(tip `r_pc - m`, root `r_pc + 1.25 m`); neutral line half a wall (0.01 m Z_f) under the root;
+contact threshold 5 um (and 20 um); thinnest acceptable circular-spline tooth 0.05 m.
+
+**Which numbers are meshing results, and which are not.**
+- The root clearance `(1.25 - kappa) m` (`rRoot - reach`) and the minor-axis tip clearance `(kappa - 1) m`
+  (`rTip - minorTip`) are **arithmetic on the assumed nominal circular-spline radii** (`MeshingAnalysis`, using
+  `StrainWavePair.circularTipRadius` / `circularRootRadius`). They restate the tooth depth against the assumed
+  circle; they are not meshing results. The derived circular spline is built from the flexspline's own motion, so it
+  cannot disagree with that motion.
+- **Transmission error is zero by construction and is not measured**: the circular spline is derived from each
+  flexspline-and-cam pair. A fixed circular spline meshing with a cam is needed to measure it: TD11 does that (see "TD11 notes").
+- The engagement metric (changed 2026-11-01). The first version counted a tooth as engaged when any outline point was
+  within the threshold, which includes the tip rounding and the tip land. That reported 48 % for D1 at kappa 1, but
+  it was almost entirely tip edge contact. Each sample point is now classified by region (`ToothProfile.regionAt`:
+  flank strictly between the root join and the tip-blend start; tip = tip blend and land; root blend), and a tooth
+  within the threshold is attributed to the region of its closest point. **Flank engaged** and **tip edge contact**
+  are reported apart; tip contact is edge contact, not engagement. The attribution matters: counting every tooth with
+  any flank point within 5 um (joins excluded) gives 32 % for D1 at kappa 1, because flank points a few samples below
+  the edge lie within 5 um of the edge's own trace.
+
+m 0.3, Z 200/202, cosine cam. "CS tip trim" is how far the circular-spline tooth tip must be cut
+back from the nominal tip for the derived tooth to be 0.05 m thick. Minimum clearance on both flank and tip is
+0 to -0.2 um (inside the 0.7 um fit bound) in every interference-free row, by construction.
+
+| Case | kappa | Interference | Root clr | Tip-tip clr (minor axis) | CS tip trim | Flank engaged 5 um / 20 um | Tip edge contact 5 um / 20 um | Root fillet R min | Hobbable |
+|---|---|---|---|---|---|---|---|---|---|
+| D1 20 deg, hob corner 0.38 m | 0.8 | yes (tips meet) | 135 um | -60 um | 88 um | 0 % / 0 % | 84.3 % / 84.4 % | 0.116 mm | yes |
+| D1 | 1.0 | no | 75 um | 0 | 28 um | 1.6 % / 19.9 % | 46.5 % / 65.9 % | 0.116 mm | yes |
+| D1 | 1.1 | no | 45 um | 30 um | 0 | 10.8 % / 19.3 % | 22.6 % / 31 % | 0.116 mm | yes |
+| D1 | 1.2 | no | 15 um | 60 um | 0 | 11.7 % / 22.8 % | 12.6 % / 12.7 % | 0.116 mm | yes |
+| D3 30 deg, hob corner 0.1 m | 0.8 | yes | 135 um | -60 um | 68 um | 1.3 % / 21 % | 52.5 % / 71 % | 0.034 mm | yes |
+| D3 | 0.9 | yes | 105 um | -30 um | 37 um | 0 % / 4.8 % | 35 % / 46.6 % | 0.034 mm | yes |
+| D3 | 1.0 | no | 75 um | 0 | 8 um | 0 % / 2.2 % | 22.5 % / 33 % | 0.034 mm | yes |
+| D3 | 1.1 | no | 45 um | 30 um | 0 | 9.1 % / 15.9 % | 1.1 % / 1.1 % | 0.034 mm | yes |
+| D3 | 1.2 | no | 15 um | 60 um | 0 | 10.1 % / 16.4 % | 1.8 % / 1.8 % | 0.034 mm | yes |
+
+- D3 with the reference hob's 0.38 m corner radius cannot be cut: "rack corner leaves no cutter tip
+  land". At full depth the largest corner radius is 0.47 m at 20 deg but 0.11 m at 30 deg
+  (0.033 mm at m 0.3), so the root fillet of a 30 deg flexspline is about 3.5 times smaller.
+  At the same 0.1 m corner radius, 20 and 30 deg have the same root fillet.
+- Both forms are interference-free for kappa 1.0 to 1.2 and interfere below 1 (tooth tip meets
+  circular-spline tooth tip at the minor axis) because the tooth depth is 1.0 m; kappa above 1.25
+  bottoms in the root (D4, kappa 2: tips 225 um past the root, tooth 0, wave generator 0.0039 rad).
+  **This window follows from the assumed nominal circular-spline radii** (see above): it restates tooth depth
+  against the assumed circle, so it is arithmetic, not a meshing finding.
+- **Flank engagement is small and rises with kappa for the involute forms.** At kappa 1 the D1 flank is engaged for
+  1.6 % of teeth (5 um) and the D3 flank for 0 %, while 46.5 % (D1) and 22.5 % (D3) of teeth touch only with the tip
+  edge. At kappa 1.1 and 1.2 flank engagement is 9 to 12 % for both and tip edge contact falls. The earlier claim that
+  engagement falls as kappa rises, and that 20 deg engages far more than 30 deg, came from counting tip edge contact;
+  with the flank counted alone it is not supported. At 20 um the D1 flank figure is 20 % at kappa 1 and 23 % at 1.2
+  and D3 2 % at kappa 1, so the pressure-angle difference at kappa 1 is small in absolute terms and sensitive to the
+  threshold. Do not compare any of these percentages with published (loaded) figures: the derived circular spline
+  makes every tooth pass through its envelope, so the flank fraction measures how closely the other teeth follow
+  the envelope (an upper bound on real unloaded engagement), not load sharing.
+- **No pressure-angle recommendation follows from engagement.** D1 is the pick for other reasons: the reference hob is
+  a catalogue hob, the involute has direct metrology (the base circle and involute traces; the hobber's Fr and flank
+  grading exist for it), and it has the larger root-fillet room (0.472 m against 0.11 m at 30 deg). It is not the pick
+  because it "engages more".
+- Not done here: loaded meshing, root stress. (A fixed circular-spline tooth, derived once or a nominal involute, is TD11.)
+
+### D2 (double-circular-arc) against D1 and D3
+
+`D2s` = Liu's arcs scaled to m 0.3, Z 200/202; `D2` = the unscaled paper case (m 0.5, Z 100/102, w0 0.5). Both are
+valid. Same assumptions, thresholds and metric as above, root fillet 0.38 m for D2 (circular, assumed).
+
+| Case | kappa | Interference | Root clr | Tip-tip clr (minor axis) | Flank engaged 5 um / 20 um | Tip edge contact 5 um / 20 um | Min clr flank / tip | Flank zone | Root fillet R |
+|---|---|---|---|---|---|---|---|---|---|
+| D2s | 0.8 | no | 97 um | 188 um | 48.8 % / 48.8 % | 7.8 % / 7.9 % | 0 / -0.1 um | +-50 deg | 0.113 mm |
+| D2s | 1.0 | no | 37 um | 248 um | 16.3 % / 40.7 % | 1.2 % / 1.2 % | 0 / -0.1 um | +-16 deg | 0.113 mm |
+| D2s | 1.1 | no | 7 um | 278 um | 10.9 % / 22.7 % | 1.0 % / 1.0 % | 0 / -0.1 um | +-11 deg | 0.113 mm |
+| D2s | 1.2 | yes (root bottoming) | -23 um | 308 um | 2.7 % / 10.3 % | 11.8 % / 11.8 % | -12.9 / -23.3 um | +-13 deg | 0.113 mm |
+| D2 (paper) | 0.8 | no | 161 um | 314 um | 47.8 % / 47.8 % | 8.4 % / 8.8 % | 0 / -0.1 um | +-50 deg | 0.186 mm |
+| D2 (paper) | 1.0 | no | 61 um | 414 um | 14.2 % / 34.7 % | 1.8 % / 1.8 % | 0 / -0.1 um | +-14 deg | 0.186 mm |
+| D2 (paper) | 1.2 | yes | -39 um | 514 um | 0.5 % / 6.5 % | 11.9 % / 11.9 % | -21.5 / -38.9 um | +-11 deg | 0.186 mm |
+
+- D2 is shorter (addendum 0.586 m, dedendum 0.708 m), so its root clearance is hf - ha = 0.122 m (37 um) at kappa 1
+  and it bottoms above kappa about 1.12; it never has tip-tip interference (minor-axis tips clear by 190 to 310 um).
+  Both clearances are arithmetic on the assumed nominal circular-spline radii (see TD5 notes), not meshing results:
+  they are the form's own tooth depth restated.
+- Flank engagement at kappa 1 (5 um / 20 um): D2s 16.3 % / 40.7 %, D2 (paper) 14.2 % / 34.7 %, against D1 1.6 % / 19.9 %
+  and D3 0 % / 2.2 %. The D2 flank is engaged for roughly ten times as many teeth as the D1 flank at 5 um in this
+  unloaded, zero-backlash model, and its tooth tip is almost never the contact (1 to 2 %); D1 and D3 touch mostly
+  with the tip edge. This is a statement about how closely the other teeth follow the derived envelope in a
+  kinematic model, not a load-sharing result, and not the published ~30 % (loaded). The earlier "D2 engages fewer
+  teeth than D1" came from tip edge contact and is withdrawn.
+- Backlash/clearance along the mesh: with the derived (conjugate) circular spline the clearance is zero on the
+  envelope by construction; the fractions above are how many teeth stay within 5 / 20 um of it.
+- Fillet: D2's root fillet is a design choice here (circular, equal to the hob corner radius). The geometric
+  maximum is 0.743 m (D1's trochoid reaches 0.472 m at 20 deg, D3 0.11 m at 30 deg), so D2 allows the largest fillet.
+- D2's curved flank cannot be cut with the existing hob (next section), so the choice between D1 and D2 is a
+  hob and metrology choice as much as a meshing one. Meshing evidence here is kinematic and unloaded only.
+
+### Hob implications for D2 (rack recovered by `ConjugateRack` from the D2s tooth)
+
+`ToothStudy.hobStudy` prints these; rack heights are in module units, flank angle from the tooth axis.
+
+| Rack | Flank | Datum half-thickness | Tooth depth below datum | Tip corner radius (curvature) |
+|---|---|---|---|---|
+| D1 reference hob | straight 20 deg | 0.2356 mm | 1.25 m | 0.114 mm (0.38 m) |
+| D3 | straight 30 deg | 0.2356 mm | 1.25 m | 0.030 mm |
+| D2s | curved, 29.5 / 16.4 / 38.4 deg (low end / pitch / root end) | 0.202 mm | 0.709 m | 0.112 to 0.113 mm |
+
+- **Verdict: D2 can be hobbed, but not with the existing hob.** `HobCheck.problem` returns none, the rack has no root fold
+  and no flank reversal, and a `HobDesign` builds. The hob needs its own profile.
+- Flank: the conjugate rack flank is gently curved. The best straight line is 23.5 deg and stays within +-8.8 um of it;
+  a straight 20 deg flank stays within +-13.5 um, but only when placed at a datum half-thickness of 0.1927 mm. The
+  reference hob (20 deg, 0.2356 mm) differs from the D2 rack flank by up to 56 um as it stands. A straight-flank
+  hob ground to about 23.5 deg with the right thickness would approximate D2 to about 9 um (profile form error, to be set against
+  the class 5 to 6 target); a form-ground hob follows it exactly.
+- Depth and thickness: D2's tooth is 0.709 m deep against the reference hob's 1.25 m, and its pitch-line tooth is
+  0.404 mm (vs 0.471 mm): the hob tooth must be 14 % fatter on the datum. Sinking the reference hob to fix the
+  thickness (about 0.12 mm) would cut the root about 0.4 m too deep.
+- Corner: the hob tip corner radius needed to cut a circular root fillet of radius rho is about rho (0.112 mm for
+  0.38 m). So the reference hob's 0.38 m corner radius is the right order and would cut a root fillet near 0.38 m,
+  but its exact trochoid shape (not circular) was not computed. Any corner up to 0.7 m is hobbable (no fold).
+- Not checked: the real hob's relief and gash, and the trochoidal root actually generated by a given corner.
+
+
+### Running the tooth study
+
+The D1 / D2 / D3 comparison, the cam comparison and the D2 hob study are not part of the gearkit test run. They are
+`ToothStudy` in its own project, `gearkit/studies/tooth-design/` (it depends on `gearkit` and has no other inputs; the
+study-only helper `maxCutterTipRadius` lives there, not in `HobCheck`). From the repository root,
+with the main checkout's native libraries on `LD_LIBRARY_PATH` as for the other suites:
+
+```
+haxeon run --project gearkit/studies/tooth-design/haxeon.json
+```
+
+It prints one line per case (about 40 s, plus the fixed-circular-spline study below, about 6 min). The fixed-circular-spline
+study (TD11) alone runs by giving the built program the argument `fixed`
+(`hl gearkit/studies/tooth-design/build/host/main.hl fixed`, with the same `LD_LIBRARY_PATH`). The modified-involute study (TD12)
+is `ModifiedInvoluteStudy`, run as `main.hl mod-hob|mod-nominal|mod-search|mod-detail "<variant>"...` with a variant written
+`ha=0.8,x=0,tip=c20x120,cha=0.6,ctip=d` (see TD12 notes; `SAMPLES=24` in the environment changes the angle count). The meshing assertions that guard the analysis stay in `gearkit/tests`
+(`MeshingTests`, with `ToothDesigns` as their fixture).
+
+## TD11 notes: meshing against a fixed circular spline
+
+Added after TD5. It answers the TD5 limitation "transmission error is zero by construction": the circular spline is built
+once, from one design state, and then any flexspline form, cam, kappa and error is meshed against it. Code in
+`gearkit/haxe/gearkit`: `CircularSpline`, `SampledInternalForm`, `SampledInternalProfile` (the tooth),
+`FixedMesh`, `MeshErrors`, `FlexOffset`, `OffsetFrame`, `ToothContact`, `FixedMeshReport` (the solver). Tests:
+`CircularSplineTests`, `FixedMeshTests`. Study: `ToothStudy.fixedStudy`. **All numbers are model output: unloaded, rigid
+teeth, planar, the flexspline otherwise held to the kinematic poses.**
+
+**The circular spline as a tooth.** `CircularSpline.derived(label, pair)` takes the `SweptSpace` of a design state (form, cam,
+kappa), cuts the tooth off where it is 0.05 m thick (D1 tip radius 30.0285 mm; D2s 30.1241 mm) and gives a
+`SampledInternalProfile`, a `ToothProfile` for an internal gear: closed one-pitch `outline`, `flank` from the tip to the
+sampled reach, `regionAt`, `halfAngleAt`, `normalLever` and the sweep's `deviationBound` (D1 0.69 um, D2s 0.26 um).
+`CircularSpline.involute(...)` is the nominal involute internal gear (bound 0) for comparison and for the rigid limit. Both
+answer `clearance(p)`, the signed distance (+ open space, - material) from the outline, and `sideClearance(p, side)`, the
+distance to the tooth on one side of the space. Assumed, not generated:
+- **Root.** The swept space is known only up to the flexspline's reach; from there to the nominal root circle (pitch +
+  1.25 m for an involute flexspline) the tooth wall is a radial line (constant half-angle). The generated root trochoid is a
+  later step (below). The deviation bound covers the flank only.
+- **Tip.** A sharp corner: no tip rounding, a land at the cut-off radius.
+- The ring is placed with a tooth space on +Y at wave-generator angle 0, where flexspline tooth 0 is at the major axis
+  (the same frame as `SweptSpace`).
+
+**The solver.** `FixedMesh.run(spline, pair, errors, samples, ...)`. For each wave-generator angle theta the flexspline teeth
+are placed by `StrainWaveKinematics.pose` (with `MeshErrors`: cam amplitude error w0 + e, a uniform tooth rotation, ring
+translations `FlexOffset` fixed in the circular-spline frame, the wave generator or the flexspline). The whole ring is
+then turned rigidly about the axis by psi, positive in the drive direction (the direction the flexspline turns under the
+drive torque, opposite to the wave generator). Output: `drive(theta)`, the psi of the first drive-flank contact (the
+forward end of the free range); `reverse(theta)`, the first reverse-flank contact (the backward end); `backlash =
+drive - reverse` (negative = the teeth overlap, i.e. interference); transmission error = `drive` about its mean over the
+scan, peak to peak and rms (`FixedMeshReport.tePeakToPeakArcsec()`); and per angle the teeth within 1 um of contact at each
+end, with `ToothRegion` of the closest point (flank, or tip edge).
+- **Root bracketing, no optimiser.** Each end is the root of a minimum signed clearance against psi. The clearance to the
+  tooth on the drive side (`sideClearance`, side +1) falls monotonically as psi grows and the one on the reverse side
+  rises, so each end is the first sign change from psi = 0: bracket by growing steps, then bisect to 1e-10 rad (3 nm at the
+  pitch circle). A clearance band (starting 5 um, following the previous angle, triple on a miss, capped 0.2 mm) restricts
+  the search to the points that can reach the surface; points that cannot are dropped as the bracket narrows (clearance is
+  1-Lipschitz in the displacement). No hit inside the cap marks the angle `unresolved` (none occurred).
+- **Radial contacts.** A point whose contact normal is nearly radial (lever under a tenth of its radius) cannot be moved
+  by rotation: tip on tip land. It is not in the root search; its overlap is reported as `radialOverlap` (interference).
+  Flexspline points past the circular-spline root circle are `rootBottoming`.
+- **Period.** For errors that are the same for every tooth, the ring state repeats, up to relabelling the teeth and a turn by
+  one circular pitch, every 2 pi / Zc of wave-generator angle (one circular pitch; tested to 1e-8 rad, including 57 pitches
+  later, inside one output pitch). That span is the default. An output pitch is theta = pi (101 circular pitches), so one
+  circular pitch is the whole transmission error unless an error is tied to a tooth (runout), which needs a longer span.
+- **Lever.** The angles are rotations of the flexspline, in arcsec; "um at the pitch circle" in the study is angle x 30.3 mm.
+  A contact at the flexspline tip has a small lever (about 5 mm against about 28 mm for a flank contact), so the same
+  normal gap reads 5 to 6 times larger as an angle at tip-edge contact. Compare backlash between rows of the same contact
+  type, or in normal length (angle x lever).
+- Sampling: 64 points per outline segment of the flexspline tooth, 800 per segment of the spline wall. The rigid-limit test
+  shows the sampling noise on the transmission error is below 0.0001 arcsec; 96 points per segment changes the D1 case by
+  0.002 arcsec.
+
+**Validation (`FixedMeshTests`, `CircularSplineTests`).**
+- (a) **Rigid limit.** A rigid 200/202 involute pair at centre distance m (w0 -> 0, `kappa` 1e-7, the flexspline centre
+  orbiting with the wave generator, which is a planet in a ring). Only teeth within 0.3 rad of the mesh zone are used:
+  every full-depth involute pair with a tooth difference of two interferes away from the zone (up to 0.17 mm at 200/202), which is
+  why the real gear deforms; this is also why the section limit is a solver argument. With the circular spline shifted by 0,
+  0.1 and 0.25: transmission error below 0.0001 arcsec; backlash within 0.0002 arcsec of the analytic value
+  `(pi m - s_c - s_f) / R_c` (circular play on the pitch circles over the circular-spline pitch radius; shift 0.1:
+  148.662 arcsec both). Backlash constant over theta to 0.01 arcsec.
+- (b) **Self-consistency (zero by construction).** The D1 cosine kappa-1 spline run with D1 cosine kappa 1: transmission error
+  5.2 arcsec p-p, backlash -8.8 arcsec mean (-1.3 um at the pitch circle, worst -1.9 um), against a sweep bound of 0.69 um
+  at a contact lever of 3 mm or more (47 arcsec allowed). The deepest overlap of any flexspline point with the spline at
+  rest is under the bound (checked directly on `CircularSpline.clearance`). This is the only place zero is expected, and it
+  is zero because the spline is the envelope of this very motion: it tests the solver and the sampled spline, not the gear.
+  The residual is set by tip-edge contact at a small lever (0.1 um of clearance is 6 arcsec there).
+- (c) **Known perturbations.**
+  - Uniform tooth rotation d0 (+3e-4 and -2e-4 rad), with a cam amplitude error present: drive and reverse angles shift by
+    exactly -d0 (< 1e-8 rad), transmission error and backlash unchanged. (The correction that puts the teeth back is -d0;
+    the absolute output angle is unchanged.)
+  - Flexspline runout e = 5 um (a ring offset rotating with the flexspline), rigid planet: a sinusoidal transmission error,
+    p-p x r_b / (2 e) = 0.996 (r_b the base radius, the distance of the line of action from the axis), first harmonic
+    e / r_b to 2 %, once per revolution of the flexspline relative to the wave generator (theta period 2 pi Zf / Zc).
+    **The amplitude is e / r_b, not e sin(a) / r_b**: the full runout vector projects on the line of action (amplitude e),
+    and only its radial component is e sin(a). The radial component alone is the next item.
+  - Centre-distance error (ring offset e = 2 um along the major axis, fixed in the wave generator): the drive contact moves
+    by e sin(a') / r_b with a' the operating pressure angle at the mean centre distance; measured / expected = 0.9999. The
+    nominal-angle value e sin(20 deg) / r_b is 6 % low at e = 5 um, because the two base circles are close (r_bc - r_bf = 0.28 mm
+    against a = 0.3 mm), so a' = 20.6 deg and moves fast. The backlash change is twice the drive shift.
+  - Not tested: the real two-zone wave. A ring offset acts on the two diametral zones with opposite signs and the free
+    range is the minimum of the two, so the error is expected to be rectified (a term at twice the wave-generator frequency
+    in the drive angle), unlike the single-zone planet above. Run it with `FlexOffset` before relying on a number.
+- Interference is reported with its kind: kappa 1.1 into the kappa-1 spline gives a negative free range with flank contact;
+  kappa 0.9 gives radial tip overlap.
+
+**Study (`ToothStudy.fixedStudy`).** The spline is derived once from D1 cosine kappa 1 (involute 20 deg, m 0.3, 200/202) and
+once from D2s cosine kappa 1. Each is meshed with the same form's flexspline, cams cosine, ellipse and Resal, kappa
+0.9 / 1.0 / 1.1, cam amplitude error -2 / 0 / +2 um, 24 wave-generator angles over one circular pitch. Backlash is at the
+pitch circle (R 30.3 mm, see the lever note); negative backlash is overlap. Flank / tip are the teeth within 1 um at the
+drive-flank position (mean over angles, maximum in brackets). "root blend" means the closest point of the first-contact tooth
+is on the flexspline's root blend (the spline tooth tip reaching the flexspline root).
+
+| Circular spline | Flex cam | kappa | TE p-p, arcsec (-2 / 0 / +2 um) | Backlash, um (-2 / 0 / +2 um) | Flank / tip-edge teeth in contact at 0 um (mean, max) | First contact at 0 um | Interference at 0 um |
+|---|---|---|---|---|---|---|---|
+| D1 cos k1 | cosine | 0.9 | 11.13 / 11.78 / 13.69 | -111.1 / -105.1 / -99.1 | 0 (0) / 3.2 (4) | 0% flank, 100% tip | tip overlap 26.8 um, overlap |
+| D1 cos k1 | cosine | 1 | 3.23 / 5.51 / 2.28 | -8 / -1.3 / -14.1 | 0 (0) / 39.5 (42) | 0% flank, 100% tip | overlap |
+| D1 cos k1 | cosine | 1.1 | 1.33 / 1.2 / 1.12 | -40.9 / -41.3 / -41.3 | 8.9 (10) / 0 (0) | 100% flank, 0% tip | overlap |
+| D1 cos k1 | ellipse | 0.9 | 10.63 / 11.41 / 12.16 | -119.9 / -114.3 / -108.7 | 0 (0) / 3.1 (4) | 0% flank, 100% tip | tip overlap 9.6 um, overlap |
+| D1 cos k1 | ellipse | 1 | 9.24 / 7.73 / 2.19 | -23.6 / -15.8 / -14.1 | 0 (0) / 4.4 (6) | 0% flank, 100% tip | overlap |
+| D1 cos k1 | ellipse | 1.1 | 1.54 / 1.48 / 1.39 | -40.9 / -41.4 / -41.5 | 8.8 (10) / 0 (0) | 100% flank, 0% tip | overlap |
+| D1 cos k1 | resal | 0.9 | 9.68 / 8.34 / 7.51 | -162.6 / -158.2 / -153.7 | 0 (0) / 2.8 (4) | 0% flank, 100% tip | tip overlap 44 um, overlap |
+| D1 cos k1 | resal | 1 | 20.31 / 20.54 / 20.4 | -85.8 / -80 / -74.1 | 0 (0) / 3.9 (6) | 0% flank, 100% tip | tip overlap 19.9 um, overlap |
+| D1 cos k1 | resal | 1.1 | 3.69 / 3.54 / 3.08 | -41 / -42 / -42.5 | 4.7 (6) / 0 (0) | 100% flank, 0% tip | overlap |
+| D2s cos k1 | cosine | 0.9 | 0.12 / 0.04 / 0.07 | 10.3 / 10.3 / 10.1 | 22.7 (24) / 0 (0) | 100% flank, 0% tip | none |
+| D2s cos k1 | cosine | 1 | 0.18 / 4.46 / 1.85 | 1 / -0.7 / -14.1 | 5.3 (6) / 4.8 (6) | 0% flank, 100% tip | overlap |
+| D2s cos k1 | cosine | 1.1 | 7.04 / 7.77 / 3.46 | -79.3 / -89.7 / -101.9 | 0 (0) / 0 (0) | root blend | overlap |
+| D2s cos k1 | ellipse | 0.9 | 0.09 / 0.05 / 0.08 | 10.5 / 10.4 / 10.1 | 22 (22) / 0 (0) | 100% flank, 0% tip | none |
+| D2s cos k1 | ellipse | 1 | 0.19 / 4.42 / 1.9 | 1 / -0.7 / -14 | 5.3 (6) / 4.7 (6) | 21% flank, 79% tip | overlap |
+| D2s cos k1 | ellipse | 1.1 | 7.06 / 7.78 / 3.36 | -79.3 / -89.6 / -101.9 | 0 (0) / 0 (0) | root blend | overlap |
+| D2s cos k1 | resal | 0.9 | 0.07 / 0.1 / 0.12 | 11.5 / 11.1 / 10.6 | 18.4 (20) / 0 (0) | 100% flank, 0% tip | none |
+| D2s cos k1 | resal | 1 | 0.31 / 3.5 / 2.61 | 0.7 / -0.7 / -14 | 5.9 (8) / 3.9 (6) | 42% flank, 58% tip | overlap |
+| D2s cos k1 | resal | 1.1 | 7.93 / 8.48 / 3.21 | -79.3 / -89.7 / -101.7 | 0 (0) / 0 (0) | root blend | overlap |
+
+Two rows are the self-consistency case and are not results: D1 and D2s cosine kappa 1 at 0 um (overlap of 1.3 um and 0.7
+um at the pitch circle, within the sweep bound at the contact lever).
+
+What this table does and does not say:
+- **A spline fits the motion it was derived from, and only that.** Anything off the design state closes the mesh: kappa 1.1
+  overlaps by about 41 um (D1) and 80 to 100 um (D2s) at the pitch circle, because the spline was cut for a flexspline 30 um less
+  deep and its root is the nominal one; a 2 um cam amplitude error of either sign overlaps D1 by 8 to 14 um (D1 rests on tip-edge contact
+  near the sampled reach, lever about 5 mm, so a few um of normal gap read as 8 to 14 um of arc). For D2s, -2 um opens the
+  mesh by 0.7 to 1 um and +2 um overlaps it by 14 um. **There is no tolerance window in these numbers**: they say how far the
+  mesh closes, not what amplitude error is acceptable, which needs the compliant flexspline (below).
+- **Shallower is looser for D2s only.** D2s kappa 0.9 has 10 to 11 um of backlash, transmission error under 0.15 arcsec and 17
+  to 23 teeth in flank contact, all three cams. D1 kappa 0.9 overlaps by 100 to 160 um (tooth tips meet at the minor axis; the
+  spline tip was cut for kappa 1), so it is not a looser D1. That contrast is between two derived splines and the tooth
+  geometry behind them; it is not a ranking of D2 over D1.
+- **Contact type.** D1 meshes on tip edges at kappa 1 and below (first contact 100 % tip edge) and on flanks at kappa 1.1;
+  D2s meshes on flanks at kappa 0.9 and on a mix of tip edge and flank at kappa 1. This agrees with TD5, where D1 kappa 1
+  was 46.5 % tip edge, 1.6 % flank (the same envelope, a different measure).
+- **No cam ranking.** The ellipse differs from the cosine by 4.6 um at the major axis, of the order of the 3 um dropped by
+  the cam-to-neutral mapping: `ShapedCam` takes the radius at the deformed angle as w at the material angle, dropping an
+  O(w0^2 / r_n) term: for D1, w0 = 0.3 mm, so 0.09 / 29.3 = about 3 um. **Cam differences of that order are inside model
+  error**, so the ellipse rows (D1 kappa 1: TE 2 to 9 arcsec, backlash -14 to -24 um) cannot be told from the cosine rows. The Resal
+  cam differs by 24 um, outside the model error, and meshes with 20 arcsec of transmission error and 80 um of overlap at kappa 1 (D1)
+  in the cosine spline: that is the mismatch between a Resal motion and a cosine-cut spline. A Resal spline cut for the Resal
+  cam would give about zero (TD5 setting). It is not a statement about Resal as a cam, and Gravagno 2016's cam comparison (kinematic
+  error against a common circular spline) is not reproduced by it: that needs a spline of independent origin (the nominal
+  involute internal gear, `CircularSpline.involute`, or a spline made once and shared), and the compliance of the real flexspline.
+- Not supported by this model: any claim that one cam or form has lower real transmission error. The flexspline here is rigid
+  except for its kinematic poses and has one rigid degree of freedom (the rotation); a real one yields.
+
+### TD11 follow-up: design-kappa sweep and a nominal involute spline
+
+The first study derived both splines only at kappa 1. This one derives each at a design kappa kd (0.9, 1.0, 1.1, 1.2) and runs
+it with flexspline kappa kd - 0.1, kd - 0.05 and kd, each at cam amplitude error -2 / 0 / +2 um (cosine cam, `ToothStudy.sweepStudy`;
+run with the argument `sweep`, about 9 min). **To keep the grid short it uses 12 wave-generator angles over one circular pitch**
+(the first study used 24; the D1 kappa-1 matched case moves from 5.5 to 5.2 arcsec between 24 and 12 angles, so TE values are good
+to about 0.3 arcsec for the tip-edge cases and to under 0.05 arcsec for the D2s flank cases). D2s kd 1.2 is omitted: D2s
+bottoms in the root above about kappa 1.12, so its spline root is the reach, not a valid design. The last block is the nominal involute
+internal spline (`CircularSpline.involute`, 202 teeth, 20 deg, no shift, full-depth: independent origin, the spline a catalogue shaper
+cutter would make) run with D1 at kappa 0.9 / 1.0 / 1.1. Backlash is at the 30.3 mm pitch circle, negative is overlap. The
+matched rows (flex kappa = kd) at 0 um are the self-consistency case, zero by construction within the sweep bound, and not results.
+All the caveats of the first study apply (unloaded, rigid, one rotational degree of freedom, assumed radial root wall and sharp tip,
+tip-edge contacts read 5 to 6 times larger as an angle than a flank contact of the same normal gap, no cam ranking).
+
+| Circular spline | Design kappa | Flex kappa | TE p-p, arcsec (-2 / 0 / +2 um) | Backlash, um (-2 / 0 / +2 um) | Flank / tip-edge teeth at 0 um (mean) | Interference at 0 um |
+|---|---|---|---|---|---|---|
+| D1 cosine | 0.9 | 0.8 | 16.14 / 17.01 / 17.02 | -110.5 / -104.6 / -98.6 | 0 / 4 | tip overlap 13.4, overlap |
+| D1 cosine | 0.9 | 0.85 | 12.91 / 11.43 / 10.75 | -64.5 / -57.8 / -50.7 | 0 / 3.8 | overlap |
+| D1 cosine | 0.9 | 0.9 | 2.77 / 5.43 / 2.59 | -8 / -1.4 / -15.2 | 0 / 60.8 | self-consistency (not a result); overlap |
+| D1 cosine | 1 | 0.9 | 9.58 / 11.26 / 13.69 | -111.1 / -105.2 / -99 | 0 / 3.2 | tip overlap 25.2, overlap |
+| D1 cosine | 1 | 0.95 | 13.46 / 13 / 12.17 | -63.7 / -56.9 / -49.9 | 0 / 3.8 | overlap |
+| D1 cosine | 1 | 1 | 3.12 / 5.21 / 2.28 | -8 / -1.3 / -14.1 | 0 / 39.5 | self-consistency (not a result); overlap |
+| D1 cosine | 1.1 | 1 | 10.87 / 9.81 / 9.21 | -111.4 / -105.7 / -99.8 | 0 / 2.7 | tip overlap 11, overlap |
+| D1 cosine | 1.1 | 1.05 | 9.83 / 9.44 / 8.99 | -64.6 / -57.7 / -50.6 | 0 / 3.2 | overlap |
+| D1 cosine | 1.1 | 1.1 | 3.05 / 5.8 / 2.05 | -7.8 / -1.3 / -13.6 | 3 / 26.2 | self-consistency (not a result); overlap |
+| D1 cosine | 1.2 | 1.1 | 25.06 / 24.34 / 21.55 | -105.1 / -97 / -89.2 | 0 / 2 | overlap |
+| D1 cosine | 1.2 | 1.15 | 13.43 / 11.8 / 10.12 | -50.4 / -44 / -37.7 | 0 / 2.2 | overlap |
+| D1 cosine | 1.2 | 1.2 | 1.64 / 5.52 / 2.34 | -5.4 / -1.3 / -13.7 | 5.5 / 13.7 | self-consistency (not a result); overlap |
+| D2s cosine | 0.9 | 0.8 | 3.13 / 3.22 / 3.11 | -28.4 / -26.4 / -24.4 | 8.7 / 0 | overlap |
+| D2s cosine | 0.9 | 0.85 | 1.77 / 1.69 / 1.44 | -14.4 / -12.7 / -10.9 | 10.2 / 0 | overlap |
+| D2s cosine | 0.9 | 0.9 | 0.47 / 4.5 / 1.98 | -1.6 / -0.7 / -15 | 45.8 / 6.5 | self-consistency (not a result); overlap |
+| D2s cosine | 1 | 0.9 | 0.12 / 0.04 / 0.06 | 10.3 / 10.3 / 10.1 | 22.7 / 0 | none |
+| D2s cosine | 1 | 0.95 | 0.14 / 0.15 / 0.17 | 7.2 / 6.5 / 5.7 | 13.3 / 0 | none |
+| D2s cosine | 1 | 1 | 0.18 / 4.43 / 1.85 | 1 / -0.7 / -14.1 | 5.3 / 4.7 | self-consistency (not a result); overlap |
+| D2s cosine | 1.1 | 1 | 0.2 / 0.24 / 0.22 | 18.3 / 17.3 / 16.3 | 10.8 / 0 | none |
+| D2s cosine | 1.1 | 1.05 | 0.28 / 0.29 / 0.29 | 10.4 / 9.2 / 8.1 | 9.7 / 0 | none |
+| D2s cosine | 1.1 | 1.1 | 0.21 / 4.56 / 2.05 | 1.3 / -0.7 / -13.8 | 3.5 / 3.5 | self-consistency (not a result); overlap |
+| nominal involute 202 | - | 0.9 | 3.99 / 29.23 / 31.22 | -299.1 / -294.4 / -288.6 | 0 / 2.2 | tip overlap 75.3, overlap |
+| nominal involute 202 | - | 1 | 29.66 / 28.3 / 34.21 | -221.6 / -216.8 / -211.8 | 0 / 2 | tip overlap 43, overlap |
+| nominal involute 202 | - | 1.1 | 34.56 / 34.39 / 34.21 | -154 / -149.8 / -145.6 | 0 / 2 | tip overlap 33, overlap |
+
+Best operating point per form (flank contact, small positive backlash, lowest TE, least sensitivity to +-2 um), from this grid only:
+- **D2s: spline kd 1.0, flexspline kappa 0.95.** Backlash 6.5 um (5.7 to 7.2 over +-2 um), TE 0.15 arcsec p-p (0.14 to 0.17),
+  13 teeth in flank contact, no tip-edge contact, no interference. The whole family with flex kappa 0.05 to 0.1 below kd
+  (kd 1.0 and 1.1) behaves alike: positive backlash that falls by about 0.4 um per um of amplitude, TE 0.04 to 0.4 arcsec, 10 to 23
+  flank teeth. kd 1.0 / 0.90 has the lowest TE (0.04) and most contact (22.7) but 10 um of backlash; kd 1.1 / 1.05 has 9 um and 10
+  teeth. Running at kd itself (flex kappa = kd) is the self-consistency case: with +2 um it overlaps by 14 um and the TE jumps to
+  2 to 4.6 arcsec, so a D2s spline needs its flexspline at least 0.05 shallower than it was cut for, or an amplitude margin. A
+  spline cut at 0.9 overlaps at all three flex kappas (it was cut with tips meeting); one cut at 1.2 is not valid.
+- **D1: no operating point meets the brief.** With flex kappa below kd the D1 flexspline overlaps by 38 to 112 um in every row (tip
+  edges meet tip edges at the minor axis because the spline tip was cut for kd), with 2 to 4 teeth touching, none on a flank. At kd
+  the mesh is the self-consistency case and rests on tip edges (flank contact appears only at kd 1.1 and 1.2: 3 and 5.5 teeth,
+  still beside 14 to 26 tip-edge teeth), and +-2 um gives 5 to 8 um (-2 um) or 14 um (+2 um) of overlap. The least bad D1 row is kd 1.2
+  matched (flank 5.5, tip 13.7, the lowest +-2 um overlaps, 5.4 and 13.7 um); it is not a point with backlash.
+- **Nominal involute spline with the D1 flexspline: overlaps everywhere** (150 to 300 um at kappa 0.9 to 1.1, tip overlap 33 to 139 um,
+  TE 4 to 34 arcsec, tip-edge contact only). The standard full-depth internal spline does not accept the deformed D1 flexspline
+  at these kappas in this rigid model, in line with the rigid-limit result that a 200/202 full-depth involute pair interferes
+  away from the mesh zone. A shaper-cut standard spline would need shortened teeth or a profile shift, and the compliant
+  model, to say more; the model here does not support a conclusion on it beyond "does not mesh rigidly".
+- None of this ranks D1 against D2s as forms: D2s has the flank-contact, positive-backlash window because its spline
+  is a swept envelope of a flank-contact tooth, and D1's envelope is made by tip edges (TD5: 46.5 % tip edge). It says what the
+  rigid kinematic model of each derived spline accepts.
+
+**Out of scope, next steps.** Loaded and compliant contact (the flexspline will comply at these um-scale overlaps; this is the
+step that gives tolerance windows and real engagement); the generated root trochoid and tip rounding of the circular spline
+(replacing the radial wall and the sharp tip); the `StrainWaveDesign` refactor; EDM and shaper output and metrology from the
+`CircularSpline` profile (the profile is ready to be read through `ToothProfile`); deleting `FourRollerCam`. None blocked this
+work. A two-zone eccentricity study and a nominal-involute-circular-spline comparison of the cams are the first uses.
+
+## TD12 notes: can a modified involute flexspline mesh? (catalogue hob against the D2 tooth)
+
+Question: can the flexspline stay an involute that a standard 20 deg rack hob cuts (shortened tooth, profile shift, tip relief), or must
+it be the double-circular-arc (D2) tooth with its own hob? Branch `tooth-involute-mod`. **All numbers are model output on the same footing
+as TD11: unloaded, rigid teeth, one rotational degree of freedom, cosine cam, cam amplitude error +-2 um, 12 wave-generator angles over
+one circular pitch (24 and 48 give the same TE and backlash for the best point: 0.31 arcsec, 9.7 um). The cam-to-flexspline mapping error
+is about 3 um, as in TD11, so differences of a few um in backlash are not resolved. No loaded contact, no root stress.** m 0.3, Z 200/202,
+backlash is at the 30.3 mm pitch circle, negative is overlap.
+
+### New form parameters (general, in `gearkit`)
+
+- `Involute(pressureAngle, addendumFactor = 1.0, ?tipRelief)`: `addendumFactor` is the addendum in modules before shift (the blank outside
+  diameter; the dedendum 1.25 m, the rack and the hob are unchanged). `TipRelief(amount, length, exponent = 1)`: material removed along the flank
+  normal, 0 at `length` (radial mm) below the tip circle, `amount` at the tip circle, growing as the `exponent` power (1 linear, 2 near-circular);
+  works for external and internal teeth; the tip rounding is re-solved tangent to the relieved flank (`InvoluteProfile`).
+- Profile shift was already a `GearSpec` input; its bound is widened from (-1, 1) to (-2, 2) (pointed or undercut teeth are still rejected by the
+  profile's own checks). `StrainWaveInput` takes `addendumFactor`, `profileShift`, `tipRelief` (involute only); `CircularSpline.involute` takes
+  `addendumFactor` and `tipRelief`. A larger tip rounding was already `GearSpec.tipFilletRadius`.
+- `StrainWavePair.circularTipRadius` stays the nominal full-depth circular-spline tip (pitch - 1 m) for any involute flexspline, whatever its
+  own addendum or shift (it was `pitch - flexspline addendum`, which is the same number for the default).
+- **Identity**: the defaults reproduce today's D1 exactly. The hobber probe (outline, rack flank, corner and root samples, `HobDesign`, cutter
+  region and rake face, `GearInspection` and `GearMeasurement` on synthetic rings, for the reference, demo, comparison, shifted and internal
+  gears; 852 364 bytes of double bit patterns) is byte-identical against `c403f7b75`; the flexspline supplier package JSON md5 is
+  `017ec06361ce3f4663e9ee765544712f`, unchanged. Gearkit tests: GeometryTests 1 034 568, MetrologyTests 246, FormInterfaceTests 3 570 and the rest
+  unchanged; `InvoluteVariantTests` adds 40 (shortened tip radius and unchanged flank, shift past one module, relief amount and derivative
+  against finite differences, tip rounding tangent to the relieved flank, hobbability, rack straightness).
+
+### The hob (`ConjugateRack` / `HobCheck` on the variants)
+
+| Flexspline | Rack flank | Flank heights above the datum | Datum half-thickness | Hobbable |
+|---|---|---|---|---|
+| ha 0.8, x 0, rounding 0.05 m (any ha, any x, any rounding) | straight 20 deg, deviation 0.00 um | -1.0 to 0.47..0.94 m (up to the tip) | 0.2356 mm = pi m / 4 | yes (`HobCheck` none, no root fold) |
+| ha 0.8, x 0, relief 20 um over 0.12 mm (0.4 m) | straight 20 deg up to 0.40 m, then relieved, at most 20 um from the line at the top (0.77 m) | -1.0 to 0.77 m | 0.2356 mm below the relief | yes |
+| ha 1.0, relief 30 um over 0.24 mm | straight up to 0.21 m, up to 31 um off the line at the top | -1.0 to 0.96 m | 0.2356 mm below the relief | yes |
+
+- **Shift is the hob infeed and the addendum is the blank outside diameter: both are catalogue operations on a catalogue 20 deg rack hob (m 0.3,
+  tip corner 0.38 m, tooth depth 1.25 m).** Shift 0 to 1.5 and ha 0.6 to 1.0 all give the same straight rack (the height range changes, the
+  line does not). A plain larger tip rounding is also a straight rack. The maximum hob corner radius stays 0.472 m and the flexspline root
+  fillet is unchanged: minimum radius 116 um (0.39 m), against 113 um for D2s.
+- **Tip relief is not a catalogue hob.** The relieved part of the tooth tip is cut by the lower flank at the root of the hob tooth, so the hob
+  needs that flank region ground off the 20 deg line by 10 to 30 um over the last 0.1 to 0.24 mm: a protuberance / tip-relief (Kopfruecknahme) hob,
+  an order option of a hob maker, not a catalogue item; availability and cost were not checked. `HobCheck` accepts the relieved tooth.
+
+### Search (flexspline variants, 12 angles, amplitude 0)
+
+Criteria: positive backlash (small), flank contact (at least 3 teeth), no tip-edge contact (mean tip-edge teeth below 1), low TE. Grid:
+ha 0.6 / 0.7 / 0.8 / 1.0, x 0 / 0.5 / 1.0 / 1.5, tip: rounding 0.05 m (default), rounding 0.15 m, linear relief 20 um over 0.12 mm.
+(i) derived spline at kappa_d 1.0 and 1.1, flexspline kappa_d - 0.1 and - 0.05; (ii) nominal involute 202 spline with the same addendum factor and tip
+treatment, shift x + 0.05 or x + 0.15 ("delta" thins the spline tooth, opening 2 delta m tan 20 deg of backlash), flexspline kappa 0.9 / 1.0 / 1.1.
+Best row per cell:
+
+| ha | x | Tip | (i) derived spline | (ii) nominal involute spline |
+|---|---|---|---|---|
+| 0.6 | 0 | rounding 0.05 / 0.15 m | overlap (25 / 13 um) | tip edges only (8.7 teeth), TE 0.3 |
+| 0.6 | 0 | relief 20 um | tip edges (1.3) TE 0.02, bl 10.9 | **pass** kappa 0.9: TE 0.17, bl 25.8, 13 flank |
+| 0.6 | 0.5, 1.0, 1.5 | relief 20 um | **pass** TE 0.02, bl 11 to 12, 10.5 to 11 flank | spline cannot be built (internal rack limit) |
+| 0.6 | 1.0, 1.5 | rounding 0.05 / 0.15 m | tip edges (3.5 to 4.3), TE 2.9 / 0.02 | cannot be built |
+| 0.7 | 0 | relief 20 um | overlap (21 um) | **pass** kappa 0.9: TE 0.17, bl 25.7, 13 flank |
+| 0.7 | 1.5 | relief 20 um | tip edges (3.5) TE 2.9 | cannot be built |
+| 0.8 | 0 | relief 20 um | overlap (34 um) | **pass** kappa 1.0: TE 0.31, bl 9.7, 9.8 flank |
+| 0.8 | 0 | rounding 0.05 / 0.15 m | overlap (34 / 33 um) | tip edges only (7.7 teeth) |
+| 0.7, 0.8 | 0.5 to 1.5 | any | overlap 7 to 51 um (one tip-edge row) | cannot be built |
+| 1.0 | any | rounding | overlap 57 to 72 um | overlap 47 to 62 um (x 0) |
+| 1.0 | 0 | relief 20 um | overlap 66 um | overlap 6 um (spline ha equal to the flexspline's) |
+| 1.0 | 0.5 to 1.5 | any | overlap 59 to 78 um | cannot be built |
+
+- **Profile shift does not help.** Positive shift on the flexspline neither removes the overlap nor opens a flank window by itself (the (i) passes at
+  x 0.5 to 1.5 are the same ha 0.6 relief case as at x 0), and the nominal involute spline cannot follow it: the internal rack-limit root rule rejects
+  a spline shift above about 0.3, and its root fillet shrinks as the shift rises (minimum radius 75 um at -0.15, 56 um at 0, 49 um at +0.05, 34 um
+  at +0.15, 16 um at +0.25, 7 um at +0.3 for the 0.38 m corner, each against 116 um on the flexspline). x = 0 is the sensible choice; a mild
+  negative shift on the spline buys fillet room. Giving flexspline and spline the same shift (x -0.2, +0.1, +0.2 with the spline at x + 0.05)
+  reproduces the x 0 numbers to 0.1 um, as the standard-centre-distance argument says.
+- **Without relief nothing passes**: every rounding-only row (0.05 to 0.7 m, any ha, any spline) has 7 to 9 teeth touching on the tip edge and
+  at most 2 on the flank, or overlaps. The shortened tooth removes the overlap against a nominal involute spline (TE 0.3, bl 10) but the contact is
+  still the flexspline tip edge on the spline flank.
+- **Tip relief is what turns the tip-edge contact into flank contact**, at 20 um over 0.12 mm (smaller amounts do not: 5 um still has 2 tip-edge
+  teeth and TE 13 arcsec at ha 0.8; 10 um passes at ha 0.8; 30 um over 0.24 mm passes at ha 1.0). Linear and quadratic profiles behave alike
+  at ha 0.8; at ha 1.0 the quadratic is worse (30 um over 0.12 mm: TE 4.0 arcsec against 0.3 for the linear).
+- **Nominal spline (ii), the shaper-cut option, is a rule on the tooth heights.** With 20 um relief on the flexspline and flexspline kappa 1.0,
+  delta 0.05, the pair passes whenever ha_flex + ha_spline <= 1.6 (0.6 + 1.0, 0.7 + 0.9, 0.8 + 0.8, 0.9 + 0.7, 1.0 + 0.6 pass; 0.7 + 1.0, 0.8 + 0.9,
+  0.9 + 0.8, 1.0 + 0.7 overlap by 4 to 9 um): the tip-to-tip clearance at the minor axis, (2 - ha_flex - ha_spline) m, has to cover the 0.12 mm
+  relief length. Relief on the spline as well is not needed (its plain 0.05 m rounding passes at ha_spline 0.5 to 0.7 with a relieved flexspline).
+  The flexspline can stay full height if the spline is shortened to 0.5 to 0.6 and the relief is 30 um over 0.24 mm.
+- **Derived spline (i) is fragile and depends on an assumption.** It passes only at design kappa 1.1 (flexspline 1.05; ha at most 0.7) and 1.2
+  (flexspline 1.10 or 1.15; ha at most 0.8), always with relief, and never at design kappa 0.9 or 1.0; the derived tooth is trimmed at the assumed nominal full-depth spline tip (pitch - 1 m, 30.0 mm), which
+  cuts off the long tip formed by the flexspline's tip-edge envelope. It is also the custom EDM or wire spline, so it has no catalogue-cutter
+  advantage.
+
+### Best points, with the cam amplitude error (-2 / 0 / +2 um)
+
+Flank / tip are mean teeth within 1 um of contact at the drive-flank position. D2s from TD11 for comparison. The flexspline's relief is
+linear, amount at the tip circle over a radial length.
+
+| Case | Flexspline | Spline | Kappa | TE p-p, arcsec | Backlash, um | Flank / tip teeth |
+|---|---|---|---|---|---|---|
+| D2s (TD11 best) | D2s | derived kd 1.0 | 0.95 | 0.14 / 0.15 / 0.17 | 7.2 / 6.5 / 5.7 | 13.3 / 0 |
+| N1 | ha 0.8, x 0, relief 20 um / 0.12 mm | nominal involute, ha 0.6, x +0.05 | 1.0 | 0.30 / 0.31 / 0.32 | 11.0 / 9.7 / 8.5 | 10.0 / 0 |
+| N2 | ha 0.7, x 0, relief 20 um / 0.12 mm | nominal, ha 0.6, x +0.05 | 1.0 | 0.30 / 0.30 / 0.31 | 11.1 / 9.9 / 8.6 | 10.3 / 0 |
+| N3 | ha 0.6, x 0, relief 20 um / 0.12 mm | nominal, ha 0.6, x +0.05 | 1.0 | 0.28 / 0.29 / 0.29 | 11.3 / 10.0 / 8.7 | 10.3 / 0 |
+| N3' | same | same | 0.9 | 0.15 / 0.17 / 0.18 | 26.6 / 25.8 / 25.0 | 13.5 / 0 |
+| N4 | ha 1.0, x 0, relief 30 um / 0.24 mm | nominal, ha 0.5, x +0.05 | 1.0 | 0.28 / 0.28 / 0.29 | 11.3 / 10.0 / 8.7 | 10.3 / 0 |
+| N5 | ha 0.8, x 0, relief 10 um / 0.12 mm | nominal, ha 0.6, x +0.05 | 1.0 | 0.30 / 0.32 / 0.32 | 11.0 / 9.7 / 8.5 | 10.0 / 0 |
+| I1 | ha 0.6, x 0, relief 30 um / 0.12 mm | derived kd 1.1 | 1.05 | 0.03 / 0.02 / 0.02 | 12.3 / 10.9 / 9.5 | 11.0 / 0 |
+| I2 | ha 0.6, x 1.5, relief 20 um / 0.12 mm | derived kd 1.1 | 1.05 | 0.02 / 0.02 / 0.02 | 13.3 / 11.8 / 10.3 | 10.5 / 0 |
+| I3 | ha 0.7, x 1.0, relief 30 um / 0.24 mm | derived kd 1.2 | 1.15 | 0.02 / 0.02 / 0.02 | 14.5 / 12.9 / 11.2 | 9.3 / 0 |
+| control | ha 0.8, x 0, rounding 0.5 m (no relief) | nominal, ha 0.6, x +0.05 | 1.0 | 0.31 | 9.6 | 1.5 / 8.5 (tip edges) |
+| control | full-depth D1 | nominal full-depth (TD11) | 1.0 | 28.3 | -216.8 | 0 / 2 (overlap) |
+
+- The nominal-spline backlash falls about 0.6 to 0.7 um per um of cam amplitude (11.0 to 8.5 for +-2 um), as for D2s, and about 20 um per 0.1 of
+  kappa; delta sets it (10 um per 0.05, i.e. 2 delta m tan 20 deg) and the window moves with it: delta 0.05 passes kappa 0.9 (ha 0.6) to 1.0, delta
+  0.15 passes 0.9 to 1.1 and delta 0.25 passes up to 1.2 (backlash 8 um there), at 0.17 to 0.5 arcsec. Kappa 0.8 gives flank contact on only 3 to 7 teeth
+  and TE 3 to 5 arcsec; kappa above the window overlaps by 11 um (delta 0.05 at kappa 1.1).
+- TE: the nominal involute pair is about twice D2s's TE (0.3 against 0.15 arcsec at kappa 1.0; 0.17 at kappa 0.9) and has fewer flank teeth
+  (10 against 13). Both are well below the 2 to 34 arcsec of the unmodified D1.
+
+### Tooth room at the best points
+
+| Gear | Tip circle radius | Tip land (thickness) | Tooth thickness at the pitch circle | Root fillet, minimum radius (0.38 m corner) | Note |
+|---|---|---|---|---|---|
+| Flexspline ha 0.8, relief 20 um | 30.24 mm | 233 um (0.78 m) | 1.571 m | 116 um (0.39 m) | not pointed; tip land is wider than D1's 227 um because the tip is lower |
+| Flexspline ha 0.6, x 1.5 | 30.63 mm | 252 um (0.84 m) | 2.66 m | 115 um | space at the pitch circle 0.48 m; root land 0.129 m |
+| Flexspline ha 1.0, relief 30 um / 0.24 mm | 30.30 mm | 165 um (0.55 m) | 1.571 m | 116 um | the thinnest tip of the set, still blunt |
+| Nominal spline ha 0.6, x +0.05 | 30.135 mm | 320 um (1.07 m) | 1.534 m | 49 um (0.16 m) | tooth height 1.85 m; fillet from the rack-limit construction, not a pinion shaper |
+| Nominal spline ha 0.5, x +0.05 | 30.165 mm | 341 um (1.14 m) | 1.534 m | 49 um | |
+| D2s (TD5) | | | | 113 um (0.38 m) | |
+
+Large positive shift does not point the tooth here (the tip rounds off before that; the shifted flexspline stays 250 um at the tip at x 1.5), but it
+thickens the tooth to 2.66 m and leaves a 0.48 m space, which no spline of 202 teeth can take in this model. The spline root is the weak point: the
+49 um fillet is a third of the flexspline's and D2s's; a pinion-shaped cutter would make a different root and was not modelled.
+
+### Conclusions
+
+- **As far as this rigid unloaded model says, a modified involute flexspline with a nominal involute internal spline does mesh properly**: 10 teeth
+  in flank contact, no tip-edge contact, 8.5 to 11 um backlash for +-2 um, TE 0.3 arcsec (D2s: 13 teeth, 6.5 um, 0.15 arcsec), at flexspline kappa 1.0
+  and a spline shift of +0.05. Two modifications make it so, and neither is a profile shift: (1) tip relief on the flexspline, 20 um over 0.12 mm (10 um
+  at ha 0.8; 30 um over 0.24 mm at full height), without which every variant touches on tip edges or overlaps; (2) a shortened spline tooth so that
+  ha_flex + ha_spline <= 1.6 (the spline at 0.5 to 0.6 m addendum if the flexspline stays full height). Shift is not needed (and the spline cannot
+  take more than about +0.3).
+- **Hob verdict.** Shift, tooth height and tip rounding keep the rack a standard straight 20 deg flank at pi m / 4 on a catalogue hob. The tip relief
+  that the mesh needs does not: it needs a hob whose root flank is ground 20 um off the 20 deg line over the last 0.4 m of height (a tip-relief /
+  protuberance hob), and the spline needs a shaper cutter (or wire) for the shortened tooth at +0.05 shift, which is a custom cutter either way. So the
+  choice is not "catalogue hob against a special hob": it is a hob with an ordinary-looking 20 deg flank plus a tip-relief option, against a D2 hob with
+  a curved flank and a different tooth depth. A catalogue hob with no relief does not mesh in this model.
+- Not supported by this model, and the next tests: loaded contact (an involute flank contact between a convex and a concave flank has a smaller
+  contact radius than D2's conformal arcs; the flexspline will comply at the 10 to 30 um overlaps that separate these cases), the spline root and a
+  pinion-shaper cutter, the real relief form a hob can produce, kappa and centre-distance tolerance windows (the window here is 0.1 in kappa per spline
+  shift), and the 3 um cam mapping error.
 
 ## Steps
 
@@ -245,8 +875,18 @@ units) are compared only as plausibility, with the source and the load condition
 - Tests:
   - D1 and D2 have zero interference;
   - D4 is reported with the tooth index and wave-generator angle where interference occurs;
-  - the engaged fraction rises monotonically with κ over a feasible range;
-  - D2 engages more teeth than D1 at equal module scaling (stated margin, plausibility only).
+  - flank-engaged and tip-edge-contact fractions are reported apart, with the minimum clearance of each region;
+  - no ordering claim (rise with κ, or D2 above D1) is asserted: the measured values are in the TD5 notes, and they are unloaded kinematic numbers.
+
+**TD11. Fixed circular spline (added after TD5; TD-D4 follow-up).**
+- A concrete circular-spline tooth (`CircularSpline`, a `ToothProfile` with a deviation bound) built once from a design
+  state, or a nominal involute internal gear.
+- A solver that meshes any flexspline form, cam, kappa and simple errors against it: first drive-flank and reverse-flank
+  contact rotation per wave-generator angle, transmission error, backlash, flank or tip-edge contact (`FixedMesh`).
+- Tests: rigid-limit backlash against the analytic involute value and zero transmission error; self-consistency within the
+  sweep bound (labelled zero by construction); a uniform rotation shifts the result by exactly that rotation; runout and
+  centre-distance error give the amplitudes expected from the line of action.
+- Study: D1 and D2s cosine kappa-1 splines against cosine, ellipse and Resal cams, kappa 0.9 to 1.1, +-2 um amplitude error.
 
 **TD6. Design rules and manufacturability (TD-D5).**
 - Backlash, clearance, tip thickness, fillet, hobbability, internal generation and the bending
@@ -305,7 +945,8 @@ TD0 ── TD1 ── TD2 ──┐
          └── TD3 ───┴── TD4 ── TD5 ── TD6 ── TD7 ── TD8 ── TD9 ── TD10
 ```
 
-- TD2 and TD3 can run in parallel after TD1. TD4 needs both.
+- TD2 and TD3 can run in parallel after TD1. TD4 needs both. TD11 (fixed-circular-spline mesh) needs TD4 and TD5 and feeds
+  TD6 (backlash rule), TD7 (search) and TD9 (circular-spline output).
 - **TD1 changes `GearSpec`, which the hobber uses.** Start it only after the hobber's HB12 has
   landed, or coordinate with the session running the hobber, so the two don't edit `gearkit` at
   the same time.
@@ -324,12 +965,14 @@ TD0 ── TD1 ── TD2 ──┐
 
 | Step | State | Commits |
 |---|---|---|
-| TD0 | planned | |
-| TD1 | planned | |
-| TD2 | planned | |
-| TD3 | planned | |
-| TD4 | planned | |
-| TD5 | planned | |
+| TD0 | done | Tooth design: baseline and test-design inputs (TD0) |
+| TD1 | done | Tooth design: tooth-form interface (TD1) |
+| TD2 | done: `DoubleCircularArc` / `DoubleArcProfile` (flat construction rebuilt from the definitions, wrapped on the pitch circle; circular root and tip blends assumed); deviations from the paper in the TD2 notes | Tooth design: double-circular-arc form (TD2) |
+| TD3 | done: cosine, ellipse, four-roller, Resal (Gravagno 2016 eq 18) | Tooth design: deformation kinematics (TD3) |
+| TD4 | done for involute forms (D1, D3); not fitted to a full `Sampled` ToothForm (root/tip blends), and no contact-condition refinement: accuracy is by convergence | Tooth design: circular-spline envelope (TD4) |
+| TD5 | done for D1, D2, D3, D4 (unloaded kinematic), metric corrected 2026-11-01: flank engagement and tip edge contact are reported apart. D1 kappa 1 flank 1.6 % (tip edge 46.5 %); D2s 16.3 %; D3 0 %. Root and minor-tip clearances are arithmetic on the assumed circular-spline radii, transmission error is zero by construction, and cam differences of a few um are inside model error (see TD5 notes) | Tooth design: meshing analysis and D1/D3 comparison (TD5); Tooth design: double-circular-arc form (TD2) (D2 comparison) |
+| TD11 | done 2026-11-01 (branch `tooth-mesh`, unloaded rigid kinematic): `CircularSpline` / `SampledInternalProfile` (derived tooth with deviation bound, or nominal involute) and `FixedMesh` (drive and reverse contact rotation, transmission error, backlash, flank or tip-edge contact). Rigid limit: TE below 0.0001 arcsec, backlash within 0.0002 arcsec of the analytic value; self-consistency within the sweep bound (zero by construction); uniform rotation exact; runout and centre-distance amplitudes within 0.4 % and 0.01 %. Study: a spline fits only its design state (kappa 1.1 overlaps 41 to 100 um, 2 um amplitude error overlaps D1 8 to 14 um); no cam ranking is supported (see TD11 notes). Root is an assumed radial wall, tip a sharp corner; loaded contact not done | Tooth design: the circular spline as a concrete internal tooth (TD11); Tooth design: fixed-circular-spline mesh solver (TD11); Tooth design: fixed-spline study and plan (TD11); Tooth design: design-kappa sweep for the fixed-spline study (TD11) |
+| TD12 | done 2026-11-01 (branch `tooth-involute-mod`, unloaded rigid kinematic): involute addendum factor and `TipRelief`, shift bound widened to 2; study of shortened / shifted / relieved involute flexsplines against derived and nominal involute splines. A nominal involute spline meshes with flank contact (TE 0.3 arcsec, backlash 10 um, 10 flank teeth, +-2 um 8.5 to 11 um) only with tip relief on the flexspline and ha_flex + ha_spline <= 1.6; shift does not help; without relief every variant touches on tip edges. Relief needs a non-catalogue hob; see TD12 notes | Involute form: addendum factor, tip relief and shift up to two modules; Tooth design: modified-involute study (TD12) |
 | TD6 | planned | |
 | TD7 | planned | |
 | TD8 | planned | |

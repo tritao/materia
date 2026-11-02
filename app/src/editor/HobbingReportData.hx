@@ -2,10 +2,12 @@ package app.editor;
 
 import gearkit.GearMeasurement;
 import gearkit.GearTrace;
+import Diffable;
+import Hashable;
 
 /** Presentation snapshot; numerical inspection and its qualification stay in GearKit. */
 class HobbingReportData {
-  public final telemetry = new HobbingTelemetry();
+  public var telemetry = new HobbingTelemetry();
   public var measurement:Null<GearMeasurement>;
 
   public function new() {
@@ -54,7 +56,7 @@ class HobbingReportData {
 }
 
 /** Reusable live readings, separate from the immutable inspection result. */
-@:structural class HobbingTelemetry {
+struct HobbingTelemetry : Hashable, Diffable {
   public var status = "Cutting";
   public var complete = false;
   public var failure:Null<String>;
@@ -72,5 +74,23 @@ class HobbingReportData {
   public var hobTorque = 0.0;
   public var tableTorque = 0.0;
   public var materialBasis = "";
-  public function new() {}
+  public function new() {
+    status = "Cutting";
+    complete = false;
+    failure = null;
+    inspectionFailure = null;
+    seconds = 0.0;
+    syncArcsec = 0.0;
+    contacts = 0;
+    windows = 0;
+    poses = 0;
+    buffered = 0;
+    stockKiB = 0;
+    cutting = 0.0;
+    radial = 0.0;
+    power = 0.0;
+    hobTorque = 0.0;
+    tableTorque = 0.0;
+    materialBasis = "";
+  }
 }

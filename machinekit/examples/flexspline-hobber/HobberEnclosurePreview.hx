@@ -245,13 +245,14 @@ class HobberEnclosurePreview {
     scenarios:Bool = false
   ):materia.project.SceneArtifact.SceneArtifactData {
     var scene = AssemblyPreview.scene(assembly, "hobber-enclosed");
+    var pressureAngle = machine.spec.form.pressureAngle();
     if (scene.machineMotion == null) scene.machineMotion = {belts: []};
     var axes = ["machine/X", "machine/Y", "machine/Z", "machine/swivel/A", "machine/spindle/B", "machine/table/C"];
     scene.machineMotion.hobbing = {
       module: machine.spec.module,
       teeth: machine.spec.teeth,
       width: machine.spec.faceWidth,
-      pressureAngle: machine.spec.pressureAngle,
+      pressureAngle: pressureAngle,
       starts: machine.hob.design.starts,
       gashes: machine.hob.design.gashes,
       outside: 32,
@@ -318,7 +319,7 @@ class HobberEnclosurePreview {
     return scene;
   }
   public static function unified():materia.project.SceneArtifact.SceneArtifactData {
-    var machine = new FlexsplineHobber(new gearkit.GearSpec(1, 40, 4, 20 * Math.PI / 180), 4, true);
+    var machine = new FlexsplineHobber(new gearkit.GearSpec(1, 40, 4, new gearkit.Involute(20 * Math.PI / 180)), 4, true);
     var fitted = assembled(machine);
     return runtimeScene(fitted.assembly, machine, fitted.shell.layout.stroke, true);
   }

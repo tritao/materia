@@ -3,6 +3,8 @@ package app.editor;
 import app.ApplicationSimulation;
 import app.ProgramErrorMessage;
 import app.ProjectDocumentSession;
+import Diffable;
+import Equatable;
 import haxeon.ui.Color;
 import haxeon.ui.Insets;
 import haxeon.ui.LayoutAxis;
@@ -41,8 +43,8 @@ class CncPanel {
   var errorDetails = false;
   var lastFailure:Null<String>;
 
-  final presentation = new CncPresentation();
-  final nextPresentation = new CncPresentation();
+  var presentation = new CncPresentation();
+  var nextPresentation = new CncPresentation();
   final report = new HobbingReportData();
   final nextReport = new HobbingReportData();
   var player:Null<app.ToolpathPlayer>;
@@ -95,20 +97,20 @@ class CncPanel {
     nextPresentation.title = nextPlayer == null ? null : nextPlayer.title();
     nextPresentation.detail = nextPlayer == null ? null : nextPlayer.statusDetail();
     var changed = player != nextPlayer || hobbing != nextHobbing;
-    var mask = haxeon.Structural.changedMask(presentation, nextPresentation);
+    var mask = haxeon.Diff.mask(presentation, nextPresentation);
     if (mask != 0) {
-      haxeon.Structural.assignChanged(presentation, presentation, nextPresentation);
+      haxeon.Diff.apply(presentation, presentation, nextPresentation);
       changed = true;
     }
     if (nextHobbing != null) {
       reportData(nextHobbing, nextReport);
-      var reportMask = haxeon.Structural.changedMask(report.telemetry, nextReport.telemetry);
+      var reportMask = haxeon.Diff.mask(report.telemetry, nextReport.telemetry);
       if (report.measurement != nextReport.measurement) {
         report.measurement = nextReport.measurement;
         changed = true;
       }
       if (reportMask != 0) {
-        haxeon.Structural.assignChanged(report.telemetry, report.telemetry, nextReport.telemetry);
+        haxeon.Diff.apply(report.telemetry, report.telemetry, nextReport.telemetry);
         changed = true;
       }
     }
@@ -302,21 +304,35 @@ private class GcodeListModel implements ListViewModel {
 }
 
 
-@:structural private class CncPresentation {
+private struct CncPresentation : Equatable, Diffable {
   public var source:Null<String>;
-  public var generation = -1;
-  public var print = false;
-  public var running = false;
-  public var line = 0;
+  public var generation:Int;
+  public var print:Bool;
+  public var running:Bool;
+  public var line:Int;
   public var failure:Null<String>;
-  public var held = false;
-  public var finished = false;
-  public var started = false;
-  public var restart = false;
-  public var speed = 1.0;
+  public var held:Bool;
+  public var finished:Bool;
+  public var started:Bool;
+  public var restart:Bool;
+  public var speed:Float;
   public var title:Null<String>;
   public var detail:Null<String>;
-  public function new() {}
+  public function new() {
+    source = null;
+    generation = -1;
+    print = false;
+    running = false;
+    line = 0;
+    failure = null;
+    held = false;
+    finished = false;
+    started = false;
+    restart = false;
+    speed = 1.0;
+    title = null;
+    detail = null;
+  }
 }
 
 @:access(app.editor.CncPanel) private class CncPanelView implements View {

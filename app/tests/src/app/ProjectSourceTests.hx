@@ -1,6 +1,5 @@
 package app;
 
-import haxeon.Equality;
 import haxeon.ui.Path;
 
 import RobotKitRuntime;
@@ -5728,7 +5727,7 @@ typedef CubeRun = {
           "actual mill waits for physical released contact before moving its Z load"
         );
         check(
-          Equality.equals(runtime.channelValue(brake.releaseChannel), ProcessEventValue.Digital(true)),
+          Type.enumEq(runtime.channelValue(brake.releaseChannel), ProcessEventValue.Digital(true)),
           "actual mill energizes release while waiting for physical contact"
         );
         for (tick in 0...100) physical.step();
@@ -5743,7 +5742,7 @@ typedef CubeRun = {
             'release fault removes motor effort while the applied brake holds the actual Z load: q=${moving.q.get(zIndex)}, effort=${moving.effort.get(motorIndex)}, motor=${moving.q.get(motorIndex)}'
           );
           check(
-            Equality.equals(runtime.channelValue(brake.releaseChannel), ProcessEventValue.Digital(false)),
+            Type.enumEq(runtime.channelValue(brake.releaseChannel), ProcessEventValue.Digital(false)),
             "release fault de-energizes the device coil"
           );
         } else {
@@ -5758,7 +5757,7 @@ typedef CubeRun = {
           for (tick in 0...30) physical.step();
           var stopped = runtime.snapshot();
           check(
-            Equality.equals(runtime.channelValue(brake.releaseChannel), ProcessEventValue.Digital(true))
+            Type.enumEq(runtime.channelValue(brake.releaseChannel), ProcessEventValue.Digital(true))
             && Math.abs(stopped.q.get(zIndex) - moving.q.get(zIndex)) < 0.0001,
             "ordinary stop retains released brake and powered Z hold"
           );
@@ -5766,7 +5765,7 @@ typedef CubeRun = {
           for (tick in 0...50) physical.step();
           var applied = runtime.snapshot();
           check(
-            Equality.equals(runtime.channelValue(brake.releaseChannel), ProcessEventValue.Digital(false))
+            Type.enumEq(runtime.channelValue(brake.releaseChannel), ProcessEventValue.Digital(false))
             && Math.abs(applied.effort.get(motorIndex)) < 1e-6 && Math.abs(applied.effort.get(zIndex)) < 1e-6,
             "emergency stop de-energizes the brake and disables motor and follower effort"
           );
@@ -5789,7 +5788,7 @@ typedef CubeRun = {
           var reset = runtime.snapshot();
           check(
             reset.faultCode == 0 && Math.abs(reset.q.get(zIndex) - held.q.get(zIndex)) < 0.0001
-            && Equality.equals(runtime.channelValue(brake.releaseChannel), ProcessEventValue.Digital(true)),
+            && Type.enumEq(runtime.channelValue(brake.releaseChannel), ProcessEventValue.Digital(true)),
             "mill reset releases afresh while holding the actual stopped Z pose"
           );
           Sys.println('actual mill Z brake: ${brake.holdingEffort} N m; e-stop sag ${sag * 1000} mm, '

@@ -4,6 +4,7 @@ import app.Main.ReferenceEditorApp;
 import haxeon.ui.Insets;
 import haxeon.ui.core.TextStyleOverride;
 import haxeon.ui.core.View;
+import haxeon.ui.core.RetainedVariants;
 import haxeon.ui.icons.IconName;
 import haxeon.ui.widgets.KeyedView;
 import haxeon.ui.widgets.controls.Button;
@@ -91,15 +92,33 @@ import haxeon.ui.widgets.text.TextField;
       return new Column("inspector-empty", emptyRows, style);
     }
     if (app.sceneInspector == null || app.inspectorSelectionRevision != scene.selectionRevision) {
-      app.sceneInspector = new PropertyInspector(
-        "scene-inspector:" + scene.selectedId,
-        scene.properties(),
-        style,
-        null,
-        null,
-        null,
-        "Selected object inspector"
-      );
+      var feature = scene.selectedFeatureKey;
+      var modelKey = session.generation + ":" + scene.revision + ":" + selected.id.length + ":" + selected.id + ":" +
+        (feature == null ? "-1:" : feature.length + ":" + feature);
+      var cached = app.inspectorModels.get(modelKey);
+      if (cached == null || !cached.isPristine()) {
+        cached = new PropertyInspector(
+          "scene-inspector:" + scene.selectedId,
+          scene.properties(),
+          style,
+          null,
+          null,
+          null,
+          "Selected object inspector"
+        );
+        app.inspectorModels.set(modelKey, cached);
+        app.inspectorModelIds.set(modelKey, app.nextInspectorModelId++);
+      }
+      app.inspectorModelOrder.remove(modelKey);
+      app.inspectorModelOrder.push(modelKey);
+      if (app.inspectorModelOrder.length > 4) {
+        var oldest = app.inspectorModelOrder.shift();
+        if (oldest != null) { app.inspectorModels.remove(oldest); app.inspectorModelIds.remove(oldest); }
+      }
+      app.sceneInspector = cached;
+      var modelId = app.inspectorModelIds.get(modelKey);
+      if (modelId == null) throw "Missing retained inspector model identity";
+      app.inspectorModelId = modelId;
       app.inspectorSelectionRevision = scene.selectionRevision;
     }
     var inspector = app.sceneInspector;
@@ -419,7 +438,14 @@ import haxeon.ui.widgets.text.TextField;
         if (ownership.revertTarget(selected.id)) refreshScriptMaterialization("Object overrides reverted");
       }, "script-object-revert")));
     }
-    rows.push(new KeyedView("properties", inspector));
+    // A clean selected-object inspector can be restored after visiting another object. Changed detached state
+    // is rebuilt in a fresh scope, preserving the previous reset-on-selection behavior for edited controls.
+    rows.push(new KeyedView("properties", new RetainedVariants("scene-properties", Std.string(app.inspectorModelId),
+      function(_) return inspector,
+      function() return scene.revision + ":" + session.document.revision + ":" + simulation.appliedRevision + ":" +
+        inspector.contentRevision() + ":" + inspector.labelWidth + ":" +
+        inspector.enabled + ":" + inspector.stackedRows + ":" + inspector.searchQuery,
+      4, true)));
     var sheetWorkflow = SheetWorkflowPanel.build(app);
     var projectPanel = app.projectUiPanel();
     if (projectPanel != null) rows.push(new KeyedView("project-ui", projectPanel));

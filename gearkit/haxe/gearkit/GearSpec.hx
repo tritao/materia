@@ -1,13 +1,13 @@
 package gearkit;
 
-/** Full-depth normal-system spur gear. Lengths in mm, angles in radians.
+/** Normal-system spur gear of a given tooth form. Lengths in mm, angles in radians.
     Positive shift thickens external teeth and thins internal teeth.
     Fillet defaults are design assumptions, not catalogue/standard claims. */
 class GearSpec {
   public final module:Float;
   public final teeth:Int;
   public final faceWidth:Float;
-  public final pressureAngle:Float;
+  public final form:ToothForm;
   public final internal:Bool;
   public final profileShift:Float;
   public final cutterTipRadius:Float;
@@ -18,7 +18,7 @@ class GearSpec {
     module:Float,
     teeth:Int,
     faceWidth:Float,
-    pressureAngle:Float,
+    form:ToothForm,
     internal:Bool = false,
     profileShift:Float = 0,
     ?cutterTipRadius:Float,
@@ -28,10 +28,9 @@ class GearSpec {
     if (!Math.isFinite(module) || module <= 0) throw "gear module must be finite and positive";
     if (teeth < 3) throw "gear must have at least three teeth";
     if (!Math.isFinite(faceWidth) || faceWidth <= 0) throw "gear face width must be finite and positive";
-    if (!Math.isFinite(pressureAngle) || pressureAngle <= 0
-      || pressureAngle >= Math.PI / 2) throw "gear pressure angle must be between zero and pi/2 radians";
+    if (form == null) throw "gear needs a tooth form";
     if (!Math.isFinite(profileShift)
-      || profileShift <= -1 || profileShift >= 1) throw "profile shift must be finite and strictly between -1 and 1";
+      || profileShift <= -2 || profileShift >= 2) throw "profile shift must be finite and strictly between -2 and 2";
     var corner = cutterTipRadius == null ? 0.38 * module : cutterTipRadius;
     var tip = tipFilletRadius == null ? 0.05 * module : tipFilletRadius;
     if (!Math.isFinite(corner)
@@ -42,14 +41,14 @@ class GearSpec {
     this.module = module;
     this.teeth = teeth;
     this.faceWidth = faceWidth;
-    this.pressureAngle = pressureAngle;
+    this.form = form;
     this.internal = internal;
     this.profileShift = profileShift;
     this.cutterTipRadius = corner;
     this.tipFilletRadius = tip;
     this.evaluation = evaluation;
-    if (rootRadius() <= 0
-      || tipRadius() <= baseRadius()) throw "gear root must be positive and tooth tip must lie above the base circle";
+    if (rootRadius() <= 0) throw "gear root radius must be positive";
+    form.validate(this);
     if (pitchToothThickness() <= 0
       || pitchToothThickness() >= Math.PI * module) throw "profile shift leaves no tooth or tooth space";
   }
@@ -57,11 +56,10 @@ class GearSpec {
   public function sign():Float return internal ? -1.0 : 1.0;
   public function pitchDiameter():Float return module * teeth;
   public function pitchRadius():Float return pitchDiameter() / 2;
-  public function baseRadius():Float return pitchRadius() * Math.cos(pressureAngle);
-  public function tipRadius():Float return pitchRadius() + sign() * module + profileShift * module;
-  public function rootRadius():Float return pitchRadius() - sign() * 1.25 * module + profileShift * module;
-  public function pitchToothThickness():Float return Math.PI
-    * module / 2 + sign() * 2 * profileShift * module * Math.tan(pressureAngle);
+  public function tipRadius():Float return pitchRadius() + sign() * form.addendum(module) + profileShift * module;
+  public function rootRadius():Float return pitchRadius() - sign() * form.dedendum(module) + profileShift * module;
+  public function pitchToothThickness():Float return form.pitchToothThickness(this);
+  public function profile():ToothProfile return form.profile(this);
   /** Default is the entire unrounded flank and face; HB4 supplies standard-specific windows. */
-  public function evaluationRange():GearEvaluationRange return new ToothProfile(this).evaluationRange();
+  public function evaluationRange():GearEvaluationRange return profile().evaluationRange();
 }

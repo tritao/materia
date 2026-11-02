@@ -20,7 +20,7 @@ class FlexsplineHobberCam {
       new Point3(x.upper, y.upper, z.upper),
       low,
       high,
-      machine.spindle.motor.maxSpeed * 60 / (2 * Math.PI),
+      machine.spindle.maxSpeed() * 60 / (2 * Math.PI),
       machine.tableSpec.maxSpeed * 60 / (2 * Math.PI)
     );
     return new HobbingJob(machine.spec, machine.hob.design, machine.hob.parameterNumber("height"), settings, limits);

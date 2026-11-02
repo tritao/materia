@@ -5,6 +5,7 @@ import machinekit.assembly.PosedParts;
 import machinekit.hobbing.*;
 import stockkit.hobbing.HobbingAxes;
 import gearkit.GearSpec;
+import gearkit.Involute;
 
 class FlexsplineHobberChecks {
   static var assertions = 0;
@@ -238,7 +239,7 @@ class FlexsplineHobberChecks {
       throw e;
     }
     parts.close();
-    for (s in [new GearSpec(1, 40, 10, 20 * Math.PI / 180), new GearSpec(0.5, 100, 15, 20 * Math.PI / 180)]) {
+    for (s in [new GearSpec(1, 40, 10, new Involute(20 * Math.PI / 180)), new GearSpec(0.5, 100, 15, new Involute(20 * Math.PI / 180))]) {
       var other = new FlexsplineHobber(s),
         depth = s.pitchRadius() + other.hob.design.pitchDiameter / 2 + s.profileShift * s.module;
       check(
@@ -251,13 +252,13 @@ class FlexsplineHobberChecks {
   /** Small physical integration fixture, separate from reference-budget acceptance. */
   static function wallCuts():Void {
     var machine = new FlexsplineHobber(), support = new MandrelRadialSupport(machine.mandrel, machine.spec.faceWidth);
-    var spec = new GearSpec(1, 20, 2, 20 * Math.PI / 180);
-    var hob = new gearkit.HobDesign(gearkit.ConjugateRack.of(new gearkit.ToothProfile(spec)), 1, 32, 4);
+    var spec = new GearSpec(1, 20, 2, new Involute(20 * Math.PI / 180));
+    var hob = new gearkit.HobDesign(gearkit.ConjugateRack.of(spec.profile()), 1, 32, 4);
     var motion = new stockkit.hobbing.IdealHobbingJob(spec, hob, 3000, 1.1, 0, 1);
     var grid = stockkit.ring.RingStock.fromGearBlank(spec, 0.6, 0.1, 0.2);
     var passes = motion.schedule(grid.grid);
     grid.dispose();
-    var force = 100 * Math.tan(spec.pressureAngle);
+    var force = 100 * Math.tan(spec.form.pressureAngle());
     var rows:Array<{factor:Float, thicknessChangeUm:Float, profileUm:Float}> = [];
     var inspection = new gearkit.GearInspection(spec, spec.pitchRadius());
     var baseline = new stockkit.hobbing.errors.HobbingErrorJob(
@@ -369,7 +370,7 @@ class FlexsplineHobberChecks {
       );
       var mean = ring.deflection(meanForceBound) * 1000, variation = ring.deflection(rangeForceBound) * 1000;
       var profile = 2 * variation,
-        pitch = 2 * Math.tan(s.pressureAngle) * variation, thickness = 2 * Math.tan(s.pressureAngle) * mean;
+        pitch = 2 * Math.tan(s.form.pressureAngle()) * variation, thickness = 2 * Math.tan(s.form.pressureAngle()) * mean;
       rows.push({
         factor: factor,
         supportNPerMm: support,
@@ -387,10 +388,10 @@ class FlexsplineHobberChecks {
       });
     }
     var requiredTotal = Math.max(
-      meanForceBound * 1000 * 2 * Math.tan(s.pressureAngle) / thicknessTolerance,
+      meanForceBound * 1000 * 2 * Math.tan(s.form.pressureAngle()) / thicknessTolerance,
       Math.max(
         rangeForceBound * 2000 / profileBudget,
-        rangeForceBound * 1000 * 2 * Math.tan(s.pressureAngle) / pitchBudget
+        rangeForceBound * 1000 * 2 * Math.tan(s.form.pressureAngle()) / pitchBudget
       )
     );
     var required = Math.max(0, requiredTotal - bare.ringStiffness);
@@ -522,12 +523,12 @@ class FlexsplineHobberChecks {
       validated,
       settings
     );
-    var b = machine.spindle.motor, c = machine.tableSpec;
-    var bTorque = b.continuousTorque * reserve, bPower = b.continuousTorque * b.ratedSpeed * reserve;
+    var b = machine.spindle.motor.rating, c = machine.tableSpec;
+    var bTorque = b.ratedTorque * reserve, bPower = b.ratedTorque * b.ratedSpeed * reserve;
     var cTorque = c.continuousTorque
       * reserve - c.number("sealDrag") - c.number("sealDragRipple") - c.number("coggingTorque");
     check(
-      cam.rpm * 2 * Math.PI / 60 <= b.maxSpeed && cam.tableRpm * 2 * Math.PI / 60 <= c.maxSpeed,
+      cam.rpm * 2 * Math.PI / 60 <= machine.spindle.maxSpeed() && cam.tableRpm * 2 * Math.PI / 60 <= c.maxSpeed,
       "reference process speeds within installed limits"
     );
     check(

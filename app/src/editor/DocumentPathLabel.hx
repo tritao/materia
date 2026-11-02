@@ -139,15 +139,12 @@ class DocumentPathLabel implements View {
       }
     }
     layout.dispose();
-    cache = {
-      value: value,
-      width: available,
-      result: next,
-      fullWidth: fullWidth,
-      font: resolved.textStyle.font,
-      fontSize: resolved.textStyle.fontSize
-    };
-    memo.updateQuietly(cache);
+    cache.value = value;
+    cache.width = available;
+    cache.result = next;
+    cache.fullWidth = fullWidth;
+    cache.font = resolved.textStyle.font;
+    cache.fontSize = resolved.textStyle.fontSize;
   }
   truncated = cache.result != value;
   // The fitted text changes this node in place: announced as an edit, so the next frame compares it, and with a new

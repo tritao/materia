@@ -15,8 +15,8 @@ class MetrologyTests {
   }
   public static function main():Void run();
   public static function run():Void {
-    var s = new GearSpec(0.5, 100, 10, 20 * Math.PI / 180), p = new ToothProfile(s);
-    var control = p.rootJoinRadius + 0.02 * (p.tipJoinRadius - p.rootJoinRadius);
+    var s = new GearSpec(0.5, 100, 10, new Involute(20 * Math.PI / 180)), p = s.profile();
+    var control = p.rootJoinRadius() + 0.02 * (p.tipJoinRadius() - p.rootJoinRadius());
     var cfg = new GearInspection(s, control);
     // Independently calculated decimal fixtures, ISO 2013 equations, NOT the 1995 tables.
     var expected = [
@@ -50,9 +50,9 @@ class MetrologyTests {
     check(perfect.isoClass == 1, 'perfect gear class 1: ${perfect.warnings}');
     for (k in Iso1328.parameters) near(perfect.value(k), 0, 1e-6, 'perfect $k');
     for (w in perfect.thickness) near(w, s.pitchToothThickness(), 1e-10, "circular tooth thickness");
-    var delta = Math.PI / (2 * s.teeth), q = s.pitchRadius() * Math.sin(delta) / Math.cos(s.pressureAngle + delta);
+    var delta = Math.PI / (2 * s.teeth), q = s.pitchRadius() * Math.sin(delta) / Math.cos(s.form.pressureAngle() + delta);
     var ballCentre = Math.sqrt(s.pitchRadius()
-      * s.pitchRadius() + q * q + 2 * s.pitchRadius() * q * Math.sin(s.pressureAngle));
+      * s.pitchRadius() + q * q + 2 * s.pitchRadius() * q * Math.sin(s.form.pressureAngle()));
     for (v in perfect.dimensionsOverBalls) near(
       v,
       2 * ballCentre + 2 * q,
@@ -78,7 +78,7 @@ class MetrologyTests {
       ) / s.teeth;
       near(
         Math.sqrt(cs * cs + sn * sn),
-        5 * s.pitchRadius() / s.baseRadius(),
+        5 * s.pitchRadius() / Involute.baseRadius(s),
         0.005,
         "eccentric pitch first-harmonic amplitude"
       );
@@ -105,8 +105,8 @@ class MetrologyTests {
       partial.overallGrade == null && partial.isoClass == null && !partial.values.exists("Fbeta"),
       "missing helix never passes as zero"
     );
-    var fine = new GearSpec(0.3, 200, 8, 20 * Math.PI / 180), fp = new ToothProfile(fine);
-    var fc = fp.rootJoinRadius + 0.02 * (fp.tipJoinRadius - fp.rootJoinRadius);
+    var fine = new GearSpec(0.3, 200, 8, new Involute(20 * Math.PI / 180)), fp = fine.profile();
+    var fc = fp.rootJoinRadius() + 0.02 * (fp.tipJoinRadius() - fp.rootJoinRadius());
     var extrapolated = GearMeasurement.fromRings(new SyntheticGearRings(fine, fc), fine, new GearInspection(fine, fc));
     check(
       extrapolated.overallGrade == 1 && extrapolated.isoClass == null && extrapolated.extrapolation.length == 1,
@@ -114,8 +114,8 @@ class MetrologyTests {
     );
     rejects(() -> {new GearInspection(s, s.rootRadius());
     }, "control radius below involute rejected");
-    var internal = new GearSpec(0.5, 240, 10, 20 * Math.PI / 180, true);
-    var ip = new ToothProfile(internal), ic = ip.rootJoinRadius - 0.02 * (ip.rootJoinRadius - ip.tipJoinRadius);
+    var internal = new GearSpec(0.5, 240, 10, new Involute(20 * Math.PI / 180), true);
+    var ip = internal.profile(), ic = ip.rootJoinRadius() - 0.02 * (ip.rootJoinRadius() - ip.tipJoinRadius());
     var internalReport = GearMeasurement.fromRings(
       new SyntheticGearRings(internal, ic),
       internal,
@@ -160,9 +160,9 @@ class SyntheticGearRings implements GearRings {
     this.eccentricity = eccentricity;
     this.slope = slope;
     this.twist = twist;
-    var p = new ToothProfile(s), lo = Math.min(p.rootJoinRadius, p.tipJoinRadius) + 0.00001 * s.module, hi = Math.max(
-      p.rootJoinRadius,
-      p.tipJoinRadius
+    var p = s.profile(), lo = Math.min(p.rootJoinRadius(), p.tipJoinRadius()) + 0.00001 * s.module, hi = Math.max(
+      p.rootJoinRadius(),
+      p.tipJoinRadius()
     ) - 0.00001 * s.module;
     rr = [for (i in 0...nr) lo + (hi - lo) * i / (nr - 1)];
     zz = [for (i in 0...nz) s.faceWidth * i / (nz - 1)];
@@ -170,7 +170,7 @@ class SyntheticGearRings implements GearRings {
   public function radii():Array<Float> return rr.copy();
   public function axialPositions():Array<Float> return zz.copy();
   public function boundaries(r:Int, z:Int):Array<Float> {
-    var tau = 2 * Math.PI, rb = s.baseRadius();
+    var tau = 2 * Math.PI, rb = Involute.baseRadius(s);
     if (!byRadius.exists(r)) {
       var ends:Array<Float> = [];
       for (t in 0...s.teeth) for (f in 0...2) {
@@ -178,11 +178,10 @@ class SyntheticGearRings implements GearRings {
         function point(rho:Float):Array<Float> {
           var alpha = Math.acos(rb / rho);
           var h = s.pitchToothThickness() / (2
-            * s.pitchRadius()) + s.sign() * (Math.tan(s.pressureAngle) - s.pressureAngle - Math.tan(alpha) + alpha);
-          var u = GearInspection.roll(rho, rb), start = GearInspection.roll(control, rb), tip = GearInspection.roll(
-            s.tipRadius(),
-            rb
-          );
+            * s.pitchRadius()) + s.sign() * (Math.tan(s.form.pressureAngle()) - s.form.pressureAngle() - Math.tan(alpha) + alpha);
+          // Independent of the profile interface: involute roll length from the base circle.
+          function roll(r:Float):Float return Math.sqrt(Math.max(0, r * r - rb * rb));
+          var u = roll(rho), start = roll(control), tip = roll(s.tipRadius());
           var angle = Math.PI / 2 + t * tau / s.teeth + side * (h + slope * (u - start) / (tip - start) / 1000 / rb);
           return [rho * Math.cos(angle) + eccentricity, rho * Math.sin(angle)];
         }

@@ -96,8 +96,8 @@ class HobMeshTests {
       {gashes : 4, rake : -0.12, starts : 2}
     ];
     for (item in cases) {
-      var spec = new GearSpec(reference ? 0.3 : 1, reference ? 200 : 40, 8, 20 * Math.PI / 180);
-      var design = new HobDesign(ConjugateRack.of(new ToothProfile(spec)), item.starts, 32, item.gashes, item.rake);
+      var spec = new GearSpec(reference ? 0.3 : 1, reference ? 200 : 40, 8, new Involute(20 * Math.PI / 180));
+      var design = new HobDesign(ConjugateRack.of(spec.profile()), item.starts, 32, item.gashes, item.rake);
       var tool = Hob.fromDesign(design, spec, 4, 16, false, true);
       var hob = new Hob(tool.values().copy().setNumber("keywayWidth", 5));
       Sys.println('Hob mesh build: gashes=${item.gashes} rake=${item.rake}');

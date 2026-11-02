@@ -79,11 +79,16 @@ class HobArbor extends MachineComponent {
       height
     ));
     var body = Solids.union(sections);
+    // Two torque-pin holes and four M4 clearance holes on a 32 mm PCD; the flange
+    // screws close the taper and face contacts, so there is no drawbar thread.
     var tools = [
-      cadkit.modeling.Part.cylinderSpan(3, -20.1, -8),
       cadkit.modeling.Part.cylinderSpan(2, 0, 4.1, 14, 0),
       cadkit.modeling.Part.cylinderSpan(2, 0, 4.1, -14, 0)
     ];
+    for (i in 0...4) {
+      var angle = Math.PI / 4 + i * Math.PI / 2;
+      tools.push(cadkit.modeling.Part.cylinderSpan(2.25, -0.1, 4.1, 16 * Math.cos(angle), 16 * Math.sin(angle)));
+    }
     if (parameterNumber("bore") > 0) tools.push(cadkit.modeling.Part.cylinderSpan(
       parameterNumber("bore") / 2,
       -20.1,

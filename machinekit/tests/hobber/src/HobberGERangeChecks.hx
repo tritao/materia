@@ -1,11 +1,12 @@
 import gearkit.GearSpec;
+import gearkit.Involute;
 import materia.assembly.AssemblyFrames as F;
 
 /** Configured size limits, guide travel and front-loading provision. */
 class HobberGERangeChecks {
   public static function run():Void {
     var count = 0;
-    for (spec in [new GearSpec(0.5, 48, 20, 20 * Math.PI / 180), new GearSpec(0.5, 278, 20, 20 * Math.PI / 180)]) {
+    for (spec in [new GearSpec(0.5, 48, 20, new Involute(20 * Math.PI / 180)), new GearSpec(0.5, 278, 20, new Involute(20 * Math.PI / 180))]) {
       var machine = new FlexsplineHobber(spec), model = new cadkit.modeling.AssemblyModel("mm");
       machine.addTo(model, "");
       var state = model.initialState();

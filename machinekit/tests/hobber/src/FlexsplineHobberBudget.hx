@@ -58,8 +58,7 @@ class FlexsplineHobberBudget {
         if (i > 0 && rows[i][0] <= rows[i - 1][0]) throw "history times must increase";
       }
     }
-    if (inputs.masterCounts != machine.spindle
-      .encoder.parameterCount("countsPerRevolution")) throw "sync trace master encoder differs from installed part";
+    if (inputs.masterCounts != machine.spindle.encoder.countsPerRevolution) throw "sync trace master encoder differs from installed part";
     var support = FlexsplineHobberChecks.installedSupport(machine);
     if (!support.supportsRim) throw "reference sleeve does not support tooth band";
     var wall = new RingCompliance(
@@ -77,9 +76,9 @@ class FlexsplineHobberBudget {
     );
     var sources = FlexsplineHobberErrors.sources(machine, t -> Math.max(0, lookup(force, 1, t)), wall, syncSource);
     var motion = new IdealHobbingJob(s, machine.hob.design, cam.rpm, path.revolutions, 0.5, path.zStart);
-    var profile = new ToothProfile(s), inspection = new GearInspection(
+    var profile = s.profile(), inspection = new GearInspection(
       s,
-      profile.rootJoinRadius + 0.01 * (profile.tipJoinRadius - profile.rootJoinRadius)
+      profile.rootJoinRadius() + 0.01 * (profile.tipJoinRadius() - profile.rootJoinRadius())
     );
     var radialStep = 0.0015, axialStep = 0.04, tolerance = 0.000025, threads = 8;
     var configuredThreads = Sys.getEnv("HOBBER_BUDGET_THREADS");

@@ -439,6 +439,37 @@ patented by the first author (US 11,614,153).
   the tooth-design plan's later work. Check the patent before using the idea in a
   product.
 
+### Leaderdrive Model Y third-harmonic gear (found 2026-11-01)
+
+Source: <http://www.leaderdrive.com/product/7.html>. Marketing claims, not test data.
+
+- **What it is.** Leaderdrive's YLHS series (hollow, hat-type flexspline), sold as
+  the "Model Y". It uses a **third-harmonic** (three-lobe) wave generator instead of the
+  usual two-lobe one, with its own tooth profile, materials and heat treatment.
+  Leaderdrive holds international PCT patents on it. They claim doubled transmission accuracy and
+  torsional stiffness against their LHSG, reduced vibration coupling, and "the first
+  gear reducer with transmission accuracy within 10 arcseconds".
+- **Published table (YLHS):**
+
+  | Size / ratio | Rated (2000 rpm in) | Start/stop | Momentary | Max input | Stiffness | Weight |
+  |---|---|---|---|---|---|---|
+  | 17-80 / 17-100 | 20 / 23 N·m | 40 / 46 | 108 / 134 | 6000 rpm | 3.5×10⁴ N·m/rad | 0.56 kg |
+  | 20-80 / 20-100 | 33 / 50 N·m | 66 / 100 | 158 / 180 | 6000 rpm | 5.4×10⁴ | 0.76 kg |
+  | 25-80 / -100 / -120 | 80 / 85 / 85 N·m | 160 / 170 / 170 | 315–376 | 5000 rpm | 9.3×10⁴ | 1.24 kg |
+  | 32-80 / -100 / -120 | 145 / 170 / 170 N·m | 300–400 | 600–800 | 4000 rpm | 15×10⁴ | 2.6 kg |
+  | 40-100 / -120 / -160 | 300–350 N·m | 600–700 | 1334–1458 | 3500 rpm | 32×10⁴ | 5 kg |
+
+  One-way / two-way transmission accuracy ≤ 20″ / ≤ 40″ (stated in the size-17 row;
+  other sizes not legible in the page text). Efficiency 75–80 %, design life 10,000 h.
+- **For us.** A three-lobe wave generator changes the deformation model in this
+  document (two-lobe inextensible-ring theory) and the number of simultaneously
+  engaged tooth zones. It is the main domestic competitor for sizes 14–25 and a
+  benchmark for transmission accuracy. Leaderdrive also uses it in its KCR NC rotary
+  tables (10″ positioning, 4″ repeatability, 1:121) and KAH hollow actuators
+  (gear, frameless motor, brake, 19–24-bit absolute encoder and driver in one unit). Buy a
+  YLHS-20 for benchmarking alongside a standard LCSG/LSS unit, and check the patents
+  before any three-lobe design of our own.
+
 ## Suppliers and prices (collected 2026-10-19)
 
 From web listings and marketing pages, not experience with these companies. All

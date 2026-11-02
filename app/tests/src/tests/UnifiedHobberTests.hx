@@ -24,7 +24,7 @@ class UnifiedHobberTests {
     }
   }
   static function run():Void {
-    var machine = new FlexsplineHobber(new gearkit.GearSpec(1, 40, 4, 20 * Math.PI / 180), 4);
+    var machine = new FlexsplineHobber(new gearkit.GearSpec(1, 40, 4, new gearkit.Involute(20 * Math.PI / 180)), 4);
     var fit = HobberEnclosurePreview.assembled(machine);
     var data = HobberEnclosurePreview.runtimeScene(fit.assembly, machine, fit.shell.layout.stroke, true);
     var initial = new cadkit.modeling.AssemblyState(data.assemblyDefinition);

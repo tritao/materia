@@ -45,10 +45,10 @@ class HobberGEFrameChecks {
     );
     before.setThreads(1);
     after.setThreads(1);
-    var fa = new HobbingForces(before, 30, machine.spec.pressureAngle, 1), fb = new HobbingForces(
+    var fa = new HobbingForces(before, 30, machine.spec.form.pressureAngle(), 1), fb = new HobbingForces(
       after,
       30,
-      machine.spec.pressureAngle,
+      machine.spec.form.pressureAngle(),
       1
     );
     var pass = new GashPass(0, 0, 0, 0.00005, 0.0001), maxPose = 0.0, maxArc = 0.0;

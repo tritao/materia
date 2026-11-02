@@ -1,0 +1,68 @@
+package gearkit;
+
+/** Inputs of one strain-wave tooth design (TOOTH_DESIGN_PLAN.md, TD-D1): tooth counts, module,
+    deflection coefficient, cam, and the flexspline tooth form by name. The cam name is resolved by `Cams.make` when
+    a `StrainWavePair` is built. Lengths in mm, angles in
+    radians. The deformation is `w0 = kappa * module * (circularTeeth - flexTeeth) / 2`. Validation
+    here covers only the inputs; whether the resulting pair meshes is the meshing analysis's job. */
+class StrainWaveInput {
+  public static final FORMS = ["involute", "double-circular-arc"];
+
+  public final name:String;
+  public final form:String;
+  public final module:Float;
+  public final flexTeeth:Int;
+  public final circularTeeth:Int;
+  public final kappa:Float;
+  public final cam:String;
+  /** Involute pressure angle; null for forms that define their own flank. */
+  public final pressureAngle:Null<Float>;
+  /** Involute flexspline tooth variants (defaults: full-depth, unshifted, no relief): addendum in modules, profile shift in
+      modules, tip relief. Only the involute form takes them. */
+  public final addendumFactor:Float;
+  public final profileShift:Float;
+  public final tipRelief:Null<TipRelief>;
+
+  public function new(
+    name:String,
+    form:String,
+    module:Float,
+    flexTeeth:Int,
+    circularTeeth:Int,
+    kappa:Float,
+    cam:String,
+    ?pressureAngle:Float,
+    addendumFactor:Float = 1.0,
+    profileShift:Float = 0,
+    ?tipRelief:TipRelief
+  ) {
+    if (FORMS.indexOf(form) < 0) throw 'tooth form "$form" is not one of ${FORMS.join(", ")}';
+    if (!Math.isFinite(module) || module <= 0) throw "module must be finite and positive";
+    if (flexTeeth < 20) throw "flexspline needs at least twenty teeth";
+    if (circularTeeth - flexTeeth != 2) throw "circular spline must have exactly two more teeth than the flexspline (two-lobe cam)";
+    if (!Math.isFinite(kappa) || kappa <= 0) throw "deflection coefficient kappa must be finite and positive";
+    if (form == "involute") {
+      if (pressureAngle == null || !Math.isFinite(pressureAngle) || pressureAngle <= 0
+        || pressureAngle >= Math.PI / 2) throw "involute pressure angle must be between zero and pi/2 radians";
+    } else if (pressureAngle != null) throw 'tooth form "$form" defines its own flank; pressure angle is not an input';
+    if (form != "involute" && (addendumFactor != 1.0 || profileShift != 0
+      || tipRelief != null)) throw 'tooth form "$form" defines its own tooth height, shift and tip; they are not inputs';
+    this.name = name;
+    this.form = form;
+    this.module = module;
+    this.flexTeeth = flexTeeth;
+    this.circularTeeth = circularTeeth;
+    this.kappa = kappa;
+    this.cam = cam;
+    this.pressureAngle = pressureAngle;
+    this.addendumFactor = addendumFactor;
+    this.profileShift = profileShift;
+    this.tipRelief = tipRelief;
+  }
+
+  /** Radial deflection amplitude of the flexspline neutral line, mm. */
+  public function w0():Float return kappa * module * (circularTeeth - flexTeeth) / 2;
+
+  public function flexPitchRadius():Float return module * flexTeeth / 2;
+  public function circularPitchRadius():Float return module * circularTeeth / 2;
+}

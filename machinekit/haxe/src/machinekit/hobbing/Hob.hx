@@ -74,14 +74,14 @@ class Hob extends MachineComponent {
       parameterNumber("module"),
       parameterCount("teeth"),
       parameterNumber("faceWidth"),
-      parameterNumber("pressureAngle"),
+      new Involute(parameterNumber("pressureAngle")),
       false,
       parameterNumber("profileShift"),
       parameterNumber("cutterTipRadius"),
       parameterNumber("tipFilletRadius")
     );
     design = new HobDesign(
-      ConjugateRack.of(new ToothProfile(target)),
+      ConjugateRack.of(target.profile()),
       parameterCount("starts"),
       parameterNumber("outside"),
       parameterCount("gashes"),
@@ -137,7 +137,7 @@ class Hob extends MachineComponent {
       target.faceWidth
     ).setNumber(
       "pressureAngle",
-      target.pressureAngle
+      target.form.pressureAngle()
     ).setNumber(
       "profileShift",
       target.profileShift
