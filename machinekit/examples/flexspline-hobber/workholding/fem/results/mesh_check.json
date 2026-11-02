@@ -1,0 +1,22 @@
+[
+ {
+  "mesh": "base nth36 fine1 nr2",
+  "model": "cup alone stuck",
+  "ur_load_um": -1.01039
+ },
+ {
+  "mesh": "base nth36 fine1 nr2",
+  "model": "V3 sleeve tied",
+  "ur_load_um": -0.06578713
+ },
+ {
+  "mesh": "refined nth72 fine0.5 nr4",
+  "model": "cup alone stuck",
+  "ur_load_um": -1.0885070000000001
+ },
+ {
+  "mesh": "refined nth72 fine0.5 nr4",
+  "model": "V3 sleeve tied",
+  "ur_load_um": -0.06842548
+ }
+]
