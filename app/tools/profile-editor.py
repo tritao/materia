@@ -224,7 +224,8 @@ def main():
                                                  "cpuSeconds": cpu_seconds(process.pid)}) + "\n")
                     if capture is not None and capture.poll() not in (None, 0):
                         raise RuntimeError("hlprof-live failed to attach")
-                    time.sleep(0.1)
+                    # A 100 ms gap can straddle a whole RSS growth step near a cycle checkpoint.
+                    time.sleep(0.01)
                 if process.poll() is None:
                     if args.idle_seconds is None:
                         raise TimeoutError(f"editor did not finish within {run_timeout:g} seconds")
