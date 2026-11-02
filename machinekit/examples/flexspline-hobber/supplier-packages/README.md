@@ -20,8 +20,8 @@ Hob package: `hob-datasheet.pdf`, `gear-datasheet.pdf`, `hob-rack-profile.dxf`
 (DXF R12, mm, 1:1) and `hob-rack-profile.csv`.
 
 Mandrel package: `mandrel-datasheet.pdf`, `mandrel-section.dxf` (half section,
-r = x, z = y, mm; layers CUP, SLEEVE, STOP_LAND, MANDREL_NOMINAL, HOB_KEEPOUT,
-MANDREL_MAX_ENVELOPE, AXIS, SEAT) and `hob-keepout.csv`. The keep-out is the swept
+r = x, z = y, mm; datum A and B on separate layers: CUP, SLEEVE_A, MANDREL_A,
+DATUM_A_PADS, SLEEVE_B, MANDREL_B, DATUM_B_LAND, HOB_KEEPOUT, MANDREL_MAX_ENVELOPE, AXIS, SEAT) and `hob-keepout.csv`. The keep-out is the swept
 hob body at full depth over the hob centre heights of the real CAM job
 (`camkit.HobbingJob` with the cup blank: engagement overrun plus axial clearance,
 7.49 mm below the seat for the reference), swivel over the exported range, with
