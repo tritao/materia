@@ -17,16 +17,21 @@ class HobSpindlePart extends MachineComponent {
     ).numbered(v -> 'HOB-SPINDLE-${v.token("role").toUpperCase()}').procured(_ -> Make("turning and machining"))
       .requiring(v -> {
         var role = v.token("role");
+        // Finished envelopes of the geometry below: largest turned diameter and overall length.
         var dims = switch role {
-          case "shaft": [25.0, 180.0];
-          case "drawbar": [6.0, 172.0];
-          case "bearingRetainer": [62.0, 17.0];
-          case "bearingLocknut": [32.0, 6.0];
+          case "shaft": [40.0, 210.0];
+          case "motorAdapter": [80.0, 70.0];
+          case "bearingRetainer": [80.0, 23.0];
+          case "bearingLocknut": [38.0, 7.0];
           default: throw "unknown spindle cartridge part";
         };
-        return [machinekit.component.Procurement.ProcurementCodec.choice("role", role),
+        var terms = [machinekit.component.Procurement.ProcurementCodec.choice("role", role),
           machinekit.component.Procurement.ProcurementCodec.requirement("bodyDiameter", "mm", null, null, dims[0]),
           machinekit.component.Procurement.ProcurementCodec.requirement("bodyLength", "mm", null, null, dims[1])];
+        // The motor adapter's rear flange is a 90 mm square for the 80-frame servo.
+        if (role == "motorAdapter")
+          terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("flangeWidth", "mm", null, null, 90));
+        return terms;
       });
     return recipe;
   }
