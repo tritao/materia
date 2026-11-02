@@ -200,20 +200,41 @@ Open decisions:
    sensor at the closed end) is left to the mandrel maker. Low drag
    torque is a requirement, because seal drag is a table ripple source. A manual
    screw-piston mandrel is ruled out by robot loading; a 100 bar hydraulic union
-   would add drag. The sleeve is sized from the cup bore (Ø58.05, 0.025 mm
-   collapsed radial clearance), as `FlexsplineHobber` already builds it; "OD 59"
-   in PARTS.md is only the generic recipe default. **Open model issue:** the
-   `ExpandingMandrel` default expansion (0.05 mm diametral) equals the nominal
-   loading gap, so it cannot also absorb bore tolerance or provide grip; the
-   supplier sizes sleeve and expansion for the real bore, and the model should take
-   their values. Bore specification for the flexspline drawing (2026-11-01):
-   Ø58.05 H5 honed after hardening, roundness and cylindricity 0.003 mm over the
-   clamped length, Ra 0.8 (0.4 preferred), only an edge break (≤ 0.1 mm) at the
-   open-end bore edge because the cup seats there on the 0.3 mm land (the loading
+   would add drag. The sleeve is sized from the cup bore (Ø58.05 H5, 0.020 mm
+   diametral collapsed clearance = `FlexsplineHobber.LOADING_CLEARANCE`: OD 58.040 -0.005/0 against
+   58.050/+0.013 gives 0.010 to 0.028 mm), as `FlexsplineHobber` builds it; "OD 59"
+   in PARTS.md is only the generic recipe default. The earlier 0.050 mm clearance could not hold
+   the cup (about 0.2 MPa contact at 10 MPa oil). Rated values now in `ExpandingMandrel`
+   (evidence: `workholding/loads/README.md`, `workholding/fem/README.md`):
+   - `oilPressure` 10 MPa / `maxOilPressure` 15 MPa are oil pressures inside the sleeve. The
+     contact pressure on the cup is a separate window, `contactPressureMin/Max` 0.5 to 1.5 MPa
+     (oil 5 to 9 MPa for the 0.010-0.028 mm clearance range).
+   - Holding: 3.0 N·m torque (SF 2 on the 1.49 N·m `maxTableTorqueBound`, mu 0.08) and 28 N
+     pull-off, replacing the underived "below 5 N·m".
+   - Expansion: the cup wall grows 6.8 µm per MPa of contact pressure, so the old 2 µm limit
+     (0.29 MPa) could not hold the part. Uniform expansion up to 10 µm radial is a size offset
+     compensated by hob depth (`uniformExpansionLimit`); non-uniform (lobed) part ≤ 1.5 µm
+     (`lobedDistortion`); expansion variation over the 8 mm tooth band ≤ 3 µm
+     (`bandExpansionVariation`, flank-line effect 0.34 x that); clamped sleeve roundness ≤ 1.5 µm
+     (`clampedRoundness`, the cup copies the sleeve at about 0.95 µm/µm).
+   - Accuracy: clamped runout ≤ 3 µm TIR (`eccentricity` 0.0015 mm amplitude; the old 0.004 mm
+     was 8 µm TIR, over the 5.1 µm class 5 workholding Fr allowance), re-clamp repeatability
+     1.5 µm, tilt ≤ 2 µm over 8 mm.
+   - Pressed length: pressure starts at the cup's open edge (`sleeveStart` = seat) and runs the
+     tooth band plus 8 mm (`pressedMargin`; FE case 1 gives band taper under 4% of the mean). The
+     reference sleeve max(16, face + 8) = 16 mm satisfies this (`ExpandingMandrel.pressesBand`, checked
+     in the loading test).
+   Bore specification for the flexspline drawing (2026-11-01, updated 2026-11-02):
+   Ø58.05 H5 honed after hardening, roundness 0.002 mm peak-to-peak (cup copies the sleeve and
+   springs back; with the 1.5 µm sleeve it stays inside the 1.5 µm lobing limit), cylindricity 0.003 mm
+   over the clamped length, wall thickness constant around the circumference to 0.010 mm
+   peak-to-peak (expansion varies as dt/t: under 0.1 µm of lobing at 1.5 MPa; EMAG flags wall
+   variation as changing expansion behaviour), Ra 0.8 (0.4 preferred), only an edge break
+   (≤ 0.1 mm) at the open-end bore edge because the cup seats there on the 0.3 mm land (the loading
    lead-in is on the mandrel nose), seating face flatness 0.002 mm and
    perpendicularity to the bore 0.003 mm. The teeth are cut while the cup is
    clamped, so clamping expansion springs back as tooth error: contact pressure
-   is limited to what the cutting torque needs (below 5 N·m).
+   is limited to the 0.5 to 1.5 MPa window, which holds 3.0 N·m with margin.
    The mandrel request does not need the table drawing:
    the maker uses its standard flange and we make the adapter. Below the seat the
    mandrel and fixture must stay inside the swept-hob keep-out (0.3 mm clearance),
@@ -431,7 +452,7 @@ The integral mandrel has a 2 mm-high axial stop immediately below the work seat,
 with a 0.3 mm radial rim-support land. The sleeve is a separate child part;
 the body is recessed for it and its assumed 0.5 mm oil cavity. Sleeve start is
 now the work seat, so the stop is below the active sleeve and the complete
-4/8 mm tooth band remains supported. Collapsed radial bore clearance is 0.025 mm.
+4/8 mm tooth band remains supported. Collapsed radial bore clearance is 0.010 mm (0.020 mm diametral).
 The head retracts to X=110 mm, parks Y=Z=0 and stops B. The robot approaches
 from work −X (global −Y, away from the column), transfers 250 mm horizontally
 with the cup 35 mm above its seat, then lowers it over the collapsed sleeve.

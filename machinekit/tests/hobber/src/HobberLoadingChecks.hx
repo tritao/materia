@@ -27,10 +27,10 @@ class HobberLoadingChecks {
       var members = machine.components(), cup = members.filter(m -> m.id == "blank")[0], cache = new PosedParts();
       var diameter = cup.component.parameterNumber("bore"),
         gap = (diameter - machine.mandrel.parameterNumber("outside")) / 2;
-      if (Math.abs(gap - 0.025) > 1e-8) throw "collapsed sleeve must have 25 um radial loading clearance";
+      if (Math.abs(gap - FlexsplineHobber.LOADING_CLEARANCE / 2) > 1e-8) throw "collapsed sleeve must have the 20 um diametral loading clearance";
       var seat = machine.mandrel.parameterNumber("workSeat"), start = machine.mandrel.parameterNumber("sleeveStart"),
         end = start + machine.mandrel.parameterNumber("sleeveLength");
-      if (start > seat || end < seat + machine.spec.faceWidth) throw "sleeve must support entire tooth band";
+      if (!machine.mandrel.pressesBand(seat, machine.spec.faceWidth)) throw "pressure must start at the cup open edge and cover the band plus the pressed margin";
       var protrusion = machine.mandrel.parameterNumber("height") - seat;
       if (protrusion >= cup.component.parameterNumber("height")
         - cup.component.parameterNumber("endThickness")) throw "mandrel hits closed cup end";

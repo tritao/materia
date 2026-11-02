@@ -17,6 +17,12 @@ typedef HobberTravel = {id:String, lower:Float, upper:Float, initial:Float};
 class FlexsplineHobber extends MachineAssembly {
   /** Work-frame +X (radial) -> machine +Y; work-frame -Y (hob) -> machine +X. */
   public static final MACHINE_FROM_WORK = F.fromRotationMatrix(0, 0, 637, [0.0, -1, 0, 1, 0, 0, 0, 0, 1]);
+  /** Collapsed sleeve to cup bore, diametral. The H5 bore (58.050/+0.013) against a sleeve OD of 58.040 -0.005/0 gives
+      0.010-0.028 mm, mean 0.019: enough lead-in for the robot and for the oil to close in the 0.5-1.5 MPa contact window
+      (workholding/loads/README 2). The previous 0.050 mm could not hold the cup at 10 MPa oil. */
+  public static final LOADING_CLEARANCE = 0.02;
+  /** Pressed length beyond the tooth band, from the open edge upward (workholding/fem/README case 1). */
+  public static final PRESSED_MARGIN = 8.0;
   public static final C = "table/C";
   public static final B = "spindle/B";
   public static final A = "swivel/A";
@@ -121,18 +127,24 @@ class FlexsplineHobber extends MachineAssembly {
       exposePort("table." + name, port.instanceId, port.portName);
     }
     var diameter = 2 * (this.spec.rootRadius() - 0.6), workSeat = 363 - FoundationLayout.TABLE_FACE;
-    mandrel = new ExpandingMandrel(new ComponentValues().setNumber("outside", diameter - 0.05).setNumber(
+    mandrel = new ExpandingMandrel(new ComponentValues().setNumber("outside", diameter - LOADING_CLEARANCE).setNumber(
+      "radialFitGap",
+      LOADING_CLEARANCE / 2
+    ).setNumber(
+      "pressedMargin",
+      PRESSED_MARGIN
+    ).setNumber(
       "workSeat",
       workSeat
     ).setNumber(
       "height",
-      workSeat + Math.max(16, this.spec.faceWidth + 8) + 2
+      workSeat + Math.max(16, this.spec.faceWidth + PRESSED_MARGIN) + 2
     ).setNumber(
       "sleeveStart",
       workSeat
     ).setNumber(
       "sleeveLength",
-      Math.max(16, this.spec.faceWidth + 8)
+      Math.max(16, this.spec.faceWidth + PRESSED_MARGIN)
     ).setNumber(
       "stopDiameter",
       diameter + 0.6
@@ -170,7 +182,7 @@ class FlexsplineHobber extends MachineAssembly {
     );
     fixAt(
       "mandrelSleeve",
-      new MandrelSleeve(new ComponentValues().setNumber("outside", diameter - 0.05).setNumber(
+      new MandrelSleeve(new ComponentValues().setNumber("outside", diameter - LOADING_CLEARANCE).setNumber(
         "wall",
         mandrel.parameterNumber("sleeveWall")
       ).setNumber(

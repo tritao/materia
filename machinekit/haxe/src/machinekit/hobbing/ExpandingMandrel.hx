@@ -4,7 +4,12 @@ import machinekit.motion.PrecisionErrors;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 
-/** Hydraulic expanding mandrel. Reference row is Assumed; dimensions are simplified envelopes. */
+/** Hydraulic expanding mandrel. Reference row is Assumed; dimensions are simplified envelopes.
+    Pressure naming: `oilPressure`/`maxOilPressure` are the pressures of the oil inside the sleeve (MPa range, set
+    by the air-to-oil booster). They are NOT the contact pressure on the cup bore, which is `contactPressureMin/Max`
+    (0.5-1.5 MPa): the sleeve wall and the loading clearance absorb most of the oil pressure.
+    Derivations and evidence: examples/flexspline-hobber/workholding/loads/README.md (sections 1-3) and
+    workholding/fem/README.md (cases 1-2). */
 class ExpandingMandrel extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
     P.quantity("outside", 59, "mm"),
@@ -30,10 +35,33 @@ class ExpandingMandrel extends MachineComponent {
     P.quantity("oilBulkModulus", 1500, "N/mm²"),
     P.quantity("contactStiffnessFactor", 1, ""),
     P.quantity("radialFitGap", 0.025, "mm"),
-    P.quantity("clampingPressure", 10000000, "Pa"),
-    P.quantity("maxPressure", 15000000, "Pa"),
-    P.quantity("eccentricity", 0.004, "mm"),
-    P.quantity("clampingDistortion", 0.002, "mm")
+    // Oil pressure inside the sleeve (operating / proof). Not the contact pressure on the cup.
+    P.quantity("oilPressure", 10000000, "Pa"),
+    P.quantity("maxOilPressure", 15000000, "Pa"),
+    // Contact pressure on the cup bore, over the whole loading-clearance range (loads/README 2).
+    P.quantity("contactPressureMin", 500000, "Pa"),
+    P.quantity("contactPressureMax", 1500000, "Pa"),
+    // Torque the clamp must transmit at the bore: 2 x 1.49 N m bound (maxTableTorqueBound), mu 0.08 (loads/README 1).
+    P.quantity("holdingTorque", 3.0, "N m"),
+    // Pull-off holding force: 2 x 14 N assumed axial load (loads/README 1).
+    P.quantity("holdingAxialForce", 28, "N"),
+    // Pressure must start at the cup's open edge and run past the tooth band by this much (fem/README case 1:
+    // about 3 shell lengths 1/beta = 3.3 mm keeps band taper under ~4% of the mean).
+    P.quantity("pressedMargin", 8, "mm"),
+    // Uniform radial cup expansion allowed at working pressure: a size offset, compensated by hob depth
+    // (6.8 um/MPa of contact pressure x 1.5 MPa = 10 um; loads/README 2).
+    P.quantity("uniformExpansionLimit", 0.010, "mm"),
+    // Clamped-state error bounds. Eccentricity is the offset amplitude (runout TIR = 2x).
+    P.quantity("eccentricity", 0.0015, "mm"),
+    P.quantity("reclampRepeatability", 0.0015, "mm"),
+    P.quantity("tilt", 0.002, "mm"),
+    P.quantity("tiltLength", 8, "mm"),
+    // Non-uniform (n >= 2) part of the clamped bore displacement, peak.
+    P.quantity("lobedDistortion", 0.0015, "mm"),
+    // Max-min of the circumferential-mean expansion over the 8 mm tooth band (flank-line error = 0.34 x this).
+    P.quantity("bandExpansionVariation", 0.003, "mm"),
+    // Roundness of the clamped sleeve OD; the cup copies it at about 0.95 um/um (fem/README case 2).
+    P.quantity("clampedRoundness", 0.0015, "mm")
   ]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
@@ -42,7 +70,7 @@ class ExpandingMandrel extends MachineComponent {
       parameters(),
       v -> new ExpandingMandrel(v)
     ).numbered(v -> 'MANDREL-ASSUMED-D${Dimension.format(v.number("outside"))}-E${Dimension.format(v.number("expansion"))}')
-      .procured(_ -> NotSupplied).requiringInputs(["outside", "bore", "height", "workSeat", "expansion"], ["clampingPressure", "maxPressure"]);
+      .procured(_ -> NotSupplied).requiringInputs(["outside", "bore", "height", "workSeat", "expansion"], ["oilPressure", "maxOilPressure"]);
     return recipe;
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues
@@ -63,9 +91,21 @@ class ExpandingMandrel extends MachineComponent {
     addFacet(new EngineeringMetadata(v));
     addFacet(PrecisionErrors.fromValues(
       v,
-      [{name: "eccentricity", unit: "mm"}, {name: "clampingDistortion", unit: "mm"}]
+      [
+        {name: "eccentricity", unit: "mm"},
+        {name: "reclampRepeatability", unit: "mm"},
+        {name: "tilt", unit: "mm"},
+        {name: "lobedDistortion", unit: "mm"},
+        {name: "bandExpansionVariation", unit: "mm"},
+        {name: "clampedRoundness", unit: "mm"}
+      ]
     ));
-    if (parameterNumber("clampingPressure") <= 0 || parameterNumber("clampingPressure") > parameterNumber("maxPressure")
+    if (parameterNumber("oilPressure") <= 0 || parameterNumber("oilPressure") > parameterNumber("maxOilPressure")
+      || parameterNumber("contactPressureMin") <= 0
+      || parameterNumber("contactPressureMax") < parameterNumber("contactPressureMin")
+      || parameterNumber("holdingTorque") <= 0 || parameterNumber("holdingAxialForce") <= 0
+      || parameterNumber("pressedMargin") < 0 || parameterNumber("uniformExpansionLimit") <= 0
+      || parameterNumber("tiltLength") <= 0
       || parameterNumber("workSeat") >= parameterNumber("height")
       || parameterNumber("expansion") <= 0) throw "invalid mandrel ratings";
     for (key in ["sleeveWall", "sleeveLength", "sleeveYoungs", "oilCavity",
@@ -114,12 +154,16 @@ class ExpandingMandrel extends MachineComponent {
     addFacet(new CollisionHullFacet(hulls));
   }
   override public function componentType():Null<ComponentType> return recipeType();
-  public var clampingPressure(get, never):Float;
-  function get_clampingPressure():Float return parameterNumber("clampingPressure");
+  /** Oil pressure inside the sleeve, Pa. */
+  public var oilPressure(get, never):Float;
+  function get_oilPressure():Float return parameterNumber("oilPressure");
   public var eccentricity(get, never):Float;
   function get_eccentricity():Float return parameterNumber("eccentricity");
-  public var clampingDistortion(get, never):Float;
-  function get_clampingDistortion():Float return parameterNumber("clampingDistortion");
+  /** Pressure must start at or below the cup's open edge `rimStart` (work height) and cover the band plus `pressedMargin`. */
+  public function pressesBand(rimStart:Float, band:Float):Bool {
+    var start = parameterNumber("sleeveStart");
+    return start <= rimStart + 1e-9 && start + parameterNumber("sleeveLength") >= rimStart + band + parameterNumber("pressedMargin") - 1e-9;
+  }
 
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):cadkit.modeling.Part {

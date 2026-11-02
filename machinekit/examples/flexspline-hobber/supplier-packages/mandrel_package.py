@@ -34,7 +34,7 @@ KEEPOUT_CLEARANCE = 0.3    # minimum radial clearance from the swept hob to the 
 # open-end bore edge only gets an edge break because the cup seats on a 0.3 mm land
 # there, so the loading lead-in belongs on the mandrel nose.
 BORE_TOLERANCE = "H5"
-BORE_ROUNDNESS = 0.003
+BORE_ROUNDNESS = 0.002
 BORE_CYLINDRICITY = 0.003
 BORE_RA = 0.8
 BORE_EDGE = "edge break ≤ 0.1 mm (no chamfer: it would remove the seating contact)"
@@ -211,12 +211,19 @@ def sheet(d, profile, shapes):
         ("Height", f"Mandrel top about {w['protrusionAboveSeat']:.0f} mm above the seat (30 mm maximum). "
                    f"Seat {w['seatAboveTableFace']:.0f} mm above the rotary table face: your mandrel plus our "
                    "adapter fill this; please state your height from mounting face to seat"),
-        ("Concentricity", "Clamped bore runout ≤ 0.005 mm TIR (target 0.003); stop land face runout ≤ 0.003 mm"),
-        ("Part distortion", f"The teeth are cut while the part is clamped, so any elastic expansion of the "
-                            f"{w['cupWall']} mm wall springs back as tooth error: radial deformation at the teeth "
-                            "≤ 0.002 mm. Use only the pressure needed for the cutting torque (below 5 N·m), "
-                            "regulated. Please state the contact pressure and the resulting part expansion"),
-        ("Loads", "Gear hobbing, module 0.3: cutting forces below 50 N, torque below 5 N·m; up to 300 rpm"),
+        ("Concentricity", "Clamped runout of the cup bore to the mounting pilot ≤ 0.003 mm TIR; re-clamp repeatability "
+                         "≤ 0.0015 mm over 50 cycles; axis tilt ≤ 0.002 mm over 8 mm; stop land flat to 0.002 mm"),
+        ("Holding", "Torque transmitted at the bore ≥ 3.0 N·m (2 × the 1.49 N·m cutting-torque bound) and "
+                    "pull-off ≥ 28 N, at a contact pressure of 0.5 to 1.5 MPa over the whole loading-clearance "
+                    "range. Please state the oil pressure you need for that; it is not the contact pressure"),
+        ("Part distortion", f"The teeth are cut while the part is clamped. The {w['cupWall']} mm wall expands about "
+                            "6.8 µm per MPa of contact pressure. Uniform expansion up to 0.010 mm radial is "
+                            "acceptable (we compensate it by hob depth; repeatability ±0.001 mm). Non-uniform "
+                            "(lobed, 2 or more lobes) clamped displacement ≤ 0.0015 mm; expansion variation over the "
+                            f"{w['toothBand']:.0f} mm tooth band ≤ 0.003 mm; clamped sleeve OD roundness ≤ 0.0015 mm. "
+                            "Contact pressure must start at the cup's open edge and extend at least 8 mm above the "
+                            "tooth band. Please state contact pressure and part expansion"),
+        ("Loads", "Gear hobbing, module 0.3: cutting force below 50 N, torque 1.5 N·m bound; table 15 rpm in cut"),
         ("Actuation (preferred)", "6 bar air through a rotary union in the table's Ø40 mm centre bore, "
                                   "air-to-hydraulic booster in the mandrel"),
         ("Actuation (alternative)", "Draw-bar or push-rod through the Ø40 mm table bore, cylinder under the "

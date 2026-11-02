@@ -54,7 +54,7 @@ class MandrelRadialSupport {
     // Axisymmetric oil compression diagnostic, never added to n=2 stiffness.
     uniformOilStiffness = 2 * Math.PI * r * length * bulk / cavity;
     seatingPressure = gap * e * t / (r * r); // hoop estimate, excludes end restraint
-    contactPressure = mandrel.clampingPressure / 1e6 - seatingPressure;
+    contactPressure = mandrel.oilPressure / 1e6 - seatingPressure;
     basis =
       'Assumed: sleeve span [$sleeveStart,$sleeveEnd] mm; toothed rim [$bandStart,$bandEnd] mm, radial gap=$radialGap mm, rim supported=$supportsRim; sleeve t=$t mm, end span L=$length mm, band=$band mm, mid-radius R=$r mm; E=$e N/mm², nu=$nu; '
       + 'D=E*t^3/[12(1-nu²)]; k_s=D*pi*R*[pi^4/(2L^3)+9L/(2R^4)+(4-nu)*pi²/(R²L)]; '

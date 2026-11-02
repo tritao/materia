@@ -63,11 +63,17 @@ and empty verified-field lists.
   the lightweight blank remains available. Cutting uses the unchanged rake regions.
   See [HOB_GEOMETRY.md](HOB_GEOMETRY.md) for assumptions and accuracy limits.
 - `ExpandingMandrel`: recipe defaults OD 59, bore 12, length 50 mm, work shoulder at 30 mm,
-  expansion 0.05 mm, operating/maximum pressures 10/15 MPa. `FlexsplineHobber` sizes its
-  instance from the cup: OD 2 × (root radius − 0.6) − 0.05 (Ø58.00 for the reference part),
-  stop land Ø58.65, sleeve max(16, face + 8) from the seat and top 2 mm above the sleeve. Eccentricity amplitude is 0.004 mm
-  and clamping distortion bound 0.002 mm. The expansion is a capacity, not a solved
-  deformation or hydraulic circuit. Other cup bores require another recipe size.
+  expansion 0.05 mm. `oilPressure`/`maxOilPressure` (10/15 MPa) are oil pressures in the sleeve, not
+  contact pressure. Rated requirements (derivation in `workholding/loads/README.md`, FE in
+  `workholding/fem/README.md`): contact pressure 0.5-1.5 MPa, holding torque 3.0 N·m and 28 N pull-off,
+  pressed length = tooth band + `pressedMargin` 8 mm from the cup's open edge, uniform expansion up to
+  10 µm (hob-depth offset), lobed ≤ 1.5 µm, band variation ≤ 3 µm, clamped sleeve roundness ≤ 1.5 µm.
+  Precision bounds exposed to the budget: eccentricity amplitude 0.0015 mm (3 µm TIR), re-clamp
+  repeatability 1.5 µm, tilt 2 µm over 8 mm. `FlexsplineHobber` sizes its instance from the cup:
+  OD 2 × (root radius − 0.6) − `LOADING_CLEARANCE` 0.02 (Ø58.03 for the reference part),
+  stop land Ø58.65, sleeve max(16, face + 8) from the seat and top 2 mm above the sleeve.
+  The expansion is a capacity, not a solved deformation or hydraulic circuit. Other cup bores
+  require another recipe size.
 - `SwivelHead extends MachineAssembly`: direct servo, crossed-roller support, housing,
   moving head and clamp. A is ±45°, with 15°/s rated and 30°/s maximum speed.
   The static 100 N m clamp rating remains separate from the drive's joint effort.
@@ -194,7 +200,9 @@ tray and align the rails before installing the moving column/head.
 
 
 `FlexsplineCupBlank` is the single-piece physical workpiece recipe, including
-its open toothed rim, thin body wall and closed end. `MandrelSleeve` is a separate
+its open toothed rim, thin body wall and closed end. Its bore carries the process
+requirements (honed, H5, roundness 2 µm, cylindricity 3 µm, wall thickness constant
+around the circumference to 10 µm) as recipe values; reasons are in the class comment. `MandrelSleeve` is a separate
 steel child/BOM part on the mandrel; the mandrel body includes the axial stop
 and cavity/recess. The loading scene illustrates radial sleeve take-up only;
 pressure deformation and seals remain unqualified.

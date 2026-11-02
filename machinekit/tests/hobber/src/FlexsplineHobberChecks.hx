@@ -70,7 +70,14 @@ class FlexsplineHobberChecks {
       installed.supportsRim && installed.bandStart >= installed.sleeveStart && installed.bandEnd <= installed.sleeveEnd,
       "assembled toothed band lies entirely on designed expansion sleeve"
     );
-    near(installed.radialGap, 0.025, 1e-9, "assembled bore/sleeve radial clearance matches design");
+    near(installed.radialGap, FlexsplineHobber.LOADING_CLEARANCE / 2, 1e-9, "assembled bore/sleeve radial clearance matches design");
+    var rated = machine.mandrel;
+    near(rated.parameterNumber("contactPressureMin"), 0.5e6, 1, "contact pressure window starts at 0.5 MPa");
+    near(rated.parameterNumber("contactPressureMax"), 1.5e6, 1, "contact pressure window ends at 1.5 MPa");
+    near(rated.parameterNumber("holdingTorque"), 3.0, 1e-12, "holding torque is 2 x the 1.49 N m bound, rounded");
+    check(rated.oilPressure > rated.parameterNumber("contactPressureMax"), "oil pressure is not the contact pressure");
+    near(rated.eccentricity, 0.0015, 1e-12, "clamped runout is 3 um TIR");
+    check(rated.pressesBand(rated.parameterNumber("workSeat"), machine.spec.faceWidth), "pressure starts at the open edge and covers band + 8 mm");
     var unsupported = new MandrelRadialSupport(machine.mandrel, machine.spec.faceWidth, 0);
     check(!unsupported.supportsRim && unsupported.stiffness == 0,
       "rim outside sleeve gets no mandrel radial stiffness");

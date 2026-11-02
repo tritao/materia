@@ -260,7 +260,7 @@ class HobberPartTests {
     }, "bearing walls must exist");
     rejects(() -> {new RotaryEncoderRing(new ComponentValues().setInteger("countsPerRevolution", 0));
     }, "zero encoder counts rejected");
-    rejects(() -> {new ExpandingMandrel(new ComponentValues().setNumber("clampingPressure", 20000000));
+    rejects(() -> {new ExpandingMandrel(new ComponentValues().setNumber("oilPressure", 20000000));
     }, "mandrel overpressure rejected");
     rejects(() -> {new CrossedRollerBearing(new ComponentValues().setNumber("radialRunout", -1));
     }, "negative error bounds rejected");

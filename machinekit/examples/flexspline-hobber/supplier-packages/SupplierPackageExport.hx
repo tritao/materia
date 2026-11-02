@@ -26,10 +26,10 @@ class SupplierPackageExport {
   static inline final TIP_RELIEF_DEG = 3.0;
   static inline final LAND_FRACTION = 0.6;
   // Workholding, as FlexsplineHobber builds it: cup wall 0.6 mm under the root,
-  // 0.05 mm diametral loading clearance, 0.3 mm radial rim-support land, sleeve
+  // 0.02 mm diametral loading clearance (FlexsplineHobber.LOADING_CLEARANCE), 0.3 mm radial rim-support land, sleeve
   // max(16, face + 8) long from the seat, mandrel 2 mm above the sleeve end.
   static inline final WALL = 0.6;
-  static inline final CLEARANCE = 0.05;
+  static inline final CLEARANCE = 0.02;
   static inline final RIM_LAND = 0.3;
   // Work datum (tooth band) z = 363 mm in the machine; table face FoundationLayout.TABLE_FACE = 228 mm.
   static inline final WORK_DATUM = 363.0;
