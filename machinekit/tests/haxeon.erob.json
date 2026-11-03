@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-erob-tests"},
+  "entry": "ErobActuatorTests",
+  "sourceRoots": ["src"],
+  "dependencies": {"machinekit": {"path": ".."}},
+  "target": "host",
+  "outputDir": "build/erob"
+}

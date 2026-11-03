@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# usage: prepare-erob-cad <eRob110I-18EX-V6-MC2E.DX.zip>
+# Unpacks the maker's STEP into the hash-addressed supplier library (build/suppliers/zeroerr/cad/assets/<sha256>.step).
+zip="${1:?usage: prepare-erob-cad <zip from ZeroErr>}"
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+library="${MATERIA_ZEROERR_ROOT:-$repo_root/build/suppliers/zeroerr}"
+expected=81eaf3294a6d38ed70cc42d6a0bca8718f3eacf76f7c5adc0edd054ee0c166ad
+work="$(mktemp -d)"
+trap 'rm -rf "${work:?}"' EXIT
+unzip -q "$zip" '*.step' -d "$work"
+step="$(find "$work" -name '*.step' | head -n 1)"
+actual="$(sha256sum "$step" | cut -d' ' -f1)"
+[[ "$actual" == "$expected" ]] || { echo "STEP differs from the pinned file: $actual" >&2; exit 1; }
+mkdir -p "$library/cad/assets"
+cp "$step" "$library/cad/assets/$expected.step"
+echo "$library/cad/assets/$expected.step"

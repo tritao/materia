@@ -22,6 +22,9 @@ class SupplierLibraries {
   /** `MATERIA_HZMOTION_ROOT`, else build/suppliers/hzmotion in the repository. */
   public static function hzmotion():String return configured("MATERIA_HZMOTION_ROOT", "build/suppliers/hzmotion");
 
+  /** `MATERIA_ZEROERR_ROOT`, else build/suppliers/zeroerr in the repository. */
+  public static function zeroerr():String return configured("MATERIA_ZEROERR_ROOT", "build/suppliers/zeroerr");
+
   /** The pinned file `sha256` in `library`. */
   public static function asset(library:String, sha256:String):String return library + "/cad/assets/" + sha256 + ".step";
 
