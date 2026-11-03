@@ -1,0 +1,20 @@
+{
+	"version": 1,
+	"package": {
+		"name": "machinekit-manufacturing-route-tests"
+	},
+	"entry": "ManufacturingRouteTests",
+	"sourceRoots": [
+		"src"
+	],
+	"dependencies": {
+		"cadkit": {
+			"path": "../../cadkit"
+		},
+		"machinekit": {
+			"path": ".."
+		}
+	},
+	"target": "host",
+	"outputDir": "build/manufacturing-route"
+}

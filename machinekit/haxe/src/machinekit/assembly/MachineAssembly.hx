@@ -1052,6 +1052,28 @@ typedef MachineAssemblyMassProperties = {
 
   public function billOfMaterials():Bom return AssemblyInventory.billOfMaterials(flat());
 
+  /**
+	 * The manufacturing route of each made part in the assembly (and its subassemblies), once per part number, in member
+	 * order: what the BOM's `Make` lines say about process, with the stock, setups and machined faces behind it. A route
+	 * whose process text differs from the part's `Make` process is refused.
+	 */
+  public function manufacturingRoutes():Array<{partNumber:String, route:machinekit.component.ManufacturingRoute}> {
+    var seen = new Map<String, Bool>();
+    var result:Array<{partNumber:String, route:machinekit.component.ManufacturingRoute}> = [];
+    for (member in flat().members) {
+      var route = machinekit.component.ManufacturingRoute.of(member.component);
+      if (route == null) continue;
+      var item = member.component.bom;
+      var procurement = item.procurement;
+      var process = procurement == null ? null : machinekit.component.Procurement.ProcurementCodec.document(procurement).process;
+      if (process != route.process()) throw 'Part "${item.partNumber}" routes as "${route.process()}" but its Make process is "$process"';
+      if (seen.exists(item.partNumber)) continue;
+      seen.set(item.partNumber, true);
+      result.push({partNumber: item.partNumber, route: route});
+    }
+    return result;
+  }
+
   /** Snapshot the engineering tree and derive the procurement view from its occurrences. */
   public function bomDocument(machineId:String, sourceCommit:String, generatedAt:String,
     ?releases:machinekit.component.BomReleases):BomDocument {

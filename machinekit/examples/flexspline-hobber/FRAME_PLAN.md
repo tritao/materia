@@ -112,3 +112,4 @@ main at the end of each phase.
 - 2026-11-03: plan written.
 - 2026-11-03: L1 done (worktree hobber-frames): `AssemblyIntegrity` running gap, contact area and flange cut-out checks, opt-in via `strict`; `MountingFace`; tests in `AssemblyIntegrityTests`.
 - 2026-11-03: L2 done: `MillScrewDrive` moved to `motion/SupportedScrewDrive` (placement from axis start, direction and mounting side; seat holes and dowels); the bench mill's Y and Z drive poses are reproduced by `poses` (`MillScrewDrivePlacementChecks`).
+- 2026-11-03: L4 done: `GroundStock` (ground plate and flat bar rows, standard thicknesses and grinding tolerances), `ManufacturingRoute` facet (ground stock / cut plate / milled / turned, setups, tolerance class, machined faces, supplier), `MachineAssembly.manufacturingRoutes()`; tests in `ManufacturingRouteTests`.

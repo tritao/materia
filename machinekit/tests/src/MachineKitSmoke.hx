@@ -3197,6 +3197,10 @@ class MachineKitSmoke {
       run: () -> AssemblyIntegrityTests.run(),
       weight: 1.0
     }, {
+      name: "ManufacturingRouteTests.run",
+      run: () -> ManufacturingRouteTests.run(),
+      weight: 1.0
+    }, {
       name: "SheetRouterChecks.run",
       run: () -> SheetRouterChecks.run(),
       weight: 4.0
