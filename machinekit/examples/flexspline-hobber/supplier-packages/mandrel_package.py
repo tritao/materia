@@ -41,7 +41,7 @@ BORE_RA = 0.8
 BORE_EDGE = "edge break ≤ 0.1 mm (no chamfer: it would remove the seating contact)"
 SEAT_FLATNESS = 0.002
 SEAT_PERPENDICULARITY = 0.003
-# Datum A (preferred): inside face of the closed end, 3 hardened pads on the mandrel nose.
+# Datum A (variant): inside face of the closed end, 3 hardened pads on the mandrel nose.
 PAD_R_IN, PAD_R_OUT = 24.5, 27.5   # pad contact ring, inside the cup's inside corner radius (about 1 mm)
 PAD_HEIGHT = 1.0
 SLEEVE_A_BELOW_EDGE = 3.0          # sleeve A starts this far below the open edge
@@ -99,13 +99,13 @@ def section_shapes(d, profile):
            (0, height - end), (rb, height - end), (rb, 0)]
     rs, ls = SLEEVE_OD / 2, w["sleeveLength"]
     wall = 1.5
-    # Datum B (alternative): sleeve from the seat, stop land on the open-end face.
+    # Datum B (base): sleeve from the seat, stop land on the open-end face.
     sleeve_b = [(rs - wall, 0), (rs, 0), (rs, ls), (rs - wall, ls), (rs - wall, 0)]
     rstop = w["stopDiameter"] / 2
     stop = [(rb - 1.0, -2.0), (rstop, -2.0), (rstop, 0), (rb - 1.0, 0)]
     top = w["protrusionAboveSeat"]
     body_b = [(0, -2.0), (rb - 1.0, -2.0), (rb - 1.0, 0), (rs - wall, 0), (rs - wall, top), (0, top), (0, -2.0)]
-    # Datum A (preferred): sleeve starts 3 mm below the open edge, nose with 3 pads on the inside end face.
+    # Datum A (variant): sleeve starts 3 mm below the open edge, nose with 3 pads on the inside end face.
     za = height - end                       # inside face of the closed end
     sleeve_a = [(rs - wall, -SLEEVE_A_BELOW_EDGE), (rs, -SLEEVE_A_BELOW_EDGE), (rs, ls), (rs - wall, ls),
                 (rs - wall, -SLEEVE_A_BELOW_EDGE)]
@@ -227,9 +227,8 @@ def sheet(d, profile, shapes):
         ("Workpiece", "Flexspline of a strain wave gear: one-piece thin-walled steel cup, open end down"),
         ("Clamping bore", f"Ø{w['cupBore']:.2f} {BORE_TOLERANCE}, honed after hardening; roundness {BORE_ROUNDNESS} mm, "
                           f"cylindricity {BORE_CYLINDRICITY} mm over the clamped length, Ra {BORE_RA} µm (0.4 preferred)"),
-        ("Inside end face (datum A)", f"Face inside the closed end, {w['cupEnd']:.0f} mm plate. Ground or turned flat, "
-                                      f"perpendicular to the bore within {SEAT_PERPENDICULARITY} mm. Pads touch it "
-                                      f"inside R {PAD_R_OUT}"),
+        ("Closed end", "Geometry to be confirmed (hub, centre bore, bolt holes, inside corner radius). "
+                       "The plain plate shown is a placeholder"),
         ("Open-end face (datum B)", f"Flatness {SEAT_FLATNESS} mm, perpendicular to the bore within "
                                     f"{SEAT_PERPENDICULARITY} mm. Bore edge: {BORE_EDGE}"),
         ("Bore depth", f"{w['cupHeight'] - w['cupEnd']:.0f} mm (closed end plate {w['cupEnd']:.0f} mm)"),
@@ -244,19 +243,19 @@ def sheet(d, profile, shapes):
         ("Clamping principle", "Hydraulic expansion sleeve in the bore under the tooth band. The sleeve must be "
                                "continuous (no slots): a slotted collet is not acceptable on a 0.6 mm wall. "
                                "Other precision expansion: please propose"),
-        ("Axial location, A (preferred)", f"Datum is the inside face of the closed end. 3 hardened pads on the "
+        ("Axial location, A (variant)", f"Only if the final closed end allows it. Datum is the inside face of the closed end. 3 hardened pads on the "
                                           f"mandrel nose (120°), contact ring inside R {PAD_R_OUT}, pad plane "
                                           f"perpendicular to the bore axis within {SEAT_PERPENDICULARITY} mm. The cup "
                                           f"hangs on the pads. The sleeve runs past the open edge: it starts about "
                                           f"{SLEEVE_A_BELOW_EDGE:.0f} mm below the edge and is {w['sleeveLength'] + SLEEVE_A_BELOW_EDGE:.0f} mm long. "
                                           f"Its OD (R {SLEEVE_OD / 2:.3f}) stays inside the hob keep-out with "
                                           f"{shapes['margin']:.2f} mm margin. No land at the open end"),
-        ("Axial location, B (alternative)", f"Hardened, ground stop land on the open-end face, Ø{w['stopDiameter']:.2f} "
+        ("Axial location, B (base)", f"Hardened, ground stop land on the open-end face, Ø{w['stopDiameter']:.2f} "
                                             f"maximum (0.3 mm wide, the hob passes just outside it); sleeve "
                                             f"{w['sleeveLength']:.0f} mm from the seat. Pull-down onto the land "
                                             "during clamping"),
         ("Your advice", "Which of A or B do you recommend? How do you locate flexsplines or other thin cups "
-                        "axially in your practice? Please quote A. Quote B only if you recommend it"),
+                        "axially in your practice? Please quote B. Tell us if you recommend A instead"),
         ("Sleeve size", f"Collapsed sleeve Ø{SLEEVE_OD:.3f} −0.005/0, so the loading clearance is 0.010 to 0.028 mm "
                         f"(diametral) in the Ø{w['cupBore']:.2f} {BORE_TOLERANCE} bore. Nose lead-in for robot loading, "
                         "at least 0.5 mm radial, 15°"),
@@ -317,8 +316,8 @@ def sheet(d, profile, shapes):
 <div class="sub">{html.escape(COMPANY)} &middot; joao@materia-expedita.pt &middot; issued {date.today().isoformat()}</div>
 {table("Workpiece", part)}{table("Mandrel requirements", req)}
 {table("Hob keep-out below the seat (z = 0, positive up)", keep_rows)}
-<h2>Half section (scale 4:1)</h2><b>Datum A (preferred)</b><br>{svg_section(shapes, w, "A")}
-<br><b>Datum B (alternative), lower part</b><br>{svg_section(shapes, w, "B")}
+<h2>Half section (scale 4:1)</h2><b>Datum A (variant, if the closed end allows)</b><br>{svg_section(shapes, w, "A")}
+<br><b>Datum B (base), lower part</b><br>{svg_section(shapes, w, "B")}
 <p class="note">{html.escape(sweep)} Files: mandrel-section.dxf (layers CUP, SLEEVE_A, MANDREL_A, DATUM_A_PADS, SLEEVE_B, MANDREL_B,
 DATUM_B_LAND, HOB_KEEPOUT, MANDREL_MAX_ENVELOPE, AXIS, SEAT; r = x, z = y, mm; SEAT is the open edge) and hob-keepout.csv. Cup body dimensions are from our design
 model; the production flexspline drawing will follow.</p>
