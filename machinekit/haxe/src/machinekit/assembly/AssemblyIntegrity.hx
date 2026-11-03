@@ -518,7 +518,7 @@ class AssemblyIntegrity {
   ):Void {
     var face:Null<MountingFace> = flat.member(flanged).mountingFace();
     if (face == null) return;
-    var pose = need(poses, flanged);
+    var pose = AssemblyFrames.compose(need(poses, flanged), face.pose);
     var owned:Array<Part> = [];
     try {
       var localTool = face.tool(FLANGE_PROBE);

@@ -13,6 +13,9 @@ import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
+import machinekit.component.MountingFace;
+import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 import machinekit.component.Solids;
 import machinekit.standard.ClearanceFit;
 import machinekit.standard.SocketHeadCapScrew;
@@ -186,6 +189,45 @@ class LeadScrewNut extends MachineComponent {
     default:
       throw 'Unknown lead screw nut kind "$value"';
   };
+
+  /**
+	 * The flange face a block seats this nut on, as a `MountingFace`: the flange's barrel-side face, with +Z into the block
+	 * (against the nut's own +Z) and +Y reversed. Null for a barrel nut.
+	 */
+  override public function mountingFace():Null<MountingFace> {
+    if (!flanged) return null;
+    return new MountingFace(
+      flangeDiameter,
+      flangeDiameter,
+      depth -> mountingCutout(depth),
+      AssemblyFrames.fromRotationMatrix(0, 0, flangeOffset, [1, 0, 0, 0, -1, 0, 0, 0, -1])
+    );
+  }
+
+  /** Diameter of the core hole the block taps for the flange bolts. */
+  public function mountingTapDrill():Float {
+    var screw = SocketHeadCapScrew.catalog().get(mountScrew);
+    if (screw == null) throw 'No ${mountScrew} screw row for the nut flange';
+    return screw.tapDrill;
+  }
+
+  /** The flange bolt centres in the face frame (`mountingFace().pose`): the nut's pattern with +Y reversed. */
+  public function mountingHoles():Array<{x:Float, y:Float}> return [for (point in boltPattern()) {x: point.x, y: -point.y}];
+
+  /**
+	 * Tool for a block ahead of the flange face (face frame z = 0..`depth`): the barrel's bore, with `clearance` on its
+	 * radius, and the tap-drill holes for the flange bolts. The block is cut with it before the nut is bolted on.
+	 */
+  public function mountingCutout(depth:Float, clearance:Float = 0.2):Part {
+    if (!flanged || !(depth > 0) || !(clearance >= 0)) throw "A nut cut-out needs a flanged nut, a positive depth and a non-negative clearance";
+    var tools = [Solids.named(Part.cylinderSpan(bodyDiameter / 2 + clearance, 0, depth), "bore")];
+    var index = 1;
+    for (point in mountingHoles()) tools.push(Solids.named(
+      Part.cylinderSpan(mountingTapDrill() / 2, 0, depth, point.x, point.y),
+      "bolt" + index++
+    ));
+    return Solids.union(tools);
+  }
 
   /** Mount bolt centres on the flange face, counter-clockwise from angle 0. */
   public function boltPattern():Array<{x:Float, y:Float}> {

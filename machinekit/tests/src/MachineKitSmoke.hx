@@ -3201,6 +3201,10 @@ class MachineKitSmoke {
       run: () -> ManufacturingRouteTests.run(),
       weight: 1.0
     }, {
+      name: "NutBlockTests.run",
+      run: () -> NutBlockTests.run(),
+      weight: 1.0
+    }, {
       name: "SheetRouterChecks.run",
       run: () -> SheetRouterChecks.run(),
       weight: 4.0

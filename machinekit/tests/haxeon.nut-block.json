@@ -1,0 +1,20 @@
+{
+	"version": 1,
+	"package": {
+		"name": "machinekit-nut-block-tests"
+	},
+	"entry": "NutBlockTests",
+	"sourceRoots": [
+		"src"
+	],
+	"dependencies": {
+		"cadkit": {
+			"path": "../../cadkit"
+		},
+		"machinekit": {
+			"path": ".."
+		}
+	},
+	"target": "host",
+	"outputDir": "build/nut-block"
+}
