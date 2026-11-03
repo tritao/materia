@@ -1,6 +1,6 @@
 package machinekit.component;
 
-@:wire enum PortInterface : Equatable {
+@:wire enum PortInterface implements Equatable {
   @:id(1) PushIn(tubeOd:Float);
   @:id(2) Thread(designation:String);
   @:id(3) Plug(designation:String, pins:Int);

@@ -1,7 +1,7 @@
 package robotkit.skill;
 
 /** Shared lifecycle state for a composable robot skill. */
-enum SkillStatus : Equatable {
+enum SkillStatus implements Equatable {
   Idle;
   Running;
   Succeeded;

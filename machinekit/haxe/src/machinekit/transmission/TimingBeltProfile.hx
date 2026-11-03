@@ -3,7 +3,7 @@ package machinekit.transmission;
 /** Belt family and pitch-line geometry for a simplified timing pulley.
  * Custom requires an explicit family, pitch and pitch-line differential in millimetres.
  */
-enum TimingBeltProfile : Equatable {
+enum TimingBeltProfile implements Equatable {
   GT2;
   HTD3M;
   HTD5M;

@@ -44,7 +44,7 @@ import materia.project.SceneArtifact.SceneArtifactData;
 }
 
 /** Explicit acquisition arrangement; a tool receiver never supplies a remote pickup pose. */
-@:wire enum ScrewDeliveryMode : Equatable {
+@:wire enum ScrewDeliveryMode implements Equatable {
   @:id(1) Presented;
   @:id(2) BlowFeed(feeder:String);
 }

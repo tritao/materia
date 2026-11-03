@@ -58,7 +58,7 @@ class HobbingReportData implements Observable {
 }
 
 /** Reusable live readings, separate from the immutable inspection result. */
-struct HobbingTelemetry : Hashable, Diffable {
+struct HobbingTelemetry implements Hashable implements Diffable {
   public var status = "Cutting";
   public var complete = false;
   public var failure:Null<String>;

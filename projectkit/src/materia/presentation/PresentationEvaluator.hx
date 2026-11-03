@@ -8,7 +8,7 @@ import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.presentation.AssemblyPresentation;
 
-struct PresentationCursor : Equatable {
+struct PresentationCursor implements Equatable {
   public final view:String;
   public final explode:Float;
   public final procedure:Null<String>;

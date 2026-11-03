@@ -307,7 +307,7 @@ private class CncPanelBuildBinding {
 }
 
 
-private struct CncPresentation : Equatable, Diffable {
+private struct CncPresentation implements Equatable implements Diffable {
   public var source:Null<String>;
   public var generation:Int;
   public var print:Bool;

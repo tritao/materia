@@ -12,7 +12,7 @@ package materia.casting;
  * means a perpendicular plane normal and line direction; plane-line squareness
  * means parallel normal and direction. Normals are not substituted for planes.
  */
-@:wire enum InterfaceRelationshipKind : Equatable {
+@:wire enum InterfaceRelationshipKind implements Equatable {
   @:id(1) Coplanar;
   @:id(2) Parallel;
   @:id(3) Perpendicular;

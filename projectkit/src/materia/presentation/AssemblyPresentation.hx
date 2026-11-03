@@ -26,7 +26,7 @@ import materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
   @:id(2) Transparent;
   @:id(3) Hidden;
 }
-@:wire enum PresentationSource : Equatable {
+@:wire enum PresentationSource implements Equatable {
   @:id(1) Generated(producer:String);
   @:id(2) Authored;
 }
@@ -84,7 +84,7 @@ import materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
   @:id(1) Passed;
   @:id(2) Failed;
 }
-@:wire enum MotionEvidence : Equatable {
+@:wire enum MotionEvidence implements Equatable {
   @:id(1) Illustrative;
   @:id(2) Checked(checker:String, status:CheckStatus, geometryFingerprint:String, report:String);
 }
