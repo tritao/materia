@@ -232,21 +232,6 @@ class SupportedScrewDrive {
     return pose;
   }
 
-  /** Bolt thread for a clearance hole of this diameter in a catalogue mount or support foot. */
-  static function threadFor(holeDiameter:Float):{name:String, diameter:Float} {
-    var best = {name: "M3", diameter: 3.0};
-    var bestGap = Math.POSITIVE_INFINITY;
-    for (row in [{hole: 3.4, name: "M3", diameter: 3.0}, {hole: 4.5, name: "M4", diameter: 4.0}, {hole: 5.5, name: "M5", diameter: 5.0},
-      {hole: 6.6, name: "M6", diameter: 6.0}, {hole: 9.0, name: "M8", diameter: 8.0}, {hole: 11.0, name: "M10", diameter: 10.0}]) {
-      var gap = Math.abs(row.hole - holeDiameter);
-      if (gap < bestGap) {
-        bestGap = gap;
-        best = {name: row.name, diameter: row.diameter};
-      }
-    }
-    return best;
-  }
-
   /** Dowel diameter and how far inboard of the two farthest bolts it sits (assumed: the catalogue feet carry no dowel holes). */
   public static inline var DOWEL_DIAMETER:Float = 5;
   public static inline var DOWEL_INBOARD:Float = 10;
@@ -269,7 +254,7 @@ class SupportedScrewDrive {
         z: base[2] + across.z * hole.x + axis.direction[2] * hole.z
       }];
       for (index in 0...holes.length) {
-        var thread = threadFor(holes[index].diameter);
+        var thread = machinekit.component.MountingFace.boltFor(holes[index].diameter);
         result.push({
           kind: throughBolts ? "clearance" : "tapped",
           support: name,

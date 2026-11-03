@@ -199,6 +199,10 @@ class ScrewSupportUnit extends MachineComponent {
   /** Assumed catalogue-typical axial rigidity of the preloaded fixed pair, N/mm; floating supports carry no axial load. */
   public function axialStiffness():Null<Float> return fixed ? LeadScrew.SUPPORT_BEARING_STIFFNESS : null;
 
+  /** The seat a footed support's bolts tap into: its base plane, a shaft height below the support's axis. */
+  override public function mountingFace():Null<machinekit.component.MountingFace> return spec.base ? machinekit.component.MountingFace
+    .tappedFoot([for (p in mountingPositions()) {x: p.x, z: p.z, diameter: drawingSource().holeDiameter}], -spec.shaftHeight) : null;
+
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {

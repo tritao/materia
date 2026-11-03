@@ -1,6 +1,7 @@
 package machinekit.component;
 
 import cadkit.modeling.Part;
+import machinekit.standard.SocketHeadCapScrew;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
@@ -27,4 +28,50 @@ class MountingFace {
 
   /** A new owned tool in the face frame; the caller closes it. */
   public function tool(depth:Float):Part return cutout(depth);
+
+  /** The bolt a catalogue clearance hole of this diameter belongs to: thread name, nominal diameter and tap-drill, mm. */
+  public static function boltFor(holeDiameter:Float):{name:String, diameter:Float, tapDrill:Float} {
+    var best = "M3", bestDiameter = 3.0, bestGap = Math.POSITIVE_INFINITY;
+    for (row in [{hole: 3.4, name: "M3", diameter: 3.0}, {hole: 4.5, name: "M4", diameter: 4.0}, {hole: 5.5, name: "M5", diameter: 5.0},
+      {hole: 6.6, name: "M6", diameter: 6.0}, {hole: 9.0, name: "M8", diameter: 8.0}, {hole: 11.0, name: "M10", diameter: 10.0}]) {
+      var gap = Math.abs(row.hole - holeDiameter);
+      if (gap < bestGap) {
+        bestGap = gap;
+        best = row.name;
+        bestDiameter = row.diameter;
+      }
+    }
+    var screw = SocketHeadCapScrew.catalog().get(best);
+    if (screw == null) throw 'No $best screw row';
+    return {name: best, diameter: bestDiameter, tapDrill: screw.tapDrill};
+  }
+
+  /**
+	 * The seat of a part that stands on a flat base on tapped holes: `holes` are bolt axes in the part's x and z on the base
+	 * plane y = `planeY` (the part's +Y is up from the base); the seat is cut `depth` deep downward (-Y) with the tap-drill hole
+	 * of each bolt. The footprint is the holes' box with a margin, centred on them.
+	 */
+  public static function tappedFoot(holes:Array<{x:Float, z:Float, diameter:Float}>, planeY:Float):Null<MountingFace> {
+    if (holes.length == 0) return null;
+    var minX = Math.POSITIVE_INFINITY, maxX = Math.NEGATIVE_INFINITY, minZ = Math.POSITIVE_INFINITY, maxZ = Math.NEGATIVE_INFINITY;
+    var widest = 0.0;
+    for (hole in holes) {
+      minX = Math.min(minX, hole.x);
+      maxX = Math.max(maxX, hole.x);
+      minZ = Math.min(minZ, hole.z);
+      maxZ = Math.max(maxZ, hole.z);
+      widest = Math.max(widest, hole.diameter);
+    }
+    var cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2, margin = 2 * widest;
+    var local = [for (hole in holes) {x: hole.x - cx, y: hole.z - cz, drill: boltFor(hole.diameter).tapDrill}];
+    return new MountingFace(
+      Math.max(maxX - minX, widest) + 2 * margin,
+      Math.max(maxZ - minZ, widest) + 2 * margin,
+      depth -> {
+        if (!(depth > 0)) throw "A seat cut-out needs a positive depth";
+        return Solids.union([for (hole in local) Part.cylinderSpan(hole.drill / 2, 0, depth, hole.x, hole.y)]);
+      },
+      AssemblyFrames.fromRotationMatrix(cx, planeY, cz, [1, 0, 0, 0, 0, -1, 0, 1, 0])
+    );
+  }
 }

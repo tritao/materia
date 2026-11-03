@@ -337,6 +337,10 @@ class MotorMount extends MachineComponent {
     return super.massProperties();
   }
 
+  /** The seat the mount's base holes tap into: where its feet stand, y = 0 in the mount's frame. */
+  override public function mountingFace():Null<machinekit.component.MountingFace> return machinekit.component.MountingFace
+    .tappedFoot([for (hole in spec.baseHoles) {x: hole.x, z: hole.z, diameter: hole.diameter}], 0);
+
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
