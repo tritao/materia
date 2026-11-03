@@ -48,5 +48,6 @@ class MotionComponents {
     registry.register(LimitSwitch.recipeType());
     registry.register(ProximitySwitch.recipeType());
     registry.register(ErobActuatorPart.recipeType());
+    registry.register(SealedScalePart.recipeType());
   }
 }

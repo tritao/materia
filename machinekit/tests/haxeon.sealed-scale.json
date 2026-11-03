@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-sealed-scale-tests"},
+  "entry": "SealedScaleTests",
+  "sourceRoots": ["src"],
+  "dependencies": {"machinekit": {"path": ".."}},
+  "target": "host",
+  "outputDir": "build/sealed-scale"
+}
