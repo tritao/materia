@@ -289,7 +289,7 @@ Make these layout inputs, defaulting to today's values:
 tests pass unchanged; scene and checks outputs for Small and Compact are identical.
 
 **Status (2026-10-21): done, apart from the guided XY drive set.**
-- **`MillScrewDrive`** is one HZMotion-supported screw drive: fixed motor mount,
+- **`SupportedScrewDrive`** is one HZMotion-supported screw drive: fixed motor mount,
   floating support, servo and coupling. It derives every mounting datum from part
   data instead of literals:
   - screw-end profile and lengths from the mount's end profile;

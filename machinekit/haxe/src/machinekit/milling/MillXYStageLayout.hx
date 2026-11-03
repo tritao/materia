@@ -14,7 +14,7 @@ class MillXYStageLayout {
   public static inline var TABLE_HEIGHT:Float = 40;
   public final frame:MillFrameLayout;
   /** HZMotion-supported Y drive; null when Y uses the same BK12 set as X. */
-  public final yDrive:Null<MillScrewDrive>;
+  public final yDrive:Null<SupportedScrewDrive>;
   public final supplierY:Bool;
   public final yMotor:LeadshineServo;
   public final yDriveScrew:LeadScrew;
@@ -73,7 +73,7 @@ class MillXYStageLayout {
     centreY:Float,
     profile:String = "HGH15CA",
     guideBlock:Null<LinearRailBlock> = null,
-    ?yDrive:MillScrewDrive,
+    ?yDrive:SupportedScrewDrive,
     ?drive:MillXYDrive
   ) {
     if (frame == null || !Math.isFinite(centreY)) throw "XY stage needs finite matching frame datums";

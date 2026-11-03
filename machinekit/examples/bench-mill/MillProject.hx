@@ -34,7 +34,7 @@ class MillProject {
       z.spindleY,
       BenchMill.RAIL,
       guide,
-      MillScrewDrive.m60dBk12()
+      SupportedScrewDrive.m60dBk12()
     );
     return BenchMillFrame.create(f, z, xy, casting);
   }

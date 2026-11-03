@@ -26,7 +26,7 @@ A review of `HobberSaddle` and `FlexsplineHobber` found:
   face more simply. Rules for milled parts: within about 600 mm, at most two setups on a 3-axis mill, tight
   tolerances only on functional faces, no weld-then-machine.
 - **Screw drives (X, Y, Z):** SFU1605, catalogue BK12 motor bracket (HZMotion M60D-BK12-C type) with BF12 and a
-  Leadshine 400 W servo, braked on Z (`MillScrewDrive.m60dBk12()` parts). Screw supports aligned to the nut at
+  Leadshine 400 W servo, braked on Z (`SupportedScrewDrive.m60dBk12()` parts). Screw supports aligned to the nut at
   assembly, then pinned; their seats need drilled and tapped holes only. Z falls back to BK15 + SFU2005 if the
   400 W sizing check fails.
 - **Nuts:** a simple steel nut block (flat bar or small milled block) per axis. No DSG housings (usually
@@ -111,3 +111,4 @@ main at the end of each phase.
 
 - 2026-11-03: plan written.
 - 2026-11-03: L1 done (worktree hobber-frames): `AssemblyIntegrity` running gap, contact area and flange cut-out checks, opt-in via `strict`; `MountingFace`; tests in `AssemblyIntegrityTests`.
+- 2026-11-03: L2 done: `MillScrewDrive` moved to `motion/SupportedScrewDrive` (placement from axis start, direction and mounting side; seat holes and dowels); the bench mill's Y and Z drive poses are reproduced by `poses` (`MillScrewDrivePlacementChecks`).

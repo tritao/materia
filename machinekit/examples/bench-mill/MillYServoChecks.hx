@@ -2,6 +2,7 @@ import machinekit.milling.*;
 import machinekit.assembly.*;
 import machinekit.component.*;
 import machinekit.motion.LinearRail;
+import machinekit.motion.SupportedScrewDrive;
 import machinekit.motion.LinearRailBlock;
 import cadkit.modeling.*;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -65,7 +66,7 @@ class MillYServoChecks {
       guide
     );
     var l = new MillXYStageLayout(f,
-      z.spindleY, BenchMill.RAIL, guide, MillScrewDrive.m60dBk12()), frame = BenchMillFrame.create(
+      z.spindleY, BenchMill.RAIL, guide, SupportedScrewDrive.m60dBk12()), frame = BenchMillFrame.create(
         f,
         z,
         l

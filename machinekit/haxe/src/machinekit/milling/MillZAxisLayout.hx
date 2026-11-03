@@ -12,8 +12,8 @@ typedef MillZAxisOptions = {
   ?head:ComponentValues;
   ?headBoltLength:Float;
   ?overtravelLimit:Float;
-  /** Mount, floating support, servo and coupling; defaults to `MillScrewDrive.m80eBk15()`. */
-  ?drive:MillScrewDrive;
+  /** Mount, floating support, servo and coupling; defaults to `SupportedScrewDrive.m80eBk15()`. */
+  ?drive:SupportedScrewDrive;
   /** Defaults to an SFU2005 nut on a 16 mm race root. */
   ?nut:SfuNut;
   /** The spindle the head carries; defaults to the belt-driven BT30 (`MillBeltSpindle`). */
@@ -27,7 +27,7 @@ typedef MillZAxisOptions = {
 class MillZAxisLayout {
   public final frame:MillFrameLayout;
   public final block:LinearRailBlock;
-  public final drive:MillScrewDrive;
+  public final drive:SupportedScrewDrive;
   public final spindle:MillSpindlePackage;
   public final nut:SfuNut;
   public final fixed:machinekit.motion.MotorMount;
@@ -90,7 +90,7 @@ class MillZAxisLayout {
     this.spindleY = spindleY;
     this.lower = lower;
     this.profile = profile;
-    drive = options.drive ?? MillScrewDrive.m80eBk15();
+    drive = options.drive ?? SupportedScrewDrive.m80eBk15();
     nut = options.nut ?? new SfuNut("SFU2005", 16);
     spindle = options.spindle ?? new MillBeltSpindle();
     fixed = drive.fixed;
