@@ -33,7 +33,7 @@ Ball-screw package (three ground SFU1605 screws for RFQs to NJPE, HIWIN, TBI, HJ
 `python3 machinekit/examples/flexspline-hobber/supplier-packages/ballscrew_package.py <out-dir>`
 needs no Haxe run and writes `ballscrew-X/Y/Z.pdf` (one A4 sheet each: side view, total and
 threaded length, nut position and flange side, BK12 and BF12 end details, C5, lead 5, preload,
-title block) and `ballscrew-X/Y/Z.dxf` (side view 1:1). Lengths (X 260, Y 250, Z 420), nut
+title block) and `ballscrew-X/Y/Z.dxf` (side view 1:1). Lengths (X 260, Y 170, Z 420), nut
 stations and the nut are the model's; end machining is the HZMotion BK12 profile of
 `HzMotionDrawingScrew`; sources are listed at the top of the script. Update the constants
 there if `HobberXLayout`, `HobberZLayout` or the Y drive length change.
