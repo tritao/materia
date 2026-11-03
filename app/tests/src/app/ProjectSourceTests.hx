@@ -10534,7 +10534,7 @@ typedef CubeRun = {
       ":mass")) item][0];
     var massEdit = new PropertyBinding(massProperty,
       machineSession.scene.context()).apply(PropertyValue.Float(machineScene.objects[0].mass * 1.1));
-    check(massEdit == PropertyEditResult.Applied, "generated part mass edit applies: " + massEdit);
+    check((switch massEdit { case Applied: true; default: false; }), "generated part mass edit applies: " + massEdit);
     check(
       machineSimulation.pending(machineSession.sensors, machineSession.scene),
       "generated part mass requires a physics rebuild"

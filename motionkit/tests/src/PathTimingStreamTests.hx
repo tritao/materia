@@ -357,7 +357,7 @@ class PathTimingStreamTests extends MotionKitTestSupport {
               motion.hold();
               held = true;
             }
-            if (held && !resumed && motion.sessionState() == motionkit.robot.SessionState.Held &&++ heldTicks >= 20) {
+            if (held && !resumed && Type.enumEq(motion.sessionState(), motionkit.robot.SessionState.Held) &&++ heldTicks >= 20) {
               motion.resume();
               resumed = true;
             }

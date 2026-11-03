@@ -1285,7 +1285,7 @@ class MissionPlayer implements SessionMember implements Observable {
       advanceEnergyTransfer(snapshot);
       return;
     }
-    if (runner.status() != Running && beginEnergyTransfer(snapshot)) return;
+    if (!Type.enumEq(runner.status(), Running) && beginEnergyTransfer(snapshot)) return;
     switch runner.status() {
       case Running:
       case _:
@@ -1301,7 +1301,7 @@ class MissionPlayer implements SessionMember implements Observable {
           );
           return;
         }
-        if (runner.start(skill) != Running) {
+        if (!Type.enumEq(runner.start(skill), Running)) {
           settle();
           return;
         }
@@ -1415,7 +1415,7 @@ class MissionPlayer implements SessionMember implements Observable {
         energyStage = NoEnergyTransfer;
         return true;
       }
-      if (stowing.status() == Running) stowing.update(snapshot, timestep);
+      if (Type.enumEq(stowing.status(), Running)) stowing.update(snapshot, timestep);
       switch stowing.status() {
         case Running:
           return true;
@@ -1509,8 +1509,8 @@ class MissionPlayer implements SessionMember implements Observable {
       energyStage = NoEnergyTransfer;
       return true;
     }
-    if (active.status() == Running) active.update(snapshot, timestep);
-    if (active.status() == Running) return true;
+    if (Type.enumEq(active.status(), Running)) active.update(snapshot, timestep);
+    if (Type.enumEq(active.status(), Running)) return true;
     switch active.status() {
       case Running:
         return true;
@@ -1841,7 +1841,7 @@ class MissionPlayer implements SessionMember implements Observable {
 
   /** The index of the weld step the robot is welding now, or -1 when it is not welding. */
   public function weldingStep():Int {
-    if (failure != null || runner.status() != Running || mission.steps[stepIndex].kind != "weld") return -1;
+    if (failure != null || !Type.enumEq(runner.status(), Running) || mission.steps[stepIndex].kind != "weld") return -1;
     return stepIndex;
   }
 
@@ -1997,7 +1997,7 @@ class MissionPlayer implements SessionMember implements Observable {
         var continuation = interruptedScrewSkill;
         interruptedScrewSkill = null;
         if (continuation != null && continuation.canResume()) {
-          if (runner.start(continuation) != Running) settle();
+          if (!Type.enumEq(runner.start(continuation), Running)) settle();
         } else clearJointMotions();
         return;
       }
@@ -2469,7 +2469,7 @@ class MissionPlayer implements SessionMember implements Observable {
     );
     screwArm = arm;
     var work = assemblyParts.get("project:" + job.frame),
-      presenter = job.delivery == Presented ? assemblyParts.get("project:" + job.presenter) : null;
+      presenter = Type.enumEq(job.delivery, Presented) ? assemblyParts.get("project:" + job.presenter) : null;
     var clamped = assemblyParts.get("project:" + job.clamped);
     var clampedBody = clamped.freeObject ? clamped.freeBody() : null;
     if (clampedBody != null && clampedBody.motion != nativekit.sim.MotionType.Dynamic) clampedBody = null;
@@ -2553,7 +2553,7 @@ class MissionPlayer implements SessionMember implements Observable {
         escape = {
           screw: job.screw,
           link: spindle[0].child.id,
-          contacts: job.delivery == Presented ? [job.presenter, job.frame] : [job.frame]
+          contacts: Type.enumEq(job.delivery, Presented) ? [job.presenter, job.frame] : [job.frame]
         };
       }
       var physicalThreadAttached = driver.physicalThreadAttached();

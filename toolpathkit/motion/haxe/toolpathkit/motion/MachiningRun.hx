@@ -46,7 +46,7 @@ class MachiningRun {
   /** Aborts a held execution and returns the program to submit once idle. */
   public function prepareRestart(opIndex:Int, distance:Float):MachiningContinuation {
     if (spindleFaulted) throw "cannot restart after spindle fault";
-    if (motion.sessionState() != SessionState.Held) throw "machining restart needs a completed feed hold";
+    if (!Type.enumEq(motion.sessionState(), SessionState.Held)) throw "machining restart needs a completed feed hold";
     var continuation = continuationFrom(opIndex, distance);
     motion.abort();
     return continuation;
@@ -150,7 +150,7 @@ class MachiningRun {
   public function resumePrepared(continuation:MachiningContinuation):Void {
     if (spindleFaulted) throw "cannot resume after spindle fault";
     var snapshot = motion.robot.snapshot();
-    if (motion.running || motion.sessionState() != SessionState.Idle || snapshot.trajectoryActive
+    if (motion.running || !Type.enumEq(motion.sessionState(), SessionState.Idle) || snapshot.trajectoryActive
       || snapshot.trajectoryQueueDepth > 0 || snapshot.safety != 0) throw "machining restart needs a controlled stop";
     motion.run(continuation.program);
   }
@@ -164,7 +164,7 @@ class MachiningRun {
   public function safeShutdown():MotionProgram {
     var snapshot = motion.robot.snapshot();
     if (!spindleFaulted || motion.running
-      || motion.sessionState() != SessionState.Idle || snapshot.trajectoryActive || snapshot.trajectoryQueueDepth > 0
+      || !Type.enumEq(motion.sessionState(), SessionState.Idle) || snapshot.trajectoryActive || snapshot.trajectoryQueueDepth > 0
       || snapshot.safety != 0) throw "spindle fault shutdown waits for a controlled stop";
     return new MotionProgram([
       MotionOp.SetOutput(channels.spindleSpeed, EventValue.Analog(0.0)),

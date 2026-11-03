@@ -778,7 +778,7 @@ class FoundationToolingTests {
       >= 0;
     check(missingRole, "CastInsert requires an explicit role with no guide-seat fallback");
     var requiredSchema = CastInsert.parameters().filter(v -> v.name == "role")[0];
-    check(requiredSchema.defaultValue == machinekit.component.ComponentValue.Unset, "role choice has no default value");
+    check(Type.enumEq(requiredSchema.defaultValue, machinekit.component.ComponentValue.Unset), "role choice has no default value");
     var rejectedRole = false;
     try new CastInsert(new ComponentValues().setToken("role", "unknown role")) catch (e:Dynamic) rejectedRole = true;
     check(rejectedRole, "unknown source roles fail at the typed source parameter");

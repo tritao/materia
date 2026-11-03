@@ -1,6 +1,5 @@
 package machinekit.transmission;
 
-import haxeon.Equality;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyElasticNetwork;
 import materia.assembly.AssemblyDefinition.AssemblyElasticSpan;
@@ -66,7 +65,7 @@ class BeltElasticity {
       if (!Std.isOfType(part,
         TimingPulley)) throw new TransmissionDesignError("A loaded belt wrap needs a timing pulley");
       var pulley:TimingPulley = cast part;
-      if (!Equality.equals(pulley.beltProfile, belt.beltProfile) || Math.abs(pulley.pitchDiameter / 2 - belt.wraps()[index].radius)
+      if (!Type.enumEq(pulley.beltProfile, belt.beltProfile) || Math.abs(pulley.pitchDiameter / 2 - belt.wraps()[index].radius)
         > 1e-5) throw new TransmissionDesignError("Loaded pulley tooth count or profile does not match its belt wrap");
       var sign = BeltStretch.axisSign(definition, state, path.belt, joint, reference.instanceId);
       indexes.push(index);

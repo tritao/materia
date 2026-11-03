@@ -90,7 +90,7 @@ class PlanExecutor {
     completed = false;
     stream.beginSegments(new TrajectoryStream.NativeStreamSegments(arrays), plan.durationSeconds);
     deferredRefill = false;
-    if (session.state == Idle) session.begin();
+    if (Type.enumEq(session.state, Idle)) session.begin();
     fill();
   }
 
@@ -109,7 +109,7 @@ class PlanExecutor {
       }
       return false;
     }
-    if (session.state == Holding) {
+    if (Type.enumEq(session.state, Holding)) {
       if (TrajectoryStream.atRest(observation)) {
         session.rest();
         if (session.resumePending) {
@@ -121,7 +121,7 @@ class PlanExecutor {
       }
       return false;
     }
-    if (session.state == Held) return false;
+    if (Type.enumEq(session.state, Held)) return false;
     var active = plan;
     if (active == null) return !awaitingResume;
     if (stream.finishedProgram(observation, endsAtRest) && (!endsAtRest || settled(active, observation))) {
@@ -186,7 +186,7 @@ class PlanExecutor {
   public function abort():Void {
     session.requireReady();
     if (session.isStopping()) return;
-    if (session.state == Idle) {
+    if (Type.enumEq(session.state, Idle)) {
       clear();
       return;
     }

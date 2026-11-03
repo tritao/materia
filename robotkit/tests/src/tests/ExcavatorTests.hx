@@ -328,7 +328,7 @@ class ExcavatorTests {
     var lastCyclesReported = 0;
     var status = runner.start(dig);
     var steps = 0;
-    while (status == SkillStatus.Running && steps < 200000) {
+    while (Type.enumEq(status, SkillStatus.Running) && steps < 200000) {
       simulationHarness.step(Int64.ofInt(tick));
       tick++;
       var snapshot = robot.snapshot();
@@ -442,7 +442,7 @@ class ExcavatorTests {
     var tick = 0;
     var status = runner.start(grade);
     var steps = 0;
-    while (status == SkillStatus.Running && steps < 200000) {
+    while (Type.enumEq(status, SkillStatus.Running) && steps < 200000) {
       simulationHarness.step(Int64.ofInt(tick));
       tick++;
       status = runner.update(robot.snapshot(), 0.02);
@@ -513,7 +513,7 @@ class ExcavatorTests {
     var status = runner.start(dumpAt);
     var steps = 0;
     var lastQ = seed;
-    while (status == SkillStatus.Running && steps < 20000) {
+    while (Type.enumEq(status, SkillStatus.Running) && steps < 20000) {
       simulationHarness.step(Int64.ofInt(tick));
       tick++;
       var snapshot = robot.snapshot();

@@ -162,7 +162,7 @@ class SessionTests extends MotionKitTestSupport {
     check(abortRig.robot.planCount() == planCount, "deferred move sends no plan before rest");
     abortRig.settleStop();
     check(
-      abortRig.machine.sessionState() == Running && abortRig.robot.planCount() == planCount + 1,
+      Type.enumEq(abortRig.machine.sessionState(), Running) && abortRig.robot.planCount() == planCount + 1,
       "stopping + rest starts the deferred plan"
     );
     abortRig.dispose();
@@ -173,7 +173,7 @@ class SessionTests extends MotionKitTestSupport {
     expect(stopRig, "stopping + hold", Stopping(Discard), 0, () -> stopRig.machine.hold());
     expect(stopRig, "stopping + resume", Stopping(Discard), 0, () -> stopRig.machine.resume());
     stopRig.settleStop();
-    check(stopRig.machine.sessionState() == Idle, "stopping + rest discards aborted motion");
+    check(Type.enumEq(stopRig.machine.sessionState(), Idle), "stopping + rest discards aborted motion");
     stopRig.dispose();
 
     var holdRig = new SessionTransitionRig("session-hold-resume");
@@ -182,7 +182,7 @@ class SessionTests extends MotionKitTestSupport {
     expect(holdRig, "holding + resume", Holding, 0, () -> holdRig.machine.resume());
     holdRig.settleHold();
     check(
-      holdRig.machine.sessionState() == Running && holdRig.robot.commandCount("resume") == 1,
+      Type.enumEq(holdRig.machine.sessionState(), Running) && holdRig.robot.commandCount("resume") == 1,
       "holding + rest sends one deferred resume"
     );
     holdRig.dispose();
@@ -192,7 +192,7 @@ class SessionTests extends MotionKitTestSupport {
     heldRig.machine.hold();
     heldRig.settleHold();
     check(
-      heldRig.machine.sessionState() == Held && heldRig.robot.commandCount("resume") == 0,
+      Type.enumEq(heldRig.machine.sessionState(), Held) && heldRig.robot.commandCount("resume") == 0,
       "holding + rest becomes held without resuming"
     );
     expect(heldRig, "held + resume", Running, 1, () -> heldRig.machine.resume());
@@ -224,13 +224,13 @@ class SessionTests extends MotionKitTestSupport {
     var faultCommands = faultRig.robot.commands.length;
     throws(() -> faultRig.machine.update(), "snapshot fault while stopping interrupts the update");
     check(
-      faultRig.machine.sessionState() == Faulted && faultRig.robot.commands.length == faultCommands,
+      Type.enumEq(faultRig.machine.sessionState(), Faulted) && faultRig.robot.commands.length == faultCommands,
       "stopping + fault latches Faulted without another command"
     );
     throws(() -> faultRig.machine.moveAxes([new AxisTarget("x", 0.01)]), "faulted session rejects new motion");
     faultRig.robot.faultOverride = 0;
     faultRig.machine.reset();
-    check(faultRig.machine.sessionState() == Idle, "faulted + explicit reset returns to idle");
+    check(Type.enumEq(faultRig.machine.sessionState(), Idle), "faulted + explicit reset returns to idle");
     faultRig.dispose();
 
     var rejectRig = new SessionTransitionRig("session-rejection");
@@ -239,7 +239,7 @@ class SessionTests extends MotionKitTestSupport {
       () -> rejectRig.machine.moveAxes([new AxisTarget("x", 0.07)], rejectRig.options),
       "rejected initial plan reports an error"
     );
-    check(rejectRig.machine.sessionState() == Faulted, "rejected submission latches Faulted");
+    check(Type.enumEq(rejectRig.machine.sessionState(), Faulted), "rejected submission latches Faulted");
     rejectRig.dispose();
   }
 

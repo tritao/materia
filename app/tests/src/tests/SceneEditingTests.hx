@@ -74,7 +74,7 @@ import materia.project.MaterialLibrary;
       for (option in finishProperty.options) if (option.key == "bronze") bronzeChoice = true;
       check(bronzeChoice, "finish choices include the shared material library");
       var binding = new PropertyBinding(finishProperty, scene.context());
-      check(binding.apply(PropertyValue.Enum("bronze")) == PropertyEditResult.Applied,
+      check((switch binding.apply(PropertyValue.Enum("bronze")) { case Applied: true; default: false; }),
         "library finish can be selected");
       var selected = scene.object(scene.selectedId);
       check(
@@ -82,8 +82,8 @@ import materia.project.MaterialLibrary;
         "library finish supplies its visual values"
       );
       check(
-        new PropertyBinding(metallicProperty,
-        scene.context()).apply(PropertyValue.Float(0.2)) == PropertyEditResult.Applied,
+        (switch new PropertyBinding(metallicProperty,
+        scene.context()).apply(PropertyValue.Float(0.2)) { case Applied: true; default: false; }),
         "metallic edit succeeds"
       );
       check(haxeon.ui.properties.PropertyValueTools.same(binding.read(), PropertyValue.Enum("custom")), "edited library finish is shown as Custom");
@@ -105,14 +105,13 @@ import materia.project.MaterialLibrary;
     check(name != null && rate != null, "sensor properties are identified by id");
     var before = sensors.document.revision;
     check(
-      new PropertyBinding(name, sensors.context()).apply(PropertyValue.Text("Renamed sensor"))
-      == PropertyEditResult.Applied && sensors.document.revision > before,
+      (switch new PropertyBinding(name, sensors.context()).apply(PropertyValue.Text("Renamed sensor")) { case Applied: true; default: false; }) && sensors.document.revision > before,
       "sensor rename is recorded in the shared document"
     );
     before = sensors.document.revision;
     check(
-      new PropertyBinding(rate,
-      sensors.context()).apply(PropertyValue.Float(12.0)) == PropertyEditResult.Applied && sensors.document.revision > before,
+      (switch new PropertyBinding(rate,
+      sensors.context()).apply(PropertyValue.Float(12.0)) { case Applied: true; default: false; }) && sensors.document.revision > before,
       "sensor acquisition change is recorded in the shared document"
     );
     sensors.dispose();
@@ -221,7 +220,7 @@ import materia.project.MaterialLibrary;
     scene.setFinish(source.id, Appearances.blackOxide());
     var finish = new PropertyBinding(property(scene.properties(), "finish"), scene.context());
     check(
-      finish.apply(PropertyValue.Enum("component")) == PropertyEditResult.Applied,
+      (switch finish.apply(PropertyValue.Enum("component")) { case Applied: true; default: false; }),
       "component finish reset is available in picker"
     );
     var restored = scene.records()[0];
@@ -735,54 +734,54 @@ import materia.project.MaterialLibrary;
 
     var name = new PropertyBinding(property(empty.properties(), "name"), empty.context());
     check(
-      name.apply(PropertyValue.Text("Hidden panel")) == PropertyEditResult.Applied,
+      (switch name.apply(PropertyValue.Text("Hidden panel")) { case Applied: true; default: false; }),
       "rename succeeds through inspector binding"
     );
     var renamed = empty.object(originalId);
     check(renamed != null && renamed.label == "Hidden panel", "hierarchy model observes rename");
     check(
-      new PropertyBinding(property(empty.properties(),
-      "width"), empty.context()).apply(PropertyValue.Float(2.4)) == PropertyEditResult.Applied,
+      (switch new PropertyBinding(property(empty.properties(),
+      "width"), empty.context()).apply(PropertyValue.Float(2.4)) { case Applied: true; default: false; }),
       "width edit succeeds"
     );
     check(
-      new PropertyBinding(property(empty.properties(),
-      "height"), empty.context()).apply(PropertyValue.Float(0.8)) == PropertyEditResult.Applied,
+      (switch new PropertyBinding(property(empty.properties(),
+      "height"), empty.context()).apply(PropertyValue.Float(0.8)) { case Applied: true; default: false; }),
       "height edit succeeds"
     );
     check(
-      new PropertyBinding(property(empty.properties(),
-      "colour"), empty.context()).apply(PropertyValue.Text("#336699")) == PropertyEditResult.Applied,
+      (switch new PropertyBinding(property(empty.properties(),
+      "colour"), empty.context()).apply(PropertyValue.Text("#336699")) { case Applied: true; default: false; }),
       "colour edit succeeds"
     );
     check(
-      new PropertyBinding(property(empty.properties(),
-      "finish"), empty.context()).apply(PropertyValue.Enum("machined-steel")) == PropertyEditResult.Applied,
+      (switch new PropertyBinding(property(empty.properties(),
+      "finish"), empty.context()).apply(PropertyValue.Enum("machined-steel")) { case Applied: true; default: false; }),
       "finish preset edit succeeds"
     );
     check(
-      new PropertyBinding(property(empty.properties(),
-      "metallic"), empty.context()).apply(PropertyValue.Float(0.7)) == PropertyEditResult.Applied,
+      (switch new PropertyBinding(property(empty.properties(),
+      "metallic"), empty.context()).apply(PropertyValue.Float(0.7)) { case Applied: true; default: false; }),
       "metallic edit succeeds"
     );
     check(
-      new PropertyBinding(property(empty.properties(),
-      "depth"), empty.context()).apply(PropertyValue.Float(0.6)) == PropertyEditResult.Applied,
+      (switch new PropertyBinding(property(empty.properties(),
+      "depth"), empty.context()).apply(PropertyValue.Float(0.6)) { case Applied: true; default: false; }),
       "collision depth edit succeeds"
     );
     check(
-      new PropertyBinding(property(empty.properties(),
-      "dynamic"), empty.context()).apply(PropertyValue.Bool(true)) == PropertyEditResult.Applied,
+      (switch new PropertyBinding(property(empty.properties(),
+      "dynamic"), empty.context()).apply(PropertyValue.Bool(true)) { case Applied: true; default: false; }),
       "dynamic collision mode edit succeeds"
     );
     check(
-      new PropertyBinding(property(empty.properties(),
-      "mass"), empty.context()).apply(PropertyValue.Float(4.0)) == PropertyEditResult.Applied,
+      (switch new PropertyBinding(property(empty.properties(),
+      "mass"), empty.context()).apply(PropertyValue.Float(4.0)) { case Applied: true; default: false; }),
       "collision mass edit succeeds"
     );
     var visible = new PropertyBinding(property(empty.properties(), "visible"), empty.context());
     check(
-      visible.apply(PropertyValue.Bool(false)) == PropertyEditResult.Applied,
+      (switch visible.apply(PropertyValue.Bool(false)) { case Applied: true; default: false; }),
       "visibility edit succeeds through inspector binding"
     );
     check(empty.pick(0.0, 0.0) == "scene", "hidden object disappears from viewport picking");
@@ -899,9 +898,9 @@ import materia.project.MaterialLibrary;
         default:
           false;
       }, "invalid colour is rejected");
-      check(width.apply(PropertyValue.Float(4.0)) == PropertyEditResult.Applied, "width updates");
-      check(height.apply(PropertyValue.Float(0.5)) == PropertyEditResult.Applied, "height updates");
-      check(colour.apply(PropertyValue.Text("#33CC66")) == PropertyEditResult.Applied, "colour updates");
+      check((switch width.apply(PropertyValue.Float(4.0)) { case Applied: true; default: false; }), "width updates");
+      check((switch height.apply(PropertyValue.Float(0.5)) { case Applied: true; default: false; }), "height updates");
+      check((switch colour.apply(PropertyValue.Text("#33CC66")) { case Applied: true; default: false; }), "colour updates");
       check(scene.pick(0.3, 0.0) == "box", "expanded geometry updates picking bounds");
       check(scene.pick(-1.5, 0.4) == "scene", "reduced geometry removes stale picking bounds");
       var frameCamera = new PerspectiveCamera();
@@ -1126,7 +1125,7 @@ import materia.project.MaterialLibrary;
       default:
         false;
     }, "sensor UI rejects ray counts above runtime capacity");
-    check(rays.apply(PropertyValue.Int(32)) == PropertyEditResult.Applied, "sensor UI edits LiDAR resolution");
+    check((switch rays.apply(PropertyValue.Int(32)) { case Applied: true; default: false; }), "sensor UI edits LiDAR resolution");
     check(sensors.model.sensors[sensors.selectedIndex].rayCount == 32, "sensor model receives property edit");
     sensors.add("imu");
     check(
@@ -1237,9 +1236,9 @@ import materia.project.MaterialLibrary;
       ":position-x"
     )) property][0];
     var mountX = new PropertyBinding(mountXProperty, session.sensors.context());
-    check(rate.apply(PropertyValue.Float(20.0)) == PropertyEditResult.Applied,
+    check((switch rate.apply(PropertyValue.Float(20.0)) { case Applied: true; default: false; }),
       "sensor workflow edits acquisition rate");
-    check(mountX.apply(PropertyValue.Float(0.25)) == PropertyEditResult.Applied,
+    check((switch mountX.apply(PropertyValue.Float(0.25)) { case Applied: true; default: false; }),
       "sensor workflow edits mount position");
     check(session.sensors.selectRobot("materia/robot-b"), "sensor workflow adds a second robot target");
     new PropertyBinding(property(session.sensors.properties(),
@@ -1433,8 +1432,8 @@ import materia.project.MaterialLibrary;
     session.scene.setPositionXY("tower", 1.0, 3.0);
     session.scene.select("tower");
     check(
-      new PropertyBinding(property(session.scene.properties(),
-      "dynamic"), session.scene.context()).apply(PropertyValue.Bool(true)) == PropertyEditResult.Applied,
+      (switch new PropertyBinding(property(session.scene.properties(),
+      "dynamic"), session.scene.context()).apply(PropertyValue.Bool(true)) { case Applied: true; default: false; }),
       "physics regression makes the observed obstacle dynamic"
     );
 
@@ -2137,7 +2136,7 @@ import materia.project.MaterialLibrary;
       var originalTarget = camera.targetX;
       var originalRevision = scene.revision;
       var x = new PropertyBinding(property(scene.properties(), "position-x"), scene.context());
-      check(x.apply(PropertyValue.Float(-2.5)) == PropertyEditResult.Applied, "position edit accepted");
+      check((switch x.apply(PropertyValue.Float(-2.5)) { case Applied: true; default: false; }), "position edit accepted");
       near(scene.info("box").localTransform().element(12), -2.5, "selected object moved");
       near(scene.info("tower").localTransform().element(12), 1.1, "other object unchanged");
       near(camera.targetX, originalTarget, "editing does not move camera");

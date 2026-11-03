@@ -1,6 +1,5 @@
 package motionkit.robot;
 
-import haxeon.Equality;
 import haxe.Int64;
 import motionkit.AxisTarget;
 import motionkit.Feed;
@@ -371,7 +370,7 @@ class MotionSystem {
       session.stop(Discard, []);
       return;
     }
-    if (mode != StopMode.Normal && (session.state == Holding || session.isStopping())) {
+    if (mode != StopMode.Normal && (Type.enumEq(session.state, Holding) || session.isStopping())) {
       stopRobot(mode);
       queuedTrajectories = [];
       session.stop(Discard, []);
@@ -410,7 +409,7 @@ class MotionSystem {
    * started and not finished, or a stop still slowing down.
    */
   function isMotionInProgress():Bool {
-    if (session.isStopping() || session.state == Holding) return true;
+    if (session.isStopping() || Type.enumEq(session.state, Holding)) return true;
     var trajectoryValue = activeTrajectory;
     if (trajectoryValue == null) return false;
     if (syncFromRuntime().trajectoryActive) return true;
@@ -435,8 +434,8 @@ class MotionSystem {
   /** Runs deferred work or a pending resume once a stop has reached rest. */
   function advanceStop():Void {
     if (!stopSettled()) return;
-    var wasHolding = session.state == Holding;
-    var discarding = Equality.equals(session.state, Stopping(Discard));
+    var wasHolding = Type.enumEq(session.state, Holding);
+    var discarding = Type.enumEq(session.state, Stopping(Discard));
     var actions = session.rest();
     if (discarding) clearBufferedMotion();
     if (wasHolding && session.resumePending) resume();

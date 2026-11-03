@@ -179,8 +179,8 @@ class ProcessRun {
     return engagement != null && engagement.exit.length > 0;
   }
 
-  function canRecover():Bool return motionSession.state == SessionState.Held
-    || motionSession.state == SessionState.Idle;
+  function canRecover():Bool return Type.enumEq(motionSession.state, SessionState.Held)
+    || Type.enumEq(motionSession.state, SessionState.Idle);
 
   /** Apply runtime-fired process records to the bound simulation device. */
   public function applyRecords(records:Array<FiredProcessEvent>):Void device.apply(records);

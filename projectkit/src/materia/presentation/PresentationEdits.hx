@@ -24,12 +24,11 @@ class PresentationEdits {
     var value:AuthoredPresentation = JsonWire.decode(text);
     if (value.schemaVersion != 1 || value.views == null
       || value.explode == null || value.procedures == null) throw "Unsupported or incomplete authored presentation";
-    for (view in value.views) if (view.source != Authored) throw "Saved presentation view must be Authored";
-    for (offset in value.explode) if (offset.source != Authored) throw "Saved explode offset must be Authored";
+    for (view in value.views) if (!Type.enumEq(view.source, Authored)) throw "Saved presentation view must be Authored";
+    for (offset in value.explode) if (!Type.enumEq(offset.source, Authored)) throw "Saved explode offset must be Authored";
     for (procedure in value.procedures) {
-      if (procedure.source != Authored) throw "Saved procedure must be Authored";
-      for (step in procedure.steps) for (member in StepMotions.members(step.action)) if (member.motion.evidence
-        != Illustrative) throw "Authored motions must be Illustrative";
+      if (!Type.enumEq(procedure.source, Authored)) throw "Saved procedure must be Authored";
+      for (step in procedure.steps) for (member in StepMotions.members(step.action)) if (!Type.enumEq(member.motion.evidence, Illustrative)) throw "Authored motions must be Illustrative";
     }
     return value;
   }

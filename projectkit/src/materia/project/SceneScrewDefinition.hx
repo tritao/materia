@@ -251,7 +251,7 @@ class SceneScrewDefinition {
     var sensors = flat.sensors;
     var present = sensors == null ? [] : [for (sensor in sensors) if (sensor.id == screw.presentSensor
       && sensor.kind == "presence" && sensor.occurrence == screw.presenter) sensor];
-    if (screw.delivery == Presented && present.length
+    if (Type.enumEq(screw.delivery, Presented) && present.length
       != 1) throw 'Scene screw "${screw.fastening}": presenter sensor "${screw.presentSensor}" is missing or ambiguous';
     var recovery = screw.recovery;
     if (recovery != null) {

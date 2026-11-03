@@ -1,6 +1,5 @@
 package motionkit.robot;
 
-import haxeon.Equality;
 import motionkit.path.OrientationPolicy;
 import motionkit.path.PoseMath;
 
@@ -277,7 +276,7 @@ class ManipulatorKinematics implements RedundantPathSolver {
     var named = parameterization;
     var freedom = request.freedoms[0];
     var uniform = true;
-    for (policy in request.freedoms) if (!Equality.equals(policy, freedom)) uniform = false;
+    for (policy in request.freedoms) if (!sameOrientationPolicy(policy, freedom)) uniform = false;
     if (named == null || (uniform && fullyConstrained(request.startQ,
       freedom))) return new PathSolution(request.followPointByPoint(this));
     named.preferringOrientation(preferredOrientation, preferTargetOrientation);
@@ -465,6 +464,30 @@ class ManipulatorKinematics implements RedundantPathSolver {
   static function toTransform(value:Pose3):Transform3 {
     if (value == null) throw "IK target pose is required";
     return new Transform3(new Vec3(value.x, value.y, value.z), new Quat(value.qx, value.qy, value.qz, value.qw));
+  }
+
+  /** Compare the complete orientation constraint, including the cone axis and angle. */
+  static function sameOrientationPolicy(left:OrientationPolicy, right:OrientationPolicy):Bool {
+    if (left == null || right == null) return left == null && right == null;
+    return switch left {
+      case Fixed: switch right { case Fixed: true; default: false; };
+      case Interpolated: switch right { case Interpolated: true; default: false; };
+      case FreeAboutTool: switch right { case FreeAboutTool: true; default: false; };
+      case Free: switch right { case Free: true; default: false; };
+      case Cone(axis, angle):
+        switch right {
+          case Cone(otherAxis, otherAngle):
+            if (angle != otherAngle || axis == null || otherAxis == null)
+              angle == otherAngle && axis == null && otherAxis == null;
+            else if (axis.length != otherAxis.length) false;
+            else {
+              var equal = true;
+              for (index in 0...axis.length) if (axis[index] != otherAxis[index]) equal = false;
+              equal;
+            }
+          default: false;
+        }
+    };
   }
 
   static function containsNear(candidates:Array<Array<Float>>, value:Array<Float>, separation:Float):Bool {

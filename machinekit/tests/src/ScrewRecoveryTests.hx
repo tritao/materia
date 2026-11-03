@@ -496,7 +496,7 @@ class ScrewRecoveryTests {
       var status = execution.update(null, 0.01);
     }
     check(
-      execution.status() == Succeeded && created == 1 && execution.report.finished && execution.report.failed,
+      Type.enumEq(execution.status(), Succeeded) && created == 1 && execution.report.finished && execution.report.failed,
       "An exhausted supply budget recovers the installed body's NOK and continues without another attempt"
     );
     check(
@@ -527,7 +527,7 @@ class ScrewRecoveryTests {
     var finalPass = new processkit.skill.SkippedFinalFastening(snug);
     finalPass.start();
     check(
-      finalPass.update(null, 0.01) == Succeeded && finalPass.runReport().finished && finalPass.runReport().failed
+      Type.enumEq(finalPass.update(null, 0.01), Succeeded) && finalPass.runReport().finished && finalPass.runReport().failed
       && finalPass.runReport().pass == FinalPass && finalPass.runReport().skipped != null,
       "Failed snug explicitly skips final and lets the mission continue with its reason"
     );
@@ -652,7 +652,7 @@ class ScrewRecoveryTests {
       var status = skill.update(null, 0.01);
     }
     check(
-      skill.status() == Succeeded && skill.report.finished && skill.report.failed == exhausted && created == 2,
+      Type.enumEq(skill.status(), Succeeded) && skill.report.finished && skill.report.failed == exhausted && created == 2,
       "A recovered attempt retries once and reports either OK or exhausted fastening failure without stopping the mission"
     );
     check(
@@ -719,7 +719,7 @@ class ScrewRecoveryTests {
     cancelled.start();
     cancelled.cancel();
     check(
-      cancelled.status() == Cancelled && cancelledOutputs.vacuumOn && !cancelledOutputs.startOn,
+      Type.enumEq(cancelled.status(), Cancelled) && cancelledOutputs.vacuumOn && !cancelledOutputs.startOn,
       "Cancellation retains the held body and stops spindle outputs"
     );
     var report = new processkit.screwdriving.FasteningRunReport("recovery-probe");

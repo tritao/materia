@@ -128,9 +128,9 @@ class MachiningRunTests {
     for (_ in 0...1000) {
       motion.update(0.01);
       simulationHarness.step(Int64.ofInt(tick++));
-      if (motion.sessionState() == SessionState.Held) break;
+      if (Type.enumEq(motion.sessionState(), SessionState.Held)) break;
     }
-    if (motion.sessionState() != SessionState.Held) throw "machining feed hold did not reach rest";
+    if (!Type.enumEq(motion.sessionState(), SessionState.Held)) throw "machining feed hold did not reach rest";
     var continuation = run.prepareRestart(target, heldAt);
     // A held stop can be beyond the restart point. Clear the work and allow a
     // traverse at clearance before reloading the tool and restoring process outputs.
@@ -163,7 +163,7 @@ class MachiningRunTests {
       motion.update(0.01);
       simulationHarness.step(Int64.ofInt(tick++));
       var snapshot = robot.snapshot();
-      if (motion.sessionState() == SessionState.Idle
+      if (Type.enumEq(motion.sessionState(), SessionState.Idle)
         && !snapshot.trajectoryActive && snapshot.trajectoryQueueDepth == 0 && snapshot.safety == 0) {
         settled = true;
         break;
@@ -212,7 +212,7 @@ class MachiningRunTests {
       motion.update(0.01);
       simulationHarness.step(Int64.ofInt(tick++));
       var snapshot = robot.snapshot();
-      if (motion.sessionState() == SessionState.Idle
+      if (Type.enumEq(motion.sessionState(), SessionState.Idle)
         && !snapshot.trajectoryActive && snapshot.trajectoryQueueDepth == 0 && snapshot.safety == 0) {
         settled = true;
         break;

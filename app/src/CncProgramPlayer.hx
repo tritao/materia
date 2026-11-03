@@ -1012,7 +1012,7 @@ class CncProgramPlayer extends ToolpathPlayer {
     var request = restartRequest;
     if (request != null) {
       var run = new MachiningRun(recipe, program, motion, channels);
-      if (motion.running && motion.sessionState() != SessionState.Held) motion.hold();
+      if (motion.running && !Type.enumEq(motion.sessionState(), SessionState.Held)) motion.hold();
       else if (motion.running) {
         pendingContinuation = run.prepareRestart(request.op, request.distance);
         restartRequest = null;
@@ -1022,7 +1022,7 @@ class CncProgramPlayer extends ToolpathPlayer {
       }
     }
     var next = pendingContinuation;
-    if (next == null || motion.running || motion.sessionState() != SessionState.Idle) return;
+    if (next == null || motion.running || !Type.enumEq(motion.sessionState(), SessionState.Idle)) return;
     var snapshot = robot.robot.snapshot();
     if (snapshot.trajectoryActive || snapshot.trajectoryQueueDepth > 0 || snapshot.safety != 0) return;
     new MachiningRun(recipe, program, motion, channels).resumePrepared(next);

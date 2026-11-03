@@ -358,7 +358,7 @@ class PresentationTests {
     rejects(() -> PresentationCodec.validate(definition, value));
     motion.evidence = Illustrative;
     var authored = PresentationCodec.decode(definition, PresentationCodec.encode(definition, value));
-    check(authored.procedures[0].source == Authored, "Authored procedure source round trip");
+    check(Type.enumEq(authored.procedures[0].source, Authored), "Authored procedure source round trip");
     motion.path[1].x = Math.NaN;
     rejects(() -> PresentationCodec.validate(definition, value));
     motion.path[1].x = 0;

@@ -294,14 +294,14 @@ class WallFinishingScenarioTests {
       // uses a smaller physicsTimestep, per the plan's `new SimulationHarness(0.01,
       // 2, 1)`, so it needs proportionally more ticks for the same 40s).
       var maxNavSteps = Std.int(40.0 / timestep);
-      while (status == SkillStatus.Running && navSteps < maxNavSteps) {
+      while (Type.enumEq(status, SkillStatus.Running) && navSteps < maxNavSteps) {
         var snapshot = plant.step(Int64.ofInt(tick++));
         latestSnapshot = snapshot;
         localization.update(snapshot);
         status = runner.update(snapshot, timestep);
         navSteps++;
       }
-      check(status == SkillStatus.Succeeded, 'Base navigates to patch base pose (status $status)');
+      check(Type.enumEq(status, SkillStatus.Succeeded), 'Base navigates to patch base pose (status $status)');
       // Let the runtime finish the navigation stop before submitting the arm
       // plan. MuJoCo can need several owner cycles to settle the stop ramp.
       var stopSteps = 0;

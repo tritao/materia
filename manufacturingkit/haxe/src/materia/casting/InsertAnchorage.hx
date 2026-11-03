@@ -633,7 +633,7 @@ class InsertAnchorageChecks {
             "Guaranteed Type F flange bearing annulus " + area + " mm2; source minimum " + rules.minimumBearingAreaMm2
             + " mm2. Certify the actual face bearing on resin, excluding steel/tooling contact, before this rule can pass."
           ));
-          if (anchor.locking == InsertAnchorLock.Shoulder) result.push(record(
+          if (switch anchor.locking { case Shoulder: true; default: false; }) result.push(record(
             key + ".locking",
             insert.id,
             ToolingCheckStatus.Unsupported,

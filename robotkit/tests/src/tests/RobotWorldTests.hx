@@ -4184,7 +4184,7 @@ class RobotWorldTests {
     var goalRunner = new SkillRunner();
     var goalSkill = new GoTo(navigator, offPathGoal, perceive);
     check(
-      goalRunner.start(goalSkill) == SkillStatus.Running && navigator.status == NavigatorStatus.Navigating,
+      Type.enumEq(goalRunner.start(goalSkill), SkillStatus.Running) && navigator.status == NavigatorStatus.Navigating,
       "GoTo plans and starts a goal through SkillRunner"
     );
 
@@ -4193,13 +4193,13 @@ class RobotWorldTests {
     var goalStatus = goalRunner.update(robotObservation(tick++), 0.02);
     var status = navigator.status;
     var initialOffPathError = Math.abs(navigation.crossTrackError);
-    while (tick < 1000 && goalStatus == SkillStatus.Running) {
+    while (tick < 1000 && Type.enumEq(goalStatus, SkillStatus.Running)) {
       goalStatus = goalRunner.update(robotObservation(tick++), 0.02);
       status = navigator.status;
     }
     var offPathFinal = requireLocalizationState(localization);
     check(
-      initialOffPathError >= 0.45 && goalStatus == SkillStatus.Succeeded && status == NavigatorStatus.Succeeded
+      initialOffPathError >= 0.45 && Type.enumEq(goalStatus, SkillStatus.Succeeded) && status == NavigatorStatus.Succeeded
       && goalRunner.result() != null && Math.abs(offPathFinal.pose.x - offPathGoalPose.x) <= 0.16
       && Math.abs(offPathFinal.pose.y - offPathGoalPose.y) <= 0.16,
       "SkillRunner GoTo reaches its goal after starting off the planned path"
@@ -4210,7 +4210,7 @@ class RobotWorldTests {
     var obstacleGoalSkill = new GoTo(navigator, goal, perceive);
     var obstacleGoalStatus = goalRunner.start(obstacleGoalSkill);
     check(
-      obstacleGoalStatus == SkillStatus.Running && navigator.status == NavigatorStatus.Navigating,
+      Type.enumEq(obstacleGoalStatus, SkillStatus.Running) && navigator.status == NavigatorStatus.Navigating,
       "GoTo starts another simulated goal before an obstacle appears"
     );
     for (_ in 0...40) {
@@ -4235,7 +4235,7 @@ class RobotWorldTests {
       if (navigator.replanCount > 0 && currentPath != null) {
         for (point in currentPath.poses()) if (Math.abs(point.y - goalPose.y) > 0.45) pathDetoured = true;
       }
-      if (obstacleGoalStatus == SkillStatus.Succeeded) break;
+      if (Type.enumEq(obstacleGoalStatus, SkillStatus.Succeeded)) break;
     }
     check(detectedObstacle, "simulated LiDAR perception detects an obstacle during navigation");
     check(navigator.replanCount > 0 && pathDetoured, "Navigator replans onto a route around the detected obstacle");
@@ -4250,7 +4250,7 @@ class RobotWorldTests {
       }
     }
     check(
-      obstacleGoalStatus == SkillStatus.Succeeded && status == NavigatorStatus.Succeeded,
+      Type.enumEq(obstacleGoalStatus, SkillStatus.Succeeded) && status == NavigatorStatus.Succeeded,
       'GoTo reaches its goal through SkillRunner after replanning (state: ${Std.string(status)}, pose: ${finalState.pose.x},${finalState.pose.y},${finalState.pose.yaw}, goal: ${goalPose.x},${goalPose.y}, replans: ${navigator.replanCount}, guard: ${Std.string(guard.state)}, command: ${Std.string(base.currentCommand().linear)},${Std.string(base.currentCommand().angular)}, path: ${routeSummary.join(";")})'
     );
     var finalDx = finalState.pose.x - goalPose.x;
@@ -4399,7 +4399,7 @@ class RobotWorldTests {
     sustained.start();
     for (_ in 0...3) sustained.update(observation, 0.1);
     check(
-      sustained.status() == SkillStatus.Running && isBlocked() && navigator.replanCount >= 2,
+      Type.enumEq(sustained.status(), SkillStatus.Running) && isBlocked() && navigator.replanCount >= 2,
       "GoTo keeps running while the Navigator retries within its blocked timeout"
     );
     sustained.update(observation, 0.1);
@@ -4423,22 +4423,22 @@ class RobotWorldTests {
     recovering.start();
     recovering.update(observation, 0.1);
     recovering.update(observation, 0.1);
-    check(recovering.status() == SkillStatus.Running && isBlocked(), "GoTo starts a second blocked interval");
+    check(Type.enumEq(recovering.status(), SkillStatus.Running) && isBlocked(), "GoTo starts a second blocked interval");
     perception = clear;
     recovering.update(observation, 0.1);
     check(
-      recovering.status() == SkillStatus.Running && navigator.status == NavigatorStatus.Navigating,
+      Type.enumEq(recovering.status(), SkillStatus.Running) && navigator.status == NavigatorStatus.Navigating,
       "GoTo resumes when the Navigator finds a clear route"
     );
     perception = blocked;
     for (_ in 0...3) recovering.update(observation, 0.1);
     check(
-      recovering.status() == SkillStatus.Running && isBlocked(),
+      Type.enumEq(recovering.status(), SkillStatus.Running) && isBlocked(),
       "GoTo restarts its blocked timeout after navigation resumes"
     );
     recovering.cancel();
     check(
-      recovering.status() == SkillStatus.Cancelled && navigator.status == NavigatorStatus.Cancelled,
+      Type.enumEq(recovering.status(), SkillStatus.Cancelled) && navigator.status == NavigatorStatus.Cancelled,
       "GoTo cancels a blocked navigation cleanly"
     );
   }
@@ -5450,7 +5450,7 @@ class RobotWorldTests {
     function runSkill(skill:Skill):SkillStatus {
       var status = runner.start(skill);
       var steps = 0;
-      while (status == SkillStatus.Running && steps < 1500) {
+      while (Type.enumEq(status, SkillStatus.Running) && steps < 1500) {
         var snapshot = plant.step(Int64.ofInt(tick++));
         latestSnapshot = snapshot;
         observationHook(snapshot);
@@ -5464,7 +5464,7 @@ class RobotWorldTests {
 
     var dock = new Dock(unloadedNavigator, scene.dockingTargets()[0], observeNavigation);
     check(
-      runSkill(dock) == SkillStatus.Succeeded && runner.result() != null,
+      Type.enumEq(runSkill(dock), SkillStatus.Succeeded) && runner.result() != null,
       "SkillRunner docks at the pallet staging pose in simulation"
     );
 
@@ -5492,7 +5492,7 @@ class RobotWorldTests {
     observationHook = function(_) {
     };
     check(
-      pickStatus == SkillStatus.Succeeded && runner.result() != null && forks.loadState.secured
+      Type.enumEq(pickStatus, SkillStatus.Succeeded) && runner.result() != null && forks.loadState.secured
       && forks.loadState.payload == payload && Math.abs(forks.state().lift.position - 0.5) < 1e-6,
       "SkillRunner picks and secures the pallet after simulated fork actuation"
     );
@@ -5523,7 +5523,7 @@ class RobotWorldTests {
     };
     var loadedEstimate = localization.state();
     check(
-      loadedStatus == SkillStatus.Succeeded
+      Type.enumEq(loadedStatus, SkillStatus.Succeeded)
       && runner.result() != null && maxLoadedCommand > 0.05 && maxLoadedCommand <= loadedLimits.maxLinearSpeed + 1e-9
       && loadedEstimate != null && Math.abs(loadedEstimate.pose.x - loadedGoalPose.x) <= 0.14,
       "goal-level GoTo reaches the delivery area within load-reduced speed limits"
@@ -5547,7 +5547,7 @@ class RobotWorldTests {
     };
     var placeStatus = runSkill(place);
     check(
-      placeStatus == SkillStatus.Succeeded && runner.result() != null
+      Type.enumEq(placeStatus, SkillStatus.Succeeded) && runner.result() != null
       && forks.loadState.observed && !forks.loadState.secured && forks.loadState.payload == null,
       "SkillRunner places the pallet after simulated release confirmation"
     );
@@ -5574,15 +5574,15 @@ class RobotWorldTests {
     var charge = new Charge(loadedNavigator, chargerTarget, power, 0.8, observeNavigation);
     var chargeStatus = runner.start(charge);
     var chargeTicks = 0;
-    while (chargeStatus == SkillStatus.Running && charge.dock.status() == SkillStatus.Running && chargeTicks < 1500) {
+    while (Type.enumEq(chargeStatus, SkillStatus.Running) && Type.enumEq(charge.dock.status(), SkillStatus.Running) && chargeTicks < 1500) {
       latestSnapshot = plant.step(Int64.ofInt(tick++));
       loadSafety.refresh();
       chargeStatus = runner.update(latestSnapshot, timestep);
       chargeTicks++;
     }
     check(
-      chargeStatus == SkillStatus.Running
-      && charge.dock.status() == SkillStatus.Succeeded && runner.activeSkill() == charge,
+      Type.enumEq(chargeStatus, SkillStatus.Running)
+      && Type.enumEq(charge.dock.status(), SkillStatus.Succeeded) && runner.activeSkill() == charge,
       "Charge docks at the detected charger and waits while the battery is low"
     );
     power.battery = new BatteryState(
@@ -5598,7 +5598,7 @@ class RobotWorldTests {
     );
     chargeStatus = runner.update(latestSnapshot, timestep);
     check(
-      chargeStatus == SkillStatus.Succeeded && runner.result() != null && runner.activeSkill() == null,
+      Type.enumEq(chargeStatus, SkillStatus.Succeeded) && runner.result() != null && runner.activeSkill() == null,
       "Charge completes through SkillRunner when the battery reaches its target"
     );
 
@@ -5652,7 +5652,7 @@ class RobotWorldTests {
     var skillRunner = new SkillRunner();
     var liveStatus = skillRunner.start(pathSkill);
     check(
-      liveStatus == SkillStatus.Running && skillRunner.activeSkill() == pathSkill,
+      Type.enumEq(liveStatus, SkillStatus.Running) && skillRunner.activeSkill() == pathSkill,
       "SkillRunner starts one robot-local skill and exposes it as active"
     );
     var conflictingSkill = new FollowPath(navigation, path);
@@ -5693,7 +5693,7 @@ class RobotWorldTests {
     skillRunner.start(cancelledSkill);
     skillRunner.cancel();
     check(
-      skillRunner.status() == SkillStatus.Cancelled
+      Type.enumEq(skillRunner.status(), SkillStatus.Cancelled)
       && skillRunner.activeSkill() == null && skillRunner.result() != null,
       "SkillRunner cancels its active skill and records a terminal result"
     );
@@ -5706,9 +5706,9 @@ class RobotWorldTests {
     function runLive(initial:SkillStatus, update:RobotSnapshot -> SkillStatus, until:Void -> Bool):SkillStatus {
       var status = initial;
       var count = 0;
-      while (status == SkillStatus.Running && !until() && count < 3000) {
+      while (Type.enumEq(status, SkillStatus.Running) && !until() && count < 3000) {
         status = update(simulatedRobot.snapshot());
-        if (status == SkillStatus.Running && !until()) simulationHarness.step(nextLiveTimestamp());
+        if (Type.enumEq(status, SkillStatus.Running) && !until()) simulationHarness.step(nextLiveTimestamp());
         count++;
       }
       return status;
@@ -5741,7 +5741,7 @@ class RobotWorldTests {
     );
     var dockEnd = livePose();
     check(
-      dockStatus == SkillStatus.Succeeded && skillRunner.activeSkill() == null && distance(dockEnd,
+      Type.enumEq(dockStatus, SkillStatus.Succeeded) && skillRunner.activeSkill() == null && distance(dockEnd,
       dockStart) > 0.2 && distance(
         dockEnd,
         dockPose
@@ -5771,7 +5771,7 @@ class RobotWorldTests {
     var pickStatus = runLive(pick.status(), function(snapshot) return pick.update(snapshot, 0.01), liveApproachReached);
     var pickEnd = livePose();
     check(
-      pickStatus == SkillStatus.Running && forks.loadState.payload == payload && !forks.loadState.secured && distance(
+      Type.enumEq(pickStatus, SkillStatus.Running) && forks.loadState.payload == payload && !forks.loadState.secured && distance(
         pickEnd,
         pickStart
       ) > 0.2 && distance(
@@ -5900,7 +5900,7 @@ class RobotWorldTests {
     );
     var chargeEnd = livePose();
     check(
-      chargeStatus == SkillStatus.Running && charge.dock.status() == SkillStatus.Succeeded && distance(
+      Type.enumEq(chargeStatus, SkillStatus.Running) && Type.enumEq(charge.dock.status(), SkillStatus.Succeeded) && distance(
         chargeEnd,
         chargeStart
       ) > 0.2 && distance(
@@ -5973,12 +5973,12 @@ class RobotWorldTests {
     );
     var goalReplayRunner = new SkillRunner();
     var goalReplayStatus = goalReplayRunner.start(goalReplaySkill);
-    while (goalReplayStatus == SkillStatus.Running && goalReplay.advance()) goalReplayStatus = goalReplayRunner.update(
+    while (Type.enumEq(goalReplayStatus, SkillStatus.Running) && goalReplay.advance()) goalReplayStatus = goalReplayRunner.update(
       goalReplay.snapshot(),
       0.01
     );
     check(
-      goalReplayStatus == SkillStatus.Succeeded && goalReplayRunner.result() != null,
+      Type.enumEq(goalReplayStatus, SkillStatus.Succeeded) && goalReplayRunner.result() != null,
       "goal-level GoTo completes against recorded ReplayRobot observations"
     );
     goalReplay.close();
@@ -6019,8 +6019,8 @@ class RobotWorldTests {
     // Mirrors runLive: one update per distinct recorded observation.
     function runReplay(initial:SkillStatus, update:RobotSnapshot -> SkillStatus, until:Void -> Bool):SkillStatus {
       var status = initial;
-      if (status == SkillStatus.Running && !until()) status = update(replay.snapshot());
-      while (status == SkillStatus.Running
+      if (Type.enumEq(status, SkillStatus.Running) && !until()) status = update(replay.snapshot());
+      while (Type.enumEq(status, SkillStatus.Running)
         && !until() && advanceReplaySample(replay)) status = update(replay.snapshot());
       return status;
     }
@@ -6050,7 +6050,7 @@ class RobotWorldTests {
       function() return false
     );
     check(
-      replayDockStatus == SkillStatus.Succeeded && replaySkillRunner.activeSkill() == null && distance(
+      Type.enumEq(replayDockStatus, SkillStatus.Succeeded) && replaySkillRunner.activeSkill() == null && distance(
         replayPose(),
         dockEnd
       ) < 1e-9,
@@ -6097,7 +6097,7 @@ class RobotWorldTests {
       replayApproachReached
     );
     check(
-      replayPickStatus == SkillStatus.Running && replayForks.loadState.payload == payload && distance(
+      Type.enumEq(replayPickStatus, SkillStatus.Running) && replayForks.loadState.payload == payload && distance(
         replayPose(),
         pickEnd
       ) < 1e-9,
@@ -6217,7 +6217,7 @@ class RobotWorldTests {
       replayApproachReached
     );
     check(
-      replayChargeStatus == SkillStatus.Running && replayCharge.dock.status() == SkillStatus.Succeeded && distance(
+      Type.enumEq(replayChargeStatus, SkillStatus.Running) && Type.enumEq(replayCharge.dock.status(), SkillStatus.Succeeded) && distance(
         replayPose(),
         chargeEnd
       ) < 1e-9,

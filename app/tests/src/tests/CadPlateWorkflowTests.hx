@@ -79,7 +79,7 @@ class CadPlateWorkflowTests {
     if (height == null) throw "the draft has no solution";
     var measuredHeight = height.y("p2") - height.y("p1");
     check(
-      toggle(scene, "Reference height (measured)", true) == PropertyEditResult.Applied,
+      (switch toggle(scene, "Reference height (measured)", true) { case Applied: true; default: false; }),
       "the height can become a reference"
     );
     check(
@@ -122,7 +122,7 @@ class CadPlateWorkflowTests {
       "a finished drag becomes the draft"
     );
 
-    check(toggle(scene, "Reference height (measured)", false) == PropertyEditResult.Applied, "and driving again");
+    check((switch toggle(scene, "Reference height (measured)", false) { case Applied: true; default: false; }), "and driving again");
     check(
       scene.sketchEditSummary().indexOf("0 degrees of freedom") >= 0,
       'which fixes the rectangle again: ${scene.sketchEditSummary()}'
@@ -221,7 +221,7 @@ class CadPlateWorkflowTests {
         "the draft exposes solver state and enables apply after it forms a closed profile"
       );
       check(
-        edit(scene, "Dimension width", 30) == PropertyEditResult.Applied,
+        (switch edit(scene, "Dimension width", 30) { case Applied: true; default: false; }),
         "starter sketch width can be edited before the feature is created"
       );
       checkReferenceDimension(scene);
@@ -248,7 +248,7 @@ class CadPlateWorkflowTests {
         "an applied sketch can reopen as a separate transient draft"
       );
       check(
-        edit(scene, "Dimension width", 32) == PropertyEditResult.Applied,
+        (switch edit(scene, "Dimension width", 32) { case Applied: true; default: false; }),
         "an existing sketch dimension can be edited in the draft"
       );
       var pendingEditReload = new EditorScene(SceneCodec.decode(SceneCodec.encode(scene)));
@@ -370,8 +370,8 @@ class CadPlateWorkflowTests {
         "start an editor sheet sketch"
       );
       var id = scene.selectedId;
-      check(edit(scene, "Dimension width", 55) == PropertyEditResult.Applied, "set P2 web width");
-      check(edit(scene, "Dimension height", 120) == PropertyEditResult.Applied, "set P2 web length");
+      check((switch edit(scene, "Dimension width", 55) { case Applied: true; default: false; }), "set P2 web width");
+      check((switch edit(scene, "Dimension height", 120) { case Applied: true; default: false; }), "set P2 web length");
       check(scene.applySelectedSketchEdit(), "publish P2 base profile");
       var stock = cadkit.sheetmetal.SheetDemoParts.materialA();
       check(
@@ -380,8 +380,8 @@ class CadPlateWorkflowTests {
       );
       check(scene.createSheetBase(stock), "create a sheet base with explicit stock");
       check(scene.selectedSheetFeature() != null, "sheet selection is typed");
-      check(edit(scene, "Sheet thickness", 1.2) == PropertyEditResult.Applied, "edit sheet thickness in inspector");
-      check(edit(scene, "Sheet thickness", 1.5) == PropertyEditResult.Applied, "restore P2 stock thickness");
+      check((switch edit(scene, "Sheet thickness", 1.2) { case Applied: true; default: false; }), "edit sheet thickness in inspector");
+      check((switch edit(scene, "Sheet thickness", 1.5) { case Applied: true; default: false; }), "restore P2 stock thickness");
       check(scene.selectAtRay(0.1, 0.05, -0.00075, -1, 0, 0) == id, "pick P2 right wall-side face");
       check(scene.createSheetFlange(37.5, Math.PI / 2, 1), "bend first P2 flange through editor");
       check(scene.selectAtRay(-0.1, 0.05, -0.00075, 1, 0, 0) == id, "pick P2 left wall-side face");
@@ -394,8 +394,8 @@ class CadPlateWorkflowTests {
       nearWithin(foldedBounds.maxX - foldedBounds.minX, 60, 0.00001, "P2 outside width");
       nearWithin(foldedBounds.maxY - foldedBounds.minY, 120, 0.00001, "P2 length");
       nearWithin(foldedBounds.maxZ - foldedBounds.minZ, 40, 0.00001, "P2 outside height");
-      check(edit(scene, "Flange length", 42) == PropertyEditResult.Applied, "edit flange length in inspector");
-      check(edit(scene, "Flange length", 37.5) == PropertyEditResult.Applied, "restore P2 flange length");
+      check((switch edit(scene, "Flange length", 42) { case Applied: true; default: false; }), "edit flange length in inspector");
+      check((switch edit(scene, "Flange length", 37.5) { case Applied: true; default: false; }), "restore P2 flange length");
       var encoded = scene.currentCadGraph(id);
       scene.setSelectedSheetFlatView(true);
       check(
@@ -442,7 +442,7 @@ class CadPlateWorkflowTests {
       var id = scene.selectedId;
       check(scene.createSketch(), "create a sketch to extrude");
       check(scene.addSketchDraftRectangle(), "draw a rectangular extrusion profile");
-      check(edit(scene, "Dimension width", 30) == PropertyEditResult.Applied, "edit the sketch before extrusion");
+      check((switch edit(scene, "Dimension width", 30) { case Applied: true; default: false; }), "edit the sketch before extrusion");
       check(scene.applySelectedSketchEdit(), "apply the sketch before extrusion");
       check(scene.canCreateExtrusion(), "a selected solved sketch offers an extrusion action");
       check(scene.createExtrusion(), "extrude the selected sketch into a solid");
@@ -454,7 +454,7 @@ class CadPlateWorkflowTests {
         "default extrusion uses the authored sketch dimensions"
       );
       check(
-        edit(scene, "Extrusion depth", 12) == PropertyEditResult.Applied,
+        (switch edit(scene, "Extrusion depth", 12) { case Applied: true; default: false; }),
         "extrusion depth can be edited from its feature inspector"
       );
       near(extrusionDepth(extrusion), 12, "extrusion depth edit updates the authored feature");
@@ -552,7 +552,7 @@ class CadPlateWorkflowTests {
       );
       step = "change upstream dimension";
       check(
-        edit(scene, "Dimension width", 24) == PropertyEditResult.Applied,
+        (switch edit(scene, "Dimension width", 24) { case Applied: true; default: false; }),
         "upstream sketch dimensions can change below a face-supported pocket"
       );
       step = "recompute downstream pocket";
@@ -1040,7 +1040,7 @@ class CadPlateWorkflowTests {
       );
 
       check(
-        edit(scene, "Fillet radius", 1) == PropertyEditResult.Applied,
+        (switch edit(scene, "Fillet radius", 1) { case Applied: true; default: false; }),
         "fillet radius can be edited from the feature inspector"
       );
       near(fillet.radius.value, 1, "fillet radius edit updates the authored feature");
@@ -1056,7 +1056,7 @@ class CadPlateWorkflowTests {
         "the sketch remains editable below the fillet"
       );
       check(
-        edit(scene, "Dimension width", 24) == PropertyEditResult.Applied,
+        (switch edit(scene, "Dimension width", 24) { case Applied: true; default: false; }),
         "upstream profile dimensions can change below the fillet"
       );
       check(scene.applySelectedSketchEdit(), "recompute the fillet after the upstream edit");
@@ -1219,7 +1219,7 @@ class CadPlateWorkflowTests {
       var retainedVolume = retainedShape.volume();
       check(plate.kind == "cad-plate", "selected plate has CAD kind");
       check(scene.pick(0.0, 0.0) == "scene", "initial hole is pick-through");
-      check(edit(scene, "Width", 0.1) == PropertyEditResult.Applied, "edit width");
+      check((switch edit(scene, "Width", 0.1) { case Applied: true; default: false; }), "edit width");
       check(
         scene.cadSession(id) == cadSession && cadSession.revision > sessionRevision,
         "parameter editing keeps one live CAD document session and publishes a new result revision"
@@ -1230,11 +1230,11 @@ class CadPlateWorkflowTests {
         "a retained published shape stays valid after the session publishes a new revision"
       );
       retainedShape.close();
-      check(edit(scene, "Height", 0.06) == PropertyEditResult.Applied, "edit height");
-      check(edit(scene, "Depth", 0.008) == PropertyEditResult.Applied, "edit thickness");
-      check(edit(scene, "Hole diameter", 0.01) == PropertyEditResult.Applied, "edit hole diameter");
-      check(edit(scene, "Hole X", 0.02) == PropertyEditResult.Applied, "edit hole X");
-      check(edit(scene, "Hole Y", 0.01) == PropertyEditResult.Applied, "edit hole Y");
+      check((switch edit(scene, "Height", 0.06) { case Applied: true; default: false; }), "edit height");
+      check((switch edit(scene, "Depth", 0.008) { case Applied: true; default: false; }), "edit thickness");
+      check((switch edit(scene, "Hole diameter", 0.01) { case Applied: true; default: false; }), "edit hole diameter");
+      check((switch edit(scene, "Hole X", 0.02) { case Applied: true; default: false; }), "edit hole X");
+      check((switch edit(scene, "Hole Y", 0.01) { case Applied: true; default: false; }), "edit hole Y");
       var editedCollision:app.CadCollisionBounds = cast cadSession.collisionBounds;
       near(editedCollision.halfExtents.x, 0.05, "published collision proxy follows changed CAD width");
       near(editedCollision.halfExtents.y, 0.03, "published collision proxy follows changed CAD height");
@@ -1251,7 +1251,7 @@ class CadPlateWorkflowTests {
       var current = object(scene, id);
       var graph = scene.currentCadGraph(id);
       var undoCount = scene.document.history.undoCount;
-      check(edit(scene, "Hole diameter", 0.2) != PropertyEditResult.Applied, "invalid hole recompute is rejected");
+      check(!(switch edit(scene, "Hole diameter", 0.2) { case Applied: true; default: false; }), "invalid hole recompute is rejected");
       check(
         scene.currentCadGraph(id) == graph && scene.document.history.undoCount == undoCount,
         "failed recompute keeps last valid mesh and history"
@@ -1415,7 +1415,7 @@ class CadPlateWorkflowTests {
       }
       check(draftPropertyFound, "draft exposes its dimensional constraint in the inspector");
       check(
-        edit(scene, "Dimension width", 61) == PropertyEditResult.Applied,
+        (switch edit(scene, "Dimension width", 61) { case Applied: true; default: false; }),
         "sketch inspector edits a draft constraint value"
       );
       check(
@@ -1467,7 +1467,7 @@ class CadPlateWorkflowTests {
       bracketModel = cast scene.cadSession(id).model;
       var initialRadius = bracketModel.holeRadius();
       check(
-        edit(scene, "Hole radius", 0.002) == PropertyEditResult.Applied,
+        (switch edit(scene, "Hole radius", 0.002) { case Applied: true; default: false; }),
         "inspector edits the bracket's supported hole sketch"
       );
       near(bracketModel.holeRadius(), 0.002, "hole sketch radius edits the pocket feature");
@@ -1476,7 +1476,7 @@ class CadPlateWorkflowTests {
       check(scene.document.redo(), "redo bracket hole radius edit");
       near(bracketModel.holeRadius(), 0.002, "redo restores the edited bracket hole radius");
       check(
-        edit(scene, "Wall thickness", 0.007) == PropertyEditResult.Applied,
+        (switch edit(scene, "Wall thickness", 0.007) { case Applied: true; default: false; }),
         "inspector edits the bracket's constrained wall dimension"
       );
       near(bracketModel.wallThickness(), 0.007, "wall edit updates both constrained profile dimensions");

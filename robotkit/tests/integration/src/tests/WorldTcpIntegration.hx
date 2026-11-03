@@ -383,7 +383,7 @@ class WorldTcpIntegration {
       }
       );
       var skillRunner = new SkillRunner();
-      if (skillRunner.start(goTo) != SkillStatus.Running
+      if (!Type.enumEq(skillRunner.start(goTo), SkillStatus.Running)
         || skillRunner.activeSkill() != goTo) throw "SkillRunner did not start goal-level GoTo for RemoteRobot";
       if (skillRunner.update(current,
         0.02) != SkillStatus.Running) throw "RemoteRobot GoTo did not remain active after its first update";
@@ -392,7 +392,7 @@ class WorldTcpIntegration {
         return state.velocities.length == 3 && state.velocities.get(0) > 0.0 && state.velocities.get(1) > 0.0;
       }, "GoTo did not send an atomic two-wheel velocity target through robotd");
       skillRunner.cancel();
-      if (skillRunner.status() != SkillStatus.Cancelled || skillRunner.activeSkill() != null
+      if (!Type.enumEq(skillRunner.status(), SkillStatus.Cancelled) || skillRunner.activeSkill() != null
         || skillRunner.result() == null) throw "SkillRunner did not cancel RemoteRobot GoTo cleanly";
 
       var facility = new Facility("serial-facility", "Serial integration facility");

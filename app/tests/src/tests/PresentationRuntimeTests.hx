@@ -301,9 +301,9 @@ import sys.FileSystem;
     var savedProject = app.SceneCodec.decodeProject(File.getContent(saved));
     if (savedProject == null || savedProject.presentation == null) throw "Missing saved authored entries";
     var edits = PresentationEdits.decode(savedProject.presentation);
-    check(edits.views.length == 1 && edits.views[0].source == Authored, "Only authored entries are saved");
+    check(edits.views.length == 1 && Type.enumEq(edits.views[0].source, Authored), "Only authored entries are saved");
     check(
-      edits.procedures.length == 1 && edits.procedures[0].source == Authored,
+      edits.procedures.length == 1 && Type.enumEq(edits.procedures[0].source, Authored),
       "Authored procedure survives document encoding"
     );
     var first = PresentationEdits.encode(edits), firstDocument = File.getContent(saved);

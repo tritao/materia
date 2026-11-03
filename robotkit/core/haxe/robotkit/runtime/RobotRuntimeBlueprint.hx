@@ -1,6 +1,5 @@
 package robotkit.runtime;
 
-import haxeon.Equality;
 import RobotKitRuntime;
 import robotkit.tool.ToolChannels;
 import robotkit.execution.ProcessChannelDeclaration;
@@ -277,9 +276,9 @@ class RobotRuntimeBlueprint {
       processJointIds.set(drive.joint, true);
       var channelA = false, channelB = drive.channelB == null;
       for (channel in channels) {
-        if (channel.id == drive.channelA && Equality.equals(channel.safeValue, Digital(false))) channelA = true;
+        if (channel.id == drive.channelA && Type.enumEq(channel.safeValue, Digital(false))) channelA = true;
         if (drive.channelB != null
-          && channel.id == drive.channelB && Equality.equals(channel.safeValue, Digital(false))) channelB = true;
+          && channel.id == drive.channelB && Type.enumEq(channel.safeValue, Digital(false))) channelB = true;
       }
       if (!channelA || !channelB) throw 'Cylinder drive on joint ${drive.joint} needs declared digital coil channels';
     }
@@ -295,8 +294,8 @@ class RobotRuntimeBlueprint {
         || drive.maxEffort < 0.0) throw 'Velocity process drive on joint ${drive.joint} has invalid ratings';
       var speedChannel = false, directionChannel = false;
       for (channel in channels) {
-        if (channel.id == drive.speedChannel && Equality.equals(channel.safeValue, Analog(0.0))) speedChannel = true;
-        if (channel.id == drive.directionChannel && Equality.equals(channel.safeValue, Analog(0.0))) directionChannel = true;
+        if (channel.id == drive.speedChannel && Type.enumEq(channel.safeValue, Analog(0.0))) speedChannel = true;
+        if (channel.id == drive.directionChannel && Type.enumEq(channel.safeValue, Analog(0.0))) directionChannel = true;
       }
       if (!speedChannel
         || !directionChannel) throw 'Velocity drive on joint ${drive.joint} needs declared analog speed and direction channels';

@@ -112,7 +112,7 @@ class ScrewdrivingAccess implements ScrewAccess {
   function check(job:SceneScrew):Null<String> {
     var targets:Array<AccessPose> = [];
     var primary = template(job.screw);
-    if (job.delivery == Presented) {
+    if (Type.enumEq(job.delivery, Presented)) {
       var pickup = job.pickup;
       if (pickup == null) return "Presented fastening lost its pickup frame";
       targets.push({

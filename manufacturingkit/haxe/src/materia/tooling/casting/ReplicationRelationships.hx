@@ -131,7 +131,7 @@ class ReplicationRelationships {
           var cosine = Math.abs(dot(references[i].direction, references[j].direction));
           var mixed = references[i].kind != references[j].kind;
           // Plane-line parallelism means a perpendicular normal and line direction.
-          var parallelDirections = relationship.kind == Parallel ? !mixed : mixed;
+          var parallelDirections = Type.enumEq(relationship.kind, Parallel) ? !mixed : mixed;
           var rise = parallelDirections ? (cosine == 0 ? Math.POSITIVE_INFINITY
             : span * sine / cosine) : (sine == 0 ? Math.POSITIVE_INFINITY : span * cosine / sine);
           worst = Math.max(worst, rise);
