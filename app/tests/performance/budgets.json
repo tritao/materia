@@ -4,8 +4,8 @@
     "tab-matrix": {
       "cycles": 30,
       "actions": {
-        "hierarchy->sensors": {"frameMs": 4.0, "allocKiB": 149},
-        "sensors->hierarchy": {"frameMs": 4.0, "allocKiB": 104},
+        "hierarchy->sensors": {"frameMs": 4.0, "allocKiB": 147},
+        "sensors->hierarchy": {"frameMs": 4.0, "allocKiB": 102},
         "console->telemetry": {"frameMs": 4.0, "allocKiB": 99},
         "telemetry->console": {"frameMs": 4.0, "allocKiB": 120}
       }
@@ -23,7 +23,7 @@
         "hover-field": {"frameMs": 3.5, "allocKiB": 17.8},
         "hover-away": {"frameMs": 3.5, "allocKiB": 18.8},
         "type-char": {"frameMs": 3.5, "allocKiB": 19.8},
-        "type-backspace": {"frameMs": 3.5, "allocKiB": 19.9}
+        "type-backspace": {"frameMs": 3.5, "allocKiB": 19.5}
       }
     },
     "selection-stress": {
