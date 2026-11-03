@@ -7,6 +7,7 @@ class LeadshineServoTests {
   static function near(a:Float, b:Float, message:String):Void {
     if (!Math.isFinite(a) || Math.abs(a - b) > 1e-7) throw '$message: $a != $b';
   }
+  static function check(condition:Bool, message:String):Void if (!condition) throw message;
   public static function main():Void {
     var names = LeadshineServo.catalog().designations();
     if (names.length != 55) throw "Expected 54 PDF variants and one explicit MS1AE variant";
@@ -56,6 +57,20 @@ class LeadshineServoTests {
     var brake = LeadshineServo.model("ELM2H-0400LA60E");
     near(brake.spec.bodyLength, 118.1, "400 W braked length");
     near(brake.rating.rotorInertia, 5.8e-5, "Braked rotor inertia SI");
+    // Rows the flexspline hobber names: 400 W 60-frame unbraked (F) and braked (E), and the 1 kW 80-frame spindle servo.
+    var hobber = ["ELM2H-0400LA60F", "ELM2H-0400LA60E", "ELM2H-1000LA80F", "ELM2H-1000LA80E"];
+    for (name in hobber) check(LeadshineServo.catalog().exists(name), 'catalogue row $name');
+    var plain400 = LeadshineServo.model("ELM2H-0400LA60F"), brake400 = LeadshineServo.model("ELM2H-0400LA60E");
+    check(!plain400.spec.brake && brake400.spec.brake && brake400.spec.face == 60 && plain400.spec.face == 60, "400 W is 60 frame, E braked, F not");
+    near(plain400.spec.bodyLength, 88.8, "400 W F length");
+    near(brake400.spec.mass, 1.55, "400 W E mass");
+    near(brake400.spec.bodyLength - plain400.spec.bodyLength, 29.3, "brake adds 29.3 mm");
+    var kw = LeadshineServo.model("ELM2H-1000LA80F"), kwBrake = LeadshineServo.model("ELM2H-1000LA80E");
+    check(kw.spec.face == 80 && kw.spec.voltage == 220 && !kw.spec.brake && kwBrake.spec.brake, "1 kW is 80 frame, 220 V");
+    near(kw.rating.ratedTorque, 3.18, "1 kW rated torque");
+    near(kw.spec.bodyLength, 103.9, "1 kW length");
+    near(kwBrake.spec.bodyLength, 134.9, "1 kW braked length");
+    // The catalogue holds no brake holding torque, delay or voltage: braked rows add length, inertia and mass only.
     var large = LeadshineServo.model("ELM2M-7500LD180ET-H");
     near(large.spec.bodyLength, 345, "7.5 kW braked length");
     near(large.spec.voltage, 380, "7.5 kW voltage");

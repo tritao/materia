@@ -117,3 +117,4 @@ main at the end of each phase.
 - 2026-11-03: L1/L2 follow-up: `MotorMount` and footed `ScrewSupportUnit` present their tapped seat as a `MountingFace` (`MountingFace.tappedFoot`), so the flange-cut-out check covers seats; bare vs cut slab checked in `MillScrewDrivePlacementChecks`.
 - 2026-11-03: L5 done on hobber-catalog: eRob 110 V6 rev D family (ErobActuatorPart/ErobActuator, ErobActuatorData, DcBusConsumer, pinned STEP loader); moment rating, bearing stiffness and brake holding torque stay unset (Assumed once entered) until ZeroErr answers.
 - 2026-11-03: L6 done on hobber-catalog: sealed absolute scale family (SealedScalePart housing + head, SealedScaleData JFT-40/JFT-10 rows, standardLength, BiSS-C EncoderPart).
+- 2026-11-03: L7 done on hobber-catalog: ELM2H-0400LA60F/E and ELM2H-1000LA80F/E rows already in the catalogue; test now pins them. No brake holding torque/delay in the catalogue.
