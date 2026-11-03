@@ -8,6 +8,11 @@ import machinekit.assembly.AxisBuilder.AxisSpec;
 import machinekit.assembly.Sense;
 import machinekit.assembly.Transmission;
 import machinekit.gantry.GantryParts.GantryPlate;
+import cadkit.modeling.Part;
+import machinekit.component.ComponentDetail;
+import machinekit.component.MachineComponent;
+import machinekit.component.Solids;
+import machinekit.motion.LeadshineServo;
 import machinekit.motion.LeadScrew;
 import machinekit.motion.LeadScrewNut;
 import machinekit.motion.LeadScrewThread;
@@ -73,7 +78,79 @@ class AssemblyIntegrityTests {
     seated();
     racks();
     screws();
+    strictChecks();
     Sys.println("assembly integrity: support, interference, sweep and drive checks pass");
+  }
+
+  /** The new checks are off unless asked for; `strict` turns on the running gap, contact area and flange cut-out. */
+  static function strictChecks():Void {
+    var strict:IntegrityOptions = {strict: true};
+    // A face that only rubs: a wall flush with the side of the block that runs past it. No volume is shared, so the
+    // overlap check passes; the running gap does not.
+    function rubbing(clear:Float):AxisBuilder {
+      var builder = new AxisBuilder();
+      var up = [0.0, 0, 1], along = [1.0, 0, 0];
+      var block = LinearRailBlock.metric("MGN12C"), rail = LinearRail.metric("MGN12C", 300);
+      // The rail's frame is on its running surface; its foot stands on the base.
+      var top = 10 + rail.spec.railHeight;
+      builder.place("base", new GantryPlate("TEST-STRICT-BASE", "Strict base", 400, 120, 10), AssemblyFrames.translation(150, 0, 0));
+      builder.attach("rail", rail, AxisBuilder.orient(0, 0, top, up, along), "base");
+      builder.slide(
+        {id: "x", lower: 0, upper: 100, initial: 0},
+        "rail",
+        "block",
+        block,
+        AxisBuilder.orient(50, 0, top, up, along),
+        {x: 1.0, y: 0.0, z: 0.0}
+      );
+      var wallY = block.spec.blockWidth / 2 + clear + 5;
+      builder.attach(
+        "wall",
+        new GantryPlate("TEST-STRICT-WALL", "Strict wall", 300, 10, 40),
+        AssemblyFrames.translation(150, wallY, 10),
+        "base"
+      );
+      return builder;
+    }
+    expectClean(AssemblyIntegrity.check(rubbing(0)), "a block running along a flush wall, new checks off");
+    expectOnly(AssemblyIntegrity.check(rubbing(0), strict), ["integrity.gap"], "a block rubbing a wall");
+    expectOnly(
+      AssemblyIntegrity.check(rubbing(0.5), strict),
+      ["integrity.gap"],
+      "a block running 0.5 mm from a wall"
+    );
+    expectClean(AssemblyIntegrity.check(rubbing(5), strict), "a block running 5 mm from a wall");
+    expectClean(
+      AssemblyIntegrity.check(rubbing(0.5), {runningGap: 0.25}),
+      "a block 0.5 mm from a wall against a 0.25 mm running gap"
+    );
+
+    // A part carried by a 20 x 20 tab on a large plate.
+    function tabbed(tab:Float):AxisBuilder {
+      var builder = new AxisBuilder();
+      builder.place("base", new GantryPlate("TEST-STRICT-BASE2", "Strict base", 200, 200, 10), AssemblyFrames.translation(0, 0, 0));
+      builder.attach("tab", new GantryPlate("TEST-STRICT-TAB", "Strict tab", tab, tab, 40), AssemblyFrames.translation(0, 0, 10), "base");
+      builder.attach("load", new GantryPlate("TEST-STRICT-LOAD", "Strict load", 120, 120, 10), AssemblyFrames.translation(0, 0, 50), "tab");
+      return builder;
+    }
+    expectClean(AssemblyIntegrity.check(tabbed(20)), "a part on a 20 mm tab, new checks off");
+    expectOnly(AssemblyIntegrity.check(tabbed(20), strict), ["integrity.contact.area"], "a part on a 20 x 20 mm tab");
+    expectClean(AssemblyIntegrity.check(tabbed(60), strict), "a part on a 60 x 60 mm tab");
+
+    // A servo on a plate: cut for its pilot and bolts, drilled for the shaft only, or no plate under its flange.
+    var motor = LeadshineServo.model("ELM2H-0400LA60E");
+    function motorOn(plate:MachineComponent):AxisBuilder {
+      var builder = new AxisBuilder();
+      builder.place("plate", plate, AssemblyFrames.translation(0, 0, 0));
+      builder.attach("motor", motor, AssemblyFrames.translation(0, 0, 0), "plate");
+      return builder;
+    }
+    var cut = new GantryPlate("TEST-STRICT-MOTOR-PLATE", "Strict motor plate", 100, 100, 8, motor, AssemblyFrames.translation(0, 0, 0));
+    expectClean(AssemblyIntegrity.check(motorOn(cut), strict), "a servo on a plate cut for it");
+    var shaftOnly = AssemblyIntegrity.check(motorOn(new ShaftHolePlate()), strict);
+    check(codes(shaftOnly).indexOf("integrity.mount.cutout") >= 0, 'a plate with a shaft hole only must lack the cut-out, found ${codes(shaftOnly)}');
+    var plain = AssemblyIntegrity.check(motorOn(new GantryPlate("TEST-STRICT-UNCUT", "Strict uncut plate", 100, 100, 8)), strict);
+    check(codes(plain).indexOf("integrity.mount.cutout") >= 0, 'an uncut plate must lack the cut-out, found ${codes(plain)}');
   }
 
   /** A block on a rail meets a stop only at the far end of its travel: the rest state is sound, the sweep is not. */
@@ -322,6 +399,21 @@ class AssemblyIntegrityTests {
     var reversed = [for (item in AssemblyIntegrity.check(axis(true)).errors()) item.code];
     check(reversed.indexOf("integrity.drive.slip") >= 0, 'a hand-reversed screw sense is a slip, found $reversed');
   }
+}
+
+/** A plate drilled for a motor shaft and nothing else: no pilot bore, no bolt holes. */
+class ShaftHolePlate extends MachineComponent {
+  public function new() super("TEST-SHAFT-HOLE-PLATE", "Plate with a shaft hole only", "aluminium 6061", true);
+
+  override public function hasGeometry():Bool return true;
+
+  override public function geometry(detail:ComponentDetail = Preview):Part return Solids.building([], owned -> {
+    var block = Part.box(100, 100, 8);
+    owned.push(block);
+    var hole = Part.cylinderSpan(7, -1, 9);
+    owned.push(hole);
+    return Solids.cut(block, [hole]);
+  });
 }
 
 /** Standalone run. */

@@ -3,7 +3,9 @@ package machinekit.assembly;
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
 import cadkit.modeling.Part;
+import cadkit.modeling.Vector;
 import machinekit.assembly.PosedParts.PartBox;
+import machinekit.component.MountingFace;
 import machinekit.motion.LeadScrew;
 import machinekit.transmission.Rack;
 import machinekit.transmission.SpurGear;
@@ -33,6 +35,24 @@ typedef IntegrityOptions = {
   /** Joint states to sweep, replacing the default sampling (see `AssemblyIntegrity.sweepStates`). */
   @:optional var sweepStates:Array<Map<String,
   Float>>;
+  /**
+	 * Least distance (mm) bodies that move relative to each other keep over the sampled sweep (`AssemblyIntegrity.RUNNING_GAP`).
+	 * Off when absent: overlap is always reported, a face that merely rubs is not. Pairs a moving mate joins (a block on its
+	 * rail) and pairs the model says mesh are exempt.
+	 */
+  @:optional var runningGap:Float;
+  /**
+	 * Least contact area (mm²) a fixed mate must have where its child carries other members (`AssemblyIntegrity.MIN_CONTACT_AREA`).
+	 * Off when absent. Measured by pushing the child a little into its parent, so it counts faces normal to a world axis.
+	 */
+  @:optional var minContactArea:Float;
+  /**
+	 * Every part with a `mountingFace` that is fixed to a host finds its cut-out in the host: the host has no material in
+	 * the pilot and bolt holes, and lies under the flange.
+	 */
+  @:optional var flangeCutouts:Bool;
+  /** All three of the above at their defaults. */
+  @:optional var strict:Bool;
 }
 
 /** What one `AssemblyIntegrity.check` found, and how much it looked at. */
@@ -67,11 +87,25 @@ class IntegrityReport {
  *   pitch circles roll on each other, and a nut travels one signed lead per turn of its screw (the thread's hand
  *   included). A wrong ratio or sense is found here. Belts and chains are not checked this way: their strands are not
  *   part geometry.
+ *
+ * Three further checks are off unless asked for (`IntegrityOptions.strict` turns them all on): a running gap between
+ * bodies that move relative to each other, a minimum contact area for fixed mates that carry other members, and the
+ * cut-out a flanged part (`MachineComponent.mountingFace`) needs in the host it is fixed to.
  */
 class AssemblyIntegrity {
   public static inline var CONTACT_TOLERANCE:Float = 0.05;
   public static inline var OVERLAP_LIMIT:Float = 1e-3;
   public static inline var MESH_OVERLAP_LIMIT:Float = 0.05;
+  /** Default running gap between bodies that move relative to each other, mm. */
+  public static inline var RUNNING_GAP:Float = 1.0;
+  /** Default contact area for a fixed mate that carries other members, mm² (25 x 25). */
+  public static inline var MIN_CONTACT_AREA:Float = 625.0;
+  /** How far the contact area probe pushes the child into its parent, mm. */
+  static inline var CONTACT_PROBE:Float = 0.5;
+  /** Depth of the layer of the host a flange's cut-out is checked in, mm. */
+  static inline var FLANGE_PROBE:Float = 1.0;
+  /** Share of the footprint's material a flange's host must supply. */
+  static inline var FLANGE_SEAT_SHARE:Float = 0.5;
   /** Leader step for the drive consistency check, in the leader's units (mm or rad). */
   static inline var DRIVE_STEP:Float = 0.01;
   /** A drive's material points may part by this share of their travel (the test is first order). */
@@ -134,6 +168,12 @@ class AssemblyIntegrity {
   final meshOverlapLimit:Float;
   final floorZ:Null<Float>;
   final requestedStates:Null<Array<Map<String, Float>>>;
+  final runningGap:Null<Float>;
+  final minContactArea:Null<Float>;
+  final flangeCutouts:Bool;
+  /** Pairs joined by a moving mate, keyed "a|b" both ways: they run in contact by design. */
+  final movingPairs = new Map<String, Bool>();
+  final gapReported = new Map<String, Bool>();
   final diagnostics = new Diagnostics();
   /** Pairs the model says mesh, keyed "a|b" both ways, with the volume each may share. */
   final interfaces = new Map<String, Float>();
@@ -149,6 +189,14 @@ class AssemblyIntegrity {
     meshOverlapLimit = options.meshOverlapLimit == null ? MESH_OVERLAP_LIMIT : options.meshOverlapLimit;
     floorZ = options.floorZ;
     requestedStates = options.sweepStates;
+    var strict = options.strict == true;
+    runningGap = options.runningGap ?? (strict ? RUNNING_GAP : null);
+    minContactArea = options.minContactArea ?? (strict ? MIN_CONTACT_AREA : null);
+    flangeCutouts = options.flangeCutouts ?? strict;
+    for (joint in definition.joints) if (joint.type != AssemblyJointType.Fixed) {
+      movingPairs.set(joint.parent + "|" + joint.child, true);
+      movingPairs.set(joint.child + "|" + joint.parent, true);
+    }
     for (member in flat.members) ids.push(member.id);
     for (body in AssemblyBodies.of(definition)) for (id in body.occurrences) bodyOf.set(id, body.id);
     for (record in flat.transmissions) switch record.source {
@@ -200,6 +248,8 @@ class AssemblyIntegrity {
     var parts = poseAll(posed, state);
     try {
       checkSupport(parts.parts, parts.boxes);
+      if (minContactArea != null) checkContactAreas(parts.parts, parts.boxes);
+      if (flangeCutouts) checkFlangeCutouts(parts.parts, parts.boxes, restPoses);
       checkInterference(parts.parts, parts.boxes, null);
     } catch (error:Dynamic) {
       closeAll(parts.parts);
@@ -344,7 +394,10 @@ class AssemblyIntegrity {
       }
       var shared = PosedParts.commonVolume(need(parts, a), need(boxes, a), need(parts, b), need(boxes, b));
       var limit = allowed(a, b);
-      if (shared <= limit) continue;
+      if (shared <= limit) {
+        if (sweep != null && runningGap != null) checkRunningGap(parts, boxes, a, b, sweep);
+        continue;
+      }
       if (sweep == null) diagnostics.error(
         "integrity.overlap",
         '$a|$b',
@@ -362,6 +415,28 @@ class AssemblyIntegrity {
     }
   }
 
+  /** Bodies that move relative to each other keep `runningGap` apart, unless a moving mate joins them or they mesh. */
+  function checkRunningGap(
+    parts:Map<String, Part>,
+    boxes:Map<String, PartBox>,
+    a:String,
+    b:String,
+    sweep:SweepSample
+  ):Void {
+    var margin = runningGap;
+    if (margin == null || interfaces.exists(a + "|" + b) || movingPairs.exists(a + "|" + b)
+      || gapReported.exists(a + "|" + b) || PosedParts.apart(need(boxes, a), need(boxes, b), margin)) return;
+    var gap = need(parts, a).distance(need(parts, b));
+    if (gap >= margin) return;
+    gapReported.set(a + "|" + b, true);
+    diagnostics.error(
+      "integrity.gap",
+      '$a|$b',
+      '$a and $b move relative to each other and come within ${round(gap)} mm (running gap ${round(margin)} mm) at '
+      + describe(sweep.sample) + " (sampled sweep)"
+    );
+  }
+
   static function describe(sample:Map<String, Float>):String {
     var entries = [for (key => value in sample) '$key = ${round(value)}'];
     entries.sort(Reflect.compare);
@@ -369,6 +444,114 @@ class AssemblyIntegrity {
   }
 
   static function round(value:Float):Float return Math.round(value * 1000) / 1000;
+
+  // ---- fixed mates ------------------------------------------------------------------------------------------------
+
+  static final PUSHES:Array<Array<Float>> = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+
+  /**
+	 * A fixed mate whose child carries other members must touch its parent over `minContactArea`: a block on a plate's edge
+	 * that holds up a frame is a mounting in name only. The area is the volume the child shares with the parent when pushed
+	 * `CONTACT_PROBE` into it, over the push, summed over the six axis directions.
+	 */
+  function checkContactAreas(parts:Map<String, Part>, boxes:Map<String, PartBox>):Void {
+    var least = minContactArea;
+    if (least == null) return;
+    var carries = new Map<String, Bool>();
+    for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree) carries.set(joint.parent, true);
+    for (joint in definition.joints) {
+      if (joint.role != AssemblyJointRole.Tree || joint.type != AssemblyJointType.Fixed
+        || !carries.exists(joint.child)) continue;
+      var gap = touching(parts, boxes, joint.parent, joint.child);
+      if (gap > contactTolerance) continue;
+      var area = contactArea(parts, boxes, joint.child, joint.parent, gap);
+      if (area < least) diagnostics.error(
+        "integrity.contact.area",
+        joint.id,
+        'Mate ${joint.id} holds ${joint.child}, which carries other members, on ${joint.parent} over only '
+        + '${round(area)} mm² (at least ${round(least)} mm² wanted)'
+      );
+    }
+  }
+
+  function contactArea(
+    parts:Map<String, Part>,
+    boxes:Map<String, PartBox>,
+    child:String,
+    parent:String,
+    gap:Float
+  ):Float {
+    var total = 0.0;
+    for (push in PUSHES) {
+      var moved = need(parts, child).translated(new Vector(push[0] * CONTACT_PROBE, push[1] * CONTACT_PROBE,
+        push[2] * CONTACT_PROBE));
+      try {
+        var shared = PosedParts.commonVolume(moved, PosedParts.boxOf(moved), need(parts, parent), need(boxes, parent));
+        total += shared / Math.max(CONTACT_PROBE - gap, 1e-6);
+      } catch (error:Dynamic) {
+        moved.close();
+        throw error;
+      }
+      moved.close();
+    }
+    return total;
+  }
+
+  // ---- flanges ----------------------------------------------------------------------------------------------------
+
+  /** A part with a `mountingFace` fixed to a host: the host is cut for the flange's pilot and bolts, and lies under it. */
+  function checkFlangeCutouts(parts:Map<String, Part>, boxes:Map<String, PartBox>, poses:Map<String, AssemblyFrame>):Void {
+    for (joint in definition.joints) {
+      if (joint.role != AssemblyJointRole.Tree || joint.type != AssemblyJointType.Fixed) continue;
+      checkFlange(parts, boxes, poses, joint.child, joint.parent, joint.id);
+      checkFlange(parts, boxes, poses, joint.parent, joint.child, joint.id);
+    }
+  }
+
+  function checkFlange(
+    parts:Map<String, Part>,
+    boxes:Map<String, PartBox>,
+    poses:Map<String, AssemblyFrame>,
+    flanged:String,
+    host:String,
+    mate:String
+  ):Void {
+    var face:Null<MountingFace> = flat.member(flanged).mountingFace();
+    if (face == null) return;
+    var pose = need(poses, flanged);
+    var owned:Array<Part> = [];
+    try {
+      var localTool = face.tool(FLANGE_PROBE);
+      owned.push(localTool);
+      var tool = PosedParts.moved(localTool, pose);
+      owned.push(tool);
+      var slab = Part.box(face.width, face.height, FLANGE_PROBE);
+      owned.push(slab);
+      var seat = PosedParts.moved(slab, pose);
+      owned.push(seat);
+      var hostPart = need(parts, host), hostBox = need(boxes, host);
+      var cut = PosedParts.commonVolume(hostPart, hostBox, tool, PosedParts.boxOf(tool));
+      var under = PosedParts.commonVolume(hostPart, hostBox, seat, PosedParts.boxOf(seat));
+      var available = slab.volume() - localTool.volume();
+      if (cut > overlapLimit) diagnostics.error(
+        "integrity.mount.cutout",
+        mate,
+        '$flanged is bolted to $host, which has ${round(cut)} mm³ of material in the pilot and bolt holes the flange needs '
+        + "(the host is not cut for it)"
+      );
+      else if (under < FLANGE_SEAT_SHARE * available) diagnostics.error(
+        "integrity.mount.seat",
+        mate,
+        '$flanged is bolted to $host, which supplies ${round(under)} of the ${round(available)} mm³ under the flange face'
+      );
+    } catch (error:Dynamic) {
+      closeList(owned);
+      throw error;
+    }
+    closeList(owned);
+  }
+
+  static function closeList(parts:Array<Part>):Void for (part in parts) part.close();
 
   // ---- drive consistency -------------------------------------------------------------------------------------------
 

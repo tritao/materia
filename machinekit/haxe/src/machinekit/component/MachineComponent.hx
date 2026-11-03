@@ -22,6 +22,11 @@ class MachineComponent {
   /** Typed electrical endpoints, absent on unrelated components. */
   public function motorDrive():Null<machinekit.motion.MotorDrive> return null;
   public function axisMotor():Null<machinekit.motion.AxisMotor> return null;
+  /** The flange this part bolts to a host with, when it has one; a motor's is its axis motor flange. */
+  public function mountingFace():Null<MountingFace> {
+    var motor = axisMotor();
+    return motor == null ? null : new MountingFace(motor.flange.face, motor.flange.face, depth -> motor.mountingCutout(depth));
+  }
   public function reducerSpec():Null<machinekit.motion.ReducerSpec> return null;
   public function motorDriver():Null<machinekit.motion.MotorDriver> return null;
   public function electricalSource():Null<machinekit.motion.ElectricalSource> return null;

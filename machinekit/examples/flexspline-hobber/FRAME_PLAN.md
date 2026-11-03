@@ -110,3 +110,4 @@ main at the end of each phase.
 ## Log
 
 - 2026-11-03: plan written.
+- 2026-11-03: L1 done (worktree hobber-frames): `AssemblyIntegrity` running gap, contact area and flange cut-out checks, opt-in via `strict`; `MountingFace`; tests in `AssemblyIntegrityTests`.
