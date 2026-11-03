@@ -24,8 +24,8 @@ hardcoded below with its source:
                1.15 wide, Ø9.6, 1.85..3 from the tip). Vallder's standard SFU1605 ends differ
                slightly (fixed end 54, 14 mm thread relief); the supplier's standard is accepted.
   supports     ScrewSupportCatalog / VallderSupportData: BK12 bore Ø12, BF12 bore Ø10.
-Not in the model (assumed here): tolerances beyond "supplier standard", motor journal flat/keyway
-(model has a plain Ø10 journal and a clamp coupling).
+Not in the model (assumed here): tolerances beyond "supplier standard"; the motor journal is a plain
+Ø10 journal, no keyway (clamp coupling).
 """
 import html
 import os
@@ -193,7 +193,7 @@ def details(sh, length, ox_f, ox_b, oy, s):
     dim_h(sh, X(COUPLING_L), X(COUPLING_L + THREAD_L), top, fmt(THREAD_L), oy + 6 * s, oy + 6 * s)
     dim_h(sh, X(FIXED_END - 24), X(FIXED_END), top, "24", oy + 6 * s, oy + 6 * s)
     dim_h(sh, X(0), X(FIXED_END), top + 8, f"{fmt(FIXED_END)} fixed end (face to race)", oy + 8 * s, oy + 8 * s)
-    leader(sh, (X(7.5), oy - 5 * s), (X(1), oy - 8 * s - 9), "Ø10 coupling journal (flat/keyway per your std)")
+    leader(sh, (X(7.5), oy - 5 * s), (X(1), oy - 8 * s - 9), "plain Ø10 journal, no keyway (clamp coupling)")
     leader(sh, (X(21), oy - 5.4 * s), (X(17), oy - 8 * s - 18), "M12x1 locknut thread, 12 long")
     leader(sh, (X(39), oy - 6 * s), (X(36), oy - 8 * s - 9), "Ø12 bearing seat (BK12)")
     leader(sh, (X(54), oy - 8 * s), (X(46), oy - 8 * s - 18), "Ø16 race")
@@ -222,7 +222,7 @@ def notes(ax):
 def sheet(name, ax):
     L = ax["length"]
     sh = Sheet(3.0)
-    main_view(sh, ax, 22, 168, min(0.8, 250.0 / ax["length"]), 3.0)
+    main_view(sh, ax, 22, 173, min(0.8, 250.0 / ax["length"]), 3.0)
     details(sh, L, 22, 215, 90, 2.5)
     nt = notes(ax)
     notes_svg = "".join(f'<text x="10" y="{170.5 + 5.2 * i}" font-size="2.9">{html.escape(t)}</text>' for i, t in enumerate(nt))

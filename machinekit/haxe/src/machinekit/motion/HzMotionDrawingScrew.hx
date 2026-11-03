@@ -13,6 +13,10 @@ import machinekit.component.ComponentRecipeSupport as P;
 class HzMotionDrawingScrew extends LeadScrew {
   public static inline final FIXED_END:Float = 51;
   public static inline final FLOAT_END:Float = 11;
+  /** BK12 housing length (`ScrewSupportCatalog`); its screw-side face seats on the 51 mm shoulder. */
+  public static inline final BK12_HOUSING:Float = 25;
+  /** Screw end to the BK12 support centre on the standard fixed end. */
+  public static inline final BK12_SUPPORT_CENTRE:Float = FIXED_END - BK12_HOUSING / 2;
   static var recipe:Null<ComponentType>;
   public final endProfile:String;
   public final fixedEnd:Float;

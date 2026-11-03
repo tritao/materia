@@ -9,6 +9,10 @@ class HobberZLayout {
   public static inline final SHAFT_TOP = 730.0;
   public static inline final SHAFT_LENGTH = 420.0;
   public static inline final NUT_STATION = SHAFT_TOP - (363 + NUT_OFFSET_Z);
+  /** BK12 centre, from the top of the standard 51 mm screw end. */
+  public static inline final FIXED_BEARING_Z=SHAFT_TOP-machinekit.motion.HzMotionDrawingScrew.BK12_SUPPORT_CENTRE;
+  /** Clamp coupling length: its screw half stays clear of the BK12 housing on the 51 mm screw end. */
+  public static inline final COUPLING_LENGTH=40.0;
   public static inline final SEAT_FACE_X = 241.0;
   public static inline final SEAT_COLUMN_Y = 25.0;
   public static inline final SPINE_FRONT_COLUMN_Y = 45.0;

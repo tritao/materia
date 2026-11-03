@@ -490,7 +490,7 @@ class FlexsplineHobber extends MachineAssembly {
   ):Void {
     var motor = ServoMotor.model(id == "Z" ? "GENERIC-HV-SERVO-750W" : "GENERIC-HV-SERVO-400W"), screw = new BallScrew(
       length,
-      id == "Z" ? 60 : BallScrew.INPUT_JOURNAL_LENGTH,
+      HzMotionDrawingScrew.FIXED_END,
       true
     ), nut = new BallNut();
     var start = [nutOrigin.x - d[0] * nutStation, nutOrigin.y - d[1] * nutStation, nutOrigin.z - d[2] * nutStation];
@@ -538,7 +538,7 @@ class FlexsplineHobber extends MachineAssembly {
       id + "turnChild",
       ratio * initial
     );
-    var near = ScrewSupportUnit.bk12(), far = ScrewSupportUnit.bf12(), nearOffset = id == "Z" ? 47.5 : 37.5;
+    var near = ScrewSupportUnit.bk12(), far = ScrewSupportUnit.bf12(), nearOffset = HzMotionDrawingScrew.BK12_SUPPORT_CENTRE;
     fixAt(
       id + "fixed",
       near,
@@ -564,7 +564,7 @@ class FlexsplineHobber extends MachineAssembly {
       parent
     );
     supportScrew(id + "lead", near.support, far.support);
-    var coupling = new ShaftCoupling(motor.rating.shaftDiameter, 12);
+    var coupling = new ShaftCoupling(motor.rating.shaftDiameter, 12, null, id == "Z" ? HobberZLayout.COUPLING_LENGTH : null);
     if (motor.rating.shaftLength < coupling.length / 2) throw "motor shaft cannot engage half coupling";
     fixAt(
       id + "coupling",

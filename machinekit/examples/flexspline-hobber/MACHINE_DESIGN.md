@@ -549,8 +549,12 @@ The ground SFU1605 screw now lies at Y=0 between the Z guides at Y=±145 mm,
 guide-to-hob offsets and Z=-10..190 mm travel stay unchanged.
 
 The 420 mm screw points down from work Z=730 to 310 mm. Its fixed bearing is
-at the top (682.5 mm), floating bearing below (322.5 mm), and 750 W motor above
-the column (mount face Z=765 mm, body top Z=910 mm). The head hangs below the
+at the top (691.5 mm), floating bearing below (322.5 mm), and 750 W motor above
+the column (mount face Z=765 mm, body top Z=910 mm). All three axes use the standard 51 mm BK12 screw end (Ø10 x 15 journal, M12x1 x 12,
+Ø12 x 24 seat to the shoulder): the 25 mm BK12 housing seats on the shoulder, so
+its centre is 38.5 mm from the screw end (`HzMotionDrawingScrew.BK12_SUPPORT_CENTRE`)
+and the race starts at 51 mm. The Z bearing pad is centred on that bearing and
+the Z clamp coupling is 40 mm long, so its screw half clears the housing. The head hangs below the
 fixed bearing, loading that screw segment in tension. The normal positive-Z
 command still raises the head; an actual-pose/right-hand-thread regression
 verifies the transmission sign.
