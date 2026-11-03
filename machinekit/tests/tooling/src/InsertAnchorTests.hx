@@ -883,7 +883,7 @@ class InsertAnchorTests {
     bolts(copy)[0].locking = InsertAnchorLock.Shoulder;
     check(switch C.copy(copy.anchorage) {
       case Bolted(_, a):
-        a[0].locking == InsertAnchorLock.Shoulder;
+        (switch (a[0].locking) { case InsertAnchorLock.Shoulder: true; default: false; });
       default:
         false;
     }, "shoulder intent never invents a flange-to-insert clamp or a thread-runout stop");

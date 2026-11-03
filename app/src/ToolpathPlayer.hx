@@ -275,7 +275,7 @@ class ToolpathPlayer implements SessionMember {
   public function sourceLines():Array<String> return source.split("\n");
 
   /** Whether the machine is stopped by a feed hold. */
-  public function held():Bool return Type.enumEq(motion.sessionState(), SessionState.Held);
+  public function held():Bool return (switch (motion.sessionState()) { case SessionState.Held: true; default: false; });
 
   /** Brings the machine to a controlled stop on its path. */
   public function hold():Void motion.hold();

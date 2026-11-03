@@ -44,7 +44,7 @@ import materia.project.SceneArtifact.SceneArtifactData;
 }
 
 /** Explicit acquisition arrangement; a tool receiver never supplies a remote pickup pose. */
-@:wire enum ScrewDeliveryMode {
+@:wire enum ScrewDeliveryMode : Equatable {
   @:id(1) Presented;
   @:id(2) BlowFeed(feeder:String);
 }
@@ -251,7 +251,7 @@ class SceneScrewDefinition {
     var sensors = flat.sensors;
     var present = sensors == null ? [] : [for (sensor in sensors) if (sensor.id == screw.presentSensor
       && sensor.kind == "presence" && sensor.occurrence == screw.presenter) sensor];
-    if (Type.enumEq(screw.delivery, Presented) && present.length
+    if ((switch (screw.delivery) { case Presented: true; default: false; }) && present.length
       != 1) throw 'Scene screw "${screw.fastening}": presenter sensor "${screw.presentSensor}" is missing or ambiguous';
     var recovery = screw.recovery;
     if (recovery != null) {

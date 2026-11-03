@@ -651,7 +651,7 @@ class SessionTransitionRig {
 
   public function settleStop():Void {
     var steps = 0;
-    while (!Type.enumEq(machine.sessionState(), SessionState.Idle) && !Type.enumEq(machine.sessionState(), SessionState.Running)) {
+    while (!(switch (machine.sessionState()) { case SessionState.Idle: true; default: false; }) && !(switch (machine.sessionState()) { case SessionState.Running: true; default: false; })) {
       advance(1);
       if (++ steps > 500) throw "session stop did not settle";
     }
@@ -659,7 +659,7 @@ class SessionTransitionRig {
 
   public function settleHold():Void {
     var steps = 0;
-    while (Type.enumEq(machine.sessionState(), SessionState.Holding)) {
+    while ((switch (machine.sessionState()) { case SessionState.Holding: true; default: false; })) {
       advance(1);
       if (++ steps > 500) throw "session hold did not settle";
     }

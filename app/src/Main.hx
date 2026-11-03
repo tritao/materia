@@ -2748,7 +2748,7 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
     var controller = viewport.presentation;
     if (controller == null) return;
     var id = controller.cursor.view, existing = controller.record.views.filter(v -> v.id == id)[0];
-    if (sections == null || !Type.enumEq(existing.source, materia.presentation.AssemblyPresentation.PresentationSource.Authored)) {
+    if (sections == null || !(switch (existing.source) { case materia.presentation.AssemblyPresentation.PresentationSource.Authored: true; default: false; })) {
       var index = 1;
       while (controller.record.views.filter(v -> v.id == "view-" + index).length > 0) index++;
       id = "view-" + index;
@@ -2774,7 +2774,7 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
       id:"", label:"Service procedure", kind:Service, start:Assembled, steps:[], source:Authored
     }
     :haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(selected));
-    if (!Type.enumEq(procedure.source, Authored) || procedure.id == "") {
+    if (!(switch (procedure.source) { case Authored: true; default: false; }) || procedure.id == "") {
       var index = 1;
       while (controller.record.procedures.filter(p -> p.id == "procedure-" + index).length > 0) index++;
       procedure.id = "procedure-" + index;

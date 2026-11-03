@@ -314,7 +314,7 @@ class RobotRuntimeCompiler {
   /** Whether a joint is the follower of a spring coupling (stiffness and a damping ratio, simulated as a spring): a belt's pulley. */
   static function ensureDigitalChannel(blueprint:RobotRuntimeBlueprint, id:String, keepOnStop:Bool):Void {
     for (channel in blueprint.channels) if (channel.id == id) {
-      if (!Type.enumEq(channel.safeValue, robotkit.execution.ProcessEventValue.Digital(false))) throw 'Cylinder valve channel "$id" must be digital and safe when de-energized';
+      if (!(switch (channel.safeValue) { case robotkit.execution.ProcessEventValue.Digital(false): true; default: false; })) throw 'Cylinder valve channel "$id" must be digital and safe when de-energized';
       if (channel.keepOnStop != keepOnStop) throw 'Cylinder valve channel "$id" has the wrong normal-stop policy';
       return;
     }
@@ -327,7 +327,7 @@ class RobotRuntimeCompiler {
 
   static function ensureAnalogChannel(blueprint:RobotRuntimeBlueprint, id:String):Void {
     for (channel in blueprint.channels) if (channel.id == id) {
-      if (!Type.enumEq(channel.safeValue, ProcessEventValue.Analog(0.0))) throw 'Process velocity channel "$id" must be analog and safe at zero';
+      if (!(switch (channel.safeValue) { case ProcessEventValue.Analog(0.0): true; default: false; })) throw 'Process velocity channel "$id" must be analog and safe at zero';
       return;
     }
     blueprint.channels.push(new ProcessChannelDeclaration(id, ProcessEventValue.Analog(0.0), false));

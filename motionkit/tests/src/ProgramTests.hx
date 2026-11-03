@@ -1232,10 +1232,10 @@ class ProgramTests extends MotionKitTestSupport {
     for (_ in 0...600) {
       motion.update(0.01);
       harness.step(Int64.ofInt(++ tick));
-      if (Type.enumEq(motion.sessionState(), Held) || motion.failure != null) break;
+      if ((switch (motion.sessionState()) { case Held: true; default: false; }) || motion.failure != null) break;
     }
     check(
-      Type.enumEq(motion.sessionState(), Held) && motion.failure == null && !motion.completed,
+      (switch (motion.sessionState()) { case Held: true; default: false; }) && motion.failure == null && !motion.completed,
       "a hold during asynchronous startup reaches Held before executing the first plan"
     );
     for (_ in 0...10) {
@@ -1622,7 +1622,7 @@ class ProgramTests extends MotionKitTestSupport {
     check(Equality.equals(motion.sessionState(), Stopping(Discard)), "arm stops before process recovery");
     robot.faultOverride = 42;
     motion.update(0.01);
-    check(Type.enumEq(motion.sessionState(), Faulted), "runtime fault while stopping latches the shared session");
+    check((switch (motion.sessionState()) { case Faulted: true; default: false; }), "runtime fault while stopping latches the shared session");
     device.setFault(null);
     run.update(distance);
     check(run.state == ControlledInterruption, "process recovery waits while the arm session is faulted");
@@ -1639,7 +1639,7 @@ class ProgramTests extends MotionKitTestSupport {
     check(settled, "virtual arm settles before reset");
     robot.faultOverride = 0;
     motion.reset();
-    check(Type.enumEq(motion.sessionState(), Idle), "explicit arm reset permits recovery");
+    check((switch (motion.sessionState()) { case Idle: true; default: false; }), "explicit arm reset permits recovery");
     simulationHarness.step(Int64.ofInt(tick++));
     run.update(distance);
     check(run.state == Recovery, "process run enters recovery after arm reset");
@@ -1757,11 +1757,11 @@ class ProgramTests extends MotionKitTestSupport {
       simulationHarness.step(Int64.ofInt(tick++));
     }
     motion.hold();
-    check(Type.enumEq(motion.sessionState(), Holding) && robot.commandCount("hold") == 1, "arm running plus hold enters Holding");
+    check((switch (motion.sessionState()) { case Holding: true; default: false; }) && robot.commandCount("hold") == 1, "arm running plus hold enters Holding");
     var resumesBefore = robot.commandCount("resume");
     motion.resume();
     check(
-      Type.enumEq(motion.sessionState(), Holding) && robot.commandCount("resume") == resumesBefore,
+      (switch (motion.sessionState()) { case Holding: true; default: false; }) && robot.commandCount("resume") == resumesBefore,
       "arm resume during Holding waits for rest"
     );
     for (_ in 0...800) {
@@ -1791,7 +1791,7 @@ class ProgramTests extends MotionKitTestSupport {
     motion.update(0.01);
     simulationHarness.step(Int64.ofInt(tick++));
     check(
-      Type.enumEq(motion.sessionState(), Held) && robot.commandCount("hold") == holdsBefore && robot.snapshot().faultCode == 0,
+      (switch (motion.sessionState()) { case Held: true; default: false; }) && robot.commandCount("hold") == holdsBefore && robot.snapshot().faultCode == 0,
       "holding a finished owner plan stays local and preserves the program"
     );
     motion.resume();
@@ -1815,13 +1815,13 @@ class ProgramTests extends MotionKitTestSupport {
     robot.faultOverride = 42;
     motion.update(0.01);
     check(
-      Type.enumEq(motion.sessionState(), Faulted) && robot.commands.length == commandsBeforeFault,
+      (switch (motion.sessionState()) { case Faulted: true; default: false; }) && robot.commands.length == commandsBeforeFault,
       "arm snapshot fault during Stopping latches Faulted"
     );
     throws(() -> motion.run(longMove), "arm fault blocks new programs until reset");
     robot.faultOverride = 0;
     motion.reset();
-    check(Type.enumEq(motion.sessionState(), Idle), "arm explicit reset returns Faulted to Idle");
+    check((switch (motion.sessionState()) { case Idle: true; default: false; }), "arm explicit reset returns Faulted to Idle");
     simulationHarness.dispose();
   }
 

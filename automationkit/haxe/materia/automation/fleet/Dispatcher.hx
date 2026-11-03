@@ -13,8 +13,7 @@ class Dispatcher {
 
   /** Returns null when no ready, unassigned fleet robot is available. */
   public function dispatch(mission:Mission):Null<FleetAssignment> {
-    if (mission == null || mission.status
-      != materia.automation.mission.MissionStatus.Pending) throw "Dispatcher requires a pending mission";
+    if (mission == null || !(switch (mission.status) { case materia.automation.mission.MissionStatus.Pending: true; default: false; })) throw "Dispatcher requires a pending mission";
     var available = fleet.availableRobotIds();
     if (available.length == 0) return null;
     return fleet.assign(available[0], mission);

@@ -1,7 +1,7 @@
 package machinekit.component;
 
 /** Stored input value; its variant must match the parameter type. */
-enum ComponentValue {
+enum ComponentValue : Equatable {
   Number(value:Float);
   Integer(value:Int);
   Boolean(value:Bool);

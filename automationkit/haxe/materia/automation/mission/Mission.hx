@@ -29,18 +29,18 @@ class Mission {
   public function completedTaskCount():Int return taskIndex;
 
   public function start():Void {
-    if (status != Pending) throw "Only a pending mission can start";
+    if (!(switch (status) { case Pending: true; default: false; })) throw "Only a pending mission can start";
     status = Running;
   }
 
   public function completeCurrentTask():Void {
-    if (status != Running) throw "Only a running mission can complete tasks";
+    if (!(switch (status) { case Running: true; default: false; })) throw "Only a running mission can complete tasks";
     taskIndex++;
     if (taskIndex == work.length) status = Succeeded;
   }
 
   public function fail(message:String):Void {
-    if (isTerminal() || status == Pending) throw "Only a running mission can fail";
+    if (isTerminal() || (switch (status) { case Pending: true; default: false; })) throw "Only a running mission can fail";
     if (message == null || message.length == 0) throw "Mission failure requires a message";
     status = Failed(message);
   }

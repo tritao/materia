@@ -359,11 +359,11 @@ import robotkit.skill.SkillStatus;
   static function execute(simulation:ApplicationSimulation, mission:MissionPlayer, skill:Skill):Void {
     skill.start();
     var limit = simulation.activeSession().simulationTime() + 20;
-    while (Type.enumEq(skill.status(), Running) && simulation.activeSession().simulationTime() < limit) {
+    while ((switch (skill.status()) { case Running: true; default: false; }) && simulation.activeSession().simulationTime() < limit) {
       simulation.step();
       var outcome = skill.update(mission.robot.robot.snapshot(), simulation.timestep);
     }
-    if (!Type.enumEq(skill.status(), Succeeded)) throw 'Joint owner handoff failed: ${skill.status()}';
+    if (!(switch (skill.status()) { case Succeeded: true; default: false; })) throw 'Joint owner handoff failed: ${skill.status()}';
   }
 
   /** A cached joint runner must reacquire its start after another motion owner moves the arm. */

@@ -1,6 +1,6 @@
 package motionkit.robot;
 
-enum SessionState {
+enum SessionState : Equatable {
   Idle;
   Running;
   Holding;

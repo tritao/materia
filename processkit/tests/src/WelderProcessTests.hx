@@ -409,7 +409,7 @@ class WelderProcessTests {
     switch program.ops[0] {
       case MoveL(_, _, feed, _, freedom):
         near(feed, 0.08, "the approach moves at the recipe's approach speed");
-        check(freedom == OrientationPolicy.FreeAboutTool, "the approach preserves the recipe's tool-axis freedom");
+        check((switch (freedom) { case OrientationPolicy.FreeAboutTool: true; default: false; }), "the approach preserves the recipe's tool-axis freedom");
       case _:
         check(false, "the program begins with a straight move");
     }

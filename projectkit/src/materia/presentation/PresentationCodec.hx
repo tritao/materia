@@ -150,8 +150,8 @@ class PresentationCodec {
               text(report);
               if (status == null) throw "Missing movement check status";
           }
-          if (Type.enumEq(procedure.source, Authored)
-            && !Type.enumEq(motion.evidence, Illustrative)) throw "Authored movement evidence must be Illustrative";
+          if ((switch (procedure.source) { case Authored: true; default: false; })
+            && !(switch (motion.evidence) { case Illustrative: true; default: false; })) throw "Authored movement evidence must be Illustrative";
         }
         switch step.action {
           case SetJoints(coordinates):

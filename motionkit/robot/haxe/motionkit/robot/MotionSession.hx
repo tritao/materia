@@ -30,16 +30,16 @@ class MotionSession {
   public function new() {
   }
 
-  public function isFaulted():Bool return Type.enumEq(state, Faulted);
-  public function isActive():Bool return !Type.enumEq(state, Idle) && !Type.enumEq(state, Faulted);
-  public function isHolding():Bool return Type.enumEq(state, Holding) || Type.enumEq(state, Held);
+  public function isFaulted():Bool return (switch (state) { case Faulted: true; default: false; });
+  public function isActive():Bool return !(switch (state) { case Idle: true; default: false; }) && !(switch (state) { case Faulted: true; default: false; });
+  public function isHolding():Bool return (switch (state) { case Holding: true; default: false; }) || (switch (state) { case Held: true; default: false; });
   public function isStopping():Bool return switch state {
     case Stopping(_):
       true;
     case _:
       false;
   }
-  public function canStream():Bool return Type.enumEq(state, Running) || Type.enumEq(state, Idle);
+  public function canStream():Bool return (switch (state) { case Running: true; default: false; }) || (switch (state) { case Idle: true; default: false; });
   public function hasPending():Bool return pending.length > 0;
 
   public function begin(?axis:Null<String>):Void {
@@ -50,11 +50,11 @@ class MotionSession {
 
   public function hold():Bool {
     requireReady();
-    if (Type.enumEq(state, Idle)) {
+    if ((switch (state) { case Idle: true; default: false; })) {
       state = Held;
       return false;
     }
-    if (!Type.enumEq(state, Running)) return false;
+    if (!(switch (state) { case Running: true; default: false; })) return false;
     state = Holding;
     resumePending = false;
     return true;
@@ -119,7 +119,7 @@ class MotionSession {
   }
 
   public function completed():Void {
-    if (Type.enumEq(state, Running)) state = Idle;
+    if ((switch (state) { case Running: true; default: false; })) state = Idle;
     jogAxis = null;
   }
 

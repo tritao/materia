@@ -37,6 +37,7 @@ import materia.assembly.AssemblyDefinition.AssemblyMateKind;
 import haxeon.ui.properties.PropertyBinding;
 import haxeon.ui.properties.PropertyValue;
 import haxeon.ui.properties.PropertyEditResult;
+import haxeon.ui.properties.PropertyEditResultTools;
 import haxe.Json;
 import haxe.Int64;
 import robotkit.runtime.Simulation;
@@ -5725,7 +5726,7 @@ typedef CubeRun = {
           "actual mill waits for physical released contact before moving its Z load"
         );
         check(
-          Type.enumEq(runtime.channelValue(brake.releaseChannel), ProcessEventValue.Digital(true)),
+          (switch (runtime.channelValue(brake.releaseChannel)) { case ProcessEventValue.Digital(true): true; default: false; }),
           "actual mill energizes release while waiting for physical contact"
         );
         for (tick in 0...100) physical.step();
@@ -5740,7 +5741,7 @@ typedef CubeRun = {
             'release fault removes motor effort while the applied brake holds the actual Z load: q=${moving.q.get(zIndex)}, effort=${moving.effort.get(motorIndex)}, motor=${moving.q.get(motorIndex)}'
           );
           check(
-            Type.enumEq(runtime.channelValue(brake.releaseChannel), ProcessEventValue.Digital(false)),
+            (switch (runtime.channelValue(brake.releaseChannel)) { case ProcessEventValue.Digital(false): true; default: false; }),
             "release fault de-energizes the device coil"
           );
         } else {
@@ -5755,7 +5756,7 @@ typedef CubeRun = {
           for (tick in 0...30) physical.step();
           var stopped = runtime.snapshot();
           check(
-            Type.enumEq(runtime.channelValue(brake.releaseChannel), ProcessEventValue.Digital(true))
+            (switch (runtime.channelValue(brake.releaseChannel)) { case ProcessEventValue.Digital(true): true; default: false; })
             && Math.abs(stopped.q.get(zIndex) - moving.q.get(zIndex)) < 0.0001,
             "ordinary stop retains released brake and powered Z hold"
           );
@@ -5763,7 +5764,7 @@ typedef CubeRun = {
           for (tick in 0...50) physical.step();
           var applied = runtime.snapshot();
           check(
-            Type.enumEq(runtime.channelValue(brake.releaseChannel), ProcessEventValue.Digital(false))
+            (switch (runtime.channelValue(brake.releaseChannel)) { case ProcessEventValue.Digital(false): true; default: false; })
             && Math.abs(applied.effort.get(motorIndex)) < 1e-6 && Math.abs(applied.effort.get(zIndex)) < 1e-6,
             "emergency stop de-energizes the brake and disables motor and follower effort"
           );
@@ -5786,7 +5787,7 @@ typedef CubeRun = {
           var reset = runtime.snapshot();
           check(
             reset.faultCode == 0 && Math.abs(reset.q.get(zIndex) - held.q.get(zIndex)) < 0.0001
-            && Type.enumEq(runtime.channelValue(brake.releaseChannel), ProcessEventValue.Digital(true)),
+            && (switch (runtime.channelValue(brake.releaseChannel)) { case ProcessEventValue.Digital(true): true; default: false; }),
             "mill reset releases afresh while holding the actual stopped Z pose"
           );
           Sys.println('actual mill Z brake: ${brake.holdingEffort} N m; e-stop sag ${sag * 1000} mm, '
@@ -10534,7 +10535,7 @@ typedef CubeRun = {
       ":mass")) item][0];
     var massEdit = new PropertyBinding(massProperty,
       machineSession.scene.context()).apply(PropertyValue.Float(machineScene.objects[0].mass * 1.1));
-    check((switch massEdit { case Applied: true; default: false; }), "generated part mass edit applies: " + massEdit);
+    check(PropertyEditResultTools.isApplied(massEdit), "generated part mass edit applies: " + massEdit);
     check(
       machineSimulation.pending(machineSession.sensors, machineSession.scene),
       "generated part mass requires a physics rebuild"

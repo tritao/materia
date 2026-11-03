@@ -27,11 +27,11 @@ class ComponentParameter {
     this.unit = unit;
     this.minimum = minimum;
     this.maximum = maximum;
-    if (!Type.enumEq(defaultValue, Unset)) validate(defaultValue);
+    if (!(switch (defaultValue) { case Unset: true; default: false; })) validate(defaultValue);
   }
 
   public function validate(value:ComponentValue):Void {
-    if (Type.enumEq(value, Unset)) switch type {
+    if ((switch (value) { case Unset: true; default: false; })) switch type {
       case Optional(_):
       case _:
         throw 'Missing component parameter "$name"';
@@ -39,7 +39,7 @@ class ComponentParameter {
     if (value == null) throw 'Missing component parameter "$name"';
     switch type {
       case Optional(inner):
-        if (!Type.enumEq(value, Unset)) new ComponentParameter(name, inner, value, unit, minimum, maximum);
+        if (!(switch (value) { case Unset: true; default: false; })) new ComponentParameter(name, inner, value, unit, minimum, maximum);
       case Scalar | Length | Angle:
         switch value {
           case Number(v):

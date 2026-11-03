@@ -57,7 +57,7 @@ class Fleet {
     > return assignmentsByMission.get(missionId);
 
   public function assign(robotId:String, mission:Mission):FleetAssignment {
-    if (mission == null || mission.status != Pending) throw "Only a pending mission can be assigned";
+    if (mission == null || !(switch (mission.status) { case Pending: true; default: false; })) throw "Only a pending mission can be assigned";
     if (!memberIds.exists(robotId)) throw 'Robot "$robotId" is not in fleet "$id"';
     if (assignmentsByMission.exists(mission.id)) throw "Mission already has a fleet assignment";
     if (missionByRobot.exists(robotId)) throw 'Robot "$robotId" already has an active mission';

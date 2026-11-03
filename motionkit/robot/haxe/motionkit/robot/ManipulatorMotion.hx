@@ -235,7 +235,7 @@ class ManipulatorMotion {
       // program block now would make its plan race the pending safety command.
       if (!executor.update()) return;
       if (session.isStopping()) return;
-      if (Type.enumEq(session.state, Idle)) {
+      if ((switch (session.state) { case Idle: true; default: false; })) {
         release();
         var next = pendingProgram;
         pendingProgram = null;
@@ -251,7 +251,7 @@ class ManipulatorMotion {
       }
       var carrying = slip;
       if (carrying != null && planStarted) carrying.update(executor.completed ? plansEnd : executor.elapsedSeconds);
-      if (successorQueued && Type.enumEq(session.state, Running)) successorExecutor.update();
+      if (successorQueued && (switch (session.state) { case Running: true; default: false; })) successorExecutor.update();
       while (executor.completed && planStarted) {
         if (planning == null || blockIndex >= planning.blocks.blocks.length) throw "Completed plan has no owner";
         var block = planning.blocks.blocks[blockIndex];
@@ -352,7 +352,7 @@ class ManipulatorMotion {
   }
   public function reset():Void {
     executor.reset();
-    if (Type.enumEq(session.state, Idle)) {
+    if ((switch (session.state) { case Idle: true; default: false; })) {
       release();
       pendingProgram = null;
       lastCommandedQ = null;
@@ -412,7 +412,7 @@ class ManipulatorMotion {
     var planning = planner;
     if (planning == null) return;
     var source = planning.blocks;
-    while (Type.enumEq(session.state, Running) && blockIndex < source.blocks.length) {
+    while ((switch (session.state) { case Running: true; default: false; }) && blockIndex < source.blocks.length) {
       var block = source.blocks[blockIndex];
       if (planIndex < block.plans.length) {
         if (!planStarted) {
@@ -482,7 +482,7 @@ class ManipulatorMotion {
       planIndex = 0;
       barrierElapsed = 0.0;
     }
-    if (Type.enumEq(session.state, Running)) {
+    if ((switch (session.state) { case Running: true; default: false; })) {
       var next = source.nextPlanId;
       if (next != null) nextPlanId = next;
       programCompleted = true;
@@ -523,7 +523,7 @@ class ManipulatorMotion {
       pendingProgram = null;
       release();
       executor.clear();
-    } else if (Type.enumEq(session.state, Idle)) release();
+    } else if ((switch (session.state) { case Idle: true; default: false; })) release();
   }
   /**
    * Between programs the runtime still records every output change, the controller's own writes

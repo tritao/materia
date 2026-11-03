@@ -122,7 +122,7 @@ class ConstructionSkillTests {
     function runToCompletion(skill:Skill):SkillStatus {
       var status = runner.start(skill);
       var steps = 0;
-      while (Type.enumEq(status, SkillStatus.Running) && steps < 20000) {
+      while ((switch (status) { case SkillStatus.Running: true; default: false; }) && steps < 20000) {
         var snapshot = plant.step(Int64.ofInt(tick++));
         observe(snapshot);
         status = runner.update(snapshot, timestep);
@@ -148,12 +148,12 @@ class ConstructionSkillTests {
       return SimulatedSurfaceScanner.scan(design, trueOffset, 0.0015, 0.02, 0.0003, 5, Int64.ofInt(0));
     }
     );
-    check(Type.enumEq(runToCompletion(scan), SkillStatus.Succeeded), "ScanSurface completes through SkillRunner");
+    check((switch (runToCompletion(scan)) { case SkillStatus.Succeeded: true; default: false; }), "ScanSurface completes through SkillRunner");
     check(scan.cloud != null && scan.cloud.size() > 20, "ScanSurface captures a non-trivial point cloud");
 
     // -- RegisterSurface --
     var register = new RegisterSurface(design, scan.cloud, 5);
-    check(Type.enumEq(runToCompletion(register), SkillStatus.Succeeded), "RegisterSurface completes through SkillRunner");
+    check((switch (runToCompletion(register)) { case SkillStatus.Succeeded: true; default: false; }), "RegisterSurface completes through SkillRunner");
     var registrationOutcome = register.registration;
     check(registrationOutcome != null && registrationOutcome.accepted, "RegisterSurface accepts the injected offset");
     if (registrationOutcome == null
@@ -205,7 +205,7 @@ class ConstructionSkillTests {
       seed,
       paintMotion
     );
-    check(Type.enumEq(runToCompletion(paint), SkillStatus.Succeeded), 'Paint completes through SkillRunner (${paint.status()})');
+    check((switch (runToCompletion(paint)) { case SkillStatus.Succeeded: true; default: false; }), 'Paint completes through SkillRunner (${paint.status()})');
     var paintCoverage = paint.coverage();
     check(
       paintCoverage != null && paintCoverage.coverageFraction() >= 0.9,
@@ -239,7 +239,7 @@ class ConstructionSkillTests {
       seed,
       sandMotion
     );
-    check(Type.enumEq(runToCompletion(sand), SkillStatus.Succeeded), 'Sand completes through SkillRunner (${sand.status()})');
+    check((switch (runToCompletion(sand)) { case SkillStatus.Succeeded: true; default: false; }), 'Sand completes through SkillRunner (${sand.status()})');
     var sandedOn = false;
     for (event in sander.history) if (event.contactForce > 0.0) sandedOn = true;
     check(sandedOn, "Sand commands a contact-force setpoint on the simulated sander");

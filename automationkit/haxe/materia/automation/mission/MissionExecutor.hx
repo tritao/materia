@@ -53,7 +53,7 @@ class MissionExecutor {
   public function start():Void {
     if (hasStarted) throw "MissionExecutor can only be started once";
     hasStarted = true;
-    if (assignment.mission.status != MissionStatus.Running) {
+    if (!(switch (assignment.mission.status) { case MissionStatus.Running: true; default: false; })) {
       fail("assigned mission is not running");
       return;
     }
@@ -63,7 +63,7 @@ class MissionExecutor {
 
   /** Advances the current skill with the latest snapshot from its assigned robot. */
   public function update(durationSeconds:Float):MissionExecutionStatus {
-    if (status != Running) return status;
+    if (!(switch (status) { case Running: true; default: false; })) return status;
     if (!Math.isFinite(durationSeconds)
       || durationSeconds <= 0.0) return fail("mission update duration must be finite and positive");
     var robotValue = assignedRobot();
@@ -72,7 +72,7 @@ class MissionExecutor {
     var robot:Robot = cast robotValue;
     if (!currentSkillStarted) {
       if (!startCurrentSkillIfReserved()) {
-        if (status != Running) return status;
+        if (!(switch (status) { case Running: true; default: false; })) return status;
         return status;
       }
     }
@@ -109,7 +109,7 @@ class MissionExecutor {
   }
 
   public function cancel():Void {
-    if (status != Running) return;
+    if (!(switch (status) { case Running: true; default: false; })) return;
     if (currentSkill != null) {
       try currentSkill.cancel() catch (_:Dynamic) {
       }
@@ -123,7 +123,7 @@ class MissionExecutor {
   }
 
   function startCurrentTask():Void {
-    if (status != Running) return;
+    if (!(switch (status) { case Running: true; default: false; })) return;
     currentSkillStarted = false;
     currentTrafficRoute = null;
     var taskValue = assignment.mission.currentTask();

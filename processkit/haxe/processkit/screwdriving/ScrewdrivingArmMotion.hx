@@ -81,7 +81,7 @@ class ScrewdrivingArmMotion implements ScrewdrivingMotion {
   public function completed():Bool return pending == null && motion.completed;
   public function failure():Null<String> return motion.failure;
   public function synchronize():Void {
-    if (!Type.enumEq(motion.sessionState(), motionkit.robot.SessionState.Idle)) throw "Screwdriving arm can only synchronize after motion reaches rest";
+    if (!(switch (motion.sessionState()) { case motionkit.robot.SessionState.Idle: true; default: false; })) throw "Screwdriving arm can only synchronize after motion reaches rest";
     motion.reset();
   }
   public function stop():Void {
@@ -90,13 +90,13 @@ class ScrewdrivingArmMotion implements ScrewdrivingMotion {
     motion.stop();
   }
   public function stopped():Bool return motion.failure == null
-    && Type.enumEq(motion.sessionState(), motionkit.robot.SessionState.Idle);
+    && (switch (motion.sessionState()) { case motionkit.robot.SessionState.Idle: true; default: false; });
   public function resetAfterSafety():Void {
     // The cancelled skill has not polled its outstanding stop acknowledgement.
     // Observe it before resetting; this never advances the physical simulation.
-    if (!Type.enumEq(motion.sessionState(), motionkit.robot.SessionState.Idle)) motion.update(0.000001);
+    if (!(switch (motion.sessionState()) { case motionkit.robot.SessionState.Idle: true; default: false; })) motion.update(0.000001);
     motion.reset();
-    if (!Type.enumEq(motion.sessionState(), motionkit.robot.SessionState.Idle)) throw "Screw resume needs a stopped, reset motion session";
+    if (!(switch (motion.sessionState()) { case motionkit.robot.SessionState.Idle: true; default: false; })) throw "Screw resume needs a stopped, reset motion session";
   }
   public function abort():Void {
     pending = null;

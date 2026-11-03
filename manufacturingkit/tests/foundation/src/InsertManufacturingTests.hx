@@ -38,11 +38,11 @@ class InsertManufacturingTests {
       "Unexpected casting record fields"
     );
     check(
-      InsertBlankFit.assess(body, draft.blank) == InsertBlankFitResult.Unselected,
+      (switch (InsertBlankFit.assess(body, draft.blank)) { case Unselected: true; default: false; }),
       "unselected stock remains explicit"
     );
     draft.blank = Stock("synthetic-flat-bar", Box(40, 30, 20), F.identity());
-    check(InsertBlankFit.assess(body, draft.blank) == Fits, "exact nominal flat stock contains insert");
+    check((switch (InsertBlankFit.assess(body, draft.blank)) { case Fits: true; default: false; }), "exact nominal flat stock contains insert");
     check(switch InsertBlankFit.assess(body, Stock("small", Box(39, 30, 20), F.identity())) {
       case Invalid(_):
         true;
@@ -51,7 +51,7 @@ class InsertManufacturingTests {
     }, "undersize stock rejected");
     var rotated = F.fromRotationMatrix(0, 0, 0, [0, -1, 0, 1, 0, 0, 0, 0, 1]);
     check(
-      InsertBlankFit.assess(body, Stock("rotated", Box(30, 40, 20), rotated)) == Fits,
+      (switch (InsertBlankFit.assess(body, Stock("rotated", Box(30, 40, 20), rotated))) { case Fits: true; default: false; }),
       "part-to-stock orientation is used"
     );
     check(switch InsertBlankFit.assess(body, Stock("offset", Box(40, 30, 20), F.translation(1, 0, 0))) {
@@ -61,15 +61,15 @@ class InsertManufacturingTests {
         false;
     }, "offset stock cannot use only nominal dimensions");
     check(
-      InsertBlankFit.assess(Primitive(Cylinder(8, 20)), Stock("round", Cylinder(8, 20), F.identity())) == Fits,
+      (switch (InsertBlankFit.assess(Primitive(Cylinder(8, 20)), Stock("round", Cylinder(8, 20), F.identity()))) { case Fits: true; default: false; }),
       "round stock exact fit"
     );
     check(
-      InsertBlankFit.assess(Primitive(Cylinder(8, 20)), Stock("square", Box(8, 8, 20), F.identity())) == Fits,
+      (switch (InsertBlankFit.assess(Primitive(Cylinder(8, 20)), Stock("square", Box(8, 8, 20), F.identity()))) { case Fits: true; default: false; }),
       "analytic cylinder supports fit square stock"
     );
     check(
-      InsertBlankFit.assess(Primitive(Box(6, 8, 20)), Stock("round", Cylinder(10, 20), F.identity())) == Fits,
+      (switch (InsertBlankFit.assess(Primitive(Box(6, 8, 20)), Stock("round", Cylinder(10, 20), F.identity()))) { case Fits: true; default: false; }),
       "convex vertex check fits a rectangular part in round stock"
     );
     check(switch InsertBlankFit.assess(Primitive(Box(8, 8, 20)), Stock("round", Cylinder(10, 20), F.identity())) {

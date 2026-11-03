@@ -383,16 +383,16 @@ class WorldTcpIntegration {
       }
       );
       var skillRunner = new SkillRunner();
-      if (!Type.enumEq(skillRunner.start(goTo), SkillStatus.Running)
+      if (!(switch (skillRunner.start(goTo)) { case SkillStatus.Running: true; default: false; })
         || skillRunner.activeSkill() != goTo) throw "SkillRunner did not start goal-level GoTo for RemoteRobot";
-      if (skillRunner.update(current,
-        0.02) != SkillStatus.Running) throw "RemoteRobot GoTo did not remain active after its first update";
+      if (!(switch (skillRunner.update(current,
+        0.02)) { case SkillStatus.Running: true; default: false; })) throw "RemoteRobot GoTo did not remain active after its first update";
       waitUntil(runtime, function() {
         var state = remote.snapshot();
         return state.velocities.length == 3 && state.velocities.get(0) > 0.0 && state.velocities.get(1) > 0.0;
       }, "GoTo did not send an atomic two-wheel velocity target through robotd");
       skillRunner.cancel();
-      if (!Type.enumEq(skillRunner.status(), SkillStatus.Cancelled) || skillRunner.activeSkill() != null
+      if (!(switch (skillRunner.status()) { case SkillStatus.Cancelled: true; default: false; }) || skillRunner.activeSkill() != null
         || skillRunner.result() == null) throw "SkillRunner did not cancel RemoteRobot GoTo cleanly";
 
       var facility = new Facility("serial-facility", "Serial integration facility");
@@ -451,7 +451,7 @@ class WorldTcpIntegration {
           false;
       }
       ) throw 'RemoteRobot mission did not succeed: ${Std.string(missionStatus)}';
-      if (mission.status != materia.automation.mission.MissionStatus.Succeeded
+      if (!(switch (mission.status) { case materia.automation.mission.MissionStatus.Succeeded: true; default: false; })
         || fleet.availableRobotIds().indexOf(LOGICAL_ID)
         < 0) throw "serial mission did not complete and release its fleet assignment";
       Sys.println("SkillRunner GoTo, shared behavior, and MissionExecutor passed: local simulation and robotd serial");
