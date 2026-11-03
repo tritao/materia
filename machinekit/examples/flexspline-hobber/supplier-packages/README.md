@@ -29,6 +29,15 @@ hob body at full depth over the hob centre heights of the real CAM job
 envelope (agreement better than 0.001 mm). It covers the hob only; check a supplier's
 mandrel STEP in the machine model for the arbor and outboard support.
 
+Ball-screw package (three ground SFU1605 screws for RFQs to NJPE, HIWIN, TBI, HJMT):
+`python3 machinekit/examples/flexspline-hobber/supplier-packages/ballscrew_package.py <out-dir>`
+needs no Haxe run and writes `ballscrew-X/Y/Z.pdf` (one A4 sheet each: side view, total and
+threaded length, nut position and flange side, BK12 and BF12 end details, C5, lead 5, preload,
+title block) and `ballscrew-X/Y/Z.dxf` (side view 1:1). Lengths (X 260, Y 250, Z 420), nut
+stations and the nut are the model's; end machining is the HZMotion BK12 profile of
+`HzMotionDrawingScrew`; sources are listed at the top of the script. Update the constants
+there if `HobberXLayout`, `HobberZLayout` or the Y drive length change.
+
 PDFs need Chrome or Chromium on the PATH.
 
 The constants in `SupplierPackageExport.hx` mirror the `FlexsplineHobber`,
