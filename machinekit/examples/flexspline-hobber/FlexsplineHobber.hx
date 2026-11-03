@@ -375,7 +375,15 @@ class FlexsplineHobber extends MachineAssembly {
       HobberZLayout.SHAFT_LENGTH,
       HobberZLayout.NUT_STATION
     );
-    drive("Y", "YdriveFrame", "Yplate", [0.0, -1, 0], F.translation(centre + 70, 0, 508), 250);
+    drive(
+      "Y",
+      "YdriveFrame",
+      "Yplate",
+      [0.0, -1, 0],
+      F.translation(centre + 70, 0, 508),
+      HobberYLayout.SCREW_LENGTH,
+      HobberYLayout.NUT_STATION
+    );
     fixAt(
       "chipTray",
       new HobberSaddle(
@@ -491,7 +499,8 @@ class FlexsplineHobber extends MachineAssembly {
     var motor = ServoMotor.model(id == "Z" ? "GENERIC-HV-SERVO-750W" : "GENERIC-HV-SERVO-400W"), screw = new BallScrew(
       length,
       HzMotionDrawingScrew.FIXED_END,
-      true
+      true,
+      HzMotionDrawingScrew.FLOAT_END
     ), nut = new BallNut();
     var start = [nutOrigin.x - d[0] * nutStation, nutOrigin.y - d[1] * nutStation, nutOrigin.z - d[2] * nutStation];
     var up = id == "Z" ? [-1.0, 0, 0] : id == "Y" ? [1.0, 0, 0] : [0.0, 0, 1];
@@ -555,9 +564,9 @@ class FlexsplineHobber extends MachineAssembly {
       id + "floating",
       far,
       AxisBuilder.orient(
-        start[0] + d[0] * (length - 12.5),
-        start[1] + d[1] * (length - 12.5),
-        start[2] + d[2] * (length - 12.5),
+        start[0] + d[0] * (length - HzMotionDrawingScrew.BF12_SUPPORT_CENTRE),
+        start[1] + d[1] * (length - HzMotionDrawingScrew.BF12_SUPPORT_CENTRE),
+        start[2] + d[2] * (length - HzMotionDrawingScrew.BF12_SUPPORT_CENTRE),
         up,
         d
       ),

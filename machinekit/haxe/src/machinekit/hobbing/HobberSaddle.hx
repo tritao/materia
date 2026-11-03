@@ -168,7 +168,7 @@ class HobberSaddle extends MachineComponent {
         [
           box(226, 241, -50, 50, 300, 780),
           box(205, 226, -35, 35, HobberZLayout.FIXED_BEARING_Z - 12.5, HobberZLayout.FIXED_BEARING_Z + 12.5),
-          box(205, 226, -35, 35, 312.5, 332.5),
+          box(205, 226, -35, 35, HobberZLayout.FLOATING_BEARING_Z - 10, HobberZLayout.FLOATING_BEARING_Z + 10),
           Solids.cut(box(125, 241, -55, 55, 750, 765), [couplingWindow(HobberZLayout.AXIS_X, 749.9, 765.1)]),
           box(226, 231, 50, 85, 310, 730)
         ];

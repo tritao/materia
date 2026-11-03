@@ -11,9 +11,9 @@ Usage: ballscrew_package.py <output-dir>
 No Haxe run is needed. Values mirror the model; where it exports no value the constant is
 hardcoded below with its source:
   lengths      FlexsplineHobber.hx: X = HobberXLayout.front().screwLength (260, LAYOUT_REPORT.json),
-               Z = HobberZLayout.SHAFT_LENGTH (420), Y = drive("Y", ..., 250)
+               Z = HobberZLayout.SHAFT_LENGTH (420), Y = HobberYLayout.SCREW_LENGTH (170)
   nut station  X = screwStart 450 - NUT_DATUM 250 = 200; Z = HobberZLayout.NUT_STATION (312);
-               Y = drive() default nutStation (100). Station = nut body centre from the
+               Y = HobberYLayout.NUT_STATION (100). Station = nut body centre from the
                fixed-end face; the model's flange is on the floating-end side of the body
                (body 35 + flange 10, BallNut).
   nut          BallNut: body Ø28 x 35, flange Ø48 x 10, 4 x Ø5.5 (M5) on Ø38, preloaded.
@@ -46,7 +46,7 @@ FLOAT_END, FLOAT_D, GROOVE_W, GROOVE_D, GROOVE_FROM_TIP = 11.0, 10.0, 1.15, 9.6,
 
 AXES = {  # length, nut station (body centre from the fixed-end face)
     "X": dict(length=260.0, nut=200.0, note="Installed horizontally, X axis."),
-    "Y": dict(length=250.0, nut=100.0, note="Installed horizontally, Y axis."),
+    "Y": dict(length=170.0, nut=100.0, note="Installed horizontally, Y axis."),
     "Z": dict(length=420.0, nut=312.0, note="Installed vertically: fixed end (BK12) at the TOP, floating end (BF12) at the bottom."),
 }
 

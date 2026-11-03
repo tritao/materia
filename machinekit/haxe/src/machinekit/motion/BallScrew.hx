@@ -25,23 +25,27 @@ class BallScrew extends LeadScrew {
   public static inline var JOURNAL_LENGTH:Float = 25;
   public static inline var INPUT_JOURNAL_LENGTH:Float = 50;
   public final inputJournalLength:Float;
+  /** Length of the floating-end journal (`JOURNAL_LENGTH` unless the drawing's standard 11 mm end is used). */
+  public final outputJournalLength:Float;
   /** Procurement requirement only; ground does not certify a lead-error grade. */
   public final ground:Bool;
-  public function new(length:Float, inputJournalLength:Float = INPUT_JOURNAL_LENGTH, ground:Bool = false) {
+  public function new(length:Float, inputJournalLength:Float = INPUT_JOURNAL_LENGTH, ground:Bool = false, outputJournalLength:Float = JOURNAL_LENGTH) {
     super(race(), length);
     addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
       .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.inputJournalLength = inputJournalLength;
     this.ground = ground;
+    this.outputJournalLength = outputJournalLength;
     if (!Math.isFinite(inputJournalLength)
       || inputJournalLength < JOURNAL_LENGTH) throw "Input journal must accommodate its bearing seat";
-    if (length <= inputJournalLength + JOURNAL_LENGTH) throw "Ball screw needs a race between its journals";
+    if (!Math.isFinite(outputJournalLength) || outputJournalLength <= 0) throw "Floating journal must have a length";
+    if (length <= inputJournalLength + outputJournalLength) throw "Ball screw needs a race between its journals";
     addConnector("retainer", Mount, machinekit.component.Solids.axial(0, 0, BallScrewRetainer.STATION));
   }
 
   override public function axialRigidityAt(position:Float):Float {
     if (position >= inputJournalLength
-      && position <= totalLength - JOURNAL_LENGTH) return super.axialRigidityAt(position);
+      && position <= totalLength - outputJournalLength) return super.axialRigidityAt(position);
     return YOUNGS_MODULUS / 1e6 * Math.PI * JOURNAL_DIAMETER * JOURNAL_DIAMETER / 4.0;
   }
 
@@ -49,7 +53,7 @@ class BallScrew extends LeadScrew {
     if (!Math.isFinite(from) || !Math.isFinite(to) || Math.min(from,
       to) < 0 || Math.max(from, to) > totalLength) throw "Axial load path must lie on the ball screw shaft";
     var low = Math.min(from, to), high = Math.max(from, to), compliance = 0.0;
-    var boundaries = [0.0, inputJournalLength, totalLength - JOURNAL_LENGTH, totalLength];
+    var boundaries = [0.0, inputJournalLength, totalLength - outputJournalLength, totalLength];
     for (index in 0...3) {
       var a = Math.max(low, boundaries[index]), b = Math.min(high, boundaries[index + 1]);
       if (b > a) compliance += (b - a) / axialRigidityAt((a + b) * 0.5);
@@ -68,16 +72,16 @@ class BallScrew extends LeadScrew {
         "input-journal"
       ),
       machinekit.component.Solids.named(
-        cadkit.modeling.Part.cylinderSpan(thread.screwDiameter / 2, inputJournalLength, totalLength - JOURNAL_LENGTH),
+        cadkit.modeling.Part.cylinderSpan(thread.screwDiameter / 2, inputJournalLength, totalLength - outputJournalLength),
         "race"
       ),
       machinekit.component.Solids.named(
         detail == Envelope ? cadkit.modeling.Part.cylinderSpan(
           JOURNAL_DIAMETER / 2,
-          totalLength - JOURNAL_LENGTH,
+          totalLength - outputJournalLength,
           totalLength
         ) : journal(
-          totalLength - JOURNAL_LENGTH,
+          totalLength - outputJournalLength,
           totalLength,
           true
         ),
@@ -137,17 +141,21 @@ class BallScrew extends LeadScrew {
       [
         ComponentRecipeSupport.length("length", 400),
         ComponentRecipeSupport.length("inputJournalLength", INPUT_JOURNAL_LENGTH),
-        ComponentRecipeSupport.flag("ground", false)
+        ComponentRecipeSupport.flag("ground", false),
+        ComponentRecipeSupport.length("outputJournalLength", JOURNAL_LENGTH)
       ],
-      v -> new BallScrew(v.number("length"), v.number("inputJournalLength"), v.boolean("ground"))
+      v -> new BallScrew(v.number("length"), v.number("inputJournalLength"), v.boolean("ground"), v.number("outputJournalLength"))
     ).numbered(v -> 'SFU1605-L${Dimension.format(v.number("length"))}-J${Dimension.format(v.number("inputJournalLength"))}-'
+      + (v.number("outputJournalLength") == JOURNAL_LENGTH ? "" : 'F${Dimension.format(v.number("outputJournalLength"))}-')
       + (v.boolean("ground") ? "GROUND" : "UNSPEC")).procured(_ -> Buy(null, null, null)).requiring(v -> [
         machinekit.component.Procurement.ProcurementCodec.requirement("diameter", "mm", null, null, 16),
         machinekit.component.Procurement.ProcurementCodec.requirement("lead", "mm", null, null, 5),
         machinekit.component.Procurement.ProcurementCodec.requirement("length", "mm", null, null, v.number("length")),
         machinekit.component.Procurement.ProcurementCodec.requirement("inputJournalLength", "mm", null, null, v.number("inputJournalLength")),
         machinekit.component.Procurement.ProcurementCodec.choice("ground", v.boolean("ground") ? "true" : "false")
-      ]);
+      ].concat(v.number("outputJournalLength") == JOURNAL_LENGTH ? [] : [
+        machinekit.component.Procurement.ProcurementCodec.requirement("outputJournalLength", "mm", null, null, v.number("outputJournalLength"))
+      ]));
     return ballRecipe;
   }
   override public function componentType():Null<ComponentType> return ballRecipeType();
@@ -155,6 +163,9 @@ class BallScrew extends LeadScrew {
     totalLength).setNumber(
       "inputJournalLength",
       inputJournalLength
+    ).setNumber(
+      "outputJournalLength",
+      outputJournalLength
     ).setBoolean(
       "ground",
       ground

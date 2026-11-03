@@ -17,6 +17,10 @@ class HzMotionDrawingScrew extends LeadScrew {
   public static inline final BK12_HOUSING:Float = 25;
   /** Screw end to the BK12 support centre on the standard fixed end. */
   public static inline final BK12_SUPPORT_CENTRE:Float = FIXED_END - BK12_HOUSING / 2;
+  /** Width of the BF12 bearing (6000ZZ), seated on the 11 mm end's shoulder; the retaining ring is on the tip side. */
+  public static inline final BF12_BEARING_WIDTH:Float = 8;
+  /** Screw tip to the BF12 support centre on the standard floating end (shoulder at 11 mm, bearing 8 wide: 7 mm). */
+  public static inline final BF12_SUPPORT_CENTRE:Float = FLOAT_END - BF12_BEARING_WIDTH / 2;
   static var recipe:Null<ComponentType>;
   public final endProfile:String;
   public final fixedEnd:Float;

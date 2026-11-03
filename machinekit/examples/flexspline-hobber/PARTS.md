@@ -143,6 +143,9 @@ the existing transmission resolver. Linear scales provide 10,000 counts/mm
 (0.1 micrometre resolution). Six 20 A phase-RMS drives share an assumed 400 V
 three-phase rectifier/bus; explicit winding ratings are checked by the existing
 motor/driver power model. Ratings, fixtures and travel are design assumptions.
+The screws use the supplier's standard ends (51 mm BK12 fixed end, 11 mm BF12 floating end; BF12 centre 7 mm
+from the tip, BK12 centre 38.5 mm from the end). Lengths: X 260 mm, Z 420 mm, Y 170 mm (Y travels only
++-10 mm; `HobberYLayout`).
 
 The reference's work shoulder is 135 mm above the table platen (including an integral 25 mm six-lobed base), allowing end feed
 and tilted-tool clearance. Its mandrel is sized from the cup's inner root/wall
