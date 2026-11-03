@@ -25,7 +25,13 @@ class MachineComponent {
   /** The flange this part bolts to a host with, when it has one; a motor's is its axis motor flange. */
   public function mountingFace():Null<MountingFace> {
     var motor = axisMotor();
-    return motor == null ? null : new MountingFace(motor.flange.face, motor.flange.face, depth -> motor.mountingCutout(depth));
+    return motor == null ? null : new MountingFace(
+      motor.flange.face,
+      motor.flange.face,
+      depth -> motor.mountingCutout(depth),
+      null,
+      motor.hostCutout()
+    );
   }
   public function reducerSpec():Null<machinekit.motion.ReducerSpec> return null;
   public function motorDriver():Null<machinekit.motion.MotorDriver> return null;

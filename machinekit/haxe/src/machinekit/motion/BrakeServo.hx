@@ -59,7 +59,7 @@ class BrakeServo extends AssumedCatalogComponent {
   public final motor:ServoMotor;
   override public function axisMotor():Null<AxisMotor> {
     var face = AxisMotor.of(motor);
-    return new AxisMotor(this, face.flange, face.shaftDiameter, face.shaftLength, depth -> face.mountingCutout(depth));
+    return new AxisMotor(this, face.flange, face.shaftDiameter, face.shaftLength, depth -> face.mountingCutout(depth), face.hostCutout());
   }
   override public function motorDrive():Null<MotorDrive> return motor;
   override public function motorBrakeSpec():Null<MotorBrakeSpec> return new BrakeServoSpec(this);

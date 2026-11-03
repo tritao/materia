@@ -521,7 +521,7 @@ class AssemblyIntegrity {
     var pose = AssemblyFrames.compose(need(poses, flanged), face.pose);
     var owned:Array<Part> = [];
     try {
-      var localTool = face.tool(FLANGE_PROBE);
+      var localTool = face.hostTool(FLANGE_PROBE);
       owned.push(localTool);
       var tool = PosedParts.moved(localTool, pose);
       owned.push(tool);

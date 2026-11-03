@@ -12,13 +12,16 @@ class AxisMotor {
   public final shaftDiameter:Float;
   public final shaftLength:Float;
   final cutout:Float -> Part;
+  final tappedCutout:Null<Float -> Part>;
   public function new(
     part:MachineComponent,
     flange:MotorFlange,
     shaftDiameter:Float,
     shaftLength:Float,
-    cutout:Float -> Part
+    cutout:Float -> Part,
+    ?tappedCutout:Float -> Part
   ) {
+    this.tappedCutout = tappedCutout;
     if (part.motorDrive() == null) throw 'Axis motor ' + part.designation + ' has no drive ratings';
     var face = flange.face;
     for (value in [face,
@@ -31,6 +34,8 @@ class AxisMotor {
     this.cutout = cutout;
   }
   public function mountingCutout(depth:Float):Part return cutout(depth);
+  /** The cut-out for a tapped host (tap-drill holes), where the flange has clearance holes; null otherwise. */
+  public function hostCutout():Null<Float -> Part> return tappedCutout;
   public static function of(part:MachineComponent):AxisMotor {
     var result = part.axisMotor();
     if (result == null) throw 'Component ' + part.designation + ' does not declare an axis motor interface';

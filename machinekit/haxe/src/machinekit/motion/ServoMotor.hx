@@ -296,7 +296,27 @@ class ServoMotor extends MachineComponent implements MotorDrive {
   override public function axisMotor():Null<AxisMotor> {
     var face = mounting();
     if (face == null) return null;
-    return new AxisMotor(this, face, rating.shaftDiameter, rating.shaftLength, depth -> mountingCutout(depth));
+    return new AxisMotor(
+      this,
+      face,
+      rating.shaftDiameter,
+      rating.shaftLength,
+      depth -> mountingCutout(depth),
+      face.holeDiameter > 0 ? depth -> mountingTappedCutout(depth) : null
+    );
+  }
+
+  /** The pilot and the tap-drill holes of the flange's bolts: what a tapped host (a motor mount) is cut with. */
+  public function mountingTappedCutout(depth:Float, pilotClearance:Float = 0.2):Part {
+    var face = mounting();
+    if (face == null || !Math.isFinite(depth) || depth <= 0) throw "Servo needs declared mounting data and positive cutout depth";
+    var drill = machinekit.component.MountingFace.boltFor(face.holeDiameter).tapDrill;
+    var tools = [Solids.named(Part.cylinderSpan((face.pilotDiameter + pilotClearance) / 2, 0, depth), "pilot")];
+    return Solids.building(tools, parts -> {
+      var i = 0;
+      for (hole in face.holes) parts.push(Solids.named(Part.cylinderSpan(drill / 2, 0, depth, hole.x, hole.y), "bolt" + (++i)));
+      return Solids.union(parts);
+    });
   }
 
   /** Pilot and fastener clearances from the declared interface, in the mounting face. */

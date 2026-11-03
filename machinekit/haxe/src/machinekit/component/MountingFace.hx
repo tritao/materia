@@ -17,8 +17,11 @@ class MountingFace {
   /** The face frame in the part's frame: origin on the flange face, +Z into the host. */
   public final pose:AssemblyFrame;
   final cutout:Float -> Part;
+  /** The cut-out for a host that threads the flange's bolts (pilot and tap-drill holes), where the flange takes that. */
+  final tapped:Null<Float -> Part>;
 
-  public function new(width:Float, height:Float, cutout:Float -> Part, ?pose:AssemblyFrame) {
+  public function new(width:Float, height:Float, cutout:Float -> Part, ?pose:AssemblyFrame, ?tapped:Float -> Part) {
+    this.tapped = tapped;
     if (!(width > 0) || !(height > 0) || !Math.isFinite(width) || !Math.isFinite(height)) throw "A mounting face needs a positive finite footprint";
     this.width = width;
     this.height = height;
@@ -26,8 +29,21 @@ class MountingFace {
     this.pose = pose ?? AssemblyFrames.identity();
   }
 
-  /** A new owned tool in the face frame; the caller closes it. */
+  /** A new owned tool in the face frame, with clearance holes for through bolts; the caller closes it. */
   public function tool(depth:Float):Part return cutout(depth);
+
+  /** Whether the flange has clearance holes only and bolts into a tapped host (a servo on its mount). */
+  public function acceptsTapped():Bool return tapped != null;
+
+  /**
+	 * The tool the host must be cut with: the tapped host's tap-drill holes when the flange takes them (clearance holes in the
+	 * flange, bolts threading into the host), otherwise the clearance holes. A host cut for through bolts has holes at least
+	 * the tap drill wide, so it passes too.
+	 */
+  public function hostTool(depth:Float):Part {
+    var make = tapped;
+    return make == null ? cutout(depth) : make(depth);
+  }
 
   /** The bolt a catalogue clearance hole of this diameter belongs to: thread name, nominal diameter and tap-drill, mm. */
   public static function boltFor(holeDiameter:Float):{name:String, diameter:Float, tapDrill:Float} {
