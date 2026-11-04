@@ -128,7 +128,8 @@ class HobberFrameChecks {
       'A head change: swivel stack was ${r(oldMass)} kg (torque motor, crossed roller, clamp, housing, platen), now actuator ${r(machine.swivel.housing.massProperties().mass + machine.swivel.output.massProperties().mass)} kg ' +
       '+ adapter ring, ${r(newMass - machine.swivel.housing.massProperties().mass - machine.swivel.output.massProperties().mass)} kg',
       'A output bearing: gravity tilting moment ${r(tilt)} N m, cutting ${cutting} N at the hob (${r(hobOverhang * 1000, 1)} mm out) ${r(cutTilt)} N m, together ${r(bearingMoment)} N m; ' +
-      (moment == null ? "moment rating: unknown (asked ZeroErr)" : 'moment rating ${moment} N m (assumed), margin ${r(moment / bearingMoment)}x'),
+      (moment == null ? "moment rating: unknown (asked ZeroErr)" : 'moment rating ${moment} N m (assumed), margin ${r(moment / bearingMoment)}x') +
+      '; reference: Honpine HPJM-RE80-110 static moment 260 N m (a different product), our ${r(bearingMoment)} N m is ${r(100 * bearingMoment / 260, 1)} % of it',
       'A torque about the axis: gravity ${r(at0)} N m at 0, ${r(worst)} N m at most over +-15 deg; cutting ${r(cutTorque)} N m (${cutting} N at a ${r(hobLever * 1000, 1)} mm lever); ' +
       'demand ${r(demandTorque)} N m against rated ${row.ratedTorque} / peak ${row.peakTorque} N m (${r(row.ratedTorque / demandTorque, 1)}x rated)',
       'A brake: must hold ${r(demandTorque)} N m with the power off; ' +
@@ -140,12 +141,74 @@ class HobberFrameChecks {
     return lines;
   }
 
+
+  /** The members that move with the Z joint (the Z saddle and everything carried on it), and their mass and centre of mass in the work frame. */
+  static function zMoving(machine:FlexsplineHobber):{mass:Float, x:Float, y:Float, z:Float, ids:Array<String>} {
+    var def = machine.definition(), poses = machine.solvedPoses(), back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
+    var moving = new Map<String, Bool>();
+    moving.set("blockZLeft", true);
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (j in def.joints) if (moving.exists(j.parent) && !moving.exists(j.child)) {
+        moving.set(j.child, true);
+        changed = true;
+      }
+    }
+    var mass = 0.0, mx = 0.0, my = 0.0, mz = 0.0, ids = [];
+    for (m in machine.components()) if (moving.exists(m.id)) {
+      var props = m.component.massProperties(), at = F.transformPoint(F.compose(back, poses.get(m.id)), props.centreOfMass.x, props.centreOfMass.y, props.centreOfMass.z);
+      mass += props.mass;
+      mx += props.mass * at.x;
+      my += props.mass * at.y;
+      mz += props.mass * at.z;
+      ids.push(m.id);
+    }
+    return {mass: mass, x: mx / mass, y: my / mass, z: mz / mass, ids: ids};
+  }
+
+  /**
+   * The Z screw stands off the rail pair's middle (`HobberZOffset`), so its thrust and the moving mass's weight, which acts at the mass's
+   * centre of mass, are `e` apart across the machine and form a moment about the rail normal (x), the blocks' yaw. The sign of the offset must be
+   * the side of the centre of mass. The moment is shared by the four blocks and set against the block row's rated yaw moment (static: the
+   * weight, held by the brake; dynamic: the sizing's peak thrust, the rated moment scaled by C/C0 because the catalogue lists static moments
+   * only). Returns the lines; throws when the sign is wrong or a block is over its rating.
+   */
+  public static function zOffsetMoments(machine:FlexsplineHobber):Array<String> {
+    var z = zMoving(machine), g = 9.80665, offset = HobberZLayout.axisY(), result = machinekit.hobbing.HobberZOffset.result();
+    if (offset * (z.y - 0) <= 0) throw 'Z screw at y ${offset} is on the opposite side of the moving mass centre (y ${z.y})';
+    var report:Dynamic = FlexsplineHobberLayoutReport.measure(machine), mass = z.mass, q = 0.005 / (2 * Math.PI);
+    var nut:machinekit.motion.BallNut = cast machine.components().filter(m -> m.id == "Znut")[0].component;
+    var motor:machinekit.motion.ServoMotor = cast machine.components().filter(m -> m.id == "Zmotor")[0].component;
+    var demand = machinekit.sizing.LinearDriveSizing.demand({
+      massKg: mass, motors: 1, metresPerRadian: q, efficiency: nut.efficiency(), rotaryInertiaKgM2: 0.4e-4, acceleration: 0.5, velocity: 0.2, strokeM: 0.2,
+      cuttingForceN: 100, dragForceN: 100, gravityForceN: mass * g, rotaryDragNm: 0.1, reserve: 1.5
+    }, motor.rating);
+    var peakThrust = demand.peakNm * nut.efficiency() / q, weight = mass * g;
+    var arm = Math.abs(offset - z.y) / 1000, mirrored = Math.abs(-offset - z.y) / 1000;
+    var block:machinekit.motion.LinearRailBlock = cast machine.components().filter(m -> m.id == "blockZLeft")[0].component;
+    var rating:Null<machinekit.motion.LinearRailProfile.LinearRailRating> = null;
+    for (item in block.spec.ratings) if (item.yawMoment != null && rating == null) rating = item;
+    if (rating == null) throw "Z block row " + block.spec.designation + " has no rated yaw moment";
+    var blocks = 4, staticMoment = weight * arm / blocks, dynamicMoment = peakThrust * arm / blocks;
+    var yawBase:Float = rating.yawMoment ?? 0.0, yawStatic:Float = yawBase, yawDynamic:Float = yawBase * rating.dynamicLoad / rating.staticLoad;
+    function r(v:Float, d:Int = 2):Float return Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
+    var lines = [
+      'Z screw offset: y ${offset} (minimum ${result.minimum} mm set by ${result.governing}; casting allows at most ${result.maximum} mm); Z moving mass ${r(mass)} kg, centre of mass y ${r(z.y, 1)}',
+      'Z offset moments on ${blocks} ${block.spec.designation} blocks (${rating.source}): arm ${r(arm * 1000, 1)} mm (on the other side it would be ${r(mirrored * 1000, 1)} mm); ' +
+      'static weight ${r(weight)} N: ${r(staticMoment, 3)} N m per block against yaw ${yawStatic} N m (safety factor ${r(yawStatic / Math.max(staticMoment, 1e-9), 1)}); ' +
+      'peak thrust ${r(peakThrust)} N: ${r(dynamicMoment, 3)} N m per block against ${r(yawDynamic, 1)} N m (dynamic, scaled by C/C0; safety factor ${r(yawDynamic / Math.max(dynamicMoment, 1e-9), 1)}); roll about the rail axis: none (thrust and weight are along it)'
+    ];
+    if (staticMoment > yawStatic || dynamicMoment > yawDynamic) throw "Z blocks exceed their yaw rating: " + lines.join("; ");
+    return lines;
+  }
+
   /** Procedures, drive sizing and strict integrity of the assembled machine; returns the number of checks. */
   public static function run(machine:FlexsplineHobber, sweep:Bool = false):Int {
     var presentation = materia.presentation.Presentations.assembled(machine.definition(), -1.1, 0.35, "hobber");
     presentation.procedures = HobberAssemblyProcedures.build(machine);
     materia.presentation.PresentationCodec.validate(machine.definition(), presentation);
-    var lines = sizing(machine).concat(scales(machine)).concat(swivelLoad(machine)), errors = newErrors(machine, sweep);
+    var lines = sizing(machine).concat(scales(machine)).concat(swivelLoad(machine)).concat(zOffsetMoments(machine)), errors = newErrors(machine, sweep);
     for (line in lines) Sys.println(line);
     if (errors.length > 0) throw 'hobber strict integrity: ${errors.length} findings\n  ' + errors.join("\n  ");
     return presentation.procedures.length + lines.length + 1;
@@ -204,6 +267,7 @@ class HobberFrameChecks {
     if (args.indexOf("sizing") >= 0) for (line in sizing(machine)) Sys.println(line);
     if (args.indexOf("scales") >= 0) for (line in scales(machine)) Sys.println(line);
     if (args.indexOf("swivel") >= 0) for (line in swivelLoad(machine)) Sys.println(line);
+    if (args.indexOf("zoffset") >= 0) for (line in zOffsetMoments(machine)) Sys.println(line);
     if (args.indexOf("roundtrip") >= 0) {
       roundTrip(machine);
       Sys.println("round trip ok");
