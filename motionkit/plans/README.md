@@ -5,6 +5,7 @@
 | `../IMPLEMENTATION_PLAN.md` | Completed foundation (P1–P11): native polynomial trajectories, validation, Ruckig, runtime execution sessions, native HOLD/RESUME/ABORT, plans over serial and robotd, model transmissions. Its decisions D1–D4 and ground rules still apply. |
 | `ONLINE_MOTION.md` | Ruckig for free/reactive motion, TOPP-RA/TR3 for path stops, and jerk-constrained path timing as research; independent of simulation fidelity and pellet work. |
 | `SIMPLIFICATION.md` | Removing the parallel generations left by earlier plans (S0–S5): J5 landing gates, one path-planning route, one way to move a machine, one path-timing abstraction and limits type, the `path.cpp` split, package and kinematics boundaries. Starts after jerk-timing lands. |
+| `API_INVENTORY.md` | Current C API call-site inventory and proposed disposition for each exported MotionKit function, keyed to the simplification phases. |
 | `CONTRACTS.md` | **Start here.** Shared contracts C1–C5 used by more than one lane, cross-lane rules, and §P0: the one session that lands the shared types before the lanes start. |
 | `LANE_A_VIRTUAL_DEVICE.md` | RKD6 scheduled device protocol, virtual MCU, clock sync, device-side stop, step generation, SimKit loop, transmissions end to end, then retiring RKD5 in favour of a minimal RKD6 profile (A9). |
 | `LANE_B_ARM_PROCESS.md` | Arm toolpaths as validated plans, path-synchronized process events, `ManipulatorMotion`, wall finishing and excavator migration, ProcessKit. |
