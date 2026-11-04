@@ -46,7 +46,7 @@ class CncPanel implements Observable {
   var lastFailure:Null<String>;
 
   var presentation = new CncPresentation();
-  var nextPresentation = new CncPresentation();
+  @:unobservable var nextPresentation = new CncPresentation();
   final report = new HobbingReportData();
   final nextReport = new HobbingReportData();
   var player:Null<app.ToolpathPlayer>;
@@ -236,25 +236,27 @@ class CncPanel implements Observable {
 
   static function reportData(player:app.HobbingProgramPlayer, data:HobbingReportData):Void {
     var stock = player.stock;
-    data.telemetry.complete = player.completed;
-    data.telemetry.failure = player.failure;
-    data.telemetry.status = player.failure != null
+    var telemetry = data.telemetry;
+    telemetry.complete = player.completed;
+    telemetry.failure = player.failure;
+    telemetry.status = player.failure != null
       ? "Stopped" : player.handling != null ? player.handling.phase : player.completed ? "Cycle complete" : "Cutting";
-    data.telemetry.seconds = player.elapsed;
-    data.telemetry.syncArcsec = player.syncError * 648000 / Math.PI;
-    data.telemetry.contacts = stock.collisions;
-    data.telemetry.windows = stock.stream.passes;
-    data.telemetry.poses = stock.stream.poses;
-    data.telemetry.buffered = stock.stream.peakFrames;
-    data.telemetry.stockKiB = Math.round(stock.maxBytes / 1024);
-    data.telemetry.cutting = stock.forces.maxTangential;
-    data.telemetry.radial = stock.forces.maxRadial;
-    data.telemetry.power = stock.forces.maxPower;
-    data.telemetry.hobTorque = stock.forces.maxHobTorque;
-    data.telemetry.tableTorque = stock.forces.maxTableTorqueBound;
-    data.telemetry.materialBasis = stock.forces.material.basis;
+    telemetry.seconds = player.elapsed;
+    telemetry.syncArcsec = player.syncError * 648000 / Math.PI;
+    telemetry.contacts = stock.collisions;
+    telemetry.windows = stock.stream.passes;
+    telemetry.poses = stock.stream.poses;
+    telemetry.buffered = stock.stream.peakFrames;
+    telemetry.stockKiB = Math.round(stock.maxBytes / 1024);
+    telemetry.cutting = stock.forces.maxTangential;
+    telemetry.radial = stock.forces.maxRadial;
+    telemetry.power = stock.forces.maxPower;
+    telemetry.hobTorque = stock.forces.maxHobTorque;
+    telemetry.tableTorque = stock.forces.maxTableTorqueBound;
+    telemetry.materialBasis = stock.forces.material.basis;
     data.measurement = stock.measurement;
-    data.telemetry.inspectionFailure = stock.measurementFailure;
+    telemetry.inspectionFailure = stock.measurementFailure;
+    data.telemetry = telemetry;
   }
 
   static function fill():LayoutStyle {
