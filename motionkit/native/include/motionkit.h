@@ -1,7 +1,15 @@
 #ifndef MOTIONKIT_H
 #define MOTIONKIT_H
 
+/* ------------------------------------------------------------------------- */
+/* Dependencies                                                              */
+/* ------------------------------------------------------------------------- */
+
 #include "trajectory_core.h"
+
+/* ------------------------------------------------------------------------- */
+/* Symbol export                                                             */
+/* ------------------------------------------------------------------------- */
 
 #if defined(_WIN32)
 #if defined(MK_STATIC)
@@ -17,9 +25,17 @@
 #define MK_CALL
 #endif
 
+/* ------------------------------------------------------------------------- */
+/* C linkage                                                                 */
+/* ------------------------------------------------------------------------- */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* ------------------------------------------------------------------------- */
+/* Runtime handles                                                           */
+/* ------------------------------------------------------------------------- */
 
 typedef struct mk_path_handle { uint32_t id; } mk_path_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_path_destroy);
@@ -31,6 +47,14 @@ typedef struct mk_path_timing_stream_handle { uint32_t id; } mk_path_timing_stre
     MK_HANDLE MK_HANDLE_DESTROY(mk_path_timing_stream_destroy);
 typedef struct mk_path_timing_preview_handle { uint32_t id; } mk_path_timing_preview_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_path_timing_preview_destroy);
+
+/** Immutable compact candidate layer, generated once and then copied out. */
+typedef struct mk_candidate_batch_handle { uint32_t id; } mk_candidate_batch_handle
+    MK_HANDLE MK_HANDLE_DESTROY(mk_candidate_batch_destroy);
+
+/* ------------------------------------------------------------------------- */
+/* Kinematics models and solutions                                           */
+/* ------------------------------------------------------------------------- */
 
 /** Compiled 6R zero-pose axes H, link displacements P and terminal rotation. */
 typedef struct mk_eaik_model {
@@ -52,10 +76,6 @@ typedef struct mk_eaik_configuration {
 } mk_eaik_configuration;
 typedef struct mk_eaik_handle { uint32_t id; } mk_eaik_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_eaik_destroy);
-
-/** Immutable compact candidate layer, generated once and then copied out. */
-typedef struct mk_candidate_batch_handle { uint32_t id; } mk_candidate_batch_handle
-    MK_HANDLE MK_HANDLE_DESTROY(mk_candidate_batch_destroy);
 
 /** Rigid target or FK pose shared by the analytic families. */
 
@@ -86,6 +106,10 @@ typedef struct mk_analytic_solution {
     uint32_t singular; /**< Family-specific flags; Cartesian C axis or EAIK wrist/elbow. */
 } mk_analytic_solution;
 
+
+/* ------------------------------------------------------------------------- */
+/* Candidate and path planning types                                         */
+/* ------------------------------------------------------------------------- */
 
 /** Deterministic orientation lattice in the target TCP frame. */
 typedef struct mk_orientation_lattice {
@@ -283,6 +307,10 @@ typedef struct mk_path_sample {
     double second_before[MK_MAX_JOINTS];
 } mk_path_sample;
 
+/* ------------------------------------------------------------------------- */
+/* Redundancy refinement                                                     */
+/* ------------------------------------------------------------------------- */
+
 /** One knot of a drive-aware redundancy curve. Units are joint units and
  * metres of path distance. feed and feed_gradient are conservative span caps. */
 typedef struct mk_refinement_sample {
@@ -329,6 +357,10 @@ MK_API mk_result MK_CALL mk_refine_redundancy(
     const mk_refinement_bound *bounds MK_IN_ARRAY(bound_count), uint32_t bound_count,
     mk_refinement_solution *out_solutions MK_OUT_ARRAY(sample_count));
 
+/* ------------------------------------------------------------------------- */
+/* Time law types                                                            */
+/* ------------------------------------------------------------------------- */
+
 /** s(t) = start_s + speed*tau + acceleration*tau^2/2, tau in seconds. */
 typedef struct mk_time_stage {
     uint32_t struct_size MK_STRUCT_SIZE;
@@ -350,31 +382,9 @@ typedef struct mk_timing_binding {
     double limit;
 } mk_timing_binding;
 
-/**
- * TIME: every joint takes the same duration. PHASE: every joint also follows
- * one profile scaled to its distance, so a rest-to-rest move is a straight
- * line in joint space (a planned edge, COLLISION.md CL-D7); Ruckig falls back
- * to time synchronization where phase is impossible.
- */
-enum { MK_SYNCHRONIZATION_TIME = 0, MK_SYNCHRONIZATION_PHASE = 1 };
-enum { MK_CONTROL_POSITION = 0, MK_CONTROL_VELOCITY_STOP = 1 };
-
-/** Offline Ruckig request. Velocity-stop ignores target position and velocity limits. */
-typedef struct mk_state_to_state_request {
-    uint32_t struct_size MK_STRUCT_SIZE;
-    uint32_t joint_count;
-    uint32_t synchronization; /**< MK_SYNCHRONIZATION_TIME or MK_SYNCHRONIZATION_PHASE. */
-    uint32_t control_mode; /**< Position target or velocity-control stop. */
-    double current_position[MK_MAX_JOINTS];
-    double current_velocity[MK_MAX_JOINTS];
-    double current_acceleration[MK_MAX_JOINTS];
-    double target_position[MK_MAX_JOINTS];
-    double target_velocity[MK_MAX_JOINTS];
-    double target_acceleration[MK_MAX_JOINTS];
-    double max_velocity[MK_MAX_JOINTS];
-    double max_acceleration[MK_MAX_JOINTS];
-    double max_jerk[MK_MAX_JOINTS];
-} mk_state_to_state_request;
+/* ------------------------------------------------------------------------- */
+/* Kinematics                                                                */
+/* ------------------------------------------------------------------------- */
 
 /** Construct only known exact decompositions of a compiled 6R chain. */
 MK_API mk_result MK_CALL mk_eaik_create(const mk_eaik_model *model,
@@ -404,6 +414,11 @@ MK_API mk_result MK_CALL mk_analytic_cartesian_inverse(const mk_analytic_cartesi
     const mk_analytic_pose *target, uint32_t axis_only, double singular_c_seed,
     mk_analytic_solution *out_solutions MK_OUT_ARRAY(solution_capacity), uint32_t solution_capacity,
     uint32_t *out_count MK_OUT);
+
+/* ------------------------------------------------------------------------- */
+/* Candidate generation                                                      */
+/* ------------------------------------------------------------------------- */
+
 /** Count first, then allocate exactly enough output. Invalid requests fail before writing. */
 MK_API mk_result MK_CALL mk_orientation_lattice_count(const mk_orientation_lattice *lattice,
     uint32_t *out_count MK_OUT);
@@ -488,6 +503,11 @@ MK_API mk_result MK_CALL mk_sample_cartesian_candidates_compact(const mk_analyti
     const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     double *out_joints MK_OUT_ARRAY(joint_value_count), int32_t *out_wraps MK_OUT_ARRAY(joint_value_count), uint32_t joint_value_count,
     uint32_t *out_coordinates MK_OUT_ARRAY(coordinate_count), uint32_t coordinate_count, uint32_t *out_count MK_OUT);
+
+/* ------------------------------------------------------------------------- */
+/* Path differential                                                         */
+/* ------------------------------------------------------------------------- */
+
 /** Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected. */
 /** Jacobians are 6 x joint_count, row-major; J' is dJ/ds. */
 MK_API mk_result MK_CALL mk_path_differential(const mk_differential_request *request,
@@ -495,6 +515,10 @@ MK_API mk_result MK_CALL mk_path_differential(const mk_differential_request *req
     const double *jacobian_prime MK_IN_ARRAY(jacobian_count), uint32_t jacobian_count,
     uint32_t joint_count, double *out_first MK_OUT_ARRAY(joint_count),
     double *out_second MK_OUT_ARRAY(joint_count), mk_differential_report *out_report MK_OUT);
+
+/* ------------------------------------------------------------------------- */
+/* Ladder and configuration search                                           */
+/* ------------------------------------------------------------------------- */
 
 /** No candidate copies: samples address slices of the candidate array.
  * Costs are nonnegative; +infinity disables a candidate. Selected indices are
@@ -530,6 +554,11 @@ MK_API mk_result MK_CALL mk_select_configurations(const mk_configuration_request
     const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
     const mk_configuration_candidate *candidates MK_IN_ARRAY(candidate_count), uint32_t candidate_count,
     mk_configuration_solution *out_sequence MK_OUT_ARRAY(sample_count));
+
+/* ------------------------------------------------------------------------- */
+/* Paths and time laws                                                       */
+/* ------------------------------------------------------------------------- */
+
 MK_API mk_result MK_CALL mk_path_create(const mk_path_sample *samples MK_IN_ARRAY(sample_count),
     uint32_t sample_count, mk_path_handle *out_path MK_OUT MK_OWNED);
 MK_API void MK_CALL mk_path_destroy(mk_path_handle path);
@@ -548,9 +577,18 @@ MK_API mk_result MK_CALL mk_path_distance_to_time(mk_time_law_handle law,
 MK_API mk_result MK_CALL mk_path_times_to_distances(mk_time_law_handle law,
     const double *seconds MK_IN_ARRAY(count), uint32_t count,
     double *out_distances MK_OUT_ARRAY(count));
+MK_API mk_result MK_CALL mk_time_law_binding_count(mk_time_law_handle law,
+    uint32_t *out_count MK_OUT);
+MK_API mk_result MK_CALL mk_time_law_get_binding(mk_time_law_handle law,
+    uint32_t index, mk_timing_binding *out_binding);
 /** Quintic Hermite lowering, with adaptive knots and exact polynomial-deviation extrema. */
 MK_API mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
     double tolerance, mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+
+/* ------------------------------------------------------------------------- */
+/* Path timing                                                               */
+/* ------------------------------------------------------------------------- */
+
 /** Validation metadata for a time law. Strict process mode reports a binding
  * joint and sustainable speed scale instead of retrying or stretching. */
 typedef struct mk_timing_report {
@@ -576,6 +614,11 @@ MK_API mk_result MK_CALL mk_time_path(mk_path_handle path,
     mk_timing_report *out_report MK_OUT,
     mk_time_law_handle *out_law MK_OUT MK_OWNED,
     mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+
+/* ------------------------------------------------------------------------- */
+/* Reusable timing sessions                                                  */
+/* ------------------------------------------------------------------------- */
+
 /** Snapshot one immutable path/limits/cap table for repeated endpoint timing.
  * The source path may be destroyed after creation. Session calls are serialized;
  * session timing uses one serial solver workspace, independent of helper settings.
@@ -617,6 +660,11 @@ MK_API mk_result MK_CALL mk_path_timing_session_time_to_interval(mk_path_timing_
 MK_API mk_result MK_CALL mk_path_timing_session_entry_interval(mk_path_timing_session_handle session,
     double end_lower_speed, double end_upper_speed, uint32_t entry_may_move,
     double *out_lower_speed MK_OUT, double *out_upper_speed MK_OUT);
+
+/* ------------------------------------------------------------------------- */
+/* Windowed timing streams                                                   */
+/* ------------------------------------------------------------------------- */
+
 enum { MK_TIMING_STREAM_WAITING = 0, MK_TIMING_STREAM_READY = 1, MK_TIMING_STREAM_DONE = 2 };
 typedef struct mk_path_timing_stream_progress {
     uint32_t struct_size MK_STRUCT_SIZE;
@@ -668,6 +716,11 @@ MK_API mk_result MK_CALL mk_path_timing_stream_step(mk_path_timing_stream_handle
 MK_API mk_result MK_CALL mk_path_timing_stream_commit(mk_path_timing_stream_handle stream,
     mk_path_timing_preview_handle preview);
 MK_API void MK_CALL mk_path_timing_preview_destroy(mk_path_timing_preview_handle preview);
+
+/* ------------------------------------------------------------------------- */
+/* Reference timing                                                          */
+/* ------------------------------------------------------------------------- */
+
 /**
  * The same timing on the grid the adaptive one replaces: 32 TOPP-RA stages a span and the whole path in one window,
  * whatever its length. It is the reference the adaptive grid and the windows are tested against (their timing within a
@@ -681,6 +734,11 @@ MK_API mk_result MK_CALL mk_time_path_reference(mk_path_handle path,
     mk_timing_report *out_report MK_OUT,
     mk_time_law_handle *out_law MK_OUT MK_OWNED,
     mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+
+/* ------------------------------------------------------------------------- */
+/* Trajectory transforms                                                     */
+/* ------------------------------------------------------------------------- */
+
 /**
  * A copy of `trajectory` whose coupled joints are exactly the sum of their terms: for each term in order,
  * follower += ratio * leader (every degree), plus offset in the constant term. A follower's terms must come
@@ -768,10 +826,37 @@ MK_API mk_result MK_CALL mk_advance_joint(mk_trajectory_handle trajectory, uint3
 MK_API mk_result MK_CALL mk_advance_joint_context(mk_trajectory_handle trajectory, uint32_t joint,
     double lead_seconds, double window_seconds, int64_t origin_ns, uint32_t final_context,
     mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
-MK_API mk_result MK_CALL mk_time_law_binding_count(mk_time_law_handle law,
-    uint32_t *out_count MK_OUT);
-MK_API mk_result MK_CALL mk_time_law_get_binding(mk_time_law_handle law,
-    uint32_t index, mk_timing_binding *out_binding);
+
+/* ------------------------------------------------------------------------- */
+/* State-to-state motion                                                     */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * TIME: every joint takes the same duration. PHASE: every joint also follows
+ * one profile scaled to its distance, so a rest-to-rest move is a straight
+ * line in joint space (a planned edge, COLLISION.md CL-D7); Ruckig falls back
+ * to time synchronization where phase is impossible.
+ */
+enum { MK_SYNCHRONIZATION_TIME = 0, MK_SYNCHRONIZATION_PHASE = 1 };
+enum { MK_CONTROL_POSITION = 0, MK_CONTROL_VELOCITY_STOP = 1 };
+
+/** Offline Ruckig request. Velocity-stop ignores target position and velocity limits. */
+typedef struct mk_state_to_state_request {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t joint_count;
+    uint32_t synchronization; /**< MK_SYNCHRONIZATION_TIME or MK_SYNCHRONIZATION_PHASE. */
+    uint32_t control_mode; /**< Position target or velocity-control stop. */
+    double current_position[MK_MAX_JOINTS];
+    double current_velocity[MK_MAX_JOINTS];
+    double current_acceleration[MK_MAX_JOINTS];
+    double target_position[MK_MAX_JOINTS];
+    double target_velocity[MK_MAX_JOINTS];
+    double target_acceleration[MK_MAX_JOINTS];
+    double max_velocity[MK_MAX_JOINTS];
+    double max_acceleration[MK_MAX_JOINTS];
+    double max_jerk[MK_MAX_JOINTS];
+} mk_state_to_state_request;
+
 /** Converts Ruckig Community's offline phases to degree-3 native segments. */
 MK_API mk_result MK_CALL mk_generate_state_to_state(const mk_state_to_state_request *request,
     mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED, int32_t *out_ruckig_result MK_OUT);
