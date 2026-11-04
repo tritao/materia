@@ -15,6 +15,12 @@ import haxeon.ui.widgets.text.Text;
 
 /** Shared controls for the main viewport, dock and picture-in-picture. */
 class PresentationControls {
+  /**
+   * Label of the assembly view the latest `build` showed, for the scene card's summary. Read from what build
+   * already read, so the card adds no reads of the presentation of its own; empty without a presentation.
+   */
+  public static var lastViewLabel:String = "";
+
   public static function build(
     viewport:EditorPerspectiveViewport,
     changed:Void -> Void,
@@ -31,6 +37,9 @@ class PresentationControls {
       var selectStyle = new LayoutStyle();
       selectStyle.width = LayoutAxis.grow();
       var current = viewport.presentationFrame();
+      var shown = current == null ? controller.cursor.view : current.view;
+      lastViewLabel = "";
+      for (view in controller.record.views) if (view.id == shown) lastViewLabel = view.label;
       var select = new Select<String>(key + "-views",
         options, current == null ? controller.cursor.view : current.view, id -> {viewport.selectPresentationView(id);
       changed();

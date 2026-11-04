@@ -698,6 +698,7 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
   final cncPanel = new app.editor.CncPanel();
   final machineControlPanel = new app.editor.MachineControlPanel();
   final inspectionCamera = new app.editor.InspectionCameraPanel();
+  final sceneCard = new app.editor.SceneControlsCard();
   var inspectionCameraRequested = false;
   static inline var MAX_LOG_LINES:Int = 1000;
   final logLines:Array<String>;
@@ -835,6 +836,7 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
     semanticRecordPath = recordPath;
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     preferences = AppPreferences.besideWorkspace(workspacePath);
+    sceneCard.attach(preferences.store);
     appearance = new EditorAppearance(theme != null ? theme : savedTheme());
     ui = new UiContext(null, fonts, appearance.theme);
     commands = ui.commands;
@@ -2608,24 +2610,27 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
       invalidateView();
     }
     )));
-    if (sceneControls.length > 0) {
-      var overlayStyle = new LayoutStyle();
-      overlayStyle.width = LayoutAxis.grow();
-      overlayStyle.childGap = 10;
-      overlayStyle.padding = new Insets(10, 10, 10, 10);
-      overlayStyle.background = appearance.theme.tokens.surfaceRaised;
-      var width = Math.max(120.0, Math.min(300.0, (availableWidth > 0 ? availableWidth : 400.0) - 20.0));
-      layers.push(new StackChild(
-        "project-controls",
-        new Column("viewport-project-controls", sceneControls, overlayStyle),
-        10,
-        54,
-        2,
-        LayoutAxis.fixed(width),
-        LayoutAxis.fit(),
-        false
-      ));
-    }
+    if (sceneControls.length > 0) layers.push(new StackChild(
+      "project-controls",
+      sceneCard.layer(
+        sceneControls,
+        app.editor.SceneControlsCard.summary(
+          perspectiveViewport != null && perspectiveViewport.presentation != null
+          ? app.editor.PresentationControls.lastViewLabel : null,
+          app.editor.SceneControlsCard.variantLabel(variantState.variants, variantState.selected)
+        ),
+        simulation.isRunning(),
+        availableWidth,
+        () -> invalidateView(),
+        appearance.theme.tokens
+      ),
+      0,
+      0,
+      2,
+      LayoutAxis.grow(),
+      LayoutAxis.grow(),
+      false
+    ));
     if (mode == EditorMode.Simulate && inspectionCamera.overlay) {
       var cameraWidth = Math.min(360.0, Math.max(180.0, availableWidth > 0 ? availableWidth * 0.4 : 320));
       layers.push(new StackChild(
