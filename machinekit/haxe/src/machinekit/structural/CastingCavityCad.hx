@@ -50,6 +50,15 @@ class CastingCavityCad {
     });
   }
 
+  /**
+	 * Realized and validated exact cavities, by their inputs: the body, the feature and the features its openings name.
+	 * A casting's solid, mass and sizing passes rebuild the same non-box cavities (a socket's lofted tail, its opening
+	 * checks) for every insert layout tried, and the result depends on nothing else. Kept native shapes are copied out.
+	 */
+  static var exact:Null<Map<String, Part>>;
+  static var exactCount = 0;
+  static inline final EXACT_LIMIT = 256;
+
   public static function part(cavity:FinishedCastingCavity):Part {
     return switch cavity.geometry {
       case Prisms(pieces):
@@ -57,14 +66,34 @@ class CastingCavityCad {
       case UnsupportedGeometry(reason):
         throw "Unsupported casting cavity geometry: " + cavity.featureId + ": " + reason;
       case SolidIntersection(body, feature, features):
-        Scope.run(scope -> {var envelope = scope.own(union(body)), tool = scope.own(cut(feature, body));
-        var common = scope.own(new Model(envelope.shape.common(tool.shape)));
-        if (common.shape.volume() <= CONTACT_VOLUME) throw "Casting feature does not reach body: " + feature.id;
-        var finished = scope.own(new Part(common.shape.cloneShape()));
-        validateOpenings(scope, body, feature, features, envelope, tool, finished);
-        return finished;
-        });
+        var targets = [for (opening in feature.openings) if (opening.kind != BodyFace) for (other in features) if (other.id
+          == opening.target) other];
+        var key = haxe.Json.stringify(body) + "|" + materia.casting.CastingFeatureCodec.encode([feature].concat(targets));
+        var memo:Map<String, Part> = exact == null ? [] : exact;
+        exact = memo;
+        var known = memo.get(key);
+        if (known == null) {
+          known = intersection(body, feature, features);
+          if (exactCount >= EXACT_LIMIT) {
+            for (kept in memo) kept.close();
+            memo.clear();
+            exactCount = 0;
+          }
+          memo.set(key, known);
+          exactCount++;
+        }
+        new Part(known.shape.cloneShape());
     };
+  }
+
+  static function intersection(body:Array<CastingPrism>, feature:CastingFeature, features:Array<CastingFeature>):Part {
+    return Scope.run(scope -> {var envelope = scope.own(union(body)), tool = scope.own(cut(feature, body));
+    var common = scope.own(new Model(envelope.shape.common(tool.shape)));
+    if (common.shape.volume() <= CONTACT_VOLUME) throw "Casting feature does not reach body: " + feature.id;
+    var finished = scope.own(new Part(common.shape.cloneShape()));
+    validateOpenings(scope, body, feature, features, envelope, tool, finished);
+    return finished;
+    });
   }
 
   static function validateOpenings(
