@@ -33,7 +33,7 @@ A review of `HobberSaddle` and `FlexsplineHobber` found:
   aluminium, 20 mm centre height against the BK12's 25).
 - **A axis:** ZeroErr eRob110I V6, revision D (MC2E.DX), EtherCAT, ratio 100, 20-bit output encoder
   (±7/±15″), brake, 48 V bus. CAD: `build/suppliers/zeroerr/` (git-ignored).
-- **Scales:** Yuheng JFT-40 (slim, sealed, absolute, BiSS-C): X ML 120 ±3 µm, Z ML 270 ±5 µm, Y ML 70 ±5 µm,
+- **Scales:** Yuheng JFT-40 (slim, sealed, absolute, BiSS-C): X ML 120 ±3 µm, Z ML 220 ±5 µm (H4: 200 stroke + 2 × 5 overtravel; the RFQ asked 270), Y ML 70 ±5 µm,
   read by the controller. Datasheets: `build/suppliers/yuheng/` (git-ignored).
 - **Spindle:** bought Ø80 g6 cartridge with the maker's outboard support. No standard flange-mount Ø80 cartridge was
   found (R0), so the seat is one milled split-clamp block for the Ø80 housing; ask the spindle maker for a flange anyway.
@@ -106,7 +106,7 @@ A review of `HobberSaddle` and `FlexsplineHobber` found:
 - ZeroErr: bearing moment rating, brake holding torque, 48 V supply, configuration, price.
 - NJPE: BK12 motor brackets (60-frame, 80-frame option), BF12, preloaded BK12 bearing pair, nut flange drawing;
   revised Y screw drawing after H3.
-- Yuheng: JFT-40 at X 120 / Z 270 / Y 70, BiSS-C, air connection, STEP files.
+- Yuheng: JFT-40 at X 120 / Z 220 (RFQ said 270) / Y 70, BiSS-C, air connection, STEP files.
 
 ## Order
 
