@@ -29,6 +29,10 @@ Python 3 with numpy, and Chrome or Chromium on the PATH for the PDFs; `pdftotext
 | `HOBBER-GE-Z-drive-fixed/-floating` | ground flat bar, 40 mm, holes | 80 x 40 |
 | `HOBBER-GE-Y-drive-fixed/-floating` | milled L bracket, 1 setup, fine | block |
 | `HOBBER-GE-Y-nut-seat` | ground flat bar, 20 mm | 60 x 20 |
+| `HOBBER-GE-X-scale-seat`, `HOBBER-GE-Z-scale-seat` | ground flat bar, 10 x 20, 2 tapped M8 | 20 x 10 |
+| `HOBBER-GE-Z-scale-arm` | milled arm for the Z scale head, 1 setup, fine | block |
+| `HOBBER-GE-Y-saddle` | milled, 2 setups, fine (boss for the Y scale head) | block |
+| `HOBBER-GE-swivel-plate` | milled, 1 setup, fine (Y scale housing seat) | plate |
 | `NUT-BLOCK-...` (X, Y, Z) | ground flat bar, 16 mm, bore, holes | 60 x 16 |
 
 Quantities are one per machine. The list is the exporter's `DESIGNS` plus one nut block per axis; a new route on a

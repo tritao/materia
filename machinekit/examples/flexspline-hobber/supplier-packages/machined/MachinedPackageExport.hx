@@ -21,7 +21,8 @@ import machinekit.motion.NutBlock;
 class MachinedPackageExport {
   static final DESIGNS = [
     "GE-X-carriage", "GE-Z-saddle", "GE-X-drive-fixed", "GE-X-drive-floating", "GE-Z-drive-fixed", "GE-Z-drive-floating",
-    "GE-Y-drive-fixed", "GE-Y-drive-floating", "GE-Y-nut-seat"
+    "GE-Y-drive-fixed", "GE-Y-drive-floating", "GE-Y-nut-seat", "GE-X-scale-seat", "GE-Z-scale-seat", "GE-Z-scale-arm", "GE-Y-saddle",
+    "GE-swivel-plate"
   ];
 
   static function r(v:Float, digits:Int = 4):Float {

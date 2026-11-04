@@ -307,7 +307,7 @@ class HobberSaddle extends MachineComponent {
           Solids.cut(box(-50, 57, 80, 100, -50, 50), [boreY(40, 79.9, 100.1, 0, 0)]),
           Solids.cut(box(-50, 35, 200, 220, -50, 50), [boreY(40, 199.9, 220.1, 0, 0)]),
           box(35, 57, 200, 220, 40, 55),
-          Solids.cut(box(-45, 57, -115, -85, -45, 45), [box(-30, 30, -115.1, -84.9, -30, 30)])
+          withHoles(Solids.cut(box(-45, 57, -115, -85, -45, 45), [box(-30, 30, -115.1, -84.9, -30, 30)]), yHoles)
         ];
       case "GE-X-drive-fixed":
         [fixedPad(HobberDrives.x(), 15)];
