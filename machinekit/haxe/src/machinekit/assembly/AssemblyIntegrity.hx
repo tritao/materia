@@ -58,6 +58,11 @@ typedef IntegrityOptions = {
 	 * member can be moved away). Absent when the assembly derived none.
 	 */
   @:optional var fasteners:Bool;
+  /**
+	 * Members the operator takes away to reach a screw (a workpiece and its clamps): they do not block a driver's access
+	 * (`fasteners.access`) though they are fixed to the clamped part. They still count for holes and heads.
+	 */
+  @:optional var removable:Array<String>;
   /** Pairs of members the machine's process brings together (a hob in the work, a tool in the stock); they may share volume. */
   @:optional var processContacts:Array<{a:String, b:String}>;
   /** All three of the above at their defaults. */
@@ -191,6 +196,7 @@ class AssemblyIntegrity {
   final minContactArea:Null<Float>;
   final flangeCutouts:Bool;
   final fastenerFit:Bool;
+  final removable = new Map<String, Bool>();
   /** Pairs joined by a moving mate, keyed "a|b" both ways: they run in contact by design. */
   final movingPairs = new Map<String, Bool>();
   final gapReported = new Map<String, Bool>();
@@ -216,6 +222,7 @@ class AssemblyIntegrity {
     minContactArea = options.minContactArea ?? (strict ? MIN_CONTACT_AREA : null);
     flangeCutouts = options.flangeCutouts ?? strict;
     fastenerFit = options.fasteners ?? strict;
+    if (options.removable != null) for (id in options.removable) removable.set(id, true);
     for (joint in definition.joints) if (joint.type != AssemblyJointType.Fixed) {
       movingPairs.set(joint.parent + "|" + joint.child, true);
       movingPairs.set(joint.child + "|" + joint.parent, true);
@@ -662,7 +669,7 @@ class AssemblyIntegrity {
         try {
           for (id => part in parts) {
             if (reported.exists(volume.name + "|" + id)) continue;
-            if (volume.access && group.get(id) != group.get(joint.clampedMember)) continue;
+            if (volume.access && (group.get(id) != group.get(joint.clampedMember) || removable.exists(id))) continue;
             var shared = PosedParts.commonVolume(part, need(boxes, id), tool, box);
             if (shared <= overlapLimit) continue;
             reported.set(volume.name + "|" + id, true);

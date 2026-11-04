@@ -110,6 +110,29 @@ class LinearRailBlock extends MachineComponent {
   /** Full depth of the tapped mounting holes where the table gives it; HGW tables give only the thread. */
   public function mountThreadDepth():Null<Float> return spec.blockMountThreadDepth;
 
+  /**
+	 * The carriage's top, the face a machine bolts to: the catalogue blocks are tapped from the top only, so the screws come
+	 * from the carriage side through clearance holes. A receiving face with the four holes already tapped, `mountThreadDepth`
+	 * deep (none where the table gives only the thread).
+	 */
+  override public function fasteningFaces():Array<machinekit.component.BoltedFace> {
+    var depth = spec.blockMountThreadDepth;
+    if (depth == null) return [];
+    var top = spec.blockHeight - spec.railHeight;
+    // Into the block (-Y of the block's frame), across along X; the face's y axis is the rail's +Z.
+    return [machinekit.component.BoltedFace.tapped(
+      "top",
+      machinekit.component.BoltedFace.frameOf({x: 0, y: top, z: 0}, {x: 0, y: -1, z: 0}, {x: 1, y: 0, z: 0}),
+      [for (x in [-spec.blockHoleSpacingAcross / 2, spec.blockHoleSpacingAcross / 2]) for (z in [
+        -spec.blockHoleSpacingAlong / 2,
+        spec.blockHoleSpacingAlong / 2
+      ]) {x: x, y: z}],
+      spec.blockMountThread,
+      depth,
+      top
+    )];
+  }
+
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {

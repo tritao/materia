@@ -176,6 +176,28 @@ class JointFasteners {
         continue;
       }
       if (a.face.alternative != null) matchedAlternatives.set(a.member + "#" + a.face.alternative, true);
+      if (a.face.holes == null) {
+        // Drilled to suit: it takes the pattern of each receiving face under it (a seat for several rail blocks).
+        for (b in candidates) {
+          if (b.face.holes == null) {
+            result.diagnostics.error(
+              "fasteners.suit",
+              subject,
+              '$subject is drilled to suit and so is ${b.member}#${b.face.id}: neither knows the hole pattern'
+            );
+            continue;
+          }
+          var seat = AssemblyFrames.compose(AssemblyFrames.inverse(a.world), b.world);
+          var mapped:Array<BoltHole> = [for (hole in b.face.holes) {
+            var at = AssemblyFrames.transformPoint(seat, hole.x, hole.y, 0);
+            {x: at.x, y: at.y};
+          }];
+          var paired = {member: a.member, face: a.face.paired(mapped), world: a.world};
+          var joint = joinFaces(result, paired, b, tolerance, propertyClass, access, group, members, used, derived);
+          if (joint != null) result.joints.push(joint);
+        }
+        continue;
+      }
       if (candidates.length > 1) {
         result.diagnostics.error(
           "fasteners.ambiguous",
@@ -207,6 +229,18 @@ class JointFasteners {
     var local = AssemblyFrames.compose(AssemblyFrames.inverse(b.world), a.world);
     var normal = AssemblyFrames.transformVector(local, 0, 0, 1);
     if (normal.z > -0.9999 || Math.abs(local.z) > tolerance) return false;
+    if (a.face.holes == null) {
+      // A footprint takes the receiving face whose holes are centred inside it: a face that is merely beside it is another.
+      var tappedHoles = b.face.holes;
+      if (tappedHoles == null) return true;
+      var cx = 0.0, cy = 0.0;
+      for (hole in tappedHoles) {
+        cx += hole.x / tappedHoles.length;
+        cy += hole.y / tappedHoles.length;
+      }
+      var at = AssemblyFrames.transformPoint(AssemblyFrames.inverse(local), cx, cy, 0);
+      return Math.abs(at.x) <= a.face.width / 2 + tolerance && Math.abs(at.y) <= a.face.height / 2 + tolerance;
+    }
     // The holes' extent overlaps the receiving extent: a face that merely lies on the plane elsewhere is another face.
     var lowX = Math.POSITIVE_INFINITY, highX = Math.NEGATIVE_INFINITY, lowY = Math.POSITIVE_INFINITY, highY = Math.NEGATIVE_INFINITY;
     for (hole in a.face.holes) {
@@ -348,6 +382,20 @@ class JointFasteners {
         }
       }
       index++;
+    }
+    // A clamped face drilled to suit: its holes keep an edge distance from its footprint.
+    if (a.face.width > 0) {
+      var edge = EDGE_DIAMETERS * spec.diameter;
+      var index = 0;
+      for (hole in a.face.holes) {
+        index++;
+        if (Math.abs(hole.x) > a.face.width / 2 - edge + 1e-9 || Math.abs(hole.y) > a.face.height / 2 - edge + 1e-9) diagnostics.error(
+          "fasteners.edge",
+          id,
+          '$id: hole $index at (${round(hole.x)}, ${round(hole.y)}) is within ${EDGE_DIAMETERS} diameters of the edge of the clamped '
+          + 'footprint ${round(a.face.width)} x ${round(a.face.height)} or outside it'
+        );
+      }
     }
     // The fastener.
     if (clearance + 1e-9 < spec.clearanceFine) diagnostics.error(
@@ -503,11 +551,13 @@ class JointFasteners {
       seat -= lift;
     }
     volumes.push({name: "head", code: "fasteners.head-clearance", diameter: spec.headDiameter, from: seat - spec.headHeight + margin, to: seat - margin, access: false});
+    // A recess is the driver's way in: it must be clear to its mouth, and then the driver's own length beyond it.
+    var pocket = recess == null ? 0.0 : Math.max(0.0, recess.depth - spec.headHeight - lift);
     volumes.push({
       name: "driver access",
       code: "fasteners.access",
       diameter: spec.headDiameter,
-      from: seat - spec.headHeight - accessLength,
+      from: seat - spec.headHeight - accessLength - pocket,
       to: seat - spec.headHeight - margin,
       access: true
     });

@@ -268,25 +268,34 @@ class JointFastenerTests {
       var rail:LinearRail = cast entry.component;
       railHoles += rail.holePositions.length;
     }
+    // Every carriage block is bolted by its four top threads from the casting it carries, with the same M4 x 16.
+    var blocks = 0;
+    for (entry in machine.components()) if (Std.isOfType(entry.component, machinekit.motion.LinearRailBlock)) blocks++;
+    check(blocks == 12, "the mill has twelve carriage blocks, got " + blocks);
     var count = new Map<String, Int>();
     for (line in derivation.lines()) count.set(line.item.partNumber, line.quantity);
-    check(count.get("ISO4762-M4x16") == railHoles && railHoles > 0, 'rail screws M4x16 must equal the rail holes $railHoles, got ${count.get("ISO4762-M4x16")}');
+    check(count.get("ISO4762-M4x16") == railHoles + 4 * blocks && railHoles > 0,
+      'M4x16 screws must be the rail holes $railHoles and four per block ($blocks), got ${count.get("ISO4762-M4x16")}');
     check(count.get("ISO4762-M5x12") == 8 && count.get("ISO4762-M6x12") == 4, 'motor screws: ${[for (k in count.keys()) k + "=" + count.get(k)]}');
     var total = 0;
     for (key in count.keys()) total += count.get(key);
     // The three ball nuts (six flange bolts each) are bolted through their adapter plates with a washer and a nut.
     check(count.get("ISO4762-M5x30") == 18 && count.get("ISO7089-M5") == 18 && count.get("ISO4032-M5") == 18, 'nut flange bolts: ${[for (k in count.keys()) k + "=" + count.get(k)]}');
-    check(total == railHoles + 12 + 18 + 18 + 18, 'screws, washers and nuts only: $total');
+    check(total == railHoles + 4 * blocks + 12 + 18 + 18 + 18, 'screws, washers and nuts only: $total');
     var rails = [for (joint in derivation.joints) if (joint.drilledToSuit) joint];
+    var blockJoints = [for (joint in derivation.joints) if (joint.clampedFace == "blockLeft" || joint.clampedFace == "blockRight") joint];
+    check(blockJoints.length == blocks, "one joint per block, got " + blockJoints.length);
+    for (joint in blockJoints) check(joint.length == 16 && joint.grip == 12 && joint.engagement >= joint.minEngagement - 1e-9
+      && joint.count == 4 && !joint.drilledToSuit, 'block joint ${joint.id}: x${joint.length}, grip ${joint.grip}, engagement ${joint.engagement}');
     check(rails.length == 6, "six rails are bolted to cast pads, got " + rails.length);
     // The derived fasteners fit the mill's solids: holes cut, heads and drivers clear.
     var started = Sys.time();
-    var fit = machinekit.assembly.AssemblyIntegrity.fasteners(machine, {fasteners: true});
+    var fit = machinekit.assembly.AssemblyIntegrity.fasteners(machine, {fasteners: true, removable: machine.workholdingMembers()});
     Sys.println('bench mill fastener fit: ${fit.errors().length} findings in ${Math.round(Sys.time() - started)} s');
     for (item in fit.errors()) Sys.println("  " + item.code + ": " + item.message);
     // The motors' flange screws have corner reliefs behind the flange (`MotorBody`) and nothing stands in their heads' way.
     check(fit.errors().length == 0, 'the derived fasteners fit the mill: ${[for (item in fit.errors()) item.message].join("; ")}');
-    Sys.println('bench mill: ${derivation.joints.length} joints, ${derivation.count()} screws (${railHoles} rail, 12 motor, 18 nut flange), ' + [for (k in count.keys()) k + " x" + count.get(k)].join(", "));
+    Sys.println('bench mill: ${derivation.joints.length} joints, ${derivation.count()} screws (${railHoles} rail, ${4 * blocks} block, 12 motor, 18 nut flange), ' + [for (k in count.keys()) k + " x" + count.get(k)].join(", "));
     // The drilled seats are in the castings' solids: one tap-drill hole per rail screw, none anywhere else.
     var cut = 0;
     for (entry in machine.components()) {
@@ -294,7 +303,8 @@ class JointFastenerTests {
       if (cuts.length > 0) check(Std.isOfType(entry.component, machinekit.milling.MillCasting), entry.id + " is machined but is not a casting");
       cut += cuts.length;
     }
-    check(cut == railHoles, 'every rail hole is a tap-drill hole in a casting: $cut cuts for $railHoles holes');
+    // Each block screw cuts its clearance hole and its counterbored pocket into the casting it is bolted through.
+    check(cut == railHoles + 2 * 4 * blocks, 'every rail hole is a tap-drill hole in a casting, every block screw a hole and a pocket: $cut cuts for $railHoles rail holes and $blocks blocks');
     for (joint in rails) check(joint.length == 16 && joint.engagement >= joint.minEngagement - 1e-9, 'rail joint ${joint.id}: x${joint.length} engages ${joint.engagement} of ${joint.minEngagement}');
   }
 }

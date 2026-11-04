@@ -92,7 +92,8 @@ class BoltedFace {
     this.height = height;
     switch role {
       case Clamped(_, clearance, grip, recess):
-        if (holes == null || holes.length == 0) throw 'Clamped face "$id" needs its holes';
+        if (holes == null && (!(width > 0) || !(height > 0))) throw 'Clamped face "$id" needs its holes, or a footprint to be drilled to suit';
+        if (holes != null && holes.length == 0) throw 'Clamped face "$id" lists no holes';
         if (!(clearance > 0) || !(grip > 0) || !Math.isFinite(clearance + grip)) throw 'Clamped face "$id" needs a positive clearance hole and grip';
         if (recess != null && (!(recess.diameter > clearance) || !(recess.depth > 0))) throw 'Clamped face "$id" has an invalid recess';
       case Through(_, clearance, thickness):
@@ -108,6 +109,20 @@ class BoltedFace {
     }
     if (holes != null) for (hole in holes) if (!Math.isFinite(hole.x) || !Math.isFinite(hole.y)) throw 'Face "$id" has a non-finite hole';
   }
+
+  /**
+	 * A clamped face whose holes are not listed: the part is drilled to suit whatever it is bolted to. It lies over a footprint
+	 * (`width` by `height`, centred on the origin) and meets every receiving face with tapped holes inside it, a carriage
+	 * seat that takes several rail blocks; each pairing takes the receiving face's hole pattern (see `paired`). Its holes are
+	 * never drawn: the derivation cuts them, with the recess where there is one.
+	 */
+  public static function clampedToSuit(id:String, frame:AssemblyFrame, width:Float, height:Float, clearance:Float, grip:Float, ?size:String,
+      ?recess:BoltRecess, washer:Bool = false):BoltedFace return new BoltedFace(id, frame, Clamped(size, clearance, grip, recess), null, width,
+      height, null, false, washer);
+
+  /** A clamped face drilled to suit, with the holes one receiving face gave it. */
+  public function paired(holes:Array<BoltHole>):BoltedFace return new BoltedFace(id, frame, role, holes, width, height, thicknessAt, drawn,
+      washer, alternative);
 
   public static function clamped(id:String, frame:AssemblyFrame, holes:Array<BoltHole>, clearance:Float, grip:Float,
       ?size:String, ?recess:BoltRecess, drawn:Bool = true, washer:Bool = false, ?alternative:String):BoltedFace return new BoltedFace(id, frame,

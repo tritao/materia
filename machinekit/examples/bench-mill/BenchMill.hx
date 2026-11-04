@@ -96,6 +96,10 @@ class BenchMill extends MachineAssembly {
     vise = withVise ? new machinekit.milling.PneumaticVise(STOCK_DEPTH, STOCK_WIDTH) : null;
     var railSpec = guideBlock.spec;
     var halfSpan = (railSpec.blockLength + BLOCK_GAP) / 2;
+    // The saddle's two blocks on a Y rail stand under its two X rails. The saddle is bolted to them from its top face, through
+    // pockets, and the blocks' four holes (26 mm apart) then fall either side of each X rail: the inner pockets between the
+    // rails, the outer ones between the rail and the casting's edge, so a driver reaches every screw.
+    var yHalfSpan = saddle.railSpacing / 2;
     var up = [0.0, 0, 1], alongX = [1.0, 0, 0], alongY = [0.0, 1, 0];
     var baseTop = base.height;
     var saddleBottom = baseTop + railSpec.blockHeight;
@@ -127,7 +131,7 @@ class BenchMill extends MachineAssembly {
         "base"
       );
     }
-    var yBlocks = [for (side in [-1, 1]) for (span in [-halfSpan, halfSpan]) orient(
+    var yBlocks = [for (side in [-1, 1]) for (span in [-yHalfSpan, yHalfSpan]) orient(
       side * base.railSpacing / 2,
       saddleY + span,
       baseTop + railSpec.railHeight,
@@ -390,6 +394,10 @@ class BenchMill extends MachineAssembly {
       }
     );
   }
+
+  /** The workpiece, its clamps and the vise: the operator takes them off the table to reach the carriage screws. */
+  public function workholdingMembers():Array<String> return [for (entry in components()) if (entry.id == "stock" || entry.id == "clampLeft"
+    || entry.id == "clampRight" || StringTools.startsWith(entry.id, "vise/")) entry.id];
 
   /** Conservative routing allowance until the actual cable paths are designed. */
   function cableCut(motor:AssemblyFrame, driver:AssemblyFrame, extra:Float):BomCut {

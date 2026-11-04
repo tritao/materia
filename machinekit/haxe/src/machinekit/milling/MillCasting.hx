@@ -39,19 +39,7 @@ class MillCasting extends MachineComponent {
     addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.kind = kind;
-    var dims = switch kind {
-      case Base:
-        [520.0, 550, 80, 140];
-      case Column:
-        [180.0, 120, 670, 110];
-        // The 50 mm nut-clearance bore leaves a continuous lower web and upper rail-side webs.
-      case Saddle:
-        [450.0, 130, 70, 90];
-      case Table:
-        [400.0, 130, 40, 90];
-      case Head:
-        [180.0, 220, 130, 110];
-    };
+    var dims = dimensions(kind);
     width = dims[0];
     depth = dims[1];
     height = dims[2];
@@ -76,6 +64,25 @@ class MillCasting extends MachineComponent {
       Axis, Solids.axial(0, -depth / 2 + SpindleCartridge.DIAMETER / 2 + 10, 0));
   }
 
+  static function dimensions(kind:MillCastingKind):Array<Float> return switch kind {
+    case Base:
+      [520.0, 550, 80, 140];
+    case Column:
+      [180.0, 120, 670, 110];
+      // The 50 mm nut-clearance bore leaves a continuous lower web and upper rail-side webs.
+    case Saddle:
+      [450.0, 130, 70, 90];
+    case Table:
+      [400.0, 130, 40, 90];
+    case Head:
+      [180.0, 220, 130, 110];
+  };
+
+  /** The material left under a carriage block's screw heads, mm: the grip, with one nominal diameter of thread engagement. */
+  public static inline var BLOCK_SOLE:Float = 12;
+  /** The carriage block the bench mill rides on (all three axes). */
+  public static inline var BLOCK:String = "HGH15CA";
+
   /** The deepest rail screw thread a pad is tapped, mm. */
   public static inline var SEAT_TAP_DEPTH:Float = 20;
 
@@ -85,6 +92,7 @@ class MillCasting extends MachineComponent {
 	 */
   override public function fasteningFaces():Array<BoltedFace> {
     var faces:Array<BoltedFace> = [];
+    if (kind == Saddle || kind == Table || kind == Head) blockSeats(faces);
     if (kind != Base && kind != Saddle && kind != Column) return faces;
     var nut = new machinekit.motion.BallNut();
     var wall = switch kind {
@@ -110,6 +118,51 @@ class MillCasting extends MachineComponent {
       });
     }
     return faces;
+  }
+
+  /**
+	 * Where the carriage blocks are bolted to this casting: the catalogue block is tapped from its top only, so the screws come
+	 * through the casting from the side away from the guide, through clearance holes and counterbored pockets that leave
+	 * `BLOCK_SOLE` of material under the heads (the casting is drilled and counterbored to suit the blocks; the pocket opens on
+	 * the casting's far face and the assembly checks that it is clear). One seat per guide rail, as long as the casting.
+	 * The pocket's diameter is the head and two millimetres for the driver (assumed).
+	 */
+  function blockSeats(faces:Array<BoltedFace>):Void {
+    var block = machinekit.motion.LinearRailBlock.metric(BLOCK);
+    var screw = machinekit.standard.SocketHeadCapScrew.catalog().get(block.spec.blockMountThread);
+    var seatWidth = block.spec.blockHoleSpacingAcross + 4 * screw.diameter;
+    var guide = dimensions(switch kind {
+      case Saddle:
+        Base;
+      case Table:
+        Saddle;
+      default:
+        Column;
+    })[3];
+    // The wall the pocket is cut through, from the seat to the far face.
+    var thickness = kind == Head ? depth : height;
+    var recess = {diameter: screw.headDiameter + 2, depth: thickness - BLOCK_SOLE};
+    for (side in [-1, 1]) {
+      var name = side < 0 ? "blockLeft" : "blockRight";
+      var at = side * guide / 2;
+      var along = switch kind {
+        case Saddle:
+          depth;
+        case Table:
+          width;
+        default:
+          height;
+      };
+      var frame = switch kind {
+        case Saddle:
+          BoltedFace.frameOf({x: at, y: 0, z: 0}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0});
+        case Table:
+          BoltedFace.frameOf({x: 0, y: at, z: 0}, {x: 0, y: 0, z: 1}, {x: 0, y: -1, z: 0});
+        default:
+          BoltedFace.frameOf({x: at, y: depth / 2, z: height / 2}, {x: 0, y: -1, z: 0}, {x: 1, y: 0, z: 0});
+      };
+      faces.push(BoltedFace.clampedToSuit(name, frame, seatWidth, along, screw.clearanceMedium, BLOCK_SOLE, block.spec.blockMountThread, recess));
+    }
   }
 
   override public function hasGeometry():Bool return true;
