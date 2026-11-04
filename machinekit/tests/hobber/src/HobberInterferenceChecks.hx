@@ -8,13 +8,6 @@ class HobberInterferenceChecks {
   public static function run():Void {
     var output = Sys.getEnv("HOBBER_INTERFERENCE_EVIDENCE");
     if (output == null) throw "HOBBER_INTERFERENCE_EVIDENCE required";
-    var zDrive = Sys.args().indexOf("z-drive") >= 0;
-    var feet = Sys.args().indexOf("feet") >= 0;
-    var chipGuard = Sys.args().indexOf("chip-guard") >= 0;
-    var workholding = Sys.args().indexOf("workholding") >= 0;
-    var cartridge = Sys.args().indexOf("cartridge") >= 0;
-    var railSupport = Sys.args().indexOf("rail-support") >= 0;
-    var castingOnly = Sys.args().indexOf("bed-casting") >= 0;
     var reference = Sys.args().indexOf("reference") >= 0, sweep = Sys.args().indexOf("sweep") >= 0;
     var machine = reference ? new FlexsplineHobber() : new FlexsplineHobber(
       new GearSpec(1, 40, 4, new Involute(20 * Math.PI / 180)),
@@ -26,24 +19,12 @@ class HobberInterferenceChecks {
     state.forwardKinematics();
     var members = machine.components(), definition = machine.definition(), cache = new PosedParts();
     var relativeVolumes:Map<String, Float> = [];
-    function changed(id:String):Bool return zDrive ? (StringTools.startsWith(id, "column/") || StringTools.startsWith(
-      id,
-      "Z"
-    )) : feet ? (id == "bed/casting" || StringTools.startsWith(
-      id,
-      "foot"
-    )) : chipGuard ? id == "chipTray" : workholding ? (id == "blank"
-      || id == "mandrel" || id == "mandrelSleeve") : cartridge ? StringTools.startsWith(
-        id,
-        "spindle/"
-      ) : id == "bed/casting"
-      || id == "bed/railLeft" || id == "bed/railRight" || id == "Xbridge" || StringTools.startsWith(
-        id,
-        "railX"
-      ) || StringTools.startsWith(
-        id,
-        "blockX"
-      );
+    // The cutting zone: the hob, its arbor and outboard support, and the work (cup, mandrel, sleeve, table). `AssemblyIntegrity`
+    // (strict, FrameChecks) covers every other pair at rest and over the joint sweep; this check keeps the hob and the work against
+    // every part at the CAM pass endpoints and the inspection pose, with the real tooth geometry.
+    function inCuttingZone(id:String):Bool return id == "hob" || id == "outboard" || id == "outboardBearing"
+      || StringTools.startsWith(id, "spindle/arbor") || id == "blank" || id == "mandrel" || id == "mandrelSleeve"
+      || StringTools.startsWith(id, "table/");
     var groups:Map<String, String> = [], rigidVolumes:Map<String, Float> = [];
     for (m in members) groups.set(m.id, m.id);
     for (j in definition.joints) if (j.type == materia.assembly.AssemblyDefinition.AssemblyJointType.Fixed) {
@@ -87,20 +68,9 @@ class HobberInterferenceChecks {
       output + "/overlaps.json",
       haxe.Json.stringify({
         reference: reference,
-        scope: zDrive
-      ? "changed central Z drive, saddle and column against all parts; unchanged pairs retain prior audit evidence"
-      : feet
-      ? "changed casting and foot hardware against all parts; unchanged pairs retain prior audit evidence" : chipGuard
-      ? "changed table chip guard against all parts; unchanged pairs retain prior audit evidence" : workholding
-      ? "changed cup and mandrel against all machine parts; unchanged pairs retain prior audit evidence" : cartridge
-      ? "changed spindle cartridge against all parts at full travel grid; unchanged pairs retain prior audit evidence"
-      : railSupport
-      ? "changed bed casting, X rail seats, rails, blocks and widened carriage against all parts at full travel grid; unchanged pairs retain prior audit evidence"
-      : castingOnly
-      ? "changed bed casting against every other part at the full travel grid; unchanged pairs retain prior audit evidence"
-      : sweep
-      ? "conservative hob envelope; exact CAD common volumes on 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof"
-      : "exact CAD common volume at initial, CAM inspection and pass endpoints",
+        scope: sweep
+      ? "cutting zone (hob, arbor, outboard support, cup, mandrel, sleeve, table) against every part: exact CAD common volumes on a 3x3x3x3 travel grid plus initial, CAM inspection and pass endpoints; sampled clearance, not continuous swept-volume proof"
+      : "cutting zone (hob, arbor, outboard support, cup, mandrel, sleeve, table) against every part: exact CAD common volume at initial, CAM inspection and pass endpoints",
       samples : samples,
       completed : completed,
       members : members.length,
@@ -124,9 +94,7 @@ class HobberInterferenceChecks {
           poses[i]
         )];
         for (a in 0...members.length) for (b in a + 1...members.length) {
-          if ((zDrive || feet || chipGuard
-            || workholding || cartridge || railSupport) && !changed(members[a].id) && !changed(members[b].id)) continue;
-          if (castingOnly && members[a].id != "bed/casting" && members[b].id != "bed/casting") continue;
+          if (!inCuttingZone(members[a].id) && !inCuttingZone(members[b].id)) continue;
           if (PosedParts.apart(boxes[a], boxes[b], 0)) continue;
           var first = members[a], second = members[b];
           checked++;
