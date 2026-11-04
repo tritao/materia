@@ -41,23 +41,44 @@ class MachinedPackageExport {
     return placed;
   }
 
-  /** Volume of the solid inside a probe cylinder along a hole's axis between `from` and `to` (mm from the mouth). */
+  /** The probe of a slot: the cylinders at its two ends and the box between them (axis-aligned: the part frame is a permutation of the work frame). */
+  static function stadiumAlong(hole:RouteHole, radius:Float, from:Float, to:Float):Part {
+    var a = hole.slotAxis, d = hole.direction, half = (hole.slotLength ?? 0.0) / 2, p = hole.position;
+    var w = [d[1] * a[2] - d[2] * a[1], d[2] * a[0] - d[0] * a[2], d[0] * a[1] - d[1] * a[0]];
+    var lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+    for (sa in [-1.0, 1.0]) for (sw in [-1.0, 1.0]) for (sd in [from, to]) for (i in 0...3) {
+      var v = p[i] + sd * d[i] + sa * half * a[i] + sw * radius * w[i];
+      lo[i] = Math.min(lo[i], v);
+      hi[i] = Math.max(hi[i], v);
+    }
+    var raw = Part.box(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]), middle = raw.translated(new Vector((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]));
+    raw.close();
+    var parts = [middle];
+    for (s in [-1.0, 1.0]) parts.push(cylinderAlong([p[0] + s * half * a[0], p[1] + s * half * a[1], p[2] + s * half * a[2]], d, radius, from, to));
+    var joined = machinekit.component.Solids.union(parts);
+    for (q in parts) q.close();
+    return joined;
+  }
+
+  /** Volume of the solid inside a probe cylinder (a stadium for a slot) along a hole's axis between `from` and `to` (mm from the mouth). */
   static function probe(body:Part, hole:RouteHole, radius:Float, from:Float, to:Float):{inside:Float, whole:Float} {
-    var tool = cylinderAlong(hole.position, hole.direction, radius, from, to);
+    var slot = hole.slotLength != null && hole.slotLength > 0;
+    var tool = slot ? stadiumAlong(hole, radius, from, to) : cylinderAlong(hole.position, hole.direction, radius, from, to);
     var common = body.intersect(tool);
-    var inside = common.volume(), whole = Math.PI * radius * radius * (to - from);
+    var inside = common.volume(), whole = (Math.PI * radius * radius + (slot ? 2 * radius * (hole.slotLength ?? 0.0) : 0)) * (to - from);
     common.close();
     tool.close();
     return {inside: inside, whole: whole};
   }
 
   static function holeJson(body:Part, hole:RouteHole):Dynamic {
-    var depth = hole.depth, r0 = hole.diameter / 2, k = 1.02;
+    var depth = hole.depth, r0 = hole.diameter / 2, k = 1.02, slotExtra = hole.slotLength != null && hole.slotLength > 0 ? 2 * r0 * (hole.slotLength ?? 0.0) : 0.0;
     // Empty bore at 0.98 r; the material in a 1.02 r probe is the wall ring, so its volume gives the length of wall the hole runs
     // through: L = V / (pi r^2 (k^2 - 1)). A hole that is missing gives 25 times that, a wider one gives none.
     var inner = probe(body, hole, r0 * 0.98, 0.05, depth - 0.05), outer = probe(body, hole, r0 * k, 0, depth);
     var emptyBore = inner.inside < 0.005 * inner.whole;
-    var wall = outer.inside / (Math.PI * r0 * r0 * (k * k - 1));
+    // A slot's ring area is that of the offset stadium: pi r^2 (k^2 - 1) + 2 r L (k - 1).
+    var wall = outer.inside / (Math.PI * r0 * r0 * (k * k - 1) + (slotExtra > 0 ? slotExtra * (k - 1) : 0.0));
     var behind = probe(body, hole, r0 * 0.9, depth + 0.1, depth + 0.6);
     var backing = behind.inside / behind.whole;
     var through = backing < 0.5;
@@ -72,6 +93,8 @@ class MachinedPackageExport {
       depth: r(hole.depth),
       position: [for (v in hole.position) r(v)],
       direction: [for (v in hole.direction) r(v, 6)],
+      slotLength: hole.slotLength == null ? 0 : r(hole.slotLength),
+      slotAxis: hole.slotAxis == null ? null : [for (v in hole.slotAxis) r(v, 6)],
       present: present,
       emptyBore: emptyBore,
       wallLength: r(wall, 3),
@@ -134,7 +157,7 @@ class MachinedPackageExport {
     var size = PosedParts.boxOf(part);
     var moved:Array<RouteHole> = [for (h in holes) {
       id: h.id, kind: h.kind, thread: h.thread, diameter: h.diameter, nominal: h.nominal, fit: h.fit, depth: h.depth,
-      position: local(h.position), direction: turn(h.direction)
+      position: local(h.position), direction: turn(h.direction), slotLength: h.slotLength, slotAxis: h.slotAxis == null ? null : turn(h.slotAxis)
     }];
     var id = component.designation, volume = part.volume();
     var physical = materia.project.MaterialLibrary.require(component.materialId).physical;

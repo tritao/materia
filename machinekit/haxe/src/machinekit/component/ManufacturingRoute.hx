@@ -29,7 +29,9 @@ typedef MachinedFace = {
  * A hole a made part carries, in the part's own frame: what the drawing's hole table lists. `kind` is `"tapped"` (cut at the tap
  * drill `diameter`, thread `thread`, to `depth`), `"clearance"` (a bolt of size `thread` passes), `"dowel"` (drilled `diameter`,
  * reamed to `fit` at assembly) or `"bore"` (a plain bore, `nominal` the diameter it is for). `position` is the mouth, `direction`
- * the unit vector into the part, `depth` measured from the mouth along it.
+ * the unit vector into the part, `depth` measured from the mouth along it. A slot is one hole whose `diameter` is the slot width: it
+ * runs `slotLength` mm between the centres of its two round ends, along the unit vector `slotAxis` (perpendicular to `direction`), `position`
+ * the middle of the slot.
  */
 typedef RouteHole = {
   var id:String;
@@ -43,6 +45,8 @@ typedef RouteHole = {
   var depth:Float;
   var position:Array<Float>;
   var direction:Array<Float>;
+  @:optional var slotLength:Null<Float>;
+  @:optional var slotAxis:Array<Float>;
 }
 
 /**

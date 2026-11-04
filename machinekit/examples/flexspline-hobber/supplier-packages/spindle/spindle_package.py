@@ -34,7 +34,7 @@ PARTS = {
         material="38CrMoAlA (34CrAlNi7-10) quenched and tempered 28-32 HRC, stress relieved; gas nitrided "
                  "≥ 850 HV0.3, case 0.3 mm, on journals, taper and nose; ground after nitriding",
         rows=[
-            (20, (-36, 0), "Pulley and encoder stub", "Ø20 h5 (encoder rotor 0 to -14, HTD5M 45T pulley -16 to -34, keyed or taper-bushed); radial runout 0.003 to A-B; Ra 0.4"),
+            (20, (-36, 0), "Pulley and encoder stub", "Ø20 h5 (encoder rotor 0 to -14, HTD5M 40T pulley -16 to -34, keyed or taper-bushed); radial runout 0.003 to A-B; Ra 0.4"),
             (25, (0, 15), "Rear journal (datum B), floating 6205", "Ø25 k5 (+0.011/+0.002); roundness 0.0015; Ra 0.4"),
             (25, (15, 122), "Between journals", "Ø25, may be relieved to Ø24.8; ISO 2768-m"),
             (None, (122, 129), "Locknut thread", "M25 × 1.5-4h for a KM5-size precision locknut; thread runs out before the front journal"),
@@ -100,9 +100,9 @@ PARTS = {
 BOUGHT = {
     "motor": "Servo motor 1 kW, 80 frame, Ø19 × 35 shaft (Leadshine ELM2H-1000LA80F or equivalent); supplied by us, "
              "standing beside the cartridge on our cradle (not part of the cartridge)",
-    "motorPulley": "HTD5M timing pulley 36T, 18 wide, bore Ø19 (ours, on the motor)",
-    "spindlePulley": "HTD5M timing pulley 45T, 18 wide, bore Ø20 (on the cartridge stub; to be supplied or specified by the maker)",
-    "belt": "HTD5M timing belt, 15 wide, about 455 mm (91 teeth); ours",
+    "motorPulley": "HTD5M timing pulley 40T, 18 wide, bore Ø19 (ours, on the motor)",
+    "spindlePulley": "HTD5M timing pulley 40T, 18 wide, bore Ø20 (on the cartridge stub; to be supplied or specified by the maker)",
+    "belt": "HTD5M timing belt, 15 wide, 450 mm (90 teeth, 450-5M); ours",
     "motorEncoder": "Motor's own encoder (ours)",
     "frontBearing": "Angular-contact bearing 7305 size (25 × 62 × 17), P4, 25° contact; matched pair, back to back",
     "rearBearing": "Angular-contact bearing 7305 size (25 × 62 × 17), P4, 25° contact; matched pair, back to back",
@@ -126,10 +126,10 @@ REQUIREMENTS = [
     ("Running accuracy", "radial runout at the arbor taper and axial runout at the nose face ≤ 0.002 mm TIR"),
     ("Bearings", "front: matched P4 angular-contact pair 7305 size (25 × 62 × 17), back to back, light "
                  "preload; rear: 6205 floating; grease for life"),
-    ("Drive", "belt-drive cartridge: HTD5M 45T pulley on the Ø20 rear stub, driven by a 1 kW servo (80 frame, "
-              "Leadshine ELM2H-1000LA80F) on 36T beside the cartridge; the belt's radial pull on the pulley is about "
-              "500 N (quote the cartridge for at least 750 N radial at the pulley, 33 mm behind the 6205), "
-              "motor torque up to 9.5 N·m x 1.25 at the spindle; a motor spindle is the upgrade path with the same seat and encoder interface"),
+    ("Drive", "belt-drive cartridge: HTD5M 40T pulley on the Ø20 rear stub, driven by a 1 kW servo (80 frame, "
+              "Leadshine ELM2H-1000LA80F) on a 40T pulley (1:1) beside the cartridge; the belt's radial pull on the pulley is about "
+              "450 N (quote the cartridge for at least 700 N radial at the pulley, 33 mm behind the 6205), "
+              "motor torque up to 9.5 N·m at the spindle (1:1); a motor spindle is the upgrade path with the same seat and encoder interface"),
     ("Feedback", "19-bit absolute BiSS-C encoder on the rear face and stub: the machine's gearbox master"),
     ("Arbor", "removable from the front: 1:5 short taper and face, held by 4 × M4; 2 pins carry torque"),
     ("Coolant", "neat cutting oil, flood and mist: labyrinth at the nose"),

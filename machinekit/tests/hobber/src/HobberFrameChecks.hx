@@ -168,14 +168,15 @@ class HobberFrameChecks {
     var lines = [];
     // Belt pull on the cartridge pulley.
     var rm = spindle.motorPulley.pitchDiameter / 2000, rs = spindle.spindlePulley.pitchDiameter / 2000, c = HobSpindle.centres() / 1000;
-    var fRated = rating.ratedTorque / rm, fPeak = rating.peakTorque / rm, t0 = 0.75 * fPeak;
+    var fRated = rating.ratedTorque / rm, fPeak = rating.peakTorque / rm, t0 = HobSpindle.pretension(rating.peakTorque, spindle.motorPulley.pitchDiameter);
     var radial = 2 * t0 * Math.cos(Math.asin((rs - rm) / c));
     var pulleyZ = HobSpindle.pulleyFront(rating.shaftLength) - HobSpindle.PULLEY_WIDTH / 2, tailZ = 7.5, pairZ = HobSpindle.FRONT_BEARING_Z;
     var overhang = tailZ - pulleyZ, span = pairZ - tailZ, tail = radial * (1 + overhang / span), pair = radial * overhang / span;
     var c0 = 7800.0, dyn = 14800.0, nTop = spindle.maxSpeed() * 60 / (2 * Math.PI);
     var l10 = 1e6 / (60 * nTop) * Math.pow(dyn / tail, 3);
     lines.push('B belt: HTD5M ${spindle.motorPulley.teeth}T/${spindle.spindlePulley.teeth}T, ${r(spindle.belt.length, 1)} mm belt on ${r(c * 1000, 1)} mm centres, motor turns ${r(spindle.ratio, 3)}x the hob; tangential force ${r(fRated)} N rated / ${r(fPeak)} N motor peak, '
-      + 'pretension ${r(t0)} N per strand (slack side kept at 25 % of the peak force: assumed rule, belt maker to confirm), tight side ${r(t0 + fPeak / 2)} N at peak');
+      + 'pretension ${r(t0)} N per strand (slack side kept at 25 % of the peak force: assumed rule, belt maker to confirm), tight side ${r(t0 + fPeak / 2)} N at peak; '
+      + 'set by the jack screw: free span ${r(c * 1000, 0)} mm rings at ${r(HobSpindle.spanFrequency(t0), 0)} Hz (${HobSpindle.BELT_MASS_PER_M} kg/m assumed), needs ${r(HobSpindle.tensioningTravel(t0, spindle.belt.length), 2)} mm more centres than slack, slots give +-${HobSpindle.TENSION_TRAVEL} mm');
     lines.push('Cartridge rear radial load (belt pull): ${r(radial)} N on the pulley, ${r(overhang, 1)} mm behind the 6205 tail bearing: tail bearing ${r(tail)} N (${r(100 * tail / c0, 1)} % of C0 ${c0} N, L10 ${Math.round(l10 / 1000) * 1000 / 1000}k h at ${Math.round(nTop)} rpm; SKF 6205 ratings C ${dyn} N, C0 ${c0} N assumed from the maker), '
       + 'opposite ${r(pair)} N on the angular-contact pair; the cartridge must be a belt-drive cartridge rated for at least ${Math.ceil(radial * 1.5 / 50) * 50} N radial at the pulley (1.5 x the pull)');
     // The servo group on its cradle.
@@ -207,14 +208,19 @@ class HobberFrameChecks {
     }
     // N/mm at the group's centre of mass.
     function hz(k:Float):Float return Math.sqrt(k * 1000 / mass) / (2 * Math.PI);
-    function modesFor(joint:Float) {
+    // Floor overhang (sensitivity only): the wall's foot stands beyond the rear bolt row on the floor plate, a cantilever of the wall's width that turns under the wall's moment.
+    var rearBolt = 0.0;
+    for (b in sec.bolts) rearBolt = Math.max(rearBolt, b.y);
+    var dims = HobberSaddle.cradleDimensions(), floorLen = HobberSaddle.cradleRearY() - dims.wall / 2 - rearBolt, iFloor = width * Math.pow(dims.floor, 3) / 12;
+    function modesFor(joint:Float, floorFlex:Bool = false) {
       var kz = e * iX / (ahead * ahead * height);
       var kyWall = 3 * e * iX / Math.pow(height, 3), kyRoot = joint * sumY2 / Math.pow(height, 2);
+      if (floorFlex) kyRoot = 1 / (1 / kyRoot + height * height * floorLen / (e * iFloor));
       var kxWall = 3 * e * iY / Math.pow(height, 3), kxRoot = joint * sumX2 / Math.pow(height, 2);
       return [{name: "vertical (flange rocking on the wall)", f: hz(kz)}, {name: "axial (wall and floor bolts)", f: hz(1 / (1 / kyWall + 1 / kyRoot))},
         {name: "lateral (wall and floor bolts)", f: hz(1 / (1 / kxWall + 1 / kxRoot))}];
     }
-    var modes = modesFor(kJoint), loose = modesFor(kJoint / 10);
+    var modes = modesFor(kJoint), loose = modesFor(kJoint / 10), flexed = modesFor(kJoint, true);
     var first = modes[0], firstLoose = loose[0];
     for (m in modes) if (m.f < first.f) first = m;
     for (m in loose) if (m.f < firstLoose.f) firstLoose = m;
@@ -229,6 +235,27 @@ class HobberFrameChecks {
       + 'avoid ${Math.round(lo)}..${Math.round(hi)} Hz (+-20 %), ${first.f > hi ? Math.round(100 * first.f / hi - 100) + " % above" : first.f < lo ? "below" : "INSIDE"}; '
       + 'sensitivity: with the floor joint ten times softer (not preloaded) the first mode is ${Math.round(firstLoose.f)} Hz ${firstLoose.name}');
     if (first.f >= lo && first.f <= hi) throw "the servo's first mode lies within 20 % of the tooth-pass band: " + lines.join("; ");
+    var margin = 1.3;
+    lines.push('B servo first-mode margin: ${r(first.f / hi, 2)} x the top of the avoid band (${Math.round(hi)} Hz), required at least ${margin} x; '
+      + 'floor overhang sensitivity (the wall foot ${r(floorLen, 1)} mm beyond the rear bolt row as a ${dims.floor} mm cantilever of the wall width, not in the estimate above): axial mode ${Math.round(flexed[1].f)} Hz');
+    if (first.f < margin * hi) throw "the servo's first mode is less than 1.3 x the top of the tooth-pass band: " + lines.join("; ");
+    // Cradle mass and the lightening.
+    lines.push('Motor cradle: ${r(cradle, 3)} kg (was 2.036 kg: 15 mm wall, 12 mm floor, solid rib); wall ${dims.wall}, floor ${dims.floor} (${dims.floorThin} ahead of y 195), windowed rib, jack lug ${dims.lug} mm above the floor');
+    // The servo's speed and torque over the hob's speed range (1:1 belt).
+    var ratio = spindle.ratio, motorRatedRpm = rating.ratedSpeed * 60 / (2 * Math.PI), hobRpmTop = 3 * nLow, motorRpmTop = hobRpmTop * ratio;
+    var cuttingBound = 100.0, efficiency = 0.97, reserve = 1.2;
+    var cuttingTorque = cuttingBound * diameter / 2000, motorTorque = cuttingTorque / ratio / efficiency, motorPower = motorTorque * motorRpmTop * 2 * Math.PI / 60;
+    lines.push('B speed and torque over the hob range (Ø${r(diameter, 1)}, 100..300 m/min = ${Math.round(nLow)}..${Math.round(hobRpmTop)} rpm): servo ${Math.round(nLow * ratio)}..${Math.round(motorRpmTop)} rpm against ${Math.round(motorRatedRpm)} rpm rated (${r(100 * motorRpmTop / motorRatedRpm, 1)} %), '
+      + 'the cartridge limit ${Math.round(nTop)} rpm is above the rated speed (torque falls there: not for continuous cutting); cutting torque bound ${r(cuttingTorque, 2)} N m at the hob '
+      + '(tangential force ${cuttingBound} N: ASSUMED upper bound, above the repo\'s load studies: 46.7 N peak on the reference part, 72.1 N on the m0.3 z40 1 mm smoke; at 16 mm radius those are 0.75 and 1.15 N m) = ${r(motorTorque, 2)} N m at the servo through the belt '
+      + '(${efficiency} efficiency, ratio ${r(ratio, 2)}); servo rated ${r(rating.ratedTorque, 2)} N m (${r(rating.ratedTorque / motorTorque, 2)} x, ${reserve} x required), peak ${r(rating.peakTorque, 2)} N m; power ${Math.round(motorPower)} W against ${Math.round(rating.ratedTorque * rating.ratedSpeed)} W');
+    if (motorRpmTop > motorRatedRpm) throw "the servo would run above its rated speed at the top of the hob speed range: " + lines.join("; ");
+    if (motorTorque * reserve > rating.ratedTorque || motorPower > rating.ratedTorque * rating.ratedSpeed) throw "the servo's rated torque or power does not cover the hob's cutting load: " + lines.join("; ");
+    // The flange bolts hold the servo against the belt (slots in the wall): friction of four M6 8.8 at 60 % of proof (assumed), steel on steel.
+    var preload = 0.6 * 580 * 20.1, grip = 4 * preload * 0.12, pull = 2 * t0;
+    lines.push('B servo flange grip: 4 M6 8.8 at 60 % of proof (${Math.round(preload)} N each, assumed), friction 0.12 steel on steel (assumed) holds ${Math.round(grip)} N along the slots against the belt\'s net pull ${Math.round(pull)} N (2 x pretension): ${r(grip / pull, 1)} x; '
+      + 'the jack screw also bears on the flange from below against that pull');
+    if (grip < 3 * pull) throw "the flange bolts' friction does not hold the belt pull with a factor of 3: " + lines.join("; ");
     return lines;
   }
 

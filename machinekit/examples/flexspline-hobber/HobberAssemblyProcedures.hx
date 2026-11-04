@@ -1,3 +1,4 @@
+import machinekit.hobbing.HobSpindle;
 import materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
 import materia.presentation.AssemblyPresentation;
 
@@ -71,13 +72,17 @@ class HobberAssemblyProcedures {
   }
 
   /**
-   * B belt drive (head redesign): the centre distance is fixed (a whole-tooth belt on 36T/45T pulleys), the servo stands on a cradle bolted
-   * to the seat block's top, and the belt tension is set with a peel-able shim pack between the seat top and the cradle floor (0.05 mm leaves
-   * a tension step of a few newtons for the HTD5M 15 mm belt; the shims are loose, so the cradle's dowel holes are reamed through them at
-   * the final pack). The pretension is the one `HobberFrameChecks.spindleDrive` prints.
+   * B belt drive (head redesign): 40T pulleys on both shafts, a whole-tooth 450-5M belt on 125 mm centres. The cradle is bolted and dowelled to the
+   * seat block's top first (that joint is the one the drive's first-mode estimate depends on). The servo then slides along the belt's line in the
+   * wall's vertical slots on its pilot, a jack screw in the lug under its flange raises it, and the flange bolts are tightened once the belt carries
+   * its pretension (frequency of the free span, or the deflection under a stated force). Values come from `HobSpindle` and the drive check
+   * `HobberFrameChecks.spindleDrive` prints them too.
    */
-  public static function tensionBelt():Procedure {
-    var drive = ["spindle/motor", "spindle/motorPulley", "spindle/spindlePulley", "spindle/belt"];
+  public static function tensionBelt(machine:FlexsplineHobber):Procedure {
+    var drive = ["spindle/motor", "spindle/motorPulley", "spindle/spindlePulley", "spindle/belt"], spindle = machine.spindle, rating = spindle.motor.rating;
+    function r(v:Float, d:Int = 1):Float return Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
+    var t = HobSpindle.pretension(rating.peakTorque, spindle.motorPulley.pitchDiameter), f = HobSpindle.spanFrequency(t), span = HobSpindle.centres();
+    var travel = HobSpindle.tensioningTravel(t, spindle.belt.length), force = 4 * t * (span / 64) / span;
     return {
       id: "b-tension-belt",
       label: "B: fit the belt and set its tension",
@@ -85,18 +90,27 @@ class HobberAssemblyProcedures {
       start: Assembled,
       steps: [
         note("cradle", "Bolt the cradle to the seat block",
-          "Stone the seat block's top and the cradle's underside, put a 0.5 mm shim pack on the seat top, set the cradle on it and tighten its four M8 into the block's top. "
-          + "The cradle's slit lies over the seat's own so the clamp still closes.", ["motorCradle", "spindleSeat"]),
-        note("motor", "Fit the servo",
-          "Bolt the servo to the cradle wall with its four M6 (pilot register in the wall), the connectors up. Its shaft must be flush with the pulley's rear face.",
+          "Stone the seat block's top and the cradle's underside, set the cradle on the block with its two dowels and tighten its four M8 into the block's top "
+          + "(this is a preloaded, dowelled joint: tighten crosswise to the screw's full torque). The cradle's slit lies over the seat's own so the clamp still closes.",
+          ["motorCradle", "spindleSeat"]),
+        note("motor", "Seat the servo on its slides",
+          "Offer the servo to the cradle wall with its Ø70 pilot in the wall's vertical slot (the slot is a sliding fit on the pilot) and its connectors up, the four M6 through the "
+          + "flange into the wall's slots with a washer and nut on the wall's rear face, finger-tight. Run the jack screw (M8 in the lug under the flange) down to the lug so the servo "
+          + "rests at the bottom of its " + r(2 * HobSpindle.TENSION_TRAVEL) + " mm of slot travel. The shaft must be flush with the pulley's rear face.",
           ["motorCradle", "spindle/motor"]),
         note("pulleys", "Fit the pulleys",
-          "Set the 36T pulley on the servo shaft and the 45T pulley on the cartridge stub, their front faces 16 mm behind the housing rear face (the encoder's rotor lies in front of them), belt planes aligned with a straightedge across both.",
+          "Set the " + spindle.motorPulley.teeth + "T pulley on the servo shaft and the " + spindle.spindlePulley.teeth + "T pulley on the cartridge stub, their front faces 16 mm behind the housing rear face (the encoder's rotor lies in front of them), belt planes aligned with a straightedge across both.",
           ["spindle/motorPulley", "spindle/spindlePulley"]),
-        note("belt", "Put the belt on and read the tension",
-          "Slip the belt over the pulleys (lift the cradle's shim pack out for the first fit) and measure the span tension with a sonic tension meter against the pretension the drive check prints.", drive),
-        note("shim", "Adjust the shim pack",
-          "Add or peel shims (each raises the servo by its thickness) until the belt carries its pretension; ream the cradle's two dowel holes through the final pack and tighten the floor bolts.", ["motorCradle", "spindleSeat"]),
+        note("belt", "Put the belt on",
+          "With the servo at the bottom of its slots the centres are " + r(span - HobSpindle.TENSION_TRAVEL) + " mm: slip the " + r(spindle.belt.length, 0) + " mm belt over both pulleys without rolling it.", drive),
+        note("jack", "Set the tension with the jack screw",
+          "Turn the jack screw up, raising the servo, until the free span (" + r(span, 0) + " mm) rings at " + r(f, 0) + " Hz on a sonic tension meter, i.e. " + r(t, 0) + " N per strand "
+          + "(belt mass " + HobSpindle.BELT_MASS_PER_M + " kg/m assumed; set the meter to the maker's value and recompute). Alternatively, deflect the middle of the span by 1/64 of its length ("
+          + r(span / 64, 2) + " mm) under " + r(force, 0) + " N. The belt needs about " + r(travel, 2) + " mm more centre distance than slack to reach this (cord stiffness "
+          + HobSpindle.BELT_CORD_RIGIDITY + " N per mm of width assumed), well inside the " + r(HobSpindle.TENSION_TRAVEL) + " mm of travel. The jack bears on the flange from below, against the belt's pull.", drive),
+        note("clamp", "Tighten the flange bolts",
+          "Holding the jack where it is, tighten the four M6 crosswise to their full torque (the friction of the preloaded flange holds the servo; the drive check prints its margin over the belt pull), "
+          + "then re-read the tension and trim with the jack and re-tighten if it moved. Lock the jack screw with thread-locker.", ["motorCradle", "spindle/motor"]),
         note("run", "Run in and re-check",
           "Turn the spindle by hand, then run it at 500 rpm for ten minutes and re-measure the tension; the belt must track on both pulleys without climbing a flange.", drive)
       ],
@@ -138,7 +152,7 @@ class HobberAssemblyProcedures {
   public static function build(machine:FlexsplineHobber):Array<Procedure> {
     var result:Array<Procedure> = [];
     for (travel in machine.travel) result.push(alignScrewSupports(travel.id, {lower: travel.lower, upper: travel.upper}));
-    result.push(tensionBelt());
+    result.push(tensionBelt(machine));
     result.push(setRails("X", ["railXLeft", "railXRight"]));
     result.push(setRails("Z", ["railZLeft", "railZRight"]));
     result.push(setRails("Y", ["railYLeft", "railYRight"]));

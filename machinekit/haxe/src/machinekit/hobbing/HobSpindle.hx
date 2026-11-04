@@ -17,8 +17,9 @@ import materia.assembly.AssemblyDefinition.AssemblyJointType;
     belt-drive cartridge has the 19-bit absolute spindle encoder on its rear face (z 0..-14), the cartridge
     pulley behind it (z -16..-34) and the opposed angular-contact pair at 129..163, nose 170..180. The servo
     stands parallel to the cartridge above it (`centres()` from the spindle axis, shaft toward the rear), its flange on a
-    milled cradle bolted to the Y saddle, and drives a pulley in the cartridge pulley's plane: 36T on the motor, 45T on the spindle
-    (HTD5M, 15 mm belt), so the hob turns 0.8 of the motor speed. The spindle encoder is the B master (electronic-gearbox) encoder;
+    milled cradle bolted to the spindle seat block (the flange bolts run in vertical slots, a jack screw sets the belt tension), and drives a
+    pulley in the cartridge pulley's plane: 40T on the motor and on the spindle (HTD5M, 15 mm belt, 1:1: the reference cut's 2984 rpm stays
+    inside the servo's 3000 rpm rated speed). The spindle encoder is the B master (electronic-gearbox) encoder;
     the motor keeps its own absolute encoder for the drive's loop. The arbor's flange is held by four M4 screws on a 32 mm PCD (no
     drawbar); two pins carry torque. Fits, preload, balance and sealing remain manufacturing design. */
 class HobSpindle extends MachineAssembly {
@@ -47,10 +48,19 @@ class HobSpindle extends MachineAssembly {
   public static inline final ENCODER_BORE = 24.0;
   /** 19-bit absolute BiSS-C ring encoder on the rear shaft: assumed (class of a Ø52-80 ring encoder), no catalogue row yet. */
   public static inline final ENCODER_COUNTS = 524288.0;
-  public static inline final MOTOR_TEETH = 36;
-  public static inline final SPINDLE_TEETH = 45;
-  /** Nominal centre distance before the whole-tooth belt: the 90 flange clears the cradle foot (top 78) and the seat block (top 58) from above. */
+  public static inline final MOTOR_TEETH = 40;
+  public static inline final SPINDLE_TEETH = 40;
+  /**
+   * Nominal centre distance before the whole-tooth belt: the 80 flange clears the cradle foot (top 78) and the seat block (top 58) from above.
+   * Two 40T HTD5M pulleys (pitch Ø63.66) on 125 mm centres take the catalogue 450-5M belt (90 teeth) exactly.
+   */
   public static inline final NOMINAL_CENTRES = 125.0;
+  /** The servo slides this far each way along the belt's line in the cradle's slotted flange holes: slack to fit the belt, travel to tension it. */
+  public static inline final TENSION_TRAVEL = 3.0;
+  /** Assumed mass of the 15 mm HTD5M belt per metre of length, kg/m (belt maker to confirm): converts a span's natural frequency to its tension. */
+  public static inline final BELT_MASS_PER_M = 0.07;
+  /** Assumed belt cord stiffness per mm of width (N) that `belt` is built with: HTD5M has no recorded family value. */
+  public static inline final BELT_CORD_RIGIDITY = 5000.0;
   /**
    * The servo stands this far toward work -x of the cartridge's vertical (spindle +x), so its 90 mm flange clears the Y drive's motor and
    * bracket (work x from 35) on the swivel plate's top edge; the belt's centre line tilts by `asin(MOTOR_OFFSET / centres())`.
@@ -114,7 +124,7 @@ class HobSpindle extends MachineAssembly {
     motorEncoder = new ShaftEncoder(this.motor.rating.encoderCounts, true);
     spindlePulley = new TimingPulley(HTD5M, SPINDLE_TEETH, 20, PULLEY_WIDTH);
     motorPulley = new TimingPulley(HTD5M, MOTOR_TEETH, face.shaftDiameter, PULLEY_WIDTH);
-    belt = TimingBelt.twoPulley(HTD5M, SPINDLE_TEETH, MOTOR_TEETH, c, BELT_WIDTH, 5000);
+    belt = TimingBelt.twoPulley(HTD5M, SPINDLE_TEETH, MOTOR_TEETH, c, BELT_WIDTH, BELT_CORD_RIGIDITY);
     addComponent("housing", new SpindleHousing());
     attach("frontBearing", frontBearing, FRONT_BEARING_Z);
     addComponent("rearBearing", rearBearing);
@@ -233,6 +243,21 @@ class HobSpindle extends MachineAssembly {
   /** B speed limit: the lower of the servo's maximum seen through the belt and the cartridge rating. */
   public function maxSpeed():Float return Math.min(motor.rating.maxSpeed * MOTOR_TEETH / SPINDLE_TEETH, MAX_RPM * 2 * Math.PI / 60);
   public function interfaceName():String return "ASSUMED-TF20";
-  /** The belt reduces the speed: joint torque is the motor torque times the spindle-to-motor tooth ratio (belt efficiency not applied). */
+  /**
+   * Belt pretension per strand (N) the drive is set to: the slack side is kept at a quarter of the motor's peak tangential force
+   * (assumed rule; belt maker to confirm), i.e. 0.75 of the peak force for the mean of the two spans.
+   */
+  public static function pretension(peakTorque:Float, motorPulleyPitchDiameter:Float):Float return 0.75 * peakTorque / (motorPulleyPitchDiameter / 2000);
+
+  /** Natural frequency (Hz) of the free span (the two pulleys are equal, so the span is the centre distance) at tension `t` newtons, as a taut string; `BELT_MASS_PER_M` assumed. */
+  public static function spanFrequency(t:Float):Float return Math.sqrt(t / BELT_MASS_PER_M) / (2 * centres() / 1000);
+
+  /** Tension (N) of the span from the frequency read with a sonic meter. */
+  public static function tensionAt(frequency:Float):Float return 4 * BELT_MASS_PER_M * Math.pow(centres() / 1000 * frequency, 2);
+
+  /** Centre-distance increase (mm) that stretches the belt to tension `t`: two strands carry `t` over the belt length, cord stiffness `BELT_CORD_RIGIDITY` x width. */
+  public static function tensioningTravel(t:Float, beltLength:Float):Float return t * beltLength / (2 * BELT_CORD_RIGIDITY * BELT_WIDTH);
+
+  /** The belt reduces nothing at 1:1: joint torque is the motor torque times the spindle-to-motor tooth ratio (belt efficiency not applied). */
   public function jointTorque(motorTorque:Float):Float return motorTorque * SPINDLE_TEETH / MOTOR_TEETH;
 }

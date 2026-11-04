@@ -42,11 +42,11 @@ and empty verified-field lists.
   initial effort/speed limits come from the installed motor. Exposes `mount`/`work`.
 - `HobSpindle extends MachineAssembly`: steel housing, floating rear 6205, opposed angular-contact
   pair, shaft, bolted gland, locknut, removable arbor and its four screws; behind the housing the 19-bit absolute spindle
-  encoder (the B master) and the 45T HTD5M pulley on the rear stub. The 1 kW 80-frame servo (the quoted Leadshine `ELM2H-1000LA80F`, catalogue
+  encoder (the B master) and the 40T HTD5M pulley on the rear stub. The 1 kW 80-frame servo (the quoted Leadshine `ELM2H-1000LA80F`, catalogue
   envelope with its connectors, assumed winding) stands beside the cartridge above it (it is a member of the assembly but bolted to the
-  `GE-motor-cradle` on the spindle seat at machine level), with a 36T pulley, a 15 mm HTD5M belt and its own encoder on the servo joint.
-  B's torque is the servo's times the belt's 1.25 (1 kW, 3000 rpm rated at the motor) and its speed limit is the
-  4000 rpm cartridge rating (reached at the servo's 5000 rpm); the cartridge's encoder is the B master and the servo's the drive's loop. The two
+  `GE-motor-cradle` on the spindle seat at machine level), with a 40T pulley, a 15 mm 450-5M HTD5M belt and its own encoder on the servo joint.
+  B's torque is the servo's through the 1:1 belt (1 kW, 3000 rpm rated at the motor) and its speed limit is the
+  4000 rpm cartridge rating (the servo's 5000 rpm would exceed it); the cartridge's encoder is the B master and the servo's the drive's loop. The two
   angular-contact bearings remain two instances of the same BOM item; opposing
   orientation is a placement, not another bearing model. Exposes `mount`,
   `gaugeLine`, `hobCentre`. B is continuous.

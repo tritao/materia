@@ -287,29 +287,55 @@ class HobberSaddle extends MachineComponent {
 
   // ---- B motor cradle (FRAME_PLAN head redesign) -------------------------------------------------------------------------------
 
-  /** The cradle wall: it stands behind the cartridge's rear face (y 240), the motor flange on its front face; thickness leaves the pulley 2 mm clear. */
-  static inline final CRADLE_WALL = 15.0;
+  /**
+   * The cradle wall: it stands behind the cartridge's rear face (y 240), the motor flange on its front face; the pulleys stand clear of its rear
+   * face and the flange bolts' nuts. The servo slides along the belt's line (work z) in slots through the wall, so the nuts are on the rear face.
+   */
+  static inline final CRADLE_WALL = 8.0;
   /** The wall's front face (the motor flange face) in work y. */
   static inline final CRADLE_FACE_Y = HobberSwivelLayout.SPINDLE_Y - HobSpindle.MOTOR_FACE_Z;
-  /** The floor sits on the spindle seat block's top (z `SEAT_HALF`), 12 thick, from y `CRADLE_FLOOR_Y0` to the wall's rear; the wall and ribs stand on it. */
+  /**
+   * The floor sits on the spindle seat block's top (z `SEAT_HALF`). Behind `CRADLE_FLOOR_STEP` (where the seat block ends and the wall's foot
+   * overhangs it) it is `CRADLE_FLOOR` thick; ahead, where it only carries the first bolt row, `CRADLE_FLOOR_THIN`.
+   */
   static inline final CRADLE_FLOOR = 12.0;
+  static inline final CRADLE_FLOOR_THIN = 8.0;
   static inline final CRADLE_FLOOR_Y0 = 150.0;
+  static inline final CRADLE_FLOOR_STEP = 195.0;
   /** The wall stands clear of the Y drive's motor and bracket (x from 35) on the +x side: the servo is 8 mm toward -x of the cartridge (the flange's holes are 31.8 from its axis). */
   static inline final CRADLE_X0 = -56.0;
   static inline final CRADLE_X1 = 31.0;
-  /** The floor reaches farther on the +x side (x 38) for its bolts; it is far below the Y drive's motor. */
+  /** The floor ahead of the step is trimmed to the bolts' width; the thick part reaches farther on the +x side (x 38) for its bolts. */
+  static inline final CRADLE_FLOOR_THIN_X0 = -44.0;
   static inline final CRADLE_FLOOR_X1 = 38.0;
   /** The servo's axis in work x. */
   static inline final CRADLE_MOTOR_X = -HobSpindle.MOTOR_OFFSET;
-  /** Two ribs stiffen the wall against the servo rocking on its offset centre of mass: 8 thick, outside the flange, from y `CRADLE_RIB_Y0` to the wall's rear. */
+  /** One rib stiffens the wall against the servo rocking on its offset centre of mass: 6 thick, outside the flange, from y `CRADLE_RIB_Y0` to the wall's rear, with a lightening window. */
   static inline final CRADLE_RIB = 6.0;
-  static inline final CRADLE_RIB_Y0 = 199.0;
+  static inline final CRADLE_RIB_Y0 = 192.0;
+  /** The rib's window (work y, z above the cartridge axis): a 17 mm front post and a 15 mm rear post stay, and the foot below z 95. */
+  static inline final CRADLE_RIB_WINDOW_Y0 = 209.0;
+  static inline final CRADLE_RIB_WINDOW_Y1 = 232.0;
+  static inline final CRADLE_RIB_WINDOW_Z0 = 95.0;
+  static inline final CRADLE_RIB_WINDOW_Z1 = 160.0;
   /** The slit through the floor, over the seat's own, so the clamp's two arms are not bridged by the floor (it stops short of the wall by this much). */
   static inline final CRADLE_SLIT = 4.0;
   static inline final CRADLE_SLIT_END = 3.0;
+  /** The jack screw's lug under the servo flange: it stands on the floor against the wall's front face, `CRADLE_LUG` above the floor top, M8 vertical in the flange's y middle. */
+  static inline final CRADLE_LUG = 10.0;
+  static inline final CRADLE_LUG_Y0 = 224.0;
+  static inline final CRADLE_LUG_HALF = 13.0;
+  /** Width of the flange-bolt slots and of the rest, mm: M6 clearance 6.6 plus 0.4. */
+  static inline final CRADLE_SLOT = 7.0;
 
   /** The floor's four M8 into the seat block's top: two rows 50 apart along the spindle, 60 apart across it. */
   public static function cradleFloorBolts():Array<{x:Float, y:Float}> return [{x: -30.0, y: 165.0}, {x: 30.0, y: 165.0}, {x: -30.0, y: 215.0}, {x: 30.0, y: 215.0}];
+
+  /** The floor's top at work y: the thin part ahead of the step. */
+  static function cradleFloorTop(y:Float):Float return SEAT_HALF + (y < CRADLE_FLOOR_STEP ? CRADLE_FLOOR_THIN : CRADLE_FLOOR);
+
+  /** Work y of the wall's rear face. */
+  public static inline function cradleRearY():Float return CRADLE_FACE_Y + CRADLE_WALL;
 
   /**
    * The cradle's section for the drive-mode estimate: wall thickness and width, height above the floor, the rib's thickness, x and depth ahead of the
@@ -317,15 +343,26 @@ class HobberSaddle extends MachineComponent {
    */
   public static function cradleSection():{wall:Float, width:Float, x0:Float, height:Float, ribThickness:Float, ribDepth:Float, ribX:Float, floorTop:Float, bolts:Array<{x:Float, y:Float}>} {
     return {wall: CRADLE_WALL, width: CRADLE_X1 - CRADLE_X0, x0: CRADLE_X0, ribX: CRADLE_X0 - 2.0, height: HobSpindle.motorHeight() + 47 - (SEAT_HALF + CRADLE_FLOOR), ribThickness: CRADLE_RIB,
-      ribDepth: CRADLE_FACE_Y + CRADLE_WALL - CRADLE_RIB_Y0, floorTop: SEAT_HALF + CRADLE_FLOOR, bolts: cradleFloorBolts()};
+      ribDepth: cradleRearY() - CRADLE_RIB_Y0, floorTop: SEAT_HALF + CRADLE_FLOOR, bolts: cradleFloorBolts()};
+  }
+
+  /** The thicknesses the drive check reports: wall, thick floor, thin floor, jack lug height above the floor, slot travel (each way), slot width. */
+  public static function cradleDimensions():{wall:Float, floor:Float, floorThin:Float, lug:Float, travel:Float, slot:Float, jackY:Float} {
+    return {wall: CRADLE_WALL, floor: CRADLE_FLOOR, floorThin: CRADLE_FLOOR_THIN, lug: CRADLE_LUG, travel: HobSpindle.TENSION_TRAVEL, slot: CRADLE_SLOT, jackY: CRADLE_FACE_Y - 4.0};
   }
 
   static function cradleMotor():machinekit.motion.ServoMotor return machinekit.motion.LeadshineServo.driven(HobSpindle.MOTOR);
 
+  /** A slot as `holeTool` ends and the box between them: vertical (work z) with the round ends at `zc` +- `travel`, cut into +y from the mouth at `y0`. */
+  static function slotCuts(x:Float, zc:Float, width:Float, travel:Float, y0:Float, depth:Float):Array<Part> {
+    return [holeTool([x, y0, zc - travel], [0.0, 1, 0], width, depth), holeTool([x, y0, zc + travel], [0.0, 1, 0], width, depth),
+      box(x - width / 2, x + width / 2, y0 - 1, y0 + depth, zc - travel, zc + travel)];
+  }
+
   /**
    * The cradle's holes in the work frame lowered by the seat height (`inSeat` false), or the seat block's matching tapped holes (true): the
-   * floor's four M8 and two dowels into the seat's top, and in the cradle the motor's pilot register, four tapped flange holes and the
-   * shaft's through bore.
+   * floor's four M8 and two dowels into the seat's top, and in the cradle the motor's pilot register, four flange bolts and the
+   * shaft's through bore, all three vertical slots (listed as their two round ends), and the jack screw's tapped M8 in the lug.
    */
   static function cradleHoles(inSeat:Bool):Array<machinekit.component.ManufacturingRoute.RouteHole> {
     var list:Array<machinekit.component.ManufacturingRoute.RouteHole> = [], m8 = machinekit.standard.SocketHeadCapScrew.catalog().get("M8").tapDrill;
@@ -334,36 +371,55 @@ class HobberSaddle extends MachineComponent {
       n++;
       if (inSeat) list.push({id: "FT" + n, kind: "tapped", thread: "M8", diameter: m8, nominal: 8, fit: null, depth: 16.0,
         position: [b.x, b.y, SEAT_HALF], direction: [0.0, 0, -1]});
-      else list.push({id: "FS" + n, kind: "clearance", thread: "M8", diameter: 9.0, nominal: 8, fit: null, depth: CRADLE_FLOOR,
-        position: [b.x, b.y, SEAT_HALF + CRADLE_FLOOR], direction: [0.0, 0, -1]});
+      else list.push({id: "FS" + n, kind: "clearance", thread: "M8", diameter: 9.0, nominal: 8, fit: null, depth: cradleFloorTop(b.y) - SEAT_HALF,
+        position: [b.x, b.y, cradleFloorTop(b.y)], direction: [0.0, 0, -1]});
     }
     n = 0;
     for (x in [-40.0, 24.0]) {
       n++;
       list.push({id: "FD" + n, kind: "dowel", thread: null, diameter: 8.0, nominal: 8.0, fit: "H7", depth: 12.0,
-        position: [x, 190.0, inSeat ? SEAT_HALF : SEAT_HALF + CRADLE_FLOOR], direction: [0.0, 0, -1]});
+        position: [x, 190.0, inSeat ? SEAT_HALF : cradleFloorTop(190.0)], direction: [0.0, 0, -1]});
     }
     if (inSeat) return list;
     var motor = cradleMotor(), flange = motor.mounting();
     if (flange == null) flange = machinekit.motion.ServoMotor.assumedMounting(motor.rating.designation);
-    var c = HobSpindle.motorHeight(), drill = machinekit.component.MountingFace.boltFor(flange.holeDiameter).tapDrill, k = 0;
+    var c = HobSpindle.motorHeight(), t = HobSpindle.TENSION_TRAVEL, k = 0;
+    // The pilot register and the shaft bore are slots too (the servo slides on its flange bolts, the pilot has the travel to spare).
     list.push({id: "P1", kind: "bore", thread: null, diameter: flange.pilotDiameter + 0.2, nominal: flange.pilotDiameter, fit: "H7",
-      depth: flange.pilotHeight, position: [CRADLE_MOTOR_X, CRADLE_FACE_Y, c], direction: [0.0, 1, 0]});
+      depth: flange.pilotHeight, position: [CRADLE_MOTOR_X, CRADLE_FACE_Y, c], direction: [0.0, 1, 0], slotLength: 2 * t, slotAxis: [0.0, 0, 1]});
     list.push({id: "P2", kind: "bore", thread: null, diameter: motor.rating.shaftDiameter + 8, nominal: motor.rating.shaftDiameter + 8, fit: null,
-      depth: CRADLE_WALL, position: [CRADLE_MOTOR_X, CRADLE_FACE_Y, c], direction: [0.0, 1, 0]});
-    for (h in flange.holes) list.push({id: "M" + (++k), kind: "tapped", thread: "M" + Std.int(flange.holeDiameter - 0.5), diameter: drill, nominal: flange.holeDiameter - 0.5,
-      fit: null, depth: 12.0, position: [CRADLE_MOTOR_X + h.x, CRADLE_FACE_Y, c + h.y], direction: [0.0, 1, 0]});
+      depth: CRADLE_WALL, position: [CRADLE_MOTOR_X, CRADLE_FACE_Y, c], direction: [0.0, 1, 0], slotLength: 2 * t, slotAxis: [0.0, 0, 1]});
+    // The flange bolts: M6 from the motor side through the slot and a washer and nut on the wall's rear face.
+    for (h in flange.holes) {
+      k++;
+      list.push({id: "M" + k, kind: "clearance", thread: "M" + Std.int(flange.holeDiameter - 0.5), diameter: CRADLE_SLOT, nominal: flange.holeDiameter - 0.5, fit: null,
+        depth: CRADLE_WALL, position: [CRADLE_MOTOR_X + h.x, CRADLE_FACE_Y, c + h.y], direction: [0.0, 1, 0], slotLength: 2 * t, slotAxis: [0.0, 0, 1]});
+    }
+    // The jack screw: M8 up through the lug, its tip on the flange's underside.
+    list.push({id: "J1", kind: "tapped", thread: "M8", diameter: m8, nominal: 8, fit: null, depth: CRADLE_LUG,
+      position: [CRADLE_MOTOR_X, CRADLE_FACE_Y - 4.0, cradleFloorTop(CRADLE_FACE_Y) + CRADLE_LUG], direction: [0.0, 0, -1]});
     return list;
   }
 
-  /** The motor cradle: a milled steel part, floor on the seat block's top, wall carrying the servo flange (pilot and four tapped holes), two ribs. */
+  /** The motor cradle: a milled steel part, a floor on the seat block's top, a wall with the servo's slotted flange register, a jack lug and one windowed rib. */
   static function motorCradle():Part {
-    var c = HobSpindle.motorHeight(), top = c + 47, rear = CRADLE_FACE_Y + CRADLE_WALL, low = SEAT_HALF, floor = low + CRADLE_FLOOR;
-    var body = Solids.union([box(CRADLE_X0, CRADLE_FLOOR_X1, CRADLE_FLOOR_Y0, rear, low, floor),
+    var c = HobSpindle.motorHeight(), top = c + 47, rear = cradleRearY(), low = SEAT_HALF, floor = low + CRADLE_FLOOR, thin = low + CRADLE_FLOOR_THIN;
+    var body = Solids.union([box(CRADLE_FLOOR_THIN_X0, CRADLE_FLOOR_X1, CRADLE_FLOOR_Y0, CRADLE_FLOOR_STEP, low, thin),
+      box(CRADLE_X0, CRADLE_FLOOR_X1, CRADLE_FLOOR_STEP, rear, low, floor),
       box(CRADLE_X0, CRADLE_X1, CRADLE_FACE_Y, rear, floor, top),
-      box(CRADLE_X0 - 5, CRADLE_X0 + 1, CRADLE_RIB_Y0, rear, low, top)]);
+      box(CRADLE_X0 - 5, CRADLE_X0 + 1, CRADLE_RIB_Y0, rear, low, top),
+      box(CRADLE_MOTOR_X - CRADLE_LUG_HALF, CRADLE_MOTOR_X + CRADLE_LUG_HALF, CRADLE_LUG_Y0, CRADLE_FACE_Y + 0.5, floor, floor + CRADLE_LUG)]);
     var slit = box(-CRADLE_SLIT / 2, CRADLE_SLIT / 2, CRADLE_FLOOR_Y0 - 1, CRADLE_FACE_Y - CRADLE_SLIT_END, low - 1, floor + 1);
-    return withHoles(Solids.cut(body, [slit]), cradleHoles(false));
+    var window = box(CRADLE_X0 - 6, CRADLE_X0 + 2, CRADLE_RIB_WINDOW_Y0, CRADLE_RIB_WINDOW_Y1, CRADLE_RIB_WINDOW_Z0, CRADLE_RIB_WINDOW_Z1);
+    var flange = cradleMotor().mounting();
+    if (flange == null) flange = machinekit.motion.ServoMotor.assumedMounting(cradleMotor().rating.designation);
+    var t = HobSpindle.TENSION_TRAVEL, cuts = [slit, window];
+    // Pilot recess, shaft bore and the four flange-bolt slots, then the plain holes.
+    cuts = cuts.concat(slotCuts(CRADLE_MOTOR_X, c, flange.pilotDiameter + 0.2, t, CRADLE_FACE_Y, flange.pilotHeight));
+    cuts = cuts.concat(slotCuts(CRADLE_MOTOR_X, c, cradleMotor().rating.shaftDiameter + 8, t, CRADLE_FACE_Y, CRADLE_WALL));
+    for (h in flange.holes) cuts = cuts.concat(slotCuts(CRADLE_MOTOR_X + h.x, c + h.y, CRADLE_SLOT, t, CRADLE_FACE_Y, CRADLE_WALL));
+    var plain = [for (h in cradleHoles(false)) if (h.slotLength == null) h];
+    return withHoles(Solids.cut(body, cuts), plain);
   }
 
   /** The seat holes of both supports on the one pad, ids numbered per support (F for the fixed support, B for the floating one). */

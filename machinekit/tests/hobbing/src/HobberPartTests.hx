@@ -175,7 +175,7 @@ class HobberPartTests {
     check((cast spindle.motor : machinekit.motion.LeadshineServo).clearanceBoxes().length == 3
       && (cast spindle.motor : machinekit.motion.LeadshineServo).clearanceBoxes().filter(b -> b.name != "body" && b.y1 == 55).length == 2,
       "spindle servo clearance has its body and both connectors, reaching LH 55 from the axis");
-    near(spindle.maxSpeed(), 4000 * 2 * Math.PI / 60, 1e-9, "B speed limit is the 4000 rpm cartridge rating (the servo's 5000 rpm through the 36T/45T belt reaches it)");
+    near(spindle.maxSpeed(), 4000 * 2 * Math.PI / 60, 1e-9, "B speed limit is the 4000 rpm cartridge rating (the servo's 5000 rpm through the 1:1 belt exceeds it)");
     check(
       spindle.definition().joints.filter(j -> j.id == "B")[0].limits.velocity == spindle.maxSpeed(),
       "B joint carries the cartridge speed limit"
@@ -183,18 +183,21 @@ class HobberPartTests {
     check(spindle.encoder.countsPerRevolution == HobSpindle.ENCODER_COUNTS && spindle.encoder.absolute
       && spindle.motorEncoder.countsPerRevolution == spindle.motor.rating.encoderCounts,
       "B master is the cartridge's own 19-bit absolute encoder; the servo keeps its own for the drive loop");
-    near(spindle.ratio, 1.25, 1e-9, "the belt turns the motor 1.25 times per spindle turn");
-    near(spindle.jointTorque(2), 2.5, 1e-9, "the belt reduction multiplies the motor torque by 1.25");
-    check(spindle.motorPulley.teeth == 36 && spindle.spindlePulley.teeth == 45 && spindle.belt.length > 0,
-      "HTD5M 36T on the motor, 45T on the spindle, one belt");
+    near(spindle.ratio, 1.0, 1e-9, "the belt turns the motor once per spindle turn");
+    near(spindle.jointTorque(2), 2.0, 1e-9, "the 1:1 belt passes the motor torque unchanged");
+    check(spindle.motorPulley.teeth == 40 && spindle.spindlePulley.teeth == 40 && Math.abs(spindle.belt.length - 450) < 1e-6 && spindle.belt.teeth == 90,
+      "HTD5M 40T on the motor and on the spindle, one 450 mm (90 tooth) belt");
+    near(HobSpindle.centres(), 125, 1e-6, "the 450-5M belt sits on 125 mm centres");
+    near(HobSpindle.tensionAt(HobSpindle.spanFrequency(250)), 250, 1e-9, "span frequency and tension convert both ways");
     check(spindle.motorPulley.boreDiameter == spindle.motor.rating.shaftDiameter && spindle.spindlePulley.boreDiameter == 20,
       "pulley bores are the motor shaft and the Ø20 stub");
     check(HobSpindle.pulleyFront(spindle.motor.rating.shaftLength) - HobSpindle.PULLEY_WIDTH >= HobSpindle.SHAFT_REAR,
       "the cartridge stub reaches past the pulley");
     var cradle = new machinekit.hobbing.HobberSaddle("GE-motor-cradle"), cradleHoles = cradle.holes();
-    check(machinekit.component.ManufacturingRoute.of(cradle) != null && cradleHoles.filter(h -> h.kind == "tapped").length == 4
-      && cradleHoles.filter(h -> h.kind == "dowel").length == 2 && cradleHoles.filter(h -> h.kind == "clearance").length == 4,
-      "the servo cradle is a routed milled part with the flange's four tapped holes, four floor bolts and two dowels");
+    check(machinekit.component.ManufacturingRoute.of(cradle) != null && cradleHoles.filter(h -> h.kind == "tapped").length == 1
+      && cradleHoles.filter(h -> h.kind == "dowel").length == 2 && cradleHoles.filter(h -> h.kind == "clearance" && h.thread == "M8").length == 4
+      && cradleHoles.filter(h -> h.kind == "clearance" && h.thread == "M6" && h.slotLength == 2 * HobSpindle.TENSION_TRAVEL).length == 4,
+      "the servo cradle is a routed milled part with the jack screw's tapped M8, four floor bolts, two dowels and the flange's four M6 vertical slots");
     check(spindle.frontBearing != spindle.rearBearing, "spindle has two bearing instances");
     check(
       spindle.billOfMaterials().quantity(spindle.frontBearing.bom.partNumber) == 2,

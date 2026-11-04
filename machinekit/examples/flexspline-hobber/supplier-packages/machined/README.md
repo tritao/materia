@@ -35,7 +35,7 @@ Python 3 with numpy, and Chrome or Chromium on the PATH for the PDFs; `pdftotext
 | `HOBBER-GE-swivel-plate` | ground steel plate, 15 mm (not aluminium: it carries the steel Y rails and the spindle seat), sawn to size, two faces ground after cutting, holes (Y scale housing seat, 8 adapter-ring screws) | plate 15 |
 | `HOBBER-GE-swivel-adapter` | turned ring, 2 setups, fine, aluminium (output flange to swivel plate) | bar |
 | `HOBBER-GE-spindle-seat` | milled split-clamp block for the Ø80 g6 cartridge, 2 setups, tight | block |
-| `HOBBER-GE-motor-cradle` | milled steel, 2 setups, fine: 12 mm floor on the spindle seat block's top (4 × M8, 2 dowels, slit over the seat's), 15 mm wall carrying the spindle servo's flange (Ø70 pilot, 4 × M6 tapped), one 6 mm rib | block |
+| `HOBBER-GE-motor-cradle` | milled steel, 2 setups, fine: 12 mm floor (8 mm ahead of y 195) on the spindle seat block's top (4 × M8, 2 dowels, slit over the seat's), 8 mm wall carrying the spindle servo's flange (Ø70 pilot slot, 4 × M6 in vertical slots, ±3 mm travel; nuts on the rear), M8 jack screw lug under the flange, one windowed 6 mm rib | block |
 | `NUT-BLOCK-...` (X, Y, Z) | ground flat bar, 16 mm, bore, holes | 60 x 16 |
 
 Quantities are one per machine. The list is the exporter's `DESIGNS` plus one nut block per axis; a new route on a
