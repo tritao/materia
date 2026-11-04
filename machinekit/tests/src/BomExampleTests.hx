@@ -89,7 +89,10 @@ class BomExampleTests {
         var rail:machinekit.motion.LinearRail = cast entry.component;
         railHoles += rail.holePositions.length;
       }
-      if (quantity(document, "ISO4762-M4x16") != railHoles || railHoles == 0
+      var blocks = 0;
+      for (entry in machine.components()) if (Std.isOfType(entry.component, machinekit.motion.LinearRailBlock)) blocks++;
+      // Four screws per carriage block join the rail screws in the same M4 x 16 line.
+      if (quantity(document, "ISO4762-M4x16") != railHoles + 4 * blocks || railHoles == 0
         || quantity(document, "ISO4762-M5x12") != 8 || quantity(document, "ISO4762-M6x12") != 4)
         throw "Bench mill fasteners must match the rail and motor flange patterns";
       var mill:BenchMill = cast machine;
