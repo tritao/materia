@@ -164,19 +164,18 @@ class JointFasteners {
     }
     var members = new Map<String, MachineComponent>();
     for (entry in assembly.components()) members.set(entry.id, entry.component);
+    var matchedAlternatives = new Map<String, Bool>();
+    var unmatched:Array<{placed:Placed, subject:String}> = [];
     var used = new Map<String, String>();
     var derived = new Map<String, Array<{x:Float, y:Float, joint:String}>>();
     for (a in clamped) {
       var subject = a.member + "#" + a.face.id;
       var candidates = [for (b in receiving) if (b.member != a.member && meets(a, b, tolerance)) b];
       if (candidates.length == 0) {
-        result.diagnostics.error(
-          "fasteners.unmatched",
-          subject,
-          '$subject has clearance holes but no receiving face where it lies: its fasteners have nothing to thread into'
-        );
+        unmatched.push({placed: a, subject: subject});
         continue;
       }
+      if (a.face.alternative != null) matchedAlternatives.set(a.member + "#" + a.face.alternative, true);
       if (candidates.length > 1) {
         result.diagnostics.error(
           "fasteners.ambiguous",
@@ -188,6 +187,16 @@ class JointFasteners {
       var b = candidates[0];
       var joint = joinFaces(result, a, b, tolerance, propertyClass, access, group, members, used, derived);
       if (joint != null) result.joints.push(joint);
+    }
+    // A face is unmatched unless it is one of a set of alternatives and another of them is bolted on.
+    for (entry in unmatched) {
+      var alternative = entry.placed.face.alternative;
+      if (alternative != null && matchedAlternatives.exists(entry.placed.member + "#" + alternative)) continue;
+      result.diagnostics.error(
+        "fasteners.unmatched",
+        entry.subject,
+        '${entry.subject} has clearance holes but no receiving face where it lies: its fasteners have nothing to thread into'
+      );
     }
     for (key in derived.keys()) spacing(result, key, derived.get(key), result.joints);
     return result;

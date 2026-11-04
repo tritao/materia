@@ -204,6 +204,26 @@ class LeadScrewNut extends MachineComponent {
     );
   }
 
+  /**
+	 * The flange's two faces, as alternatives: a bolted flange sits on a plate by its barrel-side face (the bolts tap into a
+	 * block ahead of the barrel, head on the flange back) or by its back face (the bolts pass the plate, head on the barrel
+	 * side). Clearance holes as drawn (`geometry`); the grip is the flange.
+	 */
+  override public function fasteningFaces():Array<machinekit.component.BoltedFace> {
+    if (!flanged) return [];
+    var screw = SocketHeadCapScrew.catalog().get(mountScrew);
+    if (screw == null) throw 'No ${mountScrew} screw row for the nut flange';
+    var pattern = boltPattern();
+    var barrel = machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: flangeOffset}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0});
+    var back = machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: flangeOffset + flangeThickness}, {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0});
+    return [
+      machinekit.component.BoltedFace.clamped("barrel", barrel, [for (p in pattern) {x: p.x, y: p.y}], screw.clearanceMedium, flangeThickness,
+        mountScrew, null, true, false, "flange"),
+      machinekit.component.BoltedFace.clamped("back", back, [for (p in pattern) {x: p.x, y: -p.y}], screw.clearanceMedium, flangeThickness,
+        mountScrew, null, true, false, "flange")
+    ];
+  }
+
   /** Diameter of the core hole the block taps for the flange bolts. */
   public function mountingTapDrill():Float {
     var screw = SocketHeadCapScrew.catalog().get(mountScrew);

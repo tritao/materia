@@ -71,9 +71,15 @@ class BoltedFace {
   public final drawn:Bool;
   /** Whether a clamped face wants a plain washer under the head (a soft or thin bearing surface); a nut always has one. */
   public final washer:Bool;
+  /**
+	 * Names a set of faces of one part that are alternatives (a nut flange bolts on by either of its faces): the part is
+	 * fastened if one of them meets a receiving face, and only when none does is it unmatched.
+	 */
+  public final alternative:Null<String>;
 
   function new(id:String, frame:AssemblyFrame, role:BoltedRole, holes:Null<Array<BoltHole>>, width:Float, height:Float,
-      ?thicknessAt:(Float, Float) -> Float, drawn:Bool = true, washer:Bool = false) {
+      ?thicknessAt:(Float, Float) -> Float, drawn:Bool = true, washer:Bool = false, ?alternative:String) {
+    this.alternative = alternative;
     this.thicknessAt = thicknessAt;
     this.drawn = drawn;
     this.washer = washer;
@@ -104,8 +110,8 @@ class BoltedFace {
   }
 
   public static function clamped(id:String, frame:AssemblyFrame, holes:Array<BoltHole>, clearance:Float, grip:Float,
-      ?size:String, ?recess:BoltRecess, drawn:Bool = true, washer:Bool = false):BoltedFace return new BoltedFace(id, frame,
-      Clamped(size, clearance, grip, recess), holes, 0, 0, null, drawn, washer);
+      ?size:String, ?recess:BoltRecess, drawn:Bool = true, washer:Bool = false, ?alternative:String):BoltedFace return new BoltedFace(id, frame,
+      Clamped(size, clearance, grip, recess), holes, 0, 0, null, drawn, washer, alternative);
 
   /** A plate the bolt passes through, with a nut and washer on its far side (`BoltedRole.Through`). */
   public static function through(id:String, frame:AssemblyFrame, holes:Array<BoltHole>, clearance:Float, thickness:Float, ?size:String,

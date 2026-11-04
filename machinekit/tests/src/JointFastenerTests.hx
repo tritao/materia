@@ -274,7 +274,9 @@ class JointFastenerTests {
     check(count.get("ISO4762-M5x12") == 8 && count.get("ISO4762-M6x12") == 4, 'motor screws: ${[for (k in count.keys()) k + "=" + count.get(k)]}');
     var total = 0;
     for (key in count.keys()) total += count.get(key);
-    check(total == railHoles + 12, "no other screw is derived");
+    // The three ball nuts (six flange bolts each) are bolted through their adapter plates with a washer and a nut.
+    check(count.get("ISO4762-M5x30") == 18 && count.get("ISO7089-M5") == 18 && count.get("ISO4032-M5") == 18, 'nut flange bolts: ${[for (k in count.keys()) k + "=" + count.get(k)]}');
+    check(total == railHoles + 12 + 18 + 18 + 18, 'screws, washers and nuts only: $total');
     var rails = [for (joint in derivation.joints) if (joint.drilledToSuit) joint];
     check(rails.length == 6, "six rails are bolted to cast pads, got " + rails.length);
     // The derived fasteners fit the mill's solids: holes cut, heads and drivers clear.
@@ -288,7 +290,7 @@ class JointFastenerTests {
     // Open findings of the mill, stated by the check and not yet resolved in the model: the motors' corner screws at (-25, -25)
     // meet the motor body at its corner and, on X, the screw support next to it.
     check(fit.errors().length == 7, 'the mill\'s known motor-corner findings are 7, found ${fit.errors().length}');
-    Sys.println('bench mill: ${derivation.joints.length} joints, ${derivation.count()} screws (${railHoles} rail, 12 motor), ' + [for (k in count.keys()) k + " x" + count.get(k)].join(", "));
+    Sys.println('bench mill: ${derivation.joints.length} joints, ${derivation.count()} screws (${railHoles} rail, 12 motor, 18 nut flange), ' + [for (k in count.keys()) k + " x" + count.get(k)].join(", "));
     // The drilled seats are in the castings' solids: one tap-drill hole per rail screw, none anywhere else.
     var cut = 0;
     for (entry in machine.components()) {

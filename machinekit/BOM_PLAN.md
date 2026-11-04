@@ -482,8 +482,8 @@ and readers reject anything else. It contains:
 
 ### F1 — Joint-derived fasteners (2026-11-04)
 
-Status: first slice done on branch `joint-fasteners`; the bench mill's rail and
-motor screws are derived and the B6 declarations are deleted.
+Status: first slice done (local main 15c70f491): the bench mill's rail and motor screws are derived and the B6
+declarations are deleted. Second slice below (items 1-3 of the old open list, and the nut flange adopters).
 
 Vocabulary (one path, no hand-declared fallback):
 
@@ -520,36 +520,61 @@ the same lines B6 declared, with the cast-iron engagement and the saddle's thin
 wall over the nut bore now checked rather than assumed. The saddle check is
 real: with a uniform 10 mm wall the M4x16 rail screws fail `fasteners.back-wall`.
 
+Second slice (2026-11-04, branch `joint-fasteners-2`):
+
+- **Derived holes are geometry.** `deriveFasteners()` hands the derivation's `machining` (tap-drill holes of every
+  host drilled to suit; clearance holes and counterbores of a clamped face whose part does not draw them,
+  `BoltedFace.drawn` false; clearance holes of an undrawn `through` plate) to the parts with
+  `MachineComponent.machine(cuts)`. A part that cuts them opts in with `machinable()` and ends `geometry()` with
+  `machined(...)`; deriving a joint that needs a hole in a part that cannot cut it is `fasteners.machining`. The
+  derivation is computed once from the solved joint (no second hole list); the cuts are in the part's frame, so no
+  cycle with poses: poses come from connectors, geometry follows the derivation. The geometry key and the BOM revision
+  include the cuts (a drilled casting is another revision), so caches cannot serve the undrilled solid. `MillCasting`
+  is machinable: the bench mill's 48 rail holes are in the casting solids and `JointFastenerTests` checks the volume
+  removed. Preview speed: one extra boolean per casting build, kept by `PosedParts` per geometry key.
+- **Head, washer, nut and driver clearance.** Each `FastenedJoint` carries `volumes` (receiving face frame, +Z into the
+  receiving part): the hole through the clamped part and the thread/plate hole, the washer, the head, the nut and
+  washer of a bolt, and a driver access cylinder of `FastenerOptions.accessLength` (default 25 mm, a hex key's short
+  arm). `AssemblyIntegrity.fasteners(assembly)` (also option `fasteners`, on in `strict`) poses them against the
+  members: `fasteners.hole` (material in a hole the screw passes), `fasteners.head-clearance` (head, washer or nut meets
+  a member, including the clamped part's own body: a recess the geometry does not draw), `fasteners.access`
+  (only members rigidly fixed with the clamped part count: a moving member can be moved away).
+- **Washers and nuts.** `BoltedFace.clamped(..., washer)` asks for an ISO 7089 washer under the head (it lifts the head:
+  the recess must still hold it); `BoltedFace.through` is a plate with clearance holes, and the derivation selects the
+  ISO 7089 washer and ISO 4032 nut, takes the length from the stack (grip + washers + plate + nut + two pitches) and adds
+  the washer and nut to the BOM lines.
+- **Adopters added.** `LeadScrewNut` flange (two alternative clamped faces, `BoltedFace.alternative`: barrel side and
+  back; an unmatched face is only an error when none of its alternatives is bolted on), `NutBlock` (tapped) and the bench
+  mill's `MillNutBracket` (a `through` plate): the mill now derives 18 M5x30 flange bolts with 18 washers and 18 nuts (six
+  per axis) besides the 48 + 12 + 8 screws.
+
+Findings the checks make on the bench mill, left open on purpose (they are the model's, not the checks'): the two axis
+motors' corner screws at (-25, -25) meet the motor body at the corner (heads and driver access) and, on X, the screw
+support `screwXNearBridge` stands in the screw's hole and head (`JointFastenerTests` pins the seven findings, none on a
+rail or nut screw).
+
 Not done yet (open, in order):
 
-1. Washers and nuts: a clamped face has no washer thickness or bearing
-   diameter; a receiving face cannot be a through hole with a nut.
-2. Head/tool clearance as geometry: only the recess fit is checked. A head
-   envelope (head plus driver access) intersected with the other members'
-   posed parts belongs in `AssemblyIntegrity` beside `integrity.mount.cutout`.
-3. Apply the derived host drilling to the host geometry (tap-drill holes in
-   the casting, counterbore in the clamped part) so `AssemblyIntegrity`'s
-   flange cut-out check and the casting drawings see them; today the result
-   lists the holes and the casting geometry is unchanged.
-4. Instance the derived screws as real members with `head` mates (what
-   `MillRailFasteners` and `MountServiceScrews` do for the mineral frame) from
-   the same `FastenedJoint`, and delete that second selection path; they use
-   preferred-length lists and `DesignInterfaces` holes and should become
-   receiving faces.
-5. Rail blocks on carriages, ball-nut flange, screw supports and the spindle
-   motor shelf have no faces yet (the B6 BOM never listed them either).
-6. Hobber adoption (another worktree owns those files): Y nut seat becomes a
-   receiving face drilled to suit on the housing (tapped to the nut flange's
-   clamped pattern, its hole positions then come out of the derivation);
-   X carriage and Z saddle fixings to the rail blocks and column are clamped
-   faces on the carriage/saddle (clearance holes, grip) meeting receiving
-   faces on the block (tapped, with the block's published thread depth) and
-   the column (drilled to suit); scale heads get a clamped face from the head
-   recess and a receiving face on the bracket; the swivel plate's M5 heads
-   are the recess case, a clamped face with `recess` from the counterbore so a
-   head standing proud of the face fails `fasteners.head-clearance` rather
-   than escaping the checks. Replace each hand-placed screw by the derived
-   list and delete the hand placement in the same change.
+1. Rail blocks on carriages: the block top is a tapped receiving face (`LinearRailBlock.mountThreadDepth`, HGH15CA M4 x 5)
+   but the castings need the other half: a clamped face whose holes follow the block pattern (a clamped footprint
+   "drilled to suit", the mirror of `drilledToSuit`, pairing with several blocks), and a casting seat design that states
+   its grip and counterbore (a bolt through the whole head casting is not a screw length). Needs that decision first.
+2. Screw support units and motor mounts: foot faces exist as `MountingFace.tappedFoot`; as `BoltedFace` they need the
+   foot's grip and bolt recess (`boltSeatY` is assumed for unreviewed supports) and receiving faces on the casting pads
+   and `MillDriveBox` stands (drilled to suit, machinable).
+3. Fold in `MillRailFasteners` and `MountServiceScrews`. They instance real screw members with `head` mates from the
+   mineral frame's `DesignInterfaces` holes, with provenance fingerprints. The derivation lists BOM lines; to replace
+   them it must also instance members (head mates, `Coaxial` requirements) from a `FastenedJoint`, and the mineral
+   inserts must become receiving faces. Until then both selection paths exist.
+4. Hobber adoption (another worktree owns those files): Y nut seat becomes a receiving face drilled to suit on the
+   housing (tapped to the nut flange's clamped pattern, its hole positions then come out of the derivation); X carriage
+   and Z saddle fixings to the rail blocks and column are clamped faces on the carriage/saddle (clearance holes, grip)
+   meeting receiving faces on the block (tapped, with the block's published thread depth) and the column (drilled to
+   suit); scale heads get a clamped face from the head recess and a receiving face on the bracket; the swivel plate's M5
+   heads are the recess case, a clamped face with `recess` from the counterbore so a head standing proud of the face fails
+   `fasteners.head-clearance` rather than escaping the checks. The hobber's parts that are drilled to suit must be
+   `machinable()` and end `geometry()` with `machined(...)`. Replace each hand-placed screw by the derived list and delete
+   the hand placement in the same change.
 
 ### B7 — Rollout and hard gate
 - Done in `fa1f1534f`. The full gate passed 11/24 shards with no new

@@ -913,6 +913,18 @@ private class MillNutBracket extends MachineComponent {
   override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
     [drawingNumber, materialSpec(), axis, machinekit.component.ComponentNumberKey.encode(mountRise),
       machinekit.motion.BallNut.recipeType().key(nut.values())].join("|"), 1);
+  /**
+	 * The plate the nut flange's back face seats on: clearance holes for the flange bolts, which pass through it and are held by
+	 * a washer and nut on the far side.
+	 */
+  override public function fasteningFaces():Array<machinekit.component.BoltedFace> return [machinekit.component.BoltedFace.through(
+    "nut",
+    machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0}),
+    [for (p in nut.boltPattern()) {x: p.x, y: p.y}],
+    5.5,
+    8,
+    nut.mountScrew
+  )];
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var radius = nut.flangeDiameter / 2 + (axis == "y" ? 11 : 1);

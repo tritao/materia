@@ -165,6 +165,17 @@ class NutBlock extends MachineComponent {
       number(nut.boltCircleDiameter), nut.mountScrew, Std.string(nut.boltCount)].join("|"), 1);
   }
 
+  /** The face the nut's flange seats on: its bolts thread the tap-drill holes `geometry` cuts, through the bar. */
+  override public function fasteningFaces():Array<machinekit.component.BoltedFace> return [machinekit.component.BoltedFace.tapped(
+    "nut",
+    machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0}),
+    [for (p in nut.mountingHoles()) {x: p.x, y: p.y}],
+    nut.mountScrew,
+    thickness,
+    thickness,
+    true
+  )];
+
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
