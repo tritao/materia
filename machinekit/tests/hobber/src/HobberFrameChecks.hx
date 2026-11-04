@@ -1,7 +1,12 @@
 import machinekit.assembly.AssemblyIntegrity;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.MachineKitComponents;
+import machinekit.hobbing.FoundationLayout;
+import machinekit.hobbing.HobSpindle;
+import machinekit.hobbing.HobberCastingPockets;
 import machinekit.hobbing.HobberSaddle;
+import machinekit.hobbing.HobberSpindleRelief;
+import machinekit.hobbing.HobberXLayout;
 import machinekit.hobbing.HobberScales;
 import machinekit.hobbing.SpindleHousing;
 import machinekit.hobbing.HobberSwivelLayout;
@@ -18,19 +23,16 @@ class HobberFrameChecks {
     return [for (item in report.errors()) item.code + " " + item.message];
   }
 
-  /**
-   * The members whose strict-integrity findings are open, with the reason for each. A finding on any other member fails the check, so the
-   * frames, drives, guides, casting and anchors stay covered.
-   * - `spindle/motor`: the servo's bottom edge passes 1.79 mm (running gap 2 mm) above the bed casting's end beam top at X 45, Y -10, Z -10,
-   *   A +15 deg. It is the Z travel's lower end, not the tilt or the servo's clocking (a square 80 flange has four equivalent clockings): the
-   *   servo's bottom stands 1.8 mm above the beam end at Z -10. The fix is a choice: a 1 mm relief in the bed beam's end top (casting
-   *   change), or the Z lower limit at -9.8 (travel change); see FRAME_PLAN.
-   */
   /** Assumed guide pitch/yaw error over the travel, arcseconds (no measurement yet): sets the uncompensated Abbe error printed by `scales`. */
   static inline final GUIDE_ANGLE_ERROR_ARCSEC = 5.0;
   static inline final GUIDE_ANGLE_ERROR_RAD = GUIDE_ANGLE_ERROR_ARCSEC * Math.PI / 648000;
 
-  static final OPEN_MEMBERS = ["spindle/motor"];
+  /**
+   * The members whose strict-integrity findings are open, with the reason for each. A finding on any other member fails the check, so the
+   * frames, drives, guides, casting and anchors stay covered.
+   * Empty: the last one, the spindle servo against the bed casting, is fixed by the relief in the casting (`HobberSpindleRelief`).
+   */
+  static final OPEN_MEMBERS:Array<String> = [];
 
   /** Integrity errors that do not touch an open member (see `OPEN_MEMBERS`). */
   public static function newErrors(machine:FlexsplineHobber, sweep:Bool):Array<String> {
@@ -231,28 +233,76 @@ class HobberFrameChecks {
     return lines;
   }
 
-  /** Where the spindle servo comes closest to the bed casting at the worst sweep state: bounds of the casting inside the servo's box grown by 3 mm. */
-  public static function motorGap(machine:FlexsplineHobber):Array<String> {
+  /**
+   * The relief in the bed casting under the spindle servo (`HobberSpindleRelief`). Checks (1) the relief's pose chain against the solved
+   * machine at three joint states (servo frame within 1e-6 mm and radians), (2) the servo, with its connector envelopes, keeps the running
+   * gap from the finished casting at the extreme poses including the overtravel on every axis, and (3) the casting keeps `WALL` of solid
+   * material under the pocket's floor. Returns the report lines; throws with the numbers otherwise.
+   */
+  public static function spindleRelief(machine:FlexsplineHobber):Array<String> {
+    var relief = HobberSpindleRelief.result(), lines = [];
+    function r(v:Float, d:Int = 2):Float return Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
+    if (relief == null) throw "the spindle servo never comes within the running gap of the bed casting: the relief feature should not exist";
     var model = new cadkit.modeling.AssemblyModel("mm");
     machine.addTo(model, "");
     var state = model.initialState();
-    state.setJoint("X", machine.travel.filter(t -> t.id == "X")[0].lower);
-    state.setJoint("Y", -10);
-    state.setJoint("Z", -10);
-    state.setJoint("swivel/A", 0.2617);
+    var toMachine = FlexsplineHobber.MACHINE_FROM_WORK, zero = HobberSpindleRelief.motorZeroPose(HobSpindle.MOTOR_CLOCKING);
+    function analytic(x:Float, y:Float, z:Float, a:Float) return F.compose(toMachine, F.compose(HobberSpindleRelief.motion(x, y, z, a), zero));
+    // (1) the chain.
+    var xl = machine.travel.filter(t -> t.id == "X")[0].lower, xu = machine.travel.filter(t -> t.id == "X")[0].upper;
+    for (s in [{x: xl, y: 0.0, z: 0.0, a: 0.0}, {x: xl, y: -10.0, z: -10.0, a: 15 * Math.PI / 180}, {x: (xl + xu) / 2, y: 7.0, z: 120.0, a: -9 * Math.PI / 180}]) {
+      state.setJoint("X", s.x);
+      state.setJoint("Y", s.y);
+      state.setJoint("Z", s.z);
+      state.setJoint("swivel/A", s.a);
+      state.forwardKinematics();
+      var actual = state.worldPose("spindle/motor"), expected = analytic(s.x, s.y, s.z, s.a), worst = 0.0;
+      worst = Math.max(worst, Math.max(Math.abs(actual.x - expected.x), Math.max(Math.abs(actual.y - expected.y), Math.abs(actual.z - expected.z))));
+      var ma = F.toRotationMatrix(actual), me = F.toRotationMatrix(expected);
+      for (i in 0...9) worst = Math.max(worst, Math.abs(ma[i] - me[i]));
+      if (worst > 1e-6) throw 'spindle relief pose chain differs from the machine by ${worst} at X ${s.x}, Y ${s.y}, Z ${s.z}, A ${r(s.a * 180 / Math.PI, 1)} deg';
+    }
+    for (t in machine.travel) if (t.id == "X" && t.lower < HobberScales.stroke("X").lower - 1e-9) throw 'X lower limit ${t.lower} is below the design stroke ${HobberScales.stroke("X").lower} the relief is derived for';
+    state.setJoint("X", xl);
     state.forwardKinematics();
     var cache = new machinekit.assembly.PosedParts(), members = machine.components();
-    function posed(id:String) return cache.posed(members.filter(m -> m.id == id)[0].component, state.worldPose(id));
-    var motor = posed("spindle/motor"), casting = posed("bed/casting"), lines = [];
-    var b = machinekit.assembly.PosedParts.boxOf(motor);
-    lines.push('motor box x ${b.minX}..${b.maxX} y ${b.minY}..${b.maxY} z ${b.minZ}..${b.maxZ}; distance to bed casting ${motor.distance(casting)}');
-    var g = 3.0, grown = cadkit.modeling.Part.box(b.maxX - b.minX + 2 * g, b.maxY - b.minY + 2 * g, b.maxZ - b.minZ + 2 * g, cadkit.modeling.Align.Center, cadkit.modeling.Align.Center, cadkit.modeling.Align.Center);
-    var placed = machinekit.assembly.PosedParts.moved(grown, F.translation((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, (b.minZ + b.maxZ) / 2));
-    var near = placed.intersect(casting);
-    if (near.volume() < 1e-6) { lines.push('no casting inside the grown box'); cache.close(); return lines; }
-    var c = machinekit.assembly.PosedParts.boxOf(near);
-    lines.push('casting inside the grown box: ${near.volume()} mm3, x ${c.minX}..${c.maxX} y ${c.minY}..${c.maxY} z ${c.minZ}..${c.maxZ}');
+    var castingPose = state.worldPose("bed/casting");
+    var expectedCasting = F.compose(toMachine, FoundationLayout.worldPose("bed"));
+    var cp = F.toRotationMatrix(castingPose), ce = F.toRotationMatrix(expectedCasting);
+    var offset = Math.max(Math.abs(castingPose.x - expectedCasting.x), Math.max(Math.abs(castingPose.y - expectedCasting.y), Math.abs(castingPose.z - expectedCasting.z)));
+    for (i in 0...9) offset = Math.max(offset, Math.abs(cp[i] - ce[i]));
+    if (offset > 1e-6) throw 'the bed casting is not at the bed frame the relief assumes (off by ${offset})';
+    var casting = cache.posed(members.filter(m -> m.id == "bed/casting")[0].component, castingPose);
+    var motor = members.filter(m -> m.id == "spindle/motor")[0].component;
+    // (2) the gap at the extremes with the overtravel.
+    var ot = HobberXLayout.OVERTRAVEL, worstGap = 1e9, worstAt = "";
+    var x = HobberScales.stroke("X"), y = HobberScales.stroke("Y"), z = HobberScales.stroke("Z");
+    for (xv in [x.lower - ot, x.upper + ot]) for (yv in [y.lower - ot, y.upper + ot]) for (zv in [z.lower - ot, z.lower, 0.0]) for (a in [-HobberSwivelLayout.RANGE, 0.0, HobberSwivelLayout.RANGE]) {
+      var posed = cache.posed(motor, analytic(xv, yv, zv, a)), gap = posed.distance(casting);
+      posed.close();
+      if (gap < worstGap) {
+        worstGap = gap;
+        worstAt = 'X ${xv}, Y ${yv}, Z ${zv}, A ${r(a * 180 / Math.PI, 1)} deg';
+      }
+    }
+    if (worstGap < HobberSpindleRelief.RUNNING_GAP - 1e-6)
+      throw 'spindle servo comes ${r(worstGap, 3)} mm from the bed casting at ${worstAt} (running gap ${HobberSpindleRelief.RUNNING_GAP} mm) with the relief in place';
+    // (3) the wall under the floor, in the casting's frame (the casting is posed at the bed frame).
+    var wall = HobberCastingPockets.WALL;
+    var d = FoundationLayout.dimensions("bed");
+    var slab = cadkit.modeling.Part.box(relief.x1 - relief.x0, relief.y1 - relief.y0, wall, cadkit.modeling.Align.Min, cadkit.modeling.Align.Min, cadkit.modeling.Align.Min)
+      .translated(new cadkit.modeling.Vector(relief.x0, relief.y0, relief.z0 - wall));
+    var slabPosed = machinekit.assembly.PosedParts.moved(slab, castingPose);
+    slab.close();
+    var solid = slabPosed.intersect(casting), missing = (relief.x1 - relief.x0) * (relief.y1 - relief.y0) * wall - solid.volume();
+    solid.close();
+    slabPosed.close();
     cache.close();
+    if (missing > 1.0) throw 'the bed casting is not solid for ${wall} mm under the spindle relief floor (z ${relief.z0}): ${r(missing)} mm3 missing in the footprint x ${relief.x0}..${relief.x1}, y ${relief.y0}..${relief.y1}';
+    lines.push('Spindle servo relief in the bed casting (${HobSpindle.MOTOR}, connectors to LH assumed positions): pocket x ${relief.x0}..${relief.x1}, y ${relief.y0}..${relief.y1} in the casting frame '
+      + '(${r(relief.width, 1)} x ${r(relief.depth, 1)} mm), floor z ${relief.z0} (${r(d[2] - relief.z0, 1)} mm below the top), '
+      + 'box volume ${r(relief.volume / 1000, 1)} cm3, opens through ${relief.faces.join(", ")}; set by ${relief.governing} (${relief.poses} poses); ' +
+      'least gap to the finished casting over the extremes with overtravel ${r(worstGap, 2)} mm at ${worstAt}; ${wall} mm of material under the floor');
     return lines;
   }
 
@@ -261,7 +311,7 @@ class HobberFrameChecks {
     var presentation = materia.presentation.Presentations.assembled(machine.definition(), -1.1, 0.35, "hobber");
     presentation.procedures = HobberAssemblyProcedures.build(machine);
     materia.presentation.PresentationCodec.validate(machine.definition(), presentation);
-    var lines = sizing(machine).concat(scales(machine)).concat(swivelLoad(machine)).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)), errors = newErrors(machine, sweep);
+    var lines = sizing(machine).concat(scales(machine)).concat(swivelLoad(machine)).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)).concat(spindleRelief(machine)), errors = newErrors(machine, sweep);
     for (line in lines) Sys.println(line);
     if (errors.length > 0) throw 'hobber strict integrity: ${errors.length} findings\n  ' + errors.join("\n  ");
     return presentation.procedures.length + lines.length + 1;
@@ -309,6 +359,30 @@ class HobberFrameChecks {
 
   public static function main():Void {
     var args = Sys.args(), began = Sys.time();
+    if (args.indexOf("spindlepose") >= 0) {
+      var names = [], spindles:Array<HobSpindle> = [];
+      for (k in 0...4) {
+        names.push("k" + k);
+        spindles.push(new HobSpindle(null, null, k));
+      }
+      names.push("default");
+      spindles.push(new HobSpindle());
+      for (i in 0...names.length) {
+        var poses = spindles[i].solvedPoses();
+        var m:materia.assembly.AssemblyRecord.AssemblyFrame = poses.get("motor");
+        Sys.println(names[i] + " motor " + [m.x, m.y, m.z] + " rot " + F.toRotationMatrix(m).map(v -> Math.round(v * 1000) / 1000));
+      }
+      var spin = HobberSpindleRelief.motorZeroPose(HobSpindle.MOTOR_CLOCKING);
+      Sys.println("zero pose " + [spin.x, spin.y, spin.z] + " rot " + F.toRotationMatrix(spin).map(v -> Math.round(v * 1000) / 1000));
+      if (args.length == 1) return;
+    }
+    if (args.indexOf("clocking") >= 0) {
+      for (k in 0...4) {
+        var r = HobberSpindleRelief.reliefFor(k);
+        Sys.println(r == null ? 'clocking $k: no relief' : 'clocking $k: x ${r.x0}..${r.x1} y ${r.y0}..${r.y1} floor ${r.z0} (box ${Math.round(r.volume / 1000)} cm3) faces ${r.faces.join(",")} governed by ${r.governing}');
+      }
+      if (args.length == 1) return;
+    }
     var machine = new FlexsplineHobber();
     Sys.println('machine built: ${machine.components().length} members in ${Math.round(Sys.time() - began)} s');
     if (args.indexOf("procedures") >= 0) {
@@ -326,7 +400,7 @@ class HobberFrameChecks {
       roundTrip(machine);
       Sys.println("round trip ok");
     }
-    if (args.indexOf("motorgap") >= 0) for (line in motorGap(machine)) Sys.println(line);
+    if (args.indexOf("spindlerelief") >= 0) for (line in spindleRelief(machine)) Sys.println(line);
     if (args.indexOf("integrity") >= 0) {
       var errors = integrity(machine, args.indexOf("sweep") >= 0);
       var counts = new Map<String, Int>();

@@ -268,7 +268,7 @@ class FlexsplineHobber extends MachineAssembly {
     swivel = new ErobActuator(100, 20, true, "A", new ComponentValues().setNumber("brakeHoldingTorque", A_BRAKE_HOLDING), HobberSwivelLayout.RANGE, A_ACCELERATION);
     includeAt("swivel", swivel, HobberSwivelLayout.pose());
     fixExisting("swivel-mount", "Zplate", "swivel/housing", F.alongY(HobberSwivelLayout.OUTPUT_X + 6, 0, HobberZLayout.SEAT_Z, 1, 0, 0));
-    var e0 = [-1.0, 0, 0, 0, 0, -1, 0, -1, 0];
+    var e0 = HobberSwivelLayout.SPINDLE_ROTATION;
     fixAt(
       "swivelAdapter",
       new HobberSaddle("GE-swivel-adapter"),
@@ -312,7 +312,7 @@ class FlexsplineHobber extends MachineAssembly {
         22
       ))
     );
-    includeAt("spindle", spindle, F.fromRotationMatrix(centre, 240, HobberZLayout.SEAT_Z, e0));
+    includeAt("spindle", spindle, F.fromRotationMatrix(centre, HobberSwivelLayout.SPINDLE_Y, HobberZLayout.SEAT_Z, e0));
     // One milled split-clamp block holds the Ø80 cartridge (FRAME_PLAN R2): bore with a slit up the +z side, three clamp screws across it,
     // four M8 and two dowels into the Y saddle's plate.
     fixAt("spindleSeat", new HobberSaddle("GE-spindle-seat"), F.translation(centre, 0, HobberZLayout.SEAT_Z), "Yplate",

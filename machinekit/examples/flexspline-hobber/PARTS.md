@@ -40,8 +40,8 @@ and empty verified-field lists.
 - `RotaryTable extends MachineAssembly`: stepped-bore housing, torque motor,
   crossed-roller bearing, ring encoder, clamp and platen. C is continuous and its
   initial effort/speed limits come from the installed motor. Exposes `mount`/`work`.
-- `HobSpindle extends MachineAssembly`: steel housing, assumed 1 kW 80-frame servo
-  (`GENERIC-HV-SERVO-1000W`, envelope of the quoted Leadshine ELM2H-1000LA80F) on a
+- `HobSpindle extends MachineAssembly`: steel housing, 1 kW 80-frame servo
+  (the quoted Leadshine `ELM2H-1000LA80F`, catalogue envelope with its connectors, assumed winding) on a
   bell adapter, coupling, floating rear 6205, opposed angular-contact
   pair, shaft, bolted gland, locknut, removable arbor and its
   four screws, and the gland and adapter screws.

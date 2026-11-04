@@ -55,6 +55,9 @@ contours against the same data.
 
 ## What is in the model and what is not
 
+The base has one cut that follows the machine's motion rather than its structure: the spindle servo relief (`spindle-motor-relief`,
+179 x 47.5 mm in the top at the back edge, 13 mm deep), derived from the servo's swept envelope by `HobberSpindleRelief`.
+
 Tolerances the model holds: the insert position budget (0.01 mm on finished steel seats, checked
 by `FoundationIntegrity` as position error plus tilt times face span; 0.5 mm on the fixing
 sockets) and the ground-after-casting finish. Everything else (flatness, parallelism, general

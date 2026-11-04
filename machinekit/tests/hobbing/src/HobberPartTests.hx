@@ -169,9 +169,13 @@ class HobberPartTests {
       edited.definition().joints.filter(j -> j.id == "C")[0].limits.effort == 42,
       "edited motor changes derived C limit"
     );
-    check(spindle.motor.rating.designation == HobSpindle.MOTOR && spindle.motor.ratingsBasis == Assumed,
-      "spindle is driven by the assumed 1 kW servo");
-    near(spindle.motor.rating.ratedTorque * spindle.motor.rating.ratedSpeed, 1000, 1e-9, "spindle servo is 1 kW");
+    check(spindle.motor.rating.designation == HobSpindle.MOTOR && spindle.motor.ratingsBasis == Catalog
+      && (cast spindle.motor : machinekit.motion.LeadshineServo).assumedWinding,
+      "spindle is driven by the catalogue ELM2H-1000LA80F with an assumed winding");
+    near(spindle.motor.rating.ratedTorque * spindle.motor.rating.ratedSpeed, 1000, 2, "spindle servo is 1 kW");
+    check((cast spindle.motor : machinekit.motion.LeadshineServo).clearanceBoxes().length == 3
+      && (cast spindle.motor : machinekit.motion.LeadshineServo).clearanceBoxes().filter(b -> b.name != "body" && b.y1 == 55).length == 2,
+      "spindle servo clearance has its body and both connectors, reaching LH 55 from the axis");
     near(spindle.maxSpeed(), 4000 * 2 * Math.PI / 60, 1e-9, "B speed limit is the 4000 rpm cartridge rating");
     check(
       spindle.definition().joints.filter(j -> j.id == "B")[0].limits.velocity == spindle.maxSpeed(),

@@ -16,8 +16,18 @@ import materia.assembly.AssemblyDefinition.AssemblyJointType;
     The coupling is a sleeve envelope standing in for a balanced torsionally stiff
     bellows/disc coupling. Fits, preload, balance and sealing remain manufacturing design. */
 class HobSpindle extends MachineAssembly {
-  /** Assumed 1 kW 400 V servo in the envelope of the Leadshine ELM2H-1000LA80F being quoted. */
-  public static inline final MOTOR = "GENERIC-HV-SERVO-1000W";
+  /**
+   * The Leadshine ELM2H-1000LA80F being quoted (catalogue drawing: 80 flange, 103.9 body, connectors to LH 55 from the axis), with
+   * the generic high-voltage winding assumed so a driver can be wired (`LeadshineServo.driven`).
+   */
+  public static inline final MOTOR = "ELM2H-1000LA80F";
+  /**
+   * Quarter turns of the servo about the spindle axis (the flange's 90 mm square pattern allows four): which side of the cartridge its
+   * connectors point. Clockings 1 to 3 need the same relief in the bed casting (111 cm3 box, the body sets it) and clocking 0, which points
+   * the connectors down at the casting, needs 510 cm3 (`HobberSpindleRelief.reliefFor`); 2 points them up, away from the casting and the chips.
+   * Not `inline`, so that a change reaches every caller in an incremental build.
+   */
+  public static final MOTOR_CLOCKING = 2;
   public static inline final MOTOR_FACE = -70.0;
   public static inline final COUPLING_START = -55.0;
   public static inline final COUPLING_LENGTH = 45.0;
@@ -35,9 +45,9 @@ class HobSpindle extends MachineAssembly {
   public final tailBearing:DeepGrooveBearing;
   public final arbor:HobArbor;
   public final encoder:ShaftEncoder;
-  public function new(?motor:ServoMotor, ?arbor:HobArbor) {
+  public function new(?motor:ServoMotor, ?arbor:HobArbor, clocking:Int = MOTOR_CLOCKING) {
     super();
-    this.motor = motor == null ? ServoMotor.model(MOTOR) : motor;
+    this.motor = motor == null ? LeadshineServo.driven(MOTOR) : motor;
     this.arbor = arbor == null ? new HobArbor() : arbor;
     var face = this.motor.rating;
     // The motor shaft must reach into its half of the coupling, and the pilot and body fit the adapter.
@@ -53,7 +63,8 @@ class HobSpindle extends MachineAssembly {
     attach("motorAdapter", new HobSpindlePart("motorAdapter"), 0);
     addComponent("motor", this.motor);
     // The servo bolts to the adapter's rear flange (the adapter is on the housing), not to the housing itself.
-    addMemberConnector("motorAdapter", "motorSeat", Solids.axial(0, 0, MOTOR_FACE));
+    addMemberConnector("motorAdapter", "motorSeat", materia.assembly.AssemblyFrames.compose(Solids.axial(0, 0, MOTOR_FACE),
+      materia.assembly.AssemblyFrames.turnY(clocking * Math.PI / 2)));
     addMate("motor-mount", Fixed, "motorAdapter", "motorSeat", "motor", "mountFace");
     attach("frontBearing", frontBearing, FRONT_BEARING_Z);
     addComponent("encoder", encoder);

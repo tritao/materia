@@ -231,6 +231,21 @@ class LeadshineServo extends ServoMotor {
     );
   }
 
+  /**
+   * The motor's clearance envelope as axis-aligned boxes in its own frame (mounting face z = 0, body toward -z, connectors on +y): the
+   * body and the two connector envelopes of `geometry`, which reach the published maximum LH from the shaft axis. The connectors'
+   * positions along the body are **assumed** (the drawing gives LH only), and so is the room for the plug and its cable bend, which is
+   * not included. Each row is `{x0, x1, y0, y1, z0, z1, name}`.
+   */
+  public function clearanceBoxes():Array<{x0:Float, x1:Float, y0:Float, y1:Float, z0:Float, z1:Float, name:String}> {
+    var f = spec.face, l = spec.bodyLength, t = spec.flangeThickness, reach = 2 * (spec.connectorHeight - f / 2);
+    return [
+      {x0: -f / 2, x1: f / 2, y0: -f / 2, y1: f / 2, z0: -l, z1: 0.0, name: "body"},
+      {x0: -0.14 * f, x1: 0.14 * f, y0: f / 2 - reach / 2, y1: f / 2 + reach / 2, z0: -t - 0.30 * f, z1: -t - 0.08 * f, name: "powerConnector"},
+      {x0: -0.12 * f, x1: 0.12 * f, y0: f / 2 - reach / 2, y1: f / 2 + reach / 2, z0: -l + 0.08 * f, z1: -l + 0.27 * f, name: "encoderConnector"}
+    ];
+  }
+
   static function box(w:Float, d:Float, z0:Float, z1:Float, x:Float = 0, y:Float = 0):Part return Part.prism(
     [
       new Vector(x - w / 2, y - d / 2),

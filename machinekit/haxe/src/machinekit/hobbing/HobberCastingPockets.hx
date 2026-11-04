@@ -9,13 +9,15 @@ import machinekit.structural.CastingFeaturePatterns;
  * There is no source grid, retained-box subtraction or hashed ID.
  */
 class HobberCastingPockets {
+  /** Wall and roof thickness the cores leave, which every cut near a core must keep, mm. */
+  public static inline final WALL = 25.0;
   static inline final DRIVE_CAP_TOP = 720.0;
   static inline final SOCKET_BOSS_DEPTH = 60.0;
   static inline final DECK_RIB_WIDTH = 50.0;
 
   public static function plinth(width:Float, depth:Float, height:Float):Array<CastingFeature> {
     var layout = HobberXLayout.front();
-    var wall = 25.0;
+    var wall = WALL;
     var footInset = 120.0, footBossHalf = FoundationLayout.FOOT_BOSS_WIDTH / 2;
     var tableHalf = FoundationLayout.TABLE_INSERT_WIDTH / 2 + FoundationLayout.SOURCE_STEEL_COVER_MM,
       ribHalf = FoundationLayout.PLINTH_CORE_WEB / 2;

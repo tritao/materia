@@ -37,6 +37,14 @@ class HobberSwivelLayout {
   /** Depth of the pocket from the plate's back face to the housing's front face. */
   public static inline final POCKET_DEPTH:Float = PLATE_BACK - (OUTPUT_X - ErobActuatorPart.SEAT_Z);
 
+  /** Rotation of the spindle cartridge and the hob's line in the work frame (the arbor, outboard support and hob use the same). */
+  public static final SPINDLE_ROTATION:Array<Float> = [-1.0, 0, 0, 0, 0, -1, 0, -1, 0];
+  /** Where the cartridge's housing datum stands across the machine (work y), at X = 0 and the swivel's middle position. */
+  public static inline final SPINDLE_Y = 240.0;
+
+  /** The spindle cartridge's housing frame in the work frame at X = 0, Y = 0, Z = 0 and the swivel's middle position. */
+  public static function spindlePose():AssemblyFrame return F.fromRotationMatrix(0, SPINDLE_Y, HobberZLayout.SEAT_Z, SPINDLE_ROTATION);
+
   /** The actuator's CAD frame in the work frame. */
   public static function pose():AssemblyFrame return F.fromRotationMatrix(OUTPUT_X, 0, HobberZLayout.SEAT_Z, ROTATION);
 

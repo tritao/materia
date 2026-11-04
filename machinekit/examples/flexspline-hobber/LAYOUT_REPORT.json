@@ -1,5 +1,5 @@
 {
-  "basis": "CAD volumes and declared material densities; assumed eRob110I moment rating and brake holding torque, assumed structural adequacy, not measured machine accuracy. 'after' regenerated 2026-11-04 (layout-metrics) on the frames/drives/eRob model; other sections are historic",
+  "basis": "CAD volumes and declared material densities; assumed eRob110I moment rating and brake holding torque, assumed structural adequacy, not measured machine accuracy. 'after' regenerated 2026-11-04 (layout-metrics) on the frames/drives/eRob model with the pad bars, the electrical panel and the ELM2H-1000LA80F spindle servo with its bed-casting relief; other sections are historic",
   "before": {
     "guideToHobMm": {
       "X": 346.99999999999994,
@@ -16,7 +16,7 @@
   },
   "after": {
     "collisionShapes": {
-      "authoredPlusDefaultTotal": 1505,
+      "authoredPlusDefaultTotal": 1502,
       "parts": [
         {
           "part": "bed/casting",
@@ -747,11 +747,11 @@
           "hulls": 1
         },
         {
-          "part": "spindle/motorShaft",
+          "part": "spindle/coupling",
           "hulls": 1
         },
         {
-          "part": "spindle/coupling",
+          "part": "spindle/motorShaft",
           "hulls": 1
         },
         {
@@ -847,24 +847,16 @@
           "hulls": 1
         },
         {
-          "part": "XdriveFixed",
-          "hulls": 124
+          "part": "XdrivePad",
+          "hulls": 188
         },
         {
-          "part": "ZdriveFixed",
+          "part": "ZdrivePad",
           "hulls": 1
         },
         {
           "part": "YdriveFixed",
           "hulls": 126
-        },
-        {
-          "part": "XdriveFloating",
-          "hulls": 65
-        },
-        {
-          "part": "ZdriveFloating",
-          "hulls": 2
         },
         {
           "part": "YdriveFloating",
@@ -1049,9 +1041,9 @@
       ]
     },
     "installedPoseEnvelopeMm": {
-      "radial": 1510,
+      "radial": 930,
       "scope": "initial pose including separate electrical rack; CAD envelope bounds",
-      "tangential": 836
+      "tangential": 1280
     },
     "headStackMm": {
       "swivelOutputFlangeFace": 124,
@@ -1063,29 +1055,29 @@
     },
     "drives": [
       {
-        "thrustMarginN": 861.0030078164991,
+        "thrustMarginN": 856.8689822666547,
         "axis": "X",
-        "movingMassKg": 176.13184232100735,
+        "movingMassKg": 184.39989342069612,
         "continuousThrustWith20PercentReserveN": 1149.0689289770028,
-        "designDemandN": 288.06592116050365,
+        "designDemandN": 292.19994671034806,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       },
       {
-        "thrustMarginN": 878.0934611087296,
+        "thrustMarginN": 874.1115256760156,
         "axis": "Y",
-        "movingMassKg": 23.361427029098824,
+        "movingMassKg": 24.672072761206966,
         "continuousThrustWith20PercentReserveN": 1149.0689289770028,
-        "designDemandN": 270.9754678682732,
+        "designDemandN": 274.9574033009872,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       },
       {
-        "thrustMarginN": 470.2492262912547,
+        "thrustMarginN": 456.7408594564223,
         "axis": "Z",
-        "movingMassKg": 46.45735546329293,
+        "movingMassKg": 47.76800119540108,
         "continuousThrustWith20PercentReserveN": 1149.0689289770028,
-        "designDemandN": 678.8197026857481,
+        "designDemandN": 692.3280695205805,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       }
@@ -1096,16 +1088,16 @@
     ],
     "guideToHobMm": {
       "X": 121,
-      "Y": 70.00000000000013,
+      "Y": 70.00000000000011,
       "Z": 160.99999999999994
     },
     "movingMassKg": {
-      "X": 176.13184232100735,
-      "Y": 23.361427029098824,
-      "Z": 46.45735546329293
+      "X": 184.39989342069612,
+      "Y": 24.672072761206966,
+      "Z": 47.76800119540108
     },
-    "machineMassKg": 1512.18366753486,
-    "members": 257
+    "machineMassKg": 1521.1548715192923,
+    "members": 255
   },
   "open": [
     "Z guide offset 161 mm is 11 mm beyond the approximate 150 mm target; needed for the front-mounted stack.",
@@ -2371,7 +2363,7 @@
       }
     },
     "installedMandrelSensitivity": {
-      "basis": "Assumed: sleeve span [115,131] mm; toothed rim [115,123] mm, radial gap=0.02499999999999858 mm, rim supported=true; sleeve t=1.5 mm, end span L=16 mm, band=8 mm, mid-radius R=28.25 mm; E=210000 N/mm\u00b2, nu=0.3; D=E*t^3/[12(1-nu\u00b2)]; k_s=D*pi*R*[pi^4/(2L^3)+9L/(2R^4)+(4-nu)*pi\u00b2/(R\u00b2L)]; conforming steel harmonic half-space contact c=E*q/[4(1-nu\u00b2)]*factor, q=sqrt(4/R\u00b2+pi\u00b2/L\u00b2), factor=1, c=12041.710189094985 N/mm\u00b3; k_c=c*pi*R*integral_band cos\u00b2(pi*z/L) dz; 1/k=1/k_s+1/k_c; oil K=1500 N/mm\u00b2, cavity=0.5 mm: n=2 volume change and oil stiffness zero at first order; uniform oil k=8519999.276535518 N/mm only; radial fit gap=0.02499999999999858 mm, hoop seating pressure=9.867648210509268 MPa, remaining pressure=0.13235178949073223 MPa (end restraint omitted from seating check); full seated contact required; modal estimate, not measured stiffness or FEA; expansion sleeve/cavity are assumed design dimensions, envelope CAD does not resolve them",
+      "basis": "Assumed: sleeve span [115,131] mm; toothed rim [115,123] mm, radial gap=0.02499999999999858 mm, rim supported=true; sleeve t=1.5 mm, end span L=16 mm, band=8 mm, mid-radius R=28.25 mm; E=210000 N/mm², nu=0.3; D=E*t^3/[12(1-nu²)]; k_s=D*pi*R*[pi^4/(2L^3)+9L/(2R^4)+(4-nu)*pi²/(R²L)]; conforming steel harmonic half-space contact c=E*q/[4(1-nu²)]*factor, q=sqrt(4/R²+pi²/L²), factor=1, c=12041.710189094985 N/mm³; k_c=c*pi*R*integral_band cos²(pi*z/L) dz; 1/k=1/k_s+1/k_c; oil K=1500 N/mm², cavity=0.5 mm: n=2 volume change and oil stiffness zero at first order; uniform oil k=8519999.276535518 N/mm only; radial fit gap=0.02499999999999858 mm, hoop seating pressure=9.867648210509268 MPa, remaining pressure=0.13235178949073223 MPa (end restraint omitted from seating check); full seated contact required; modal estimate, not measured stiffness or FEA; expansion sleeve/cavity are assumed design dimensions, envelope CAD does not resolve them",
       "forceBasis": "radial time mean over material-engaged windows; full-stroke mean including air retained separately",
       "forceSettings": {
         "acceptanceBasis": "completed full stroke; <1% short reference-geometry fixture convergence; no fine full-stroke comparison",
@@ -2754,7 +2746,7 @@
       }
     },
     "installedMandrelSensitivity": {
-      "basis": "Assumed: sleeve span [115,131] mm; toothed rim [115,123] mm, radial gap=0.02499999999999858 mm, rim supported=true; sleeve t=1.5 mm, end span L=16 mm, band=8 mm, mid-radius R=28.25 mm; E=210000 N/mm\u00b2, nu=0.3; D=E*t^3/[12(1-nu\u00b2)]; k_s=D*pi*R*[pi^4/(2L^3)+9L/(2R^4)+(4-nu)*pi\u00b2/(R\u00b2L)]; conforming steel harmonic half-space contact c=E*q/[4(1-nu\u00b2)]*factor, q=sqrt(4/R\u00b2+pi\u00b2/L\u00b2), factor=1, c=12041.710189094985 N/mm\u00b3; k_c=c*pi*R*integral_band cos\u00b2(pi*z/L) dz; 1/k=1/k_s+1/k_c; oil K=1500 N/mm\u00b2, cavity=0.5 mm: n=2 volume change and oil stiffness zero at first order; uniform oil k=8519999.276535518 N/mm only; radial fit gap=0.02499999999999858 mm, hoop seating pressure=9.867648210509268 MPa, remaining pressure=0.13235178949073223 MPa (end restraint omitted from seating check); full seated contact required; modal estimate, not measured stiffness or FEA; expansion sleeve/cavity are assumed design dimensions, envelope CAD does not resolve them",
+      "basis": "Assumed: sleeve span [115,131] mm; toothed rim [115,123] mm, radial gap=0.02499999999999858 mm, rim supported=true; sleeve t=1.5 mm, end span L=16 mm, band=8 mm, mid-radius R=28.25 mm; E=210000 N/mm², nu=0.3; D=E*t^3/[12(1-nu²)]; k_s=D*pi*R*[pi^4/(2L^3)+9L/(2R^4)+(4-nu)*pi²/(R²L)]; conforming steel harmonic half-space contact c=E*q/[4(1-nu²)]*factor, q=sqrt(4/R²+pi²/L²), factor=1, c=12041.710189094985 N/mm³; k_c=c*pi*R*integral_band cos²(pi*z/L) dz; 1/k=1/k_s+1/k_c; oil K=1500 N/mm², cavity=0.5 mm: n=2 volume change and oil stiffness zero at first order; uniform oil k=8519999.276535518 N/mm only; radial fit gap=0.02499999999999858 mm, hoop seating pressure=9.867648210509268 MPa, remaining pressure=0.13235178949073223 MPa (end restraint omitted from seating check); full seated contact required; modal estimate, not measured stiffness or FEA; expansion sleeve/cavity are assumed design dimensions, envelope CAD does not resolve them",
       "forceBasis": "radial time mean over material-engaged windows; full-stroke mean including air retained separately",
       "forceSettings": {
         "acceptanceBasis": "completed full stroke; <1% short reference-geometry fixture convergence; no fine full-stroke comparison",

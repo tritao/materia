@@ -388,6 +388,8 @@ class FoundationLayout {
       );
       cable.draft.axis = {x: 1, y: 0, z: 0};
       cores.push(cable);
+      // The hob spindle's servo passes close to the side beam's top at the Z lower limit: the relief is derived from its swept envelope.
+      cores = cores.concat(HobberSpindleRelief.features());
     } else {
       // The spine continues into the head opening. Three direct spans
       // describe its U-shaped recess without cutting it and retaining a boss.

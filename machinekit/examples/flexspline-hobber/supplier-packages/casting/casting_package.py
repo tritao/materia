@@ -65,6 +65,7 @@ CATEGORIES = [
     (r"^X-drive-channel$", "X-drive channel"),
     (r"^cable-route$", "cable duct"),
     (r"^coolant-front-access$", "coolant tank access opening"),
+    (r"^spindle-motor-relief$", "spindle servo relief (running gap from the hob spindle's servo over its whole sweep)"),
     (r"^tray-", "chip-tray ledge and bridge seat"),
     (r"^pocket-", "lightening core (pocket between ribs)"),
     (r"^head-recess-", "column head recess"),

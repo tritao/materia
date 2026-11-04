@@ -22,7 +22,7 @@ model, not released manufacturing, and every assumption is listed in [FRAME_PLAN
 - **Scales:** Yuheng JFT-40 sealed absolute BiSS-C scales, X ML 120, Y ML 70, Z ML 220, with the Abbe offset of each printed by `HobberFrameChecks.scales`.
 - **A axis:** ZeroErr eRob110I (ratio 100, brake, ±15°) on the Z saddle; output bearing moment rating and brake holding torque are unknown or assumed.
 - **Electrical:** one 48 V supply with a regeneration resistor and a BiSS master on the controller; the A axis has its own amplifier.
-- **Masses (this model, `layout-metrics`, regenerated into [LAYOUT_REPORT.json](LAYOUT_REPORT.json)):** moving X 176.1 kg, Y 23.4 kg, Z 46.5 kg; whole machine 1512 kg (835.6 kg base casting). The table below and the HB-D11 sections keep the 2026-10 figures (135 / 14 / 41 kg, 1133 kg) as history.
+- **Masses (this model, `layout-metrics`, regenerated into [LAYOUT_REPORT.json](LAYOUT_REPORT.json)):** moving X 184.4 kg, Y 24.7 kg, Z 47.8 kg; whole machine 1521 kg, 255 members (the bed casting package is 1170.9 kg; 835.6 kg is the figure of an older revision kept in the sections below). The table below and the HB-D11 sections keep the 2026-10 figures (135 / 14 / 41 kg, 1133 kg) as history.
 
 ## Coordinates and load path
 
@@ -398,10 +398,16 @@ this layout check is not structural or mould-process qualification.
 Load path: hob → removable arbor → taper and face → spindle shaft → opposed
 angular-contact pair → stepped steel housing → Y saddle. B is driven by a standard
 80-frame servo through a coupling behind the housing, replacing the earlier assumed
-hollow direct motor. The model uses the assumed `GENERIC-HV-SERVO-1000W` (1 kW,
-3.18 N m, 3000/5000 rpm) in the envelope and hole pattern of the Leadshine
-ELM2H-1000LA80F being quoted; the catalogue Leadshine row has no published winding
-constants, which the drive check requires. The CAM job's reference speed is 2984 rpm (300 m/min on Ø32), inside
+hollow direct motor. The model uses the catalogue Leadshine ELM2H-1000LA80F (1 kW,
+3.18 N m, 3000/5000 rpm; 80 flange, 103.9 body, connectors to LH 55 from the axis, their
+positions along the body assumed) with an assumed winding (`LeadshineServo.driven`): the
+catalogue row has no published winding constants, which the drive check requires. The
+connectors point up (`HobSpindle.MOTOR_CLOCKING` 2). At the Z lower limit the servo stands
+below the bed beam's top, so the bed casting has a relief pocket there, derived from the
+servo's swept envelope (`HobberSpindleRelief`: X, Y and Z to their limits and 5 mm beyond, A over
++-15 deg, each box grown by the 2 mm running gap): 179 x 47.5 mm in plan, 13 mm deep, open
+through the back face and the top, 110 cm3 as a box (about 93 cm3 and 0.22 kg of mineral
+casting, the chip tray ledge being there already), with 25 mm of casting left under its floor. The CAM job's reference speed is 2984 rpm (300 m/min on Ø32), inside
 the servo's rated speed. The outboard bearing remains radially supporting and
 axially floating. This is an **assumed custom TF20** interface, not an HSK-E25
 claim. Dimensions are assumed, in millimetres, along the spindle from the housing
