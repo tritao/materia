@@ -128,7 +128,7 @@ class HobberSaddle extends MachineComponent {
     return shaped;
   }
   /** Width of the ground flat bar a drive pad is sawn from. */
-  static inline final PAD_WIDTH = 80.0;
+  static inline final PAD_WIDTH = HobberDrives.PAD_WIDTH;
 
   /** A hole's tool: a cylinder of `diameter` from `position` along `direction`, `depth` long, starting 1 mm outside the mouth. */
   static function holeTool(position:Array<Float>, direction:Array<Float>, diameter:Float, depth:Float):Part {
@@ -276,6 +276,9 @@ class HobberSaddle extends MachineComponent {
     return list;
   }
 
+  /** The spindle seat's extent along the spindle axis (work y) and the y of its three clamp screws. */
+  public static function spindleSeatRange():{y0:Float, y1:Float, clampYs:Array<Float>} return {y0: SEAT_Y0, y1: SEAT_Y1, clampYs: [100.0, 150.0, 200.0]};
+
   /** The split-clamp block that holds the Ø80 cartridge: bore, slit up the +z side and the holes of `seatHoles`. */
   static function spindleSeat():Part {
     var block = box(SEAT_X0, SEAT_X1, SEAT_Y0, SEAT_Y1, SEAT_LOW, SEAT_HALF);
@@ -284,17 +287,14 @@ class HobberSaddle extends MachineComponent {
   }
 
   /**
-   * The Z floating pad, with its inner face cut back where the A axis housing's Ø110 body reaches it: the pad's front face (x 201) stands 0.8 mm
-   * behind the actuator's rear face (x 200.2) over the 13 mm nearest the axis, so an 11 x 8 mm notch (to x 209, past the rear boss and connectors) clears it.
-   * The housing's rear edge circle (r 55) then passes the pad's top corner at x_m 53 within 1.26 mm, so the top 6 mm over the inner 14 mm is cut too. The notch stays 1 mm from the nearest seat hole.
+   * The Z floating pad, with the A axis housing's envelope cut out of it: the housing (Ø110 body, Ø85 rear boss and connectors) swept over the Z
+   * travel and grown by the running gap (`HobberZOffset.relief`). The pad's seat holes keep 1 mm from that relief (the screw offset is derived so they do).
    */
   static function zFloatingPad():Part {
-    var b = HobberDrives.padBounds(HobberDrives.z(), "floating", PAD_WIDTH, 40), notch = [b[0] - 0.1, b[4] - 11, b[2] - 0.1, b[0] + 8, b[4] + 0.1, b[5] + 0.1];
-    for (h in HobberDrives.seatHoles(HobberDrives.z(), "floating")) if (h.position[1] + h.diameter / 2 + 1 > notch[1])
-      throw "Z floating pad: seat hole at y " + h.position[1] + " (diameter " + h.diameter + ") is within 1 mm of the relief notch from y " + notch[1];
-    // The pad's top corner nearest the housing's rear edge circle: 6 mm off the top over the inner 14 mm (the nearest seat hole is 9 mm lower).
-    var top = [b[0] - 0.1, b[4] - 14, b[5] - 6, b[3] + 0.1, b[4] + 0.1, b[5] + 0.1];
-    return Solids.cut(padBox(b), [padBox(notch), padBox(top)]);
+    var relief = HobberZOffset.relief(), pad = padBox(HobberDrives.padBounds(HobberDrives.z(), "floating", PAD_WIDTH, 40));
+    var cut = Solids.cut(pad, [relief]);
+    relief.close();
+    return cut;
   }
 
   /** A fixed pad: its box with the mount's flange relief and the seat holes. */
@@ -323,7 +323,7 @@ class HobberSaddle extends MachineComponent {
       case "GE-Z-drive-fixed":
         bar(40, [{name: "seat holes", tolerance: 0.1, roughnessRa: null}]);
       case "GE-Z-drive-floating":
-        bar(40, [{name: "seat holes", tolerance: 0.1, roughnessRa: null}, {name: "relief notch at the A housing, 11 x 8 mm, and top corner 14 x 6 mm", tolerance: 0.5, roughnessRa: null}]);
+        bar(40, [{name: "seat holes", tolerance: 0.1, roughnessRa: null}, {name: "relief for the A housing envelope (swept over Z, 2 mm gap)", tolerance: 0.5, roughnessRa: null}]);
       case "GE-Y-drive-fixed" | "GE-Y-drive-floating":
         ManufacturingRoute.milled(1, "fine", [{name: "seat face, bolts and dowels", tolerance: 0.05, roughnessRa: 3.2}], 160);
       case "GE-Y-nut-seat":
@@ -426,7 +426,8 @@ class HobberSaddle extends MachineComponent {
         var z = HobberScales.z(), face = HobberScales.headFace(z), half = z.head.series.headLength / 2 + 2;
         var reach = z.headPose.x + z.head.series.headDepth / 2 + HobberScales.HEAD_CARRIER_MARGIN;
         var zc = face[2] - Z_SADDLE_ORIGIN_Z;
-        [withHoles(box(148, reach, face[1] - HobberScales.Z_ARM_THICKNESS, face[1], zc - half, zc + half), headHoles(z, HobberScales.Z_ARM_THICKNESS, Z_SADDLE_ORIGIN_Z))];
+        var wall = HobberScales.zWallSign(), y0 = wall > 0 ? face[1] - HobberScales.Z_ARM_THICKNESS : face[1], y1 = wall > 0 ? face[1] : face[1] + HobberScales.Z_ARM_THICKNESS;
+        [withHoles(box(148, reach, y0, y1, zc - half, zc + half), headHoles(z, HobberScales.Z_ARM_THICKNESS, Z_SADDLE_ORIGIN_Z))];
       case "GE-Y-saddle":
         // A 2.3 mm boss on the back face (x 57) is the head's seat; the head's screws go through it and the plate.
         var yHead = HobberScales.y(), yFace = HobberScales.headFace(yHead), yHeadHalf = yHead.head.series.headLength / 2 + 2;

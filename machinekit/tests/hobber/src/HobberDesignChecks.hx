@@ -44,7 +44,7 @@ class HobberDesignChecks {
         );
       var zd = F.transformVector(zScrew, 0, 0, 1);
       count++;
-      if (Math.abs(zScrew.y - (zl.y + zr.y) / 2 - machinekit.hobbing.HobberZLayout.AXIS_Y) > 1e-8 || Math.abs(zScrew.x - zl.x - 15) > 1e-8
+      if (Math.abs(zScrew.y - (zl.y + zr.y) / 2 - machinekit.hobbing.HobberZLayout.axisY()) > 1e-8 || Math.abs(zScrew.x - zl.x - 15) > 1e-8
         || Math.abs(zd.z + 1) > 1e-8) throw "Z screw must lie behind the guide plane, offset clear of the A actuator housing, and point down";
       var zFixed = F.compose(canonical, poses.get("Zfixed")), zFloating = F.compose(canonical, poses.get("Zfloating"));
       count++;

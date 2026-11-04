@@ -556,7 +556,7 @@ class FoundationLayout {
         76,
         460,
         20,
-        F.fromRotationMatrix(HobberZLayout.AXIS_Y, HobberZLayout.SEAT_COLUMN_Y, 250, [-1.0, 0, 0, 0, 0, 1, 0, 1, 0]),
+        F.fromRotationMatrix(HobberZLayout.axisY(), HobberZLayout.SEAT_COLUMN_Y, 250, [-1.0, 0, 0, 0, 0, 1, 0, 1, 0]),
         [],
         fixtureHoles(20),
         "column"

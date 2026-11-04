@@ -19,7 +19,7 @@ class HobberZDriveChecks {
     function pose(id:String):materia.assembly.AssemblyRecord.AssemblyFrame return F.compose(work, state.worldPose(id));
     var a = pose("railZLeft"), b = pose("railZRight"),
       screw = pose("Zscrew"), fixed = pose("Zfixed"), floating = pose("Zfloating"), motor = pose("Zmotor");
-    near(screw.y, (a.y + b.y) / 2 + Z.AXIS_Y, "screw between rails, offset clear of the A actuator housing");
+    near(screw.y, (a.y + b.y) / 2 + Z.axisY(), "screw between rails, offset clear of the A actuator housing");
     near(screw.x - a.x, 15, "screw 15 mm behind guide axis plane");
     near(screw.z, Z.SHAFT_TOP, "top drive journal");
     near(motor.z, 764, "motor mounting face: 34 mm above the screw start");

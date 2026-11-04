@@ -48,6 +48,9 @@ class HobberScales {
   public static inline final SEAT_BAR_WIDTH = 20.0;
   /** Inner face of the column channel wall (work y), mm: the casting's wall stands at +120 and -120. */
   public static inline final COLUMN_WALL_Y = 120.0;
+
+  /** Which channel wall the Z scale stands on: the one away from the Z screw's pads (+1 is the +y wall). */
+  public static function zWallSign():Float return HobberZLayout.axisY() < 0 ? 1.0 : -1.0;
   /** Where the Z scale stands along x (centre), mm: just inside the channel's open front (the casting wall starts at x 186). */
   public static inline final Z_COLUMN_X = 198.0;
   /** Arm that carries the Z head, thickness across the wall and bolt-up height, mm. */
@@ -84,9 +87,9 @@ class HobberScales {
         // The joint runs along -y; the scale is read along +y (the sign is set in the drive). The plate is 230 long (y +-115).
         {toSeat: [1.0, 0, 0], along: [0.0, 1, 0], start: [85.0, -104.0, HobberZLayout.SEAT_Z], bar: null, headCentre: startFor};
       case "Z":
-        var at = HobberZLayout.SEAT_Z + 50.0 - startFor;
-        {toSeat: [0.0, 1, 0], along: [0.0, 0, 1], start: [Z_COLUMN_X, COLUMN_WALL_Y - SEAT_BAR, at],
-          bar: [Z_COLUMN_X - SEAT_BAR_WIDTH / 2, Z_COLUMN_X + SEAT_BAR_WIDTH / 2, COLUMN_WALL_Y - SEAT_BAR, COLUMN_WALL_Y, at, at + len], headCentre: startFor};
+        var at = HobberZLayout.SEAT_Z + 50.0 - startFor, w = zWallSign();
+        {toSeat: [0.0, w, 0], along: [0.0, 0, 1], start: [Z_COLUMN_X, w * (COLUMN_WALL_Y - SEAT_BAR), at],
+          bar: [Z_COLUMN_X - SEAT_BAR_WIDTH / 2, Z_COLUMN_X + SEAT_BAR_WIDTH / 2, w > 0 ? COLUMN_WALL_Y - SEAT_BAR : -COLUMN_WALL_Y, w > 0 ? COLUMN_WALL_Y : -COLUMN_WALL_Y + SEAT_BAR, at, at + len], headCentre: startFor};
       default:
         throw 'No scale for axis $id';
     };

@@ -37,6 +37,9 @@ typedef HobberDriveHole = {
  * holes and dowels from `SupportedScrewDrive.seatHoles`, aligned to the nut and reamed at assembly.
  */
 class HobberDrives {
+  /** Width of the ground bar pads under the X and Z supports, mm. */
+  public static inline final PAD_WIDTH = 80.0;
+
   /** Nut-part start from the nut body's centre station. */
   static function partStart(centre:Float):Float return centre - new BallNut().bodyLength / 2;
 
@@ -62,11 +65,19 @@ class HobberDrives {
     return yCache;
   }
 
-  /** Z: screw straight down at x 176, y -82 (the A axis housing stands at y 0) from the motor at the top, supports on ground bar pads against the column. */
-  public static function z():HobberDriveAxis {
-    if (zCache == null) zCache = {id: "Z", drive: SupportedScrewDrive.m60dBk12Braked(true),
-      axis: {start: [HobberZLayout.AXIS_X, HobberZLayout.AXIS_Y, HobberZLayout.SHAFT_TOP], direction: [0.0, 0, -1.0], normal: [-1.0, 0, 0]},
+  static var zDriveCache:Null<SupportedScrewDrive>;
+
+  /** Z with its screw at `y` across the machine (not cached). */
+  public static function zAt(y:Float):HobberDriveAxis {
+    if (zDriveCache == null) zDriveCache = SupportedScrewDrive.m60dBk12Braked(true);
+    return {id: "Z", drive: zDriveCache,
+      axis: {start: [HobberZLayout.AXIS_X, y, HobberZLayout.SHAFT_TOP], direction: [0.0, 0, -1.0], normal: [-1.0, 0, 0]},
       length: HobberZLayout.SHAFT_LENGTH, nutStation: partStart(HobberZLayout.NUT_STATION), nutUp: [-1.0, 0, 0], blockHeight: HobberZLayout.AXIS_X - 148};
+  }
+
+  /** Z: screw straight down at x 176, y `HobberZLayout.axisY()` (derived: clear of the A axis housing) from the motor at the top, supports on ground bar pads against the column. */
+  public static function z():HobberDriveAxis {
+    if (zCache == null) zCache = zAt(HobberZLayout.axisY());
     return zCache;
   }
 

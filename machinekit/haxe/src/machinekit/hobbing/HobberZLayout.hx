@@ -9,11 +9,11 @@ class HobberZLayout {
   /** Screw axis, 25 mm (the BK12 and BF12 shaft height) in front of the 40 mm ground bar pads on the column's drive seat at 241. */
   public static inline final AXIS_X = 176.0;
   /**
-   * Screw axis across the machine (y): the eRob housing of the A axis (Ø110, 88 mm deep) stands behind the Z saddle at y = 0, so the screw
-   * and its nut block, 60 wide, are offset 82 mm to -y (the BF12 support and its pad keep 2 mm from the housing's Ø110 at the lowest Z; at -80 they came within 0.8 and 1.6 mm, and at -85 the 80 mm seat insert lacks casting cover to the lifting insert). The drive's
-   * 80 mm pads stand on the spine's left side, which is widened for them (`FoundationLayout`: the left head recess is 65 mm deep).
+   * Screw axis across the machine (y), derived (`HobberZOffset`): the eRob housing of the A axis (Ø110, 88 mm deep) stands behind the Z saddle at y = 0,
+   * so the screw and its nut block are offset by the least distance that keeps the 2 mm running gap to the housing, on the side of the moving mass's
+   * centre of mass, within what the column casting's cover to the lifting lands allows.
    */
-  public static inline final AXIS_Y = -82.0;
+  public static function axisY():Float return HobberZOffset.axisY();
   public static inline final NUT_OFFSET_Z = 55.0;
   public static inline final SHAFT_TOP = 730.0;
   public static inline final SHAFT_LENGTH = 420.0;
