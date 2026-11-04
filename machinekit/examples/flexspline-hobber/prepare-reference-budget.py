@@ -20,10 +20,10 @@ def main():
     force = json.loads((force_directory / 'loads.json').read_text())
     if not (force['referenceForceAccepted'] and force['forceToleranceValidated']):
         raise ValueError('Accepted full-reference HB10 loads required')
-    # These are the installed reference B encoder counts (the spindle servo's own
-    # absolute encoder). Kept in the manifest and checked against the assembly by
+    # These are the installed reference B encoder counts (the cartridge's own absolute
+    # encoder on its rear shaft, the electronic-gearbox master). Kept in the manifest and checked against the assembly by
     # the Haxe consumer.
-    master_counts = 131072
+    master_counts = 524288  # the spindle's own 19-bit encoder (HobSpindle.ENCODER_COUNTS), the B master
     rpm = force['tableRpm'] * force['teeth']
     subprocess.run([args.sync_exporter, str(output / 'sync.csv'), str(rpm),
                     str(force['seconds']), str(master_counts), str(force['teeth'])], check=True)

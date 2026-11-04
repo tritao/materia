@@ -34,7 +34,7 @@ PARTS = {
         material="38CrMoAlA (34CrAlNi7-10) quenched and tempered 28-32 HRC, stress relieved; gas nitrided "
                  "≥ 850 HV0.3, case 0.3 mm, on journals, taper and nose; ground after nitriding",
         rows=[
-            (20, (-30, 0), "Coupling stub", "Ø20 h5; radial runout 0.003 to A-B; Ra 0.4"),
+            (20, (-36, 0), "Pulley and encoder stub", "Ø20 h5 (encoder rotor 0 to -14, HTD5M 45T pulley -16 to -34, keyed or taper-bushed); radial runout 0.003 to A-B; Ra 0.4"),
             (25, (0, 15), "Rear journal (datum B), floating 6205", "Ø25 k5 (+0.011/+0.002); roundness 0.0015; Ra 0.4"),
             (25, (15, 122), "Between journals", "Ø25, may be relieved to Ø24.8; ISO 2768-m"),
             (None, (122, 129), "Locknut thread", "M25 × 1.5-4h for a KM5-size precision locknut; thread runs out before the front journal"),
@@ -49,7 +49,7 @@ PARTS = {
                                                     "Ra 0.2. Finish-grind in its own bearings preferred"),
             (None, None, "Drive pins", "2 × Ø4 m6 dowels pressed on Ø28 PCD (on the section plane), 2 mm proud"),
             (None, None, "Arbor screw holes", "4 × M4 × 10 deep on Ø32 PCD, at 45° to the pins"),
-            (None, None, "Balance", "Rotor (shaft, coupling hub, arbor) G1 at 4000 rpm"),
+            (None, None, "Balance", "Rotor (shaft, encoder rotor, pulley, arbor) G1 at 4000 rpm"),
         ]),
     "housing": dict(
         drawing="HS-02", title="Spindle housing", qty="1",
@@ -67,21 +67,6 @@ PARTS = {
             (80, (0, 180), "Outside register", "Ø80 g6, coaxial to A within 0.005 (seat for the machine's clamp ring and bracket)"),
             (None, None, "End faces", "front face perpendicular to A within 0.005; 4 × M4 × 10 deep on Ø72 PCD "
                                       "at 45°, both ends"),
-        ]),
-    "motorAdapter": dict(
-        drawing="HS-03", title="Motor adapter bell", qty="1",
-        material="C45 (1.0503) or 6082-T6, blackened/anodised",
-        rows=[
-            (70, (-70, -66.8), "Motor pilot recess", "Ø70 H7 for the servo pilot; coaxial to the front flange "
-                                                     "within 0.05"),
-            (80, (-8, 0), "Front flange", "front face flat within 0.02; 4 × Ø4.5 on Ø72 PCD at 45° for M4 "
-                                          "into the housing"),
-            (64, (-20, -8), "Tube", "Ø64, with two 20 mm wide windows from z -50 to -20 for the coupling clamp screws"),
-            (None, (-70, -60), "Motor flange", "90 × 90 square; 4 × M6 through on Ø90 PCD at 45° (80-frame servo); "
-                                              "rear face parallel to the front face within 0.03"),
-            (50, (-66.8, -50), "Bore", "Ø50 clearance, ISO 2768-m"),
-            (None, None, "Location", "indicate the motor pilot to the housing axis within 0.05 before "
-                                     "tightening, then dowel (2 × Ø5) to the housing"),
         ]),
     "bearingRetainer": dict(
         drawing="HS-04", title="Front gland (bearing clamp and labyrinth)", qty="1",
@@ -113,16 +98,19 @@ PARTS = {
         ]),
 }
 BOUGHT = {
-    "motor": "Servo motor 1 kW, 80 frame, Ø19 × 35 shaft (Leadshine ELM2H-1000LA80F or equivalent); its built-in "
-             "absolute encoder is the master encoder; supplied by us",
+    "motor": "Servo motor 1 kW, 80 frame, Ø19 × 35 shaft (Leadshine ELM2H-1000LA80F or equivalent); supplied by us, "
+             "standing beside the cartridge on our cradle (not part of the cartridge)",
+    "motorPulley": "HTD5M timing pulley 36T, 18 wide, bore Ø19 (ours, on the motor)",
+    "spindlePulley": "HTD5M timing pulley 45T, 18 wide, bore Ø20 (on the cartridge stub; to be supplied or specified by the maker)",
+    "belt": "HTD5M timing belt, 15 wide, about 455 mm (91 teeth); ours",
+    "motorEncoder": "Motor's own encoder (ours)",
     "frontBearing": "Angular-contact bearing 7305 size (25 × 62 × 17), P4, 25° contact; matched pair, back to back",
     "rearBearing": "Angular-contact bearing 7305 size (25 × 62 × 17), P4, 25° contact; matched pair, back to back",
     "tailBearing": "Deep groove ball bearing 6205 (25 × 52 × 15), P5 or better; floating",
-    "coupling": "Bellows or disc coupling, Ø19 to Ø20, about Ø36 × 45, balanced, torsionally stiff",
+    "encoder": "Absolute BiSS-C ring encoder, 19 bit, about Ø80 × 14 on the housing rear face (stator) and the shaft stub (rotor); the B master of our electronic gearbox; envelope assumed, maker to propose a catalogue part",
     "arborScrew": "Socket head cap screw M4 × 10, 12.9 (arbor flange)",
     "glandScrew": "Socket head cap screw M4 × 12 (gland)",
     "bearingLocknut": "Precision bearing locknut M25 × 1.5, KM5 size (Ø38 × 7), face runout ≤ 0.003, radial locking screws",
-    "adapterScrew": "Socket head cap screw M4 × 12 (motor adapter)",
 }
 GENERAL = [
     "Dimensions in mm. Untoleranced: ISO 2768-mK. Break sharp edges 0.2 unless stated.",
@@ -138,8 +126,11 @@ REQUIREMENTS = [
     ("Running accuracy", "radial runout at the arbor taper and axial runout at the nose face ≤ 0.002 mm TIR"),
     ("Bearings", "front: matched P4 angular-contact pair 7305 size (25 × 62 × 17), back to back, light "
                  "preload; rear: 6205 floating; grease for life"),
-    ("Drive", "1 kW servo (80 frame, Ø19 shaft, e.g. Leadshine ELM2H-1000LA80F) through a balanced, "
-              "torsionally stiff bellows or disc coupling, Ø20 stub"),
+    ("Drive", "belt-drive cartridge: HTD5M 45T pulley on the Ø20 rear stub, driven by a 1 kW servo (80 frame, "
+              "Leadshine ELM2H-1000LA80F) on 36T beside the cartridge; the belt's radial pull on the pulley is about "
+              "500 N (quote the cartridge for at least 750 N radial at the pulley, 33 mm behind the 6205), "
+              "motor torque up to 9.5 N·m x 1.25 at the spindle; a motor spindle is the upgrade path with the same seat and encoder interface"),
+    ("Feedback", "19-bit absolute BiSS-C encoder on the rear face and stub: the machine's gearbox master"),
     ("Arbor", "removable from the front: 1:5 short taper and face, held by 4 × M4; 2 pins carry torque"),
     ("Coolant", "neat cutting oil, flood and mist: labyrinth at the nose"),
 ]
@@ -245,7 +236,7 @@ def check_layout(data):
     """The fixed specifications above assume these member positions; fail if the model moved them."""
     lay = data["layout"]
     expect = {"tailBearing": 0.0, "frontBearing": 146.0, "rearBearing": 146.0,
-              "arbor": lay["toolFace"], "motor": lay["motorFace"], "coupling": lay["couplingStart"]}
+              "arbor": lay["toolFace"], "encoder": 0.0}
     for mid, z in expect.items():
         got = member(data, mid)["position"][2]
         if abs(got - z) > 1e-6:
@@ -256,8 +247,8 @@ def pages(data):
     made = {p["id"]: p for p in data["made"]}
     lay, motor, arbor = data["layout"], data["motor"], data["arbor"]
     overview, _ = svg({pid: placed(made[pid], 180.0 if pid == "arbor" else 0.0)
-                       for pid in ["housing", "motorAdapter", "bearingRetainer", "shaft", "arbor"]},
-                      width_px=690, labels=[(-69, -50, "motor face z -70"), (1, -50, "rear datum z 0"),
+                       for pid in ["housing", "bearingRetainer", "shaft", "arbor"]},
+                      width_px=690, labels=[(-34, -50, "pulley z -16 to -34"), (1, -50, "rear datum z 0"),
                                             (112, -50, "bearing pair z 129-163"), (186, -50, "tool face z 180")])
     made_rows = [(PARTS[p["id"]]["drawing"], PARTS[p["id"]]["title"], PARTS[p["id"]]["qty"], p["step"],
                   f"{p['massKg']:.2f}") for p in data["made"]]
@@ -266,22 +257,21 @@ def pages(data):
     bought, seen = [], {}
     for m in data["members"]:
         mid = m["id"].rstrip("0123456789")
-        if m["id"] in made_ids or mid in ("motorShaft", "encoder"):
+        if m["id"] in made_ids or mid in ("motorShaft",):
             continue
         if mid not in BOUGHT:
             sys.exit(f"no supplier description for bought member {m['id']}")
         name = BOUGHT[mid]
         seen[name] = seen.get(name, 0) + 1
     bought = [(n, name) for name, n in seen.items()]
-    bought.append((4, "Socket head cap screw M6 × 18, servo flange to adapter"))
     first = f"""<section><h1>Hob spindle cartridge: drawing package</h1>
 <div class="sub">{html.escape(COMPANY)} · joao@materia-expedita.pt · issued {date.today().isoformat()} ·
 generated from our machine model</div>
 <h2>Requirements</h2>{table(REQUIREMENTS)}
 <h2>Assembly section (axial, through the drive pins)</h2>{overview}
-<p class="note">Axial positions are from the housing rear datum (z 0) toward the tool face (z 180). Motor face
-z {lay['motorFace']:.0f}; coupling z {lay['couplingStart']:.0f} to {lay['couplingStart'] + lay['couplingLength']:.0f};
-Ø{lay['shaftStub']:.0f} stub to z {lay['shaftRear']:.0f}. Servo (Leadshine ELM2H-1000LA80F or equivalent):
+<p class="note">Axial positions are from the housing rear datum (z 0) toward the tool face (z 180). Encoder
+z 0 to {-lay['encoderLength']:.0f}; pulley (HTD5M {lay['pulleyTeeth']}T, motor {lay['motorTeeth']}T, {lay['centres']:.1f} mm centres)
+z {lay['pulleyFront']:.0f} to {lay['pulleyFront'] - lay['pulleyWidth']:.0f}; Ø20 stub to z {lay['shaftRear']:.0f}. Servo (Leadshine ELM2H-1000LA80F or equivalent):
 {motor['ratedTorque']:.2f} N·m, {motor['ratedRpm']:.0f}/{motor['maxRpm']:.0f} rpm, {motor['face']:.0f} frame,
 Ø{motor['shaftDiameter']:.0f} × {motor['shaftLength']:.0f} shaft. Arbor {arbor['length']:.0f} long, hob seat
 Ø{arbor['hobSeatDiameter']:.0f}, hob centre {arbor['hobCentre']:.0f} from the tool face.</p>

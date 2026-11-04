@@ -9,7 +9,7 @@ class FlexsplineHobberLoads {
     if (!Math.isFinite(reserve) || reserve < 0 || reserve >= 1) throw "invalid hobber load reserve";
     var b = machine.spindle.motor.rating, c = machine.tableSpec;
     var bSpeed = job.rpm * 2 * Math.PI / 60, cSpeed = job.tableRpm * 2 * Math.PI / 60;
-    return bSpeed <= machine.spindle.maxSpeed() && cSpeed <= c.maxSpeed && loads.maxHobTorque <= b.ratedTorque * (1 - reserve)
+    return bSpeed <= machine.spindle.maxSpeed() && cSpeed <= c.maxSpeed && loads.maxHobTorque <= machine.spindle.jointTorque(b.ratedTorque) * (1 - reserve)
       && loads.maxPower <= b.ratedTorque * b.ratedSpeed * (1 - reserve)
       && loads.maxTableTorqueBound + c.number("sealDrag") + c.number("sealDragRipple") + c.number("coggingTorque")
       <= c.continuousTorque * (1 - reserve);

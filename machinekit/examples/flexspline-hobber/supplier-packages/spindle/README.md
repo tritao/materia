@@ -15,7 +15,7 @@ LD_LIBRARY_PATH=$PWD/haxeon/.tools/hashlink:$PWD/haxeon/out:$N/cadkit ./haxeon/.
 python3 machinekit/examples/flexspline-hobber/supplier-packages/spindle/spindle_package.py /tmp/spindle
 ```
 
-The exporter writes a STEP per made part (shaft, housing, motor adapter, gland,
+The exporter writes a STEP per made part (shaft, housing, gland,
 locknut, arbor) in its own frame, `spindle-assembly.step` (all members posed), and
 `spindle-package.json`: the exact axial section of each made part (CadKit planar
 section through the axis), member positions and the BOM. The script writes
@@ -24,5 +24,5 @@ and `spindle-drawings.pdf`: an overview and one page per made part.
 
 Tolerances, materials, heat treatment and inspection live in `spindle_package.py`.
 Every toleranced diameter row must match a cylinder in the model section over its
-span, and the script stops if a bearing, the motor, coupling or arbor moved, so the
+span, and the script stops if a bearing, the encoder or arbor moved, so the
 specification cannot silently drift from the model. PDFs need Chrome or Chromium.

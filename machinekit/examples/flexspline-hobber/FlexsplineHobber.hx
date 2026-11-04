@@ -26,6 +26,8 @@ class FlexsplineHobber extends MachineAssembly {
   public static final PRESSED_MARGIN = 8.0;
   public static final C = "table/C";
   public static final B = "spindle/B";
+  /** The servo's own joint: the belt couples it to B, and the hob drive is bound on it. */
+  public static final B_MOTOR = "spindle/motor-turn";
   public static final A = "swivel/A";
   /**
    * ASSUMED holding torque of the A brake, N m at the output flange. ZeroErr has not published it (asked 2026-11-03); this is the
@@ -318,6 +320,12 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt("spindleSeat", new HobberSaddle("GE-spindle-seat"), F.translation(centre, 0, HobberZLayout.SEAT_Z), "Yplate",
       F.alongY(centre + 45, 150, HobberZLayout.SEAT_Z, 1, 0, 0));
     fixExisting("spindle-mount", "spindleSeat", "spindle/housing", F.alongY(centre + 40, 150, HobberZLayout.SEAT_Z, 1, 0, 0));
+    // The belt-drive servo stands above the cartridge on a milled cradle bolted to the top of the spindle seat block (the stiffest part
+    // near it); its flange is on the cradle wall.
+    fixAt("motorCradle", new HobberSaddle("GE-motor-cradle"), F.translation(centre, 0, HobberZLayout.SEAT_Z), "spindleSeat",
+      F.alongY(centre, 190, HobberZLayout.SEAT_Z + 58, 0, 0, 1));
+    fixExisting("motor-mount", "motorCradle", "spindle/motor",
+      F.alongY(centre - HobSpindle.MOTOR_OFFSET, HobberSwivelLayout.SPINDLE_Y - HobSpindle.MOTOR_FACE_Z, HobberZLayout.SEAT_Z + HobSpindle.motorHeight(), 0, 1, 0));
     fixAt("hob", hob, F.fromRotationMatrix(centre, 20, HobberZLayout.SEAT_Z, e0), "spindle/arbor");
     fixAt(
       "outboard",
@@ -415,10 +423,13 @@ class FlexsplineHobber extends MachineAssembly {
     connectPorts("swivel-power", "supply48", "power1", "swivel/housing", "power");
     addMotor("swivel-drive", A, "swivel/housing", "swivel/housing", 1);
     exposePort("swivel.bus", "swivel/housing", "bus");
-    bind("hob-drive", B, "spindle/motor", true);
+    bind("hob-drive", B_MOTOR, "spindle/motor", true, spindle.ratio);
     // Feedback belongs to the outer drives; the cartridge encoders are also exposed as sensors.
     addEncoder("table-feedback", C, "table/" + tableSpec.encoderPart, "table-drive");
-    addEncoder("hob-master", B, "spindle/encoder", "hob-drive");
+    // The spindle's own encoder on the cartridge's rear shaft is the B master of the electronic gearbox; the servo's absolute encoder
+    // stays on its motor joint for the drive's loop.
+    addEncoder("hob-angle", B, "spindle/encoder");
+    addEncoder("hob-motor", B_MOTOR, "spindle/motorEncoder", "hob-drive");
     bindMotorBrake("swivel-drive", "swivel/housing", "swivel.brakeRelease", "swivel.brakeReleased", 1000, 30);
     machinekit.structural.FoundationIntegrity.check(bed).throwIfErrors();
     machinekit.structural.FoundationIntegrity.check(column).throwIfErrors();
@@ -542,7 +553,7 @@ class FlexsplineHobber extends MachineAssembly {
     addEncoder(a.id + "position", a.id, head);
     connectPorts(a.id + "-biss", head, "biss", "bissMaster", "ch" + (bissChannel++ + 1));
   }
-  function bind(id:String, joint:String, motor:String, process:Bool = false):Void {
+  function bind(id:String, joint:String, motor:String, process:Bool = false, ratio:Float = 1.0):Void {
     driverNumber++;
     var driver = id + "-driver";
     fixAt(
@@ -559,7 +570,7 @@ class FlexsplineHobber extends MachineAssembly {
     );
     connectPorts(id + "-power", "powerSupply", "power" + driverNumber, driver, "power");
     addMotor(id, joint, motor, driver, 1, null, process ? {
-      speedChannel:"hob.speed", directionChannel:"hob.direction", radiansPerSpeedUnit:2 * Math.PI / 60
+      speedChannel:"hob.speed", directionChannel:"hob.direction", radiansPerSpeedUnit:ratio * 2 * Math.PI / 60
     }
     :null);
   }

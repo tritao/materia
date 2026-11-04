@@ -20,7 +20,6 @@ class HobSpindlePart extends MachineComponent {
         // Finished envelopes of the geometry below: largest turned diameter and overall length.
         var dims = switch role {
           case "shaft": [40.0, 210.0];
-          case "motorAdapter": [80.0, 70.0];
           case "bearingRetainer": [80.0, 23.0];
           case "bearingLocknut": [38.0, 7.0];
           default: throw "unknown spindle cartridge part";
@@ -28,9 +27,6 @@ class HobSpindlePart extends MachineComponent {
         var terms = [machinekit.component.Procurement.ProcurementCodec.choice("role", role),
           machinekit.component.Procurement.ProcurementCodec.requirement("bodyDiameter", "mm", null, null, dims[0]),
           machinekit.component.Procurement.ProcurementCodec.requirement("bodyLength", "mm", null, null, dims[1])];
-        // The motor adapter's rear flange is a 90 mm square for the 80-frame servo.
-        if (role == "motorAdapter")
-          terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("flangeWidth", "mm", null, null, 90));
         return terms;
       });
     return recipe;
@@ -38,8 +34,7 @@ class HobSpindlePart extends MachineComponent {
   public function new(role:String, ?overrides:ComponentValues) {
     var v = P.resolve(EngineeringMetadata.parameters().concat([P.text("role", role)]), overrides);
     super("HOB-SPINDLE-" + v.token("role"), "Assumed spindle cartridge " + v.token("role"), "steel", false, v);
-    if (["shaft", "motorAdapter", "bearingRetainer",
-      "bearingLocknut"].indexOf(v.token("role")) < 0) throw "unknown spindle cartridge part";
+    if (["shaft", "bearingRetainer", "bearingLocknut"].indexOf(v.token("role")) < 0) throw "unknown spindle cartridge part";
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addFacet(new EngineeringMetadata(v));
     addFacet(machinekit.motion.PrecisionErrors.fromValues(v, []));
@@ -49,9 +44,9 @@ class HobSpindlePart extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     return switch (values().token("role")) {
       case "shaft":
-        // Rear stub for the coupling, bearing journals, shoulder and nose; solid, no drawbar bore.
+        // Rear stub for the encoder rotor and the belt pulley, bearing journals, shoulder and nose; solid, no drawbar bore.
         var body = Solids.union([
-          Part.cylinderSpan(10, -30, 0),
+          Part.cylinderSpan(10, HobSpindle.SHAFT_REAR, 0),
           Part.cylinderSpan(12.5, 0, 163),
           Part.cylinderSpan(15, 163, 170),
           Part.cylinderSpan(20, 170, 180),
@@ -73,25 +68,6 @@ class HobSpindlePart extends MachineComponent {
           tools.push(Part.cylinderSpan(2, 170, 180.1, 16 * Math.cos(angle), 16 * Math.sin(angle)));
         }
         Solids.cut(body, tools);
-      case "motorAdapter":
-        // Front flange bolted to the housing rear face (four M4 on Ø72), Ø64 tube with two
-        // coupling access windows, and a 90 mm square rear flange for the 80-frame servo
-        // (Ø70 pilot recess, four M6 on Ø90). Threads omitted from CAD.
-        var holes = [
-          Part.cylinderSpan(25, -70.1, 0.1),
-          Part.cylinderSpan(35, -70.1, -66.8),
-          Part.prism([new Vector(-50, -10), new Vector(50, -10), new Vector(50, 10), new Vector(-50, 10)], -50, -20)
-        ];
-        for (i in 0...4) {
-          var angle = Math.PI / 4 + i * Math.PI / 2;
-          holes.push(Part.cylinderSpan(2.25, -8.1, 0.1, 36 * Math.cos(angle), 36 * Math.sin(angle)));
-          holes.push(Part.cylinderSpan(3, -70.1, -59.9, 45 * Math.cos(angle), 45 * Math.sin(angle)));
-        }
-        Solids.cut(Solids.union([
-          Part.cylinderSpan(40, -8, 0),
-          Part.cylinderSpan(32, -60, -8),
-          Part.prism([new Vector(-45, -45), new Vector(45, -45), new Vector(45, 45), new Vector(-45, 45)], -70, -60)
-        ]), holes);
       case "bearingRetainer":
         // Front gland: spigot clamping the pair's outer rings at 163, flange on the housing face
         // held by four M4 on Ø72; Ø42 bore round the Ø40 nose as the labyrinth gap.

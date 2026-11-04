@@ -24,18 +24,23 @@ class ShaftEncoder extends MachineComponent implements EncoderPart {
   public final hasIndex:Bool;
   public final bodyDiameter:Float;
   public final bodyLength:Float;
+  /** Diameter of the hollow bore the shaft passes through (0.16 of the body unless given). */
+  public final boreDiameter:Float;
 
   public function new(
     countsPerRevolution:Float,
     absolute:Bool = false,
     hasIndex:Bool = true,
     bodyDiameter:Float = 38.0,
-    bodyLength:Float = 22.0
+    bodyLength:Float = 22.0,
+    boreDiameter:Float = 0.0
   ) {
     if (!(countsPerRevolution > 0)
       || !Math.isFinite(countsPerRevolution)) throw "Shaft encoder needs a positive count per revolution";
     if (!(bodyDiameter > 0) || !(bodyLength > 0)) throw "Shaft encoder needs a positive body size";
-    var size = '${Dimension.format(bodyDiameter)}x${Dimension.format(bodyLength)}';
+    var bore = boreDiameter > 0 ? boreDiameter : bodyDiameter * 0.16;
+    if (!(bore < bodyDiameter * 0.8)) throw "Shaft encoder bore must leave a wall";
+    var size = '${Dimension.format(bodyDiameter)}x${Dimension.format(bodyLength)}' + (boreDiameter > 0 ? '-B${Dimension.format(boreDiameter)}' : "");
     super(
       'ENCODER-${Dimension.format(countsPerRevolution)}${absolute ? "A" : "I"}${hasIndex ? "Z" : ""}-$size',
       'Shaft encoder, ${Dimension.format(countsPerRevolution)} counts per revolution, ${absolute ? "absolute" : "incremental"}'
@@ -47,6 +52,7 @@ class ShaftEncoder extends MachineComponent implements EncoderPart {
     this.hasIndex = hasIndex;
     this.bodyDiameter = bodyDiameter;
     this.bodyLength = bodyLength;
+    this.boreDiameter = bore;
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
@@ -63,14 +69,16 @@ class ShaftEncoder extends MachineComponent implements EncoderPart {
         ComponentRecipeSupport.flag("absolute", false),
         ComponentRecipeSupport.flag("index", true),
         ComponentRecipeSupport.length("bodyDiameter", 38),
-        ComponentRecipeSupport.length("bodyLength", 22)
+        ComponentRecipeSupport.length("bodyLength", 22),
+        ComponentRecipeSupport.length("boreDiameter", 0.16 * 38)
       ],
       v -> new ShaftEncoder(
         v.number("countsPerRevolution"),
         v.boolean("absolute"),
         v.boolean("index"),
         v.number("bodyDiameter"),
-        v.number("bodyLength")
+        v.number("bodyLength"),
+        Math.abs(v.number("boreDiameter") - 0.16 * v.number("bodyDiameter")) < 1e-9 ? 0.0 : v.number("boreDiameter")
       ),
       true
     ).procured(_ -> Buy(null, null, null)).requiring(v -> [
@@ -78,7 +86,8 @@ class ShaftEncoder extends MachineComponent implements EncoderPart {
       machinekit.component.Procurement.ProcurementCodec.choice("absolute", v.boolean("absolute") ? "true" : "false"),
       machinekit.component.Procurement.ProcurementCodec.choice("index", v.boolean("index") ? "true" : "false"),
       machinekit.component.Procurement.ProcurementCodec.requirement("bodyDiameter", "mm", null, null, v.number("bodyDiameter")),
-      machinekit.component.Procurement.ProcurementCodec.requirement("bodyLength", "mm", null, null, v.number("bodyLength"))
+      machinekit.component.Procurement.ProcurementCodec.requirement("bodyLength", "mm", null, null, v.number("bodyLength")),
+      machinekit.component.Procurement.ProcurementCodec.requirement("boreDiameter", "mm", null, null, v.number("boreDiameter"))
     ]);
     return recipeTypeCache;
   }
@@ -102,6 +111,9 @@ class ShaftEncoder extends MachineComponent implements EncoderPart {
     ).setNumber(
       "bodyLength",
       bodyLength
+    ).setNumber(
+      "boreDiameter",
+      boreDiameter
     ).setToken(
       "material",
       materialSpec()
@@ -134,7 +146,7 @@ class ShaftEncoder extends MachineComponent implements EncoderPart {
           {z0: flange, z1: l - cover, diameter: d * 0.94},
           {z0: l - cover, z1: l, diameter: d * 0.88}
         ],
-        d * 0.16,
+        boreDiameter,
         0,
         3,
         d * 0.82,

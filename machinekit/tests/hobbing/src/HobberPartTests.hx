@@ -29,7 +29,6 @@ class HobberPartTests {
     new CrossedRollerBearing(),
     new RotaryEncoderRing(),
     new HobSpindlePart("shaft"),
-    new HobSpindlePart("motorAdapter"),
     new HobSpindlePart("bearingRetainer"),
     new HobSpindlePart("bearingLocknut"),
     new FlexsplineCupBlank(),
@@ -176,22 +175,26 @@ class HobberPartTests {
     check((cast spindle.motor : machinekit.motion.LeadshineServo).clearanceBoxes().length == 3
       && (cast spindle.motor : machinekit.motion.LeadshineServo).clearanceBoxes().filter(b -> b.name != "body" && b.y1 == 55).length == 2,
       "spindle servo clearance has its body and both connectors, reaching LH 55 from the axis");
-    near(spindle.maxSpeed(), 4000 * 2 * Math.PI / 60, 1e-9, "B speed limit is the 4000 rpm cartridge rating");
+    near(spindle.maxSpeed(), 4000 * 2 * Math.PI / 60, 1e-9, "B speed limit is the 4000 rpm cartridge rating (the servo's 5000 rpm through the 36T/45T belt reaches it)");
     check(
       spindle.definition().joints.filter(j -> j.id == "B")[0].limits.velocity == spindle.maxSpeed(),
       "B joint carries the cartridge speed limit"
     );
-    check(spindle.encoder.countsPerRevolution == spindle.motor.rating.encoderCounts && spindle.encoder.absolute,
-      "B master is the servo's own absolute encoder");
-    near(spindle.jointTorque(2), 2, 0, "coupling gives a 1:1 spindle drive");
-    check(
-      spindle.coupling.boreA == spindle.motor.rating.shaftDiameter && spindle.coupling.boreB == HobSpindle.SHAFT_STUB,
-      "coupling joins the motor shaft to the spindle stub"
-    );
-    check(
-      HobSpindle.MOTOR_FACE + spindle.motor.rating.shaftLength >= HobSpindle.COUPLING_START + 15,
-      "motor shaft engages its half of the coupling"
-    );
+    check(spindle.encoder.countsPerRevolution == HobSpindle.ENCODER_COUNTS && spindle.encoder.absolute
+      && spindle.motorEncoder.countsPerRevolution == spindle.motor.rating.encoderCounts,
+      "B master is the cartridge's own 19-bit absolute encoder; the servo keeps its own for the drive loop");
+    near(spindle.ratio, 1.25, 1e-9, "the belt turns the motor 1.25 times per spindle turn");
+    near(spindle.jointTorque(2), 2.5, 1e-9, "the belt reduction multiplies the motor torque by 1.25");
+    check(spindle.motorPulley.teeth == 36 && spindle.spindlePulley.teeth == 45 && spindle.belt.length > 0,
+      "HTD5M 36T on the motor, 45T on the spindle, one belt");
+    check(spindle.motorPulley.boreDiameter == spindle.motor.rating.shaftDiameter && spindle.spindlePulley.boreDiameter == 20,
+      "pulley bores are the motor shaft and the Ø20 stub");
+    check(HobSpindle.pulleyFront(spindle.motor.rating.shaftLength) - HobSpindle.PULLEY_WIDTH >= HobSpindle.SHAFT_REAR,
+      "the cartridge stub reaches past the pulley");
+    var cradle = new machinekit.hobbing.HobberSaddle("GE-motor-cradle"), cradleHoles = cradle.holes();
+    check(machinekit.component.ManufacturingRoute.of(cradle) != null && cradleHoles.filter(h -> h.kind == "tapped").length == 4
+      && cradleHoles.filter(h -> h.kind == "dowel").length == 2 && cradleHoles.filter(h -> h.kind == "clearance").length == 4,
+      "the servo cradle is a routed milled part with the flange's four tapped holes, four floor bolts and two dowels");
     check(spindle.frontBearing != spindle.rearBearing, "spindle has two bearing instances");
     check(
       spindle.billOfMaterials().quantity(spindle.frontBearing.bom.partNumber) == 2,
@@ -205,8 +208,8 @@ class HobberPartTests {
     );
     var cartridgePoses = spindle.solvedPoses();
     for (id in [
-      "shaft", "motorAdapter", "motor", "motorShaft", "coupling", "tailBearing", "bearingRetainer", "bearingLocknut",
-      "arborScrew1", "arborScrew4", "glandScrew1", "adapterScrew4"
+      "shaft", "encoder", "motor", "motorShaft", "motorPulley", "spindlePulley", "belt", "motorEncoder", "tailBearing", "bearingRetainer", "bearingLocknut",
+      "arborScrew1", "arborScrew4", "glandScrew1"
     ]) check(
       cartridgePoses.exists(id),
       "cartridge load-path part present: " + id

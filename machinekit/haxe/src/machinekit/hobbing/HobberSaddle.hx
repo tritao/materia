@@ -34,6 +34,7 @@ class HobberSaddle extends MachineComponent {
         "GE-swivel-plate",
         "GE-swivel-adapter",
         "GE-spindle-seat",
+        "GE-motor-cradle",
         "GE-Y-saddle",
         "electrical-panel"
       ],
@@ -77,7 +78,7 @@ class HobberSaddle extends MachineComponent {
       addFacet(route.intent());
     }
     if (["GE-X-carriage", "GE-Z-saddle", "GE-X-drive-pad", "GE-Z-drive-pad",
-      "GE-Y-saddle", "GE-Y-drive-fixed", "GE-Y-drive-floating", "GE-Y-nut-seat", "GE-X-scale-seat", "GE-Z-scale-seat", "GE-Z-scale-arm"].indexOf(design) >= 0) {
+      "GE-Y-saddle", "GE-motor-cradle", "GE-Y-drive-fixed", "GE-Y-drive-floating", "GE-Y-nut-seat", "GE-X-scale-seat", "GE-Z-scale-seat", "GE-Z-scale-arm"].indexOf(design) >= 0) {
       var parts = pieces();
       try {
         addFacet(ExtrusionCollision.pieces(parts));
@@ -277,11 +278,92 @@ class HobberSaddle extends MachineComponent {
   /** The spindle seat's extent along the spindle axis (work y) and the y of its three clamp screws. */
   public static function spindleSeatRange():{y0:Float, y1:Float, clampYs:Array<Float>} return {y0: SEAT_Y0, y1: SEAT_Y1, clampYs: [100.0, 150.0, 200.0]};
 
-  /** The split-clamp block that holds the Ø80 cartridge: bore, slit up the +z side and the holes of `seatHoles`. */
+  /** The split-clamp block that holds the Ø80 cartridge: bore, slit up the +z side, the holes of `seatHoles` and the cradle floor's tapped holes in its top. */
   static function spindleSeat():Part {
     var block = box(SEAT_X0, SEAT_X1, SEAT_Y0, SEAT_Y1, SEAT_LOW, SEAT_HALF);
     var cuts = [boreY(SEAT_BORE / 2, SEAT_Y0 - 0.1, SEAT_Y1 + 0.1, 0, 0), box(-SEAT_SLIT / 2, SEAT_SLIT / 2, SEAT_Y0 - 0.1, SEAT_Y1 + 0.1, 0, SEAT_HALF + 0.1)];
-    return withHoles(Solids.cut(block, cuts), seatHoles(false));
+    return withHoles(Solids.cut(block, cuts), seatHoles(false).concat(cradleHoles(true)));
+  }
+
+  // ---- B motor cradle (FRAME_PLAN head redesign) -------------------------------------------------------------------------------
+
+  /** The cradle wall: it stands behind the cartridge's rear face (y 240), the motor flange on its front face; thickness leaves the pulley 2 mm clear. */
+  static inline final CRADLE_WALL = 15.0;
+  /** The wall's front face (the motor flange face) in work y. */
+  static inline final CRADLE_FACE_Y = HobberSwivelLayout.SPINDLE_Y - HobSpindle.MOTOR_FACE_Z;
+  /** The floor sits on the spindle seat block's top (z `SEAT_HALF`), 12 thick, from y `CRADLE_FLOOR_Y0` to the wall's rear; the wall and ribs stand on it. */
+  static inline final CRADLE_FLOOR = 12.0;
+  static inline final CRADLE_FLOOR_Y0 = 150.0;
+  /** The wall stands clear of the Y drive's motor and bracket (x from 35) on the +x side: the servo is 8 mm toward -x of the cartridge (the flange's holes are 31.8 from its axis). */
+  static inline final CRADLE_X0 = -56.0;
+  static inline final CRADLE_X1 = 31.0;
+  /** The floor reaches farther on the +x side (x 38) for its bolts; it is far below the Y drive's motor. */
+  static inline final CRADLE_FLOOR_X1 = 38.0;
+  /** The servo's axis in work x. */
+  static inline final CRADLE_MOTOR_X = -HobSpindle.MOTOR_OFFSET;
+  /** Two ribs stiffen the wall against the servo rocking on its offset centre of mass: 8 thick, outside the flange, from y `CRADLE_RIB_Y0` to the wall's rear. */
+  static inline final CRADLE_RIB = 6.0;
+  static inline final CRADLE_RIB_Y0 = 199.0;
+  /** The slit through the floor, over the seat's own, so the clamp's two arms are not bridged by the floor (it stops short of the wall by this much). */
+  static inline final CRADLE_SLIT = 4.0;
+  static inline final CRADLE_SLIT_END = 3.0;
+
+  /** The floor's four M8 into the seat block's top: two rows 50 apart along the spindle, 60 apart across it. */
+  public static function cradleFloorBolts():Array<{x:Float, y:Float}> return [{x: -30.0, y: 165.0}, {x: 30.0, y: 165.0}, {x: -30.0, y: 215.0}, {x: 30.0, y: 215.0}];
+
+  /**
+   * The cradle's section for the drive-mode estimate: wall thickness and width, height above the floor, the rib's thickness, x and depth ahead of the
+   * wall's rear face, the floor bolts, mm.
+   */
+  public static function cradleSection():{wall:Float, width:Float, x0:Float, height:Float, ribThickness:Float, ribDepth:Float, ribX:Float, floorTop:Float, bolts:Array<{x:Float, y:Float}>} {
+    return {wall: CRADLE_WALL, width: CRADLE_X1 - CRADLE_X0, x0: CRADLE_X0, ribX: CRADLE_X0 - 2.0, height: HobSpindle.motorHeight() + 47 - (SEAT_HALF + CRADLE_FLOOR), ribThickness: CRADLE_RIB,
+      ribDepth: CRADLE_FACE_Y + CRADLE_WALL - CRADLE_RIB_Y0, floorTop: SEAT_HALF + CRADLE_FLOOR, bolts: cradleFloorBolts()};
+  }
+
+  static function cradleMotor():machinekit.motion.ServoMotor return machinekit.motion.LeadshineServo.driven(HobSpindle.MOTOR);
+
+  /**
+   * The cradle's holes in the work frame lowered by the seat height (`inSeat` false), or the seat block's matching tapped holes (true): the
+   * floor's four M8 and two dowels into the seat's top, and in the cradle the motor's pilot register, four tapped flange holes and the
+   * shaft's through bore.
+   */
+  static function cradleHoles(inSeat:Bool):Array<machinekit.component.ManufacturingRoute.RouteHole> {
+    var list:Array<machinekit.component.ManufacturingRoute.RouteHole> = [], m8 = machinekit.standard.SocketHeadCapScrew.catalog().get("M8").tapDrill;
+    var n = 0;
+    for (b in cradleFloorBolts()) {
+      n++;
+      if (inSeat) list.push({id: "FT" + n, kind: "tapped", thread: "M8", diameter: m8, nominal: 8, fit: null, depth: 16.0,
+        position: [b.x, b.y, SEAT_HALF], direction: [0.0, 0, -1]});
+      else list.push({id: "FS" + n, kind: "clearance", thread: "M8", diameter: 9.0, nominal: 8, fit: null, depth: CRADLE_FLOOR,
+        position: [b.x, b.y, SEAT_HALF + CRADLE_FLOOR], direction: [0.0, 0, -1]});
+    }
+    n = 0;
+    for (x in [-40.0, 24.0]) {
+      n++;
+      list.push({id: "FD" + n, kind: "dowel", thread: null, diameter: 8.0, nominal: 8.0, fit: "H7", depth: 12.0,
+        position: [x, 190.0, inSeat ? SEAT_HALF : SEAT_HALF + CRADLE_FLOOR], direction: [0.0, 0, -1]});
+    }
+    if (inSeat) return list;
+    var motor = cradleMotor(), flange = motor.mounting();
+    if (flange == null) flange = machinekit.motion.ServoMotor.assumedMounting(motor.rating.designation);
+    var c = HobSpindle.motorHeight(), drill = machinekit.component.MountingFace.boltFor(flange.holeDiameter).tapDrill, k = 0;
+    list.push({id: "P1", kind: "bore", thread: null, diameter: flange.pilotDiameter + 0.2, nominal: flange.pilotDiameter, fit: "H7",
+      depth: flange.pilotHeight, position: [CRADLE_MOTOR_X, CRADLE_FACE_Y, c], direction: [0.0, 1, 0]});
+    list.push({id: "P2", kind: "bore", thread: null, diameter: motor.rating.shaftDiameter + 8, nominal: motor.rating.shaftDiameter + 8, fit: null,
+      depth: CRADLE_WALL, position: [CRADLE_MOTOR_X, CRADLE_FACE_Y, c], direction: [0.0, 1, 0]});
+    for (h in flange.holes) list.push({id: "M" + (++k), kind: "tapped", thread: "M" + Std.int(flange.holeDiameter - 0.5), diameter: drill, nominal: flange.holeDiameter - 0.5,
+      fit: null, depth: 12.0, position: [CRADLE_MOTOR_X + h.x, CRADLE_FACE_Y, c + h.y], direction: [0.0, 1, 0]});
+    return list;
+  }
+
+  /** The motor cradle: a milled steel part, floor on the seat block's top, wall carrying the servo flange (pilot and four tapped holes), two ribs. */
+  static function motorCradle():Part {
+    var c = HobSpindle.motorHeight(), top = c + 47, rear = CRADLE_FACE_Y + CRADLE_WALL, low = SEAT_HALF, floor = low + CRADLE_FLOOR;
+    var body = Solids.union([box(CRADLE_X0, CRADLE_FLOOR_X1, CRADLE_FLOOR_Y0, rear, low, floor),
+      box(CRADLE_X0, CRADLE_X1, CRADLE_FACE_Y, rear, floor, top),
+      box(CRADLE_X0 - 5, CRADLE_X0 + 1, CRADLE_RIB_Y0, rear, low, top)]);
+    var slit = box(-CRADLE_SLIT / 2, CRADLE_SLIT / 2, CRADLE_FLOOR_Y0 - 1, CRADLE_FACE_Y - CRADLE_SLIT_END, low - 1, floor + 1);
+    return withHoles(Solids.cut(body, [slit]), cradleHoles(false));
   }
 
   /** The seat holes of both supports on the one pad, ids numbered per support (F for the fixed support, B for the floating one). */
@@ -358,6 +440,11 @@ class HobberSaddle extends MachineComponent {
           {name: "output flange face (bore and ends turned together)", tolerance: 0.02, roughnessRa: 1.6},
           {name: "plate end face, parallel to the flange face", tolerance: 0.02, roughnessRa: 1.6}
         ]);
+      case "GE-motor-cradle":
+        ManufacturingRoute.milled(2, "fine", [
+          {name: "motor flange face, front (square to the shaft bore; pilot register)", tolerance: 0.02, roughnessRa: 1.6},
+          {name: "floor underside, on the seat block's top", tolerance: 0.02, roughnessRa: 1.6}
+        ], 160);
       case "GE-spindle-seat":
         ManufacturingRoute.milled(2, "tight", [
           {name: "spindle bore, clamp slit closed at the screw torque (cylindricity)", tolerance: 0.01, roughnessRa: 0.8},
@@ -382,7 +469,8 @@ class HobberSaddle extends MachineComponent {
       case "GE-Y-saddle": headHoles(HobberScales.y(), Y_HEAD_HOLE_DEPTH, Z_SADDLE_ORIGIN_Z).concat(seatHoles(true));
       case "GE-swivel-plate": shifted(HobberScales.seatHoles(HobberScales.y(), 12), Z_SADDLE_ORIGIN_Z).concat(platePlateHoles());
       case "GE-swivel-adapter": ringOutputHoles().concat(ringPlateHoles());
-      case "GE-spindle-seat": seatHoles(false);
+      case "GE-spindle-seat": seatHoles(false).concat(cradleHoles(true));
+      case "GE-motor-cradle": cradleHoles(false);
       case "GE-X-scale-seat": HobberScales.seatHoles(HobberScales.x(), 8);
       case "GE-Z-scale-seat": HobberScales.seatHoles(HobberScales.z(), 8);
       case "GE-Z-scale-arm": headHoles(HobberScales.z(), HobberScales.Z_ARM_THICKNESS, Z_SADDLE_ORIGIN_Z);
@@ -423,6 +511,8 @@ class HobberSaddle extends MachineComponent {
           [boreX(HobberSwivelLayout.RING_INSIDE / 2, HobberSwivelLayout.PLATE_X - 1, HobberSwivelLayout.OUTPUT_X + 1, 0, 0)]), ringOutputHoles().concat(ringPlateHoles()))];
       case "GE-spindle-seat":
         [spindleSeat()];
+      case "GE-motor-cradle":
+        [motorCradle()];
       case "GE-X-scale-seat":
         [withHoles(padBox(barBox(HobberScales.x())), HobberScales.seatHoles(HobberScales.x(), 8))];
       case "GE-Z-scale-seat":

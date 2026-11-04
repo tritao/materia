@@ -71,6 +71,40 @@ class HobberAssemblyProcedures {
   }
 
   /**
+   * B belt drive (head redesign): the centre distance is fixed (a whole-tooth belt on 36T/45T pulleys), the servo stands on a cradle bolted
+   * to the seat block's top, and the belt tension is set with a peel-able shim pack between the seat top and the cradle floor (0.05 mm leaves
+   * a tension step of a few newtons for the HTD5M 15 mm belt; the shims are loose, so the cradle's dowel holes are reamed through them at
+   * the final pack). The pretension is the one `HobberFrameChecks.spindleDrive` prints.
+   */
+  public static function tensionBelt():Procedure {
+    var drive = ["spindle/motor", "spindle/motorPulley", "spindle/spindlePulley", "spindle/belt"];
+    return {
+      id: "b-tension-belt",
+      label: "B: fit the belt and set its tension",
+      kind: Assembly,
+      start: Assembled,
+      steps: [
+        note("cradle", "Bolt the cradle to the seat block",
+          "Stone the seat block's top and the cradle's underside, put a 0.5 mm shim pack on the seat top, set the cradle on it and tighten its four M8 into the block's top. "
+          + "The cradle's slit lies over the seat's own so the clamp still closes.", ["motorCradle", "spindleSeat"]),
+        note("motor", "Fit the servo",
+          "Bolt the servo to the cradle wall with its four M6 (pilot register in the wall), the connectors up. Its shaft must be flush with the pulley's rear face.",
+          ["motorCradle", "spindle/motor"]),
+        note("pulleys", "Fit the pulleys",
+          "Set the 36T pulley on the servo shaft and the 45T pulley on the cartridge stub, their front faces 16 mm behind the housing rear face (the encoder's rotor lies in front of them), belt planes aligned with a straightedge across both.",
+          ["spindle/motorPulley", "spindle/spindlePulley"]),
+        note("belt", "Put the belt on and read the tension",
+          "Slip the belt over the pulleys (lift the cradle's shim pack out for the first fit) and measure the span tension with a sonic tension meter against the pretension the drive check prints.", drive),
+        note("shim", "Adjust the shim pack",
+          "Add or peel shims (each raises the servo by its thickness) until the belt carries its pretension; ream the cradle's two dowel holes through the final pack and tighten the floor bolts.", ["motorCradle", "spindleSeat"]),
+        note("run", "Run in and re-check",
+          "Turn the spindle by hand, then run it at 500 rpm for ten minutes and re-measure the tension; the belt must track on both pulleys without climbing a flange.", drive)
+      ],
+      source: Generated("hobber")
+    };
+  }
+
+  /**
    * Commissioning: the guides' pitch and yaw over the travel, measured with an autocollimator or laser angular optics, go into the
    * controller's correction table, so the angular error times the offset to the tool (the Abbe error, see `HobberFrameChecks.scales`) is
    * compensated instead of left in the part. Roll about the travel is not measured here (it needs a level or the optics' roll option).
@@ -104,6 +138,7 @@ class HobberAssemblyProcedures {
   public static function build(machine:FlexsplineHobber):Array<Procedure> {
     var result:Array<Procedure> = [];
     for (travel in machine.travel) result.push(alignScrewSupports(travel.id, {lower: travel.lower, upper: travel.upper}));
+    result.push(tensionBelt());
     result.push(setRails("X", ["railXLeft", "railXRight"]));
     result.push(setRails("Z", ["railZLeft", "railZRight"]));
     result.push(setRails("Y", ["railYLeft", "railYRight"]));

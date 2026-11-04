@@ -13,8 +13,8 @@ class SpindleHousing extends MachineComponent {
   ]);
   /**
    * Clamping length (assumed, the maker's drawing is not in hand): the Ø80 land of the housing between its two end registers, in the housing's
-   * own z. It stops 10 mm short of the motor adapter's flange (z -8..0) and 10 mm short of the front face (z 180, the nose and gland flange at
-   * 180..186), so a clamp never grips a register, the nose or the adapter; it must cover the angular-contact pair's outer rings (129..163).
+   * own z. It stops 10 mm short of the rear face (z 0, the encoder stator stands on it) and 10 mm short of the front face (z 180, the nose and gland flange at
+   * 180..186), so a clamp never grips a register or the nose; it must cover the angular-contact pair's outer rings (129..163).
    */
   public static inline final CLAMP_FROM = 10.0;
   public static inline final CLAMP_TO = 170.0;
@@ -52,7 +52,7 @@ class SpindleHousing extends MachineComponent {
 
   public function interfaceName():String return "ASSUMED-TF20";
   override public function hasGeometry():Bool return true;
-  /** Bores and the eight M4 holes (four each end, on Ø72) for the gland and motor adapter; threads omitted. */
+  /** Bores and the eight M4 holes (four each end, on Ø72) for the gland and the encoder stator; threads omitted. */
   override public function geometry(detail:ComponentDetail = Preview):cadkit.modeling.Part {
     var tools = [
       cadkit.modeling.Part.cylinderSpan(26, -0.1, 15),

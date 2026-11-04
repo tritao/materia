@@ -41,7 +41,8 @@ class FlexsplineHobberChecks {
     assertions += HobberFrameChecks.run(machine);
     assertions += HobberCastingMassChecks.run(machine);
     var runtimeModel = modelForRuntime(machine);
-    for (joint in [FlexsplineHobber.B, FlexsplineHobber.C]) {
+    // The hob drive is bound on the servo's own joint (the belt couples it to B); the table's on C.
+    for (joint in [FlexsplineHobber.B_MOTOR, FlexsplineHobber.C]) {
       var drive = runtimeModel.actuators.filter(a -> switch a.transmission {
         case SimpleTransmission(id, _, _):
           id == joint;
@@ -213,8 +214,10 @@ class FlexsplineHobberChecks {
       check(joint.filter(j -> j.id == FlexsplineHobber.C).length == 1, "independent table C joint");
       var definition = model.definition("hobber");
       check(
-        definition.couplings.filter(k -> k.source == FlexsplineHobber.B || k.target == FlexsplineHobber.C).length == 0,
-        "B/C have no mechanical gear coupling"
+        definition.couplings.filter(k -> (k.source == FlexsplineHobber.B && k.target == FlexsplineHobber.C)
+          || (k.source == FlexsplineHobber.C && k.target == FlexsplineHobber.B)).length == 0
+          && definition.couplings.filter(k -> k.source == FlexsplineHobber.B).length == 1,
+        "B/C have no mechanical gear coupling (B's only coupling is the belt to its servo)"
       );
       for (axis in ["X", "Y", "Z"]) {
         var j = joint.filter(k -> k.id == axis)[0];
@@ -237,7 +240,7 @@ class FlexsplineHobberChecks {
       var actuators = definition.actuators;
       if (actuators == null) throw "missing drives";
       check(actuators.length == 6, "six powered drives exported");
-      var bDrive = actuators.filter(a -> a.joint == FlexsplineHobber.B)[0];
+      var bDrive = actuators.filter(a -> a.joint == FlexsplineHobber.B_MOTOR)[0];
       check(bDrive.processVelocity != null, "B is a process velocity spindle");
       var aDrive = actuators.filter(a -> a.joint == FlexsplineHobber.A)[0];
       check(aDrive.brake != null, "A has a spring-applied static clamp with release feedback");
@@ -533,7 +536,7 @@ class FlexsplineHobberChecks {
       settings
     );
     var b = machine.spindle.motor.rating, c = machine.tableSpec;
-    var bTorque = b.ratedTorque * reserve, bPower = b.ratedTorque * b.ratedSpeed * reserve;
+    var bTorque = machine.spindle.jointTorque(b.ratedTorque) * reserve, bPower = b.ratedTorque * b.ratedSpeed * reserve;
     var cTorque = c.continuousTorque
       * reserve - c.number("sealDrag") - c.number("sealDragRipple") - c.number("coggingTorque");
     check(

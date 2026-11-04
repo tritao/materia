@@ -55,8 +55,7 @@ contours against the same data.
 
 ## What is in the model and what is not
 
-The base has one cut that follows the machine's motion rather than its structure: the spindle servo relief (`spindle-motor-relief`,
-179 x 47.5 mm in the top at the back edge, 13 mm deep), derived from the servo's swept envelope by `HobberSpindleRelief`.
+The base no longer has a cut that follows the machine's motion: the spindle servo stands above the cartridge since the belt-drive redesign (2026-11-04), so `HobberSpindleRelief` finds no relief (the earlier 179 x 47.5 mm pocket, 13 mm deep, is gone). The class stays: if the servo ever comes within the running gap again, the feature returns by itself.
 
 Tolerances the model holds: the insert position budget (0.01 mm on finished steel seats, checked
 by `FoundationIntegrity` as position error plus tilt times face span; 0.5 mm on the fixing
