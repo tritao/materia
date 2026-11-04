@@ -1,0 +1,7 @@
+{
+  "version": 1, "package": {"name": "machinekit-hobber-frames"},
+  "entry": "HobberFrameChecks",
+  "sourceRoots": ["src", "../../examples/flexspline-hobber"],
+  "dependencies": {"toolpathkit-motion": {"path": "../../../toolpathkit/motion"}, "machinekit": {"path": "../.."}, "stockkit": {"path": "../../../stockkit"}, "camkit": {"path": "../../../camkit"}},
+  "target": "host", "outputDir": "build/frames"
+}

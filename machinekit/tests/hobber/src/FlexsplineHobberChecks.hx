@@ -38,6 +38,7 @@ class FlexsplineHobberChecks {
     var machine = new FlexsplineHobber();
     machine.validate();
     assertions += HobberDesignChecks.run(machine);
+    assertions += HobberFrameChecks.run(machine);
     var runtimeModel = modelForRuntime(machine);
     for (joint in [FlexsplineHobber.B, FlexsplineHobber.C]) {
       var drive = runtimeModel.actuators.filter(a -> switch a.transmission {
@@ -545,7 +546,7 @@ class FlexsplineHobberChecks {
     check(number("tableTorqueBoundNm") <= cTorque, "measured reference table torque bound retains 20 percent reserve");
     var members = machine.components();
     var motor:machinekit.motion.ServoMotor = cast members.filter(m -> m.id == "Xmotor")[0].component;
-    var screw:machinekit.motion.BallScrew = cast members.filter(m -> m.id == "Xscrew")[0].component;
+    var screw:machinekit.motion.LeadScrew = cast members.filter(m -> m.id == "Xscrew")[0].component;
     var nut:machinekit.motion.BallNut = cast members.filter(m -> m.id == "Xnut")[0].component;
     var xForce = motor.rating.ratedTorque * 2 * Math.PI / (screw.thread.lead * 0.001) * nut.efficiency() * reserve;
     check(number("radialN") <= xForce, "measured reference radial load retains X continuous thrust reserve");
