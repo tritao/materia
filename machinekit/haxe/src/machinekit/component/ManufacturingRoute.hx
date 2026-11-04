@@ -25,6 +25,26 @@ typedef MachinedFace = {
 }
 
 /**
+ * A hole a made part carries, in the part's own frame: what the drawing's hole table lists. `kind` is `"tapped"` (cut at the tap
+ * drill `diameter`, thread `thread`, to `depth`), `"clearance"` (a bolt of size `thread` passes), `"dowel"` (drilled `diameter`,
+ * reamed to `fit` at assembly) or `"bore"` (a plain bore, `nominal` the diameter it is for). `position` is the mouth, `direction`
+ * the unit vector into the part, `depth` measured from the mouth along it.
+ */
+typedef RouteHole = {
+  var id:String;
+  var kind:String;
+  var thread:Null<String>;
+  /** As cut in the model's solid, mm. */
+  var diameter:Float;
+  /** The thread's major diameter, the dowel's or the bore's finished diameter, mm. */
+  var nominal:Float;
+  var fit:Null<String>;
+  var depth:Float;
+  var position:Array<Float>;
+  var direction:Array<Float>;
+}
+
+/**
  * The production route of a made part: which stock or process, how many setups and what tolerance class, and which faces
  * are machined. The route states its process text (`process()`), which the BOM carries as the part's
  * `manufacturingProcess`, and which supplier group the part goes to (`supplier()`); the faces stay with the route for the

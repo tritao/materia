@@ -103,6 +103,27 @@ class NutBlock extends MachineComponent {
   /** The pose of `nut` in this block's frame: the nut's flange seat against the broad face, its axis along the block's. */
   public function nutPose():AssemblyFrame return AssemblyFrames.inverse(seat);
 
+  /** The holes of the finished block in its own frame: the barrel bore, the flange's tapped holes (through) and the two base holes. */
+  public function holes():Array<ManufacturingRoute.RouteHole> {
+    var flange = SocketHeadCapScrew.catalog().get(nut.mountScrew), base = SocketHeadCapScrew.catalog().get(BASE_THREAD);
+    if (flange == null || base == null) throw "Nut block lost a screw row";
+    var out:Array<ManufacturingRoute.RouteHole> = [{
+      id: "N1", kind: "bore", thread: null, diameter: nut.bodyDiameter + 0.4, nominal: nut.bodyDiameter, fit: null, depth: thickness,
+      position: [0, 0, 0], direction: [0, 0, 1]
+    }];
+    var n = 0;
+    for (h in nut.mountingHoles()) out.push({
+      id: "F" + (++n), kind: "tapped", thread: nut.mountScrew, diameter: flange.tapDrill, nominal: flange.diameter, fit: null,
+      depth: thickness, position: [h.x, h.y, 0], direction: [0, 0, 1]
+    });
+    n = 0;
+    for (x in baseHoleXs()) out.push({
+      id: "T" + (++n), kind: "tapped", thread: BASE_THREAD, diameter: base.tapDrill, nominal: base.diameter, fit: null,
+      depth: BASE_DEPTH, position: [x, -centreHeight, thickness / 2], direction: [0, 1, 0]
+    });
+    return out;
+  }
+
   static var recipeCache:Null<ComponentType>;
 
   /** The recipe for a block on a ball nut (SFU1605 flange); a block on another nut is code-only. */

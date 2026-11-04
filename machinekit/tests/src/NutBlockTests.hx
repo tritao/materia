@@ -51,6 +51,22 @@ class NutBlockTests {
     rejects(() -> new NutBlock("NB-BARREL", new machinekit.motion.LeadScrewNut(new machinekit.motion.LeadScrewThread(MetricTrapezoidal, 8, 2, 4), 4, false), 30), "an unflanged nut");
   }
 
+  /** The hole list of the drawing package: bore, flange holes through, base holes blind, all on the bar. */
+  static function holeList():Void {
+    var nut = new BallNut(), block = new NutBlock("NB-HOLES", nut, 28);
+    var holes = block.holes(), body = block.geometry(), box = body.shape.bounds(), lo = box.get_min(), hi = box.get_max();
+    check(holes.length == 1 + nut.boltCount + 2, "a bore, the flange holes and two base holes: " + holes.length);
+    check(holes[0].kind == "bore" && holes[0].diameter > nut.bodyDiameter, "the bore clears the barrel");
+    for (h in holes) {
+      check(h.position[0] >= lo.get_x() - 1e-6 && h.position[0] <= hi.get_x() + 1e-6 && h.position[1] >= lo.get_y() - 1e-6
+        && h.position[1] <= hi.get_y() + 1e-6 && h.position[2] >= lo.get_z() - 1e-6 && h.position[2] <= hi.get_z() + 1e-6, 'hole ${h.id} mouth on the bar');
+      check(h.kind != "tapped" || (h.thread != null && h.diameter < h.nominal), 'tapped hole ${h.id} is cut at the tap drill');
+    }
+    var base = holes.filter(h -> h.thread == NutBlock.BASE_THREAD);
+    check(base.length == 2 && base[0].depth == NutBlock.BASE_DEPTH, "two blind base holes");
+    body.close();
+  }
+
   static function routes():Void {
     var nut = new BallNut();
     var block = new NutBlock("NB-ROUTE", nut, 25);
@@ -66,6 +82,7 @@ class NutBlockTests {
 
   public static function run():Void {
     cutouts();
+    holeList();
     routes();
     Sys.println("nut block: cut-out, block, ground stock rows and routes pass");
   }

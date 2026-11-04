@@ -47,3 +47,6 @@ tolerances, coating, material, inspection) live in the two Python scripts.
 
 The two mineral castings (base and column) with their cast-in steel inserts have their own
 package in `casting/` (STEP, JSON summary, drawings and checks; see its README).
+
+The milled parts, ground-bar drive pads and nut blocks (every hobber member with a `ManufacturingRoute`) have their
+own package in `machined/` (STEP, A4 PDF drawing and DXF per part, `parts.json`, RFQ table and checks; see its README).

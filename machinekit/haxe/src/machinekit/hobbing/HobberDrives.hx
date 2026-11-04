@@ -107,6 +107,28 @@ class HobberDrives {
     }];
   }
 
+  /** The same holes as `seatHoles`, with their kind and thread, for a drawing's hole table (world frame). */
+  public static function seatRouteHoles(d:HobberDriveAxis, support:String):Array<machinekit.component.ManufacturingRoute.RouteHole> {
+    var counts = new Map<String, Int>(), result = [];
+    for (h in d.drive.seatHoles(d.axis, d.length)) if (h.support == support) {
+      var spec = h.kind == "tapped" ? machinekit.standard.SocketHeadCapScrew.catalog().get(h.thread) : null;
+      var n = (counts.get(h.kind) ?? 0) + 1;
+      counts.set(h.kind, n);
+      result.push({
+        id: (h.kind == "dowel" ? "D" : "T") + n,
+        kind: h.kind,
+        thread: h.thread,
+        diameter: spec == null ? h.diameter : spec.tapDrill,
+        nominal: h.diameter,
+        fit: h.kind == "dowel" ? "H7" : null,
+        depth: h.depth,
+        position: [h.position.x, h.position.y, h.position.z],
+        direction: [h.direction.x, h.direction.y, h.direction.z]
+      });
+    }
+    return result;
+  }
+
   /**
    * The relief the fixed pad needs under the motor mount: the part of the mount's drawn body that hangs below its base plane (the
    * motor flange plate hangs 5 mm below it), measured on the mount's geometry and placed by its pose, plus 0.5 mm all round, as

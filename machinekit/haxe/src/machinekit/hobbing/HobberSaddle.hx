@@ -137,10 +137,14 @@ class HobberSaddle extends MachineComponent {
     return Solids.cut(body, [for (h in HobberDrives.seatHoles(axis, support)) holeTool(h.position, h.direction, h.diameter, h.depth)]);
   }
 
-  /** `body` with clear holes for the nut block's two carriage bolts, `through` mm deep from the block's base end. */
-  static function withBlockBolts(body:Part, axis:HobberDriveAxis, through:Float):Part {
-    var nut = new machinekit.motion.BallNut(), block = HobberDrives.nutBlock(axis, nut);
-    return Solids.cut(body, [for (h in HobberDrives.nutBlockHoles(axis, nut, block)) holeTool(h.position, h.direction, h.diameter, through)]);
+  /** Where the Z saddle's own frame sits in the work frame (z), mm: `FlexsplineHobber` places it at z 363. The drive's holes are in the work frame. */
+  static inline final Z_SADDLE_ORIGIN_Z = 363.0;
+
+  /** `body` with clear holes for the nut block's two carriage bolts, `through` mm deep from the block's base end; `origin` is the part frame's origin in the work frame. */
+  static function withBlockBolts(body:Part, axis:HobberDriveAxis, through:Float, ?origin:Array<Float>):Part {
+    var nut = new machinekit.motion.BallNut(), block = HobberDrives.nutBlock(axis, nut), at = origin ?? [0.0, 0, 0];
+    return Solids.cut(body, [for (h in HobberDrives.nutBlockHoles(axis, nut, block))
+      holeTool([h.position[0] - at[0], h.position[1] - at[1], h.position[2] - at[2]], h.direction, h.diameter, through)]);
   }
 
   static function padBox(b:Array<Float>):Part return box(b[0], b[3], b[1], b[4], b[2], b[5]);
@@ -177,6 +181,28 @@ class HobberSaddle extends MachineComponent {
     };
   }
 
+  /** The holes this design carries, in the world frame the geometry is authored in: the drive seats' tapped holes and dowels, the nut block's carriage bolts. Empty for designs without any. */
+  public function holes():Array<machinekit.component.ManufacturingRoute.RouteHole> {
+    function bolts(axis:HobberDriveAxis, through:Float, at:Array<Float>) {
+      var nut = new machinekit.motion.BallNut(), block = HobberDrives.nutBlock(axis, nut), n = 0;
+      return [for (h in HobberDrives.nutBlockHoles(axis, nut, block)) ({
+        id: "B" + (++n), kind: "clearance", thread: machinekit.motion.NutBlock.BASE_THREAD, diameter: h.diameter, nominal: h.diameter,
+        fit: null, depth: through, position: [h.position[0] - at[0], h.position[1] - at[1], h.position[2] - at[2]], direction: h.direction
+      } : machinekit.component.ManufacturingRoute.RouteHole)];
+    }
+    return switch designId {
+      case "GE-X-carriage": bolts(HobberDrives.x(), 40, [0.0, 0, 0]);
+      case "GE-Z-saddle": bolts(HobberDrives.z(), 30, [0.0, 0, Z_SADDLE_ORIGIN_Z]);
+      case "GE-X-drive-fixed": HobberDrives.seatRouteHoles(HobberDrives.x(), "fixed");
+      case "GE-X-drive-floating": HobberDrives.seatRouteHoles(HobberDrives.x(), "floating");
+      case "GE-Z-drive-fixed": HobberDrives.seatRouteHoles(HobberDrives.z(), "fixed");
+      case "GE-Z-drive-floating": HobberDrives.seatRouteHoles(HobberDrives.z(), "floating");
+      case "GE-Y-drive-fixed": HobberDrives.seatRouteHoles(HobberDrives.y(), "fixed");
+      case "GE-Y-drive-floating": HobberDrives.seatRouteHoles(HobberDrives.y(), "floating");
+      default: [];
+    };
+  }
+
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.union(pieces());
   function pieces():Array<Part> {
     return switch designId {
@@ -193,7 +219,7 @@ class HobberSaddle extends MachineComponent {
         ];
       case "GE-Z-saddle":
         // One milled plate between the swivel seat (x 135) and the block faces (x 148), with the nut block's bolts.
-        [withBlockBolts(box(135, 148, -175, 175, -65, 170), HobberDrives.z(), 30)];
+        [withBlockBolts(box(135, 148, -175, 175, -65, 170), HobberDrives.z(), 30, [0.0, 0, Z_SADDLE_ORIGIN_Z])];
       case "GE-swivel-plate":
         [box(85, 100, -115, 115, -95, 95)];
       case "GE-Y-saddle":
