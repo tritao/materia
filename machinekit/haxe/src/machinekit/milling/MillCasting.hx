@@ -113,7 +113,10 @@ class MillCasting extends MachineComponent {
   }
 
   override public function hasGeometry():Bool return true;
-  override public function geometry(detail:ComponentDetail = Preview):Part {
+  override public function machinable():Bool return true;
+  override public function geometry(detail:ComponentDetail = Preview):Part return detail == Envelope ? drawnBody(detail) : machined(drawnBody(detail));
+
+  function drawnBody(detail:ComponentDetail):Part {
     var body:Part;
     var pad = 4.0;
     if (kind == Base || kind == Saddle) {

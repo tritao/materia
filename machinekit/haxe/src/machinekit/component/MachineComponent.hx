@@ -38,6 +38,47 @@ class MachineComponent {
 	 * the fasteners of every pair of faces that meet in an assembly; a part with none is never fastened by derivation.
 	 */
   public function fasteningFaces():Array<BoltedFace> return [];
+
+  var machining:Array<MachinedCut> = [];
+
+  /**
+	 * Whether this part cuts the holes `JointFasteners` derives for it into its geometry: its `geometry()` ends with
+	 * `machined(...)`. A part that lacks it cannot be a drilled-to-suit host (nor a clamped face with undrawn holes);
+	 * deriving such a joint is refused rather than leaving the solid without the hole.
+	 */
+  public function machinable():Bool return false;
+
+  /** Records the holes derived for this part, once; they are cut by `machined`. */
+  public function machine(cuts:Array<MachinedCut>):Void {
+    if (!machinable()) throw 'Part "$designation" does not cut derived holes into its geometry';
+    if (machining.length > 0) throw 'Part "$designation" is already machined';
+    machining = cuts.copy();
+    cachedBom = null;
+    cachedMass = null;
+    cachedMassMaterialId = null;
+  }
+
+  public function machinedCuts():Array<MachinedCut> return machining.copy();
+
+  /** Names the recorded holes, for a cache of the geometry and for the revision. */
+  function machiningKey():String {
+    var out:Array<String> = [];
+    for (cut in machining) out.push([cut.frame.x, cut.frame.y, cut.frame.z, cut.frame.qx, cut.frame.qy, cut.frame.qz, cut.frame.qw, cut.x, cut.y,
+      cut.diameter, cut.from, cut.to].map(v -> ComponentNumberKey.encode(v)).join(","));
+    return out.join(";");
+  }
+
+  /** `part` with the derived holes cut in (consumes it); the end of a machinable part's `geometry()`. */
+  function machined(part:Part):Part {
+    if (machining.length == 0) return part;
+    var tools:Array<Part> = [];
+    for (cut in machining) {
+      var tool = Part.cylinderSpan(cut.diameter / 2, cut.from, cut.to, cut.x, cut.y);
+      tools.push(machinekit.assembly.PosedParts.moved(tool, cut.frame));
+      tool.close();
+    }
+    return Solids.cut(part, tools);
+  }
   /**
 	 * Whether a shaft turns in this part: its bearings (a screw support, a motor mount, a motor housing, a bearing block) carry
 	 * a journal. A body that turns relative to the structure may touch such a part without it counting as a rubbing contact.
@@ -169,7 +210,7 @@ class MachineComponent {
       material : MaterialLibrary.require(materialId).physical.spec,
       typeId : recipe == null ? null : recipe.id,
       valuesKey : valuesKey,
-      fingerprint : recipe == null ? revisionFingerprint() : BomRevision.fingerprint(recipe.bomKey(values()), recipe.generatorVersion),
+      fingerprint : recipe == null ? machinedRevision(revisionFingerprint()) : BomRevision.fingerprint(recipe.bomKey(values()) + machinedSuffix(), recipe.generatorVersion),
       procurement : procurement,
       maturity : maturity,
       requirements : requirements
@@ -214,10 +255,17 @@ class MachineComponent {
 	 * inputs and material, which build the same shape, and for a component without a recipe (nothing says which components are
 	 * alike) its own.
 	 */
+  /** The revision with the derived holes in it: the same part drilled differently is another revision. */
+  function machinedRevision(revision:Null<String>):Null<String> return revision == null || machining.length == 0 ? revision : BomRevision.fingerprint(revision
+    + machinedSuffix(), 1);
+
+  function machinedSuffix():String return machining.length == 0 ? "" : "|machined:" + machiningKey();
+
   public function geometryKey(detail:ComponentDetail = Preview):String {
     var recipe = type, suffix = materialId + "|" + Std.string(detail);
     return recipe
-      == null ? "instance|" + instanceId + "|" + suffix : recipe.id + "|" + recipe.key(values()) + "|" + suffix;
+      == null ? "instance|" + instanceId + "|" + suffix + machinedSuffix() : recipe.id + "|" + recipe.key(values()) + "|" + suffix
+      + machinedSuffix();
   }
 
   /**

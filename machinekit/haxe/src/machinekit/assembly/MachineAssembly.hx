@@ -1046,6 +1046,11 @@ typedef MachineAssemblyMassProperties = {
     var derivation = JointFasteners.derive(this, options);
     derivation.require();
     for (line in derivation.lines()) addBomItem(line.item, line.quantity);
+    // The derived holes become part of the parts' geometry, so the solids and every export show what the joints need.
+    for (entry in components()) {
+      var cuts = derivation.machining.get(entry.id);
+      if (cuts != null) entry.component.machine(cuts);
+    }
     fastenersDerived = derivation;
     return derivation;
   }

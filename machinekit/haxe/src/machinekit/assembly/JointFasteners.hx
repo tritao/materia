@@ -3,6 +3,7 @@ package machinekit.assembly;
 import machinekit.component.BoltedFace;
 import machinekit.component.BoltedFace.BoltHole;
 import machinekit.component.BoltedFace.BoltRecess;
+import machinekit.component.BoltedFace.MachinedCut;
 import machinekit.component.BoltedFace.ThreadMaterial;
 import machinekit.assembly.Diagnostics.DiagnosticSeverity;
 import machinekit.component.BomItem;
@@ -53,6 +54,12 @@ typedef FastenedJoint = {
 class FastenerDerivation {
   public final joints:Array<FastenedJoint> = [];
   public final diagnostics = new Diagnostics();
+  /**
+	 * The holes the joints need cut into their parts, by member id, in each part's frame: the tap-drill holes of a host
+	 * drilled to suit and the clearance holes of a clamped face whose holes the part does not draw. They are derived once,
+	 * here, from the solved joint; `MachineAssembly.deriveFasteners` hands them to the parts (`MachineComponent.machine`).
+	 */
+  public final machining = new Map<String, Array<MachinedCut>>();
 
   public function new() {
   }
@@ -129,6 +136,8 @@ class JointFasteners {
         (face.isClamped() ? clamped : receiving).push(placed);
       }
     }
+    var members = new Map<String, MachineComponent>();
+    for (entry in assembly.components()) members.set(entry.id, entry.component);
     var used = new Map<String, String>();
     var derived = new Map<String, Array<{x:Float, y:Float, joint:String}>>();
     for (a in clamped) {
@@ -151,7 +160,7 @@ class JointFasteners {
         continue;
       }
       var b = candidates[0];
-      var joint = joinFaces(result.diagnostics, a, b, tolerance, propertyClass, group, assembly, used, derived);
+      var joint = joinFaces(result, a, b, tolerance, propertyClass, group, members, used, derived);
       if (joint != null) result.joints.push(joint);
     }
     for (key in derived.keys()) spacing(result, key, derived.get(key), result.joints);
@@ -199,16 +208,17 @@ class JointFasteners {
   }
 
   static function joinFaces(
-    diagnostics:Diagnostics,
+    result:FastenerDerivation,
     a:Placed,
     b:Placed,
     tolerance:Float,
     propertyClass:PropertyClass,
     group:Map<String, Int>,
-    assembly:MachineAssembly,
+    members:Map<String, MachineComponent>,
     used:Map<String, String>,
     derived:Map<String, Array<{x:Float, y:Float, joint:String}>>
   ):Null<FastenedJoint> {
+    var diagnostics = result.diagnostics;
     var id = a.member + "#" + a.face.id + " -> " + b.member + "#" + b.face.id;
     var before = diagnostics.items.length;
     if (group.get(a.member) != group.get(b.member)) diagnostics.error(
@@ -353,6 +363,42 @@ class JointFasteners {
       if (!derived.exists(host)) derived.set(host, []);
       for (point in points) derived.get(host).push({x: point.x, y: point.y, joint: id});
     }
+    // The holes the parts are cut with, in their own frames.
+    if (drilled) {
+      if (!members.get(b.member).machinable()) diagnostics.error(
+        "fasteners.machining",
+        id,
+        '$id: ${b.member} is drilled to suit the joint but its geometry does not cut derived holes'
+      );
+      else for (point in points) cutsOf(result, b.member).push({
+        frame: b.face.frame,
+        x: point.x,
+        y: point.y,
+        diameter: spec.tapDrill,
+        from: -1.0,
+        to: through ? thickness + 1 : drillDepth
+      });
+    }
+    if (!a.face.drawn) {
+      if (!members.get(a.member).machinable()) diagnostics.error(
+        "fasteners.machining",
+        id,
+        '$id: ${a.member} has clearance holes its geometry does not draw and does not cut derived holes'
+      );
+      else for (hole in a.face.holes) {
+        var back = grip + (recess == null ? 0.0 : recess.depth);
+        cutsOf(result, a.member).push({frame: a.face.frame, x: hole.x, y: hole.y, diameter: clearance, from: -1.0, to: back + 1});
+        if (recess != null) cutsOf(result, a.member).push({
+          frame: a.face.frame,
+          x: hole.x,
+          y: hole.y,
+          diameter: recess.diameter,
+          from: grip,
+          to: back + 1
+        });
+      }
+    }
+    if (hasErrorSince(diagnostics, before)) return null;
     return {
       id: id,
       clampedMember: a.member,
@@ -374,6 +420,15 @@ class JointFasteners {
       drillDepth: drillDepth,
       item: screw.bom
     };
+  }
+
+  static function cutsOf(result:FastenerDerivation, member:String):Array<MachinedCut> {
+    var cuts = result.machining.get(member);
+    if (cuts == null) {
+      cuts = [];
+      result.machining.set(member, cuts);
+    }
+    return cuts;
   }
 
   static function hasErrorSince(diagnostics:Diagnostics, from:Int):Bool {

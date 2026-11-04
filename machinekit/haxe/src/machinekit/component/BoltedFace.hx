@@ -16,6 +16,13 @@ enum ThreadMaterial {
 /** The counterbore a fastener head sinks into: the recess floor is the bearing seat. */
 typedef BoltRecess = {diameter:Float, depth:Float}
 
+/**
+ * One round hole or recess `JointFasteners` derives for a part: a cylinder of `diameter` on the axis through (`x`, `y`) of
+ * `frame` (a frame in the part's own frame), spanning `from` to `to` along that frame's +Z, mm. A part that `machinable()`
+ * cuts these into its geometry (`MachineComponent.machined`), so the solid, the exports and the checks see the same holes.
+ */
+typedef MachinedCut = {frame:AssemblyFrame, x:Float, y:Float, diameter:Float, from:Float, to:Float};
+
 enum BoltedRole {
   /**
 	 * This side is clamped: the fastener passes through a clearance hole of `clearance` mm. `grip` is the material from the
@@ -51,10 +58,17 @@ class BoltedFace {
   public final height:Float;
   /** The material behind the plane at (x, y) of a face drilled to suit, where a bore or pocket makes it thinner than `thickness`. */
   public final thicknessAt:Null<(Float, Float) -> Float>;
+  /**
+	 * Whether the part's own geometry already draws this face's holes (a catalogue rail with its counterbores, a datasheet
+	 * flange). A clamped face that does not (`drawn` false) has its clearance holes, and its counterbore where it declares a
+	 * recess, cut by the derivation; a receiving face drilled to suit is always cut.
+	 */
+  public final drawn:Bool;
 
   function new(id:String, frame:AssemblyFrame, role:BoltedRole, holes:Null<Array<BoltHole>>, width:Float, height:Float,
-      ?thicknessAt:(Float, Float) -> Float) {
+      ?thicknessAt:(Float, Float) -> Float, drawn:Bool = true) {
     this.thicknessAt = thicknessAt;
+    this.drawn = drawn;
     if (id == null || StringTools.trim(id) == "") throw "A bolted face needs an id";
     this.id = id;
     this.frame = frame;
@@ -78,7 +92,8 @@ class BoltedFace {
   }
 
   public static function clamped(id:String, frame:AssemblyFrame, holes:Array<BoltHole>, clearance:Float, grip:Float,
-      ?size:String, ?recess:BoltRecess):BoltedFace return new BoltedFace(id, frame, Clamped(size, clearance, grip, recess), holes, 0, 0);
+      ?size:String, ?recess:BoltRecess, drawn:Bool = true):BoltedFace return new BoltedFace(id, frame,
+      Clamped(size, clearance, grip, recess), holes, 0, 0, null, drawn);
 
   public static function tapped(id:String, frame:AssemblyFrame, holes:Array<BoltHole>, size:String, depth:Float, thickness:Float,
       through:Bool = false, ?material:ThreadMaterial):BoltedFace return new BoltedFace(id, frame,
