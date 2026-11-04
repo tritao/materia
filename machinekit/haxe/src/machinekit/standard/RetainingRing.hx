@@ -24,6 +24,8 @@ import machinekit.component.Solids;
  * Preview leaves a 40 degree gap, matching the ring's open form; Envelope is a full annulus.
  */
 class RetainingRing extends MachineComponent {
+  override public function carriesJournal():Bool return true;
+
   static var table:Null<Catalog<RetainingRingSpec>>;
   static inline var GAP:Float = Math.PI * 2 / 9;
 

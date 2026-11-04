@@ -25,6 +25,8 @@ import machinekit.component.Solids;
  * +Y along +Z.
  */
 class HexNut extends MachineComponent {
+  override public function fastensByForm():Bool return true;
+
   static var table:Null<Catalog<HexNutSpec>>;
 
   public final spec:HexNutSpec;

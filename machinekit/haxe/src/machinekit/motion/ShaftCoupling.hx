@@ -29,6 +29,8 @@ typedef ShaftCouplingSetScrew = {
  * +Y along +Z.
  */
 class ShaftCoupling extends MachineComponent {
+  override public function fastensByForm():Bool return true;
+
   public final boreA:Float;
   public final boreB:Float;
   public final outerDiameter:Float;

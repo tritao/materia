@@ -87,6 +87,11 @@ class LevelingFoot extends AssumedCatalogComponent {
     LevelingFootCodec.encode(spec)
   ));
 
+  override public function fastensByForm():Bool return switch spec {
+    case Nut(_, _, _), Foot(_, _, _, _, _, _, _, _): true;
+    default: false;
+  };
+
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides);
     var parsed = LevelingFootCodec.decode(v.token("part"));

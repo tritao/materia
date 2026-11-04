@@ -33,6 +33,16 @@ class MachineComponent {
       motor.hostCutout()
     );
   }
+  /**
+	 * Whether a shaft turns in this part: its bearings (a screw support, a motor mount, a motor housing, a bearing block) carry
+	 * a journal. A body that turns relative to the structure may touch such a part without it counting as a rubbing contact.
+	 */
+  public function carriesJournal():Bool return false;
+  /**
+	 * Whether this part is held by form rather than by a flat face: threaded onto a screw or into a hole (a nut, a levelling foot's
+	 * adjuster) or clamped round a shaft (a coupling). The face-area rule for a fixed mate does not apply to it.
+	 */
+  public function fastensByForm():Bool return false;
   public function reducerSpec():Null<machinekit.motion.ReducerSpec> return null;
   public function motorDriver():Null<machinekit.motion.MotorDriver> return null;
   public function electricalSource():Null<machinekit.motion.ElectricalSource> return null;

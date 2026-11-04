@@ -6,6 +6,8 @@ import machinekit.component.ComponentRecipeSupport as P;
 
 /** Frameless direct-drive torque motor. Reference row is Assumed: its outside, bore and height are not a product's. */
 class TorqueMotor extends MachineComponent implements machinekit.motion.MotorDrive {
+  override public function carriesJournal():Bool return true;
+
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
     P.quantity("outside", 150, "mm"),
     P.quantity("bore", 80, "mm"),

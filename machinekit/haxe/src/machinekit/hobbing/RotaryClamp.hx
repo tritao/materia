@@ -6,6 +6,8 @@ import machinekit.component.ComponentRecipeSupport as P;
 
 /** Static rotary clamp. Reference row is Assumed; dimensions are simplified envelopes. */
 class RotaryClamp extends MachineComponent implements machinekit.motion.MotorBrakeSpec {
+  override public function carriesJournal():Bool return true;
+
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
     P.quantity("outside", 150, "mm"),
     P.quantity("bore", 120, "mm"),

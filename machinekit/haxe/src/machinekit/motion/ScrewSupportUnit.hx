@@ -203,6 +203,8 @@ class ScrewSupportUnit extends MachineComponent {
   override public function mountingFace():Null<machinekit.component.MountingFace> return spec.base ? machinekit.component.MountingFace
     .tappedFoot([for (p in mountingPositions()) {x: p.x, z: p.z, diameter: drawingSource().holeDiameter}], -spec.shaftHeight) : null;
 
+  override public function carriesJournal():Bool return true;
+
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {

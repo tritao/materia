@@ -51,6 +51,8 @@ typedef IntegrityOptions = {
 	 * the pilot and bolt holes, and lies under the flange.
 	 */
   @:optional var flangeCutouts:Bool;
+  /** Pairs of members the machine's process brings together (a hob in the work, a tool in the stock); they may share volume. */
+  @:optional var processContacts:Array<{a:String, b:String}>;
   /** All three of the above at their defaults. */
   @:optional var strict:Bool;
 }
@@ -179,6 +181,8 @@ class AssemblyIntegrity {
   final interfaces = new Map<String, Float>();
   final ids:Array<String> = [];
   final bodyOf = new Map<String, String>();
+  /** Bodies a revolute or continuous joint turns relative to their parent. */
+  final turning = new Map<String, Bool>();
 
   function new(assembly:MachineAssembly, options:IntegrityOptions) {
     this.assembly = assembly;
@@ -196,9 +200,19 @@ class AssemblyIntegrity {
     for (joint in definition.joints) if (joint.type != AssemblyJointType.Fixed) {
       movingPairs.set(joint.parent + "|" + joint.child, true);
       movingPairs.set(joint.child + "|" + joint.parent, true);
+    } else if (joint.role == AssemblyJointRole.Tree && (Std.isOfType(flat.member(joint.parent), machinekit.standard.ScrewFastener)
+      || Std.isOfType(flat.member(joint.child), machinekit.standard.ScrewFastener))) {
+      // A screw or bolt fixed to its part is threaded into it: the thread overlaps the hole's.
+      allow(joint.parent, joint.child, Math.POSITIVE_INFINITY);
     }
+    for (contact in options.processContacts ?? []) allow(contact.a, contact.b, Math.POSITIVE_INFINITY);
     for (member in flat.members) ids.push(member.id);
     for (body in AssemblyBodies.of(definition)) for (id in body.occurrences) bodyOf.set(id, body.id);
+    for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree
+      && (joint.type == AssemblyJointType.Continuous || joint.type == AssemblyJointType.Revolute)) {
+      var body = bodyOf.get(joint.child);
+      if (body != null) turning.set(body, true);
+    }
     for (record in flat.transmissions) switch record.source {
       case LeadScrew(screw, nut):
         allow(screw, nut, Math.POSITIVE_INFINITY);
@@ -428,6 +442,9 @@ class AssemblyIntegrity {
       || gapReported.exists(a + "|" + b) || PosedParts.apart(need(boxes, a), need(boxes, b), margin)) return;
     var gap = need(parts, a).distance(need(parts, b));
     if (gap >= margin) return;
+    // A shaft in the bearing it turns in (a turning body next to a part that carries a journal) and a guide block on its rail
+    // run close by design; an overlap is still an error, found by the interference check.
+    if (journalAgainst(a, b) || journalAgainst(b, a) || guided(a, b)) return;
     gapReported.set(a + "|" + b, true);
     diagnostics.error(
       "integrity.gap",
@@ -435,6 +452,19 @@ class AssemblyIntegrity {
       '$a and $b move relative to each other and come within ${round(gap)} mm (running gap ${round(margin)} mm) at '
       + describe(sweep.sample) + " (sampled sweep)"
     );
+  }
+
+  /** A guide block and a guide rail: the block rides the rail it touches. */
+  function guided(a:String, b:String):Bool {
+    var first = flat.member(a), second = flat.member(b);
+    return (Std.isOfType(first, machinekit.motion.LinearRail) && Std.isOfType(second, machinekit.motion.LinearRailBlock))
+      || (Std.isOfType(second, machinekit.motion.LinearRail) && Std.isOfType(first, machinekit.motion.LinearRailBlock));
+  }
+
+  /** `bearing` carries a journal and `other` is in a body that turns: the shaft runs in its bearing. */
+  function journalAgainst(bearing:String, other:String):Bool {
+    var body = bodyOf.get(other);
+    return flat.member(bearing).carriesJournal() && body != null && turning.exists(body);
   }
 
   static function describe(sample:Map<String, Float>):String {
@@ -461,7 +491,7 @@ class AssemblyIntegrity {
     for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree) carries.set(joint.parent, true);
     for (joint in definition.joints) {
       if (joint.role != AssemblyJointRole.Tree || joint.type != AssemblyJointType.Fixed
-        || !carries.exists(joint.child)) continue;
+        || !carries.exists(joint.child) || flat.member(joint.child).fastensByForm()) continue;
       var gap = touching(parts, boxes, joint.parent, joint.child);
       if (gap > contactTolerance) continue;
       var area = contactArea(parts, boxes, joint.child, joint.parent, gap);
@@ -533,6 +563,11 @@ class AssemblyIntegrity {
       var cut = PosedParts.commonVolume(hostPart, hostBox, tool, PosedParts.boxOf(tool));
       var under = PosedParts.commonVolume(hostPart, hostBox, seat, PosedParts.boxOf(seat));
       var available = slab.volume() - localTool.volume();
+      // A host with no material at the flange at all is some other mate of this part (a motor on a mount, a ring on a support).
+      if (cut <= overlapLimit && under <= overlapLimit) {
+        closeList(owned);
+        return;
+      }
       if (cut > overlapLimit) diagnostics.error(
         "integrity.mount.cutout",
         mate,
