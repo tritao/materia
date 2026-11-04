@@ -240,7 +240,7 @@ import materia.assembly.AssemblyFrames as F;
       }
       if (kind == Column) {
         var rows = foundation.insertLocations(), site = rows.filter(row -> row.id == "liftRight")[0];
-        var neighbours = rows.filter(row -> row.id != site.id),
+        var neighbours = new machinekit.tooling.SourceSteel(rows.filter(row -> row.id != site.id)),
           resin = new machinekit.structural.MineralCasting(FoundationLayout.bodyValues("column")).geometry();
         var cover = switch site.part.insertSpec().anchorage {
           case Bolted(rules, _):
@@ -269,9 +269,11 @@ import materia.assembly.AssemblyFrames as F;
           FoundationLayout.dimensions("column"),
           cover
         ) catch (error:Dynamic) {
+          neighbours.close();
           resin.close();
           throw error;
         }
+        neighbours.close();
         resin.close();
         check(
           message.indexOf("Lifting blank lacks casting cover to source anchor:") >= 0 && message.indexOf("rail") >= 0,

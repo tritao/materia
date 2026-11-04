@@ -78,8 +78,9 @@ class MillLiftingPattern {
     footprints = admissible;
     if (footprints.length == 0) throw "No declared lifting blank meets source anchor demand";
     var resin = foundation.body.geometry(), result:Array<CastInsertPlacement> = [];
-    var neighbours = fixed.copy();
+    var neighbours:machinekit.tooling.SourceSteel = null;
     try {
+      neighbours = new machinekit.tooling.SourceSteel(fixed);
       for (sx in [-1, 1]) for (sy in [-1, 1]) {
         var id = "lift" + (sx < 0 ? "Left" : "Right") + (sy < 0 ? "Front" : "Rear");
         var failures:Array<String> = [], chosen:CastInsertPlacement = null;
@@ -138,7 +139,7 @@ class MillLiftingPattern {
                 Casting(resin, candidate.pose),
                 share
               );
-              neighbours.push({id: candidate.id, part: anchored, pose: candidate.pose, openings: candidate.openings});
+              neighbours.add({id: candidate.id, part: anchored, pose: candidate.pose, openings: candidate.openings});
               chosen = candidate;
               break;
             } catch (error:Dynamic) {
@@ -156,9 +157,11 @@ class MillLiftingPattern {
         result.push(chosen);
       }
     } catch (error:Dynamic) {
+      if (neighbours != null) neighbours.close();
       resin.close();
       throw error;
     }
+    neighbours.close();
     resin.close();
     return result;
   }

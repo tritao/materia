@@ -44,14 +44,16 @@ typedef InsertAnchorComponent = {
  * interference remain separate; source shape bounds never substitute for solids. */
 class InsertAnchorGeometry {
   /** Proud steel is permitted only beyond the declared casting face. Inside
- * the envelope it must remain in resin and clear all other source inserts. */
+ * the envelope it must remain in resin and clear all other source inserts,
+ * `neighbours`, whose steel is built once for every candidate tried. */
   public static function checkSourceClearance(
     candidate:machinekit.structural.MineralFoundation.CastInsertPlacement,
-    others:Array<machinekit.structural.MineralFoundation.CastInsertPlacement>,
+    neighbours:SourceSteel,
     resin:cadkit.modeling.Part,
     dimensions:Array<Float>,
     minimumClearance:Float
   ):Void {
+    var others = neighbours.rows;
     // Source sheet/plate frames are signed axis permutations. Their
     // box-to-box distance is exact, so reject insufficient source lands before
     // constructing native solids. Catalogue/socket geometry keeps the native path.
@@ -166,24 +168,13 @@ class InsertAnchorGeometry {
       var steelBounds = machinekit.assembly.PosedParts.boxOf(steel);
       // Confirm the screened choice with the complete neighbouring steel,
       // including the actual anchor hardware, once all analytic checks pass.
-      for (other in others) {
-        var spec = other.part.insertSpec();
-        var blanks = [own(machinekit.structural.InsertBodies.part(other.part.bodySpec()))];
-        for (hardware in machinekit.tooling.InsertAnchorGeometry.components(spec)) {
-          var local = own(hardware.part.geometry());
-          local.shape.setThreadedFaces([]);
-          blanks.push(own(machinekit.assembly.PosedParts.moved(local, hardware.pose)));
-        }
-        var blank = own(cadkit.modeling.Part.fuseAll(blanks));
-        var placed = own(machinekit.assembly.PosedParts.moved(blank, other.pose));
+      for (index in 0...others.length) {
+        var other = others[index], spec = other.part.insertSpec();
         // Bounds include the complete placed blank and its anchor hardware.
         // Axis separation beyond the requirement proves both nonintersection
         // and sufficient distance, even for a remote catalogue spline tail.
-        if (machinekit.assembly.PosedParts.apart(
-          steelBounds,
-          machinekit.assembly.PosedParts.boxOf(placed),
-          minimumClearance
-        )) continue;
+        if (machinekit.assembly.PosedParts.apart(steelBounds, neighbours.box(index), minimumClearance)) continue;
+        var placed = neighbours.solid(index);
         var common = own(steel.intersect(placed));
         if (common.volume() > 1e-6 || steel.distance(placed) + 1e-7 < minimumClearance) {
           if (materia.casting.CastingFeature

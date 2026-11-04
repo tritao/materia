@@ -162,20 +162,23 @@ class HobberFoundationSizing {
         openings: [materia.casting.CastingPatterns.face("body.z-max")]
       });
     }
-    var resin = new machinekit.structural.MineralCasting(body).geometry();
+    var resin = new machinekit.structural.MineralCasting(body).geometry(), steel:machinekit.tooling.SourceSteel = null;
     try {
+      steel = new machinekit.tooling.SourceSteel(fixed);
       for (candidate in result.filter(row -> row.part.parameterToken("role")
         == LiftingMount)) machinekit.tooling.InsertAnchorGeometry.checkSourceClearance(
           candidate,
-          fixed,
+          steel,
           resin,
           d,
           cover
         );
     } catch (error:Dynamic) {
+      if (steel != null) steel.close();
       resin.close();
       throw error;
     }
+    steel.close();
     resin.close();
     return result;
   }
@@ -231,9 +234,9 @@ class HobberFoundationSizing {
         openings: [materia.casting.CastingPatterns.face("body.z-max")]
       });
     }
-    var resin = new machinekit.structural.MineralCasting(body).geometry();
+    var resin = new machinekit.structural.MineralCasting(body).geometry(), neighbours:machinekit.tooling.SourceSteel = null;
     try {
-      var neighbours = FoundationSizing.anchors(result, rule, body);
+      neighbours = new machinekit.tooling.SourceSteel(FoundationSizing.anchors(result, rule, body));
       for (site in sites) {
         var chosen:CastInsertPlacement = null, chosenHardware:CastInsertPlacement = null, failures:Array<String> = [];
         var stock = site.part.boxDimensions(site.id);
@@ -276,12 +279,14 @@ class HobberFoundationSizing {
         }
         if (chosen == null) throw "No source lifting footprint fits plinth/" + site.id + ": " + failures.join("; ");
         result.push(chosen);
-        neighbours.push(chosenHardware);
+        neighbours.add(chosenHardware);
       }
     } catch (error:Dynamic) {
+      if (neighbours != null) neighbours.close();
       resin.close();
       throw error;
     }
+    neighbours.close();
     resin.close();
     return result;
   }
