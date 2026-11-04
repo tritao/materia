@@ -480,6 +480,77 @@ and readers reject anything else. It contains:
 - Acceptance: bench mill fasteners in the BOM, matched to the motor-plate
   and rail bolt patterns.
 
+### F1 — Joint-derived fasteners (2026-11-04)
+
+Status: first slice done on branch `joint-fasteners`; the bench mill's rail and
+motor screws are derived and the B6 declarations are deleted.
+
+Vocabulary (one path, no hand-declared fallback):
+
+- `component/BoltedFace` is the port a part declares through
+  `MachineComponent.fasteningFaces()`. A face frame lies in the part's frame
+  with its origin on the mating plane and +Z into the part's own material.
+  A **clamped** face lists its clearance holes, the clearance diameter, the
+  grip (material from bearing seat to mating plane), an optional named size
+  and an optional head recess. A **receiving** face either lists the holes
+  already tapped (size, thread depth, thickness, through or blind, material)
+  or is **drilled to suit**: a footprint plus the deepest thread the material
+  takes, optionally a `thicknessAt(x, y)` where a bore thins the wall.
+- `assembly/JointFasteners.derive` (also `MachineAssembly.deriveFasteners()`,
+  which adds the BOM lines once) pairs every clamped face with the one
+  receiving face it meets (planes coincide, normals opposed, hole extents
+  overlap, members held together by fixed mates) and validates the pair:
+  pattern correspondence in the receiving frame, size agreement, clearance
+  against the catalogue screw, head against the recess, the shortest ISO 4762
+  length (`SocketHeadCapScrew.standardLengths`) whose engagement meets
+  1.0/1.5/2.0 diameters (steel/cast iron/aluminium) beyond the grip, thread
+  depth with a one-pitch tip gap in a blind hole, unthreaded shank, edge
+  distance and hole spacing in a footprint, and back wall under the tap-drill
+  depth. Findings carry codes `fasteners.*`; duplicate counting is refused by
+  claiming each tapped hole once and by hole spacing in drilled-to-suit seats.
+- The result is a `FastenedJoint` list: fastener (standard, size, length,
+  property class, count), grip and engagement, and for a drilled-to-suit host
+  its hole positions, tap drill, thread depth and drilling depth.
+
+Adopters: `LinearRail` (counterbored bottom face, catalogue screw),
+`ServoMotor` (drilled flange), `MillCasting` (rail pads drilled to suit, the
+saddle with its nut-bore wall), bench-mill `MillMotorPlate` (tapped through).
+Acceptance: the bench mill derives 48 M4x16 (six rails), 8 M5x12 and 4 M6x12,
+the same lines B6 declared, with the cast-iron engagement and the saddle's thin
+wall over the nut bore now checked rather than assumed. The saddle check is
+real: with a uniform 10 mm wall the M4x16 rail screws fail `fasteners.back-wall`.
+
+Not done yet (open, in order):
+
+1. Washers and nuts: a clamped face has no washer thickness or bearing
+   diameter; a receiving face cannot be a through hole with a nut.
+2. Head/tool clearance as geometry: only the recess fit is checked. A head
+   envelope (head plus driver access) intersected with the other members'
+   posed parts belongs in `AssemblyIntegrity` beside `integrity.mount.cutout`.
+3. Apply the derived host drilling to the host geometry (tap-drill holes in
+   the casting, counterbore in the clamped part) so `AssemblyIntegrity`'s
+   flange cut-out check and the casting drawings see them; today the result
+   lists the holes and the casting geometry is unchanged.
+4. Instance the derived screws as real members with `head` mates (what
+   `MillRailFasteners` and `MountServiceScrews` do for the mineral frame) from
+   the same `FastenedJoint`, and delete that second selection path; they use
+   preferred-length lists and `DesignInterfaces` holes and should become
+   receiving faces.
+5. Rail blocks on carriages, ball-nut flange, screw supports and the spindle
+   motor shelf have no faces yet (the B6 BOM never listed them either).
+6. Hobber adoption (another worktree owns those files): Y nut seat becomes a
+   receiving face drilled to suit on the housing (tapped to the nut flange's
+   clamped pattern, its hole positions then come out of the derivation);
+   X carriage and Z saddle fixings to the rail blocks and column are clamped
+   faces on the carriage/saddle (clearance holes, grip) meeting receiving
+   faces on the block (tapped, with the block's published thread depth) and
+   the column (drilled to suit); scale heads get a clamped face from the head
+   recess and a receiving face on the bracket; the swivel plate's M5 heads
+   are the recess case, a clamped face with `recess` from the counterbore so a
+   head standing proud of the face fails `fasteners.head-clearance` rather
+   than escaping the checks. Replace each hand-placed screw by the derived
+   list and delete the hand placement in the same change.
+
 ### B7 — Rollout and hard gate
 - Done in `fa1f1534f`. The full gate passed 11/24 shards with no new
   failure or exception compared with B6. The only differences from the
@@ -593,6 +664,6 @@ unit tests also passed.
 
 1. Made parts use author-declared drawing numbers. Their fingerprints change
    with the design inputs without changing the drawing number.
-2. The bench mill declares fasteners from modeled patterns in B6. The F1
-   follow-up will derive them from validated fastening interfaces.
+2. The bench mill declared fasteners from modeled patterns in B6. F1 replaced
+   that with derivation from the parts' bolted faces (`JointFasteners`).
 3. B8 moves `SourcingPlan` and `SupplierOffer` to the sourcing layer.

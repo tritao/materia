@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-joint-fastener-tests"
+  },
+  "entry": "JointFastenerTests",
+  "sources": [
+    "src/JointFastenerTests.hx",
+    "../examples/bench-mill/BenchMill.hx",
+    "../examples/bench-mill/BenchMillPreview.hx",
+    "../examples/bench-mill/BearingBlock.hx",
+    "../examples/bench-mill/BearingBlockJob.hx",
+    "../examples/bench-mill/../cnc-router/CncRouter.hx",
+    "../examples/bench-mill/EnclosedBenchMill.hx",
+    "../examples/bench-mill/MillBasePreview.hx",
+    "../examples/bench-mill/MillFramePreview.hx",
+    "../examples/bench-mill/BenchMillFrame.hx",
+    "../examples/bench-mill/MillCastingDetails.hx",
+    "../examples/bench-mill/MillLiftingPattern.hx"
+  ],
+  "sourceRoots": [
+    "src",
+    "../examples/bench-mill",
+    "../examples/cnc-router",
+    "../examples/casting-shop"
+  ],
+  "dependencies": {
+    "robotkit-autonomy": {
+      "path": "../../robotkit/autonomy"
+    },
+    "projectkit": {
+      "path": "../../projectkit"
+    },
+    "cadkit": {
+      "path": "../../cadkit"
+    },
+    "machinekit": {
+      "path": ".."
+    },
+    "manufacturingkit": {
+      "path": "../../manufacturingkit"
+    },
+    "toolpathkit": {
+      "path": "../../toolpathkit"
+    },
+    "camkit": {
+      "path": "../../camkit"
+    },
+    "cnckit": {
+      "path": "../../cnckit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/joint-fasteners"
+}

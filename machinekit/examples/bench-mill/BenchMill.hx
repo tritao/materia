@@ -24,7 +24,6 @@ import machinekit.motion.LinearRailBlock;
 import machinekit.motion.CableChain;
 import machinekit.motion.ServoMotor;
 import machinekit.motion.MotorFlange;
-import machinekit.standard.SocketHeadCapScrew;
 import machinekit.motion.ShaftBrakePart;
 import machinekit.motion.MotorDriver;
 import machinekit.power.ThreePhaseRectifier;
@@ -121,7 +120,6 @@ class BenchMill extends MachineAssembly {
       var name = side < 0 ? "Left" : "Right";
       var guide = LinearRail.metric(RAIL, yRailLength);
       yRails.push(guide);
-      declareRailFasteners(guide);
       attach(
         'railY$name',
         guide,
@@ -148,7 +146,6 @@ class BenchMill extends MachineAssembly {
       var name = side < 0 ? "Front" : "Back";
       var guide = LinearRail.metric(RAIL, xRailLength);
       xRails.push(guide);
-      declareRailFasteners(guide);
       attach(
         'railX$name',
         guide,
@@ -178,7 +175,6 @@ class BenchMill extends MachineAssembly {
       var name = side < 0 ? "Left" : "Right";
       var guide = LinearRail.metric(RAIL, zRailLength);
       zRails.push(guide);
-      declareRailFasteners(guide);
       attach(
         'railZ$name',
         guide,
@@ -378,6 +374,8 @@ class BenchMill extends MachineAssembly {
     connectPorts("spindle-power", "powerSupply", "power4", spindleDriver, "power");
     powerCableCuts.push(cableCut(zeroPose("spindleMotor"), zeroPose(spindleDriver), 0));
     declareServices();
+    // The rail and motor screws follow from the bolted faces the parts declare, not from a list here.
+    deriveFasteners();
     addMotor(
       "spindleMotor",
       "spindle-motor-turn",
@@ -391,14 +389,6 @@ class BenchMill extends MachineAssembly {
         radiansPerSpeedUnit: motorRatio * 2 * Math.PI / 60
       }
     );
-  }
-
-  /** Each drive reads its lead and bearing boundary from its screw, nut and support parts. */
-  function declareRailFasteners(rail:LinearRail):Void {
-    var screw = rail.spec.railMountScrew;
-    if (screw == null || screw.size == null || !Math.isFinite(screw.length)
-      || screw.length <= 0) throw "Rail must declare its mounting screw size and length";
-    addBomItem(SocketHeadCapScrew.metric(screw.size, screw.length).bom, rail.holePositions.length);
   }
 
   /** Conservative routing allowance until the actual cable paths are designed. */
@@ -550,9 +540,6 @@ class BenchMill extends MachineAssembly {
     var plateBore = Math.max(flange.pilotDiameter,
       couplingStart < plateThickness ? coupling.outerDiameter : motor.rating.shaftDiameter);
     var motorPlate = new MillMotorPlate("MILL-" + spec.id.toUpperCase() + "-MOTOR-PLATE", motor.rating.bodyDiameter + 20, plateThickness, plateBore, flange);
-    var motorScrew = flange.holeDiameter == 5.5 ? "M5" : flange.holeDiameter == 6.6 ? "M6" : null;
-    if (motorScrew == null) throw "Axis motor flange has no reviewed mounting screw";
-    addBomItem(SocketHeadCapScrew.metric(motorScrew, 12).bom, flange.holes.length);
     if (spec.id == "y") {
       var footZ = start[2] + near.connector("mount").frame.y;
       for (end in 0...2) {
@@ -876,6 +863,21 @@ private class MillMotorPlate extends MachineComponent {
         + machinekit.component.ComponentNumberKey.encode(hole.y));
     }
     return machinekit.component.BomRevision.fingerprint(inputs.join("|"), 1);
+  }
+  /** The tapped face the motor flange bolts to: its holes are the flange's, tapped through the plate. */
+  override public function fasteningFaces():Array<machinekit.component.BoltedFace> {
+    if (flange == null) return [];
+    var size = flange.holeDiameter == 5.5 ? "M5" : flange.holeDiameter == 6.6 ? "M6" : null;
+    if (size == null) throw "Axis motor flange has no reviewed tapped hole";
+    return [machinekit.component.BoltedFace.tapped(
+      "motor",
+      machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0}),
+      flange.holes.copy(),
+      size,
+      thickness,
+      thickness,
+      true
+    )];
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
