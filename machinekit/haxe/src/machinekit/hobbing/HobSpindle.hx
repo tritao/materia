@@ -22,6 +22,8 @@ class HobSpindle extends MachineAssembly {
   public static inline final COUPLING_START = -55.0;
   public static inline final COUPLING_LENGTH = 45.0;
   public static inline final SHAFT_STUB = 20.0;
+  /** Seat of the front angular-contact bearing on the housing datum. */
+  public static inline final FRONT_BEARING_Z = 146.0;
   public static inline final SHAFT_REAR = -30.0;
   public static inline final ARBOR_SCREW_PCD = 32.0;
   /** Cartridge speed rating, below the servo's 5000 rpm; the reference cut runs near 3000 rpm. */
@@ -53,7 +55,7 @@ class HobSpindle extends MachineAssembly {
     // The servo bolts to the adapter's rear flange (the adapter is on the housing), not to the housing itself.
     addMemberConnector("motorAdapter", "motorSeat", Solids.axial(0, 0, MOTOR_FACE));
     addMate("motor-mount", Fixed, "motorAdapter", "motorSeat", "motor", "mountFace");
-    attach("frontBearing", frontBearing, 146);
+    attach("frontBearing", frontBearing, FRONT_BEARING_Z);
     addComponent("encoder", encoder);
     // The encoder sits on the motor's rear face.
     addMemberConnector("motor", "encoderSeat", materia.assembly.AssemblyFrames.alongY(0, 0, -face.bodyLength, 0, 0, -1));
@@ -66,11 +68,13 @@ class HobSpindle extends MachineAssembly {
     addMate("tailBearing-mount", Fixed, "housing", "tailBearingSeat", "tailBearing", "front");
     addComponent("shaft", new HobSpindlePart("shaft"));
     addMemberConnector("shaft", "toolFace", Solids.axial(0, 0, 180));
-    addMemberConnector("housing", "gaugeLine", Solids.axial(0, 0, 180));
+    // The shaft turns in the opposed angular-contact pair, so B joins the front bearing (fixed to the housing) to the shaft:
+    // the pair's inner rings sit on the Ø25 journal, which is the load path into the housing.
+    addMemberConnector("frontBearing", "gaugeLine", Solids.axial(0, 0, 180 - FRONT_BEARING_Z));
     addMateOnAxis(
       "B",
       Continuous,
-      "housing",
+      "frontBearing",
       "gaugeLine",
       "shaft",
       "toolFace",
@@ -86,13 +90,14 @@ class HobSpindle extends MachineAssembly {
         )
       }
     );
-    // Rotating with the shaft: the motor's own shaft and the coupling joining it to the stub.
-    addComponent("motorShaft", this.motor.shaft());
-    addMemberConnector("shaft", "motorShaftDatum", Solids.axial(0, 0, MOTOR_FACE));
-    addMate("motorShaft-mount", Fixed, "shaft", "motorShaftDatum", "motorShaft", "input");
+    // Rotating with the shaft: the coupling clamps the stub, and the motor's own shaft (which the servo's bearings carry) reaches into
+    // the coupling's other half, so it is held by the coupling.
     addComponent("coupling", coupling);
     addMemberConnector("shaft", "couplingDatum", Solids.axial(0, 0, COUPLING_START));
     addMate("coupling-mount", Fixed, "shaft", "couplingDatum", "coupling", "sideA");
+    addComponent("motorShaft", this.motor.shaft());
+    addMemberConnector("coupling", "motorShaftDatum", Solids.axial(0, 0, MOTOR_FACE - COUPLING_START));
+    addMate("motorShaft-mount", Fixed, "coupling", "motorShaftDatum", "motorShaft", "input");
     addComponent("arbor", this.arbor);
     addMate("arbor-mount", Fixed, "shaft", "toolFace", "arbor", "gaugeLine");
     for (i in 0...4) {
