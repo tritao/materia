@@ -47,7 +47,7 @@ class HobberDesignChecks {
         );
       var zd = F.transformVector(zScrew, 0, 0, 1);
       count++;
-      if (Math.abs(zScrew.y - (zl.y + zr.y) / 2) > 1e-8 || Math.abs(zScrew.x - zl.x - 19) > 1e-8
+      if (Math.abs(zScrew.y - (zl.y + zr.y) / 2) > 1e-8 || Math.abs(zScrew.x - zl.x - 15) > 1e-8
         || Math.abs(zd.z + 1) > 1e-8) throw "Z screw must lie centrally behind the guide plane and point down";
       var zFixed = F.compose(canonical, poses.get("Zfixed")), zFloating = F.compose(canonical, poses.get("Zfloating"));
       count++;
@@ -104,7 +104,7 @@ class HobberDesignChecks {
       // Verify physical nut/carrier travel, including reserve beyond both soft stops.
       // Use the full mechanism lower bound even when this fixture imposes a higher cutting stop.
       var xTravel = machine.travel.filter(t -> t.id == "X")[0];
-      var screwPart:machinekit.motion.BallScrew = cast members.filter(m -> m.id == "Xscrew")[0].component;
+      var screwPart:machinekit.motion.HzMotionDrawingScrew = cast members.filter(m -> m.id == "Xscrew")[0].component;
       var nutPart:machinekit.motion.BallNut = cast members.filter(m -> m.id == "Xnut")[0].component;
       for (x in [machinekit.hobbing.HobberXLayout.MIN - 5, xTravel.upper + 5]) {
         // Translation vector only; keep the mounted part's existing orientation.
@@ -116,8 +116,8 @@ class HobberDesignChecks {
           F.translation(0, 0, nutPart.bodyLength + nutPart.flangeThickness)
         );
         count++;
-        if (Math.min(n0.z, n1.z) < screwPart.inputJournalLength + 10 - 1e-7 || Math.max(n0.z,
-          n1.z) > screwPart.totalLength - machinekit.motion.BallScrew.JOURNAL_LENGTH
+        if (Math.min(n0.z, n1.z) < screwPart.fixedEnd + 10 - 1e-7 || Math.max(n0.z,
+          n1.z) > screwPart.totalLength - screwPart.floatingEnd
           - 10 + 1e-7) throw 'X nut lacks 10 mm race allowance at reserve travel $x';
         for (id in ["Xnut", "Xbridge"]) {
           var moving = members.filter(m -> m.id == id)[0], pose = F.compose(
@@ -215,7 +215,7 @@ class HobberDesignChecks {
           "bed/") || StringTools.startsWith(m.id, "railX") || StringTools.startsWith(
             m.id,
             "table/"
-          ) || m.id == "XdriveFrame" || m.id == "Xfixed" || m.id == "Xfloating" || m.id == "Xscrew") {
+          ) || m.id == "XdriveFixed" || m.id == "XdriveFloating" || m.id == "Xfixed" || m.id == "Xfloating" || m.id == "Xscrew") {
           var overlap = cache.overlap(tray, trayPose, m.component, poses.get(m.id));
           count++;
           if (overlap

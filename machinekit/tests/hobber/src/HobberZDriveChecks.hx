@@ -20,13 +20,13 @@ class HobberZDriveChecks {
     var a = pose("railZLeft"), b = pose("railZRight"),
       screw = pose("Zscrew"), fixed = pose("Zfixed"), floating = pose("Zfloating"), motor = pose("Zmotor");
     near(screw.y, (a.y + b.y) / 2, "screw between rails");
-    near(screw.x - a.x, 19, "screw 19 mm behind guide axis plane");
+    near(screw.x - a.x, 15, "screw 15 mm behind guide axis plane");
     near(screw.z, Z.SHAFT_TOP, "top drive journal");
-    near(motor.z, 765, "motor mounting face");
+    near(motor.z, 764, "motor mounting face: 34 mm above the screw start");
     var direction = F.transformVector(screw, 0, 0, 1);
     near(direction.z, -1, "screw axis points down");
     check(fixed.z > floating.z, "fixed bearing above floating bearing");
-    var part:machinekit.motion.BallScrew = cast members.filter(p -> p.id == "Zscrew")[0].component;
+    var part:machinekit.motion.HzMotionDrawingScrew = cast members.filter(p -> p.id == "Zscrew")[0].component;
     near(part.totalLength, 420, "screw length");
     var flange = m.column.insertLocations().filter(p -> p.id == "driveSeat")[0], body = m.column.body.geometry();
     var raw = Part.box(flange.part.boxDimensions(flange.id).width,
@@ -42,11 +42,14 @@ class HobberZDriveChecks {
     check(body.solidCount() == 1, "column remains monolithic");
     body.close();
     var coupling = cache.posed(members.filter(p -> p.id == "Zcoupling")[0].component, state.worldPose("Zcoupling"));
-    var bracket = cache.posed(members.filter(p -> p.id == "ZdriveFrame")[0].component, state.worldPose("ZdriveFrame"));
-    var couplingClearance = coupling.distance(bracket);
+    var couplingClearance = 1e30;
+    for (id in ["ZdriveFixed", "ZdriveFloating", "Zfixed"]) if (id != "Zfixed") {
+      var bracket = cache.posed(members.filter(p -> p.id == id)[0].component, state.worldPose(id));
+      couplingClearance = Math.min(couplingClearance, coupling.distance(bracket));
+      bracket.close();
+    }
     coupling.close();
-    bracket.close();
-    check(couplingClearance >= 2, "coupling clears motor plate by at least 2 mm");
+    check(couplingClearance >= 2, "coupling clears the drive pads by at least 2 mm");
     var minimumRaceMargin = 1e30, minimumMovingGap = 1e30;
     try {
       for (z in [-15.0, -10, 0, 190, 195]) {
@@ -56,13 +59,13 @@ class HobberZDriveChecks {
         var nutWorld = F.compose(delta, state.worldPose("Znut"));
         var nut = F.compose(F.inverse(state.worldPose("Zscrew")), nutWorld);
         var far = nut.z + 45, margin = Math.min(
-          nut.z - part.inputJournalLength,
-          part.totalLength - machinekit.motion.BallScrew.JOURNAL_LENGTH - far
+          nut.z - part.fixedEnd,
+          part.totalLength - part.floatingEnd - far
         );
         minimumRaceMargin = Math.min(minimumRaceMargin, margin);
         check(margin >= 10, "nut stays on race with 10 mm allowance at " + z);
         check(pose("Zfixed").z > F.compose(work, nutWorld).z, "gravity-loaded segment hangs below fixed bearing");
-        for (id in ["Zfixed", "Zfloating", "ZdriveFrame"]) {
+        for (id in ["Zfixed", "Zfloating", "ZdriveFixed", "ZdriveFloating"]) {
           var component = members.filter(p -> p.id == id)[0].component;
           var p = cache.posed(component, state.worldPose(id)), saddle = cache.posed(
             members.filter(p -> p.id == "Zplate")[0].component,

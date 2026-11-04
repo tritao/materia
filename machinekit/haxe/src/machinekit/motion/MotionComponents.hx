@@ -39,6 +39,7 @@ class MotionComponents {
     registry.register(HzMotionDrawingScrew.recipeType());
     registry.register(ScrewSupportUnit.recipeType());
     registry.register(LeadScrewNut.recipeType());
+    registry.register(NutBlock.recipeType());
     registry.register(DriveWheel.recipeType());
     registry.register(CasterWheel.recipeType());
     registry.register(SteppedShaft.recipeType());

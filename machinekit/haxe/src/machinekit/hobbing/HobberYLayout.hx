@@ -16,4 +16,6 @@ package machinekit.hobbing;
 class HobberYLayout {
   public static inline final SCREW_LENGTH = 170.0;
   public static inline final NUT_STATION = 100.0;
+  /** Y axis (z 508) above the top of the nut seat bar on the Y saddle (z 458 + 20). */
+  public static inline final NUT_BLOCK_HEIGHT = 30.0;
 }

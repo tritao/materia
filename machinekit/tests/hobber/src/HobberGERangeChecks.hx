@@ -17,9 +17,10 @@ class HobberGERangeChecks {
           == "railXLeft")[0].component;
         if (guide.spec.preloadTarget == null) throw "column guide needs stated preload target";
         for (id in ["X", "Y", "Z"]) {
-          var screw:machinekit.motion.BallScrew = cast machine.components().filter(m -> m.id
+          // The supplier-drawing screw (the HZMotion BK12/BF12 ends) the supported drives are made for.
+          var screw:machinekit.motion.HzMotionDrawingScrew = cast machine.components().filter(m -> m.id
             == id + "screw")[0].component;
-          if (!screw.ground) throw "ground screw requirement missing";
+          if (screw.endProfile != "BK12") throw "supported drive screw must have the BK12 end";
           count++;
         }
         state.setJoint("X", machine.travel[0].initial);

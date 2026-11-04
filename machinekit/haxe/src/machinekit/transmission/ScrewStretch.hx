@@ -16,17 +16,26 @@ class ScrewStretch {
     context.reset();
     var state = context.state, inverse = AssemblyFrames.inverse(state.worldPose(screwId));
     var bearing = Math.NaN, bearingStiffness = 0.0;
-    for (member in flat.members) if (Std.isOfType(member.component, ScrewSupportUnit)) {
-      var unit:ScrewSupportUnit = cast member.component;
-      if (!unit.fixed) continue;
-      var world = state.worldConnector(member.id, "axis");
+    for (member in flat.members) {
+      // A fixed bearing pair: a fixed screw support, or a motor mount with its own (a connector at the bearing centre).
+      var rigidity:Null<Float> = null, connector = "axis";
+      if (Std.isOfType(member.component, ScrewSupportUnit)) {
+        var unit:ScrewSupportUnit = cast member.component;
+        if (!unit.fixed) continue;
+        rigidity = unit.axialStiffness();
+      } else if (Std.isOfType(member.component, machinekit.motion.MotorMount)) {
+        var mount:machinekit.motion.MotorMount = cast member.component;
+        if (mount.axialStiffness() == null) continue;
+        rigidity = mount.axialStiffness();
+        connector = "bearingAxis";
+      } else continue;
+      var world = state.worldConnector(member.id, connector);
       var local = AssemblyFrames.transformPoint(inverse, world.x, world.y, world.z);
       if (Math.abs(local.x) > 1e-5 || Math.abs(local.y) > 1e-5 || local.z < 0 || local.z > screw.totalLength) continue;
       var axis = AssemblyFrames.transformVector(AssemblyFrames.compose(inverse, world), 0, 1, 0);
       if (Math.abs(axis.x) > 1e-5 || Math.abs(axis.y) > 1e-5) continue;
       if (Math
         .isFinite(bearing)) throw new TransmissionDesignError("Two axial fixed supports need an explicit parallel shaft/support model");
-      var rigidity = unit.axialStiffness();
       if (rigidity == null) throw new TransmissionDesignError("Fixed support needs axial rigidity");
       bearing = local.z;
       bearingStiffness = rigidity;

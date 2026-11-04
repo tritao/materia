@@ -4,6 +4,8 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.assembly.PosedParts;
 import machinekit.component.*;
+import machinekit.component.ManufacturingRoute.MachinedFace;
+import machinekit.structural.GroundStock;
 import machinekit.component.ComponentRecipeSupport as P;
 import materia.assembly.AssemblyFrames as F;
 
@@ -18,14 +20,18 @@ class HobberSaddle extends MachineComponent {
       [
         "GE-X-carriage",
         "GE-Z-saddle",
-        "GE-X-drive",
-        "GE-Z-drive",
+        "GE-X-drive-fixed",
+        "GE-X-drive-floating",
+        "GE-Z-drive-fixed",
+        "GE-Z-drive-floating",
+        "GE-Y-drive-fixed",
+        "GE-Y-drive-floating",
+        "GE-Y-nut-seat",
         "GE-chip-tray",
         "GE-enclosure",
         "GE-coolant",
         "GE-swivel-plate",
         "GE-Y-saddle",
-        "GE-Y-drive",
         "electrical-panel"
       ],
       "GE-Z-saddle"
@@ -60,8 +66,13 @@ class HobberSaddle extends MachineComponent {
       .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
     designId = design;
     addConnector("datum", Mount, F.identity());
-    if (["GE-X-carriage",
-      "GE-Z-saddle", "GE-X-drive", "GE-Z-drive", "GE-Y-saddle", "GE-Y-drive"].indexOf(design) >= 0) {
+    var route = routeOf(design);
+    if (route != null) {
+      addFacet(route);
+      addFacet(new ProcurementIntent(Make(route.process())));
+    }
+    if (["GE-X-carriage", "GE-Z-saddle", "GE-X-drive-fixed", "GE-X-drive-floating", "GE-Z-drive-fixed", "GE-Z-drive-floating",
+      "GE-Y-saddle", "GE-Y-drive-fixed", "GE-Y-drive-floating", "GE-Y-nut-seat"].indexOf(design) >= 0) {
       var parts = pieces();
       try {
         addFacet(ExtrusionCollision.pieces(parts));
@@ -109,22 +120,80 @@ class HobberSaddle extends MachineComponent {
     raw.close();
     return shaped;
   }
+  /** Width of the ground flat bar a drive pad is sawn from. */
+  static inline final PAD_WIDTH = 80.0;
+
+  /** A hole's tool: a cylinder of `diameter` from `position` along `direction`, `depth` long, starting 1 mm outside the mouth. */
+  static function holeTool(position:Array<Float>, direction:Array<Float>, diameter:Float, depth:Float):Part {
+    var cylinder = Part.cylinderSpan(diameter / 2, -1, depth);
+    var up = Math.abs(direction[2]) < 0.9 ? [0.0, 0, 1] : [1.0, 0, 0];
+    var placed = PosedParts.moved(cylinder, machinekit.assembly.AxisBuilder.orient(position[0], position[1], position[2], up, direction));
+    cylinder.close();
+    return placed;
+  }
+
+  /** `body` with the drive's seat holes (tapped to their drilled depth, dowels reamed) cut in. */
+  static function withSeatHoles(body:Part, axis:HobberDriveAxis, support:String):Part {
+    return Solids.cut(body, [for (h in HobberDrives.seatHoles(axis, support)) holeTool(h.position, h.direction, h.diameter, h.depth)]);
+  }
+
+  /** `body` with clear holes for the nut block's two carriage bolts, `through` mm deep from the block's base end. */
+  static function withBlockBolts(body:Part, axis:HobberDriveAxis, through:Float):Part {
+    var nut = new machinekit.motion.BallNut(), block = HobberDrives.nutBlock(axis, nut);
+    return Solids.cut(body, [for (h in HobberDrives.nutBlockHoles(axis, nut, block)) holeTool(h.position, h.direction, h.diameter, through)]);
+  }
+
+  static function padBox(b:Array<Float>):Part return box(b[0], b[3], b[1], b[4], b[2], b[5]);
+
+  /** A fixed pad: its box with the mount's flange relief and the seat holes. */
+  static function fixedPad(axis:HobberDriveAxis, thickness:Float):Part {
+    var relieved = Solids.cut(padBox(HobberDrives.padBounds(axis, "fixed", PAD_WIDTH, thickness)), [padBox(HobberDrives.mountRelief(axis))]);
+    return withSeatHoles(relieved, axis, "fixed");
+  }
+
+  /** How each made design is produced; null for the designs that are not part of the moving structure. */
+  static function routeOf(design:String):Null<ManufacturingRoute> {
+    function bar(thickness:Float, faces:Array<MachinedFace>):ManufacturingRoute return ManufacturingRoute.groundStock(GroundStock.bar(PAD_WIDTH, thickness), faces);
+    return switch design {
+      case "GE-X-carriage":
+        ManufacturingRoute.milled(2, "fine", [
+          {name: "block pads, underside", tolerance: 0.02, roughnessRa: 1.6},
+          {name: "column sole, top", tolerance: 0.02, roughnessRa: 1.6}
+        ], 490);
+      case "GE-Z-saddle":
+        ManufacturingRoute.milled(2, "fine", [
+          {name: "block faces, back", tolerance: 0.02, roughnessRa: 1.6},
+          {name: "swivel seat, front", tolerance: 0.02, roughnessRa: 1.6}
+        ], 350);
+      case "GE-X-drive-fixed" | "GE-X-drive-floating":
+        bar(15, [{name: "seat holes", tolerance: 0.1, roughnessRa: null}]);
+      case "GE-Z-drive-fixed" | "GE-Z-drive-floating":
+        bar(40, [{name: "seat holes", tolerance: 0.1, roughnessRa: null}]);
+      case "GE-Y-drive-fixed" | "GE-Y-drive-floating":
+        ManufacturingRoute.milled(1, "fine", [{name: "seat face, bolts and dowels", tolerance: 0.05, roughnessRa: 3.2}], 160);
+      case "GE-Y-nut-seat":
+        ManufacturingRoute.groundStock(GroundStock.bar(60, 20), [{name: "nut block seat", tolerance: 0.02, roughnessRa: 1.6}]);
+      default: null;
+    };
+  }
+
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.union(pieces());
   function pieces():Array<Part> {
     return switch designId {
       case "GE-X-carriage":
+        // One milled part: a 20 mm deck between the block plane (260) and the column sole plane (280), open at the front over the
+        // swivel stack and the head's swing (x 60-140, 300 wide; a front bar would meet the Y guides at A +-15 deg, Y and Z at -10); 25 mm deep ribs under the deck run
+        // beside the rails (y +-120..140 and +-160..180), clear of the blocks (y 196..244) and the bed.
         [
-          box(240, 386, -245, 245, 260, 280),
-          box(60, 386, -245, -195, 260, 280),
-          box(60, 386, 195, 245, 260, 280),
-          Solids.cut(box(202.5, 222.5, -35, 35, 155, 280), [boreX(8.2, 202.4, 222.6, 0, 180)]),
-          box(202.5, 260, -35, 35, 260, 280)
+          withBlockBolts(Solids.cut(box(60, 386, -245, 245, 260, 280), [box(55, 140, -150, 150, 259, 281)]), HobberDrives.x(), 40),
+          box(140, 386, -140, -120, 235, 260),
+          box(140, 386, 120, 140, 235, 260),
+          box(140, 386, -180, -160, 235, 260),
+          box(140, 386, 160, 180, 235, 260)
         ];
       case "GE-Z-saddle":
-        [
-          box(135, 148, -175, 175, -65, 170),
-          Solids.cut(box(148, 215, -40, 40, 7.5, 27.5), [Part.cylinderSpan(8.2, 7.4, 27.6, HobberZLayout.AXIS_X, 0)])
-        ];
+        // One milled plate between the swivel seat (x 135) and the block faces (x 148), with the nut block's bolts.
+        [withBlockBolts(box(135, 148, -175, 175, -65, 170), HobberDrives.z(), 30)];
       case "GE-swivel-plate":
         [box(85, 100, -115, 115, -95, 95)];
       case "GE-Y-saddle":
@@ -145,33 +214,35 @@ class HobberSaddle extends MachineComponent {
           Solids.cut(box(-50, 57, 80, 100, -50, 50), [boreY(40, 79.9, 100.1, 0, 0)]),
           Solids.cut(box(-50, 35, 200, 220, -50, 50), [boreY(40, 199.9, 220.1, 0, 0)]),
           box(35, 57, 200, 220, 40, 55),
-          Solids.cut(box(-45, 57, -115, -85, -45, 45), [box(-30, 30, -115.1, -84.9, -30, 30)]),
-          Solids.cut(box(45, 95, -45, -27.5, 95, 170), [boreY(8.2, -45.1, -27.4, 70, 145)])
+          Solids.cut(box(-45, 57, -115, -85, -45, 45), [box(-30, 30, -115.1, -84.9, -30, 30)])
         ];
-      case "GE-Y-drive":
+      case "GE-X-drive-fixed":
+        [fixedPad(HobberDrives.x(), 15)];
+      case "GE-X-drive-floating":
+        [withSeatHoles(padBox(HobberDrives.padBounds(HobberDrives.x(), "floating", PAD_WIDTH, 15)), HobberDrives.x(), "floating")];
+      case "GE-Z-drive-fixed":
+        [fixedPad(HobberDrives.z(), 40)];
+      case "GE-Z-drive-floating":
+        [withSeatHoles(padBox(HobberDrives.padBounds(HobberDrives.z(), "floating", PAD_WIDTH, 40)), HobberDrives.z(), "floating")];
+      case "GE-Y-drive-fixed" | "GE-Y-drive-floating":
+        // An L bracket milled in one setup: the 10 mm wall carrying the support (seat plane x 45), a 10 mm bridge 5 mm over the Y
+        // saddle's top edge (z 458) and a foot that bolts to the swivel plate's top edge (x 85-100). The floating one stops 2 mm
+        // short of the nut seat bar's travel (y -57), the fixed one clears its +35.
+        var support = designId == "GE-Y-drive-fixed" ? "fixed" : "floating";
+        var holes = HobberDrives.seatHoles(HobberDrives.y(), support), lo = 1e9, hi = -1e9;
+        for (h in holes) {
+          lo = Math.min(lo, h.position[1]);
+          hi = Math.max(hi, h.position[1]);
+        }
+        var y0 = support == "fixed" ? lo - 18 : -113.0, y1 = support == "fixed" ? hi + 18 : -57.0;
         [
-          box(35, 45, -160, 130, 115, 190),
-          box(35, 100, -115, -95, 95, 115),
-          box(35, 115, 100, 130, 185, 190),
-          Solids.cut(box(35, 115, 125, 130, 110, 190), [boreY(7.1, 124.9, 130.1, 70, 145)])
+          withSeatHoles(support == "fixed" ? Solids.cut(box(35, 45, y0, y1, 463, 548), [padBox(HobberDrives.mountRelief(HobberDrives.y()))]) : box(35, 45, y0, y1, 463, 548), HobberDrives.y(), support),
+          box(35, 100, y0, y1, 463, 473),
+          box(85, 100, y0, y1, 458, 473)
         ];
-      case "GE-X-drive":
-        [
-          box(HobberXLayout.front().deckStart, HobberXLayout.front().motorFace, -45, 45, 140, 155),
-          box(HobberXLayout.front().deckStart, HobberXLayout.front().motorFace - 10, 40, 45, 155, 190),
-          Solids.cut(
-            box(HobberXLayout.front().motorFace - 5, HobberXLayout.front().motorFace, -45, 45, 150, 220),
-            [boreX(7.1, HobberXLayout.front().motorFace - 5.1, HobberXLayout.front().motorFace + 0.1, 0, 180)]
-          )
-        ];
-      case "GE-Z-drive":
-        [
-          box(226, 241, -50, 50, 300, 780),
-          box(205, 226, -35, 35, HobberZLayout.FIXED_BEARING_Z - 12.5, HobberZLayout.FIXED_BEARING_Z + 12.5),
-          box(205, 226, -35, 35, HobberZLayout.FLOATING_BEARING_Z - 10, HobberZLayout.FLOATING_BEARING_Z + 10),
-          Solids.cut(box(125, 241, -55, 55, 750, 765), [couplingWindow(HobberZLayout.AXIS_X, 749.9, 765.1)]),
-          box(226, 231, 50, 85, 310, 730)
-        ];
+      case "GE-Y-nut-seat":
+        // Ground bar, 20 thick, 42 x 60, on the Y saddle's top edge (x 45-57, z 458) under the nut block, 3 mm short of the swivel plate.
+        [box(40, 82, -40, 20, 458, 478)];
       case "GE-chip-tray":
         // Removable stationary skirt: 5 mm radial face clearance, 15 mm housing
         // clearance and 2 mm sheet. The lower skirt covers the full table height.

@@ -156,13 +156,19 @@ class ServoMotor extends MachineComponent implements MotorDrive {
   public static function namedRecipeType():machinekit.component.ComponentType {
     if (namedRecipe == null) namedRecipe = new machinekit.component.ComponentType(
       "machinekit.motion.servo-motor",
-      [machinekit.component.ComponentRecipeSupport.choice(
-        "designation",
-        [for (row in ratings()) row.designation],
-        "GENERIC-SERVO-200W"
-      )],
-      v -> model(v.token("designation")),
-      true
+      [
+        machinekit.component.ComponentRecipeSupport.choice(
+          "designation",
+          [for (row in ratings()) row.designation],
+          "GENERIC-SERVO-200W"
+        ),
+        // A Leadshine row wired to a driver in a simulation carries an assumed winding (LeadshineServo.driven).
+        machinekit.component.ComponentRecipeSupport.choice("winding", ["catalogue", "assumed"], "catalogue")
+      ],
+      v -> v.token("winding") == "assumed" && LeadshineServo.catalog().exists(v.token("designation")) ? LeadshineServo.driven(v.token("designation")) : model(v.token("designation")),
+      true,
+      false,
+      ["winding"]
     ).numbered(partNumberFor).procured(procurementFor).requiring(requirementsFor);
     return namedRecipe;
   }
@@ -290,6 +296,8 @@ class ServoMotor extends MachineComponent implements MotorDrive {
     ] : null
   };
 
+  override public function carriesJournal():Bool return true;
+
   /** Supplier or explicitly assumed mounting dimensions; never infer them from body size. */
   public function mounting():Null<MotorFlange> return null;
 
@@ -306,8 +314,11 @@ class ServoMotor extends MachineComponent implements MotorDrive {
     );
   }
 
-  /** The pilot and the tap-drill holes of the flange's bolts: what a tapped host (a motor mount) is cut with. */
-  public function mountingTappedCutout(depth:Float, pilotClearance:Float = 0.2):Part {
+  /**
+	 * The pilot and the tap-drill holes of the flange's bolts: what a tapped host (a motor mount) is cut with. The host's bore is
+	 * the pilot's nominal diameter, so the tool is 0.1 mm smaller: it asks for the hole, not for a clearance on top of it.
+	 */
+  public function mountingTappedCutout(depth:Float, pilotClearance:Float = -0.1):Part {
     var face = mounting();
     if (face == null || !Math.isFinite(depth) || depth <= 0) throw "Servo needs declared mounting data and positive cutout depth";
     var drill = machinekit.component.MountingFace.boltFor(face.holeDiameter).tapDrill;

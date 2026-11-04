@@ -271,6 +271,8 @@ class MotorMount extends MachineComponent {
     addConnector("base", Mount, F.alongY(0, 0, 0, 0, 1, 0));
     addConnector("motor", Mount, Solids.axial(0, h, 0));
     addConnector("shaftAxis", Axis, Solids.axial(0, h, 0));
+    // The fixed bearing pair's centre on the screw axis, where the CAD is measured.
+    if (s.bearingCentreZ != null && s.construction == "integrated") addConnector("bearingAxis", Axis, Solids.axial(0, h, s.bearingCentreZ));
     for (i in 0...s.motorBolts.length) addConnector(
       'motorBolt${i + 1}',
       Face,
@@ -337,9 +339,14 @@ class MotorMount extends MachineComponent {
     return super.massProperties();
   }
 
+  /** Axial rigidity of the integrated fixed bearing pair, N/mm: the catalogue-typical assumed value (the maker publishes none); null for a mount without one. */
+  public function axialStiffness():Null<Float> return spec.construction == "integrated" && spec.bearingCentreZ != null ? LeadScrew.SUPPORT_BEARING_STIFFNESS : null;
+
   /** The seat the mount's base holes tap into: where its feet stand, y = 0 in the mount's frame. */
   override public function mountingFace():Null<machinekit.component.MountingFace> return machinekit.component.MountingFace
     .tappedFoot([for (hole in spec.baseHoles) {x: hole.x, z: hole.z, diameter: hole.diameter}], 0);
+
+  override public function carriesJournal():Bool return true;
 
   override public function hasGeometry():Bool return true;
 

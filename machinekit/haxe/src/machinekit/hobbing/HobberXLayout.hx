@@ -54,7 +54,8 @@ class HobberXLayout {
     var carrierFront = NUT_DATUM + MIN - OVERTRAVEL - nut.bodyLength / 2 - nut.flangeThickness - 20;
     var supportEnd = carrierFront - 12.5 - ScrewSupportUnit.bf12().length / 2 - END_ALLOWANCE;
     var length = up10(start - Math.min(raceEnd, supportEnd));
-    var face = start + motor.shaftLength, rear = face + motor.bodyLength, floating = start - length + machinekit.motion.HzMotionDrawingScrew.BF12_SUPPORT_CENTRE;
+    // The bought mount puts the motor face 34 mm from the screw start; the bed keeps the length it was cast for.
+    var face = start + SupportedScrewDrive.m60dBk12().faceToStart(), rear = start + motor.shaftLength + motor.bodyLength, floating = start - length + machinekit.motion.HzMotionDrawingScrew.BF12_SUPPORT_CENTRE;
     var bedRear = up10(Math.max(
       retract + COLUMN_REAR + OVERTRAVEL + 35,
       Math.max(railStart + railLength + 25, rear + 20)

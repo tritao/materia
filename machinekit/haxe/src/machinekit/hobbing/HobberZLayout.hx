@@ -4,7 +4,8 @@ package machinekit.hobbing;
  */
 class HobberZLayout {
   public static inline final FOUNDATION_ORIGIN_Z = 290.0;
-  public static inline final AXIS_X = 180.0;
+  /** Screw axis, 25 mm (the BK12 and BF12 shaft height) in front of the 40 mm ground bar pads on the column's drive seat at 241. */
+  public static inline final AXIS_X = 176.0;
   public static inline final NUT_OFFSET_Z = 55.0;
   public static inline final SHAFT_TOP = 730.0;
   public static inline final SHAFT_LENGTH = 420.0;

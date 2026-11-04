@@ -20,6 +20,8 @@ class LeadshineServo extends ServoMotor {
   public static inline final MS1AE_SOURCE = "https://www.leadshine.com/product-detail/ELM2L-1500LA100FT-H%20MS1AE.html";
   static var table:Null<Catalog<LeadshineServoSpec>>;
   public final spec:LeadshineServoSpec;
+  /** Whether the winding constants are an assumed high-voltage estimate, so a driver and a supply can be wired to it. */
+  public final assumedWinding:Bool;
   var massDeclared:Bool = false;
 
   public static function catalog():Catalog<LeadshineServoSpec> {
@@ -107,7 +109,14 @@ class LeadshineServo extends ServoMotor {
 
   public static function model(designation:String):LeadshineServo return new LeadshineServo(catalog().get(designation));
 
-  private function new(spec:LeadshineServoSpec) {
+  /**
+	 * The servo with an assumed winding (the generic high-voltage estimate from its rated torque and speed) so a driver can be wired
+	 * to it in a simulation. Leadshine publishes no winding constants and the ELM2H is a 220 V class motor: the voltage class
+	 * against the machine's supply is an open electrical decision, labelled assumed on its actuator.
+	 */
+  public static function driven(designation:String):LeadshineServo return new LeadshineServo(catalog().get(designation), true);
+
+  private function new(spec:LeadshineServoSpec, assumedWinding:Bool = false) {
     var rpm = 2 * Math.PI / 60;
     super(
       {
@@ -122,7 +131,7 @@ class LeadshineServo extends ServoMotor {
         bodyLength: spec.bodyLength,
         shaftDiameter: spec.shaftDiameter,
         shaftLength: spec.shaftLength,
-        electrical: spec.voltage > 220 ? ServoMotor.highVoltageWinding(spec.ratedTorque,
+        electrical: spec.voltage > 220 || assumedWinding ? ServoMotor.highVoltageWinding(spec.ratedTorque,
       spec.ratedRpm * rpm) : ServoMotor.acWinding(
         spec.ratedTorque,
         spec.ratedRpm * rpm
@@ -131,6 +140,7 @@ class LeadshineServo extends ServoMotor {
       Catalog
     );
     this.spec = spec;
+    this.assumedWinding = assumedWinding;
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Catalog").setToken("errorsBasis", "Assumed")
       .setToken("source", spec.designation == "ELM2L-1500LA100FT-H MS1AE" ? MS1AE_SOURCE : SOURCE)));
@@ -159,7 +169,7 @@ class LeadshineServo extends ServoMotor {
   }
 
   /** No verified winding constants: prevent simulation from treating estimates as vendor data. */
-  override public function electricalRating():Null<ServoElectricalRating> return null;
+  override public function electricalRating():Null<ServoElectricalRating> return assumedWinding ? rating.electrical : null;
   override public function ratedPhaseCurrent():Float return spec.ratedCurrent;
   public function torqueCurveEvidence():Array<LeadshineTorqueCurves.LeadshineTorqueCurve
     > return LeadshineTorqueCurves.evidenceFor(spec.designation);
@@ -171,8 +181,8 @@ class LeadshineServo extends ServoMotor {
   override public function actuator(id:String,
     joint:String, volts:Float, margin:Float, ?current:Float):AssemblyActuator {
     var result = super.actuator(id, joint, volts, margin, current);
-    result.assumed = ["servo torque-speed interpolation"];
-    result.assumptions = [{quantity: "motor curve", label: "servo torque-speed interpolation"}];
+    result.assumed = assumedWinding ? ["servo torque-speed interpolation", "servo winding constants"] : ["servo torque-speed interpolation"];
+    result.assumptions = assumedWinding ? [{quantity: "motor curve", label: "servo torque-speed interpolation"}, {quantity: "winding", label: "servo winding constants"}] : [{quantity: "motor curve", label: "servo torque-speed interpolation"}];
     return result;
   }
 
@@ -360,7 +370,7 @@ class LeadshineServo extends ServoMotor {
   override public function values():ComponentValues return new ComponentValues().setToken(
     "designation",
     spec.designation
-  ).setToken(
+  ).setToken("winding", assumedWinding ? "assumed" : "catalogue").setToken(
     "material",
     materialSpec()
   );

@@ -2,6 +2,9 @@ package machinekit.motion;
 
 import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.ManufacturingRoute;
@@ -99,6 +102,40 @@ class NutBlock extends MachineComponent {
 
   /** The pose of `nut` in this block's frame: the nut's flange seat against the broad face, its axis along the block's. */
   public function nutPose():AssemblyFrame return AssemblyFrames.inverse(seat);
+
+  static var recipeCache:Null<ComponentType>;
+
+  /** The recipe for a block on a ball nut (SFU1605 flange); a block on another nut is code-only. */
+  public static function recipeType():ComponentType {
+    if (recipeCache == null) recipeCache = new ComponentType(
+      "machinekit.motion.nut-block",
+      [
+        ComponentRecipeSupport.text("drawing", "NUT-BLOCK"),
+        ComponentRecipeSupport.flag("preloaded", true),
+        ComponentRecipeSupport.length("centreHeight", 50),
+        ComponentRecipeSupport.length("width", 60),
+        ComponentRecipeSupport.length("thickness", 16)
+      ],
+      v -> new NutBlock(v.token("drawing"), new BallNut(v.boolean("preloaded")), v.number("centreHeight"), v.number("width"), v.number("thickness")),
+      true
+    ).numbered(v -> v.token("drawing"))
+      .procured(_ -> Make("ground steel flat bar, cut and drilled"))
+      .requiringInputs(["centreHeight", "width", "thickness"]);
+    return recipeCache;
+  }
+
+  override public function componentType():Null<ComponentType> return Std.isOfType(nut, BallNut) ? recipeType() : null;
+
+  override public function values():ComponentValues {
+    if (!Std.isOfType(nut, BallNut)) return super.values();
+    return new ComponentValues()
+    .setToken("drawing", drawingNumber ?? "NUT-BLOCK")
+    .setBoolean("preloaded", cast(nut, BallNut).preloaded)
+    .setNumber("centreHeight", centreHeight)
+    .setNumber("width", width)
+    .setNumber("thickness", thickness)
+    .setToken("material", materialSpec());
+  }
 
   override public function revisionFingerprint():Null<String> {
     var number = machinekit.component.ComponentNumberKey.encode;

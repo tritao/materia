@@ -306,10 +306,21 @@ class SupportedScrewDrive {
   );
 
   /** Small mill Y: M60D-BK12-C / BF12, ELM2H-0400 servo, 25 × 32 clamp coupling. */
-  public static function m60dBk12():SupportedScrewDrive return new SupportedScrewDrive(
+  public static function m60dBk12(driven:Bool = false):SupportedScrewDrive return new SupportedScrewDrive(
     MotorMount.of("M60D-BK12-C", null, "hzmotion"),
     ScrewSupportUnit.model("BF12", "hzmotion"),
-    LeadshineServo.model("ELM2H-0400LA60F"),
+    driven ? LeadshineServo.driven("ELM2H-0400LA60F") : LeadshineServo.model("ELM2H-0400LA60F"),
+    32,
+    16,
+    25,
+    [{z: 8, angle: Math.PI / 2}, {z: 24, angle: Math.PI / 2}]
+  );
+
+  /** The same drive with the braked ELM2H-0400LA60E servo, for a vertical axis that must hold when the power drops. */
+  public static function m60dBk12Braked(driven:Bool = false):SupportedScrewDrive return new SupportedScrewDrive(
+    MotorMount.of("M60D-BK12-C", null, "hzmotion"),
+    ScrewSupportUnit.model("BF12", "hzmotion"),
+    driven ? LeadshineServo.driven("ELM2H-0400LA60E") : LeadshineServo.model("ELM2H-0400LA60E"),
     32,
     16,
     25,

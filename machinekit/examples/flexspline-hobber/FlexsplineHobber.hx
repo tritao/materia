@@ -221,26 +221,19 @@ class FlexsplineHobber extends MachineAssembly {
       fixAt(placed.memberId, placed.rail, placed.pose, insert, placed.contact);
       precisionMounts.push({name: placed.memberId + "-mount", parent: insert});
     }
-    addComponent("Xbridge", new HobberSaddle("GE-X-carriage"));
-    zero.set("Xbridge", F.translation(centre, 0, 0));
-    moving(
-      "X",
-      Prismatic,
-      "railXLeft",
-      "Xbridge",
-      F.translation(0, 0, 242),
-      [1.0, 0, 0],
-      cutDistance,
-      minX,
-      HobberXLayout.RETRACT
-    );
-    for (side in [-1, 1]) for (row in [HobberXLayout.BLOCK_FRONT, HobberXLayout.BLOCK_REAR]) fixAt(
-      "blockX" + (side < 0 ? "Left" : "Right") + (row == HobberXLayout.BLOCK_FRONT ? "" : "Front"),
-      LinearRailBlock.metric("HGH25CA", LinearRailBlock.SUPPLIER),
-      AxisBuilder.orient(centre + row, side * FoundationLayout.BED_RAIL_CENTRE, 242, [0.0, 0, 1], [1.0, 0, 0]),
-      "Xbridge",
-      F.alongY(centre + row, side * FoundationLayout.BED_RAIL_CENTRE, 260, 0, 0, 1)
-    );
+    // The prismatic joint is the guide block on its rail; the carriage is fixed to that block and carries the others.
+    for (side in [-1, 1]) for (row in [HobberXLayout.BLOCK_FRONT, HobberXLayout.BLOCK_REAR]) {
+      var id = "blockX" + (side < 0 ? "Left" : "Right") + (row == HobberXLayout.BLOCK_FRONT ? "" : "Front");
+      var block = LinearRailBlock.metric("HGH25CA", LinearRailBlock.SUPPLIER);
+      var pose = AxisBuilder.orient(centre + row, side * FoundationLayout.BED_RAIL_CENTRE, 242, [0.0, 0, 1], [1.0, 0, 0]);
+      var top = F.alongY(centre + row, side * FoundationLayout.BED_RAIL_CENTRE, 260, 0, 0, 1);
+      if (id == "blockXLeft") {
+        addComponent(id, block);
+        zero.set(id, pose);
+        moving("X", Prismatic, "railXLeft", id, F.translation(0, 0, 242), [1.0, 0, 0], cutDistance, minX, HobberXLayout.RETRACT);
+        fixAt("Xbridge", new HobberSaddle("GE-X-carriage"), F.translation(centre, 0, 0), id, top);
+      } else fixAt(id, block, pose, "Xbridge", top);
+    }
     includeAt("column", column, FoundationLayout.worldPose("column"));
     fixExisting("column-mount", "Xbridge", "column/basePlate", F.alongY(centre + 326, 0, 280, 0, 0, 1));
     for (placed in HobberRailPlacement.placements("column", FoundationLayout.placements("column"))) {
@@ -248,16 +241,18 @@ class FlexsplineHobber extends MachineAssembly {
       fixAt(placed.memberId, placed.rail, placed.pose, insert, placed.contact);
       precisionMounts.push({name: placed.memberId + "-mount", parent: insert});
     }
-    addComponent("Zplate", new HobberSaddle("GE-Z-saddle"));
-    zero.set("Zplate", F.translation(centre, 0, 363));
-    moving("Z", Prismatic, "railZLeft", "Zplate", F.translation(centre + 161, 0, 363), [0.0, 0, 1], 0, -10, 190);
-    for (side in [-1, 1]) for (row in [0, 110]) fixAt(
-      "blockZ" + (side < 0 ? "Left" : "Right") + (row == 0 ? "" : "Upper"),
-      LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER),
-      AxisBuilder.orient(centre + 161, side * 145, 363 + row, [-1.0, 0, 0], [0.0, 0, 1]),
-      "Zplate",
-      F.alongY(centre + 148, side * 145, 363 + row, -1, 0, 0)
-    );
+    for (side in [-1, 1]) for (row in [0, 110]) {
+      var id = "blockZ" + (side < 0 ? "Left" : "Right") + (row == 0 ? "" : "Upper");
+      var block = LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER);
+      var pose = AxisBuilder.orient(centre + 161, side * 145, 363 + row, [-1.0, 0, 0], [0.0, 0, 1]);
+      var face = F.alongY(centre + 148, side * 145, 363 + row, -1, 0, 0);
+      if (id == "blockZLeft") {
+        addComponent(id, block);
+        zero.set(id, pose);
+        moving("Z", Prismatic, "railZLeft", id, F.translation(centre + 161, 0, 363), [0.0, 0, 1], 0, -10, 190);
+        fixAt("Zplate", new HobberSaddle("GE-Z-saddle"), F.translation(centre, 0, 363), id, face);
+      } else fixAt(id, block, pose, "Zplate", face);
+    }
     var swivelMotor = new TorqueMotor(new ComponentValues().setNumber("height", 20).setNumber(
       "ratedSpeed",
       Math.PI / 12
@@ -289,16 +284,18 @@ class FlexsplineHobber extends MachineAssembly {
       "swivelPlate",
       F.alongY(centre + 85, 110, 363 + side * 60, -1, 0, 0)
     );
-    addComponent("Yplate", new HobberSaddle("GE-Y-saddle"));
-    zero.set("Yplate", F.translation(centre, 0, 363));
-    moving("Y", Prismatic, "railYLeft", "Yplate", F.translation(centre + 70, 0, 363), [0.0, -1, 0], 0, -10, 10);
-    for (side in [-1, 1]) for (row in [-40, 40]) fixAt(
-      "blockY" + (side < 0 ? "Left" : "Right") + (row < 0 ? "" : "Front"),
-      LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER),
-      AxisBuilder.orient(centre + 70, row, 363 + side * 60, [-1.0, 0, 0], [0.0, -1, 0]),
-      "Yplate",
-      F.alongY(centre + 57, row, 363 + side * 60, -1, 0, 0)
-    );
+    for (side in [-1, 1]) for (row in [-40, 40]) {
+      var id = "blockY" + (side < 0 ? "Left" : "Right") + (row < 0 ? "" : "Front");
+      var block = LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER);
+      var pose = AxisBuilder.orient(centre + 70, row, 363 + side * 60, [-1.0, 0, 0], [0.0, -1, 0]);
+      var face = F.alongY(centre + 57, row, 363 + side * 60, -1, 0, 0);
+      if (id == "blockYLeft") {
+        addComponent(id, block);
+        zero.set(id, pose);
+        moving("Y", Prismatic, "railYLeft", id, F.translation(centre + 70, 0, 363), [0.0, -1, 0], 0, -10, 10);
+        fixAt("Yplate", new HobberSaddle("GE-Y-saddle"), F.translation(centre, 0, 363), id, face);
+      } else fixAt(id, block, pose, "Yplate", face);
+    }
     spindle = new HobSpindle(
       null,
       new HobArbor(new ComponentValues().setNumber("height", 175).setNumber("hobCentreOffset", 60).setNumber(
@@ -334,56 +331,29 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt("electricalPanel", new HobberSaddle("electrical-panel"), HobberElectricalLayout.panelPose(), "bed/liftLeft");
     fixAt("powerSupply", supply, HobberElectricalLayout.devicePose(0, 130), "electricalPanel");
     exposePort("mains", "powerSupply", "mains");
-    fixAt(
-      "XdriveFrame",
-      new HobberSaddle("GE-X-drive"),
-      F.translation(centre, 0, 0),
-      "bed/driveSeat",
-      F.alongY((HobberXLayout.front().motorFace + HobberXLayout.front().deckStart) / 2, 0, 140, 0, 0, 1)
-    );
-    precisionMounts.push({name: "XdriveFrame-mount", parent: "bed/driveSeat"});
-    fixAt(
-      "ZdriveFrame",
-      new HobberSaddle("GE-Z-drive"),
-      F.translation(centre, 0, 0),
-      "column/driveSeat",
-      F.alongY(centre + HobberZLayout.SEAT_FACE_X, 0, 540, -1, 0, 0)
-    );
-    precisionMounts.push({name: "ZdriveFrame-mount", parent: "column/driveSeat"});
-    fixAt(
-      "YdriveFrame",
-      new HobberSaddle("GE-Y-drive"),
-      F.translation(centre, 0, 363),
-      "swivelPlate",
-      F.alongY(centre + 85, -105, 458, -1, 0, 0)
-    );
-    drive(
-      "X",
-      "XdriveFrame",
-      "Xbridge",
-      [-1.0, 0, 0],
-      F.translation(centre + HobberXLayout.NUT_DATUM, 0, 180),
-      HobberXLayout.front().screwLength,
-      HobberXLayout.front().nutStation
-    );
-    drive(
-      "Z",
-      "ZdriveFrame",
-      "Zplate",
-      [0.0, 0, -1],
-      F.translation(centre + HobberZLayout.AXIS_X, 0, 363 + HobberZLayout.NUT_OFFSET_Z),
-      HobberZLayout.SHAFT_LENGTH,
-      HobberZLayout.NUT_STATION
-    );
-    drive(
-      "Y",
-      "YdriveFrame",
-      "Yplate",
-      [0.0, -1, 0],
-      F.translation(centre + 70, 0, 508),
-      HobberYLayout.SCREW_LENGTH,
-      HobberYLayout.NUT_STATION
-    );
+    // Drive seats: pads under the two supports of X and Z (the nut block travels between them), brackets on the swivel plate for Y.
+    var xDrive = HobberDrives.x(), yDrive = HobberDrives.y(), zDrive = HobberDrives.z();
+    for (support in ["fixed", "floating"]) {
+      var name = support == "fixed" ? "Fixed" : "Floating";
+      var xb = HobberDrives.padBounds(xDrive, support, 80, 15), zb = HobberDrives.padBounds(zDrive, support, 80, 40);
+      fixAt("Xdrive" + name, new HobberSaddle("GE-X-drive-" + support), F.identity(), "bed/driveSeat",
+        F.alongY((xb[0] + xb[3]) / 2, 0, 140, 0, 0, 1));
+      precisionMounts.push({name: "Xdrive" + name + "-mount", parent: "bed/driveSeat"});
+      fixAt("Zdrive" + name, new HobberSaddle("GE-Z-drive-" + support), F.identity(), "column/driveSeat",
+        F.alongY(HobberZLayout.SEAT_FACE_X, 0, (zb[2] + zb[5]) / 2, -1, 0, 0));
+      precisionMounts.push({name: "Zdrive" + name + "-mount", parent: "column/driveSeat"});
+      var yHoles = HobberDrives.seatHoles(yDrive, support), yLo = 1e9, yHi = -1e9;
+      for (h in yHoles) {
+        yLo = Math.min(yLo, h.position[1]);
+        yHi = Math.max(yHi, h.position[1]);
+      }
+      fixAt("Ydrive" + name, new HobberSaddle("GE-Y-drive-" + support), F.identity(), "swivelPlate",
+        F.alongY(92.5, support == "fixed" ? (yLo + yHi) / 2 : -85, 458, 0, 0, 1));
+    }
+    fixAt("YnutSeat", new HobberSaddle("GE-Y-nut-seat"), F.identity(), "Yplate", F.alongY(60, -10, 458, 0, 0, 1));
+    drive(xDrive, "XdriveFixed", "XdriveFloating", "Xbridge");
+    drive(zDrive, "ZdriveFixed", "ZdriveFloating", "Zplate");
+    drive(yDrive, "YdriveFixed", "YdriveFloating", "YnutSeat");
     fixAt(
       "chipTray",
       new HobberSaddle(
@@ -427,6 +397,9 @@ class FlexsplineHobber extends MachineAssembly {
     exposeConnector("work", "mandrel", "work");
     exposeConnector("hobCentre", "hob", "centre");
   }
+  /** The pairs of members the hobbing process brings together: the hob in the cup's band. */
+  public function processContacts():Array<{a:String, b:String}> return [{a: "blank", b: "hob"}, {a: "mandrel", b: "hob"}, {a: "mandrelSleeve", b: "hob"}];
+
   function includeAt(id:String, a:MachineAssembly, pose:AssemblyFrame):Void {
     include(id, a, F.compose(MACHINE_FROM_WORK, pose));
     var positions = a.solvedPoses();
@@ -487,122 +460,35 @@ class FlexsplineHobber extends MachineAssembly {
       {lower: lower, upper: upper, velocity: null, effort: null, acceleration: 500, overtravel: 5}
     );
   }
-  function drive(
-    id:String,
-    parent:String,
-    carriage:String,
-    d:Array<Float>,
-    nutOrigin:AssemblyFrame,
-    length:Float,
-    nutStation:Float = 100
-  ):Void {
-    var motor = ServoMotor.model(id == "Z" ? "GENERIC-HV-SERVO-750W" : "GENERIC-HV-SERVO-400W"), screw = new BallScrew(
-      length,
-      HzMotionDrawingScrew.FIXED_END,
-      true,
-      HzMotionDrawingScrew.FLOAT_END
-    ), nut = new BallNut();
-    var start = [nutOrigin.x - d[0] * nutStation, nutOrigin.y - d[1] * nutStation, nutOrigin.z - d[2] * nutStation];
-    var up = id == "Z" ? [-1.0, 0, 0] : id == "Y" ? [1.0, 0, 0] : [0.0, 0, 1];
-    var mp = AxisBuilder.orient(
-      start[0] - d[0] * motor.rating.shaftLength,
-      start[1] - d[1] * motor.rating.shaftLength,
-      start[2] - d[2] * motor.rating.shaftLength,
-      up,
-      d
-    );
-    fixAt(id + "motor", motor, mp, parent, F.compose(mp, Solids.axial(0, 0, 0)));
+  /**
+   * One axis's drive from `HobberDrives`: the mount on its fixed pad, servo and coupling, the screw turning in them, the BF12
+   * and its ring on the floating pad, and the nut on a nut block bolted to `blockHost`. The seat holes are cut into the pads.
+   */
+  function drive(hd:HobberDriveAxis, fixedPad:String, floatingPad:String, blockHost:String):Void {
+    var id = hd.id, dr = hd.drive, at = HobberDrives.poses(hd), d = hd.axis.direction, s = hd.axis.start;
+    var motor = dr.motor, screw = new HzMotionDrawingScrew(hd.length, dr.endProfile), nut = new BallNut();
+    fixAt(id + "fixed", dr.fixed, at.get("mount"), fixedPad);
+    fixAt(id + "motor", motor, at.get("motor"), id + "fixed");
     addComponent(id + "screw", screw);
-    zero.set(id + "screw", AxisBuilder.orient(start[0], start[1], start[2], up, d));
-    var f = F.alongY(start[0], start[1], start[2], d[0], d[1], d[2]);
-    addMemberConnector(id + "motor", id + "turnParent", F.compose(F.inverse(required(id + "motor")), f));
+    zero.set(id + "screw", at.get("screw"));
+    var f = F.alongY(s[0], s[1], s[2], d[0], d[1], d[2]);
+    // The screw turns in the mount's bearings: the mount is the joint's parent (the motor is bolted to it).
+    addMemberConnector(id + "fixed", id + "turnParent", F.compose(F.inverse(required(id + "fixed")), f));
     addMemberConnector(id + "screw", id + "turnChild", F.compose(F.inverse(required(id + "screw")), f));
-    fixAt(
-      id + "nut",
-      nut,
-      AxisBuilder.orient(
-        nutOrigin.x - d[0] * nut.bodyLength / 2,
-        nutOrigin.y - d[1] * nut.bodyLength / 2,
-        nutOrigin.z - d[2] * nut.bodyLength / 2,
-        up,
-        d
-      ),
-      carriage,
-      F.alongY(nutOrigin.x + d[0] * 27.5, nutOrigin.y + d[1] * 27.5, nutOrigin.z + d[2] * 27.5, d[0], d[1], d[2])
-    );
-    var ratio = addTransmission(
-      id + "lead",
-      id,
-      id + "screw-turn",
-      Transmission.LeadScrew(id + "screw", id + "nut"),
-      id == "X" ? Same : Opposite
-    );
+    var block = HobberDrives.nutBlock(hd, nut), blockPose = HobberDrives.nutBlockPose(hd, nut);
+    fixAt(id + "nutBlock", block, blockPose, blockHost, F.compose(blockPose, F.translation(0, -block.centreHeight, block.thickness / 2)));
+    fixAt(id + "nut", nut, at.get("nut"), id + "nutBlock", blockPose);
+    var ratio = addTransmission(id + "lead", id, id + "screw-turn", Transmission.LeadScrew(id + "screw", id + "nut"), id == "Z" ? Opposite : id == "X" ? Opposite : Same);
     var initial = travel.filter(t -> t.id == id)[0].initial;
-    addMate(
-      id + "screw-turn",
-      Continuous,
-      id + "motor",
-      id + "turnParent",
-      id + "screw",
-      id + "turnChild",
-      ratio * initial
-    );
-    var near = ScrewSupportUnit.bk12(), far = ScrewSupportUnit.bf12(), nearOffset = HzMotionDrawingScrew.BK12_SUPPORT_CENTRE;
-    fixAt(
-      id + "fixed",
-      near,
-      AxisBuilder.orient(
-        start[0] + d[0] * nearOffset,
-        start[1] + d[1] * nearOffset,
-        start[2] + d[2] * nearOffset,
-        up,
-        d
-      ),
-      parent
-    );
-    fixAt(
-      id + "floating",
-      far,
-      AxisBuilder.orient(
-        start[0] + d[0] * (length - HzMotionDrawingScrew.BF12_SUPPORT_CENTRE),
-        start[1] + d[1] * (length - HzMotionDrawingScrew.BF12_SUPPORT_CENTRE),
-        start[2] + d[2] * (length - HzMotionDrawingScrew.BF12_SUPPORT_CENTRE),
-        up,
-        d
-      ),
-      parent
-    );
-    supportScrew(id + "lead", near.support, far.support);
-    var coupling = new ShaftCoupling(motor.rating.shaftDiameter, 12, null, id == "Z" ? HobberZLayout.COUPLING_LENGTH : null);
-    if (motor.rating.shaftLength < coupling.length / 2) throw "motor shaft cannot engage half coupling";
-    fixAt(
-      id + "coupling",
-      coupling,
-      AxisBuilder.orient(
-        start[0] - d[0] * coupling.length / 2,
-        start[1] - d[1] * coupling.length / 2,
-        start[2] - d[2] * coupling.length / 2,
-        up,
-        d
-      ),
-      id + "screw"
-    );
-    fixAt(id + "motor-shaft", motor.shaft(), mp, id + "screw");
-    var scaleSeat = switch id {
-      case "X":
-        AxisBuilder.orient(start[0], 46, 175, [0.0, 1, 0], d);
-      case "Z":
-        AxisBuilder.orient(start[0] + 45, HobberZLayout.SCALE_Y, start[2], [-1.0, 0, 0], d);
-      case "Y":
-        AxisBuilder.orient(nutOrigin.x - 24, start[1], 548, [-1.0, 0, 0], d);
-      default:
-        throw "missing scale mounting datum";
-    };
-    fixAt(id + "scale", new LinearScale(length, 10000, true), scaleSeat, parent);
-    mountContacts.push({parent: parent, child: id + "fixed"});
-    mountContacts.push({parent: parent, child: id + "floating"});
-    mountContacts.push({parent: parent, child: id + "scale"});
-    addEncoder(id + "position", id, id + "scale");
+    addMate(id + "screw-turn", Continuous, id + "fixed", id + "turnParent", id + "screw", id + "turnChild", ratio * initial);
+    fixAt(id + "floating", dr.floating, at.get("floating"), floatingPad);
+    fixAt(id + "floatingRing", dr.ring, at.get("ring"), id + "floating");
+    supportScrew(id + "lead", ScrewSupport.Fixed, dr.floating.support);
+    fixAt(id + "coupling", dr.coupling, at.get("coupling"), id + "screw");
+    fixAt(id + "motor-shaft", motor.shaft(), at.get("motor"), id + "coupling");
+    mountContacts.push({parent: fixedPad, child: id + "fixed"});
+    mountContacts.push({parent: floatingPad, child: id + "floating"});
+    // Position feedback: the exposed tapes went with the old drive frames; H4 puts the sealed scales on the new seats.
     bind(id + "drive", id + "screw-turn", id + "motor");
   }
   function bind(id:String, joint:String, motor:String, process:Bool = false):Void {
