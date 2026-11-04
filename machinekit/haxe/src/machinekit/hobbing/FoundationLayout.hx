@@ -267,6 +267,8 @@ class FoundationLayout {
 
   static inline final COLUMN_SPINE_HALF_WIDTH = 60.0;
   public static inline final COLUMN_HEAD_WIDTH = 240.0;
+  /** The left recess opens this far past the head's side face, so the Z drive supports (60 wide plus bracket flange, at y -82) are not cut by the wall. */
+  static inline final LEFT_RECESS_OVERRUN = 5.0;
   static inline final COLUMN_HEAD_DEPTH = 100.0;
   static inline final COLUMN_HEAD_CENTRE_Y = 60.0;
 
@@ -391,15 +393,17 @@ class FoundationLayout {
       // describe its U-shaped recess without cutting it and retaining a boss.
       var headRear = COLUMN_HEAD_CENTRE_Y + COLUMN_HEAD_DEPTH / 2;
       var sideWidth = COLUMN_HEAD_WIDTH / 2 - COLUMN_SPINE_HALF_WIDTH;
+      // The Z screw stands at y -82 (the A axis housing is at y 0), its pads on the spine's left side: that recess stops at the spine's
+      // front face instead of cutting 35 mm further back.
       for (side in [-1, 1]) cores.push(Patterns.box(
         "head-recess-" + (side < 0 ? "left" : "right"),
         ServiceOpening,
         faces(["body.y-max", "body.z-min", "body.z-max"]),
-        sideWidth,
-        COLUMN_HEAD_DEPTH,
+        side < 0 ? sideWidth + LEFT_RECESS_OVERRUN : sideWidth,
+        side < 0 ? headRear - HobberZLayout.SPINE_FRONT_COLUMN_Y : COLUMN_HEAD_DEPTH,
         d[2],
-        side * (COLUMN_HEAD_WIDTH / 2 + COLUMN_SPINE_HALF_WIDTH) / 2,
-        COLUMN_HEAD_CENTRE_Y,
+        side * (COLUMN_HEAD_WIDTH / 2 + COLUMN_SPINE_HALF_WIDTH) / 2 - (side < 0 ? LEFT_RECESS_OVERRUN / 2 : 0),
+        side < 0 ? (headRear + HobberZLayout.SPINE_FRONT_COLUMN_Y) / 2 : COLUMN_HEAD_CENTRE_Y,
         0
       ));
       cores.push(Patterns.box(
@@ -548,11 +552,11 @@ class FoundationLayout {
       out.push(boxInsert(
         "driveSeat",
         DriveMount,
-        "central Z drive back seat",
-        100,
+        "Z drive back seat",
+        76,
         460,
         20,
-        F.fromRotationMatrix(0, HobberZLayout.SEAT_COLUMN_Y, 250, [-1.0, 0, 0, 0, 0, 1, 0, 1, 0]),
+        F.fromRotationMatrix(HobberZLayout.AXIS_Y, HobberZLayout.SEAT_COLUMN_Y, 250, [-1.0, 0, 0, 0, 0, 1, 0, 1, 0]),
         [],
         fixtureHoles(20),
         "column"

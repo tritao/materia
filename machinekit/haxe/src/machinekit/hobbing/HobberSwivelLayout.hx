@@ -1,0 +1,50 @@
+package machinekit.hobbing;
+
+import cadkit.modeling.Part;
+import machinekit.assembly.PosedParts;
+import machinekit.motion.ErobActuatorPart;
+import materia.assembly.AssemblyFrames as F;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
+
+/**
+ * Where the A axis sits (work frame, mm): the eRob 110 actuator's output face looks toward the hob along -x and stands 11 mm proud of the Z
+ * saddle plate; its Ø85 pilot (16 mm tall, `ErobActuatorData.PILOT_HEIGHT`) goes through an output bore in a 5 mm web at the plate's front, and
+ * the Ø110 housing stands in an 8 mm pocket cut into the plate from behind, its front face (with the 16 M4 holes) against the web. The 13 mm
+ * plate is the 5 mm web and the 8 mm minimum pocket depth. A turned adapter ring bridges the 24 mm between the output face and the back of the
+ * swivel plate. The axis passes through the hob centre line at y = 0 (the hob is 20 mm off it, as before) at `HobberZLayout.SEAT_Z`.
+ */
+class HobberSwivelLayout {
+  /** Output flange face, x. */
+  public static inline final OUTPUT_X = 124.0;
+  /** The Z saddle plate's front face and back (block) face, x. */
+  public static inline final PLATE_FRONT = 135.0;
+  public static inline final PLATE_BACK = 148.0;
+  /** The swivel plate's back face, where the adapter ring ends. */
+  public static inline final PLATE_X = 100.0;
+  /** Swing either side of the middle position. */
+  public static inline final RANGE:Float = Math.PI / 12;
+  /** Adapter ring: outside and inside diameter, mm. The inside leaves the output flange more than half its footprint to bear on. */
+  public static inline final RING_OUTSIDE = 110.0;
+  public static inline final RING_INSIDE = 40.0;
+  /** Adapter-to-plate screws: M5 on this pitch circle, in the ring's plate end. */
+  public static inline final PLATE_PCD = 95.0;
+  public static inline final PLATE_SCREWS = 8;
+  /** Rotation that takes the actuator's CAD +Z to the work frame's -x (the old swivel head used the same). */
+  public static final ROTATION:Array<Float> = [0.0, 0, -1, 1, 0, 0, 0, -1, 0];
+
+  /** How far the output face stands in front of the saddle plate's front face (its bore is 2.2 mm wider in radius than the pilot). */
+  public static inline final RUNNING_GAP:Float = PLATE_FRONT - OUTPUT_X;
+  /** Depth of the pocket from the plate's back face to the housing's front face. */
+  public static inline final POCKET_DEPTH:Float = PLATE_BACK - (OUTPUT_X - ErobActuatorPart.SEAT_Z);
+
+  /** The actuator's CAD frame in the work frame. */
+  public static function pose():AssemblyFrame return F.fromRotationMatrix(OUTPUT_X, 0, HobberZLayout.SEAT_Z, ROTATION);
+
+  /** The pocket, output bore and screw clearance holes the Z saddle needs, in the saddle's frame (the work frame lowered by `SEAT_Z`). */
+  public static function housingCutout():Part {
+    var tool = new ErobActuatorPart().mountingCutout(POCKET_DEPTH, RUNNING_GAP, 0.4, 0, ErobActuatorPart.PILOT_BORE_CLEARANCE);
+    var placed = PosedParts.moved(tool, F.fromRotationMatrix(OUTPUT_X, 0, 0, ROTATION));
+    tool.close();
+    return placed;
+  }
+}

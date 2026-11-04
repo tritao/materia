@@ -62,10 +62,10 @@ class HobberDrives {
     return yCache;
   }
 
-  /** Z: screw straight down at x 176 from the motor at the top, supports on ground bar pads against the column. */
+  /** Z: screw straight down at x 176, y -82 (the A axis housing stands at y 0) from the motor at the top, supports on ground bar pads against the column. */
   public static function z():HobberDriveAxis {
     if (zCache == null) zCache = {id: "Z", drive: SupportedScrewDrive.m60dBk12Braked(true),
-      axis: {start: [HobberZLayout.AXIS_X, 0.0, HobberZLayout.SHAFT_TOP], direction: [0.0, 0, -1.0], normal: [-1.0, 0, 0]},
+      axis: {start: [HobberZLayout.AXIS_X, HobberZLayout.AXIS_Y, HobberZLayout.SHAFT_TOP], direction: [0.0, 0, -1.0], normal: [-1.0, 0, 0]},
       length: HobberZLayout.SHAFT_LENGTH, nutStation: partStart(HobberZLayout.NUT_STATION), nutUp: [-1.0, 0, 0], blockHeight: HobberZLayout.AXIS_X - 148};
     return zCache;
   }

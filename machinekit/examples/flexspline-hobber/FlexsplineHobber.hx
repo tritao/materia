@@ -3,6 +3,7 @@ import gearkit.*;
 import machinekit.assembly.*;
 import machinekit.assembly.AxisBuilder;
 import machinekit.component.*;
+import machinekit.control.BissMaster;
 import machinekit.motion.*;
 import machinekit.hobbing.*;
 import machinekit.power.*;
@@ -26,6 +27,14 @@ class FlexsplineHobber extends MachineAssembly {
   public static final C = "table/C";
   public static final B = "spindle/B";
   public static final A = "swivel/A";
+  /**
+   * ASSUMED holding torque of the A brake, N m at the output flange. ZeroErr has not published it (asked 2026-11-03); this is the
+   * actuator's rated output torque (87 N m, ratio 100), a placeholder for a spring-applied holding brake of this class. Replace it from
+   * the maker's answer; `HobberFrameChecks.swivelLoad` reports the demand against it.
+   */
+  public static final A_BRAKE_HOLDING = 87.0;
+  /** ASSUMED acceleration limit of A, rad/s^2: the old torque-motor head used the same; not a vendor value. */
+  public static final A_ACCELERATION:Float = Math.PI / 2;
   public final spec:GearSpec;
   public final hob:Hob;
   public final mandrel:ExpandingMandrel;
@@ -34,13 +43,14 @@ class FlexsplineHobber extends MachineAssembly {
   public final table:machinekit.assembly.MachineAssembly;
   public final tableSpec:machinekit.motion.RotaryAxisSpec;
   public final spindle:HobSpindle;
-  public final swivel:SwivelHead;
+  public final swivel:ErobActuator;
   public final travel:Array<HobberTravel>;
   public final workOrigin:AssemblyFrame;
   public final precisionMounts:Array<{name:String, parent:String}> = [];
   public final mountContacts:Array<{parent:String, child:String}> = [];
   final zero:Map<String, AssemblyFrame> = [];
   var driverNumber = 0;
+  var bissChannel = 0;
   public function new(
     ?spec:GearSpec,
     gashes:Int = 12,
@@ -253,29 +263,25 @@ class FlexsplineHobber extends MachineAssembly {
         fixAt("Zplate", new HobberSaddle("GE-Z-saddle"), F.translation(centre, 0, HobberZLayout.SEAT_Z), id, face);
       } else fixAt(id, block, pose, "Zplate", face);
     }
-    var swivelMotor = new TorqueMotor(new ComponentValues().setNumber("height", 20).setNumber(
-      "ratedSpeed",
-      Math.PI / 12
-    ).setNumber(
-      "maxSpeed",
-      Math.PI / 6
-    ).setNumber(
-      "torqueConstant",
-      2
-    ).setNumber(
-      "backEmfConstant",
-      2 / Math.sqrt(3)
-    ));
-    swivel = new SwivelHead(swivelMotor, null, Math.PI / 12);
-    includeAt("swivel", swivel, F.fromRotationMatrix(centre + 135, 0, HobberZLayout.SEAT_Z, [0.0, 0, -1, 1, 0, 0, 0, -1, 0]));
-    fixExisting("swivel-mount", "Zplate", "swivel/housing", F.alongY(centre + 135, 0, HobberZLayout.SEAT_Z, 1, 0, 0));
+    // A axis (FRAME_PLAN R1): the eRob 110 actuator, its housing in a pocket cut into the Z saddle from behind, a turned adapter ring on its
+    // output flange and the ground swivel plate on the ring. The actuator's own brake holds the head; its holding torque is an assumption.
+    swivel = new ErobActuator(100, 20, true, "A", new ComponentValues().setNumber("brakeHoldingTorque", A_BRAKE_HOLDING), HobberSwivelLayout.RANGE, A_ACCELERATION);
+    includeAt("swivel", swivel, HobberSwivelLayout.pose());
+    fixExisting("swivel-mount", "Zplate", "swivel/housing", F.alongY(HobberSwivelLayout.OUTPUT_X + 6, 0, HobberZLayout.SEAT_Z, 1, 0, 0));
     var e0 = [-1.0, 0, 0, 0, 0, -1, 0, -1, 0];
+    fixAt(
+      "swivelAdapter",
+      new HobberSaddle("GE-swivel-adapter"),
+      F.translation(centre, 0, HobberZLayout.SEAT_Z),
+      "swivel/output",
+      F.alongY(HobberSwivelLayout.OUTPUT_X, 0, HobberZLayout.SEAT_Z, -1, 0, 0)
+    );
     fixAt(
       "swivelPlate",
       new HobberSaddle("GE-swivel-plate"),
       F.translation(centre, 0, HobberZLayout.SEAT_Z),
-      "swivel/head",
-      F.alongY(centre + 100, 0, HobberZLayout.SEAT_Z, -1, 0, 0)
+      "swivelAdapter",
+      F.alongY(HobberSwivelLayout.PLATE_X, 0, HobberZLayout.SEAT_Z, -1, 0, 0)
     );
     for (side in [-1, 1]) fixAt(
       side < 0 ? "railYLeft" : "railYRight",
@@ -307,7 +313,11 @@ class FlexsplineHobber extends MachineAssembly {
       ))
     );
     includeAt("spindle", spindle, F.fromRotationMatrix(centre, 240, HobberZLayout.SEAT_Z, e0));
-    fixExisting("spindle-mount", "Yplate", "spindle/housing", F.alongY(centre + 40, 210, HobberZLayout.SEAT_Z, 1, 0, 0));
+    // One milled split-clamp block holds the Ø80 cartridge (FRAME_PLAN R2): bore with a slit up the +z side, three clamp screws across it,
+    // four M8 and two dowels into the Y saddle's plate.
+    fixAt("spindleSeat", new HobberSaddle("GE-spindle-seat"), F.translation(centre, 0, HobberZLayout.SEAT_Z), "Yplate",
+      F.alongY(centre + 45, 150, HobberZLayout.SEAT_Z, 1, 0, 0));
+    fixExisting("spindle-mount", "spindleSeat", "spindle/housing", F.alongY(centre + 40, 150, HobberZLayout.SEAT_Z, 1, 0, 0));
     fixAt("hob", hob, F.fromRotationMatrix(centre, 20, HobberZLayout.SEAT_Z, e0), "spindle/arbor");
     fixAt(
       "outboard",
@@ -331,6 +341,12 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt("electricalPanel", new HobberSaddle("electrical-panel"), HobberElectricalLayout.panelPose(), "bed/liftLeft");
     fixAt("powerSupply", supply, HobberElectricalLayout.devicePose(0, 130), "electricalPanel");
     exposePort("mains", "powerSupply", "mains");
+    // The 48 V bus for the A actuator, from the same mains: it takes back what the actuator regenerates in a brake chopper and resistor.
+    fixAt("supply48", new ThreePhaseDcSupply(new AcMains(ThreePhase, new AcRmsVoltage(400), 50), 48, 20, 1, 125, 125, 120, 300),
+      HobberElectricalLayout.devicePose(-105, 700), "electricalPanel");
+    exposePort("mains48", "supply48", "mains");
+    // The three sealed scales are read by a BiSS-C master module of the controller.
+    fixAt("bissMaster", new BissMaster(4), HobberElectricalLayout.devicePose(110, 700), "electricalPanel");
     // Drive seats: pads under the two supports of X and Z (the nut block travels between them), brackets on the swivel plate for Y.
     var xDrive = HobberDrives.x(), yDrive = HobberDrives.y(), zDrive = HobberDrives.z();
     for (support in ["fixed", "floating"]) {
@@ -392,12 +408,15 @@ class FlexsplineHobber extends MachineAssembly {
     );
     // Enclosure envelope reserved; panels omitted for the current open inspection layout.
     bind("table-drive", C, "table/" + tableSpec.drivePart);
-    bind("swivel-drive", A, "swivel/motor");
+    // A: the actuator's own amplifier (EtherCAT, 48 V), no separate driver.
+    connectPorts("swivel-power", "supply48", "power1", "swivel/housing", "power");
+    addMotor("swivel-drive", A, "swivel/housing", "swivel/housing", 1);
+    exposePort("swivel.bus", "swivel/housing", "bus");
     bind("hob-drive", B, "spindle/motor", true);
     // Feedback belongs to the outer drives; the cartridge encoders are also exposed as sensors.
     addEncoder("table-feedback", C, "table/" + tableSpec.encoderPart, "table-drive");
     addEncoder("hob-master", B, "spindle/encoder", "hob-drive");
-    bindMotorBrake("swivel-drive", "swivel/clamp", "swivel.clampRelease", "swivel.clampReleased", 1000, 30);
+    bindMotorBrake("swivel-drive", "swivel/housing", "swivel.brakeRelease", "swivel.brakeReleased", 1000, 30);
     machinekit.structural.FoundationIntegrity.check(bed).throwIfErrors();
     machinekit.structural.FoundationIntegrity.check(column).throwIfErrors();
     machinekit.structural.FoundationIntegrity.checkMounts(
@@ -518,6 +537,7 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt(housing, a.housing, a.housingPose, seatHost, F.compose(a.housingPose, a.housing.connector("mount").frame));
     fixAt(head, a.head, a.headPose, headHost, F.compose(a.headPose, a.head.connector("mount").frame));
     addEncoder(a.id + "position", a.id, head);
+    connectPorts(a.id + "-biss", head, "biss", "bissMaster", "ch" + (bissChannel++ + 1));
   }
   function bind(id:String, joint:String, motor:String, process:Bool = false):Void {
     driverNumber++;

@@ -28,14 +28,11 @@ class HobberDesignChecks {
           > 1e-8 || Math.abs(axis.y + 1) + Math.abs(axis.x) + Math.abs(axis.z)
           > 1e-8) throw "Y guides must lie on the radial vertical face, 70 mm behind hob";
       }
-      var face = F.compose(
-        canonical,
-        F.compose(poses.get("swivel/bearing"), F.translation(0, 0, machine.swivel.bearing.parameterNumber("height")))
-      );
+      var face = F.compose(canonical, poses.get("swivel/output"));
       var mount = F.compose(canonical, poses.get("swivel/housing"));
       count++;
-      if (Math.abs(face.x - centre.x - 114) > 1e-8 || Math.abs(mount.x - centre.x - 135) > 1e-8
-        || face.x >= mount.x) throw "swivel bearing must be in front of the Z saddle";
+      if (Math.abs(face.x - centre.x - machinekit.hobbing.HobberSwivelLayout.OUTPUT_X) > 1e-8
+        || Math.abs(mount.x - face.x) > 1e-8 || face.x >= centre.x + machinekit.hobbing.HobberSwivelLayout.PLATE_FRONT - 2) throw "swivel output face must be in front of the Z saddle plate by its running gap";
       var screw = F.compose(canonical, poses.get("Xscrew"));
       count++;
       if (Math.abs(screw.y) > 1e-8
@@ -47,8 +44,8 @@ class HobberDesignChecks {
         );
       var zd = F.transformVector(zScrew, 0, 0, 1);
       count++;
-      if (Math.abs(zScrew.y - (zl.y + zr.y) / 2) > 1e-8 || Math.abs(zScrew.x - zl.x - 15) > 1e-8
-        || Math.abs(zd.z + 1) > 1e-8) throw "Z screw must lie centrally behind the guide plane and point down";
+      if (Math.abs(zScrew.y - (zl.y + zr.y) / 2 - machinekit.hobbing.HobberZLayout.AXIS_Y) > 1e-8 || Math.abs(zScrew.x - zl.x - 15) > 1e-8
+        || Math.abs(zd.z + 1) > 1e-8) throw "Z screw must lie behind the guide plane, offset clear of the A actuator housing, and point down";
       var zFixed = F.compose(canonical, poses.get("Zfixed")), zFloating = F.compose(canonical, poses.get("Zfloating"));
       count++;
       if (zFixed.z <= zFloating.z) throw "Z fixed bearing must be at the top";

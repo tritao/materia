@@ -54,10 +54,8 @@ class FlexsplineHobberLayoutReport {
       "column/railLeft",
       "blockZLeft",
       "swivel/housing",
-      "swivel/bearing",
-      "swivel/motor",
-      "swivel/clamp",
-      "swivel/head",
+      "swivel/output",
+      "swivelAdapter",
       "swivelPlate",
       "railYLeft",
       "railYRight",
@@ -93,18 +91,7 @@ class FlexsplineHobberLayoutReport {
         function rect(a:Float,
           c:Float, d:Float, e:Float):Void lines.push('<rect x="' + px(a) + '" y="' + py(e) + '" width="' + ((c - a)
           * 1.2) + '" height="' + ((e - d) * 1.05) + '" fill="' + fill + '" fill-opacity="0.55" stroke="#334455"/>');
-        if (id == "swivel/housing") {
-          for (side in [-1, 1]) {
-            rect(130, 135, side < 0 ? -110 : 50, side < 0 ? -50 : 110);
-            rect(120, 130, side < 0 ? -110 : 90, side < 0 ? -90 : 110);
-            rect(110, 120, side < 0 ? -110 : 100, side < 0 ? -100 : 110);
-          }
-        } else if (id == "swivel/bearing" || id == "swivel/motor" || id == "swivel/clamp" || id == "swivel/head") {
-          var bore = member.component.parameterNumber("bore") / 2,
-            outside = member.component.parameterNumber("outside") / 2;
-          rect(x0, x1, bore, outside);
-          rect(x0, x1, -outside, -bore);
-        } else if (id == "spindle/housing" || id == "hob") {
+        if (id == "spindle/housing" || id == "hob") {
           var r = (x1 - x0) / 2;
           lines.push('<ellipse cx="' + px((x0 + x1) / 2) + '" cy="' + py((z0 + z1) / 2)
             + '" rx="' + (r * 1.2) + '" ry="' + (r * 1.05) + '" fill="none" stroke="#334455" stroke-dasharray="5 3"/>');
@@ -125,8 +112,8 @@ class FlexsplineHobberLayoutReport {
       + (px(0) - 100) + '" y="670">hob centre radial = 0</text>');
     var dimensions = [
       {x: 70.0, label: "Y guide axis plane: 70 mm"},
-      {x: 114.0, label: "A bearing front face: 114 mm"},
-      {x: 135.0, label: "Z saddle front / A mounting face: 135 mm"},
+      {x: machinekit.hobbing.HobberSwivelLayout.OUTPUT_X, label: "A output flange face: " + machinekit.hobbing.HobberSwivelLayout.OUTPUT_X + " mm"},
+      {x: 135.0, label: "Z saddle plate front: 135 mm"},
       {x: 161.0, label: "Z guide axis plane: 161 mm"}
     ];
     for (i in 0...dimensions.length) {
@@ -230,8 +217,8 @@ class FlexsplineHobberLayoutReport {
       },
       headStackMm: {
         yGuidePlane: 70,
-        swivelBearingFrontFace: 114,
-        swivelOutputFace: 100,
+        swivelOutputFlangeFace: machinekit.hobbing.HobberSwivelLayout.OUTPUT_X,
+        swivelPlateBackFace: 100,
         zSaddleFront: 135,
         zGuidePlane: 161,
         verticalGuideSeparation: 120
