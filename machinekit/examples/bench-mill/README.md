@@ -147,6 +147,13 @@ remain at the drive stations. The rail-side fields are lowered 20 mm. Central un
 side supports and a 60 mm casting roof above the motor bay. Sealing, cover edges,
 mounting fasteners and structural qualification remain unfinished.
 
+Service removal: the Y motor's withdrawal out of the back is declared once by `MillXYStage.declareMotorService` (a
+`ServiceRemoval` design requirement: rear hatch and motor screws off, then motor and shaft along +Y) and swept against the
+whole mill by `AssemblyIntegrity.service`, which replaced the bespoke sweep in `MillXYStageIntegrity`. Swept with the real
+motor solid it finds the casting 82.8 mm3 in the way after 24 mm (the old envelope cylinder reported 4680 mm3): the open
+y-servo finding. Way covers (`machinekit.cover.WayCover`) and a real stand for the Z screw supports (now on a 1 mm shim,
+`footBolted = false`) are not applied yet.
+
 Y travel increases from 150 to 160 mm without changing spindle reach or base
 footprint. The table retains 25 mm tool-edge margin and clears the column-side envelope
 by at least 3 mm at the rear stop. The 2 mm geometric overtravel allowance is not a verified

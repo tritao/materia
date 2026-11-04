@@ -146,46 +146,6 @@ class MillXYStageIntegrity {
       }
       moving.close();
     }
-    // Remove the rear hatch, hatch screws and four motor mounting screws before extraction along +Y.
-    var withdrawal = l.yServiceRear - l.yMotorFace + l.yMotor.rating.shaftLength + l.clearance;
-    var extraction:Array<Part>;
-    if (l.supplierY) {
-      var local = l.yMotor.axialEnvelope(-withdrawal, 0, true);
-      extraction = [PosedParts.moved(local, axis.zeroPose("motorY"))];
-      local.close();
-    } else extraction = [
-      Part.cylinderAlongY(
-        l.motor.rating.bodyDiameter / 2,
-        l.yMotorFace,
-        l.yMotorFace + l.motor.rating.bodyLength + withdrawal,
-        0,
-        l.yScrewZ
-      ),
-      Part.cylinderAlongY(
-        l.motor.rating.shaftDiameter / 2,
-        l.yMotorFace - l.motor.rating.shaftLength,
-        l.yMotorFace + withdrawal,
-        0,
-        l.yScrewZ
-      )
-    ];
-    for (part in extraction) {
-      owned.push(part);
-      for (other in frameParts) noOverlap(out, part, other.part, 'rear motor extraction/frame/${other.id}');
-      for (other in components) if (yFixed(other.id)
-        && other.id != "motorY" && other.id != "motorShaftY" && other.id != "motorCoverY" && !StringTools.startsWith(
-          other.id,
-          "rearCoverBoltY"
-        ) && !StringTools.startsWith(
-          other.id,
-          "motorYBolt"
-        )) {
-        var fixed = cache.posed(other.component, axis.zeroPose(other.id));
-        owned.push(fixed);
-        noOverlap(out, part, fixed, 'rear motor extraction/${other.id}');
-        fixed.close();
-      }
-    }
     if (frame.zAxis != null) {
       var zAxis = new MillZAxis(frame.zAxis);
       var zParts:Array<{id:String, part:Part}> = [];

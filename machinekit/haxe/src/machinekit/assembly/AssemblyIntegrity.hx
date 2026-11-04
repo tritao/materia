@@ -145,6 +145,16 @@ class AssemblyIntegrity {
   }
 
   /**
+	 * Only the declared service removals and guarded channels (`ServiceChecks`), at the joints' initial values: the cheap check
+	 * for a machine whose other integrity checks are not run. Every finding is `integrity.service.<id>` or `integrity.drain.<id>`.
+	 */
+  public static function service(assembly:MachineAssembly, ?options:IntegrityOptions):IntegrityReport {
+    var checker = new AssemblyIntegrity(assembly, options == null ? ({} : IntegrityOptions) : options);
+    PosedParts.scope(posed -> checker.runService(posed));
+    return new IntegrityReport(checker.diagnostics, 1);
+  }
+
+  /**
 	 * The default sweep: every corner of the leader joints' travel when there are at most six leaders, and each leader at
 	 * its quarter points with the others at their initial values. A leader is a movable tree joint (prismatic or
 	 * revolute, with finite limits) that no coupling drives.
@@ -321,6 +331,14 @@ class AssemblyIntegrity {
     ServiceChecks.run(assembly, flat, state, posed, diagnostics, overlapLimit, runningGap, rest);
     checkDrives(state, rest);
     return states.length + 1;
+  }
+
+  function runService(posed:PosedParts):Void {
+    var model = new AssemblyModel("mm");
+    assembly.addTo(model, "");
+    var state = new AssemblyState(model.definition("integrity"));
+    state.forwardKinematics();
+    ServiceChecks.run(assembly, flat, state, posed, diagnostics, overlapLimit, runningGap, new Map<String, Float>());
   }
 
   function runFasteners(posed:PosedParts):Void {

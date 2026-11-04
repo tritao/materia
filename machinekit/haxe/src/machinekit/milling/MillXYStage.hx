@@ -7,6 +7,7 @@ import machinekit.standard.SocketHeadCapScrew;
 import machinekit.transmission.TimingPulley;
 import machinekit.transmission.TimingBelt;
 import machinekit.assembly.Sense;
+import machinekit.design.DesignRequirement;
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
@@ -50,6 +51,7 @@ class MillXYStage extends MillGuidedXYStage {
       F.compose(y, F.translation(0, 0, l.yScrewStart - yFace - l.nut.bodyLength - l.nut.flangeThickness)),
       "nutBracketY"
     );
+    declareMotorService();
     var x = orient(l.xScrewStart, l.centreY, l.xScrewZ, [0, 0, 1], [1, 0, 0]);
     foldedXDrive(x);
     movingNut("X", x, -l.xScrewStart, "table", true);
@@ -108,6 +110,21 @@ class MillXYStage extends MillGuidedXYStage {
     );
     exposeConnector("mount", "fixedPedestalY", "mount");
     MillYNutDesignChecks.declare(this);
+  }
+
+  /**
+   * The Y motor comes out of the back: the rear hatch and the motor's four screws come off, then the motor and its shaft
+   * withdraw along +Y far enough to free the shaft, clearing the frame and the stage (`AssemblyIntegrity.service`).
+   */
+  function declareMotorService():Void {
+    var l = layout, ids = [for (m in components()) m.id];
+    var shaft = (l.supplierY ? l.yMotor.rating : l.motor.rating).shaftLength;
+    var withdrawal = l.yServiceRear - l.yMotorFace + shaft + l.clearance;
+    var movers = ["motorY"];
+    if (ids.indexOf("motorShaftY") >= 0) movers.push("motorShaftY");
+    var off = ["motorCoverY"];
+    for (id in ids) if (StringTools.startsWith(id, "motorYBolt")) off.push(id);
+    addDesignRequirement(ServiceRemoval("yMotorWithdrawal", movers, [{direction: [0.0, 1.0, 0.0], distance: withdrawal}], off, []));
   }
 
   static function requireGuides(layout:MillXYStageLayout):MillGuidedXYStage.MillGuidedXYLayout {

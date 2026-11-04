@@ -413,11 +413,13 @@ class MillXYStageChecks {
       new MillPanel(20, 20, 20),
       F.translation(0, l.yServiceRear + 20, l.yScrewZ - 10)
     );
-    var extractionAudit = MillXYStageIntegrity.check(axis, extractionBlocked);
+    var clearService = machinekit.assembly.AssemblyIntegrity.service(MillFramePreview.concept(reference, frame));
+    check(clearService.errors().length == 0, "rear motor withdrawal is clear: " + [for (e in clearService.errors()) e.message].join("; "));
+    var extractionAudit = machinekit.assembly.AssemblyIntegrity.service(MillFramePreview.concept(reference, extractionBlocked));
     check(
-      extractionAudit.items.filter(item -> item.subject.indexOf("rear motor extraction/frame/extractionObstruction")
-      >= 0).length > 0,
-      "audit rejects blocked rear motor withdrawal"
+      extractionAudit.errors().filter(item -> item.code == "integrity.service.xyStage/yMotorWithdrawal"
+      && item.message.indexOf("extractionObstruction") >= 0).length > 0,
+      "service check rejects blocked rear motor withdrawal: " + [for (e in extractionAudit.errors()) e.message].join("; ")
     );
     var concept = MillFramePreview.concept(reference, frame), model = new AssemblyModel("mm");
     concept.addTo(model, "");

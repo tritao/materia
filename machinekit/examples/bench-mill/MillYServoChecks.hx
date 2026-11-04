@@ -188,6 +188,9 @@ class MillYServoChecks {
     cache.close();
     Sys.println("Sampled drive motion passed; running full-stroke audit");
     MillXYStageIntegrity.check(stage, frame).throwIfErrors();
+    var service = machinekit.assembly.AssemblyIntegrity.service(MillFramePreview.concept(reference, frame));
+    for (item in service.errors()) Sys.println("service: " + item.code + " " + item.message);
+    service.require();
     Sys.println("Full-stroke XY/XYZ and motor extraction passed");
     var restored = MachineAssembly.decode(stage.encode(), MachineKitComponents.standard());
     restored.validate();
