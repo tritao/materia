@@ -33,6 +33,17 @@
 extern "C" {
 #endif
 
+/**
+ * Public C API conventions: functions returning mk_result report MK_OK on
+ * success and an MK_ERROR_* code on failure. Initialize every structure's
+ * struct_size field to sizeof that structure before passing it in. Counts and
+ * capacities are element counts unless a parameter says otherwise. Outputs
+ * marked MK_OWNED transfer a handle to the caller; release it with the
+ * matching destroy function (or mk_trajectory_destroy for trajectories).
+ * Numeric units follow the caller's joint and path units; durations and speeds
+ * use seconds, while fields ending in _ns use nanoseconds.
+ */
+
 /* ------------------------------------------------------------------------- */
 /* Runtime handles                                                           */
 /* ------------------------------------------------------------------------- */
@@ -395,13 +406,16 @@ MK_API void MK_CALL mk_eaik_destroy(mk_eaik_handle solver);
 MK_API mk_result MK_CALL mk_eaik_forward(mk_eaik_handle solver,
     const double *joints MK_IN_ARRAY(joint_count), uint32_t joint_count,
     mk_analytic_pose *out_pose MK_OUT);
-/** Exact solutions only; least-squares approximations are rejected. */
+/** Return all exact inverse solutions for the target pose, with branch and
+ * singularity metadata. Least-squares approximations are rejected; out_count
+ * reports the number of returned solutions. */
 MK_API mk_result MK_CALL mk_eaik_inverse(mk_eaik_handle solver,
     const mk_analytic_pose *target,
     mk_analytic_solution *out_solutions MK_OUT_ARRAY(solution_capacity),
     uint32_t solution_capacity, uint32_t *out_count MK_OUT);
 
-/** Solve exact branches for one physical configuration, using seed to select equivalent joint angles. */
+/** Return exact inverse solutions for one physical configuration. The seed
+ * chooses equivalent joint angles; out_count reports the returned solutions. */
 MK_API mk_result MK_CALL mk_eaik_inverse_labelled(mk_eaik_handle solver,
     const mk_eaik_configuration *configuration, const mk_analytic_pose *target,
     const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
@@ -426,7 +440,8 @@ MK_API mk_result MK_CALL mk_analytic_cartesian_inverse(const mk_analytic_cartesi
 /** Count first, then allocate exactly enough output. Invalid requests fail before writing. */
 MK_API mk_result MK_CALL mk_orientation_lattice_count(const mk_orientation_lattice *lattice,
     uint32_t *out_count MK_OUT);
-/** Write the target poses and lattice coordinates in deterministic lattice order. */
+/** Sample target poses in deterministic lattice order. sample_capacity is the
+ * number of output records; out_count reports the generated count. */
 MK_API mk_result MK_CALL mk_sample_orientations(const mk_orientation_lattice *lattice,
     const mk_analytic_pose *target, mk_orientation_sample *out_samples MK_OUT_ARRAY(sample_capacity),
     uint32_t sample_capacity, uint32_t *out_count MK_OUT);
@@ -434,7 +449,8 @@ MK_API mk_result MK_CALL mk_sample_orientations(const mk_orientation_lattice *la
  * Infinite planning ranges or a count/index overflow return INVALID_ARGUMENT. */
 MK_API mk_result MK_CALL mk_joint_lift_count(const mk_joint_lift_request *request,
     const double *joints MK_IN_ARRAY(joint_count), uint32_t joint_count, uint32_t *out_count MK_OUT);
-/** Write every in-range periodic lift and its wrap counts. */
+/** Write every in-range periodic lift and its wrap counts in lexicographic
+ * wrap order. lift_capacity counts records, and out_count reports the result. */
 MK_API mk_result MK_CALL mk_enumerate_joint_lifts(const mk_joint_lift_request *request,
     const double *joints MK_IN_ARRAY(joint_count), uint32_t joint_count,
     mk_joint_lift *out_lifts MK_OUT_ARRAY(lift_capacity), uint32_t lift_capacity, uint32_t *out_count MK_OUT);
@@ -454,25 +470,25 @@ MK_API mk_result MK_CALL mk_cartesian_candidate_count(const mk_analytic_cartesia
     const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
     const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     uint32_t *out_count MK_OUT);
-/** Write all legal Cartesian cells, branches and joint lifts as full candidate records. */
+/** Write all legal Cartesian cells, branches and joint lifts as full records.
+ * candidate_capacity counts records; out_count reports the generated count. */
 MK_API mk_result MK_CALL mk_sample_cartesian_candidates(const mk_analytic_cartesian_model *parameters,
     const mk_serial_cell_model *model, const mk_external_lattice *external,
     const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
     const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     mk_lattice_candidate *out_candidates MK_OUT_ARRAY(candidate_capacity), uint32_t candidate_capacity,
     uint32_t *out_count MK_OUT);
-/** Compact sampling outputs are candidate-major, preserving full-record order.
- * Joint and wrap rows have joint_count entries. Coordinate rows contain external
- * cells followed by roll, tilt, azimuth, branch and singular bits. Lengths must
- * exactly match candidate_count times their respective row dimensions. */
-/** Generate all legal cells/branches/lifts once; no truncation or pruning. */
+/** Generate all legal EAIK cells, branches and lifts once, without truncation
+ * or pruning. out_count is the number retained in the owned batch; destroy
+ * that batch after its last read. */
 MK_API mk_result MK_CALL mk_create_eaik_candidate_batch(mk_eaik_handle solver,
     const mk_eaik_configuration *configuration, const mk_serial_cell_model *model,
     const mk_external_lattice *external, const mk_orientation_lattice *orientation,
     const mk_joint_lift_request *limits, const mk_analytic_pose *target,
     const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     mk_candidate_batch_handle *out_batch MK_OUT MK_OWNED, uint32_t *out_count MK_OUT);
-/** Generate and retain the complete Cartesian candidate set for compact reads. */
+/** Generate and retain every legal Cartesian candidate for later compact
+ * reads. out_count reports the batch size; the caller owns out_batch. */
 MK_API mk_result MK_CALL mk_create_cartesian_candidate_batch(const mk_analytic_cartesian_model *parameters,
     const mk_serial_cell_model *model, const mk_external_lattice *external,
     const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
@@ -480,7 +496,11 @@ MK_API mk_result MK_CALL mk_create_cartesian_candidate_batch(const mk_analytic_c
     mk_candidate_batch_handle *out_batch MK_OUT MK_OWNED, uint32_t *out_count MK_OUT);
 /** Release a retained candidate batch. */
 MK_API void MK_CALL mk_candidate_batch_destroy(mk_candidate_batch_handle batch);
-/** Exact compact dimensions are required. The read is reusable and thread-safe. */
+/** Copy a batch into candidate-major arrays, preserving full-record order.
+ * Each joint and wrap row has joint_count entries. Coordinate rows contain
+ * external cells, roll, tilt, azimuth, branch and singular metadata. The two
+ * supplied array lengths must exactly match the batch dimensions. The batch
+ * remains reusable, and concurrent reads are safe. */
 MK_API mk_result MK_CALL mk_read_candidate_batch(mk_candidate_batch_handle batch,
     double *out_joints MK_OUT_ARRAY(joint_value_count),
     int32_t *out_wraps MK_OUT_ARRAY(joint_value_count), uint32_t joint_value_count,
@@ -494,7 +514,8 @@ MK_API mk_result MK_CALL mk_eaik_candidate_count(mk_eaik_handle solver,
     const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
     const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     uint32_t *out_count MK_OUT);
-/** Write all legal EAIK candidates as full records. */
+/** Write all legal EAIK candidates as full records. candidate_capacity counts
+ * records; out_count reports the generated count. */
 MK_API mk_result MK_CALL mk_sample_eaik_candidates(mk_eaik_handle solver,
     const mk_eaik_configuration *configuration,
     const mk_serial_cell_model *model, const mk_external_lattice *external,
@@ -502,7 +523,9 @@ MK_API mk_result MK_CALL mk_sample_eaik_candidates(mk_eaik_handle solver,
     const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     mk_lattice_candidate *out_candidates MK_OUT_ARRAY(candidate_capacity), uint32_t candidate_capacity,
     uint32_t *out_count MK_OUT);
-/** Write EAIK candidates into candidate-major joint, wrap and coordinate arrays. */
+/** Write EAIK candidates into candidate-major joint, wrap and coordinate
+ * arrays. Array lengths must match the candidate count and row dimensions
+ * described for mk_read_candidate_batch. */
 MK_API mk_result MK_CALL mk_sample_eaik_candidates_compact(mk_eaik_handle solver,
     const mk_eaik_configuration *configuration,
     const mk_serial_cell_model *model, const mk_external_lattice *external,
@@ -510,7 +533,9 @@ MK_API mk_result MK_CALL mk_sample_eaik_candidates_compact(mk_eaik_handle solver
     const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     double *out_joints MK_OUT_ARRAY(joint_value_count), int32_t *out_wraps MK_OUT_ARRAY(joint_value_count), uint32_t joint_value_count,
     uint32_t *out_coordinates MK_OUT_ARRAY(coordinate_count), uint32_t coordinate_count, uint32_t *out_count MK_OUT);
-/** Write Cartesian candidates into candidate-major joint, wrap and coordinate arrays. */
+/** Write Cartesian candidates into candidate-major joint, wrap and coordinate
+ * arrays. Array lengths must match the candidate count and row dimensions
+ * described for mk_read_candidate_batch. */
 MK_API mk_result MK_CALL mk_sample_cartesian_candidates_compact(const mk_analytic_cartesian_model *parameters,
     const mk_serial_cell_model *model, const mk_external_lattice *external,
     const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
@@ -522,8 +547,10 @@ MK_API mk_result MK_CALL mk_sample_cartesian_candidates_compact(const mk_analyti
 /* Path differential                                                         */
 /* ------------------------------------------------------------------------- */
 
-/** Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected. */
-/** Jacobians are 6 x joint_count, row-major; J' is dJ/ds. */
+/** Solve J q' = task velocity and J q'' = task acceleration - J' q'.
+ * Jacobians are 6 x joint_count, row-major; J' is dJ/ds. A disconnected
+ * solve returns MK_ERROR_GENERATION with a sample-distance diagnostic in
+ * out_report. */
 MK_API mk_result MK_CALL mk_path_differential(const mk_differential_request *request,
     const double *jacobian MK_IN_ARRAY(jacobian_count),
     const double *jacobian_prime MK_IN_ARRAY(jacobian_count), uint32_t jacobian_count,
@@ -564,7 +591,9 @@ MK_API mk_result MK_CALL mk_search_ladder_compact_filtered(const mk_ladder_reque
     const mk_ladder_edge *blocked_edges MK_IN_ARRAY(blocked_edge_count), uint32_t blocked_edge_count,
     uint32_t *out_indices MK_OUT_ARRAY(sample_count), mk_ladder_result *out_result MK_OUT);
 
-/** Choose one candidate per sample and write the selected joint sequence or failure diagnostic. */
+/** Choose one candidate per sample from the sample-addressed candidate slices.
+ * Write the selected joint sequence on success; report a failed sample and
+ * diagnostic in the output sequence when no complete path can be selected. */
 MK_API mk_result MK_CALL mk_select_configurations(const mk_configuration_request *request,
     const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
     const mk_configuration_candidate *candidates MK_IN_ARRAY(candidate_count), uint32_t candidate_count,
@@ -574,12 +603,14 @@ MK_API mk_result MK_CALL mk_select_configurations(const mk_configuration_request
 /* Paths and time laws                                                       */
 /* ------------------------------------------------------------------------- */
 
-/** Copy ordered joint path samples into an owned path handle. */
+/** Copy ordered joint path samples into an owned path handle. The caller may
+ * release or reuse the input array after this call. */
 MK_API mk_result MK_CALL mk_path_create(const mk_path_sample *samples MK_IN_ARRAY(sample_count),
     uint32_t sample_count, mk_path_handle *out_path MK_OUT MK_OWNED);
 /** Release a path handle. */
 MK_API void MK_CALL mk_path_destroy(mk_path_handle path);
-/** Copy ordered polynomial time stages into an owned time-law handle. */
+/** Copy ordered polynomial time stages into an owned time-law handle. The
+ * caller may release or reuse the input array after this call. */
 MK_API mk_result MK_CALL mk_time_law_create(const mk_time_stage *stages MK_IN_ARRAY(stage_count),
     uint32_t stage_count, mk_time_law_handle *out_law MK_OUT MK_OWNED);
 /** Release a time-law handle. */
@@ -599,10 +630,13 @@ MK_API mk_result MK_CALL mk_path_times_to_distances(mk_time_law_handle law,
 /** Return the number of recorded limiting constraints on a time law. */
 MK_API mk_result MK_CALL mk_time_law_binding_count(mk_time_law_handle law,
     uint32_t *out_count MK_OUT);
-/** Read one recorded binding by zero-based index. */
+/** Read one recorded binding by zero-based index. Use
+ * mk_time_law_binding_count to obtain the valid index range. */
 MK_API mk_result MK_CALL mk_time_law_get_binding(mk_time_law_handle law,
     uint32_t index, mk_timing_binding *out_binding);
-/** Quintic Hermite lowering, with adaptive knots and exact polynomial-deviation extrema. */
+/** Lower a path and time law to a new owned trajectory using quintic Hermite
+ * pieces. Adaptive knots and exact polynomial-deviation extrema enforce the
+ * requested tolerance. */
 MK_API mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
     double tolerance, mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
 
