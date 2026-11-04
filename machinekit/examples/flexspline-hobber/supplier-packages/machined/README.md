@@ -24,15 +24,17 @@ Python 3 with numpy, and Chrome or Chromium on the PATH for the PDFs; `pdftotext
 | Part | Process | Stock |
 |---|---|---|
 | `HOBBER-GE-X-carriage` | milled, 2 setups, fine | block |
-| `HOBBER-GE-Z-saddle` | milled, 2 setups, fine | block |
+| `HOBBER-GE-Z-saddle` | milled, 2 setups, fine (pocket, bore and 16 screw holes for the eRob 110, R1) | block |
 | `HOBBER-GE-X-drive-fixed/-floating` | ground flat bar, 15 mm, holes | 80 x 15 |
-| `HOBBER-GE-Z-drive-fixed/-floating` | ground flat bar, 40 mm, holes | 80 x 40 |
+| `HOBBER-GE-Z-drive-fixed/-floating` | ground flat bar, 40 mm, holes (the floating one also has an 11 x 8 mm relief notch and a 14 x 6 mm top-corner cut where the eRob housing is near) | 80 x 40 |
 | `HOBBER-GE-Y-drive-fixed/-floating` | milled L bracket, 1 setup, fine | block |
 | `HOBBER-GE-Y-nut-seat` | ground flat bar, 20 mm | 60 x 20 |
 | `HOBBER-GE-X-scale-seat`, `HOBBER-GE-Z-scale-seat` | ground flat bar, 10 x 20, 2 tapped M8 | 20 x 10 |
 | `HOBBER-GE-Z-scale-arm` | milled arm for the Z scale head, 1 setup, fine | block |
 | `HOBBER-GE-Y-saddle` | milled, 2 setups, fine (boss for the Y scale head) | block |
-| `HOBBER-GE-swivel-plate` | milled, 1 setup, fine (Y scale housing seat) | plate |
+| `HOBBER-GE-swivel-plate` | ground plate, 15 mm, sawn to size, holes (Y scale housing seat, 8 adapter-ring screws) | plate 15 |
+| `HOBBER-GE-swivel-adapter` | turned ring, 2 setups, fine, aluminium (output flange to swivel plate) | bar |
+| `HOBBER-GE-spindle-seat` | milled split-clamp block for the Ø80 g6 cartridge, 2 setups, tight | block |
 | `NUT-BLOCK-...` (X, Y, Z) | ground flat bar, 16 mm, bore, holes | 60 x 16 |
 
 Quantities are one per machine. The list is the exporter's `DESIGNS` plus one nut block per axis; a new route on a

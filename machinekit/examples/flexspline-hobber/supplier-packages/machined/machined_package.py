@@ -99,6 +99,9 @@ def stock_cut(part, widths):
         raise Check(f"{part['id']}: no side equals the stock thickness {t}")
     rest = list(dims)
     rest.remove(match[0])
+    if stock.get("kind") == "plate":
+        # Ground plate: sawn to the part's two other sides; there is no standard width.
+        return {"width": min(rest), "thickness": t, "length": max(rest), "row": stock["id"], "plate": True}
     candidates = [(w, l) for w, l in ((rest[0], rest[1]), (rest[1], rest[0])) if any(abs(w - s) < 1e-6 for s in widths)]
     if not candidates:
         raise Check(f"{part['id']}: neither {rest} is a standard bar width")
@@ -518,7 +521,7 @@ def sheet_html(part):
     ]
     if route["kind"] == "GroundStock":
         c = part["stockCut"]
-        data_rows.append(("Stock", f"{route['stock']['id']}: ground flat bar {fmt(c['width'])} x {fmt(c['thickness'])}, cut to {fmt(c['length'])}"))
+        data_rows.append(("Stock", f"{route['stock']['id']}: ground {'plate' if c.get('plate') else 'flat bar'} {fmt(c['width'])} x {fmt(c['thickness'])}, cut to {fmt(c['length'])}"))
     else:
         data_rows.append(("Stock", f"block ≥ {' x '.join(fmt(d) for d in part['rawBlock'])} (indicative)"))
     data_rows += [
@@ -640,7 +643,7 @@ def rfq(data, directory):
         r = p["route"]
         if r["kind"] == "GroundStock":
             c = p["stockCut"]
-            stock = f"{p['material']}; ground flat bar {fmt(c['width'])} x {fmt(c['thickness'])} cut to {fmt(c['length'])}"
+            stock = f"{p['material']}; ground {'plate' if c.get('plate') else 'flat bar'} {fmt(c['width'])} x {fmt(c['thickness'])} cut to {fmt(c['length'])}"
         else:
             stock = f"{p['material']}; block ≥ {' x '.join(fmt(d) for d in p['rawBlock'])}"
         holes = {}
