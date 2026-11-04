@@ -181,8 +181,8 @@ class AssemblyIntegrity {
   final interfaces = new Map<String, Float>();
   final ids:Array<String> = [];
   final bodyOf = new Map<String, String>();
-  /** Bodies a revolute or continuous joint turns relative to their parent. */
-  final turning = new Map<String, Bool>();
+  /** Bodies a revolute or continuous joint turns relative to their parent, to the parent's body. */
+  final turning = new Map<String, Map<String, Bool>>();
 
   function new(assembly:MachineAssembly, options:IntegrityOptions) {
     this.assembly = assembly;
@@ -210,8 +210,10 @@ class AssemblyIntegrity {
     for (body in AssemblyBodies.of(definition)) for (id in body.occurrences) bodyOf.set(id, body.id);
     for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree
       && (joint.type == AssemblyJointType.Continuous || joint.type == AssemblyJointType.Revolute)) {
-      var body = bodyOf.get(joint.child);
-      if (body != null) turning.set(body, true);
+      var body = bodyOf.get(joint.child), parent = bodyOf.get(joint.parent);
+      if (body == null || parent == null) continue;
+      if (!turning.exists(body)) turning.set(body, new Map());
+      turning.get(body).set(parent, true);
     }
     for (record in flat.transmissions) switch record.source {
       case LeadScrew(screw, nut):
@@ -461,10 +463,15 @@ class AssemblyIntegrity {
       || (Std.isOfType(second, machinekit.motion.LinearRail) && Std.isOfType(first, machinekit.motion.LinearRailBlock));
   }
 
-  /** `bearing` carries a journal and `other` is in a body that turns: the shaft runs in its bearing. */
+  /**
+	 * `bearing` carries a journal and `other` is in a body that turns relative to the bearing's own body: the shaft runs in its
+	 * bearing. A turning body next to some other part with bearings (another axis's motor) is still a rubbing contact.
+	 */
   function journalAgainst(bearing:String, other:String):Bool {
-    var body = bodyOf.get(other);
-    return flat.member(bearing).carriesJournal() && body != null && turning.exists(body);
+    if (!flat.member(bearing).carriesJournal()) return false;
+    var body = bodyOf.get(other), host = bodyOf.get(bearing);
+    var parents = body == null ? null : turning.get(body);
+    return parents != null && host != null && parents.exists(host);
   }
 
   static function describe(sample:Map<String, Float>):String {

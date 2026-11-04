@@ -35,13 +35,19 @@ A review of `HobberSaddle` and `FlexsplineHobber` found:
   (±7/±15″), brake, 48 V bus. CAD: `build/suppliers/zeroerr/` (git-ignored).
 - **Scales:** Yuheng JFT-40 (slim, sealed, absolute, BiSS-C): X ML 120 ±3 µm, Z ML 270 ±5 µm, Y ML 70 ±5 µm,
   read by the controller. Datasheets: `build/suppliers/yuheng/` (git-ignored).
-- **Spindle:** bought Ø80 cartridge, flange-mount version preferred, with the maker's outboard support.
+- **Spindle:** bought Ø80 g6 cartridge with the maker's outboard support. No standard flange-mount Ø80 cartridge was
+  found (R0), so the seat is one milled split-clamp block for the Ø80 housing; ask the spindle maker for a flange anyway.
+- **Y:** two rails + SFU1605 screw with the standard bracket and a nut block (R0). Bought KK modules rejected: the
+  shortest KK86 is 440 mm long (210 stroke for a 30 mm need) on a 230 mm head, +5.7 kg on the eRob, stiffness
+  unpublished; KK60 cannot take the 400 W servo.
+- **X carriage:** one milled steel part, 20 mm deck with 25 mm ribs, U open at the front (H1: a front bar meets the Y
+  guides at A ±15°; a thicker deck needs the X rails lower).
 
 ## Open
 
-- Y as a bought linear module (KK60/KK86 type) or rails + screw (R0).
-- ~~Whether a front cross-bar can close the X carriage's open U (H1).~~ Yes: a 20 mm front bar (x 60-80) clears the table, chip tray, mandrel and cup and the loading corridor; see the log.
 - eRob output bearing moment rating and brake holding torque (asked from ZeroErr).
+- Servo voltage class: the ELM2H is a 220 V motor, the rack is 400 V; the model uses an assumed winding (R4).
+- Thicker X carriage deck: needs the X rails 10-20 mm lower on the bed inserts (user decision; today 20 mm + ribs).
 
 ## Phase L: MachineKit library
 
@@ -82,7 +88,7 @@ A review of `HobberSaddle` and `FlexsplineHobber` found:
 
 ## Phase R: head redesign (after ZeroErr replies)
 
-- **R0.** Y module check: KK60/KK86 moment rating, length and stiffness against the head load.
+- **R0.** ~~Y module check~~ done: rails + screw (see Decisions).
 - **R1.** eRob swivel: housing seated on the Z saddle, swivel plate on the output flange; torque motor,
   crossed roller and clamp removed.
 - **R2.** Head: swivel plate (ground or milled with rail shoulder), Y as module or rails + drive, spindle seat
@@ -125,4 +131,4 @@ main at the end of each phase.
 - 2026-11-04: H6 done: Y drive frame replaced by two milled L brackets (wall 10, bridge 5 mm over the Y saddle's top, foot 15 mm on the swivel plate edge, 89 and 56 mm long: contact above 625 mm2) and a nut-seat bar on the saddle edge (42 x 60 over the 12 mm edge); the old Y nut bracket is off the saddle; running clearance to the moving saddle verified by the sweep. The rear spindle cradle was not changed (spindle cartridge is open, R2).
 - 2026-11-04: H7 done: `HobberAssemblyProcedures` (presentation procedures per axis: fit supports loose, run to both ends, tighten, ream and pin; rails against an edge); validated against the machine in `HobberFrameChecks`.
 - 2026-11-04: checks run on hobber-frames: `haxeon.json` (default mechanical checks, now with `HobberFrameChecks.run`: procedures, 400 W sizing, strict rest-state integrity) 2078 assertions pass; `installation` pass (5888); `layout-metrics` thrust margins X 863 / Y 896 / Z 499 N (moving 171.6 / 17.5 / 43.7 kg; X was 128 kg in the older report); strict integrity with the full 28-state sweep at a 2 mm running gap (`haxeon.frames.json integrity sweep`): one finding left on a non-open member set, spindle/motor against the bed casting 1.79 mm at X min, Y -10, Z -10, A +15 deg (spindle cartridge, R2). Overtravel (+-5 mm beyond the limits) is not in the integrity sweep; the X reserve-travel checks (10 mm) and the Z saddle gaps in `HobberZDriveChecks` cover it. `z-drive-checks` fails before reaching the drive assertions, on the "125 mm casting backing behind the drive insert" check and, past that, on the report's `column.body.materialBoxes()` ("Unsupported non-box anchor material"): both are the column casting's own geometry, which H1-H7 do not touch, so the Z drive assertions in that file (coupling clearance, saddle gaps at overtravel, race margin, thread sign) were not executed against the new Z drive; the default run's `HobberDesignChecks` and the strict sweep cover the same geometry. Not done: H4 (sealed scales; the tapes left with the old frames), `HobberInterferenceChecks` not reduced, the Y drive's sweep margin at overtravel.
-
+- 2026-11-04: R0 recorded: Y stays rails + screw; spindle seat is a milled split clamp (see Decisions). H branch rebased on main 4e1c9d8df; journal exemption narrowed to a body turning relative to the bearing's own body.
