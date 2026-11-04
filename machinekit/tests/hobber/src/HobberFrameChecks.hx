@@ -19,11 +19,16 @@ class HobberFrameChecks {
   }
 
   /**
-   * Members whose strict-integrity findings are known and belong to other work, not to the frames or drives: the spindle
-   * cartridge (replaced by the bought one in R2), the electrical rack's mount on the lifting seat and the chip tray's resting
-   * seat. A finding on any other member fails the check, so the frames, drives, guides, casting and anchors stay covered.
+   * The members whose strict-integrity findings are open, with the reason for each. A finding on any other member fails the check, so the
+   * frames, drives, guides, casting and anchors stay covered.
+   * - `spindle/`: the cartridge's rotating group is not supported by its bearings in the model (the B joint's shaft stands 9.5 mm from the
+   *   housing, the motor shaft does not reach it; coupling and arbor hang from it. The motor and encoder mates were fixed: the motor now bolts to
+   *   the adapter, the encoder to the motor), and its servo comes within 1.8 mm of the bed casting at X 45, Y -10, Z -10, A +15 deg
+   *   (a clearance to settle with the real cartridge from the maker).
+   * - `electricalPanel`: the rack (panel, supplies, drivers, BiSS master) mounts on the bed's lifting seat, which its mate does not reach.
+   * - `chipTray`: the tray rests on the table plate's seat, which its mate does not reach.
    */
-  static final OPEN_MEMBERS = ["spindle/", "electricalPanel", "powerSupply", "-driver", "chipTray"];
+  static final OPEN_MEMBERS = ["spindle/", "electricalPanel", "chipTray"];
 
   /** Integrity errors that do not touch an open member (see `OPEN_MEMBERS`). */
   public static function newErrors(machine:FlexsplineHobber, sweep:Bool):Array<String> {

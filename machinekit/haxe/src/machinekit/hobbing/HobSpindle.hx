@@ -50,13 +50,14 @@ class HobSpindle extends MachineAssembly {
     addComponent("housing", new SpindleHousing());
     attach("motorAdapter", new HobSpindlePart("motorAdapter"), 0);
     addComponent("motor", this.motor);
-    addMemberConnector("housing", "motorSeat", Solids.axial(0, 0, MOTOR_FACE));
-    addMate("motor-mount", Fixed, "housing", "motorSeat", "motor", "mountFace");
+    // The servo bolts to the adapter's rear flange (the adapter is on the housing), not to the housing itself.
+    addMemberConnector("motorAdapter", "motorSeat", Solids.axial(0, 0, MOTOR_FACE));
+    addMate("motor-mount", Fixed, "motorAdapter", "motorSeat", "motor", "mountFace");
     attach("frontBearing", frontBearing, 146);
     addComponent("encoder", encoder);
-    addMemberConnector("housing", "encoderSeat", materia.assembly.AssemblyFrames.alongY(0, 0,
-      MOTOR_FACE - face.bodyLength, 0, 0, -1));
-    addMate("encoder-mount", Fixed, "housing", "encoderSeat", "encoder", "mount");
+    // The encoder sits on the motor's rear face.
+    addMemberConnector("motor", "encoderSeat", materia.assembly.AssemblyFrames.alongY(0, 0, -face.bodyLength, 0, 0, -1));
+    addMate("encoder-mount", Fixed, "motor", "encoderSeat", "encoder", "mount");
     addComponent("rearBearing", rearBearing);
     addMemberConnector("housing", "rearBearingSeat", materia.assembly.AssemblyFrames.alongY(0, 0, 146, 0, 0, -1));
     addMate("rearBearing-mount", Fixed, "housing", "rearBearingSeat", "rearBearing", "mount");
