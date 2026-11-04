@@ -212,7 +212,7 @@ class HobberDesignChecks {
           "bed/") || StringTools.startsWith(m.id, "railX") || StringTools.startsWith(
             m.id,
             "table/"
-          ) || m.id == "XdriveFixed" || m.id == "XdriveFloating" || m.id == "Xfixed" || m.id == "Xfloating" || m.id == "Xscrew") {
+          ) || m.id == "XdrivePad" || m.id == "Xfixed" || m.id == "Xfloating" || m.id == "Xscrew") {
           var overlap = cache.overlap(tray, trayPose, m.component, poses.get(m.id));
           count++;
           if (overlap

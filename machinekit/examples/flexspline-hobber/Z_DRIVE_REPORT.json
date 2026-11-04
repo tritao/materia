@@ -509,7 +509,7 @@
     "coordinateBasis": "Work-frame coordinates at X mechanism zero"
   },
   "after": {
-    "assertions": 42,
+    "assertions": 37,
     "castingBackingMm": 125,
     "columnCastingKg": 72.65469880904504,
     "columnCells": [
@@ -727,7 +727,7 @@
     "motorTopZMm": 910,
     "nutCentreAtZeroZMm": 418,
     "scope": "Geometry, mechanical travel and thread sign only; structural stiffness and brake performance unqualified.",
-    "screwBehindGuideMm": 14.999999999999943,
+    "screwBehindGuideMm": 14.999999999999773,
     "screwLateralOffsetMm": 80.9999999999999,
     "screwLengthMm": 420,
     "shaftBottomZMm": 310,

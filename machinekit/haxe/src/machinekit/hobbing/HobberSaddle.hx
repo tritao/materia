@@ -20,10 +20,8 @@ class HobberSaddle extends MachineComponent {
       [
         "GE-X-carriage",
         "GE-Z-saddle",
-        "GE-X-drive-fixed",
-        "GE-X-drive-floating",
-        "GE-Z-drive-fixed",
-        "GE-Z-drive-floating",
+        "GE-X-drive-pad",
+        "GE-Z-drive-pad",
         "GE-Y-drive-fixed",
         "GE-Y-drive-floating",
         "GE-Y-nut-seat",
@@ -78,7 +76,7 @@ class HobberSaddle extends MachineComponent {
       addFacet(route);
       addFacet(route.intent());
     }
-    if (["GE-X-carriage", "GE-Z-saddle", "GE-X-drive-fixed", "GE-X-drive-floating", "GE-Z-drive-fixed", "GE-Z-drive-floating",
+    if (["GE-X-carriage", "GE-Z-saddle", "GE-X-drive-pad", "GE-Z-drive-pad",
       "GE-Y-saddle", "GE-Y-drive-fixed", "GE-Y-drive-floating", "GE-Y-nut-seat", "GE-X-scale-seat", "GE-Z-scale-seat", "GE-Z-scale-arm"].indexOf(design) >= 0) {
       var parts = pieces();
       try {
@@ -286,21 +284,29 @@ class HobberSaddle extends MachineComponent {
     return withHoles(Solids.cut(block, cuts), seatHoles(false));
   }
 
-  /**
-   * The Z floating pad, with the A axis housing's envelope cut out of it: the housing (Ø110 body, Ø85 rear boss and connectors) swept over the Z
-   * travel and grown by the running gap (`HobberZOffset.relief`). The pad's seat holes keep 1 mm from that relief (the screw offset is derived so they do).
-   */
-  static function zFloatingPad():Part {
-    var relief = HobberZOffset.relief(), pad = padBox(HobberDrives.padBounds(HobberDrives.z(), "floating", PAD_WIDTH, 40));
-    var cut = Solids.cut(pad, [relief]);
-    relief.close();
-    return cut;
+  /** The seat holes of both supports on the one pad, ids numbered per support (F for the fixed support, B for the floating one). */
+  static function padRouteHoles(axis:HobberDriveAxis):Array<machinekit.component.ManufacturingRoute.RouteHole> {
+    var result = [];
+    for (support in ["fixed", "floating"]) for (h in HobberDrives.seatRouteHoles(axis, support)) {
+      h.id = (support == "fixed" ? "F" : "B") + h.id;
+      result.push(h);
+    }
+    return result;
   }
 
-  /** A fixed pad: its box with the mount's flange relief and the seat holes. */
-  static function fixedPad(axis:HobberDriveAxis, thickness:Float):Part {
-    var relieved = Solids.cut(padBox(HobberDrives.padBounds(axis, "fixed", PAD_WIDTH, thickness)), [padBox(HobberDrives.mountRelief(axis))]);
-    return withSeatHoles(relieved, axis, "fixed");
+  /**
+   * The ground bar under both screw supports of an axis: one box over the fixed support's mount-flange relief and both supports'
+   * seat holes; the Z one is also cut by the A actuator's housing envelope swept over Z.
+   */
+  static function drivePad(axis:HobberDriveAxis, thickness:Float, housingRelief:Bool):Part {
+    var cutters = [padBox(HobberDrives.mountRelief(axis))];
+    if (housingRelief) cutters.push(HobberZOffset.padRelief());
+    var groove = HobberDrives.nutGroove(axis);
+    if (groove != null) cutters.push(padBox(groove));
+    var relieved = Solids.cut(padBox(HobberDrives.padBoundsBoth(axis, PAD_WIDTH, thickness)), cutters);
+    for (c in cutters) c.close();
+    var fixed = Solids.cut(relieved, [for (h in HobberDrives.seatHoles(axis, "fixed")) holeTool(h.position, h.direction, h.diameter, h.depth)]);
+    return withSeatHoles(fixed, axis, "floating");
   }
 
   /** How each made design is produced; null for the designs that are not part of the moving structure. */
@@ -318,12 +324,14 @@ class HobberSaddle extends MachineComponent {
           {name: "block faces, back", tolerance: 0.02, roughnessRa: 1.6},
           {name: "eRob seat: output bore, front face web and pocket", tolerance: 0.05, roughnessRa: 1.6}
         ], 350);
-      case "GE-X-drive-fixed" | "GE-X-drive-floating":
-        bar(15, [{name: "seat holes", tolerance: 0.1, roughnessRa: null}]);
-      case "GE-Z-drive-fixed":
-        bar(40, [{name: "seat holes", tolerance: 0.1, roughnessRa: null}]);
-      case "GE-Z-drive-floating":
-        bar(40, [{name: "seat holes", tolerance: 0.1, roughnessRa: null}, {name: "relief for the A housing envelope (swept over Z, 2 mm gap)", tolerance: 0.5, roughnessRa: null}]);
+      case "GE-X-drive-pad":
+        // One bar under both supports: the grinding makes both seats coplanar, and it stays the re-grindable height spacer.
+        bar(15, [{name: "seat plane under both supports (ground together)", tolerance: 0.01, roughnessRa: 1.6}, {name: "seat holes", tolerance: 0.1, roughnessRa: null},
+          {name: "groove for the nut block's travel (block + 2.5 mm each way)", tolerance: 0.5, roughnessRa: null}]);
+      case "GE-Z-drive-pad":
+        bar(40, [{name: "seat plane under both supports (ground together)", tolerance: 0.01, roughnessRa: 1.6}, {name: "seat holes", tolerance: 0.1, roughnessRa: null},
+          {name: "groove for the nut block's travel (block + 2.5 mm each way)", tolerance: 0.5, roughnessRa: null},
+          {name: "relief for the A housing envelope (swept over Z, 2.5 mm gap)", tolerance: 0.5, roughnessRa: null}]);
       case "GE-Y-drive-fixed" | "GE-Y-drive-floating":
         ManufacturingRoute.milled(1, "fine", [{name: "seat face, bolts and dowels", tolerance: 0.05, roughnessRa: 3.2}], 160);
       case "GE-Y-nut-seat":
@@ -378,10 +386,8 @@ class HobberSaddle extends MachineComponent {
       case "GE-X-scale-seat": HobberScales.seatHoles(HobberScales.x(), 8);
       case "GE-Z-scale-seat": HobberScales.seatHoles(HobberScales.z(), 8);
       case "GE-Z-scale-arm": headHoles(HobberScales.z(), HobberScales.Z_ARM_THICKNESS, Z_SADDLE_ORIGIN_Z);
-      case "GE-X-drive-fixed": HobberDrives.seatRouteHoles(HobberDrives.x(), "fixed");
-      case "GE-X-drive-floating": HobberDrives.seatRouteHoles(HobberDrives.x(), "floating");
-      case "GE-Z-drive-fixed": HobberDrives.seatRouteHoles(HobberDrives.z(), "fixed");
-      case "GE-Z-drive-floating": HobberDrives.seatRouteHoles(HobberDrives.z(), "floating");
+      case "GE-X-drive-pad": padRouteHoles(HobberDrives.x());
+      case "GE-Z-drive-pad": padRouteHoles(HobberDrives.z());
       case "GE-Y-drive-fixed": HobberDrives.seatRouteHoles(HobberDrives.y(), "fixed");
       case "GE-Y-drive-floating": HobberDrives.seatRouteHoles(HobberDrives.y(), "floating");
       default: [];
@@ -450,14 +456,10 @@ class HobberSaddle extends MachineComponent {
           withHoles(box(45, 57, 90, SEAT_Y1, SEAT_LOW + 2, 95), seatHoles(true)),
           withHoles(Solids.cut(box(-45, 57, -115, -85, -45, 45), [box(-30, 30, -115.1, -84.9, -30, 30)]), yHoles)
         ];
-      case "GE-X-drive-fixed":
-        [fixedPad(HobberDrives.x(), 15)];
-      case "GE-X-drive-floating":
-        [withSeatHoles(padBox(HobberDrives.padBounds(HobberDrives.x(), "floating", PAD_WIDTH, 15)), HobberDrives.x(), "floating")];
-      case "GE-Z-drive-fixed":
-        [fixedPad(HobberDrives.z(), 40)];
-      case "GE-Z-drive-floating":
-        [withSeatHoles(zFloatingPad(), HobberDrives.z(), "floating")];
+      case "GE-X-drive-pad":
+        [drivePad(HobberDrives.x(), 15, false)];
+      case "GE-Z-drive-pad":
+        [drivePad(HobberDrives.z(), 40, true)];
       case "GE-Y-drive-fixed" | "GE-Y-drive-floating":
         // An L bracket milled in one setup: the 10 mm wall carrying the support (seat plane x 45), a 10 mm bridge 5 mm over the Y
         // saddle's top edge (z 458) and a foot that bolts to the swivel plate's top edge (x 85-100). The floating one stops 2 mm
@@ -482,7 +484,7 @@ class HobberSaddle extends MachineComponent {
         // clearance and 2 mm sheet. The lower skirt covers the full table height.
         var lip = parameterNumber("tableFaceDiameter") / 2 + 5;
         var skirt = Math.max(parameterNumber("tableHousingDiameter") / 2 + 15, lip + 5);
-        var top = parameterNumber("tableFaceHeight") - 3, bottom = parameterNumber("tableSeatHeight") + 2;
+        var top = parameterNumber("tableFaceHeight") - 3, bottom = parameterNumber("tableSeatHeight");
         var shoulder = Math.max(bottom + 5, top - 61);
         var front = FoundationLayout.WORK_WELL_CENTRE_X
           - FoundationLayout.WORK_WELL_WIDTH / 2 + FoundationLayout.CHIP_TRAY_WELL_CLEARANCE_MM;

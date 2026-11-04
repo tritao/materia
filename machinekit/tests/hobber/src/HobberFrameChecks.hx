@@ -21,14 +21,16 @@ class HobberFrameChecks {
   /**
    * The members whose strict-integrity findings are open, with the reason for each. A finding on any other member fails the check, so the
    * frames, drives, guides, casting and anchors stay covered.
-   * - `spindle/`: the cartridge's rotating group is not supported by its bearings in the model (the B joint's shaft stands 9.5 mm from the
-   *   housing, the motor shaft does not reach it; coupling and arbor hang from it. The motor and encoder mates were fixed: the motor now bolts to
-   *   the adapter, the encoder to the motor), and its servo comes within 1.8 mm of the bed casting at X 45, Y -10, Z -10, A +15 deg
-   *   (a clearance to settle with the real cartridge from the maker).
-   * - `electricalPanel`: the rack (panel, supplies, drivers, BiSS master) mounts on the bed's lifting seat, which its mate does not reach.
-   * - `chipTray`: the tray rests on the table plate's seat, which its mate does not reach.
+   * - `spindle/motor`: the servo's bottom edge passes 1.79 mm (running gap 2 mm) above the bed casting's end beam top at X 45, Y -10, Z -10,
+   *   A +15 deg. It is the Z travel's lower end, not the tilt or the servo's clocking (a square 80 flange has four equivalent clockings): the
+   *   servo's bottom stands 1.8 mm above the beam end at Z -10. The fix is a choice: a 1 mm relief in the bed beam's end top (casting
+   *   change), or the Z lower limit at -9.8 (travel change); see FRAME_PLAN.
    */
-  static final OPEN_MEMBERS = ["spindle/", "electricalPanel", "chipTray"];
+  /** Assumed guide pitch/yaw error over the travel, arcseconds (no measurement yet): sets the uncompensated Abbe error printed by `scales`. */
+  static inline final GUIDE_ANGLE_ERROR_ARCSEC = 5.0;
+  static inline final GUIDE_ANGLE_ERROR_RAD = GUIDE_ANGLE_ERROR_ARCSEC * Math.PI / 648000;
+
+  static final OPEN_MEMBERS = ["spindle/motor"];
 
   /** Integrity errors that do not touch an open member (see `OPEN_MEMBERS`). */
   public static function newErrors(machine:FlexsplineHobber, sweep:Bool):Array<String> {
@@ -72,7 +74,7 @@ class HobberFrameChecks {
       var low = Math.min(from, to), high = Math.max(from, to), start = a.housing.startOffset(), end = start + a.housing.measuringLength;
       var names = ["x", "y", "z"], parts = [for (i in 0...3) if (Math.abs(u[i]) < 0.5) '${names[i]} ${Math.round(Math.abs(across[i]) * 10) / 10}'];
       var total = Math.sqrt(across[0] * across[0] + across[1] * across[1] + across[2] * across[2]);
-      var line = '${a.id} scale ${a.housing.designation}: Abbe offset ${parts.join(", ")} mm (${Math.round(total * 10) / 10} mm), head ' +
+      var line = '${a.id} scale ${a.housing.designation}: Abbe offset ${parts.join(", ")} mm (${Math.round(total * 10) / 10} mm), uncompensated Abbe error ${Math.round(total * GUIDE_ANGLE_ERROR_RAD * 1e4) / 10} um at an assumed ${GUIDE_ANGLE_ERROR_ARCSEC}" guide angular error (assumed; compensated by the tilt table, see the compensate-tilt procedures), head ' +
         'window ${Math.round(low * 10) / 10}..${Math.round(high * 10) / 10} of ${Math.round(start * 10) / 10}..${Math.round(end * 10) / 10}';
       lines.push(line);
       if (low < start - 1e-6 || high > end + 1e-6) throw "scale head leaves its measuring window: " + line;
@@ -229,6 +231,31 @@ class HobberFrameChecks {
     return lines;
   }
 
+  /** Where the spindle servo comes closest to the bed casting at the worst sweep state: bounds of the casting inside the servo's box grown by 3 mm. */
+  public static function motorGap(machine:FlexsplineHobber):Array<String> {
+    var model = new cadkit.modeling.AssemblyModel("mm");
+    machine.addTo(model, "");
+    var state = model.initialState();
+    state.setJoint("X", machine.travel.filter(t -> t.id == "X")[0].lower);
+    state.setJoint("Y", -10);
+    state.setJoint("Z", -10);
+    state.setJoint("swivel/A", 0.2617);
+    state.forwardKinematics();
+    var cache = new machinekit.assembly.PosedParts(), members = machine.components();
+    function posed(id:String) return cache.posed(members.filter(m -> m.id == id)[0].component, state.worldPose(id));
+    var motor = posed("spindle/motor"), casting = posed("bed/casting"), lines = [];
+    var b = machinekit.assembly.PosedParts.boxOf(motor);
+    lines.push('motor box x ${b.minX}..${b.maxX} y ${b.minY}..${b.maxY} z ${b.minZ}..${b.maxZ}; distance to bed casting ${motor.distance(casting)}');
+    var g = 3.0, grown = cadkit.modeling.Part.box(b.maxX - b.minX + 2 * g, b.maxY - b.minY + 2 * g, b.maxZ - b.minZ + 2 * g, cadkit.modeling.Align.Center, cadkit.modeling.Align.Center, cadkit.modeling.Align.Center);
+    var placed = machinekit.assembly.PosedParts.moved(grown, F.translation((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, (b.minZ + b.maxZ) / 2));
+    var near = placed.intersect(casting);
+    if (near.volume() < 1e-6) { lines.push('no casting inside the grown box'); cache.close(); return lines; }
+    var c = machinekit.assembly.PosedParts.boxOf(near);
+    lines.push('casting inside the grown box: ${near.volume()} mm3, x ${c.minX}..${c.maxX} y ${c.minY}..${c.maxY} z ${c.minZ}..${c.maxZ}');
+    cache.close();
+    return lines;
+  }
+
   /** Procedures, drive sizing and strict integrity of the assembled machine; returns the number of checks. */
   public static function run(machine:FlexsplineHobber, sweep:Bool = false):Int {
     var presentation = materia.presentation.Presentations.assembled(machine.definition(), -1.1, 0.35, "hobber");
@@ -299,6 +326,7 @@ class HobberFrameChecks {
       roundTrip(machine);
       Sys.println("round trip ok");
     }
+    if (args.indexOf("motorgap") >= 0) for (line in motorGap(machine)) Sys.println(line);
     if (args.indexOf("integrity") >= 0) {
       var errors = integrity(machine, args.indexOf("sweep") >= 0);
       var counts = new Map<String, Int>();

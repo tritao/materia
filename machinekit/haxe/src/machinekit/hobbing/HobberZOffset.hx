@@ -46,6 +46,8 @@ typedef ZOffsetResult = {
 class HobberZOffset {
   /** The running gap the housing keeps from every fixed or moving part of the drive, mm. */
   public static inline final RUNNING_GAP = 2.0;
+  /** Extra cut on the pad bar's relief and nut groove beyond the running gap, mm. */
+  public static inline final PAD_RELIEF_MARGIN = 0.5;
   /** The side of the housing the screw stands on: +1 is +y. */
   public static inline final SIDE = 1.0;
   /** The offset is rounded up to a whole millimetre. */
@@ -103,6 +105,15 @@ class HobberZOffset {
   public static function relief():Part {
     var s = HobberScales.stroke("Z");
     return envelope(s.lower, s.upper, RUNNING_GAP);
+  }
+
+  /**
+   * The relief cut in the pad bar: the same envelope with `PAD_RELIEF_MARGIN` more, so that the machined edge, which comes out at the
+   * running gap to within the cut's tolerance, never lands under it.
+   */
+  public static function padRelief():Part {
+    var s = HobberScales.stroke("Z");
+    return envelope(s.lower, s.upper, RUNNING_GAP + PAD_RELIEF_MARGIN);
   }
 
   static function derive():ZOffsetResult {

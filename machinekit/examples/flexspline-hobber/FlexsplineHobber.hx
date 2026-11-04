@@ -338,7 +338,10 @@ class FlexsplineHobber extends MachineAssembly {
       100,
       15000
     );
-    fixAt("electricalPanel", new HobberSaddle("electrical-panel"), HobberElectricalLayout.panelPose(), "bed/liftLeft");
+    // The rack is a free-standing floor unit with its own base plate on the floor, not part of the machine's structure (it was
+    // mated to the bed's lifting seat 650 mm away); the wiring to the machine is by ports, not by a mate.
+    addComponent("electricalPanel", new HobberSaddle("electrical-panel"), HobberElectricalLayout.panelPose());
+    zero.set("electricalPanel", HobberElectricalLayout.panelPose());
     fixAt("powerSupply", supply, HobberElectricalLayout.devicePose(0, 130), "electricalPanel");
     exposePort("mains", "powerSupply", "mains");
     // The 48 V bus for the A actuator, from the same mains: it takes back what the actuator regenerates in a brake chopper and resistor.
@@ -347,17 +350,17 @@ class FlexsplineHobber extends MachineAssembly {
     exposePort("mains48", "supply48", "mains");
     // The three sealed scales are read by a BiSS-C master module of the controller.
     fixAt("bissMaster", new BissMaster(4), HobberElectricalLayout.devicePose(110, 700), "electricalPanel");
-    // Drive seats: pads under the two supports of X and Z (the nut block travels between them), brackets on the swivel plate for Y.
+    // Drive seats: one ground bar under both supports of X and Z (the nut block travels above it; grinding makes both seats coplanar and
+    // it stays the re-grindable height spacer), two brackets on the swivel plate for Y.
     var xDrive = HobberDrives.x(), yDrive = HobberDrives.y(), zDrive = HobberDrives.z();
+    var xb = HobberDrives.padBoundsBoth(xDrive, HobberDrives.PAD_WIDTH, 15), zb = HobberDrives.padBoundsBoth(zDrive, HobberDrives.PAD_WIDTH, 40);
+    fixAt("XdrivePad", new HobberSaddle("GE-X-drive-pad"), F.identity(), "bed/driveSeat", F.alongY((xb[0] + xb[3]) / 2, 0, 140, 0, 0, 1));
+    precisionMounts.push({name: "XdrivePad-mount", parent: "bed/driveSeat"});
+    fixAt("ZdrivePad", new HobberSaddle("GE-Z-drive-pad"), F.identity(), "column/driveSeat",
+      F.alongY(HobberZLayout.SEAT_FACE_X, 0, (zb[2] + zb[5]) / 2, -1, 0, 0));
+    precisionMounts.push({name: "ZdrivePad-mount", parent: "column/driveSeat"});
     for (support in ["fixed", "floating"]) {
       var name = support == "fixed" ? "Fixed" : "Floating";
-      var xb = HobberDrives.padBounds(xDrive, support, 80, 15), zb = HobberDrives.padBounds(zDrive, support, 80, 40);
-      fixAt("Xdrive" + name, new HobberSaddle("GE-X-drive-" + support), F.identity(), "bed/driveSeat",
-        F.alongY((xb[0] + xb[3]) / 2, 0, 140, 0, 0, 1));
-      precisionMounts.push({name: "Xdrive" + name + "-mount", parent: "bed/driveSeat"});
-      fixAt("Zdrive" + name, new HobberSaddle("GE-Z-drive-" + support), F.identity(), "column/driveSeat",
-        F.alongY(HobberZLayout.SEAT_FACE_X, 0, (zb[2] + zb[5]) / 2, -1, 0, 0));
-      precisionMounts.push({name: "Zdrive" + name + "-mount", parent: "column/driveSeat"});
       var yHoles = HobberDrives.seatHoles(yDrive, support), yLo = 1e9, yHi = -1e9;
       for (h in yHoles) {
         yLo = Math.min(yLo, h.position[1]);
@@ -367,8 +370,8 @@ class FlexsplineHobber extends MachineAssembly {
         F.alongY(92.5, support == "fixed" ? (yLo + yHi) / 2 : -85, 458, 0, 0, 1));
     }
     fixAt("YnutSeat", new HobberSaddle("GE-Y-nut-seat"), F.identity(), "Yplate", F.alongY(60, -10, 458, 0, 0, 1));
-    drive(xDrive, "XdriveFixed", "XdriveFloating", "Xbridge");
-    drive(zDrive, "ZdriveFixed", "ZdriveFloating", "Zplate");
+    drive(xDrive, "XdrivePad", "XdrivePad", "Xbridge");
+    drive(zDrive, "ZdrivePad", "ZdrivePad", "Zplate");
     drive(yDrive, "YdriveFixed", "YdriveFloating", "YnutSeat");
     // Sealed scales (FRAME_PLAN H4): X on a ground bar on the bed beam, Z on a bar on the column channel's wall with its head on
     // an arm from the Z saddle, Y on the swivel plate with its head on a boss of the Y saddle.

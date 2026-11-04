@@ -169,6 +169,48 @@ class HobberDrives {
    * The box of a pad under one support: the holes' bounds plus `margin` along the plane, `width` across the screw
    * and `thickness` down from the seat plane, as {x0, x1, y0, y1, z0, z1}.
    */
+  /** The one bar under both supports of an axis: the two supports' pad boxes joined (same seat plane, same width), mm. */
+  public static function padBoundsBoth(d:HobberDriveAxis, width:Float, thickness:Float, margin:Float = 18):Array<Float> {
+    var a = padBounds(d, "fixed", width, thickness, margin), b = padBounds(d, "floating", width, thickness, margin);
+    return [for (i in 0...6) i < 3 ? Math.min(a[i], b[i]) : Math.max(a[i], b[i])];
+  }
+
+  /**
+   * The groove in the pad bar for the nut block's travel, as a box (the six bounds of `padBounds`), or null when the block's lower end
+   * stays above the seat plane by `gap`. The block hangs from the carriage and reaches past the screw axis by the flange radius plus its
+   * edge, farther than the supports' seat plane is below the axis, so the bar under the nut's path is cut `gap` deeper than the block,
+   * as wide as the block plus `gap` each side, between the two supports' holes (`margin` clear of them).
+   */
+  public static function nutGroove(d:HobberDriveAxis, gap:Float = 2.5, margin:Float = 8):Null<Array<Float>> {
+    var block = nutBlock(d, new machinekit.motion.BallNut());
+    var holes = seatHoles(d, "fixed").concat(seatHoles(d, "floating"));
+    var n = d.axis.normal, a = d.axis.direction, s = d.axis.start, ni = -1, ai = -1;
+    for (i in 0...3) {
+      if (Math.abs(n[i]) > 0.5) ni = i;
+      if (Math.abs(a[i]) > 0.5) ai = i;
+    }
+    var ci = 3 - ni - ai, plane = 1e9;
+    for (h in holes) plane = Math.min(plane, h.position[ni]);
+    var reach = block.length - block.centreHeight, height = Math.abs(s[ni] - plane);
+    if (reach + gap <= height) return null;
+    var depth = reach - height + gap, along = [for (h in holes) h.position[ai]];
+    along.sort((x, y) -> x < y ? -1 : x > y ? 1 : 0);
+    var lo = along[0], hi = along[0], best = 0.0;
+    for (k in 1...along.length) if (along[k] - along[k - 1] > best) {
+      best = along[k] - along[k - 1];
+      lo = along[k - 1];
+      hi = along[k];
+    }
+    var result = [0.0, 0, 0, 0, 0, 0];
+    result[ni] = n[ni] > 0 ? plane - depth : plane - 1;
+    result[ni + 3] = n[ni] > 0 ? plane + 1 : plane + depth;
+    result[ci] = s[ci] - block.width / 2 - gap;
+    result[ci + 3] = s[ci] + block.width / 2 + gap;
+    result[ai] = lo + margin;
+    result[ai + 3] = hi - margin;
+    return result;
+  }
+
   public static function padBounds(d:HobberDriveAxis, support:String, width:Float, thickness:Float, margin:Float = 18):Array<Float> {
     var holes = seatHoles(d, support), lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
     for (h in holes) for (i in 0...3) {
