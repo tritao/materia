@@ -74,9 +74,11 @@ and empty verified-field lists.
   stop land Ø58.65, sleeve max(16, face + 8) from the seat and top 2 mm above the sleeve.
   The expansion is a capacity, not a solved deformation or hydraulic circuit. Other cup bores
   require another recipe size.
-- `SwivelHead extends MachineAssembly`: direct servo, crossed-roller support, housing,
-  moving head and clamp. A is ±45°, with 15°/s rated and 30°/s maximum speed.
-  The static 100 N m clamp rating remains separate from the drive's joint effort.
+- `ErobActuator` (`machinekit.motion`, ZeroErr eRob110I V6 rev D, ratio 100, brake, 20-bit output encoder, 48 V bus) is the A axis in the
+  machine: housing in a pocket of the Z saddle, output flange on a turned adapter ring and the ground swivel plate; A is ±15°. Its bearing
+  moment rating and brake holding torque are not published (asked of ZeroErr); the model assumes the brake holds the rated output torque
+  and an A acceleration of π/2 rad/s². `SwivelHead` (direct torque motor, crossed-roller support, clamp, ±45°) remains in the library
+  but the hobber no longer uses it.
 - `MineralCastBed`: 930 × 800 × 800 mm monolithic ribbed casting, with steel rail seats,
   a table plate and used drive seat as child parts. Levelling uses three side-access cast pockets with removable steel plates, not embedded foot anchors; lifting hardware is deferred.
 - `MineralCastColumn`: 400 × 200 × 500 mm ribbed casting and separate steel base,
@@ -133,16 +135,13 @@ Full workspace/native builds and heavy suites use the repository heavy-run wrapp
 Y shifts along the tilted hob axis, Z feeds along the vertical work axis, A tilts
 about the negative world X direction, and B/C rotate the hob/table independently.
 The package-preserving IDs are `X`, `Y`, `Z`, `swivel/A`, `spindle/B`, `table/C`.
-B has process-velocity ownership, C has a position servo, and A has a spring-applied
-100 N m static clamp with release/feedback channels. Electronic gearing and the
+B has process-velocity ownership, C has a position servo, and A holds with the eRob's own brake (release and feedback channels `swivel.brakeRelease/Released`). Electronic gearing and the
 program that releases/reapplies A remain HB7 work; there is no B/C mechanical coupling.
 
-Three ground SFU1605 ball-screw/nut drives carry 400 W X/Y and 750 W Z servos, fixed/floating supports,
-couplings and separate rotating shafts. The lead and support critical speed enter
-the existing transmission resolver. Linear scales provide 10,000 counts/mm
-(0.1 micrometre resolution). Six 20 A phase-RMS drives share an assumed 400 V
-three-phase rectifier/bus; explicit winding ratings are checked by the existing
-motor/driver power model. Ratings, fixtures and travel are design assumptions.
+Three ground SFU1605 ball-screw/nut drives (`SupportedScrewDrive`: HZMotion M60D-BK12-C mount, BF12, Leadshine ELM2H-0400 400 W servo on each axis, braked on Z, steel nut blocks) carry the axes with couplings and separate rotating shafts. The lead and support critical speed enter
+the existing transmission resolver. Sealed absolute Yuheng JFT-40 scales (BiSS-C, read by the controller's BiSS master; X ML 120, Y ML 70, Z ML 220) close the position loops. The
+servos share an assumed 400 V three-phase bus; the A actuator and its brake run from a 48 V supply with a regeneration resistor. The Leadshine
+winding ratings a driver needs are assumed (`LeadshineServo.driven`) and checked by the motor/driver power model. Ratings, fixtures and travel are design assumptions.
 The screws use the supplier's standard ends (51 mm BK12 fixed end, 11 mm BF12 floating end; BF12 centre 7 mm
 from the tip, BK12 centre 38.5 mm from the end). Lengths: X 260 mm, Z 420 mm, Y 170 mm (Y travels only
 +-10 mm; `HobberYLayout`).
@@ -173,9 +172,9 @@ case checks project loading, source-derived axis limits and a coarse physical Mu
 
 ## Redesigned machine structure
 
-The example uses registered `HobberSaddle` recipes for the X carriage, vertical
-Z saddle, vertical swivel and Y plates, three drive support frames and electrical rack.
-The old overhead A-yoke, Y-saddle, X-bridge and Z-saddle recipes are retired.
+The example uses registered `HobberSaddle` recipes: the milled X carriage and Z saddle, the ground swivel plate, adapter ring, Y saddle, the
+spindle split-clamp seat, ground bar drive pads, Y brackets and nut seat, scale seat bars and arm, and the electrical rack. Every made one has a
+`ManufacturingRoute` (see `supplier-packages/machined/`). The old overhead A-yoke, Y-saddle, X-bridge and Z-saddle recipes are retired.
 These extend `MachineComponent` directly. Designed steel weldments remain assumed;
 physical contacts, connected solids and recipe/pose round trips are checked.
 See [MACHINE_DESIGN.md](MACHINE_DESIGN.md) for datums, load paths and qualification scope.

@@ -7,6 +7,23 @@ Turning belongs to the separate lathe plan. This checked design is not a release
 manufacturing drawing set: stiffness, guide preload, fits and drive friction
 remain assumed inputs.
 
+## Current frames, drives and head (FRAME_PLAN.md, 2026-11-04)
+
+This section is the current state; the sections below keep their history and are corrected where a figure changed. All of it is
+model, not released manufacturing, and every assumption is listed in [FRAME_PLAN.md](FRAME_PLAN.md) (Decisions, Open).
+
+- **Frames, no welding:** the X carriage is one milled steel part (20 mm deck, 25 mm ribs, open U); the Z saddle one milled plate
+  with the eRob pocket and the nut block bolts; ground steel bar pads carry the X and Z screw supports; the Y drive stands on two milled
+  L brackets and a nut seat bar; the swivel plate is ground plate, the adapter ring turned aluminium; the Ø80 spindle cartridge is held
+  by one milled split-clamp seat (clamping length assumed, `SpindleHousing.CLAMP_FROM..CLAMP_TO`). Each has a `ManufacturingRoute`;
+  `supplier-packages/machined/` holds their STEP, drawings and RFQ table.
+- **Drives:** SFU1605 screws (X 260, Y 170, Z 420 mm), HZMotion M60D-BK12-C mount with BF12, Leadshine ELM2H-0400 servo on each axis, Z with its built-in
+  brake (holding torque assumed 2 × rated), steel nut blocks.
+- **Scales:** Yuheng JFT-40 sealed absolute BiSS-C scales, X ML 120, Y ML 70, Z ML 220, with the Abbe offset of each printed by `HobberFrameChecks.scales`.
+- **A axis:** ZeroErr eRob110I (ratio 100, brake, ±15°) on the Z saddle; output bearing moment rating and brake holding torque are unknown or assumed.
+- **Electrical:** one 48 V supply with a regeneration resistor and a BiSS master on the controller; the A axis has its own amplifier.
+- **Masses (this model, `layout-metrics`, regenerated into [LAYOUT_REPORT.json](LAYOUT_REPORT.json)):** moving X 176.1 kg, Y 23.4 kg, Z 46.5 kg; whole machine 1512 kg (835.6 kg base casting). The table below and the HB-D11 sections keep the 2026-10 figures (135 / 14 / 41 kg, 1133 kg) as history.
+
 ## Coordinates and load path
 
 `MACHINE_FROM_WORK` is an explicit +90° rotation about C and a 637 mm floor-height translation. Work-frame radial X
@@ -36,13 +53,9 @@ Its table seat, two column rail seats, drive seat and lifting points use shared
 Precision mounts land on inserts, never on mineral cast. The recessed column is
 400 × 200 × 500 mm, on a steel carriage and twin preloaded HGR25 bed rails.
 Z uses twin 480 mm HGR15 rails with four blocks. Its vertical saddle carries
-a 25 mm deep swivel housing on its front face. A 180 × 150 × 16 mm crossed-roller
-bearing surrounds an assumed 150 × 80 × 20 mm torque motor; a 200 × 180 × 10 mm
-clamp shares the outer radial bay. The rotating output and vertical swivel plate
-carry twin 220 mm Y rails on their front face, with four blocks and 120 mm
-vertical separation. The spindle and floating outboard bracket share the vertical
-Y saddle. An open C bracket supports the rear spindle housing; there is no
-overhead roof. These compact motor and bearing dimensions and ratings require
+a ZeroErr eRob110I actuator, its housing in a pocket cut into the saddle from behind. The rotating output and vertical swivel plate
+carry the Y rails on their front face with four blocks. The spindle (in its split-clamp seat) and floating outboard bracket share the vertical
+Y saddle; there is no overhead roof. These compact motor and bearing dimensions and ratings require
 supplier confirmation; geometry checks do not establish a thermal duty rating.
 All twelve carriages use pinned HGH25CA (X) or HGH15CA (Z/Y) supplier CAD,
 including wraparound sides and lubrication fittings. X uses matching supplier-derived
@@ -153,9 +166,9 @@ Procurement requirements for position feedback. None is selected or commissioned
 
 | Axis | Feedback | Requirement | Status |
 |---|---|---|---|
-| X | Sealed absolute linear scale, ML ≈ 140 mm | ±3 µm/m, ≤ 0.1 µm, BiSS-C, slim, air purge | RFQ drafted (Changchun Yuheng JFT series) |
-| Z | Same, ML ≈ 240 mm | ±5 µm/m; spur parts, so scale error barely reaches the gear | same RFQ |
-| Y | Same, ML ≈ 70 mm | ±5–10 µm/m; same model as Z for spares | same RFQ |
+| X | Sealed absolute linear scale, JFT-40 ML 120 | ±3 µm/m, ≤ 0.1 µm, BiSS-C, slim, air purge | RFQ drafted (Changchun Yuheng JFT series) |
+| Z | Same, JFT-40 ML 220 (stroke 200 + 2 × 5 mm overtravel) | ±5 µm/m; spur parts, so scale error barely reaches the gear | same RFQ |
+| Y | Same, JFT-40 ML 70 | ±5–10 µm/m; same model as Z for spares | same RFQ |
 | C | Table's own angle encoder | Purchased table, ±5″ positioning / ±2″ repeatability; protocol must match the C drive | uncommissioned |
 | B | Spindle servo's own absolute encoder (master) | ≥ 2¹⁶ counts/rev (model 2¹⁷), up to 4000 rpm, deterministic latching and low, fixed latency | with drive selection |
 | X/Y/Z/A motors | Servo motor encoders | Standard | with drive selection |
@@ -541,12 +554,19 @@ by exact repartition, preserving every cavity and the CAD volume; no geometry or
 metrology tolerance is relaxed.
 
 
-## Centered recessed Z drive
+## Offset Z drive
 
-The former Z screw at transverse Y=-250 mm and its high side nut arm are removed.
-The ground SFU1605 screw now lies at Y=0 between the Z guides at Y=±145 mm,
-19 mm behind their radial plane (screw X=180 mm, guides X=161 mm). Head frames,
-guide-to-hob offsets and Z=-10..190 mm travel stay unchanged.
+The ground SFU1605 screw lies 19 mm behind the Z guides' radial plane (screw X=176 mm after the 25 mm BK12 shaft height
+in front of the 40 mm ground pads at the column's seat) but is no longer at Y=0: the eRob housing of the A axis (Ø110, rear boss and
+connectors, 88 mm deep) stands behind the Z saddle there. The offset is derived, not typed (`HobberZOffset`): the least |Y| at which the
+BK12 mount, the BF12 support, the ball nut and its block keep 2 mm from the housing swept over the Z travel (BF12 governs: 81 mm), on the
+side of the Z moving mass's centre of mass (+Y: the head and its spindle seat lie at Y 70..222), within the casting's limit (the drive seat insert
+must keep 10 mm of casting between it and the lifting lands: |Y| + half the insert width at most 120 mm; the seat holes need 37.5 mm
+each side, so at most 82.5 mm). Fails with the numbers if no Y satisfies both. The floating pad is cut by the housing's swept
+envelope grown by the 2 mm gap; the column's head recess on that side, the insert width and position follow from the same offset
+(`FoundationLayout`), and the Z scale stands on the other channel wall. `HobberFrameChecks.zOffsetMoments` prints the yaw moment the offset
+thrust and the weight put on the four Z blocks against the block row's rating. See [FRAME_PLAN.md](FRAME_PLAN.md).
+Head frames, guide-to-hob offsets and Z=-10..190 mm travel stay unchanged.
 
 The 420 mm screw points down from work Z=730 to 310 mm. Its fixed bearing is
 at the top (691.5 mm), floating bearing below (317 mm, 7 mm from the screw tip: BF12 6000ZZ bearing 8 mm wide against the shoulder of the standard 11 mm floating end, ring on the tip side; `HzMotionDrawingScrew.BF12_SUPPORT_CENTRE`), and 750 W motor above
@@ -559,13 +579,11 @@ fixed bearing, loading that screw segment in tension. The normal positive-Z
 command still raises the head; an actual-pose/right-hand-thread regression
 verifies the transmission sign.
 
-A short 20 mm-thick nut shelf on the Z saddle replaces the long side arm. The
-bearing pads and motor platform connect to a vertical backplate, bolted to one
-central ground steel casting insert. A retained rear casting spine provides
-125 mm of full backing behind that insert, continuous to the column sole. The
-linear scale sits beside the screw, at Y=70 mm. The motor platform has a milled
-40 × 40 mm R3 coupling service window, with 2.9 mm minimum coupling clearance.
-Motor mounting/centering and nut fastener details remain assumed pending the
+The nut is a steel nut block bolted to the Z saddle's back face. The BK12 mount (M60D-BK12-C, 400 W braked servo) and the BF12 stand on
+ground steel bar pads (40 mm) against one ground steel insert in the column's drive seat, whose width and position are derived
+from the offset. The rear casting spine keeps its full backing behind that insert (`z-drive-checks` asserts 125 mm). The Z scale
+stands on the channel wall opposite the drive. The motor platform's 40 × 40 mm R3 coupling window is no longer part of the model;
+the coupling clears the pads by at least 2 mm. Motor mounting/centering and nut fastener details remain assumed pending the
 selected hardware drawings; this is a layout, not a manufacturing release.
 
 Checks cover 5 mm of reserve beyond both soft stops: minimum nut/race margin

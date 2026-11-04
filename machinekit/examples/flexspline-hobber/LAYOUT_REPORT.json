@@ -1,5 +1,5 @@
 {
-  "basis": "CAD volumes and declared material densities; assumed compact swivel ratings and structural adequacy, not measured machine accuracy",
+  "basis": "CAD volumes and declared material densities; assumed eRob110I moment rating and brake holding torque, assumed structural adequacy, not measured machine accuracy. 'after' regenerated 2026-11-04 (layout-metrics) on the frames/drives/eRob model; other sections are historic",
   "before": {
     "guideToHobMm": {
       "X": 346.99999999999994,
@@ -16,35 +16,379 @@
   },
   "after": {
     "collisionShapes": {
-      "authoredPlusDefaultTotal": 750,
+      "authoredPlusDefaultTotal": 1505,
       "parts": [
         {
           "part": "bed/casting",
-          "hulls": 170
+          "hulls": 1
+        },
+        {
+          "part": "bed/enclosureSeat00",
+          "hulls": 1
+        },
+        {
+          "part": "bed/anchor-e6d79ce8891950d4a1a2-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-bf8f8ab867ea8fd668a3-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/enclosureSeat02",
+          "hulls": 1
+        },
+        {
+          "part": "bed/anchor-083dad872f7d333ecca7-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-459015658c9a14391359-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/enclosureSeat20",
+          "hulls": 1
+        },
+        {
+          "part": "bed/anchor-3d13da68c197ca0903f4-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-ff1f9cfe2b57ed670cb3-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/enclosureSeat22",
+          "hulls": 1
+        },
+        {
+          "part": "bed/anchor-bb917e22c9a04c9e8994-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-5d11df9eef8db81ea75e-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/trayClampSeat0",
+          "hulls": 1
+        },
+        {
+          "part": "bed/trayClampSeat1",
+          "hulls": 1
+        },
+        {
+          "part": "bed/trayClampSeat2",
+          "hulls": 1
+        },
+        {
+          "part": "bed/trayClampSeat3",
+          "hulls": 1
+        },
+        {
+          "part": "bed/trayClampSeat4",
+          "hulls": 1
+        },
+        {
+          "part": "bed/trayClampSeat5",
+          "hulls": 1
+        },
+        {
+          "part": "bed/trayClampSeat6",
+          "hulls": 1
+        },
+        {
+          "part": "bed/trayClampSeat7",
+          "hulls": 1
+        },
+        {
+          "part": "bed/trayClampSeat8",
+          "hulls": 1
+        },
+        {
+          "part": "bed/trayClampSeat9",
+          "hulls": 1
+        },
+        {
+          "part": "bed/trayClampSeat10",
+          "hulls": 1
+        },
+        {
+          "part": "bed/trayClampSeat11",
+          "hulls": 1
         },
         {
           "part": "bed/tablePlate",
           "hulls": 1
         },
         {
+          "part": "bed/anchor-cd8fcb4770718ea1452b-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-8e2132ded0da2597bb48-bolt",
+          "hulls": 3
+        },
+        {
           "part": "bed/railLeft",
           "hulls": 1
+        },
+        {
+          "part": "bed/anchor-be8d018992033b6ec88f-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-b7bc8cb93d2e5c0f8a4c-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-8325901dc1569498e659-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-7f26c3ca7defa6a4a325-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-a7fb1f8cfb4c9d841b9f-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-06a9d09e5b4cb39ca9a0-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-54c526c60baab7f9d01d-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-d577cc620bcc7823a7ec-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-1bf1ad702a94546bce76-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-4f620cd1d23a0203e52b-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-7cb08b4de6b9ba2d60e3-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-9a2c0727a0fe80059e62-bolt",
+          "hulls": 3
         },
         {
           "part": "bed/railRight",
           "hulls": 1
         },
         {
+          "part": "bed/anchor-d78f2ce12b870dfb1b78-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-0ba5d8e130d2e43bf59e-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-7024ea96836736f402a3-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-04e45f3524ea0f3709f4-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-22fdf0f37642b7e2a4c9-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-c11823cbbe8025b4982b-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-20e994fc70e16489d32b-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-ca4e88888bfb1722c60a-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-dbab56cdd3e99269abc1-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-2ba1e88aedbfd362826a-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-c050dafa7ef914b2db2b-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-80ae895c818372cf6f32-bolt",
+          "hulls": 3
+        },
+        {
           "part": "bed/driveSeat",
           "hulls": 1
+        },
+        {
+          "part": "bed/anchor-90988280ddca04c4acb6-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-6475e2308a7456850b1a-bolt",
+          "hulls": 3
         },
         {
           "part": "bed/liftLeft",
           "hulls": 1
         },
         {
+          "part": "bed/anchor-b80ce33046799d3b69d5-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-e0b2ffa110f368473171-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-231a4e0fe8ab10ea9cd3-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-cedb6cedc8fb612bd3b4-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-b4f694a90cffde87ad25-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-68c8e3ffbd23d174b2de-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-3ddca38746fca1ff9d0e-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-ee9e7c7dd241e05b2af7-bolt",
+          "hulls": 3
+        },
+        {
           "part": "bed/liftRight",
           "hulls": 1
+        },
+        {
+          "part": "bed/anchor-a0274655369d70b85197-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-2f3a35d8837c9d700196-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-8785dac20e8519ee4a96-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-a79bef80ffc4115e9dc9-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-a7bef1012ee1e3ab873b-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-44f409d94c0905315f4d-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-8e762f74bd83174825b6-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-60f74fc4a8340d2e907f-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/liftAdditional1",
+          "hulls": 1
+        },
+        {
+          "part": "bed/anchor-2dc15884c140c5186535-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-321247c6fb2c5bfc78d1-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-efd27181c91fb26de978-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-949823eb3430918c8b9e-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-812a6d8b30d8b3b88490-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-5de52b1752074b7a29ab-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-bd13284084b1a637af8c-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-ad1899f6ec67e208ec56-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/liftAdditional2",
+          "hulls": 1
+        },
+        {
+          "part": "bed/anchor-f8c7b5da4b935feeed5e-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-e593be335b6c37f97257-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-4eae9ccb3afe230d6849-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-7f82651070d59a432634-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-15318969270c3c6822e1-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-78becf4d111dad459721-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-f96c4055a08d9d4a20b1-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "bed/anchor-ca7ff3068581fa18d641-bolt",
+          "hulls": 3
         },
         {
           "part": "footSeat0",
@@ -123,12 +467,12 @@
           "hulls": 1
         },
         {
-          "part": "Xbridge",
-          "hulls": 45
-        },
-        {
           "part": "blockXLeft",
           "hulls": 1
+        },
+        {
+          "part": "Xbridge",
+          "hulls": 119
         },
         {
           "part": "blockXLeftFront",
@@ -144,31 +488,159 @@
         },
         {
           "part": "column/casting",
-          "hulls": 43
+          "hulls": 1
         },
         {
           "part": "column/basePlate",
           "hulls": 1
         },
         {
+          "part": "column/anchor-297d29ec08a4196e572c-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-3f4047cd013e7a5e03d1-bolt",
+          "hulls": 3
+        },
+        {
           "part": "column/railLeft",
           "hulls": 1
+        },
+        {
+          "part": "column/anchor-be8d018992033b6ec88f-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-00dbb4f3a2cfbc930cf9-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-8325901dc1569498e659-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-1bf1ad702a94546bce76-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-f5510dcfd4ba23a73ffc-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-7631923170ac7a08e72c-bolt",
+          "hulls": 3
         },
         {
           "part": "column/railRight",
           "hulls": 1
         },
         {
+          "part": "column/anchor-d78f2ce12b870dfb1b78-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-803e00a2c350ca02805a-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-7024ea96836736f402a3-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-dbab56cdd3e99269abc1-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-5e673a6653ca0f8d531b-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-02633ad647e7165326f8-bolt",
+          "hulls": 3
+        },
+        {
           "part": "column/driveSeat",
           "hulls": 1
+        },
+        {
+          "part": "column/anchor-90988280ddca04c4acb6-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-ca8b0d2fc916895bb238-bolt",
+          "hulls": 3
         },
         {
           "part": "column/liftLeft",
           "hulls": 1
         },
         {
+          "part": "column/anchor-b80ce33046799d3b69d5-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-4d7620dfa6d6df1df6c7-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-231a4e0fe8ab10ea9cd3-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-cedb6cedc8fb612bd3b4-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-b4f694a90cffde87ad25-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-ab475b3de6adee11cadc-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-3ddca38746fca1ff9d0e-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-ee9e7c7dd241e05b2af7-bolt",
+          "hulls": 3
+        },
+        {
           "part": "column/liftRight",
           "hulls": 1
+        },
+        {
+          "part": "column/anchor-a0274655369d70b85197-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-ae137a4fd5afdc14f396-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-8785dac20e8519ee4a96-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-a79bef80ffc4115e9dc9-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-a7bef1012ee1e3ab873b-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-240692ffc45e3b1e0757-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-8e762f74bd83174825b6-bolt",
+          "hulls": 3
+        },
+        {
+          "part": "column/anchor-60f74fc4a8340d2e907f-bolt",
+          "hulls": 3
         },
         {
           "part": "railZLeft",
@@ -179,12 +651,12 @@
           "hulls": 1
         },
         {
-          "part": "Zplate",
-          "hulls": 42
-        },
-        {
           "part": "blockZLeft",
           "hulls": 1
+        },
+        {
+          "part": "Zplate",
+          "hulls": 126
         },
         {
           "part": "blockZLeftUpper",
@@ -203,19 +675,11 @@
           "hulls": 1
         },
         {
-          "part": "swivel/bearing",
+          "part": "swivel/output",
           "hulls": 1
         },
         {
-          "part": "swivel/motor",
-          "hulls": 1
-        },
-        {
-          "part": "swivel/clamp",
-          "hulls": 1
-        },
-        {
-          "part": "swivel/head",
+          "part": "swivelAdapter",
           "hulls": 1
         },
         {
@@ -231,12 +695,12 @@
           "hulls": 1
         },
         {
-          "part": "Yplate",
-          "hulls": 223
-        },
-        {
           "part": "blockYLeft",
           "hulls": 1
+        },
+        {
+          "part": "Yplate",
+          "hulls": 203
         },
         {
           "part": "blockYLeftFront",
@@ -252,6 +716,10 @@
         },
         {
           "part": "spindle/housing",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/motorAdapter",
           "hulls": 1
         },
         {
@@ -271,7 +739,19 @@
           "hulls": 1
         },
         {
+          "part": "spindle/tailBearing",
+          "hulls": 1
+        },
+        {
           "part": "spindle/shaft",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/motorShaft",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/coupling",
           "hulls": 1
         },
         {
@@ -279,8 +759,20 @@
           "hulls": 1
         },
         {
-          "part": "spindle/drawbar",
-          "hulls": 1
+          "part": "spindle/arborScrew1",
+          "hulls": 8
+        },
+        {
+          "part": "spindle/arborScrew2",
+          "hulls": 8
+        },
+        {
+          "part": "spindle/arborScrew3",
+          "hulls": 8
+        },
+        {
+          "part": "spindle/arborScrew4",
+          "hulls": 8
         },
         {
           "part": "spindle/bearingLocknut",
@@ -288,6 +780,42 @@
         },
         {
           "part": "spindle/bearingRetainer",
+          "hulls": 1
+        },
+        {
+          "part": "spindle/glandScrew1",
+          "hulls": 8
+        },
+        {
+          "part": "spindle/adapterScrew1",
+          "hulls": 8
+        },
+        {
+          "part": "spindle/glandScrew2",
+          "hulls": 8
+        },
+        {
+          "part": "spindle/adapterScrew2",
+          "hulls": 8
+        },
+        {
+          "part": "spindle/glandScrew3",
+          "hulls": 8
+        },
+        {
+          "part": "spindle/adapterScrew3",
+          "hulls": 8
+        },
+        {
+          "part": "spindle/glandScrew4",
+          "hulls": 8
+        },
+        {
+          "part": "spindle/adapterScrew4",
+          "hulls": 8
+        },
+        {
+          "part": "spindleSeat",
           "hulls": 1
         },
         {
@@ -311,16 +839,44 @@
           "hulls": 1
         },
         {
-          "part": "XdriveFrame",
-          "hulls": 40
+          "part": "supply48",
+          "hulls": 1
         },
         {
-          "part": "ZdriveFrame",
-          "hulls": 36
+          "part": "bissMaster",
+          "hulls": 1
         },
         {
-          "part": "YdriveFrame",
-          "hulls": 41
+          "part": "XdriveFixed",
+          "hulls": 124
+        },
+        {
+          "part": "ZdriveFixed",
+          "hulls": 1
+        },
+        {
+          "part": "YdriveFixed",
+          "hulls": 126
+        },
+        {
+          "part": "XdriveFloating",
+          "hulls": 65
+        },
+        {
+          "part": "ZdriveFloating",
+          "hulls": 2
+        },
+        {
+          "part": "YdriveFloating",
+          "hulls": 71
+        },
+        {
+          "part": "YnutSeat",
+          "hulls": 1
+        },
+        {
+          "part": "Xfixed",
+          "hulls": 1
         },
         {
           "part": "Xmotor",
@@ -331,15 +887,19 @@
           "hulls": 1
         },
         {
+          "part": "XnutBlock",
+          "hulls": 1
+        },
+        {
           "part": "Xnut",
           "hulls": 1
         },
         {
-          "part": "Xfixed",
+          "part": "Xfloating",
           "hulls": 1
         },
         {
-          "part": "Xfloating",
+          "part": "XfloatingRing",
           "hulls": 1
         },
         {
@@ -351,11 +911,11 @@
           "hulls": 1
         },
         {
-          "part": "Xscale",
+          "part": "Xdrive-driver",
           "hulls": 1
         },
         {
-          "part": "Xdrive-driver",
+          "part": "Zfixed",
           "hulls": 1
         },
         {
@@ -367,15 +927,19 @@
           "hulls": 1
         },
         {
+          "part": "ZnutBlock",
+          "hulls": 1
+        },
+        {
           "part": "Znut",
           "hulls": 1
         },
         {
-          "part": "Zfixed",
+          "part": "Zfloating",
           "hulls": 1
         },
         {
-          "part": "Zfloating",
+          "part": "ZfloatingRing",
           "hulls": 1
         },
         {
@@ -387,11 +951,11 @@
           "hulls": 1
         },
         {
-          "part": "Zscale",
+          "part": "Zdrive-driver",
           "hulls": 1
         },
         {
-          "part": "Zdrive-driver",
+          "part": "Yfixed",
           "hulls": 1
         },
         {
@@ -403,15 +967,19 @@
           "hulls": 1
         },
         {
+          "part": "YnutBlock",
+          "hulls": 1
+        },
+        {
           "part": "Ynut",
           "hulls": 1
         },
         {
-          "part": "Yfixed",
+          "part": "Yfloating",
           "hulls": 1
         },
         {
-          "part": "Yfloating",
+          "part": "YfloatingRing",
           "hulls": 1
         },
         {
@@ -423,11 +991,43 @@
           "hulls": 1
         },
         {
+          "part": "Ydrive-driver",
+          "hulls": 1
+        },
+        {
+          "part": "XscaleSeat",
+          "hulls": 42
+        },
+        {
+          "part": "ZscaleSeat",
+          "hulls": 43
+        },
+        {
+          "part": "ZscaleArm",
+          "hulls": 44
+        },
+        {
+          "part": "Xscale",
+          "hulls": 1
+        },
+        {
+          "part": "XscaleHead",
+          "hulls": 1
+        },
+        {
           "part": "Yscale",
           "hulls": 1
         },
         {
-          "part": "Ydrive-driver",
+          "part": "YscaleHead",
+          "hulls": 1
+        },
+        {
+          "part": "Zscale",
+          "hulls": 1
+        },
+        {
+          "part": "ZscaleHead",
           "hulls": 1
         },
         {
@@ -443,10 +1043,6 @@
           "hulls": 1
         },
         {
-          "part": "swivel-drive-driver",
-          "hulls": 1
-        },
-        {
           "part": "hob-drive-driver",
           "hulls": 1
         }
@@ -455,11 +1051,11 @@
     "installedPoseEnvelopeMm": {
       "radial": 1510,
       "scope": "initial pose including separate electrical rack; CAD envelope bounds",
-      "tangential": 800
+      "tangential": 836
     },
     "headStackMm": {
-      "swivelBearingFrontFace": 114,
-      "swivelOutputFace": 100,
+      "swivelOutputFlangeFace": 124,
+      "swivelPlateBackFace": 100,
       "verticalGuideSeparation": 120,
       "yGuidePlane": 70,
       "zGuidePlane": 161,
@@ -467,29 +1063,29 @@
     },
     "drives": [
       {
-        "thrustMarginN": 884.3712577649027,
+        "thrustMarginN": 861.0030078164991,
         "axis": "X",
-        "movingMassKg": 135.25748447019464,
-        "continuousThrustWith20PercentReserveN": 1152,
-        "designDemandN": 267.6287422350973,
+        "movingMassKg": 176.13184232100735,
+        "continuousThrustWith20PercentReserveN": 1149.0689289770028,
+        "designDemandN": 288.06592116050365,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       },
       {
-        "thrustMarginN": 909.3780888359331,
+        "thrustMarginN": 878.0934611087296,
         "axis": "Y",
-        "movingMassKg": 14.028913051310433,
-        "continuousThrustWith20PercentReserveN": 1152,
-        "designDemandN": 242.62191116406694,
+        "movingMassKg": 23.361427029098824,
+        "continuousThrustWith20PercentReserveN": 1149.0689289770028,
+        "designDemandN": 270.9754678682732,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       },
       {
-        "thrustMarginN": 1534.3480628122572,
+        "thrustMarginN": 470.2492262912547,
         "axis": "Z",
-        "movingMassKg": 41.29876702786476,
-        "continuousThrustWith20PercentReserveN": 2159.9999999999995,
-        "designDemandN": 625.6519371877423,
+        "movingMassKg": 46.45735546329293,
+        "continuousThrustWith20PercentReserveN": 1149.0689289770028,
+        "designDemandN": 678.8197026857481,
         "passed": true,
         "basis": "assumed 0.5 m/s2 acceleration, 100 N process force plus 100 N friction; Z includes full gravity and Y includes gravity at A +/-15 degrees; 5 mm lead and declared nut efficiency"
       }
@@ -500,16 +1096,16 @@
     ],
     "guideToHobMm": {
       "X": 121,
-      "Y": 70.00000000000011,
-      "Z": 161.00000000000006
+      "Y": 70.00000000000013,
+      "Z": 160.99999999999994
     },
     "movingMassKg": {
-      "X": 135.25748447019464,
-      "Y": 14.028913051310433,
-      "Z": 41.29876702786476
+      "X": 176.13184232100735,
+      "Y": 23.361427029098824,
+      "Z": 46.45735546329293
     },
-    "machineMassKg": 1132.8323981654075,
-    "members": 108
+    "machineMassKg": 1512.18366753486,
+    "members": 257
   },
   "open": [
     "Z guide offset 161 mm is 11 mm beyond the approximate 150 mm target; needed for the front-mounted stack.",
@@ -582,11 +1178,11 @@
   "baseAcceptance": {
     "baseCastingKg": 835.5798839999995,
     "baseAssemblyKg": 859.2230419813541,
-    "machineKg": 1132.8323981654075,
+    "machineKg": 1512.18366753486,
     "baseToMovingMassRatio": {
-      "X": 6.177697946054347,
-      "Y": 59.56127042372314,
-      "Z": 20.232562474231344
+      "X": 4.744059183103993,
+      "Y": 35.76750182937058,
+      "Z": 17.98595455266952
     },
     "column": {
       "afterAssemblyKg": 62.00225000000003,

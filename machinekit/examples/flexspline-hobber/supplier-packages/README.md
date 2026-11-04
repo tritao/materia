@@ -36,7 +36,8 @@ threaded length, nut position and flange side, BK12 and BF12 end details, C5, le
 title block) and `ballscrew-X/Y/Z.dxf` (side view 1:1). Lengths (X 260, Y 170, Z 420), nut
 stations and the nut are the model's; end machining is the HZMotion BK12 profile of
 `HzMotionDrawingScrew`; sources are listed at the top of the script. Update the constants
-there if `HobberXLayout`, `HobberZLayout` or the Y drive length change.
+there if `HobberXLayout`, `HobberZLayout` or the Y drive length change. The Z screw's offset across the machine (`HobberZOffset`, derived) is
+not in the drawing; the column casting package follows it.
 
 PDFs need Chrome or Chromium on the PATH.
 
@@ -48,5 +49,9 @@ tolerances, coating, material, inspection) live in the two Python scripts.
 The two mineral castings (base and column) with their cast-in steel inserts have their own
 package in `casting/` (STEP, JSON summary, drawings and checks; see its README).
 
-The milled parts, ground-bar drive pads and nut blocks (every hobber member with a `ManufacturingRoute`) have their
+The milled parts, ground-bar drive pads and nut blocks (every hobber member with a `ManufacturingRoute`: X carriage, Z saddle, swivel plate and adapter ring,
+spindle split-clamp seat, drive pads and brackets, scale bars, nut blocks) have their
 own package in `machined/` (STEP, A4 PDF drawing and DXF per part, `parts.json`, RFQ table and checks; see its README).
+
+What is not in a package: the eRob110I (ZeroErr's own drawing and STEP, `build/suppliers/zeroerr/`), the JFT-40 scales (`build/suppliers/yuheng/`), the bought
+BK12/BF12 supports and servos, and the Ø80 spindle cartridge (maker's drawing awaited; the model's cartridge is an assumed envelope). See `FRAME_PLAN.md`.
