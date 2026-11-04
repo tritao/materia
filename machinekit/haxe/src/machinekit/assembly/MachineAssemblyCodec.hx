@@ -189,7 +189,7 @@ class MachineAssemblyCodec {
       var key = MachineAssembly.definitionKey(id, member.component);
       var candidates = shared.get(key);
       var definition:Null<AssemblyComponentDefinition> = null;
-      if (candidates != null) for (candidate in candidates) if (Equality.equals(candidate.connectors,
+      if (candidates != null) for (candidate in candidates) if (sameConnectors(candidate.connectors,
         connectors) && sameHulls(candidate.collisionHulls, collisionHulls)) definition = candidate;
       if (definition == null) {
         definition = {id: id, connectors: connectors};
@@ -656,6 +656,13 @@ class MachineAssemblyCodec {
       if (nested.couplings != null) nested.couplings.sort((a, b) -> Reflect.compare(a.id, b.id));
       if (nested.exposedConnectors != null) nested.exposedConnectors.sort((a, b) -> Reflect.compare(a.name, b.name));
     }
+  }
+
+  /** Whether two connector lists hold the same connectors, compared one by one (`Equality.equals` compares the lists by reference). */
+  static function sameConnectors(a:Array<materia.assembly.AssemblyRecord.AssemblyConnector>, b:Array<materia.assembly.AssemblyRecord.AssemblyConnector>):Bool {
+    if (a.length != b.length) return false;
+    for (i in 0...a.length) if (!Equality.equals(a[i], b[i])) return false;
+    return true;
   }
 
   /**

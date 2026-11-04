@@ -79,6 +79,7 @@ class AssemblyIntegrityTests {
     racks();
     screws();
     strictChecks();
+    journals();
     Sys.println("assembly integrity: support, interference, sweep and drive checks pass");
   }
 
@@ -151,6 +152,36 @@ class AssemblyIntegrityTests {
     check(codes(shaftOnly).indexOf("integrity.mount.cutout") >= 0, 'a plate with a shaft hole only must lack the cut-out, found ${codes(shaftOnly)}');
     var plain = AssemblyIntegrity.check(motorOn(new GantryPlate("TEST-STRICT-UNCUT", "Strict uncut plate", 100, 100, 8)), strict);
     check(codes(plain).indexOf("integrity.mount.cutout") >= 0, 'an uncut plate must lack the cut-out, found ${codes(plain)}');
+  }
+
+  /**
+   * A shaft turns in a bearing of body A. A cap in A (it carries a journal, too) stands 0.5 mm from the shaft's end: the shaft
+   * runs in its own mount, which is fine. A motor fixed in an unrelated body B (it carries a journal, too) stands 1 mm from the
+   * shaft's side: that is not the bearing the shaft turns in, so it is still a rubbing contact (`integrity.gap`). The sweep
+   * turns the shaft, so the shaft and the parts it stands near move relative to each other.
+   */
+  static function journals():Void {
+    function build(withMotor:Bool):AxisBuilder {
+      var builder = new AxisBuilder();
+      var up = [0.0, 0, 1], along = [1.0, 0, 0];
+      builder.place("base", new GantryPlate("TEST-JOURNAL-BASE", "Journal base", 90, 30, 10), AssemblyFrames.translation(25, 0, 0));
+      builder.attach("bearing", new JournalBox("BEARING", 20, 20, 20, true), AssemblyFrames.translation(0, 0, 10), "base");
+      builder.hang("shaft", new JournalBox("SHAFT", 10, 10, 40, false), AxisBuilder.orient(10, 0, 20, up, along), "bearing");
+      builder.addMateOnAxis("turn", "continuous", "bearing", "to-shaft", "shaft", "attach-shaft", {x: 1, y: 0, z: 0}, 0);
+      builder.attach("cap", new JournalBox("CAP", 10, 30, 30, true), AssemblyFrames.translation(55.5, 0, 10), "base");
+      if (withMotor) {
+        builder.place("mountB", new GantryPlate("TEST-JOURNAL-BASE-B", "Journal base B", 90, 30, 10), AssemblyFrames.translation(25, 35, 0));
+        builder.attach("motor", new JournalBox("MOTOR", 30, 34, 30, true), AssemblyFrames.translation(35, 23, 10), "mountB");
+      }
+      return builder;
+    }
+    var options:IntegrityOptions = {runningGap: 2.0, sweepStates: [["turn" => Math.PI / 2]]};
+    expectClean(AssemblyIntegrity.check(build(false), options), "a shaft turning 0.5 mm from a cap of its own bearing's body");
+    expectOnly(
+      AssemblyIntegrity.check(build(true), options),
+      ["integrity.gap"],
+      "a shaft turning 1 mm from a motor fixed in an unrelated body"
+    );
   }
 
   /** A block on a rail meets a stop only at the far end of its travel: the rest state is sound, the sweep is not. */
@@ -414,6 +445,28 @@ class ShaftHolePlate extends MachineComponent {
     owned.push(hole);
     return Solids.cut(block, [hole]);
   });
+}
+
+/** A box of steel that may carry a journal (a bearing or a motor), for the journal rule's test. */
+class JournalBox extends MachineComponent {
+  final w:Float;
+  final d:Float;
+  final h:Float;
+  final journal:Bool;
+
+  public function new(name:String, w:Float, d:Float, h:Float, journal:Bool) {
+    super('TEST-JOURNAL-$name-${w}x${d}x$h', 'Journal test box $name', "steel", true);
+    this.w = w;
+    this.d = d;
+    this.h = h;
+    this.journal = journal;
+  }
+
+  override public function hasGeometry():Bool return true;
+
+  override public function carriesJournal():Bool return journal;
+
+  override public function geometry(detail:ComponentDetail = Preview):Part return Solids.named(Part.box(w, d, h), "box");
 }
 
 /** Standalone run. */

@@ -111,79 +111,19 @@ class HobberFrameChecks {
         + '(rated ${motor.rating.ratedTorque}), inertia ratio ${Math.round(demand.inertiaRatio * 100) / 100}, failures: ${demand.failures.join("; ")}';
       lines.push(line);
       if (demand.failures.length > 0) throw "drive sizing fails: " + line;
+      if (id == "Z") {
+        // The braked servo holds the axis with the power off: the brake is bound to the motor's drive and holds the screw torque of the weight.
+        var brake = machine.actuatorFor("Zdrive").brake, load = mass * 9.80665 * q;
+        if (brake == null) throw "Z drive has no brake bound";
+        if (brake.holdingEffort < 1.5 * load) throw 'Z brake holds ${brake.holdingEffort} N m against ${Math.round(load * 1000) / 1000} N m of weight';
+        lines.push('Z brake: holds ${Math.round(brake.holdingEffort * 100) / 100} N m (assumed) against ${Math.round(load * 1000) / 1000} N m of weight, release ${brake.releaseChannel} read back on ${brake.releasedSensor}');
+      }
     }
     return lines;
   }
 
   public static function main():Void {
     var args = Sys.args(), began = Sys.time();
-    if (args.indexOf("recipes") >= 0) {
-      var block = machinekit.hobbing.HobberDrives.nutBlock(machinekit.hobbing.HobberDrives.x(), new machinekit.motion.BallNut());
-      var type = block.componentType();
-      if (type == null) throw "the nut block has no recipe";
-      Sys.println('nut block recipe ${type.id}: ${block.values().token("drawing")} h=${block.values().number("centreHeight")}');
-      return;
-    }
-    if (args.indexOf("relief") >= 0) {
-      for (d in machinekit.hobbing.HobberDrives.all()) Sys.println(d.id + " relief " + machinekit.hobbing.HobberDrives.mountRelief(d));
-      return;
-    }
-    if (args.indexOf("bounds") >= 0) {
-      var d = machinekit.hobbing.HobberDrives.x();
-      for (item in [{n: "mount", p: (d.drive.fixed : machinekit.component.MachineComponent)}, {n: "floating", p: (d.drive.floating : machinekit.component.MachineComponent)}]) {
-        var g = item.p.geometry(), b = g.shape.bounds();
-        Sys.println('${item.n}: x ${b.get_min().get_x()}..${b.get_max().get_x()} y ${b.get_min().get_y()}..${b.get_max().get_y()} z ${b.get_min().get_z()}..${b.get_max().get_z()} shaftHeight ${d.drive.fixed.spec.shaftHeight}');
-        g.close();
-      }
-      return;
-    }
-    if (args.indexOf("equality") >= 0) {
-      var a:Array<Array<Float>> = [[1.0, 2.5], [3.0]], b:Array<Array<Float>> = [[1.0, 2.5], [3.0]];
-      Sys.println("nested literal equal: " + haxeon.Equality.equals(a, b));
-      var hull = machinekit.component.CollisionHullFacet.of(new machinekit.hobbing.HobberSaddle("GE-Y-nut-seat"));
-      if (hull == null) throw "no hull";
-      var copy = new machinekit.component.CollisionHullFacet(hull.hulls);
-      Sys.println("hull facet vs copy: " + haxeon.Equality.equals(hull.hulls, copy.hulls) + " hull " + hull.hulls[0]);
-      var viaWire = [for (h in hull.hulls) [for (v in h) v + 0.0]];
-      Sys.println("hull vs rebuilt arrays: " + haxeon.Equality.equals(hull.hulls, viaWire));
-      return;
-    }
-    if (args.indexOf("tiny") >= 0) {
-      for (design in ["GE-Z-saddle", "GE-X-carriage", "GE-X-drive-fixed", "GE-Z-drive-fixed", "GE-Y-drive-fixed", "GE-Y-nut-seat", "GE-Y-saddle"]) {
-        var tiny = new MachineAssembly();
-        tiny.addComponent("part", new machinekit.hobbing.HobberSaddle(design));
-        try {
-          var back = MachineAssembly.decode(tiny.encode(), MachineKitComponents.standard());
-          Sys.println('$design: round trip ok (${back.components().length} members)');
-        } catch (e:Dynamic) {
-          var a = machinekit.component.CollisionHullFacet.of(new machinekit.hobbing.HobberSaddle(design));
-          var first = a == null ? "none" : '${a.hulls.length} hulls, first sizes ${[for (h in a.hulls.slice(0, 6)) h.length]}';
-          Sys.println('$design: FAILS ${Std.string(e).split("\n")[0]} ($first)');
-        }
-      }
-      return;
-    }
-    if (args.indexOf("hulls") >= 0) {
-      for (design in ["GE-X-carriage", "GE-Z-saddle"]) {
-        var a = machinekit.component.CollisionHullFacet.of(new machinekit.hobbing.HobberSaddle(design));
-        var b = machinekit.component.CollisionHullFacet.of(new machinekit.hobbing.HobberSaddle(design));
-        if (a == null || b == null) throw "no hulls for " + design;
-        var bad = 0;
-        for (i in 0...a.hulls.length) for (j in 0...a.hulls[i].length) {
-          var u = a.hulls[i][j], v = b.hulls[i][j];
-          if (u != v || Math.isNaN(u)) {
-            if (bad++ < 5) Sys.println('$design hull $i[$j]: $u vs $v');
-          }
-        }
-        Sys.println('$design: ${a.hulls.length} hulls, $bad differing values');
-        var text = haxe.Json.stringify(a.hulls), back:Array<Array<Float>> = haxe.Json.parse(text), lost = 0;
-        for (i in 0...a.hulls.length) for (j in 0...a.hulls[i].length) if (a.hulls[i][j] != back[i][j]) {
-          if (lost++ < 5) Sys.println('$design json $i[$j]: ${a.hulls[i][j]} -> ${back[i][j]}');
-        }
-        Sys.println('$design: json round trip changes $lost values');
-      }
-      return;
-    }
     var machine = new FlexsplineHobber();
     Sys.println('machine built: ${machine.components().length} members in ${Math.round(Sys.time() - began)} s');
     if (args.indexOf("procedures") >= 0) {
