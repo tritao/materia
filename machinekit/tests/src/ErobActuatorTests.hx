@@ -210,7 +210,7 @@ class ErobActuatorTests {
     near(rating.torqueConstant, D.TORQUE_CONSTANT * 100, "torque constant through the ratio");
     check(output.electricalRating() == null && output.motorDriver() == null, "output side has no winding or amplifier");
     var amplifier = housing.motorDriver();
-    check(amplifier != null, "integrated amplifier");
+    check(amplifier != null && amplifier.rating.designation == D.INTEGRATED_AMPLIFIER, "integrated amplifier row");
     check(housing.motorBrakeSpec() == null, "no brake torque, no brake spec");
     var held = new ErobActuatorPart(new ComponentValues().setNumber("brakeHoldingTorque", 40));
     var spec = held.motorBrakeSpec();
