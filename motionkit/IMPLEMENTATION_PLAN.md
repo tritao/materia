@@ -249,8 +249,8 @@ Do:
   - opaque handles, `struct_size`, error codes (`MK_ERROR_*`) and
     `MK_API_VERSION`;
   - no exceptions across the ABI.
-- C++ implementation behind it. C++ callers such as the runtime may use a
-  C++ header `motionkit.hpp`; the C ABI exists for Haxe.
+- C++ implementation behind it. C++ callers such as the runtime use
+  `trajectory_core.hpp` for trajectory evaluation; the C ABI exists for Haxe.
 - Trajectory API:
   - `mk_trajectory_create(joint_count)`;
   - `mk_trajectory_append_segment(t, duration_ns, degree, coefficients[joint][degree+1])`,
@@ -389,7 +389,7 @@ Do:
   - start time in the chunk's time base, plus duration, degree and
     coefficients;
   - the chunk tag;
-  - evaluation through `motionkit.hpp`, so the runtime has no evaluator of
+  - evaluation through `trajectory_core.hpp`, so the runtime has no evaluator of
     its own.
 - Convert existing `RK_COMMAND_TRAJECTORY_CHUNK` points to degree-1 segments
   on submit. Their external behaviour must not change.

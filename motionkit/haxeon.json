@@ -26,7 +26,6 @@
       "inputs": [
         "native/CMakeLists.txt",
         "native/include/motionkit.h",
-        "native/include/motionkit.hpp",
         "native/src/generator.cpp",
         "native/src/path.cpp",
         "native/src/configuration.cpp",

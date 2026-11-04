@@ -1,4 +1,5 @@
-#include "motionkit.hpp"
+#include "motionkit.h"
+#include "trajectory_core.hpp"
 
 #include <ruckig/ruckig.hpp>
 
