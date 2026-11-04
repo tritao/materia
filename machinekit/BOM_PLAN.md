@@ -548,33 +548,68 @@ Second slice (2026-11-04, branch `joint-fasteners-2`):
   mill's `MillNutBracket` (a `through` plate): the mill now derives 18 M5x30 flange bolts with 18 washers and 18 nuts (six
   per axis) besides the 48 + 12 + 8 screws.
 
-Findings the checks make on the bench mill, left open on purpose (they are the model's, not the checks'): the two axis
-motors' corner screws at (-25, -25) meet the motor body at the corner (heads and driver access) and, on X, the screw
-support `screwXNearBridge` stands in the screw's hole and head (`JointFastenerTests` pins the seven findings, none on a
-rail or nut screw).
+Third slice (2026-11-04, branch `joint-fasteners-3`):
+
+- **Motor corners fixed in the model, findings unpinned.** The servo body has corner reliefs behind the flange (`MotorBody`
+  `relief`, a cylinder per bolt axis over the whole body, the screw head the flange's hole takes plus 1 mm for the driver,
+  `ServoMotor.reliefDiameter`; the maker data gives no relief dimension, so the 1 mm is assumed). The X motor bridge ends
+  against the plate's inner face instead of standing 12 mm behind it, where the lowest flange screws' heads are. The mill's
+  fastener fit is 0 findings and `JointFastenerTests` expects 0.
+- **Clamped faces drilled to suit.** `BoltedFace.clampedToSuit` is a clamped footprint with no listed holes: it pairs with every
+  tapped receiving face whose holes are centred inside it and takes that face's pattern (`paired`), so one seat serves several
+  rail blocks. Holes keep an edge distance from the footprint (`fasteners.edge`); two faces drilled to suit are
+  `fasteners.suit`. Its holes and recess are never drawn: the derivation cuts them (the part is `machinable()`).
+- **Recess as the driver's way in.** A declared recess is a pocket: the driver access volume runs the whole pocket to its
+  mouth and then `accessLength` beyond, so a rail, workpiece or casting wall across the mouth is `fasteners.access`.
+  `IntegrityOptions.removable` lists members the operator takes away to reach a screw (the mill's workpiece, clamps and vise,
+  `BenchMill.workholdingMembers()`).
+- **Rail blocks.** `LinearRailBlock` declares its top as a tapped receiving face (the catalogue's thread and depth, none where
+  the table gives only the thread). The bench mill's saddle, table and head castings (`MillCasting.blockSeats`) are clamped
+  footprints drilled to suit, one per guide rail: clearance holes and a counterbored pocket from the casting's far face
+  leaving `BLOCK_SOLE` = 12 mm under the heads (one nominal diameter of engagement in the 5 mm thread plus the standard
+  length), pocket diameter head + 2 mm (assumed). Result: 12 blocks, 48 M4x16, all engage. The checks forced one model
+  change: the saddle's four Y blocks stand under its X rails (half span 45 mm, not 32.7) so their pockets fall either side of
+  the rails; with the old span the outer pockets opened under the X rails (`fasteners.access`).
+- **Screw support feet.** `ScrewSupportUnit.fasteningFaces` declares the foot: the maker's hole diameter, grip = the bolt
+  seat (`boltSeatY`, measured on the maker's CAD where reviewed, else the row's assumed value), the row's counterbore, its
+  depth assumed as deep as the head (flush; not published), the screw the hole passes (`SocketHeadCapScrew.takenByHole`).
+  The bench mill's Y stands and X bridges are `MillDriveBox` bodies with a drilled-to-suit top face (tapped through when 12 mm
+  or thinner); the Y stands grew to hold 8 mm of edge round the hole pattern. The mill derives 12 more M5 screws (BK12 4 each
+  x 2, BF12 2 each x 2; M5x16 and M5x40 from the BF12's reviewed bolt seat).
+
+Acceptance now: the bench mill derives 138 screws (48 rail, 48 block, 12 support, 12 motor, 18 nut flange) plus 18 washers
+and 18 nuts, fits the mill's solids with 0 findings, and every number above is checked by `JointFastenerTests`.
 
 Not done yet (open, in order):
 
-1. Rail blocks on carriages: the block top is a tapped receiving face (`LinearRailBlock.mountThreadDepth`, HGH15CA M4 x 5)
-   but the castings need the other half: a clamped face whose holes follow the block pattern (a clamped footprint
-   "drilled to suit", the mirror of `drilledToSuit`, pairing with several blocks), and a casting seat design that states
-   its grip and counterbore (a bolt through the whole head casting is not a screw length). Needs that decision first.
-2. Screw support units and motor mounts: foot faces exist as `MountingFace.tappedFoot`; as `BoltedFace` they need the
-   foot's grip and bolt recess (`boltSeatY` is assumed for unreviewed supports) and receiving faces on the casting pads
-   and `MillDriveBox` stands (drilled to suit, machinable).
-3. Fold in `MillRailFasteners` and `MountServiceScrews`. They instance real screw members with `head` mates from the
-   mineral frame's `DesignInterfaces` holes, with provenance fingerprints. The derivation lists BOM lines; to replace
-   them it must also instance members (head mates, `Coaxial` requirements) from a `FastenedJoint`, and the mineral
-   inserts must become receiving faces. Until then both selection paths exist.
-4. Hobber adoption (another worktree owns those files): Y nut seat becomes a receiving face drilled to suit on the
-   housing (tapped to the nut flange's clamped pattern, its hole positions then come out of the derivation); X carriage
-   and Z saddle fixings to the rail blocks and column are clamped faces on the carriage/saddle (clearance holes, grip)
-   meeting receiving faces on the block (tapped, with the block's published thread depth) and the column (drilled to
-   suit); scale heads get a clamped face from the head recess and a receiving face on the bracket; the swivel plate's M5
-   heads are the recess case, a clamped face with `recess` from the counterbore so a head standing proud of the face fails
-   `fasteners.head-clearance` rather than escaping the checks. The hobber's parts that are drilled to suit must be
-   `machinable()` and end `geometry()` with `machined(...)`. Replace each hand-placed screw by the derived list and delete
-   the hand placement in the same change.
+1. **One path (old item 3).** Fold `MillRailFasteners` and `MountServiceScrews` into the derivation. They instance real screw
+   members with `head` mates and `Coaxial` requirements from the mineral frame's `DesignInterfaces` holes, with provenance
+   fingerprints, and select the length by `DesignChecks.blindFastener` (usable thread depth, tip gap, back wall, relief) rather
+   than the derivation's engagement rule. The mineral insert holes must become receiving faces carrying that thread policy
+   (`ThreadSpec` usable/cylindrical depth, point, stock, minimum engagement, tip gap, back wall) and the derivation must
+   instance `SocketHeadCapScrew` members from a `FastenedJoint` (member per hole: head connector mate, coaxial requirement on
+   the rail connector and the insert hole, provenance), then `RailSeatTests`, `LinearMountContactTests`,
+   `LinearMountAssemblyTests`, `LinearMountTests` and `LinearRackMount` (sheet router) move to it and both old classes go.
+   Member count: instancing is only needed where an insert carries provenance (the mineral frames, 36 screws in the small
+   frame); the bench mill's 138 screws stay BOM lines only, because as members they would add 138 solids to every preview
+   with nothing to mate them to.
+2. **Z screw supports.** They stand on a 1 mm shim between the column and the foot plane (`BenchMill.driveScrew`), which
+   cannot be tapped, so their feet are marked `footBolted = false` and their screws are not derived (2 units, 6 screws). The Z drive needs a real stand or a boss on the column; the support also sits 14 mm in front of the column
+   face, so only 16 mm of its 60 mm foot is over the column.
+3. **Motor mounts and stands to castings.** `MotorMount` (HZMotion/BK/BF-style motor seats) still declares only `tappedFoot`; as a
+   `BoltedFace` it needs the foot grip and bolt recess from its drawing (`boltSeatY` exists only where measured) and its
+   receiving face (the y-servo variant). The Y stands and X bridges themselves are not bolted to the base and saddle yet
+   (their lower faces have no clamped face; the base casting's `screw-support-pad` is a 4 mm pad with no holes).
+4. Hobber adoption (another worktree owns those files): Y nut seat becomes a receiving face drilled to suit on the housing
+   (tapped to the nut flange's clamped pattern, its hole positions then come out of the derivation); X carriage and Z saddle
+   fixings to the rail blocks and column are clamped faces on the carriage/saddle meeting the block's top, which now declares
+   its receiving face (use `BoltedFace.clampedToSuit` on the carriage and `recess` for a counterbored pocket, or `clamped`
+   with listed holes) and the column (drilled to suit); scale heads get a clamped face from the head recess and a receiving
+   face on the bracket; the swivel plate's M5 heads are the recess case, a clamped face with `recess` from the counterbore so a
+   head standing proud of the face fails `fasteners.head-clearance` rather than escaping the checks. A recess is also the
+   driver's way in: it is checked clear to its mouth. The hobber's parts that are drilled to suit must be `machinable()` and end
+   `geometry()` with `machined(...)`. Replace each hand-placed screw by the derived list and delete the hand placement in the
+   same change.
 
 ### B7 — Rollout and hard gate
 - Done in `fa1f1534f`. The full gate passed 11/24 shards with no new
