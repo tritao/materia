@@ -71,6 +71,8 @@ class AssemblyDesignChecks {
           interfaceAlignment(out, id, relationship, members, definition);
         case FoundationConnection(_, joint):
           FoundationJointDesignChecks.check(out, id, joint, members, initial);
+        case ServiceRemoval(_, _, _, _, _), GuardedChannel(_, _, _, _):
+          // Swept by AssemblyIntegrity, which has the sweep machinery.
         case Coaxial(_, first, second, tolerance):
           if (!Math.isFinite(tolerance) || tolerance <= 0) throw "Invalid nominal coaxial tolerance";
           nominalCoaxial(out, id, axisPose(first, members, initial), axisPose(second, members, initial), tolerance);

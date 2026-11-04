@@ -1,0 +1,20 @@
+{
+	"version": 1,
+	"package": {
+		"name": "machinekit-way-cover-tests"
+	},
+	"entry": "WayCoverTests",
+	"sourceRoots": [
+		"src"
+	],
+	"dependencies": {
+		"cadkit": {
+			"path": "../../cadkit"
+		},
+		"machinekit": {
+			"path": ".."
+		}
+	},
+	"target": "host",
+	"outputDir": "build/way-cover"
+}

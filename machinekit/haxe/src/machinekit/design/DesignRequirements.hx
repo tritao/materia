@@ -33,6 +33,12 @@ class DesignRequirements {
         Coaxial(map(id), first, second, tolerance);
       case FoundationConnection(id, joint):
         FoundationConnection(map(id), materia.casting.FoundationJoint.FoundationJoints.remap(joint, map));
+      case ServiceRemoval(id, members, steps, prerequisites, pose):
+        for (j in pose) j.joint = map(j.joint);
+        ServiceRemoval(map(id), members.map(map), steps, prerequisites.map(map), pose);
+      case GuardedChannel(id, channel, covers, drain):
+        for (d in drain) d.drain = map(d.drain);
+        GuardedChannel(map(id), map(channel), covers.map(map), drain);
     };
   }
   public static function id(r:DesignRequirement):String return switch (r) {
@@ -42,7 +48,7 @@ class DesignRequirements {
         _,
         _,
         _
-      ):
+      ), ServiceRemoval(id, _, _, _, _), GuardedChannel(id, _, _, _):
       id;
   };
 }

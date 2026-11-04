@@ -6,6 +6,7 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.assembly.PosedParts.PartBox;
 import machinekit.component.MountingFace;
+import machinekit.design.DesignRequirement;
 import machinekit.motion.LeadScrew;
 import machinekit.transmission.Rack;
 import machinekit.transmission.SpurGear;
@@ -317,6 +318,7 @@ class AssemblyIntegrity {
     }
     for (id => value in rest) state.setJoint(id, value);
     state.forwardKinematics();
+    ServiceChecks.run(assembly, flat, state, posed, diagnostics, overlapLimit, runningGap, rest);
     checkDrives(state, rest);
     return states.length + 1;
   }
