@@ -44,7 +44,7 @@ class ErobActuatorData {
 
   public static inline final BODY_DIAMETER = 110.0;
   public static inline final BODY_DIAMETER_TOLERANCE = 0.035;
-  /** Rear face to output mounting face. */
+  /** Output mounting face to the end of the rear boss. */
   public static inline final BODY_LENGTH = 80.2;
   /** Including the rear connectors. */
   public static inline final OVERALL_LENGTH = 83.6;
@@ -65,9 +65,14 @@ class ErobActuatorData {
   public static inline final OUTPUT_THREAD_DEPTH = 6.0;
   /** Rear spigot. */
   public static inline final REAR_SPIGOT_DIAMETER = 85.0;
-  /** Output pilot height and flange stand-off above the housing front face, from the section view; the drawing does not dimension either on its own. */
-  public static inline final PILOT_HEIGHT = 6.0;
-  public static inline final REAR_SPIGOT_HEIGHT = 2.0;
+  /**
+   * Output pilot height above the housing's front face, and the rear boss: measured on the maker's STEP (pinned above, 2026-11-04), which the
+   * drawing does not dimension. In the STEP's frame (axis along its Y) the output face is the top at y = 38.0, the housing's front face with its
+   * M4 holes is at y = 22.0 (16.0 below), the Ø110 body ends at y = -38.2 (76.2 behind the output face), the Ø85 rear boss at y = -42.2 (the
+   * 80.2 of `BODY_LENGTH`) and the rear connectors at y = -45.6 (`OVERALL_LENGTH`). An earlier estimate of 6 and 2 mm was wrong.
+   */
+  public static inline final PILOT_HEIGHT = 16.0;
+  public static inline final REAR_SPIGOT_HEIGHT = 4.0;
   public static inline final FIXED_THREAD_DEPTH = 7.0;
   /** Rev D output-flange locking screws sit on the output pitch circle; the drawing neither dimensions nor counts them. */
   public static inline final LOCKING_SCREW_NOTE = "Rev D output-flange locking screws: position and count not dimensioned on the drawing";
@@ -77,6 +82,14 @@ class ErobActuatorData {
   /** Rotor inertia at the motor shaft, kg m2 (308632 g mm2, 316600 braked). */
   public static inline final ROTOR_INERTIA = 308632e-9;
   public static inline final ROTOR_INERTIA_BRAKED = 316600e-9;
+
+  /** Designation of the amplifier built into the actuator, in `MotorDriver`'s catalogue. */
+  public static inline final INTEGRATED_AMPLIFIER = "EROB110I-INTEGRATED-AMP";
+  /** Share of the mechanical output power the harmonic gear and bearings pass (the rest is friction). Not published; assumed. */
+  public static inline final GEAR_EFFICIENCY = 0.8;
+  /** Release and application delays of the motor brake. Not published; assumed like the servo brakes (50 ms and 30 ms). */
+  public static inline final BRAKE_RELEASE_DELAY = 0.05;
+  public static inline final BRAKE_APPLY_DELAY = 0.03;
 
   public static inline final BUS_VOLTS = 48.0;
   public static inline final BUS_TOLERANCE = 0.10;

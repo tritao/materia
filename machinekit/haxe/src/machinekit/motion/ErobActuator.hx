@@ -4,11 +4,13 @@ import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentValues;
 import machinekit.component.Solids;
 import machinekit.motion.ErobActuatorData as D;
+import materia.assembly.AssemblyDefinition.AssemblyJointType;
 
 /**
  * An eRob 110 integrated actuator: fixed `housing` and turning `output` joined by one revolute joint `A` (named by
  * `joint`) about the hollow axis. The joint is continuous, as the flange turns without end stops, its effort limit
- * is the ratio's start-stop peak torque and its speed limit the rated output speed on a 48 V bus. The output
+ * is the ratio's start-stop peak torque and its speed limit the rated output speed on a 48 V bus (a `range` makes it a
+ * revolute joint with that stop). The output
  * encoder is registered as the joint's feedback. Exposed connectors: `seat` (the housing's front face) and
  * `output` (the output mounting face); exposed ports: `power` (48 V DC) and `bus`.
  */
@@ -17,7 +19,8 @@ class ErobActuator extends MachineAssembly {
   public final output:ErobActuatorPart;
   public final jointId:String;
 
-  public function new(ratio:Int = 100, encoderBits:Int = 20, brake:Bool = true, joint:String = "A", ?overrides:ComponentValues) {
+  /** `acceleration` (rad/s^2, assumed by the application) is the joint's limit; without it none is stated. `range` limits the joint to +-`range` rad (a stop in the application); without it the flange turns without end. */
+  public function new(ratio:Int = 100, encoderBits:Int = 20, brake:Bool = true, joint:String = "A", ?overrides:ComponentValues, ?range:Float, ?acceleration:Float) {
     super();
     jointId = joint;
     var values = overrides == null ? new ComponentValues() : overrides.copy();
@@ -30,7 +33,7 @@ class ErobActuator extends MachineAssembly {
     var row = housing.ratioRow;
     addMateOnAxis(
       joint,
-      Continuous,
+      range == null ? AssemblyJointType.Continuous : AssemblyJointType.Revolute,
       "housing",
       "rotation",
       "output",
@@ -38,12 +41,12 @@ class ErobActuator extends MachineAssembly {
       {x: 0, y: 1, z: 0},
       0,
       {
-        lower: null,
-        upper: null,
+        lower: range == null ? null : -range,
+        upper: range,
         velocity: housing.ratedSpeed(),
         effort: row.peakTorque,
-        acceleration: null,
-        assumptions: [{quantity: "acceleration limit", label: "not published; set by the controller profile"}]
+        acceleration: acceleration,
+        assumptions: [{quantity: "acceleration limit", label: acceleration == null ? "not published; set by the controller profile" : "not published; stated by the application (assumed)"}]
       }
     );
     addEncoder(joint + "-encoder", joint, "housing");

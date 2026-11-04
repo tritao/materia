@@ -131,6 +131,22 @@ class MotorDriver extends MachineComponent {
           depth: 45.0
         },
         {
+          // The amplifier built into the eRob 110 actuator (ErobActuatorData): the 48 V bus band and the motor's peak current.
+          designation: ErobActuatorData.INTEGRATED_AMPLIFIER,
+          family: Servo,
+          control: Bus,
+          minimumVoltage: ErobActuatorData.BUS_VOLTS * (1 - ErobActuatorData.BUS_TOLERANCE),
+          maximumVoltage: ErobActuatorData.BUS_VOLTS * (1 + ErobActuatorData.BUS_TOLERANCE),
+          maximumCurrent: ErobActuatorData.MOTOR_MAX_CURRENT,
+          efficiency: 0.95,
+          maximumMicrosteps: 1,
+          maximumStepRate: 0.0,
+          positionLoopRate: 4000.0,
+          width: 110.0,
+          height: 110.0,
+          depth: 80.2
+        },
+        {
           designation: "GENERIC-LV-SERVO-AMP",
           family: Servo,
           control: Bus,
@@ -146,7 +162,13 @@ class MotorDriver extends MachineComponent {
           depth: 45.0
         }
       ],
-      row -> ({
+      row -> row.designation == ErobActuatorData.INTEGRATED_AMPLIFIER ? ({
+        source: ErobActuatorData.SOURCE + "; the loop rate and efficiency are assumed",
+        standard: null,
+        standardEdition: null,
+        dimensionKind: Nominal,
+        conformance: NominalEnvelope
+      }) : ({
         source: "Assumed generic driver class; ratings and envelope are unverified",
         standard: null,
         standardEdition: null,

@@ -33,6 +33,7 @@ class ErobActuatorTests {
     encoderAndErrors();
     electrical();
     unpublished();
+    hostFaceAndDrive();
     recipeRoundTrip();
     cadFallback();
     Sys.println("eRob: ratio rows, dimensions, bolt patterns, cut-outs, joint, encoder, 48 V bus and recipes passed");
@@ -70,14 +71,14 @@ class ErobActuatorTests {
     var hb = housing.shape.bounds(), ob = pilot.shape.bounds();
     near(hb.get_max().get_x(), 55, "body radius");
     near(hb.get_max().get_z(), ErobActuatorPart.SEAT_Z, "housing front face");
-    near(hb.get_min().get_z(), -D.BODY_LENGTH - D.REAR_SPIGOT_HEIGHT, "rear spigot end");
+    near(hb.get_min().get_z(), -D.BODY_LENGTH, "rear boss end");
     near(ob.get_max().get_x(), 42.5, "pilot radius");
     near(ob.get_max().get_z(), 0, "output face");
     near(ob.get_min().get_z(), -D.PILOT_HEIGHT, "pilot height");
     check(housing.solidCount() == 1 && pilot.solidCount() == 1, "one solid each");
     check(housing.volume() < envelope.volume(), "preview inside envelope");
     // The hollow bore is Ø18 through both.
-    near(plain.geometry(Envelope).volume(), Math.PI * (55 * 55 - 9 * 9) * (D.BODY_LENGTH + ErobActuatorPart.SEAT_Z)
+    near(plain.geometry(Envelope).volume(), Math.PI * (55 * 55 - 9 * 9) * (D.BODY_LENGTH - D.REAR_SPIGOT_HEIGHT + ErobActuatorPart.SEAT_Z)
       + Math.PI * (42.5 * 42.5 - 81) * D.REAR_SPIGOT_HEIGHT, "envelope volume", 1);
     near(D.BODY_LENGTH, 80.2, "body length");
     near(D.OVERALL_LENGTH, 83.6, "length with connectors");
@@ -194,6 +195,31 @@ class ErobActuatorTests {
     fails(() -> a.housing.checkSupply(new PowerSupply(new DcVoltage(48), new DcCurrent(5)).outputRating("power1")), "240 W supply rejected");
     fails(() -> new ErobActuatorPart(new ComponentValues().setToken("variant", ErobActuatorPart.OUTPUT)).busRequirement("power"), "output side has no bus");
     check(new ErobActuatorPart(new ComponentValues().setToken("bus", "CANopen")).port("bus").name == "bus", "CANopen variant has the bus port");
+  }
+
+  /** The flange as a host sees it, the output-referred winding, the integrated amplifier, the optional stop and acceleration, the brake once entered. */
+  static function hostFaceAndDrive():Void {
+    var housing = new ErobActuatorPart(), output = new ErobActuatorPart(new ComponentValues().setToken("variant", ErobActuatorPart.OUTPUT));
+    var face = housing.mountingFace(), outFace = output.mountingFace();
+    if (face == null || outFace == null) throw "eRob: both sides present a mounting face";
+    var cut = face.tool(8);
+    check(cut.volume() > 0, "housing face carries holes");
+    cut.close();
+    var rating = housing.electricalRating();
+    if (rating == null) throw "eRob: housing has a winding rating";
+    near(rating.torqueConstant, D.TORQUE_CONSTANT * 100, "torque constant through the ratio");
+    check(output.electricalRating() == null && output.motorDriver() == null, "output side has no winding or amplifier");
+    var amplifier = housing.motorDriver();
+    check(amplifier != null, "integrated amplifier");
+    check(housing.motorBrakeSpec() == null, "no brake torque, no brake spec");
+    var held = new ErobActuatorPart(new ComponentValues().setNumber("brakeHoldingTorque", 40));
+    var spec = held.motorBrakeSpec();
+    if (spec == null) throw "eRob: brake spec once a torque is entered";
+    near(spec.holdingTorque(), 40, "entered holding torque");
+    var stopped = new ErobActuator(100, 20, true, "A", null, 0.2, 1.5);
+    var joint = [for (j in stopped.definition().joints) if (j.id == "A") j][0];
+    near(joint.limits.upper, 0.2, "stop");
+    near(joint.limits.acceleration, 1.5, "acceleration");
   }
 
   static function unpublished():Void {

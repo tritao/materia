@@ -11,6 +11,7 @@ import machinekit.component.ComponentValues;
 import machinekit.component.Dimension;
 import machinekit.component.EngineeringMetadata;
 import machinekit.component.MachineComponent;
+import machinekit.component.MountingFace;
 import machinekit.component.Solids;
 import machinekit.component.ToolSpec;
 import machinekit.motion.ErobActuatorData as D;
@@ -21,6 +22,7 @@ import machinekit.standard.SocketHeadCapScrew;
 import machinekit.transmission.ValueBasis;
 import materia.assembly.AssemblyDefinition.AssemblyActuator;
 import materia.assembly.AssemblyDefinition.AssemblyEncoder;
+import materia.assembly.AssemblyFrames;
 
 /**
  * One physical side of an eRob 110 actuator, which is one purchase: the fixed `housing` (stator, amplifier, front
@@ -29,8 +31,9 @@ import materia.assembly.AssemblyDefinition.AssemblyEncoder;
  * not publish (bearing moment rating and stiffness, brake holding torque) is `Assumed` and only present once an
  * assumption is entered as an input.
  *
- * CAD frame: axis along +Z, output mounting face at z=0, facing +Z. The pilot disc (Ø85) stands 6 mm above the
- * housing's front face (z=-6), which is where the housing's `seat` connector is. The housing runs back to z=-80.2.
+ * CAD frame: axis along +Z, output mounting face at z=0, facing +Z. The pilot disc (Ø85) stands 16 mm above the
+ * housing's front face (z=-16, measured on the maker's STEP), which is where the housing's `seat` connector is. The Ø110 housing runs
+ * back to z=-76.2 and the Ø85 rear boss to z=-80.2.
  * Connectors: `axis` and `seat` (housing, Ø110 front face), `fixedBolt1..16` (housing, M4 on Ø102), `face` and
  * `outputBolt1..12` (output, M4 on Ø77), all at their faces with +Y along +Z. Bolt 1 of each pattern is on +X; the
  * drawing does not dimension the pattern phase.
@@ -44,7 +47,7 @@ class ErobActuatorPart extends MachineComponent implements MotorDrive implements
   /** Share of the actuator's mass that turns with the output flange. Not published; estimated. */
   public static inline final OUTPUT_MASS_FRACTION = 0.12;
   /** Housing front face and the output mounting face, z in the CAD frame. */
-  public static inline final SEAT_Z = -6.0;
+  public static inline final SEAT_Z:Float = -D.PILOT_HEIGHT;
 
   public final variant:String;
   public final ratio:Int;
@@ -99,7 +102,7 @@ class ErobActuatorPart extends MachineComponent implements MotorDrive implements
     var total = brake ? D.MASS_BRAKED : D.MASS, rotating = total * OUTPUT_MASS_FRACTION;
     if (variant == HOUSING) {
       var mass = total - rotating, r = D.BODY_DIAMETER / 2, b = D.BORE_DIAMETER / 2;
-      var length = D.BODY_LENGTH + SEAT_Z;
+      var length = D.BODY_LENGTH - D.REAR_SPIGOT_HEIGHT + SEAT_Z;
       var iz = mass * (r * r + b * b) / 2, ix = mass * (3 * (r * r + b * b) + length * length) / 12;
       declareMass(mass, new Vector(0, 0, SEAT_Z - length / 2), new InertiaTensor(ix, 0, 0, ix, 0, iz));
       addConnector("axis", Axis, Solids.axial(0, 0, 0));
@@ -165,7 +168,33 @@ class ErobActuatorPart extends MachineComponent implements MotorDrive implements
   public function brakeHoldingTorque():Null<Float> return brake ? assumedValue("brakeHoldingTorque") : null;
 
   override public function motorDrive():Null<MotorDrive> return variant == HOUSING ? this : null;
-  public function electricalRating():Null<ServoElectricalRating> return null;
+
+  /**
+   * The winding as the output flange sees it, for the bus sizing in `DriveSystem`: torque constant and back-EMF constant of the motor
+   * (drawing) through the ratio, phase resistance half the line resistance, and the gear's efficiency (`ErobActuatorData.GEAR_EFFICIENCY`,
+   * assumed). The back-EMF is taken as the line-to-line RMS value of the stated V per 1000 rpm.
+   */
+  public function electricalRating():Null<ServoElectricalRating> return variant == HOUSING ? {
+    torqueConstant: D.TORQUE_CONSTANT * ratio,
+    backEmfConstant: D.BACK_EMF / 1000 * 60 / (2 * Math.PI) * ratio,
+    phaseResistance: D.LINE_RESISTANCE / 2,
+    mechanicalEfficiency: D.GEAR_EFFICIENCY
+  } : null;
+
+  var amplifier:Null<MotorDriver>;
+
+  /** The amplifier built into the housing: a drive binding names the housing as its own driver (`MachineAssembly.addMotor`). */
+  override public function motorDriver():Null<MotorDriver> {
+    if (variant != HOUSING) return null;
+    if (amplifier == null) amplifier = new MotorDriver(D.INTEGRATED_AMPLIFIER, new machinekit.power.PhaseRmsCurrent(D.MOTOR_MAX_CURRENT));
+    return amplifier;
+  }
+
+  /** The brake once its holding torque is entered as an assumption (`brakeHoldingTorque`); the drawing gives neither it nor the delays. */
+  override public function motorBrakeSpec():Null<MotorBrakeSpec> {
+    var torque = brakeHoldingTorque();
+    return torque == null ? null : new ErobBrake(torque);
+  }
 
   public function actuator(id:String, joint:String, volts:Float, margin:Float, ?current:Float):AssemblyActuator {
     if (variant != HOUSING) throw "Only the eRob housing drives a joint";
@@ -237,8 +266,8 @@ class ErobActuatorPart extends MachineComponent implements MotorDrive implements
       return Solids.cut(disc, tools);
     }
     var body = Solids.union([
-      Solids.named(Part.cylinderSpan(D.BODY_DIAMETER / 2, -D.BODY_LENGTH, SEAT_Z), "housing"),
-      Solids.named(Part.cylinderSpan(D.REAR_SPIGOT_DIAMETER / 2, -D.BODY_LENGTH - D.REAR_SPIGOT_HEIGHT, -D.BODY_LENGTH), "rearSpigot")
+      Solids.named(Part.cylinderSpan(D.BODY_DIAMETER / 2, D.REAR_SPIGOT_HEIGHT - D.BODY_LENGTH, SEAT_Z), "housing"),
+      Solids.named(Part.cylinderSpan(D.REAR_SPIGOT_DIAMETER / 2, -D.BODY_LENGTH, D.REAR_SPIGOT_HEIGHT - D.BODY_LENGTH), "rearSpigot")
     ]);
     if (detail == Envelope) return Solids.cut(body, [Solids.named(bore, "bore")]);
     var screw = SocketHeadCapScrew.metric("M4", 10);
@@ -259,14 +288,14 @@ class ErobActuatorPart extends MachineComponent implements MotorDrive implements
    * it. Output: the part bolted to the flange, ahead of z=0: 12 M4 clearance holes (Ø4.6 as drawn), and a bore for the
    * hollow axis that is the pilot's size plus `pilotClearance`.
    */
-  public function mountingCutout(pocketDepth:Float = 8, runningGap:Float = 1, pilotClearance:Float = 0.4, depth:Float = 0):Part {
+  public function mountingCutout(pocketDepth:Float = 8, runningGap:Float = 1, pilotClearance:Float = 0.4, depth:Float = 0, ?outputClearance:Float):Part {
     if (!(pocketDepth >= D.POCKET_DEPTH_MIN) || !(runningGap >= 0) || !(pilotClearance >= 0)) throw "eRob mounting cutout needs a pocket of at least 8 mm and non-negative gaps";
     var tools:Array<Part> = [];
     if (variant == HOUSING) {
       var floor = SEAT_Z, bottom = floor - pocketDepth, top = -runningGap;
       var screw = SocketHeadCapScrew.metric("M4", 10);
       tools.push(Solids.named(Part.cylinderSpan((D.BODY_DIAMETER + 2 * D.BODY_DIAMETER_TOLERANCE + pilotClearance) / 2, bottom - 0.1, floor), "pocket"));
-      tools.push(Solids.named(Part.cylinderSpan((D.OUTPUT_PILOT_DIAMETER + pilotClearance + 1) / 2, floor - 0.1, top + 0.1), "outputBore"));
+      tools.push(Solids.named(Part.cylinderSpan((D.OUTPUT_PILOT_DIAMETER + (outputClearance ?? pilotClearance + 1)) / 2, floor - 0.1, top + 0.1), "outputBore"));
       for (i in 0...D.FIXED_BOLT_COUNT) {
         var p = fixedBolt(i);
         tools.push(Solids.named(Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, floor - 0.1, top + 0.1, p.x, p.y), 'fixedBolt${i + 1}'));
@@ -280,6 +309,27 @@ class ErobActuatorPart extends MachineComponent implements MotorDrive implements
       tools.push(Solids.named(Part.cylinderSpan((D.BORE_DIAMETER + pilotClearance) / 2, -0.1, thickness + 0.1), "bore"));
     }
     return Solids.union(tools);
+  }
+
+  /** Gap (diameter) between the output pilot and its bore in the plate that holds the housing, `ErobActuatorPart.mountingFace` and `ErobMount`. */
+  public static inline final PILOT_BORE_CLEARANCE = 4.4;
+
+  /**
+   * The flange as the host must be cut for it. Housing: the front face (z = `SEAT_Z`, +Z into the host), with the output pilot's bore and
+   * the 16 clearance holes for the M4 screws into the front face; the pocket behind it is not a probe. Output: the output face (z = 0), the
+   * 12 clearance holes and the bore for the 12 M4 screws into the flange.
+   */
+  override public function mountingFace():Null<MountingFace> {
+    if (variant == HOUSING) return new MountingFace(D.BODY_DIAMETER, D.BODY_DIAMETER, depth -> {
+      var screw = SocketHeadCapScrew.metric("M4", 10);
+      var tools = [Solids.named(Part.cylinderSpan((D.OUTPUT_PILOT_DIAMETER + PILOT_BORE_CLEARANCE) / 2, -0.1, depth + 0.1), "outputBore")];
+      for (i in 0...D.FIXED_BOLT_COUNT) {
+        var p = fixedBolt(i);
+        tools.push(Solids.named(Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, -0.1, depth + 0.1, p.x, p.y), 'fixedBolt${i + 1}'));
+      }
+      return Solids.union(tools);
+    }, AssemblyFrames.translation(0, 0, SEAT_Z));
+    return new MountingFace(D.OUTPUT_PITCH_CIRCLE, D.OUTPUT_PITCH_CIRCLE, depth -> mountingCutout(D.POCKET_DEPTH_MIN, 1, 0.4, depth));
   }
 
   override public function toolSpecs():Array<ToolSpec> return [new ToolSpec("mountingCutout", variant == HOUSING ? [
@@ -316,4 +366,13 @@ class ErobActuatorPart extends MachineComponent implements MotorDrive implements
   }
 
   override public function componentType():Null<ComponentType> return recipeType();
+}
+
+/** The brake of an eRob: spring-applied on the motor shaft; torque from the entered assumption, delays assumed (`ErobActuatorData`). */
+class ErobBrake implements MotorBrakeSpec {
+  final torque:Float;
+  public function new(torque:Float) this.torque = torque;
+  public function holdingTorque():Float return torque;
+  public function releaseDelaySeconds():Float return D.BRAKE_RELEASE_DELAY;
+  public function applicationDelaySeconds():Float return D.BRAKE_APPLY_DELAY;
 }
