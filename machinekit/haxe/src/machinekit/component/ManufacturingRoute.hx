@@ -1,5 +1,6 @@
 package machinekit.component;
 
+import machinekit.component.Procurement.ProcurementCodec;
 import machinekit.structural.GroundStock.GroundStockRow;
 
 /** How a made part is produced. */
@@ -122,6 +123,27 @@ class ManufacturingRoute implements ComponentFacet {
     case Turned:
       "turning, " + setups + (setups == 1 ? " setup, " : " setups, ") + toleranceClass + " tolerance";
   };
+
+  /**
+   * What a quote needs to know to make the part, as structured procurement requirements: the route, its setups and tolerance class,
+   * the stock row of a ground part and the tightest machined-face tolerance. A made part is specified by this route and its drawing.
+   */
+  public function requirements():Array<machinekit.component.Procurement.ProcurementRequirement> {
+    var out = [ProcurementCodec.choice("route", Std.string(kind))];
+    if (setups > 0) out.push(ProcurementCodec.requirement("setups", "count", null, null, setups));
+    out.push(ProcurementCodec.choice("toleranceClass", toleranceClass));
+    var row = stock;
+    if (row != null) out.push(ProcurementCodec.requirement("stockThickness", "mm", null, null, row.thickness));
+    if (faces.length > 0) {
+      var tightest = 1e9;
+      for (face in faces) tightest = Math.min(tightest, face.tolerance);
+      out.push(ProcurementCodec.requirement("machinedFaceTolerance", "mm", null, tightest));
+    }
+    return out;
+  }
+
+  /** The procurement intent of a part made by this route: `Make(process)` with `requirements()`. */
+  public function intent():machinekit.component.ProcurementIntent return new machinekit.component.ProcurementIntent(Make(process()), requirements());
 
   /** Who the part goes to. */
   public function supplier():String return switch kind {

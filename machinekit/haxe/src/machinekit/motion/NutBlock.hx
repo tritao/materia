@@ -78,7 +78,7 @@ class NutBlock extends MachineComponent {
       {name: "nut bore", tolerance: 0.02, roughnessRa: 1.6}
     ]);
     addFacet(route);
-    addFacet(new machinekit.component.ProcurementIntent(Make(route.process())));
+    addFacet(route.intent());
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     // The flange holes must leave room for the base holes.

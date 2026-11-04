@@ -45,6 +45,16 @@ class HzMotionDrawingScrew extends LeadScrew {
       'HZMOTION-DRAWING-$endProfile-L${Dimension.format(length)}'
     );
     this.endProfile = endProfile;
+    // Bought ground from the maker's drawing (NJPE/HZMotion machined ends): the thread, length and end profile select the part.
+    if (machinekit.component.EngineeringMetadata.of(this) == null) addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
+      .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", "")));
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), [
+      machinekit.component.Procurement.ProcurementCodec.choice("family", Std.string(thread.family)),
+      machinekit.component.Procurement.ProcurementCodec.requirement("diameter", "mm", null, null, thread.screwDiameter),
+      machinekit.component.Procurement.ProcurementCodec.requirement("pitch", "mm", null, null, thread.pitch),
+      machinekit.component.Procurement.ProcurementCodec.requirement("length", "mm", null, null, length),
+      machinekit.component.Procurement.ProcurementCodec.choice("endProfile", endProfile)
+    ]));
     fixedEnd = fixedEndFor(endProfile);
     floatingEnd = floatingEndFor(endProfile);
     addConnector("fixedShoulder", Mount, Solids.axial(0, 0, fixedEnd));

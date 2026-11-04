@@ -76,7 +76,7 @@ class HobberSaddle extends MachineComponent {
     var route = routeOf(design);
     if (route != null) {
       addFacet(route);
-      addFacet(new ProcurementIntent(Make(route.process())));
+      addFacet(route.intent());
     }
     if (["GE-X-carriage", "GE-Z-saddle", "GE-X-drive-fixed", "GE-X-drive-floating", "GE-Z-drive-fixed", "GE-Z-drive-floating",
       "GE-Y-saddle", "GE-Y-drive-fixed", "GE-Y-drive-floating", "GE-Y-nut-seat", "GE-X-scale-seat", "GE-Z-scale-seat", "GE-Z-scale-arm"].indexOf(design) >= 0) {
