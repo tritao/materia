@@ -138,6 +138,35 @@ class MineralCasting extends MachineComponent {
     }
   }
 
+  /**
+	 * The box cavities taken from the envelope's disjoint material boxes in closed form, less the solids box algebra
+	 * cannot hold: the non-box cavities (realized and validated as `geometry` realizes them), the embedded anchor
+	 * hardware and, in service, the post-cure receivers (`BoxMaterialVolume`). Null for a chamfered envelope or when
+	 * those solids overlap one another, and the solid is integrated instead.
+	 */
+  override public function analyticVolume():Null<machinekit.component.VolumeProperties> {
+    var envelope = castingEnvelope();
+    for (prism in envelope) if (!CastingCavities.supportsBoxes({
+      featureId: prism.id,
+      geometry: CastingCavities.FinishedCavityGeometry.Prisms([prism])
+    })) return null;
+    var cavities = finishedCavities();
+    var boxes = BoxAlgebra.materialLess(envelope, cavities.filter(cavity -> CastingCavities.supportsBoxes(cavity)));
+    var tools:Array<Part> = [];
+    try {
+      for (cavity in cavities) if (!CastingCavities.supportsBoxes(cavity)) tools.push(CastingCavityCad.part(cavity));
+      for (part in InsertAnchorGeometry.embeddedParts(embeddedAnchors())) tools.push(part);
+      if (parameterToken("buildStage") == materia.casting.InsertStages
+        .InsertStage.Service) for (bond in postCureBonds()) tools.push(CastingCavityCad.receiver(bond.receiver));
+      var result = BoxMaterialVolume.of(boxes, tools);
+      for (tool in tools) tool.close();
+      return result;
+    } catch (error:Dynamic) {
+      for (tool in tools) tool.close();
+      throw error;
+    }
+  }
+
   public function asCastGeometry():Part return new MineralCasting(values().copy().setToken(
     "buildStage",
     materia.casting.InsertStages.InsertStage.BeforeCasting

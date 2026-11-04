@@ -79,6 +79,12 @@ class MillFrameChecks {
     var poses = frame.solvedPoses();
     for (foundation in [frame.base, frame.column]) {
       check(!FoundationIntegrity.check(foundation).hasErrors(), "nominal insert planes");
+      // Its mass comes from the analytic casting volume; the column also cuts post-cure receivers in service.
+      for (stage in [materia.casting.InsertStages.InsertStage.BeforeCasting, materia.casting.InsertStages.InsertStage.Service]) {
+        machinekit.structural.CastingVolumeAgreement.check(new machinekit.structural.MineralCasting(foundation.body.values()
+          .copy().setToken("buildStage", stage)), (foundation == frame.base ? "mill base " : "mill column ") + stage);
+        check(true, "analytic casting volume agrees with the solid");
+      }
       var lifting = foundation.insertLocations().filter(row -> row.part.parameterToken("role")
         == materia.casting.InsertSpec.InsertRole.LiftingMount);
       check(lifting.length == 4, "four declared source lifting connections");

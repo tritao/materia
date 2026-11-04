@@ -39,6 +39,7 @@ class FlexsplineHobberChecks {
     machine.validate();
     assertions += HobberDesignChecks.run(machine);
     assertions += HobberFrameChecks.run(machine);
+    assertions += HobberCastingMassChecks.run(machine);
     var runtimeModel = modelForRuntime(machine);
     for (joint in [FlexsplineHobber.B, FlexsplineHobber.C]) {
       var drive = runtimeModel.actuators.filter(a -> switch a.transmission {
@@ -562,6 +563,10 @@ class FlexsplineHobberChecks {
     Sys.println('Reference load ratings: $assertions checks passed');
   }
   public static function main():Void {
+    if (Sys.args().indexOf("casting-mass") >= 0) {
+      Sys.println('casting mass: ${HobberCastingMassChecks.run(new FlexsplineHobber())} assertions passed');
+      return;
+    }
     if (Sys.args().indexOf("z-drive-checks") >= 0) {
       HobberZDriveChecks.run();
       return;

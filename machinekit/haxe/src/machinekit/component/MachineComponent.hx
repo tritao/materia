@@ -297,6 +297,13 @@ class MachineComponent {
 	 */
   public function massGeometry():Null<Part> return null;
 
+  /**
+	 * The volume, centroid and unit-density inertia of `geometry(Preview)`, computed exactly from the component's own
+	 * representation without building the solid, or null when that representation cannot give them. A component returns
+	 * them only where they equal integrating the preview solid, to rounding; `massProperties` then skips the solid.
+	 */
+  public function analyticVolume():Null<VolumeProperties> return null;
+
   /** The preview shape supplies volume and centroid; its density is kg/m³. */
   public function massProperties():MassProperties {
     if (declaredMass != null) return declaredMass;
@@ -313,6 +320,19 @@ class MachineComponent {
         cachedMassMaterialId = materialId;
         return known;
       }
+    }
+    var analytic = effective == null && modelled == null ? analyticVolume() : null;
+    if (analytic != null) {
+      var density = MaterialLibrary.require(materialId).physical.density;
+      cachedMass = new MassProperties(
+        analytic.volume * 1e-9 * density,
+        analytic.centre,
+        Computed(Preview),
+        analytic.inertia.scaled(density * 1e-9)
+      );
+      cachedMassMaterialId = materialId;
+      if (shareKey != null) recipe.rememberMass(shareKey, cachedMass);
+      return cachedMass;
     }
     var part:Part;
     if (modelled != null) {

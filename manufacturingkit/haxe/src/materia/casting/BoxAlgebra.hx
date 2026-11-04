@@ -168,8 +168,12 @@ class BoxAlgebra {
 
   public static function remove(boxes:Array<Box3>, cut:Box3):Array<Box3> return subtract(boxes, [cut]);
 
-  public static function material(body:Array<CastingPrism>, features:Array<CastingFeature>):Array<Box3> {
-    var cavities = CastingCavities.derive(body, features);
+  public static function material(body:Array<CastingPrism>, features:Array<CastingFeature>):Array<Box3> return
+    materialLess(body, CastingCavities.derive(body, features));
+
+  /** The envelope less `cavities`, each of which must be a box cavity (`CastingCavities.supportsBoxes`). */
+  public static function materialLess(body:Array<CastingPrism>,
+    cavities:Array<CastingCavities.FinishedCastingCavity>):Array<Box3> {
     // Validate cavities before the envelope, preserving the source feature in diagnostics.
     var cuts = [for (c in cavities) for (b in CastingCavities.boxes(c)) b];
     var region:Array<Box3> = [];
@@ -179,7 +183,7 @@ class BoxAlgebra {
         geometry: CastingCavities.FinishedCavityGeometry.Prisms([prism])
       };
       if (!CastingCavities.supportsBoxes(residue)) {
-        var ids = [for (feature in features) feature.id];
+        var ids = [for (cavity in cavities) cavity.featureId];
         ids.sort(Reflect.compare);
         throw ids.length == 0 ? "Unsupported non-box casting material envelope: " + prism.id
           : "Unsupported non-box casting material residue after features: " + ids.join(", ");
