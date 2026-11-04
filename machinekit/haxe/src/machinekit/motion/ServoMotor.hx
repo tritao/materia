@@ -453,10 +453,29 @@ class ServoMotor extends MachineComponent implements MotorDrive {
         length,
         declared == null ? Math.max(6, face * 0.1) : declared.flangeThickness,
         declared == null ? 0 : declared.holeDiameter,
-        declared == null ? [] : declared.holes
+        declared == null ? [] : declared.holes,
+        declared == null ? null : reliefDiameter(declared)
       ),
       "body"
     );
+  }
+
+  /** Room left round a flange screw head for its driver, mm (assumed: no maker's drawing gives the corner relief). */
+  public static inline var RELIEF_MARGIN:Float = 1.0;
+
+  /**
+	 * The diameter of the corner relief behind the flange round each bolt axis: the head of the screw the flange's hole takes
+	 * (`MotorFlange.screw`, else the largest catalogue screw whose medium clearance hole is no wider than the flange's) plus
+	 * `RELIEF_MARGIN`. The catalogue gives no relief dimension, so this is assumed from the screw.
+	 */
+  public static function reliefDiameter(flange:MotorFlange):Null<Float> {
+    var catalog = machinekit.standard.SocketHeadCapScrew.catalog();
+    var spec = flange.screw == null ? null : catalog.get(flange.screw);
+    if (spec == null) for (name in catalog.designations()) {
+      var candidate = catalog.get(name);
+      if (candidate.clearanceMedium <= flange.holeDiameter + 1e-6 && (spec == null || candidate.diameter > spec.diameter)) spec = candidate;
+    }
+    return spec == null ? null : spec.headDiameter + RELIEF_MARGIN;
   }
 
   /** The motor's mass is that of its body as a solid cylinder of the flange's width (the drawn body does not set it). */

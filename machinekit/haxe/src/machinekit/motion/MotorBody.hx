@@ -9,7 +9,8 @@ import machinekit.component.Solids;
  * A square-flanged motor housing as servo and spindle motors are built: a flange of side `face` and thickness
  * `flange` with bolt holes, a housing with chamfered corners, a rear (encoder) cap, and a connector boss on the
  * housing's +Y side. Motor CAD frame: mounting face at z = 0, body towards -Z over `length`; the shaft is its own
- * part. Everything lies inside the box `face` × `face` × `length` behind the face, the motor's envelope.
+ * part. Everything lies inside the box `face` × `face` × `length` behind the face, the motor's envelope. With a `relief`
+ * diameter the housing and cap are relieved round each bolt axis, as a servo's corners are behind its flange.
  */
 class MotorBody {
   public static function part(
@@ -17,7 +18,8 @@ class MotorBody {
     length:Float,
     flange:Float,
     holeDiameter:Float,
-    holes:Array<{x:Float, y:Float}>
+    holes:Array<{x:Float, y:Float}>,
+    ?relief:Float
   ):Part {
     if (!(face > 0)
       || !(length > flange) || !(flange > 0)) throw "Motor body needs a positive face, flange and a longer body";
@@ -46,6 +48,12 @@ class MotorBody {
       Part.cylinderSpan(holeDiameter / 2, -flange - 0.1, 0.1, hole.x, hole.y),
       "bolt-hole"
     )];
+    // Corner reliefs behind the flange: a cylinder the width of the screw head and its driver round each bolt axis, over
+    // the whole body, so the heads of the flange screws can be reached from the back (`ServoMotor.reliefDiameter`).
+    if (relief != null && relief > 0) for (hole in holes) tools.push(Solids.named(
+      Part.cylinderSpan(relief / 2, -length - 0.1, -flange, hole.x, hole.y),
+      "screw-relief"
+    ));
     for (tool in tools) owned.push(tool);
     return tools.length == 0 ? body : Solids.cut(body, tools);
     });

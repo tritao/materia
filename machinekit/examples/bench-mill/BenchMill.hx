@@ -564,11 +564,12 @@ class BenchMill extends MachineAssembly {
     } else if (spec.id == "x") {
       var footZ = start[2] + near.connector("mount").frame.y;
       for (side in [-1, 1]) {
-        var reach = Math.abs(motorPose.x) + motorPlate.thickness + 4 - saddle.width / 2;
-        var slot = side < 0 ? motorPose.x + saddle.width / 2 + reach / 2 + motorPlate.thickness / 2 : null;
+        // The bridge ends against the motor plate's inner face: nothing stands behind the plate, where the flange screws' heads
+        // and their drivers are.
+        var reach = Math.abs(motorPose.x) - motorPlate.thickness - saddle.width / 2;
         attach(
           id + (side < 0 ? "NearBridge" : "FarBridge"),
-          new MillDriveBox(side < 0 ? "MILL-X-BRIDGE-NEAR" : "MILL-X-BRIDGE-FAR", reach, 80, 10, slot, motorPlate.thickness),
+          new MillDriveBox(side < 0 ? "MILL-X-BRIDGE-NEAR" : "MILL-X-BRIDGE-FAR", reach, 80, 10),
           AssemblyFrames.translation(side * (saddle.width / 2 + reach / 2), start[1], footZ - 10),
           parent
         );
@@ -806,10 +807,8 @@ class MillDriveBox extends MachineComponent {
   final width:Float;
   final depth:Float;
   final height:Float;
-  final slot:Null<Float>;
-  final slotWidth:Float;
-  public function new(drawing:String, width:Float, depth:Float, height:Float, ?slot:Float, slotWidth:Float = 0) {
-    super('MILL-BRACKET-$width-$depth-$height-$slot-$slotWidth', "Mill drive support bracket", "steel", true);
+  public function new(drawing:String, width:Float, depth:Float, height:Float) {
+    super('MILL-BRACKET-$width-$depth-$height', "Mill drive support bracket", "steel", true);
     declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(machinekit.component.Procurement.Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
@@ -817,22 +816,13 @@ class MillDriveBox extends MachineComponent {
     this.width = width;
     this.depth = depth;
     this.height = height;
-    this.slot = slot;
-    this.slotWidth = slotWidth;
   }
   override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
     [drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(width),
-      machinekit.component.ComponentNumberKey.encode(depth), machinekit.component.ComponentNumberKey.encode(height),
-      slot == null ? "none" : machinekit.component.ComponentNumberKey.encode(slot),
-      machinekit.component.ComponentNumberKey.encode(slotWidth)].join("|"), 1);
+      machinekit.component.ComponentNumberKey.encode(depth), machinekit.component.ComponentNumberKey.encode(height)].join("|"), 1);
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
-    var body = Solids.named(Part.box(width, depth, height), "bracket");
-    if (slot == null) return body;
-    return Solids.cut(
-      body,
-      [Solids.named(Part.box(slotWidth, depth + 2, height + 2).translated(new Vector(slot, 0, -1)), "motor-plate-seat")]
-    );
+    return Solids.named(Part.box(width, depth, height), "bracket");
   }
 }
 

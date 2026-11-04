@@ -283,13 +283,9 @@ class JointFastenerTests {
     var started = Sys.time();
     var fit = machinekit.assembly.AssemblyIntegrity.fasteners(machine, {fasteners: true});
     Sys.println('bench mill fastener fit: ${fit.errors().length} findings in ${Math.round(Sys.time() - started)} s');
-    for (item in fit.errors()) {
-      Sys.println("  " + item.code + ": " + item.message);
-      check(StringTools.startsWith(item.message, "motorX#flange") || StringTools.startsWith(item.message, "motorY#flange"), "a rail screw does not fit: " + item.message);
-    }
-    // Open findings of the mill, stated by the check and not yet resolved in the model: the motors' corner screws at (-25, -25)
-    // meet the motor body at its corner and, on X, the screw support next to it.
-    check(fit.errors().length == 7, 'the mill\'s known motor-corner findings are 7, found ${fit.errors().length}');
+    for (item in fit.errors()) Sys.println("  " + item.code + ": " + item.message);
+    // The motors' flange screws have corner reliefs behind the flange (`MotorBody`) and nothing stands in their heads' way.
+    check(fit.errors().length == 0, 'the derived fasteners fit the mill: ${[for (item in fit.errors()) item.message].join("; ")}');
     Sys.println('bench mill: ${derivation.joints.length} joints, ${derivation.count()} screws (${railHoles} rail, 12 motor, 18 nut flange), ' + [for (k in count.keys()) k + " x" + count.get(k)].join(", "));
     // The drilled seats are in the castings' solids: one tap-drill hole per rail screw, none anywhere else.
     var cut = 0;
