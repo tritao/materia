@@ -35,8 +35,12 @@ class HobberZDriveChecks {
         F.compose(flange.pose, F.translation(0, 0, -125))
       );
     raw.close();
-    var missing = back.subtract(body), missingMm3 = missing.volume();
+    // Backing means as-cast occupancy: resin plus the permanent steel and anchors cast into the pockets
+    // (the finished body alone has the anchor pockets cut out, which is not thinner casting).
+    var composite = m.column.asCastCompositeGeometry();
+    var missing = back.subtract(composite), missingMm3 = missing.volume();
     missing.close();
+    composite.close();
     back.close();
     check(missingMm3 < 0.001, "125 mm full casting backing behind drive insert");
     check(body.solidCount() == 1, "column remains monolithic");
@@ -100,10 +104,10 @@ class HobberZDriveChecks {
       couplingClearanceMm: couplingClearance,
       guideSpacingMm: 290,
       screwLateralOffsetMm: screw.y - (a.y + b.y) / 2,
-      screwBehindGuideMm: 19,
-      shaftTopZMm: 730,
+      screwBehindGuideMm: screw.x - a.x,
+      shaftTopZMm: Z.SHAFT_TOP,
       shaftBottomZMm: 310,
-      motorFaceZMm: 765,
+      motorFaceZMm: motor.z,
       motorTopZMm: 910,
       fixedBearingZMm: fixed.z,
       floatingBearingZMm: floating.z,
@@ -114,7 +118,7 @@ class HobberZDriveChecks {
       driveInsertMissingBackingMm3: missingMm3,
       castingBackingMm: 125,
       columnCastingKg: m.column.castingByWeight().kg,
-      columnCells: [for (b in m.column.body.materialBoxes()) materia.casting.BoxAlgebra.limits(b)],
+      columnCells: [for (b in materia.casting.BoxAlgebra.material(m.column.body.castingEnvelope(), m.column.body.castingFeatures())) materia.casting.BoxAlgebra.limits(b)],
       scope: "Geometry, mechanical travel and thread sign only; structural stiffness and brake performance unqualified."
     };
     var output = Sys.getEnv("HOBBER_Z_DRIVE_EVIDENCE");
