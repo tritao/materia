@@ -99,6 +99,7 @@ class JointFastenerTests {
     sound();
     machining();
     washersAndNuts();
+    suitSeats();
     fit();
     defects();
     mill();
@@ -178,6 +179,37 @@ class JointFastenerTests {
     var washed = JointFasteners.derive(stack(tappedHost(square(50)), cover(square(50), null, 6, 5.5, null, true, true)));
     washed.require();
     check(washed.joints[0].length == 12 && washed.joints[0].extras.length == 1 && washed.joints[0].extras[0].count == 4, 'a washer under the head: x${washed.joints[0].length}');
+  }
+
+  /** A clamped footprint drilled to suit takes the pattern of each tapped block face under it. */
+  static function suitSeats():Void {
+    function seat(width:Float, height:Float):BoltedFace
+      return BoltedFace.clampedToSuit("seat", BoltedFace.frameOf(origin, up, across), width, height, 5.5, 6, "M5");
+    function two(footprint:BoltedFace, tapped:Array<BoltedFace>):AxisBuilder {
+      var builder = new AxisBuilder();
+      builder.place("cover", new FaceBlock("COVER", [footprint], 6, 0), AssemblyFrames.translation(0, 0, 10));
+      var index = 0;
+      for (face in tapped) {
+        builder.attach("host" + index, new FaceBlock("HOST" + index, [face], 8, 2), AssemblyFrames.translation(index * 70, 0, 0), "cover");
+        index++;
+      }
+      return builder;
+    }
+    function tappedAt(x:Float):BoltedFace
+      return BoltedFace.tapped("top", frameAtTop(10), square(30), "M5", 8, 8, true);
+    // One 200 x 60 seat takes two blocks, each with its own four holes; the pattern comes from the blocks.
+    var good = JointFasteners.derive(two(seat(200, 60), [tappedAt(0), tappedAt(70)]));
+    good.require();
+    check(good.joints.length == 2 && good.count() == 8, "a footprint pairs with both blocks: " + good.joints.length + " joints");
+    var cuts = good.machining.get("cover");
+    check(cuts != null && cuts.length == 8, "the seat is cut by the derivation");
+    // A hole close to the footprint's edge, and a footprint with no block under it.
+    check(JointFasteners.derive(two(seat(200, 34), [tappedAt(0), tappedAt(70)])).codes().indexOf("fasteners.edge") >= 0, "a hole 2 mm from the footprint's edge");
+    check(JointFasteners.derive(two(seat(200, 60), [])).codes().indexOf("fasteners.unmatched") >= 0, "a footprint with no block under it");
+    var both = new AxisBuilder();
+    both.place("cover", new FaceBlock("COVER", [seat(60, 60)], 6, 0), AssemblyFrames.translation(0, 0, 10));
+    both.place("host", new FaceBlock("HOST", [BoltedFace.drilledToSuit("top", frameAtTop(10), 60, 60, 8, 8, CastIron)], 8, 2), AssemblyFrames.translation(0, 0, 0));
+    check(JointFasteners.derive(both).codes().indexOf("fasteners.suit") >= 0, "two footprints: neither knows the pattern");
   }
 
   /** The derived fasteners fit: the holes exist in the solids, the heads stand clear and a driver reaches them. */
