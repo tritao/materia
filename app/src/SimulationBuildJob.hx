@@ -21,11 +21,18 @@ class SimulationBuildJob {
     session:ProjectDocumentSession
   ) {
     var self = this;
+    // Collect editable models on the owner thread: robotModels updates the configuration's
+    // current selection and caches while resolving the complete set of robots.
+    var models:Null<Array<{id:String, model:robotkit.model.RobotModel, profile:robotkit.profile.RobotProfile,
+      position:Array<Float>, rotation:Array<Float>}>> = null;
+    var captureFailure:Null<String> = null;
+    try models = configuration.robotModels() catch (error:Dynamic) captureFailure = Std.string(error);
     function prepare():Void {
       var target = source.preparationTarget();
       var problem:Null<String> = null;
       try {
-        if (!target.rebuild(configuration, scene, session, false, self.control)) throw target.error;
+        if (captureFailure != null) throw captureFailure;
+        if (!target.rebuild(configuration, scene, session, false, self.control, models)) throw target.error;
         self.control.throwIfCancelled();
         target.detachPreparedRobots();
       } catch (error:Dynamic) {

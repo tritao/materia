@@ -208,7 +208,9 @@ class ApplicationSimulation implements Observable {
     scene:EditorScene,
     ?session:ProjectDocumentSession,
     publishVisuals:Bool = true,
-    ?control:ProjectLoadControl
+    ?control:ProjectLoadControl,
+    ?preparedModels:Array<{id:String, model:robotkit.model.RobotModel, profile:robotkit.profile.RobotProfile,
+      position:Array<Float>, rotation:Array<Float>}>
   ):Bool {
     var candidateSpace:Null<SimulationSpace> = null;
     var environmentTopologyOpen = false;
@@ -249,7 +251,7 @@ class ApplicationSimulation implements Observable {
         control.throwIfCancelled();
         control.phase("Building controllers");
       }
-      var models = configuration.robotModels();
+      var models = preparedModels == null ? configuration.robotModels() : preparedModels;
       var hasWorkers = false;
       for (record in scene.records()) if (record.type == "human-worker") {
         hasWorkers = true;
