@@ -104,7 +104,7 @@ class HobberPartTests {
     for (p in parts) {
       var metadata = EngineeringMetadata.of(p);
       check(
-        (metadata == null) == (Std.isOfType(p, MineralCasting) || Std.isOfType(p, CastInsert)),
+        metadata != null || Std.isOfType(p, MineralCasting) || Std.isOfType(p, CastInsert),
         "engineering provenance optional on structural parts and present on rated motion parts"
       );
       if (metadata != null) {
