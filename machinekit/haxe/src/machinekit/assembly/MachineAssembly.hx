@@ -4,6 +4,8 @@ import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
 import cadkit.modeling.Vector;
 import cadkit.InertiaTensor;
+import machinekit.assembly.JointFasteners.FastenerDerivation;
+import machinekit.assembly.JointFasteners.FastenerOptions;
 import machinekit.component.Bom;
 import machinekit.component.BomItem;
 import machinekit.component.ComponentRegistry;
@@ -1032,6 +1034,24 @@ typedef MachineAssemblyMassProperties = {
   }
 
   // Inventory --------------------------------------------------------------------------------
+
+  var fastenersDerived:Null<FastenerDerivation>;
+
+  /**
+	 * Derives the fasteners of the bolted joints from the faces the members declare (`JointFasteners`), throws every finding,
+	 * and adds the purchase lines to the BOM. Call it once, when the members are placed; the fasteners are not listed by hand.
+	 */
+  public function deriveFasteners(?options:FastenerOptions):FastenerDerivation {
+    if (fastenersDerived != null) throw "The joint fasteners of this assembly are already derived";
+    var derivation = JointFasteners.derive(this, options);
+    derivation.require();
+    for (line in derivation.lines()) addBomItem(line.item, line.quantity);
+    fastenersDerived = derivation;
+    return derivation;
+  }
+
+  /** The derivation `deriveFasteners` made, if it ran. */
+  public function derivedFasteners():Null<FastenerDerivation> return fastenersDerived;
 
   public function addBomItem(item:BomItem, quantity:Int = 1, mass:AssemblyBomMass = Unknown):Void {
     if (item == null || quantity <= 0) throw "Assembly BOM entry needs an item and positive quantity";

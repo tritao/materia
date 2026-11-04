@@ -2,6 +2,8 @@ package machinekit.milling;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
+import machinekit.component.BoltedFace;
+import machinekit.component.BoltedFace.ThreadMaterial.CastIron;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
@@ -72,6 +74,42 @@ class MillCasting extends MachineComponent {
     if (kind == Base) addConnector("column", Mount, Solids.axial(0, depth / 2 - new MillColumn().depth / 2, height));
     if (kind == Head) addConnector("spindle",
       Axis, Solids.axial(0, -depth / 2 + SpindleCartridge.DIAMETER / 2 + 10, 0));
+  }
+
+  /** The deepest rail screw thread a pad is tapped, mm. */
+  public static inline var SEAT_TAP_DEPTH:Float = 20;
+
+  /**
+	 * The rail pads, where the rails are bolted down: the pads are drilled and tapped to suit the rails, in the wall behind
+	 * them (the base's top skin, the saddle's top above the nut bore, the column's front wall).
+	 */
+  override public function fasteningFaces():Array<BoltedFace> {
+    var faces:Array<BoltedFace> = [];
+    if (kind != Base && kind != Saddle && kind != Column) return faces;
+    var nut = new machinekit.motion.BallNut();
+    var wall = switch kind {
+      case Base: 21.0;
+      case Column: 20.0;
+      default: height;
+    };
+    for (side in [-1, 1]) {
+      var name = side < 0 ? "railLeft" : "railRight";
+      faces.push(switch kind {
+        case Base:
+          BoltedFace.drilledToSuit(name, BoltedFace.frameOf({x: side * railSpacing / 2, y: 0, z: height}, {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0}),
+            30, depth, Math.min(SEAT_TAP_DEPTH, wall), wall, CastIron);
+        case Saddle:
+          // The nut bore runs under the pad at x = 0: the wall above it is thin only where the bore is.
+          var radius = nut.flangeDiameter / 2 + 1;
+          BoltedFace.drilledToSuit(name, BoltedFace.frameOf({x: 0, y: side * railSpacing / 2, z: height}, {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0}),
+            width, 30, SEAT_TAP_DEPTH, height, CastIron, null, false,
+            (u, _) -> Math.abs(u) < radius ? height - screwHeight - Math.sqrt(radius * radius - u * u) : height);
+        default:
+          BoltedFace.drilledToSuit(name, BoltedFace.frameOf({x: side * railSpacing / 2, y: -depth / 2, z: height / 2}, {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}),
+            30, height, Math.min(SEAT_TAP_DEPTH, wall), wall, CastIron);
+      });
+    }
+    return faces;
   }
 
   override public function hasGeometry():Bool return true;

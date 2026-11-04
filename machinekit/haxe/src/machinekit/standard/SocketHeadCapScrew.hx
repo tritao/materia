@@ -150,6 +150,16 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
     return table;
   }
 
+  /** ISO 4762 preferred nominal lengths, mm. */
+  public static function standardLengths():Array<Float> return [6, 8, 10, 12, 16, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100, 110, 120,
+    130, 140, 150, 160, 180, 200];
+
+  /** The shortest standard length of at least `minimum` mm, or null where the series ends before it. */
+  public static function standardLengthAtLeast(minimum:Float):Null<Float> {
+    for (length in standardLengths()) if (length >= minimum - 1e-9) return length;
+    return null;
+  }
+
   public static function metric(size:String,
     length:Float, propertyClass:PropertyClass = Steel129):SocketHeadCapScrew return new SocketHeadCapScrew(
       catalog().get(size),

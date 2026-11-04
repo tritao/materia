@@ -34,6 +34,11 @@ class MachineComponent {
     );
   }
   /**
+	 * The faces where this part is bolted to another, with the holes they know (see `BoltedFace`). `JointFasteners` derives
+	 * the fasteners of every pair of faces that meet in an assembly; a part with none is never fastened by derivation.
+	 */
+  public function fasteningFaces():Array<BoltedFace> return [];
+  /**
 	 * Whether a shaft turns in this part: its bearings (a screw support, a motor mount, a motor housing, a bearing block) carry
 	 * a journal. A body that turns relative to the structure may touch such a part without it counting as a rubbing contact.
 	 */

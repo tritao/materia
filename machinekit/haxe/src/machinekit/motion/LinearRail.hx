@@ -128,6 +128,27 @@ class LinearRail extends MachineComponent {
   public function mountingConnectors():Array<machinekit.component.Connector
     > return [for (index in 0...holePositions.length) connector('mount${index+1}')];
 
+  /**
+	 * The bottom face the rail is bolted down by: the counterbored holes along it, for the catalogue screw. The screw bears
+	 * on the counterbore floor, so the grip is the rail's height less the counterbore depth.
+	 */
+  override public function fasteningFaces():Array<machinekit.component.BoltedFace> {
+    var mounting = spec.railMountScrew;
+    if (mounting == null || mounting.size == null) throw "Invalid rail mounting screw";
+    var bore = spec.railBore;
+    var frame = machinekit.component.BoltedFace.frameOf({x: 0, y: -spec.railHeight, z: 0}, {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0});
+    // The face's y axis runs along -Z of the rail.
+    return [machinekit.component.BoltedFace.clamped(
+      "base",
+      frame,
+      [for (z in holePositions) {x: 0.0, y: -z}],
+      bore.through,
+      spec.railHeight - bore.depth,
+      mounting.size,
+      {diameter: bore.counterbore, depth: bore.depth}
+    )];
+  }
+
   public function mountingThread():cadkit.threads.ThreadSpec {
     var mounting = spec.railMountScrew;
     if (mounting == null || mounting.size == null || !Math.isFinite(mounting.length)

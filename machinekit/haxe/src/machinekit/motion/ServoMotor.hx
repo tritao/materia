@@ -345,6 +345,24 @@ class ServoMotor extends MachineComponent implements MotorDrive {
     });
   }
 
+  /**
+	 * The flange face of a drilled flange: clearance holes in the flange, screws entering from the flange's back face into a
+	 * tapped host. A tapped flange (a stepper that takes the mount's screws) is a receiving face and is not described here.
+	 */
+  override public function fasteningFaces():Array<machinekit.component.BoltedFace> {
+    var flange = mounting();
+    if (flange == null || !(flange.holeDiameter > 0)) return [];
+    // The flange lies behind its face (-Z); the face frame looks into the motor, so its y axis is -Y.
+    return [machinekit.component.BoltedFace.clamped(
+      "flange",
+      machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: 0}, {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0}),
+      [for (hole in flange.holes) {x: hole.x, y: -hole.y}],
+      flange.holeDiameter,
+      flange.flangeThickness,
+      flange.screw
+    )];
+  }
+
   /** Explicit, unverified flange rows for the generic motor families. */
   public static function assumedMounting(designation:String):MotorFlange {
     var face = 0.0, pilot = 0.0, pitch = 0.0, hole = 0.0;
