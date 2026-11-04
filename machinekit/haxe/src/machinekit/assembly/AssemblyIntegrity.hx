@@ -456,9 +456,16 @@ class AssemblyIntegrity {
     );
   }
 
-  /** A guide block and a guide rail: the block rides the rail it touches. */
+  /**
+	 * Parts that run close by design: a guide block and its guide rail (the block rides the rail it touches), and a sealed scale's
+	 * reading head in its housing's slot (they keep the datasheet's running gap and never touch).
+	 */
   function guided(a:String, b:String):Bool {
     var first = flat.member(a), second = flat.member(b);
+    if (Std.isOfType(first, machinekit.motion.SealedScalePart) && Std.isOfType(second, machinekit.motion.SealedScalePart)) {
+      var one:machinekit.motion.SealedScalePart = cast first, two:machinekit.motion.SealedScalePart = cast second;
+      return one.variant != two.variant;
+    }
     return (Std.isOfType(first, machinekit.motion.LinearRail) && Std.isOfType(second, machinekit.motion.LinearRailBlock))
       || (Std.isOfType(second, machinekit.motion.LinearRail) && Std.isOfType(first, machinekit.motion.LinearRailBlock));
   }

@@ -126,7 +126,7 @@ class FlexsplineHobber extends MachineAssembly {
       var port = table.port(name, "table");
       exposePort("table." + name, port.instanceId, port.portName);
     }
-    var diameter = 2 * (this.spec.rootRadius() - 0.6), workSeat = 363 - FoundationLayout.TABLE_FACE;
+    var diameter = 2 * (this.spec.rootRadius() - 0.6), workSeat = HobberZLayout.SEAT_Z - FoundationLayout.TABLE_FACE;
     mandrel = new ExpandingMandrel(new ComponentValues().setNumber("outside", diameter - LOADING_CLEARANCE).setNumber(
       "radialFitGap",
       LOADING_CLEARANCE / 2
@@ -192,7 +192,7 @@ class FlexsplineHobber extends MachineAssembly {
       F.translation(0, 0, FoundationLayout.TABLE_FACE + mandrel.parameterNumber("sleeveStart")),
       "mandrel"
     );
-    workOrigin = F.compose(MACHINE_FROM_WORK, F.translation(0, 0, 363));
+    workOrigin = F.compose(MACHINE_FROM_WORK, F.translation(0, 0, HobberZLayout.SEAT_Z));
     var blank = new FlexsplineCupBlank(new ComponentValues().setNumber("outside", 2 * this.spec.tipRadius()).setNumber(
       "bore",
       diameter
@@ -203,7 +203,7 @@ class FlexsplineHobber extends MachineAssembly {
       "bandWidth",
       this.spec.faceWidth
     ));
-    fixAt("blank", blank, F.translation(0, 0, 363), "mandrel");
+    fixAt("blank", blank, F.translation(0, 0, HobberZLayout.SEAT_Z), "mandrel");
     var minX = Math.max(25, mandrel.parameterNumber("outside") / 2 + hob.design.outsideDiameter / 2 + 0.2);
     var cutDistance = this.spec.pitchRadius()
       + hob.design.pitchDiameter / 2 + this.spec.profileShift * this.spec.module;
@@ -244,13 +244,13 @@ class FlexsplineHobber extends MachineAssembly {
     for (side in [-1, 1]) for (row in [0, 110]) {
       var id = "blockZ" + (side < 0 ? "Left" : "Right") + (row == 0 ? "" : "Upper");
       var block = LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER);
-      var pose = AxisBuilder.orient(centre + 161, side * 145, 363 + row, [-1.0, 0, 0], [0.0, 0, 1]);
-      var face = F.alongY(centre + 148, side * 145, 363 + row, -1, 0, 0);
+      var pose = AxisBuilder.orient(centre + 161, side * 145, HobberZLayout.SEAT_Z + row, [-1.0, 0, 0], [0.0, 0, 1]);
+      var face = F.alongY(centre + 148, side * 145, HobberZLayout.SEAT_Z + row, -1, 0, 0);
       if (id == "blockZLeft") {
         addComponent(id, block);
         zero.set(id, pose);
-        moving("Z", Prismatic, "railZLeft", id, F.translation(centre + 161, 0, 363), [0.0, 0, 1], 0, -10, 190);
-        fixAt("Zplate", new HobberSaddle("GE-Z-saddle"), F.translation(centre, 0, 363), id, face);
+        moving("Z", Prismatic, "railZLeft", id, F.translation(centre + 161, 0, HobberZLayout.SEAT_Z), [0.0, 0, 1], 0, -10, 190);
+        fixAt("Zplate", new HobberSaddle("GE-Z-saddle"), F.translation(centre, 0, HobberZLayout.SEAT_Z), id, face);
       } else fixAt(id, block, pose, "Zplate", face);
     }
     var swivelMotor = new TorqueMotor(new ComponentValues().setNumber("height", 20).setNumber(
@@ -267,33 +267,33 @@ class FlexsplineHobber extends MachineAssembly {
       2 / Math.sqrt(3)
     ));
     swivel = new SwivelHead(swivelMotor, null, Math.PI / 12);
-    includeAt("swivel", swivel, F.fromRotationMatrix(centre + 135, 0, 363, [0.0, 0, -1, 1, 0, 0, 0, -1, 0]));
-    fixExisting("swivel-mount", "Zplate", "swivel/housing", F.alongY(centre + 135, 0, 363, 1, 0, 0));
+    includeAt("swivel", swivel, F.fromRotationMatrix(centre + 135, 0, HobberZLayout.SEAT_Z, [0.0, 0, -1, 1, 0, 0, 0, -1, 0]));
+    fixExisting("swivel-mount", "Zplate", "swivel/housing", F.alongY(centre + 135, 0, HobberZLayout.SEAT_Z, 1, 0, 0));
     var e0 = [-1.0, 0, 0, 0, 0, -1, 0, -1, 0];
     fixAt(
       "swivelPlate",
       new HobberSaddle("GE-swivel-plate"),
-      F.translation(centre, 0, 363),
+      F.translation(centre, 0, HobberZLayout.SEAT_Z),
       "swivel/head",
-      F.alongY(centre + 100, 0, 363, -1, 0, 0)
+      F.alongY(centre + 100, 0, HobberZLayout.SEAT_Z, -1, 0, 0)
     );
     for (side in [-1, 1]) fixAt(
       side < 0 ? "railYLeft" : "railYRight",
       LinearRail.metric("HGH15CA", 220),
-      AxisBuilder.orient(centre + 70, 110, 363 + side * 60, [-1.0, 0, 0], [0.0, -1, 0]),
+      AxisBuilder.orient(centre + 70, 110, HobberZLayout.SEAT_Z + side * 60, [-1.0, 0, 0], [0.0, -1, 0]),
       "swivelPlate",
-      F.alongY(centre + 85, 110, 363 + side * 60, -1, 0, 0)
+      F.alongY(centre + 85, 110, HobberZLayout.SEAT_Z + side * 60, -1, 0, 0)
     );
     for (side in [-1, 1]) for (row in [-40, 40]) {
       var id = "blockY" + (side < 0 ? "Left" : "Right") + (row < 0 ? "" : "Front");
       var block = LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER);
-      var pose = AxisBuilder.orient(centre + 70, row, 363 + side * 60, [-1.0, 0, 0], [0.0, -1, 0]);
-      var face = F.alongY(centre + 57, row, 363 + side * 60, -1, 0, 0);
+      var pose = AxisBuilder.orient(centre + 70, row, HobberZLayout.SEAT_Z + side * 60, [-1.0, 0, 0], [0.0, -1, 0]);
+      var face = F.alongY(centre + 57, row, HobberZLayout.SEAT_Z + side * 60, -1, 0, 0);
       if (id == "blockYLeft") {
         addComponent(id, block);
         zero.set(id, pose);
-        moving("Y", Prismatic, "railYLeft", id, F.translation(centre + 70, 0, 363), [0.0, -1, 0], 0, -10, 10);
-        fixAt("Yplate", new HobberSaddle("GE-Y-saddle"), F.translation(centre, 0, 363), id, face);
+        moving("Y", Prismatic, "railYLeft", id, F.translation(centre + 70, 0, HobberZLayout.SEAT_Z), [0.0, -1, 0], 0, -10, 10);
+        fixAt("Yplate", new HobberSaddle("GE-Y-saddle"), F.translation(centre, 0, HobberZLayout.SEAT_Z), id, face);
       } else fixAt(id, block, pose, "Yplate", face);
     }
     spindle = new HobSpindle(
@@ -306,17 +306,17 @@ class FlexsplineHobber extends MachineAssembly {
         22
       ))
     );
-    includeAt("spindle", spindle, F.fromRotationMatrix(centre, 240, 363, e0));
-    fixExisting("spindle-mount", "Yplate", "spindle/housing", F.alongY(centre + 40, 210, 363, 1, 0, 0));
-    fixAt("hob", hob, F.fromRotationMatrix(centre, 20, 363, e0), "spindle/arbor");
+    includeAt("spindle", spindle, F.fromRotationMatrix(centre, 240, HobberZLayout.SEAT_Z, e0));
+    fixExisting("spindle-mount", "Yplate", "spindle/housing", F.alongY(centre + 40, 210, HobberZLayout.SEAT_Z, 1, 0, 0));
+    fixAt("hob", hob, F.fromRotationMatrix(centre, 20, HobberZLayout.SEAT_Z, e0), "spindle/arbor");
     fixAt(
       "outboard",
       new OutboardSupport(new ComponentValues().setNumber("height", 30).setNumber("seatLength", 9)),
-      F.fromRotationMatrix(centre, -85, 363, e0),
+      F.fromRotationMatrix(centre, -85, HobberZLayout.SEAT_Z, e0),
       "Yplate",
-      F.alongY(centre + 30, -100, 363, 1, 0, 0)
+      F.alongY(centre + 30, -100, HobberZLayout.SEAT_Z, 1, 0, 0)
     );
-    fixAt("outboardBearing", new FloatingRadialBearing(), F.fromRotationMatrix(centre, -95.5, 363, e0), "outboard");
+    fixAt("outboardBearing", new FloatingRadialBearing(), F.fromRotationMatrix(centre, -95.5, HobberZLayout.SEAT_Z, e0), "outboard");
     mountContacts.push({parent: "outboard", child: "outboardBearing"});
     mountContacts.push({parent: "spindle/arbor", child: "outboardBearing"});
     var supply = new ThreePhaseRectifier(
@@ -354,6 +354,17 @@ class FlexsplineHobber extends MachineAssembly {
     drive(xDrive, "XdriveFixed", "XdriveFloating", "Xbridge");
     drive(zDrive, "ZdriveFixed", "ZdriveFloating", "Zplate");
     drive(yDrive, "YdriveFixed", "YdriveFloating", "YnutSeat");
+    // Sealed scales (FRAME_PLAN H4): X on a ground bar on the bed beam, Z on a bar on the column channel's wall with its head on
+    // an arm from the Z saddle, Y on the swivel plate with its head on a boss of the Y saddle.
+    var scaleX = HobberScales.x(), scaleY = HobberScales.y(), scaleZ = HobberScales.z();
+    fixAt("XscaleSeat", new HobberSaddle("GE-X-scale-seat"), F.identity(), "bed/casting", scaleBarContact(scaleX));
+    fixAt("ZscaleSeat", new HobberSaddle("GE-Z-scale-seat"), F.identity(), "column/casting", scaleBarContact(scaleZ));
+    var armFace = HobberScales.headFace(scaleZ);
+    fixAt("ZscaleArm", new HobberSaddle("GE-Z-scale-arm"), F.translation(0, 0, HobberZLayout.SEAT_Z), "Zplate",
+      F.alongY(148, armFace[1] - HobberScales.Z_ARM_THICKNESS / 2, armFace[2], 1, 0, 0));
+    scale(scaleX, "XscaleSeat", "Xbridge");
+    scale(scaleY, "swivelPlate", "Yplate");
+    scale(scaleZ, "ZscaleSeat", "ZscaleArm");
     fixAt(
       "chipTray",
       new HobberSaddle(
@@ -375,7 +386,7 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt(
       "coolantPort",
       new HobberSaddle("GE-coolant"),
-      F.translation(centre, 0, 363),
+      F.translation(centre, 0, HobberZLayout.SEAT_Z),
       "Yplate",
       F.alongY(centre + 45, 40, 435, 1, 0, 0)
     );
@@ -488,8 +499,23 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt(id + "motor-shaft", motor.shaft(), at.get("motor"), id + "coupling");
     mountContacts.push({parent: fixedPad, child: id + "fixed"});
     mountContacts.push({parent: floatingPad, child: id + "floating"});
-    // Position feedback: the exposed tapes went with the old drive frames; H4 puts the sealed scales on the new seats.
+    // Position feedback comes from the sealed scales (`scale`).
     bind(id + "drive", id + "screw-turn", id + "motor");
+  }
+  /** Where a scale's seat bar rests on its host: the far face of the bar from the housing, normal toward the host. */
+  function scaleBarContact(a:HobberScaleAxis):AssemblyFrame {
+    var face = HobberScales.housingFace(a), t = a.toSeat, bar = HobberScales.SEAT_BAR;
+    var b = a.seatBar;
+    if (b == null) throw "scale has no seat bar";
+    // The bar's contact face is one bar thickness behind the housing's mounting face; the bar is 20 wide across the travel.
+    return F.alongY(face[0] + t[0] * bar, face[1] + t[1] * bar, face[2] + t[2] * bar, t[0], t[1], t[2]);
+  }
+  /** One axis's sealed scale: the housing on its seat, the head on its carrier, and the head as the axis's position encoder. */
+  function scale(a:HobberScaleAxis, seatHost:String, headHost:String):Void {
+    var housing = a.id + "scale", head = a.id + "scaleHead";
+    fixAt(housing, a.housing, a.housingPose, seatHost, F.compose(a.housingPose, a.housing.connector("mount").frame));
+    fixAt(head, a.head, a.headPose, headHost, F.compose(a.headPose, a.head.connector("mount").frame));
+    addEncoder(a.id + "position", a.id, head);
   }
   function bind(id:String, joint:String, motor:String, process:Bool = false):Void {
     driverNumber++;

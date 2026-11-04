@@ -3,13 +3,15 @@ package machinekit.hobbing;
  * Fixed bearing/motor above the nut; the loaded screw segment works in tension.
  */
 class HobberZLayout {
+  /** Height of the work seat above the work frame's zero (z), mm: the hob axis, the mandrel's seat and the origin of the Z, Y and swivel parts. */
+  public static inline final SEAT_Z = 363.0;
   public static inline final FOUNDATION_ORIGIN_Z = 290.0;
   /** Screw axis, 25 mm (the BK12 and BF12 shaft height) in front of the 40 mm ground bar pads on the column's drive seat at 241. */
   public static inline final AXIS_X = 176.0;
   public static inline final NUT_OFFSET_Z = 55.0;
   public static inline final SHAFT_TOP = 730.0;
   public static inline final SHAFT_LENGTH = 420.0;
-  public static inline final NUT_STATION = SHAFT_TOP - (363 + NUT_OFFSET_Z);
+  public static inline final NUT_STATION = SHAFT_TOP - (SEAT_Z + NUT_OFFSET_Z);
   /** BK12 centre, from the top of the standard 51 mm screw end. */
   public static inline final FIXED_BEARING_Z=SHAFT_TOP-machinekit.motion.HzMotionDrawingScrew.BK12_SUPPORT_CENTRE;
   /** BF12 centre, from the screw tip on the standard 11 mm floating end. */

@@ -1,6 +1,8 @@
 import machinekit.assembly.AssemblyIntegrity;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.MachineKitComponents;
+import machinekit.hobbing.HobberScales;
+import materia.assembly.AssemblyFrames as F;
 
 /** Frame, drive and integrity checks on the assembled hobber (FRAME_PLAN.md H1-H6). */
 class HobberFrameChecks {
@@ -29,12 +31,53 @@ class HobberFrameChecks {
     return [for (error in found) if (!open(error)) error];
   }
 
+  /** The joint's positive direction in the work frame, per axis. */
+  static function jointDirection(id:String):Array<Float> return id == "X" ? [1.0, 0, 0] : id == "Y" ? [0.0, -1, 0] : [0.0, 0, 1];
+
+  /**
+   * The sealed scales (FRAME_PLAN H4): the measuring length is the smallest standard one for the stroke, the head's centre stays inside
+   * the measuring window over the whole stroke plus overtravel, and the Abbe offsets are reported. The Abbe offset of an axis is the
+   * distance from the housing's line (the face toward the head, along the travel) to the hob centre, across the travel, in the work
+   * frame at the initial joint values: two components, along the two work axes that are not the travel, and their length. Returns
+   * one line per axis; throws when the head can leave the window or the scale is not where the machine says.
+   */
+  public static function scales(machine:FlexsplineHobber):Array<String> {
+    var poses = machine.solvedPoses(), lines = [];
+    var back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
+    var tool = F.compose(poses.get("hob"), machine.hob.connector("centre").frame);
+    var toolWork = F.transformPoint(back, tool.x, tool.y, tool.z);
+    for (a in HobberScales.all()) {
+      var travel = machine.travel.filter(t -> t.id == a.id)[0];
+      var housing = poses.get(a.id + "scale"), head = poses.get(a.id + "scaleHead");
+      if (housing == null || head == null) throw 'axis ${a.id} has no scale members';
+      var origin = F.transformPoint(back, housing.x, housing.y, housing.z);
+      var worldAlong = F.transformVector(housing, 0, 0, 1), along = F.transformVector(back, worldAlong.x, worldAlong.y, worldAlong.z);
+      var centre = F.transformPoint(back, head.x, head.y, head.z);
+      var d = [toolWork.x - origin.x, toolWork.y - origin.y, toolWork.z - origin.z];
+      var u = [along.x, along.y, along.z], along0 = d[0] * u[0] + d[1] * u[1] + d[2] * u[2];
+      var across = [for (i in 0...3) d[i] - along0 * u[i]];
+      var sense = jointDirection(a.id), sign = sense[0] * u[0] + sense[1] * u[1] + sense[2] * u[2];
+      // Head position along the scale: at the initial joint value, then over the stroke with the guide overtravel (5 mm each end).
+      var here = (centre.x - origin.x) * u[0] + (centre.y - origin.y) * u[1] + (centre.z - origin.z) * u[2];
+      var from = here + sign * (travel.lower - 5 - travel.initial), to = here + sign * (travel.upper + 5 - travel.initial);
+      var low = Math.min(from, to), high = Math.max(from, to), start = a.housing.startOffset(), end = start + a.housing.measuringLength;
+      var names = ["x", "y", "z"], parts = [for (i in 0...3) if (Math.abs(u[i]) < 0.5) '${names[i]} ${Math.round(Math.abs(across[i]) * 10) / 10}'];
+      var total = Math.sqrt(across[0] * across[0] + across[1] * across[1] + across[2] * across[2]);
+      var line = '${a.id} scale ${a.housing.designation}: Abbe offset ${parts.join(", ")} mm (${Math.round(total * 10) / 10} mm), head ' +
+        'window ${Math.round(low * 10) / 10}..${Math.round(high * 10) / 10} of ${Math.round(start * 10) / 10}..${Math.round(end * 10) / 10}';
+      lines.push(line);
+      if (low < start - 1e-6 || high > end + 1e-6) throw "scale head leaves its measuring window: " + line;
+    }
+    return lines;
+  }
+
   /** Procedures, drive sizing and strict integrity of the assembled machine; returns the number of checks. */
   public static function run(machine:FlexsplineHobber, sweep:Bool = false):Int {
     var presentation = materia.presentation.Presentations.assembled(machine.definition(), -1.1, 0.35, "hobber");
     presentation.procedures = HobberAssemblyProcedures.build(machine);
     materia.presentation.PresentationCodec.validate(machine.definition(), presentation);
-    var lines = sizing(machine), errors = newErrors(machine, sweep);
+    var lines = sizing(machine).concat(scales(machine)), errors = newErrors(machine, sweep);
+    for (line in lines) Sys.println(line);
     if (errors.length > 0) throw 'hobber strict integrity: ${errors.length} findings\n  ' + errors.join("\n  ");
     return presentation.procedures.length + lines.length + 1;
   }
@@ -150,6 +193,7 @@ class HobberFrameChecks {
       Sys.println('procedures valid: ${[for (p in presentation.procedures) p.id].join(", ")}');
     }
     if (args.indexOf("sizing") >= 0) for (line in sizing(machine)) Sys.println(line);
+    if (args.indexOf("scales") >= 0) for (line in scales(machine)) Sys.println(line);
     if (args.indexOf("roundtrip") >= 0) {
       roundTrip(machine);
       Sys.println("round trip ok");
