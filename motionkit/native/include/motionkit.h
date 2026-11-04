@@ -48,14 +48,19 @@ extern "C" {
 /* Runtime handles                                                           */
 /* ------------------------------------------------------------------------- */
 
+/** Owned immutable joint path; release with mk_path_destroy. */
 typedef struct mk_path_handle { uint32_t id; } mk_path_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_path_destroy);
+/** Owned polynomial path-distance law; release with mk_time_law_destroy. */
 typedef struct mk_time_law_handle { uint32_t id; } mk_time_law_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_time_law_destroy);
+/** Owned snapshot for repeated timing queries; release with mk_path_timing_session_destroy. */
 typedef struct mk_path_timing_session_handle { uint32_t id; } mk_path_timing_session_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_path_timing_session_destroy);
+/** Owned windowed timing state; release with mk_path_timing_stream_destroy. */
 typedef struct mk_path_timing_stream_handle { uint32_t id; } mk_path_timing_stream_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_path_timing_stream_destroy);
+/** Owned guard token for a stream preview; release even after commit. */
 typedef struct mk_path_timing_preview_handle { uint32_t id; } mk_path_timing_preview_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_path_timing_preview_destroy);
 
@@ -85,6 +90,7 @@ typedef struct mk_eaik_configuration {
     double shoulder_offset;
     double elbow_offset;
 } mk_eaik_configuration;
+/** Owned compiled 6R solver; release with mk_eaik_destroy. */
 typedef struct mk_eaik_handle { uint32_t id; } mk_eaik_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_eaik_destroy);
 
@@ -110,6 +116,7 @@ typedef struct mk_analytic_cartesian_model {
     double home_quaternion[4];
 } mk_analytic_cartesian_model;
 
+/** One analytic branch, including its branch identifier and singularity flags. */
 typedef struct mk_analytic_solution {
     uint32_t struct_size MK_STRUCT_SIZE;
     double joints[6];
@@ -132,6 +139,7 @@ typedef struct mk_orientation_lattice {
     double half_angle; /**< Cone half-angle in radians, [0, pi]. */
 } mk_orientation_lattice;
 
+/** Sampled target pose and its roll, tilt and azimuth lattice coordinates. */
 typedef struct mk_orientation_sample {
     uint32_t struct_size MK_STRUCT_SIZE;
     double position[3];
@@ -150,6 +158,7 @@ typedef struct mk_joint_lift_request {
     uint8_t periodic[MK_MAX_JOINTS];
 } mk_joint_lift_request;
 
+/** Joint values after a legal periodic lift and each joint's wrap count. */
 typedef struct mk_joint_lift {
     uint32_t struct_size MK_STRUCT_SIZE;
     double joints[MK_MAX_JOINTS];
@@ -167,6 +176,7 @@ typedef struct mk_external_lattice {
     double upper[MK_MAX_JOINTS];
 } mk_external_lattice;
 
+/** One external-axis lattice point in full joint-vector coordinates. */
 typedef struct mk_external_cell {
     uint32_t struct_size MK_STRUCT_SIZE;
     double joints[MK_MAX_JOINTS];
@@ -195,6 +205,7 @@ typedef struct mk_serial_cell_model {
     double tool_quaternion[4];
 } mk_serial_cell_model;
 
+/** Full planning candidate with joint, wrap, lattice and branch metadata. */
 typedef struct mk_lattice_candidate {
     uint32_t struct_size MK_STRUCT_SIZE;
     double joints[MK_MAX_JOINTS];
@@ -235,6 +246,7 @@ typedef struct mk_ladder_edge {
     uint32_t to_candidate;
 } mk_ladder_edge;
 
+/** Search status, failure location, path cost and selected search backend. */
 typedef struct mk_ladder_result {
     uint32_t struct_size MK_STRUCT_SIZE;
     uint32_t failed_sample; /**< UINT32_MAX on success. */
@@ -259,6 +271,7 @@ typedef struct mk_differential_request {
     double linear_tolerance;
     double angular_tolerance;
 } mk_differential_request;
+/** Numerical rank, singularity and residual errors of a differential solve. */
 typedef struct mk_differential_report {
     uint32_t struct_size MK_STRUCT_SIZE;
     uint32_t rank;
@@ -280,6 +293,7 @@ typedef struct mk_configuration_request {
     double preferred[MK_MAX_JOINTS];
 } mk_configuration_request;
 
+/** Candidate-array slice for one path distance; offsets are global indices. */
 typedef struct mk_configuration_sample {
     uint32_t struct_size MK_STRUCT_SIZE;
     double distance;
@@ -288,11 +302,13 @@ typedef struct mk_configuration_sample {
 } mk_configuration_sample;
 
 
+/** One joint-vector choice in a configuration sample's candidate slice. */
 typedef struct mk_configuration_candidate {
     uint32_t struct_size MK_STRUCT_SIZE;
     double joints[MK_MAX_JOINTS];
 } mk_configuration_candidate;
 
+/** Selected joint vector and search diagnostic; failure fields are in slot zero. */
 typedef struct mk_configuration_solution {
     uint32_t struct_size MK_STRUCT_SIZE;
     double joints[MK_MAX_JOINTS];
@@ -335,6 +351,7 @@ typedef struct mk_refinement_sample {
     double upper[MK_MAX_JOINTS];
     double gradient[MK_MAX_JOINTS]; /**< Linear posture objective. */
 } mk_refinement_sample;
+/** Coordinate count, drive derivative limits and objective weights for refinement. */
 typedef struct mk_refinement_limits {
     uint32_t struct_size MK_STRUCT_SIZE;
     uint32_t coordinate_count;
@@ -354,6 +371,7 @@ typedef struct mk_refinement_bound {
     double lower;
     double upper;
 } mk_refinement_bound;
+/** Refined redundant coordinates and their first and second path derivatives. */
 typedef struct mk_refinement_solution {
     uint32_t struct_size MK_STRUCT_SIZE;
     double value[MK_MAX_JOINTS];
@@ -382,9 +400,11 @@ typedef struct mk_time_stage {
     double acceleration;
 } mk_time_stage;
 
+/** Constraint kinds recorded when a time-law stage meets a limiting cap. */
 enum { MK_TIMING_BINDING_JOINT_VELOCITY = 1,
     MK_TIMING_BINDING_JOINT_ACCELERATION = 2,
     MK_TIMING_BINDING_FEED_CAP = 3 };
+/** Limiting constraint for one stage; joint is UINT32_MAX for a feed cap. */
 typedef struct mk_timing_binding {
     uint32_t struct_size MK_STRUCT_SIZE;
     uint32_t stage_index;
@@ -722,7 +742,9 @@ MK_API mk_result MK_CALL mk_path_timing_session_entry_interval(mk_path_timing_se
 /* Windowed timing streams                                                   */
 /* ------------------------------------------------------------------------- */
 
+/** Stream step state: awaiting a stable preview, ready to inspect, or complete. */
 enum { MK_TIMING_STREAM_WAITING = 0, MK_TIMING_STREAM_READY = 1, MK_TIMING_STREAM_DONE = 2 };
+/** Window and boundary metadata returned by mk_path_timing_stream_step. */
 typedef struct mk_path_timing_stream_progress {
     uint32_t struct_size MK_STRUCT_SIZE;
     uint32_t state;
@@ -843,6 +865,7 @@ MK_API mk_result MK_CALL mk_merge_segments_position_budget(mk_trajectory_handle 
     mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
 
 /** The most impulses one joint's input shaper may have. */
+/** Maximum number of input-shaper impulses for each joint. */
 enum { MK_MAX_SHAPER_IMPULSES = 8 };
 /**
  * A copy of `trajectory` convolved with an input shaper: joint `j` of the result is the sum over its impulses `i` of
@@ -896,7 +919,9 @@ MK_API mk_result MK_CALL mk_advance_joint_context(mk_trajectory_handle trajector
  * line in joint space (a planned edge, COLLISION.md CL-D7); Ruckig falls back
  * to time synchronization where phase is impossible.
  */
+/** Ruckig synchronization policy for a state-to-state request. */
 enum { MK_SYNCHRONIZATION_TIME = 0, MK_SYNCHRONIZATION_PHASE = 1 };
+/** Position-target or velocity-stop control mode for a state-to-state request. */
 enum { MK_CONTROL_POSITION = 0, MK_CONTROL_VELOCITY_STOP = 1 };
 
 /** Offline Ruckig request. Velocity-stop ignores target position and velocity limits. */
