@@ -40,12 +40,13 @@ capacity parameter; allocate the full requested length before calling.
    `mk_eaik_forward`/`mk_eaik_inverse` and their Cartesian counterparts expose
    the underlying analytic solutions.
 2. Define the target pose, orientation lattice, external-axis lattice, serial
-   cell model, and finite joint limits. Use the `*_count` calls to size output,
-   then sample full candidates or create a batch and read its compact arrays.
+   cell model, and finite joint limits. Use the lattice `*_count` calls to size
+   lattice output; create a candidate batch to obtain the candidate count, then
+   read its compact arrays.
    Candidate generation preserves all legal cells, branches, and periodic lifts.
-3. Select a continuous sequence with `mk_search_ladder` (or its filtered or
-   compact form). `mk_select_configurations` is the simpler configuration
-   selection interface. `mk_path_differential` and `mk_refine_redundancy` support
+3. Select a continuous sequence with `mk_search_ladder_compact_filtered`.
+   Pass an empty blocked-edge list when no transitions are excluded.
+   `mk_path_differential` and `mk_refine_redundancy` support
    derivative solving and redundant-coordinate smoothing.
 4. Create a joint path with `mk_path_create`. Use `mk_time_path` for a timed law
    and lowered trajectory, or create a time law directly and call
@@ -82,10 +83,11 @@ stream does not release laws or trajectories already returned to the caller.
 Destroy preview tokens even after committing them. Functions that produce a
 copy of a trajectory leave the input handle owned by the caller.
 
-For variable-length candidate and lattice output, call the corresponding
-`*_count` function first, allocate that many records, and pass the allocation
-as the capacity. The compact candidate forms require exact joint, wrap, and
-coordinate array lengths; their row layout is specified beside the functions
+For variable-length lattice output, call the corresponding `*_count` function
+first, allocate that many records, and pass the allocation as the capacity.
+Candidate batch creation returns a count; `mk_read_candidate_batch` requires
+exact joint, wrap, and coordinate array lengths. Their row layout is specified
+beside the functions
 in the header. Check each result code and the returned count or report before
 using output data. The declaration comments in `motionkit.h` give the specific
 contract for every exported function.

@@ -17,7 +17,7 @@ struct TrackLayers {
         const auto generated_at=std::chrono::steady_clock::now();
         cells.clear();cells.reserve(7700);
         for(unsigned branch=0;branch<8;++branch)for(unsigned roll=0;roll<24;++roll)for(unsigned track=0;track<40;++track){
-            mk_lattice_candidate c{};c.struct_size=sizeof(c);c.branch=branch;c.roll_index=roll;c.external_coordinates[0]=track;
+            LadderCandidate c{};c.struct_size=sizeof(c);c.branch=branch;c.roll_index=roll;c.external_coordinates[0]=track;
             c.joints[0]=2.6*layer/(count-1)+.01*track;
             c.joints[1]=.5*(branch&1)+.003*track;
             c.joints[2]=.5*((branch>>1)&1)-.002*track;

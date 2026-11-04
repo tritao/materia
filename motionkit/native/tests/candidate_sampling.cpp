@@ -1,3 +1,5 @@
+#include "../src/lattice_candidate.h"
+using motionkit::LadderCandidate;
 #include "eaik_fixtures.h"
 #include <Eigen/Geometry>
 #include <cassert>
@@ -15,7 +17,23 @@ void store(const T &t,double *p,double *r) {
     Eigen::Quaterniond q(t.linear());for(unsigned i=0;i<3;++i)p[i]=t.translation()[i];
     r[0]=q.x();r[1]=q.y();r[2]=q.z();r[3]=q.w();
 }
-void check_compact(const std::vector<mk_lattice_candidate> &expected,unsigned n,unsigned external,
+// Decode the production compact batch for geometric and ordering assertions.
+std::vector<LadderCandidate> read_batch(mk_candidate_batch_handle batch,unsigned count,unsigned n,unsigned external) {
+    std::vector<double> joints(count*n);std::vector<int32_t> wraps(count*n);
+    std::vector<uint32_t> cells(count*(external+5));uint32_t written=UINT32_MAX;
+    assert(mk_read_candidate_batch(batch,joints.data(),wraps.data(),joints.size(),cells.data(),cells.size(),&written)==MK_OK);
+    assert(written==count);
+    std::vector<LadderCandidate> records(count);
+    for(unsigned i=0;i<count;++i){auto &c=records[i];
+        for(unsigned j=0;j<n;++j){c.joints[j]=joints[i*n+j];c.wraps[j]=wraps[i*n+j];}
+        const auto row=cells.data()+i*(external+5);
+        for(unsigned j=0;j<external;++j)c.external_coordinates[j]=row[j];
+        c.roll_index=row[external];c.tilt_index=row[external+1];c.azimuth_index=row[external+2];
+        c.branch=row[external+3];c.singular=row[external+4];
+    }
+    return records;
+}
+void check_compact(const std::vector<LadderCandidate> &expected,unsigned n,unsigned external,
     const std::vector<double> &joints,const std::vector<int32_t> &wraps,const std::vector<uint32_t> &cells) {
     for(unsigned i=0;i<expected.size();++i){const auto &c=expected[i];
         for(unsigned j=0;j<n;++j){assert(joints[i*n+j]==c.joints[j]);assert(wraps[i*n+j]==c.wraps[j]);}
@@ -25,7 +43,7 @@ void check_compact(const std::vector<mk_lattice_candidate> &expected,unsigned n,
         assert(row[external+3]==c.branch && row[external+4]==c.singular);
     }
 }
-void check_batch(mk_candidate_batch_handle batch,const std::vector<mk_lattice_candidate> &expected,unsigned n,unsigned external) {
+void check_batch(mk_candidate_batch_handle batch,const std::vector<LadderCandidate> &expected,unsigned n,unsigned external) {
     assert(batch.id!=0);
     std::vector<double> joints(expected.size()*n);std::vector<int32_t> wraps(expected.size()*n);
     std::vector<uint32_t> cells(expected.size()*(external+5));uint32_t written=UINT32_MAX;
@@ -36,6 +54,8 @@ void check_batch(mk_candidate_batch_handle batch,const std::vector<mk_lattice_ca
     }
     assert(mk_read_candidate_batch(batch,joints.data(),wraps.data(),static_cast<uint32_t>(joints.size()-1),
         cells.data(),static_cast<uint32_t>(cells.size()),&written)==MK_ERROR_INVALID_ARGUMENT && written==0);
+    assert(mk_read_candidate_batch(batch,joints.data(),wraps.data(),static_cast<uint32_t>(joints.size()),
+        cells.data(),static_cast<uint32_t>(cells.size()-1),&written)==MK_ERROR_INVALID_ARGUMENT && written==0);
     mk_candidate_batch_destroy(batch);mk_candidate_batch_destroy(batch);
     assert(mk_read_candidate_batch(batch,nullptr,nullptr,0,nullptr,0,&written)==MK_ERROR_INVALID_HANDLE && written==0);
 }
@@ -68,27 +88,17 @@ int main() {
     mk_analytic_pose arm{};assert(forward(seed+1,&arm)==MK_OK);
     const T goal=work.inverse()*base*pose(arm.position,arm.quaternion)*tool;
     mk_analytic_pose target={};target.struct_size=sizeof(target);store(goal,target.position,target.quaternion);
-    const auto candidate_count=[&](uint32_t *out){return mk_eaik_candidate_count(solver,&labels,&model,&external,&orientation,&limits,&target,seed,8,out);};
-    const auto sample=[&](mk_lattice_candidate *out,uint32_t capacity,uint32_t *written){return mk_sample_eaik_candidates(solver,&labels,&model,&external,&orientation,&limits,&target,seed,8,out,capacity,written);};
+    const auto create=[&](mk_candidate_batch_handle *out,uint32_t *count){return mk_create_eaik_candidate_batch(
+        solver,&labels,&model,&external,&orientation,&limits,&target,seed,8,out,count);};
     for(unsigned mode=0;mode<3;++mode) {
         orientation.mode=mode;orientation.tilt_rings=1;orientation.azimuth_count=4;orientation.half_angle=.1;
-        uint32_t count=0,written=0;assert(candidate_count(&count)==MK_OK && count>0);
-        std::vector<mk_lattice_candidate> candidates(count),repeat(count);
-        assert(sample(candidates.data(),count,&written)==MK_OK && written==count);
-        assert(sample(repeat.data(),count,&written)==MK_OK);
-        std::vector<double> compact_joints(count*8);std::vector<int32_t> compact_wraps(count*8);
-        std::vector<uint32_t> compact_cells(count*7);
-        const auto compact_sample=[&](unsigned joint_values,unsigned cell_values){return
-            mk_sample_eaik_candidates_compact(solver,&labels,&model,&external,&orientation,&limits,&target,seed,8,
-                compact_joints.data(),compact_wraps.data(),joint_values,compact_cells.data(),cell_values,&written);};
-        assert(compact_sample(compact_joints.size(),compact_cells.size())==MK_OK && written==count);
-        check_compact(candidates,8,2,compact_joints,compact_wraps,compact_cells);
-        mk_candidate_batch_handle batch{};uint32_t batch_count=0;
-        assert(mk_create_eaik_candidate_batch(solver,&labels,&model,&external,&orientation,&limits,&target,seed,8,
-            &batch,&batch_count)==MK_OK && batch_count==count);
+        uint32_t count=0;mk_candidate_batch_handle batch{};
+        assert(create(&batch,&count)==MK_OK && count>0);
+        const auto candidates=read_batch(batch,count,8,2);
+        mk_candidate_batch_handle repeated{};uint32_t repeated_count=0;
+        assert(create(&repeated,&repeated_count)==MK_OK && repeated_count==count);
+        const auto repeat=read_batch(repeated,count,8,2);mk_candidate_batch_destroy(repeated);
         check_batch(batch,candidates,8,2);
-        assert(compact_sample(compact_joints.size()-1,compact_cells.size())==MK_ERROR_INVALID_ARGUMENT);
-        assert(compact_sample(compact_joints.size(),compact_cells.size()-1)==MK_ERROR_INVALID_ARGUMENT);
         std::set<std::tuple<unsigned,unsigned,unsigned,unsigned,unsigned>> covered;
         for(unsigned i=0;i<count;++i) {
             const auto &c=candidates[i],&r=repeat[i];assert(c.branch<8);
@@ -112,16 +122,15 @@ int main() {
             covered.emplace(c.external_coordinates[0],c.external_coordinates[1],c.roll_index,c.tilt_index,c.azimuth_index);
         }
         assert(covered.size()==6*(mode==0?1u:mode==1?4u:20u));
-        assert(sample(candidates.data(),count-1,&written)==MK_ERROR_INVALID_ARGUMENT);
     }
-    external.upper[0]=10;uint32_t count=0;
-    assert(candidate_count(&count)==MK_ERROR_INVALID_ARGUMENT);
+    external.upper[0]=10;uint32_t count=0;mk_candidate_batch_handle invalid{};
+    assert(create(&invalid,&count)==MK_ERROR_INVALID_ARGUMENT && invalid.id==0 && count==0);
     external.upper[0]=.03;
     target.position[0]=100;
-    assert(candidate_count(&count)==MK_OK && count==0);
-    uint32_t written=99;assert(sample(nullptr,0,&written)==MK_OK && written==0);
+    assert(create(&invalid,&count)==MK_OK && count==0);
+    assert(read_batch(invalid,0,8,2).empty());mk_candidate_batch_destroy(invalid);
     const auto original=model.arm_joint_indices[0];model.arm_joint_indices[0]=model.arm_joint_indices[1];
-    assert(candidate_count(&count)==MK_ERROR_INVALID_ARGUMENT);model.arm_joint_indices[0]=original;
+    assert(create(&invalid,&count)==MK_ERROR_INVALID_ARGUMENT && invalid.id==0);model.arm_joint_indices[0]=original;
     auto unreachable=target;unreachable.position[0]+=1000;
     mk_candidate_batch_handle empty{};uint32_t empty_count=999;
     assert(mk_create_eaik_candidate_batch(solver,&labels,&model,&external,&orientation,&limits,&unreachable,seed,8,
@@ -147,20 +156,12 @@ int main() {
         mk_orientation_lattice orientation={};orientation.struct_size=sizeof(orientation);orientation.roll_count=4;
         orientation.tilt_rings=1;orientation.azimuth_count=4;orientation.half_angle=.1;
         for(unsigned mode=0;mode<3;++mode) {
-            orientation.mode=mode;uint32_t count=0,written=0;
-            assert(mk_cartesian_candidate_count(&cart,&model,&external,&orientation,&limits,&target,seed,n,&count)==MK_OK && count>0);
+            orientation.mode=mode;uint32_t count=0;mk_candidate_batch_handle batch{};
+            assert(mk_create_cartesian_candidate_batch(&cart,&model,&external,&orientation,&limits,&target,seed,n,
+                &batch,&count)==MK_OK && count>0);
             if(mode==0)assert(count==1);
             if(mode==1)assert(count==(n==3?1u:n==4?4u:2u));
-            std::vector<mk_lattice_candidate> candidates(count);
-            assert(mk_sample_cartesian_candidates(&cart,&model,&external,&orientation,&limits,&target,seed,n,candidates.data(),count,&written)==MK_OK && written==count);
-            std::vector<double> compact_joints(count*n);std::vector<int32_t> compact_wraps(count*n);
-            std::vector<uint32_t> compact_cells(count*5);
-            assert(mk_sample_cartesian_candidates_compact(&cart,&model,&external,&orientation,&limits,&target,seed,n,
-                compact_joints.data(),compact_wraps.data(),compact_joints.size(),compact_cells.data(),compact_cells.size(),&written)==MK_OK && written==count);
-            check_compact(candidates,n,0,compact_joints,compact_wraps,compact_cells);
-            mk_candidate_batch_handle batch{};uint32_t batch_count=0;
-            assert(mk_create_cartesian_candidate_batch(&cart,&model,&external,&orientation,&limits,&target,seed,n,
-                &batch,&batch_count)==MK_OK && batch_count==count);
+            const auto candidates=read_batch(batch,count,n,0);
             check_batch(batch,candidates,n,0);
             bool original=false;
             const auto wanted=pose(target.position,target.quaternion);
@@ -177,10 +178,10 @@ int main() {
             }
             assert(original);
         }
-        model.tool_position[0]=.1;uint32_t invalid_count=0;
-        assert(mk_cartesian_candidate_count(&cart,&model,&external,&orientation,&limits,&target,seed,n,&invalid_count)==MK_ERROR_INVALID_ARGUMENT);
+        model.tool_position[0]=.1;uint32_t invalid_count=0;mk_candidate_batch_handle invalid{};
+        assert(mk_create_cartesian_candidate_batch(&cart,&model,&external,&orientation,&limits,&target,seed,n,&invalid,&invalid_count)==MK_ERROR_INVALID_ARGUMENT);
         model.tool_position[0]=0;limits.periodic[0]=1;
-        assert(mk_cartesian_candidate_count(&cart,&model,&external,&orientation,&limits,&target,seed,n,&invalid_count)==MK_ERROR_INVALID_ARGUMENT);
+        assert(mk_create_cartesian_candidate_batch(&cart,&model,&external,&orientation,&limits,&target,seed,n,&invalid,&invalid_count)==MK_ERROR_INVALID_ARGUMENT);
     }
 
     for(unsigned conventions=0;conventions<2;++conventions)for(unsigned pole=0;pole<2;++pole) {
@@ -200,9 +201,9 @@ int main() {
         double canonical[]={.2,-.3,.4,.5,pole*acos(-1.0),.7},seed[6];
         for(unsigned i=0;i<6;++i)seed[i]=(canonical[i]+offsets[i])*signs[i];
         mk_analytic_pose target{};target.struct_size=sizeof(target);assert(mk_eaik_forward(solver,seed,6,&target)==MK_OK);
-        uint32_t count=0,written=0;assert(mk_eaik_candidate_count(solver,&labels,&model,&external,&orientation,&limits,&target,seed,6,&count)==MK_OK);
-        std::vector<mk_lattice_candidate> candidates(count);
-        assert(mk_sample_eaik_candidates(solver,&labels,&model,&external,&orientation,&limits,&target,seed,6,candidates.data(),count,&written)==MK_OK);
+        uint32_t count=0;mk_candidate_batch_handle batch{};
+        assert(mk_create_eaik_candidate_batch(solver,&labels,&model,&external,&orientation,&limits,&target,seed,6,&batch,&count)==MK_OK);
+        const auto candidates=read_batch(batch,count,6,0);mk_candidate_batch_destroy(batch);
         bool original=false;
         for(const auto &c:candidates) {
             bool same=true;for(unsigned i=0;i<6;++i)if(std::abs(c.joints[i]-seed[i])>1e-6)same=false;

@@ -1,6 +1,5 @@
 import CollisionFixture;
 import robotkit.collision.CollisionClearance;
-import MotionKitNative.mk_lattice_candidate;
 import haxe.Int64;
 import haxe.io.Bytes;
 import motionkit.AxisTarget;

@@ -7,10 +7,10 @@ struct CoarseLadderSettings {
 };
 // Only selected coarse/corridor cells need owning records. The complete
 // source may expose compact views over joint and lattice-coordinate arrays.
-inline mk_lattice_candidate own_ladder_candidate(const mk_lattice_candidate &c,const LadderSettings &) {return c;}
+inline LadderCandidate own_ladder_candidate(const LadderCandidate &c,const LadderSettings &) {return c;}
 template<class Candidate>
-inline mk_lattice_candidate own_ladder_candidate(const Candidate &c,const LadderSettings &s) {
-    mk_lattice_candidate result{};result.struct_size=sizeof(result);
+inline LadderCandidate own_ladder_candidate(const Candidate &c,const LadderSettings &s) {
+    LadderCandidate result{};result.struct_size=sizeof(result);
     for(unsigned j=0;j<s.joints;++j)result.joints[j]=c.joints[j];
     for(unsigned j=0;j<s.externals;++j)result.external_coordinates[j]=c.external_coordinates[j];
     result.roll_index=c.roll_index;result.tilt_index=c.tilt_index;
@@ -21,7 +21,7 @@ template<class Layers> struct CorridorLayers {
     const Layers &source;
     const LadderSettings &settings;
     const std::vector<unsigned> &anchors;
-    const std::vector<mk_lattice_candidate> &centres;
+    const std::vector<LadderCandidate> &centres;
     unsigned radius;
     mutable std::array<LadderLayer,2> cache;
     mutable std::array<std::vector<unsigned>,2> mapping;
@@ -104,7 +104,7 @@ template<class Layers> LadderResult coarse_ladder(const Layers &source,const Lad
     }
     if(route.failed!=UINT32_MAX){auto complete=structured_ladder(source,settings,state_cost,edge_allowed);
         complete.tested_edges+=coarse_tested;return complete;}
-    std::vector<mk_lattice_candidate> centres;
+    std::vector<LadderCandidate> centres;
     for(unsigned i=0;i<anchors.size();++i)centres.push_back(own_ladder_candidate(source[anchors[i]][mapping[i][route.route[i]]],settings));
     uint64_t tested=coarse_tested;
     unsigned radius=options.corridor_radius;

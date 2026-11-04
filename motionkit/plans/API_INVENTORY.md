@@ -1,7 +1,10 @@
 # MotionKit C API inventory
 
 Snapshot of `motionkit/native/include/motionkit.h` on 2026-11-04. This is a
-source-reference inventory, not a removal approval. The scan covers MotionKit,
+source-reference inventory. The nine S1 test-only exports listed below have
+now been removed; their geometric, ordering and route-selection coverage uses
+candidate batches and compact filtered ladder search. The other rows describe
+the original snapshot. The scan covers MotionKit,
 RobotKit, MachineKit, ProcessKit and app sources. It excludes declarations,
 implementations, generated bindings and vendor code. “Tests only” means no
 literal non-test call was found in those trees. Haxe owned-handle cleanup can
@@ -29,21 +32,21 @@ transforms to TrajectoryKit. S4 also calls out unused kinematics exports.
 | `mk_enumerate_joint_lifts` | Production | `motionkit/robot/haxe/motionkit/robot/JointLifts.hx` | Keep; reassess after S1–S4 |
 | `mk_external_lattice_count` | Production | `motionkit/robot/haxe/motionkit/robot/ExternalAxisGrid.hx` | Keep; reassess after S1–S4 |
 | `mk_sample_external_cells` | Production | `motionkit/robot/haxe/motionkit/robot/ExternalAxisGrid.hx` | Keep; reassess after S1–S4 |
-| `mk_cartesian_candidate_count` | Tests only | `motionkit/native/tests/candidate_sampling.cpp` | S1: retire after unified planner migration |
-| `mk_sample_cartesian_candidates` | Tests only | `motionkit/native/tests/candidate_sampling.cpp` | S1: retire after unified planner migration |
+| `mk_cartesian_candidate_count` | Tests only | `motionkit/native/tests/candidate_sampling.cpp` | Removed: batch/compact search covers these cases |
+| `mk_sample_cartesian_candidates` | Tests only | `motionkit/native/tests/candidate_sampling.cpp` | Removed: batch/compact search covers these cases |
 | `mk_create_eaik_candidate_batch` | Production | `motionkit/robot/haxe/motionkit/robot/SerialCandidateSampler.hx` | Keep; reassess after S1–S4 |
 | `mk_create_cartesian_candidate_batch` | Production | `motionkit/robot/haxe/motionkit/robot/CartesianCandidateSampler.hx` | Keep; reassess after S1–S4 |
 | `mk_candidate_batch_destroy` | Tests only; ownership hook | `motionkit/native/tests/candidate_sampling.cpp` | Keep while batch handles exist; generated ownership call |
 | `mk_read_candidate_batch` | Production | `motionkit/robot/haxe/motionkit/robot/NativeCandidateBatch.hx` | Keep; reassess after S1–S4 |
-| `mk_eaik_candidate_count` | Tests only | `motionkit/native/tests/candidate_sampling.cpp` | S1: retire after unified planner migration |
-| `mk_sample_eaik_candidates` | Tests only | `motionkit/native/tests/candidate_sampling.cpp` | S1: retire after unified planner migration |
-| `mk_sample_eaik_candidates_compact` | Tests only | `motionkit/native/tests/candidate_sampling.cpp` | S1: retire after unified planner migration |
-| `mk_sample_cartesian_candidates_compact` | Tests only | `motionkit/native/tests/candidate_sampling.cpp` | S1: retire after unified planner migration |
+| `mk_eaik_candidate_count` | Tests only | `motionkit/native/tests/candidate_sampling.cpp` | Removed: batch/compact search covers these cases |
+| `mk_sample_eaik_candidates` | Tests only | `motionkit/native/tests/candidate_sampling.cpp` | Removed: batch/compact search covers these cases |
+| `mk_sample_eaik_candidates_compact` | Tests only | `motionkit/native/tests/candidate_sampling.cpp` | Removed: batch/compact search covers these cases |
+| `mk_sample_cartesian_candidates_compact` | Tests only | `motionkit/native/tests/candidate_sampling.cpp` | Removed: batch/compact search covers these cases |
 | `mk_path_differential` | Production | `motionkit/robot/haxe/motionkit/robot/PathDifferential.hx` | Keep; reassess after S1–S4 |
-| `mk_search_ladder` | Tests only | `motionkit/native/tests/structured_ladder.cpp` | S1: retire after unified planner migration |
-| `mk_search_ladder_filtered` | Tests only | `motionkit/native/tests/structured_ladder.cpp` | S1: retire after unified planner migration |
+| `mk_search_ladder` | Tests only | `motionkit/native/tests/structured_ladder.cpp` | Removed: batch/compact search covers these cases |
+| `mk_search_ladder_filtered` | Tests only | `motionkit/native/tests/structured_ladder.cpp` | Removed: batch/compact search covers these cases |
 | `mk_search_ladder_compact_filtered` | Production | `motionkit/robot/haxe/motionkit/robot/StructuredLadder.hx` | Keep; reassess after S1–S4 |
-| `mk_select_configurations` | Tests only | `motionkit/native/tests/configuration.cpp` | S1: retire after unified planner migration |
+| `mk_select_configurations` | Tests only | `motionkit/native/tests/configuration.cpp` | Removed: batch/compact search covers these cases |
 | `mk_path_create` | Production | `motionkit/haxe/motionkit/path/NativeJointPath.hx` | Keep; reassess after S1–S4 |
 | `mk_path_destroy` | Example/tool + tests; ownership hook | `machinekit/examples/sheet-router/fem/planner_sample.cpp` | Keep while path handles exist; generated ownership call |
 | `mk_time_law_create` | Production | `motionkit/haxe/motionkit/path/PathTimeLaw.hx` | Keep; reassess after S1–S4 |
@@ -75,8 +78,9 @@ transforms to TrajectoryKit. S4 also calls out unused kinematics exports.
 
 ## Review order
 
-1. Land the S1 unified planner migration, then remove the listed
-   test-only candidate and search entry points together with their Haxe bindings.
+1. Completed: remove the nine test-only candidate and search entry points and
+   their Haxe bindings; migrate their tests to the retained production APIs.
+   The wider S1 persistent-planner migration remains separate.
 2. Port the router FEM example to the timing stream, then retire S3 timing
    entry points and their reports/handles where no longer needed.
 3. Move the transform family to TrajectoryKit under one ownership and validation

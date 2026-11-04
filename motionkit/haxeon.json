@@ -26,9 +26,9 @@
       "inputs": [
         "native/CMakeLists.txt",
         "native/include/motionkit.h",
+        "native/src/lattice_candidate.h",
         "native/src/generator.cpp",
         "native/src/path.cpp",
-        "native/src/configuration.cpp",
         "native/src/eaik.cpp",
         "native/src/redundancy_qp.cpp",
         "../kinematicskit/native/vendor/proxsuite/include",

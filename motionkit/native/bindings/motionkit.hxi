@@ -34,6 +34,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * are not process stops. The result still needs drive/task/seam certification.
 	 */
 	extern fn mk_advance_joint_context(trajectory: mk_trajectory_handle, joint: u32, lead_seconds: f64, window_seconds: f64, origin_ns: i64, final_context: u32, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
+	/**
+	 * Evaluate the Cartesian chain and return its TCP pose.
+	 */
 	extern fn mk_analytic_cartesian_forward(model: ptr<const<mk_analytic_cartesian_model>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_pose: ptr<mk_analytic_pose> @out) -> mk_result;
 	/**
 	 * All geometric branches, before limits/wrap enumeration by the sampler.
@@ -41,34 +44,55 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * The seed selects C at its explicit axis singularity.
 	 */
 	extern fn mk_analytic_cartesian_inverse(model: ptr<const<mk_analytic_cartesian_model>>, target: ptr<const<mk_analytic_pose>>, axis_only: u32, singular_c_seed: f64, out_solutions: ptr<mk_analytic_solution> @out_array("solution_capacity"), solution_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
+	/**
+	 * Release a retained candidate batch.
+	 */
 	extern fn mk_candidate_batch_destroy(batch: mk_candidate_batch_handle) -> void;
 	/**
-	 * Cartesian free-spin/cone cells solve the tool-axis constraint. Repeated
-	 * geometric configurations retain their first lattice coordinates. The Cartesian
-	 * descriptor includes its TCP, so model.tool must be identity and XYZ nonperiodic.
+	 * Generate and retain every legal Cartesian candidate for later compact
+	 * reads. out_count reports the batch size; the caller owns out_batch.
+	 * Free-spin/cone cells solve the tool-axis constraint; repeated geometric
+	 * configurations retain their first lattice coordinates. parameters includes
+	 * the TCP, so model.tool must be identity and XYZ joints must be nonperiodic.
 	 */
-	extern fn mk_cartesian_candidate_count(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_create_cartesian_candidate_batch(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_batch: ptr<mk_candidate_batch_handle> @out @owned, out_count: ptr<u32> @out) -> mk_result;
 	/**
-	 * Compact sampling outputs are candidate-major, preserving full-record order.
-	 * Joint and wrap rows have joint_count entries. Coordinate rows contain external
-	 * cells followed by roll, tilt, azimuth, branch and singular bits. Lengths must
-	 * exactly match candidate_count times their respective row dimensions.
+	 * Generate all legal EAIK cells, branches and lifts once, without truncation
+	 * or pruning. out_count is the number retained in the owned batch; destroy
+	 * that batch after its last read.
 	 */
 	extern fn mk_create_eaik_candidate_batch(solver: mk_eaik_handle, configuration: ptr<const<mk_eaik_configuration>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_batch: ptr<mk_candidate_batch_handle> @out @owned, out_count: ptr<u32> @out) -> mk_result;
-	extern fn mk_eaik_candidate_count(solver: mk_eaik_handle, configuration: ptr<const<mk_eaik_configuration>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Construct only known exact decompositions of a compiled 6R chain.
 	 */
 	extern fn mk_eaik_create(model: ptr<const<mk_eaik_model>>, out_solver: ptr<mk_eaik_handle> @out @owned) -> mk_result;
+	/**
+	 * Release an EAIK solver handle.
+	 */
 	extern fn mk_eaik_destroy(solver: mk_eaik_handle) -> void;
+	/**
+	 * Evaluate the compiled 6R chain at the supplied six joint values.
+	 */
 	extern fn mk_eaik_forward(solver: mk_eaik_handle, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_pose: ptr<mk_analytic_pose> @out) -> mk_result;
 	/**
-	 * Exact solutions only; least-squares approximations are rejected.
+	 * Return all exact inverse solutions for the target pose, with branch and
+	 * singularity metadata. Least-squares approximations are rejected; out_count
+	 * reports the number of returned solutions.
 	 */
 	extern fn mk_eaik_inverse(solver: mk_eaik_handle, target: ptr<const<mk_analytic_pose>>, out_solutions: ptr<mk_analytic_solution> @out_array("solution_capacity"), solution_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
+	/**
+	 * Return exact inverse solutions for one physical configuration. The seed
+	 * chooses equivalent joint angles; out_count reports the returned solutions.
+	 */
 	extern fn mk_eaik_inverse_labelled(solver: mk_eaik_handle, configuration: ptr<const<mk_eaik_configuration>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_solutions: ptr<mk_analytic_solution> @out_array("solution_capacity"), solution_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
+	/**
+	 * Write every in-range periodic lift and its wrap counts in lexicographic
+	 * wrap order. lift_capacity counts records, and out_count reports the result.
+	 */
 	extern fn mk_enumerate_joint_lifts(request: ptr<const<mk_joint_lift_request>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_lifts: ptr<mk_joint_lift> @out_array("lift_capacity"), lift_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
+	/**
+	 * Count the Cartesian product of the external-axis points.
+	 */
 	extern fn mk_external_lattice_count(lattice: ptr<const<mk_external_lattice>>, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Converts Ruckig Community's offline phases to degree-3 native segments.
@@ -100,10 +124,20 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * Count first, then allocate exactly enough output. Invalid requests fail before writing.
 	 */
 	extern fn mk_orientation_lattice_count(lattice: ptr<const<mk_orientation_lattice>>, out_count: ptr<u32> @out) -> mk_result;
+	/**
+	 * Copy ordered joint path samples into an owned path handle. The caller may
+	 * release or reuse the input array after this call.
+	 */
 	extern fn mk_path_create(samples: ptr<const<mk_path_sample>> @in_array("sample_count"), sample_count: u32, out_path: ptr<mk_path_handle> @out @owned) -> mk_result;
+	/**
+	 * Release a path handle.
+	 */
 	extern fn mk_path_destroy(path: mk_path_handle) -> void;
 	/**
-	 * Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected.
+	 * Solve J q' = task velocity and J q'' = task acceleration - J' q'.
+	 * Jacobians are 6 x joint_count, row-major; J' is dJ/ds. A disconnected
+	 * solve returns MK_ERROR_GENERATION with a sample-distance diagnostic in
+	 * out_report.
 	 */
 	extern fn mk_path_differential(request: ptr<const<mk_differential_request>>, jacobian: ptr<const<f64>> @in_array("jacobian_count"), jacobian_prime: ptr<const<f64>> @in_array("jacobian_count"), jacobian_count: u32, joint_count: u32, out_first: ptr<f64> @out_array("joint_count"), out_second: ptr<f64> @out_array("joint_count"), out_report: ptr<mk_differential_report> @out) -> mk_result;
 	/**
@@ -111,7 +145,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 */
 	extern fn mk_path_distance_to_time(law: mk_time_law_handle, s: f64, out_seconds: ptr<f64> @out) -> mk_result;
 	/**
-	 * Quintic Hermite lowering, with adaptive knots and exact polynomial-deviation extrema.
+	 * Lower a path and time law to a new owned trajectory using quintic Hermite
+	 * pieces. Adaptive knots and exact polynomial-deviation extrema enforce the
+	 * requested tolerance.
 	 */
 	extern fn mk_path_lower(path: mk_path_handle, law: mk_time_law_handle, tolerance: f64, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	/**
@@ -121,6 +157,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * One call replaces a bisection of mk_path_distance_to_time per sample.
 	 */
 	extern fn mk_path_times_to_distances(law: mk_time_law_handle, seconds: ptr<const<f64>> @in_array("count"), count: u32, out_distances: ptr<f64> @out_array("count")) -> mk_result;
+	/**
+	 * Release a preview token, including after a successful stream commit.
+	 */
 	extern fn mk_path_timing_preview_destroy(preview: mk_path_timing_preview_handle) -> void;
 	/**
 	 * Snapshot one immutable path/limits/cap table for repeated endpoint timing.
@@ -133,6 +172,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * not cancel an already active call; subsequent calls reject the removed handle.
 	 */
 	extern fn mk_path_timing_session_create(path: mk_path_handle, max_velocity: ptr<const<f64>> @in_array("joint_count"), max_acceleration: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, speed_caps: ptr<const<f64>> @in_array("speed_cap_count"), speed_cap_count: u32, lowering_tolerance: f64, require_feasible_path: u32, out_session: ptr<mk_path_timing_session_handle> @out @owned) -> mk_result;
+	/**
+	 * Release a reusable timing session; previously returned laws and trajectories remain owned by the caller.
+	 */
 	extern fn mk_path_timing_session_destroy(session: mk_path_timing_session_handle) -> void;
 	/**
 	 * Complete feasible entry-speed interval for a requested terminal interval.
@@ -144,6 +186,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * Returned bounds are values, independent of later session updates/disposal.
 	 */
 	extern fn mk_path_timing_session_entry_interval(session: mk_path_timing_session_handle, end_lower_speed: f64, end_upper_speed: f64, entry_may_move: u32, out_lower_speed: ptr<f64> @out, out_upper_speed: ptr<f64> @out) -> mk_result;
+	/**
+	 * Time the session snapshot for fixed entry and exit speeds, returning independent owned results.
+	 */
 	extern fn mk_path_timing_session_time(session: mk_path_timing_session_handle, start_speed: f64, end_speed: f64, out_report: ptr<mk_timing_report> @out, out_law: ptr<mk_time_law_handle> @out @owned, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	/**
 	 * Fastest timing to any speed in the requested terminal interval. Unlike a
@@ -167,6 +212,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * stable prefix earlier. No preview is published to execution by this API.
 	 */
 	extern fn mk_path_timing_stream_create(path: mk_path_handle, max_velocity: ptr<const<f64>> @in_array("joint_count"), max_acceleration: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, speed_caps: ptr<const<f64>> @in_array("speed_cap_count"), speed_cap_count: u32, start_speed: f64, end_speed: f64, lowering_tolerance: f64, require_feasible_path: u32, max_pending_windows: u32, out_stream: ptr<mk_path_timing_stream_handle> @out @owned) -> mk_result;
+	/**
+	 * Release a timing stream; previously returned laws and trajectories remain owned by the caller.
+	 */
 	extern fn mk_path_timing_stream_destroy(stream: mk_path_timing_stream_handle) -> void;
 	/**
 	 * Advances by at most one input window, then offers a candidate if proven.
@@ -188,7 +236,11 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 */
 	extern fn mk_project_couplings(trajectory: mk_trajectory_handle, followers: ptr<const<u32>> @in_array("term_count"), leaders: ptr<const<u32>> @in_array("term_count"), ratios: ptr<const<f64>> @in_array("term_count"), offsets: ptr<const<f64>> @in_array("term_count"), term_count: u32, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	/**
-	 * Exact compact dimensions are required. The read is reusable and thread-safe.
+	 * Copy a batch into candidate-major arrays, preserving full-record order.
+	 * Each joint and wrap row has joint_count entries. Coordinate rows contain
+	 * external cells, roll, tilt, azimuth, branch and singular metadata. The two
+	 * supplied array lengths must exactly match the batch dimensions. The batch
+	 * remains reusable, and concurrent reads are safe.
 	 */
 	extern fn mk_read_candidate_batch(batch: mk_candidate_batch_handle, out_joints: ptr<f64> @out_array("joint_value_count"), out_wraps: ptr<i32> @out_array("joint_value_count"), joint_value_count: u32, out_coordinates: ptr<u32> @out_array("coordinate_count"), coordinate_count: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
@@ -196,22 +248,16 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * using its Bernstein control polygons, including between authored knots.
 	 */
 	extern fn mk_refine_redundancy(limits: ptr<const<mk_refinement_limits>>, samples: ptr<const<mk_refinement_sample>> @in_array("sample_count"), sample_count: u32, bounds: ptr<const<mk_refinement_bound>> @in_array("bound_count"), bound_count: u32, out_solutions: ptr<mk_refinement_solution> @out_array("sample_count")) -> mk_result;
-	extern fn mk_sample_cartesian_candidates(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_candidates: ptr<mk_lattice_candidate> @out_array("candidate_capacity"), candidate_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
-	extern fn mk_sample_cartesian_candidates_compact(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_joints: ptr<f64> @out_array("joint_value_count"), out_wraps: ptr<i32> @out_array("joint_value_count"), joint_value_count: u32, out_coordinates: ptr<u32> @out_array("coordinate_count"), coordinate_count: u32, out_count: ptr<u32> @out) -> mk_result;
-	extern fn mk_sample_eaik_candidates(solver: mk_eaik_handle, configuration: ptr<const<mk_eaik_configuration>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_candidates: ptr<mk_lattice_candidate> @out_array("candidate_capacity"), candidate_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
-	extern fn mk_sample_eaik_candidates_compact(solver: mk_eaik_handle, configuration: ptr<const<mk_eaik_configuration>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_joints: ptr<f64> @out_array("joint_value_count"), out_wraps: ptr<i32> @out_array("joint_value_count"), joint_value_count: u32, out_coordinates: ptr<u32> @out_array("coordinate_count"), coordinate_count: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Axis endpoints are included; the last external coordinate varies fastest.
 	 * Non-external joints are copied from the seed. Zero external axes yields one cell.
 	 */
 	extern fn mk_sample_external_cells(lattice: ptr<const<mk_external_lattice>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_cells: ptr<mk_external_cell> @out_array("cell_capacity"), cell_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
-	extern fn mk_sample_orientations(lattice: ptr<const<mk_orientation_lattice>>, target: ptr<const<mk_analytic_pose>>, out_samples: ptr<mk_orientation_sample> @out_array("sample_capacity"), sample_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
-	 * No candidate copies: samples address slices of the candidate array.
-	 * Costs are nonnegative; +infinity disables a candidate. Selected indices are
-	 * global candidate-array offsets. Failure details remain in out_result.
+	 * Sample target poses in deterministic lattice order. sample_capacity is the
+	 * number of output records; out_count reports the generated count.
 	 */
-	extern fn mk_search_ladder(request: ptr<const<mk_ladder_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_lattice_candidate>> @in_array("candidate_count"), state_costs: ptr<const<f64>> @in_array("candidate_count"), candidate_count: u32, out_indices: ptr<u32> @out_array("sample_count"), out_result: ptr<mk_ladder_result> @out) -> mk_result;
+	extern fn mk_sample_orientations(lattice: ptr<const<mk_orientation_lattice>>, target: ptr<const<mk_analytic_pose>>, out_samples: ptr<mk_orientation_sample> @out_array("sample_capacity"), sample_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Compact equivalent of filtered ladder search. Joints are candidate-major,
 	 * with joint_count values per candidate. Coordinates are candidate-major:
@@ -220,11 +266,6 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * Array lengths must exactly match these dimensions.
 	 */
 	extern fn mk_search_ladder_compact_filtered(request: ptr<const<mk_ladder_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, joints: ptr<const<f64>> @in_array("joint_value_count"), joint_value_count: u32, coordinates: ptr<const<u32>> @in_array("coordinate_count"), coordinate_count: u32, state_costs: ptr<const<f64>> @in_array("candidate_count"), candidate_count: u32, blocked_edges: ptr<const<mk_ladder_edge>> @in_array("blocked_edge_count"), blocked_edge_count: u32, out_indices: ptr<u32> @out_array("sample_count"), out_result: ptr<mk_ladder_result> @out) -> mk_result;
-	/**
-	 * Same search with collision-excluded transitions; endpoint states remain available.
-	 */
-	extern fn mk_search_ladder_filtered(request: ptr<const<mk_ladder_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_lattice_candidate>> @in_array("candidate_count"), state_costs: ptr<const<f64>> @in_array("candidate_count"), candidate_count: u32, blocked_edges: ptr<const<mk_ladder_edge>> @in_array("blocked_edge_count"), blocked_edge_count: u32, out_indices: ptr<u32> @out_array("sample_count"), out_result: ptr<mk_ladder_result> @out) -> mk_result;
-	extern fn mk_select_configurations(request: ptr<const<mk_configuration_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_configuration_candidate>> @in_array("candidate_count"), candidate_count: u32, out_sequence: ptr<mk_configuration_solution> @out_array("sample_count")) -> mk_result;
 	/**
 	 * A copy of `trajectory` convolved with an input shaper: joint `j` of the result is the sum over its impulses `i` of
 	 * `amplitudes[j * MK_MAX_SHAPER_IMPULSES + i]` times the joint's original motion delayed by `delays_seconds[j *
@@ -237,9 +278,23 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * MK_MAX_SHAPER_IMPULSES`. Joints that follow others are to be projected again after.
 	 */
 	extern fn mk_shape_trajectory(trajectory: mk_trajectory_handle, impulse_counts: ptr<const<u32>> @in_array("joint_count"), delays_seconds: ptr<const<f64>> @in_array("table_size"), amplitudes: ptr<const<f64>> @in_array("table_size"), joint_count: u32, table_size: u32, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
+	/**
+	 * Return the number of recorded limiting constraints on a time law.
+	 */
 	extern fn mk_time_law_binding_count(law: mk_time_law_handle, out_count: ptr<u32> @out) -> mk_result;
+	/**
+	 * Copy ordered polynomial time stages into an owned time-law handle. The
+	 * caller may release or reuse the input array after this call.
+	 */
 	extern fn mk_time_law_create(stages: ptr<const<mk_time_stage>> @in_array("stage_count"), stage_count: u32, out_law: ptr<mk_time_law_handle> @out @owned) -> mk_result;
+	/**
+	 * Release a time-law handle.
+	 */
 	extern fn mk_time_law_destroy(law: mk_time_law_handle) -> void;
+	/**
+	 * Read one recorded binding by zero-based index. Use
+	 * mk_time_law_binding_count to obtain the valid index range.
+	 */
 	extern fn mk_time_law_get_binding(law: mk_time_law_handle, index: u32, out_binding: ptr<mk_timing_binding>) -> mk_result;
 	/**
 	 * Reachability-based TOPP-RA timing and its validated lowered trajectory.
@@ -280,6 +335,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		 */
 		quaternion: array<f64, 4> @offset(32);
 	}
+	/**
+	 * One analytic branch, including its branch identifier and singularity flags.
+	 */
 	struct mk_analytic_solution @layout(64, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		joints: array<f64, 6> @offset(8);
@@ -289,44 +347,18 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		 */
 		singular: u32 @offset(60);
 	}
-	struct mk_configuration_candidate @layout(520, 8) {
-		struct_size: u32 @offset(0) @struct_size;
-		joints: array<f64, 64> @offset(8);
-	}
 	/**
-	 * Candidate sets for one Descartes ladder-graph selection call.
+	 * Candidate-array slice for one path distance; offsets are global indices.
 	 */
-	struct mk_configuration_request @layout(2576, 8) {
-		struct_size: u32 @offset(0) @struct_size;
-		joint_count: u32 @offset(4);
-		/**
-		 * < 1 by default; multiple threads need OpenMP.
-		 */
-		threads: u32 @offset(8);
-		has_preferred: u8 @offset(12);
-		lower: array<f64, 64> @offset(16);
-		upper: array<f64, 64> @offset(528);
-		max_jump: array<f64, 64> @offset(1040);
-		weights: array<f64, 64> @offset(1552);
-		preferred: array<f64, 64> @offset(2064);
-	}
 	struct mk_configuration_sample @layout(24, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		distance: f64 @offset(8);
 		first_candidate: u32 @offset(16);
 		candidate_count: u32 @offset(20);
 	}
-	struct mk_configuration_solution @layout(800, 8) {
-		struct_size: u32 @offset(0) @struct_size;
-		joints: array<f64, 64> @offset(8);
-		/**
-		 * < Only slot zero: UINT32_MAX on success.
-		 */
-		failed_sample: u32 @offset(520);
-		failed_distance: f64 @offset(528);
-		cost: f64 @offset(536);
-		diagnostic: array<i8, 256> @offset(544);
-	}
+	/**
+	 * Numerical rank, singularity and residual errors of a differential solve.
+	 */
 	struct mk_differential_report @layout(32, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		rank: u32 @offset(4);
@@ -381,6 +413,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		 */
 		terminal_rotation: array<f64, 9> @offset(320);
 	}
+	/**
+	 * One external-axis lattice point in full joint-vector coordinates.
+	 */
 	struct mk_external_cell @layout(776, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		joints: array<f64, 64> @offset(8);
@@ -401,6 +436,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		lower: array<f64, 64> @offset(528);
 		upper: array<f64, 64> @offset(1040);
 	}
+	/**
+	 * Joint values after a legal periodic lift and each joint's wrap count.
+	 */
 	struct mk_joint_lift @layout(776, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		joints: array<f64, 64> @offset(8);
@@ -449,6 +487,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		corridor_radius: u32 @offset(2088);
 		corridor_widenings: u32 @offset(2092);
 	}
+	/**
+	 * Search status, failure location, path cost and selected search backend.
+	 */
 	struct mk_ladder_result @layout(48, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		/**
@@ -466,17 +507,6 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		 * < 1 structured, 2 coarse corridor, 3 Descartes.
 		 */
 		backend: u32 @offset(40);
-	}
-	struct mk_lattice_candidate @layout(1056, 8) {
-		struct_size: u32 @offset(0) @struct_size;
-		joints: array<f64, 64> @offset(8);
-		wraps: array<i32, 64> @offset(520);
-		external_coordinates: array<u32, 64> @offset(776);
-		roll_index: u32 @offset(1032);
-		tilt_index: u32 @offset(1036);
-		azimuth_index: u32 @offset(1040);
-		branch: u32 @offset(1044);
-		singular: u32 @offset(1048);
 	}
 	/**
 	 * Deterministic orientation lattice in the target TCP frame.
@@ -498,6 +528,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		 */
 		half_angle: f64 @offset(24);
 	}
+	/**
+	 * Sampled target pose and its roll, tilt and azimuth lattice coordinates.
+	 */
 	struct mk_orientation_sample @layout(80, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		position: array<f64, 3> @offset(8);
@@ -527,6 +560,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		second: array<f64, 64> @offset(1048);
 		second_before: array<f64, 64> @offset(1560);
 	}
+	/**
+	 * Window and boundary metadata returned by mk_path_timing_stream_step.
+	 */
 	struct mk_path_timing_stream_progress @layout(64, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		state: u32 @offset(4);
@@ -552,6 +588,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		lower: f64 @offset(528);
 		upper: f64 @offset(536);
 	}
+	/**
+	 * Coordinate count, drive derivative limits and objective weights for refinement.
+	 */
 	struct mk_refinement_limits @layout(1056, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		coordinate_count: u32 @offset(4);
@@ -579,6 +618,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		 */
 		gradient: array<f64, 64> @offset(2080);
 	}
+	/**
+	 * Refined redundant coordinates and their first and second path derivatives.
+	 */
 	struct mk_refinement_solution @layout(1544, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		value: array<f64, 64> @offset(8);
@@ -646,6 +688,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		speed: f64 @offset(32);
 		acceleration: f64 @offset(40);
 	}
+	/**
+	 * Limiting constraint for one stage; joint is UINT32_MAX for a feed cap.
+	 */
 	struct mk_timing_binding @layout(24, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		stage_index: u32 @offset(4);
@@ -684,10 +729,28 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * Immutable compact candidate layer, generated once and then copied out.
 	 */
 	handle mk_candidate_batch_handle : u32 @destroy("mk_candidate_batch_destroy");
+	/**
+	 * Owned compiled 6R solver; release with mk_eaik_destroy.
+	 */
 	handle mk_eaik_handle : u32 @destroy("mk_eaik_destroy");
+	/**
+	 * Owned immutable joint path; release with mk_path_destroy.
+	 */
 	handle mk_path_handle : u32 @destroy("mk_path_destroy");
+	/**
+	 * Owned guard token for a stream preview; release even after commit.
+	 */
 	handle mk_path_timing_preview_handle : u32 @destroy("mk_path_timing_preview_destroy");
+	/**
+	 * Owned snapshot for repeated timing queries; release with mk_path_timing_session_destroy.
+	 */
 	handle mk_path_timing_session_handle : u32 @destroy("mk_path_timing_session_destroy");
+	/**
+	 * Owned windowed timing state; release with mk_path_timing_stream_destroy.
+	 */
 	handle mk_path_timing_stream_handle : u32 @destroy("mk_path_timing_stream_destroy");
+	/**
+	 * Owned polynomial path-distance law; release with mk_time_law_destroy.
+	 */
 	handle mk_time_law_handle : u32 @destroy("mk_time_law_destroy");
 }

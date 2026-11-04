@@ -102,7 +102,6 @@ typedef struct mk_analytic_pose {
     double quaternion[4]; /**< x, y, z, w. */
 } mk_analytic_pose;
 
-
 /** Cartesian chain represented by its zero-pose space screws and TCP pose.
  * The three translation axes are columns of translation_axes. Optional C/A
  * axes and origins are in the same reference frame, in chain order. */
@@ -123,7 +122,6 @@ typedef struct mk_analytic_solution {
     uint32_t branch;
     uint32_t singular; /**< Family-specific flags; Cartesian C axis or EAIK wrist/elbow. */
 } mk_analytic_solution;
-
 
 /* ------------------------------------------------------------------------- */
 /* Candidate and path planning types                                         */
@@ -205,19 +203,6 @@ typedef struct mk_serial_cell_model {
     double tool_quaternion[4];
 } mk_serial_cell_model;
 
-/** Full planning candidate with joint, wrap, lattice and branch metadata. */
-typedef struct mk_lattice_candidate {
-    uint32_t struct_size MK_STRUCT_SIZE;
-    double joints[MK_MAX_JOINTS];
-    int32_t wraps[MK_MAX_JOINTS];
-    uint32_t external_coordinates[MK_MAX_JOINTS];
-    uint32_t roll_index;
-    uint32_t tilt_index;
-    uint32_t azimuth_index;
-    uint32_t branch;
-    uint32_t singular;
-} mk_lattice_candidate;
-
 /** Structured ladder costs and lattice dimensions. External axes use their
  * process weights in weights[]; speeds normalize travel costs. */
 typedef struct mk_ladder_request {
@@ -280,19 +265,6 @@ typedef struct mk_differential_report {
     double acceleration_error;
 } mk_differential_report;
 
-/** Candidate sets for one Descartes ladder-graph selection call. */
-typedef struct mk_configuration_request {
-    uint32_t struct_size MK_STRUCT_SIZE;
-    uint32_t joint_count;
-    uint32_t threads; /**< 1 by default; multiple threads need OpenMP. */
-    uint8_t has_preferred;
-    double lower[MK_MAX_JOINTS];
-    double upper[MK_MAX_JOINTS];
-    double max_jump[MK_MAX_JOINTS];
-    double weights[MK_MAX_JOINTS];
-    double preferred[MK_MAX_JOINTS];
-} mk_configuration_request;
-
 /** Candidate-array slice for one path distance; offsets are global indices. */
 typedef struct mk_configuration_sample {
     uint32_t struct_size MK_STRUCT_SIZE;
@@ -300,23 +272,6 @@ typedef struct mk_configuration_sample {
     uint32_t first_candidate;
     uint32_t candidate_count;
 } mk_configuration_sample;
-
-
-/** One joint-vector choice in a configuration sample's candidate slice. */
-typedef struct mk_configuration_candidate {
-    uint32_t struct_size MK_STRUCT_SIZE;
-    double joints[MK_MAX_JOINTS];
-} mk_configuration_candidate;
-
-/** Selected joint vector and search diagnostic; failure fields are in slot zero. */
-typedef struct mk_configuration_solution {
-    uint32_t struct_size MK_STRUCT_SIZE;
-    double joints[MK_MAX_JOINTS];
-    uint32_t failed_sample; /**< Only slot zero: UINT32_MAX on success. */
-    double failed_distance;
-    double cost;
-    int8_t diagnostic[256];
-} mk_configuration_solution;
 
 /**
  * Joint path derivatives are with respect to path parameter s. `second` is the
@@ -482,22 +437,7 @@ MK_API mk_result MK_CALL mk_external_lattice_count(const mk_external_lattice *la
 MK_API mk_result MK_CALL mk_sample_external_cells(const mk_external_lattice *lattice,
     const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     mk_external_cell *out_cells MK_OUT_ARRAY(cell_capacity), uint32_t cell_capacity, uint32_t *out_count MK_OUT);
-/** Cartesian free-spin/cone cells solve the tool-axis constraint. Repeated
- * geometric configurations retain their first lattice coordinates. The Cartesian
- * descriptor includes its TCP, so model.tool must be identity and XYZ nonperiodic. */
-MK_API mk_result MK_CALL mk_cartesian_candidate_count(const mk_analytic_cartesian_model *parameters,
-    const mk_serial_cell_model *model, const mk_external_lattice *external,
-    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
-    const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
-    uint32_t *out_count MK_OUT);
-/** Write all legal Cartesian cells, branches and joint lifts as full records.
- * candidate_capacity counts records; out_count reports the generated count. */
-MK_API mk_result MK_CALL mk_sample_cartesian_candidates(const mk_analytic_cartesian_model *parameters,
-    const mk_serial_cell_model *model, const mk_external_lattice *external,
-    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
-    const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
-    mk_lattice_candidate *out_candidates MK_OUT_ARRAY(candidate_capacity), uint32_t candidate_capacity,
-    uint32_t *out_count MK_OUT);
+
 /** Generate all legal EAIK cells, branches and lifts once, without truncation
  * or pruning. out_count is the number retained in the owned batch; destroy
  * that batch after its last read. */
@@ -508,7 +448,10 @@ MK_API mk_result MK_CALL mk_create_eaik_candidate_batch(mk_eaik_handle solver,
     const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     mk_candidate_batch_handle *out_batch MK_OUT MK_OWNED, uint32_t *out_count MK_OUT);
 /** Generate and retain every legal Cartesian candidate for later compact
- * reads. out_count reports the batch size; the caller owns out_batch. */
+ * reads. out_count reports the batch size; the caller owns out_batch.
+ * Free-spin/cone cells solve the tool-axis constraint; repeated geometric
+ * configurations retain their first lattice coordinates. parameters includes
+ * the TCP, so model.tool must be identity and XYZ joints must be nonperiodic. */
 MK_API mk_result MK_CALL mk_create_cartesian_candidate_batch(const mk_analytic_cartesian_model *parameters,
     const mk_serial_cell_model *model, const mk_external_lattice *external,
     const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
@@ -526,42 +469,6 @@ MK_API mk_result MK_CALL mk_read_candidate_batch(mk_candidate_batch_handle batch
     int32_t *out_wraps MK_OUT_ARRAY(joint_value_count), uint32_t joint_value_count,
     uint32_t *out_coordinates MK_OUT_ARRAY(coordinate_count), uint32_t coordinate_count,
     uint32_t *out_count MK_OUT);
-
-/** Count all legal EAIK cells, branches and joint lifts before allocating output. */
-MK_API mk_result MK_CALL mk_eaik_candidate_count(mk_eaik_handle solver,
-    const mk_eaik_configuration *configuration,
-    const mk_serial_cell_model *model, const mk_external_lattice *external,
-    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
-    const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
-    uint32_t *out_count MK_OUT);
-/** Write all legal EAIK candidates as full records. candidate_capacity counts
- * records; out_count reports the generated count. */
-MK_API mk_result MK_CALL mk_sample_eaik_candidates(mk_eaik_handle solver,
-    const mk_eaik_configuration *configuration,
-    const mk_serial_cell_model *model, const mk_external_lattice *external,
-    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
-    const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
-    mk_lattice_candidate *out_candidates MK_OUT_ARRAY(candidate_capacity), uint32_t candidate_capacity,
-    uint32_t *out_count MK_OUT);
-/** Write EAIK candidates into candidate-major joint, wrap and coordinate
- * arrays. Array lengths must match the candidate count and row dimensions
- * described for mk_read_candidate_batch. */
-MK_API mk_result MK_CALL mk_sample_eaik_candidates_compact(mk_eaik_handle solver,
-    const mk_eaik_configuration *configuration,
-    const mk_serial_cell_model *model, const mk_external_lattice *external,
-    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
-    const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
-    double *out_joints MK_OUT_ARRAY(joint_value_count), int32_t *out_wraps MK_OUT_ARRAY(joint_value_count), uint32_t joint_value_count,
-    uint32_t *out_coordinates MK_OUT_ARRAY(coordinate_count), uint32_t coordinate_count, uint32_t *out_count MK_OUT);
-/** Write Cartesian candidates into candidate-major joint, wrap and coordinate
- * arrays. Array lengths must match the candidate count and row dimensions
- * described for mk_read_candidate_batch. */
-MK_API mk_result MK_CALL mk_sample_cartesian_candidates_compact(const mk_analytic_cartesian_model *parameters,
-    const mk_serial_cell_model *model, const mk_external_lattice *external,
-    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
-    const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
-    double *out_joints MK_OUT_ARRAY(joint_value_count), int32_t *out_wraps MK_OUT_ARRAY(joint_value_count), uint32_t joint_value_count,
-    uint32_t *out_coordinates MK_OUT_ARRAY(coordinate_count), uint32_t coordinate_count, uint32_t *out_count MK_OUT);
 
 /* ------------------------------------------------------------------------- */
 /* Path differential                                                         */
@@ -581,23 +488,6 @@ MK_API mk_result MK_CALL mk_path_differential(const mk_differential_request *req
 /* Ladder and configuration search                                           */
 /* ------------------------------------------------------------------------- */
 
-/** No candidate copies: samples address slices of the candidate array.
- * Costs are nonnegative; +infinity disables a candidate. Selected indices are
- * global candidate-array offsets. Failure details remain in out_result. */
-MK_API mk_result MK_CALL mk_search_ladder(const mk_ladder_request *request,
-    const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
-    const mk_lattice_candidate *candidates MK_IN_ARRAY(candidate_count),
-    const double *state_costs MK_IN_ARRAY(candidate_count), uint32_t candidate_count,
-    uint32_t *out_indices MK_OUT_ARRAY(sample_count), mk_ladder_result *out_result MK_OUT);
-
-/** Same search with collision-excluded transitions; endpoint states remain available. */
-MK_API mk_result MK_CALL mk_search_ladder_filtered(const mk_ladder_request *request,
-    const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
-    const mk_lattice_candidate *candidates MK_IN_ARRAY(candidate_count),
-    const double *state_costs MK_IN_ARRAY(candidate_count), uint32_t candidate_count,
-    const mk_ladder_edge *blocked_edges MK_IN_ARRAY(blocked_edge_count), uint32_t blocked_edge_count,
-    uint32_t *out_indices MK_OUT_ARRAY(sample_count), mk_ladder_result *out_result MK_OUT);
-
 /** Compact equivalent of filtered ladder search. Joints are candidate-major,
  * with joint_count values per candidate. Coordinates are candidate-major:
  * external_count external cells, then roll, tilt, azimuth and branch.
@@ -610,14 +500,6 @@ MK_API mk_result MK_CALL mk_search_ladder_compact_filtered(const mk_ladder_reque
     const double *state_costs MK_IN_ARRAY(candidate_count), uint32_t candidate_count,
     const mk_ladder_edge *blocked_edges MK_IN_ARRAY(blocked_edge_count), uint32_t blocked_edge_count,
     uint32_t *out_indices MK_OUT_ARRAY(sample_count), mk_ladder_result *out_result MK_OUT);
-
-/** Choose one candidate per sample from the sample-addressed candidate slices.
- * Write the selected joint sequence on success; report a failed sample and
- * diagnostic in the output sequence when no complete path can be selected. */
-MK_API mk_result MK_CALL mk_select_configurations(const mk_configuration_request *request,
-    const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
-    const mk_configuration_candidate *candidates MK_IN_ARRAY(candidate_count), uint32_t candidate_count,
-    mk_configuration_solution *out_sequence MK_OUT_ARRAY(sample_count));
 
 /* ------------------------------------------------------------------------- */
 /* Paths and time laws                                                       */

@@ -6,22 +6,6 @@
 #include <descartes_light/solvers/ladder_graph/ladder_graph_solver.h>
 #include <console_bridge/console.h>
 namespace {
-struct CandidateSlice {
-    const mk_lattice_candidate *data;unsigned count;
-    unsigned size()const{return count;}
-    bool empty()const{return count==0;}
-    const mk_lattice_candidate &operator[](unsigned i)const{return data[i];}
-    const mk_lattice_candidate *begin()const{return data;}
-    const mk_lattice_candidate *end()const{return count?data+count:data;}
-};
-struct Slices {
-    const mk_configuration_sample *samples;unsigned count;
-    const mk_lattice_candidate *candidates;
-    unsigned size()const{return count;}
-    bool empty()const{return count==0;}
-    const mk_lattice_candidate &candidate(unsigned i)const{return candidates[i];}
-    CandidateSlice operator[](unsigned i)const{return {candidates?candidates+samples[i].first_candidate:nullptr,samples[i].candidate_count};}
-};
 struct CompactCandidate {
     const double *joints;const uint32_t *external_coordinates;
     unsigned roll_index,tilt_index,azimuth_index,branch;
@@ -181,16 +165,6 @@ static mk_result search_ladder(const Layers &slices,const mk_ladder_request *req
     catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
 }
 
-extern "C" mk_result MK_CALL mk_search_ladder_filtered(const mk_ladder_request *request,
-    const mk_configuration_sample *samples,uint32_t sample_count,
-    const mk_lattice_candidate *candidates,const double *state_costs,uint32_t candidate_count,
-    const mk_ladder_edge *blocked_edges,uint32_t blocked_edge_count,
-    uint32_t *out_indices,mk_ladder_result *out_result) {
-    if(candidate_count && !candidates)return MK_ERROR_INVALID_ARGUMENT;
-    for(unsigned i=0;i<candidate_count;++i)if(candidates[i].struct_size!=sizeof(candidates[i]))return MK_ERROR_INVALID_ARGUMENT;
-    return search_ladder(Slices{samples,sample_count,candidates},request,samples,sample_count,
-        state_costs,candidate_count,blocked_edges,blocked_edge_count,out_indices,out_result);
-}
 extern "C" mk_result MK_CALL mk_search_ladder_compact_filtered(const mk_ladder_request *request,
     const mk_configuration_sample *samples,uint32_t sample_count,
     const double *joints,uint32_t joint_value_count,const uint32_t *coordinates,uint32_t coordinate_count,
@@ -203,12 +177,4 @@ extern "C" mk_result MK_CALL mk_search_ladder_compact_filtered(const mk_ladder_r
         (candidate_count && (!joints || !coordinates)))return MK_ERROR_INVALID_ARGUMENT;
     return search_ladder(CompactSlices{samples,sample_count,joints,coordinates,request->joint_count,request->external_count},
         request,samples,sample_count,state_costs,candidate_count,blocked_edges,blocked_edge_count,out_indices,out_result);
-}
-
-extern "C" mk_result MK_CALL mk_search_ladder(const mk_ladder_request *request,
-    const mk_configuration_sample *samples,uint32_t sample_count,
-    const mk_lattice_candidate *candidates,const double *state_costs,uint32_t candidate_count,
-    uint32_t *out_indices,mk_ladder_result *out_result) {
-    return mk_search_ladder_filtered(request,samples,sample_count,candidates,state_costs,candidate_count,
-        nullptr,0,out_indices,out_result);
 }

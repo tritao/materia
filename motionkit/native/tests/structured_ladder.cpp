@@ -50,6 +50,20 @@ std::vector<CompactLayer> compact_layers(const std::vector<LadderLayer> &source,
         }result.push_back(std::move(compact));
     }return result;
 }
+// Encode fixture records using the same compact layout consumed by production.
+static mk_result search_records(const mk_ladder_request *request,
+    const mk_configuration_sample *samples,unsigned sample_count,
+    const LadderCandidate *candidates,const double *costs,unsigned count,
+    unsigned *indices,mk_ladder_result *report,const mk_ladder_edge *blocked=nullptr,unsigned blocked_count=0) {
+    std::vector<double> joints;std::vector<uint32_t> coordinates;
+    for(unsigned i=0;i<count;++i){const auto &c=candidates[i];
+        joints.insert(joints.end(),c.joints,c.joints+request->joint_count);
+        coordinates.insert(coordinates.end(),c.external_coordinates,c.external_coordinates+request->external_count);
+        coordinates.insert(coordinates.end(),{c.roll_index,c.tilt_index,c.azimuth_index,c.branch});
+    }
+    return mk_search_ladder_compact_filtered(request,samples,sample_count,joints.data(),joints.size(),
+        coordinates.data(),coordinates.size(),costs,count,blocked,blocked_count,indices,report);
+}
 int main(){
     LadderSettings s;s.joints=4;s.externals=1;s.rolls=4;s.roll_weight=.07;
     for(unsigned j=0;j<4;++j){s.jump[j]=.5;s.weight[j]=1+j;s.velocity[j]=1;}
@@ -58,8 +72,8 @@ int main(){
     LadderSettings edge_settings;edge_settings.joints=1;
     edge_settings.jump[0]=1;edge_settings.weight[0]=edge_settings.velocity[0]=1;
     std::vector<LadderLayer> edge_layers(3);
-    for(double value:{0.0,0.2}){mk_lattice_candidate c{};c.joints[0]=value;edge_layers[0].push_back(c);}
-    for(unsigned layer=1;layer<3;++layer){mk_lattice_candidate c{};c.joints[0]=0.0;edge_layers[layer].push_back(c);}
+    for(double value:{0.0,0.2}){LadderCandidate c{};c.joints[0]=value;edge_layers[0].push_back(c);}
+    for(unsigned layer=1;layer<3;++layer){LadderCandidate c{};c.joints[0]=0.0;edge_layers[layer].push_back(c);}
     auto exclude=[](unsigned layer,unsigned from,unsigned to){return !(layer==1 && from==0 && to==0);};
     auto edge_route=structured_ladder(edge_layers,edge_settings,{},exclude);
     assert(edge_route.failed==UINT32_MAX && edge_route.route==std::vector<unsigned>({1,0,0}));
@@ -73,7 +87,7 @@ int main(){
         assert(coarse_edge_route.cost==edge_route.cost);
     }
     auto remapped_layers=edge_layers;auto remapped_settings=edge_settings;remapped_settings.rolls=4;
-    for(auto &layer:remapped_layers){mk_lattice_candidate decoy{};decoy.roll_index=3;decoy.joints[0]=3;
+    for(auto &layer:remapped_layers){LadderCandidate decoy{};decoy.roll_index=3;decoy.joints[0]=3;
         layer.insert(layer.begin(),decoy);}
     auto remapped_exclude=[](unsigned layer,unsigned from,unsigned to){return !(layer==1 && from==1 && to==1);};
     auto remapped_route=coarse_ladder(remapped_layers,remapped_settings,CoarseLadderSettings{2,2,1,0},{},remapped_exclude);
@@ -90,7 +104,7 @@ int main(){
     for(unsigned trial=0;trial<100;++trial){
         std::vector<LadderLayer> layers(4);std::vector<std::vector<double>> states(4);
         for(unsigned l=0;l<4;++l)for(unsigned i=0;i<16;++i){
-            mk_lattice_candidate c{};c.branch=i%2;c.external_coordinates[0]=(i/2)%2;c.roll_index=i/4;
+            LadderCandidate c{};c.branch=i%2;c.external_coordinates[0]=(i/2)%2;c.roll_index=i/4;
             for(unsigned j=0;j<4;++j)c.joints[j]=q(random)*(trial<50?.2:1.0);layers[l].push_back(c);states[l].push_back(.01*i);
         }
         auto result=structured_ladder(layers,s,states);
@@ -127,11 +141,11 @@ int main(){
         mk_ladder_request request{};request.struct_size=sizeof(request);request.joint_count=s.joints;request.external_count=s.externals;
         request.roll_count=s.rolls;request.tilt_count=request.azimuth_count=1;request.roll_weight=s.roll_weight;
         for(unsigned j=0;j<s.joints;++j){request.max_jump[j]=s.jump[j];request.velocity[j]=s.velocity[j];request.weights[j]=s.weight[j];}
-        std::vector<mk_lattice_candidate> flat;std::vector<double> prices;mk_configuration_sample samples[4]{};
+        std::vector<LadderCandidate> flat;std::vector<double> prices;mk_configuration_sample samples[4]{};
         for(unsigned l=0;l<4;++l){samples[l].struct_size=sizeof(samples[l]);samples[l].distance=.1*l;samples[l].first_candidate=flat.size();samples[l].candidate_count=layers[l].size();
             for(unsigned i=0;i<layers[l].size();++i){auto c=layers[l][i];c.struct_size=sizeof(c);flat.push_back(c);prices.push_back(states[l][i]);}}
         unsigned indices[4];mk_ladder_result report;
-        auto status=mk_search_ladder(&request,samples,4,flat.data(),prices.data(),flat.size(),indices,&report);
+        auto status=search_records(&request,samples,4,flat.data(),prices.data(),flat.size(),indices,&report);
         assert(status==(failed==UINT32_MAX?MK_OK:MK_ERROR_GENERATION));assert(report.failed_sample==failed);
         std::vector<double> compact_joints;std::vector<uint32_t> compact_cells;
         for(const auto &layer:compact){compact_joints.insert(compact_joints.end(),layer.joints.begin(),layer.joints.end());
@@ -158,7 +172,7 @@ int main(){
             assert(compact_filtered_coarse.route==expected.route && compact_filtered_coarse.cost==expected.cost && compact_filtered_coarse.failed==expected.failed);
             for(unsigned coarse_stride:{0u,2u}){
                 request.coarse_sample_stride=coarse_stride;request.coarse_lattice_stride=1;request.corridor_radius=10;request.corridor_widenings=0;
-                auto filtered=mk_search_ladder_filtered(&request,samples,4,flat.data(),prices.data(),flat.size(),&blocked,1,indices,&report);
+                auto filtered=search_records(&request,samples,4,flat.data(),prices.data(),flat.size(),indices,&report,&blocked,1);
                 assert(filtered==(expected.failed==UINT32_MAX?MK_OK:MK_ERROR_GENERATION));
                 assert(report.failed_sample==expected.failed);
                 auto compact_filtered_status=mk_search_ladder_compact_filtered(&request,samples,4,
@@ -171,20 +185,20 @@ int main(){
                     assert(indices[0]-samples[0].first_candidate!=blocked.from_candidate || indices[1]-samples[1].first_candidate!=blocked.to_candidate);}
             }
             blocked.sample=0;
-            assert(mk_search_ladder_filtered(&request,samples,4,flat.data(),prices.data(),flat.size(),&blocked,1,indices,&report)==MK_ERROR_INVALID_ARGUMENT);
+            assert(search_records(&request,samples,4,flat.data(),prices.data(),flat.size(),indices,&report,&blocked,1)==MK_ERROR_INVALID_ARGUMENT);
         }
         assert(result.failed==failed);
         if(failed==UINT32_MAX)assert(std::abs(result.cost-*std::min_element(old.begin(),old.end()))<1e-10);
     }
     // The cheapest first branch dies; the globally reachable branch wins.
-    std::vector<LadderLayer> layers(3);for(unsigned l=0;l<3;++l){mk_lattice_candidate c{};c.branch=1;c.joints[0]=.3+.1*l;layers[l].push_back(c);}
-    mk_lattice_candidate dead{};dead.branch=0;layers[0].insert(layers[0].begin(),dead);
+    std::vector<LadderLayer> layers(3);for(unsigned l=0;l<3;++l){LadderCandidate c{};c.branch=1;c.joints[0]=.3+.1*l;layers[l].push_back(c);}
+    LadderCandidate dead{};dead.branch=0;layers[0].insert(layers[0].begin(),dead);
     s.jump[0]=.15;auto route=structured_ladder(layers,s);assert(route.failed==UINT32_MAX && route.route[0]==1);
     layers[1].clear();route=structured_ladder(layers,s);assert(route.failed==1 && route.no_candidates);
     layers[1].push_back(dead);layers[1][0].joints[0]=2;route=structured_ladder(layers,s);assert(route.failed==1 && !route.no_candidates);
     // Adjacent periodic roll cells connect across the seam even when inverse
     // representatives change wrap labels, provided physical joints stay close.
-    layers.assign(2,{});mk_lattice_candidate a{},b{};
+    layers.assign(2,{});LadderCandidate a{},b{};
     a.roll_index=3;a.joints[0]=.3;a.wraps[0]=0;
     b.roll_index=0;b.joints[0]=.4;b.wraps[0]=1;
     layers[0].push_back(a);layers[1].push_back(b);
@@ -205,33 +219,33 @@ int main(){
     request.max_jump[0]=.2;request.velocity[0]=request.weights[0]=1;
     mk_configuration_sample samples[2]{};
     for(unsigned i=0;i<2;++i){samples[i].struct_size=sizeof(samples[i]);samples[i].distance=.1*i;samples[i].first_candidate=i;samples[i].candidate_count=1;}
-    mk_lattice_candidate cells[2]{};
+    LadderCandidate cells[2]{};
     for(auto &c:cells)c.struct_size=sizeof(c);
     cells[1].joints[0]=.1;double costs[]={0,.03};unsigned selected[2];mk_ladder_result report;
-    assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_OK);
+    assert(search_records(&request,samples,2,cells,costs,2,selected,&report)==MK_OK);
     assert(selected[0]==0 && selected[1]==1 && std::abs(report.cost-.13)<1e-12 && report.failed_sample==UINT32_MAX && report.backend==3);
     request.coarse_sample_stride=2;request.coarse_lattice_stride=2;request.corridor_radius=1;
-    assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_OK);
+    assert(search_records(&request,samples,2,cells,costs,2,selected,&report)==MK_OK);
     assert(selected[0]==0 && selected[1]==1 && std::abs(report.cost-.13)<1e-12 && report.backend==2);
     request.coarse_lattice_stride=0;
-    assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_INVALID_ARGUMENT);
+    assert(search_records(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_INVALID_ARGUMENT);
     request.coarse_lattice_stride=2;
     cells[1].joints[0]=1;
-    assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_GENERATION);
+    assert(search_records(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_GENERATION);
     assert(report.failed_sample==1 && report.failure_kind==2 && report.failed_distance==.1 && selected[0]==UINT32_MAX);
     samples[1].candidate_count=0;
-    assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_GENERATION);
+    assert(search_records(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_GENERATION);
     assert(report.failed_sample==1 && report.failure_kind==1);
     samples[1].candidate_count=2;
-    assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_INVALID_ARGUMENT);
+    assert(search_records(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_INVALID_ARGUMENT);
     samples[1].candidate_count=1;request.max_jump[0]=0;
-    assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_INVALID_ARGUMENT);
+    assert(search_records(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_INVALID_ARGUMENT);
 
     LadderSettings corridor_settings;corridor_settings.joints=1;corridor_settings.externals=1;
     corridor_settings.jump[0]=.15;corridor_settings.velocity[0]=corridor_settings.weight[0]=1;
     std::vector<LadderLayer> bend(5);
     unsigned coordinates[]={0,1,2,1,0};
-    for(unsigned l=0;l<5;++l){mk_lattice_candidate c{};c.joints[0]=.1*l;c.external_coordinates[0]=coordinates[l];bend[l].push_back(c);}
+    for(unsigned l=0;l<5;++l){LadderCandidate c{};c.joints[0]=.1*l;c.external_coordinates[0]=coordinates[l];bend[l].push_back(c);}
     auto exact_bend=structured_ladder(bend,corridor_settings);
     auto widened=coarse_ladder(bend,corridor_settings,CoarseLadderSettings{4,2,1,1});
     assert(widened.failed==UINT32_MAX && widened.route==exact_bend.route && widened.cost==exact_bend.cost && widened.backend==2);

@@ -1,6 +1,6 @@
 #ifndef MOTIONKIT_STRUCTURED_LADDER_H
 #define MOTIONKIT_STRUCTURED_LADDER_H
-#include "motionkit.h"
+#include "lattice_candidate.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -25,7 +25,7 @@ struct LadderResult {
     bool no_candidates=false;
     uint64_t tested_edges=0;
 };
-using LadderLayer=std::vector<mk_lattice_candidate>;
+using LadderLayer=std::vector<LadderCandidate>;
 template<unsigned Capacity>
 struct BasicLatticeKey {
     unsigned branch, dimensions=0;
