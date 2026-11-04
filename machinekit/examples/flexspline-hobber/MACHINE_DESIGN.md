@@ -13,8 +13,8 @@ This section is the current state; the sections below keep their history and are
 model, not released manufacturing, and every assumption is listed in [FRAME_PLAN.md](FRAME_PLAN.md) (Decisions, Open).
 
 - **Frames, no welding:** the X carriage is one milled steel part (20 mm deck, 25 mm ribs, open U); the Z saddle one milled plate
-  with the eRob pocket and the nut block bolts; ground steel bar pads carry the X and Z screw supports; the Y drive stands on two milled
-  L brackets and a nut seat bar; the swivel plate is ground plate, the adapter ring turned aluminium; the Ø80 spindle cartridge is held
+  with the eRob pocket and the nut block bolts; one ground steel bar pad per axis (X and Z) carries both screw supports, ground together so the seats are coplanar; the Y drive stands on two milled
+  L brackets and a nut seat bar; the swivel plate is ground steel plate (the Y rails and the spindle seat are steel: aluminium would be about a third as stiff and would bow against them as it warms), the adapter ring turned aluminium; the Ø80 spindle cartridge is held
   by one milled split-clamp seat (clamping length assumed, `SpindleHousing.CLAMP_FROM..CLAMP_TO`). Each has a `ManufacturingRoute`;
   `supplier-packages/machined/` holds their STEP, drawings and RFQ table.
 - **Drives:** SFU1605 screws (X 260, Y 170, Z 420 mm), HZMotion M60D-BK12-C mount with BF12, Leadshine ELM2H-0400 servo on each axis, Z with its built-in
@@ -580,10 +580,10 @@ command still raises the head; an actual-pose/right-hand-thread regression
 verifies the transmission sign.
 
 The nut is a steel nut block bolted to the Z saddle's back face. The BK12 mount (M60D-BK12-C, 400 W braked servo) and the BF12 stand on
-ground steel bar pads (40 mm) against one ground steel insert in the column's drive seat, whose width and position are derived
+one ground steel bar pad (40 mm) under both, against one ground steel insert in the column's drive seat, whose width and position are derived
 from the offset. The rear casting spine keeps its full backing behind that insert (`z-drive-checks` asserts 125 mm). The Z scale
 stands on the channel wall opposite the drive. The motor platform's 40 × 40 mm R3 coupling window is no longer part of the model;
-the coupling clears the pads by at least 2 mm. Motor mounting/centering and nut fastener details remain assumed pending the
+the coupling clears the pad by at least 2 mm. Motor mounting/centering and nut fastener details remain assumed pending the
 selected hardware drawings; this is a layout, not a manufacturing release.
 
 Checks cover 5 mm of reserve beyond both soft stops: minimum nut/race margin

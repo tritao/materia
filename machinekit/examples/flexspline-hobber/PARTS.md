@@ -173,7 +173,7 @@ case checks project loading, source-derived axis limits and a coarse physical Mu
 ## Redesigned machine structure
 
 The example uses registered `HobberSaddle` recipes: the milled X carriage and Z saddle, the ground swivel plate, adapter ring, Y saddle, the
-spindle split-clamp seat, ground bar drive pads, Y brackets and nut seat, scale seat bars and arm, and the electrical rack. Every made one has a
+spindle split-clamp seat, one ground bar drive pad each for X and Z, Y brackets and nut seat, scale seat bars and arm, and the electrical rack. Every made one has a
 `ManufacturingRoute` (see `supplier-packages/machined/`). The old overhead A-yoke, Y-saddle, X-bridge and Z-saddle recipes are retired.
 These extend `MachineComponent` directly. Designed steel weldments remain assumed;
 physical contacts, connected solids and recipe/pose round trips are checked.

@@ -5,8 +5,9 @@ import machinekit.component.Dimension;
 /**
  * One ground stock size: a plate or flat bar whose faces are ground, so a face that only needs to be flat and parallel
  * needs no machining. `thicknessTolerance` is the symmetric deviation of the ground thickness (mm); `flatness` and
- * `parallelism` are over any 100 mm; `roughnessRa` in micrometres. The values are catalogue-typical and assumed until a
- * supplier's row replaces them.
+ * `parallelism` are over any 100 mm; `roughnessRa` in micrometres. They are the tolerances of the stock **as bought**: a
+ * face that needs better is ground after cutting and says so on its `ManufacturingRoute` machined faces. The values are
+ * catalogue-typical (`assumed`) until a supplier's row replaces them.
  */
 typedef GroundStockRow = {
   var id:String;
@@ -19,13 +20,18 @@ typedef GroundStockRow = {
   var flatness:Float;
   var parallelism:Float;
   var roughnessRa:Float;
+  /** Where the tolerances come from: a standard or a supplier datasheet. */
+  var source:String;
+  /** True while the values are typical figures not yet taken from a supplier's row for the grade bought. */
+  var assumed:Bool;
 }
 
 /**
  * Ground plate and ground flat bar stock rows, the standard thicknesses and grinding tolerances a part is cut from:
  *
- * - **plate**: ground aluminium tooling plate (cast or rolled, the maker's grade stands in for "aluminium 6061");
- * - **flat bar**: ground steel flat stock ("gauge plate" bar), sold in widths of 10 to 100 mm.
+ * - **steel plate**: Blanchard- or precision-ground steel plate (C45 or 1.2842 tool steel), the material named by the caller;
+ * - **aluminium plate**: cast tooling plate (MIC-6 / 5083 type), the material named by the caller;
+ * - **flat bar**: precision-ground steel flat stock (DIN 59350 type, "gauge plate" bar), widths of 10 to 100 mm.
  *
  * Both are looked up by thickness; `atLeast` picks the smallest standard thickness that leaves a required finished
  * thickness, so a part is drawn on stock rather than on an arbitrary dimension.
@@ -44,27 +50,52 @@ class GroundStock {
     return false;
   }
 
-  /** Grinding tolerance on thickness, ±mm: tighter on thin stock. */
-  static function thicknessTolerance(thickness:Float):Float return thickness <= 12 ? 0.01 : thickness <= 30 ? 0.015 : 0.02;
+  public static inline final STEEL = "steel";
+  public static inline final ALUMINIUM = "aluminium 6061";
 
-  static function row(kind:String, material:String, thickness:Float, flatness:Float):GroundStockRow {
-    var tag = kind == "plate" ? "GROUND-PLATE" : "GROUND-BAR";
+  /**
+   * The stock rows' tolerances as sold, by kind and material: thickness (±mm, tighter up to 12 mm), flatness and parallelism (mm over
+   * 100 mm), and the source. ASSUMED: DIN 59350 gives precision-ground flat steel its own thickness classes and the Blanchard-ground
+   * plate and cast tooling plate (MIC-6 datasheet: about ±0.1 mm thickness, flatness 0.1 mm over a metre) are looser still; the figures
+   * here are typical catalogue values taken at the loose end of those, not a quoted grade, until a supplier row replaces them.
+   */
+  static function figures(kind:String, material:String, thickness:Float): {tolerance:Float, flatness:Float, parallelism:Float, source:String} {
+    var thin = thickness <= 12;
+    if (kind == "flat bar") return {
+      tolerance: thin ? 0.03 : 0.05, flatness: 0.05, parallelism: 0.03,
+      source: "precision-ground flat steel, DIN 59350 type (typical catalogue values, assumed)"
+    };
+    if (material == STEEL) return {
+      tolerance: thin ? 0.05 : 0.10, flatness: 0.10, parallelism: 0.05,
+      source: "Blanchard/precision-ground steel plate, C45 or 1.2842 (typical catalogue values, assumed)"
+    };
     return {
-      id: tag + "-" + (material == "steel" ? "STEEL" : "AL") + "-" + Dimension.format(thickness),
-      kind: kind,
-      material: material,
-      thickness: thickness,
-      thicknessTolerance: thicknessTolerance(thickness),
-      flatness: flatness,
-      parallelism: 0.01,
-      roughnessRa: 0.8
+      tolerance: thin ? 0.08 : 0.10, flatness: 0.10, parallelism: 0.05,
+      source: "cast aluminium tooling plate, MIC-6 / 5083 type (datasheet-typical +-0.1 mm, assumed)"
     };
   }
 
-  /** The ground aluminium plate row of a standard `thickness`. */
-  public static function plate(thickness:Float):GroundStockRow {
+  static function row(kind:String, material:String, thickness:Float):GroundStockRow {
+    var tag = kind == "plate" ? "GROUND-PLATE" : "GROUND-BAR", f = figures(kind, material, thickness);
+    return {
+      id: tag + "-" + (material == STEEL ? "STEEL" : "AL") + "-" + Dimension.format(thickness),
+      kind: kind,
+      material: material,
+      thickness: thickness,
+      thicknessTolerance: f.tolerance,
+      flatness: f.flatness,
+      parallelism: f.parallelism,
+      roughnessRa: 0.8,
+      source: f.source,
+      assumed: true
+    };
+  }
+
+  /** The ground plate row of a standard `thickness` in `material` (`STEEL` or `ALUMINIUM`); there is no default material. */
+  public static function plate(material:String, thickness:Float):GroundStockRow {
+    if (material != STEEL && material != ALUMINIUM) throw 'No ground plate in "$material"; use "$STEEL" or "$ALUMINIUM"';
     if (!contains(plateThicknesses(), thickness)) throw 'No ground plate ${Dimension.format(thickness)} mm thick; standard: ${plateThicknesses()}';
-    return row("plate", "aluminium 6061", thickness, 0.02);
+    return row("plate", material, thickness);
   }
 
   /** The ground steel flat bar row of a standard `thickness`; `width` must be a standard width and exceed it. */
@@ -72,7 +103,7 @@ class GroundStock {
     if (!contains(barThicknesses(), thickness)) throw 'No ground flat bar ${Dimension.format(thickness)} mm thick; standard: ${barThicknesses()}';
     if (!contains(barWidths(), width)) throw 'No ground flat bar ${Dimension.format(width)} mm wide; standard: ${barWidths()}';
     if (width < thickness) throw "A ground flat bar is at least as wide as it is thick";
-    return row("flat bar", "steel", thickness, 0.01);
+    return row("flat bar", STEEL, thickness);
   }
 
   /** The smallest standard `kind` thickness of at least `thickness`, mm: the stock a part of that thickness is cut from. */

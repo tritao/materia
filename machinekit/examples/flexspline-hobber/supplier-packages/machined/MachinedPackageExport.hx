@@ -20,7 +20,7 @@ import machinekit.motion.NutBlock;
     Usage: hl main.hl <output dir>. */
 class MachinedPackageExport {
   static final DESIGNS = [
-    "GE-X-carriage", "GE-Z-saddle", "GE-X-drive-fixed", "GE-X-drive-floating", "GE-Z-drive-fixed", "GE-Z-drive-floating",
+    "GE-X-carriage", "GE-Z-saddle", "GE-X-drive-pad", "GE-Z-drive-pad",
     "GE-Y-drive-fixed", "GE-Y-drive-floating", "GE-Y-nut-seat", "GE-X-scale-seat", "GE-Z-scale-seat", "GE-Z-scale-arm", "GE-Y-saddle",
     "GE-swivel-plate", "GE-swivel-adapter", "GE-spindle-seat"
   ];
@@ -86,7 +86,7 @@ class MachinedPackageExport {
     if (s == null) return null;
     return {
       id: s.id, kind: s.kind, material: s.material, thickness: s.thickness, thicknessTolerance: s.thicknessTolerance,
-      flatness: s.flatness, parallelism: s.parallelism, roughnessRa: s.roughnessRa
+      flatness: s.flatness, parallelism: s.parallelism, roughnessRa: s.roughnessRa, source: s.source, assumed: s.assumed
     };
   }
 

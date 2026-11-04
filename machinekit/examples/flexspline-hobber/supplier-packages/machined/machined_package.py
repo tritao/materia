@@ -401,8 +401,8 @@ def notes_for(part):
     if route["kind"] == "GroundStock":
         s = route["stock"]
         notes.append(f"3. Cut from ground flat {s['kind']} {fmt(part['stockCut']['width'])} x {fmt(s['thickness'])}: thickness ±{fmt(s['thicknessTolerance'], 3)}, "
-                     f"flatness {fmt(s['flatness'], 3)}, parallelism {fmt(s['parallelism'], 3)} per 100 mm, Ra {fmt(s['roughnessRa'])}. Broad faces stay as ground; "
-                     "sawn edges as cut.")
+                     f"flatness {fmt(s['flatness'], 3)}, parallelism {fmt(s['parallelism'], 3)} per 100 mm, Ra {fmt(s['roughnessRa'])}. Stock as bought (source: {s.get('source', 'n/a')}{', assumed' if s.get('assumed') else ''}); "
+                     "broad faces stay as bought except those marked ground after cutting in the face table; sawn edges as cut.")
     else:
         notes.append(f"3. Milled from the block in {route['setups']} setup{'s' if route['setups'] > 1 else ''} on a 3-axis machine. "
                      f"Indicative raw block {' x '.join(fmt(d) for d in part['rawBlock'])} (size + 3 mm per side).")

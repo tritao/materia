@@ -326,20 +326,20 @@ class HobberSaddle extends MachineComponent {
         ], 350);
       case "GE-X-drive-pad":
         // One bar under both supports: the grinding makes both seats coplanar, and it stays the re-grindable height spacer.
-        bar(15, [{name: "seat plane under both supports (ground together)", tolerance: 0.01, roughnessRa: 1.6}, {name: "seat holes", tolerance: 0.1, roughnessRa: null},
+        bar(15, [{name: "seat plane under both supports (ground together after cutting)", tolerance: 0.01, roughnessRa: 1.6}, {name: "seat holes", tolerance: 0.1, roughnessRa: null},
           {name: "groove for the nut block's travel (block + 2.5 mm each way)", tolerance: 0.5, roughnessRa: null}]);
       case "GE-Z-drive-pad":
-        bar(40, [{name: "seat plane under both supports (ground together)", tolerance: 0.01, roughnessRa: 1.6}, {name: "seat holes", tolerance: 0.1, roughnessRa: null},
+        bar(40, [{name: "seat plane under both supports (ground together after cutting)", tolerance: 0.01, roughnessRa: 1.6}, {name: "seat holes", tolerance: 0.1, roughnessRa: null},
           {name: "groove for the nut block's travel (block + 2.5 mm each way)", tolerance: 0.5, roughnessRa: null},
           {name: "relief for the A housing envelope (swept over Z, 2.5 mm gap)", tolerance: 0.5, roughnessRa: null}]);
       case "GE-Y-drive-fixed" | "GE-Y-drive-floating":
         ManufacturingRoute.milled(1, "fine", [{name: "seat face, bolts and dowels", tolerance: 0.05, roughnessRa: 3.2}], 160);
       case "GE-Y-nut-seat":
-        ManufacturingRoute.groundStock(GroundStock.bar(60, 20), [{name: "nut block seat", tolerance: 0.02, roughnessRa: 1.6}]);
+        ManufacturingRoute.groundStock(GroundStock.bar(60, 20), [{name: "nut block seat (ground after cutting)", tolerance: 0.02, roughnessRa: 1.6}]);
       case "GE-X-scale-seat" | "GE-Z-scale-seat":
         // Ground bar: the housing's mounting face parallelism comes from the datasheet (0.1 over the length), the grinding gives 0.01.
         ManufacturingRoute.groundStock(GroundStock.bar(HobberScales.SEAT_BAR_WIDTH, HobberScales.SEAT_BAR),
-          [{name: "housing seat, tapped holes", tolerance: HobberScales.x().housing.mounting().housingParallelism, roughnessRa: null}]);
+          [{name: "housing seat, tapped holes (ground after cutting)", tolerance: HobberScales.x().housing.mounting().housingParallelism, roughnessRa: null}]);
       case "GE-Z-scale-arm":
         ManufacturingRoute.milled(1, "fine", [{name: "scale head seat, face", tolerance: HobberScales.z().head.mounting().headParallelism, roughnessRa: 1.6}], 230);
       case "GE-Y-saddle":
@@ -349,9 +349,9 @@ class HobberSaddle extends MachineComponent {
         ], 400);
       case "GE-swivel-plate":
         // Ground plate (the faces are as ground; the Y rails seat on the front face against an edge); the holes are drilled and tapped.
-        ManufacturingRoute.groundStock(GroundStock.plate(15), [
-          {name: "scale housing seat, front", tolerance: HobberScales.y().housing.mounting().housingParallelism, roughnessRa: 1.6},
-          {name: "adapter ring seat, back", tolerance: 0.05, roughnessRa: 1.6}
+        ManufacturingRoute.groundStock(GroundStock.plate(GroundStock.STEEL, 15), [
+          {name: "scale housing seat, front (ground after cutting)", tolerance: HobberScales.y().housing.mounting().housingParallelism, roughnessRa: 1.6},
+          {name: "adapter ring seat, back (ground after cutting)", tolerance: 0.05, roughnessRa: 1.6}
         ]);
       case "GE-swivel-adapter":
         ManufacturingRoute.turned(2, "fine", [

@@ -25,14 +25,14 @@ Python 3 with numpy, and Chrome or Chromium on the PATH for the PDFs; `pdftotext
 |---|---|---|
 | `HOBBER-GE-X-carriage` | milled, 2 setups, fine | block |
 | `HOBBER-GE-Z-saddle` | milled, 2 setups, fine (pocket, bore and 16 screw holes for the eRob 110, R1) | block |
-| `HOBBER-GE-X-drive-fixed/-floating` | ground flat bar, 15 mm, holes | 80 x 15 |
-| `HOBBER-GE-Z-drive-fixed/-floating` | ground flat bar, 40 mm, holes (the floating one is cut by the eRob housing envelope swept over the Z travel plus the 2 mm gap, `HobberZOffset.relief`) | 80 x 40 |
+| `HOBBER-GE-X-drive-pad` | one ground flat bar, 15 mm, under both supports (ground together: coplanar seats), holes of both | 80 x 15 |
+| `HOBBER-GE-Z-drive-pad` | one ground flat bar, 40 mm, under both supports, holes of both, cut by the mount's flange relief and the eRob housing envelope swept over the Z travel plus the 2 mm gap (`HobberZOffset.relief`) | 80 x 40 |
 | `HOBBER-GE-Y-drive-fixed/-floating` | milled L bracket, 1 setup, fine | block |
 | `HOBBER-GE-Y-nut-seat` | ground flat bar, 20 mm | 60 x 20 |
 | `HOBBER-GE-X-scale-seat`, `HOBBER-GE-Z-scale-seat` | ground flat bar, 10 x 20, 2 tapped M8 | 20 x 10 |
 | `HOBBER-GE-Z-scale-arm` | milled arm for the Z scale head, 1 setup, fine | block |
 | `HOBBER-GE-Y-saddle` | milled, 2 setups, fine (boss for the Y scale head) | block |
-| `HOBBER-GE-swivel-plate` | ground plate, 15 mm, sawn to size, holes (Y scale housing seat, 8 adapter-ring screws) | plate 15 |
+| `HOBBER-GE-swivel-plate` | ground steel plate, 15 mm (not aluminium: it carries the steel Y rails and the spindle seat), sawn to size, two faces ground after cutting, holes (Y scale housing seat, 8 adapter-ring screws) | plate 15 |
 | `HOBBER-GE-swivel-adapter` | turned ring, 2 setups, fine, aluminium (output flange to swivel plate) | bar |
 | `HOBBER-GE-spindle-seat` | milled split-clamp block for the Ø80 g6 cartridge, 2 setups, tight | block |
 | `NUT-BLOCK-...` (X, Y, Z) | ground flat bar, 16 mm, bore, holes | 60 x 16 |
@@ -92,3 +92,7 @@ own) is the first thing these checks caught; `HobberSaddle.withBlockBolts` now t
 - Machined faces are listed by name with their tolerances; the views do not mark which face is which.
 - Mass is volume times the generic steel density; the model's own mass estimate for the carriage may differ by the
   amount of detail it carries.
+
+## Stock tolerances
+
+Ground stock is priced and toleranced as bought (`GroundStock`: DIN 59350-type flat steel, Blanchard-ground steel plate, MIC-6 type aluminium plate; thickness about +-0.03 to 0.1 mm, flatness 0.05 to 0.1 mm per 100 mm; **assumed** typical catalogue values, each row carries its source). A face that needs better is marked *ground after cutting* in the face table with its tolerance: the drive pad seat planes, the nut block base ends, the Y nut seat, the scale seat bars and the swivel plate's two seats.

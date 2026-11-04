@@ -74,7 +74,7 @@ class NutBlock extends MachineComponent {
     seat = face.pose;
     declareDrawingNumber(drawing);
     var route = ManufacturingRoute.groundStock(row, [
-      {name: "base end", tolerance: 0.02, roughnessRa: 1.6},
+      {name: "base end (ground after cutting)", tolerance: 0.02, roughnessRa: 1.6},
       {name: "nut bore", tolerance: 0.02, roughnessRa: 1.6}
     ]);
     addFacet(route);
