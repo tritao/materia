@@ -79,8 +79,8 @@ class JointFastenerTests {
     return builder;
   }
 
-  static function cover(holes:Array<BoltHole>, ?size:String, grip:Float = 6, clearance:Float = 5.5, ?recess:machinekit.component.BoltedFace.BoltRecess, drawn:Bool = true):BoltedFace
-    return BoltedFace.clamped("bottom", BoltedFace.frameOf(origin, up, across), holes, clearance, grip, size, recess, drawn);
+  static function cover(holes:Array<BoltHole>, ?size:String, grip:Float = 6, clearance:Float = 5.5, ?recess:machinekit.component.BoltedFace.BoltRecess, drawn:Bool = true, washer:Bool = false):BoltedFace
+    return BoltedFace.clamped("bottom", BoltedFace.frameOf(origin, up, across), holes, clearance, grip, size, recess, drawn, washer);
 
   static function tappedHost(holes:Array<BoltHole>, size:String = "M5", depth:Float = 8, thickness:Float = 8, through:Bool = true):BoltedFace
     return BoltedFace.tapped("top", frameAtTop(10), holes, size, depth, thickness, through);
@@ -98,6 +98,8 @@ class JointFastenerTests {
   public static function run():Void {
     sound();
     machining();
+    washersAndNuts();
+    fit();
     defects();
     mill();
     Sys.println("joint fasteners: derivation, validation and the bench mill's rail and motor screws pass");
@@ -154,6 +156,59 @@ class JointFastenerTests {
     plain.place("host", new PlainBlock([suitHost()]), AssemblyFrames.translation(0, 0, 0));
     plain.attach("cover", new FaceBlock("COVER", [cover(square(50), "M5")]), AssemblyFrames.translation(0, 0, 10), "host");
     expect(plain, "fasteners.machining", "a host that cannot be cut");
+  }
+
+  /** A plate with clearance holes and a nut: the washers and the nut come from the derivation, and set the length. */
+  static function washersAndNuts():Void {
+    var plate = BoltedFace.through("top", frameAtTop(10), square(50), 5.5, 10);
+    var builder = stack(plate, cover(square(50), "M5", 6, 5.5, null, true, true));
+    var derived = JointFasteners.derive(builder);
+    derived.require();
+    var joint = derived.joints[0];
+    // 6 grip + 1 washer + 10 plate + 1 washer + 4.7 nut + 2 pitches (1.6) = 24.3: the next standard length is 25.
+    check(joint.nutted && joint.length == 25 && Math.abs(joint.stack - 18) < 1e-9, 'a bolt through a plate: x${joint.length}, stack ${joint.stack}');
+    var counts = new Map<String, Int>();
+    for (line in derived.lines()) counts.set(line.item.partNumber, line.quantity);
+    check(counts.get("ISO4762-M5x25") == 4 && counts.get("ISO7089-M5") == 8 && counts.get("ISO4032-M5") == 4, 'bolt lines: ${[for (k in counts.keys()) k + "=" + counts.get(k)]}');
+    // The nut side is a plate too: its holes must pass the screw.
+    expect(stack(BoltedFace.through("top", frameAtTop(10), square(50), 4.0, 10), cover(square(50), "M5")), "fasteners.clearance", "4 mm holes in the plate");
+    expect(stack(BoltedFace.through("top", frameAtTop(10), square(40), 5.5, 10), cover(square(50), "M5")), "fasteners.pattern", "a plate drilled on another pitch");
+    // A washer under the head lifts it: it must still fit the recess.
+    expect(stack(tappedHost(square(50)), cover(square(50), null, 6, 5.5, {diameter: 9.0, depth: 5.5}, true, true)), "fasteners.head-clearance", "an M5 head on a washer (5.0 + 1.0) in a 5.5 mm recess");
+    var washed = JointFasteners.derive(stack(tappedHost(square(50)), cover(square(50), null, 6, 5.5, null, true, true)));
+    washed.require();
+    check(washed.joints[0].length == 12 && washed.joints[0].extras.length == 1 && washed.joints[0].extras[0].count == 4, 'a washer under the head: x${washed.joints[0].length}');
+  }
+
+  /** The derived fasteners fit: the holes exist in the solids, the heads stand clear and a driver reaches them. */
+  static function fit():Void {
+    // A cover (z 0..6 over the host top) bolted down with M5: the host is drilled, the cover's holes are drawn only if cut.
+    function fitting(cap:Float, washer:Bool = false, lidAt:Null<Float> = null, lidFixed:Bool = true, drawn:Bool = false):AxisBuilder {
+      var builder = new AxisBuilder();
+      builder.place("host", new FaceBlock("HOST", [suitHost()], 21, -11), AssemblyFrames.translation(0, 0, 0));
+      builder.attach("cover", new FaceBlock("COVER", [cover(square(50), "M5", 6, 5.5, null, drawn, washer)], 6, 0), AssemblyFrames.translation(0, 0, 10), "host");
+      if (lidAt != null) {
+        var lid = new FaceBlock("LID", [], 4, 0);
+        if (lidFixed) builder.attach("lid", lid, AssemblyFrames.translation(0, 0, 10 + lidAt), "cover");
+        else builder.place("lid", lid, AssemblyFrames.translation(0, 0, 10 + lidAt));
+      }
+      builder.deriveFasteners();
+      return builder;
+    }
+    function codes(builder:AxisBuilder):Array<String> {
+      var report = machinekit.assembly.AssemblyIntegrity.check(builder, {fasteners: true});
+      return [for (item in report.diagnostics.items) if (StringTools.startsWith(item.code, "fasteners.")) item.code];
+    }
+    check(codes(fitting(0)).length == 0, "bolted down with its holes cut, a clear cover fits: " + codes(fitting(0)));
+    // The M5 head stands 5 mm proud of a 6 mm cover (z 6..11): a lid 8 mm above the cover (z 8) sits on it.
+    check(codes(fitting(0, false, 8)).indexOf("fasteners.head-clearance") >= 0, "a lid on the heads is reported: " + codes(fitting(0, false, 8)));
+    // A lid 40 mm up clears the head and the 25 mm driver reach (to z 36), and one fixed at 30 mm blocks the driver only.
+    check(codes(fitting(0, false, 40)).length == 0, "a lid clear of head and driver: " + codes(fitting(0, false, 40)));
+    check(codes(fitting(0, false, 30)).indexOf("fasteners.access") >= 0 && codes(fitting(0, false, 30)).indexOf("fasteners.head-clearance") < 0, "a lid in the driver's way is an access finding: " + codes(fitting(0, false, 30)));
+    // The same lid, not held with the cover (it could be moved away), is not in the way.
+    check(codes(fitting(0, false, 30, false)).length == 0, "a separate body is no obstacle to the driver: " + codes(fitting(0, false, 30, false)));
+    // A cover whose holes are declared drawn but are not: the shank meets its material.
+    check(codes(fitting(0, false, null, true, true)).indexOf("fasteners.hole") >= 0, "undrawn holes in a cover are reported: " + codes(fitting(0, false, null, true, true)));
   }
 
   static function defects():Void {
@@ -222,6 +277,17 @@ class JointFastenerTests {
     check(total == railHoles + 12, "no other screw is derived");
     var rails = [for (joint in derivation.joints) if (joint.drilledToSuit) joint];
     check(rails.length == 6, "six rails are bolted to cast pads, got " + rails.length);
+    // The derived fasteners fit the mill's solids: holes cut, heads and drivers clear.
+    var started = Sys.time();
+    var fit = machinekit.assembly.AssemblyIntegrity.fasteners(machine, {fasteners: true});
+    Sys.println('bench mill fastener fit: ${fit.errors().length} findings in ${Math.round(Sys.time() - started)} s');
+    for (item in fit.errors()) {
+      Sys.println("  " + item.code + ": " + item.message);
+      check(StringTools.startsWith(item.message, "motorX#flange") || StringTools.startsWith(item.message, "motorY#flange"), "a rail screw does not fit: " + item.message);
+    }
+    // Open findings of the mill, stated by the check and not yet resolved in the model: the motors' corner screws at (-25, -25)
+    // meet the motor body at its corner and, on X, the screw support next to it.
+    check(fit.errors().length == 7, 'the mill\'s known motor-corner findings are 7, found ${fit.errors().length}');
     Sys.println('bench mill: ${derivation.joints.length} joints, ${derivation.count()} screws (${railHoles} rail, 12 motor), ' + [for (k in count.keys()) k + " x" + count.get(k)].join(", "));
     // The drilled seats are in the castings' solids: one tap-drill hole per rail screw, none anywhere else.
     var cut = 0;

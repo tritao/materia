@@ -8,6 +8,8 @@ import machinekit.component.BoltedFace.ThreadMaterial;
 import machinekit.assembly.Diagnostics.DiagnosticSeverity;
 import machinekit.component.BomItem;
 import machinekit.component.MachineComponent;
+import machinekit.standard.FlatWasher;
+import machinekit.standard.HexNut;
 import machinekit.standard.MetricScrewSpec;
 import machinekit.standard.PropertyClass;
 import machinekit.standard.SocketHeadCapScrew;
@@ -21,7 +23,17 @@ typedef FastenerOptions = {
   @:optional var propertyClass:PropertyClass;
   /** How far (mm) a hole may stand from its partner, and a face from the other's plane. */
   @:optional var tolerance:Float;
+  /** Length (mm) of the driver access cylinder along the axis beyond a head or nut; `JointFasteners.ACCESS_LENGTH` when absent. */
+  @:optional var accessLength:Float;
 };
+
+/**
+ * A cylinder along a fastener's axis, per hole, in the receiving face frame (+Z into the receiving part, the clamped part
+ * at negative z): `from` to `to` mm, `diameter` wide. `AssemblyIntegrity` checks that it is clear of the members: of every
+ * member, or for an `access` volume only of those held rigidly with the clamped part (a moving member can be moved away).
+ * `code` names the finding (`fasteners.head-clearance`, `fasteners.hole`, `fasteners.access`).
+ */
+typedef FastenerVolume = {name:String, code:String, diameter:Float, from:Float, to:Float, access:Bool};
 
 /** One bolted joint: two faces that meet, the fastener derived for them and the host drilling it needs. */
 typedef FastenedJoint = {
@@ -48,6 +60,13 @@ typedef FastenedJoint = {
   var threadDepth:Float;
   var drillDepth:Float;
   var item:BomItem;
+  /** Clamped material, washer under the head and (for a bolt) the plate and nut washer: the length the thread must clear, mm. */
+  var stack:Float;
+  /** A bolt: the receiving face is a plate, and a washer and nut hold it. */
+  var nutted:Bool;
+  /** Washers and nuts the joint adds, one line each, counted over all its holes. */
+  var extras:Array<{item:BomItem, count:Int}>;
+  var volumes:Array<FastenerVolume>;
 }
 
 /** What `JointFasteners.derive` found: the joints, every finding, and the purchase lines the joints add up to. */
@@ -74,11 +93,13 @@ class FastenerDerivation {
     var out:Array<{item:BomItem, quantity:Int}> = [];
     var at = new Map<String, Int>();
     for (joint in joints) {
-      var key = joint.item.partNumber;
-      if (at.exists(key)) out[at.get(key)].quantity += joint.count;
-      else {
-        at.set(key, out.length);
-        out.push({item: joint.item, quantity: joint.count});
+      for (line in [{item: joint.item, count: joint.count}].concat(joint.extras)) {
+        var key = line.item.partNumber;
+        if (at.exists(key)) out[at.get(key)].quantity += line.count;
+        else {
+          at.set(key, out.length);
+          out.push({item: line.item, quantity: line.count});
+        }
       }
     }
     return out;
@@ -114,11 +135,16 @@ class JointFasteners {
   public static inline var SPACING_DIAMETERS:Float = 2.5;
   /** Back wall left behind a blind drilling, mm. */
   public static inline var BACK_WALL:Float = 1.0;
+  /** The driver's way in along the axis beyond a head or nut: a hex key's short arm, mm. */
+  public static inline var ACCESS_LENGTH:Float = 25;
+  /** Nuts stand this many pitches beyond the plate's washer: the screw shows at least this far past the nut. */
+  public static inline var NUT_PROTRUSION_PITCHES:Float = 2;
 
   public static function derive(assembly:MachineAssembly, ?options:FastenerOptions):FastenerDerivation {
     var result = new FastenerDerivation();
     var tolerance = options == null || options.tolerance == null ? TOLERANCE : options.tolerance;
     var propertyClass = options == null || options.propertyClass == null ? PropertyClass.Steel129 : options.propertyClass;
+    var access = options == null || options.accessLength == null ? ACCESS_LENGTH : options.accessLength;
     var poses = assembly.solvedPoses();
     var group = rigidGroups(assembly);
     var clamped:Array<Placed> = [], receiving:Array<Placed> = [];
@@ -160,7 +186,7 @@ class JointFasteners {
         continue;
       }
       var b = candidates[0];
-      var joint = joinFaces(result, a, b, tolerance, propertyClass, group, members, used, derived);
+      var joint = joinFaces(result, a, b, tolerance, propertyClass, access, group, members, used, derived);
       if (joint != null) result.joints.push(joint);
     }
     for (key in derived.keys()) spacing(result, key, derived.get(key), result.joints);
@@ -213,6 +239,7 @@ class JointFasteners {
     b:Placed,
     tolerance:Float,
     propertyClass:PropertyClass,
+    accessLength:Float,
     group:Map<String, Int>,
     members:Map<String, MachineComponent>,
     used:Map<String, String>,
@@ -236,7 +263,13 @@ class JointFasteners {
       case _:
     }
     var receivingSize:Null<String> = null, depth = 0.0, thickness = 0.0, through = false, material:ThreadMaterial = ThreadMaterial.Steel;
+    var nutted = false, plateClearance = 0.0;
     switch b.face.role {
+      case Through(size, c, t):
+        receivingSize = size;
+        thickness = t;
+        nutted = true;
+        plateClearance = c;
       case Receiving(size, d, t, th, m):
         receivingSize = size;
         depth = d;
@@ -313,41 +346,68 @@ class JointFasteners {
       id,
       '$id: ${round(clearance)} mm clearance holes do not pass an $size screw (${round(spec.clearanceFine)} mm needed)'
     );
-    if (recess != null && (spec.headDiameter > recess.diameter + 1e-9 || spec.headHeight > recess.depth + 1e-9)) diagnostics.error(
+    if (nutted && plateClearance + 1e-9 < spec.clearanceFine) diagnostics.error(
+      "fasteners.clearance",
+      id,
+      '$id: ${round(plateClearance)} mm holes in the plate do not pass an $size screw (${round(spec.clearanceFine)} mm needed)'
+    );
+    // Washers: under the head where the clamped face asks for one, and always under the nut of a bolt.
+    var headWasher = a.face.washer ? washerOf(diagnostics, id, size) : null;
+    var nutWasher = nutted ? washerOf(diagnostics, id, size) : null;
+    var nut = nutted ? nutOf(diagnostics, id, size) : null;
+    var lift = headWasher == null ? 0.0 : headWasher.thickness;
+    var headWasherOuter = headWasher == null ? 0.0 : headWasher.outerDiameter;
+    var headWidth = Math.max(spec.headDiameter, headWasherOuter);
+    if (recess != null && (headWidth > recess.diameter + 1e-9 || spec.headHeight + lift > recess.depth + 1e-9)) diagnostics.error(
       "fasteners.head-clearance",
       id,
-      '$id: an $size head (${round(spec.headDiameter)} dia x ${round(spec.headHeight)}) does not fit its '
+      '$id: an $size head${headWasher == null ? "" : " on its washer"} (${round(headWidth)} dia x ${round(spec.headHeight + lift)}) does not fit its '
       + '${round(recess.diameter)} dia x ${round(recess.depth)} recess'
     );
-    var minEngagement = BoltedFace.engagementFactor(material) * spec.diameter;
-    var tipGap = through ? 0.0 : spec.pitch;
-    var reach = depth - tipGap;
-    if (minEngagement > reach + 1e-9) diagnostics.error(
-      "fasteners.engagement",
-      id,
-      '$id: ${material} needs ${round(minEngagement)} mm of $size thread engagement but the receiving thread allows '
-      + '${round(reach)} mm (depth ${round(depth)}${through ? "" : ", less a tip gap of " + round(tipGap)})'
-    );
-    var length = SocketHeadCapScrew.standardLengthAtLeast(grip + minEngagement);
-    if (length == null) {
-      diagnostics.error("fasteners.length", id, '$id: no standard length reaches grip ${round(grip)} + engagement ${round(minEngagement)}');
-      return null;
+    if (hasErrorSince(diagnostics, before)) return null;
+    var washerT = nutWasher == null ? 0.0 : nutWasher.thickness, washerOuter = nutWasher == null ? 0.0 : nutWasher.outerDiameter;
+    var nutHeight = nut == null ? 0.0 : nut.height, nutAcross = nut == null ? 0.0 : nut.acrossFlats;
+    var minEngagement:Float, length:Null<Float>, engagement:Float, stack = grip + lift, tipGap = 0.0, reach = 0.0;
+    if (nutted) {
+      stack += thickness + washerT;
+      minEngagement = nutHeight + NUT_PROTRUSION_PITCHES * spec.pitch;
+      length = SocketHeadCapScrew.standardLengthAtLeast(stack + minEngagement);
+      if (length == null) {
+        diagnostics.error("fasteners.length", id, '$id: no standard length reaches stack ${round(stack)} + nut ${round(minEngagement)}');
+        return null;
+      }
+      engagement = length - stack;
+    } else {
+      minEngagement = BoltedFace.engagementFactor(material) * spec.diameter;
+      tipGap = through ? 0.0 : spec.pitch;
+      reach = depth - tipGap;
+      if (minEngagement > reach + 1e-9) diagnostics.error(
+        "fasteners.engagement",
+        id,
+        '$id: ${material} needs ${round(minEngagement)} mm of $size thread engagement but the receiving thread allows '
+        + '${round(reach)} mm (depth ${round(depth)}${through ? "" : ", less a tip gap of " + round(tipGap)})'
+      );
+      length = SocketHeadCapScrew.standardLengthAtLeast(stack + minEngagement);
+      if (length == null) {
+        diagnostics.error("fasteners.length", id, '$id: no standard length reaches grip ${round(stack)} + engagement ${round(minEngagement)}');
+        return null;
+      }
+      engagement = length - stack;
+      if (engagement > reach + 1e-9 && minEngagement <= reach + 1e-9) diagnostics.error(
+        "fasteners.length",
+        id,
+        '$id: the shortest standard length ${round(length)} gives ${round(engagement)} mm of engagement; the thread takes '
+        + '${round(reach)} mm. No standard length fits grip ${round(stack)}'
+      );
     }
-    var engagement = length - grip;
-    if (engagement > reach + 1e-9 && minEngagement <= reach + 1e-9) diagnostics.error(
-      "fasteners.length",
-      id,
-      '$id: the shortest standard length ${round(length)} gives ${round(engagement)} mm of engagement; the thread takes '
-      + '${round(reach)} mm. No standard length fits grip ${round(grip)}'
-    );
-    if (length - spec.threadLength > grip + 1e-9) diagnostics.error(
+    if (length - spec.threadLength > stack + 1e-9) diagnostics.error(
       "fasteners.shank",
       id,
       '$id: the unthreaded shank of an $size x ${round(length)} screw (${round(length - spec.threadLength)} mm) is longer than the grip '
-      + '${round(grip)} mm, so it enters the thread'
+      + '${round(stack)} mm, so it enters the ${nutted ? "nut" : "thread"}'
     );
-    var threadDepth = Math.min(depth, Math.ceil((engagement + tipGap) * 2) / 2);
-    var drillDepth = through ? thickness : threadDepth + 2 * spec.pitch + 0.3 * spec.diameter;
+    var threadDepth = nutted ? 0.0 : Math.min(depth, Math.ceil((engagement + tipGap) * 2) / 2);
+    var drillDepth = nutted ? 0.0 : through ? thickness : threadDepth + 2 * spec.pitch + 0.3 * spec.diameter;
     var wall = thickness;
     var wallAt = b.face.thicknessAt;
     if (wallAt != null) for (point in points) wall = Math.min(wall, wallAt(point.x, point.y));
@@ -379,6 +439,21 @@ class JointFasteners {
         to: through ? thickness + 1 : drillDepth
       });
     }
+    if (nutted && !b.face.drawn) {
+      if (!members.get(b.member).machinable()) diagnostics.error(
+        "fasteners.machining",
+        id,
+        '$id: ${b.member} has clearance holes its geometry does not draw and does not cut derived holes'
+      );
+      else for (point in points) cutsOf(result, b.member).push({
+        frame: b.face.frame,
+        x: point.x,
+        y: point.y,
+        diameter: plateClearance,
+        from: -1.0,
+        to: thickness + 1
+      });
+    }
     if (!a.face.drawn) {
       if (!members.get(a.member).machinable()) diagnostics.error(
         "fasteners.machining",
@@ -399,6 +474,52 @@ class JointFasteners {
       }
     }
     if (hasErrorSince(diagnostics, before)) return null;
+    // The fastener's envelope, per hole, in the receiving frame; the clamped part lies at negative z. Each end is drawn a
+    // hair short of the faces it touches, so touching is not overlap.
+    var volumes:Array<FastenerVolume> = [];
+    var margin = 0.01;
+    // The shank's hole through the clamped part, and the thread's (or the plate's) hole in the receiving part.
+    volumes.push({name: "clamped hole", code: "fasteners.hole", diameter: HOLE_SHARE * spec.diameter, from: -grip + margin, to: -margin, access: false});
+    volumes.push({
+      name: nutted ? "plate hole" : "threaded hole",
+      code: "fasteners.hole",
+      diameter: HOLE_SHARE * (nutted ? spec.diameter : spec.tapDrill),
+      from: margin,
+      to: (nutted ? thickness : threadDepth) - margin,
+      access: false
+    });
+    var seat = -grip;
+    if (headWasher != null) {
+      volumes.push({name: "head washer", code: "fasteners.head-clearance", diameter: headWasherOuter, from: seat - lift + margin, to: seat - margin, access: false});
+      seat -= lift;
+    }
+    volumes.push({name: "head", code: "fasteners.head-clearance", diameter: spec.headDiameter, from: seat - spec.headHeight + margin, to: seat - margin, access: false});
+    volumes.push({
+      name: "driver access",
+      code: "fasteners.access",
+      diameter: spec.headDiameter,
+      from: seat - spec.headHeight - accessLength,
+      to: seat - spec.headHeight - margin,
+      access: true
+    });
+    var extras:Array<{item:BomItem, count:Int}> = [];
+    if (headWasher != null) extras.push({item: FlatWasher.metric(size).bom, count: points.length});
+    if (nutted) {
+      var far = thickness + margin;
+      volumes.push({name: "nut washer", code: "fasteners.head-clearance", diameter: washerOuter, from: far, to: thickness + washerT - margin, access: false});
+      var corners = nutAcross / Math.cos(Math.PI / 6);
+      volumes.push({name: "nut", code: "fasteners.head-clearance", diameter: corners, from: thickness + washerT + margin, to: thickness + washerT + nutHeight - margin, access: false});
+      volumes.push({
+        name: "wrench access",
+        code: "fasteners.access",
+        diameter: corners,
+        from: thickness + washerT + nutHeight + margin,
+        to: thickness + washerT + nutHeight + accessLength,
+        access: true
+      });
+      extras.push({item: FlatWasher.metric(size).bom, count: points.length});
+      extras.push({item: HexNut.metric(size).bom, count: points.length});
+    }
     return {
       id: id,
       clampedMember: a.member,
@@ -418,8 +539,33 @@ class JointFasteners {
       tapDrill: spec.tapDrill,
       threadDepth: threadDepth,
       drillDepth: drillDepth,
-      item: screw.bom
+      item: screw.bom,
+      stack: stack,
+      nutted: nutted,
+      extras: extras,
+      volumes: volumes
     };
+  }
+
+  /** The share of a hole's diameter the clearance volumes take, so a modelled hole's polygons and rounding do not catch. */
+  public static inline var HOLE_SHARE:Float = 0.9;
+
+  static function washerOf(diagnostics:Diagnostics, id:String, size:String):Null<machinekit.standard.FlatWasherSpec> {
+    var catalog = FlatWasher.catalog();
+    if (!catalog.exists(size)) {
+      diagnostics.error("fasteners.washer", id, '$id: no ISO 7089 washer of size $size');
+      return null;
+    }
+    return catalog.get(size);
+  }
+
+  static function nutOf(diagnostics:Diagnostics, id:String, size:String):Null<machinekit.standard.HexNutSpec> {
+    var catalog = HexNut.catalog();
+    if (!catalog.exists(size)) {
+      diagnostics.error("fasteners.nut", id, '$id: no ISO 4032 nut of size $size');
+      return null;
+    }
+    return catalog.get(size);
   }
 
   static function cutsOf(result:FastenerDerivation, member:String):Array<MachinedCut> {
@@ -460,7 +606,7 @@ class JointFasteners {
   }
 
   /** The rigid body each member belongs to, joined by its fixed tree mates. */
-  static function rigidGroups(assembly:MachineAssembly):Map<String, Int> {
+  public static function rigidGroups(assembly:MachineAssembly):Map<String, Int> {
     var flat = assembly.derived();
     var parent = new Map<String, String>();
     function find(id:String):String {

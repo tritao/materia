@@ -37,6 +37,11 @@ enum BoltedRole {
 	 * stand flush with it) rather than ending blind.
 	 */
   Receiving(size:Null<String>, depth:Float, thickness:Float, through:Bool, material:ThreadMaterial);
+  /**
+	 * This side is a plate with clearance holes of `clearance` mm, `thickness` thick, listing its holes: the fastener passes
+	 * through it and a nut with a washer clamps it on the far side (the screw is a bolt). `size` as for `Clamped`.
+	 */
+  Through(size:Null<String>, clearance:Float, thickness:Float);
 }
 
 /**
@@ -64,11 +69,14 @@ class BoltedFace {
 	 * recess, cut by the derivation; a receiving face drilled to suit is always cut.
 	 */
   public final drawn:Bool;
+  /** Whether a clamped face wants a plain washer under the head (a soft or thin bearing surface); a nut always has one. */
+  public final washer:Bool;
 
   function new(id:String, frame:AssemblyFrame, role:BoltedRole, holes:Null<Array<BoltHole>>, width:Float, height:Float,
-      ?thicknessAt:(Float, Float) -> Float, drawn:Bool = true) {
+      ?thicknessAt:(Float, Float) -> Float, drawn:Bool = true, washer:Bool = false) {
     this.thicknessAt = thicknessAt;
     this.drawn = drawn;
+    this.washer = washer;
     if (id == null || StringTools.trim(id) == "") throw "A bolted face needs an id";
     this.id = id;
     this.frame = frame;
@@ -81,6 +89,10 @@ class BoltedFace {
         if (holes == null || holes.length == 0) throw 'Clamped face "$id" needs its holes';
         if (!(clearance > 0) || !(grip > 0) || !Math.isFinite(clearance + grip)) throw 'Clamped face "$id" needs a positive clearance hole and grip';
         if (recess != null && (!(recess.diameter > clearance) || !(recess.depth > 0))) throw 'Clamped face "$id" has an invalid recess';
+      case Through(_, clearance, thickness):
+        if (holes == null || holes.length == 0) throw 'Through face "$id" needs its holes';
+        if (!(clearance > 0) || !(thickness > 0) || !Math.isFinite(clearance + thickness))
+          throw 'Through face "$id" needs a positive clearance hole and thickness';
       case Receiving(size, depth, thickness, _, _):
         if (!(depth > 0) || !(thickness >= depth) || !Math.isFinite(depth + thickness))
           throw 'Receiving face "$id" needs a positive thread depth within its thickness';
@@ -92,8 +104,12 @@ class BoltedFace {
   }
 
   public static function clamped(id:String, frame:AssemblyFrame, holes:Array<BoltHole>, clearance:Float, grip:Float,
-      ?size:String, ?recess:BoltRecess, drawn:Bool = true):BoltedFace return new BoltedFace(id, frame,
-      Clamped(size, clearance, grip, recess), holes, 0, 0, null, drawn);
+      ?size:String, ?recess:BoltRecess, drawn:Bool = true, washer:Bool = false):BoltedFace return new BoltedFace(id, frame,
+      Clamped(size, clearance, grip, recess), holes, 0, 0, null, drawn, washer);
+
+  /** A plate the bolt passes through, with a nut and washer on its far side (`BoltedRole.Through`). */
+  public static function through(id:String, frame:AssemblyFrame, holes:Array<BoltHole>, clearance:Float, thickness:Float, ?size:String,
+      drawn:Bool = true):BoltedFace return new BoltedFace(id, frame, Through(size, clearance, thickness), holes, 0, 0, null, drawn);
 
   public static function tapped(id:String, frame:AssemblyFrame, holes:Array<BoltHole>, size:String, depth:Float, thickness:Float,
       through:Bool = false, ?material:ThreadMaterial):BoltedFace return new BoltedFace(id, frame,

@@ -51,6 +51,13 @@ typedef IntegrityOptions = {
 	 * the pilot and bolt holes, and lies under the flange.
 	 */
   @:optional var flangeCutouts:Bool;
+  /**
+	 * Every joint `MachineAssembly.deriveFasteners` derived has its fastener fit: the holes it passes through exist in the
+	 * parts (`fasteners.hole`), its head, washer and nut stand clear of the other members (`fasteners.head-clearance`), and a
+	 * driver reaches it along the axis (`fasteners.access`, among the members held rigidly with the clamped part: a moving
+	 * member can be moved away). Absent when the assembly derived none.
+	 */
+  @:optional var fasteners:Bool;
   /** Pairs of members the machine's process brings together (a hob in the work, a tool in the stock); they may share volume. */
   @:optional var processContacts:Array<{a:String, b:String}>;
   /** All three of the above at their defaults. */
@@ -122,6 +129,16 @@ class AssemblyIntegrity {
   }
 
   /**
+	 * Only the fit of the derived fasteners (`IntegrityOptions.fasteners`), at the joints' initial values: the cheap check
+	 * for a machine whose other integrity checks are not run.
+	 */
+  public static function fasteners(assembly:MachineAssembly, ?options:IntegrityOptions):IntegrityReport {
+    var checker = new AssemblyIntegrity(assembly, options == null ? ({} : IntegrityOptions) : options);
+    PosedParts.scope(posed -> checker.runFasteners(posed));
+    return new IntegrityReport(checker.diagnostics, 1);
+  }
+
+  /**
 	 * The default sweep: every corner of the leader joints' travel when there are at most six leaders, and each leader at
 	 * its quarter points with the others at their initial values. A leader is a movable tree joint (prismatic or
 	 * revolute, with finite limits) that no coupling drives.
@@ -173,6 +190,7 @@ class AssemblyIntegrity {
   final runningGap:Null<Float>;
   final minContactArea:Null<Float>;
   final flangeCutouts:Bool;
+  final fastenerFit:Bool;
   /** Pairs joined by a moving mate, keyed "a|b" both ways: they run in contact by design. */
   final movingPairs = new Map<String, Bool>();
   final gapReported = new Map<String, Bool>();
@@ -197,6 +215,7 @@ class AssemblyIntegrity {
     runningGap = options.runningGap ?? (strict ? RUNNING_GAP : null);
     minContactArea = options.minContactArea ?? (strict ? MIN_CONTACT_AREA : null);
     flangeCutouts = options.flangeCutouts ?? strict;
+    fastenerFit = options.fasteners ?? strict;
     for (joint in definition.joints) if (joint.type != AssemblyJointType.Fixed) {
       movingPairs.set(joint.parent + "|" + joint.child, true);
       movingPairs.set(joint.child + "|" + joint.parent, true);
@@ -266,6 +285,7 @@ class AssemblyIntegrity {
       checkSupport(parts.parts, parts.boxes);
       if (minContactArea != null) checkContactAreas(parts.parts, parts.boxes);
       if (flangeCutouts) checkFlangeCutouts(parts.parts, parts.boxes, restPoses);
+      if (fastenerFit) checkFasteners(parts.parts, parts.boxes, restPoses);
       checkInterference(parts.parts, parts.boxes, null);
     } catch (error:Dynamic) {
       closeAll(parts.parts);
@@ -292,6 +312,21 @@ class AssemblyIntegrity {
     state.forwardKinematics();
     checkDrives(state, rest);
     return states.length + 1;
+  }
+
+  function runFasteners(posed:PosedParts):Void {
+    var model = new AssemblyModel("mm");
+    assembly.addTo(model, "");
+    var state = new AssemblyState(model.definition("integrity"));
+    state.forwardKinematics();
+    var restPoses = new Map<String, AssemblyFrame>();
+    for (id in ids) restPoses.set(id, state.worldPose(id));
+    var parts = poseAll(posed, state);
+    try checkFasteners(parts.parts, parts.boxes, restPoses) catch (error:Dynamic) {
+      closeAll(parts.parts);
+      throw error;
+    }
+    closeAll(parts.parts);
   }
 
   function poseAll(posed:PosedParts, state:AssemblyState): {parts: Map<String, Part>, boxes: Map<String, PartBox>} {
@@ -598,6 +633,54 @@ class AssemblyIntegrity {
       throw error;
     }
     closeList(owned);
+  }
+
+  // ---- fasteners -----------------------------------------------------------------------------------------------------
+
+  /**
+	 * The envelope of every derived fastener (`FastenedJoint.volumes`), carried to the receiving face's pose, against the
+	 * members: the holes must be free of material, heads and nuts must have room, and a driver must reach them.
+	 */
+  function checkFasteners(parts:Map<String, Part>, boxes:Map<String, PartBox>, poses:Map<String, AssemblyFrame>):Void {
+    var derivation = assembly.derivedFasteners();
+    if (derivation == null) return;
+    var group = JointFasteners.rigidGroups(assembly);
+    var faces = new Map<String, machinekit.component.BoltedFace>();
+    for (joint in derivation.joints) {
+      var key = joint.receivingMember + "#" + joint.receivingFace;
+      if (!faces.exists(key)) for (face in flat.member(joint.receivingMember).fasteningFaces()) if (face.id == joint.receivingFace)
+        faces.set(key, face);
+      var face = faces.get(key);
+      if (face == null) throw 'Assembly integrity lost the face "$key" of joint ${joint.id}';
+      var frame = AssemblyFrames.compose(need(poses, joint.receivingMember), face.frame);
+      var reported = new Map<String, Bool>();
+      for (volume in joint.volumes) for (point in joint.hostHoles) {
+        var local = Part.cylinderSpan(volume.diameter / 2, volume.from, volume.to, point.x, point.y);
+        var tool = PosedParts.moved(local, frame);
+        local.close();
+        var box = PosedParts.boxOf(tool);
+        try {
+          for (id => part in parts) {
+            if (reported.exists(volume.name + "|" + id)) continue;
+            if (volume.access && group.get(id) != group.get(joint.clampedMember)) continue;
+            var shared = PosedParts.commonVolume(part, need(boxes, id), tool, box);
+            if (shared <= overlapLimit) continue;
+            reported.set(volume.name + "|" + id, true);
+            diagnostics.error(
+              volume.code,
+              joint.id,
+              '${joint.id}: the ${joint.size} x ${Math.round(joint.length)} fastener\'s ${volume.name} '
+              + (volume.access ? 'cannot be reached: $id stands in its ${Math.round(volume.to - volume.from)} mm access' : 'meets $id')
+              + ' (${round(shared)} mm³ at (${round(point.x)}, ${round(point.y)}))'
+            );
+          }
+        } catch (error:Dynamic) {
+          tool.close();
+          throw error;
+        }
+        tool.close();
+      }
+    }
   }
 
   static function closeList(parts:Array<Part>):Void for (part in parts) part.close();
