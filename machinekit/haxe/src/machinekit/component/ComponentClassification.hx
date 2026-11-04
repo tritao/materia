@@ -144,6 +144,8 @@ class ComponentClassification {
     file(registry, "machinekit.power.vfd", "Spindle drives", ComponentKind.Generic);
     file(registry, "machinekit.power.brake-resistor", "Spindle drives", ComponentKind.Generic);
     file(registry, "machinekit.power.three-phase-rectifier", "Spindle drives", ComponentKind.Generic);
+    file(registry, "machinekit.power.three-phase-dc-supply", "Drives and power", ComponentKind.Generic);
+    file(registry, "machinekit.control.biss-master", "Drives and power", ComponentKind.Generic);
     file(registry, "machinekit.power.contactor", "Switching and protection", ComponentKind.Generic);
     file(registry, "machinekit.power.circuit-breaker", "Switching and protection", ComponentKind.Generic);
     // pressbrake

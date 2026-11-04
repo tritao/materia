@@ -30,6 +30,7 @@ class MotionComponents {
     registry.register(MotorDriver.recipeType());
     registry.register(PowerSupply.recipeType());
     registry.register(machinekit.power.ThreePhaseRectifier.recipeType());
+    registry.register(machinekit.power.ThreePhaseDcSupply.recipeType());
     registry.register(Gearbox.recipeType());
     registry.register(FlangeBearingHousing.recipeType());
     registry.register(LeadScrew.recipeType());

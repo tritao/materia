@@ -12,5 +12,6 @@ class ControlComponents {
     registry.register(RobotController.recipeType());
     registry.register(DigitalSensor.recipeType());
     registry.register(ThermistorInput.recipeType());
+    registry.register(BissMaster.recipeType());
   }
 }
