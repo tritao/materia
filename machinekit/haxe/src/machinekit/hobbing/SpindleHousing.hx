@@ -11,6 +11,13 @@ class SpindleHousing extends MachineComponent {
     P.quantity("bore", 62, "mm"),
     P.quantity("height", 180, "mm")
   ]);
+  /**
+   * Clamping length (assumed, the maker's drawing is not in hand): the Ø80 land of the housing between its two end registers, in the housing's
+   * own z. It stops 10 mm short of the motor adapter's flange (z -8..0) and 10 mm short of the front face (z 180, the nose and gland flange at
+   * 180..186), so a clamp never grips a register, the nose or the adapter; it must cover the angular-contact pair's outer rings (129..163).
+   */
+  public static inline final CLAMP_FROM = 10.0;
+  public static inline final CLAMP_TO = 170.0;
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(

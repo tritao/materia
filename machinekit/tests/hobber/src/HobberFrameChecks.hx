@@ -1,7 +1,9 @@
 import machinekit.assembly.AssemblyIntegrity;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.MachineKitComponents;
+import machinekit.hobbing.HobberSaddle;
 import machinekit.hobbing.HobberScales;
+import machinekit.hobbing.SpindleHousing;
 import machinekit.hobbing.HobberSwivelLayout;
 import machinekit.hobbing.HobberZLayout;
 import materia.assembly.AssemblyFrames as F;
@@ -203,12 +205,31 @@ class HobberFrameChecks {
     return lines;
   }
 
+  /**
+   * The spindle seat against the cartridge (FRAME_PLAN R2): in the housing's own z (tool face at 180, motor adapter flange at -8..0), the seat's
+   * bore must lie inside the housing's clamping length (`SpindleHousing.CLAMP_FROM..CLAMP_TO`), cover the angular-contact pair's outer rings
+   * (129..163), and carry its clamp screws inside that length. Returns the line; throws otherwise.
+   */
+  public static function spindleSeat(machine:FlexsplineHobber):Array<String> {
+    var poses = machine.solvedPoses(), housing = poses.get("spindle/housing"), back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
+    var seat = HobberSaddle.spindleSeatRange(), toHousing = F.inverse(F.compose(back, housing));
+    function zOf(y:Float):Float return F.transformPoint(toHousing, 0, y, HobberZLayout.SEAT_Z).z;
+    var a = zOf(seat.y0), b = zOf(seat.y1), from = Math.min(a, b), to = Math.max(a, b);
+    var screws = [for (y in seat.clampYs) zOf(y)];
+    var lines = ['Spindle seat grips housing z ${Math.round(from * 10) / 10}..${Math.round(to * 10) / 10} (${Math.round((to - from) * 10) / 10} mm) of the clamping length ${SpindleHousing.CLAMP_FROM}..${SpindleHousing.CLAMP_TO} (assumed); ' +
+      'bearing pair 129..163; clamp screws at z ${screws.join(", ")}; motor adapter flange -8..0, nose and gland flange 170..186 are not gripped'];
+    if (from < SpindleHousing.CLAMP_FROM - 1e-6 || to > SpindleHousing.CLAMP_TO + 1e-6) throw "spindle seat leaves the housing's clamping length: " + lines.join("; ");
+    if (from > 129 || to < 163) throw "spindle seat does not cover the bearing pair: " + lines.join("; ");
+    for (z in screws) if (z < from || z > to) throw "spindle seat clamp screw outside the seat: " + lines.join("; ");
+    return lines;
+  }
+
   /** Procedures, drive sizing and strict integrity of the assembled machine; returns the number of checks. */
   public static function run(machine:FlexsplineHobber, sweep:Bool = false):Int {
     var presentation = materia.presentation.Presentations.assembled(machine.definition(), -1.1, 0.35, "hobber");
     presentation.procedures = HobberAssemblyProcedures.build(machine);
     materia.presentation.PresentationCodec.validate(machine.definition(), presentation);
-    var lines = sizing(machine).concat(scales(machine)).concat(swivelLoad(machine)).concat(zOffsetMoments(machine)), errors = newErrors(machine, sweep);
+    var lines = sizing(machine).concat(scales(machine)).concat(swivelLoad(machine)).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)), errors = newErrors(machine, sweep);
     for (line in lines) Sys.println(line);
     if (errors.length > 0) throw 'hobber strict integrity: ${errors.length} findings\n  ' + errors.join("\n  ");
     return presentation.procedures.length + lines.length + 1;
@@ -268,6 +289,7 @@ class HobberFrameChecks {
     if (args.indexOf("scales") >= 0) for (line in scales(machine)) Sys.println(line);
     if (args.indexOf("swivel") >= 0) for (line in swivelLoad(machine)) Sys.println(line);
     if (args.indexOf("zoffset") >= 0) for (line in zOffsetMoments(machine)) Sys.println(line);
+    if (args.indexOf("spindleseat") >= 0) for (line in spindleSeat(machine)) Sys.println(line);
     if (args.indexOf("roundtrip") >= 0) {
       roundTrip(machine);
       Sys.println("round trip ok");
