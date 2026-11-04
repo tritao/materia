@@ -181,10 +181,19 @@ class LeadshineServo extends ServoMotor {
   override public function actuator(id:String,
     joint:String, volts:Float, margin:Float, ?current:Float):AssemblyActuator {
     var result = super.actuator(id, joint, volts, margin, current);
-    result.assumed = assumedWinding ? ["servo torque-speed interpolation", "servo winding constants"] : ["servo torque-speed interpolation"];
-    result.assumptions = assumedWinding ? [{quantity: "motor curve", label: "servo torque-speed interpolation"}, {quantity: "winding", label: "servo winding constants"}] : [{quantity: "motor curve", label: "servo torque-speed interpolation"}];
+    var assumed = assumedWinding ? ["servo torque-speed interpolation", "servo winding constants"] : ["servo torque-speed interpolation"];
+    var assumptions = assumedWinding ? [{quantity: "motor curve", label: "servo torque-speed interpolation"}, {quantity: "winding", label: "servo winding constants"}] : [{quantity: "motor curve", label: "servo torque-speed interpolation"}];
+    if (spec.brake) {
+      assumed.push("brake holding torque and delays");
+      assumptions.push({quantity: "holding effort", label: "brake holding torque and delays"});
+    }
+    result.assumed = assumed;
+    result.assumptions = assumptions;
     return result;
   }
+
+  /** The built-in holding brake of an `E` row (null on an `F` row). Its rating is assumed: see `LeadshineBrake`. */
+  override public function motorBrakeSpec():Null<MotorBrakeSpec> return spec.brake ? new LeadshineBrake(spec.ratedTorque) : null;
 
   override public function mounting():Null<machinekit.motion.MotorFlange> return {
     face: spec.face,
@@ -374,4 +383,18 @@ class LeadshineServo extends ServoMotor {
     "material",
     materialSpec()
   );
+}
+
+/**
+ * The spring-applied holding brake built into a Leadshine ELM `E` servo. The datasheet (pp. 3-16) lists the brake only as an option
+ * and gives no holding torque or delays, so the figures are assumed: twice the motor's rated torque (it must hold the shaft of a
+ * vertical axis with the power off, and a servo brake of this class is rated well above rated torque), 50 ms to release and 30 ms
+ * to apply, the values the other assumed brakes in this library use. Replace them from the supplier's brake data.
+ */
+class LeadshineBrake implements MotorBrakeSpec {
+  final ratedTorque:Float;
+  public function new(ratedTorque:Float) this.ratedTorque = ratedTorque;
+  public function holdingTorque():Float return 2 * ratedTorque;
+  public function releaseDelaySeconds():Float return 0.05;
+  public function applicationDelaySeconds():Float return 0.03;
 }

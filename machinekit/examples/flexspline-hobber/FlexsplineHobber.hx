@@ -501,6 +501,8 @@ class FlexsplineHobber extends MachineAssembly {
     mountContacts.push({parent: floatingPad, child: id + "floating"});
     // Position feedback comes from the sealed scales (`scale`).
     bind(id + "drive", id + "screw-turn", id + "motor");
+    // The braked Z servo holds its axis when the power drops: the controller releases the brake and reads back that it let go.
+    if (dr.motor.motorBrakeSpec() != null) bindMotorBrake(id + "drive", id + "motor", id + ".brakeRelease", id + ".brakeReleased", 250, 30);
   }
   /** Where a scale's seat bar rests on its host: the far face of the bar from the housing, normal toward the host. */
   function scaleBarContact(a:HobberScaleAxis):AssemblyFrame {
