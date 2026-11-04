@@ -153,6 +153,85 @@ class HobberFrameChecks {
   }
 
 
+  /**
+   * The B spindle belt drive (head redesign): the belt's pull on the cartridge's rear bearing, and the first mode of the servo on its
+   * cradle against the hob's tooth-pass frequency over the hob speed range. ESTIMATES from the model's masses and sections with stated joint
+   * assumptions (preloaded, dowelled bolted joints: axial stiffness 3 x the bolt's); they say where the mode is, not that the part is released.
+   * Lines: belt tangential force and pretension (slack side kept at a quarter of the peak force, an assumed rule), the radial pull and
+   * what it does to the 6205 tail bearing (catalogue ratings assumed from the maker), then the servo group's mass and centre, each stiffness
+   * and mode, and the tooth-pass band (hob rpm x gashes / 60, from 100 m/min to the cartridge's top speed) with +-20 %. Throws when the first
+   * mode lies inside that band.
+   */
+  public static function spindleDrive(machine:FlexsplineHobber):Array<String> {
+    var spindle = machine.spindle, rating = spindle.motor.rating, poses = machine.solvedPoses(), back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
+    function r(v:Float, digits:Int = 2):Float return Math.round(v * Math.pow(10, digits)) / Math.pow(10, digits);
+    var lines = [];
+    // Belt pull on the cartridge pulley.
+    var rm = spindle.motorPulley.pitchDiameter / 2000, rs = spindle.spindlePulley.pitchDiameter / 2000, c = HobSpindle.centres() / 1000;
+    var fRated = rating.ratedTorque / rm, fPeak = rating.peakTorque / rm, t0 = 0.75 * fPeak;
+    var radial = 2 * t0 * Math.cos(Math.asin((rs - rm) / c));
+    var pulleyZ = HobSpindle.pulleyFront(rating.shaftLength) - HobSpindle.PULLEY_WIDTH / 2, tailZ = 7.5, pairZ = HobSpindle.FRONT_BEARING_Z;
+    var overhang = tailZ - pulleyZ, span = pairZ - tailZ, tail = radial * (1 + overhang / span), pair = radial * overhang / span;
+    var c0 = 7800.0, dyn = 14800.0, nTop = spindle.maxSpeed() * 60 / (2 * Math.PI);
+    var l10 = 1e6 / (60 * nTop) * Math.pow(dyn / tail, 3);
+    lines.push('B belt: HTD5M ${spindle.motorPulley.teeth}T/${spindle.spindlePulley.teeth}T, ${r(spindle.belt.length, 1)} mm belt on ${r(c * 1000, 1)} mm centres, motor turns ${r(spindle.ratio, 3)}x the hob; tangential force ${r(fRated)} N rated / ${r(fPeak)} N motor peak, '
+      + 'pretension ${r(t0)} N per strand (slack side kept at 25 % of the peak force: assumed rule, belt maker to confirm), tight side ${r(t0 + fPeak / 2)} N at peak');
+    lines.push('Cartridge rear radial load (belt pull): ${r(radial)} N on the pulley, ${r(overhang, 1)} mm behind the 6205 tail bearing: tail bearing ${r(tail)} N (${r(100 * tail / c0, 1)} % of C0 ${c0} N, L10 ${Math.round(l10 / 1000) * 1000 / 1000}k h at ${Math.round(nTop)} rpm; SKF 6205 ratings C ${dyn} N, C0 ${c0} N assumed from the maker), '
+      + 'opposite ${r(pair)} N on the angular-contact pair; the cartridge must be a belt-drive cartridge rated for at least ${Math.ceil(radial * 1.5 / 50) * 50} N radial at the pulley (1.5 x the pull)');
+    // The servo group on its cradle.
+    var ids = ["spindle/motor", "spindle/motorShaft", "spindle/motorPulley", "spindle/motorEncoder"], mass = 0.0, mx = 0.0, my = 0.0, mz = 0.0, cradle = 0.0;
+    for (m in machine.components()) {
+      var weight = ids.indexOf(m.id) >= 0 ? 1.0 : m.id == "motorCradle" ? 1.0 / 3 : 0.0;
+      if (weight == 0) continue;
+      var props = m.component.massProperties(), at = F.transformPoint(F.compose(back, poses.get(m.id)), props.centreOfMass.x, props.centreOfMass.y, props.centreOfMass.z);
+      mass += weight * props.mass;
+      mx += weight * props.mass * at.x;
+      my += weight * props.mass * at.y;
+      mz += weight * props.mass * (at.z - HobberZLayout.SEAT_Z);
+      if (m.id == "motorCradle") cradle = props.mass;
+    }
+    var com = {x: mx / mass, y: my / mass, z: mz / mass}, sec = HobberSaddle.cradleSection();
+    var e = 210000.0, kJoint = 3 * e * 36.6 / 28.0;
+    // Root section about x (bending in y-z): the wall at the rear of the section and the rib ahead of it; about y the rib stands at its x.
+    var width = sec.width, t = sec.wall, tr = sec.ribThickness, d = sec.ribDepth;
+    var aw = width * t, ar = tr * d, yw = d - t / 2, yr = d / 2, yc = (aw * yw + ar * yr) / (aw + ar);
+    var iX = width * Math.pow(t, 3) / 12 + aw * Math.pow(yw - yc, 2) + tr * Math.pow(d, 3) / 12 + ar * Math.pow(yr - yc, 2);
+    var xMid = sec.x0 + width / 2, xc = (aw * xMid + ar * sec.ribX) / (aw + ar);
+    var iY = t * Math.pow(width, 3) / 12 + aw * Math.pow(xMid - xc, 2) + d * Math.pow(tr, 3) / 12 + ar * Math.pow(sec.ribX - xc, 2);
+    var height = com.z - (sec.floorTop), ahead = 239.0 - com.y;
+    var sumY2 = 0.0, sumX2 = 0.0, yMean = 0.0;
+    for (b in sec.bolts) yMean += b.y / sec.bolts.length;
+    for (b in sec.bolts) {
+      sumY2 += (b.y - yMean) * (b.y - yMean);
+      sumX2 += b.x * b.x;
+    }
+    // N/mm at the group's centre of mass.
+    function hz(k:Float):Float return Math.sqrt(k * 1000 / mass) / (2 * Math.PI);
+    function modesFor(joint:Float) {
+      var kz = e * iX / (ahead * ahead * height);
+      var kyWall = 3 * e * iX / Math.pow(height, 3), kyRoot = joint * sumY2 / Math.pow(height, 2);
+      var kxWall = 3 * e * iY / Math.pow(height, 3), kxRoot = joint * sumX2 / Math.pow(height, 2);
+      return [{name: "vertical (flange rocking on the wall)", f: hz(kz)}, {name: "axial (wall and floor bolts)", f: hz(1 / (1 / kyWall + 1 / kyRoot))},
+        {name: "lateral (wall and floor bolts)", f: hz(1 / (1 / kxWall + 1 / kxRoot))}];
+    }
+    var modes = modesFor(kJoint), loose = modesFor(kJoint / 10);
+    var first = modes[0], firstLoose = loose[0];
+    for (m in modes) if (m.f < first.f) first = m;
+    for (m in loose) if (m.f < firstLoose.f) firstLoose = m;
+    // Tooth-pass band.
+    var gashes = machine.hob.parameterCount("gashes"), diameter = machine.hob.design.outsideDiameter;
+    var nLow = 100000 / (Math.PI * diameter), fLow = nLow * gashes / 60, fHigh = nTop * gashes / 60;
+    var lo = 0.8 * fLow, hi = 1.2 * fHigh;
+    lines.push('B servo group: ${r(mass)} kg (motor, shaft, pulley, encoder and a third of the ${r(cradle)} kg cradle), centre ${r(ahead, 1)} mm ahead of the flange, ${r(height, 1)} mm above the floor; '
+      + 'cradle section I about x ${Math.round(iX)} mm4, about y ${Math.round(iY)} mm4; floor bolts ${sec.bolts.length} M8 (joint ${Math.round(kJoint / 1000)} N/um each)');
+    lines.push('B servo first-mode estimate: ' + [for (m in modes) m.name + " " + Math.round(m.f) + " Hz"].join("; ") + '; first ${Math.round(first.f)} Hz ' + first.name
+      + ' against tooth-pass ${Math.round(fLow)}..${Math.round(fHigh)} Hz (hob Ø${r(diameter, 1)} at 100 m/min = ${Math.round(nLow)} rpm up to ${Math.round(nTop)} rpm, ${gashes} gashes): '
+      + 'avoid ${Math.round(lo)}..${Math.round(hi)} Hz (+-20 %), ${first.f > hi ? Math.round(100 * first.f / hi - 100) + " % above" : first.f < lo ? "below" : "INSIDE"}; '
+      + 'sensitivity: with the floor joint ten times softer (not preloaded) the first mode is ${Math.round(firstLoose.f)} Hz ${firstLoose.name}');
+    if (first.f >= lo && first.f <= hi) throw "the servo's first mode lies within 20 % of the tooth-pass band: " + lines.join("; ");
+    return lines;
+  }
+
   /** The members that move with the Z joint (the Z saddle and everything carried on it), and their mass and centre of mass in the work frame. */
   static function zMoving(machine:FlexsplineHobber):{mass:Float, x:Float, y:Float, z:Float, ids:Array<String>} {
     var def = machine.definition(), poses = machine.solvedPoses(), back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
@@ -215,7 +294,7 @@ class HobberFrameChecks {
   }
 
   /**
-   * The spindle seat against the cartridge (FRAME_PLAN R2): in the housing's own z (tool face at 180, motor adapter flange at -8..0), the seat's
+   * The spindle seat against the cartridge (FRAME_PLAN R2): in the housing's own z (tool face at 180, encoder stator at 0..-14), the seat's
    * bore must lie inside the housing's clamping length (`SpindleHousing.CLAMP_FROM..CLAMP_TO`), cover the angular-contact pair's outer rings
    * (129..163), and carry its clamp screws inside that length. Returns the line; throws otherwise.
    */
@@ -226,7 +305,7 @@ class HobberFrameChecks {
     var a = zOf(seat.y0), b = zOf(seat.y1), from = Math.min(a, b), to = Math.max(a, b);
     var screws = [for (y in seat.clampYs) zOf(y)];
     var lines = ['Spindle seat grips housing z ${Math.round(from * 10) / 10}..${Math.round(to * 10) / 10} (${Math.round((to - from) * 10) / 10} mm) of the clamping length ${SpindleHousing.CLAMP_FROM}..${SpindleHousing.CLAMP_TO} (assumed); ' +
-      'bearing pair 129..163; clamp screws at z ${screws.join(", ")}; motor adapter flange -8..0, nose and gland flange 170..186 are not gripped'];
+      'bearing pair 129..163; clamp screws at z ${screws.join(", ")}; rear face and the encoder stator (z 0..-14) and the nose and gland flange 170..186 are not gripped'];
     if (from < SpindleHousing.CLAMP_FROM - 1e-6 || to > SpindleHousing.CLAMP_TO + 1e-6) throw "spindle seat leaves the housing's clamping length: " + lines.join("; ");
     if (from > 129 || to < 163) throw "spindle seat does not cover the bearing pair: " + lines.join("; ");
     for (z in screws) if (z < from || z > to) throw "spindle seat clamp screw outside the seat: " + lines.join("; ");
@@ -242,7 +321,6 @@ class HobberFrameChecks {
   public static function spindleRelief(machine:FlexsplineHobber):Array<String> {
     var relief = HobberSpindleRelief.result(), lines = [];
     function r(v:Float, d:Int = 2):Float return Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
-    if (relief == null) throw "the spindle servo never comes within the running gap of the bed casting: the relief feature should not exist";
     var model = new cadkit.modeling.AssemblyModel("mm");
     machine.addTo(model, "");
     var state = model.initialState();
@@ -287,7 +365,14 @@ class HobberFrameChecks {
     }
     if (worstGap < HobberSpindleRelief.RUNNING_GAP - 1e-6)
       throw 'spindle servo comes ${r(worstGap, 3)} mm from the bed casting at ${worstAt} (running gap ${HobberSpindleRelief.RUNNING_GAP} mm) with the relief in place';
-    // (3) the wall under the floor, in the casting's frame (the casting is posed at the bed frame).
+    // (3) the wall under the floor, in the casting's frame (the casting is posed at the bed frame). With the servo standing above the
+    // cartridge it never reaches the casting and there is no relief.
+    if (relief == null) {
+      cache.close();
+      lines.push('Spindle servo (${HobSpindle.MOTOR}, connectors to LH assumed positions) stands above the cartridge and never comes within the ${HobberSpindleRelief.RUNNING_GAP} mm running gap of the bed casting: '
+        + 'no relief in the casting; least gap to the finished casting over the extremes with overtravel ${r(worstGap, 2)} mm at ${worstAt}');
+      return lines;
+    }
     var wall = HobberCastingPockets.WALL;
     var d = FoundationLayout.dimensions("bed");
     var slab = cadkit.modeling.Part.box(relief.x1 - relief.x0, relief.y1 - relief.y0, wall, cadkit.modeling.Align.Min, cadkit.modeling.Align.Min, cadkit.modeling.Align.Min)
@@ -311,7 +396,7 @@ class HobberFrameChecks {
     var presentation = materia.presentation.Presentations.assembled(machine.definition(), -1.1, 0.35, "hobber");
     presentation.procedures = HobberAssemblyProcedures.build(machine);
     materia.presentation.PresentationCodec.validate(machine.definition(), presentation);
-    var lines = sizing(machine).concat(scales(machine)).concat(swivelLoad(machine)).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)).concat(spindleRelief(machine)), errors = newErrors(machine, sweep);
+    var lines = sizing(machine).concat(scales(machine)).concat(swivelLoad(machine)).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)).concat(spindleDrive(machine)).concat(spindleRelief(machine)), errors = newErrors(machine, sweep);
     for (line in lines) Sys.println(line);
     if (errors.length > 0) throw 'hobber strict integrity: ${errors.length} findings\n  ' + errors.join("\n  ");
     return presentation.procedures.length + lines.length + 1;
@@ -400,6 +485,7 @@ class HobberFrameChecks {
       roundTrip(machine);
       Sys.println("round trip ok");
     }
+    if (args.indexOf("spindledrive") >= 0) for (line in spindleDrive(machine)) Sys.println(line);
     if (args.indexOf("spindlerelief") >= 0) for (line in spindleRelief(machine)) Sys.println(line);
     if (args.indexOf("integrity") >= 0) {
       var errors = integrity(machine, args.indexOf("sweep") >= 0);
