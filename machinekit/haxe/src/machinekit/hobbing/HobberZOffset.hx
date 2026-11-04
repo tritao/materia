@@ -141,25 +141,33 @@ class HobberZOffset {
       {name: "ball nut", part: nutPart, against: here},
       {name: "nut block", part: blockPart, against: here}
     ];
-    function gapsAt(a:Float):Array<{name:String, gap:Float}> {
-      var shift = new Vector(0, SIDE * a, 0), out = [];
-      for (o in obstacles) {
-        var moved = o.part.translated(shift), d = moved.distance(o.against);
-        moved.close();
-        out.push({name: o.name, gap: d});
-      }
+    function obstacleGap(o:{name:String, part:Part, against:Part}, a:Float):Float {
+      var moved = o.part.translated(new Vector(0, SIDE * a, 0)), d = moved.distance(o.against);
+      moved.close();
+      return d;
+    }
+    function holesGap(a:Float):Float {
       var worst = 1e9;
       for (t in tools) {
-        var moved = t.translated(shift), d = moved.distance(grown);
+        var moved = t.translated(new Vector(0, SIDE * a, 0)), d = moved.distance(grown);
         moved.close();
         worst = Math.min(worst, d);
       }
-      out.push({name: "floating pad seat holes to relief", gap: worst});
+      return worst;
+    }
+    function gapsAt(a:Float):Array<{name:String, gap:Float}> {
+      var out = [for (o in obstacles) {name: o.name, gap: obstacleGap(o, a)}];
+      out.push({name: "floating pad seat holes to relief", gap: holesGap(a)});
       return out;
     }
-    function ok(g:Array<{name:String, gap:Float}>):Bool {
-      for (item in g) if (item.gap < (item.name.indexOf("holes") >= 0 ? HOLE_MARGIN : RUNNING_GAP) - 1e-6) return false;
-      return true;
+    /** How far the first failing gap at `a` falls short of its need (beyond the 1e-6 acceptance), or 0 when all pass. */
+    function shortfall(a:Float):Float {
+      for (o in obstacles) {
+        var gap = obstacleGap(o, a);
+        if (gap < RUNNING_GAP - 1e-6) return RUNNING_GAP - 1e-6 - gap;
+      }
+      var gap = holesGap(a);
+      return gap < HOLE_MARGIN - 1e-6 ? HOLE_MARGIN - 1e-6 - gap : 0;
     }
     function governing(g:Array<{name:String, gap:Float}>):String {
       var name = "", worst = 1e9;
@@ -172,15 +180,18 @@ class HobberZOffset {
       }
       return name;
     }
-    var found:Null<Float> = null, previous = 0.0;
+    // The first passing step of the 1 mm scan. Moving a part by d changes its distance to another by at most d, so a
+    // gap short of its need by more than k mm still fails k steps on: those steps are skipped, not assumed. A step
+    // stops at its first failing gap; the reported gaps are measured in full below.
+    var found:Null<Float> = null;
     var a = 0.0;
     while (a <= 130) {
-      if (ok(gapsAt(a))) {
+      var deficit = shortfall(a);
+      if (deficit <= 0) {
         found = a;
         break;
       }
-      previous = a;
-      a += 1.0;
+      a += Math.max(1.0, Math.ceil(deficit - 1e-6));
     }
     var maximum = FoundationLayout.COLUMN_HEAD_WIDTH / 2 - (reach + FoundationLayout.SOURCE_STEEL_COVER_MM);
     var below = found == null ? [] : gapsAt(Math.max(0.0, found - 1.0));
