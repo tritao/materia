@@ -469,12 +469,8 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 	 * `RELIEF_MARGIN`. The catalogue gives no relief dimension, so this is assumed from the screw.
 	 */
   public static function reliefDiameter(flange:MotorFlange):Null<Float> {
-    var catalog = machinekit.standard.SocketHeadCapScrew.catalog();
-    var spec = flange.screw == null ? null : catalog.get(flange.screw);
-    if (spec == null) for (name in catalog.designations()) {
-      var candidate = catalog.get(name);
-      if (candidate.clearanceMedium <= flange.holeDiameter + 1e-6 && (spec == null || candidate.diameter > spec.diameter)) spec = candidate;
-    }
+    var spec = flange.screw == null ? machinekit.standard.SocketHeadCapScrew.takenByHole(flange.holeDiameter)
+      : machinekit.standard.SocketHeadCapScrew.catalog().get(flange.screw);
     return spec == null ? null : spec.headDiameter + RELIEF_MARGIN;
   }
 

@@ -395,6 +395,10 @@ class BenchMill extends MachineAssembly {
     );
   }
 
+  /** A stand's footprint under a support: the foot's hole pattern with room for the screws' edge distance (`JointFasteners.EDGE_DIAMETERS`). */
+  static function standWidth(unit:ScrewSupportUnit):Float return Math.max(unit.width, unit.spec.pitch + 2 * 8);
+  static function standLength(unit:ScrewSupportUnit):Float return Math.max(unit.length, unit.spec.longitudinalPitch + 2 * 8);
+
   /** The workpiece, its clamps and the vise: the operator takes them off the table to reach the carriage screws. */
   public function workholdingMembers():Array<String> return [for (entry in components()) if (entry.id == "stock" || entry.id == "clampLeft"
     || entry.id == "clampRight" || StringTools.startsWith(entry.id, "vise/")) entry.id];
@@ -532,6 +536,9 @@ class BenchMill extends MachineAssembly {
       carriage
     );
     var near = ScrewSupportUnit.bk12(), far = ScrewSupportUnit.bf12();
+    // The Z supports stand on a 1 mm shim between the column and their foot plane, which cannot be tapped: their fasteners are
+    // not derived until that stand is redesigned (the foot would need a real bracket or a boss on the column).
+    if (spec.id == "z") near.footBolted = far.footBolted = false;
     for (end in 0...2) {
       var support = end == 0 ? near : far;
       var offset = end == 0 ? BallScrew.INPUT_JOURNAL_LENGTH - near.length / 2 : length - BallScrew.JOURNAL_LENGTH / 2;
@@ -556,7 +563,7 @@ class BenchMill extends MachineAssembly {
           == 0 ? BallScrew.INPUT_JOURNAL_LENGTH - near.length / 2 : length - BallScrew.JOURNAL_LENGTH / 2;
         attach(
           id + 'Stand$end',
-          new MillDriveBox(end == 0 ? "MILL-Y-STAND-FIXED" : "MILL-Y-STAND-FLOATING", unit.width, unit.length, footZ - base.height),
+          new MillDriveBox(end == 0 ? "MILL-Y-STAND-FIXED" : "MILL-Y-STAND-FLOATING", standWidth(unit), standLength(unit), footZ - base.height, true),
           AssemblyFrames.translation(start[0], start[1] + offset, base.height),
           parent
         );
@@ -577,7 +584,7 @@ class BenchMill extends MachineAssembly {
         var reach = Math.abs(motorPose.x) - motorPlate.thickness - saddle.width / 2;
         attach(
           id + (side < 0 ? "NearBridge" : "FarBridge"),
-          new MillDriveBox(side < 0 ? "MILL-X-BRIDGE-NEAR" : "MILL-X-BRIDGE-FAR", reach, 80, 10),
+          new MillDriveBox(side < 0 ? "MILL-X-BRIDGE-NEAR" : "MILL-X-BRIDGE-FAR", reach, 80, 10, true),
           AssemblyFrames.translation(side * (saddle.width / 2 + reach / 2), start[1], footZ - 10),
           parent
         );
@@ -815,8 +822,14 @@ class MillDriveBox extends MachineComponent {
   final width:Float;
   final depth:Float;
   final height:Float;
-  public function new(drawing:String, width:Float, depth:Float, height:Float) {
-    super('MILL-BRACKET-$width-$depth-$height', "Mill drive support bracket", "steel", true);
+  /** Whether a screw support stands on the top face (drilled and tapped to suit its foot). */
+  final footed:Bool;
+  /** A plate this thin is tapped through. */
+  static inline var TAPPED_THROUGH:Float = 12;
+  /** The deepest thread tapped in a stand, mm. */
+  static inline var TAP_DEPTH:Float = 20;
+  public function new(drawing:String, width:Float, depth:Float, height:Float, footed:Bool = false) {
+    super('MILL-BRACKET-$width-$depth-$height' + (footed ? "-footed" : ""), "Mill drive support bracket", "steel", true);
     declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(machinekit.component.Procurement.Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
@@ -824,13 +837,28 @@ class MillDriveBox extends MachineComponent {
     this.width = width;
     this.depth = depth;
     this.height = height;
+    this.footed = footed;
   }
   override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
     [drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(width),
-      machinekit.component.ComponentNumberKey.encode(depth), machinekit.component.ComponentNumberKey.encode(height)].join("|"), 1);
+      machinekit.component.ComponentNumberKey.encode(depth), machinekit.component.ComponentNumberKey.encode(height),
+      footed ? "footed" : "plain"].join("|"), 1);
+  /** The top face a screw support's foot is bolted to: drilled and tapped to suit the support, the whole top face. */
+  override public function fasteningFaces():Array<machinekit.component.BoltedFace> return footed ? [machinekit.component.BoltedFace.drilledToSuit(
+    "foot",
+    machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: height}, {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0}),
+    width,
+    depth,
+    Math.min(height, TAP_DEPTH),
+    height,
+    machinekit.component.BoltedFace.ThreadMaterial.Steel,
+    null,
+    height <= TAPPED_THROUGH
+  )] : [];
+  override public function machinable():Bool return footed;
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
-    return Solids.named(Part.box(width, depth, height), "bracket");
+    return machined(Solids.named(Part.box(width, depth, height), "bracket"));
   }
 }
 

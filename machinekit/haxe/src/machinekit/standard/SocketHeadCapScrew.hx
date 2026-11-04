@@ -53,6 +53,19 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
     row("M20", 20, 2.5, 30, 20, 17, 10, 52, 17.5, 21, 22, 24, 33, 20.6),
   ];
 
+  /**
+	 * The largest catalogue screw a round hole of `diameter` passes (its medium clearance hole is no wider), or null where none
+	 * fits: the screw a flange or foot with that hole is meant for when its maker names none.
+	 */
+  public static function takenByHole(diameter:Float):Null<MetricScrewSpec> {
+    var rows = catalog(), found:Null<MetricScrewSpec> = null;
+    for (name in rows.designations()) {
+      var candidate = rows.get(name);
+      if (candidate.clearanceMedium <= diameter + 1e-6 && (found == null || candidate.diameter > found.diameter)) found = candidate;
+    }
+    return found;
+  }
+
   public static function catalog():Catalog<MetricScrewSpec> {
     if (table == null) table = new Catalog("metric screw size", spec -> spec.size, rows(), spec -> switch (spec.size) {
       case "M5":

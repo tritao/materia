@@ -203,6 +203,35 @@ class ScrewSupportUnit extends MachineComponent {
   override public function mountingFace():Null<machinekit.component.MountingFace> return spec.base ? machinekit.component.MountingFace
     .tappedFoot([for (p in mountingPositions()) {x: p.x, z: p.z, diameter: drawingSource().holeDiameter}], -spec.shaftHeight) : null;
 
+  /**
+	 * Whether the foot is bolted down by derivation (`fasteningFaces`). A machine that stands a support on something it cannot tap
+	 * (a shim) sets it false for that instance, and the support's fasteners are then not derived.
+	 */
+  public var footBolted = true;
+
+  /**
+	 * The foot's bolted face: clearance holes of the maker's hole diameter, the screws bearing on the counterbore seat
+	 * `boltSeatY()` above the base (measured on the maker's CAD where reviewed, else assumed), in the row's counterbore. The
+	 * counterbore's depth is not published: it is assumed as deep as the screw's head, flush. The screw is the one the hole
+	 * passes (`SocketHeadCapScrew.takenByHole`). Frame: on the base plane, +Z up into the foot.
+	 */
+  override public function fasteningFaces():Array<machinekit.component.BoltedFace> {
+    if (!spec.base || !footBolted) return [];
+    var hole = drawingSource().holeDiameter;
+    var screw = machinekit.standard.SocketHeadCapScrew.takenByHole(hole);
+    if (screw == null) throw 'No catalogue screw passes the ${hole} mm foot holes of $designation';
+    return [machinekit.component.BoltedFace.clamped(
+      "foot",
+      machinekit.component.BoltedFace.frameOf({x: 0, y: -spec.shaftHeight, z: 0}, {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}),
+      // The face's y axis runs along -Z of the support.
+      [for (p in mountingPositions()) {x: p.x, y: -p.z}],
+      hole,
+      boltSeatY(),
+      screw.size,
+      {diameter: spec.counterbore, depth: screw.headHeight}
+    )];
+  }
+
   override public function carriesJournal():Bool return true;
 
   override public function hasGeometry():Bool return true;

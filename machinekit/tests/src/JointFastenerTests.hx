@@ -313,8 +313,14 @@ class JointFastenerTests {
     for (key in count.keys()) total += count.get(key);
     // The three ball nuts (six flange bolts each) are bolted through their adapter plates with a washer and a nut.
     check(count.get("ISO4762-M5x30") == 18 && count.get("ISO7089-M5") == 18 && count.get("ISO4032-M5") == 18, 'nut flange bolts: ${[for (k in count.keys()) k + "=" + count.get(k)]}');
-    check(total == railHoles + 4 * blocks + 12 + 18 + 18 + 18, 'screws, washers and nuts only: $total');
-    var rails = [for (joint in derivation.joints) if (joint.drilledToSuit) joint];
+    var feet = [for (joint in derivation.joints) if (joint.clampedFace == "foot") joint];
+    var footScrews = 0;
+    for (joint in feet) footScrews += joint.count;
+    // The Y and X screw supports are bolted down by their feet (the Z supports stand on a shim, see `BenchMill.driveScrew`).
+    check(feet.length == 4 && footScrews == 12, 'four supports are bolted: ${feet.length} joints, $footScrews screws');
+    for (joint in feet) check(joint.drilledToSuit && joint.size == "M5" && joint.engagement >= joint.minEngagement - 1e-9, 'support joint ${joint.id}: ${joint.size} x${joint.length}');
+    check(total == railHoles + 4 * blocks + footScrews + 12 + 18 + 18 + 18, 'screws, washers and nuts only: $total');
+    var rails = [for (joint in derivation.joints) if (joint.drilledToSuit && joint.clampedFace == "base") joint];
     var blockJoints = [for (joint in derivation.joints) if (joint.clampedFace == "blockLeft" || joint.clampedFace == "blockRight") joint];
     check(blockJoints.length == blocks, "one joint per block, got " + blockJoints.length);
     for (joint in blockJoints) check(joint.length == 16 && joint.grip == 12 && joint.engagement >= joint.minEngagement - 1e-9
@@ -327,16 +333,16 @@ class JointFastenerTests {
     for (item in fit.errors()) Sys.println("  " + item.code + ": " + item.message);
     // The motors' flange screws have corner reliefs behind the flange (`MotorBody`) and nothing stands in their heads' way.
     check(fit.errors().length == 0, 'the derived fasteners fit the mill: ${[for (item in fit.errors()) item.message].join("; ")}');
-    Sys.println('bench mill: ${derivation.joints.length} joints, ${derivation.count()} screws (${railHoles} rail, ${4 * blocks} block, 12 motor, 18 nut flange), ' + [for (k in count.keys()) k + " x" + count.get(k)].join(", "));
+    Sys.println('bench mill: ${derivation.joints.length} joints, ${derivation.count()} screws (${railHoles} rail, ${4 * blocks} block, ${footScrews} support, 12 motor, 18 nut flange), ' + [for (k in count.keys()) k + " x" + count.get(k)].join(", "));
     // The drilled seats are in the castings' solids: one tap-drill hole per rail screw, none anywhere else.
     var cut = 0;
     for (entry in machine.components()) {
       var cuts = entry.component.machinedCuts();
-      if (cuts.length > 0) check(Std.isOfType(entry.component, machinekit.milling.MillCasting), entry.id + " is machined but is not a casting");
+      if (cuts.length > 0) check(Std.isOfType(entry.component, machinekit.milling.MillCasting) || StringTools.startsWith(entry.id, "screwXNearBridge") || StringTools.startsWith(entry.id, "screwXFarBridge") || StringTools.startsWith(entry.id, "screwYStand"), entry.id + " is machined but is neither a casting nor a support stand");
       cut += cuts.length;
     }
     // Each block screw cuts its clearance hole and its counterbored pocket into the casting it is bolted through.
-    check(cut == railHoles + 2 * 4 * blocks, 'every rail hole is a tap-drill hole in a casting, every block screw a hole and a pocket: $cut cuts for $railHoles rail holes and $blocks blocks');
+    check(cut == railHoles + 2 * 4 * blocks + footScrews, 'every rail hole is a tap-drill hole in a casting, every block screw a hole and a pocket: $cut cuts for $railHoles rail holes and $blocks blocks');
     for (joint in rails) check(joint.length == 16 && joint.engagement >= joint.minEngagement - 1e-9, 'rail joint ${joint.id}: x${joint.length} engages ${joint.engagement} of ${joint.minEngagement}');
   }
 }
