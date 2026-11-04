@@ -40,13 +40,13 @@ and empty verified-field lists.
 - `RotaryTable extends MachineAssembly`: stepped-bore housing, torque motor,
   crossed-roller bearing, ring encoder, clamp and platen. C is continuous and its
   initial effort/speed limits come from the installed motor. Exposes `mount`/`work`.
-- `HobSpindle extends MachineAssembly`: steel housing, 1 kW 80-frame servo
-  (the quoted Leadshine `ELM2H-1000LA80F`, catalogue envelope with its connectors, assumed winding) on a
-  bell adapter, coupling, floating rear 6205, opposed angular-contact
-  pair, shaft, bolted gland, locknut, removable arbor and its
-  four screws, and the gland and adapter screws.
-  B's torque comes from the servo (1 kW, 3000 rpm rated) and its speed limit from the
-  4000 rpm cartridge rating; the servo's own absolute encoder is the B master. The two
+- `HobSpindle extends MachineAssembly`: steel housing, floating rear 6205, opposed angular-contact
+  pair, shaft, bolted gland, locknut, removable arbor and its four screws; behind the housing the 19-bit absolute spindle
+  encoder (the B master) and the 45T HTD5M pulley on the rear stub. The 1 kW 80-frame servo (the quoted Leadshine `ELM2H-1000LA80F`, catalogue
+  envelope with its connectors, assumed winding) stands beside the cartridge above it (it is a member of the assembly but bolted to the
+  `GE-motor-cradle` on the spindle seat at machine level), with a 36T pulley, a 15 mm HTD5M belt and its own encoder on the servo joint.
+  B's torque is the servo's times the belt's 1.25 (1 kW, 3000 rpm rated at the motor) and its speed limit is the
+  4000 rpm cartridge rating (reached at the servo's 5000 rpm); the cartridge's encoder is the B master and the servo's the drive's loop. The two
   angular-contact bearings remain two instances of the same BOM item; opposing
   orientation is a placement, not another bearing model. Exposes `mount`,
   `gaugeLine`, `hobCentre`. B is continuous.
@@ -91,13 +91,13 @@ and empty verified-field lists.
   definitions are available through ProjectKit's material library.
 
 `ASSUMED-TF20` is a custom taper-and-face spindle/arbor interface, replacing the
-unimplemented HSK-E25 label. It includes a Ø25 spindle shaft with a Ø20 coupling
+unimplemented HSK-E25 label. It includes a Ø25 spindle shaft with a Ø20 pulley and encoder
 stub, front opposed bearing pair, housing shoulder and removable front gland, shaft
 locknut, Ø40 nose/flange, 20 mm 1:5 taper, four M4 flange screws and two Ø4 drive
 pins; there is no drawbar. The locknut is a catalogue KM5-size precision nut. Shaft,
-motor adapter, gland and locknut have separate
-persistent recipes/BOM entries. B drives the shaft; the motor shaft, coupling and
-arbor rotate with it. Thread helices, fits, preload and strength qualification
+gland and locknut have separate
+persistent recipes/BOM entries. B drives the shaft; the arbor and the spindle pulley rotate with it, and the belt couples it to the servo's shaft
+(joint `motor-turn`, a `BeltReduction` transmission). Thread helices, fits, preload and strength qualification
 remain open manufacturing requirements.
 See the dimensioned cartridge specification in MACHINE_DESIGN.md.
 
@@ -173,7 +173,7 @@ case checks project loading, source-derived axis limits and a coarse physical Mu
 ## Redesigned machine structure
 
 The example uses registered `HobberSaddle` recipes: the milled X carriage and Z saddle, the ground swivel plate, adapter ring, Y saddle, the
-spindle split-clamp seat, one ground bar drive pad each for X and Z, Y brackets and nut seat, scale seat bars and arm, and the electrical rack. Every made one has a
+spindle split-clamp seat and the servo cradle on its top, one ground bar drive pad each for X and Z, Y brackets and nut seat, scale seat bars and arm, and the electrical rack. Every made one has a
 `ManufacturingRoute` (see `supplier-packages/machined/`). The old overhead A-yoke, Y-saddle, X-bridge and Z-saddle recipes are retired.
 These extend `MachineComponent` directly. Designed steel weldments remain assumed;
 physical contacts, connected solids and recipe/pose round trips are checked.

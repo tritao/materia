@@ -393,22 +393,23 @@ fastener selections and tightening procedures still need manufacturing drawings;
 this layout check is not structural or mould-process qualification.
 
 
-### Hob spindle cartridge (revised 2026-11-01: coupled servo)
+### Hob spindle cartridge (revised 2026-11-04: belt drive)
 
 Load path: hob → removable arbor → taper and face → spindle shaft → opposed
-angular-contact pair → stepped steel housing → Y saddle. B is driven by a standard
-80-frame servo through a coupling behind the housing, replacing the earlier assumed
-hollow direct motor. The model uses the catalogue Leadshine ELM2H-1000LA80F (1 kW,
+angular-contact pair → stepped steel housing → spindle seat block → Y saddle. B is driven by a standard
+80-frame servo standing **beside the cartridge, above it, shaft toward the rear**, through a 36T/45T HTD5M belt (15 mm) onto the cartridge's rear stub,
+replacing the 2026-11-01 servo behind the housing on a bell adapter and a coupling (which put the servo's face 70 mm and its centre of mass about 150 mm behind
+the clamp, hung 4 kg on four M4 and put the bending mode near the tooth-pass frequency, and needed a pocket in the bed casting). The servo is the catalogue Leadshine ELM2H-1000LA80F (1 kW,
 3.18 N m, 3000/5000 rpm; 80 flange, 103.9 body, connectors to LH 55 from the axis, their
-positions along the body assumed) with an assumed winding (`LeadshineServo.driven`): the
-catalogue row has no published winding constants, which the drive check requires. The
-connectors point up (`HobSpindle.MOTOR_CLOCKING` 2). At the Z lower limit the servo stands
-below the bed beam's top, so the bed casting has a relief pocket there, derived from the
-servo's swept envelope (`HobberSpindleRelief`: X, Y and Z to their limits and 5 mm beyond, A over
-+-15 deg, each box grown by the 2 mm running gap): 179 x 47.5 mm in plan, 13 mm deep, open
-through the back face and the top, 110 cm3 as a box (about 93 cm3 and 0.22 kg of mineral
-casting, the chip tray ledge being there already), with 25 mm of casting left under its floor. The CAM job's reference speed is 2984 rpm (300 m/min on Ø32), inside
-the servo's rated speed. The outboard bearing remains radially supporting and
+positions along the body assumed) with an assumed winding (`LeadshineServo.driven`: the
+catalogue row has no published winding constants, which the drive check requires). The connectors point up (`HobSpindle.MOTOR_CLOCKING` 0). Its flange is on the wall of one
+milled **cradle** (`GE-motor-cradle`: 12 mm floor bolted by four M8 and two dowels to the top of the spindle seat block, a 15 mm wall with the pilot register and four tapped M6, a 6 mm rib outside the flange; the floor's slit lies over the seat's own so the clamp still closes), 126 mm from the spindle axis (centres; 8 mm toward work -x of its vertical, so the flange clears the Y drive on the swivel plate's top edge),
+so the servo no longer comes near the bed casting: **the bed relief pocket is gone** (`HobberSpindleRelief` derives it from the swept servo and finds none: least gap to the casting 155 mm over the whole sweep with overtravel; the
+class and the casting feature stay, so a lower Z limit or another servo would bring it back).
+The 1.25 ratio (motor turns per hob turn) is chosen from speed and torque: the hob (Ø32, assumed 100 to 300 m/min, 995 to 2984 rpm; the CAM job's reference speed 2984 rpm) needs 3730 motor rpm at the top of that range, inside the servo's 5000, and the hob gets 3.97 N m rated (11.9 peak) against 3.18 (9.5) direct.
+The **B master (electronic-gearbox) encoder is the cartridge's own 19-bit absolute encoder** on the rear face of the housing with its rotor on the stub (`addEncoder("hob-angle", "B")`), so belt wind-up, tooth error and pulley runout are inside the measurement; the servo's encoder serves the drive's loop on the `motor-turn` joint.
+The belt's pull on the cartridge is printed by `HobberFrameChecks.spindleDrive`: 499 N radial on the pulley, 32.5 mm behind the 6205 tail bearing (reaction 616 N, 7.9 % of its static rating), and the cartridge must be rated for a belt drive of at least 750 N there.
+The outboard bearing remains radially supporting and
 axially floating. This is an **assumed custom TF20** interface, not an HSK-E25
 claim. Dimensions are assumed, in millimetres, along the spindle from the housing
 rear datum; the tool face stays at 180, so the cutting geometry and work-frame
@@ -417,9 +418,10 @@ kinematics are unchanged.
 | Feature | Axial interval / dimensions |
 | --- | --- |
 | Housing | Steel, Ø80 g6 outside (a standard spindle-clamp size), 0–180, held by the Y saddle's front ring and rear open C bracket |
-| Servo | Face at −70 on a bell adapter: Ø80 front flange (−8–0, 4 × M4 to the housing), Ø64 tube with two coupling windows, 90 mm square rear flange (4 × M6 on Ø90), Ø70 pilot recess |
-| Coupling | −55 to −10, motor Ø19 to shaft stub Ø20; envelope for a balanced bellows/disc coupling |
-| Shaft stub | Ø20, −30–0 |
+| Servo | Beside the cartridge, 126 mm above its axis (belt centres), flange face at z +1 on the cradle wall (4 × M6 on Ø90, Ø70 pilot), shaft toward the rear; body forward over the seat block |
+| Spindle encoder | 19-bit absolute ring encoder envelope Ø80 × 14 on the housing rear face, −14–0 (stator on the housing's four M4 on Ø72, rotor on the stub) |
+| Pulleys and belt | HTD5M 45T (spindle, bore Ø20) and 36T (servo, bore Ø19), 18 wide at −34 to −16, 15 mm belt of 91 teeth |
+| Shaft stub | Ø20, −36–0 |
 | Floating rear bearing | 6205 (25 × 52 × 15) at 0–15 in a Ø52 bore |
 | Opposed bearing pair | 129–146 and 146–163; Ø25 journals, Ø62 housing seats |
 | Outer-ring retention | Housing shoulder at 129; bolted front gland: Ø62 spigot 163–180, Ø80 flange 180–186, 4 × M4 on Ø72 |
@@ -436,8 +438,7 @@ front. Assembly sequence: slide the matched pair onto the shaft from its rear
 against the shaft shoulder and tighten the rear locknut; fit the shaft and pair
 from the front against the housing shoulder and bolt the front gland, its spigot
 ground at assembly to clamp the outer rings; fit the
-rear 6205 over the journal into its floating bore; mount the
-bell adapter, coupling and servo; fit the arbor and its four screws.
+rear 6205 over the journal into its floating bore; fit the encoder and the pulley; fit the arbor and its four screws. The cradle goes on the seat block's top afterwards (belt tensioned with a shim pack under its floor, `HobberAssemblyProcedures.tensionBelt`).
 
 A bought cartridge to this interface is being quoted as an alternative to making
 it (2026-11-01); `supplier-packages/spindle/` generates the drawing package (per-part
@@ -446,11 +447,8 @@ helices, fits, preload, screw torque, pin strength, balance, sealing and grindin
 tolerances remain manufacturing design requirements; the CAD does not qualify them.
 Simultaneous taper/face contact must be specified and verified during manufacture.
 The existing runout assumptions are retained, not requalified. The B master
-(electronic-gearbox) encoder is the servo's own absolute encoder through the
-torsionally stiff coupling: coupling wind-up and encoder error reach the table
-divided by the tooth count, so the requirement is the drive's position latency, not
-an extra ring encoder. The cartridge is rated 4000 rpm, which limits B below the
-servo's 5000 rpm.
+(electronic-gearbox) encoder is the cartridge's own, measuring the spindle angle itself, so the belt is inside the loop it observes and does not add to the error the controller cannot see; the requirement is that encoder's accuracy over a
+tooth pitch. The cartridge is rated 4000 rpm, which limits B (the servo's 5000 rpm through the belt reaches it exactly).
 
 Before HB-D11, the original direct-motor cartridge added 1.086 kg: total mass 425.297 kg; moving X/Y/Z masses
 132.064 / 14.574 / 41.603 kg. Continuous thrust margins under the existing assumed
