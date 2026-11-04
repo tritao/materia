@@ -190,10 +190,7 @@ class MachineAssemblyCodec {
       var candidates = shared.get(key);
       var definition:Null<AssemblyComponentDefinition> = null;
       if (candidates != null) for (candidate in candidates) if (Equality.equals(candidate.connectors,
-        connectors) && Equality.equals(
-          candidate.collisionHulls,
-          collisionHulls
-        )) definition = candidate;
+        connectors) && sameHulls(candidate.collisionHulls, collisionHulls)) definition = candidate;
       if (definition == null) {
         definition = {id: id, connectors: connectors};
         var flange = machinekit.robotics.RobotFlangeFacet.of(member.component);
@@ -480,7 +477,7 @@ class MachineAssemblyCodec {
         var collision = machinekit.component.CollisionHullFacet.of(component);
         if (collision == null) @:privateAccess component
           .addFacet(new machinekit.component.CollisionHullFacet(definition.collisionHulls));
-        else if (!Equality.equals(collision.hulls,
+        else if (!sameHulls(collision.hulls,
           definition.collisionHulls)) throw 'Collision hulls disagree with recipe for "${occurrence.id}"';
       }
       target.addMember(occurrence.id, component, occurrence.initialPose);
@@ -659,5 +656,19 @@ class MachineAssemblyCodec {
       if (nested.couplings != null) nested.couplings.sort((a, b) -> Reflect.compare(a.id, b.id));
       if (nested.exposedConnectors != null) nested.exposedConnectors.sort((a, b) -> Reflect.compare(a.name, b.name));
     }
+  }
+
+  /**
+	 * Whether two lists of hulls hold the same numbers. `Equality.equals` compares arrays that are not declared value types by
+	 * reference, so two equal lists of point arrays would never match; the numbers are compared one by one.
+	 */
+  static function sameHulls(a:Null<Array<Array<Float>>>, b:Null<Array<Array<Float>>>):Bool {
+    if (a == null || b == null) return a == null && b == null;
+    if (a.length != b.length) return false;
+    for (i in 0...a.length) {
+      if (a[i].length != b[i].length) return false;
+      for (j in 0...a[i].length) if (a[i][j] != b[i][j]) return false;
+    }
+    return true;
   }
 }
