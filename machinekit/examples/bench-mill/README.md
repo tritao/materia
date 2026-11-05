@@ -570,3 +570,20 @@ motor/bearing housing and BF15 support, with an SFU2005 screw. A flat T adapter
 fits the housing between the guide rails, replacing the separate stand/bearing
 stack. See `MOTOR_MOUNTS.md` for the STEP/drawing discrepancies and outstanding
 brake, fastener and load qualifications.
+
+## Follow-ups after chip protection (2026-11-05, Codex)
+
+One commit per step; each keeps the baselines (frame tests 917, Z-axis 423, way covers, service, BOM example).
+
+1. **Covered build becomes the default.** `BenchMill` has one design, and the covers are part of it: remove the
+   covered/uncovered switch rather than keeping both. Update every consumer that builds the mill (the tooling tests, the
+   feet tests, machine tending and its baselines, `HybridMillPreview`, fixture export) and re-accept their changed baselines
+   with a stated reason. Do not loosen any check.
+2. **Bolt the cover walls and carriers.** The 14 mm end walls (on the base, bridges and column) and the head carriers are
+   fixed members with no derived screws today. Give them `BoltedFace`s and receiving faces on their hosts, so their screws,
+   holes and dowels derive and pass the head and access checks.
+3. **Covers on the framed concept** (`MillXYStage`/`MillZAxis`/`BenchMillFrame` via `MillFramePreview`). Apply box covers
+   where they fit: the X gap is 76 mm with the screw 40 mm above the saddle top. Use the same library, flange bolting and
+   drains, and keep the service removals clear.
+4. **Blocked service paths.** Reassess the three kept findings (Y screw out of the rear, Z screw up past its grease fitting,
+   cartridge up). Fix them where the fix is small and clean. Otherwise state the decided removal route in the procedures.
