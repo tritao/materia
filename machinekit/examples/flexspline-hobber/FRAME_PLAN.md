@@ -70,8 +70,12 @@ A review of `HobberSaddle` and `FlexsplineHobber` found:
   (1) *Limit*: each linear drive is set to a torque limit (`CrashProtection`, `HobberCrashProtection`): the largest multiple of 5 % of the motor's rated torque that keeps the
   thrust at or under 2 x the axis sizing thrust (and not under 1.5 x, so it never clips the sizing duty): X 65 % of rated = 0.826 N m = 934 N (1.96 x the sizing 477 N), Y 60 % = 0.762 N m = 862 N (1.86 x 462 N),
   Z 120 % = 1.524 N m = 1724 N (1.94 x 887 N), against 4309 N at the motor's 3.82 N m peak; plus a following-error trip of 1 mm (ASSUMED, jam energy under 2 J; it must be set above the tuned axis's
-  largest following error at rapid speed). **To be set in the three drives (Leadshine EL8)**: the internal torque limit (share of rated torque, both directions) and the excessive-position-error alarm; the
-  repository holds no EL8 manual, so the parameter numbers are not named; write both at commissioning and read them back. The model has no drive parameter store (`MotorDriver` has a current rating and the
+  largest following error at rapid speed). **To be set in the three drives (Leadshine EL8)**: the internal torque limit (share of rated torque, both directions) and the excessive-position-error alarm; per
+  the EL8-EC manual (V2.0.1): **P00.13** "1st Torque Limit" (index 2013h, % of rated motor current, range 0–750, factory default 500 %): set X 65, Y 60, Z 120; the drive
+  applies the smaller of P00.13 and EtherCAT 6072h (max torque, 0.1 %), and 60E0h/60E1h (positive/negative torque limit, 0.1 %) may set it per direction from the controller.
+  **P00.14** "Excessive Position Deviation" (index 2014h, unit 0.1 rev, factory default 30 = 3 rev = 15 mm on the 5 mm lead, alarm Er180): set 2 (0.2 rev = 1 mm) once tuning
+  confirms the largest following error at rapid stays below it; over EtherCAT the following-error window is 6065h with time-out 6066h (default 10 ms). Write all at commissioning
+  and read them back. The model has no drive parameter store (`MotorDriver` has a current rating and the
   actuator record the motor's peak effort), so the settings live in `HobberCrashProtection` and `HobberJointLoads` takes the momentary loads from them (limited thrust plus the weight along the screw: Z 477 N, Y 65 N).
   (2) *Locate*: the nut blocks are located against the thrust by dowels or a key, not by screw friction. X and Z: two Ø6 H7 dowels in the block's base end (`NutBlock.pinned`, 10 mm either side of the axis,
   7 mm deep) and in the carriage deck / Z saddle plate (8 mm), derived joints (`PinnedFace`). Y: no room for dowels (the base screws are 16 mm apart on a 20 mm base, a dowel would leave 1.7 mm of web),
