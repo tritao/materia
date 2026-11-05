@@ -6,6 +6,7 @@ typedef HobberXDimensions = {
   railLength:Float,
   screwStart:Float,
   screwLength:Float,
+  /** Nut-part origin station from the screw start; X nut points motorward. */
   nutStation:Float,
   motorFace:Float,
   motorRear:Float,
@@ -30,7 +31,8 @@ class HobberXLayout {
   public static inline final END_ALLOWANCE = 10.0;
   public static inline final BLOCK_FRONT = 102.0;
   public static inline final BLOCK_REAR = 300.0;
-  public static inline final NUT_DATUM = 250.0;
+  /** Front face of the X nut block at joint zero; carriage interface datum. */
+  public static inline final NUT_BLOCK_FRONT = 232.5;
   public static inline final COLUMN_REAR = 386.0;
   public static inline final BED_FRONT = -300.0;
   public static inline final FOOT_FRONT = -180.0;
@@ -47,11 +49,11 @@ class HobberXLayout {
       nut = new BallNut(), motor = ServoMotor.model("GENERIC-HV-SERVO-400W").rating;
     var railStart = MIN + BLOCK_FRONT - guide.blockLength / 2 - guide.railEndMargin - OVERTRAVEL;
     var railLength = up10(retract + BLOCK_REAR + guide.blockLength / 2 + guide.railEndMargin + OVERTRAVEL - railStart);
-    var start = up10(NUT_DATUM
-      + retract + nut.bodyLength / 2 + BallScrew.INPUT_JOURNAL_LENGTH + OVERTRAVEL + END_ALLOWANCE);
-    var raceEnd = NUT_DATUM
-      + MIN - nut.bodyLength / 2 - nut.flangeThickness - OVERTRAVEL - END_ALLOWANCE - BallScrew.JOURNAL_LENGTH;
-    var carrierFront = NUT_DATUM + MIN - OVERTRAVEL - nut.bodyLength / 2 - nut.flangeThickness - 20;
+    var start = up10(NUT_BLOCK_FRONT
+      + retract + nut.bodyLength + BallScrew.INPUT_JOURNAL_LENGTH + OVERTRAVEL + END_ALLOWANCE);
+    var raceEnd = NUT_BLOCK_FRONT
+      + MIN - nut.flangeThickness - OVERTRAVEL - END_ALLOWANCE - BallScrew.JOURNAL_LENGTH;
+    var carrierFront = NUT_BLOCK_FRONT + MIN - OVERTRAVEL - nut.flangeThickness - 20;
     var supportEnd = carrierFront - 12.5 - ScrewSupportUnit.bf12().length / 2 - END_ALLOWANCE;
     var length = up10(start - Math.min(raceEnd, supportEnd));
     // The bought mount puts the motor face 34 mm from the screw start; the bed keeps the length it was cast for.
@@ -65,7 +67,7 @@ class HobberXLayout {
       railLength: railLength,
       screwStart: start,
       screwLength: length,
-      nutStation: start - NUT_DATUM,
+      nutStation: start - (NUT_BLOCK_FRONT + machinekit.structural.GroundStock.atLeast("flat bar", NutBlock.MIN_THICKNESS) - nut.bodyLength),
       motorFace: face,
       motorRear: rear,
       floatingCentre: floating,

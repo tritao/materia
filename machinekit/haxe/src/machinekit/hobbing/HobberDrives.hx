@@ -55,7 +55,7 @@ class HobberDrives {
     if (xCache == null) {
       var l = HobberXLayout.front();
       xCache = {id: "X", drive: SupportedScrewDrive.m60dBk12(true), axis: {start: [l.screwStart, 0.0, 180.0], direction: [-1.0, 0, 0], normal: [0.0, 0, 1]},
-        length: l.screwLength, nutStation: partStart(l.nutStation), nutUp: [0.0, 0, 1], blockHeight: 80.0};
+        length: l.screwLength, nutStation: l.nutStation, nutUp: [0.0, 0, 1], blockHeight: 80.0};
       pin(xCache);
     }
     return xCache;
@@ -106,7 +106,7 @@ class HobberDrives {
     var at = d.drive.poses(d.axis, d.length, d.nutStation);
     var nut = at.get("nut");
     if (nut == null) throw "Hobber drive lost its nut pose";
-    at.set("nut", AxisBuilder.orient(nut.x, nut.y, nut.z, d.nutUp, d.axis.direction));
+    at.set("nut", AxisBuilder.orient(nut.x, nut.y, nut.z, d.nutUp, d.id == "X" ? [for(c in d.axis.direction) -c] : d.axis.direction));
     return at;
   }
 

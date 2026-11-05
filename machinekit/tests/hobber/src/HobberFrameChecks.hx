@@ -56,20 +56,8 @@ class HobberFrameChecks {
     return [for (item in report.errors()) item.code + " " + item.message];
   }
 
-  /**
-   * The service removals (FRAME_PLAN, "Chip protection and service"): every declared removal clears the machine (`integrity.service.<id>`), and each path tried
-   * that does not work as built is reported blocked, with the part that blocks it and the distance along the path. Returns one line per removal.
-   */
-  static function shorten(message:String):String {
-    var cut = message.indexOf("; prerequisites off");
-    var text = cut < 0 ? message : message.substr(0, cut);
-    var from = text.indexOf(" is blocked by ");
-    return from < 0 ? text : text.substr(from + 4);
-  }
-
-  // checkedIntegrity is the completed strict check of this same, unchanged
-  // instance in main. It already swept every declared removal; reuse that
-  // evidence rather than repeating the same removals before the tried paths.
+  /** Every declared service path is checked against the parts left installed.
+   * Reuse main's completed strict check only for that same unchanged instance. */
   public static function service(machine:FlexsplineHobber, ?checkedIntegrity:Array<String>):Array<String> {
     var lines = [];
     var declared = [for (r in machine.serviceRemovals()) switch r {
@@ -82,18 +70,6 @@ class HobberFrameChecks {
       lines.push(mine.length == 0 ? 'service $id: clear' : 'service $id: BLOCKED ${mine.join("; ")}');
     }
     if (errors.length > 0) throw "Declared service removals are blocked: " + errors.join("; ");
-    // The tried paths are added together and swept once; each is reported with every part that blocks it and how far along the path.
-    var tried = [for (t in machine.serviceTries()) switch t {
-      case ServiceRemoval(id, _, _, _, _): id;
-      default: "";
-    }];
-    for (t in machine.serviceTries()) machine.addDesignRequirement(t);
-    var found = [for (e in AssemblyIntegrity.service(machine).errors()) e.code + " " + e.message];
-    for (id in tried) {
-      var mine = [for (e in found) if (e.indexOf("integrity.service." + id + " ") == 0) shorten(e.substr(("integrity.service." + id + " ").length))];
-      lines.push(mine.length == 0 ? 'tried $id: CLEAR (declare it)' : 'tried $id: blocked: ${mine.join(" | ")}');
-      if (mine.length == 0) throw 'The service path $id now clears: move it from serviceTries to serviceRemovals';
-    }
     return lines;
   }
 
@@ -596,7 +572,7 @@ class HobberFrameChecks {
     var translated:Map<String, materia.assembly.AssemblyRecord.AssemblyFrame> = [];
     for (id => pose in machine.solvedPoses()) translated.set(id, F.compose(F.translation(17, 29, 31), pose));
     if (headReport.join("\n") != swivelLoad(machine, translated).join("\n")) throw "head demands depend on the machine's world origin";
-    var lines = bt30(machine).concat(outboard(machine)).concat(sizing(machine)).concat(scales(machine)).concat(headReport).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)).concat(spindleDrive(machine).lines).concat(spindleRelief(machine)), errors = newErrors(machine, sweep);
+    var lines = HobberServiceDesignChecks.run(machine).concat(bt30(machine)).concat(outboard(machine)).concat(sizing(machine)).concat(scales(machine)).concat(headReport).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)).concat(spindleDrive(machine).lines).concat(spindleRelief(machine)), errors = newErrors(machine, sweep);
     for (line in lines) Sys.println(line);
     if (errors.length > 0) throw 'hobber strict integrity: ${errors.length} findings\n  ' + errors.join("\n  ");
     return presentation.procedures.length + lines.length + 2;
@@ -680,6 +656,7 @@ class HobberFrameChecks {
     if (args.indexOf("scales") >= 0) for (line in scales(machine)) Sys.println(line);
     if (args.indexOf("swivel") >= 0) for (line in swivelLoad(machine)) Sys.println(line);
     if (args.indexOf("zoffset") >= 0) for (line in zOffsetMoments(machine)) Sys.println(line);
+    if (args.indexOf("servicedesign") >= 0) for (line in HobberServiceDesignChecks.run(machine)) Sys.println(line);
     if (args.indexOf("chipguards") >= 0) for (line in HobberChipGuardChecks.run(machine)) Sys.println(line);
     if (args.indexOf("motorstudy") >= 0) for (line in HobberMotorStudy.run(machine)) Sys.println(line);
     if (args.indexOf("outboard") >= 0) for (line in outboard(machine)) Sys.println(line);
@@ -723,7 +700,7 @@ class HobberFrameChecks {
       Sys.println('integrity: ${errors.length} errors in ${Math.round(Sys.time() - began)} s');
       if (errors.length > 0) Sys.exit(1);
     }
-    // Last: `service` adds the paths it tries (which are blocked) to the machine's requirements, so nothing may follow it that checks the machine as built.
+    // Service reports the declared paths without changing the machine.
     if (args.indexOf("coverfit") >= 0) for (line in coverFit(machine)) Sys.println(line);
     if (args.indexOf("service") >= 0) for (line in service(machine, checkedIntegrity)) Sys.println(line);
   }

@@ -697,7 +697,7 @@ See [Z_DRIVE_SECTION.svg](Z_DRIVE_SECTION.svg) and [Z_DRIVE_REPORT.json](Z_DRIVE
 Block wipers: an end scraper at each end of every guide block (`WIPER-HG25-SCRAPER` on the four X blocks, `WIPER-HG15-SCRAPER` on the four Z and four Y blocks, 24 in all;
 `WayWiperCatalog`, added lengths assumed; BOM lines only, the block models do not carry them).
 
-Way covers (`machinekit.cover`, box covers of the lamella bellows row, 14 mm end walls and carriers, 2 mm gaps, opening 40 x 50 round the bare screw) measured on the
+The bellows figures in this paragraph describe the pre-P4/P5 configuration and are retained as the decision record; current protection is the fixed-sheet design below. Way covers (`machinekit.cover`, box covers of the lamella bellows row, 14 mm end walls and carriers, 2 mm gaps, opening 40 x 50 round the bare screw) measured on the
 posed machine by `HobberFrameChecks.coverFit`: X front (BF12 to the nut, stroke 64.8 mm) 28.7 mm free, 22 mm needed, flange 106 mm of the 110 mm channel: fits, but its wall
 has no host (the nut groove of the pad bar starts at x 205, 2 mm behind the BF12, the insert is 100 wide, the casting wall in front is a 12.5 mm strip); X rear (nut to BK12) -9 mm free,
 31 mm short; Z bottom 21.5 mm and Z top 23 mm free against 38 mm (4 folds for 200 mm), 16.5 and 15 mm short. Y has no room for a skin: the 28 mm between the saddle's plate and the
@@ -729,8 +729,40 @@ gap throughout travel. The guards do not seal the machine: block wipers remain
 and the enclosure must contain oil mist. No drain is declared because the
 flat channel has no modelled fall or bore.
 
-Service removals (declared, `FlexsplineHobber.serviceRemovals`, swept by `ServiceChecks`): the X, Y, Z and B servos come off along their own axes (shaft out of the coupling, 45 mm);
-the B belt slides off along its pulleys (40 mm); the B cartridge with the hob and arbor leaves forward out of its split clamp (240 mm, X at retract, belt, outboard carrier/support/bearing and Y reading head off); the X screw and nut leave
-upward after 25 mm rearward, once the motor, the BK12, the BF12's ring and the carriage stack are off. Blocked (reported by `HobberFrameChecks.service`, `serviceTries`): the X screw
-rearward with the nut (the nut's flange is on the block's front face), with the block (the pad bar's full-height rear end is 5 mm above the block's lower end), and the eRob out of the Z
-saddle rearward (Z pad bar after 4 mm, column casting after 38 mm; about 90 mm needed) or forward with the saddle (the nut block hangs on the nut).
+Phase P5 puts the X nut flange on the motor side of its block. The physical
+block face is the datum, X232.5..248.5 at joint zero, and remains in the same
+carriage interface. The nut origin is X213.5 and its local axis points +X,
+opposite the screw's construction axis; lead sense and thread hand are unchanged.
+The six M5 flange screws remain joint derived. With the servo, BK12 bracket
+(including its bolts and locating dowels) and BF retaining ring removed, a long
+AF4 key reaches each flange screw through the rear channel: all six conservative
+driver corridors pass with the fixed shields and skirt installed. Require a
+400 mm reach shop key. The screw, coupling and nut withdraw 445 mm rearward;
+the screw tip finishes 5 mm past the bed rear. The nut block, BF12, carriage and
+chip shields stay installed. At 5 mm linear overtravel, the whole nut envelope
+retains 25.5 mm race reserve and its barrel at least 32.5 mm. No source path for
+the former nut orientation or upward X removal remains.
+
+The eRob leaves with the complete Z saddle and head, rather than dismantling
+the head on the machine: the adapter output screws are behind the swivel plate.
+At X retract with Y/A centred and Z at joint zero, first remove the Y servo and
+shaft stub along their declared path; its connector envelope otherwise blocks
+the right Z guard. Unbolt each guard foot, move it forward 19, up 24, back 4,
+then outward 200 mm. The two guards have separately declared paths (no casting
+or sheet change). Release the Z nut block and all guide-block fixings from the
+saddle, leaving the nut block on the braked screw and all four guide blocks on
+the rails. Support the unbolted reading head on the fixed Z scale while its arm
+leaves with the saddle. Disconnect cables and coolant, and support the complete
+module with a qualified shop hoist/sling arrangement; lifting and temporary
+reader support are assumed shop procedures, not modelled vendor fixtures.
+Withdraw the 47.59 kg saddle/eRob/head module (Y servo off) 60 mm forward. Refit the Z guards by reversing
+their removal paths after the saddle is assembled. The generated service
+procedure reports the installed module mass.
+
+`FlexsplineHobber.serviceRemovals` is the single service definition;
+`HobberFrameChecks.service` reports its swept results without mutating the
+machine or adding failed experimental paths. Existing servo, belt, cartridge,
+outboard and fixed-X-guard removals remain declared. Service sweeps sample at
+2 mm and require no positive-volume interference; operating clearances are
+checked separately by strict integrity. Historical failed alternatives remain
+only in the FRAME_PLAN Log.

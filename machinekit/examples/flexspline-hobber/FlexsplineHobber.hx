@@ -493,7 +493,7 @@ class FlexsplineHobber extends MachineAssembly {
    * member are taken away with it). A servo comes off its mount along its own axis, away from the screw or pulley: the shaft stub out of the coupling,
    * then the body free of the flange pilot. The B servo leaves with its belt and pulley off. The B belt slides off both pulleys along their axis. The spindle
    * cartridge, with the hob and arbor, leaves forward out of its split clamp (the front register cannot pass the bore), with the outboard support and belt off.
-   * The paths that do not work as built are `serviceTries`, swept by `HobberFrameChecks.service` and reported with their numbers.
+   * The head stays on the eRob, which leaves with its Z saddle; the Z nut block stays on the screw.
    */
   function declareServices():Void {
     for (r in serviceRemovals()) addDesignRequirement(r);
@@ -521,32 +521,30 @@ class FlexsplineHobber extends MachineAssembly {
       [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 55.0}], ["outboardLocknut", "outboardInnerSpacer", "YscaleHead"], [{joint: "X", value: HobberXLayout.RETRACT}]));
     out.push(ServiceRemoval("spindleCartridgeWithdrawal", cartridgeMembers(),
       [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 180 + 60}], ["spindle/belt", "outboardLocknut", "outboardInnerSpacer", "YscaleHead"].concat(outboardMembers()), [{joint: "X", value: HobberXLayout.RETRACT}]));
-    // The X screw and its nut leave upward, with the carriage and everything it carries lifted off the rails first: the nut block is trapped between the pad bar's
-    // full-height ends and the deck, and the nut's flange cannot pass the block's bore. The screw first slides back until its front journal is out of the BF12.
-    var stack = below("Xbridge").concat(["Xbridge"]).filter(id -> id != "Xnut");
+    // The flange is motor-side. Release the nut flange, motor and BK12;
+    // the BF12 stays and the barrel slides through the stationary nut block.
+    var x = HobberDrives.x();
+    var rearward = HobberXLayout.front().bedRear - (x.axis.start[0] - x.length) + SERVICE_CLEARANCE;
     out.push(ServiceRemoval("xScrewWithdrawal", ["Xscrew", "Xcoupling", "Xnut"],
-      [{direction: worldDir(1, 0, 0), distance: 25.0}, {direction: worldDir(0, 0, 1), distance: 130.0}],
-      ["Xmotor", "Xmotor-shaft", "Xfixed", "XfloatingRing"].concat(stack).concat(HobberChipCover.fixedMembers()), []));
+      [{direction: worldDir(1,0,0), distance: rearward}],
+      ["Xmotor", "Xmotor-shaft", "Xfixed", "XfloatingRing"], []));
+    var stack = below("Xbridge").concat(["Xbridge"]).filter(id -> id != "Xnut");
     out.push(ServiceRemoval("xChipGuardWithdrawal",HobberChipCover.fixedMembers(),
       [{direction:worldDir(0,0,1),distance:100.0}],stack,[]));
+    var head = below("swivelAdapter").concat(["swivelAdapter"]).filter(id -> id != "Ymotor" && id != "Ymotor-shaft");
+    var retract = [{joint:"X",value:HobberXLayout.RETRACT}];
+    // Free the under-deck foot, lift it above the deck, then move the
+    // C-profile clear of the head. Left/right shields leave to their own side.
+    for (side in [-1,1]) out.push(ServiceRemoval(side<0?"zLeftGuardWithdrawal":"zRightGuardWithdrawal",
+      [side<0?"ZcoverLeft":"ZcoverRight"],
+      [{direction:worldDir(-1,0,0),distance:19.0}, {direction:worldDir(0,0,1),distance:24.0},
+       {direction:worldDir(1,0,0),distance:4.0}, {direction:worldDir(0,side,0),distance:200.0}],side>0?["Ymotor","Ymotor-shaft"]:[],retract));
+    // Keep the head on the actuator: the adapter output screws are buried
+    // behind the swivel plate. Release the saddle from its blocks and nut
+    // block, and support the disconnected scale head on the fixed scale.
+    out.push(ServiceRemoval("erobWithSaddle",["Zplate","swivel/housing","swivel/output","ZscaleArm"].concat(head),
+      [{direction:worldDir(-1,0,0),distance:60.0}],HobberChipCover.zMembers().concat(["Ymotor","Ymotor-shaft"]),retract));
     return out;
-  }
-
-  /** The removals tried as the procedure a technician would follow, which do not clear as built: each is swept on its own and reported with the part that blocks it. */
-  public function serviceTries():Array<DesignRequirement> {
-    var away = (d:Array<Float>) -> [for (c in d) -c];
-    var xBack = away(axisOf("Xmotor", 0, 0, 1));
-    var head = below("swivelAdapter").concat(["swivelAdapter"]);
-    return [
-      // The X screw out of the rear with its nut (the motor and the BK12 off): the nut's flange is on the block's front face.
-      ServiceRemoval("xScrewRearward", ["Xscrew", "Xcoupling", "Xnut"], [{direction: xBack, distance: 260 + 20}], ["Xmotor", "Xmotor-shaft", "Xfixed", "XfloatingRing"], []),
-      // The same with the carriage at its rear stop and the block off the carriage with its screws.
-      ServiceRemoval("xScrewWithBlock", ["Xscrew", "Xcoupling", "Xnut", "XnutBlock"], [{direction: xBack, distance: 260 + 20}], ["Xmotor", "Xmotor-shaft", "Xfixed", "XfloatingRing"], []),
-      // The eRob actuator out of the Z saddle's pocket from behind, with the whole head off the output flange.
-      ServiceRemoval("erobRearward", ["swivel/housing", "swivel/output"], [{direction: xBack, distance: 100}], head, []),
-      // The Z saddle with the actuator moved forward off its four blocks (the head off): the nut block hangs on the nut, whose barrel is in the way.
-      ServiceRemoval("erobWithSaddle", ["Zplate", "swivel/housing", "swivel/output", "ZnutBlock", "ZscaleArm"], [{direction: worldDir(-1, 0, 0), distance: 60}], head, [])
-    ];
   }
 
   /** The pairs of members the hobbing process brings together: the hob in the cup's band. */

@@ -12,7 +12,7 @@ No Haxe run is needed. Values mirror the model; where it exports no value the co
 hardcoded below with its source:
   lengths      FlexsplineHobber.hx: X = HobberXLayout.front().screwLength (260, LAYOUT_REPORT.json),
                Z = HobberZLayout.SHAFT_LENGTH (420), Y = HobberYLayout.SCREW_LENGTH (170)
-  nut station  X = screwStart 450 - NUT_DATUM 250 = 200; Z = HobberZLayout.NUT_STATION (312);
+  nut station  X = screwStart 450 - motorward nut origin 213.5 = 236.5; Z = HobberZLayout.NUT_STATION (312);
                Y = HobberYLayout.NUT_STATION (100). Station = nut body centre from the
                fixed-end face; the model's flange is on the floating-end side of the body
                (body 35 + flange 10, BallNut).

@@ -4,7 +4,7 @@ Builds the quote package for the hobber's made parts that go to a CNC shop or a 
 with a `ManufacturingRoute` facet (FRAME_PLAN H8). The exporter builds the installed machine and exports its actual parts and joint-derived holes; `machined_package.py` makes the drawings, tables and checks from its output.
 
 ```sh
-cd /media/joao/DATA1/materia-hobber-head
+# Run from the repository root in your task worktree.
 export HAXEON_COMPILER_SERVER=0; ulimit -s 65536
 # the motor mounts' reference STEP (HZMotion) must be installed: build/suppliers/hzmotion, or MATERIA_HZMOTION_ROOT
 HL=machinekit/examples/flexspline-hobber/supplier-packages/machined
@@ -44,6 +44,8 @@ hobber member means adding it there.
 The P2 export also includes the installed outboard housing, floating sleeve, M36x1 gland, rear cap and ground inner spacer. Their separate routes preserve the indicated housing interface, matched bearing retention and thermal float. Bolt and dowel tables are derived from joints; the gland's two blind pin-spanner holes are functional tool features. See `b-align-outboard` for indication and pinning.
 
 The P4 export adds nine chip shields: eight cut and formed 2 mm steel sheets (inside R2) and one flat rear lid. Routes carry thickness, bend count and radius separately from CNC setups. The STEP is the finished formed shape, not an unfolded blank; the sheet shop must develop the blank using its tooling and bend allowance. No welding. The Z saddle has two 6.5 mm-deep counterbores for its nut-block screw heads, keeping them clear of the guards.
+
+P5 installs the X nut block with its tapped flange face toward the motor; the carriage interface remains at X232.5..248.5 mm. The nut and screw withdraw rearward with the block and chip guards retained; see the generated `x-service-screw` procedure.
 
 ## What is written
 

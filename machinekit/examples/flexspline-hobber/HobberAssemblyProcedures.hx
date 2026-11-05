@@ -1,3 +1,4 @@
+import machinekit.design.DesignRequirement;
 import machinekit.hobbing.HobSpindle;
 import materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
 import materia.presentation.AssemblyPresentation;
@@ -174,11 +175,37 @@ class HobberAssemblyProcedures {
     steps:[
       note("bench","Preassemble the fixed X guard on the bench","Bolt the low front and high rear side sheets to their front and rear lids on the bench, with the M3 heads below the side roofs. This leaves room for the nut driver before the assembly is lowered onto the casting. Do not weld the sheet corners or the lapped height transition.",["XcoverFrontLeft","XcoverFrontRight","XcoverRearLeft","XcoverRearRight","XfrontCover","XrearCover"]),
       note("feet","Lower the guard before fitting the carriage","Set the formed feet on the X pad and fit the four joint-derived M3 through the tool ports. Use a long 2.5 mm hex key. After the carriage is fitted, front ports are reached at X retract; rear ports at X minimum. Fit the NBR plugs after tightening; their procurement envelope and oil compatibility remain assumed requirements.",["XdrivePad","XfrontCover","XrearCover","XfrontPlugLeft","XfrontPlugRight","XrearPlugLeft","XrearPlugRight"]),
-      note("moving","Fit the skirt and the Z shields to the carriage underside","Bolt the skirt's four tabs and each Z shield's two fixings to the carriage underside. These holes belong to the carriage's existing bottom milling setup; no side drilling or casting modification is needed. Keep the sheet's R2 bends and relief slots free, and keep its feet out of the carriage ribs.",["Xbridge","Xskirt","ZcoverLeft","ZcoverRight"]),
+      note("moving","Fit the skirt and the Z shields to the carriage underside","Bolt the skirt's four tabs and each Z shield's two fixings to the carriage underside. These holes belong to the carriage's existing bottom milling setup; no side drilling or casting modification is needed. Keep the sheet's R2 bends and relief slots free, and keep its feet out of the carriage ribs. The Z shields can be fitted after the saddle using the reverse z-service-erob path.",["Xbridge","Xskirt","ZcoverLeft","ZcoverRight"]),
       note("gaps","Verify the overlaps over full travel","With screws snug, set at least 2 mm running clearance and then tighten. Check the low fixed sheets at A +/-15, X limits and minimum Z. The rear skirt return has reliefs over the high side lips. Nominal end overlaps include 5 mm linear overtravel; flat side overlap is 6 mm. The Z sheets shield the offset screw and used guide region while the saddle moves behind them. Keep the existing block wipers.",["Xskirt","XfrontCover","XrearCover","ZcoverLeft","ZcoverRight"]),
       note("clean","Keep the tool ports closed","Brush chips from the lapped roofs and refit all four port plugs. These are fixed overlapping chip shields; the enclosure contains mist. No drain is declared for the flat channels, and no new casting floor or bore is implied.",["XfrontPlugLeft","XfrontPlugRight","XrearPlugLeft","XrearPlugRight"])
     ],source:Generated("hobber")
   };
+
+  public static function serviceAxes(machine:FlexsplineHobber):Array<Procedure> {
+    var module:Array<String> = [], xStroke=0.0;
+    for (r in machine.serviceRemovals()) switch r {
+      case ServiceRemoval("erobWithSaddle", members, _, _, _): module = members;
+      case ServiceRemoval("xScrewWithdrawal", _, steps, _, _): xStroke=steps[0].distance;
+      default:
+    }
+    var kg = Math.round(HobberJointLoads.massOf(machine,module)*100)/100;
+    return [
+      {id:"x-service-screw",label:"X: withdraw screw and nut rearward",kind:Service,start:Assembled,steps:[
+        note("park","Park and isolate X","Park X at its initial 45 mm position, stop and isolate the axes. Leave the X carriage and chip shields installed. Provide rear workspace for the " + xStroke + " mm withdrawal stroke.",["Xscrew","Xnut","XnutBlock"]),
+        note("release","Release the rear drive and nut flange","Remove the X servo and shaft stub, BK12 motor bracket/fixed support and BF12 retaining ring; the BF12 stays in place. Support the screw. Through the rear channel opening, use a long AF4 key (at least 400 mm reach, shop tool requirement) to remove the joint-derived M5 nut-flange screws. The nut block stays bolted and pinned to the carriage.",["Xmotor","Xfixed","XfloatingRing","Xnut","XnutBlock"]),
+        note("withdraw","Slide the screw, coupling and nut rearward","Draw the screw, coupling and nut " + xStroke + " mm toward the rear. The motor-side flange leaves directly, while the nut barrel passes through the stationary block. Keep the nut on the screw or fit its transfer tube; do not spill the recirculating balls. The declared swept path leaves all chip shields installed.",["Xscrew","Xcoupling","Xnut"]),
+        note("refit","Refit and recheck the axis","Reverse the path, refit the BF ring and pinned support, tighten the nut flange and drive fasteners, then check free running, end reserves and encoder zero before restoring motion.",["Xscrew","Xnut","Xfixed"])
+      ],source:Generated("hobber")},
+      {id:"z-service-erob",label:"Z: remove the saddle, eRob and head as a module",kind:Service,start:Assembled,steps:[
+        {id:"park",title:"Park for module removal",instruction:"Park X at retract, centre Y and A, and set Z to joint zero. Stop and isolate drives; retain the Z brake. Clear the work area.",highlight:[select("Zplate")],action:SetJoints([{joint:"X",value:110.0},{joint:"Y",value:0.0},{joint:"Z",value:0.0},{joint:FlexsplineHobber.A,value:0.0}])},
+        note("ymotor","Remove the Y servo first","Withdraw the Y servo and shaft stub along their already declared axial path. Its connector envelope blocks the right Z shield's first forward move; keep the servo off for module removal.",["Ymotor","Ymotor-shaft","ZcoverRight"]),
+        note("guards","Remove the two Z shields","Unbolt each shield's two underside foot screws and support the loose sheet. Move it 19 mm forward, 24 mm upward, 4 mm back, then 200 mm outwards to its own side. This frees the under-deck foot and clears the head before sideways withdrawal. Fit by reversing this path after the Z saddle is assembled.",["ZcoverLeft","ZcoverRight"]),
+        note("support","Support the complete module","The selected module weighs " + kg + " kg from the installed parts. Support the saddle and head with a rated hoist and qualified shop slings/fixture before releasing it. Lifting arrangement and load balance remain shop assumptions to qualify; no unmodelled lifting holes are implied. Disconnect A/B/Y cables, feedback and coolant services.",module),
+        note("release","Leave the nut block and guide blocks on the machine","Support the Z scale reading head on the fixed scale, unbolt it from its arm, and secure it without loading its cable. Release the Z nut block's base screws and dowels from the saddle, leaving nut and block on the braked screw. Remove the saddle-to-guide-block screws; all four blocks stay on the rails. Keep the eRob, adapter and complete head bolted to the saddle: the adapter output screws are buried behind the swivel plate.",["Zplate","ZnutBlock","ZscaleArm","ZscaleHead"]),
+        note("withdraw","Draw the saddle and head forward together","With the module supported, move the saddle, eRob and complete head 60 mm forward. The declared path retains the column, rails, nut block, fixed scale and reading head. Service the actuator on the bench, reversing the head assembly order as needed. Refit and indicate the saddle, reconnect the scale head, refit the shields along their reverse paths and recheck axis zero before operation.",module)
+      ],source:Generated("hobber")}
+    ];
+  }
 
   public static function build(machine:FlexsplineHobber):Array<Procedure> {
     var result:Array<Procedure> = [];
@@ -187,6 +214,7 @@ class HobberAssemblyProcedures {
     result.push(fitBt30Arbor());
     result.push(alignOutboard());
     result.push(fitChipGuards());
+    result = result.concat(serviceAxes(machine));
     result.push(setRails("X", ["railXLeft", "railXRight"]));
     result.push(setRails("Z", ["railZLeft", "railZRight"]));
     result.push(setRails("Y", ["railYLeft", "railYRight"]));
