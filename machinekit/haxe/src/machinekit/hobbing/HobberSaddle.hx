@@ -274,9 +274,10 @@ class HobberSaddle extends MachineComponent {
   function derivedHoles():Array<machinekit.component.ManufacturingRoute.RouteHole> {
     var n = 0;
     return [for (cut in machinedCuts()) {
-      var p = F.transformPoint(cut.frame, cut.x, cut.y, cut.from), q = F.transformVector(cut.frame, 0, 0, 1);
+      // The tool starts 1 mm outside the mating plane (and ends 1 mm past the far face for clearance holes): the hole is from the plane.
+      var mouth = Math.max(cut.from, 0.0), p = F.transformPoint(cut.frame, cut.x, cut.y, mouth), q = F.transformVector(cut.frame, 0, 0, 1);
       ({id: "J" + (++n), kind: cut.kind == "counterbore" ? "bore" : cut.kind ?? "clearance", thread: cut.kind == "counterbore" ? null : cut.thread, diameter: cut.diameter,
-        nominal: cut.diameter, fit: null, depth: cut.to - cut.from, position: [p.x, p.y, p.z], direction: [q.x, q.y, q.z]} : machinekit.component.ManufacturingRoute.RouteHole);
+        nominal: cut.diameter, fit: null, depth: cut.to - mouth - (cut.kind == "tapped" ? 0.0 : 1.0), position: [p.x, p.y, p.z], direction: [q.x, q.y, q.z]} : machinekit.component.ManufacturingRoute.RouteHole);
     }];
   }
 

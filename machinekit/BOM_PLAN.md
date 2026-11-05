@@ -611,6 +611,26 @@ Not done yet (open, in order):
    `geometry()` with `machined(...)`. Replace each hand-placed screw by the derived list and delete the hand placement in the
    same change.
 
+Fourth slice (2026-11-05, branch `hobber-bolts`): hobber adoption, item 4 above, mostly done.
+
+- The hobber calls `deriveFasteners()` at the end of its constructor: 36 joints, 150 screws (M4x10 32, M4x16 24, M5x12 12, M5x16 18, M5x40 2, M6x16 20,
+  M6x20 16, M6x30 22, M6x40 4), before: none. Strict integrity sweep 0 findings, `tests/hobber` 2138, `tests/hobbing` 1044, joint-fasteners and the
+  machined package pass (its hole tables now carry the derived holes: `HobberSaddle.derivedHoles`).
+- Library: `CastInsert.fasteningFaces` (tapped receiving faces from the insert's own threaded holes, one per entry plane and thread size: the
+  rails' and the pads' screws check against the pattern `InsertMountPattern` already cut; it does not cut a second set), `MotorMount` (`motor` tapped,
+  `foot` clamped where the CAD measured the bolt seat), `NutBlock.base` (tapped M6), `ScrewSupportUnit.screwSize` (a machine may bolt a foot with
+  a smaller screw than the hole passes), `MachinedCut.kind/thread` (hole tables). `JointFasteners`: among several receiving faces in a plane the one the
+  pattern lands on pairs; spacing is checked between joints only (a catalogue pattern, the BK12 foot's M6 holes 13 mm apart, is the part's own).
+- Hobber: carriage, Z saddle and Y saddle are `clampedToSuit` on the guide blocks (counterbored from the far face); nut blocks bolt to the carriage and Z
+  saddle (`withBlockBolts` deleted); pads and Y brackets are drilled to suit under the BK12/BF12 feet (only the dowels stay hand-cut); the swivel plate
+  takes the Y rails; the spindle seat and the Y saddle's plate carry the four M8 (seat holes moved to z -38/46 for the 1.5 d edge rule). Findings that changed
+  the design: the Y floating bracket is 59.2 mm long (-114.6..-55.4) and the BF12 there takes M5; the coolant port moved to y 59..69.5 off the Y block's driver access.
+  The X carriage's rear block screws and its nut-block bolts are under the column: the integrity run lists the column as `removable` (screws fitted before the column is lowered).
+- Still hand-cut or not derived (library or design gaps): dowels (no dowel concept in `BoltedFace`), the Y nut seat (its block bolts would enter from under the
+  bar where the Y saddle edge and the swivel plate stand: needs a redesign, e.g. bolts from the block side), pads to inserts (no bolt positions on the pads),
+  Y brackets to the swivel plate, swivel plate / adapter ring / eRob output / Z saddle to eRob (the eRob declares no faces), scale housings and heads,
+  the cradle (other session: the motor face is declared; the cradle floor's holes at y 215 are 7 mm from the seat's end, short of the 12 mm M8 edge rule).
+
 ### B7 — Rollout and hard gate
 - Done in `fa1f1534f`. The full gate passed 11/24 shards with no new
   failure or exception compared with B6. The only differences from the

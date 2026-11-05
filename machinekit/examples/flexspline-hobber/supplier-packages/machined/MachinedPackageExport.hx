@@ -203,13 +203,19 @@ class MachinedPackageExport {
     sys.FileSystem.createDirectory(dir);
     sys.FileSystem.createDirectory(dir + "/step");
     var parts:Array<Dynamic> = [];
+    // The parts of the built machine: the holes its bolted joints derive (BOM_PLAN F1) are cut into them.
+    var machine = new FlexsplineHobber();
+    function member(designation:String):machinekit.component.MachineComponent {
+      for (entry in machine.components()) if (entry.component.designation == designation) return entry.component;
+      throw "FlexsplineHobber has no part " + designation;
+    }
     for (design in DESIGNS) {
-      var saddle = new HobberSaddle(design);
+      var saddle = cast(member("HOBBER-" + design), HobberSaddle);
       parts.push(exportPart(dir + "/step", saddle, saddle.holes(), 1, design.substr(3) + ", " + ManufacturingRoute.of(saddle).process().split(",")[0]));
       Sys.println("exported " + saddle.designation);
     }
     for (axis in HobberDrives.all()) {
-      var block = HobberDrives.nutBlock(axis, new BallNut());
+      var block = cast(member(HobberDrives.nutBlock(axis, new BallNut()).designation), NutBlock);
       parts.push(exportPart(dir + "/step", block, block.holes(), 1, "Nut block, " + axis.id + " axis"));
       Sys.println("exported " + block.designation);
     }

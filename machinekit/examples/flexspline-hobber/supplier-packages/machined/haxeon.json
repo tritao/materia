@@ -5,11 +5,21 @@
   },
   "entry": "MachinedPackageExport",
   "sourceRoots": [
-    "."
+    ".",
+    "../.."
   ],
   "dependencies": {
     "machinekit": {
       "path": "../../../.."
+    },
+    "toolpathkit-motion": {
+      "path": "../../../../../toolpathkit/motion"
+    },
+    "stockkit": {
+      "path": "../../../../../stockkit"
+    },
+    "camkit": {
+      "path": "../../../../../camkit"
     }
   },
   "target": "host",
