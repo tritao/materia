@@ -36,7 +36,7 @@ class HobberFrameChecks {
         {member: "blockYRight", fastened: ["YnutSeat"]}, {member: "blockYRightFront", fastened: ["YnutSeat"]},
         {member: "Ynut", fastened: ["Yplate"]},
         // The Y scale head's rear screw is driven through the outboard support's arm: the head is screwed on before the outboard support and its bearing go on.
-        {member: "outboard", fastened: ["Yplate"]}, {member: "outboardBearing", fastened: ["Yplate"]},
+        {member: "outboardCarrier", fastened: ["YscaleHead"]}, {member: "outboard", fastened: ["Yplate"]}, {member: "outboardBearing", fastened: ["Yplate"]},
         // The Z scale head's screws are driven from the arm's inner face, where the eRob housing will stand: the head is screwed on before the actuator is fitted.
         {member: "swivel/housing", fastened: ["ZscaleArm"]}]};
     if (!sweep) options.sweepStates = [];
@@ -267,6 +267,20 @@ class HobberFrameChecks {
   }
 
 
+  /** BT30 retention/load interface. Material allowables and drawbar force are
+   * explicit assumptions, not ratings inferred from the cartridge listing. */
+  public static function bt30(machine:FlexsplineHobber):Array<String> {
+    var keyBearing = 240.0 * 3 * 2 * 9.5 / 1000, keyRoot = 600.0 / Math.sqrt(3) * 3 * 5 * 9.5 / 1000;
+    var capacity = Math.min(keyBearing, keyRoot), designTorque = 1.6, jamTorque = machine.spindle.motor.rating.peakTorque;
+    if (capacity / designTorque < 1.5 || capacity / jamTorque < 1.2) throw "BT30 arbor face key fails torque reserve";
+    if (machine.spindle.maxSpeed() * 60 / (2 * Math.PI) > machinekit.hobbing.Bt30SpindleData.MAX_RPM) throw "B exceeds bought BT30 speed limit";
+    if (machine.hob.parameterNumber("faceKeyWidth") < 5.2 || machine.hob.parameterNumber("faceKeyDepth") < 2.2) throw "hob end slot does not clear arbor key";
+    if (machine.billOfMaterials().quantity(machinekit.hobbing.Bt30SpindleData.DESIGNATION) != 1) throw "BT30 purchase is not unique";
+    return ['BT30 arbor: face-key bearing capacity ${Math.round(keyBearing * 100) / 100} N m, root ${Math.round(keyRoot * 100) / 100} N m '
+      + '(240 MPa bearing, 600/sqrt(3) MPa shear ASSUMED), factors ${Math.round(capacity / designTorque * 10) / 10} design / ${Math.round(capacity / jamTorque * 100) / 100} motor peak; '
+      + 'MAS taper-only location, M12 pull stud; bought gripper retention force and stud-head outline require confirmation.'];
+  }
+
   /**
    * The B spindle belt drive (head redesign): the belt's pull on the cartridge's rear bearing, and the first mode of the servo on its
    * cradle against the hob's tooth-pass frequency over the hob speed range. ESTIMATES from the model's masses and sections with stated joint
@@ -284,15 +298,11 @@ class HobberFrameChecks {
     var rm = spindle.motorPulley.pitchDiameter / 2000, rs = spindle.spindlePulley.pitchDiameter / 2000, c = HobSpindle.centres() / 1000;
     var fRated = rating.ratedTorque / rm, fPeak = rating.peakTorque / rm, t0 = HobSpindle.pretension(rating.peakTorque, spindle.motorPulley.pitchDiameter);
     var radial = 2 * t0 * Math.cos(Math.asin((rs - rm) / c));
-    var pulleyZ = HobSpindle.pulleyFront(rating.shaftLength) - HobSpindle.PULLEY_WIDTH / 2, tailZ = 7.5, pairZ = HobSpindle.FRONT_BEARING_Z;
-    var overhang = tailZ - pulleyZ, span = pairZ - tailZ, tail = radial * (1 + overhang / span), pair = radial * overhang / span;
-    var c0 = 7800.0, dyn = 14800.0, nTop = spindle.maxSpeed() * 60 / (2 * Math.PI);
-    var l10 = 1e6 / (60 * nTop) * Math.pow(dyn / tail, 3);
     lines.push('B belt: HTD5M ${spindle.motorPulley.teeth}T/${spindle.spindlePulley.teeth}T, ${r(spindle.belt.length, 1)} mm belt on ${r(c * 1000, 1)} mm centres, motor turns ${r(spindle.ratio, 3)}x the hob; tangential force ${r(fRated)} N rated / ${r(fPeak)} N motor peak, '
-      + 'pretension ${r(t0)} N per strand (slack side kept at 25 % of the peak force: assumed rule, belt maker to confirm), tight side ${r(t0 + fPeak / 2)} N at peak; '
-      + 'set by the jack screw: free span ${r(c * 1000, 0)} mm rings at ${r(HobSpindle.spanFrequency(t0), 0)} Hz (${HobSpindle.BELT_MASS_PER_M} kg/m assumed), needs ${r(HobSpindle.tensioningTravel(t0, spindle.belt.length), 2)} mm more centres than slack, slots give +-${HobSpindle.TENSION_TRAVEL} mm');
-    lines.push('Cartridge rear radial load (belt pull): ${r(radial)} N on the pulley, ${r(overhang, 1)} mm behind the 6205 tail bearing: tail bearing ${r(tail)} N (${r(100 * tail / c0, 1)} % of C0 ${c0} N, L10 ${Math.round(l10 / 1000) * 1000 / 1000}k h at ${Math.round(nTop)} rpm; SKF 6205 ratings C ${dyn} N, C0 ${c0} N assumed from the maker), '
-      + 'opposite ${r(pair)} N on the angular-contact pair; the cartridge must be a belt-drive cartridge rated for at least ${Math.ceil(radial * 1.5 / 50) * 50} N radial at the pulley (1.5 x the pull)');
+      + 'pretension ${r(t0)} N per strand (assumed rule), tight side ${r(t0 + fPeak / 2)} N at peak; '
+      + 'free span rings at ${r(HobSpindle.spanFrequency(t0), 0)} Hz (${HobSpindle.BELT_MASS_PER_M} kg/m assumed), tension travel ${r(HobSpindle.tensioningTravel(t0, spindle.belt.length), 2)} mm; slots +-${HobSpindle.TENSION_TRAVEL} mm');
+    lines.push('Purchased BT30 cartridge: ${r(radial)} N radial belt pull; require ${Math.ceil(radial * 1.5 / 50) * 50} N at the pulley. Allowable load unpublished (ASSUMED acceptance requirement); no life calculation from invented internal bearing positions/ratings.');
+    var nTop = spindle.maxSpeed() * 60 / (2 * Math.PI);
     // The servo group on its cradle.
     var ids = ["spindle/motor", "spindle/motorShaft", "spindle/motorPulley", "spindle/motorEncoder"], mass = 0.0, mx = 0.0, my = 0.0, mz = 0.0, cradle = 0.0;
     for (m in machine.components()) {
@@ -442,8 +452,8 @@ class HobberFrameChecks {
 
   /**
    * The spindle seat against the cartridge (FRAME_PLAN R2): in the housing's own z (tool face at 180, encoder stator at 0..-14), the seat's
-   * bore must lie inside the housing's clamping length (`SpindleHousing.CLAMP_FROM..CLAMP_TO`), cover the angular-contact pair's outer rings
-   * (129..163), and carry its clamp screws inside that length. Returns the line; throws otherwise.
+   * bore must lie inside the assumed cartridge clamp land (`SpindleHousing.CLAMP_FROM..CLAMP_TO`) and carry its clamp screws inside that
+   * length. Internal bearing seats are part of the purchase, not an invented housing design. Returns the line; throws otherwise.
    */
   public static function spindleSeat(machine:FlexsplineHobber):Array<String> {
     var poses = machine.solvedPoses(), housing = poses.get("spindle/housing"), back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
@@ -452,9 +462,9 @@ class HobberFrameChecks {
     var a = zOf(seat.y0), b = zOf(seat.y1), from = Math.min(a, b), to = Math.max(a, b);
     var screws = [for (y in seat.clampYs) zOf(y)];
     var lines = ['Spindle seat grips housing z ${Math.round(from * 10) / 10}..${Math.round(to * 10) / 10} (${Math.round((to - from) * 10) / 10} mm) of the clamping length ${SpindleHousing.CLAMP_FROM}..${SpindleHousing.CLAMP_TO} (assumed); ' +
-      'bearing pair 129..163; clamp screws at z ${screws.join(", ")}; rear face and the encoder stator (z 0..-14) and the nose and gland flange 170..186 are not gripped'];
+      'BT30 cartridge; clamp screws at z ${screws.join(", ")}; rear encoder and front flange at 170..180 stay outside the clamp (axial envelope ASSUMED)'];
     if (from < SpindleHousing.CLAMP_FROM - 1e-6 || to > SpindleHousing.CLAMP_TO + 1e-6) throw "spindle seat leaves the housing's clamping length: " + lines.join("; ");
-    if (from > 129 || to < 163) throw "spindle seat does not cover the bearing pair: " + lines.join("; ");
+    if (to - from < 120) throw "spindle clamp engagement below the assumed 120 mm requirement";
     for (z in screws) if (z < from || z > to) throw "spindle seat clamp screw outside the seat: " + lines.join("; ");
     return lines;
   }
@@ -543,7 +553,7 @@ class HobberFrameChecks {
     var presentation = materia.presentation.Presentations.assembled(machine.definition(), -1.1, 0.35, "hobber");
     presentation.procedures = HobberAssemblyProcedures.build(machine);
     materia.presentation.PresentationCodec.validate(machine.definition(), presentation);
-    var lines = sizing(machine).concat(scales(machine)).concat(swivelLoad(machine)).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)).concat(spindleDrive(machine)).concat(spindleRelief(machine)), errors = newErrors(machine, sweep);
+    var lines = bt30(machine).concat(sizing(machine)).concat(scales(machine)).concat(swivelLoad(machine)).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)).concat(spindleDrive(machine)).concat(spindleRelief(machine)), errors = newErrors(machine, sweep);
     for (line in lines) Sys.println(line);
     if (errors.length > 0) throw 'hobber strict integrity: ${errors.length} findings\n  ' + errors.join("\n  ");
     return presentation.procedures.length + lines.length + 1;
@@ -627,6 +637,7 @@ class HobberFrameChecks {
     if (args.indexOf("scales") >= 0) for (line in scales(machine)) Sys.println(line);
     if (args.indexOf("swivel") >= 0) for (line in swivelLoad(machine)) Sys.println(line);
     if (args.indexOf("zoffset") >= 0) for (line in zOffsetMoments(machine)) Sys.println(line);
+    if (args.indexOf("bt30") >= 0) for (line in bt30(machine)) Sys.println(line);
     if (args.indexOf("spindleseat") >= 0) for (line in spindleSeat(machine)) Sys.println(line);
     if (args.indexOf("roundtrip") >= 0) {
       roundTrip(machine);

@@ -29,72 +29,16 @@ TOL = 1e-6
 # Each feature row: (diameter or None, axial span or None, feature, requirement). A row with
 # a diameter must match a cylinder of that diameter in the model section over that span.
 PARTS = {
-    "shaft": dict(
-        drawing="HS-01", title="Spindle shaft", qty="1",
-        material="38CrMoAlA (34CrAlNi7-10) quenched and tempered 28-32 HRC, stress relieved; gas nitrided "
-                 "≥ 850 HV0.3, case 0.3 mm, on journals, taper and nose; ground after nitriding",
-        rows=[
-            (20, (-36, 0), "Pulley and encoder stub", "Ø20 h5 (encoder rotor 0 to -14, HTD5M 40T pulley -16 to -34, keyed or taper-bushed); radial runout 0.003 to A-B; Ra 0.4"),
-            (25, (0, 15), "Rear journal (datum B), floating 6205", "Ø25 k5 (+0.011/+0.002); roundness 0.0015; Ra 0.4"),
-            (25, (15, 122), "Between journals", "Ø25, may be relieved to Ø24.8; ISO 2768-m"),
-            (None, (122, 129), "Locknut thread", "M25 × 1.5-4h for a KM5-size precision locknut; thread runs out before the front journal"),
-            (25, (129, 163), "Front journal (datum A), matched angular-contact pair",
-             "Ø25 +0.003/0, fitted to the bearing bores for 0-0.003 interference; roundness 0.001; "
-             "cylindricity 0.0015; Ra 0.2"),
-            (30, (163, 170), "Bearing shoulder", "face at z 163 perpendicular to A within 0.002; Ra 0.4"),
-            (40, (170, 180), "Nose", "Ø40 h5 (labyrinth to the Ø42 gland bore); front face axial runout 0.002 "
-                                     "to A-B, Ra 0.4"),
-            (None, (160, 180), "Arbor taper socket", "1:5 on diameter, Ø20 at the face; AT3; contact ≥ 85 % "
-                                                    "with the arbor (blue check); radial runout 0.002 to A-B; "
-                                                    "Ra 0.2. Finish-grind in its own bearings preferred"),
-            (None, None, "Drive pins", "2 × Ø4 m6 dowels pressed on Ø28 PCD (on the section plane), 2 mm proud"),
-            (None, None, "Arbor screw holes", "4 × M4 × 10 deep on Ø32 PCD, at 45° to the pins"),
-            (None, None, "Balance", "Rotor (shaft, encoder rotor, pulley, arbor) G1 at 4000 rpm"),
-        ]),
-    "housing": dict(
-        drawing="HS-02", title="Spindle housing", qty="1",
-        material="C45 (1.0503) normalised; stress relieved after rough machining. All bearing bores and "
-                 "the outside register finished in one setting",
-        rows=[
-            (52, (0, 15), "Rear bearing bore, 6205 floating", "Ø52 H6 (+0.019/0) for axial float; coaxial to A "
-                                                             "within 0.004; Ra 0.8"),
-            (62, (15, 120), "Clearance bore", "Ø62, ISO 2768-m"),
-            (44, (120, 129), "Shoulder bore", "Ø44, ISO 2768-m (clears the Ø38 locknut)"),
-            (62, (129, 163), "Front bearing bore (datum A)", "Ø62 JS5 (±0.0065); roundness 0.002; cylindricity "
-                                                             "0.002; Ra 0.4"),
-            (62, (163, 180), "Gland spigot bore", "Ø62 H6"),
-            (None, (129, 129), "Bearing shoulder face", "perpendicular to A within 0.002; Ra 0.8"),
-            (80, (0, 180), "Outside register", "Ø80 g6, coaxial to A within 0.005 (seat for the machine's clamp ring and bracket)"),
-            (None, None, "End faces", "front face perpendicular to A within 0.005; 4 × M4 × 10 deep on Ø72 PCD "
-                                      "at 45°, both ends"),
-        ]),
-    "bearingRetainer": dict(
-        drawing="HS-04", title="Front gland (bearing clamp and labyrinth)", qty="1",
-        material="C45 (1.0503)",
-        rows=[
-            (62, (163, 180), "Spigot", "Ø62 g5 in the housing's H6 bore; end face at z 163 clamps the bearing "
-                                       "outer rings: perpendicular within 0.003"),
-            (80, (180, 186), "Flange", "4 × Ø4.5 on Ø72 PCD at 45°; grind the spigot length at assembly to "
-                                       "leave 0.02-0.05 mm before the flange touches the housing"),
-            (42, (163, 186), "Bore", "Ø42 H7 round the Ø40 nose: 1 mm radial labyrinth gap; add a flinger "
-                                     "groove and drain at the bottom"),
-        ]),
     "arbor": dict(
-        drawing="HS-06", title="Hob arbor", qty="1 (+1 spare)",
-        material="42CrMo4 (1.7225) hardened 52-56 HRC, or 1.2379 58-60 HRC; ground all over the functional "
-                 "surfaces; stabilised",
+        drawing="HS-BT30-01", title="BT30 hob arbor", qty="1 (+1 spare)",
+        material="42CrMo4 hardened 52-56 HRC, stabilised; grind functional faces after hardening (design requirement)",
         rows=[
-            (None, (-20, 0), "Taper", "1:5 on diameter, Ø20 at the face; AT3; ≥ 85 % contact with the spindle "
-                                      "socket; Ra 0.2"),
-            (40, (0, 4), "Flange", "face perpendicular to the taper within 0.002; 2 × Ø4 H7 pin holes on Ø28; "
-                                   "4 × Ø4.5 on Ø32 PCD at 45°"),
-            (16, (4, 153), "Hob seat", "Ø16 h4 (0/-0.005) for the Ø16 H5 hob bore; radial runout 0.002 to the "
-                                       "taper; cylindricity 0.002; Ra 0.2"),
-            (15, (153, 175), "Outboard journal", "Ø15 k5 for the 6002 inner ring of the floating outboard "
-                                                "support; coaxial to the taper within 0.002"),
-            (None, None, "Hob drive and clamping (to add)", "drive key for the hob's DIN 138 end slot on the "
-                                                           "flange side, ground spacer sleeve, and an M16 × 1 "
-                                                           "clamp nut: dimensions follow the hob maker's slot drawing"),
+            (None, (-48.4, 0), "BT30 shank", "MAS BT30, gauge diameter 31.75; 7/24 diametral taper, AT3, Ra 0.2; blue-check in the purchased spindle"),
+            (46, (10.2, 22), "Holder flange", "BT30 flange 2..22, 20 thick; drive slots 16.1 wide, floor 16.3 from axis; axial dog engagement 10 ASSUMED. Taper-only location"),
+            (16, (42.1, 153), "Hob seat / nut thread", "Hob seat 40..80: diameter 16 h4, runout 0.002 to taper; M16x1 thread at 80..90, nut 8 thick"),
+            (15, (153, 175), "Outboard journal", "Diameter 15; coaxiality 0.002 to taper; finish/grip to be matched to P2 support"),
+            (None, None, "Face key", "Integral end-face dog 5 wide x 3 radial x 2 axial. Assumed slot 5.2 wide x 2.2 deep; confirm with hob maker"),
+            (None, (-48.4, -28.4), "Pull stud", "M12; 45 degree head selected to suit bought gripper; detailed head geometry assumed pending maker drawing"),
         ]),
 }
 BOUGHT = {
@@ -104,19 +48,18 @@ BOUGHT = {
     "spindlePulley": "HTD5M timing pulley 40T, 18 wide, bore Ø20 (on the cartridge stub; to be supplied or specified by the maker)",
     "belt": "HTD5M timing belt, 15 wide, 450 mm (90 teeth, 450-5M); ours",
     "motorEncoder": "Motor's own encoder (ours)",
-    "frontBearing": "Angular-contact bearing 7305 size (25 × 62 × 17), P4, 25° contact; matched pair, back to back",
-    "rearBearing": "Angular-contact bearing 7305 size (25 × 62 × 17), P4, 25° contact; matched pair, back to back",
-    "tailBearing": "Deep groove ball bearing 6205 (25 × 52 × 15), P5 or better; floating",
+    "housing": "Complete RobotDigg 2049 option A D80 BT30 belt spindle; 6000 rpm, HTD5M, 7008+7006 family. Axial envelope, flange and belt-load allowance ASSUMED",
+    "shaft": "Rotor, bearings and drawbar included in the cartridge purchase (not ordered separately)",
+    "pullStud": "BT30 M12 45 degree pull stud; exact head dimensions to suit the gripper (envelope assumed)",
+    "hobLocknut": "M16x1 retaining nut, 24 across flats x 8 thick (design inputs)",
     "encoder": "Absolute BiSS-C ring encoder, 19 bit, about Ø80 × 14 on the housing rear face (stator) and the shaft stub (rotor); the B master of our electronic gearbox; envelope assumed, maker to propose a catalogue part",
-    "arborScrew": "Socket head cap screw M4 × 10, 12.9 (arbor flange)",
-    "glandScrew": "Socket head cap screw M4 × 12 (gland)",
-    "bearingLocknut": "Precision bearing locknut M25 × 1.5, KM5 size (Ø38 × 7), face runout ≤ 0.003, radial locking screws",
+
 }
 GENERAL = [
     "Dimensions in mm. Untoleranced: ISO 2768-mK. Break sharp edges 0.2 unless stated.",
     "Geometry is the nominal model: the STEP files are authoritative for shape. Threads are not modelled; "
     "tapped holes are modelled at the thread major diameter.",
-    "Datums: A = front bearing journal/bore axis, B = rear journal/bore axis.",
+    "Datum A = BT30 taper axis; finished hob seat and support journal referred to A.",
     "Please state the inspection you provide (CMM report or runout/roundness measurements on the "
     "toleranced features).",
 ]
@@ -124,14 +67,13 @@ REQUIREMENTS = [
     ("Function", "Hob spindle for a gear hobbing machine, module 0.3, ISO class 5-6"),
     ("Speed", "up to 4000 rpm; normally 2000-3000 rpm; about 1 kW"),
     ("Running accuracy", "radial runout at the arbor taper and axial runout at the nose face ≤ 0.002 mm TIR"),
-    ("Bearings", "front: matched P4 angular-contact pair 7305 size (25 × 62 × 17), back to back, light "
-                 "preload; rear: 6205 floating; grease for life"),
+    ("Purchase", "RobotDigg 2049 option A D80 BT30 6000 rpm. The linked NT30 drawing is not accepted as BT30 interface evidence; unpublished packaging stays assumed"),
     ("Drive", "belt-drive cartridge: HTD5M 40T pulley on the Ø20 rear stub, driven by a 1 kW servo (80 frame, "
               "Leadshine ELM2H-1000LA80F) on a 40T pulley (1:1) beside the cartridge; the belt's radial pull on the pulley is about "
-              "450 N (quote the cartridge for at least 700 N radial at the pulley, 33 mm behind the 6205), "
+              "450 N (acceptance requirement at least 700 N radial at the pulley; allowance unpublished), "
               "motor torque up to 9.5 N·m at the spindle (1:1); a motor spindle is the upgrade path with the same seat and encoder interface"),
     ("Feedback", "19-bit absolute BiSS-C encoder on the rear face and stub: the machine's gearbox master"),
-    ("Arbor", "removable from the front: 1:5 short taper and face, held by 4 × M4; 2 pins carry torque"),
+    ("Arbor", "MAS BT30 shank and M12 pull stud; plain diameter 16 hob seat, integral end-face key, M16x1 nut, outboard journal"),
     ("Coolant", "neat cutting oil, flood and mist: labyrinth at the nose"),
 ]
 
@@ -235,8 +177,7 @@ def member(data, mid):
 def check_layout(data):
     """The fixed specifications above assume these member positions; fail if the model moved them."""
     lay = data["layout"]
-    expect = {"tailBearing": 0.0, "frontBearing": 146.0, "rearBearing": 146.0,
-              "arbor": lay["toolFace"], "encoder": 0.0}
+    expect = {"arbor": lay["toolFace"], "encoder": 0.0}
     for mid, z in expect.items():
         got = member(data, mid)["position"][2]
         if abs(got - z) > 1e-6:
@@ -247,9 +188,9 @@ def pages(data):
     made = {p["id"]: p for p in data["made"]}
     lay, motor, arbor = data["layout"], data["motor"], data["arbor"]
     overview, _ = svg({pid: placed(made[pid], 180.0 if pid == "arbor" else 0.0)
-                       for pid in ["housing", "bearingRetainer", "shaft", "arbor"]},
+                       for pid in ["arbor"]},
                       width_px=690, labels=[(-34, -50, "pulley z -16 to -34"), (1, -50, "rear datum z 0"),
-                                            (112, -50, "bearing pair z 129-163"), (186, -50, "tool face z 180")])
+                                            (112, -50, "BT30 gauge ahead"), (186, -50, "tool face z 180")])
     made_rows = [(PARTS[p["id"]]["drawing"], PARTS[p["id"]]["title"], PARTS[p["id"]]["qty"], p["step"],
                   f"{p['massKg']:.2f}") for p in data["made"]]
     made_ids = {p["id"] for p in data["made"]}
@@ -268,7 +209,7 @@ def pages(data):
 <div class="sub">{html.escape(COMPANY)} · joao@materia-expedita.pt · issued {date.today().isoformat()} ·
 generated from our machine model</div>
 <h2>Requirements</h2>{table(REQUIREMENTS)}
-<h2>Assembly section (axial, through the drive pins)</h2>{overview}
+<h2>Made arbor section (axial)</h2>{overview}
 <p class="note">Axial positions are from the housing rear datum (z 0) toward the tool face (z 180). Encoder
 z 0 to {-lay['encoderLength']:.0f}; pulley (HTD5M {lay['pulleyTeeth']}T, motor {lay['motorTeeth']}T, {lay['centres']:.1f} mm centres)
 z {lay['pulleyFront']:.0f} to {lay['pulleyFront'] - lay['pulleyWidth']:.0f}; Ø20 stub to z {lay['shaftRear']:.0f}. Servo (Leadshine ELM2H-1000LA80F or equivalent):

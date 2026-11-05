@@ -149,10 +149,21 @@ class HobberAssemblyProcedures {
     };
   }
 
+  public static function fitBt30Arbor():Procedure return {
+    id: "b-fit-bt30-arbor", label: "B: seat the BT30 arbor and secure the hob", kind: Assembly, start: Assembled,
+    steps: [
+      note("stud", "Match the pull stud and gripper", "Use the cartridge maker's M12 45-degree pull stud; verify its head and retention force. The model's stud outline and retention force are assumed. Inspect the clean taper and confirm the supplier's drawbar clamping specification before running.", ["spindle/housing", "spindle/pullStud"]),
+      note("taper", "Seat and indicate the BT30 arbor", "Clean and blue-check the BT30 taper, clamp the drawbar and indicate the ground hob seat and journal. The standard BT30 taper locates; do not force the holder flange against the spindle face. The model's 2 micrometre errors are assumed acceptance requirements.", ["spindle/shaft", "spindle/arbor"]),
+      note("hob", "Engage the face key and lock the retaining nut", "Slide the plain-bore hob onto the ground diameter 16 seat with its end slot over the integral face key. Tighten the M16x1 nut against the hob to 2000 N axial preload (ASSUMED assembly target; establish shop torque by test). Secure with medium-strength thread-locking compound and witness-mark it; verify the hob is seated and cannot turn on the arbor.", ["hob", "spindle/arbor", "spindle/hobLocknut"]),
+      note("service", "Withdraw the cartridge toward the tool", "Park X at retract, stop and isolate B, remove the belt and the outboard support with its bearing, loosen the split clamp, and draw the complete cartridge forward. Its front register cannot pass rearward through the clamp bore.", ["spindle/housing", "spindleSeat", "outboard"])
+    ], source: Generated("hobber")
+  };
+
   public static function build(machine:FlexsplineHobber):Array<Procedure> {
     var result:Array<Procedure> = [];
     for (travel in machine.travel) result.push(alignScrewSupports(travel.id, {lower: travel.lower, upper: travel.upper}));
     result.push(tensionBelt(machine));
+    result.push(fitBt30Arbor());
     result.push(setRails("X", ["railXLeft", "railXRight"]));
     result.push(setRails("Z", ["railZLeft", "railZRight"]));
     result.push(setRails("Y", ["railYLeft", "railYRight"]));

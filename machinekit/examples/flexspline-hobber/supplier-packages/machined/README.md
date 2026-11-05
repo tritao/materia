@@ -31,11 +31,13 @@ Python 3 with numpy, and Chrome or Chromium on the PATH for the PDFs; `pdftotext
 | `HOBBER-GE-Y-nut-seat` | milled from 19 mm bar, 1 setup: the seat plane (16 mm) and two key ribs 3.5 x 3 mm either side of the nut block's 20 mm base (the block is located against the screw thrust in both directions) | block |
 | `HOBBER-GE-X-scale-seat`, `HOBBER-GE-Z-scale-seat` | ground flat bar, 10 x 20, 2 M8 tapped through (the scale housing's screws) | 20 x 10 |
 | `HOBBER-GE-Z-scale-arm` | milled arm for the Z scale head, 1 setup, fine | block |
-| `HOBBER-GE-Y-saddle` | milled, 2 setups, fine (boss for the Y scale head) | block |
+| `HOBBER-GE-Y-saddle` | milled, 2 setups, fine (Ø114 forward cartridge-clearance channel; spine for the Y scale head) | block |
+| `HOBBER-GE-outboard-carrier` | milled, 2 setups, fine; separate structural service interface, four derived M4 and two Ø4 H7 pins to the Y saddle | block |
 | `HOBBER-GE-swivel-plate` | ground steel plate, 15 mm (not aluminium: it carries the steel Y rails and the spindle seat), sawn to size, two faces ground after cutting, holes (Y scale housing seat, 8 adapter-ring screws) | plate 15 |
 | `HOBBER-GE-swivel-adapter` | turned ring, 2 setups, fine, aluminium (output flange to swivel plate) | bar |
 | `HOBBER-GE-spindle-seat` | milled split-clamp block for the Ø80 g6 cartridge, 2 setups, tight | block |
 | `HOBBER-GE-motor-cradle` | milled steel, 2 setups, fine: 12 mm floor (8 mm ahead of y 195) on the spindle seat block's top (4 × M8, 2 dowels, slit over the seat's), 8 mm wall carrying the spindle servo's flange (Ø70 pilot slot, 4 × M6 in vertical slots, ±3 mm travel; nuts on the rear), M8 jack screw lug under the flange, one windowed 6 mm rib | block |
+| `HOB-ARBOR-BT30` | turned and ground in 2 setups, face key milled at the second setup; BT30 taper, Ø16 hob seat, M16x1 retaining thread, Ø15 journal; functional runout 0.002 (design requirement) | bar |
 | `NUT-BLOCK-...` (X, Y, Z) | ground flat bar, 16 mm (Y 20 mm), bore, holes; X and Z (part number ends `-P`) also 2 reamed Ø6 H7 dowel bores in the base end (the Y block has none: the seat's key locates it) | 60 x 16 |
 
 Quantities are one per machine. The list is the exporter's `DESIGNS` plus one nut block per axis; a new route on a

@@ -64,8 +64,9 @@ class FlexsplineHobber extends MachineAssembly {
     this.spec = spec == null ? new GearSpec(0.3, 200, 8, new Involute(20 * Math.PI / 180)) : spec;
     if (this.spec.internal) throw "external hobbing machine requires external gear";
     var profile = this.spec.profile();
-    hob = Hob.fromDesign(new HobDesign(ConjugateRack.of(profile),
+    var hobTool = Hob.fromDesign(new HobDesign(ConjugateRack.of(profile),
       1, 32, gashes), this.spec, 40, 16, false, detailedHob);
+    hob = new Hob(hobTool.values().setNumber("faceKeyWidth", 5.2));
     bed = new MineralCastBed();
     column = new MineralCastColumn();
     includeAt("bed", bed, FoundationLayout.worldPose("bed"));
@@ -328,11 +329,13 @@ class FlexsplineHobber extends MachineAssembly {
     fixExisting("motor-mount", "motorCradle", "spindle/motor",
       F.alongY(centre - HobSpindle.MOTOR_OFFSET, HobberSwivelLayout.SPINDLE_Y - HobSpindle.MOTOR_FACE_Z, HobberZLayout.SEAT_Z + HobSpindle.motorHeight(), 0, 1, 0));
     fixAt("hob", hob, F.fromRotationMatrix(centre, 20, HobberZLayout.SEAT_Z, e0), "spindle/arbor");
+    fixAt("outboardCarrier", new HobberSaddle("GE-outboard-carrier"), F.translation(centre, 0, HobberZLayout.SEAT_Z), "Yplate",
+      F.alongY(centre + 45, -100, HobberZLayout.SEAT_Z, 1, 0, 0));
     fixAt(
       "outboard",
       new OutboardSupport(new ComponentValues().setNumber("height", 30).setNumber("seatLength", 9)),
       F.fromRotationMatrix(centre, -85, HobberZLayout.SEAT_Z, e0),
-      "Yplate",
+      "outboardCarrier",
       F.alongY(centre + 30, -100, HobberZLayout.SEAT_Z, 1, 0, 0)
     );
     fixAt("outboardBearing", new FloatingRadialBearing(), F.fromRotationMatrix(centre, -95.5, HobberZLayout.SEAT_Z, e0), "outboard");
@@ -486,7 +489,7 @@ class FlexsplineHobber extends MachineAssembly {
    * The service removals the machine declares (`ServiceChecks` sweeps each against everything that stays; screws that hold a removed or prerequisite
    * member are taken away with it). A servo comes off its mount along its own axis, away from the screw or pulley: the shaft stub out of the coupling,
    * then the body free of the flange pilot. The B servo leaves with its belt and pulley off. The B belt slides off both pulleys along their axis. The spindle
-   * cartridge, with the hob and arbor, leaves rearward out of its split clamp, the arbor tip drawn out of the outboard bearing, the belt off.
+   * cartridge, with the hob and arbor, leaves forward out of its split clamp (the front register cannot pass the bore), with the outboard support and belt off.
    * The paths that do not work as built are `serviceTries`, swept by `HobberFrameChecks.service` and reported with their numbers.
    */
   function declareServices():Void {
@@ -508,7 +511,7 @@ class FlexsplineHobber extends MachineAssembly {
     out.push(ServiceRemoval("bBeltRemoval", ["spindle/belt"],
       [{direction: away(axisOf("spindle/housing", 0, 0, 1)), distance: 2 * HobSpindle.BELT_WIDTH + SERVICE_CLEARANCE}], [], []));
     out.push(ServiceRemoval("spindleCartridgeWithdrawal", cartridgeMembers(),
-      [{direction: away(axisOf("spindle/housing", 0, 0, 1)), distance: 180 + 60}], ["spindle/belt"], [{joint: "X", value: HobberXLayout.RETRACT}]));
+      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 180 + 60}], ["spindle/belt", "outboardCarrier", "outboard", "outboardBearing", "YscaleHead"], [{joint: "X", value: HobberXLayout.RETRACT}]));
     // The X screw and its nut leave upward, with the carriage and everything it carries lifted off the rails first: the nut block is trapped between the pad bar's
     // full-height ends and the deck, and the nut's flange cannot pass the block's bore. The screw first slides back until its front journal is out of the BF12.
     var stack = below("Xbridge").concat(["Xbridge"]).filter(id -> id != "Xnut");

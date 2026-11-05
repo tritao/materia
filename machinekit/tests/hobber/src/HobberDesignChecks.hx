@@ -14,6 +14,28 @@ class HobberDesignChecks {
       count++;
       if (Math.abs(seat.x - cutter.x) + Math.abs(seat.y - cutter.y) + Math.abs(seat.z - cutter.z)
         > 1e-7) throw "arbor hob seat differs from actual cutter datum";
+      // Independent standard-taper probes in the assembled gauge frame. These
+      // detect a wrong taper, translation or spindle/holder orientation.
+      var arbMember = members.filter(m -> m.id == "spindle/arbor")[0];
+      var rotorMember = members.filter(m -> m.id == "spindle/shaft")[0];
+      var arbSolid = cache.posed(arbMember.component, poses.get(arbMember.id));
+      var rotorSolid = cache.posed(rotorMember.component, poses.get(rotorMember.id));
+      var gauge = poses.get(arbMember.id);
+      for (z in [-40.0, -30.0, -20.0, -10.0, -1.0]) for (angle in [0.0, Math.PI / 2, Math.PI, 3 * Math.PI / 2]) {
+        var radius = 31.75 / 2 + z * 7 / 48;
+        for (side in [-1.0, 1.0]) {
+          var raw = cadkit.modeling.Part.cylinderSpan(0.03, z, z + 0.05,
+            (radius + side * 0.1) * Math.cos(angle), (radius + side * 0.1) * Math.sin(angle));
+          var probe = PosedParts.moved(raw, gauge), holderHit = arbSolid.intersect(probe), socketHit = rotorSolid.intersect(probe);
+          raw.close();
+          count++;
+          if ((holderHit.volume() > 0.0001) != (side < 0)) throw "assembled BT30 arbor leaves standard taper";
+          count++;
+          if ((socketHit.volume() > 0.0001) != (side > 0)) throw "assembled BT30 socket leaves standard taper";
+          holderHit.close(); socketHit.close(); probe.close();
+        }
+      }
+      arbSolid.close(); rotorSolid.close();
       var canonical = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK), centre = F.compose(canonical, cutter);
       for (id in ["railYLeft", "railYRight"]) {
         var frame = F.compose(canonical,

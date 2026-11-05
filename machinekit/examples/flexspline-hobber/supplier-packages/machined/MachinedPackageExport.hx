@@ -22,7 +22,7 @@ class MachinedPackageExport {
   static final DESIGNS = [
     "GE-X-carriage", "GE-Z-saddle", "GE-X-drive-pad", "GE-Z-drive-pad",
     "GE-Y-drive-fixed", "GE-Y-drive-floating", "GE-Y-nut-seat", "GE-X-scale-seat", "GE-Z-scale-seat", "GE-Z-scale-arm", "GE-Y-saddle",
-    "GE-swivel-plate", "GE-swivel-adapter", "GE-spindle-seat", "GE-motor-cradle"
+    "GE-swivel-plate", "GE-swivel-adapter", "GE-spindle-seat", "GE-motor-cradle", "GE-outboard-carrier"
   ];
 
   static function r(v:Float, digits:Int = 4):Float {
@@ -219,6 +219,8 @@ class MachinedPackageExport {
       parts.push(exportPart(dir + "/step", block, block.holes(), 1, "Nut block, " + axis.id + " axis"));
       Sys.println("exported " + block.designation);
     }
+    parts.push(exportPart(dir + "/step", machine.spindle.arbor, [{id: "pull-stud-thread", kind: "tapped", thread: "M12",
+      diameter: 12.0, nominal: 12.0, fit: null, depth: 20.0, position: [0.0, 0, -48.4], direction: [0.0, 0, 1]}], 1, "BT30 hob arbor"));
     var data = {
       machine: "FlexsplineHobber",
       generated: "machined-package export",

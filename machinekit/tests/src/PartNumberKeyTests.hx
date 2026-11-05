@@ -564,7 +564,7 @@ class PartNumberKeyTests {
     var spindlePart = machinekit.hobbing.HobSpindlePart.recipeType().create().bom.partNumber;
     var floatingBearing = machinekit.hobbing.FloatingRadialBearing.recipeType().create().bom.partNumber;
     if (saddleZ != "HOBBER-GE-Z-SADDLE" || saddleX != "HOBBER-GE-X-CARRIAGE"
-      || spindlePart != "HOB-SPINDLE-SHAFT" || floatingBearing != "FLOAT-BRG-ASSUMED-15x32x9"
+      || spindlePart != "BT30-D80-INCLUDED-ROTOR" || floatingBearing != "FLOAT-BRG-ASSUMED-15x32x9"
       || PartNumberLint.problems(saddleZ).length != 0 || PartNumberLint.problems(saddleX).length != 0
       || PartNumberLint.problems(spindlePart).length != 0 || PartNumberLint.problems(floatingBearing).length != 0)
       throw "Hobber design and bearing identities must reflect their specified roles";
@@ -577,9 +577,9 @@ class PartNumberKeyTests {
       machinekit.hobbing.OutboardSupport.recipeType().create().bom.partNumber,
       machinekit.hobbing.SwivelHousing.recipeType().create().bom.partNumber,
       machinekit.hobbing.HobArbor.recipeType().create().bom.partNumber];
-    var hobberExpected = ["MANDREL-SLEEVE", "HOBBER-TABLE-HOUSING", "HOB-SPINDLE-HOUSING",
+    var hobberExpected = ["MANDREL-SLEEVE", "HOBBER-TABLE-HOUSING", "ROBOTDIGG-2049-BT30-D80-6000",
       "HOBBER-TABLE-PLATEN", "FLEXSPLINE-CUP-BLANK", "HOBBER-BRACKET", "HOB-OUTBOARD-SUPPORT",
-      "SWIVEL-HOUSING", "HOB-ARBOR-TF20"];
+      "SWIVEL-HOUSING", "HOB-ARBOR-BT30"];
     for (i in 0...hobberParts.length) if (hobberParts[i] != hobberExpected[i]
       || PartNumberLint.problems(hobberParts[i]).length != 0) throw 'Hobber part identity: ${hobberParts[i]}';
     var toolService = machinekit.robotics.ToolServiceModule.recipeType().create().bom.partNumber;

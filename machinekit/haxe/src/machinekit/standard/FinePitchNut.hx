@@ -9,6 +9,7 @@ import machinekit.component.ComponentRecipeSupport as P;
  * Anti-loosening treatment and preload are installation specifications, not inferred geometry.
  */
 class FinePitchNut extends MachineComponent {
+  override public function fastensByForm():Bool return true;
   public final diameter:Float;
   public final pitch:Float;
   public final acrossFlats:Float;

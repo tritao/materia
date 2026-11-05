@@ -14,8 +14,8 @@ model, not released manufacturing, and every assumption is listed in [FRAME_PLAN
 
 - **Frames, no welding:** the X carriage is one milled steel part (20 mm deck, 25 mm ribs, open U); the Z saddle one milled plate
   with the eRob pocket and the nut block bolts; one ground steel bar pad per axis (X and Z) carries both screw supports, ground together so the seats are coplanar; the Y drive stands on two milled
-  L brackets and a nut seat bar; the swivel plate is ground steel plate (the Y rails and the spindle seat are steel: aluminium would be about a third as stiff and would bow against them as it warms), the adapter ring turned aluminium; the Ø80 spindle cartridge is held
-  by one milled split-clamp seat (clamping length assumed, `SpindleHousing.CLAMP_FROM..CLAMP_TO`). Each has a `ManufacturingRoute`;
+  L brackets and a nut seat bar; the swivel plate is ground steel plate (the Y rails and the spindle seat are steel: aluminium would be about a third as stiff and would bow against them as it warms), the adapter ring turned aluminium; the bought Ø80 BT30 belt spindle is held
+  by one milled split-clamp seat (axial envelope assumed, `SpindleHousing.CLAMP_FROM..CLAMP_TO`); its standard-taper hob arbor is a separate made part. Each has a `ManufacturingRoute`;
   `supplier-packages/machined/` holds their STEP, drawings and RFQ table.
 - **Drives:** SFU1605 screws (X 260, Y 170, Z 420 mm), HZMotion M60D-BK12-C mount with BF12, Leadshine ELM2H-0400 servo on each axis, Z with its built-in
   brake (holding torque assumed 2 × rated), steel nut blocks.
@@ -424,67 +424,59 @@ fastener selections and tightening procedures still need manufacturing drawings;
 this layout check is not structural or mould-process qualification.
 
 
-### Hob spindle cartridge (revised 2026-11-04: belt drive)
+### BT30 hob spindle (Phase P1, 2026-11-05)
 
-Load path: hob → removable arbor → taper and face → spindle shaft → opposed
-angular-contact pair → stepped steel housing → spindle seat block → Y saddle. B is driven by a standard
-80-frame servo standing **beside the cartridge, above it, shaft toward the rear**, through a 1:1 HTD5M belt (15 mm, 40T on both) onto the cartridge's rear stub,
-replacing the 2026-11-01 servo behind the housing on a bell adapter and a coupling (which put the servo's face 70 mm and its centre of mass about 150 mm behind
-the clamp, hung 4 kg on four M4 and put the bending mode near the tooth-pass frequency, and needed a pocket in the bed casting). The servo is the catalogue Leadshine ELM2H-1000LA80F (1 kW,
-3.18 N m, 3000/5000 rpm; 80 flange, 103.9 body, connectors to LH 55 from the axis, their
-positions along the body assumed) with an assumed winding (`LeadshineServo.driven`: the
-catalogue row has no published winding constants, which the drive check requires). The connectors point up (`HobSpindle.MOTOR_CLOCKING` 0). Its flange is on the wall of one
-milled **cradle** (`GE-motor-cradle`: 12 mm floor (8 mm ahead of y 195) bolted by four M8 and two dowels to the top of the spindle seat block, an 8 mm wall with the pilot register and the four M6 flange bolts in vertical slots (nuts on the wall's rear face), an M8 jack screw in a lug under the flange, a windowed 6 mm rib outside the flange; the floor's slit lies over the seat's own so the clamp still closes), 125 mm from the spindle axis (centres; 8 mm toward work -x of its vertical, so the flange clears the Y drive on the swivel plate's top edge),
-so the servo no longer comes near the bed casting: **the bed relief pocket is gone** (`HobberSpindleRelief` derives it from the swept servo and finds none: least gap to the casting 155 mm over the whole sweep with overtravel; the
-class and the casting feature stay, so a lower Z limit or another servo would bring it back).
-The ratio is 1:1 (decided 2026-11-04) from speed and torque: the hob (Ø32, assumed 100 to 300 m/min, 995 to 2984 rpm; the CAM job's reference speed 2984 rpm) turns the servo at 2984 rpm, inside its 3000 rpm rated speed (a 1.25 reduction would need 3730 rpm, where torque falls), and 3.18 N m rated (9.5 peak) covers the cutting load (assumed upper bound 100 N tangential, 1.65 N m at the servo, `HobberFrameChecks.spindleDrive`). The belt tension is set by the jack screw: the servo slides +-3 mm in the wall's slots, the belt needs about 0.7 mm more centres than slack, and the four M6 clamp it (friction 7.5 x the belt's net pull, assumed).
-The **B master (electronic-gearbox) encoder is the cartridge's own 19-bit absolute encoder** on the rear face of the housing with its rotor on the stub (`addEncoder("hob-angle", "B")`), so belt wind-up, tooth error and pulley runout are inside the measurement; the servo's encoder serves the drive's loop on the `motor-turn` joint.
-The belt's pull on the cartridge is printed by `HobberFrameChecks.spindleDrive`: 450 N radial on the pulley, 32.5 mm behind the 6205 tail bearing (reaction 555 N, 7.1 % of its static rating), and the cartridge must be rated for a belt drive of at least 700 N there.
-The outboard bearing remains radially supporting and
-axially floating. This is an **assumed custom TF20** interface, not an HSK-E25
-claim. Dimensions are assumed, in millimetres, along the spindle from the housing
-rear datum; the tool face stays at 180, so the cutting geometry and work-frame
-kinematics are unchanged.
+The spindle is the bought RobotDigg 2049 option A **Ø80 BT30 belt-drive cartridge**.
+The public listing confirms D80, BT30, 6000 rpm, HTD5M and the 7008+7006 bearing
+family. Its linked drawing is labelled NT30 and differs from the text; it is not
+accepted as BT30 axial-interface evidence. See FRAME_PLAN Decisions for links and
+provenance. The model keeps a deliberate 4000 rpm operating cap. It replaces the
+supplied 36/45T pulley with the existing 40T cartridge pulley for the 1:1 drive.
 
-| Feature | Axial interval / dimensions |
-| --- | --- |
-| Housing | Steel, Ø80 g6 outside (a standard spindle-clamp size), 0–180, held by the Y saddle's front ring and rear open C bracket |
-| Servo | Beside the cartridge, 125 mm above its axis (belt centres), flange face at z +1 on the cradle wall (4 × M6 on Ø90 in vertical slots, Ø70 pilot slot), shaft toward the rear; body forward over the seat block |
-| Spindle encoder | 19-bit absolute ring encoder envelope Ø80 × 14 on the housing rear face, −14–0 (stator on the housing's four M4 on Ø72, rotor on the stub) |
-| Pulleys and belt | HTD5M 40T (spindle, bore Ø20) and 40T (servo, bore Ø19), 18 wide at −34 to −16, 15 mm 450-5M belt of 90 teeth |
-| Shaft stub | Ø20, −36–0 |
-| Floating rear bearing | 6205 (25 × 52 × 15) at 0–15 in a Ø52 bore |
-| Opposed bearing pair | 129–146 and 146–163; Ø25 journals, Ø62 housing seats |
-| Outer-ring retention | Housing shoulder at 129; bolted front gland: Ø62 spigot 163–180, Ø80 flange 180–186, 4 × M4 on Ø72 |
-| Inner-ring retention | Shaft shoulder at 163; catalogue precision locknut M25 × 1.5 (KM5 size, Ø38 × 7) at 122–129, in a Ø44 housing shoulder bore |
-| Spindle nose | Ø40, 170–180; gland bore Ø42 (1 mm labyrinth gap) |
-| Taper engagement | 160–180; Ø16 small end, Ø20 large end (1:5) |
-| Arbor face flange | Ø40 × 4, starting at unchanged gauge face 180 |
-| Arbor retention | Four M4 × 10 socket screws on Ø32 PCD, at 45° to the pins |
-| Torque transmission | Two Ø4 axial pins on Ø28 PCD; 2 mm engagement in flange |
+Load path: hob → plain Ø16 arbor seat and end-face key → BT30 taper → bought rotor
+and bearings → bought housing → split clamp → Y saddle. The cartridge's rotor is
+an included physical envelope for B kinematics, not a separately ordered shaft.
+There is no made gland, separately purchased internal bearing pair or custom TF20
+interface. Cartridge internals and drawbar retention are the supplier's assembly.
 
-The taper locates radially, the face locates axially, and the four flange screws
-hold both contacts closed; there is no drawbar, so the arbor changes from the
-front. Assembly sequence: slide the matched pair onto the shaft from its rear
-against the shaft shoulder and tighten the rear locknut; fit the shaft and pair
-from the front against the housing shoulder and bolt the front gland, its spigot
-ground at assembly to clamp the outer rings; fit the
-rear 6205 over the journal into its floating bore; fit the encoder and the pulley; fit the arbor and its four screws. The cradle goes on the seat block's top afterwards (belt tensioned with a shim pack under its floor, `HobberAssemblyProcedures.tensionBelt`).
+The **axial packaging remains assumed**, pending the selected option's outline:
+rear-to-gauge 180 mm, front register Ø110 at 170..180, clamp land 10..168, Ø20 rear
+stub 36 mm long, rotor/stationary mass partition. The split clamp grips 18..168
+(150 mm), stopping 2 mm short of the front register. A Ø116 relief (minimum 2 mm clearance at the reader spine)
+through the Y saddle lets that register leave toward the tool. Its outboard
+carrier is a separate structural interface, fixed by four derived M4 with
+washers and two Ø4 H7 pins, with a declared load/slip check. The carrier, support,
+bearing and Y reading head come off before cartridge withdrawal; the reader
+is clamped to a 2.3 mm spine behind the channel. These assumptions permit
+layout checks; they are not manufacturing-release dimensions.
 
-A bought cartridge to this interface is being quoted as an alternative to making
-it (2026-11-01); `supplier-packages/spindle/` generates the drawing package (per-part
-STEP, exact sections and the specified tolerances) from this model. Bearing envelopes do not resolve individual races. Thread
-helices, fits, preload, screw torque, pin strength, balance, sealing and grinding
-tolerances remain manufacturing design requirements; the CAD does not qualify them.
-Simultaneous taper/face contact must be specified and verified during manufacture.
-The existing runout assumptions are retained, not requalified. The B master
-(electronic-gearbox) encoder is the cartridge's own, measuring the spindle angle itself, so the belt is inside the loop it observes and does not add to the error the controller cannot see; the requirement is that encoder's accuracy over a
-tooth pitch. The cartridge is rated 4000 rpm, which limits B (the servo's 5000 rpm through the belt reaches it exactly).
+The made arbor has the standard MAS BT30 shank (gauge Ø31.75, 7/24 diametral taper,
+48.4 mm long, Ø46 flange, M12 pull stud). It is taper-located; no dual face contact
+is claimed. From its gauge plane: hob shoulder 40, hob seat 40..80, M16x1 retaining
+nut at 80..88 (24 AF x 8, design inputs), Ø15 x 22 outboard journal at 153..175.
+An integral end-face dog 5 wide x 3 radial x 2 axial drives the plain-bore hob.
+Its matching slot is 5.2 wide x 2.2 deep, **assumed** pending the hob maker's drawing.
+The retaining nut is secured with medium-strength thread-locking compound and witness-marked; 2000 N assembly preload is an assumed target to establish by shop test. `b-fit-bt30-arbor` declares fitting, runout inspection and forward cartridge withdrawal with the outboard support off.
+The 45-degree pull-stud head must match the bought gripper; its outline is assumed.
+The arbor is turned in two setups, the dog milled at the second, then functional
+surfaces ground. The machined and spindle supplier packages both describe it.
 
-Before HB-D11, the original direct-motor cartridge added 1.086 kg: total mass 425.297 kg; moving X/Y/Z masses
-132.064 / 14.574 / 41.603 kg. Continuous thrust margins under the existing assumed
-demand are X 885.968 N, Y 907.722 N, Z 1531.207 N. Guide-to-hob offsets and bed
-footprint were unchanged by that cartridge change; current masses are in the HB-D11 table above.
+The Leadshine ELM2H-1000LA80F remains above the cartridge, 125 mm belt centres,
+shaft rearward on its slotted cradle with jack-screw tension adjustment. A 450-5M
+15 mm belt and 40T/40T pulleys transmit 3.18 N m rated / 9.5 peak; the Ø32 hob at
+300 m/min runs at 2984 rpm, below the servo's 3000 rpm rated speed. The B master
+remains the 19-bit spindle-side encoder on the rear stub; the motor encoder
+serves the drive loop. Encoder geometry, belt properties and winding remain
+assumed as recorded in FRAME_PLAN.
+
+The analytic drive check reports about 450 N radial belt pull and requires at
+least 700 N allowable pull at the cartridge pulley. The bought cartridge's
+allowable pull and runout are unpublished: those are **assumed acceptance
+requirements**, including the existing 2 µm model error parameters. Haozhi's
+separately published accuracy/balance ratings belong to its Ø100 DGZZ-10020;
+they do not qualify this D80 purchase. No bearing-life result is calculated
+from invented internal bearing locations. Cradle modal estimates retain their
+stated joint assumptions and need FE/impact-test confirmation.
 
 
 ### Cup and front loading
@@ -643,7 +635,7 @@ ends (a 20 mm taller column), and a purpose-made wall for the X front (an insert
 is the ground drive-seat insert over 100 of 110 mm, so no casting fall or drain was cut; gutters need a wider channel (at least 150 mm) and the deck ribs' inner faces, now on the channel walls, would move.
 
 Service removals (declared, `FlexsplineHobber.serviceRemovals`, swept by `ServiceChecks`): the X, Y, Z and B servos come off along their own axes (shaft out of the coupling, 45 mm);
-the B belt slides off along its pulleys (40 mm); the B cartridge with the hob and arbor leaves rearward out of its split clamp (240 mm, X at retract, belt off); the X screw and nut leave
+the B belt slides off along its pulleys (40 mm); the B cartridge with the hob and arbor leaves forward out of its split clamp (240 mm, X at retract, belt, outboard carrier/support/bearing and Y reading head off); the X screw and nut leave
 upward after 25 mm rearward, once the motor, the BK12, the BF12's ring and the carriage stack are off. Blocked (reported by `HobberFrameChecks.service`, `serviceTries`): the X screw
 rearward with the nut (the nut's flange is on the block's front face), with the block (the pad bar's full-height rear end is 5 mm above the block's lower end), and the eRob out of the Z
 saddle rearward (Z pad bar after 4 mm, column casting after 38 mm; about 90 mm needed) or forward with the saddle (the nut block hangs on the nut).

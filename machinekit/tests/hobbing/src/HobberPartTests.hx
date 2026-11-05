@@ -28,9 +28,8 @@ class HobberPartTests {
     new AngularContactBearing(),
     new CrossedRollerBearing(),
     new RotaryEncoderRing(),
-    new HobSpindlePart("shaft"),
-    new HobSpindlePart("bearingRetainer"),
-    new HobSpindlePart("bearingLocknut"),
+    new HobSpindlePart(),
+    new HobSpindlePart(new ComponentValues().setToken("role", "pullStud")),
     new FlexsplineCupBlank(),
     new MandrelSleeve(),
     new Hob(),
@@ -175,7 +174,7 @@ class HobberPartTests {
     check((cast spindle.motor : machinekit.motion.LeadshineServo).clearanceBoxes().length == 3
       && (cast spindle.motor : machinekit.motion.LeadshineServo).clearanceBoxes().filter(b -> b.name != "body" && b.y1 == 55).length == 2,
       "spindle servo clearance has its body and both connectors, reaching LH 55 from the axis");
-    near(spindle.maxSpeed(), 4000 * 2 * Math.PI / 60, 1e-9, "B speed limit is the 4000 rpm cartridge rating (the servo's 5000 rpm through the 1:1 belt exceeds it)");
+    near(spindle.maxSpeed(), 4000 * 2 * Math.PI / 60, 1e-9, "B has a deliberate 4000 rpm operating cap below the bought 6000 rpm rating");
     check(
       spindle.definition().joints.filter(j -> j.id == "B")[0].limits.velocity == spindle.maxSpeed(),
       "B joint carries the cartridge speed limit"
@@ -198,21 +197,51 @@ class HobberPartTests {
       && cradleHoles.filter(h -> h.kind == "dowel").length == 0 && cradleHoles.filter(h -> h.kind == "clearance" && h.thread == "M8").length == 0
       && cradleHoles.filter(h -> h.kind == "clearance" && h.thread == "M6" && h.slotLength == 2 * HobSpindle.TENSION_TRAVEL).length == 4,
       "the servo cradle is a routed milled part with the jack screw's tapped M8, no floor bolts or dowels of its own (the machine derives them) and the flange's four M6 vertical slots");
-    check(spindle.frontBearing != spindle.rearBearing, "spindle has two bearing instances");
-    check(
-      spindle.billOfMaterials().quantity(spindle.frontBearing.bom.partNumber) == 2,
-      "opposed bearings are two of the same BOM part"
-    );
-    check(spindle.interfaceName() == spindle.arbor.interfaceName(), "assumed taper-and-face interface identity");
-    check(spindle.interfaceName() == "ASSUMED-TF20", "no unsupported HSK designation");
+    var purchase = Bt30SpindleData.catalog(), row = purchase.get(Bt30SpindleData.DESIGNATION), meta = purchase.metadata(Bt30SpindleData.DESIGNATION);
+    near(row.number("outside"), 80, 0, "selected BT30 cartridge has the catalogue 80 mm body");
+    near(row.number("maxRpm"), 6000, 0, "option A has catalogue 6000 rpm maximum");
+    check(meta.source == Bt30SpindleData.SOURCE, "cartridge provenance follows the selected listing");
+    check(meta.verifiedFields.indexOf("height") < 0 && meta.verifiedFields.indexOf("radialRunout") < 0,
+      "unpublished length and accuracy are not claimed as verified supplier values");
+    check(spindle.billOfMaterials().quantity(Bt30SpindleData.DESIGNATION) == 1, "one complete cartridge purchase");
+    check(spindle.billOfMaterials().quantity("BT30-D80-INCLUDED-ROTOR") == 0, "rotor is included in the cartridge purchase");
+    check(spindle.billOfMaterials().lines().filter(l -> l.partNumber.indexOf("7305") >= 0 || l.partNumber.indexOf("6205") >= 0).length == 0,
+      "no separately purchased invented cartridge internals");
+    check(spindle.interfaceName() == spindle.arbor.interfaceName(), "BT30 interfaces agree");
+    check(spindle.interfaceName() == "BT30", "cartridge uses the standard BT30 taper");
+    near(Bt30SpindleData.TAPER_DIAMETER, 31.75, 0, "BT30 gauge diameter");
+    near(Bt30SpindleData.TAPER_LENGTH, 48.4, 0, "BT30 shank length");
+    near(Bt30SpindleData.TAPER_RATIO, 7.0 / 24, 1e-12, "BT30 is a 7/24 diametral taper");
+    near(Bt30SpindleData.HOLDER_LENGTH, 20, 0, "BT30 holder flange is 20 mm thick after the 2 mm gap");
+    near(Bt30SpindleData.DRIVE_SLOT_WIDTH, 16.1, 0, "BT30 holder drive slot width");
+    near(Bt30SpindleData.DRIVE_SLOT_FLOOR, 16.3, 0, "BT30 drive slot floor from axis");
+    near(spindle.arbor.hobStart(), 40, 0, "hob shoulder is at 40 from gauge");
+    near(spindle.arbor.hobEnd(), 80, 0, "hob retaining nut bears at 80 from gauge");
+    near(spindle.arbor.parameterNumber("supportDiameter"), 15, 0, "outboard journal is 15 mm");
+    near(spindle.arbor.parameterNumber("supportLength"), 22, 0, "outboard journal retains the 22 mm float allowance");
+    var arb = spindle.arbor.geometry(), rotor = spindle.components().filter(c -> c.id == "shaft")[0].component.geometry();
+    check(arb.solidCount() == 1, "BT30 arbor face key is rooted in one connected solid");
+    // Cross-section probes prove the male taper has material immediately inside
+    // its surface and none outside, independently of the generator's profile.
+    for (z in [-40.0, -30.0, -20.0, -10.0, -1.0]) {
+      var radius = 31.75 / 2 + z * 7 / 48;
+      for (a in [0.0, Math.PI / 2, Math.PI, 3 * Math.PI / 2]) {
+        var inside = cadkit.modeling.Part.cylinderSpan(0.03, z, z + 0.05, (radius - 0.1) * Math.cos(a), (radius - 0.1) * Math.sin(a));
+        var outside = cadkit.modeling.Part.cylinderSpan(0.03, z, z + 0.05, (radius + 0.1) * Math.cos(a), (radius + 0.1) * Math.sin(a));
+        var hit = arb.intersect(inside), miss = arb.intersect(outside);
+        check(hit.volume() > 0.0001, "BT30 male taper material inside the nominal cone");
+        check(miss.volume() < 1e-8, "BT30 male taper clears outside the nominal cone");
+        hit.close(); miss.close(); inside.close(); outside.close();
+      }
+    }
+    arb.close(); rotor.close();
     check(
       spindle.definition().joints.filter(j -> j.id == "B")[0].child == "shaft",
       "B drives shaft; arbor is retained to its tool face"
     );
     var cartridgePoses = spindle.solvedPoses();
     for (id in [
-      "shaft", "encoder", "motor", "motorShaft", "motorPulley", "spindlePulley", "belt", "motorEncoder", "tailBearing", "bearingRetainer", "bearingLocknut",
-      "arborScrew1", "arborScrew4", "glandScrew1"
+      "shaft", "encoder", "motor", "motorShaft", "motorPulley", "spindlePulley", "belt", "motorEncoder", "hobLocknut", "pullStud"
     ]) check(
       cartridgePoses.exists(id),
       "cartridge load-path part present: " + id
@@ -220,9 +249,9 @@ class HobberPartTests {
     var arborBounds = spindle.arbor.geometry();
     near(
       arborBounds.shape.bounds().get_min().get_z(),
-      -20,
+      -48.4,
       1e-6,
-      "arbor includes male taper behind unchanged gauge face"
+      "arbor includes the complete BT30 taper behind the gauge face"
     );
     arborBounds.close();
     rejects(

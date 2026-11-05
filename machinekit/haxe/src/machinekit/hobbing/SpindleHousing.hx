@@ -1,71 +1,50 @@
 package machinekit.hobbing;
 
-import machinekit.motion.PrecisionErrors;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
+import cadkit.modeling.Part;
 
-/** Hob spindle housing. Reference row is Assumed; dimensions are simplified envelopes. */
+/** Stationary envelope of the purchased RobotDigg D80 BT30 cartridge. The
+ * purchase includes its rotor, bearings and drawbar. Only diameter, taper type,
+ * speed and bearing family are verified; axial envelope and mass are ASSUMED. */
 class SpindleHousing extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
-    P.quantity("outside", 80, "mm"),
-    P.quantity("bore", 62, "mm"),
-    P.quantity("height", 180, "mm")
+    P.quantity("outside", Bt30SpindleData.OUTSIDE, "mm"),
+    P.quantity("height", Bt30SpindleData.GAUGE_Z, "mm")
   ]);
-  /**
-   * Clamping length (assumed, the maker's drawing is not in hand): the Ø80 land of the housing between its two end registers, in the housing's
-   * own z. It stops 10 mm short of the rear face (z 0, the encoder stator stands on it) and 10 mm short of the front face (z 180, the nose and gland flange at
-   * 180..186), so a clamp never grips a register or the nose; it must cover the angular-contact pair's outer rings (129..163).
-   */
-  public static inline final CLAMP_FROM = 10.0;
-  public static inline final CLAMP_TO = 170.0;
+  public static inline final CLAMP_FROM = Bt30SpindleData.CLAMP_FROM;
+  public static inline final CLAMP_TO = Bt30SpindleData.CLAMP_TO;
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
-      "machinekit.hobbing.spindle-housing",
-      parameters(),
-      v -> new SpindleHousing(v)
-    ).numbered(_ -> "HOB-SPINDLE-HOUSING").procured(_ -> Make("CNC machining")).requiringInputs(["outside", "bore", "height"]);
+    if (recipe == null) recipe = new ComponentType("machinekit.hobbing.spindle-housing", parameters(), v -> new SpindleHousing(v))
+      .versioned(2).numbered(_ -> Bt30SpindleData.DESIGNATION)
+      .procured(_ -> Buy("RobotDigg", "2049 option A", "MAS BT30"));
     return recipe;
   }
-  public static function catalog():machinekit.catalog.Catalog<ComponentValues
-    > return EngineeringMetadata.assumedCatalog(
-      "Hob spindle housing",
-      "HOB-SPINDLE-HOUSING",
-      parameters(),
-      "machinekit/examples/flexspline-hobber/PLAN.md (assumed reference design)"
-    );
+  public static function catalog():machinekit.catalog.Catalog<ComponentValues> return Bt30SpindleData.catalog();
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides);
-    super("HOB-SPINDLE-HOUSING", "Hob spindle housing (reference envelope)", "steel", false, v);
-    if (v.get("material") != null) setMaterial(v.token("material"));
-    ComponentEnvelopes.validateAnnular(v);
-    if (parameterNumber("bore") != 62
-      || parameterNumber("height") != 180) throw "cartridge housing requires the 62 mm seats and 180 mm length";
+    v.setToken("source", Bt30SpindleData.SOURCE + "; verified: D80, BT30, 6000 rpm, HTD5M, 7008+7006. ASSUMED: axial geometry, registers, mass, runout and belt-load allowance; linked NT30 drawing not used.");
+    super(Bt30SpindleData.DESIGNATION, "RobotDigg D80 BT30 belt spindle, 6000 rpm (axial envelope assumed)", "steel", false, v);
+    if (parameterNumber("outside") != Bt30SpindleData.OUTSIDE || parameterNumber("height") != Bt30SpindleData.GAUGE_Z)
+      throw "BT30 spindle envelope differs from the selected purchase configuration";
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("axis", Axis, Solids.axial(0, 0, 0));
-    addConnector("top", Mount, Solids.axial(0, 0, parameterNumber("height")));
+    addConnector("top", Mount, Solids.axial(0, 0, Bt30SpindleData.GAUGE_Z));
     addFacet(new EngineeringMetadata(v));
-    addFacet(PrecisionErrors.fromValues(v, []));
-
+    addFacet(machinekit.motion.PrecisionErrors.fromValues(v, []));
   }
+  override public function carriesJournal():Bool return true;
   override public function componentType():Null<ComponentType> return recipeType();
-
-  public function interfaceName():String return "ASSUMED-TF20";
+  public function interfaceName():String return "BT30";
   override public function hasGeometry():Bool return true;
-  /** Bores and the eight M4 holes (four each end, on Ø72) for the gland and the encoder stator; threads omitted. */
-  override public function geometry(detail:ComponentDetail = Preview):cadkit.modeling.Part {
-    var tools = [
-      cadkit.modeling.Part.cylinderSpan(26, -0.1, 15),
-      cadkit.modeling.Part.cylinderSpan(31, 15, 120),
-      // Ø44 shoulder bore: clears the Ø38 locknut and still backs the 7305 outer ring.
-      cadkit.modeling.Part.cylinderSpan(22, 120, 129),
-      cadkit.modeling.Part.cylinderSpan(31, 129, 180.1)
-    ];
-    for (i in 0...4) {
-      var angle = Math.PI / 4 + i * Math.PI / 2, x = 36 * Math.cos(angle), y = 36 * Math.sin(angle);
-      tools.push(cadkit.modeling.Part.cylinderSpan(2, -0.1, 10, x, y));
-      tools.push(cadkit.modeling.Part.cylinderSpan(2, 170, 180.1, x, y));
-    }
-    return Solids.cut(cadkit.modeling.Part.cylinderSpan(parameterNumber("outside") / 2, 0, 180), tools);
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    // The annulus stands for the complete bought stationary assembly, not a
+    // specified race/shaft design. The fixed/rotating partitions touch at the
+    // included bearing interface: an air gap would sever the support graph.
+    return Solids.cut(Solids.union([
+      Part.cylinderSpan(Bt30SpindleData.OUTSIDE / 2, 0, Bt30SpindleData.GAUGE_Z),
+      Part.cylinderSpan(Bt30SpindleData.FLANGE_DIAMETER / 2, Bt30SpindleData.FLANGE_FROM, Bt30SpindleData.GAUGE_Z)
+    ]), [Part.cylinderSpan(Bt30SpindleData.ROTOR_DIAMETER / 2, -1, Bt30SpindleData.GAUGE_Z + 1)]);
   }
 }

@@ -4,24 +4,16 @@ import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.Transmission;
 import machinekit.component.*;
 import machinekit.motion.*;
-import machinekit.standard.DeepGrooveBearing;
-import machinekit.standard.SocketHeadCapScrew;
+import machinekit.standard.FinePitchNut;
 import machinekit.transmission.TimingBelt;
 import machinekit.transmission.TimingPulley;
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
 
-/** B spindle cartridge driven by a servo beside it through a timing belt (FRAME_PLAN head redesign).
-    Coordinates are along the spindle from the housing rear datum (z = 0), the tool face at 180: the
-    belt-drive cartridge has the 19-bit absolute spindle encoder on its rear face (z 0..-14), the cartridge
-    pulley behind it (z -16..-34) and the opposed angular-contact pair at 129..163, nose 170..180. The servo
-    stands parallel to the cartridge above it (`centres()` from the spindle axis, shaft toward the rear), its flange on a
-    milled cradle bolted to the spindle seat block (the flange bolts run in vertical slots, a jack screw sets the belt tension), and drives a
-    pulley in the cartridge pulley's plane: 40T on the motor and on the spindle (HTD5M, 15 mm belt, 1:1: the reference cut's 2984 rpm stays
-    inside the servo's 3000 rpm rated speed). The spindle encoder is the B master (electronic-gearbox) encoder;
-    the motor keeps its own absolute encoder for the drive's loop. The arbor's flange is held by four M4 screws on a 32 mm PCD (no
-    drawbar); two pins carry torque. Fits, preload, balance and sealing remain manufacturing design. */
+/** Purchased D80 BT30 belt cartridge with a made hob arbor. The servo and its
+ * 1:1 HTD5M belt remain on the separate cradle; the spindle encoder measures
+ * the cartridge rotor. Unpublished packaging is identified in Bt30SpindleData. */
 class HobSpindle extends MachineAssembly {
   /**
    * The Leadshine ELM2H-1000LA80F being quoted (catalogue drawing: 80 flange, 103.9 body, connectors to LH 55 from the axis), with
@@ -66,15 +58,9 @@ class HobSpindle extends MachineAssembly {
    * bracket (work x from 35) on the swivel plate's top edge; the belt's centre line tilts by `asin(MOTOR_OFFSET / centres())`.
    */
   public static inline final MOTOR_OFFSET = 8.0;
-  /** Seat of the front angular-contact bearing on the housing datum. */
-  public static inline final FRONT_BEARING_Z = 146.0;
-  public static inline final ARBOR_SCREW_PCD = 32.0;
-  /** Cartridge speed rating, below the servo's 5000 rpm / ratio; the reference cut runs near 3000 rpm. */
+  /** Deliberate 4000 rpm operating cap, below catalogue 6000 rpm and the servo maximum. */
   public static inline final MAX_RPM = 4000.0;
   public final motor:ServoMotor;
-  public final frontBearing:AngularContactBearing;
-  public final rearBearing:AngularContactBearing;
-  public final tailBearing:DeepGrooveBearing;
   public final arbor:HobArbor;
   /** The spindle encoder: B master. */
   public final encoder:ShaftEncoder;
@@ -117,31 +103,21 @@ class HobSpindle extends MachineAssembly {
     // The motor shaft must carry its pulley and the cartridge stub reach past it.
     if (front > -ENCODER_LENGTH - 1 || front - PULLEY_WIDTH < SHAFT_REAR || face.bodyDiameter > 80 || face.shaftDiameter > 19
       || this.arbor.parameterNumber("outside") != 16 || this.arbor.parameterNumber("bore") != 0) throw "spindle reference seats do not fit installed parts";
-    frontBearing = new AngularContactBearing();
-    rearBearing = new AngularContactBearing();
-    tailBearing = DeepGrooveBearing.metric("6205", false);
     encoder = new ShaftEncoder(ENCODER_COUNTS, true, false, ENCODER_DIAMETER, ENCODER_LENGTH, ENCODER_BORE);
     motorEncoder = new ShaftEncoder(this.motor.rating.encoderCounts, true);
     spindlePulley = new TimingPulley(HTD5M, SPINDLE_TEETH, 20, PULLEY_WIDTH);
     motorPulley = new TimingPulley(HTD5M, MOTOR_TEETH, face.shaftDiameter, PULLEY_WIDTH);
     belt = TimingBelt.twoPulley(HTD5M, SPINDLE_TEETH, MOTOR_TEETH, c, BELT_WIDTH, BELT_CORD_RIGIDITY);
     addComponent("housing", new SpindleHousing());
-    attach("frontBearing", frontBearing, FRONT_BEARING_Z);
-    addComponent("rearBearing", rearBearing);
-    addMemberConnector("housing", "rearBearingSeat", materia.assembly.AssemblyFrames.alongY(0, 0, 146, 0, 0, -1));
-    addMate("rearBearing-mount", Fixed, "housing", "rearBearingSeat", "rearBearing", "mount");
-    addComponent("tailBearing", tailBearing);
-    addMemberConnector("housing", "tailBearingSeat", Solids.axial(0, 0, 0));
-    addMate("tailBearing-mount", Fixed, "housing", "tailBearingSeat", "tailBearing", "front");
-    addComponent("shaft", new HobSpindlePart("shaft"));
+    addComponent("shaft", new HobSpindlePart());
     addMemberConnector("shaft", "toolFace", Solids.axial(0, 0, 180));
-    // The shaft turns in the opposed angular-contact pair, so B joins the front bearing (fixed to the housing) to the shaft:
-    // the pair's inner rings sit on the Ø25 journal, which is the load path into the housing.
-    addMemberConnector("frontBearing", "gaugeLine", Solids.axial(0, 0, 180 - FRONT_BEARING_Z));
+    // Internal bearings and drawbar are included in the purchase; the journal
+    // joint exposes its rotor without inventing a manufacturer bearing design.
+    addMemberConnector("housing", "gaugeLine", Solids.axial(0, 0, Bt30SpindleData.GAUGE_Z));
     addMateOnAxis(
       "B",
       Continuous,
-      "frontBearing",
+      "housing",
       "gaugeLine",
       "shaft",
       "toolFace",
@@ -152,7 +128,7 @@ class HobSpindle extends MachineAssembly {
         upper: null,
         velocity: maxSpeed(),
         effort: jointTorque(this.motor.rating.peakTorque),
-        assumptions: [{quantity : "speed limit", label : "assumed 4000 rpm cartridge rating"}].concat(
+        assumptions: [{quantity : "speed limit", label : "4000 rpm operating cap (design choice), below catalogue 6000 rpm"}].concat(
           this.motor.ratingsBasis == Assumed ? [{quantity : "effort limit", label : "assumed peak servo torque"}] : []
         )
       }
@@ -187,21 +163,10 @@ class HobSpindle extends MachineAssembly {
     ratio = addTransmission("hob-belt", "B", "motor-turn", Transmission.BeltReduction("belt", "spindlePulley", "motorPulley"), Same);
     addComponent("arbor", this.arbor);
     addMate("arbor-mount", Fixed, "shaft", "toolFace", "arbor", "gaugeLine");
-    for (i in 0...4) {
-      var angle = Math.PI / 4 + i * Math.PI / 2, r = ARBOR_SCREW_PCD / 2, id = "arborScrew" + (i + 1);
-      addComponent(id, SocketHeadCapScrew.metric("M4", 10));
-      addMemberConnector("arbor", id + "Seat", Solids.axial(r * Math.cos(angle), r * Math.sin(angle), 4));
-      addMate(id + "-mount", Fixed, "arbor", id + "Seat", id, "head");
-    }
-    addComponent("bearingLocknut", new HobSpindlePart("bearingLocknut"));
-    addMemberConnector("shaft", "bearingLocknutDatum", Solids.axial(0, 0, 0));
-    addMate("bearingLocknut-mount", Fixed, "shaft", "bearingLocknutDatum", "bearingLocknut", "mount");
-    attach("bearingRetainer", new HobSpindlePart("bearingRetainer"), 0);
-    // Four M4 x 12 for the gland (heads on its face at 186), on Ø72.
-    for (i in 0...4) {
-      var angle = Math.PI / 4 + i * Math.PI / 2, co = Math.cos(angle), si = Math.sin(angle);
-      screw("glandScrew" + (i + 1), "M4", 12, 36 * co, 36 * si, 186, 1);
-    }
+    fixed("pullStud", new HobSpindlePart(new ComponentValues().setToken("role", "pullStud")), F.translation(0, 0, 180), "arbor");
+    // The hob is clamped against the arbor shoulder by an M16x1 fine nut.
+    // Nut thickness and wrench size are explicit project inputs, not vendor data.
+    fixed("hobLocknut", new FinePitchNut(16, 1, 24, 8), F.translation(0, 0, 180 + this.arbor.hobEnd()), "arbor");
     // The servo's flange holes are on the 80-frame 90 mm PCD; the motor's own screws are not modelled (the generic motor body is an
     // envelope that hides the real recessed corners).
     var flange = this.motor.mounting();
@@ -212,11 +177,6 @@ class HobSpindle extends MachineAssembly {
     exposeConnector("mount", "housing", "mount");
     exposeConnector("gaugeLine", "arbor", "gaugeLine");
     exposeConnector("hobCentre", "arbor", "hobCentre");
-  }
-  function attach(id:String, part:MachineComponent, z:Float):Void {
-    addComponent(id, part);
-    addMemberConnector("housing", id + "Seat", Solids.axial(0, 0, z));
-    addMate(id + "-mount", Fixed, "housing", id + "Seat", id, "mount");
   }
   /** `part` at `pose` (spindle frame), fixed to `parent`. */
   function fixed(id:String, part:MachineComponent, pose:AssemblyFrame, parent:String):Void {
@@ -234,15 +194,9 @@ class HobSpindle extends MachineAssembly {
     addMemberConnector(id, "seat", F.compose(F.inverse(pose), frame));
     addMateOnAxis(joint, Continuous, parent, 'to-$id', id, "seat", {x: 0, y: 0, z: 1}, 0, {lower: null, upper: null, velocity: speed, effort: null});
   }
-  /** A socket screw fixed to the housing, head bearing face at `z`, shank toward `direction` * -z. */
-  function screw(id:String, size:String, length:Float, x:Float, y:Float, z:Float, direction:Float):Void {
-    addComponent(id, SocketHeadCapScrew.metric(size, length));
-    addMemberConnector("housing", id + "Seat", materia.assembly.AssemblyFrames.alongY(x, y, z, 0, 0, direction));
-    addMate(id + "-mount", Fixed, "housing", id + "Seat", id, "head");
-  }
   /** B speed limit: the lower of the servo's maximum seen through the belt and the cartridge rating. */
   public function maxSpeed():Float return Math.min(motor.rating.maxSpeed * MOTOR_TEETH / SPINDLE_TEETH, MAX_RPM * 2 * Math.PI / 60);
-  public function interfaceName():String return "ASSUMED-TF20";
+  public function interfaceName():String return "BT30";
   /**
    * Belt pretension per strand (N) the drive is set to: the slack side is kept at a quarter of the motor's peak tangential force
    * (assumed rule; belt maker to confirm), i.e. 0.75 of the peak force for the mean of the two spans.

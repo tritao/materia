@@ -264,10 +264,18 @@ class ProcurementTests {
     if (floatingBearing.procurement == null || ProcurementCodec.document(floatingBearing.procurement).kind != "Buy"
       || floatingBearing.maturity != "Assumed" || floatingBearing.requirements == null || floatingBearing.requirements.length == 0)
       throw "A floating bearing must declare its assumed selection data";
-    var hobShaft = machinekit.hobbing.HobSpindlePart.recipeType().create().bom;
-    if (hobShaft.procurement == null || ProcurementCodec.document(hobShaft.procurement).kind != "Make"
-      || hobShaft.maturity != "Assumed" || hobShaft.requirements == null || hobShaft.requirements.length != 3)
-      throw "A hob spindle part must retain its assumed manufacturing dimensions";
+    var hobRotor = machinekit.hobbing.HobSpindlePart.recipeType().create(), rotorPurchase = machinekit.component.IncludedInPurchase.of(hobRotor);
+    var cartridge = machinekit.hobbing.SpindleHousing.recipeType().create().bom;
+    if (rotorPurchase == null || rotorPurchase.ownerPartNumber != cartridge.partNumber
+      || hobRotor.bom.procurement == null || ProcurementCodec.document(hobRotor.bom.procurement).kind != "NotSupplied")
+      throw "The BT30 rotor must be included in its complete cartridge purchase";
+    if (cartridge.procurement == null || ProcurementCodec.document(cartridge.procurement).kind != "Buy"
+      || ProcurementCodec.document(cartridge.procurement).manufacturer != "RobotDigg")
+      throw "The D80 BT30 cartridge is bought from the catalogue reference";
+    var hobArbor = machinekit.hobbing.HobArbor.recipeType().create();
+    if (hobArbor.bom.procurement == null || ProcurementCodec.document(hobArbor.bom.procurement).kind != "Make"
+      || machinekit.component.ManufacturingRoute.of(hobArbor) == null)
+      throw "The BT30 hob arbor must retain its separate manufacturing route";
     for (candidate in [machinekit.hobbing.MandrelSleeve.recipeType().create(), machinekit.hobbing.FlexsplineCupBlank.recipeType().create(),
       machinekit.hobbing.Hob.recipeType().create()]) {
       var item = candidate.bom;

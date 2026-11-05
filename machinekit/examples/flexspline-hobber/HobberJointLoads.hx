@@ -96,6 +96,9 @@ class HobberJointLoads {
       between: ["motorCradle", "spindleSeat"],
       shear: {peak: pull + massOf(machine, ["motorCradle", "spindle/motor"]) * g}
     });
+    var outboardWeight = massOf(machine, ["outboardCarrier", "outboard", "outboardBearing"]) * (g + 0.5);
+    loads.push({label: "Outboard carrier on the Y saddle", between: ["outboardCarrier", "Yplate"],
+      shear: {peak: CUTTING_FORCE + outboardWeight, momentary: jam + outboardWeight}});
     return loads;
   }
 }

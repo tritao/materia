@@ -32,6 +32,8 @@ class Hob extends MachineComponent {
     P.length("fluteExtraDepth", 0.5),
     P.length("edgeTolerance", 0.0005),
     P.length("surfaceTolerance", 0.01),
+    P.length("faceKeyWidth", 0),
+    P.length("faceKeyDepth", 2.2),
     P.length("keywayWidth", 0),
     P.length("keywayDepth", 2.3),
     P.length("radialRunout", 0.002),
@@ -172,6 +174,13 @@ class Hob extends MachineComponent {
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function hasGeometry():Bool return true;
-  override public function geometry(detail:ComponentDetail = Preview):cadkit.modeling.Part return detail == Envelope
-    || !values().boolean("detailed") ? ComponentEnvelopes.annular(values()) : HobSolid.build(this);
+  override public function geometry(detail:ComponentDetail = Preview):cadkit.modeling.Part {
+    var body = detail == Envelope || !values().boolean("detailed") ? ComponentEnvelopes.annular(values()) : HobSolid.build(this);
+    if (parameterNumber("faceKeyWidth") == 0) return body;
+    // End-face key, outside the plain centring bore; one slot, as specified for
+    // the hob purchase. Width/depth are assumed pending the tool maker's sheet.
+    return Solids.cut(body, [cadkit.modeling.Part.box(parameterNumber("outside") / 2,
+      parameterNumber("faceKeyWidth"), parameterNumber("faceKeyDepth") + 0.1)
+      .translated(new cadkit.modeling.Vector(parameterNumber("outside") / 4, 0, -0.1))]);
+  }
 }

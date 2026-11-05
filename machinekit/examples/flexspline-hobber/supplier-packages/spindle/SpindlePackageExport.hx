@@ -10,7 +10,7 @@ import machinekit.tooling.CastingSectionContours;
     The arbor is the one FlexsplineHobber installs. Usage: hl main.hl <output dir> */
 class SpindlePackageExport {
   // Members we have made; everything else in the cartridge is bought.
-  static final MADE = ["shaft", "housing", "bearingRetainer", "arbor"];
+  static final MADE = ["arbor"];
 
   static function main() {
     var args = Sys.args();
@@ -103,7 +103,6 @@ class SpindlePackageExport {
         pulleyTeeth: HobSpindle.SPINDLE_TEETH,
         motorTeeth: HobSpindle.MOTOR_TEETH,
         centres: HobSpindle.centres(),
-        arborScrewPcd: HobSpindle.ARBOR_SCREW_PCD,
         toolFace: 180.0
       },
       arbor: {
