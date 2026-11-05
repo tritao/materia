@@ -234,6 +234,28 @@ class HobberFoundationSizing {
         openings: [materia.casting.CastingPatterns.face("body.z-max")]
       });
     }
+    // Every site carries the same share of the casting's weight. A footprint whose pattern cannot meet it alone (no casting,
+    // no neighbours) cannot meet it in the casting either, so a site no footprint can carry fails this thread before the
+    // neighbours' anchors and the casting are built, and the scan below skips those footprints.
+    var liftingShareN = mass.mass * rule.gravityMps2 / Math.min(rule.liftingLoadPaths, LIFT_POINT_COUNT);
+    function carries(id:String, part:CastInsert):Bool {
+      try {
+        machinekit.tooling.InsertAnchorGeometry.derive(id, part, rule, FootprintOnly, liftingShareN);
+        return true;
+      } catch (error:Dynamic) {
+        if (Std.isOfType(error, machinekit.tooling.InsertAnchorGeometry.InsertAnchorScreenDefect)) throw error;
+        return false;
+      }
+    }
+    for (site in sites) {
+      var stock = site.part.boxDimensions(site.id), any = false;
+      for (width in minimumWidth...Std.int(stock.width) + 1) if (carries(site.id, blank(width, stock.depth))) {
+        any = true;
+        break;
+      }
+      if (!any) throw "No source lifting footprint fits plinth/" + site.id + ": no pattern of " + minimumWidth + ".."
+        + stock.width + " x " + stock.depth + " mm carries " + liftingShareN + " N";
+    }
     var casting = new machinekit.structural.MineralCasting(body), resin = casting.geometry(), resinKey = casting.geometryKey();
     var neighbours:machinekit.tooling.SourceSteel = null;
     try {
@@ -253,6 +275,10 @@ class HobberFoundationSizing {
               pose: pose,
               openings: site.openings
             };
+            if (!carries(site.id, candidate.part)) {
+              failures.push(width + " x " + stock.depth + " mm, turn " + turn + ": no pattern carries " + liftingShareN + " N");
+              continue;
+            }
             try {
               machinekit.tooling.InsertAnchorGeometry.checkSourceClearance(
                 candidate,
@@ -266,7 +292,7 @@ class HobberFoundationSizing {
                 candidate.part,
                 rule,
                 Casting(resin, pose, resinKey),
-                mass.mass * rule.gravityMps2 / Math.min(rule.liftingLoadPaths, LIFT_POINT_COUNT)
+                liftingShareN
               );
               chosen = candidate;
               chosenHardware = {id: site.id, part: anchored, pose: pose, openings: site.openings};

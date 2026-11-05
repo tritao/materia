@@ -916,8 +916,8 @@ class InsertAnchorGeometry {
     var window = switch context {
       case FootprintOnly:
         null;
-      case Casting(body, pose, _):
-        anchorWindow(body, pose, stock, choices, rule);
+      case Casting(body, pose, bodyKey):
+        anchorWindow(body, bodyKey, pose, stock, choices, rule);
     };
     try {
       var result = selectPattern(source, spec, rule, context, stock, choices, failures, liftingShareN, window);
@@ -985,7 +985,7 @@ class InsertAnchorGeometry {
     }
     ];
     var result = backPattern(source, InsertHoles.threadSpec(candidate.thread), candidate.rules, selected);
-    if (!contained(result, context, candidate.rules.minimumCoverMm, candidate.rules
+    if (!confirmed(result, context, candidate.rules.minimumCoverMm, candidate.rules
       .minimumEmbedmentMm, window)) throw new InsertAnchorScreenDefect("Analytic anchor screen disagrees with native confirmation; candidate must not fall back");
     components(result.insertSpec());
     return result;
@@ -999,6 +999,7 @@ class InsertAnchorGeometry {
 	 */
   static function anchorWindow(
     body:Part,
+    bodyKey:Null<String>,
     pose:AssemblyFrame,
     stock:materia.casting.Box3,
     choices:Array<InsertAnchorStockChoice>,
@@ -1016,6 +1017,14 @@ class InsertAnchorGeometry {
     var margin = radius + cover;
     var low = stock.z - length - head - margin;
     var high = stock.z + stock.height + embedment + margin;
+    var min = {x: stock.x - margin, y: stock.y - margin, z: low};
+    var max = {x: stock.x + stock.width + margin, y: stock.y + stock.depth + margin, z: high};
+    // The region depends on the keyed casting, the pose and the window alone: each lifting pass and each candidate
+    // pattern of one insert crops the same one.
+    var key = bodyKey == null ? null : bodyKey + "|" + haxe.Json.stringify(pose) + "|" + haxe.Json.stringify(min) + "|"
+      + haxe.Json.stringify(max);
+    var cropped:Null<Part> = key == null || windows == null ? null : windows.get(key);
+    if (cropped != null) return {region: new Part(cropped.shape.cloneShape()), min: min, max: max};
     var scope = new cadkit.modeling.Scope();
     try {
       var local = scope.own(Part.box(stock.width + 2 * margin, stock.depth + 2 * margin, high - low));
@@ -1025,11 +1034,18 @@ class InsertAnchorGeometry {
       ));
       var region = body.intersect(window);
       scope.close();
-      return {
-        region: region,
-        min: {x: stock.x - margin, y: stock.y - margin, z: low},
-        max: {x: stock.x + stock.width + margin, y: stock.y + stock.depth + margin, z: high}
-      };
+      if (key != null) {
+        var memo:Map<String, Part> = windows == null ? [] : windows;
+        if (windowCount >= WINDOW_LIMIT) {
+          for (kept in memo) kept.close();
+          memo.clear();
+          windowCount = 0;
+        }
+        memo.set(key, new Part(region.shape.cloneShape()));
+        windows = memo;
+        windowCount++;
+      }
+      return {region: region, min: min, max: max};
     } catch (error:Dynamic) {
       scope.close();
       throw error;
@@ -1073,6 +1089,48 @@ class InsertAnchorGeometry {
 
   /** Chosen-pattern confirmation. Analytic admission never substitutes for
 	 * native occupancy, all-anchor embedment or finite-face cover. */
+  /** Cropped regions by casting, pose and window (`anchorWindow`); kept native shapes are copied out. */
+  static var windows:Null<Map<String, Part>>;
+  static var windowCount = 0;
+  static inline final WINDOW_LIMIT = 128;
+  /** Confirmations by the anchored insert, the keyed casting, the pose, the rules and the window. */
+  static var confirmations:Null<Map<String, Bool>>;
+  static var confirmationCount = 0;
+
+  /**
+   * `contained`, remembered in a keyed casting: the lifting passes re-derive an insert for a new weight share, and the
+   * pattern they choose, whose confirmation depends on nothing else, is mostly the one confirmed before.
+   */
+  static function confirmed(
+    source:CastInsert,
+    context:InsertAnchorContext,
+    cover:Float,
+    minimumEmbedment:Float,
+    window:Null<AnchorWindow>
+  ):Bool {
+    var key:Null<String> = null;
+    switch context {
+      case FootprintOnly:
+      case Casting(_, pose, bodyKey):
+        var region = window == null ? "body" : haxe.Json.stringify(window.min) + "|" + haxe.Json.stringify(window.max);
+        if (bodyKey != null) key = bodyKey + "|" + haxe.Json.stringify(pose) + "|" + source.geometryKey() + "|" + cover
+          + "|" + minimumEmbedment + "|" + region;
+    }
+    var memo:Map<String, Bool> = confirmations == null ? [] : confirmations;
+    confirmations = memo;
+    if (key != null && memo.exists(key)) return memo.get(key) == true;
+    var result = contained(source, context, cover, minimumEmbedment, window);
+    if (key != null) {
+      if (confirmationCount >= DERIVED_LIMIT) {
+        memo.clear();
+        confirmationCount = 0;
+      }
+      memo.set(key, result);
+      confirmationCount++;
+    }
+    return result;
+  }
+
   static function contained(
     source:CastInsert,
     context:InsertAnchorContext,
