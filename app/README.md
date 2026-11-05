@@ -322,6 +322,10 @@ across opens and editable recipe changes. Deterministic entrypoints opt into geo
 caching with `"cache": {}`. Haxeon's analyzed module graph supplies the transitive
 source inputs using the same request as compilation; source lists are unnecessary.
 External non-source resources may additionally be declared in `cache.inputs`.
+The module-graph analysis behind the fingerprint is recorded beside the cache as
+`<key>.inputs.json` (file hashes, source-directory listings, native library stamps,
+compiler options); a repeat open confirms the fingerprint by rehashing those files
+instead of re-analyzing, and falls back to the analysis on any difference.
 The Gantry picker, yaw picker, and welder enable this cache. Source contents,
 manifests, compiler options, declared inputs, and tool/native library metadata invalidate
 cached artifacts. Recipe edits always execute the generator with the new document.

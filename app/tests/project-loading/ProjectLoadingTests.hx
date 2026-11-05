@@ -165,7 +165,8 @@ class ProjectLoadingTests {
       File.saveContent(data, "first");
       File.saveContent(counter, "");
       var source = 'import haxe.io.Bytes;\nimport sys.io.File;\nimport materia.project.SceneArtifact;\n'
-        + 'class LoadingPreview { public static function preview(?document:String):Bytes {\n'
+        + 'class LoadingPreview { public static function alternate(?document:String):Bytes return preview("alternate");\n'
+        + 'public static function preview(?document:String):Bytes {\n'
         + 'File.saveContent(' + Json.stringify(counter) + ', File.getContent(' + Json.stringify(counter) + ') + "x");\n'
         + 'var vertices = Bytes.alloc(96); var coordinates = [0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0];\n'
         + 'for (i in 0...12) vertices.setDouble(i * 8, coordinates[i]);\n'
@@ -202,9 +203,22 @@ class ProjectLoadingTests {
       check(files(artifacts, ".hl").length == 1, "cold load caches compiled code");
       check(files(artifacts, ".mtrg").length == 1, "declared deterministic output is cached");
       check(files(root + "/cache/materia/project-tools", ".hl").length == 2, "both tools run as compiled executables");
+      check(hasPhase(coldControl, "Fingerprinting the project"), "cold load analyzes the module graph");
+      check(files(artifacts, ".inputs.json").length == 1, "cold load records the fingerprint's inputs");
       var warmControl = new ProjectLoadControl();
       var warmScene = MateriaProjectRunner.loadProject(manifest, null, warmControl);
       check(warmScene.recipeDocument == "first-v1", "warm output");
+      check(!hasPhase(warmControl, "Fingerprinting the project"), "warm load confirms the recorded fingerprint");
+      // A new module could change resolution: its directory listing changes, so the graph is analyzed again (same result here).
+      File.saveContent(root + "/Unrelated.hx", "class Unrelated {}\n");
+      var listingControl = new ProjectLoadControl();
+      check(MateriaProjectRunner.loadProject(manifest, null, listingControl).recipeDocument == "first-v1", "new module output");
+      check(hasPhase(listingControl, "Fingerprinting the project"), "a new module re-runs the analysis");
+      File.saveContent(files(artifacts, ".inputs.json")[0], "{not json");
+      var recordControl = new ProjectLoadControl();
+      check(MateriaProjectRunner.loadProject(manifest, null, recordControl).recipeDocument == "first-v1", "corrupt record output");
+      check(hasPhase(recordControl, "Fingerprinting the project"), "a corrupt fingerprint record is ignored");
+      check(File.getContent(counter) == "x", "fingerprint records never change cached output");
       check(!hasPhase(warmControl, "Preparing geometry and physics"), "warm load skips preparation");
       check(
         Json.stringify(coldScene.physical) == Json.stringify(warmScene.physical),
@@ -362,10 +376,12 @@ class ProjectLoadingTests {
         "same-size declared input edit invalidates output"
       );
       File.saveContent(root + "/LoadingPreview.hx", StringTools.replace(source, "-v1", "-v2"));
+      var editControl = new ProjectLoadControl();
       check(
-        MateriaProjectRunner.loadProject(manifest).recipeDocument == "other-v2",
+        MateriaProjectRunner.loadProject(manifest, null, editControl).recipeDocument == "other-v2",
         "same-size source edit invalidates code and output"
       );
+      check(hasPhase(editControl, "Fingerprinting the project"), "a source edit fails fingerprint confirmation");
       Reflect.deleteField(entry, "cache");
       File.saveContent(manifest, Json.stringify(project));
       var before = files(artifacts, ".mtrg").length;
@@ -381,6 +397,23 @@ class ProjectLoadingTests {
       try MateriaProjectRunner.loadProject(manifest,
         null, control) catch (error:Dynamic) cancelled = Std.string(error) == ProjectLoadControl.CANCELLED;
       check(cancelled && File.getContent(counter).length == 8, "cancelled open executes no generator");
+      // Variants select entrypoints; each keeps its own cached output, and switching never serves the other's.
+      File.saveContent(manifest, '{"format":"materia.project","version":1,"defaultEntrypoint":"preview",'
+        + '"build":{"system":"haxeon","manifest":"haxeon.json"},"entrypoints":{'
+        + '"preview":{"kind":"cad-preview","module":"LoadingPreview","function":"preview","cache":{}},'
+        + '"alternate":{"kind":"cad-preview","module":"LoadingPreview","function":"alternate","cache":{}}},'
+        + '"defaultVariant":"main","variants":['
+        + '{"id":"main","label":"Main","entrypoint":"preview","kind":"configuration","summary":"Main."},'
+        + '{"id":"other","label":"Other","entrypoint":"alternate","kind":"study","summary":"Other."}]}');
+      var runsBeforeVariants = File.getContent(counter).length;
+      check(MateriaProjectRunner.loadProject(manifest, null, null, "main").recipeDocument == "other-v2", "default variant output");
+      check(
+        MateriaProjectRunner.loadProject(manifest, null, null, "other").recipeDocument == "alternate-v2",
+        "variant change misses the other variant's output"
+      );
+      check(MateriaProjectRunner.loadProject(manifest, null, null, "main").recipeDocument == "other-v2", "variant switch back hits");
+      check(MateriaProjectRunner.loadProject(manifest, null, null, "other").recipeDocument == "alternate-v2", "variant hits");
+      check(File.getContent(counter).length == runsBeforeVariants + 2, "each variant executes once, then reuses its output");
     } catch (error:Dynamic) {
       Sys.putEnv("XDG_CACHE_HOME", previousCache);
       remove(root);

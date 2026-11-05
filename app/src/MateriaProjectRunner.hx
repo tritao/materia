@@ -393,7 +393,22 @@ class MateriaProjectRunner {
       home,
       Reflect.field(entry, "documentInput") == true ? "true" : "false"
     ].concat(inputs);
-    var fingerprint = StringTools.trim(runProjectTool(
+    // The fingerprint tool analyzes the entrypoint's whole module graph, which takes tens of seconds for a large machine.
+    // Its record of what that analysis read lets a repeat open confirm the same fingerprint by rehashing those files.
+    var recordPath = ProjectPath.join([
+      cacheDirectory,
+      digestHex(Sha256.make(Bytes.ofString("materia-fingerprint-record-v" + FINGERPRINT_RECORD_VERSION + "\n"
+        + arguments.join("\n")))) + ".inputs.json"
+    ]);
+    var confirmationStarted = Sys.time();
+    var confirmed = confirmFingerprint(recordPath, home, tools, control);
+    if (control != null) control.measure("Fingerprint confirmation", Sys.time() - confirmationStarted);
+    if (confirmed != null) {
+      Sys.println("Materia project: confirmed its fingerprint from recorded inputs");
+      return ProjectPath.join([cacheDirectory, confirmed]);
+    }
+    if (control != null) control.phase("Fingerprinting the project");
+    var output = runProjectTool(
       "MateriaProjectFingerprint",
       arguments,
       haxe,
@@ -401,9 +416,123 @@ class MateriaProjectRunner {
       tools,
       "Could not fingerprint Materia project entrypoint",
       control
-    ));
+    );
+    var lines = output.split("\n");
+    var fingerprint = StringTools.trim(lines[0]);
     if (!Sha256Digest.isHex(fingerprint)) throw "Project fingerprint has an invalid result";
+    var record = lines.length > 1 ? StringTools.trim(lines[1]) : "";
+    if (record.length > 0) try AtomicFile.writeBytes(recordPath, Bytes.ofString(record)) catch (error:Dynamic) Sys.println(
+      "Materia project: could not save fingerprint record: " + Std.string(error)
+    );
     return ProjectPath.join([cacheDirectory, fingerprint]);
+  }
+
+  /** Must match MateriaProjectFingerprint.RECORD_VERSION. */
+  static inline var FINGERPRINT_RECORD_VERSION:Int = 1;
+  static final FINGERPRINT_OPTIONS = ["HAXEON_INLINE", "HAXEON_LOADSTORE", "HAXEON_STRENGTH"];
+
+  /**
+   * The recorded fingerprint when everything the fingerprint tool read is unchanged: the same contents of every analyzed
+   * module and hashed input, the same module-resolution directory listings (so no module appeared or vanished), the same
+   * compiler options and the same native binaries. Otherwise null, and the tool runs again. Any doubt (a missing or
+   * malformed record, an unreadable file) also returns null: the record only ever skips work, never decides staleness.
+   */
+  static function confirmFingerprint(recordPath:String, home:String, tools:String, ?control:ProjectLoadControl):Null<String> {
+    if (!FileSystem.exists(recordPath)) return null;
+    try {
+      var metadata = FileSystem.metadata(recordPath);
+      if (metadata == null || metadata.size > 64000000) return stale("record size");
+      var record:Dynamic = Json.parse(File.getContent(recordPath));
+      if (Reflect.field(record, "version") != FINGERPRINT_RECORD_VERSION) return stale("record version");
+      var fingerprint:Dynamic = Reflect.field(record, "fingerprint");
+      if (!Std.isOfType(fingerprint, String) || !Sha256Digest.isHex(fingerprint)) return stale("record fingerprint");
+      var options = pairs(record, "options");
+      if (options == null || options.length != FINGERPRINT_OPTIONS.length) return stale("options");
+      for (index in 0...options.length) if (options[index].length != 2 || options[index][0] != FINGERPRINT_OPTIONS[index]
+        || options[index][1] != (Sys.getEnv(FINGERPRINT_OPTIONS[index]) == "0" ? "off" : "on")) return stale("compiler options");
+      var binaries = pairs(record, "binaries");
+      var nativeRoot:Dynamic = Reflect.field(record, "nativeRoot");
+      if (binaries == null || !Std.isOfType(nativeRoot, String)) return stale("record binaries");
+      var current = binaryStamps(home, nativeRoot);
+      if (current.length != binaries.length) return stale("native library set");
+      for (index in 0...current.length) {
+        var expected = binaries[index], actual = current[index];
+        if (expected.length != 3 || expected[0] != actual[0] || expected[1] != actual[1] || expected[2] != actual[2]) return stale(actual[0]);
+      }
+      var directories = pairs(record, "directories");
+      if (directories == null || directories.length == 0) return stale("record directories");
+      for (directory in directories) {
+        if (control != null) control.throwIfCancelled();
+        if (directory.length != 2 || directory[1] != sourceListingDigest(directory[0])) return stale(directory[0] + "/");
+      }
+      var files = pairs(record, "files");
+      if (files == null || files.length == 0) return stale("record files");
+      for (file in files) {
+        if (control != null) control.throwIfCancelled();
+        if (file.length != 2 || !FileSystem.exists(file[0]) || FileSystem.isDirectory(file[0])) return stale(file[0]);
+        if (digestHex(Sha256.make(File.getBytes(file[0]))) != file[1]) return stale(file[0]);
+      }
+      return fingerprint;
+    } catch (error:Dynamic) {
+      if (Std.string(error) == ProjectLoadControl.CANCELLED) throw error;
+      return stale("unreadable record");
+    }
+  }
+
+  /** Reports why the module analysis runs again; a repeat open that analyzes is otherwise unexplained. */
+  static function stale(changed:String):Null<String> {
+    Sys.println("Materia project: fingerprint inputs changed (" + changed + "); analyzing the entrypoint again");
+    return null;
+  }
+
+  static function pairs(record:Dynamic, name:String):Null<Array<Array<String>>> {
+    var raw:Dynamic = Reflect.field(record, name);
+    if (!Std.isOfType(raw, Array)) return null;
+    var result:Array<Array<String>> = [];
+    for (item in (cast raw:Array<Dynamic>)) {
+      if (!Std.isOfType(item, Array)) return null;
+      var values:Array<String> = [];
+      for (value in (cast item:Array<Dynamic>)) {
+        if (!Std.isOfType(value, String)) return null;
+        values.push(value);
+      }
+      result.push(values);
+    }
+    return result;
+  }
+
+  /** The tool's binary stamps, in its order: its pinned tools, then every package native library. */
+  static function binaryStamps(home:String, nativeRoot:String):Array<Array<String>> {
+    var binaries = [
+      ProjectPath.join([home, ".tools", "haxe", "haxe"]),
+      ProjectPath.join([home, ".tools", "hashlink", "hl"]),
+      ProjectPath.join([home, "out", "haxeon_runtime.hdll"])
+    ];
+    if (FileSystem.exists(nativeRoot)) for (kit in FileSystem.readDirectory(nativeRoot)) {
+      var nativeDirectory = ProjectPath.join([nativeRoot, kit]);
+      if (FileSystem.isDirectory(nativeDirectory)) for (name in FileSystem.readDirectory(nativeDirectory))
+        if (StringTools.endsWith(name, ".hdll") || name.indexOf(".so") >= 0) binaries.push(ProjectPath.join([nativeDirectory, name]));
+    }
+    binaries.sort(Reflect.compare);
+    return [for (path in binaries) {
+      var metadata = FileSystem.exists(path) ? FileSystem.metadata(path) : null;
+      metadata == null ? [path, "missing", ""] : [path, Std.string(metadata.size), Std.string(metadata.modified)];
+    }];
+  }
+
+  /** Same rule as MateriaProjectFingerprint.listSourceDirectories: sorted subdirectory and `.hx` names, hidden excluded. */
+  static function sourceListingDigest(path:String):String {
+    if (!FileSystem.exists(path) || !FileSystem.isDirectory(path)) return "missing";
+    var names:Array<String> = [];
+    for (entry in FileSystem.readDirectoryEntries(path)) {
+      var name = entry.name;
+      if (StringTools.startsWith(name, ".")) continue;
+      if (entry.isDirectory || (!StringTools.endsWith(name, ".hx")
+        && FileSystem.isDirectory(ProjectPath.join([path, name])))) names.push(name + "/");
+      else if (StringTools.endsWith(name, ".hx")) names.push(name);
+    }
+    names.sort(Reflect.compare);
+    return digestHex(Sha256.make(Bytes.ofString(names.join("\n"))));
   }
 
   static function ensureCacheDirectory(path:String):Bool {

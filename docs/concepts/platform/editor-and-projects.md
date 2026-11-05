@@ -81,7 +81,15 @@ disposable, sit under the user's cache directory (`~/.cache/materia`):
 - **Compiled generators** (`generated-artifacts/<fingerprint>.hl`). The
   fingerprint hashes every source file and manifest of the resolved packages,
   the compiler and runtime, the native libraries' build stamps and the
-  compiler options. Any change compiles again.
+  compiler options. Any change compiles again. Computing it means analyzing
+  the entrypoint's whole module graph (about 30 s for the flexspline hobber),
+  so a **fingerprint record** (`<key>.inputs.json`) lists what that analysis
+  read: every module and input file with its content hash, the listing of
+  every source directory (so a new module that could change resolution is
+  noticed), the native libraries and the compiler options. A repeat open
+  rehashes those files and reuses the recorded fingerprint (a warm headless
+  hobber open loads its scene under 3 s after launch, down from about 40 s);
+  any difference, or a missing or unreadable record, runs the analysis again.
 - **Artifacts** (`generated-artifacts/<fingerprint>.mtrg`), only for
   entrypoints that declare `"cache": {"inputs": [...]}`. That declaration is a
   promise that the output is deterministic and depends only on the sources and

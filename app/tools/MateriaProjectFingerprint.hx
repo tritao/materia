@@ -9,6 +9,8 @@ import sys.io.File;
 /** Fingerprint the declared inputs of a deterministic CAD preview entrypoint. */
 class MateriaProjectFingerprint {
   static var generatedSources:String;
+  /** Caches are outputs (Materia's and the compiler's); a source root that contains XDG_CACHE_HOME must not list them. */
+  static var cacheRoot:String;
   static function main():Void {
     var args = Sys.args();
     if (args.length
@@ -19,6 +21,7 @@ class MateriaProjectFingerprint {
     var cache = Sys.getEnv("XDG_CACHE_HOME");
     if (cache == null || cache.length == 0) cache = Path.join([Sys.getEnv("HOME"), ".cache"]);
     generatedSources = Path.normalize(Path.join([FileSystem.fullPath(cache), "materia", "project-sources"]));
+    cacheRoot = Path.normalize(FileSystem.fullPath(cache));
     var paths = new Map<String, Bool>();
     add(paths, manifest);
     for (item in project.packages.packages) {
@@ -60,10 +63,7 @@ class MateriaProjectFingerprint {
     var fields = new StringBuf();
     field(fields, "materia-generated-artifact-v3");
     // These options affect generated code even when source bytes are unchanged.
-    for (name in ["HAXEON_INLINE", "HAXEON_LOADSTORE", "HAXEON_STRENGTH"]) field(
-      fields,
-      name + ":" + (Sys.getEnv(name) == "0" ? "off" : "on")
-    );
+    for (name in OPTIONS) field(fields, name + ":" + optionValue(name));
     field(fields, args[1]);
     field(fields, args[2]);
     moduleSources.sort((a, b) -> Reflect.compare(a.name, b.name));
@@ -72,10 +72,38 @@ class MateriaProjectFingerprint {
       field(fields, source.path);
       field(fields, source.text);
     }
-    for (path in ordered) {
-      field(fields, path);
-      field(fields, ContentDigest.make(File.getBytes(path)).toHex());
+    // The record lets the editor confirm this fingerprint without re-running the module analysis: the same file contents
+    // and the same module-resolution directories (and binaries and options below) give the same analysis and fingerprint.
+    var recordFiles:Array<Array<String>> = [];
+    var hashedSources = new Map<String, Bool>();
+    // Explicit sources (the entry module, the wrapper) are named relative to the request; library modules are absolute.
+    var explicitSources = [for (path in parsed.paths) FileSystem.exists(path) ? FileSystem.fullPath(path) : null];
+    // FFI projection modules (CadKit.hx from CadKit.hxi/.hxmap) are generated from files already hashed above.
+    var projections = new Map<String, Bool>();
+    for (path in parsed.ffiInterfaces.concat(parsed.ffiProjections)) projections.set(Path.withoutExtension(Path.withoutDirectory(path)) + ".hx", true);
+    var recordable = true;
+    for (source in moduleSources) {
+      if (!Path.isAbsolute(source.path) && projections.exists(source.path) && sourceFile(source.path, explicitSources) == null) continue;
+      var absolute = sourceFile(source.path, explicitSources);
+      // Every analyzed module must be confirmable from its file; otherwise the editor always runs this analysis.
+      if (absolute == null || ContentDigest.make(File.getBytes(absolute)).toHex() != ContentDigest.make(haxe.io.Bytes.ofString(source.text)).toHex()) {
+        recordable = false;
+        continue;
+      }
+      if (paths.exists(absolute) || hashedSources.exists(absolute)) continue;
+      hashedSources.set(absolute, true);
+      recordFiles.push([absolute, ContentDigest.make(haxe.io.Bytes.ofString(source.text)).toHex()]);
     }
+    for (path in ordered) {
+      var digest = ContentDigest.make(File.getBytes(path)).toHex();
+      field(fields, path);
+      field(fields, digest);
+      recordFiles.push([path, digest]);
+    }
+    var recordDirectories:Array<Array<String>> = [];
+    var visited = new Map<String, Bool>();
+    for (root in parsed.roots) listSourceDirectories(root, recordDirectories, visited);
+    for (root in parsed.packageRoots) listSourceDirectories(root.path, recordDirectories, visited);
     // Native code and tool binaries are not Haxe sources. Their build stamps
     // invalidate generated geometry without reading large shared libraries.
     var binaries = [
@@ -97,16 +125,78 @@ class MateriaProjectFingerprint {
         ]));
     }
     binaries.sort(Reflect.compare);
+    var recordBinaries:Array<Array<String>> = [];
     for (path in binaries) {
-      if (!FileSystem.exists(path)) continue;
+      if (!FileSystem.exists(path)) {
+        recordBinaries.push([path, "missing", ""]);
+        continue;
+      }
       var stat = FileSystem.stat(path);
+      // Whole Unix seconds, as Haxeon's FileSystem.metadata reports them to the editor.
+      recordBinaries.push([path, Std.string(stat.size), Std.string(Std.int(stat.mtime.getTime() / 1000.0))]);
       // Empty files contain no executable native code.
       if (stat.size == 0) continue;
       field(fields, path);
       field(fields, Std.string(stat.size));
       field(fields, Std.string(stat.mtime.getTime()));
     }
-    Sys.println(ContentDigest.make(haxe.io.Bytes.ofString(fields.toString())).toHex());
+    var fingerprint = ContentDigest.make(haxe.io.Bytes.ofString(fields.toString())).toHex();
+    Sys.println(fingerprint);
+    // Second line: what the fingerprint depends on, for MateriaProjectRunner's fast confirmation.
+    if (recordable) Sys.println(haxe.Json.stringify({
+      version: RECORD_VERSION,
+      fingerprint: fingerprint,
+      options: [for (name in OPTIONS) [name, optionValue(name)]],
+      files: recordFiles,
+      directories: recordDirectories,
+      nativeRoot: nativeRoot,
+      binaries: recordBinaries
+    }));
+  }
+
+  /** Must match MateriaProjectRunner.FINGERPRINT_RECORD_VERSION. */
+  static inline var RECORD_VERSION:Int = 1;
+  static final OPTIONS = ["HAXEON_INLINE", "HAXEON_LOADSTORE", "HAXEON_STRENGTH"];
+
+  /** The file a module was read from: its own path when that resolves, else the one explicit source it names. */
+  static function sourceFile(path:String, explicitSources:Array<Null<String>>):Null<String> {
+    if (Path.isAbsolute(path)) return FileSystem.exists(path) && !FileSystem.isDirectory(path) ? FileSystem.fullPath(path) : null;
+    var found:Null<String> = null;
+    for (candidate in explicitSources) if (candidate != null && (candidate == path || StringTools.endsWith(candidate, "/" + path))) {
+      if (found != null && found != candidate) return null;
+      found = candidate;
+    }
+    return found;
+  }
+
+  static function optionValue(name:String):String return Sys.getEnv(name) == "0" ? "off" : "on";
+
+  /**
+   * Module resolution reads only directory names and `.hx` names, so a directory's sorted list of those (hidden entries
+   * excluded: they are never packages) changes whenever a module could appear or disappear. MateriaProjectRunner computes
+   * the same digest.
+   */
+  static function listSourceDirectories(root:String, out:Array<Array<String>>, visited:Map<String, Bool>):Void {
+    if (!FileSystem.exists(root) || !FileSystem.isDirectory(root)) {
+      out.push([Path.normalize(root), "missing"]);
+      return;
+    }
+    var absolute = FileSystem.fullPath(root);
+    if (visited.exists(absolute)) return;
+    visited.set(absolute, true);
+    var names:Array<String> = [];
+    var directories:Array<String> = [];
+    for (name in FileSystem.readDirectory(absolute)) {
+      if (StringTools.startsWith(name, ".")) continue;
+      var path = Path.join([absolute, name]);
+      if (FileSystem.isDirectory(path)) {
+        names.push(name + "/");
+        directories.push(path);
+      } else if (StringTools.endsWith(name, ".hx")) names.push(name);
+    }
+    names.sort(Reflect.compare);
+    out.push([absolute, ContentDigest.make(haxe.io.Bytes.ofString(names.join("\n"))).toHex()]);
+    for (path in directories) if (Path.normalize(path) != cacheRoot) listSourceDirectories(path, out, visited);
   }
 
   static function add(paths:Map<String, Bool>, path:String):Void {

@@ -1333,8 +1333,8 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
     // A stable editor frame does not need to reconstruct its declarative tree.
     // Keep live simulation, component stories, and externally populated worlds
     // on the normal path because their presentation can change independently
-    // of the UI revision counters.
-    if (componentLab != null || startLoading != null || simulationBuild != null
+    // of the UI revision counters. A project open's progress is in the submit key.
+    if (componentLab != null || simulationBuild != null
       || simulationStop != null || simulation.isActive() || externalWorldHasRobots) return ui.submit(
         view(),
         frame
@@ -1350,11 +1350,12 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
     var queued = startLoading;
     if (queued != null) {
       var job = startJob;
-      updateProjectLoadingProgress(job);
+      var progressChanged = updateProjectLoadingProgress(job);
       if (job != null) {
-        // A project is building on its worker thread: keep the frame loop going for the spinner and phase.
+        // A project is building on its worker thread. Tick polls it every host iteration; draw only when the shown phase
+        // or elapsed second changes (the spinner wakes the host for its own steps).
         if (!job.isFinished()) {
-          if (hostContext != null) hostContext.requestFrame();
+          if (progressChanged && hostContext != null) hostContext.requestFrame();
         } else {
           startJob = null;
           startLoading = null;
@@ -1589,13 +1590,15 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
 
   function projectLoadingFailure():Null<String> return startFailure ?? projectVariants.snapshot().error;
 
-  function updateProjectLoadingProgress(job:Null<ExampleLoadJob>):Void {
+  function updateProjectLoadingProgress(job:Null<ExampleLoadJob>):Bool {
     var phase = job == null ? "Starting" : job.control.currentPhase();
     var elapsed = Std.int(Sys.time() - projectOpenStartedAt);
     var cancelling = job != null && job.control.isCancelled();
-    if (startLoadingPhase != phase) startLoadingPhase = phase;
-    if (startLoadingElapsedSeconds != elapsed) startLoadingElapsedSeconds = elapsed;
-    if (startLoadingCancelling != cancelling) startLoadingCancelling = cancelling;
+    if (startLoadingPhase == phase && startLoadingElapsedSeconds == elapsed && startLoadingCancelling == cancelling) return false;
+    startLoadingPhase = phase;
+    startLoadingElapsedSeconds = elapsed;
+    startLoadingCancelling = cancelling;
+    return true;
   }
 
   function clearProjectLoadingProgress():Void {
@@ -1624,7 +1627,11 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
     if (hostContext != null) hostContext.requestFrame();
   }
 
-  function editorSubmitKey():String return "editor";
+  function editorSubmitKey():String {
+    var loading = startLoading;
+    return loading == null ? "editor" : "editor|opening:" + loading.title + "|" + startLoadingPhase + "|"
+      + startLoadingElapsedSeconds + "|" + startLoadingCancelling;
+  }
 
   public function context():UiContext return ui;
 
