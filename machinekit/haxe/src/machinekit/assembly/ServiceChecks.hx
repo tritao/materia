@@ -13,7 +13,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
  *
  * - `integrity.service.<id>` (`ServiceRemoval`): the removed members, taken along their steps with the prerequisites
  *   already off, clear every member that stays. The screws that hold the removed and the prerequisite members come off with
- *   them. The path is sampled every `STEP` mm (and at its end), with the running gap against any member that is farther than
+ *   them. The path is sampled every `STEP` mm (and at its end), with the running gap (at most `MAX_GAP`) against any member that is farther than
  *   the gap when the removal starts; members already in contact at the start (a flange on its seat) only may not interpenetrate.
  *   A sampled sweep: a sliver thinner than `STEP` can be missed.
  * - `integrity.drain.<id>` (`GuardedChannel`): a channel a cover protects states how it drains: the floor falls at least
@@ -22,14 +22,20 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 class ServiceChecks {
   /** Distance between the sampled poses of a removal, mm. */
   public static inline var STEP:Float = 2.0;
+  /**
+   * The most clearance a removal path keeps from the members that were farther away when it starts, mm: a part is slid out of a fit (a cartridge out of
+   * its clamp, a belt off its pulleys), so the running gap of the machine in operation does not apply: the path may touch what it passes, but not enter it.
+   * Raise it to hold removal paths to a clearance (at most the check's running gap).
+   */
+  public static inline var MAX_GAP:Float = 0.0;
   /** Least fall of a channel floor toward its drain, mm per mm. */
   public static inline var MIN_FALL:Float = 0.01;
 
   public static function run(assembly:MachineAssembly, flat:FlatAssembly, state:AssemblyState, posed:PosedParts,
-      diagnostics:Diagnostics, overlapLimit:Float, runningGap:Null<Float>, rest:Map<String, Float>):Void {
+      diagnostics:Diagnostics, overlapLimit:Float, runningGap:Null<Float>, rest:Map<String, Float>, ?allowed:String -> String -> Float):Void {
     for (requirement in flat.designRequirements) switch requirement {
       case ServiceRemoval(id, members, steps, prerequisites, pose):
-        try removal(flat, state, posed, diagnostics, overlapLimit, runningGap, rest, id, members, steps, prerequisites, pose) catch (error:Dynamic)
+        try removal(flat, state, posed, diagnostics, overlapLimit, runningGap, rest, id, members, steps, prerequisites, pose, allowed) catch (error:Dynamic)
           diagnostics.error("integrity.service." + id, id, 'Service removal "$id" could not be checked: ' + Std.string(error));
       case GuardedChannel(id, channel, covers, drain):
         try channelDrain(flat, state, posed, diagnostics, id, channel, covers, drain) catch (error:Dynamic)
@@ -40,7 +46,7 @@ class ServiceChecks {
 
   static function removal(flat:FlatAssembly, state:AssemblyState, posed:PosedParts, diagnostics:Diagnostics, overlapLimit:Float,
       runningGap:Null<Float>, rest:Map<String, Float>, id:String, members:Array<String>, steps:Array<ServiceStep>,
-      prerequisites:Array<String>, pose:Array<{joint:String, value:Float}>):Void {
+      prerequisites:Array<String>, pose:Array<{joint:String, value:Float}>, ?allowed:String -> String -> Float):Void {
     var code = "integrity.service." + id;
     if (members.length == 0 || steps.length == 0) throw "a removal needs members and at least one step";
     var known = new Map<String, Bool>();
@@ -81,7 +87,7 @@ class ServiceChecks {
       }
       // Contacts at the start: those pairs are not held to the running gap.
       var touching = new Map<String, Bool>();
-      var gap = runningGap == null ? 0.0 : runningGap;
+      var gap = runningGap == null ? 0.0 : Math.min(runningGap, MAX_GAP);
       if (gap > 0) for (mover in movers) for (other in obstacles) {
         if (PosedParts.apart(mover.box, other.box, gap)) continue;
         if (mover.part.distance(other.part) < gap) touching.set(mover.id + "|" + other.id, true);
@@ -110,7 +116,8 @@ class ServiceChecks {
               var margin = touching.exists(key) ? 0.0 : gap;
               if (PosedParts.apart(box, other.box, Math.max(margin, 0.0))) continue;
               var shared = PosedParts.commonVolume(shifted, box, other.part, other.box);
-              var close = shared > overlapLimit;
+              // Pairs the model says mesh or wrap (a belt on its pulley, a screw in its nut) may share volume, as in the static check.
+              var close = shared > (allowed == null ? overlapLimit : allowed(mover.id, other.id));
               var measured = 0.0;
               if (!close && margin > 0) {
                 measured = shifted.distance(other.part);
@@ -120,7 +127,7 @@ class ServiceChecks {
               blocked.set(key, true);
               diagnostics.error(code, other.id,
                 'Removing ${mover.id} (' + members.join(", ") + ') is blocked by ${other.id}: '
-                + (shared > overlapLimit ? 'they share ${round(shared)} mm3' : 'only ${round(measured)} mm apart (running gap ${round(margin)} mm)')
+                + (shared > (allowed == null ? overlapLimit : allowed(mover.id, other.id)) ? 'they share ${round(shared)} mm3' : 'only ${round(measured)} mm apart (running gap ${round(margin)} mm)')
                 + ' after ${round(travelled + d)} mm of the path, at ${round(now[0])}, ${round(now[1])}, ${round(now[2])} from the installed position'
                 + (prerequisites.length > 0 ? '; prerequisites off: ' + prerequisites.join(", ") : ""));
             }

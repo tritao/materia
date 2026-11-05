@@ -1,5 +1,6 @@
 import machinekit.assembly.AssemblyIntegrity;
 import machinekit.assembly.PosedParts;
+import machinekit.design.DesignRequirement;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.MachineKitComponents;
 import machinekit.hobbing.FoundationLayout;
@@ -41,6 +42,45 @@ class HobberFrameChecks {
     if (!sweep) options.sweepStates = [];
     var report = AssemblyIntegrity.check(machine, options);
     return [for (item in report.errors()) item.code + " " + item.message];
+  }
+
+  /**
+   * The service removals (FRAME_PLAN, "Chip protection and service"): every declared removal clears the machine (`integrity.service.<id>`), and each path tried
+   * that does not work as built is reported blocked, with the part that blocks it and the distance along the path. Returns one line per removal.
+   */
+  static function shorten(message:String):String {
+    var cut = message.indexOf("; prerequisites off");
+    var text = cut < 0 ? message : message.substr(0, cut);
+    var from = text.indexOf(" is blocked by ");
+    return from < 0 ? text : text.substr(from + 4);
+  }
+
+  public static function service(machine:FlexsplineHobber):Array<String> {
+    var lines = [];
+    var declared = [for (r in machine.serviceRemovals()) switch r {
+      case ServiceRemoval(id, _, _, _, _): id;
+      default: "";
+    }];
+    var report = AssemblyIntegrity.service(machine);
+    var errors = [for (e in report.errors()) e.code + " " + e.message];
+    for (id in declared) {
+      var mine = [for (e in errors) if (e.indexOf("integrity.service." + id + " ") == 0) e];
+      lines.push(mine.length == 0 ? 'service $id: clear' : 'service $id: BLOCKED ${mine.join("; ")}');
+    }
+    if (errors.length > 0) throw "Declared service removals are blocked: " + errors.join("; ");
+    // The tried paths are added together and swept once; each is reported with every part that blocks it and how far along the path.
+    var tried = [for (t in machine.serviceTries()) switch t {
+      case ServiceRemoval(id, _, _, _, _): id;
+      default: "";
+    }];
+    for (t in machine.serviceTries()) machine.addDesignRequirement(t);
+    var found = [for (e in AssemblyIntegrity.service(machine).errors()) e.code + " " + e.message];
+    for (id in tried) {
+      var mine = [for (e in found) if (e.indexOf("integrity.service." + id + " ") == 0) shorten(e.substr(("integrity.service." + id + " ").length))];
+      lines.push(mine.length == 0 ? 'tried $id: CLEAR (declare it)' : 'tried $id: blocked: ${mine.join(" | ")}');
+      if (mine.length == 0) throw 'The service path $id now clears: move it from serviceTries to serviceRemovals';
+    }
+    return lines;
   }
 
   /** Thickness of a cover end wall and of a carrier on the moving member, mm (the bench mill's `COVER_PLATE`). */
@@ -605,6 +645,7 @@ class HobberFrameChecks {
       Sys.println('  world: origin ${w(0, 0, 0)} x ${w(1, 0, 0)} y ${w(0, 1, 0)} z ${w(0, 0, 1)} base centre ${w(0, -b.centreHeight, b.thickness / 2)}');
     }
     if (args.indexOf("coverfit") >= 0) for (line in coverFit(machine)) Sys.println(line);
+    if (args.indexOf("service") >= 0) for (line in service(machine)) Sys.println(line);
     if (args.indexOf("crash") >= 0) for (line in HobberCrashProtection.report(machine)) Sys.println(line);
     if (args.indexOf("fasteners") >= 0) for (line in HobberFastenerChecks.report(machine)) Sys.println(line);
     if (args.indexOf("integrity") >= 0) {

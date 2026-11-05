@@ -242,3 +242,9 @@ The centered Z drive uses a 420 mm ground SFU1605 screw, top fixed / bottom
 floating supports, a top-mounted 750 W servo, short saddle nut shelf and adjacent
 linear scale. Its 40 × 40 R3 motor-platform window clears the actual coupling.
 See Z_DRIVE_REPORT.json for travel, backing and thread-direction evidence.
+
+### Chip protection (2026-11-05)
+
+Block wipers are bought parts in the BOM: `WIPER-HG25-SCRAPER` x 8 (the four X blocks, one scraper at each end) and `WIPER-HG15-SCRAPER` x 16 (four Z and four Y blocks); their rows in
+`WayWiperCatalog` carry assumed added lengths. No way cover is in the BOM: they do not fit as built (MACHINE_DESIGN.md, "Chip protection and service"). The service removals are declared on
+the assembly as design requirements and add no parts.

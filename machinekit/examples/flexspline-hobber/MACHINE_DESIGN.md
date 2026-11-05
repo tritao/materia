@@ -68,8 +68,9 @@ recessed casting channel. Its nut carrier drops from the carriage into the chann
 a steel deck mounts to a separate ground-after-casting steel insert. The fixed
 support and motor sit at the rear; the screw axis points towards the table.
 The screw transmission sign follows that reversed axis. The insert starts beyond
-the chip guard, with 45.5 mm nominal radial clearance. A channel cover/bellows remains
-a design provision; the exposed mechanism is an inspection model.
+the chip guard, with 45.5 mm nominal radial clearance. A way cover over the screw does not fit as built
+(see "Chip protection and service" below: the front one fits dimensionally but has no host for its wall, the rear one is 31 mm short);
+the exposed mechanism is an inspection model with wipers on the guide blocks.
 
 Ground screws and linear scales serve
 all three translations; screw manufacturing grades and preload need procurement
@@ -597,3 +598,22 @@ The work height remains 1000 mm. Local spine/adapter stiffness and a Z holding
 brake specification remain open; the simulation models powered holding.
 
 See [Z_DRIVE_SECTION.svg](Z_DRIVE_SECTION.svg) and [Z_DRIVE_REPORT.json](Z_DRIVE_REPORT.json).
+
+## Chip protection and service
+
+Block wipers: an end scraper at each end of every guide block (`WIPER-HG25-SCRAPER` on the four X blocks, `WIPER-HG15-SCRAPER` on the four Z and four Y blocks, 24 in all;
+`WayWiperCatalog`, added lengths assumed; BOM lines only, the block models do not carry them).
+
+Way covers (`machinekit.cover`, box covers of the lamella bellows row, 14 mm end walls and carriers, 2 mm gaps, opening 40 x 50 round the bare screw) measured on the
+posed machine by `HobberFrameChecks.coverFit`: X front (BF12 to the nut, stroke 64.8 mm) 28.7 mm free, 22 mm needed, flange 106 mm of the 110 mm channel: fits, but its wall
+has no host (the nut groove of the pad bar starts at x 205, 2 mm behind the BF12, the insert is 100 wide, the casting wall in front is a 12.5 mm strip); X rear (nut to BK12) -9 mm free,
+31 mm short; Z bottom 21.5 mm and Z top 23 mm free against 38 mm (4 folds for 200 mm), 16.5 and 15 mm short. Y has no room for a skin: the 28 mm between the saddle's plate and the
+swivel plate holds the rails, blocks and screw. The geometry that would make them fit: 31 mm more screw behind the nut's far stop (the bed 40 mm longer), 16.5 and 15 mm more at the two Z
+ends (a 20 mm taller column), and a purpose-made wall for the X front (an insert extended 14 mm forward with the channel front, or the pad bar milled with an upstand). The channel floor
+is the ground drive-seat insert over 100 of 110 mm, so no casting fall or drain was cut; gutters need a wider channel (at least 150 mm) and the deck ribs' inner faces, now on the channel walls, would move.
+
+Service removals (declared, `FlexsplineHobber.serviceRemovals`, swept by `ServiceChecks`): the X, Y, Z and B servos come off along their own axes (shaft out of the coupling, 45 mm);
+the B belt slides off along its pulleys (40 mm); the B cartridge with the hob and arbor leaves rearward out of its split clamp (240 mm, X at retract, belt off); the X screw and nut leave
+upward after 25 mm rearward, once the motor, the BK12, the BF12's ring and the carriage stack are off. Blocked (reported by `HobberFrameChecks.service`, `serviceTries`): the X screw
+rearward with the nut (the nut's flange is on the block's front face), with the block (the pad bar's full-height rear end is 5 mm above the block's lower end), and the eRob out of the Z
+saddle rearward (Z pad bar after 4 mm, column casting after 38 mm; about 90 mm needed) or forward with the saddle (the nut block hangs on the nut).

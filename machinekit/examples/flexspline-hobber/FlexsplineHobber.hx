@@ -4,6 +4,7 @@ import machinekit.assembly.*;
 import machinekit.assembly.AxisBuilder;
 import machinekit.component.*;
 import machinekit.control.BissMaster;
+import machinekit.design.DesignRequirement;
 import machinekit.motion.*;
 import machinekit.hobbing.*;
 import machinekit.power.*;
@@ -442,11 +443,96 @@ class FlexsplineHobber extends MachineAssembly {
     deriveFasteners();
     // The loads the joints carry come from the finished parts (masses), so they are checked after the derived holes are cut.
     checkJointLoads(HobberJointLoads.of(this));
-    // Chip protection (FRAME_PLAN, "Chip protection and service"): an end scraper at each end of every guide block (X: HGH25CA x 4, Z and Y: HGH15CA x 8).
+    // Chip protection and service (FRAME_PLAN, "Chip protection and service"): wipers on every guide block, and the removals a technician needs.
     addBomItem(machinekit.cover.WayWiperCatalog.bomItem("WIPER-HG25-SCRAPER", 8));
     addBomItem(machinekit.cover.WayWiperCatalog.bomItem("WIPER-HG15-SCRAPER", 16));
+    declareServices();
     exposeConnector("work", "mandrel", "work");
     exposeConnector("hobCentre", "hob", "centre");
+  }
+
+  /** The assembly's world direction of a work-frame direction (the work frame is `MACHINE_FROM_WORK` turned). */
+  static function worldDir(x:Float, y:Float, z:Float):Array<Float> return [-y, x, z];
+
+  /** Every member below `root` in the mate tree, `root` not included. */
+  function below(root:String):Array<String> {
+    var parents = mateParents(), out = [];
+    for (c in components()) {
+      var at:Null<String> = c.id, guard = 0;
+      while (at != null && at != root && guard++ < 200) at = parents.get(at);
+      if (at == root && c.id != root) out.push(c.id);
+    }
+    return out;
+  }
+
+  /** The direction (assembly world frame) of `local` in member `id`'s frame at the rest pose, as a unit vector. */
+  function axisOf(id:String, x:Float, y:Float, z:Float):Array<Float> {
+    var p = solvedPoses().get(id), v = F.transformVector(p, x, y, z);
+    return [v.x, v.y, v.z];
+  }
+
+  /** Clearance added to every service path past the length that frees the part, mm. */
+  public static final SERVICE_CLEARANCE = 5.0;
+
+  function startsWith(id:String, prefix:String):Bool return StringTools.startsWith(id, prefix);
+
+  /** The members of the B cartridge: the housing with the shaft, bearings, encoder, pulley and arbor, and the hob on it (not the servo, its pulley or the belt). */
+  function cartridgeMembers():Array<String> {
+    var motorGroup = ["spindle/motor", "spindle/motorShaft", "spindle/motorPulley", "spindle/motorEncoder", "spindle/belt"];
+    return [for (c in components()) if (startsWith(c.id, "spindle/") && motorGroup.indexOf(c.id) < 0) c.id].concat(["hob"]);
+  }
+
+  /**
+   * The service removals the machine declares (`ServiceChecks` sweeps each against everything that stays; screws that hold a removed or prerequisite
+   * member are taken away with it). A servo comes off its mount along its own axis, away from the screw or pulley: the shaft stub out of the coupling,
+   * then the body free of the flange pilot. The B servo leaves with its belt and pulley off. The B belt slides off both pulleys along their axis. The spindle
+   * cartridge, with the hob and arbor, leaves rearward out of its split clamp, the arbor tip drawn out of the outboard bearing, the belt off.
+   * The paths that do not work as built are `serviceTries`, swept by `HobberFrameChecks.service` and reported with their numbers.
+   */
+  function declareServices():Void {
+    for (r in serviceRemovals()) addDesignRequirement(r);
+  }
+
+  /** The declared removals. */
+  public function serviceRemovals():Array<DesignRequirement> {
+    var away = (d:Array<Float>) -> [for (c in d) -c];
+    var out:Array<DesignRequirement> = [];
+    for (axis in ["X", "Y", "Z"]) {
+      var back = away(axisOf(axis + "motor", 0, 0, 1));
+      out.push(ServiceRemoval(axis.toLowerCase() + "MotorWithdrawal", [axis + "motor", axis + "motor-shaft"],
+        [{direction: back, distance: 30 + 10 + SERVICE_CLEARANCE}], [], []));
+    }
+    var shaft = spindle.motor.rating.shaftLength;
+    out.push(ServiceRemoval("bMotorWithdrawal", ["spindle/motor", "spindle/motorShaft", "spindle/motorEncoder"],
+      [{direction: away(axisOf("spindle/motor", 0, 0, 1)), distance: shaft + 10 + SERVICE_CLEARANCE}], ["spindle/belt", "spindle/motorPulley"], []));
+    out.push(ServiceRemoval("bBeltRemoval", ["spindle/belt"],
+      [{direction: away(axisOf("spindle/housing", 0, 0, 1)), distance: 2 * HobSpindle.BELT_WIDTH + SERVICE_CLEARANCE}], [], []));
+    out.push(ServiceRemoval("spindleCartridgeWithdrawal", cartridgeMembers(),
+      [{direction: away(axisOf("spindle/housing", 0, 0, 1)), distance: 180 + 60}], ["spindle/belt"], [{joint: "X", value: HobberXLayout.RETRACT}]));
+    // The X screw and its nut leave upward, with the carriage and everything it carries lifted off the rails first: the nut block is trapped between the pad bar's
+    // full-height ends and the deck, and the nut's flange cannot pass the block's bore. The screw first slides back until its front journal is out of the BF12.
+    var stack = below("Xbridge").concat(["Xbridge"]).filter(id -> id != "Xnut");
+    out.push(ServiceRemoval("xScrewWithdrawal", ["Xscrew", "Xcoupling", "Xnut"],
+      [{direction: worldDir(1, 0, 0), distance: 25.0}, {direction: worldDir(0, 0, 1), distance: 130.0}],
+      ["Xmotor", "Xmotor-shaft", "Xfixed", "XfloatingRing"].concat(stack), []));
+    return out;
+  }
+
+  /** The removals tried as the procedure a technician would follow, which do not clear as built: each is swept on its own and reported with the part that blocks it. */
+  public function serviceTries():Array<DesignRequirement> {
+    var away = (d:Array<Float>) -> [for (c in d) -c];
+    var xBack = away(axisOf("Xmotor", 0, 0, 1));
+    var head = below("swivelAdapter").concat(["swivelAdapter"]);
+    return [
+      // The X screw out of the rear with its nut (the motor and the BK12 off): the nut's flange is on the block's front face.
+      ServiceRemoval("xScrewRearward", ["Xscrew", "Xcoupling", "Xnut"], [{direction: xBack, distance: 260 + 20}], ["Xmotor", "Xmotor-shaft", "Xfixed", "XfloatingRing"], []),
+      // The same with the carriage at its rear stop and the block off the carriage with its screws.
+      ServiceRemoval("xScrewWithBlock", ["Xscrew", "Xcoupling", "Xnut", "XnutBlock"], [{direction: xBack, distance: 260 + 20}], ["Xmotor", "Xmotor-shaft", "Xfixed", "XfloatingRing"], []),
+      // The eRob actuator out of the Z saddle's pocket from behind, with the whole head off the output flange.
+      ServiceRemoval("erobRearward", ["swivel/housing", "swivel/output"], [{direction: xBack, distance: 100}], head, []),
+      // The Z saddle with the actuator moved forward off its four blocks (the head off): the nut block hangs on the nut, whose barrel is in the way.
+      ServiceRemoval("erobWithSaddle", ["Zplate", "swivel/housing", "swivel/output", "ZnutBlock", "ZscaleArm"], [{direction: worldDir(-1, 0, 0), distance: 60}], head, [])
+    ];
   }
 
   /** The pairs of members the hobbing process brings together: the hob in the cup's band. */

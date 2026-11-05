@@ -341,7 +341,7 @@ class AssemblyIntegrity {
     }
     for (id => value in rest) state.setJoint(id, value);
     state.forwardKinematics();
-    ServiceChecks.run(assembly, flat, state, posed, diagnostics, overlapLimit, runningGap, rest);
+    ServiceChecks.run(assembly, flat, state, posed, diagnostics, overlapLimit, runningGap, rest, allowed);
     checkDrives(state, rest);
     return states.length + 1;
   }
@@ -351,7 +351,7 @@ class AssemblyIntegrity {
     assembly.addTo(model, "");
     var state = new AssemblyState(model.definition("integrity"));
     state.forwardKinematics();
-    ServiceChecks.run(assembly, flat, state, posed, diagnostics, overlapLimit, runningGap, new Map<String, Float>());
+    ServiceChecks.run(assembly, flat, state, posed, diagnostics, overlapLimit, runningGap, new Map<String, Float>(), allowed);
   }
 
   function runFasteners(posed:PosedParts):Void {
