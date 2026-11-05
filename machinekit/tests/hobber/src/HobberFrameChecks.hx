@@ -208,19 +208,23 @@ class HobberFrameChecks {
     }
     // N/mm at the group's centre of mass.
     function hz(k:Float):Float return Math.sqrt(k * 1000 / mass) / (2 * Math.PI);
-    // Floor overhang (sensitivity only): the wall's foot stands beyond the rear bolt row on the floor plate, a cantilever of the wall's width that turns under the wall's moment.
+    // Load-path elements of the axial mode (bending in y-z): the wall (and rib) as a cantilever from the foot top, the foot (the floor under the wall) as a
+    // cantilever of the wall's width from the nearest bolt row to the wall's mid-plane, and the floor joint (the bolt rows rocking). The foot is taken
+    // as a free cantilever though the seat's tongue carries it in compression: no credit for that support.
     var rearBolt = 0.0;
     for (b in sec.bolts) rearBolt = Math.max(rearBolt, b.y);
-    var dims = HobberSaddle.cradleDimensions(), floorLen = HobberSaddle.cradleRearY() - dims.wall / 2 - rearBolt, iFloor = width * Math.pow(dims.floor, 3) / 12;
-    function modesFor(joint:Float, floorFlex:Bool = false) {
-      var kz = e * iX / (ahead * ahead * height);
-      var kyWall = 3 * e * iX / Math.pow(height, 3), kyRoot = joint * sumY2 / Math.pow(height, 2);
-      if (floorFlex) kyRoot = 1 / (1 / kyRoot + height * height * floorLen / (e * iFloor));
+    var dims = HobberSaddle.cradleDimensions(), footLen = HobberSaddle.cradleRearY() - dims.wall / 2 - rearBolt, iFoot = width * Math.pow(dims.foot, 3) / 12;
+    function axialElements(joint:Float) {
+      var kWall = 3 * e * iX / Math.pow(height, 3), kJointRock = joint * sumY2 / Math.pow(height, 2), kFoot = e * iFoot / (height * height * footLen);
+      return [{name: "wall bending", f: hz(kWall), k: kWall}, {name: "foot", f: hz(kFoot), k: kFoot}, {name: "floor joint", f: hz(kJointRock), k: kJointRock}];
+    }
+    function modesFor(joint:Float) {
+      var kz = e * iX / (ahead * ahead * height), el = axialElements(joint);
       var kxWall = 3 * e * iY / Math.pow(height, 3), kxRoot = joint * sumX2 / Math.pow(height, 2);
-      return [{name: "vertical (flange rocking on the wall)", f: hz(kz)}, {name: "axial (wall and floor bolts)", f: hz(1 / (1 / kyWall + 1 / kyRoot))},
+      return [{name: "vertical (flange rocking on the wall)", f: hz(kz)}, {name: "axial (wall, foot and floor bolts)", f: hz(1 / (1 / el[0].k + 1 / el[1].k + 1 / el[2].k))},
         {name: "lateral (wall and floor bolts)", f: hz(1 / (1 / kxWall + 1 / kxRoot))}];
     }
-    var modes = modesFor(kJoint), loose = modesFor(kJoint / 10), flexed = modesFor(kJoint, true);
+    var modes = modesFor(kJoint), loose = modesFor(kJoint / 10), elements = axialElements(kJoint);
     var first = modes[0], firstLoose = loose[0];
     for (m in modes) if (m.f < first.f) first = m;
     for (m in loose) if (m.f < firstLoose.f) firstLoose = m;
@@ -236,11 +240,13 @@ class HobberFrameChecks {
       + 'sensitivity: with the floor joint ten times softer (not preloaded) the first mode is ${Math.round(firstLoose.f)} Hz ${firstLoose.name}');
     if (first.f >= lo && first.f <= hi) throw "the servo's first mode lies within 20 % of the tooth-pass band: " + lines.join("; ");
     var margin = 1.3;
-    lines.push('B servo first-mode margin: ${r(first.f / hi, 2)} x the top of the avoid band (${Math.round(hi)} Hz), required at least ${margin} x; '
-      + 'floor overhang sensitivity (the wall foot ${r(floorLen, 1)} mm beyond the rear bolt row as a ${dims.floor} mm cantilever of the wall width, not in the estimate above): axial mode ${Math.round(flexed[1].f)} Hz');
-    if (first.f < margin * hi) throw "the servo's first mode is less than 1.3 x the top of the tooth-pass band: " + lines.join("; ");
+    lines.push('B servo first-mode margin: ${r(first.f / hi, 2)} x the top of the avoid band (${Math.round(hi)} Hz), required at least ${margin} x (${Math.round(margin * hi)} Hz); '
+      + 'axial load-path elements, each alone with the servo group on it: ' + [for (el in elements) el.name + " " + Math.round(el.f) + " Hz"].join(", ")
+      + ' (foot: ${r(footLen, 1)} mm from the rear bolt row to the wall mid-plane as a ${dims.foot} mm cantilever of the wall width)');
+    var bad = [for (el in elements) if (el.f < margin * hi) el.name + " " + Math.round(el.f) + " Hz"];
+    if (first.f < margin * hi || bad.length > 0) throw "the servo's first mode (" + Math.round(first.f) + " Hz) or a load-path element (" + bad.join(", ") + ") is less than 1.3 x the top of the tooth-pass band: " + lines.join("; ");
     // Cradle mass and the lightening.
-    lines.push('Motor cradle: ${r(cradle, 3)} kg (was 2.036 kg: 15 mm wall, 12 mm floor, solid rib); wall ${dims.wall}, floor ${dims.floor} (${dims.floorThin} ahead of y 195), windowed rib, jack lug ${dims.lug} mm above the floor');
+    lines.push('Motor cradle: ${r(cradle, 3)} kg (was 2.036 kg with a 15 mm wall, 12 mm floor and solid rib, 1.285 kg before the foot); wall ${dims.wall}, floor ${dims.floor} (${dims.floorThin} ahead of y 195, foot ${dims.foot} under the wall), windowed rib, jack lug ${dims.lug} mm above the foot');
     // The servo's speed and torque over the hob's speed range (1:1 belt).
     var ratio = spindle.ratio, motorRatedRpm = rating.ratedSpeed * 60 / (2 * Math.PI), hobRpmTop = 3 * nLow, motorRpmTop = hobRpmTop * ratio;
     var cuttingBound = 100.0, efficiency = 0.97, reserve = 1.2;
