@@ -83,9 +83,9 @@ class WayCoverTests {
    * A box cover (roof and two walls, no floor) over a rail on a bed: the base top closes it. The carriage is a bridge over the block with its
    * face at `space` along the bed; a wall at the bed end carries the fixed flange. Returns the cover for the checks.
    */
-  static function bed(rowId:String, space:Float, stroke:Float, ?extra:AxisBuilder -> Void):{builder:AxisBuilder, cover:WayCover, plan:WayCoverPlan} {
+  static function bed(rowId:String, space:Float, stroke:Float, ?extra:AxisBuilder -> Void, reversed:Bool = false):{builder:AxisBuilder, cover:WayCover, plan:WayCoverPlan} {
     var builder = new AxisBuilder();
-    var shape = WayCoverPlan.boxCover(13, 140);
+    var shape = WayCoverPlan.boxCover(13, 140, reversed ? 50 : 100000, reversed);
     var plan = new WayCoverPlan(WayCoverCatalog.get(rowId), 60, 25, stroke, space, shape);
     var half = plan.outerWidth() / 2 + 10, wallTop = plan.outerHeight() + 20;
     var across = {x: 1.0, y: 0.0, z: 0.0};
@@ -131,6 +131,21 @@ class WayCoverTests {
       var blocked = bed(row, space, 250, b -> b.attach("post", new TestSlab("POST", [-5, space + 100, 0], [5, space + 110, 30]), AssemblyFrames.translation(0, 0, 0), "bed"));
       var found = codes(AssemblyIntegrity.check(blocked.builder));
       check(found.indexOf("integrity.sweep") >= 0 || found.indexOf("integrity.overlap") >= 0, "a post inside the box cover is found, found: " + found);
+    }
+    // The nesting can grow toward the fixed end instead: the moving flange then carries the smallest skin, no wider than its host face.
+    var small = bed("BELLOWS-LAMELLA-8x8", 60, 250, null, true);
+    check(small.plan.movingLevel() == 0 && small.plan.fixedLevel() == small.plan.levels, "reversed nesting: the fixed flange carries the largest skin");
+    check(small.plan.plateHalf() <= 50 + 1e-9, "a flange plate is no wider than the host face it is bolted to");
+    var moving = small.builder.component("box-moving");
+    check(cast(moving, machinekit.cover.WayCoverSection).holes().length >= 3, "the narrow flange still has holes on the host");
+    var report = AssemblyIntegrity.check(small.builder, {runningGap: 1.0});
+    check(report.errors().length == 0, "reversed box cover should be sound on its bed, found: " + messages(report));
+    var order = [for (id in small.cover.members().concat(["wall"])) {member: id, fastened: ["rail", "bed"]}];
+    var screws = AssemblyIntegrity.fasteners(small.builder, {fittedBefore: order});
+    check(screws.errors().length == 0, "the reversed cover's flange screws fit: " + messages(screws));
+    for (id in small.cover.members()) {
+      var component = small.builder.component(id), again = component.componentType().create(component.values());
+      check(again.designation == component.designation, "reversed cover member " + id + " rebuilds from its values");
     }
     // A box cover is refused where it cannot fold into the space, with the numbers.
     var thrown = false;

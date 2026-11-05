@@ -94,7 +94,7 @@ class WayCover {
       p.origin[0] + p.along[0] * distance, p.origin[1] + p.along[1] * distance, p.origin[2] + p.along[2] * distance,
       p.up, flip ? [-p.along[0], -p.along[1], -p.along[2]] : p.along
     );
-    members.attach(fixedId, section(Fixed, 0), pose(0, false), p.fixedParent);
+    members.attach(fixedId, section(Fixed, plan.fixedLevel()), pose(0, false), p.fixedParent);
     var skins:Array<String> = [];
     var n = plan.levels, tf = row.flangeThickness;
     // Skin k of n sits k/n along the free span; each rides on the one before it, so each joint carries 1/n of the growth.
@@ -102,7 +102,7 @@ class WayCover {
       var id = p.id + "-s" + k;
       var start = tf + WayCoverPlan.AXIAL_GAP + k / n * (plan.slack() + s * (0 - folded));
       var parent = k == 1 ? fixedId : p.id + "-s" + (k - 1);
-      members.hang(id, section(Sleeve, k), pose(start, false), parent);
+      members.hang(id, section(Sleeve, plan.sleeveLevel(k)), pose(start, false), parent);
       var ratio = s / n;
       var low = Math.min(ratio * p.leader.lower, ratio * p.leader.upper), high = Math.max(ratio * p.leader.lower, ratio * p.leader.upper);
       builder.addMateOnAxis(id + "-joint", "prismatic", parent, 'to-$id', id, 'attach-$id', {x: p.along[0], y: p.along[1], z: p.along[2]},
@@ -110,7 +110,7 @@ class WayCover {
       builder.addCoupling(id + "-follows", p.leader.id, id + "-joint", ratio);
       skins.push(id);
     }
-    members.attach(movingId, section(Moving, n), pose(p.space + extension0, true), p.movingParent);
+    members.attach(movingId, section(Moving, plan.movingLevel()), pose(p.space + extension0, true), p.movingParent);
     return new WayCover(p.id, plan, fixedId, movingId, skins, folded);
   }
 }

@@ -13,6 +13,10 @@ typedef CoverShape = {
   /** Open cover: the range of heights above the surface in which the host face of each flange exists, mm; bolt holes go only there. */
   var hostMin:Float;
   var hostMax:Float;
+  /** Half the width of the narrowest host face across the cover, mm: a flange plate is no wider, and its holes stay inside it. */
+  var hostHalfWidth:Float;
+  /** The nesting grows toward the fixed end: the moving flange carries the smallest skin and the fixed flange the largest. */
+  var reversed:Bool;
 };
 
 /**
@@ -55,9 +59,10 @@ class WayCoverPlan {
    * part. The cover must fold into `space` and reach `space + stroke`, which fixes its folds (or sections): the fewest that
    * extend far enough, and then they must fold short enough.
    */
-  public static function ring():CoverShape return {open: false, hostMin: 0, hostMax: 100000};
+  public static function ring():CoverShape return {open: false, hostMin: 0, hostMax: 100000, hostHalfWidth: 100000, reversed: false};
 
-  public static function boxCover(hostMin:Float = 0, hostMax:Float = 100000):CoverShape return {open: true, hostMin: hostMin, hostMax: hostMax};
+  public static function boxCover(hostMin:Float = 0, hostMax:Float = 100000, hostHalfWidth:Float = 100000, reversed:Bool = false):CoverShape
+    return {open: true, hostMin: hostMin, hostMax: hostMax, hostHalfWidth: hostHalfWidth, reversed: reversed};
 
   public function new(row:WayCoverRow, width:Float, height:Float, stroke:Float, space:Float, ?shape:CoverShape) {
     if (!(width > 0) || !(height > 0) || !(stroke > 0) || !(space > 0) || !Math.isFinite(width + height + stroke + space)) throw "A way cover needs a positive opening, stroke and space";
@@ -121,15 +126,30 @@ class WayCoverPlan {
 
   public function outerHigh(level:Int):Float return innerHigh(level) + row.wall;
 
-  /** The flanges' outer footprint, mm. */
+  /** The skin level the fixed flange carries and the moving flange carries, and that of the k-th loose skin from the fixed end (1 to `levels - 1`). */
+  public function fixedLevel():Int return shape.reversed ? levels : 0;
+
+  public function movingLevel():Int return shape.reversed ? 0 : levels;
+
+  public function sleeveLevel(k:Int):Int return shape.reversed ? levels - k : k;
+
+  /**
+   * Half the width of a flange plate: the largest skin and the lip round it, so the screws in the lip are clear of every skin, but no wider
+   * than the narrowest host face. A plate cut back to the host has no holes in the walls' lips (`WayCoverSection.holes`).
+   */
+  public function plateHalf():Float return Math.min(fullPlateHalf(), shape.hostHalfWidth);
+
+  public function fullPlateHalf():Float return innerHalfWidth(levels) + row.wall + row.lip;
+
+  /** The largest flange's outer footprint, mm. */
   public function outerWidth():Float return 2 * (innerHalfWidth(levels) + row.wall + row.lip);
 
-  public function outerHeight():Float return plateHigh(levels) - plateLow(levels);
+  public function outerHeight():Float return plateHigh() - plateLow();
 
-  /** The plate of a flange carrying skin `level` spans this range up the frame: the skin's outer extent and the lip, mm. */
-  public function plateLow(level:Int):Float return shape.open ? FLOOR_GAP : innerLow(level) - row.wall - row.lip;
+  /** A flange plate spans this range up the frame: the largest skin's outer extent and the lip, mm. */
+  public function plateLow():Float return shape.open ? FLOOR_GAP : innerLow(levels) - row.wall - row.lip;
 
-  public function plateHigh(level:Int):Float return outerHigh(level) + row.lip;
+  public function plateHigh():Float return outerHigh(levels) + row.lip;
 
   /** Length of the loose skins and of the two attached to the flanges, mm. */
   public function looseSkin():Float return body - 2 * AXIAL_GAP;
