@@ -676,6 +676,15 @@ Seventh slice (2026-11-05, branch `hobber-crash`): the three open items of the s
   their screws), counterbored so the heads end 0.5 mm below the floor; the pad's clamped face derives its clearance holes and counterbores, and `HobberMountingHoles` taps the same points into the
   cast drive-seat inserts (blind, before casting), which `CastInsert.fasteningFaces` then offers as the receiving face. Slip: X x7.5 peak / x3.8 jam, Z x9.2 / x3.7 (friction). The casting package
   regenerated (bed 24 inserts 1171 kg, column 6 inserts 72.6 kg, its checks pass).
+- Scale faces. `SealedScalePart` declares its faces: the housing is clamped by two M8 through its end holes (Ø9.6, 11.5 mm from each end; the Ø15 counterbore is now cut only from the face
+  toward the head, `holeCounterboreDepth` 9.5 mm: the old geometry cut the Ø15 through the whole 13.5 mm height; the datasheet's "about 5 mm" is read as the floor left under the head,
+  4 mm here, ASSUMED, since no ISO 4762 M8 head fits a 5 mm well) and the reading head is tapped M5 at the 97.5 mm pitch (thread depth 8 mm of the 11.2 mm head: ASSUMED, not on the datasheet;
+  `rated`, so one diameter of engagement with a `fasteners.rated-thread` warning where aluminium asks for two). The head's tapped holes are now drawn in its geometry. Hobber, six new
+  joints (51 joints / 216 screws, was 45 / 204): housing to the X and Z seat bars and to the swivel plate (2 x M8x12 each, through-tapped, the bars' and plate's explicit tapped faces), head to the X
+  carriage rib (2 x M5x35 from the deck's top, counterbored), to the Y saddle (2 x M5x16 from the plate's front, counterbored, the rear screw through a Ø10.5 well in the outboard support's arm wall) and to the Z arm
+  (2 x M5x16). The hand clearance holes (`carrierHoles`, `headHoles`) are gone: the carriers cut them from the derivation (the Z arm is now machinable). Assembly order added to the integrity run:
+  the Y head's screws before the outboard support and its bearing (the driver comes in through the arm's cavity), the Z head's before the eRob housing; the Y scale housing after the plate's other joints.
+  The bars' and the plate's M8 holes stay the seats' own (`HobberScales.seatHoles`): a 20 mm bar cannot be a drilled-to-suit host at the 1.5 d edge rule.
 
 ### B7 — Rollout and hard gate
 - Done in `fa1f1534f`. The full gate passed 11/24 shards with no new

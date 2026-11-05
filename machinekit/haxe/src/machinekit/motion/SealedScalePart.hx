@@ -175,21 +175,61 @@ class SealedScalePart extends MachineComponent implements EncoderPart {
     z1
   );
 
+  /**
+   * The housing is clamped to its seat by two M8 through the end holes, heads in the counterbores (face frame: origin on the mounting face, +Z into the
+   * housing, x along the travel); the reading head is tapped M5 for two screws from its carrier (origin on the face away from the housing, +Z into the head).
+   * The head's thread depth is ASSUMED (`SealedScaleData`); the maker's rating is not given, so the thread is `rated` (one diameter of engagement).
+   */
+  override public function fasteningFaces():Array<machinekit.component.BoltedFace> {
+    if (variant == HOUSING) {
+      var hole = series.holeDiameter, bore = series.holeCounterbore, boreDepth = series.holeCounterboreDepth;
+      if (hole == null || bore == null || boreDepth == null) return [];
+      return [machinekit.component.BoltedFace.clamped(
+        "mount",
+        machinekit.component.BoltedFace.frameOf({x: 0, y: series.housingHeight, z: 0}, {x: 0, y: -1, z: 0}, {x: 0, y: 0, z: 1}),
+        [{x: endHole(), y: 0.0}, {x: overallLength() - endHole(), y: 0.0}],
+        hole,
+        series.housingHeight - boreDepth,
+        "M8",
+        {diameter: bore, depth: boreDepth}
+      )];
+    }
+    var depth = series.headThreadDepth;
+    if (depth == null) return [];
+    return [machinekit.component.BoltedFace.tapped(
+      "mount",
+      machinekit.component.BoltedFace.frameOf({x: 0, y: -series.headHeight, z: 0}, {x: 0, y: 1, z: 0}, {x: 0, y: 0, z: 1}),
+      [{x: -series.headHolePitch / 2, y: 0.0}, {x: series.headHolePitch / 2, y: 0.0}],
+      series.headThread,
+      depth,
+      series.headHeight,
+      false,
+      machinekit.component.BoltedFace.ThreadMaterial.Aluminium,
+      true
+    )];
+  }
+
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
     if (variant == HEAD) {
-      // The nominal head is a solid block: its M5 holes are tapped in the carriage-side face and not modelled.
-      return Solids.named(box(series.headDepth, -series.headHeight, 0, -series.headLength / 2, series.headLength / 2), "head");
+      // The nominal head is a block with its two M5 tapped holes (tap drill, `headThreadDepth` deep, ASSUMED) in the carriage-side face.
+      var block = Solids.named(box(series.headDepth, -series.headHeight, 0, -series.headLength / 2, series.headLength / 2), "head");
+      var depth = series.headThreadDepth;
+      if (detail == Envelope || depth == null) return block;
+      var drill = machinekit.standard.SocketHeadCapScrew.catalog().get(series.headThread).tapDrill;
+      return Solids.cut(block, [for (z in [-series.headHolePitch / 2, series.headHolePitch / 2])
+        Solids.named(Part.cylinderAlongY(drill / 2, -series.headHeight - 0.1, -series.headHeight + depth, 0, z), "headThread")]);
     }
     var h = series.housingHeight, d = series.housingDepth, len = overallLength();
     var body = Solids.named(box(d, 0, h, 0, len), "housing");
-    var hole = series.holeDiameter, bore = series.holeCounterbore;
-    if (detail == Envelope || hole == null || bore == null) return body;
+    var hole = series.holeDiameter, bore = series.holeCounterbore, boreDepth = series.holeCounterboreDepth;
+    if (detail == Envelope || hole == null || bore == null || boreDepth == null) return body;
     var tools:Array<Part> = [];
+    // The screw enters from the face toward the head (y = 0) and its head sinks into the counterbore; the mounting face (y = h) is clear of it.
     for (z in [endHole(), len - endHole()]) {
       tools.push(Solids.named(Part.cylinderAlongY(hole / 2, -0.1, h + 0.1, 0, z), "endHole"));
-      tools.push(Solids.named(Part.cylinderAlongY(bore / 2, 0, h + 0.1, 0, z), "endCounterbore"));
+      tools.push(Solids.named(Part.cylinderAlongY(bore / 2, -0.1, boreDepth, 0, z), "endCounterbore"));
     }
     return Solids.cut(body, tools);
   }

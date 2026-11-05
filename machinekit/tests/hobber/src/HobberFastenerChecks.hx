@@ -11,7 +11,7 @@ class HobberFastenerChecks {
     var sizes = new Map<String, Int>();
     for (line in derivation.lines()) sizes.set(line.item.description + " [" + line.item.partNumber + "]", line.quantity);
     for (name => count in sizes) lines.push('line $count x $name');
-    for (joint in derivation.joints) lines.push('joint ${joint.id}: ${joint.count} x ${joint.size}x${joint.length}${joint.nutted ? " bolt" : ""}, grip ${joint.grip}, engagement ${joint.engagement}');
+    for (joint in derivation.joints) lines.push('joint ${joint.id}: ${joint.count} x ${joint.size}x${joint.length}${joint.nutted ? " bolt" : ""}, grip ${joint.grip}, engagement ${joint.engagement}, at ${[for (p in joint.worldHoles) "(" + Math.round(p.x * 10) / 10 + ", " + Math.round(p.y * 10) / 10 + ", " + Math.round(p.z * 10) / 10 + ")"].join(" ")}');
     for (joint in derivation.dowels) lines.push('dowel ${joint.id}: ${joint.count} x ISO 8734 ${joint.size}x${joint.length} ${joint.fit}, engagement ${joint.engagementA}/${joint.engagementB}');
     for (slip in derivation.slips) lines.push("slip " + machinekit.assembly.JointSlip.describe(slip));
     lines.push('totals: ${derivation.joints.length} joints, ${derivation.count()} screws, ${derivation.dowels.length} dowelled joints, ${derivation.dowelCount()} dowels');

@@ -29,6 +29,7 @@ class SealedScaleTests {
     connectorsAndGap();
     feedback();
     recipes();
+    faces();
     Sys.println("Sealed scale: length selection, overall length, mass, connectors, tolerances and feedback passed");
   }
 
@@ -131,6 +132,33 @@ class SealedScaleTests {
     a.addComponent("housing", h);
     a.addComponent("head", part("JFT-40", 120, "head"));
     check(a.components().length == 2, "both parts in an assembly");
+  }
+
+  /** The fastening faces: the housing's two M8 through the end holes (Ø15 counterbore from the head side only), the head's tapped M5 pair. */
+  static function faces():Void {
+    var h = part("JFT-40", 120), head = part("JFT-40", 120, "head");
+    var housing = h.fasteningFaces(), tapped = head.fasteningFaces();
+    check(housing.length == 1 && tapped.length == 1, "one face each");
+    var clamped = housing[0], holes:Array<machinekit.component.BoltedFace.BoltHole> = clamped.holes ?? [], pair:Array<machinekit.component.BoltedFace.BoltHole> = tapped[0].holes ?? [];
+    check(clamped.isClamped() && holes.length == 2 && Math.abs(holes[0].x - 11.5) < 1e-9 && Math.abs(holes[1].x - (h.overallLength() - 11.5)) < 1e-9,
+      "the housing's two M8 sit 11.5 mm from each end");
+    switch clamped.role {
+      case Clamped(size, clearance, grip, recess):
+        check(size == "M8" && clearance == 9.6 && recess != null && recess.diameter == 15 && Math.abs(grip + recess.depth - 13.5) < 1e-9, "Ø9.6 holes, Ø15 counterbore, floor under it");
+      default:
+        check(false, "the housing's face is clamped");
+    }
+    check(pair.length == 2 && Math.abs(pair[1].x - 48.75) < 1e-9 && Math.abs(pair[0].x + 48.75) < 1e-9, "the head's M5 pair at 97.5 mm");
+    // The counterbore is cut only from the head side: the mounting face (y = 13.5) keeps the bearing area around the Ø9.6 hole.
+    var body = h.geometry(), full = machinekit.component.Solids.named(cadkit.modeling.Part.prism([new cadkit.modeling.Vector(-9, 0), new cadkit.modeling.Vector(9, 0), new cadkit.modeling.Vector(9, 13.5), new cadkit.modeling.Vector(-9, 13.5)], 0, h.overallLength()), "ref");
+    var removed = full.volume() - body.volume(), expected = 2 * Math.PI / 4 * (9.6 * 9.6 * 13.5 + (15 * 15 - 9.6 * 9.6) * 9.5);
+    check(Math.abs(removed - expected) < 0.5 * expected / 100, 'the end holes remove ${removed} mm3, expected ${expected}; a through counterbore would remove more');
+    body.close();
+    full.close();
+    var tappedBody = head.geometry();
+    var block = 18.25 * 11.2 * 115.3, drill = machinekit.standard.SocketHeadCapScrew.catalog().get("M5").tapDrill;
+    check(Math.abs(block - tappedBody.volume() - 2 * Math.PI / 4 * drill * drill * 8) < 1.0, "the head's two tapped holes are drawn, 8 mm deep");
+    tappedBody.close();
   }
 
   static function recipes():Void {

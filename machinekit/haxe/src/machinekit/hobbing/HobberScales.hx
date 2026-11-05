@@ -1,6 +1,7 @@
 package machinekit.hobbing;
 
 import machinekit.assembly.AxisBuilder;
+import machinekit.component.BoltedFace;
 import machinekit.component.ManufacturingRoute.RouteHole;
 import machinekit.motion.SealedScalePart;
 import machinekit.standard.SocketHeadCapScrew;
@@ -142,15 +143,37 @@ class HobberScales {
     return out;
   }
 
-  /** The head's two M5 screws through its carrier: clearance holes, mouth on the carrier face, into the carrier `depth` mm. */
-  public static function carrierHoles(a:HobberScaleAxis, depth:Float):Array<RouteHole> {
-    var out = [], n = 0;
-    var into = F.transformVector(a.headPose, 0, -1, 0);
-    for (name in ["hole1", "hole2"]) {
-      var f = a.head.connector(name).frame, p = F.transformPoint(a.headPose, f.x, f.y, f.z);
-      out.push({id: "H" + (++n), kind: "clearance", thread: "M5", diameter: 5.5, nominal: 5.5, fit: null, depth: depth,
-        position: [p.x, p.y, p.z], direction: [into.x, into.y, into.z]});
-    }
-    return out;
+  /** A screw head sunk below the face it is counterbored into, mm. */
+  public static inline final HEAD_SINK = 0.5;
+
+  /**
+   * The seat's receiving face under the housing: the two M8 tapped holes at the housing's end connectors, through the seat (`thickness` of bar or plate),
+   * in the seat part's frame (`origin` is that frame's origin in the work frame). The holes are the seat's own (`seatHoles`); the housing's face is its own.
+   */
+  public static function seatFace(a:HobberScaleAxis, origin:Array<Float>, thickness:Float):BoltedFace {
+    var mid = housingFace(a), up = a.toSeat, along = a.along;
+    var frame = BoltedFace.frameOf({x: mid[0] - origin[0], y: mid[1] - origin[1], z: mid[2] - origin[2]}, {x: up[0], y: up[1], z: up[2]}, {x: along[0], y: along[1], z: along[2]});
+    var inverse = F.inverse(frame);
+    var holes = [for (name in ["end1", "end2"]) {
+      var f = a.housing.connector(name).frame, p = F.transformPoint(a.housingPose, f.x, f.y, f.z);
+      var q = F.transformPoint(inverse, p.x - origin[0], p.y - origin[1], p.z - origin[2]);
+      ({x: q.x, y: q.y} : BoltedFace.BoltHole);
+    }];
+    return BoltedFace.tapped("scale-housing", frame, holes, "M8", thickness, thickness, true);
+  }
+
+  /** Depth a counterbore must have for an M5 head to end `HEAD_SINK` below its mouth, mm. */
+  public static function headRecess():Float return SocketHeadCapScrew.catalog().get("M5").headHeight + HEAD_SINK;
+
+  /**
+   * The carrier's face under the head: M5 clearance holes drilled to suit the head's tapped pair, in the carrier part's frame. `grip` is the carrier's
+   * material from the head's face to the counterbore floor; `recess` (null for none) is the counterbore's depth from that floor, which a machine
+   * may make deeper than the head (a well through more material, for the driver); the head ends `HEAD_SINK` below the floor's top.
+   */
+  public static function carrierFace(a:HobberScaleAxis, origin:Array<Float>, grip:Float, ?recess:Float):BoltedFace {
+    var p = headFace(a), into = F.transformVector(a.headPose, 0, -1, 0), along = a.along, screw = SocketHeadCapScrew.catalog().get("M5");
+    var frame = BoltedFace.frameOf({x: p[0] - origin[0], y: p[1] - origin[1], z: p[2] - origin[2]}, {x: into.x, y: into.y, z: into.z}, {x: along[0], y: along[1], z: along[2]});
+    return BoltedFace.clampedToSuit("scale-head", frame, a.head.series.headHolePitch + 4 * screw.diameter, 4 * screw.diameter, screw.clearanceMedium,
+      grip, "M5", recess == null ? null : {diameter: screw.headDiameter + 2, depth: recess});
   }
 }

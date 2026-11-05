@@ -23,15 +23,20 @@ class HobberFrameChecks {
       fittedBefore: [{member: "column/", fastened: ["Xbridge"]},
         // The ring's heads are sunk at the plate end: its screws into the output flange are fitted before the swivel plate goes on.
         {member: "swivelPlate", fastened: ["swivel/output"]},
-        // The Y scale is bolted to the plate's front after the plate's screws into the ring (and its rails) are fitted.
-        {member: "Yscale", fastened: ["swivelPlate", "swivel/output"]},
+        // The Y scale is bolted to the plate's front after the plate's screws into the ring (and its rails and the bracket feet) are fitted: the joints are named
+        // by their other members, since the plate itself is part of the scale's own joint.
+        {member: "Yscale", fastened: ["swivelAdapter", "railYLeft", "railYRight", "YdriveFixed", "YdriveFloating", "swivel/output"]},
         // The servo goes on the cradle after the cradle is bolted to the seat (the floor bolts' heads are under the servo).
         {member: "spindle/motor", fastened: ["spindleSeat"]},
         // The Y nut seat is bolted to the saddle and the nut block to the seat before the guide blocks are screwed on (their rows stand over the block's bolts)
         // and before the nut and screw go in (the nut stands over the seat's).
         {member: "blockYLeft", fastened: ["YnutSeat"]}, {member: "blockYLeftFront", fastened: ["YnutSeat"]},
         {member: "blockYRight", fastened: ["YnutSeat"]}, {member: "blockYRightFront", fastened: ["YnutSeat"]},
-        {member: "Ynut", fastened: ["Yplate"]}]};
+        {member: "Ynut", fastened: ["Yplate"]},
+        // The Y scale head's rear screw is driven through the outboard support's arm: the head is screwed on before the outboard support and its bearing go on.
+        {member: "outboard", fastened: ["Yplate"]}, {member: "outboardBearing", fastened: ["Yplate"]},
+        // The Z scale head's screws are driven from the arm's inner face, where the eRob housing will stand: the head is screwed on before the actuator is fitted.
+        {member: "swivel/housing", fastened: ["ZscaleArm"]}]};
     if (!sweep) options.sweepStates = [];
     var report = AssemblyIntegrity.check(machine, options);
     return [for (item in report.errors()) item.code + " " + item.message];

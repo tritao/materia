@@ -47,6 +47,14 @@ typedef SealedScaleSeries = {
   /** End fixing holes of the housing (JFT-40 only): through diameter and counterbore. */
   var holeDiameter:Null<Float>;
   var holeCounterbore:Null<Float>;
+  /**
+   * Depth of that counterbore from the face toward the head, mm. ASSUMED: the drawing's ~5 mm is read as the floor left under the screw head (13.5 housing less
+   * 9.5 = 4.0 here: M8 ISO 4762 head 8 mm plus 1.5 mm sunk below the face, so the head never meets the reading head's gap), not as the depth, which no socket head fits.
+   */
+  var holeCounterboreDepth:Null<Float>;
+  /** Thread of the reading head's two mounting holes and its depth in the head body, mm (JFT-40: M5; the depth is not on the datasheet: ASSUMED 8 of the 11.2 mm head). */
+  var headThread:String;
+  var headThreadDepth:Null<Float>;
 }
 
 /**
@@ -101,7 +109,10 @@ class SealedScaleData {
     plateRequiredFrom: 1340,
     mounting: {housingParallelism: 0.1, headParallelism: 0.05, headLateral: 0.2, gap: 1, gapTolerance: 0.3},
     holeDiameter: 9.6,
-    holeCounterbore: 15
+    holeCounterbore: 15,
+    holeCounterboreDepth: 9.5,
+    headThread: "M5",
+    headThreadDepth: 8
   };
 
   /** JFT-10: 140 to 1840 in 100 mm steps, then 2040 to 4240 in 200 mm steps (the datasheet's list). */
@@ -127,7 +138,10 @@ class SealedScaleData {
     plateRequiredFrom: null,
     mounting: {housingParallelism: 0.1, headParallelism: 0.2, headLateral: 0.1, gap: 1.5, gapTolerance: null},
     holeDiameter: null,
-    holeCounterbore: null
+    holeCounterbore: null,
+    holeCounterboreDepth: null,
+    headThread: "M5",
+    headThreadDepth: null
   };
 
   /** The smallest standard measuring length of `series` that covers `travel`; throws past the longest. */

@@ -143,7 +143,11 @@ class HobberSaddle extends MachineComponent {
   static inline final Z_SADDLE_ORIGIN_Z = HobberZLayout.SEAT_Z;
   /** The head screws' clearance holes run through the X carriage's rib and deck, and through the Y saddle's boss and plate, mm. */
   static inline final X_HEAD_HOLE_DEPTH = 34.3;
+  /** The swivel plate's thickness (ground plate), mm: the Y scale housing's M8 are tapped through it. */
+  static inline final SWIVEL_PLATE_THICKNESS = 15.0;
   static inline final Y_HEAD_HOLE_DEPTH = 14.3;
+  /** The wall of the outboard support's arm in front of the Y saddle's plate (x 30..45), mm. */
+  static inline final OUTBOARD_ARM_WALL = 15.0;
 
   /** The scale holes `list` (work frame) in the frame of a part whose origin is at z `originZ` in the work frame. */
   static function shifted(list:Array<machinekit.component.ManufacturingRoute.RouteHole>, originZ:Float):Array<machinekit.component.ManufacturingRoute.RouteHole> {
@@ -157,9 +161,6 @@ class HobberSaddle extends MachineComponent {
   static function withHoles(body:Part, list:Array<machinekit.component.ManufacturingRoute.RouteHole>):Part {
     return Solids.cut(body, [for (h in list) holeTool(h.position, h.direction, h.diameter, h.depth)]);
   }
-
-  /** The head of the scale of `axis` rests on this face: a clearance hole for each of its two screws, `depth` mm into the carrier. */
-  static function headHoles(axis:HobberScaleAxis, depth:Float, originZ:Float):Array<machinekit.component.ManufacturingRoute.RouteHole> return shifted(HobberScales.carrierHoles(axis, depth), originZ);
 
   /** The seat bar under a scale housing as a box (it is authored in the work frame, so no origin shift). */
   static function barBox(axis:HobberScaleAxis):Array<Float> {
@@ -254,7 +255,7 @@ class HobberSaddle extends MachineComponent {
   static inline final NUT_SEAT_THICKNESS = 16.0;
 
   override public function machinable():Bool return ["GE-X-carriage", "GE-Z-saddle", "GE-Y-saddle", "GE-X-drive-pad", "GE-Z-drive-pad", "GE-Y-drive-fixed",
-    "GE-Y-drive-floating", "GE-swivel-plate", "GE-swivel-adapter", "GE-spindle-seat", "GE-motor-cradle", "GE-Y-nut-seat"].indexOf(designId) >= 0;
+    "GE-Y-drive-floating", "GE-swivel-plate", "GE-swivel-adapter", "GE-spindle-seat", "GE-motor-cradle", "GE-Y-nut-seat", "GE-Z-scale-arm"].indexOf(designId) >= 0;
 
   /** The dowels of the supports on a pad or bracket: each support's two, the seat's half of `SupportedScrewDrive.dowelPoints` (the foot's half is the support's own). */
   function padPins(axis:HobberDriveAxis, supports:Array<String>, thickness:Float, ?clip:Array<Float>):Array<machinekit.component.BoltedFace.PinnedFace> {
@@ -322,6 +323,8 @@ class HobberSaddle extends MachineComponent {
           faces.push(blockFace("block" + (side < 0 ? "L" : "R") + (row == HobberXLayout.BLOCK_FRONT ? "1" : "2"), [row, side * FoundationLayout.BED_RAIL_CENTRE, 260.0],
             [0.0, 0, 1], [1.0, 0, 0], block, 20, X_BLOCK_SOLE));
         faces.push(nutBlockFace(HobberDrives.x(), 20, [0.0, 0, 0]));
+        // The X scale head's two M5 from the deck's top, counterbored (the column stands on it), into the outer rib's underside.
+        faces.push(HobberScales.carrierFace(HobberScales.x(), [0.0, 0, 0], X_HEAD_HOLE_DEPTH - HobberScales.headRecess(), HobberScales.headRecess()));
       case "GE-Z-saddle":
         var block = machinekit.motion.LinearRailBlock.metric("HGH15CA", machinekit.motion.LinearRailBlock.SUPPLIER);
         for (side in [-1, 1]) for (row in [0.0, 110.0])
@@ -335,6 +338,9 @@ class HobberSaddle extends MachineComponent {
           }], machinekit.standard.SocketHeadCapScrew.catalog().get("M4").clearanceMedium,
           HobberSwivelLayout.OUTPUT_X - machinekit.motion.ErobActuatorPart.SEAT_Z - HobberSwivelLayout.PLATE_FRONT, "M4", null, false));
       case "GE-Y-saddle":
+        // The Y scale head's two M5 from the plate's front face, counterbored, through the plate and the boss. The head's rear screw stands in the outboard
+        // support's arm (y -115..-85, a box 15 mm thick in front of the plate): the counterbore is a well through that wall into the arm's cavity, where the driver comes in.
+        faces.push(HobberScales.carrierFace(HobberScales.y(), [0.0, 0, Z_SADDLE_ORIGIN_Z], Y_HEAD_HOLE_DEPTH - HobberScales.headRecess(), HobberScales.headRecess() + OUTBOARD_ARM_WALL));
         // The spindle seat's four M8: the plate's face at x 45, +Z into the plate (+x), y across the plate (z).
         faces.push(BoltedFace.clamped("seat", BoltedFace.frameOf({x: 45.0, y: 0.0, z: 0.0}, {x: 1, y: 0, z: 0}, {x: 0, y: 1, z: 0}), seatBolts(), 9.0, 12.0, "M8", null, false));
         // The nut seat's M4 into the plate's top edge (z 95, x 45..57: 12 thick, so the screws run down its middle).
@@ -349,6 +355,13 @@ class HobberSaddle extends MachineComponent {
         faces.push(nutBlockFace(HobberDrives.y(), NUT_SEAT_THICKNESS, [0.0, 0, 0]));
         faces.push(BoltedFace.clamped("saddle", BoltedFace.frameOf({x: 51.0, y: -10.0, z: 458.0}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0}),
           [{x: 0.0, y: -NUT_SEAT_BOLT_SPAN / 2}, {x: 0.0, y: NUT_SEAT_BOLT_SPAN / 2}], machinekit.standard.SocketHeadCapScrew.catalog().get("M4").clearanceMedium, NUT_SEAT_THICKNESS, "M4", null, false));
+      case "GE-X-scale-seat":
+        faces.push(HobberScales.seatFace(HobberScales.x(), [0.0, 0, 0], HobberScales.SEAT_BAR));
+      case "GE-Z-scale-seat":
+        faces.push(HobberScales.seatFace(HobberScales.z(), [0.0, 0, 0], HobberScales.SEAT_BAR));
+      case "GE-Z-scale-arm":
+        // The Z scale head's two M5 through the arm (10 thick), heads on its inner face.
+        faces.push(HobberScales.carrierFace(HobberScales.z(), [0.0, 0, Z_SADDLE_ORIGIN_Z], HobberScales.Z_ARM_THICKNESS));
       case "GE-X-drive-pad":
         faces.push(seatFace(HobberDrives.x(), "fixed", 15));
         faces.push(seatFace(HobberDrives.x(), "floating", 15));
@@ -377,6 +390,8 @@ class HobberSaddle extends MachineComponent {
         faces.push(BoltedFace.drilledToSuit("plate", BoltedFace.frameOf({x: HobberSwivelLayout.PLATE_X, y: 0.0, z: 0.0}, {x: 1, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
           HobberSwivelLayout.RING_OUTSIDE, HobberSwivelLayout.RING_OUTSIDE, 16, ring, BoltedFace.ThreadMaterial.Aluminium));
       case "GE-swivel-plate":
+        // The Y scale housing's two M8 are tapped through the plate from its front face (x 85).
+        faces.push(HobberScales.seatFace(HobberScales.y(), [0.0, 0, Z_SADDLE_ORIGIN_Z], SWIVEL_PLATE_THICKNESS));
         // The ring's 4 M6 pass the plate from its front face into the ring.
         faces.push(BoltedFace.clamped("ring", BoltedFace.frameOf({x: HobberSwivelLayout.PLATE_X, y: 0.0, z: 0.0}, {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
           [for (p in platePositions()) {x: p.y, y: -p.z}], machinekit.standard.SocketHeadCapScrew.catalog().get("M6").clearanceMedium, 15, "M6", null, false));
@@ -705,16 +720,16 @@ class HobberSaddle extends MachineComponent {
   /** The holes this design carries, in the world frame the geometry is authored in: the drive seats' tapped holes and dowels, the nut block's carriage bolts. Empty for designs without any. */
   public function holes():Array<machinekit.component.ManufacturingRoute.RouteHole> {
     return switch designId {
-      case "GE-X-carriage": derivedHoles().concat(headHoles(HobberScales.x(), X_HEAD_HOLE_DEPTH, 0));
+      case "GE-X-carriage": derivedHoles();
       case "GE-Z-saddle": derivedHoles().concat(erobPilotBore());
-      case "GE-Y-saddle": derivedHoles().concat(headHoles(HobberScales.y(), Y_HEAD_HOLE_DEPTH, Z_SADDLE_ORIGIN_Z));
-      case "GE-swivel-plate": derivedHoles().concat(shifted(HobberScales.seatHoles(HobberScales.y(), 12), Z_SADDLE_ORIGIN_Z));
+      case "GE-Y-saddle": derivedHoles();
+      case "GE-swivel-plate": derivedHoles().concat(shifted(HobberScales.seatHoles(HobberScales.y(), SWIVEL_PLATE_THICKNESS), Z_SADDLE_ORIGIN_Z));
       case "GE-swivel-adapter": derivedHoles();
       case "GE-spindle-seat": derivedHoles().concat(seatHoles(false)).concat(cradleHoles(true));
       case "GE-motor-cradle": derivedHoles().concat(cradleHoles(false));
-      case "GE-X-scale-seat": HobberScales.seatHoles(HobberScales.x(), 8);
-      case "GE-Z-scale-seat": HobberScales.seatHoles(HobberScales.z(), 8);
-      case "GE-Z-scale-arm": headHoles(HobberScales.z(), HobberScales.Z_ARM_THICKNESS, Z_SADDLE_ORIGIN_Z);
+      case "GE-X-scale-seat": HobberScales.seatHoles(HobberScales.x(), HobberScales.SEAT_BAR);
+      case "GE-Z-scale-seat": HobberScales.seatHoles(HobberScales.z(), HobberScales.SEAT_BAR);
+      case "GE-Z-scale-arm": derivedHoles();
       case "GE-X-drive-pad": derivedHoles();
       case "GE-Z-drive-pad": derivedHoles();
       case "GE-Y-drive-fixed": derivedHoles();
@@ -732,13 +747,12 @@ class HobberSaddle extends MachineComponent {
         // swivel stack and the head's swing (x 60-140, 300 wide; a front bar would meet the Y guides at A +-15 deg, Y and Z at -10); 25 mm deep ribs under the deck run
         // beside the rails (y +-120..140 and +-160..180), clear of the blocks (y 196..244) and the bed.
         [
-          withHoles(Solids.cut(box(60, 386, -245, 245, 260, 280), [box(55, 140, -150, 150, 259, 281)]),
-            headHoles(HobberScales.x(), X_HEAD_HOLE_DEPTH, 0)),
+          Solids.cut(box(60, 386, -245, 245, 260, 280), [box(55, 140, -150, 150, 259, 281)]),
           box(140, 386, -140, -120, 235, 260),
           box(140, 386, 120, 140, 235, 260),
           box(140, 386, -180, -160, 235, 260),
           // The outer rib on the scale's side stands under the head: its underside is the head's seat, as deep as the scale stack leaves.
-          withHoles(box(140, 386, 178 - 9.5, 178 + 9.5, HobberScales.headFace(HobberScales.x())[2], 260), headHoles(HobberScales.x(), X_HEAD_HOLE_DEPTH, 0))
+          box(140, 386, 178 - 9.5, 178 + 9.5, HobberScales.headFace(HobberScales.x())[2], 260)
         ];
       case "GE-Z-saddle":
         // One milled plate between the swivel seat (x 135) and the block faces (x 148), with the nut block's bolts.
@@ -746,7 +760,7 @@ class HobberSaddle extends MachineComponent {
         [Solids.cut(box(135, 148, -175, 175, -65, 170), [HobberSwivelLayout.housingCutout()])];
       case "GE-swivel-plate":
         // The Y scale housing's seat is the front face (x 85); its end screws are tapped into the plate. Ground plate, 15 thick.
-        [withHoles(box(85, 100, -115, 115, -95, 95), shifted(HobberScales.seatHoles(HobberScales.y(), 12), Z_SADDLE_ORIGIN_Z))];
+        [withHoles(box(85, 100, -115, 115, -95, 95), shifted(HobberScales.seatHoles(HobberScales.y(), SWIVEL_PLATE_THICKNESS), Z_SADDLE_ORIGIN_Z))];
       case "GE-swivel-adapter":
         // Turned ring from the output flange (x 124) to the swivel plate (x 100): Ø110, Ø40 through, M4 clearance holes for the actuator and M5 tapped into the plate end.
         [Solids.cut(boreX(HobberSwivelLayout.RING_OUTSIDE / 2, HobberSwivelLayout.PLATE_X, HobberSwivelLayout.OUTPUT_X, 0, 0),
@@ -756,22 +770,21 @@ class HobberSaddle extends MachineComponent {
       case "GE-motor-cradle":
         [motorCradle()];
       case "GE-X-scale-seat":
-        [withHoles(padBox(barBox(HobberScales.x())), HobberScales.seatHoles(HobberScales.x(), 8))];
+        [withHoles(padBox(barBox(HobberScales.x())), HobberScales.seatHoles(HobberScales.x(), HobberScales.SEAT_BAR))];
       case "GE-Z-scale-seat":
-        [withHoles(padBox(barBox(HobberScales.z())), HobberScales.seatHoles(HobberScales.z(), 8))];
+        [withHoles(padBox(barBox(HobberScales.z())), HobberScales.seatHoles(HobberScales.z(), HobberScales.SEAT_BAR))];
       case "GE-Z-scale-arm":
         // Milled arm from the Z saddle's back face (x 148) into the column channel, 10 thick across it; it carries the head.
         var z = HobberScales.z(), face = HobberScales.headFace(z), half = z.head.series.headLength / 2 + 2;
         var reach = z.headPose.x + z.head.series.headDepth / 2 + HobberScales.HEAD_CARRIER_MARGIN;
         var zc = face[2] - Z_SADDLE_ORIGIN_Z;
         var wall = HobberScales.zWallSign(), y0 = wall > 0 ? face[1] - HobberScales.Z_ARM_THICKNESS : face[1], y1 = wall > 0 ? face[1] : face[1] + HobberScales.Z_ARM_THICKNESS;
-        [withHoles(box(148, reach, y0, y1, zc - half, zc + half), headHoles(z, HobberScales.Z_ARM_THICKNESS, Z_SADDLE_ORIGIN_Z))];
+        [box(148, reach, y0, y1, zc - half, zc + half)];
       case "GE-Y-saddle":
         // A 2.3 mm boss on the back face (x 57) is the head's seat; the head's screws go through it and the plate.
         var yHead = HobberScales.y(), yFace = HobberScales.headFace(yHead), yHeadHalf = yHead.head.series.headLength / 2 + 2;
-        var yHoles = headHoles(yHead, Y_HEAD_HOLE_DEPTH, Z_SADDLE_ORIGIN_Z);
         [
-          withHoles(radialPlate(
+          radialPlate(
             45,
             57,
             [
@@ -782,11 +795,11 @@ class HobberSaddle extends MachineComponent {
               {y: 90.0, z: 95.0},
               {y: -130.0, z: 95.0}
             ]
-          ), yHoles),
-          withHoles(box(57, yFace[0], yFace[1] - yHeadHalf, yFace[1] + yHeadHalf, -yHead.head.series.headDepth / 2 - 2, yHead.head.series.headDepth / 2 + 2), yHoles),
+          ),
+          box(57, yFace[0], yFace[1] - yHeadHalf, yFace[1] + yHeadHalf, -yHead.head.series.headDepth / 2 - 2, yHead.head.series.headDepth / 2 + 2),
           // The plate continues under the spindle seat block (y 70-230) and its screws.
           box(45, 57, 90, SEAT_Y1, SEAT_LOW + 2, 95),
-          withHoles(Solids.cut(box(-45, 57, -115, -85, -45, 45), [box(-30, 30, -115.1, -84.9, -30, 30)]), yHoles)
+          Solids.cut(box(-45, 57, -115, -85, -45, 45), [box(-30, 30, -115.1, -84.9, -30, 30)])
         ];
       case "GE-X-drive-pad":
         [drivePad(HobberDrives.x(), 15, false)];
