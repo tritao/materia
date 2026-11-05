@@ -644,8 +644,6 @@ class HobberFrameChecks {
       Sys.println('  flange holes ${[for (h in nut.mountingHoles()) [Math.round(h.x * 10) / 10, Math.round(h.y * 10) / 10]]}, tap drill ${nut.mountingTapDrill()}, flange dia ${nut.flangeDiameter}, bolt circle ${nut.boltCircleDiameter}');
       Sys.println('  world: origin ${w(0, 0, 0)} x ${w(1, 0, 0)} y ${w(0, 1, 0)} z ${w(0, 0, 1)} base centre ${w(0, -b.centreHeight, b.thickness / 2)}');
     }
-    if (args.indexOf("coverfit") >= 0) for (line in coverFit(machine)) Sys.println(line);
-    if (args.indexOf("service") >= 0) for (line in service(machine)) Sys.println(line);
     if (args.indexOf("crash") >= 0) for (line in HobberCrashProtection.report(machine)) Sys.println(line);
     if (args.indexOf("fasteners") >= 0) for (line in HobberFastenerChecks.report(machine)) Sys.println(line);
     if (args.indexOf("integrity") >= 0) {
@@ -660,5 +658,8 @@ class HobberFrameChecks {
       Sys.println('integrity: ${errors.length} errors in ${Math.round(Sys.time() - began)} s');
       if (errors.length > 0) Sys.exit(1);
     }
+    // Last: `service` adds the paths it tries (which are blocked) to the machine's requirements, so nothing may follow it that checks the machine as built.
+    if (args.indexOf("coverfit") >= 0) for (line in coverFit(machine)) Sys.println(line);
+    if (args.indexOf("service") >= 0) for (line in service(machine)) Sys.println(line);
   }
 }
