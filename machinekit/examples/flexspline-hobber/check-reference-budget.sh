@@ -28,7 +28,7 @@ if [[ "$mode" != parallel && -z "${HOBBER_STOCK_NATIVE:-}" ]]; then
 fi
 export HAXEON_COMPILER_SERVER=0
 export CADKIT_OCCT_DIR=${CADKIT_OCCT_DIR:-"$HOME/dev/materia-cache/occt-f1dc4efb-release"}
-export LD_LIBRARY_PATH="$stock:$CADKIT_OCCT_DIR/lib:$root/haxeon/.tools/hashlink:$root/haxeon/out"
+export LD_LIBRARY_PATH="$stock:$CADKIT_OCCT_DIR/lib:$root/haxeon/out"
 for provider in "$cache"/*; do [[ ! -d "$provider" ]] || LD_LIBRARY_PATH+=":$provider"; done
 export LD_LIBRARY_PATH
 ulimit -s 65536
@@ -74,7 +74,7 @@ rm -f "$evidence/$mode-exit-status.txt"
 status=0
 systemd-run --user --scope --quiet --collect -p MemoryMax=6G -p MemorySwapMax=0 \
   --unit="flexspline-hb11-$mode-$$" /usr/bin/time -v -o "$evidence/$mode-time.log" \
-  ./haxeon/.tools/hashlink/hl "$evidence/main.hl" reference-budget "$evidence/inputs.json" "$evidence" "$mode" \
+  ./haxeon/scripts/hl "$evidence/main.hl" reference-budget "$evidence/inputs.json" "$evidence" "$mode" \
   > "$evidence/$mode.log" 2>&1 || status=$?
 printf '%s\n' "$status" > "$evidence/$mode-exit-status.txt"
 tail -n 8 "$evidence/$mode.log"

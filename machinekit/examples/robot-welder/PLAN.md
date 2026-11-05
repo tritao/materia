@@ -419,7 +419,7 @@ Done before W4, on the review of W0-W3. What was found and decided:
   `CADKIT_OCCT_DIR`). It needs the worktree's submodules for `animkit/native/vendor/*` and `haxeon/packages/ui/vendor/*`
   (`git clone --shared --no-checkout <src> <wt>/<path>` and `git checkout <pinned sha>`; no network). After that
   `--compiler-only` rebuilds the test program in a minute, and the run takes
-  `LD_LIBRARY_PATH=<wt>/haxeon/out:<wt>/haxeon/.tools/hashlink:<wt>/app/build/host/native/{app,kinematicskit-native,stockkit}:$OCCT/lib`.
+  `LD_LIBRARY_PATH=<wt>/haxeon/out:<wt>/app/build/host/native/{app,kinematicskit-native,stockkit}:$OCCT/lib`.
   The tests in `robotkit/tests`, `motionkit/tests` and the like build their own `robotd_native` the same way.
 - **The exit crash: root cause.** A core from one crash (a segmentation fault 1 run in 24 with the borrowed libraries, none
   in 39 runs of the new ones) shows the main thread inside `exit()`, running static destructors (`~HandleMap<Session>` of

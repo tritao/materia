@@ -14,11 +14,11 @@ router_sampler=${SHEET_ROUTER_PLANNER_SAMPLE:-"$router_output/planner-sample"}
 mkdir -p "$router_output"
 export HAXEON_COMPILER_SERVER=0
 "$router_heavy" --mem 6G --need 1G --label router-atc-mass-build haxeon/scripts/haxeon build --compiler-only --project machinekit/examples/sheet-router/haxeon.atc-mass.json --output "$router_output/mass.hl"
-export LD_LIBRARY_PATH="$router_repo/haxeon/out:$router_repo/haxeon/.tools/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$router_repo/haxeon/out${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 for router_provider in "$router_repo/machinekit/tests/build/host/native"/*; do
   [[ ! -d "$router_provider" ]] || LD_LIBRARY_PATH+=":$router_provider"
 done
-"$router_heavy" --mem 3G --need 1G --label router-atc-mass haxeon/.tools/hashlink/hl "$router_output/mass.hl"
+"$router_heavy" --mem 3G --need 1G --label router-atc-mass haxeon/scripts/hl "$router_output/mass.hl"
 export OPENBLAS_NUM_THREADS=1
 export LD_LIBRARY_PATH="$(dirname "$router_ccx")/../lib/x86_64-linux-gnu"
 "$router_heavy" --mem 6G --need 1G --label router-atc-structure python3 machinekit/examples/sheet-router/atc/structural_check.py \

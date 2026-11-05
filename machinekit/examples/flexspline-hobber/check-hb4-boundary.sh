@@ -13,7 +13,7 @@ flock -n 9 || { echo 'Boundary diagnostic already running in this evidence direc
 HAXEON_COMPILER_SERVER=0 ./haxeon/scripts/haxeon build --compiler-only --project=stockkit/tests/metrology/haxeon.json > "$evidence/build.log" 2>&1
 cp stockkit/tests/metrology/build/host/main.hl "$evidence/main.hl"
 export HB4_BOUNDARY_EVIDENCE="$evidence" HB4_BOUNDARY_INPUT="$input"
-export LD_LIBRARY_PATH="$native:$root/haxeon/.tools/hashlink:$root/haxeon/out${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$native:$root/haxeon/out${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 python3 - "$evidence" "$native" "$input" <<'PYMETA'
 import hashlib,json,subprocess,sys
 from pathlib import Path
@@ -27,7 +27,7 @@ for name in ['result.json','levels.json','exit-status.txt']:
 PYMETA
 ulimit -s 65536
 status=0
-/usr/bin/time -v -o "$evidence/time.log" haxeon/.tools/hashlink/hl "$evidence/main.hl" boundary-probe > "$evidence/run.log" 2>&1 || status=$?
+/usr/bin/time -v -o "$evidence/time.log" haxeon/scripts/hl "$evidence/main.hl" boundary-probe > "$evidence/run.log" 2>&1 || status=$?
 printf '%s\n' "$status" > "$evidence/exit-status.txt"
 cat "$evidence/run.log"
 exit "$status"

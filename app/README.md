@@ -725,7 +725,7 @@ python3 app/tools/profile-editor.py --no-profile --scenario tab-inspector --cycl
 
 The output directory contains `editor.hlpc`, `editor.perfetto.json`,
 `memory.jsonl`, `frame-timeline.jsonl`, `profiler.log`, and `launch.log`.
-Open `editor.hlpc` with `haxeon/.tools/hashlink/hlprof-live report` or view the
+Open `editor.hlpc` with `haxeon/scripts/hlprof-live report` or view the
 Perfetto file as a timeline. Profiling adds frame overhead, so compare timings
 across profiled runs rather than treating them as normal frame rates. Pass editor
 options after `--`, for example `-- --perspective`.

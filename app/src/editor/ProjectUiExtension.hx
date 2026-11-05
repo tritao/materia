@@ -44,7 +44,7 @@ class ProjectUiExtension {
     var command = requiredText(declaration, "command");
     var installation = MateriaProjectRunner.installationRoot();
     var builder = UiPath.join([installation, "haxeon", "scripts", "haxeon"]);
-    var executable = UiPath.join([installation, "haxeon", ".tools", "hashlink", "hl"]);
+    var executable = UiPath.join([installation, "haxeon", "scripts", "hl"]);
     // Haxeon's compiler service may inherit output descriptors after the build command
     // exits, so use inherited stdio instead of waiting for captured pipe EOF.
     #if wasm

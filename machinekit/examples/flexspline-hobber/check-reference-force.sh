@@ -15,7 +15,7 @@ if [[ -z "${HOBBER_STOCK_NATIVE:-}" ]]; then
 fi
 export HAXEON_COMPILER_SERVER=0
 export CADKIT_OCCT_DIR=${CADKIT_OCCT_DIR:-"$HOME/dev/materia-cache/occt-f1dc4efb-release"}
-export LD_LIBRARY_PATH="$stock:$CADKIT_OCCT_DIR/lib:$root/haxeon/.tools/hashlink:$root/haxeon/out"
+export LD_LIBRARY_PATH="$stock:$CADKIT_OCCT_DIR/lib:$root/haxeon/out"
 for provider in "$cache"/*; do [[ ! -d "$provider" ]] || LD_LIBRARY_PATH+=":$provider"; done
 export LD_LIBRARY_PATH
 ulimit -s 65536
@@ -35,7 +35,7 @@ run_capped() {
   systemd-run --user --scope --quiet --collect -p MemoryMax=4G -p MemorySwapMax=0 \
     --unit="hobber-force-$1-$$" -- "${@:2}"
 }
-run_capped calibration ./haxeon/.tools/hashlink/hl "$evidence/force-main.hl" speed | tee "$evidence/calibration.log"
+run_capped calibration ./haxeon/scripts/hl "$evidence/force-main.hl" speed | tee "$evidence/calibration.log"
 HOBBER_FORCE_TOLERANCE_MM=$(python3 - "$evidence/calibration.log" "$evidence/calibration.json" "${HOBBER_FORCE_TOLERANCE_MM:-}" "${HOBBER_FORCE_PARITY_LOG:-}" <<'PY'
 import json,pathlib,sys
 lines=pathlib.Path(sys.argv[1]).read_text().splitlines()
@@ -64,7 +64,7 @@ export HOBBER_FORCE_THREADS=${HOBBER_FORCE_THREADS:-4}
 export HOBBER_FORCE_HISTORY="$evidence/passes.csv"
 cut_status=0
 run_capped full /usr/bin/time -v -o "$evidence/time.log" \
-  ./haxeon/.tools/hashlink/hl "$evidence/force-main.hl" reference | tee "$evidence/force.log" || cut_status=$?
+  ./haxeon/scripts/hl "$evidence/force-main.hl" reference | tee "$evidence/force.log" || cut_status=$?
 sed -n 's/^REFERENCE_FORCE //p' "$evidence/force.log" > "$evidence/loads.json"
 [[ -s "$evidence/loads.json" ]] || exit 1
 python3 machinekit/examples/flexspline-hobber/force-band-study.py "$evidence/loads.json" --output "$evidence/bands.json" | tee "$evidence/bands.log"

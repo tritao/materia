@@ -112,8 +112,8 @@ assumed masses, not manufacturer measurements.
 
 ```sh
 ./haxeon/scripts/haxeon build --project=machinekit/examples/cobot-arm/haxeon.json
-LD_LIBRARY_PATH="$PWD/haxeon/.tools/hashlink:$PWD/haxeon/out:$PWD/machinekit/examples/cobot-arm/build/host/native/cadkit:$PWD/machinekit/examples/cobot-arm/build/host/native/collisionkit-native" \
-  ./haxeon/.tools/hashlink/hl machinekit/examples/cobot-arm/build/host/main.hl
+LD_LIBRARY_PATH="$PWD/haxeon/out:$PWD/machinekit/examples/cobot-arm/build/host/native/cadkit:$PWD/machinekit/examples/cobot-arm/build/host/native/collisionkit-native" \
+  ./haxeon/scripts/hl machinekit/examples/cobot-arm/build/host/main.hl
 ```
 
 Eleven sampled poses include both wrist bend directions and the preview motion loop. The checks compare the flange against independent DH arithmetic, check CAD solid

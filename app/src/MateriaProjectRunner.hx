@@ -256,8 +256,8 @@ class MateriaProjectRunner {
       if (control != null) control.throwIfCancelled();
       Sys.println("Materia project: executing its entrypoint");
       if (control != null) control.phase("Running the project");
-      var hashlink = ProjectPath.join([home, ".tools", "hashlink", "hl"]);
-      if (!FileSystem.exists(hashlink)) throw 'Pinned HashLink executable was not found at $hashlink';
+      var hashlink = ProjectPath.join([home, "scripts", "hl"]);
+      if (!FileSystem.exists(hashlink)) throw 'HashLink launcher was not found at $hashlink';
       if (recipeDocument != null) File.saveContent(outputPrefix + ".document.json", recipeDocument);
       runCommand(
         hashlink,
@@ -513,7 +513,7 @@ class MateriaProjectRunner {
     }
     projectToolMutex.release();
     return runCommand(
-      ProjectPath.join([home, ".tools", "hashlink", "hl"]),
+      ProjectPath.join([home, "scripts", "hl"]),
       [artifact].concat(arguments),
       description,
       control

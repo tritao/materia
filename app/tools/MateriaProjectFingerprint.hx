@@ -80,7 +80,7 @@ class MateriaProjectFingerprint {
     // invalidate generated geometry without reading large shared libraries.
     var binaries = [
       Path.join([home, ".tools", "haxe", "haxe"]),
-      Path.join([home, ".tools", "hashlink", "hl"]),
+      build.HashLinkPath.executable(home),
       Path.join([home, "out", "haxeon_runtime.hdll"])
     ];
     // The generator loads every package's native libraries (CadKit's, StockKit's, ...), each built in its own directory.

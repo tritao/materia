@@ -70,7 +70,7 @@ def main():
     env.update(HOBBER_BUDGET_THREADS='4', STOCKKIT_RAKE_BATCH_DOMAINS='1')
     env.pop('HOBBER_BUDGET_LEGACY_ENDS', None)
     env['LD_LIBRARY_PATH'] = ':'.join(map(str, [native, root / '../machine-tending/app/build/host/native/cadkit',
-        Path('/home/joao/dev/materia-cache/occt-f1dc4efb-release/lib'), root / 'haxeon/.tools/hashlink', root / 'haxeon/out']))
+        Path('/home/joao/dev/materia-cache/occt-f1dc4efb-release/lib'), root / 'haxeon/out']))
     stopping, children, mutex = threading.Event(), set(), threading.Lock()
 
     def stop(signum, frame):
@@ -114,7 +114,7 @@ def main():
             with mutex:
                 if stopping.is_set():
                     raise RuntimeError('scheduler stopped')
-                child = subprocess.Popen([str(root / 'haxeon/.tools/hashlink/hl'), str(directory / 'main.hl'),
+                child = subprocess.Popen([str(root / 'haxeon/scripts/hl'), str(directory / 'main.hl'),
                     'reference-budget', str(directory / 'inputs.json'), str(directory), label], cwd=root,
                     env=env, stdout=log, stderr=subprocess.STDOUT)
                 children.add(child)

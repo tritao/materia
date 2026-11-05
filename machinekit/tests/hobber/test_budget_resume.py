@@ -40,7 +40,7 @@ with tempfile.TemporaryDirectory(prefix='hb11-upgrade-') as temp:
  # evidence. Use a synthetic launcher root so no real HashLink/native cut can run.
  synthetic=p/'synthetic';copied=synthetic/'machinekit/examples/flexspline-hobber/run-reference-budget.py'
  copied.parent.mkdir(parents=True);shutil.copyfile(script,copied)
- fake=synthetic/'haxeon/.tools/hashlink/hl';fake.parent.mkdir(parents=True)
+ fake=synthetic/'haxeon/scripts/hl';fake.parent.mkdir(parents=True)
  fake.write_text("#!/usr/bin/env python3\nimport sys,json\nfrom pathlib import Path\np=Path(sys.argv[4]);mode=sys.argv[5]\n(p/(mode+'.json')).write_text("+repr(json.dumps(raw))+ ")\nprint('HOBBING_ERROR_RESULT '+json.dumps(dict(wallSeconds=.01,threads=4)))\n")
  fake.chmod(0o755)
  (out/'combined.json').unlink();partial='HOBBING_ERROR_PROGRESS {"windows":64900,"total":92151}\n'

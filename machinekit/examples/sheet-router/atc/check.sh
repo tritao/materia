@@ -24,9 +24,9 @@ export HAXEON_COMPILER_SERVER=0
 export SHEET_ROUTER_PLANNER_SAMPLE="$router_sampler"
 "$router_heavy" --mem 6G --need 1G --label router-atc-build haxeon/scripts/haxeon build --compiler-only \
   --project machinekit/examples/sheet-router/haxeon.atc.json --output "$router_output/full.hl"
-export LD_LIBRARY_PATH="$router_repo/haxeon/out:$router_repo/haxeon/.tools/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$router_repo/haxeon/out${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 for router_provider in "$router_repo/machinekit/tests/build/host/native"/*; do
   [[ ! -d "$router_provider" ]] || LD_LIBRARY_PATH+=":$router_provider"
 done
-"$router_heavy" --mem 3G --need 1G --label router-atc-policy haxeon/.tools/hashlink/hl "$router_output/full.hl" --policy-only
-"$router_heavy" --mem 5G --need 1G --label router-atc-clearance haxeon/.tools/hashlink/hl "$router_output/full.hl" --sequence-only
+"$router_heavy" --mem 3G --need 1G --label router-atc-policy haxeon/scripts/hl "$router_output/full.hl" --policy-only
+"$router_heavy" --mem 5G --need 1G --label router-atc-clearance haxeon/scripts/hl "$router_output/full.hl" --sequence-only

@@ -85,7 +85,7 @@ not a suction model: there is no evacuation time, leakage, or load limit.
 
 ```sh
 ./haxeon/scripts/haxeon build --project=machinekit/examples/robot-arm/haxeon.json
-./haxeon/.tools/hashlink/hl machinekit/examples/robot-arm/build/host/main.hl
+./haxeon/scripts/hl machinekit/examples/robot-arm/build/host/main.hl
 ```
 
 The check generates the preview, checks it carries the tool with its sensor and the four-step

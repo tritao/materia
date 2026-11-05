@@ -24,7 +24,7 @@ cmake -S machinekit/tests/hobber/quick-native -B "$evidence/runtime" -G Ninja \
 cmake --build "$evidence/runtime" --target robotkit_runtime -j1 > "$evidence/logs/native.log" 2>&1
 export LD_LIBRARY_PATH="$evidence/runtime/robotkit/runtime:$stock"
 for provider in "$cache"/*; do [[ ! -d "$provider" ]] || LD_LIBRARY_PATH+=":$provider"; done
-export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$CADKIT_OCCT_DIR/lib:$root/haxeon/.tools/hashlink:$root/haxeon/out"
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$CADKIT_OCCT_DIR/lib:$root/haxeon/out"
 {
   git rev-parse HEAD
   git diff --binary HEAD | sha256sum
@@ -51,7 +51,7 @@ for test_case in force errors app; do
   printf 'Running %s check...\n' "$test_case"
   if run_capped "compile-$test_case" ./haxeon/scripts/haxeon build --compiler-only --project="$manifest" > "$evidence/logs/$test_case-build.log" 2>&1 \
     && run_capped "$test_case" /usr/bin/time -v -o "$evidence/logs/$test_case-time.log" \
-      env PROJECT_SOURCE_ONLY=flexspline-hobber ./haxeon/.tools/hashlink/hl "$binary" "${args[@]}" > "$evidence/logs/$test_case.log" 2>&1; then
+      env PROJECT_SOURCE_ONLY=flexspline-hobber ./haxeon/scripts/hl "$binary" "${args[@]}" > "$evidence/logs/$test_case.log" 2>&1; then
     printf '%s: PASS\n' "$test_case"
     sed -n '/QUICK_FORCE /p; /QUICK_ERRORS /p; /HOBBER_ACCEPTANCE /p' "$evidence/logs/$test_case.log"
   else

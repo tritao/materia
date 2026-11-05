@@ -27,15 +27,15 @@ PY
 "$router_heavy" --mem 3G --need 1G --label router-sheet-program-build haxeon/scripts/haxeon build --compiler-only --project projectkit/tests/haxeon.json
 "$router_heavy" --mem 3G --need 1G --label router-sheet-preview-build haxeon/scripts/haxeon build --compiler-only --project stockkit/tests/sheet-scale/haxeon.json
 "$router_heavy" --mem 6G --need 1G --label router-sheet-app-build haxeon/scripts/haxeon build --compiler-only --project app/tests/sheet-machining/haxeon.json
-export LD_LIBRARY_PATH="$router_repo/haxeon/out:$router_repo/haxeon/.tools/hashlink:$router_output/compact:$router_repo/stockkit/tests/build/host/native/stockkit${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$router_repo/haxeon/out:$router_output/compact:$router_repo/stockkit/tests/build/host/native/stockkit${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 for router_provider in "$router_repo/machinekit/tests/build/host/native"/*; do
   [[ ! -d "$router_provider" ]] || LD_LIBRARY_PATH+=":$router_provider"
 done
 (
   cd "$router_repo/projectkit/tests"
-  "$router_heavy" --mem 3G --need 1G --label router-sheet-program-tests "$router_repo/haxeon/.tools/hashlink/hl" build/host/main.hl
+  "$router_heavy" --mem 3G --need 1G --label router-sheet-program-tests "$router_repo/haxeon/scripts/hl" build/host/main.hl
 )
 "$router_heavy" --mem 3G --need 1G --label router-sheet-preview-tests env LD_PRELOAD="$router_output/compact/libstockkit_core.so" \
-  haxeon/.tools/hashlink/hl "$router_output/preview/host/main.hl"
+  haxeon/scripts/hl "$router_output/preview/host/main.hl"
 "$router_heavy" --mem 3G --need 1G --label router-sheet-app-tests \
-  haxeon/.tools/hashlink/hl "$router_output/artifact-app/host/main.hl"
+  haxeon/scripts/hl "$router_output/artifact-app/host/main.hl"

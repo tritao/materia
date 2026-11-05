@@ -9,6 +9,6 @@ if [[ ! -d "$native_root" ]]; then
 fi
 ./haxeon/scripts/haxeon build --compiler-only --project machinekit/scripts/haxeon.bom-lint.json
 native_paths=$(printf '%s:' "$native_root"/*/)
-export LD_LIBRARY_PATH="${native_paths}$root/haxeon/out:$root/haxeon/.tools/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-export DYLD_LIBRARY_PATH="${native_paths}$root/haxeon/out:$root/haxeon/.tools/hashlink${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
-exec "$root/haxeon/.tools/hashlink/hl" "$root/machinekit/build/bom-lint/host/main.hl" "$@"
+export LD_LIBRARY_PATH="${native_paths}$root/haxeon/out${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export DYLD_LIBRARY_PATH="${native_paths}$root/haxeon/out${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+exec "$root/haxeon/scripts/hl" "$root/machinekit/build/bom-lint/host/main.hl" "$@"

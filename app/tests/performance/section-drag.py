@@ -54,7 +54,7 @@ def main():
     options = parser.parse_args()
     native = ROOT / "app/tests/presentation-capture/build/host/native"
     environment = dict(os.environ, HAXEON_HOME=str(ROOT / "haxeon"))
-    environment["LD_LIBRARY_PATH"] = ":".join(map(str, [ROOT / "haxeon/out", ROOT / "haxeon/.tools/hashlink", *sorted(native.iterdir())])) + ":" + environment.get("LD_LIBRARY_PATH", "")
+    environment["LD_LIBRARY_PATH"] = ":".join(map(str, [ROOT / "haxeon/out", *sorted(native.iterdir())])) + ":" + environment.get("LD_LIBRARY_PATH", "")
     environment["NK_SCENE_GPU_TIMING_INTERVAL"] = "1"
     summaries = []
     cameras = {}
@@ -73,7 +73,7 @@ def main():
                     environment["NK_X11_DISABLE_FRAME_SYNC"] = "1" if bypass else "0"
                     environment["NK_SCENE_GPU_TIMINGS"] = str(directory / "gpu-timings.jsonl")
                     (directory / "gpu-timings.jsonl").write_text("")
-                    args = [str(ROOT / "haxeon/.tools/hashlink/hl"), str(ROOT / "app/tests/presentation/build/host/capture.hl"), f"--view={view}", f"--section-mode={mode}", "--section-drag=60", f"--project={ROOT / project}", f"--capture-dir={directory}", f"--capture-seconds={options.seconds}", "--msaa=4", "--reset-workspace", "--perspective", "--width=1800", "--height=900"]
+                    args = [str(ROOT / "haxeon/scripts/hl"), str(ROOT / "app/tests/presentation/build/host/capture.hl"), f"--view={view}", f"--section-mode={mode}", "--section-drag=60", f"--project={ROOT / project}", f"--capture-dir={directory}", f"--capture-seconds={options.seconds}", "--msaa=4", "--reset-workspace", "--perspective", "--width=1800", "--height=900"]
                     for attempt in range(4):
                         directory.mkdir(parents=True,exist_ok=True)
                         (directory / "gpu-timings.jsonl").write_text("")

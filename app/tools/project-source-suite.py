@@ -44,7 +44,7 @@ def resident_mb(pid: int) -> int:
 def main() -> int:
     root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--hl", type=Path, default=root / "haxeon/.tools/hashlink/hl")
+    parser.add_argument("--hl", type=Path, default=root / "haxeon/scripts/hl")
     parser.add_argument("--suite", type=Path, default=root / "app/build/host/project-source.hl")
     parser.add_argument("--jobs", type=int, default=max(1, min(6, (os.cpu_count() or 4) // 3)))
     parser.add_argument("--only", help="comma-separated cases or groups instead of the default suite")

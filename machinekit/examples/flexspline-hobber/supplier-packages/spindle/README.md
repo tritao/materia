@@ -10,7 +10,7 @@ cd ~/dev/materia
 ./haxeon/scripts/haxeon build --compiler-only \
   --project=machinekit/examples/flexspline-hobber/supplier-packages/spindle/haxeon.json
 N=$PWD/app/build/host/native
-LD_LIBRARY_PATH=$PWD/haxeon/.tools/hashlink:$PWD/haxeon/out:$N/cadkit ./haxeon/.tools/hashlink/hl \
+LD_LIBRARY_PATH=$PWD/haxeon/out:$N/cadkit ./haxeon/scripts/hl \
   machinekit/examples/flexspline-hobber/supplier-packages/spindle/build/host/main.hl /tmp/spindle
 python3 machinekit/examples/flexspline-hobber/supplier-packages/spindle/spindle_package.py /tmp/spindle
 ```

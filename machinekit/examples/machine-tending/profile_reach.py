@@ -46,8 +46,8 @@ def main():
         parser.error("Not enough available system memory for this probe")
     native = sorted(artifact.parent.glob("native/*"))
     environment = os.environ.copy()
-    environment["LD_LIBRARY_PATH"] = ":".join(map(str, [root / "haxeon/out", root / "haxeon/.tools/hashlink", *native])) + ":" + environment.get("LD_LIBRARY_PATH", "")
-    command = [str(root / "haxeon/.tools/hashlink/hl"), str(artifact), "--profile-memory"]
+    environment["LD_LIBRARY_PATH"] = ":".join(map(str, [root / "haxeon/out", *native])) + ":" + environment.get("LD_LIBRARY_PATH", "")
+    command = [str(root / "haxeon/scripts/hl"), str(artifact), "--profile-memory"]
     command.append("--store" if args.store else "--profile-search" if args.search else "--profile-setup")
     if args.census:
         command.append("--profile-census=" + str(output / "allocations.json"))

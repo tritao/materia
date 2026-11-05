@@ -38,8 +38,9 @@ if [[ ! -f "$emsdk_dir/emsdk_env.sh" ]]; then
 	echo "build.sh: Emscripten is not installed; run haxeon/vendor/nativekit/tools/setup-web.sh" >&2
 	exit 1
 fi
-if [[ ! -x "$haxeon_dir/.tools/hashlink/hl" ]]; then
-	echo "build.sh: the Haxeon toolchain is missing; run haxeon/scripts/bootstrap-tools.sh" >&2
+hashlink_dir=$("$haxeon_dir/scripts/hashlink-path.sh")
+if [[ ! -x "$hashlink_dir/hl" ]]; then
+	echo "build.sh: the checkout HashLink VM is missing; run haxeon/scripts/build-native.sh" >&2
 	exit 1
 fi
 mkdir -p "$build_dir" "$site_dir/assets"
@@ -82,9 +83,9 @@ while IFS= read -r argument; do
 done < "$build_dir/guest-arguments.txt"
 # The page's own services (materia.js), which only the browser guest imports.
 guest_arguments+=("--ffi-interface=$app_dir/web/MateriaWebFiles.hxi")
-(cd "$haxeon_dir" && LD_LIBRARY_PATH="$haxeon_dir/out:$haxeon_dir/.tools/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+(cd "$haxeon_dir" && LD_LIBRARY_PATH="$haxeon_dir/out${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
 	HAXEON_WASM_LEGACY_EXCEPTIONS=1 \
-	"$haxeon_dir/.tools/hashlink/hl" "$compiler" --target="$guest_target" --output="$guest" --entry=app.MainWeb \
+	"$haxeon_dir/scripts/hl" "$compiler" --target="$guest_target" --output="$guest" --entry=app.MainWeb \
 	--wasm-import-memory --wasm-memory-contract="$contract" \
 	"${guest_arguments[@]}") > "$build_dir/guest-compile.log" 2>&1 || true
 grep -E '^compiled' "$build_dir/guest-compile.log" || true
@@ -101,9 +102,9 @@ for argument in "${guest_arguments[@]}"; do
   [[ "$argument" == --* && "$argument" != "--ffi-interface=$app_dir/web/MateriaPreparation.hxi" && "$argument" != "--ffi-interface=$app_dir/web/MateriaWebFiles.hxi" ]] && worker_arguments+=("$argument")
 done
 worker_guest="$build_dir/materia_preparation.wasm"
-(cd "$haxeon_dir" && LD_LIBRARY_PATH="$haxeon_dir/out:$haxeon_dir/.tools/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+(cd "$haxeon_dir" && LD_LIBRARY_PATH="$haxeon_dir/out${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
   HAXEON_WASM_LEGACY_EXCEPTIONS=1 \
-  "$haxeon_dir/.tools/hashlink/hl" "$compiler" --target="$guest_target" --output="$worker_guest" \
+  "$haxeon_dir/scripts/hl" "$compiler" --target="$guest_target" --output="$worker_guest" \
   --entry=app.PreparationWorkerMain --wasm-import-memory \
   "${worker_arguments[@]}" --ffi-interface="$app_dir/web/MateriaPreparation.hxi" \
   "$app_dir/src/PreparationWorkerMain.hx") > "$build_dir/worker-compile.log" 2>&1

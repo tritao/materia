@@ -200,7 +200,7 @@ def main():
     env.pop('HOBBER_BUDGET_LEGACY_ENDS', None)
     env['STOCKKIT_RAKE_BATCH_DOMAINS'] = '1' if proof else '0'
     env['LD_LIBRARY_PATH'] = ':'.join(map(str, [args.native.resolve(), root / '../machine-tending/app/build/host/native/cadkit',
-        Path('/home/joao/dev/materia-cache/occt-f1dc4efb-release/lib'), root / 'haxeon/.tools/hashlink', root / 'haxeon/out']))
+        Path('/home/joao/dev/materia-cache/occt-f1dc4efb-release/lib'), root / 'haxeon/out']))
 
     stopping, children, child_lock = threading.Event(), set(), threading.Lock()
 
@@ -275,7 +275,7 @@ def main():
                             rss = 0
                         pending += max(0, worker_memory - rss)
                     if available >= pending + worker_memory + 3 * 1024**3:
-                        child = subprocess.Popen([str(root / 'haxeon/.tools/hashlink/hl'), str(binary),
+                        child = subprocess.Popen([str(root / 'haxeon/scripts/hl'), str(binary),
                             'reference-budget', str(directory / 'inputs.json'), str(directory), mode], cwd=root, env=env, stdout=log, stderr=subprocess.STDOUT)
                         children.add(child)
                         break

@@ -27,7 +27,7 @@ def main():
                   acceptanceBasis='completed full stroke; <1% short reference-geometry fixture convergence; no fine full-stroke comparison')
     (directory / 'loads.json').write_text(json.dumps(report, indent=2) + '\n')
     with (directory / 'ratings.log').open('w') as log:
-        completed = subprocess.run(['./haxeon/.tools/hashlink/hl', str(directory / 'ratings-main.hl'),
+        completed = subprocess.run(['./haxeon/scripts/hl', str(directory / 'ratings-main.hl'),
                                    'reference-loads', str(directory / 'loads.json')],
                                   stdout=log, stderr=subprocess.STDOUT, env=os.environ)
     lines = (directory / 'ratings.log').read_text().splitlines()

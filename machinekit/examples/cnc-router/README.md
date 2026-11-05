@@ -147,7 +147,7 @@ machine.
 
 ```sh
 ./haxeon/scripts/haxeon build --project=machinekit/examples/cnc-router/haxeon.json
-./haxeon/.tools/hashlink/hl machinekit/examples/cnc-router/build/host/main.hl
+./haxeon/scripts/hl machinekit/examples/cnc-router/build/host/main.hl
 ```
 
 These also run in the MachineKit smoke suite (`machinekit/scripts/test-haxeon`).

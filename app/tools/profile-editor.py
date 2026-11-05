@@ -131,10 +131,10 @@ def main():
     output = (args.output_dir or APP / "build/profiles" / time.strftime("%Y%m%d-%H%M%S")).resolve()
     output.mkdir(parents=True, exist_ok=False)
     editor_args = args.editor_args[1:] if args.editor_args[:1] == ["--"] else args.editor_args
-    runtime = ROOT / "haxeon/.tools/hashlink/hl"
-    profiler = ROOT / "haxeon/.tools/hashlink/hlprof-live"
+    runtime = ROOT / "haxeon/scripts/hl"
+    profiler = ROOT / "haxeon/scripts/hlprof-live"
     with (output / "launch.log").open("w") as log, (output / "memory.jsonl").open("w") as memory:
-        configure = subprocess.run(["cmake", "--preset", "release", "-S", str(ROOT / "haxeon")],
+        configure = subprocess.run(["cmake", "--preset", "release", "-S", str((ROOT / "haxeon").resolve())],
                                    cwd=ROOT / "haxeon", stdout=log, stderr=subprocess.STDOUT)
         if configure.returncode:
             print(f"release runtime configure failed; see {output / 'launch.log'}", file=sys.stderr)
@@ -173,7 +173,7 @@ def main():
         if args.scenario == "tab-matrix" and not args.no_profile:
             environment["HAXEON_PROFILE_SPANS"] = "1"
         environment["LD_LIBRARY_PATH"] = os.pathsep.join(
-            [str(runtime.parent), str(ROOT / "haxeon/out"), *native_dirs,
+            [str(ROOT / "haxeon/out"), *native_dirs,
              environment.get("LD_LIBRARY_PATH", "")])
         bytecode_name = "headless-profile.hl" if args.scenario is not None else "main.hl"
         shutil.copy2(binary, output / bytecode_name)

@@ -28,12 +28,12 @@ The example commands use the compiled workflow artifact. The launcher's runtime 
 
 ```sh
 export LD_LIBRARY_PATH="$PWD/haxeon/out:$PWD/app/build/host/native/app:$PWD/cadkit/build/debug/core${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-./haxeon/.tools/hashlink/hl machinekit/examples/picking-station/build/host/main.hl check
-./haxeon/.tools/hashlink/hl machinekit/examples/picking-station/build/host/main.hl station-check
-./haxeon/.tools/hashlink/hl machinekit/examples/picking-station/build/host/main.hl scenario-demo
-./haxeon/.tools/hashlink/hl machinekit/examples/picking-station/build/host/main.hl bom
-./haxeon/.tools/hashlink/hl machinekit/examples/picking-station/build/host/main.hl cut-list
-./haxeon/.tools/hashlink/hl machinekit/examples/picking-station/build/host/main.hl preview machinekit/examples/picking-station/materia.project.json.sheet.json sheet-001 station-default-sheet-1
+./haxeon/scripts/hl machinekit/examples/picking-station/build/host/main.hl check
+./haxeon/scripts/hl machinekit/examples/picking-station/build/host/main.hl station-check
+./haxeon/scripts/hl machinekit/examples/picking-station/build/host/main.hl scenario-demo
+./haxeon/scripts/hl machinekit/examples/picking-station/build/host/main.hl bom
+./haxeon/scripts/hl machinekit/examples/picking-station/build/host/main.hl cut-list
+./haxeon/scripts/hl machinekit/examples/picking-station/build/host/main.hl preview machinekit/examples/picking-station/materia.project.json.sheet.json sheet-001 station-default-sheet-1
 ```
 
 `check` covers layout and IDs, BOM and sheet requirements, plan staleness, the full order, wrong bin, shortage, reset, repeated confirmation, and deterministic replay. `station-check` generates and checks the selectable assembly artifact. `bom` prints finished part counts, `cut-list` prints each extrusion member's cut length, and `preview` validates the authored guillotine cut plan. The project sheet record includes one registered stock sheet. A changed station dimension updates requirements; the original plan then reports stale references and must be revalidated or revised.

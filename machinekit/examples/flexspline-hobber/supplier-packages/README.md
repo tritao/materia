@@ -10,7 +10,7 @@ depends on `gearkit` and `camkit`.
 cd ~/dev/materia
 ./haxeon/scripts/haxeon build --compiler-only \
   --project=machinekit/examples/flexspline-hobber/supplier-packages/haxeon.json
-LD_LIBRARY_PATH=$PWD/haxeon/.tools/hashlink:$PWD/haxeon/out ./haxeon/.tools/hashlink/hl \
+LD_LIBRARY_PATH=$PWD/haxeon/out ./haxeon/scripts/hl \
   machinekit/examples/flexspline-hobber/supplier-packages/build/host/main.hl /tmp/supplier-package.json
 python3 machinekit/examples/flexspline-hobber/supplier-packages/hob_package.py /tmp/supplier-package.json /tmp/hob
 python3 machinekit/examples/flexspline-hobber/supplier-packages/mandrel_package.py /tmp/supplier-package.json /tmp/mandrel

@@ -13,10 +13,10 @@ export HAXEON_COMPILER_SERVER=0; ulimit -s 65536
 ./haxeon/scripts/haxeon build --compiler-only \
   --project=machinekit/examples/flexspline-hobber/supplier-packages/casting/haxeon.json
 N=$PWD/app/build/host/native
-export LD_LIBRARY_PATH=$PWD/haxeon/.tools/hashlink:$PWD/haxeon/out:$N/cadkit:$N/app:$N/collisionkit-native:$N/kinematicskit-native:$N/stockkit:$N/motionkit:$N/trajectorykit
+export LD_LIBRARY_PATH=$PWD/haxeon/out:$N/cadkit:$N/app:$N/collisionkit-native:$N/kinematicskit-native:$N/stockkit:$N/motionkit:$N/trajectorykit
 HL=machinekit/examples/flexspline-hobber/supplier-packages/casting
-./haxeon/.tools/hashlink/hl $HL/build/host/main.hl /tmp/casting bed
-./haxeon/.tools/hashlink/hl $HL/build/host/main.hl /tmp/casting column
+./haxeon/scripts/hl $HL/build/host/main.hl /tmp/casting bed
+./haxeon/scripts/hl $HL/build/host/main.hl /tmp/casting column
 python3 $HL/casting_package.py /tmp/casting
 ```
 
