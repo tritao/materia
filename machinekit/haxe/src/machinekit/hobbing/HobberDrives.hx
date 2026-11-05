@@ -177,7 +177,23 @@ class HobberDrives {
    * {x0, x1, y0, y1, z0, z1} in world mm.
    */
   public static function mountRelief(d:HobberDriveAxis):Array<Float> {
-    var mount = d.drive.fixed, body = mount.geometry();
+    var mount = d.drive.fixed, pose = poses(d).get("mount");
+    var memo:Map<String, Array<Float>> = reliefs == null ? [] : reliefs;
+    reliefs = memo;
+    var key = mount.geometryKey() + "|" + haxe.Json.stringify(pose), known = memo.get(key);
+    if (known == null) {
+      known = measureRelief(mount, pose);
+      memo.set(key, known);
+    }
+    return known.copy();
+  }
+
+  /** Reliefs by the mount's geometry and pose: the saddle's pad and pieces ask for the same mount's relief, and each answer
+   * cuts the supplier body. */
+  static var reliefs:Null<Map<String, Array<Float>>>;
+
+  static function measureRelief(mount:machinekit.component.MachineComponent, pose:materia.assembly.AssemblyRecord.AssemblyFrame):Array<Float> {
+    var body = mount.geometry();
     var raw = Part.box(400, 10, 400), slab = raw.translated(new Vector(0, -5, -100));
     raw.close();
     var hanging = body.intersect(slab);
@@ -185,7 +201,7 @@ class HobberDrives {
     slab.close();
     var bounds = hanging.shape.bounds(), lo = bounds.get_min(), hi = bounds.get_max();
     hanging.close();
-    var pose = poses(d).get("mount"), result = [1e9, 1e9, 1e9, -1e9, -1e9, -1e9];
+    var result = [1e9, 1e9, 1e9, -1e9, -1e9, -1e9];
     for (x in [lo.get_x(), hi.get_x()]) for (y in [lo.get_y() - 0.5, 0.0]) for (z in [lo.get_z(), hi.get_z()]) {
       var p = F.transformPoint(pose, x, y, z), q = [p.x, p.y, p.z];
       for (i in 0...3) {

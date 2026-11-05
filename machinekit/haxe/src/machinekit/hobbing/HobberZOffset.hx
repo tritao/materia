@@ -160,10 +160,21 @@ class HobberZOffset {
       out.push({name: "floating pad seat holes to relief", gap: holesGap(a)});
       return out;
     }
+    // Boxes bound each part, so their separation bounds the distance from below. A step an obstacle's boxes clear by a
+    // millimetre beyond its need passes that obstacle without the exact query (the gap of a failing one is still exact).
+    var boxes = [for (o in obstacles) {part: PosedParts.boxOf(o.part), against: PosedParts.boxOf(o.against)}];
+    function boxGap(index:Int, a:Float):Float {
+      var p = boxes[index].part, q = boxes[index].against, shift = SIDE * a;
+      var dx = Math.max(0, Math.max(p.minX - q.maxX, q.minX - p.maxX));
+      var dy = Math.max(0, Math.max(p.minY + shift - q.maxY, q.minY - p.maxY - shift));
+      var dz = Math.max(0, Math.max(p.minZ - q.maxZ, q.minZ - p.maxZ));
+      return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
     /** How far the first failing gap at `a` falls short of its need (beyond the 1e-6 acceptance), or 0 when all pass. */
     function shortfall(a:Float):Float {
-      for (o in obstacles) {
-        var gap = obstacleGap(o, a);
+      for (index in 0...obstacles.length) {
+        if (boxGap(index, a) >= RUNNING_GAP + 1) continue;
+        var gap = obstacleGap(obstacles[index], a);
         if (gap < RUNNING_GAP - 1e-6) return RUNNING_GAP - 1e-6 - gap;
       }
       var gap = holesGap(a);
