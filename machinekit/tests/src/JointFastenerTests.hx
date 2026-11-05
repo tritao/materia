@@ -3,6 +3,7 @@ import machinekit.assembly.JointFasteners;
 import machinekit.component.BoltedFace;
 import machinekit.component.BoltedFace.BoltHole;
 import machinekit.component.BoltedFace.ThreadMaterial;
+import machinekit.component.BoltedFace.PinnedFace;
 import machinekit.component.MachineComponent;
 import machinekit.motion.LinearRail;
 import cadkit.modeling.Part;
@@ -33,6 +34,26 @@ class FaceBlock extends MachineComponent {
     if (!(thickness > 0)) throw new machinekit.component.NoGeometry(designation);
     return machined(Solids.named(Part.box(100, 100, thickness).translated(new cadkit.modeling.Vector(0, 0, low)), "body"));
   }
+}
+
+/** A part that only states its dowel faces, with a body (z from `low`, `thickness` thick) that cuts their reamed holes. */
+class PinBlock extends MachineComponent {
+  final faces:Array<machinekit.component.BoltedFace.PinnedFace>;
+  final thickness:Float;
+  final low:Float;
+
+  public function new(name:String, faces:Array<machinekit.component.BoltedFace.PinnedFace>, thickness:Float, low:Float) {
+    super("TEST-PIN-BLOCK-" + name, "Pin block " + name, "steel", true);
+    this.faces = faces;
+    this.thickness = thickness;
+    this.low = low;
+  }
+
+  override public function pinnedFaces():Array<machinekit.component.BoltedFace.PinnedFace> return faces;
+  override public function machinable():Bool return true;
+  override public function hasGeometry():Bool return true;
+  override public function geometry(detail:ComponentDetail = Preview):Part
+    return machined(Solids.named(Part.box(100, 100, thickness).translated(new cadkit.modeling.Vector(0, 0, low)), "body"));
 }
 
 /** A part that states faces but does not cut holes. */
@@ -102,8 +123,58 @@ class JointFastenerTests {
     suitSeats();
     fit();
     defects();
+    dowels();
     mill();
     Sys.println("joint fasteners: derivation, validation and the bench mill's rail and motor screws pass");
+  }
+
+  /** A host (z -10..10) and a cover (z 10..18) located by dowels; each pin face lists its own holes. */
+  static function pinned(hostHoles:Array<BoltHole>, coverHoles:Array<BoltHole>, hostDiameter:Float = 5, coverDiameter:Float = 5, hostDepth:Float = 10,
+      coverDepth:Float = 8, fixed:Bool = true, drawn:Bool = false):AxisBuilder {
+    var builder = new AxisBuilder();
+    builder.place("host", new PinBlock("HOST", [new PinnedFace("top", frameAtTop(10), hostHoles, hostDiameter, hostDepth, false, drawn)], 20, -10),
+      AssemblyFrames.translation(0, 0, 0));
+    var cover = new PinBlock("COVER", [new PinnedFace("bottom", BoltedFace.frameOf(origin, up, across), coverHoles, coverDiameter, coverDepth, true, drawn)], 8, 0);
+    if (fixed) builder.attach("cover", cover, AssemblyFrames.translation(0, 0, 10), "host");
+    else builder.place("cover", cover, AssemblyFrames.translation(0, 0, 10));
+    return builder;
+  }
+
+  static function dowels():Void {
+    var two:Array<BoltHole> = [{x: -20.0, y: 0.0}, {x: 20.0, y: 0.0}];
+    var result = JointFasteners.derive(pinned(two, two));
+    result.require();
+    check(result.dowels.length == 1 && result.dowelCount() == 2 && result.joints.length == 0, "two matching pinned faces are one dowelled joint of two pins");
+    var joint = result.dowels[0];
+    check(joint.size == "5" && joint.length == 10 && joint.item.partNumber == "ISO8734-5x10", 'a 5 mm dowel takes the shortest standard length that engages one diameter each side: ${joint.item.partNumber}');
+    check(Math.abs(joint.engagementA + joint.engagementB - joint.length) < 1e-9 && joint.engagementA >= 5 - 1e-9 && joint.engagementB >= 5 - 1e-9, "the pin stands in both parts by a diameter or more");
+    var lines = result.lines();
+    check(lines.length == 1 && lines[0].quantity == 2, "the BOM line is the pin, twice");
+    var cuts = [for (member in ["host", "cover"]) result.machining.get(member)];
+    check(cuts[0] != null && cuts[0].length == 2 && cuts[0][0].kind == "dowel" && cuts[0][0].fit == "H7" && cuts[0][0].through != true, "the host is reamed blind: " + cuts[0]);
+    check(cuts[1] != null && cuts[1].length == 2 && cuts[1][0].through == true, "the cover is reamed through");
+    // Holes the parts draw are not cut again.
+    var drawn = JointFasteners.derive(pinned(two, two, 5, 5, 10, 8, true, true));
+    drawn.require();
+    check(drawn.dowels.length == 1 && drawn.machining.get("host") == null, "a part that draws its dowel holes gets no derived cuts");
+    // A deeper pair takes the longer pin only as far as the holes allow; 8 mm needs 16.
+    var big = JointFasteners.derive(pinned(two, two, 8, 8, 12, 12));
+    big.require();
+    check(big.dowels[0].length == 16 && big.dowels[0].item.partNumber == "ISO8734-8x16", "an 8 mm dowel in 12 mm holes is 8 x 16: " + big.dowels[0].item.partNumber);
+    // The derivation gives the machine its pins in the BOM and the cuts in the parts' geometry.
+    var builder = pinned(two, two);
+    builder.deriveFasteners();
+    var kept = builder.derivedFasteners();
+    check(kept != null && kept.dowels.length == 1, "the assembly keeps its derived dowels");
+    var host = builder.components()[0].component;
+    check(host.machinedCuts().length == 2, "the host machines its reamed holes");
+    // Defects.
+    expect(pinned(two, two, 5, 6), "fasteners.pin-diameter", "dowel holes of different diameters");
+    expect(pinned(two, [{x: -20.0, y: 0.0}, {x: 20.0, y: 3.0}]), "fasteners.pin-pattern", "dowel holes that differ in one place");
+    expect(pinned(two, [{x: -20.0, y: 0.0}]), "fasteners.pin-pattern", "dowel faces with different hole counts");
+    expect(pinned(two, [{x: -30.0, y: 0.0}, {x: 30.0, y: 0.0}]), "fasteners.pin-unmatched", "dowel faces with no common hole");
+    expect(pinned(two, two, 5, 5, 4, 8), "fasteners.dowel-depth", "a dowel hole shallower than one diameter");
+    expect(pinned(two, two, 5, 5, 10, 8, false), "fasteners.not-fixed", "dowelled members that are not fixed together");
   }
 
   static function sound():Void {

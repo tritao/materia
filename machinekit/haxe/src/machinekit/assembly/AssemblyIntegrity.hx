@@ -303,7 +303,10 @@ class AssemblyIntegrity {
       checkSupport(parts.parts, parts.boxes);
       if (minContactArea != null) checkContactAreas(parts.parts, parts.boxes);
       if (flangeCutouts) checkFlangeCutouts(parts.parts, parts.boxes, restPoses);
-      if (fastenerFit) checkFasteners(parts.parts, parts.boxes, restPoses);
+      if (fastenerFit) {
+        checkFasteners(parts.parts, parts.boxes, restPoses);
+        checkDowels(parts.parts, parts.boxes, restPoses);
+      }
       checkInterference(parts.parts, parts.boxes, null);
     } catch (error:Dynamic) {
       closeAll(parts.parts);
@@ -349,7 +352,10 @@ class AssemblyIntegrity {
     var restPoses = new Map<String, AssemblyFrame>();
     for (id in ids) restPoses.set(id, state.worldPose(id));
     var parts = poseAll(posed, state);
-    try checkFasteners(parts.parts, parts.boxes, restPoses) catch (error:Dynamic) {
+    try {
+      checkFasteners(parts.parts, parts.boxes, restPoses);
+      checkDowels(parts.parts, parts.boxes, restPoses);
+    } catch (error:Dynamic) {
       closeAll(parts.parts);
       throw error;
     }
@@ -699,6 +705,41 @@ class AssemblyIntegrity {
               '${joint.id}: the ${joint.size} x ${Math.round(joint.length)} fastener\'s ${volume.name} '
               + (volume.access ? 'cannot be reached: $id stands in its ${Math.round(volume.to - volume.from)} mm access' : 'meets $id')
               + ' (${round(shared)} mm³ at (${round(point.x)}, ${round(point.y)}))'
+            );
+          }
+        } catch (error:Dynamic) {
+          tool.close();
+          throw error;
+        }
+        tool.close();
+      }
+    }
+  }
+
+  /** The dowel pins of the dowelled joints: their holes must be free of the other members' material (`fasteners.hole`). */
+  function checkDowels(parts:Map<String, Part>, boxes:Map<String, PartBox>, poses:Map<String, AssemblyFrame>):Void {
+    var derivation = assembly.derivedFasteners();
+    if (derivation == null) return;
+    for (joint in derivation.dowels) {
+      var face:Null<machinekit.component.BoltedFace.PinnedFace> = null;
+      for (candidate in flat.member(joint.memberB).pinnedFaces()) if (candidate.id == joint.faceB) face = candidate;
+      if (face == null) throw 'Assembly integrity lost the pinned face "${joint.memberB}#${joint.faceB}" of joint ${joint.id}';
+      var frame = AssemblyFrames.compose(need(poses, joint.memberB), face.frame);
+      for (volume in joint.volumes) for (point in joint.hostHoles) {
+        var local = Part.cylinderSpan(volume.diameter / 2, volume.from, volume.to, point.x, point.y);
+        var tool = PosedParts.moved(local, frame);
+        local.close();
+        var box = PosedParts.boxOf(tool);
+        try {
+          for (id => part in parts) {
+            // The two parts the pin joins hold it in their own holes (a catalogue foot's is reamed at assembly and not modelled).
+            if (id == joint.memberA || id == joint.memberB) continue;
+            var shared = PosedParts.commonVolume(part, need(boxes, id), tool, box);
+            if (shared <= overlapLimit) continue;
+            diagnostics.error(
+              volume.code,
+              joint.id,
+              '${joint.id}: the ${joint.diameter} x ${Math.round(joint.length)} dowel pin\'s ${volume.name} meets $id (${round(shared)} mm³ at (${round(point.x)}, ${round(point.y)}))'
             );
           }
         } catch (error:Dynamic) {

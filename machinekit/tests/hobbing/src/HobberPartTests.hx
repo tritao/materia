@@ -195,9 +195,9 @@ class HobberPartTests {
       "the cartridge stub reaches past the pulley");
     var cradle = new machinekit.hobbing.HobberSaddle("GE-motor-cradle"), cradleHoles = cradle.holes();
     check(machinekit.component.ManufacturingRoute.of(cradle) != null && cradleHoles.filter(h -> h.kind == "tapped").length == 1
-      && cradleHoles.filter(h -> h.kind == "dowel").length == 2 && cradleHoles.filter(h -> h.kind == "clearance" && h.thread == "M8").length == 4
+      && cradleHoles.filter(h -> h.kind == "dowel").length == 0 && cradleHoles.filter(h -> h.kind == "clearance" && h.thread == "M8").length == 4
       && cradleHoles.filter(h -> h.kind == "clearance" && h.thread == "M6" && h.slotLength == 2 * HobSpindle.TENSION_TRAVEL).length == 4,
-      "the servo cradle is a routed milled part with the jack screw's tapped M8, four floor bolts, two dowels and the flange's four M6 vertical slots");
+      "the servo cradle is a routed milled part with the jack screw's tapped M8, four floor bolts (its dowels are derived inside the machine) and the flange's four M6 vertical slots");
     check(spindle.frontBearing != spindle.rearBearing, "spindle has two bearing instances");
     check(
       spindle.billOfMaterials().quantity(spindle.frontBearing.bom.partNumber) == 2,

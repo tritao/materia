@@ -383,6 +383,19 @@ class MotorMount extends MachineComponent {
     return faces;
   }
 
+  /** Whether the machine locates the foot with two dowels reamed at assembly (see `ScrewSupportUnit.footPinned`). */
+  public var footPinned = false;
+
+  /** The foot's two dowels (`SupportedScrewDrive.dowelPoints`), on the base plane, the bore running to the bolt seat. */
+  override public function pinnedFaces():Array<machinekit.component.BoltedFace.PinnedFace> {
+    var seat = spec.boltSeatY;
+    if (!footPinned || seat == null || spec.baseHoles.length == 0) return [];
+    var holes = [for (p in SupportedScrewDrive.dowelPoints([for (h in spec.baseHoles) {x: h.x, y: 0.0, z: h.z}])) {x: p.x, y: -p.z}];
+    if (holes.length == 0) return [];
+    return [new machinekit.component.BoltedFace.PinnedFace("foot-pins", machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: 0}, {x: 0, y: 1, z: 0},
+      {x: 1, y: 0, z: 0}), holes, SupportedScrewDrive.DOWEL_DIAMETER, seat, false, true)];
+  }
+
   override public function carriesJournal():Bool return true;
 
   override public function hasGeometry():Bool return true;

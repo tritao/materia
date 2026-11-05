@@ -53,6 +53,7 @@ class HobberDrives {
       var l = HobberXLayout.front();
       xCache = {id: "X", drive: SupportedScrewDrive.m60dBk12(true), axis: {start: [l.screwStart, 0.0, 180.0], direction: [-1.0, 0, 0], normal: [0.0, 0, 1]},
         length: l.screwLength, nutStation: partStart(l.nutStation), nutUp: [0.0, 0, 1], blockHeight: 80.0};
+      pin(xCache);
     }
     return xCache;
   }
@@ -66,14 +67,25 @@ class HobberDrives {
     var axis = yCache;
     if (axis == null) throw "Hobber Y drive lost its axis";
     axis.drive.floating.screwSize = "M5";
+    pin(axis);
     return axis;
+  }
+
+  /** Both supports of an axis are located by dowels, reamed through the foot and the seat at assembly (`ScrewSupportUnit.footPinned`). */
+  static function pin(axis:HobberDriveAxis):Void {
+    axis.drive.fixed.footPinned = true;
+    axis.drive.floating.footPinned = true;
   }
 
   static var zDriveCache:Null<SupportedScrewDrive>;
 
   /** Z with its screw at `y` across the machine (not cached). */
   public static function zAt(y:Float):HobberDriveAxis {
-    if (zDriveCache == null) zDriveCache = SupportedScrewDrive.m60dBk12Braked(true);
+    if (zDriveCache == null) {
+      zDriveCache = SupportedScrewDrive.m60dBk12Braked(true);
+      zDriveCache.fixed.footPinned = true;
+      zDriveCache.floating.footPinned = true;
+    }
     return {id: "Z", drive: zDriveCache,
       axis: {start: [HobberZLayout.AXIS_X, y, HobberZLayout.SHAFT_TOP], direction: [0.0, 0, -1.0], normal: [-1.0, 0, 0]},
       length: HobberZLayout.SHAFT_LENGTH, nutStation: partStart(HobberZLayout.NUT_STATION), nutUp: [-1.0, 0, 0], blockHeight: HobberZLayout.AXIS_X - 148};

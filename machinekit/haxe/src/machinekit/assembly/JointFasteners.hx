@@ -5,6 +5,8 @@ import machinekit.component.BoltedFace.BoltHole;
 import machinekit.component.BoltedFace.BoltRecess;
 import machinekit.component.BoltedFace.MachinedCut;
 import machinekit.component.BoltedFace.ThreadMaterial;
+import machinekit.component.BoltedFace.PinnedFace;
+import machinekit.standard.DowelPin;
 import machinekit.assembly.Diagnostics.DiagnosticSeverity;
 import machinekit.component.BomItem;
 import machinekit.component.MachineComponent;
@@ -69,9 +71,36 @@ typedef FastenedJoint = {
   var volumes:Array<FastenerVolume>;
 }
 
+/** One dowelled joint: two pinned faces that meet with the same holes, and the pins derived for them. */
+typedef DowelJoint = {
+  var id:String;
+  var memberA:String;
+  var faceA:String;
+  var memberB:String;
+  var faceB:String;
+  var standard:String;
+  var size:String;
+  var diameter:Float;
+  var length:Float;
+  var fit:String;
+  var count:Int;
+  /** How deep each part's reamed hole is and how far the pin stands in each, mm. */
+  var depthA:Float;
+  var depthB:Float;
+  var engagementA:Float;
+  var engagementB:Float;
+  /** The holes in the frame of member B's face. */
+  var hostHoles:Array<BoltHole>;
+  var item:BomItem;
+  /** The pin in its holes, in member B's face frame (A lies at negative z). */
+  var volumes:Array<FastenerVolume>;
+}
+
 /** What `JointFasteners.derive` found: the joints, every finding, and the purchase lines the joints add up to. */
 class FastenerDerivation {
   public final joints:Array<FastenedJoint> = [];
+  /** The dowelled joints (`PinnedFace`), beside the bolted ones. */
+  public final dowels:Array<DowelJoint> = [];
   public final diagnostics = new Diagnostics();
   /**
 	 * The holes the joints need cut into their parts, by member id, in each part's frame: the tap-drill holes of a host
@@ -102,7 +131,22 @@ class FastenerDerivation {
         }
       }
     }
+    for (joint in dowels) {
+      var key = joint.item.partNumber;
+      if (at.exists(key)) out[at.get(key)].quantity += joint.count;
+      else {
+        at.set(key, out.length);
+        out.push({item: joint.item, quantity: joint.count});
+      }
+    }
     return out;
+  }
+
+  /** The dowel pins over all dowelled joints. */
+  public function dowelCount():Int {
+    var total = 0;
+    for (joint in dowels) total += joint.count;
+    return total;
   }
 
   public function count():Int {
@@ -226,7 +270,150 @@ class JointFasteners {
       );
     }
     for (key in derived.keys()) spacing(result, key, derived.get(key), result.joints);
+    derivePins(result, assembly, poses, group, members, tolerance);
     return result;
+  }
+
+  /**
+	 * The dowelled joints: pinned faces that meet (opposed normals on one plane) pair when their holes coincide. A face with some
+	 * holes in common with another but not all, or of another diameter, is an error; a face with no partner is one too.
+	 */
+  static function derivePins(result:FastenerDerivation, assembly:MachineAssembly, poses:Map<String, AssemblyFrame>, group:Map<String, Int>,
+      members:Map<String, MachineComponent>, tolerance:Float):Void {
+    var diagnostics = result.diagnostics;
+    var pins:Array<{member:String, face:PinnedFace, world:AssemblyFrame}> = [];
+    for (entry in assembly.components()) {
+      var pose = poses.get(entry.id);
+      if (pose == null) continue;
+      var seen = new Map<String, Bool>();
+      for (face in entry.component.pinnedFaces()) {
+        if (seen.exists(face.id)) {
+          diagnostics.error("fasteners.face", entry.id, 'Member ${entry.id} declares pinned face "${face.id}" twice');
+          continue;
+        }
+        seen.set(face.id, true);
+        pins.push({member: entry.id, face: face, world: AssemblyFrames.compose(pose, face.frame)});
+      }
+    }
+    var paired = [for (_ in pins) false];
+    for (i in 0...pins.length) for (j in i + 1...pins.length) {
+      var a = pins[i], b = pins[j];
+      if (a.member == b.member) continue;
+      var local = AssemblyFrames.compose(AssemblyFrames.inverse(b.world), a.world);
+      var normal = AssemblyFrames.transformVector(local, 0, 0, 1);
+      if (normal.z > -0.9999 || Math.abs(local.z) > tolerance) continue;
+      var at = [for (hole in a.face.holes) AssemblyFrames.transformPoint(local, hole.x, hole.y, 0)];
+      function onB(x:Float, y:Float):Bool {
+        for (hole in b.face.holes) if (Math.abs(hole.x - x) <= tolerance && Math.abs(hole.y - y) <= tolerance) return true;
+        return false;
+      }
+      var shared = 0;
+      for (p in at) if (onB(p.x, p.y)) shared++;
+      if (shared == 0) continue;
+      var id = a.member + "#" + a.face.id + " ~ " + b.member + "#" + b.face.id;
+      if (paired[i] || paired[j]) {
+        diagnostics.error("fasteners.pin-duplicate", id, '$id: a pinned face is already paired with another');
+        continue;
+      }
+      if (shared != at.length || at.length != b.face.holes.length) {
+        diagnostics.error("fasteners.pin-pattern", id, '$id: the dowel holes differ (${at.length} and ${b.face.holes.length} holes, $shared in common)');
+        continue;
+      }
+      if (Math.abs(a.face.diameter - b.face.diameter) > 1e-9) {
+        diagnostics.error("fasteners.pin-diameter", id, '$id: the dowel holes are ${round(a.face.diameter)} and ${round(b.face.diameter)} mm');
+        continue;
+      }
+      paired[i] = true;
+      paired[j] = true;
+      if (group.get(a.member) != group.get(b.member)) diagnostics.error(
+        "fasteners.not-fixed",
+        id,
+        '$id: the members are not held together by fixed mates, so a dowelled joint between them contradicts the model'
+      );
+      var spec:Null<machinekit.standard.DowelPinSpec> = null;
+      for (designation in DowelPin.catalog().designations()) {
+        var candidate = DowelPin.catalog().get(designation);
+        if (Math.abs(candidate.diameter - a.face.diameter) < 1e-9) spec = candidate;
+      }
+      if (spec == null) {
+        diagnostics.error("fasteners.size", id, '$id: no ISO 8734 dowel pin of ${round(a.face.diameter)} mm');
+        continue;
+      }
+      var minEngagement = PinnedFace.ENGAGEMENT_DIAMETERS * spec.diameter;
+      var usableA = a.face.usable(), usableB = b.face.usable();
+      if (usableA + 1e-9 < minEngagement || usableB + 1e-9 < minEngagement) {
+        diagnostics.error(
+          "fasteners.dowel-depth",
+          id,
+          '$id: a ${round(spec.diameter)} mm dowel needs ${round(minEngagement)} mm in each part but the holes allow ${round(usableA)} and ${round(usableB)} mm'
+        );
+        continue;
+      }
+      var length = DowelPin.standardLengthAtLeast(2 * minEngagement);
+      if (length == null || length > usableA + usableB + 1e-9) {
+        diagnostics.error(
+          "fasteners.dowel-depth",
+          id,
+          '$id: no standard dowel length fits holes of ${round(usableA)} and ${round(usableB)} mm (at least ${round(2 * minEngagement)} mm needed)'
+        );
+        continue;
+      }
+      var engagementA = Math.min(usableA, Math.max(length / 2, length - usableB)), engagementB = length - engagementA;
+      var pin = DowelPin.metric(spec.size, length);
+      var cuts = [{p: a, member: a.member}, {p: b, member: b.member}];
+      for (side in cuts) if (!side.p.face.drawn) {
+        if (!members.get(side.member).machinable()) {
+          diagnostics.error("fasteners.machining", id, '$id: ${side.member} has dowel holes its geometry does not draw and does not cut derived holes');
+          continue;
+        }
+        var holes = side.p == a ? a.face.holes : b.face.holes;
+        for (hole in holes) cutsOf(result, side.member).push({
+          frame: side.p.face.frame,
+          x: hole.x,
+          y: hole.y,
+          diameter: spec.diameter,
+          from: -1.0,
+          to: side.p.face.through ? side.p.face.depth + 1 : side.p.face.depth,
+          kind: "dowel",
+          thread: null,
+          fit: side.p.face.fit,
+          through: side.p.face.through
+        });
+      }
+      var margin = 0.01;
+      result.dowels.push({
+        id: id,
+        memberA: a.member,
+        faceA: a.face.id,
+        memberB: b.member,
+        faceB: b.face.id,
+        standard: "ISO 8734",
+        size: spec.size,
+        diameter: spec.diameter,
+        length: length,
+        fit: b.face.fit,
+        count: at.length,
+        depthA: a.face.depth,
+        depthB: b.face.depth,
+        engagementA: engagementA,
+        engagementB: engagementB,
+        hostHoles: [for (hole in b.face.holes) {x: hole.x, y: hole.y}],
+        item: pin.bom,
+        volumes: [{
+          name: "dowel pin",
+          code: "fasteners.hole",
+          diameter: HOLE_SHARE * spec.diameter,
+          from: -engagementA + margin,
+          to: engagementB - margin,
+          access: false
+        }]
+      });
+    }
+    for (i in 0...pins.length) if (!paired[i]) diagnostics.error(
+      "fasteners.pin-unmatched",
+      pins[i].member + "#" + pins[i].face.id,
+      '${pins[i].member}#${pins[i].face.id} has dowel holes but no pinned face meets it with the same holes'
+    );
   }
 
   /** Whether `a` lies on `b`'s plane with opposed normals and at least one of its holes over `b`'s footprint. */

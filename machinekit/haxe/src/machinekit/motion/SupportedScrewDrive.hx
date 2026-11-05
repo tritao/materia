@@ -237,6 +237,30 @@ class SupportedScrewDrive {
   public static inline var DOWEL_INBOARD:Float = 10;
 
   /**
+	 * Where the dowels of one support go among its bolt `points`: on the line between the two farthest bolts, `DOWEL_INBOARD` inboard of each
+	 * (none where they are closer than twice that). Points may be in any frame; the result is in the same one. The seat's holes and the
+	 * support's own dowel face (`ScrewSupportUnit`, `MotorMount`) both use it, so the two always agree.
+	 */
+  public static function dowelPoints(points:Array<{x:Float, y:Float, z:Float}>):Array<{x:Float, y:Float, z:Float}> {
+    var first = 0, second = 0, farthest = -1.0;
+    for (i in 0...points.length) for (j in i + 1...points.length) {
+      var dx = points[j].x - points[i].x, dy = points[j].y - points[i].y, dz = points[j].z - points[i].z;
+      var span = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      // A tie (the diagonals of a rectangle) goes to the first pair, whatever the frame's rounding.
+      if (span > farthest + 1e-6) {
+        farthest = span;
+        first = i;
+        second = j;
+      }
+    }
+    if (!(farthest > 2 * DOWEL_INBOARD)) return [];
+    return [for (pair in [[first, second], [second, first]]) {
+      var a = points[pair[0]], b = points[pair[1]], share = DOWEL_INBOARD / farthest;
+      {x: a.x + (b.x - a.x) * share, y: a.y + (b.y - a.y) * share, z: a.z + (b.z - a.z) * share};
+    }];
+  }
+
+  /**
 	 * The holes the seats need, in world mm: a tapped hole (or, with `throughBolts`, a clearance hole) for each foot bolt of
 	 * the fixed mount and of the floating support, and for each support two dowels on the line between its two farthest
 	 * bolts, `DOWEL_INBOARD` inboard of each, reamed through the foot at assembly once the support is aligned to the nut.
@@ -265,29 +289,15 @@ class SupportedScrewDrive {
           direction: down
         });
       }
-      var first = 0, second = 0, farthest = -1.0;
-      for (i in 0...points.length) for (j in i + 1...points.length) {
-        var dx = points[j].x - points[i].x, dy = points[j].y - points[i].y, dz = points[j].z - points[i].z;
-        var span = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        if (span > farthest) {
-          farthest = span;
-          first = i;
-          second = j;
-        }
-      }
-      if (farthest > 2 * DOWEL_INBOARD) for (pair in [[first, second], [second, first]]) {
-        var a = points[pair[0]], b = points[pair[1]];
-        var share = DOWEL_INBOARD / farthest;
-        result.push({
-          kind: "dowel",
-          support: name,
-          thread: null,
-          diameter: DOWEL_DIAMETER,
-          depth: 2 * DOWEL_DIAMETER,
-          position: {x: a.x + (b.x - a.x) * share, y: a.y + (b.y - a.y) * share, z: a.z + (b.z - a.z) * share},
-          direction: down
-        });
-      }
+      for (point in dowelPoints(points)) result.push({
+        kind: "dowel",
+        support: name,
+        thread: null,
+        diameter: DOWEL_DIAMETER,
+        depth: 2 * DOWEL_DIAMETER,
+        position: point,
+        direction: down
+      });
     }
     support("fixed", need(at, "mount"), [for (hole in fixed.spec.baseHoles) {x: hole.x, z: hole.z, diameter: hole.diameter}]);
     // The floating support's holes are in the foot frame, which `poses` composes `supportInFootFrame` onto.

@@ -13,6 +13,7 @@ class StandardComponents {
     registry.register(FinePitchNut.recipeType());
     registry.register(FlatWasher.recipeType());
     registry.register(ParallelKey.recipeType());
+    registry.register(DowelPin.recipeType());
     registry.register(RetainingRing.recipeType());
     registry.register(ShaftCollar.recipeType());
     registry.register(Bushing.recipeType());

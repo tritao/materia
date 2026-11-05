@@ -238,6 +238,24 @@ class ScrewSupportUnit extends MachineComponent {
     )];
   }
 
+  /**
+	 * Whether the machine locates the foot with two dowels, reamed through the foot and the seat at assembly once the support is aligned
+	 * to the nut (`SupportedScrewDrive.seatHoles`). The foot is a maker's part: its bores are not modelled, only declared (`pinnedFaces`).
+	 */
+  public var footPinned = false;
+
+  /**
+	 * The two dowels of a pinned foot, on the line between its two farthest bolts, `SupportedScrewDrive.DOWEL_INBOARD` inboard of each (the
+	 * rule `SupportedScrewDrive.seatHoles` uses for the seat), in the foot face's frame; the bore runs to the bolt seat.
+	 */
+  override public function pinnedFaces():Array<machinekit.component.BoltedFace.PinnedFace> {
+    if (!spec.base || !footBolted || !footPinned) return [];
+    var holes = [for (p in SupportedScrewDrive.dowelPoints([for (p in mountingPositions()) {x: p.x, y: 0.0, z: p.z}])) {x: p.x, y: -p.z}];
+    if (holes.length == 0) return [];
+    return [new machinekit.component.BoltedFace.PinnedFace("foot-pins", machinekit.component.BoltedFace.frameOf({x: 0, y: -spec.shaftHeight, z: 0},
+      {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}), holes, SupportedScrewDrive.DOWEL_DIAMETER, boltSeatY(), false, true)];
+  }
+
   override public function carriesJournal():Bool return true;
 
   override public function hasGeometry():Bool return true;

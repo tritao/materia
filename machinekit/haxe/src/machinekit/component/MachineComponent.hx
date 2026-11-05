@@ -38,6 +38,8 @@ class MachineComponent {
 	 * the fasteners of every pair of faces that meet in an assembly; a part with none is never fastened by derivation.
 	 */
   public function fasteningFaces():Array<BoltedFace> return [];
+  /** The faces where this part is located to another by dowel pins (see `PinnedFace`); `JointFasteners` derives the pins. */
+  public function pinnedFaces():Array<machinekit.component.BoltedFace.PinnedFace> return [];
 
   var machining:Array<MachinedCut> = [];
 

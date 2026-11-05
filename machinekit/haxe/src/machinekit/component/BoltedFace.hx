@@ -30,7 +30,11 @@ typedef MachinedCut = {
   to:Float,
   /** What the hole is, for a drawing's hole table: "tapped" (a tap drill), "clearance" or "counterbore"; the thread names the screw. */
   ?kind:String,
-  ?thread:String
+  ?thread:String,
+  /** The fit a reamed hole is finished to ("H7" for a dowel's), for the hole table. */
+  ?fit:String,
+  /** A hole that leaves the far face: its depth is the material and not the cut. */
+  ?through:Bool
 };
 
 enum BoltedRole {
@@ -179,4 +183,61 @@ class BoltedFace {
     case CastIron: 1.5;
     case Aluminium: 2.0;
   };
+}
+
+/** A dowel hole position in a face frame, mm. */
+typedef PinHole = BoltHole;
+
+/**
+ * One face of a part where it is located by dowel pins: a pattern of holes of `diameter` (the pin's nominal diameter), reamed H7 for a
+ * m6 pin, `depth` deep into this part (the material behind the plane when `through`), in a face frame like `BoltedFace`'s (origin on
+ * the mating plane, +Z into the part). Two pinned faces that meet with the same holes and diameter are one dowelled joint:
+ * `JointFasteners` derives the pin (ISO 8734, the shortest standard length that engages `ENGAGEMENT_DIAMETERS` diameters in each part), cuts
+ * the reamed bore into each part whose geometry does not draw it, and adds the pins to the BOM. `atAssembly` marks a bore the maker
+ * leaves to be reamed through the pair once aligned (a catalogue part, whose geometry is not ours to cut, or a joint aligned in the build).
+ */
+class PinnedFace {
+  public final id:String;
+  public final frame:AssemblyFrame;
+  public final holes:Array<PinHole>;
+  public final diameter:Float;
+  public final depth:Float;
+  public final through:Bool;
+  /** The part's own geometry already has these holes (or, a catalogue part, they are made at assembly and not modelled); the derivation cuts none. */
+  public final drawn:Bool;
+  public final fit:String;
+
+  /** Diameters of engagement each part gives a dowel, at least. */
+  public static inline var ENGAGEMENT_DIAMETERS:Float = 1.0;
+  /** Air relief left at the bottom of a blind dowel hole, mm. */
+  public static inline var RELIEF:Float = 1.0;
+
+  public function new(id:String, frame:AssemblyFrame, holes:Array<PinHole>, diameter:Float, depth:Float, through:Bool = false,
+      drawn:Bool = false, fit:String = "H7") {
+    if (id == null || StringTools.trim(id) == "") throw "A pinned face needs an id";
+    if (holes == null || holes.length == 0) throw 'Pinned face "$id" lists no holes';
+    if (!(diameter > 0) || !(depth > 0) || !Math.isFinite(diameter + depth)) throw 'Pinned face "$id" needs a positive diameter and depth';
+    for (hole in holes) if (!Math.isFinite(hole.x) || !Math.isFinite(hole.y)) throw 'Pinned face "$id" has a non-finite hole';
+    this.id = id;
+    this.frame = frame;
+    this.holes = holes;
+    this.diameter = diameter;
+    this.depth = depth;
+    this.through = through;
+    this.drawn = drawn;
+    this.fit = fit;
+  }
+
+  /** The holes given as points of the part's frame, which `frame` carries onto the face. */
+  public static function atPoints(id:String, frame:AssemblyFrame, points:Array<{x:Float, y:Float, z:Float}>, diameter:Float, depth:Float,
+      through:Bool = false, drawn:Bool = false, fit:String = "H7"):PinnedFace {
+    var inverse = AssemblyFrames.inverse(frame);
+    return new PinnedFace(id, frame, [for (p in points) {
+      var at = AssemblyFrames.transformPoint(inverse, p.x, p.y, p.z);
+      {x: at.x, y: at.y};
+    }], diameter, depth, through, drawn, fit);
+  }
+
+  /** The depth a pin can use in this part: the hole less the relief of a blind one. */
+  public function usable():Float return through ? depth : depth - RELIEF;
 }
