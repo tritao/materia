@@ -298,8 +298,8 @@ class JointFastenerTests {
       builder.deriveFasteners();
       return builder;
     }
-    function codes(builder:AxisBuilder):Array<String> {
-      var report = machinekit.assembly.AssemblyIntegrity.check(builder, {fasteners: true});
+    function codes(builder:AxisBuilder, ?fittedBefore:Array<{member:String, fastened:Array<String>}>):Array<String> {
+      var report = machinekit.assembly.AssemblyIntegrity.check(builder, {fasteners: true, fittedBefore: fittedBefore});
       return [for (item in report.diagnostics.items) if (StringTools.startsWith(item.code, "fasteners.")) item.code];
     }
     check(codes(fitting(0)).length == 0, "bolted down with its holes cut, a clear cover fits: " + codes(fitting(0)));
@@ -310,6 +310,14 @@ class JointFastenerTests {
     check(codes(fitting(0, false, 30)).indexOf("fasteners.access") >= 0 && codes(fitting(0, false, 30)).indexOf("fasteners.head-clearance") < 0, "a lid in the driver's way is an access finding: " + codes(fitting(0, false, 30)));
     // The same lid, not held with the cover (it could be moved away), is not in the way.
     check(codes(fitting(0, false, 30, false)).length == 0, "a separate body is no obstacle to the driver: " + codes(fitting(0, false, 30, false)));
+    // The same lid fixed with the cover but installed after the cover's screws are fitted: the driver reaches them first. Per fastener: the lid still
+    // counts for the holes and heads (a lid on the heads is an error whatever the order), and it cannot be installed after a joint it belongs to.
+    check(codes(fitting(0, false, 30), [{member: "lid", fastened: ["cover"]}]).length == 0, "a lid installed after the screws is no obstacle: " + codes(fitting(0, false, 30), [{member: "lid", fastened: ["cover"]}]));
+    check(codes(fitting(0, false, 30), [{member: "lid", fastened: ["host"]}]).length == 0, "the rule names either member of the joint");
+    check(codes(fitting(0, false, 30), [{member: "lid", fastened: ["elsewhere"]}]).indexOf("fasteners.access") >= 0, "an order that does not name the joint's members changes nothing");
+    check(codes(fitting(0, false, 8), [{member: "lid", fastened: ["cover"]}]).indexOf("fasteners.head-clearance") >= 0, "an installed lid still stands on the heads");
+    check(codes(fitting(0), [{member: "cover", fastened: ["cover"]}]).indexOf("fasteners.order") >= 0, "a part cannot be installed after its own joint");
+    check(codes(fitting(0, false, 30), [{member: "li", fastened: ["cover"]}]).indexOf("fasteners.access") >= 0, "a member name is exact");
     // A cover whose holes are declared drawn but are not: the shank meets its material.
     check(codes(fitting(0, false, null, true, true)).indexOf("fasteners.hole") >= 0, "undrawn holes in a cover are reported: " + codes(fitting(0, false, null, true, true)));
   }

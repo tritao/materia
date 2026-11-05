@@ -64,6 +64,14 @@ typedef IntegrityOptions = {
 	 * (`fasteners.access`) though they are fixed to the clamped part. They still count for holes and heads.
 	 */
   @:optional var removable:Array<String>;
+  /**
+	 * The assembly order where it matters for access: `member` is installed after the fasteners of the joints that touch any of
+	 * `fastened` (member ids) are fitted, so it does not block their driver access (`fasteners.access`) - the screws are reached
+	 * before it is in place. A `member` ending in `/` names every member of that sub-assembly. It still counts for holes and heads
+	 * (it is there once built), and it may not be a member of a joint it is installed after (`fasteners.order`). Unlike `removable`,
+	 * which exempts a part from every screw, this is per fastener: a screw fitted after `member` is installed is still blocked by it.
+	 */
+  @:optional var fittedBefore:Array<{member:String, fastened:Array<String>}>;
   /** Pairs of members the machine's process brings together (a hob in the work, a tool in the stock); they may share volume. */
   @:optional var processContacts:Array<{a:String, b:String}>;
   /** All three of the above at their defaults. */
@@ -208,6 +216,7 @@ class AssemblyIntegrity {
   final flangeCutouts:Bool;
   final fastenerFit:Bool;
   final removable = new Map<String, Bool>();
+  var fittedBefore:Array<{member:String, fastened:Array<String>}> = [];
   /** Pairs joined by a moving mate, keyed "a|b" both ways: they run in contact by design. */
   final movingPairs = new Map<String, Bool>();
   final gapReported = new Map<String, Bool>();
@@ -234,6 +243,7 @@ class AssemblyIntegrity {
     flangeCutouts = options.flangeCutouts ?? strict;
     fastenerFit = options.fasteners ?? strict;
     if (options.removable != null) for (id in options.removable) removable.set(id, true);
+    if (options.fittedBefore != null) fittedBefore = options.fittedBefore;
     for (joint in definition.joints) if (joint.type != AssemblyJointType.Fixed) {
       movingPairs.set(joint.parent + "|" + joint.child, true);
       movingPairs.set(joint.child + "|" + joint.parent, true);
@@ -678,6 +688,15 @@ class AssemblyIntegrity {
     var derivation = assembly.derivedFasteners();
     if (derivation == null) return;
     var group = JointFasteners.rigidGroups(assembly);
+    // A part cannot be installed after the joint it is a member of: it is part of what the screw clamps or threads into.
+    for (joint in derivation.joints) for (rule in fittedBefore) for (member in [joint.clampedMember, joint.receivingMember]) {
+      var matches = StringTools.endsWith(rule.member, "/") ? StringTools.startsWith(member, rule.member) : member == rule.member;
+      if (matches && (rule.fastened.indexOf(joint.clampedMember) >= 0 || rule.fastened.indexOf(joint.receivingMember) >= 0)) diagnostics.error(
+        "fasteners.order",
+        joint.id,
+        '${joint.id}: $member is a member of the joint but is declared installed after its fasteners are fitted'
+      );
+    }
     var faces = new Map<String, machinekit.component.BoltedFace>();
     for (joint in derivation.joints) {
       var key = joint.receivingMember + "#" + joint.receivingFace;
@@ -695,7 +714,7 @@ class AssemblyIntegrity {
         try {
           for (id => part in parts) {
             if (reported.exists(volume.name + "|" + id)) continue;
-            if (volume.access && (group.get(id) != group.get(joint.clampedMember) || removable.exists(id))) continue;
+            if (volume.access && (group.get(id) != group.get(joint.clampedMember) || removable.exists(id) || installedLater(id, joint))) continue;
             var shared = PosedParts.commonVolume(part, need(boxes, id), tool, box);
             if (shared <= overlapLimit) continue;
             reported.set(volume.name + "|" + id, true);
@@ -714,6 +733,15 @@ class AssemblyIntegrity {
         tool.close();
       }
     }
+  }
+
+  /** Whether member `id` is installed after the fasteners of `joint` are fitted (`IntegrityOptions.fittedBefore`). */
+  function installedLater(id:String, joint:JointFasteners.FastenedJoint):Bool {
+    for (rule in fittedBefore) {
+      var matches = StringTools.endsWith(rule.member, "/") ? StringTools.startsWith(id, rule.member) : id == rule.member;
+      if (matches && (rule.fastened.indexOf(joint.clampedMember) >= 0 || rule.fastened.indexOf(joint.receivingMember) >= 0)) return true;
+    }
+    return false;
   }
 
   /** The dowel pins of the dowelled joints: their holes must be free of the other members' material (`fasteners.hole`). */

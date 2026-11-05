@@ -17,9 +17,10 @@ import materia.assembly.AssemblyFrames as F;
 class HobberFrameChecks {
   /** `AssemblyIntegrity` in strict mode on the whole machine; `sweep` false checks the rest state only. */
   public static function integrity(machine:FlexsplineHobber, sweep:Bool, gap:Float = 2.0):Array<String> {
-    // The column is lowered onto the carriage after the carriage's block and nut-block screws are fitted: those screws are reached with it off.
+    // The column is lowered onto the carriage after the carriage's block and nut-block screws are fitted: those screws are reached before it is in place
+    // (the assembly order, per fastener: the column still blocks every other screw's driver and counts for holes and heads).
     var options:IntegrityOptions = {strict: true, processContacts: machine.processContacts(), runningGap: gap,
-      removable: [for (m in machine.components()) if (StringTools.startsWith(m.id, "column/")) m.id]};
+      fittedBefore: [{member: "column/", fastened: ["Xbridge"]}]};
     if (!sweep) options.sweepStates = [];
     var report = AssemblyIntegrity.check(machine, options);
     return [for (item in report.errors()) item.code + " " + item.message];
