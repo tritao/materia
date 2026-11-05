@@ -718,7 +718,6 @@ typedef InsertAnchorCandidate = {
   var points:Array<InsertBackAnchorChoice>;
   var lengthMm:Float;
   var landMm:Float;
-  var key:String;
 }
 
 class InsertAnchorSelection {
@@ -904,7 +903,6 @@ class InsertAnchorSelection {
                     Math.max(stock.y + margin - point.yMm, point.yMm + margin - stock.y - stock.depth)
                   );
                 }
-                var key = haxe.Json.stringify(points);
                 for (length in lengths) candidates.push({
                   size: size,
                   diameter: diameter,
@@ -912,8 +910,7 @@ class InsertAnchorSelection {
                   rules: rules,
                   points: points,
                   lengthMm: length,
-                  landMm: landX + landY,
-                  key: key
+                  landMm: landX + landY
                 });
               }
             }
@@ -922,16 +919,32 @@ class InsertAnchorSelection {
       }
     }
     // Preserve demand/count, diameter, length, land and coordinate ordering.
-    // Compare concrete numeric/string fields directly; Reflect boxes each
-    // comparison in the large rail-seat candidate sets.
-    candidates.sort((a,
-      b) -> {if (a.points.length != b.points.length) return a.points.length < b.points.length ? -1 : 1;
-    if (a.diameter != b.diameter) return a.diameter < b.diameter ? -1 : 1;
-    if (a.lengthMm != b.lengthMm) return a.lengthMm < b.lengthMm ? -1 : 1;
-    if (a.landMm != b.landMm) return a.landMm < b.landMm ? -1 : 1;
-    return a.key == b.key ? 0 : a.key < b.key ? -1 : 1;
-    });
-    for (candidate in candidates) if (admit(candidate)) return candidate;
+    // Compare concrete numeric fields directly; Reflect boxes each comparison
+    // in the large rail-seat candidate sets. The coordinate order (the JSON
+    // text of the points) only breaks ties, so it is built for the tied
+    // candidates of a group when the admission scan reaches that group: the
+    // sorts are stable, so the scan sees the order of one (primary, text) sort.
+    function primary(a:InsertAnchorCandidate, b:InsertAnchorCandidate):Int {
+      if (a.points.length != b.points.length) return a.points.length < b.points.length ? -1 : 1;
+      if (a.diameter != b.diameter) return a.diameter < b.diameter ? -1 : 1;
+      if (a.lengthMm != b.lengthMm) return a.lengthMm < b.lengthMm ? -1 : 1;
+      if (a.landMm != b.landMm) return a.landMm < b.landMm ? -1 : 1;
+      return 0;
+    }
+    candidates.sort(primary);
+    var start = 0;
+    while (start < candidates.length) {
+      var end = start + 1;
+      while (end < candidates.length && primary(candidates[start], candidates[end]) == 0) end++;
+      if (end - start == 1) {
+        if (admit(candidates[start])) return candidates[start];
+      } else {
+        var tied = [for (index in start...end) {key: haxe.Json.stringify(candidates[index].points), candidate: candidates[index]}];
+        tied.sort((a, b) -> a.key == b.key ? 0 : a.key < b.key ? -1 : 1);
+        for (item in tied) if (admit(item.candidate)) return item.candidate;
+      }
+      start = end;
+    }
     throw "No ISO 4162 pattern meets design demand " + total + " N, hole policy, footprint and casting cover; "
       + candidates.length + " demand-admissible patterns checked. " + failures.join("; ");
   }
