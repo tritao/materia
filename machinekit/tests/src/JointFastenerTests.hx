@@ -204,6 +204,12 @@ class JointFastenerTests {
     var pinned = JointSlip.check(load, screws, pins)[0];
     near(pinned.pinCapacity, 240 * 8 * 12 * 0.08, 1.0, "two 8 mm pins at 40 mm");
     check(pinned.primary == "pins" && pinned.capacity == pinned.pinCapacity && pinned.frictionCapacity > 0 && pinned.passes, "with pins the pins are the capacity and friction is only reported");
+    // A locating key (two ribs either side of a block's base): the lesser of its bearing (240 x 3 x 40 = 28.8 kN) and the root shear (140 x 3.5 x 40 = 19.6 kN); no torque; friction not counted.
+    var keyed = JointSlip.check({label: "thrust", between: ["a", "b"], shear: {peak: 1000, momentary: 2000}}, screws, [], [{id: "seat#base", height: 3, length: 40, thickness: 3.5}])[0];
+    near(keyed.keyCapacity, 140 * 3.5 * 40, 1.0, "a key's root shear");
+    check(keyed.primary == "key" && keyed.capacity == keyed.keyCapacity && keyed.pinCapacity == 0, "with a key the key is the capacity and friction is only reported");
+    check(JointSlip.check(load, screws, [], [{id: "k", height: 3, length: 40, thickness: 3.5}])[0].primary == "friction", "a key carries no torque");
+    check(JointSlip.check({label: "thrust", between: ["a", "b"], shear: {peak: 1000}}, screws, pins, [{id: "k", height: 3, length: 40, thickness: 3.5}])[0].primary == "pins+key", "pins and a key add");
     // A shear is mu F n, and the pins share it equally.
     var shear = JointSlip.check({label: "thrust", between: ["a", "b"], shear: {peak: 1000}}, screws, [])[0];
     near(shear.capacity, 0.15 * 4 * 13661, 5.0, "shear by friction");

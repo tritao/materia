@@ -201,12 +201,31 @@ class HobberSaddle extends MachineComponent {
 
   /** The nut block's base end on the carriage, saddle or seat that carries it: two clearance holes for the block's tapped base, `grip` of material, in this part's frame (`origin` is the part frame's origin in the work frame). */
   static function nutBlockFace(axis:HobberDriveAxis, grip:Float, origin:Array<Float>, ?recess:machinekit.component.BoltedFace.BoltRecess):BoltedFace {
-    var nut = new machinekit.motion.BallNut(), block = HobberDrives.nutBlock(axis, nut), pose = HobberDrives.nutBlockPose(axis, nut);
-    var at = F.transformPoint(pose, 0, -block.centreHeight, block.thickness / 2), out = F.transformVector(pose, 0, -1, 0), x = F.transformVector(pose, 1, 0, 0);
+    var block = HobberDrives.nutBlock(axis, new machinekit.motion.BallNut());
     var screw = machinekit.standard.SocketHeadCapScrew.catalog().get(machinekit.motion.NutBlock.BASE_THREAD);
-    return BoltedFace.clamped("nut-block", BoltedFace.frameOf({x: at.x - origin[0], y: at.y - origin[1], z: at.z - origin[2]}, {x: out.x, y: out.y, z: out.z},
-      {x: x.x, y: x.y, z: x.z}), [for (u in block.baseHoleXs()) {x: u, y: 0.0}], screw.clearanceMedium, grip, machinekit.motion.NutBlock.BASE_THREAD, recess, false);
+    return BoltedFace.clamped("nut-block", nutBlockFrame(axis, origin), [for (u in block.baseHoleXs()) {x: u, y: 0.0}], screw.clearanceMedium, grip,
+      machinekit.motion.NutBlock.BASE_THREAD, recess, false);
   }
+
+  /** The face frame of the nut block's base end on its carrier (this part's frame; `origin` is the part frame's origin in the work frame). */
+  static function nutBlockFrame(axis:HobberDriveAxis, origin:Array<Float>):materia.assembly.AssemblyRecord.AssemblyFrame {
+    var block = HobberDrives.nutBlock(axis, new machinekit.motion.BallNut()), pose = HobberDrives.nutBlockPose(axis, new machinekit.motion.BallNut());
+    var at = F.transformPoint(pose, 0, -block.centreHeight, block.thickness / 2), out = F.transformVector(pose, 0, -1, 0), x = F.transformVector(pose, 1, 0, 0);
+    return BoltedFace.frameOf({x: at.x - origin[0], y: at.y - origin[1], z: at.z - origin[2]}, {x: out.x, y: out.y, z: out.z}, {x: x.x, y: x.y, z: x.z});
+  }
+
+  /** The dowels of a pinned nut block in its carrier (X deck, Z saddle plate): the block's two, blind `NUT_PIN_DEPTH` deep. */
+  static function nutBlockPins(axis:HobberDriveAxis, origin:Array<Float>):PinnedFace {
+    var block = HobberDrives.nutBlock(axis, new machinekit.motion.BallNut());
+    return new PinnedFace("nut-block-pins", nutBlockFrame(axis, origin), [for (u in block.pinXs()) {x: u, y: 0.0}], machinekit.motion.NutBlock.PIN_DIAMETER, NUT_PIN_DEPTH);
+  }
+  /** Depth of the carrier's dowel bores for the nut block, mm: one diameter of engagement plus the relief, with a millimetre over (the carrier is 20 and 13 thick). */
+  static inline final NUT_PIN_DEPTH = 8.0;
+  /** The key on the Y nut seat: two ribs, either side of the block's base, each KEY_THICKNESS thick and KEY_HEIGHT proud of the seat (the block's 20 mm base sits between them). */
+  public static inline final KEY_HEIGHT = 3.0;
+  public static inline final KEY_THICKNESS = 3.5;
+  /** The Y nut seat's extent across the screw (x 40..82), which is the key's length. */
+  static inline final NUT_SEAT_WIDTH = 42.0;
 
   /** Material under the heads of the guide-block screws (the pocket is cut from the far face), mm: M6 into a 20 mm deck, M4 into the 13 and 12 mm plates. */
   static inline final X_BLOCK_SOLE = 10.0;
@@ -253,8 +272,15 @@ class HobberSaddle extends MachineComponent {
   static final SEAT_PIN_Y = 150.0;
   static final SEAT_PIN_Z = 35.0;
 
+  /** The Y nut seat's key (the ribs either side of the block's base) locates the block against the screw thrust in both directions. */
+  override public function locatingKeys():Array<machinekit.component.BoltedFace.LocatingKey> {
+    return designId == "GE-Y-nut-seat" ? [{face: "nut-block", height: KEY_HEIGHT, length: NUT_SEAT_WIDTH, thickness: KEY_THICKNESS}] : [];
+  }
+
   override public function pinnedFaces():Array<machinekit.component.BoltedFace.PinnedFace> {
     return switch designId {
+      case "GE-X-carriage": [nutBlockPins(HobberDrives.x(), [0.0, 0, 0])];
+      case "GE-Z-saddle": [nutBlockPins(HobberDrives.z(), [0.0, 0, Z_SADDLE_ORIGIN_Z])];
       case "GE-X-drive-pad": padPins(HobberDrives.x(), ["fixed", "floating"], 15);
       case "GE-Z-drive-pad": padPins(HobberDrives.z(), ["fixed", "floating"], 40);
       case "GE-Y-drive-fixed": padPins(HobberDrives.y(), ["fixed"], 10);
@@ -387,15 +413,7 @@ class HobberSaddle extends MachineComponent {
   }
 
   /** The holes the derivation cut into this part, as a hole table (part frame): tapped, clearance and counterbore, from the mating plane. */
-  function derivedHoles():Array<machinekit.component.ManufacturingRoute.RouteHole> {
-    var n = 0;
-    return [for (cut in machinedCuts()) {
-      // The tool starts 1 mm outside the mating plane (and ends 1 mm past the far face for clearance holes): the hole is from the plane.
-      var mouth = Math.max(cut.from, 0.0), p = F.transformPoint(cut.frame, cut.x, cut.y, mouth), q = F.transformVector(cut.frame, 0, 0, 1);
-      ({id: "J" + (++n), kind: cut.kind == "counterbore" ? "bore" : cut.kind ?? "clearance", thread: cut.kind == "counterbore" ? null : cut.thread, diameter: cut.diameter,
-        nominal: cut.diameter, fit: cut.fit, depth: cut.to - mouth - (cut.kind == "tapped" || (cut.kind == "dowel" && cut.through != true) ? 0.0 : 1.0), position: [p.x, p.y, p.z], direction: [q.x, q.y, q.z]} : machinekit.component.ManufacturingRoute.RouteHole);
-    }];
-  }
+  function derivedHoles():Array<machinekit.component.ManufacturingRoute.RouteHole> return derivedRouteHoles();
 
   // ---- A axis and spindle seat (FRAME_PLAN R1, R2) ------------------------------------------------------------------------------
 
@@ -643,7 +661,8 @@ class HobberSaddle extends MachineComponent {
       case "GE-Y-drive-fixed" | "GE-Y-drive-floating":
         ManufacturingRoute.milled(1, "fine", [{name: "seat face, bolts and dowels", tolerance: 0.05, roughnessRa: 3.2}], 160);
       case "GE-Y-nut-seat":
-        ManufacturingRoute.groundStock(GroundStock.bar(60, NUT_SEAT_THICKNESS), [{name: "nut block seat (ground after cutting)", tolerance: 0.02, roughnessRa: 1.6}]);
+        // Milled from 19 mm bar in one setup: the seat plane and the two key ribs (20 mm apart for the block's ground 20 mm base).
+        ManufacturingRoute.milled(1, "fine", [{name: "nut block seat plane and key ribs (20 mm between them)", tolerance: 0.02, roughnessRa: 1.6}], 60);
       case "GE-X-scale-seat" | "GE-Z-scale-seat":
         // Ground bar: the housing's mounting face parallelism comes from the datasheet (0.1 over the length), the grinding gives 0.01.
         ManufacturingRoute.groundStock(GroundStock.bar(HobberScales.SEAT_BAR_WIDTH, HobberScales.SEAT_BAR),
@@ -788,7 +807,10 @@ class HobberSaddle extends MachineComponent {
         ];
       case "GE-Y-nut-seat":
         // Ground bar, 16 thick, 42 x 60, on the Y saddle's top edge (x 45-57, z 458) under the nut block, 3 mm short of the swivel plate.
-        [box(40, 82, -40, 20, 458, 458 + NUT_SEAT_THICKNESS)];
+        // Two ribs stand KEY_HEIGHT proud of the seat's top either side of the nut block's base (y -17.5..2.5, the block's 20 mm thickness): the key.
+        var block = HobberDrives.nutBlock(HobberDrives.y(), new machinekit.motion.BallNut());
+        var y0 = F.transformPoint(HobberDrives.nutBlockPose(HobberDrives.y(), new machinekit.motion.BallNut()), 0, 0, 0).y, top = 458 + NUT_SEAT_THICKNESS;
+        [box(40, 82, -40, 20, 458, top), box(40, 82, y0 - KEY_THICKNESS, y0, top, top + KEY_HEIGHT), box(40, 82, y0 + block.thickness, y0 + block.thickness + KEY_THICKNESS, top, top + KEY_HEIGHT)];
       case "GE-chip-tray":
         // Removable stationary skirt: 5 mm radial face clearance, 15 mm housing
         // clearance and 2 mm sheet. The lower skirt covers the full table height.

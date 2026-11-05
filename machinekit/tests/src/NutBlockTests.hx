@@ -67,6 +67,20 @@ class NutBlockTests {
     body.close();
   }
 
+  /** A pinned block (crash locating): two Ø6 dowel faces on the base end, clear of the base screws, the flange bolts and the bore; an unpinned one has none. */
+  static function pinned():Void {
+    var nut = new BallNut(), plain = new NutBlock("NB-PLAIN", nut, 28), block = new NutBlock("NB-PINNED", nut, 28, null, null, NutBlock.BASE_EDGE, NutBlock.BASE_DEPTH, true);
+    check(plain.pinnedFaces().length == 0 && !plain.machinable(), "an unpinned block declares no dowels");
+    var faces = block.pinnedFaces();
+    check(faces.length == 1 && faces[0].holes.length == 2 && faces[0].diameter == NutBlock.PIN_DIAMETER && faces[0].depth == NutBlock.PIN_DEPTH && block.machinable(), "a pinned block declares two Ø6 dowels and cuts them");
+    check(block.designation != plain.designation && block.revisionFingerprint() != plain.revisionFingerprint(), "pinning changes the part number and its revision");
+    check(block.pinned && !plain.pinned && block.values().boolean("pinned"), "the recipe carries the pinned flag");
+    // The Y block's 16 mm screw spacing leaves no room between the screws: refused.
+    rejects(() -> new NutBlock("NB-Y", nut, 34, null, 20, 22, 10, true), "dowels between base screws 16 mm apart");
+    // Too low: the dowel would meet the flange bolts.
+    rejects(() -> new NutBlock("NB-LOW", nut, 25, null, null, NutBlock.BASE_EDGE, NutBlock.BASE_DEPTH, true), "dowels that would meet the flange bolts");
+  }
+
   static function routes():Void {
     var nut = new BallNut();
     var block = new NutBlock("NB-ROUTE", nut, 25);
@@ -83,6 +97,7 @@ class NutBlockTests {
   public static function run():Void {
     cutouts();
     holeList();
+    pinned();
     routes();
     Sys.println("nut block: cut-out, block, ground stock rows and routes pass");
   }

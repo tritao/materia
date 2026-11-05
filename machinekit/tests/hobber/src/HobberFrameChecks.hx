@@ -534,6 +534,17 @@ class HobberFrameChecks {
     }
     if (args.indexOf("spindledrive") >= 0) for (line in spindleDrive(machine)) Sys.println(line);
     if (args.indexOf("spindlerelief") >= 0) for (line in spindleRelief(machine)) Sys.println(line);
+    if (args.indexOf("nutblocks") >= 0) for (d in machinekit.hobbing.HobberDrives.all()) {
+      var nut = new machinekit.motion.BallNut(), b = machinekit.hobbing.HobberDrives.nutBlock(d, nut), pose = machinekit.hobbing.HobberDrives.nutBlockPose(d, nut);
+      function w(x:Float, y:Float, z:Float) {
+        var p = F.transformPoint(pose, x, y, z);
+        return [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10, Math.round(p.z * 10) / 10];
+      }
+      Sys.println('${d.id}: block ${b.width} x ${b.thickness} x ${b.length}, centre height ${b.centreHeight}, base xs ${b.baseHoleXs()}, base depth ${b.baseDepth}');
+      Sys.println('  flange holes ${[for (h in nut.mountingHoles()) [Math.round(h.x * 10) / 10, Math.round(h.y * 10) / 10]]}, tap drill ${nut.mountingTapDrill()}, flange dia ${nut.flangeDiameter}, bolt circle ${nut.boltCircleDiameter}');
+      Sys.println('  world: origin ${w(0, 0, 0)} x ${w(1, 0, 0)} y ${w(0, 1, 0)} z ${w(0, 0, 1)} base centre ${w(0, -b.centreHeight, b.thickness / 2)}');
+    }
+    if (args.indexOf("crash") >= 0) for (line in HobberCrashProtection.report(machine)) Sys.println(line);
     if (args.indexOf("fasteners") >= 0) for (line in HobberFastenerChecks.report(machine)) Sys.println(line);
     if (args.indexOf("integrity") >= 0) {
       var errors = integrity(machine, args.indexOf("sweep") >= 0);

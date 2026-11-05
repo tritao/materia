@@ -28,7 +28,7 @@ Python 3 with numpy, and Chrome or Chromium on the PATH for the PDFs; `pdftotext
 | `HOBBER-GE-X-drive-pad` | one ground flat bar, 15 mm, under both supports (ground together: coplanar seats), holes of both | 80 x 15 |
 | `HOBBER-GE-Z-drive-pad` | one ground flat bar, 40 mm, under both supports, holes of both, cut by the mount's flange relief and the eRob housing envelope swept over the Z travel plus the 2 mm gap (`HobberZOffset.relief`) | 80 x 40 |
 | `HOBBER-GE-Y-drive-fixed/-floating` | milled L bracket, 1 setup, fine | block |
-| `HOBBER-GE-Y-nut-seat` | ground flat bar, 16 mm | 60 x 16 |
+| `HOBBER-GE-Y-nut-seat` | milled from 19 mm bar, 1 setup: the seat plane (16 mm) and two key ribs 3.5 x 3 mm either side of the nut block's 20 mm base (the block is located against the screw thrust in both directions) | block |
 | `HOBBER-GE-X-scale-seat`, `HOBBER-GE-Z-scale-seat` | ground flat bar, 10 x 20, 2 tapped M8 | 20 x 10 |
 | `HOBBER-GE-Z-scale-arm` | milled arm for the Z scale head, 1 setup, fine | block |
 | `HOBBER-GE-Y-saddle` | milled, 2 setups, fine (boss for the Y scale head) | block |
@@ -36,7 +36,7 @@ Python 3 with numpy, and Chrome or Chromium on the PATH for the PDFs; `pdftotext
 | `HOBBER-GE-swivel-adapter` | turned ring, 2 setups, fine, aluminium (output flange to swivel plate) | bar |
 | `HOBBER-GE-spindle-seat` | milled split-clamp block for the Ø80 g6 cartridge, 2 setups, tight | block |
 | `HOBBER-GE-motor-cradle` | milled steel, 2 setups, fine: 12 mm floor (8 mm ahead of y 195) on the spindle seat block's top (4 × M8, 2 dowels, slit over the seat's), 8 mm wall carrying the spindle servo's flange (Ø70 pilot slot, 4 × M6 in vertical slots, ±3 mm travel; nuts on the rear), M8 jack screw lug under the flange, one windowed 6 mm rib | block |
-| `NUT-BLOCK-...` (X, Y, Z) | ground flat bar, 16 mm, bore, holes | 60 x 16 |
+| `NUT-BLOCK-...` (X, Y, Z) | ground flat bar, 16 mm (Y 20 mm), bore, holes; X and Z (part number ends `-P`) also 2 reamed Ø6 H7 dowel bores in the base end (the Y block has none: the seat's key locates it) | 60 x 16 |
 
 Quantities are one per machine. The list is the exporter's `DESIGNS` plus one nut block per axis; a new route on a
 hobber member means adding it there.

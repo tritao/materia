@@ -41,6 +41,9 @@ class MachineComponent {
   /** The faces where this part is located to another by dowel pins (see `PinnedFace`); `JointFasteners` derives the pins. */
   public function pinnedFaces():Array<machinekit.component.BoltedFace.PinnedFace> return [];
 
+  /** The shoulders or keys that locate this part against a thrust in both directions (see `LocatingKey`); `JointSlip` counts them for the joint of the face they name. */
+  public function locatingKeys():Array<machinekit.component.BoltedFace.LocatingKey> return [];
+
   var machining:Array<MachinedCut> = [];
 
   /**
@@ -61,6 +64,19 @@ class MachineComponent {
   }
 
   public function machinedCuts():Array<MachinedCut> return machining.copy();
+
+  /**
+	 * The derived holes as a hole table (this part's frame): tapped, clearance, counterbore and dowel, from the mating plane. A tool starts 1 mm
+	 * outside the plane (and a clearance hole ends 1 mm past the far face), so the table's mouth and depth are the hole's.
+	 */
+  public function derivedRouteHoles():Array<ManufacturingRoute.RouteHole> {
+    var n = 0;
+    return [for (cut in machining) {
+      var mouth = Math.max(cut.from, 0.0), p = materia.assembly.AssemblyFrames.transformPoint(cut.frame, cut.x, cut.y, mouth), q = materia.assembly.AssemblyFrames.transformVector(cut.frame, 0, 0, 1);
+      ({id: "J" + (++n), kind: cut.kind == "counterbore" ? "bore" : cut.kind ?? "clearance", thread: cut.kind == "counterbore" ? null : cut.thread, diameter: cut.diameter,
+        nominal: cut.diameter, fit: cut.fit, depth: cut.to - mouth - (cut.kind == "tapped" || (cut.kind == "dowel" && cut.through != true) ? 0.0 : 1.0), position: [p.x, p.y, p.z], direction: [q.x, q.y, q.z]} : ManufacturingRoute.RouteHole);
+    }];
+  }
 
   /** Names the recorded holes, for a cache of the geometry and for the revision. */
   function machiningKey():String {

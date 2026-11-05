@@ -191,6 +191,15 @@ class BoltedFace {
   };
 }
 
+/**
+ * A shoulder or key that locates a bolted part against a thrust in both directions: a step of the part that carries it, `height` proud of the
+ * plane the other part seats on, that the other part butts against on each side (a rib either side of a block's base, or a rebate the base sits in).
+ * `face` names the `BoltedFace` of this part that the key belongs to (the joint it locates); `length` is the key's extent across the thrust and
+ * `thickness` the step's root, the material that carries it in shear, mm. `JointSlip` counts the least of its bearing (`height` x `length`) and its
+ * root shear (`thickness` x `length`) as the capacity of a shear load, as it counts a dowel; the friction is then not counted.
+ */
+typedef LocatingKey = {face:String, height:Float, length:Float, thickness:Float}
+
 /** A dowel hole position in a face frame, mm. */
 typedef PinHole = BoltHole;
 

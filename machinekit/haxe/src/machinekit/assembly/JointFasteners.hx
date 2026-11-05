@@ -283,12 +283,12 @@ class JointFasteners {
     }
     for (key in derived.keys()) spacing(result, key, derived.get(key), result.joints);
     derivePins(result, assembly, poses, group, members, tolerance);
-    if (options != null && options.loads != null) slip(result, options.loads);
+    if (options != null && options.loads != null) slip(result, options.loads, members);
     return result;
   }
 
   /** The slip check of the declared loads (`JointSlip`): each meets the joints of its member pair; a load that meets none is an error. */
-  public static function slip(result:FastenerDerivation, loads:Array<JointLoad>):Void {
+  public static function slip(result:FastenerDerivation, loads:Array<JointLoad>, ?members:Map<String, MachineComponent>):Void {
     for (load in loads) {
       if (load.between == null || load.between.length != 2) {
         result.diagnostics.error("fasteners.slip", load.label, '${load.label}: a joint load names the two members it joins');
@@ -296,12 +296,19 @@ class JointFasteners {
       }
       function pair(a:String, b:String):Bool return (a == load.between[0] && b == load.between[1]) || (a == load.between[1] && b == load.between[0]);
       function facePasses(a:String, b:String):Bool return load.face == null || a == load.face || b == load.face;
-      var screws:Array<SlipScrew> = [], pins:Array<SlipPin> = [];
-      for (joint in result.joints) if (pair(joint.clampedMember, joint.receivingMember) && facePasses(joint.clampedFace, joint.receivingFace))
+      var screws:Array<SlipScrew> = [], pins:Array<SlipPin> = [], keys:Array<JointSlip.SlipKey> = [];
+      for (joint in result.joints) if (pair(joint.clampedMember, joint.receivingMember) && facePasses(joint.clampedFace, joint.receivingFace)) {
         screws.push({id: joint.id, size: joint.size, propertyClass: joint.propertyClass, points: joint.worldHoles});
+        // The shoulders and keys a member declares for the face of this joint locate it (counted once per joint).
+        if (members != null) for (side in [{m: joint.clampedMember, f: joint.clampedFace}, {m: joint.receivingMember, f: joint.receivingFace}]) {
+          var component = members.get(side.m);
+          if (component != null) for (k in component.locatingKeys()) if (k.face == side.f && [for (e in keys) if (e.id == side.m + "#" + k.face) e].length == 0)
+            keys.push({id: side.m + "#" + k.face, height: k.height, length: k.length, thickness: k.thickness});
+        }
+      }
       for (joint in result.dowels) if (pair(joint.memberA, joint.memberB) && facePasses(joint.faceA, joint.faceB))
         pins.push({id: joint.id, diameter: joint.diameter, engagement: Math.min(joint.engagementA, joint.engagementB), points: joint.worldHoles});
-      var checked = JointSlip.check(load, screws, pins);
+      var checked = JointSlip.check(load, screws, pins, keys);
       if (checked.length == 0) result.diagnostics.error(
         "fasteners.slip",
         load.label,

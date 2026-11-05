@@ -107,9 +107,13 @@ class HobberDrives {
     return at;
   }
 
-  /** The nut block for this axis, on the barrel side of the nut's flange, its base end `blockHeight` from the axis. */
+  /**
+   * The nut block for this axis, on the barrel side of the nut's flange, its base end `blockHeight` from the axis. X and Z blocks are pinned (two dowels in the
+   * base end locate them against a crash); the Y block has no room for dowels (its screws are 16 mm apart on a 20 mm base) and is located by a key on its seat
+   * (`HobberSaddle.KEY_HEIGHT`).
+   */
   public static function nutBlock(d:HobberDriveAxis, nut:BallNut):NutBlock return new NutBlock("HOBBER-" + d.id + "-NUT-BLOCK", nut, d.blockHeight, null, d.id == "Y" ? Y_BLOCK_THICKNESS : null,
-    d.id == "Y" ? Y_BLOCK_BASE_EDGE : NutBlock.BASE_EDGE, d.id == "Y" ? Y_BLOCK_BASE_DEPTH : NutBlock.BASE_DEPTH);
+    d.id == "Y" ? Y_BLOCK_BASE_EDGE : NutBlock.BASE_EDGE, d.id == "Y" ? Y_BLOCK_BASE_DEPTH : NutBlock.BASE_DEPTH, d.id != "Y");
 
   /**
    * The Y nut block's base holes stand 16 mm apart (x 70 +- 8), not 40: its seat sits between the Y saddle's plate (x to 57) and the swivel plate (x from 85), and

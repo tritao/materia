@@ -1063,7 +1063,9 @@ typedef MachineAssemblyMassProperties = {
     var derivation = fastenersDerived;
     if (derivation == null) throw "The joint fasteners of this assembly are not derived yet";
     var before = derivation.diagnostics.items.length;
-    JointFasteners.slip(derivation, loads);
+    var members = new Map<String, MachineComponent>();
+    for (entry in components()) members.set(entry.id, entry.component);
+    JointFasteners.slip(derivation, loads, members);
     var errors = [for (item in derivation.diagnostics.items.slice(before)) if (item.severity == machinekit.assembly.Diagnostics.DiagnosticSeverity.Error) item.message];
     if (errors.length > 0) throw errors.join("\n");
   }

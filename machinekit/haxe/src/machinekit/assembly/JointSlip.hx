@@ -39,7 +39,9 @@ typedef JointSlipResult = {
   var frictionCapacity:Float;
   /** Dowel capacity: each pin's shear and bearing least value, shared out as the pattern geometry requires; 0 with no pins. */
   var pinCapacity:Float;
-  /** "pins" where the connection has dowels (friction not counted), else "friction". */
+  /** Capacity of the shoulders or keys that locate the connection against a shear (`LocatingKey`), N; 0 with none. */
+  var keyCapacity:Float;
+  /** "pins" where the connection has dowels, "key" for a shoulder or key, "pins+key" for both (friction not counted), else "friction". */
   var primary:String;
   var capacity:Float;
   var peak:Float;
@@ -55,6 +57,9 @@ typedef SlipPoint = {x:Float, y:Float, z:Float};
 /** A bolted joint as the slip check sees it. */
 typedef SlipScrew = {id:String, size:String, propertyClass:PropertyClass, points:Array<SlipPoint>};
 
+/** A shoulder or key as the slip check sees it: the height it stands, the length across the thrust and the thickness of its root, mm. */
+typedef SlipKey = {id:String, height:Float, length:Float, thickness:Float};
+
 /** A dowelled joint as the slip check sees it: the pin diameter, the shortest engagement in either part, and the holes. */
 typedef SlipPin = {id:String, diameter:Float, engagement:Float, points:Array<SlipPoint>};
 
@@ -69,6 +74,8 @@ typedef SlipPin = {id:String, diameter:Float, engagement:Float, points:Array<Sli
  *   the reserve, not part of the factor. A pin's capacity is the lesser of its shear (single shear at the joint plane, `PIN_SHEAR_STRENGTH`) and the
  *   bearing on the part (`BEARING_YIELD` over diameter times the shortest engagement); a torque is shared by the pins in proportion to their distance
  *   from the centroid, so the farthest pin governs.
+ * - A shoulder or key (`LocatingKey`) locates a shear the way a dowel does: its capacity is the lesser of the bearing of the step (`BEARING_YIELD` times
+ *   height times length) and the shear of its root (`KEY_SHEAR_STRENGTH` times thickness times length); the friction is not counted. It carries no torque.
  * - The factor is capacity over load. The design peak needs `PEAK_FACTOR`, a momentary load (collision, emergency stop) `MOMENTARY_FACTOR`.
  *
  * The coefficient 0.15 is steel on steel, dry, machined (handbooks give 0.12 to 0.15 for ground and 0.15 to 0.2 for milled steel); it is also used for steel
@@ -82,6 +89,8 @@ class JointSlip {
   public static inline var MOMENTARY_FACTOR:Float = 1.2;
   /** ASSUMED shear strength of a hardened dowel pin, MPa. */
   public static inline var PIN_SHEAR_STRENGTH:Float = 600.0;
+  /** ASSUMED shear strength of a milled step in mild or C45 steel (0.58 of a 240 MPa yield), MPa. */
+  public static inline var KEY_SHEAR_STRENGTH:Float = 140.0;
   /** ASSUMED bearing yield of the weaker part (6061-T6 aluminium), MPa. */
   public static inline var BEARING_YIELD:Float = 240.0;
 
@@ -106,7 +115,7 @@ class JointSlip {
   static function distance(a:SlipPoint, b:SlipPoint):Float return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) + (a.z - b.z) * (a.z - b.z));
 
   /** One result per kind of load `load` declares (torque, shear), against the screws and pins of the joints it meets. */
-  public static function check(load:JointLoad, screws:Array<SlipScrew>, pins:Array<SlipPin>):Array<JointSlipResult> {
+  public static function check(load:JointLoad, screws:Array<SlipScrew>, pins:Array<SlipPin>, ?keys:Array<SlipKey>):Array<JointSlipResult> {
     var out:Array<JointSlipResult> = [];
     var mu = load.friction == null ? FRICTION : load.friction, utilisation = load.utilisation == null ? UTILISATION : load.utilisation;
     var yieldMpa = load.bearingYield == null ? BEARING_YIELD : load.bearingYield;
@@ -114,6 +123,8 @@ class JointSlip {
     for (s in screws) for (p in s.points) all.push(p);
     for (s in pins) for (p in s.points) all.push(p);
     if (all.length == 0) return out;
+    var keyForce = 0.0;
+    if (keys != null) for (k in keys) keyForce += Math.min(yieldMpa * k.height * k.length, KEY_SHEAR_STRENGTH * k.thickness * k.length);
     var centre:SlipPoint = {x: 0.0, y: 0.0, z: 0.0};
     for (p in all) {
       centre.x += p.x / all.length;
@@ -146,11 +157,12 @@ class JointSlip {
       var friction = mu * (torque ? sumFr : sumF);
       var pinCapacity = 0.0;
       if (nPins > 0) pinCapacity = torque ? (maxR > 1e-9 ? pinForce * sumR2 / maxR : 0.0) : pinForce * nPins;
-      var primary = nPins > 0 ? "pins" : "friction", capacity = nPins > 0 ? pinCapacity : friction;
+      var keyed = torque ? 0.0 : keyForce, located = pinCapacity + keyed;
+      var primary = nPins > 0 && keyed > 0 ? "pins+key" : nPins > 0 ? "pins" : keyed > 0 ? "key" : "friction", capacity = located > 0 ? located : friction;
       var peakFactor = capacity / cases.peak, momentaryFactor = cases.momentary == null ? null : capacity / cases.momentary;
       return {
         label: load.label, kind: kind, joints: [for (s in screws) s.id].concat([for (s in pins) s.id]), screws: nScrews, pins: nPins,
-        preload: nScrews > 0 ? leastPreload : 0.0, friction: mu, frictionCapacity: friction, pinCapacity: pinCapacity, primary: primary,
+        preload: nScrews > 0 ? leastPreload : 0.0, friction: mu, frictionCapacity: friction, pinCapacity: pinCapacity, keyCapacity: keyed, primary: primary,
         capacity: capacity, peak: cases.peak, momentary: cases.momentary, peakFactor: peakFactor, momentaryFactor: momentaryFactor,
         passes: peakFactor >= PEAK_FACTOR - 1e-9 && (momentaryFactor == null || momentaryFactor >= MOMENTARY_FACTOR - 1e-9)
       };
@@ -168,6 +180,7 @@ class JointSlip {
     var text = '${slip.label}: ${slip.screws} screws';
     if (slip.screws > 0) text += ' (preload ${Math.round(slip.preload)} N each, mu ${slip.friction}, friction ${Math.round(slip.frictionCapacity)} $unit)';
     if (slip.pins > 0) text += ', ${slip.pins} dowels carry ${Math.round(slip.pinCapacity)} $unit (friction not counted)';
+    if (slip.keyCapacity > 0) text += ', a locating key carries ${Math.round(slip.keyCapacity)} $unit (friction not counted)';
     text += '; ${slip.primary} ${Math.round(slip.capacity)} $unit against peak ${r(slip.peak)} = x${r(slip.peakFactor)}';
     var momentary:Null<Float> = slip.momentary, factor:Null<Float> = slip.momentaryFactor;
     if (momentary != null && factor != null) text += ', momentary ${r(cast momentary)} = x${r(cast factor)}';

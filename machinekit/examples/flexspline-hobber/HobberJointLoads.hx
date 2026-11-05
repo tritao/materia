@@ -1,6 +1,5 @@
 import machinekit.assembly.JointSlip.JointLoad;
 import machinekit.assembly.JointSlip.LoadCase;
-import machinekit.motion.BallNut;
 import machinekit.motion.ErobActuatorData;
 import machinekit.motion.ErobActuatorPart;
 import machinekit.motion.ServoMotor;
@@ -20,20 +19,20 @@ class HobberJointLoads {
   public static inline final CUTTING_FORCE = 100.0;
 
   /** The member of `machine` with id `id`. */
-  static function member(machine:FlexsplineHobber, id:String):Dynamic {
+  public static function member(machine:FlexsplineHobber, id:String):Dynamic {
     for (entry in machine.components()) if (entry.id == id) return entry.component;
     throw 'The hobber has no member "$id"';
   }
 
   /** Mass of the members whose id is `id` or starts with `id` + "/", kg. */
-  static function massOf(machine:FlexsplineHobber, ids:Array<String>):Float {
+  public static function massOf(machine:FlexsplineHobber, ids:Array<String>):Float {
     var total = 0.0;
     for (entry in machine.components()) for (id in ids) if (entry.id == id || StringTools.startsWith(entry.id, id + "/")) total += entry.component.massProperties().mass;
     return total;
   }
 
   /** Mass of everything that rides on the guide block `first`: its members and all their descendants in the joint graph, kg. */
-  static function movingMass(machine:FlexsplineHobber, first:String):Float {
+  public static function movingMass(machine:FlexsplineHobber, first:String):Float {
     var moving = new Map<String, Bool>();
     moving.set(first, true);
     var changed = true;
@@ -59,32 +58,27 @@ class HobberJointLoads {
     loads.push({label: "A axis: housing reaction on the Z saddle", between: ["Zplate", "swivel/housing"], torque: torque});
     loads.push({label: "A axis: output flange to the adapter ring", between: ["swivelAdapter", "swivel/output"], torque: torque, utilisation: 0.8});
     loads.push({label: "A axis: adapter ring to the swivel plate", between: ["swivelPlate", "swivelAdapter"], torque: torque});
-    // The drives' thrust. The design peak is the drive sizing's duty (`HobberFrameChecks.sizing`: 0.5 m/s2, 100 N process and 100 N friction, gravity on Z and
+    // The drives' thrust. The design peak is the drive sizing's duty (`HobberCrashProtection`: 0.5 m/s2, 100 N process and 100 N friction, gravity on Z and
     // along the tilted Y, the rotor's inertia and drag) on the axis's moving mass: the sizing's peak torque through the nut's efficiency and the lead. The
-    // momentary load of the fixed supports is the motor's peak torque the same way (a jam against the stops). It passes the fixed support's feet into their
-    // pads and brackets, and the nut block's base into its carriage (the nut's flange is perpendicular to the screw: tension, not slip); a jam is sized into the
-    // supports' dowels but not into the nut blocks' two screws (open: JointSlip reports x0.95 for X and Z, less for Y).
+    // momentary load (a jam against the stops, a collision) is what the drive's crash protection lets through: the torque limit (`CrashProtection`, 2 x the
+    // sizing thrust at most, to be set in the drive) as thrust plus the weight the axis carries along the screw. It passes the fixed support's feet into their
+    // pads and brackets, and the nut block's base into its carriage (the nut's flange is perpendicular to the screw: tension, not slip). The nut blocks are
+    // located against it by dowels (X and Z) or by a key on the seat (Y), and the seat is held to the Y saddle by friction alone.
     for (axis in [
-      {id: "X", first: "blockXLeft", pad: "XdrivePad", foot: "Xfixed", carriage: "Xbridge", block: "XnutBlock", seat: null},
-      {id: "Y", first: "blockYLeft", pad: "YdriveFixed", foot: "Yfixed", carriage: "Yplate", block: "YnutBlock", seat: "YnutSeat"},
-      {id: "Z", first: "blockZLeft", pad: "ZdrivePad", foot: "Zfixed", carriage: "Zplate", block: "ZnutBlock", seat: null}
+      {id: "X", pad: "XdrivePad", foot: "Xfixed", carriage: "Xbridge", block: "XnutBlock", seat: null},
+      {id: "Y", pad: "YdriveFixed", foot: "Yfixed", carriage: "Yplate", block: "YnutBlock", seat: "YnutSeat"},
+      {id: "Z", pad: "ZdrivePad", foot: "Zfixed", carriage: "Zplate", block: "ZnutBlock", seat: null}
     ]) {
-      var motor:ServoMotor = member(machine, axis.id + "motor"), nut:BallNut = member(machine, axis.id + "nut");
-      var q = LEAD / (2 * Math.PI), moving = movingMass(machine, axis.first);
-      var duty = machinekit.sizing.LinearDriveSizing.demand({
-        massKg: moving, motors: 1, metresPerRadian: q, efficiency: nut.efficiency(), rotaryInertiaKgM2: 0.4e-4, acceleration: 0.5, velocity: 0.2,
-        strokeM: axis.id == "Y" ? 0.03 : axis.id == "X" ? 0.095 : 0.2, cuttingForceN: CUTTING_FORCE, dragForceN: 100,
-        gravityForceN: axis.id == "Z" ? moving * g : axis.id == "Y" ? moving * g * Math.sin(Math.PI / 12) : 0, rotaryDragNm: 0.1, reserve: 1.5
-      }, motor.rating);
-      var perNm = nut.efficiency() / q, design = duty.peakNm * perNm;
+      var crash = HobberCrashProtection.axis(machine, axis.id);
+      var design = crash.limit.designThrust, jam = crash.limit.thrust + crash.gravityN;
       loads.push({
         label: axis.id + " drive: screw thrust on the fixed support",
         between: [axis.pad, axis.foot],
-        shear: {peak: design, momentary: motor.rating.peakTorque * perNm}
+        shear: {peak: design, momentary: jam}
       });
       var base = axis.seat == null ? axis.carriage : axis.seat;
-      loads.push({label: axis.id + " drive: screw thrust through the nut block", between: [base, axis.block], shear: {peak: design}});
-      if (axis.seat != null) loads.push({label: axis.id + " drive: screw thrust from the nut seat into the saddle", between: [axis.seat, axis.carriage], shear: {peak: design}});
+      loads.push({label: axis.id + " drive: screw thrust through the nut block", between: [base, axis.block], shear: {peak: design, momentary: jam}});
+      if (axis.seat != null) loads.push({label: axis.id + " drive: screw thrust from the nut seat into the saddle", between: [axis.seat, axis.carriage], shear: {peak: design, momentary: jam}});
     }
     // The spindle seat on the Y saddle's plate carries the weight of the seat, cradle and spindle (with the Y axis's 0.5 m/s2) and the cutting force; a jammed
     // hob loads it with the tangential force the servo's peak torque makes at the hob's radius.

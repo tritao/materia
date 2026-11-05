@@ -37,6 +37,13 @@ class NutBlock extends MachineComponent {
   public static inline var MIN_THICKNESS:Float = 16;
   /** Web kept between a flange hole and a base hole, mm. */
   static inline var WEB:Float = 1;
+  /**
+	 * The dowels of a pinned block (`pinned`): two Ø6 H7 on the base end, 10 mm either side of the screw axis, `PIN_DEPTH` deep in the block (one diameter
+	 * of engagement plus the 1 mm relief of a blind hole). They carry the thrust the screws' friction cannot (a crash), so the block is located against it.
+	 */
+  public static inline var PIN_DIAMETER:Float = 6;
+  public static inline var PIN_OFFSET:Float = 10;
+  public static inline var PIN_DEPTH:Float = 7;
   /** Distance from the block's side to the base holes' centres, mm, unless a machine asks for another (`baseEdge`). */
   public static inline var BASE_EDGE:Float = 10;
 
@@ -52,10 +59,12 @@ class NutBlock extends MachineComponent {
   public final baseEdge:Float;
   /** Depth of the base holes' thread, mm (`BASE_DEPTH` unless a machine shortens it to clear the flange bolts). */
   public final baseDepth:Float;
+  /** Whether the base end carries the two locating dowels (`PIN_*`). */
+  public final pinned:Bool;
   public final stock:GroundStockRow;
   final seat:AssemblyFrame;
 
-  public function new(drawing:String, nut:LeadScrewNut, centreHeight:Float, ?width:Float, ?thickness:Float, baseEdge:Float = BASE_EDGE, baseDepth:Float = BASE_DEPTH) {
+  public function new(drawing:String, nut:LeadScrewNut, centreHeight:Float, ?width:Float, ?thickness:Float, baseEdge:Float = BASE_EDGE, baseDepth:Float = BASE_DEPTH, pinned:Bool = false) {
     var face = nut.mountingFace();
     if (!nut.flanged || face == null) throw "A nut block carries a flanged nut";
     if (!Math.isFinite(centreHeight) || centreHeight <= 0) throw "A nut block needs a positive screw centre height";
@@ -71,7 +80,7 @@ class NutBlock extends MachineComponent {
     if (wide < nut.flangeDiameter + 2 * EDGE - 1e-9) throw "Nut block is too narrow for the nut flange";
     if (thick < MIN_THICKNESS - 1e-9) throw "Nut block is too thin for the nut pilot and the base holes";
     super(
-      'NUT-BLOCK-${Dimension.format(wide)}x${Dimension.format(thick)}x${Dimension.format(long)}-C${Dimension.format(centreHeight)}-F${Dimension.format(nut.flangeDiameter)}x${Dimension.format(nut.flangeThickness)}${baseEdge == BASE_EDGE ? "" : "-E" + Dimension.format(baseEdge)}${baseDepth == BASE_DEPTH ? "" : "-D" + Dimension.format(baseDepth)}',
+      'NUT-BLOCK-${Dimension.format(wide)}x${Dimension.format(thick)}x${Dimension.format(long)}-C${Dimension.format(centreHeight)}-F${Dimension.format(nut.flangeDiameter)}x${Dimension.format(nut.flangeThickness)}${baseEdge == BASE_EDGE ? "" : "-E" + Dimension.format(baseEdge)}${baseDepth == BASE_DEPTH ? "" : "-D" + Dimension.format(baseDepth)}${pinned ? "-P" : ""}',
       'Nut block for ${nut.description}, screw ${Dimension.format(centreHeight)} mm above the base',
       "steel",
       true
@@ -82,6 +91,7 @@ class NutBlock extends MachineComponent {
     this.thickness = thick;
     this.baseEdge = baseEdge;
     this.baseDepth = baseDepth;
+    this.pinned = pinned;
     this.length = long;
     this.stock = row;
     seat = face.pose;
@@ -102,6 +112,20 @@ class NutBlock extends MachineComponent {
       var gap = Math.sqrt((hole.x - nearestX) * (hole.x - nearestX) + (hole.y - nearestY) * (hole.y - nearestY));
       if (gap < tap + WEB) throw "Nut block: the screw centre height leaves no room between the flange bolts and the base holes";
     }
+    if (pinned) {
+      // The dowels sit between the base screws and clear of the flange bolts and the barrel's bore.
+      for (x in pinXs()) {
+        for (sx in baseHoleXs()) if (Math.abs(sx - x) < PIN_DIAMETER / 2 + base.diameter / 2 + 2 * WEB) throw "Nut block: the base dowels need room between the base screws";
+        var rect = {x0: x - PIN_DIAMETER / 2, x1: x + PIN_DIAMETER / 2, y0: -centreHeight, y1: -centreHeight + PIN_DEPTH};
+        for (hole in nut.mountingHoles()) {
+          var nearestX = Math.max(rect.x0, Math.min(hole.x, rect.x1)), nearestY = Math.max(rect.y0, Math.min(hole.y, rect.y1));
+          if (Math.sqrt((hole.x - nearestX) * (hole.x - nearestX) + (hole.y - nearestY) * (hole.y - nearestY)) < tap + WEB)
+            throw "Nut block: the screw centre height leaves no room between the flange bolts and the base dowels";
+        }
+        var nx = Math.max(rect.x0, Math.min(0.0, rect.x1)), ny = Math.max(rect.y0, Math.min(0.0, rect.y1));
+        if (Math.sqrt(nx * nx + ny * ny) < nut.bodyDiameter / 2 + 0.2 + WEB) throw "Nut block: the screw centre height leaves no room between the barrel's bore and the base dowels";
+      }
+    }
     addConnector("nut", Mount, Solids.axial(0, 0, 0));
   }
 
@@ -112,6 +136,11 @@ class NutBlock extends MachineComponent {
 
   /** The base holes' centres across the width. */
   public function baseHoleXs():Array<Float> return [-(width / 2 - baseEdge), width / 2 - baseEdge];
+
+  /** The base dowels' centres across the width. */
+  public function pinXs():Array<Float> return [-PIN_OFFSET, PIN_OFFSET];
+
+  override public function machinable():Bool return pinned;
 
   /** The pose of `nut` in this block's frame: the nut's flange seat against the broad face, its axis along the block's. */
   public function nutPose():AssemblyFrame return AssemblyFrames.inverse(seat);
@@ -134,7 +163,7 @@ class NutBlock extends MachineComponent {
       id: "T" + (++n), kind: "tapped", thread: BASE_THREAD, diameter: base.tapDrill, nominal: base.diameter, fit: null,
       depth: baseDepth, position: [x, -centreHeight, thickness / 2], direction: [0, 1, 0]
     });
-    return out;
+    return out.concat(derivedRouteHoles());
   }
 
   static var recipeCache:Null<ComponentType>;
@@ -150,9 +179,10 @@ class NutBlock extends MachineComponent {
         ComponentRecipeSupport.length("width", 60),
         ComponentRecipeSupport.length("thickness", 16),
         ComponentRecipeSupport.length("baseEdge", BASE_EDGE),
-        ComponentRecipeSupport.length("baseDepth", BASE_DEPTH)
+        ComponentRecipeSupport.length("baseDepth", BASE_DEPTH),
+        ComponentRecipeSupport.flag("pinned", false)
       ],
-      v -> new NutBlock(v.token("drawing"), new BallNut(v.boolean("preloaded")), v.number("centreHeight"), v.number("width"), v.number("thickness"), v.number("baseEdge"), v.number("baseDepth")),
+      v -> new NutBlock(v.token("drawing"), new BallNut(v.boolean("preloaded")), v.number("centreHeight"), v.number("width"), v.number("thickness"), v.number("baseEdge"), v.number("baseDepth"), v.boolean("pinned")),
       true
     ).numbered(v -> v.token("drawing"))
       .procured(_ -> Make("ground steel flat bar, cut and drilled"))
@@ -173,6 +203,7 @@ class NutBlock extends MachineComponent {
     .setToken("material", materialSpec());
     if (baseEdge != BASE_EDGE) values.setNumber("baseEdge", baseEdge);
     if (baseDepth != BASE_DEPTH) values.setNumber("baseDepth", baseDepth);
+    if (pinned) values.setBoolean("pinned", true);
     return values;
   }
 
@@ -180,7 +211,7 @@ class NutBlock extends MachineComponent {
     var number = machinekit.component.ComponentNumberKey.encode;
     return machinekit.component.BomRevision.fingerprint([drawingNumber, materialSpec(), number(width), number(thickness),
       number(length), number(centreHeight), number(nut.flangeDiameter), number(nut.flangeThickness), number(nut.bodyDiameter),
-      number(nut.boltCircleDiameter), nut.mountScrew, Std.string(nut.boltCount)].concat(baseEdge == BASE_EDGE ? [] : [number(baseEdge)]).concat(baseDepth == BASE_DEPTH ? [] : [number(baseDepth)]).join("|"), 1);
+      number(nut.boltCircleDiameter), nut.mountScrew, Std.string(nut.boltCount)].concat(baseEdge == BASE_EDGE ? [] : [number(baseEdge)]).concat(baseDepth == BASE_DEPTH ? [] : [number(baseDepth)]).concat(pinned ? ["pinned"] : []).join("|"), 1);
   }
 
   /**
@@ -211,6 +242,18 @@ class NutBlock extends MachineComponent {
     ];
   }
 
+  /** The base end's two locating dowels, where the block is pinned (the carriage declares the same holes). */
+  override public function pinnedFaces():Array<machinekit.component.BoltedFace.PinnedFace> {
+    if (!pinned) return [];
+    return [new machinekit.component.BoltedFace.PinnedFace(
+      "base-pins",
+      machinekit.component.BoltedFace.frameOf({x: 0, y: -centreHeight, z: thickness / 2}, {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}),
+      [for (x in pinXs()) {x: x, y: 0.0}],
+      PIN_DIAMETER,
+      PIN_DEPTH
+    )];
+  }
+
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -230,7 +273,7 @@ class NutBlock extends MachineComponent {
         // Along +Y from the base end, in the middle of the thickness.
         tools.push(Part.cylinderAlongY(base.tapDrill / 2, -centreHeight - 1, -centreHeight + baseDepth, x, thickness / 2));
       }
-      return Solids.cut(body, tools);
+      return machined(Solids.cut(body, tools));
     });
   }
 }
