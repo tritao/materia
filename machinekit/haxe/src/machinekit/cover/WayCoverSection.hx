@@ -65,6 +65,8 @@ class WayCoverSection extends MachineComponent {
   override public function fasteningFaces():Array<BoltedFace> {
     if (role == Sleeve) return [];
     var row = plan.row;
+    if (holes().length < 3) throw 'Way cover flange ${designation} has ${holes().length} holes on its host: the host faces cover heights ${plan.shape.hostMin} to ${plan.shape.hostMax} mm, '
+      + 'half width ${plan.shape.hostHalfWidth}; the plate is ${plan.plateHalf() * 2} wide and its roof lip is at ${plan.plateHigh() - row.lip / 2} mm';
     return [BoltedFace.clamped(
       role == Fixed ? "fixed" : "moving",
       BoltedFace.frameOf({x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0}),
@@ -77,6 +79,9 @@ class WayCoverSection extends MachineComponent {
       true
     )];
   }
+
+  /** Least distance of a flange hole from the edge of its host face: one and a half screw diameters of an M5 or M6, mm. */
+  public static inline var HOST_EDGE:Float = 8;
 
   /** Half the width of this flange's plate: the largest skin and its lip; the moving flange is cut back to its host face if that is narrower. */
   function plateHalf():Float return role == Moving ? plan.plateHalf() : plan.fullPlateHalf();
@@ -95,7 +100,7 @@ class WayCoverSection extends MachineComponent {
       for (j in 1...ny) for (sx in [-1, 1]) out.push({x: sx * hx, y: -hy + 2 * hy * j / ny});
       return out;
     }
-    var edge = plan.row.lip / 2, hostLow = plan.shape.hostMin + edge, hostHigh = plan.shape.hostMax - edge;
+    var edge = HOST_EDGE, hostLow = plan.shape.hostMin + edge, hostHigh = plan.shape.hostMax - edge;
     var roof = plan.plateHigh() - plan.row.lip / 2;
     // Across the roof lip, as far as the host face goes; walls' lips only when the plate's walls are over the host too.
     var hxRoof = role == Moving ? Math.min(hx, plan.shape.hostHalfWidth - edge) : hx;

@@ -8,12 +8,21 @@ import machinekit.component.BomItem.BomCut;
 import machinekit.component.Procurement.ProcurementCodec;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
+import machinekit.milling.MillCasting;
 import machinekit.milling.MillCasting.MillBase;
 import machinekit.milling.MillCasting.ColumnBoss;
 import machinekit.milling.MillCasting.MillColumn;
 import machinekit.milling.MillCasting.MillSaddle;
 import machinekit.milling.MillCasting.MillTable;
 import machinekit.milling.MillCasting.MillHead;
+import machinekit.cover.WayCover;
+import machinekit.cover.WayCoverCatalog;
+import machinekit.cover.WayCoverMount;
+import machinekit.cover.WayCoverMount.MountBore;
+import machinekit.cover.WayCoverMount.MountCut;
+import machinekit.cover.WayCoverPlan;
+import machinekit.cover.WayWiperCatalog;
+import machinekit.design.DesignRequirement;
 import machinekit.milling.SpindleCartridge;
 import machinekit.milling.SpindleCartridge.Er20Holder;
 import machinekit.milling.SpindleMotor;
@@ -61,7 +70,7 @@ typedef MillAxisDrive = {
  * All mates are solved from the zero poses, as on the router. The rails, screw supports and
  * current motor parts decide room, speed and acceleration every time the machine is compiled.
  */
-class BenchMill extends MachineAssembly {
+class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.CoverMembers {
   public static inline var RAIL:String = "HGH15CA";
   public static inline var STOCK_WIDTH:Float = 60;
   public static inline var STOCK_DEPTH:Float = 60;
@@ -70,10 +79,12 @@ class BenchMill extends MachineAssembly {
   /** Assumed assembly gap between carriage blocks, in mm. */
   public static inline var BLOCK_GAP:Float = 4;
   public final vise:Null<machinekit.milling.PneumaticVise>;
-  public final base = new MillBase();
-  public final column:MillColumn = new MillColumn(zBosses());
-  public final saddle = new MillSaddle();
-  public final table = new MillTable();
+  /** Whether the mill is built with chip protection: way covers on all three axes (`installCovers`). */
+  public final covered:Bool;
+  public final base:MillBase;
+  public final column:MillColumn;
+  public final saddle:MillSaddle;
+  public final table:MillTable;
   public final head = new MillHead();
   public final spindle = new SpindleCartridge();
   public final holder = new Er20Holder();
@@ -89,11 +100,19 @@ class BenchMill extends MachineAssembly {
   public final gaugeZero:AssemblyFrame;
   final zeroPoses = new Map<String, AssemblyFrame>();
   final overtravel = new Map<String, Float>();
+  final axisDirections = new Map<String, Array<Float>>();
+  /** The way covers of a covered mill, by id. */
+  public final wayCovers = new Map<String, WayCover>();
   final powerCableCuts:Array<BomCut> = [];
   final encoderCableCuts:Array<BomCut> = [];
 
-  public function new(withVise:Bool = false, includeWorkpiece:Bool = true) {
+  public function new(withVise:Bool = false, includeWorkpiece:Bool = true, covered:Bool = false) {
     super();
+    this.covered = covered;
+    base = new MillBase(covered);
+    column = new MillColumn(zBosses(covered ? Z_SCREW_SHORTENING : 0), covered);
+    saddle = new MillSaddle(covered);
+    table = new MillTable(covered);
     vise = withVise ? new machinekit.milling.PneumaticVise(STOCK_DEPTH, STOCK_WIDTH) : null;
     var railSpec = guideBlock.spec;
     var halfSpan = (railSpec.blockLength + BLOCK_GAP) / 2;
@@ -299,7 +318,7 @@ class BenchMill extends MachineAssembly {
       [0.0, yRailStart, saddleBottom + saddle.screwHeight],
       [0.0, 1, 0],
       [0.0, 0, 1],
-      yRailLength,
+      yRailLength + (covered ? Y_SCREW_EXTENSION : 0),
       [0.0, saddleY + saddle.depth / 2 - yNutFace, saddleBottom + saddle.screwHeight]
     );
     var zScrewTop = columnPose.z + column.height + railSpec.railEndMargin;
@@ -311,7 +330,7 @@ class BenchMill extends MachineAssembly {
       [zScrewX, (headBack + columnFront) / 2, zScrewTop],
       [0.0, 0, -1],
       [1.0, 0, 0],
-      column.height,
+      column.height - (covered ? Z_SCREW_SHORTENING : 0),
       [zScrewX, (headBack + columnFront) / 2, headZ + head.height / 2]
     );
     var pulley = new TimingPulley(HTD5M, 20, 20, 15);
@@ -379,6 +398,7 @@ class BenchMill extends MachineAssembly {
     connectPorts("spindle-power", "powerSupply", "power4", spindleDriver, "power");
     powerCableCuts.push(cableCut(zeroPose("spindleMotor"), zeroPose(spindleDriver), 0));
     declareServices();
+    if (covered) installCovers();
     // The rail and motor screws follow from the bolted faces the parts declare, not from a list here.
     deriveFasteners();
     addMotor(
@@ -396,8 +416,148 @@ class BenchMill extends MachineAssembly {
     );
   }
 
+
+  /** How far the Y screw's rear bearing moves back into the column's bay to leave the rear cover its stack, mm. */
+  public static inline var Y_SCREW_EXTENSION:Float = 12.5;
+  /**
+   * How much shorter the Z screw is in a covered mill, mm. Its lower 180 mm lay below the head's travel and carried nothing but the
+   * floating bearing, which stood at the corner of the base where the Y rear cover's stack goes, and its cover wall would have stood at the
+   * table's height.
+   */
+  public static inline var Z_SCREW_SHORTENING:Float = 180;
+  /** Clearance a cover's opening keeps round what it protects, mm. */
+  public static inline var COVER_CLEARANCE:Float = 3;
+  /** How far a cover end wall or carrier stands out beyond the flange plate it holds, so the screws keep their edge distance, mm. */
+  public static inline var COVER_MARGIN:Float = 4;
+  /** Thickness of the cover end walls and carriers, mm. */
+  public static inline var COVER_PLATE:Float = 14;
+  /** The cover row the mill buys (every end has less than 100 mm to fold into). */
+  public static inline var COVER_ROW:String = "BELLOWS-LAMELLA-8x8";
+
+  /** The way cover `id` of a covered mill. */
+  public function coverOf(id:String):WayCover {
+    var cover = wayCovers.get(id);
+    if (cover == null) throw 'Bench mill has no way cover "$id"';
+    return cover;
+  }
+
+  function dot(a:Array<Float>, b:Array<Float>):Float return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+  /**
+   * One way cover and its mounting plates: an end wall for the fixed flange (and a carrier for the moving one where the moving member
+   * has no face of its own), the cover from `WayCover.installOn`, all at the zero pose. `origin` is the fixed flange's mounting plane on
+   * the surface the box cover stands on, `along` runs from it to the moving flange, whose plane at joint value 0 is `moving0`. The
+   * fixed and moving ends' space is measured at the end stop where they are closest.
+   */
+  function coverFrom(id:String, row:String, wallParent:String, movingParent:String, leader:MillAxisSpec, origin:Array<Float>, moving0:Array<Float>,
+      along:Array<Float>, up:Array<Float>, width:Float, height:Float, shape:WayCoverPlan.CoverShape, wallBores:Array<MountBore>, wallCuts:Array<MountCut>,
+      wallBelow:Float, carrierBores:Null<Array<MountBore>>):WayCover {
+    var axis = axisDirection(leader.id);
+    var folded = dot(axis, along) > 0 ? leader.lower : leader.upper;
+    var closest = [for (k in 0...3) moving0[k] + axis[k] * folded];
+    var space = dot([for (k in 0...3) closest[k] - origin[k]], along);
+    var plan = new WayCoverPlan(WayCoverCatalog.get(row), width, height, leader.upper - leader.lower, space, shape);
+    var wall = "wall" + id.substr(5);
+    attach(wall, new WayCoverMount("MILL-COVER-WALL-" + id.substr(5).toUpperCase(), plan.fullPlateHalf() + COVER_MARGIN, plan.plateHigh() + COVER_MARGIN, COVER_PLATE, wallBores, wallCuts,
+      wallBelow), orient(origin[0], origin[1], origin[2], up, along), wallParent);
+    var host = movingParent;
+    if (carrierBores != null) {
+      host = "carrier" + id.substr(5);
+      attach(host, new WayCoverMount("MILL-COVER-CARRIER-" + id.substr(5).toUpperCase(), plan.plateHalf() + COVER_MARGIN, plan.plateHigh() + COVER_MARGIN, COVER_PLATE, carrierBores, null, wallBelow),
+        orient(moving0[0], moving0[1], moving0[2], up, [-along[0], -along[1], -along[2]]), movingParent);
+    }
+    var cover = WayCover.installOn(this, this, {
+      id: id, row: row, fixedParent: wall, movingParent: host, leader: {id: leader.id, lower: leader.lower, upper: leader.upper, initial: leader.initial}, origin: origin, along: along, up: up, width: width, height: height,
+      space: space, shape: shape
+    });
+    wayCovers.set(id, cover);
+    return cover;
+  }
+
+  /**
+   * Chip protection, built into a covered mill: a box cover on each end of each axis, all of one lamella bellows (`COVER_ROW`).
+   * Y has a cover either side of the saddle from an end wall behind the bearing to the saddle's face; X either side of the table from an end
+   * wall on the saddle's bridge to the table's end face; Z above and below the nut, from a wall at the bearing to a carrier on the head.
+   * The cover walls are the surfaces they stand on: the base top for Y, the saddle top for X, the column's side face for Z.
+   */
+  function installCovers():Void {
+    var bk = ScrewSupportUnit.bk12(), bf = ScrewSupportUnit.bf12();
+    var up = [0.0, 0, 1], baseTop = base.height, rail = guideBlock.spec;
+    var xSpec = specs[0], ySpec = specs[1], zSpec = specs[2];
+    var saddlePose = zeroPose("saddle"), tablePose = zeroPose("table");
+    var nut = new BallNut();
+    // The rails stand through a wall as it stands on the base: a slot clears each, a little wider than the rail.
+    var railSlots:Array<MountCut> = [for (side in [-1, 1]) {
+      x0: side * base.railSpacing / 2 - rail.railWidth / 2 - 3.5,
+      x1: side * base.railSpacing / 2 + rail.railWidth / 2 + 3.5,
+      y0: -1.0,
+      y1: rail.railHeight + 4
+    }];
+    var screwYUp = zeroPose("screwY").z - baseTop;
+    var yWidth = 2 * (base.railSpacing / 2 + rail.blockWidth / 2 + COVER_CLEARANCE);
+    // The faces on the saddle the moving flanges are bolted to span the saddle's height.
+    var saddleHost = WayCoverPlan.boxCover(saddlePose.z - baseTop, saddlePose.z + saddle.height - baseTop, saddle.width / 2);
+    // Y front: the wall stands in front of the front bearing's stand and the coupling passes through it; the cover encloses the bearing.
+    var frontWall = zeroPose("screwYFixed").y - Math.max(bk.length, standLength(bk)) / 2 - 7;
+    var yCoupling = axisDrives[1].coupling.outerDiameter + 6;
+    coverFrom("coverYFront", COVER_ROW, "base", "saddle", ySpec, [0.0, frontWall, baseTop], [0.0, saddlePose.y - saddle.depth / 2, baseTop], [0.0, 1, 0],
+      up, yWidth, screwYUp + 22, saddleHost, [{x: 0.0, y: screwYUp, d: yCoupling}], railSlots, 0, null);
+    // Y rear: the wall stands in front of the rear bearing, which has moved back into the column's bay; the screw passes through it.
+    var rearWall = zeroPose("screwYFloating").y - Math.max(bf.length, standLength(bf)) / 2 - 2 - COVER_PLATE;
+    var bracketTop = screwYUp + nut.flangeDiameter / 2 + 11;
+    coverFrom("coverYRear", COVER_ROW, "base", "saddle", ySpec, [0.0, rearWall, baseTop], [0.0, saddlePose.y + saddle.depth / 2, baseTop], [0.0, -1, 0],
+      up, yWidth, bracketTop + COVER_CLEARANCE, saddleHost, [{x: 0.0, y: screwYUp, d: 24.0}], railSlots, 0, null);
+    // X: the covers stand on the saddle's top, between the rails' outer edges and the saddle's sides, and their walls on the bridges that
+    // carry the screw's bearings; the nesting grows toward the wall so the skins at the table stay narrower than the table.
+    var floor = saddlePose.z + saddle.height, bridgeTop = zeroPose("screwXNearBridge").z + 10;
+    var screwXUp = zeroPose("screwX").z - floor;
+    var xWidth = 2 * (saddle.railSpacing / 2 + rail.railWidth / 2 + 4);
+    var tableHost = WayCoverPlan.boxCover(tablePose.z - floor, tablePose.z + table.height - floor, table.depth / 2 - 3, true);
+    var leftWall = zeroPose("screwXFixed").x - bk.length / 2 - 7;
+    var xCoupling = axisDrives[0].coupling.outerDiameter + 6;
+    coverFrom("coverXLeft", COVER_ROW, "screwXNearBridge", "table", xSpec, [leftWall, saddlePose.y, floor], [tablePose.x - table.width / 2, saddlePose.y, floor],
+      [1.0, 0, 0], up, xWidth, screwXUp + 19, tableHost, [{x: 0.0, y: screwXUp, d: xCoupling}], [], floor - bridgeTop, null);
+    var rightWall = Math.max(zeroPose("screwXFloating").x + bf.length / 2, zeroPose("screwX").x + axisDrives[0].screw.totalLength) + 2;
+    coverFrom("coverXRight", COVER_ROW, "screwXFarBridge", "table", xSpec, [rightWall, saddlePose.y, floor], [tablePose.x + table.width / 2, saddlePose.y, floor],
+      [-1.0, 0, 0], up, xWidth, screwXUp + 19, tableHost, [], [], floor - bridgeTop, null);
+    // Z: the covers stand on the column's side face, open toward it, and run along the screw above and below the nut; the walls are on the
+    // column, at the bearings, and the carriers on the head, above the nut and below its bracket.
+    var side = column.width / 2 + 1, screwZ = zeroPose("screwZ"), carrier = COVER_PLATE;
+    var screwZUp = screwZ.x - side;
+    var zWidth = Math.max(bk.width, bf.width) + 2 * COVER_CLEARANCE;
+    var zHeight = Math.max(bk.height, bf.height) + COVER_CLEARANCE;
+    var topWall = Math.max(zeroPose("screwZFixed").z + bk.length / 2, zeroPose("screwZStand0").z + standLength(bk) / 2) + 1;
+    var zCoupling = axisDrives[2].coupling.outerDiameter + 6;
+    var nutTop = zeroPose("screwZNut").z;
+    var bracketBottom = zeroPose("screwZNutBracket").z - 8;
+    var zeroUp = [1.0, 0, 0];
+    coverFrom("coverZTop", COVER_ROW, "column", "head", zSpec, [side, screwZ.y, topWall], [side, screwZ.y, nutTop + carrier], [0.0, 0, -1], zeroUp,
+      zWidth, zHeight, WayCoverPlan.boxCover(), [{x: 0.0, y: screwZUp, d: zCoupling}], [], 1, [{x: 0.0, y: screwZUp, d: 24.0}]);
+    var bottomWall = Math.min(zeroPose("screwZFloating").z - bf.length / 2, screwZ.z - axisDrives[2].screw.totalLength) - 4;
+    // The carrier under the bracket clears the nut flange's bolts, whose nuts and washers stand on the bracket's far side.
+    var boltReach = 0.0;
+    for (point in nut.boltPattern()) boltReach = Math.max(boltReach, Math.sqrt(point.x * point.x + point.y * point.y));
+    coverFrom("coverZBottom", COVER_ROW, "column", "head", zSpec, [side, screwZ.y, bottomWall], [side, screwZ.y, bracketBottom - carrier], [0.0, 0, 1], zeroUp,
+      zWidth, zHeight, WayCoverPlan.boxCover(), [], [], 1, [{x: 0.0, y: screwZUp, d: 2 * (boltReach + 8)}]);
+    // The Y covers keep chips and coolant off the rails and the screw; what gets past their wipers runs along the base's gutters to the drain
+    // holes at the front, which open into the hollow base over the chip tray.
+    var gutterTop = base.height - MillCasting.BODY_PAD;
+    var gutterFall = (MillCasting.GUTTER_REAR - MillCasting.GUTTER_FRONT) * MillCasting.GUTTER_FALL;
+    var drains:Array<ChannelDrain> = [for (side in [-1.0, 1.0]) {
+      high: [side * MillCasting.GUTTER_CENTRE, MillCasting.GUTTER_REAR, gutterTop],
+      low: [side * MillCasting.GUTTER_CENTRE, MillCasting.GUTTER_FRONT, gutterTop - gutterFall],
+      drain: "base",
+      diameter: MillCasting.DRAIN_DIAMETER,
+      outletZ: base.height - 25
+    }];
+    var yMembers = coverOf("coverYFront").members().concat(coverOf("coverYRear").members());
+    addDesignRequirement(GuardedChannel("yCoverGutters", "base", yMembers, drains));
+    // Wipers on the twelve guide blocks, an end scraper at each end.
+    addBomItem(WayWiperCatalog.bomItem("WIPER-HG15-SCRAPER", 24));
+  }
+
   /** Where in the column the Z supports' bosses are cast: under the feet of the supports `driveScrew` places on the screw. */
-  static function zBosses():Array<ColumnBoss> {
+  static function zBosses(shortening:Float = 0):Array<ColumnBoss> {
     var plain = new MillColumn(), rail = LinearRailBlock.metric(RAIL).spec;
     var near = ScrewSupportUnit.bk12(), far = ScrewSupportUnit.bf12();
     // The screw runs from the column's top plus the rail's end margin down its height; the supports' feet look at the column from the
@@ -405,7 +565,7 @@ class BenchMill extends MachineAssembly {
     var top = plain.height + rail.railEndMargin, y = -plain.depth / 2 - rail.blockHeight / 2;
     return [for (end in 0...2) {
       var unit = end == 0 ? near : far;
-      var offset = end == 0 ? BallScrew.INPUT_JOURNAL_LENGTH - near.length / 2 : plain.height - BallScrew.JOURNAL_LENGTH / 2;
+      var offset = end == 0 ? BallScrew.INPUT_JOURNAL_LENGTH - near.length / 2 : plain.height - shortening - BallScrew.JOURNAL_LENGTH / 2;
       {y: y, z: top - offset, width: standWidth(unit), length: standLength(unit), back: Z_BOSS_BACK};
     }];
   }
@@ -776,6 +936,7 @@ class BenchMill extends MachineAssembly {
     }
     if (!(room > 0)) throw 'Bench mill ${spec.id} needs room beyond travel on its rail';
     overtravel.set(spec.id, room);
+    axisDirections.set(spec.id, axis.copy());
     addComponent(id, block);
     zeroPoses.set(id, pose);
     connect(parent, id);
@@ -807,11 +968,25 @@ class BenchMill extends MachineAssembly {
   }
 
   /** A member fixed to `parent`, at its world pose with every axis at zero. */
-  function attach(id:String, component:MachineComponent, pose:AssemblyFrame, parent:String):Void {
+  public function attach(id:String, component:MachineComponent, pose:AssemblyFrame, parent:String):Void {
     addComponent(id, component);
     zeroPoses.set(id, pose);
     connect(parent, id);
     addMate('$id-mount', "fixed", parent, 'to-$id', id, 'attach-$id');
+  }
+
+  /** A member hung on `parent` at its world pose with every axis at zero, without a mate: the caller adds the joint (`WayCover.installOn`). */
+  public function hang(id:String, component:MachineComponent, pose:AssemblyFrame, parent:String):Void {
+    addComponent(id, component);
+    zeroPoses.set(id, pose);
+    connect(parent, id);
+  }
+
+  /** The world direction axis `id` moves its carriage as its coordinate grows, a unit vector. */
+  public function axisDirection(id:String):Array<Float> {
+    var direction = axisDirections.get(id);
+    if (direction == null) throw 'Bench mill has no axis "$id"';
+    return direction.copy();
   }
 
   function component(id:String):MachineComponent {

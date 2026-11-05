@@ -68,7 +68,7 @@ class WayCoverCatalog {
       },
       {
         id: "BELLOWS-LAMELLA-8x8", kind: Bellows, description: "Flat bellows with steel lamellas, polyester-PVC fabric, 8 mm per fold, 1:8, chip-proof",
-        material: "polyurethane PU", foldCompressed: 8, ratio: 8, sectionLength: 0, overlap: 0, stackStep: 0, wall: 1.8, gap: 1.2, lip: 16, flangeThickness: 3,
+        material: "polyurethane PU", foldCompressed: 8, ratio: 8, sectionLength: 0, overlap: 0, stackStep: 0, wall: 1.0, gap: 1.1, lip: 12, flangeThickness: 3,
         screw: "M5", clearance: 5.5, holePitch: 120, wiper: 6, maxSpeed: 1500,
         basis: "Typical lamella-bellows family values for machine-tool ways (assumed): steel lamellas sewn into the fabric every fold"
       },
