@@ -18,7 +18,7 @@ import materia.assembly.AssemblyFrames as F;
 /** Frame, drive and integrity checks on the assembled hobber (FRAME_PLAN.md H1-H6). */
 class HobberFrameChecks {
   /** `AssemblyIntegrity` in strict mode on the whole machine; `sweep` false checks the rest state only. */
-  public static function integrity(machine:FlexsplineHobber, sweep:Bool, gap:Float = 2.0):Array<String> {
+  static function integrityOptions(machine:FlexsplineHobber, sweep:Bool, gap:Float = 2.0):IntegrityOptions {
     // The column is lowered onto the carriage after the carriage's block and nut-block screws are fitted: those screws are reached before it is in place
     // (the assembly order, per fastener: the column still blocks every other screw's driver and counts for holes and heads).
     var options:IntegrityOptions = {strict: true, processContacts: machine.processContacts(), runningGap: gap,
@@ -36,11 +36,16 @@ class HobberFrameChecks {
         {member: "blockYRight", fastened: ["YnutSeat"]}, {member: "blockYRightFront", fastened: ["YnutSeat"]},
         {member: "Ynut", fastened: ["Yplate"]},
         // The Y scale head's rear screw is driven through the outboard support's arm: the head is screwed on before the outboard support and its bearing go on.
-        {member: "outboardCarrier", fastened: ["YscaleHead"]}, {member: "outboard", fastened: ["Yplate"]}, {member: "outboardBearing", fastened: ["Yplate"]},
+        {member: "Yplate", fastened: ["outboard"]},
         // The Z scale head's screws are driven from the arm's inner face, where the eRob housing will stand: the head is screwed on before the actuator is fitted.
         {member: "swivel/housing", fastened: ["ZscaleArm"]}]};
+    options.fittedBefore = options.fittedBefore.concat([for (id in FlexsplineHobber.outboardMembers()) {member: id, fastened: ["YscaleHead"]}]);
     if (!sweep) options.sweepStates = [];
-    var report = AssemblyIntegrity.check(machine, options);
+    return options;
+  }
+
+  public static function integrity(machine:FlexsplineHobber, sweep:Bool, gap:Float = 2.0):Array<String> {
+    var report = AssemblyIntegrity.check(machine, integrityOptions(machine, sweep, gap));
     return [for (item in report.errors()) item.code + " " + item.message];
   }
 
@@ -55,14 +60,16 @@ class HobberFrameChecks {
     return from < 0 ? text : text.substr(from + 4);
   }
 
-  public static function service(machine:FlexsplineHobber):Array<String> {
+  // checkedIntegrity is the completed strict check of this same, unchanged
+  // instance in main. It already swept every declared removal; reuse that
+  // evidence rather than repeating the same removals before the tried paths.
+  public static function service(machine:FlexsplineHobber, ?checkedIntegrity:Array<String>):Array<String> {
     var lines = [];
     var declared = [for (r in machine.serviceRemovals()) switch r {
       case ServiceRemoval(id, _, _, _, _): id;
       default: "";
     }];
-    var report = AssemblyIntegrity.service(machine);
-    var errors = [for (e in report.errors()) e.code + " " + e.message];
+    var errors = checkedIntegrity ?? [for (e in AssemblyIntegrity.service(machine).errors()) e.code + " " + e.message];
     for (id in declared) {
       var mine = [for (e in errors) if (e.indexOf("integrity.service." + id + " ") == 0) e];
       lines.push(mine.length == 0 ? 'service $id: clear' : 'service $id: BLOCKED ${mine.join("; ")}');
@@ -266,6 +273,30 @@ class HobberFrameChecks {
     return lines;
   }
 
+
+  /** Worst-case radial budget; all terms are radial, not TIR or diametral. */
+  public static function outboard(machine:FlexsplineHobber):Array<String> {
+    var poses = machine.solvedPoses(), arbor = machine.spindle.arbor;
+    var inv = F.inverse(poses.get("spindle/arbor"));
+    var radial = machinekit.hobbing.HobberOutboardLayout.INDICATED_RADIAL + machinekit.hobbing.HobberOutboardLayout.SEAT_RADIAL
+      + machinekit.hobbing.HobberOutboardLayout.BEARING_RADIAL + machinekit.hobbing.HobberOutboardLayout.THERMAL_RADIAL;
+    for (id in ["outboard", "outboardSleeve", "outboardBearingFront", "outboardBearingRear"]) {
+      var p = F.compose(inv, poses.get(id)), axis = F.transformVector(p, 0, 0, 1);
+      if (Math.sqrt(p.x * p.x + p.y * p.y) > 1e-7 || Math.abs(Math.abs(axis.z) - 1) > 1e-8) throw "outboard is not on spindle axis: " + id;
+    }
+    var front = F.compose(inv, poses.get("outboardBearingFront")), rear = F.compose(inv, poses.get("outboardBearingRear"));
+    if (Math.abs(front.z - (arbor.parameterNumber("height") - arbor.parameterNumber("supportLength"))) > 1e-8
+      || Math.abs(rear.z - front.z - 18) > 1e-8
+      || F.transformVector(F.compose(F.inverse(poses.get("outboardBearingFront")), poses.get("outboardBearingRear")), 0, 0, 1).z > -0.999999) throw "outboard DB pair does not seat against journal shoulder";
+    if (radial > machinekit.hobbing.HobberOutboardLayout.RADIAL_BUDGET + 1e-12) throw "outboard coaxiality budget exceeded";
+    var thermal = machinekit.hobbing.HobberOutboardLayout.STEEL_EXPANSION * arbor.parameterNumber("height") * machinekit.hobbing.HobberOutboardLayout.TEMPERATURE_RISE;
+    var floatMargin = 1 - thermal - machinekit.hobbing.HobberOutboardLayout.ASSEMBLY_AXIAL;
+    var nutClearance = (30 - 22 / Math.cos(Math.PI / 6)) / 2;
+    if (floatMargin <= 0 || nutClearance < 2) throw "outboard thermal travel or nut access insufficient";
+    return ['Outboard: SKF 7002 CDGA/P4A DB pair, 15x32x9 each, class-A 20 N unmounted preload; installed radial budget 5 um '
+      + '(2 indicated + 1 seats + 1.5 bearing + 0.5 thermal, all ASSUMED requirements); thermal growth ${Math.round(thermal * 10000) / 10000} mm at assumed 30 K, '
+      + 'float +/-1 mm, remaining margin ${Math.round(floatMargin * 10000) / 10000} mm; nut/cap radial clearance ${Math.round(nutClearance * 1000) / 1000} mm.'];
+  }
 
   /** BT30 retention/load interface. Material allowables and drawbar force are
    * explicit assumptions, not ratings inferred from the cartridge listing. */
@@ -553,7 +584,7 @@ class HobberFrameChecks {
     var presentation = materia.presentation.Presentations.assembled(machine.definition(), -1.1, 0.35, "hobber");
     presentation.procedures = HobberAssemblyProcedures.build(machine);
     materia.presentation.PresentationCodec.validate(machine.definition(), presentation);
-    var lines = bt30(machine).concat(sizing(machine)).concat(scales(machine)).concat(swivelLoad(machine)).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)).concat(spindleDrive(machine)).concat(spindleRelief(machine)), errors = newErrors(machine, sweep);
+    var lines = bt30(machine).concat(outboard(machine)).concat(sizing(machine)).concat(scales(machine)).concat(swivelLoad(machine)).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)).concat(spindleDrive(machine)).concat(spindleRelief(machine)), errors = newErrors(machine, sweep);
     for (line in lines) Sys.println(line);
     if (errors.length > 0) throw 'hobber strict integrity: ${errors.length} findings\n  ' + errors.join("\n  ");
     return presentation.procedures.length + lines.length + 1;
@@ -637,6 +668,7 @@ class HobberFrameChecks {
     if (args.indexOf("scales") >= 0) for (line in scales(machine)) Sys.println(line);
     if (args.indexOf("swivel") >= 0) for (line in swivelLoad(machine)) Sys.println(line);
     if (args.indexOf("zoffset") >= 0) for (line in zOffsetMoments(machine)) Sys.println(line);
+    if (args.indexOf("outboard") >= 0) for (line in outboard(machine)) Sys.println(line);
     if (args.indexOf("bt30") >= 0) for (line in bt30(machine)) Sys.println(line);
     if (args.indexOf("spindleseat") >= 0) for (line in spindleSeat(machine)) Sys.println(line);
     if (args.indexOf("roundtrip") >= 0) {
@@ -657,8 +689,16 @@ class HobberFrameChecks {
     }
     if (args.indexOf("crash") >= 0) for (line in HobberCrashProtection.report(machine)) Sys.println(line);
     if (args.indexOf("fasteners") >= 0) for (line in HobberFastenerChecks.report(machine)) Sys.println(line);
+    var checkedIntegrity:Null<Array<String>> = null;
+    if (args.indexOf("fastenerfit") >= 0) {
+      var report = AssemblyIntegrity.fasteners(machine, integrityOptions(machine, false));
+      for (e in report.errors()) Sys.println(e.code + " " + e.message);
+      Sys.println('fastener fit: ${report.errors().length} errors');
+      report.require();
+    }
     if (args.indexOf("integrity") >= 0) {
       var errors = integrity(machine, args.indexOf("sweep") >= 0);
+      checkedIntegrity = errors;
       var counts = new Map<String, Int>();
       for (error in errors) {
         var code = error.split(" ")[0];
@@ -671,6 +711,6 @@ class HobberFrameChecks {
     }
     // Last: `service` adds the paths it tries (which are blocked) to the machine's requirements, so nothing may follow it that checks the machine as built.
     if (args.indexOf("coverfit") >= 0) for (line in coverFit(machine)) Sys.println(line);
-    if (args.indexOf("service") >= 0) for (line in service(machine)) Sys.println(line);
+    if (args.indexOf("service") >= 0) for (line in service(machine, checkedIntegrity)) Sys.println(line);
   }
 }

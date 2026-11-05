@@ -1,5 +1,5 @@
 import materia.assembly.AssemblyFrames as F;
-import machinekit.hobbing.FloatingRadialBearing;
+import machinekit.motion.SpindleBearing;
 import gearkit.GearSpec;
 import gearkit.Involute;
 import stockkit.hobbing.HobbingAxes;
@@ -112,23 +112,18 @@ class HobberInstallationChecks {
         near(axis.y, 0, "tool axis Y");
         near(axis.z, 1, "tool axis Z");
         near(tool.z + hob.parameterNumber("height"), seatEnd, "tool ends at seat datum");
-        var bearing:FloatingRadialBearing = cast machine.components().filter(m -> m.id
-          == "outboardBearing")[0].component;
-        var support = F.compose(F.inverse(state.worldPose("spindle/arbor")), state.worldPose("outboardBearing"));
-        near(support.x, 0, "support bearing coaxial X");
-        near(support.y, 0, "support bearing coaxial Y");
-        var supportAxis = F.transformVector(support, 0, 0, 1);
-        near(supportAxis.z, 1, "support bearing axis");
-        near(
-          bearing.parameterNumber("bore"),
-          arbor.parameterNumber("supportDiameter"),
-          "support journal nominal bore fit"
-        );
-        check(
-          support.z >= arbor.parameterNumber("height") - arbor.parameterNumber("supportLength") - 1e-8
-          && support.z + bearing.parameterNumber("height") <= arbor.parameterNumber("height") + 1e-8,
-          "bearing width lands on support journal"
-        );
+        for (id in ["outboardBearingFront", "outboardBearingRear"]) {
+          var bearing:SpindleBearing = cast machine.components().filter(m -> m.id == id)[0].component;
+          var support = F.compose(F.inverse(state.worldPose("spindle/arbor")), state.worldPose(id));
+          near(support.x, 0, "support bearing coaxial X");
+          near(support.y, 0, "support bearing coaxial Y");
+          var axis = F.transformVector(support, 0, 0, 1);
+          near(Math.abs(axis.z), 1, "DB support bearing axis");
+          near(bearing.row.bore, arbor.parameterNumber("supportDiameter"), "support journal nominal bore fit");
+          var end = support.z + axis.z * bearing.row.width;
+          check(Math.min(support.z, end) >= arbor.parameterNumber("height") - arbor.parameterNumber("supportLength") - 1e-8
+            && Math.max(support.z, end) <= arbor.parameterNumber("height") + 1e-8, "bearing width lands on support journal");
+        }
       }
       mounts();
       var actual = machine.hobToWork(state), expected = new HobbingAxes(

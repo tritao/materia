@@ -578,7 +578,7 @@ class PartNumberKeyTests {
       machinekit.hobbing.SwivelHousing.recipeType().create().bom.partNumber,
       machinekit.hobbing.HobArbor.recipeType().create().bom.partNumber];
     var hobberExpected = ["MANDREL-SLEEVE", "HOBBER-TABLE-HOUSING", "ROBOTDIGG-2049-BT30-D80-6000",
-      "HOBBER-TABLE-PLATEN", "FLEXSPLINE-CUP-BLANK", "HOBBER-BRACKET", "HOB-OUTBOARD-SUPPORT",
+      "HOBBER-TABLE-PLATEN", "FLEXSPLINE-CUP-BLANK", "HOBBER-BRACKET", "HOB-OUTBOARD-HOUSING-D40-DB7002",
       "SWIVEL-HOUSING", "HOB-ARBOR-BT30"];
     for (i in 0...hobberParts.length) if (hobberParts[i] != hobberExpected[i]
       || PartNumberLint.problems(hobberParts[i]).length != 0) throw 'Hobber part identity: ${hobberParts[i]}';

@@ -113,6 +113,14 @@ def raw_block(part):
     return [math.ceil((d + 6) / 5) * 5 for d in part["size"]]
 
 
+def blank_text(part):
+    if part["route"]["kind"] == "Turned":
+        return "round bar blank: supplier proposes diameter and length from the STEP turning axis"
+    if part["route"]["kind"] == "CutPlate":
+        return "plate blank: supplier proposes thickness and cut allowance from STEP"
+    return f"block ≥ {' x '.join(fmt(d) for d in part['rawBlock'])} (indicative)"
+
+
 def supplier_class(part):
     kind = part["route"]["kind"]
     if kind == "GroundStock":
@@ -403,9 +411,14 @@ def notes_for(part):
         notes.append(f"3. Cut from ground flat {s['kind']} {fmt(part['stockCut']['width'])} x {fmt(s['thickness'])}: thickness ±{fmt(s['thicknessTolerance'], 3)}, "
                      f"flatness {fmt(s['flatness'], 3)}, parallelism {fmt(s['parallelism'], 3)} per 100 mm, Ra {fmt(s['roughnessRa'])}. Stock as bought (source: {s.get('source', 'n/a')}{', assumed' if s.get('assumed') else ''}); "
                      "broad faces stay as bought except those marked ground after cutting in the face table; sawn edges as cut.")
-    else:
+    elif route["kind"] == "Turned":
+        notes.append(f"3. Turn in {route['setups']} setup{'s' if route['setups'] > 1 else ''}; grind the functional faces as listed. "
+                     "Choose the round bar blank and turning axis from the STEP geometry. Mill cross-features only where listed on the route.")
+    elif route["kind"] == "Milled":
         notes.append(f"3. Milled from the block in {route['setups']} setup{'s' if route['setups'] > 1 else ''} on a 3-axis machine. "
                      f"Indicative raw block {' x '.join(fmt(d) for d in part['rawBlock'])} (size + 3 mm per side).")
+    else:
+        notes.append("3. Cut the plate profile and holes; supplier proposes the blank from STEP.")
     notes.extend(f"{4 + i}. {t}" for i, t in enumerate(ORDERING))
     if any(h["kind"] == "dowel" for h in part["holes"]):
         notes.append(f"{4 + len(ORDERING)}. {DOWEL_NOTE}")
@@ -523,7 +536,7 @@ def sheet_html(part):
         c = part["stockCut"]
         data_rows.append(("Stock", f"{route['stock']['id']}: ground {'plate' if c.get('plate') else 'flat bar'} {fmt(c['width'])} x {fmt(c['thickness'])}, cut to {fmt(c['length'])}"))
     else:
-        data_rows.append(("Stock", f"block ≥ {' x '.join(fmt(d) for d in part['rawBlock'])} (indicative)"))
+        data_rows.append(("Stock", blank_text(part)))
     data_rows += [
         ("Setups", str(route["setups"]) if route["setups"] else "cut only"),
         ("General tol.", f"ISO 2768-{cls}"),
@@ -645,7 +658,7 @@ def rfq(data, directory):
             c = p["stockCut"]
             stock = f"{p['material']}; ground {'plate' if c.get('plate') else 'flat bar'} {fmt(c['width'])} x {fmt(c['thickness'])} cut to {fmt(c['length'])}"
         else:
-            stock = f"{p['material']}; block ≥ {' x '.join(fmt(d) for d in p['rawBlock'])}"
+            stock = f"{p['material']}; {blank_text(p)}"
         holes = {}
         for h in p["holes"]:
             key = {"tapped": f"{h['thread']} tapped", "dowel": f"dowel Ø{fmt(h['nominal'])} {h['fit']}", "clearance": f"Ø{fmt(h['diameter'])} clearance",

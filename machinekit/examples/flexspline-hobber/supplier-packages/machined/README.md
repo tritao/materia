@@ -31,7 +31,7 @@ Python 3 with numpy, and Chrome or Chromium on the PATH for the PDFs; `pdftotext
 | `HOBBER-GE-Y-nut-seat` | milled from 19 mm bar, 1 setup: the seat plane (16 mm) and two key ribs 3.5 x 3 mm either side of the nut block's 20 mm base (the block is located against the screw thrust in both directions) | block |
 | `HOBBER-GE-X-scale-seat`, `HOBBER-GE-Z-scale-seat` | ground flat bar, 10 x 20, 2 M8 tapped through (the scale housing's screws) | 20 x 10 |
 | `HOBBER-GE-Z-scale-arm` | milled arm for the Z scale head, 1 setup, fine | block |
-| `HOBBER-GE-Y-saddle` | milled, 2 setups, fine (Ø114 forward cartridge-clearance channel; spine for the Y scale head) | block |
+| `HOBBER-GE-Y-saddle` | milled, 2 setups, fine (Ø116 forward cartridge-clearance channel; spine for the Y scale head) | block |
 | `HOBBER-GE-outboard-carrier` | milled, 2 setups, fine; separate structural service interface, four derived M4 and two Ø4 H7 pins to the Y saddle | block |
 | `HOBBER-GE-swivel-plate` | ground steel plate, 15 mm (not aluminium: it carries the steel Y rails and the spindle seat), sawn to size, two faces ground after cutting, holes (Y scale housing seat, 8 adapter-ring screws) | plate 15 |
 | `HOBBER-GE-swivel-adapter` | turned ring, 2 setups, fine, aluminium (output flange to swivel plate) | bar |
@@ -42,6 +42,8 @@ Python 3 with numpy, and Chrome or Chromium on the PATH for the PDFs; `pdftotext
 
 Quantities are one per machine. The list is the exporter's `DESIGNS` plus one nut block per axis; a new route on a
 hobber member means adding it there.
+
+The P2 export also includes the installed outboard housing, floating sleeve, M36x1 gland, rear cap and ground inner spacer. Their separate routes preserve the indicated housing interface, matched bearing retention and thermal float. Bolt and dowel tables are derived from joints; the gland's two blind pin-spanner holes are functional tool features. See `b-align-outboard` for indication and pinning.
 
 ## What is written
 

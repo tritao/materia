@@ -96,9 +96,13 @@ class HobberJointLoads {
       between: ["motorCradle", "spindleSeat"],
       shear: {peak: pull + massOf(machine, ["motorCradle", "spindle/motor"]) * g}
     });
-    var outboardWeight = massOf(machine, ["outboardCarrier", "outboard", "outboardBearing"]) * (g + 0.5);
+    var outboardWeight = massOf(machine, FlexsplineHobber.outboardMembers().concat(["outboardInnerSpacer", "outboardLocknut"])) * (g + 0.5);
     loads.push({label: "Outboard carrier on the Y saddle", between: ["outboardCarrier", "Yplate"],
       shear: {peak: CUTTING_FORCE + outboardWeight, momentary: jam + outboardWeight}});
+    loads.push({label: "Indicated housing on its carrier", between: ["outboard", "outboardCarrier"],
+      shear: {peak: CUTTING_FORCE + outboardWeight, momentary: jam + outboardWeight}});
+    loads.push({label: "Floating sleeve rear stop cap", between: ["outboard", "outboardCap"],
+      shear: {peak: massOf(machine, ["outboardCap"]) * (g + 0.5)}});
     return loads;
   }
 }

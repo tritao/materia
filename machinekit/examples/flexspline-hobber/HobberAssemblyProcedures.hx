@@ -159,11 +159,22 @@ class HobberAssemblyProcedures {
     ], source: Generated("hobber")
   };
 
+  public static function alignOutboard():Procedure return {
+    id: "b-align-outboard", label: "B: preload, indicate and pin the floating outboard pair", kind: Assembly, start: Assembled,
+    steps: [
+      note("pair", "Assemble the matched DB pair", "Use two SKF 7002 CDGA/P4A bearings back-to-back, arrows and matched faces per SKF. Seat both outer rings against the sleeve shoulder with the M36x1 gland, then clamp both inner rings between the arbor D20 shoulder and ground D20 spacer with the M15x1 AF22 nut. Their ground faces establish class-A preload (SKF: 20 N unmounted), not a torque-derived preload. Shaft fit and retaining torque require shop qualification to avoid race creep and excessive interference preload; use fillets <=0.2 mm, clean precision grease and verify free rotation and temperature. Secure both retaining threads with medium-strength threadlocker and witness marks.", ["spindle/arbor", "outboardSleeve", "outboardGland", "outboardBearingFront", "outboardBearingRear", "outboardInnerSpacer", "outboardLocknut"]),
+      note("indicate", "Indicate the housing to the spindle axis", "Fit the Y scale reading head before the outboard carrier and housing (the housing blocks the rear screw driver). Before fitting the carrier to the Y saddle, fit the housing screws and washers in the 5.5 mm deep carrier recesses (heads finish 0.5 mm below the saddle face). Fit the carrier to its Y-saddle pins. For indication leave the housing screws snug and housing pins absent, indicate a ground test arbor at both ends of the D40 housing bore; shim the carrier face for X/tilt and use screw clearance for Z. Require <=2 micrometres radial residual (<=4 micrometres TIR), then lift the carrier off, torque the four derived M4 from its saddle side, refit it on its dowels and recheck. Ream the two derived D4 H7 housing/carrier pin bores together, fit the dowels and recheck. Worst-case radial budget: indication 2 + seat 1 + bearing 1.5 + thermal 0.5 = 5 micrometres, all project acceptance assumptions.", ["outboardCarrier", "outboard"]),
+      note("float", "Verify thermal float and labyrinth clearance", "Before final inner-ring clamping verify the sleeve slides without binding in the D40 H6/g5 fit. At cold assembly centre it between the front housing stop and rear cap spigot: 1 mm travel each direction. The spindle cartridge alone locates axially; the entire preloaded pair follows the expanding arbor. The front D21 sleeve throat clears the D20 arbor shoulder by 0.5 mm radial. The 30 K thermal case, 12e-6/K steel coefficient and 0.2 mm assembly allowance are assumed; verify the retained travel and keep the labyrinth clean.", ["outboard", "outboardSleeve", "outboardCap"]),
+      note("remove", "Free the retaining stack before withdrawing the support", "At X retract isolate B. Undo the M15x1 nut using a thin 22 AF socket with outside diameter <=28 mm through the D30 cap bore. Slide the nut and inner spacer off the journal first. Remove the Y scale head and carrier screws, then pull the complete carrier/housing/pair forward off the journal (use a bearing puller if the qualified shaft fit requires it). The support is located by its dowels when refitted; re-indicate after service.", ["outboardLocknut", "outboardInnerSpacer", "outboardCarrier", "outboard"])
+    ], source: Generated("hobber")
+  };
+
   public static function build(machine:FlexsplineHobber):Array<Procedure> {
     var result:Array<Procedure> = [];
     for (travel in machine.travel) result.push(alignScrewSupports(travel.id, {lower: travel.lower, upper: travel.upper}));
     result.push(tensionBelt(machine));
     result.push(fitBt30Arbor());
+    result.push(alignOutboard());
     result.push(setRails("X", ["railXLeft", "railXRight"]));
     result.push(setRails("Z", ["railZLeft", "railZRight"]));
     result.push(setRails("Y", ["railYLeft", "railYRight"]));

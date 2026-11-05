@@ -10,11 +10,11 @@ class HobArbor extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
     P.quantity("outside", 16, "mm"),
     P.quantity("bore", 0, "mm"),
-    P.quantity("height", 175, "mm"),
+    P.quantity("height", HobberOutboardLayout.ARBOR_HEIGHT, "mm"),
     P.quantity("hobSeatLength", 40, "mm"),
     P.quantity("hobCentreOffset", 60, "mm"),
     P.quantity("supportDiameter", 15, "mm"),
-    P.quantity("supportLength", 22, "mm"),
+    P.quantity("supportLength", HobberOutboardLayout.JOURNAL_LENGTH, "mm"),
     P.quantity("radialRunout", 0.002, "mm"),
     P.quantity("axialRunout", 0.002, "mm")
   ]);
@@ -42,7 +42,7 @@ class HobArbor extends MachineComponent {
     addFacet(new EngineeringMetadata(v));
     addFacet(ManufacturingRoute.turned(2, "tight", [
       {name: "BT30 taper, AT3; gauge diameter 31.75, 7/24 (grind)", tolerance: 0.002, roughnessRa: 0.2},
-      {name: "hob seat and outboard journal coaxial to taper (grind)", tolerance: 0.002, roughnessRa: 0.2},
+      {name: "hob seat and D15 journal; D20 shoulder, fillet <=0.2; M15x1 at rear (grind)", tolerance: 0.002, roughnessRa: 0.2},
       {name: "hob shoulder perpendicular to taper; M16x1 nut thread beyond seat", tolerance: 0.002, roughnessRa: 0.4},
       {name: "integral face key 5 wide x 3 radial x 2 axial (mill at second setup)", tolerance: 0.02, roughnessRa: 1.6}
     ]));
@@ -84,7 +84,10 @@ class HobArbor extends MachineComponent {
       // ASSUMED DIN-138-style end slot. The bore remains plain for centring.
       cadkit.modeling.Part.box(3.5, 5, 2).translated(new cadkit.modeling.Vector(9.25, 0, start))
     ];
-    if (length > 0) sections.push(cadkit.modeling.Part.cylinderSpan(parameterNumber("supportDiameter") / 2, height - length, height));
+    if (length > 0) {
+      sections.push(cadkit.modeling.Part.cylinderSpan(10, height - length - 5, height - length));
+      sections.push(cadkit.modeling.Part.cylinderSpan(parameterNumber("supportDiameter") / 2, height - length, height));
+    }
     var tools = [cadkit.modeling.Part.cylinderSpan(6, -Bt30SpindleData.TAPER_LENGTH - 0.1, -Bt30SpindleData.TAPER_LENGTH + 20)];
     // MAS drive-key slots: 16.1 wide, floor 16.3 from axis. Axial
     // engagement depth is an assumed envelope matched to the bought dogs.

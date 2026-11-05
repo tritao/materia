@@ -294,7 +294,7 @@ class HobberSaddle extends MachineComponent {
       case "GE-Z-drive-pad": padPins(HobberDrives.z(), ["fixed", "floating"], 40);
       case "GE-Y-drive-fixed": padPins(HobberDrives.y(), ["fixed"], 10);
       case "GE-Y-drive-floating": padPins(HobberDrives.y(), ["floating"], 10, [35.0, -114.6, 463, 45, -55.4, 548]);
-      case "GE-outboard-carrier": [outboardCarrierPins(-1)];
+      case "GE-outboard-carrier": [outboardCarrierPins(-1), HobberOutboardLayout.carrierPins()];
       case "GE-Y-saddle":
         [outboardCarrierPins(1), PinnedFace.atPoints("seat-pins", BoltedFace.frameOf({x: 45.0, y: 0.0, z: 0.0}, {x: 1, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
           [for (z in [-SEAT_PIN_Z, SEAT_PIN_Z]) {x: 57.0, y: SEAT_PIN_Y, z: z}], 8.0, 12.0, true)];
@@ -348,6 +348,7 @@ class HobberSaddle extends MachineComponent {
           HobberSwivelLayout.OUTPUT_X - machinekit.motion.ErobActuatorPart.SEAT_Z - HobberSwivelLayout.PLATE_FRONT, "M4", null, false));
       case "GE-outboard-carrier":
         faces.push(BoltedFace.drilledToSuit("saddle", outboardCarrierFrame(-1), 30, 110, 10, 15, BoltedFace.ThreadMaterial.Steel));
+        faces.push(BoltedFace.clamped("housing", HobberOutboardLayout.carrierMountFrame(), HobberOutboardLayout.carrierHoles(), 4.5, 9.5, "M4", {diameter: 9.5, depth: 5.5}, false, true));
       case "GE-Y-saddle":
         // Heads are reached from the guide side, between the two Y rails. This
         // avoids burying a driver in the carrier's closed upper/lower beams.

@@ -46,6 +46,29 @@ class HobberPartTests {
   ];
   public static function run():Void {
     var registry = MachineKitComponents.standard(), parts = members();
+    var supportBearing = new SpindleBearing();
+    near(supportBearing.row.bore, 15, 0, "SKF 7002 journal size");
+    near(supportBearing.row.outside, 32, 0, "SKF 7002 housing size");
+    near(supportBearing.row.width, 9, 0, "SKF 7002 width");
+    near(supportBearing.massProperties().mass, 0.03, 1e-12, "SKF catalogue mass retained independently of race envelope");
+    near(supportBearing.row.pairPreload, 20, 0, "GA pair unmounted preload from SKF sheet");
+    near(supportBearing.row.pairAxialStiffness, 17e6, 0, "SKF pair axial stiffness in N/m");
+    var bearingMetadata = EngineeringMetadata.of(supportBearing);
+    check(bearingMetadata != null && bearingMetadata.ratingsBasis == Catalog, "bearing ratings have catalogue provenance");
+    var bearingRecipe = supportBearing.componentType();
+    check(bearingRecipe != null && !bearingRecipe.materialEditable, "SKF steel bearing cannot become another material under same SKU");
+    var supportRecipe = OutboardSupport.recipeType(), interfaceRecipe = OutboardBearingPart.recipeType();
+    check(!supportRecipe.materialEditable && !interfaceRecipe.materialEditable, "precision support retains specified steel and thermal design");
+    for (role in ["sleeve", "gland", "cap", "innerSpacer"]) {
+      var part = new OutboardBearingPart(new ComponentValues().setToken("role", role));
+      var solid = part.geometry();
+      check(solid.volume() > 0 && Math.isFinite(solid.volume()), "outboard " + role + " solid valid");
+      check(solid.solidCount() == 1, "outboard " + role + " one made part");
+      var route = ManufacturingRoute.of(part);
+      check(route != null && route.setups <= 2, "outboard " + role + " within two setups");
+      solid.close();
+    }
+
     var rendered = new Hob(new ComponentValues().setBoolean("renderTeeth", true));
     check(ComponentDisplayMesh.of(rendered) != null, "detailed display has the CAD tessellation facet");
     var detailed = new Hob(new ComponentValues().setBoolean("renderTeeth", true).setBoolean("detailed", true));
@@ -218,7 +241,7 @@ class HobberPartTests {
     near(spindle.arbor.hobStart(), 40, 0, "hob shoulder is at 40 from gauge");
     near(spindle.arbor.hobEnd(), 80, 0, "hob retaining nut bears at 80 from gauge");
     near(spindle.arbor.parameterNumber("supportDiameter"), 15, 0, "outboard journal is 15 mm");
-    near(spindle.arbor.parameterNumber("supportLength"), 22, 0, "outboard journal retains the 22 mm float allowance");
+    near(spindle.arbor.parameterNumber("supportLength"), 29, 0, "outboard journal carries pair, inner spacer and M15 nut");
     var arb = spindle.arbor.geometry(), rotor = spindle.components().filter(c -> c.id == "shaft")[0].component.geometry();
     check(arb.solidCount() == 1, "BT30 arbor face key is rooted in one connected solid");
     // Cross-section probes prove the male taper has material immediately inside

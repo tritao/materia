@@ -35,8 +35,8 @@ PARTS = {
         rows=[
             (None, (-48.4, 0), "BT30 shank", "MAS BT30, gauge diameter 31.75; 7/24 diametral taper, AT3, Ra 0.2; blue-check in the purchased spindle"),
             (46, (10.2, 22), "Holder flange", "BT30 flange 2..22, 20 thick; drive slots 16.1 wide, floor 16.3 from axis; axial dog engagement 10 ASSUMED. Taper-only location"),
-            (16, (42.1, 153), "Hob seat / nut thread", "Hob seat 40..80: diameter 16 h4, runout 0.002 to taper; M16x1 thread at 80..90, nut 8 thick"),
-            (15, (153, 175), "Outboard journal", "Diameter 15; coaxiality 0.002 to taper; finish/grip to be matched to P2 support"),
+            (16, (42.1, 146), "Hob seat / nut thread", "Hob seat 40..80: diameter 16 h4, runout 0.002 to taper; M16x1 thread at 80..90, nut 8 thick"),
+            (15, (151, 180), "Outboard journal", "Diameter 15; coaxiality 0.002 to taper; pair 151..169, spacer 169..174, M15x1 174..180; D20 shoulder 146..151, fillet <=0.2"),
             (None, None, "Face key", "Integral end-face dog 5 wide x 3 radial x 2 axial. Assumed slot 5.2 wide x 2.2 deep; confirm with hob maker"),
             (None, (-48.4, -28.4), "Pull stud", "M12; 45 degree head selected to suit bought gripper; detailed head geometry assumed pending maker drawing"),
         ]),

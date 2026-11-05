@@ -54,7 +54,7 @@ Precision mounts land on inserts, never on mineral cast. The recessed column is
 400 × 200 × 500 mm, on a steel carriage and twin preloaded HGR25 bed rails.
 Z uses twin 480 mm HGR15 rails with four blocks. Its vertical saddle carries
 a ZeroErr eRob110I actuator, its housing in a pocket cut into the saddle from behind. The rotating output and vertical swivel plate
-carry the Y rails on their front face with four blocks. The spindle (in its split-clamp seat) and floating outboard bracket share the vertical
+carry the Y rails on their front face with four blocks. The spindle (in its split-clamp seat) and floating-sleeve outboard housing share the vertical
 Y saddle; there is no overhead roof. These compact motor and bearing dimensions and ratings require
 supplier confirmation; geometry checks do not establish a thermal duty rating.
 All twelve carriages use pinned HGH25CA (X) or HGH15CA (Z/Y) supplier CAD,
@@ -122,11 +122,32 @@ An integral low-profile flange and mandrel base replaces the stacked riser assem
 it preserves the work-frame tooth-band datum (Z=363 mm), now 1000 mm above the floor, and tilt clearance. The mandrel sleeve continues
 to support the toothed rim.
 
-The spindle locates the arbor axially. The outboard 15 × 32 × 9 mm radial bearing
-is explicitly axially floating (±1 mm assumed allowance); its 22 mm journal
-provides the required float margin. It is not a second locating bearing pair.
-Fits, retention hardware, lubrication and demonstrated radial stiffness remain
-manufacturing-design work.
+The spindle locates the arbor axially. The outboard uses two SKF 7002 CDGA/P4A
+15 × 32 × 9 mm universally matchable bearings back-to-back in one ground sliding
+sleeve. SKF states 20 N class-A unmounted preload and 17 N/µm axial stiffness for
+the DB/DF pair ([maker sheet](https://docs.rs-online.com/4857/A700000013821392.pdf)).
+The sleeve shoulder and M36x1 gland clamp the outer rings; the arbor's Ø20
+shoulder, ground inner spacer and M15x1 AF22 retaining nut clamp the inner rings.
+The Ø15 journal is 29 mm long (arbor 151..180): pair 151..169, spacer 169..174,
+retaining thread 174..180. Shoulder fillets are at most 0.2 mm. Shaft fit, installed
+preload and retaining torque require shop qualification; no vendor runout or
+installed radial stiffness is inferred from catalogue class alone.
+
+The entire preloaded sleeve floats ±1 mm between the housing's front stop and
+the rear cap's spigot. The cartridge remains the only axial locator. With assumed
+steel expansion 12e-6/K and 30 K rise over 180 mm, growth is 0.0648 mm;
+0.2 mm assembly allowance leaves 0.7352 mm of travel. The Ø21 front throat
+forms a dry labyrinth with 0.5 mm radial clearance to the Ø20 arbor shoulder.
+The fixed cap bore Ø30 clears the retaining nut corners by 2.298 mm radially;
+a thin 22 AF socket with OD ≤28 fits through it.
+
+Indicate the housing bore against the spindle axis before tightening its four
+derived M4 screws; shim the carrier face, then ream and fit two derived Ø4 H7
+pins. The worst-case **radial** coaxiality budget is 5 µm: 2 indication residual,
+1 sleeve/seats, 1.5 bearing, 0.5 thermal (all **assumed project requirements**).
+Indication residual 2 µm corresponds to 4 µm TIR, not 2 µm TIR. `b-align-outboard`
+declares assembly, pinning, free-slide verification and service. Remove the nut
+and inner spacer first, then pull the complete carrier/housing/pair off the journal.
 
 ## Chips and enclosure
 
@@ -453,7 +474,7 @@ layout checks; they are not manufacturing-release dimensions.
 The made arbor has the standard MAS BT30 shank (gauge Ø31.75, 7/24 diametral taper,
 48.4 mm long, Ø46 flange, M12 pull stud). It is taper-located; no dual face contact
 is claimed. From its gauge plane: hob shoulder 40, hob seat 40..80, M16x1 retaining
-nut at 80..88 (24 AF x 8, design inputs), Ø15 x 22 outboard journal at 153..175.
+nut at 80..88 (24 AF x 8, design inputs), Ø15 x 29 outboard journal at 151..180, with a Ø20 shoulder at 146..151.
 An integral end-face dog 5 wide x 3 radial x 2 axial drives the plain-bore hob.
 Its matching slot is 5.2 wide x 2.2 deep, **assumed** pending the hob maker's drawing.
 The retaining nut is secured with medium-strength thread-locking compound and witness-marked; 2000 N assembly preload is an assumed target to establish by shop test. `b-fit-bt30-arbor` declares fitting, runout inspection and forward cartridge withdrawal with the outboard support off.

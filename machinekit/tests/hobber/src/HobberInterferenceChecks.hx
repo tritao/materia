@@ -22,7 +22,7 @@ class HobberInterferenceChecks {
     // The cutting zone: the hob, its arbor and outboard support, and the work (cup, mandrel, sleeve, table). `AssemblyIntegrity`
     // (strict, FrameChecks) covers every other pair at rest and over the joint sweep; this check keeps the hob and the work against
     // every part at the CAM pass endpoints and the inspection pose, with the real tooth geometry.
-    function inCuttingZone(id:String):Bool return id == "hob" || id == "outboard" || id == "outboardBearing"
+    function inCuttingZone(id:String):Bool return id == "hob" || StringTools.startsWith(id, "outboard")
       || StringTools.startsWith(id, "spindle/arbor") || id == "blank" || id == "mandrel" || id == "mandrelSleeve"
       || StringTools.startsWith(id, "table/");
     var groups:Map<String, String> = [], rigidVolumes:Map<String, Float> = [];

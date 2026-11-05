@@ -17,11 +17,8 @@ class SpindlePackageExport {
     if (args.length != 1) throw "usage: hl main.hl <output dir>";
     var dir = args[0];
     sys.FileSystem.createDirectory(dir);
-    // FlexsplineHobber's arbor: 175 long, hob centre 60 from the gauge face, Ø15 x 22 support journal.
-    var spindle = new HobSpindle(null, new HobArbor(new ComponentValues().setNumber("height", 175).setNumber(
-      "hobCentreOffset",
-      60
-    ).setNumber("supportDiameter", 15).setNumber("supportLength", 22)));
+    // The installed arbor, shared with FlexsplineHobber.
+    var spindle = new HobSpindle();
     spindle.validate();
     var poses = spindle.solvedPoses(), cache = new PosedParts();
     var plane = CastingSectionContours.normalFrame({x: 0, y: 1, z: 0}, "spindle-axial");

@@ -306,16 +306,7 @@ class FlexsplineHobber extends MachineAssembly {
         fixAt("Yplate", new HobberSaddle("GE-Y-saddle"), F.translation(centre, 0, HobberZLayout.SEAT_Z), id, face);
       } else fixAt(id, block, pose, "Yplate", face);
     }
-    spindle = new HobSpindle(
-      null,
-      new HobArbor(new ComponentValues().setNumber("height", 175).setNumber("hobCentreOffset", 60).setNumber(
-        "supportDiameter",
-        15
-      ).setNumber(
-        "supportLength",
-        22
-      ))
-    );
+    spindle = new HobSpindle();
     includeAt("spindle", spindle, F.fromRotationMatrix(centre, HobberSwivelLayout.SPINDLE_Y, HobberZLayout.SEAT_Z, e0));
     // One milled split-clamp block holds the Ø80 cartridge (FRAME_PLAN R2): bore with a slit up the +z side, three clamp screws across it,
     // four M8 and two dowels into the Y saddle's plate.
@@ -331,16 +322,23 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt("hob", hob, F.fromRotationMatrix(centre, 20, HobberZLayout.SEAT_Z, e0), "spindle/arbor");
     fixAt("outboardCarrier", new HobberSaddle("GE-outboard-carrier"), F.translation(centre, 0, HobberZLayout.SEAT_Z), "Yplate",
       F.alongY(centre + 45, -100, HobberZLayout.SEAT_Z, 1, 0, 0));
-    fixAt(
-      "outboard",
-      new OutboardSupport(new ComponentValues().setNumber("height", 30).setNumber("seatLength", 9)),
-      F.fromRotationMatrix(centre, -85, HobberZLayout.SEAT_Z, e0),
-      "outboardCarrier",
-      F.alongY(centre + 30, -100, HobberZLayout.SEAT_Z, 1, 0, 0)
-    );
-    fixAt("outboardBearing", new FloatingRadialBearing(), F.fromRotationMatrix(centre, -95.5, HobberZLayout.SEAT_Z, e0), "outboard");
-    mountContacts.push({parent: "outboard", child: "outboardBearing"});
-    mountContacts.push({parent: "spindle/arbor", child: "outboardBearing"});
+    var supportPose = F.compose(F.translation(centre, 0, HobberZLayout.SEAT_Z), HobberOutboardLayout.bodyPose());
+    fixAt("outboard", new OutboardSupport(), supportPose, "outboardCarrier",
+      F.alongY(centre + 30, -100, HobberZLayout.SEAT_Z, 1, 0, 0));
+    for (role in ["sleeve", "gland", "cap"]) fixAt("outboard" + (role == "sleeve" ? "Sleeve" : role == "gland" ? "Gland" : "Cap"),
+      new OutboardBearingPart(new ComponentValues().setToken("role", role)),
+      supportPose, role == "cap" ? "outboard" : role == "gland" ? "outboardSleeve" : "outboard");
+    for (rear in [false, true]) {
+      var id = rear ? "outboardBearingRear" : "outboardBearingFront";
+      var pose = F.compose(supportPose, F.fromRotationMatrix(0, 0, rear ? HobberOutboardLayout.PAIR_TO : HobberOutboardLayout.PAIR_FROM,
+        rear ? [1.0, 0, 0, 0, -1, 0, 0, 0, -1] : [1.0, 0, 0, 0, 1, 0, 0, 0, 1]));
+      fixAt(id, new SpindleBearing(), pose, "outboardSleeve");
+      mountContacts.push({parent: "spindle/arbor", child: id});
+    }
+    fixAt("outboardInnerSpacer", new OutboardBearingPart(new ComponentValues().setToken("role", "innerSpacer")),
+      supportPose, "spindle/arbor");
+    fixAt("outboardLocknut", new machinekit.standard.FinePitchNut(),
+      F.compose(supportPose, F.translation(0, 0, HobberOutboardLayout.PAIR_TO + HobberOutboardLayout.SPACER_LENGTH)), "spindle/arbor");
     var supply = new ThreePhaseRectifier(
       new AcMains(ThreePhase, new AcRmsVoltage(400), 50),
       new DcCurrent(40),
@@ -496,6 +494,8 @@ class FlexsplineHobber extends MachineAssembly {
     for (r in serviceRemovals()) addDesignRequirement(r);
   }
 
+  public static function outboardMembers():Array<String> return ["outboardCarrier", "outboard", "outboardSleeve", "outboardGland", "outboardCap", "outboardBearingFront", "outboardBearingRear"];
+
   /** The declared removals. */
   public function serviceRemovals():Array<DesignRequirement> {
     var away = (d:Array<Float>) -> [for (c in d) -c];
@@ -510,8 +510,12 @@ class FlexsplineHobber extends MachineAssembly {
       [{direction: away(axisOf("spindle/motor", 0, 0, 1)), distance: shaft + 10 + SERVICE_CLEARANCE}], ["spindle/belt", "spindle/motorPulley"], []));
     out.push(ServiceRemoval("bBeltRemoval", ["spindle/belt"],
       [{direction: away(axisOf("spindle/housing", 0, 0, 1)), distance: 2 * HobSpindle.BELT_WIDTH + SERVICE_CLEARANCE}], [], []));
+    out.push(ServiceRemoval("outboardRetainersWithdrawal", ["outboardLocknut", "outboardInnerSpacer"],
+      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 16.0}], [], [{joint: "X", value: HobberXLayout.RETRACT}]));
+    out.push(ServiceRemoval("outboardWithdrawal", outboardMembers(),
+      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 55.0}], ["outboardLocknut", "outboardInnerSpacer", "YscaleHead"], [{joint: "X", value: HobberXLayout.RETRACT}]));
     out.push(ServiceRemoval("spindleCartridgeWithdrawal", cartridgeMembers(),
-      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 180 + 60}], ["spindle/belt", "outboardCarrier", "outboard", "outboardBearing", "YscaleHead"], [{joint: "X", value: HobberXLayout.RETRACT}]));
+      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 180 + 60}], ["spindle/belt", "outboardLocknut", "outboardInnerSpacer", "YscaleHead"].concat(outboardMembers()), [{joint: "X", value: HobberXLayout.RETRACT}]));
     // The X screw and its nut leave upward, with the carriage and everything it carries lifted off the rails first: the nut block is trapped between the pad bar's
     // full-height ends and the deck, and the nut's flange cannot pass the block's bore. The screw first slides back until its front journal is out of the BF12.
     var stack = below("Xbridge").concat(["Xbridge"]).filter(id -> id != "Xnut");

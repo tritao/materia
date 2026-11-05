@@ -7,6 +7,7 @@ class MotionComponents {
   public static function register(registry:ComponentRegistry):Void {
     registry.register(TorqueMotor.recipeType());
     registry.register(AngularContactBearing.recipeType());
+    registry.register(SpindleBearing.recipeType());
     registry.register(CrossedRollerBearing.recipeType());
     registry.register(RotaryEncoderRing.recipeType());
     registry.register(PlanetaryReducer.recipeType());

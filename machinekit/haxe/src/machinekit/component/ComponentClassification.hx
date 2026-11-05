@@ -43,6 +43,8 @@ class ComponentClassification {
     file(registry, "machinekit.hobbing.rotary-clamp", "Workholding", ComponentKind.Reference);
     file(registry, "machinekit.hobbing.spindle-housing", "Spindle and supports", ComponentKind.Reference);
     file(registry, "machinekit.hobbing.bt30-spindle-rotor", "Spindle and supports", ComponentKind.Reference);
+    file(registry, "machinekit.motion.spindle-bearing", "Bearings", ComponentKind.Supplier);
+    file(registry, "machinekit.hobbing.outboard-bearing-part", "Spindle and supports", ComponentKind.MachinePart);
     file(registry, "machinekit.hobbing.outboard-support", "Spindle and supports", ComponentKind.Reference);
     file(registry, "machinekit.hobbing.floating-radial-bearing", "Spindle and supports", ComponentKind.MachinePart);
     file(registry, "machinekit.hobbing.table-housing", "Rotary table", ComponentKind.Reference);
