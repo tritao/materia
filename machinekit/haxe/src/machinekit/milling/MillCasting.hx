@@ -187,7 +187,7 @@ class MillCasting extends MachineComponent {
 
   /** The column's bay for the Y screw's rear bearing: half its width, depth into the front face and height from the base, mm. */
   public static inline var COVER_BAY_HALF_WIDTH:Float = 40;
-  public static inline var COVER_BAY_DEPTH:Float = 16;
+  public static inline var COVER_BAY_DEPTH:Float = 10;
   public static inline var COVER_BAY_HEIGHT:Float = 92;
 
   /** The deepest thread tapped in a casting for a cover flange's screws, mm. */
