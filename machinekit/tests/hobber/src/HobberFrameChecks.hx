@@ -209,12 +209,11 @@ class HobberFrameChecks {
    * The head on the A axis (FRAME_PLAN R3): the mass that turns with the actuator's output flange and its centre of mass, and what that
    * puts on the output bearing and the brake, at the middle position and at A +-15 deg. Work frame, N m. The actuator's bearing moment
    * rating and brake holding torque are not published (asked from ZeroErr); a missing one is reported as unknown, and an assumed one
-   * is labelled. Gravity is -z; the output bearing's tilting moment is taken about the output face (the bearing lies behind it, which
-   * adds `force x offset`, under 1 N m here). The cutting force is 100 N at the hob, in the direction that loads the bearing most.
+   * is labelled. Gravity is -z; the output bearing's tilting moment is taken about the output face (the internal bearing location is unpublished; the reported demand is at the output face). The cutting force is 100 N at the hob, in the direction that loads the bearing most.
    * Returns one line per quantity; throws when the demand exceeds a rating that is known.
    */
-  public static function swivelLoad(machine:FlexsplineHobber):Array<String> {
-    var def = machine.definition(), poses = machine.solvedPoses(), back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
+  public static function swivelLoad(machine:FlexsplineHobber, ?worldPoses:Map<String, materia.assembly.AssemblyRecord.AssemblyFrame>):Array<String> {
+    var def = machine.definition(), poses = worldPoses ?? machine.solvedPoses(), back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
     var turning = new Map<String, Bool>();
     turning.set("swivel/output", true);
     var changed = true;
@@ -234,15 +233,16 @@ class HobberFrameChecks {
       mz += props.mass * at.z;
       count++;
     }
-    var com = {x: mx / mass, y: my / mass, z: mz / mass - HobberZLayout.SEAT_Z};
-    var g = 9.80665, face = HobberSwivelLayout.OUTPUT_X, overhang = (face - com.x) / 1000;
+    var outputFace = F.compose(back, poses.get("swivel/output"));
+    var com = {x: mx / mass - outputFace.x, y: my / mass - outputFace.y, z: mz / mass - outputFace.z};
+    var g = 9.80665, face = outputFace.x, overhang = -com.x / 1000;
     var tilt = mass * g * overhang;
     // Gravity torque about A: the centre of mass is (dy, dz) from the axis; turned by theta its lever on the vertical force is dy cos - dz sin.
     function gravityTorque(theta:Float):Float return mass * g * (com.y * Math.cos(theta) - com.z * Math.sin(theta)) / 1000;
     var worst = 0.0, at0 = gravityTorque(0), limit = HobberSwivelLayout.RANGE;
     for (i in -15...16) worst = Math.max(worst, Math.abs(gravityTorque(i * Math.PI / 180)));
     var tool = F.transformPoint(F.compose(back, F.compose(poses.get("hob"), machine.hob.connector("centre").frame)), 0, 0, 0);
-    var hobOverhang = (face - tool.x) / 1000, hobLever = Math.sqrt(Math.pow(tool.y, 2) + Math.pow(tool.z - HobberZLayout.SEAT_Z, 2)) / 1000;
+    var hobOverhang = (face - tool.x) / 1000, hobLever = Math.sqrt(Math.pow(tool.y - outputFace.y, 2) + Math.pow(tool.z - outputFace.z, 2)) / 1000;
     var cutting = 100.0, cutTilt = cutting * hobOverhang, cutTorque = cutting * hobLever;
     var demandTorque = worst + cutTorque, bearingMoment = tilt + cutTilt;
     var row = machine.swivel.housing.ratioRow, moment = machine.swivel.housing.momentRating(), holding = machine.swivel.housing.brakeHoldingTorque();
@@ -255,13 +255,12 @@ class HobberFrameChecks {
     var newMass = 0.0;
     for (id in ["swivel/housing", "swivel/output", "swivelAdapter"]) for (m in machine.components()) if (m.id == id) newMass += m.component.massProperties().mass;
     var lines = [
-      'A head: ${r(mass)} kg on the output flange (${count} members), centre of mass x ${r(com.x, 1)} y ${r(com.y, 1)} z ${r(com.z, 1)} mm from the A axis; ' +
+      'A head: ${r(mass)} kg on the output flange (${count} members), centre of mass x ${r(com.x, 1)} y ${r(com.y, 1)} z ${r(com.z, 1)} mm relative to the output face; ' +
       'overhang ${r(overhang * 1000, 1)} mm in front of the output face',
       'A head change: swivel stack was ${r(oldMass)} kg (torque motor, crossed roller, clamp, housing, platen), now actuator ${r(machine.swivel.housing.massProperties().mass + machine.swivel.output.massProperties().mass)} kg ' +
       '+ adapter ring, ${r(newMass - machine.swivel.housing.massProperties().mass - machine.swivel.output.massProperties().mass)} kg',
       'A output bearing: gravity tilting moment ${r(tilt)} N m, cutting ${cutting} N at the hob (${r(hobOverhang * 1000, 1)} mm out) ${r(cutTilt)} N m, together ${r(bearingMoment)} N m; ' +
-      (moment == null ? "moment rating: unknown (asked ZeroErr)" : 'moment rating ${moment} N m (assumed), margin ${r(moment / bearingMoment)}x') +
-      '; reference: Honpine HPJM-RE80-110 static moment 260 N m (a different product), our ${r(bearingMoment)} N m is ${r(100 * bearingMoment / 260, 1)} % of it',
+      (moment == null ? "moment rating: unknown (asked ZeroErr)" : 'moment rating ${moment} N m (assumed), margin ${r(moment / bearingMoment)}x'),
       'A torque about the axis: gravity ${r(at0)} N m at 0, ${r(worst)} N m at most over +-15 deg; cutting ${r(cutTorque)} N m (${cutting} N at a ${r(hobLever * 1000, 1)} mm lever); ' +
       'demand ${r(demandTorque)} N m against rated ${row.ratedTorque} / peak ${row.peakTorque} N m (${r(row.ratedTorque / demandTorque, 1)}x rated)',
       'A brake: must hold ${r(demandTorque)} N m with the power off; ' +
@@ -321,7 +320,7 @@ class HobberFrameChecks {
    * and mode, and the tooth-pass band (hob rpm x gashes / 60, from 100 m/min to the cartridge's top speed) with +-20 %. Throws when the first
    * mode lies inside that band.
    */
-  public static function spindleDrive(machine:FlexsplineHobber):Array<String> {
+  public static function spindleDrive(machine:FlexsplineHobber):{lines:Array<String>, modes:Array<{name:String, f:Float}>, modalMass:Float} {
     var spindle = machine.spindle, rating = spindle.motor.rating, poses = machine.solvedPoses(), back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
     function r(v:Float, digits:Int = 2):Float return Math.round(v * Math.pow(10, digits)) / Math.pow(10, digits);
     var lines = [];
@@ -417,7 +416,7 @@ class HobberFrameChecks {
     lines.push('B servo flange grip: 4 M6 8.8 at 60 % of proof (${Math.round(preload)} N each, assumed), friction 0.12 steel on steel (assumed) holds ${Math.round(grip)} N along the slots against the belt\'s net pull ${Math.round(pull)} N (2 x pretension): ${r(grip / pull, 1)} x; '
       + 'the jack screw also bears on the flange from below against that pull');
     if (grip < 3 * pull) throw "the flange bolts' friction does not hold the belt pull with a factor of 3: " + lines.join("; ");
-    return lines;
+    return {lines: lines, modes: modes, modalMass: mass};
   }
 
   /** The members that move with the Z joint (the Z saddle and everything carried on it), and their mass and centre of mass in the work frame. */
@@ -584,10 +583,16 @@ class HobberFrameChecks {
     var presentation = materia.presentation.Presentations.assembled(machine.definition(), -1.1, 0.35, "hobber");
     presentation.procedures = HobberAssemblyProcedures.build(machine);
     materia.presentation.PresentationCodec.validate(machine.definition(), presentation);
-    var lines = bt30(machine).concat(outboard(machine)).concat(sizing(machine)).concat(scales(machine)).concat(swivelLoad(machine)).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)).concat(spindleDrive(machine)).concat(spindleRelief(machine)), errors = newErrors(machine, sweep);
+    var headReport = swivelLoad(machine);
+    // A common translation of the entire machine cannot change head load on
+    // the output face. This catches mixing posed COM with a construction datum.
+    var translated:Map<String, materia.assembly.AssemblyRecord.AssemblyFrame> = [];
+    for (id => pose in machine.solvedPoses()) translated.set(id, F.compose(F.translation(17, 29, 31), pose));
+    if (headReport.join("\n") != swivelLoad(machine, translated).join("\n")) throw "head demands depend on the machine's world origin";
+    var lines = bt30(machine).concat(outboard(machine)).concat(sizing(machine)).concat(scales(machine)).concat(headReport).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)).concat(spindleDrive(machine).lines).concat(spindleRelief(machine)), errors = newErrors(machine, sweep);
     for (line in lines) Sys.println(line);
     if (errors.length > 0) throw 'hobber strict integrity: ${errors.length} findings\n  ' + errors.join("\n  ");
-    return presentation.procedures.length + lines.length + 1;
+    return presentation.procedures.length + lines.length + 2;
   }
 
   /** The machine survives encode and decode with its member recipes and collision hulls. */
@@ -668,6 +673,7 @@ class HobberFrameChecks {
     if (args.indexOf("scales") >= 0) for (line in scales(machine)) Sys.println(line);
     if (args.indexOf("swivel") >= 0) for (line in swivelLoad(machine)) Sys.println(line);
     if (args.indexOf("zoffset") >= 0) for (line in zOffsetMoments(machine)) Sys.println(line);
+    if (args.indexOf("motorstudy") >= 0) for (line in HobberMotorStudy.run(machine)) Sys.println(line);
     if (args.indexOf("outboard") >= 0) for (line in outboard(machine)) Sys.println(line);
     if (args.indexOf("bt30") >= 0) for (line in bt30(machine)) Sys.println(line);
     if (args.indexOf("spindleseat") >= 0) for (line in spindleSeat(machine)) Sys.println(line);
@@ -675,7 +681,7 @@ class HobberFrameChecks {
       roundTrip(machine);
       Sys.println("round trip ok");
     }
-    if (args.indexOf("spindledrive") >= 0) for (line in spindleDrive(machine)) Sys.println(line);
+    if (args.indexOf("spindledrive") >= 0) for (line in spindleDrive(machine).lines) Sys.println(line);
     if (args.indexOf("spindlerelief") >= 0) for (line in spindleRelief(machine)) Sys.println(line);
     if (args.indexOf("nutblocks") >= 0) for (d in machinekit.hobbing.HobberDrives.all()) {
       var nut = new machinekit.motion.BallNut(), b = machinekit.hobbing.HobberDrives.nutBlock(d, nut), pose = machinekit.hobbing.HobberDrives.nutBlockPose(d, nut);

@@ -500,6 +500,56 @@ from invented internal bearing locations. Cradle modal estimates retain their
 stated joint assumptions and need FE/impact-test confirmation.
 
 
+### B motor position study (Phase P3, 2026-11-05)
+
+Keep the installed top-mounted servo. Rotating the bought drive and its cradle
+beside the cartridge does not improve every required measure. The inward option
+collides with the Z saddle; the outward option clears the sampled structure but
+adds an interface and increases the demand on the eRob bearing.
+
+| Measure | Top, installed | Beside, inward (+work X) | Beside, outward (-work X) |
+|---|---:|---:|---:|
+| Head mass (kg) | 38.48 | 38.98 estimate | 38.98 estimate |
+| COM from output face, X/Y/Z (mm) | -93.2 / 84.0 / 35.5 | -79.1 / 85.4 / 23.6 | -105.7 / 85.4 / 21.1 |
+| Maximum gravity torque about A, +/-15 degrees (N m) | 34.06 | 33.86 | 33.62 |
+| eRob tilt at output face, gravity + 100 N cut (N m) | 47.58 | 42.62 | 52.82 |
+| First cradle mode (Hz), analytic | 1432 | <=1432, rigid-interface bound | <=1432, rigid-interface bound |
+| Minimum sampled structural clearance (mm) | 7.000 | 0, collision | 11.268 |
+| Largest sampled overlap (mm3) | 0 | 71800.529 | 0 |
+| Added made interfaces | 0 | >=1 plate, 1 extra joint | >=1 plate, 1 extra joint |
+
+These are envelope studies, not alternate installed configurations. The assumed
+10 x 72 x 89 mm solid steel interface blank contributes 0.503 kg; its dimensions
+and 7850 kg/m3 are project study inputs. Finish cuts and additional hardware
+are omitted, so candidate masses are estimates. Adapter/hardware collision
+checks are also omitted; hardware would have to be defined by real joints
+before any adoption. The rejection is based on the present components and
+interface concept, not a claim that no possible beside redesign could work.
+
+The top modes are 1870 Hz vertical, 1432 Hz axial and 3017 Hz lateral. A rigidly
+rotated cradle with a perfectly rigid extra interface cannot improve those
+frequencies under the same analytic model. If one third of the adapter mass
+participates, they become 1826 / 1398 / 2946 Hz; that participation is an
+**assumed sensitivity case**, not a proven upper bound or an FE result. The
+extra joint remains unqualified. The existing 960 Hz avoid ceiling and 1.3
+minimum factor continue to apply to the installed drive.
+
+`HobberMotorStudy` compares selected structural members at 24 combinations:
+X20/115, Y-15/+15, Z-15/195 and A-15/0/+15 degrees (linear overtravel included
+in an independent study snapshot). The inward witness is motor/Z saddle at
+X20, Y-15, Z-15, A-15; the outward nearest pair is cradle/bed casting at the
+same linear corner and A+15. Top's nearest is cradle/Y saddle at A0. This is
+sampled clearance, not a continuous swept-volume proof or candidate release.
+
+The study also corrects an inherited reporting error: the old tilt calculation
+compared the posed COM (including X infeed) with the construction datum X124.
+It now uses the actual output-face pose for COM and cutting levers. Thus the
+current demand is **47.58 N m**, superseding the earlier 25.8 N m report without
+changing any hardware. A regression check translates every absolute pose and
+requires identical head-demand results. The eRob moment rating is still unknown;
+the 87 N m brake holding value is assumed, giving 2.55 against 34.06 N m holding
+demand. The unrelated Honpine rating is no longer used as a scale comparison.
+
 ### Cup and front loading
 
 The workpiece is now a one-piece cup blank rather than an annular band: the
