@@ -656,6 +656,13 @@ Fifth slice (2026-11-05, branch `hobber-bolts-2`): the remaining hobber gaps clo
   `HobberMountingHoles` and the casting package regenerated), scale housings to bars/plate and heads to rib/boss/arm (the Yuheng housing/head thread data lacks the head
   thread and depth; `SealedScalePart` declares no faces; hand holes in `HobberScales`).
 
+Sixth slice (2026-11-05, branch `hobber-slip`): slip check. `JointSlip` (library): a joint without dowels is a friction grip (mu F n for a shear, mu sum(F r) for a torque
+about the hole centroid; mu 0.15 steel on steel and, deliberately low, steel on aluminium; screws at 70 % of ISO 898-1 proof); a joint with dowels is carried by the pins alone
+(shear and bearing, ASSUMED 600 MPa / 240 MPa) and the friction is reported but not counted. Factors 1.5 on the design peak, 1.2 on a momentary load, finding `fasteners.slip`
+(`FastenerOptions.loads`, or `MachineAssembly.checkJointLoads` after the derivation). Hobber loads in `HobberJointLoads` (eRob 204 / 369 N m, drive thrust from the sizing duty,
+spindle seat and cradle). Ring to swivel plate: two Ø6 dowels (the 4 M6 gave x1.05 on the momentary torque); eRob output flange joint is tightened to 80 % of proof (x1.3).
+Open: nut-block bases under a motor-peak jam (X, Z x0.95; the Y seat cannot take more screws), pads to casting inserts, scale housings and heads.
+
 ### B7 — Rollout and hard gate
 - Done in `fa1f1534f`. The full gate passed 11/24 shards with no new
   failure or exception compared with B6. The only differences from the

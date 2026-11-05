@@ -270,8 +270,21 @@ class HobberSaddle extends MachineComponent {
       case "GE-motor-cradle":
         [PinnedFace.atPoints("floor-pins", BoltedFace.frameOf({x: 0.0, y: CRADLE_PIN_Y, z: SEAT_HALF}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0}),
           [for (x in CRADLE_PIN_X) {x: x, y: CRADLE_PIN_Y, z: SEAT_HALF}], 8.0, cradleFloorTop(CRADLE_PIN_Y) - SEAT_HALF, true)];
+      case "GE-swivel-adapter":
+        [ringPins(BoltedFace.frameOf({x: HobberSwivelLayout.PLATE_X, y: 0.0, z: 0.0}, {x: 1, y: 0, z: 0}, {x: 0, y: 1, z: 0}))];
+      case "GE-swivel-plate":
+        [ringPins(BoltedFace.frameOf({x: HobberSwivelLayout.PLATE_X, y: 0.0, z: 0.0}, {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}))];
       default: [];
     };
+  }
+
+  /** The two dowels between the adapter ring and the swivel plate (`HobberSwivelLayout.RING_PIN_*`), on the joint plane, the face frame being that side's. */
+  static function ringPins(frame:materia.assembly.AssemblyRecord.AssemblyFrame):PinnedFace {
+    var r = HobberSwivelLayout.RING_PIN_RADIUS;
+    return PinnedFace.atPoints("ring-pins", frame, [for (k in 0...2) {
+      var a = HobberSwivelLayout.RING_PIN_PHASE + k * Math.PI;
+      {x: HobberSwivelLayout.PLATE_X, y: r * Math.cos(a), z: r * Math.sin(a)};
+    }], HobberSwivelLayout.RING_PIN_DIAMETER, HobberSwivelLayout.RING_PIN_DEPTH);
   }
 
   override public function fasteningFaces():Array<BoltedFace> {

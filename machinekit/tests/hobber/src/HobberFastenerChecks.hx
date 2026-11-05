@@ -13,6 +13,7 @@ class HobberFastenerChecks {
     for (name => count in sizes) lines.push('line $count x $name');
     for (joint in derivation.joints) lines.push('joint ${joint.id}: ${joint.count} x ${joint.size}x${joint.length}${joint.nutted ? " bolt" : ""}, grip ${joint.grip}, engagement ${joint.engagement}');
     for (joint in derivation.dowels) lines.push('dowel ${joint.id}: ${joint.count} x ISO 8734 ${joint.size}x${joint.length} ${joint.fit}, engagement ${joint.engagementA}/${joint.engagementB}');
+    for (slip in derivation.slips) lines.push("slip " + machinekit.assembly.JointSlip.describe(slip));
     lines.push('totals: ${derivation.joints.length} joints, ${derivation.count()} screws, ${derivation.dowels.length} dowelled joints, ${derivation.dowelCount()} dowels');
     return lines;
   }

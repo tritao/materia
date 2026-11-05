@@ -283,12 +283,12 @@ class JointFasteners {
     }
     for (key in derived.keys()) spacing(result, key, derived.get(key), result.joints);
     derivePins(result, assembly, poses, group, members, tolerance);
-    if (options != null && options.loads != null) slip(result, options.loads, propertyClass);
+    if (options != null && options.loads != null) slip(result, options.loads);
     return result;
   }
 
   /** The slip check of the declared loads (`JointSlip`): each meets the joints of its member pair; a load that meets none is an error. */
-  static function slip(result:FastenerDerivation, loads:Array<JointLoad>, propertyClass:PropertyClass):Void {
+  public static function slip(result:FastenerDerivation, loads:Array<JointLoad>):Void {
     for (load in loads) {
       if (load.between == null || load.between.length != 2) {
         result.diagnostics.error("fasteners.slip", load.label, '${load.label}: a joint load names the two members it joins');

@@ -29,11 +29,22 @@ class HobberSwivelLayout {
   /**
    * Adapter-to-plate screws: four M6 on this pitch circle, in the ring's plate end, at 45 deg to the plate's axes. They have to stand in the strip |z| 24..40 of the
    * plate's front: the Y scale's housing lies on it along y at z 0, and the Y guide blocks (z 43 to 77, on the rails at +-60) run over everything beyond z 40.
-   * Four M6 12.9 clamp the ring with ~440 N m of friction at this radius (mu 0.15, 70 % proof preload) against the 100:1 eRob's 204 N m peak and 369 N m momentary output; the ring was first drawn with eight M5, whose heads fell under the scale and the guide blocks.
+   * Four M6 12.9 clamp the ring (70 % of proof, ~390 N m of friction at mu 0.15 on this radius), which holds the eRob's 204 N m peak but not its 369 N m momentary
+   * torque with the 1.2 the slip check wants (1.05); the ring was first drawn with eight M5, whose heads fell under the scale and the guide blocks. The torque is
+   * therefore taken by two dowels (`RING_PIN_*`) and the friction is the reserve (`JointSlip`: pins carry, friction not counted).
    */
   public static inline final PLATE_PCD = 95.0;
   public static inline final PLATE_SCREWS = 4;
   public static inline final PLATE_PHASE:Float = Math.PI / 4;
+  /**
+   * The two dowels between the adapter ring and the swivel plate, on opposite sides of the axis: Ø6 (ISO 8734) on this radius, 15 deg off the output flange's
+   * screw at 0 deg so the ring's sunk heads (Ø7.5 on r 38.5) keep 2.5 mm from them, each hole `RING_PIN_DEPTH` deep from the joint plane into the ring and into
+   * the plate (blind: the plate's front, where the Y scale lies, stays whole). Two Ø6 pins bearing 6 mm in aluminium take ~740 N m (the check says).
+   */
+  public static inline final RING_PIN_DIAMETER = 6.0;
+  public static inline final RING_PIN_RADIUS = 43.0;
+  public static inline final RING_PIN_PHASE:Float = Math.PI / 12;
+  public static inline final RING_PIN_DEPTH = 10.0;
   /** Rotation that takes the actuator's CAD +Z to the work frame's -x (the old swivel head used the same). */
   public static final ROTATION:Array<Float> = [0.0, 0, -1, 1, 0, 0, 0, -1, 0];
 

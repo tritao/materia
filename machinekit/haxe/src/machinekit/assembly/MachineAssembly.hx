@@ -1055,6 +1055,19 @@ typedef MachineAssemblyMassProperties = {
     return derivation;
   }
 
+  /**
+	 * Checks the loads the machine declares its joints carry against the joints `deriveFasteners` made (`JointSlip`, findings `fasteners.slip`) and throws
+	 * every failure. A separate call, after the derivation, because the loads often come from the finished parts (their masses, which need the derived holes).
+	 */
+  public function checkJointLoads(loads:Array<machinekit.assembly.JointSlip.JointLoad>):Void {
+    var derivation = fastenersDerived;
+    if (derivation == null) throw "The joint fasteners of this assembly are not derived yet";
+    var before = derivation.diagnostics.items.length;
+    JointFasteners.slip(derivation, loads);
+    var errors = [for (item in derivation.diagnostics.items.slice(before)) if (item.severity == machinekit.assembly.Diagnostics.DiagnosticSeverity.Error) item.message];
+    if (errors.length > 0) throw errors.join("\n");
+  }
+
   /** The derivation `deriveFasteners` made, if it ran. */
   public function derivedFasteners():Null<FastenerDerivation> return fastenersDerived;
 

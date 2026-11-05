@@ -440,6 +440,8 @@ class FlexsplineHobber extends MachineAssembly {
     ).throwIfErrors();
     // The screws, washers, nuts and the holes they need follow from the bolted faces the parts declare (BOM_PLAN F1).
     deriveFasteners();
+    // The loads the joints carry come from the finished parts (masses), so they are checked after the derived holes are cut.
+    checkJointLoads(HobberJointLoads.of(this));
     exposeConnector("work", "mandrel", "work");
     exposeConnector("hobCentre", "hob", "centre");
   }
