@@ -149,6 +149,30 @@ A review of `HobberSaddle` and `FlexsplineHobber` found:
 - **F1.** Remaining generic parts (spindle servo, couplings) to catalogue rows as quotes arrive.
 - **F2.** Docs: `MACHINE_DESIGN.md` and `LAYOUT_REPORT` (stale 836 kg), `Z_DRIVE_REPORT.json`, `PARTS.md`.
 
+## Phase P: product round (2026-11-05, Codex)
+
+Decided by the user and lead after reviewing the design in the editor. One commit per step; every step keeps the baselines.
+
+- **P1. Standard BT30 belt-drive spindle.** Replace the assumed Ø80 cartridge (`HobSpindle`/`HobSpindlePart`) with a catalogue row
+  for a standard Ø80-housing BT30 belt-driven spindle (reference: RobotDigg "Spindle BT30 80mm with Timing Belt Pulley", HTD5M
+  pulleys; Guangzhou Haozhi belt-driven BT30 states ≤3 µm taper and face runout, G0.4). Values not on a public page are labelled
+  assumed. Add a BT30 hob arbor part (a BT30 shank, a Ø16 hob seat with key and lock nut, and an outboard journal), and keep the
+  B belt drive and the spindle-side encoder on the rear stub. The split-clamp seat follows the real housing.
+- **P2. Outboard support as a real bearing housing.** A preloaded bearing pair, or a precision live centre, in a housing that is
+  aligned to the spindle axis at assembly (indicated, then dowelled). Add an assembly procedure and a check on the coaxiality
+  budget (the outboard bore against the spindle axis).
+- **P3. B motor beside the cartridge (study, then decide).** Compare motor-on-top (today) with motor beside the cartridge on the
+  Y saddle on these measures: head mass and centre of mass, A torque, the eRob tilt moment, first modes, clearances over A ±15°,
+  and parts. Adopt the beside layout only if it is better and passes every check; record the comparison either way.
+- **P4. Chip protection, option (b).** Fixed cover plates over the X screw channel (bolted to the bed and inserts, clear of the
+  nut-block path), a skirt on the X carriage that overlaps them, and the existing block wipers. The enclosure contains the oil
+  mist. Declare drains only where a real path exists; there is no casting change. Do the same for the Z column channel where it
+  is exposed.
+- **P5. Serviceability.** Move the X nut's flange to the motor side of its nut block, so the X screw and nut withdraw rearward
+  through the declared service path (`HobberFrameChecks.service` must show the X screw path clear). Record that the eRob is
+  removed with the Z saddle, and declare that path.
+- **Y centred screw:** blocked on SFU1204/BK10/BF10/40-frame data; not in this round.
+
 ## Suppliers (outside the model)
 
 - ZeroErr: bearing moment rating, brake holding torque, 48 V supply, configuration, price.
