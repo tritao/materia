@@ -442,9 +442,13 @@ class FlexsplineHobber extends MachineAssembly {
     deriveFasteners();
     // The loads the joints carry come from the finished parts (masses), so they are checked after the derived holes are cut.
     checkJointLoads(HobberJointLoads.of(this));
+    // Chip protection (FRAME_PLAN, "Chip protection and service"): an end scraper at each end of every guide block (X: HGH25CA x 4, Z and Y: HGH15CA x 8).
+    addBomItem(machinekit.cover.WayWiperCatalog.bomItem("WIPER-HG25-SCRAPER", 8));
+    addBomItem(machinekit.cover.WayWiperCatalog.bomItem("WIPER-HG15-SCRAPER", 16));
     exposeConnector("work", "mandrel", "work");
     exposeConnector("hobCentre", "hob", "centre");
   }
+
   /** The pairs of members the hobbing process brings together: the hob in the cup's band. */
   public function processContacts():Array<{a:String, b:String}> return [{a: "blank", b: "hob"}, {a: "mandrel", b: "hob"}, {a: "mandrelSleeve", b: "hob"}];
 

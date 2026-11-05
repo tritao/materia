@@ -1,4 +1,5 @@
 import machinekit.assembly.AssemblyIntegrity;
+import machinekit.assembly.PosedParts;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.MachineKitComponents;
 import machinekit.hobbing.FoundationLayout;
@@ -40,6 +41,60 @@ class HobberFrameChecks {
     if (!sweep) options.sweepStates = [];
     var report = AssemblyIntegrity.check(machine, options);
     return [for (item in report.errors()) item.code + " " + item.message];
+  }
+
+  /** Thickness of a cover end wall and of a carrier on the moving member, mm (the bench mill's `COVER_PLATE`). */
+  static inline final COVER_PLATE = 14.0;
+  /** Gap kept between a cover's plates and the supports and nut around them, mm (the running gap of the integrity check). */
+  static inline final COVER_GAP = 2.0;
+
+  /** The least free length, mm, at which a box cover of the lamella row folds and reaches `stroke`, with its opening `width` x `height`; also the half width of its fixed flange there. */
+  static function leastCoverSpace(stroke:Float, width:Float, height:Float):{space:Float, folds:Int, half:Float} {
+    var space = 20.0;
+    while (space < 400) {
+      try {
+        var plan = new machinekit.cover.WayCoverPlan(machinekit.cover.WayCoverCatalog.get("BELLOWS-LAMELLA-8x8"), width, height, stroke, space, machinekit.cover.WayCoverPlan.boxCover());
+        return {space: space, folds: plan.folds, half: plan.fullPlateHalf()};
+      } catch (e:Dynamic) space += 1;
+    }
+    throw "no cover space found";
+  }
+
+  /**
+   * Way covers on the X and Z screws (FRAME_PLAN, "Chip protection and service"): the free length each cover would have between its end wall (behind the support, a `COVER_PLATE` plate
+   * and a gap) and its carrier on the nut block's side of the moving member, measured on the posed machine at the end stop where they are closest, and the least length a box
+   * cover of the lamella row needs for that stroke round the bare screw (opening 40 x 50). Where the free length is short, the line says by how much: the geometry change that would make
+   * the cover fit is that much more screw between the support and the nut's end stop (`HobberXLayout`, `HobberZLayout`). Returns one line per cover.
+   */
+  public static function coverFit(machine:FlexsplineHobber):Array<String> {
+    var poses = machine.solvedPoses(), lines = [];
+    PosedParts.scope(posed -> {
+      function box(id:String) {
+        var member = [for (c in machine.components()) if (c.id == id) c.component][0];
+        var p = posed.posed(member, poses.get(id)), b = PosedParts.boxOf(p);
+        p.close();
+        return b;
+      }
+      function row(name:String, free:Float, stroke:Float, channelHalf:Float):Void {
+        var need = leastCoverSpace(stroke, 40, 50);
+        var verdict = free >= need.space ? 'fits' : 'SHORT by ${Math.round((need.space - free) * 10) / 10} mm';
+        lines.push('cover $name: stroke ${stroke} mm, free ${Math.round(free * 10) / 10} mm, needs ${need.space} mm (${need.folds} folds), flange half width ${Math.round(need.half * 10) / 10} of ${channelHalf} mm: $verdict');
+      }
+      // X: work x is world y. The nut and its block move with the carriage by the joint value from its initial one.
+      var x = machine.travel.filter(t -> t.id == "X")[0], z = machine.travel.filter(t -> t.id == "Z")[0];
+      var nut = box("Xnut"), floating = box("Xfloating"), fixedSupport = box("Xfixed");
+      var xStroke = x.upper - x.lower;
+      var nutFront = nut.minY + (x.lower - x.initial), nutBack = nut.maxY + (x.upper - x.initial);
+      row("X front (floating support to nut)", (nutFront - COVER_GAP - COVER_PLATE) - (floating.maxY + COVER_GAP + COVER_PLATE), xStroke, FoundationLayout.DRIVE_CHANNEL_WIDTH / 2);
+      row("X rear (nut to fixed support)", (fixedSupport.minY - COVER_GAP - COVER_PLATE) - (nutBack + COVER_GAP + COVER_PLATE), xStroke, FoundationLayout.DRIVE_CHANNEL_WIDTH / 2);
+      // Z: work z is world z. The nut moves with the saddle.
+      var znut = box("Znut"), zfloating = box("Zfloating"), zfixed = box("Zfixed");
+      var zStroke = z.upper - z.lower;
+      var nutLow = znut.minZ + (z.lower - z.initial), nutHigh = znut.maxZ + (z.upper - z.initial);
+      row("Z bottom (floating support to nut)", (nutLow - COVER_GAP - COVER_PLATE) - (zfloating.maxZ + COVER_GAP + COVER_PLATE), zStroke, 60);
+      row("Z top (nut to fixed support)", (zfixed.minZ - COVER_GAP - COVER_PLATE) - (nutHigh + COVER_GAP + COVER_PLATE), zStroke, 60);
+    });
+    return lines;
   }
 
   /** Assumed guide pitch/yaw error over the travel, arcseconds (no measurement yet): sets the uncompensated Abbe error printed by `scales`. */
@@ -549,6 +604,7 @@ class HobberFrameChecks {
       Sys.println('  flange holes ${[for (h in nut.mountingHoles()) [Math.round(h.x * 10) / 10, Math.round(h.y * 10) / 10]]}, tap drill ${nut.mountingTapDrill()}, flange dia ${nut.flangeDiameter}, bolt circle ${nut.boltCircleDiameter}');
       Sys.println('  world: origin ${w(0, 0, 0)} x ${w(1, 0, 0)} y ${w(0, 1, 0)} z ${w(0, 0, 1)} base centre ${w(0, -b.centreHeight, b.thickness / 2)}');
     }
+    if (args.indexOf("coverfit") >= 0) for (line in coverFit(machine)) Sys.println(line);
     if (args.indexOf("crash") >= 0) for (line in HobberCrashProtection.report(machine)) Sys.println(line);
     if (args.indexOf("fasteners") >= 0) for (line in HobberFastenerChecks.report(machine)) Sys.println(line);
     if (args.indexOf("integrity") >= 0) {

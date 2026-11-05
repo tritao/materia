@@ -40,6 +40,16 @@ class WayWiperCatalog {
         basis: "HIWIN HG accessory family (end seal, double seal, metal scraper); added length assumed, check against the HIWIN catalogue before buying"
       },
       {
+        id: "WIPER-HG25-SCRAPER", kind: MetalScraper, description: "Metal scraper plate with felt wiper for an HG25 carriage, one per block end",
+        profile: "HGH25CA", added: 3.0,
+        basis: "HIWIN HG accessory family (end seal, double seal, metal scraper); added length assumed, check against the HIWIN catalogue before buying"
+      },
+      {
+        id: "WIPER-HG25-DOUBLE-SEAL", kind: EndSeal, description: "Double-lip end seal for an HG25 carriage, one per block end",
+        profile: "HGH25CA", added: 3.5,
+        basis: "HIWIN HG accessory family (double seal DD); added length assumed, check against the HIWIN catalogue before buying"
+      },
+      {
         id: "WIPER-HG15-DOUBLE-SEAL", kind: EndSeal, description: "Double-lip end seal for an HG15 carriage, one per block end",
         profile: "HGH15CA", added: 3.0,
         basis: "HIWIN HG accessory family (double seal DD); added length assumed, check against the HIWIN catalogue before buying"
