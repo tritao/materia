@@ -259,12 +259,13 @@ class HobberSaddle extends MachineComponent {
         faces.push(BoltedFace.drilledToSuit("back", BoltedFace.frameOf({x: SEAT_X1, y: (SEAT_Y0 + SEAT_Y1) / 2, z: (SEAT_LOW + SEAT_HALF) / 2}, {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
           SEAT_Y1 - SEAT_Y0, SEAT_HALF - SEAT_LOW, 16, SEAT_X1 - SEAT_X0, BoltedFace.ThreadMaterial.Steel));
       case "GE-motor-cradle":
-        // The servo's flange screws thread into the four tapped flange holes in the wall (see `cradleHoles`).
+        // The servo's flange screws pass through the wall's vertical tension slots (drawn by `cradleHoles`) and take a washer
+        // and nut on its rear face: a through plate, so the screws, washers and nuts derive while the slots stay the part's own.
         var motor = cradleMotor(), flange = motor.mounting();
         if (flange == null) flange = machinekit.motion.ServoMotor.assumedMounting(motor.rating.designation);
-        faces.push(BoltedFace.tapped("motor", BoltedFace.frameOf({x: CRADLE_MOTOR_X, y: CRADLE_FACE_Y, z: HobSpindle.motorHeight()},
-          {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}), [for (h in flange.holes) {x: h.x, y: -h.y}],
-          "M" + Std.int(flange.holeDiameter - 0.5), 12.0, CRADLE_WALL));
+        faces.push(BoltedFace.through("motor", BoltedFace.frameOf({x: CRADLE_MOTOR_X, y: CRADLE_FACE_Y, z: HobSpindle.motorHeight()},
+          {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}), [for (h in flange.holes) {x: h.x, y: -h.y}], flange.holeDiameter, CRADLE_WALL,
+          "M" + Std.int(flange.holeDiameter - 0.5)));
       default:
     }
     return faces;
