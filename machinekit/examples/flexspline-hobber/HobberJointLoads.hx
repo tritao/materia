@@ -35,10 +35,11 @@ class HobberJointLoads {
   public static function movingMass(machine:FlexsplineHobber, first:String):Float {
     var moving = new Map<String, Bool>();
     moving.set(first, true);
-    var changed = true;
+    // The definition is derived and copied on every call: take its joints once.
+    var joints = machine.definition().joints, changed = true;
     while (changed) {
       changed = false;
-      for (j in machine.definition().joints) if (moving.exists(j.parent) && !moving.exists(j.child)) {
+      for (j in joints) if (moving.exists(j.parent) && !moving.exists(j.child)) {
         moving.set(j.child, true);
         changed = true;
       }
