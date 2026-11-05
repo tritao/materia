@@ -193,7 +193,14 @@ and more. A roll-up (spring roller) cover was considered and not built: its cass
 (a roller of 30 mm or so), so it gains nothing at the 32 mm Y rear, and the model has no strip envelope. X right and Z top could take a steel
 telescopic cover if the walls moved out by 100 mm (a longer base or bridge); the lamella bellows are the wear item and the first spare.
 Each cover is one BOM line (`WAYCOVER-...`: both flanges, the skins are not bought separately); the walls (`MILL-COVER-WALL-*`) and the two carriers
-are steel plates to make; the twelve guide blocks carry 24 end scrapers (`WIPER-HG15-SCRAPER`, `WayWiperCatalog`, assumed values).
+are machined steel mounts; the twelve guide blocks carry 24 end scrapers (`WIPER-HG15-SCRAPER`, `WayWiperCatalog`, assumed values).
+
+The eight walls/carriers have monolithic mounting feet, with receiving faces and independent locating-bore datums on the
+actual castings and bridges. Their nine joints derive 16 mounting screws (12 M5×25 into cast iron, four M5×20 into steel)
+and 16 ISO 8734 Ø4×8 dowels in paired 4 H7 blind holes. No mounting hardware is listed by hand. The complete mill now
+derives 51 screw joints, 232 screws and 370 machining cuts. The right bridge has a local 6 mm underside pad and the right
+wall has side tabs, preserving the bridge's outer envelope; no weld is assumed. The rear feet stop 3 mm before the column
+and power supply. The checks also measure actual material around every new thread, through each grip and under its head.
 
 Each cover is placed by `BenchMill.coverFrom` from the mill's own poses (nothing is typed in per cover) and installed by `WayCover.installOn`.
 Each flange is bolted to its wall, carrier or casting face with screws derived from `BoltedFace`s (flange holes only where the host face exists, 8
@@ -204,7 +211,7 @@ including its volume or distance. The covers go on after the rails and screws th
 `IntegrityOptions.fittedBefore`): the
 cover is over the rail screws' driver access otherwise, so a rail is changed with the cover unbolted.
 
-The permanent `BenchMill` geometry provisions follow. Its casting recipe has no optional cover input and uses generator revision 2.
+The permanent `BenchMill` geometry provisions follow. Its casting recipe has no optional cover input and uses generator revision 3, including the mounting interfaces.
 The framed concept has an independent layout; its before-change frame and Z-axis baselines are 917 and 423 assertions.
 
 - **Z screw 670 to 490 mm**, its floating bearing and boss 180 mm higher (centre z 112.5 to 292.5). The lower 180 mm of the screw lay below the head's
@@ -577,7 +584,7 @@ brake, fastener and load qualifications.
 
 One commit per step, with the bench-mill and library checks after each change.
 
-Status: **1 complete; 2–4 pending.**
+Status: **1–2 complete; 3–4 pending.**
 
 Item 1 removes both the assembly switch and the casting's optional cover input. The single design always has its six
 covers, casting seats, gutters and rear-bearing bay, the 12.5 mm Y screw extension and the 180 mm Z screw shortening.
@@ -637,8 +644,27 @@ existing environment failures; no collision baseline was accepted by inventing c
 
 1. **Covered build becomes the default — complete.** Validation is recorded above. `BenchMill` has one design. Its consumers
    and exact BOM/integrity expectations have been updated with the measured reasons above.
-2. **Bolt the cover walls and carriers.** Pending. Give the 14 mm end walls and head carriers `BoltedFace`s and receiving
-   faces on their hosts, so their screws, holes and dowels derive and pass the head and access checks.
+2. **Bolt the cover walls and carriers — complete.** The 14 mm walls/carriers now have integral feet, `BoltedFace`s
+   and locating bores; their hosts declare actual receiving faces and independent pin patterns. The installed design
+   has 51 joints, 232 screws, 16 dowels and 370 cuts, with zero fastener-fit findings and the same exact 117 integrity
+   findings in 28 states. Each of the eight feet has two screws and two ISO 8734 Ø4×8 dowels, with 7 mm blind H7
+   bores and 4 mm pin engagement in each member. Twelve new M5×25 screws engage cast iron by 11 mm; four M5×20
+   screws engage steel by 6 mm, all through 14 mm feet. Actual-solid checks retain 3 mm around the tapped holes.
+   Snapshot copying also retains derived drilling: the previous recipe copy dropped 22 base cuts, 28 column cuts,
+   40 head cuts and four front-cover-flange cuts. Hole-table, revision and solid-equivalence regressions cover both
+   direct snapshots and nested placement, retaining the drilled solid within 0.01 mm³ symmetric difference.
+
+   All **11 required core projects pass** after this change: frame **917**, central Z **423**, capacity **335** with
+   **24,669** continuous envelope pairs, the way-cover, service, Y-servo and screw-placement checks, all three library
+   checks and BOM examples. Integrity retains all **117 exact findings in 28 states**, with none on covers; service
+   retains **zero declared-route findings and five findings on the three rejected routes**. The two known core failures
+   are unchanged. The **23 consumer runs** have **13 passes** and the same **ten existing failures or unavailable inputs**
+   recorded above. Their assertion counts, arm scene bytes, 60,345 hybrid pairs and electric-access outcome counts are
+   unchanged. Fabrication still reports the existing `ISO4762-M12x36.1-8.8` metadata conflict.
+
+   Tending revalidated all **96 saved poses and every production path in 135 seconds** before storing fingerprint
+   `58c7ffe2139b…`. Only that fingerprint changed in the certificate; poses, routes and the 551 mm stand-off did not.
+   This acceptance records the new mounting cuts and preserved snapshot machining, rather than editing a hash alone.
 3. **Covers on the framed concept** (`MillXYStage`/`MillZAxis`/`BenchMillFrame` via `MillFramePreview`). Pending. Apply box
    covers where they fit: the X gap is 76 mm with the screw 40 mm above the saddle top. Use the same library, flange bolting
    and drains, and keep the service removals clear. Record numbered reasons for any position that cannot accept a cover.

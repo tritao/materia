@@ -3,6 +3,7 @@ package machinekit.milling;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.BoltedFace;
+import machinekit.component.BoltedFace.PinnedFace;
 import machinekit.component.BoltedFace.ThreadMaterial.CastIron;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
@@ -41,6 +42,8 @@ class MillCasting extends MachineComponent {
   public final screwHeight:Float;
   /** The column's cast-in bosses (empty for the other bodies). */
   public final bosses:Array<ColumnBoss>;
+  /** Lower Z drive clearance for the canonical cover seats, mm. */
+  public static inline var COVER_Z_SHORTENING:Float = 180;
   public static inline var SLOT_WIDTH:Float = 10;
   public static inline var SLOT_SPACING:Float = 40;
 
@@ -139,6 +142,20 @@ class MillCasting extends MachineComponent {
    * flange is bolted there.
    */
   function coverFaces(faces:Array<BoltedFace>):Void {
+    // Independent receiving stock: the actual base skins and casting side walls, not artificial mating planes on the mounts.
+    if (kind == Base) {
+      faces.push(BoltedFace.drilledToSuit("coverFrontMount",
+        BoltedFace.frameOf({x: 0, y: -depth / 2, z: height - 20}, {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}),
+        264, 32, 12, 20, CastIron));
+      var columnFront = depth / 2 - dimensions(Column)[1];
+      faces.push(BoltedFace.drilledToSuit("coverRearMount",
+        BoltedFace.frameOf({x: 0, y: columnFront - 11, z: height - BODY_PAD}, {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0}),
+        264, 28, 12, 21 - BODY_PAD, CastIron));
+    }
+    if (kind == Column || kind == Head) faces.push(BoltedFace.drilledToSuit("coverMount",
+      BoltedFace.frameOf({x: width / 2, y: 0, z: height / 2}, {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
+      depth, height, 12, 20, CastIron));
+
     if (kind == Saddle) for (side in [-1, 1]) faces.push(BoltedFace.drilledToSuit(
       side < 0 ? "coverFront" : "coverRear",
       BoltedFace.frameOf({x: 0, y: side * depth / 2, z: height / 2}, {x: 0, y: -side, z: 0}, {x: 1, y: 0, z: 0}),
@@ -149,6 +166,41 @@ class MillCasting extends MachineComponent {
       BoltedFace.frameOf({x: side * width / 2, y: 0, z: height / 2}, {x: -side, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
       depth, height, COVER_TAP_DEPTH, 30, CastIron
     ));
+  }
+
+  /** Drawing datums of the cover mounts' two 4 H7 locating bores per seat. Unmatched or shifted mates are rejected by F1. */
+  override public function pinnedFaces():Array<PinnedFace> {
+    var pair = (half:Float) -> [{x: -half, y: 0.0}, {x: half, y: 0.0}];
+    if (kind == Base) return [
+      new PinnedFace("coverFrontMount", BoltedFace.frameOf({x: 0, y: -depth / 2, z: height - 26},
+        {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}), pair(110), 4, 7),
+      new PinnedFace("coverRearMount", BoltedFace.frameOf({x: 0, y: depth / 2 - dimensions(Column)[1] - 23, z: height - BODY_PAD},
+        {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0}), pair(110), 4, 7)
+    ];
+    var block = machinekit.motion.LinearRailBlock.metric(BLOCK).spec, nut = new machinekit.motion.BallNut();
+    if (kind == Column) {
+      var bk = machinekit.motion.ScrewSupportUnit.bk12();
+      var topWall = height + block.railEndMargin - machinekit.motion.BallScrew.INPUT_JOURNAL_LENGTH + bk.length / 2
+        + Math.max(bk.length, bk.spec.longitudinalPitch + 16) / 2 + 1;
+      return [
+        new PinnedFace("coverTopMount", BoltedFace.frameOf({x: width / 2, y: -depth / 2 - block.blockHeight / 2 + 91, z: topWall - 24},
+          {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}), pair(12), 4, 7),
+        new PinnedFace("coverBottomMount", BoltedFace.frameOf({x: width / 2, y: -depth / 2 - block.blockHeight / 2 + 72,
+          z: block.railEndMargin + COVER_Z_SHORTENING - 4 - 8},
+          {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}), pair(12), 4, 7)
+      ];
+    }
+    if (kind == Head) {
+      var y = depth / 2 + block.blockHeight / 2 - 72;
+      return [
+        new PinnedFace("coverTopMount", BoltedFace.frameOf({x: width / 2, y: y, z: height / 2 + nut.bodyLength / 2 + 14 - 8},
+          {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}), pair(12), 4, 7),
+        new PinnedFace("coverBottomMount", BoltedFace.frameOf({x: width / 2, y: y,
+          z: height / 2 - nut.bodyLength / 2 - nut.flangeThickness - 14},
+          {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}), pair(12), 4, 7)
+      ];
+    }
+    return [];
   }
 
   /**
@@ -384,7 +436,7 @@ class MillCasting extends MachineComponent {
       "machinekit.milling.casting",
       [ComponentRecipeSupport.choice("kind", ["Base", "Column", "Saddle", "Table", "Head"], "Base"), ComponentRecipeSupport.optionalText("bosses")],
       v -> new MillCasting(parse(v.token("kind")), bossesOf(v.optionalToken("bosses")))
-    ).versioned(2).numbered(v -> 'MILL-${v.token("kind").toUpperCase()}')
+    ).versioned(3).numbered(v -> 'MILL-${v.token("kind").toUpperCase()}')
       .procured(_ -> Make("casting and CNC machining"));
     return castingRecipe;
   }

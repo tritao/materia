@@ -209,6 +209,9 @@ typedef MachineAssemblyMassProperties = {
     if (recipe == null) return component;
     var result = recipe.create(component.values());
     result.setMaterial(component.materialSpec());
+    // A snapshot retains the derived drilling in both its solid and its hole table.
+    var cuts = component.machinedCuts();
+    if (cuts.length > 0) result.machine(cuts);
     var included = machinekit.component.IncludedInPurchase.of(component);
     var copiedIncluded = machinekit.component.IncludedInPurchase.of(result);
     if (included != null && copiedIncluded == null) result.includedInPurchase(included.ownerPartNumber);

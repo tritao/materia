@@ -18,6 +18,11 @@ import machinekit.milling.MillCasting.MillHead;
 import machinekit.cover.WayCover;
 import machinekit.cover.WayCoverCatalog;
 import machinekit.cover.WayCoverMount;
+import machinekit.cover.WayCoverMount.MountAttachment;
+import machinekit.cover.WayCoverMount.MountStock;
+import machinekit.component.BoltedFace;
+import machinekit.component.BoltedFace.BoltHole;
+import machinekit.component.BoltedFace.PinnedFace;
 import machinekit.cover.WayCoverSection;
 import machinekit.cover.WayCoverMount.MountBore;
 import machinekit.cover.WayCoverMount.MountCut;
@@ -422,7 +427,7 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
    * floating bearing, which stood at the corner of the base where the Y rear cover's stack goes, and its cover wall would have stood at the
    * table's height.
    */
-  public static inline var Z_SCREW_SHORTENING:Float = 180;
+  public static inline var Z_SCREW_SHORTENING:Float = machinekit.milling.MillCasting.COVER_Z_SHORTENING;
   /** Clearance a cover's opening keeps round what it protects, mm. */
   public static inline var COVER_CLEARANCE:Float = 3;
   /** How far a cover end wall or carrier stands out beyond the flange plate it holds, so the screws keep their edge distance, mm. */
@@ -473,11 +478,11 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
     var plan = new WayCoverPlan(WayCoverCatalog.get(row), width, height, leader.upper - leader.lower, space, shape);
     var wall = "wall" + id.substr(5);
     attach(wall, new WayCoverMount("MILL-COVER-WALL-" + id.substr(5).toUpperCase(), plan.fullPlateHalf() + COVER_MARGIN, plan.plateHigh() + COVER_MARGIN, COVER_PLATE, wallBores, wallCuts,
-      wallBelow), orient(origin[0], origin[1], origin[2], up, along), wallParent);
+      wallBelow, MillCoverFeet.of(wall)), orient(origin[0], origin[1], origin[2], up, along), wallParent);
     var host = movingParent;
     if (carrierBores != null) {
       host = "carrier" + id.substr(5);
-      attach(host, new WayCoverMount("MILL-COVER-CARRIER-" + id.substr(5).toUpperCase(), plan.plateHalf() + COVER_MARGIN, plan.plateHigh() + COVER_MARGIN, COVER_PLATE, carrierBores, null, wallBelow),
+      attach(host, new WayCoverMount("MILL-COVER-CARRIER-" + id.substr(5).toUpperCase(), plan.plateHalf() + COVER_MARGIN, plan.plateHigh() + COVER_MARGIN, COVER_PLATE, carrierBores, null, wallBelow, MillCoverFeet.of(host)),
         orient(moving0[0], moving0[1], moving0[2], up, [-along[0], -along[1], -along[2]]), movingParent);
     }
     var cover = WayCover.installOn(this, this, {
@@ -1027,6 +1032,47 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
   }
 }
 
+/** Monolithic mounting feet, dimensioned in each wall/carrier's own frame. Only interfaces are listed; F1 selects all hardware. */
+private class MillCoverFeet {
+  static function box(x0:Float, x1:Float, y0:Float, y1:Float, z0:Float, z1:Float):MountStock
+    return {x0: x0, x1: x1, y0: y0, y1: y1, z0: z0, z1: z1};
+  static function frame(x:Float, y:Float, z:Float, nx:Float, ny:Float, nz:Float, ax:Float = 1, ay:Float = 0, az:Float = 0):AssemblyFrame
+    return BoltedFace.frameOf({x: x, y: y, z: z}, {x: nx, y: ny, z: nz}, {x: ax, y: ay, z: az});
+  static function pair(half:Float):Array<BoltHole> return [{x: -half, y: 0}, {x: half, y: 0}];
+  static function foot(stock:Array<MountStock>, bolts:AssemblyFrame, pins:AssemblyFrame, half:Float):MountAttachment return {
+    stock: stock,
+    bolted: [BoltedFace.clamped("mount", bolts, pair(half), 5.5, 14, "M5", null, false)],
+    pinned: [new PinnedFace("mount", pins, pair(half), 4, 7)]
+  };
+  public static function of(id:String):MountAttachment return switch id {
+    case "wallYFront":
+      foot([for (x in [-110.0, 110.0]) box(x - 12, x + 12, -4, 10, -35, 0)]
+        .concat([for (x in [-110.0, 110.0]) box(x - 12, x + 12, -32, -4, -35, -21)]),
+        frame(0, -16, -21, 0, 0, -1), frame(0, -26, -21, 0, 0, -1), 110);
+    case "wallYRear":
+      // The feet stop 3 mm before the power supply/column front at y = 155.
+      foot([for (x in [-110.0, 110.0]) box(x - 12, x + 12, -4, 10, -28, 0)],
+        frame(0, -4, -20, 0, 1, 0), frame(0, -4, -8, 0, 1, 0), 110);
+    case "wallXLeft":
+      foot([for (x in [-28.0, 28.0]) box(x - 10, x + 10, -11, 3, -36, 0)],
+        frame(0, -11, -24, 0, 1, 0), frame(0, -11, -8, 0, 1, 0), 28);
+    case "wallXRight":
+      {stock: [box(-54, -40, -27, -11, -14, 0), box(40, 54, -27, -11, -14, 0)],
+        bolted: [for (side in [-1, 1]) BoltedFace.clamped(side < 0 ? "mountLeft" : "mountRight",
+          frame(side * 40, -19, -7, side, 0, 0, 0, 0, 1), [{x: 0, y: 0}], 5.5, 14, "M5", null, false)],
+        pinned: [new PinnedFace("mount", frame(0, -11, -7, 0, 1, 0), pair(18), 4, 7)]};
+    case "wallZTop":
+      // This sole lies outside the fixed cover flange; the root joins it to the end wall.
+      foot([box(48, 117, -1, 13, -14, 0), box(66.9, 117, -1, 13, 0, 36)],
+        frame(91, -1, 8, 0, 1, 0), frame(91, -1, 24, 0, 1, 0), 12);
+    case "wallZBottom", "carrierZTop", "carrierZBottom":
+      var sign = id == "carrierZTop" ? 1.0 : -1.0;
+      foot([box(sign > 0 ? 48 : -96, sign > 0 ? 96 : -48, -1, 13, -36, 0)],
+        frame(sign * 72, -1, -24, 0, 1, 0), frame(sign * 72, -1, -8, 0, 1, 0), 12);
+    case _: throw 'No mounting foot drawing for "$id"';
+  };
+}
+
 /** Designed flat bracket bodies; source placement derives from the supported shaft and casting. */
 class MillDriveBox extends MachineComponent {
   final width:Float;
@@ -1052,9 +1098,10 @@ class MillDriveBox extends MachineComponent {
   override public function revisionFingerprint():Null<String> return machinekit.component.BomRevision.fingerprint(
     [drawingNumber, materialSpec(), machinekit.component.ComponentNumberKey.encode(width),
       machinekit.component.ComponentNumberKey.encode(depth), machinekit.component.ComponentNumberKey.encode(height),
-      footed ? "footed" : "plain"].join("|"), 1);
+      footed ? "footed" : "plain"].concat(drawingNumber == "MILL-X-BRIDGE-FAR" ? ["cover-mount-pad-1"] : []).join("|"), 1);
   /** The top face a screw support's foot is bolted to: drilled and tapped to suit the support, the whole top face. */
-  override public function fasteningFaces():Array<machinekit.component.BoltedFace> return footed ? [machinekit.component.BoltedFace.drilledToSuit(
+  override public function fasteningFaces():Array<machinekit.component.BoltedFace> {
+    var faces = footed ? [machinekit.component.BoltedFace.drilledToSuit(
     "foot",
     machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: height}, {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0}),
     width,
@@ -1065,10 +1112,27 @@ class MillDriveBox extends MachineComponent {
     null,
     height <= TAPPED_THROUGH
   )] : [];
+    if (drawingNumber == "MILL-X-BRIDGE-FAR") for (side in [-1, 1]) faces.push(BoltedFace.drilledToSuit(
+      side < 0 ? "coverLeftMount" : "coverRightMount",
+      BoltedFace.frameOf({x: width / 2 - 13, y: side * depth / 2, z: 2}, {x: 0, y: -side, z: 0}, {x: 1, y: 0, z: 0}),
+      26, 16, 12, depth, machinekit.component.BoltedFace.ThreadMaterial.Steel));
+    return faces;
+  }
+  override public function pinnedFaces():Array<PinnedFace> {
+    if (drawingNumber != "MILL-X-BRIDGE-NEAR" && drawingNumber != "MILL-X-BRIDGE-FAR") return [];
+    var near = drawingNumber == "MILL-X-BRIDGE-NEAR", half = near ? 28.0 : 18.0;
+    return [new PinnedFace("coverMount",
+      BoltedFace.frameOf({x: near ? -width / 2 + 32 : width / 2 - 13, y: 0, z: height},
+        {x: 0, y: 0, z: -1}, {x: 0, y: 1, z: 0}), [{x: -half, y: 0}, {x: half, y: 0}], 4, 7)];
+  }
   override public function machinable():Bool return footed;
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
-    return machined(Solids.named(Part.box(width, depth, height), "bracket"));
+    var body = Solids.named(Part.box(width, depth, height), "bracket");
+    if (drawingNumber == "MILL-X-BRIDGE-FAR") body = Solids.union([body, Solids.named(
+      Part.box(28, depth, 7).translated(new Vector(width / 2 - 14, 0, -6)), "cover-mount-pad"
+    )]);
+    return machined(body);
   }
 }
 

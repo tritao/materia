@@ -95,7 +95,9 @@ class BomExampleTests {
       // The six covers add 16 M5x12 and 56 M5x10 flange screws, each with a washer.
       if (quantity(document, "ISO4762-M4x16") != railHoles + 4 * blocks || railHoles == 0
         || quantity(document, "ISO4762-M5x12") != 8 + 16 || quantity(document, "ISO4762-M6x12") != 4
-        || quantity(document, "ISO4762-M5x10") != 56 || quantity(document, "ISO7089-M5") != 18 + 72)
+        || quantity(document, "ISO4762-M5x10") != 56 || quantity(document, "ISO7089-M5") != 18 + 72
+        || quantity(document, "ISO4762-M5x25") != 12 || quantity(document, "ISO4762-M5x20") != 4
+        || quantity(document, "ISO8734-4x8") != 16)
         throw "Bench mill fasteners must match the rail, motor and cover flange patterns";
       var mill:BenchMill = cast machine;
       for (drive in mill.axisDrives) {

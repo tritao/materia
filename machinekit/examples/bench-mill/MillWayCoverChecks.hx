@@ -39,6 +39,33 @@ class MillWayCoverChecks {
     return state.worldPose(member);
   }
 
+  /** Validate the declared host thread and foot bearing material in the actual drilled CAD, not just the face records. */
+  static function mountMaterial(mill:BenchMill, mounts:Array<String>):Void {
+    var derived = mill.derivedFasteners();
+    if (derived == null) throw "Missing mounting joints";
+    var poses = mill.solvedPoses();
+    var parts = new Map<String, machinekit.component.MachineComponent>();for (m in mill.components()) parts.set(m.id, m.component);
+    for (joint in derived.joints) if (mounts.indexOf(joint.clampedMember) >= 0) {
+      var host = parts.get(joint.receivingMember), clamped = parts.get(joint.clampedMember);
+      var face = host.fasteningFaces().filter(f -> f.id == joint.receivingFace)[0];
+      var world = materia.assembly.AssemblyFrames.compose(poses.get(joint.receivingMember), face.frame);
+      for (hole in joint.hostHoles) for (zone in ["thread wall", "grip", "head bearing"]) {
+        var thread = zone == "thread wall", from = thread ? 0.01 : -joint.grip + 0.01;
+        var to = thread ? joint.threadDepth - 0.01 : zone == "grip" ? -0.01 : -joint.grip + 0.2;
+        var inner = thread ? joint.tapDrill / 2 + 0.1 : 2.8, outer = thread ? joint.tapDrill / 2 + 3 : 4.25;
+        var cylinder = cadkit.modeling.Part.cylinderSpan(outer, from, to, hole.x, hole.y);
+        var bore = cadkit.modeling.Part.cylinderSpan(inner, from - 1, to + 1, hole.x, hole.y), ring = cylinder.subtract(bore);
+        cylinder.close();bore.close();var expected = ring.shape.volume();
+        var tool = machinekit.assembly.PosedParts.moved(ring, world);ring.close();
+        var id = thread ? joint.receivingMember : joint.clampedMember, raw = parts.get(id).geometry();
+        var body = machinekit.assembly.PosedParts.moved(raw, poses.get(id));raw.close();
+        var actual = machinekit.assembly.PosedParts.commonVolume(body, machinekit.assembly.PosedParts.boxOf(body), tool, machinekit.assembly.PosedParts.boxOf(tool));
+        body.close();tool.close();
+        check(Math.abs(expected - actual) < 0.01, '${joint.id}: $zone has $actual of $expected mm3 of required stock');
+      }
+    }
+  }
+
   public static function main():Void {
     var mill = new BenchMill(false, false);
     var members:Array<String> = [];
@@ -89,8 +116,20 @@ class MillWayCoverChecks {
     var screwFindings = [for (item in screws.errors()) if (mentions(item.message, members)) item];
     for (item in screwFindings) Sys.println("  " + item.code + ": " + item.message);
     check(screwFindings.length == 0, "the cover flange screws fit: " + [for (item in screwFindings) item.message].join("; "));
-    var flangeJoints = [for (joint in derived.joints) if (mentions(joint.clampedMember, members)) joint].length;
+    var flangeJoints = [for (joint in derived.joints) if (StringTools.startsWith(joint.clampedMember, "cover")) joint].length;
     check(flangeJoints == 2 * covers.length, 'each cover has a fixed and a moving flange bolted on, found $flangeJoints flange joints');
+    var mounts = [for (entry in mill.components()) if (Std.isOfType(entry.component, machinekit.cover.WayCoverMount)) entry.id];
+    check(mounts.length == 8, "six fixed end walls and two moving head carriers");
+    var mountJoints = 0;
+    for (id in mounts) {
+      var joints = [for (joint in derived.joints) if (joint.clampedMember == id) joint], count = 0, pins = 0;
+      for (joint in joints) count += joint.count;
+      for (joint in derived.dowels) if (joint.memberA == id || joint.memberB == id) pins += joint.count;
+      check(count == 2 && pins == 2, '$id needs two derived clamping screws and two locating dowels, found $count and $pins');
+      mountJoints += joints.length;
+    }
+    check(mountJoints == 9 && derived.dowelCount() == 16, "the side-mounted right end wall has two joints; all eight mounts are located");
+    mountMaterial(mill, mounts);
     // The drains: declared on the base's gutters and found by the integrity run (a missing bore would be a finding).
     var declared = 0;
     for (requirement in mill.designRequirements()) switch requirement {

@@ -1,4 +1,5 @@
 import machinekit.assembly.AxisBuilder;
+import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.JointFasteners;
 import machinekit.assembly.JointSlip;
 import machinekit.assembly.JointSlip.JointLoad;
@@ -459,7 +460,13 @@ class JointFastenerTests {
     var flangeScrews = 0;
     for (joint in flangeJoints) flangeScrews += joint.count;
     check(flangeJoints.length == 12 && flangeScrews == 72, 'cover flange joints: ${flangeJoints.length}, screws: $flangeScrews');
-    check(total == railHoles + 4 * blocks + footScrews + 12 + 18 + 18 + 18 + 2 * flangeScrews, 'screws, washers and nuts only: $total');
+    var mounts = [for (joint in derivation.joints) if (StringTools.startsWith(joint.clampedMember, "wall") || StringTools.startsWith(joint.clampedMember, "carrier")) joint];
+    var mountScrews = 0; for (joint in mounts) mountScrews += joint.count;
+    check(mounts.length == 9 && mountScrews == 16 && derivation.dowels.length == 8 && derivation.dowelCount() == 16,
+      "all eight cover mounts have two derived screws and two dowels");
+    check(count.get("ISO4762-M5x25") == 12 && count.get("ISO4762-M5x20") == 4 && count.get("ISO8734-4x8") == 16,
+      "cover mount screws and dowels follow their actual grip and host material");
+    check(total == railHoles + 4 * blocks + footScrews + 12 + 18 + 18 + 18 + 2 * flangeScrews + mountScrews + derivation.dowelCount(), 'derived screws, washers, nuts and dowels only: $total');
     var rails = [for (joint in derivation.joints) if (joint.drilledToSuit && joint.clampedFace == "base") joint];
     var blockJoints = [for (joint in derivation.joints) if (joint.clampedFace == "blockLeft" || joint.clampedFace == "blockRight") joint];
     check(blockJoints.length == blocks, "one joint per block, got " + blockJoints.length);
@@ -484,7 +491,7 @@ class JointFastenerTests {
       check(machine.column.bosses.length == 2 && parts.get(boss).fasteningFaces().length == 1, "each Z support has one boss with one tapped foot face");
     }
     posed.close();
-    Sys.println('bench mill: ${derivation.joints.length} joints, ${derivation.count()} screws (${railHoles} rail, ${4 * blocks} block, ${footScrews} support, 12 motor, 18 nut flange, $flangeScrews cover flange), ' + [for (k in count.keys()) k + " x" + count.get(k)].join(", "));
+    Sys.println('bench mill: ${derivation.joints.length} joints, ${derivation.count()} screws (${railHoles} rail, ${4 * blocks} block, ${footScrews} support, 12 motor, 18 nut flange, $flangeScrews cover flange, $mountScrews cover mount), ${derivation.dowelCount()} dowels, ' + [for (k in count.keys()) k + " x" + count.get(k)].join(", "));
     // The drilled seats are in the castings' solids: one tap-drill hole per rail screw, none anywhere else.
     var cut = 0;
     for (entry in machine.components()) {
@@ -493,8 +500,30 @@ class JointFastenerTests {
       cut += cuts.length;
     }
     // Each block screw cuts its clearance hole and its counterbored pocket into the casting it is bolted through.
-    check(cut == railHoles + 2 * 4 * blocks + footScrews + 2 * flangeScrews,
-      'every rail hole is tapped, every block screw has a hole and pocket, every cover flange screw cuts both faces: $cut cuts');
+    check(cut == railHoles + 2 * 4 * blocks + footScrews + 2 * flangeScrews + 2 * mountScrews + 2 * derivation.dowelCount(),
+      'every rail hole is tapped, every block screw has a hole and pocket, every cover flange/mount screw and dowel cuts both faces: $cut cuts');
     for (joint in rails) check(joint.length == 16 && joint.engagement >= joint.minEngagement - 1e-9, 'rail joint ${joint.id}: x${joint.length} engages ${joint.engagement} of ${joint.minEngagement}');
+
+    // Recipe-backed hosts and purchased flanges keep their actual machining when an enclosing assembly takes a snapshot.
+    var nested = new MachineAssembly();
+    nested.include("mill", machine, materia.assembly.AssemblyFrames.translation(73, -21, 41));
+    for (saved in [{assembly: machine.snapshot(), prefix: ""}, {assembly: nested, prefix: "mill/"}]) {
+      var copyParts = new Map<String, machinekit.component.MachineComponent>();
+      for (entry in saved.assembly.components()) copyParts.set(entry.id, entry.component);
+      for (entry in machine.components()) if (entry.component.componentType() != null && entry.component.machinedCuts().length > 0)
+        check(copyParts.get(saved.prefix + entry.id).machinedCuts().length == entry.component.machinedCuts().length,
+          saved.prefix + entry.id + " preserves its derived hole table");
+      for (id in ["base", "head", "coverYFront-fixed"]) {
+        var original:MachineComponent = parts.get(id);
+        var copied:MachineComponent = copyParts.get(saved.prefix + id);
+        var originalBom = original.bom, copiedBom = copied.bom;
+        check(originalBom.fingerprint == copiedBom.fingerprint, saved.prefix + id + " preserves its machined revision");
+        var sourceSolid = original.geometry(), copySolid = copied.geometry();
+        var missing = sourceSolid.subtract(copySolid), added = copySolid.subtract(sourceSolid);
+        var difference = missing.shape.volume() + added.shape.volume();
+        missing.close();added.close();sourceSolid.close();copySolid.close();
+        check(difference < 0.01, saved.prefix + id + ' preserves the drilled solid: $difference mm3 difference');
+      }
+    }
   }
 }
