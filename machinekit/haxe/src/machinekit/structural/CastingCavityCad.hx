@@ -59,6 +59,22 @@ class CastingCavityCad {
   static var exactCount = 0;
   static inline final EXACT_LIMIT = 256;
 
+  /** Names the solid `part(cavity)` builds: its prisms, or the body, feature and opening targets of its exact region. */
+  public static function key(cavity:FinishedCastingCavity):Null<String> return switch cavity.geometry {
+    case Prisms(pieces):
+      "prisms|" + haxe.Json.stringify(pieces);
+    case UnsupportedGeometry(_):
+      null;
+    case SolidIntersection(body, feature, features):
+      "exact|" + exactKey(body, feature, features);
+  };
+
+  static function exactKey(body:Array<CastingPrism>, feature:CastingFeature, features:Array<CastingFeature>):String {
+    var targets = [for (opening in feature.openings) if (opening.kind != BodyFace) for (other in features) if (other.id
+      == opening.target) other];
+    return haxe.Json.stringify(body) + "|" + materia.casting.CastingFeatureCodec.encode([feature].concat(targets));
+  }
+
   public static function part(cavity:FinishedCastingCavity):Part {
     return switch cavity.geometry {
       case Prisms(pieces):
@@ -66,9 +82,7 @@ class CastingCavityCad {
       case UnsupportedGeometry(reason):
         throw "Unsupported casting cavity geometry: " + cavity.featureId + ": " + reason;
       case SolidIntersection(body, feature, features):
-        var targets = [for (opening in feature.openings) if (opening.kind != BodyFace) for (other in features) if (other.id
-          == opening.target) other];
-        var key = haxe.Json.stringify(body) + "|" + materia.casting.CastingFeatureCodec.encode([feature].concat(targets));
+        var key = exactKey(body, feature, features);
         var memo:Map<String, Part> = exact == null ? [] : exact;
         exact = memo;
         var known = memo.get(key);

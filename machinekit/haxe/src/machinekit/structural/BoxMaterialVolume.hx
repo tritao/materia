@@ -19,40 +19,106 @@ class BoxMaterialVolume {
   /** Shared volume (mm³) below which two solids only touch: the casting cavity contact threshold. */
   static inline final CONTACT_VOLUME = 1e-8;
 
+  /** Entries kept across calls before they are dropped. */
+  static inline final MEMO_LIMIT = 8192;
+
+  /**
+   * What each keyed solid contributed before: its bounds and integrated properties, whether two of them overlap, and its
+   * share inside a material box. Sizing integrates many layouts holding the same cavities and anchor screws at the same
+   * places; a keyed solid is built only when one of these is not yet known.
+   */
+  static var memo:Null<VolumeMemo>;
+
   /** `boxes` must be pairwise disjoint (as `BoxAlgebra.material` returns them). The caller owns `tools`. */
-  public static function of(boxes:Array<Box3>, tools:Array<Part>):Null<VolumeProperties> {
+  public static function of(boxes:Array<Box3>, tools:Array<Part>):Null<VolumeProperties> return integrate(boxes,
+    [for (tool in tools) {key: null, build: () -> tool}], false);
+
+  /**
+   * The same for solids each named by `key` (its shape and pose, or null for one not kept) and built by `build` only when
+   * something about it is not yet known. The solids built here are closed here.
+   */
+  public static function ofKeyed(boxes:Array<Box3>, tools:Array<KeyedSolid>):Null<VolumeProperties> return integrate(boxes,
+    tools, true);
+
+  static function integrate(boxes:Array<Box3>, tools:Array<KeyedSolid>, owned:Bool):Null<VolumeProperties> {
     if (boxes.length == 0) return null;
+    if (memo == null || memo.entries > MEMO_LIMIT) memo = new VolumeMemo();
+    var built:Array<Null<Part>> = [for (_ in tools) null];
+    function solid(index:Int):Part {
+      if (built[index] == null) built[index] = tools[index].build();
+      return built[index];
+    }
+    try {
+      var result = sum(boxes, tools, solid, memo);
+      if (owned) for (part in built) if (part != null) part.close();
+      return result;
+    } catch (error:Dynamic) {
+      if (owned) for (part in built) if (part != null) part.close();
+      throw error;
+    }
+  }
+
+  static function sum(boxes:Array<Box3>, tools:Array<KeyedSolid>, solid:Int->Part, kept:VolumeMemo):Null<VolumeProperties> {
     var sums = new Moments(boxes[0].x + boxes[0].width / 2, boxes[0].y + boxes[0].depth / 2,
       boxes[0].z + boxes[0].height / 2);
     for (box in boxes) sums.addBox(box);
-    var toolBoxes = [for (tool in tools) PosedParts.boxOf(tool)];
+    var toolBoxes:Array<PartBox> = [];
+    for (index in 0...tools.length) {
+      var key = tools[index].key, bounds = key == null ? null : kept.bounds.get(key);
+      if (bounds == null) {
+        bounds = PosedParts.boxOf(solid(index));
+        if (key != null) kept.keepBounds(key, bounds);
+      }
+      toolBoxes.push(bounds);
+    }
     for (i in 0...tools.length) for (j in i + 1...tools.length) {
       if (PosedParts.apart(toolBoxes[i], toolBoxes[j], 0)) continue;
-      var shared = tools[i].intersect(tools[j]);
-      var volume = shared.volume();
-      shared.close();
-      if (volume > CONTACT_VOLUME) return null;
+      var a = tools[i].key, b = tools[j].key, pair = a == null || b == null ? null : a + "#" + b;
+      var overlap = false;
+      if (pair != null && kept.overlaps.exists(pair)) overlap = kept.overlaps.get(pair) else {
+        var shared = solid(i).intersect(solid(j));
+        var volume = shared.volume();
+        shared.close();
+        overlap = volume > CONTACT_VOLUME;
+        if (pair != null) kept.keepOverlap(pair, overlap);
+      }
+      if (overlap) return null;
     }
     for (t in 0...tools.length) {
-      var tool = tools[t], bounds = toolBoxes[t];
+      var key = tools[t].key, bounds = toolBoxes[t];
       for (box in boxes) {
         if (PosedParts.apart(bounds, limits(box), 0)) continue;
         if (inside(bounds, box)) {
-          sums.addSolid(tool.massProperties(), -1);
+          var properties = key == null ? null : kept.whole.get(key);
+          if (properties == null) {
+            properties = solid(t).massProperties();
+            if (key != null) kept.keepWhole(key, properties);
+          }
+          sums.addSolid(properties, -1);
+          continue;
+        }
+        var cellKey = key == null ? null : key + "#" + box.x + "," + box.y + "," + box.z + "," + box.width + ","
+          + box.depth + "," + box.height;
+        if (cellKey != null && kept.shares.exists(cellKey)) {
+          var share = kept.shares.get(cellKey);
+          if (share != null) sums.addSolid(share, -1);
           continue;
         }
         var cell = Part.box(box.width, box.depth, box.height);
         var placed = cell.translated(new Vector(box.x + box.width / 2, box.y + box.depth / 2, box.z));
         cell.close();
-        var common = tool.intersect(placed);
+        var common = solid(t).intersect(placed);
         placed.close();
+        var share:Null<cadkit.PhysicalProperties> = null;
         try {
-          if (common.volume() > 0) sums.addSolid(common.massProperties(), -1);
+          if (common.volume() > 0) share = common.massProperties();
         } catch (error:Dynamic) {
           common.close();
           throw error;
         }
         common.close();
+        if (cellKey != null) kept.keepShare(cellKey, share);
+        if (share != null) sums.addSolid(share, -1);
       }
     }
     return sums.result();
@@ -73,6 +139,40 @@ class BoxMaterialVolume {
 }
 
 private typedef PartBox = machinekit.assembly.PosedParts.PartBox;
+
+/** A solid named by its shape and pose (`key`, or null for one not kept), built on demand by `build`. */
+typedef KeyedSolid = {key:Null<String>, build:() -> Part};
+
+/** What `BoxMaterialVolume` knows about keyed solids. */
+private class VolumeMemo {
+  public final bounds = new Map<String, PartBox>();
+  public final whole = new Map<String, cadkit.PhysicalProperties>();
+  public final overlaps = new Map<String, Bool>();
+  public final shares = new Map<String, Null<cadkit.PhysicalProperties>>();
+  public var entries = 0;
+
+  public function new() {}
+
+  public function keepBounds(key:String, value:PartBox):Void {
+    bounds.set(key, value);
+    entries++;
+  }
+
+  public function keepWhole(key:String, value:cadkit.PhysicalProperties):Void {
+    whole.set(key, value);
+    entries++;
+  }
+
+  public function keepOverlap(key:String, value:Bool):Void {
+    overlaps.set(key, value);
+    entries++;
+  }
+
+  public function keepShare(key:String, value:Null<cadkit.PhysicalProperties>):Void {
+    shares.set(key, value);
+    entries++;
+  }
+}
 
 /** Signed zeroth, first and second volume moments about a fixed reference point near the material. */
 private class Moments {

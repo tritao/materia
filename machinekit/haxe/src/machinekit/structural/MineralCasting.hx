@@ -152,17 +152,25 @@ class MineralCasting extends MachineComponent {
     })) return null;
     var cavities = finishedCavities();
     var boxes = BoxAlgebra.materialLess(envelope, cavities.filter(cavity -> CastingCavities.supportsBoxes(cavity)));
-    var tools:Array<Part> = [];
+    // Each solid is named by its inputs and built only when the integral has not met it before.
+    var tools:Array<BoxMaterialVolume.KeyedSolid> = [];
+    for (cavity in cavities) if (!CastingCavities.supportsBoxes(cavity)) tools.push({
+      key: CastingCavityCad.key(cavity),
+      build: () -> CastingCavityCad.part(cavity)
+    });
+    var screws = new machinekit.assembly.PosedParts();
     try {
-      for (cavity in cavities) if (!CastingCavities.supportsBoxes(cavity)) tools.push(CastingCavityCad.part(cavity));
-      for (part in InsertAnchorGeometry.embeddedParts(embeddedAnchors())) tools.push(part);
+      for (solid in InsertAnchorGeometry.embeddedSolids(embeddedAnchors(), screws)) tools.push(solid);
       if (parameterToken("buildStage") == materia.casting.InsertStages
-        .InsertStage.Service) for (bond in postCureBonds()) tools.push(CastingCavityCad.receiver(bond.receiver));
-      var result = BoxMaterialVolume.of(boxes, tools);
-      for (tool in tools) tool.close();
+        .InsertStage.Service) for (bond in postCureBonds()) tools.push({
+          key: "receiver|" + haxe.Json.stringify(bond.receiver),
+          build: () -> CastingCavityCad.receiver(bond.receiver)
+        });
+      var result = BoxMaterialVolume.ofKeyed(boxes, tools);
+      screws.close();
       return result;
     } catch (error:Dynamic) {
-      for (tool in tools) tool.close();
+      screws.close();
       throw error;
     }
   }

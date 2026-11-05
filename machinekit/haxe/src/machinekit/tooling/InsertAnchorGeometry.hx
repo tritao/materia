@@ -528,8 +528,9 @@ class InsertAnchorGeometry {
   }
 
   public static function components(spec:InsertSpec):Array<InsertAnchorComponent> {
-    var source = InsertSpecCodec.snapshot(InsertSpecCodec.record(spec)), result:Array<InsertAnchorComponent> = [];
-    checkHoleClearance(source);
+    var record = InsertSpecCodec.record(spec);
+    var source = InsertSpecCodec.snapshot(record), result:Array<InsertAnchorComponent> = [];
+    checkedHoleClearance(haxe.Json.stringify(record), source);
     var holes = materia.casting.InsertStages.holes(source, materia.casting.InsertStages.InsertStage.BeforeCasting);
     switch source.anchorage {
       case Undeclared, CatalogueRetention:
@@ -581,6 +582,36 @@ class InsertAnchorGeometry {
   /** Exact separation of the declared bore/major-thread design envelopes, in
 	 * insert coordinates. Counterbores and reliefs retain their own axial spans.
 	 * No mesh, endpoint-only distance or parallel-axis assumption is used. */
+  /**
+   * `checkHoleClearance` by the spec's record, `key`: every layout and pass holds the same inserts, and the verdict (or the
+   * reason it fails) depends on nothing else.
+   */
+  static function checkedHoleClearance(key:String, spec:InsertSpec):Void {
+    if (holeClearance == null) holeClearance = [];
+    var memo:Map<String, Null<String>> = holeClearance;
+    if (memo.exists(key)) {
+      var reason = memo.get(key);
+      if (reason != null) throw reason;
+      return;
+    }
+    if (holeClearanceCount >= DERIVED_LIMIT) {
+      memo.clear();
+      holeClearanceCount = 0;
+    }
+    try checkHoleClearance(spec) catch (error:Dynamic) {
+      if (Std.isOfType(error, String)) {
+        memo.set(key, error);
+        holeClearanceCount++;
+      }
+      throw error;
+    }
+    memo.set(key, null);
+    holeClearanceCount++;
+  }
+
+  static var holeClearance:Null<Map<String, Null<String>>>;
+  static var holeClearanceCount = 0;
+
   static function checkHoleClearance(spec:InsertSpec):Void {
     var occupied = C.occupiedHoleIds(spec.anchorage);
     if (occupied.length == 0) return;
@@ -1157,6 +1188,29 @@ class InsertAnchorGeometry {
       }
     }
     return true;
+  }
+
+  /**
+   * `embeddedParts` as solids named by the screw's recipe and pose, built on demand from `screws` (which the caller closes
+   * once the solids are used), for integrals that already know most of them.
+   */
+  public static function embeddedSolids(rows:Array<EmbeddedInsertAnchors>,
+      screws:PosedParts):Array<machinekit.structural.BoxMaterialVolume.KeyedSolid> {
+    var result:Array<machinekit.structural.BoxMaterialVolume.KeyedSolid> = [];
+    for (row in rows) {
+      var components:Array<InsertAnchorGeometry.InsertAnchorComponent>;
+      try components = InsertAnchorGeometry.components(row.spec) catch (error:Dynamic) throw "Insert "
+        + row.owner + ": " + Std.string(error);
+      for (hardware in components) {
+        var pose = F.compose(row.pose, hardware.pose), screw = hardware.part;
+        result.push({key: "anchor|" + screw.geometryKey() + "|" + haxe.Json.stringify(pose), build: () -> {
+          var occupancy = screws.posed(screw, pose);
+          occupancy.shape.setThreadedFaces([]);
+          return occupancy;
+        }});
+      }
+    }
+    return result;
   }
 
   public static function embeddedParts(rows:Array<EmbeddedInsertAnchors>):Array<Part> {
