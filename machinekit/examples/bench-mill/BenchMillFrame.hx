@@ -375,15 +375,17 @@ private class MillCastingSizing {
       var a = xyAxis;
       var bayFront = a.yFixedY - a.yFixedDepth / 2 - a.clearance;
       // Only shallow bearing/motor-foot recesses remain in the base.
+      // The recess runs out to the base's rear edge: the Y motor withdraws along it, and its round body would otherwise meet the
+      // 220 mm apron behind the column by 2 mm (the service sweep's y-servo finding).
       baseVoids.push(CastingFeaturePatterns.box(
         "rear-y-drive-seat",
         InterfaceRecess,
-        [CastingPatterns.face("body.z-max")],
+        [CastingPatterns.face("body.z-max"), CastingPatterns.face("body.y-max")],
         a.yBayWidth,
-        a.yServiceRear + details.rearBayDesignClearance - bayFront,
+        l.rear - bayFront,
         l.baseHeight - a.yMountPlane,
         0,
-        (bayFront + a.yServiceRear + details.rearBayDesignClearance) / 2 - l.baseCentreY,
+        (bayFront + l.rear) / 2 - l.baseCentreY,
         a.yMountPlane
       ));
       baseVoids.push(CastingFeaturePatterns.box(
