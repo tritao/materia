@@ -133,7 +133,8 @@ class MillCrossSaddle extends MachineComponent {
     if (values().boolean("motorPocket")) {
       // Square Leadshine flange/body and front-facing connector envelope.
       tools.push(Part.box(102, 66, 66).translated(new Vector(-170, 0, 7)));
-      tools.push(Part.box(102, 20, 24).translated(new Vector(-170, -38, 28)));
+      // The connector envelope runs on through the end wall, so the motor (with its mounting plate) withdraws outwards along X.
+      tools.push(Part.box(107, 20, 24).translated(new Vector(-172.5, -38, 28)));
       var bore = Part.cylinderSpan(33, -226, -64);
       tools.push(PosedParts.moved(bore, F.fromRotationMatrix(0, 0, 40, [0, 0, 1, 1, 0, 0, 0, 1, 0])));
       bore.close();

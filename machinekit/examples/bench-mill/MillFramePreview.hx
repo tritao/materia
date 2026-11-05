@@ -1,5 +1,6 @@
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.AssemblyPreview;
+import machinekit.design.DesignRequirement;
 import machinekit.milling.MillFrameLayout;
 import machinekit.milling.MillZAxis;
 import machinekit.milling.MillZAxisLayout;
@@ -141,6 +142,29 @@ class MillFramePreview {
     return result;
   }
 
+  /**
+   * The spindle's service removals, swept with the whole mill by `AssemblyIntegrity.service`:
+   * `motorWithdrawal`: belt, pulley, guard, and the motor's screws and nuts off, then the motor and its shaft up off the head;
+   * `cartridgeWithdrawal`: the tool, belt, motor and its carrier, the draw-bar cylinder and its frame off, then the cartridge with its rotor,
+   * draw-bar and belt pulley down out of the head until the pulley is below the head's underside (at the upper Z stop the table is 266 mm below).
+   */
+  static function declareSpindleServices(parts:MachineAssembly):Void {
+    var ids = [for (m in parts.components()) m.id];
+    function named(prefix:String):Array<String> return [for (id in ids) if (StringTools.startsWith(id, prefix)) id];
+    // The motor's shaft and body length; a spindle drive that is not a servo motor (a study part) is taken out the same 220 mm.
+    var motor = Std.downcast(parts.components().filter(m -> m.id == "motor")[0].component, machinekit.motion.ServoMotor);
+    var lift = motor == null ? 220.0 : motor.rating.shaftLength + motor.rating.bodyLength;
+    var drive = ["belt", "beltGuard", "motorPulley"].concat(named("guardBolt")).concat(named("motorBolt")).concat(named("motorNut"));
+    parts.addDesignRequirement(ServiceRemoval("motorWithdrawal", ["motor", "motorShaft"],
+      [{direction: [0.0, 0.0, 1.0], distance: lift}], drive, []));
+    // The pulley plane is 252.5 mm above the gauge line (`MillSpindleHead`), the head's underside `Bt30Cartridge.SEAT` above it.
+    parts.addDesignRequirement(ServiceRemoval("cartridgeWithdrawal",
+      ["spindle", "rotor", "springs", "pullStud", "holder", "drawbar", "gripper", "spindlePulley"],
+      [{direction: [0.0, 0.0, -1.0], distance: 252.5 + 15 + 3 - machinekit.milling.Bt30Cartridge.SEAT}],
+      ["tool", "belt", "motorCarrier", "motor", "motorShaft", "motorPulley", "beltGuard", "reactionFrame", "cylinder", "pistonRod", "piston"]
+        .concat(named("motorNut")).concat(named("motorBolt")).concat(named("guardBolt")).concat(named("carrierBolt")), []));
+  }
+
   /** Complete shared spindle payload for both machine configurations. */
   public static function attachSpindle(
     reference:BenchMill,
@@ -169,6 +193,7 @@ class MillFramePreview {
     spindleParts.addMemberConnector("holder", "toolSeat", F.translation(0, 0, -35 - reference.tool.stickout));
     spindleParts.addMemberConnector("tool", "seat", F.identity());
     spindleParts.addMate("tool-in-holder", "fixed", "holder", "toolSeat", "tool", "seat");
+    declareSpindleServices(spindleParts);
     result.include("spindle", spindleParts);
     var axis = new MillZAxis(spindleLayout);
     result.addMemberConnector(

@@ -51,7 +51,6 @@ class MillXYStage extends MillGuidedXYStage {
       F.compose(y, F.translation(0, 0, l.yScrewStart - yFace - l.nut.bodyLength - l.nut.flangeThickness)),
       "nutBracketY"
     );
-    declareMotorService();
     var x = orient(l.xScrewStart, l.centreY, l.xScrewZ, [0, 0, 1], [1, 0, 0]);
     foldedXDrive(x);
     movingNut("X", x, -l.xScrewStart, "table", true);
@@ -110,21 +109,44 @@ class MillXYStage extends MillGuidedXYStage {
     );
     exposeConnector("mount", "fixedPedestalY", "mount");
     MillYNutDesignChecks.declare(this);
+    declareServices();
   }
 
   /**
-   * The Y motor comes out of the back: the rear hatch and the motor's four screws come off, then the motor and its shaft
-   * withdraw along +Y far enough to free the shaft, clearing the frame and the stage (`AssemblyIntegrity.service`).
+   * The service removals the stage declares, each swept against the whole mill by `AssemblyIntegrity.service`:
+   *
+   * - `yMotorWithdrawal`: the rear hatch and the motor's four screws off, then the motor and its shaft back along +Y far enough to free the shaft.
+   * - `xMotorWithdrawal`: the end hood, the belt and the motor's nuts off, then the motor with its mounting plate (its four plate screws come
+   *   away with it) out of the saddle along -X, until the motor is clear of the saddle's end.
+   * - `xScrewWithdrawal`: the hood, the belt and both bearings off, then the screw with its nut, pulley and retainer out along -X.
+   * - `yScrewWithdrawal`: the motor and its mount, the coupling, the front bearing and the nut's bracket off, then the screw with its nut out of
+   *   the front along -Y until its rear end is past the base's front (the rear way is closed: the nut's flange cannot pass the 24 mm crossing
+   *   bore in the Z axis' lower plate, `MillServiceChecks`).
    */
-  function declareMotorService():Void {
+  function declareServices():Void {
     var l = layout, ids = [for (m in components()) m.id];
+    function named(prefix:String):Array<String> return [for (id in ids) if (StringTools.startsWith(id, prefix)) id];
+    // Y motor: out of the back.
     var shaft = (l.supplierY ? l.yMotor.rating : l.motor.rating).shaftLength;
     var withdrawal = l.yServiceRear - l.yMotorFace + shaft + l.clearance;
     var movers = ["motorY"];
     if (ids.indexOf("motorShaftY") >= 0) movers.push("motorShaftY");
-    var off = ["motorCoverY"];
-    for (id in ids) if (StringTools.startsWith(id, "motorYBolt")) off.push(id);
-    addDesignRequirement(ServiceRemoval("yMotorWithdrawal", movers, [{direction: [0.0, 1.0, 0.0], distance: withdrawal}], off, []));
+    addDesignRequirement(ServiceRemoval("yMotorWithdrawal", movers, [{direction: [0.0, 1.0, 0.0], distance: withdrawal}],
+      ["motorCoverY"].concat(named("motorYBolt")), []));
+    // X motor: the hood, the belt and the nuts behind the flange off; the plate screws, with the plate, come away with the motor.
+    var bodyEnd = MillXYStageLayout.X_MOTOR_FACE + l.motor.rating.bodyLength;
+    addDesignRequirement(ServiceRemoval("xMotorWithdrawal", ["motorMountX", "motorX", "motorShaftX", "motorPulleyX"],
+      [{direction: [-1.0, 0.0, 0.0], distance: bodyEnd + l.guided().saddleWidth / 2 + l.clearance}],
+      ["motorCoverX", "beltX"].concat(named("motorNutX")), []));
+    // X screw: its bearings (and their screws) and the belt off, then out along -X with everything that turns with it.
+    addDesignRequirement(ServiceRemoval("xScrewWithdrawal", ["screwX", "nutX", "screwPulleyX", "screwRetainerX"],
+      [{direction: [-1.0, 0.0, 0.0], distance: l.xScrew.totalLength + l.clearance}],
+      ["motorCoverX", "beltX", "fixedBearingX", "floatingBearingX"], []));
+    // Y screw: the motor end is off the screw (motor, its shaft and mount, the coupling), the front bearing and the nut's bracket with it.
+    if (l.supplierY) addDesignRequirement(ServiceRemoval("yScrewWithdrawal", ["screwY", "nutY"],
+      [{direction: [0.0, -1.0, 0.0], distance: l.yScrewStart - l.frame.front + l.clearance}],
+      ["motorY", "motorShaftY", "motorCoverY", "motorMountY", "couplingY", "floatingBearingY", "floatingRingY", "nutBracketY"]
+        .concat(named("motorYBolt")).concat(named("nutYBolt")), []));
   }
 
   static function requireGuides(layout:MillXYStageLayout):MillGuidedXYStage.MillGuidedXYLayout {

@@ -2,6 +2,7 @@ package machinekit.milling;
 
 import machinekit.assembly.AxisBuilder;
 import machinekit.component.ComponentValues;
+import machinekit.design.DesignRequirement;
 import machinekit.motion.*;
 import machinekit.standard.SocketHeadCapScrew;
 import materia.assembly.AssemblyFrames as F;
@@ -213,6 +214,10 @@ class MillZAxis extends AxisBuilder {
     exposeConnector("mount", "fixedMount", "mount");
     exposeConnector("head", "head", "mount");
     exposeConnector("spindle", "head", "spindle");
+    // The motor lifts straight off the top of the column: its four screws off, then up until the shaft is out of the coupling and the body clear.
+    var motorBolts = [for (m in components()) if (StringTools.startsWith(m.id, "motorBolt")) m.id];
+    addDesignRequirement(ServiceRemoval("zMotorWithdrawal", ["motor", "motorShaft"],
+      [{direction: [0.0, 0.0, 1.0], distance: l.motor.rating.shaftLength + l.motor.rating.bodyLength}], motorBolts, []));
   }
 
   public static function isTranslating(id:String):Bool return id == "carriage"
