@@ -9,8 +9,33 @@ import materia.casting.InsertSpec.InsertBodyCodec;
 
 /** Realize insert-only retention geometry separately from design-cut primitives. */
 class InsertBodies {
+  /**
+   * Realized bodies by their record: sizing places the same steel (a lofted socket tail among them) in every layout and
+   * candidate it tries. Kept native shapes are copied out; the caller owns the copy.
+   */
+  static var realized:Null<Map<String, Part>>;
+  static var realizedCount = 0;
+  static inline final REALIZED_LIMIT = 256;
+
   public static function part(body:InsertBody):Part {
     InsertBodyCodec.validate(body);
+    var key = InsertBodyCodec.encode(body), memo:Map<String, Part> = realized == null ? [] : realized;
+    realized = memo;
+    var known = memo.get(key);
+    if (known == null) {
+      known = build(body);
+      if (realizedCount >= REALIZED_LIMIT) {
+        for (kept in memo) kept.close();
+        memo.clear();
+        realizedCount = 0;
+      }
+      memo.set(key, known);
+      realizedCount++;
+    }
+    return new Part(known.shape.cloneShape());
+  }
+
+  static function build(body:InsertBody):Part {
     return switch body {
       case Primitive(solid):
         CastingSolids.part(solid);
