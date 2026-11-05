@@ -169,25 +169,63 @@ all of them clear and keeps the findings of the procedures that do not work:
 - The spindle cartridge cannot leave upwards: the head is over it (10,574 mm3 after 2 mm). Down it clears the table by 56 mm; with the
   tool in it would meet the table after 266 mm.
 
-Way covers (`machinekit.cover`): the study `MillWayCoverChecks` (`haxeon.way-covers.json`) takes the six exposed screw ends of the bench
-mill (Y and X either side of the carrier, Z above and below the nut) and asks `WayCoverPlan` for each catalogue row, from the mill's solved
-poses, then checks the cover against the room round the screw and the faces its flanges would bolt to. None fits as built, so none is
-installed and no `GuardedChannel` is declared (the mill has no channel a cover guards: the Y seat recesses are 8 mm). The Y way and the X
-and Z guides themselves are not covered by this model at all: their blocks fill the 28 mm gap between base, saddle and table, and the
-nested-skin envelope of a bellows around them (flanges 90 mm and up) would sit inside the casting.
+Way covers (`machinekit.cover`, chip protection): the mill built with `new BenchMill(false, false, true)` (a "covered" mill; the default
+mill is unchanged) has a **box cover** at both ends of each axis, six in all, checked by `MillWayCoverChecks` (`haxeon.way-covers.json`, about
+2 min). A first study of ring covers (a bellows round each screw end) found that none fits the mill as built: the Y ends had 32 and 27.5 mm of
+space (the smallest bellows folds to 30 and its flanges would bolt to a 42 mm bearing housing), X had 14 mm between the saddle top and the
+table underside above the screw, Z had the screw 26 mm from the column's side face, and the guides' blocks fill the 28 mm gaps between base,
+saddle and table, so a ring cannot enclose them. A box cover has a roof and two walls and no floor: it stands on a surface of the machine, which
+closes it, and its skins nest outward on the three walled sides only (`WayCoverPlan.CoverShape`), so nothing grows into the surface and one
+cover encloses the guides and the screw together.
 
-| Screw end | stroke / space at the nearest stop | best bellows | folds, folded to extended | skins, flange | why not |
-| --- | --- | --- | --- | --- | --- |
-| Y front | 150 / 32 | PU 6x8 | 4, 30 to 182 mm | 10, 96 x 96 | flanges bolt to the saddle's front face (70 tall) and the BK12 housing (42 tall): the cover fits its space and the 53 mm round the screw |
-| Y rear | 150 / 27.5 | PU 6x8 | 4, folds to 30 mm | - | 2.5 mm short of the folded length |
-| X left, right | 250 / 207.5, 217 | PU 8x10 | 6, 54 to 457.5, 467 mm | 11, 109 x 109 | 14 mm between saddle top and table underside above the screw and 28 across |
-| Z top | 250 / 76.5 | PU 6x8 | 7, 48 to 326.5 mm | 9, 92 x 92 | the column side face is 26 mm from the screw axis |
-| Z bottom | 250 / 218 | PU 6x8 | 10, 66 to 468 mm | 8, 88 x 88 | same 26 mm |
+| Cover | stands on | fixed end (a steel wall) | moving end | folded / space | reach | skins, flange |
+| --- | --- | --- | --- | --- | --- | --- |
+| Y front | base top | wall 7 mm in front of the front bearing's stand, the coupling through a bore, the rails through slots; the cover encloses the bearing | saddle front face | 38 / 66 mm | 216 mm | 8, 242 x 114 |
+| Y rear | base top | wall 2 mm in front of the rear bearing, the screw through a bore | saddle rear face | 30 / 32 mm | 182 mm | 10, 250 x 135 |
+| X left | saddle top | wall on the near bridge behind the bearing, the coupling through a bore | table's left end face | 46 / 57 mm | 307 mm | 9, 124 x 65 (cut back to the table's width) |
+| X right | saddle top | wall on the far bridge behind the bearing | table's right end face | 54 / 77 mm | 327 mm | 7, 124 x 60 |
+| Z top | column side face | wall above the bearing, the coupling through a bore | carrier on the head over the nut | 54 / 90.5 mm | 340.5 mm | 8, 128 x 75 |
+| Z bottom | column side face | wall under the bearing | carrier under the nut's bracket (clearing the nut flange's bolts) | 46 / 50.5 mm | 300.5 mm | 9, 132 x 78 |
 
-The telescopic row (250 mm sections) folds to 258 mm: it fits no end. To fit a cover: Y front needs a flange bracket 100 mm square on the
-saddle front and a post behind the BK12 (the cover is then 8 mm shorter: 24 mm of space against 30 needed, so the support moves back or
-the stroke shortens); X needs a wider gap than 28 mm or a cover that is not a ring round the screw; Z needs
-the screw 40 mm further from the column side face. The mill's Z screw supports now stand on bosses (below).
+All six are `BELLOWS-LAMELLA-8x8` (flat bellows, steel lamellas sewn into the fabric every 8 mm fold, 1:8; assumed values of the family). It is the
+only catalogue row that folds into the room: every end has 32 to 90 mm and the steel telescopic rows (`TELESCOPIC-SS-250`, `-150`) fold to 174 mm
+and more. A roll-up (spring roller) cover was considered and not built: its cassette needs the same length along the axis as the folded bellows
+(a roller of 30 mm or so), so it gains nothing at the 32 mm Y rear, and the model has no strip envelope. X right and Z top could take a steel
+telescopic cover if the walls moved out by 100 mm (a longer base or bridge); the lamella bellows are the wear item and the first spare.
+Each cover is one BOM line (`WAYCOVER-...`: both flanges, the skins are not bought separately); the walls (`MILL-COVER-WALL-*`) and the two carriers
+are steel plates to make; the twelve guide blocks carry 24 end scrapers (`WIPER-HG15-SCRAPER`, `WayWiperCatalog`, assumed values).
+
+Each cover is placed by `BenchMill.coverFrom` from the mill's own poses (nothing is typed in per cover) and installed by `WayCover.installOn`.
+Each flange is bolted to its wall, carrier or casting face with screws derived from `BoltedFace`s (flange holes only where the host face exists, 8
+mm from its edge), and the check posed each cover at its near and far stop and measured the flanges the planned space and extended length apart.
+The sweep (all 27 combinations of each axis at its ends and middle) finds nothing on the covers, and no finding the plain mill lacks (117 in both,
+all of them the legacy mill's support gaps). The covers go on after the rails and screws they surround (`IntegrityOptions.fittedBefore`): the
+cover is over the rail screws' driver access otherwise, so a rail is changed with the cover unbolted.
+
+Geometry changes, all in the covered mill only (the default mill and the framed concept are untouched, so the frame (917) and Z-axis (423)
+assertions stand; they build their layout from the default mill):
+
+- **Z screw 670 to 490 mm**, its floating bearing and boss 180 mm higher (centre z 112.5 to 292.5). The lower 180 mm of the screw lay below the head's
+  travel and carried only that bearing, which stood in the base's rear corner where the Y rear cover's stack goes; the lower cover's wall would
+  also have stood at the table's height. The Z travel, the spindle reach and the head are as before. Cost: the Z bottom cover has 50.5 mm of
+  space (a 5-fold bellows folds to 46), the first to fail if the head's travel grows downward.
+- **Y screw 420 to 432.5 mm**, the rear bearing and its stand 12.5 mm further back, into a **bay in the column's lower front** (80 wide, 10 deep, 92 high;
+  the bearing's housing stands 5 mm and the screw end 7.5 mm into the column, 10 mm of the 20 mm wall is left). It gives the rear cover 32 mm.
+- **Saddle and table**: end faces tapped M5 for the moving flanges (`MillCasting.coverFaces`), no change of shape.
+- **Base**: two chip gutters either side of the screw-support pad (21 mm wide, falling 1.5 % over 370 mm, 5.6 mm deep at the front) and two 14 mm
+  drain holes through the top skin at their low ends (11 mm of skin is left under the gutter). The Y covers are declared a `GuardedChannel`
+  on the base (`yCoverGutters`): the floor falls at least 1 % and the bores exist in the base, as `AssemblyIntegrity` checks; the holes open into the
+  hollow base over the chip tray. A chip or coolant that gets past a wiper runs forward along the gutters; the covers' roofs shed the rest over
+  the base's sides.
+- New parts: six steel end walls, two carriers (14 mm, tapped to suit the flange holes), wipers. The overall envelope is unchanged (X walls end
+  inside the bridges, the Y front wall inside the base's front edge).
+
+Open, in the covered mill: the walls are fixed members on the base, the bridges and the column, and the carriers on the head, without derived
+screws of their own (a weldment or an assumed bolting, to be detailed); the X and Z covers have no guarded channel (an X cover's floor is the
+flat saddle top, and what gets in leaves over the saddle's ends onto the bridges and the tray; a Z cover is open to the column's side face); the
+bellows are not drawn pleat by pleat (the nested skins are their envelope, with the loose skins' and flanges' sizes from the folds). The framed
+concept (`MillXYStage`, `MillZAxis`) has its own layout: its X gap is 76 mm (28 mm of block and a 48 mm riser) with the screw 40 mm above the
+saddle top, so a box cover fits there as well, but its supports are elsewhere (rear drive bay and hatch), and it is not covered here.
 
 Z screw supports: each foot is bolted to a steel boss cast into the column's +x side wall (`MillCasting.ColumnBoss`, placed by
 `BenchMill.zBosses`). The boss is a 62 x 29 x 16 mm tapped steel block (`MILL-Z-BOSS-FIXED`, `-FLOATING`) in a pocket cut in the 20 mm wall,

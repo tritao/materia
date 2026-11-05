@@ -80,9 +80,6 @@ class WayCoverSection extends MachineComponent {
     )];
   }
 
-  /** Least distance of a flange hole from the edge of its host face: one and a half screw diameters of an M5 or M6, mm. */
-  public static inline var HOST_EDGE:Float = 8;
-
   /** Half the width of this flange's plate: the largest skin and its lip; the moving flange is cut back to its host face if that is narrower. */
   function plateHalf():Float return role == Moving ? plan.plateHalf() : plan.fullPlateHalf();
 
@@ -100,7 +97,7 @@ class WayCoverSection extends MachineComponent {
       for (j in 1...ny) for (sx in [-1, 1]) out.push({x: sx * hx, y: -hy + 2 * hy * j / ny});
       return out;
     }
-    var edge = HOST_EDGE, hostLow = plan.shape.hostMin + edge, hostHigh = plan.shape.hostMax - edge;
+    var edge = 1.5 * Std.parseFloat(plan.row.screw.substr(1)) + 0.5, hostLow = plan.shape.hostMin + edge, hostHigh = plan.shape.hostMax - edge;
     var roof = plan.plateHigh() - plan.row.lip / 2;
     // Across the roof lip, as far as the host face goes; walls' lips only when the plate's walls are over the host too.
     var hxRoof = role == Moving ? Math.min(hx, plan.shape.hostHalfWidth - edge) : hx;

@@ -85,7 +85,7 @@ class WayCoverTests {
    */
   static function bed(rowId:String, space:Float, stroke:Float, ?extra:AxisBuilder -> Void, reversed:Bool = false):{builder:AxisBuilder, cover:WayCover, plan:WayCoverPlan} {
     var builder = new AxisBuilder();
-    var shape = WayCoverPlan.boxCover(13, 140, reversed ? 50 : 100000, reversed);
+    var shape = WayCoverPlan.boxCover(13, 100, reversed ? 50 : 100000, reversed);
     var plan = new WayCoverPlan(WayCoverCatalog.get(rowId), 60, 25, stroke, space, shape);
     var half = plan.outerWidth() / 2 + 10, wallTop = plan.outerHeight() + 20;
     var across = {x: 1.0, y: 0.0, z: 0.0};
@@ -98,8 +98,8 @@ class WayCoverTests {
       AssemblyFrames.translation(0, 0, 0), "bed");
     builder.attach("rail", LinearRail.metric("MGN12C", length), AxisBuilder.orient(0, 10, LinearRail.metric("MGN12C", length).spec.railHeight, [0.0, 0, 1], [0.0, 1, 0]), "bed");
     builder.slideOn({id: "y", lower: 0, upper: stroke, initial: 0}, "rail", "block", LinearRailBlock.metric("MGN12C"), space + 20);
-    builder.attach("carriage", new TestSlab("CARRIAGE", [-half, space, 13], [half, space + 60, 140],
-      [BoltedFace.drilledToSuit("cover", BoltedFace.frameOf({x: 0, y: space, z: 76.5}, {x: 0.0, y: 1.0, z: 0.0}, across), 2 * half, 127, 12, 60, CastIron)]),
+    builder.attach("carriage", new TestSlab("CARRIAGE", [-half - 40, space, 13], [half + 40, space + 60, 200],
+      [BoltedFace.drilledToSuit("cover", BoltedFace.frameOf({x: 0, y: space, z: 106.5}, {x: 0.0, y: 1.0, z: 0.0}, across), 2 * half + 80, 187, 12, 60, CastIron)]),
       AssemblyFrames.translation(0, 0, 0), "block");
     var cover = WayCover.install(builder, {
       id: "box", row: rowId, fixedParent: "wall", movingParent: "carriage", leader: {id: "y", lower: 0, upper: stroke, initial: 0},
