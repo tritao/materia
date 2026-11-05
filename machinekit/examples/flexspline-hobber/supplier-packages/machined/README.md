@@ -1,12 +1,10 @@
-# Machined parts package (milled parts, ground bar pads and nut blocks)
+# Made parts package (machining, ground stock and formed guards)
 
 Builds the quote package for the hobber's made parts that go to a CNC shop or a ground-stock vendor: every member
-with a `ManufacturingRoute` facet (FRAME_PLAN H8). The exporter constructs the parts directly, with the same
-constructors `FlexsplineHobber` installs (`HobberSaddle` designs, `HobberDrives.nutBlock`), rather than building the whole
-hobber; `machined_package.py` makes the drawings, tables and checks from its output.
+with a `ManufacturingRoute` facet (FRAME_PLAN H8). The exporter builds the installed machine and exports its actual parts and joint-derived holes; `machined_package.py` makes the drawings, tables and checks from its output.
 
 ```sh
-cd ~/dev/materia
+cd /media/joao/DATA1/materia-hobber-head
 export HAXEON_COMPILER_SERVER=0; ulimit -s 65536
 # the motor mounts' reference STEP (HZMotion) must be installed: build/suppliers/hzmotion, or MATERIA_HZMOTION_ROOT
 HL=machinekit/examples/flexspline-hobber/supplier-packages/machined
@@ -25,7 +23,7 @@ Python 3 with numpy, and Chrome or Chromium on the PATH for the PDFs; `pdftotext
 |---|---|---|
 | `HOBBER-GE-X-carriage` | milled, 2 setups, fine | block |
 | `HOBBER-GE-Z-saddle` | milled, 2 setups, fine (pocket, bore and 16 screw holes for the eRob 110, R1) | block |
-| `HOBBER-GE-X-drive-pad` | one ground flat bar, 15 mm, under both supports (ground together: coplanar seats), holes of both | 80 x 15 |
+| `HOBBER-GE-X-drive-pad` | one ground flat bar, 15 mm, under both supports (ground together: coplanar seats), holes of both, guard threads in edge lands | 100 x 15 |
 | `HOBBER-GE-Z-drive-pad` | one ground flat bar, 40 mm, under both supports, holes of both, cut by the mount's flange relief and the eRob housing envelope swept over the Z travel plus the 2 mm gap (`HobberZOffset.relief`) | 80 x 40 |
 | `HOBBER-GE-Y-drive-fixed/-floating` | milled L bracket, 1 setup, fine | block |
 | `HOBBER-GE-Y-nut-seat` | milled from 19 mm bar, 1 setup: the seat plane (16 mm) and two key ribs 3.5 x 3 mm either side of the nut block's 20 mm base (the block is located against the screw thrust in both directions) | block |
@@ -44,6 +42,8 @@ Quantities are one per machine. The list is the exporter's `DESIGNS` plus one nu
 hobber member means adding it there.
 
 The P2 export also includes the installed outboard housing, floating sleeve, M36x1 gland, rear cap and ground inner spacer. Their separate routes preserve the indicated housing interface, matched bearing retention and thermal float. Bolt and dowel tables are derived from joints; the gland's two blind pin-spanner holes are functional tool features. See `b-align-outboard` for indication and pinning.
+
+The P4 export adds nine chip shields: eight cut and formed 2 mm steel sheets (inside R2) and one flat rear lid. Routes carry thickness, bend count and radius separately from CNC setups. The STEP is the finished formed shape, not an unfolded blank; the sheet shop must develop the blank using its tooling and bend allowance. No welding. The Z saddle has two 6.5 mm-deep counterbores for its nut-block screw heads, keeping them clear of the guards.
 
 ## What is written
 

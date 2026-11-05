@@ -40,6 +40,9 @@ class HobberDrives {
   /** Width of the ground bar pads under the X and Z supports, mm. */
   public static inline final PAD_WIDTH = 80.0;
 
+  /** X guard threads use the edge lands of 100 mm stock on the existing 100 mm insert. */
+  public static inline final X_PAD_WIDTH = 100.0;
+
   /** Nut-part start from the nut body's centre station. */
   static function partStart(centre:Float):Float return centre - new BallNut().bodyLength / 2;
 

@@ -169,12 +169,24 @@ class HobberAssemblyProcedures {
     ], source: Generated("hobber")
   };
 
+  public static function fitChipGuards():Procedure return {
+    id:"fit-chip-guards",label:"Fit the fixed chip sheets and overlapping carriage skirt",kind:Assembly,start:Assembled,
+    steps:[
+      note("bench","Preassemble the fixed X guard on the bench","Bolt the low front and high rear side sheets to their front and rear lids on the bench, with the M3 heads below the side roofs. This leaves room for the nut driver before the assembly is lowered onto the casting. Do not weld the sheet corners or the lapped height transition.",["XcoverFrontLeft","XcoverFrontRight","XcoverRearLeft","XcoverRearRight","XfrontCover","XrearCover"]),
+      note("feet","Lower the guard before fitting the carriage","Set the formed feet on the X pad and fit the four joint-derived M3 through the tool ports. Use a long 2.5 mm hex key. After the carriage is fitted, front ports are reached at X retract; rear ports at X minimum. Fit the NBR plugs after tightening; their procurement envelope and oil compatibility remain assumed requirements.",["XdrivePad","XfrontCover","XrearCover","XfrontPlugLeft","XfrontPlugRight","XrearPlugLeft","XrearPlugRight"]),
+      note("moving","Fit the skirt and the Z shields to the carriage underside","Bolt the skirt's four tabs and each Z shield's two fixings to the carriage underside. These holes belong to the carriage's existing bottom milling setup; no side drilling or casting modification is needed. Keep the sheet's R2 bends and relief slots free, and keep its feet out of the carriage ribs.",["Xbridge","Xskirt","ZcoverLeft","ZcoverRight"]),
+      note("gaps","Verify the overlaps over full travel","With screws snug, set at least 2 mm running clearance and then tighten. Check the low fixed sheets at A +/-15, X limits and minimum Z. The rear skirt return has reliefs over the high side lips. Nominal end overlaps include 5 mm linear overtravel; flat side overlap is 6 mm. The Z sheets shield the offset screw and used guide region while the saddle moves behind them. Keep the existing block wipers.",["Xskirt","XfrontCover","XrearCover","ZcoverLeft","ZcoverRight"]),
+      note("clean","Keep the tool ports closed","Brush chips from the lapped roofs and refit all four port plugs. These are fixed overlapping chip shields; the enclosure contains mist. No drain is declared for the flat channels, and no new casting floor or bore is implied.",["XfrontPlugLeft","XfrontPlugRight","XrearPlugLeft","XrearPlugRight"])
+    ],source:Generated("hobber")
+  };
+
   public static function build(machine:FlexsplineHobber):Array<Procedure> {
     var result:Array<Procedure> = [];
     for (travel in machine.travel) result.push(alignScrewSupports(travel.id, {lower: travel.lower, upper: travel.upper}));
     result.push(tensionBelt(machine));
     result.push(fitBt30Arbor());
     result.push(alignOutboard());
+    result.push(fitChipGuards());
     result.push(setRails("X", ["railXLeft", "railXRight"]));
     result.push(setRails("Z", ["railZLeft", "railZRight"]));
     result.push(setRails("Y", ["railYLeft", "railYRight"]));

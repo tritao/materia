@@ -17,5 +17,6 @@ class StandardComponents {
     registry.register(RetainingRing.recipeType());
     registry.register(ShaftCollar.recipeType());
     registry.register(Bushing.recipeType());
+    registry.register(PanelHolePlug.recipeType());
   }
 }

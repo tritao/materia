@@ -103,6 +103,18 @@ class HobberJointLoads {
       shear: {peak: CUTTING_FORCE + outboardWeight, momentary: jam + outboardWeight}});
     loads.push({label: "Floating sleeve rear stop cap", between: ["outboard", "outboardCap"],
       shear: {peak: massOf(machine, ["outboardCap"]) * (g + 0.5)}});
+    // Chip guards carry their own mass with the axis acceleration and an assumed
+    // 2 N debris/handling force, not cutting thrust. Apply the whole fixed X
+    // assembly weight to each foot conservatively; all loads remain joint-derived.
+    var fixedGuardWeight=massOf(machine,machinekit.hobbing.HobberChipCover.fixedMembers())*(g+0.5)+2;
+    for(r in machinekit.hobbing.HobberChipCover.installations()) {
+      var shear=r.parent=="XdrivePad"?fixedGuardWeight:massOf(machine,[r.id])*(g+0.5)+2;
+      loads.push({label:"Chip guard "+r.id,between:[r.id,r.parent],shear:{peak:shear}});
+    }
+    // Each lid also transfers weight through its other side, whose fixed tree
+    // parent is the common X pad rather than the lid.
+    loads.push({label:"Front lid on right sheet",between:["XfrontCover","XcoverFrontRight"],shear:{peak:fixedGuardWeight}});
+    loads.push({label:"Rear lid on right sheet",between:["XrearCover","XcoverRearRight"],shear:{peak:fixedGuardWeight}});
     return loads;
   }
 }

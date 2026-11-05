@@ -39,6 +39,13 @@ class HobberFrameChecks {
         {member: "Yplate", fastened: ["outboard"]},
         // The Z scale head's screws are driven from the arm's inner face, where the eRob housing will stand: the head is screwed on before the actuator is fitted.
         {member: "swivel/housing", fastened: ["ZscaleArm"]}]};
+    // Assemble the fixed shield/lid joints on the bench, lower that assembly
+    // onto the bed and fit its foot screws through capped tool ports, then fit
+    // the carriage. The casting otherwise obstructs the lid-nut driver's axis.
+    options.fittedBefore = options.fittedBefore.concat([
+      {member:"bed/casting",fastened:["XfrontCover","XrearCover"]},
+      {member:"Xbridge",fastened:["XcoverFrontLeft","XcoverFrontRight","XcoverRearLeft","XcoverRearRight"]}
+    ]);
     options.fittedBefore = options.fittedBefore.concat([for (id in FlexsplineHobber.outboardMembers()) {member: id, fastened: ["YscaleHead"]}]);
     if (!sweep) options.sweepStates = [];
     return options;
@@ -673,6 +680,7 @@ class HobberFrameChecks {
     if (args.indexOf("scales") >= 0) for (line in scales(machine)) Sys.println(line);
     if (args.indexOf("swivel") >= 0) for (line in swivelLoad(machine)) Sys.println(line);
     if (args.indexOf("zoffset") >= 0) for (line in zOffsetMoments(machine)) Sys.println(line);
+    if (args.indexOf("chipguards") >= 0) for (line in HobberChipGuardChecks.run(machine)) Sys.println(line);
     if (args.indexOf("motorstudy") >= 0) for (line in HobberMotorStudy.run(machine)) Sys.println(line);
     if (args.indexOf("outboard") >= 0) for (line in outboard(machine)) Sys.println(line);
     if (args.indexOf("bt30") >= 0) for (line in bt30(machine)) Sys.println(line);

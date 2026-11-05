@@ -114,6 +114,9 @@ def raw_block(part):
 
 
 def blank_text(part):
+    if part["route"]["kind"] == "FoldedSheet":
+        f = part["route"]["sheet"]
+        return f"sheet {fmt(f['thickness'])} mm; unfold STEP, R{fmt(f['insideRadius'])}"
     if part["route"]["kind"] == "Turned":
         return "round bar blank: supplier proposes diameter and length from the STEP turning axis"
     if part["route"]["kind"] == "CutPlate":
@@ -129,6 +132,8 @@ def supplier_class(part):
         return "CNC milling shop"
     if kind == "Turned":
         return "CNC lathe shop"
+    if kind == "FoldedSheet":
+        return "sheet metal shop"
     return "plate cutter"
 
 
@@ -411,6 +416,11 @@ def notes_for(part):
         notes.append(f"3. Cut from ground flat {s['kind']} {fmt(part['stockCut']['width'])} x {fmt(s['thickness'])}: thickness ±{fmt(s['thicknessTolerance'], 3)}, "
                      f"flatness {fmt(s['flatness'], 3)}, parallelism {fmt(s['parallelism'], 3)} per 100 mm, Ra {fmt(s['roughnessRa'])}. Stock as bought (source: {s.get('source', 'n/a')}{', assumed' if s.get('assumed') else ''}); "
                      "broad faces stay as bought except those marked ground after cutting in the face table; sawn edges as cut.")
+    elif route["kind"] == "FoldedSheet":
+        f = route["sheet"]
+        notes.append(f"3. Cut and form one {fmt(f['thickness'])} mm sheet blank, {f['bends']} bends, inside radius {fmt(f['insideRadius'])} mm. "
+                     "Supplier develops the flat pattern from STEP. Corner and tab reliefs are open; no welding. "
+                     "Set running edges for at least 2 mm installed clearance; oversize fixing holes allow alignment.")
     elif route["kind"] == "Turned":
         notes.append(f"3. Turn in {route['setups']} setup{'s' if route['setups'] > 1 else ''}; grind the functional faces as listed. "
                      "Choose the round bar blank and turning axis from the STEP geometry. Mill cross-features only where listed on the route.")
@@ -538,7 +548,7 @@ def sheet_html(part):
     else:
         data_rows.append(("Stock", blank_text(part)))
     data_rows += [
-        ("Setups", str(route["setups"]) if route["setups"] else "cut only"),
+        ("Bends" if route["kind"] == "FoldedSheet" else "Setups", str(route["sheet"]["bends"]) if route["kind"] == "FoldedSheet" else str(route["setups"]) if route["setups"] else "cut only"),
         ("General tol.", f"ISO 2768-{cls}"),
         ("Size / mass", f"{fmt(part['size'][0])} x {fmt(part['size'][1])} x {fmt(part['size'][2])} mm, {fmt(part['mass'], 3)} kg"),
         ("Finish", "deburred, oiled; ground faces as ground"),

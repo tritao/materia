@@ -50,6 +50,8 @@ class ComponentClassification {
     file(registry, "machinekit.hobbing.table-housing", "Rotary table", ComponentKind.Reference);
     file(registry, "machinekit.hobbing.table-platen", "Rotary table", ComponentKind.Reference);
     file(registry, "machinekit.hobbing.hobber-bracket", "Structure", ComponentKind.MachinePart);
+    file(registry, "machinekit.standard.panel-hole-plug", "Covers", ComponentKind.Generic);
+    file(registry, "machinekit.hobbing.chip-cover", "Covers", ComponentKind.MachinePart);
     file(registry, "machinekit.hobbing.saddle", "Structure", ComponentKind.MachinePart);
     file(registry, "machinekit.hobbing.swivel-housing", "Structure", ComponentKind.Reference);
     file(registry, "machinekit.hobbing.flexspline-cup-blank", "Workpieces", ComponentKind.MachinePart);

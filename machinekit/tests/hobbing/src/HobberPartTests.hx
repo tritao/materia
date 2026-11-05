@@ -46,6 +46,29 @@ class HobberPartTests {
   ];
   public static function run():Void {
     var registry = MachineKitComponents.standard(), parts = members();
+    rejects(() -> ManufacturingRoute.foldedSheet(0, 1, 2), "formed sheet rejects zero thickness");
+    rejects(() -> ManufacturingRoute.foldedSheet(2, 0, 2), "formed sheet needs bends");
+    for (role in HobberChipCover.MADE) {
+      var guard = new HobberChipCover(new ComponentValues().setToken("role", role)), shape = guard.geometry();
+      check(shape.solidCount() == 1 && shape.volume() > 0, "one connected sheet " + role);
+      var sheetRoute:ManufacturingRoute = ManufacturingRoute.of(guard);
+      check(sheetRoute != null && sheetRoute.setups == 0, "sheet production does not invent machining setups " + role);
+      if (role != "Xrear") {
+        var form = sheetRoute.sheet;
+        if (form == null) throw "missing formed-sheet specification";
+        check(Std.string(sheetRoute.kind) == "FoldedSheet", "formed sheet route " + role);
+        near(form.thickness, 2, 0, "shield sheet thickness");
+        near(form.insideRadius, 2, 0, "shield bend radius");
+      } else check(Std.string(sheetRoute.kind) == "CutPlate", "rear lid remains flat cut plate");
+      check(!HobberChipCover.recipeType().materialEditable, "guard steel fixed for stated mass " + role);
+      shape.close();
+    }
+    var plug = new machinekit.standard.PanelHolePlug();
+    var plugMetadata = EngineeringMetadata.of(plug);
+    check(plugMetadata != null && plugMetadata.ratingsBasis == Assumed, "panel plug procurement envelope is assumed");
+    check(plug.fastensByForm() && plug.mountingFace() != null, "panel plug has a retained port interface");
+    check(HobberChipCover.plugs().length == 4, "all four foot tool ports close with plugs");
+    check(HobberChipCover.coverage().length > 0, "end overlaps checked at overtravel");
     var supportBearing = new SpindleBearing();
     near(supportBearing.row.bore, 15, 0, "SKF 7002 journal size");
     near(supportBearing.row.outside, 32, 0, "SKF 7002 housing size");

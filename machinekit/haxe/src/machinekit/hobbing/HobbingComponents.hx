@@ -7,6 +7,7 @@ class HobbingComponents {
     registry.register(FloatingRadialBearing.recipeType());
     registry.register(HobberBracket.recipeType());
     registry.register(HobberSaddle.recipeType());
+    registry.register(HobberChipCover.recipeType());
     registry.register(FlexsplineCupBlank.recipeType());
     registry.register(MandrelSleeve.recipeType());
     registry.register(HobArbor.recipeType());

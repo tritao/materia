@@ -120,6 +120,7 @@ class MachinedPackageExport {
     setups: route.setups,
     toleranceClass: route.toleranceClass,
     stock: stockJson(route),
+    sheet: route.sheet,
     faces: [for (f in route.machinedFaces()) {name: f.name, tolerance: f.tolerance, roughnessRa: f.roughnessRa}]
   };
 
@@ -227,6 +228,10 @@ class MachinedPackageExport {
       if (id == "outboardGland") for (x in [-16.0, 16.0]) holes.push({id: x < 0 ? "spanner1" : "spanner2", kind: "bore", thread: null,
         diameter: 2.0, nominal: 2.0, fit: null, depth: 2.0, position: [x, 0, 27], direction: [0.0, 0, -1]});
       parts.push(exportPart(dir + "/step", part, holes, 1, part.description));
+    }
+    for (r in machinekit.hobbing.HobberChipCover.installations()) {
+      var part=cast(machine.components().filter(m->m.id==r.id)[0].component,machinekit.hobbing.HobberChipCover);
+      parts.push(exportPart(dir+"/step",part,part.derivedRouteHoles().concat(part.toolHoles()),1,part.description));
     }
     var data = {
       machine: "FlexsplineHobber",

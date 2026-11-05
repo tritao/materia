@@ -332,13 +332,15 @@ class HobberSaddle extends MachineComponent {
           faces.push(blockFace("block" + (side < 0 ? "L" : "R") + (row == HobberXLayout.BLOCK_FRONT ? "1" : "2"), [row, side * FoundationLayout.BED_RAIL_CENTRE, 260.0],
             [0.0, 0, 1], [1.0, 0, 0], block, 20, X_BLOCK_SOLE));
         faces.push(nutBlockFace(HobberDrives.x(), 20, [0.0, 0, 0]));
+        faces = faces.concat(HobberChipCover.carriageReceivers());
         // The X scale head's two M5 from the deck's top, counterbored (the column stands on it), into the outer rib's underside.
         faces.push(HobberScales.carrierFace(HobberScales.x(), [0.0, 0, 0], X_HEAD_HOLE_DEPTH - HobberScales.headRecess(), HobberScales.headRecess()));
       case "GE-Z-saddle":
         var block = machinekit.motion.LinearRailBlock.metric("HGH15CA", machinekit.motion.LinearRailBlock.SUPPLIER);
         for (side in [-1, 1]) for (row in [0.0, 110.0])
           faces.push(blockFace("block" + (side < 0 ? "L" : "R") + (row == 0 ? "1" : "2"), [148.0, side * 145.0, row], [-1.0, 0, 0], [0.0, 1, 0], block, 13, PLATE_BLOCK_SOLE));
-        faces.push(nutBlockFace(HobberDrives.z(), 13, [0.0, 0, Z_SADDLE_ORIGIN_Z]));
+        // Flush heads keep the fixed Z chip shield clear throughout saddle travel.
+        faces.push(nutBlockFace(HobberDrives.z(), 6.5, [0.0, 0, Z_SADDLE_ORIGIN_Z], {diameter: 12.0, depth: 6.5}));
         // The eRob housing's 16 M4 into its front face, passed through the 5 mm web from the front (x 135): the plane is the housing's front face.
         faces.push(BoltedFace.clamped("erob", BoltedFace.frameOf({x: HobberSwivelLayout.OUTPUT_X - machinekit.motion.ErobActuatorPart.SEAT_Z, y: 0.0, z: 0.0}, {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
           [for (i in 0...machinekit.motion.ErobActuatorData.FIXED_BOLT_COUNT) {
@@ -379,10 +381,14 @@ class HobberSaddle extends MachineComponent {
         // The Z scale head's two M5 through the arm (10 thick), heads on its inner face.
         faces.push(HobberScales.carrierFace(HobberScales.z(), [0.0, 0, Z_SADDLE_ORIGIN_Z], HobberScales.Z_ARM_THICKNESS));
       case "GE-X-drive-pad":
-        faces.push(seatFace(HobberDrives.x(), "fixed", 15));
-        faces.push(seatFace(HobberDrives.x(), "floating", 15));
+        // Support seats end at the support foot, leaving separate edge lands for the guards.
+        for (support in ["fixed", "floating"]) {
+          var seat = HobberDrives.padBounds(HobberDrives.x(), support, 70, 15);
+          faces.push(seatFace(HobberDrives.x(), support, 15, seat));
+        }
         // The four screws that hold the bar on the bed's drive-seat insert, in the groove floor (`HobberPadBolts`).
         faces.push(HobberPadBolts.face(HobberDrives.x()));
+        faces = faces.concat(HobberChipCover.padReceivers());
       case "GE-Z-drive-pad":
         faces.push(seatFace(HobberDrives.z(), "fixed", 40));
         faces.push(seatFace(HobberDrives.z(), "floating", 40));
@@ -664,14 +670,14 @@ class HobberSaddle extends MachineComponent {
     if (housingRelief) cutters.push(HobberZOffset.padRelief());
     var groove = HobberDrives.nutGroove(axis);
     if (groove != null) cutters.push(padBox(groove));
-    var relieved = Solids.cut(padBox(HobberDrives.padBoundsBoth(axis, PAD_WIDTH, thickness)), cutters);
+    var relieved = Solids.cut(padBox(HobberDrives.padBoundsBoth(axis, axis.id == "X" ? HobberDrives.X_PAD_WIDTH : PAD_WIDTH, thickness)), cutters);
     for (c in cutters) c.close();
     return relieved;
   }
 
   /** How each made design is produced; null for the designs that are not part of the moving structure. */
   static function routeOf(design:String):Null<ManufacturingRoute> {
-    function bar(thickness:Float, faces:Array<MachinedFace>):ManufacturingRoute return ManufacturingRoute.groundStock(GroundStock.bar(PAD_WIDTH, thickness), faces);
+    function bar(thickness:Float, faces:Array<MachinedFace>):ManufacturingRoute return ManufacturingRoute.groundStock(GroundStock.bar(design == "GE-X-drive-pad" ? HobberDrives.X_PAD_WIDTH : PAD_WIDTH, thickness), faces);
     return switch design {
       case "GE-X-carriage":
         ManufacturingRoute.milled(2, "fine", [

@@ -9,10 +9,18 @@ enum RouteKind {
   GroundStock;
   /** Laser- or waterjet-cut plate, flat as rolled. */
   CutPlate;
+  /** Cut and brake-formed sheet; bend count is distinct from machining setups. */
+  FoldedSheet;
   /** CNC milled from a block, in `setups` setups on a 3-axis mill. */
   Milled;
   /** Turned on a lathe, in `setups` setups. */
   Turned;
+}
+
+typedef SheetForm = {
+  final thickness:Float;
+  final bends:Int;
+  final insideRadius:Float;
 }
 
 /** A machined face and what is asked of it. Faces not listed stay as the stock or the cut leaves them. */
@@ -69,8 +77,9 @@ class ManufacturingRoute implements ComponentFacet {
   public final toleranceClass:String;
   public final stock:Null<GroundStockRow>;
   final faces:Array<MachinedFace>;
+  public final sheet:Null<SheetForm>;
 
-  function new(kind:RouteKind, setups:Int, toleranceClass:String, stock:Null<GroundStockRow>, machined:Array<MachinedFace>) {
+  function new(kind:RouteKind, setups:Int, toleranceClass:String, stock:Null<GroundStockRow>, machined:Array<MachinedFace>, ?sheet:SheetForm) {
     if (setups < 0) throw "A route has a non-negative number of setups";
     if (toleranceClasses().indexOf(toleranceClass) < 0) throw 'Unknown tolerance class "$toleranceClass"';
     for (face in machined) {
@@ -81,6 +90,7 @@ class ManufacturingRoute implements ComponentFacet {
     this.setups = setups;
     this.toleranceClass = toleranceClass;
     this.stock = stock;
+    this.sheet = sheet;
     faces = [for (face in machined) {name: face.name, tolerance: face.tolerance, roughnessRa: face.roughnessRa}];
   }
 
@@ -93,6 +103,12 @@ class ManufacturingRoute implements ComponentFacet {
 
   /** Laser- or waterjet-cut plate; holes and the profile come with the cut. */
   public static function cutPlate():ManufacturingRoute return new ManufacturingRoute(CutPlate, 0, "general", null, []);
+
+  /** Formed from one blank, with the specified finished inside bend radius. */
+  public static function foldedSheet(thickness:Float, bends:Int, insideRadius:Float):ManufacturingRoute {
+    if (!(thickness > 0) || !Math.isFinite(thickness) || bends < 1 || !(insideRadius > 0) || !Math.isFinite(insideRadius)) throw "Invalid formed-sheet route";
+    return new ManufacturingRoute(FoldedSheet, 0, "general", null, [], {thickness:thickness,bends:bends,insideRadius:insideRadius});
+  }
 
   /**
 	 * Milled in `setups` setups. `extent` is the longest side of the finished part, mm. A tight class needs at least one
@@ -122,6 +138,10 @@ class ManufacturingRoute implements ComponentFacet {
       "ground " + row.kind + " " + Dimension.format(row.thickness) + " mm, cut" + (faces.length == 0 ? "" : " and machined");
     case CutPlate:
       "cut plate";
+    case FoldedSheet:
+      var form = sheet;
+      if (form == null) throw "Formed sheet route lost its specification";
+      "cut and formed sheet, " + Dimension.format(form.thickness) + " mm, " + form.bends + " bends, inside R" + Dimension.format(form.insideRadius);
     case Milled:
       "CNC milling, " + setups + (setups == 1 ? " setup, " : " setups, ") + toleranceClass + " tolerance";
     case Turned:
@@ -138,6 +158,12 @@ class ManufacturingRoute implements ComponentFacet {
     out.push(ProcurementCodec.choice("toleranceClass", toleranceClass));
     var row = stock;
     if (row != null) out.push(ProcurementCodec.requirement("stockThickness", "mm", null, null, row.thickness));
+    var form = sheet;
+    if (form != null) {
+      out.push(ProcurementCodec.requirement("sheetThickness", "mm", null, null, form.thickness));
+      out.push(ProcurementCodec.requirement("bends", "count", null, null, form.bends));
+      out.push(ProcurementCodec.requirement("insideBendRadius", "mm", null, null, form.insideRadius));
+    }
     if (faces.length > 0) {
       var tightest = 1e9;
       for (face in faces) tightest = Math.min(tightest, face.tolerance);
@@ -155,6 +181,8 @@ class ManufacturingRoute implements ComponentFacet {
       faces.length == 0 ? "stock supplier" : "stock supplier and machine shop";
     case CutPlate:
       "plate cutter";
+    case FoldedSheet:
+      "sheet metal shop";
     case Milled:
       "machine shop";
     case Turned:

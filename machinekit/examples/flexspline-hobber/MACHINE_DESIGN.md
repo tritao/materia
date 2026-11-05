@@ -705,6 +705,30 @@ swivel plate holds the rails, blocks and screw. The geometry that would make the
 ends (a 20 mm taller column), and a purpose-made wall for the X front (an insert extended 14 mm forward with the channel front, or the pad bar milled with an upstand). The channel floor
 is the ground drive-seat insert over 100 of 110 mm, so no casting fall or drain was cut; gutters need a wider channel (at least 150 mm) and the deck ribs' inner faces, now on the channel walls, would move.
 
+Phase P4 implements fixed lapped X shields and a moving skirt, rather than the
+bellows evaluated above. Nine steel sheets are individual, connected solids:
+four fixed side profiles, front/rear lids, the X skirt and two Z shields. Each
+formed role is cut from one 2 mm blank with R2 inside bends; the rear lid stays
+flat. No welding is required. The X ground pad is 100 mm wide (previously 80),
+matching its existing 100 mm insert and providing edge distance for guard
+threads. The castings and their inserts are unchanged. All mounting holes and
+hardware derive from BoltedFace joints; tool-access ports follow four assumed
+D10 / 2 mm-panel NBR plugs. Their nominal envelopes and oil compatibility are
+procurement requirements to qualify, not supplier data.
+
+The X lid ends clear the nut block at 5 mm overtravel, while the carriage skirt
+laps them by 14.5 mm at the front and 39.5 mm at the rear; side flat overlap is
+6 mm (10 mm projected edge overlap). The Z sheets shield the offset screw and
+exposed rail channels from Z282 to 750. Their roots and skirt tabs bolt from
+below into the existing carriage underside, preserving its two machining
+setups. Fixed lid nuts are tightened on the bench before the assembly is
+lowered onto the bed; the fixed feet are then tightened through the plugged
+ports with a long key. Fit the moving guards before lowering the carriage.
+Clear chips from the laps, refit all plugs and verify the minimum 2 mm moving
+gap throughout travel. The guards do not seal the machine: block wipers remain
+and the enclosure must contain oil mist. No drain is declared because the
+flat channel has no modelled fall or bore.
+
 Service removals (declared, `FlexsplineHobber.serviceRemovals`, swept by `ServiceChecks`): the X, Y, Z and B servos come off along their own axes (shaft out of the coupling, 45 mm);
 the B belt slides off along its pulleys (40 mm); the B cartridge with the hob and arbor leaves forward out of its split clamp (240 mm, X at retract, belt, outboard carrier/support/bearing and Y reading head off); the X screw and nut leave
 upward after 25 mm rearward, once the motor, the BK12, the BF12's ring and the carriage stack are off. Blocked (reported by `HobberFrameChecks.service`, `serviceTries`): the X screw

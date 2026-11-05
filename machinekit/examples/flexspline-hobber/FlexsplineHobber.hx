@@ -440,6 +440,11 @@ class FlexsplineHobber extends MachineAssembly {
       precisionMounts,
       [for (mount in precisionMounts) mount.name => mount.name]
     ).throwIfErrors();
+    // P4: fixed lapped X sheets, the carriage skirt, and Z channel shields.
+    // All feet are on existing steel parts; the castings are unchanged.
+    for (r in HobberChipCover.installations()) fixAt(r.id, new HobberChipCover(new ComponentValues().setToken("role",r.role)), F.identity(),r.parent,r.seat);
+    for (p in HobberChipCover.plugs()) fixAt(p.id,new machinekit.standard.PanelHolePlug(),F.translation(p.x,p.y,p.z),p.parent,
+      F.alongY(p.x,p.y,p.z,0,0,-1));
     // The screws, washers, nuts and the holes they need follow from the bolted faces the parts declare (BOM_PLAN F1).
     deriveFasteners();
     // The loads the joints carry come from the finished parts (masses), so they are checked after the derived holes are cut.
@@ -521,7 +526,9 @@ class FlexsplineHobber extends MachineAssembly {
     var stack = below("Xbridge").concat(["Xbridge"]).filter(id -> id != "Xnut");
     out.push(ServiceRemoval("xScrewWithdrawal", ["Xscrew", "Xcoupling", "Xnut"],
       [{direction: worldDir(1, 0, 0), distance: 25.0}, {direction: worldDir(0, 0, 1), distance: 130.0}],
-      ["Xmotor", "Xmotor-shaft", "Xfixed", "XfloatingRing"].concat(stack), []));
+      ["Xmotor", "Xmotor-shaft", "Xfixed", "XfloatingRing"].concat(stack).concat(HobberChipCover.fixedMembers()), []));
+    out.push(ServiceRemoval("xChipGuardWithdrawal",HobberChipCover.fixedMembers(),
+      [{direction:worldDir(0,0,1),distance:100.0}],stack,[]));
     return out;
   }
 
