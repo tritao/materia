@@ -56,6 +56,8 @@ class HobberZOffset {
   public static inline final HOLE_MARGIN = 1.0;
   /** Widest drive seat insert the casting wants (the width of the old central one), mm. */
   public static inline final MAX_INSERT_WIDTH = 100.0;
+  /** What a surface point's closed-form distance to the envelope may be off by (tolerance and rounding), mm. */
+  static inline final POINT_MARGIN = 1e-3;
 
   static var cache:Null<ZOffsetResult>;
 
@@ -74,16 +76,7 @@ class HobberZOffset {
 
   /** The housing envelope (body, rear boss, connectors) swept over the Z joint range `lo`..`hi`, grown by `grow`, in the work frame. */
   public static function envelope(lo:Float, hi:Float, grow:Float):Part {
-    var front = HobberSwivelLayout.OUTPUT_X + E.PILOT_HEIGHT;
-    // Segments along work x: the Ø110 body from the front face, the Ø85 rear boss, the connectors (the boss's envelope to the overall length).
-    var bodyEnd = HobberSwivelLayout.OUTPUT_X + E.BODY_LENGTH - E.REAR_SPIGOT_HEIGHT;
-    var bossEnd = HobberSwivelLayout.OUTPUT_X + E.BODY_LENGTH;
-    var connectorEnd = HobberSwivelLayout.OUTPUT_X + E.OVERALL_LENGTH;
-    var segments = [
-      {x0: front - grow, x1: bodyEnd + grow, r: E.BODY_DIAMETER / 2 + grow},
-      {x0: bodyEnd, x1: bossEnd + grow, r: E.REAR_SPIGOT_DIAMETER / 2 + grow},
-      {x0: bossEnd, x1: connectorEnd + grow, r: E.REAR_SPIGOT_DIAMETER / 2 + grow}
-    ];
+    var segments = envelopeSegments(grow);
     var pieces:Array<Part> = [];
     var zLow = HobberZLayout.SEAT_Z + lo, zHigh = HobberZLayout.SEAT_Z + hi;
     for (s in segments) {
@@ -99,6 +92,34 @@ class HobberZOffset {
       }
     }
     return Solids.union(pieces);
+  }
+
+  /**
+   * The distance from a point to `envelope(lo, hi, grow)`, in closed form: each segment is the set within its radius, across
+   * y and z, of the line z = SEAT_Z + lo .. SEAT_Z + hi at y = 0, over its x span (a cylinder along x when lo = hi), so the
+   * distance to it is the x overshoot combined with the radial overshoot beyond the radius.
+   */
+  public static function envelopeDistance(lo:Float, hi:Float, grow:Float, x:Float, y:Float, z:Float):Float {
+    var zLow = HobberZLayout.SEAT_Z + lo, zHigh = HobberZLayout.SEAT_Z + Math.max(lo, hi), best = Math.POSITIVE_INFINITY;
+    for (s in envelopeSegments(grow)) {
+      var dx = Math.max(0, Math.max(s.x0 - x, x - s.x1)), dz = z - Math.max(zLow, Math.min(zHigh, z));
+      var radial = Math.max(0, Math.sqrt(y * y + dz * dz) - s.r);
+      best = Math.min(best, Math.sqrt(dx * dx + radial * radial));
+    }
+    return best;
+  }
+
+  static function envelopeSegments(grow:Float):Array<{x0:Float, x1:Float, r:Float}> {
+    var front = HobberSwivelLayout.OUTPUT_X + E.PILOT_HEIGHT;
+    // Segments along work x: the Ø110 body from the front face, the Ø85 rear boss, the connectors (the boss's envelope to the overall length).
+    var bodyEnd = HobberSwivelLayout.OUTPUT_X + E.BODY_LENGTH - E.REAR_SPIGOT_HEIGHT;
+    var bossEnd = HobberSwivelLayout.OUTPUT_X + E.BODY_LENGTH;
+    var connectorEnd = HobberSwivelLayout.OUTPUT_X + E.OVERALL_LENGTH;
+    return [
+      {x0: front - grow, x1: bodyEnd + grow, r: E.BODY_DIAMETER / 2 + grow},
+      {x0: bodyEnd, x1: bossEnd + grow, r: E.REAR_SPIGOT_DIAMETER / 2 + grow},
+      {x0: bossEnd, x1: connectorEnd + grow, r: E.REAR_SPIGOT_DIAMETER / 2 + grow}
+    ];
   }
 
   /** The relief the floating pad needs: the housing's envelope over the Z travel grown by the running gap. */
@@ -136,12 +157,12 @@ class HobberZOffset {
     }
     // Obstacles: name, part at y = 0, the housing it is measured against.
     var obstacles = [
-      {name: "BK12 mount (fixed)", part: fixedMount, against: swept},
-      {name: "BF12 support (floating)", part: floatingSupport, against: swept},
-      {name: "ball nut", part: nutPart, against: here},
-      {name: "nut block", part: blockPart, against: here}
+      {name: "BK12 mount (fixed)", part: fixedMount, against: swept, lo: s.lower, hi: s.upper},
+      {name: "BF12 support (floating)", part: floatingSupport, against: swept, lo: s.lower, hi: s.upper},
+      {name: "ball nut", part: nutPart, against: here, lo: 0.0, hi: 0.0},
+      {name: "nut block", part: blockPart, against: here, lo: 0.0, hi: 0.0}
     ];
-    function obstacleGap(o:{name:String, part:Part, against:Part}, a:Float):Float {
+    function obstacleGap(o:{name:String, part:Part, against:Part, lo:Float, hi:Float}, a:Float):Float {
       var moved = o.part.translated(new Vector(0, SIDE * a, 0)), d = moved.distance(o.against);
       moved.close();
       return d;
@@ -160,6 +181,23 @@ class HobberZOffset {
       out.push({name: "floating pad seat holes to relief", gap: holesGap(a)});
       return out;
     }
+    // A point of an obstacle bounds its gap from above by the point's distance to the housing's envelope (closed form), so a
+    // step where some point is short of the need fails without the exact query, by at least that shortfall. The points are
+    // the nodes of a coarse tessellation, which lie on the obstacle's surface, taken the first time an obstacle needs them.
+    // `POINT_MARGIN` keeps the nodes' tolerance and the closed form's rounding from deciding a step.
+    var points:Array<Null<Array<Float>>> = [for (_ in obstacles) null];
+    function pointGap(index:Int, a:Float):Float {
+      var o = obstacles[index], nodes = points[index];
+      if (nodes == null) {
+        var mesh = o.part.shape.tessellate(1.0, 0.5);
+        nodes = [for (i in 0...mesh.vertexCount * 3) mesh.vertices.getDouble(i * 8)];
+        points[index] = nodes;
+      }
+      var best = Math.POSITIVE_INFINITY, shift = SIDE * a;
+      for (i in 0...Std.int(nodes.length / 3)) best = Math.min(best,
+        envelopeDistance(o.lo, o.hi, 0, nodes[3 * i], nodes[3 * i + 1] + shift, nodes[3 * i + 2]));
+      return best + POINT_MARGIN;
+    }
     // Boxes bound each part, so their separation bounds the distance from below. A step an obstacle's boxes clear by a
     // millimetre beyond its need passes that obstacle without the exact query (the gap of a failing one is still exact).
     var boxes = [for (o in obstacles) {part: PosedParts.boxOf(o.part), against: PosedParts.boxOf(o.against)}];
@@ -174,11 +212,29 @@ class HobberZOffset {
     function shortfall(a:Float):Float {
       for (index in 0...obstacles.length) {
         if (boxGap(index, a) >= RUNNING_GAP + 1) continue;
+        var bound = pointGap(index, a);
+        if (bound < RUNNING_GAP - 1e-6) return RUNNING_GAP - 1e-6 - bound;
         var gap = obstacleGap(obstacles[index], a);
         if (gap < RUNNING_GAP - 1e-6) return RUNNING_GAP - 1e-6 - gap;
       }
       var gap = holesGap(a);
       return gap < HOLE_MARGIN - 1e-6 ? HOLE_MARGIN - 1e-6 - gap : 0;
+    }
+    // The gaps that can govern at `a`: an obstacle whose boxes already clear it by more than the least margin measured
+    // cannot be the least, so its exact gap is not needed to name the governing one.
+    function governingGaps(a:Float):Array<{name:String, gap:Float}> {
+      var holes = holesGap(a), best = holes - HOLE_MARGIN, exact:Array<Null<Float>> = [for (_ in obstacles) null];
+      var order = [for (index in 0...obstacles.length) index];
+      order.sort((i, j) -> Reflect.compare(boxGap(i, a), boxGap(j, a)));
+      for (index in order) {
+        if (boxGap(index, a) - RUNNING_GAP > best) continue;
+        var gap = obstacleGap(obstacles[index], a);
+        exact[index] = gap;
+        best = Math.min(best, gap - RUNNING_GAP);
+      }
+      var out = [for (index in 0...obstacles.length) if (exact[index] != null) {name: obstacles[index].name, gap: (exact[index] : Float)}];
+      out.push({name: "floating pad seat holes to relief", gap: holes});
+      return out;
     }
     function governing(g:Array<{name:String, gap:Float}>):String {
       var name = "", worst = 1e9;
@@ -205,7 +261,7 @@ class HobberZOffset {
       a += Math.max(1.0, Math.ceil(deficit - 1e-6));
     }
     var maximum = FoundationLayout.COLUMN_HEAD_WIDTH / 2 - (reach + FoundationLayout.SOURCE_STEEL_COVER_MM);
-    var below = found == null ? [] : gapsAt(Math.max(0.0, found - 1.0));
+    var below = found == null ? [] : governingGaps(Math.max(0.0, found - 1.0));
     var g = found == null ? [] : gapsAt(found);
     for (o in obstacles) o.part.close();
     for (t in tools) t.close();
