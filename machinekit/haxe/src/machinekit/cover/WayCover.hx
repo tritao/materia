@@ -2,9 +2,24 @@ package machinekit.cover;
 
 import machinekit.assembly.AxisBuilder;
 import machinekit.assembly.AxisBuilder.AxisSpec;
+import machinekit.assembly.MachineAssembly;
+import machinekit.component.MachineComponent;
+import machinekit.cover.WayCoverPlan.CoverShape;
 import machinekit.cover.WayCoverSection.WayCoverRole;
 import machinekit.design.DesignRequirement;
 import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
+
+/**
+ * What `WayCover.installOn` needs of an assembly besides the joints and couplings every `MachineAssembly` has: the direction an
+ * axis moves its carriage, and placing a member (fixed to its parent, or hung on it with the joint to be added by the caller) at a pose
+ * with all axes at zero. `AxisBuilder` is one; a machine that builds its own members (the bench mill) implements it too.
+ */
+interface CoverMembers {
+  function axisDirection(id:String):Array<Float>;
+  function attach(id:String, component:MachineComponent, pose:AssemblyFrame, parent:String):Void;
+  function hang(id:String, component:MachineComponent, pose:AssemblyFrame, parent:String):Void;
+}
 
 /** Where a way cover goes: between a fixed and a moving member along a prismatic joint. */
 typedef WayCoverPlacement = {
@@ -26,6 +41,8 @@ typedef WayCoverPlacement = {
   var height:Float;
   /** Length between the two mounting planes with the joint at its end stop where they are closest, mm. */
   var space:Float;
+  /** A ring (all four sides, the default) or a box cover that stands on a surface at `origin`; see `WayCoverPlan.CoverShape`. */
+  @:optional var shape:CoverShape;
 };
 
 /**
@@ -58,10 +75,13 @@ class WayCover {
   /** Every member of the cover, fixed flange first. */
   public function members():Array<String> return [fixedMember].concat(skinMembers).concat([movingMember]);
 
-  public static function install(builder:AxisBuilder, p:WayCoverPlacement):WayCover {
+  public static function install(builder:AxisBuilder, p:WayCoverPlacement):WayCover return installOn(builder, builder, p);
+
+  /** `install` on any assembly that places its own members (`CoverMembers`). */
+  public static function installOn(builder:MachineAssembly, members:CoverMembers, p:WayCoverPlacement):WayCover {
     var row = WayCoverCatalog.get(p.row);
-    var plan = new WayCoverPlan(row, p.width, p.height, p.leader.upper - p.leader.lower, p.space);
-    var axis = builder.axisDirection(p.leader.id);
+    var plan = new WayCoverPlan(row, p.width, p.height, p.leader.upper - p.leader.lower, p.space, p.shape);
+    var axis = members.axisDirection(p.leader.id);
     var sense = axis[0] * p.along[0] + axis[1] * p.along[1] + axis[2] * p.along[2];
     if (Math.abs(Math.abs(sense) - 1) > 1e-6) throw 'Way cover ${p.id}: the cover must run along the joint ${p.leader.id}, not across it';
     var s:Float = sense > 0 ? 1 : -1;
@@ -69,12 +89,12 @@ class WayCover {
     var folded = s > 0 ? p.leader.lower : p.leader.upper;
     var extension0 = s * (0 - folded);
     var fixedId = p.id + "-fixed", movingId = p.id + "-moving";
-    function section(role:WayCoverRole, level:Int):WayCoverSection return new WayCoverSection(row, role, level, p.width, p.height, p.leader.upper - p.leader.lower, p.space);
+    function section(role:WayCoverRole, level:Int):WayCoverSection return new WayCoverSection(row, role, level, p.width, p.height, p.leader.upper - p.leader.lower, p.space, p.shape);
     function pose(distance:Float, flip:Bool) return AxisBuilder.orient(
       p.origin[0] + p.along[0] * distance, p.origin[1] + p.along[1] * distance, p.origin[2] + p.along[2] * distance,
       p.up, flip ? [-p.along[0], -p.along[1], -p.along[2]] : p.along
     );
-    builder.attach(fixedId, section(Fixed, 0), pose(0, false), p.fixedParent);
+    members.attach(fixedId, section(Fixed, 0), pose(0, false), p.fixedParent);
     var skins:Array<String> = [];
     var n = plan.levels, tf = row.flangeThickness;
     // Skin k of n sits k/n along the free span; each rides on the one before it, so each joint carries 1/n of the growth.
@@ -82,7 +102,7 @@ class WayCover {
       var id = p.id + "-s" + k;
       var start = tf + WayCoverPlan.AXIAL_GAP + k / n * (plan.slack() + s * (0 - folded));
       var parent = k == 1 ? fixedId : p.id + "-s" + (k - 1);
-      builder.hang(id, section(Sleeve, k), pose(start, false), parent);
+      members.hang(id, section(Sleeve, k), pose(start, false), parent);
       var ratio = s / n;
       var low = Math.min(ratio * p.leader.lower, ratio * p.leader.upper), high = Math.max(ratio * p.leader.lower, ratio * p.leader.upper);
       builder.addMateOnAxis(id + "-joint", "prismatic", parent, 'to-$id', id, 'attach-$id', {x: p.along[0], y: p.along[1], z: p.along[2]},
@@ -90,7 +110,7 @@ class WayCover {
       builder.addCoupling(id + "-follows", p.leader.id, id + "-joint", ratio);
       skins.push(id);
     }
-    builder.attach(movingId, section(Moving, n), pose(p.space + extension0, true), p.movingParent);
+    members.attach(movingId, section(Moving, n), pose(p.space + extension0, true), p.movingParent);
     return new WayCover(p.id, plan, fixedId, movingId, skins, folded);
   }
 }

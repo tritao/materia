@@ -10,6 +10,7 @@ import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.cover.WayCoverCatalog.WayCoverRow;
+import machinekit.cover.WayCoverPlan.CoverShape;
 
 /** Which piece of a way cover a `WayCoverSection` is. */
 enum WayCoverRole {
@@ -34,16 +35,16 @@ class WayCoverSection extends MachineComponent {
   public final role:WayCoverRole;
   public final level:Int;
 
-  public function new(row:WayCoverRow, role:WayCoverRole, level:Int, width:Float, height:Float, stroke:Float, space:Float) {
-    var plan = new WayCoverPlan(row, width, height, stroke, space);
+  public function new(row:WayCoverRow, role:WayCoverRole, level:Int, width:Float, height:Float, stroke:Float, space:Float, ?shape:CoverShape) {
+    var plan = new WayCoverPlan(row, width, height, stroke, space, shape);
     if (level < 0 || level > plan.levels) throw 'Way cover ${row.id} has skins 0 to ${plan.levels}, not $level';
     if (role == Fixed && level != 0) throw "The fixed flange carries skin 0";
     if (role == Moving && level != plan.levels) throw 'The moving flange carries skin ${plan.levels}';
     if (role == Sleeve && (level < 1 || level >= plan.levels)) throw "A loose skin is neither the first nor the last";
     super(
-      baseNumber(row, width, height, stroke, space) + (role == Fixed ? "" : role == Moving ? "-M" : '-S$level'),
+      baseNumber(row, width, height, stroke, space, plan.shape) + (role == Fixed ? "" : role == Moving ? "-M" : '-S$level'),
       row.description + ", " + Dimension.format(width) + " x " + Dimension.format(height) + " opening, " + Dimension.format(stroke) + " mm stroke"
-      + (role == Fixed ? "" : role == Moving ? " (moving flange and skin)" : ' (skin $level)'),
+      + (plan.shape.open ? ", box cover" : "") + (role == Fixed ? "" : role == Moving ? " (moving flange and skin)" : ' (skin $level)'),
       row.material,
       true
     );
@@ -53,11 +54,12 @@ class WayCoverSection extends MachineComponent {
     addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null)));
     addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
       .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", row.basis)));
-    if (role != Fixed) includedInPurchase(baseNumber(row, width, height, stroke, space));
+    if (role != Fixed) includedInPurchase(baseNumber(row, width, height, stroke, space, plan.shape));
   }
 
-  public static function baseNumber(row:WayCoverRow, width:Float, height:Float, stroke:Float, space:Float):String
-    return 'WAYCOVER-${row.id}-${Dimension.format(width)}x${Dimension.format(height)}-S${Dimension.format(stroke)}-L${Dimension.format(space)}';
+  public static function baseNumber(row:WayCoverRow, width:Float, height:Float, stroke:Float, space:Float, ?shape:CoverShape):String
+    return 'WAYCOVER-${row.id}-${Dimension.format(width)}x${Dimension.format(height)}-S${Dimension.format(stroke)}-L${Dimension.format(space)}'
+      + (shape != null && shape.open ? "-BOX" : "");
 
   /** The face the flange bolts down by. */
   override public function fasteningFaces():Array<BoltedFace> {
@@ -76,13 +78,35 @@ class WayCoverSection extends MachineComponent {
     )];
   }
 
-  /** The flange holes in its face frame: along the middle of the lip, at most `holePitch` apart. */
+  /**
+   * The flange holes in its face frame: along the middle of the lip, at most `holePitch` apart. An open cover has no bottom row; its
+   * holes are only where the host face exists (`CoverShape.hostMin`/`hostMax`, heights above the surface), at least an edge distance in.
+   */
   public function holes():Array<{x:Float, y:Float}> {
-    var hx = plan.outerWidth() / 2 - plan.row.lip / 2, hy = plan.outerHeight() / 2 - plan.row.lip / 2;
-    var nx = Math.ceil(2 * hx / plan.row.holePitch), ny = Math.ceil(2 * hy / plan.row.holePitch);
+    var hx = plan.outerWidth() / 2 - plan.row.lip / 2;
     var out:Array<{x:Float, y:Float}> = [];
-    for (i in 0...nx + 1) for (sy in [-1, 1]) out.push({x: -hx + 2 * hx * i / nx, y: sy * hy});
-    for (j in 1...ny) for (sx in [-1, 1]) out.push({x: sx * hx, y: -hy + 2 * hy * j / ny});
+    if (!plan.shape.open) {
+      var hy = plan.outerHeight() / 2 - plan.row.lip / 2;
+      var nx = Math.ceil(2 * hx / plan.row.holePitch), ny = Math.ceil(2 * hy / plan.row.holePitch);
+      for (i in 0...nx + 1) for (sy in [-1, 1]) out.push({x: -hx + 2 * hx * i / nx, y: sy * hy});
+      for (j in 1...ny) for (sx in [-1, 1]) out.push({x: sx * hx, y: -hy + 2 * hy * j / ny});
+      return out;
+    }
+    var edge = plan.row.lip / 2, hostLow = plan.shape.hostMin + edge, hostHigh = plan.shape.hostMax - edge;
+    var roof = plan.plateHigh(plan.levels) - plan.row.lip / 2;
+    if (roof >= hostLow - 1e-9 && roof <= hostHigh + 1e-9) {
+      var nx = Math.ceil(2 * hx / plan.row.holePitch);
+      for (i in 0...nx + 1) out.push({x: -hx + 2 * hx * i / nx, y: roof});
+    }
+    // The walls' lips: from the roof down (or from the top of the host face) to the lowest host height, at most a pitch apart.
+    var top = Math.min(roof - (out.length > 0 ? 10 : 0), hostHigh), bottom = Math.max(hostLow, WayCoverPlan.FLOOR_GAP + edge);
+    if (top >= bottom - 1e-9) {
+      var ny = Std.int(Math.max(1, Math.ceil((top - bottom) / plan.row.holePitch)));
+      for (j in 0...ny + 1) {
+        var y = top - (top - bottom) * j / ny;
+        for (sx in [-1, 1]) out.push({x: sx * hx, y: y});
+      }
+    }
     return out;
   }
 
@@ -90,41 +114,46 @@ class WayCoverSection extends MachineComponent {
 
   override public function hasGeometry():Bool return true;
 
-  static function slab(width:Float, height:Float, z0:Float, z1:Float):Part {
-    var box = Part.box(width, height, z1 - z0), moved = box.translated(new cadkit.modeling.Vector(0, 0, z0));
+  /** A box centred across the frame (x), `y0` to `y1` up and `z0` to `z1` along. */
+  static function slab(halfWidth:Float, y0:Float, y1:Float, z0:Float, z1:Float):Part {
+    var box = Part.box(2 * halfWidth, y1 - y0, z1 - z0), moved = box.translated(new cadkit.modeling.Vector(0, (y0 + y1) / 2, z0));
     box.close();
     return moved;
   }
 
-  static function ring(outerW:Float, outerH:Float, innerW:Float, innerH:Float, z0:Float, z1:Float):Part
-    return Solids.cut(slab(outerW, outerH, z0, z1), [slab(innerW, innerH, z0 - 1, z1 + 1)]);
+  /** The solid between an outer and an inner section: both rectangles are given by their half width and height range. */
+  static function ring(outerHalf:Float, oy0:Float, oy1:Float, innerHalf:Float, iy0:Float, iy1:Float, z0:Float, z1:Float):Part
+    return Solids.cut(slab(outerHalf, oy0, oy1, z0, z1), [slab(innerHalf, iy0, iy1, z0 - 1, z1 + 1)]);
 
   function skin(z0:Float, z1:Float):Part {
-    var row = plan.row, w = 2 * plan.innerHalfWidth(level), h = 2 * plan.innerHalfHeight(level);
-    return ring(w + 2 * row.wall, h + 2 * row.wall, w, h, z0, z1);
+    var row = plan.row, w = plan.innerHalfWidth(level);
+    return ring(w + row.wall, plan.outerLow(level), plan.outerHigh(level), w, plan.innerLow(level), plan.innerHigh(level), z0, z1);
   }
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var row = plan.row;
     if (role == Sleeve) return Solids.building([], owned -> {
       // The slide lip at the start end rides on the next smaller skin, which is how a loose skin is held and touches its parent.
-      var w = 2 * plan.innerHalfWidth(level), h = 2 * plan.innerHalfHeight(level), g = 2 * row.gap;
+      var w = plan.innerHalfWidth(level), g = row.gap;
       var shell = skin(0, plan.looseSkin());
       owned.push(shell);
-      var lip = ring(w, h, w - g, h - g, 0, WayCoverPlan.LIP);
+      var open = plan.shape.open;
+      var lip = ring(w, open ? WayCoverPlan.FLOOR_GAP : plan.innerLow(level), plan.innerHigh(level), w - g, open ? WayCoverPlan.FLOOR_GAP - 1 : plan.innerLow(level) + g,
+        plan.innerHigh(level) - g, 0, WayCoverPlan.LIP);
       owned.push(lip);
       return Solids.union([shell, lip]);
     });
     return Solids.building([], owned -> {
-      var plate = ring(plan.outerWidth(), plan.outerHeight(), plan.width, plan.height, 0, row.flangeThickness);
+      var half = plan.outerWidth() / 2;
+      var plate = ring(half, plan.plateLow(plan.levels), plan.plateHigh(plan.levels), plan.width / 2, plan.openingLow(), plan.openingHigh(), 0, row.flangeThickness);
       owned.push(plate);
       var shell = skin(row.flangeThickness, row.flangeThickness + plan.flangeSkin());
       owned.push(shell);
       var parts = [plate, shell];
       if (role == Moving) {
-        // The wiper pad: from the opening out to the skin, standing on the plate's inner face.
-        var pad = ring(2 * plan.innerHalfWidth(level), 2 * plan.innerHalfHeight(level), plan.width, plan.height, row.flangeThickness,
-          row.flangeThickness + row.wiper);
+        // The wiper pad: a lip hugging the protected profile, from the opening out to the first skin, standing on the plate's inner face.
+        var pad = ring(plan.innerHalfWidth(0), plan.shape.open ? WayCoverPlan.FLOOR_GAP : plan.innerLow(0), plan.innerHigh(0), plan.width / 2, plan.openingLow(), plan.openingHigh(),
+          row.flangeThickness, row.flangeThickness + row.wiper);
         owned.push(pad);
         parts.push(pad);
       }
@@ -146,10 +175,14 @@ class WayCoverSection extends MachineComponent {
         ComponentRecipeSupport.length("width", 40),
         ComponentRecipeSupport.length("height", 40),
         ComponentRecipeSupport.length("stroke", 300),
-        ComponentRecipeSupport.length("space", 120)
+        ComponentRecipeSupport.length("space", 120),
+        ComponentRecipeSupport.choice("section", ["Ring", "Box"], "Ring"),
+        ComponentRecipeSupport.length("hostMin", 0),
+        ComponentRecipeSupport.length("hostMax", 100000)
       ],
       v -> {
-        var row = WayCoverCatalog.get(v.token("row")), plan = new WayCoverPlan(row, v.number("width"), v.number("height"), v.number("stroke"), v.number("space"));
+        var shape:CoverShape = {open: v.token("section") == "Box", hostMin: v.number("hostMin"), hostMax: v.number("hostMax")};
+        var row = WayCoverCatalog.get(v.token("row")), plan = new WayCoverPlan(row, v.number("width"), v.number("height"), v.number("stroke"), v.number("space"), shape);
         var role = switch v.token("role") {
           case "Sleeve": Sleeve;
           case "Moving": Moving;
@@ -157,12 +190,12 @@ class WayCoverSection extends MachineComponent {
         };
         // The defaults describe the fixed flange; the other roles name the skin they are.
         return new WayCoverSection(row, role, role == Fixed ? 0 : role == Moving ? plan.levels : v.integer("level"), v.number("width"), v.number("height"),
-          v.number("stroke"), v.number("space"));
+          v.number("stroke"), v.number("space"), shape);
       },
       true
     ).numbered(v -> {
       var row = WayCoverCatalog.get(v.token("row"));
-      var base = baseNumber(row, v.number("width"), v.number("height"), v.number("stroke"), v.number("space"));
+      var base = baseNumber(row, v.number("width"), v.number("height"), v.number("stroke"), v.number("space"), {open: v.token("section") == "Box", hostMin: 0, hostMax: 0});
       return v.token("role") == "Fixed" ? base : v.token("role") == "Moving" ? base + "-M" : base + "-S" + v.integer("level");
     }).procured(_ -> Buy(null, null, null)).requiringInputs(["width", "height", "stroke", "space"]);
     return recipe;
@@ -178,5 +211,8 @@ class WayCoverSection extends MachineComponent {
     .setNumber("height", plan.height)
     .setNumber("stroke", plan.stroke)
     .setNumber("space", plan.space)
+    .setToken("section", plan.shape.open ? "Box" : "Ring")
+    .setNumber("hostMin", plan.shape.hostMin)
+    .setNumber("hostMax", Math.min(plan.shape.hostMax, 100000))
     .setToken("material", materialSpec());
 }

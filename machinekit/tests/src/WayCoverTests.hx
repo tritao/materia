@@ -75,7 +75,67 @@ class WayCoverTests {
     fasteners();
     drain();
     service();
-    Sys.println("way cover: plans, sweep, flange bolts, BOM, drain rule and service removal pass");
+    boxes();
+    Sys.println("way cover: plans, sweep, flange bolts, BOM, drain rule, service removal and box covers pass");
+  }
+
+  /**
+   * A box cover (roof and two walls, no floor) over a rail on a bed: the base top closes it. The carriage is a bridge over the block with its
+   * face at `space` along the bed; a wall at the bed end carries the fixed flange. Returns the cover for the checks.
+   */
+  static function bed(rowId:String, space:Float, stroke:Float, ?extra:AxisBuilder -> Void):{builder:AxisBuilder, cover:WayCover, plan:WayCoverPlan} {
+    var builder = new AxisBuilder();
+    var shape = WayCoverPlan.boxCover(13, 140);
+    var plan = new WayCoverPlan(WayCoverCatalog.get(rowId), 60, 25, stroke, space, shape);
+    var half = plan.outerWidth() / 2 + 10, wallTop = plan.outerHeight() + 20;
+    var across = {x: 1.0, y: 0.0, z: 0.0};
+    var length = stroke + space + 100;
+    builder.place("bed", new TestSlab("BED", [-half - 20, -60, -30], [half + 20, space + stroke + 200, 0],
+      [BoltedFace.drilledToSuit("seat", BoltedFace.frameOf({x: 0, y: length / 2 + 10, z: 0}, {x: 0.0, y: 0.0, z: -1.0}, {x: 1.0, y: 0.0, z: 0.0}), 40, length + 30, 12, 30, CastIron)]),
+      AssemblyFrames.translation(0, 0, 0));
+    builder.attach("wall", new TestSlab("WALL", [-half, -24, 0], [half, 0, wallTop],
+      [BoltedFace.drilledToSuit("cover", BoltedFace.frameOf({x: 0, y: 0, z: wallTop / 2}, {x: 0.0, y: -1.0, z: 0.0}, across), 2 * half, wallTop, 16, 24, CastIron)]),
+      AssemblyFrames.translation(0, 0, 0), "bed");
+    builder.attach("rail", LinearRail.metric("MGN12C", length), AxisBuilder.orient(0, 10, LinearRail.metric("MGN12C", length).spec.railHeight, [0.0, 0, 1], [0.0, 1, 0]), "bed");
+    builder.slideOn({id: "y", lower: 0, upper: stroke, initial: 0}, "rail", "block", LinearRailBlock.metric("MGN12C"), space + 20);
+    builder.attach("carriage", new TestSlab("CARRIAGE", [-half, space, 13], [half, space + 60, 140],
+      [BoltedFace.drilledToSuit("cover", BoltedFace.frameOf({x: 0, y: space, z: 76.5}, {x: 0.0, y: 1.0, z: 0.0}, across), 2 * half, 127, 12, 60, CastIron)]),
+      AssemblyFrames.translation(0, 0, 0), "block");
+    var cover = WayCover.install(builder, {
+      id: "box", row: rowId, fixedParent: "wall", movingParent: "carriage", leader: {id: "y", lower: 0, upper: stroke, initial: 0},
+      origin: [0.0, 0, 0], along: [0.0, 1, 0], up: [0.0, 0, 1], width: 60, height: 25, space: space, shape: shape
+    });
+    if (extra != null) extra(builder);
+    return {builder: builder, cover: cover, plan: plan};
+  }
+
+  static function boxes():Void {
+    for (row in ["BELLOWS-LAMELLA-8x8", "TELESCOPIC-SS-150"]) {
+      var space = row == "BELLOWS-LAMELLA-8x8" ? 60.0 : 200.0;
+      var sound = bed(row, space, 250);
+      var plan = sound.plan;
+      check(plan.shape.open && plan.outerHigh(0) > plan.height && plan.outerLow(0) == WayCoverPlan.FLOOR_GAP, "a box cover stands on the surface: no bottom wall, feet at the floor gap");
+      var report = AssemblyIntegrity.check(sound.builder, {runningGap: 1.0});
+      check(report.errors().length == 0, "box cover " + row + " should be sound on its bed, found: " + messages(report));
+      var derived = sound.builder.deriveFasteners();
+      var flanges = [for (joint in derived.joints) if (StringTools.startsWith(joint.clampedMember, "box-")) joint];
+      check(flanges.length == 2, "two box flange joints for " + row + ", found " + flanges.length);
+      for (joint in flanges) check(joint.count >= 4, "the box flange has screws round it: " + joint.count);
+      // The rail is screwed down before the cover goes over it; without that order its screws are under the cover's skin.
+      var open = AssemblyIntegrity.fasteners(sound.builder);
+      check(codes(open).indexOf("fasteners.access") >= 0, "the cover stands over the rail screws until they are fitted first: " + codes(open));
+      var order = [for (id in sound.cover.members().concat(["wall"])) {member: id, fastened: ["rail", "bed"]}];
+      var fasteners = AssemblyIntegrity.fasteners(sound.builder, {fittedBefore: order});
+      check(fasteners.errors().length == 0, "the box flange screws fit on " + row + ": " + messages(fasteners));
+      // A post across the bed inside the envelope is found by the sweep.
+      var blocked = bed(row, space, 250, b -> b.attach("post", new TestSlab("POST", [-5, space + 100, 0], [5, space + 110, 30]), AssemblyFrames.translation(0, 0, 0), "bed"));
+      var found = codes(AssemblyIntegrity.check(blocked.builder));
+      check(found.indexOf("integrity.sweep") >= 0 || found.indexOf("integrity.overlap") >= 0, "a post inside the box cover is found, found: " + found);
+    }
+    // A box cover is refused where it cannot fold into the space, with the numbers.
+    var thrown = false;
+    try new WayCoverPlan(WayCoverCatalog.get("TELESCOPIC-SS-150"), 60, 25, 250, 60, WayCoverPlan.boxCover()) catch (e:Dynamic) thrown = Std.string(e).indexOf("only 60") >= 0;
+    check(thrown, "a telescopic box cover that cannot fold into 60 mm is refused");
   }
 
   static function plans():Void {

@@ -47,7 +47,7 @@ typedef TwoPulleyAxis = {
 };
 
 /** Shared member placement and rail travel for assemblies built from linear axes. */
-class AxisBuilder extends MachineAssembly {
+class AxisBuilder extends MachineAssembly implements machinekit.cover.CoverMembers {
   /** Poses with all axes at zero; these determine the mate connectors. */
   public final zeroPoses = new Map<String, AssemblyFrame>();
   /** Room beyond travel before each guide block reaches its rail's end. */
