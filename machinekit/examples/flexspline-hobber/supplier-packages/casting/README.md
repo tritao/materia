@@ -3,8 +3,9 @@
 Builds the quote package for the two mineral (epoxy granite) castings of `FlexsplineHobber` with
 their steel inserts and fixing sockets cast in: the base (`MineralCastBed`) and the column
 (`MineralCastColumn`), exactly as the machine installs them. The exporter depends on `machinekit`
-and needs CadKit's native library at run time. Each casting takes several minutes to export
-(the anchor sizing in `HobberFoundationSizing` is not cached); the column takes about a minute and the base about five.
+and needs CadKit's native library at run time. Each casting runs the full anchor sizing of
+`HobberFoundationSizing` once (repeated derivations are remembered within the run); the column takes about a minute
+and the base about two.
 
 ```sh
 cd ~/dev/materia

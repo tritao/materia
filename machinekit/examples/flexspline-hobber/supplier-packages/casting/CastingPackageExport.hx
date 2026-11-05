@@ -15,7 +15,7 @@ import materia.casting.InsertStages.InsertStage;
     as-cast body, STEP of the body with its cast-in steel (full and light), a STEP of each distinct insert, exact
     sections of the body, and <kind>-package.json for casting_package.py. Both castings are built by the same
     MineralCastBed / MineralCastColumn FlexsplineHobber installs.
-    Usage: hl main.hl <output dir> bed|column. Each run takes several minutes: the anchor sizing is not cached. */
+    Usage: hl main.hl <output dir> bed|column. Each run takes one to a few minutes (it runs the full anchor sizing). */
 class CastingPackageExport {
   static inline final SECTION_ARC = 5.0;
   static final STAGE = InsertStage.BeforeCasting;

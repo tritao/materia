@@ -14,6 +14,8 @@ class SourceSteel {
   public final rows:Array<CastInsertPlacement> = [];
   final solids:Array<Part> = [];
   final bounds:Array<PosedParts.PartBox> = [];
+  /** Anchor screws by recipe: neighbours repeat a few screw sizes, so each solid is built once. */
+  final screws = new PosedParts();
 
   public function new(rows:Array<CastInsertPlacement>) {
     try {
@@ -35,9 +37,9 @@ class SourceSteel {
     try {
       var blanks = [own(machinekit.structural.InsertBodies.part(row.part.bodySpec()))];
       for (hardware in InsertAnchorGeometry.components(row.part.insertSpec())) {
-        var local = own(hardware.part.geometry());
-        local.shape.setThreadedFaces([]);
-        blanks.push(own(PosedParts.moved(local, hardware.pose)));
+        var screw = own(screws.posed(hardware.part, hardware.pose));
+        screw.shape.setThreadedFaces([]);
+        blanks.push(screw);
       }
       var blank = own(Part.fuseAll(blanks));
       placed = PosedParts.moved(blank, row.pose);
@@ -60,5 +62,6 @@ class SourceSteel {
   public function close():Void {
     for (part in solids) part.close();
     solids.resize(0);
+    screws.close();
   }
 }

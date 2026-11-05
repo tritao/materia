@@ -77,7 +77,7 @@ class MillLiftingPattern {
     }
     footprints = admissible;
     if (footprints.length == 0) throw "No declared lifting blank meets source anchor demand";
-    var resin = foundation.body.geometry(), result:Array<CastInsertPlacement> = [];
+    var resin = foundation.body.geometry(), resinKey = foundation.body.geometryKey(), result:Array<CastInsertPlacement> = [];
     var neighbours:machinekit.tooling.SourceSteel = null;
     try {
       neighbours = new machinekit.tooling.SourceSteel(fixed);
@@ -136,7 +136,7 @@ class MillLiftingPattern {
                 id,
                 candidate.part,
                 rule,
-                Casting(resin, candidate.pose),
+                Casting(resin, candidate.pose, resinKey),
                 share
               );
               neighbours.add({id: candidate.id, part: anchored, pose: candidate.pose, openings: candidate.openings});

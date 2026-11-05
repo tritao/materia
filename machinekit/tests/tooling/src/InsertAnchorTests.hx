@@ -665,8 +665,8 @@ class InsertAnchorTests {
       var drilled = keep(body.subtract(cut));
       check(drilled.volume() < body.volume() - 100000, "control casting contains a real remote cylindrical opening");
       var pose = F.translation(0, 0, 380);
-      var plain = InsertAnchorGeometry.derive("plain-window", source, rule, Casting(body, pose), 0);
-      var curved = InsertAnchorGeometry.derive("curved-window", source, rule, Casting(drilled, pose), 0);
+      var plain = InsertAnchorGeometry.derive("plain-window", source, rule, Casting(body, pose, null), 0);
+      var curved = InsertAnchorGeometry.derive("curved-window", source, rule, Casting(drilled, pose, null), 0);
       check(
         materia.tooling.ToolingCodec.canonical(C.record(plain.insertSpec().anchorage))
         == materia.tooling.ToolingCodec.canonical(C.record(curved.insertSpec().anchorage)),

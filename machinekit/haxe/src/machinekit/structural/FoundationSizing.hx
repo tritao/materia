@@ -100,7 +100,8 @@ class FoundationSizing {
       }
       throw "No shared declared anchor thread fits the casting: " + failures.join("; ");
     }
-    var body = new machinekit.structural.MineralCasting(castingValues).geometry();
+    var casting = new machinekit.structural.MineralCasting(castingValues);
+    var body = casting.geometry(), bodyKey = casting.geometryKey();
     try {
       var lifting = rows.filter(row -> row.part.parameterToken("role")
         == materia.casting.InsertSpec.InsertRole.LiftingMount);
@@ -137,7 +138,7 @@ class FoundationSizing {
           case Catalogue(_):
             row.part;
           case Fabricated(_):
-            machinekit.tooling.InsertAnchorGeometry.derive(row.id, row.part, rule, Casting(body, row.pose), 0);
+            machinekit.tooling.InsertAnchorGeometry.derive(row.id, row.part, rule, Casting(body, row.pose, bodyKey), 0);
         };
         fixed.set(row.id, part);
       }
@@ -150,7 +151,7 @@ class FoundationSizing {
               row.id,
               row.part,
               rule,
-              Casting(body, row.pose),
+              Casting(body, row.pose, bodyKey),
               liftingShare * shareCount(row.id)
             )
         }

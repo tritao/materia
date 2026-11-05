@@ -234,7 +234,8 @@ class HobberFoundationSizing {
         openings: [materia.casting.CastingPatterns.face("body.z-max")]
       });
     }
-    var resin = new machinekit.structural.MineralCasting(body).geometry(), neighbours:machinekit.tooling.SourceSteel = null;
+    var casting = new machinekit.structural.MineralCasting(body), resin = casting.geometry(), resinKey = casting.geometryKey();
+    var neighbours:machinekit.tooling.SourceSteel = null;
     try {
       neighbours = new machinekit.tooling.SourceSteel(FoundationSizing.anchors(result, rule, body));
       for (site in sites) {
@@ -264,7 +265,7 @@ class HobberFoundationSizing {
                 candidate.id,
                 candidate.part,
                 rule,
-                Casting(resin, pose),
+                Casting(resin, pose, resinKey),
                 mass.mass * rule.gravityMps2 / Math.min(rule.liftingLoadPaths, LIFT_POINT_COUNT)
               );
               chosen = candidate;

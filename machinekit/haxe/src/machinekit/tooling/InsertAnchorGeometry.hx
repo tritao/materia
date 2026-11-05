@@ -22,9 +22,24 @@ import materia.tooling.ToolingDiagnostic.ToolingSeverity;
 class InsertAnchorScreenDefect extends haxe.Exception {
 }
 
+/** A remembered derivation: the anchored source's values, or why no pattern fits. */
+enum InsertAnchorDerivation {
+  Built(values:machinekit.component.ComponentValues);
+  Failed(reason:String);
+}
+
+/** The cropped casting around one insert's possible anchors, and the window's box in the insert's frame. */
+typedef AnchorWindow = {
+  var region:Part;
+  var min:{x:Float, y:Float, z:Float};
+  var max:{x:Float, y:Float, z:Float};
+}
+
 enum InsertAnchorContext {
   FootprintOnly;
-  Casting(body:Part, pose:materia.assembly.AssemblyRecord.AssemblyFrame);
+  /** `bodyKey` names `body`'s geometry, as `MachineComponent.geometryKey` of the casting it was realized from: equal
+   * keys must mean equal solids. A derivation in a keyed casting is remembered; null derives every time. */
+  Casting(body:Part, pose:materia.assembly.AssemblyRecord.AssemblyFrame, bodyKey:Null<String>);
 }
 
 
@@ -766,10 +781,52 @@ class InsertAnchorGeometry {
     context:InsertAnchorContext,
     liftingShareN:Float
   ):CastInsert {
-    try return build(source, rule, context, liftingShareN) catch (error:Dynamic) {
-      if (Std.isOfType(error, InsertAnchorScreenDefect)) throw error;
-      throw "Insert " + id + ": anchor pattern: " + Std.string(error);
+    var key = derivationKey(source, rule, context, liftingShareN);
+    var remembered = key == null || derived == null ? null : derived.get(key);
+    var known:InsertAnchorDerivation = remembered;
+    if (remembered == null) {
+      try known = Built(build(source, rule, context, liftingShareN).values().copy()) catch (error:Dynamic) {
+        if (Std.isOfType(error, InsertAnchorScreenDefect)) throw error;
+        known = Failed(Std.string(error));
+      }
+      if (key != null) {
+        var memo:Map<String, InsertAnchorDerivation> = derived == null ? [] : derived;
+        derived = memo;
+        if (derivedCount >= DERIVED_LIMIT) {
+          memo.clear();
+          derivedCount = 0;
+        }
+        memo.set(key, known);
+        derivedCount++;
+      }
     }
+    return switch known {
+      case Built(values): new CastInsert(values.copy());
+      case Failed(reason): throw "Insert " + id + ": anchor pattern: " + reason;
+    };
+  }
+
+  /**
+   * Derivations by their inputs: the source steel's recipe, the rule, the demand and the keyed casting at the pose. Sizing
+   * derives the same fixed inserts in every pass and once more for the lifting layout, and the result (or the reason none
+   * fits) depends on nothing else. Only component values are kept; each caller gets its own copy.
+   */
+  static var derived:Null<Map<String, InsertAnchorDerivation>>;
+  static var derivedCount = 0;
+  static inline final DERIVED_LIMIT = 512;
+
+  static function derivationKey(
+    source:CastInsert,
+    rule:InsertAnchorPatternRule,
+    context:InsertAnchorContext,
+    liftingShareN:Float
+  ):Null<String> {
+    var where = switch context {
+      case FootprintOnly: "footprint";
+      case Casting(_, pose, bodyKey): bodyKey == null ? null : bodyKey + "|" + haxe.Json.stringify(pose);
+    };
+    return where == null ? null : source.geometryKey() + "|" + haxe.Json.stringify(rule) + "|" + where + "|"
+      + Std.string(liftingShareN);
   }
 
   static function build(
@@ -825,12 +882,34 @@ class InsertAnchorGeometry {
         assemblyPreloadN: machinekit.design.ThreadedHolePolicy.assemblyPreloadN(InsertHoles.threadSpec(hole.thread))
       });
     }
-    var boundary = switch context {
+    var window = switch context {
       case FootprintOnly:
-        [];
-      case Casting(body, pose):
-        anchorBoundary(body, pose, stock, choices, rule);
+        null;
+      case Casting(body, pose, _):
+        anchorWindow(body, pose, stock, choices, rule);
     };
+    try {
+      var result = selectPattern(source, spec, rule, context, stock, choices, failures, liftingShareN, window);
+      if (window != null) window.region.close();
+      return result;
+    } catch (error:Dynamic) {
+      if (window != null) window.region.close();
+      throw error;
+    }
+  }
+
+  static function selectPattern(
+    source:CastInsert,
+    spec:InsertSpec,
+    rule:InsertAnchorPatternRule,
+    context:InsertAnchorContext,
+    stock:materia.casting.Box3,
+    choices:Array<InsertAnchorStockChoice>,
+    failures:Array<String>,
+    liftingShareN:Float,
+    window:Null<AnchorWindow>
+  ):CastInsert {
+    var boundary = window == null ? [] : planarBoundary(window.region);
     var tested = new Map<String, Bool>(), screws = new Map<String, InsertAnchorScrew>();
     var candidate = InsertAnchorSelection.select(spec, rule, demand(spec,
       rule.id, rule.demandFactor, liftingShareN, []), choices, failures, item -> {for (point in item.points) {
@@ -852,7 +931,7 @@ class InsertAnchorGeometry {
         var accepted = switch context {
           case FootprintOnly:
             true;
-          case Casting(_, pose):
+          case Casting(_, pose, _):
             InsertAnchorScreen.accepts(
               selected,
               screws.get(screwKey),
@@ -876,7 +955,7 @@ class InsertAnchorGeometry {
     ];
     var result = backPattern(source, InsertHoles.threadSpec(candidate.thread), candidate.rules, selected);
     if (!contained(result, context, candidate.rules.minimumCoverMm, candidate.rules
-      .minimumEmbedmentMm)) throw new InsertAnchorScreenDefect("Analytic anchor screen disagrees with native confirmation; candidate must not fall back");
+      .minimumEmbedmentMm, window)) throw new InsertAnchorScreenDefect("Analytic anchor screen disagrees with native confirmation; candidate must not fall back");
     components(result.insertSpec());
     return result;
   }
@@ -884,17 +963,17 @@ class InsertAnchorGeometry {
   /** Exact query window, not a replacement casting envelope. Every possible
 	 * anchor, its required cover and its embedment test segment lie inside it.
 	 * Artificial window faces therefore cannot change an admission predicate.
-	 * Cropping once avoids unrelated curved faces elsewhere in the casting;
-	 * the chosen pattern is still confirmed against the complete original body.
+	 * Cropping once avoids unrelated curved faces elsewhere in the casting.
+	 * The caller owns the region.
 	 */
-  static function anchorBoundary(
+  static function anchorWindow(
     body:Part,
     pose:AssemblyFrame,
     stock:materia.casting.Box3,
     choices:Array<InsertAnchorStockChoice>,
     rule:InsertAnchorPatternRule
-  ):Array<AnchorFace> {
-    if (choices.length == 0) return [];
+  ):Null<AnchorWindow> {
+    if (choices.length == 0) return null;
     var radius = 0.0, cover = 0.0, embedment = 0.0, length = 0.0, head = 0.0;
     for (choice in choices) {
       radius = Math.max(radius, choice.flangeDiameter / 2);
@@ -913,10 +992,13 @@ class InsertAnchorGeometry {
         local,
         F.compose(pose, F.translation(stock.x + stock.width / 2, stock.y + stock.depth / 2, low))
       ));
-      var region = scope.own(body.intersect(window));
-      var result = planarBoundary(region);
+      var region = body.intersect(window);
       scope.close();
-      return result;
+      return {
+        region: region,
+        min: {x: stock.x - margin, y: stock.y - margin, z: low},
+        max: {x: stock.x + stock.width + margin, y: stock.y + stock.depth + margin, z: high}
+      };
     } catch (error:Dynamic) {
       scope.close();
       throw error;
@@ -960,12 +1042,18 @@ class InsertAnchorGeometry {
 
   /** Chosen-pattern confirmation. Analytic admission never substitutes for
 	 * native occupancy, all-anchor embedment or finite-face cover. */
-  static function contained(source:CastInsert, context:InsertAnchorContext, cover:Float, minimumEmbedment:Float):Bool {
+  static function contained(
+    source:CastInsert,
+    context:InsertAnchorContext,
+    cover:Float,
+    minimumEmbedment:Float,
+    window:Null<AnchorWindow>
+  ):Bool {
     return switch context {
       case FootprintOnly:
         true;
-      case Casting(body, pose):
-        var owned:Array<Part> = [], accepted = true;
+      case Casting(body, pose, _):
+        var owned:Array<Part> = [], accepted = true, bolts = new PosedParts();
         function keep(part:Part):Part {
           owned.push(part);
           return part;
@@ -978,29 +1066,33 @@ class InsertAnchorGeometry {
             default:
               throw "Missing anchor candidate";
           };
+          var exterior = keep(machinekit.assembly.PosedParts.moved(keep(InsertBodies.part(spec.body)), pose));
+          var hardware:Array<Part> = [];
+          // A pattern's anchors are one screw: build its solid once.
+          for (component in InsertAnchorGeometry.components(spec)) {
+            var shape = keep(bolts.posed(component.part, F.compose(pose, component.pose)));
+            shape.shape.setThreadedFaces([]);
+            hardware.push(shape);
+          }
+          var bulk = window != null && insideWindow(window, spec, anchors, pose, hardware, cover,
+            minimumEmbedment) ? window.region : body;
           for (anchor in anchors) {
             var hole = spec.holes.filter(value -> value.id == anchor.holeId)[0];
             var bearing = F.compose(pose, C.bearingFrame(hole, anchor));
             if (axialEmbedment(F.transformPoint(bearing,
-              0, 0, 0), F.transformVector(bearing, 0, 0, 1), body) + 1e-7 < minimumEmbedment) return false;
-          }
-          var exterior = keep(machinekit.assembly.PosedParts.moved(keep(InsertBodies.part(spec.body)), pose));
-          var hardware:Array<Part> = [];
-          for (component in InsertAnchorGeometry.components(spec)) {
-            var shape = keep(machinekit.assembly.PosedParts.moved(
-              keep(component.part.geometry()),
-              F.compose(pose, component.pose)
-            ));
-            shape.shape.setThreadedFaces([]);
-            hardware.push(shape);
+              0, 0, 0), F.transformVector(bearing, 0, 0, 1), bulk) + 1e-7 < minimumEmbedment) {
+              for (part in owned) part.close();
+              bolts.close();
+              return false;
+            }
           }
           var exposed = keep(keep(Part.fuseAll(hardware)).subtract(exterior));
-          if (keep(exposed.subtract(body)).volume() > 1e-6) {
+          if (keep(exposed.subtract(bulk)).volume() > 1e-6) {
             accepted = false;
           }
           var bounds = exposed.shape.bounds(), lo = bounds.get_min(), hi = bounds.get_max();
-          if (accepted) for (index in 0...body.shape.subshapeCount(CadKit.ShapeKind.Face)) {
-            var face = body.shape.subshape(CadKit.ShapeKind.Face, index);
+          if (accepted) for (index in 0...bulk.shape.subshapeCount(CadKit.ShapeKind.Face)) {
+            var face = bulk.shape.subshape(CadKit.ShapeKind.Face, index);
             try {
               var other = face.bounds(), a = other.get_min(), b = other.get_max();
               var dx = Math.max(0, Math.max(lo.get_x() - b.get_x(), a.get_x() - hi.get_x()));
@@ -1020,13 +1112,52 @@ class InsertAnchorGeometry {
           }
         } catch (error:Dynamic) {
           for (part in owned) part.close();
+          bolts.close();
           throw error;
         }
         for (part in owned) part.close();
+        bolts.close();
         accepted;
     };
   }
 
+
+  /**
+   * Whether the chosen pattern's confirmation may run on the window's region instead of the whole casting: every
+   * embedment test segment, and the hardware's bounds grown by the cover, lie inside the window (in the insert's frame,
+   * so for any pose). Then no point outside the window, and no artificial window face, is within cover of the hardware
+   * or on a test segment, and the hardware outside the window is empty: each native predicate gives the same answer on
+   * the region as on the whole body.
+   */
+  static function insideWindow(
+    window:AnchorWindow,
+    spec:InsertSpec,
+    anchors:Array<materia.casting.InsertAnchorage.InsertBoltAnchor>,
+    pose:AssemblyFrame,
+    hardware:Array<Part>,
+    cover:Float,
+    minimumEmbedment:Float
+  ):Bool {
+    var slack = 1e-3;
+    function inside(x:Float, y:Float, z:Float, grow:Float):Bool return x - grow >= window.min.x + slack
+      && y - grow >= window.min.y + slack && z - grow >= window.min.z + slack && x + grow <= window.max.x - slack
+      && y + grow <= window.max.y - slack && z + grow <= window.max.z - slack;
+    for (anchor in anchors) {
+      var hole = spec.holes.filter(value -> value.id == anchor.holeId)[0];
+      var bearing = C.bearingFrame(hole, anchor);
+      var start = F.transformPoint(bearing, 0, 0, 0), end = F.transformPoint(bearing, 0, 0, minimumEmbedment);
+      if (!inside(start.x, start.y, start.z, 0) || !inside(end.x, end.y, end.z, 0)) return false;
+    }
+    var back = F.inverse(pose);
+    for (part in hardware) {
+      var bounds = part.shape.bounds(), lo = bounds.get_min(), hi = bounds.get_max();
+      for (x in [lo.get_x(), hi.get_x()]) for (y in [lo.get_y(), hi.get_y()]) for (z in [lo.get_z(), hi.get_z()]) {
+        var corner = F.transformPoint(back, x, y, z);
+        if (!inside(corner.x, corner.y, corner.z, cover)) return false;
+      }
+    }
+    return true;
+  }
 
   public static function embeddedParts(rows:Array<EmbeddedInsertAnchors>):Array<Part> {
     var result:Array<Part> = [], cache = new PosedParts();
