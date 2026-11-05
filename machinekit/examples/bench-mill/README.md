@@ -147,12 +147,55 @@ remain at the drive stations. The rail-side fields are lowered 20 mm. Central un
 side supports and a 60 mm casting roof above the motor bay. Sealing, cover edges,
 mounting fasteners and structural qualification remain unfinished.
 
-Service removal: the Y motor's withdrawal out of the back is declared once by `MillXYStage.declareMotorService` (a
-`ServiceRemoval` design requirement: rear hatch and motor screws off, then motor and shaft along +Y) and swept against the
-whole mill by `AssemblyIntegrity.service`, which replaced the bespoke sweep in `MillXYStageIntegrity`. Swept with the real
-motor solid it finds the casting 82.8 mm3 in the way after 24 mm (the old envelope cylinder reported 4680 mm3): the open
-y-servo finding. Way covers (`machinekit.cover.WayCover`) and a real stand for the Z screw supports (now on a 1 mm shim,
-`footBolted = false`) are not applied yet.
+Service removals are declared as `ServiceRemoval` design requirements where the parts are built and swept against the whole mill by
+`AssemblyIntegrity.service` (every 2 mm along the path, the screws that hold the removed parts taken away with them; nuts are not
+screws, so they are listed): in `MillXYStage`, `yMotorWithdrawal` (rear hatch and the motor's four screws off, motor and shaft out of
+the back), `xMotorWithdrawal` (hood, belt and the nuts behind the flange off; the motor with its mounting plate out of the saddle along
+-X), `xScrewWithdrawal` (hood, belt and both bearings off; screw, nut, pulley and retainer out along -X) and `yScrewWithdrawal` (motor with
+its mount, coupling, front bearing and the nut's bracket off; screw and nut out of the front along -Y); in `MillZAxis`, `zMotorWithdrawal`
+(four screws off, straight up); in `MillFramePreview.attachSpindle`, spindle `motorWithdrawal` (belt, pulley, guard, screws and nuts off,
+motor up) and `cartridgeWithdrawal` (tool, belt, motor and carrier, draw-bar cylinder off; the cartridge with its rotor, draw-bar and pulley
+down out of the head, 210 mm, 56 mm short of the table at the upper Z stop). `MillServiceChecks` (`haxeon.service.json`, about 13 min: 158 s for the declared removals) sweeps
+all of them clear and keeps the findings of the procedures that do not work:
+
+- Two earlier findings were small reliefs, now cut. The old y-servo finding (the Y motor's round body met the base's rear apron, 82.8 mm3
+  after 24 mm) is gone: the base's `rear-y-drive-seat` recess, 118 mm wide, now runs out to the rear edge. The X motor's connector envelope
+  was 2 mm outside the plate pocket and met the saddle's end wall after 18 mm (53.8 mm3): the connector pocket now runs through the wall.
+- The Y screw cannot leave by the rear with its nut: the 48 mm nut flange meets the Z axis' lower plate (24 mm crossing bore for the Y shaft)
+  after 240 mm (326.7 mm3), then the Z floating bearing and the Z screw. The front is open once the nut's bracket is off.
+- The Z screw cannot leave upwards with its nut: the nut's grease fitting meets the rear face of the Z adapter plate across the front of the
+  channel after 72 mm (5.05 mm3, over the 100 mm of the plate). The fitting comes out first, or the plate takes a 6 x 1.5 mm relief that
+  competes with the M80E seat on the same face: not cut. Down is closed by the channel floor; the nut is not a screw to thread out.
+- The spindle cartridge cannot leave upwards: the head is over it (10,574 mm3 after 2 mm). Down it clears the table by 56 mm; with the
+  tool in it would meet the table after 266 mm.
+
+Way covers (`machinekit.cover`): the study `MillWayCoverChecks` (`haxeon.way-covers.json`) takes the six exposed screw ends of the bench
+mill (Y and X either side of the carrier, Z above and below the nut) and asks `WayCoverPlan` for each catalogue row, from the mill's solved
+poses, then checks the cover against the room round the screw and the faces its flanges would bolt to. None fits as built, so none is
+installed and no `GuardedChannel` is declared (the mill has no channel a cover guards: the Y seat recesses are 8 mm). The Y way and the X
+and Z guides themselves are not covered by this model at all: their blocks fill the 28 mm gap between base, saddle and table, and the
+nested-skin envelope of a bellows around them (flanges 90 mm and up) would sit inside the casting.
+
+| Screw end | stroke / space at the nearest stop | best bellows | folds, folded to extended | skins, flange | why not |
+| --- | --- | --- | --- | --- | --- |
+| Y front | 150 / 32 | PU 6x8 | 4, 30 to 182 mm | 10, 96 x 96 | flanges bolt to the saddle's front face (70 tall) and the BK12 housing (42 tall): the cover fits its space and the 53 mm round the screw |
+| Y rear | 150 / 27.5 | PU 6x8 | 4, folds to 30 mm | - | 2.5 mm short of the folded length |
+| X left, right | 250 / 207.5, 217 | PU 8x10 | 6, 54 to 457.5, 467 mm | 11, 109 x 109 | 14 mm between saddle top and table underside above the screw and 28 across |
+| Z top | 250 / 76.5 | PU 6x8 | 7, 48 to 326.5 mm | 9, 92 x 92 | the column side face is 26 mm from the screw axis |
+| Z bottom | 250 / 218 | PU 6x8 | 10, 66 to 468 mm | 8, 88 x 88 | same 26 mm |
+
+The telescopic row (250 mm sections) folds to 258 mm: it fits no end. To fit a cover: Y front needs a flange bracket 100 mm square on the
+saddle front and a post behind the BK12 (the cover is then 8 mm shorter: 24 mm of space against 30 needed, so the support moves back or
+the stroke shortens); X needs a wider gap than 28 mm or a cover that is not a ring round the screw; Z needs
+the screw 40 mm further from the column side face. The mill's Z screw supports now stand on bosses (below).
+
+Z screw supports: each foot is bolted to a steel boss cast into the column's +x side wall (`MillCasting.ColumnBoss`, placed by
+`BenchMill.zBosses`). The boss is a 62 x 29 x 16 mm tapped steel block (`MILL-Z-BOSS-FIXED`, `-FLOATING`) in a pocket cut in the 20 mm wall,
+its back face at x = 75 and its face 1 mm proud of the wall at x = 91, which is the supports' foot plane, so the Z screw axis does not move.
+The foot is 14 mm in front of the column face, so the rear row of holes is over the casting and the front row is over the boss's forward
+part, which stands out of the column's front face beside the head (the head never comes near: its top is 27 mm below the upper boss at the
+upper stop). The six screws are derived like the Y and X supports': M5 x 16 for the fixed support's four holes, M5 x 40 for the floating's two;
+the mill derives 144 screws. Cast in, the bosses need no screws of their own.
 
 Y travel increases from 150 to 160 mm without changing spindle reach or base
 footprint. The table retains 25 mm tool-edge margin and clears the column-side envelope
