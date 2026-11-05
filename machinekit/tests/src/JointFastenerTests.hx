@@ -443,18 +443,23 @@ class JointFastenerTests {
     for (line in derivation.lines()) count.set(line.item.partNumber, line.quantity);
     check(count.get("ISO4762-M4x16") == railHoles + 4 * blocks && railHoles > 0,
       'M4x16 screws must be the rail holes $railHoles and four per block ($blocks), got ${count.get("ISO4762-M4x16")}');
-    check(count.get("ISO4762-M5x12") == 8 && count.get("ISO4762-M6x12") == 4, 'motor screws: ${[for (k in count.keys()) k + "=" + count.get(k)]}');
+    check(count.get("ISO4762-M5x12") == 24 && count.get("ISO4762-M6x12") == 4 && count.get("ISO4762-M5x10") == 56, 'motor and cover flange screws: ${[for (k in count.keys()) k + "=" + count.get(k)]}');
     var total = 0;
     for (key in count.keys()) total += count.get(key);
     // The three ball nuts (six flange bolts each) are bolted through their adapter plates with a washer and a nut.
-    check(count.get("ISO4762-M5x30") == 18 && count.get("ISO7089-M5") == 18 && count.get("ISO4032-M5") == 18, 'nut flange bolts: ${[for (k in count.keys()) k + "=" + count.get(k)]}');
+    check(count.get("ISO4762-M5x30") == 18 && count.get("ISO7089-M5") == 90 && count.get("ISO4032-M5") == 18, 'nut flange bolts: ${[for (k in count.keys()) k + "=" + count.get(k)]}');
     var feet = [for (joint in derivation.joints) if (joint.clampedFace == "foot") joint];
     var footScrews = 0;
     for (joint in feet) footScrews += joint.count;
     // Every screw support is bolted down by its feet: the Y and X supports to their stands and bridges, the Z supports to the steel bosses cast into the column.
     check(feet.length == 6 && footScrews == 18, 'six supports are bolted: ${feet.length} joints, $footScrews screws');
     for (joint in feet) check(joint.drilledToSuit && joint.size == "M5" && joint.engagement >= joint.minEngagement - 1e-9, 'support joint ${joint.id}: ${joint.size} x${joint.length}');
-    check(total == railHoles + 4 * blocks + footScrews + 12 + 18 + 18 + 18, 'screws, washers and nuts only: $total');
+    // The six covers add twelve flange joints: 72 screws and 72 head washers, measured before making them standard.
+    var flangeJoints = [for (joint in derivation.joints) if (StringTools.startsWith(joint.clampedMember, "cover")) joint];
+    var flangeScrews = 0;
+    for (joint in flangeJoints) flangeScrews += joint.count;
+    check(flangeJoints.length == 12 && flangeScrews == 72, 'cover flange joints: ${flangeJoints.length}, screws: $flangeScrews');
+    check(total == railHoles + 4 * blocks + footScrews + 12 + 18 + 18 + 18 + 2 * flangeScrews, 'screws, washers and nuts only: $total');
     var rails = [for (joint in derivation.joints) if (joint.drilledToSuit && joint.clampedFace == "base") joint];
     var blockJoints = [for (joint in derivation.joints) if (joint.clampedFace == "blockLeft" || joint.clampedFace == "blockRight") joint];
     check(blockJoints.length == blocks, "one joint per block, got " + blockJoints.length);
@@ -463,7 +468,7 @@ class JointFastenerTests {
     check(rails.length == 6, "six rails are bolted to cast pads, got " + rails.length);
     // The derived fasteners fit the mill's solids: holes cut, heads and drivers clear.
     var started = Sys.time();
-    var fit = machinekit.assembly.AssemblyIntegrity.fasteners(machine, {fasteners: true, removable: machine.workholdingMembers()});
+    var fit = machinekit.assembly.AssemblyIntegrity.fasteners(machine, {fasteners: true, removable: machine.workholdingMembers(), fittedBefore: machine.coverInstallationOrder()});
     Sys.println('bench mill fastener fit: ${fit.errors().length} findings in ${Math.round(Sys.time() - started)} s');
     for (item in fit.errors()) Sys.println("  " + item.code + ": " + item.message);
     // The motors' flange screws have corner reliefs behind the flange (`MotorBody`) and nothing stands in their heads' way.
@@ -479,16 +484,17 @@ class JointFastenerTests {
       check(machine.column.bosses.length == 2 && parts.get(boss).fasteningFaces().length == 1, "each Z support has one boss with one tapped foot face");
     }
     posed.close();
-    Sys.println('bench mill: ${derivation.joints.length} joints, ${derivation.count()} screws (${railHoles} rail, ${4 * blocks} block, ${footScrews} support, 12 motor, 18 nut flange), ' + [for (k in count.keys()) k + " x" + count.get(k)].join(", "));
+    Sys.println('bench mill: ${derivation.joints.length} joints, ${derivation.count()} screws (${railHoles} rail, ${4 * blocks} block, ${footScrews} support, 12 motor, 18 nut flange, $flangeScrews cover flange), ' + [for (k in count.keys()) k + " x" + count.get(k)].join(", "));
     // The drilled seats are in the castings' solids: one tap-drill hole per rail screw, none anywhere else.
     var cut = 0;
     for (entry in machine.components()) {
       var cuts = entry.component.machinedCuts();
-      if (cuts.length > 0) check(Std.isOfType(entry.component, machinekit.milling.MillCasting) || StringTools.startsWith(entry.id, "screwXNearBridge") || StringTools.startsWith(entry.id, "screwXFarBridge") || StringTools.startsWith(entry.id, "screwYStand") || StringTools.startsWith(entry.id, "screwZStand"), entry.id + " is machined but is neither a casting nor a support stand");
+      if (cuts.length > 0) check(Std.isOfType(entry.component, machinekit.milling.MillCasting) || StringTools.startsWith(entry.id, "screwXNearBridge") || StringTools.startsWith(entry.id, "screwXFarBridge") || StringTools.startsWith(entry.id, "screwYStand") || StringTools.startsWith(entry.id, "screwZStand") || Std.isOfType(entry.component, machinekit.cover.WayCoverMount) || Std.isOfType(entry.component, machinekit.cover.WayCoverSection), entry.id + " is machined but is not a casting, support stand or cover part");
       cut += cuts.length;
     }
     // Each block screw cuts its clearance hole and its counterbored pocket into the casting it is bolted through.
-    check(cut == railHoles + 2 * 4 * blocks + footScrews, 'every rail hole is a tap-drill hole in a casting, every block screw a hole and a pocket: $cut cuts for $railHoles rail holes and $blocks blocks');
+    check(cut == railHoles + 2 * 4 * blocks + footScrews + 2 * flangeScrews,
+      'every rail hole is tapped, every block screw has a hole and pocket, every cover flange screw cuts both faces: $cut cuts');
     for (joint in rails) check(joint.length == 16 && joint.engagement >= joint.minEngagement - 1e-9, 'rail joint ${joint.id}: x${joint.length} engages ${joint.engagement} of ${joint.minEngagement}');
   }
 }

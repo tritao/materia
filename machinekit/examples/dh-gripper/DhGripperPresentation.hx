@@ -30,24 +30,24 @@ class DhGripperPresentation {
       select: {occurrence: part.id, subtree: false}, mode:Hidden
     }
     ];
-    result.views.push({
-      id: "jaw-detail",
-      label: "Jaw detail",
-      camera: Frame(jawFocus, 2.0, 0.65, 1.5),
-      visibility: detailVisibility,
-      sections: [{occurrence: null, point: guide, normal: {x: 0, y: 0, z: -1}}],
-      explode: 0,
-      source: Generated("dh-gripper")
-    });
-    result.views.push({
-      id: "finger-service",
-      label: "Finger service",
-      camera: Frame(detail, 2.0, 0.45, 1.8),
-      visibility: [],
-      sections: [],
-      explode: 0,
-      source: Generated("dh-gripper")
-    });
+    result.views.push(new materia.presentation.AssemblyPresentation.PresentationView(
+      "jaw-detail",
+      "Jaw detail",
+      Frame(jawFocus, 2.0, 0.65, 1.5),
+      detailVisibility,
+      [{occurrence: null, point: guide, normal: {x: 0, y: 0, z: -1}}],
+      0,
+      Generated("dh-gripper")
+    ));
+    result.views.push(new materia.presentation.AssemblyPresentation.PresentationView(
+      "finger-service",
+      "Finger service",
+      Frame(detail, 2.0, 0.45, 1.8),
+      [],
+      [],
+      0,
+      Generated("dh-gripper")
+    ));
     for (side in ["left", "right"]) {
       for (index in 0...2) result.explode.push({
         select: {occurrence: 'finger-$side-screw-$index', subtree: false},

@@ -80,7 +80,9 @@ class MillMoldSuite {
       poses.set(part.id, part.initialPose);
     }
     var cursor = materia.presentation.PresentationEvaluator.reset(scene.presentation);
-    cursor.procedure = assembly.id;
+    cursor = new materia.presentation.PresentationEvaluator.PresentationCursor(
+      cursor.view, cursor.explode, assembly.id, cursor.step, cursor.progress
+    );
     var initial = materia.presentation.PresentationEvaluator.evaluate(
       definition,
       poses,
@@ -90,7 +92,9 @@ class MillMoldSuite {
     );
     for (insert in p.document.input.inserts) if (initial.visibility.get(steelId(insert.id))
       != materia.presentation.AssemblyPresentation.VisibilityMode.Hidden) throw "Unplaced steel must be hidden";
-    cursor.step = assembly.steps.length;
+    cursor = new materia.presentation.PresentationEvaluator.PresentationCursor(
+      cursor.view, cursor.explode, cursor.procedure, assembly.steps.length, cursor.progress
+    );
     var complete = materia.presentation.PresentationEvaluator.evaluate(
       definition,
       poses,

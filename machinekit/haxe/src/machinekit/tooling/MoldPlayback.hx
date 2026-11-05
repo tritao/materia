@@ -55,6 +55,18 @@ class MoldPlayback {
       if (groups.exists(group.id)) throw "Duplicate playback group";
       groups.set(group.id, group.members.copy());
     }
+    // Assembly steps already name their leaf parts, so an assembly-only group may never reach expand().
+    // Validate the complete group graph before playback, including groups absent from demolding steps.
+    var checkedGroups = new Map<String, Bool>();
+    function validateGroup(id:String, path:Array<String>):Void {
+      if (path.indexOf(id) >= 0) throw "Cyclic playback group: " + path.concat([id]).join(" -> ");
+      if (checkedGroups.exists(id)) return;
+      var members = groups.get(id);
+      if (members == null) return;
+      for (child in members) validateGroup(child, path.concat([id]));
+      checkedGroups.set(id, true);
+    }
+    for (id in groups.keys()) validateGroup(id, []);
     var hardware = [for (h in p.hardware) h.id];
     function expand(id:String, path:Array<String>):Array<String> {
       if (path.indexOf(id) >= 0) throw "Cyclic playback group: " + path.concat([id]).join(" -> ");

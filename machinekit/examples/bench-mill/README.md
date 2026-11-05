@@ -169,8 +169,8 @@ all of them clear and keeps the findings of the procedures that do not work:
 - The spindle cartridge cannot leave upwards: the head is over it (10,574 mm3 after 2 mm). Down it clears the table by 56 mm; with the
   tool in it would meet the table after 266 mm.
 
-Way covers (`machinekit.cover`, chip protection): the mill built with `new BenchMill(false, false, true)` (a "covered" mill; the default
-mill is unchanged) has a **box cover** at both ends of each axis, six in all, checked by `MillWayCoverChecks` (`haxeon.way-covers.json`, about
+Way covers (`machinekit.cover`, chip protection): `BenchMill` has one design, with a **box cover** at both ends of each axis,
+six in all, checked by `MillWayCoverChecks` (`haxeon.way-covers.json`, about
 2 min). A first study of ring covers (a bellows round each screw end) found that none fits the mill as built: the Y ends had 32 and 27.5 mm of
 space (the smallest bellows folds to 30 and its flanges would bolt to a 42 mm bearing housing), X had 14 mm between the saddle top and the
 table underside above the screw, Z had the screw 26 mm from the column's side face, and the guides' blocks fill the 28 mm gaps between base,
@@ -198,12 +198,14 @@ are steel plates to make; the twelve guide blocks carry 24 end scrapers (`WIPER-
 Each cover is placed by `BenchMill.coverFrom` from the mill's own poses (nothing is typed in per cover) and installed by `WayCover.installOn`.
 Each flange is bolted to its wall, carrier or casting face with screws derived from `BoltedFace`s (flange holes only where the host face exists, 8
 mm from its edge), and the check posed each cover at its near and far stop and measured the flanges the planned space and extended length apart.
-The sweep (all 27 combinations of each axis at its ends and middle) finds nothing on the covers, and no finding the plain mill lacks (117 in both,
-all of them the legacy mill's support gaps). The covers go on after the rails and screws they surround (`IntegrityOptions.fittedBefore`): the
+The sweep (all 27 combinations of each axis at its ends and middle, plus rest) finds nothing on the covers. Its 117 pre-existing findings
+(48 support gaps, 48 ground-support findings and 21 overlaps) are frozen in `cover-integrity-baseline.json`; the check compares every message,
+including its volume or distance. The covers go on after the rails and screws they surround (`BenchMill.coverInstallationOrder` and
+`IntegrityOptions.fittedBefore`): the
 cover is over the rail screws' driver access otherwise, so a rail is changed with the cover unbolted.
 
-Geometry changes, all in the covered mill only (the default mill and the framed concept are untouched, so the frame (917) and Z-axis (423)
-assertions stand; they build their layout from the default mill):
+The permanent `BenchMill` geometry provisions follow. Its casting recipe has no optional cover input and uses generator revision 2.
+The framed concept has an independent layout; its before-change frame and Z-axis baselines are 917 and 423 assertions.
 
 - **Z screw 670 to 490 mm**, its floating bearing and boss 180 mm higher (centre z 112.5 to 292.5). The lower 180 mm of the screw lay below the head's
   travel and carried only that bearing, which stood in the base's rear corner where the Y rear cover's stack goes; the lower cover's wall would
@@ -220,7 +222,7 @@ assertions stand; they build their layout from the default mill):
 - New parts: six steel end walls, two carriers (14 mm, tapped to suit the flange holes), wipers. The overall envelope is unchanged (X walls end
   inside the bridges, the Y front wall inside the base's front edge).
 
-Open, in the covered mill: the walls are fixed members on the base, the bridges and the column, and the carriers on the head, without derived
+Open: the walls are fixed members on the base, the bridges and the column, and the carriers on the head, without derived
 screws of their own (a weldment or an assumed bolting, to be detailed); the X and Z covers have no guarded channel (an X cover's floor is the
 flat saddle top, and what gets in leaves over the saddle's ends onto the bridges and the tray; a Z cover is open to the column's side face); the
 bellows are not drawn pleat by pleat (the nested skins are their envelope, with the loose skins' and flanges' sizes from the folds). The framed
@@ -573,17 +575,72 @@ brake, fastener and load qualifications.
 
 ## Follow-ups after chip protection (2026-11-05, Codex)
 
-One commit per step; each keeps the baselines (frame tests 917, Z-axis 423, way covers, service, BOM example).
+One commit per step, with the bench-mill and library checks after each change.
 
-1. **Covered build becomes the default.** `BenchMill` has one design, and the covers are part of it: remove the
-   covered/uncovered switch rather than keeping both. Update every consumer that builds the mill (the tooling tests, the
-   feet tests, machine tending and its baselines, `HybridMillPreview`, fixture export) and re-accept their changed baselines
-   with a stated reason. Do not loosen any check.
-2. **Bolt the cover walls and carriers.** The 14 mm end walls (on the base, bridges and column) and the head carriers are
-   fixed members with no derived screws today. Give them `BoltedFace`s and receiving faces on their hosts, so their screws,
-   holes and dowels derive and pass the head and access checks.
-3. **Covers on the framed concept** (`MillXYStage`/`MillZAxis`/`BenchMillFrame` via `MillFramePreview`). Apply box covers
-   where they fit: the X gap is 76 mm with the screw 40 mm above the saddle top. Use the same library, flange bolting and
-   drains, and keep the service removals clear.
-4. **Blocked service paths.** Reassess the three kept findings (Y screw out of the rear, Z screw up past its grease fitting,
-   cartridge up). Fix them where the fix is small and clean. Otherwise state the decided removal route in the procedures.
+Status: **1 complete; 2–4 pending.**
+
+Item 1 removes both the assembly switch and the casting's optional cover input. The single design always has its six
+covers, casting seats, gutters and rear-bearing bay, the 12.5 mm Y screw extension and the 180 mm Z screw shortening.
+Casting generator revision 2 records that change; no uncovered recipe remains.
+
+| Check | Before | After item 1 |
+| --- | --- | --- |
+| Frame / central Z assertions | 917 / 423 | 917 / 423 |
+| Integrity | 117 findings in 28 states | The same 117 exact findings; none on covers |
+| Derived screw joints / screws | Plain: 30 / 144; optional covered: 42 / 216 | Single design: 42 / 216 |
+| Cover flange hardware | 12 joints, 72 screws, 72 washers in the covered study | Unchanged: 56 M5×10, 16 M5×12, 72 washers |
+| Declared / rejected service procedures | Clear declared routes; five findings across three rejected routes | Zero / five findings, unchanged |
+| Main mill capacity | Existing study | 335 assertions, 24,669 continuous envelope pairs pass |
+| Library way-cover / joint-fastener / assembly-integrity / BOM examples | Pass | Pass; zero fastener-fit findings |
+
+The 117 findings are 48 support gaps, 48 ground-support findings and 21 overlaps, rather than 117 support gaps. The
+replacement regression fixture records every full finding, including its numerical values. Each of the six covers still
+folds into its allocated space, reaches the opposite stop and sweeps clear. The Y gutters drain through their modeled bores;
+the BOM includes 24 purchased wipers.
+The two known core failures remain: XY stack height **444 versus 448**, and the general machinekit test project's
+`Transmission`/`Equatable` compilation error.
+
+BOM validation exposed an empty procurement facet masking the cover recipe's selection requirements. Constructor and
+recipe now state the same seven requirements: family, section, nesting, width, height, stroke and folded space. Supplier
+values remain **Assumed**. Compact family codes keep purchase numbers within the existing 40-character limit; the full
+configuration and descriptive model designation are retained. Exact BOM checks now count all cover screws and the 90
+M5 washers. No lint, collision limit or engagement check was relaxed.
+
+Consumer checks, with their prerequisites prepared in this worktree:
+
+- Former-manufacturing **87**, lifting-source **989**, mold **293**, production-anchor **994**, rail-seat **116** (including
+  36 service screws), tending-table **12,886** and all five tending mass-property invariants pass before and after.
+- Presentation consumers use the current `PresentationView` constructor and immutable cursor API, with the required
+  casting-shop source roots. Playback now rejects cycles in assembly-only groups too; the existing negative fixture
+  exposed that missing validation. Casting and tending presentation checks pass.
+- The hybrid audit checks two generic XY retainers, two XY nut details and the complete supplier Z nut. The integrated
+  BK15 drive has no third generic retainer. It retains the 0.01 mm³ overlap limit: **60,345 clear pairs at 27 poses** before
+  and after. Export verifies all **12** installed supplier carriages by drawing/profile rather than object identity.
+- Pinned UR5e and FAIRINO 5 v6 assets were prepared locally. Each arm passes **39** round trips with unchanged scene bytes
+  (17,698,009 / 11,285,156); current mill and physical dual-tool fixture export pass.
+- The tending study revalidated **96 saved poses and every production path** after the cover change in **137 seconds**.
+  Only the stored fingerprint changed; poses and routes did not. The final fingerprint starts `fff368d59aed`.
+- The old 541 mm tending stand-off expectation was already stale: a probe using the original sources measures **551 mm
+  for both plain and covered builds**, limited by `motorYEncoder` at Y = −452 mm. The door plane is −482 mm and the
+  unchanged robot base is −1033 mm. The check now expects 551 mm with the same 0.5 mm tolerance; the main tending run passes.
+
+Existing failures remain visible: foundation-design reports the same **55,224 mm³ mill-base simplification difference**
+and feet reports “foot mount follows its source steel seat.” Fabrication reproduces the same conflicting metadata for
+`ISO4762-M12x36.1-8.8`.
+
+The separate electric study is not a qualified tending mission. Once its pinned DH STEP asset was prepared, the current
+access run exported **112 rows: 22 clear routes, six conservative clearance flags and 84 unattempted cases**. The historical
+arm audit lacks its captured earlier reports; the cable/link audit has no matching witness in the current report. The
+cycle review and runtime checks lack the generated planner/process review inputs. Direct gripper/servo physics checks
+still lack `libnativekit_scene.so`, and playback lacks its review file. These runs are recorded as unavailable inputs or
+existing environment failures; no collision baseline was accepted by inventing captures, altering a hash or relaxing a check.
+
+1. **Covered build becomes the default — complete.** Validation is recorded above. `BenchMill` has one design. Its consumers
+   and exact BOM/integrity expectations have been updated with the measured reasons above.
+2. **Bolt the cover walls and carriers.** Pending. Give the 14 mm end walls and head carriers `BoltedFace`s and receiving
+   faces on their hosts, so their screws, holes and dowels derive and pass the head and access checks.
+3. **Covers on the framed concept** (`MillXYStage`/`MillZAxis`/`BenchMillFrame` via `MillFramePreview`). Pending. Apply box
+   covers where they fit: the X gap is 76 mm with the screw 40 mm above the saddle top. Use the same library, flange bolting
+   and drains, and keep the service removals clear. Record numbered reasons for any position that cannot accept a cover.
+4. **Blocked service paths.** Pending. Reassess the kept Y rearward, Z upward and cartridge upward findings. Make small,
+   clean fixes where possible; otherwise state the decided removal route in the procedures.

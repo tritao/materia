@@ -8,6 +8,8 @@ import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
+import machinekit.component.Procurement.ProcurementCodec;
+import machinekit.component.Procurement.ProcurementRequirement;
 import machinekit.component.Solids;
 import machinekit.cover.WayCoverCatalog.WayCoverRow;
 import machinekit.cover.WayCoverPlan.CoverShape;
@@ -51,15 +53,38 @@ class WayCoverSection extends MachineComponent {
     this.plan = plan;
     this.role = role;
     this.level = level;
-    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null)));
+    addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null), selectionRequirements(
+      row.id, width, height, stroke, space, plan.shape.open, plan.shape.reversed
+    )));
     addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
       .setToken("ratingsBasis", "Assumed").setToken("errorsBasis", "Assumed").setToken("source", row.basis)));
-    if (role != Fixed) includedInPurchase(baseNumber(row, width, height, stroke, space, plan.shape));
+    if (role != Fixed) includedInPurchase(purchaseNumber(row, width, height, stroke, space, plan.shape));
   }
 
+  /** Descriptive model designation. The shorter purchaseNumber is the BOM identity. */
   public static function baseNumber(row:WayCoverRow, width:Float, height:Float, stroke:Float, space:Float, ?shape:CoverShape):String
     return 'WAYCOVER-${row.id}-${Dimension.format(width)}x${Dimension.format(height)}-S${Dimension.format(stroke)}-L${Dimension.format(space)}'
       + (shape != null && shape.open ? "-BOX" : "") + (shape != null && shape.reversed ? "-R" : "");
+
+  /** Readable purchase identity; full family and dimensional selection remain structured BOM requirements. */
+  public static function purchaseNumber(row:WayCoverRow, width:Float, height:Float, stroke:Float, space:Float, ?shape:CoverShape):String {
+    var code = row.purchaseCode;
+    if (code == null) code = row.id;
+    return 'WAYCOVER-$code-${Dimension.format(width)}x${Dimension.format(height)}-S${Dimension.format(stroke)}-L${Dimension.format(space)}'
+      + (shape != null && shape.open ? "-B" : "") + (shape != null && shape.reversed ? "-R" : "");
+  }
+
+  /** The direct component's intent and its recipe describe the same purchased cover, including its family and section. */
+  static function selectionRequirements(row:String, width:Float, height:Float, stroke:Float, space:Float, open:Bool,
+      reversed:Bool):Array<ProcurementRequirement> return [
+    ProcurementCodec.choice("row", row),
+    ProcurementCodec.choice("section", open ? "Box" : "Ring"),
+    ProcurementCodec.choice("nesting", reversed ? "GrowsToFixed" : "GrowsToMoving"),
+    ProcurementCodec.requirement("width", "mm", null, null, width),
+    ProcurementCodec.requirement("height", "mm", null, null, height),
+    ProcurementCodec.requirement("stroke", "mm", null, null, stroke),
+    ProcurementCodec.requirement("space", "mm", null, null, space)
+  ];
 
   /** The face the flange bolts down by. */
   override public function fasteningFaces():Array<BoltedFace> {
@@ -210,9 +235,12 @@ class WayCoverSection extends MachineComponent {
       true
     ).numbered(v -> {
       var row = WayCoverCatalog.get(v.token("row"));
-      var base = baseNumber(row, v.number("width"), v.number("height"), v.number("stroke"), v.number("space"), {open: v.token("section") == "Box", hostMin: 0, hostMax: 0, hostHalfWidth: 0, reversed: v.token("nesting") == "GrowsToFixed"});
+      var base = purchaseNumber(row, v.number("width"), v.number("height"), v.number("stroke"), v.number("space"), {open: v.token("section") == "Box", hostMin: 0, hostMax: 0, hostHalfWidth: 0, reversed: v.token("nesting") == "GrowsToFixed"});
       return v.token("role") == "Fixed" ? base : v.token("role") == "Moving" ? base + "-M" : base + "-S" + v.integer("level");
-    }).procured(_ -> Buy(null, null, null)).requiringInputs(["width", "height", "stroke", "space"]);
+    }).procured(_ -> Buy(null, null, null)).requiring(v -> selectionRequirements(
+      v.token("row"), v.number("width"), v.number("height"), v.number("stroke"), v.number("space"),
+      v.token("section") == "Box", v.token("nesting") == "GrowsToFixed"
+    ));
     return recipe;
   }
 

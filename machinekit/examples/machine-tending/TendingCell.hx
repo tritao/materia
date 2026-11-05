@@ -20,15 +20,15 @@ class TendingCell {
     .assembly.AssemblyDefinition):materia.presentation.AssemblyPresentation {
     var presentation = materia.presentation.Presentations.assembled(definition, -1.1, 0.35, "machine-tending");
     function view(id:String, label:String, occurrence:String, yaw:Float):Void {
-      presentation.views.push({
-        id: id,
-        label: label,
-        camera: Frame([{occurrence: occurrence, subtree: true}], yaw, 0.35, 1.3),
-        visibility: [],
-        sections: [],
-        explode: 0,
-        source: Generated("machine-tending")
-      });
+      presentation.views.push(new materia.presentation.AssemblyPresentation.PresentationView(
+        id,
+        label,
+        Frame([{occurrence: occurrence, subtree: true}], yaw, 0.35, 1.3),
+        [],
+        [],
+        0,
+        Generated("machine-tending")
+      ));
     }
     view("robot", "Robot and tool", "arm", -1.1);
     view("machine", "Machine interface", "mill", -1.1);

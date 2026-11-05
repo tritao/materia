@@ -29,15 +29,15 @@ class TendingEndEffectorPreview {
       [for (root in scene.assemblyState.rootPoses) if (root.occurrence != "air") root];
     scene.parts = [for (part in scene.parts) if (airDefinitions.indexOf(part.id) < 0) part];
     var presentation = materia.presentation.Presentations.assembled(definition, -1.1, 0.35, "tending-end-effector");
-    presentation.views.push({
-      id: "tool-services",
-      label: "Tool services and guides",
-      camera: Frame([{occurrence: "tool", subtree: true}], 2.0, 0.45, 1.25),
-      visibility: [],
-      sections: [],
-      explode: 0,
-      source: Generated("tending-end-effector")
-    });
+    presentation.views.push(new materia.presentation.AssemblyPresentation.PresentationView(
+      "tool-services",
+      "Tool services and guides",
+      Frame([{occurrence: "tool", subtree: true}], 2.0, 0.45, 1.25),
+      [],
+      [],
+      0,
+      Generated("tending-end-effector")
+    ));
     scene.presentation = presentation;
     return SceneArtifact.encode(scene);
   }

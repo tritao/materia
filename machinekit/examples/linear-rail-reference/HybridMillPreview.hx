@@ -20,7 +20,13 @@ class HybridMillPreview {
     var frame = BenchMillFrame.create(layout, z, xy);
     var assembly = MillFramePreview.concept(reference, frame);
     BallScrewDetailChecks.check(assembly, xy, z);
-    var count = assembly.components().filter(row -> row.component == block).length;
+    var count = 0;
+    for (row in assembly.components()) if (Std.isOfType(row.component, LinearRailBlock)) {
+      var installed:LinearRailBlock = cast row.component;
+      if (installed.drawing != LinearRailBlock.SUPPLIER || installed.spec.designation != BenchMill.RAIL)
+        throw 'Carriage ${row.id} must use supplier CAD for ${BenchMill.RAIL}, got ${installed.drawing}/${installed.spec.designation}';
+      count++;
+    }
     if (count != 12) throw 'Expected twelve supplier carriages, got $count';
     sys.io.File.saveBytes(
       output + "mill-hybrid.mtrg",

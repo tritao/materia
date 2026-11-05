@@ -7,7 +7,7 @@ import machinekit.design.DesignRequirement;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /**
- * The chip protection of the bench mill (`new BenchMill(false, false, true)`): a box cover on both ends of each axis, every one from the
+ * The chip protection of the bench mill (`new BenchMill(false, false)`): a box cover on both ends of each axis, every one from the
  * catalogue. For each: its folded length fits the space at the near stop, it reaches the far stop, the fixed and moving flanges stand that far apart
  * when the axis is posed there, and the integrity run (every combination of the three axes at their ends and middles) finds nothing on it; the flange
  * screws are derived and fit; the Y covers' gutters drain to bores that exist in the base; the BOM has the covers and the wipers.
@@ -30,9 +30,6 @@ class MillWayCoverChecks {
     return false;
   }
 
-  /** Message with its numbers removed, to compare findings of two mills whose members stand a little differently. */
-  static function shape(text:String):String return ~/[-0-9.]+/g.replace(text, "#");
-
   static function pose(mill:BenchMill, axis:String, value:Float, member:String):AssemblyFrame {
     var model = new AssemblyModel("mm");
     mill.addTo(model, "");
@@ -43,7 +40,7 @@ class MillWayCoverChecks {
   }
 
   public static function main():Void {
-    var mill = new BenchMill(false, false, true);
+    var mill = new BenchMill(false, false);
     var members:Array<String> = [];
     for (entry in covers) {
       var cover = mill.coverOf(entry.id), plan = cover.plan;
@@ -73,23 +70,22 @@ class MillWayCoverChecks {
     Sys.println('integrity: ${report.errors().length} findings in ${report.statesChecked} states, ${related.length} on the covers, ${Math.round(Sys.time() - started)} s');
     for (item in related) Sys.println("  " + item.code + ": " + item.message);
     check(related.length == 0, "the covers are clear of the whole mill in every state: " + [for (item in related) item.message].join("; "));
-    // The provisions do not add findings the mill did not have: the same sweep of the mill without covers finds the same kinds.
-    var plain = AssemblyIntegrity.check(new BenchMill(false, false), {sweepStates: states});
-    var before = [for (item in plain.errors()) shape(item.code + " " + item.message)];
-    var added = [for (item in report.errors()) if (before.indexOf(shape(item.code + " " + item.message)) < 0) item];
-    Sys.println('without covers: ${plain.errors().length} findings; ${added.length} of the covered mill\'s are new');
-    for (item in added) Sys.println("  new " + item.code + ": " + item.message);
-    check(added.length == 0, "the covered mill has no finding the plain one lacks: " + [for (item in added) item.message].join("; "));
+    // Freeze the measured covered design's full finding set, including volumes and distances. The default has one design;
+    // a second, uncovered machine must not survive just to supply a regression comparison.
+    var baseline:Dynamic = haxe.Json.parse(sys.io.File.getContent("cover-integrity-baseline.json"));
+    var expected:Array<String> = cast baseline.findings;
+    var actual = [for (item in report.errors()) item.code + " " + item.message];
+    actual.sort((a, b) -> Reflect.compare(a, b));
+    var added = [for (finding in actual) if (expected.indexOf(finding) < 0) finding];
+    var missing = [for (finding in expected) if (actual.indexOf(finding) < 0) finding];
+    check(report.statesChecked == baseline.statesChecked, "the regression baseline checks every requested state");
+    check(actual.length == expected.length && added.length == 0 && missing.length == 0,
+      "integrity findings changed; added: " + added.join("; ") + "; missing: " + missing.join("; "));
+    Sys.println('integrity baseline: ${expected.length} exact findings unchanged');
     // The flange screws are derived (the mill's constructor throws without them) and fit: the covers go on after everything they surround.
-    var ground = [for (entry in mill.components()) if (!mentions(entry.id, members)) entry.id];
     var derived = mill.derivedFasteners();
-    if (derived == null) throw "The covered mill derived no fasteners";
-    // A cover part is fitted after the screws of everything round it except the host it is bolted to (which it is a member of).
-    var order = [for (id in members) {
-      var hosts = [for (joint in derived.joints) if (joint.clampedMember == id) joint.receivingMember];
-      {member: id, fastened: [for (other in ground) if (hosts.indexOf(other) < 0) other]};
-    }];
-    var screws = AssemblyIntegrity.fasteners(mill, {fittedBefore: order});
+    if (derived == null) throw "The mill derived no fasteners";
+    var screws = AssemblyIntegrity.fasteners(mill, {fittedBefore: mill.coverInstallationOrder()});
     var screwFindings = [for (item in screws.errors()) if (mentions(item.message, members)) item];
     for (item in screwFindings) Sys.println("  " + item.code + ": " + item.message);
     check(screwFindings.length == 0, "the cover flange screws fit: " + [for (item in screwFindings) item.message].join("; "));

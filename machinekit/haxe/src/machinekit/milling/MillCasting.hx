@@ -41,20 +41,13 @@ class MillCasting extends MachineComponent {
   public final screwHeight:Float;
   /** The column's cast-in bosses (empty for the other bodies). */
   public final bosses:Array<ColumnBoss>;
-  /**
-   * Whether the casting carries the provisions for the mill's way covers: the saddle's and the table's end faces are drilled to suit
-   * the cover flanges, the column has a bay in its lower front for the Y screw's rear bearing (the bearing moves back into it to leave
-   * the cover its stack), and the base has the chip drains.
-   */
-  public final covered:Bool;
   public static inline var SLOT_WIDTH:Float = 10;
   public static inline var SLOT_SPACING:Float = 40;
 
-  public function new(kind:MillCastingKind, ?bosses:Array<ColumnBoss>, covered:Bool = false) {
-    super('MILL-${Std.string(kind).toUpperCase()}' + (covered ? "-COVERED" : ""), 'Bench mill ${Std.string(kind).toLowerCase()}', "cast iron");
+  public function new(kind:MillCastingKind, ?bosses:Array<ColumnBoss>) {
+    super('MILL-${Std.string(kind).toUpperCase()}', 'Bench mill ${Std.string(kind).toLowerCase()}', "cast iron");
     if (bosses != null && bosses.length > 0 && kind != Column) throw "Only the column carries cast-in bosses";
     this.bosses = bosses == null ? [] : bosses.copy();
-    this.covered = covered;
     addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.kind = kind;
@@ -112,7 +105,7 @@ class MillCasting extends MachineComponent {
   override public function fasteningFaces():Array<BoltedFace> {
     var faces:Array<BoltedFace> = [];
     if (kind == Saddle || kind == Table || kind == Head) blockSeats(faces);
-    if (covered) coverFaces(faces);
+    coverFaces(faces);
     if (kind != Base && kind != Saddle && kind != Column) return faces;
     var nut = new machinekit.motion.BallNut();
     var wall = switch kind {
@@ -308,7 +301,7 @@ class MillCasting extends MachineComponent {
       ));
     }
     // The chip gutters of the Y covers: either side of the screw-support pad, the base's top falls to a drain hole at the front.
-    if (kind == Base && covered) for (side in [-1, 1]) {
+    if (kind == Base) for (side in [-1, 1]) {
       tools.push(Solids.named(gutter(side), side < 0 ? "chip-gutter-left" : "chip-gutter-right"));
       tools.push(Solids.named(
         Part.cylinderSpan(DRAIN_DIAMETER / 2, height - 30, height + 1, side * GUTTER_CENTRE, GUTTER_FRONT),
@@ -316,7 +309,7 @@ class MillCasting extends MachineComponent {
       ));
     }
     // The bay for the Y screw's rear bearing: its housing and stand stand back into the column's lower front, a little wider than they are.
-    if (kind == Column && covered) tools.push(Solids.named(
+    if (kind == Column) tools.push(Solids.named(
       Part.box(2 * COVER_BAY_HALF_WIDTH, COVER_BAY_DEPTH + 1, COVER_BAY_HEIGHT).translated(new Vector(0, -depth / 2 + (COVER_BAY_DEPTH - 1) / 2, -1)),
       "y-bearing-bay"
     ));
@@ -389,10 +382,9 @@ class MillCasting extends MachineComponent {
   public static function recipeType():ComponentType {
     if (castingRecipe == null) castingRecipe = new ComponentType(
       "machinekit.milling.casting",
-      [ComponentRecipeSupport.choice("kind", ["Base", "Column", "Saddle", "Table", "Head"], "Base"), ComponentRecipeSupport.optionalText("bosses"),
-        ComponentRecipeSupport.optionalText("covered")],
-      v -> new MillCasting(parse(v.token("kind")), bossesOf(v.optionalToken("bosses")), v.optionalToken("covered") == "yes")
-    ).numbered(v -> 'MILL-${v.token("kind").toUpperCase()}' + (v.optionalToken("covered") == "yes" ? "-COVERED" : ""))
+      [ComponentRecipeSupport.choice("kind", ["Base", "Column", "Saddle", "Table", "Head"], "Base"), ComponentRecipeSupport.optionalText("bosses")],
+      v -> new MillCasting(parse(v.token("kind")), bossesOf(v.optionalToken("bosses")))
+    ).versioned(2).numbered(v -> 'MILL-${v.token("kind").toUpperCase()}')
       .procured(_ -> Make("casting and CNC machining"));
     return castingRecipe;
   }
@@ -407,23 +399,21 @@ class MillCasting extends MachineComponent {
     var out = new ComponentValues().setToken("kind", Std.string(kind)).setToken("material", materialSpec());
     if (bosses.length == 0) out.setUnset("bosses");
     else out.setToken("bosses", haxe.Json.stringify(bosses));
-    if (covered) out.setToken("covered", "yes");
-    else out.setUnset("covered");
     return out;
   }
 }
 
 class MillBase extends MillCasting {
-  public function new(covered:Bool = false) super(Base, null, covered);
+  public function new() super(Base);
 }
 class MillColumn extends MillCasting {
-  public function new(?bosses:Array<ColumnBoss>, covered:Bool = false) super(Column, bosses, covered);
+  public function new(?bosses:Array<ColumnBoss>) super(Column, bosses);
 }
 class MillSaddle extends MillCasting {
-  public function new(covered:Bool = false) super(Saddle, null, covered);
+  public function new() super(Saddle);
 }
 class MillTable extends MillCasting {
-  public function new(covered:Bool = false) super(Table, null, covered);
+  public function new() super(Table);
 }
 class MillHead extends MillCasting {
   public function new() super(Head);

@@ -30,7 +30,8 @@
   "sourceRoots": [
     ".",
     "../bench-mill",
-    "../cnc-router"
+    "../cnc-router",
+    "../casting-shop"
   ],
   "dependencies": {
     "processkit": {

@@ -260,8 +260,8 @@ class TendingReach {
 
   static inline var SEATED_STOCK:String = "machine:mill/seated-stock";
   static inline var MIN_JOINT_MARGIN:Float = 0.1;
-  /** Base stand-off behind the door opening certified by MT12, in millimetres; a drift is a layout change. */
-  static inline var CERTIFIED_STAND_OFF_MM:Float = 541.0;
+  /** Base stand-off behind the actual Y-encoder enclosure envelope, in millimetres; a drift is a layout change. */
+  static inline var CERTIFIED_STAND_OFF_MM:Float = 551.0;
   // Improvements use a smaller search budget after a feasible incumbent is certified.
   static inline var APPROACH_SEARCH_ITERATIONS:Int = 256;
   /** Assumed fixture placement allowance on each side, beyond collision clearance. */

@@ -9,7 +9,8 @@
     "../bench-mill",
     "../cnc-router",
     "build/assets",
-    "../machine-tending"
+    "../machine-tending",
+    "../casting-shop"
   ],
   "dependencies": {
     "robotkit-autonomy": {

@@ -18,6 +18,7 @@ import machinekit.milling.MillCasting.MillHead;
 import machinekit.cover.WayCover;
 import machinekit.cover.WayCoverCatalog;
 import machinekit.cover.WayCoverMount;
+import machinekit.cover.WayCoverSection;
 import machinekit.cover.WayCoverMount.MountBore;
 import machinekit.cover.WayCoverMount.MountCut;
 import machinekit.cover.WayCoverPlan;
@@ -79,8 +80,6 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
   /** Assumed assembly gap between carriage blocks, in mm. */
   public static inline var BLOCK_GAP:Float = 4;
   public final vise:Null<machinekit.milling.PneumaticVise>;
-  /** Whether the mill is built with chip protection: way covers on all three axes (`installCovers`). */
-  public final covered:Bool;
   public final base:MillBase;
   public final column:MillColumn;
   public final saddle:MillSaddle;
@@ -101,18 +100,17 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
   final zeroPoses = new Map<String, AssemblyFrame>();
   final overtravel = new Map<String, Float>();
   final axisDirections = new Map<String, Array<Float>>();
-  /** The way covers of a covered mill, by id. */
+  /** The six installed way covers, by id. */
   public final wayCovers = new Map<String, WayCover>();
   final powerCableCuts:Array<BomCut> = [];
   final encoderCableCuts:Array<BomCut> = [];
 
-  public function new(withVise:Bool = false, includeWorkpiece:Bool = true, covered:Bool = false) {
+  public function new(withVise:Bool = false, includeWorkpiece:Bool = true) {
     super();
-    this.covered = covered;
-    base = new MillBase(covered);
-    column = new MillColumn(zBosses(covered ? Z_SCREW_SHORTENING : 0), covered);
-    saddle = new MillSaddle(covered);
-    table = new MillTable(covered);
+    base = new MillBase();
+    column = new MillColumn(zBosses());
+    saddle = new MillSaddle();
+    table = new MillTable();
     vise = withVise ? new machinekit.milling.PneumaticVise(STOCK_DEPTH, STOCK_WIDTH) : null;
     var railSpec = guideBlock.spec;
     var halfSpan = (railSpec.blockLength + BLOCK_GAP) / 2;
@@ -318,7 +316,7 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
       [0.0, yRailStart, saddleBottom + saddle.screwHeight],
       [0.0, 1, 0],
       [0.0, 0, 1],
-      yRailLength + (covered ? Y_SCREW_EXTENSION : 0),
+      yRailLength + Y_SCREW_EXTENSION,
       [0.0, saddleY + saddle.depth / 2 - yNutFace, saddleBottom + saddle.screwHeight]
     );
     var zScrewTop = columnPose.z + column.height + railSpec.railEndMargin;
@@ -330,7 +328,7 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
       [zScrewX, (headBack + columnFront) / 2, zScrewTop],
       [0.0, 0, -1],
       [1.0, 0, 0],
-      column.height - (covered ? Z_SCREW_SHORTENING : 0),
+      column.height - Z_SCREW_SHORTENING,
       [zScrewX, (headBack + columnFront) / 2, headZ + head.height / 2]
     );
     var pulley = new TimingPulley(HTD5M, 20, 20, 15);
@@ -398,7 +396,7 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
     connectPorts("spindle-power", "powerSupply", "power4", spindleDriver, "power");
     powerCableCuts.push(cableCut(zeroPose("spindleMotor"), zeroPose(spindleDriver), 0));
     declareServices();
-    if (covered) installCovers();
+    installCovers();
     // The rail and motor screws follow from the bolted faces the parts declare, not from a list here.
     deriveFasteners();
     addMotor(
@@ -420,7 +418,7 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
   /** How far the Y screw's rear bearing moves back into the column's bay to leave the rear cover its stack, mm. */
   public static inline var Y_SCREW_EXTENSION:Float = 12.5;
   /**
-   * How much shorter the Z screw is in a covered mill, mm. Its lower 180 mm lay below the head's travel and carried nothing but the
+   * How much shorter the Z screw is to clear the Y rear cover, mm. Its lower 180 mm lay below the head's travel and carried nothing but the
    * floating bearing, which stood at the corner of the base where the Y rear cover's stack goes, and its cover wall would have stood at the
    * table's height.
    */
@@ -434,11 +432,27 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
   /** The cover row the mill buys (every end has less than 100 mm to fold into). */
   public static inline var COVER_ROW:String = "BELLOWS-LAMELLA-8x8";
 
-  /** The way cover `id` of a covered mill. */
+  /** The installed way cover `id`. */
   public function coverOf(id:String):WayCover {
     var cover = wayCovers.get(id);
     if (cover == null) throw 'Bench mill has no way cover "$id"';
     return cover;
+  }
+
+  /** The cover skins, flanges and their mounting plates, all fitted after the enclosed hardware. */
+  public function coverMembers():Array<String> return [for (entry in components())
+    if (Std.isOfType(entry.component, WayCoverMount) || Std.isOfType(entry.component, WayCoverSection)) entry.id];
+
+  /** A rail is unbolted with its cover off; a cover's own host remains present for its fastener checks. */
+  public function coverInstallationOrder():Array<{member:String, fastened:Array<String>}> {
+    var members = coverMembers();
+    var ground = [for (entry in components()) if (members.indexOf(entry.id) < 0) entry.id];
+    var derived = derivedFasteners();
+    if (derived == null) throw "The mill derived no fasteners";
+    return [for (id in members) {
+      var hosts = [for (joint in derived.joints) if (joint.clampedMember == id) joint.receivingMember];
+      {member: id, fastened: [for (other in ground) if (hosts.indexOf(other) < 0) other]};
+    }];
   }
 
   function dot(a:Array<Float>, b:Array<Float>):Float return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -475,7 +489,7 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
   }
 
   /**
-   * Chip protection, built into a covered mill: a box cover on each end of each axis, all of one lamella bellows (`COVER_ROW`).
+   * Chip protection, built into the mill: a box cover on each end of each axis, all of one lamella bellows (`COVER_ROW`).
    * Y has a cover either side of the saddle from an end wall behind the bearing to the saddle's face; X either side of the table from an end
    * wall on the saddle's bridge to the table's end face; Z above and below the nut, from a wall at the bearing to a carrier on the head.
    * The cover walls are the surfaces they stand on: the base top for Y, the saddle top for X, the column's side face for Z.
@@ -557,15 +571,15 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
   }
 
   /** Where in the column the Z supports' bosses are cast: under the feet of the supports `driveScrew` places on the screw. */
-  static function zBosses(shortening:Float = 0):Array<ColumnBoss> {
-    var plain = new MillColumn(), rail = LinearRailBlock.metric(RAIL).spec;
+  static function zBosses():Array<ColumnBoss> {
+    var casting = new MillColumn(), rail = LinearRailBlock.metric(RAIL).spec;
     var near = ScrewSupportUnit.bk12(), far = ScrewSupportUnit.bf12();
     // The screw runs from the column's top plus the rail's end margin down its height; the supports' feet look at the column from the
     // middle of the gap between its front and the head's back.
-    var top = plain.height + rail.railEndMargin, y = -plain.depth / 2 - rail.blockHeight / 2;
+    var top = casting.height + rail.railEndMargin, y = -casting.depth / 2 - rail.blockHeight / 2;
     return [for (end in 0...2) {
       var unit = end == 0 ? near : far;
-      var offset = end == 0 ? BallScrew.INPUT_JOURNAL_LENGTH - near.length / 2 : plain.height - shortening - BallScrew.JOURNAL_LENGTH / 2;
+      var offset = end == 0 ? BallScrew.INPUT_JOURNAL_LENGTH - near.length / 2 : casting.height - Z_SCREW_SHORTENING - BallScrew.JOURNAL_LENGTH / 2;
       {y: y, z: top - offset, width: standWidth(unit), length: standLength(unit), back: Z_BOSS_BACK};
     }];
   }
