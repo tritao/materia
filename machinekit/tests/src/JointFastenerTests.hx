@@ -324,8 +324,8 @@ class JointFastenerTests {
     var feet = [for (joint in derivation.joints) if (joint.clampedFace == "foot") joint];
     var footScrews = 0;
     for (joint in feet) footScrews += joint.count;
-    // The Y and X screw supports are bolted down by their feet (the Z supports stand on a shim, see `BenchMill.driveScrew`).
-    check(feet.length == 4 && footScrews == 12, 'four supports are bolted: ${feet.length} joints, $footScrews screws');
+    // Every screw support is bolted down by its feet: the Y and X supports to their stands and bridges, the Z supports to the steel bosses cast into the column.
+    check(feet.length == 6 && footScrews == 18, 'six supports are bolted: ${feet.length} joints, $footScrews screws');
     for (joint in feet) check(joint.drilledToSuit && joint.size == "M5" && joint.engagement >= joint.minEngagement - 1e-9, 'support joint ${joint.id}: ${joint.size} x${joint.length}');
     check(total == railHoles + 4 * blocks + footScrews + 12 + 18 + 18 + 18, 'screws, washers and nuts only: $total');
     var rails = [for (joint in derivation.joints) if (joint.drilledToSuit && joint.clampedFace == "base") joint];
@@ -341,12 +341,23 @@ class JointFastenerTests {
     for (item in fit.errors()) Sys.println("  " + item.code + ": " + item.message);
     // The motors' flange screws have corner reliefs behind the flange (`MotorBody`) and nothing stands in their heads' way.
     check(fit.errors().length == 0, 'the derived fasteners fit the mill: ${[for (item in fit.errors()) item.message].join("; ")}');
+    // The steel bosses cast into the column fill the pockets cut for them: no volume shared with the casting, and the support's foot on the boss.
+    var poses = machine.solvedPoses(), posed = new machinekit.assembly.PosedParts();
+    var parts = new Map<String, machinekit.component.MachineComponent>();
+    for (entry in machine.components()) parts.set(entry.id, entry.component);
+    for (end in 0...2) {
+      var boss = 'screwZStand$end';
+      var shared = posed.overlap(parts.get(boss), poses.get(boss), parts.get("column"), poses.get("column"));
+      check(shared < 1e-3, 'the Z boss $end shares ${shared} mm3 with the column casting');
+      check(machine.column.bosses.length == 2 && parts.get(boss).fasteningFaces().length == 1, "each Z support has one boss with one tapped foot face");
+    }
+    posed.close();
     Sys.println('bench mill: ${derivation.joints.length} joints, ${derivation.count()} screws (${railHoles} rail, ${4 * blocks} block, ${footScrews} support, 12 motor, 18 nut flange), ' + [for (k in count.keys()) k + " x" + count.get(k)].join(", "));
     // The drilled seats are in the castings' solids: one tap-drill hole per rail screw, none anywhere else.
     var cut = 0;
     for (entry in machine.components()) {
       var cuts = entry.component.machinedCuts();
-      if (cuts.length > 0) check(Std.isOfType(entry.component, machinekit.milling.MillCasting) || StringTools.startsWith(entry.id, "screwXNearBridge") || StringTools.startsWith(entry.id, "screwXFarBridge") || StringTools.startsWith(entry.id, "screwYStand"), entry.id + " is machined but is neither a casting nor a support stand");
+      if (cuts.length > 0) check(Std.isOfType(entry.component, machinekit.milling.MillCasting) || StringTools.startsWith(entry.id, "screwXNearBridge") || StringTools.startsWith(entry.id, "screwXFarBridge") || StringTools.startsWith(entry.id, "screwYStand") || StringTools.startsWith(entry.id, "screwZStand"), entry.id + " is machined but is neither a casting nor a support stand");
       cut += cuts.length;
     }
     // Each block screw cuts its clearance hole and its counterbored pocket into the casting it is bolted through.

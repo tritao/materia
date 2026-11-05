@@ -9,6 +9,7 @@ import machinekit.component.Procurement.ProcurementCodec;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.milling.MillCasting.MillBase;
+import machinekit.milling.MillCasting.ColumnBoss;
 import machinekit.milling.MillCasting.MillColumn;
 import machinekit.milling.MillCasting.MillSaddle;
 import machinekit.milling.MillCasting.MillTable;
@@ -70,7 +71,7 @@ class BenchMill extends MachineAssembly {
   public static inline var BLOCK_GAP:Float = 4;
   public final vise:Null<machinekit.milling.PneumaticVise>;
   public final base = new MillBase();
-  public final column = new MillColumn();
+  public final column:MillColumn = new MillColumn(zBosses());
   public final saddle = new MillSaddle();
   public final table = new MillTable();
   public final head = new MillHead();
@@ -395,6 +396,23 @@ class BenchMill extends MachineAssembly {
     );
   }
 
+  /** Where in the column the Z supports' bosses are cast: under the feet of the supports `driveScrew` places on the screw. */
+  static function zBosses():Array<ColumnBoss> {
+    var plain = new MillColumn(), rail = LinearRailBlock.metric(RAIL).spec;
+    var near = ScrewSupportUnit.bk12(), far = ScrewSupportUnit.bf12();
+    // The screw runs from the column's top plus the rail's end margin down its height; the supports' feet look at the column from the
+    // middle of the gap between its front and the head's back.
+    var top = plain.height + rail.railEndMargin, y = -plain.depth / 2 - rail.blockHeight / 2;
+    return [for (end in 0...2) {
+      var unit = end == 0 ? near : far;
+      var offset = end == 0 ? BallScrew.INPUT_JOURNAL_LENGTH - near.length / 2 : plain.height - BallScrew.JOURNAL_LENGTH / 2;
+      {y: y, z: top - offset, width: standWidth(unit), length: standLength(unit), back: Z_BOSS_BACK};
+    }];
+  }
+
+  /** The x of a boss's back face, mm: it is let 15 mm into the 20 mm wall and its face stands 1 mm proud. */
+  static inline var Z_BOSS_BACK:Float = 75;
+
   /** A stand's footprint under a support: the foot's hole pattern with room for the screws' edge distance (`JointFasteners.EDGE_DIAMETERS`). */
   static function standWidth(unit:ScrewSupportUnit):Float return Math.max(unit.width, unit.spec.pitch + 2 * 8);
   static function standLength(unit:ScrewSupportUnit):Float return Math.max(unit.length, unit.spec.longitudinalPitch + 2 * 8);
@@ -536,9 +554,6 @@ class BenchMill extends MachineAssembly {
       carriage
     );
     var near = ScrewSupportUnit.bk12(), far = ScrewSupportUnit.bf12();
-    // The Z supports stand on a 1 mm shim between the column and their foot plane, which cannot be tapped: their fasteners are
-    // not derived until that stand is redesigned (the foot would need a real bracket or a boss on the column).
-    if (spec.id == "z") near.footBolted = far.footBolted = false;
     for (end in 0...2) {
       var support = end == 0 ? near : far;
       var offset = end == 0 ? BallScrew.INPUT_JOURNAL_LENGTH - near.length / 2 : length - BallScrew.JOURNAL_LENGTH / 2;
@@ -590,15 +605,21 @@ class BenchMill extends MachineAssembly {
         );
       }
     } else {
+      // Each Z support's foot is bolted to a steel boss cast into the column's side wall (`zBosses`): the boss fills a pocket in the
+      // wall and stands 1 mm proud of it, which is where the support's foot plane is. Cast in, it needs no screws of its own.
+      var columnPose = zeroPose(parent);
       for (end in 0...2) {
         var unit = end == 0 ? near : far;
         var offset = end
           == 0 ? BallScrew.INPUT_JOURNAL_LENGTH - near.length / 2 : length - BallScrew.JOURNAL_LENGTH / 2;
         var footX = start[0] + unit.connector("mount").frame.y;
+        var boss = column.bosses[end];
+        if (Math.abs(footX - (column.width / 2 + 1)) > 1e-6 || Math.abs(start[2] - offset - (columnPose.z + boss.z)) > 1e-6
+          || Math.abs(start[1] - (columnPose.y + boss.y)) > 1e-6) throw "The column's Z support bosses are not under the supports' feet";
         attach(
           id + 'Stand$end',
-          new MillDriveBox(end == 0 ? "MILL-Z-STAND-FIXED" : "MILL-Z-STAND-FLOATING", footX - column.width / 2, unit.width, unit.length),
-          AssemblyFrames.translation((footX + column.width / 2) / 2, start[1], start[2] - offset - unit.length / 2),
+          new MillDriveBox(end == 0 ? "MILL-Z-BOSS-FIXED" : "MILL-Z-BOSS-FLOATING", boss.width, boss.length, footX - boss.back, true),
+          orient(boss.back, start[1], start[2] - offset, [0.0, 0, 1], [1.0, 0, 0]),
           parent
         );
       }

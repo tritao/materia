@@ -21,6 +21,14 @@ enum MillCastingKind {
   Head;
 }
 
+/**
+ * A steel boss cast into the column's +x side wall, the seat of a Z screw support's foot: a pocket in the wall that the boss fills,
+ * from its `back` face (x) out to the wall's face (a boss stands proud of the wall by what its foot plane needs), `width` across and
+ * `length` along the column, centred at `y` and `z` in the column's frame (origin at the middle of its bottom face). The pocket runs on
+ * out through the column's front face: the boss's foot stands partly in front of the column, beside the head.
+ */
+typedef ColumnBoss = {y:Float, z:Float, width:Float, length:Float, back:Float};
+
 /** Machined cast-iron bodies with rail seats, screw clearances and mounting holes.
  * Dimensions describe this example's designed bodies, rather than a vendor catalogue.
  */
@@ -31,11 +39,15 @@ class MillCasting extends MachineComponent {
   public final height:Float;
   public final railSpacing:Float;
   public final screwHeight:Float;
+  /** The column's cast-in bosses (empty for the other bodies). */
+  public final bosses:Array<ColumnBoss>;
   public static inline var SLOT_WIDTH:Float = 10;
   public static inline var SLOT_SPACING:Float = 40;
 
-  public function new(kind:MillCastingKind) {
+  public function new(kind:MillCastingKind, ?bosses:Array<ColumnBoss>) {
     super('MILL-${Std.string(kind).toUpperCase()}', 'Bench mill ${Std.string(kind).toLowerCase()}', "cast iron");
+    if (bosses != null && bosses.length > 0 && kind != Column) throw "Only the column carries cast-in bosses";
+    this.bosses = bosses == null ? [] : bosses.copy();
     addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.kind = kind;
@@ -226,6 +238,14 @@ class MillCasting extends MachineComponent {
       Part.box(width - 40, depth - 40, height - 50).translated(new Vector(0, 0, 25)),
       "column-core"
     ));
+    // The pockets the cast-in steel bosses fill; the boss's face stands 1 mm proud of the wall.
+    for (i in 0...bosses.length) {
+      var boss = bosses[i], face = width / 2 + 1;
+      tools.push(Solids.named(
+        Part.box(face - boss.back, boss.width, boss.length).translated(new Vector((boss.back + face) / 2, boss.y, boss.z - boss.length / 2)),
+        'z-boss-pocket${i + 1}'
+      ));
+    }
     // Clearance for the screw along the body; the rail pads remain above it.
     if (kind == Saddle) tools.push(Solids.named(
       Part.cylinderAlongY(
@@ -295,25 +315,32 @@ class MillCasting extends MachineComponent {
   public static function recipeType():ComponentType {
     if (castingRecipe == null) castingRecipe = new ComponentType(
       "machinekit.milling.casting",
-      [ComponentRecipeSupport.choice("kind", ["Base", "Column", "Saddle", "Table", "Head"], "Base")],
-      v -> new MillCasting(parse(v.token("kind")))
+      [ComponentRecipeSupport.choice("kind", ["Base", "Column", "Saddle", "Table", "Head"], "Base"), ComponentRecipeSupport.optionalText("bosses")],
+      v -> new MillCasting(parse(v.token("kind")), bossesOf(v.optionalToken("bosses")))
     ).numbered(v -> 'MILL-${v.token("kind").toUpperCase()}')
       .procured(_ -> Make("casting and CNC machining"));
     return castingRecipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
-  override public function values():ComponentValues return new ComponentValues().setToken("kind",
-    Std.string(kind)).setToken(
-      "material",
-      materialSpec()
-    );
+  static function bossesOf(text:Null<String>):Array<ColumnBoss> {
+    if (text == null) return [];
+    var raw:Array<Dynamic> = haxe.Json.parse(text);
+    return [for (b in raw) {y: (b.y : Float), z: (b.z : Float), width: (b.width : Float), length: (b.length : Float), back: (b.back : Float)}];
+  }
+
+  override public function values():ComponentValues {
+    var out = new ComponentValues().setToken("kind", Std.string(kind)).setToken("material", materialSpec());
+    if (bosses.length == 0) out.setUnset("bosses");
+    else out.setToken("bosses", haxe.Json.stringify(bosses));
+    return out;
+  }
 }
 
 class MillBase extends MillCasting {
   public function new() super(Base);
 }
 class MillColumn extends MillCasting {
-  public function new() super(Column);
+  public function new(?bosses:Array<ColumnBoss>) super(Column, bosses);
 }
 class MillSaddle extends MillCasting {
   public function new() super(Saddle);

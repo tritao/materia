@@ -593,9 +593,10 @@ Not done yet (open, in order):
    Member count: instancing is only needed where an insert carries provenance (the mineral frames, 36 screws in the small
    frame); the bench mill's 138 screws stay BOM lines only, because as members they would add 138 solids to every preview
    with nothing to mate them to.
-2. **Z screw supports.** They stand on a 1 mm shim between the column and the foot plane (`BenchMill.driveScrew`), which
-   cannot be tapped, so their feet are marked `footBolted = false` and their screws are not derived (2 units, 6 screws). The Z drive needs a real stand or a boss on the column; the support also sits 14 mm in front of the column
-   face, so only 16 mm of its 60 mm foot is over the column.
+2. **Z screw supports (done).** They stand on steel bosses cast into the column's side wall (`MillCasting.ColumnBoss`, `BenchMill.zBosses`):
+   a 16 mm tapped block in a pocket, its face 1 mm proud at the supports' foot plane, so the screw axis did not move; the six foot
+   screws are derived (the mill: 144 screws) and the bosses need none of their own. The support's foot is 14 mm in front of the column
+   face, so the front row of holes is over the boss's forward part, beside the head.
 3. **Motor mounts and stands to castings.** `MotorMount` (HZMotion/BK/BF-style motor seats) still declares only `tappedFoot`; as a
    `BoltedFace` it needs the foot grip and bolt recess from its drawing (`boltSeatY` exists only where measured) and its
    receiving face (the y-servo variant). The Y stands and X bridges themselves are not bolted to the base and saddle yet
