@@ -41,7 +41,39 @@ class HobberMountingHoles {
       );
       result[index] = {id: row.id, pose: row.pose, openings: row.openings, part: addFixture(row.id, part)};
     }
+    // The drive pad bar's screws: the pad declares its pattern (`HobberPadBolts`), the cast insert under it is tapped to suit.
+    for (index in 0...result.length) if (result[index].id == "driveSeat") {
+      var row = result[index];
+      result[index] = {id: row.id, pose: row.pose, openings: row.openings, part: addPadHoles(kind, row)};
+    }
     return result;
+  }
+
+  /** The tapped holes the drive pad's screws thread into: blind, in the insert's top face, before casting like the fixture thread. */
+  static function addPadHoles(kind:String, row:CastInsertPlacement):CastInsert {
+    var d = kind == "bed" ? HobberDrives.x() : HobberDrives.z(), part = row.part, spec = part.insertSpec();
+    var toInsert = F.inverse(F.compose(FoundationLayout.worldPose(kind), row.pose)), thickness = part.boxDimensions(row.id).height;
+    var choice = InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(Std.parseFloat(HobberPadBolts.thread(d).substr(1))).mating());
+    var n = 0;
+    for (p in HobberPadBolts.points(d)) {
+      var q = F.transformPoint(toInsert, p.x, p.y, p.z);
+      if (Math.abs(q.z - thickness) > 1e-6) throw "A drive pad screw is not on the top face of its insert: " + kind + "/" + row.id + " z " + q.z + " of " + thickness;
+      var hole = InsertHoles.records(InsertHoles.tappedBlind(choice, thickness))[0];
+      hole.id = "pad" + (++n);
+      hole.frame.x = q.x;
+      hole.frame.y = q.y;
+      spec.holes.push(hole);
+      switch spec.origin {
+        case Fabricated(manufacturing):
+          manufacturing.holeRoutes.push({holeId: hole.id, route: BeforeCasting});
+        case Catalogue(_):
+          throw "A catalogue insert cannot acquire the drive pad's threads: " + row.id;
+      }
+    }
+    return new CastInsert(part.values().copy().setToken("holes", InsertHoles.fromNeutral(spec.holes)).setToken(
+      "origin",
+      haxe.Json.stringify(materia.casting.InsertOrigin.InsertOriginCodec.record(spec.origin))
+    ));
   }
 
   static function addFixture(id:String, part:CastInsert):CastInsert {

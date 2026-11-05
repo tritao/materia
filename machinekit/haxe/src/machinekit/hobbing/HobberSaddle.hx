@@ -352,9 +352,12 @@ class HobberSaddle extends MachineComponent {
       case "GE-X-drive-pad":
         faces.push(seatFace(HobberDrives.x(), "fixed", 15));
         faces.push(seatFace(HobberDrives.x(), "floating", 15));
+        // The four screws that hold the bar on the bed's drive-seat insert, in the groove floor (`HobberPadBolts`).
+        faces.push(HobberPadBolts.face(HobberDrives.x()));
       case "GE-Z-drive-pad":
         faces.push(seatFace(HobberDrives.z(), "fixed", 40));
         faces.push(seatFace(HobberDrives.z(), "floating", 40));
+        faces.push(HobberPadBolts.face(HobberDrives.z()));
       case "GE-Y-drive-fixed":
         faces.push(seatFace(HobberDrives.y(), "fixed", 10));
         faces.push(bracketFoot(bracketMid("fixed")));

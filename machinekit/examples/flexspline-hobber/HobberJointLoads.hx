@@ -65,9 +65,9 @@ class HobberJointLoads {
     // pads and brackets, and the nut block's base into its carriage (the nut's flange is perpendicular to the screw: tension, not slip). The nut blocks are
     // located against it by dowels (X and Z) or by a key on the seat (Y), and the seat is held to the Y saddle by friction alone.
     for (axis in [
-      {id: "X", pad: "XdrivePad", foot: "Xfixed", carriage: "Xbridge", block: "XnutBlock", seat: null},
-      {id: "Y", pad: "YdriveFixed", foot: "Yfixed", carriage: "Yplate", block: "YnutBlock", seat: "YnutSeat"},
-      {id: "Z", pad: "ZdrivePad", foot: "Zfixed", carriage: "Zplate", block: "ZnutBlock", seat: null}
+      {id: "X", pad: "XdrivePad", foot: "Xfixed", carriage: "Xbridge", block: "XnutBlock", seat: null, insert: "bed/driveSeat"},
+      {id: "Y", pad: "YdriveFixed", foot: "Yfixed", carriage: "Yplate", block: "YnutBlock", seat: "YnutSeat", insert: null},
+      {id: "Z", pad: "ZdrivePad", foot: "Zfixed", carriage: "Zplate", block: "ZnutBlock", seat: null, insert: "column/driveSeat"}
     ]) {
       var crash = HobberCrashProtection.axis(machine, axis.id);
       var design = crash.limit.designThrust, jam = crash.limit.thrust + crash.gravityN;
@@ -76,6 +76,8 @@ class HobberJointLoads {
         between: [axis.pad, axis.foot],
         shear: {peak: design, momentary: jam}
       });
+      // The pad bar passes the same thrust into the cast insert under it (four screws in the groove floor).
+      if (axis.insert != null) loads.push({label: axis.id + " drive: screw thrust from the pad bar into the casting insert", between: [axis.pad, axis.insert], shear: {peak: design, momentary: jam}});
       var base = axis.seat == null ? axis.carriage : axis.seat;
       loads.push({label: axis.id + " drive: screw thrust through the nut block", between: [base, axis.block], shear: {peak: design, momentary: jam}});
       if (axis.seat != null) loads.push({label: axis.id + " drive: screw thrust from the nut seat into the saddle", between: [axis.seat, axis.carriage], shear: {peak: design, momentary: jam}});

@@ -663,6 +663,20 @@ about the hole centroid; mu 0.15 steel on steel and, deliberately low, steel on 
 spindle seat and cradle). Ring to swivel plate: two Ø6 dowels (the 4 M6 gave x1.05 on the momentary torque); eRob output flange joint is tightened to 80 % of proof (x1.3).
 Open: nut-block bases under a motor-peak jam (X, Z x0.95; the Y seat cannot take more screws), pads to casting inserts, scale housings and heads.
 
+Seventh slice (2026-11-05, branch `hobber-crash`): the three open items of the sixth closed.
+
+- Crash loads on the nut blocks. A jam no longer loads the structure with the motor's peak (4309 N): each linear drive carries a declared crash protection (`CrashProtection`,
+  `HobberCrashProtection`): a torque limit at the largest 5 % step of rated torque that keeps the thrust at or under 2 x the sizing thrust (X 65 % = 934 N, Y 60 % = 862 N, Z 120 % = 1724 N)
+  and a following-error trip (1 mm, assumed), to be set in the EL8 drives; `HobberJointLoads` takes the momentary loads from the limited thrust plus the weight along the screw.
+  Locating, in the library: `NutBlock.pinned` (two Ø6 H7 dowels in the base end, derived with the carrier's matching face), `LocatingKey`/`MachineComponent.locatingKeys` (a shoulder or key that locates
+  a part against a shear in both directions: the lesser of its bearing and root shear, friction not counted, `JointSlip.SlipKey`). Hobber: X and Z blocks are pinned; the Y block has no room
+  for dowels (base screws 16 mm apart on a 20 mm base) and sits between two 3.5 x 3 mm ribs on its seat. Momentary factors, before -> after: X block base 0.95 -> 18.5, Z 0.95 -> 7.9, Y block on its seat
+  (not declared before) -> 22.2, Y seat to saddle 0.41 -> 1.9 (friction only); design-peak factors X 8.6 -> 36.2, Y 8.9 -> 44.5, Z 4.6 -> 19.5, seat to saddle 3.9.
+- Pads to casting inserts. `HobberPadBolts` declares the X (4 M4x8) and Z (4 M6x35) pad bars' screws once, in the nut groove floor (the one place clear of the feet, the mount relief and
+  their screws), counterbored so the heads end 0.5 mm below the floor; the pad's clamped face derives its clearance holes and counterbores, and `HobberMountingHoles` taps the same points into the
+  cast drive-seat inserts (blind, before casting), which `CastInsert.fasteningFaces` then offers as the receiving face. Slip: X x7.5 peak / x3.8 jam, Z x9.2 / x3.7 (friction). The casting package
+  regenerated (bed 24 inserts 1171 kg, column 6 inserts 72.6 kg, its checks pass).
+
 ### B7 — Rollout and hard gate
 - Done in `fa1f1534f`. The full gate passed 11/24 shards with no new
   failure or exception compared with B6. The only differences from the
