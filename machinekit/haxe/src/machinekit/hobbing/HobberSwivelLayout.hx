@@ -26,9 +26,14 @@ class HobberSwivelLayout {
   /** Adapter ring: outside and inside diameter, mm. The inside leaves the output flange more than half its footprint to bear on. */
   public static inline final RING_OUTSIDE = 110.0;
   public static inline final RING_INSIDE = 40.0;
-  /** Adapter-to-plate screws: M5 on this pitch circle, in the ring's plate end. */
+  /**
+   * Adapter-to-plate screws: four M6 on this pitch circle, in the ring's plate end, at 45 deg to the plate's axes. They have to stand in the strip |z| 24..40 of the
+   * plate's front: the Y scale's housing lies on it along y at z 0, and the Y guide blocks (z 43 to 77, on the rails at +-60) run over everything beyond z 40.
+   * Four M6 12.9 clamp the ring with ~440 N m of friction at this radius (mu 0.15, 70 % proof preload) against the 100:1 eRob's 204 N m peak and 369 N m momentary output; the ring was first drawn with eight M5, whose heads fell under the scale and the guide blocks.
+   */
   public static inline final PLATE_PCD = 95.0;
-  public static inline final PLATE_SCREWS = 8;
+  public static inline final PLATE_SCREWS = 4;
+  public static inline final PLATE_PHASE:Float = Math.PI / 4;
   /** Rotation that takes the actuator's CAD +Z to the work frame's -x (the old swivel head used the same). */
   public static final ROTATION:Array<Float> = [0.0, 0, -1, 1, 0, 0, 0, -1, 0];
 

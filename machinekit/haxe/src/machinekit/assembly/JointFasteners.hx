@@ -640,7 +640,13 @@ class JointFasteners {
       }
       engagement = length - stack;
     } else {
-      minEngagement = BoltedFace.engagementFactor(material) * spec.diameter;
+      minEngagement = BoltedFace.engagementFactor(b.face.rated ? ThreadMaterial.Steel : material) * spec.diameter;
+      if (b.face.rated && BoltedFace.engagementFactor(material) > 1.0) diagnostics.warning(
+        "fasteners.rated-thread",
+        id,
+        '$id: the maker rates a ${round(depth)} mm $size thread in ${material}; the material rule asks for '
+        + '${round(BoltedFace.engagementFactor(material) * spec.diameter)} mm of engagement, the screw is chosen for ${round(minEngagement)}'
+      );
       tipGap = through ? 0.0 : spec.pitch;
       reach = depth - tipGap;
       if (minEngagement > reach + 1e-9) diagnostics.error(

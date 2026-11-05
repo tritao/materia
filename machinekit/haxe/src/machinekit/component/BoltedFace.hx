@@ -90,10 +90,16 @@ class BoltedFace {
 	 * fastened if one of them meets a receiving face, and only when none does is it unmatched.
 	 */
   public final alternative:Null<String>;
+  /**
+	 * A tapped face whose thread depth is the maker's own, rated on its drawing (a catalogue actuator's flange): the least engagement is
+	 * one diameter, the steel rule, whatever the material, and the derivation reports a warning where the material's rule asks for more.
+	 */
+  public final rated:Bool;
 
   function new(id:String, frame:AssemblyFrame, role:BoltedRole, holes:Null<Array<BoltHole>>, width:Float, height:Float,
-      ?thicknessAt:(Float, Float) -> Float, drawn:Bool = true, washer:Bool = false, ?alternative:String) {
+      ?thicknessAt:(Float, Float) -> Float, drawn:Bool = true, washer:Bool = false, ?alternative:String, rated:Bool = false) {
     this.alternative = alternative;
+    this.rated = rated;
     this.thicknessAt = thicknessAt;
     this.drawn = drawn;
     this.washer = washer;
@@ -136,7 +142,7 @@ class BoltedFace {
 
   /** A clamped face drilled to suit, with the holes one receiving face gave it. */
   public function paired(holes:Array<BoltHole>):BoltedFace return new BoltedFace(id, frame, role, holes, width, height, thicknessAt, drawn,
-      washer, alternative);
+      washer, alternative, rated);
 
   public static function clamped(id:String, frame:AssemblyFrame, holes:Array<BoltHole>, clearance:Float, grip:Float,
       ?size:String, ?recess:BoltRecess, drawn:Bool = true, washer:Bool = false, ?alternative:String):BoltedFace return new BoltedFace(id, frame,
@@ -147,8 +153,8 @@ class BoltedFace {
       drawn:Bool = true):BoltedFace return new BoltedFace(id, frame, Through(size, clearance, thickness), holes, 0, 0, null, drawn);
 
   public static function tapped(id:String, frame:AssemblyFrame, holes:Array<BoltHole>, size:String, depth:Float, thickness:Float,
-      through:Bool = false, ?material:ThreadMaterial):BoltedFace return new BoltedFace(id, frame,
-      Receiving(size, depth, thickness, through, material ?? Steel), holes, 0, 0);
+      through:Bool = false, ?material:ThreadMaterial, rated:Bool = false):BoltedFace return new BoltedFace(id, frame,
+      Receiving(size, depth, thickness, through, material ?? Steel), holes, 0, 0, null, true, false, null, rated);
 
   public static function drilledToSuit(id:String, frame:AssemblyFrame, width:Float, height:Float, depth:Float, thickness:Float,
       ?material:ThreadMaterial, ?size:String, through:Bool = false, ?thicknessAt:(Float, Float) -> Float):BoltedFace return new BoltedFace(id, frame,

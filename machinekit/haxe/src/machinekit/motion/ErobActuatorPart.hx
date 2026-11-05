@@ -250,6 +250,41 @@ class ErobActuatorPart extends MachineComponent implements MotorDrive implements
 
   // Geometry -----------------------------------------------------------------------------------------------
 
+  /**
+	 * The maker's bolt patterns as faces (see `BoltedFace`), from the drawing data: the housing's front face, 16 M4 tapped `FIXED_THREAD_DEPTH`
+	 * deep (the maker's rated depth, 1.75 diameters in the aluminium housing: `BoltedFace.rated`), and the output flange, 12 M4 tapped
+	 * `OUTPUT_THREAD_DEPTH` deep in steel. Frames: the face plane with +Z into the actuator (down the axis), x along the CAD x, so y runs against the CAD y.
+	 */
+  override public function fasteningFaces():Array<machinekit.component.BoltedFace> {
+    if (variant == HOUSING) return [machinekit.component.BoltedFace.tapped(
+      "front",
+      machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: SEAT_Z}, {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0}),
+      [for (i in 0...D.FIXED_BOLT_COUNT) {
+        var p = fixedBolt(i);
+        {x: p.x, y: -p.y};
+      }],
+      "M4",
+      D.FIXED_THREAD_DEPTH,
+      D.BODY_LENGTH - D.REAR_SPIGOT_HEIGHT + SEAT_Z,
+      false,
+      machinekit.component.BoltedFace.ThreadMaterial.Aluminium,
+      true
+    )];
+    return [machinekit.component.BoltedFace.tapped(
+      "output",
+      machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: 0}, {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0}),
+      [for (i in 0...D.OUTPUT_BOLT_COUNT) {
+        var p = outputBolt(i);
+        {x: p.x, y: -p.y};
+      }],
+      "M4",
+      D.OUTPUT_THREAD_DEPTH,
+      D.PILOT_HEIGHT,
+      false,
+      machinekit.component.BoltedFace.ThreadMaterial.Steel
+    )];
+  }
+
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
