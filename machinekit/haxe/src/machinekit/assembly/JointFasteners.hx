@@ -199,6 +199,11 @@ class JointFasteners {
         continue;
       }
       if (candidates.length > 1) {
+        // Several receiving faces in the plane (one per thread size of a cast insert): the one whose tapped holes the pattern lands on.
+        var covering = [for (b in candidates) if (covers(a, b, tolerance)) b];
+        if (covering.length == 1) candidates = covering;
+      }
+      if (candidates.length > 1) {
         result.diagnostics.error(
           "fasteners.ambiguous",
           subject,
@@ -265,6 +270,19 @@ class JointFasteners {
       }
     }
     return lowX <= bHighX + tolerance && highX >= bLowX - tolerance && lowY <= bHighY + tolerance && highY >= bLowY - tolerance;
+  }
+
+  /** Whether every hole of `a` lands on a tapped hole of `b` (a receiving face that lists its holes). */
+  static function covers(a:Placed, b:Placed, tolerance:Float):Bool {
+    var tapped = b.face.holes, holes = a.face.holes;
+    if (tapped == null || holes == null) return false;
+    var local = AssemblyFrames.compose(AssemblyFrames.inverse(b.world), a.world);
+    for (hole in holes) {
+      var at = AssemblyFrames.transformPoint(local, hole.x, hole.y, 0), found = false;
+      for (t in tapped) if (Math.abs(t.x - at.x) <= tolerance && Math.abs(t.y - at.y) <= tolerance) found = true;
+      if (!found) return false;
+    }
+    return true;
   }
 
   /** Whether (x, y) in `face` is on one of its holes, or inside its footprint inset by `edge`. */
@@ -493,7 +511,9 @@ class JointFasteners {
         y: point.y,
         diameter: spec.tapDrill,
         from: -1.0,
-        to: through ? thickness + 1 : drillDepth
+        to: through ? thickness + 1 : drillDepth,
+        kind: "tapped",
+        thread: size
       });
     }
     if (nutted && !b.face.drawn) {
@@ -508,7 +528,9 @@ class JointFasteners {
         y: point.y,
         diameter: plateClearance,
         from: -1.0,
-        to: thickness + 1
+        to: thickness + 1,
+        kind: "clearance",
+        thread: size
       });
     }
     if (!a.face.drawn) {
@@ -519,14 +541,16 @@ class JointFasteners {
       );
       else for (hole in a.face.holes) {
         var back = grip + (recess == null ? 0.0 : recess.depth);
-        cutsOf(result, a.member).push({frame: a.face.frame, x: hole.x, y: hole.y, diameter: clearance, from: -1.0, to: back + 1});
+        cutsOf(result, a.member).push({frame: a.face.frame, x: hole.x, y: hole.y, diameter: clearance, from: -1.0, to: back + 1, kind: "clearance", thread: size});
         if (recess != null) cutsOf(result, a.member).push({
           frame: a.face.frame,
           x: hole.x,
           y: hole.y,
           diameter: recess.diameter,
           from: grip,
-          to: back + 1
+          to: back + 1,
+          kind: "counterbore",
+          thread: size
         });
       }
     }
@@ -656,7 +680,7 @@ class JointFasteners {
         host,
         'Two fasteners (${holes[i].joint}; ${holes[j].joint}) are derived for the same hole of $host'
       );
-      else if (distance < SPACING_DIAMETERS * diameter) result.diagnostics.error(
+      else if (holes[i].joint != holes[j].joint && distance < SPACING_DIAMETERS * diameter) result.diagnostics.error(
         "fasteners.spacing",
         host,
         'Derived holes of $host are only ${round(distance)} mm apart (${holes[i].joint}; ${holes[j].joint})'

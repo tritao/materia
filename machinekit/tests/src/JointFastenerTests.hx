@@ -284,6 +284,14 @@ class JointFastenerTests {
     var crowded = stack(suitHost(), cover(square(50), "M5"));
     crowded.attach("cover2", new FaceBlock("COVER2", [cover([{x: 26.0, y: 25.0}], "M5")]), AssemblyFrames.translation(0, 0, 10), "host");
     expect(crowded, "fasteners.spacing", "a hole derived 1 mm from another");
+    // Two receiving faces in one plane (an insert's M5 and M6 holes): the cover's pattern picks the one it lands on.
+    var plane = new AxisBuilder();
+    plane.place("host", new FaceBlock("HOST", [tappedHost(square(50)), BoltedFace.tapped("top6", frameAtTop(10), [{x: 0.0, y: 0.0}, {x: 30.0, y: 0.0}], "M6", 8, 8, true)]),
+      AssemblyFrames.translation(0, 0, 0));
+    plane.attach("cover", new FaceBlock("COVER", [cover(square(50))]), AssemblyFrames.translation(0, 0, 10), "host");
+    JointFasteners.derive(plane).require();
+    // The close holes of one catalogue pattern (M6 holes 13 mm apart) are the part's, not a crowding by two joints.
+    JointFasteners.derive(stack(suitHost(), cover([{x: 20.0, y: 0.0}, {x: 20.0, y: 13.0}], "M6", 6, 6.6))).require();
     var twice = stack(tappedHost(square(50)), cover(square(50)));
     twice.deriveFasteners();
     var again = false;

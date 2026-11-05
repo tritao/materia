@@ -201,13 +201,19 @@ class ScrewSupportUnit extends MachineComponent {
 
   /** The seat a footed support's bolts tap into: its base plane, a shaft height below the support's axis. */
   override public function mountingFace():Null<machinekit.component.MountingFace> return spec.base ? machinekit.component.MountingFace
-    .tappedFoot([for (p in mountingPositions()) {x: p.x, z: p.z, diameter: drawingSource().holeDiameter}], -spec.shaftHeight) : null;
+    .tappedFoot([for (p in mountingPositions()) {x: p.x, z: p.z, diameter: screwSize == null ? drawingSource().holeDiameter : machinekit.standard.SocketHeadCapScrew.catalog().get(screwSize).clearanceMedium}], -spec.shaftHeight) : null;
 
   /**
 	 * Whether the foot is bolted down by derivation (`fasteningFaces`). A machine that stands a support on something it cannot tap
 	 * (a shim) sets it false for that instance, and the support's fasteners are then not derived.
 	 */
   public var footBolted = true;
+
+  /**
+   * The screw size a machine bolts the foot with when it chooses a smaller one than the largest the maker's hole passes
+   * (`SocketHeadCapScrew.takenByHole`): a bracket too short for the edge distance of the larger screw takes the smaller.
+   */
+  public var screwSize:Null<String> = null;
 
   /**
 	 * The foot's bolted face: clearance holes of the maker's hole diameter, the screws bearing on the counterbore seat
@@ -218,7 +224,7 @@ class ScrewSupportUnit extends MachineComponent {
   override public function fasteningFaces():Array<machinekit.component.BoltedFace> {
     if (!spec.base || !footBolted) return [];
     var hole = drawingSource().holeDiameter;
-    var screw = machinekit.standard.SocketHeadCapScrew.takenByHole(hole);
+    var screw = screwSize == null ? machinekit.standard.SocketHeadCapScrew.takenByHole(hole) : machinekit.standard.SocketHeadCapScrew.catalog().get(screwSize);
     if (screw == null) throw 'No catalogue screw passes the ${hole} mm foot holes of $designation';
     return [machinekit.component.BoltedFace.clamped(
       "foot",

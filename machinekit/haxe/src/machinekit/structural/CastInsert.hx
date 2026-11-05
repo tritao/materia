@@ -299,6 +299,56 @@ class CastInsert extends MachineComponent {
 
   override public function componentType():Null<ComponentType> return recipeType();
 
+  /**
+   * The threaded holes the insert is finished with, as receiving faces: one per entry plane (the hole frame's origin plane and
+   * +Z into the insert), listing the holes already tapped there, so a rail or pad bolted on the plane has its screws checked
+   * against the insert's own pattern. Steel; the thread is the full-thread depth the hole records, through or blind as drilled.
+   */
+  override public function fasteningFaces():Array<BoltedFace> {
+    var faces:Array<BoltedFace> = [], groups:Array<{frame:materia.assembly.AssemblyRecord.AssemblyFrame, holes:Array<materia.casting.InsertHole>}> = [];
+    for (hole in insertSpec().holes) {
+      var thread = hole.thread;
+      if (thread == null || Math.abs(thread.majorDiameter - Math.round(thread.majorDiameter)) > 1e-9) continue;
+      var found = false;
+      for (group in groups) {
+        var local = materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.inverse(group.frame), hole.frame);
+        var z = materia.assembly.AssemblyFrames.transformVector(local, 0, 0, 1);
+        if (Math.abs(local.z) < 1e-6 && z.z > 0.9999) {
+          group.holes.push(hole);
+          found = true;
+          break;
+        }
+      }
+      if (!found) groups.push({frame: hole.frame, holes: [hole]});
+    }
+    var index = 0;
+    for (group in groups) {
+      // One thread size and depth per face: holes of other sizes in the plane are another face.
+      var sizes = new Map<String, Array<materia.casting.InsertHole>>();
+      for (hole in group.holes) {
+        var thread = hole.thread;
+        if (thread == null) continue;
+        var size = "M" + Math.round(thread.majorDiameter);
+        if (!sizes.exists(size)) sizes.set(size, []);
+        sizes.get(size).push(hole);
+      }
+      var names = [for (name in sizes.keys()) name];
+      names.sort(Reflect.compare);
+      for (size in names) {
+        var holes = sizes.get(size), first = holes[0];
+        var points = [for (hole in holes) {
+          var at = materia.assembly.AssemblyFrames.transformPoint(
+            materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.inverse(group.frame), hole.frame), 0, 0, 0);
+          ({x: at.x, y: at.y} : machinekit.component.BoltedFace.BoltHole);
+        }];
+        var depth = first.threadDepth ?? first.depth;
+        for (hole in holes) depth = Math.min(depth, hole.threadDepth ?? hole.depth);
+        faces.push(BoltedFace.tapped("seat" + (++index), group.frame, points, size, depth, first.depth, first.extent == materia.casting.InsertHole.HoleExtent.Through));
+      }
+    }
+    return faces;
+  }
+
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part return InsertGeometry.part(

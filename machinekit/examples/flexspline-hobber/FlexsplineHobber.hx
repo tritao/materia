@@ -415,7 +415,7 @@ class FlexsplineHobber extends MachineAssembly {
       new HobberSaddle("GE-coolant"),
       F.translation(centre, 0, HobberZLayout.SEAT_Z),
       "Yplate",
-      F.alongY(centre + 45, 40, 435, 1, 0, 0)
+      F.alongY(centre + 45, 64.35, 435, 1, 0, 0)
     );
     // Enclosure envelope reserved; panels omitted for the current open inspection layout.
     bind("table-drive", C, "table/" + tableSpec.drivePart);
@@ -438,6 +438,8 @@ class FlexsplineHobber extends MachineAssembly {
       precisionMounts,
       [for (mount in precisionMounts) mount.name => mount.name]
     ).throwIfErrors();
+    // The screws, washers, nuts and the holes they need follow from the bolted faces the parts declare (BOM_PLAN F1).
+    deriveFasteners();
     exposeConnector("work", "mandrel", "work");
     exposeConnector("hobCentre", "hob", "centre");
   }

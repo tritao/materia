@@ -17,7 +17,9 @@ import materia.assembly.AssemblyFrames as F;
 class HobberFrameChecks {
   /** `AssemblyIntegrity` in strict mode on the whole machine; `sweep` false checks the rest state only. */
   public static function integrity(machine:FlexsplineHobber, sweep:Bool, gap:Float = 2.0):Array<String> {
-    var options:IntegrityOptions = {strict: true, processContacts: machine.processContacts(), runningGap: gap};
+    // The column is lowered onto the carriage after the carriage's block and nut-block screws are fitted: those screws are reached with it off.
+    var options:IntegrityOptions = {strict: true, processContacts: machine.processContacts(), runningGap: gap,
+      removable: [for (m in machine.components()) if (StringTools.startsWith(m.id, "column/")) m.id]};
     if (!sweep) options.sweepStates = [];
     var report = AssemblyIntegrity.check(machine, options);
     return [for (item in report.errors()) item.code + " " + item.message];
@@ -520,6 +522,7 @@ class HobberFrameChecks {
     }
     if (args.indexOf("spindledrive") >= 0) for (line in spindleDrive(machine)) Sys.println(line);
     if (args.indexOf("spindlerelief") >= 0) for (line in spindleRelief(machine)) Sys.println(line);
+    if (args.indexOf("fasteners") >= 0) for (line in HobberFastenerChecks.report(machine)) Sys.println(line);
     if (args.indexOf("integrity") >= 0) {
       var errors = integrity(machine, args.indexOf("sweep") >= 0);
       var counts = new Map<String, Int>();

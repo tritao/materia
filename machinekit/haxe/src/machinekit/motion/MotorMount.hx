@@ -346,6 +346,43 @@ class MotorMount extends MachineComponent {
   override public function mountingFace():Null<machinekit.component.MountingFace> return machinekit.component.MountingFace
     .tappedFoot([for (hole in spec.baseHoles) {x: hole.x, z: hole.z, diameter: hole.diameter}], 0);
 
+  /**
+   * The faces the mount is bolted by. `motor`: the flange face the servo's flange screws thread into (the row's bolt pattern, thread
+   * and measured thread depth, in the mount's material). `foot`: the base holes, clearance holes the screws pass, bearing on the
+   * bolt seat where the reviewed CAD measured it (none otherwise: a mount whose seat is not measured is not derived).
+   */
+  override public function fasteningFaces():Array<machinekit.component.BoltedFace> {
+    var faces:Array<machinekit.component.BoltedFace> = [];
+    var depth = spec.threadDepth ?? 2 * machinekit.standard.SocketHeadCapScrew.catalog().get(spec.thread).diameter;
+    var material = materialSpec().toLowerCase().indexOf("alumin") >= 0 ? machinekit.component.BoltedFace.ThreadMaterial.Aluminium : machinekit.component.BoltedFace.ThreadMaterial.Steel;
+    faces.push(machinekit.component.BoltedFace.tapped(
+      "motor",
+      machinekit.component.BoltedFace.frameOf({x: 0, y: spec.shaftHeight, z: 0}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0}),
+      [for (b in spec.motorBolts) {x: b.x, y: b.y}],
+      spec.thread,
+      depth,
+      Math.max(depth, spec.flange),
+      false,
+      material
+    ));
+    var seat = spec.boltSeatY;
+    if (seat != null && spec.baseHoles.length > 0) {
+      var hole = spec.baseHoles[0], bolt = machinekit.component.MountingFace.boltFor(hole.diameter);
+      var recess = hole.counterboreDiameter != null && hole.counterboreDepth != null ? {diameter: hole.counterboreDiameter, depth: hole.counterboreDepth} : null;
+      faces.push(machinekit.component.BoltedFace.clamped(
+        "foot",
+        machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: 0}, {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}),
+        // The face's y axis runs along -Z of the mount.
+        [for (h in spec.baseHoles) {x: h.x, y: -h.z}],
+        hole.diameter,
+        seat,
+        bolt.name,
+        recess
+      ));
+    }
+    return faces;
+  }
+
   override public function carriesJournal():Bool return true;
 
   override public function hasGeometry():Bool return true;

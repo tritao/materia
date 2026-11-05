@@ -21,7 +21,17 @@ typedef BoltRecess = {diameter:Float, depth:Float}
  * `frame` (a frame in the part's own frame), spanning `from` to `to` along that frame's +Z, mm. A part that `machinable()`
  * cuts these into its geometry (`MachineComponent.machined`), so the solid, the exports and the checks see the same holes.
  */
-typedef MachinedCut = {frame:AssemblyFrame, x:Float, y:Float, diameter:Float, from:Float, to:Float};
+typedef MachinedCut = {
+  frame:AssemblyFrame,
+  x:Float,
+  y:Float,
+  diameter:Float,
+  from:Float,
+  to:Float,
+  /** What the hole is, for a drawing's hole table: "tapped" (a tap drill), "clearance" or "counterbore"; the thread names the screw. */
+  ?kind:String,
+  ?thread:String
+};
 
 enum BoltedRole {
   /**

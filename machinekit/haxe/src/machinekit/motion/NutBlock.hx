@@ -165,16 +165,33 @@ class NutBlock extends MachineComponent {
       number(nut.boltCircleDiameter), nut.mountScrew, Std.string(nut.boltCount)].join("|"), 1);
   }
 
-  /** The face the nut's flange seats on: its bolts thread the tap-drill holes `geometry` cuts, through the bar. */
-  override public function fasteningFaces():Array<machinekit.component.BoltedFace> return [machinekit.component.BoltedFace.tapped(
-    "nut",
-    machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0}),
-    [for (p in nut.mountingHoles()) {x: p.x, y: p.y}],
-    nut.mountScrew,
-    thickness,
-    thickness,
-    true
-  )];
+  /**
+   * The faces the block is bolted by: the nut's flange seats on `nut` (its bolts thread the tap-drill holes `geometry` cuts, through
+   * the bar), and the block's base end is the tapped `base` the carriage or seat is bolted to (`BASE_THREAD` holes `BASE_DEPTH`
+   * deep, in the middle of the thickness).
+   */
+  override public function fasteningFaces():Array<machinekit.component.BoltedFace> {
+    var base = SocketHeadCapScrew.catalog().get(BASE_THREAD);
+    return [
+      machinekit.component.BoltedFace.tapped(
+        "nut",
+        machinekit.component.BoltedFace.frameOf({x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0}),
+        [for (p in nut.mountingHoles()) {x: p.x, y: p.y}],
+        nut.mountScrew,
+        thickness,
+        thickness,
+        true
+      ),
+      machinekit.component.BoltedFace.tapped(
+        "base",
+        machinekit.component.BoltedFace.frameOf({x: 0, y: -centreHeight, z: thickness / 2}, {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}),
+        [for (x in baseHoleXs()) {x: x, y: 0.0}],
+        BASE_THREAD,
+        BASE_DEPTH,
+        length
+      )
+    ];
+  }
 
   override public function hasGeometry():Bool return true;
 

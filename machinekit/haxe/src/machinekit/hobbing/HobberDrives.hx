@@ -62,7 +62,11 @@ class HobberDrives {
     if (yCache == null) yCache = {id: "Y", drive: SupportedScrewDrive.m60dBk12(true),
       axis: {start: [70.0, HobberYLayout.NUT_STATION, 508.0], direction: [0.0, -1.0, 0], normal: [1.0, 0, 0]},
       length: HobberYLayout.SCREW_LENGTH, nutStation: partStart(HobberYLayout.NUT_STATION), nutUp: [0.0, 0, -1], blockHeight: HobberYLayout.NUT_BLOCK_HEIGHT};
-    return yCache;
+    // The floating bracket is 59 mm long (it stops short of the nut seat's travel): M5 screws in the BF12's 6.6 mm holes keep 1.5 diameters to its ends, M6 would not.
+    var axis = yCache;
+    if (axis == null) throw "Hobber Y drive lost its axis";
+    axis.drive.floating.screwSize = "M5";
+    return axis;
   }
 
   static var zDriveCache:Null<SupportedScrewDrive>;
