@@ -24,7 +24,14 @@ class HobberFrameChecks {
         // The ring's heads are sunk at the plate end: its screws into the output flange are fitted before the swivel plate goes on.
         {member: "swivelPlate", fastened: ["swivel/output"]},
         // The Y scale is bolted to the plate's front after the plate's screws into the ring (and its rails) are fitted.
-        {member: "Yscale", fastened: ["swivelPlate", "swivel/output"]}]};
+        {member: "Yscale", fastened: ["swivelPlate", "swivel/output"]},
+        // The servo goes on the cradle after the cradle is bolted to the seat (the floor bolts' heads are under the servo).
+        {member: "spindle/motor", fastened: ["spindleSeat"]},
+        // The Y nut seat is bolted to the saddle and the nut block to the seat before the guide blocks are screwed on (their rows stand over the block's bolts)
+        // and before the nut and screw go in (the nut stands over the seat's).
+        {member: "blockYLeft", fastened: ["YnutSeat"]}, {member: "blockYLeftFront", fastened: ["YnutSeat"]},
+        {member: "blockYRight", fastened: ["YnutSeat"]}, {member: "blockYRightFront", fastened: ["YnutSeat"]},
+        {member: "Ynut", fastened: ["Yplate"]}]};
     if (!sweep) options.sweepStates = [];
     var report = AssemblyIntegrity.check(machine, options);
     return [for (item in report.errors()) item.code + " " + item.message];

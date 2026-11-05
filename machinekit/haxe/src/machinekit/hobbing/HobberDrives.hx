@@ -108,7 +108,18 @@ class HobberDrives {
   }
 
   /** The nut block for this axis, on the barrel side of the nut's flange, its base end `blockHeight` from the axis. */
-  public static function nutBlock(d:HobberDriveAxis, nut:BallNut):NutBlock return new NutBlock("HOBBER-" + d.id + "-NUT-BLOCK", nut, d.blockHeight);
+  public static function nutBlock(d:HobberDriveAxis, nut:BallNut):NutBlock return new NutBlock("HOBBER-" + d.id + "-NUT-BLOCK", nut, d.blockHeight, null, d.id == "Y" ? Y_BLOCK_THICKNESS : null,
+    d.id == "Y" ? Y_BLOCK_BASE_EDGE : NutBlock.BASE_EDGE, d.id == "Y" ? Y_BLOCK_BASE_DEPTH : NutBlock.BASE_DEPTH);
+
+  /**
+   * The Y nut block's base holes stand 16 mm apart (x 70 +- 8), not 40: its seat sits between the Y saddle's plate (x to 57) and the swivel plate (x from 85), and
+   * bolts at the usual 40 would stand over each, with no room for a head under the seat or a driver below it.
+   */
+  public static inline final Y_BLOCK_BASE_EDGE = 22.0;
+  /** ... and 10 deep, not 12: close to the middle the holes would reach the nut flange's lower bolt (the web check of `NutBlock`). */
+  public static inline final Y_BLOCK_BASE_DEPTH = 10.0;
+  /** ... and 20 thick, not 16: the seat is only 42 wide (3 mm short of the swivel plate), and the 16 mm block bore on it less than the 625 mm2 a mate that carries members wants. */
+  public static inline final Y_BLOCK_THICKNESS = 20.0;
 
   /** The nut block's world frame: the nut's pose composed with the nut's flange seat. */
   public static function nutBlockPose(d:HobberDriveAxis, nut:BallNut):AssemblyFrame {

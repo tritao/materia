@@ -200,20 +200,42 @@ class HobberSaddle extends MachineComponent {
   }
 
   /** The nut block's base end on the carriage, saddle or seat that carries it: two clearance holes for the block's tapped base, `grip` of material, in this part's frame (`origin` is the part frame's origin in the work frame). */
-  static function nutBlockFace(axis:HobberDriveAxis, grip:Float, origin:Array<Float>):BoltedFace {
+  static function nutBlockFace(axis:HobberDriveAxis, grip:Float, origin:Array<Float>, ?recess:machinekit.component.BoltedFace.BoltRecess):BoltedFace {
     var nut = new machinekit.motion.BallNut(), block = HobberDrives.nutBlock(axis, nut), pose = HobberDrives.nutBlockPose(axis, nut);
     var at = F.transformPoint(pose, 0, -block.centreHeight, block.thickness / 2), out = F.transformVector(pose, 0, -1, 0), x = F.transformVector(pose, 1, 0, 0);
     var screw = machinekit.standard.SocketHeadCapScrew.catalog().get(machinekit.motion.NutBlock.BASE_THREAD);
     return BoltedFace.clamped("nut-block", BoltedFace.frameOf({x: at.x - origin[0], y: at.y - origin[1], z: at.z - origin[2]}, {x: out.x, y: out.y, z: out.z},
-      {x: x.x, y: x.y, z: x.z}), [for (u in block.baseHoleXs()) {x: u, y: 0.0}], screw.clearanceMedium, grip, machinekit.motion.NutBlock.BASE_THREAD, null, false);
+      {x: x.x, y: x.y, z: x.z}), [for (u in block.baseHoleXs()) {x: u, y: 0.0}], screw.clearanceMedium, grip, machinekit.motion.NutBlock.BASE_THREAD, recess, false);
   }
 
   /** Material under the heads of the guide-block screws (the pocket is cut from the far face), mm: M6 into a 20 mm deck, M4 into the 13 and 12 mm plates. */
   static inline final X_BLOCK_SOLE = 10.0;
   static inline final PLATE_BLOCK_SOLE = 6.0;
 
+  /** The middle y of the Y bracket under `support` (its foot's bolts are centred on it). */
+  static function bracketMid(support:String):Float {
+    if (support == "floating") return (-114.6 + -55.4) / 2;
+    var lo = 1e9, hi = -1e9;
+    for (h in HobberDrives.seatHoles(HobberDrives.y(), "fixed")) {
+      lo = Math.min(lo, h.position[1]);
+      hi = Math.max(hi, h.position[1]);
+    }
+    return (lo + hi) / 2;
+  }
+
+  /** A bracket's foot on the swivel plate's top edge: two M5 `BRACKET_BOLT_SPAN` apart on the foot's middle (x 92.5), heads on the bridge's top, 15 mm of foot under them. */
+  static function bracketFoot(mid:Float):BoltedFace {
+    return BoltedFace.clamped("plate", BoltedFace.frameOf({x: 92.5, y: mid, z: 458.0}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0}),
+      [{x: 0.0, y: -BRACKET_BOLT_SPAN / 2}, {x: 0.0, y: BRACKET_BOLT_SPAN / 2}], machinekit.standard.SocketHeadCapScrew.catalog().get("M5").clearanceMedium, 15, "M5", null, false);
+  }
+  static inline final BRACKET_BOLT_SPAN = 40.0;
+  /** The nut seat's two M4 into the saddle's top edge, mm apart (the nut block stands between them). */
+  static inline final NUT_SEAT_BOLT_SPAN = 40.0;
+  /** The nut seat's thickness (ground flat bar): see `HobberYLayout.NUT_BLOCK_HEIGHT`. */
+  static inline final NUT_SEAT_THICKNESS = 16.0;
+
   override public function machinable():Bool return ["GE-X-carriage", "GE-Z-saddle", "GE-Y-saddle", "GE-X-drive-pad", "GE-Z-drive-pad", "GE-Y-drive-fixed",
-    "GE-Y-drive-floating", "GE-swivel-plate", "GE-swivel-adapter", "GE-spindle-seat", "GE-motor-cradle"].indexOf(designId) >= 0;
+    "GE-Y-drive-floating", "GE-swivel-plate", "GE-swivel-adapter", "GE-spindle-seat", "GE-motor-cradle", "GE-Y-nut-seat"].indexOf(designId) >= 0;
 
   /** The dowels of the supports on a pad or bracket: each support's two, the seat's half of `SupportedScrewDrive.dowelPoints` (the foot's half is the support's own). */
   function padPins(axis:HobberDriveAxis, supports:Array<String>, thickness:Float, ?clip:Array<Float>):Array<machinekit.component.BoltedFace.PinnedFace> {
@@ -276,10 +298,18 @@ class HobberSaddle extends MachineComponent {
       case "GE-Y-saddle":
         // The spindle seat's four M8: the plate's face at x 45, +Z into the plate (+x), y across the plate (z).
         faces.push(BoltedFace.clamped("seat", BoltedFace.frameOf({x: 45.0, y: 0.0, z: 0.0}, {x: 1, y: 0, z: 0}, {x: 0, y: 1, z: 0}), seatBolts(), 9.0, 12.0, "M8", null, false));
+        // The nut seat's M4 into the plate's top edge (z 95, x 45..57: 12 thick, so the screws run down its middle).
+        faces.push(BoltedFace.drilledToSuit("topEdge", BoltedFace.frameOf({x: 51.0, y: -20.0, z: 458.0 - Z_SADDLE_ORIGIN_Z}, {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0}),
+          12, 220, 8, 170, BoltedFace.ThreadMaterial.Steel));
         var block = machinekit.motion.LinearRailBlock.metric("HGH15CA", machinekit.motion.LinearRailBlock.SUPPLIER);
         for (side in [-1, 1]) for (row in [-40.0, 40.0])
           faces.push(blockFace("block" + (side < 0 ? "L" : "R") + (row < 0 ? "1" : "2"), [57.0, row, side * 60.0], [-1.0, 0, 0], [0.0, 1, 0], block, 12, PLATE_BLOCK_SOLE));
-      // GE-Y-nut-seat: not declared (FRAME_PLAN, 2026-11-05): the block's bolts would enter from under the bar, where the Y saddle's edge and the swivel plate stand.
+      case "GE-Y-nut-seat":
+        // The nut block's two M6 pass the seat from below (x 70 +- 8: between the saddle's plate and the swivel plate, see `HobberDrives.Y_BLOCK_BASE_EDGE`) into its tapped
+        // base; the seat is held to the saddle's top edge by two M4 from above, outside the block's thickness, fitted first.
+        faces.push(nutBlockFace(HobberDrives.y(), NUT_SEAT_THICKNESS, [0.0, 0, 0]));
+        faces.push(BoltedFace.clamped("saddle", BoltedFace.frameOf({x: 51.0, y: -10.0, z: 458.0}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0}),
+          [{x: 0.0, y: -NUT_SEAT_BOLT_SPAN / 2}, {x: 0.0, y: NUT_SEAT_BOLT_SPAN / 2}], machinekit.standard.SocketHeadCapScrew.catalog().get("M4").clearanceMedium, NUT_SEAT_THICKNESS, "M4", null, false));
       case "GE-X-drive-pad":
         faces.push(seatFace(HobberDrives.x(), "fixed", 15));
         faces.push(seatFace(HobberDrives.x(), "floating", 15));
@@ -288,8 +318,10 @@ class HobberSaddle extends MachineComponent {
         faces.push(seatFace(HobberDrives.z(), "floating", 40));
       case "GE-Y-drive-fixed":
         faces.push(seatFace(HobberDrives.y(), "fixed", 10));
+        faces.push(bracketFoot(bracketMid("fixed")));
       case "GE-Y-drive-floating":
         faces.push(seatFace(HobberDrives.y(), "floating", 10, [35.0, -114.6, 463, 45, -55.4, 548]));
+        faces.push(bracketFoot(bracketMid("floating")));
       case "GE-swivel-adapter":
         // Aluminium ring from the output flange (x 124) to the swivel plate (x 100): its 12 M4 clearance holes (heads sunk at the plate end) onto the output flange
         // and 4 M6 tapped into the plate end. The actuator's CAD x is the work frame's y, its y is -z.
@@ -307,13 +339,28 @@ class HobberSaddle extends MachineComponent {
         faces.push(BoltedFace.clamped("ring", BoltedFace.frameOf({x: HobberSwivelLayout.PLATE_X, y: 0.0, z: 0.0}, {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
           [for (p in platePositions()) {x: p.y, y: -p.z}], machinekit.standard.SocketHeadCapScrew.catalog().get("M6").clearanceMedium, 15, "M6", null, false));
         // The Y rails' screws are tapped through the plate from its front face (x 85), the plate's frame is the Z saddle's.
+        // The brackets' M5 into the plate's top edge (z 95): the edge is 15 thick, so the screws run down its middle (7.5 = 1.5 d from each side).
+        faces.push(BoltedFace.drilledToSuit("topEdge", BoltedFace.frameOf({x: 92.5, y: 0.0, z: 458.0 - Z_SADDLE_ORIGIN_Z}, {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0}),
+          15, 230, 12, 190, BoltedFace.ThreadMaterial.Steel));
         for (side in [-1, 1]) faces.push(BoltedFace.drilledToSuit(side < 0 ? "railYLeft" : "railYRight",
           BoltedFace.frameOf({x: 85.0, y: 0.0, z: side * 60.0}, {x: 1, y: 0, z: 0}, {x: 0, y: 1, z: 0}), 230, 36, 15, 15, BoltedFace.ThreadMaterial.Steel, null, true));
       case "GE-spindle-seat":
         // The back face on the Y saddle's plate: tapped to suit the plate's clearance holes (M8, 12 mm plate).
+        // The cradle floor's M8 into the top (z 58): ahead of y 195 over the bore (the wall under the thread is what is left above its Ø80), behind it into the 14 mm tongue, tapped through.
+        faces.push(BoltedFace.drilledToSuit("topFront", BoltedFace.frameOf({x: -1.5, y: 132.5, z: SEAT_HALF}, {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0}), SEAT_X1 - SEAT_X0, 125, 16,
+          SEAT_HALF - SEAT_LOW, BoltedFace.ThreadMaterial.Steel, null, false, (u, _) -> SEAT_HALF - Math.sqrt(Math.max(0.0, SEAT_BORE * SEAT_BORE / 4 - (u - 1.5) * (u - 1.5)))));
+        faces.push(BoltedFace.drilledToSuit("topRear", BoltedFace.frameOf({x: (SEAT_X0 + SEAT_TONGUE_X1) / 2, y: 223.0, z: SEAT_HALF}, {x: 0, y: 0, z: -1}, {x: 1, y: 0, z: 0}),
+          SEAT_TONGUE_X1 - SEAT_X0, 56, 14, SEAT_HALF - SEAT_TONGUE_Z0, BoltedFace.ThreadMaterial.Steel, null, true));
         faces.push(BoltedFace.drilledToSuit("back", BoltedFace.frameOf({x: SEAT_X1, y: (SEAT_Y0 + SEAT_Y1) / 2, z: (SEAT_LOW + SEAT_HALF) / 2}, {x: -1, y: 0, z: 0}, {x: 0, y: 1, z: 0}),
           SEAT_Y1 - SEAT_Y0, SEAT_HALF - SEAT_LOW, 16, SEAT_X1 - SEAT_X0, BoltedFace.ThreadMaterial.Steel));
       case "GE-motor-cradle":
+        // The floor's four M8 into the seat: heads on the floor top, clearance holes through it; the rear row's heads are sunk (Ø14 x 9) under the servo's flange.
+        for (row in [CRADLE_FRONT_BOLT_Y, CRADLE_REAR_BOLT_Y]) {
+          var rear = row >= SEAT_Y1, floor = cradleFloorTop(row) - SEAT_HALF;
+          faces.push(BoltedFace.clamped(rear ? "floorRear" : "floorFront", BoltedFace.frameOf({x: 0.0, y: row, z: SEAT_HALF}, {x: 0, y: 0, z: 1}, {x: 1, y: 0, z: 0}),
+            [for (b in cradleFloorBolts()) if (b.y == row) {x: b.x, y: 0.0}], machinekit.standard.SocketHeadCapScrew.catalog().get("M8").clearanceMedium,
+            rear ? floor - CRADLE_BORE_DEPTH : floor, "M8", rear ? {diameter: CRADLE_BORE, depth: CRADLE_BORE_DEPTH} : null, false));
+        }
         // The servo's flange screws pass through the wall's vertical tension slots (drawn by `cradleHoles`) and take a washer
         // and nut on its rear face: a through plate, so the screws, washers and nuts derive while the slots stay the part's own.
         var motor = cradleMotor(), flange = motor.mounting();
@@ -365,8 +412,8 @@ class HobberSaddle extends MachineComponent {
   static inline final SEAT_BORE = 80.0;
   static inline final SEAT_SLIT = 2.0;
   static inline final SEAT_CLAMP_Z = 49.5;
-  /** The tongue behind the clamp that the cradle's foot rests on and bolts into: above the cartridge (its top is z 40), cut by the same slit as the floor. */
-  static inline final SEAT_TONGUE_X1 = 38.0;
+  /** The tongue behind the clamp that the cradle's foot rests on and bolts into (it reaches x 42 so the rear bolts at x 30 keep 12 mm, 1.5 M8 diameters, to its edge): above the cartridge (its top is z 40), cut by the same slit as the floor. */
+  static inline final SEAT_TONGUE_X1 = 42.0;
   static inline final SEAT_TONGUE_Y1 = 251.0;
   static inline final SEAT_TONGUE_Z0 = 44.0;
 
@@ -457,7 +504,11 @@ class HobberSaddle extends MachineComponent {
   static final CRADLE_PIN_X = [-40.0, 24.0];
 
   /** The floor's four M8 into the seat block's top and its tongue: two rows 67 apart along the spindle, 60 apart across it. */
-  public static function cradleFloorBolts():Array<{x:Float, y:Float}> return [{x: -30.0, y: 165.0}, {x: 30.0, y: 165.0}, {x: -30.0, y: CRADLE_REAR_BOLT_Y}, {x: 30.0, y: CRADLE_REAR_BOLT_Y}];
+  public static function cradleFloorBolts():Array<{x:Float, y:Float}> return [{x: -30.0, y: CRADLE_FRONT_BOLT_Y}, {x: 30.0, y: CRADLE_FRONT_BOLT_Y}, {x: -30.0, y: CRADLE_REAR_BOLT_Y}, {x: 30.0, y: CRADLE_REAR_BOLT_Y}];
+  static inline final CRADLE_FRONT_BOLT_Y = 165.0;
+  /** The rear row's counterbore for the M8 heads (Ø13 x 8): the heads end below the foot's top, under the servo's flange. */
+  static inline final CRADLE_BORE = 14.0;
+  static inline final CRADLE_BORE_DEPTH = 9.0;
 
   /** The floor's top at work y: the thin part ahead of the step. */
   static function cradleFloorTop(y:Float):Float return SEAT_HALF + (y >= SEAT_Y1 ? CRADLE_FOOT : y < CRADLE_FLOOR_STEP ? CRADLE_FLOOR_THIN : CRADLE_FLOOR);
@@ -495,16 +546,7 @@ class HobberSaddle extends MachineComponent {
   static function cradleHoles(inSeat:Bool):Array<machinekit.component.ManufacturingRoute.RouteHole> {
     var list:Array<machinekit.component.ManufacturingRoute.RouteHole> = [], m8 = machinekit.standard.SocketHeadCapScrew.catalog().get("M8").tapDrill;
     var n = 0;
-    for (b in cradleFloorBolts()) {
-      n++;
-      if (inSeat) list.push({id: "FT" + n, kind: "tapped", thread: "M8", diameter: m8, nominal: 8, fit: null, depth: b.y >= SEAT_Y1 ? 12.0 : 16.0,
-        position: [b.x, b.y, SEAT_HALF], direction: [0.0, 0, -1]});
-      else list.push({id: "FS" + n, kind: "clearance", thread: "M8", diameter: 9.0, nominal: 8, fit: null, depth: cradleFloorTop(b.y) - SEAT_HALF,
-        position: [b.x, b.y, cradleFloorTop(b.y)], direction: [0.0, 0, -1]});
-      // The rear row's heads sit under the servo's flange: counterbored 9 mm so the M8 head (Ø13 x 8) ends below the foot top.
-      if (!inSeat && b.y >= SEAT_Y1) list.push({id: "FB" + n, kind: "bore", thread: null, diameter: 14.0, nominal: 14.0, fit: null, depth: 9.0,
-        position: [b.x, b.y, cradleFloorTop(b.y)], direction: [0.0, 0, -1]});
-    }
+    // The floor's four M8 (clearance, the rear row's counterbore, the seat's thread) are derived (`fasteningFaces`).
     if (inSeat) return list;
     var motor = cradleMotor(), flange = motor.mounting();
     if (flange == null) flange = machinekit.motion.ServoMotor.assumedMounting(motor.rating.designation);
@@ -588,7 +630,7 @@ class HobberSaddle extends MachineComponent {
       case "GE-Y-drive-fixed" | "GE-Y-drive-floating":
         ManufacturingRoute.milled(1, "fine", [{name: "seat face, bolts and dowels", tolerance: 0.05, roughnessRa: 3.2}], 160);
       case "GE-Y-nut-seat":
-        ManufacturingRoute.groundStock(GroundStock.bar(60, 20), [{name: "nut block seat (ground after cutting)", tolerance: 0.02, roughnessRa: 1.6}]);
+        ManufacturingRoute.groundStock(GroundStock.bar(60, NUT_SEAT_THICKNESS), [{name: "nut block seat (ground after cutting)", tolerance: 0.02, roughnessRa: 1.6}]);
       case "GE-X-scale-seat" | "GE-Z-scale-seat":
         // Ground bar: the housing's mounting face parallelism comes from the datasheet (0.1 over the length), the grinding gives 0.01.
         ManufacturingRoute.groundStock(GroundStock.bar(HobberScales.SEAT_BAR_WIDTH, HobberScales.SEAT_BAR),
@@ -732,8 +774,8 @@ class HobberSaddle extends MachineComponent {
           box(85, 100, y0, y1, 458, 473)
         ];
       case "GE-Y-nut-seat":
-        // Ground bar, 20 thick, 42 x 60, on the Y saddle's top edge (x 45-57, z 458) under the nut block, 3 mm short of the swivel plate.
-        [box(40, 82, -40, 20, 458, 478)];
+        // Ground bar, 16 thick, 42 x 60, on the Y saddle's top edge (x 45-57, z 458) under the nut block, 3 mm short of the swivel plate.
+        [box(40, 82, -40, 20, 458, 458 + NUT_SEAT_THICKNESS)];
       case "GE-chip-tray":
         // Removable stationary skirt: 5 mm radial face clearance, 15 mm housing
         // clearance and 2 mm sheet. The lower skirt covers the full table height.

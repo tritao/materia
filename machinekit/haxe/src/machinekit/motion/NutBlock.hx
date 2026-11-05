@@ -37,16 +37,25 @@ class NutBlock extends MachineComponent {
   public static inline var MIN_THICKNESS:Float = 16;
   /** Web kept between a flange hole and a base hole, mm. */
   static inline var WEB:Float = 1;
+  /** Distance from the block's side to the base holes' centres, mm, unless a machine asks for another (`baseEdge`). */
+  public static inline var BASE_EDGE:Float = 10;
 
   public final nut:LeadScrewNut;
   public final centreHeight:Float;
   public final width:Float;
   public final thickness:Float;
   public final length:Float;
+  /**
+	 * Distance from the block's side to each base hole's centre: the holes stand `width - 2 * baseEdge` apart. A machine that must keep both
+	 * clear of something beside the block (the Y nut block's bolts between the saddle and the swivel plate) draws them closer together.
+	 */
+  public final baseEdge:Float;
+  /** Depth of the base holes' thread, mm (`BASE_DEPTH` unless a machine shortens it to clear the flange bolts). */
+  public final baseDepth:Float;
   public final stock:GroundStockRow;
   final seat:AssemblyFrame;
 
-  public function new(drawing:String, nut:LeadScrewNut, centreHeight:Float, ?width:Float, ?thickness:Float) {
+  public function new(drawing:String, nut:LeadScrewNut, centreHeight:Float, ?width:Float, ?thickness:Float, baseEdge:Float = BASE_EDGE, baseDepth:Float = BASE_DEPTH) {
     var face = nut.mountingFace();
     if (!nut.flanged || face == null) throw "A nut block carries a flanged nut";
     if (!Math.isFinite(centreHeight) || centreHeight <= 0) throw "A nut block needs a positive screw centre height";
@@ -56,11 +65,13 @@ class NutBlock extends MachineComponent {
     if (base == null) throw 'No ${BASE_THREAD} screw row';
     if (centreHeight < nut.flangeDiameter / 2 + 1) throw "Nut block: the screw centre height leaves the flange rim no clearance from the carriage";
     var long = centreHeight + nut.flangeDiameter / 2 + EDGE;
+    if (baseEdge < 1.5 * base.diameter - 1e-9 || width != null && wide - 2 * baseEdge < 2.5 * base.diameter - 1e-9 || wide - 2 * baseEdge < 0)
+      throw "Nut block: the base holes need 1.5 diameters to the side and 2.5 between them";
     var row = GroundStock.bar(wide, thick);
     if (wide < nut.flangeDiameter + 2 * EDGE - 1e-9) throw "Nut block is too narrow for the nut flange";
     if (thick < MIN_THICKNESS - 1e-9) throw "Nut block is too thin for the nut pilot and the base holes";
     super(
-      'NUT-BLOCK-${Dimension.format(wide)}x${Dimension.format(thick)}x${Dimension.format(long)}-C${Dimension.format(centreHeight)}-F${Dimension.format(nut.flangeDiameter)}x${Dimension.format(nut.flangeThickness)}',
+      'NUT-BLOCK-${Dimension.format(wide)}x${Dimension.format(thick)}x${Dimension.format(long)}-C${Dimension.format(centreHeight)}-F${Dimension.format(nut.flangeDiameter)}x${Dimension.format(nut.flangeThickness)}${baseEdge == BASE_EDGE ? "" : "-E" + Dimension.format(baseEdge)}${baseDepth == BASE_DEPTH ? "" : "-D" + Dimension.format(baseDepth)}',
       'Nut block for ${nut.description}, screw ${Dimension.format(centreHeight)} mm above the base',
       "steel",
       true
@@ -69,6 +80,8 @@ class NutBlock extends MachineComponent {
     this.centreHeight = centreHeight;
     this.width = wide;
     this.thickness = thick;
+    this.baseEdge = baseEdge;
+    this.baseDepth = baseDepth;
     this.length = long;
     this.stock = row;
     seat = face.pose;
@@ -84,7 +97,7 @@ class NutBlock extends MachineComponent {
     // The flange holes must leave room for the base holes.
     var tap = nut.mountingTapDrill() / 2;
     for (hole in nut.mountingHoles()) for (x in baseHoleXs()) {
-      var rect = {x0: x - base.tapDrill / 2, x1: x + base.tapDrill / 2, y0: -centreHeight, y1: -centreHeight + BASE_DEPTH};
+      var rect = {x0: x - base.tapDrill / 2, x1: x + base.tapDrill / 2, y0: -centreHeight, y1: -centreHeight + baseDepth};
       var nearestX = Math.max(rect.x0, Math.min(hole.x, rect.x1)), nearestY = Math.max(rect.y0, Math.min(hole.y, rect.y1));
       var gap = Math.sqrt((hole.x - nearestX) * (hole.x - nearestX) + (hole.y - nearestY) * (hole.y - nearestY));
       if (gap < tap + WEB) throw "Nut block: the screw centre height leaves no room between the flange bolts and the base holes";
@@ -98,7 +111,7 @@ class NutBlock extends MachineComponent {
   }
 
   /** The base holes' centres across the width. */
-  public function baseHoleXs():Array<Float> return [-(width / 2 - 10), width / 2 - 10];
+  public function baseHoleXs():Array<Float> return [-(width / 2 - baseEdge), width / 2 - baseEdge];
 
   /** The pose of `nut` in this block's frame: the nut's flange seat against the broad face, its axis along the block's. */
   public function nutPose():AssemblyFrame return AssemblyFrames.inverse(seat);
@@ -119,7 +132,7 @@ class NutBlock extends MachineComponent {
     n = 0;
     for (x in baseHoleXs()) out.push({
       id: "T" + (++n), kind: "tapped", thread: BASE_THREAD, diameter: base.tapDrill, nominal: base.diameter, fit: null,
-      depth: BASE_DEPTH, position: [x, -centreHeight, thickness / 2], direction: [0, 1, 0]
+      depth: baseDepth, position: [x, -centreHeight, thickness / 2], direction: [0, 1, 0]
     });
     return out;
   }
@@ -135,9 +148,11 @@ class NutBlock extends MachineComponent {
         ComponentRecipeSupport.flag("preloaded", true),
         ComponentRecipeSupport.length("centreHeight", 50),
         ComponentRecipeSupport.length("width", 60),
-        ComponentRecipeSupport.length("thickness", 16)
+        ComponentRecipeSupport.length("thickness", 16),
+        ComponentRecipeSupport.length("baseEdge", BASE_EDGE),
+        ComponentRecipeSupport.length("baseDepth", BASE_DEPTH)
       ],
-      v -> new NutBlock(v.token("drawing"), new BallNut(v.boolean("preloaded")), v.number("centreHeight"), v.number("width"), v.number("thickness")),
+      v -> new NutBlock(v.token("drawing"), new BallNut(v.boolean("preloaded")), v.number("centreHeight"), v.number("width"), v.number("thickness"), v.number("baseEdge"), v.number("baseDepth")),
       true
     ).numbered(v -> v.token("drawing"))
       .procured(_ -> Make("ground steel flat bar, cut and drilled"))
@@ -149,20 +164,23 @@ class NutBlock extends MachineComponent {
 
   override public function values():ComponentValues {
     if (!Std.isOfType(nut, BallNut)) return super.values();
-    return new ComponentValues()
+    var values = new ComponentValues()
     .setToken("drawing", drawingNumber ?? "NUT-BLOCK")
     .setBoolean("preloaded", cast(nut, BallNut).preloaded)
     .setNumber("centreHeight", centreHeight)
     .setNumber("width", width)
     .setNumber("thickness", thickness)
     .setToken("material", materialSpec());
+    if (baseEdge != BASE_EDGE) values.setNumber("baseEdge", baseEdge);
+    if (baseDepth != BASE_DEPTH) values.setNumber("baseDepth", baseDepth);
+    return values;
   }
 
   override public function revisionFingerprint():Null<String> {
     var number = machinekit.component.ComponentNumberKey.encode;
     return machinekit.component.BomRevision.fingerprint([drawingNumber, materialSpec(), number(width), number(thickness),
       number(length), number(centreHeight), number(nut.flangeDiameter), number(nut.flangeThickness), number(nut.bodyDiameter),
-      number(nut.boltCircleDiameter), nut.mountScrew, Std.string(nut.boltCount)].join("|"), 1);
+      number(nut.boltCircleDiameter), nut.mountScrew, Std.string(nut.boltCount)].concat(baseEdge == BASE_EDGE ? [] : [number(baseEdge)]).concat(baseDepth == BASE_DEPTH ? [] : [number(baseDepth)]).join("|"), 1);
   }
 
   /**
@@ -187,7 +205,7 @@ class NutBlock extends MachineComponent {
         machinekit.component.BoltedFace.frameOf({x: 0, y: -centreHeight, z: thickness / 2}, {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}),
         [for (x in baseHoleXs()) {x: x, y: 0.0}],
         BASE_THREAD,
-        BASE_DEPTH,
+        baseDepth,
         length
       )
     ];
@@ -210,7 +228,7 @@ class NutBlock extends MachineComponent {
       if (base == null) throw 'No ${BASE_THREAD} screw row';
       for (x in baseHoleXs()) {
         // Along +Y from the base end, in the middle of the thickness.
-        tools.push(Part.cylinderAlongY(base.tapDrill / 2, -centreHeight - 1, -centreHeight + BASE_DEPTH, x, thickness / 2));
+        tools.push(Part.cylinderAlongY(base.tapDrill / 2, -centreHeight - 1, -centreHeight + baseDepth, x, thickness / 2));
       }
       return Solids.cut(body, tools);
     });

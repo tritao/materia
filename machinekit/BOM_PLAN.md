@@ -632,6 +632,30 @@ Fourth slice (2026-11-05, branch `hobber-bolts`): hobber adoption, item 4 above,
   Y brackets to the swivel plate, swivel plate / adapter ring / eRob output / Z saddle to eRob (the eRob declares no faces), scale housings and heads,
   the cradle (other session: the motor face is declared; the cradle floor's holes at y 215 are 7 mm from the seat's end, short of the 12 mm M8 edge rule).
 
+Fifth slice (2026-11-05, branch `hobber-bolts-2`): the remaining hobber gaps closed except two.
+
+- Library: `PinnedFace` (dowel holes: diameter, depth each side, H7, `through`/`drawn`), `DowelPin` (ISO 8734 type A, rows 3-16, preferred length series;
+  the nominal-envelope source is the standard's page, the chamfer is assumed), `MachineComponent.pinnedFaces()`, `FastenerDerivation.dowels/dowelCount`. A pin is the
+  shortest standard length that engages one diameter in each part (holes less 1 mm of relief when blind); bores (kind `dowel`, fit H7) are cut into parts
+  that do not draw them and listed in the hole tables; `AssemblyIntegrity` checks the pin volume against third members. Findings: `fasteners.pin-pattern/-diameter/-unmatched/-duplicate`,
+  `fasteners.dowel-depth`. `SupportedScrewDrive.dowelPoints` is the one rule for a support's two pins (seat holes, `ScrewSupportUnit` and `MotorMount` feet agree by construction).
+- `IntegrityOptions.fittedBefore` (assembly order): a member (or `sub/` prefix) is installed after the fasteners of the joints that touch the named members, so it does
+  not block their driver access; per fastener, still counts for holes and heads, `fasteners.order` if the member is part of the joint. `removable` stays for workholding.
+- `BoltedFace.rated` (maker-rated thread depth: steel engagement rule, `fasteners.rated-thread` warning) for the eRob housing (7 mm M4 in aluminium).
+- `NutBlock.baseEdge/baseDepth` (base hole spacing and thread depth; defaults unchanged, part number and BOM key change only when set).
+- Hobber, before -> after: 34 joints / 152 screws / 16 hand-cut dowels -> 43 joints / 196 screws / 8 dowelled joints with 16 pins (X, Z pads and Y brackets with their feet, Y saddle
+  plate to spindle seat, seat top to cradle). New joints: Z saddle web to eRob housing (16 M4x10), ring to eRob output (12 M4x25, heads sunk 4.2), swivel plate to ring (4 M6x30),
+  Y brackets to the plate's top edge (2 x 2 M5x20), cradle floor to the seat (2 M8x16 front, 2 M8x20 rear, tapped through the tongue), Y nut seat to the saddle (2 M4x25) and
+  the nut block to the seat (2 M6x25). Hand hole lists gone: dowels, `erobSaddleHoles` screws, `ringOutputHoles`, `ringPlateHoles`, `platePlateHoles`, the cradle floor's FS/FB/FT.
+  The strict sweep passes with the assembly order in `HobberFrameChecks.integrity` (column after the carriage's screws, swivel plate and Y scale after the ring's, servo after the
+  cradle bolts, Y guide blocks and nut after the nut seat's).
+- Design changes the derivation forced: swivel plate/ring screws 8 M5 on 0 deg -> 4 M6 at 45 deg (heads were under the Y scale and the guide blocks; friction ~440 N m
+  against 204 peak / 369 momentary); the seat tongue reaches x 42 (rear bolts keep 12 mm); Y nut seat 16 mm bar (was 20; no standard M6 length fits grip 20 with 9 mm of usable thread),
+  NUT_BLOCK_HEIGHT 34, the Y block 20 thick (contact area on the 42 mm seat), its base holes 16 mm apart (x 70 +- 8, between the saddle and the swivel plate) and 10 deep.
+- Still not derived: pads to casting inserts (the drive-seat inserts carry only the source fixture thread, no pad pattern: the insert pattern would have to be added in
+  `HobberMountingHoles` and the casting package regenerated), scale housings to bars/plate and heads to rib/boss/arm (the Yuheng housing/head thread data lacks the head
+  thread and depth; `SealedScalePart` declares no faces; hand holes in `HobberScales`).
+
 ### B7 — Rollout and hard gate
 - Done in `fa1f1534f`. The full gate passed 11/24 shards with no new
   failure or exception compared with B6. The only differences from the

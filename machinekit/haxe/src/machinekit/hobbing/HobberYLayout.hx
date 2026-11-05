@@ -16,6 +16,9 @@ package machinekit.hobbing;
 class HobberYLayout {
   public static inline final SCREW_LENGTH = 170.0;
   public static inline final NUT_STATION = 100.0;
-  /** Y axis (z 508) above the top of the nut seat bar on the Y saddle (z 458 + 20). */
-  public static inline final NUT_BLOCK_HEIGHT = 30.0;
+  /**
+   * Y axis (z 508) above the top of the nut seat bar on the Y saddle (z 458 + 16). The bar is 16 thick so that the block's M6 (12.9, tapped 10 deep, 9 mm
+   * of thread usable) pass it with a standard length: grip 16 + 9 mm engagement is an M6 x 25; at 20 mm there is none (x 25 engages 5, x 30 engages 10).
+   */
+  public static inline final NUT_BLOCK_HEIGHT = 34.0;
 }

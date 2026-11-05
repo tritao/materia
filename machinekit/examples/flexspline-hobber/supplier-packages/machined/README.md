@@ -28,7 +28,7 @@ Python 3 with numpy, and Chrome or Chromium on the PATH for the PDFs; `pdftotext
 | `HOBBER-GE-X-drive-pad` | one ground flat bar, 15 mm, under both supports (ground together: coplanar seats), holes of both | 80 x 15 |
 | `HOBBER-GE-Z-drive-pad` | one ground flat bar, 40 mm, under both supports, holes of both, cut by the mount's flange relief and the eRob housing envelope swept over the Z travel plus the 2 mm gap (`HobberZOffset.relief`) | 80 x 40 |
 | `HOBBER-GE-Y-drive-fixed/-floating` | milled L bracket, 1 setup, fine | block |
-| `HOBBER-GE-Y-nut-seat` | ground flat bar, 20 mm | 60 x 20 |
+| `HOBBER-GE-Y-nut-seat` | ground flat bar, 16 mm | 60 x 16 |
 | `HOBBER-GE-X-scale-seat`, `HOBBER-GE-Z-scale-seat` | ground flat bar, 10 x 20, 2 tapped M8 | 20 x 10 |
 | `HOBBER-GE-Z-scale-arm` | milled arm for the Z scale head, 1 setup, fine | block |
 | `HOBBER-GE-Y-saddle` | milled, 2 setups, fine (boss for the Y scale head) | block |
@@ -86,10 +86,8 @@ own) is the first thing these checks caught; `HobberSaddle.withBlockBolts` now t
 
 ## Limits
 
-- The nut seat `GE-Y-nut-seat` has no holes in the model: the Y nut block's two M6 bolts and the seat's own fixing to
-  the Y saddle are not modelled, so the drawing lists none. Do not order it before they are.
-- The X carriage and Z saddle list only the nut block bolts: their fixings to the rail blocks and the column are not
-  modelled yet.
+- The scale housings' and heads' fixing holes (`HobberScales.seatHoles`, `headHoles`) are still hand lists, and the drive pads are not yet bolted to the cast
+  inserts (no bolt pattern on the pads or in the inserts): the drawings show only the dowels and the support screws.
 - Machined faces are listed by name with their tolerances; the views do not mark which face is which.
 - Mass is volume times the generic steel density; the model's own mass estimate for the carriage may differ by the
   amount of detail it carries.
