@@ -1,5 +1,11 @@
 import machinekit.assembly.AxisBuilder;
 import machinekit.assembly.JointFasteners;
+import machinekit.assembly.JointSlip;
+import machinekit.assembly.JointSlip.JointLoad;
+import machinekit.assembly.JointSlip.SlipPin;
+import machinekit.assembly.JointSlip.SlipPoint;
+import machinekit.assembly.JointSlip.SlipScrew;
+import machinekit.assembly.JointFasteners.FastenerDerivation;
 import machinekit.component.BoltedFace;
 import machinekit.component.BoltedFace.BoltHole;
 import machinekit.component.BoltedFace.ThreadMaterial;
@@ -124,6 +130,7 @@ class JointFastenerTests {
     fit();
     defects();
     dowels();
+    slip();
     mill();
     Sys.println("joint fasteners: derivation, validation and the bench mill's rail and motor screws pass");
   }
@@ -175,6 +182,41 @@ class JointFastenerTests {
     expect(pinned(two, [{x: -30.0, y: 0.0}, {x: 30.0, y: 0.0}]), "fasteners.pin-unmatched", "dowel faces with no common hole");
     expect(pinned(two, two, 5, 5, 4, 8), "fasteners.dowel-depth", "a dowel hole shallower than one diameter");
     expect(pinned(two, two, 5, 5, 10, 8, false), "fasteners.not-fixed", "dowelled members that are not fixed together");
+  }
+
+  /** Slip of bolted and dowelled joints (`JointSlip`): friction grip without pins, pins alone with them, declared loads checked in the derivation. */
+  static function slip():Void {
+    function near(actual:Float, expected:Float, tolerance:Float, what:String):Void check(Math.abs(actual - expected) <= tolerance, '$what: $actual, expected $expected');
+    near(JointSlip.stressArea("M6"), 20.12, 0.05, "M6 stress area (ISO 898-1: 20.1)");
+    near(JointSlip.stressArea("M8"), 36.6, 0.2, "M8 stress area (ISO 898-1: 36.6)");
+    near(JointSlip.preload("M6", machinekit.standard.PropertyClass.Steel129, 0.7), 13661, 30, "M6 12.9 at 70 % of proof");
+    // The ring's four M6 on a 47.5 mm radius: mu F sum(r), no pins.
+    function ring(rad:Float):Array<SlipPoint> return [for (i in 0...4) {x: 0.0, y: rad * Math.cos(Math.PI / 4 + i * Math.PI / 2), z: rad * Math.sin(Math.PI / 4 + i * Math.PI / 2)}];
+    var screws:Array<SlipScrew> = [{id: "ring", size: "M6", propertyClass: machinekit.standard.PropertyClass.Steel129, points: ring(47.5)}];
+    var load:JointLoad = {label: "A axis", between: ["a", "b"], torque: {peak: 204, momentary: 369}};
+    var friction = JointSlip.check(load, screws, [])[0];
+    near(friction.capacity, 0.15 * 4 * 13661 * 0.0475, 3.0, "four M6 at 47.5 mm");
+    check(friction.primary == "friction" && friction.pinCapacity == 0, "no pins: friction is the capacity");
+    var momentaryFactor:Float = cast friction.momentaryFactor;
+    check(friction.peakFactor > 1.5 && momentaryFactor < 1.2 && !friction.passes, 'friction alone passes the peak (x${friction.peakFactor}) and misses the momentary load (x$momentaryFactor)');
+    // Two 8 mm pins 40 mm out, 12 mm in the weaker part: bearing (240 x 8 x 12 = 23 kN) governs the pin; the torque is the farthest pin's force over sum(r^2)/r_max.
+    var pins:Array<SlipPin> = [{id: "pins", diameter: 8, engagement: 12, points: [{x: 0.0, y: 40.0, z: 0.0}, {x: 0.0, y: -40.0, z: 0.0}]}];
+    var pinned = JointSlip.check(load, screws, pins)[0];
+    near(pinned.pinCapacity, 240 * 8 * 12 * 0.08, 1.0, "two 8 mm pins at 40 mm");
+    check(pinned.primary == "pins" && pinned.capacity == pinned.pinCapacity && pinned.frictionCapacity > 0 && pinned.passes, "with pins the pins are the capacity and friction is only reported");
+    // A shear is mu F n, and the pins share it equally.
+    var shear = JointSlip.check({label: "thrust", between: ["a", "b"], shear: {peak: 1000}}, screws, [])[0];
+    near(shear.capacity, 0.15 * 4 * 13661, 5.0, "shear by friction");
+    near(JointSlip.check({label: "thrust", between: ["a", "b"], shear: {peak: 1000}, friction: 0.12}, screws, [])[0].capacity, 0.12 * 4 * 13661, 5.0, "a declared friction coefficient");
+    // In an assembly: four M5 12.9 on a square of 50 mm clamp 4 x 0.15 x 9627 N = 5776 N against sliding.
+    function loaded(peak:Float, momentary:Null<Float>, between:Array<String>):FastenerDerivation
+      return JointFasteners.derive(stack(tappedHost(square(50)), cover(square(50))), {loads: [{label: "load", between: between, shear: {peak: peak, momentary: momentary}}]});
+    var sound = loaded(3000, 4000, ["cover", "host"]);
+    sound.require();
+    check(sound.slips.length == 1 && sound.slips[0].passes && Math.abs(sound.slips[0].capacity - 5776) < 20, 'the declared load is checked: ${sound.slips[0].capacity}');
+    check(loaded(4000, null, ["host", "cover"]).codes().indexOf("fasteners.slip") >= 0, "a peak load of 4000 N on 5776 N of friction (x1.44) is a finding");
+    check(loaded(3000, 5000, ["host", "cover"]).codes().indexOf("fasteners.slip") >= 0, "a momentary 5000 N on 5776 N (x1.16) is a finding");
+    check(loaded(1000, null, ["host", "nowhere"]).codes().indexOf("fasteners.slip") >= 0, "a load between members that share no joint is a finding");
   }
 
   static function sound():Void {

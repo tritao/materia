@@ -8,6 +8,11 @@ import machinekit.component.BoltedFace.ThreadMaterial;
 import machinekit.component.BoltedFace.PinnedFace;
 import machinekit.standard.DowelPin;
 import machinekit.assembly.Diagnostics.DiagnosticSeverity;
+import machinekit.assembly.JointSlip;
+import machinekit.assembly.JointSlip.JointLoad;
+import machinekit.assembly.JointSlip.JointSlipResult;
+import machinekit.assembly.JointSlip.SlipPin;
+import machinekit.assembly.JointSlip.SlipScrew;
 import machinekit.component.BomItem;
 import machinekit.component.MachineComponent;
 import machinekit.standard.FlatWasher;
@@ -27,6 +32,8 @@ typedef FastenerOptions = {
   @:optional var tolerance:Float;
   /** Length (mm) of the driver access cylinder along the axis beyond a head or nut; `JointFasteners.ACCESS_LENGTH` when absent. */
   @:optional var accessLength:Float;
+  /** The loads the machine declares its joints carry; each is checked for slip (`JointSlip`, findings `fasteners.slip`). */
+  @:optional var loads:Array<JointLoad>;
 };
 
 /**
@@ -56,6 +63,8 @@ typedef FastenedJoint = {
   var minEngagement:Float;
   /** The holes in the receiving face frame, and whether the joint made them (the host is drilled to suit). */
   var hostHoles:Array<BoltHole>;
+  /** The same holes in world coordinates, mm. */
+  var worldHoles:Array<{x:Float, y:Float, z:Float}>;
   var drilledToSuit:Bool;
   /** The tap-drill diameter and the depths of thread and of drilling the host needs for them, mm. */
   var tapDrill:Float;
@@ -89,8 +98,9 @@ typedef DowelJoint = {
   var depthB:Float;
   var engagementA:Float;
   var engagementB:Float;
-  /** The holes in the frame of member B's face. */
+  /** The holes in the frame of member B's face, and in world coordinates. */
   var hostHoles:Array<BoltHole>;
+  var worldHoles:Array<{x:Float, y:Float, z:Float}>;
   var item:BomItem;
   /** The pin in its holes, in member B's face frame (A lies at negative z). */
   var volumes:Array<FastenerVolume>;
@@ -102,6 +112,8 @@ class FastenerDerivation {
   /** The dowelled joints (`PinnedFace`), beside the bolted ones. */
   public final dowels:Array<DowelJoint> = [];
   public final diagnostics = new Diagnostics();
+  /** The slip check of every declared load (`FastenerOptions.loads`), in the order declared. */
+  public final slips:Array<JointSlipResult> = [];
   /**
 	 * The holes the joints need cut into their parts, by member id, in each part's frame: the tap-drill holes of a host
 	 * drilled to suit and the clearance holes of a clamped face whose holes the part does not draw. They are derived once,
@@ -271,7 +283,39 @@ class JointFasteners {
     }
     for (key in derived.keys()) spacing(result, key, derived.get(key), result.joints);
     derivePins(result, assembly, poses, group, members, tolerance);
+    if (options != null && options.loads != null) slip(result, options.loads, propertyClass);
     return result;
+  }
+
+  /** The slip check of the declared loads (`JointSlip`): each meets the joints of its member pair; a load that meets none is an error. */
+  static function slip(result:FastenerDerivation, loads:Array<JointLoad>, propertyClass:PropertyClass):Void {
+    for (load in loads) {
+      if (load.between == null || load.between.length != 2) {
+        result.diagnostics.error("fasteners.slip", load.label, '${load.label}: a joint load names the two members it joins');
+        continue;
+      }
+      function pair(a:String, b:String):Bool return (a == load.between[0] && b == load.between[1]) || (a == load.between[1] && b == load.between[0]);
+      function facePasses(a:String, b:String):Bool return load.face == null || a == load.face || b == load.face;
+      var screws:Array<SlipScrew> = [], pins:Array<SlipPin> = [];
+      for (joint in result.joints) if (pair(joint.clampedMember, joint.receivingMember) && facePasses(joint.clampedFace, joint.receivingFace))
+        screws.push({id: joint.id, size: joint.size, propertyClass: joint.propertyClass, points: joint.worldHoles});
+      for (joint in result.dowels) if (pair(joint.memberA, joint.memberB) && facePasses(joint.faceA, joint.faceB))
+        pins.push({id: joint.id, diameter: joint.diameter, engagement: Math.min(joint.engagementA, joint.engagementB), points: joint.worldHoles});
+      var checked = JointSlip.check(load, screws, pins);
+      if (checked.length == 0) result.diagnostics.error(
+        "fasteners.slip",
+        load.label,
+        '${load.label}: no bolted or dowelled joint between ${load.between[0]} and ${load.between[1]}${load.face == null ? "" : " at face " + load.face}, or no load declared'
+      );
+      for (slip in checked) {
+        result.slips.push(slip);
+        if (!slip.passes) result.diagnostics.error(
+          "fasteners.slip",
+          load.label,
+          JointSlip.describe(slip) + ' (needs x${JointSlip.PEAK_FACTOR} on the peak and x${JointSlip.MOMENTARY_FACTOR} on a momentary load)'
+        );
+      }
+    }
   }
 
   /**
@@ -398,6 +442,7 @@ class JointFasteners {
         engagementA: engagementA,
         engagementB: engagementB,
         hostHoles: [for (hole in b.face.holes) {x: hole.x, y: hole.y}],
+        worldHoles: [for (hole in b.face.holes) AssemblyFrames.transformPoint(b.world, hole.x, hole.y, 0)],
         item: pin.bom,
         volumes: [{
           name: "dowel pin",
@@ -811,6 +856,7 @@ class JointFasteners {
       engagement: engagement,
       minEngagement: minEngagement,
       hostHoles: points,
+      worldHoles: [for (p in points) AssemblyFrames.transformPoint(b.world, p.x, p.y, 0)],
       drilledToSuit: drilled,
       tapDrill: spec.tapDrill,
       threadDepth: threadDepth,
