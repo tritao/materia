@@ -83,11 +83,12 @@ class MillXYStageChecks {
       );
     axis.validate();
     frame.validate();
-    near(l.tableTop, 448, "stack height");
+    // Rail plane, two HGH15CA carriage blocks (28 mm each in the sourced catalogue), saddle, riser and 40 mm table.
+    near(l.tableTop, 444, "stack height");
     near(f.yRailSpacing, 220, "broad Y guide stance");
     near(l.xRailSpacing, 160, "X guides support separated table ribs");
     check(2 * l.yBlockSpan > 80, "Y saddle has a longer guide footprint");
-    near(l.xMotorZ, 292, "X return drive independent of lowered Y shaft");
+    near(l.xMotorZ, 288, "X return drive independent of lowered Y shaft");
     near(l.yScrewZ, l.saddleBottom, "Y screw at saddle underside between rails");
     near(axis.axisOvertravel("x"), l.xOvertravel, "X bearing/guide overrun limit");
     near(axis.axisOvertravel("y"), l.yOvertravel, "Y bearing overrun limit");
