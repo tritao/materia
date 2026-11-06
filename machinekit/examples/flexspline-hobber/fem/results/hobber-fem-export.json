@@ -1,0 +1,2513 @@
+{
+  "parts": [
+    {
+      "name": "GE-X-carriage",
+      "pose": {
+        "axes": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "id": "Xbridge",
+        "origin": [
+          45.625,
+          0,
+          -363
+        ]
+      },
+      "volume": 3122926.8787911204,
+      "mass": 24.514975998510295,
+      "comLocal": [
+        247.6146248910846,
+        -3.0183008811737406,
+        266.9571728348341
+      ],
+      "holes": [
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J1",
+          "kind": "clearance",
+          "position": [
+            84.5,
+            -237.5,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 10,
+          "diameter": 12,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J2",
+          "kind": "bore",
+          "position": [
+            84.5,
+            -237.5,
+            270
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J3",
+          "kind": "clearance",
+          "position": [
+            119.5,
+            -237.5,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 10,
+          "diameter": 12,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J4",
+          "kind": "bore",
+          "position": [
+            119.5,
+            -237.5,
+            270
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J5",
+          "kind": "clearance",
+          "position": [
+            84.5,
+            -202.5,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 10,
+          "diameter": 12,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J6",
+          "kind": "bore",
+          "position": [
+            84.5,
+            -202.5,
+            270
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J7",
+          "kind": "clearance",
+          "position": [
+            119.5,
+            -202.5,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 10,
+          "diameter": 12,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J8",
+          "kind": "bore",
+          "position": [
+            119.5,
+            -202.5,
+            270
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J9",
+          "kind": "clearance",
+          "position": [
+            282.5,
+            -237.5,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 10,
+          "diameter": 12,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J10",
+          "kind": "bore",
+          "position": [
+            282.5,
+            -237.5,
+            270
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J11",
+          "kind": "clearance",
+          "position": [
+            317.5,
+            -237.5,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 10,
+          "diameter": 12,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J12",
+          "kind": "bore",
+          "position": [
+            317.5,
+            -237.5,
+            270
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J13",
+          "kind": "clearance",
+          "position": [
+            282.5,
+            -202.5,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 10,
+          "diameter": 12,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J14",
+          "kind": "bore",
+          "position": [
+            282.5,
+            -202.5,
+            270
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J15",
+          "kind": "clearance",
+          "position": [
+            317.5,
+            -202.5,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 10,
+          "diameter": 12,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J16",
+          "kind": "bore",
+          "position": [
+            317.5,
+            -202.5,
+            270
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J17",
+          "kind": "clearance",
+          "position": [
+            84.5,
+            202.5,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 10,
+          "diameter": 12,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J18",
+          "kind": "bore",
+          "position": [
+            84.5,
+            202.5,
+            270
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J19",
+          "kind": "clearance",
+          "position": [
+            119.5,
+            202.5,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 10,
+          "diameter": 12,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J20",
+          "kind": "bore",
+          "position": [
+            119.5,
+            202.5,
+            270
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J21",
+          "kind": "clearance",
+          "position": [
+            84.5,
+            237.5,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 10,
+          "diameter": 12,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J22",
+          "kind": "bore",
+          "position": [
+            84.5,
+            237.5,
+            270
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J23",
+          "kind": "clearance",
+          "position": [
+            119.5,
+            237.5,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 10,
+          "diameter": 12,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J24",
+          "kind": "bore",
+          "position": [
+            119.5,
+            237.5,
+            270
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J25",
+          "kind": "clearance",
+          "position": [
+            282.5,
+            202.5,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 10,
+          "diameter": 12,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J26",
+          "kind": "bore",
+          "position": [
+            282.5,
+            202.5,
+            270
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J27",
+          "kind": "clearance",
+          "position": [
+            317.5,
+            202.5,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 10,
+          "diameter": 12,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J28",
+          "kind": "bore",
+          "position": [
+            317.5,
+            202.5,
+            270
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J29",
+          "kind": "clearance",
+          "position": [
+            282.5,
+            237.5,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 10,
+          "diameter": 12,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J30",
+          "kind": "bore",
+          "position": [
+            282.5,
+            237.5,
+            270
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J31",
+          "kind": "clearance",
+          "position": [
+            317.5,
+            237.5,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 10,
+          "diameter": 12,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J32",
+          "kind": "bore",
+          "position": [
+            317.5,
+            237.5,
+            270
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J33",
+          "kind": "clearance",
+          "position": [
+            240.5,
+            20,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 20,
+          "diameter": 6.6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J34",
+          "kind": "clearance",
+          "position": [
+            240.5,
+            -20,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 34.3,
+          "diameter": 5.5,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J35",
+          "kind": "clearance",
+          "position": [
+            213.25,
+            178,
+            245.7
+          ],
+          "slotLength": 0,
+          "thread": "M5"
+        },
+        {
+          "depth": 5.5,
+          "diameter": 10.5,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J36",
+          "kind": "bore",
+          "position": [
+            213.25,
+            178,
+            274.5
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 34.3,
+          "diameter": 5.5,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J37",
+          "kind": "clearance",
+          "position": [
+            310.75,
+            178,
+            245.7
+          ],
+          "slotLength": 0,
+          "thread": "M5"
+        },
+        {
+          "depth": 5.5,
+          "diameter": 10.5,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J38",
+          "kind": "bore",
+          "position": [
+            310.75,
+            178,
+            274.5
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 8,
+          "diameter": 6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J39",
+          "kind": "dowel",
+          "position": [
+            240.5,
+            10,
+            260
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 8,
+          "diameter": 6,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J40",
+          "kind": "dowel",
+          "position": [
+            240.5,
+            -10,
+            260
+          ],
+          "slotLength": 0,
+          "thread": null
+        }
+      ]
+    },
+    {
+      "name": "GE-Z-saddle",
+      "pose": {
+        "axes": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "id": "Zplate",
+        "origin": [
+          45.625,
+          0,
+          0
+        ]
+      },
+      "volume": 949920.2730619283,
+      "mass": 7.456874143536138,
+      "comLocal": [
+        141.45140605082017,
+        -0.11442422469839329,
+        58.52987149830066
+      ],
+      "holes": [
+        {
+          "depth": 13,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J1",
+          "kind": "clearance",
+          "position": [
+            148,
+            -158,
+            -13
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 7,
+          "diameter": 9,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J2",
+          "kind": "bore",
+          "position": [
+            142,
+            -158,
+            -13
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 13,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J3",
+          "kind": "clearance",
+          "position": [
+            148,
+            -158,
+            13
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 7,
+          "diameter": 9,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J4",
+          "kind": "bore",
+          "position": [
+            142,
+            -158,
+            13
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 13,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J5",
+          "kind": "clearance",
+          "position": [
+            148,
+            -132,
+            -13
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 7,
+          "diameter": 9,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J6",
+          "kind": "bore",
+          "position": [
+            142,
+            -132,
+            -13
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 13,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J7",
+          "kind": "clearance",
+          "position": [
+            148,
+            -132,
+            13
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 7,
+          "diameter": 9,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J8",
+          "kind": "bore",
+          "position": [
+            142,
+            -132,
+            13
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 13,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J9",
+          "kind": "clearance",
+          "position": [
+            148,
+            -158,
+            97
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 7,
+          "diameter": 9,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J10",
+          "kind": "bore",
+          "position": [
+            142,
+            -158,
+            97
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 13,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J11",
+          "kind": "clearance",
+          "position": [
+            148,
+            -158,
+            123
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 7,
+          "diameter": 9,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J12",
+          "kind": "bore",
+          "position": [
+            142,
+            -158,
+            123
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 13,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J13",
+          "kind": "clearance",
+          "position": [
+            148,
+            -132,
+            97
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 7,
+          "diameter": 9,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J14",
+          "kind": "bore",
+          "position": [
+            142,
+            -132,
+            97
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 13,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J15",
+          "kind": "clearance",
+          "position": [
+            148,
+            -132,
+            123
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 7,
+          "diameter": 9,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J16",
+          "kind": "bore",
+          "position": [
+            142,
+            -132,
+            123
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 13,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J17",
+          "kind": "clearance",
+          "position": [
+            148,
+            132,
+            -13
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 7,
+          "diameter": 9,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J18",
+          "kind": "bore",
+          "position": [
+            142,
+            132,
+            -13
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 13,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J19",
+          "kind": "clearance",
+          "position": [
+            148,
+            132,
+            13
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 7,
+          "diameter": 9,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J20",
+          "kind": "bore",
+          "position": [
+            142,
+            132,
+            13
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 13,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J21",
+          "kind": "clearance",
+          "position": [
+            148,
+            158,
+            -13
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 7,
+          "diameter": 9,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J22",
+          "kind": "bore",
+          "position": [
+            142,
+            158,
+            -13
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 13,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J23",
+          "kind": "clearance",
+          "position": [
+            148,
+            158,
+            13
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 7,
+          "diameter": 9,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J24",
+          "kind": "bore",
+          "position": [
+            142,
+            158,
+            13
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 13,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J25",
+          "kind": "clearance",
+          "position": [
+            148,
+            132,
+            97
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 7,
+          "diameter": 9,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J26",
+          "kind": "bore",
+          "position": [
+            142,
+            132,
+            97
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 13,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J27",
+          "kind": "clearance",
+          "position": [
+            148,
+            132,
+            123
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 7,
+          "diameter": 9,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J28",
+          "kind": "bore",
+          "position": [
+            142,
+            132,
+            123
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 13,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J29",
+          "kind": "clearance",
+          "position": [
+            148,
+            158,
+            97
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 7,
+          "diameter": 9,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J30",
+          "kind": "bore",
+          "position": [
+            142,
+            158,
+            97
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 13,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J31",
+          "kind": "clearance",
+          "position": [
+            148,
+            158,
+            123
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 7,
+          "diameter": 9,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J32",
+          "kind": "bore",
+          "position": [
+            142,
+            158,
+            123
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 13,
+          "diameter": 6.6,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J33",
+          "kind": "clearance",
+          "position": [
+            148,
+            101,
+            45.5
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 13,
+          "diameter": 6.6,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J34",
+          "kind": "clearance",
+          "position": [
+            148,
+            61,
+            45.5
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J35",
+          "kind": "clearance",
+          "position": [
+            140,
+            51,
+            0
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J36",
+          "kind": "clearance",
+          "position": [
+            140,
+            47.1179,
+            -19.5169
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J37",
+          "kind": "clearance",
+          "position": [
+            140,
+            36.0624,
+            -36.0624
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J38",
+          "kind": "clearance",
+          "position": [
+            140,
+            19.5169,
+            -47.1179
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J39",
+          "kind": "clearance",
+          "position": [
+            140,
+            0,
+            -51
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J40",
+          "kind": "clearance",
+          "position": [
+            140,
+            -19.5169,
+            -47.1179
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J41",
+          "kind": "clearance",
+          "position": [
+            140,
+            -36.0624,
+            -36.0624
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J42",
+          "kind": "clearance",
+          "position": [
+            140,
+            -47.1179,
+            -19.5169
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J43",
+          "kind": "clearance",
+          "position": [
+            140,
+            -51,
+            0
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J44",
+          "kind": "clearance",
+          "position": [
+            140,
+            -47.1179,
+            19.5169
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J45",
+          "kind": "clearance",
+          "position": [
+            140,
+            -36.0624,
+            36.0624
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J46",
+          "kind": "clearance",
+          "position": [
+            140,
+            -19.5169,
+            47.1179
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J47",
+          "kind": "clearance",
+          "position": [
+            140,
+            0,
+            51
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J48",
+          "kind": "clearance",
+          "position": [
+            140,
+            19.5169,
+            47.1179
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J49",
+          "kind": "clearance",
+          "position": [
+            140,
+            36.0624,
+            36.0624
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J50",
+          "kind": "clearance",
+          "position": [
+            140,
+            47.1179,
+            19.5169
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 8,
+          "diameter": 6,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J51",
+          "kind": "dowel",
+          "position": [
+            148,
+            91,
+            45.5
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 8,
+          "diameter": 6,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J52",
+          "kind": "dowel",
+          "position": [
+            148,
+            71,
+            45.5
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 5,
+          "diameter": 89.4,
+          "direction": [
+            1,
+            0,
+            0
+          ],
+          "id": "P1",
+          "kind": "bore",
+          "position": [
+            135,
+            0,
+            0
+          ],
+          "slotLength": 0,
+          "thread": null
+        }
+      ]
+    },
+    {
+      "name": "GE-spindle-seat",
+      "pose": {
+        "axes": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "id": "spindleSeat",
+        "origin": [
+          45.625,
+          0,
+          0
+        ]
+      },
+      "volume": 780758.0321677643,
+      "mass": 6.12895055251695,
+      "comLocal": [
+        -3.0878904797551088,
+        149.94069516891088,
+        9.233246269249332
+      ],
+      "holes": [
+        {
+          "depth": 14.4,
+          "diameter": 6.8,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J1",
+          "kind": "tapped",
+          "position": [
+            45,
+            95,
+            -38
+          ],
+          "slotLength": 0,
+          "thread": "M8"
+        },
+        {
+          "depth": 14.4,
+          "diameter": 6.8,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J2",
+          "kind": "tapped",
+          "position": [
+            45,
+            95,
+            46
+          ],
+          "slotLength": 0,
+          "thread": "M8"
+        },
+        {
+          "depth": 14.4,
+          "diameter": 6.8,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J3",
+          "kind": "tapped",
+          "position": [
+            45,
+            205,
+            -38
+          ],
+          "slotLength": 0,
+          "thread": "M8"
+        },
+        {
+          "depth": 14.4,
+          "diameter": 6.8,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J4",
+          "kind": "tapped",
+          "position": [
+            45,
+            205,
+            46
+          ],
+          "slotLength": 0,
+          "thread": "M8"
+        },
+        {
+          "depth": 14.4,
+          "diameter": 6.8,
+          "direction": [
+            0,
+            0,
+            -1
+          ],
+          "id": "J5",
+          "kind": "tapped",
+          "position": [
+            -30,
+            165,
+            58
+          ],
+          "slotLength": 0,
+          "thread": "M8"
+        },
+        {
+          "depth": 14.4,
+          "diameter": 6.8,
+          "direction": [
+            0,
+            0,
+            -1
+          ],
+          "id": "J6",
+          "kind": "tapped",
+          "position": [
+            30,
+            165,
+            58
+          ],
+          "slotLength": 0,
+          "thread": "M8"
+        },
+        {
+          "depth": 15,
+          "diameter": 6.8,
+          "direction": [
+            0,
+            0,
+            -1
+          ],
+          "id": "J7",
+          "kind": "tapped",
+          "position": [
+            -30,
+            232,
+            58
+          ],
+          "slotLength": 0,
+          "thread": "M8"
+        },
+        {
+          "depth": 15,
+          "diameter": 6.8,
+          "direction": [
+            0,
+            0,
+            -1
+          ],
+          "id": "J8",
+          "kind": "tapped",
+          "position": [
+            30,
+            232,
+            58
+          ],
+          "slotLength": 0,
+          "thread": "M8"
+        },
+        {
+          "depth": 12,
+          "diameter": 8,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J9",
+          "kind": "dowel",
+          "position": [
+            45,
+            150,
+            -35
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 12,
+          "diameter": 8,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J10",
+          "kind": "dowel",
+          "position": [
+            45,
+            150,
+            35
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 12,
+          "diameter": 8,
+          "direction": [
+            0,
+            0,
+            -1
+          ],
+          "id": "J11",
+          "kind": "dowel",
+          "position": [
+            -40,
+            190,
+            58
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 12,
+          "diameter": 8,
+          "direction": [
+            0,
+            0,
+            -1
+          ],
+          "id": "J12",
+          "kind": "dowel",
+          "position": [
+            24,
+            190,
+            58
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 47,
+          "diameter": 6.6,
+          "direction": [
+            1,
+            0,
+            0
+          ],
+          "id": "C1",
+          "kind": "clearance",
+          "position": [
+            -48,
+            100,
+            49.5
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 20,
+          "diameter": 5,
+          "direction": [
+            1,
+            0,
+            0
+          ],
+          "id": "K1",
+          "kind": "tapped",
+          "position": [
+            1,
+            100,
+            49.5
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 47,
+          "diameter": 6.6,
+          "direction": [
+            1,
+            0,
+            0
+          ],
+          "id": "C2",
+          "kind": "clearance",
+          "position": [
+            -48,
+            150,
+            49.5
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 20,
+          "diameter": 5,
+          "direction": [
+            1,
+            0,
+            0
+          ],
+          "id": "K2",
+          "kind": "tapped",
+          "position": [
+            1,
+            150,
+            49.5
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 47,
+          "diameter": 6.6,
+          "direction": [
+            1,
+            0,
+            0
+          ],
+          "id": "C3",
+          "kind": "clearance",
+          "position": [
+            -48,
+            200,
+            49.5
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        },
+        {
+          "depth": 20,
+          "diameter": 5,
+          "direction": [
+            1,
+            0,
+            0
+          ],
+          "id": "K3",
+          "kind": "tapped",
+          "position": [
+            1,
+            200,
+            49.5
+          ],
+          "slotLength": 0,
+          "thread": "M6"
+        }
+      ]
+    },
+    {
+      "name": "GE-motor-cradle",
+      "pose": {
+        "axes": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "id": "motorCradle",
+        "origin": [
+          45.625,
+          0,
+          0
+        ]
+      },
+      "volume": 168264.63530923793,
+      "mass": 1.320877387177518,
+      "comLocal": [
+        -17.805722978620295,
+        220.31403077984416,
+        88.89935456855581
+      ],
+      "holes": [
+        {
+          "depth": 8,
+          "diameter": 9,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J1",
+          "kind": "clearance",
+          "position": [
+            -30,
+            165,
+            58
+          ],
+          "slotLength": 0,
+          "thread": "M8"
+        },
+        {
+          "depth": 8,
+          "diameter": 9,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J2",
+          "kind": "clearance",
+          "position": [
+            30,
+            165,
+            58
+          ],
+          "slotLength": 0,
+          "thread": "M8"
+        },
+        {
+          "depth": 18,
+          "diameter": 9,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J3",
+          "kind": "clearance",
+          "position": [
+            -30,
+            232,
+            58
+          ],
+          "slotLength": 0,
+          "thread": "M8"
+        },
+        {
+          "depth": 9,
+          "diameter": 14,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J4",
+          "kind": "bore",
+          "position": [
+            -30,
+            232,
+            67
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 18,
+          "diameter": 9,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J5",
+          "kind": "clearance",
+          "position": [
+            30,
+            232,
+            58
+          ],
+          "slotLength": 0,
+          "thread": "M8"
+        },
+        {
+          "depth": 9,
+          "diameter": 14,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J6",
+          "kind": "bore",
+          "position": [
+            30,
+            232,
+            67
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 8,
+          "diameter": 8,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J7",
+          "kind": "dowel",
+          "position": [
+            -40,
+            190,
+            58
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 8,
+          "diameter": 8,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J8",
+          "kind": "dowel",
+          "position": [
+            24,
+            190,
+            58
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
+          "depth": 3,
+          "diameter": 70.2,
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "id": "P1",
+          "kind": "bore",
+          "position": [
+            -8,
+            239,
+            124.7437
+          ],
+          "slotLength": 6,
+          "thread": null
+        },
+        {
+          "depth": 8,
+          "diameter": 27,
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "id": "P2",
+          "kind": "bore",
+          "position": [
+            -8,
+            239,
+            124.7437
+          ],
+          "slotLength": 6,
+          "thread": null
+        },
+        {
+          "depth": 8,
+          "diameter": 7,
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "id": "M1",
+          "kind": "clearance",
+          "position": [
+            23.8198,
+            239,
+            156.5635
+          ],
+          "slotLength": 6,
+          "thread": "M6"
+        },
+        {
+          "depth": 8,
+          "diameter": 7,
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "id": "M2",
+          "kind": "clearance",
+          "position": [
+            -39.8198,
+            239,
+            156.5635
+          ],
+          "slotLength": 6,
+          "thread": "M6"
+        },
+        {
+          "depth": 8,
+          "diameter": 7,
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "id": "M3",
+          "kind": "clearance",
+          "position": [
+            -39.8198,
+            239,
+            92.9239
+          ],
+          "slotLength": 6,
+          "thread": "M6"
+        },
+        {
+          "depth": 8,
+          "diameter": 7,
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "id": "M4",
+          "kind": "clearance",
+          "position": [
+            23.8198,
+            239,
+            92.9239
+          ],
+          "slotLength": 6,
+          "thread": "M6"
+        },
+        {
+          "depth": 16,
+          "diameter": 6.8,
+          "direction": [
+            0,
+            0,
+            -1
+          ],
+          "id": "J1",
+          "kind": "tapped",
+          "position": [
+            -8,
+            235,
+            80
+          ],
+          "slotLength": 0,
+          "thread": "M8"
+        }
+      ]
+    }
+  ],
+  "servo": {
+    "com": [
+      36.3703,
+      193.0934,
+      120.1572
+    ],
+    "cradleComAuthored": [
+      -17.8057,
+      220.314,
+      88.8994
+    ],
+    "cradleComWork": [
+      27.8193,
+      220.314,
+      88.8994
+    ],
+    "mass": 3.4409475529299245,
+    "members": [
+      {
+        "id": "spindle/motor",
+        "mass": 2.726032923225839,
+        "weight": 1,
+        "com": [
+          37.625,
+          185.1685,
+          124.7548
+        ]
+      },
+      {
+        "id": "spindle/motorShaft",
+        "mass": 0.07396707677416099,
+        "weight": 1,
+        "com": [
+          37.625,
+          256.3937,
+          124.3358
+        ]
+      },
+      {
+        "id": "spindle/motorPulley",
+        "mass": 0.13328866262943126,
+        "weight": 1,
+        "com": [
+          37.625,
+          265,
+          124.7437
+        ]
+      },
+      {
+        "id": "spindle/motorEncoder",
+        "mass": 0.06736642790798739,
+        "weight": 1,
+        "com": [
+          37.625,
+          124.1,
+          124.7437
+        ]
+      },
+      {
+        "id": "motorCradle",
+        "mass": 1.320877387177518,
+        "weight": 0.3333333333333333,
+        "com": [
+          27.8193,
+          220.314,
+          88.8994
+        ]
+      }
+    ]
+  },
+  "head": {
+    "com": [
+      79.2069,
+      79.1091,
+      37.214
+    ],
+    "hob": [
+      45.625,
+      0,
+      0
+    ],
+    "mass": 36.67241518046542,
+    "outputFaceX": 124
+  },
+  "seatZ": 363,
+  "zMoving": {
+    "com": [
+      108.3647,
+      59.2851,
+      39.2436
+    ],
+    "mass": 48.5796782227889
+  }
+}

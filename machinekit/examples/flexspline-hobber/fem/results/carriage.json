@@ -1,0 +1,40 @@
+[
+ {
+  "size": 14.0,
+  "elements": 7268,
+  "dofs": 43998,
+  "volume_step": 3122926.8787911255,
+  "volume_filled": 3150638.2000000007,
+  "pad_nodes": [
+   106,
+   119,
+   108,
+   100
+  ],
+  "sole_nodes": 932,
+  "front_tie_N_per_um": 20.527942552465404,
+  "front_tie_work_N_per_um": 10.263971276232702,
+  "volume_mesh": 3150638.1999999993,
+  "sole_tilt_kNm_per_rad_pads_uz": 9690.518946821301,
+  "sole_tilt_kNm_per_rad_pads_xyz": 13322.457581812578
+ },
+ {
+  "size": 10.0,
+  "elements": 18830,
+  "dofs": 102255,
+  "volume_step": 3122926.8787911255,
+  "volume_filled": 3150638.2000000007,
+  "pad_nodes": [
+   204,
+   206,
+   198,
+   197
+  ],
+  "sole_nodes": 1836,
+  "front_tie_N_per_um": 20.23185335521772,
+  "front_tie_work_N_per_um": 10.115926677608858,
+  "volume_mesh": 3150638.1999999993,
+  "sole_tilt_kNm_per_rad_pads_uz": 10344.513590821074,
+  "sole_tilt_kNm_per_rad_pads_xyz": 14121.867068520349
+ }
+]
