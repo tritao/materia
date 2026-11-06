@@ -161,6 +161,36 @@ reference cycle-time acceptance. Frozen HB4/HB11 cuts use their original layout
 and remain separate evidence. Structural/modal analysis, spindle/mandrel sag,
 thermal behaviour and detailed manufacturing release remain open plan items.
 
+## Accuracy budget (2026-11-06)
+
+`HobberAccuracyBudget` (`machinekit/hobbing`) predicts the reference gear's ISO 1328 class from the machine model; `tests/hobber/src/HobberAccuracyChecks.hx`
+reads `FlexsplineHobber` (read-only), prints the budget and gates on it. Run: `haxeon run --project machinekit/tests/hobber/haxeon.accuracy.json`
+(about 1 min; argument `report` prints without failing, `uncompensated` adds the budget before the tilt-compensation step).
+
+- **Target.** PLAN.md HB12: "the reference flexspline grades ISO 5-6 on every parameter" (prototype target class 5-6). The gate is **class 6**; class 5 is the stretch.
+  Class limits come from `gearkit.Iso1328` (ISO 1328-1:2013 tolerance formulas, class 5 base from module and reference diameter, times 2^(1/2) per class; fp = 0.001 d + 0.4 m + 5,
+  Fp = 0.002 d + 0.55 sqrt(d) + 0.7 m + 12, Fr = 0.9 Fp, profile and helix terms from the standard). m 0.3 is below the standard's range (m >= 0.5), so every class here is extrapolated.
+  Class 6 limits at d 60, b 8: fp 7.5, Fp 23, Fr 21, F-alpha 9.5, F-beta 11 um (rounded as the standard rounds; unrounded fp 7.3, Fp 23.5).
+- **Rows.** Each error source has a value, a basis (Catalog, Model, Stated, Derived, Assumed), a sensitivity and a bound on fp, Fp, Fr, F-alpha, F-beta (and tooth thickness, which ISO 1328 does not
+  grade; it is set by the first-article trim). A bound is what that source alone can do to the parameter. Totals: RSS (expected, gates) and the plain sum (all at bound). Mapping:
+  radial error to thickness 2 tan(alpha) = 0.728 per um; a hob radial runout to profile sin(alpha) = 0.342 per um and axial runout cos(alpha) = 0.94 per um (a single-start hob makes one
+  revolution per work tooth, so its runout repeats on every tooth and gives no pitch error); C angle to pitch 2 r per rad = 0.291 um per arcsecond; A and guide tilt to helix b per rad = 0.039 um per arcsecond;
+  B encoder and timing reach C divided by z/starts, so 1 us of unknown delay is 0.09 um (1 ms is the 47 um case); work eccentricity is Fr = Fp = TIR.
+  Values from the model: scale accuracies and Abbe offsets (`HobberScales` poses), table fields (`RotaryAxisSpec`), part runouts (`PrecisionErrors` facets of hob, arbor, outboard support and spindle bearings),
+  eRob output accuracy, mandrel eccentricity, roundness and band expansion, outboard stiffness. Assumed (each labelled in the printout): guide angular error 5" (the `HobberFrameChecks` value; no rail class in
+  the catalogue), tilt-table residual 20 %, rail straightness 3 um per 200 mm, thermal dT 1 K (frame loops of 262 mm steel and 253 mm mineral cast from the poses), cartridge nose 50 N/um, unlisted structure equal to the listed,
+  A torsional stiffness 2e4 N m/rad with 10 mm of engagement lever, B encoder accuracy 40", sync delay 1 us, cycle 250 us, B speed ripple 0.5 %. Forces are the HB10 values already quoted in the repository (radial 17.0 N, tangential 46.7 N, table torque 1.49 N m).
+- **Result (this model).** With the tilt table loaded: fp 1.1, Fp **60.1**, Fr 3.9, F-alpha 4.2, F-beta 1.2 um RSS, i.e. extrapolated classes 1, **9**, 2, 4, 1; worst-case sums 2.1, 68, 6.8, 11.9, 2.4 (classes 3, 10, 3, 7, 2).
+  The check **fails the gate on Fp only**, and the cause is a single modelled number: the table's once-per-turn speed ripple (assumed 0.1 %, 60 um of Fp; the same finding as the table-only screen above). Every other
+  row together is 4 um of Fp (RSS). The ripple that keeps Fp at class 6 with the rest unchanged is 0.038 % (RSS; the 0.0317 % above sums the amplitudes instead). The tilt-compensation step changes only tooth thickness
+  here (RSS 6.3 to 5.0 um): the Abbe offsets are 220 mm on X and Z, 72 mm on Y (5" gives 5.3 um uncompensated, 1.1 um after), and none of it reaches a class parameter for a spur gear.
+- **Top three limiting causes** (share of the class 6 limit on the worst parameter): 1. C table speed ripple, 261 % of Fp (measure it on the bench at 10-20 rpm; position-loop gain or torque-ripple feedforward; ask the vendor);
+  2. hob chain axial runout (hob, arbor, two spindle bearings, 2 um TIR each, assumed) 3.8 um on F-alpha, 40 % (square clamping faces, indicate the hob face, lower-runout cartridge);
+  3. hob chain radial runout (five 2 um sources, assumed) 1.5 um on F-alpha, 16 % (arbor and outboard coaxiality). Outside the class: X thermal growth 6.1 um per K is the largest tooth-thickness term (thermal control or a trim per part).
+  Also close: mandrel eccentricity 3 um on Fr and Fp (13 % of Fp). Not budgeted: hob lead and pitch errors, hob wear, flexspline wall compliance (HB10/HB11 simulate it), forced response at the tooth-pass frequency (the spindle drive modes keep a 1.3x margin from the band, so the quasi-static stiffness is used).
+- **Limits of the budget.** It is analytic and untrimmed; static terms (thickness, a constant helix error from A or deflection) can be trimmed from a first article. Most rows are assumptions until a bench measurement; the ranking
+  is robust, the absolute Fp number is not (it is one assumed ripple). The full-cut error budget (`stockkit.hobbing.errors`) remains the simulation; this one ranks the machine's parts.
+
 ## Feedback and drive requirements (open, 2026-11-01)
 
 Procurement requirements for position feedback. None is selected or commissioned.
