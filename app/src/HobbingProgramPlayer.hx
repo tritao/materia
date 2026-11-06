@@ -120,22 +120,16 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     settings.hobJoint = config.axes[4];
     settings.tableJoint = config.axes[5];
     job = new HobbingJob(spec, hob, config.length, settings);
-    var spindleDrives = [for (drive in robot.blueprint.velocityDrives) if (drive.joint == indices[4]) drive];
-    if (spindleDrives.length != 1) throw "Hobbing needs one declared spindle velocity drive";
-    var spindleDrive = spindleDrives[0], speedSuffix = ".speed";
-    if (!StringTools.endsWith(spindleDrive.speedChannel,
-      speedSuffix)) throw "Hobbing spindle needs named speed/direction channels";
-    var spindleName = spindleDrive.speedChannel.substr(0, spindleDrive.speedChannel.length - speedSuffix.length);
-    if (spindleDrive.directionChannel
-      != spindleName + ".direction") throw "Hobbing spindle channels must share their declared name";
+    var spindleDrive = SpindleDriveBinding.resolve(robot.blueprint, indices[4]);
     var binding = new MachineBinding(
       "hobber-axes",
       config.axes[0],
       config.axes[1],
       config.axes[2],
       0.02,
-      new ToolpathChannels("", spindleName)
+      new ToolpathChannels("", spindleDrive.name)
     );
+    binding.spindleDrive = spindleDrive;
     spindleAtSpeedChannel = binding.channels.spindleAtSpeed;
     binding.spindleJointId = config.axes[4];
     binding.auxiliaryJoints = [config.axes[3], config.axes[5]];

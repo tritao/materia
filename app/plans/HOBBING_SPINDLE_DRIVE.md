@@ -26,9 +26,13 @@ now the cartridge encoder, while `hob-motor` is the servo's own encoder), the at
   joints whose rates cannot be related by one scalar.
   Validation: `app/tests/haxeon.spindle-drive.json` passes 15 checks (direct, reversed 3:1 belt, inverse and forward
   relations, chained reduction, radians/second channels, missing/ambiguous drives, differential, cycles and channel names).
-- G2 — Hobbing command binding: pending. Keep the declared speed/direction channel convention; convert spindle RPM at
+- G2 — Hobbing command binding: complete. Keep the declared speed/direction channel convention; convert spindle RPM at
   output lowering using both the mechanical relation and the drive's declared radians-per-speed-unit. Keep feed and
   synchronization calculations in spindle coordinates.
+  Validation: the focused spindle-drive project passes 21 checks, including lowered start, running speed/reverse and
+  stop commands through a reversed chained reduction, and the existing `.at_speed` startup barrier. Unbound CNC
+  channels retain their ordinary RPM units; a bound physical drive supplies the explicit conversion. The toolpath's
+  modal spindle RPM remains physical spindle RPM for work-revolution feeds.
 - G3 — Encoder timing: pending. Bind the master to the encoder on the actual hob joint, independently of the motor's
   feedback encoder. The explicit controller rate schedules master sampling; follower timing remains bounded by its servo
   position loop. At-speed, tooth-pass windows and synchronization must continue to read measured B state.

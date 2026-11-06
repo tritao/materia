@@ -8,6 +8,8 @@ class MachineBinding {
   /** Process spindle joint used to resolve per-work-revolution feeds. */
   public var auxiliaryJoints:Array<String> = [];
   public var spindleJointId:String = "";
+  /** Installed process spindle conversion; unbound CNC channels use their standard RPM convention. */
+  public var spindleDrive:Null<SpindleDriveBinding> = null;
   public var gearFollowers:Array<String> = [];
   public var gearJointIds:Array<String> = [];
   public var gearEncoders:Map<String, GearEncoderTiming> = new Map();

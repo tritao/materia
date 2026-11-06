@@ -50,6 +50,7 @@ class SpindleDriveTests {
     spindle = SpindleDriveBinding.resolve(belt, 0);
     near(spindle.speed(600), 60 * 2 * Math.PI, "Chained reduction respects a radian/second speed channel");
     near(spindle.direction(-1), 1, "Reverse spindle command through a reversing chain");
+    checkLowering(spindle);
 
     var forward = blueprint(0, rpm);
     forward.couplings.push(new RobotRuntimeJointCouplingBlueprint(0, 1, 0.25, 0));
@@ -71,5 +72,37 @@ class SpindleDriveTests {
     named.velocityDrives.push(new RobotRuntimeVelocityDriveBlueprint(0, "spindle.speed", "other.direction", rpm, 10, 1000));
     reject(() -> {SpindleDriveBinding.resolve(named, 0);}, "Speed and direction keep the shared-name rule");
     Sys.println('Spindle drive: $checks checks passed');
+  }
+
+  static function checkLowering(spindle:SpindleDriveBinding):Void {
+    var binding = new toolpathkit.motion.MachineBinding("axes", "X", "Y", "Z", 0.02,
+      new toolpathkit.motion.ToolpathChannels("", spindle.name));
+    binding.spindleDrive = spindle;
+    var span = toolpathkit.path.Provenance.cam(0, "belt-coupled spindle");
+    var lowered = new toolpathkit.motion.ToolpathLowering(binding).lower([
+      toolpathkit.path.ToolpathOp.Spindle(Clockwise, 600, span),
+      toolpathkit.path.ToolpathOp.Dwell(0.01, span),
+      toolpathkit.path.ToolpathOp.Spindle(CounterClockwise, 300, span),
+      toolpathkit.path.ToolpathOp.Dwell(0.01, span),
+      toolpathkit.path.ToolpathOp.Spindle(Off, 0, span),
+      toolpathkit.path.ToolpathOp.End(span)
+    ]);
+    var program = lowered.program;
+    if (program == null) throw "Spindle program was not lowered";
+    var speeds:Array<Float> = [], directions:Array<Float> = [], waits:Array<String> = [];
+    for (op in program.ops) switch op {
+      case SetOutput(channel, Analog(value)):
+        if (channel == binding.channels.spindleSpeed) speeds.push(value);
+        if (channel == binding.channels.spindleDirection) directions.push(value);
+      case WaitInput(channel, _, _): waits.push(channel);
+      case _:
+    }
+    check(speeds.length == 3 && directions.length == 3, "Lowering emits start, reverse and stop commands");
+    near(speeds[0], 120 * Math.PI, "Start command includes chained reduction and radian/second units");
+    near(speeds[1], 60 * Math.PI, "Running spindle speed change uses the same conversion");
+    near(speeds[2], 0, "Stop speed remains zero");
+    check(directions[0] == -1 && directions[1] == 1 && directions[2] == 0,
+      "Lowered start, reverse and stop directions include mechanical sign");
+    check(waits.length == 1 && waits[0] == "spindle.at_speed", "Start waits on the declared spindle at-speed channel");
   }
 }

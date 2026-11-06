@@ -173,27 +173,29 @@ class ToolpathLowering {
         add(MotionOp.Dwell(seconds), span);
       case Spindle(direction, rpm, span):
         spindleRpm = direction == Off ? 0 : rpm;
-        var directionValue = EventValue.Analog(switch direction {
+        var spindleDrive = machine.spindleDrive;
+        var speedValue = spindleDrive == null ? rpm : spindleDrive.speed(rpm);
+        var directionSign = switch direction {
           case Off:
             0.0;
           case Clockwise:
             1.0;
           case CounterClockwise:
             -1.0;
-        }
-        );
+        };
+        var directionValue = EventValue.Analog(spindleDrive == null ? directionSign : spindleDrive.direction(directionSign));
         if (direction != Off && !spindleOn) {
           flush();
           drainQueued();
           add(MotionOp.SetOutput(machine.channels.spindleDirection, directionValue), span);
-          add(MotionOp.SetOutput(machine.channels.spindleSpeed, EventValue.Analog(rpm)), span);
+          add(MotionOp.SetOutput(machine.channels.spindleSpeed, EventValue.Analog(speedValue)), span);
           add(
             MotionOp.WaitInput(machine.channels.spindleAtSpeed, InputPredicate.Equals(EventValue.Digital(true)), null),
             span
           );
         } else {
           outputEvent(machine.channels.spindleDirection, directionValue, span);
-          outputEvent(machine.channels.spindleSpeed, EventValue.Analog(rpm), span);
+          outputEvent(machine.channels.spindleSpeed, EventValue.Analog(speedValue), span);
         }
         spindleOn = direction != Off;
       case Coolant(mist, flood, span):
