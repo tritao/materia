@@ -64,8 +64,18 @@ class HobberAccuracyInputs {
   public var noseStiffness:Float = 50.0;
   public var outboardStiffness:Float = 100.0;
   public var tableRadialStiffness:Float = 100.0;
-  /** Column sole tilt about the carriage's travel axis, N m/rad (`frame_stiffness.py`, plate share), and the hob's height above the sole, mm. */
-  public var soleTilt:Float = 263923900.0;
+  /**
+   * Column sole tilt about the carriage's travel axis, N m/rad, and the hob's height above the sole, mm. The value is the C3D10 FE of the CAD X carriage
+   * (`fem/carriage_fem.py`, 2026-11-06: sole on a rigid master, the four block pads held in z; 14.1 MN m/rad with the pads held in all directions); the
+   * `frame_stiffness.py` plate model gives 11.75 after its sign fix (it was quoted as 263.9) and overstates the front tie by about 27 %.
+   */
+  public var soleTilt:Float = 10344513.590821;
+  /**
+   * Hob tip displacement per newton of cutting force through the Z saddle plate, um/N: the FE of the 13 mm milled plate (`fem/saddle_fem.py`) with the head on the
+   * eRob seat, the four blocks held at their bolt patches: 100 N at the hob moves the tip 5.68 um beyond the weight alone (seat tilt 346-377 kN m/rad about y; 21.1 um
+   * with the 36.7 kg head's weight, which is a constant offset the first-article trim absorbs). Taken for the radial force too (the FE load is along the cut, down).
+   */
+  public var saddleTipCompliance:Float = 0.05676;
   public var hobHeightMm:Float = 300.0;
   /** Compliance of everything not listed (column, casting, rail blocks) as a multiple of the listed compliance (assumed). */
   public var unlistedCompliance:Float = 1.0;
@@ -338,14 +348,15 @@ class HobberAccuracyBudget {
     // ---- Structural deflection under cutting load --------------------------------------------------------------------------------
     var kHob = inputs.noseStiffness + inputs.outboardStiffness;
     var tilt = Math.pow(inputs.hobHeightMm / 1000, 2) / inputs.soleTilt * 1e6;
-    var compliance = (1 / kHob + 1 / inputs.tableRadialStiffness + tilt) * (1 + inputs.unlistedCompliance);
+    var compliance = (1 / kHob + 1 / inputs.tableRadialStiffness + tilt + inputs.saddleTipCompliance) * (1 + inputs.unlistedCompliance);
     var deflection = inputs.radialForceN * compliance;
     rowOf(list, "structure.radial", "Structure under load", deflection, "um", "Assumed",
       "radial force " + r2(inputs.radialForceN) + " N (HB10 peak) / [hob side nose " + inputs.noseStiffness + " N/um (assumed) + outboard " + inputs.outboardStiffness + " N/um (model); table "
-      + inputs.tableRadialStiffness + " N/um (model); column sole tilt " + r3(inputs.soleTilt / 1e6) + " MN m/rad over " + r2(inputs.hobHeightMm) + " mm (frame_stiffness.py, steel deck with ribs)]"
+      + inputs.tableRadialStiffness + " N/um (model); column sole tilt " + r3(inputs.soleTilt / 1e6) + " MN m/rad over " + r2(inputs.hobHeightMm) + " mm (FE of the CAD carriage); Z saddle plate "
+      + r3(inputs.saddleTipCompliance) + " um/N at the hob tip (FE)]"
       + " x (1 + " + inputs.unlistedCompliance + " for the unlisted casting, column and blocks, assumed)",
       "size: 2 tan(alpha) x deflection; flank line: the force changes along the 8 mm band, x sin(alpha) = " + r3(sinA), 0, 0, 0, 0, deflection * sinA, tan2 * deflection,
-      "Stiffer hob side (cartridge nose stiffness, two-sided outboard), FE of the column and rails to replace the assumed unlisted share");
+      "Stiffer hob side (cartridge nose stiffness, two-sided outboard), a thicker Z saddle plate (the saddle is now the largest listed structural term), FE of the column and rails to replace the assumed unlisted share");
     var rollTilt = tv(inputs, "momentStiffness");
     if (rollTilt > 0) {
       var angle = inputs.radialForceN * inputs.tablePivotMm / 1000 / rollTilt;
