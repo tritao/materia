@@ -56,7 +56,8 @@ class HobberFemExport {
     }
     var cradle = member("HOBBER-GE-motor-cradle").massProperties();
     var cc = at("motorCradle", cradle.centreOfMass.x, cradle.centreOfMass.y, cradle.centreOfMass.z);
-    out.servo = {mass: servo.mass, com: [r(servo.x / servo.mass), r(servo.y / servo.mass), r(servo.z / servo.mass)], members: parts,
+    out.cradle = {bolts: [for (b in HobberSaddle.cradleFloorBolts()) [b.x, b.y]], rest: HobberSaddle.cradleRest()};
+    out.servo = {mass: servo.mass, com: [r(servo.x / servo.mass), r(servo.y / servo.mass), r(servo.z / servo.mass)], members: parts, motorBody: {face: machine.spindle.motor.rating.bodyDiameter, length: machine.spindle.motor.rating.bodyLength},
       cradleComWork: [r(cc.x), r(cc.y), r(cc.z - seatZ)], cradleComAuthored: [r(cradle.centreOfMass.x), r(cradle.centreOfMass.y), r(cradle.centreOfMass.z)]};
     // Head on the A flange.
     var def = machine.definition(), turning = new Map<String, Bool>();

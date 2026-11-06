@@ -13,7 +13,10 @@
   },
   "carriage": {
    "front_tie_N_per_um": 28.9,
-   "sole_tilt_kNm_per_rad": 263923.9
+   "sole_tilt_kNm_per_rad": 11751.4,
+   "sole_tilt_flat_kNm_per_rad": 7306.1,
+   "welded_U_front_tie_N_per_um": 3.68,
+   "welded_U_sole_tilt_kNm_per_rad": 6272.8
   },
   "saddle": {}
  },
@@ -148,6 +151,156 @@
      688.4,
      1420.8,
      1631.6
+    ]
+   }
+  },
+  "final_design": {
+   "plate/bolts/bonded/rest=3000000.0": [
+    810.0,
+    1262.0,
+    1543.1,
+    1667.6
+   ],
+   "plate/bolts/pre_hi/rest=3000000.0": [
+    774.9,
+    1192.0,
+    1503.8,
+    1651.4
+   ],
+   "plate/bolts/pre_lo/rest=3000000.0": [
+    749.8,
+    1161.7,
+    1470.3,
+    1642.6
+   ],
+   "plate/bolts/unpre_hi/rest=3000000.0": [
+    742.8,
+    1053.8,
+    1323.7,
+    1632.4
+   ],
+   "plate/bolts/unpre_lo/rest=3000000.0": [
+    575.3,
+    836.5,
+    1184.5,
+    1414.6
+   ],
+   "plate/face/bonded/rest=3000000.0": [
+    837.6,
+    1345.1,
+    1574.1,
+    1683.1
+   ],
+   "plate/face/pre_hi/rest=3000000.0": [
+    799.7,
+    1265.2,
+    1533.8,
+    1662.6
+   ],
+   "plate/face/pre_lo/rest=3000000.0": [
+    772.8,
+    1226.0,
+    1499.7,
+    1653.1
+   ],
+   "plate/face/unpre_hi/rest=3000000.0": [
+    764.2,
+    1091.7,
+    1355.4,
+    1643.1
+   ],
+   "plate/face/unpre_lo/rest=3000000.0": [
+    584.6,
+    856.2,
+    1221.5,
+    1420.8
+   ],
+   "plate/bolts/pre_hi/rest=600000.0": [
+    707.9,
+    1102.0,
+    1456.6,
+    1635.6
+   ],
+   "plate/bolts/pre_lo/rest=600000.0": [
+    689.0,
+    1066.5,
+    1419.6,
+    1629.3
+   ],
+   "plate/bolts/unpre_hi/rest=600000.0": [
+    671.9,
+    969.0,
+    1319.6,
+    1629.6
+   ],
+   "plate/bolts/bonded/rest=None": [
+    361.3,
+    717.0,
+    1365.8,
+    1610.9
+   ],
+   "plate/bolts/pre_hi/rest=None": [
+    351.5,
+    669.0,
+    1305.8,
+    1601.3
+   ],
+   "plate/bolts/pre_lo/rest=None": [
+    339.0,
+    646.5,
+    1273.1,
+    1595.8
+   ],
+   "plate/bolts/unpre_hi/rest=None": [
+    334.3,
+    624.3,
+    1205.0,
+    1349.4
+   ],
+   "plate/bolts/unpre_lo/rest=None": [
+    265.3,
+    465.8,
+    1006.6,
+    1205.6
+   ],
+   "bore/face/pre_hi/rest=3000000.0": [
+    951.9,
+    1579.9,
+    1621.5,
+    2920.8
+   ],
+   "bore/face/pre_lo/rest=3000000.0": [
+    916.0,
+    1498.0,
+    1617.9,
+    2662.0
+   ]
+  },
+  "final_design_fine_mesh": {
+   "plate/bolts/pre_hi/rest=3000000.0": {
+    "size": 6.0,
+    "elements": [
+     10784,
+     5028
+    ],
+    "frequencies_Hz": [
+     770.3,
+     1180.1,
+     1489.9,
+     1642.4
+    ]
+   },
+   "plate/bolts/pre_lo/rest=3000000.0": {
+    "size": 6.0,
+    "elements": [
+     10784,
+     5028
+    ],
+    "frequencies_Hz": [
+     745.1,
+     1149.0,
+     1456.7,
+     1634.5
     ]
    }
   },

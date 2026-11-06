@@ -15,13 +15,14 @@ Seat supports: `plate` = the seat's +x face tied (all DOF) in 10 mm annuli round
 rigid); `bore` adds the 80 mm cartridge bore held rigid (stiff cartridge, upper bound).
 """
 import json
+import os
 import sys
 import numpy as np
 import fe
 
 BOLT_R, DOWEL_R = 12.0, 6.0
 KN = 1e5  # contact normal penalty, N/mm per mm^2
-BOLTS = [(-30.0, 165.0), (30.0, 165.0), (-30.0, 232.0), (30.0, 232.0)]
+BOLTS = [(-30.0, 135.0), (30.0, 135.0), (-30.0, 232.0), (30.0, 232.0)]  # fallback; the exporter's `cradle.bolts` replaces them (2026-11-06 design: front row at y 135)
 DOWELS = [(-40.0, 190.0), (24.0, 190.0)]
 SEAT_BOLTS = [(95.0, -38.0), (95.0, 46.0), (205.0, -38.0), (205.0, 46.0)]  # (y, z) at x = 45
 SEAT_DOWELS = [(150.0, -35.0), (150.0, 35.0)]
@@ -44,7 +45,8 @@ def servo_group(export):
         p = np.array([m["com"][0] - shift, m["com"][1], m["com"][2]]) - com
         inertia += m["mass"] * (np.dot(p, p) * np.eye(3) - np.outer(p, p))
     motor = next(m for m in members if m["id"] == "spindle/motor")
-    a, b, c = 90.0, 90.0, 115.0  # flange square, body length
+    body = export["servo"].get("motorBody", {"face": 90.0, "length": 115.0})
+    a, b, c = body["face"], body["face"], body["length"]  # flange square, body length (the exporter's motor rating; the 2026-11-06 FE used 90 / 115)
     own = motor["mass"] / 12 * np.diag([b * b + c * c, a * a + c * c, a * a + b * b])  # body box about its own centre (x z flange, y long)
     own = motor["mass"] / 12 * np.diag([a * a + c * c, a * a + a * a, a * a + c * c])
     inertia += own
@@ -94,16 +96,30 @@ def simple_seat_step(path):
 
 
 class Cradle:
-    def __init__(self, export, step_dir, size=8.0, seat_size=16.0, seat_support="plate", flange="bolts", curvature=4):
+    def __init__(self, export, step_dir, size=8.0, seat_size=16.0, seat_support="plate", flange="bolts", curvature=4, rest=None):
+        """rest: None (no body support), "rigid", or the stiffness in N/mm of the shim pack and its contact in series (z only, all rest-top nodes)."""
         self.export = export
-        import os
-        seat_step = os.path.join(os.environ.get("TMPDIR", "/tmp"), "hobber-seat-simple.step")
+        global BOLTS
+        design = export.get("cradle")
+        if design:
+            BOLTS = [tuple(b) for b in design["bolts"]]
+            if rest is not None:
+                r = design["rest"]
+                self.pad = {"box": [r["x0"], r["x1"], r["y0"], r["y1"]], "z": r["top"], "dirs": [2], "k": None if rest == "rigid" else float(rest)}
+        seat_step = os.path.join(os.environ.get("TMPDIR", "/tmp"), f"hobber-seat-simple-{os.getpid()}.step")
         self.seat_volume = simple_seat_step(seat_step)
-        pts, (cc, sc) = fe.mesh_parts([f"{step_dir}/GE-motor-cradle.step", seat_step], seat_size, min_size=min(size / 2, 4.0), curvature=curvature,
-                                      refine=[([-62, 39, 148, 248, 56, 175], size)])
+        cradle_step = f"{step_dir}/GE-motor-cradle.step"
+        part = next(p for p in export["parts"] if p["name"] == "GE-motor-cradle")
+        floor_holes = [h for h in part["holes"] if h["direction"] == [0, 0, 1]]  # the floor's bolt, counterbore and dowel holes: filled (volume +0.5 %) so they do not drive the mesh
+        if floor_holes:
+            cradle_step = os.path.join(os.environ.get("TMPDIR", "/tmp"), f"hobber-cradle-filled-{os.getpid()}.step")
+            fe.filled_step(f"{step_dir}/GE-motor-cradle.step", floor_holes, cradle_step)
+        pts, (cc, sc) = fe.mesh_parts([cradle_step, seat_step], seat_size, min_size=min(size / 2, 4.0), curvature=curvature,
+                                      refine=[([-62, 39, 118, 248, 56, 175], size)])
         nodes, (cc, sc), pairs = fe.split_interface(pts, [cc, sc])
         self.nodes, self.cc, self.sc, self.pairs = nodes, cc, sc, pairs
         self.size, self.seat_support, self.flange = size, seat_support, flange
+        self.mat_cradle = self.mat_seat = fe.STEEL  # diagnostics may stiffen one body (`dict(fe.STEEL, E=...)`) to see which one limits a mode
         self.vols = {}
         mass, com, inertia, shift = servo_group(export)
         self.servo = (mass, com, inertia)
@@ -112,13 +128,24 @@ class Cradle:
         self.area = node_areas(nodes, tris)
         self.pair_of = dict(pairs)
 
+    def pad_selection(self, cp):
+        (x0, x1, y0, y1), z = self.pad["box"], self.pad["z"]
+        return (np.abs(cp[:, 2] - z) < 1e-6) & (cp[:, 0] >= x0) & (cp[:, 0] <= x1) & (cp[:, 1] >= y0) & (cp[:, 1] <= y1)
+
     def base_model(self, joint):
         """Model with supports, servo mass and the chosen floor-joint (`bonded`, `preloaded`, `unpreloaded`); returns Model and the contact pairs."""
         self.bolt_nodes = {}
         m = fe.Model()
         m.add_nodes(self.nodes)
-        m.add_body("cradle", self.cc, fe.STEEL)
-        m.add_body("seat", self.sc, fe.STEEL)
+        if getattr(self, "pad", None) and self.pad.get("k") is not None:  # dummy nodes carry the pad's series spring (added before the master)
+            cn0 = fe.used_nodes(self.cc)
+            ids = cn0[self.pad_selection(self.nodes[cn0])]
+            start = m.add_nodes(self.nodes[ids])
+            self.pad_dummies = list(range(start, start + len(ids)))
+            for dm in self.pad_dummies:
+                m.fix(dm)  # all three; the rigid constraint below overrides the directions the master carries
+        m.add_body("cradle", self.cc, self.mat_cradle)
+        m.add_body("seat", self.sc, self.mat_seat)
         nodes = self.nodes
         # Seat supports.
         seat_nodes = fe.used_nodes(self.sc)
@@ -128,6 +155,8 @@ class Cradle:
             held |= set(seat_nodes[(np.abs(sp[:, 0] - 45) < 1e-6) & (np.hypot(sp[:, 1] - y, sp[:, 2] - z) <= 14)].tolist())
         for y, z in SEAT_DOWELS:
             held |= set(seat_nodes[(np.abs(sp[:, 0] - 45) < 1e-6) & (np.hypot(sp[:, 1] - y, sp[:, 2] - z) <= 10)].tolist())
+        if self.seat_support == "face":  # the whole back face stuck to the saddle plate (friction of the preloaded bolts holds at these amplitudes)
+            held |= set(seat_nodes[np.abs(sp[:, 0] - 45) < 1e-6].tolist())
         if self.seat_support == "bore":
             r = np.hypot(sp[:, 0], sp[:, 2])
             held |= set(seat_nodes[(np.abs(r - 40.0) < 0.6) & (sp[:, 1] > 70 - 1e-6) & (sp[:, 1] < 222 + 1e-6)].tolist())
@@ -169,12 +198,25 @@ class Cradle:
             sel = np.zeros(len(cn), bool)
             for x, z in FLANGE_HOLES:
                 sel |= face & (np.hypot(cp[:, 0] - x, cp[:, 2] - z) <= 9.0)
-        else:  # bonded flange: the whole 90 x 90 flange footprint
-            sel = face & (np.abs(cp[:, 0] - (-8.0)) <= 45) & (np.abs(cp[:, 2] - 124.7437) <= 45)
+        else:  # bonded flange: the whole flange footprint
+            half = self.export["servo"].get("motorBody", {"face": 90.0})["face"] / 2
+            sel = face & (np.abs(cp[:, 0] - (-8.0)) <= half) & (np.abs(cp[:, 2] - 124.7437) <= half)
         group = [int(n) for n in cn[sel]]
         m.rigid(mi, group)
         self.servo_master = mi
         self.servo_nodes = len(group)
+        if getattr(self, "pad", None):  # a body support: the pad top coupled to the servo group in `dirs` (stuck contact / clamp bound)
+            sel = self.pad_selection(cp)
+            ids = [int(n) for n in cn[sel]]
+            self.pad_nodes = len(ids)
+            if self.pad.get("k") is None:
+                m.rigid(mi, ids, tuple(self.pad["dirs"]))
+            else:  # through a series spring (the jack screw's column), k in N/mm spread over the pad nodes, along each dir
+                dummies = list(self.pad_dummies)
+                m.rigid(mi, dummies, tuple(self.pad["dirs"]))
+                for d in self.pad["dirs"]:
+                    for a, b in zip(ids, dummies):
+                        m.spring(3 * a + d, 3 * b + d, self.pad["k"] / len(ids))
         return m, contact
 
     def penalty(self, m, contact, active):
@@ -227,7 +269,8 @@ class Cradle:
             for x, z in FLANGE_HOLES:
                 sel |= face & (np.hypot(cp[:, 0] - x, cp[:, 2] - z) <= 9.0)
         else:
-            sel = face & (np.abs(cp[:, 0] - (-8.0)) <= 45) & (np.abs(cp[:, 2] - 124.7437) <= 45)
+            half = self.export["servo"].get("motorBody", {"face": 90.0})["face"] / 2
+            sel = face & (np.abs(cp[:, 0] - (-8.0)) <= half) & (np.abs(cp[:, 2] - 124.7437) <= half)
         m.rigid(mi, [int(n) for n in cn[sel]])
         K, M, _ = m.system()
         T, free = m.reduction()
@@ -262,11 +305,12 @@ JOINTS = ("bonded", "pre_hi", "pre_lo", "unpre_hi", "unpre_lo")
 
 
 def one(args):
-    export_dir, size, seat_size, cur, support, joint, flange = args
+    export_dir, size, seat_size, cur, support, joint, flange = args[:7]
+    rest = args[7] if len(args) > 7 else None
     export = json.load(open(f"{export_dir}/hobber-fem-export.json"))
-    c = Cradle(export, export_dir, size, seat_size, support, flange, cur)
+    c = Cradle(export, export_dir, size, seat_size, support, flange, cur, rest)
     r = c.modes(joint, 4)
-    r.update(support=support, joint=joint, flange=flange, size=size, seat_size=seat_size, elements=[len(c.cc), len(c.sc)])
+    r.update(support=support, joint=joint, flange=flange, size=size, seat_size=seat_size, rest=rest, elements=[len(c.cc), len(c.sc)])
     return r
 
 
@@ -287,6 +331,14 @@ def foot(args):
 
 
 def plan(export_dir, name):
+    if name == "final":  # the 2026-11-06 design: rest block carrying the servo body through a shim pack (3000 N/um assumed; a jack screw pair 600 N/um; none for the effect)
+        j = [(export_dir, 8.0, 16.0, 4, "plate", jt, fl, 3e6) for fl in ("bolts", "face") for jt in JOINTS]
+        j += [(export_dir, 8.0, 16.0, 4, "plate", jt, "bolts", 6e5) for jt in ("pre_hi", "pre_lo", "unpre_hi")]
+        j += [(export_dir, 8.0, 16.0, 4, "plate", jt, "bolts", None) for jt in JOINTS]
+        j += [(export_dir, 8.0, 16.0, 4, "bore", jt, "face", 3e6) for jt in ("pre_hi", "pre_lo")]
+        return j
+    if name == "final-fine":  # mesh check of the final design: first mode at 6 mm (cradle) / 14 mm (seat), preloaded
+        return [(export_dir, 6.0, 14.0, 4, "plate", jt, "bolts", 3e6) for jt in ("pre_hi", "pre_lo")]
     if name == "medium":
         j = [(export_dir, 8.0, 16.0, 4, "plate", jt, fl) for fl in ("bolts", "face") for jt in JOINTS]
         j += [(export_dir, 8.0, 16.0, 4, "bore", jt, "face") for jt in ("pre_hi", "pre_lo")]
@@ -311,4 +363,4 @@ if __name__ == "__main__":
     results = run(plan(d, name))
     json.dump(results, open(out, "w"), indent=1)
     for r in results:
-        print(r["size"], r["support"], r["flange"], r["joint"], [round(x) for x in r["frequencies_Hz"][:4]], r["dofs"], flush=True)
+        print(r["size"], r["support"], r["flange"], r["joint"], r.get("rest"), [round(x) for x in r["frequencies_Hz"][:4]], r["dofs"], flush=True)

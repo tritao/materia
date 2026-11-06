@@ -1,0 +1,220 @@
+{
+ "note": "Prototype cradles built from boxes by cradle_variants.py on the (unchanged) tongue seat, plate support, preloaded joint (pre_hi), flange on its four bolts; k = rest block series stiffness N/mm (null = rigid); FE_Hz = first two modes. Used to fit the hand model's constants (cradle_handmodel.py).",
+ "variants": [
+  {
+   "name": "base",
+   "params": {},
+   "rest": null,
+   "FE_Hz": [
+    341,
+    661
+   ]
+  },
+  {
+   "name": "nowin",
+   "params": {
+    "window": false
+   },
+   "rest": null,
+   "FE_Hz": [
+    434,
+    677
+   ]
+  },
+  {
+   "name": "w12",
+   "params": {
+    "window": false,
+    "wall": 12
+   },
+   "rest": null,
+   "FE_Hz": [
+    480,
+    717
+   ]
+  },
+  {
+   "name": "w15",
+   "params": {
+    "window": false,
+    "wall": 15
+   },
+   "rest": null,
+   "FE_Hz": [
+    508,
+    731
+   ]
+  },
+  {
+   "name": "w15nr",
+   "params": {
+    "rib": false,
+    "wall": 15
+   },
+   "rest": null,
+   "FE_Hz": [
+    368,
+    693
+   ]
+  },
+  {
+   "name": "a",
+   "params": {
+    "window": false,
+    "wall": 14
+   },
+   "rest": null,
+   "FE_Hz": [
+    504,
+    732
+   ]
+  },
+  {
+   "name": "J1",
+   "params": {},
+   "rest": {
+    "k": null,
+    "x0": -40,
+    "x1": 24,
+    "y0": 145,
+    "y1": 200
+   },
+   "FE_Hz": [
+    846,
+    1290
+   ]
+  },
+  {
+   "name": "L1",
+   "params": {},
+   "rest": {
+    "k": 3000000.0,
+    "x0": -44,
+    "x1": 36,
+    "y0": 145,
+    "y1": 200
+   },
+   "FE_Hz": [
+    790,
+    1186
+   ]
+  },
+  {
+   "name": "K1",
+   "params": {},
+   "rest": {
+    "k": 600000.0,
+    "x0": -44,
+    "x1": 36,
+    "y0": 145,
+    "y1": 200
+   },
+   "FE_Hz": [
+    726,
+    1092
+   ]
+  },
+  {
+   "name": "K2",
+   "params": {
+    "window": false,
+    "wall": 12
+   },
+   "rest": {
+    "k": 600000.0,
+    "x0": -44,
+    "x1": 36,
+    "y0": 145,
+    "y1": 200
+   },
+   "FE_Hz": [
+    772,
+    1088
+   ]
+  },
+  {
+   "name": "H0",
+   "params": {},
+   "rest": {
+    "k": null,
+    "x0": -21,
+    "x1": 5,
+    "y0": 152,
+    "y1": 192
+   },
+   "FE_Hz": [
+    713,
+    1143
+   ]
+  },
+  {
+   "name": "H1",
+   "params": {
+    "window": false
+   },
+   "rest": {
+    "k": null,
+    "x0": -21,
+    "x1": 5,
+    "y0": 152,
+    "y1": 192
+   },
+   "FE_Hz": [
+    718,
+    1138
+   ]
+  },
+  {
+   "name": "H2k4",
+   "params": {
+    "window": false
+   },
+   "rest": {
+    "k": 400000.0,
+    "x0": -21,
+    "x1": 5,
+    "y0": 152,
+    "y1": 192
+   },
+   "FE_Hz": [
+    679,
+    983
+   ]
+  },
+  {
+   "name": "H2k15",
+   "params": {
+    "window": false
+   },
+   "rest": {
+    "k": 150000.0,
+    "x0": -21,
+    "x1": 5,
+    "y0": 152,
+    "y1": 192
+   },
+   "FE_Hz": [
+    673,
+    830
+   ]
+  },
+  {
+   "name": "F1",
+   "params": {
+    "window": false,
+    "wall": 14
+   },
+   "rest": {
+    "k": null,
+    "x0": -40,
+    "x1": 24,
+    "y0": 128,
+    "y1": 168
+   },
+   "FE_Hz": [
+    897,
+    1265
+   ]
+  }
+ ]
+}

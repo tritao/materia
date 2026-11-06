@@ -510,8 +510,12 @@ allowable pull and runout are unpublished: those are **assumed acceptance
 requirements**, including the existing 2 µm model error parameters. Haozhi's
 separately published accuracy/balance ratings belong to its Ø100 DGZZ-10020;
 they do not qualify this D80 purchase. No bearing-life result is calculated
-from invented internal bearing locations. Cradle modal estimates retain their
-stated joint assumptions and need FE/impact-test confirmation.
+from invented internal bearing locations. The servo group's first mode on the
+cradle is an FE result (`fem/`, FRAME_PLAN 2026-11-06): 750-775 Hz with the floor
+joint preloaded, 743 Hz unpreloaded (575 Hz with the contact lost); the earlier
+analytic 1432 Hz credited a rib that is windowed under the flange and was wrong.
+The cradle carries a rest block and shim pack under the servo body to get there
+(352 Hz without it); impact-test confirmation is still open.
 
 
 ### B motor position study (Phase P3, 2026-11-05)
@@ -527,7 +531,7 @@ adds an interface and increases the demand on the eRob bearing.
 | COM from output face, X/Y/Z (mm) | -93.2 / 84.0 / 35.5 | -79.1 / 85.4 / 23.6 | -105.7 / 85.4 / 21.1 |
 | Maximum gravity torque about A, +/-15 degrees (N m) | 34.06 | 33.86 | 33.62 |
 | eRob tilt at output face, gravity + 100 N cut (N m) | 47.58 | 42.62 | 52.82 |
-| First cradle mode (Hz), analytic | 1432 | <=1432, rigid-interface bound | <=1432, rigid-interface bound |
+| First cradle mode (Hz) | 775 (FE, preloaded; 352 before the rest block); the analytic 1432 was wrong | not modelled; same seat and base (rigid-cradle ceiling 1098 Hz), so not better | not modelled; same seat and base, so not better |
 | Minimum sampled structural clearance (mm) | 7.000 | 0, collision | 11.268 |
 | Largest sampled overlap (mm3) | 0 | 71800.529 | 0 |
 | Added made interfaces | 0 | >=1 plate, 1 extra joint | >=1 plate, 1 extra joint |
@@ -540,13 +544,18 @@ checks are also omitted; hardware would have to be defined by real joints
 before any adoption. The rejection is based on the present components and
 interface concept, not a claim that no possible beside redesign could work.
 
-The top modes are 1870 Hz vertical, 1432 Hz axial and 3017 Hz lateral. A rigidly
-rotated cradle with a perfectly rigid extra interface cannot improve those
-frequencies under the same analytic model. If one third of the adapter mass
-participates, they become 1826 / 1398 / 2946 Hz; that participation is an
-**assumed sensitivity case**, not a proven upper bound or an FE result. The
-extra joint remains unqualified. The existing 960 Hz avoid ceiling and 1.3
-minimum factor continue to apply to the installed drive.
+The analytic top modes quoted in the first version of this study (1870 Hz
+vertical, 1432 Hz axial, 3017 Hz lateral) are void: the C3D10 FE of 2026-11-06
+puts the installed servo at 352 Hz on the floor alone and 750-775 Hz with the
+rest block, and a base ceiling of 1098 Hz (rigid cradle on the plate-supported
+seat, 1480 Hz with the seat's whole back face stuck) applies to any cradle on
+this seat block, so a beside mount on the Y saddle's 12 mm plate, with a further
+joint, cannot be stiffer; stiffness does not change the inward collision or the
+outward eRob tilt either. The beside layouts were not re-meshed. The 1.3 minimum
+factor over the avoid band to the cartridge's top speed (1248 Hz) is not met by
+the installed drive (0.60 x); against the band the servo's rated speed allows
+(100..300 m/min, tooth-pass 199..597 Hz, avoid to 716 Hz) the preloaded first
+mode is 1.05-1.08 x above. See FRAME_PLAN 2026-11-06 (ovn-cradle).
 
 `HobberMotorStudy` compares selected structural members at 24 combinations:
 X20/115, Y-15/+15, Z-15/195 and A-15/0/+15 degrees (linear overtravel included

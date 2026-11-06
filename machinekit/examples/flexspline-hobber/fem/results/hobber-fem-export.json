@@ -27,12 +27,12 @@
           -363
         ]
       },
-      "volume": 3122926.8787911204,
-      "mass": 24.514975998510295,
+      "volume": 3122338.433354358,
+      "mass": 24.510356701831714,
       "comLocal": [
-        247.6146248910846,
-        -3.0183008811737406,
-        266.9571728348341
+        247.6227504049641,
+        -3.018869719375687,
+        266.9576736137417
       ],
       "holes": [
         {
@@ -623,7 +623,7 @@
           "kind": "clearance",
           "position": [
             240.5,
-            20,
+            -20,
             260
           ],
           "slotLength": 0,
@@ -641,7 +641,7 @@
           "kind": "clearance",
           "position": [
             240.5,
-            -20,
+            20,
             260
           ],
           "slotLength": 0,
@@ -720,6 +720,150 @@
           "thread": null
         },
         {
+          "depth": 8.6,
+          "diameter": 3.3,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J39",
+          "kind": "tapped",
+          "position": [
+            170,
+            -100,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 8.6,
+          "diameter": 3.3,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J40",
+          "kind": "tapped",
+          "position": [
+            170,
+            100,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 8.6,
+          "diameter": 3.3,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J41",
+          "kind": "tapped",
+          "position": [
+            350,
+            -100,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 8.6,
+          "diameter": 3.3,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J42",
+          "kind": "tapped",
+          "position": [
+            350,
+            100,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 8.6,
+          "diameter": 3.3,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J43",
+          "kind": "tapped",
+          "position": [
+            149,
+            -90,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 8.6,
+          "diameter": 3.3,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J44",
+          "kind": "tapped",
+          "position": [
+            149,
+            -110,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 8.6,
+          "diameter": 3.3,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J45",
+          "kind": "tapped",
+          "position": [
+            149,
+            110,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 8.6,
+          "diameter": 3.3,
+          "direction": [
+            0,
+            0,
+            1
+          ],
+          "id": "J46",
+          "kind": "tapped",
+          "position": [
+            149,
+            90,
+            260
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
           "depth": 8,
           "diameter": 6,
           "direction": [
@@ -727,11 +871,11 @@
             0,
             1
           ],
-          "id": "J39",
+          "id": "J47",
           "kind": "dowel",
           "position": [
             240.5,
-            10,
+            -10,
             260
           ],
           "slotLength": 0,
@@ -745,11 +889,11 @@
             0,
             1
           ],
-          "id": "J40",
+          "id": "J48",
           "kind": "dowel",
           "position": [
             240.5,
-            -10,
+            10,
             260
           ],
           "slotLength": 0,
@@ -784,12 +928,12 @@
           0
         ]
       },
-      "volume": 949920.2730619283,
-      "mass": 7.456874143536138,
+      "volume": 948894.7629720164,
+      "mass": 7.448823889330329,
       "comLocal": [
-        141.45140605082017,
-        -0.11442422469839329,
-        58.52987149830066
+        141.45486594367125,
+        -0.2020879612114149,
+        58.543953423096866
       ],
       "holes": [
         {
@@ -1387,6 +1531,24 @@
           "thread": "M6"
         },
         {
+          "depth": 6.5,
+          "diameter": 12,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J34",
+          "kind": "bore",
+          "position": [
+            141.5,
+            101,
+            45.5
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
           "depth": 13,
           "diameter": 6.6,
           "direction": [
@@ -1394,7 +1556,7 @@
             0,
             0
           ],
-          "id": "J34",
+          "id": "J35",
           "kind": "clearance",
           "position": [
             148,
@@ -1405,6 +1567,24 @@
           "thread": "M6"
         },
         {
+          "depth": 6.5,
+          "diameter": 12,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J36",
+          "kind": "bore",
+          "position": [
+            141.5,
+            61,
+            45.5
+          ],
+          "slotLength": 0,
+          "thread": null
+        },
+        {
           "depth": 5,
           "diameter": 4.5,
           "direction": [
@@ -1412,7 +1592,7 @@
             0,
             0
           ],
-          "id": "J35",
+          "id": "J37",
           "kind": "clearance",
           "position": [
             140,
@@ -1430,7 +1610,7 @@
             0,
             0
           ],
-          "id": "J36",
+          "id": "J38",
           "kind": "clearance",
           "position": [
             140,
@@ -1448,7 +1628,7 @@
             0,
             0
           ],
-          "id": "J37",
+          "id": "J39",
           "kind": "clearance",
           "position": [
             140,
@@ -1466,47 +1646,11 @@
             0,
             0
           ],
-          "id": "J38",
-          "kind": "clearance",
-          "position": [
-            140,
-            19.5169,
-            -47.1179
-          ],
-          "slotLength": 0,
-          "thread": "M4"
-        },
-        {
-          "depth": 5,
-          "diameter": 4.5,
-          "direction": [
-            -1,
-            0,
-            0
-          ],
-          "id": "J39",
-          "kind": "clearance",
-          "position": [
-            140,
-            0,
-            -51
-          ],
-          "slotLength": 0,
-          "thread": "M4"
-        },
-        {
-          "depth": 5,
-          "diameter": 4.5,
-          "direction": [
-            -1,
-            0,
-            0
-          ],
           "id": "J40",
           "kind": "clearance",
           "position": [
             140,
-            -19.5169,
+            19.5169,
             -47.1179
           ],
           "slotLength": 0,
@@ -1524,8 +1668,8 @@
           "kind": "clearance",
           "position": [
             140,
-            -36.0624,
-            -36.0624
+            0,
+            -51
           ],
           "slotLength": 0,
           "thread": "M4"
@@ -1542,8 +1686,8 @@
           "kind": "clearance",
           "position": [
             140,
-            -47.1179,
-            -19.5169
+            -19.5169,
+            -47.1179
           ],
           "slotLength": 0,
           "thread": "M4"
@@ -1560,8 +1704,8 @@
           "kind": "clearance",
           "position": [
             140,
-            -51,
-            0
+            -36.0624,
+            -36.0624
           ],
           "slotLength": 0,
           "thread": "M4"
@@ -1579,7 +1723,7 @@
           "position": [
             140,
             -47.1179,
-            19.5169
+            -19.5169
           ],
           "slotLength": 0,
           "thread": "M4"
@@ -1593,6 +1737,42 @@
             0
           ],
           "id": "J45",
+          "kind": "clearance",
+          "position": [
+            140,
+            -51,
+            0
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J46",
+          "kind": "clearance",
+          "position": [
+            140,
+            -47.1179,
+            19.5169
+          ],
+          "slotLength": 0,
+          "thread": "M4"
+        },
+        {
+          "depth": 5,
+          "diameter": 4.5,
+          "direction": [
+            -1,
+            0,
+            0
+          ],
+          "id": "J47",
           "kind": "clearance",
           "position": [
             140,
@@ -1610,7 +1790,7 @@
             0,
             0
           ],
-          "id": "J46",
+          "id": "J48",
           "kind": "clearance",
           "position": [
             140,
@@ -1628,7 +1808,7 @@
             0,
             0
           ],
-          "id": "J47",
+          "id": "J49",
           "kind": "clearance",
           "position": [
             140,
@@ -1646,7 +1826,7 @@
             0,
             0
           ],
-          "id": "J48",
+          "id": "J50",
           "kind": "clearance",
           "position": [
             140,
@@ -1664,7 +1844,7 @@
             0,
             0
           ],
-          "id": "J49",
+          "id": "J51",
           "kind": "clearance",
           "position": [
             140,
@@ -1682,7 +1862,7 @@
             0,
             0
           ],
-          "id": "J50",
+          "id": "J52",
           "kind": "clearance",
           "position": [
             140,
@@ -1700,7 +1880,7 @@
             0,
             0
           ],
-          "id": "J51",
+          "id": "J53",
           "kind": "dowel",
           "position": [
             148,
@@ -1718,7 +1898,7 @@
             0,
             0
           ],
-          "id": "J52",
+          "id": "J54",
           "kind": "dowel",
           "position": [
             148,
@@ -1775,12 +1955,12 @@
           0
         ]
       },
-      "volume": 780758.0321677643,
-      "mass": 6.12895055251695,
+      "volume": 770795.1453274814,
+      "mass": 6.0507418908207296,
       "comLocal": [
-        -3.0878904797551088,
-        149.94069516891088,
-        9.233246269249332
+        -3.0887108059193507,
+        151.00174873520308,
+        9.252922644363535
       ],
       "holes": [
         {
@@ -1867,7 +2047,7 @@
           "kind": "tapped",
           "position": [
             -30,
-            165,
+            135,
             58
           ],
           "slotLength": 0,
@@ -1885,7 +2065,7 @@
           "kind": "tapped",
           "position": [
             30,
-            165,
+            135,
             58
           ],
           "slotLength": 0,
@@ -2136,12 +2316,12 @@
           0
         ]
       },
-      "volume": 168264.63530923793,
-      "mass": 1.320877387177518,
+      "volume": 245818.92633250222,
+      "mass": 1.9296785717101423,
       "comLocal": [
-        -17.805722978620295,
-        220.31403077984416,
-        88.89935456855581
+        -13.450384239395778,
+        202.9366614571484,
+        83.37668386984481
       ],
       "holes": [
         {
@@ -2156,7 +2336,7 @@
           "kind": "clearance",
           "position": [
             -30,
-            165,
+            135,
             58
           ],
           "slotLength": 0,
@@ -2174,7 +2354,7 @@
           "kind": "clearance",
           "position": [
             30,
-            165,
+            135,
             58
           ],
           "slotLength": 0,
@@ -2417,23 +2597,50 @@
       ]
     }
   ],
+  "cradle": {
+    "bolts": [
+      [
+        -30,
+        135
+      ],
+      [
+        30,
+        135
+      ],
+      [
+        -30,
+        232
+      ],
+      [
+        30,
+        232
+      ]
+    ],
+    "rest": {
+      "top": 81.2437373177462,
+      "x0": -44,
+      "x1": 36,
+      "y0": 145,
+      "y1": 200
+    }
+  },
   "servo": {
     "com": [
-      36.3703,
-      193.0934,
-      120.1572
+      36.6629,
+      191.5419,
+      117.4415
     ],
     "cradleComAuthored": [
-      -17.8057,
-      220.314,
-      88.8994
+      -13.4504,
+      202.9367,
+      83.3767
     ],
     "cradleComWork": [
-      27.8193,
-      220.314,
-      88.8994
+      32.1746,
+      202.9367,
+      83.3767
     ],
-    "mass": 3.4409475529299245,
+    "mass": 3.6438812811074657,
     "members": [
       {
         "id": "spindle/motor",
@@ -2477,37 +2684,41 @@
       },
       {
         "id": "motorCradle",
-        "mass": 1.320877387177518,
+        "mass": 1.9296785717101423,
         "weight": 0.3333333333333333,
         "com": [
-          27.8193,
-          220.314,
-          88.8994
+          32.1746,
+          202.9367,
+          83.3767
         ]
       }
-    ]
+    ],
+    "motorBody": {
+      "face": 80,
+      "length": 103.9
+    }
   },
   "head": {
     "com": [
-      79.2069,
-      79.1091,
-      37.214
+      75.8635,
+      85.2233,
+      36.011
     ],
     "hob": [
       45.625,
       0,
       0
     ],
-    "mass": 36.67241518046542,
+    "mass": 39.08770240335385,
     "outputFaceX": 124
   },
   "seatZ": 363,
   "zMoving": {
     "com": [
-      108.3647,
-      59.2851,
-      39.2436
+      104.4085,
+      64.908,
+      38.2243
     ],
-    "mass": 48.5796782227889
+    "mass": 50.986915191471546
   }
 }

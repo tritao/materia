@@ -7,6 +7,9 @@ Pipeline (all under the shared heavy-run queue; see README in the FRAME_PLAN log
   3. carriage   python3 carriage_fem.py <dir> results/carriage.json 14 10         (+ results/carriage-primitives.json: plate-model geometry)
   4. saddle     python3 saddle_fem.py <dir> results/saddle.json 14 10
   5. report     python3 hobber_fem.py report                           -> results/hobber-fem-results.json and a Markdown table on stdout
+  All of it: run_fem.sh. The cradle's final design (2026-11-06: floor extension, front bolt row at y 135, rest block under the servo body) is `cradle_fem.py ... final`
+  (results/cradle-final.json); the 2026-11-06 first pass (the cradle without a rest block, medium / foot / fine) stays in results/cradle-*.json. The routine hand model
+  (`HobberFrameChecks.spindleDrive`) has its Python twin and fit in cradle_handmodel.py against results/cradle-variants.json.
 Solver: fe.py (C3D10 tetrahedra, scipy sparse, SuperLU / AMG), meshes by gmsh 4.12.2; kernel verified by `tests/test_hobber_fem.py`.
 """
 import json
@@ -40,6 +43,12 @@ def cradle_summary():
     fine = load("cradle-fine.json")
     if fine:
         out["fine_mesh"] = {f'{r["support"]}/{r["flange"]}/{r["joint"]}': {"size": r["size"], "elements": r["elements"], "frequencies_Hz": [round(x, 1) for x in r["frequencies_Hz"]]} for r in fine}
+    final = load("cradle-final.json")
+    if final:
+        out["final_design"] = {f'{r["support"]}/{r["flange"]}/{r["joint"]}/rest={r.get("rest")}': [round(x, 1) for x in r["frequencies_Hz"]] for r in final}
+    ff = load("cradle-final-fine.json")
+    if ff:
+        out["final_design_fine_mesh"] = {f'{r["support"]}/{r["flange"]}/{r["joint"]}/rest={r.get("rest")}': {"size": r["size"], "elements": r["elements"], "frequencies_Hz": [round(x, 1) for x in r["frequencies_Hz"]]} for r in ff}
     foot = load("cradle-foot.json")
     if foot:
         out["cradle_alone_floor_held"] = foot

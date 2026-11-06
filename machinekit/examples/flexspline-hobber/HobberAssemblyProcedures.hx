@@ -112,6 +112,12 @@ class HobberAssemblyProcedures {
         note("clamp", "Tighten the flange bolts",
           "Holding the jack where it is, tighten the four M6 crosswise to their full torque (the friction of the preloaded flange holds the servo; the drive check prints its margin over the belt pull), "
           + "then re-read the tension and trim with the jack and re-tighten if it moved. Lock the jack screw with thread-locker.", ["motorCradle", "spindle/motor"]),
+        note("rest", "Shim the servo body onto the rest block",
+          "With the tension set and the flange bolts tight, measure the gap between the rest block's ground top (it stands " + r(HobSpindle.TENSION_TRAVEL + 0.5) + " mm under the body's underside at the bottom of the slots, so the servo can still go down to fit the belt) "
+          + "and the body's underside, at both ends of the block, with feeler gauges: about " + r(HobSpindle.TENSION_TRAVEL + 0.5 + travel, 1) + " mm. Make a pack of ground steel shim 0.02 mm thinner than the smaller gap (peel shim in 0.05 and 0.1 mm layers, at most "
+          + "8 laminations, no wedge over 0.05 mm) and slide it in, bearing on the block's full width. The belt's pull and the servo's weight keep the body pressed on it; it carries the servo's weight and "
+          + "makes the first mode of the servo group clear the tooth-pass band (the drive check prints the FE and hand-model values). Re-fit the pack whenever the tension is trimmed.",
+          ["motorCradle", "spindle/motor"]),
         note("run", "Run in and re-check",
           "Turn the spindle by hand, then run it at 500 rpm for ten minutes and re-measure the tension; the belt must track on both pulleys without climbing a flange.", drive)
       ],
