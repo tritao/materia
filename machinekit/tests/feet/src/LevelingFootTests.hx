@@ -94,14 +94,18 @@ class LevelingFootTests {
       var floor = materia.assembly.AssemblyFrames.compose(pose, row.component.connector("floor").frame);
       var mount = materia.assembly.AssemblyFrames.compose(pose, row.component.connector("mount").frame);
       check(Math.abs(floor.z + 50) < 1e-6, "installed mill floor remains -50 mm");
-      check(Math.abs(mount.z - frame.casting.footAccessFloor) < 1e-6, "foot mount follows its source steel seat");
+      // The complete foot hangs from the removable roof plate's underside, which is the source steel seat.
+      var seat = frame.casting.footRoof - frame.casting.footPlateThickness;
+      check(Math.abs(mount.z - seat) < 1e-6, "foot mount follows its source steel seat: " + mount.z + " vs " + seat);
       var local = row.component.geometry();
       var actual = machinekit.assembly.PosedParts.moved(local, pose);
       local.close();
+      // Pad on the floor, threaded stem to the roof less its end clearance, no collar.
+      var casting = frame.casting, padTop = -casting.footGroundClearance + casting.levelingPadHeight;
+      var stemTop = casting.footRoof - casting.footStemEndClearance;
       var old = Solids.union([
-        Part.cylinderSpan(35, -50, -30, pose.x, pose.y),
-        Part.cylinderSpan(8, -30, 65, pose.x, pose.y),
-        Part.cylinderSpan(14, 40, 50, pose.x, pose.y)
+        Part.cylinderSpan(casting.levelingPadDiameter / 2, -casting.footGroundClearance, padTop, pose.x, pose.y),
+        Part.cylinderSpan(casting.levelingThread.majorDiameter / 2, padTop, stemTop, pose.x, pose.y)
       ]);
       try {
         var a = actual.subtract(old), b = old.subtract(actual);
