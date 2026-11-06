@@ -1,4 +1,6 @@
 """Known-answer checks of the hobber FE kernel (fe.py): a steel cantilever in bending and its first mode, and rigid-body / reduction identities."""
+import json
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -47,6 +49,43 @@ class KernelTests(unittest.TestCase):
         gmsh.write(path)
         gmsh.finalize()
         return path
+
+
+class HandModelTests(unittest.TestCase):
+    """The routine hand model (cradle_handmodel.py, the twin of HobberFrameChecks.spindleDrive) against the stored FE of the cradle variants, and the Haxe constants against the stored results."""
+
+    def test_hand_model_matches_the_fe_of_the_rest_block_variants(self):
+        import cradle_handmodel as hm
+        export = Path(__file__).resolve().parents[1] / "results" / "hobber-fem-export.json"
+        if not export.exists():
+            self.skipTest("no export")
+        mdl = hm.servo(json.loads(export.read_text()))
+        worst = 0.0
+        for name, params, rest, fe_hz in hm.variants():
+            if rest:
+                first = min(hm.modes(params, rest, mdl).values())
+                worst = max(worst, abs(first / fe_hz[0] - 1))
+        self.assertLess(worst, 0.12)  # the fit's worst residual is 9 %
+
+    def test_haxe_constants_match_the_stored_results(self):
+        results = json.loads((Path(__file__).resolve().parents[1] / "results" / "hobber-fem-results.json").read_text())
+        hx = (Path(__file__).resolve().parents[4] / "haxe" / "src" / "machinekit" / "hobbing" / "HobberFeResults.hx").read_text()
+
+        def const(name):
+            m = re.search(name + r" = \[?([-0-9.eE, ]+)\]?;", hx)
+            return [float(v) for v in m.group(1).split(",")]
+        final = results["cradle"]["final_design"]
+        key = lambda sup, fl, jt, rest: f"{sup}/{fl}/{jt}/rest={rest}"
+        for name, (fl, rest, joints) in {"CRADLE_PRELOADED_HZ": ("bolts", 3000000.0, ("pre_hi", "pre_lo")), "CRADLE_UNPRELOADED_HZ": ("bolts", 3000000.0, ("unpre_hi", "unpre_lo")),
+                                         "CRADLE_FACE_FLANGE_PRELOADED_HZ": ("face", 3000000.0, ("pre_hi", "pre_lo")), "CRADLE_NO_REST_PRELOADED_HZ": ("bolts", None, ("pre_hi", "pre_lo")),
+                                         "CRADLE_JACK_SCREW_PRELOADED_HZ": ("bolts", 600000.0, ("pre_hi", "pre_lo"))}.items():
+            for jt, value in zip(joints, const(name)):
+                self.assertAlmostEqual(final[key("plate", fl, jt, rest)][0], value, delta=0.6, msg=name)
+        saddle = results["saddle"][-1]
+        for i, value in enumerate(const("SADDLE_MODES_BOLTS_HZ")):
+            self.assertAlmostEqual(saddle["bolts"]["modes"]["frequencies_Hz"][i], value, delta=0.6)
+        for i, value in enumerate(const("SADDLE_MODES_BLOCKS_HZ")):
+            self.assertAlmostEqual(saddle["blocks"]["modes"]["frequencies_Hz"][i], value, delta=0.6)
 
 
 if __name__ == "__main__":

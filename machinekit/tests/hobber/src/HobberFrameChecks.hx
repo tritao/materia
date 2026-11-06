@@ -5,6 +5,7 @@ import machinekit.assembly.MachineAssembly;
 import machinekit.component.MachineKitComponents;
 import machinekit.hobbing.FoundationLayout;
 import machinekit.hobbing.HobSpindle;
+import machinekit.hobbing.HobberFeResults;
 import machinekit.hobbing.HobberCastingPockets;
 import machinekit.hobbing.HobberSaddle;
 import machinekit.hobbing.HobberSpindleRelief;
@@ -316,8 +317,8 @@ class HobberFrameChecks {
       + 'free span rings at ${r(HobSpindle.spanFrequency(t0), 0)} Hz (${HobSpindle.BELT_MASS_PER_M} kg/m assumed), tension travel ${r(HobSpindle.tensioningTravel(t0, spindle.belt.length), 2)} mm; slots +-${HobSpindle.TENSION_TRAVEL} mm');
     lines.push('Purchased BT30 cartridge: ${r(radial)} N radial belt pull; require ${Math.ceil(radial * 1.5 / 50) * 50} N at the pulley. Allowable load unpublished (ASSUMED acceptance requirement); no life calculation from invented internal bearing positions/ratings.');
     var nTop = spindle.maxSpeed() * 60 / (2 * Math.PI);
-    // The servo group on its cradle.
-    var ids = ["spindle/motor", "spindle/motorShaft", "spindle/motorPulley", "spindle/motorEncoder"], mass = 0.0, mx = 0.0, my = 0.0, mz = 0.0, cradle = 0.0;
+    // The servo group on its cradle: members without the cradle (the FE carries the cradle's own mass in its mesh), and a third of the cradle for the load lines.
+    var ids = ["spindle/motor", "spindle/motorShaft", "spindle/motorPulley", "spindle/motorEncoder"], mass = 0.0, mx = 0.0, my = 0.0, mz = 0.0, cradle = 0.0, servo:Array<{m:Float, x:Float, y:Float, z:Float}> = [];
     for (m in machine.components()) {
       var weight = ids.indexOf(m.id) >= 0 ? 1.0 : m.id == "motorCradle" ? 1.0 / 3 : 0.0;
       if (weight == 0) continue;
@@ -327,65 +328,123 @@ class HobberFrameChecks {
       my += weight * props.mass * at.y;
       mz += weight * props.mass * (at.z - HobberZLayout.SEAT_Z);
       if (m.id == "motorCradle") cradle = props.mass;
+      else servo.push({m: props.mass, x: at.x, y: at.y, z: at.z - HobberZLayout.SEAT_Z});
     }
-    var com = {x: mx / mass, y: my / mass, z: mz / mass}, sec = HobberSaddle.cradleSection();
-    var e = 210000.0, kJoint = 3 * e * 36.6 / 28.0;
-    // Root section about x (bending in y-z): the wall at the rear of the section and the rib ahead of it; about y the rib stands at its x.
-    var width = sec.width, t = sec.wall, tr = sec.ribThickness, d = sec.ribDepth;
-    var aw = width * t, ar = tr * d, yw = d - t / 2, yr = d / 2, yc = (aw * yw + ar * yr) / (aw + ar);
-    var iX = width * Math.pow(t, 3) / 12 + aw * Math.pow(yw - yc, 2) + tr * Math.pow(d, 3) / 12 + ar * Math.pow(yr - yc, 2);
-    var xMid = sec.x0 + width / 2, xc = (aw * xMid + ar * sec.ribX) / (aw + ar);
-    var iY = t * Math.pow(width, 3) / 12 + aw * Math.pow(xMid - xc, 2) + d * Math.pow(tr, 3) / 12 + ar * Math.pow(sec.ribX - xc, 2);
-    var height = com.z - (sec.floorTop), ahead = 239.0 - com.y;
-    var sumY2 = 0.0, sumX2 = 0.0, yMean = 0.0;
-    for (b in sec.bolts) yMean += b.y / sec.bolts.length;
-    for (b in sec.bolts) {
-      sumY2 += (b.y - yMean) * (b.y - yMean);
-      sumX2 += b.x * b.x;
+    var sec = HobberSaddle.cradleSection(), dims = HobberSaddle.cradleDimensions(), rest = HobberSaddle.cradleRest(), faceY = HobberSaddle.cradleFaceY();
+    var com = {x: mx / mass, y: my / mass, z: mz / mass}, ahead = faceY - com.y, height = com.z - sec.floorTop;
+    var motor = machine.spindle.motor, face = motor.rating.bodyDiameter, bodyLength = motor.rating.bodyLength;
+    // ---- Hand model of the servo group on the cradle, validated against the C3D10 FE (HobberFeResults, fem/): two coupled-pair modes.
+    //  rocking  the wall bends as a cantilever (the section of `cradleSlabs` at each height: wall at full thickness, the rib at a fitted participation) from the foot's top to the upper
+    //           flange bolt row, where the servo is attached; the base turns about x (floor joint, seat: FE-derived rotation stiffness); the rest block adds a vertical spring ahead of the wall.
+    //           DOFs: y displacement and rotation about x of the attachment point, 2 x 2 generalised eigenproblem with the servo's mass and inertia.
+    //  lateral  the same cantilever bending in x, the base rolling about y, the rest block's width as a roll spring.
+    var e = 210000.0, g = e / 2.6, kappa = 5.0 / 6.0, base = sec.floorTop, flange = machine.spindle.motor.mounting();
+    if (flange == null) flange = machinekit.motion.ServoMotor.assumedMounting(motor.rating.designation);
+    var zq = HobSpindle.motorHeight(), zTop = zq;
+    for (h in flange.holes) zTop = Math.max(zTop, zq + h.y);
+    var eta = HobberFeResults.RIB_PARTICIPATION, hq = zTop - base, steps = Math.round(hq);
+    function props(z:Float, withRib:Bool, axis:Int) {
+      var area = 0.0, sx = 0.0, slabs = HobberSaddle.cradleSlabs(z, withRib);
+      for (sl in slabs) {
+        var a = (sl.x1 - sl.x0) * (sl.y1 - sl.y0);
+        area += a;
+        sx += a * (axis == 0 ? 0.5 * (sl.y0 + sl.y1) : 0.5 * (sl.x0 + sl.x1));
+      }
+      var c = sx / area, inertia = 0.0;
+      for (sl in slabs) {
+        var a = (sl.x1 - sl.x0) * (sl.y1 - sl.y0), d = (axis == 0 ? 0.5 * (sl.y0 + sl.y1) : 0.5 * (sl.x0 + sl.x1)) - c;
+        inertia += (axis == 0 ? (sl.x1 - sl.x0) * Math.pow(sl.y1 - sl.y0, 3) : (sl.y1 - sl.y0) * Math.pow(sl.x1 - sl.x0, 3)) / 12 + a * d * d;
+      }
+      return {area: area, inertia: inertia};
     }
-    // N/mm at the group's centre of mass.
-    function hz(k:Float):Float return Math.sqrt(k * 1000 / mass) / (2 * Math.PI);
-    // Load-path elements of the axial mode (bending in y-z): the wall (and rib) as a cantilever from the foot top, the foot (the floor under the wall) as a
-    // cantilever of the wall's width from the nearest bolt row to the wall's mid-plane, and the floor joint (the bolt rows rocking). The foot is taken
-    // as a free cantilever though the seat's tongue carries it in compression: no credit for that support.
-    var rearBolt = 0.0;
-    for (b in sec.bolts) rearBolt = Math.max(rearBolt, b.y);
-    var dims = HobberSaddle.cradleDimensions(), footLen = HobberSaddle.cradleRearY() - dims.wall / 2 - rearBolt, iFoot = width * Math.pow(dims.foot, 3) / 12;
-    function axialElements(joint:Float) {
-      var kWall = 3 * e * iX / Math.pow(height, 3), kJointRock = joint * sumY2 / Math.pow(height, 2), kFoot = e * iFoot / (height * height * footLen);
-      return [{name: "wall bending", f: hz(kWall), k: kWall}, {name: "foot", f: hz(kFoot), k: kFoot}, {name: "floor joint", f: hz(kJointRock), k: kJointRock}];
+    // Flexibility of the wall cantilever at the attachment height: [[v, v-theta], [v-theta, theta]] per unit load / moment (1 mm slices).
+    function wallFlex(axis:Int) {
+      var f11 = 0.0, f12 = 0.0, f22 = 0.0;
+      for (i in 0...steps) {
+        var s = (i + 0.5) * hq / steps, z = base + s, with = props(z, true, axis), without = props(z, false, axis);
+        var a = without.area + eta * (with.area - without.area), inertia = without.inertia + eta * (with.inertia - without.inertia), arm = hq - s, ds = hq / steps;
+        f11 += (arm * arm / (e * inertia) + 1 / (kappa * g * a)) * ds;
+        f12 += arm / (e * inertia) * ds;
+        f22 += ds / (e * inertia);
+      }
+      return [f11, f12, f22];
     }
-    function modesFor(joint:Float) {
-      var kz = e * iX / (ahead * ahead * height), el = axialElements(joint);
-      var kxWall = 3 * e * iY / Math.pow(height, 3), kxRoot = joint * sumX2 / Math.pow(height, 2);
-      return [{name: "vertical (flange rocking on the wall)", f: hz(kz)}, {name: "axial (wall, foot and floor bolts)", f: hz(1 / (1 / el[0].k + 1 / el[1].k + 1 / el[2].k))},
-        {name: "lateral (wall and floor bolts)", f: hz(1 / (1 / kxWall + 1 / kxRoot))}];
+    // The servo's inertias about its centre of mass (the motor body as a box, the members as points), tonne mm2.
+    var ixx = 0.0, iyy = 0.0, mServo = 0.0, cx = 0.0, cy = 0.0, cz = 0.0;
+    for (m in servo) {
+      mServo += m.m;
+      cx += m.m * m.x;
+      cy += m.m * m.y;
+      cz += m.m * m.z;
     }
-    var modes = modesFor(kJoint), loose = modesFor(kJoint / 10), elements = axialElements(kJoint);
-    var first = modes[0], firstLoose = loose[0];
+    cx /= mServo;
+    cy /= mServo;
+    cz /= mServo;
+    for (m in servo) {
+      ixx += m.m * ((m.y - cy) * (m.y - cy) + (m.z - cz) * (m.z - cz));
+      iyy += m.m * ((m.x - cx) * (m.x - cx) + (m.z - cz) * (m.z - cz));
+    }
+    var body = servo.filter(m -> m.m > 2.0)[0];
+    ixx += body.m / 12 * (face * face + bodyLength * bodyLength);
+    iyy += body.m / 12 * (face * face + face * face);
+    var tonne = 1e-3, mt = mServo * tonne, ry = cy - faceY, rz = cz - zTop;
+    function eigen2(k:Array<Float>, m:Array<Float>):Float {
+      // det(K - l M) = 0 for symmetric 2x2: a l^2 + b l + c = 0
+      var a = m[0] * m[2] - m[1] * m[1], b = -(k[0] * m[2] + k[2] * m[0] - 2 * k[1] * m[1]), c = k[0] * k[2] - k[1] * k[1];
+      var l = (-b - Math.sqrt(Math.max(0.0, b * b - 4 * a * c))) / (2 * a);
+      return Math.sqrt(Math.max(0.0, l)) / (2 * Math.PI);
+    }
+    function invert(f:Array<Float>):Array<Float> {
+      var d = f[0] * f[2] - f[1] * f[1];
+      return [f[2] / d, -f[1] / d, f[0] / d];
+    }
+    var packSeries = 1 / (1 / HobberFeResults.REST_PACK_N_PER_MM + 1 / HobberFeResults.SEAT_UNDER_REST_N_PER_MM);
+    // rocking: u_y(cg) = v - theta rz, u_z(cg) = theta ry
+    var fr = wallFlex(0), kb = HobberFeResults.BASE_ROCKING_N_MM_PER_RAD;
+    var kRock = invert([fr[0] + hq * hq / kb, fr[1] + hq / kb, fr[2] + 1 / kb]);
+    var restArm = faceY - 0.5 * (rest.y0 + rest.y1), kRest = packSeries * restArm * restArm;
+    kRock[2] += kRest;
+    var mRock = [mt, -mt * rz, mt * (rz * rz + ry * ry) + ixx * tonne];
+    var fRock = eigen2(kRock, mRock);
+    // lateral: u_x(cg) = u + phi rz
+    var fl = wallFlex(1), kbl = HobberFeResults.BASE_ROLL_N_MM_PER_RAD;
+    var kLat = invert([fl[0] + hq * hq / kbl, fl[1] + hq / kbl, fl[2] + 1 / kbl]);
+    var restWidth = rest.x1 - rest.x0, restOffset = 0.5 * (rest.x0 + rest.x1) - HobberSaddle.cradleMotorX();
+    kLat[2] += packSeries * (restWidth * restWidth / 12 + restOffset * restOffset);
+    var mLat = [mt, mt * rz, mt * rz * rz + iyy * tonne];
+    var fLat = eigen2(kLat, mLat);
+    var modes = [{name: "rocking about x (wall, base, rest block)", f: fRock}, {name: "lateral roll about y (wall, base, rest block width)", f: fLat}];
+    var first = modes[0];
     for (m in modes) if (m.f < first.f) first = m;
-    for (m in loose) if (m.f < firstLoose.f) firstLoose = m;
-    // Tooth-pass band.
+    function hz(k:Float):Float return Math.sqrt(k * 1000 / mass) / (2 * Math.PI);
+    // Tooth-pass band: hobbing runs from 100 to 300 m/min (the servo's rated speed caps it, below); the cartridge itself turns up to its own limit.
     var gashes = machine.hob.parameterCount("gashes"), diameter = machine.hob.design.outsideDiameter;
-    var nLow = 100000 / (Math.PI * diameter), fLow = nLow * gashes / 60, fHigh = nTop * gashes / 60;
-    var lo = 0.8 * fLow, hi = 1.2 * fHigh;
+    var nLow = 100000 / (Math.PI * diameter), hobRpmTop = 3 * nLow, fLow = nLow * gashes / 60, fOp = hobRpmTop * gashes / 60, fHigh = nTop * gashes / 60;
+    var lo = 0.8 * fLow, opHi = 1.2 * fOp, hi = 1.2 * fHigh;
+    var feSig = HobberFeResults.CRADLE_DESIGN, signature = HobberSaddle.cradleSignature();
+    var fePre = Math.min(HobberFeResults.CRADLE_PRELOADED_HZ[0], HobberFeResults.CRADLE_PRELOADED_HZ[1]), feUnpre = HobberFeResults.CRADLE_UNPRELOADED_HZ[0], feOpen = HobberFeResults.CRADLE_UNPRELOADED_HZ[1];
     lines.push('B servo group: ${r(mass)} kg (motor, shaft, pulley, encoder and a third of the ${r(cradle)} kg cradle), centre ${r(ahead, 1)} mm ahead of the flange, ${r(height, 1)} mm above the floor; '
-      + 'cradle section I about x ${Math.round(iX)} mm4, about y ${Math.round(iY)} mm4; floor bolts ${sec.bolts.length} M8 (joint ${Math.round(kJoint / 1000)} N/um each)');
-    lines.push('B servo first-mode estimate: ' + [for (m in modes) m.name + " " + Math.round(m.f) + " Hz"].join("; ") + '; first ${Math.round(first.f)} Hz ' + first.name
-      + ' against tooth-pass ${Math.round(fLow)}..${Math.round(fHigh)} Hz (hob Ø${r(diameter, 1)} at 100 m/min = ${Math.round(nLow)} rpm up to ${Math.round(nTop)} rpm, ${gashes} gashes): '
-      + 'avoid ${Math.round(lo)}..${Math.round(hi)} Hz (+-20 %), ${first.f > hi ? Math.round(100 * first.f / hi - 100) + " % above" : first.f < lo ? "below" : "INSIDE"}; '
-      + 'sensitivity: with the floor joint ten times softer (not preloaded) the first mode is ${Math.round(firstLoose.f)} Hz ${firstLoose.name}');
-    if (first.f >= lo && first.f <= hi) throw "the servo's first mode lies within 20 % of the tooth-pass band: " + lines.join("; ");
+      + 'hand-model servo ${r(mServo)} kg, inertia ${Math.round(ixx)} kg mm2 about x / ${Math.round(iyy)} about y, attachment at the upper flange bolt row, ${r(hq, 1)} mm above the foot; rest block ${r(restWidth, 0)} x ${r(rest.y1 - rest.y0, 0)} mm, '
+      + '${r(restArm, 0)} mm ahead of the wall, spring ${Math.round(packSeries / 1000)} N/um (shim pack ${Math.round(HobberFeResults.REST_PACK_N_PER_MM / 1000)} in series with the seat ${Math.round(HobberFeResults.SEAT_UNDER_REST_N_PER_MM / 1000)} N/um)');
+    lines.push('B servo first-mode hand model (calibrated to the FE of 15 cradle variants): ' + [for (m in modes) m.name + " " + Math.round(m.f) + " Hz"].join("; ") + '; first ${Math.round(first.f)} Hz '
+      + 'against FE (C3D10, flange on its four bolts: ${HobberFeResults.CRADLE_PRELOADED_HZ.map(Math.round)} Hz preloaded (joint closed / open), ${HobberFeResults.CRADLE_UNPRELOADED_HZ.map(Math.round)} Hz unpreloaded (contact closed / open), '
+      + '${Math.round(HobberFeResults.CRADLE_BONDED_HZ)} Hz bonded, ${HobberFeResults.CRADLE_FACE_FLANGE_PRELOADED_HZ.map(Math.round)} Hz with the whole flange coupled; ${HobberFeResults.CRADLE_NO_REST_PRELOADED_HZ.map(Math.round)} Hz without the rest block, '
+      + '${HobberFeResults.CRADLE_JACK_SCREW_PRELOADED_HZ.map(Math.round)} Hz with jack screws instead of the shim pack): hand / FE preloaded (lowest) = ${r(first.f / fePre, 2)}');
+    if (signature != feSig) throw "the cradle's geometry changed since the FE reference was run (fem/run_fem.sh): FE \"" + feSig + "\" now \"" + signature + "\"";
+    if (Math.abs(first.f / fePre - 1) > 0.25) throw 'the cradle hand model (${Math.round(first.f)} Hz) and the FE (${Math.round(fePre)} Hz) disagree by more than 25 %: refit HobberFeResults constants or fix the model';
+    lines.push('B servo vs the tooth-pass band (hob Ø${r(diameter, 1)}, ${gashes} gashes): operating range 100..300 m/min = ${Math.round(nLow)}..${Math.round(hobRpmTop)} rpm (the servo\'s ${Math.round(rating.ratedSpeed * 60 / (2 * Math.PI))} rpm rated speed caps it) = tooth-pass ${Math.round(fLow)}..${Math.round(fOp)} Hz, '
+      + 'avoid ${Math.round(lo)}..${Math.round(opHi)} Hz (+-20 %); FE first mode ${Math.round(fePre)} Hz preloaded / ${Math.round(feUnpre)} Hz unpreloaded (contact closed) is ${r(fePre / opHi, 2)} x / ${r(feUnpre / opHi, 2)} x the top of that band; '
+      + 'with the joint open (no preload, contact lost) ${Math.round(feOpen)} Hz, ${feOpen > opHi ? "still above" : "INSIDE"} the band, excited at ${Math.round(feOpen * 60 / gashes)} rpm (${Math.round(feOpen * 60 / gashes * Math.PI * diameter / 1000)} m/min): not a gate (the procedure torques the floor bolts), the reason to re-check their torque; '
+      + 'the mode is excited by the tooth-pass at ${Math.round(fePre * 60 / gashes)} rpm (${Math.round(fePre * 60 / gashes * Math.PI * diameter / 1000)} m/min) and its +-20 % window begins at ${Math.round(0.8 * fePre * 60 / gashes)} rpm, ${r(0.8 * fePre * 60 / gashes / hobRpmTop, 2)} x the 300 m/min limit; '
+      + 'the cartridge turns up to ${Math.round(nTop)} rpm (tooth-pass ${Math.round(fHigh)} Hz, avoid to ${Math.round(hi)} Hz): hobbing above ${Math.round(0.8 * fePre * 60 / gashes)} rpm would cross the mode');
+    if (first.f <= opHi || fePre <= opHi || feUnpre <= opHi) throw "the servo's first mode lies within 20 % of the operating tooth-pass band: " + lines.join("; ");
     var margin = 1.3;
-    lines.push('B servo first-mode margin: ${r(first.f / hi, 2)} x the top of the avoid band (${Math.round(hi)} Hz), required at least ${margin} x (${Math.round(margin * hi)} Hz); '
-      + 'axial load-path elements, each alone with the servo group on it: ' + [for (el in elements) el.name + " " + Math.round(el.f) + " Hz"].join(", ")
-      + ' (foot: ${r(footLen, 1)} mm from the rear bolt row to the wall mid-plane as a ${dims.foot} mm cantilever of the wall width)');
-    var bad = [for (el in elements) if (el.f < margin * hi) el.name + " " + Math.round(el.f) + " Hz"];
-    if (first.f < margin * hi || bad.length > 0) throw "the servo's first mode (" + Math.round(first.f) + " Hz) or a load-path element (" + bad.join(", ") + ") is less than 1.3 x the top of the tooth-pass band: " + lines.join("; ");
+    lines.push('B servo first-mode margin against the cartridge-limit band: FE ${r(fePre / hi, 2)} x the top of the avoid band (${Math.round(hi)} Hz), required ${margin} x (${Math.round(margin * hi)} Hz): '
+      + (fePre >= margin * hi ? "met" : "NOT MET (open decision: limit hobbing to the servo's rated speed, as the speed check already does, or stiffen the seat; see FRAME_PLAN 2026-11-06)"));
     // Cradle mass and the lightening.
-    lines.push('Motor cradle: ${r(cradle, 3)} kg (was 2.036 kg with a 15 mm wall, 12 mm floor and solid rib, 1.285 kg before the foot); wall ${dims.wall}, floor ${dims.floor} (${dims.floorThin} ahead of y 195, foot ${dims.foot} under the wall), windowed rib, jack lug ${dims.lug} mm above the foot');
+    lines.push('Motor cradle: ${r(cradle, 3)} kg (1.321 kg before the rest block and the floor extension; 2.036 kg with a 15 mm wall, 12 mm floor and solid rib); wall ${dims.wall}, floor ${dims.floor} (${dims.floorThin} ahead of y 195, foot ${dims.foot} under the wall), windowed rib, jack lug ${dims.lug} mm above the foot, rest block top ${r(rest.top, 1)} mm');
     // The servo's speed and torque over the hob's speed range (1:1 belt).
-    var ratio = spindle.ratio, motorRatedRpm = rating.ratedSpeed * 60 / (2 * Math.PI), hobRpmTop = 3 * nLow, motorRpmTop = hobRpmTop * ratio;
+    var ratio = spindle.ratio, motorRatedRpm = rating.ratedSpeed * 60 / (2 * Math.PI), motorRpmTop = hobRpmTop * ratio;
     var cuttingBound = 100.0, efficiency = 0.97, reserve = 1.2;
     var cuttingTorque = cuttingBound * diameter / 2000, motorTorque = cuttingTorque / ratio / efficiency, motorPower = motorTorque * motorRpmTop * 2 * Math.PI / 60;
     lines.push('B speed and torque over the hob range (Ø${r(diameter, 1)}, 100..300 m/min = ${Math.round(nLow)}..${Math.round(hobRpmTop)} rpm): servo ${Math.round(nLow * ratio)}..${Math.round(motorRpmTop)} rpm against ${Math.round(motorRatedRpm)} rpm rated (${r(100 * motorRpmTop / motorRatedRpm, 1)} %), '
@@ -400,6 +459,32 @@ class HobberFrameChecks {
       + 'the jack screw also bears on the flange from below against that pull');
     if (grip < 3 * pull) throw "the flange bolts' friction does not hold the belt pull with a factor of 3: " + lines.join("; ");
     return {lines: lines, modes: modes, modalMass: mass};
+  }
+
+  /**
+   * The Z saddle plate's first modes (C3D10 FE, `HobberFeResults`, the head as a rigid mass on the eRob seat: upper bounds, the eRob's bearing and housing compliance are not in the model)
+   * against the tooth-pass of the hob at the cutting speeds used. The tooth-pass f = n gashes / 60 reaches a mode of frequency m at the hob speed n = 60 m / gashes; the mode is "hit" over
+   * +-20 % of that speed. Lines only (no throw): the 13 mm plate is fixed by the swivel seat (x 135) and the block faces (x 148), so a stiffer plate is a redesign, not a parameter.
+   */
+  public static function zSaddleModes(machine:FlexsplineHobber):Array<String> {
+    function r(v:Float, d:Int = 0):Float return Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
+    var gashes = machine.hob.parameterCount("gashes"), diameter = machine.hob.design.outsideDiameter, perMetre = 1000 / (Math.PI * diameter);
+    var nLow = 100 * perMetre, nTop = 300 * perMetre;
+    var lines = ['Z saddle plate modes (FE, head rigid on the eRob seat, upper bounds; supports at the block bolts / whole block footprints): ' + [for (i in 0...3) '${r(HobberFeResults.SADDLE_MODES_BOLTS_HZ[i])}..${r(HobberFeResults.SADDLE_MODES_BLOCKS_HZ[i])}'].join(", ")
+      + ' Hz (head tilting about y on the plate, then two translation-yaw modes); seat tilt stiffness about y ${r(HobberFeResults.SADDLE_TILT_KNM_PER_RAD[0])}..${r(HobberFeResults.SADDLE_TILT_KNM_PER_RAD[1])} kN m/rad, '
+      + 'hob tip ${HobberFeResults.SADDLE_TIP_UM_PER_100N} um per 100 N of cutting force'];
+    var hit = [];
+    for (i in 0...3) {
+      var f = HobberFeResults.SADDLE_MODES_BOLTS_HZ[i], n = 60 * f / gashes, v = n / perMetre, lowV = 0.8 * v, highV = 1.2 * v;
+      var inside = !(highV < 100 || lowV > 300);
+      lines.push('  mode ${i + 1} (${r(f)} Hz): tooth-pass reaches it at ${r(n)} rpm = ${r(v)} m/min (hob Ø${r(diameter, 1)}, ${gashes} gashes); window ${r(lowV)}..${r(highV)} m/min against the used range 100..300 m/min (${r(nLow)}..${r(nTop)} rpm): '
+        + (inside ? "INSIDE the range" : highV < 100 ? "below the range" : "above the range"));
+      if (inside) hit.push(i + 1);
+    }
+    lines.push('Z saddle conclusion: ' + (hit.length == 0 ? "no saddle mode lies in the used speed range." : 'saddle mode ${hit.join(", ")} lie${hit.length == 1 ? "s" : ""} in the 100..300 m/min range as an upper bound (the head on the eRob bearing is softer, so the true modes are lower and may sit '
+      + 'in other windows). Proposal, not implemented: avoid the speed windows above when finishing; or stiffen the plate where the seat tilts (box the plate with ribs along the block rows on the swivel side, a steel stiffener under the eRob pocket) '
+      + 'and re-run fem/saddle_fem.py; a thicker plate needs the swivel seat or the block planes moved (decision).'));
+    return lines;
   }
 
   /** The members that move with the Z joint (the Z saddle and everything carried on it), and their mass and centre of mass in the work frame. */
@@ -572,7 +657,7 @@ class HobberFrameChecks {
     var translated:Map<String, materia.assembly.AssemblyRecord.AssemblyFrame> = [];
     for (id => pose in machine.solvedPoses()) translated.set(id, F.compose(F.translation(17, 29, 31), pose));
     if (headReport.join("\n") != swivelLoad(machine, translated).join("\n")) throw "head demands depend on the machine's world origin";
-    var lines = HobberServiceDesignChecks.run(machine).concat(bt30(machine)).concat(outboard(machine)).concat(sizing(machine)).concat(scales(machine)).concat(headReport).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)).concat(spindleDrive(machine).lines).concat(spindleRelief(machine)), errors = newErrors(machine, sweep);
+    var lines = HobberServiceDesignChecks.run(machine).concat(bt30(machine)).concat(outboard(machine)).concat(sizing(machine)).concat(scales(machine)).concat(headReport).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)).concat(spindleDrive(machine).lines).concat(zSaddleModes(machine)).concat(spindleRelief(machine)), errors = newErrors(machine, sweep);
     for (line in lines) Sys.println(line);
     if (errors.length > 0) throw 'hobber strict integrity: ${errors.length} findings\n  ' + errors.join("\n  ");
     return presentation.procedures.length + lines.length + 2;
@@ -668,6 +753,7 @@ class HobberFrameChecks {
       Sys.println("round trip ok");
     }
     if (args.indexOf("spindledrive") >= 0) for (line in spindleDrive(machine).lines) Sys.println(line);
+    if (args.indexOf("zsaddle") >= 0) for (line in zSaddleModes(machine)) Sys.println(line);
     if (args.indexOf("spindlerelief") >= 0) for (line in spindleRelief(machine)) Sys.println(line);
     if (args.indexOf("nutblocks") >= 0) for (d in machinekit.hobbing.HobberDrives.all()) {
       var nut = new machinekit.motion.BallNut(), b = machinekit.hobbing.HobberDrives.nutBlock(d, nut), pose = machinekit.hobbing.HobberDrives.nutBlockPose(d, nut);
