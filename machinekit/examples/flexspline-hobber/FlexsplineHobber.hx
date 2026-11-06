@@ -67,8 +67,12 @@ class FlexsplineHobber extends MachineAssembly {
     var hobTool = Hob.fromDesign(new HobDesign(ConjugateRack.of(profile),
       1, 32, gashes), this.spec, 40, 16, false, detailedHob);
     hob = new Hob(hobTool.values().setNumber("faceKeyWidth", 5.2));
-    bed = new MineralCastBed();
-    column = new MineralCastColumn();
+    // The bed and the column size independently (each its own anchors, lifting trials and casting): side by side.
+    function sizedBed():machinekit.structural.MineralFoundation return new MineralCastBed();
+    function sizedColumn():machinekit.structural.MineralFoundation return new MineralCastColumn();
+    var foundations = machinekit.cache.Parallel.all([sizedBed, sizedColumn]);
+    bed = cast foundations[0];
+    column = cast foundations[1];
     includeAt("bed", bed, FoundationLayout.worldPose("bed"));
     var footCentres = FoundationLayout.feet();
     for (i in 0...footCentres.length) {

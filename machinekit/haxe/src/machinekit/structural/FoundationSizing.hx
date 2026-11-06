@@ -130,30 +130,26 @@ class FoundationSizing {
       var liftingShare = share(rows);
       // Only lifting demand depends on the resolved casting mass. Other
       // patterns and their exact containment are unchanged across this loop.
+      // Each insert's pattern depends on its own record and pose in the one casting: derived side by side.
       var fixed:Map<String, CastInsert> = [];
-      for (row in rows) if (row.part.parameterToken("role") != InsertRole.LiftingMount) {
-        var part = switch row.part.insertSpec().origin {
-          // Published retention stays unchanged, while its real mass and
-          // displacement remain in the complete lifting-demand assembly.
-          case Catalogue(_):
-            row.part;
-          case Fabricated(_):
-            machinekit.tooling.InsertAnchorGeometry.derive(row.id, row.part, rule, Casting(body, row.pose, bodyKey), 0);
-        };
-        fixed.set(row.id, part);
-      }
+      var fixedRows = rows.filter(row -> row.part.parameterToken("role") != InsertRole.LiftingMount);
+      var fixedParts = machinekit.cache.Parallel.all([for (row in fixedRows) () -> switch row.part.insertSpec().origin {
+        // Published retention stays unchanged, while its real mass and
+        // displacement remain in the complete lifting-demand assembly.
+        case Catalogue(_):
+          row.part;
+        case Fabricated(_):
+          machinekit.tooling.InsertAnchorGeometry.derive(row.id, row.part, rule, Casting(body, row.pose, bodyKey), 0);
+      }]);
+      for (index in 0...fixedRows.length) fixed.set(fixedRows[index].id, fixedParts[index]);
       // Hardware changes the casting mass. Resolve that known design coupling
       // without borrowing workshop strength values or dropping hardware mass.
       for (pass in 0...8) {
-        var result:Array<CastInsertPlacement> = [for (row in rows) {
-          id:row.id, pose:row.pose, openings:row.openings,
-            part:fixed.exists(row.id) ? fixed.get(row.id) : machinekit.tooling.InsertAnchorGeometry.derive(
-              row.id,
-              row.part,
-              rule,
-              Casting(body, row.pose, bodyKey),
-              liftingShare * shareCount(row.id)
-            )
+        var demand = liftingShare;
+        var parts = machinekit.cache.Parallel.all([for (row in rows) () -> fixed.exists(row.id) ? fixed.get(row.id) : machinekit
+          .tooling.InsertAnchorGeometry.derive(row.id, row.part, rule, Casting(body, row.pose, bodyKey), demand * shareCount(row.id))]);
+        var result:Array<CastInsertPlacement> = [for (index in 0...rows.length) {
+          id:rows[index].id, pose:rows[index].pose, openings:rows[index].openings, part:parts[index]
         }
         ];
         var resolved = share(result);
