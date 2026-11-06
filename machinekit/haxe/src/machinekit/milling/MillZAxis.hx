@@ -218,6 +218,17 @@ class MillZAxis extends AxisBuilder {
     var motorBolts = [for (m in components()) if (StringTools.startsWith(m.id, "motorBolt")) m.id];
     addDesignRequirement(ServiceRemoval("zMotorWithdrawal", ["motor", "motorShaft"],
       [{direction: [0.0, 0.0, 1.0], distance: l.motor.rating.shaftLength + l.motor.rating.bodyLength}], motorBolts, []));
+    // Support the head at its upper stop, disconnect the nut flange and adapter-to-column anchors,
+    // and lift the complete upper drive. Keeping the adapter with the nut avoids cutting the M80E seat.
+    var driveBolts = [for (m in components()) if (StringTools.startsWith(m.id, "motorBolt")
+      || StringTools.startsWith(m.id, "mountBolt")) m.id];
+    var lowerBolts = [for (m in components()) if (StringTools.startsWith(m.id, "floatingBolt")) m.id];
+    var shaftBottom = l.screwTop - l.screw.totalLength;
+    var withdrawal = f.columnMountPlane + f.columnHeight - shaftBottom + l.clearance;
+    addDesignRequirement(ServiceRemoval("zDriveWithdrawal",
+      ["fixedMount", "motorMount", "motor", "motorShaft", "coupling", "screw", "nut"].concat(driveBolts),
+      [{direction: [0.0, 0.0, 1.0], distance: withdrawal}],
+      ["floatingBearing", "floatingRing"].concat(lowerBolts), [{joint: "z", value: 0.0}]));
   }
 
   public static function isTranslating(id:String):Bool return id == "carriage"

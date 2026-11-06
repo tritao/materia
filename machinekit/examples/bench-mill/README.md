@@ -153,19 +153,25 @@ screws, so they are listed): in `MillXYStage`, `yMotorWithdrawal` (rear hatch an
 the back), `xMotorWithdrawal` (hood, belt and the nuts behind the flange off; the motor with its mounting plate out of the saddle along
 -X), `xScrewWithdrawal` (hood, belt and both bearings off; screw, nut, pulley and retainer out along -X) and `yScrewWithdrawal` (motor with
 its mount, coupling, front bearing and the nut's bracket off; screw and nut out of the front along -Y); in `MillZAxis`, `zMotorWithdrawal`
-(four screws off, straight up); in `MillFramePreview.attachSpindle`, spindle `motorWithdrawal` (belt, pulley, guard, screws and nuts off,
+(four screws off, straight up) and `zDriveWithdrawal` (support the head at its upper stop, disconnect the nut flange and
+adapter-to-column fastening, remove the lower bearing, ring and two bolts, then lift the complete upper drive **784.5 mm**);
+in `MillFramePreview.attachSpindle`, spindle `motorWithdrawal` (belt, pulley, guard, screws and nuts off,
 motor up) and `cartridgeWithdrawal` (tool, belt, motor and carrier, draw-bar cylinder off; the cartridge with its rotor, draw-bar and pulley
-down out of the head, 210 mm, 56 mm short of the table at the upper Z stop). `MillServiceChecks` (`haxeon.service.json`, about 13 min: 158 s for the declared removals) sweeps
-all of them clear and keeps the findings of the procedures that do not work:
+down out of the head, 210 mm, 56 mm short of the table at the upper Z stop). `MillServiceChecks` (`haxeon.service.json`) sweeps all **eight** declared routes clear and retains **five** findings on the
+three rejected procedures. A measured run takes 726 seconds for the declared routes and 823 seconds for the rejected routes,
+plus compilation/queue time:
 
 - Two earlier findings were small reliefs, now cut. The old y-servo finding (the Y motor's round body met the base's rear apron, 82.8 mm3
   after 24 mm) is gone: the base's `rear-y-drive-seat` recess, 118 mm wide, now runs out to the rear edge. The X motor's connector envelope
   was 2 mm outside the plate pocket and met the saddle's end wall after 18 mm (53.8 mm3): the connector pocket now runs through the wall.
 - The Y screw cannot leave by the rear with its nut: the 48 mm nut flange meets the Z axis' lower plate (24 mm crossing bore for the Y shaft)
   after 240 mm (326.7 mm3), then the Z floating bearing and the Z screw. The front is open once the nut's bracket is off.
-- The Z screw cannot leave upwards with its nut: the nut's grease fitting meets the rear face of the Z adapter plate across the front of the
-  channel after 72 mm (5.05 mm3, over the 100 mm of the plate). The fitting comes out first, or the plate takes a 6 x 1.5 mm relief that
-  competes with the M80E seat on the same face: not cut. Down is closed by the channel floor; the nut is not a screw to thread out.
+- The Z screw/nut alone cannot leave upwards: the modeled nut flange meets the rear face of the adapter after 72 mm
+  (5.051 mm³). The modeled SFU2005 nut has no separate grease fitting; the earlier description misidentified this witness.
+  The decided procedure lifts the adapter, housing, motor, shaft, coupling, screw and nut together. Seventeen installed members
+  move after the four lower-support parts come off. Support the head at the upper stop and disconnect its nut flange first.
+  The shaft tip ends **3 mm above the physical column**. Allow **784.5 mm additional lift above the installed assembly**;
+  the M80E seat and lower crossing bore are unchanged.
 - The spindle cartridge cannot leave upwards: the head is over it (10,574 mm3 after 2 mm). Down it clears the table by 56 mm; with the
   tool in it would meet the table after 266 mm.
 
@@ -584,7 +590,7 @@ brake, fastener and load qualifications.
 
 One commit per step, with the bench-mill and library checks after each change.
 
-Status: **1–3 complete; 4 pending.**
+Status: **1–4 complete, with framed coverage limits recorded in 3.1–3.4.**
 
 Item 1 removes both the assembly switch and the casting's optional cover input. The single design always has its six
 covers, casting seats, gutters and rear-bearing bay, the 12.5 mm Y screw extension and the 180 mm Z screw shortening.
@@ -719,5 +725,30 @@ existing environment failures; no collision baseline was accepted by inventing c
    The Y cover, its seats and all candidate casting changes are omitted. Redesign the drainage/tooling architecture
    before installing front Y protection; geometric clearance alone is not a manufacturing qualification.
 
-4. **Blocked service paths.** Pending. Reassess the kept Y rearward, Z upward and cartridge upward findings. Make small,
-   clean fixes where possible; otherwise state the decided removal route in the procedures.
+4. **Blocked service paths — complete.** The rejected trials remain negative fixtures; the machine declares the decided routes.
+
+   **Y screw:** remove it through the front with the motor/mount, coupling, front bearing and nut bracket off. The rear trial
+   still meets the lower Z plate, floating bearing and Z screw; enlarging the crossing bore is not the chosen design.
+
+   **Z screw/nut:** lift the complete upper drive using `zAxis/zDriveWithdrawal`. Support the head at its upper Z stop,
+   disconnect the nut flange and adapter-to-column fastening, and remove the lower bearing, ring and two bolts. The **17-member**
+   drive lifts **784.5 mm**, leaving its shaft tip **3 mm above the actual column**. Keeping the adapter with the nut avoids a relief
+   in the M80E seat. This needs the stated additional overhead lift; the shaft-only upward trial remains blocked by the nut flange.
+
+   **Spindle cartridge:** use the existing downward **210 mm** withdrawal after the prescribed tool, belt, motor/carrier and
+   draw-bar-cylinder preparation. At the upper Z stop it retains **56 mm** clearance above the table. The upward trial still
+   meets the head after 2 mm; no head relief is introduced.
+
+   `MillServiceChecks` verifies all eight declared routes with **zero findings**, the complete-drive end position, **17 movers /
+   four lower prerequisites**, and exactly **five findings** on the three rejected routes. The measured full audit takes
+   **726 / 823 seconds**. The final Y-servo check also repeats every declared removal after the persistence changes.
+   The additive `serviceProcedures` audit option lets negative fixtures select their three trials against the complete
+   assembly. Default audits still check every removal, guarded channels are always checked, and unknown names are errors;
+   five regressions cover these selection rules. No overlap threshold, sampling step or obstacle was relaxed.
+
+   The final item-4 inputs pass all **11 required core projects plus the framed-cover project**: frame **917**, Z **423**,
+   capacity **335 / 24,669 pairs**, exact integrity **117 / 28 states / zero on covers**, the three library checks, BOM examples,
+   screw placement, Y-servo and both cover audits. The two known core failures remain unchanged. These inputs were validated
+   in isolated configurations and checked byte-for-byte when applied; temporary package/fixture path errors were corrected
+   without editing the test assertions or the fixture. The final consumer round in item 3 remains **13 / 23 passing** with
+   the ten recorded pre-existing failures or unavailable inputs; item 4 changes procedure declarations and audit selection.

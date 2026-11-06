@@ -22,6 +22,9 @@ typedef SweepSample = {moved:Map<String, AssemblyFrame>, sample:Map<String, Floa
 typedef LeaderMove = {id:String, from:Float, step:Float};
 
 typedef IntegrityOptions = {
+  /** Optional named removal audit. Absent checks every removal; guarded channels are always checked.
+   * Unknown names are errors. An empty list checks the guarded channels only. */
+  @:optional var serviceProcedures:Array<String>;
   /** Two members closer than this (mm) touch. */
   @:optional var contactTolerance:Float;
   /** Shared volume (mm³) above which two members interfere. */
@@ -211,6 +214,7 @@ class AssemblyIntegrity {
   final meshOverlapLimit:Float;
   final floorZ:Null<Float>;
   final requestedStates:Null<Array<Map<String, Float>>>;
+  final serviceProcedures:Null<Array<String>>;
   final runningGap:Null<Float>;
   final minContactArea:Null<Float>;
   final flangeCutouts:Bool;
@@ -237,6 +241,8 @@ class AssemblyIntegrity {
     meshOverlapLimit = options.meshOverlapLimit == null ? MESH_OVERLAP_LIMIT : options.meshOverlapLimit;
     floorZ = options.floorZ;
     requestedStates = options.sweepStates;
+    var procedures = options.serviceProcedures;
+    serviceProcedures = procedures == null ? null : procedures.copy();
     var strict = options.strict == true;
     runningGap = options.runningGap ?? (strict ? RUNNING_GAP : null);
     minContactArea = options.minContactArea ?? (strict ? MIN_CONTACT_AREA : null);
@@ -341,7 +347,7 @@ class AssemblyIntegrity {
     }
     for (id => value in rest) state.setJoint(id, value);
     state.forwardKinematics();
-    ServiceChecks.run(assembly, flat, state, posed, diagnostics, overlapLimit, runningGap, rest, allowed);
+    ServiceChecks.run(assembly, flat, state, posed, diagnostics, overlapLimit, runningGap, rest, allowed, serviceProcedures);
     checkDrives(state, rest);
     return states.length + 1;
   }
@@ -351,7 +357,7 @@ class AssemblyIntegrity {
     assembly.addTo(model, "");
     var state = new AssemblyState(model.definition("integrity"));
     state.forwardKinematics();
-    ServiceChecks.run(assembly, flat, state, posed, diagnostics, overlapLimit, runningGap, new Map<String, Float>(), allowed);
+    ServiceChecks.run(assembly, flat, state, posed, diagnostics, overlapLimit, runningGap, new Map<String, Float>(), allowed, serviceProcedures);
   }
 
   function runFasteners(posed:PosedParts):Void {

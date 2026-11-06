@@ -32,9 +32,19 @@ class ServiceChecks {
   public static inline var MIN_FALL:Float = 0.01;
 
   public static function run(assembly:MachineAssembly, flat:FlatAssembly, state:AssemblyState, posed:PosedParts,
-      diagnostics:Diagnostics, overlapLimit:Float, runningGap:Null<Float>, rest:Map<String, Float>, ?allowed:String -> String -> Float):Void {
+      diagnostics:Diagnostics, overlapLimit:Float, runningGap:Null<Float>, rest:Map<String, Float>, ?allowed:String -> String -> Float,
+      ?procedures:Array<String>):Void {
+    if (procedures != null) {
+      var known = new Map<String, Bool>();
+      for (requirement in flat.designRequirements) switch requirement {
+        case ServiceRemoval(id, _, _, _, _): known.set(id, true);
+        case _:
+      }
+      for (id in procedures) if (!known.exists(id)) diagnostics.error("integrity.service.selection", id,
+        'Unknown service removal "$id"');
+    }
     for (requirement in flat.designRequirements) switch requirement {
-      case ServiceRemoval(id, members, steps, prerequisites, pose):
+      case ServiceRemoval(id, members, steps, prerequisites, pose) if (procedures == null || procedures.indexOf(id) >= 0):
         try removal(flat, state, posed, diagnostics, overlapLimit, runningGap, rest, id, members, steps, prerequisites, pose, allowed) catch (error:Dynamic)
           diagnostics.error("integrity.service." + id, id, 'Service removal "$id" could not be checked: ' + Std.string(error));
       case GuardedChannel(id, channel, covers, drain):

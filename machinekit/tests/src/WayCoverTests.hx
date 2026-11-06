@@ -244,5 +244,18 @@ class WayCoverTests {
     check(codes(found).indexOf("integrity.service.unit") >= 0 && messages(found).indexOf("blocked by lid") >= 0, "the lid blocks the unit: " + messages(found));
     found = AssemblyIntegrity.check(build(true));
     check(found.errors().length == 0, "with the lid off the unit comes out: " + messages(found));
+    var scoped = build(false);
+    scoped.addDesignRequirement(ServiceRemoval("free", ["unit"], [{direction: [0.0, 0, 1], distance: 100.0}], ["lid"], []));
+    check(codes(AssemblyIntegrity.service(scoped)).indexOf("integrity.service.unit") >= 0,
+      "the default service audit still checks every removal");
+    check(AssemblyIntegrity.service(scoped, {serviceProcedures: ["free"]}).errors().length == 0,
+      "a named removal audit keeps the complete obstacle context");
+    check(codes(AssemblyIntegrity.service(scoped, {serviceProcedures: ["unit"]})).indexOf("integrity.service.unit") >= 0,
+      "a selected blocked removal remains blocked");
+    check(codes(AssemblyIntegrity.service(scoped, {serviceProcedures: ["missing"]})).indexOf("integrity.service.selection") >= 0,
+      "unknown procedure names cannot silently pass");
+    scoped.addDesignRequirement(GuardedChannel("flow", "base", ["lid"], []));
+    check(codes(AssemblyIntegrity.service(scoped, {serviceProcedures: ["free"]})).indexOf("integrity.drain.flow") >= 0,
+      "a named removal audit still checks every guarded channel");
   }
 }
