@@ -76,6 +76,10 @@ class MillCrossTable extends MachineComponent {
 
   override public function componentType():Null<ComponentType> return recipeType();
 
+  override public function fasteningFaces():Array<BoltedFace> return [for (side in [-1, 1]) BoltedFace.drilledToSuit(
+    'coverEnd$side', BoltedFace.frameOf({x: side * parameterNumber("width") / 2, y: 0, z: 18},
+      {x: -side, y: 0, z: 0}, {x: 0, y: 1, z: 0}), parameterNumber("depth"), 16, 12, 30, CastIron)];
+  override public function machinable():Bool return true;
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -99,6 +103,6 @@ class MillCrossTable extends MachineComponent {
       side * parameterNumber("ribSpacing") / 2,
       -ribHeight
     )));
-    return Solids.cut(Solids.union(pieces), tools);
+    return machined(Solids.cut(Solids.union(pieces), tools));
   }
 }

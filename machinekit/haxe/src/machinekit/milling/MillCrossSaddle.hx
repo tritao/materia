@@ -109,6 +109,15 @@ class MillCrossSaddle extends MachineComponent {
   }
   override public function componentType():Null<ComponentType> return recipeType();
 
+  /** Independent cover datums on the retained end webs and the front sole/deck. */
+  override public function fasteningFaces():Array<BoltedFace> {
+    var faces:Array<BoltedFace> = [], w = parameterNumber("width"), d = parameterNumber("depth"), h = parameterNumber("height");
+    for (side in [-1, 1]) for (y in [-62.0, 62.0]) faces.push(BoltedFace.drilledToSuit(
+      'coverEnd$side-$y', BoltedFace.frameOf({x: side * w / 2, y: y, z: h - 29},
+        {x: -side, y: 0, z: 0}, {x: 0, y: 1, z: 0}), 24, 40, 13, 20, CastIron));
+    return faces;
+  }
+  override public function machinable():Bool return true;
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -282,6 +291,7 @@ class MillCrossSaddle extends MachineComponent {
       } else tools.push(Part.cylinderSpan(5, 24, h + 1, 0, -d / 2 + 5));
     }
     var raw = Solids.cut(body, tools);
+    raw = machined(raw);
     if (!values().boolean("blockAccess") && !values().boolean("nutBoss")) return raw;
     try {
       var result = raw.refined();

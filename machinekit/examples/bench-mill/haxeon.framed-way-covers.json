@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-bench-mill-framed-way-covers"
+  },
+  "entry": "MillFramedCoverChecks",
+  "sources": [
+    "BenchMill.hx",
+    "BenchMillPreview.hx",
+    "BearingBlock.hx",
+    "BearingBlockJob.hx",
+    "../cnc-router/CncRouter.hx",
+    "EnclosedBenchMill.hx",
+    "MillBasePreview.hx",
+    "MillFramePreview.hx",
+    "MillFrameChecks.hx",
+    "MillZAxisChecks.hx",
+    "../../tests/src/AxisBuilderChecks.hx",
+    "MillXYStageChecks.hx",
+    "BenchMillFrame.hx",
+    "MillCastingDetails.hx",
+    "MillLiftingPattern.hx",
+    "MillWayCoverChecks.hx",
+    "MillFrameCovers.hx",
+    "MillFramedCoverChecks.hx"
+  ],
+  "sourceRoots": [
+    "../casting-shop",
+    ".",
+    "../cnc-router",
+    "../../tests/src"
+  ],
+  "dependencies": {
+    "robotkit-autonomy": {
+      "path": "../../../robotkit/autonomy"
+    },
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    },
+    "machinekit": {
+      "path": "../../"
+    },
+    "manufacturingkit": {
+      "path": "../../../manufacturingkit"
+    },
+    "toolpathkit": {
+      "path": "../../../toolpathkit"
+    },
+    "camkit": {
+      "path": "../../../camkit"
+    },
+    "cnckit": {
+      "path": "../../../cnckit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/framed-way-covers"
+}

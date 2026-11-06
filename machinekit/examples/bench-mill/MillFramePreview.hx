@@ -124,7 +124,8 @@ class MillFramePreview {
   ):MachineAssembly {
     var result = structure(frame);
     attachSpindle(reference, result, frame.zAxis, spindle);
-    result.include("xyStage", xy);
+    var driven = Std.downcast(xy, machinekit.milling.MillXYStage);
+    result.include("xyStage", driven == null ? xy : MillFrameCovers.stage(driven));
     var poses:Map<String, AssemblyFrame> = frame.solvedPoses();
     result.addMemberConnector(
       "frame/base/casting",
@@ -139,6 +140,7 @@ class MillFramePreview {
       "frame/base",
       frame.casting.anchorRule.screwLengthsMm
     );
+    if (driven != null) MillFrameCovers.finish(result);
     return result;
   }
 

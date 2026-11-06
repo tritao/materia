@@ -14,6 +14,7 @@ class MachineKitComponents {
     machinekit.pneumatic.PneumaticComponents.register(registry);
     machinekit.milling.MillingComponents.register(registry);
     registry.register(machinekit.cover.WayCoverSection.recipeType());
+    registry.register(machinekit.cover.WayCoverMount.recipeType());
     registry.register(machinekit.enclosure.EnclosurePanel.recipeType());
     registry.register(machinekit.enclosure.EnclosureCutPanel.cutRecipeType());
     registry.register(machinekit.enclosure.TrayClamp.recipeType());

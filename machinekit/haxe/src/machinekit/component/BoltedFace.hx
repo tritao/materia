@@ -21,20 +21,19 @@ typedef BoltRecess = {diameter:Float, depth:Float}
  * `frame` (a frame in the part's own frame), spanning `from` to `to` along that frame's +Z, mm. A part that `machinable()`
  * cuts these into its geometry (`MachineComponent.machined`), so the solid, the exports and the checks see the same holes.
  */
-typedef MachinedCut = {
-  frame:AssemblyFrame,
-  x:Float,
-  y:Float,
-  diameter:Float,
-  from:Float,
-  to:Float,
-  /** What the hole is, for a drawing's hole table: "tapped" (a tap drill), "clearance" or "counterbore"; the thread names the screw. */
-  ?kind:String,
-  ?thread:String,
-  /** The fit a reamed hole is finished to ("H7" for a dowel's), for the hole table. */
-  ?fit:String,
-  /** A hole that leaves the far face: its depth is the material and not the cut. */
-  ?through:Bool
+@:wire typedef MachinedCut = {
+  @:id(1) var frame:AssemblyFrame;
+  @:id(2) var x:Float;
+  @:id(3) var y:Float;
+  @:id(4) var diameter:Float;
+  @:id(5) var from:Float;
+  @:id(6) var to:Float;
+  /** Tapped, clearance or counterbore; the thread names the screw. */
+  @:id(7) @:optional var kind:String;
+  @:id(8) @:optional var thread:String;
+  /** Reamed fit (H7 for a dowel) and whether the hole exits the stock. */
+  @:id(9) @:optional var fit:String;
+  @:id(10) @:optional var through:Bool;
 };
 
 enum BoltedRole {

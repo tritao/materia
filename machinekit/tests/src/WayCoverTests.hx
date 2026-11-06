@@ -72,11 +72,41 @@ class WayCoverTests {
     check(tele.cover.plan.sections >= 3, "a telescopic cover of 600 mm stroke has several sections");
     report = AssemblyIntegrity.check(tele.builder, {runningGap: 1.0});
     check(report.errors().length == 0, "a telescopic cover should be sound, found: " + messages(report));
+    mountRecipes();
     fasteners();
     drain();
     service();
     boxes();
     Sys.println("way cover: plans, sweep, flange bolts, BOM, drain rule, service removal and box covers pass");
+  }
+
+  /** Save full mount stock/interfaces and derived holes, including a locating dowel. */
+  static function mountRecipes():Void {
+    for (foot in [false, true]) {
+      var frame = materia.assembly.AssemblyFrames.identity();
+      var attachment:Null<machinekit.cover.WayCoverMount.MountAttachment> = foot ? {
+        stock:[{x0:30.0, x1:50.0, y0:-10.0, y1:0.0, z0:-14.0, z1:0.0}],
+        bolted:[BoltedFace.clamped("foot", frame, [{x:40.0, y:-5.0}], 5.5, 14, "M5", null, false)],
+        pinned:[new machinekit.component.BoltedFace.PinnedFace("locate", frame,
+          [{x:35.0, y:-5.0}], 4, 7, false, false, "H7")]
+      } : null;
+      var mount = new machinekit.cover.WayCoverMount("TEST-COVER-MOUNT" + (foot ? "-FOOT" : ""), 50, 50, 14,
+        [{x:-20.0, y:25.0, d:8.0}], [{x0:10.0, x1:25.0, y0:0.0, y1:18.0}], 5, attachment);
+      mount.machine([{frame:frame, x:0.0, y:30.0, diameter:5.0, from:-14.0, to:0.0, kind:"clearance"}]);
+      var assembly = new machinekit.assembly.MachineAssembly();
+      assembly.addComponent("mount", mount);
+      var restored = machinekit.assembly.MachineAssembly.decode(assembly.encode()).components()[0].component;
+      check(mount.bom.partNumber == restored.bom.partNumber && mount.bom.fingerprint == restored.bom.fingerprint,
+        "a mount retains its drawing identity and drilled revision");
+      check(mount.values().token("attachment") == restored.values().token("attachment"),
+        "saved feet retain stock, bolt faces and dowel patterns");
+      check(haxe.Json.stringify(mount.machinedCuts()) == haxe.Json.stringify(restored.machinedCuts()),
+        "saved mounts retain derived drilling");
+      var a = mount.geometry(), b = restored.geometry(), added = a.subtract(b), removed = b.subtract(a);
+      var difference = added.volume() + removed.volume();
+      a.close(); b.close(); added.close(); removed.close();
+      check(difference < 0.01, "saved mount stock is solid-equivalent within 0.01 mm3");
+    }
   }
 
   /**

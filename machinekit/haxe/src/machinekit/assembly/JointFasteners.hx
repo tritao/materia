@@ -26,6 +26,8 @@ import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 typedef FastenerOptions = {
+  /** Derive only these clamped members, with all assembly hosts visible. Absent means every joint. */
+  @:optional var clampedMembers:Array<String>;
   /** The fastener class; 12.9, as the catalogue screws are drawn, when absent. */
   @:optional var propertyClass:PropertyClass;
   /** How far (mm) a hole may stand from its partner, and a face from the other's plane. */
@@ -201,6 +203,12 @@ class JointFasteners {
     var tolerance = options == null || options.tolerance == null ? TOLERANCE : options.tolerance;
     var propertyClass = options == null || options.propertyClass == null ? PropertyClass.Steel129 : options.propertyClass;
     var access = options == null || options.accessLength == null ? ACCESS_LENGTH : options.accessLength;
+    var selection = options == null ? null : options.clampedMembers;
+    if (selection != null) {
+      var names = [for (entry in assembly.components()) entry.id];
+      for (id in selection) if (names.indexOf(id) < 0)
+        result.diagnostics.error("fasteners.selection", id, 'Unknown clamped member "$id"');
+    }
     var poses = assembly.solvedPoses();
     var group = rigidGroups(assembly);
     var clamped:Array<Placed> = [], receiving:Array<Placed> = [];
@@ -215,7 +223,8 @@ class JointFasteners {
         }
         seen.set(face.id, true);
         var placed = {member: entry.id, face: face, world: AssemblyFrames.compose(pose, face.frame)};
-        (face.isClamped() ? clamped : receiving).push(placed);
+        if (!face.isClamped() || selection == null || selection.indexOf(entry.id) >= 0)
+          (face.isClamped() ? clamped : receiving).push(placed);
       }
     }
     var members = new Map<String, MachineComponent>();
@@ -282,7 +291,7 @@ class JointFasteners {
       );
     }
     for (key in derived.keys()) spacing(result, key, derived.get(key), result.joints);
-    derivePins(result, assembly, poses, group, members, tolerance);
+    derivePins(result, assembly, poses, group, members, tolerance, selection);
     if (options != null && options.loads != null) slip(result, options.loads, members);
     return result;
   }
@@ -330,7 +339,7 @@ class JointFasteners {
 	 * holes in common with another but not all, or of another diameter, is an error; a face with no partner is one too.
 	 */
   static function derivePins(result:FastenerDerivation, assembly:MachineAssembly, poses:Map<String, AssemblyFrame>, group:Map<String, Int>,
-      members:Map<String, MachineComponent>, tolerance:Float):Void {
+      members:Map<String, MachineComponent>, tolerance:Float, selection:Null<Array<String>>):Void {
     var diagnostics = result.diagnostics;
     var pins:Array<{member:String, face:PinnedFace, world:AssemblyFrame}> = [];
     for (entry in assembly.components()) {
@@ -350,6 +359,7 @@ class JointFasteners {
     for (i in 0...pins.length) for (j in i + 1...pins.length) {
       var a = pins[i], b = pins[j];
       if (a.member == b.member) continue;
+      if (selection != null && selection.indexOf(a.member) < 0 && selection.indexOf(b.member) < 0) continue;
       var local = AssemblyFrames.compose(AssemblyFrames.inverse(b.world), a.world);
       var normal = AssemblyFrames.transformVector(local, 0, 0, 1);
       if (normal.z > -0.9999 || Math.abs(local.z) > tolerance) continue;
@@ -461,7 +471,7 @@ class JointFasteners {
         }]
       });
     }
-    for (i in 0...pins.length) if (!paired[i]) diagnostics.error(
+    for (i in 0...pins.length) if (!paired[i] && (selection == null || selection.indexOf(pins[i].member) >= 0)) diagnostics.error(
       "fasteners.pin-unmatched",
       pins[i].member + "#" + pins[i].face.id,
       '${pins[i].member}#${pins[i].face.id} has dowel holes but no pinned face meets it with the same holes'

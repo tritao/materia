@@ -125,6 +125,7 @@ class JointFastenerTests {
 
   public static function run():Void {
     sound();
+    selection();
     machining();
     washersAndNuts();
     suitSeats();
@@ -146,6 +147,31 @@ class JointFastenerTests {
     if (fixed) builder.attach("cover", cover, AssemblyFrames.translation(0, 0, 10), "host");
     else builder.place("cover", cover, AssemblyFrames.translation(0, 0, 10));
     return builder;
+  }
+
+  static function selection():Void {
+    var builder = stack(tappedHost(square(50)), cover(square(50), "M5"));
+    builder.place("uninstalled", new FaceBlock("UNINSTALLED", [cover(square(50), "M5")]), AssemblyFrames.translation(300, 0, 0));
+    var all = JointFasteners.derive(builder);
+    check(all.codes().indexOf("fasteners.unmatched") >= 0, "default derivation still rejects an unmatched clamped member");
+    var selected = JointFasteners.derive(builder, {clampedMembers: ["cover"]});
+    selected.require();
+    check(selected.joints.length == 1 && selected.count() == 4, "selected clamped members still find unselected hosts");
+    check(JointFasteners.derive(builder, {clampedMembers: ["missing"]}).codes().indexOf("fasteners.selection") >= 0,
+      "unknown selected clamped members are errors");
+    check(JointFasteners.derive(builder, {clampedMembers: ["uninstalled"]}).codes().indexOf("fasteners.unmatched") >= 0,
+      "selected unmatched faces remain errors");
+    var holes:Array<BoltHole> = [{x: -20.0, y: 0.0}, {x: 20.0, y: 0.0}];
+    var pins = pinned(holes, holes);
+    pins.place("uninstalled", new PinBlock("UNINSTALLED", [new PinnedFace("pin", frameAtTop(10), holes, 5, 10)], 20, -10),
+      AssemblyFrames.translation(300, 0, 0));
+    var scopedPins = JointFasteners.derive(pins, {clampedMembers: ["cover"]});
+    scopedPins.require();
+    check(scopedPins.dowelCount() == 2, "scoped pins pair with unselected hosts");
+    check(JointFasteners.derive(pins).codes().indexOf("fasteners.pin-unmatched") >= 0,
+      "default derivation still checks every pin face");
+    check(JointFasteners.derive(pins, {clampedMembers: ["uninstalled"]}).codes().indexOf("fasteners.pin-unmatched") >= 0,
+      "selected unmatched pins remain errors");
   }
 
   static function dowels():Void {

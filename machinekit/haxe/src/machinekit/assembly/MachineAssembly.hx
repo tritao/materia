@@ -108,6 +108,19 @@ typedef MachineAssemblyMassProperties = {
     designRequirementList.push(machinekit.design.DesignRequirements.copy(requirement, same));
     changed();
   }
+  /** Add assembly-specific preparation to a local service procedure before including this assembly. */
+  public function addServicePrerequisites(id:String, off:Array<String>):Void {
+    for (i in 0...designRequirementList.length) switch designRequirementList[i] {
+      case ServiceRemoval(name, movers, legs, prerequisites, at) if (name == id):
+        var combined = prerequisites.copy();
+        for (member in off) if (combined.indexOf(member) < 0) combined.push(member);
+        designRequirementList[i] = machinekit.design.DesignRequirements.copy(ServiceRemoval(name, movers, legs, combined, at), same);
+        changed();
+        return;
+      case _:
+    }
+    throw 'No local service procedure "$id"';
+  }
   public function designRequirements():Array<machinekit.design.DesignRequirement
     > return [for (r in flat().designRequirements) machinekit.design.DesignRequirements.copy(
       r,

@@ -29,6 +29,8 @@ class ComponentClassification {
     file(registry, "machinekit.hmi.rotary-switch", "Operator controls", ComponentKind.Generic);
     file(registry, "machinekit.hmi.push-button", "Operator controls", ComponentKind.Generic);
     file(registry, "machinekit.hmi.oled-module", "Operator controls", ComponentKind.Generic);
+    // cover
+    file(registry, "machinekit.cover.way-cover-mount", "Cover mounts", ComponentKind.MachinePart);
     // enclosure
     file(registry, "machinekit.enclosure.panel", "Panels", ComponentKind.Generic);
     file(registry, "machinekit.enclosure.cut-panel", "Panels", ComponentKind.Generic);
@@ -85,6 +87,7 @@ class ComponentClassification {
     file(registry, "machinekit.milling.z-drive-adapter", "Drives and mounts", ComponentKind.MachinePart);
     file(registry, "machinekit.milling.z-motor-stand", "Drives and mounts", ComponentKind.MachinePart);
     file(registry, "machinekit.milling.drive-service-hatch", "Guards and covers", ComponentKind.MachinePart);
+    file(registry, "machinekit.milling.cover-outrigger", "Guards and covers", ComponentKind.MachinePart);
     file(registry, "machinekit.milling.motor-cover", "Guards and covers", ComponentKind.MachinePart);
     file(registry, "machinekit.milling.spindle-belt-guard", "Guards and covers", ComponentKind.MachinePart);
     file(registry, "machinekit.milling.z-coupling-guard", "Guards and covers", ComponentKind.MachinePart);

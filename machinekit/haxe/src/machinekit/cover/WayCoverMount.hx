@@ -26,6 +26,21 @@ typedef MountAttachment = {
   pinned:Array<PinnedFace>
 };
 
+private typedef MountClampRecipe = {
+  id:String, frame:materia.assembly.AssemblyRecord.AssemblyFrame,
+  holes:Null<Array<machinekit.component.BoltedFace.BoltHole>>, width:Float, height:Float,
+  size:Null<String>, clearance:Float, grip:Float, recess:Null<machinekit.component.BoltedFace.BoltRecess>,
+  drawn:Bool, washer:Bool, alternative:Null<String>, rated:Bool
+};
+private typedef MountPinRecipe = {
+  id:String, frame:materia.assembly.AssemblyRecord.AssemblyFrame,
+  holes:Array<machinekit.component.BoltedFace.PinHole>, diameter:Float, depth:Float,
+  through:Bool, drawn:Bool, fit:String
+};
+private typedef MountAttachmentRecipe = {
+  version:Int, stock:Array<MountStock>, bolted:Array<MountClampRecipe>, pinned:Array<MountPinRecipe>
+};
+
 /**
  * The plate a way cover's flange is bolted to where the machine has no face of its own: an end wall behind the folded cover or a carrier
  * on the moving member. Frame: the mounting face at z = 0 with the plate behind it (z from `-thickness` to 0), `x` across, `y` up from the
@@ -67,6 +82,84 @@ class WayCoverMount extends MachineComponent {
     this.attachment = attachment == null ? null : {
       stock: attachment.stock.copy(), bolted: attachment.bolted.copy(), pinned: attachment.pinned.copy()
     };
+  }
+
+  static var recipe:Null<machinekit.component.ComponentType>;
+  public static function recipeType():machinekit.component.ComponentType {
+    if (recipe == null) recipe = new machinekit.component.ComponentType("machinekit.cover.way-cover-mount", [
+      machinekit.component.ComponentRecipeSupport.text("drawing", "WAYCOVER-MOUNT"),
+      machinekit.component.ComponentRecipeSupport.length("halfWidth", 50),
+      machinekit.component.ComponentRecipeSupport.length("height", 50),
+      machinekit.component.ComponentRecipeSupport.length("thickness", 14),
+      machinekit.component.ComponentRecipeSupport.length("below", 0),
+      machinekit.component.ComponentRecipeSupport.text("bores", "[]"),
+      machinekit.component.ComponentRecipeSupport.text("cuts", "[]"),
+      machinekit.component.ComponentRecipeSupport.text("attachment", "null")
+    ], v -> new WayCoverMount(v.token("drawing"), v.number("halfWidth"), v.number("height"), v.number("thickness"),
+      readBores(v.token("bores")), readCuts(v.token("cuts")), v.number("below"),
+      readAttachment(v.token("attachment"))), true).numbered(v -> v.token("drawing"));
+    return recipe;
+  }
+  override public function componentType():Null<machinekit.component.ComponentType> return recipeType();
+  override public function values():ComponentValues return new ComponentValues()
+    .setToken("drawing", drawingNumber).setNumber("halfWidth", halfWidth).setNumber("height", height)
+    .setNumber("thickness", thickness).setNumber("below", below).setToken("bores", haxe.Json.stringify(bores))
+    .setToken("cuts", haxe.Json.stringify(cuts)).setToken("attachment", writeAttachment(attachment))
+    .setToken("material", materialSpec());
+
+  static function writeAttachment(a:Null<MountAttachment>):String {
+    if (a == null) return "null";
+    var bolts:Array<MountClampRecipe> = [for (f in a.bolted) {
+      if (f.thicknessAt != null) throw "A cover mount recipe cannot serialize a stock callback";
+      switch f.role {
+        case Clamped(size, clearance, grip, recess): {
+          id:f.id, frame:f.frame, holes:f.holes, width:f.width, height:f.height, size:size,
+          clearance:clearance, grip:grip, recess:recess, drawn:f.drawn, washer:f.washer,
+          alternative:f.alternative, rated:f.rated
+        };
+        case _: throw "A mounting foot declares its clamped faces";
+      }
+    }];
+    var pins:Array<MountPinRecipe> = [for (f in a.pinned) {
+      id:f.id, frame:f.frame, holes:f.holes, diameter:f.diameter, depth:f.depth,
+      through:f.through, drawn:f.drawn, fit:f.fit
+    }];
+    var data:MountAttachmentRecipe = {version:1, stock:a.stock, bolted:bolts, pinned:pins};
+    return haxe.Json.stringify(data);
+  }
+  static function readBores(text:String):Array<MountBore> {
+    var rows:Array<Dynamic> = cast haxe.Json.parse(text);
+    return [for (r in rows) {x:r.x, y:r.y, d:r.d}];
+  }
+  static function readCuts(text:String):Array<MountCut> {
+    var rows:Array<Dynamic> = cast haxe.Json.parse(text);
+    return [for (r in rows) {x0:r.x0, x1:r.x1, y0:r.y0, y1:r.y1}];
+  }
+  static function readFrame(r:Dynamic):materia.assembly.AssemblyRecord.AssemblyFrame {
+    var frame:materia.assembly.AssemblyRecord.AssemblyFrame = {x:r.x, y:r.y, z:r.z, qx:r.qx, qy:r.qy, qz:r.qz, qw:r.qw};
+    materia.assembly.AssemblyCodec.validateFrame(frame);
+    return frame;
+  }
+  static function readHoles(rows:Null<Array<Dynamic>>):Null<Array<machinekit.component.BoltedFace.BoltHole>>
+    return rows == null ? null : [for (r in rows) {x:r.x, y:r.y}];
+  static function readAttachment(text:String):Null<MountAttachment> {
+    var data:Dynamic = haxe.Json.parse(text);
+    if (data == null) return null;
+    if (data.version != 1) throw "Unsupported cover mount attachment recipe";
+    var stock:Array<MountStock> = [for (b in (cast data.stock:Array<Dynamic>))
+      {x0:b.x0, x1:b.x1, y0:b.y0, y1:b.y1, z0:b.z0, z1:b.z1}];
+    var bolts:Array<BoltedFace> = [for (f in (cast data.bolted:Array<Dynamic>)) {
+      var recess:Null<machinekit.component.BoltedFace.BoltRecess> = f.recess == null ? null
+        : {diameter:f.recess.diameter, depth:f.recess.depth};
+      new BoltedFace(f.id, readFrame(f.frame), Clamped(f.size, f.clearance, f.grip, recess), readHoles(f.holes),
+        f.width, f.height, null, f.drawn, f.washer, f.alternative, f.rated);
+    }];
+    var pins:Array<PinnedFace> = [for (f in (cast data.pinned:Array<Dynamic>)) {
+      var holes = readHoles(f.holes);
+      if (holes == null) throw "A locating face needs its hole pattern";
+      new PinnedFace(f.id, readFrame(f.frame), holes, f.diameter, f.depth, f.through, f.drawn, f.fit);
+    }];
+    return {stock:stock, bolted:bolts, pinned:pins};
   }
 
   static function dimensionsKey(values:Array<Float>):String

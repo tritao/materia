@@ -16,6 +16,7 @@ class MillingComponents {
     registry.register(MillBeltMotorPlate.recipeType());
     registry.register(MillSupportTray.recipeType());
     registry.register(MillCasting.recipeType());
+    registry.register(MillCoverOutrigger.recipeType());
     registry.register(MillCrossSaddle.recipeType());
     registry.register(MillCrossTable.recipeType());
     registry.register(MillBallNutBracket.recipeType());

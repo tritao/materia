@@ -270,7 +270,10 @@ class MachineAssemblyCodec {
 
   static function levelRecord(assembly:MachineAssembly):MachineLevelRecord {
     var members:Array<MemberRecord> = [for (member in assembly.mechanical.members) {
-      occurrence:member.id, source:memberSource(member.component)
+      var record:MemberRecord = {occurrence:member.id, source:memberSource(member.component)};
+      var machining = member.component.machinedCuts();
+      if (machining.length > 0) record.machining = machining;
+      record;
     }
     ];
     members.sort((a, b) -> Reflect.compare(a.occurrence, b.occurrence));
@@ -392,6 +395,8 @@ class MachineAssemblyCodec {
         for (entry in saved) values.set(entry.name, componentValue(entry.value));
         registry.byId(typeId).create(values);
     };
+    var machining = member.machining;
+    if (machining != null && machining.length > 0) component.machine(machining);
     return component;
   }
 

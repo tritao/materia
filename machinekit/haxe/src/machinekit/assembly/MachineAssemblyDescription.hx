@@ -26,6 +26,8 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 @:wire typedef MemberRecord = {
   @:id(1) var occurrence:String;
   @:id(2) var source:MemberSource;
+  /** Physical holes derived from the installed joints. */
+  @:id(3) @:optional var machining:Array<machinekit.component.BoltedFace.MachinedCut>;
 }
 
 @:wire typedef PortConnectionRecord = {

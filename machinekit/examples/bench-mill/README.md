@@ -584,7 +584,7 @@ brake, fastener and load qualifications.
 
 One commit per step, with the bench-mill and library checks after each change.
 
-Status: **1–2 complete; 3–4 pending.**
+Status: **1–3 complete; 4 pending.**
 
 Item 1 removes both the assembly switch and the casting's optional cover input. The single design always has its six
 covers, casting seats, gutters and rear-bearing bay, the 12.5 mm Y screw extension and the 180 mm Z screw shortening.
@@ -665,8 +665,59 @@ existing environment failures; no collision baseline was accepted by inventing c
    Tending revalidated all **96 saved poses and every production path in 135 seconds** before storing fingerprint
    `58c7ffe2139b…`. Only that fingerprint changed in the certificate; poses, routes and the 551 mm stand-off did not.
    This acceptance records the new mounting cuts and preserved snapshot machining, rather than editing a hash alone.
-3. **Covers on the framed concept** (`MillXYStage`/`MillZAxis`/`BenchMillFrame` via `MillFramePreview`). Pending. Apply box
-   covers where they fit: the X gap is 76 mm with the screw 40 mm above the saddle top. Use the same library, flange bolting
-   and drains, and keep the service removals clear. Record numbered reasons for any position that cannot accept a cover.
+3. **Covers on the framed concept — complete, with the four no-fit cases below.** The Small concept carries the X pair
+   through `MillFramePreview`, using the assumed lamella family. Each folds to **46 mm in 75 mm**, reaching **325 mm**.
+   Reversed nesting keeps the small moving skin below the **76 mm** table gap, around the screw **40 mm** above the saddle.
+   Independent walls and four outriggers derive **12 joints, 24 screws, 48 cuts and no dowels**: 16 flange screws and eight
+   mounting screws. Four M6×25 screws engage cast iron by 11 mm through 14 mm feet; four M5×20 screws engage steel by 6 mm.
+   The outriggers leave the motor/connector withdrawal corridor open. Cover parts are local prerequisites for X screw and
+   motor removal. Actual-solid checks retain 3 mm around threads and verify grip and head bearing material. Both covers
+   meet their end stops, with **zero fit findings and zero overlaps in 330,993 pairs at 27 XYZ poses**.
+
+   Caller-owned stages remain undrilled when reused; scoped derivation sees every receiving host and derives only the new
+   cover joints. Default derivation remains strict. The root inventory includes **24 block-end wipers**. The separate Compact
+   capacity model still has unfitted XY drives and claims no installed drive-cover design.
+
+   Export exposed two persistence gaps. Cover mounts and outriggers now have registered rebuild recipes, preserving authored
+   drawing numbers as their BOM identities. Mount inputs include bores, cut-outs, stock, clamped faces and locating pins.
+   Assembly member records now save and restore their joint-derived machining, which previously disappeared on load.
+   Plain/footed mount regressions retain their drilling and dowel data; both installed walls and all four outriggers retain
+   their BOM revisions, drilling tables and solids within **0.01 mm³** symmetric difference after a complete assembly round trip.
+
+   All **11 required core projects plus the new framed-cover check pass**: frame **917**, Z **423**, capacity **335 / 24,669
+   continuous pairs**, exact **117 findings / 28 states / zero on covers**, library checks and BOM examples. Service retains
+   **zero declared-route findings and five rejected-route findings**. The final geometry was swept before recipe enrichment;
+   the final Y-servo run repeats every declared route, and the round-trip checks verify the drilled mount solids.
+   Both known core failures are unchanged. The **23 consumer outcomes** remain **13 passes and ten existing failures or
+   unavailable inputs**, with their assertion counts and reference-arm scene bytes unchanged. The hybrid audit increases
+   from **60,345 to 63,855 clear pairs at 27 poses** because it now includes the installed framed X covers and their hardware;
+   all **12** supplier carriages still export. This is the only accepted changed physical audit count. Full tending
+   revalidation certifies **96 poses and every production path in 122 seconds**; the certificate and fingerprint
+   `58c7ffe2139b…` remain unchanged.
+
+   The full framed BOM already fails on `CAST-INSERT-Y-GUIDE-SEAT` metadata: an isolated run of item 2's sources reproduces
+   the same conflict. New cover procurement is checked independently; the global conflict remains open.
+
+   **No-fit reason 3.1 — rear Y:** at the rear stop the saddle leaves at most **23 mm** before the column, even before
+   mounting plates. A 160 mm stroke needs at least **30 mm** folded length in the selected family. A shorter cover cannot
+   be accepted by changing its declared stroke.
+
+   **No-fit reason 3.2 — upper Z:** after the two 14 mm end mounts, the upper nut/adapter gap leaves **33.5 mm**. The
+   250 mm stroke needs **46 mm** with lamellas; even the best plain-PU catalog alternative needs **38 mm**. A full-width
+   front alternative also intersects the adapter and motor; it is not an accepted fit.
+
+   **No-fit reason 3.3 — lower Z:** a narrow central screw cover clears geometrically, but has no protected 14 mm gravity
+   return around the 60 mm lower bearing in the 94 mm channel: only **17 mm per side** remains before clearance and wall
+   allowances. Discharging through the shaft opening would wet the bearing and Y-drive bay. Leave this position unresolved
+   until the channel and drain architecture are redesigned; a screw-only envelope also leaves the Z guides unprotected.
+   The separate Compact capacity model still has unfitted XY drives and claims no installed drive-cover design.
+   **No-fit reason 3.4 — front Y drain:** the cover itself folds to **38 mm in 58 mm**, reaching **218 mm**, but
+   needs protected gravity drainage across the lowered base field. The candidate used two 14 mm gutters at 1.5%
+   fall and square outlets into the underside pocket. It passed 24 floor probes and the three-cover clearance audit
+   (**482,517 pairs, 27 poses, zero overlaps**), but its source cuts overlapped existing pockets. A disjoint revision
+   failed exact mold reconstruction by **65,961.49 mm³** and lost analytic volume support. Neither regression is accepted.
+   The Y cover, its seats and all candidate casting changes are omitted. Redesign the drainage/tooling architecture
+   before installing front Y protection; geometric clearance alone is not a manufacturing qualification.
+
 4. **Blocked service paths.** Pending. Reassess the kept Y rearward, Z upward and cartridge upward findings. Make small,
    clean fixes where possible; otherwise state the decided removal route in the procedures.
