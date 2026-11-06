@@ -185,3 +185,33 @@ pre-warmup sleeping samples. `orbit-stable-ui-02` records On throughout: 38.60 f
 1,540 draws and 2,275,354 triangles with the pending UI-frame fix. This is validation of an awake capture; GPU time varies
 with shared-machine load. Earlier healthy baselines predate DPMS recording; their cadence is tens of milliseconds rather
 than the multi-second power-saving cadence. Use a guarded paired comparison for the final report.
+
+
+**Step 3c validated: keep camera frames on the retained UI path.** Direct source invalidation counting found
+`ReferenceEditorApp.collisionSummary` being cleared to null and restored on every query (two invalidations per frame).
+The perspective controls observe it, so unchanged queries rebuilt their tab content. Publish the final summary once;
+clear it only when collision display is disabled. Together with `RenderNode.invalidatePaint` this removes both reasons
+for a camera-only UI rebuild. Temporary diagnostic source and core instrumentation have been removed; haxeon is clean.
+
+`orbit-stable-ui-02`, display On throughout, same 360-frame 4x-MSAA path:
+
+| Metric | Retained view 01 | Stable UI 02 |
+| --- | ---: | ---: |
+| Throughput | 29.75 fps | 38.60 fps |
+| Mean cadence | 33.62 ms | 25.91 ms |
+| Median CPU / p95 | 10.50 / 13.13 ms | 7.74 / 20.76 ms |
+| Median UI submit | 3.20 ms | 0.084 ms |
+| Reused UI submissions | 0 / 360 | 360 / 360 |
+| Median scene GPU / p95 | 6.24 / 7.14 ms | 6.41 / 17.75 ms |
+| Median allocations | 491,320 bytes | 155,824 bytes |
+| Automatic GC collections | 3 | 1 |
+
+All 360 draw/triangle pairs match (medians 1,540 / 2,275,354); the final viewport remains pixel-identical over 379,440 pixels.
+The full app suite passes (`viewport-stable-ui-app-tests-02.log`, exit 0), including camera-only UI reuse, unchanged collision
+summary notification suppression, disabled-summary publication, and existing geometry/CAD workflows. The fly-paint assertion
+now accepts either changed content key or paint revision, matching the public display-list invalidation contract.
+
+The native-submit p95 is 15.50 ms in this capture, while native plan preparation is 0.52 ms median. The warmed fixed-app CPU
+profile shows NVIDIA driver work and scheduler yielding inside scene rendering after the managed rebuild costs are removed.
+GPU state during the profile is P0 (1,569–1,771 MHz graphics, 4,006 MHz memory); no fixed low-power clock limit was observed.
+Next checks: an unprofiled/no-GPU-query control and an awake paired baseline. No LOD or renderer architecture change is applied.

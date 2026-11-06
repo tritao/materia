@@ -183,7 +183,7 @@ import haxeon.ui.widgets.layout.Spacer;
     try {
       // Wide, tall, both capped, fractional layout, and resizing back below the cap.
       for (size in [[3840.0, 2160.0], [1700.0, 3000.0], [3600.0, 2800.0], [3100.5, 1700.25], [1400.0, 900.0]]) {
-        var node = viewportNode(ui.submit(layout, new LayoutFrame(size[0], size[1])));
+        var node = viewportNode(ui.submitCached(() -> layout, new LayoutFrame(size[0], size[1]), "coordinates"));
         check(node != null, "docked viewport resolves");
         var bounds = node.globalBounds(), width = bounds.width, height = bounds.height;
         near(bounds.x, 300, "viewport accounts for the hierarchy dock");
@@ -265,8 +265,13 @@ import haxeon.ui.widgets.layout.Spacer;
         var radius = 0.0;
         for (i in 0...3) radius += Math.pow(eye[i] - pivot[i], 2);
         for (step in 1...4) {
-          ui.submit(layout, new LayoutFrame(size[0], size[1]));
+          viewport.updateRetainedPaint();
+          ui.submitCached(() -> layout, new LayoutFrame(size[0], size[1]), "coordinates");
           ui.pointerMove(bounds.x + anchor.x + step * 25, bounds.y + anchor.y + step * 12);
+          check(viewport.updateRetainedPaint(), "camera paint reaches the mounted viewport");
+          ui.submitCached(() -> layout, new LayoutFrame(size[0], size[1]), "coordinates");
+          var metrics = ui.lastFrameMetrics;
+          check(metrics != null && metrics.reusedSubmission, "camera-only moves reuse the submitted UI tree");
           check(viewport.hoveredObjectId == null, "orbit moves keep surface hover suspended");
           check(viewport.orbitPivot == pivot, "orbit pivot stays fixed across view rebuilds");
           var projected = viewport.camera.project(pivot[0], pivot[1], pivot[2], width, height);

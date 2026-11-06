@@ -1728,7 +1728,9 @@ import materia.project.MaterialLibrary;
       app.ui.key(UiEventKind.KeyDown, UiKey.W);
       var backward = viewport.camera.viewDirection();
       var speed = Math.max(0.1, viewport.camera.distance * 0.5);
-      before = viewportPaintNode(app.submit(frame)).retainedPaintKey();
+      var beforeFlyNode = viewportPaintNode(app.submit(frame));
+      before = beforeFlyNode.retainedPaintKey();
+      var beforeFlyPaintRevision = beforeFlyNode.paintRevision;
       frame.deltaSeconds = 0.02;
       app.submit(frame);
       var moved = viewport.camera.eyePosition();
@@ -1737,8 +1739,9 @@ import materia.project.MaterialLibrary;
         eye[axis] - backward[axis] * speed * 0.02,
         "held W advances camera once per host frame"
       );
+      var afterFlyNode = viewportPaintNode(app.submit(new LayoutFrame(1400, 900)));
       check(
-        viewportPaintNode(app.submit(new LayoutFrame(1400, 900))).retainedPaintKey() != before,
+        afterFlyNode.retainedPaintKey() != before || afterFlyNode.paintRevision != beforeFlyPaintRevision,
         "fly movement invalidates docked paint"
       );
       app.ui.key(UiEventKind.KeyDown, 340, UiModifier.Shift);

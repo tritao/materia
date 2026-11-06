@@ -186,16 +186,24 @@ import nativekit.scene.Transform;
       pairs.length == 1 && app.collisionSummary != null && app.collisionSummary.indexOf("1 collision") == 0,
       'the editor finds the overlap (${app.collisionSummary})'
     );
+    var summaries:Array<Null<String>> = [];
+    var summaryReader = new haxeon.reactive.Effect(function() { summaries.push(app.collisionSummary); });
+    app.editingCollisions();
+    haxeon.reactive.ReactiveRuntime.flushEffects();
+    check(summaries.length == 1, "an unchanged collision query does not invalidate summary readers");
     app.preferences.store.set(AppSettings.COLLISIONS_VISIBLE, PropertyValue.Bool(false));
     check(
       !app.collisionsVisible && app.editingCollisions().length == 0 && app.collisionSummary == null,
       "turned off, nothing is shown"
     );
+    haxeon.reactive.ReactiveRuntime.flushEffects();
+    check(summaries.length == 2 && summaries[1] == null, "turning collisions off publishes the cleared summary");
     app.commands.execute("scene.toggle-collisions");
     check(app.collisionsVisible && app.editingCollisions().length == 1, "the command turns it back on");
     app.preferences.store.set(AppSettings.COLLISION_NEAR, PropertyValue.Float(0.0));
     app.scene.setPosition(ids[1], 0, 0.105);
     check(app.editingCollisions().length == 0, "a 0 mm near distance shows only collisions");
+    summaryReader.dispose();
     app.dispose();
   }
 }

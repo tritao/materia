@@ -1023,7 +1023,7 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
       perspectiveViewport.advanceNavigation(deltaSeconds);
       if (perspectiveViewport.advancePresentation(deltaSeconds)) invalidateView();
       perspectiveViewport.preparePresentationFrame();
-      if (!perspectiveViewport.requestCameraPaintPatch()) invalidateView();
+      if (!perspectiveViewport.updateRetainedPaint()) invalidateView();
     }
     if (cameraVisible) {
       if (inspectionCamera.advancePresentation(deltaSeconds)) invalidateView();
@@ -2685,8 +2685,10 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
    * contact is tolerated. The world answers once per scene revision or presented frame.
    */
   function editingCollisions():Array<SceneCollision.SceneCollisionPair> {
-    collisionSummary = null;
-    if (!collisionsVisible) return NoCollisionPairs;
+    if (!collisionsVisible) {
+      collisionSummary = null;
+      return NoCollisionPairs;
+    }
     var collision = sceneCollision;
     if (collision
       == null) sceneCollision = collision = new SceneCollision(() -> new collisionkit.native.NativeCollisionWorld());

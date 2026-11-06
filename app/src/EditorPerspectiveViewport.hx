@@ -711,20 +711,20 @@ class EditorPerspectiveViewport implements View implements Observable {
 
   @:unobservable var paintContext:Null<BuildContext>;
   @:unobservable var paintNodeId:Null<haxeon.ui.core.WidgetId>;
+  @:unobservable var paintNode:Null<RenderNode>;
   @:unobservable var submittedPaintKey:Null<String>;
-  @:unobservable var submittedCameraRevision:Int = -1;
 
-  /** The native camera mutates in place, so its revision needs an explicit paint patch. */
-  public function requestCameraPaintPatch():Bool {
-    if (paintContext == null || paintNodeId == null) return true;
-    return submittedCameraRevision == camera.revision || updateRetainedPaint();
-  }
-
-  /** True when the image is current or a patch is scheduled; false requires the owner to rebuild an unmounted binding. */
+  /** Invalidate only the display list; an unmounted binding needs the owner's ordinary UI rebuild. */
   public function updateRetainedPaint():Bool {
-    if (submittedPaintKey == paintKey()) return true;
-    var context = paintContext, id = paintNodeId;
-    return context != null && id != null && context.requestPatch(id);
+    var nextKey = paintKey();
+    if (submittedPaintKey == nextKey) return true;
+    var context = paintContext, built = paintNode;
+    if (context == null || built == null) return false;
+    var current = RenderNode.latest(built);
+    if (context.updatingBuild(current) == null) return false;
+    current.invalidatePaint();
+    submittedPaintKey = nextKey;
+    return true;
   }
 
   function paintKey():String return "perspective:" + scene.visualRevision + ":" + runtimeRevision + ":" + presentationRevision
@@ -752,7 +752,7 @@ class EditorPerspectiveViewport implements View implements Observable {
     node.focusable = true;
     node.semantics = new Semantics(AccessibilityRole.Image, "Scene perspective GPU view");
     submittedPaintKey = paintKey();
-    submittedCameraRevision = camera.revision;
+    paintNode = node;
     node.onPaint(paint, submittedPaintKey);
     installNavigation(node);
     return node;
@@ -1618,6 +1618,7 @@ class EditorPerspectiveViewport implements View implements Observable {
     retainedRenderViewKey = "";
     paintContext = null;
     paintNodeId = null;
+    paintNode = null;
     submittedPaintKey = null;
     clearFlyKeys();
     if (surface != null) surface.dispose();
