@@ -112,7 +112,9 @@ int main() {
         for (int index = 0; index < 4; ++index) {
             const auto material = scene->reserve_material_id();
             materials.push_back(material);
-            scene->material_store().create(material);
+            // This benchmark exercises sparse updates across distinct GPU groups.
+            // Equal-material coalescing is covered by the pixel regression.
+            scene->material_store().create(material).edit_state().roughness = 0.2f + 0.1f * index;
         }
 
         std::vector<nkscene::NodeId> groups;

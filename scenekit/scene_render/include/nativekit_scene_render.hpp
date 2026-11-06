@@ -456,6 +456,11 @@ class RenderPlan {
     std::span<const RenderItem> items() const noexcept { return items_; }
     std::span<const WorldTransform> transforms() const noexcept { return transforms_; }
     std::span<const InstanceBatch> batches() const noexcept { return batches_; }
+    std::span<const std::size_t> batches_for_geometry(GeometryId geometry) const noexcept {
+        const auto found = batches_by_geometry_.find(geometry);
+        return found == batches_by_geometry_.end() ? std::span<const std::size_t>{}
+                                                   : std::span<const std::size_t>{found->second};
+    }
     std::size_t item_index(NodeId node) const noexcept {
         const auto found = item_by_node_.find(node);
         return found == item_by_node_.end() ? invalid_item_index : found->second;

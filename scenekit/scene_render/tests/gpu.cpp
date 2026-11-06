@@ -131,6 +131,74 @@ void highlight_alpha_regression(nkgpu_renderer renderer) {
 
 // Touching opposite faces must resolve by sidedness, not submission order or depth bias.
 // Mirrored transforms and explicit two-sided sheets use the same rules for color and picking.
+void equivalent_material_batch_regression(nkgpu_renderer renderer) {
+    auto scene = std::make_shared<Scene>();
+    const auto geometry = scene->reserve_geometry_id();
+    auto &mesh = scene->geometry_store().create(geometry);
+    mesh.edit_payload().vertices = {{{{-0.3f, -0.3f, 0}}}, {{{0.3f, -0.3f, 0}}}, {{{0, 0.3f, 0}}}};
+    const auto first_material = scene->reserve_material_id();
+    auto &a = scene->material_store().create(first_material);
+    a.edit_state().base_color = {0.2f, 0.6f, 0.3f, 1};
+    const auto second_material = scene->reserve_material_id();
+    auto &b = scene->material_store().create(second_material);
+    b.edit_state() = *a.state;
+    const auto first = scene->reserve_node_id(), second = scene->reserve_node_id();
+    Transaction create(scene);
+    for (const auto node : {first, second}) {
+        create.add_create(node); create.add_geometry(node, geometry);
+        create.add_material(node, first_material);
+        nkscene::LocalTransform transform;
+        transform.matrix[12] = node == first ? -0.5f : 0.5f;
+        create.add_transform(node, transform);
+    }
+    ChangeSet changes;
+    assert(scene->commit(create, changes) == NKS_OK); create.close();
+    nkscene::SceneView view;
+    auto plan = nkscene::compile(scene->snapshot(), view);
+    nkscene::NativeKitGpuExecutor executor(renderer);
+    const auto pixels = [&]() {
+        std::vector<std::uint8_t> image;
+        assert(executor.capture_rgba8(plan, scene->snapshot(), 64, 64, {0,0,0,0}, image) == NKGPU_OK);
+        return image;
+    };
+    const auto shared_pixels = pixels();
+    Transaction separate(scene); separate.add_material(second, second_material);
+    assert(scene->commit(separate, changes) == NKS_OK); separate.close();
+    nkscene::update(plan, scene->snapshot(), changes, view);
+    assert(plan.items()[plan.item_index(second)].material == second_material);
+    assert(executor.execute(plan, scene->snapshot()).draw_calls == 1);
+    assert(pixels() == shared_pixels);
+    // Material-only edits also work without refreshing the caller's retained plan.
+    const auto verify_draws = [&](std::size_t draws) {
+        scene->publish();
+        const auto stats = executor.execute(plan, scene->snapshot());
+        assert(stats.result == NKGPU_OK && stats.draw_calls == draws);
+    };
+    b.edit_state().roughness = 0.2f; verify_draws(2);
+    b.edit_state().roughness = 1.0f; verify_draws(1);
+    assert(pixels() == shared_pixels);
+    b.edit_state().opacity = 0.5f; verify_draws(2);
+    b.edit_state().opacity = 1.0f; verify_draws(1);
+    b.edit_state().normal_texture = {991}; verify_draws(2);
+    b.edit_state().normal_texture = {}; verify_draws(1);
+    b.edit_state().sampler = {992}; verify_draws(2);
+    b.edit_state().sampler = {}; verify_draws(1);
+    b.edit_state().flags |= static_cast<std::uint32_t>(nkscene::MaterialFlags::DoubleSided);
+    verify_draws(2);
+    b.edit_state().flags &= ~static_cast<std::uint32_t>(nkscene::MaterialFlags::DoubleSided);
+    verify_draws(1);
+    b.edit_state().base_color = {0.8f, 0.1f, 0.3f, 1}; verify_draws(2);
+    const auto edited_pixels = pixels();
+    assert(edited_pixels != shared_pixels);
+    for (std::size_t y = 0; y < 64; ++y) for (std::size_t x = 0; x < 32; ++x)
+        for (std::size_t channel = 0; channel < 4; ++channel)
+            assert(edited_pixels[(y*64+x)*4+channel] == shared_pixels[(y*64+x)*4+channel]);
+    b.edit_state().base_color = a.state->base_color; verify_draws(1);
+    nkscene::PickResult pick;
+    assert(executor.pick_pixel(plan, scene->snapshot(), 64, 64, 48, 32, &pick) == NKGPU_OK);
+    assert(pick.node == second);
+}
+
 void sidedness_regression(nkgpu_renderer renderer) {
     auto scene = std::make_shared<Scene>();
     const auto geometry = scene->reserve_geometry_id();
@@ -356,6 +424,7 @@ int main() {
     }
 
     highlight_alpha_regression(renderer);
+    equivalent_material_batch_regression(renderer);
     sidedness_regression(renderer);
     contact_edge_regression(renderer);
 

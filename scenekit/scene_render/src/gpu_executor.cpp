@@ -4,6 +4,7 @@
 #include "render_internal.hpp"
 #include "section_contours.hpp"
 #include "stroke_support.hpp"
+#include "material_batches.hpp"
 
 #include <algorithm>
 #include <array>
@@ -369,8 +370,7 @@ ClipUniformData clip_uniform_data(const RenderPlan &plan) {
     return result;
 }
 
-DesiredBatch desired_batch(const RenderPlan &plan, const InstanceBatch &batch) {
-    DesiredBatch desired{{batch.geometry, batch.material}};
+void append_instances(DesiredBatch &desired, const RenderPlan &plan, const InstanceBatch &batch) {
     const auto transforms = plan.transforms();
     for (const auto node : batch.instances) {
         const auto item_index = plan.item_index(node);
@@ -387,17 +387,31 @@ DesiredBatch desired_batch(const RenderPlan &plan, const InstanceBatch &batch) {
         desired.pick_ids.push_back(item->pickId);
         desired.highlight_tints.push_back(item->highlight_tint);
     }
+}
+
+DesiredBatch desired_batch(const RenderPlan &plan, BatchKey key,
+                           const render_internal::BatchMaterials &materials) {
+    DesiredBatch desired{key};
+    for (const auto index : plan.batches_for_geometry(key.geometry)) {
+        const auto &batch = plan.batches()[index];
+        if (materials.canonical(batch.material) == key.material)
+            append_instances(desired, plan, batch);
+    }
     return desired;
 }
 
-std::vector<DesiredBatch> desired_batches(const RenderPlan &plan) {
+std::vector<DesiredBatch> desired_batches(const RenderPlan &plan,
+                                         const render_internal::BatchMaterials &materials) {
     std::vector<DesiredBatch> result;
     result.reserve(plan.batches().size());
+    std::unordered_map<BatchKey, std::size_t, BatchKeyHash> groups;
     for (const auto &batch : plan.batches()) {
-        auto desired = desired_batch(plan, batch);
-        if (!desired.instances.empty())
-            result.push_back(std::move(desired));
+        const BatchKey key{batch.geometry, materials.canonical(batch.material)};
+        const auto [found, inserted] = groups.try_emplace(key, result.size());
+        if (inserted) result.push_back(DesiredBatch{key});
+        append_instances(result[found->second], plan, batch);
     }
+    std::erase_if(result, [](const auto &batch) { return batch.instances.empty(); });
     return result;
 }
 
@@ -520,6 +534,7 @@ struct NativeKitGpuExecutor::State {
     std::unordered_map<MaterialId, std::uint64_t> material_revisions;
     std::unordered_map<MaterialId, MaterialGpu> material_resources;
     std::vector<BatchGpu> batches;
+    render_internal::BatchMaterials batch_materials;
     std::unordered_map<BatchKey, std::size_t, BatchKeyHash> batch_by_key;
     std::vector<std::size_t> free_batches;
     std::unordered_map<NodeId, BatchInstance> batch_instances;
@@ -2287,7 +2302,7 @@ template <class StateT>
 bool synchronize_batches(StateT &state, const RenderPlan &plan, GpuExecutionStats &stats,
                          std::span<const NodeId> affected_nodes = {}) {
     if (affected_nodes.empty()) {
-        const auto desired = desired_batches(plan);
+        const auto desired = desired_batches(plan, state.batch_materials);
         bool same_layout = desired.size() == state.batch_by_key.size();
         if (same_layout) {
             for (const auto &batch : desired) {
@@ -2331,21 +2346,14 @@ bool synchronize_batches(StateT &state, const RenderPlan &plan, GpuExecutionStat
         const auto batch_index = plan.batch_index(node);
         if (batch_index != static_cast<std::size_t>(-1)) {
             const auto &batch = plan.batches()[batch_index];
-            affected_batches.insert({batch.geometry, batch.material});
+            affected_batches.insert({batch.geometry, state.batch_materials.canonical(batch.material)});
         }
     }
 
     for (const auto key : affected_batches) {
         ++stats.batches_inspected;
-        const auto current_index = plan.batch_index(key.geometry, key.material);
         const auto old = state.batch_by_key.find(key);
-        if (current_index == static_cast<std::size_t>(-1)) {
-            if (old != state.batch_by_key.end())
-                remove_batch(state, old->second);
-            continue;
-        }
-
-        const auto desired = desired_batch(plan, plan.batches()[current_index]);
+        const auto desired = desired_batch(plan, key, state.batch_materials);
         if (desired.instances.empty()) {
             if (old != state.batch_by_key.end())
                 remove_batch(state, old->second);
@@ -2957,6 +2965,14 @@ bool NativeKitGpuExecutor::synchronize(const RenderPlan &plan, const SceneSnapsh
     }
     if (!work.resource_delta_complete)
         work.full_rebuild = true;
+
+    if (state_->renderer.id && state_->batch_materials.refresh(snapshot, work.full_rebuild)) {
+        // Material edits can split/join groups even without a plan/layout delta.
+        // Keep source commands and resource updates incremental; reconcile only
+        // the GPU grouping, once at this resource boundary.
+        work.layout_changed = true;
+        work.layout_nodes.clear();
+    }
 
     if (plan.geometry_resources_revision_ != snapshot.geometry_resources_revision() ||
         plan.material_resources_revision_ != snapshot.material_resources_revision()) {

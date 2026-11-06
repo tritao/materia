@@ -336,13 +336,13 @@ Round 2, everything else, measured on the committed orbit benchmark (`app/tools/
    per-frame but camera-independent.
 5. **Scale.** Re-run on the bench mill and the tending cell as well as the hobber, so the gains are general.
 
-### Round 2 status: diagnosis in progress
+### Round 2 status: material instancing measured; remaining work in progress
 
 Read the retained viewport, SceneRenderer, render compiler, GPU executor and nkgpu draw path.
 Frustum culling and geometry/material instancing already exist. Surface, stroke and AO passes
 each submit the visible batches; these are not per-face draws. Each loaded occurrence receives
 its own material resource, potentially splitting repeated geometry into separate batches.
-Quantify that split before changing ownership or batching.
+The census below confirms this split; GPU equivalence now coalesces it without changing ownership.
 
 The orbit runner now accepts `--project` for the scale checks, summarizes GPU passes and
 per-pass draw/triangle work, and exports a node/resource inventory beside the native timeline.
@@ -355,3 +355,61 @@ warm acceptance baseline. Publishing the instrumentation library also invalidate
 generator fingerprint, so `r2-baseline-hobber-02` primes that dependency before the unchanged
 warm run and resource census. No gain is claimed from the timing variation. Artifacts use the `r2-` prefix
 under `/media/joao/DATA1/claude-hobber-tools/tmp/`.
+
+**Warm current-source baseline:** `r2-baseline-hobber-03`, 360 measured frames after 60 warmup,
+cached source open in 2.46 s, 4x MSAA, 766x498 target, DPMS On. Median/p95 CPU
+7.44/21.57 ms; scene GPU 8.16/18.70 ms; native scene preparation 0.933 ms,
+submission 2.341 ms, plan preparation 0.521 ms. Throughput 30.25 fps (reported only).
+Median draws 1,540; submitted triangles 2,299,637; all work counts match the priming run.
+GPU medians: surfaces 4.515 ms, edges 2.978 ms, AO surfaces 0.545 ms, resolve 0.037 ms.
+Median pass work: surfaces 521 draws/485,402 triangles, edges 501/1,328,858,
+AO surfaces 518/485,377. The original 403 editor objects expand to 542 native nodes
+including cosmetic overlays (535 shown); 318 shown geometry IDs have 535 separate
+materials. Repeated geometry includes 71 M6 bolts, 21 M8 bolts, eight HGH15 blocks,
+and repeated mounts, wipers, extrusions and door rollers. The hob alone has 151,696
+base triangles; the casting and three BK12 mounts dominate edge segments.
+
+**First fix measured:** coalesce GPU instance groups with exactly equal material
+values, keeping source material IDs and source batches unchanged. Equivalence includes
+all colour/opacity/finish/alpha/sidedness, texture and sampler fields. Resource edits
+re-evaluate equivalence; camera frames retain it. Sparse visibility/pose changes use
+the geometry's indexed source batches. Native callers updating resource values against
+a retained render plan are covered. The new GPU regression verifies equal-resource
+pixel identity, independent edits, splitting/rejoining, and occurrence picking. All
+11 renderer suites pass, including lighting images and the 50,000-node sparse-update
+benchmark (whose material groups now use explicitly distinct roughness values).
+`r2-material-batches-hobber-01`, same full source-project orbit, 4x MSAA and camera:
+
+| Median metric | Warm baseline 03 | Material batches 01 |
+| --- | ---: | ---: |
+| CPU / p95 | 7.44 / 21.57 ms | 6.18 / 20.20 ms |
+| Scene GPU / p95 | 8.16 / 18.70 ms | 6.11 / 16.66 ms |
+| Native preparation | 0.933 ms | 0.669 ms |
+| Native submission | 2.341 ms | 1.260 ms |
+| Draw calls | 1,540 | 910.5 |
+| Submitted triangles | 2,299,637 | 2,299,637 |
+| Surface GPU | 4.515 ms | 2.861 ms |
+| Edge GPU | 2.978 ms | 2.465 ms |
+| AO surface GPU | 0.545 ms | 0.457 ms |
+| Throughput (context only) | 30.25 fps | 35.48 fps |
+
+Median draws fall 40.9%; all 360 per-frame triangle counts match. Median per-pass
+draws become 311.5 surfaces, 291 edges and 308.5 AO surfaces. Timings vary under
+shared-machine load; the work reduction is deterministic. At the identical final
+camera, 3 of 376,922 interior viewport pixels differ by at most one 8-bit channel
+level (`comparison.json`); no visible quality, resolution, MSAA or LOD change.
+The full app suite is running (`r2-material-batches-app-tests.log`); scale checks,
+triangle reduction and remaining CPU/GPU work are pending. Source hashes are in
+`r2-material-batches-variant.json`. No haxeon/nativekit changes for this fix.
+
+Next measured candidates (not implemented): the stroke buffer uses six triangles
+per segment for its body and two round caps, plus up to two incident support triangles.
+Each cap's circular antialias footprint can potentially be covered by one circumscribed
+triangle instead of a quad, retaining the shader's exact coverage/depth rule; validate
+pixels and section/contact tests. Surface shaders already discard single-sided back
+faces, while all ordinary pipelines disable hardware culling. A per-batch winding
+classification (positive, reflected, mixed/singular), retained with instance transforms,
+could safely reject the same faces earlier; reflected batches need front culling with
+the original CCW convention to preserve the shader's `gl_FrontFacing` parity test.
+Pass-global camera/lighting/clip uniforms are also redundantly submitted per batch.
+Measure these independently after the first fix; they are not measured gains yet.
