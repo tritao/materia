@@ -987,6 +987,7 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
   public function updatePresentation(deltaSeconds:Float):Void {
     if (workspace.isOpen("start")) preferences.refreshRecentAvailability();
     projectVariants.update();
+    updateProjectUiExtension();
     if (workspace.isOpen("machine-control")) machineControlPanel.update(this);
     else machineControlPanel.cancelGesture();
     if (workspace.isOpen("mission")) missionPanel.update(missionController);
@@ -3128,23 +3129,27 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
     ui.setCommandContext(context);
   }
 
-  function projectUiPanel():Null<View> {
+  /** Prepare project-owned UI before tracked panel builds; opening it can publish scene colours. */
+  function updateProjectUiExtension():Void {
     var reference = session.projectReference;
-    if (reference == null) return null;
-    if (projectUiReference != reference) {
-      if (projectUiExtension != null) projectUiExtension.dispose();
-      projectUiExtension = null;
-      projectUiError = null;
-      projectUiReference = reference;
-      try {
-        projectUiExtension = ProjectUiExtension.open(reference, projectInitialAction);
-        projectInitialAction = null;
-        syncProjectUi();
-      } catch (error:Dynamic) {
-        projectUiError = Std.string(error);
-        log("Project UI extension: " + projectUiError);
-      }
+    if (projectUiReference == reference) return;
+    if (projectUiExtension != null) projectUiExtension.dispose();
+    projectUiExtension = null;
+    projectUiError = null;
+    projectUiReference = reference;
+    if (reference == null) return;
+    try {
+      projectUiExtension = ProjectUiExtension.open(reference, projectInitialAction);
+      projectInitialAction = null;
+      syncProjectUi();
+    } catch (error:Dynamic) {
+      projectUiError = Std.string(error);
+      log("Project UI extension: " + projectUiError);
     }
+  }
+
+  function projectUiPanel():Null<View> {
+    if (session.projectReference == null) return null;
     if (projectUiError != null) return new Text("Project UI extension: " + projectUiError);
     return projectUiExtension == null ? null : projectUiExtension.panel(projectUiAction);
   }

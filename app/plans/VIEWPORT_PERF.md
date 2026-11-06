@@ -34,3 +34,47 @@
 **Acceptance.** Orbit frame time before and after on the same machine, a target of at least 60 fps (or the best achievable with
 the reason stated). The app tests pass, the visuals are unchanged (or the LOD threshold is documented), and the benchmark is
 committed.
+
+**Status (in progress).** Inspected the editor host, scripted entry point, retained viewport paint binding and SceneKit executor.
+The design-mode editor already uses `submitCached` and a camera paint patch. Measure their actual cost before changing them.
+The native capture profiler already supplies asynchronous per-pass GPU timestamps (`NK_SCENE_GPU_TIMINGS`, interval 1 for
+the benchmark); extend this single instrumentation path with draw/triangle/upload counters instead of adding another timer.
+The scripted benchmark routes captured middle-button drags through `UiContext`, advances by one degree per rendered frame
+and runs the complete desktop host. Camera-only setters would omit orbit's current per-move hover ray test; input time and
+camera advance/capture checks are therefore part of the benchmark. Suppressing drag-time hover is a candidate, not yet a
+measured fix. The cache-priming run still uses the earlier camera-only draft; it is not the interaction baseline.
+No LOD or visible feature changes are authorized. Initial runtime build exposed uninitialized nested dependencies; the pinned
+Haxeon submodules are now initialized and the release runtime builds. After waiting for a shared `heavy-run` slot, the cold
+app build found the app's MuJoCo/animation dependencies uninitialized; restoring those exact pins before retrying native
+configuration. The first Haxe compile passed (3,328 files), and native configuration now passes with the pinned dependencies.
+The native build passed. The initial priming run rejected an empty scene: Haxeon launches the app with `app/` as its cwd,
+while supplier libraries need `MATERIA_ROOT` for this checkout's `build/suppliers` link. The runner now sets that root and
+keeps temporary generation files in its output directory. The same compiled generator succeeded from the worktree root
+(serial diagnostic run): 59,569,269 artifact bytes, SHA-256
+`f20aa39b53c57519074fa94d4a5fa62a30d62b98e90c0d7791550ef46b212d7d`. Its own-worktree fingerprint cache is primed.
+The routed-input app build passed (3,328 files; native targets cached). Its idle compiler worker retained the completed build's
+queue lock and 7.7 GB heap; that exact own-worktree idle PID was stopped after verifying the build had exited successfully.
+Bounded benchmark runs now use the supported `HAXEON_COMPILER_IDLE_SECONDS=1` setting. The short routed-input pilot is queued.
+Native executor syntax and the six standalone report regressions pass (`python3 app/tools/test-benchmark-orbit.py`):
+time-based GPU/input matching, capture/camera advance, warmup/drain exclusion, throughput from nonuniform cadence, and
+failed-load/missing-result rejection. Runtime validation and the routed-input baseline are pending.
+The routed pilot loaded the cached artifact but aborted before its first scene frame: `projectUiPanel()` lazily assigned
+`projectUiExtension` inside a tracked Inspector build. Extension opening/colour publication is now prepared in
+`updatePresentation()`; panel builds only read that state. A replacement/error/close regression was added to the app suite
+and the routed pilot then rendered the project successfully. The full app suite, including the new regression, passed:
+`./haxeon/scripts/haxeon run --project app/tests/haxeon.json` (exit 0; `viewport-app-tests-prereq.log`).
+
+**Initial full-turn measurement (before performance fixes).** `orbit-baseline-01`: 60 warmup + 360 measured + 8 drain frames,
+403 objects, 766×498 scene image, 4× MSAA, GTX 1060 3GB. 20.16 fps (49.62 ms cadence); CPU median 27.69 ms / p95 58.03 ms;
+scene GPU median 14.14 ms / p95 30.13 ms. Median input 6.41 ms, UI submit 2.89 ms, custom paint 14.22 ms, native scene
+prepare 0.94 ms and submit 4.75 ms, native UI render 2.18 ms. Median 1,541 draws / 2,275,358 submitted triangles (including
+AO/edge passes), median resource upload 0 bytes. Median frame allocation 1,854,656 bytes; 17 collections / 378 ms GC over
+the measured window. No physical pointer moves were delivered during this run; pitch remained 0.35.
+
+Physical mouse input contaminated the earlier short pilot's pitch. The harness now uses a separate pointer ID and records
+and validates pitch as well as yaw. Recheck the full baseline with that hardened harness before comparative fix commits.
+These phase/allocation measurements point to transient view setup and drag input, rather than geometry re-upload; confirm
+the hot functions with the CPU profiler before optimizing.
+The capture serialization repair is committed as haxeon `84113e490` on branch `viewport-perf-capture`; the parent pin remains
+unchanged. Validation: parseable layout for 209 nodes/80 styles, 9,696 loading/empty-scene host timeline records and screenshot.
+Those records are capture validation only and are not hobber orbit measurements.
