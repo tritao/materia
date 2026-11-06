@@ -1,3 +1,4 @@
+import machinekit.component.Same;
 import cadkit.InertiaTensor;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
@@ -13,7 +14,6 @@ import machinekit.robotics.ParallelGripperSpec;
 import machinekit.robotics.BayonetChangerMaster;
 import machinekit.robotics.BayonetChangerTool;
 import materia.assembly.AssemblyFrames;
-import haxeon.Equality;
 import haxeon.wire.JsonWire;
 
 private class TestChangerMaster extends MachineComponent {
@@ -153,8 +153,7 @@ class EndEffectorSetTests {
     sxtSet.addTool("manual", sxtTool);
     var savedSxt = sxtSet.encode();
     var rebuiltSxt = EndEffectorSet.decode(savedSxt);
-    if (!Equality.equals(sxtSet.describe(),
-      rebuiltSxt.describe())) throw "SXT changer description changed after wire round trip";
+    if (JsonWire.encode(sxtSet.describe()) != JsonWire.encode(rebuiltSxt.describe())) throw "SXT changer description changed after wire round trip";
     sxtTool.addComponent("late", new BayonetChangerTool("10.07.13.00018"));
     if (sxtSet.configuration("manual").components().length != 2) throw "Changer retained a mutable tool builder";
     var coupledSxt = sxtSet.configuration("manual");

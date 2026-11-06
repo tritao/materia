@@ -1,7 +1,7 @@
 package machinekit.assembly;
 
 import cadkit.modeling.Vector;
-import haxeon.Equality;
+import machinekit.component.Same;
 import haxeon.wire.JsonWire;
 import machinekit.component.ComponentRegistry;
 import machinekit.component.ComponentValue;
@@ -558,16 +558,10 @@ class MachineAssemblyCodec {
         var saved = target.mechanical.coupling(transmission.coupling);
         if (saved == null) continue;
         var current = derivedCoupling(flat, saved);
-        if (!Equality.equals(couplingValues(saved), couplingValues(current)) || !Equality.equals(
-          saved.stiffnessLaw,
-          current.stiffnessLaw
-        ) || !Equality.equals(
-          saved.calibration,
-          current.calibration
-        ) || !Equality.equals(
-          saved.assumed,
-          current.assumed
-        )) target.diagnostics.warning(
+        if (!sameNumbers(couplingValues(saved), couplingValues(current))
+          || !sameSprings(saved.stiffnessLaw, current.stiffnessLaw)
+          || !sameCalibration(saved.calibration, current.calibration)
+          || !sameLabels(saved.assumed, current.assumed)) target.diagnostics.warning(
           "transmission.snapshot",
           transmission.coupling,
           'Transmission "${transmission.coupling}" changed; its current parts replace the stored coupling'
@@ -663,11 +657,34 @@ class MachineAssemblyCodec {
     }
   }
 
-  /** Whether two connector lists hold the same connectors, compared one by one (`Equality.equals` compares the lists by reference). */
+  /** Whether two connector lists hold the same connectors, compared one by one (lists are reference types). */
   static function sameConnectors(a:Array<materia.assembly.AssemblyRecord.AssemblyConnector>, b:Array<materia.assembly.AssemblyRecord.AssemblyConnector>):Bool {
     if (a.length != b.length) return false;
-    for (i in 0...a.length) if (!Equality.equals(a[i], b[i])) return false;
+    for (i in 0...a.length) if (a[i].name != b[i].name || a[i].reference != b[i].reference
+      || !Same.frame(a[i].frame, b[i].frame)) return false;
     return true;
+  }
+
+  static function sameSprings(a:Null<Array<materia.assembly.AssemblyDefinition.AssemblyComplianceSpring>>,
+      b:Null<Array<materia.assembly.AssemblyDefinition.AssemblyComplianceSpring>>):Bool {
+    if (a == null || b == null) return a == null && b == null;
+    return JsonWire.encode(a) == JsonWire.encode(b);
+  }
+
+  static function sameCalibration(a:Null<materia.assembly.BeltCalibration>, b:Null<materia.assembly.BeltCalibration>):Bool {
+    if (a == null || b == null) return a == null && b == null;
+    return JsonWire.encode(a) == JsonWire.encode(b);
+  }
+
+  static function sameNumbers(a:Array<Null<Float>>, b:Array<Null<Float>>):Bool {
+    if (a.length != b.length) return false;
+    for (i in 0...a.length) if (a[i] != b[i]) return false;
+    return true;
+  }
+
+  static function sameLabels(a:Null<haxe.ds.ReadOnlyArray<String>>, b:Null<haxe.ds.ReadOnlyArray<String>>):Bool {
+    if (a == null || b == null) return a == null && b == null;
+    return Same.strings(cast a, cast b);
   }
 
   /**

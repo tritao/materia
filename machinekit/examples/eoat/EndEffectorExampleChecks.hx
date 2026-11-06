@@ -1,5 +1,6 @@
 package eoat;
 
+import machinekit.component.Same;
 import cadkit.modeling.Part;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.BomItem;
@@ -7,7 +8,6 @@ import machinekit.component.ComponentDetail;
 import machinekit.component.MachineComponent;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
-import haxeon.Equality;
 import haxeon.wire.JsonWire;
 
 private class ExampleAirSource extends MachineComponent {
@@ -33,7 +33,7 @@ class EndEffectorExampleChecks {
     var set = EndEffectorExample.build();
     var rebuiltSet = EndEffectorSet.decode(set.encode());
     check(
-      Equality.equals(set.describe(), rebuiltSet.describe()),
+      JsonWire.encode(set.describe()) == JsonWire.encode(rebuiltSet.describe()),
       "EOAT changer description changed after save and rebuild"
     );
     var short = set.configuration("short");
@@ -59,20 +59,20 @@ class EndEffectorExampleChecks {
     for (configuration in [short, long]) {
       var rebuilt = EndEffector.decode(configuration.encode());
       check(
-        Equality.equals(configuration.describe(), rebuilt.describe()),
+        JsonWire.encode(configuration.describe()) == JsonWire.encode(rebuilt.describe()),
         "EOAT configuration description changed after save and rebuild"
       );
       // A saved description lists members by sorted id, so a rebuild adds them in that order
       // rather than the order the original was assembled in.
       check(
-        Equality.equals(
+        Same.bom(
           sortedLines(configuration.billOfMaterials().lines()),
           sortedLines(rebuilt.billOfMaterials().lines())
         ),
         "EOAT configuration BOM changed after save and rebuild"
       );
       check(
-        Equality.equals(configuration.mountTFrame("contact"), rebuilt.mountTFrame("contact")),
+        Same.frame(configuration.mountTFrame("contact").raw(), rebuilt.mountTFrame("contact").raw()),
         "EOAT contact frame changed after save and rebuild"
       );
       var source = configuration.upstream("tool/cup", "vacuum");

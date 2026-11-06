@@ -1,3 +1,5 @@
+import haxeon.wire.JsonWire;
+import machinekit.component.Same;
 import machinekit.motion.MotorDriver;
 import machinekit.assembly.AllowanceEdit;
 import haxeon.Equality;
@@ -55,7 +57,7 @@ class MachineAssemblyDescriptionTests {
   public static function roundTrip(assembly:MachineAssembly, label:String, massAvailable:Bool = true):Void {
     var rebuilt:MachineAssembly = Std.isOfType(assembly,
       EndEffector) ? EndEffector.decode(assembly.encode()) : MachineAssembly.decode(assembly.encode());
-    if (!Equality.equals(assembly.describe(), rebuilt.describe())) {
+    if (JsonWire.encode(assembly.describe()) != JsonWire.encode(rebuilt.describe())) {
       var before = assembly.encode(), after = rebuilt.encode(), offset = 0;
       while (offset < before.length && offset < after.length && before.charAt(offset) == after.charAt(offset)) offset++;
       throw '$label description changed after round trip at $offset: ' + before.substr(0,
@@ -68,8 +70,8 @@ class MachineAssemblyDescriptionTests {
     var rebuiltBom = rebuilt.billOfMaterials().lines();
     originalBom.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));
     rebuiltBom.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));
-    if (!Equality.equals(originalBom, rebuiltBom)) throw '$label BOM changed after round trip';
-    if (!Equality.equals(assembly.check().items,
+    if (!Same.bom(originalBom, rebuiltBom)) throw '$label BOM changed after round trip';
+    if (!Same.diagnostics(assembly.check().items,
       rebuilt.check().items)) throw '$label diagnostics changed after round trip';
     if (massAvailable) {
       var originalMass = assembly.massProperties(), restoredMass = rebuilt.massProperties();
@@ -77,7 +79,7 @@ class MachineAssemblyDescriptionTests {
       close(originalMass.centreOfMass.x, restoredMass.centreOfMass.x, '$label mass centre x');
       close(originalMass.centreOfMass.y, restoredMass.centreOfMass.y, '$label mass centre y');
       close(originalMass.centreOfMass.z, restoredMass.centreOfMass.z, '$label mass centre z');
-      if (!Equality.equals(originalMass.unaccounted, restoredMass.unaccounted) || !Equality.equals(
+      if (!Same.strings(originalMass.unaccounted, restoredMass.unaccounted) || !Same.strings(
         originalMass.unaccountedInertia,
         restoredMass.unaccountedInertia
       )) throw '$label mass accounting changed after round trip';
@@ -95,12 +97,11 @@ class MachineAssemblyDescriptionTests {
       }
     }
     var poses = assembly.solvedPoses(), restored = rebuilt.solvedPoses();
-    for (member in assembly.components()) if (!Equality.equals(poses.get(member.id),
-      restored.get(member.id))) throw '$label pose changed for ${member.id}';
+    for (member in assembly.components()) if (JsonWire.encode(poses.get(member.id)) != JsonWire.encode(restored.get(member.id))) throw '$label pose changed for ${member.id}';
     if (Std.isOfType(assembly, EndEffector)) {
       var originalPieces = cadbridge.EndEffectorCollision.pieces(cast assembly);
       var rebuiltPieces = cadbridge.EndEffectorCollision.pieces(cast rebuilt);
-      if (!Equality.equals(collisionSignature(originalPieces),
+      if (!Same.strings(collisionSignature(originalPieces),
         collisionSignature(rebuiltPieces))) throw '$label collision pieces changed after round trip';
     }
   }
@@ -147,8 +148,7 @@ class MachineAssemblyDescriptionTests {
       == 42) throw "Description retained a mutable connector or pose from the builder";
     var encoded = assembly.encode();
     var rebuilt = MachineAssembly.decode(encoded);
-    if (!Equality.equals(assembly.describe(),
-      rebuilt.describe())) throw "Machine assembly description changed after wire round trip";
+    if (JsonWire.encode(assembly.describe()) != JsonWire.encode(rebuilt.describe())) throw "Machine assembly description changed after wire round trip";
     if (rebuilt.components().length != 2) throw "Machine assembly lost a member";
     if (rebuilt.connectorNames()[0] != "mount"
       || rebuilt.billOfMaterials().lines().length != 2) throw "Machine assembly lost its exposure or BOM extra";
@@ -454,8 +454,7 @@ class MachineAssemblyDescriptionTests {
     if (outer.solvedPoses().get("unit/part") == null) throw "Outer connector was lost during pose solve";
     if (outer.massProperties().mass <= 0) throw "Outer connector was lost during mass solve";
     var restored = MachineAssembly.decode(outer.encode());
-    if (!Equality.equals(outer.solvedPoses().get("unit/part"),
-      restored.solvedPoses().get("unit/part"))) throw "Outer connector was lost during nested round trip";
+    if (JsonWire.encode(outer.solvedPoses().get("unit/part")) != JsonWire.encode(restored.solvedPoses().get("unit/part"))) throw "Outer connector was lost during nested round trip";
     if (restored.subassemblies().length != 1
       || restored.subassemblies()[0].id != "unit") throw "Included builder was not restored";
   }
@@ -508,8 +507,7 @@ class MachineAssemblyDescriptionTests {
     var root = MachineAssemblyDocuments.defineAssembly(document, outer);
     var reopened = DocumentCodec.decode(DocumentCodec.encode(document), false, false);
     var restored = MachineAssemblyDocuments.rebuildAssembly(reopened.element(root.id));
-    if (!Equality.equals(outer.describe(),
-      restored.describe())) throw "Nested MachineKit assembly changed after document round trip";
+    if (JsonWire.encode(outer.describe()) != JsonWire.encode(restored.describe())) throw "Nested MachineKit assembly changed after document round trip";
     var nestedInstance:InstanceElement = null;
     for (element in reopened.allElements()) if (element.kind == "instance") {
       var instance:InstanceElement = cast element;
@@ -550,7 +548,7 @@ class MachineAssemblyDescriptionTests {
       var saved = haxeon.wire.JsonWire.encode(record);
       var restored:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord =
         haxeon.wire.JsonWire.decode(saved);
-      if (!Equality.equals(record, restored)) throw "A typed transmission lost its source or sense on the wire";
+      if (JsonWire.encode(record) != JsonWire.encode(restored)) throw "A typed transmission lost its source or sense on the wire";
       var mapped = machinekit.transmission.TransmissionResolver.mapSource(source, id -> "unit/" + id);
       if (Equality.equals(source, mapped)) throw "An included transmission lost its member prefix";
     }
@@ -1210,10 +1208,7 @@ class MachineAssemblyDescriptionTests {
     var bindingReopened = DocumentCodec.decode(DocumentCodec.encode(bindingDocument), false, false);
     var restoredBinding = MachineAssemblyDocuments.rebuildAssembly(bindingReopened.element(bindingRoot.id));
     var restoredDefinition = definition(restoredBinding);
-    if (!Equality.equals(restoredDefinition.actuators, closedDefinition.actuators) || !Equality.equals(
-      restoredDefinition.encoders,
-      closedDefinition.encoders
-    )) throw "Document load must recompile the motor and retain its wired encoder binding";
+    if (JsonWire.encode(restoredDefinition.actuators) != JsonWire.encode(closedDefinition.actuators) || JsonWire.encode(restoredDefinition.encoders) != JsonWire.encode(closedDefinition.encoders)) throw "Document load must recompile the motor and retain its wired encoder binding";
     bindingReopened.close();
     bindingDocument.close();
     var railed = new MachineAssembly();
@@ -1285,8 +1280,7 @@ class MachineAssemblyDescriptionTests {
     var reopened = DocumentCodec.decode(DocumentCodec.encode(document), false, false);
     var loaded = reopened.element(root.id);
     var restored = MachineAssemblyDocuments.rebuildAssembly(loaded);
-    if (!Equality.equals(assembly.describe(),
-      restored.describe())) throw "MachineKit document changed the assembly description";
+    if (JsonWire.encode(assembly.describe()) != JsonWire.encode(restored.describe())) throw "MachineKit document changed the assembly description";
     if (restored.upstreamChain("generator",
       "air")[1] != "manifold/out1") throw "MachineKit document changed the service source";
     var count = 0;
@@ -1405,7 +1399,7 @@ class MachineAssemblyDescriptionTests {
       && relationship.property("machinekit.assembly.tool") != null) toolConnections++;
     if (toolConnections != 1) throw "Tool port connection was not saved as a scoped relationship";
     var restored:EndEffectorSet = cast MachineAssemblyDocuments.rebuildAssembly(reopened.element(root.id));
-    if (!Equality.equals(set.describeSet(), restored.describeSet())) {
+    if (JsonWire.encode(set.describeSet()) != JsonWire.encode(restored.describeSet())) {
       var before = set.encode(), after = restored.encode(), offset = 0;
       while (offset < before.length && offset < after.length && before.charAt(offset) == after.charAt(offset)) offset++;
       throw "EOAT set changed after document round trip at " + offset + ": " + before.substr(offset,
@@ -1418,7 +1412,7 @@ class MachineAssemblyDescriptionTests {
     var restoredLines = restored.configuration("manual").billOfMaterials().lines();
     originalLines.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));
     restoredLines.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));
-    if (!Equality.equals(originalLines, restoredLines)) throw "EOAT BOM changed after document round trip";
+    if (!Same.bom(originalLines, restoredLines)) throw "EOAT BOM changed after document round trip";
     if (restored.configuration("manual").upstream("tool/half",
       "airOut1").port.instanceId != "robot/master") throw "EOAT service path changed after document round trip";
     reopened.close();
@@ -1431,17 +1425,17 @@ class MachineAssemblyDescriptionTests {
     var root = MachineAssemblyDocuments.defineAssembly(document, original);
     var reopened = DocumentCodec.decode(DocumentCodec.encode(document), false, false);
     var restored:EndEffectorSet = cast MachineAssemblyDocuments.rebuildAssembly(reopened.element(root.id));
-    if (!Equality.equals(original.describe(),
-      restored.describe())) throw "EOAT document changed the frozen description";
+    if (JsonWire.encode(original.describe()) != JsonWire.encode(restored.describe())) throw "EOAT document changed the frozen description";
     for (name in ["short", "long"]) {
       var before = original.configuration(name), after = restored.configuration(name);
       var massBefore = before.massPropertiesAtMount(), massAfter = after.massPropertiesAtMount();
       close(massBefore.mass, massAfter.mass, 'EOAT $name document mass');
-      if (!Equality.equals(before.mountTFrame("contact"),
-        after.mountTFrame("contact"))) throw 'EOAT $name document TCP changed';
-      if (!Equality.equals(before.upstream("tool/cup",
-        "vacuum"), after.upstream("tool/cup", "vacuum"))) throw 'EOAT $name document upstream path changed';
-      if (!Equality.equals(
+      if (!Same.frame(before.mountTFrame("contact").raw(),
+        after.mountTFrame("contact").raw())) throw 'EOAT $name document TCP changed';
+      var upBefore = before.upstream("tool/cup", "vacuum"), upAfter = after.upstream("tool/cup", "vacuum");
+      if (upBefore.external != upAfter.external || upBefore.port.instanceId != upAfter.port.instanceId
+        || upBefore.port.portName != upAfter.port.portName) throw 'EOAT $name document upstream path changed';
+      if (!Same.strings(
         collisionSignature(cadbridge.EndEffectorCollision.pieces(before)),
         collisionSignature(cadbridge.EndEffectorCollision.pieces(after))
       )) throw 'EOAT $name document collision pieces changed';
@@ -1464,8 +1458,7 @@ class MachineAssemblyDescriptionTests {
     var modelState = model.initialState(), savedState = new AssemblyState(definition);
     modelState.setJoint("first", 5);
     savedState.setJoint("first", 5);
-    for (id in ["a", "b", "c"]) if (!Equality.equals(modelState.worldPose(id),
-      savedState.worldPose(id))) throw 'Saved definition changed the pose of "$id"';
+    for (id in ["a", "b", "c"]) if (JsonWire.encode(modelState.worldPose(id)) != JsonWire.encode(savedState.worldPose(id))) throw 'Saved definition changed the pose of "$id"';
     assembly.addMate("extra", "fixed", "a", "face", "c", "face");
     var found = false;
     for (item in assembly.check().items) if (item.code == "assembly.multiple-parents"
@@ -1650,7 +1643,7 @@ class MachineAssemblyDescriptionTests {
       "two-pulley stiffness excludes engaged arcs and converts N mm to N m"
     );
     if (relation.backlash == null || relation.backlash <= 0) throw "Belt reduction needs an assumed tooth clearance";
-    if (!Equality.equals(assembly.describe(), MachineAssembly
+    if (JsonWire.encode(assembly.describe()) != JsonWire.encode(MachineAssembly
       .decode(assembly.encode()).describe())) throw "Belt reduction lost its source or attachments in a round trip";
     var included = new MachineAssembly();
     included.include("stage", assembly);

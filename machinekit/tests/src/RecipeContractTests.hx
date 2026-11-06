@@ -1,5 +1,5 @@
+import machinekit.component.Same;
 import cadkit.modeling.Part;
-import haxeon.Equality;
 import cadkit.modeling.Vector;
 import machinekit.motion.ShaftCoupling;
 import machinekit.motion.SteppedShaft;
@@ -108,11 +108,11 @@ class RecipeContractTests {
         );
         check(sameBom(component.bom, rebuilt.bom), '${type.id}: BOM changed after rebuild');
         check(
-          Equality.equals(component.connectors(), rebuilt.connectors()),
+          Same.connectors(component.connectors(), rebuilt.connectors()),
           '${type.id}: connectors changed after rebuild'
         );
-        check(Equality.equals(component.ports(), rebuilt.ports()), '${type.id}: ports changed after rebuild');
-        check(Equality.equals(facetWords(component), facetWords(rebuilt)), '${type.id}: facets changed after rebuild');
+        check(Same.ports(component.ports(), rebuilt.ports()), '${type.id}: ports changed after rebuild');
+        check(Same.strings(facetWords(component), facetWords(rebuilt)), '${type.id}: facets changed after rebuild');
 
         var partNumber = component.bom.partNumber;
         var prior = partNumbers.get(partNumber);
@@ -180,12 +180,12 @@ class RecipeContractTests {
     var rebuilt = type.create(component.values());
     check(component.designation == rebuilt.designation, '${component.designation}: custom designation changed');
     check(
-      Equality.equals(component.connectors(), rebuilt.connectors()),
+      Same.connectors(component.connectors(), rebuilt.connectors()),
       '${component.designation}: custom connectors changed'
     );
-    check(Equality.equals(component.ports(), rebuilt.ports()), '${component.designation}: custom ports changed');
+    check(Same.ports(component.ports(), rebuilt.ports()), '${component.designation}: custom ports changed');
     check(
-      Equality.equals(facetWords(component), facetWords(rebuilt)),
+      Same.strings(facetWords(component), facetWords(rebuilt)),
       '${component.designation}: custom facets changed'
     );
   }

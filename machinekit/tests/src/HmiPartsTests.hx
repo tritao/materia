@@ -1,4 +1,4 @@
-import haxeon.Equality;
+import machinekit.component.Same;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentParameterType;
 import machinekit.component.ComponentValues;
@@ -122,10 +122,10 @@ class HmiPartsTests {
         check(type.key(rebuilt.values()) == type.key(component.values()), '${type.id}: values changed after rebuild');
         check(rebuilt.designation == component.designation, '${type.id}: designation changed after rebuild');
         check(
-          Equality.equals(component.connectors(), rebuilt.connectors()),
+          Same.connectors(component.connectors(), rebuilt.connectors()),
           '${type.id}: connectors changed after rebuild'
         );
-        check(Equality.equals(component.ports(), rebuilt.ports()), '${type.id}: ports changed after rebuild');
+        check(Same.ports(component.ports(), rebuilt.ports()), '${type.id}: ports changed after rebuild');
         check(
           component.bom.partNumber == rebuilt.bom.partNumber && component.bom.description == rebuilt.bom.description,
           '${type.id}: BOM changed after rebuild'
