@@ -428,7 +428,9 @@ class JointFasteners {
           continue;
         }
         var holes = side.p == a ? a.face.holes : b.face.holes;
+        var dowelHole = 0;
         for (hole in holes) cutsOf(result, side.member).push({
+          name: cutName(id, ++dowelHole, "dowel"),
           frame: side.p.face.frame,
           x: hole.x,
           y: hole.y,
@@ -760,7 +762,8 @@ class JointFasteners {
         id,
         '$id: ${b.member} is drilled to suit the joint but its geometry does not cut derived holes'
       );
-      else for (point in points) cutsOf(result, b.member).push({
+      else for (k => point in points) cutsOf(result, b.member).push({
+        name: cutName(id, k + 1, "tap"),
         frame: b.face.frame,
         x: point.x,
         y: point.y,
@@ -777,7 +780,8 @@ class JointFasteners {
         id,
         '$id: ${b.member} has clearance holes its geometry does not draw and does not cut derived holes'
       );
-      else for (point in points) cutsOf(result, b.member).push({
+      else for (k => point in points) cutsOf(result, b.member).push({
+        name: cutName(id, k + 1, "clearance"),
         frame: b.face.frame,
         x: point.x,
         y: point.y,
@@ -788,16 +792,18 @@ class JointFasteners {
         thread: size
       });
     }
+    var aHoles:Array<BoltHole> = a.face.holes == null ? [] : a.face.holes;
     if (!a.face.drawn) {
       if (!members.get(a.member).machinable()) diagnostics.error(
         "fasteners.machining",
         id,
         '$id: ${a.member} has clearance holes its geometry does not draw and does not cut derived holes'
       );
-      else for (hole in a.face.holes) {
+      else for (k => hole in aHoles) {
         var back = grip + (recess == null ? 0.0 : recess.depth);
-        cutsOf(result, a.member).push({frame: a.face.frame, x: hole.x, y: hole.y, diameter: clearance, from: -1.0, to: back + 1, kind: "clearance", thread: size});
+        cutsOf(result, a.member).push({name: cutName(id, k + 1, "clearance"), frame: a.face.frame, x: hole.x, y: hole.y, diameter: clearance, from: -1.0, to: back + 1, kind: "clearance", thread: size});
         if (recess != null) cutsOf(result, a.member).push({
+          name: cutName(id, k + 1, "counterbore"),
           frame: a.face.frame,
           x: hole.x,
           y: hole.y,
@@ -905,6 +911,22 @@ class JointFasteners {
       return null;
     }
     return catalog.get(size);
+  }
+
+  /**
+   * The stable name of hole `hole` (from 1) of joint `joint`, cut as `role` (tap, clearance, counterbore, dowel): `host.top..cover.bottom.h2.tap`.
+   * The joint id's member and face separators become dots and everything else outside a name's alphabet an underscore, so the
+   * cylinder's faces are named strongly under it (`MachinedCut.name`).
+   */
+  public static function cutName(joint:String, hole:Int, role:String):String {
+    var id = StringTools.replace(StringTools.replace(StringTools.replace(joint, " -> ", ".."), " ~ ", ".."), "#", ".");
+    var out = new StringBuf();
+    for (i in 0...id.length) {
+      var c = id.charCodeAt(i);
+      var ok = (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 46 || c == 95 || c == 43 || c == 45;
+      out.add(ok ? id.charAt(i) : "_");
+    }
+    return out.toString() + ".h" + hole + "." + role;
   }
 
   static function cutsOf(result:FastenerDerivation, member:String):Array<MachinedCut> {

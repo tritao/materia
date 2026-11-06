@@ -82,7 +82,7 @@ class MachineComponent {
   function machiningKey():String {
     var out:Array<String> = [];
     for (cut in machining) out.push([cut.frame.x, cut.frame.y, cut.frame.z, cut.frame.qx, cut.frame.qy, cut.frame.qz, cut.frame.qw, cut.x, cut.y,
-      cut.diameter, cut.from, cut.to].map(v -> ComponentNumberKey.encode(v)).join(","));
+      cut.diameter, cut.from, cut.to].map(v -> ComponentNumberKey.encode(v)).join(",") + "," + cut.name);
     return out.join(";");
   }
 
@@ -90,8 +90,10 @@ class MachineComponent {
   function machined(part:Part):Part {
     if (machining.length == 0) return part;
     var tools:Array<Part> = [];
+    var index = 0;
     for (cut in machining) {
-      var tool = Part.cylinderSpan(cut.diameter / 2, cut.from, cut.to, cut.x, cut.y);
+      // Named like the part's own bodies, so the faces a derived hole leaves are found by what they are, not by shape.
+      var tool = Solids.named(Part.cylinderSpan(cut.diameter / 2, cut.from, cut.to, cut.x, cut.y), cut.name ?? 'cut${++index}');
       tools.push(machinekit.assembly.PosedParts.moved(tool, cut.frame));
       tool.close();
     }

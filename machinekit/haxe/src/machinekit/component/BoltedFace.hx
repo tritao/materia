@@ -34,6 +34,11 @@ typedef BoltRecess = {diameter:Float, depth:Float}
   /** Reamed fit (H7 for a dowel) and whether the hole exits the stock. */
   @:id(9) @:optional var fit:String;
   @:id(10) @:optional var through:Bool;
+  /**
+   * The cut's stable name, `<joint>.h<k>.<role>` (`J3.h2.tap`, `J3.h1.counterbore`): the cylinder's faces are named under
+   * it, so a mate or drawing picks "the bore of hole 2 of joint J3" whatever else the part's geometry does.
+   */
+  @:id(11) @:optional var name:String;
 };
 
 enum BoltedRole {

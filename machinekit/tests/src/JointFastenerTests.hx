@@ -1,3 +1,4 @@
+import CadKit;
 import machinekit.assembly.AxisBuilder;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.JointFasteners;
@@ -296,6 +297,16 @@ class JointFastenerTests {
     check(Math.abs((hostVolume - drilled.volume()) - tap) < 0.01 * tap, 'the host loses ${hostVolume - drilled.volume()} mm3, the four tap-drill holes are $tap');
     var clearance = 4 * (Math.PI * Math.pow(5.5 / 2, 2) * 6 + Math.PI * Math.pow(4.5, 2) * 5);
     check(Math.abs((plateVolume - counterbored.volume()) - clearance) < 0.01 * clearance, 'the cover loses ${plateVolume - counterbored.volume()} mm3, the holes and counterbores are $clearance');
+    // The derived cuts name the faces they leave: strong, unique, and under the joint's hole ids.
+    for (pair in [{part: drilled, role: "tap"}, {part: counterbored, role: "clearance"}, {part: counterbored, role: "counterbore"}]) {
+      var names = pair.part.shape.elementNames(CadKit.ShapeKind.Face), seen:Map<String, Bool> = [], found = 0;
+      for (name in names) {
+        check(cadkit.ElementNames.isStrong(name) && !seen.exists(name), 'a derived hole face is named strongly and uniquely: $name');
+        seen.set(name, true);
+        if (name.indexOf(JointFasteners.cutName(joint.id, 1, pair.role) + ":") >= 0 || name.indexOf(JointFasteners.cutName(joint.id, 2, pair.role) + ":") >= 0) found++;
+      }
+      check(found >= 2, 'the ${pair.role} holes of ${joint.id} are named by hole: $found faces of ${names.length}');
+    }
     drilled.close();
     counterbored.close();
     // A part that does not cut derived holes is refused as a host drilled to suit.
