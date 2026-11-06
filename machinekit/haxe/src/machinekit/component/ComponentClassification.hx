@@ -212,6 +212,7 @@ class ComponentClassification {
     file(registry, "machinekit.standard.fine-pitch-nut", "Fasteners", ComponentKind.Generic);
     file(registry, "machinekit.standard.flat-washer", "Fasteners", ComponentKind.Generic);
     file(registry, "machinekit.standard.socket-set-screw", "Fasteners", ComponentKind.Generic);
+    file(registry, "machinekit.standard.dowel-pin", "Fasteners", ComponentKind.Generic);
     file(registry, "machinekit.standard.deep-groove-bearing", "Bearings and bushings", ComponentKind.Generic);
     file(registry, "machinekit.standard.bushing", "Bearings and bushings", ComponentKind.Generic);
     file(registry, "machinekit.standard.shaft-collar", "Shaft retention", ComponentKind.Generic);
