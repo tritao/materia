@@ -154,7 +154,7 @@ class BoxMoldCad {
         a,
         fixing.hardwareId,
         hole,
-        t + materia.tooling.casting.InsertFixturePlanner.minimumInsertion(hole),
+        ToolingHardwareCad.purchasableFixtureLength(hole, t + materia.tooling.casting.InsertFixturePlanner.minimumInsertion(hole)),
         F.fromRotationMatrix(fixing.entry.x, fixing.entry.y, b.z - t, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
         fixing.entry
       );

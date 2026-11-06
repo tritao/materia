@@ -29,6 +29,20 @@ class ToolingHardwareCad {
     a.addComponent(members[3], nut, nutPose);
   }
 
+  /**
+   * A planned fixture screw length is a derived number (panel grip plus the thread's minimum insertion). The screw
+   * that is bought is the shortest ISO 4762 length that reaches it, so the part number names a purchasable item.
+   * The result excludes the washer, like the planned length.
+   */
+  public static function purchasableFixtureLength(hole:materia.casting.InsertHole, plannedLength:Float):Float {
+    var thread = hole.thread;
+    if (thread == null) throw "Fixture screw requires a source steel thread";
+    var washer = FlatWasher.metric(thread.designation);
+    var standard = SocketHeadCapScrew.standardLengthAtLeast(plannedLength + washer.thickness);
+    if (standard == null) throw "No standard " + thread.designation + " screw reaches " + (plannedLength + washer.thickness) + " mm";
+    return standard - washer.thickness;
+  }
+
   /** A nominal study screw into a real source hole. Length excludes its washer.
 	 * Validate the actual standard component before mutating the assembly.
 	 */

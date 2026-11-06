@@ -499,7 +499,14 @@ class CastingMoldCad {
         var fixing = fixings[0].fixing;
         var hole = materia.tooling.casting.InsertFixturePlanner.holes(source).filter(hole -> hole.id
           == fixing.sourceHoleId)[0];
-        ToolingHardwareCad.fixtureScrew(a, h.id, hole, h.length, h.pose, fixing.entry);
+        ToolingHardwareCad.fixtureScrew(
+          a,
+          h.id,
+          hole,
+          ToolingHardwareCad.purchasableFixtureLength(hole, h.length),
+          h.pose,
+          fixing.entry
+        );
       } else {
         ToolingHardwareCad.throughBolt(a, h.id, h.diameter, h.length, h.pose);
       }
