@@ -73,7 +73,7 @@ class FastenerDataTests {
     var oldInputRejected = false;
     try {
       var wrong = SocketHeadCapScrew.recipeType().create(new ComponentValues().setToken("material", "steel C45"));
-    } catch (error:Dynamic) oldInputRejected = Std.string(error).indexOf("Unknown input") >= 0;
+    } catch (error:Dynamic) oldInputRejected = Std.string(error).indexOf("Unknown component input") >= 0;
     check(oldInputRejected, "obsolete free-text material recipe input is rejected");
     var inconsistentMaterialRejected = false;
     try SocketHeadCapScrew.metric("M6",
