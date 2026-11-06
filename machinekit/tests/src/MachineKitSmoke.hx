@@ -2380,14 +2380,14 @@ class MachineKitSmoke {
     blockPart.close();
     check(guide.blocks[0].connectors().length == 7, "profile block has four mount connectors, two axes and its top");
     check(guide.blocks[0].connector("top") != null, "profile block names its top");
-    near(guide.blocks[0].connector("mount1").frame.x, -7.5, "profile block first mount X");
-    near(guide.blocks[0].connector("mount1").frame.z, -10, "profile block first mount Z");
-    near(guide.blocks[0].connector("mount2").frame.x, -7.5, "profile block second mount X");
-    near(guide.blocks[0].connector("mount2").frame.z, 10, "profile block second mount Z");
-    near(guide.blocks[0].connector("mount3").frame.x, 7.5, "profile block third mount X");
-    near(guide.blocks[0].connector("mount3").frame.z, -10, "profile block third mount Z");
-    near(guide.blocks[0].connector("mount4").frame.x, 7.5, "profile block fourth mount X");
-    near(guide.blocks[0].connector("mount4").frame.z, 10, "profile block fourth mount Z");
+    near(guide.blocks[0].connector("mount1").frame.x, -10, "profile block first mount X (across the rail)");
+    near(guide.blocks[0].connector("mount1").frame.z, -7.5, "profile block first mount Z (along the rail)");
+    near(guide.blocks[0].connector("mount2").frame.x, -10, "profile block second mount X (across the rail)");
+    near(guide.blocks[0].connector("mount2").frame.z, 7.5, "profile block second mount Z (along the rail)");
+    near(guide.blocks[0].connector("mount3").frame.x, 10, "profile block third mount X (across the rail)");
+    near(guide.blocks[0].connector("mount3").frame.z, -7.5, "profile block third mount Z (along the rail)");
+    near(guide.blocks[0].connector("mount4").frame.x, 10, "profile block fourth mount X (across the rail)");
+    near(guide.blocks[0].connector("mount4").frame.z, 7.5, "profile block fourth mount Z (along the rail)");
 
     var model = guide.assembly();
     var definition = model.definition("linear-rail");
