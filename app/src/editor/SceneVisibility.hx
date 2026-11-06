@@ -92,7 +92,8 @@ typedef VisibilityState = {
     for (item in scene.items()) {
       var selected = members.indexOf(item.id) >= 0, groups = masks(item.hiddenBy);
       groups.remove("isolate:scene");
-      if (selected && revealGroups != null) for (key in revealGroups) groups.remove(key);
+      // Reveal ancestors for their full membership so a saved state's rebind retains the same visibility.
+      if (revealGroups != null) for (key in revealGroups) groups.remove(key);
       if (!selected) groups.push("isolate:scene");
       after.push({id: item.id, visible: selected && forceSelected ? true : item.visible, hiddenBy : groups});
     }

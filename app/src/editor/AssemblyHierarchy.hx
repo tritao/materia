@@ -25,7 +25,7 @@ class AssemblyHierarchy {
       var object = "project:" + occurrence.id;
       if (!available.exists(object)) continue;
       ensureGroup("");
-      var path = occurrence.includePath == null ? "" : occurrence.includePath;
+      var path = occurrence.groupPath != null ? occurrence.groupPath : occurrence.includePath == null ? "" : occurrence.includePath;
       ensureGroup(path);
       children.get(key(path)).push(object);
       parents.set(object, key(path));

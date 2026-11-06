@@ -26,6 +26,7 @@ class SceneTreeRow implements View {
   final ownVisible:Bool;
   final mixed:Bool;
   final toggle:Null<Void -> Void>;
+  final isolate:Null<Void -> Void>;
   public function new(
     key:String,
     label:String,
@@ -34,7 +35,8 @@ class SceneTreeRow implements View {
     visible:Bool,
     ownVisible:Bool,
     mixed:Bool,
-    toggle:Null<Void -> Void>
+    toggle:Null<Void -> Void>,
+    ?isolate:Void -> Void
   ) {
     this.key = key;
     this.label = label;
@@ -44,6 +46,7 @@ class SceneTreeRow implements View {
     this.ownVisible = ownVisible;
     this.mixed = mixed;
     this.toggle = toggle;
+    this.isolate = isolate;
   }
   public function build(context:BuildContext):RenderNode {
     var color = visible ? context.theme.tokens.textPrimary : context.theme.tokens.textSecondary;
@@ -58,9 +61,22 @@ class SceneTreeRow implements View {
     // Keep the 24px eye target clear of the overlay scrollbar (12px + 2px inset).
     style.padding = new Insets(0, 0, 16, 0);
     var children = [new KeyedView("icon", new Icon("glyph:" + key, icon, 15, color)), new KeyedView("label", tooltip)];
+    if (isolate != null) {
+      var activate:Void -> Void = isolate;
+      var button = new haxeon.ui.widgets.controls.Button("", null, activate, "isolate:" + key);
+      button.leadingIcon = IconName.Inspect;
+      button.variant = haxeon.ui.widgets.controls.ButtonVariant.Navigation;
+      button.accessibilityLabel = "Isolate " + label;
+      button.onClickEvent = event -> {
+        event.preventDefault();
+        event.stopPropagation();
+        activate();
+      };
+      children.push(new KeyedView("isolate", new Tooltip("isolate-tip:" + key, button, new Text("Isolate " + label))));
+    }
     if (toggle != null) {
       var hint = (ownVisible ? "Hide " : "Show ") + label + " (Space)";
-      if (ownVisible && !visible) hint += " · Hidden by object or parent visibility";
+      if (ownVisible && !visible) hint += " · Hidden by object, group or set visibility";
       else if (mixed) hint += " · Some descendants hidden";
       children.push(new KeyedView(
         "eye",

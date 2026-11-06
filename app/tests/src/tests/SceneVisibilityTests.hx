@@ -197,7 +197,90 @@ import sys.FileSystem;
     }
     scene.dispose();
   }
+  static function functionalGroups():Void {
+    var authored = definition();
+    for (occurrence in authored.occurrences) {
+      occurrence.groupPath = switch occurrence.id {
+        case "base": "Bed";
+        case "cover": "X axis/Protection";
+        case "bracket": "X axis/Drive";
+        case "slide": "X axis/Carriage";
+        case "tool": "B spindle";
+        default: "Electrical";
+      };
+      occurrence.selectionKinds = occurrence.id == "bracket" || occurrence.id == "other" ? ["Fasteners"] : [];
+    }
+    var scene = new EditorScene(data()), tree = new EditorSceneTree(scene, authored);
+    try {
+      var axis = tree.assemblyKey("X axis"), fasteners = tree.setKey("kind:Fasteners"), moves = tree.setKey("moves:slide-moving");
+      check(tree.visibilityMembers(axis).length == 3, "functional axis contains fixed and moving members");
+      check(tree.visibilityMembers(fasteners).join(",") == "project:bracket,project:other", "derived set crosses functional ownership");
+      check(tree.visibilityMembers(moves).join(",") == "project:slide,project:tool", "moves-with contains descendants in other groups");
+      check(tree.visibilityChildren(tree.setKey("all")).indexOf(fasteners) >= 0, "Sets section lists derived sets");
+      var setInfo = tree.groupInfo(fasteners), axisInfo = tree.groupInfo(axis);
+      check(setInfo != null && setInfo.kind == "Set" && setInfo.path == "Fasteners", "set inspector exposes a readable selection");
+      check(axisInfo != null && axisInfo.kind == "Group", "functional folders are groups in the inspector");
+      tree.toggleVisibility(axis);
+      check(!scene.info("project:bracket").visible() && !scene.info("project:slide").visible(), "axis hide reaches viewport for both fixed and moving parts");
+      check(scene.isVisible("project:tool"), "physical child keeps independent functional ownership");
+      tree.toggleVisibility(fasteners);
+      tree.toggleVisibility(axis);
+      check(!scene.isVisible("project:bracket") && scene.isVisible("project:slide"), "overlapping group and set masks compose");
+      tree.selectKey(moves); tree.isolateSelected();
+      check(scene.isVisible("project:slide") && scene.isVisible("project:tool") && !scene.isVisible("project:base"), "set isolate follows full membership");
+      var encoded = SceneCodec.encode(scene), restored = new EditorScene(SceneCodec.decode(encoded));
+      try {
+        var reloaded = new EditorSceneTree(restored, authored);
+        check(!restored.isVisible("project:base") && restored.isVisible("project:tool"), "isolate persists after document roundtrip");
+        check(!reloaded.visibilityState(fasteners).own, "set visibility persists after rebind");
+        reloaded.showAll(); reloaded.selectKey(axis); reloaded.isolateSelected();
+        check(restored.isVisible("project:bracket") && restored.isVisible("project:slide") && !restored.isVisible("project:tool"), "functional isolate is independent of joint descendants");
+        restored.document.undo();
+        check(restored.isVisible("project:tool"), "isolate undo restores document visibility");
+      } catch (error:Dynamic) {restored.dispose(); throw error;}
+      restored.dispose();
+      var independent = new EditorScene(data()), otherTree = new EditorSceneTree(independent, authored);
+      check(independent.isVisible("project:bracket") && otherTree.visibilityState(fasteners).own, "group and set state belongs to its document");
+      independent.dispose();
+      function hiddenAncestorIsolation(ancestor:String, target:String, member:String):Void {
+        tree.showAll();
+        tree.toggleVisibility(ancestor);
+        tree.selectKey(target);
+        tree.isolateSelected();
+        check(scene.isVisible(member), "isolate reveals the selected branch through its hidden ancestor");
+        var saved = new EditorScene(SceneCodec.decode(SceneCodec.encode(scene)));
+        try {
+          var savedTree = new EditorSceneTree(saved, authored);
+          check(saved.isVisible(member), "saved isolation keeps its revealed ancestor visible");
+          for (item in scene.items()) check(saved.isVisible(item.id) == scene.isVisible(item.id), "isolate rebind preserves " + item.id);
+        } catch (error:Dynamic) {saved.dispose(); throw error;}
+        saved.dispose();
+      }
+      hiddenAncestorIsolation(tree.assemblyKey(), axis, "project:slide");
+      hiddenAncestorIsolation(tree.setKey("all"), fasteners, "project:bracket");
+      tree.showAll();
+      var fonts = haxeon.ui.FontCollection.create();
+      fonts.add(TestPaths.font());
+      var ui = new haxeon.ui.core.UiContext(null, fonts);
+      try {
+        var root = ui.submit(tree.buildItem(fasteners), new haxeon.ui.LayoutFrame(420, 40));
+        var isolate = findNode(root, node -> node.semantics != null && node.semantics.label == "Isolate Fasteners (2)");
+        if (isolate == null) throw "Missing set row isolate control";
+        ui.focusWidget(isolate.id);
+        ui.key(UiEventKind.KeyDown, UiKey.Enter);
+        ui.key(UiEventKind.KeyUp, UiKey.Enter);
+        check(scene.isVisible("project:bracket") && scene.isVisible("project:other") && !scene.isVisible("project:slide"), "rendered set row isolate activates once by keyboard");
+        check(tree.selectionKey() == fasteners, "set row isolate selects the set without an editable object target");
+      } catch (error:Dynamic) {ui.dispose(); fonts.dispose(); throw error;}
+      ui.dispose(); fonts.dispose();
+      var branch = tree.assemblyKey();
+      Sys.println("Functional UI tree: " + [for (key in tree.visibilityChildren(branch)) tree.visibilityLabel(key)].join(" | "));
+      Sys.println("Sets UI tree: " + [for (key in tree.visibilityChildren(tree.setKey("all"))) tree.visibilityLabel(key)].join(" | "));
+    } catch (error:Dynamic) {scene.dispose(); throw error;}
+    scene.dispose();
+  }
   public static function run():Void {
+    functionalGroups();
     var scene = new EditorScene(data()), tree = new EditorSceneTree(scene, definition());
     try {
       var physics = scene.environmentRevision;

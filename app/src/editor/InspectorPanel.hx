@@ -48,13 +48,14 @@ import haxeon.ui.widgets.text.TextField;
     var group = app.treeModel.groupInfo(groupKey);
     if (group != null) {
       var editable = !app.documents.blocked();
+      var noun = group.kind.toLowerCase();
       var shown = app.treeModel.visibilityState(groupKey).own;
-      var visibility = new Button(shown ? "Hide assembly" : "Show assembly",
+      var visibility = new Button(shown ? "Hide " + noun : "Show " + noun,
         null, function() {
         if (!app.documents.blocked()) app.treeModel.toggleVisibility(groupKey);
       }
       );
-      var isolate = new Button("Isolate assembly", null, function() {
+      var isolate = new Button("Isolate " + noun, null, function() {
         if (!app.documents.blocked()) app.treeModel.isolateSelected();
       }
       );
@@ -63,10 +64,10 @@ import haxeon.ui.widgets.text.TextField;
         new KeyedView("heading", sectionHeading(group.label)),
         new KeyedView(
           "assembly-summary",
-          new Text("Assembly · " + group.count + " part occurrences · " + group.shown + " shown")
+          new Text(group.kind + " · " + group.count + " part occurrences · " + group.shown + " shown")
         ),
         new KeyedView("assembly-path", new Text(group.path == "" ? "Root assembly" : group.path)),
-        new KeyedView("frame", sceneAction("assembly-frame", "scene.frame-selected", "Frame assembly", null)),
+        new KeyedView("frame", sceneAction("assembly-frame", "scene.frame-selected", "Frame " + noun, null)),
         new KeyedView("visibility", visibility),
         new KeyedView("isolate", isolate)
       ];

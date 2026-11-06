@@ -129,6 +129,8 @@ import materia.assembly.AssemblyDefinition;
     var marker = key.indexOf(":feature:");
     if (marker >= 0) key = key.substr(0, marker);
     if (key == "scene") return [for (item in scene.items()) item.id];
+    var set = setMembers.get(key);
+    if (set != null) return set.copy();
     if (!visibilityGroup(key)) return scene.object(key) == null ? [] : [key];
     var objectIds:Map<String, Bool> = [];
     for (item in scene.items()) objectIds.set(item.id, true);
@@ -188,15 +190,9 @@ import materia.assembly.AssemblyDefinition;
   public function isolateSelected():Bool {
     if (canChangeVisibility != null && !canChangeVisibility()) return false;
     var key = selectionKey(), ancestors = ["scene", key], cursor = key;
-    var found = true;
-    while (found) {
-      found = false;
-      for (parent in children.keys()) if (children.get(parent).indexOf(cursor) >= 0) {
-        ancestors.push(parent);
-        cursor = parent;
-        found = true;
-        break;
-      }
+    while (parentOf.exists(cursor)) {
+      cursor = parentOf.get(cursor);
+      ancestors.push(cursor);
     }
     var changed = SceneVisibility.isolate(scene, visibilityMembers(key), ancestors, !visibilityGroup(key));
     if (changed && onVisibilityChanged != null) onVisibilityChanged();
@@ -211,6 +207,9 @@ import materia.assembly.AssemblyDefinition;
   final parentOf:Map<String, String> = [];
   final groups:Map<String, app.editor.AssemblyHierarchy.AssemblyTreeGroup> = [];
   var hierarchy:Null<AssemblyHierarchy>;
+  final setMembers:Map<String, Array<String>> = [];
+  var setsRoot:Null<String>;
+  public function setKey(id:String):String return hierarchy == null ? "" : "set:" + hierarchy.definition.id + ":" + id;
   /** Body root to the kind of moving joint that carries it. */
   final jointOf:Map<String, String> = [];
   final childCache:Map<String, Array<String>> = [];
@@ -228,12 +227,14 @@ import materia.assembly.AssemblyDefinition;
   }
   public function isGroup(key:String):Bool return groups.exists(key);
   public function assemblyKey(path:String = ""):String return hierarchy == null ? "scene" : hierarchy.key(path);
-  public function groupInfo(key:String):Null<{label:String, path:String, count:Int, shown:Int}> {
+  public function groupInfo(key:String):Null<{label:String, path:String, kind:String, count:Int, shown:Int}> {
     var group = groups.get(key);
     if (group == null) return null;
     var members = visibilityMembers(key), shown = 0;
     for (id in members) if (scene.isVisible(id)) shown++;
-    return {label: group.label, path: group.path, count: members.length, shown: shown};
+    return {label: group.label, path: group.path,
+      kind: setMembers.exists(key) ? "Set" : group.path == "" ? "Assembly" : "Group",
+      count: members.length, shown: shown};
   }
   /** Object names are resolved when project overrides are materialized, never in the tree. */
   function displayLabel(key:String):String {
@@ -316,6 +317,27 @@ import materia.assembly.AssemblyDefinition;
       PROJECT + joint.child,
       Std.string(joint.type)
     );
+    var available = [for (item in scene.items()) item.id => true];
+    var selections = machinekit.assembly.AssemblySets.derive(authored.definition);
+    if (selections.length > 0) {
+      var root = setKey("all"), entries:Array<String> = [];
+      setsRoot = root;
+      groups.set(root, {label:"Sets", path:"Sets"});
+      children.set(root, entries);
+      var all:Array<String> = [];
+      for (selection in selections) {
+        var members = [for (id in selection.members) if (available.exists(PROJECT + id)) PROJECT + id];
+        if (members.length == 0) continue;
+        var key = setKey(selection.id);
+        setMembers.set(key, members);
+        for (id in members) if (all.indexOf(id) < 0) all.push(id);
+        groups.set(key, {label:selection.label, path:selection.label});
+        children.set(key, []);
+        entries.push(key);
+        parentOf.set(key, root);
+      }
+      setMembers.set(root, all);
+    }
     var visibilityGroups:Map<String, Array<String>> = ["scene" => visibilityMembers("scene")];
     for (key in groups.keys()) visibilityGroups.set(key, visibilityMembers(key));
     var legacy = false;
@@ -341,6 +363,11 @@ import materia.assembly.AssemblyDefinition;
         seen.set(key, true);
         result.push(key);
       }
+    }
+    var root = setsRoot;
+    if (root != null) {
+      var entries = children.get(root);
+      if (entries != null && entries.length > 0) result.push(root);
     }
     return result;
   }
@@ -380,7 +407,7 @@ import materia.assembly.AssemblyDefinition;
     var own = visibilityGroup(key) ? !SceneVisibility.groupHidden(scene, key, members) : item == null || item.visible;
     return new SceneTreeRow(key, label, icon, detail, shown > 0 || members.length == 0,
       own, shown > 0 && shown < members.length, members.length == 0 ? null : () -> {toggleVisibility(key);
-    });
+    }, isGroup(key) && members.length > 0 ? () -> {selectKey(key); isolateSelected();} : null);
   }
   public function buildItem(key:String):View {
     var source = sourceFeature(key);
@@ -400,7 +427,7 @@ import materia.assembly.AssemblyDefinition;
         key,
         info.label + " (" + info.count + ")",
         IconName.Hierarchy,
-        "Assembly" + (info.path == "" ? "" : " · " + info.path) + " · " + info.count + " part occurrences"
+        info.kind + (info.path == "" ? "" : " · " + info.path) + " · " + info.count + " part occurrences"
       );
     }
     var item = scene.object(key);
