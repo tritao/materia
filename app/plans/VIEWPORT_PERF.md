@@ -168,7 +168,7 @@ frame-clock deadlines are sensitive to callback work. The fixed-app warmed profi
 150–509, 8.324–20.425 s) also measures native UI GPU time at 0.503 ms median / 0.537 ms p95. CAD input and overlay
 validation are no longer dominant, but UI submission still walks the tree for a camera-only widget patch.
 
-**Step 3c (measurement pending): paint-only invalidation.** Use the existing `RenderNode.invalidatePaint()` operation for the
+**Step 3c implementation: paint-only invalidation.** Use the existing `RenderNode.invalidatePaint()` operation for the
 viewport's native-camera revision instead of `BuildContext.requestPatch()`. Resolve reconciled/replaced nodes through
 `RenderNode.latest` and validate their current self-updating registration before invalidating; an unmounted binding still
 requests the ordinary owner rebuild. Keep the custom display-list cache for unchanged frames. Both perspective and
@@ -215,3 +215,25 @@ The native-submit p95 is 15.50 ms in this capture, while native plan preparation
 profile shows NVIDIA driver work and scheduler yielding inside scene rendering after the managed rebuild costs are removed.
 GPU state during the profile is P0 (1,569–1,771 MHz graphics, 4,006 MHz memory); no fixed low-power clock limit was observed.
 Next checks: an unprofiled/no-GPU-query control and an awake paired baseline. No LOD or renderer architecture change is applied.
+
+
+**Remaining-cost controls.** `orbit-no-query-control-01` runs the same 428 ready frames without CPU sampling or GPU timing
+queries: 29.15 fps, median CPU 8.20 ms, 360/360 UI submissions reused. Removing query instrumentation does not remove the
+cadence limit. Shared-machine timing varies; this control is not a quality-adjusted performance result.
+
+**Step 3d: retain displayed clip bounds.** World bounds are independent of camera motion but were
+rebuilt for every clip fit; visibility checks also looked up each already-known item through a linear scene search.
+Retain the bounds until scene visual, runtime-pose/active, or presentation revisions change, and use the existing visibility
+policy directly on the current item when rebuilding. Recompute near/far clipping against the current camera, aspect and
+inspection FOV on every call. Add regressions for edited geometry, hide/show, runtime-pose revisions, leaving simulation,
+and camera motion against a freshly computed reference. No clipping margin or culling policy changes.
+
+
+`orbit-retained-bounds-01` (display On, same 360 frames, 4x MSAA) reduces median view setup from 1.007 to 0.127 ms
+(p95 0.151 ms) and allocations from 155,824 to 116,332 bytes per frame. All 360 draw/triangle pairs and all 379,440 viewport
+pixels match `orbit-stable-ui-02`. Median CPU is 8.07 ms, scene GPU 6.61 ms, and throughput 31.91 fps; native UI rendering
+rose from 1.67 to 2.85 ms under shared-machine load. This run establishes the setup/allocation saving, not an end-to-end
+FPS gain. Scene submission remains 15.85 ms at p95 and GPU 18.28 ms at p95. Median GPU pass times are 3.64 ms surfaces,
+2.38 ms surface edges, 0.44 ms AO surfaces, and 0.03 ms resolve. Full app suite passed (exit 0; `viewport-retained-bounds-app-tests-03.log`),
+including 88 clip assertions, 268 routed coordinate assertions and the complete CAD workflow. The new bounds fixture uses
+an empty scene so default editor objects cannot mask a moved object's clip range.

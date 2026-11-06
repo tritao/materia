@@ -3,13 +3,60 @@ package tests;
 import nativekit.scene.PerspectiveCamera;
 
 /** Off-screen exploded parts must not consume the visible model's depth precision. */
-class CameraClipRangeTests {
+@:access(app.EditorPerspectiveViewport) class CameraClipRangeTests {
   static var assertions = 0;
   static function check(value:Bool, message:String):Void {
     assertions++;
     if (!value) throw message;
   }
+  static function viewportBounds():Void {
+    var scene = new app.EditorScene([]);
+    scene.createRectangle();
+    var id = scene.selectedId;
+    scene.setDimensions(id, 1, 1, 1);
+    var host = new haxeon.ui.host.UiHostContext(null, new haxeon.platform.event.EventPump(), () -> {}, () -> {});
+    var viewport = new app.EditorPerspectiveViewport("clip-bounds-test", scene, host);
+    try {
+      viewport.updateViewportSize(800, 600);
+      viewport.camera.setAngle(0.3, 0);
+      viewport.camera.frame(0, 0, 0, 4, 3, 2, 4.0 / 3.0);
+      viewport.fitCameraClipRange();
+      var originalNear = viewport.camera.clipNear, originalFar = viewport.camera.clipFar;
+      var back = viewport.camera.viewDirection();
+      scene.setPositionXY(id, back[0], back[1]);
+      viewport.fitCameraClipRange();
+      var movedNear = viewport.camera.clipNear;
+      check(movedNear < originalNear - 0.5, "scene edits update displayed clip bounds");
+      scene.setVisible(id, false);
+      viewport.fitCameraClipRange();
+      check(viewport.camera.clipFar > originalFar * 10, "hidden geometry leaves the clip range");
+      scene.setVisible(id, true);
+      viewport.fitCameraClipRange();
+      check(Math.abs(viewport.camera.clipNear - movedNear) < 1e-6, "showing geometry restores its clip bounds");
+      viewport.setSimulationState(true, [{id:id, position:[0, 0, 0], rotation:[0, 0, 0, 1]}], 1);
+      viewport.fitCameraClipRange();
+      check(Math.abs(viewport.camera.clipNear - originalNear) < 1e-6, "runtime poses replace authored clip bounds");
+      viewport.setSimulationState(true, [{id:id, position:[for (value in back) value * 2], rotation:[0, 0, 0, 1]}], 2);
+      viewport.fitCameraClipRange();
+      check(viewport.camera.clipNear < movedNear - 0.5, "new runtime revisions update clip bounds");
+      viewport.setSimulationState(false, [], 3);
+      viewport.camera.orbit(30, 20);
+      viewport.camera.pan(20, -10, 600);
+      viewport.fitCameraClipRange();
+      var world = scene.info(id).bounds(), expected = new PerspectiveCamera();
+      expected.setAngle(viewport.camera.yaw, viewport.camera.pitch);
+      expected.setTarget(viewport.camera.targetX, viewport.camera.targetY, viewport.camera.targetZ, viewport.camera.distance);
+      expected.fitClipRange([[world.minX, world.minY, world.minZ, world.maxX, world.maxY, world.maxZ]], 4.0 / 3.0);
+      check(Math.abs(viewport.camera.clipNear - expected.clipNear) < 1e-6
+        && Math.abs(viewport.camera.clipFar - expected.clipFar) < 1e-6,
+        "camera motion refits clipping against the current world bounds");
+    } catch (error:Dynamic) {
+      viewport.dispose(); scene.dispose(); throw error;
+    }
+    viewport.dispose(); scene.dispose();
+  }
   public static function main():Int {
+    viewportBounds();
     var camera = new PerspectiveCamera();
     for (yaw in [0.0, 0.7, 13.241878906249955]) for (pitch in [-0.8, 0.0, 0.46328857421874864]) {
       camera.setAngle(yaw, pitch);

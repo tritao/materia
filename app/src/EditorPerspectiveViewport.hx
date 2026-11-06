@@ -651,6 +651,7 @@ class EditorPerspectiveViewport implements View implements Observable {
   @:unobservable var simulationTransformCount:Int = 0;
   final clipBoundsScratch:Array<Array<Float>> = [];
   final clipBounds:Array<Array<Float>> = [];
+  @:unobservable var clipBoundsRevision:String = "";
   final linkMarkerPath = new PathBuilder();
   final sensorMarkerPath = new PathBuilder();
   final sensorRayPath = new PathBuilder();
@@ -1522,10 +1523,13 @@ class EditorPerspectiveViewport implements View implements Observable {
     return result;
   }
 
-  function fitCameraClipRange():Void {
+  /** World bounds change with the displayed scene, not with the camera. */
+  function updateClipBounds():Void {
+    var revision = scene.visualRevision + ":" + runtimeRevision + ":" + simulationActive + ":" + presentationRevision;
+    if (clipBoundsRevision == revision) return;
     clipBounds.resize(0);
     for (item in scene.items()) {
-      if (!scene.isVisible(item.id) || presentationHidden(item.id)) continue;
+      if (!app.editor.SceneVisibility.shown(item.visible, item.hiddenBy) || presentationHidden(item.id)) continue;
       if (simulationActive || presentation != null) {
         var index = clipBounds.length;
         if (index == clipBoundsScratch.length) clipBoundsScratch.push([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
@@ -1555,6 +1559,11 @@ class EditorPerspectiveViewport implements View implements Observable {
         if (world.valid) clipBounds.push([world.minX, world.minY, world.minZ, world.maxX, world.maxY, world.maxZ]);
       }
     }
+    clipBoundsRevision = revision;
+  }
+
+  function fitCameraClipRange():Void {
+    updateClipBounds();
     camera.fitClipRange(
       clipBounds,
       aspect(),
@@ -1614,6 +1623,8 @@ class EditorPerspectiveViewport implements View implements Observable {
   }
 
   public function dispose():Void {
+    clipBounds.resize(0);
+    clipBoundsRevision = "";
     retainedRenderView = null;
     retainedRenderViewKey = "";
     paintContext = null;
