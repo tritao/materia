@@ -25,6 +25,9 @@ class SupplierLibraries {
   /** `MATERIA_ZEROERR_ROOT`, else build/suppliers/zeroerr in the repository. */
   public static function zeroerr():String return configured("MATERIA_ZEROERR_ROOT", "build/suppliers/zeroerr");
 
+  /** `MATERIA_YUHENG_ROOT`, else build/suppliers/yuheng in the repository. Holds the maker's STEP files under their delivered names (`YuhengScaleCad`). */
+  public static function yuheng():String return configured("MATERIA_YUHENG_ROOT", "build/suppliers/yuheng");
+
   /** The pinned file `sha256` in `library`. */
   public static function asset(library:String, sha256:String):String return library + "/cad/assets/" + sha256 + ".step";
 

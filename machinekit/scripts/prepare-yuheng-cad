@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# usage: prepare-yuheng-cad <directory holding JFT-40B-70.STEP JFT-40B-120.STEP JFT-40B-220.STEP>
+# Checks the maker's STEP files against their pinned digests and copies them into the supplier library (build/suppliers/yuheng, or $MATERIA_YUHENG_ROOT).
+dir="${1:?usage: prepare-yuheng-cad <directory with the Yuheng JFT-40B STEP files>}"
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+library="${MATERIA_YUHENG_ROOT:-$repo_root/build/suppliers/yuheng}"
+declare -A expected=(
+  [JFT-40B-70.STEP]=d94459a392ed6cc5a9756dd231a0232d9452f43c7d8c4bc1102c785ed6890978
+  [JFT-40B-120.STEP]=1875bf25774f66912e93fd54e9be4c9f3df26611af477bdd128d30501c9b0e7f
+  [JFT-40B-220.STEP]=0966f2f4dd38fc23859941398fa915fcaf6a017e4876bfd8f567deb6ef656d30
+)
+mkdir -p "$library"
+for file in "${!expected[@]}"; do
+  actual="$(sha256sum "$dir/$file" | cut -d' ' -f1)"
+  [[ "$actual" == "${expected[$file]}" ]] || { echo "$file differs from the pinned file: $actual" >&2; exit 1; }
+  cp "$dir/$file" "$library/$file"
+  echo "$library/$file"
+done
