@@ -1,7 +1,7 @@
 package machinekit.assembly;
 
 /** Parts that define a coupling. The leader is the coordinate motion is planned in. */
-@:wire enum Transmission {
+@:wire enum Transmission implements Equatable {
   /** The nut rides the leader's slide; the screw turns on the follower. Same follows the screw's
 	 * thread handedness: positive slide turns a right-hand screw negatively. */
   @:id(1) LeadScrew(screw:String, nut:String);
