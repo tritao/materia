@@ -12,7 +12,7 @@ import machinekit.assembly.PosedParts;
  * Local base spans X=0..28, Y=±32 (end pieces shifted 3 mm inward); web X=0..11. Source dimensions are engineering
  * inputs. Two recessed M6 base clearances and two recessed M6 web clearances have real connectors. */
 class LinearMountCleat extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final height:Float;
   public final bodyShift:Float;
   public static inline final WALL = 11.0;
@@ -54,7 +54,7 @@ class LinearMountCleat extends MachineComponent {
     addConnector("receiver", Mount, AxisBuilder.orient(0, 0, height - 10, [0.0, 1, 0], [-1.0, 0, 0]));
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.structural.linear-mount-cleat",
       inputs(),
       v -> new LinearMountCleat(v),
@@ -62,8 +62,7 @@ class LinearMountCleat extends MachineComponent {
       false,
       null,
       false
-    ).numbered(v -> 'LINEAR-MOUNT-CLEAT-H${Dimension.format(v.number("height"))}').procured(_ -> Make("machining"));
-    return recipe;
+    ).numbered(v -> 'LINEAR-MOUNT-CLEAT-H${Dimension.format(v.number("height"))}').procured(_ -> Make("machining")));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function hasGeometry():Bool return true;
@@ -94,16 +93,16 @@ class LinearMountCleat extends MachineComponent {
   }
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var parts:Array<Part> = [];
-    for (r in stockRegions()) {
+    for (k => r in stockRegions()) {
       var raw = Part.box(r[1] - r[0], r[3] - r[2], r[5] - r[4]);
-      parts.push(raw.translated(new Vector((r[0] + r[1]) / 2, (r[2] + r[3]) / 2, r[4])));
+      parts.push(Solids.named(raw.translated(new Vector((r[0] + r[1]) / 2, (r[2] + r[3]) / 2, r[4])), k == 0 ? "base" : "wall"));
       raw.close();
     }
     var stock = Solids.union(parts), tools:Array<Part> = [];
-    for (h in cutBores()) {
+    for (k => h in cutBores()) {
       var raw = Part.cylinder(h.diameter / 2, h.depth);
       try {
-        tools.push(PosedParts.moved(raw, h.frame));
+        tools.push(Solids.named(PosedParts.moved(raw, h.frame), "bore" + (k + 1)));
         raw.close();
       } catch (e:Dynamic) {
         raw.close();
