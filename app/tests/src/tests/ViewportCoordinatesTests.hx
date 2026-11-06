@@ -251,7 +251,10 @@ import haxeon.ui.widgets.layout.Spacer;
           viewport.camera.targetZ
         ];
         distance = viewport.camera.distance;
+        ui.pointerMove(bounds.x + anchor.x, bounds.y + anchor.y);
+        check(viewport.hoveredObjectId == "target", "surface hover is active before orbit");
         ui.pointerDown(bounds.x + anchor.x, bounds.y + anchor.y, 2);
+        check(viewport.hoveredObjectId == null, "orbit press clears surface hover");
         var pivot = viewport.orbitPivot;
         if (pivot == null) throw "Orbit did not choose a pivot";
         for (i in 0...3) {
@@ -266,6 +269,7 @@ import haxeon.ui.widgets.layout.Spacer;
         for (step in 1...4) {
           ui.submit(layout, new LayoutFrame(size[0], size[1]));
           ui.pointerMove(bounds.x + anchor.x + step * 25, bounds.y + anchor.y + step * 12);
+          check(viewport.hoveredObjectId == null, "orbit moves keep surface hover suspended");
           check(viewport.orbitPivot == pivot, "orbit pivot stays fixed across view rebuilds");
           var projected = viewport.camera.project(pivot[0], pivot[1], pivot[2], width, height);
           if (projected == null) throw "Orbit pivot moved behind camera";
@@ -273,6 +277,8 @@ import haxeon.ui.widgets.layout.Spacer;
           near(projected.y, anchor.y, "off-centre orbit pivot stays vertically fixed");
         }
         ui.pointerUp(bounds.x + anchor.x + 75, bounds.y + anchor.y + 36, 2);
+        ui.pointerMove(bounds.x + anchor.x, bounds.y + anchor.y);
+        check(viewport.hoveredObjectId == "target", "surface hover resumes after orbit");
         var nextEye = viewport.camera.eyePosition(), nextRadius = 0.0;
         for (i in 0...3) nextRadius += Math.pow(nextEye[i] - pivot[i], 2);
         near(nextRadius, radius, "orbit preserves distance from the surface pivot");

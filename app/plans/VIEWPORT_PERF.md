@@ -100,3 +100,36 @@ are the principal CPU phase targets. No performance fix, LOD, quality reduction 
 The capture serialization repair is committed as haxeon `84113e490` on branch `viewport-perf-capture`; the parent pin remains
 unchanged. Validation: parseable layout for 209 nodes/80 styles, 9,696 loading/empty-scene host timeline records and screenshot.
 Those records are capture validation only and are not hobber orbit measurements.
+
+
+**Step 2: warmed diagnosis.** `orbit-profile-before-02` captured 428 ready frames, 403 objects, constant pitch 0.35
+and one-degree yaw steps. Analysis uses Frame 229 through Frame 588 (11.874–30.481 s), excluding loading and warmup.
+Within routed input, `ScenePresentation.configureRenderView` accounts for 70.8% of samples and cosmetic-thread `ensure`
+for 49.5%; within paint, `ensure` accounts for 41.0%. This repeatedly scans CAD metadata and serializes appearance merely
+to discover unchanged overlay nodes. Uploads are already mostly zero; tessellation and native plan refresh are not the
+steady-orbit bottleneck. View construction also repeats pose, selection, visibility and section overrides each camera frame.
+
+**Step 3a: suspend hover during camera navigation.** Orbit/pan were omitted from the existing drag-time hover policy.
+Clear hover on navigation press, skip picks on captured moves, and restore hover on release through the existing handler.
+This intentionally removes transient hover highlighting during navigation; geometry, materials, camera path and render
+quality are unchanged. Routed coordinate regressions cover hover before/during/after orbit and preserve the surface pivot.
+
+`orbit-no-drag-hover-01`, same full-turn benchmark:
+
+| Metric | Baseline 02 | Drag fix 01 |
+| --- | ---: | ---: |
+| Throughput | 24.56 fps | 28.64 fps |
+| Mean cadence | 40.71 ms | 34.92 ms |
+| Median CPU / p95 | 23.88 / 60.25 ms | 15.87 / 21.83 ms |
+| Median input / p95 | 5.62 / 9.17 ms | 0.060 / 0.089 ms |
+| Median view setup | 6.82 ms | 6.59 ms |
+| Median scene GPU / p95 | 12.00 / 22.60 ms | 9.13 / 12.00 ms |
+| Median draws | 1,541 | 1,540 |
+| Median submitted triangles | 2,275,358 | 2,275,354 |
+| Median uploads / p95 | 0 / 864 bytes | 0 / 288 bytes |
+
+Tiny draw/triangle differences are the removed hover overlay. GPU improvements also reflect shared-machine load and must
+not be attributed solely to this CPU fix. The measured input reduction is direct evidence. Next: retain camera-independent
+view overrides while updating camera, grid and studio lighting every render. No LOD or renderer architecture change.
+
+Validation: routed viewport-coordinate suite passes 238 assertions plus hover/docked-navigation regressions.

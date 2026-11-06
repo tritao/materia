@@ -2020,6 +2020,7 @@ class EditorPerspectiveViewport implements View implements Observable {
           chooseOrbitPivot(event.localX, event.localY);
           host.requestFrame();
         }
+        clearHover();
         event.capturePointer();
         event.preventDefault();
         event.stopPropagation();
@@ -2195,7 +2196,7 @@ class EditorPerspectiveViewport implements View implements Observable {
       if (navigationMode == 1 || navigationMode == 2 || navigationMode == 8) host.requestFrame();
       // Hover follows the cursor only when nothing is being dragged: under a drag the part being moved is the subject, and
       // whatever slides beneath the cursor must not flicker or cost a pick per move.
-      if (navigationMode == 3 || navigationMode == 4
+      if (navigationMode == 1 || navigationMode == 2 || navigationMode == 3 || navigationMode == 4
         || navigationMode == 5 || navigationMode == 6 || navigationMode == 8 || navigationMode == 9) clearHover();
       else updateHover(event.localX, event.localY);
       event.preventDefault();

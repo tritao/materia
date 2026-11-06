@@ -10,6 +10,7 @@ class AppTests {
     SceneTreeSelectionTests.run();
     MoldSourceLinkTests.run();
     ViewportSelectionTests.run();
+    if (ViewportCoordinatesTests.main() != 0) return 1;
     if (StartPageTests.main() != 0) return 1;
     if (MissionJobsTests.main() != 0) return 1;
     SheetMaterialIntegrationTests.run();
