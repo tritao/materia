@@ -2,7 +2,7 @@
 
 **Symptom (user).** Orbiting the camera around the flexspline hobber in the editor is slow: low frame rate and lag.
 
-**Known so far.**
+**Initial evidence.**
 - The hobber scene has about 255 assembly members, plus tessellated purchased parts: HGH blocks and rails, the eRob STEP, BK12
   STEP mounts, sealed scales with long cables, a 59.6 MB generated artifact, fine features such as threads and hob teeth, and
   derived holes. Editor resident memory is about 1.3 GB once loaded.
@@ -35,7 +35,80 @@
 the reason stated). The app tests pass, the visuals are unchanged (or the LOD threshold is documented), and the benchmark is
 committed.
 
-**Status (in progress).** Inspected the editor host, scripted entry point, retained viewport paint binding and SceneKit executor.
+**Status: measured CPU fixes complete; 60 fps remains unmet.** The best observed fixed run is 38.60 fps; the final awake
+paired comparison is 25.54 -> 30.04 fps. All application tests pass. Quality remains 4x MSAA with no LOD, tessellation,
+culling, batching or renderer architecture changes. Stop here at the native frame scheduling/presentation boundary;
+a reliable 60 fps result needs further native rendering work, rather than more camera-only UI caching.
+
+**Final paired comparison.** `orbit-baseline-awake-03` uses application sources from `3441586c3` (benchmark before performance
+fixes); `orbit-final-awake-03` uses `5b5a4d1d5`. Only Main/viewport were temporarily restored for the baseline, then restored
+byte-for-byte before rebuilding the final app. `paired-variant.json` records their source commit and SHA-256 hashes; native
+code, project, runtime and settings are shared. Both captures record DPMS On throughout. Run artifacts are below
+`/media/joao/DATA1/claude-hobber-tools/tmp/`. The final compiled app contains the final sources.
+
+Benchmark: full desktop host, routed captured middle-button drag, one degree yaw per rendered frame at fixed pitch 0.35;
+60 warmup + 360 measured + 8 GPU drain frames. Warm cached 403-object hobber, 1320x900 window, 766x498 scene target,
+4x MSAA, GTX 1060 3GB / NVIDIA 550.144.03 on the 60 Hz GTK desktop. Per-frame CPU includes input; GPU is scene passes only,
+not UI/compositor. Phase timings nest. Draws and triangles include AO and edge passes. Throughput uses actual start cadence.
+
+| Metric | Awake baseline 03 | Final awake 03 |
+| --- | ---: | ---: |
+| Throughput | 25.54 fps | 30.04 fps |
+| Mean cadence | 39.15 ms | 33.29 ms |
+| CPU median / p95 | 15.91 / 37.27 ms | 4.44 / 7.58 ms |
+| Scene GPU median / p95 | 7.98 / 21.50 ms | 6.33 / 7.07 ms |
+| Drag input median | 4.134 ms | 0.043 ms |
+| View setup median | 4.250 ms | 0.092 ms |
+| UI submission median | 2.837 ms | 0.072 ms |
+| Native scene preparation median | 0.610 ms | 0.638 ms |
+| Native scene submission median / p95 | 1.255 / 6.550 ms | 1.341 / 2.359 ms |
+| Draw calls median | 1,541 | 1,540 |
+| Submitted triangles median | 2,275,358 | 2,275,354 |
+| Resource upload median / p95 | 0 / 864 bytes | 0 / 288 bytes |
+| Allocations median | 1,854,172 bytes | 116,664 bytes |
+| Reused UI submissions | 0 / 360 | 360 / 360 |
+| Automatic collections / GC time | 17 / 248.67 ms | 0 / 0 ms |
+
+CPU falls 72.1%, allocations 93.7%, and throughput rises 17.6% in the paired run. GPU load varies on the shared workstation;
+do not attribute its change to the CPU fixes. The one-draw/four-triangle median difference is the hover overlay suppressed
+while navigating. Hover resumes on release. After that change, all 360 draw/triangle pairs match through the final run;
+the final viewport matches the previous bounds capture pixel-for-pixel across 379,440 interior pixels.
+
+**Root causes and commits.**
+
+- `89a641fab`: drag-time hover picking performed geometry ray tests despite camera capture; suspend it during navigation.
+- `1dcfd4327`: camera frames rebuilt presentation overrides and revalidated cosmetic threads; retain a revision-keyed view.
+- `7fbd0d1c0`: collision summary cleared/restored its observed value each frame, and camera invalidation requested a widget
+  patch; publish the final summary once and use the existing paint invalidation API. Keep full rebuild fallback on unmount.
+- `5b5a4d1d5`: every clip fit rebuilt world bounds and used repeated linear visibility lookups; retain displayed bounds by
+  revision and still fit the current camera's near/far range each frame.
+- `3441586c3`: committed routed benchmark, asynchronous GPU stats, per-frame CPU/input phases and report regressions.
+- `542973f60`: reject display-power-saving captures, after observing a focused but DPMS-Off window fall below 1 fps.
+- `5bb9c3f98`: prerequisite project UI preparation before tracked panel construction; fixes benchmark project opening.
+
+Capture prerequisite: haxeon branch `viewport-perf-capture`, commit `84113e4904a483fcbad00612ca7ef20ce761b905`, serializes
+computed diagnostic styles without function values. The parent gitlink stays at `e7d8716e59dc387409df4de1a15029883c2aca14`.
+No nativekit branch or changes. No push/merge. Other sessions' four source files are untouched by these commits.
+
+**Validation and remaining limit.** Full app suite passes (exit 0, `viewport-retained-bounds-app-tests-03.log`), including
+268 routed coordinate assertions, retained selection/pose/section behavior, collision notification suppression, 88 clipping
+assertions and the complete CAD workflow. All seven standalone benchmark-report tests pass. All final source files are
+restored and the compiled app was rebuilt from them.
+
+Final CPU p95 7.58 ms and scene GPU p95 7.07 ms are below 16.67 ms individually, yet 351/359 intervals round to 33 or 34 ms.
+Median request-to-callback delay is 28.86 ms. Thus final cadence is limited by the native frame scheduling/presentation
+path, not the removed managed work or a proven geometry throughput ceiling. Native GTK runs rendering in GtkGLArea's
+platform-owned callback/context; its backend submit/finish defer actual presentation until callback return. Earlier fixed
+captures also show NVIDIA submission stalls (~16 ms p95) and GPU tails (~18 ms p95). The exact driver/GTK scheduling cause
+is not isolated; do not claim a universal 30 fps cap or guaranteed 60 fps after a particular native change.
+
+Controls: no-query/no-sampling orbit remains below 60 fps, 1x MSAA does not remove the cadence limit, and a clear-only native
+surface achieves 58.51 fps (42.75 fps with a 10 ms callback delay). Fixed-app profiling shows native-driver yielding and P0
+GPU clocks, rather than a fixed low-power clock. Further work should trace GTK frame-clock deadlines and native
+submission/presentation scheduling before choosing a physical render-executor split or other renderer architecture change.
+Such a change is a new design boundary; no visible LOD or native scheduling workaround is applied here.
+
+**Investigation record (chronological; pending notes below describe their historical point in the work).** Inspected the editor host, scripted entry point, retained viewport paint binding and SceneKit executor.
 The design-mode editor already uses `submitCached` and a camera paint patch. Measure their actual cost before changing them.
 The native capture profiler already supplies asynchronous per-pass GPU timestamps (`NK_SCENE_GPU_TIMINGS`, interval 1 for
 the benchmark); extend this single instrumentation path with draw/triangle/upload counters instead of adding another timer.
@@ -214,7 +287,7 @@ now accepts either changed content key or paint revision, matching the public di
 The native-submit p95 is 15.50 ms in this capture, while native plan preparation is 0.52 ms median. The warmed fixed-app CPU
 profile shows NVIDIA driver work and scheduler yielding inside scene rendering after the managed rebuild costs are removed.
 GPU state during the profile is P0 (1,569–1,771 MHz graphics, 4,006 MHz memory); no fixed low-power clock limit was observed.
-Next checks: an unprofiled/no-GPU-query control and an awake paired baseline. No LOD or renderer architecture change is applied.
+Those controls and the awake paired comparison are recorded in the final status above. No LOD or renderer architecture change is applied.
 
 
 **Remaining-cost controls.** `orbit-no-query-control-01` runs the same 428 ready frames without CPU sampling or GPU timing
