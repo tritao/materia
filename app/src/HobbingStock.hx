@@ -37,7 +37,8 @@ class HobbingStock {
   var lastPreviewTime = -1e30;
   var finalPreview = false;
   var disposed = false;
-  var lastMaster = 0.0;
+  var lastMaster:Null<Float> = null;
+  var streamStarted = false;
   var streamStopped = false;
   /** RingStock coordinates are mm; the centred scene-geometry offset is explicitly metres. */
   public function new(config:SceneArtifactHobbing, centerMetres:Array<Float>) {
@@ -84,9 +85,13 @@ class HobbingStock {
     );
     cutGeometry = blankGeometry;
   }
-  public function follow(time:Float, axes:HobbingAxes):Void {
-    if (!streamStopped) {
-      if (axes.b < lastMaster - 1e-8 && axes.x > stock.grid.radiusMax + config.outside / 2) {
+  public function follow(time:Float, axes:HobbingAxes, spindleReady:Bool):Void {
+    // A compliant transmission can settle in either direction before spin-up. Start phase windows at measured
+    // spindle readiness, then retain every sample through the cut, even if speed later drops out of the ready band.
+    streamStarted = streamStarted || spindleReady;
+    if (streamStarted && !streamStopped) {
+      var previous = lastMaster;
+      if (previous != null && axes.b < previous - 1e-8 && axes.x > stock.grid.radiusMax + config.outside / 2) {
         stream.finish();
         streamStopped = true;
       } else stream.push(time, axes);

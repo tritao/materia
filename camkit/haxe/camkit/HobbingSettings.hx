@@ -24,7 +24,7 @@ class HobbingSettings {
   public var tiltJoint:String = "swivel/A";
   public var hobJoint:String = "spindle/B";
   public var tableJoint:String = "table/C";
-  /** Startup witness: hob encoder datum B=0, released EGB, and machine ready to accept this job. */
+  /** Startup witness: stopped hob with valid absolute encoder phase, released EGB, and machine ready for this job. */
   public var readySignal:String = "hob.job_ready";
   public var stoppedSignal:String = "hob.stopped";
   public function new() {

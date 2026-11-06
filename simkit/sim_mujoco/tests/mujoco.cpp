@@ -1952,6 +1952,56 @@ void a_vertical_follower_sags_by_its_weight_over_the_stiffness() {
     nkscene_scene_destroy(scene);
 }
 
+// A speed amplifier must carry gravity through its transmission, in either declaration direction.
+// The belt remains elastic: load sag is physical, but stopped shafts must not creep indefinitely.
+void velocity_drive_carries_a_compliant_transmission_load() {
+    for (bool inverse : {false, true}) {
+        nkscene_scene scene = 0;
+        assert(nkscene_scene_create(&scene) == NKS_OK);
+        nksim_world_desc desc{};
+        desc.struct_size = sizeof(desc); desc.scene = scene;
+        desc.fixed_timestep = 0.001; desc.physics_substeps = 4; desc.gravity[2] = -9.81;
+        nksim_world world = 0;
+        assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+        const auto base = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_STATIC, 0.0);
+        const auto rotor = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, 1.0);
+        const auto load = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, 10.0);
+        nksim_joint_desc joint{};
+        joint.struct_size = sizeof(joint); joint.type = NKSIM_JOINT_PRISMATIC; joint.body_a = base;
+        joint.lower_limit = -10.0; joint.upper_limit = 10.0; joint.max_force = 1000.0;
+        joint.body_b = rotor; joint.axis_a[0] = 1.0;
+        nksim_joint motor = 0, spindle = 0;
+        assert(nksim_joint_create(world, &joint, &motor) == NKSIM_OK);
+        joint.body_b = load; joint.axis_a[0] = 0.0; joint.axis_a[2] = 1.0;
+        assert(nksim_joint_create(world, &joint, &spindle) == NKSIM_OK);
+        nksim_joint_coupling_desc coupling{};
+        coupling.struct_size = sizeof(coupling);
+        coupling.leader = inverse ? spindle : motor; coupling.follower = inverse ? motor : spindle;
+        coupling.ratio = inverse ? -0.5 : -2.0;
+        coupling.stiffness = inverse ? 4e5 : 1e5; coupling.damping_ratio = 1.0;
+        assert(nksim_joint_couple(world, &coupling) == NKSIM_OK);
+        nksim_joint_target command{};
+        command.struct_size = sizeof(command); command.joint = motor;
+        command.mode = NKSIM_JOINT_TARGET_VELOCITY; command.max_force = 1000.0;
+        for (double speed : {0.0, 0.05, -0.05, 0.0}) {
+            command.target = speed;
+            assert(nksim_world_set_joint_targets(world, &command, 1) == NKSIM_OK);
+            step_world(world, 1000);
+            nksim_joint_state driven{}, measured{};
+            driven.struct_size = measured.struct_size = sizeof(driven);
+            assert(nksim_joint_get_state(world, motor, &driven) == NKSIM_OK);
+            assert(nksim_joint_get_state(world, spindle, &measured) == NKSIM_OK);
+            std::printf("belt velocity inverse=%d target=%g motor=%g load=%g effort=%g\n",
+                inverse, speed, driven.velocity, measured.velocity, driven.effort);
+            assert(std::abs(driven.velocity - speed) < 1e-5);
+            assert(std::abs(measured.velocity + 2.0 * speed) < 2e-5);
+            assert(std::abs(measured.position + 2.0 * driven.position + 98.1 / 1e5) < 2e-5);
+            assert(std::abs(driven.effort) <= 1000.0001);
+        }
+        nksim_world_destroy(world); nkscene_scene_destroy(scene);
+    }
+}
+
 // A carriage on a belt rings at the belt's frequency. The motor (a light joint held by its drive) pulls a carriage of
 // known mass through a coupling of known stiffness; a step of the motor's command makes the carriage swing, and its
 // frequency must be sqrt(k / m) / 2 pi and its decay the damping ratio's. The motor's coordinate is the carriage's
@@ -3541,6 +3591,7 @@ int main() {
     a_follower_with_two_leaders_uses_a_tendon_equality();
     a_coupling_rings_as_its_damping_ratio_says();
     a_vertical_follower_sags_by_its_weight_over_the_stiffness();
+    velocity_drive_carries_a_compliant_transmission_load();
     belt_stiffness_follows_physical_span_lengths();
     a_belt_carriage_rings_at_its_belt_frequency();
     convex_hulls_overlapping_at_rest_do_not_collide();

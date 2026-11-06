@@ -229,6 +229,23 @@ class HobberPartTests {
       && spindle.motorEncoder.countsPerRevolution == spindle.motor.rating.encoderCounts,
       "B master is the cartridge's own 19-bit absolute encoder; the servo keeps its own for the drive loop");
     near(spindle.ratio, 1.0, 1e-9, "the belt turns the motor once per spindle turn");
+    var spindleState = new cadkit.modeling.AssemblyState(spindle.definition());
+    var beltBefore = spindleState.worldPose("belt"), pulleyBefore = spindleState.worldPose("spindlePulley"),
+      motorBefore = spindleState.worldPose("motorPulley");
+    spindleState.setJoint("B", Math.PI / 3);
+    var beltAfter = spindleState.worldPose("belt"), pulleyAfter = spindleState.worldPose("spindlePulley"),
+      motorAfter = spindleState.worldPose("motorPulley");
+    var beltDot = beltBefore.qx * beltAfter.qx + beltBefore.qy * beltAfter.qy
+      + beltBefore.qz * beltAfter.qz + beltBefore.qw * beltAfter.qw;
+    check(Math.abs(beltBefore.x - beltAfter.x) + Math.abs(beltBefore.y - beltAfter.y)
+      + Math.abs(beltBefore.z - beltAfter.z) < 1e-8 && Math.abs(Math.abs(beltDot) - 1) < 1e-10,
+      "the closed belt envelope stays on the housing when B turns");
+    var pulleyDot = pulleyBefore.qx * pulleyAfter.qx + pulleyBefore.qy * pulleyAfter.qy
+      + pulleyBefore.qz * pulleyAfter.qz + pulleyBefore.qw * pulleyAfter.qw;
+    var motorDot = motorBefore.qx * motorAfter.qx + motorBefore.qy * motorAfter.qy
+      + motorBefore.qz * motorAfter.qz + motorBefore.qw * motorAfter.qw;
+    check(Math.abs(pulleyDot) < 0.99 && Math.abs(motorDot) < 0.99,
+      "both pulleys rotate through the belt transmission without rotating the loop envelope");
     near(spindle.jointTorque(2), 2.0, 1e-9, "the 1:1 belt passes the motor torque unchanged");
     check(spindle.motorPulley.teeth == 40 && spindle.spindlePulley.teeth == 40 && Math.abs(spindle.belt.length - 450) < 1e-6 && spindle.belt.teeth == 90,
       "HTD5M 40T on the motor and on the spindle, one 450 mm (90 tooth) belt");

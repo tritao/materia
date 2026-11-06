@@ -23,7 +23,10 @@ class HobberFrameChecks {
     // The column is lowered onto the carriage after the carriage's block and nut-block screws are fitted: those screws are reached before it is in place
     // (the assembly order, per fastener: the column still blocks every other screw's driver and counts for holes and heads).
     var options:IntegrityOptions = {strict: true, processContacts: machine.processContacts(), runningGap: gap,
-      fittedBefore: [{member: "column/", fastened: ["Xbridge"]},
+      fittedBefore: [
+        // Fit the belt after fastening the servo flange; the stationary loop covers its wrench access.
+        {member: "spindle/belt", fastened: ["spindle/motor"]},
+        {member: "column/", fastened: ["Xbridge"]},
         // The ring's heads are sunk at the plate end: its screws into the output flange are fitted before the swivel plate goes on.
         {member: "swivelPlate", fastened: ["swivel/output"]},
         // The outboard support's carrier is screwed to the saddle plate's face before the plate is (its driver axis passes the plate).

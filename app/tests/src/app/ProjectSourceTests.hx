@@ -6790,7 +6790,8 @@ typedef CubeRun = {
         var grippedSignal = -1.0;
         for (frame in runtimeSnapshot.sensors.toArray()) if (frame.sensorId == "arm/tool/gripper/gripped"
           && frame.values.length > 0) grippedSignal = frame.values.get(0);
-        var closeCommand = switch mission.robot.runtime.channelValue("arm/tool/gripper/body.close") {
+        var closeCoil = mission.robot.runtime.channelValue("arm/tool/gripper/body.close");
+        var closeCommand = switch closeCoil {
           case Digital(value):
             value;
           case _:
@@ -7040,8 +7041,10 @@ typedef CubeRun = {
     if (testBlank == null) throw "Generated tending CNC project lost its scripted blank";
     testBlank.dynamicBody = true;
     testBlank.collisionEnabled = true;
-    var generatedState = new cadkit.modeling.AssemblyState(generated.assemblyDefinition, generated.assemblyState);
-    var generatedSensors = generated.assemblyDefinition.sensors;
+    var generatedDefinition = generated.assemblyDefinition;
+    if (generatedDefinition == null) throw "Generated tending cell lost its assembly definition";
+    var generatedState = new cadkit.modeling.AssemblyState(generatedDefinition, generated.assemblyState);
+    var generatedSensors = generatedDefinition.sensors;
     if (generatedSensors == null) throw "Generated tending cell lost its field sensors";
     var stockSensor = [for (sensor in generatedSensors) if (sensor.id == "mill/stock-present") sensor];
     var sensorOccurrence = stockSensor.length == 1 ? stockSensor[0].occurrence : null;
@@ -7942,7 +7945,8 @@ typedef CubeRun = {
       while (mission.failure == null && !closeRequested && closeTicks < retryLimit) {
         simulation.step();
         closeTicks++;
-        closeRequested = switch mission.robot.runtime.channelValue(DualArmGripperTool.TOOL_CHANNEL_A) {
+        var closeCoil = mission.robot.runtime.channelValue(DualArmGripperTool.TOOL_CHANNEL_A);
+        closeRequested = switch closeCoil {
           case Digital(value):
             value;
           case _:

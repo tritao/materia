@@ -1701,6 +1701,7 @@ private:
         servo_effort.assign(model->nv, 0.0);
         servo_limits.assign(model->nv, 0.0);
         servo_coordinates_dirty = true;
+        velocity_coordinates.reset();
     }
 
     void servo_inertia_feedforward() {
@@ -2592,7 +2593,31 @@ private:
             }
             }
         }
+        // A speed source drives the load through its nominal transmission coordinate, even when the
+        // physical transmission is compliant. Lift its acceleration to that load before inverse dynamics;
+        // local motor inertia alone supplies neither load acceleration nor its steady gravity torque.
+        std::vector<int> velocity_motors;
+        std::vector<mjtNum> velocity_limits(nv, 0.0), lifted(nv, 0.0), velocity_effort(nv, 0.0);
+        for (const auto id : joint_order) {
+            const auto &joint = joints.at(id);
+            if (joint.target_mode != NKSIM_JOINT_TARGET_VELOCITY) continue;
+            const int native = model_joint_id(joint);
+            if (native < 0 || (model->jnt_type[native] != mjJNT_HINGE && model->jnt_type[native] != mjJNT_SLIDE)) continue;
+            const int dof = model->jnt_dofadr[native];
+            const double limit = joint.target_max_force != 0.0 ? joint.target_max_force : joint.desc.max_force;
+            if (limit < 0.0) continue;
+            velocity_motors.push_back(dof);
+            velocity_limits[dof] = limit;
+        }
+        if (!velocity_coordinates || velocity_coordinates->motors != velocity_motors)
+            velocity_coordinates = std::make_unique<ServoCoordinateMap>(servo_space, velocity_motors);
+        velocity_coordinates->accelerations(qacc_desired, lifted);
+        for (const int dof : velocity_motors) qacc_desired[dof] = 0.0;
+        for (std::size_t dof = 0; dof < nv; ++dof) qacc_desired[dof] += lifted[dof];
         mj_mulM(model, data, m_qacc.data(), qacc_desired.data());
+        std::vector<mjtNum> total_effort(m_qacc);
+        for (std::size_t dof = 0; dof < nv; ++dof) total_effort[dof] += data->qfrc_bias[dof];
+        velocity_coordinates->efforts(total_effort, velocity_limits, velocity_effort);
         servo_inertia_feedforward();
 
         for (const auto joint_id : joint_order) {
@@ -2651,8 +2676,10 @@ private:
             double torque = 0.0;
             switch (joint.target_mode) {
             case NKSIM_JOINT_TARGET_POSITION:
-            case NKSIM_JOINT_TARGET_VELOCITY:
                 torque = m_qacc[dof] + bias;
+                break;
+            case NKSIM_JOINT_TARGET_VELOCITY:
+                torque = velocity_effort[dof];
                 break;
             case NKSIM_JOINT_TARGET_FLOW:
                 torque = m_qacc[dof] + bias - contact_load[dof];
@@ -2771,7 +2798,7 @@ private:
     };
     std::vector<BrakeSolverResponse> brake_responses;
     DriveCoordinateSpace servo_space;
-    std::unique_ptr<ServoCoordinateMap> servo_coordinates;
+    std::unique_ptr<ServoCoordinateMap> servo_coordinates, velocity_coordinates;
     bool servo_coordinates_dirty = true;
     std::vector<mjtNum> servo_accelerations, servo_qacc, servo_mass_effort, servo_effort, servo_limits;
     std::vector<nksim::BackendClosure> closures;

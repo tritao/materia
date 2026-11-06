@@ -149,7 +149,9 @@ class HobSpindle extends MachineAssembly {
     fixed("motorEncoder", motorEncoder, F.compose(motorPose, F.fromRotationMatrix(0, 0, -face.bodyLength, [1.0, 0, 0, 0, -1, 0, 0, 0, -1])), "motor");
     // The belt's x runs from the cartridge pulley to the servo's, tilted from straight up by the offset; its z is toward the rear.
     var ux = MOTOR_OFFSET / c, uy = -h / c;
-    fixed("belt", belt, F.fromRotationMatrix(0, 0, front - 1.5, [ux, uy, 0, uy, -ux, 0, 0, 0, -1]), "spindlePulley");
+    // The closed belt path has a stationary envelope. Its material travels around the pulleys; fixing the whole
+    // loop to a pulley would orbit its mass and collision hull about B and strike the bed during approach.
+    fixed("belt", belt, F.fromRotationMatrix(0, 0, front - 1.5, [ux, uy, 0, uy, -ux, 0, 0, 0, -1]), "housing");
     addMemberConnector("spindlePulley", "beltPlane", Solids.axial(0, 0, 1.5));
     addMemberConnector("motorPulley", "beltPlane", Solids.axial(0, 0, 1.5));
     addBeltPath({

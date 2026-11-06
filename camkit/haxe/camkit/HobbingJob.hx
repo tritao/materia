@@ -121,7 +121,8 @@ class HobbingJob {
     var s = settings, ops:Array<ToolpathOp> = [], span = Provenance.cam(0, "hobbing setup");
     ops.push(WaitSignal(s.readySignal, true, s.signalTimeout, span));
     ops.push(SetSetup("hobber-axes", span));
-    // The startup witness includes a referenced B=0 and released gear. Clear radially before tilt/phase changes.
+    // Absolute measured B supplies the electronic gear's phase; it need not be zero. Clear radially before tilt,
+    // table phase alignment and engaging the gear, then wait for spindle speed before approaching the stock.
     ops.push(PositionJoint(s.xAxis, safeX / 1000, span));
     ops.push(PositionJoint(s.tiltJoint, -hob.leadAngle, span));
     ops.push(PositionJoint(s.tableJoint, passes[0].tablePhase, span));

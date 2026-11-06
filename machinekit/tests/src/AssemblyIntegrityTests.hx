@@ -60,7 +60,31 @@ class AssemblyIntegrityTests {
     return builder;
   }
 
+  static function beltSupports():Void {
+    function loop(lift:Float):AxisBuilder {
+      var builder = new AxisBuilder();
+      builder.place("base", new GantryPlate("TEST-BELT-BASE", "Base", 100, 100, 10), AssemblyFrames.identity());
+      for (side in ["left", "right"]) {
+        builder.attach(side, new GantryPlate("TEST-BELT-" + side, "Pulley contact", 10, 10, 10),
+          AssemblyFrames.translation(side == "left" ? -20 : 20, 0, 10), "base");
+        builder.addMemberConnector(side, "wrap", AssemblyFrames.identity());
+      }
+      builder.attach("belt", new GantryPlate("TEST-BELT-ENVELOPE", "Closed loop envelope", 50, 10, 2),
+        AssemblyFrames.translation(0, 0, 20 + lift), "base");
+      builder.addBeltPath({belt:"belt", wraps:[
+        {instanceId:"left", connectorName:"wrap"}, {instanceId:"right", connectorName:"wrap"}
+      ]});
+      return builder;
+    }
+    expectClean(AssemblyIntegrity.check(loop(0), {floorZ:0}),
+      "a stationary belt envelope is supported by its declared pulley contacts");
+    expectOnly(AssemblyIntegrity.check(loop(2), {floorZ:0}),
+      ["integrity.support.gap", "integrity.support.ground"],
+      "a declared belt path cannot conceal missing physical support");
+  }
+
   public static function run():Void {
+    beltSupports();
     expectClean(AssemblyIntegrity.check(stack(0), {floorZ: 0}), "a plate standing on a plate on the floor");
     expectOnly(
       AssemblyIntegrity.check(stack(5)),

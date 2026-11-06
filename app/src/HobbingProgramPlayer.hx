@@ -283,14 +283,16 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
   );
   function input(channel:String):Null<EventValue> {
     var s = robot.robot.snapshot(), b = s.velocities.get(indices[4]);
-    if (channel == "hob.job_ready") return Digital(Math.abs(s.positions.get(indices[4]) + offsets[4]) < 1e-5
-      && Math.abs(b) < 0.01);
+    // The cartridge encoder supplies absolute phase to the electronic gear. A velocity drive has no position-zero
+    // contract, and a compliant transmission may settle away from its assembled angle while stopped.
+    if (channel == "hob.job_ready") return Digital(Math.abs(b) < 0.01);
     if (channel == "hob.stopped") return Digital(Math.abs(b) < 0.01);
-    if (channel == spindleAtSpeedChannel) return Digital(Math.abs(b - job.rpm * 2 * Math.PI / 60) < Math.max(
-      0.01,
-      job.rpm * 2 * Math.PI / 60 * 0.001
-    ));
+    if (channel == spindleAtSpeedChannel) return Digital(spindleAtSpeed(b));
     return null;
+  }
+  function spindleAtSpeed(velocity:Float):Bool {
+    var target = job.rpm * 2 * Math.PI / 60;
+    return Math.abs(velocity - target) < Math.max(0.01, target * 0.001);
   }
   /** Display-only transfer time; paused playback never advances it. */
   public function advanceHandling(seconds:Float):Void {
@@ -392,7 +394,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     if (!started
       || cutCompleted || completed || failure != null || disposed || guardInterrupted && !motion.running) return;
     try {
-      var q = robot.robot.snapshot().positions;
+      var snapshot = robot.robot.snapshot(), q = snapshot.positions;
       var axes = new HobbingAxes(
         (q.get(indices[0]) + offsets[0]) * 1000,
         (q.get(indices[1]) + offsets[1]) * 1000,
@@ -401,7 +403,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
         q.get(indices[4]) + offsets[4],
         q.get(indices[5]) + offsets[5]
       );
-      stock.follow(Int64.toFloat(timestamp) * 1e-9, axes);
+      stock.follow(Int64.toFloat(timestamp) * 1e-9, axes, spindleAtSpeed(snapshot.velocities.get(indices[4])));
       if (trace && session.simulationTime() - traceTime >= 0.25) {
         traceTime = session.simulationTime();
         var contactCount = -1;
@@ -432,7 +434,18 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
       // Compare measured phase only while the material feed is underway (A and C datum already positioned).
       if (stock.forces.last != null && stock.forces.last.removedVolume > 0 && axes.b > 1) {
         var phase = job.passes[0].tablePhase;
-        syncError = Math.max(syncError, Math.abs(axes.c - axes.b * config.starts / config.teeth - phase));
+        var error = Math.abs(axes.c - axes.b * config.starts / config.teeth - phase);
+        if (trace && error > Math.max(1e-8, syncError * 1.2)) {
+          var force = stock.forces.last;
+          Sys.println("HOBBER_SYNC " + haxe.Json.stringify({
+            t:session.simulationTime(), errorArcsec:error * 648000 / Math.PI,
+            x:axes.x, z:axes.z, b:axes.b, c:axes.c,
+            bVelocity:snapshot.velocities.get(indices[4]), cVelocity:snapshot.velocities.get(indices[5]),
+            cSet:snapshot.setpointPositions.get(indices[5]) + offsets[5], cEffort:snapshot.efforts.get(indices[5]),
+            passStart:force == null ? 0 : force.pass.start, passEnd:force == null ? 0 : force.pass.end
+          }));
+        }
+        syncError = Math.max(syncError, error);
       }
       elapsed = session.simulationTime() - startTime;
       if (stock.maxBytes > 128 * 1024 * 1024

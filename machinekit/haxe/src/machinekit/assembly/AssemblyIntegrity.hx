@@ -437,9 +437,23 @@ class AssemblyIntegrity {
     }
     function join(a:String, b:String):Void parent.set(find(a), find(b));
     for (id in ids) parent.set(id, id);
+    // A closed belt's fixed mate places its stationary envelope. Its physical supports are the
+    // pulleys/clamp declared by its path, whose real contacts must still reach grounded members.
+    var belts = new Map<String, Bool>();
+    for (path in flat.beltPaths) {
+      belts.set(path.belt, true);
+      var supports = [for (wrap in path.wraps) wrap.instanceId];
+      if (path.clamp != null) supports.push(path.clamp.instanceId);
+      for (support in supports) {
+        if (touching(parts, boxes, path.belt, support) <= contactTolerance) join(path.belt, support);
+        else diagnostics.error("integrity.support.gap", path.belt,
+          'Belt ${path.belt} does not touch its declared support $support');
+      }
+    }
     var carried = new Map<String, Bool>();
     for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree) {
       carried.set(joint.child, true);
+      if (belts.exists(joint.child) && joint.type == AssemblyJointType.Fixed) continue;
       var gap = touching(parts, boxes, joint.parent, joint.child);
       if (gap <= contactTolerance) join(joint.parent, joint.child);
       else diagnostics.error(

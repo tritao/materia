@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "entry": "tests.HobbingSpindleSamplingTests",
+  "sourceRoots": ["src"],
+  "scopeSourceRoots": false,
+  "dependencies": {"app": {"path": ".."}},
+  "target": "host",
+  "outputDir": "../build/hobbing-spindle-sampling-tests"
+}
