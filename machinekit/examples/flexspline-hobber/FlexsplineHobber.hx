@@ -73,6 +73,7 @@ class FlexsplineHobber extends MachineAssembly {
     var foundations = machinekit.cache.Parallel.all([sizedBed, sizedColumn]);
     bed = cast foundations[0];
     column = cast foundations[1];
+    group("Bed and column");
     includeAt("bed", bed, FoundationLayout.worldPose("bed"));
     var footCentres = FoundationLayout.feet();
     for (i in 0...footCentres.length) {
@@ -113,6 +114,7 @@ class FlexsplineHobber extends MachineAssembly {
       ));
       fixAt("foot" + i, foot, F.translation(x, y, -637), "footNut" + i);
     }
+    group("C table and work");
     var installed:machinekit.motion.PrecisionRotaryAxis = rotaryAxis
       == null ? new machinekit.motion.PurchasedRotaryTable() : rotaryAxis;
     table = installed.assembly();
@@ -234,6 +236,7 @@ class FlexsplineHobber extends MachineAssembly {
       {id: "Y", lower: -10, upper: 10, initial: 0},
       {id: "Z", lower: -10, upper: 190, initial: 0}
     ];
+    group("X axis");
     for (placed in HobberRailPlacement.placements("bed", FoundationLayout.placements("bed"))) {
       var insert = "bed/" + placed.insertId;
       fixAt(placed.memberId, placed.rail, placed.pose, insert, placed.contact);
@@ -252,8 +255,10 @@ class FlexsplineHobber extends MachineAssembly {
         fixAt("Xbridge", new HobberSaddle("GE-X-carriage"), F.translation(centre, 0, 0), id, top);
       } else fixAt(id, block, pose, "Xbridge", top);
     }
+    group("Bed and column");
     includeAt("column", column, FoundationLayout.worldPose("column"));
     fixExisting("column-mount", "Xbridge", "column/basePlate", F.alongY(centre + 326, 0, 280, 0, 0, 1));
+    group("Z axis");
     for (placed in HobberRailPlacement.placements("column", FoundationLayout.placements("column"))) {
       var insert = "column/" + placed.insertId;
       fixAt(placed.memberId, placed.rail, placed.pose, insert, placed.contact);
@@ -273,6 +278,7 @@ class FlexsplineHobber extends MachineAssembly {
     }
     // A axis (FRAME_PLAN R1): the eRob 110 actuator, its housing in a pocket cut into the Z saddle from behind, a turned adapter ring on its
     // output flange and the ground swivel plate on the ring. The actuator's own brake holds the head; its holding torque is an assumption.
+    group("A swivel");
     swivel = new ErobActuator(100, 20, true, "A", new ComponentValues().setNumber("brakeHoldingTorque", A_BRAKE_HOLDING), HobberSwivelLayout.RANGE, A_ACCELERATION);
     includeAt("swivel", swivel, HobberSwivelLayout.pose());
     fixExisting("swivel-mount", "Zplate", "swivel/housing", F.alongY(HobberSwivelLayout.OUTPUT_X + 6, 0, HobberZLayout.SEAT_Z, 1, 0, 0));
@@ -291,6 +297,7 @@ class FlexsplineHobber extends MachineAssembly {
       "swivelAdapter",
       F.alongY(HobberSwivelLayout.PLATE_X, 0, HobberZLayout.SEAT_Z, -1, 0, 0)
     );
+    group("Y axis");
     for (side in [-1, 1]) fixAt(
       side < 0 ? "railYLeft" : "railYRight",
       LinearRail.metric("HGH15CA", 220),
@@ -310,6 +317,7 @@ class FlexsplineHobber extends MachineAssembly {
         fixAt("Yplate", new HobberSaddle("GE-Y-saddle"), F.translation(centre, 0, HobberZLayout.SEAT_Z), id, face);
       } else fixAt(id, block, pose, "Yplate", face);
     }
+    group("B spindle");
     spindle = new HobSpindle();
     includeAt("spindle", spindle, F.fromRotationMatrix(centre, HobberSwivelLayout.SPINDLE_Y, HobberZLayout.SEAT_Z, e0));
     // One milled split-clamp block holds the Ø80 cartridge (FRAME_PLAN R2): bore with a slit up the +z side, three clamp screws across it,
@@ -354,6 +362,7 @@ class FlexsplineHobber extends MachineAssembly {
     );
     // The rack is a free-standing floor unit with its own base plate on the floor, not part of the machine's structure (it was
     // mated to the bed's lifting seat 650 mm away); the wiring to the machine is by ports, not by a mate.
+    group("Electrical");
     addComponent("electricalPanel", new HobberSaddle("electrical-panel"), HobberElectricalLayout.panelPose());
     zero.set("electricalPanel", HobberElectricalLayout.panelPose());
     fixAt("powerSupply", supply, HobberElectricalLayout.devicePose(0, 130), "electricalPanel");
@@ -368,11 +377,14 @@ class FlexsplineHobber extends MachineAssembly {
     // it stays the re-grindable height spacer), two brackets on the swivel plate for Y.
     var xDrive = HobberDrives.x(), yDrive = HobberDrives.y(), zDrive = HobberDrives.z();
     var xb = HobberDrives.padBoundsBoth(xDrive, HobberDrives.PAD_WIDTH, 15), zb = HobberDrives.padBoundsBoth(zDrive, HobberDrives.PAD_WIDTH, 40);
+    group("X axis/Drive");
     fixAt("XdrivePad", new HobberSaddle("GE-X-drive-pad"), F.identity(), "bed/driveSeat", F.alongY((xb[0] + xb[3]) / 2, 0, 140, 0, 0, 1));
     precisionMounts.push({name: "XdrivePad-mount", parent: "bed/driveSeat"});
+    group("Z axis/Drive");
     fixAt("ZdrivePad", new HobberSaddle("GE-Z-drive-pad"), F.identity(), "column/driveSeat",
       F.alongY(HobberZLayout.SEAT_FACE_X, 0, (zb[2] + zb[5]) / 2, -1, 0, 0));
     precisionMounts.push({name: "ZdrivePad-mount", parent: "column/driveSeat"});
+    group("Y axis/Drive");
     for (support in ["fixed", "floating"]) {
       var name = support == "fixed" ? "Fixed" : "Floating";
       var yHoles = HobberDrives.seatHoles(yDrive, support), yLo = 1e9, yHi = -1e9;
@@ -390,7 +402,9 @@ class FlexsplineHobber extends MachineAssembly {
     // Sealed scales (FRAME_PLAN H4): X on a ground bar on the bed beam, Z on a bar on the column channel's wall with its head on
     // an arm from the Z saddle, Y on the swivel plate with its head on a boss of the Y saddle.
     var scaleX = HobberScales.x(), scaleY = HobberScales.y(), scaleZ = HobberScales.z();
+    group("X axis/Scale");
     fixAt("XscaleSeat", new HobberSaddle("GE-X-scale-seat"), F.identity(), "bed/casting", scaleBarContact(scaleX));
+    group("Z axis/Scale");
     fixAt("ZscaleSeat", new HobberSaddle("GE-Z-scale-seat"), F.identity(), "column/casting", scaleBarContact(scaleZ));
     var armFace = HobberScales.headFace(scaleZ);
     fixAt("ZscaleArm", new HobberSaddle("GE-Z-scale-arm"), F.translation(0, 0, HobberZLayout.SEAT_Z), "Zplate",
@@ -398,6 +412,7 @@ class FlexsplineHobber extends MachineAssembly {
     scale(scaleX, "XscaleSeat", "Xbridge");
     scale(scaleY, "swivelPlate", "Yplate");
     scale(scaleZ, "ZscaleSeat", "ZscaleArm");
+    group("Chip protection and enclosure");
     fixAt(
       "chipTray",
       new HobberSaddle(
@@ -446,9 +461,12 @@ class FlexsplineHobber extends MachineAssembly {
     ).throwIfErrors();
     // P4: fixed lapped X sheets, the carriage skirt, and Z channel shields.
     // All feet are on existing steel parts; the castings are unchanged.
-    for (r in HobberChipCover.installations()) fixAt(r.id, new HobberChipCover(new ComponentValues().setToken("role",r.role)), F.identity(),r.parent,r.seat);
-    for (p in HobberChipCover.plugs()) fixAt(p.id,new machinekit.standard.PanelHolePlug(),F.translation(p.x,p.y,p.z),p.parent,
-      F.alongY(p.x,p.y,p.z,0,0,-1));
+    for (r in HobberChipCover.installations()) withGroup(r.role.substr(0, 1) + " axis/Protection", () ->
+      fixAt(r.id, new HobberChipCover(new ComponentValues().setToken("role",r.role)), F.identity(),r.parent,r.seat));
+    withGroup("X axis/Protection", () -> {
+      for (p in HobberChipCover.plugs()) fixAt(p.id,new machinekit.standard.PanelHolePlug(),F.translation(p.x,p.y,p.z),p.parent,
+        F.alongY(p.x,p.y,p.z,0,0,-1));
+    });
     // The screws, washers, nuts and the holes they need follow from the bolted faces the parts declare (BOM_PLAN F1).
     deriveFasteners();
     // The loads the joints carry come from the finished parts (masses), so they are checked after the derived holes are cut.
@@ -619,6 +637,7 @@ class FlexsplineHobber extends MachineAssembly {
    * and its ring on the floating pad, and the nut on a nut block bolted to `blockHost`. The seat holes are cut into the pads.
    */
   function drive(hd:HobberDriveAxis, fixedPad:String, floatingPad:String, blockHost:String):Void {
+    group(hd.id + " axis/Drive");
     var id = hd.id, dr = hd.drive, at = HobberDrives.poses(hd), d = hd.axis.direction, s = hd.axis.start;
     var motor = dr.motor, screw = new HzMotionDrawingScrew(hd.length, dr.endProfile), nut = new BallNut();
     fixAt(id + "fixed", dr.fixed, at.get("mount"), fixedPad);
@@ -657,6 +676,7 @@ class FlexsplineHobber extends MachineAssembly {
   }
   /** One axis's sealed scale: the housing on its seat, the head on its carrier, and the head as the axis's position encoder. */
   function scale(a:HobberScaleAxis, seatHost:String, headHost:String):Void {
+    group(a.id + " axis/Scale");
     var housing = a.id + "scale", head = a.id + "scaleHead";
     fixAt(housing, a.housing, a.housingPose, seatHost, F.compose(a.housingPose, a.housing.connector("mount").frame));
     fixAt(head, a.head, a.headPose, headHost, F.compose(a.headPose, a.head.connector("mount").frame));
@@ -666,7 +686,7 @@ class FlexsplineHobber extends MachineAssembly {
   function bind(id:String, joint:String, motor:String, process:Bool = false, ratio:Float = 1.0):Void {
     driverNumber++;
     var driver = id + "-driver";
-    fixAt(
+    withGroup("Electrical", () -> fixAt(
       driver,
       new MotorDriver(
         "GENERIC-400V-SERVO-AMP",
@@ -677,7 +697,7 @@ class FlexsplineHobber extends MachineAssembly {
         300 + Std.int((driverNumber - 1) / 3) * 250
       ),
       "electricalPanel"
-    );
+    ));
     connectPorts(id + "-power", "powerSupply", "power" + driverNumber, driver, "power");
     addMotor(id, joint, motor, driver, 1, null, process ? {
       speedChannel:"hob.speed", directionChannel:"hob.direction", radiansPerSpeedUnit:ratio * 2 * Math.PI / 60

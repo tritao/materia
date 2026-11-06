@@ -59,7 +59,7 @@ fixed and moving parts) and cross-cutting categories (all fasteners, everything 
 - G2 implemented: functional hierarchy, Sets section, independent eye/isolate controls and composed document masks.
   Focused editor visibility suite passed (118 assertions), including rendered isolate keyboard activation and hidden-ancestor
   isolation across save/load. Real-machine editor-tree integration passed 2858 checks. Full app validation is running.
-- G3 implemented and validated: all 269 hobber members are grouped, with 16 derived sets. Final hobber baseline passed
+- G3 implemented, validated and committed: all 269 hobber members are grouped, with 16 derived sets. Final hobber baseline passed
   2345 assertions (original baseline 2333). Changes to the hobber construction are group declarations/scopes only.
 - G4 implemented: legacy/framed mills and production hand-built examples, including inherited gantries and tracks.
   Final hobbing, mill-frame and real-machine editor-tree tests are queued. The tree fixture covers generated artifact

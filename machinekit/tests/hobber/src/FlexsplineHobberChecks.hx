@@ -37,6 +37,19 @@ class FlexsplineHobberChecks {
   public static function run():Void {
     var machine = new FlexsplineHobber();
     machine.validate();
+    check(machine.checkGroups().items.length == 0, "every hobber member has authored functional ownership");
+    var ownership = machine.functionalGroups(), count = 0;
+    for (id in ownership.keys()) count++;
+    check(count == machine.components().length, "hobber ownership is total and single-valued");
+    for (id in ["railXLeft", "Xbridge", "XdrivePad", "Xfixed", "Xnut", "Xscale", "XscaleHead", "Xskirt"])
+      check(StringTools.startsWith(ownership.get(id), "X axis"), "X function includes fixed and moving " + id);
+    var selections = machine.sets();
+    var movesX = selections.filter(s -> s.id == "moves:X")[0].members;
+    check(movesX.indexOf("Xbridge") >= 0 && movesX.indexOf("column/casting") >= 0
+      && movesX.indexOf("railXLeft") < 0, "moves-with X follows joint descendants across functional groups");
+    var covers = selections.filter(s -> s.id == "kind:Covers and wipers")[0].members;
+    check(covers.indexOf("Xskirt") >= 0 && covers.indexOf("ZcoverLeft") >= 0, "covers set derives from component metadata");
+    Sys.println("Hobber groups: " + count + " members, no ungrouped members; " + selections.length + " derived sets");
     assertions += HobberDesignChecks.run(machine);
     assertions += HobberFrameChecks.run(machine);
     assertions += HobberCastingMassChecks.run(machine);
