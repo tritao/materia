@@ -58,6 +58,33 @@ class CouplingProjection {
 
   public function isEmpty():Bool return followers.length == 0;
 
+  /**
+   * Target rate per source rate, when every independent coordinate gives the same relation. Mechanical relations
+   * work in either direction: a motor declared as a follower can drive its load. A differential with another
+   * independent input has no scalar conversion. Position offsets do not affect rates.
+   */
+  public function relativeRate(source:Int, target:Int, jointCount:Int):Null<Float> {
+    if (source < 0 || target < 0 || source >= jointCount || target >= jointCount)
+      throw "Rate relation references a joint outside the projection";
+    var ratio:Null<Float> = null;
+    for (root in 0...jointCount) {
+      if (followers.indexOf(root) >= 0) continue;
+      var rates = [for (_ in 0...jointCount) 0.0];
+      rates[root] = 1.0;
+      complete(rates, false);
+      var from = rates[source], to = rates[target];
+      if (from == 0.0) {
+        if (to != 0.0) return null;
+        continue;
+      }
+      var candidate = to / from;
+      if (!Math.isFinite(candidate) || candidate == 0.0) return null;
+      if (ratio == null) ratio = candidate;
+      else if (Math.abs(candidate - ratio) > 1e-10 * Math.max(Math.abs(candidate), Math.abs(ratio))) return null;
+    }
+    return ratio;
+  }
+
   /** The terms of `follower` as (leader, ratio, offset), in the order they are summed. */
   public function termsOf(follower:Int):Array<{leader:Int, ratio:Float, offset:Float}> {
     var result = [];
