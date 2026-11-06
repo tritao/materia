@@ -1016,10 +1016,14 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
         || !simulation.isActive() || !simulationOverlaysVisible ? null : mission.overlay());
       perspectiveViewport.advanceNavigation(deltaSeconds);
       if (perspectiveViewport.advancePresentation(deltaSeconds)) invalidateView();
+      perspectiveViewport.preparePresentationFrame();
       if (!perspectiveViewport.requestCameraPaintPatch()) invalidateView();
     }
-    if (inspectionCamera.advancePresentation(deltaSeconds)) invalidateView();
-    if (cameraVisible && !inspectionCamera.requestPaintPatch()) invalidateView();
+    if (cameraVisible) {
+      if (inspectionCamera.advancePresentation(deltaSeconds)) invalidateView();
+      inspectionCamera.preparePresentationFrame();
+      if (!inspectionCamera.requestPaintPatch()) invalidateView();
+    }
   }
 
   /** Build the shared view tree for one host frame, after `updatePresentation`. */

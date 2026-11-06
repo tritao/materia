@@ -31,6 +31,9 @@ import haxeon.ui.widgets.text.Text;
   }
   public function advancePresentation(seconds:Float):Bool return viewport != null
     && viewport.advancePresentation(seconds);
+  public function preparePresentationFrame():Void {
+    if (viewport != null) viewport.preparePresentationFrame();
+  }
   public function dispose():Void {
     if (viewport != null) viewport.dispose();
     viewport = null;

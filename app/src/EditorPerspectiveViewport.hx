@@ -61,8 +61,8 @@ class EditorPerspectiveViewport implements View implements Observable {
   var surface:Null<GraphicsSurface> = null;
   var renderedRevision:String = "";
   // Input and overlays use layout pixels; the GPU texture can be smaller on large displays.
-  var viewportWidth:Float = 1.0;
-  var viewportHeight:Float = 1.0;
+  @:unobservable var viewportWidth:Float = 1.0;
+  @:unobservable var viewportHeight:Float = 1.0;
   var renderedViewportWidth:Float = 0.0;
   var renderedViewportHeight:Float = 0.0;
   var renderedWidth:Int = 0;
@@ -81,8 +81,9 @@ class EditorPerspectiveViewport implements View implements Observable {
   var totalRenderSeconds:Float = 0.0;
   final camera:PerspectiveCamera = new PerspectiveCamera();
   public var presentation(default, null):Null<PresentationController>;
-  var presentationCenters:Null<Map<String, Array<Float>>>;
-  var presentationScale = 1.0;
+  @:unobservable var presentationCenters:Null<Map<String, Array<Float>>>;
+  @:unobservable var presentationScale = 1.0;
+  // Published frame state; changed only by the owner update phase.
   var presentationResult:Null<PresentationFrame>;
   var presentationRevision = "";
   @:unobservable var presentationInputKey = "";
@@ -90,11 +91,11 @@ class EditorPerspectiveViewport implements View implements Observable {
   @:unobservable var presentationInputCursor:Null<PresentationCursor>;
   @:unobservable var presentationInputAnimating = false;
   @:unobservable var presentationFrameSerial = 0;
-  var presentationPoses:Array<SimulationPoseVisual> = [];
-  var presentationPoseById:Map<String, SimulationPoseVisual> = [];
-  var presentationCameraDirty = true;
-  var presentationTarget:Null<Array<Float>>;
-  var presentationCameraView:Null<String>;
+  @:unobservable var presentationPoses:Array<SimulationPoseVisual> = [];
+  @:unobservable var presentationPoseById:Map<String, SimulationPoseVisual> = [];
+  @:unobservable var presentationCameraDirty = true;
+  @:unobservable var presentationTarget:Null<Array<Float>>;
+  @:unobservable var presentationCameraView:Null<String>;
   var readOnly = false;
   var inspectionZoom:Float = 1;
   public var onInspectionZoom:Null<Float -> Void> = null;
@@ -131,6 +132,7 @@ class EditorPerspectiveViewport implements View implements Observable {
     offsetDraft = draft;
     offsetSaved = save;
     previewPresentationOffset(draft.distance);
+    preparePresentationFrame();
     var initial = presentationFrame();
     if (initial == null) {
       cancelPresentationOffsetEdit();
@@ -143,6 +145,7 @@ class EditorPerspectiveViewport implements View implements Observable {
     }
     var before = [first.x, first.y, first.z], distance = draft.distance;
     previewPresentationOffset(distance + 1);
+    preparePresentationFrame();
     var extended = presentationFrame();
     if (extended == null) {
       cancelPresentationOffsetEdit();
@@ -203,7 +206,6 @@ class EditorPerspectiveViewport implements View implements Observable {
   function offsetHandle(width:Float, height:Float):Null<Array<Float>> {
     var draft = offsetDraft;
     if (draft == null || offsetAxis.length != 3) return null;
-    updatePresentation();
     var item = scene.object("project:" + draft.select.occurrence);
     if (item == null) return null;
     var pose = presentationPoseById.get(item.id), at = pose == null ? [item.x, item.y, item.z] : pose.position;
@@ -339,7 +341,7 @@ class EditorPerspectiveViewport implements View implements Observable {
     }
   }
   public function capturePresentationView(id:String, label:String):PresentationView {
-    updatePresentationCamera();
+    preparePresentationFrame();
     var controller = presentation, frame = presentationResult;
     if (controller == null || frame == null) throw "No assembly presentation to save";
     var selected = controller.record.views.filter(v -> v.id == frame.view)[0];
@@ -367,23 +369,28 @@ class EditorPerspectiveViewport implements View implements Observable {
     if (selected.displayTransform != null) value.displayTransform = selected.displayTransform;
     return haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(value));
   }
+  /** Read-only result of the last owner preparation; safe inside reactive builds. */
   public function presentationFrame():Null<PresentationFrame> {
-    updatePresentation();
     return presentationResult;
   }
   function occurrenceId(id:String):String return StringTools.startsWith(id, "project:") ? id.substr(8) : id;
+  /** Owner-thread update phase, before any reactive UI build or retained patch. */
+  public function preparePresentationFrame():Void {
+    updatePresentation();
+    updatePresentationCamera();
+  }
   function updatePresentation():Void {
     var controller = presentation;
     if (controller == null) {
       presentationResult = null;
       presentationPoses = [];
-      presentationPoseById.clear();
+      presentationPoseById = [];
       return;
     }
     var cursor = controller.cursor, animating = controller.animating;
     var key = scene.visualRevision + ":" + runtimeRevision + ":" + simulationActive
       + ":" + presentationGeometryFingerprint;
-    if (key == presentationInputKey && controller == presentationInputController
+    if (presentationResult != null && key == presentationInputKey && controller == presentationInputController
       && cursor == presentationInputCursor && animating == presentationInputAnimating) return;
     var flat = AssemblyDefinitionFlattener.flattenView(controller.definition);
     var solved = new Map<String, AssemblyFrame>();
@@ -410,9 +417,8 @@ class EditorPerspectiveViewport implements View implements Observable {
       if (solve == null) throw "Procedure joint motions require an engineering pose provider";
       result = controller.evaluate(solve(result.jointOverrides), presentationGeometryFingerprint, simulationActive);
     }
-    presentationResult = result;
-    presentationPoses = [];
-    presentationPoseById.clear();
+    var nextPoses:Array<SimulationPoseVisual> = [];
+    var nextPoseById:Map<String, SimulationPoseVisual> = [];
     for (part in flat.occurrences) {
       var pose = result.poses.get(part.id);
       if (pose == null) continue;
@@ -427,14 +433,17 @@ class EditorPerspectiveViewport implements View implements Observable {
         position: [world.x * presentationScale, world.y * presentationScale, world.z * presentationScale],
         rotation: [pose.qx, pose.qy, pose.qz, pose.qw]
       };
-      presentationPoseById.set(item.id, visual);
+      nextPoseById.set(item.id, visual);
       // Presentation owns the generated occurrence's final transform in this view.
-      presentationPoses.push(visual);
+      nextPoses.push(visual);
     }
-    if (simulationActive) for (live in simulationPoses) if (!presentationPoseById.exists(live.id)) {
-      presentationPoseById.set(live.id, live);
-      presentationPoses.push(live);
+    if (simulationActive) for (live in simulationPoses) if (!nextPoseById.exists(live.id)) {
+      nextPoseById.set(live.id, live);
+      nextPoses.push(live);
     }
+    presentationPoses = nextPoses;
+    presentationPoseById = nextPoseById;
+    presentationResult = result;
     simulationTransforms.clear();
     simulationTransformCount = 0;
     presentationInputKey = key;
@@ -444,7 +453,6 @@ class EditorPerspectiveViewport implements View implements Observable {
     presentationRevision = key + ":" + ++presentationFrameSerial;
   }
   function displayPoses():Null<Array<SimulationPoseVisual>> {
-    updatePresentation();
     return presentation == null ? (simulationActive ? simulationPoses : null) : presentationPoses;
   }
   function presentationHidden(id:String):Bool {
@@ -452,7 +460,6 @@ class EditorPerspectiveViewport implements View implements Observable {
     return frame != null && frame.visibility.get(occurrenceId(id)) == Hidden;
   }
   function applyPresentation(view:SceneView):Void {
-    updatePresentation();
     var frame = presentationResult;
     if (frame == null) return;
     if (readOnly) {
@@ -477,7 +484,6 @@ class EditorPerspectiveViewport implements View implements Observable {
     }
   }
   function updatePresentationCamera():Void {
-    updatePresentation();
     var frame = presentationResult;
     if (frame == null) return;
     // Step transport changes geometry, not camera intent. Reframe only on an explicit
@@ -613,7 +619,7 @@ class EditorPerspectiveViewport implements View implements Observable {
   var simulationPoseById:Map<String, SimulationPoseVisual> = new Map();
   var simulationTransforms:Map<String, Transform> = new Map();
   final simulationTransformScratch:Array<Transform> = [];
-  var simulationTransformCount:Int = 0;
+  @:unobservable var simulationTransformCount:Int = 0;
   final clipBoundsScratch:Array<Array<Float>> = [];
   final clipBounds:Array<Array<Float>> = [];
   final linkMarkerPath = new PathBuilder();
@@ -662,7 +668,6 @@ class EditorPerspectiveViewport implements View implements Observable {
 
   /** Revision key for state that changes the retained viewport presentation. */
   public function presentationKey():String {
-    updatePresentation();
     return scene.visualRevision + ":" + camera.revision + ":" + lightingRevision
       + ":" + sketchDragRevision + ":" + assemblyDragRevision + ":" + matePickRevision + ":"
       + presentationRevision + ":" + hoverRevision + ":orbit:" + orbiting() + ":" + gridVisible
@@ -675,8 +680,8 @@ class EditorPerspectiveViewport implements View implements Observable {
     lightingRevision++;
   }
 
-  var paintContext:Null<BuildContext>;
-  var paintNodeId:Null<haxeon.ui.core.WidgetId>;
+  @:unobservable var paintContext:Null<BuildContext>;
+  @:unobservable var paintNodeId:Null<haxeon.ui.core.WidgetId>;
   @:unobservable var submittedPaintKey:Null<String>;
   @:unobservable var submittedCameraRevision:Int = -1;
 
@@ -688,7 +693,6 @@ class EditorPerspectiveViewport implements View implements Observable {
 
   /** True when the image is current or a patch is scheduled; false requires the owner to rebuild an unmounted binding. */
   public function updateRetainedPaint():Bool {
-    updatePresentation();
     if (submittedPaintKey == paintKey()) return true;
     var context = paintContext, id = paintNodeId;
     return context != null && id != null && context.requestPatch(id);
@@ -717,7 +721,6 @@ class EditorPerspectiveViewport implements View implements Observable {
     node.hitTestSelf = true;
     node.focusable = true;
     node.semantics = new Semantics(AccessibilityRole.Image, "Scene perspective GPU view");
-    updatePresentation();
     submittedPaintKey = paintKey();
     submittedCameraRevision = camera.revision;
     node.onPaint(paint, submittedPaintKey);
@@ -732,7 +735,6 @@ class EditorPerspectiveViewport implements View implements Observable {
 
   function paint(canvas:Canvas, geometry:ResolvedLayoutItem):Void {
     updateViewportSize(geometry.width, geometry.height);
-    updatePresentationCamera();
     ensureRenderer();
     var width = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.width))));
     var height = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.height))));
@@ -927,7 +929,7 @@ class EditorPerspectiveViewport implements View implements Observable {
     return frame != null && frame.sections.length > 0;
   }
   public function inspectObject(id:String):Void {
-    updatePresentationCamera();
+    preparePresentationFrame();
     var item = scene.object(id);
     if (item == null) throw "No displayed part for this axis";
     var bounds = transformedBounds(displayTransform(item), item.width, item.height, item.depth);
@@ -1479,7 +1481,6 @@ class EditorPerspectiveViewport implements View implements Observable {
   }
 
   function fitCameraClipRange():Void {
-    updatePresentation();
     clipBounds.resize(0);
     for (item in scene.items()) {
       if (!scene.isVisible(item.id) || presentationHidden(item.id)) continue;
@@ -1520,7 +1521,6 @@ class EditorPerspectiveViewport implements View implements Observable {
   }
 
   function displayTransform(item:EditorSceneObject):Transform {
-    updatePresentation();
     if (simulationActive || presentation != null) {
       var cached = simulationTransforms.get(item.id);
       if (cached != null) return cached;

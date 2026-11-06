@@ -20,11 +20,13 @@ import haxe.Json;
     var controller = viewport.presentation;
     if (controller == null) throw "Missing artifact controller";
     function frame():String {
+      viewport.preparePresentationFrame();
       var frame = viewport.presentationFrame();
       if (frame == null) throw "Missing artifact frame";
       return PresentationRuntimeTests.signature(frame);
     }
     function evidence():Null<String> {
+      viewport.preparePresentationFrame();
       var result = viewport.presentationFrame();
       if (result == null) throw "Missing evidence frame";
       return result.evidence;
