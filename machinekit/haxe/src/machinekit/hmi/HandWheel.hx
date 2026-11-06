@@ -26,7 +26,7 @@ import materia.assembly.AssemblyDefinition.AssemblyJointType;
  * recipe with other values. The body's flare and the dial recess are drawn to look right, not measured.
  */
 class HandWheel extends HmiPart {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   /** The black seal round the flange's foot. */
   static inline var GASKET_WIDTH:Float = 1.6;
@@ -113,9 +113,8 @@ class HandWheel extends HmiPart {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.hmi.hand-wheel", inputs(), v -> new HandWheel(v))
-      .numbered(v -> v.token("model") == "CUSTOM" ? 'HANDWHEEL-ASSUMED-${v.integer("scaleDivisions")}DIV' : v.token("model"));
-    return recipe;
+    return recipe.get(() -> new ComponentType("machinekit.hmi.hand-wheel", inputs(), v -> new HandWheel(v))
+      .numbered(v -> v.token("model") == "CUSTOM" ? 'HANDWHEEL-ASSUMED-${v.integer("scaleDivisions")}DIV' : v.token("model")));
   }
   override public function componentType():Null<ComponentType> return recipeType();
 
@@ -220,20 +219,16 @@ class HandWheel extends HmiPart {
    */
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var key = recipeType().key(values());
-    if (detail != Envelope) {
-      var cached = previewCache.get(key);
-      if (cached != null) return new Part(cached.cloneShape());
-    }
-    var parts:Array<Part> = [];
-    for (spec in bodies()) parts.push(spec.id == "studs" ? studSolid(false) : spec.id == "nuts"
-      ? nutSolid(false) : spec.id == "wheel" && (detail == Envelope || textured()) ? plainWheel() : spec.build());
-    var result = Solids.union(parts);
-    if (detail != Envelope) previewCache.set(key, result.shape.cloneShape());
-    return result;
+    return previewCache.get(detail == Envelope ? null : key, () -> {
+      var parts:Array<Part> = [];
+      for (spec in bodies()) parts.push(spec.id == "studs" ? studSolid(false) : spec.id == "nuts"
+        ? nutSolid(false) : spec.id == "wheel" && (detail == Envelope || textured()) ? plainWheel() : spec.build());
+      return Solids.union(parts);
+    });
   }
 
   /** Whole-device preview solids already built, by recipe key. */
-  static var previewCache:Map<String, Shape> = [];
+  static final previewCache = machinekit.cache.Memos.parts("hand-wheel-previews", 16);
 
   /** The wheel's silhouette: the cone, the grip at its tip radius, the recessed dial and the spinner, without knurling or scale. */
   function plainWheel():Part {
@@ -348,7 +343,7 @@ class HandWheel extends HmiPart {
   }
 
   /** Wheel solids already built, by the numbers they depend on: the knurling and the scale make one cost seconds to build. */
-  static var wheelCache:Map<String, Shape> = [];
+  static final wheelCache = machinekit.cache.Memos.parts("hand-wheel-wheels", 16);
 
   /** The wheel, from the cache when these numbers have been built before; the caller owns the solid and closes it. */
   function wheelSolid():Part {
@@ -366,11 +361,7 @@ class HandWheel extends HmiPart {
       "knurlDepth"
     ]) Std.string(n(name))].join("|") + "|" + count("knurlTeeth")
       + "|" + count("scaleDivisions") + "|" + values().token("detail") + "|" + (flag("handle") ? "h" : "-");
-    var cached = wheelCache.get(key);
-    if (cached != null) return new Part(cached.cloneShape());
-    var built = buildWheel();
-    wheelCache.set(key, built.shape.cloneShape());
-    return built;
+    return wheelCache.get(key, () -> buildWheel());
   }
 
   /** Whether the knurling and scale are textures on a plain wheel (the default) or modelled as geometry. */

@@ -587,30 +587,20 @@ class InsertAnchorGeometry {
    * reason it fails) depends on nothing else.
    */
   static function checkedHoleClearance(key:String, spec:InsertSpec):Void {
-    if (holeClearance == null) holeClearance = [];
-    var memo:Map<String, Null<String>> = holeClearance;
-    if (memo.exists(key)) {
-      var reason = memo.get(key);
-      if (reason != null) throw reason;
-      return;
-    }
-    if (holeClearanceCount >= DERIVED_LIMIT) {
-      memo.clear();
-      holeClearanceCount = 0;
-    }
-    try checkHoleClearance(spec) catch (error:Dynamic) {
-      if (Std.isOfType(error, String)) {
-        memo.set(key, error);
-        holeClearanceCount++;
+    var reason = holeClearance.get(key, () -> {
+      try {
+        checkHoleClearance(spec);
+        return null;
+      } catch (error:Dynamic) {
+        if (Std.isOfType(error, String)) return Std.string(error);
+        throw error;
       }
-      throw error;
-    }
-    memo.set(key, null);
-    holeClearanceCount++;
+    });
+    if (reason != null) throw reason;
   }
 
-  static var holeClearance:Null<Map<String, Null<String>>>;
-  static var holeClearanceCount = 0;
+  /** Hole clearance verdicts by the spec's record: null when the holes clear, else the reason they do not. */
+  static final holeClearance = new machinekit.cache.Memo<Null<String>>("anchor-hole-clearance", 512);
 
   static function checkHoleClearance(spec:InsertSpec):Void {
     var occupied = C.occupiedHoleIds(spec.anchorage);
@@ -812,25 +802,12 @@ class InsertAnchorGeometry {
     context:InsertAnchorContext,
     liftingShareN:Float
   ):CastInsert {
-    var key = derivationKey(source, rule, context, liftingShareN);
-    var remembered = key == null || derived == null ? null : derived.get(key);
-    var known:InsertAnchorDerivation = remembered;
-    if (remembered == null) {
-      try known = Built(build(source, rule, context, liftingShareN).values().copy()) catch (error:Dynamic) {
+    var known = derived.get(derivationKey(source, rule, context, liftingShareN), () -> {
+      try return Built(build(source, rule, context, liftingShareN).values().copy()) catch (error:Dynamic) {
         if (Std.isOfType(error, InsertAnchorScreenDefect)) throw error;
-        known = Failed(Std.string(error));
+        return Failed(Std.string(error));
       }
-      if (key != null) {
-        var memo:Map<String, InsertAnchorDerivation> = derived == null ? [] : derived;
-        derived = memo;
-        if (derivedCount >= DERIVED_LIMIT) {
-          memo.clear();
-          derivedCount = 0;
-        }
-        memo.set(key, known);
-        derivedCount++;
-      }
-    }
+    });
     return switch known {
       case Built(values): new CastInsert(values.copy());
       case Failed(reason): throw "Insert " + id + ": anchor pattern: " + reason;
@@ -842,9 +819,7 @@ class InsertAnchorGeometry {
    * derives the same fixed inserts in every pass and once more for the lifting layout, and the result (or the reason none
    * fits) depends on nothing else. Only component values are kept; each caller gets its own copy.
    */
-  static var derived:Null<Map<String, InsertAnchorDerivation>>;
-  static var derivedCount = 0;
-  static inline final DERIVED_LIMIT = 512;
+  static final derived = new machinekit.cache.Memo<InsertAnchorDerivation>("anchor-derivations", 512);
 
   static function derivationKey(
     source:CastInsert,
@@ -1023,33 +998,23 @@ class InsertAnchorGeometry {
     // pattern of one insert crops the same one.
     var key = bodyKey == null ? null : bodyKey + "|" + haxe.Json.stringify(pose) + "|" + haxe.Json.stringify(min) + "|"
       + haxe.Json.stringify(max);
-    var cropped:Null<Part> = key == null || windows == null ? null : windows.get(key);
-    if (cropped != null) return {region: new Part(cropped.shape.cloneShape()), min: min, max: max};
-    var scope = new cadkit.modeling.Scope();
-    try {
-      var local = scope.own(Part.box(stock.width + 2 * margin, stock.depth + 2 * margin, high - low));
-      var window = scope.own(PosedParts.moved(
-        local,
-        F.compose(pose, F.translation(stock.x + stock.width / 2, stock.y + stock.depth / 2, low))
-      ));
-      var region = body.intersect(window);
-      scope.close();
-      if (key != null) {
-        var memo:Map<String, Part> = windows == null ? [] : windows;
-        if (windowCount >= WINDOW_LIMIT) {
-          for (kept in memo) kept.close();
-          memo.clear();
-          windowCount = 0;
-        }
-        memo.set(key, new Part(region.shape.cloneShape()));
-        windows = memo;
-        windowCount++;
+    var region = windows.get(key, () -> {
+      var scope = new cadkit.modeling.Scope();
+      try {
+        var local = scope.own(Part.box(stock.width + 2 * margin, stock.depth + 2 * margin, high - low));
+        var window = scope.own(PosedParts.moved(
+          local,
+          F.compose(pose, F.translation(stock.x + stock.width / 2, stock.y + stock.depth / 2, low))
+        ));
+        var cropped = body.intersect(window);
+        scope.close();
+        return cropped;
+      } catch (error:Dynamic) {
+        scope.close();
+        throw error;
       }
-      return {region: region, min: min, max: max};
-    } catch (error:Dynamic) {
-      scope.close();
-      throw error;
-    }
+    });
+    return {region: region, min: min, max: max};
   }
 
   /** Copy exact trimmed planar boundaries once per selector invocation. The
@@ -1089,13 +1054,10 @@ class InsertAnchorGeometry {
 
   /** Chosen-pattern confirmation. Analytic admission never substitutes for
 	 * native occupancy, all-anchor embedment or finite-face cover. */
-  /** Cropped regions by casting, pose and window (`anchorWindow`); kept native shapes are copied out. */
-  static var windows:Null<Map<String, Part>>;
-  static var windowCount = 0;
-  static inline final WINDOW_LIMIT = 128;
+  /** Cropped regions by casting, pose and window (`anchorWindow`). */
+  static final windows = machinekit.cache.Memos.parts("anchor-windows", 128);
   /** Confirmations by the anchored insert, the keyed casting, the pose, the rules and the window. */
-  static var confirmations:Null<Map<String, Bool>>;
-  static var confirmationCount = 0;
+  static final confirmations = new machinekit.cache.Memo<Bool>("anchor-confirmations", 512);
 
   /**
    * `contained`, remembered in a keyed casting: the lifting passes re-derive an insert for a new weight share, and the
@@ -1116,19 +1078,7 @@ class InsertAnchorGeometry {
         if (bodyKey != null) key = bodyKey + "|" + haxe.Json.stringify(pose) + "|" + source.geometryKey() + "|" + cover
           + "|" + minimumEmbedment + "|" + region;
     }
-    var memo:Map<String, Bool> = confirmations == null ? [] : confirmations;
-    confirmations = memo;
-    if (key != null && memo.exists(key)) return memo.get(key) == true;
-    var result = contained(source, context, cover, minimumEmbedment, window);
-    if (key != null) {
-      if (confirmationCount >= DERIVED_LIMIT) {
-        memo.clear();
-        confirmationCount = 0;
-      }
-      memo.set(key, result);
-      confirmationCount++;
-    }
-    return result;
+    return confirmations.get(key, () -> contained(source, context, cover, minimumEmbedment, window));
   }
 
   static function contained(

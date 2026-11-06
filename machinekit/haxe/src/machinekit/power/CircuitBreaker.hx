@@ -8,7 +8,7 @@ import materia.assembly.AssemblyFrames as F;
 /** Assumed catalogue-class three-pole circuit breaker. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class CircuitBreaker extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.quantity("ratedCurrent", 32, "A"),
     P.quantity("ratedVoltage", 400, "V"),
@@ -32,14 +32,13 @@ class CircuitBreaker extends AssumedCatalogComponent {
     });
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.power.circuit-breaker",
       inputs(),
       v -> new CircuitBreaker(v)
     ).numbered(v -> 'BREAKER-ASSUMED-${Dimension.format(v.number("ratedCurrent"))}A-'
       + '${Dimension.format(v.number("ratedVoltage"))}V-${Dimension.format(v.number("breakingCapacity"))}A-'
-      + '${v.integer("poles")}P').procured(_ -> Buy(null, null, null)).requiringInputs(["ratedVoltage", "poles"], ["ratedCurrent", "breakingCapacity"], []);
-    return recipe;
+      + '${v.integer("poles")}P').procured(_ -> Buy(null, null, null)).requiringInputs(["ratedVoltage", "poles"], ["ratedCurrent", "breakingCapacity"], []));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   /** A housing, not a solid block: mass from the envelope at an assumed effective density. */

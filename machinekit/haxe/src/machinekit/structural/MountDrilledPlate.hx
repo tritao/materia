@@ -8,7 +8,7 @@ import machinekit.gantry.GantryParts.GantryPlate;
 /** Machined host plate. Thin pads remain clearance-only; thick-host taps require
  * their explicit material/engagement policy, never a C45 insert assumption. */
 class MountDrilledPlate extends GantryPlate {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   final drilling:Array<materia.casting.InsertHole>;
   final partId:String;
   static function inputs():Array<ComponentParameter> return [
@@ -36,7 +36,7 @@ class MountDrilledPlate extends GantryPlate {
     }
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.structural.mount-drilled-plate",
       inputs(),
       v -> new MountDrilledPlate(v),
@@ -46,8 +46,7 @@ class MountDrilledPlate extends GantryPlate {
       false
     ).numbered(v -> v.token("partId") != "" ? 'HOST-PAD-${v.token("partId").toUpperCase()}'
       : 'HOST-PAD-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}-${materia.project.MaterialLibrary.fromSpec(v.token("hostMaterial")).toUpperCase()}')
-      .procured(_ -> Make("CNC machining"));
-    return recipe;
+      .procured(_ -> Make("CNC machining")));
   }
   public function holes():Array<materia.casting.InsertHole
     > return InsertHoles.records(InsertHoles.fromNeutral(drilling));

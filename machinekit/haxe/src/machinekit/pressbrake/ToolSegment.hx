@@ -19,7 +19,7 @@ class ToolSegment extends MachineComponent {
   public final length:Float;
   public final horn:Null<ToolHorn>;
   final catalogueProfile:Null<String>;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public static function standardLengths():Array<Float> return [10, 15, 20, 40, 50, 100, 200, 300];
 
@@ -71,7 +71,7 @@ class ToolSegment extends MachineComponent {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.pressbrake.tool-segment", [
+    return recipe.get(() -> new ComponentType("machinekit.pressbrake.tool-segment", [
       ComponentRecipeSupport.choice("profile", ToolProfiles.catalogueIds(), ToolingCatalogue.straight().id),
       ComponentRecipeSupport.length("length", 100),
       ComponentRecipeSupport.choice("horn", ["None", "Left", "Right"], "None"),
@@ -94,8 +94,7 @@ class ToolSegment extends MachineComponent {
       var horn = v.token("horn");
       var end = horn == "None" ? "" : '-${horn == "Left" ? "L" : "R"}${Dimension.format(v.number("reliefLength"))}x${Dimension.format(v.number("remainingHeight"))}';
       return 'TOOL-${profile.toUpperCase()}-L${Dimension.format(v.number("length"))}$end';
-    }).procured(_ -> NotSupplied);
-    return recipe;
+    }).procured(_ -> NotSupplied));
   }
 
   override public function componentType():Null<ComponentType> return catalogueProfile == null ? null : recipeType();

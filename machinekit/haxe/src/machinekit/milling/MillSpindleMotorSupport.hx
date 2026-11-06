@@ -10,14 +10,13 @@ import machinekit.component.ComponentRecipeSupport as P;
  * Nominal fabricated geometry; welds and fasteners are not qualified.
  */
 class MillSpindleMotorSupport extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.spindle-motor-support",
       [P.length("height", 27)],
       v -> new MillSpindleMotorSupport(v.number("height"))
-    ).numbered(_ -> "MILL-SPINDLE-MOTOR-SUPPORT");
-    return recipe;
+    ).numbered(_ -> "MILL-SPINDLE-MOTOR-SUPPORT"));
   }
   public function new(height:Float) {
     if (!Math.isFinite(height) || height < 16) throw "Spindle motor support needs room for its bridge";

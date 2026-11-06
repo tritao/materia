@@ -141,9 +141,9 @@ class ToolServiceModule extends MachineComponent {
     }
     return current;
   }
-  static var recipe:Null<machinekit.component.ComponentType>;
+  static final recipe = new machinekit.cache.Once<machinekit.component.ComponentType>();
   public static function recipeType():machinekit.component.ComponentType {
-    if (recipe == null) recipe = new machinekit.component.ComponentType(
+    return recipe.get(() -> new machinekit.component.ComponentType(
       "machinekit.robotics.tool-service-module",
       [
         machinekit.component.ComponentRecipeSupport.scalar("voltage", 24, 0.001),
@@ -166,8 +166,7 @@ class ToolServiceModule extends MachineComponent {
         v.integer("outlets")
       ),
       true
-    ).numbered(v -> 'TOOL-SVC-ASSUMED-${machinekit.component.Dimension.format(v.number("voltage"))}V-${machinekit.component.Dimension.format(v.number("totalCurrent"))}A-${machinekit.component.Dimension.format(v.number("branchCurrent"))}A-${v.integer("pins")}P-${v.integer("outlets")}O');
-    return recipe;
+    ).numbered(v -> 'TOOL-SVC-ASSUMED-${machinekit.component.Dimension.format(v.number("voltage"))}V-${machinekit.component.Dimension.format(v.number("totalCurrent"))}A-${machinekit.component.Dimension.format(v.number("branchCurrent"))}A-${v.integer("pins")}P-${v.integer("outlets")}O'));
   }
   override public function componentType():Null<machinekit.component.ComponentType> return recipeType();
   override public function values():machinekit

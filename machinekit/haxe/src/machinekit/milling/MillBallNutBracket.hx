@@ -8,17 +8,16 @@ import machinekit.motion.BallNut;
 
 /** SFU1605 flange bracket, shaft +Z, up +Y. Optional top foot attaches under a table. */
 class MillBallNutBracket extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public static function parameters():Array<ComponentParameter> return [P.flag("tableFoot", false)];
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.ball-nut-bracket",
       parameters(),
       v -> new MillBallNutBracket(v)
-    ).numbered(_ -> "MILL-BALL-NUT-BRACKET");
-    return recipe;
+    ).numbered(_ -> "MILL-BALL-NUT-BRACKET"));
   }
 
   public function new(?values:ComponentValues) {

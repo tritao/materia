@@ -10,7 +10,7 @@ import machinekit.component.ComponentRecipeSupport as P;
  * Motor receiving pattern follows the 60 mm Leadshine catalog interface.
  */
 class MillServoMount extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public static function parameters():Array<ComponentParameter> return [
     P.length("width", 100),
@@ -19,12 +19,11 @@ class MillServoMount extends MachineComponent {
   ];
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.servo-mount",
       parameters(),
       v -> new MillServoMount(v)
-    ).numbered(_ -> "MILL-SERVO-MOUNT");
-    return recipe;
+    ).numbered(_ -> "MILL-SERVO-MOUNT"));
   }
 
   public function new(?values:ComponentValues) {

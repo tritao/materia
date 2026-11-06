@@ -8,7 +8,7 @@ import machinekit.standard.SocketHeadCapScrew;
 class Sfu20AxisPart extends MachineComponent {
   public final kind:String;
   public final layout:Sfu20AxisLayout;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function kinds():Array<String> return ["base", "riserLeft", "riserRight", "carriage", "motorBracket"];
   public function new(kind:String = "base", ?layout:Sfu20AxisLayout) {
     if (layout == null) layout = new Sfu20AxisLayout();
@@ -96,7 +96,7 @@ class Sfu20AxisPart extends MachineComponent {
   return Solids.cut(body, tools);
   });
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.assembly.sfu20-axis-part",
       [
         P.choice("kind", kinds(), "base"),
@@ -118,8 +118,7 @@ class Sfu20AxisPart extends MachineComponent {
       false,
       ["travel"]
     ).numbered(v -> 'SFU20-AXIS-${v.token("kind").toUpperCase()}')
-      .procured(_ -> Make("CNC machining"));
-    return recipe;
+      .procured(_ -> Make("CNC machining")));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setToken("kind", kind).setNumber(

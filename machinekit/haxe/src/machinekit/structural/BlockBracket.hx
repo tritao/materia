@@ -18,7 +18,7 @@ typedef BracketBlock = {min:Array<Float>, max:Array<Float>};
  */
 class BlockBracket extends MachineComponent {
   final label:String;
-  static var recipe:Null<machinekit.component.ComponentType>;
+  static final recipe = new machinekit.cache.Once<machinekit.component.ComponentType>();
   public final blocks:Array<BracketBlock>;
 
   public function new(name:String, blocks:Array<BracketBlock>, material:String = "aluminium 6061") {
@@ -62,7 +62,7 @@ class BlockBracket extends MachineComponent {
   }
 
   public static function recipeType():machinekit.component.ComponentType {
-    if (recipe == null) recipe = new machinekit.component.ComponentType(
+    return recipe.get(() -> new machinekit.component.ComponentType(
       "machinekit.structural.block-bracket",
       [
         machinekit.component.ComponentRecipeSupport.text("label", "bracket"),
@@ -71,8 +71,7 @@ class BlockBracket extends MachineComponent {
       v -> new BlockBracket(v.token("label"), readBlocks(v.token("blocks"))),
       true
     ).numbered(v -> 'BRACKET-${v.token("label").toUpperCase().split(" ").join("-")}')
-      .procured(_ -> Make("CNC machining"));
-    return recipe;
+      .procured(_ -> Make("CNC machining")));
   }
   override public function componentType():Null<machinekit.component.ComponentType> return recipeType();
   override public function values():machinekit

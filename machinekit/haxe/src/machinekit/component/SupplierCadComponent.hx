@@ -21,38 +21,28 @@ class SupplierCadComponent extends MachineComponent {
   ) {
     super(partNumber, description, material, true);
     sha256 = expectedSha256;
-    source = imported(path, expectedSha256).cloneShape();
+    source = imported(path, expectedSha256);
   }
 
   /**
    * Checked imports by file and pinned digest. A pinned asset never changes, and supplier parts are drawn many times
    * per process (each `geometry()` of a support or mount reads its asset), so each file is hashed and parsed once.
-   * Kept shapes are copied out.
+   * Each component gets its own copy.
    */
-  static var imports:Null<Map<String, Shape>>;
-  static var importCount = 0;
-  static inline final IMPORT_LIMIT = 32;
+  static final imports = machinekit.cache.Memos.shapes("supplier-step-imports", 32);
 
-  static function imported(path:String, expectedSha256:String):Shape {
-    var key = path + "|" + expectedSha256, memo:Map<String, Shape> = imports == null ? [] : imports;
-    imports = memo;
-    var known = memo.get(key);
-    if (known != null) return known;
+  static function imported(path:String, expectedSha256:String):Shape return imports.get(path + "|" + expectedSha256,
+    () -> importChecked(path, expectedSha256));
+
+  static function importChecked(path:String, expectedSha256:String):Shape {
     var bytes = sys.io.File.getBytes(path), digest = haxe.crypto.Sha256.make(bytes), hex = new StringBuf();
     for (i in 0...digest.length) hex.add(StringTools.hex(digest.get(i), 2).toLowerCase());
     if (hex.toString() != expectedSha256) throw "Supplier STEP hash differs from pinned asset";
-    var shape = Shape.importStep(path);
+    var shape = machinekit.cache.Parallel.serialized(() -> Shape.importStep(path));
     if (shape.subshapeCount(CadKit.ShapeKind.Solid) == 0 || CadKit.shapeValidChecked(shape.borrowHandle()) == 0) {
       shape.close();
       throw "Supplier CAD requires valid solids";
     }
-    if (importCount >= IMPORT_LIMIT) {
-      for (kept in memo) kept.close();
-      memo.clear();
-      importCount = 0;
-    }
-    memo.set(key, shape);
-    importCount++;
     return shape;
   }
 

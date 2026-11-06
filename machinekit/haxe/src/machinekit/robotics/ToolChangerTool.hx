@@ -43,10 +43,10 @@ class ToolChangerTool extends MachineComponent {
     addFacet(new machinekit.component.CouplingFacet('generic:$airChannels:${Dimension.format(diameter)}', "master"));
   }
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.robotics.tool-changer-tool",
       [
         ComponentRecipeSupport.count("airChannels", 2),
@@ -55,8 +55,7 @@ class ToolChangerTool extends MachineComponent {
       ],
       v -> new ToolChangerTool(v.integer("airChannels"), v.number("diameter"), v.number("thickness")),
       true
-    );
-    return recipeTypeCache;
+    ));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

@@ -28,10 +28,10 @@ class PneumaticManifold extends MachineComponent {
     }
   }
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.pneumatic.manifold",
       [ComponentRecipeSupport.count("outlets", 2)],
       v -> new PneumaticManifold(v.integer("outlets")),
@@ -39,8 +39,7 @@ class PneumaticManifold extends MachineComponent {
     ).procured(_ -> Buy(null, null, null)).requiring(v -> [
       machinekit.component.Procurement.ProcurementCodec.requirement("outlets", "1", v.integer("outlets")),
       machinekit.component.Procurement.ProcurementCodec.requirement("tubeOutsideDiameter", "mm", null, null, 6)
-    ]);
-    return recipeTypeCache;
+    ]));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

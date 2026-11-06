@@ -8,7 +8,7 @@ import machinekit.motion.SfuFamilyData.SfuNutReference;
  * Root diameter is an explicit engineering input, not inferred from nominal size/lead.
  */
 class SfuNut extends LeadScrewNut {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final spec:SfuNutReference;
   public function new(model:String = "SFU1605", raceRootDiameter:Float = 0) {
     var s = SfuFamilyData.nut(model);
@@ -63,13 +63,12 @@ class SfuNut extends LeadScrewNut {
     });
   }
   public static function familyRecipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.sfu-nut",
       [P.choice("model", SfuFamilyData.nutModels(), "SFU1605"), P.length("raceRootDiameter", 13)],
       v -> new SfuNut(v.token("model"), v.number("raceRootDiameter"))
     ).numbered(v -> v.token("model") + "-NUT-R" + Dimension.format(v.number("raceRootDiameter")))
-      .procured(_ -> Buy(null, null, null)).requiringInputs(["model", "raceRootDiameter"]);
-    return recipe;
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["model", "raceRootDiameter"]));
   }
   override public function componentType():Null<ComponentType> return familyRecipeType();
   override public function values():ComponentValues return new ComponentValues().setToken("model",

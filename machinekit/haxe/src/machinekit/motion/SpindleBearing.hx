@@ -13,17 +13,16 @@ import machinekit.motion.SpindleBearingData.SpindleBearingRow;
  * Two GA bearings mounted DB form the outboard's preloaded pair. */
 class SpindleBearing extends MachineComponent {
   public final row:SpindleBearingRow;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
     P.choice("model", SpindleBearingData.catalog().designations(), SpindleBearingData.SKF_MODEL),
     P.quantity("radialRunout", 0.0015, "mm"),
     P.quantity("axialRunout", 0.0015, "mm")
   ]);
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.motion.spindle-bearing", parameters(), v -> new SpindleBearing(v), false, false, null, false)
+    return recipe.get(() -> new ComponentType("machinekit.motion.spindle-bearing", parameters(), v -> new SpindleBearing(v), false, false, null, false)
       .numbered(v -> "SKF-" + v.token("model").split(" ").join("-").split("/").join("-"))
-      .procured(v -> Buy("SKF", v.token("model"), "P4A; universally matchable GA"));
-    return recipe;
+      .procured(v -> Buy("SKF", v.token("model"), "P4A; universally matchable GA")));
   }
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides);

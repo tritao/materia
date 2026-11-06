@@ -11,14 +11,13 @@ import machinekit.component.ComponentRecipeSupport as P;
  */
 class MillYDriveSeat extends MachineComponent {
   public final floating:Bool;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.hzmotion-y-drive-seat",
       [P.flag("floating", false)],
       v -> new MillYDriveSeat(v.boolean("floating"))
-    ).numbered(v -> v.boolean("floating") ? "MILL-Y-BF12-SEAT" : "MILL-Y-BK12-C-SEAT");
-    return recipe;
+    ).numbered(v -> v.boolean("floating") ? "MILL-Y-BF12-SEAT" : "MILL-Y-BK12-C-SEAT"));
   }
   public function new(floating:Bool = false) {
     this.floating = floating;

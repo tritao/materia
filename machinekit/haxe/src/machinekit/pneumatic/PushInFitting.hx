@@ -29,11 +29,11 @@ typedef PushInFittingRow = {
 /** A threaded push-in fitting from a maker's catalogue: thread to tube OD. Cylindrical envelope and centre/inertia
  * are approximations; the published weight is retained. */
 class PushInFitting extends MachineComponent {
-  static var table:Null<Catalog<PushInFittingRow>>;
+  static final table = new machinekit.cache.Once<Catalog<PushInFittingRow>>();
   public final spec:PushInFittingRow;
 
   public static function catalog():Catalog<PushInFittingRow> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "push-in fitting",
       row -> row.designation,
       [{
@@ -54,8 +54,7 @@ class PushInFitting extends MachineComponent {
         conformance: NominalEnvelope,
         verifiedFields: ["envelopeDiameterMm", "envelopeLengthMm", "tubeOdMm", "thread", "massKg"]
       })
-    );
-    return table;
+    ));
   }
 
   public function new(designation:String) {
@@ -74,16 +73,15 @@ class PushInFitting extends MachineComponent {
     declareMass(m, new Vector(0, 0, -h / 2), new InertiaTensor(transverse, 0, 0, transverse, 0, m * r * r / 2));
   }
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.pneumatic.push-in-fitting",
       [ComponentRecipeSupport.catalog("designation", PushInFitting.catalog(), "10.08.02.00203")],
       v -> new PushInFitting(v.token("designation")),
       true
-    ).procured(v -> {var row = catalog().get(v.token("designation")); return Buy(row.maker, row.designation, null);});
-    return recipeTypeCache;
+    ).procured(v -> {var row = catalog().get(v.token("designation")); return Buy(row.maker, row.designation, null);}));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

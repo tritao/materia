@@ -26,10 +26,10 @@ class VacuumPressureSensor extends MachineComponent {
     addFacet(new VacuumPressureSensorFacet("vacuumIn", "pressureSignal"));
   }
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.pneumatic.vacuum-pressure-sensor",
       [ComponentRecipeSupport.length("tubeOdMm", 4)],
       v -> new VacuumPressureSensor(v.number("tubeOdMm")),
@@ -37,8 +37,7 @@ class VacuumPressureSensor extends MachineComponent {
     ).procured(_ -> Buy(null, null, null)).requiring(v -> [
       machinekit.component.Procurement.ProcurementCodec.requirement("tubeOutsideDiameter", "mm", null, null, v.number("tubeOdMm")),
       machinekit.component.Procurement.ProcurementCodec.choice("output", "analog-vacuum-kpa")
-    ]);
-    return recipeTypeCache;
+    ]));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

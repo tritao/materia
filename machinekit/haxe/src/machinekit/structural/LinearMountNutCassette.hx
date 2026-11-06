@@ -18,7 +18,7 @@ typedef MountNutStation = {
  * Frame: XY stock centred on origin, bottom z=0, washer mouths at z=10.
  */
 class LinearMountNutCassette extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final length:Float;
   public final width:Float;
   public final height:Float;
@@ -36,7 +36,7 @@ class LinearMountNutCassette extends MachineComponent {
     P.text("sourceFingerprint", "")
   ];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.structural.linear-mount-nut-cassette",
       inputs(),
       v -> new LinearMountNutCassette(v),
@@ -56,8 +56,7 @@ class LinearMountNutCassette extends MachineComponent {
       var coordinates = [for (row in rows) ComponentNumberKey.encode(row.x) + "," + ComponentNumberKey.encode(row.y)];
       return [ComponentNumberKey.encode(v.number("length")), ComponentNumberKey.encode(v.number("width")),
         v.token("size"), v.token("layout"), coordinates.join(";")].join("|");
-    }).procured(_ -> Make("machining"));
-    return recipe;
+    }).procured(_ -> Make("machining")));
   }
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(inputs(), overrides, false);

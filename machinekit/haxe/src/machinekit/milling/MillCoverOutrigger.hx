@@ -7,14 +7,13 @@ import machinekit.component.BoltedFace.ThreadMaterial;
 
 /** A single machined outrigger, clear of the X motor/connector withdrawal corridor. */
 class MillCoverOutrigger extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.milling.cover-outrigger", [
+    return recipe.get(() -> new ComponentType("machinekit.milling.cover-outrigger", [
       ComponentRecipeSupport.choice("side", ["Left", "Right"], "Right"),
       ComponentRecipeSupport.choice("row", ["Front", "Rear"], "Rear")
     ], v -> new MillCoverOutrigger(v.token("side") == "Left" ? -1 : 1,
-      v.token("row") == "Front" ? -1 : 1), true).numbered(v -> 'MILL-FRAME-COVER-OUTRIGGER-${v.token("side") == "Left" ? -1 : 1}-${v.token("row") == "Front" ? -1 : 1}');
-    return recipe;
+      v.token("row") == "Front" ? -1 : 1), true).numbered(v -> 'MILL-FRAME-COVER-OUTRIGGER-${v.token("side") == "Left" ? -1 : 1}-${v.token("row") == "Front" ? -1 : 1}'));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues()

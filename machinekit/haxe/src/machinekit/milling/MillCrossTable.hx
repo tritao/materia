@@ -8,10 +8,10 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** T-slot table with integral longitudinal ribs and a recessed X nut bracket seat.
  * Origin is the underside of the deck; ribs extend down to the guide blocks. */
 class MillCrossTable extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.cross-table",
       [
         P.length("depth", 200),
@@ -31,8 +31,7 @@ class MillCrossTable extends MachineComponent {
         v.number("ribWidth"),
         v.boolean("nutSeat")
       )
-    ).numbered(_ -> "MILL-CROSS-TABLE");
-    return recipe;
+    ).numbered(_ -> "MILL-CROSS-TABLE"));
   }
 
   public function new(

@@ -32,7 +32,8 @@ class CobotArmLink extends MachineComponent {
   public final faceY:Float;
   public final input:CobotJoint;
   public final output:CobotJoint;
-  static final collisionCache:Map<String, Array<Array<Float>>> = [];
+  /** Collision hulls by the link's drawing numbers; shared, never changed. */
+  static final collisionCache = new machinekit.cache.Memo<Array<Array<Float>>>("cobot-link-hulls", 64);
   final inputPad:Float;
   final outputPad:Float;
   final end:Vector;
@@ -126,11 +127,7 @@ class CobotArmLink extends MachineComponent {
       next.length,
       next.pocketDiameter
     ]);
-    var hulls = collisionCache.get(key);
-    if (hulls == null) {
-      hulls = collisionPieces();
-      collisionCache.set(key, hulls);
-    }
+    var hulls = collisionCache.get(key, () -> collisionPieces());
     addFacet(new machinekit.component.CollisionHullFacet(hulls));
   }
 

@@ -23,7 +23,7 @@ import machinekit.component.Solids;
  * keyway connector shares this convention, so mating the two with a fixed joint seats the key flush.
  */
 class ParallelKey extends MachineComponent {
-  static var table:Null<Catalog<ParallelKeySpec>>;
+  static final table = new machinekit.cache.Once<Catalog<ParallelKeySpec>>();
 
   public final spec:ParallelKeySpec;
   public final length:Float;
@@ -39,7 +39,7 @@ class ParallelKey extends MachineComponent {
   ];
 
   public static function catalog():Catalog<ParallelKeySpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "parallel key",
       spec -> '${spec.width}x${spec.height}',
       rows(),
@@ -50,8 +50,7 @@ class ParallelKey extends MachineComponent {
         dimensionKind: Nominal,
         conformance: NominalEnvelope
       })
-    );
-    return table;
+    ));
   }
 
   public static function metric(size:String, length:Float):ParallelKey return new ParallelKey(
@@ -118,10 +117,10 @@ class ParallelKey extends MachineComponent {
     length
   );
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.standard.parallel-key",
       [
         ComponentRecipeSupport.catalog("size", ParallelKey.catalog(), "2x2"),
@@ -129,8 +128,7 @@ class ParallelKey extends MachineComponent {
       ],
       v -> ParallelKey.metric(v.token("size"), v.number("length")),
       true
-    ).procured(_ -> Buy(null, null, "DIN 6885-1"));
-    return recipeTypeCache;
+    ).procured(_ -> Buy(null, null, "DIN 6885-1")));
   }
 
   override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();

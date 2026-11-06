@@ -8,7 +8,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Assumed catalogue-class normal-module helical pinion. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class HelicalPinion extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.length("normalModule", 1.5),
     P.count("teeth", 20),
@@ -41,14 +41,13 @@ class HelicalPinion extends AssumedCatalogComponent {
     addConnector("pitch", Pitch, Solids.axial(0, -pitchDiameter() / 2, n("faceWidth") / 2));
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.transmission.helical-pinion",
       inputs(),
       v -> new HelicalPinion(v)
     ).numbered(v -> 'PIN-ASSUMED-M${Dimension.format(v.number("normalModule"))}-${v.integer("teeth")}T-'
         + 'B${Dimension.format(v.number("bore"))}-H${Dimension.format(v.number("helixAngle"))}-'
-        + v.token("hand").substr(0, 1).toUpperCase()).procured(_ -> Buy(null, null, null)).requiringInputs(["normalModule", "teeth", "faceWidth", "helixAngle", "pressureAngle", "hand", "bore"], [], ["backlash"]);
-    return recipe;
+        + v.token("hand").substr(0, 1).toUpperCase()).procured(_ -> Buy(null, null, null)).requiringInputs(["normalModule", "teeth", "faceWidth", "helixAngle", "pressureAngle", "hand", "bore"], [], ["backlash"]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function geometry(detail:ComponentDetail = Preview):Part {

@@ -17,7 +17,7 @@ class MineralCasting extends MachineComponent {
   public final collisionHullQualification:CastingCollisionQualification;
   final features:Array<CastingFeature>;
   final envelope:Array<CastingPrism>;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public static function parameters():Array<ComponentParameter> return [
     P.length("width", 650),
@@ -33,7 +33,7 @@ class MineralCasting extends MachineComponent {
   ];
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.structural.mineral-casting",
       parameters(),
       v -> new MineralCasting(v),
@@ -42,8 +42,7 @@ class MineralCasting extends MachineComponent {
       null,
       false
     ).numbered(v -> 'MINERAL-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}')
-      .procured(_ -> Make("mineral casting"));
-    return recipe;
+      .procured(_ -> Make("mineral casting")));
   }
 
   public function new(?overrides:ComponentValues) {
@@ -151,7 +150,7 @@ class MineralCasting extends MachineComponent {
       geometry: CastingCavities.FinishedCavityGeometry.Prisms([prism])
     })) return null;
     var cavities = finishedCavities();
-    var boxes = BoxAlgebra.materialLess(envelope, cavities.filter(cavity -> CastingCavities.supportsBoxes(cavity)));
+    var boxes = materialLess(envelope, cavities.filter(cavity -> CastingCavities.supportsBoxes(cavity)));
     // Each solid is named by its inputs and built only when the integral has not met it before.
     var tools:Array<BoxMaterialVolume.KeyedSolid> = [];
     for (cavity in cavities) if (!CastingCavities.supportsBoxes(cavity)) tools.push({
@@ -218,7 +217,35 @@ class MineralCasting extends MachineComponent {
     var embedded = embeddedAnchors();
     if (embedded.length
       > 0) throw "Unsupported non-box anchor material for inserts: " + [for (row in embedded) row.owner].join(", ");
-    return BoxAlgebra.material(castingEnvelope(), features);
+    return materialLess(castingEnvelope(), finishedCavities());
+  }
+
+  /**
+   * `BoxAlgebra.materialLess`, by its inputs: sizing integrates many layouts of one envelope whose box cavities repeat. The
+   * key is the envelope and the cavities' boxes (whose validation `materialLess` repeats on a miss).
+   */
+  static function materialLess(envelope:Array<CastingPrism>,
+    cavities:Array<CastingCavities.FinishedCastingCavity>):Array<materia.casting.Box3> {
+    var cuts = [for (c in cavities) for (b in CastingCavities.boxes(c)) b];
+    return materials.get(haxe.Json.stringify(envelope) + "|" + haxe.Json.stringify(cuts), () -> BoxAlgebra.materialLess(
+      envelope,
+      cavities
+    ));
+  }
+
+  static final materials = new machinekit.cache.Memo<Array<materia.casting.Box3>>("casting-material-boxes", 512, copyBoxes);
+
+  static function copyBoxes(boxes:Array<materia.casting.Box3>):Array<materia.casting.Box3> {
+    var copies:Array<materia.casting.Box3> = [];
+    for (box in boxes) copies.push({
+      x: box.x,
+      y: box.y,
+      z: box.z,
+      width: box.width,
+      depth: box.depth,
+      height: box.height
+    });
+    return copies;
   }
 
   public function minimumSectionIy(x0:Float, x1:Float):Float return BoxAlgebra.minimumIy(materialBoxes(), x0, x1);

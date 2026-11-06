@@ -9,7 +9,7 @@ import materia.assembly.AssemblyFrames as F;
 /** Assumed catalogue-class control cabinet with DIN rows and derived I/O. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class ControlCabinet extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.length("width", 800),
     P.length("depth", 300),
@@ -38,7 +38,7 @@ class ControlCabinet extends AssumedCatalogComponent {
     );
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.control.control-cabinet",
       inputs(),
       v -> new ControlCabinet(v),
@@ -46,8 +46,7 @@ class ControlCabinet extends AssumedCatalogComponent {
       false,
       ["inputs", "outputs", "analogOutputs"]
     ).numbered(v -> 'CABINET-ASSUMED-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x'
-      + '${Dimension.format(v.number("height"))}-${v.integer("dinRows")}R').procured(_ -> Buy(null, null, null)).requiringInputs(["width", "depth", "height"], ["dinRows"], []);
-    return recipe;
+      + '${Dimension.format(v.number("height"))}-${v.integer("dinRows")}R').procured(_ -> Buy(null, null, null)).requiringInputs(["width", "depth", "height"], ["dinRows"], []));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function geometry(detail:ComponentDetail = Preview):Part {

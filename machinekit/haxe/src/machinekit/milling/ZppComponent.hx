@@ -8,8 +8,11 @@ import materia.assembly.AssemblyFrames as F;
 
 /** Reviewed solid groups from pinned supplier STEP. Coordinates: X closes jaws, Y across jaws, Z up. */
 class ZppComponent extends MachineComponent {
-  static var recipe:Null<ComponentType>;
-  static final sources:Map<String, Shape> = [];
+  static final recipe = new machinekit.cache.Once<ComponentType>();
+  /** Supplier STEP imports by model, read once per file. */
+  static final sources = machinekit.cache.Memos.shapes("zpp-step-imports", 8);
+  /** A role's solids, unplaced, by model and role: a role's members are drawn many times, each from its own copy. */
+  static final groups = machinekit.cache.Memos.parts("zpp-role-solids", 32);
   public final role:String;
   public static inline var VISE_BOTTOM:Float = 23.3172156163821;
   public static inline var BED:Float = VISE_BOTTOM + 11.684;
@@ -80,18 +83,47 @@ class ZppComponent extends MachineComponent {
     role,
     "ar-"
   ) ? "AR155_I" : role == "plate" ? "TS52-108" : role == "stud" ? "ps16f" : "CV15075";
-  static function source(model:String):Shape {
-    if (!sources.exists(model)) {
-      var path = directory() + "/" + model + ".stp";
-      if (!sys.FileSystem.exists(path)) throw "Missing ZPP CAD; run python3 tools/suppliers/zppcnc.py --prepare";
-      if (machinekit.catalog.PinnedCad.sha256(path) != hash(model)) throw "Unreviewed ZPP STEP: " + model;
-      sources.set(model, Shape.importStep(path));
-    }
-    return sources.get(model);
-  }
+  static function source(model:String):Shape return sources.get(model, () -> {
+    var path = directory() + "/" + model + ".stp";
+    if (!sys.FileSystem.exists(path)) throw "Missing ZPP CAD; run python3 tools/suppliers/zppcnc.py --prepare";
+    if (machinekit.catalog.PinnedCad.sha256(path) != hash(model)) throw "Unreviewed ZPP STEP: " + model;
+    return machinekit.cache.Parallel.serialized(() -> Shape.importStep(path));
+  });
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     if (isLink()) return role == "stud-link96" ? Part.cylinderSpan(5, -10, 10) : Part.cylinderSpan(4, -8, 8);
+    var group = groups.get(model() + "|" + role, () -> solids());
+    var pose = (role == "stud" || role == "stud96") ? F.fromRotationMatrix(
+      0,
+      0,
+      role == "stud" ? -24.638 : -29.083,
+      [0, 0, 1, 0, -1, 0, 1, 0, 0]
+    ) : StringTools.startsWith(
+      role,
+      "ar-"
+    ) ? F.fromRotationMatrix(
+      0,
+      0,
+      0,
+      [1, 0, 0, 0, 0, -1, 0, 1, 0]
+    ) : F.fromRotationMatrix(
+      0,
+      0,
+      (role == "plate" || role == "plate96") ? 0 : VISE_BOTTOM,
+      [0, 0, 1, 1, 0, 0, 0, 1, 0]
+    );
+    try {
+      var result = machinekit.assembly.PosedParts.moved(group, pose);
+      group.close();
+      return result;
+    } catch (e:Dynamic) {
+      group.close();
+      throw e;
+    }
+  }
+
+  /** This member's solids taken from the supplier STEP, as it places them. */
+  function solids():Part {
     var raw = source(model()), indices:Array<Int> = switch role {
       case "body":
         [for (i in 0...81) i].concat([83]);
@@ -122,47 +154,22 @@ class ZppComponent extends MachineComponent {
     };
     var expected = StringTools.startsWith(role,
       "ar-") ? 7 : (role == "plate96" || role == "stud96" || role == "stud") ? 1 : role == "plate" ? 5 : 99;
-    if (raw.subshapeCount(CadKit.ShapeKind.Solid) != expected) throw "ZPP solid layout changed";
     var pieces:Array<Shape> = [];
     try {
+      if (raw.subshapeCount(CadKit.ShapeKind.Solid) != expected) throw "ZPP solid layout changed";
       for (i in indices) pieces.push(raw.subshape(CadKit.ShapeKind.Solid, i));
       var group = new Part(Shape.compound(pieces));
       for (p in pieces) p.close();
-      pieces = [];
-      var pose = (role == "stud" || role == "stud96") ? F.fromRotationMatrix(
-        0,
-        0,
-        role == "stud" ? -24.638 : -29.083,
-        [0, 0, 1, 0, -1, 0, 1, 0, 0]
-      ) : StringTools.startsWith(
-        role,
-        "ar-"
-      ) ? F.fromRotationMatrix(
-        0,
-        0,
-        0,
-        [1, 0, 0, 0, 0, -1, 0, 1, 0]
-      ) : F.fromRotationMatrix(
-        0,
-        0,
-        (role == "plate" || role == "plate96") ? 0 : VISE_BOTTOM,
-        [0, 0, 1, 1, 0, 0, 0, 1, 0]
-      );
-      try {
-        var result = machinekit.assembly.PosedParts.moved(group, pose);
-        group.close();
-        return result;
-      } catch (e:Dynamic) {
-        group.close();
-        throw e;
-      }
+      raw.close();
+      return group;
     } catch (e:Dynamic) {
       for (p in pieces) p.close();
+      raw.close();
       throw e;
     }
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.zpp-supplier-member",
       [P.choice("role", roles(), "body")],
       v -> new ZppComponent(v.token("role")),
@@ -177,8 +184,7 @@ class ZppComponent extends MachineComponent {
         : StringTools.startsWith(member, "ar-") ? "AR155-I" : member == "plate" ? "TS52-108"
         : member == "stud" ? "PS16F" : "CV15075";
       return 'ZPP-$product-${member.toUpperCase()}';
-    });
-    return recipe;
+    }));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setToken("role", role);

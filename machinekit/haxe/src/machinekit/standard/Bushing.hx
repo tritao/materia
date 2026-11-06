@@ -50,10 +50,10 @@ class Bushing extends MachineComponent {
     [Solids.named(Part.cylinderSpan(boreDiameter / 2, -0.1, length + 0.1), "bore")]
   );
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.standard.bushing",
       [
         ComponentRecipeSupport.length("boreDiameter", 8),
@@ -61,8 +61,7 @@ class Bushing extends MachineComponent {
         ComponentRecipeSupport.length("length", 10)
       ],
       v -> new Bushing(v.number("boreDiameter"), v.number("outerDiameter"), v.number("length"))
-    ).numbered(v -> 'BUSHING-${Dimension.format(v.number("boreDiameter"))}x${Dimension.format(v.number("outerDiameter"))}x${Dimension.format(v.number("length"))}').procured(_ -> Make("turning"));
-    return recipeTypeCache;
+    ).numbered(v -> 'BUSHING-${Dimension.format(v.number("boreDiameter"))}x${Dimension.format(v.number("outerDiameter"))}x${Dimension.format(v.number("length"))}').procured(_ -> Make("turning")));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

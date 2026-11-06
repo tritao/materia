@@ -18,11 +18,10 @@ class HobArbor extends MachineComponent {
     P.quantity("radialRunout", 0.002, "mm"),
     P.quantity("axialRunout", 0.002, "mm")
   ]);
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.hobbing.hob-arbor", parameters(), v -> new HobArbor(v))
-      .numbered(_ -> "HOB-ARBOR-BT30").procured(_ -> Make("turning and grinding")).requiringInputs(["outside", "bore", "height", "hobSeatLength", "supportDiameter"]);
-    return recipe;
+    return recipe.get(() -> new ComponentType("machinekit.hobbing.hob-arbor", parameters(), v -> new HobArbor(v))
+      .numbered(_ -> "HOB-ARBOR-BT30").procured(_ -> Make("turning and grinding")).requiringInputs(["outside", "bore", "height", "hobSeatLength", "supportDiameter"]));
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues
     > return EngineeringMetadata.assumedCatalog(

@@ -118,10 +118,10 @@ class Rack extends MachineComponent {
     }
   }
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.transmission.involute-rack",
       [
         ComponentRecipeSupport.length("moduleSize", 2),
@@ -148,8 +148,7 @@ class Rack extends MachineComponent {
       ),
       true
     ).procured(_ -> Buy(null, null, null))
-      .requiringInputs(["moduleSize", "teethCount", "faceWidth", "pressureAngle", "barHeight", "material"], [], ["backlash"]);
-    return recipeTypeCache;
+      .requiringInputs(["moduleSize", "teethCount", "faceWidth", "pressureAngle", "barHeight", "material"], [], ["backlash"]));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this, Rack) ? recipeType() : null;

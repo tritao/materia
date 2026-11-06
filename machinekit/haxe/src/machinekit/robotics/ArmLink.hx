@@ -101,10 +101,10 @@ class ArmLink extends MachineComponent {
       throw 'Unknown arm axis "$token"';
   };
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.robotics.arm-link",
       [
         ComponentRecipeSupport.length("length", 300),
@@ -125,8 +125,7 @@ class ArmLink extends MachineComponent {
         v.number("endJointLength")
       ),
       true
-    ).procured(_ -> Make("CNC machining"));
-    return recipeTypeCache;
+    ).procured(_ -> Make("CNC machining")));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

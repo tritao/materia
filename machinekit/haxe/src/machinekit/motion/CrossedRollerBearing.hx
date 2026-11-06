@@ -15,9 +15,9 @@ class CrossedRollerBearing extends MachineComponent {
     P.quantity("axialRunout", 0.002, "mm"),
     P.quantity("momentStiffness", 1000000, "N m/rad")
   ]);
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.crossed-roller-bearing",
       parameters(),
       v -> new CrossedRollerBearing(v)
@@ -30,8 +30,7 @@ class CrossedRollerBearing extends MachineComponent {
         machinekit.component.Procurement.ProcurementCodec.requirement("radialRunout", "um", null, v.number("radialRunout") * 1000),
         machinekit.component.Procurement.ProcurementCodec.requirement("axialRunout", "um", null, v.number("axialRunout") * 1000),
         machinekit.component.Procurement.ProcurementCodec.requirement("momentStiffness", "N m/rad", v.number("momentStiffness"))
-      ]);
-    return recipe;
+      ]));
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues
     > return EngineeringMetadata.assumedCatalog(

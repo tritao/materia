@@ -40,7 +40,7 @@ class ToolingBlock extends MachineComponent {
     }
   }
 
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   static function parameters():Array<machinekit.component.ComponentParameter> return [
     P.length("width", 100),
@@ -49,9 +49,8 @@ class ToolingBlock extends MachineComponent {
   ];
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.tooling.block", parameters(), v -> new ToolingBlock(v), false, true)
-      .numbered(v -> 'TOOL-BLOCK-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}-${materia.project.MaterialLibrary.fromSpec(v.token("material")).toUpperCase()}');
-    return recipe;
+    return recipe.get(() -> new ComponentType("machinekit.tooling.block", parameters(), v -> new ToolingBlock(v), false, true)
+      .numbered(v -> 'TOOL-BLOCK-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}-${materia.project.MaterialLibrary.fromSpec(v.token("material")).toUpperCase()}'));
   }
 
   public function new(?input:ComponentValues) {

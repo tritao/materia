@@ -32,10 +32,10 @@ class FrameBar extends MachineComponent {
     addConnector("end", Mount, Solids.axial(0, 0, length));
   }
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.robotics.frame-bar",
       [
         ComponentRecipeSupport.length("width", 20),
@@ -44,8 +44,7 @@ class FrameBar extends MachineComponent {
       ],
       v -> new FrameBar(v.number("width"), v.number("depth"), v.number("length")),
       true
-    ).procured(_ -> Make("cutting and machining"));
-    return recipeTypeCache;
+    ).procured(_ -> Make("cutting and machining")));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

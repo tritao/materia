@@ -31,12 +31,12 @@ typedef HeatedBedSpec = {
  * face, whose normal is +Z; `surface` is there. The plate's underside carries `mount`.
  */
 class HeatedBed extends MachineComponent {
-  static var table:Null<Catalog<HeatedBedSpec>>;
-  static var recipe:Null<ComponentType>;
+  static final table = new machinekit.cache.Once<Catalog<HeatedBedSpec>>();
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final spec:HeatedBedSpec;
 
   public static function catalog():Catalog<HeatedBedSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "heated bed",
       s -> s.designation,
       [{
@@ -59,8 +59,7 @@ class HeatedBed extends MachineComponent {
         conformance: GenericApproximation,
         verifiedFields: []
       })
-    );
-    return table;
+    ));
   }
 
   public function new(designation:String = "BED-ALU-235-24V-300W") {
@@ -83,7 +82,7 @@ class HeatedBed extends MachineComponent {
   public function thickness():Float return spec.plateThickness + spec.padThickness;
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.printing.heated-bed",
       [ComponentRecipeSupport.catalog("designation", catalog(), "BED-ALU-235-24V-300W")],
       v -> new HeatedBed(v.token("designation"))
@@ -94,8 +93,7 @@ class HeatedBed extends MachineComponent {
         machinekit.component.Procurement.ProcurementCodec.requirement("voltage", "V", null, null, row.volts),
         machinekit.component.Procurement.ProcurementCodec.requirement("power", "W", row.watts),
         machinekit.component.Procurement.ProcurementCodec.requirement("maxTemperature", "C", row.maxTemperature)];
-    });
-    return recipe;
+    }));
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,
     HeatedBed) ? recipeType() : null;

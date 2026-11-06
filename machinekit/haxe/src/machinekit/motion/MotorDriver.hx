@@ -43,15 +43,15 @@ typedef MotorDriverRating = {
  * not verified product specifications. A stated voltage is used only without a wired supply.
  */
 class MotorDriver extends MachineComponent {
-  static var table:Null<Catalog<MotorDriverRating>>;
-  static var recipe:Null<ComponentType>;
+  static final table = new machinekit.cache.Once<Catalog<MotorDriverRating>>();
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final rating:MotorDriverRating;
   public final current:machinekit.power.PhaseRmsCurrent;
   public final microsteps:Int;
   public final statedVoltage:Null<machinekit.power.DcVoltage>;
 
   public static function catalog():Catalog<MotorDriverRating> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "motor driver",
       row -> row.designation,
       [
@@ -175,8 +175,7 @@ class MotorDriver extends MachineComponent {
         dimensionKind: Unverified,
         conformance: GenericApproximation
       })
-    );
-    return table;
+    ));
   }
 
   public function new(
@@ -225,7 +224,7 @@ class MotorDriver extends MachineComponent {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.motor-driver",
       [
         ComponentRecipeSupport.catalog("designation", catalog(), "GENERIC-TMC2209"),
@@ -256,8 +255,7 @@ class MotorDriver extends MachineComponent {
         req("maximumCurrent", "A rms", row.maximumCurrent)];
       if (row.positionLoopRate > 0) terms.push(req("positionLoopRate", "Hz", row.positionLoopRate));
       return terms;
-    });
-    return recipe;
+    }));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

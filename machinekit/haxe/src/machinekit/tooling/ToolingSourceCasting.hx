@@ -11,12 +11,12 @@ import machinekit.structural.CastingCavityCad;
 
 /** A detached casting source, with one strict neutral encoding and exact cavities. */
 class ToolingSourceCasting extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   static function parameters():Array<ComponentParameter> return [new ComponentParameter("source", Text, Unset)];
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.tooling.source-casting",
       parameters(),
       v -> new ToolingSourceCasting(v),
@@ -45,8 +45,7 @@ class ToolingSourceCasting extends MachineComponent {
           inserts: []
         })
       )
-    ).numbered(v -> 'CASTING-${ToolingCodec.decodeInput(v.token("source")).id.toUpperCase()}');
-    return recipe;
+    ).numbered(v -> 'CASTING-${ToolingCodec.decodeInput(v.token("source")).id.toUpperCase()}'));
   }
 
   public static function fromInput(input:CastingToolingInput):ToolingSourceCasting return new ToolingSourceCasting(new ComponentValues()

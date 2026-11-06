@@ -28,7 +28,7 @@ import materia.assembly.AssemblyFrames;
  * `axis` at the shaft centre, `input`/`output` at the housing ends, `base` on the mounting face,
  * and `bolt1`/`bolt2` at the two mounting-hole centres. */
 class PillowBlock extends MachineComponent {
-  static var table:Null<Catalog<PillowBlockSpec>>;
+  static final table = new machinekit.cache.Once<Catalog<PillowBlockSpec>>();
 
   public final spec:PillowBlockSpec;
   public final bearing:DeepGrooveBearing;
@@ -187,7 +187,7 @@ class PillowBlock extends MachineComponent {
 
   /** Koyo/JTEKT UCP204–UCP213 product dimensions, with the generated solids treated as nominal envelopes. */
   public static function catalog():Catalog<PillowBlockSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "pillow block unit",
       spec -> spec.designation,
       rows(),
@@ -209,8 +209,7 @@ class PillowBlock extends MachineComponent {
           "mountScrew"
         ]
       })
-    );
-    return table;
+    ));
   }
 
   public static function metric(designation:String):PillowBlock return new PillowBlock(catalog().get(designation));
@@ -285,16 +284,15 @@ class PillowBlock extends MachineComponent {
     return result;
   }
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.motion.pillow-block",
       [ComponentRecipeSupport.catalog("designation", PillowBlock.catalog(), "UCP204")],
       v -> PillowBlock.metric(v.token("designation")),
       true
-    );
-    return recipeTypeCache;
+    ));
   }
 
   override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();

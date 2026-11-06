@@ -26,7 +26,7 @@ class PneumaticCylinder extends MachineComponent implements CylinderSpec {
   public final bodyLength:Float;
   public final bodyWidth:Float;
   public final stemLength:Float;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public function new(family:String, bore:Float, stroke:Float, ratedSpeed:Float) {
     var bores = family == "ISO6432" ? [8,
@@ -91,7 +91,7 @@ class PneumaticCylinder extends MachineComponent implements CylinderSpec {
   return Solids.cut(parts[0], [parts[1], parts[2]]);
   }), "body");
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.pneumatic.cylinder",
       [
         ComponentRecipeSupport.choice("family", ["ISO6432", "ISO15552"], "ISO6432"),
@@ -101,8 +101,7 @@ class PneumaticCylinder extends MachineComponent implements CylinderSpec {
       ],
       v -> new PneumaticCylinder(v.token("family"), v.number("bore"), v.number("stroke"), v.number("ratedSpeed"))
     ).numbered(v -> '${v.token("family")}-${Dimension.format(v.number("bore"))}x${Dimension.format(v.number("stroke"))}-ASSUMED-${Dimension.format(v.number("ratedSpeed"))}MMS')
-      .procured(_ -> Buy(null, null, null)).requiringInputs(["family", "bore", "stroke"], ["ratedSpeed"]);
-    return recipe;
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["family", "bore", "stroke"], ["ratedSpeed"]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setToken("family", family).setNumber(

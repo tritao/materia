@@ -9,7 +9,7 @@ import materia.assembly.AssemblyFrames as F;
 /** Assumed catalogue-class zoned vacuum plenum table. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class VacuumTable extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.length("width", 1600),
     P.length("length", 2600),
@@ -57,9 +57,8 @@ class VacuumTable extends AssumedCatalogComponent {
     }
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.routing.vacuum-table",
-      inputs(), v -> new VacuumTable(v)).numbered(_ -> "ROUTER-VACUUM-TABLE").procured(_ -> Buy(null, null, null)).requiringInputs(["width", "length", "height", "columns", "rows", "zonePortDiameter"], [], []);
-    return recipe;
+    return recipe.get(() -> new ComponentType("machinekit.routing.vacuum-table",
+      inputs(), v -> new VacuumTable(v)).numbered(_ -> "ROUTER-VACUUM-TABLE").procured(_ -> Buy(null, null, null)).requiringInputs(["width", "length", "height", "columns", "rows", "zonePortDiameter"], [], []));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function geometry(detail:ComponentDetail = Preview):Part {

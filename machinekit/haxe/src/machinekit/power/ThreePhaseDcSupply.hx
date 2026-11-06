@@ -32,10 +32,10 @@ class ThreePhaseDcSupply extends PowerSupply {
     for (index in 1...outlets + 1) addConversion("mains", 'power$index');
   }
 
-  static var dcRecipe:Null<ComponentType>;
+  static final dcRecipe = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (dcRecipe == null) dcRecipe = new ComponentType(
+    return dcRecipe.get(() -> new ComponentType(
       "machinekit.power.three-phase-dc-supply",
       [
         ComponentRecipeSupport.scalar("lineVoltage", 400, 0.001),
@@ -66,8 +66,7 @@ class ThreePhaseDcSupply extends PowerSupply {
           req("frequency", "Hz", null, null, v.number("frequency")), req("voltage", "V", null, null, v.number("voltage")),
           req("current", "A", v.number("current")), req("outlets", "count", v.integer("outlets")),
           req("regenerativePower", "W", v.number("regenerativePower"))];
-      });
-    return dcRecipe;
+      }));
   }
 
   override public function componentType():Null<ComponentType> return recipeType();

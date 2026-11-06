@@ -8,7 +8,7 @@ import machinekit.component.ComponentRecipeSupport as P;
  * Origin at plate centre X/Y and bottom Z. Mounting holes are nominal clearances.
  */
 class MillZBearingPlate extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [
     P.length("bearingTapDepth", 0),
     P.length("bearingPitch", 46),
@@ -26,12 +26,11 @@ class MillZBearingPlate extends MachineComponent {
     P.length("anchorSpacing", 180)
   ];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.z-bearing-plate",
       parameters(),
       v -> new MillZBearingPlate(v)
-    ).numbered(_ -> "MILL-Z-BEARING-PLATE");
-    return recipe;
+    ).numbered(_ -> "MILL-Z-BEARING-PLATE"));
   }
   public function new(?values:ComponentValues) {
     var v = P.resolve(parameters(), values);

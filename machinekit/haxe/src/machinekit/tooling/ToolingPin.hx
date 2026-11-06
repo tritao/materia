@@ -11,7 +11,7 @@ import materia.assembly.AssemblyFrames as F;
 
 /** Nominal locating pins and stepped bore masks; supplier fits need qualification. */
 class ToolingPin extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function parameters():Array<machinekit.component.ComponentParameter> return [
     P.length("diameter", 6),
     P.length("length", 40),
@@ -19,7 +19,7 @@ class ToolingPin extends MachineComponent {
     P.length("headLength", 0)
   ];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.tooling.plain-pin",
       parameters(),
       v -> new ToolingPin(v),
@@ -28,8 +28,7 @@ class ToolingPin extends MachineComponent {
       null,
       false
     ).numbered(v -> 'TOOL-PIN-${Dimension.format(v.number("diameter"))}x${Dimension.format(v.number("length"))}'
-      + (v.number("headDiameter") == 0 ? "" : '-H${Dimension.format(v.number("headDiameter"))}x${Dimension.format(v.number("headLength"))}'));
-    return recipe;
+      + (v.number("headDiameter") == 0 ? "" : '-H${Dimension.format(v.number("headDiameter"))}x${Dimension.format(v.number("headLength"))}')));
   }
   public function new(?input:ComponentValues) {
     var v = P.resolve(parameters(), input);

@@ -9,7 +9,7 @@ import machinekit.component.ComponentRecipeSupport as P;
  * published; internal slides, mounting accessories and recesses are nominal.
  */
 class Rke92VisePart extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function parameters():Array<ComponentParameter> return [
     P.choice("role", ["body", "jaw-back", "slide", "jaw-plate", "drive", "stop", "clamp", "key"], "body"),
     P.length("depth", 39)
@@ -20,12 +20,11 @@ class Rke92VisePart extends MachineComponent {
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.rke92-reference-part",
       parameters(),
       v -> new Rke92VisePart(v.token("role"), v.number("depth"))
-    ).numbered(v -> 'RKE92-REFERENCE-${v.token("role").toUpperCase()}');
-    return recipe;
+    ).numbered(v -> 'RKE92-REFERENCE-${v.token("role").toUpperCase()}'));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function hasGeometry():Bool return true;

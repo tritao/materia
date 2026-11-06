@@ -28,7 +28,7 @@ import machinekit.component.Solids;
  * Hole tools share the convention: the seat surface is z=0 and material lies at z<0.
  */
 class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
-  static var table:Null<Catalog<MetricScrewSpec>>;
+  static final table = new machinekit.cache.Once<Catalog<MetricScrewSpec>>();
 
   public final spec:MetricScrewSpec;
   public final length:Float;
@@ -67,7 +67,7 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
   }
 
   public static function catalog():Catalog<MetricScrewSpec> {
-    if (table == null) table = new Catalog("metric screw size", spec -> spec.size, rows(), spec -> switch (spec.size) {
+    return table.get(() -> new Catalog("metric screw size", spec -> spec.size, rows(), spec -> switch (spec.size) {
       case "M5":
         ({
           source: "https://www.accu.co.uk/api/product-datasheet?id=652689",
@@ -159,8 +159,7 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
           conformance: NominalEnvelope
         })
     }
-    );
-    return table;
+    ));
   }
 
   /** ISO 4762 preferred nominal lengths, mm. */
@@ -410,10 +409,10 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
     };
   }
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.standard.socket-head-cap-screw",
       [
         ComponentRecipeSupport.catalog("size", SocketHeadCapScrew.catalog(), "M5"),
@@ -429,8 +428,7 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
       true,
       null,
       false
-    ).procured(_ -> Buy(null, null, "ISO 4762"));
-    return recipeTypeCache;
+    ).procured(_ -> Buy(null, null, "ISO 4762")));
   }
 
   override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();

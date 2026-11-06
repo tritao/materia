@@ -12,7 +12,7 @@ class MillCrossSaddle extends MachineComponent {
   public static inline var BLOCK_SEAT:Float = 12;
   public static inline var BLOCK_SCREW_LENGTH:Float = 16;
   public static inline var WRENCH_HEIGHT:Float = 34;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public static function parameters():Array<ComponentParameter> return [
     P.length("width", 450),
@@ -37,12 +37,11 @@ class MillCrossSaddle extends MachineComponent {
   ];
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.cross-saddle",
       parameters(),
       v -> new MillCrossSaddle(v)
-    ).numbered(_ -> "MILL-CROSS-SADDLE");
-    return recipe;
+    ).numbered(_ -> "MILL-CROSS-SADDLE"));
   }
 
   public function new(?values:ComponentValues) {

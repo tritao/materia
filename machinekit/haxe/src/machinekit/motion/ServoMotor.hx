@@ -75,13 +75,13 @@ class ServoMotor extends MachineComponent implements MotorDrive {
       mechanicalEfficiency: 0.95
     };
   }
-  static var table:Null<Array<ServoRating>>;
+  static final table = new machinekit.cache.Once<Array<ServoRating>>();
 
   public final rating:ServoRating;
   public final ratingsBasis:machinekit.transmission.ValueBasis;
 
   public static function ratings():Array<ServoRating> {
-    if (table == null) {
+    return table.get(() -> {
       var rpm = 2.0 * Math.PI / 60.0;
       function generic(
         name:String,
@@ -108,7 +108,7 @@ class ServoMotor extends MachineComponent implements MotorDrive {
           electrical: acWinding(rated, 3000.0 * rpm)
         };
       }
-      table = [
+      var rows:Array<ServoRating> = [
         generic("GENERIC-SERVO-50W", 50, 3.0e-6, 40, 70, 8, 20),
         generic("GENERIC-SERVO-100W", 100, 5.0e-6, 40, 85, 8, 20),
         generic("GENERIC-SERVO-200W", 200, 2.5e-5, 60, 100, 14, 30),
@@ -118,8 +118,8 @@ class ServoMotor extends MachineComponent implements MotorDrive {
         generic("GENERIC-SERVO-1000W", 1000, 2.0e-4, 80, 104, 19, 35)
       ];
       // Distinct saved designations preserve the selected winding on reconstruction.
-      var baseRows = table.copy();
-      for (row in baseRows) table.push({
+      var baseRows = rows.copy();
+      for (row in baseRows) rows.push({
         designation: StringTools.replace(row.designation, "GENERIC-SERVO-", "GENERIC-LV-SERVO-"),
         ratedTorque: row.ratedTorque,
         peakTorque: row.peakTorque,
@@ -133,7 +133,7 @@ class ServoMotor extends MachineComponent implements MotorDrive {
         shaftLength: row.shaftLength,
         electrical: lowVoltageWinding(row.ratedTorque, row.ratedSpeed, row.maxSpeed)
       });
-      for (row in baseRows) table.push({
+      for (row in baseRows) rows.push({
         designation: StringTools.replace(row.designation, "GENERIC-SERVO-", "GENERIC-HV-SERVO-"),
         ratedTorque: row.ratedTorque,
         peakTorque: row.peakTorque,
@@ -147,14 +147,14 @@ class ServoMotor extends MachineComponent implements MotorDrive {
         shaftLength: row.shaftLength,
         electrical: highVoltageWinding(row.ratedTorque, row.ratedSpeed)
       });
-      for (name in LeadshineServo.catalog().designations()) table.push(LeadshineServo.model(name).rating);
-    }
-    return table;
+      for (name in LeadshineServo.catalog().designations()) rows.push(LeadshineServo.model(name).rating);
+      return rows;
+    });
   }
 
-  static var namedRecipe:Null<machinekit.component.ComponentType>;
+  static final namedRecipe = new machinekit.cache.Once<machinekit.component.ComponentType>();
   public static function namedRecipeType():machinekit.component.ComponentType {
-    if (namedRecipe == null) namedRecipe = new machinekit.component.ComponentType(
+    return namedRecipe.get(() -> new machinekit.component.ComponentType(
       "machinekit.motion.servo-motor",
       [
         machinekit.component.ComponentRecipeSupport.choice(
@@ -169,8 +169,7 @@ class ServoMotor extends MachineComponent implements MotorDrive {
       true,
       false,
       ["winding"]
-    ).numbered(partNumberFor).procured(procurementFor).requiring(requirementsFor);
-    return namedRecipe;
+    ).numbered(partNumberFor).procured(procurementFor).requiring(requirementsFor));
   }
 
   /** Selection data comes from the same rating row used by the motor. */

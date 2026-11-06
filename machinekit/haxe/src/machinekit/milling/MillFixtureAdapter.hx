@@ -6,7 +6,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 import machinekit.standard.SocketHeadCapScrew;
 /** Fabricated plate: four table through holes and four top taps, centred on rectangular patterns. */
 class MillFixtureAdapter extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final height:Float;
   public final pneumatic:Bool;
   public function new(height:Float = 20, pneumatic:Bool = false) {
@@ -40,12 +40,11 @@ class MillFixtureAdapter extends MachineComponent {
     return Solids.cut(body, cuts);
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.fixture-adapter",
       [P.length("height", 20), P.choice("pattern", ["82-square", "128-square"], "82-square")],
       v -> new MillFixtureAdapter(v.number("height"), v.token("pattern") == "128-square")
-    ).numbered(v -> v.token("pattern") == "128-square" ? "MILL-FIXTURE-ADAPTER-128" : "MILL-FIXTURE-ADAPTER-82");
-    return recipe;
+    ).numbered(v -> v.token("pattern") == "128-square" ? "MILL-FIXTURE-ADAPTER-128" : "MILL-FIXTURE-ADAPTER-82"));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setNumber("height", height).setToken(

@@ -21,10 +21,10 @@ class FastenerTightening {
     "https://optimas.com/technical-resources/pre-load-and-tightening-torques-of-metric-thread-steel-fasteners/";
   public static inline var STAINLESS_SOURCE =
     "https://international.optimas.com/technical-resources/stainless-steel-fasteners-pre-load-and-tightening-torques/";
-  static var table:Null<Catalog<TighteningTableRow>>;
+  static final table = new machinekit.cache.Once<Catalog<TighteningTableRow>>();
 
   public static function catalog():Catalog<TighteningTableRow> {
-    if (table == null) {
+    return table.get(() -> {
       var rows:Array<TighteningTableRow> = [];
       // Optimas coarse table, mu=0.125. M3..M5 torque columns are Ncm; M6 and above are Nm.
       steel(rows, "M3", 2320, 3270, 3920, 1.28, 1.80, 2.15);
@@ -48,7 +48,7 @@ class FastenerTightening {
       stainless(rows, "M14", 40000, 79);
       stainless(rows, "M16", 55000, 121);
       stainless(rows, "M20", 88600, 224);
-      table = new Catalog(
+      return new Catalog(
         "fastener tightening",
         key,
         rows,
@@ -61,8 +61,7 @@ class FastenerTightening {
           verifiedFields : ["torqueNm", "preloadN", "friction"]
         })
       );
-    }
-    return table;
+    });
   }
 
   static function key(row:TighteningTableRow):String return row.size + "/" + PropertyClasses.token(row.propertyClass);

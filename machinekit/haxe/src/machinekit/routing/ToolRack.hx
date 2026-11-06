@@ -9,7 +9,7 @@ import materia.assembly.AssemblyFrames as F;
 /** Assumed catalogue-class linear covered tool rack. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class ToolRack extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.count("pockets", 8),
     P.length("pitch", 110),
@@ -33,9 +33,8 @@ class ToolRack extends AssumedCatalogComponent {
     addPort({name: "cover_air", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.routing.tool-rack", inputs(), v -> new ToolRack(v))
-      .numbered(_ -> "ROUTER-TOOL-RACK").procured(_ -> Buy(null, null, null)).requiringInputs(["pitch", "depth", "height"], ["pockets", "coverStroke"], []);
-    return recipe;
+    return recipe.get(() -> new ComponentType("machinekit.routing.tool-rack", inputs(), v -> new ToolRack(v))
+      .numbered(_ -> "ROUTER-TOOL-RACK").procured(_ -> Buy(null, null, null)).requiringInputs(["pitch", "depth", "height"], ["pockets", "coverStroke"], []));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function geometry(detail:ComponentDetail = Preview):Part {

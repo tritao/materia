@@ -28,7 +28,7 @@ import machinekit.component.Solids;
  * with +Y along +Z. Envelope approximates the head as its across-corners cylinder.
  */
 class HexBolt extends MachineComponent implements ScrewFastener {
-  static var table:Null<Catalog<HexBoltSpec>>;
+  static final table = new machinekit.cache.Once<Catalog<HexBoltSpec>>();
 
   public final spec:HexBoltSpec;
   public final length:Float;
@@ -123,7 +123,7 @@ class HexBolt extends MachineComponent implements ScrewFastener {
   ];
 
   public static function catalog():Catalog<HexBoltSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "hex bolt size",
       spec -> spec.size,
       rows(),
@@ -142,8 +142,7 @@ class HexBolt extends MachineComponent implements ScrewFastener {
         dimensionKind : Unverified,
         conformance : NominalEnvelope
       })
-    );
-    return table;
+    ));
   }
 
   public static function metric(size:String,
@@ -322,10 +321,10 @@ class HexBolt extends MachineComponent implements ScrewFastener {
     };
   }
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.standard.hex-bolt",
       [
         ComponentRecipeSupport.catalog("size", HexBolt.catalog(), "M5"),
@@ -337,8 +336,7 @@ class HexBolt extends MachineComponent implements ScrewFastener {
       true,
       null,
       false
-    ).procured(_ -> Buy(null, null, "ISO 4017"));
-    return recipeTypeCache;
+    ).procured(_ -> Buy(null, null, "ISO 4017")));
   }
 
   override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();

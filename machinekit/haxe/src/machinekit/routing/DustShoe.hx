@@ -8,7 +8,7 @@ import materia.assembly.AssemblyFrames as F;
 /** Assumed catalogue-class lifting dust shoe. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class DustShoe extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.length("diameter", 180),
     P.length("spindleClearance", 130),
@@ -57,9 +57,8 @@ class DustShoe extends AssumedCatalogComponent {
     addPort({name: "lift_air", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.routing.dust-shoe", inputs(), v -> new DustShoe(v))
-      .numbered(_ -> "ROUTER-DUST-SHOE").procured(_ -> Buy(null, null, null)).requiringInputs(["spindleClearance", "hoseDiameter"], ["liftStroke"], []);
-    return recipe;
+    return recipe.get(() -> new ComponentType("machinekit.routing.dust-shoe", inputs(), v -> new DustShoe(v))
+      .numbered(_ -> "ROUTER-DUST-SHOE").procured(_ -> Buy(null, null, null)).requiringInputs(["spindleClearance", "hoseDiameter"], ["liftStroke"], []));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   /**

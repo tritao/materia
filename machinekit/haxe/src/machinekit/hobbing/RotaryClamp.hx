@@ -15,15 +15,14 @@ class RotaryClamp extends MachineComponent implements machinekit.motion.MotorBra
     P.quantity("holdingTorque", 100, "N m"),
     P.quantity("releaseTime", 0.1, "s")
   ]);
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.hobbing.rotary-clamp",
       parameters(),
       v -> new RotaryClamp(v)
     ).numbered(v -> 'CLAMP-ASSUMED-${Dimension.format(v.number("holdingTorque"))}NM-${Dimension.format(v.number("bore"))}x${Dimension.format(v.number("outside"))}')
-      .procured(_ -> NotSupplied).requiringInputs(["outside", "bore", "height"], ["holdingTorque"], ["releaseTime"]);
-    return recipe;
+      .procured(_ -> NotSupplied).requiringInputs(["outside", "bore", "height"], ["holdingTorque"], ["releaseTime"]));
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues
     > return EngineeringMetadata.assumedCatalog(

@@ -53,11 +53,9 @@ class CastingCavityCad {
   /**
 	 * Realized and validated exact cavities, by their inputs: the body, the feature and the features its openings name.
 	 * A casting's solid, mass and sizing passes rebuild the same non-box cavities (a socket's lofted tail, its opening
-	 * checks) for every insert layout tried, and the result depends on nothing else. Kept native shapes are copied out.
+	 * checks) for every insert layout tried, and the result depends on nothing else.
 	 */
-  static var exact:Null<Map<String, Part>>;
-  static var exactCount = 0;
-  static inline final EXACT_LIMIT = 256;
+  static final exact = machinekit.cache.Memos.parts("casting-exact-cavities", 256);
 
   /** Names the solid `part(cavity)` builds: its prisms, or the body, feature and opening targets of its exact region. */
   public static function key(cavity:FinishedCastingCavity):Null<String> return switch cavity.geometry {
@@ -82,21 +80,7 @@ class CastingCavityCad {
       case UnsupportedGeometry(reason):
         throw "Unsupported casting cavity geometry: " + cavity.featureId + ": " + reason;
       case SolidIntersection(body, feature, features):
-        var key = exactKey(body, feature, features);
-        var memo:Map<String, Part> = exact == null ? [] : exact;
-        exact = memo;
-        var known = memo.get(key);
-        if (known == null) {
-          known = intersection(body, feature, features);
-          if (exactCount >= EXACT_LIMIT) {
-            for (kept in memo) kept.close();
-            memo.clear();
-            exactCount = 0;
-          }
-          memo.set(key, known);
-          exactCount++;
-        }
-        new Part(known.shape.cloneShape());
+        exact.get(exactKey(body, feature, features), () -> intersection(body, feature, features));
     };
   }
 

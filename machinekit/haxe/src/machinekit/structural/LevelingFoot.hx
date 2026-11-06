@@ -14,7 +14,7 @@ import machinekit.structural.LevelingFootSpec.FootStemEnvelope;
  * Saved dimensions are layout assumptions. Supplier geometry and load qualification remain pending.
  */
 class LevelingFoot extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   final spec:LevelingFootSpec;
 
   public static function parameters():Array<ComponentParameter> return [P.text(
@@ -32,13 +32,12 @@ class LevelingFoot extends AssumedCatalogComponent {
   )];
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.structural.leveling-foot",
       parameters(),
       v -> new LevelingFoot(v)
     ).numbered(v -> partNumber(LevelingFootCodec.decode(v.token("part"))))
-      .procured(_ -> Buy(null, null, null)).requiring(v -> requirementsFor(LevelingFootCodec.decode(v.token("part"))));
-    return recipe;
+      .procured(_ -> Buy(null, null, null)).requiring(v -> requirementsFor(LevelingFootCodec.decode(v.token("part")))));
   }
 
   static function requirementsFor(part:LevelingFootSpec):Array<machinekit.component.Procurement.ProcurementRequirement> {

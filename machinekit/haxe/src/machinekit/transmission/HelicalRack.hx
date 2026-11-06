@@ -12,7 +12,7 @@ class HelicalRack extends AssumedCatalogComponent {
   override public function presentationView():Null<machinekit.component.ComponentView
     > return machinekit.component.ComponentView.lengthAlongZ();
 
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.length("normalModule", 1.5),
     P.count("teeth", 20),
@@ -37,14 +37,13 @@ class HelicalRack extends AssumedCatalogComponent {
     addConnector("end", Mount, Solids.axial(n("faceWidth") / 2, 0, length()));
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.transmission.helical-rack",
       inputs(),
       v -> new HelicalRack(v)
     ).numbered(v -> 'RACK-ASSUMED-M${Dimension.format(v.number("normalModule"))}-${v.integer("teeth")}T-'
         + 'W${Dimension.format(v.number("faceWidth"))}-H${Dimension.format(v.number("helixAngle"))}-'
-        + v.token("hand").substr(0, 1).toUpperCase()).procured(_ -> Buy(null, null, null)).requiringInputs(["normalModule", "teeth", "faceWidth", "helixAngle", "pressureAngle", "hand", "barHeight"], ["meshStiffness"], ["backlash"]);
-    return recipe;
+        + v.token("hand").substr(0, 1).toUpperCase()).procured(_ -> Buy(null, null, null)).requiringInputs(["normalModule", "teeth", "faceWidth", "helixAngle", "pressureAngle", "hand", "barHeight"], ["meshStiffness"], ["backlash"]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function geometry(detail:ComponentDetail = Preview):Part {

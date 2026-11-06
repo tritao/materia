@@ -11,7 +11,7 @@ import machinekit.component.Solids;
 
 /** Moving hydraulic rod, mounted at its tip and extending back along local -Z. */
 class HydraulicCylinderRod extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final diameter:Float;
   public final length:Float;
 
@@ -43,13 +43,12 @@ class HydraulicCylinderRod extends MachineComponent {
     "rod"
   );
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.pressbrake.hydraulic-cylinder-rod",
       [ComponentRecipeSupport.length("diameter", 100), ComponentRecipeSupport.length("length", 190)],
       v -> new HydraulicCylinderRod(v.number("diameter"), v.number("length"))
     ).numbered(v -> 'HYDRAULIC-ROD-${Dimension.format(v.number("diameter"))}x${Dimension.format(v.number("length"))}')
-      .procured(_ -> Buy(null, null, null)).requiringInputs(["diameter", "length"]);
-    return recipe;
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["diameter", "length"]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setNumber("diameter",

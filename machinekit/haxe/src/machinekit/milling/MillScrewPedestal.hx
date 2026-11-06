@@ -6,7 +6,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 
 /** Bearing riser: Z up, +Y toward motor. Rear base bolts leave room for front motor anchors. */
 class MillScrewPedestal extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public static function parameters():Array<ComponentParameter> return [
     P.length("width", 100),
@@ -16,12 +16,11 @@ class MillScrewPedestal extends MachineComponent {
   ];
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.screw-pedestal",
       parameters(),
       v -> new MillScrewPedestal(v)
-    ).numbered(_ -> "MILL-SCREW-PEDESTAL");
-    return recipe;
+    ).numbered(_ -> "MILL-SCREW-PEDESTAL"));
   }
 
   public function new(?values:ComponentValues) {

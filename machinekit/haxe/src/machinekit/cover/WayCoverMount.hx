@@ -84,9 +84,9 @@ class WayCoverMount extends MachineComponent {
     };
   }
 
-  static var recipe:Null<machinekit.component.ComponentType>;
+  static final recipe = new machinekit.cache.Once<machinekit.component.ComponentType>();
   public static function recipeType():machinekit.component.ComponentType {
-    if (recipe == null) recipe = new machinekit.component.ComponentType("machinekit.cover.way-cover-mount", [
+    return recipe.get(() -> new machinekit.component.ComponentType("machinekit.cover.way-cover-mount", [
       machinekit.component.ComponentRecipeSupport.text("drawing", "WAYCOVER-MOUNT"),
       machinekit.component.ComponentRecipeSupport.length("halfWidth", 50),
       machinekit.component.ComponentRecipeSupport.length("height", 50),
@@ -97,8 +97,7 @@ class WayCoverMount extends MachineComponent {
       machinekit.component.ComponentRecipeSupport.text("attachment", "null")
     ], v -> new WayCoverMount(v.token("drawing"), v.number("halfWidth"), v.number("height"), v.number("thickness"),
       readBores(v.token("bores")), readCuts(v.token("cuts")), v.number("below"),
-      readAttachment(v.token("attachment"))), true).numbered(v -> v.token("drawing"));
-    return recipe;
+      readAttachment(v.token("attachment"))), true).numbered(v -> v.token("drawing")));
   }
   override public function componentType():Null<machinekit.component.ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues()

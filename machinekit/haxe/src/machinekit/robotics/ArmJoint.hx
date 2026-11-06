@@ -56,10 +56,10 @@ class ArmJoint extends MachineComponent implements MotorDrive {
     }
   }
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.robotics.arm-joint",
       [
         ComponentRecipeSupport.length("diameter", 100),
@@ -82,8 +82,7 @@ class ArmJoint extends MachineComponent implements MotorDrive {
         )
       ),
       true
-    );
-    return recipeTypeCache;
+    ));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

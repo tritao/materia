@@ -7,7 +7,7 @@ import machinekit.component.*;
  * 8.6 mm motor and 11.5 mm screw; 19.9 mm gap. Reference design, no supplier SKU.
  */
 class ScrewAxisCoupling extends ShaftCoupling {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final motorShaftLength:Float;
   public function new(motorShaftLength:Float = 20.6) {
     super(6.35, 10, 25, 40, [{z: 6.0, angle: Math.PI / 2}, {z: 34.0, angle: Math.PI / 2}]);
@@ -18,13 +18,12 @@ class ScrewAxisCoupling extends ShaftCoupling {
     addConnector("screwEnd", Axis, Solids.axial(0, 0, 28.5));
   }
   public static function axisRecipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.assembly.screw-axis-coupling",
       [ComponentRecipeSupport.length("motorShaftLength", 20.6)],
       v -> new ScrewAxisCoupling(v.number("motorShaftLength")),
       true
-    ).procured(_ -> Buy(null, null, null));
-    return recipe;
+    ).procured(_ -> Buy(null, null, null)));
   }
   override public function componentType():Null<ComponentType> return axisRecipeType();
   override public function values():ComponentValues return new ComponentValues().setNumber(

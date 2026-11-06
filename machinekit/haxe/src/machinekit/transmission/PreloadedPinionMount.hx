@@ -8,7 +8,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Assumed catalogue-class hinged spring-preloaded pinion mount. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class PreloadedPinionMount extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.choice("layout", ["plate", "radial-fork"], "plate"),
     P.length("width", 100),
@@ -64,12 +64,11 @@ class PreloadedPinionMount extends AssumedCatalogComponent {
     );
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.transmission.preloaded-pinion-mount",
       inputs(),
       v -> new PreloadedPinionMount(v)
-    ).numbered(v -> 'PIN-MOUNT-ASSUMED-${v.token("layout").toUpperCase()}-${Dimension.format(v.number("springForce"))}N').procured(_ -> Buy(null, null, null)).requiringInputs(["layout", "hingeBore", "shaftClearance"], ["springForce", "springRate", "stroke"], []);
-    return recipe;
+    ).numbered(v -> 'PIN-MOUNT-ASSUMED-${v.token("layout").toUpperCase()}-${Dimension.format(v.number("springForce"))}N').procured(_ -> Buy(null, null, null)).requiringInputs(["layout", "hingeBore", "shaftClearance"], ["springForce", "springRate", "stroke"], []));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function geometry(detail:ComponentDetail = Preview):Part {

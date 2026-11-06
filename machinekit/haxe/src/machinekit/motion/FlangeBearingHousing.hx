@@ -98,10 +98,10 @@ class FlangeBearingHousing extends MachineComponent {
     return super.buildTool(name, values);
   }
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.motion.flange-bearing-housing",
       [
         ComponentRecipeSupport.catalog("bearing", DeepGrooveBearing.catalog(), "608"),
@@ -113,8 +113,7 @@ class FlangeBearingHousing extends MachineComponent {
         ComponentRecipeSupport.fit(v.token("fit"))
       )
     ).numbered(v -> 'FLANGE-HOUSING-${v.token("bearing")}-${v.token("fit").toUpperCase()}')
-      .procured(_ -> Make("casting and machining"));
-    return recipeTypeCache;
+      .procured(_ -> Make("casting and machining")));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

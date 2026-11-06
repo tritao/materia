@@ -17,7 +17,7 @@ import machinekit.component.Solids;
  * represents an integrated shunt and braking resistor, with an assumed envelope.
  */
 class PowerSupply extends MachineComponent implements ElectricalSource {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final voltage:machinekit.power.DcVoltage;
   public final current:machinekit.power.DcCurrent;
   public final regenerativePower:Float;
@@ -73,7 +73,7 @@ class PowerSupply extends MachineComponent implements ElectricalSource {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.power-supply",
       [
         new ComponentParameter("voltage", ComponentParameterType.Scalar, ComponentValue.Number(24), "V", 0.001),
@@ -100,8 +100,7 @@ class PowerSupply extends MachineComponent implements ElectricalSource {
         var req = machinekit.component.Procurement.ProcurementCodec.requirement;
         return [req("voltage", "V", null, null, v.number("voltage")), req("current", "A", v.number("current")),
           req("outlets", "count", v.integer("outlets")), req("regenerativePower", "W", v.number("regenerativePower"))];
-      });
-    return recipe;
+      }));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

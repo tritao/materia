@@ -18,7 +18,7 @@ import machinekit.power.DcVoltage;
  * assignments belong to a concrete controller. All electrical values are explicit.
  */
 class ThermistorInput extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final pullupOhm:Float;
   public final reference:DcVoltage;
   public final channels:Int;
@@ -68,7 +68,7 @@ class ThermistorInput extends MachineComponent {
     return pullupOhm * volts / (reference.volts() - volts);
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.control.thermistor-input",
       [
         new ComponentParameter("pullupOhm", Scalar, Number(4700), "ohm", 0),
@@ -87,8 +87,7 @@ class ThermistorInput extends MachineComponent {
         v.number("height")
       )
     ).numbered(v -> 'NTC-ADC-ASSUMED-${v.integer("channels")}CH-${Dimension.format(v.number("pullupOhm"))}R-${Dimension.format(v.number("referenceVolts"))}V')
-      .procured(_ -> Buy(null, null, null)).requiringInputs(["pullupOhm", "referenceVolts"], ["channels"]);
-    return recipe;
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["pullupOhm", "referenceVolts"], ["channels"]));
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,
     ThermistorInput) ? recipeType() : null;

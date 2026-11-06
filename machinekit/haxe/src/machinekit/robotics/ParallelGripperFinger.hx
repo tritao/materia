@@ -14,7 +14,7 @@ import machinekit.component.Solids;
 class ParallelGripperFinger extends MachineComponent {
   public final spec:ParallelGripperSpec;
   public final side:Int;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public function new(spec:ParallelGripperSpec, side:Int = -1) {
     if (spec == null || (side != -1 && side != 1)) throw "Gripper finger needs its size row and side";
@@ -44,7 +44,7 @@ class ParallelGripperFinger extends MachineComponent {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.robotics.parallel-gripper-finger",
       [
         ComponentRecipeSupport.count("size", 32),
@@ -69,8 +69,7 @@ class ParallelGripperFinger extends MachineComponent {
         v.token("side") == "left" ? -1 : 1
       ),
       true
-    );
-    return recipe;
+    ));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

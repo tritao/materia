@@ -28,7 +28,7 @@ import materia.assembly.AssemblyFrames;
  * links moved from the SPI default.
  */
 class OledModule extends HmiPart {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   // Vendor drawing 2_42inch_oled_module-sku25742 (millimetres).
   static inline var GLASS_WIDTH:Float = 60.5;
@@ -118,9 +118,8 @@ class OledModule extends HmiPart {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.hmi.oled-module", inputs(), v -> new OledModule(v))
-      .numbered(v -> "WAVESHARE-25742");
-    return recipe;
+    return recipe.get(() -> new ComponentType("machinekit.hmi.oled-module", inputs(), v -> new OledModule(v))
+      .numbered(v -> "WAVESHARE-25742"));
   }
   override public function componentType():Null<ComponentType> return recipeType();
 

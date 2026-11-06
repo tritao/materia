@@ -15,7 +15,7 @@ class RectTubeMember extends MachineComponent {
   public final length:Float;
   public final drilling:Array<materia.casting.InsertHole>;
   public final partId:String;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public function new(width:Float, depth:Float, wall:Float, length:Float, ?holes:Array<materia.casting.InsertHole>, ?partId:String) {
     if (!Math.isFinite(width + depth + wall + length)
@@ -54,7 +54,7 @@ class RectTubeMember extends MachineComponent {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.structural.rect-tube-member",
       [
         ComponentRecipeSupport.length("width", 30),
@@ -76,8 +76,7 @@ class RectTubeMember extends MachineComponent {
       : 'TUBE-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("wall"))}-L${Dimension.format(v.number("length"))}'
         + (InsertHoles.records(v.token("holes")).length == 0 ? "" : "-DRILLED"))
       .procured(v -> InsertHoles.records(v.token("holes")).length == 0
-        ? Buy(null, null, null) : Make("cutting and drilling"));
-    return recipe;
+        ? Buy(null, null, null) : Make("cutting and drilling")));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setNumber("width",

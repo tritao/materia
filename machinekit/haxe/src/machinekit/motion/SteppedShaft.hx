@@ -409,10 +409,10 @@ class SteppedShaft extends MachineComponent {
     return new SteppedShaft(sections, faces, rebuilt, grooves, detail);
   }
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.motion.stepped-shaft",
       [
         ComponentRecipeSupport.text("sections", '[{"diameter":10,"length":100}]'),
@@ -430,8 +430,7 @@ class SteppedShaft extends MachineComponent {
       var keyways:Array<Dynamic> = Json.parse(v.token("keyways"));
       return "SHAFT-" + sizes.join("-") + (grooves.length == 0 ? "" : "-G" + grooves.length)
         + (keyways.length == 0 ? "" : "-K" + keyways.length);
-    }).procured(_ -> Make("turning and CNC machining"));
-    return recipeTypeCache;
+    }).procured(_ -> Make("turning and CNC machining")));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

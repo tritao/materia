@@ -46,33 +46,30 @@ class HobberDrives {
   /** Nut-part start from the nut body's centre station. */
   static function partStart(centre:Float):Float return centre - new BallNut().bodyLength / 2;
 
-  static var xCache:Null<HobberDriveAxis>;
-  static var yCache:Null<HobberDriveAxis>;
-  static var zCache:Null<HobberDriveAxis>;
+  /** The three axes, each built once and shared: no caller changes them. */
+  static final xCache = new machinekit.cache.Once<HobberDriveAxis>();
+  static final yCache = new machinekit.cache.Once<HobberDriveAxis>();
+  static final zCache = new machinekit.cache.Once<HobberDriveAxis>();
 
   /** X: screw along -x from the motor end at the back of the bed, supports on pads 15 mm above the bed insert. */
-  public static function x():HobberDriveAxis {
-    if (xCache == null) {
-      var l = HobberXLayout.front();
-      xCache = {id: "X", drive: SupportedScrewDrive.m60dBk12(true), axis: {start: [l.screwStart, 0.0, 180.0], direction: [-1.0, 0, 0], normal: [0.0, 0, 1]},
-        length: l.screwLength, nutStation: l.nutStation, nutUp: [0.0, 0, 1], blockHeight: 80.0};
-      pin(xCache);
-    }
-    return xCache;
-  }
+  public static function x():HobberDriveAxis return xCache.get(() -> {
+    var l = HobberXLayout.front();
+    var axis:HobberDriveAxis = {id: "X", drive: SupportedScrewDrive.m60dBk12(true), axis: {start: [l.screwStart, 0.0, 180.0], direction: [-1.0, 0, 0], normal: [0.0, 0, 1]},
+      length: l.screwLength, nutStation: l.nutStation, nutUp: [0.0, 0, 1], blockHeight: 80.0};
+    pin(axis);
+    return axis;
+  });
 
   /** Y: screw along -y at z 508 (rel 145), supports on brackets standing on the swivel plate's top edge. */
-  public static function y():HobberDriveAxis {
-    if (yCache == null) yCache = {id: "Y", drive: SupportedScrewDrive.m60dBk12(true),
+  public static function y():HobberDriveAxis return yCache.get(() -> {
+    var axis:HobberDriveAxis = {id: "Y", drive: SupportedScrewDrive.m60dBk12(true),
       axis: {start: [70.0, HobberYLayout.NUT_STATION, 508.0], direction: [0.0, -1.0, 0], normal: [1.0, 0, 0]},
       length: HobberYLayout.SCREW_LENGTH, nutStation: partStart(HobberYLayout.NUT_STATION), nutUp: [0.0, 0, -1], blockHeight: HobberYLayout.NUT_BLOCK_HEIGHT};
     // The floating bracket is 59 mm long (it stops short of the nut seat's travel): M5 screws in the BF12's 6.6 mm holes keep 1.5 diameters to its ends, M6 would not.
-    var axis = yCache;
-    if (axis == null) throw "Hobber Y drive lost its axis";
     axis.drive.floating.screwSize = "M5";
     pin(axis);
     return axis;
-  }
+  });
 
   /** Both supports of an axis are located by dowels, reamed through the foot and the seat at assembly (`ScrewSupportUnit.footPinned`). */
   static function pin(axis:HobberDriveAxis):Void {
@@ -80,24 +77,24 @@ class HobberDrives {
     axis.drive.floating.footPinned = true;
   }
 
-  static var zDriveCache:Null<SupportedScrewDrive>;
+  static final zDriveCache = new machinekit.cache.Once<SupportedScrewDrive>();
 
   /** Z with its screw at `y` across the machine (not cached). */
   public static function zAt(y:Float):HobberDriveAxis {
-    if (zDriveCache == null) {
-      zDriveCache = SupportedScrewDrive.m60dBk12Braked(true);
-      zDriveCache.fixed.footPinned = true;
-      zDriveCache.floating.footPinned = true;
-    }
-    return {id: "Z", drive: zDriveCache,
+    var drive = zDriveCache.get(() -> {
+      var built = SupportedScrewDrive.m60dBk12Braked(true);
+      built.fixed.footPinned = true;
+      built.floating.footPinned = true;
+      return built;
+    });
+    return {id: "Z", drive: drive,
       axis: {start: [HobberZLayout.AXIS_X, y, HobberZLayout.SHAFT_TOP], direction: [0.0, 0, -1.0], normal: [-1.0, 0, 0]},
       length: HobberZLayout.SHAFT_LENGTH, nutStation: partStart(HobberZLayout.NUT_STATION), nutUp: [-1.0, 0, 0], blockHeight: HobberZLayout.AXIS_X - 148};
   }
 
   /** Z: screw straight down at x 176, y `HobberZLayout.axisY()` (derived: clear of the A axis housing) from the motor at the top, supports on ground bar pads against the column. */
   public static function z():HobberDriveAxis {
-    if (zCache == null) zCache = zAt(HobberZLayout.axisY());
-    return zCache;
+    return zCache.get(() -> zAt(HobberZLayout.axisY()));
   }
 
   public static function all():Array<HobberDriveAxis> return [x(), y(), z()];
@@ -181,19 +178,12 @@ class HobberDrives {
    */
   public static function mountRelief(d:HobberDriveAxis):Array<Float> {
     var mount = d.drive.fixed, pose = poses(d).get("mount");
-    var memo:Map<String, Array<Float>> = reliefs == null ? [] : reliefs;
-    reliefs = memo;
-    var key = mount.geometryKey() + "|" + haxe.Json.stringify(pose), known = memo.get(key);
-    if (known == null) {
-      known = measureRelief(mount, pose);
-      memo.set(key, known);
-    }
-    return known.copy();
+    return reliefs.get(mount.geometryKey() + "|" + haxe.Json.stringify(pose), () -> measureRelief(mount, pose));
   }
 
   /** Reliefs by the mount's geometry and pose: the saddle's pad and pieces ask for the same mount's relief, and each answer
    * cuts the supplier body. */
-  static var reliefs:Null<Map<String, Array<Float>>>;
+  static final reliefs = new machinekit.cache.Memo<Array<Float>>("hobber-mount-reliefs", 64, bounds -> bounds.copy());
 
   static function measureRelief(mount:machinekit.component.MachineComponent, pose:materia.assembly.AssemblyRecord.AssemblyFrame):Array<Float> {
     var body = mount.geometry();

@@ -12,7 +12,7 @@ import machinekit.assembly.PosedParts;
  * Local base spans X=0..28, Y=±29; web X=0..11. Source dimensions are engineering
  * inputs. Two recessed M6 base clearances and two recessed M6 web clearances have real connectors. */
 class LinearMountCleat extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final height:Float;
   public static inline final WALL = 11.0;
   public static inline final BASE = 13.0;
@@ -37,7 +37,7 @@ class LinearMountCleat extends MachineComponent {
     addConnector("receiver", Mount, AxisBuilder.orient(0, 0, height - 10, [0.0, 1, 0], [-1.0, 0, 0]));
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.structural.linear-mount-cleat",
       inputs(),
       v -> new LinearMountCleat(v),
@@ -45,8 +45,7 @@ class LinearMountCleat extends MachineComponent {
       false,
       null,
       false
-    ).numbered(v -> 'LINEAR-MOUNT-CLEAT-H${Dimension.format(v.number("height"))}').procured(_ -> Make("machining"));
-    return recipe;
+    ).numbered(v -> 'LINEAR-MOUNT-CLEAT-H${Dimension.format(v.number("height"))}').procured(_ -> Make("machining")));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function hasGeometry():Bool return true;

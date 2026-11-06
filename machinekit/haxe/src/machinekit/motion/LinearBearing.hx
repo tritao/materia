@@ -25,7 +25,7 @@ import machinekit.standard.BearingFit.BearingShaftFit;
  * along +Z.
  */
 class LinearBearing extends MachineComponent {
-  static var table:Null<Catalog<LinearBearingSpec>>;
+  static final table = new machinekit.cache.Once<Catalog<LinearBearingSpec>>();
 
   public final spec:LinearBearingSpec;
   public var boreDiameter(get, never):Float;
@@ -41,7 +41,7 @@ class LinearBearing extends MachineComponent {
   ];
 
   public static function catalog():Catalog<LinearBearingSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "linear bearing",
       spec -> spec.designation,
       rows(),
@@ -53,8 +53,7 @@ class LinearBearing extends MachineComponent {
         conformance: NominalEnvelope,
         verifiedFields: ["boreDiameter", "outerDiameter", "length"]
       })
-    );
-    return table;
+    ));
   }
 
   public static function metric(designation:String):LinearBearing return new LinearBearing(catalog().get(designation));
@@ -162,16 +161,15 @@ class LinearBearing extends MachineComponent {
   function get_outerDiameter():Float return spec.outerDiameter;
   function get_length():Float return spec.length;
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.motion.linear-bearing",
       [ComponentRecipeSupport.catalog("designation", LinearBearing.catalog(), "LM8UU")],
       v -> LinearBearing.metric(v.token("designation")),
       true
-    );
-    return recipeTypeCache;
+    ));
   }
 
   override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();

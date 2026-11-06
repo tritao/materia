@@ -30,14 +30,13 @@ class MillYNutMount extends MachineComponent {
     P.flag("reinforced", false),
     P.flag("serviceAccess", false)
   ];
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.y-nut-mount",
       parameters(),
       v -> new MillYNutMount(v)
-    ).numbered(_ -> "MILL-Y-NUT-MOUNT");
-    return recipe;
+    ).numbered(_ -> "MILL-Y-NUT-MOUNT"));
   }
   public function new(?v:ComponentValues) {
     v = P.resolve(parameters(), v);

@@ -26,11 +26,13 @@ class ComponentType {
   var procurementFor:Null<ComponentValues -> Procurement>;
   var requirementsFor:Null<ComponentValues -> Array<machinekit.component.Procurement.ProcurementRequirement>>;
 
-  /** Most mass properties kept per recipe; past it the memo is emptied and each is computed again on its next use. */
-  static inline final MASS_MEMO_LIMIT = 1024;
-
-  final massMemo:Map<String, MassProperties> = [];
-  var massMemoCount = 0;
+  /**
+	 * Mass properties already computed for a component of a recipe, by its `MachineComponent.geometryKey` (which names the
+	 * recipe). They come from cutting and integrating real solids, and each machine compile builds new component instances,
+	 * so a per-instance cache never hit across compiles. `MassProperties` never changes, so one value is shared by every such
+	 * component.
+	 */
+  public static final masses = new machinekit.cache.Memo<MassProperties>("component-masses", 8192);
 
   public function new(
     id:String,
@@ -210,22 +212,6 @@ class ComponentType {
   }
 
   public function key(values:ComponentValues):String return keyFor(values, false);
-
-  /**
-	 * Mass properties already computed for a component of this type, by its `MachineComponent.geometryKey(Preview)`. They come
-	 * from cutting and integrating real solids, and each machine compile builds new component instances, so a per-instance
-	 * cache never hit across compiles. `MassProperties` never changes, so one value can be shared by every such component.
-	 */
-  public function knownMass(key:String):Null<MassProperties> return massMemo.get(key);
-
-  public function rememberMass(key:String, mass:MassProperties):Void {
-    if (massMemoCount >= MASS_MEMO_LIMIT) {
-      massMemo.clear();
-      massMemoCount = 0;
-    }
-    massMemo.set(key, mass);
-    massMemoCount++;
-  }
 
   /** BOM identity omits recipe inputs that only place or route a physical part. */
   public function bomKey(values:ComponentValues):String return purchaseKeyFor == null

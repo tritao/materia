@@ -7,7 +7,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Assumed catalogue-class ISO30 ATC spindle. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class AtcSpindle extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.length("diameter", 125),
     P.length("length", 320),
@@ -56,10 +56,9 @@ class AtcSpindle extends AssumedCatalogComponent {
     addPort({name: "motor", kind: ElectricalPower, role: Consumer, iface: Plug("3-phase-PE", 4), required: true});
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.routing.atc-spindle", inputs(), v -> new AtcSpindle(v))
+    return recipe.get(() -> new ComponentType("machinekit.routing.atc-spindle", inputs(), v -> new AtcSpindle(v))
       .numbered(v -> 'ATC-SPINDLE-ASSUMED-${Dimension.format(v.number("power"))}W-'
-          + '${Dimension.format(v.number("maxRpm"))}RPM').procured(_ -> Buy(null, null, null)).requiringInputs(["diameter", "taperDiameter", "taperLength", "airPressure"], ["power", "maxRpm", "clampForce"], ["minRpm"]);
-    return recipe;
+          + '${Dimension.format(v.number("maxRpm"))}RPM').procured(_ -> Buy(null, null, null)).requiringInputs(["diameter", "taperDiameter", "taperLength", "airPressure"], ["power", "maxRpm", "clampForce"], ["minRpm"]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   /**

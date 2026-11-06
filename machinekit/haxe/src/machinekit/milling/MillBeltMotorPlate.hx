@@ -6,9 +6,9 @@ import machinekit.component.*;
  * Fits a machined saddle recess; its pilot and bolt holes follow the selected motor's flange.
  */
 class MillBeltMotorPlate extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.belt-motor-plate",
       [ComponentRecipeSupport.choice(
         "motor",
@@ -16,8 +16,7 @@ class MillBeltMotorPlate extends MachineComponent {
         "ELM2H-0400LA60F"
       )],
       v -> new MillBeltMotorPlate(v.token("motor"))
-    ).numbered(v -> 'MILL-X-RETURN-PLATE-${v.token("motor")}');
-    return recipe;
+    ).numbered(v -> 'MILL-X-RETURN-PLATE-${v.token("motor")}'));
   }
   public final motor:String;
   public function new(motor:String = "ELM2H-0400LA60F") {

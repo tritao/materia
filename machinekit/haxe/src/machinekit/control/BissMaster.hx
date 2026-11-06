@@ -15,7 +15,7 @@ import machinekit.component.Solids;
  * channels read in one control cycle are what the module is bought for, and both are assumed here (no product behind them yet).
  */
 class BissMaster extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final channels:Int;
   /** Highest clock the master drives a channel at, MHz. */
   public final clockMHz:Float;
@@ -47,7 +47,7 @@ class BissMaster extends MachineComponent {
   public function interfaceName():String return "BiSS-C";
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.control.biss-master",
       [
         ComponentRecipeSupport.count("channels", 4),
@@ -58,8 +58,7 @@ class BissMaster extends MachineComponent {
       ],
       v -> new BissMaster(v.integer("channels"), v.number("clockMHz"), v.number("width"), v.number("height"), v.number("depth"))
     ).numbered(v -> 'BISS-MASTER-ASSUMED-${v.integer("channels")}CH-${Dimension.format(v.number("clockMHz"))}MHZ')
-      .procured(_ -> Buy(null, null, null)).requiringInputs(["clockMHz"], ["channels"]);
-    return recipe;
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["clockMHz"], ["channels"]));
   }
 
   override public function componentType():Null<ComponentType> return recipeType();

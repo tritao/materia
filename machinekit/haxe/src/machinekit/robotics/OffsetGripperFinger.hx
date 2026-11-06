@@ -14,7 +14,7 @@ import materia.assembly.AssemblyFrames;
 class OffsetGripperFinger extends MachineComponent {
   public final spec:OffsetFingerSpec;
   public final variant:ManufacturingVariant;
-  static var familyCache:Null<ComponentFamily>;
+  static final familyCache = new machinekit.cache.Once<ComponentFamily>();
   public static function variants():Array<ManufacturingVariant> return [
     new ManufacturingVariant(
       "cnc-aluminium",
@@ -65,7 +65,7 @@ class OffsetGripperFinger extends MachineComponent {
     );
   }
   public static function family():ComponentFamily {
-    if (familyCache == null) {
+    return familyCache.get(() -> {
       var recipe = new ComponentType(
         "machinekit.robotics.offset-gripper-finger",
         [
@@ -79,9 +79,8 @@ class OffsetGripperFinger extends MachineComponent {
         false
       ).numbered(v -> 'OFFSET-FINGER-${v.token("side") == "left" ? "L" : "R"}-${v.token("variant").toUpperCase()}')
         .procured(v -> Make(lookup(v.token("variant")).process));
-      familyCache = new ComponentFamily(recipe.id, OffsetFingerSpec.INTERFACE_ID, recipe, variants());
-    }
-    return familyCache;
+      return new ComponentFamily(recipe.id, OffsetFingerSpec.INTERFACE_ID, recipe, variants());
+    });
   }
   override public function componentType():Null<ComponentType> return family().recipe;
   override public function values():ComponentValues return new ComponentValues().setToken(

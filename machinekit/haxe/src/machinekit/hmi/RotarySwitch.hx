@@ -16,7 +16,7 @@ import materia.assembly.AssemblyDefinition.AssemblyJointType;
  * one input per position: exactly one closed is a valid position.
  */
 class RotarySwitch extends HmiPart {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   static function inputs():Array<ComponentParameter> return [
     HmiPart.basisParameter("assumed"),
@@ -70,9 +70,8 @@ class RotarySwitch extends HmiPart {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.hmi.rotary-switch", inputs(), v -> new RotarySwitch(v))
-      .numbered(v -> 'ROTARY-SWITCH-ASSUMED-${v.integer("positions")}POS');
-    return recipe;
+    return recipe.get(() -> new ComponentType("machinekit.hmi.rotary-switch", inputs(), v -> new RotarySwitch(v))
+      .numbered(v -> 'ROTARY-SWITCH-ASSUMED-${v.integer("positions")}POS'));
   }
   override public function componentType():Null<ComponentType> return recipeType();
 

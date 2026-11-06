@@ -310,10 +310,10 @@ class LeadScrewNut extends MachineComponent {
     }
   }
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.motion.lead-screw-nut",
       ComponentRecipeSupport.threadParameters().concat([
         ComponentRecipeSupport.count("boltCount", 4),
@@ -346,8 +346,7 @@ class LeadScrewNut extends MachineComponent {
         + (material == "bronze" ? "" : material == "steel" ? "-STEEL"
           : "-" + materia.project.MaterialLibrary.fromSpec(material).toUpperCase());
     }).procured(_ -> Buy(null, null, null))
-      .requiringInputs(["family", "screwDiameter", "pitch", "starts", "hand", "kind", "boltCount", "flanged"]);
-    return recipeTypeCache;
+      .requiringInputs(["family", "screwDiameter", "pitch", "starts", "hand", "kind", "boltCount", "flanged"]));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

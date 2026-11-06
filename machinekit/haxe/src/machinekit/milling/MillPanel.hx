@@ -14,7 +14,7 @@ class MillPanel extends MachineComponent {
   public final width:Float;
   public final depth:Float;
   public final height:Float;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public function new(width:Float, depth:Float, height:Float, material:String = "steel") {
     if (!(width > 0) || !(depth > 0)
@@ -44,7 +44,7 @@ class MillPanel extends MachineComponent {
   );
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.panel",
       [
         ComponentRecipeSupport.length("width", 100),
@@ -55,8 +55,7 @@ class MillPanel extends MachineComponent {
       false,
       true
     ).numbered(v -> 'MILL-PANEL-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}-${materia.project.MaterialLibrary.fromSpec(v.token("material")).toUpperCase()}')
-      .procured(_ -> Make("cutting and machining"));
-    return recipe;
+      .procured(_ -> Make("cutting and machining")));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setNumber("width", width).setNumber(

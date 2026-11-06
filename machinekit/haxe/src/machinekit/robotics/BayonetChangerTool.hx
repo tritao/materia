@@ -30,11 +30,11 @@ typedef BayonetChangerToolRow = {
 /** The tool-side half of a manual bayonet tool changer, from a maker's catalogue, with its pneumatic passages.
  * Cylindrical envelope and mass centre are estimates from published bounds. */
 class BayonetChangerTool extends MachineComponent {
-  static var table:Null<Catalog<BayonetChangerToolRow>>;
+  static final table = new machinekit.cache.Once<Catalog<BayonetChangerToolRow>>();
   public final spec:BayonetChangerToolRow;
 
   public static function catalog():Catalog<BayonetChangerToolRow> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "tool-side bayonet changer",
       row -> row.designation,
       [{
@@ -63,8 +63,7 @@ class BayonetChangerTool extends MachineComponent {
           "outsideThread"
         ]
       })
-    );
-    return table;
+    ));
   }
 
 
@@ -94,16 +93,15 @@ class BayonetChangerTool extends MachineComponent {
     declareMass(m, new Vector(0, 0, z / 2), new InertiaTensor(transverse, 0, 0, transverse, 0, m * r * r / 2));
   }
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.robotics.bayonet-changer-tool",
       [ComponentRecipeSupport.catalog("designation", BayonetChangerTool.catalog(), "10.07.13.00018")],
       v -> new BayonetChangerTool(v.token("designation")),
       true
-    );
-    return recipeTypeCache;
+    ));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

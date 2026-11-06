@@ -63,15 +63,14 @@ class ExpandingMandrel extends MachineComponent {
     // Roundness of the clamped sleeve OD; the cup copies it at about 0.95 um/um (fem/README case 2).
     P.quantity("clampedRoundness", 0.0015, "mm")
   ]);
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.hobbing.expanding-mandrel",
       parameters(),
       v -> new ExpandingMandrel(v)
     ).numbered(v -> 'MANDREL-ASSUMED-D${Dimension.format(v.number("outside"))}-E${Dimension.format(v.number("expansion"))}')
-      .procured(_ -> NotSupplied).requiringInputs(["outside", "bore", "height", "workSeat", "expansion"], ["oilPressure", "maxOilPressure"]);
-    return recipe;
+      .procured(_ -> NotSupplied).requiringInputs(["outside", "bore", "height", "workSeat", "expansion"], ["oilPressure", "maxOilPressure"]));
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues
     > return EngineeringMetadata.assumedCatalog(

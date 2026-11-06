@@ -38,10 +38,9 @@ class HobberXLayout {
   public static inline final FOOT_FRONT = -180.0;
   public static inline final FRONT_LIFT = 35.0; // max 20 mm band + 8 mm sleeve + 2 mm cap + 5 mm clearance
   public static inline final FRONT_APPROACH = 250.0; // robot transfer distance, not X-axis stroke
-  static var frontCache:Null<HobberXDimensions>;
+  static final frontCache = new machinekit.cache.Once<HobberXDimensions>();
   public static function front():HobberXDimensions {
-    if (frontCache == null) frontCache = dimensions(RETRACT);
-    return frontCache;
+    return frontCache.get(() -> dimensions(RETRACT));
   }
   static function up10(v:Float):Float return Math.ceil(v / 10) * 10;
   public static function dimensions(retract:Float):HobberXDimensions {

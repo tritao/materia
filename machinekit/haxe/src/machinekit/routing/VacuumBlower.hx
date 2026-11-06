@@ -7,7 +7,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Assumed catalogue-class side-channel vacuum blower. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class VacuumBlower extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.quantity("power", 5500, "W"),
     P.quantity("freeFlow", 300, "m3/h"),
@@ -25,13 +25,12 @@ class VacuumBlower extends AssumedCatalogComponent {
     addPort({name: "vacuum", kind: Vacuum, role: Supply, iface: Thread("G2"), required: true, connector: "vacuum"});
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.routing.vacuum-blower",
       inputs(),
       v -> new VacuumBlower(v)
     ).numbered(v -> 'VAC-BLOWER-ASSUMED-${Dimension.format(v.number("power"))}W-'
-        + '${Dimension.format(v.number("freeFlow"))}M3H-${Dimension.format(v.number("shutoffPressure"))}PA').procured(_ -> Buy(null, null, null)).requiringInputs(["portDiameter"], ["power", "freeFlow", "shutoffPressure"], []);
-    return recipe;
+        + '${Dimension.format(v.number("freeFlow"))}M3H-${Dimension.format(v.number("shutoffPressure"))}PA').procured(_ -> Buy(null, null, null)).requiringInputs(["portDiameter"], ["power", "freeFlow", "shutoffPressure"], []));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   /**

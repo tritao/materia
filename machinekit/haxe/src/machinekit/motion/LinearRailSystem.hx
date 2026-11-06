@@ -15,7 +15,7 @@ import machinekit.motion.LinearRailProfile.LinearRailRating;
  * keyed by carriage designation; each names its rail, the tables it comes from, and the load
  * ratings published for it. */
 class LinearRailSystem {
-  static var table:Null<Catalog<LinearRailProfileSpec>>;
+  static final table = new machinekit.cache.Once<Catalog<LinearRailProfileSpec>>();
 
   public static inline var HIWIN_MG =
     "https://damencnc.com/userdata/file/3455-3_HIWIN_MGN_and_MGW_Product_Catalog_2023.pdf";
@@ -191,7 +191,7 @@ class LinearRailSystem {
 
   /** Profile-rail carriages and their rails: HIWIN MGN miniature guides and the HG family. */
   public static function catalog():Catalog<LinearRailProfileSpec> {
-    if (table == null) table = new Catalog("linear rail profile",
+    return table.get(() -> new Catalog("linear rail profile",
       spec -> spec.designation, rows(), spec -> StringTools.startsWith(
         spec.designation,
         "MGN"
@@ -203,8 +203,7 @@ class LinearRailSystem {
       sources: ["Pinned HIWIN reference CAD (tools/suppliers/hg-reference.json)"],
       standard: null, standardEdition: null, dimensionKind: Nominal, conformance: NominalEnvelope,
     // tools/suppliers/hg.py emits every one of these from the reviewed table rows.
-    verifiedFields:HG_TABLE_FIELDS}));
-    return table;
+    verifiedFields:HG_TABLE_FIELDS})));
   }
 
   /** The rating sizing uses: the first one listed, the purchase source's. */

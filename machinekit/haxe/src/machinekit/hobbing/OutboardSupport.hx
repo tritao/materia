@@ -10,16 +10,15 @@ import machinekit.hobbing.HobberOutboardLayout as L;
  * end stops permit +/-1 mm thermal float. Side bolts permit indication/shims,
  * then matching dowels locate it on the removable structural carrier. */
 class OutboardSupport extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
     P.quantity("radialRunout", L.RADIAL_BUDGET, "mm"),
     P.quantity("radialStiffness", 100000000, "N/m")
   ]);
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.hobbing.outboard-support", parameters(), v -> new OutboardSupport(v), false, false, null, false)
+    return recipe.get(() -> new ComponentType("machinekit.hobbing.outboard-support", parameters(), v -> new OutboardSupport(v), false, false, null, false)
       .versioned(2).numbered(_ -> "HOB-OUTBOARD-HOUSING-D40-DB7002")
-      .procured(_ -> Make("CNC milling and bore finishing"));
-    return recipe;
+      .procured(_ -> Make("CNC milling and bore finishing")));
   }
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides);

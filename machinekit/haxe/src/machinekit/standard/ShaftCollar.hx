@@ -21,7 +21,7 @@ import machinekit.component.Solids;
  * `front`, `back` (faces) and `axis` (mid-width), all with +Y along +Z.
  */
 class ShaftCollar extends MachineComponent {
-  static var table:Null<Catalog<ShaftCollarSpec>>;
+  static final table = new machinekit.cache.Once<Catalog<ShaftCollarSpec>>();
 
   public final spec:ShaftCollarSpec;
   public var boreDiameter(get, never):Float;
@@ -40,7 +40,7 @@ class ShaftCollar extends MachineComponent {
   ];
 
   public static function catalog():Catalog<ShaftCollarSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "shaft collar bore diameter",
       spec -> Dimension.format(spec.boreDiameter),
       rows(),
@@ -51,8 +51,7 @@ class ShaftCollar extends MachineComponent {
         dimensionKind: Unverified,
         conformance: GenericApproximation
       })
-    );
-    return table;
+    ));
   }
 
   /** Collar for exactly `boreDiameter`; throws when the catalog has no such size. */
@@ -90,16 +89,15 @@ class ShaftCollar extends MachineComponent {
   function get_boreDiameter():Float return spec.boreDiameter;
   function get_width():Float return spec.width;
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.standard.shaft-collar",
       [ComponentRecipeSupport.catalog("bore", ShaftCollar.catalog(), "8")],
       v -> ShaftCollar.forShaft(Std.parseFloat(v.token("bore"))),
       true
-    );
-    return recipeTypeCache;
+    ));
   }
 
   override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();

@@ -78,10 +78,10 @@ class Carriage extends MachineComponent {
     if (hasRailMount) addConnector("railMount", Mount, Solids.axial(0, this.railMountY, length / 2));
   }
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.assembly.carriage",
       [
         ComponentRecipeSupport.length("boreDiameter", 8),
@@ -106,8 +106,7 @@ class Carriage extends MachineComponent {
       ),
       true
     ).numbered(v -> 'CARRIAGE-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("length"))}-D${Dimension.format(v.number("boreDiameter"))}-'
-      + ComponentRecipeSupport.threadPartNumber(v)).procured(_ -> Make("CNC machining"));
-    return recipeTypeCache;
+      + ComponentRecipeSupport.threadPartNumber(v)).procured(_ -> Make("CNC machining")));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

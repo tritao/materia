@@ -10,7 +10,7 @@ import machinekit.component.ComponentRecipeSupport as P;
  * Stem clears both rails. Plate strength and casting anchors remain unqualified.
  */
 class MillZDriveAdapter extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function parameters():Array<ComponentParameter> return [
     P.length("motorOffset", 60),
     P.length("stemHeight", 60),
@@ -28,12 +28,11 @@ class MillZDriveAdapter extends MachineComponent {
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.z-drive-adapter",
       parameters(),
       v -> new MillZDriveAdapter(v)
-    ).numbered(_ -> "MILL-Z-DRIVE-ADAPTER");
-    return recipe;
+    ).numbered(_ -> "MILL-Z-DRIVE-ADAPTER"));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function hasGeometry():Bool return true;

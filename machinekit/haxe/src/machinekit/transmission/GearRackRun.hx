@@ -8,7 +8,7 @@ import materia.assembly.AssemblyFrames as F;
 /** Whole sourced sections, never a nominal extrusion with invented drilling.
  * Connectors retain section identity. Joint pitch setting is an assembly task. */
 class GearRackRun extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final section:GearRack;
   public final count:Int;
   public final length:Float;
@@ -64,14 +64,13 @@ class GearRackRun extends MachineComponent {
     addConnector("referenceSide", Mount, section.connector("referenceSide").frame);
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.transmission.gear-rack-run",
       inputs(),
       v -> new GearRackRun(v),
       false,
       false
-    );
-    return recipe;
+    ));
   }
   /** Procurement remains catalogue sections; the run owns geometry/mass once.
      * Match reaming is a shop operation, not a new supplier purchase identity. */

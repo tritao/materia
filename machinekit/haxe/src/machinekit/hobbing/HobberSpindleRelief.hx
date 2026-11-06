@@ -65,7 +65,7 @@ class HobberSpindleRelief {
   /** How far the pocket's box rises above the casting's top, so the cut is clean, mm. */
   public static inline final ABOVE_TOP = 10.0;
 
-  static var cache:Map<Int, Null<SpindleRelief>> = new Map();
+  static final cache = new machinekit.cache.Memo<Null<SpindleRelief>>("hobber-spindle-reliefs", 8);
 
   /** The relief for the servo's clocking `HobSpindle.MOTOR_CLOCKING`, or null if the servo never comes within the running gap of the casting. */
   public static function result():Null<SpindleRelief> return of(HobSpindle.MOTOR_CLOCKING);
@@ -102,10 +102,7 @@ class HobberSpindleRelief {
   }
 
   static function of(clocking:Int):Null<SpindleRelief> {
-    if (cache.exists(clocking)) return cache.get(clocking);
-    var found = derive(clocking);
-    cache.set(clocking, found);
-    return found;
+    return cache.get(Std.string(clocking), () -> derive(clocking));
   }
 
   static function derive(clocking:Int):Null<SpindleRelief> {

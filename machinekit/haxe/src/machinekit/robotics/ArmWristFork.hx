@@ -21,7 +21,7 @@ class ArmWristFork extends MachineComponent {
   public final span:Float;
   public final wall:Float;
   public final depth:Float;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public function new(length:Float, span:Float, wall:Float = 8, depth:Float = 24) {
     for (value in [length,
@@ -44,7 +44,7 @@ class ArmWristFork extends MachineComponent {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.robotics.arm-wrist-fork",
       [
         ComponentRecipeSupport.length("length", 60),
@@ -54,8 +54,7 @@ class ArmWristFork extends MachineComponent {
       ],
       v -> new ArmWristFork(v.number("length"), v.number("span"), v.number("wall"), v.number("depth"))
     ).numbered(v -> 'ARM-FORK-${Dimension.format(v.number("length"))}x${Dimension.format(v.number("span"))}-W${Dimension.format(v.number("wall"))}-D${Dimension.format(v.number("depth"))}')
-      .procured(_ -> Make("CNC machining")).requiringInputs(["length", "span", "wall", "depth"]);
-    return recipe;
+      .procured(_ -> Make("CNC machining")).requiringInputs(["length", "span", "wall", "depth"]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setNumber("length", length).setNumber(

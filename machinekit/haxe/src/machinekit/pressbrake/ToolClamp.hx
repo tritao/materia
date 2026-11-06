@@ -16,7 +16,7 @@ class ToolClamp extends MachineComponent {
   public final width:Float;
   public final depth:Float;
   public final height:Float;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public function new(mode:ToolClampMode, width:Float = 50, depth:Float = 40, height:Float = 60) {
     if (mode == null || !Math.isFinite(width) || !Math.isFinite(depth) || !Math.isFinite(height)
@@ -56,7 +56,7 @@ class ToolClamp extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(width, depth, height);
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.pressbrake.tool-clamp", [
+    return recipe.get(() -> new ComponentType("machinekit.pressbrake.tool-clamp", [
       ComponentRecipeSupport.choice("mode", ["Manual", "Powered"], "Manual"),
       ComponentRecipeSupport.length("width", 50),
       ComponentRecipeSupport.length("depth", 40),
@@ -70,8 +70,7 @@ class ToolClamp extends MachineComponent {
         throw 'Unknown tool clamp mode "$value"';
     };
     return new ToolClamp(mode, v.number("width"), v.number("depth"), v.number("height"));
-    }).numbered(v -> 'TOOL-CLAMP-${v.token("mode").toUpperCase()}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}').procured(_ -> NotSupplied);
-    return recipe;
+    }).numbered(v -> 'TOOL-CLAMP-${v.token("mode").toUpperCase()}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("depth"))}x${Dimension.format(v.number("height"))}').procured(_ -> NotSupplied));
   }
 
   override public function componentType():Null<ComponentType> return recipeType();

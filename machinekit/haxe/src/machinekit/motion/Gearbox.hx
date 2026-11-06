@@ -13,7 +13,7 @@ import machinekit.component.Solids;
  * unless explicitly marked assumed. Teeth, shaft bearings, backlash and compliance are not modelled.
  */
 class Gearbox extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final ratio:Float;
   public final efficiency:Float;
   public final diameter:Float;
@@ -87,7 +87,7 @@ class Gearbox extends MachineComponent {
   public function jointTorque(motorTorque:Float):Float return motorTorque * ratio * efficiency;
   public function jointSpeed(motorSpeed:Float):Float return motorSpeed / ratio;
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.gearbox",
       [
         ComponentRecipeSupport.scalar("ratio", 10),
@@ -116,8 +116,7 @@ class Gearbox extends MachineComponent {
       + v.token("basis").toUpperCase()
       + (v.token("material") == "aluminium 6061" ? "" : v.token("material") == "steel" ? "-STL"
         : "-" + materia.project.MaterialLibrary.fromSpec(v.token("material")).toUpperCase()))
-      .procured(_ -> Buy(null, null, null)).requiringInputs(["ratio", "diameter", "length", "bore"], ["efficiency"]);
-    return recipe;
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["ratio", "diameter", "length", "bore"], ["efficiency"]));
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,
     Gearbox) ? recipeType() : null;

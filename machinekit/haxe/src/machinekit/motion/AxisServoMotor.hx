@@ -9,7 +9,7 @@ import machinekit.component.ComponentRecipeSupport as P;
  * The rotating steel shaft is a separate part on the driven joint. */
 class AxisServoMotor extends ServoMotor {
   final source:ServoMotor;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public function new(designation:String) {
     var selected = ServoMotor.model(designation);
     if (selected.mounting() == null) throw 'Axis servo needs a declared flange: ' + designation;
@@ -58,12 +58,11 @@ class AxisServoMotor extends ServoMotor {
     });
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.axis-servo-motor",
       [P.choice("designation", [for (row in ServoMotor.ratings()) row.designation], "GENERIC-HV-SERVO-750W")],
       v -> new AxisServoMotor(v.token("designation"))
-    ).numbered(ServoMotor.partNumberFor).procured(ServoMotor.procurementFor).requiring(ServoMotor.requirementsFor);
-    return recipe;
+    ).numbered(ServoMotor.partNumberFor).procured(ServoMotor.procurementFor).requiring(ServoMotor.requirementsFor));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setToken(

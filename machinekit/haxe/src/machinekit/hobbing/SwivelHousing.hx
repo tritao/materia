@@ -11,14 +11,13 @@ class SwivelHousing extends MachineComponent {
     P.quantity("bore", 100, "mm"),
     P.quantity("height", 25, "mm")
   ]);
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.hobbing.swivel-housing",
       parameters(),
       v -> new SwivelHousing(v)
-    ).numbered(_ -> "SWIVEL-HOUSING").procured(_ -> Make("CNC machining")).requiringInputs(["outside", "bore", "height"]);
-    return recipe;
+    ).numbered(_ -> "SWIVEL-HOUSING").procured(_ -> Make("CNC machining")).requiringInputs(["outside", "bore", "height"]));
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues
     > return EngineeringMetadata.assumedCatalog(

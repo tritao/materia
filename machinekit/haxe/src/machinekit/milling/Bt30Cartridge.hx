@@ -10,14 +10,13 @@ class Bt30Cartridge extends MachineComponent {
   public static inline var DIAMETER:Float = 90;
   public static inline var SEAT:Float = 60;
   public static inline var REAR:Float = 242;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.bt30-cartridge-study",
       [],
       v -> new Bt30Cartridge()
-    ).numbered(_ -> "BT30-CARTRIDGE-ASSUMED-D90");
-    return recipe;
+    ).numbered(_ -> "BT30-CARTRIDGE-ASSUMED-D90"));
   }
   public function new() {
     super("BT30-CARTRIDGE-STUDY", "BT30 stationary housing — assumed interfaces", "steel");

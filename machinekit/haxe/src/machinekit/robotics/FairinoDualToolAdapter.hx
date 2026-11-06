@@ -81,9 +81,9 @@ class FairinoDualToolAdapter extends MachineComponent {
       });
     }
   }
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.robotics.fairino-dual-tool-adapter",
       [ComponentRecipeSupport.choice("variant", ["Standard", "Expert"], "Standard")],
       v -> new FairinoDualToolAdapter(v.token("variant")),
@@ -91,8 +91,7 @@ class FairinoDualToolAdapter extends MachineComponent {
       false,
       null,
       false
-    );
-    return recipe;
+    ));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setToken("variant", variant);

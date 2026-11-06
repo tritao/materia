@@ -33,7 +33,7 @@ typedef TSlotProfileSpec = {
  * approximation; `forProfile()` selects a catalog-backed profile with vendor dimensions.
  */
 class TSlotExtrusion implements StructuralProfile {
-  static var table:Null<Catalog<TSlotProfileSpec>>;
+  static final table = new machinekit.cache.Once<Catalog<TSlotProfileSpec>>();
 
   public final designation:String;
   public final description:String;
@@ -231,7 +231,7 @@ class TSlotExtrusion implements StructuralProfile {
 
   /** MISUMI HFS5 profile catalog, with nominal cross-section dimensions in millimetres. */
   public static function catalog():Catalog<TSlotProfileSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "T-slot profile",
       spec -> spec.designation,
       rows(),
@@ -243,8 +243,7 @@ class TSlotExtrusion implements StructuralProfile {
         conformance: NominalEnvelope,
         verifiedFields: ["width", "height", "slotWidth", "slotDepth", "tWidth", "boreDiameter"]
       })
-    );
-    return table;
+    ));
   }
 
   /** Construct a catalog-backed profile by designation, for example `HFS5-2040`. */

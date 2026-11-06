@@ -20,7 +20,7 @@ import machinekit.component.Solids;
  * Connectors: `front`, `back` (faces) and `axis` (mid-thickness), all with +Y along +Z.
  */
 class FlatWasher extends MachineComponent {
-  static var table:Null<Catalog<FlatWasherSpec>>;
+  static final table = new machinekit.cache.Once<Catalog<FlatWasherSpec>>();
 
   public final spec:FlatWasherSpec;
   public var innerDiameter(get, never):Float;
@@ -38,7 +38,7 @@ class FlatWasher extends MachineComponent {
   ];
 
   public static function catalog():Catalog<FlatWasherSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "flat washer size",
       spec -> spec.size,
       rows(),
@@ -51,8 +51,7 @@ class FlatWasher extends MachineComponent {
         sources: ["https://5.imimg.com/data5/LQ/IQ/BZ/SELLER-10566774/bossard-3092280-washers-and-securing-element.pdf"],
         verifiedFields: ["innerDiameter", "outerDiameter", "thickness"]
       })
-    );
-    return table;
+    ));
   }
 
   public static function metric(size:String):FlatWasher return new FlatWasher(catalog().get(size));
@@ -91,16 +90,15 @@ class FlatWasher extends MachineComponent {
   function get_outerDiameter():Float return spec.outerDiameter;
   function get_thickness():Float return spec.thickness;
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.standard.flat-washer",
       [ComponentRecipeSupport.catalog("size", FlatWasher.catalog(), "M5")],
       v -> FlatWasher.metric(v.token("size")),
       true
-    ).procured(_ -> Buy(null, null, "ISO 7089"));
-    return recipeTypeCache;
+    ).procured(_ -> Buy(null, null, "ISO 7089")));
   }
 
   override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();

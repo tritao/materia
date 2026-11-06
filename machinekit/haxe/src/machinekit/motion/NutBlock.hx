@@ -166,11 +166,11 @@ class NutBlock extends MachineComponent {
     return out.concat(derivedRouteHoles());
   }
 
-  static var recipeCache:Null<ComponentType>;
+  static final recipeCache = new machinekit.cache.Once<ComponentType>();
 
   /** The recipe for a block on a ball nut (SFU1605 flange); a block on another nut is code-only. */
   public static function recipeType():ComponentType {
-    if (recipeCache == null) recipeCache = new ComponentType(
+    return recipeCache.get(() -> new ComponentType(
       "machinekit.motion.nut-block",
       [
         ComponentRecipeSupport.text("drawing", "NUT-BLOCK"),
@@ -186,8 +186,7 @@ class NutBlock extends MachineComponent {
       true
     ).numbered(v -> v.token("drawing"))
       .procured(_ -> Make("ground steel flat bar, cut and drilled"))
-      .requiringInputs(["centreHeight", "width", "thickness"]);
-    return recipeCache;
+      .requiringInputs(["centreHeight", "width", "thickness"]));
   }
 
   override public function componentType():Null<ComponentType> return Std.isOfType(nut, BallNut) ? recipeType() : null;

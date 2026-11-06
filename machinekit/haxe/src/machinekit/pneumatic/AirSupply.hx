@@ -12,7 +12,7 @@ import machinekit.component.Solids;
 /** Regulated air service. Pressure is gauge pressure in Pa; the FRL envelope is assumed. */
 class AirSupply extends MachineComponent implements PressureSource {
   public final pressurePa:Float;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public function new(pressurePa:Float = 600000) {
     if (!(pressurePa > 0) || !Math.isFinite(pressurePa)) throw "Air supply needs finite positive pressure";
     super('AIR-FRL-$pressurePa', "Reference regulated air supply", "aluminium 6061", true);
@@ -40,7 +40,7 @@ class AirSupply extends MachineComponent implements PressureSource {
 
   override public function massGeometry():Null<Part> return Solids.named(Part.box(60, 40, 100), "frl");
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.pneumatic.air-supply",
       [new machinekit.component.ComponentParameter("pressurePa", Scalar, Number(600000), "Pa", 0)],
       v -> new AirSupply(v.number("pressurePa"))
@@ -48,8 +48,7 @@ class AirSupply extends MachineComponent implements PressureSource {
       .procured(_ -> Buy(null, null, null)).requiring(v -> [
         machinekit.component.Procurement.ProcurementCodec.requirement("pressure", "Pa", v.number("pressurePa")),
         machinekit.component.Procurement.ProcurementCodec.requirement("tubeOutsideDiameter", "mm", null, null, 6)
-      ]);
-    return recipe;
+      ]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setNumber("pressurePa",

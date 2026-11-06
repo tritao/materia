@@ -8,7 +8,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Assumed catalogue-class ER32 collet. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class Collet extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.length("diameter", 33),
     P.length("length", 40),
@@ -22,9 +22,8 @@ class Collet extends AssumedCatalogComponent {
     addConnector("tool", Axis, Solids.axial(0, 0, 0));
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.routing.collet", inputs(), v -> new Collet(v))
-      .numbered(v -> 'COLLET-ASSUMED-ER32-${Dimension.format(v.number("toolDiameter"))}MM').procured(_ -> Buy(null, null, null)).requiringInputs(["diameter", "length", "toolDiameter"], [], []);
-    return recipe;
+    return recipe.get(() -> new ComponentType("machinekit.routing.collet", inputs(), v -> new Collet(v))
+      .numbered(v -> 'COLLET-ASSUMED-ER32-${Dimension.format(v.number("toolDiameter"))}MM').procured(_ -> Buy(null, null, null)).requiringInputs(["diameter", "length", "toolDiameter"], [], []));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   /**

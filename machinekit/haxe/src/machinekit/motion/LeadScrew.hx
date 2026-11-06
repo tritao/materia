@@ -177,17 +177,16 @@ class LeadScrew extends MachineComponent {
     }
   }
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.motion.lead-screw",
       ComponentRecipeSupport.threadParameters().concat([ComponentRecipeSupport.length("length", 100)]),
       v -> new LeadScrew(ComponentRecipeSupport.thread(v), v.number("length"))
     ).numbered(v -> 'SCREW-${ComponentRecipeSupport.threadPartNumber(v)}-L${Dimension.format(v.number("length"))}')
       .procured(_ -> Buy(null, null, null))
-      .requiringInputs(["family", "screwDiameter", "pitch", "starts", "hand", "length"]);
-    return recipeTypeCache;
+      .requiringInputs(["family", "screwDiameter", "pitch", "starts", "hand", "length"]));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

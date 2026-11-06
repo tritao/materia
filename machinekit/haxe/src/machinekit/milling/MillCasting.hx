@@ -430,15 +430,14 @@ class MillCasting extends MachineComponent {
     default:
       throw 'Unknown mill casting "$value"';
   };
-  static var castingRecipe:Null<ComponentType>;
+  static final castingRecipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (castingRecipe == null) castingRecipe = new ComponentType(
+    return castingRecipe.get(() -> new ComponentType(
       "machinekit.milling.casting",
       [ComponentRecipeSupport.choice("kind", ["Base", "Column", "Saddle", "Table", "Head"], "Base"), ComponentRecipeSupport.optionalText("bosses")],
       v -> new MillCasting(parse(v.token("kind")), bossesOf(v.optionalToken("bosses")))
     ).versioned(3).numbered(v -> 'MILL-${v.token("kind").toUpperCase()}')
-      .procured(_ -> Make("casting and CNC machining"));
-    return castingRecipe;
+      .procured(_ -> Make("casting and CNC machining")));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   static function bossesOf(text:Null<String>):Array<ColumnBoss> {

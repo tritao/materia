@@ -9,7 +9,7 @@ import materia.assembly.AssemblyFrames as F;
 /** Assumed catalogue-class cable chain. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class CableChain extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.length("bendRadius", 75),
     P.length("innerWidth", 40),
@@ -28,9 +28,8 @@ class CableChain extends AssumedCatalogComponent {
     addConnector("moving", Mount, movingFrame(n("travel") / 2));
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.motion.cable-chain", inputs(), v -> new CableChain(v))
-      .numbered(partNumber).procured(_ -> Buy(null, null, null)).requiringInputs(["bendRadius", "innerWidth", "innerHeight"], ["travel", "fillArea"], []);
-    return recipe;
+    return recipe.get(() -> new ComponentType("machinekit.motion.cable-chain", inputs(), v -> new CableChain(v))
+      .numbered(partNumber).procured(_ -> Buy(null, null, null)).requiringInputs(["bendRadius", "innerWidth", "innerHeight"], ["travel", "fillArea"], []));
   }
   public static function partNumber(v:ComponentValues):String
     return 'CHAIN-ASSUMED-${Dimension.format(v.number("innerWidth"))}x${Dimension.format(v.number("innerHeight"))}-'

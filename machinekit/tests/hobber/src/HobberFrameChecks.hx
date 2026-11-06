@@ -646,6 +646,7 @@ class HobberFrameChecks {
     }
     var machine = new FlexsplineHobber();
     Sys.println('machine built: ${machine.components().length} members in ${Math.round(Sys.time() - began)} s (${Math.round(Sys.cpuTime())} s CPU)');
+    if (args.indexOf("memos") >= 0) for (line in machinekit.cache.Memos.report()) Sys.println(line);
     if (args.indexOf("procedures") >= 0) {
       var presentation = materia.presentation.Presentations.assembled(machine.definition(), -1.1, 0.35, "hobber");
       presentation.procedures = HobberAssemblyProcedures.build(machine);

@@ -13,7 +13,7 @@ import machinekit.motion.ServoMotor;
  * its clearance does not contribute mass a second time when the gearhead is installed.
  */
 class GearedArmJoint extends ArmJoint {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final pocketDiameter:Float;
   public final pocketLength:Float;
 
@@ -44,7 +44,7 @@ class GearedArmJoint extends ArmJoint {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.robotics.geared-arm-joint",
       [
         ComponentRecipeSupport.length("diameter", 100),
@@ -71,8 +71,7 @@ class GearedArmJoint extends ArmJoint {
         )
       )
     ).numbered(v -> 'ARM-JOINT-${Dimension.format(v.number("diameter"))}x${Dimension.format(v.number("length"))}-P${Dimension.format(v.number("pocketDiameter"))}x${Dimension.format(v.number("pocketLength"))}')
-      .procured(_ -> Make("CNC machining"));
-    return recipe;
+      .procured(_ -> Make("CNC machining")));
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,
     GearedArmJoint) ? recipeType() : null;

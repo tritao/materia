@@ -11,7 +11,7 @@ import materia.assembly.AssemblyFrames as F;
  * Published tables omit blind thread depths: caller supplies them for clearance/engagement modelling.
  */
 class DsgNutHousing extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final spec:DsgHousingReference;
   public final baseThreadDepth:Float;
   public final flangeThreadDepth:Float;
@@ -97,7 +97,7 @@ class DsgNutHousing extends MachineComponent {
     });
   }
   public static function familyRecipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.dsg-nut-housing",
       [
         P.choice("model", SfuFamilyData.housingModels(), "DSG16H"),
@@ -110,8 +110,7 @@ class DsgNutHousing extends MachineComponent {
       null,
       false
     ).procured(_ -> Buy(null, null, null))
-      .requiringInputs(["model", "baseThreadDepth", "flangeThreadDepth"]);
-    return recipe;
+      .requiringInputs(["model", "baseThreadDepth", "flangeThreadDepth"]));
   }
   override public function componentType():Null<ComponentType> return familyRecipeType();
   override public function values():ComponentValues return new ComponentValues().setToken("model",

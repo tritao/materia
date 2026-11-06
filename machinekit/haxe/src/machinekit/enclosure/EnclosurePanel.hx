@@ -17,7 +17,7 @@ class EnclosurePanel extends MachineComponent {
   public final width:Float;
   public final height:Float;
   public final construction:LaminatedPanel;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public function new(width:Float, height:Float, constructionId:String = "fr-acm-4") {
     if (!(width > 0)
@@ -75,7 +75,7 @@ class EnclosurePanel extends MachineComponent {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.enclosure.panel",
       [
         ComponentRecipeSupport.length("width", 600),
@@ -87,8 +87,7 @@ class EnclosurePanel extends MachineComponent {
       false,
       null,
       false
-    ).numbered(numberFor);
-    return recipe;
+    ).numbered(numberFor));
   }
   public static function numberFor(v:ComponentValues):String
     return 'P-${v.token("construction").toUpperCase()}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("height"))}';

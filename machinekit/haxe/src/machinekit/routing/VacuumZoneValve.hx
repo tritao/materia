@@ -7,7 +7,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Assumed full-bore, spring-return vacuum isolation valve with pneumatic actuator.
  * No pressure/flow or failure behaviour is inferred from this nominal envelope. */
 class VacuumZoneValve extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.length("bore", 50),
     P.length("length", 120),
@@ -27,13 +27,12 @@ class VacuumZoneValve extends AssumedCatalogComponent {
     addBridge("inlet", "outlet");
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.routing.vacuum-zone-valve",
       inputs(),
       v -> new VacuumZoneValve(v)
     ).numbered(v -> 'VAC-VALVE-ASSUMED-${Dimension.format(v.number("bore"))}MM-'
-        + '${Dimension.format(v.number("ratedVacuum"))}PA-${Dimension.format(v.number("flow"))}M3H').procured(_ -> Buy(null, null, null)).requiringInputs(["bore"], ["ratedVacuum", "flow"], []);
-    return recipe;
+        + '${Dimension.format(v.number("ratedVacuum"))}PA-${Dimension.format(v.number("flow"))}M3H').procured(_ -> Buy(null, null, null)).requiringInputs(["bore"], ["ratedVacuum", "flow"], []));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   /** A flanged valve body: end flanges and a waisted body with its bolt circle, on the flow bore. Envelope detail is the cylinder, which also sets the mass. */

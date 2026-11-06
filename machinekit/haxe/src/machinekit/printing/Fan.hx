@@ -28,12 +28,12 @@ typedef FanSpec = {
  * blower's outlet is the face on +X; `outlet` is there. Rows are assumed 24 V parts.
  */
 class Fan extends MachineComponent {
-  static var table:Null<Catalog<FanSpec>>;
-  static var recipe:Null<ComponentType>;
+  static final table = new machinekit.cache.Once<Catalog<FanSpec>>();
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final spec:FanSpec;
 
   public static function catalog():Catalog<FanSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "fan",
       s -> s.designation,
       [
@@ -48,8 +48,7 @@ class Fan extends MachineComponent {
         conformance: GenericApproximation,
         verifiedFields: []
       })
-    );
-    return table;
+    ));
   }
 
   public function new(designation:String = "FAN-4010-24V") {
@@ -68,7 +67,7 @@ class Fan extends MachineComponent {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.printing.fan",
       [ComponentRecipeSupport.catalog("designation", catalog(), "FAN-4010-24V")],
       v -> new Fan(v.token("designation"))
@@ -79,8 +78,7 @@ class Fan extends MachineComponent {
         machinekit.component.Procurement.ProcurementCodec.requirement("depth", "mm", null, null, row.depth),
         machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, row.height),
         machinekit.component.Procurement.ProcurementCodec.requirement("voltage", "V", null, null, row.volts)];
-    });
-    return recipe;
+    }));
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this, Fan) ? recipeType() : null;
   override public function values():ComponentValues return new ComponentValues().setToken("designation",

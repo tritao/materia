@@ -28,10 +28,10 @@ typedef HoseStockRow = {
  * (`stock`) or from custom tube sizes. The solid envelope follows the route; mass follows centreline length. */
 class RoutedHose extends MachineComponent {
   public static inline var CUSTOM = "custom";
-  static var table:Null<Catalog<HoseStockRow>>;
+  static final table = new machinekit.cache.Once<Catalog<HoseStockRow>>();
 
   public static function catalog():Catalog<HoseStockRow> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "hose stock",
       row -> row.designation,
       [{
@@ -51,8 +51,7 @@ class RoutedHose extends MachineComponent {
         conformance: NominalEnvelope,
         verifiedFields: ["outerDiameterMm", "innerDiameterMm", "massPerMetreKg"]
       })
-    );
-    return table;
+    ));
   }
 
   /** A cut of stock `designation` along `route`; its part number is the stock and cut length. */
@@ -214,10 +213,10 @@ class RoutedHose extends MachineComponent {
     return result;
   }
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.routed-hose", [
+    return recipeTypeCache.get(() -> new ComponentType("machinekit.pneumatic.routed-hose", [
       ComponentRecipeSupport.choice("stock", [CUSTOM].concat(catalog().designations()), CUSTOM),
       ComponentRecipeSupport.text("designation", "HOSE"),
       ComponentRecipeSupport.text("route", ComponentRecipeSupport.defaultRoute()),
@@ -254,8 +253,7 @@ class RoutedHose extends MachineComponent {
         machinekit.component.Procurement.ProcurementCodec.choice("service", v.token("service")),
         machinekit.component.Procurement.ProcurementCodec.choice("material", row == null ? v.token("material") : row.material)
       ];
-    });
-    return recipeTypeCache;
+    }));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

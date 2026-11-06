@@ -51,7 +51,7 @@ typedef RobotFlangeSpec = {
  * the face; `mountingCutout` is the matching tool in that part's frame.
  */
 class RobotFlange extends MachineComponent {
-  static var table:Null<Catalog<RobotFlangeSpec>>;
+  static final table = new machinekit.cache.Once<Catalog<RobotFlangeSpec>>();
   static inline var MIN_WEB:Float = 1.0;
 
   public final spec:RobotFlangeSpec;
@@ -77,7 +77,7 @@ class RobotFlange extends MachineComponent {
 
   /** ISO 9409-1 sizes keyed by pitch circle diameter text ("31.5", "50", ...). */
   public static function catalog():Catalog<RobotFlangeSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "ISO 9409-1 flange size",
       spec -> Dimension.format(spec.pitchCircle),
       rows(),
@@ -89,8 +89,7 @@ class RobotFlange extends MachineComponent {
         conformance: GenericApproximation,
         verifiedFields: ["pitchCircle", "boltCount", "screw", "pilotDiameter", "pinDiameter"]
       })
-    );
-    return table;
+    ));
   }
 
   /** `pitchCircleDiameter` selects the ISO 9409-1 size; `boltCount` overrides its bolt count. */
@@ -236,10 +235,10 @@ class RobotFlange extends MachineComponent {
     return super.buildTool(name, values);
   }
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.robotics.robot-flange",
       [ComponentRecipeSupport.length("pitchCircleDiameter", 40), ComponentRecipeSupport.count("boltCount", 4)],
       v -> new RobotFlange(v.number("pitchCircleDiameter"), v.integer("boltCount"))
@@ -257,8 +256,7 @@ class RobotFlange extends MachineComponent {
         machinekit.component.Procurement.ProcurementCodec.requirement("pinDiameter", "mm", null, null, spec.pinDiameter),
         machinekit.component.Procurement.ProcurementCodec.choice("mountScrew", spec.screw)
       ];
-    });
-    return recipeTypeCache;
+    }));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

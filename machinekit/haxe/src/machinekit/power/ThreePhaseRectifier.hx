@@ -28,9 +28,9 @@ class ThreePhaseRectifier extends PowerSupply {
       kind: ElectricalPower, role: Consumer, iface: Plug("three-phase-mains", 4), required: true});
     for (index in 1...outlets + 1) addConversion("mains", 'power$index');
   }
-  static var rectifierRecipe:Null<ComponentType>;
+  static final rectifierRecipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (rectifierRecipe == null) rectifierRecipe = new ComponentType(
+    return rectifierRecipe.get(() -> new ComponentType(
       "machinekit.power.three-phase-rectifier",
       [
         ComponentRecipeSupport.scalar("lineVoltage", 400, 0.001),
@@ -59,8 +59,7 @@ class ThreePhaseRectifier extends PowerSupply {
         return [req("lineVoltage", "V", null, null, v.number("lineVoltage")),
           req("frequency", "Hz", null, null, v.number("frequency")), req("current", "A", v.number("current")),
           req("outlets", "count", v.integer("outlets")), req("regenerativePower", "W", v.number("regenerativePower"))];
-      });
-    return rectifierRecipe;
+      }));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setNumber(

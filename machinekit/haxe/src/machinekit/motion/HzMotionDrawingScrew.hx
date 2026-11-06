@@ -21,7 +21,7 @@ class HzMotionDrawingScrew extends LeadScrew {
   public static inline final BF12_BEARING_WIDTH:Float = 8;
   /** Screw tip to the BF12 support centre on the standard floating end (shoulder at 11 mm, bearing 8 wide: 7 mm). */
   public static inline final BF12_SUPPORT_CENTRE:Float = FLOAT_END - BF12_BEARING_WIDTH / 2;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final endProfile:String;
   public final fixedEnd:Float;
   public final floatingEnd:Float;
@@ -145,12 +145,11 @@ class HzMotionDrawingScrew extends LeadScrew {
     return sum;
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.hzmotion-bk12-screw-end-study",
       [P.length("length", 400), P.choice("endProfile", ["BK12", "BK15"], "BK12")],
       v -> new HzMotionDrawingScrew(v.number("length"), v.token("endProfile"))
-    ).numbered(v -> 'HZMOTION-DRAWING-${v.token("endProfile")}-L${Dimension.format(v.number("length"))}');
-    return recipe;
+    ).numbered(v -> 'HZMOTION-DRAWING-${v.token("endProfile")}-L${Dimension.format(v.number("length"))}'));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setNumber("length",

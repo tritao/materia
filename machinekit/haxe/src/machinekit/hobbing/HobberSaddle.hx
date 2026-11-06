@@ -16,7 +16,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
  * estimates retain their stated assumptions pending Phase D. */
 class HobberSaddle extends MachineComponent {
   final designId:String;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [
     P.choice(
       "design",
@@ -50,14 +50,13 @@ class HobberSaddle extends MachineComponent {
     P.quantity("tableSeatHeight", 18, "mm")
   ];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.hobbing.saddle",
       parameters(),
       v -> new HobberSaddle(v.token("design"), v)
     ).numbered(v -> 'HOBBER-${v.token("design").toUpperCase()}')
       .procured(_ -> Make("steel fabrication and machining"))
-      .requiringInputs(["design", "tableFaceDiameter", "tableHousingDiameter", "tableFaceHeight", "tableSeatHeight"]);
-    return recipe;
+      .requiringInputs(["design", "tableFaceDiameter", "tableHousingDiameter", "tableFaceHeight", "tableSeatHeight"]));
   }
   public function new(design:String, ?values:ComponentValues) {
     var supplied = values == null ? new ComponentValues() : values.copy();

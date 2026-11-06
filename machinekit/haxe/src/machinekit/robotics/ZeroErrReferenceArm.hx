@@ -64,7 +64,7 @@ class ZeroErrReferenceArm extends MachineAssembly {
         var path = vendorDirectory + "/" + asset.id + ".STEP";
         if (!sys.FileSystem.exists(path)) throw "Missing ZeroErr CAD; run zeroerr-arm/prepare-reference.py";
         if (fileDigest(path) != asset.sha256) throw 'ZeroErr CAD changed: ${asset.id}';
-        var shape = Shape.importStep(path);
+        var shape = machinekit.cache.Parallel.serialized(() -> Shape.importStep(path));
         sourceShapes.set(asset.id, shape);
         if (shape.subshapeCount(CadKit.ShapeKind.Solid)
           != asset.solidCount) throw 'Supplier solid count changed: ${asset.id}';
@@ -91,9 +91,9 @@ class ZeroErrReferenceArm extends MachineAssembly {
             var rotorPath = vendorDirectory + "/" + key + "-rotor.STEP";
             if (fileDigest(statorPath) != Std.string(r.statorSha256)
               || fileDigest(rotorPath) != Std.string(r.rotorSha256)) throw "Derived output-spigot partition changed";
-            shape = Shape.importStep(statorPath);
-            shapes.set(asset + "-spigot", Shape.importStep(rotorPath));
-          } else shape = Shape.importStep(path);
+            shape = machinekit.cache.Parallel.serialized(() -> Shape.importStep(statorPath));
+            shapes.set(asset + "-spigot", machinekit.cache.Parallel.serialized(() -> Shape.importStep(rotorPath)));
+          } else shape = machinekit.cache.Parallel.serialized(() -> Shape.importStep(path));
           shapes.set(key, shape);
           if (shape.subshapeCount(CadKit.ShapeKind.Solid) != 1) throw "Prepared CAD must contain one solid";
         }
@@ -110,7 +110,7 @@ class ZeroErrReferenceArm extends MachineAssembly {
             || record.method != "preserve-ends-and-hollow-loft") throw "Unreviewed derived link";
           var path = vendorDirectory + "/" + asset + "-shortened.STEP";
           if (fileDigest(path) != record.sha256) throw "Derived link changed";
-          shapes.set(asset + "-solid0", Shape.importStep(path));
+          shapes.set(asset + "-solid0", machinekit.cache.Parallel.serialized(() -> Shape.importStep(path)));
         }
       }
       for (asset in layout.assets) if (asset.shortenMm > 0

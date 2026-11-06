@@ -54,10 +54,10 @@ class DriveWheel extends MachineComponent {
 
   function get_radius():Float return diameter / 2;
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.motion.drive-wheel",
       [
         ComponentRecipeSupport.length("diameter", 150),
@@ -75,8 +75,7 @@ class DriveWheel extends MachineComponent {
       ),
       true
     ).procured(_ -> Buy(null, null, null))
-      .requiringInputs(["diameter", "width", "boreDiameter", "hubDiameter", "hubLength", "material"]);
-    return recipeTypeCache;
+      .requiringInputs(["diameter", "width", "boreDiameter", "hubDiameter", "hubLength", "material"]));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

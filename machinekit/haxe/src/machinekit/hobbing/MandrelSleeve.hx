@@ -8,14 +8,13 @@ class MandrelSleeve extends MachineComponent {
     P.quantity("wall", 1.5, "mm"),
     P.quantity("height", 16, "mm")
   ]);
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.hobbing.mandrel-sleeve",
       parameters(),
       v -> new MandrelSleeve(v)
-    ).numbered(_ -> "MANDREL-SLEEVE").procured(_ -> NotSupplied).requiringInputs(["outside", "wall", "height"]);
-    return recipe;
+    ).numbered(_ -> "MANDREL-SLEEVE").procured(_ -> NotSupplied).requiringInputs(["outside", "wall", "height"]));
   }
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides);

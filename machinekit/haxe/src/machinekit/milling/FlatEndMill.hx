@@ -10,19 +10,18 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Visible flat cutter envelope, origin at tool tip. The buried shank is not
  * represented; stickout is measured from the collet's front face. */
 class FlatEndMill extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [
     P.length("diameter", 6),
     P.length("fluteLength", 22),
     P.length("stickout", 35)
   ];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.flat-end-mill",
       parameters(),
       v -> new FlatEndMill(v)
-    ).numbered(v -> 'ENDMILL-ASSUMED-D${Dimension.format(v.number("diameter"))}-F${Dimension.format(v.number("fluteLength"))}-S${Dimension.format(v.number("stickout"))}');
-    return recipe;
+    ).numbered(v -> 'ENDMILL-ASSUMED-D${Dimension.format(v.number("diameter"))}-F${Dimension.format(v.number("fluteLength"))}-S${Dimension.format(v.number("stickout"))}'));
   }
   public function new(?values:ComponentValues) {
     var v = P.resolve(parameters(), values);

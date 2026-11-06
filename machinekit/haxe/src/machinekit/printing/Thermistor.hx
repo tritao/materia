@@ -25,13 +25,13 @@ typedef ThermistorSpec = {
 
 /** An NTC temperature sensor. Rows are assumed values for the common 100k, beta 3950 part. */
 class Thermistor extends MachineComponent {
-  static var table:Null<Catalog<ThermistorSpec>>;
-  static var recipe:Null<ComponentType>;
+  static final table = new machinekit.cache.Once<Catalog<ThermistorSpec>>();
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static inline var KELVIN:Float = 273.15;
   public final spec:ThermistorSpec;
 
   public static function catalog():Catalog<ThermistorSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "thermistor",
       s -> s.designation,
       [{
@@ -50,8 +50,7 @@ class Thermistor extends MachineComponent {
         conformance: GenericApproximation,
         verifiedFields: []
       })
-    );
-    return table;
+    ));
   }
 
   public function new(designation:String = "NTC-100K-B3950") {
@@ -82,7 +81,7 @@ class Thermistor extends MachineComponent {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.printing.thermistor",
       [ComponentRecipeSupport.catalog("designation", catalog(), "NTC-100K-B3950")],
       v -> new Thermistor(v.token("designation"))
@@ -91,8 +90,7 @@ class Thermistor extends MachineComponent {
       return [machinekit.component.Procurement.ProcurementCodec.requirement("resistanceAt25C", "ohm", null, null, row.ohmsAt25),
         machinekit.component.Procurement.ProcurementCodec.requirement("beta", "K", null, null, row.beta),
         machinekit.component.Procurement.ProcurementCodec.requirement("maxTemperature", "C", row.maxTemperature)];
-    });
-    return recipe;
+    }));
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,
     Thermistor) ? recipeType() : null;

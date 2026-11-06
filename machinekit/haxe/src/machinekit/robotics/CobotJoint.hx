@@ -27,7 +27,7 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
   public final outputPeakTorque:Float;
   /** Assumed amplifier classes, with headroom above each module's phase RMS peak. */
   public final driverCurrent:machinekit.power.PhaseRmsCurrent;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public function new(
     size:Int,
@@ -125,7 +125,7 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
   };
 
   public static function moduleRecipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.robotics.cobot-joint",
       [
         ComponentRecipeSupport.scalar("size", 2),
@@ -153,8 +153,7 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
           machinekit.component.Procurement.ProcurementCodec.requirement("inputPilotDepth", "mm", null, null, v.number("inputPilotDepth")),
           machinekit.component.Procurement.ProcurementCodec.choice("wristStator", v.boolean("wristStator") ? "true" : "false"),
           machinekit.component.Procurement.ProcurementCodec.choice("wristRotor", v.boolean("wristRotor") ? "true" : "false")];
-      });
-    return recipe;
+      }));
   }
   override public function componentType():Null<ComponentType> return moduleRecipeType();
   override public function values():ComponentValues {

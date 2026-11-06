@@ -49,16 +49,17 @@ typedef ScrewSupportRow = {
 
 /** BK/BF/EF/FK/FF supports from the Vallder tables and pinned CAD, with HZMotion's reviewed drawings and STEP files. */
 class ScrewSupportCatalog {
-  static var cache:Null<Map<String, ScrewSupportRow>>;
+  static final cache = new machinekit.cache.Once<Map<String, ScrewSupportRow>>();
 
   public static function models():Array<String> return VallderSupportData.models().concat(["EF12"]);
 
   public static function get(model:String):ScrewSupportRow {
-    if (cache == null) {
-      cache = [];
-      for (name in models()) cache.set(name, build(name));
-    }
-    var row = cache.get(model);
+    var rows = cache.get(() -> {
+      var built:Map<String, ScrewSupportRow> = [];
+      for (name in models()) built.set(name, build(name));
+      return built;
+    });
+    var row = rows.get(model);
     if (row == null) throw "Support needs interface review: " + model;
     return row;
   }

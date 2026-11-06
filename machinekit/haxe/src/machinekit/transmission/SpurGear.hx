@@ -185,10 +185,10 @@ class SpurGear extends MachineComponent {
     });
   }
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.transmission.spur-gear",
       [
         ComponentRecipeSupport.length("moduleSize", 2),
@@ -216,8 +216,7 @@ class SpurGear extends MachineComponent {
         v.number("boreDiameter")
       ),
       true
-    ).procured(_ -> Make("gear hobbing and machining"));
-    return recipeTypeCache;
+    ).procured(_ -> Make("gear hobbing and machining")));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

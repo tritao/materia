@@ -15,12 +15,11 @@ class HobberChipCover extends MachineComponent {
   public final role:String;
   public static final MADE:Array<String> = ["XleftFront", "XrightFront", "XleftRear", "XrightRear", "Xfront", "Xrear", "Xskirt", "Zleft", "Zright"];
 
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [machinekit.component.ComponentRecipeSupport.choice("role",MADE,"XleftFront")];
   public static function recipeType():ComponentType {
-    if(recipe==null) recipe=new ComponentType("machinekit.hobbing.chip-cover",parameters(),v->new HobberChipCover(v),false,false,null,false)
-      .numbered(v->"HOBBER-GUARD-"+v.token("role").toUpperCase()).procured(v->Make(v.token("role")=="Xrear"?"cut plate":"cut and formed sheet"));
-    return recipe;
+    return recipe.get(() -> new ComponentType("machinekit.hobbing.chip-cover",parameters(),v->new HobberChipCover(v),false,false,null,false)
+      .numbered(v->"HOBBER-GUARD-"+v.token("role").toUpperCase()).procured(v->Make(v.token("role")=="Xrear"?"cut plate":"cut and formed sheet")));
   }
   public function new(?overrides:ComponentValues) {
     var v=machinekit.component.ComponentRecipeSupport.resolve(parameters(),overrides),r=v.token("role");

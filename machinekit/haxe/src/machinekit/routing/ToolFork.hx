@@ -8,7 +8,7 @@ import materia.assembly.AssemblyFrames as F;
 /** Assumed catalogue-class open ISO30 rack fork. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class ToolFork extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.length("width", 80),
     P.length("depth", 100),
@@ -26,9 +26,8 @@ class ToolFork extends AssumedCatalogComponent {
     addConnector("approach", Mount, F.translation(0, n("depth"), n("thickness")));
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.routing.tool-fork", inputs(), v -> new ToolFork(v))
-      .numbered(_ -> "ROUTER-TOOL-FORK").procured(_ -> Buy(null, null, null)).requiringInputs(["width", "depth", "thickness", "gripDiameter", "clearance"], [], []);
-    return recipe;
+    return recipe.get(() -> new ComponentType("machinekit.routing.tool-fork", inputs(), v -> new ToolFork(v))
+      .numbered(_ -> "ROUTER-TOOL-FORK").procured(_ -> Buy(null, null, null)).requiringInputs(["width", "depth", "thickness", "gripDiameter", "clearance"], [], []));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function geometry(detail:ComponentDetail = Preview):Part {

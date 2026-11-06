@@ -14,14 +14,13 @@ class HobberBracket extends MachineComponent {
     P.length("height", 100),
     P.flag("cantilever", false)
   ]);
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.hobbing.hobber-bracket",
       parameters(),
       v -> new HobberBracket(v)
-    ).numbered(_ -> "HOBBER-BRACKET");
-    return recipe;
+    ).numbered(_ -> "HOBBER-BRACKET"));
   }
   public function new(?values:ComponentValues) {
     var v = P.resolve(parameters(), values);

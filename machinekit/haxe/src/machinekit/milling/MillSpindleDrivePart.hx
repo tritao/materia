@@ -38,8 +38,8 @@ class MillSpindleDrivePart extends MachineComponent {
       Bt30Cartridge.SEAT + headHeight
     ));
   }
-  static var recipe:Null<ComponentType>;
-  static var guardRecipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
+  static final guardRecipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters(role:String = "carrier"):Array<ComponentParameter> return [
     P.choice("role", [role], role),
     P.choice(
@@ -56,19 +56,17 @@ class MillSpindleDrivePart extends MachineComponent {
   ];
   public static function recipeType(role:String = "carrier"):ComponentType {
     if (role == "guard") {
-      if (guardRecipe == null) guardRecipe = new ComponentType(
+      return guardRecipe.get(() -> new ComponentType(
         "machinekit.milling.spindle-drive-study-guard",
         parameters("guard"),
         v -> new MillSpindleDrivePart(v)
-      ).numbered(v -> 'MILL-SPINDLE-DRIVE-${v.token("role").toUpperCase()}');
-      return guardRecipe;
+      ).numbered(v -> 'MILL-SPINDLE-DRIVE-${v.token("role").toUpperCase()}'));
     }
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.spindle-drive-study-part",
       parameters(),
       v -> new MillSpindleDrivePart(v)
-    ).numbered(v -> 'MILL-SPINDLE-DRIVE-${v.token("role").toUpperCase()}');
-    return recipe;
+    ).numbered(v -> 'MILL-SPINDLE-DRIVE-${v.token("role").toUpperCase()}'));
   }
   public function new(?v:ComponentValues) {
     var role = v != null && v.get("role") != null ? v.token("role") : "carrier";

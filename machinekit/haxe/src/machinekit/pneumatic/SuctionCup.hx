@@ -35,10 +35,10 @@ typedef SuctionCupRow = {
  */
 class SuctionCup extends MachineComponent {
   public static inline var CUSTOM = "custom";
-  static var table:Null<Catalog<SuctionCupRow>>;
+  static final table = new machinekit.cache.Once<Catalog<SuctionCupRow>>();
 
   public static function catalog():Catalog<SuctionCupRow> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "suction cup",
       row -> row.designation,
       [
@@ -94,8 +94,7 @@ class SuctionCup extends MachineComponent {
           "vacuumThread"
         ]
       })
-    );
-    return table;
+    ));
   }
 
   /** The catalogue cup `designation`. */
@@ -192,10 +191,10 @@ class SuctionCup extends MachineComponent {
   /** The cup's outside diameter: a catalogue cup's lip may exceed its nominal diameter. */
   function outside():Float return row == null ? diameter : row.envelopeDiameterMm;
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.suction-cup", [
+    return recipeTypeCache.get(() -> new ComponentType("machinekit.pneumatic.suction-cup", [
       ComponentRecipeSupport.choice("model", [CUSTOM].concat(catalog().designations()), CUSTOM),
       ComponentRecipeSupport.length("diameter", 40),
       ComponentRecipeSupport.length("height", 18),
@@ -222,8 +221,7 @@ class SuctionCup extends MachineComponent {
       if (area != null) terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("effectiveArea", "mm2", area));
       if (moment != null) terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("ratedMoment", "N m", moment));
       return terms.concat(machinekit.component.Procurement.ProcurementCodec.port("vacuum", ComponentRecipeSupport.interfaceFrom(v, "vacuumInterface")));
-    });
-    return recipeTypeCache;
+    }));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

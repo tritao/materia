@@ -103,9 +103,9 @@ class BallNut extends LeadScrewNut {
     return Solids.cut(body, tools);
   }
 
-  static var ballRecipe:Null<ComponentType>;
+  static final ballRecipe = new machinekit.cache.Once<ComponentType>();
   public static function ballRecipeType():ComponentType {
-    if (ballRecipe == null) ballRecipe = new ComponentType(
+    return ballRecipe.get(() -> new ComponentType(
       "machinekit.motion.ball-nut",
       [ComponentRecipeSupport.flag("preloaded", true)],
       v -> new BallNut(v.boolean("preloaded"))
@@ -114,8 +114,7 @@ class BallNut extends LeadScrewNut {
         machinekit.component.Procurement.ProcurementCodec.requirement("screwDiameter", "mm", null, null, 16),
         machinekit.component.Procurement.ProcurementCodec.requirement("lead", "mm", null, null, 5),
         machinekit.component.Procurement.ProcurementCodec.choice("preloaded", v.boolean("preloaded") ? "true" : "false")
-      ]);
-    return ballRecipe;
+      ]));
   }
   override public function componentType():Null<ComponentType> return ballRecipeType();
   override public function values():ComponentValues return new ComponentValues().setBoolean("preloaded",

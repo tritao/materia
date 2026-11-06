@@ -22,12 +22,12 @@ typedef ProximitySwitchSpec = {
 
 /** Assumed generic M8/M12 inductive sensor envelope, with an explicit sensing gap. */
 class ProximitySwitch extends MachineComponent implements SwitchPart {
-  static var table:Null<Catalog<ProximitySwitchSpec>>;
-  static var recipe:Null<ComponentType>;
+  static final table = new machinekit.cache.Once<Catalog<ProximitySwitchSpec>>();
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final spec:ProximitySwitchSpec;
 
   public static function catalog():Catalog<ProximitySwitchSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "assumed inductive switch",
       s -> s.designation,
       [
@@ -56,8 +56,7 @@ class ProximitySwitch extends MachineComponent implements SwitchPart {
         conformance: GenericApproximation,
         verifiedFields: []
       })
-    );
-    return table;
+    ));
   }
 
   public function new(designation:String = "GENERIC-INDUCTIVE-M8") {
@@ -76,7 +75,7 @@ class ProximitySwitch extends MachineComponent implements SwitchPart {
   public function switchHysteresis():Float return spec.hysteresis;
   public function switchRepeatability():Float return spec.repeatability;
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.proximity-switch",
       [ComponentRecipeSupport.catalog("designation", catalog(), "GENERIC-INDUCTIVE-M8")],
       v -> new ProximitySwitch(v.token("designation"))
@@ -88,8 +87,7 @@ class ProximitySwitch extends MachineComponent implements SwitchPart {
           machinekit.component.Procurement.ProcurementCodec.requirement("sensingDistance", "mm", row.sensingDistance),
           machinekit.component.Procurement.ProcurementCodec.requirement("hysteresis", "mm", null, row.hysteresis),
           machinekit.component.Procurement.ProcurementCodec.requirement("repeatability", "mm", null, row.repeatability)];
-      });
-    return recipe;
+      }));
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,
     ProximitySwitch) ? recipeType() : null;

@@ -31,11 +31,11 @@ typedef BayonetChangerMasterRow = {
 /** The robot-side half of a manual bayonet tool changer (no lock actuator or signals, unlike `ToolChangerMaster`),
  * from a maker's catalogue, with its pneumatic passages. Box envelope and mass centre are estimates from published bounds. */
 class BayonetChangerMaster extends MachineComponent {
-  static var table:Null<Catalog<BayonetChangerMasterRow>>;
+  static final table = new machinekit.cache.Once<Catalog<BayonetChangerMasterRow>>();
   public final spec:BayonetChangerMasterRow;
 
   public static function catalog():Catalog<BayonetChangerMasterRow> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "robot-side bayonet changer",
       row -> row.designation,
       [{
@@ -66,8 +66,7 @@ class BayonetChangerMaster extends MachineComponent {
           "outsideThread"
         ]
       })
-    );
-    return table;
+    ));
   }
 
 
@@ -100,16 +99,15 @@ class BayonetChangerMaster extends MachineComponent {
     );
   }
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.robotics.bayonet-changer-master",
       [ComponentRecipeSupport.catalog("designation", BayonetChangerMaster.catalog(), "10.07.13.00013")],
       v -> new BayonetChangerMaster(v.token("designation")),
       true
-    );
-    return recipeTypeCache;
+    ));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

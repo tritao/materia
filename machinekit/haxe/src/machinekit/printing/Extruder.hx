@@ -30,12 +30,12 @@ typedef ExtruderSpec = {
  * nozzle is on), filament along +Z downwards towards -Z; the drive shaft runs along +Y behind it.
  */
 class Extruder extends MachineComponent {
-  static var table:Null<Catalog<ExtruderSpec>>;
-  static var recipe:Null<ComponentType>;
+  static final table = new machinekit.cache.Once<Catalog<ExtruderSpec>>();
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final spec:ExtruderSpec;
 
   public static function catalog():Catalog<ExtruderSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "extruder",
       s -> s.designation,
       [{designation: "GEARED-HOB-7.3",
@@ -48,8 +48,7 @@ class Extruder extends MachineComponent {
         conformance: GenericApproximation,
         verifiedFields: []
       })
-    );
-    return table;
+    ));
   }
 
   public function new(designation:String = "GEARED-HOB-7.3") {
@@ -70,7 +69,7 @@ class Extruder extends MachineComponent {
   public function filamentPerRadian():Float return spec.hobDiameter / 2.0;
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.printing.extruder",
       [ComponentRecipeSupport.catalog("designation", catalog(), "GEARED-HOB-7.3")],
       v -> new Extruder(v.token("designation"))
@@ -78,8 +77,7 @@ class Extruder extends MachineComponent {
       var row = catalog().get(v.token("designation"));
       return [machinekit.component.Procurement.ProcurementCodec.requirement("hobDiameter", "mm", null, null, row.hobDiameter),
         machinekit.component.Procurement.ProcurementCodec.requirement("filamentDiameter", "mm", null, null, row.filamentDiameter)];
-    });
-    return recipe;
+    }));
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,
     Extruder) ? recipeType() : null;

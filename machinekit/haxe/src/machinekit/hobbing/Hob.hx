@@ -40,9 +40,9 @@ class Hob extends MachineComponent {
     P.length("axialRunout", 0.002),
     P.length("profileError", 0.001)
   ]);
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.hobbing.hob", parameters(), v -> new Hob(v))
+    return recipe.get(() -> new ComponentType("machinekit.hobbing.hob", parameters(), v -> new Hob(v))
       .numbered(v -> 'HOB-ASSUMED-M${Dimension.format(v.number("module"))}-D${Dimension.format(v.number("outside"))}-B${Dimension.format(v.number("bore"))}-${v.integer("starts")}S-${v.integer("gashes")}G')
       .procured(_ -> NotSupplied).requiring(v -> [
         machinekit.component.Procurement.ProcurementCodec.requirement("module", "mm", null, null, v.number("module")),
@@ -50,8 +50,7 @@ class Hob extends MachineComponent {
         machinekit.component.Procurement.ProcurementCodec.requirement("bore", "mm", null, null, v.number("bore")),
         machinekit.component.Procurement.ProcurementCodec.requirement("starts", "1", null, null, v.integer("starts")),
         machinekit.component.Procurement.ProcurementCodec.requirement("gashes", "1", null, null, v.integer("gashes"))
-      ]);
-    return recipe;
+      ]));
   }
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides);

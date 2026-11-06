@@ -18,7 +18,7 @@ import materia.project.SceneContactFilter;
  * assumptions, not material ratings.
  */
 class GaugeFinger extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static inline final WIDTH_MM = 20.0;
   public static inline final DEPTH_MM = 60.0;
   public static inline final HEIGHT_MM = 21.0;
@@ -66,13 +66,12 @@ class GaugeFinger extends MachineComponent {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.pressbrake.gauge-finger", [], _ -> new GaugeFinger())
+    return recipe.get(() -> new ComponentType("machinekit.pressbrake.gauge-finger", [], _ -> new GaugeFinger())
       .numbered(_ -> "PRESS-GAUGE-FINGER-ASSUMED").procured(_ -> Make("CNC machining")).requiring(_ -> [
         machinekit.component.Procurement.ProcurementCodec.requirement("width", "mm", null, null, WIDTH_MM),
         machinekit.component.Procurement.ProcurementCodec.requirement("depth", "mm", null, null, DEPTH_MM),
         machinekit.component.Procurement.ProcurementCodec.requirement("height", "mm", null, null, HEIGHT_MM)
-      ]);
-    return recipe;
+      ]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setToken("material", materialSpec());

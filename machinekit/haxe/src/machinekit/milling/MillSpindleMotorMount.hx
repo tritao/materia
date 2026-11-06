@@ -8,18 +8,17 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Braced motor carrier, with a centered two-support option. The legacy offset
  * recipe remains rebuildable; motor interfaces are explicit study assumptions. */
 class MillSpindleMotorMount extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [
     P.length("height", 80),
     P.flag("centered", false)
   ];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.spindle-motor-mount",
       parameters(),
       v -> new MillSpindleMotorMount(v)
-    ).numbered(_ -> "MILL-SPINDLE-MOTOR-CARRIER");
-    return recipe;
+    ).numbered(_ -> "MILL-SPINDLE-MOTOR-CARRIER"));
   }
   public function new(?v:ComponentValues) {
     v = P.resolve(parameters(), v);

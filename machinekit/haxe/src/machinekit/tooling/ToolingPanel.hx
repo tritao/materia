@@ -17,17 +17,16 @@ import materia.casting.CastingProfileGeometry;
 
 /** Rebuildable exact panel; material is an explicit CAD/BOM material selection. */
 class ToolingPanel extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   final record:PanelPlan;
   static function parameters():Array<machinekit.component.ComponentParameter> return [P.text(
     "plan",
     PanelCodec.encode(PanelJoints.blank("panel", 100, 100, PanelJoints.stock()))
   )];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.tooling.panel", parameters(), v -> new ToolingPanel(v), false, true)
+    return recipe.get(() -> new ComponentType("machinekit.tooling.panel", parameters(), v -> new ToolingPanel(v), false, true)
       .numbered(v -> 'TOOL-PANEL-${PanelCodec.decode(v.token("plan")).id.toUpperCase()}'
-        + (v.token("material") == "birch plywood" ? "" : "-" + materia.project.MaterialLibrary.fromSpec(v.token("material")).toUpperCase()));
-    return recipe;
+        + (v.token("material") == "birch plywood" ? "" : "-" + materia.project.MaterialLibrary.fromSpec(v.token("material")).toUpperCase())));
   }
   public static function fromPlan(plan:PanelPlan,
     material:String = "birch plywood"):ToolingPanel return new ToolingPanel(new ComponentValues().setToken(

@@ -30,15 +30,15 @@ class HexFlangeBolt extends MachineComponent implements ScrewFastener {
 	 * c_min, da(Type F)_max, dw_min, b and the M14/M16 rows. The manufacturer's
 	 * current ISO 4162 table confirms the M5..M12 head/flange dimensions. */
   public static inline var STANDARD_SOURCE = "https://law.resource.org/pub/in/bis/S01/is.15582.2005.pdf";
-  static var table:Null<Catalog<HexFlangeBoltSpec>>;
-  static var recipe:Null<ComponentType>;
+  static final table = new machinekit.cache.Once<Catalog<HexFlangeBoltSpec>>();
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final spec:HexFlangeBoltSpec;
   public final length:Float;
   public final propertyClass:PropertyClass;
   public final thread:ThreadSpec;
 
   public static function catalog():Catalog<HexFlangeBoltSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "ISO 4162 flange bolt",
       row -> row.size,
       [
@@ -69,8 +69,7 @@ class HexFlangeBolt extends MachineComponent implements ScrewFastener {
           "threadLength"
         ]
       })
-    );
-    return table;
+    ));
   }
   static function row(size:String,
     d:Float, p:Float, s:Float, k:Float, dc:Float, c:Float, da:Float, dw:Float, b:Float):HexFlangeBoltSpec return {
@@ -177,7 +176,7 @@ class HexFlangeBolt extends MachineComponent implements ScrewFastener {
     super.setMaterial(material);
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.standard.hex-flange-bolt",
       [P.catalog("size", catalog(), "M6"), P.length("length", 20), P.choice("propertyClass", ["8.8", "10.9"], "8.8")],
       v -> metric(v.token("size"), v.number("length"), PropertyClasses.parse(v.token("propertyClass"))),
@@ -185,8 +184,7 @@ class HexFlangeBolt extends MachineComponent implements ScrewFastener {
       true,
       null,
       false
-    ).procured(_ -> Buy(null, null, "ISO 4162"));
-    return recipe;
+    ).procured(_ -> Buy(null, null, "ISO 4162")));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setToken("size", spec.size).setNumber(

@@ -170,7 +170,7 @@ class LinearRailBlock extends MachineComponent {
       HgReferenceData.hash(model),
       "python3 tools/suppliers/hg.py --prepare build/suppliers/vallder/hg-reference"
     );
-    var shape = Shape.importStep(path),
+    var shape = machinekit.cache.Parallel.serialized(() -> Shape.importStep(path)),
       bounds = shape.bounds(), lo = HgReferenceData.low(model), hi = HgReferenceData.high(model);
     var min = bounds.get_min(), max = bounds.get_max();
     for (pair in [
@@ -201,10 +201,10 @@ class LinearRailBlock extends MachineComponent {
     );
   }
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.motion.linear-rail-block",
       [
         ComponentRecipeSupport.catalog("profile", LinearRailSystem.catalog(), "MGN12C"),
@@ -214,8 +214,7 @@ class LinearRailBlock extends MachineComponent {
       true,
       false,
       ["geometry"]
-    ).numbered(v -> v.token("profile")).procured(_ -> Buy(null, null, null));
-    return recipeTypeCache;
+    ).numbered(v -> v.token("profile")).procured(_ -> Buy(null, null, null)));
   }
 
   override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();

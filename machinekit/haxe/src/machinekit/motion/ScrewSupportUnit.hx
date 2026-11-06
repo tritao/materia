@@ -413,10 +413,10 @@ class ScrewSupportUnit extends MachineComponent {
     z1
   );
 
-  static var supportRecipe:Null<ComponentType>;
+  static final supportRecipe = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (supportRecipe == null) supportRecipe = new ComponentType(
+    return supportRecipe.get(() -> new ComponentType(
       "machinekit.motion.screw-support-unit",
       [
         ComponentRecipeSupport.choice("model", ScrewSupportCatalog.models(), "BK12"),
@@ -426,8 +426,7 @@ class ScrewSupportUnit extends MachineComponent {
       true,
       false,
       ["geometry"]
-    ).numbered(v -> v.token("model")).procured(_ -> Buy(null, null, null));
-    return supportRecipe;
+    ).numbered(v -> v.token("model")).procured(_ -> Buy(null, null, null)));
   }
 
   override public function componentType():Null<ComponentType> return recipeType();

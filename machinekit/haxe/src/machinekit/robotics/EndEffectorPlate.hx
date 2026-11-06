@@ -157,11 +157,11 @@ class EndEffectorPlate extends MachineComponent {
     }
   }
 
-  private static var recipeTypeCache:Null<ComponentType>;
-  private static var toolScrewCatalogCache:Null<CatalogIndex>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
+  private static final toolScrewCatalogCache = new machinekit.cache.Once<CatalogIndex>();
 
   static function toolScrewCatalog():CatalogIndex {
-    if (toolScrewCatalogCache == null) {
+    return toolScrewCatalogCache.get(() -> {
       var screws = SocketHeadCapScrew.catalog();
       var compatible:Array<String> = [];
       for (designation in screws.designations()) {
@@ -171,13 +171,12 @@ class EndEffectorPlate extends MachineComponent {
         } catch (_:String) {
         }
       }
-      toolScrewCatalogCache = new FilteredCatalogIndex(screws, compatible);
-    }
-    return toolScrewCatalogCache;
+      return new FilteredCatalogIndex(screws, compatible);
+    });
   }
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.robotics.end-effector-plate",
       [
         ComponentRecipeSupport.length("flangePitchCircle", 40),
@@ -202,8 +201,7 @@ class EndEffectorPlate extends MachineComponent {
         machinekit.component.Procurement.ProcurementCodec.requirement("toolBoltCircleDiameter", "mm", null, null, v.number("toolBoltCircleDiameter")),
         machinekit.component.Procurement.ProcurementCodec.requirement("toolBoltCount", "1", null, null, v.integer("toolBoltCount")),
         machinekit.component.Procurement.ProcurementCodec.choice("toolMountScrew", v.token("toolMountScrew"))
-      ]);
-    return recipeTypeCache;
+      ]));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

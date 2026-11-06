@@ -6,7 +6,7 @@ import machinekit.component.ComponentRecipeSupport;
 
 /** Robot cabinet with one drive reference per axis and separately wired digital I/O. */
 class RobotController extends ControllerCabinet {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public function new(axes:Int = 6, inputs:Int = 16, outputs:Int = 16, valves:Int = 4) super(
     "robot",
     axes,
@@ -16,7 +16,7 @@ class RobotController extends ControllerCabinet {
   );
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.control.robot-controller",
       [
         ComponentRecipeSupport.count("axes", 6),
@@ -26,8 +26,7 @@ class RobotController extends ControllerCabinet {
       ],
       v -> new RobotController(v.integer("axes"), v.integer("inputs"), v.integer("outputs"), v.integer("valves"))
     ).numbered(v -> 'ROBOT-CTRL-ASSUMED-${v.integer("axes")}A-${v.integer("inputs")}I-${v.integer("outputs")}O-${v.integer("valves")}V')
-      .procured(_ -> Buy(null, null, null)).requiringInputs([], ["axes", "inputs", "outputs", "valves"]);
-    return recipe;
+      .procured(_ -> Buy(null, null, null)).requiringInputs([], ["axes", "inputs", "outputs", "valves"]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setInteger("axes", axes).setInteger(

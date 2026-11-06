@@ -11,21 +11,20 @@ class PurchasedRotaryPart extends MachineComponent implements MotorDrive impleme
   public static inline final PURCHASE_ID = "PURCHASED-DD-200-210";
   public final axis:RotaryAxisSpec;
   public final variant:String;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return RotaryAxisSpec.parameters().concat([
     P.choice("variant", ["body", "rotor", "adapter"], "body"),
     P.length("adapterHeight", 92),
     P.length("adapterOutside", 270)
   ]);
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.purchased-rotary-part",
       parameters(),
       v -> new PurchasedRotaryPart(v),
       true
     ).procured(v -> v.token("variant") == "adapter" ? Make("steel machining") : Buy(null, null, null))
-      .requiringInputs(["faceDiameter", "bore"], ["continuousTorque", "peakTorque", "ratedSpeed", "maxSpeed", "loadCapacity"]);
-    return recipe;
+      .requiringInputs(["faceDiameter", "bore"], ["continuousTorque", "peakTorque", "ratedSpeed", "maxSpeed", "loadCapacity"]));
   }
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides);

@@ -14,12 +14,11 @@ class SpindleHousing extends MachineComponent {
   ]);
   public static inline final CLAMP_FROM = Bt30SpindleData.CLAMP_FROM;
   public static inline final CLAMP_TO = Bt30SpindleData.CLAMP_TO;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.hobbing.spindle-housing", parameters(), v -> new SpindleHousing(v))
+    return recipe.get(() -> new ComponentType("machinekit.hobbing.spindle-housing", parameters(), v -> new SpindleHousing(v))
       .versioned(2).numbered(_ -> Bt30SpindleData.DESIGNATION)
-      .procured(_ -> Buy("RobotDigg", "2049 option A", "MAS BT30"));
-    return recipe;
+      .procured(_ -> Buy("RobotDigg", "2049 option A", "MAS BT30")));
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues> return Bt30SpindleData.catalog();
   public function new(?overrides:ComponentValues) {

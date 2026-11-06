@@ -12,14 +12,13 @@ import machinekit.component.ComponentValues;
  * Local Z=0 is the motor-side face; the washer bears at Z=5. */
 class BallScrewRetainer extends MachineComponent {
   public static inline var STATION:Float = 20;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.ballscrew-retainer",
       [],
       _ -> new BallScrewRetainer()
-    ).numbered(_ -> "BALLSCREW-D12-RETAINER-ASSUMED");
-    return recipe;
+    ).numbered(_ -> "BALLSCREW-D12-RETAINER-ASSUMED"));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   public function new() {

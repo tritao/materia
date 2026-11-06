@@ -13,15 +13,14 @@ import materia.assembly.AssemblyFrames as F;
  * Rise is measured from the nut axis to the saddle underside. Nominal holes.
  */
 class MillYNutBridge extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [P.length("rise", 128)];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.y-nut-bridge",
       parameters(),
       v -> new MillYNutBridge(v)
-    ).numbered(_ -> "MILL-Y-NUT-BRIDGE");
-    return recipe;
+    ).numbered(_ -> "MILL-Y-NUT-BRIDGE"));
   }
   public function new(?values:ComponentValues) {
     var v = P.resolve(parameters(), values);

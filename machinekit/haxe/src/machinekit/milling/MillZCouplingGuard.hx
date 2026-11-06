@@ -6,18 +6,17 @@ import machinekit.component.ComponentRecipeSupport as P;
 
 /** Two-bolt removable cover across the front of the open motor stand. */
 class MillZCouplingGuard extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [
     P.length("width", 100),
     P.length("height", 16.5)
   ];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.z-coupling-guard",
       parameters(),
       v -> new MillZCouplingGuard(v)
-    ).numbered(_ -> "MILL-Z-COUPLING-GUARD");
-    return recipe;
+    ).numbered(_ -> "MILL-Z-COUPLING-GUARD"));
   }
   public function new(?values:ComponentValues) {
     var v = P.resolve(parameters(), values);

@@ -26,7 +26,7 @@ import machinekit.component.Solids;
 class RetainingRing extends MachineComponent {
   override public function carriesJournal():Bool return true;
 
-  static var table:Null<Catalog<RetainingRingSpec>>;
+  static final table = new machinekit.cache.Once<Catalog<RetainingRingSpec>>();
   static inline var GAP:Float = Math.PI * 2 / 9;
 
   public final spec:RetainingRingSpec;
@@ -45,7 +45,7 @@ class RetainingRing extends MachineComponent {
   ];
 
   public static function catalog():Catalog<RetainingRingSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "retaining ring shaft diameter",
       spec -> Dimension.format(spec.shaftDiameter),
       rows(),
@@ -56,8 +56,7 @@ class RetainingRing extends MachineComponent {
         dimensionKind: Nominal,
         conformance: NominalEnvelope
       })
-    );
-    return table;
+    ));
   }
 
   /** Ring for exactly `shaftDiameter`; throws when the catalog has no such size. */
@@ -108,16 +107,15 @@ class RetainingRing extends MachineComponent {
 
   function get_thickness():Float return spec.thickness;
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.standard.retaining-ring",
       [ComponentRecipeSupport.catalog("shaft", RetainingRing.catalog(), "8")],
       v -> RetainingRing.forShaft(Std.parseFloat(v.token("shaft"))),
       true
-    ).procured(_ -> Buy(null, null, "DIN 471"));
-    return recipeTypeCache;
+    ).procured(_ -> Buy(null, null, "DIN 471")));
   }
 
   override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();

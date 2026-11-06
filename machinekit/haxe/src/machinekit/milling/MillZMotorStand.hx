@@ -10,7 +10,7 @@ import machinekit.component.ComponentRecipeSupport as P;
  * The caller supplies the selected motor hole pitch and pilot recess.
  */
 class MillZMotorStand extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [
     P.flag("anchored", false),
     P.length("registerDiameter", 0),
@@ -24,12 +24,11 @@ class MillZMotorStand extends MachineComponent {
     P.length("boltPitch", 40)
   ];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.z-motor-stand",
       parameters(),
       v -> new MillZMotorStand(v)
-    ).numbered(_ -> "MILL-Z-MOTOR-STAND");
-    return recipe;
+    ).numbered(_ -> "MILL-Z-MOTOR-STAND"));
   }
   public function new(?values:ComponentValues) {
     var v = P.resolve(parameters(), values);

@@ -63,10 +63,10 @@ class CasterWheel extends MachineComponent {
 
   function get_axleHeight():Float return wheelDiameter / 2;
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.motion.caster-wheel",
       [
         ComponentRecipeSupport.length("wheelDiameter", 75),
@@ -84,8 +84,7 @@ class CasterWheel extends MachineComponent {
       ),
       true
     ).procured(_ -> Buy(null, null, null))
-      .requiringInputs(["wheelDiameter", "wheelWidth", "height", "trail", "plateSize"]);
-    return recipeTypeCache;
+      .requiringInputs(["wheelDiameter", "wheelWidth", "height", "trail", "plateSize"]));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

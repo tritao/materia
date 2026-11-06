@@ -23,12 +23,12 @@ typedef HeaterCartridgeSpec = {
 
 /** A resistive cartridge heater. Its resistance follows from its rating: R = V^2 / P. */
 class HeaterCartridge extends MachineComponent {
-  static var table:Null<Catalog<HeaterCartridgeSpec>>;
-  static var recipe:Null<ComponentType>;
+  static final table = new machinekit.cache.Once<Catalog<HeaterCartridgeSpec>>();
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final spec:HeaterCartridgeSpec;
 
   public static function catalog():Catalog<HeaterCartridgeSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "heater cartridge",
       s -> s.designation,
       [{
@@ -47,8 +47,7 @@ class HeaterCartridge extends MachineComponent {
         conformance: GenericApproximation,
         verifiedFields: []
       })
-    );
-    return table;
+    ));
   }
 
   public function new(designation:String = "CARTRIDGE-6x20-24V-40W") {
@@ -74,7 +73,7 @@ class HeaterCartridge extends MachineComponent {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.printing.heater-cartridge",
       [ComponentRecipeSupport.catalog("designation", catalog(), "CARTRIDGE-6x20-24V-40W")],
       v -> new HeaterCartridge(v.token("designation"))
@@ -85,8 +84,7 @@ class HeaterCartridge extends MachineComponent {
         machinekit.component.Procurement.ProcurementCodec.requirement("voltage", "V", null, null, row.volts),
         machinekit.component.Procurement.ProcurementCodec.requirement("power", "W", row.watts),
         machinekit.component.Procurement.ProcurementCodec.requirement("maxTemperature", "C", row.maxTemperature)];
-    });
-    return recipe;
+    }));
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,
     HeaterCartridge) ? recipeType() : null;

@@ -33,7 +33,7 @@ class GearRackCatalog {
   public static inline var SOURCE =
     "https://www.motiontech.com.au/wp-content/uploads/2026/01/Atlanta-Servo-Drive-Systems.pdf";
   public static inline var PDF_SHA256 = "b0666c07fd2f0d0ec97c4541138a997e31de71a6871fbc53b117fc7b5cbcae4e";
-  static var table:Null<Catalog<GearRackSpec>>;
+  static final table = new machinekit.cache.Once<Catalog<GearRackSpec>>();
   static function row(code:String,
     module:Float, length:Float, teeth:Int, width:Float, pitchHeight:Float, mass:Float):GearRackSpec return {
       designation: code,
@@ -59,7 +59,7 @@ class GearRackCatalog {
       sectionForceFactor : length == 500 ? 0.5 : 1
     };
   public static function catalog():Catalog<GearRackSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "ATLANTA HPR helical rack",
       r -> r.designation,
       [
@@ -99,7 +99,6 @@ class GearRackCatalog {
           "sectionForceFactor"
         ]
       })
-    );
-    return table;
+    ));
   }
 }

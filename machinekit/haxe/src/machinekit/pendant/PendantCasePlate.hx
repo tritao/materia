@@ -31,12 +31,12 @@ class PendantCasePlate extends PanelSolid {
     }
   }
 
-  static var recipe:Null<ComponentType> = null;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipe == null) {
+    return recipe.get(() -> {
       var reference = ReferencePendant.size();
-      recipe = new ComponentType(
+      return new ComponentType(
         "machinekit.pendant.plate",
         [
           ComponentRecipeSupport.length("width", reference.width),
@@ -51,8 +51,7 @@ class PendantCasePlate extends PanelSolid {
         null,
         false
       ).numbered(_ -> "PENDANT-PLATE");
-    }
-    return recipe;
+    });
   }
 
   /** The dimensions a set of recipe inputs describes. */

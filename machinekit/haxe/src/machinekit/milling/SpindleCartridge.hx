@@ -32,9 +32,9 @@ class SpindleCartridge extends MachineComponent {
     Solids.named(Part.cylinderSpan(10, LENGTH, LENGTH + 30), "drive-shaft")
   ]);
 
-  static var spindleRecipe:Null<ComponentType>;
+  static final spindleRecipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (spindleRecipe == null) spindleRecipe = new ComponentType(
+    return spindleRecipe.get(() -> new ComponentType(
       "machinekit.milling.spindle-cartridge",
       [],
       v -> new SpindleCartridge()
@@ -43,8 +43,7 @@ class SpindleCartridge extends MachineComponent {
         machinekit.component.Procurement.ProcurementCodec.choice("collet", "ER20"),
         machinekit.component.Procurement.ProcurementCodec.requirement("bodyDiameter", "mm", null, null, DIAMETER),
         machinekit.component.Procurement.ProcurementCodec.requirement("maximumSpeed", "rpm", MAX_RPM)
-      ]);
-    return spindleRecipe;
+      ]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setToken("material", materialSpec());
@@ -112,17 +111,16 @@ class Er20Holder extends MachineComponent {
     Solids.named(Part.cylinderSpan(DIAMETER / 2, 0, LENGTH), "collet-nut"),
     [Solids.named(Part.cylinderSpan(BORE_DIAMETER / 2, -0.1, LENGTH + 0.1), "tool-bore")]
   );
-  static var holderRecipe:Null<ComponentType>;
+  static final holderRecipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (holderRecipe == null) holderRecipe = new ComponentType(
+    return holderRecipe.get(() -> new ComponentType(
       "machinekit.milling.er20-holder",
       [],
       v -> new Er20Holder()
     ).numbered(_ -> "HOLDER-ASSUMED-ER20-D6").procured(_ -> NotSupplied).requiring(_ -> [
       machinekit.component.Procurement.ProcurementCodec.choice("collet", "ER20"),
       machinekit.component.Procurement.ProcurementCodec.requirement("toolDiameter", "mm", null, null, BORE_DIAMETER)
-    ]);
-    return holderRecipe;
+    ]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setToken("material", materialSpec());

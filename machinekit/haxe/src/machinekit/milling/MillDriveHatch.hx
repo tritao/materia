@@ -9,16 +9,15 @@ import machinekit.component.ComponentRecipeSupport as P;
  * Four holes land on dedicated steel anchors rather than the mineral casting.
  */
 class MillDriveHatch extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [P.length("lowerZ",
     74), P.length("upperZ", 170)];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.drive-service-hatch",
       parameters(),
       v -> new MillDriveHatch(v)
-    ).numbered(_ -> "MILL-Y-DRIVE-HATCH");
-    return recipe;
+    ).numbered(_ -> "MILL-Y-DRIVE-HATCH"));
   }
   public function new(?values:ComponentValues) {
     var v = P.resolve(parameters(), values);

@@ -7,7 +7,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Assumed catalogue-class tool length setter. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class ToolLengthSetter extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.length("diameter", 40),
     P.length("height", 60),
@@ -22,13 +22,12 @@ class ToolLengthSetter extends AssumedCatalogComponent {
     addConnector("trigger", Axis, triggerFrame());
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.routing.tool-length-setter",
       inputs(),
       v -> new ToolLengthSetter(v)
     ).numbered(v -> 'TOOL-SETTER-ASSUMED-${Dimension.format(v.number("diameter"))}x${Dimension.format(v.number("height"))}-'
-        + 'S${Dimension.format(v.number("stroke"))}-R${Dimension.format(v.number("repeatability"))}').procured(_ -> Buy(null, null, null)).requiringInputs(["diameter", "height"], ["stroke"], ["repeatability"]);
-    return recipe;
+        + 'S${Dimension.format(v.number("stroke"))}-R${Dimension.format(v.number("repeatability"))}').procured(_ -> Buy(null, null, null)).requiringInputs(["diameter", "height"], ["stroke"], ["repeatability"]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   /** A base, a body and the sprung plunger on top. Envelope detail is its cylinder, which also sets the mass. */

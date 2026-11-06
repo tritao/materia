@@ -35,10 +35,10 @@ typedef VacuumGeneratorRow = {
  */
 class VacuumGenerator extends MachineComponent {
   public static inline var CUSTOM = "custom";
-  static var table:Null<Catalog<VacuumGeneratorRow>>;
+  static final table = new machinekit.cache.Once<Catalog<VacuumGeneratorRow>>();
 
   public static function catalog():Catalog<VacuumGeneratorRow> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "vacuum generator",
       row -> row.designation,
       [{
@@ -71,8 +71,7 @@ class VacuumGenerator extends MachineComponent {
           "airConsumptionLMin"
         ]
       })
-    );
-    return table;
+    ));
   }
 
   /** The catalogue generator `designation`. */
@@ -138,10 +137,10 @@ class VacuumGenerator extends MachineComponent {
   /** Its envelope box: width, depth and length along z from the mount. */
   function box():Array<Float> return row == null ? [18.0, 14, 30] : [row.widthMm, row.heightMm, row.envelopeLengthMm];
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.vacuum-generator", [
+    return recipeTypeCache.get(() -> new ComponentType("machinekit.pneumatic.vacuum-generator", [
       ComponentRecipeSupport.choice("model", [CUSTOM].concat(catalog().designations()), CUSTOM),
       ComponentRecipeSupport.optionalScalar("ratedVacuumKpa")
     ].concat(ComponentRecipeSupport
@@ -163,8 +162,7 @@ class VacuumGenerator extends MachineComponent {
       var rating = v.optionalNumber("ratedVacuumKpa");
       if (rating != null) terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("ratedVacuum", "kPa", rating));
       return terms;
-    });
-    return recipeTypeCache;
+    }));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

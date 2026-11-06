@@ -573,11 +573,11 @@ class TimingBelt extends MachineComponent {
     return sum / 2;
   }
 
-  private static var pairRecipeTypeCache:Null<ComponentType>;
+  private static final pairRecipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   /** Belt round a driver and an idler, in plain tooth counts and a centre distance. */
   public static function pairRecipeType():ComponentType {
-    if (pairRecipeTypeCache == null) pairRecipeTypeCache = new ComponentType(
+    return pairRecipeTypeCache.get(() -> new ComponentType(
       "machinekit.transmission.timing-belt",
       [
         ComponentRecipeSupport.choice("profile", ["GT2", "HTD3M", "HTD5M", "HTD8M", "HTD14M", "T5", "XL"], "GT2"),
@@ -607,8 +607,7 @@ class TimingBelt extends MachineComponent {
       .purchaseKeyed(v -> 'profile:${v.token("profile")}|teeth:${pairToothCount(v)}|'
         + 'width:${machinekit.component.ComponentNumberKey.encode(v.number("width"))}|'
         + 'cord:${machinekit.component.ComponentNumberKey.encode(v.number("cordRigidity"))}|'
-        + 'damping:${machinekit.component.ComponentNumberKey.encode(v.number("dampingRatio"))}');
-    return pairRecipeTypeCache;
+        + 'damping:${machinekit.component.ComponentNumberKey.encode(v.number("dampingRatio"))}'));
   }
 
   /** Tooth count of the two-pulley pitch loop, calculated without constructing CAD geometry. */

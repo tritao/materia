@@ -125,10 +125,10 @@ class TimingPulley extends MachineComponent {
     return result;
   }
 
-  private static var standardRecipeTypeCache:Null<ComponentType>;
+  private static final standardRecipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function standardRecipeType():ComponentType {
-    if (standardRecipeTypeCache == null) standardRecipeTypeCache = new ComponentType(
+    return standardRecipeTypeCache.get(() -> new ComponentType(
       "machinekit.transmission.timing-pulley",
       [
         ComponentRecipeSupport.choice("profile", ["GT2", "HTD3M", "HTD5M", "HTD8M", "HTD14M", "T5", "XL"], "GT2"),
@@ -144,14 +144,13 @@ class TimingPulley extends MachineComponent {
       )
     ).numbered(v -> 'PULLEY-${v.token("profile")}-${v.integer("teeth")}T-'
       + 'B${Dimension.format(v.number("boreDiameter"))}-W${Dimension.format(v.number("thickness"))}')
-      .procured(_ -> Buy(null, null, null));
-    return standardRecipeTypeCache;
+      .procured(_ -> Buy(null, null, null)));
   }
 
-  private static var customRecipeTypeCache:Null<ComponentType>;
+  private static final customRecipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function customRecipeType():ComponentType {
-    if (customRecipeTypeCache == null) customRecipeTypeCache = new ComponentType(
+    return customRecipeTypeCache.get(() -> new ComponentType(
       "machinekit.transmission.custom-timing-pulley",
       [
         ComponentRecipeSupport.choice("family", ["CUSTOM"], "CUSTOM"),
@@ -170,8 +169,7 @@ class TimingPulley extends MachineComponent {
     ).numbered(v -> 'PULLEY-${v.token("family")}-P${Dimension.format(v.number("pitch"))}-'
       + 'D${Dimension.format(v.number("pitchLineDifferential"))}-${v.integer("teeth")}T-'
       + 'B${Dimension.format(v.number("boreDiameter"))}-W${Dimension.format(v.number("thickness"))}')
-      .procured(_ -> Make("CNC machining"));
-    return customRecipeTypeCache;
+      .procured(_ -> Make("CNC machining")));
   }
 
   override public function componentType():Null<ComponentType> return switch beltProfile {

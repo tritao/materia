@@ -16,7 +16,7 @@ import materia.assembly.AssemblyFrames;
 class ParallelGripperJaw extends MachineComponent {
   public final spec:ParallelGripperSpec;
   public final side:Int;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public function new(spec:ParallelGripperSpec, side:Int) {
     if (spec == null || (side != -1 && side != 1)) throw "Gripper jaw needs a size row and side -1 or +1";
@@ -55,7 +55,7 @@ class ParallelGripperJaw extends MachineComponent {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.robotics.parallel-gripper-jaw",
       [
         ComponentRecipeSupport.count("size", 32),
@@ -77,8 +77,7 @@ class ParallelGripperJaw extends MachineComponent {
         v.token("side") == "left" ? -1 : 1
       ),
       true
-    );
-    return recipe;
+    ));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

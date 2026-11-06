@@ -17,7 +17,7 @@ import materia.assembly.AssemblyFrames;
  * mechanism, moving jaws and pneumatic drive live in `ParallelGripper`. */
 class ParallelGripperBody extends MachineComponent {
   public final spec:ParallelGripperSpec;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public function new(spec:ParallelGripperSpec) {
     if (spec == null) throw "Parallel gripper body needs its assumed size row";
@@ -83,7 +83,7 @@ class ParallelGripperBody extends MachineComponent {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.robotics.parallel-gripper-body",
       [
         ComponentRecipeSupport.count("size", 32),
@@ -100,8 +100,7 @@ class ParallelGripperBody extends MachineComponent {
         v.boolean("supportStep")
       )),
       true
-    );
-    return recipe;
+    ));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

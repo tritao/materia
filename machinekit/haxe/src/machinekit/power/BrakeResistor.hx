@@ -8,7 +8,7 @@ import materia.assembly.AssemblyFrames as F;
 /** Assumed catalogue-class VFD braking resistor. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class BrakeResistor extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.quantity("resistance", 80, "ohm"),
     P.quantity("continuousPower", 1000, "W"),
@@ -24,13 +24,12 @@ class BrakeResistor extends AssumedCatalogComponent {
     addPort({name: "brake", kind: ElectricalPower, role: Consumer, iface: Plug("DC-brake", 2), required: true});
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.power.brake-resistor",
       inputs(),
       v -> new BrakeResistor(v)
     ).numbered(v -> 'BRK-RESISTOR-ASSUMED-${Dimension.format(v.number("resistance"))}OHM-'
-      + '${Dimension.format(v.number("continuousPower"))}W-${Dimension.format(v.number("pulseEnergy"))}J').procured(_ -> Buy(null, null, null)).requiringInputs(["resistance"], ["continuousPower", "pulseEnergy"], []);
-    return recipe;
+      + '${Dimension.format(v.number("continuousPower"))}W-${Dimension.format(v.number("pulseEnergy"))}J').procured(_ -> Buy(null, null, null)).requiringInputs(["resistance"], ["continuousPower", "pulseEnergy"], []));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   /** A housing, not a solid block: mass from the envelope at an assumed effective density. */

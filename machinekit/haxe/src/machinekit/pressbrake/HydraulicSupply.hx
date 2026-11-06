@@ -14,7 +14,7 @@ import machinekit.component.Solids;
  */
 class HydraulicSupply extends MachineComponent implements PressureSource {
   public final pressurePa:Float;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public function new(pressurePa:Float) {
     if (!Math.isFinite(pressurePa) || pressurePa < 0) throw "Hydraulic supply pressure must be finite and nonnegative";
     super('HYDRAULIC-SUPPLY-$pressurePa', "Assumed regulated hydraulic service", "steel", true);
@@ -54,7 +54,7 @@ class HydraulicSupply extends MachineComponent implements PressureSource {
 
   override public function massGeometry():Null<Part> return Solids.named(Part.box(100, 100, 200), "hydraulic-service");
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.pressbrake.hydraulic-supply",
       [new machinekit.component.ComponentParameter("pressurePa", Scalar, Number(0), "Pa", 0)],
       v -> new HydraulicSupply(v.number("pressurePa"))
@@ -62,8 +62,7 @@ class HydraulicSupply extends MachineComponent implements PressureSource {
       .procured(_ -> Buy(null, null, null)).requiring(v -> [
         machinekit.component.Procurement.ProcurementCodec.requirement("pressure", "Pa", v.number("pressurePa")),
         machinekit.component.Procurement.ProcurementCodec.choice("portThread", "G1/2")
-      ]);
-    return recipe;
+      ]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setNumber("pressurePa",

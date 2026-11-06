@@ -24,12 +24,12 @@ typedef NozzleSpec = {
 
 /** A brass M6 nozzle. Origin: the orifice, with the nozzle standing up along +Z; `tip` is there. */
 class Nozzle extends MachineComponent {
-  static var table:Null<Catalog<NozzleSpec>>;
-  static var recipe:Null<ComponentType>;
+  static final table = new machinekit.cache.Once<Catalog<NozzleSpec>>();
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final spec:NozzleSpec;
 
   public static function catalog():Catalog<NozzleSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "nozzle",
       s -> s.designation,
       [{designation: "BRASS-M6-0.4", orifice: 0.4, hexSize: 6.0, hexHeight: 3.0, coneHeight: 4.0, tipDiameter: 2.0}],
@@ -41,8 +41,7 @@ class Nozzle extends MachineComponent {
         conformance: GenericApproximation,
         verifiedFields: []
       })
-    );
-    return table;
+    ));
   }
 
   public function new(designation:String = "BRASS-M6-0.4") {
@@ -59,7 +58,7 @@ class Nozzle extends MachineComponent {
   public function orificeArea():Float return Math.PI * spec.orifice * spec.orifice / 4.0;
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.printing.nozzle",
       [ComponentRecipeSupport.catalog("designation", catalog(), "BRASS-M6-0.4")],
       v -> new Nozzle(v.token("designation"))
@@ -68,8 +67,7 @@ class Nozzle extends MachineComponent {
       return [machinekit.component.Procurement.ProcurementCodec.requirement("orifice", "mm", null, null, row.orifice),
         machinekit.component.Procurement.ProcurementCodec.choice("thread", "M6"),
         machinekit.component.Procurement.ProcurementCodec.choice("material", "brass")];
-    });
-    return recipe;
+    }));
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,
     Nozzle) ? recipeType() : null;

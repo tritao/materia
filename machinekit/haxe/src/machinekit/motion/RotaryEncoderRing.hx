@@ -14,9 +14,9 @@ class RotaryEncoderRing extends MachineComponent implements machinekit.motion.En
     P.quantity("angularAccuracy", 2 * Math.PI / (180 * 3600), "rad"),
     P.quantity("eccentricity", 0.001, "mm")
   ]);
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.rotary-encoder-ring",
       parameters(),
       v -> new RotaryEncoderRing(v)
@@ -28,8 +28,7 @@ class RotaryEncoderRing extends MachineComponent implements machinekit.motion.En
         machinekit.component.Procurement.ProcurementCodec.requirement("resolution", "count/rev", v.integer("countsPerRevolution")),
         machinekit.component.Procurement.ProcurementCodec.requirement("angularAccuracy", "arcsec", null, v.number("angularAccuracy") * 180 * 3600 / Math.PI),
         machinekit.component.Procurement.ProcurementCodec.requirement("eccentricity", "um", null, v.number("eccentricity") * 1000)
-      ]);
-    return recipe;
+      ]));
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues
     > return EngineeringMetadata.assumedCatalog(

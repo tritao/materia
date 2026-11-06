@@ -7,7 +7,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 
 /** Tray with nominal seal clearance around the two bed support strips. */
 class MillSupportTray extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [
     P.length("width", 1100),
     P.length("depth", 800),
@@ -16,12 +16,11 @@ class MillSupportTray extends MachineComponent {
     P.quantity("millY", 0, "mm", null)
   ];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.support-tray",
       parameters(),
       v -> new MillSupportTray(v)
-    ).numbered(_ -> "MILL-SUPPORT-TRAY").procured(_ -> Make("sheet cutting and machining"));
-    return recipe;
+    ).numbered(_ -> "MILL-SUPPORT-TRAY").procured(_ -> Make("sheet cutting and machining")));
   }
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides);

@@ -15,15 +15,14 @@ class TablePlaten extends MachineComponent {
     P.quantity("stemBore", 0, "mm"),
     P.quantity("stemHeight", 0, "mm")
   ]);
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.hobbing.table-platen",
       parameters(),
       v -> new TablePlaten(v)
     ).numbered(_ -> "HOBBER-TABLE-PLATEN").procured(_ -> Make("CNC machining"))
-      .requiringInputs(["outside", "bore", "height", "faceBoltPcd"]);
-    return recipe;
+      .requiringInputs(["outside", "bore", "height", "faceBoltPcd"]));
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues
     > return EngineeringMetadata.assumedCatalog(

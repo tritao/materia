@@ -24,9 +24,9 @@ class TorqueMotor extends MachineComponent implements machinekit.motion.MotorDri
     P.quantity("backEmfConstant", 0.6928203230275509, "V/(rad/s)"),
     P.quantity("phaseResistance", 0.3, "ohm")
   ]);
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.torque-motor",
       parameters(),
       v -> new TorqueMotor(v)
@@ -40,8 +40,7 @@ class TorqueMotor extends MachineComponent implements machinekit.motion.MotorDri
         machinekit.component.Procurement.ProcurementCodec.requirement("ratedSpeed", "rad/s", v.number("ratedSpeed")),
         machinekit.component.Procurement.ProcurementCodec.requirement("maxSpeed", "rad/s", v.number("maxSpeed")),
         machinekit.component.Procurement.ProcurementCodec.requirement("coggingTorque", "N mm", null, v.number("coggingTorque") * 1000)
-      ]);
-    return recipe;
+      ]));
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues
     > return EngineeringMetadata.assumedCatalog(

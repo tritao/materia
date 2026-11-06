@@ -384,10 +384,10 @@ class ErobActuatorPart extends MachineComponent implements MotorDrive implements
 
   // Recipe -------------------------------------------------------------------------------------------------
 
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.motion.erob-actuator-part", parameters(), v -> new ErobActuatorPart(v), true)
+    return recipe.get(() -> new ComponentType("machinekit.motion.erob-actuator-part", parameters(), v -> new ErobActuatorPart(v), true)
       .procured(_ -> Buy("ZeroErr", null, null)).requiring(v -> {
         var row = D.row(Std.parseInt(v.token("ratio")));
         var req = machinekit.component.Procurement.ProcurementCodec.requirement;
@@ -396,8 +396,7 @@ class ErobActuatorPart extends MachineComponent implements MotorDrive implements
           req("ratedTorque", "N m", row.ratedTorque), req("busVoltage", "V", null, null, D.BUS_VOLTS),
           choice("encoderBits", v.token("encoderBits")), choice("brake", v.boolean("brake") ? "true" : "false"),
           choice("bus", v.token("bus"))];
-      });
-    return recipe;
+      }));
   }
 
   override public function componentType():Null<ComponentType> return recipeType();

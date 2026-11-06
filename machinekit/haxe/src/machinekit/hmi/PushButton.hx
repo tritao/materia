@@ -18,7 +18,7 @@ import machinekit.component.ComponentRecipeSupport as R;
  * terminals) are on the body's rear end, where the wires leave backward.
  */
 class PushButton extends HmiPart {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   static function inputs():Array<ComponentParameter> return [
     HmiPart.basisParameter("assumed"),
@@ -81,9 +81,8 @@ class PushButton extends HmiPart {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.hmi.push-button", inputs(), v -> new PushButton(v))
-      .numbered(v -> 'PUSHBUTTON-ASSUMED-${v.token("colour").toUpperCase()}-${v.boolean("illuminated") ? "LIT" : "UNLIT"}');
-    return recipe;
+    return recipe.get(() -> new ComponentType("machinekit.hmi.push-button", inputs(), v -> new PushButton(v))
+      .numbered(v -> 'PUSHBUTTON-ASSUMED-${v.token("colour").toUpperCase()}-${v.boolean("illuminated") ? "LIT" : "UNLIT"}'));
   }
   override public function componentType():Null<ComponentType> return recipeType();
 

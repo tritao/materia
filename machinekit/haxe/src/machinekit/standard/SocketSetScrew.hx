@@ -16,7 +16,7 @@ import materia.assembly.AssemblyFrames as F;
  * https://cdn.mscdirect.com/global/images/ProductDataSheet/pds_sku_254996_productbrochure_manual%20data%20sheet.pdf
  */
 class SocketSetScrew extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final thread:ThreadSpec;
   public final length:Float;
   public final socketSize:Float;
@@ -29,7 +29,7 @@ class SocketSetScrew extends MachineComponent {
   ];
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.standard.socket-set-screw",
       parameters(),
       v -> new SocketSetScrew(v),
@@ -38,8 +38,7 @@ class SocketSetScrew extends MachineComponent {
       null,
       false
     ).numbered(v -> 'ISO4026-${FastenerThreads.metric(v.number("diameter"), v.number("pitch")).designation}x${Dimension.format(v.number("length"))}')
-      .procured(_ -> Buy(null, null, "ISO 4026"));
-    return recipe;
+      .procured(_ -> Buy(null, null, "ISO 4026")));
   }
 
   public static function forThread(spec:ThreadSpec, length:Float):SocketSetScrew {

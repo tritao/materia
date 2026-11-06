@@ -97,7 +97,7 @@ class MotorMount extends MachineComponent {
   public final pilotDiameter:Float;
   public final underhang:Float;
 
-  static var rbkCache:Null<Array<Dynamic>>;
+  static final rbkCache = new machinekit.cache.Once<Array<Dynamic>>();
 
   public static function rbkModels():Array<String> return ["RBK12-57", "RBK15-57", "RBK15-86", "RBK17-86"];
 
@@ -186,11 +186,12 @@ class MotorMount extends MachineComponent {
   }
 
   static function rbkData(model:String, revision:String):Dynamic {
-    if (rbkCache == null) {
+    var interfaces = rbkCache.get(() -> {
       var data:Dynamic = haxe.Json.parse(RbkMountData.text());
-      rbkCache = data.interfaces;
-    }
-    for (entry in rbkCache) if (entry.model == model && entry.revision == revision) return entry;
+      var rows:Array<Dynamic> = data.interfaces;
+      return rows;
+    });
+    for (entry in interfaces) if (entry.model == model && entry.revision == revision) return entry;
     throw "Unknown pinned RBK interface revision";
   }
 
@@ -534,10 +535,10 @@ class MotorMount extends MachineComponent {
     }
   }
 
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.motion.motor-mount", [
+    return recipe.get(() -> new ComponentType("machinekit.motion.motor-mount", [
       P.choice("model", models(), "M60D-BK12-C"),
       P.choice("revision", revisions(), HzMotionCatalog.revision()),
       P.choice("bearingGrade", ["unspecified", "C3", "C4", "C5"], "unspecified"),
@@ -546,8 +547,7 @@ class MotorMount extends MachineComponent {
     // A revision belongs to one maker's tables; the default follows the model.
     if ((rbkModels().indexOf(model) >= 0) != (revision == "vallder-rbk-v1")) revision = defaultRevision(model);
     return new MotorMount(model, revision, v.token("geometry"), v.token("bearingGrade"));
-    }, true, false, ["geometry"], false).procured(_ -> Buy(null, null, null));
-    return recipe;
+    }, true, false, ["geometry"], false).procured(_ -> Buy(null, null, null)));
   }
 
   override public function componentType():Null<ComponentType> return recipeType();

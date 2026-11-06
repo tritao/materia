@@ -46,10 +46,10 @@ class LinearScale extends MachineComponent implements EncoderPart {
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
   }
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.motion.linear-scale",
       [
         ComponentRecipeSupport.length("length", 300),
@@ -69,8 +69,7 @@ class LinearScale extends MachineComponent implements EncoderPart {
       machinekit.component.Procurement.ProcurementCodec.requirement("resolution", "count/mm", v.number("countsPerMillimetre")),
       machinekit.component.Procurement.ProcurementCodec.choice("absolute", v.boolean("absolute") ? "true" : "false"),
       machinekit.component.Procurement.ProcurementCodec.choice("index", v.boolean("index") ? "true" : "false")
-    ]);
-    return recipeTypeCache;
+    ]));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

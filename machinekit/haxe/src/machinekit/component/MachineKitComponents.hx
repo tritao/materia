@@ -2,7 +2,7 @@ package machinekit.component;
 
 /** MachineKit's built-in component recipes, registered package by package. */
 class MachineKitComponents {
-  static var shared:Null<ComponentRegistry>;
+  static final shared = new machinekit.cache.Once<ComponentRegistry>();
 
   /** A new registry holding only the built-in recipes. */
   public static function standard():ComponentRegistry {
@@ -54,7 +54,6 @@ class MachineKitComponents {
 	 * whatever an application registers into it before loading.
 	 */
   public static function defaultRegistry():ComponentRegistry {
-    if (shared == null) shared = standard();
-    return shared;
+    return shared.get(() -> standard());
   }
 }

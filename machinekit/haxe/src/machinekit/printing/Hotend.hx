@@ -37,12 +37,12 @@ typedef HotendSpec = {
  * the top of the heatsink and the cartridge and thermistor seats are in the block.
  */
 class Hotend extends MachineComponent {
-  static var table:Null<Catalog<HotendSpec>>;
-  static var recipe:Null<ComponentType>;
+  static final table = new machinekit.cache.Once<Catalog<HotendSpec>>();
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final spec:HotendSpec;
 
   public static function catalog():Catalog<HotendSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "hotend",
       s -> s.designation,
       [{
@@ -66,8 +66,7 @@ class Hotend extends MachineComponent {
         conformance: GenericApproximation,
         verifiedFields: []
       })
-    );
-    return table;
+    ));
   }
 
   public function new(designation:String = "GENERIC-V6-STYLE") {
@@ -96,7 +95,7 @@ class Hotend extends MachineComponent {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.printing.hotend",
       [ComponentRecipeSupport.catalog("designation", catalog(), "GENERIC-V6-STYLE")],
       v -> new Hotend(v.token("designation"))
@@ -105,8 +104,7 @@ class Hotend extends MachineComponent {
       return [machinekit.component.Procurement.ProcurementCodec.requirement("heatsinkDiameter", "mm", null, null, row.heatsinkDiameter),
         machinekit.component.Procurement.ProcurementCodec.requirement("maxTemperature", "C", row.maxTemperature),
         machinekit.component.Procurement.ProcurementCodec.requirement("volumetricFlow", "mm3/s", row.maxVolumetricFlow)];
-    });
-    return recipe;
+    }));
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,
     Hotend) ? recipeType() : null;

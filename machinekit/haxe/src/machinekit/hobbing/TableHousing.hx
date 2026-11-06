@@ -13,14 +13,13 @@ class TableHousing extends MachineComponent {
     P.quantity("bearingSeat", 120, "mm"),
     P.quantity("bearingWidth", 16, "mm")
   ]);
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.hobbing.table-housing",
       parameters(),
       v -> new TableHousing(v)
-    ).numbered(_ -> "HOBBER-TABLE-HOUSING");
-    return recipe;
+    ).numbered(_ -> "HOBBER-TABLE-HOUSING"));
   }
   public static function catalog():machinekit.catalog.Catalog<ComponentValues
     > return EngineeringMetadata.assumedCatalog(

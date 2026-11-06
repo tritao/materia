@@ -238,10 +238,10 @@ class SealedScalePart extends MachineComponent implements EncoderPart {
 
   // Recipe -------------------------------------------------------------------------------------------------
 
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.motion.sealed-scale-part", parameters(), v -> new SealedScalePart(v), true)
+    return recipe.get(() -> new ComponentType("machinekit.motion.sealed-scale-part", parameters(), v -> new SealedScalePart(v), true)
       .procured(_ -> Buy(SealedScaleData.MAKER, null, null)).requiring(v -> {
         var req = machinekit.component.Procurement.ProcurementCodec.requirement;
         var choice = machinekit.component.Procurement.ProcurementCodec.choice;
@@ -249,8 +249,7 @@ class SealedScalePart extends MachineComponent implements EncoderPart {
           req("accuracy", "um", null, Std.parseFloat(v.token("accuracy"))),
           req("resolution", "nm", null, Std.parseFloat(v.token("resolution"))), choice("interface", v.token("interface")),
           choice("mountingPlate", v.boolean("mountingPlate") ? "true" : "false")];
-      });
-    return recipe;
+      }));
   }
 
   override public function componentType():Null<ComponentType> return recipeType();

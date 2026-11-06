@@ -176,14 +176,6 @@ class BoxAlgebra {
     cavities:Array<CastingCavities.FinishedCastingCavity>):Array<Box3> {
     // Validate cavities before the envelope, preserving the source feature in diagnostics.
     var cuts = [for (c in cavities) for (b in CastingCavities.boxes(c)) b];
-    // Sizing integrates many layouts of one envelope whose box cavities repeat: keep the material by its inputs.
-    var key = haxe.Json.stringify(body) + "|" + haxe.Json.stringify(cuts);
-    if (remembered == null || rememberedCount >= REMEMBERED_LIMIT) {
-      remembered = [];
-      rememberedCount = 0;
-    }
-    var memo:Map<String, Array<Box3>> = remembered, known = memo.get(key);
-    if (known != null) return [for (box in known) copyBox(box)];
     var region:Array<Box3> = [];
     for (prism in body) {
       var residue:CastingCavities.FinishedCastingCavity = {
@@ -198,24 +190,8 @@ class BoxAlgebra {
       }
       for (box in CastingCavities.boxes(residue)) region.push(box);
     }
-    var result = coalesce(subtract(region, cuts));
-    memo.set(key, [for (box in result) copyBox(box)]);
-    rememberedCount++;
-    return result;
+    return coalesce(subtract(region, cuts));
   }
-
-  static var remembered:Null<Map<String, Array<Box3>>>;
-  static var rememberedCount = 0;
-  static inline final REMEMBERED_LIMIT = 512;
-
-  static function copyBox(box:Box3):Box3 return {
-    x: box.x,
-    y: box.y,
-    z: box.z,
-    width: box.width,
-    depth: box.depth,
-    height: box.height
-  };
 
   /** Exact minimum centroidal second moment about Y over X, in mm^4. */
   public static function minimumIy(cells:Array<Box3>, x0:Float, x1:Float):Float {

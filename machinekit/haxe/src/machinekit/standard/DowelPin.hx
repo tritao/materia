@@ -20,7 +20,7 @@ import machinekit.component.Solids;
  * The preferred length series is `standardLengths()`; `standardLengthAtLeast` picks from it like a screw's.
  */
 class DowelPin extends MachineComponent {
-  static var table:Null<Catalog<DowelPinSpec>>;
+  static final table = new machinekit.cache.Once<Catalog<DowelPinSpec>>();
 
   public final spec:DowelPinSpec;
   public final length:Float;
@@ -37,7 +37,7 @@ class DowelPin extends MachineComponent {
   ];
 
   public static function catalog():Catalog<DowelPinSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "dowel pin size",
       spec -> spec.size,
       rows(),
@@ -50,8 +50,7 @@ class DowelPin extends MachineComponent {
         sources: ["https://www.bossard.com/eshop/global-en/pins/dowel-pins-cylindrical-pins/"],
         verifiedFields: ["diameter"]
       })
-    );
-    return table;
+    ));
   }
 
   /** Preferred nominal lengths (mm) of ISO 8734: the series the pin is bought in. */
@@ -94,16 +93,15 @@ class DowelPin extends MachineComponent {
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.named(Part.cylinderSpan(spec.diameter / 2, 0, length), "pin");
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.standard.dowel-pin",
       [ComponentRecipeSupport.catalog("size", DowelPin.catalog(), "5"), ComponentRecipeSupport.length("length", 16)],
       v -> DowelPin.metric(v.token("size"), v.number("length")),
       true
-    ).procured(_ -> Buy(null, null, "ISO 8734"));
-    return recipeTypeCache;
+    ).procured(_ -> Buy(null, null, "ISO 8734")));
   }
 
   override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();

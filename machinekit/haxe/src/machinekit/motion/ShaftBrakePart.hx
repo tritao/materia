@@ -26,7 +26,7 @@ class ShaftBrakePart extends MachineComponent implements MotorBrakeSpec {
   public final hubRadius:Float;
   public final discRadius:Float;
   public final bodyRadius:Float;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public function new(bore:Float, role:String, sector:Int = 0) {
     if (!(bore > 0) || !Math.isFinite(bore) || ["hub",
@@ -126,7 +126,7 @@ class ShaftBrakePart extends MachineComponent implements MotorBrakeSpec {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.shaft-brake-part",
       [
         ComponentRecipeSupport.length("bore", 19),
@@ -139,8 +139,7 @@ class ShaftBrakePart extends MachineComponent implements MotorBrakeSpec {
       .procured(_ -> Buy(null, null, null)).requiring(v -> [
         machinekit.component.Procurement.ProcurementCodec.requirement("bore", "mm", null, null, v.number("bore")),
         machinekit.component.Procurement.ProcurementCodec.requirement("holdingTorque", "N m", 4)
-      ]);
-    return recipe;
+      ]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setNumber("bore", bore).setToken(

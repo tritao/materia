@@ -14,7 +14,7 @@ class DigitalSensor extends MachineComponent {
   public static inline final BODY_DEPTH:Float = 8;
   public static inline final BODY_HEIGHT:Float = 20;
   public final kind:String;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public function new(kind:String = "reed") {
     if (kind != "reed" && kind != "presence" && kind != "scanner") throw 'Unknown digital sensor kind "$kind"';
@@ -27,13 +27,12 @@ class DigitalSensor extends MachineComponent {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.control.digital-sensor",
       [ComponentRecipeSupport.choice("kind", ["reed", "presence", "scanner"], "reed")],
       v -> new DigitalSensor(v.token("kind"))
     ).numbered(v -> 'SENSOR-ASSUMED-${v.token("kind").toUpperCase()}')
-      .procured(_ -> Buy(null, null, null)).requiringInputs(["kind"]);
-    return recipe;
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["kind"]));
   }
 
   override public function componentType():Null<ComponentType> return recipeType();

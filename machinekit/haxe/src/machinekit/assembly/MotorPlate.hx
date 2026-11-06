@@ -36,7 +36,7 @@ class MotorPlate extends MachineComponent {
   public final size:Float;
   public final margin:Float;
   final profileMount:Null<ProfilePlateMount>;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public function new(motor:MachineComponent, thickness:Float, margin:Float = 10, ?profileMount:ProfilePlateMount) {
     if (!Math.isFinite(thickness) || thickness <= 0
@@ -149,7 +149,7 @@ class MotorPlate extends MachineComponent {
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.assembly.motor-plate", [
+    return recipe.get(() -> new ComponentType("machinekit.assembly.motor-plate", [
       P.choice("motor", motorModels(), "17HS19-1684S1"),
       P.length("thickness", 6),
       P.length("margin", 10),
@@ -169,8 +169,7 @@ class MotorPlate extends MachineComponent {
     };
     return new MotorPlate(namedMotor(v.token("motor")), v.number("thickness"), v.number("margin"), mount);
     }).numbered(v -> 'MOTOR-PLATE-${v.token("motor")}-T${Dimension.format(v.number("thickness"))}'
-      + (v.token("profileSystem") == "None" ? "" : '-${v.token("profileSystem")}'));
-    return recipe;
+      + (v.token("profileSystem") == "None" ? "" : '-${v.token("profileSystem")}')));
   }
   override public function componentType():Null<ComponentType> return motorModel() != null ? recipeType() : null;
   override public function values():ComponentValues {

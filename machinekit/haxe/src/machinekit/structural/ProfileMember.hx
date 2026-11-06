@@ -20,8 +20,8 @@ class ProfileMember extends MachineComponent {
 
   public final profile:StructuralProfile;
   public final length:Float;
-  static var tslotRecipe:Null<ComponentType>;
-  static var drawingRecipe:Null<ComponentType>;
+  static final tslotRecipe = new machinekit.cache.Once<ComponentType>();
+  static final drawingRecipe = new machinekit.cache.Once<ComponentType>();
 
   public function new(profile:StructuralProfile, length:Float, material:String = "steel") {
     if (profile == null || !(length > 0)
@@ -41,7 +41,7 @@ class ProfileMember extends MachineComponent {
 
   /** Shared modular T-slot members, optionally carrying a complete measured section variant. */
   public static function tslotRecipeType():ComponentType {
-    if (tslotRecipe == null) tslotRecipe = new ProfileMemberRecipeType("machinekit.structural.tslot-member", [
+    return tslotRecipe.get(() -> new ProfileMemberRecipeType("machinekit.structural.tslot-member", [
       ComponentRecipeSupport.choice("system", ["TSLOT-30-SLOT8", "TSLOT-40-SLOT8"], "TSLOT-40-SLOT8"),
       ComponentRecipeSupport.length("width", 40),
       ComponentRecipeSupport.length("height", 40),
@@ -63,13 +63,12 @@ class ProfileMember extends MachineComponent {
         ? '${v.token("system")}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("height"))}'
         : 'TS-${DrawingExtrusionProfile.fromText(section).sectionId}';
       return '$prefix-L${Dimension.format(v.number("length"))}' + materialSuffix(v);
-    }).procured(_ -> Buy(null, null, null));
-    return tslotRecipe;
+    }).procured(_ -> Buy(null, null, null)));
   }
 
   /** Section-defined members such as slotted plates; exact lines/arcs/holes travel with the assembly. */
   public static function drawingRecipeType():ComponentType {
-    if (drawingRecipe == null) drawingRecipe = new ProfileMemberRecipeType(
+    return drawingRecipe.get(() -> new ProfileMemberRecipeType(
       "machinekit.structural.drawing-profile-member",
       [
         ComponentRecipeSupport.text("section", DrawingExtrusionProfile.defaultSectionText()),
@@ -79,8 +78,7 @@ class ProfileMember extends MachineComponent {
     ).numbered(v -> {
       var section = DrawingExtrusionProfile.fromText(v.token("section"));
       return 'DRAWN-${section.sectionId}-L${Dimension.format(v.number("length"))}' + materialSuffix(v);
-    }).procured(_ -> Buy(null, null, null));
-    return drawingRecipe;
+    }).procured(_ -> Buy(null, null, null)));
   }
 
   static function materialSuffix(v:ComponentValues):String return v.token("material") == "steel" ? ""

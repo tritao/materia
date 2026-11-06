@@ -59,10 +59,10 @@ class ShaftEncoder extends MachineComponent implements EncoderPart {
     addConnector("axis", Axis, Solids.axial(0, 0, 0));
   }
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.motion.shaft-encoder",
       [
         ComponentRecipeSupport.scalar("countsPerRevolution", 4096),
@@ -88,8 +88,7 @@ class ShaftEncoder extends MachineComponent implements EncoderPart {
       machinekit.component.Procurement.ProcurementCodec.requirement("bodyDiameter", "mm", null, null, v.number("bodyDiameter")),
       machinekit.component.Procurement.ProcurementCodec.requirement("bodyLength", "mm", null, null, v.number("bodyLength")),
       machinekit.component.Procurement.ProcurementCodec.requirement("boreDiameter", "mm", null, null, v.number("boreDiameter"))
-    ]);
-    return recipeTypeCache;
+    ]));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

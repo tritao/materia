@@ -8,7 +8,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Assumed catalogue-class ISO30 ER32 tool holder. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class ToolHolder extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.length("gaugeDiameter", 31.75),
     P.length("taperLength", 45),
@@ -41,9 +41,8 @@ class ToolHolder extends AssumedCatalogComponent {
     addConnector("collet", Mount, Solids.axial(0, 0, -n("gaugeLength") + n("colletSeatLength")));
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.routing.tool-holder", inputs(), v -> new ToolHolder(v))
-      .numbered(v -> 'ISO30-ER32-HOLDER-ASSUMED-L${Dimension.format(v.number("gaugeLength"))}').procured(_ -> Buy(null, null, null)).requiringInputs(["gaugeDiameter", "taperLength", "flangeDiameter", "flangeThickness", "colletBore"], [], []);
-    return recipe;
+    return recipe.get(() -> new ComponentType("machinekit.routing.tool-holder", inputs(), v -> new ToolHolder(v))
+      .numbered(v -> 'ISO30-ER32-HOLDER-ASSUMED-L${Dimension.format(v.number("gaugeLength"))}').procured(_ -> Buy(null, null, null)).requiringInputs(["gaugeDiameter", "taperLength", "flangeDiameter", "flangeThickness", "colletBore"], [], []));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   /** The turned holder with the two drive slots across its flange. Envelope detail is the turned body, which also sets the mass. */

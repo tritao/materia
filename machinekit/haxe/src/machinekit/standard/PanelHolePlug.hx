@@ -13,17 +13,16 @@ class PanelHolePlug extends MachineComponent {
   public static inline final FLANGE_THICKNESS=1.5;
   public static inline final STEM=9.8;
   public static inline final STEM_LENGTH=3.0;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters();
   public static function recipeType():ComponentType {
-    if(recipe==null) recipe=new ComponentType("machinekit.standard.panel-hole-plug",parameters(),v->new PanelHolePlug(v),false,false,null,false)
+    return recipe.get(() -> new ComponentType("machinekit.standard.panel-hole-plug",parameters(),v->new PanelHolePlug(v),false,false,null,false)
       .numbered(_->"HOLE-PLUG-ASSUMED-D10-P2-NBR").procured(_->Buy(null,null,null)).requiring(_->{
         var out=[for(p in [{name:"holeDiameter",value:HOLE},{name:"panelThickness",value:PANEL},{name:"flangeDiameter",value:FLANGE},
           {name:"flangeThickness",value:FLANGE_THICKNESS},{name:"stemDiameter",value:STEM},{name:"stemLength",value:STEM_LENGTH}])
           machinekit.component.Procurement.ProcurementCodec.requirement(p.name,"mm",null,null,p.value)];
         out.push(machinekit.component.Procurement.ProcurementCodec.choice("material","NBR, oil-compatible grade to qualify"));return out;
-      });
-    return recipe;
+      }));
   }
   public function new(?overrides:ComponentValues) {
     var v=machinekit.component.ComponentRecipeSupport.resolve(parameters(),overrides);

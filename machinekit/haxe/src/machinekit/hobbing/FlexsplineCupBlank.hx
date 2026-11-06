@@ -33,15 +33,14 @@ class FlexsplineCupBlank extends MachineComponent {
     P.quantity("boreCylindricity", 0.003, "mm"),
     P.quantity("wallVariation", 0.010, "mm")
   ]);
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.hobbing.flexspline-cup-blank",
       parameters(),
       v -> new FlexsplineCupBlank(v)
     ).numbered(_ -> "FLEXSPLINE-CUP-BLANK").procured(_ -> NotSupplied)
-      .requiringInputs(["outside", "bore", "bodyOutside", "bandWidth", "height", "endThickness"]);
-    return recipe;
+      .requiringInputs(["outside", "bore", "bodyOutside", "bandWidth", "height", "endThickness"]));
   }
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides);

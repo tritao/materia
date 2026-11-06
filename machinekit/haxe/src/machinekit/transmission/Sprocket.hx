@@ -46,11 +46,11 @@ class Sprocket extends MachineComponent {
     return result;
   }
 
-  static var chainTable:Null<Catalog<RollerChainSpec>>;
+  static final chainTable = new machinekit.cache.Once<Catalog<RollerChainSpec>>();
   public final chain:Null<String>;
 
   public static function chainCatalog():Catalog<RollerChainSpec> {
-    if (chainTable == null) chainTable = new Catalog(
+    return chainTable.get(() -> new Catalog(
       "roller chain",
       spec -> spec.designation,
       [
@@ -66,8 +66,7 @@ class Sprocket extends MachineComponent {
         dimensionKind: Nominal,
         conformance: GenericApproximation
       })
-    );
-    return chainTable;
+    ));
   }
 
   public static function forChain(chain:String, teeth:Int, boreDiameter:Float, thickness:Float):Sprocket {
@@ -157,10 +156,10 @@ class Sprocket extends MachineComponent {
     return result;
   }
 
-  private static var chainRecipeTypeCache:Null<ComponentType>;
+  private static final chainRecipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function chainRecipeType():ComponentType {
-    if (chainRecipeTypeCache == null) chainRecipeTypeCache = new ComponentType(
+    return chainRecipeTypeCache.get(() -> new ComponentType(
       "machinekit.transmission.sprocket",
       [
         ComponentRecipeSupport.count("teeth", 20),
@@ -169,14 +168,13 @@ class Sprocket extends MachineComponent {
         ComponentRecipeSupport.catalog("chain", Sprocket.chainCatalog(), "ANSI25")
       ],
       v -> Sprocket.forChain(v.token("chain"), v.integer("teeth"), v.number("boreDiameter"), v.number("thickness"))
-    ).numbered(v -> 'SPROCKET-${v.token("chain")}-${v.integer("teeth")}T-B${Dimension.format(v.number("boreDiameter"))}-W${Dimension.format(v.number("thickness"))}');
-    return chainRecipeTypeCache;
+    ).numbered(v -> 'SPROCKET-${v.token("chain")}-${v.integer("teeth")}T-B${Dimension.format(v.number("boreDiameter"))}-W${Dimension.format(v.number("thickness"))}'));
   }
 
-  private static var genericRecipeTypeCache:Null<ComponentType>;
+  private static final genericRecipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function genericRecipeType():ComponentType {
-    if (genericRecipeTypeCache == null) genericRecipeTypeCache = new ComponentType(
+    return genericRecipeTypeCache.get(() -> new ComponentType(
       "machinekit.transmission.generic-sprocket",
       [
         ComponentRecipeSupport.length("pitch", 6.35),
@@ -193,8 +191,7 @@ class Sprocket extends MachineComponent {
         v.number("rollerDiameter")
       )
     ).numbered(v -> 'SPROCKET-ASSUMED-P${Dimension.format(v.number("pitch"))}-${v.integer("teeth")}T-'
-      + 'B${Dimension.format(v.number("boreDiameter"))}-W${Dimension.format(v.number("thickness"))}-R${Dimension.format(v.number("rollerDiameter"))}');
-    return genericRecipeTypeCache;
+      + 'B${Dimension.format(v.number("boreDiameter"))}-W${Dimension.format(v.number("thickness"))}-R${Dimension.format(v.number("rollerDiameter"))}'));
   }
 
   override public function componentType():Null<ComponentType

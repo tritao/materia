@@ -59,7 +59,8 @@ class HobberScales {
   /** How far the head can overhang the carrier that holds it, mm (it is wider than the holes' span). */
   public static inline final HEAD_CARRIER_MARGIN = 6.0;
 
-  static var cache:Map<String, HobberScaleAxis> = new Map();
+  /** Each axis' scale, derived once per axis and shared: no caller changes it. */
+  static final cache = new machinekit.cache.Memo<HobberScaleAxis>("hobber-scales", 8);
 
   static function overtravel():Float return HobberXLayout.OVERTRAVEL;
 
@@ -96,9 +97,9 @@ class HobberScales {
     };
   }
 
-  static function axis(id:String):HobberScaleAxis {
-    var found = cache.get(id);
-    if (found != null) return found;
+  static function axis(id:String):HobberScaleAxis return cache.get(id, () -> derive(id));
+
+  static function derive(id:String):HobberScaleAxis {
     var s = stroke(id), accuracy = id == "X" ? "3" : "5";
     var span = s.upper - s.lower + 2 * overtravel();
     var pair = SealedScalePart.pair("JFT-40", span, accuracy);
@@ -115,7 +116,6 @@ class HobberScales {
     var headPose = AxisBuilder.orient(headOrigin[0], headOrigin[1], headOrigin[2], up, along);
     var result:HobberScaleAxis = {id: id, housing: pair.housing, head: pair.head, housingPose: housingPose, headPose: headPose,
       toSeat: up, along: along, seatBar: place.bar};
-    cache.set(id, result);
     return result;
   }
 

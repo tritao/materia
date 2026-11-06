@@ -12,7 +12,7 @@ import materia.casting.InsertMountHoleRequirement.InsertMountHoleRequirements;
  * Welded host pads remain separate parts; this member is bolted to them.
  */
 class LinearMountSteel extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final width:Float;
   public final length:Float;
   public final thickness:Float;
@@ -37,7 +37,7 @@ class LinearMountSteel extends MachineComponent {
   ];
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.structural.linear-mount-steel",
       inputs(),
       v -> new LinearMountSteel(v),
@@ -46,8 +46,7 @@ class LinearMountSteel extends MachineComponent {
       null,
       false
     ).numbered(v -> v.token("partId") != "" ? 'LM-${v.token("partId").toUpperCase()}' : 'LM-${v.token("stock") == "C45" ? "C45" : "MILD"}-${v.token("role").toUpperCase()}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("length"))}x${Dimension.format(v.number("thickness"))}')
-      .procured(v -> Make(v.token("stock") == "C45" ? "CNC machining" : "steel fabrication and machining"));
-    return recipe;
+      .procured(v -> Make(v.token("stock") == "C45" ? "CNC machining" : "steel fabrication and machining")));
   }
 
   public function new(?overrides:ComponentValues) {

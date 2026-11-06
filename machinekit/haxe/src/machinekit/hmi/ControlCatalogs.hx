@@ -15,8 +15,8 @@ class ControlCatalogs {
   public static inline var VALLDER:String = "VALLDER-1165001";
   public static inline var XB2:String = "XB2-ES542";
   public static inline var EAO:String = "EAO-84-COMPACT";
-  static var wheelCatalog:Null<Catalog<ControlRow>>;
-  static var eStopCatalog:Null<Catalog<ControlRow>>;
+  static final wheelCatalog = new machinekit.cache.Once<Catalog<ControlRow>>();
+  static final eStopCatalog = new machinekit.cache.Once<Catalog<ControlRow>>();
 
   static function custom():ControlRow return {
     designation: CUSTOM,
@@ -31,7 +31,7 @@ class ControlCatalogs {
   };
 
   public static function wheels():Catalog<ControlRow> {
-    if (wheelCatalog == null) wheelCatalog = new Catalog(
+    return wheelCatalog.get(() -> new Catalog(
       "hand wheel",
       row -> row.designation,
       [
@@ -189,12 +189,11 @@ class ControlCatalogs {
         }
       ],
       row -> row.metadata
-    );
-    return wheelCatalog;
+    ));
   }
 
   public static function eStops():Catalog<ControlRow> {
-    if (eStopCatalog == null) eStopCatalog = new Catalog(
+    return eStopCatalog.get(() -> new Catalog(
       "emergency stop",
       row -> row.designation,
       [
@@ -291,8 +290,7 @@ class ControlCatalogs {
       }
     ],
       row -> row.metadata
-    );
-    return eStopCatalog;
+    ));
   }
 
   /** `inputs` with the selected model's values applied over them (the model's values win); `model` is set. */

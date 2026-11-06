@@ -9,7 +9,7 @@ import machinekit.component.ComponentRecipeSupport as P;
  * Root diameter is an explicit engineering assumption. Catalogue end option, not custom machining.
  */
 class SfuDrawingScrew extends LeadScrew {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function models():Array<String> return [
     "SFU1605",
     "SFU1610",
@@ -112,14 +112,13 @@ class SfuDrawingScrew extends LeadScrew {
     return sum;
   }
   public static function drawingRecipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.sfu-drawing-screw",
       [P.choice("model", models(), "SFU2005"), P.length("length", 500), P.length("raceRootDiameter", 16)],
       v -> new SfuDrawingScrew(v.token("model"), v.number("length"), v.number("raceRootDiameter"))
     ).numbered(v -> v.token("model") + "-DRAWING-L" + Dimension.format(v.number("length"))
       + "-R" + Dimension.format(v.number("raceRootDiameter")))
-      .procured(_ -> Buy(null, null, null)).requiringInputs(["model", "length", "raceRootDiameter"]);
-    return recipe;
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["model", "length", "raceRootDiameter"]));
   }
   override public function componentType():Null<ComponentType> return drawingRecipeType();
   override public function values():ComponentValues return new ComponentValues().setToken("model", model).setNumber(

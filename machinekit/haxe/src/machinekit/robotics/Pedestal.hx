@@ -295,10 +295,10 @@ class Pedestal extends MachineComponent {
 
   static function optionalFloat(value:Null<Float>):Float return value == null ? 0 : value;
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.robotics.pedestal",
       [
         ComponentRecipeSupport.length("flangePitchCircle", 40),
@@ -333,8 +333,7 @@ class Pedestal extends MachineComponent {
       )
     ).numbered(v -> 'PEDESTAL-F${Dimension.format(v.number("flangePitchCircle"))}-D${Dimension.format(v.number("columnDiameter"))}-L${Dimension.format(v.number("height"))}')
       .procured(_ -> Make("steel fabrication and machining"))
-      .requiringInputs(["flangePitchCircle", "flangeBoltCount", "height", "columnDiameter", "floorBoltCount", "baseThickness", "anchorCircleDiameter"]);
-    return recipeTypeCache;
+      .requiringInputs(["flangePitchCircle", "flangeBoltCount", "height", "columnDiameter", "floorBoltCount", "baseThickness", "anchorCircleDiameter"]));
   }
 
   override public function componentType():Null<ComponentType> return Std.isExactType(this,

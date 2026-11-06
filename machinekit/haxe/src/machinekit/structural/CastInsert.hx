@@ -11,7 +11,7 @@ import materia.casting.InsertOrigin;
 
 /** Cast-in steel design envelope; local +Z is the finished mounting-plane normal. */
 class CastInsert extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   final sourceDesign:machinekit.design.DesignInterfaces;
 
   public static function parameters():Array<ComponentParameter> return [
@@ -43,7 +43,7 @@ class CastInsert extends MachineComponent {
   ];
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.structural.cast-in-steel-insert",
       parameters(),
       v -> new CastInsert(v),
@@ -76,8 +76,7 @@ class CastInsert extends MachineComponent {
           terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("diameter", "mm", null, null, diameter));
       }
       return terms;
-    });
-    return recipe;
+    }));
   }
 
   public function new(?overrides:ComponentValues) {

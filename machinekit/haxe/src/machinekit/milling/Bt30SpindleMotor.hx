@@ -8,14 +8,13 @@ import machinekit.motion.ServoMotor;
 /** Assumed compact 2.2 kW / 8000 rpm motor, including its mounting flange.
  * This is not the much larger motor in the Automation Technology kit. */
 class Bt30SpindleMotor extends ServoMotor {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.bt30-spindle-motor-study",
       [],
       v -> new Bt30SpindleMotor()
-    ).numbered(_ -> "BT30-MOTOR-ASSUMED-2200W-8000RPM");
-    return recipe;
+    ).numbered(_ -> "BT30-MOTOR-ASSUMED-2200W-8000RPM"));
   }
   public function new() {
     var speed = 8000 * 2 * Math.PI / 60, torque = 2200 / speed;

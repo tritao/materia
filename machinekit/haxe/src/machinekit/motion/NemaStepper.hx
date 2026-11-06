@@ -27,9 +27,9 @@ import machinekit.standard.SocketHeadCapScrew;
  * CAD frame: mounting face at z=0, body toward -Z, shaft along +Z.
  */
 class NemaStepper extends MachineComponent implements MotorDrive {
-  static var frameTable:Null<Catalog<NemaFrameInterface>>;
-  static var variantTable:Null<Catalog<StepperMotorVariant>>;
-  static var ratingTable:Null<Catalog<StepperMotorRating>>;
+  static final frameTable = new machinekit.cache.Once<Catalog<NemaFrameInterface>>();
+  static final variantTable = new machinekit.cache.Once<Catalog<StepperMotorVariant>>();
+  static final ratingTable = new machinekit.cache.Once<Catalog<StepperMotorRating>>();
 
   /** Frame mounting dimensions; kept as `spec` for existing callers. */
   public final spec:NemaFrameInterface;
@@ -37,7 +37,7 @@ class NemaStepper extends MachineComponent implements MotorDrive {
   public final bodyLength:Float;
 
   public static function catalog():Catalog<NemaFrameInterface> {
-    if (frameTable == null) frameTable = new Catalog("NEMA frame", spec -> Std.string(spec.frame), [
+    return frameTable.get(() -> new Catalog("NEMA frame", spec -> Std.string(spec.frame), [
       {frame: 17, face: 42.3, boltSpacing: 31.0, pilotDiameter: 22.0},
       {frame: 23, face: 56.4, boltSpacing: 47.14, pilotDiameter: 38.1},
       {frame: 34, face: 86.0, boltSpacing: 69.6, pilotDiameter: 73.0},
@@ -50,12 +50,11 @@ class NemaStepper extends MachineComponent implements MotorDrive {
       "face",
       "boltSpacing",
       "pilotDiameter"
-    ]}));
-    return frameTable;
+    ]})));
   }
 
   public static function variantCatalog():Catalog<StepperMotorVariant> {
-    if (variantTable == null) variantTable = new Catalog("stepper motor variant", spec -> spec.designation, [{
+    return variantTable.get(() -> new Catalog("stepper motor variant", spec -> spec.designation, [{
       designation: "17HS19-1684S1",
       frame: 17,
       bodyFace: 42.0,
@@ -136,8 +135,7 @@ class NemaStepper extends MachineComponent implements MotorDrive {
         "bodyLength",
         "shaftDiameter",
         "shaftLength"
-      ]}));
-    return variantTable;
+      ]})));
   }
 
   /**
@@ -146,7 +144,7 @@ class NemaStepper extends MachineComponent implements MotorDrive {
 	 * the linked pages.
 	 */
   public static function ratingCatalog():Catalog<StepperMotorRating> {
-    if (ratingTable == null) ratingTable = new Catalog(
+    return ratingTable.get(() -> new Catalog(
       "stepper motor rating",
       spec -> spec.designation,
       [
@@ -191,8 +189,7 @@ class NemaStepper extends MachineComponent implements MotorDrive {
         conformance: NominalEnvelope,
         verifiedFields: ["holdingTorque", "ratedCurrent", "stepAngle"]
       })
-    );
-    return ratingTable;
+    ));
   }
 
   /** Named manufacturer variant. */
@@ -553,10 +550,10 @@ class NemaStepper extends MachineComponent implements MotorDrive {
     return super.buildTool(name, values);
   }
 
-  private static var namedRecipeTypeCache:Null<ComponentType>;
+  private static final namedRecipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function namedRecipeType():ComponentType {
-    if (namedRecipeTypeCache == null) namedRecipeTypeCache = new ComponentType(
+    return namedRecipeTypeCache.get(() -> new ComponentType(
       "machinekit.motion.nema-stepper",
       [ComponentRecipeSupport.catalog("model", NemaStepper.variantCatalog(), "17HS19-1684S1")],
       v -> NemaStepper.model(v.token("model")),
@@ -575,14 +572,13 @@ class NemaStepper extends MachineComponent implements MotorDrive {
         terms.push(machinekit.component.Procurement.ProcurementCodec.requirement("stepAngle", "deg", null, null, rating.stepAngle));
       }
       return terms;
-    });
-    return namedRecipeTypeCache;
+    }));
   }
 
-  private static var genericRecipeTypeCache:Null<ComponentType>;
+  private static final genericRecipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function genericRecipeType():ComponentType {
-    if (genericRecipeTypeCache == null) genericRecipeTypeCache = new ComponentType(
+    return genericRecipeTypeCache.get(() -> new ComponentType(
       "machinekit.motion.generic-nema-stepper",
       [
         ComponentRecipeSupport.choice("frame", ["17", "23", "34"], "17"),
@@ -590,8 +586,7 @@ class NemaStepper extends MachineComponent implements MotorDrive {
       ],
       v -> NemaStepper.frame(Std.parseInt(v.token("frame")), v.number("bodyLength"))
     ).numbered(v -> 'STEPPER-ASSUMED-NEMA${v.token("frame")}-L${Dimension.format(v.number("bodyLength"))}')
-      .procured(_ -> Buy(null, null, null)).requiringInputs(["frame", "bodyLength"]);
-    return genericRecipeTypeCache;
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["frame", "bodyLength"]));
   }
 
   override public function componentType():Null<ComponentType> return codeOnly

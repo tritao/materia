@@ -20,7 +20,7 @@ class SolenoidValve extends MachineComponent implements ValveSpec {
   public final bodyWidth:Float;
   public final bodyDepth:Float = 25;
   public final bodyHeight:Float = 30;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public function new(doubleSolenoid:Bool = false, normallyToA:Bool = false) {
     super(
       doubleSolenoid ? "VALVE-5/2-DOUBLE" : "VALVE-5/2-SINGLE",
@@ -82,7 +82,7 @@ class SolenoidValve extends MachineComponent implements ValveSpec {
     "valve"
   );
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.pneumatic.solenoid-valve",
       [
         ComponentRecipeSupport.choice("solenoids", ["single", "double"], "single"),
@@ -95,8 +95,7 @@ class SolenoidValve extends MachineComponent implements ValveSpec {
         machinekit.component.Procurement.ProcurementCodec.choice("solenoids", v.token("solenoids")),
         machinekit.component.Procurement.ProcurementCodec.choice("normalOutlet", v.token("normalOutlet")),
         machinekit.component.Procurement.ProcurementCodec.requirement("tubeOutsideDiameter", "mm", null, null, 6)
-      ]);
-    return recipe;
+      ]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setToken(

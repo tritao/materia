@@ -10,7 +10,7 @@ import materia.assembly.AssemblyFrames as F;
  * the source chain for posed geometry when updating its preview. */
 class GantryCableChain extends MachineComponent {
   public final chain:CableChain;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final fixedHost:String;
   public final movingHost:String;
   public final axis:String;
@@ -46,7 +46,7 @@ class GantryCableChain extends MachineComponent {
     addConnector("moving", Mount, chain.movingFrame(positionOffset));
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) {
+    return recipe.get(() -> {
       var inputs = CableChain.recipeType().parameters().filter(p -> p.name != "material");
       inputs = inputs.concat([
         P.text("fixedHost", "fixedHost"),
@@ -54,7 +54,7 @@ class GantryCableChain extends MachineComponent {
         P.text("axis", "x"),
         P.length("positionOffset", 0)
       ]);
-      recipe = new ComponentType("machinekit.motion.routed-cable-chain", inputs, v -> {var cv = new ComponentValues();
+      return new ComponentType("machinekit.motion.routed-cable-chain", inputs, v -> {var cv = new ComponentValues();
       for (p in CableChain.recipeType().parameters()) if (v.get(p.name) != null) cv.set(p.name, v.get(p.name));
       return new GantryCableChain(
         new CableChain(cv),
@@ -69,8 +69,7 @@ class GantryCableChain extends MachineComponent {
           for (p in CableChain.recipeType().parameters()) if (v.get(p.name) != null) cv.set(p.name, v.get(p.name));
           return CableChain.recipeType().requirements(cv);
         });
-    }
-    return recipe;
+    });
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function hasGeometry():Bool return true;

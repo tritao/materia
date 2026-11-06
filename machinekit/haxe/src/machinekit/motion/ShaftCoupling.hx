@@ -82,10 +82,10 @@ class ShaftCoupling extends MachineComponent {
     }
   }
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.motion.shaft-coupling",
       [
         ComponentRecipeSupport.length("boreA", 8),
@@ -102,8 +102,7 @@ class ShaftCoupling extends MachineComponent {
         ShaftCoupling.setScrewsFromText(v.token("setScrews"))
       ),
       true
-    ).procured(_ -> Buy(null, null, null));
-    return recipeTypeCache;
+    ).procured(_ -> Buy(null, null, null)));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

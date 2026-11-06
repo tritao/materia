@@ -7,7 +7,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Physical study layer. It cannot supply steel threads, a product selection,
  * thickness/creep qualification or machining accuracy evidence. */
 class LinearMountReplication extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final width:Float;
   public final length:Float;
   public final thickness:Float;
@@ -20,7 +20,7 @@ class LinearMountReplication extends MachineComponent {
     P.text("reference", "Engineering sensitivity: E=4 GPa, density=1800 kg/m3; product/creep unqualified")
   ];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.structural.linear-mount-replication",
       inputs(),
       v -> new LinearMountReplication(v),
@@ -34,8 +34,7 @@ class LinearMountReplication extends MachineComponent {
       return [ComponentNumberKey.encode(v.number("width")), ComponentNumberKey.encode(v.number("length")),
         ComponentNumberKey.encode(v.number("thickness")), InsertHoles.fromNeutral(holes), v.token("reference")].join("|");
     }).procured(_ -> Make("casting replication compound"))
-      .requiringInputs(["width", "length", "thickness"], [], []);
-    return recipe;
+      .requiringInputs(["width", "length", "thickness"], [], []));
   }
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(inputs(), overrides, false);

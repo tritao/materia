@@ -8,7 +8,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Separately itemised study hardware, in the cartridge gauge frame. Spring
  * preload, gripper details and cylinder pressure/force remain selection inputs. */
 class MillPowerDrawbarPart extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static final roles = [
     "drawbar",
     "springs",
@@ -26,12 +26,11 @@ class MillPowerDrawbarPart extends MachineComponent {
     P.flag("compactCylinder", false)
   ];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.power-drawbar-study-part",
       parameters(),
       v -> new MillPowerDrawbarPart(v)
-    ).numbered(v -> 'BT30-STUDY-${v.token("role").toUpperCase()}');
-    return recipe;
+    ).numbered(v -> 'BT30-STUDY-${v.token("role").toUpperCase()}'));
   }
   public function new(?values:ComponentValues) {
     var v = P.resolve(parameters(), values);

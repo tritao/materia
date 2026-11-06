@@ -19,7 +19,7 @@ class EnclosureCutPanel extends EnclosurePanel {
   public final openingX:Float;
   public final openingZ:Float;
   public final diameter:Float;
-  static var cutRecipe:Null<ComponentType>;
+  static final cutRecipe = new machinekit.cache.Once<ComponentType>();
   public function new(
     width:Float,
     height:Float,
@@ -80,7 +80,7 @@ class EnclosureCutPanel extends EnclosurePanel {
     return item;
   }
   public static function cutRecipeType():ComponentType {
-    if (cutRecipe == null) cutRecipe = new ComponentType(
+    return cutRecipe.get(() -> new ComponentType(
       "machinekit.enclosure.cut-panel",
       [
         R.length("width", 600),
@@ -110,8 +110,7 @@ class EnclosureCutPanel extends EnclosurePanel {
       var opening = v.number("diameter") > 0 ? 'D${Dimension.format(v.number("diameter"))}'
         : 'R${Dimension.format(v.number("openingWidth"))}x${Dimension.format(v.number("openingHeight"))}';
       return '${EnclosurePanel.numberFor(v)}-$opening-X${Dimension.format(v.number("openingX"))}-Z${Dimension.format(v.number("openingZ"))}';
-    });
-    return cutRecipe;
+    }));
   }
   override public function componentType():Null<ComponentType> return cutRecipeType();
   override public function values():ComponentValues return super.values().setNumber("openingWidth",

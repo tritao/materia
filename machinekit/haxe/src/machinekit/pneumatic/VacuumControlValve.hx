@@ -24,16 +24,15 @@ class VacuumControlValve extends MachineComponent {
     addFacet(new VacuumValveFacet("control"));
   }
 
-  static var recipeTypeCache:Null<ComponentType>;
+  static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.pneumatic.vacuum-control-valve",
       [ComponentRecipeSupport.length("tubeOdMm", 4)],
       v -> new VacuumControlValve(v.number("tubeOdMm")),
       true
-    );
-    return recipeTypeCache;
+    ));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

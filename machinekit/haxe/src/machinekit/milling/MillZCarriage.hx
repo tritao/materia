@@ -12,7 +12,7 @@ import machinekit.motion.BallNut;
 class MillZCarriage extends MachineComponent {
   public static inline var GUSSET_HEIGHT:Float = 20;
   public static inline var SHELF_MARGIN:Float = 6;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [
     P.choice("nutModel", ["generic1605", "SFU2005"], "generic1605"),
     P.length("width", 234),
@@ -28,12 +28,11 @@ class MillZCarriage extends MachineComponent {
     P.text("profile", "HGH15CA")
   ];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.z-carriage",
       parameters(),
       v -> new MillZCarriage(v)
-    ).numbered(_ -> "MILL-Z-CARRIAGE");
-    return recipe;
+    ).numbered(_ -> "MILL-Z-CARRIAGE"));
   }
   public static function selectedNut(model:String):machinekit.motion.LeadScrewNut return model
     == "SFU2005" ? new machinekit.motion.SfuNut(

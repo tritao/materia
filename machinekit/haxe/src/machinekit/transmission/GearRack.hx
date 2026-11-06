@@ -16,7 +16,7 @@ import materia.assembly.AssemblyFrames as F;
  */
 class GearRack extends MachineComponent {
   public final spec:GearRackSpec;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [P.choice(
     "designation",
     GearRackCatalog.catalog().designations(),
@@ -69,14 +69,13 @@ class GearRack extends MachineComponent {
     );
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.transmission.gear-rack",
       inputs(),
       v -> new GearRack(v),
       true,
       false
-    ).procured(v -> Buy("ATLANTA", v.token("designation"), null));
-    return recipe;
+    ).procured(v -> Buy("ATLANTA", v.token("designation"), null)));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function presentationView():Null<ComponentView> return ComponentView.lengthAlongZ();

@@ -33,7 +33,7 @@ typedef DeepGrooveBearingSpec = {
  * Connectors: `front`, `back` (faces) and `axis` (mid-width), all with +Y along +Z.
  */
 class DeepGrooveBearing extends MachineComponent {
-  static var table:Null<Catalog<DeepGrooveBearingSpec>>;
+  static final table = new machinekit.cache.Once<Catalog<DeepGrooveBearingSpec>>();
 
   public final spec:DeepGrooveBearingSpec;
   public final shielded:Bool;
@@ -67,7 +67,7 @@ class DeepGrooveBearing extends MachineComponent {
   ];
 
   public static function catalog():Catalog<DeepGrooveBearingSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "deep groove bearing",
       spec -> spec.designation,
       rows(),
@@ -79,8 +79,7 @@ class DeepGrooveBearing extends MachineComponent {
         conformance: NominalEnvelope,
         verifiedFields: ["bore", "outside", "width", "chamfer"]
       })
-    );
-    return table;
+    ));
   }
 
   /** `designation` is the basic series number; shielded bearings add the "-2Z" suffix. */
@@ -243,10 +242,10 @@ class DeepGrooveBearing extends MachineComponent {
     return super.buildTool(name, values);
   }
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.standard.deep-groove-bearing",
       [
         ComponentRecipeSupport.catalog("designation", DeepGrooveBearing.catalog(), "608"),
@@ -254,8 +253,7 @@ class DeepGrooveBearing extends MachineComponent {
       ],
       v -> DeepGrooveBearing.metric(v.token("designation"), v.boolean("shielded")),
       true
-    ).procured(_ -> Buy(null, null, "ISO 15"));
-    return recipeTypeCache;
+    ).procured(_ -> Buy(null, null, "ISO 15")));
   }
 
   override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();

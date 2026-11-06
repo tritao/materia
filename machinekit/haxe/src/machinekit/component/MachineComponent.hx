@@ -150,6 +150,8 @@ class MachineComponent {
   var cachedBom:Null<BomItem>;
   final recipeInputs:Null<ComponentValues>;
   static var nextInstanceId = 0;
+  /** Components are built on several threads (sizing runs in parallel): each takes its id under this lock. */
+  static final instanceIdLock = new sys.thread.Mutex();
 
   /** Tells this component from every other, including ones built from the same recipe. */
   public final instanceId:Int;
@@ -173,7 +175,9 @@ class MachineComponent {
     ?recipeValues:ComponentValues
   ) {
     recipeInputs = recipeValues == null ? null : recipeValues.copy();
+    instanceIdLock.acquire();
     instanceId = nextInstanceId++;
+    instanceIdLock.release();
     if (designation == null || designation.length == 0) throw "Machine component needs a designation";
     this.designation = designation;
     materialId = MaterialLibrary.fromSpec(material);
@@ -329,28 +333,29 @@ class MachineComponent {
     var effective = effectiveDensity();
     var basis:ComponentDetail = effective == null ? Preview : Envelope;
     var modelled = effective == null ? massGeometry() : null;
-    var recipe = type, shareKey = recipe == null ? null : geometryKey(basis) + (modelled == null ? "" : "|mass-model");
-    if (shareKey != null) {
-      var known = recipe.knownMass(shareKey);
-      if (known != null) {
-        if (modelled != null) modelled.close();
-        cachedMass = known;
-        cachedMassMaterialId = materialId;
-        return known;
-      }
-    }
+    var shareKey = type == null ? null : geometryKey(basis) + (modelled == null ? "" : "|mass-model");
+    var computed = false;
+    var mass = ComponentType.masses.get(shareKey, () -> {
+      computed = true;
+      return computedMass(effective, basis, modelled);
+    });
+    if (!computed && modelled != null) modelled.close();
+    cachedMass = mass;
+    cachedMassMaterialId = materialId;
+    return mass;
+  }
+
+  /** `massProperties` worked out: analytically, else by integrating `modelled` or the geometry at `basis` (closing it). */
+  function computedMass(effective:Null<Float>, basis:ComponentDetail, modelled:Null<Part>):MassProperties {
     var analytic = effective == null && modelled == null ? analyticVolume() : null;
     if (analytic != null) {
       var density = MaterialLibrary.require(materialId).physical.density;
-      cachedMass = new MassProperties(
+      return new MassProperties(
         analytic.volume * 1e-9 * density,
         analytic.centre,
         Computed(Preview),
         analytic.inertia.scaled(density * 1e-9)
       );
-      cachedMassMaterialId = materialId;
-      if (shareKey != null) recipe.rememberMass(shareKey, cachedMass);
-      return cachedMass;
     }
     var part:Part;
     if (modelled != null) {
@@ -358,24 +363,22 @@ class MachineComponent {
     } else {
       try part = geometry(basis) catch (_:NoGeometry) throw 'Component "$designation" has no geometry or declared mass';
     }
+    var result:MassProperties;
     try {
       var physical = part.massProperties();
       var density = effective == null ? MaterialLibrary.require(materialId).physical.density : effective;
-      var mass = physical.volume * 1e-9 * density;
-      cachedMass = new MassProperties(
-        mass,
+      result = new MassProperties(
+        physical.volume * 1e-9 * density,
         physical.centerOfMass,
         effective != null ? EffectiveDensity(effective) : modelled != null ? Modelled : Computed(Preview),
         physical.inertiaAtDensity(density * 1e-9)
       );
-      cachedMassMaterialId = materialId;
     } catch (error:Dynamic) {
       part.close();
       throw error;
     }
     part.close();
-    if (shareKey != null) recipe.rememberMass(shareKey, cachedMass);
-    return cachedMass;
+    return result;
   }
 
   /** Vendor mass overrides the geometry estimate, including after material changes. */

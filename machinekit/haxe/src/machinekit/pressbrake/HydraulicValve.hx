@@ -13,7 +13,7 @@ import machinekit.component.Solids;
  * P is the regulated feed, T the tank return, and A/B the cylinder work outlets.
  */
 class HydraulicValve extends MachineComponent implements ValveSpec {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public function new() {
     super("HYDRAULIC-VALVE-CLOSED-CENTRE", "Assumed closed-centre hydraulic valve block", "steel", true);
     addFacet(new machinekit.component.EngineeringMetadata(new ComponentValues()
@@ -50,7 +50,7 @@ class HydraulicValve extends MachineComponent implements ValveSpec {
   override public function massGeometry():Null<Part> return Solids.named(Part.box(120,
     60, 60), "hydraulic-valve-block");
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.pressbrake.hydraulic-valve",
       [],
       _ -> new HydraulicValve()
@@ -58,8 +58,7 @@ class HydraulicValve extends MachineComponent implements ValveSpec {
       machinekit.component.Procurement.ProcurementCodec.choice("configuration", "4/3 closed centre"),
       machinekit.component.Procurement.ProcurementCodec.choice("portThread", "G1/2"),
       machinekit.component.Procurement.ProcurementCodec.requirement("coilVoltage", "V", null, null, 24)
-    ]);
-    return recipe;
+    ]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setToken("material", materialSpec());

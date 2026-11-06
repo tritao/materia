@@ -134,9 +134,9 @@ class BallScrew extends LeadScrew {
 
   public static function sfu1605(length:Float):BallScrew return new BallScrew(length);
 
-  static var ballRecipe:Null<ComponentType>;
+  static final ballRecipe = new machinekit.cache.Once<ComponentType>();
   public static function ballRecipeType():ComponentType {
-    if (ballRecipe == null) ballRecipe = new ComponentType(
+    return ballRecipe.get(() -> new ComponentType(
       "machinekit.motion.ball-screw",
       [
         ComponentRecipeSupport.length("length", 400),
@@ -155,8 +155,7 @@ class BallScrew extends LeadScrew {
         machinekit.component.Procurement.ProcurementCodec.choice("ground", v.boolean("ground") ? "true" : "false")
       ].concat(v.number("outputJournalLength") == JOURNAL_LENGTH ? [] : [
         machinekit.component.Procurement.ProcurementCodec.requirement("outputJournalLength", "mm", null, null, v.number("outputJournalLength"))
-      ]));
-    return ballRecipe;
+      ])));
   }
   override public function componentType():Null<ComponentType> return ballRecipeType();
   override public function values():ComponentValues return new ComponentValues().setNumber("length",

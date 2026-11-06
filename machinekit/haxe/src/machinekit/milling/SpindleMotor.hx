@@ -37,9 +37,9 @@ class SpindleMotor extends ServoMotor {
     );
     this.highVoltage = highVoltage;
   }
-  static var spindleMotorRecipe:Null<ComponentType>;
+  static final spindleMotorRecipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (spindleMotorRecipe == null) spindleMotorRecipe = new ComponentType(
+    return spindleMotorRecipe.get(() -> new ComponentType(
       "machinekit.milling.spindle-motor",
       [machinekit.component.ComponentRecipeSupport.flag("highVoltage", false)],
       v -> new SpindleMotor(v.boolean("highVoltage"))
@@ -48,8 +48,7 @@ class SpindleMotor extends ServoMotor {
         machinekit.component.Procurement.ProcurementCodec.requirement("ratedPower", "W", POWER),
         machinekit.component.Procurement.ProcurementCodec.requirement("maximumSpeed", "rpm", 10000),
         machinekit.component.Procurement.ProcurementCodec.choice("highVoltage", v.boolean("highVoltage") ? "true" : "false")
-      ]);
-    return spindleMotorRecipe;
+      ]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setBoolean("highVoltage",

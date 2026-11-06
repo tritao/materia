@@ -15,7 +15,7 @@ import machinekit.component.Solids;
  * Dimensions are mm; pressure is Pa and force is N. Setup owns the flow phase speeds.
  */
 class HydraulicCylinder extends MachineComponent implements CylinderSpec {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final bore:Float;
   public final rod:Float;
   public final stroke:Float;
@@ -109,7 +109,7 @@ class HydraulicCylinder extends MachineComponent implements CylinderSpec {
   return Solids.cut(parts[0], [parts[1], parts[2]]);
   });
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.pressbrake.hydraulic-cylinder",
       [
         ComponentRecipeSupport.length("bore", 160),
@@ -128,8 +128,7 @@ class HydraulicCylinder extends MachineComponent implements CylinderSpec {
         v.number("stemLength")
       )
     ).numbered(v -> 'HYD-CYL-ASSUMED-${machinekit.component.Dimension.format(v.number("bore"))}x${machinekit.component.Dimension.format(v.number("rod"))}x${machinekit.component.Dimension.format(v.number("stroke"))}')
-      .procured(_ -> Buy(null, null, null)).requiringInputs(["bore", "rod", "stroke"]);
-    return recipe;
+      .procured(_ -> Buy(null, null, null)).requiringInputs(["bore", "rod", "stroke"]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setNumber("bore", bore).setNumber(

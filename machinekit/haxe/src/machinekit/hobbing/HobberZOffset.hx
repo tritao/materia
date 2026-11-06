@@ -59,14 +59,11 @@ class HobberZOffset {
   /** What a surface point's closed-form distance to the envelope may be off by (tolerance and rounding), mm. */
   static inline final POINT_MARGIN = 1e-3;
 
-  static var cache:Null<ZOffsetResult>;
+  static final cache = new machinekit.cache.Once<ZOffsetResult>();
 
   public static function axisY():Float return result().y;
 
-  public static function result():ZOffsetResult {
-    if (cache == null) cache = derive();
-    return cache;
-  }
+  public static function result():ZOffsetResult return cache.get(() -> derive());
 
   /** Width of the drive seat insert at the derived offset: the widest the casting allows, up to `MAX_INSERT_WIDTH`. */
   public static function insertWidth():Float {

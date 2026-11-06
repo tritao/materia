@@ -120,7 +120,9 @@ class CastingPackageExport {
     var dir = args[0], kind = args[1];
     sys.FileSystem.createDirectory(dir);
     sys.FileSystem.createDirectory(dir + "/inserts");
+    var began = Sys.time();
     var foundation:MineralFoundation = kind == "bed" ? new MineralCastBed() : new MineralCastColumn();
+    var sized = Sys.time() - began;
     var body = foundation.body, cache = new PosedParts(), closers:Array<cadkit.modeling.Part> = [];
     var dims = FoundationLayout.dimensions(kind);
     var asCast = body.asCastGeometry();
@@ -349,5 +351,10 @@ class CastingPackageExport {
     for (p in closers) p.close();
     cache.close();
     Sys.println('wrote $dir/$kind: ${mass} kg, ${inserts.length} inserts, ${cavities.length} cavities, ${sections.length} sections');
+    // Profiling: MACHINEKIT_MEMO_REPORT=1 prints the sizing time and each build-time memo's hits and misses.
+    if (Sys.getEnv("MACHINEKIT_MEMO_REPORT") != null) {
+      Sys.println('sized $kind in ${Math.round(sized * 10) / 10} s');
+      for (line in machinekit.cache.Memos.report()) Sys.println(line);
+    }
   }
 }

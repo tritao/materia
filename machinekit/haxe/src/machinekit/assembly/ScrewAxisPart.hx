@@ -16,7 +16,7 @@ class ScrewAxisPart extends MachineComponent {
   public final kind:String;
   public final revision:String;
   public final layout:ScrewAxisLayout;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function kinds():Array<String> return ["base", "riserLeft", "riserRight", "nutBracket", "carriage"];
   public function new(kind:String = "base", revision:String = "v2-tapped", ?layout:ScrewAxisLayout) {
     if (layout == null) layout = new ScrewAxisLayout();
@@ -126,7 +126,7 @@ class ScrewAxisPart extends MachineComponent {
   return Solids.cut(body, tools);
   });
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.assembly.twin-rail-screw-part",
       [
         P.choice("kind", kinds(), "base"),
@@ -148,8 +148,7 @@ class ScrewAxisPart extends MachineComponent {
       ),
       true
     ).numbered(v -> 'TWIN-RAIL-SCREW-${v.token("kind").toUpperCase()}')
-      .procured(_ -> Make("CNC machining"));
-    return recipe;
+      .procured(_ -> Make("CNC machining")));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setToken("kind", kind).setToken(

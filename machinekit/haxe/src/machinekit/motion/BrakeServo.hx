@@ -7,7 +7,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Assumed catalogue-class AC servo with spring-applied holding brake. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class BrakeServo extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.choice("power", ["400", "750"], "400"),
     P.quantity("brakeTorque", 2.5, "N m"),
@@ -25,7 +25,7 @@ class BrakeServo extends AssumedCatalogComponent {
     addConnector("shaftEnd", Axis, Solids.axial(0, 0, motor.rating.shaftLength));
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.motion.brake-servo", inputs(), v -> new BrakeServo(v))
+    return recipe.get(() -> new ComponentType("machinekit.motion.brake-servo", inputs(), v -> new BrakeServo(v))
       .numbered(v -> 'SERVO-BRAKE-ASSUMED-${v.token("power")}W-'
           + '${Dimension.format(v.number("brakeTorque"))}NM-${Dimension.format(v.number("brakeLength"))}MM').procured(_ -> Buy(null, null, null)).requiring(v -> {
         var req = machinekit.component.Procurement.ProcurementCodec.requirement;
@@ -34,8 +34,7 @@ class BrakeServo extends AssumedCatalogComponent {
           req("brakeTorque", "N m", v.number("brakeTorque")),
           req("releaseDelay", "s", null, v.number("releaseDelay")),
           req("applicationDelay", "s", null, v.number("applicationDelay"))];
-      });
-    return recipe;
+      }));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function geometry(detail:ComponentDetail = Preview):Part return withBrake(motor.geometry(detail));

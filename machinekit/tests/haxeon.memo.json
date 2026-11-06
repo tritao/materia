@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-memo-tests"},
+  "entry": "MemoTests",
+  "sourceRoots": ["src"],
+  "dependencies": {"machinekit": {"path": ".."}},
+  "target": "host",
+  "outputDir": "build/memo"
+}

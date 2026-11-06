@@ -85,16 +85,15 @@ class MotorAdapterPlate extends MachineComponent {
   return Solids.cut(Solids.union([plate, spigot]), cuts);
   });
 
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.motor-adapter-plate",
       [P.choice("model", models(), "KK86-80EP-adapter")],
       v -> new MotorAdapterPlate(v.token("model")),
       true
-    ).numbered(v -> 'HZMOTION-${v.token("model").toUpperCase()}');
-    return recipe;
+    ).numbered(v -> 'HZMOTION-${v.token("model").toUpperCase()}'));
   }
 
   override public function componentType():Null<ComponentType> return recipeType();

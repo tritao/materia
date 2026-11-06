@@ -10,7 +10,7 @@ import machinekit.component.ComponentRecipeSupport as P;
  */
 class MillZHead extends MachineComponent {
   public static inline var COUNTERBORE_DEPTH:Float = 6.5;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [
     P.length("spindleDiameter", 70),
     P.flag("bt30Mounts", false),
@@ -29,9 +29,8 @@ class MillZHead extends MachineComponent {
     P.length("wall", 12)
   ];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.milling.z-head", parameters(), v -> new MillZHead(v))
-      .numbered(_ -> "MILL-Z-RIBBED-HEAD");
-    return recipe;
+    return recipe.get(() -> new ComponentType("machinekit.milling.z-head", parameters(), v -> new MillZHead(v))
+      .numbered(_ -> "MILL-Z-RIBBED-HEAD"));
   }
   public function new(?values:ComponentValues) {
     var v = P.resolve(parameters(), values), r = v.number("spindleDiameter") / 2;

@@ -10,12 +10,11 @@ import machinekit.hobbing.HobberOutboardLayout as L;
  * outer races; its gland closes their matched ground faces. The inner spacer
  * lets a standard-sized retaining nut clear the fixed gland. */
 class OutboardBearingPart extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [P.choice("role", ["sleeve", "gland", "cap", "innerSpacer"], "sleeve")];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.hobbing.outboard-bearing-part", parameters(), v -> new OutboardBearingPart(v), false, false, null, false)
-      .numbered(v -> "HOB-OUTBOARD-" + v.token("role").toUpperCase()).procured(v -> Make(v.token("role") == "cap" ? "CNC milling" : "turning and grinding"));
-    return recipe;
+    return recipe.get(() -> new ComponentType("machinekit.hobbing.outboard-bearing-part", parameters(), v -> new OutboardBearingPart(v), false, false, null, false)
+      .numbered(v -> "HOB-OUTBOARD-" + v.token("role").toUpperCase()).procured(v -> Make(v.token("role") == "cap" ? "CNC milling" : "turning and grinding")));
   }
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(parameters(), overrides), role = v.token("role");

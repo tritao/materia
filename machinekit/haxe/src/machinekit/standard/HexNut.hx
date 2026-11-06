@@ -27,7 +27,7 @@ import machinekit.component.Solids;
 class HexNut extends MachineComponent {
   override public function fastensByForm():Bool return true;
 
-  static var table:Null<Catalog<HexNutSpec>>;
+  static final table = new machinekit.cache.Once<Catalog<HexNutSpec>>();
 
   public final spec:HexNutSpec;
   public final thread:ThreadSpec;
@@ -45,7 +45,7 @@ class HexNut extends MachineComponent {
   ];
 
   public static function catalog():Catalog<HexNutSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "hex nut size",
       spec -> spec.size,
       rows(),
@@ -58,8 +58,7 @@ class HexNut extends MachineComponent {
         sources: ["https://www.scribd.com/document/816804171/M-FHN-4032-8-Z-3U-03"],
         verifiedFields: ["acrossFlats", "height"]
       })
-    );
-    return table;
+    ));
   }
 
   public static function metric(size:String):HexNut return new HexNut(catalog().get(size));
@@ -124,16 +123,15 @@ class HexNut extends MachineComponent {
   function get_acrossFlats():Float return spec.acrossFlats;
   function get_height():Float return spec.height;
 
-  private static var recipeTypeCache:Null<ComponentType>;
+  private static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+    return recipeTypeCache.get(() -> new ComponentType(
       "machinekit.standard.hex-nut",
       [ComponentRecipeSupport.catalog("size", HexNut.catalog(), "M5")],
       v -> HexNut.metric(v.token("size")),
       true
-    ).procured(_ -> Buy(null, null, "ISO 4032"));
-    return recipeTypeCache;
+    ).procured(_ -> Buy(null, null, "ISO 4032")));
   }
 
   override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();

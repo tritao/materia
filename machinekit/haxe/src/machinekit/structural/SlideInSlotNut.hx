@@ -22,7 +22,7 @@ class SlideInSlotNut extends MachineComponent {
   public final ridgeWidth:Float;
   public final ridgeHeight:Float;
   public final size:String;
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public function new(width:Float, length:Float, height:Float, ridgeWidth:Float, ridgeHeight:Float, size:String) {
     if (!Math.isFinite(width + length + height + ridgeWidth + ridgeHeight)
@@ -74,7 +74,7 @@ class SlideInSlotNut extends MachineComponent {
     });
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.structural.slide-in-slot-nut",
       [
         ComponentRecipeSupport.length("width", 15.9),
@@ -98,8 +98,7 @@ class SlideInSlotNut extends MachineComponent {
         for (name in ["width", "length", "height", "ridgeWidth", "ridgeHeight"])
           terms.push(machinekit.component.Procurement.ProcurementCodec.requirement(name, "mm", null, null, v.number(name)));
         return terms;
-      });
-    return recipe;
+      }));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setNumber("width", width).setNumber(

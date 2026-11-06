@@ -71,11 +71,11 @@ class HobSpindle extends MachineAssembly {
   public final belt:TimingBelt;
   /** Motor turns per spindle turn (the belt's reduction as the transmission solves it). */
   public final ratio:Float;
-  static var centresCache:Null<Float>;
+  static final centresCache = new machinekit.cache.Once<Float>();
 
   /** Whole-tooth belt centre distance, nearest the nominal, mm. */
   public static function centres():Float {
-    if (centresCache == null) {
+    return centresCache.get(() -> {
       var nominal = NOMINAL_CENTRES, pitch = 5.0;
       var target = Math.round(TimingBelt.twoPulley(HTD5M, SPINDLE_TEETH, MOTOR_TEETH, nominal, BELT_WIDTH).length / pitch) * pitch;
       var lo = nominal - 5, hi = nominal + 5;
@@ -84,9 +84,8 @@ class HobSpindle extends MachineAssembly {
         if (TimingBelt.twoPulley(HTD5M, SPINDLE_TEETH, MOTOR_TEETH, mid, BELT_WIDTH).length < target) lo = mid;
         else hi = mid;
       }
-      centresCache = (lo + hi) / 2;
-    }
-    return centresCache;
+      return (lo + hi) / 2;
+    });
   }
 
   /** The servo axis' height above the cartridge axis (the tilted centre line's vertical part), mm. */

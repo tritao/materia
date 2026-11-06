@@ -13,7 +13,7 @@ import materia.tooling.ToolingCodec;
 
 /** Rebuildable exact finished tooling volume, in mold coordinates (mm). */
 class ToolingVolume extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   final volume:MoldVolume;
 
@@ -33,12 +33,11 @@ class ToolingVolume extends MachineComponent {
   ];
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.tooling.volume",
+    return recipe.get(() -> new ComponentType("machinekit.tooling.volume",
       parameters(), v -> new ToolingVolume(v)).numbered(v -> {
         var volume = MoldVolumeRecords.snapshot(haxe.Json.parse(v.token("volume")));
         return 'MOLD-${volume.id.toUpperCase()}';
-      });
-    return recipe;
+      }));
   }
 
   public static function fromVolume(v:MoldVolume, ?materialSpec:String):ToolingVolume {

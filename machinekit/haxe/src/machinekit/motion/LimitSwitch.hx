@@ -26,12 +26,12 @@ typedef LimitSwitchSpec = {
 
 /** Housing, lever and roller envelope. Local +Z is the approaching trigger direction. */
 class LimitSwitch extends MachineComponent implements SwitchPart {
-  static var table:Null<Catalog<LimitSwitchSpec>>;
-  static var recipe:Null<ComponentType>;
+  static final table = new machinekit.cache.Once<Catalog<LimitSwitchSpec>>();
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public final spec:LimitSwitchSpec;
 
   public static function catalog():Catalog<LimitSwitchSpec> {
-    if (table == null) table = new Catalog(
+    return table.get(() -> new Catalog(
       "assumed roller switch",
       s -> s.designation,
       [{
@@ -52,8 +52,7 @@ class LimitSwitch extends MachineComponent implements SwitchPart {
         conformance: GenericApproximation,
         verifiedFields: []
       })
-    );
-    return table;
+    ));
   }
 
   public function new(designation:String = "GENERIC-ROLLER-MICROSWITCH") {
@@ -72,7 +71,7 @@ class LimitSwitch extends MachineComponent implements SwitchPart {
   public function switchRepeatability():Float return spec.repeatability;
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.limit-switch",
       [ComponentRecipeSupport.catalog("designation", catalog(), "GENERIC-ROLLER-MICROSWITCH")],
       v -> new LimitSwitch(v.token("designation"))
@@ -84,8 +83,7 @@ class LimitSwitch extends MachineComponent implements SwitchPart {
           machinekit.component.Procurement.ProcurementCodec.requirement("pretravel", "mm", null, row.pretravel),
           machinekit.component.Procurement.ProcurementCodec.requirement("hysteresis", "mm", null, row.hysteresis),
           machinekit.component.Procurement.ProcurementCodec.requirement("repeatability", "mm", null, row.repeatability)];
-      });
-    return recipe;
+      }));
   }
   override public function componentType():Null<ComponentType> return Std.isExactType(this,
     LimitSwitch) ? recipeType() : null;

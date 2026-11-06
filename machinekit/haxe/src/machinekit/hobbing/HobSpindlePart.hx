@@ -7,13 +7,12 @@ import cadkit.modeling.Part;
  * design or separately made shaft is implied. The taper is MAS BT30; rotor,
  * rear stub, drawbar/gripper envelope and mass partition are ASSUMED. */
 class HobSpindlePart extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([ComponentRecipeSupport.text("role", "rotor")]);
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.hobbing.bt30-spindle-rotor", parameters(),
+    return recipe.get(() -> new ComponentType("machinekit.hobbing.bt30-spindle-rotor", parameters(),
       v -> new HobSpindlePart(v)).numbered(v -> v.token("role") == "rotor" ? "BT30-D80-INCLUDED-ROTOR" : "BT30-M12-45-PULL-STUD-ASSUMED")
-      .procured(v -> v.token("role") == "rotor" ? NotSupplied : Buy(null, null, "MAS BT30 45 degree; head geometry assumed"));
-    return recipe;
+      .procured(v -> v.token("role") == "rotor" ? NotSupplied : Buy(null, null, "MAS BT30 45 degree; head geometry assumed")));
   }
   public function new(?overrides:ComponentValues) {
     var v = ComponentRecipeSupport.resolve(parameters(), overrides);

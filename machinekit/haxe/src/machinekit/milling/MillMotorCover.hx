@@ -9,19 +9,18 @@ import machinekit.component.ComponentRecipeSupport as P;
  * Mounting screw details depend on the selected motor cage; 2 mm sheet is assumed.
  */
 class MillMotorCover extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [
     P.length("width", 118),
     P.length("depth", 220),
     P.length("height", 110)
   ];
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.motor-cover",
       parameters(),
       v -> new MillMotorCover(v)
-    ).numbered(_ -> "MILL-MOTOR-HOOD");
-    return recipe;
+    ).numbered(_ -> "MILL-MOTOR-HOOD"));
   }
   public function new(?values:ComponentValues) {
     var v = P.resolve(parameters(), values);

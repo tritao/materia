@@ -7,7 +7,7 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Assumed catalogue-class planetary reducer. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class PlanetaryReducer extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.scalar("ratio", 5, 1),
     P.scalar("efficiency", 0.95, 0, 1),
@@ -42,14 +42,13 @@ class PlanetaryReducer extends AssumedCatalogComponent {
     addConnector("output", Axis, Solids.axial(0, 0, n("length")));
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.motion.planetary-reducer",
       inputs(),
       v -> new PlanetaryReducer(v)
     ).numbered(v -> 'PLANETARY-ASSUMED-${Dimension.format(v.number("ratio"))}R-'
         + '${Dimension.format(v.number("ratedOutputTorque"))}NM-'
-        + '${Dimension.format(v.number("backlash"))}AM-${Dimension.format(v.number("bore"))}B').procured(_ -> Buy(null, null, null)).requiringInputs(["ratio", "bore"], ["ratedOutputTorque", "peakOutputTorque", "axialLoad", "radialLoad", "torsionalStiffness"], ["backlash"]);
-    return recipe;
+        + '${Dimension.format(v.number("backlash"))}AM-${Dimension.format(v.number("bore"))}B').procured(_ -> Buy(null, null, null)).requiringInputs(["ratio", "bore"], ["ratedOutputTorque", "peakOutputTorque", "axialLoad", "radialLoad", "torsionalStiffness"], ["backlash"]));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   /**

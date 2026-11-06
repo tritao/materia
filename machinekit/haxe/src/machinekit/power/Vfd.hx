@@ -8,7 +8,7 @@ import materia.assembly.AssemblyFrames as F;
 /** Assumed catalogue-class three-phase spindle VFD with STO terminals. Dimensions mm; SI ratings unless stated.
  * Geometry is a nominal layout envelope, not manufacturing or supplier geometry. */
 class Vfd extends AssumedCatalogComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   static function inputs():Array<ComponentParameter> return [
     P.quantity("power", 7500, "W"),
     P.quantity("inputVoltage", 400, "V"),
@@ -35,11 +35,10 @@ class Vfd extends AssumedCatalogComponent {
     });
   }
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.power.vfd", inputs(), v -> new Vfd(v))
+    return recipe.get(() -> new ComponentType("machinekit.power.vfd", inputs(), v -> new Vfd(v))
       .numbered(v -> 'VFD-ASSUMED-${Dimension.format(v.number("power"))}W-${Dimension.format(v.number("inputVoltage"))}V-'
         + '${Dimension.format(v.number("outputCurrent"))}A-${Dimension.format(v.number("maxFrequency"))}HZ-'
-        + (v.boolean("sto") ? "STO" : "NO-STO")).procured(_ -> Buy(null, null, null)).requiringInputs(["inputVoltage", "sto"], ["power", "outputCurrent", "maxFrequency"], []);
-    return recipe;
+        + (v.boolean("sto") ? "STO" : "NO-STO")).procured(_ -> Buy(null, null, null)).requiringInputs(["inputVoltage", "sto"], ["power", "outputCurrent", "maxFrequency"], []));
   }
   override public function componentType():Null<ComponentType> return recipeType();
   /** A housing, not a solid block: mass from the envelope at an assumed effective density. */

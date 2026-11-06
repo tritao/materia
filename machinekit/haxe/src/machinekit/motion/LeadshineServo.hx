@@ -18,14 +18,14 @@ class LeadshineServo extends ServoMotor {
   public static inline final SOURCE =
     "https://www.leadshine.com/upfiles/downloads/006a40c553d0c6fc60a1221d6a764222_1675822261873.pdf";
   public static inline final MS1AE_SOURCE = "https://www.leadshine.com/product-detail/ELM2L-1500LA100FT-H%20MS1AE.html";
-  static var table:Null<Catalog<LeadshineServoSpec>>;
+  static final table = new machinekit.cache.Once<Catalog<LeadshineServoSpec>>();
   public final spec:LeadshineServoSpec;
   /** Whether the winding constants are an assumed high-voltage estimate, so a driver and a supply can be wired to it. */
   public final assumedWinding:Bool;
   var massDeclared:Bool = false;
 
   public static function catalog():Catalog<LeadshineServoSpec> {
-    if (table == null) {
+    return table.get(() -> {
       var rows:Array<LeadshineServoSpec> = [];
       var powers = [50, 100, 200, 400, 750, 1000];
       var lengths = [56.7, 67.7, 71.6, 88.8, 90.9, 103.9];
@@ -66,7 +66,7 @@ class LeadshineServo extends ServoMotor {
       pageVariant.ratedCurrent = 4.5;
       pageVariant.peakCurrent = 13.5;
       rows.push(pageVariant);
-      table = new Catalog(
+      return new Catalog(
         "Leadshine servo",
         s -> s.designation,
         rows,
@@ -103,8 +103,7 @@ class LeadshineServo extends ServoMotor {
           ]
         })
       );
-    }
-    return table;
+    });
   }
 
   public static function model(designation:String):LeadshineServo return new LeadshineServo(catalog().get(designation));

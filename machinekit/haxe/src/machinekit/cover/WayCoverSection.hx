@@ -200,10 +200,10 @@ class WayCoverSection extends MachineComponent {
     });
   }
 
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.cover.way-cover-section",
       [
         ComponentRecipeSupport.choice("row", WayCoverCatalog.ids(), WayCoverCatalog.ids()[0]),
@@ -240,8 +240,7 @@ class WayCoverSection extends MachineComponent {
     }).procured(_ -> Buy(null, null, null)).requiring(v -> selectionRequirements(
       v.token("row"), v.number("width"), v.number("height"), v.number("stroke"), v.number("space"),
       v.token("section") == "Box", v.token("nesting") == "GrowsToFixed"
-    ));
-    return recipe;
+    )));
   }
 
   override public function componentType():Null<ComponentType> return recipeType();

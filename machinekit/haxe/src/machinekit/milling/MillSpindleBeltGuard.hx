@@ -10,14 +10,13 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Removable belt enclosure study. The motor carrier closes its rear top;
  * explicit clearances surround reaction posts, carrier webs and fasteners. */
 class MillSpindleBeltGuard extends MachineComponent {
-  static var recipe:Null<ComponentType>;
+  static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType(
+    return recipe.get(() -> new ComponentType(
       "machinekit.milling.spindle-belt-guard",
       [P.flag("centered", false)],
       v -> new MillSpindleBeltGuard(v)
-    ).numbered(_ -> "MILL-SPINDLE-BELT-GUARD");
-    return recipe;
+    ).numbered(_ -> "MILL-SPINDLE-BELT-GUARD"));
   }
   public function new(?v:ComponentValues) {
     v = P.resolve([P.flag("centered", false)], v);
