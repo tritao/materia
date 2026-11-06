@@ -169,6 +169,7 @@ class MachineAssemblyCodec {
           id: id,
           definition: tableId,
           assembly: tableId,
+          groupPath: assembly.memberGroups.get(id),
           initialPose: sub.pose == null ? AssemblyFrames.identity() : MachineAssembly.copyFrame(sub.pose)
         });
         continue;
@@ -203,7 +204,8 @@ class MachineAssemblyCodec {
         }
         candidates.push(definition);
       }
-      level.occurrences.push({id: id, definition: definition.id, initialPose: MachineAssembly.copyFrame(member.pose)});
+      level.occurrences.push({id: id, definition: definition.id, initialPose: MachineAssembly.copyFrame(member.pose),
+        groupPath: assembly.memberGroups.get(id), selectionKinds: AssemblySets.kinds(member.component)});
     }
     var endpoint = (instanceId:String, connector:String) -> {var split = below(instanceId);
     return split == null ? {
@@ -444,6 +446,7 @@ class MachineAssemblyCodec {
     }
     var subassemblies = new Map<String, AssemblySubdefinition>();
     for (occurrence in level.occurrences) {
+      target.memberGroups.set(occurrence.id, MachineAssembly.checkedGroup(occurrence.groupPath));
       if (occurrence.assembly != null) {
         var entry = table.get(occurrence.assembly);
         var childPath = path.length == 0 ? occurrence.id : path + "/" + occurrence.id;
@@ -486,6 +489,7 @@ class MachineAssemblyCodec {
           definition.collisionHulls)) throw 'Collision hulls disagree with recipe for "${occurrence.id}"';
       }
       target.addMember(occurrence.id, component, occurrence.initialPose);
+      target.assignGroup(occurrence.id, occurrence.groupPath);
     }
     for (connector in machine.memberConnectors) target.addMemberConnector(
       connector.instanceId,

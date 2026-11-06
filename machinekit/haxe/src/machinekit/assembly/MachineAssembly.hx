@@ -87,7 +87,7 @@ typedef MachineAssemblyMassProperties = {
  */
 @:allow(machinekit.assembly) class MachineAssembly {
   /** Current MachineKit assembly format; older descriptions must be regenerated. */
-  public static inline var SCHEMA_VERSION:Int = 26;
+  public static inline var SCHEMA_VERSION:Int = 27;
   /** Findings from rebuilding sources; invalid transmissions remain available for repair. */
   public final diagnostics:Diagnostics = new Diagnostics();
   final mechanical:MechanicalAssembly = new MechanicalAssembly();
@@ -96,6 +96,61 @@ typedef MachineAssemblyMassProperties = {
   final inventory:AssemblyInventory = new AssemblyInventory();
   final massByDefinition:Map<String, MassProperties> = [];
   var flatCache:Null<FlatAssembly>;
+  final memberGroups:Map<String, String> = [];
+  var activeGroup:String = "Ungrouped";
+
+  /** Functional folder for subsequently added local members and includes. */
+  public function group(path:String):Void activeGroup = checkedGroup(path);
+
+  public function withGroup(path:String, build:Void -> Void):Void {
+    var previous = activeGroup;
+    activeGroup = checkedGroup(path);
+    try build() catch (error:Dynamic) {
+      activeGroup = previous;
+      throw error;
+    }
+    activeGroup = previous;
+  }
+
+  static function checkedGroup(path:String):String {
+    if (path == null || path.length == 0) throw "Group path must not be empty";
+    for (segment in path.split("/")) if (segment.length == 0 || StringTools.trim(segment) != segment
+      || segment == "." || segment == "..") throw 'Invalid group path "$path"';
+    return path;
+  }
+
+  /** Reassign one local member or include without altering its physical ownership. */
+  public function assignGroup(id:String, path:String):Void {
+    if (mechanical.order.indexOf(id) < 0) throw 'Unknown local group member "$id"';
+    memberGroups.set(id, checkedGroup(path));
+    changed();
+  }
+
+  public function functionalGroups():Map<String, String> {
+    var result:Map<String, String> = [];
+    collectGroups(result, "", "");
+    return result;
+  }
+
+  function collectGroups(result:Map<String, String>, prefix:String, folder:String):Void {
+    for (id in mechanical.order) {
+      var local = memberGroups.get(id);
+      if (local == null) local = "Ungrouped";
+      var path = folder == "" ? local : local == "Ungrouped" ? folder : folder + "/" + local;
+      var memberId = prefix == "" ? id : prefix + "/" + id;
+      if (mechanical.member(id) != null) result.set(memberId, path);
+      else mechanical.requireSubassembly(id).assembly.collectGroups(result, memberId, path + "/" + id);
+    }
+  }
+
+  public function sets():Array<AssemblySets.AssemblySet> return AssemblySets.derive(definition());
+
+  public function checkGroups():Diagnostics {
+    var result = new Diagnostics();
+    for (id => path in functionalGroups()) if (path.split("/").indexOf("Ungrouped") >= 0)
+      result.warning("assembly.ungrouped", id, 'Member "$id" has no authored functional group');
+    return result;
+  }
 
   final designRequirementList:Array<machinekit.design.DesignRequirement> = [];
   /** Requirements are portable data; copies prevent edits bypassing the flattened cache. */
@@ -166,6 +221,7 @@ typedef MachineAssemblyMassProperties = {
         });
       }
     }
+    for (id => path in memberGroups) target.memberGroups.set(id, path);
     for (entry in mechanical.memberConnectors) target.mechanical.memberConnectors.push({
       instanceId: entry.instanceId,
       name: entry.name,
@@ -292,6 +348,7 @@ typedef MachineAssemblyMassProperties = {
   function addMember(id:String, component:MachineComponent, ?pose:AssemblyFrame):Void {
     if (id == null || id.length == 0 || component == null) throw "Assembly component needs an id and component";
     mechanical.addMember(id, component, pose == null ? AssemblyFrames.identity() : pose);
+    memberGroups.set(id, activeGroup);
     changed();
   }
 
@@ -308,6 +365,7 @@ typedef MachineAssemblyMassProperties = {
       id + "/")) throw 'Included assembly "$id" would hide member "${member.id}"';
     assembly.validateStructure();
     mechanical.addSubassembly({id: id, assembly: assembly.snapshot(), pose: pose == null ? null : copyFrame(pose)});
+    memberGroups.set(id, activeGroup);
     changed();
   }
 
@@ -1181,6 +1239,7 @@ typedef MachineAssemblyMassProperties = {
     var flat = derived();
     var result = new Diagnostics();
     MechanicalAssembly.checkStructure(flat, result);
+    for (item in checkGroups().items) result.add(item.severity, item.code, item.subject, item.message);
     for (item in diagnostics.items) result.add(item.severity, item.code, item.subject, item.message);
     for (item in flat.diagnostics.items) result.add(item.severity, item.code, item.subject, item.message);
     ServiceNetwork.check(flat, result);
@@ -1203,8 +1262,13 @@ typedef MachineAssemblyMassProperties = {
 	 * The flattened ProjectKit definition, with member paths as occurrence ids and couplings worked
 	 * out from their transmissions. Actuators and encoders are compiled by `addTo`.
 	 */
-  public function definition():AssemblyDefinition return AssemblyDefinitionCodec
-    .decode(AssemblyDefinitionCodec.encode(derived().definition));
+  public function definition():AssemblyDefinition {
+    var source = derived();
+    var result = AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(source.definition));
+    // Category metadata belongs to the exported editor view, not to iterative mechanical solving.
+    for (occurrence in result.occurrences) occurrence.selectionKinds = AssemblySets.kinds(source.member(occurrence.id));
+    return result;
+  }
 
   /** Populate an existing model. All member and joint ids receive the supplied prefix. */
   public function addTo(model:AssemblyModel, prefix:String, ?pose:AssemblyFrame):Void {
@@ -1375,6 +1439,8 @@ typedef MachineAssemblyMassProperties = {
     if (cached != null) return cached;
     var result = new FlatAssembly();
     flattenInto(result, "", null, true);
+    var ownership = functionalGroups();
+    for (occurrence in result.definition.occurrences) occurrence.groupPath = ownership.get(occurrence.id);
     MechanicalAssembly.groundPlaced(result.definition.occurrences, result.definition.joints);
     flatCache = result;
     return result;

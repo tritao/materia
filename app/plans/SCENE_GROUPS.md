@@ -19,6 +19,27 @@ fixed and moving parts) and cross-cutting categories (all fasteners, everything 
   otherwise).
 - No layers concept; sets with visibility give the same behaviour without upkeep.
 
+- Group scopes apply to local members and includes; an include supplies the functional ownership of descendants with no
+  more specific group, retaining the include path beneath its folder. Authored child folders remain beneath that path.
+- The portable mechanical occurrences carry functional group paths and derived category tags, so generated artifacts,
+  recipe reloads and the editor all receive the same membership. MachineAssembly schema is 27; older descriptions are rejected.
+- Sets are derived only in G1–G4. Optional authored sets are deferred until a concrete use needs a rule-independent selection.
+
+- Set rows are selections, not second owners of their members. They list counts and expose visibility/isolate while each part
+  retains one row in the primary functional tree. Existing document visibility masks remain the single persisted representation.
+- Fasteners use the standard hardware recipe namespace and typed screw interface; motion nuts and nut mounts are excluded.
+  Procurement categories use explicit Make/Buy intent; electrical uses typed interfaces and ports. Sets sort IDs and members
+  for stable results across save/load and changes in construction order.
+
+- Category metadata is computed when exporting an editor definition or assembly description, not on temporary solver
+  flattenings. Iterative mechanical sizing does not evaluate BOM/procurement just to build its joint tree.
+
+- Isolate reveals the selected folder and its ancestors across their full memberships, preserving independent part and
+  descendant masks. This keeps group masks consistent when saved visibility is rebound on document reload.
+
+- Purchased includes physical subparts explicitly marked IncludedInPurchase when they are not separately supplied.
+  Explicit Make/Buy intent governs separately specified parts.
+
 ## Steps
 - **G1. Library:** group path on members (API on `MachineAssembly`: a group scope while building and/or a `group` argument on
   `fixAt`/`addMember`/`include`), saved in the assembly description (one schema version, no compat), validation, derived sets
@@ -33,4 +54,14 @@ fixed and moving parts) and cross-cutting categories (all fasteners, everything 
   migrated.
 
 ## Status
-- Not started.
+- G1 implemented: scoped functional ownership, schema 27, nested ownership roundtrips and export-time derived sets.
+  Final focused library suite passed 22 checks, including purchase-owned physical subparts.
+- G2 implemented: functional hierarchy, Sets section, independent eye/isolate controls and composed document masks.
+  Regression coverage includes isolation through hidden ancestors followed by save/load. Final focused/app runs are queued.
+- G3 implemented and validated: all 269 hobber members are grouped, with 16 derived sets. Final hobber baseline passed
+  2345 assertions (original baseline 2333). Changes to the hobber construction are group declarations/scopes only.
+- G4 implemented: legacy/framed mills and production hand-built examples, including inherited gantries and tracks.
+  Final hobbing, mill-frame and real-machine editor-tree tests are queued. The tree fixture covers generated artifact
+  ownership, viewport visibility, groups, derived sets and isolation persistence without CAD tessellation.
+- Initial app baseline confirmed the pre-existing CAD plate output-file failure after preceding tests passed.
+  Final app validation, tree evidence and the four separate step commits remain pending.

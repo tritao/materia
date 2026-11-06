@@ -108,6 +108,10 @@ enum abstract AssemblyMateKind(String) from String to String {
   @:id(6) @:optional var includePath:String;
   /** Authored default visibility; omitted means visible. Does not remove physics or wiring. */
   @:id(7) @:optional var visible:Bool;
+  /** Functional ownership, independent of include identity and kinematics. */
+  @:id(8) @:optional var groupPath:String;
+  /** Semantic categories derived by the generator from its component metadata. */
+  @:id(9) @:optional var selectionKinds:Array<String>;
 }
 
 /** A placement relation between two occurrence connectors (see `AssemblyMateKind`). */

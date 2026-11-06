@@ -332,7 +332,8 @@ class AssemblyDefinitionFlattener {
     ?sensors:Array<AssemblySensor>,
     ?networks:Array<materia.assembly.AssemblyDefinition.AssemblyElasticNetwork>,
     ?switches:Array<materia.assembly.AssemblyDefinition.AssemblySwitch>,
-    parentVisible:Bool = true
+    parentVisible:Bool = true,
+    groupPrefix:String = ""
   ):Map<
     String,
     FlatMember
@@ -385,7 +386,8 @@ class AssemblyDefinitionFlattener {
           nested.sensors,
           nested.elasticNetworks,
           nested.switches,
-          parentVisible && occurrence.visible != false
+          parentVisible && occurrence.visible != false,
+          occurrence.groupPath == null ? groupPrefix : (occurrence.groupPath == "Ungrouped" && groupPrefix != "" ? groupPrefix : (groupPrefix == "" ? "" : groupPrefix + "/") + occurrence.groupPath) + "/" + occurrence.id
         );
         active.remove(nested.id);
         connectors = exposed(nested.exposedConnectors, children, path);
@@ -409,6 +411,8 @@ class AssemblyDefinitionFlattener {
           prefix,
           occurrence.includePath
         );
+        if (occurrence.groupPath != null) flatOccurrence.groupPath = occurrence.groupPath == "Ungrouped" && groupPrefix != "" ? groupPrefix : (groupPrefix == "" ? "" : groupPrefix + "/") + occurrence.groupPath;
+        if (occurrence.selectionKinds != null) flatOccurrence.selectionKinds = occurrence.selectionKinds.copy();
         if (occurrence.grounded == true) flatOccurrence.grounded = true;
         if (!parentVisible || occurrence.visible == false) flatOccurrence.visible = false;
         flat.occurrences.push(flatOccurrence);

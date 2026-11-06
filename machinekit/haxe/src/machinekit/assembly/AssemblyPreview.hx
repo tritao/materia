@@ -132,7 +132,7 @@ class AssemblyPreview {
         == connector.name).length == 0) owner.connectors.push(connector);
     }
     var state = model.initialState(assemblyId).record();
-    preserveOwnership(definition, assembly.derived().definition);
+    preserveOwnership(definition, assembly.definition());
     shareDefinitions(definition, definitionByOccurrence);
     var cell = ControllerWiring.of(assembly, definition);
     var result:SceneArtifactData = {
@@ -228,6 +228,8 @@ class AssemblyPreview {
   public static function preserveOwnership(definition:AssemblyDefinition, source:AssemblyDefinition):Void {
     for (occurrence in definition.occurrences) for (original in source.occurrences) if (original.id == occurrence.id) {
       occurrence.includePath = original.includePath;
+      occurrence.groupPath = original.groupPath;
+      if (original.selectionKinds != null) occurrence.selectionKinds = original.selectionKinds.copy();
       for (entry in source.definitions) if (entry.id
         == original.definition) for (target in definition.definitions) if (target.id == occurrence.definition) {
         target.robotFlangeConnector = entry.robotFlangeConnector;

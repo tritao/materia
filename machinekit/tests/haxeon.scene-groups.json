@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "package": {
+    "name": "scene-group-tests"
+  },
+  "entry": "SceneGroupTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": ".."
+    }
+  },
+  "target": "host",
+  "outputDir": "build/scene-groups"
+}
