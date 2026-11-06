@@ -804,6 +804,15 @@ GPU time and draw/triangle work per pass. Native scene captures write a sibling
 IDs, base triangle and stroke counts, and hidden/culled flags. Inventory export
 runs only when the scene snapshot changes and precedes scene timing.
 
+`--skip-build` reuses the built app through `app/run-built.sh`. For paired native
+renderer variants, combine it with `--native-library-dir=/absolute/library/directory`
+containing `libnativekit_scene_render.so` and its soname symlink. The built launcher
+prepends this directory through `MATERIA_NATIVE_LIBRARY_PATH`; the default launch is
+unchanged. The benchmark records the selected renderer binary's path and SHA-256
+after the run. Use the same app, project, workspace dimensions and renderer build
+flags for both variants; keep the baseline build and its source commit alongside
+the capture artifacts. This avoids replacing production binaries or source files.
+
 UIKit's reusable Component Lab can be opened through the same desktop host:
 
 ```sh

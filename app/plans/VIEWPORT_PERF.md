@@ -336,7 +336,7 @@ Round 2, everything else, measured on the committed orbit benchmark (`app/tools/
    per-frame but camera-independent.
 5. **Scale.** Re-run on the bench mill and the tending cell as well as the hobber, so the gains are general.
 
-### Round 2 status: material instancing measured; remaining work in progress
+### Round 2 status: material instancing and edge caps measured; remaining work in progress
 
 Read the retained viewport, SceneRenderer, render compiler, GPU executor and nkgpu draw path.
 Frustum culling and geometry/material instancing already exist. Surface, stroke and AO passes
@@ -445,6 +445,20 @@ not loading. Bounded native report: 1,059 on-CPU samples; UI `prepareCommands` h
 and the scene surface draw lambda 3.12%. `Std.isOfType`/safe casts also remain.
 Artifact `orbit-cpu-report.txt` records this window; full capture wall/GC summaries
 include loading and are not steady-orbit results. Compositor waiting is excluded.
+
+**Controlled renderer variants for scale checks:** the runner's `--skip-build` and
+`--native-library-dir` options run the same built app with a separately built scene
+renderer, recording the selected binary's path/SHA-256. The default build/run remains
+unchanged. The built launcher prepends the explicit directory rather than replacing
+the production renderer or source files. `r2-baseline-sources` is a `git archive` of
+`dfddf3806`'s SceneKit, built with the current NativeKit and matching Release flags plus
+frame pointers; configuration is in `r2-baseline-render-build.json`.
+The baseline pilot (`r2-baseline-variant-pilot-01`, 5 warmup/16 measured) opens the
+previous hobber artifact only to validate library selection: 1,581 draws/2,315,109
+triangles match the opening-angle baseline census. `/proc` maps verify only the scene
+renderer comes from the baseline build; GPU and scene libraries remain the app's.
+This pilot is not a full-orbit performance comparison. Eight report tests and the
+built-launcher shell check pass. Use full source-project orbits for the scale checks.
 
 Further candidates (not implemented): surface shaders already discard single-sided back
 faces, while all ordinary pipelines disable hardware culling. A per-batch winding

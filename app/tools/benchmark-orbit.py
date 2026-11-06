@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import os
@@ -154,10 +155,15 @@ def main():
                         default=ROOT / "machinekit/examples/flexspline-hobber/materia.project.json",
                         help="project to orbit (default: flexspline hobber)")
     parser.add_argument("--launcher", default="", help="optional command prefix, e.g. 'heavy-run --slots 4 --need 4G --'")
+    parser.add_argument("--skip-build", action="store_true", help="reuse the built application and native libraries")
+    parser.add_argument("--native-library-dir", type=Path,
+                        help="prefer a native library directory for a paired renderer variant; requires --skip-build")
     parser.add_argument("--report-only", action="store_true")
     args = parser.parse_args()
     if args.frames < 2 or args.warmup < 1:
         parser.error("use at least two measured frames and one warmup frame")
+    if args.native_library_dir is not None and not args.skip_build:
+        parser.error("--native-library-dir requires --skip-build")
     output = args.output.resolve()
     if not args.report_only:
         output.mkdir(parents=True, exist_ok=False)
@@ -170,14 +176,22 @@ def main():
                            REFERENCE_EDITOR_WORKSPACE=str(output / "workspace.json"),
                            MATERIA_ROOT=str(ROOT), TMPDIR=str(output / "tmp"),
                            HAXEON_COMPILER_IDLE_SECONDS="1")
+        environment.pop("MATERIA_NATIVE_LIBRARY_PATH", None)
         (output / "tmp").mkdir()
-        command = shlex.split(args.launcher) + [str(ROOT / "haxeon/scripts/haxeon"), "run",
-                   "--project", str(ROOT / "app/haxeon.json"), "--", "--orbit-benchmark",
+        if args.native_library_dir is not None:
+            directory = args.native_library_dir.resolve()
+            if not (directory / "libnativekit_scene_render.so").is_file():
+                raise RuntimeError("native library directory must contain libnativekit_scene_render.so")
+            environment["MATERIA_NATIVE_LIBRARY_PATH"] = str(directory)
+        launch = ([str(ROOT / "app/run-built.sh")] if args.skip_build else
+                  [str(ROOT / "haxeon/scripts/haxeon"), "run", "--project", str(ROOT / "app/haxeon.json"), "--"])
+        command = shlex.split(args.launcher) + launch + ["--orbit-benchmark",
                    "--perspective", "--width=1320", "--height=900", f"--msaa={args.msaa}",
                    f"--capture-dir={output}", f"--frames={args.frames + args.warmup + DRAIN_FRAMES}",
                    "--project=" + str(args.project.resolve())]
         (output / "command.json").write_text(json.dumps(command, indent=2) + "\n")
-        metadata = {"arguments": vars(args) | {"output": str(output), "project": str(args.project.resolve())},
+        metadata = {"arguments": {key: str(value) if isinstance(value, Path) else value
+                                  for key, value in vars(args).items()} | {"output": str(output), "project": str(args.project.resolve())},
                     "display": environment.get("DISPLAY")}
         for name, query in (("commit", ["git", "rev-parse", "HEAD"]),
                             ("haxeonCommit", ["git", "-C", "haxeon", "rev-parse", "HEAD"]),
@@ -201,6 +215,10 @@ def main():
             display_log.write(json.dumps(display_sample()) + "\n")
         if result:
             raise RuntimeError(f"editor exited {result}; see {output / 'launch.log'}")
+        renderer = ((args.native_library_dir.resolve() if args.native_library_dir is not None else
+                     ROOT / "app/build/host/native/app") / "libnativekit_scene_render.so").resolve()
+        metadata["sceneRendererBinary"] = {"path": str(renderer), "sha256": hashlib.sha256(renderer.read_bytes()).hexdigest()}
+        (output / "environment.json").write_text(json.dumps(metadata, indent=2) + "\n")
     summarize(output, args.warmup, args.frames)
 
 
