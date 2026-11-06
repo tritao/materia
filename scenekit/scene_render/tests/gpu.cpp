@@ -131,6 +131,53 @@ void highlight_alpha_regression(nkgpu_renderer renderer) {
 
 // Touching opposite faces must resolve by sidedness, not submission order or depth bias.
 // Mirrored transforms and explicit two-sided sheets use the same rules for color and picking.
+void mixed_surface_pass_regression(nkgpu_renderer renderer) {
+    auto scene = std::make_shared<Scene>();
+    std::array<nkscene::NodeId,4> nodes;
+    Transaction create(scene);
+    for (unsigned i = 0; i < nodes.size(); ++i) {
+        const auto geometry = scene->reserve_geometry_id();
+        auto &mesh = scene->geometry_store().create(geometry);
+        mesh.edit_payload().vertices = {{{{-0.14f,-0.4f,0}}}, {{{0.14f,-0.4f,0}}}, {{{0,0.4f,0}}}};
+        if (i % 2 == 0) mesh.edit_payload().indices = {0,1,2};
+        const auto material = scene->reserve_material_id();
+        auto &surface = scene->material_store().create(material).edit_state();
+        surface.base_color = {0.15f + i*0.2f, 0.6f, 0.3f, 1};
+        if (i == 3) { surface.alpha_mode = nkscene::AlphaMode::Blend; surface.opacity = 0.55f; }
+        nodes[i] = scene->reserve_node_id();
+        create.add_create(nodes[i]); create.add_geometry(nodes[i], geometry); create.add_material(nodes[i], material);
+        nkscene::LocalTransform transform; transform.matrix[12] = -0.6f + i*0.4f;
+        create.add_transform(nodes[i], transform);
+    }
+    ChangeSet changes;
+    assert(scene->commit(create, changes) == NKS_OK); create.close();
+    nkscene::NativeKitGpuExecutor executor(renderer);
+    constexpr unsigned side = 96;
+    for (const auto samples : {1u,4u}) for (const float shift : {0.0f,0.1f}) for (bool clip : {false,true}) {
+        nkscene::SceneView view;
+        view.camera.enabled = true; view.camera.view_projection[12] = shift;
+        if (clip) view.clip_planes.push_back({{{0,1,0}},0,true});
+        executor.set_sample_count(samples);
+        const auto capture = [&]() {
+            auto plan = nkscene::compile(scene->snapshot(), view);
+            std::vector<std::uint8_t> image;
+            assert(executor.capture_rgba8(plan, scene->snapshot(), side, side, {0,0,0,0}, image) == NKGPU_OK);
+            return image;
+        };
+        const auto together = capture();
+        std::vector<unsigned> reference(together.size(),0);
+        // The nonoverlapping triangles rendered one at a time are independent
+        // of the indexed/nonindexed/opaque/blended pipeline order in one pass.
+        for (const auto selected : nodes) {
+            for (const auto node : nodes) view.set_visibility_override(node, node == selected);
+            const auto alone = capture();
+            for (std::size_t i = 0; i < alone.size(); ++i) reference[i] += alone[i];
+        }
+        for (std::size_t i = 0; i < together.size(); ++i)
+            assert(reference[i] == together[i]);
+    }
+}
+
 void round_stroke_caps_regression(nkgpu_renderer renderer) {
     auto scene = std::make_shared<Scene>();
     const auto geometry = scene->reserve_geometry_id();
@@ -483,6 +530,7 @@ int main() {
     }
 
     highlight_alpha_regression(renderer);
+    mixed_surface_pass_regression(renderer);
     round_stroke_caps_regression(renderer);
     equivalent_material_batch_regression(renderer);
     sidedness_regression(renderer);

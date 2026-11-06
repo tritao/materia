@@ -460,10 +460,61 @@ renderer comes from the baseline build; GPU and scene libraries remain the app's
 This pilot is not a full-orbit performance comparison. Eight report tests and the
 built-launcher shell check pass. Use full source-project orbits for the scale checks.
 
+**Pass-uniform fix measured:** keep the bound surface pipeline between compatible
+draws, uploading camera/lighting/clip blocks once per actual pipeline transition. Reset
+tracking after section caps, which can change GPU state. AO/picking and edge passes
+bind their fixed pipelines and camera/clip blocks once; per-material/sidedness data
+still updates per draw. Nothing is retained across frames. All 11 renderer suites pass,
+including a new pixel comparison of mixed indexed/nonindexed, opaque/blended draws
+against isolated references with camera shifts, sections and 1x/4x MSAA.
+`r2-pass-uniforms-hobber-01` has identical 360-frame work counts, but timings increased
+across both changed and unchanged phases (for example input 0.043 -> 0.162 ms and native
+UI 1.669 -> 3.920 ms), so it does not establish a performance gain. A back-to-back
+source-project pair (`r2-pass-uniforms-before-02` / `after-02`) compares the separately
+built cap renderer (`5de7ad27d`) with the current uniform version using the same built
+app; build recipe and sources are in `r2-native-variant-cmake` / `r2-cap-variant-sources`.
+
+| Median metric | Cap renderer, before 02 | Pass uniforms, after 02 |
+| --- | ---: | ---: |
+| CPU | 6.963 ms | 6.616 ms |
+| Scene GPU | 5.302 ms | 4.893 ms |
+| Native preparation | 0.876 ms | 0.817 ms |
+| Native submission | 1.625 ms | 1.343 ms |
+| Native UI render (control) | 2.710 ms | 2.683 ms |
+| Draw calls | 910.5 | 910.5 |
+| Submitted triangles | 1,965,069 | 1,965,069 |
+| Throughput (context only) | 30.99 fps | 32.39 fps |
+
+All 360 work-count pairs match and all 376,922 final interior pixels are identical.
+The reverse-order pair (`after-03` then `before-03`) reports CPU 5.917 vs 6.308 ms,
+GPU 5.154 vs 5.996 ms, native submission 1.219 vs 1.254 ms, and UI 2.242 vs 2.746 ms.
+Its UI control varies, so do not attribute that entire CPU difference to the fix.
+Both pairs support keeping the smaller scene-submit change; the gain is modest.
+Reverse-order work and pixels also match exactly. Binary hashes are recorded by the
+runner; `r2-pass-uniforms-variant.json` maps the production sources to this variant.
+
 Further candidates (not implemented): surface shaders already discard single-sided back
 faces, while all ordinary pipelines disable hardware culling. A per-batch winding
 classification (positive, reflected, mixed/singular), retained with instance transforms,
 could safely reject the same faces earlier; reflected batches need front culling with
 the original CCW convention to preserve the shader's `gl_FrontFacing` parity test.
-Pass-global camera/lighting/clip uniforms are also redundantly submitted per batch.
-Measure these independently after the first fix; they are not measured gains yet.
+Screen-size LOD/tessellation and the bench-mill/tending-cell comparisons remain pending;
+frustum culling is already active and covered by the native camera/culling tests.
+
+**Scale validation running:** `r2-scale-current.sh` runs source-project full orbits
+serially: `r2-scale-bench-before-01` / `after-01` use `bench-mill/materia.bench.project.json`;
+`r2-scale-cell-before-01` / `after-01` use `machine-tending/materia.project.json`.
+Before is the separate `dfddf3806` renderer; after is the built three-fix renderer.
+Both use the same built app and the standard 60/360/8 frame, 4x-MSAA benchmark.
+The script then runs the full app suite into `r2-three-fixes-app-tests.log`.
+Do not rebuild/replace the app's native libraries while these captures are live.
+An own-process-scoped helper forces DPMS On without changing its policy while the
+batch lives (`r2-scale-display-wake.jsonl`). Native and app run handles must be checked
+before interpreting unfinished logs or starting another main-app renderer build.
+
+LOD investigation remains real work, not a completed gate: consider cached index-only
+LODs for high-poly, untextured geometry without feature strokes (the hob is the main
+candidate). Reuse original packed vertices/attributes and full-resolution picking;
+select a level conservatively for the largest projected instance in a batch so there
+is no per-camera instance regrouping/upload. Section/inspection correctness and a
+documented screen-error threshold need validation before any such fix is accepted.

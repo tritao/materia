@@ -1092,6 +1092,7 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnaps
                 viewport.depth_unprojection[row] = inverse[8 + row];
     }
     const auto clip_data = clip_uniform_data(plan);
+    bool globals_bound = false;
     for (const auto &batch : state.batches) {
         const auto geometry = state.geometry_resources.find(batch.key.geometry);
         if (geometry == state.geometry_resources.end() || !geometry->second.stroke_buffer.id ||
@@ -1104,20 +1105,23 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnaps
         viewport.viewport_width_height_half_width[3] = material &&
             has_material_flag(material->state->flags, MaterialFlags::DoubleSided) ? 2.0f : 0.0f;
         const auto color = stroke_color_for(plan,material);
-        auto result = nkgpu_apply_pipeline(state.renderer, stroke_pipeline);
-        if (result == NKGPU_OK)
-            result = nkgpu_apply_uniform_data(state.renderer, 1,
-                reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()),
-                sizeof(float) * 16);
+        nkgpu_result result = NKGPU_OK;
+        if (!globals_bound) {
+            if ((result = nkgpu_apply_pipeline(state.renderer, stroke_pipeline)) != NKGPU_OK ||
+                (result = nkgpu_apply_uniform_data(state.renderer, 1,
+                    reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()),
+                    sizeof(float) * 16)) != NKGPU_OK ||
+                (result = nkgpu_apply_uniform_data(state.renderer, 2,
+                    reinterpret_cast<const std::uint8_t *>(&clip_data), sizeof(clip_data))) != NKGPU_OK)
+                return set_failure(state, stats, result);
+            globals_bound = true;
+        }
         if (result == NKGPU_OK)
             result = nkgpu_apply_uniform_data(state.renderer, 3,
                 reinterpret_cast<const std::uint8_t *>(&viewport), sizeof(viewport));
         if (result == NKGPU_OK)
             result = nkgpu_apply_uniform_data(state.renderer, 0,
                 reinterpret_cast<const std::uint8_t *>(color.data()), sizeof(color));
-        if (result == NKGPU_OK)
-            result = nkgpu_apply_uniform_data(state.renderer, 2,
-                reinterpret_cast<const std::uint8_t *>(&clip_data), sizeof(clip_data));
         if (result == NKGPU_OK)
             result = nkgpu_apply_vertex_buffer(state.renderer, 0,
                                                geometry->second.stroke_buffer, 0);
@@ -1171,6 +1175,7 @@ nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSna
                            const ClipUniformData &clip_data, const LightingUniformData &lighting_data,
                            std::uint32_t samples, GpuExecutionStats &stats) {
     const auto &set = state.pipelines[pipeline_slot(samples)];
+    nkgpu_pipeline active_pipeline{};
     const auto draw = [&](const auto &batch, std::size_t first_instance,
                           std::size_t instance_count, bool blended) -> nkgpu_result {
         const auto geometry = state.geometry_resources.find(batch.key.geometry);
@@ -1203,12 +1208,21 @@ nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSna
         material_data.texture_flags[1] = material_gpu->second.base_color_srgb ? 1.0f : 0.0f;
         material_data.texture_flags[2] = material_gpu->second.emissive_srgb ? 1.0f : 0.0f;
         nkgpu_result result = NKGPU_OK;
-        if ((result = nkgpu_apply_pipeline(state.renderer, pipeline)) != NKGPU_OK ||
-            (result = nkgpu_apply_uniform_data(
-                 state.renderer, 1,
-                 reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()),
-                 sizeof(float) * 16)) != NKGPU_OK ||
-            (result = nkgpu_apply_vertex_buffer(state.renderer, 0, geometry->second.buffer, 0)) !=
+        // Applying even the same pipeline resets Sokol's required-uniform
+        // tracking. Keep it bound between compatible draws, and upload pass
+        // uniforms again on every actual pipeline transition (including blend).
+        if (active_pipeline.id != pipeline.id) {
+            if ((result = nkgpu_apply_pipeline(state.renderer, pipeline)) != NKGPU_OK ||
+                (result = nkgpu_apply_uniform_data(state.renderer, 1,
+                    reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()), sizeof(float) * 16)) != NKGPU_OK ||
+                (result = nkgpu_apply_uniform_data(state.renderer, 3,
+                    reinterpret_cast<const std::uint8_t *>(&lighting_data), sizeof(lighting_data))) != NKGPU_OK ||
+                (result = nkgpu_apply_uniform_data(state.renderer, 2,
+                    reinterpret_cast<const std::uint8_t *>(&clip_data), sizeof(clip_data))) != NKGPU_OK)
+                return result;
+            active_pipeline = pipeline;
+        }
+        if ((result = nkgpu_apply_vertex_buffer(state.renderer, 0, geometry->second.buffer, 0)) !=
                 NKGPU_OK ||
             (geometry->second.indexed &&
              (result = nkgpu_apply_index_buffer(state.renderer, geometry->second.index_buffer,
@@ -1234,12 +1248,6 @@ nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSna
             (result = nkgpu_apply_uniform_data(
                  state.renderer, 0, reinterpret_cast<const std::uint8_t *>(&material_data),
                  sizeof(material_data))) != NKGPU_OK ||
-            (result = nkgpu_apply_uniform_data(
-                 state.renderer, 3, reinterpret_cast<const std::uint8_t *>(&lighting_data),
-                 sizeof(lighting_data))) != NKGPU_OK ||
-            (result = nkgpu_apply_uniform_data(state.renderer, 2,
-                                               reinterpret_cast<const std::uint8_t *>(&clip_data),
-                                               sizeof(clip_data))) != NKGPU_OK ||
             (result = nkgpu_draw(state.renderer, 0, element_count,
                                  static_cast<std::uint32_t>(instance_count))) != NKGPU_OK)
             return result;
@@ -1283,6 +1291,7 @@ nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSna
         }
     }
     if(auto result=draw_caps(state,plan,snapshot,lighting_data,samples,false,false,stats);result!=NKGPU_OK)return result;
+    active_pipeline = {}; // Caps may have changed the bound pipeline and uniform state.
     std::stable_sort(blended.begin(), blended.end(),
                      [](const BlendedInstance &left, const BlendedInstance &right) {
                          return left.depth > right.depth;
@@ -2666,6 +2675,7 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
         return fail_frame(result);
 
     const auto clip_data = clip_uniform_data(plan);
+    bool globals_bound = false;
     for (const auto &batch : state.batches) {
         const auto *material = snapshot.find_material(batch.key.material);
         const std::array<float, 4> pick_output{for_ao ? 1.0f : 0.0f,
@@ -2678,19 +2688,20 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
         const auto element_count = geometry->second.pick_vertex_count;
         if (!element_count)
             continue;
-        if ((result = nkgpu_apply_pipeline(state.renderer, for_ao ? state.ao_position_pipeline : state.pick_pipeline)) != NKGPU_OK ||
-            (result = nkgpu_apply_uniform_data(state.renderer, 0,
+        if (!globals_bound) {
+            if ((result = nkgpu_apply_pipeline(state.renderer, for_ao ? state.ao_position_pipeline : state.pick_pipeline)) != NKGPU_OK ||
+                (result = nkgpu_apply_uniform_data(state.renderer, 1,
+                    reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()), sizeof(float) * 16)) != NKGPU_OK ||
+                (result = nkgpu_apply_uniform_data(state.renderer, 2,
+                    reinterpret_cast<const std::uint8_t *>(&clip_data), sizeof(clip_data))) != NKGPU_OK)
+                return fail_frame(result);
+            globals_bound = true;
+        }
+        if ((result = nkgpu_apply_uniform_data(state.renderer, 0,
                  reinterpret_cast<const std::uint8_t *>(pick_output.data()), sizeof(pick_output))) != NKGPU_OK ||
-            (result = nkgpu_apply_uniform_data(
-                 state.renderer, 1,
-                 reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()),
-                 sizeof(float) * 16)) != NKGPU_OK ||
             (result = nkgpu_apply_vertex_buffer(state.renderer, 0, geometry->second.pick_buffer, 0)) !=
                 NKGPU_OK ||
             (result = nkgpu_apply_vertex_buffer(state.renderer, 1, batch.buffer, 0)) != NKGPU_OK ||
-            (result = nkgpu_apply_uniform_data(state.renderer, 2,
-                                               reinterpret_cast<const std::uint8_t *>(&clip_data),
-                                               sizeof(clip_data))) != NKGPU_OK ||
             (result = nkgpu_draw(state.renderer, 0, element_count,
                                  static_cast<std::uint32_t>(batch.instances.size()))) != NKGPU_OK)
             return fail_frame(result);
