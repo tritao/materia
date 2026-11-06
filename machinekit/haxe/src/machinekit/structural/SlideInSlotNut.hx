@@ -55,10 +55,10 @@ class SlideInSlotNut extends MachineComponent {
     Max
   );
   owned.push(base);
-  var shifted = base.translated(new cadkit.modeling.Vector(0, 0, -ridgeHeight));
+  var shifted = Solids.named(base.translated(new cadkit.modeling.Vector(0, 0, -ridgeHeight)), "base");
   owned.push(shifted);
   base.close();
-  var ridge = Part.box(ridgeWidth, length, ridgeHeight, Center, Center, Max);
+  var ridge = Solids.named(Part.box(ridgeWidth, length, ridgeHeight, Center, Center, Max), "ridge");
   owned.push(ridge);
   return Solids.union([shifted, ridge]);
   });
@@ -68,7 +68,7 @@ class SlideInSlotNut extends MachineComponent {
     var screw = SocketHeadCapScrew.metric(size, 10);
     return Solids.building([], owned -> {var body = fitEnvelope();
     owned.push(body);
-    var hole = TSlotTableParts.threadBore(screw.diameter / 2, -height - 0.1, 0.1, screw.thread.mating());
+    var hole = Solids.named(TSlotTableParts.threadBore(screw.diameter / 2, -height - 0.1, 0.1, screw.thread.mating()), "thread");
     owned.push(hole);
     return Solids.cut(body, [hole]);
     });

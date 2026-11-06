@@ -77,16 +77,16 @@ class LinearMountCleat extends MachineComponent {
   }
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var parts:Array<Part> = [];
-    for (r in stockRegions()) {
+    for (k => r in stockRegions()) {
       var raw = Part.box(r[1] - r[0], r[3] - r[2], r[5] - r[4]);
-      parts.push(raw.translated(new Vector((r[0] + r[1]) / 2, (r[2] + r[3]) / 2, r[4])));
+      parts.push(Solids.named(raw.translated(new Vector((r[0] + r[1]) / 2, (r[2] + r[3]) / 2, r[4])), k == 0 ? "base" : "wall"));
       raw.close();
     }
     var stock = Solids.union(parts), tools:Array<Part> = [];
-    for (h in cutBores()) {
+    for (k => h in cutBores()) {
       var raw = Part.cylinder(h.diameter / 2, h.depth);
       try {
-        tools.push(PosedParts.moved(raw, h.frame));
+        tools.push(Solids.named(PosedParts.moved(raw, h.frame), "bore" + (k + 1)));
         raw.close();
       } catch (e:Dynamic) {
         raw.close();

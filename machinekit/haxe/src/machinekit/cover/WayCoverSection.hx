@@ -156,12 +156,12 @@ class WayCoverSection extends MachineComponent {
   }
 
   /** The solid between an outer and an inner section: both rectangles are given by their half width and height range. */
-  static function ring(outerHalf:Float, oy0:Float, oy1:Float, innerHalf:Float, iy0:Float, iy1:Float, z0:Float, z1:Float):Part
-    return Solids.cut(slab(outerHalf, oy0, oy1, z0, z1), [slab(innerHalf, iy0, iy1, z0 - 1, z1 + 1)]);
+  static function ring(outerHalf:Float, oy0:Float, oy1:Float, innerHalf:Float, iy0:Float, iy1:Float, z0:Float, z1:Float, tag:String):Part
+    return Solids.cut(Solids.named(slab(outerHalf, oy0, oy1, z0, z1), tag), [Solids.named(slab(innerHalf, iy0, iy1, z0 - 1, z1 + 1), tag + "-opening")]);
 
   function skin(z0:Float, z1:Float):Part {
     var row = plan.row, w = plan.innerHalfWidth(level);
-    return ring(w + row.wall, plan.outerLow(level), plan.outerHigh(level), w, plan.innerLow(level), plan.innerHigh(level), z0, z1);
+    return ring(w + row.wall, plan.outerLow(level), plan.outerHigh(level), w, plan.innerLow(level), plan.innerHigh(level), z0, z1, "skin");
   }
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -175,14 +175,14 @@ class WayCoverSection extends MachineComponent {
       var lip = plan.shape.reversed
         // Nesting that grows toward the fixed end: the parent is the larger skin, so the lip is on the outside of this one.
         ? ring(w + row.wall + g, open ? WayCoverPlan.FLOOR_GAP : plan.outerLow(level) - g, plan.outerHigh(level) + g, w + row.wall,
-          open ? WayCoverPlan.FLOOR_GAP - 1 : plan.outerLow(level), plan.outerHigh(level), 0, WayCoverPlan.LIP)
+          open ? WayCoverPlan.FLOOR_GAP - 1 : plan.outerLow(level), plan.outerHigh(level), 0, WayCoverPlan.LIP, "lip")
         : ring(w, open ? WayCoverPlan.FLOOR_GAP : plan.innerLow(level), plan.innerHigh(level), w - g, open ? WayCoverPlan.FLOOR_GAP - 1 : plan.innerLow(level) + g,
-          plan.innerHigh(level) - g, 0, WayCoverPlan.LIP);
+          plan.innerHigh(level) - g, 0, WayCoverPlan.LIP, "lip");
       owned.push(lip);
       return Solids.union([shell, lip]);
     });
     return Solids.building([], owned -> {
-      var plate = ring(plateHalf(), plan.plateLow(), plan.plateHigh(), plan.width / 2, plan.openingLow(), plan.openingHigh(), 0, row.flangeThickness);
+      var plate = ring(plateHalf(), plan.plateLow(), plan.plateHigh(), plan.width / 2, plan.openingLow(), plan.openingHigh(), 0, row.flangeThickness, "plate");
       owned.push(plate);
       var shell = skin(row.flangeThickness, row.flangeThickness + plan.flangeSkin());
       owned.push(shell);
@@ -190,7 +190,7 @@ class WayCoverSection extends MachineComponent {
       if (role == Moving) {
         // The wiper pad: a lip hugging the protected profile, from the opening out to the first skin, standing on the plate's inner face.
         var pad = ring(plan.innerHalfWidth(0), plan.shape.open ? WayCoverPlan.FLOOR_GAP : plan.innerLow(0), plan.innerHigh(0), plan.width / 2, plan.openingLow(), plan.openingHigh(),
-          row.flangeThickness, row.flangeThickness + row.wiper);
+          row.flangeThickness, row.flangeThickness + row.wiper, "pad");
         owned.push(pad);
         parts.push(pad);
       }

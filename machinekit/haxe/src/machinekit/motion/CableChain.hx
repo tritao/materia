@@ -37,6 +37,18 @@ class CableChain extends AssumedCatalogComponent {
   override public function componentType():Null<ComponentType> return recipeType();
   override public function geometry(detail:ComponentDetail = Preview):Part return geometryAt(n("travel") / 2, detail);
 
+  /** The ruled solid through `sections`, built link by link, each interval named `<prefix><k>` (from 1), fused. */
+  static function links(sections:Array<cadkit.modeling.Curve>, prefix:String):Part {
+    var pieces:Array<Part> = [];
+    try {
+      for (i in 0...sections.length - 1) pieces.push(Solids.named(Part.loft([sections[i], sections[i + 1]], true), prefix + (i + 1)));
+      return Solids.union(pieces);
+    } catch (error:Dynamic) {
+      for (piece in pieces) if (!piece.shape.isClosed()) piece.close();
+      throw error;
+    }
+  }
+
   /** Hollow continuous link envelope at a travel position; links and pins are nominal. */
   public function geometryAt(position:Float, detail:ComponentDetail = Preview):Part {
     movingFrame(position);
@@ -50,18 +62,21 @@ class CableChain extends AssumedCatalogComponent {
     var delta = position - n("travel") / 2, lower = (n("travel") / 2 + delta) / 2;
     var outer:Array<cadkit.modeling.Curve> = [], inner:Array<cadkit.modeling.Curve> = [];
     function section(y:Float, z:Float, a:Float):Void {
-      function rectangle(width:Float, height:Float):cadkit.modeling.Curve {
-        return cadkit.modeling.Curve.polyline(
-          [for (corner in [{x: -1, y: -1}, {x: 1, y: -1}, {x: 1, y: 1}, {x: -1, y: 1}]) new Vector(
-            corner.x * width / 2,
-            y - corner.y * height / 2 * Math.sin(a),
-            z + corner.y * height / 2 * Math.cos(a)
-          )],
-          true
-        );
+      // Each edge of each section is named by the section's place along the chain and its side, so the faces the loft
+      // sweeps between sections are told apart (`s3.e1` is the second side of the fourth section).
+      function rectangle(width:Float, height:Float, section:Int):cadkit.modeling.Curve {
+        var corners = [for (corner in [{x: -1, y: -1}, {x: 1, y: -1}, {x: 1, y: 1}, {x: -1, y: 1}]) new Vector(
+          corner.x * width / 2,
+          y - corner.y * height / 2 * Math.sin(a),
+          z + corner.y * height / 2 * Math.cos(a)
+        )];
+        return cadkit.modeling.Curve.wire([for (k in 0...4) cadkit.modeling.Curve.named(
+          cadkit.modeling.Curve.line(corners[k], corners[(k + 1) % 4]),
+          's$section.e$k'
+        )]);
       }
-      outer.push(rectangle(w, h));
-      inner.push(rectangle(n("innerWidth"), n("innerHeight")));
+      outer.push(rectangle(w, h, outer.length));
+      inner.push(rectangle(n("innerWidth"), n("innerHeight"), inner.length));
     }
     try {
       section(0, 0, 0);
@@ -71,9 +86,11 @@ class CableChain extends AssumedCatalogComponent {
         section(lower + r * Math.sin(a), r * (1 - Math.cos(a)), a);
       }
       if (lower - delta > 1e-9) section(delta, 2 * r, Math.PI);
-      var body = Part.loft(outer, true), bore:Part = null;
+      // One ruled loft per interval between sections, each named by its link: a single loft through every section would
+      // name all the faces of an edge alike (the first section's), and the chain's faces could not be told apart.
+      var body = links(outer, "link"), bore:Part = null;
       try {
-        bore = Part.loft(inner, true);
+        bore = links(inner, "space");
       } catch (error:Dynamic) {
         body.close();
         throw error;
@@ -82,7 +99,7 @@ class CableChain extends AssumedCatalogComponent {
       outer = [];
       for (c in inner) c.close();
       inner = [];
-      return Solids.cut(Solids.named(body, "links-envelope"), [Solids.named(bore, "cable-space")]);
+      return Solids.cut(body, [bore]);
     } catch (error:Dynamic) {
       for (c in outer) c.close();
       for (c in inner) c.close();

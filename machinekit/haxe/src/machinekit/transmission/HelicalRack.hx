@@ -56,12 +56,13 @@ class HelicalRack extends AssumedCatalogComponent {
     )).geometry(detail);
     parts.push(prototype);
     var copies:Array<Part> = [];
-    var offset = 0;
+    var offset = 0, span = 0;
     while (offset < total) {
       var count = Std.int(Math.min(80, total - offset));
       var piece = count == 80 ? prototype : new HelicalRack(values().setInteger("teeth", count)).geometry(detail);
       if (piece != prototype) parts.push(piece);
-      var placed = piece.translated(new Vector(0, 0, offset * Math.PI * transverseModule()));
+      // Copies of one prototype carry a name of their place along the rack, so their faces do not collide.
+      var placed = Solids.named(piece.translated(new Vector(0, 0, offset * Math.PI * transverseModule())), "span" + (++span));
       parts.push(placed);
       copies.push(placed);
       offset += count;

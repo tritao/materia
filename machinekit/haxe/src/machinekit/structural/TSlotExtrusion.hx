@@ -286,13 +286,15 @@ class TSlotExtrusion implements StructuralProfile {
     );
     tracked.push(body);
     var tools:Array<Part> = [];
+    var boreIndex = 0;
     for (p in borePositions) {
-      var bore = Part.cylinderAlong(boreDiameter / 2, new Vector(p.x, p.y, -0.1), Vector.Z(), length + 0.2);
+      var bore = Solids.named(Part.cylinderAlong(boreDiameter / 2, new Vector(p.x, p.y, -0.1), Vector.Z(), length + 0.2), "bore" + (++boreIndex));
       tracked.push(bore);
       tools.push(bore);
     }
-    for (face in 0...4) for (offset in faceSlots[face]) {
-      var tool = Part.prism(slotPoints(face, offset), -0.1, length + 0.1);
+    for (face in 0...4) for (k => offset in faceSlots[face]) {
+      // Slot k of face f (faces rotate from +X): `slot2.1` is the second slot of the +Y face.
+      var tool = Solids.named(Part.prism(slotPoints(face, offset), -0.1, length + 0.1), "slot" + face + "." + (k + 1));
       tracked.push(tool);
       tools.push(tool);
     }

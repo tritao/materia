@@ -106,7 +106,7 @@ class GearRackRun extends MachineComponent {
         var connector = section.connector('pinPilot$pin').frame;
         var axis = F.transformVector(connector, 0, -1, 0);
         var tool = Part.cylinder(finishPinDiameter / 2, section.spec.faceWidthMm + 0.2);
-        tools.push(machinekit.assembly.PosedParts.moved(
+        tools.push(Solids.named(machinekit.assembly.PosedParts.moved(
           tool,
           machinekit.assembly.AxisBuilder.orient(
             connector.x - axis.x * 0.1,
@@ -115,13 +115,13 @@ class GearRackRun extends MachineComponent {
             [0.0, 0, 1],
             [axis.x, axis.y, axis.z]
           )
-        ));
+        ), "finish-pin" + pin));
         tool.close();
       }
       raw = Solids.cut(raw, tools);
     }
     try {
-      for (i in 0...count) parts.push(raw.translated(new cadkit.modeling.Vector(0, 0, i * section.spec.lengthMm)));
+      for (i in 0...count) parts.push(Solids.named(raw.translated(new cadkit.modeling.Vector(0, 0, i * section.spec.lengthMm)), "section" + (i + 1)));
       raw.close();
     } catch (e:Dynamic) {
       raw.close();

@@ -148,16 +148,16 @@ class GearRack extends MachineComponent {
       var y = -spec.pitchHeightMm + spec.holeHeightMm;
       for (i in 0...spec.holeCount) {
         var z = spec.holeEndMm + i * spec.holePitchMm;
-        tools.push(bore(spec.boreMm / 2, -0.1, spec.faceWidthMm + 0.1, y, z));
-        tools.push(bore(spec.counterboreMm / 2, -0.1, spec.counterboreDepthMm, y, z));
+        tools.push(Solids.named(bore(spec.boreMm / 2, -0.1, spec.faceWidthMm + 0.1, y, z), "bolt" + (i + 1)));
+        tools.push(Solids.named(bore(spec.counterboreMm / 2, -0.1, spec.counterboreDepthMm, y, z), "counterbore" + (i + 1)));
       }
-      for (z in [spec.pinEndMm, spec.lengthMm - spec.pinEndMm]) tools.push(bore(
+      for (k => z in [spec.pinEndMm, spec.lengthMm - spec.pinEndMm]) tools.push(Solids.named(bore(
         spec.pinPilotMm / 2,
         -0.1,
         spec.faceWidthMm + 0.1,
         y,
         z
-      ));
+      ), "pin-pilot" + (k + 1)));
     } catch (e:Dynamic) {
       body.close();
       for (t in tools) t.close();

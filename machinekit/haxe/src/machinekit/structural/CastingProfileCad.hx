@@ -29,17 +29,18 @@ class CastingProfileCad {
   public static function wire(profile:Array<CastingSegment>):Curve {
     CastingProfileGeometry.validate(profile);
     return Scope.run(scope -> {var edges: Array<Curve> = [];
-    for (record in profile) {
+    for (index => record in profile) {
       var curve = segment(record), start = new Vector(curve.start.x, curve.start.y), end = new Vector(
         curve.end.x,
         curve.end.y
       );
       var midpoint = curve.point(0.5);
-      edges.push(scope.own(curve.isLine() ? Curve.line(start, end) : Curve.arc(
+      // Named by place in the authored contour, so the faces extruded from it are strong.
+      edges.push(scope.own(Curve.named(curve.isLine() ? Curve.line(start, end) : Curve.arc(
         start,
         new Vector(midpoint.x, midpoint.y),
         end
-      )));
+      ), 'boundary-segment-${index + 1}')));
     }
     return scope.own(Curve.wire(edges));
     });

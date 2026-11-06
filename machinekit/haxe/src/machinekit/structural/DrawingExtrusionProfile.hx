@@ -100,17 +100,18 @@ class DrawingExtrusionProfile implements StructuralProfile {
     return {minX: -dimensions[0] / 2, maxX: dimensions[0] / 2, minY: -dimensions[1] / 2, maxY: dimensions[1] / 2};
   }
 
-  static function loop(vertices:Array<Dynamic>):Curve {
+  /** The closed outline of `vertices`, each edge named by its loop and place (`L0.e3`), so the faces extruded from it are strong. */
+  static function loop(vertices:Array<Dynamic>, index:Int):Curve {
     var edges:Array<Curve> = [];
     try {
       for (i in 0...vertices.length) {
         var a:Array<Float> = vertices[i], b:Array<Float> = vertices[(i + 1) % vertices.length];
         var start = new Vector(a[0], a[1]), end = new Vector(b[0], b[1]);
-        edges.push(Math.abs(a[2]) < 1e-12 ? Curve.line(start, end) : Curve.arc(
+        edges.push(Curve.named(Math.abs(a[2]) < 1e-12 ? Curve.line(start, end) : Curve.arc(
           start,
           new Vector((a[0] + b[0]) / 2 + (b[1] - a[1]) * a[2] / 2, (a[1] + b[1]) / 2 - (b[0] - a[0]) * a[2] / 2),
           end
-        ));
+        ), 'L$index.e$i'));
       }
       var wire = Curve.wire(edges);
       for (edge in edges) edge.close();
@@ -126,11 +127,11 @@ class DrawingExtrusionProfile implements StructuralProfile {
     var loops:Array<Dynamic> = section.loops, circles:Array<Dynamic> = section.circles;
     var wires:Array<Curve> = [];
     try {
-      for (vertices in loops) wires.push(loop(vertices));
-      for (circle in circles) wires.push(Curve.circle(
+      for (k => vertices in loops) wires.push(loop(vertices, k));
+      for (k => circle in circles) wires.push(Curve.named(Curve.circle(
         circle.radius,
         new Plane(new Vector(circle.x, circle.y), Vector.X(), Vector.Z().scale(-1))
-      ));
+      ), 'C$k'));
       var face = Sketch.face(wires[0], wires.slice(1));
       var part:Part;
       try part = face.extrude(length) catch (error:Dynamic) {

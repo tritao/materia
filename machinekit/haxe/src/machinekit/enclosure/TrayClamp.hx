@@ -31,9 +31,9 @@ class TrayClamp extends MachineComponent {
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var rawHeel = Part.box(20, 20, height), rawToe = Part.box(40, 20, 4);
-    var heel = rawHeel.translated(new Vector(-5, 0, 0)), toe = rawToe.translated(new Vector(5, 0, height));
+    var heel = Solids.named(rawHeel.translated(new Vector(-5, 0, 0)), "heel"), toe = Solids.named(rawToe.translated(new Vector(5, 0, height)), "toe");
     rawHeel.close();
     rawToe.close();
-    return Solids.cut(Solids.union([heel, toe]), [Part.cylinderSpan(3.3, -1, height + 5)]);
+    return Solids.cut(Solids.union([heel, toe]), [Solids.named(Part.cylinderSpan(3.3, -1, height + 5), "bolt")]);
   }
 }
