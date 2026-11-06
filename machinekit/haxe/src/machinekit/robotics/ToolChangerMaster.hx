@@ -94,7 +94,7 @@ class ToolChangerMaster extends MachineComponent {
       Solids.named(
         Part.cylinderAlong(1.5,
         new cadkit.modeling.Vector(dir.x * (r - 6), dir.y * (r - 6), 0.4 * thickness), dir, 6.1),
-        "air-port"
+        "air-port" + (i + 1)
       );
     }
     ]);

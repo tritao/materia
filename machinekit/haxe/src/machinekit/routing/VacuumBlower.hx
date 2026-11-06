@@ -61,7 +61,7 @@ class VacuumBlower extends AssumedCatalogComponent {
     var body = Solids.named(Part.revolve(profile), "blower");
     return Solids.cut(
       body,
-      [for (x in [-0.5 * r, 0.5 * r]) Solids.named(Part.cylinderSpan(port, -0.1, 0.12 * l, x, 0), "port")]
+      [for (k => x in [-0.5 * r, 0.5 * r]) Solids.named(Part.cylinderSpan(port, -0.1, 0.12 * l, x, 0), "port" + (k + 1))]
     );
   }
 

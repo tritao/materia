@@ -197,27 +197,29 @@ class ToolServiceModule extends MachineComponent {
     );
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
-    var parts = [Part.box(width, depth, height)];
-    parts.push(Part.cylinderAlong(6, new Vector(-width / 2 - 8, 0, 10), Vector.X(), 9));
-    for (i in 1...outlets + 1) parts.push(Part.cylinderAlong(
+    var parts = [Solids.named(Part.box(width, depth, height), "body")];
+    parts.push(Solids.named(Part.cylinderAlong(6, new Vector(-width / 2 - 8, 0, 10), Vector.X(), 9), "inlet"));
+    for (i in 1...outlets + 1) parts.push(Solids.named(Part.cylinderAlong(
       6,
       new Vector(width / 2 - 1, outlets == 1 ? 0 : (i == 1 ? -11 : 11), 10),
       Vector.X(),
       9
-    ));
+    ), "outlet" + i));
     var tools:Array<Part> = [];
+    var bolt = 0;
     for (x in [-10.0, 10.0]) for (y in [-9.0, 9.0]) {
-      tools.push(Part.cylinderSpan(1.7, -1, height + 1, x, y));
-      tools.push(Part.cylinderSpan(3, 14, height + 1, x, y));
+      bolt++;
+      tools.push(Solids.named(Part.cylinderSpan(1.7, -1, height + 1, x, y), "bolt" + bolt));
+      tools.push(Solids.named(Part.cylinderSpan(3, 14, height + 1, x, y), "counterbore" + bolt));
     }
     // Visible connector bores distinguish socket envelopes from solid cable ends.
-    tools.push(Part.cylinderAlong(4, new Vector(-width / 2 - 8.1, 0, 10), Vector.X(), 5));
-    for (i in 1...outlets + 1) tools.push(Part.cylinderAlong(
+    tools.push(Solids.named(Part.cylinderAlong(4, new Vector(-width / 2 - 8.1, 0, 10), Vector.X(), 5), "inlet-bore"));
+    for (i in 1...outlets + 1) tools.push(Solids.named(Part.cylinderAlong(
       4,
       new Vector(width / 2 + 3, outlets == 1 ? 0 : (i == 1 ? -11 : 11), 10),
       Vector.X(),
       5.1
-    ));
+    ), "outlet-bore" + i));
     return Solids.cut(Solids.union(parts), tools);
   }
 }

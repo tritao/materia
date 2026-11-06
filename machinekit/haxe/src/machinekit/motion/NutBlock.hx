@@ -268,9 +268,13 @@ class NutBlock extends MachineComponent {
       var tools = [cutout];
       var base = SocketHeadCapScrew.catalog().get(BASE_THREAD);
       if (base == null) throw 'No ${BASE_THREAD} screw row';
+      var baseHole = 0;
       for (x in baseHoleXs()) {
         // Along +Y from the base end, in the middle of the thickness.
-        tools.push(Part.cylinderAlongY(base.tapDrill / 2, -centreHeight - 1, -centreHeight + baseDepth, x, thickness / 2));
+        tools.push(Solids.named(
+          Part.cylinderAlongY(base.tapDrill / 2, -centreHeight - 1, -centreHeight + baseDepth, x, thickness / 2),
+          "base-tap" + (++baseHole)
+        ));
       }
       return machined(Solids.cut(body, tools));
     });

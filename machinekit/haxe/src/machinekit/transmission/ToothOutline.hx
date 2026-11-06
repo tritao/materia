@@ -86,7 +86,9 @@ class ToothOutline {
     }
     if (first == null) first = start;
     last = end;
-    pieces.push(curve);
+    // Each piece is an edge of its own, named by its place in the authored outline (teeth in order, each its flanks, tip and root), so
+    // the face lofted from it is found again whatever the tooth count does to the faces around it.
+    pieces.push(Curve.named(curve, "piece" + (pieces.length + 1)));
     return this;
   }
 

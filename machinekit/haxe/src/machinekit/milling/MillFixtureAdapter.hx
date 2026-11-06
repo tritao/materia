@@ -23,13 +23,14 @@ class MillFixtureAdapter extends MachineComponent {
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var body = Part.box(pneumatic ? 200 : 180, 190, height), cuts : Array<Part> = [];
-    for (x in pneumatic ? [-85, 85] : [-70, 70]) for (y in [-80, 80]) cuts.push(Part.cylinderSpan(
+    var hole = 0;
+    for (x in pneumatic ? [-85, 85] : [-70, 70]) for (y in [-80, 80]) cuts.push(Solids.named(Part.cylinderSpan(
       3.3,
       -1,
       height + 1,
       x,
       y
-    ));
+    ), "bolt" + (++hole)));
     var bolt = SocketHeadCapScrew.metric("M10", 25);
     for (x in pneumatic ? [-64, 64] : [-41, 41]) for (y in pneumatic ? [-64, 64] : [-41, 41]) {
       var tap = Threads.tappedBore(bolt.thread.mating(), bolt.spec.tapDrill, 16);

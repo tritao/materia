@@ -80,26 +80,26 @@ class BallNut extends LeadScrewNut {
     if (detail == Envelope) return body;
     var tools:Array<Part> = [];
     // Two shallow annular seal seats; the screw bore stays at its original diameter.
-    for (end in [0.0, bodyLength + flangeThickness - 0.45]) {
+    for (k => end in [0.0, bodyLength + flangeThickness - 0.45]) {
       var ring = Solids.cut(
-        Part.cylinderSpan(11.2, end - 0.01, end + 0.46),
-        [Part.cylinderSpan(9.2, end - 0.1, end + 0.6)]
+        Solids.named(Part.cylinderSpan(11.2, end - 0.01, end + 0.46), "seal-seat" + (k + 1) + "-outer"),
+        [Solids.named(Part.cylinderSpan(9.2, end - 0.1, end + 0.6), "seal-seat" + (k + 1) + "-inner")]
       );
       tools.push(ring);
     }
     // Flange flats leave all six mount holes and their face positions intact.
-    for (side in [-1, 1]) {
+    for (k => side in [-1, 1]) {
       var box = Part.box(10, 60, flangeThickness + 0.2);
       var placed = box.translated(new Vector(side * 27.5, 0, bodyLength - 0.1));
       box.close();
-      tools.push(placed);
+      tools.push(Solids.named(placed, "flange-flat" + (k + 1)));
     }
     // Relief at the barrel/flange shoulder and a visible mouth in the grease nipple.
     tools.push(Solids.cut(
-      Part.cylinderSpan(14.1, bodyLength - 0.8, bodyLength),
-      [Part.cylinderSpan(13.6, bodyLength - 0.9, bodyLength + 0.1)]
+      Solids.named(Part.cylinderSpan(14.1, bodyLength - 0.8, bodyLength), "shoulder-relief-outer"),
+      [Solids.named(Part.cylinderSpan(13.6, bodyLength - 0.9, bodyLength + 0.1), "shoulder-relief-inner")]
     ));
-    tools.push(Part.cylinderAlongY(0.65, 25.8, 27.1, 0, z));
+    tools.push(Solids.named(Part.cylinderAlongY(0.65, 25.8, 27.1, 0, z), "nipple-mouth"));
     return Solids.cut(body, tools);
   }
 

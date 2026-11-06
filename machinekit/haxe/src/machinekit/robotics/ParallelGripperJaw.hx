@@ -103,17 +103,17 @@ class ParallelGripperJaw extends MachineComponent {
 
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.building([],
-    parts -> {parts.push(Part.box(
+    parts -> {parts.push(Solids.named(Part.box(
       spec.jawWidth,
       spec.bodyDepth,
       spec.jawHeight
-    ));
-  parts.push(Part.box(spec.guideTongueReach(),
+    ), "jaw"));
+  parts.push(Solids.named(Part.box(spec.guideTongueReach(),
     spec.bodyDepth, ParallelGripperSpec.GUIDE_TONGUE_HEIGHT).translated(new Vector(
       -side * (spec.jawWidth + spec.guideTongueReach()) / 2,
       0,
       -ParallelGripperSpec.GUIDE_TONGUE_HEIGHT
-    )));
+    )), "guide-tongue"));
   return Solids.union(parts);
   });
 }

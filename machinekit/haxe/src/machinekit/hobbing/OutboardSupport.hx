@@ -43,7 +43,7 @@ class OutboardSupport extends MachineComponent {
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return machined(Solids.cut(
     Part.box(L.WIDTH, L.WIDTH, L.BODY_LENGTH), [
-      Part.cylinderSpan(L.SLEEVE_DIAMETER / 2, L.FRONT_STOP, L.BODY_LENGTH + 1),
-      Part.cylinderSpan(L.GLAND_BORE / 2, -1, L.FRONT_STOP + 1)
+      Solids.named(Part.cylinderSpan(L.SLEEVE_DIAMETER / 2, L.FRONT_STOP, L.BODY_LENGTH + 1), "sleeve-bore"),
+      Solids.named(Part.cylinderSpan(L.GLAND_BORE / 2, -1, L.FRONT_STOP + 1), "gland-bore")
     ]));
 }

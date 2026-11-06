@@ -37,6 +37,6 @@ class PanelHolePlug extends MachineComponent {
     F.fromRotationMatrix(0,0,0,[1.0,0,0,0,-1,0,0,0,-1]));
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail=Preview):Part return Solids.union([
-    Part.cylinderSpan(STEM/2,-STEM_LENGTH,0),Part.cylinderSpan(FLANGE/2,0,FLANGE_THICKNESS)
+    Solids.named(Part.cylinderSpan(STEM/2,-STEM_LENGTH,0), "stem"),Solids.named(Part.cylinderSpan(FLANGE/2,0,FLANGE_THICKNESS), "flange")
   ]);
 }

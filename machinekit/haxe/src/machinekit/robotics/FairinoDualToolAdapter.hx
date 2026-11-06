@@ -106,27 +106,29 @@ class FairinoDualToolAdapter extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     // Every number below is a planning estimate; no connector pins/threads/key are invented.
     var pieces:Array<Part> = [], bores:Array<Part> = [];
+    function piece(part:Part, tag:String):Void pieces.push(Solids.named(part, tag));
+    function bore(part:Part, tag:String):Void bores.push(Solids.named(part, tag));
     if (!externalPower) {
-      pieces.push(Part.box(42, 24, 20));
-      pieces.push(tube(7, 0, -24, 10, 0, 1, 0, 14));
-      for (x in [-12.0, 12.0]) {
-        pieces.push(tube(8, x, 10, 10, 0, 1, 0, 16));
-        bores.push(tube(5.5, x, 20, 10, 0, 1, 0, 7));
+      piece(Part.box(42, 24, 20), "body");
+      piece(tube(7, 0, -24, 10, 0, 1, 0, 14), "cable-gland");
+      for (k => x in [-12.0, 12.0]) {
+        piece(tube(8, x, 10, 10, 0, 1, 0, 16), "tool-socket" + (k + 1));
+        bore(tube(5.5, x, 20, 10, 0, 1, 0, 7), "tool-socket-bore" + (k + 1));
       }
     } else {
-      pieces.push(Part.box(36, 44, 20));
+      piece(Part.box(36, 44, 20), "body");
       // Short illustrative routes display the harness topology, not its full coiled stock length.
-      pieces.push(tube(3, 0, -100, 10, 0, 1, 0, 80));
-      pieces.push(tube(6, 0, -110, 10, 0, 1, 0, 16));
-      pieces.push(tube(7, 0, -110, 10, 0, 0, 1, 24));
-      for (x in [-12.0, 12.0]) {
-        pieces.push(tube(3, x, 20, 10, 0, 1, 0, 105));
-        pieces.push(tube(8, x, 122, 10, 0, 1, 0, 18));
-        bores.push(tube(5.5, x, 134, 10, 0, 1, 0, 7));
+      piece(tube(3, 0, -100, 10, 0, 1, 0, 80), "harness");
+      piece(tube(6, 0, -110, 10, 0, 1, 0, 16), "harness-sleeve");
+      piece(tube(7, 0, -110, 10, 0, 0, 1, 24), "harness-riser");
+      for (k => x in [-12.0, 12.0]) {
+        piece(tube(3, x, 20, 10, 0, 1, 0, 105), "tool-lead" + (k + 1));
+        piece(tube(8, x, 122, 10, 0, 1, 0, 18), "tool-socket" + (k + 1));
+        bore(tube(5.5, x, 134, 10, 0, 1, 0, 7), "tool-socket-bore" + (k + 1));
       }
-      pieces.push(tube(3, 12, 0, 10, 1, 0, 0, 12));
-      pieces.push(tube(3, 24, 0, 10, 0, 1, 0, 170));
-      for (x in [22.0, 26.0]) pieces.push(tube(0.8, x, 169, 10, 0, 1, 0, 11));
+      piece(tube(3, 12, 0, 10, 1, 0, 0, 12), "branch");
+      piece(tube(3, 24, 0, 10, 0, 1, 0, 170), "power-lead");
+      for (k => x in [22.0, 26.0]) piece(tube(0.8, x, 169, 10, 0, 1, 0, 11), "power-pin" + (k + 1));
     }
     return Solids.cut(Solids.union(pieces), bores);
   }

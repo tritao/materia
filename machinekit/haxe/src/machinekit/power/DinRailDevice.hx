@@ -41,19 +41,20 @@ class DinRailDevice {
       box(depth - rear - shoulder, window, back + rear + shoulder, middle - window / 2, "front")
     ]);
     var tools:Array<Part> = [];
-    function tool(part:Part):Void {
-      owned.push(part);
-      tools.push(part);
+    function tool(part:Part, tag:String):Void {
+      var named = Solids.named(part, tag);
+      owned.push(named);
+      tools.push(named);
     }
     tool(Part.box(width + 1, RAIL_DEPTH, RAIL_WIDTH, Center, Min, Min).translated(new Vector(
       0,
       back - 0.1,
       middle - RAIL_WIDTH / 2
-    )));
+    )), "rail-slot");
     var face = back + rear + shoulder;
     for (index in 0...terminals) {
       var x = -width / 2 + pitch * (index + 0.5);
-      for (z in [
+      for (row => z in [
         shoulderLow + (middle - window / 2 - shoulderLow) * 0.5,
         shoulderHigh - (shoulderHigh - middle - window / 2) * 0.5
       ]) tool(Part.cylinderAlongY(
@@ -62,13 +63,13 @@ class DinRailDevice {
         face + 0.1,
         x,
         z
-      ));
+      ), "terminal" + (index + 1) + "-" + (row + 1));
     }
     tool(Part.box(width * 0.7, 0.6, window * 0.45, Center, Min, Min).translated(new Vector(
       0,
       depth / 2 - 0.5,
       middle - window * 0.05
-    )));
+    )), "window");
     return Solids.cut(body, tools);
     });
   }

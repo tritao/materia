@@ -28,11 +28,11 @@ class MandrelSleeve extends MachineComponent {
   override public function componentType():Null<ComponentType> return recipeType();
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):cadkit.modeling.Part return Solids.cut(
-    cadkit.modeling.Part.cylinderSpan(parameterNumber("outside") / 2, 0, parameterNumber("height")),
-    [cadkit.modeling.Part.cylinderSpan(
+    Solids.named(cadkit.modeling.Part.cylinderSpan(parameterNumber("outside") / 2, 0, parameterNumber("height")), "sleeve"),
+    [Solids.named(cadkit.modeling.Part.cylinderSpan(
       parameterNumber("outside") / 2 - parameterNumber("wall"),
       -0.1,
       parameterNumber("height") + 0.1
-    )]
+    ), "bore")]
   );
 }

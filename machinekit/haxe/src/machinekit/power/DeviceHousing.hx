@@ -83,7 +83,7 @@ class DeviceHousing {
           -height / 2 + inset,
           front - 0.01
         )),
-        "fin"
+        "fin" + (index + 1)
       ));
     }
     var body = Solids.union(pieces);
@@ -92,7 +92,7 @@ class DeviceHousing {
       var pitch = w / terminals, screw = Math.min(pitch * 0.32, 2.5), face = depth - step;
       for (index in 0...terminals) tools.push(keep(
         Part.cylinderSpan(screw, face - 2, face + 0.1, -w / 2 + pitch * (index + 0.5), top + (strip - inset) / 2),
-        "terminal"
+        "terminal" + (index + 1)
       ));
     }
     if (vents && fins == 0) {
@@ -100,7 +100,7 @@ class DeviceHousing {
       for (row in 0...rows) {
         var y = -height / 2 + inset + (top + height / 2 - inset) * (row + 1) / (rows + 1);
         tools.push(keep(Part.box(slot,
-          1.6, 0.6, Center, Center, Min).translated(new Vector(0, y, front - 0.5)), "vent"));
+          1.6, 0.6, Center, Center, Min).translated(new Vector(0, y, front - 0.5)), "vent" + (row + 1)));
       }
     }
     return Solids.cut(body, tools);
@@ -140,6 +140,7 @@ class DeviceHousing {
       ),
       "body"
     )];
+    var footIndex = 0;
     if (feet) for (x in [-1.0, 1.0]) for (y in [-1.0, 1.0]) pieces.push(keep(
       Part.cylinderSpan(
         Math.min(width, depth) * 0.06,
@@ -148,7 +149,7 @@ class DeviceHousing {
         x * width * 0.38,
         y * (back - front) * 0.38 + (front + back) / 2
       ),
-      "foot"
+      "foot" + (++footIndex)
     ));
     if (fins > 0) {
       var pitch = width * 0.9 / fins, rib = Math.max(1.0, pitch * 0.3);
@@ -158,7 +159,7 @@ class DeviceHousing {
           back - 0.01,
           foot + (height - foot) * 0.1
         )),
-        "fin"
+        "fin" + (index + 1)
       ));
     }
     if (door) {
@@ -178,6 +179,7 @@ class DeviceHousing {
     if (door) {
       // The door seam: a 1 mm groove round the door, 0.8 mm deep.
       var dw = width * 0.92, dh = (height - foot) * 0.92, z0 = foot + (height - foot) * 0.04, depthIn = 0.8;
+      var seam = 0;
       for (strip in [
         {x: 0.0, z: z0, w: dw, h: 1.0},
         {x: 0.0, z: z0 + dh - 1, w: dw, h: 1.0},
@@ -186,7 +188,7 @@ class DeviceHousing {
       ]) tools.push(keep(
         Part.box(strip.w,
         depthIn + 0.1, strip.h, Center, Min, Min).translated(new Vector(strip.x, face - 0.1, strip.z)),
-        "door-seam"
+        "door-seam" + (++seam)
       ));
     }
     if (keypad) {
@@ -203,13 +205,14 @@ class DeviceHousing {
         (back - front) * 0.5,
         80.0
       );
+      var louvre = 0;
       for (side in [-1.0, 1.0]) for (row in 0...rows) tools.push(keep(
         Part.box(1.2, slot, 2.5, Center, Center, Min).translated(new Vector(
           side * (width / 2 - 0.5),
           (front + back) / 2,
           inner + row * 7.0
         )),
-        "louvre"
+        "louvre" + (++louvre)
       ));
     }
     return Solids.cut(body, tools);
@@ -240,16 +243,16 @@ class DeviceHousing {
         0,
         0
       )),
-      "fin"
+      "fin" + (index + 1)
     ));
     var housing = Solids.union(pieces);
-    var tools = [for (end in [-1.0, 1.0]) keep(
+    var tools = [for (k => end in [-1.0, 1.0]) keep(
       Part.box(Math.min(width * 0.2, 6.0), tab * 0.6, base + 0.2, Center, Center, Min).translated(new Vector(
         0,
         end * (length / 2 - tab / 2),
         -0.1
       )),
-      "mounting-slot"
+      "mounting-slot" + (k + 1)
     )];
     return Solids.cut(housing, tools);
     });

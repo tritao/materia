@@ -67,7 +67,7 @@ class MotorAdapterPlate extends MachineComponent {
     tracked.push(p);
     return p;
   }
-  var plate = keep(Part.prism(
+  var plate = keep(Solids.named(Part.prism(
     [
       new Vector(-face / 2, -face / 2),
       new Vector(face / 2, -face / 2),
@@ -76,12 +76,13 @@ class MotorAdapterPlate extends MachineComponent {
     ],
     0,
     thickness
-  ));
-  var spigot = keep(Part.cylinderSpan(25, thickness - 0.01, thickness + 3.5));
+  ), "plate"));
+  var spigot = keep(Solids.named(Part.cylinderSpan(25, thickness - 0.01, thickness + 3.5), "spigot"));
   if (detail == Envelope) return Solids.union([plate, spigot]);
-  var cuts = [keep(Part.cylinderSpan(23, -1, thickness + 5)), keep(Part.cylinderSpan(pilot / 2, -1, 6))];
+  var cuts = [keep(Solids.named(Part.cylinderSpan(23, -1, thickness + 5), "bore")), keep(Solids.named(Part.cylinderSpan(pilot / 2, -1, 6), "pilot"))];
   var half = pcd / (2 * Math.sqrt(2)), root = Std.parseFloat(thread.substr(1)) == 6 ? 2.5 : 2.1;
-  for (x in [-half, half]) for (y in [-half, half]) cuts.push(keep(Part.cylinderSpan(root, -1, thickness + 1, x, y)));
+  var bolt = 0;
+  for (x in [-half, half]) for (y in [-half, half]) cuts.push(keep(Solids.named(Part.cylinderSpan(root, -1, thickness + 1, x, y), "bolt" + (++bolt))));
   return Solids.cut(Solids.union([plate, spigot]), cuts);
   });
 

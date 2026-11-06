@@ -27,12 +27,13 @@ class ProfileRailShapes {
     );
     owned.push(body);
     var tools:Array<Part> = [];
-    function tool(part:Part):Void {
-      owned.push(part);
-      tools.push(part);
+    function tool(part:Part, tag:String):Void {
+      var named = Solids.named(part, tag);
+      owned.push(named);
+      tools.push(named);
     }
     var chamfer = Math.min(w, h) * 0.06;
-    for (side in [-1.0, 1.0]) tool(Part.prism(
+    for (k => side in [-1.0, 1.0]) tool(Part.prism(
       [
         new Vector(side * w / 2, 0),
         new Vector(side * (w / 2 - chamfer), 0.1),
@@ -40,13 +41,14 @@ class ProfileRailShapes {
       ],
       -0.1,
       length + 0.1
-    ));
+    ), "chamfer" + (k + 1));
     var groove = h * 0.11;
     var tracks = StringTools.startsWith(spec.rail, "MGN") ? [-h * 0.3] : [-h * 0.22, -h * 0.62];
-    for (side in [-1.0, 1.0]) for (y in tracks) tool(Part.cylinderSpan(groove, -0.1, length + 0.1, side * w / 2, y));
-    for (z in holes) {
-      tool(Part.cylinderAlongY(bore.through / 2, -h - 1, 1, 0, z));
-      tool(Part.cylinderAlongY(bore.counterbore / 2, -bore.depth, 1, 0, z));
+    var track = 0;
+    for (side in [-1.0, 1.0]) for (y in tracks) tool(Part.cylinderSpan(groove, -0.1, length + 0.1, side * w / 2, y), "track" + (++track));
+    for (k => z in holes) {
+      tool(Part.cylinderAlongY(bore.through / 2, -h - 1, 1, 0, z), "hole" + (k + 1));
+      tool(Part.cylinderAlongY(bore.counterbore / 2, -bore.depth, 1, 0, z), "counterbore" + (k + 1));
     }
     return Solids.cut(body, tools);
     });
@@ -85,20 +87,21 @@ class ProfileRailShapes {
       ),
       "body"
     ));
-    for (end in [-1.0, 1.0]) {
+    for (k => end in [-1.0, 1.0]) {
       var capWidth = w * 0.94, capTop = top * 0.9;
       var capStart = end > 0 ? steel / 2 : -steel / 2 - cap;
       keep(Solids.named(
         Part.box(capWidth, capTop, cap, Center, Min, Min).translated(new Vector(0, 0, capStart)),
-        "end-cap"
+        "end-cap" + (k + 1)
       ));
       var sealStart = end > 0 ? steel / 2 + cap : -steel / 2 - cap - seal;
       keep(Solids.named(
         Part.box(capWidth * 0.97, capTop * 0.95, seal, Center, Min, Min).translated(new Vector(0, 0, sealStart)),
-        "seal"
+        "seal" + (k + 1)
       ));
     }
     var body = Solids.union(pieces);
+    var mount = 0;
     var holes = [for (x in [-1.0, 1.0]) for (z in [-1.0, 1.0]) Solids.named(
       Part.cylinderAlongY(
         thread / 2,
@@ -107,7 +110,7 @@ class ProfileRailShapes {
         x * spec.blockHoleSpacingAcross / 2,
         z * spec.blockHoleSpacingAlong / 2
       ),
-      "mount"
+      "mount" + (++mount)
     )];
     for (hole in holes) owned.push(hole);
     return Solids.cut(body, holes);

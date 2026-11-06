@@ -30,14 +30,15 @@ class MillDriveHatch extends MachineComponent {
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var holes:Array<Part> = [];
+    var bolt = 0;
     for (x in [-75.0,
-      75.0]) for (z in [parameterNumber("lowerZ"), parameterNumber("upperZ")]) holes.push(Part.cylinderAlongY(
+      75.0]) for (z in [parameterNumber("lowerZ"), parameterNumber("upperZ")]) holes.push(Solids.named(Part.cylinderAlongY(
         2.25,
         -1,
         3,
         x,
         z
-      ));
+      ), "bolt" + (++bolt)));
     return Solids.cut(
       Part.box(180, 2, parameterNumber("upperZ") - parameterNumber("lowerZ") + 20).translated(new Vector(
         0,

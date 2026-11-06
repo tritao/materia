@@ -44,9 +44,9 @@ class AxisServoMotor extends ServoMotor {
     var blank = Part.box(face.face, face.face, face.flangeThickness);
     var flange = blank.translated(new cadkit.modeling.Vector(0, 0, -face.flangeThickness));
     blank.close();
-    var holes = [for (hole in face.holes) Solids.named(
+    var holes = [for (k => hole in face.holes) Solids.named(
       Part.cylinderSpan(face.holeDiameter / 2, -face.flangeThickness - 1, 1, hole.x, hole.y),
-      "mount-bolt"
+      "mount-bolt" + (k + 1)
     )];
     parts.push(Solids.cut(Solids.named(flange, "mounting-flange"), holes));
     var pilot = Solids.named(Part.cylinder(face.pilotDiameter / 2, face.pilotHeight), "pilot");

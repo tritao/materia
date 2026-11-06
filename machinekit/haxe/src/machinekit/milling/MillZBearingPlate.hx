@@ -54,29 +54,32 @@ class MillZBearingPlate extends MachineComponent {
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var t = parameterNumber("thickness"), tools:Array<Part> = [];
+    var bearing = 0;
     for (x in [-parameterNumber("bearingPitch") / 2,
-      parameterNumber("bearingPitch") / 2]) tools.push(Part.cylinderAlongY(
+      parameterNumber("bearingPitch") / 2]) tools.push(Solids.named(Part.cylinderAlongY(
         parameterNumber("bearingHole") / 2,
         parameterNumber("bearingTapDepth") > 0 ? t / 2 - parameterNumber("bearingTapDepth") : -t / 2 - 1,
         t / 2 + 1,
         x,
         parameterNumber("bearingZ")
-      ));
-    for (side in [-1, 1]) tools.push(Part.cylinderAlongY(
+      ), "bearing" + (++bearing)));
+    var anchor = 0;
+    for (side in [-1, 1]) tools.push(Solids.named(Part.cylinderAlongY(
       3.3,
       -t / 2 - 1,
       t / 2 + 1,
       side * parameterNumber("anchorSpacing") / 2,
       parameterNumber("anchorZ")
-    ));
-    if (parameterNumber("crossShaftZ") > 0) tools.push(Part.cylinderAlongY(
+    ), "anchor" + (++anchor)));
+    if (parameterNumber("crossShaftZ") > 0) tools.push(Solids.named(Part.cylinderAlongY(
       12,
       -t / 2 - 1,
       t / 2 + 1,
       0,
       parameterNumber("crossShaftZ")
-    ));
-    if (values().boolean("guideRelief")) for (side in [-1, 1]) tools.push(Part.box(
+    ), "cross-shaft"));
+    var guide = 0;
+    if (values().boolean("guideRelief")) for (side in [-1, 1]) tools.push(Solids.named(Part.box(
       parameterNumber("guideWidth") + 6,
       7,
       19
@@ -84,14 +87,15 @@ class MillZBearingPlate extends MachineComponent {
       side * parameterNumber("guideSpacing") / 2,
       -t / 2 + 2.5,
       -1
-    )));
-    if (values().boolean("topAnchors")) for (x in [-70.0, 70.0]) tools.push(Part.cylinderSpan(
+    )), "guide-relief" + (++guide)));
+    var topAnchor = 0;
+    if (values().boolean("topAnchors")) for (x in [-70.0, 70.0]) tools.push(Solids.named(Part.cylinderSpan(
       2.5,
       parameterNumber("height") - 14,
       parameterNumber("height") + 1,
       x,
       0
-    ));
+    ), "top-anchor" + (++topAnchor)));
     return Solids.cut(Part.box(parameterNumber("width"), t, parameterNumber("height")), tools);
   }
 }

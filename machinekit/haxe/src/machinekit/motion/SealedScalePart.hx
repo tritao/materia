@@ -218,8 +218,8 @@ class SealedScalePart extends MachineComponent implements EncoderPart {
       var depth = series.headThreadDepth;
       if (detail == Envelope || depth == null) return block;
       var drill = machinekit.standard.SocketHeadCapScrew.catalog().get(series.headThread).tapDrill;
-      return Solids.cut(block, [for (z in [-series.headHolePitch / 2, series.headHolePitch / 2])
-        Solids.named(Part.cylinderAlongY(drill / 2, -series.headHeight - 0.1, -series.headHeight + depth, 0, z), "headThread")]);
+      return Solids.cut(block, [for (k => z in [-series.headHolePitch / 2, series.headHolePitch / 2])
+        Solids.named(Part.cylinderAlongY(drill / 2, -series.headHeight - 0.1, -series.headHeight + depth, 0, z), "headThread" + (k + 1))]);
     }
     var h = series.housingHeight, d = series.housingDepth, len = overallLength();
     var body = Solids.named(box(d, 0, h, 0, len), "housing");
@@ -227,9 +227,9 @@ class SealedScalePart extends MachineComponent implements EncoderPart {
     if (detail == Envelope || hole == null || bore == null || boreDepth == null) return body;
     var tools:Array<Part> = [];
     // The screw enters from the face toward the head (y = 0) and its head sinks into the counterbore; the mounting face (y = h) is clear of it.
-    for (z in [endHole(), len - endHole()]) {
-      tools.push(Solids.named(Part.cylinderAlongY(hole / 2, -0.1, h + 0.1, 0, z), "endHole"));
-      tools.push(Solids.named(Part.cylinderAlongY(bore / 2, -0.1, boreDepth, 0, z), "endCounterbore"));
+    for (k => z in [endHole(), len - endHole()]) {
+      tools.push(Solids.named(Part.cylinderAlongY(hole / 2, -0.1, h + 0.1, 0, z), "endHole" + (k + 1)));
+      tools.push(Solids.named(Part.cylinderAlongY(bore / 2, -0.1, boreDepth, 0, z), "endCounterbore" + (k + 1)));
     }
     return Solids.cut(body, tools);
   }

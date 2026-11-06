@@ -313,10 +313,12 @@ class ScrewSupportUnit extends MachineComponent {
       )
     ]);
     var tools = [keep(Part.cylinderSpan(s.bore / 2, -s.length / 2 - 0.1, s.length / 2 + 0.1), "bore")];
+    var bolt = 0;
     for (p in mountingPositions()) {
+      bolt++;
       tools.push(keep(
         Part.cylinderAlongY(s.sources[0].holeDiameter / 2, -s.shaftHeight - 0.1, -s.shaftHeight + foot + 0.1, p.x, p.z),
-        "bolt-hole"
+        "bolt" + bolt
       ));
       tools.push(keep(
         Part.cylinderAlongY(
@@ -326,7 +328,7 @@ class ScrewSupportUnit extends MachineComponent {
           p.x,
           p.z
         ),
-        "counterbore"
+        "counterbore" + bolt
       ));
     }
     return Solids.cut(body, tools);
@@ -365,9 +367,10 @@ class ScrewSupportUnit extends MachineComponent {
       keep(Part.cylinderSpan(boss, s.height - 0.01, s.length), "boss")
     ]);
     var tools = [keep(Part.cylinderSpan(s.bore / 2, -0.1, s.length + 0.1), "bore")];
+    var bolt = 0;
     for (p in mountingPositions()) tools.push(keep(
       Part.cylinderSpan(s.sources[0].holeDiameter / 2, -0.1, s.height + 0.1, p.x, p.y),
-      "bolt-hole"
+      "bolt" + (++bolt)
     ));
     return Solids.cut(body, tools);
     });

@@ -41,7 +41,7 @@ class SwivelHousing extends MachineComponent {
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):cadkit.modeling.Part return Solids.cut(
     ComponentEnvelopes.annular(values()),
-    [cadkit.modeling.Part.cylinderSpan(90, 5, 15), cadkit.modeling.Part.cylinderSpan(100, 15, 25.1)]
+    [Solids.named(cadkit.modeling.Part.cylinderSpan(90, 5, 15), "seat"), Solids.named(cadkit.modeling.Part.cylinderSpan(100, 15, 25.1), "upper-seat")]
   );
   override public function componentType():Null<ComponentType> return recipeType();
 

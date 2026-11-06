@@ -43,14 +43,14 @@ class TableHousing extends MachineComponent {
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):cadkit.modeling.Part {
     var tools = [
-      cadkit.modeling.Part.cylinderSpan(75, -0.1, 45),
-      cadkit.modeling.Part.cylinderSpan(parameterNumber("bearingSeat") / 2, 45, 45 + parameterNumber("bearingWidth"))
+      Solids.named(cadkit.modeling.Part.cylinderSpan(75, -0.1, 45), "recess"),
+      Solids.named(cadkit.modeling.Part.cylinderSpan(parameterNumber("bearingSeat") / 2, 45, 45 + parameterNumber("bearingWidth")), "bearing-seat")
     ];
-    if (parameterNumber("bearingSeat") > 120) tools.push(cadkit.modeling.Part.cylinderSpan(
+    if (parameterNumber("bearingSeat") > 120) tools.push(Solids.named(cadkit.modeling.Part.cylinderSpan(
       parameterNumber("bearingSeat") / 2,
       45 + parameterNumber("bearingWidth"),
       parameterNumber("height") + 0.1
-    ));
+    ), "upper-seat"));
     return Solids.cut(ComponentEnvelopes.annular(values()), tools);
   }
   override public function componentType():Null<ComponentType> return recipeType();

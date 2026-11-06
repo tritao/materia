@@ -2,6 +2,7 @@ package machinekit.robotics;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
+import machinekit.component.Solids;
 
 /** Geometry for OffsetGripperFinger; coordinates are the shared closed-jaw interface frame. */
 class OffsetFingerGeometry {
@@ -54,25 +55,25 @@ class OffsetFingerGeometry {
     var x0 = left ? 183.003081202068 : 186.003081202068;
     var mountZ = CENTRE_Z + (left ? -13.2 : 13.2);
     var bounds = collisionBoxes(left, variant);
-    function piece(i:Int):Part {
+    function piece(i:Int, tag:String):Part {
       var b = bounds[i];
-      return box(b[0], b[1], b[2], b[3], b[4], b[5]);
+      return Solids.named(box(b[0], b[1], b[2], b[3], b[4], b[5]), tag);
     }
-    var pad = piece(2), base = piece(0), bridge = piece(1);
+    var pad = piece(2, "pad"), base = piece(0, "base"), bridge = piece(1, "bridge");
     var result = Part.fuseAll([base, bridge, pad]);
     base.close();
     bridge.close();
     pad.close();
     // Explicit R2 root in the XY section; avoids relying on a fillet across union seams.
     var rootX = left ? CENTRE_X - 13 : CENTRE_X + 13;
-    var square = piece(3);
-    var cutter = Part.cylinderSpan(
+    var square = piece(3, "root");
+    var cutter = Solids.named(Part.cylinderSpan(
       sls ? 3 : 2,
       mountZ - halfHeight - 1,
       mountZ + halfHeight + 1,
       left ? rootX + (sls ? 3 : 2) : rootX - (sls ? 3 : 2),
       20 + (sls ? 3 : 2)
-    );
+    ), "root-round");
     var root = square.subtract(cutter);
     square.close();
     cutter.close();
@@ -80,10 +81,10 @@ class OffsetFingerGeometry {
     root.close();
     result.close();
     result = rounded;
-    for (x in [x0 + 5, x0 + 15]) {
+    for (k => x in [x0 + 5, x0 + 15]) {
       // Existing M4 screws: bearing face is 4.5 mm ahead of the mounting plane.
-      var through = Part.cylinderAlongY(sls ? 3.1 : 2.25, MOUNT_Y - 1, 25, x, mountZ);
-      var counterbore = Part.cylinderAlongY(sls ? 5.1 : 3.75, MOUNT_Y + (sls ? 3.5 : 4.5), 25, x, mountZ);
+      var through = Solids.named(Part.cylinderAlongY(sls ? 3.1 : 2.25, MOUNT_Y - 1, 25, x, mountZ), "bolt" + (k + 1));
+      var counterbore = Solids.named(Part.cylinderAlongY(sls ? 5.1 : 3.75, MOUNT_Y + (sls ? 3.5 : 4.5), 25, x, mountZ), "counterbore" + (k + 1));
       var cut = result.subtractAll([through, counterbore]);
       result.close();
       through.close();

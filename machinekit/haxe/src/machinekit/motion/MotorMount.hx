@@ -470,34 +470,34 @@ class MotorMount extends MachineComponent {
   }
   var s = spec, h = s.shaftHeight, pieces:Array<Part> = [], cuts:Array<Part> = [];
   // The motor flange plate. The flange may hang below the base plane (RBK's underhang): its seat needs relief.
-  pieces.push(keep(s.construction == "module" ? box(s.width, 0, s.rearHeight, 0, s.flange) : box(
+  pieces.push(keep(Solids.named(s.construction == "module" ? box(s.width, 0, s.rearHeight, 0, s.flange) : box(
     s.face,
     h - s.face / 2,
     h + s.face / 2,
     0,
     s.flange
-  )));
+  ), "flange-plate")));
   // Side webs from the flange to the rear block; undimensioned on seat and module bodies and on RBK (8 mm assumed).
   var web = (s.width - s.rearWidth) / 2;
   if (s.construction != "integrated" || s.family == "RBK" || !(web > 0)) web = 8;
   var inner = s.width / 2 - web;
-  for (side in [-1, 1]) pieces.push(keep(box(
+  for (k => side in [-1, 1]) pieces.push(keep(Solids.named(box(
     web,
     0,
     s.construction == "module" ? 10 : 24,
     s.flange,
     s.length,
     side * (inner + web / 2)
-  )));
-  pieces.push(keep(box(s.rearWidth, 0, s.rearHeight, s.rearStart, s.rearEnd)));
-  cuts.push(keep(Part.cylinderSpan(s.pilot / 2, -1, s.flange + 0.01, 0, h)));
-  cuts.push(keep(Part.cylinderSpan(s.shaftBore / 2, s.rearStart - 1, s.rearEnd + 1, 0, h)));
+  ), "web" + (k + 1))));
+  pieces.push(keep(Solids.named(box(s.rearWidth, 0, s.rearHeight, s.rearStart, s.rearEnd), "rear-block")));
+  cuts.push(keep(Solids.named(Part.cylinderSpan(s.pilot / 2, -1, s.flange + 0.01, 0, h), "pilot")));
+  cuts.push(keep(Solids.named(Part.cylinderSpan(s.shaftBore / 2, s.rearStart - 1, s.rearEnd + 1, 0, h), "shaft-bore")));
   // A seat body's pocket takes its flange support's locating boss.
-  if (s.construction == "seat") cuts.push(keep(Part.cylinderSpan(seatRadius(), s.rearStart - 1, s.rearEnd + 1, 0, h)));
+  if (s.construction == "seat") cuts.push(keep(Solids.named(Part.cylinderSpan(seatRadius(), s.rearStart - 1, s.rearEnd + 1, 0, h), "seat-pocket")));
   var thread = Std.parseFloat(s.thread.substr(1)),
     root = s.threadRootRadius != null ? s.threadRootRadius : thread == 6 ? 2.5 : thread == 5 ? 2.1 : 1.65;
-  for (b in s.motorBolts) cuts.push(keep(Part.cylinderSpan(root, -1, s.flange + 1, b.x, h + b.y)));
-  for (hole in s.baseHoles) cuts.push(keep(vertical(hole.diameter / 2, -1, s.rearHeight + 1, hole.x, hole.z)));
+  for (k => b in s.motorBolts) cuts.push(keep(Solids.named(Part.cylinderSpan(root, -1, s.flange + 1, b.x, h + b.y), "bolt" + (k + 1))));
+  for (k => hole in s.baseHoles) cuts.push(keep(Solids.named(vertical(hole.diameter / 2, -1, s.rearHeight + 1, hole.x, hole.z), "base-hole" + (k + 1))));
   var all = keep(Solids.union(pieces));
   return Solids.cut(all, cuts);
   });

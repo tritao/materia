@@ -44,15 +44,15 @@ class MotorBody {
       "connector"
     ));
     var body = Solids.union(pieces);
-    var tools = [for (hole in holes) Solids.named(
+    var tools = [for (k => hole in holes) Solids.named(
       Part.cylinderSpan(holeDiameter / 2, -flange - 0.1, 0.1, hole.x, hole.y),
-      "bolt-hole"
+      "bolt" + (k + 1)
     )];
     // Corner reliefs behind the flange: a cylinder the width of the screw head and its driver round each bolt axis, over
     // the whole body, so the heads of the flange screws can be reached from the back (`ServoMotor.reliefDiameter`).
-    if (relief != null && relief > 0) for (hole in holes) tools.push(Solids.named(
+    if (relief != null && relief > 0) for (k => hole in holes) tools.push(Solids.named(
       Part.cylinderSpan(relief / 2, -length - 0.1, -flange, hole.x, hole.y),
-      "screw-relief"
+      "relief" + (k + 1)
     ));
     for (tool in tools) owned.push(tool);
     return tools.length == 0 ? body : Solids.cut(body, tools);

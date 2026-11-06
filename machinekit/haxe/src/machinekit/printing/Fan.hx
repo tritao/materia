@@ -102,7 +102,7 @@ class Fan extends MachineComponent {
             (i % 2 == 0 ? -1 : 1) * pitch / 2,
             (i < 2 ? -1 : 1) * pitch / 2
           ),
-          "screw-hole"
+          "screw-hole" + (i + 1)
         )])
       );
       var hub = Solids.named(Part.cylinderSpan(0.2 * spec.width, 0.1 * spec.height, 0.9 * spec.height), "hub");
@@ -113,7 +113,7 @@ class Fan extends MachineComponent {
           new Vector(Math.cos(i * Math.PI / 2), Math.sin(i * Math.PI / 2), 0),
           0.49 * spec.width
         ),
-        "strut"
+        "strut" + (i + 1)
       )];
       return Solids.union([frame, hub].concat(struts));
     }

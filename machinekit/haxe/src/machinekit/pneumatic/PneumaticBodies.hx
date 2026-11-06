@@ -20,18 +20,20 @@ class PneumaticBodies {
     depth:Float, height:Float, spool:Float, coils:Int, ports:Array<Float>):Part {
     return build(keep -> {var c = Math.min(depth, height) * 0.08, coil = (width - spool) / coils;
     var pieces = [keep(chamferedBox(spool, depth, height, c, -spool / 2), "spool-body")];
+    var coilIndex = 0;
     for (end in (coils == 2 ? [-1.0, 1.0] : [1.0])) {
+      coilIndex++;
       var x0 = end > 0 ? spool / 2 - 0.01 : -width / 2, x1 = end > 0 ? width / 2 : -spool / 2 + 0.01;
-      pieces.push(keep(chamferedBox(x1 - x0, depth * 0.9, height * 0.95, c, x0), "coil"));
+      pieces.push(keep(chamferedBox(x1 - x0, depth * 0.9, height * 0.95, c, x0), "coil" + coilIndex));
       // The manual-override button on the coil's top.
       pieces.push(keep(
         Part.cylinderSpan(Math.min(coil, depth) * 0.15, height * 0.95 - 0.01, height, (x0 + x1) / 2, 0),
-        "override"
+        "override" + coilIndex
       ));
     }
-    var tools = [for (x in ports) keep(
+    var tools = [for (k => x in ports) keep(
       Part.cylinderSpan(Math.min(depth * 0.18, 3.5), height * 0.6, height + 0.1, x, 0),
-      "port"
+      "port" + (k + 1)
     )];
     return {pieces: pieces, tools: tools};
     });
@@ -46,7 +48,7 @@ class PneumaticBodies {
     var pitch = (height - 12) / outlets, r = Math.min(width, height / outlets) * 0.2;
     var tools = [for (i in 0...outlets) keep(
       Part.cylinderAlongY(r, -depth / 2 - 0.1, 0, 0, 6 + pitch * (i + 0.5)),
-      "outlet"
+      "outlet" + (i + 1)
     )];
     tools.push(keep(Part.cylinderSpan(r, -0.1, 5), "inlet"));
     return {pieces: pieces, tools: tools};
@@ -61,8 +63,8 @@ class PneumaticBodies {
       keep(Part.cylinderSpan(r, body - 0.01, height), "silencer")
     ];
     var port = Math.min(width, body) * 0.14;
-    var tools = [for (z in [body * 0.3,
-      body * 0.7]) keep(Part.cylinderAlongY(port, -depth / 2 - 0.1, 0, 0, z), "port")];
+    var tools = [for (k => z in [body * 0.3,
+      body * 0.7]) keep(Part.cylinderAlongY(port, -depth / 2 - 0.1, 0, 0, z), "port" + (k + 1))];
     return {pieces: pieces, tools: tools};
     });
   }

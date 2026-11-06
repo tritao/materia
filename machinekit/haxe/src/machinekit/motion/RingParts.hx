@@ -38,11 +38,12 @@ class RingParts {
     if (holes <= 0) return body;
     var tools:Array<Part> = [];
     var diameter = Math.min(wall * 0.45, 9);
+    var bolt = 0;
     for (circle in [outer - wall / 2, inner + wall / 2]) for (index in 0...holes) {
       var angle = Math.PI / holes + 2 * Math.PI * index / holes;
       tools.push(keep(
         Part.cylinderSpan(diameter / 2, -0.1, height + 0.1, circle * Math.cos(angle), circle * Math.sin(angle)),
-        "bolt-hole"
+        "bolt" + (++bolt)
       ));
     }
     return Solids.cut(body, tools);
@@ -78,7 +79,7 @@ class RingParts {
         circle * Math.cos(2 * Math.PI * index / holes),
         circle * Math.sin(2 * Math.PI * index / holes)
       ),
-      "bolt-hole"
+      "bolt" + (index + 1)
     )];
     for (tool in tools) owned.push(tool);
     return Solids.cut(body, tools);

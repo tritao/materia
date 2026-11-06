@@ -42,8 +42,8 @@ class SpindleHousing extends MachineComponent {
     // specified race/shaft design. The fixed/rotating partitions touch at the
     // included bearing interface: an air gap would sever the support graph.
     return Solids.cut(Solids.union([
-      Part.cylinderSpan(Bt30SpindleData.OUTSIDE / 2, 0, Bt30SpindleData.GAUGE_Z),
-      Part.cylinderSpan(Bt30SpindleData.FLANGE_DIAMETER / 2, Bt30SpindleData.FLANGE_FROM, Bt30SpindleData.GAUGE_Z)
-    ]), [Part.cylinderSpan(Bt30SpindleData.ROTOR_DIAMETER / 2, -1, Bt30SpindleData.GAUGE_Z + 1)]);
+      Solids.named(Part.cylinderSpan(Bt30SpindleData.OUTSIDE / 2, 0, Bt30SpindleData.GAUGE_Z), "body"),
+      Solids.named(Part.cylinderSpan(Bt30SpindleData.FLANGE_DIAMETER / 2, Bt30SpindleData.FLANGE_FROM, Bt30SpindleData.GAUGE_Z), "flange")
+    ]), [Solids.named(Part.cylinderSpan(Bt30SpindleData.ROTOR_DIAMETER / 2, -1, Bt30SpindleData.GAUGE_Z + 1), "rotor-bore")]);
   }
 }

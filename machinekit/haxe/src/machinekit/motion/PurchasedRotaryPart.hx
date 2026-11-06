@@ -86,26 +86,26 @@ class PurchasedRotaryPart extends MachineComponent implements MotorDrive impleme
     var od = variant == "body" ? axis.number("housingDiameter")
       : variant == "rotor" ? axis.number("faceDiameter") : parameterNumber("adapterOutside");
     var bore = axis.number("bore");
-    var cuts = [Part.cylinderSpan(bore / 2, -1, h + 1)];
+    var cuts = [Solids.named(Part.cylinderSpan(bore / 2, -1, h + 1), "bore")];
     if (variant == "rotor") {
-      cuts.push(Part.cylinderSpan(axis.number("centeringDiameter") / 2, h - 3, h + 1));
+      cuts.push(Solids.named(Part.cylinderSpan(axis.number("centeringDiameter") / 2, h - 3, h + 1), "centering-recess"));
       for (i in 0...6) {
         var a = (i + 0.5) * Math.PI / 3, r = axis.number("facePcd") / 2;
-        cuts.push(Part.cylinderSpan(3.4, 0, h + 1, r * Math.cos(a), r * Math.sin(a)));
+        cuts.push(Solids.named(Part.cylinderSpan(3.4, 0, h + 1, r * Math.cos(a), r * Math.sin(a)), "face-bolt" + (i + 1)));
       }
     }
     if (variant == "body") for (i in 0...6) {
       var a = (i + 0.5) * Math.PI / 3, r = axis.number("flangePcd") / 2;
-      cuts.push(Part.cylinderSpan(5.5, -1, 15, r * Math.cos(a), r * Math.sin(a)));
+      cuts.push(Solids.named(Part.cylinderSpan(5.5, -1, 15, r * Math.cos(a), r * Math.sin(a)), "flange-bolt" + (i + 1)));
     }
     var envelope = variant == "body" ? Solids.union([
-      Part.cylinderSpan(od / 2, 0, axis.number("flangeThickness")),
-      Part.cylinderSpan(axis.number("barrelDiameter") / 2, axis.number("flangeThickness"), h)
-    ]) : Part.cylinderSpan(
+      Solids.named(Part.cylinderSpan(od / 2, 0, axis.number("flangeThickness")), "flange"),
+      Solids.named(Part.cylinderSpan(axis.number("barrelDiameter") / 2, axis.number("flangeThickness"), h), "barrel")
+    ]) : Solids.named(Part.cylinderSpan(
       od / 2,
       0,
       h
-    );
+    ), "body");
     return Solids.cut(envelope, cuts);
   }
   override public function motorDrive():Null<MotorDrive> return variant == "body" ? this : null;

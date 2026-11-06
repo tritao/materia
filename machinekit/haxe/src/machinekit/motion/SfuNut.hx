@@ -39,23 +39,24 @@ class SfuNut extends LeadScrewNut {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var body = super.geometry(detail), s = spec;
     return Solids.building([body], owned -> {var tail = Solids.cut(
-      Part.cylinderSpan(s.pilot / 2 + 0.1, s.offset + s.thickness, s.length + 0.1),
-      [Part.cylinderSpan(s.barrel / 2, s.offset + s.thickness - 0.1, s.length + 0.2)]
+      Solids.named(Part.cylinderSpan(s.pilot / 2 + 0.1, s.offset + s.thickness, s.length + 0.1), "tail-outer"),
+      [Solids.named(Part.cylinderSpan(s.barrel / 2, s.offset + s.thickness - 0.1, s.length + 0.2), "tail-inner")]
     );
     owned.push(tail);
     var tools = [tail];
-    for (side in [-1, 1]) {
-      var raw = Part.box(s.flange, s.flange * 2, s.thickness + 0.2), flat = raw.translated(new Vector(
+    for (k => side in [-1, 1]) {
+      var raw = Part.box(s.flange, s.flange * 2, s.thickness + 0.2), flat = Solids.named(raw.translated(new Vector(
         side * (s.flats / 2 + s.flange / 2),
         0,
         s.offset - 0.1
-      ));
+      )), "flange-flat" + (k + 1));
       raw.close();
       owned.push(flat);
       tools.push(flat);
     }
+    var holeIndex = 0;
     if (detail != Envelope) for (p in boltPattern()) {
-      var hole = Part.cylinderSpan(s.hole / 2, s.offset - 0.1, s.offset + s.thickness + 0.1, p.x, p.y);
+      var hole = Solids.named(Part.cylinderSpan(s.hole / 2, s.offset - 0.1, s.offset + s.thickness + 0.1, p.x, p.y), "flange-bolt" + (++holeIndex));
       owned.push(hole);
       tools.push(hole);
     }

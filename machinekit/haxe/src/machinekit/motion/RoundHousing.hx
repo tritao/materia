@@ -40,7 +40,7 @@ class RoundHousing {
       var step = steps[index];
       var piece = Solids.named(
         Part.cylinderSpan(step.diameter / 2, step.z0, step.z1),
-        index == holeStep ? "flange" : "housing"
+        index == holeStep ? "flange" : "housing" + (index + 1)
       );
       owned.push(piece);
       pieces.push(piece);
@@ -60,7 +60,7 @@ class RoundHousing {
             holeCircle / 2 * Math.cos(angle),
             holeCircle / 2 * Math.sin(angle)
           ),
-          "bolt-hole"
+          "bolt" + (index + 1)
         ));
       }
     }

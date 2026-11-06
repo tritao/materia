@@ -211,17 +211,19 @@ class MotorPlate extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var plate = Part.box(size, size, thickness);
     if (detail == Envelope) return plate;
-    return Solids.building([plate], owned -> {var tools: Array<Part> = [Part.cylinderSpan(
+    return Solids.building([plate], owned -> {var tools: Array<Part> = [Solids.named(Part.cylinderSpan(
       (flange.pilotDiameter + 0.2) / 2,
       -0.1,
       thickness + 0.1
-    )];
-    for (p in flange.holes) tools.push(Part.cylinderSpan(boltRadius(flange), -0.1, thickness + 0.1, p.x, p.y));
+    ), "pilot")];
+    var bolt = 0;
+    for (p in flange.holes) tools.push(Solids.named(Part.cylinderSpan(boltRadius(flange), -0.1, thickness + 0.1, p.x, p.y), "bolt" + (++bolt)));
     for (tool in tools) owned.push(tool);
     if (profileMount != null) {
       var m:ProfilePlateMount = cast profileMount;
+      var profileBolt = 0;
       for (p in profileHolePositions()) {
-        var bore = Part.cylinderSpan(m.holeDiameter / 2, -0.1, thickness + 0.1, p.x, p.y);
+        var bore = Solids.named(Part.cylinderSpan(m.holeDiameter / 2, -0.1, thickness + 0.1, p.x, p.y), "profile" + (++profileBolt));
         owned.push(bore);
         tools.push(bore);
       }
