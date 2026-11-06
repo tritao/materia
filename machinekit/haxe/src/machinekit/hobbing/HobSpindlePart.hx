@@ -29,19 +29,19 @@ class HobSpindlePart extends MachineComponent {
   override public function fastensByForm():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     if (values().token("role") == "pullStud") return Solids.union([
-      Part.cylinderSpan(6, -60, -33.4), Part.cylinderSpan(7, -64, -60)
+      Solids.named(Part.cylinderSpan(6, -60, -33.4), "stud"), Solids.named(Part.cylinderSpan(7, -64, -60), "head")
     ]);
     var g = Bt30SpindleData.GAUGE_Z;
     var body = Solids.union([
-      Part.cylinderSpan(Bt30SpindleData.STUB_DIAMETER / 2, Bt30SpindleData.STUB_REAR, 0),
-      Part.cylinderSpan(Bt30SpindleData.ROTOR_DIAMETER / 2, 0, g),
+      Solids.named(Part.cylinderSpan(Bt30SpindleData.STUB_DIAMETER / 2, Bt30SpindleData.STUB_REAR, 0), "stub"),
+      Solids.named(Part.cylinderSpan(Bt30SpindleData.ROTOR_DIAMETER / 2, 0, g), "rotor"),
       // Bought spindle drive dogs: width/radial envelope fit MAS holder slots;
       // axial projection is assumed until the cartridge drawing is received.
-      Part.box(6.6, 16.0, Bt30SpindleData.DRIVE_DOG_LENGTH).translated(new cadkit.modeling.Vector(19.65, 0, g)),
-      Part.box(6.6, 16.0, Bt30SpindleData.DRIVE_DOG_LENGTH).translated(new cadkit.modeling.Vector(-19.65, 0, g))
+      Solids.named(Part.box(6.6, 16.0, Bt30SpindleData.DRIVE_DOG_LENGTH).translated(new cadkit.modeling.Vector(19.65, 0, g)), "drive-dog1"),
+      Solids.named(Part.box(6.6, 16.0, Bt30SpindleData.DRIVE_DOG_LENGTH).translated(new cadkit.modeling.Vector(-19.65, 0, g)), "drive-dog2")
     ]);
     // The bought drawbar is inside this envelope. A rear axial access bore is
     // reserved; its actuation/retention forces remain supplier assumptions.
-    return Solids.cut(body, [Bt30SpindleData.taper(g), Part.cylinderSpan(8, Bt30SpindleData.STUB_REAR - 1, g - Bt30SpindleData.TAPER_LENGTH)]);
+    return Solids.cut(body, [Solids.named(Bt30SpindleData.taper(g), "taper"), Solids.named(Part.cylinderSpan(8, Bt30SpindleData.STUB_REAR - 1, g - Bt30SpindleData.TAPER_LENGTH), "drawbar-bore")]);
   }
 }

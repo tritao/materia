@@ -84,9 +84,9 @@ class AtcSpindle extends AssumedCatalogComponent {
       "spindle-body"
     );
     var tools = [taper()];
-    for (z in [0.35 * l, 0.6 * l]) tools.push(Solids.named(
+    for (k => z in [0.35 * l, 0.6 * l]) tools.push(Solids.named(
       Part.revolve([{r: r - 1.5, z: z}, {r: r + 1, z: z}, {r: r + 1, z: z + 3}, {r: r - 1.5, z: z + 3}]),
-      "coolant-groove"
+      "coolant-groove" + (k + 1)
     ));
     return Solids.cut(body, tools);
   }

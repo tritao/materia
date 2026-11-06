@@ -72,7 +72,7 @@ class VacuumTable extends AssumedCatalogComponent {
     var w = n("width") / parameterCount("columns"), l = n("length") / parameterCount("rows");
     for (i in 0...zoneCount()) {
       var frame = zoneFrame(i), blank = Part.box(w - 2 * n("wall"), l - 2 * n("wall"), n("height") - 2 * n("wall"));
-      var cut = blank.translated(new Vector(frame.x, frame.y, n("wall")));
+      var cut = Solids.named(blank.translated(new Vector(frame.x, frame.y, n("wall"))), "plenum" + (i + 1));
       blank.close();
       owned.push(cut);
     }
@@ -81,18 +81,18 @@ class VacuumTable extends AssumedCatalogComponent {
       var nx = Std.int((w - 2 * margin) / n("gridPitch")), ny = Std.int((l - 2 * margin) / n("gridPitch"));
       for (ix in 0...nx) {
         var blank = Part.box(gw, l - 2 * margin, n("grooveDepth") + 1);
-        var cut = blank.translated(new Vector(f.x + (ix - (nx - 1) / 2) * n("gridPitch"), f.y, z));
+        var cut = Solids.named(blank.translated(new Vector(f.x + (ix - (nx - 1) / 2) * n("gridPitch"), f.y, z)), 'groove${i + 1}x${ix + 1}');
         blank.close();
         owned.push(cut);
       }
       for (iy in 0...ny) {
         var blank = Part.box(w - 2 * margin, gw, n("grooveDepth") + 1);
-        var cut = blank.translated(new Vector(f.x, f.y + (iy - (ny - 1) / 2) * n("gridPitch"), z));
+        var cut = Solids.named(blank.translated(new Vector(f.x, f.y + (iy - (ny - 1) / 2) * n("gridPitch"), z)), 'groove${i + 1}y${iy + 1}');
         blank.close();
         owned.push(cut);
       }
       // A nominal through-port ties each zone's top grid to its plenum.
-      owned.push(Part.cylinderSpan(n("zonePortDiameter") / 2, -1, n("height") + 1, f.x, f.y));
+      owned.push(Solids.named(Part.cylinderSpan(n("zonePortDiameter") / 2, -1, n("height") + 1, f.x, f.y), "port" + (i + 1)));
     }
     return Solids.cut(base, owned.slice(1));
     });

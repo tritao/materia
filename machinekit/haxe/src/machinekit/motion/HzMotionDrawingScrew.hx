@@ -62,13 +62,13 @@ class HzMotionDrawingScrew extends LeadScrew {
   }
   override public function geometry(detail:ComponentDetail = Preview):Part {
     if (endProfile == "BK15") return geometryBk15(detail);
-    return Solids.building([], tracked -> {tracked.push(Part.cylinderSpan(5, 0, 15));
-    tracked.push(Part.cylinderSpan(5.4, 15, 27)); // Semantic M12x1 root; no helical thread.
-    tracked.push(Part.cylinderSpan(6, 27, 51));
+    return Solids.building([], tracked -> {tracked.push(Solids.named(Part.cylinderSpan(5, 0, 15), "input"));
+    tracked.push(Solids.named(Part.cylinderSpan(5.4, 15, 27), "relief")); // Semantic M12x1 root; no helical thread.
+    tracked.push(Solids.named(Part.cylinderSpan(6, 27, 51), "journal"));
     tracked.push(Solids.named(Part.cylinderSpan(8, 51, totalLength - 11), "race"));
-    tracked.push(Part.cylinderSpan(5, totalLength - 11, totalLength - 3));
-    tracked.push(Part.cylinderSpan(4.8, totalLength - 3, totalLength - 1.85));
-    tracked.push(Part.cylinderSpan(5, totalLength - 1.85, totalLength));
+    tracked.push(Solids.named(Part.cylinderSpan(5, totalLength - 11, totalLength - 3), "neck"));
+    tracked.push(Solids.named(Part.cylinderSpan(4.8, totalLength - 3, totalLength - 1.85), "groove"));
+    tracked.push(Solids.named(Part.cylinderSpan(5, totalLength - 1.85, totalLength), "tip"));
     var body = Solids.union(tracked.copy());
     if (detail == Envelope) return body;
     try {
@@ -86,13 +86,13 @@ class HzMotionDrawingScrew extends LeadScrew {
     // HZMotion p10: F1=20, E1=44, S1=12, bearing15, M15x1.
     // Floating end follows the explicit SFU20 standard 13 mm end requirement.
     var body = Solids.union([
-      Part.cylinderSpan(6, 0, 20),
-      Part.cylinderSpan(6.9, 20, 32),
-      Part.cylinderSpan(7.5, 32, 64),
+      Solids.named(Part.cylinderSpan(6, 0, 20), "input"),
+      Solids.named(Part.cylinderSpan(6.9, 20, 32), "relief"),
+      Solids.named(Part.cylinderSpan(7.5, 32, 64), "journal"),
       Solids.named(Part.cylinderSpan(10, 64, totalLength - 13), "race"),
-      Part.cylinderSpan(7.5, totalLength - 13, totalLength - 4),
-      Part.cylinderSpan(7.15, totalLength - 4, totalLength - 2.85),
-      Part.cylinderSpan(7.5, totalLength - 2.85, totalLength)
+      Solids.named(Part.cylinderSpan(7.5, totalLength - 13, totalLength - 4), "neck"),
+      Solids.named(Part.cylinderSpan(7.15, totalLength - 4, totalLength - 2.85), "groove"),
+      Solids.named(Part.cylinderSpan(7.5, totalLength - 2.85, totalLength), "tip")
     ]);
     if (detail == Envelope) return body;
     try {

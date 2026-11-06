@@ -51,7 +51,7 @@ class ToolHolder extends AssumedCatalogComponent {
     var slot = 16.1, depth = Math.min(8.0, 0.2 * n("flangeDiameter"));
     return Solids.cut(
       body(),
-      [for (side in [-1.0, 1.0]) Solids.named(
+      [for (k => side in [-1.0, 1.0]) Solids.named(
         Part.box(
           slot,
           depth + 1,
@@ -64,7 +64,7 @@ class ToolHolder extends AssumedCatalogComponent {
           side * (n("flangeDiameter") / 2 - depth),
           -n("flangeThickness") - 0.1
         )),
-        "drive-slot"
+        "drive-slot" + (k + 1)
       )]
     );
   }

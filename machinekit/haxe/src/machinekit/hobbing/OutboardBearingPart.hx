@@ -39,22 +39,22 @@ class OutboardBearingPart extends MachineComponent {
   ] : [];
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return switch values().token("role") {
-    case "sleeve": Solids.cut(Part.cylinderSpan(20, L.SLEEVE_FROM, L.SLEEVE_TO), [
-      Part.cylinderSpan(10.5, L.SLEEVE_FROM - 1, L.PAIR_FROM),
-      Part.cylinderSpan(16, L.PAIR_FROM, L.PAIR_TO),
-      Part.cylinderSpan(18, L.GLAND_FROM, L.GLAND_TO + 1)
+    case "sleeve": Solids.cut(Solids.named(Part.cylinderSpan(20, L.SLEEVE_FROM, L.SLEEVE_TO), "sleeve"), [
+      Solids.named(Part.cylinderSpan(10.5, L.SLEEVE_FROM - 1, L.PAIR_FROM), "shaft-bore"),
+      Solids.named(Part.cylinderSpan(16, L.PAIR_FROM, L.PAIR_TO), "pair-seat"),
+      Solids.named(Part.cylinderSpan(18, L.GLAND_FROM, L.GLAND_TO + 1), "gland-seat")
     ]);
     case "gland":
-      var tools = [Part.cylinderSpan(14, L.GLAND_FROM - 1, L.GLAND_TO + 1)];
+      var tools = [Solids.named(Part.cylinderSpan(14, L.GLAND_FROM - 1, L.GLAND_TO + 1), "bore")];
       // Blind pin-spanner holes, not fastener holes. M36x1 represented nominally.
-      for (x in [-16.0, 16.0]) tools.push(Part.cylinderSpan(1, L.GLAND_TO - 2, L.GLAND_TO + 0.1, x, 0));
-      Solids.cut(Part.cylinderSpan(18, L.GLAND_FROM, L.GLAND_TO), tools);
-    case "innerSpacer": Solids.cut(Part.cylinderSpan(L.SPACER_DIAMETER / 2, L.PAIR_TO, L.PAIR_TO + L.SPACER_LENGTH),
-      [Part.cylinderSpan(7.5, L.PAIR_TO - 1, L.PAIR_TO + L.SPACER_LENGTH + 1)]);
+      for (k => x in [-16.0, 16.0]) tools.push(Solids.named(Part.cylinderSpan(1, L.GLAND_TO - 2, L.GLAND_TO + 0.1, x, 0), "spanner-hole" + (k + 1)));
+      Solids.cut(Solids.named(Part.cylinderSpan(18, L.GLAND_FROM, L.GLAND_TO), "gland"), tools);
+    case "innerSpacer": Solids.cut(Solids.named(Part.cylinderSpan(L.SPACER_DIAMETER / 2, L.PAIR_TO, L.PAIR_TO + L.SPACER_LENGTH), "spacer"),
+      [Solids.named(Part.cylinderSpan(7.5, L.PAIR_TO - 1, L.PAIR_TO + L.SPACER_LENGTH + 1), "bore")]);
     case "cap": machined(Solids.cut(Solids.union([
-      Part.box(60, 60, L.CAP_THICKNESS).translated(new Vector(0, 0, L.BODY_LENGTH)),
-      Part.cylinderSpan(20, L.REAR_STOP, L.BODY_LENGTH)
-    ]), [Part.cylinderSpan(L.CAP_BORE / 2, L.REAR_STOP - 1, L.BODY_LENGTH + L.CAP_THICKNESS + 1)]));
+      Solids.named(Part.box(60, 60, L.CAP_THICKNESS).translated(new Vector(0, 0, L.BODY_LENGTH)), "cap"),
+      Solids.named(Part.cylinderSpan(20, L.REAR_STOP, L.BODY_LENGTH), "spigot")
+    ]), [Solids.named(Part.cylinderSpan(L.CAP_BORE / 2, L.REAR_STOP - 1, L.BODY_LENGTH + L.CAP_THICKNESS + 1), "bore")]));
     default: throw "unknown outboard bearing part";
   };
 }

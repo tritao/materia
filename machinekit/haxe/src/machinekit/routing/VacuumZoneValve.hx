@@ -63,7 +63,7 @@ class VacuumZoneValve extends AssumedCatalogComponent {
           bolts * Math.cos(Math.PI / 4 + i * Math.PI / 2),
           bolts * Math.sin(Math.PI / 4 + i * Math.PI / 2)
         ),
-        "bolt"
+        "bolt" + (i + 1)
       )]
     );
   }

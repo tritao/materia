@@ -73,28 +73,28 @@ class HobArbor extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):cadkit.modeling.Part {
     var length = parameterNumber("supportLength"), height = parameterNumber("height"), start = hobStart();
     var sections = [
-      Bt30SpindleData.taper(0),
-      cadkit.modeling.Part.cylinderSpan(19, 0, Bt30SpindleData.HOLDER_GAP + Bt30SpindleData.HOLDER_LENGTH),
-      cadkit.modeling.Part.cylinderSpan(Bt30SpindleData.HOLDER_FLANGE / 2, Bt30SpindleData.HOLDER_GAP,
-        Bt30SpindleData.HOLDER_GAP + Bt30SpindleData.HOLDER_LENGTH),
-      cadkit.modeling.Part.cylinderSpan(12, Bt30SpindleData.HOLDER_GAP + Bt30SpindleData.HOLDER_LENGTH, start),
-      cadkit.modeling.Part.cylinderSpan(parameterNumber("outside") / 2, start, height - length),
+      Solids.named(Bt30SpindleData.taper(0), "taper"),
+      Solids.named(cadkit.modeling.Part.cylinderSpan(19, 0, Bt30SpindleData.HOLDER_GAP + Bt30SpindleData.HOLDER_LENGTH), "holder-shank"),
+      Solids.named(cadkit.modeling.Part.cylinderSpan(Bt30SpindleData.HOLDER_FLANGE / 2, Bt30SpindleData.HOLDER_GAP,
+        Bt30SpindleData.HOLDER_GAP + Bt30SpindleData.HOLDER_LENGTH), "holder-flange"),
+      Solids.named(cadkit.modeling.Part.cylinderSpan(12, Bt30SpindleData.HOLDER_GAP + Bt30SpindleData.HOLDER_LENGTH, start), "neck"),
+      Solids.named(cadkit.modeling.Part.cylinderSpan(parameterNumber("outside") / 2, start, height - length), "arbor"),
       // Integral face key: 5 wide, 3 radial engagement, 2 axial engagement,
       // ASSUMED DIN-138-style end slot. The bore remains plain for centring.
-      cadkit.modeling.Part.box(3.5, 5, 2).translated(new cadkit.modeling.Vector(9.25, 0, start))
+      Solids.named(cadkit.modeling.Part.box(3.5, 5, 2).translated(new cadkit.modeling.Vector(9.25, 0, start)), "face-key")
     ];
     if (length > 0) {
-      sections.push(cadkit.modeling.Part.cylinderSpan(10, height - length - 5, height - length));
-      sections.push(cadkit.modeling.Part.cylinderSpan(parameterNumber("supportDiameter") / 2, height - length, height));
+      sections.push(Solids.named(cadkit.modeling.Part.cylinderSpan(10, height - length - 5, height - length), "support-neck"));
+      sections.push(Solids.named(cadkit.modeling.Part.cylinderSpan(parameterNumber("supportDiameter") / 2, height - length, height), "support"));
     }
-    var tools = [cadkit.modeling.Part.cylinderSpan(6, -Bt30SpindleData.TAPER_LENGTH - 0.1, -Bt30SpindleData.TAPER_LENGTH + 20)];
+    var tools = [Solids.named(cadkit.modeling.Part.cylinderSpan(6, -Bt30SpindleData.TAPER_LENGTH - 0.1, -Bt30SpindleData.TAPER_LENGTH + 20), "stud-bore")];
     // MAS drive-key slots: 16.1 wide, floor 16.3 from axis. Axial
     // engagement depth is an assumed envelope matched to the bought dogs.
-    for (side in [-1, 1]) tools.push(cadkit.modeling.Part.box(12, Bt30SpindleData.DRIVE_SLOT_WIDTH,
-      Bt30SpindleData.DRIVE_DOG_LENGTH + 0.2).translated(new cadkit.modeling.Vector(side * (Bt30SpindleData.DRIVE_SLOT_FLOOR + 6), 0, -0.1)));
+    for (k => side in [-1, 1]) tools.push(Solids.named(cadkit.modeling.Part.box(12, Bt30SpindleData.DRIVE_SLOT_WIDTH,
+      Bt30SpindleData.DRIVE_DOG_LENGTH + 0.2).translated(new cadkit.modeling.Vector(side * (Bt30SpindleData.DRIVE_SLOT_FLOOR + 6), 0, -0.1)), "drive-slot" + (k + 1)));
     // M12 pull-stud thread (major bore shown); selected 45-degree stud stays with
     // the arbor. Supplier-specific head geometry must be matched at purchase.
-    if (parameterNumber("bore") > 0) tools.push(cadkit.modeling.Part.cylinderSpan(parameterNumber("bore") / 2, -49, height + 1));
+    if (parameterNumber("bore") > 0) tools.push(Solids.named(cadkit.modeling.Part.cylinderSpan(parameterNumber("bore") / 2, -49, height + 1), "bore"));
     return Solids.cut(Solids.union(sections), tools);
   }
 }

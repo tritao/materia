@@ -57,7 +57,7 @@ class Collet extends AssumedCatalogComponent {
       )));
       raw.close();
       owned.push(slot);
-      slots.push(Solids.named(slot, "slot"));
+      slots.push(Solids.named(slot, "slot" + (i + 1)));
     }
     return Solids.cut(body, slots);
     });

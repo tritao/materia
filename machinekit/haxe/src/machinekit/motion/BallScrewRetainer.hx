@@ -38,11 +38,11 @@ class BallScrewRetainer extends MachineComponent {
       Solids.named(Part.cylinderSpan(10, 0, 4), "retaining-nut"),
       Solids.named(Part.cylinderSpan(10.5, 4, 5), "washer")
     ]);
-    var tools = [Part.cylinderSpan(6.1, -0.1, 5.1)];
+    var tools = [Solids.named(Part.cylinderSpan(6.1, -0.1, 5.1), "bore")];
     if (detail == Preview) for (axis in 0...4) {
       var angle = axis * Math.PI / 2;
       var tool = Part.box(axis % 2 == 0 ? 4 : 3, axis % 2 == 0 ? 3 : 4, 4.2);
-      var placed = tool.translated(new Vector(10 * Math.cos(angle), 10 * Math.sin(angle), -0.1));
+      var placed = Solids.named(tool.translated(new Vector(10 * Math.cos(angle), 10 * Math.sin(angle), -0.1)), "notch" + (axis + 1));
       tool.close();
       tools.push(placed);
     }
