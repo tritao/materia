@@ -60,6 +60,8 @@ class EditorPerspectiveViewport implements View implements Observable {
   final style:LayoutStyle;
   var surface:Null<GraphicsSurface> = null;
   var renderedRevision:String = "";
+  @:unobservable var retainedRenderView:Null<SceneView>;
+  @:unobservable var retainedRenderViewKey:String = "";
   // Input and overlays use layout pixels; the GPU texture can be smaller on large displays.
   @:unobservable var viewportWidth:Float = 1.0;
   @:unobservable var viewportHeight:Float = 1.0;
@@ -774,19 +776,11 @@ class EditorPerspectiveViewport implements View implements Observable {
       || viewportWidth != renderedViewportWidth || viewportHeight != renderedViewportHeight)) {
       var started = Sys.time();
       fitCameraClipRange();
-      var view = sectionView(scene.configureRenderView(
-        new SceneView(),
-        camera.viewProjection(
+      var view = prepareRenderView(camera.viewProjection(
           aspect(),
           -1,
           -1,
           !readOnly ? 0 : Math.max(5, Math.min(110, PerspectiveCamera.FOV_Y * inspectionZoom))
-        ),
-        displayPoses(),
-        hoveredObjectId,
-        hoveredFaceIndex,
-        collisionPairs,
-        cosmeticThreadsVisible
       ));
 
       view.setCameraViewPose(camera.eyePosition(), camera.viewDirection());
@@ -1022,6 +1016,24 @@ class EditorPerspectiveViewport implements View implements Observable {
       view.addClipPlane(n.x, n.y, n.z, -presentationScale * (n.x * p.x + n.y * p.y + n.z * p.z));
     }
     return view;
+  }
+
+  function renderViewKey():String {
+    return scene.visualRevision + ":" + scene.selectionRevision + ":" + runtimeRevision + ":" + simulationActive
+      + ":" + presentationRevision + ":" + lightingRevision + ":" + hoverRevision + ":" + collisionRevision
+      + ":" + cosmeticThreadsVisible + ":" + readOnly + ":" + gridVisible + ":" + gridStep;
+  }
+
+  /** Camera motion changes projection and lighting, not the scene's presentation overrides. */
+  function prepareRenderView(projection:Transform):SceneView {
+    if (retainedRenderView == null || retainedRenderViewKey != renderViewKey()) {
+      retainedRenderView = sectionView(scene.configureRenderView(
+        new SceneView(), projection, displayPoses(), hoveredObjectId, hoveredFaceIndex, collisionPairs, cosmeticThreadsVisible
+      ));
+      // Creating derived overlays can publish a new visual revision; retain the resulting state.
+      retainedRenderViewKey = renderViewKey();
+    } else retainedRenderView.setViewProjection(projection);
+    return retainedRenderView;
   }
 
   public function frameSelected():Void {
@@ -1602,6 +1614,8 @@ class EditorPerspectiveViewport implements View implements Observable {
   }
 
   public function dispose():Void {
+    retainedRenderView = null;
+    retainedRenderViewKey = "";
     paintContext = null;
     paintNodeId = null;
     submittedPaintKey = null;

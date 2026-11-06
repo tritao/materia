@@ -42,6 +42,24 @@ import haxeon.ui.widgets.collections.TreeView;
     var frame = new LayoutFrame(800, 600);
     try {
       ui.submit(viewport, frame);
+      tree.selectKey("scene");
+      var baseView = viewport.prepareRenderView(viewport.camera.viewProjection(800 / 600));
+      check(baseView.selectionOverrideCount() == 0, "rendering starts without selection overrides");
+      viewport.camera.orbit(5, 2);
+      check(viewport.prepareRenderView(viewport.camera.viewProjection(800 / 600)) == baseView,
+        "camera motion retains scene presentation overrides");
+      tree.selectKey("project:tool");
+      check(viewport.prepareRenderView(viewport.camera.viewProjection(800 / 600)).selectionOverrideCount() == 1,
+        "selection updates the retained rendering view");
+      tree.selectKey("scene");
+      check(viewport.prepareRenderView(viewport.camera.viewProjection(800 / 600)).selectionOverrideCount() == 0,
+        "clearing selection removes its retained tint");
+      viewport.setSimulationState(true, [{id: "project:tool", position: [2, 3, 4], rotation: [0, 0, 0, 1]}], 1);
+      check(viewport.prepareRenderView(viewport.camera.viewProjection(800 / 600)).poseOverrideCount() == 1,
+        "runtime poses reach the retained rendering view");
+      viewport.setSimulationState(false, [], 2);
+      check(viewport.prepareRenderView(viewport.camera.viewProjection(800 / 600)).poseOverrideCount() == 0,
+        "leaving simulation removes retained poses");
       tree.selectKey(tree.assemblyKey("machine/axes"));
       viewport.frameSelected();
       check(Math.abs(viewport.camera.targetX - 5) < 0.00001, "frame assembly uses the union of member bounds");

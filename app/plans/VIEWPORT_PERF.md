@@ -133,3 +133,23 @@ not be attributed solely to this CPU fix. The measured input reduction is direct
 view overrides while updating camera, grid and studio lighting every render. No LOD or renderer architecture change.
 
 Validation: routed viewport-coordinate suite passes 238 assertions plus hover/docked-navigation regressions.
+
+
+**Step 3b: retain scene-view overrides.** The viewport now retains its render view across camera-only frames; scene/selection,
+runtime pose, presentation/section, lighting, hover, collision, cosmetic visibility, read-only and grid revisions rebuild it.
+Projection, exact eye/direction, grid ray basis and studio lighting still update every render. Picking uses its existing fresh
+views. Dispose drops the retained reference. No native renderer policy, batching, LOD, resolution or MSAA change.
+
+`orbit-retained-view-01` (same 360-frame full-turn, 4x MSAA): 29.75 fps / 33.62 ms mean cadence; median CPU 10.50 ms
+(p95 13.13), input 0.051 ms, view setup 1.003 ms, scene GPU 6.24 ms (p95 7.14). Median draws 1,540, triangles 2,275,354,
+uploads 0 bytes (p95 288). All 360 per-frame draw/triangle pairs exactly match the drag-fix run. Final viewport screenshot
+is pixel-identical over 379,440 pixels. The reduction from 6.59 to 1.00 ms setup directly measures the removed work;
+shared-machine load contributes to the GPU difference. Added retained-view selection, pose and section-close regressions;
+full app suite pending. A compiler worker EOF triggered the compiler's successful one-shot fallback, without source errors.
+
+The median callback is now 10.50 ms and scene GPU 6.24 ms, but cadence clusters at 33.34 ms on the 60 Hz GTK desktop.
+Request-to-callback delay is 23.01 ms. Investigate presentation timing (including a diagnostic 1x MSAA run) before attributing
+the remaining 30 fps ceiling to scene complexity. Quality remains at 4x MSAA for acceptance comparisons.
+
+Retained-view allocation check: median host-frame allocations fall from 1,851,404 to 491,320 bytes (73.5%).
+Automatic GC collections over 360 frames fall from 10 to 3, with total measured GC time 164.33 -> 24.90 ms.

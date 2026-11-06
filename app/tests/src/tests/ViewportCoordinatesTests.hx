@@ -100,10 +100,7 @@ import haxeon.ui.widgets.layout.Spacer;
         "section plane reaches rendering and picking views"
       );
       var ray = viewport.camera.screenRay(400, 300, 800, 600);
-      var view = viewport.sectionView(scene.configureRenderView(
-        new SceneView(),
-        viewport.camera.viewProjection(800 / 600)
-      ));
+      var view = viewport.prepareRenderView(viewport.camera.viewProjection(800 / 600));
       var hit = scene.pickHitRayWithView(
         view,
         ray.originX,
@@ -129,7 +126,8 @@ import haxeon.ui.widgets.layout.Spacer;
       viewport.clearSection();
       viewport.preparePresentationFrame();
       check(!viewport.sectionActive(), "close section restores the complete view");
-      check(viewport.sectionView(new SceneView()).clipPlaneCount() == 0, "closed section leaves no clip planes");
+      check(viewport.prepareRenderView(viewport.camera.viewProjection(800 / 600)).clipPlaneCount() == 0,
+        "closed section leaves no clip planes in the retained rendering view");
       check(scene.revision == revision, "section inspection does not edit scene geometry or visibility");
       ui.dispose();
       viewport.dispose();
