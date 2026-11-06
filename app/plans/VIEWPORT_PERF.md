@@ -336,7 +336,7 @@ Round 2, everything else, measured on the committed orbit benchmark (`app/tools/
    per-frame but camera-independent.
 5. **Scale.** Re-run on the bench mill and the tending cell as well as the hobber, so the gains are general.
 
-### Round 2 status: material instancing and edge caps measured; remaining work in progress
+### Round 2 status: three fixes and scale validation complete; LOD validation in progress
 
 Read the retained viewport, SceneRenderer, render compiler, GPU executor and nkgpu draw path.
 Frustum culling and geometry/material instancing already exist. Surface, stroke and AO passes
@@ -536,3 +536,40 @@ candidate). Reuse original packed vertices/attributes and full-resolution pickin
 select a level conservatively for the largest projected instance in a batch so there
 is no per-camera instance regrouping/upload. Section/inspection correctness and a
 documented screen-error threshold need validation before any such fix is accepted.
+
+**Scale validation completed:** the additive tending-cell source fixture compiles but
+generation rejects an outdated stored reach certificate (`58c7…`, current `aed7…`).
+No certificate, machine source or source manifest was changed. Instead the render-only
+comparison freezes an existing full `TendingCell.preview` artifact from the authorized
+temporary directory: `r2-tending-cell-frozen.mtrg`, 30,444,157 bytes, SHA-256
+`0ba0c56a9a834dcf88e9bb8624851276da741faafec0b9e55cca6c4257d7e928`.
+`r2-tending-cell-frozen.json` records provenance. This validates rendering the full
+819-object cell; it does not validate generation/certification of current cell sources.
+Both variants use that identical frozen artifact and the same built app.
+
+Valid full orbits `r2-scale-cell-before-04` / `r2-scale-cell-after-05` compare the
+original Round 2 renderer against the three fixes:
+
+| Metric | Original | Three fixes |
+| --- | ---: | ---: |
+| CPU median / p95 | 12.098 / 36.650 ms | 8.233 / 19.886 ms |
+| Scene GPU median / p95 | 8.783 / 22.927 ms | 3.522 / 11.258 ms |
+| Draw calls | 3,398 | 1,667 |
+| Submitted triangles | 1,722,098 | 1,438,642 |
+| Surface GPU median | 5.206 ms | 1.279 ms |
+| Edge GPU median | 1.991 ms | 1.675 ms |
+| AO surface GPU median | 0.991 ms | 0.219 ms |
+| Throughput (context only) | 26.30 fps | 28.49 fps |
+
+Draws fall 50.9%, triangles 16.5%; every measured surface-triangle count is unchanged.
+Median/p95 resource uploads are zero. Normal-zoom screenshots were inspected; appearance
+is unchanged. 1,190 of 402,864 interior pixels differ, including 191 by over 32 channel
+levels (maximum 158), around thin coincident details; do not describe this as pixel
+identity or purely one-level raster rounding. See `after-05/comparison.json`.
+Earlier failed captures lost the captured drag after physical focus/key events and
+were rejected by the runner; they are not performance samples.
+
+The full app suite after all three fixes passes (exit 0,
+`r2-three-fixes-app-tests.log`; `r2-cell-and-tests-status.txt` reports both cell and
+app tests zero). The LOD prototype is still uncommitted and under separate native
+correctness and benchmark validation; the measurements above contain no LOD.
