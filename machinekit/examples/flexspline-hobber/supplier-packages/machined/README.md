@@ -27,11 +27,11 @@ Python 3 with numpy, and Chrome or Chromium on the PATH for the PDFs; `pdftotext
 | `HOBBER-GE-Z-drive-pad` | one ground flat bar, 40 mm, under both supports, holes of both, cut by the mount's flange relief and the eRob housing envelope swept over the Z travel plus the 2 mm gap (`HobberZOffset.relief`) | 80 x 40 |
 | `HOBBER-GE-Y-drive-fixed/-floating` | milled L bracket, 1 setup, fine | block |
 | `HOBBER-GE-Y-nut-seat` | milled from 19 mm bar, 1 setup: the seat plane (16 mm) and two key ribs 3.5 x 3 mm either side of the nut block's 20 mm base (the block is located against the screw thrust in both directions) | block |
-| `HOBBER-GE-X-scale-seat`, `HOBBER-GE-Z-scale-seat` | ground flat bar, 10 x 20, 2 M8 tapped through (the scale housing's screws) | 20 x 10 |
+| `HOBBER-GE-X-scale-seat`, `HOBBER-GE-Z-scale-seat` | ground flat bar, 15 x 32, 2 M8 tapped through (the scale housing's screws; the JFT-40 housing is 32.2 wide, bolted by its side) | 32 x 15 |
 | `HOBBER-GE-Z-scale-arm` | milled arm for the Z scale head, 1 setup, fine | block |
 | `HOBBER-GE-Y-saddle` | milled, 2 setups, fine (Ø116 forward cartridge-clearance channel; spine for the Y scale head) | block |
 | `HOBBER-GE-outboard-carrier` | milled, 2 setups, fine; separate structural service interface, four derived M4 and two Ø4 H7 pins to the Y saddle | block |
-| `HOBBER-GE-swivel-plate` | ground steel plate, 15 mm (not aluminium: it carries the steel Y rails and the spindle seat), sawn to size, two faces ground after cutting, holes (Y scale housing seat, 8 adapter-ring screws) | plate 15 |
+| `HOBBER-GE-swivel-plate` | ground steel plate, 15 mm (not aluminium: it carries the steel Y rails and the spindle seat), sawn to size, two faces ground after cutting, a 3 mm relief in the front face beside the Y scale housing (the head's path), holes (Y scale housing seat, 4 adapter-ring screws) | plate 15 |
 | `HOBBER-GE-swivel-adapter` | turned ring, 2 setups, fine, aluminium (output flange to swivel plate) | bar |
 | `HOBBER-GE-spindle-seat` | milled split-clamp block for the Ø80 g6 cartridge, 2 setups, tight | block |
 | `HOBBER-GE-motor-cradle` | milled steel, 2 setups, fine: 12 mm floor (8 mm ahead of y 195, extended forward to y 125 for the front bolt row at y 135) on the spindle seat block's top (4 × M8, 2 dowels, slit over the seat's), an 80 × 55 mm rest block (top ground flat: the seat of the shim pack under the servo body, FE 2026-11-06), 8 mm wall carrying the spindle servo's flange (Ø70 pilot slot, 4 × M6 in vertical slots, ±3 mm travel; nuts on the rear), M8 jack screw lug under the flange, one windowed 6 mm rib | block |

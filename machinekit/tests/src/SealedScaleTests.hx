@@ -30,7 +30,9 @@ class SealedScaleTests {
     feedback();
     recipes();
     faces();
-    Sys.println("Sealed scale: length selection, overall length, mass, connectors, tolerances and feedback passed");
+    options();
+    var compared = SealedScaleStepTests.run();
+    Sys.println('Sealed scale: length selection, overall length, mass, connectors, tolerances, feedback and ${compared} of 3 supplier STEP comparisons passed');
   }
 
   static function lengths():Void {
@@ -80,13 +82,20 @@ class SealedScaleTests {
     var g = h.geometry(), b = g.shape.bounds();
     near(b.get_min().get_z(), 0, "housing starts at z=0");
     near(b.get_max().get_z(), 258, "housing ends at ML+138");
-    near(b.get_max().get_y(), 13.5, "housing height");
-    near(b.get_max().get_x(), 9, "housing half depth");
+    near(b.get_max().get_y(), 18, "housing thickness (along the fixing holes)");
+    near(b.get_min().get_x(), -13.5, "hole axis 13.5 from the bottom face");
+    near(b.get_max().get_x(), 18.7, "reading face 18.7 from the hole axis");
     check(g.solidCount() == 1 && g.volume() < h.geometry(Envelope).volume(), "end holes cut");
     g.close();
     var head = part("JFT-40", 120, "head").geometry(), hb = head.shape.bounds();
-    near(hb.get_max().get_z() - hb.get_min().get_z(), 115.3, "head length 115.3");
-    near(hb.get_max().get_y(), 0, "head face toward housing at y=0");
+    var body = part("JFT-40", 120, "head").bodyBox();
+    near(body[5] - body[4], 97.5, "head body 97.5");
+    near(body[4] - SealedScaleData.slim().bootLength, hb.get_min().get_z() + SealedScaleData.slim().cableStraight, "boot and cable stub beyond the body");
+    near(hb.get_max().get_z(), body[5], "head ends at its body");
+    near(hb.get_min().get_x(), 19.7, "head body 1 mm beyond the reading face");
+    near(hb.get_max().get_x(), 32.7, "head body 13 high");
+    near(hb.get_min().get_y(), 0, "head level with the housing, free face at y=0");
+    near(hb.get_max().get_y(), 18, "head 18 thick");
     head.close();
     fails(() -> part("JFT-40", 1340), "JFT-40 needs the plate from ML 1340");
     check(part("JFT-40", 1340, "housing", true).mountingPlate, "plate accepted");
@@ -98,18 +107,21 @@ class SealedScaleTests {
 
   static function connectorsAndGap():Void {
     var h = part("JFT-40", 120), head = part("JFT-40", 120, "head");
-    near(h.connector("mount").frame.y, 13.5, "housing mounting face");
+    near(h.connector("mount").frame.y, 18, "housing mounting face");
     near(h.connector("axis").frame.z, 16.5, "measuring start");
     near(h.connector("end1").frame.z, 11.5, "end hole 1");
     near(h.connector("end2").frame.z - h.connector("end1").frame.z, 120 + 115, "hole spacing ML+115");
     check([for (c in head.connectors()) if (c.name == "end1") c].length == 0, "head has no end holes");
-    near(head.connector("hole2").frame.z - head.connector("hole1").frame.z, 97.5, "head M5 pitch");
-    near(head.connector("mount").frame.y, -11.2, "head mount face away from housing");
+    near(head.connector("hole2").frame.z - head.connector("hole1").frame.z, 56, "head slot pitch");
+    near(head.connector("hole1").frame.z, -17.5, "slot 1 from the reading finger");
+    near(head.connector("hole1").frame.x, 28.7, "slot axis 9 above the gap face");
+    near(head.connector("mount").frame.y, 0, "head carrier face on the free side");
+    near(head.connector("cable").frame.z, -100.5, "cable stub end");
     check(head.hasPort("biss") && head.port("biss").kind == Signal, "BiSS-C signal port on the head");
     check(h.hasPort("air"), "air inlet on the housing");
     check(part("JFT-10", 140).connectors().length == 2 && part("JFT-10", 140, "head").connectors().length == 4, "JFT-10 connectors");
     near(part("JFT-10", 140, "head").connector("hole2").frame.z - part("JFT-10", 140, "head").connector("hole1").frame.z, 76, "JFT-10 head pitch 76");
-    // No contact: head is `gap` below the housing, so a 1 mm running gap is what a mate leaves.
+    // No contact: the head stands `gap` beyond the reading face, level with the housing.
     near(h.gap(), 1, "running gap data");
   }
 
@@ -134,31 +146,63 @@ class SealedScaleTests {
     check(a.components().length == 2, "both parts in an assembly");
   }
 
-  /** The fastening faces: the housing's two M8 through the end holes (Ø15 counterbore from the head side only), the head's tapped M5 pair. */
+  /** The fastening faces: the housing's two M8 through the end holes (Ø15 counterbore 5.75 from each face), the head's two M4 through its slots into the carrier. */
   static function faces():Void {
     var h = part("JFT-40", 120), head = part("JFT-40", 120, "head");
-    var housing = h.fasteningFaces(), tapped = head.fasteningFaces();
-    check(housing.length == 1 && tapped.length == 1, "one face each");
-    var clamped = housing[0], holes:Array<machinekit.component.BoltedFace.BoltHole> = clamped.holes ?? [], pair:Array<machinekit.component.BoltedFace.BoltHole> = tapped[0].holes ?? [];
+    var housing = h.fasteningFaces(), clampedHead = head.fasteningFaces();
+    check(housing.length == 1 && clampedHead.length == 1, "one face each");
+    var clamped = housing[0], holes:Array<machinekit.component.BoltedFace.BoltHole> = clamped.holes ?? [], pair:Array<machinekit.component.BoltedFace.BoltHole> = clampedHead[0].holes ?? [];
     check(clamped.isClamped() && holes.length == 2 && Math.abs(holes[0].x - 11.5) < 1e-9 && Math.abs(holes[1].x - (h.overallLength() - 11.5)) < 1e-9,
       "the housing's two M8 sit 11.5 mm from each end");
     switch clamped.role {
       case Clamped(size, clearance, grip, recess):
-        check(size == "M8" && clearance == 9.6 && recess != null && recess.diameter == 15 && Math.abs(grip + recess.depth - 13.5) < 1e-9, "Ø9.6 holes, Ø15 counterbore, floor under it");
+        check(size == "M8" && clearance == 9.6 && recess != null && recess.diameter == 15 && Math.abs(recess.depth - 5.75) < 1e-9 && Math.abs(grip + recess.depth - 18) < 1e-9,
+          "Ø9.6 holes, Ø15 counterbore 5.75 deep, the rest of the 18 mm under it");
       default:
         check(false, "the housing's face is clamped");
     }
-    check(pair.length == 2 && Math.abs(pair[1].x - 48.75) < 1e-9 && Math.abs(pair[0].x + 48.75) < 1e-9, "the head's M5 pair at 97.5 mm");
-    // The counterbore is cut only from the head side: the mounting face (y = 13.5) keeps the bearing area around the Ø9.6 hole.
-    var body = h.geometry(), full = machinekit.component.Solids.named(cadkit.modeling.Part.prism([new cadkit.modeling.Vector(-9, 0), new cadkit.modeling.Vector(9, 0), new cadkit.modeling.Vector(9, 13.5), new cadkit.modeling.Vector(-9, 13.5)], 0, h.overallLength()), "ref");
-    var removed = full.volume() - body.volume(), expected = 2 * Math.PI / 4 * (9.6 * 9.6 * 13.5 + (15 * 15 - 9.6 * 9.6) * 9.5);
-    check(Math.abs(removed - expected) < 0.5 * expected / 100, 'the end holes remove ${removed} mm3, expected ${expected}; a through counterbore would remove more');
+    check(clampedHead[0].isClamped(), "the head's face is clamped (its slots are through)");
+    switch clampedHead[0].role {
+      case Clamped(size, clearance, grip, recess):
+        check(size == "M4" && clearance == 4.6 && recess != null && recess.diameter == 7.6 && recess.depth == 5 && Math.abs(grip - 13) < 1e-9, "Ø4.6 slots for M4, Ø7.6 counterbore 5 deep");
+      default:
+    }
+    check(pair.length == 2 && Math.abs(pair[1].x - 38.5) < 1e-9 && Math.abs(pair[0].x + 17.5) < 1e-9, "the head's M4 pair 56 mm apart, 10.5 mm past the reading finger's centre");
+    // The counterbores are cut from both faces and the holes run through the thickness: the mounting face keeps no Ø15 bearing ring beyond the relief.
+    var body = h.geometry(), full = machinekit.component.Solids.named(cadkit.modeling.Part.prism([new cadkit.modeling.Vector(-13.5, 0), new cadkit.modeling.Vector(18.7, 0), new cadkit.modeling.Vector(18.7, 18), new cadkit.modeling.Vector(-13.5, 18)], 0, h.overallLength()), "ref");
+    var removed = full.volume() - body.volume(), expected = 2 * Math.PI / 4 * (9.6 * 9.6 * 18 + 2 * (15 * 15 - 9.6 * 9.6) * 5.75);
+    check(Math.abs(removed - expected) < 0.5 * expected / 100, 'the end holes remove ${removed} mm3, expected ${expected}');
     body.close();
     full.close();
-    var tappedBody = head.geometry();
-    var block = 18.25 * 11.2 * 115.3, drill = machinekit.standard.SocketHeadCapScrew.catalog().get("M5").tapDrill;
-    check(Math.abs(block - tappedBody.volume() - 2 * Math.PI / 4 * drill * drill * 8) < 1.0, "the head's two tapped holes are drawn, 8 mm deep");
-    tappedBody.close();
+    var headBody = head.geometry(), envelope = head.geometry(Envelope);
+    // The drawn volume is the envelope's less both slots (each a Ø4.6 x 2.4 stadium through the 18 mm, with a Ø7.6 x 2.4 stadium 5 deep from each face).
+    var oneSlot = Math.PI / 4 * 4.6 * 4.6 * 18 + 4.6 * 2.4 * 18 + 2 * (Math.PI / 4 * (7.6 * 7.6 - 4.6 * 4.6) * 5 + (7.6 - 4.6) * 2.4 * 5);
+    check(Math.abs(envelope.volume() - headBody.volume() - 2 * oneSlot) < 0.01 * 2 * oneSlot, 'the head\'s two slots are drawn: ${envelope.volume() - headBody.volume()} mm3, expected ${2 * oneSlot}');
+    headBody.close();
+    envelope.close();
+  }
+
+  /** Installation choices: head side mirrors the pair, the air port and the cable's bend add their envelopes. */
+  static function options():Void {
+    var mirrored = new SealedScalePart(new ComponentValues().setNumber("measuringLength", 120).setToken("variant", "head").setToken("headSide", "-x"));
+    var g = mirrored.geometry(), b = g.shape.bounds();
+    near(b.get_min().get_x(), -32.7, "mirrored head at -X");
+    near(b.get_max().get_x(), -19.7, "mirrored head at -X, far face");
+    g.close();
+    var housing = new SealedScalePart(new ComponentValues().setNumber("measuringLength", 120).setToken("variant", "housing").setToken("airPort", "end"));
+    var a = housing.geometry(), ab = a.shape.bounds();
+    check(a.solidCount() == 1, "air fitting joins the housing");
+    near(ab.get_max().get_z(), 258 + 18 + 25, "fitting and tube past the end face", 1e-6);
+    near(housing.connector("air").frame.x, 11.7, "air port 7 below the reading face");
+    near(housing.connector("air").frame.z, 258, "air port on the far end face");
+    a.close();
+    var bent = new SealedScalePart(new ComponentValues().setNumber("measuringLength", 120).setToken("variant", "head").setToken("cableBend", "-y"));
+    var c = bent.geometry(), cb = c.shape.bounds();
+    check(c.solidCount() == 1, "cable bend joins the head");
+    // Stub end at z -100.5, y 9: quarter bend of 75 toward -y ends at y -66, then 37 straight on.
+    near(cb.get_min().get_y(), 9 - 75 - 37, "cable end after the bend and its straight run", 0.5);
+    c.close();
+    fails(() -> new SealedScalePart(new ComponentValues().setToken("series", "JFT-10").setNumber("measuringLength", 140).setToken("airPort", "end")), "JFT-10 has no air port");
   }
 
   static function recipes():Void {

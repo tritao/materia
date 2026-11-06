@@ -31,7 +31,9 @@ class HobberAccuracyChecks {
       var worldAlong = F.transformVector(housing, 0, 0, 1), along = F.transformVector(back, worldAlong.x, worldAlong.y, worldAlong.z);
       var centre = F.transformPoint(back, head.x, head.y, head.z);
       var u = [along.x, along.y, along.z];
-      var d = [toolWork.x - origin.x, toolWork.y - origin.y, toolWork.z - origin.z];
+      // The Abbe offset is from the measuring line (the housing's `axis` connector: under the groove floor of the reading face), not the hole line the housing is bolted on.
+      var ax = F.compose(housing, a.housing.connector("axis").frame), line = F.transformPoint(back, ax.x, ax.y, ax.z);
+      var d = [toolWork.x - line.x, toolWork.y - line.y, toolWork.z - line.z];
       var along0 = d[0] * u[0] + d[1] * u[1] + d[2] * u[2];
       var across = [for (i in 0...3) d[i] - along0 * u[i]];
       var item = new AccuracyAxis();

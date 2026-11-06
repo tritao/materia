@@ -26,6 +26,8 @@ class HobberFrameChecks {
       fittedBefore: [{member: "column/", fastened: ["Xbridge"]},
         // The ring's heads are sunk at the plate end: its screws into the output flange are fitted before the swivel plate goes on.
         {member: "swivelPlate", fastened: ["swivel/output"]},
+        // The outboard support's carrier is screwed to the saddle plate's face before the plate is (its driver axis passes the plate).
+        {member: "Yplate", fastened: ["outboard"]},
         // The Y scale is bolted to the plate's front after the plate's screws into the ring (and its rails and the bracket feet) are fitted: the joints are named
         // by their other members, since the plate itself is part of the scale's own joint.
         {member: "Yscale", fastened: ["swivelAdapter", "railYLeft", "railYRight", "YdriveFixed", "YdriveFloating", "swivel/output"]},
@@ -36,8 +38,6 @@ class HobberFrameChecks {
         {member: "blockYLeft", fastened: ["YnutSeat"]}, {member: "blockYLeftFront", fastened: ["YnutSeat"]},
         {member: "blockYRight", fastened: ["YnutSeat"]}, {member: "blockYRightFront", fastened: ["YnutSeat"]},
         {member: "Ynut", fastened: ["Yplate"]},
-        // The Y scale head's rear screw is driven through the outboard support's arm: the head is screwed on before the outboard support and its bearing go on.
-        {member: "Yplate", fastened: ["outboard"]},
         // The Z scale head's screws are driven from the arm's inner face, where the eRob housing will stand: the head is screwed on before the actuator is fitted.
         {member: "swivel/housing", fastened: ["ZscaleArm"]}]};
     // Assemble the fixed shield/lid joints on the bench, lower that assembly
@@ -47,7 +47,11 @@ class HobberFrameChecks {
       {member:"bed/casting",fastened:["XfrontCover","XrearCover"]},
       {member:"Xbridge",fastened:["XcoverFrontLeft","XcoverFrontRight","XcoverRearLeft","XcoverRearRight"]}
     ]);
-    options.fittedBefore = options.fittedBefore.concat([for (id in FlexsplineHobber.outboardMembers()) {member: id, fastened: ["YscaleHead"]}]);
+    // The scale heads' M4 enter from the seat side (their slots run through the head), so each head is fitted last on its carrier, with the carrier's neighbours already
+    // bolted on: the Y head after the outboard support's screws (its access runs where the head stands), the Z head before the guide blocks that stand beside its arm (a driver
+    // from the wall side passes the blocks' row), and, once the carrier is a separate part on the bench, the X head with the carriage off the rails.
+    options.fittedBefore = options.fittedBefore.concat([{member: "YscaleHead", fastened: FlexsplineHobber.outboardMembers()},
+      {member: "blockZLeft", fastened: ["ZscaleArm"]}, {member: "blockZLeftUpper", fastened: ["ZscaleArm"]}]);
     if (!sweep) options.sweepStates = [];
     return options;
   }
@@ -171,7 +175,9 @@ class HobberFrameChecks {
       var origin = F.transformPoint(back, housing.x, housing.y, housing.z);
       var worldAlong = F.transformVector(housing, 0, 0, 1), along = F.transformVector(back, worldAlong.x, worldAlong.y, worldAlong.z);
       var centre = F.transformPoint(back, head.x, head.y, head.z);
-      var d = [toolWork.x - origin.x, toolWork.y - origin.y, toolWork.z - origin.z];
+      // From the measuring line (the housing's `axis` connector, under the reading face's groove floor), not the hole line the housing is bolted on.
+      var ax = F.compose(housing, a.housing.connector("axis").frame), mline = F.transformPoint(back, ax.x, ax.y, ax.z);
+      var d = [toolWork.x - mline.x, toolWork.y - mline.y, toolWork.z - mline.z];
       var u = [along.x, along.y, along.z], along0 = d[0] * u[0] + d[1] * u[1] + d[2] * u[2];
       var across = [for (i in 0...3) d[i] - along0 * u[i]];
       var sense = jointDirection(a.id), sign = sense[0] * u[0] + sense[1] * u[1] + sense[2] * u[2];

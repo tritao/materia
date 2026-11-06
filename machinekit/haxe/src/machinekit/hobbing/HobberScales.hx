@@ -11,51 +11,87 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 /**
  * One axis's sealed scale (JFT-40, `SealedScalePart`) placed in the hobber, all in the work frame at joint zero.
  *
- * The scale is a sandwich along `toSeat`: fixed seat, housing, running gap, reading head, carriage seat. The housing sits on
- * the fixed part (a ground bar, or the swivel plate itself) with its travel along `along`, the joint's positive direction;
- * the head is carried by the moving part, centred `headAlong` mm from the housing's start end along the travel.
+ * The housing is bolted by its side (the fixing holes run through its 18 mm thickness, from the STEP) to a seat wall under `toSeat`, with its travel along
+ * `along`, the joint's positive direction; the reading head stands level with it on the reading face's side, `across` from the hole line, carried from
+ * the free side by the moving part, its reading finger `headAlong` mm from the housing's start end along the travel.
  */
 typedef HobberScaleAxis = {
   var id:String;
   var housing:SealedScalePart;
   var head:SealedScalePart;
-  /** Poses at joint zero (the part frames of `SealedScalePart`: travel along +Z, +Y from the head toward the seat). */
+  /** Poses at joint zero (the part frames of `SealedScalePart`: travel along +Z, +Y from the free face toward the seat, X across). */
   var housingPose:AssemblyFrame;
   var headPose:AssemblyFrame;
-  /** Unit vectors: from the head toward the seat, and along the travel. */
+  /** Unit vectors: from the free face toward the seat, along the travel, and across it from the hole line toward the head. */
   var toSeat:Array<Float>;
   var along:Array<Float>;
+  var across:Array<Float>;
   /** The ground bar under the housing as {x0, x1, y0, y1, z0, z1}, or null when the housing sits on a plate. */
   var seatBar:Null<Array<Float>>;
 }
 
 /**
- * Where the X, Y and Z sealed scales go (FRAME_PLAN H4). The measuring length comes from the axis stroke plus the overtravel
- * at both ends (`SealedScalePart.pair` picks the smallest standard length); the housing is placed so the head stays inside the
+ * Where the X, Y and Z sealed scales go (FRAME_PLAN H4, reworked to the maker's STEP 2026-11-06). The measuring length comes from the axis stroke plus the overtravel
+ * at both ends (`SealedScalePart.pair` picks the smallest standard length); the housing is placed so the reading finger stays inside the
  * measuring window over the whole stroke with margin at both ends.
  *
- * - **X**: housing on a 10 x 20 ground bar on the bed beam's flat top (z 210) beside the right rail, head under a rib of the
- *   carriage (the rib is as deep as the scale stack leaves).
- * - **Y**: housing on the swivel plate's front face between the guide rails, on the A axis line; head on a boss on the Y saddle.
- * - **Z**: housing on a 10 x 20 ground bar on the column channel's inner wall (y 120), head on an arm milled out of a bar and
- *   bolted to the Z saddle's back face.
+ * The housing is bolted by its side and the head stands beside it (see `HobberScaleAxis`), so every axis has the housing on a narrow seat and the head's carrier reaching
+ * round to the free side:
+ * - **X**: housing on a 32 x 15 ground bar on the bed beam's flat top (z 210) beside the right rail, the head on the bed's inboard side of it, under a rib of the carriage.
+ * - **Y**: housing on the swivel plate's front face between the guide rails, near the A axis line, with a 3 mm relief milled in the plate under the head's path (the head runs
+ *   beside the housing at its seat plane); head on a boss on the Y saddle.
+ * - **Z**: housing on a 32 x 15 ground bar on the column channel's inner wall (y 120), head on an arm milled out of a bar and bolted to the Z saddle's back face.
+ * The head's M4 enter from the seat side, so each is fitted with its carrier off the machine (`HobberFrameChecks.integrityOptions`).
+ * The cable leaves each head toward its housing's start end, along the travel, straight for 54.5 mm past the body (the STEP's stub), then bends in a radius of at least 75 mm
+ * (`SealedScaleData.CABLE_BEND_RADIUS`). Only the Y bend is drawn (across the swivel plate's edge, free); the X and Z bends are not, because no direction is free at the end
+ * of their stubs (FRAME_PLAN, open item): X leaves toward the swivel stack, where the bend meets the guide rails and blocks one way and the plate's swing at A +15 deg the
+ * other, and Z leaves downward 32 mm above the carriage deck at joint zero.
+ * The air purge is the M5 port on each housing's end face (`airPort` "end": the tail end, where the housing is 121.5 mm past the measuring window).
  */
 class HobberScales {
   /** Top of the bed beam beside the X guide (work z), mm, measured on the casting. */
   public static inline final BED_BEAM_TOP = 210.0;
-  /** Thickness of the ground bar the housing stands on, mm. */
-  public static inline final SEAT_BAR = 10.0;
-  /** Width of that bar, mm: the housing is 18 wide. */
-  public static inline final SEAT_BAR_WIDTH = 20.0;
+  /**
+   * Thickness of the ground bar the housing stands on, mm: the two M8 (DIN 7984 low head, the JFT-40's 5.75 mm counterbores) through the 12.25 mm left under the head need
+   * 8 mm of thread in the seat, which takes the 25 mm screw, and its 12.75 mm of engagement is tapped through 15 mm.
+   */
+  public static inline final SEAT_BAR = 15.0;
+  /**
+   * Width of that bar, mm: the standard ground flat (32) under the JFT-40's 32.2 mm housing (STEP). The head stands beside it, level with the housing, 1 mm past the reading face and
+   * moving: the bar's edge on that side stops `RUNNING_CLEARANCE` short of the head (1.2 mm inside the reading face) and it runs on past the housing's other face.
+   */
+  public static inline final SEAT_BAR_WIDTH = 32.0;
+  /** The relief milled in the swivel plate's front face under the Y head's path, mm: the head runs beside the housing at its seat plane (the plate's face), so the plate must stand back from it. */
+  public static inline final PLATE_RELIEF = 3.0;
+  /** Margin the relief leaves on each side of the head, mm. */
+  public static inline final PLATE_RELIEF_MARGIN = 2.5;
+  /** How far the relief runs past the housing's ends, mm: the head's body (97.5 long) overhangs the measuring window's ends, and the 230 mm plate's edge is 11 mm past the housing's. */
+  public static inline final PLATE_RELIEF_RUNOUT = 11.0;
+  /** Running gap the sweep wants between a moving part and a fixed one, mm (`AssemblyIntegrity`'s 2), and the clearance kept just beyond it. */
+  public static inline final RUNNING_CLEARANCE = 2.2;
   /** Inner face of the column channel wall (work y), mm: the casting's wall stands at +120 and -120. */
   public static inline final COLUMN_WALL_Y = 120.0;
 
   /** Which channel wall the Z scale stands on: the one away from the Z screw's pads (+1 is the +y wall). */
   public static function zWallSign():Float return HobberZLayout.axisY() < 0 ? 1.0 : -1.0;
-  /** Where the Z scale stands along x (centre), mm: just inside the channel's open front (the casting wall starts at x 186). */
-  public static inline final Z_COLUMN_X = 198.0;
+  /**
+   * Where the Z scale's hole line runs along x, mm. The head stands deeper in the channel than the housing (away from the open front, `across` +x): the housing's bar (32 wide,
+   * centred on it) then covers x 184.6..216.6 on the wall, just inside the casting's front edge at x 186 (the bottom face is 13.5 from the hole line), and the head (13 wide)
+   * stands at x 219.7..232.7, reached by an arm from the saddle.
+   */
+  public static inline final Z_COLUMN_X = 200.0;
+  /**
+   * Where the Y scale's hole line runs across the plate, from the A axis line (z), mm. The head body and the housing (x 67..85) must clear the heads of the ring's four
+   * M6 (Ø10 at 33.6 mm from the axis on each diagonal, standing 6 mm proud of the plate's front face): the housing and head together (46.9 mm) fit between them, z 335..392.
+   */
+  public static inline final Y_HOLE_LINE_Z = -10.0;
+  /**
+   * Where the X scale's hole line runs along y, mm: the housing covers y 161.3..193.5, clear of the guide blocks (y 196) by the running gap, and the bar y 162.5..194.5 (they reach 2.5
+   * mm and 3.7 mm past the beam's inner edge at y 165: the flat strip between that edge and the rail seat at y 195 is 30 mm wide, narrower than the 32.2 mm housing).
+   */
+  public static inline final X_HOLE_LINE_Y = 180.0;
   /** Arm that carries the Z head, thickness across the wall and bolt-up height, mm. */
-  public static inline final Z_ARM_THICKNESS = 10.0;
+  public static inline final Z_ARM_THICKNESS = 12.0;
   /** How far the head can overhang the carrier that holds it, mm (it is wider than the holes' span). */
   public static inline final HEAD_CARRIER_MARGIN = 6.0;
 
@@ -77,21 +113,19 @@ class HobberScales {
   public static function z():HobberScaleAxis return axis("Z");
   public static function all():Array<HobberScaleAxis> return [x(), y(), z()];
 
-  /** Where the housing's seat face starts, how it lies, and where the head's centre sits at joint zero (work frame). */
-  static function layout(id:String, startFor:Float, len:Float):{toSeat:Array<Float>, along:Array<Float>, start:Array<Float>, bar:Null<Array<Float>>, headCentre:Float} {
+  /** Which side of the housing the head stands (the part's `headSide`), where the hole line runs, and where the head's reading finger sits at joint zero. */
+  static function layout(id:String, startFor:Float, len:Float):{toSeat:Array<Float>, along:Array<Float>, start:Array<Float>, side:Float, plate:Bool, headCentre:Float, air:String, bend:String} {
     return switch id {
       case "X":
         // The head centre is at x 262 at joint zero; the housing starts so the head's travel sits in the window.
         var at = 262.0 - startFor;
-        {toSeat: [0.0, 0, -1], along: [1.0, 0, 0], start: [at, 178.0, BED_BEAM_TOP + SEAT_BAR],
-          bar: [at, at + len, 178 - SEAT_BAR_WIDTH / 2, 178 + SEAT_BAR_WIDTH / 2, BED_BEAM_TOP, BED_BEAM_TOP + SEAT_BAR], headCentre: startFor};
+        {toSeat: [0.0, 0, -1], along: [1.0, 0, 0], start: [at, X_HOLE_LINE_Y, BED_BEAM_TOP + SEAT_BAR], side: 1.0, plate: false, headCentre: startFor, air: "end", bend: "none"};
       case "Y":
         // The joint runs along -y; the scale is read along +y (the sign is set in the drive). The plate is 230 long (y +-115).
-        {toSeat: [1.0, 0, 0], along: [0.0, 1, 0], start: [85.0, -104.0, HobberZLayout.SEAT_Z], bar: null, headCentre: startFor};
+        {toSeat: [1.0, 0, 0], along: [0.0, 1, 0], start: [85.0, -104.0, HobberZLayout.SEAT_Z + Y_HOLE_LINE_Z], side: 1.0, plate: true, headCentre: startFor, air: "end", bend: "+x"};
       case "Z":
         var at = HobberZLayout.SEAT_Z + 50.0 - startFor, w = zWallSign();
-        {toSeat: [0.0, w, 0], along: [0.0, 0, 1], start: [Z_COLUMN_X, w * (COLUMN_WALL_Y - SEAT_BAR), at],
-          bar: [Z_COLUMN_X - SEAT_BAR_WIDTH / 2, Z_COLUMN_X + SEAT_BAR_WIDTH / 2, w > 0 ? COLUMN_WALL_Y - SEAT_BAR : -COLUMN_WALL_Y, w > 0 ? COLUMN_WALL_Y : -COLUMN_WALL_Y + SEAT_BAR, at, at + len], headCentre: startFor};
+        {toSeat: [0.0, w, 0], along: [0.0, 0, 1], start: [Z_COLUMN_X, w * (COLUMN_WALL_Y - SEAT_BAR), at], side: w, plate: false, headCentre: startFor, air: "end", bend: "none"};
       default:
         throw 'No scale for axis $id';
     };
@@ -99,25 +133,68 @@ class HobberScales {
 
   static function axis(id:String):HobberScaleAxis return cache.get(id, () -> derive(id));
 
+  static function cross(a:Array<Float>, b:Array<Float>):Array<Float> return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+
   static function derive(id:String):HobberScaleAxis {
     var s = stroke(id), accuracy = id == "X" ? "3" : "5";
     var span = s.upper - s.lower + 2 * overtravel();
-    var pair = SealedScalePart.pair("JFT-40", span, accuracy);
-    var h = pair.housing, len = h.overallLength(), ml = h.measuringLength;
+    var probe = SealedScalePart.pair("JFT-40", span, accuracy);
+    var h0 = probe.housing, len = h0.overallLength(), ml = h0.measuringLength;
     // The head's centre at the lowest reachable joint value sits `margin` inside the window's start; the same margin is left at the far end.
     var margin = (ml - span) / 2;
     // The head centre's distance from the housing start at joint zero: window start + margin - (lower - overtravel).
-    var headFromStart = h.startOffset() + margin - (s.lower - overtravel());
+    var headFromStart = h0.startOffset() + margin - (s.lower - overtravel());
     var place = layout(id, headFromStart, len);
-    var hh = h.series.housingHeight, gap = h.gap(), up = place.toSeat, along = place.along, p = place.start;
-    var housingOrigin = [p[0] - up[0] * hh, p[1] - up[1] * hh, p[2] - up[2] * hh];
+    var values = new machinekit.component.ComponentValues().setToken("headSide", place.side > 0 ? "+x" : "-x").setToken("airPort", place.air).setToken("cableBend", place.bend);
+    var pair = SealedScalePart.pair("JFT-40", span, accuracy, "5", false, values);
+    var h = pair.housing, t = h.series.housingThickness, up = place.toSeat, along = place.along, p = place.start;
+    var housingOrigin = [p[0] - up[0] * t, p[1] - up[1] * t, p[2] - up[2] * t];
     var housingPose = AxisBuilder.orient(housingOrigin[0], housingOrigin[1], housingOrigin[2], up, along);
-    var headOrigin = [for (i in 0...3) housingOrigin[i] + along[i] * place.headCentre - up[i] * gap];
+    var headOrigin = [for (i in 0...3) housingOrigin[i] + along[i] * place.headCentre];
     var headPose = AxisBuilder.orient(headOrigin[0], headOrigin[1], headOrigin[2], up, along);
+    var x = cross(up, along), across = [for (v in x) place.side * v];
+    // The bar under the housing (the plate needs none: the housing sits on its front face).
+    var bb = h.bodyBox(), bar:Null<Array<Float>> = null;
+    // The bar's edge toward the head stops short of it; its thickness runs beyond the seat plane.
+    var edge = h.gap() - RUNNING_CLEARANCE;
+    if (!place.plate) bar = worldBox(housingPose, place.side > 0 ? [bb[1] + edge - SEAT_BAR_WIDTH, bb[1] + edge, t, t + SEAT_BAR, 0, len]
+      : [bb[0] - edge, bb[0] - edge + SEAT_BAR_WIDTH, t, t + SEAT_BAR, 0, len]);
     var result:HobberScaleAxis = {id: id, housing: pair.housing, head: pair.head, housingPose: housingPose, headPose: headPose,
-      toSeat: up, along: along, seatBar: place.bar};
+      toSeat: up, along: along, across: across, seatBar: bar};
     return result;
   }
+
+  /** The relief in the swivel plate under the Y head's path as {x0, x1, y0, y1, z0, z1}: `PLATE_RELIEF` deep from the front face, the head's width plus a margin each side, the length of the housing and its runout (open at the plate's edges). */
+  public static function reliefBox(a:HobberScaleAxis):Array<Float> {
+    var hb = a.head.bodyBox(), t = a.housing.series.housingThickness;
+    return worldBox(a.housingPose, [hb[0] - PLATE_RELIEF_MARGIN, hb[1] + PLATE_RELIEF_MARGIN, t, t + PLATE_RELIEF, -PLATE_RELIEF_RUNOUT, a.housing.overallLength() + PLATE_RELIEF_RUNOUT]);
+  }
+
+  /** A box of a part frame ({x0, x1, y0, y1, z0, z1}) as the box of the work frame that holds it, grown by `grow`. */
+  public static function worldBox(pose:AssemblyFrame, box:Array<Float>, grow:Float = 0):Array<Float> {
+    var lo = [1e18, 1e18, 1e18], hi = [-1e18, -1e18, -1e18];
+    for (xl in [box[0], box[1]]) for (yl in [box[2], box[3]]) for (zl in [box[4], box[5]]) {
+      var p = F.transformPoint(pose, xl, yl, zl), v = [p.x, p.y, p.z];
+      for (k in 0...3) {
+        lo[k] = Math.min(lo[k], v[k]);
+        hi[k] = Math.max(hi[k], v[k]);
+      }
+    }
+    return [lo[0] - grow, hi[0] + grow, lo[1] - grow, hi[1] + grow, lo[2] - grow, hi[2] + grow];
+  }
+
+  /**
+   * The box a carrier of the head must lie within across and along the travel, work frame: the head body grown by `grow`, except on the housing's side, where it stops `RUNNING_CLEARANCE`
+   * beyond the housing's reading face (the carrier moves, the housing is fixed, and the head stands only 1 mm from it).
+   */
+  public static function carrierBox(a:HobberScaleAxis, grow:Float):Array<Float> {
+    var hb = a.head.bodyBox(), bb = a.housing.bodyBox(), x0 = hb[0] - grow, x1 = hb[1] + grow;
+    if (a.housing.side > 0) x0 = Math.max(x0, bb[1] + RUNNING_CLEARANCE) else x1 = Math.min(x1, bb[0] - RUNNING_CLEARANCE);
+    return worldBox(a.headPose, [x0, x1, hb[2] - grow, hb[3] + grow, hb[4] - grow, hb[5] + grow]);
+  }
+
+  /** The head body's box in the work frame, grown by `grow`. */
+  public static function headBox(a:HobberScaleAxis, grow:Float = 0):Array<Float> return worldBox(a.headPose, a.head.bodyBox(), grow);
 
   /** The point on the head's carrier face (the plane the head's mounting face rests on), at the head's centre, work frame. */
   public static function headFace(a:HobberScaleAxis):Array<Float> {
@@ -143,9 +220,6 @@ class HobberScales {
     return out;
   }
 
-  /** A screw head sunk below the face it is counterbored into, mm. */
-  public static inline final HEAD_SINK = 0.5;
-
   /**
    * The seat's receiving face under the housing: the two M8 tapped holes at the housing's end connectors, through the seat (`thickness` of bar or plate),
    * in the seat part's frame (`origin` is that frame's origin in the work frame). The holes are the seat's own (`seatHoles`); the housing's face is its own.
@@ -162,18 +236,17 @@ class HobberScales {
     return BoltedFace.tapped("scale-housing", frame, holes, "M8", thickness, thickness, true);
   }
 
-  /** Depth a counterbore must have for an M5 head to end `HEAD_SINK` below its mouth, mm. */
-  public static function headRecess():Float return SocketHeadCapScrew.catalog().get("M5").headHeight + HEAD_SINK;
-
   /**
-   * The carrier's face under the head: M5 clearance holes drilled to suit the head's tapped pair, in the carrier part's frame. `grip` is the carrier's
-   * material from the head's face to the counterbore floor; `recess` (null for none) is the counterbore's depth from that floor, which a machine
-   * may make deeper than the head (a well through more material, for the driver); the head ends `HEAD_SINK` below the floor's top.
+   * The carrier's face under the head: tapped to suit the head's two slots (the head's `headThread`, M4), `depth` deep in a carrier `thickness` thick (`origin` is that
+   * frame's origin in the work frame; the footprint is centred on the slot pair). The slots run through the head's thickness, so the screws enter from the seat side
+   * and thread into the carrier: the head's own face is clamped (`SealedScalePart.fasteningFaces`).
    */
-  public static function carrierFace(a:HobberScaleAxis, origin:Array<Float>, grip:Float, ?recess:Float):BoltedFace {
-    var p = headFace(a), into = F.transformVector(a.headPose, 0, -1, 0), along = a.along, screw = SocketHeadCapScrew.catalog().get("M5");
-    var frame = BoltedFace.frameOf({x: p[0] - origin[0], y: p[1] - origin[1], z: p[2] - origin[2]}, {x: into.x, y: into.y, z: into.z}, {x: along[0], y: along[1], z: along[2]});
-    return BoltedFace.clampedToSuit("scale-head", frame, a.head.series.headHolePitch + 4 * screw.diameter, 4 * screw.diameter, screw.clearanceMedium,
-      grip, "M5", recess == null ? null : {diameter: screw.headDiameter + 2, depth: recess});
+  public static function carrierFace(a:HobberScaleAxis, origin:Array<Float>, depth:Float, thickness:Float):BoltedFace {
+    var into = F.transformVector(a.headPose, 0, -1, 0), along = a.along, screw = SocketHeadCapScrew.catalog().get(a.head.series.headThread);
+    var f1 = a.head.connector("hole1").frame, f2 = a.head.connector("hole2").frame;
+    var p1 = F.transformPoint(a.headPose, f1.x, f1.y, f1.z), p2 = F.transformPoint(a.headPose, f2.x, f2.y, f2.z);
+    var mid = {x: (p1.x + p2.x) / 2 - origin[0], y: (p1.y + p2.y) / 2 - origin[1], z: (p1.z + p2.z) / 2 - origin[2]};
+    var frame = BoltedFace.frameOf(mid, {x: into.x, y: into.y, z: into.z}, {x: along[0], y: along[1], z: along[2]});
+    return BoltedFace.drilledToSuit("scale-head", frame, a.head.series.headHolePitch + 4 * screw.diameter, 4 * screw.diameter, depth, thickness, BoltedFace.ThreadMaterial.Steel);
   }
 }
