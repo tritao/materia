@@ -501,7 +501,7 @@ the original CCW convention to preserve the shader's `gl_FrontFacing` parity tes
 Screen-size LOD/tessellation and the bench-mill/tending-cell comparisons remain pending;
 frustum culling is already active and covered by the native camera/culling tests.
 
-**Scale validation running:** `r2-scale-current.sh` runs source-project full orbits
+**Scale validation:** `r2-scale-current.sh` runs source-project full orbits
 serially: `r2-scale-bench-before-01` / `after-01` use `bench-mill/materia.bench.project.json`;
 `r2-scale-cell-before-01` / `after-01` use `machine-tending/materia.project.json`.
 Before is the separate `dfddf3806` renderer; after is the built three-fix renderer.
@@ -511,6 +511,24 @@ Do not rebuild/replace the app's native libraries while these captures are live.
 An own-process-scoped helper forces DPMS On without changing its policy while the
 batch lives (`r2-scale-display-wake.jsonl`). Native and app run handles must be checked
 before interpreting unfinished logs or starting another main-app renderer build.
+
+The bench pair completed: median CPU 5.981 -> 5.792 ms, GPU 4.241 -> 4.173 ms,
+draws 528 -> 435 and triangles 627,997 -> 523,695 (17.6%/16.6% work reductions).
+CPU p95 20.878 -> 20.641 ms; GPU p95 15.116 -> 15.451 ms. Throughput is
+30.25 -> 29.79 fps, context only. Timings are nearly unchanged under shared load;
+the deterministic work savings generalize. All 360 surface-triangle counts match.
+Normal-zoom screenshots were inspected: unchanged appearance; 543 of 402,864 interior
+pixels differ, maximum six channel levels (`r2-scale-bench-after-01/comparison.json`).
+
+The original batch then stopped on a real tending-cell load failure, before app tests:
+the source manifest lacks the `casting-shop` root needed by
+`MillFabricationPreview -> CastingShopExport`. No machine source/manifest was edited.
+`r2-tending-fixture` contains an additive benchmark-only manifest with absolute original
+sources/dependencies plus that root, and an otherwise unchanged project invoking
+`TendingCell.preview`; its `provenance.json` records original paths/hashes and the reason.
+The resumed serial run uses `r2-scale-cell-before-02` / `after-02`, then the same full
+app test log. Check live handles, not this note, for its state. A separate own-process
+DPMS wake helper is scoped to the resumed batch (`r2-scale-cell-display-wake.jsonl`).
 
 LOD investigation remains real work, not a completed gate: consider cached index-only
 LODs for high-poly, untextured geometry without feature strokes (the hob is the main
