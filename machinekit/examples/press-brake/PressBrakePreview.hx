@@ -1,3 +1,4 @@
+import materia.presentation.AssemblyPresentation;
 import haxe.io.Bytes;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.pressbrake.planning.PressGeometry;
@@ -61,19 +62,11 @@ class PressBrakePreview {
       tools.push({occurrence: station.punch, subtree: false});
       tools.push({occurrence: station.die, subtree: false});
     }
-    result.views.push({
-      id: "tooling",
-      label: "Installed tooling",
-      camera: Frame(tools, -1.4, 0.2, 1.5),
-      visibility: [],
-      sections: [],
-      explode: 0,
-      source: Generated("press-brake")
-    });
-    result.views.push({id: "backgauge", label: "Backgauge registration", camera: Frame([for (id in datums.fingers) {
+    result.views.push(new PresentationView("tooling", "Installed tooling", Frame(tools, -1.4, 0.2, 1.5), [], [], 0, Generated("press-brake")));
+    result.views.push(new PresentationView("backgauge", "Backgauge registration", Frame([for (id in datums.fingers) {
       occurrence:id, subtree:false
     }
-    ], 1.1, 0.35, 1.5), visibility:[], sections:[], explode:0, source:Generated("press-brake")});
+    ], 1.1, 0.35, 1.5), [], [], 0, Generated("press-brake")));
     result.procedures = [{
       id: "setup-review",
       label: "Review the installed setup",
