@@ -47,21 +47,21 @@ class HobberInspectionViews {
       yaw:Float,
       pitch:Float,
       visibility:Array<VisibilityRule>
-    ):PresentationView return {
-      id: id,
-      label: label,
-      camera: Anchored(
+    ):PresentationView return new PresentationView(
+      id,
+      label,
+      Anchored(
         {occurrence: prefix + anchor, subtree: false},
         {x: offset[0] / scale, y: offset[1] / scale, z: offset[2] / scale},
         span / scale,
         yaw,
         pitch
       ),
-      visibility: visibility,
-      sections: [],
-      explode: 0,
-      source: Generated("hobber")
-    };
+      visibility,
+      [],
+      0,
+      Generated("hobber")
+    );
     presentation.views.push(view(
       "cutting",
       "Tool contact (cutaway)",
@@ -86,15 +86,15 @@ class HobberInspectionViews {
     for (choice in [
       {id: "enclosure-transparent", label: "Enclosure transparent", mode: Transparent},
       {id: "enclosure-hidden", label: "Enclosure hidden", mode: Hidden}
-    ]) presentation.views.push({
-      id: choice.id,
-      label: choice.label,
-      camera: presentation.views[0].camera,
-      visibility: rules(["enclosure/"], choice.mode),
-      sections: [],
-      explode: 0,
-      source: Generated("hobber")
-    });
+    ]) presentation.views.push(new PresentationView(
+      choice.id,
+      choice.label,
+      presentation.views[0].camera,
+      rules(["enclosure/"], choice.mode),
+      [],
+      0,
+      Generated("hobber")
+    ));
     var external = [for (part in flat.occurrences) if (StringTools.startsWith(part.id,
       prefix) && HobberEnclosurePreview.external(part.id.substr(prefix.length))) {
       select: {occurrence: part.id, subtree: false}, mode:Hidden

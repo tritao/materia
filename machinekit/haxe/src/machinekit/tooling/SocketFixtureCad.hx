@@ -74,32 +74,39 @@ class SocketFixtureCad {
     }
     ];
     // Oblique elevation separates the hatched side-wall ends from the uncut north wall.
-    result.views.push({id: "see-inside",
-      label: "See inside", camera: Frame(sockets, -1.25, 0.65, 2.0), visibility: [for (select in plates) {
+    result.views.push(new PresentationView(
+      "see-inside",
+      "See inside",
+      Frame(sockets, -1.25, 0.65, 2.0),
+      [for (select in plates) {
       select:select, mode:Transparent
     }
     ].concat(definition.occurrences.filter(part -> part.id == "cured-casting").map(part -> ({
       select: {occurrence: part.id, subtree: false},
       mode: Transparent
-    }))), sections:[{
+    }))),
+      [{
       occurrence: null,
       point: {x: first.x, y: first.y, z: first.z},
       normal: normal
-    }], explode:0, source:Generated("socket-fixture")});
+    }],
+      0,
+      Generated("socket-fixture")
+    ));
     var mounting:Array<PartSelector> = [];
     for (site in plan.sites.slice(0, 1)) {
       mounting.push({occurrence: site.id, subtree: false});
       mounting.push({occurrence: materia.tooling.ToolingIds.derive("", site.id, "-washer"), subtree: false});
     }
-    result.views.push({
-      id: "socket-mounting",
-      label: "Socket mounting",
-      camera: Frame(mounting, 0.6, -0.65, 2),
-      visibility: [{select: plates[0], mode: Hidden}],
-      sections: [],
-      explode: 0,
-      source: Generated("socket-fixture")
-    });
+    result.views.push(new PresentationView(
+      "socket-mounting",
+      "Socket mounting",
+      Frame(mounting, 0.6, -0.65, 2),
+      [{select: plates[0], mode: Hidden}],
+      [],
+      0,
+      Generated("socket-fixture")
+    ));
     var offsets = new Map<String, materia.assembly.AssemblyDefinition.AssemblyVector>(), c = cavity(plan);
     var flat = materia.assembly.AssemblyDefinitionFlattener.flattenView(definition);
     for (row in flat.occurrences) offsets.set(row.id, if (row.id == plan.assembly.members[0].panel.id) {

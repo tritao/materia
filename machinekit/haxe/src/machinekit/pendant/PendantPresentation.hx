@@ -20,15 +20,15 @@ class PendantPresentation {
       occurrence:id, subtree:false
     }
     ];
-    result.views.push({
-      id: "exploded",
-      label: "Exploded",
-      camera: Frame(all, -1.1, 0.35, 1.15),
-      visibility: [],
-      sections: [],
-      explode: 1.0,
-      source: Generated("pendant")
-    });
+    result.views.push(new PresentationView(
+      "exploded",
+      "Exploded",
+      Frame(all, -1.1, 0.35, 1.15),
+      [],
+      [],
+      1.0,
+      Generated("pendant")
+    ));
     for (id in ids) {
       var offset = lift(id.substr(prefix.length));
       if (offset == null) continue;

@@ -48,31 +48,54 @@ class CastingMoldView {
       select: {occurrence: REFERENCE_ID, subtree: false},
       mode: Hidden
     });
-    presentation.views.push({id: REFERENCE_ID, label: "Finished casting — installed", camera: Frame([for (id in shown) {
+    presentation.views.push(new PresentationView(
+      REFERENCE_ID,
+      "Finished casting — installed",
+      Frame([for (id in shown) {
       occurrence:id, subtree:false
     }
-    ], -1.1, 0.35, 1.15), visibility:[for (part in flat.occurrences) {
+    ], -1.1, 0.35, 1.15),
+      [for (part in flat.occurrences) {
       select: {occurrence: part.id, subtree: false}, mode:shown.indexOf(part.id) >= 0 ? Shown : Hidden
     }
-    ], sections:[], explode:0, source:Generated("casting-mold")});
+    ],
+      [],
+      0,
+      Generated("casting-mold")
+    ));
     var installed = presentation.views[presentation.views.length - 1];
     installed.displayTransform = moldToService;
-    presentation.views.push({id: AS_POURED_ID,
-      label: "Finished casting — as poured", camera: installed.camera, visibility: [for (rule in installed.visibility) {
+    presentation.views.push(new PresentationView(
+      AS_POURED_ID,
+      "Finished casting — as poured",
+      installed.camera,
+      [for (rule in installed.visibility) {
       select: {occurrence: rule.select.occurrence, subtree: rule.select.subtree}, mode:rule.mode
     }
-    ], sections:[], explode:0, source:Generated("casting-mold")});
+    ],
+      [],
+      0,
+      Generated("casting-mold")
+    ));
     if (liftingIds.length > 0) {
       for (id in liftingIds) {
         if (embedded.indexOf(id) < 0) throw "Lifting point is not a source insert: " + id;
         for (part in scene.parts) if (part.id == id) part.name = "Lifting point · " + id + " (capacity pending)";
       }
-      presentation.views.push({id: LIFTING_ID, label: "Lifting points — capacity pending",
-        camera: installed.camera, displayTransform: moldToService, visibility: [for (part in flat.occurrences) {
+      presentation.views.push(new PresentationView(
+      LIFTING_ID,
+      "Lifting points — capacity pending",
+      installed.camera,
+      [for (part in flat.occurrences) {
         select: {occurrence: part.id, subtree: false},
           mode:part.id == REFERENCE_ID ? Transparent : liftingIds.indexOf(part.id) >= 0 ? Shown : Hidden
       }
-      ], sections:[], explode:0, source:Generated("casting-mold")});
+      ],
+      [],
+      0,
+      Generated("casting-mold")
+    ));
+      presentation.views[presentation.views.length-1].displayTransform=moldToService;
       presentation.procedures.push({id: "locate-casting-lifting-points", label: "Locate lifting points (unqualified)",
         kind: Service, start: Assembled, source: Generated("casting-mold"),
         steps: [{id: "identify-lifting-connections", title: "Source lifting connections",
