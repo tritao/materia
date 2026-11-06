@@ -1,0 +1,710 @@
+{
+  "checkedAtUtc": "2026-10-29T12:59:39.578681+00:00",
+  "status": "Fixed, routed-chain service and continuous travel PASS both beds; existing caller/router regressions and local compliance screen pending",
+  "testedBaseCommit": "ed09b79527c29a9ba5ca1abef8bb948be79b21cf",
+  "implementationCommit": "2760c26cf",
+  "productAndCheckSourcesSha256": {
+    "machinekit/examples/sheet-router/SheetRouterFemYLoads.hx": "921d8f2486cf52f970935c34d5d898612c7b5ec69e887844861199170a6d9ffc",
+    "machinekit/examples/sheet-router/SheetRouterRackMountExport.hx": "e5132cfcbba7e80844ba4b6c413614e8cc80bc0009985365d3d2efba341ee04f",
+    "machinekit/examples/sheet-router/SheetRouterSizing.hx": "ac08cfcb2402e3af2a6c5ddabaf6e1f2145bba0322d6c65dd56f0cffbbf8a2e5",
+    "machinekit/examples/sheet-router/SheetRouterSpec.hx": "c6e55ed9fdbb014a1569f1d60c3ed21bd36ff32885a2ca96f798b1f33bb8a752",
+    "machinekit/haxe/src/machinekit/assembly/AssemblyIntegrity.hx": "4d1fa7810a850bf9f52c63c1d0830974117ccdc4ec39550affe8e4d82f1826d5",
+    "machinekit/haxe/src/machinekit/assembly/AxisBuilder.hx": "b67a9669097786a0580eea97320c81f5cf58d76a844165f58025c1a57a44915c",
+    "machinekit/haxe/src/machinekit/assembly/DriveSystem.hx": "75c288c3c9caf5098590dcf7075bfd22c72f819b8c712b92c611edd2546e2313",
+    "machinekit/haxe/src/machinekit/assembly/RackMesh.hx": "20ea3151f2194f8643e87698fd330c134f3b6c2c544714e15877610ae0fb74a5",
+    "machinekit/haxe/src/machinekit/assembly/RackMount.hx": "66088f3e915cc72d1ee82a2a67c4d6a019f4f179dc69b80daef1e2a9811b0422",
+    "machinekit/haxe/src/machinekit/component/ComponentClassification.hx": "81def1adf66e304d78ac357ed9a442134d2eb0b6d122732775a64b9f9e2f4f65",
+    "machinekit/haxe/src/machinekit/gantry/Gantry.hx": "ad3110551c37b87d910dfa1212af9fe9d3c508b47738a5327757f70539be63b9",
+    "machinekit/haxe/src/machinekit/gantry/GantryCableChain.hx": "7d413d8c96622a813b38ba9ed70a15245d8e0d98f70b3dec830a7f6e1c360529",
+    "machinekit/haxe/src/machinekit/gantry/GantrySpec.hx": "41cdfc262332d3e78285642b2aa63eb77dc0ed559751f2c39a31ae591166463a",
+    "machinekit/haxe/src/machinekit/gantry/LinearTrack.hx": "9c20729c2c7b07c3048251422c493b12cfc561aa6cef5dbf13b7976bbf61d929",
+    "machinekit/haxe/src/machinekit/structural/LinearMountCleat.hx": "4c9da9c852c13c5425bc225964397b6a33f3222b8b10471594d13a1579584068",
+    "machinekit/haxe/src/machinekit/structural/LinearMountComponents.hx": "27f88991f72f21b32ead4628e0d682a5bc91d2b6f1bd908286ae63e90e20ab9c",
+    "machinekit/haxe/src/machinekit/structural/LinearMountNutCassette.hx": "f253925a1f0d01de08958753f264cf489a6af12b7c78d9f356b6b0ee66b983bf",
+    "machinekit/haxe/src/machinekit/structural/LinearRackMount.hx": "2652f367895f0e85decc2a7e3e8ba4e71d87b3ebdfe378a7ed93e487f9939b97",
+    "machinekit/haxe/src/machinekit/structural/MountDrilledPlate.hx": "c888cca01d6eec0ce76cc38f08443f6e90a8291f742925b17d51402f5d0532cc",
+    "machinekit/haxe/src/machinekit/structural/MountHostThreads.hx": "9ae4acd02967e3b80b6aadd04f288b670e5073ebe278dab05ccf5eed2d2fef03",
+    "machinekit/haxe/src/machinekit/structural/MountedElement.hx": "ed1237fd69e7c8932e78c952e3c81d75830dcd994be4cac4a38b75fb43ab8294",
+    "machinekit/haxe/src/machinekit/structural/RectTubeMember.hx": "4718ac26c9acf4a42d7132b09758fb14426f17176d5cab7f0b8affc88538f065",
+    "machinekit/haxe/src/machinekit/structural/SimpleRackMount.hx": "12d7f046e9cf82f970b934bd7ae6e0d3cc4a2ec0e9be1cc8ea9561d7b479d1d6",
+    "machinekit/haxe/src/machinekit/transmission/GearRackRun.hx": "7fe12e8b6e927adeb024cbe1f617ea30c15f41de35296d011defe967b52433f3",
+    "machinekit/haxe/src/machinekit/transmission/PinionPivotAnchor.hx": "08ed2b57fda04ab5e380a586fe650da8527bc96a54fc43aa2169af3dc5857b38",
+    "machinekit/haxe/src/machinekit/transmission/PinionPreloadHardware.hx": "1b58c48799726289b1ea3eefd94621722c0cb7c5cf88c3186bc0197e92313438",
+    "machinekit/haxe/src/machinekit/transmission/PreloadedPinionMount.hx": "567bb051e3f950f8ef85b4ce6a079aa1bfc65b958e891adcb7a12b80c58378c6",
+    "machinekit/haxe/src/machinekit/transmission/RackGeometry.hx": "486580c99e20f02836efee567ee00635c46452b1eebf7414a3f8272a9d17fa16",
+    "machinekit/haxe/src/machinekit/transmission/RadialPinionAssembly.hx": "6f839deaa3441588f65c5af27689bb116870d6ebf76523437398e3465de9de98",
+    "machinekit/haxe/src/machinekit/transmission/RadialPinionCarrier.hx": "8f2873c6fc12fd05fd10c29fed8dad9b11f20f799c11caf8953e6c80c8f04919",
+    "machinekit/haxe/src/machinekit/transmission/TransmissionComponents.hx": "b0c9f66e084ee40606548966d68749d0cf9ee1e0c8a604f520fa0115d8ab0981",
+    "machinekit/tests/mounting/src/RackCallerChecks.hx": "49100a523361519327a1266525088e00a8d67817772b14e69a83f2cb0ad3d1e2",
+    "machinekit/tests/mounting/src/RackMountClearanceChecks.hx": "0e79c7a3b670049d4ec7e2000dfe6e06865739d7f4dd607a0bbb44fb1a80de5b",
+    "machinekit/tests/mounting/src/RackMountInterfaces.hx": "3a0e55f6d7826a9325f86a2fff4a3bd702dd6afc557dc1475311f4f62b594585",
+    "machinekit/tests/mounting/src/RackMountServiceChecks.hx": "492bbfa5a6c1993ad95b88bfacfe7022440db90546d08d45e377c3e2e793f0f3",
+    "machinekit/tests/mounting/src/RackMountTravelChecks.hx": "8be6dc04e93fbb96b733589180583565bb4001b50a3adb39ce7aaa60abb785cd",
+    "machinekit/tests/mounting/src/RadialPinionTests.hx": "23daee20c9f4e2961143b9d6da267bd7077c59aff1f203135eb34f0e83c84d69",
+    "machinekit/tests/mounting/src/RealRackMountTests.hx": "95c849574313535130dc4215ce24ad7a2165a65ff915edb07cb37409c531b711",
+    "machinekit/tests/mounting/src/RouterRackMountChecks.hx": "2df36fce84082a8aefa78a730c578fa616ee4b537849fb890a36a64886e3076a",
+    "machinekit/tests/src/AssemblyIntegrityTests.hx": "bad86e1c75a7daec983593b7444b9b59c874e7b7dbd62272b0b5b80aef5464a6",
+    "machinekit/tests/src/AxisBuilderChecks.hx": "182ec3930433edd2e68fda44341fa236d2df083ad1f3bd893e03cbacee5b17f9",
+    "machinekit/tests/src/GantryClearanceChecks.hx": "89d21cb73cbac72ddba7d9e8d307d5e361f1da48dd895d45f3fb1b91e1a28eec",
+    "machinekit/tests/src/SheetRouterChecks.hx": "3d8358e4f2d269fa20b99993251382e0bbe11e3190b035bd24f0b3a8ce8fff8a",
+    "machinekit/tests/src/SheetRouterNewAxesChecks.hx": "ab31f59ade33f969aff36165bd11b0f04999329c8aa43f94800f969ef8146292",
+    "projectkit/src/materia/assembly/AssemblyDefinitionCodec.hx": "409146dbf49ab55e3f3e229ccd71bf8d18002f2167f67fb7edc4a89cb9629b26",
+    "projectkit/tests/src/AssemblyLargePartsTests.hx": "5a359e6185a7ad8fe5ee01650a17f5b4fbfbeef4bb423acb005487df01e3851b"
+  },
+  "independentClearanceBudgetMm": 1.5,
+  "sameAssemblyGapMm": 0.15,
+  "budgetAllocationMm": {
+    "weldment": 0.5,
+    "datumSetting": 0.15,
+    "rackFaceWidth": 0.4,
+    "shaftAxialSetting": 0.2,
+    "machinedParts": 0.1,
+    "hardwareStack": 0.1,
+    "reserve": 0.05
+  },
+  "fitPolicy": "Declared mating threads, journals, thrust faces and stops have explicit fit qualifications, not independent clearance exemptions",
+  "beds": [
+    {
+      "bedMm": 2600,
+      "fixed": {
+        "nativePairs": 4727,
+        "qualifiedInterfaces": 460,
+        "intersections": 0,
+        "toleranceFailures": 0
+      },
+      "service": {
+        "toolTrials": 520,
+        "selectedKeys": 478,
+        "selectedSpanners": 6,
+        "clashes": 0,
+        "qualification": "Native tools against chains rerouted to each actual service park",
+        "routedChainPoses": [
+          {
+            "member": "cableChainY",
+            "axis": "y",
+            "positionMm": 20
+          },
+          {
+            "member": "cableChainX",
+            "axis": "x",
+            "positionMm": 57.25
+          },
+          {
+            "member": "cableChainY",
+            "axis": "y",
+            "positionMm": 2920
+          },
+          {
+            "member": "cableChainX",
+            "axis": "x",
+            "positionMm": 1657.25
+          },
+          {
+            "member": "cableChainY",
+            "axis": "y",
+            "positionMm": 1470
+          },
+          {
+            "member": "cableChainX",
+            "axis": "x",
+            "positionMm": 857.25
+          }
+        ]
+      },
+      "travel": {
+        "certifiedPairs": 961085,
+        "nativeDistances": 28157,
+        "failures": 0,
+        "rangeMm": {
+          "axes": [
+            "x",
+            "y",
+            "z",
+            "shoeLift",
+            "rackCoverLift"
+          ],
+          "high": [
+            1657.25,
+            2920,
+            220,
+            120,
+            600
+          ],
+          "low": [
+            -57.25,
+            -20,
+            -20,
+            0,
+            0
+          ]
+        },
+        "passivePinionEnvelopes": [
+          {
+            "id": "pinionYLeft",
+            "lowRad": -0.0012500003255210624,
+            "highRad": 0.006250040690819439,
+            "reachMm": 80,
+            "centreLocalMm": [
+              -0.00025000390633124427,
+              0.20000140627362112,
+              0
+            ],
+            "addedRadiusMm": 0.301001464869517,
+            "rotorRadiusMm": 17.465494309189534,
+            "numericalPaddingMm": 0.001,
+            "qualification": "whole-arc chord bound; native tooth containment and FK endpoint regressions"
+          },
+          {
+            "id": "pinionYRight",
+            "lowRad": -0.0012500003255210624,
+            "highRad": 0.006250040690819439,
+            "reachMm": 80,
+            "centreLocalMm": [
+              0.00025000390633010737,
+              -0.20000140627362112,
+              0
+            ],
+            "addedRadiusMm": 0.301001464869517,
+            "rotorRadiusMm": 17.465494309189534,
+            "numericalPaddingMm": 0.001,
+            "qualification": "whole-arc chord bound; native tooth containment and FK endpoint regressions"
+          },
+          {
+            "id": "pinionX",
+            "lowRad": -0.0012500003255210624,
+            "highRad": 0.006250040690819439,
+            "reachMm": 80,
+            "centreLocalMm": [
+              -0.0002500039063306758,
+              0.20000140627362112,
+              0
+            ],
+            "addedRadiusMm": 0.301001464869517,
+            "rotorRadiusMm": 17.465494309189534,
+            "numericalPaddingMm": 0.001,
+            "qualification": "whole-arc chord bound; native tooth containment and FK endpoint regressions"
+          }
+        ]
+      },
+      "retainedReports": [
+        {
+          "path": "build/router-mount-implementation/clearance-zero-2600.json",
+          "sha256": "1676503ef425d59d6340c4edfa78ee45f5569e9d577fa4c22e102b6b8bde3efc"
+        },
+        {
+          "path": "build/router-mount-implementation/service-2600.json",
+          "sha256": "47920cce265aa676fafde98f1687f1d1b61ceaab45eaf9841edf0900f12b9d1a"
+        },
+        {
+          "path": "build/router-mount-implementation/travel-2600.json",
+          "sha256": "ca1282b4fc2d8c759b5047672d6a4bf4990c483b35effa6f51dc789cdc9adc26"
+        }
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "fixed": {
+        "nativePairs": 5842,
+        "qualifiedInterfaces": 572,
+        "intersections": 0,
+        "toleranceFailures": 0
+      },
+      "service": {
+        "toolTrials": 636,
+        "selectedKeys": 590,
+        "selectedSpanners": 6,
+        "clashes": 0,
+        "qualification": "Native tools against chains rerouted to each actual service park",
+        "routedChainPoses": [
+          {
+            "member": "cableChainY",
+            "axis": "y",
+            "positionMm": 20
+          },
+          {
+            "member": "cableChainX",
+            "axis": "x",
+            "positionMm": 57.25
+          },
+          {
+            "member": "cableChainY",
+            "axis": "y",
+            "positionMm": 3470
+          },
+          {
+            "member": "cableChainX",
+            "axis": "x",
+            "positionMm": 1657.25
+          },
+          {
+            "member": "cableChainY",
+            "axis": "y",
+            "positionMm": 1745
+          },
+          {
+            "member": "cableChainX",
+            "axis": "x",
+            "positionMm": 857.25
+          }
+        ]
+      },
+      "travel": {
+        "certifiedPairs": 1239253,
+        "nativeDistances": 30610,
+        "failures": 0,
+        "rangeMm": {
+          "axes": [
+            "x",
+            "y",
+            "z",
+            "shoeLift",
+            "rackCoverLift"
+          ],
+          "high": [
+            1657.25,
+            3470,
+            220,
+            120,
+            600
+          ],
+          "low": [
+            -57.25,
+            -20,
+            -20,
+            0,
+            0
+          ]
+        },
+        "passivePinionEnvelopes": [
+          {
+            "id": "pinionYLeft",
+            "lowRad": -0.0012500003255210624,
+            "highRad": 0.006250040690819439,
+            "reachMm": 80,
+            "centreLocalMm": [
+              -0.00025000390633124427,
+              0.20000140627362112,
+              0
+            ],
+            "addedRadiusMm": 0.301001464869517,
+            "rotorRadiusMm": 17.465494309189534,
+            "numericalPaddingMm": 0.001,
+            "qualification": "whole-arc chord bound; native tooth containment and FK endpoint regressions"
+          },
+          {
+            "id": "pinionYRight",
+            "lowRad": -0.0012500003255210624,
+            "highRad": 0.006250040690819439,
+            "reachMm": 80,
+            "centreLocalMm": [
+              0.00025000390633010737,
+              -0.20000140627362112,
+              0
+            ],
+            "addedRadiusMm": 0.301001464869517,
+            "rotorRadiusMm": 17.465494309189534,
+            "numericalPaddingMm": 0.001,
+            "qualification": "whole-arc chord bound; native tooth containment and FK endpoint regressions"
+          },
+          {
+            "id": "pinionX",
+            "lowRad": -0.0012500003255210624,
+            "highRad": 0.006250040690819439,
+            "reachMm": 80,
+            "centreLocalMm": [
+              -0.0002500039063306758,
+              0.20000140627362112,
+              0
+            ],
+            "addedRadiusMm": 0.301001464869517,
+            "rotorRadiusMm": 17.465494309189534,
+            "numericalPaddingMm": 0.001,
+            "qualification": "whole-arc chord bound; native tooth containment and FK endpoint regressions"
+          }
+        ]
+      },
+      "retainedReports": [
+        {
+          "path": "build/router-mount-implementation/clearance-zero-3150.json",
+          "sha256": "c267465b04c71208591975a5c5106e0802a882458312236dbceba732eceff7d9"
+        },
+        {
+          "path": "build/router-mount-implementation/service-3150.json",
+          "sha256": "4b1c0405cd53f86c8cb41dd0fbb974d3e7ea3054df792338e19376f7dae93621"
+        },
+        {
+          "path": "build/router-mount-implementation/travel-3150.json",
+          "sha256": "7a56bbca74e99d972b53bae80e989a2d2c9fd721fb5d1a1261eaa99e4ebebf9f"
+        }
+      ]
+    }
+  ],
+  "formerBlockedPairsSource": {
+    "path": "machinekit/examples/sheet-router/fem/rack-results/mount-native-clearance.json",
+    "sha256": "a59969c402bd1c45093ba10c1cd7f2b91626f10123fea30bc2c7ae1492b76222"
+  },
+  "formerBlockedPairs": [
+    {
+      "bedMm": 2600,
+      "side": "Left",
+      "formerStudyProfile": "foot",
+      "existingOccurrence": "pinionYLeftPreload",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 2600,
+      "side": "Left",
+      "formerStudyProfile": "pad",
+      "existingOccurrence": "pinionYLeftPreload",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 2600,
+      "side": "Left",
+      "formerStudyProfile": "pad",
+      "existingOccurrence": "switchYLefthomeMount",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 2600,
+      "side": "Left",
+      "formerStudyProfile": "pad",
+      "existingOccurrence": "switchYLeftnegativeLimitMount",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 2600,
+      "side": "Left",
+      "formerStudyProfile": "pad",
+      "existingOccurrence": "switchYLeftpositiveLimitMount",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 2600,
+      "side": "Left",
+      "formerStudyProfile": "replication",
+      "existingOccurrence": "pinionYLeftPreload",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 2600,
+      "side": "Left",
+      "formerStudyProfile": "replication",
+      "existingOccurrence": "switchYLefthomeMount",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 2600,
+      "side": "Left",
+      "formerStudyProfile": "replication",
+      "existingOccurrence": "switchYLeftnegativeLimitMount",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 2600,
+      "side": "Left",
+      "formerStudyProfile": "replication",
+      "existingOccurrence": "switchYLeftpositiveLimitMount",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 2600,
+      "side": "Right",
+      "formerStudyProfile": "foot",
+      "existingOccurrence": "pinionYRightPreload",
+      "replacementAssemblyPrefix": "rackMountYRight",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 2600,
+      "side": "Right",
+      "formerStudyProfile": "pad",
+      "existingOccurrence": "switchYRighthomeMount",
+      "replacementAssemblyPrefix": "rackMountYRight",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 2600,
+      "side": "Right",
+      "formerStudyProfile": "pad",
+      "existingOccurrence": "switchYRightnegativeLimitMount",
+      "replacementAssemblyPrefix": "rackMountYRight",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 2600,
+      "side": "Right",
+      "formerStudyProfile": "pad",
+      "existingOccurrence": "switchYRightpositiveLimitMount",
+      "replacementAssemblyPrefix": "rackMountYRight",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 2600,
+      "side": "Right",
+      "formerStudyProfile": "replication",
+      "existingOccurrence": "switchYRighthomeMount",
+      "replacementAssemblyPrefix": "rackMountYRight",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 2600,
+      "side": "Right",
+      "formerStudyProfile": "replication",
+      "existingOccurrence": "switchYRightnegativeLimitMount",
+      "replacementAssemblyPrefix": "rackMountYRight",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 2600,
+      "side": "Right",
+      "formerStudyProfile": "replication",
+      "existingOccurrence": "switchYRightpositiveLimitMount",
+      "replacementAssemblyPrefix": "rackMountYRight",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 3150,
+      "side": "Left",
+      "formerStudyProfile": "foot",
+      "existingOccurrence": "pinionYLeftPreload",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 3150,
+      "side": "Left",
+      "formerStudyProfile": "pad",
+      "existingOccurrence": "pinionYLeftPreload",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 3150,
+      "side": "Left",
+      "formerStudyProfile": "pad",
+      "existingOccurrence": "switchYLefthomeMount",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 3150,
+      "side": "Left",
+      "formerStudyProfile": "pad",
+      "existingOccurrence": "switchYLeftnegativeLimitMount",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 3150,
+      "side": "Left",
+      "formerStudyProfile": "pad",
+      "existingOccurrence": "switchYLeftpositiveLimitMount",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 3150,
+      "side": "Left",
+      "formerStudyProfile": "replication",
+      "existingOccurrence": "pinionYLeftPreload",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 3150,
+      "side": "Left",
+      "formerStudyProfile": "replication",
+      "existingOccurrence": "switchYLefthomeMount",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 3150,
+      "side": "Left",
+      "formerStudyProfile": "replication",
+      "existingOccurrence": "switchYLeftnegativeLimitMount",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 3150,
+      "side": "Left",
+      "formerStudyProfile": "replication",
+      "existingOccurrence": "switchYLeftpositiveLimitMount",
+      "replacementAssemblyPrefix": "rackMountYLeft",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 3150,
+      "side": "Right",
+      "formerStudyProfile": "foot",
+      "existingOccurrence": "pinionYRightPreload",
+      "replacementAssemblyPrefix": "rackMountYRight",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 3150,
+      "side": "Right",
+      "formerStudyProfile": "pad",
+      "existingOccurrence": "switchYRighthomeMount",
+      "replacementAssemblyPrefix": "rackMountYRight",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 3150,
+      "side": "Right",
+      "formerStudyProfile": "pad",
+      "existingOccurrence": "switchYRightnegativeLimitMount",
+      "replacementAssemblyPrefix": "rackMountYRight",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 3150,
+      "side": "Right",
+      "formerStudyProfile": "pad",
+      "existingOccurrence": "switchYRightpositiveLimitMount",
+      "replacementAssemblyPrefix": "rackMountYRight",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 3150,
+      "side": "Right",
+      "formerStudyProfile": "replication",
+      "existingOccurrence": "switchYRighthomeMount",
+      "replacementAssemblyPrefix": "rackMountYRight",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 3150,
+      "side": "Right",
+      "formerStudyProfile": "replication",
+      "existingOccurrence": "switchYRightnegativeLimitMount",
+      "replacementAssemblyPrefix": "rackMountYRight",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    },
+    {
+      "bedMm": 3150,
+      "side": "Right",
+      "formerStudyProfile": "replication",
+      "existingOccurrence": "switchYRightpositiveLimitMount",
+      "replacementAssemblyPrefix": "rackMountYRight",
+      "status": "PASS: replacement assembly fixed and continuous native clearance"
+    }
+  ],
+  "regressions": {
+    "localSourceContactAssertions": 64,
+    "pivotBothBedAssertions": 582,
+    "fullRouterInstancesInContractTest": [
+      2036,
+      2472
+    ],
+    "sharedCallersAndExistingRouterSuites": "Pending guarded rerun; prerequisite OLED/BT30 fixes have landed"
+  },
+  "resources": [
+    {
+      "case": "final-zero2600",
+      "admissionBytes": 4294967296,
+      "priorPeakOrBoundBytes": 2147483648,
+      "measuredPeakBytes": 1264672768,
+      "capBytes": 3000000000,
+      "oomKills": 0,
+      "exitCode": 0,
+      "exclusiveAllSharedSlots": true,
+      "admissionAttempts": 1
+    },
+    {
+      "case": "final-service2600",
+      "admissionBytes": 4294967296,
+      "priorPeakOrBoundBytes": 2147483648,
+      "measuredPeakBytes": 1279475712,
+      "capBytes": 3000000000,
+      "oomKills": 0,
+      "exitCode": 0,
+      "exclusiveAllSharedSlots": true,
+      "admissionAttempts": 1
+    },
+    {
+      "case": "final-travel2600-arc",
+      "admissionBytes": 4294967296,
+      "priorPeakOrBoundBytes": 2147483648,
+      "measuredPeakBytes": 1268400128,
+      "capBytes": 3000000000,
+      "oomKills": 0,
+      "exitCode": 0,
+      "exclusiveAllSharedSlots": true,
+      "admissionAttempts": 1
+    },
+    {
+      "case": "final-zero3150",
+      "admissionBytes": 4294967296,
+      "priorPeakOrBoundBytes": 2147483648,
+      "measuredPeakBytes": 1517400064,
+      "capBytes": 3000000000,
+      "oomKills": 0,
+      "exitCode": 0,
+      "exclusiveAllSharedSlots": true,
+      "admissionAttempts": 1
+    },
+    {
+      "case": "final-service3150",
+      "admissionBytes": 4294967296,
+      "priorPeakOrBoundBytes": 2147483648,
+      "measuredPeakBytes": 1555816448,
+      "capBytes": 3000000000,
+      "oomKills": 0,
+      "exitCode": 0,
+      "exclusiveAllSharedSlots": true,
+      "admissionAttempts": 1
+    },
+    {
+      "case": "final-travel3150-arc",
+      "admissionBytes": 4294967296,
+      "priorPeakOrBoundBytes": 2147483648,
+      "measuredPeakBytes": 1563860992,
+      "capBytes": 3000000000,
+      "oomKills": 0,
+      "exitCode": 0,
+      "exclusiveAllSharedSlots": true,
+      "admissionAttempts": 1
+    },
+    {
+      "case": "final-routed-service2600",
+      "admissionBytes": 4294967296,
+      "priorPeakOrBoundBytes": 2147483648,
+      "measuredPeakBytes": 1228521472,
+      "capBytes": 3000000000,
+      "oomKills": 0,
+      "exitCode": 0,
+      "exclusiveAllSharedSlots": true,
+      "admissionAttempts": 1
+    },
+    {
+      "case": "final-routed-service3150",
+      "admissionBytes": 4294967296,
+      "priorPeakOrBoundBytes": 2147483648,
+      "measuredPeakBytes": 1587957760,
+      "capBytes": 3000000000,
+      "oomKills": 0,
+      "exitCode": 0,
+      "exclusiveAllSharedSlots": true,
+      "admissionAttempts": 1
+    }
+  ],
+  "releaseGates": [
+    "Actual built net moving/fixed mass and inertia, geometry-derived local mount compliance and nominal-stop J6 response screen",
+    "One final executed reduced-stop SR5/SR6 campaign, including dynamic weld fatigue at 100 million reversals",
+    "SR6-C measured modes/damping and hardware commissioning",
+    "Existing generic sensor holder lacks supplier-specific retention detail: SR17/SR18 fabrication dependency"
+  ],
+  "scope": "Frame and braces retained. Rack/pinion mount, host service windows and relocated switches are the approved change. No cycle-time or final dynamic-error acceptance claimed."
+}

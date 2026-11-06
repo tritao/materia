@@ -109,17 +109,17 @@ class LinearTrackCheck {
   static function endClearance(track:LinearTrack, state:AssemblyState):Void {
     var posed = new PosedParts();
     try {
-      var fixed = [
-        "frameLeft",
-        "frameRight",
-        "frameEnd0",
-        "frameEnd1",
-        "rackSupport",
-        "rackFoot0",
-        "rackFoot1",
-        "powerSupply",
-        "driver"
-      ];
+      var fixed = ["frameLeft", "frameRight", "frameEnd0", "frameEnd1", "rackSupport", "powerSupply", "driver"];
+      for (member in track.components()) if (member.id != "rackSupport") check(
+        posed.overlap(
+          track.component("rackSupport"),
+          state.worldPose("rackSupport"),
+          member.component,
+          state.worldPose(member.id),
+          ComponentDetail.Preview
+        ) < 1e-5,
+        'real rack support clears ${member.id}, including fixed same-motion parts'
+      );
       var moving = [
         "carriage",
         "armMount",

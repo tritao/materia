@@ -620,7 +620,7 @@ class Gantry extends AxisBuilder {
       point[2] = bounds.min[2] + 2;
       if (bounds.max[0] - bounds.min[0]
         > 70) point[outboardAxis] = (sign < 0 ? bounds.max[outboardAxis] : bounds.min[outboardAxis]) - sign * 7;
-      if (spec.catalogueRackMount) {
+      if (spec.catalogueRackMount || rackMounts.exists(fixed)) {
         // Rack supports stay outboard; the sensor and offset flag use
         // the opposite face, with a short integral attachment tab.
         point[outboardAxis] = (sign < 0 ? bounds.max[outboardAxis] : bounds.min[outboardAxis]) - sign * 27;
@@ -687,11 +687,12 @@ class Gantry extends AxisBuilder {
       // Give home its own side-facing approach. The two independent
       // sensors remain at their specified Y trip positions; their bored
       // holders no longer occupy the same 10 mm interval.
-      if (spec.catalogueRackMount && StringTools.startsWith(suffix, "Y") && kind == "home") normal = [
-        suffix == "YLeft" ? -1.0 : 1.0,
-        0,
-        0
-      ];
+      if ((spec.catalogueRackMount || rackMounts.exists(fixed)) && StringTools.startsWith(suffix,
+        "Y") && (kind == "home" || !spec.catalogueRackMount)) normal = [
+          suffix == "YLeft" ? -1.0 : 1.0,
+          0,
+          0
+        ];
       var face = [for (i in 0...3) point[i] + direction[i] * (travel + side * half) - normal[i] * dimensions[i] / 2];
       var contact = [for (i in 0...3) face[i] - direction[i] * travel];
       addMemberConnector(
@@ -765,23 +766,34 @@ class Gantry extends AxisBuilder {
         [origin[0], origin[1], overhead],
         origin
       ];
-    } else if (spec.catalogueRackMount && StringTools.startsWith(suffix, "Y")) {
+    } else if ((spec.catalogueRackMount || rackMounts.exists(fixed)) && StringTools.startsWith(suffix, "Y")) {
       var inboard = suffix == "YLeft" ? 1.0 : -1.0;
       var anchorX = (inboard > 0 ? host.max[0] : host.min[0]) + inboard * half;
       var baseZ = host.max[2] - 2 * half;
       if (StringTools.endsWith(id, "homeMount")) {
         // Move inboard before returning along Y, away from the
         // neighbouring negative-limit holder and its root.
-        var anchorY = origin[1] - 30;
+        // Short example axes have about 30 mm between home and the negative
+        // limit; return towards positive Y so their holders cannot coincide.
+        // Retain the approved catalogue router's separate return station.
+        var anchorY = origin[1] + (spec.catalogueRackMount ? -30 : 30);
         path = [[anchorX, anchorY, baseZ], [origin[0], anchorY, baseZ], [origin[0], anchorY, origin[2]], origin];
       } else if (StringTools.endsWith(id, "positiveLimitMount")) {
         // Rise clear of the rear cross-member at a separate anchor
         // station, then cross above it. No low arm through frameBack.
-        var anchorY = origin[1] - 140, postX = anchorX + inboard * clearance;
+        var anchorY = spec.catalogueRackMount ? origin[1] - 140 : mountBounds(
+          component("frameBack"),
+          zeroPose("frameBack")
+        ).min[1] - half - clearance;
+        var postX = anchorX + inboard * clearance;
         var overhead = host.max[2] + spec.railPadHeight + 2 * half + clearance;
         // Leave the frame face below its pad, then rise 3 mm clear of
         // the pad edge. A tangent post is not a tolerance clearance.
-        path = [
+        path = !spec.catalogueRackMount ? [
+        // A horizontal sensor sits above the frame. Cross below the moving
+        // foot/flag, then rise at the sensor's far inboard end; an overhead
+        // cross-arm at flag height would obstruct the passing flag.
+        [anchorX, anchorY, baseZ], [origin[0], anchorY, baseZ], [origin[0], anchorY, origin[2]], origin]:[
           [anchorX, anchorY, baseZ],
           [postX, anchorY, baseZ],
           [postX, anchorY, overhead],
@@ -995,6 +1007,60 @@ class Gantry extends AxisBuilder {
     ?clearanceDiameter:Float
   ):String {
     var host = mountBounds(component(parent), zeroPose(parent)), target = mountBounds(plate, face);
+    if (id == "motorZSupport" && spec.frontGuides == null && !spec.catalogueRackMount && (switch spec.driveZ {
+      case Rack(_, _, _) | HelicalRack(_, _, _, _):
+        true;
+      case _:
+        false;
+    }
+    )) {
+      // The fixed Z-rack back bracket occupies the rear corner between the
+      // column and this plate. Carry the motor from the carriage's front edge
+      // instead, then return to the plate's near face. Both arms stay ahead of
+      // the motor body and below the rack's backing bar throughout Z travel.
+      var stripe = Math.min(12, host.max[1] - host.min[1]);
+      var toe = Math.min(12, target.max[0] - target.min[0]);
+      var lo = Math.max(host.min[2], target.min[2]), hi = Math.min(host.max[2], target.max[2]);
+      if (target.min[0] <= host.max[0] || target.min[1] <= host.min[1] + stripe
+        || hi <= lo) throw "Z rack motor bracket needs its declared front-corner contact planes";
+      var min = [host.max[0], host.min[1], lo], max = [target.max[0], target.min[1], hi];
+      var pose = AssemblyFrames.translation((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, lo);
+      var sections = [
+        [
+          host.max[0] - pose.x,
+          host.min[1] - pose.y,
+          0.0,
+          target.max[0] - pose.x,
+          host.min[1] + stripe - pose.y,
+          hi - lo
+        ],
+        [
+          target.max[0] - toe - pose.x,
+          host.min[1] - pose.y,
+          0.0,
+          target.max[0] - pose.x,
+          target.min[1] - pose.y,
+          hi - lo
+        ]
+      ];
+      attach(
+        id,
+        new GantryMotorSupport(
+          drawing(id),
+          id,
+          max[0] - min[0],
+          max[1] - min[1],
+          hi - lo,
+          motor,
+          AssemblyFrames.compose(AssemblyFrames.inverse(pose), face),
+          sections,
+          clearanceDiameter
+        ),
+        pose,
+        parent
+      );
+      return id;
+    }
     if (spec.frontGuides != null && id == "motorXSupport") {
       // Route the carrier over the fixed rack rather than filling its swept volume.
       var top = target.max[2] + 20, loY = host.max[1], hiY = target.min[1];
@@ -1605,7 +1671,8 @@ class Gantry extends AxisBuilder {
             rackPart,
             fixed,
             hostWidth,
-            hostHeight
+            hostHeight,
+            axis.id == "z" ? cast(component(moving), GantryPlate).width / 2 + 10 : null
           );
         }
         rackMounts.set(fixed, rackMount);

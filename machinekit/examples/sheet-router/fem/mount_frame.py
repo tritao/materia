@@ -6,7 +6,7 @@ This is a section/connection screen, not a solid/contact stress qualification.
 """
 from dataclasses import dataclass
 import numpy as np
-from scipy.sparse import coo_matrix
+from scipy.sparse import coo_matrix, bmat, csc_matrix
 from scipy.sparse.linalg import spsolve
 
 
@@ -110,7 +110,7 @@ class Frame:
         if owner!=node:raise ValueError('Fix an independent node, not its rigid offset')
         self.fixed.setdefault(node,set()).update(dofs)
 
-    def solve(self,loads):
+    def solve(self,loads,reference=None):
         roots=sorted({self._owner(n)[0] for n in self.points});indices={n:i for i,n in enumerate(roots)}
         size=6*len(roots);rows=[];cols=[];values=[];records=[]
         for nodes,k,group in self.elements:
@@ -131,9 +131,33 @@ class Frame:
         fixed={6*indices[n]+d for n,ds in self.fixed.items() for d in ds}
         free=np.array([i for i in range(size) if i not in fixed],int)
         if not len(free):raise ValueError('No free displacement coordinate')
-        u=np.zeros(size);u[free]=spsolve(matrix[free,:][:,free],force[free])
+        reference_reaction=None;reference_centre=None
+        if reference is not None:
+            if self.fixed or len(reference)<3 or len(set(reference))!=len(reference):
+                raise ValueError('Mean reference needs distinct spatial points and no extra clamps')
+            reference_centre=np.mean([self.points[n] for n in reference],axis=0)
+            weights=1/len(reference)
+            offsets=[self.points[n]-reference_centre for n in reference]
+            inertia=sum(weights*(np.dot(r,r)*np.eye(3)-np.outer(r,r)) for r in offsets)
+            if min(np.linalg.eigvalsh(inertia))<=1e-12:
+                raise ValueError('Mean reference cannot be collinear')
+            inverse=np.linalg.inv(inertia);constraint=np.zeros((6,size))
+            for n,r in zip(reference,offsets):
+                owner,transform=self._owner(n);start=6*indices[owner]
+                constraint[:3,start:start+6]+=weights*transform[:3,:]
+                constraint[3:,start:start+6]+=weights*inverse@cross_matrix(r)@transform[:3,:]
+            c=csc_matrix(constraint)
+            answer=spsolve(bmat([[matrix,c.T],[c,None]],format='csc'),np.r_[force,np.zeros(6)])
+            if not np.all(np.isfinite(answer)):raise ValueError('Singular mean-reference frame')
+            u=answer[:size];multipliers=answer[size:]
+            if np.max(np.abs(constraint@u))>1e-8*max(1.,np.linalg.norm(u)):
+                raise ValueError('Mean-reference closure failed')
+            reference_reaction=-multipliers
+            residual=matrix@u-force+c.T@multipliers
+        else:
+            u=np.zeros(size);u[free]=spsolve(matrix[free,:][:,free],force[free])
+            residual=matrix@u-force
         if not np.all(np.isfinite(u)):raise ValueError('Singular/invalid local frame')
-        residual=matrix@u-force
         if np.linalg.norm(residual[free])>1e-7*max(1.,np.linalg.norm(force[free])):
             raise ValueError('Local equilibrium residual exceeds tolerance')
         displacement={}
@@ -149,4 +173,6 @@ class Frame:
         return dict(displacement=displacement,work=work,energy=energy,
                     energyShare={k:v/stored for k,v in energy.items()},
                     freeResidualNorm=float(np.linalg.norm(residual[free])),dofs=size,
+                    referenceReactionNAndNmm=None if reference_reaction is None else reference_reaction.tolist(),
+                    referenceOriginMm=None if reference_centre is None else reference_centre.tolist(),
                     reactions={n:residual[6*i:6*i+6] for n,i in indices.items() if n in self.fixed})

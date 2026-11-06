@@ -269,6 +269,21 @@ at implementation time. The required host datum and mesh frame must determine
 orientation and reject disagreement, without a bounding-box supported-side
 heuristic. A declared datum alone must not disguise a missing physical load path.
 
+**Implementation update, 2026-10-28:** the user subsequently approved building
+[the lightweight router mount](examples/sheet-router/mounting/LIGHTWEIGHT_PROPOSAL.md).
+Commit `2760c26cf` lands that physical mount and the complete required-mount API
+migration together; the earlier hold above is historical, not the current API
+contract. All listed callers now supply a physical `RackMount`; placement derives
+orientation from its declared datum and the pinion mesh and rejects mismatch.
+There is no optional/unmounted overload or bounding-box supported-side heuristic.
+Both router beds pass fixed, service and continuous travel/overtravel native
+clearance, including the guide-crossing/tolerance fixes and bounded passive
+pivot/rotor motion. Shared-caller runtime regressions are still pending; see the
+[implementation checkpoint](examples/sheet-router/mounting/IMPLEMENTATION.md).
+The geometry-derived local compliance/actual-mass screen and final executed-motion
+campaign remain open. This is not completion of RM2's broader cast/welded mount
+family, automatic compliance qualification, metrology or fabrication release.
+
 ### RM3 — Bench mill adoption
 
 `MillFrame` uses RM2 for the Y rails and the column's Z rails; the saddle carries the X rails the same

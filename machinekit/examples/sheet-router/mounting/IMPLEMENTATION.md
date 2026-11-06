@@ -1,9 +1,10 @@
 # Physical rack mount implementation
 
-Work in progress, 2026-10-28. The implementation is authorized by the approval
-of `LIGHTWEIGHT_PROPOSAL.md` (eeb6ff4e0). It must land together with the strict
-mount-required `driveRack` migration, after both-bed native acceptance. This
-file does not release fabrication or close SR5/SR6.
+Qualification in progress, 2026-10-28. The implementation is authorized by the
+approval of `LIGHTWEIGHT_PROPOSAL.md` (eeb6ff4e0). Commit 2760c26cf landed the
+mount and strict mount-required `driveRack` migration together while validation
+was ongoing; the following cleat and acceptance fixes are a follow-up. This file
+does not release fabrication or close SR5/SR6.
 
 ## Finished layout
 
@@ -24,9 +25,9 @@ Measure/select each washer pair to 3.20 +/-0.10 mm; the tolerance allocation is
 an assembly target, not a claim about unverified washer thickness tolerances.
 
 Five C45 cleats per section sit at -220, -125, 0, 125, 220 mm. Each finished
-base is 28 x 58 x 13 mm, with an 11 mm web and geometry-dependent height. Base
+base is 28 x 64 x 13 mm, with an 11 mm web and geometry-dependent height. Base
 screws are two recessed M6 class 10.9 through bolts at +/-18 mm; web screws are
-two M6x20 class 10.9 at +/-14 mm, entering the receiver 9 mm. The wider web pair
+two M6x20 class 10.9 at +/-14 mm, entering the receiver 10 mm. The wider web pair
 leaves at least 4 mm finished steel between the source locating bores and cleat
 threads. Every axial receiver bore pair is checked against this net-ligament
 rule. Four millimetres of replicated bedding separates each cleat and host.
@@ -116,13 +117,36 @@ accessory slides, conservative shaft-rotation envelopes and bounded pivot motion
 Unresolved intervals fail. Fixed/pivot fits and tooth mesh need their separate
 checks; this translational certificate does not exempt them.
 
+Pinion rotation uses a tip-radius cylinder whose containment of the actual
+lofted teeth is checked natively. For the passive pivot, the pinion centre
+follows an 80 mm radius arc. An enclosing disk about that arc's midpoint has
+radius `2 R sin((upper-lower)/4)`; adding the rotor radius encloses every angle,
+with 0.001 mm numerical padding. Native forward-kinematics containment at both
+ends and zero checks the frame/sign implementation. The actual enclosure adds
+0.3010015 mm about a centre displaced about 0.2000014 mm, rather than inflating
+in every direction by the old 0.6185 mm bound. The original diagonal-of-box
+rotor and isotropic pivot diagnostics remain diagnostic failures, not geometry
+defects or acceptance evidence. Coaxial bush/thrust faces retain their selected
+positive axial clearance; a reducer journal may start at its output plane.
+Both interfaces have explicit geometry checks and pivot regressions.
+
 The proposed independent-body clearance allocation is 1.5 mm: 0.50 mm weldment,
 0.15 mm datum setting, 0.40 mm catalogue rack face width, 0.20 mm shaft/axial
 setting, 0.10 mm machined parts, 0.10 mm hardware stack and 0.05 mm reserve.
 These are manufacturing/assembly targets, not measured capabilities. Mating
 threads, locating fits, bearing fits and hard stops use explicit fit checks
-rather than a 1.5 mm separation rule. Native results are pending on the final
-source; earlier diagnostic intersections are not release evidence.
+rather than a 1.5 mm separation rule. The 3150 mm bed passes fixed clearance
+(5,842 native pairs, 572 qualified interfaces, zero intersections or tolerance
+failures), service access (636 trials, zero clashes), and continuous travel
+(1,239,253 certified pairs, 30,610 native distances, zero failures). Updated pivot
+regressions pass 582 assertions across both beds. The 2600 mm bed also passes
+fixed clearance (4,727 native pairs, 460 qualified interfaces, zero intersections
+or tolerance failures), service access (520 trials, zero clashes), and continuous
+travel (961,085 certified pairs, 28,157 native distances, zero failures).
+The shared-caller and existing router regression suites are still pending.
+Service trials reroute both cable chains at every actual parked coordinate;
+the 520/636-trial reruns also pass. They cover both ends and the middle service
+park, rather than testing the chains' static zero-position mesh.
 
 ## Remaining model screen and release gates
 
@@ -165,3 +189,28 @@ The run BOM expands to the supplier section part number and section quantity;
 finished 6 H7 pilots remain a shop operation on that purchase. The run continues
 to own its declared physical mass once. Procurement aggregation and the absence
 of a second mass multiplication have separate regression checks.
+
+The relocated switch checks use the existing assumed `GENERIC-INDUCTIVE-M8`
+barrel and bored-holder geometry. Supplier-specific sensor retention is not
+modelled by that baseline: its M8x1 threaded region starts after the connector,
+and the holder must ultimately grip the threaded region with compatible
+fixings. For example, SICK's [accessory-family drawing](https://www.sick.com/media/pdf/0/50/450/dataSheet_BEF-MU-M12N_2103188_en.pdf)
+lists an M8x1 mounting nut, 13 mm across flats and 4 mm thick; the [sensor sheet](https://www.sick.com/media/pdf/7/17/517/dataSheet_IMB08-04NPOVT0K_1072695_en.pdf)
+identifies the matching two-nut accessory. These are sourcing references, not
+an adopted sensor or a purchase specification for this machine. Final sensor
+selection, holder clamping geometry, fasteners and their clearance remain an
+SR17/SR18 fabrication-release dependency. The rack-mount clearance result must
+state this model boundary and must not release the switch holders for manufacture.
+
+The long-bed fixed check found four guide/web-head gaps of 0.9 mm, despite
+zero solid intersections. The web washer recess is now 2.6 mm deep, moving the
+unchanged fully loadable M6 socket heads inward by 1 mm. Cleat length increases
+to 64 mm to retain the conservative 235 MPa / 1.5 net-section screen, without
+credit for a higher C45 yield strength. The two end cleats and bedding shift
+their stock centres 3 mm inward, preserving their outer bounds at +/-249 mm
+and the receiver joint gaps. Bolt stations and all axis/rail datums are unchanged.
+This revision passes fresh fixed, service and full-travel acceptance on both beds,
+as recorded above. The local section/connection fixture passes 64 assertions and
+has 4.636902 kg of gross mount members per 500 mm fixture. That fixture value is
+not the machine's added moving mass: the model screen must include all installed
+parts, removed supports and host drilling before reporting the net change.

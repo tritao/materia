@@ -173,10 +173,6 @@ class LinearRackMount {
         hostFace.z + 4 * up.z
       );
       var baseX = hostLocal.x, cleatHeight = 13 - baseX;
-      var cleat = new LinearMountCleat(new ComponentValues().setNumber("height", cleatHeight));
-      var screen = cleat.connection(1000, 400, 400);
-      screens.push(screen);
-      if (!screen.pass) throw "Rack cleat connection fails the stated 1000/400/400 N envelope";
       var derived = MountHoleDerivation.derive(
         {x: -13.0, y: -receiverLength / 2, z: 0.0, width: 26.0, depth: receiverLength, height: 18.0},
         C45Bright,
@@ -309,31 +305,38 @@ class LinearRackMount {
         links.push({first: inner, second: receiverId});
       }
       for (i in 0...anchors.length) {
+        var localCleat = new LinearMountCleat(new ComponentValues().setNumber("height", cleatHeight).setToken(
+          "endBias",
+          i == 0 ? "front" : i == anchors.length - 1 ? "back" : "middle"
+        ));
         var cleatId = prefix + 'Cleat${i+1}';
+        var screen = localCleat.connection(1000, 400, 400);
+        screens.push({id: cleatId, loadsN: {tangential: 1000, radial: 400, axial: 400}, result: screen});
+        if (!screen.pass) throw "Rack cleat connection fails the stated envelope: " + cleatId;
         var local = F.fromRotationMatrix(baseX, anchors[i], 0, [0, 0, 1, 0, 1, 0, -1, 0, 0]), cleatFrame = F.compose(
           frame,
           local
         );
-        attach(cleatId, cleat, cleatFrame, cleatId + "Replication");
+        attach(cleatId, localCleat, cleatFrame, cleatId + "Replication");
         var layerId = cleatId + "Replication";
         attach(
           layerId,
           new LinearMountReplication(new ComponentValues().setNumber("width", LinearMountCleat.BASE_WIDTH).setNumber(
             "length",
-            58
+            LinearMountCleat.BODY_LENGTH
           ).setNumber(
             "thickness",
             4
           )),
-          F.compose(cleatFrame, F.translation(LinearMountCleat.BASE_WIDTH / 2, 0, -4)),
+          F.compose(cleatFrame, F.translation(LinearMountCleat.BASE_WIDTH / 2, localCleat.bodyShift, -4)),
           host
         );
         links.push({first: receiverId, second: cleatId});
         links.push({first: cleatId, second: layerId});
         links.push({first: layerId, second: host});
         var cleatElement = new MountedElement(
-          cleat,
-          [cleat.connector("base--18"), cleat.connector("base-18")],
+          localCleat,
+          [localCleat.connector("base--18"), localCleat.connector("base-18")],
           {
             diameter: 6.6,
             counterboreDiameter: 13,
@@ -371,7 +374,7 @@ class LinearRackMount {
             flat,
             F.compose(
               cleatFrame,
-              AxisBuilder.orient(LinearMountCleat.WALL - 1.6, y, cleatHeight - 10, [0.0, 1, 0], [1.0, 0, 0])
+              AxisBuilder.orient(LinearMountCleat.webWasherSeat(), y, cleatHeight - 10, [0.0, 1, 0], [1.0, 0, 0])
             ),
             cleatId
           );
@@ -380,7 +383,7 @@ class LinearRackMount {
             screw,
             F.compose(
               cleatFrame,
-              AxisBuilder.orient(LinearMountCleat.WALL, y, cleatHeight - 10, [0.0, 1, 0], [1.0, 0, 0])
+              AxisBuilder.orient(LinearMountCleat.webBoltSeat(), y, cleatHeight - 10, [0.0, 1, 0], [1.0, 0, 0])
             ),
             cleatId + "WebWasher" + y
           );
@@ -414,12 +417,7 @@ class LinearRackMount {
             boltId + "-compound",
             6.6,
             4,
-            F.fromRotationMatrix(
-              LinearMountCleat.BOLT_X - LinearMountCleat.BASE_WIDTH / 2,
-              y,
-              4,
-              [1, 0, 0, 0, -1, 0, 0, 0, -1]
-            )
+            F.compose(F.inverse(builder.zeroPose(layerId)), F.compose(top, F.translation(0, 0, -4)))
           );
           // The layer is compression bedding, not tapped steel. Its drilled
           // clearance ligament is a stated compound manufacturing input.
@@ -448,7 +446,7 @@ class LinearRackMount {
           layerId,
           new LinearMountReplication(new ComponentValues().setNumber("width", LinearMountCleat.BASE_WIDTH).setNumber(
             "length",
-            58
+            LinearMountCleat.BODY_LENGTH
           ).setNumber(
             "thickness",
             4

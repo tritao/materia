@@ -8,6 +8,26 @@ from mount_frame import Frame,rectangle,beam_matrix
 
 
 class LocalFrameTests(unittest.TestCase):
+    def test_mean_reference_removes_rigid_motion_without_corner_clamps(self):
+        def ring(shift):
+            model=Frame()
+            for name,p in [('a',(-10,0,-10)),('b',(10,0,-10)),('c',(10,0,10)),('d',(-10,0,10))]:
+                model.node(name,np.array(p)+shift)
+            for a,b in [('a','b'),('b','c'),('c','d'),('d','a')]:
+                model.beam(a,b,rectangle(4,2),(0,1,0),'ring')
+            return model.solve({'c':[0,0,100.,0,0,0]},reference=['a','b','c','d'])
+        first=ring(np.zeros(3));moved=ring(np.array([30.,-20.,90.]))
+        self.assertAlmostEqual(first['work']/moved['work'],1.,places=8)
+        np.testing.assert_allclose(first['referenceReactionNAndNmm'],[0,0,-100,0,1000,0],atol=1e-7)
+        mean=np.mean([u[:3] for u in first['displacement'].values()],axis=0)
+        np.testing.assert_allclose(mean,[0,0,0],atol=1e-10)
+
+    def test_window_material_removal_cannot_stiffen_the_host_section(self):
+        from mount_local import host_normal_flexibility
+        intact=host_normal_flexibility(100.,100.,6.,12.,17.4,21.9,())
+        window=host_normal_flexibility(100.,100.,6.,12.,17.4,21.9,(-1,))
+        self.assertGreaterEqual(window,intact*(1-1e-8))
+
     def test_beam_cantilever_units_shear_and_torsion(self):
         model=Frame();model.node('root',(0,0,0));model.node('tip',(200,0,0));s=rectangle(20,10)
         model.beam('root','tip',s,(0,1,0),'metal');model.fix('root')

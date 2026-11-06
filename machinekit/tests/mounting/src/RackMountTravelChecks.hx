@@ -41,11 +41,15 @@ class RackMountTravelChecks {
     return Math.sqrt(x * x + y * y + z * z);
   }
   static function swept(p:TravelPart, lo:Array<Float>, hi:Array<Float>, inflate:Float):PartBox {
-    var low = [p.box.minX - inflate, p.box.minY - inflate, p.box.minZ - inflate];
-    var high = [p.box.maxX + inflate, p.box.maxY + inflate, p.box.maxZ + inflate];
-    for (k in 0...p.motion.length) for (d in 0...3) {
-      low[d] += Math.min(p.motion[k][d] * lo[k], p.motion[k][d] * hi[k]);
-      high[d] += Math.max(p.motion[k][d] * lo[k], p.motion[k][d] * hi[k]);
+    return sweptBox(p.box, p.motion, lo, hi, inflate);
+  }
+  static function sweptBox(box:PartBox,
+    motion:Array<Array<Float>>, lo:Array<Float>, hi:Array<Float>, inflate:Float):PartBox {
+    var low = [box.minX - inflate, box.minY - inflate, box.minZ - inflate];
+    var high = [box.maxX + inflate, box.maxY + inflate, box.maxZ + inflate];
+    for (k in 0...motion.length) for (d in 0...3) {
+      low[d] += Math.min(motion[k][d] * lo[k], motion[k][d] * hi[k]);
+      high[d] += Math.max(motion[k][d] * lo[k], motion[k][d] * hi[k]);
     }
     return {minX: low[0], minY: low[1], minZ: low[2], maxX: high[0], maxY: high[1], maxZ: high[2]};
   }
@@ -74,8 +78,8 @@ class RackMountTravelChecks {
       var scale = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
       directions.push([v.x / scale, v.y / scale, v.z / scale]);
     }
-    var parts:Array<TravelPart> = [],
-      failures:Array<Dynamic> = [], proofs = 0, nativeCalls = 0, skippedFits = 0, qualifiedFits:Array<Dynamic> = [];
+    var parts:Array<TravelPart> = [], failures:Array<Dynamic> = [],
+      proofs = 0, nativeCalls = 0, skippedFits = 0, qualifiedFits:Array<Dynamic> = [], pinionSweeps:Array<Dynamic> = [];
     function ancestors(id:String):Array<KinematicJoint> {
       var rows:Array<KinematicJoint> = [], seen:Map<String, Bool> = [];
       while (parents.exists(id)) {
@@ -102,7 +106,8 @@ class RackMountTravelChecks {
             hinge = j.child;
           }
         }
-        var local:Part = null, owned = false, rotary = [for (j in ancestry) if (j.type == Continuous) j];
+        var local:Part = null,
+          owned = false, pivotEnclosed = false, rotary = [for (j in ancestry) if (j.type == Continuous) j];
         // A chain's Envelope contains every routed position, including overtravel.
         // It is deliberately conservative and does not rely on interpolation of CAD.
         for (binding in machine.cableChainBindings) if (binding.member == m.id) {
@@ -119,7 +124,82 @@ class RackMountTravelChecks {
               radius,
               Math.sqrt(x * x + y * y)
             );
-            if (Std.isOfType(m.component, machinekit.motion.SteppedShaft)) {
+            if (Std.isOfType(m.component, machinekit.transmission.HelicalPinion)) {
+              var pinion:machinekit.transmission.HelicalPinion = cast m.component;
+              // The diagonal of a gear's square bounding box is not its tip
+              // radius. Prove containment of the actual lofted teeth instead.
+              local = Part.cylinder(pinion.pitchDiameter() / 2 + pinion.n("normalModule") + 0.05,
+                pinion.n("faceWidth"));
+              var outside = cache.local(m.component).subtract(local);
+              var escapedVolume = outside.volume();
+              outside.close();
+              if (!Math.isFinite(escapedVolume)
+                || escapedVolume > 1e-6) throw "Pinion rotation envelope does not contain its native teeth: " + m.id;
+              if (hinge != null) {
+                var joint = parents.get(hinge);
+                if (joint == null || joint.defaultValue != 0 || joint.limits.lower == null
+                  || joint.limits.upper == null) throw "Pinion pivot needs bounded zero-datum angular limits";
+                var pivot = state.worldConnector(joint.parent,
+                  joint.parentConnector), inverse = F.inverse(machine.zeroPose(m.id)), h = F.transformPoint(
+                    inverse,
+                    pivot.x,
+                    pivot.y,
+                    pivot.z
+                  ), worldAxis = F.transformVector(
+                    pivot,
+                    joint.axis.x,
+                    joint.axis.y,
+                    joint.axis.z
+                  ), axis = F.transformVector(
+                    inverse,
+                    worldAxis.x,
+                    worldAxis.y,
+                    worldAxis.z
+                  );
+                if (Math.abs(axis.x) + Math.abs(axis.y) + Math.abs(Math.abs(axis.z) - 1)
+                  > 1e-6) throw "Pinion passive pivot must be parallel to its shaft";
+                var low:Float = cast joint.limits.lower, high:Float = cast joint.limits.upper;
+                if (low > 0 || high < 0 || high - low > Math.PI) throw "Unsupported pinion pivot sweep";
+                var mid = (low + high) / 2 * (axis.z < 0 ? -1 : 1),
+                  reach = Math.sqrt(h.x * h.x + h.y * h.y), extra = 2 * reach * Math.sin((high - low) / 4) + 0.001,
+                  cx = h.x - Math.cos(mid) * h.x + Math.sin(mid) * h.y,
+                  cy = h.y - Math.sin(mid) * h.x - Math.cos(mid) * h.y,
+                  gearRadius = pinion.pitchDiameter() / 2 + pinion.n("normalModule") + 0.05;
+                // Every centre on the pivot arc lies within this chord-radius
+                // disk about its midpoint. The rotor disk is invariant about Z;
+                // their Minkowski sum encloses the complete passive stroke.
+                local.close();
+                var raw = Part.cylinder(gearRadius + extra, pinion.n("faceWidth") + 0.002);
+                local = raw.translated(new cadkit.modeling.Vector(cx, cy, -0.001));
+                raw.close();
+                var envelope = PosedParts.moved(local, machine.zeroPose(m.id));
+                for (angle in [low, 0.0, high]) {
+                  state.setJoint(joint.id, angle);
+                  state.forwardKinematics();
+                  var moved = PosedParts.moved(cache.local(m.component), state.worldPose(m.id));
+                  var outside = moved.subtract(envelope), volume = outside.volume();
+                  outside.close();
+                  moved.close();
+                  if (!Math.isFinite(volume)
+                    || volume > 1e-6) throw "Native pinion escapes its analytic pivot envelope";
+                }
+                state.setJoint(joint.id, 0);
+                state.forwardKinematics();
+                envelope.close();
+                pinionSweeps.push({
+                  id: m.id,
+                  lowRad: low,
+                  highRad: high,
+                  reachMm: reach,
+                  centreLocalMm: [cx, cy, 0.0],
+                  addedRadiusMm: extra,
+                  rotorRadiusMm: gearRadius,
+                  numericalPaddingMm: 0.001,
+                  qualification: "whole-arc chord bound; native tooth containment and FK endpoint regressions"
+                });
+                pivotEnclosed = true;
+              }
+            } else if (Std.isOfType(m.component, machinekit.motion.SteppedShaft)) {
               // Preserve actual shoulders; a single max-radius cylinder would fill
               // the gearbox's smaller bore with an imaginary shaft collar.
               var shaft:machinekit.motion.SteppedShaft = cast m.component, segments:Array<Part> = [], z0 = 0.0;
@@ -146,7 +226,7 @@ class RackMountTravelChecks {
         var posed = PosedParts.moved(local, machine.zeroPose(m.id));
         if (owned) local.close();
         var radius = 0.0;
-        if (hinge != null) {
+        if (hinge != null && !pivotEnclosed) {
           var relative = F.compose(F.inverse(machine.zeroPose(hinge)), machine.zeroPose(m.id));
           var bounds = PosedParts.carried(cache.box(m.component, F.identity()), relative);
           for (x in [bounds.minX, bounds.maxX]) for (y in [bounds.minY, bounds.maxY]) radius = Math.max(
@@ -198,7 +278,9 @@ class RackMountTravelChecks {
         }
         var tolerance = RackMountInterfaces.sameFitAssembly(machine, a.id, b.id) ? 0.15 : 1.5;
         var required = tolerance + inflation;
-        if (boxGap >= required) {
+        // Remove common translation before bounding the pair. This remains an
+        // enclosure of every relative pose, including simultaneous axis motion.
+        if (boxGap >= required || boxDistance(sweptBox(a.box, relative, lo, hi, 0), b.box) >= required) {
           proofs++;
           continue;
         }
@@ -212,6 +294,7 @@ class RackMountTravelChecks {
           }
           var cell = cells.pop();
           if (cell == null) throw "Missing interval cell";
+          if (boxDistance(sweptBox(a.box, relative, cell.low, cell.high, 0), b.box) >= required) continue;
           var mid = [for (k in 0...axes.length)(cell.low[k] + cell.high[k]) / 2],
             delta = [0.0, 0, 0], radius = 0.0, split = -1, largest = 0.0;
           for (k in 0...axes.length) {
@@ -227,6 +310,11 @@ class RackMountTravelChecks {
           var distance = moved.distance(b.shape);
           moved.close();
           nativeCalls++;
+          if (nativeCalls % 1000 == 0) {
+            Sys.println('Mount sweep progress ' + bed
+              + ': ' + nativeCalls + ' distances, ' + proofs + ' certified pairs; checking ' + a.id + ' / ' + b.id);
+            Sys.stdout().flush();
+          }
           minDistance = Math.min(minDistance, distance);
           if (!Math.isFinite(distance) || distance < 0) throw "Native distance failed";
           if (distance - radius >= required) continue;
@@ -268,6 +356,7 @@ class RackMountTravelChecks {
       nativeDistances: nativeCalls,
       fixedInterfacePairsExcluded: skippedFits,
       qualifiedFits: qualifiedFits,
+      passivePinionEnvelopes: pinionSweeps,
       failures: failures,
       status: failures.length
       == 0 ? "continuous sweep passes; declared fits and mesh have separate qualifications" : "FAIL"

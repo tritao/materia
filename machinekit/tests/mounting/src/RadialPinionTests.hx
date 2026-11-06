@@ -25,6 +25,10 @@ class RadialPinionTests {
         var pivotJoint = [for (j in definition.joints) if (j.id == id + "-preload-pivot") j];
         check(pivotJoint.length == 1 && pivotJoint[0].passive == true, "preload pivot is passive, not position-held");
         check(motorJoint.length == 1 && motorJoint[0].parent == carrierId, "motor has one support path through lever");
+        check(
+          RackMountInterfaces.boundedMotionFit(machine, id + "Reducer", id + "OutputShaft") != null,
+          "flush reducer output journal has a checked coaxial seating fit"
+        );
         var datum = F.compose(machine.zeroPose(carrierId), carrier.connector("pinion").frame);
         var actual = F.compose(
           machine.zeroPose(id),
@@ -76,6 +80,16 @@ class RadialPinionTests {
             cache.volume(machine, state, "pivot", carrierId, id + thrust) < 0.001,
             "lever clears its thrust shims"
           );
+          for (thrust in ["PivotThrustFront", "PivotThrustRear"]) {
+            check(
+              cache.volume(machine, state, "pivot", id + "PivotBush", id + thrust) < 0.001,
+              "pivot bush clears its thrust shim throughout stroke"
+            );
+            check(
+              RackMountInterfaces.boundedMotionFit(machine, id + "PivotBush", id + thrust) != null,
+              "pivot bush/thrust clearance has a checked coaxial qualification"
+            );
+          }
           check(
             cache.volume(machine, state, "pivot", id + "SpringCup", id + "SpringAdjuster") < 0.001,
             "adjuster guide clears the tilted spring cup"

@@ -64,6 +64,20 @@ class RealRackMountTests {
     var cleat = new LinearMountCleat(), body = cleat.geometry();
     check(body.valid() && body.solidCount() == 1, "cleat is a connected drilled solid");
     body.close();
+    check(
+      LinearMountCleat.WALL - LinearMountCleat.WEB_RECESS >= 8.4 - 1e-9,
+      "guide-clear recess retains its screened web ligament"
+    );
+    for (end in ["front", "back"]) {
+      var endCleat = new LinearMountCleat(new ComponentValues().setToken("endBias",
+        end)), regions = endCleat.stockRegions();
+      var station = end == "front" ? -220.0 : 220.0;
+      check(endCleat.connection(1000, 400, 400).pass, "asymmetric end cleat retains the full load envelope");
+      check(
+        station + regions[0][2] >= -249 && station + regions[0][3] <= 249,
+        "end cleats preserve receiver joint gaps"
+      );
+    }
     var result = cleat.connection(1000, 400, 400);
     check(result.pass, "cleat connection envelope");
     Sys.println(haxe.Json.stringify(result));
@@ -105,6 +119,8 @@ class RealRackMountTests {
       machinekit.assembly.AxisBuilder.orient(50, 0, -38, [0.0, 1, 0], [-1.0, 0, 0])
     );
     check(built.members.length > 0, "physical members");
+    check(built.connectionScreens.length == 5, "each actual cleat has a connection check");
+    for (row in built.connectionScreens) check(row.result.pass, "all installed cleat variants pass");
     var originalCount = built.mount.contacts.length, copy = built.mount.contacts;
     copy.resize(0);
     check(built.mount.contacts.length == originalCount, "contact graph is immutable through its public view");
@@ -132,6 +148,14 @@ class RealRackMountTests {
       check(shape.valid() && shape.solidCount() == 1, "cassette is a connected serviceable solid");
       shape.close();
     }
+    machinekit.assembly.PosedParts.scope(cache -> {for (i in 1...6) for (y in [-18, 18]) {
+      var layer = "rackMountSection1Cleat" + i + "Replication", bolt = "rackMountSection1Cleat" + i + "BaseBolt" + y;
+      check(
+        cache.overlap(b.component(layer), b.zeroPose(layer), b.component(bolt), b.zeroPose(bolt)) < 0.001,
+        "bedding clearance follows the placed end-cleat datum: " + bolt
+      );
+    }
+    });
     var location = machinekit.assembly.RackMesh.layout(
       {id: "y", lower: 0.0, upper: 100.0, initial: 0.0},
       [0.0, 1, 0],
@@ -188,7 +212,7 @@ class RealRackMountTests {
     }
     sys.io.File.saveContent(
       output + "/local-mass.json",
-      haxe.Json.stringify({massKg: total, members: masses}, null, "  ")
+      haxe.Json.stringify({massKg: total, members: masses, connectionScreens: built.connectionScreens}, null, "  ")
     );
 
     Sys.println("RealRackMountTests: " + assertions + " local source/contact assertions passed");

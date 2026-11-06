@@ -9,20 +9,37 @@ import machinekit.assembly.AxisBuilder;
 import machinekit.assembly.PosedParts;
 
 /** Machined C45 angle cleat, not a welded overlap or virtual connection.
- * Local base spans X=0..28, Y=±29; web X=0..11. Source dimensions are engineering
+ * Local base spans X=0..28, Y=±32 (end pieces shifted 3 mm inward); web X=0..11. Source dimensions are engineering
  * inputs. Two recessed M6 base clearances and two recessed M6 web clearances have real connectors. */
 class LinearMountCleat extends MachineComponent {
   static var recipe:Null<ComponentType>;
   public final height:Float;
+  public final bodyShift:Float;
   public static inline final WALL = 11.0;
   public static inline final BASE = 13.0;
   public static inline final BASE_WIDTH = 28.0;
   public static inline final BOLT_X = 20.0;
   public static inline final WEB_BOLT_LENGTH = 20.0;
-  static function inputs():Array<ComponentParameter> return [P.length("height", 32)];
+  public static inline final BODY_LENGTH = 64.0;
+  public static inline final WEB_RECESS = 2.6;
+  public static inline function webWasherSeat():Float return WALL - WEB_RECESS;
+  public static function webBoltSeat():Float return webWasherSeat()
+    + machinekit.standard.FlatWasher.metric("M6").thickness;
+  static function inputs():Array<ComponentParameter> return [
+    P.length("height", 32),
+    P.choice("endBias", ["middle", "front", "back"], "middle")
+  ];
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(inputs(), overrides);
     height = v.number("height");
+    bodyShift = switch (v.token("endBias")) {
+      case "front":
+        3.0;
+      case "back":
+        -3.0;
+      case _:
+        0.0;
+    };
     if (!Math.isFinite(height) || height < 29 || height > 120) throw "Cleat web height must be 29..120 mm";
     super("LINEAR-MOUNT-CLEAT", "C45 discrete bolted mount cleat", "steel C45", false, v);
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Stated")));
@@ -31,9 +48,9 @@ class LinearMountCleat extends MachineComponent {
     for (y in [-14.0, 14.0]) addConnector(
       'web-' + y,
       Mount,
-      AxisBuilder.orient(WALL, y, height - 10, [0.0, 1, 0], [1.0, 0, 0])
+      AxisBuilder.orient(webBoltSeat(), y, height - 10, [0.0, 1, 0], [1.0, 0, 0])
     );
-    addConnector("base", Mount, Solids.axial(BASE_WIDTH / 2, 0, 0));
+    addConnector("base", Mount, Solids.axial(BASE_WIDTH / 2, bodyShift, 0));
     addConnector("receiver", Mount, AxisBuilder.orient(0, 0, height - 10, [0.0, 1, 0], [-1.0, 0, 0]));
   }
   public static function recipeType():ComponentType {
@@ -51,8 +68,8 @@ class LinearMountCleat extends MachineComponent {
   override public function componentType():Null<ComponentType> return recipeType();
   override public function hasGeometry():Bool return true;
   public function stockRegions():Array<Array<Float>> return [
-    [0.0, BASE_WIDTH, -29, 29, 0, BASE],
-    [0.0, WALL, -29, 29, BASE, height]
+    [0.0, BASE_WIDTH, -BODY_LENGTH / 2 + bodyShift, BODY_LENGTH / 2 + bodyShift, 0, BASE],
+    [0.0, WALL, -BODY_LENGTH / 2 + bodyShift, BODY_LENGTH / 2 + bodyShift, BASE, height]
   ];
   /** Exact positive cutting tools, shared with local section integration. */
   public function cutBores():Array<{frame:materia.assembly.AssemblyRecord.AssemblyFrame, diameter:Float, depth:Float}> {
@@ -68,9 +85,9 @@ class LinearMountCleat extends MachineComponent {
         depth: WALL + 2
       });
       result.push({
-        frame: AxisBuilder.orient(WALL - 1.6, y, height - 10, [0.0, 1, 0], [1.0, 0, 0]),
+        frame: AxisBuilder.orient(webWasherSeat(), y, height - 10, [0.0, 1, 0], [1.0, 0, 0]),
         diameter: 12.5,
-        depth: 1.6
+        depth: WEB_RECESS
       });
     }
     return result;
@@ -123,11 +140,11 @@ class LinearMountCleat extends MachineComponent {
     // Conservative net-section bound: debit both washer recesses and
     // both key corridors together, even though the longer toe moves the
     // key corridors outside the web. No gross-section stiffness credit.
-    var netWidth = 58 - 2 * 12.5 - 2 * 6.6, effectiveWall = WALL - 1.6;
+    var netWidth = BODY_LENGTH - 2 * 12.5 - 2 * 6.6, effectiveWall = WALL - WEB_RECESS;
     var bearing = force / (2 * 6 * effectiveWall), net = force / (netWidth * effectiveWall);
     // Retain the earlier 20 mm envelope plus the 11 mm added toe.
     // The local model must replace this bound with actual reaction arms.
-    var moment = force * 31 + radialN * (height - 10);
+    var moment = force * (31 + Math.abs(bodyShift)) + radialN * (height - 10);
     var bending = 6 * moment / (netWidth * effectiveWall * effectiveWall);
     var tension = 2 * (radialN / 2 + moment / 24); // factor-two prying allowance
     var area = 20.1, proof = 830.0, preload = 0.7 * proof * area;
@@ -145,7 +162,7 @@ class LinearMountCleat extends MachineComponent {
     var tearout = 2 * 2 * edgeLigament * floor * 235 / Math.sqrt(3) / 1.5;
     var baseBearing = force / (2 * 6 * floor);
     var interaction = tension / capacity + (force / 2) / shearCapacity;
-    var engagement = WEB_BOLT_LENGTH - WALL;
+    var engagement = WEB_BOLT_LENGTH - webBoltSeat();
     var rm = materia.casting.InsertMaterial.InsertMaterials.specification(C45Bright).minimumTensileStrengthMPa;
     // Conservative half-cylinder thread shear at (major - pitch), with
     // assumed ultimate shear 0.6 Rm and factor 1.25. Installation preload

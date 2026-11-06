@@ -1,0 +1,4338 @@
+{
+  "checkedAtUtc": "2026-10-29T13:14:13.174300+00:00",
+  "status": "Built geometry mass/inertia audit; nominal-stop compliance/response screen pending",
+  "beds": [
+    {
+      "status": "CAD mass/inertia audit; no dynamic acceptance",
+      "bedMm": 2600,
+      "inputs": [
+        {
+          "path": "build/router-mount-implementation/model-2600/mount-input.json",
+          "sha256": "ce6b703daa13dc6e1ccedfbf36554e01f7cf07b73938004e1710a013a674a911"
+        },
+        {
+          "path": "build/router-mount-implementation/frozen-inputs/2600/manifest.json",
+          "sha256": "c4b0c4d674788a41ebfe5fa6febede29992aa9b34f316150b18c7c43dfffd0ec"
+        }
+      ],
+      "poseMm": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      },
+      "carriedBodiesChecked": 2028,
+      "independentFloorParts": [
+        {
+          "id": "vacuumBlower",
+          "parentId": "base",
+          "massKg": 169.64600329384885,
+          "centreOfMassMm": {
+            "x": 2325.25,
+            "y": 1136.375,
+            "z": 250
+          },
+          "poseMm": {
+            "qw": 1,
+            "qx": 0,
+            "qy": 0,
+            "qz": 0,
+            "x": 2325.25,
+            "y": 1136.375,
+            "z": 0
+          },
+          "materialId": "aluminium",
+          "centroidalInertiaKgMm2World": {
+            "xx": 5230751.768227031,
+            "xy": 1.3533185882941574e-10,
+            "xz": 2.0020008087158202e-10,
+            "yy": 5230751.768227,
+            "yz": -1.234337129381591e-12,
+            "zz": 3392920.065876996
+          },
+          "inertiaSource": "component tensor",
+          "representation": "independent-floor-mass",
+          "massSource": "Modelled"
+        },
+        {
+          "id": "vfd",
+          "parentId": "base",
+          "massKg": 6.3180000000000005,
+          "centreOfMassMm": {
+            "x": 2445.25,
+            "y": -249.25,
+            "z": 350
+          },
+          "poseMm": {
+            "qw": 1,
+            "qx": 0,
+            "qy": 0,
+            "qz": 0,
+            "x": 2445.25,
+            "y": -249.25,
+            "z": 200
+          },
+          "materialId": "device-housing-dark",
+          "centroidalInertiaKgMm2World": {
+            "xx": 64443.600000000006,
+            "xy": 1.149237505160272e-13,
+            "xz": 9.576979209668935e-14,
+            "yy": 64443.600000000006,
+            "yz": -2.130866050720215e-13,
+            "zz": 34117.200000000004
+          },
+          "inertiaSource": "component tensor",
+          "representation": "independent-floor-mass",
+          "massSource": "EffectiveDensity(650)"
+        },
+        {
+          "id": "brakeResistor",
+          "parentId": "base",
+          "massKg": 2.592,
+          "centreOfMassMm": {
+            "x": 3025.25,
+            "y": -249.25,
+            "z": 1080
+          },
+          "poseMm": {
+            "qw": 1,
+            "qx": 0,
+            "qy": 0,
+            "qz": 0,
+            "x": 3025.25,
+            "y": -249.25,
+            "z": 1050
+          },
+          "materialId": "aluminium",
+          "centroidalInertiaKgMm2World": {
+            "xx": 20217.600000000002,
+            "xy": -2.2100721253082155e-14,
+            "xz": 9.822542779147625e-16,
+            "yy": 2160,
+            "yz": 2.0116567611694328e-13,
+            "zz": 20822.4
+          },
+          "inertiaSource": "component tensor",
+          "representation": "independent-floor-mass",
+          "massSource": "EffectiveDensity(1800)"
+        },
+        {
+          "id": "mainBreaker",
+          "parentId": "base",
+          "massKg": 0.4374,
+          "centreOfMassMm": {
+            "x": 2625.25,
+            "y": -249.25,
+            "z": 645
+          },
+          "poseMm": {
+            "qw": 1,
+            "qx": 0,
+            "qy": 0,
+            "qz": 0,
+            "x": 2625.25,
+            "y": -249.25,
+            "z": 600
+          },
+          "materialId": "device-housing",
+          "centroidalInertiaKgMm2World": {
+            "xx": 500.27625000000006,
+            "xy": 5.1798565436911344e-17,
+            "xz": -6.008633590681716e-16,
+            "yy": 401.5332000000001,
+            "yz": -5.308538675308228e-15,
+            "zz": 311.31945
+          },
+          "inertiaSource": "component tensor",
+          "representation": "independent-floor-mass",
+          "massSource": "EffectiveDensity(1200)"
+        },
+        {
+          "id": "mainContactor",
+          "parentId": "base",
+          "massKg": 0.4752,
+          "centreOfMassMm": {
+            "x": 2705.25,
+            "y": -249.25,
+            "z": 645
+          },
+          "poseMm": {
+            "qw": 1,
+            "qx": 0,
+            "qy": 0,
+            "qz": 0,
+            "x": 2705.25,
+            "y": -249.25,
+            "z": 600
+          },
+          "materialId": "device-housing",
+          "centroidalInertiaKgMm2World": {
+            "xx": 574.2,
+            "xy": -2.626165951369331e-16,
+            "xz": 2.1103119252074964e-16,
+            "yy": 440.55000000000007,
+            "yz": 0,
+            "zz": 373.23000000000013
+          },
+          "inertiaSource": "component tensor",
+          "representation": "independent-floor-mass",
+          "massSource": "EffectiveDensity(1200)"
+        },
+        {
+          "id": "safetyRelay",
+          "parentId": "base",
+          "massKg": 0.378,
+          "centreOfMassMm": {
+            "x": 2805.25,
+            "y": -249.25,
+            "z": 650
+          },
+          "poseMm": {
+            "qw": 1,
+            "qx": 0,
+            "qy": 0,
+            "qz": 0,
+            "x": 2805.25,
+            "y": -249.25,
+            "z": 600
+          },
+          "materialId": "device-housing",
+          "centroidalInertiaKgMm2World": {
+            "xx": 768.6000000000001,
+            "xy": -7.788969469402219e-16,
+            "xz": -4.0287773117597686e-16,
+            "yy": 378.7875,
+            "yz": 0,
+            "zz": 517.3875
+          },
+          "inertiaSource": "component tensor",
+          "representation": "independent-floor-mass",
+          "massSource": "EffectiveDensity(700)"
+        },
+        {
+          "id": "emergencyStop",
+          "parentId": "base",
+          "massKg": 0.052399999999999995,
+          "centreOfMassMm": {
+            "x": 2625.25,
+            "y": -49.25,
+            "z": 894
+          },
+          "poseMm": {
+            "qw": 1,
+            "qx": 0,
+            "qy": 0,
+            "qz": 0,
+            "x": 2625.25,
+            "y": -49.25,
+            "z": 900
+          },
+          "materialId": "abs-red",
+          "centroidalInertiaKgMm2World": null,
+          "inertiaSource": "not declared; excluded from frame model",
+          "representation": "independent-floor-mass",
+          "massSource": "Declared"
+        },
+        {
+          "id": "cabinet",
+          "parentId": "base",
+          "massKg": 35.89359119999994,
+          "centreOfMassMm": {
+            "x": 2625.25,
+            "y": -327.1554708741425,
+            "z": 499.99999999999915
+          },
+          "poseMm": {
+            "qw": 1,
+            "qx": 0,
+            "qy": 0,
+            "qz": 0,
+            "x": 2625.25,
+            "y": -249.25,
+            "z": 0
+          },
+          "materialId": "machined-steel",
+          "centroidalInertiaKgMm2World": {
+            "xx": 4329398.481864891,
+            "xy": -5.2263527006712e-10,
+            "xz": -2.6045017875731167e-10,
+            "yy": 6902209.093088184,
+            "yz": 1.9165039062500003e-09,
+            "zz": 3215313.2962198406
+          },
+          "inertiaSource": "component tensor",
+          "representation": "independent-floor-mass",
+          "massSource": "Computed(Preview)"
+        }
+      ],
+      "componentLedgerMassKg": 2238.806893114529,
+      "independentFloorMassKg": 215.7925944938488,
+      "deltaComponentLedgerKg": 56.305271279894896,
+      "axes": [
+        {
+          "axis": "x",
+          "built": {
+            "massKg": 68.5913441349915,
+            "centreOfMassMm": {
+              "x": 5.411995608322962,
+              "y": 1173.5463306307192,
+              "z": 1057.00822556827
+            },
+            "centroidalInertiaKgMm2World": [
+              [
+                3192565.976192549,
+                66857.76983850484,
+                -151122.53406835944
+              ],
+              [
+                66857.76983850484,
+                2831685.815095587,
+                -616020.31037455
+              ],
+              [
+                -151122.53406835944,
+                -616020.31037455,
+                1946722.5845123783
+              ]
+            ],
+            "bodyCount": 89
+          },
+          "frozen": {
+            "massKg": 67.81906783827725,
+            "centreOfMassMm": {
+              "x": 5.116264882753451,
+              "y": 1166.2503541470437,
+              "z": 1052.9726720856086
+            },
+            "centroidalInertiaKgMm2World": [
+              [
+                2982663.0272423113,
+                86893.5925676631,
+                -35554.79096203663
+              ],
+              [
+                86893.5925676631,
+                2705005.2864211174,
+                -553512.3454685889
+              ],
+              [
+                -35554.79096203663,
+                -553512.3454685889,
+                1641345.6019566422
+              ]
+            ],
+            "bodyCount": 51
+          },
+          "deltaMassKg": 0.7722762967142529,
+          "changesByFamily": [
+            {
+              "family": "blockX",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockX01",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockX10",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockX11",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockZ",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockZ01",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockZ10",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockZ11",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "cableChainX",
+              "bodyCount": 1,
+              "beforeKg": 0.4410127242729428,
+              "afterKg": 0.46540122427294267,
+              "deltaKg": 0.02438849999999987
+            },
+            {
+              "family": "motorXPlate",
+              "bodyCount": 1,
+              "beforeKg": 0.07219819427353959,
+              "afterKg": 0.0,
+              "deltaKg": -0.07219819427353959
+            },
+            {
+              "family": "motorXSupport",
+              "bodyCount": 1,
+              "beforeKg": 0.9168870410778241,
+              "afterKg": 0.0,
+              "deltaKg": -0.9168870410778241
+            },
+            {
+              "family": "pinionX",
+              "bodyCount": 1,
+              "beforeKg": 0.07738928758070747,
+              "afterKg": 0.07764277647102655,
+              "deltaKg": 0.0002534888903190785
+            },
+            {
+              "family": "pinionXAnchor",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 3.2397423534446665,
+              "deltaKg": 3.2397423534446665
+            },
+            {
+              "family": "pinionXLowerStop",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00758481914983205,
+              "deltaKg": 0.00758481914983205
+            },
+            {
+              "family": "pinionXLowerStopNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorBolt0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionXMotorBolt1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionXMotorBolt2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionXMotorBolt3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionXMotorNut0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorNut1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorNut2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorNut3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorRearWasher0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorRearWasher1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorRearWasher2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorRearWasher3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorWasher0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorWasher1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorWasher2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorWasher3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXPivotBush",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.009848633787610084,
+              "deltaKg": 0.009848633787610084
+            },
+            {
+              "family": "pinionXPivotPin",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.025788237049163984,
+              "deltaKg": 0.025788237049163984
+            },
+            {
+              "family": "pinionXPivotThrustFront",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0026137240975280993,
+              "deltaKg": 0.0026137240975280993
+            },
+            {
+              "family": "pinionXPivotThrustRear",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0026137240975280993,
+              "deltaKg": 0.0026137240975280993
+            },
+            {
+              "family": "pinionXPreload",
+              "bodyCount": 1,
+              "beforeKg": 1.6068837148169777,
+              "afterKg": 0.8190439840661577,
+              "deltaKg": -0.7878397307508199
+            },
+            {
+              "family": "pinionXSpringAdjuster",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.03450299830432388,
+              "deltaKg": 0.03450299830432388
+            },
+            {
+              "family": "pinionXSpringAdjusterNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.009440147582696973,
+              "deltaKg": 0.009440147582696973
+            },
+            {
+              "family": "pinionXSpringAdjusterWasher",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0035728351501572463,
+              "deltaKg": 0.0035728351501572463
+            },
+            {
+              "family": "pinionXSpringCup",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00931742384930999,
+              "deltaKg": 0.00931742384930999
+            },
+            {
+              "family": "pinionXSpringPack",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.02841005068494322,
+              "deltaKg": 0.02841005068494322
+            },
+            {
+              "family": "pinionXUpperStop",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00758481914983205,
+              "deltaKg": 0.00758481914983205
+            },
+            {
+              "family": "pinionXUpperStopNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXhost--28-0Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.021167073976512595,
+              "deltaKg": 0.021167073976512595
+            },
+            {
+              "family": "pinionXhost--28-0Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionXhost--28-1Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.021167073976512595,
+              "deltaKg": 0.021167073976512595
+            },
+            {
+              "family": "pinionXhost--28-1Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionXhost-38-0Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.021167073976512595,
+              "deltaKg": 0.021167073976512595
+            },
+            {
+              "family": "pinionXhost-38-0Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionXhost-38-1Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.021167073976512595,
+              "deltaKg": 0.021167073976512595
+            },
+            {
+              "family": "pinionXhost-38-1Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionXringA",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0007280075488016701,
+              "deltaKg": 0.0007280075488016701
+            },
+            {
+              "family": "pinionXringB",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0007280075488016701,
+              "deltaKg": 0.0007280075488016701
+            },
+            {
+              "family": "railZ",
+              "bodyCount": 1,
+              "beforeKg": 1.5317312500000002,
+              "afterKg": 1.232075,
+              "deltaKg": -0.2996562500000002
+            },
+            {
+              "family": "railZRight",
+              "bodyCount": 1,
+              "beforeKg": 1.5317312500000002,
+              "afterKg": 1.232075,
+              "deltaKg": -0.2996562500000002
+            },
+            {
+              "family": "screwZ",
+              "bodyCount": 1,
+              "beforeKg": 0.6155510981737696,
+              "afterKg": 0.5609916180765273,
+              "deltaKg": -0.05455948009724232
+            },
+            {
+              "family": "screwZCoupling",
+              "bodyCount": 1,
+              "beforeKg": 0.09430966290965079,
+              "afterKg": 0.058951676550237364,
+              "deltaKg": -0.035357986359413424
+            },
+            {
+              "family": "screwZFixed",
+              "bodyCount": 1,
+              "beforeKg": 0.45082737169259635,
+              "afterKg": 0.41,
+              "deltaKg": -0.04082737169259637
+            },
+            {
+              "family": "screwZFixedBracket",
+              "bodyCount": 1,
+              "beforeKg": 0.07776000000000001,
+              "afterKg": 0.08067600000000001,
+              "deltaKg": 0.002916000000000002
+            },
+            {
+              "family": "xCarriage",
+              "bodyCount": 1,
+              "beforeKg": 20.057557499999998,
+              "afterKg": 20.04539863165192,
+              "deltaKg": -0.012158868348077334
+            }
+          ]
+        },
+        {
+          "axis": "y",
+          "built": {
+            "massKg": 216.37611398964273,
+            "centreOfMassMm": {
+              "x": 531.4766572823191,
+              "y": 1277.2524793508828,
+              "z": 1011.0506628446777
+            },
+            "centroidalInertiaKgMm2World": [
+              [
+                7981724.93470016,
+                -5472641.11277437,
+                2746604.761822126
+              ],
+              [
+                -5472641.11277437,
+                142460288.7476189,
+                -754944.6547557578
+              ],
+              [
+                2746604.761822126,
+                -754944.6547557578,
+                142300544.95964116
+              ]
+            ],
+            "bodyCount": 636
+          },
+          "frozen": {
+            "massKg": 196.53282591962542,
+            "centreOfMassMm": {
+              "x": 506.9110544245424,
+              "y": 1263.7569587324708,
+              "z": 1001.367252008654
+            },
+            "centroidalInertiaKgMm2World": [
+              [
+                7543998.82619761,
+                -5372649.461522365,
+                3082188.2344057867
+              ],
+              [
+                -5372649.461522365,
+                130137995.52571133,
+                -496754.6839074306
+              ],
+              [
+                3082188.2344057867,
+                -496754.6839074306,
+                129951371.99572498
+              ]
+            ],
+            "bodyCount": 86
+          },
+          "deltaMassKg": 19.84328807001731,
+          "changesByFamily": [
+            {
+              "family": "beam",
+              "bodyCount": 1,
+              "beforeKg": 72.50238506699993,
+              "afterKg": 72.34521533972654,
+              "deltaKg": -0.1571697272733985
+            },
+            {
+              "family": "beamFootLeft",
+              "bodyCount": 1,
+              "beforeKg": 7.886424,
+              "afterKg": 7.859055651173503,
+              "deltaKg": -0.027368348826496636
+            },
+            {
+              "family": "beamFootRight",
+              "bodyCount": 1,
+              "beforeKg": 7.886424,
+              "afterKg": 7.859055651173503,
+              "deltaKg": -0.027368348826496636
+            },
+            {
+              "family": "blockX",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockX01",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockX10",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockX11",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockYLeft",
+              "bodyCount": 1,
+              "beforeKg": 0.5697216,
+              "afterKg": 0.51,
+              "deltaKg": -0.05972160000000004
+            },
+            {
+              "family": "blockYLeftRear",
+              "bodyCount": 1,
+              "beforeKg": 0.5697216,
+              "afterKg": 0.51,
+              "deltaKg": -0.05972160000000004
+            },
+            {
+              "family": "blockYRight",
+              "bodyCount": 1,
+              "beforeKg": 0.5697216,
+              "afterKg": 0.51,
+              "deltaKg": -0.05972160000000004
+            },
+            {
+              "family": "blockYRightRear",
+              "bodyCount": 1,
+              "beforeKg": 0.5697216,
+              "afterKg": 0.51,
+              "deltaKg": -0.05972160000000004
+            },
+            {
+              "family": "blockZ",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockZ01",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockZ10",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockZ11",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "cableChainX",
+              "bodyCount": 1,
+              "beforeKg": 0.4410127242729428,
+              "afterKg": 0.46540122427294267,
+              "deltaKg": 0.02438849999999987
+            },
+            {
+              "family": "cableChainY",
+              "bodyCount": 1,
+              "beforeKg": 0.7179127242729432,
+              "afterKg": 0.726432724272944,
+              "deltaKg": 0.00852000000000086
+            },
+            {
+              "family": "motorXPlate",
+              "bodyCount": 1,
+              "beforeKg": 0.07219819427353959,
+              "afterKg": 0.0,
+              "deltaKg": -0.07219819427353959
+            },
+            {
+              "family": "motorXSupport",
+              "bodyCount": 1,
+              "beforeKg": 0.9168870410778241,
+              "afterKg": 0.0,
+              "deltaKg": -0.9168870410778241
+            },
+            {
+              "family": "motorYLeftPlate",
+              "bodyCount": 1,
+              "beforeKg": 0.07219819427353959,
+              "afterKg": 0.0,
+              "deltaKg": -0.07219819427353959
+            },
+            {
+              "family": "motorYLeftSupport",
+              "bodyCount": 1,
+              "beforeKg": 0.15791986864219015,
+              "afterKg": 0.0,
+              "deltaKg": -0.15791986864219015
+            },
+            {
+              "family": "motorYRightPlate",
+              "bodyCount": 1,
+              "beforeKg": 0.07219819427353959,
+              "afterKg": 0.0,
+              "deltaKg": -0.07219819427353959
+            },
+            {
+              "family": "motorYRightSupport",
+              "bodyCount": 1,
+              "beforeKg": 0.06378823905081839,
+              "afterKg": 0.0,
+              "deltaKg": -0.06378823905081839
+            },
+            {
+              "family": "pinionX",
+              "bodyCount": 1,
+              "beforeKg": 0.07738928758070747,
+              "afterKg": 0.07764277647102655,
+              "deltaKg": 0.0002534888903190785
+            },
+            {
+              "family": "pinionXAnchor",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 3.2397423534446665,
+              "deltaKg": 3.2397423534446665
+            },
+            {
+              "family": "pinionXLowerStop",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00758481914983205,
+              "deltaKg": 0.00758481914983205
+            },
+            {
+              "family": "pinionXLowerStopNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorBolt0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionXMotorBolt1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionXMotorBolt2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionXMotorBolt3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionXMotorNut0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorNut1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorNut2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorNut3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorRearWasher0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorRearWasher1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorRearWasher2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorRearWasher3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorWasher0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorWasher1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorWasher2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorWasher3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXPivotBush",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.009848633787610084,
+              "deltaKg": 0.009848633787610084
+            },
+            {
+              "family": "pinionXPivotPin",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.025788237049163984,
+              "deltaKg": 0.025788237049163984
+            },
+            {
+              "family": "pinionXPivotThrustFront",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0026137240975280993,
+              "deltaKg": 0.0026137240975280993
+            },
+            {
+              "family": "pinionXPivotThrustRear",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0026137240975280993,
+              "deltaKg": 0.0026137240975280993
+            },
+            {
+              "family": "pinionXPreload",
+              "bodyCount": 1,
+              "beforeKg": 1.6068837148169777,
+              "afterKg": 0.8190439840661577,
+              "deltaKg": -0.7878397307508199
+            },
+            {
+              "family": "pinionXSpringAdjuster",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.03450299830432388,
+              "deltaKg": 0.03450299830432388
+            },
+            {
+              "family": "pinionXSpringAdjusterNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.009440147582696973,
+              "deltaKg": 0.009440147582696973
+            },
+            {
+              "family": "pinionXSpringAdjusterWasher",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0035728351501572463,
+              "deltaKg": 0.0035728351501572463
+            },
+            {
+              "family": "pinionXSpringCup",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00931742384930999,
+              "deltaKg": 0.00931742384930999
+            },
+            {
+              "family": "pinionXSpringPack",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.02841005068494322,
+              "deltaKg": 0.02841005068494322
+            },
+            {
+              "family": "pinionXUpperStop",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00758481914983205,
+              "deltaKg": 0.00758481914983205
+            },
+            {
+              "family": "pinionXUpperStopNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXhost--28-0Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.021167073976512595,
+              "deltaKg": 0.021167073976512595
+            },
+            {
+              "family": "pinionXhost--28-0Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionXhost--28-1Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.021167073976512595,
+              "deltaKg": 0.021167073976512595
+            },
+            {
+              "family": "pinionXhost--28-1Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionXhost-38-0Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.021167073976512595,
+              "deltaKg": 0.021167073976512595
+            },
+            {
+              "family": "pinionXhost-38-0Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionXhost-38-1Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.021167073976512595,
+              "deltaKg": 0.021167073976512595
+            },
+            {
+              "family": "pinionXhost-38-1Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionXringA",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0007280075488016701,
+              "deltaKg": 0.0007280075488016701
+            },
+            {
+              "family": "pinionXringB",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0007280075488016701,
+              "deltaKg": 0.0007280075488016701
+            },
+            {
+              "family": "pinionYLeft",
+              "bodyCount": 1,
+              "beforeKg": 0.07738928758070747,
+              "afterKg": 0.07764277647102655,
+              "deltaKg": 0.0002534888903190785
+            },
+            {
+              "family": "pinionYLeftAnchor",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 1.6810518828694194,
+              "deltaKg": 1.6810518828694194
+            },
+            {
+              "family": "pinionYLeftLowerStop",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00758481914983205,
+              "deltaKg": 0.00758481914983205
+            },
+            {
+              "family": "pinionYLeftLowerStopNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYLeftMotorBolt0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionYLeftMotorBolt1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionYLeftMotorBolt2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionYLeftMotorBolt3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionYLeftMotorNut0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYLeftMotorNut1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYLeftMotorNut2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYLeftMotorNut3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYLeftMotorRearWasher0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYLeftMotorRearWasher1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYLeftMotorRearWasher2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYLeftMotorRearWasher3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYLeftMotorWasher0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYLeftMotorWasher1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYLeftMotorWasher2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYLeftMotorWasher3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYLeftPivotBush",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.009848633787610084,
+              "deltaKg": 0.009848633787610084
+            },
+            {
+              "family": "pinionYLeftPivotPin",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.025788237049163984,
+              "deltaKg": 0.025788237049163984
+            },
+            {
+              "family": "pinionYLeftPivotThrustFront",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0026137240975280993,
+              "deltaKg": 0.0026137240975280993
+            },
+            {
+              "family": "pinionYLeftPivotThrustRear",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0026137240975280993,
+              "deltaKg": 0.0026137240975280993
+            },
+            {
+              "family": "pinionYLeftPreload",
+              "bodyCount": 1,
+              "beforeKg": 1.6068837148169777,
+              "afterKg": 0.8190439840661577,
+              "deltaKg": -0.7878397307508199
+            },
+            {
+              "family": "pinionYLeftSpringAdjuster",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.03450299830432388,
+              "deltaKg": 0.03450299830432388
+            },
+            {
+              "family": "pinionYLeftSpringAdjusterNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.009440147582696973,
+              "deltaKg": 0.009440147582696973
+            },
+            {
+              "family": "pinionYLeftSpringAdjusterWasher",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0035728351501572463,
+              "deltaKg": 0.0035728351501572463
+            },
+            {
+              "family": "pinionYLeftSpringCup",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00931742384930999,
+              "deltaKg": 0.00931742384930999
+            },
+            {
+              "family": "pinionYLeftSpringPack",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.02841005068494322,
+              "deltaKg": 0.02841005068494322
+            },
+            {
+              "family": "pinionYLeftUpperStop",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00758481914983205,
+              "deltaKg": 0.00758481914983205
+            },
+            {
+              "family": "pinionYLeftUpperStopNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYLefthost--6-0Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.017221233603603812,
+              "deltaKg": 0.017221233603603812
+            },
+            {
+              "family": "pinionYLefthost--6-0Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionYLefthost--6-1Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.017221233603603812,
+              "deltaKg": 0.017221233603603812
+            },
+            {
+              "family": "pinionYLefthost--6-1Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionYLefthost-16-0Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.017221233603603812,
+              "deltaKg": 0.017221233603603812
+            },
+            {
+              "family": "pinionYLefthost-16-0Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionYLefthost-16-1Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.017221233603603812,
+              "deltaKg": 0.017221233603603812
+            },
+            {
+              "family": "pinionYLefthost-16-1Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionYLeftringA",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0007280075488016701,
+              "deltaKg": 0.0007280075488016701
+            },
+            {
+              "family": "pinionYLeftringB",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0007280075488016701,
+              "deltaKg": 0.0007280075488016701
+            },
+            {
+              "family": "pinionYRight",
+              "bodyCount": 1,
+              "beforeKg": 0.07738928758070747,
+              "afterKg": 0.07764277647102655,
+              "deltaKg": 0.0002534888903190785
+            },
+            {
+              "family": "pinionYRightAnchor",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 1.6810518828694194,
+              "deltaKg": 1.6810518828694194
+            },
+            {
+              "family": "pinionYRightLowerStop",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00758481914983205,
+              "deltaKg": 0.00758481914983205
+            },
+            {
+              "family": "pinionYRightLowerStopNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYRightMotorBolt0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionYRightMotorBolt1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionYRightMotorBolt2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionYRightMotorBolt3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionYRightMotorNut0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYRightMotorNut1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYRightMotorNut2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYRightMotorNut3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYRightMotorRearWasher0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYRightMotorRearWasher1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYRightMotorRearWasher2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYRightMotorRearWasher3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYRightMotorWasher0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYRightMotorWasher1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYRightMotorWasher2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYRightMotorWasher3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYRightPivotBush",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.009848633787610084,
+              "deltaKg": 0.009848633787610084
+            },
+            {
+              "family": "pinionYRightPivotPin",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.025788237049163984,
+              "deltaKg": 0.025788237049163984
+            },
+            {
+              "family": "pinionYRightPivotThrustFront",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0026137240975280993,
+              "deltaKg": 0.0026137240975280993
+            },
+            {
+              "family": "pinionYRightPivotThrustRear",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0026137240975280993,
+              "deltaKg": 0.0026137240975280993
+            },
+            {
+              "family": "pinionYRightPreload",
+              "bodyCount": 1,
+              "beforeKg": 1.6068837148169777,
+              "afterKg": 0.8190439840661577,
+              "deltaKg": -0.7878397307508199
+            },
+            {
+              "family": "pinionYRightSpringAdjuster",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.03450299830432388,
+              "deltaKg": 0.03450299830432388
+            },
+            {
+              "family": "pinionYRightSpringAdjusterNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.009440147582696973,
+              "deltaKg": 0.009440147582696973
+            },
+            {
+              "family": "pinionYRightSpringAdjusterWasher",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0035728351501572463,
+              "deltaKg": 0.0035728351501572463
+            },
+            {
+              "family": "pinionYRightSpringCup",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00931742384930999,
+              "deltaKg": 0.00931742384930999
+            },
+            {
+              "family": "pinionYRightSpringPack",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.02841005068494322,
+              "deltaKg": 0.02841005068494322
+            },
+            {
+              "family": "pinionYRightUpperStop",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00758481914983205,
+              "deltaKg": 0.00758481914983205
+            },
+            {
+              "family": "pinionYRightUpperStopNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYRighthost--6-0Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.017221233603603812,
+              "deltaKg": 0.017221233603603812
+            },
+            {
+              "family": "pinionYRighthost--6-0Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionYRighthost--6-1Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.017221233603603812,
+              "deltaKg": 0.017221233603603812
+            },
+            {
+              "family": "pinionYRighthost--6-1Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionYRighthost-16-0Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.017221233603603812,
+              "deltaKg": 0.017221233603603812
+            },
+            {
+              "family": "pinionYRighthost-16-0Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionYRighthost-16-1Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.017221233603603812,
+              "deltaKg": 0.017221233603603812
+            },
+            {
+              "family": "pinionYRighthost-16-1Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionYRightringA",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0007280075488016701,
+              "deltaKg": 0.0007280075488016701
+            },
+            {
+              "family": "pinionYRightringB",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0007280075488016701,
+              "deltaKg": 0.0007280075488016701
+            },
+            {
+              "family": "rackMountXSection#Cleat#",
+              "bodyCount": 20,
+              "beforeKg": 0.0,
+              "afterKg": 5.355075204700466,
+              "deltaKg": 5.355075204700466
+            },
+            {
+              "family": "rackMountXSection#Cleat#BaseBolt#",
+              "bodyCount": 40,
+              "beforeKg": 0.0,
+              "afterKg": 0.3939183408962982,
+              "deltaKg": 0.3939183408962982
+            },
+            {
+              "family": "rackMountXSection#Cleat#BaseBolt#HeadWasher",
+              "bodyCount": 40,
+              "beforeKg": 0.0,
+              "afterKg": 0.04065793920245206,
+              "deltaKg": 0.04065793920245206
+            },
+            {
+              "family": "rackMountXSection#Cleat#BaseBolt#Nut",
+              "bodyCount": 40,
+              "beforeKg": 0.0,
+              "afterKg": 0.0952382955668905,
+              "deltaKg": 0.0952382955668905
+            },
+            {
+              "family": "rackMountXSection#Cleat#BaseBolt#Washer",
+              "bodyCount": 40,
+              "beforeKg": 0.0,
+              "afterKg": 0.04065793920245206,
+              "deltaKg": 0.04065793920245206
+            },
+            {
+              "family": "rackMountXSection#Cleat#NutCassette",
+              "bodyCount": 20,
+              "beforeKg": 0.0,
+              "afterKg": 1.3113326094347189,
+              "deltaKg": 1.3113326094347189
+            },
+            {
+              "family": "rackMountXSection#Cleat#NutCassetteCover",
+              "bodyCount": 20,
+              "beforeKg": 0.0,
+              "afterKg": 0.29794598837708064,
+              "deltaKg": 0.29794598837708064
+            },
+            {
+              "family": "rackMountXSection#Cleat#NutCassettecover-backBolt",
+              "bodyCount": 20,
+              "beforeKg": 0.0,
+              "afterKg": 0.01674403865612704,
+              "deltaKg": 0.01674403865612704
+            },
+            {
+              "family": "rackMountXSection#Cleat#NutCassettecover-frontBolt",
+              "bodyCount": 20,
+              "beforeKg": 0.0,
+              "afterKg": 0.01674403865612704,
+              "deltaKg": 0.01674403865612704
+            },
+            {
+              "family": "rackMountXSection#Cleat#Replication",
+              "bodyCount": 20,
+              "beforeKg": 0.0,
+              "afterKg": 0.24819496012869316,
+              "deltaKg": 0.24819496012869316
+            },
+            {
+              "family": "rackMountXSection#Cleat#WebBolt#",
+              "bodyCount": 40,
+              "beforeKg": 0.0,
+              "afterKg": 0.3051369325058509,
+              "deltaKg": 0.3051369325058509
+            },
+            {
+              "family": "rackMountXSection#Cleat#WebWasher#",
+              "bodyCount": 40,
+              "beforeKg": 0.0,
+              "afterKg": 0.04065793920245206,
+              "deltaKg": 0.04065793920245206
+            },
+            {
+              "family": "rackMountXSection#LocatingPin#",
+              "bodyCount": 8,
+              "beforeKg": 0.0,
+              "afterKg": 0.053268845034268535,
+              "deltaKg": 0.053268845034268535
+            },
+            {
+              "family": "rackMountXSection#Push#",
+              "bodyCount": 16,
+              "beforeKg": 0.0,
+              "afterKg": 0.01806985146423954,
+              "deltaKg": 0.01806985146423954
+            },
+            {
+              "family": "rackMountXSection#RackBolt#",
+              "bodyCount": 16,
+              "beforeKg": 0.0,
+              "afterKg": 0.13981105468042987,
+              "deltaKg": 0.13981105468042987
+            },
+            {
+              "family": "rackMountXSection#Receiver",
+              "bodyCount": 4,
+              "beforeKg": 0.0,
+              "afterKg": 10.58374110394527,
+              "deltaKg": 10.58374110394527
+            },
+            {
+              "family": "rackMountXSection#Spacer#",
+              "bodyCount": 16,
+              "beforeKg": 0.0,
+              "afterKg": 0.016263175680980825,
+              "deltaKg": 0.016263175680980825
+            },
+            {
+              "family": "rackMountXSection#Spacer#Inner",
+              "bodyCount": 16,
+              "beforeKg": 0.0,
+              "afterKg": 0.016263175680980825,
+              "deltaKg": 0.016263175680980825
+            },
+            {
+              "family": "rackX",
+              "bodyCount": 1,
+              "beforeKg": 4.432438680357503,
+              "afterKg": 5.196710648819134,
+              "deltaKg": 0.7642719684616308
+            },
+            {
+              "family": "railX",
+              "bodyCount": 1,
+              "beforeKg": 5.857670000000001,
+              "afterKg": 4.711720000000001,
+              "deltaKg": -1.14595
+            },
+            {
+              "family": "railXLower",
+              "bodyCount": 1,
+              "beforeKg": 5.857670000000001,
+              "afterKg": 4.711720000000001,
+              "deltaKg": -1.14595
+            },
+            {
+              "family": "railZ",
+              "bodyCount": 1,
+              "beforeKg": 1.5317312500000002,
+              "afterKg": 1.232075,
+              "deltaKg": -0.2996562500000002
+            },
+            {
+              "family": "railZRight",
+              "bodyCount": 1,
+              "beforeKg": 1.5317312500000002,
+              "afterKg": 1.232075,
+              "deltaKg": -0.2996562500000002
+            },
+            {
+              "family": "screwZ",
+              "bodyCount": 1,
+              "beforeKg": 0.6155510981737696,
+              "afterKg": 0.5609916180765273,
+              "deltaKg": -0.05455948009724232
+            },
+            {
+              "family": "screwZCoupling",
+              "bodyCount": 1,
+              "beforeKg": 0.09430966290965079,
+              "afterKg": 0.058951676550237364,
+              "deltaKg": -0.035357986359413424
+            },
+            {
+              "family": "screwZFixed",
+              "bodyCount": 1,
+              "beforeKg": 0.45082737169259635,
+              "afterKg": 0.41,
+              "deltaKg": -0.04082737169259637
+            },
+            {
+              "family": "screwZFixedBracket",
+              "bodyCount": 1,
+              "beforeKg": 0.07776000000000001,
+              "afterKg": 0.08067600000000001,
+              "deltaKg": 0.002916000000000002
+            },
+            {
+              "family": "switchTriggerYLeft",
+              "bodyCount": 1,
+              "beforeKg": 0.34854,
+              "afterKg": 0.3533442,
+              "deltaKg": 0.004804199999999981
+            },
+            {
+              "family": "switchTriggerYRight",
+              "bodyCount": 1,
+              "beforeKg": 0.34854,
+              "afterKg": 0.3533442,
+              "deltaKg": 0.004804199999999981
+            },
+            {
+              "family": "switchXhomeMount",
+              "bodyCount": 1,
+              "beforeKg": 0.6482433228786054,
+              "afterKg": 0.665039482878606,
+              "deltaKg": 0.016796160000000615
+            },
+            {
+              "family": "switchXnegativeLimitMount",
+              "bodyCount": 1,
+              "beforeKg": 0.6482433228786054,
+              "afterKg": 0.665039482878606,
+              "deltaKg": 0.016796160000000615
+            },
+            {
+              "family": "switchXpositiveLimitMount",
+              "bodyCount": 1,
+              "beforeKg": 0.6482433228786054,
+              "afterKg": 0.665039482878606,
+              "deltaKg": 0.016796160000000615
+            },
+            {
+              "family": "xCarriage",
+              "bodyCount": 1,
+              "beforeKg": 20.057557499999998,
+              "afterKg": 20.04539863165192,
+              "deltaKg": -0.012158868348077334
+            }
+          ]
+        },
+        {
+          "axis": "z",
+          "built": {
+            "massKg": 30.62321175798294,
+            "centreOfMassMm": {
+              "x": -3.245328081663393,
+              "y": 1085.0440339661502,
+              "z": 961.0805281066197
+            },
+            "centroidalInertiaKgMm2World": [
+              [
+                812474.9755212244,
+                -4009.7646932401976,
+                -5995.620693830828
+              ],
+              [
+                -4009.7646932401976,
+                885174.4151236439,
+                -79303.11477446106
+              ],
+              [
+                -5995.620693830828,
+                -79303.11477446106,
+                235888.50187966152
+              ]
+            ],
+            "bodyCount": 18
+          },
+          "frozen": {
+            "massKg": 31.22252425798294,
+            "centreOfMassMm": {
+              "x": -3.1830344096376733,
+              "y": 1086.4588108882106,
+              "z": 962.6337673834441
+            },
+            "centroidalInertiaKgMm2World": [
+              [
+                835055.0371889882,
+                -4150.368575458568,
+                -6149.985292892524
+              ],
+              [
+                -4150.368575458568,
+                909426.4691061872,
+                -82808.95196841208
+              ],
+              [
+                -6149.985292892524,
+                -82808.95196841208,
+                243977.7080169566
+              ]
+            ],
+            "bodyCount": 18
+          },
+          "deltaMassKg": -0.5993124999999999,
+          "changesByFamily": [
+            {
+              "family": "railZ",
+              "bodyCount": 1,
+              "beforeKg": 1.5317312500000002,
+              "afterKg": 1.232075,
+              "deltaKg": -0.2996562500000002
+            },
+            {
+              "family": "railZRight",
+              "bodyCount": 1,
+              "beforeKg": 1.5317312500000002,
+              "afterKg": 1.232075,
+              "deltaKg": -0.2996562500000002
+            }
+          ]
+        }
+      ],
+      "excludedFromCarriedBodies": [
+        "brakeResistor",
+        "cabinet",
+        "emergencyStop",
+        "mainBreaker",
+        "mainContactor",
+        "safetyRelay",
+        "vacuumBlower",
+        "vfd"
+      ],
+      "assumptions": [
+        "Whole cable-chain moving mass remains a conservative upper bound",
+        "Carried tensors retain each component distribution assumption",
+        "Do not add stock-beam density to aggregate weldment mass in a structural model"
+      ],
+      "detailReport": "build/router-mount-implementation/mass-2600.json"
+    },
+    {
+      "status": "CAD mass/inertia audit; no dynamic acceptance",
+      "bedMm": 3150,
+      "inputs": [
+        {
+          "path": "build/router-mount-implementation/model-3150/mount-input.json",
+          "sha256": "8bbd53528c368ad5b2cb8670c7104376252845d36a083d464cbca60b2301622c"
+        },
+        {
+          "path": "build/router-mount-implementation/frozen-inputs/3150/manifest.json",
+          "sha256": "eb1a8771a39b174fec586b53c021fcb56f3169d546f8378df4a10dd1eb5565de"
+        }
+      ],
+      "poseMm": {
+        "x": 0,
+        "y": 1575,
+        "z": 200
+      },
+      "carriedBodiesChecked": 2464,
+      "independentFloorParts": [
+        {
+          "id": "vacuumBlower",
+          "parentId": "base",
+          "massKg": 169.64600329384885,
+          "centreOfMassMm": {
+            "x": 2325.25,
+            "y": 1411.375,
+            "z": 250
+          },
+          "poseMm": {
+            "qw": 1,
+            "qx": 0,
+            "qy": 0,
+            "qz": 0,
+            "x": 2325.25,
+            "y": 1411.375,
+            "z": 0
+          },
+          "materialId": "aluminium",
+          "centroidalInertiaKgMm2World": {
+            "xx": 5230751.768227031,
+            "xy": 1.3533185882941574e-10,
+            "xz": 2.0020008087158202e-10,
+            "yy": 5230751.768227,
+            "yz": -1.234337129381591e-12,
+            "zz": 3392920.065876996
+          },
+          "inertiaSource": "component tensor",
+          "representation": "independent-floor-mass",
+          "massSource": "Modelled"
+        },
+        {
+          "id": "vfd",
+          "parentId": "base",
+          "massKg": 6.3180000000000005,
+          "centreOfMassMm": {
+            "x": 2445.25,
+            "y": -249.25,
+            "z": 350
+          },
+          "poseMm": {
+            "qw": 1,
+            "qx": 0,
+            "qy": 0,
+            "qz": 0,
+            "x": 2445.25,
+            "y": -249.25,
+            "z": 200
+          },
+          "materialId": "device-housing-dark",
+          "centroidalInertiaKgMm2World": {
+            "xx": 64443.600000000006,
+            "xy": 1.149237505160272e-13,
+            "xz": 9.576979209668935e-14,
+            "yy": 64443.600000000006,
+            "yz": -2.130866050720215e-13,
+            "zz": 34117.200000000004
+          },
+          "inertiaSource": "component tensor",
+          "representation": "independent-floor-mass",
+          "massSource": "EffectiveDensity(650)"
+        },
+        {
+          "id": "brakeResistor",
+          "parentId": "base",
+          "massKg": 2.592,
+          "centreOfMassMm": {
+            "x": 3025.25,
+            "y": -249.25,
+            "z": 1080
+          },
+          "poseMm": {
+            "qw": 1,
+            "qx": 0,
+            "qy": 0,
+            "qz": 0,
+            "x": 3025.25,
+            "y": -249.25,
+            "z": 1050
+          },
+          "materialId": "aluminium",
+          "centroidalInertiaKgMm2World": {
+            "xx": 20217.600000000002,
+            "xy": -2.2100721253082155e-14,
+            "xz": 9.822542779147625e-16,
+            "yy": 2160,
+            "yz": 2.0116567611694328e-13,
+            "zz": 20822.4
+          },
+          "inertiaSource": "component tensor",
+          "representation": "independent-floor-mass",
+          "massSource": "EffectiveDensity(1800)"
+        },
+        {
+          "id": "mainBreaker",
+          "parentId": "base",
+          "massKg": 0.4374,
+          "centreOfMassMm": {
+            "x": 2625.25,
+            "y": -249.25,
+            "z": 645
+          },
+          "poseMm": {
+            "qw": 1,
+            "qx": 0,
+            "qy": 0,
+            "qz": 0,
+            "x": 2625.25,
+            "y": -249.25,
+            "z": 600
+          },
+          "materialId": "device-housing",
+          "centroidalInertiaKgMm2World": {
+            "xx": 500.27625000000006,
+            "xy": 5.1798565436911344e-17,
+            "xz": -6.008633590681716e-16,
+            "yy": 401.5332000000001,
+            "yz": -5.308538675308228e-15,
+            "zz": 311.31945
+          },
+          "inertiaSource": "component tensor",
+          "representation": "independent-floor-mass",
+          "massSource": "EffectiveDensity(1200)"
+        },
+        {
+          "id": "mainContactor",
+          "parentId": "base",
+          "massKg": 0.4752,
+          "centreOfMassMm": {
+            "x": 2705.25,
+            "y": -249.25,
+            "z": 645
+          },
+          "poseMm": {
+            "qw": 1,
+            "qx": 0,
+            "qy": 0,
+            "qz": 0,
+            "x": 2705.25,
+            "y": -249.25,
+            "z": 600
+          },
+          "materialId": "device-housing",
+          "centroidalInertiaKgMm2World": {
+            "xx": 574.2,
+            "xy": -2.626165951369331e-16,
+            "xz": 2.1103119252074964e-16,
+            "yy": 440.55000000000007,
+            "yz": 0,
+            "zz": 373.23000000000013
+          },
+          "inertiaSource": "component tensor",
+          "representation": "independent-floor-mass",
+          "massSource": "EffectiveDensity(1200)"
+        },
+        {
+          "id": "safetyRelay",
+          "parentId": "base",
+          "massKg": 0.378,
+          "centreOfMassMm": {
+            "x": 2805.25,
+            "y": -249.25,
+            "z": 650
+          },
+          "poseMm": {
+            "qw": 1,
+            "qx": 0,
+            "qy": 0,
+            "qz": 0,
+            "x": 2805.25,
+            "y": -249.25,
+            "z": 600
+          },
+          "materialId": "device-housing",
+          "centroidalInertiaKgMm2World": {
+            "xx": 768.6000000000001,
+            "xy": -7.788969469402219e-16,
+            "xz": -4.0287773117597686e-16,
+            "yy": 378.7875,
+            "yz": 0,
+            "zz": 517.3875
+          },
+          "inertiaSource": "component tensor",
+          "representation": "independent-floor-mass",
+          "massSource": "EffectiveDensity(700)"
+        },
+        {
+          "id": "emergencyStop",
+          "parentId": "base",
+          "massKg": 0.052399999999999995,
+          "centreOfMassMm": {
+            "x": 2625.25,
+            "y": -49.25,
+            "z": 894
+          },
+          "poseMm": {
+            "qw": 1,
+            "qx": 0,
+            "qy": 0,
+            "qz": 0,
+            "x": 2625.25,
+            "y": -49.25,
+            "z": 900
+          },
+          "materialId": "abs-red",
+          "centroidalInertiaKgMm2World": null,
+          "inertiaSource": "not declared; excluded from frame model",
+          "representation": "independent-floor-mass",
+          "massSource": "Declared"
+        },
+        {
+          "id": "cabinet",
+          "parentId": "base",
+          "massKg": 35.89359119999994,
+          "centreOfMassMm": {
+            "x": 2625.25,
+            "y": -327.1554708741425,
+            "z": 499.99999999999915
+          },
+          "poseMm": {
+            "qw": 1,
+            "qx": 0,
+            "qy": 0,
+            "qz": 0,
+            "x": 2625.25,
+            "y": -249.25,
+            "z": 0
+          },
+          "materialId": "machined-steel",
+          "centroidalInertiaKgMm2World": {
+            "xx": 4329398.481864891,
+            "xy": -5.2263527006712e-10,
+            "xz": -2.6045017875731167e-10,
+            "yy": 6902209.093088184,
+            "yz": 1.9165039062500003e-09,
+            "zz": 3215313.2962198406
+          },
+          "inertiaSource": "component tensor",
+          "representation": "independent-floor-mass",
+          "massSource": "Computed(Preview)"
+        }
+      ],
+      "componentLedgerMassKg": 2444.6015393631037,
+      "independentFloorMassKg": 215.7925944938488,
+      "deltaComponentLedgerKg": 80.62251164630607,
+      "axes": [
+        {
+          "axis": "x",
+          "built": {
+            "massKg": 68.5913441349915,
+            "centreOfMassMm": {
+              "x": 5.411995608322962,
+              "y": 1448.5463306307192,
+              "z": 1057.00822556827
+            },
+            "centroidalInertiaKgMm2World": [
+              [
+                3192565.976192549,
+                66857.76983850484,
+                -151122.53406835944
+              ],
+              [
+                66857.76983850484,
+                2831685.815095587,
+                -616020.31037455
+              ],
+              [
+                -151122.53406835944,
+                -616020.31037455,
+                1946722.5845123783
+              ]
+            ],
+            "bodyCount": 89
+          },
+          "frozen": {
+            "massKg": 67.81906783827725,
+            "centreOfMassMm": {
+              "x": 5.116264882753451,
+              "y": 1441.2503541470437,
+              "z": 1052.9726720856086
+            },
+            "centroidalInertiaKgMm2World": [
+              [
+                2982663.0272423113,
+                86893.5925676631,
+                -35554.79096203663
+              ],
+              [
+                86893.5925676631,
+                2705005.2864211174,
+                -553512.3454685889
+              ],
+              [
+                -35554.79096203663,
+                -553512.3454685889,
+                1641345.6019566422
+              ]
+            ],
+            "bodyCount": 51
+          },
+          "deltaMassKg": 0.7722762967142529,
+          "changesByFamily": [
+            {
+              "family": "blockX",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockX01",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockX10",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockX11",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockZ",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockZ01",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockZ10",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockZ11",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "cableChainX",
+              "bodyCount": 1,
+              "beforeKg": 0.4410127242729428,
+              "afterKg": 0.46540122427294267,
+              "deltaKg": 0.02438849999999987
+            },
+            {
+              "family": "motorXPlate",
+              "bodyCount": 1,
+              "beforeKg": 0.07219819427353959,
+              "afterKg": 0.0,
+              "deltaKg": -0.07219819427353959
+            },
+            {
+              "family": "motorXSupport",
+              "bodyCount": 1,
+              "beforeKg": 0.9168870410778241,
+              "afterKg": 0.0,
+              "deltaKg": -0.9168870410778241
+            },
+            {
+              "family": "pinionX",
+              "bodyCount": 1,
+              "beforeKg": 0.07738928758070747,
+              "afterKg": 0.07764277647102655,
+              "deltaKg": 0.0002534888903190785
+            },
+            {
+              "family": "pinionXAnchor",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 3.2397423534446665,
+              "deltaKg": 3.2397423534446665
+            },
+            {
+              "family": "pinionXLowerStop",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00758481914983205,
+              "deltaKg": 0.00758481914983205
+            },
+            {
+              "family": "pinionXLowerStopNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorBolt0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionXMotorBolt1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionXMotorBolt2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionXMotorBolt3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionXMotorNut0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorNut1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorNut2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorNut3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorRearWasher0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorRearWasher1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorRearWasher2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorRearWasher3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorWasher0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorWasher1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorWasher2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorWasher3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXPivotBush",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.009848633787610084,
+              "deltaKg": 0.009848633787610084
+            },
+            {
+              "family": "pinionXPivotPin",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.025788237049163984,
+              "deltaKg": 0.025788237049163984
+            },
+            {
+              "family": "pinionXPivotThrustFront",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0026137240975280993,
+              "deltaKg": 0.0026137240975280993
+            },
+            {
+              "family": "pinionXPivotThrustRear",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0026137240975280993,
+              "deltaKg": 0.0026137240975280993
+            },
+            {
+              "family": "pinionXPreload",
+              "bodyCount": 1,
+              "beforeKg": 1.6068837148169777,
+              "afterKg": 0.8190439840661577,
+              "deltaKg": -0.7878397307508199
+            },
+            {
+              "family": "pinionXSpringAdjuster",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.03450299830432388,
+              "deltaKg": 0.03450299830432388
+            },
+            {
+              "family": "pinionXSpringAdjusterNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.009440147582696973,
+              "deltaKg": 0.009440147582696973
+            },
+            {
+              "family": "pinionXSpringAdjusterWasher",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0035728351501572463,
+              "deltaKg": 0.0035728351501572463
+            },
+            {
+              "family": "pinionXSpringCup",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00931742384930999,
+              "deltaKg": 0.00931742384930999
+            },
+            {
+              "family": "pinionXSpringPack",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.02841005068494322,
+              "deltaKg": 0.02841005068494322
+            },
+            {
+              "family": "pinionXUpperStop",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00758481914983205,
+              "deltaKg": 0.00758481914983205
+            },
+            {
+              "family": "pinionXUpperStopNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXhost--28-0Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.021167073976512595,
+              "deltaKg": 0.021167073976512595
+            },
+            {
+              "family": "pinionXhost--28-0Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionXhost--28-1Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.021167073976512595,
+              "deltaKg": 0.021167073976512595
+            },
+            {
+              "family": "pinionXhost--28-1Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionXhost-38-0Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.021167073976512595,
+              "deltaKg": 0.021167073976512595
+            },
+            {
+              "family": "pinionXhost-38-0Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionXhost-38-1Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.021167073976512595,
+              "deltaKg": 0.021167073976512595
+            },
+            {
+              "family": "pinionXhost-38-1Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionXringA",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0007280075488016701,
+              "deltaKg": 0.0007280075488016701
+            },
+            {
+              "family": "pinionXringB",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0007280075488016701,
+              "deltaKg": 0.0007280075488016701
+            },
+            {
+              "family": "railZ",
+              "bodyCount": 1,
+              "beforeKg": 1.5317312500000002,
+              "afterKg": 1.232075,
+              "deltaKg": -0.2996562500000002
+            },
+            {
+              "family": "railZRight",
+              "bodyCount": 1,
+              "beforeKg": 1.5317312500000002,
+              "afterKg": 1.232075,
+              "deltaKg": -0.2996562500000002
+            },
+            {
+              "family": "screwZ",
+              "bodyCount": 1,
+              "beforeKg": 0.6155510981737696,
+              "afterKg": 0.5609916180765273,
+              "deltaKg": -0.05455948009724232
+            },
+            {
+              "family": "screwZCoupling",
+              "bodyCount": 1,
+              "beforeKg": 0.09430966290965079,
+              "afterKg": 0.058951676550237364,
+              "deltaKg": -0.035357986359413424
+            },
+            {
+              "family": "screwZFixed",
+              "bodyCount": 1,
+              "beforeKg": 0.45082737169259635,
+              "afterKg": 0.41,
+              "deltaKg": -0.04082737169259637
+            },
+            {
+              "family": "screwZFixedBracket",
+              "bodyCount": 1,
+              "beforeKg": 0.07776000000000001,
+              "afterKg": 0.08067600000000001,
+              "deltaKg": 0.002916000000000002
+            },
+            {
+              "family": "xCarriage",
+              "bodyCount": 1,
+              "beforeKg": 20.057557499999998,
+              "afterKg": 20.04539863165192,
+              "deltaKg": -0.012158868348077334
+            }
+          ]
+        },
+        {
+          "axis": "y",
+          "built": {
+            "massKg": 216.49326398964274,
+            "centreOfMassMm": {
+              "x": 530.8886019056552,
+              "y": 1552.803950015193,
+              "z": 1011.0755271973554
+            },
+            "centroidalInertiaKgMm2World": [
+              [
+                8104167.236617658,
+                -5342967.36816423,
+                2752451.407730464
+              ],
+              [
+                -5342967.36816423,
+                142599520.82611057,
+                -760427.5630611727
+              ],
+              [
+                2752451.407730464,
+                -760427.5630611727,
+                142560372.81939214
+              ]
+            ],
+            "bodyCount": 636
+          },
+          "frozen": {
+            "massKg": 196.64997591962543,
+            "centreOfMassMm": {
+              "x": 506.2782947867955,
+              "y": 1537.9221899919823,
+              "z": 1001.4450736628679
+            },
+            "centroidalInertiaKgMm2World": [
+              [
+                7776641.620194421,
+                -5546907.030074343,
+                3098433.4668710907
+              ],
+              [
+                -5546907.030074343,
+                130272131.32035513,
+                -475323.1458714516
+              ],
+              [
+                3098433.4668710907,
+                -475323.1458714516,
+                130314120.49319865
+              ]
+            ],
+            "bodyCount": 86
+          },
+          "deltaMassKg": 19.84328807001731,
+          "changesByFamily": [
+            {
+              "family": "beam",
+              "bodyCount": 1,
+              "beforeKg": 72.50238506699993,
+              "afterKg": 72.34521533972654,
+              "deltaKg": -0.1571697272733985
+            },
+            {
+              "family": "beamFootLeft",
+              "bodyCount": 1,
+              "beforeKg": 7.886424,
+              "afterKg": 7.859055651173503,
+              "deltaKg": -0.027368348826496636
+            },
+            {
+              "family": "beamFootRight",
+              "bodyCount": 1,
+              "beforeKg": 7.886424,
+              "afterKg": 7.859055651173503,
+              "deltaKg": -0.027368348826496636
+            },
+            {
+              "family": "blockX",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockX01",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockX10",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockX11",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockYLeft",
+              "bodyCount": 1,
+              "beforeKg": 0.5697216,
+              "afterKg": 0.51,
+              "deltaKg": -0.05972160000000004
+            },
+            {
+              "family": "blockYLeftRear",
+              "bodyCount": 1,
+              "beforeKg": 0.5697216,
+              "afterKg": 0.51,
+              "deltaKg": -0.05972160000000004
+            },
+            {
+              "family": "blockYRight",
+              "bodyCount": 1,
+              "beforeKg": 0.5697216,
+              "afterKg": 0.51,
+              "deltaKg": -0.05972160000000004
+            },
+            {
+              "family": "blockYRightRear",
+              "bodyCount": 1,
+              "beforeKg": 0.5697216,
+              "afterKg": 0.51,
+              "deltaKg": -0.05972160000000004
+            },
+            {
+              "family": "blockZ",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockZ01",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockZ10",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "blockZ11",
+              "bodyCount": 1,
+              "beforeKg": 0.33460625,
+              "afterKg": 0.3,
+              "deltaKg": -0.034606250000000005
+            },
+            {
+              "family": "cableChainX",
+              "bodyCount": 1,
+              "beforeKg": 0.4410127242729428,
+              "afterKg": 0.46540122427294267,
+              "deltaKg": 0.02438849999999987
+            },
+            {
+              "family": "cableChainY",
+              "bodyCount": 1,
+              "beforeKg": 0.835062724272944,
+              "afterKg": 0.8435827242729435,
+              "deltaKg": 0.008519999999999417
+            },
+            {
+              "family": "motorXPlate",
+              "bodyCount": 1,
+              "beforeKg": 0.07219819427353959,
+              "afterKg": 0.0,
+              "deltaKg": -0.07219819427353959
+            },
+            {
+              "family": "motorXSupport",
+              "bodyCount": 1,
+              "beforeKg": 0.9168870410778241,
+              "afterKg": 0.0,
+              "deltaKg": -0.9168870410778241
+            },
+            {
+              "family": "motorYLeftPlate",
+              "bodyCount": 1,
+              "beforeKg": 0.07219819427353959,
+              "afterKg": 0.0,
+              "deltaKg": -0.07219819427353959
+            },
+            {
+              "family": "motorYLeftSupport",
+              "bodyCount": 1,
+              "beforeKg": 0.15791986864219015,
+              "afterKg": 0.0,
+              "deltaKg": -0.15791986864219015
+            },
+            {
+              "family": "motorYRightPlate",
+              "bodyCount": 1,
+              "beforeKg": 0.07219819427353959,
+              "afterKg": 0.0,
+              "deltaKg": -0.07219819427353959
+            },
+            {
+              "family": "motorYRightSupport",
+              "bodyCount": 1,
+              "beforeKg": 0.06378823905081839,
+              "afterKg": 0.0,
+              "deltaKg": -0.06378823905081839
+            },
+            {
+              "family": "pinionX",
+              "bodyCount": 1,
+              "beforeKg": 0.07738928758070747,
+              "afterKg": 0.07764277647102655,
+              "deltaKg": 0.0002534888903190785
+            },
+            {
+              "family": "pinionXAnchor",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 3.2397423534446665,
+              "deltaKg": 3.2397423534446665
+            },
+            {
+              "family": "pinionXLowerStop",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00758481914983205,
+              "deltaKg": 0.00758481914983205
+            },
+            {
+              "family": "pinionXLowerStopNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorBolt0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionXMotorBolt1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionXMotorBolt2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionXMotorBolt3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionXMotorNut0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorNut1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorNut2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorNut3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXMotorRearWasher0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorRearWasher1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorRearWasher2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorRearWasher3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorWasher0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorWasher1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorWasher2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXMotorWasher3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionXPivotBush",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.009848633787610084,
+              "deltaKg": 0.009848633787610084
+            },
+            {
+              "family": "pinionXPivotPin",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.025788237049163984,
+              "deltaKg": 0.025788237049163984
+            },
+            {
+              "family": "pinionXPivotThrustFront",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0026137240975280993,
+              "deltaKg": 0.0026137240975280993
+            },
+            {
+              "family": "pinionXPivotThrustRear",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0026137240975280993,
+              "deltaKg": 0.0026137240975280993
+            },
+            {
+              "family": "pinionXPreload",
+              "bodyCount": 1,
+              "beforeKg": 1.6068837148169777,
+              "afterKg": 0.8190439840661577,
+              "deltaKg": -0.7878397307508199
+            },
+            {
+              "family": "pinionXSpringAdjuster",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.03450299830432388,
+              "deltaKg": 0.03450299830432388
+            },
+            {
+              "family": "pinionXSpringAdjusterNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.009440147582696973,
+              "deltaKg": 0.009440147582696973
+            },
+            {
+              "family": "pinionXSpringAdjusterWasher",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0035728351501572463,
+              "deltaKg": 0.0035728351501572463
+            },
+            {
+              "family": "pinionXSpringCup",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00931742384930999,
+              "deltaKg": 0.00931742384930999
+            },
+            {
+              "family": "pinionXSpringPack",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.02841005068494322,
+              "deltaKg": 0.02841005068494322
+            },
+            {
+              "family": "pinionXUpperStop",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00758481914983205,
+              "deltaKg": 0.00758481914983205
+            },
+            {
+              "family": "pinionXUpperStopNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionXhost--28-0Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.021167073976512595,
+              "deltaKg": 0.021167073976512595
+            },
+            {
+              "family": "pinionXhost--28-0Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionXhost--28-1Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.021167073976512595,
+              "deltaKg": 0.021167073976512595
+            },
+            {
+              "family": "pinionXhost--28-1Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionXhost-38-0Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.021167073976512595,
+              "deltaKg": 0.021167073976512595
+            },
+            {
+              "family": "pinionXhost-38-0Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionXhost-38-1Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.021167073976512595,
+              "deltaKg": 0.021167073976512595
+            },
+            {
+              "family": "pinionXhost-38-1Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionXringA",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0007280075488016701,
+              "deltaKg": 0.0007280075488016701
+            },
+            {
+              "family": "pinionXringB",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0007280075488016701,
+              "deltaKg": 0.0007280075488016701
+            },
+            {
+              "family": "pinionYLeft",
+              "bodyCount": 1,
+              "beforeKg": 0.07738928758070747,
+              "afterKg": 0.07764277647102655,
+              "deltaKg": 0.0002534888903190785
+            },
+            {
+              "family": "pinionYLeftAnchor",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 1.6810518828694194,
+              "deltaKg": 1.6810518828694194
+            },
+            {
+              "family": "pinionYLeftLowerStop",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00758481914983205,
+              "deltaKg": 0.00758481914983205
+            },
+            {
+              "family": "pinionYLeftLowerStopNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYLeftMotorBolt0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionYLeftMotorBolt1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionYLeftMotorBolt2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionYLeftMotorBolt3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionYLeftMotorNut0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYLeftMotorNut1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYLeftMotorNut2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYLeftMotorNut3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYLeftMotorRearWasher0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYLeftMotorRearWasher1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYLeftMotorRearWasher2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYLeftMotorRearWasher3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYLeftMotorWasher0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYLeftMotorWasher1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYLeftMotorWasher2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYLeftMotorWasher3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYLeftPivotBush",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.009848633787610084,
+              "deltaKg": 0.009848633787610084
+            },
+            {
+              "family": "pinionYLeftPivotPin",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.025788237049163984,
+              "deltaKg": 0.025788237049163984
+            },
+            {
+              "family": "pinionYLeftPivotThrustFront",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0026137240975280993,
+              "deltaKg": 0.0026137240975280993
+            },
+            {
+              "family": "pinionYLeftPivotThrustRear",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0026137240975280993,
+              "deltaKg": 0.0026137240975280993
+            },
+            {
+              "family": "pinionYLeftPreload",
+              "bodyCount": 1,
+              "beforeKg": 1.6068837148169777,
+              "afterKg": 0.8190439840661577,
+              "deltaKg": -0.7878397307508199
+            },
+            {
+              "family": "pinionYLeftSpringAdjuster",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.03450299830432388,
+              "deltaKg": 0.03450299830432388
+            },
+            {
+              "family": "pinionYLeftSpringAdjusterNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.009440147582696973,
+              "deltaKg": 0.009440147582696973
+            },
+            {
+              "family": "pinionYLeftSpringAdjusterWasher",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0035728351501572463,
+              "deltaKg": 0.0035728351501572463
+            },
+            {
+              "family": "pinionYLeftSpringCup",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00931742384930999,
+              "deltaKg": 0.00931742384930999
+            },
+            {
+              "family": "pinionYLeftSpringPack",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.02841005068494322,
+              "deltaKg": 0.02841005068494322
+            },
+            {
+              "family": "pinionYLeftUpperStop",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00758481914983205,
+              "deltaKg": 0.00758481914983205
+            },
+            {
+              "family": "pinionYLeftUpperStopNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYLefthost--6-0Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.017221233603603812,
+              "deltaKg": 0.017221233603603812
+            },
+            {
+              "family": "pinionYLefthost--6-0Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionYLefthost--6-1Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.017221233603603812,
+              "deltaKg": 0.017221233603603812
+            },
+            {
+              "family": "pinionYLefthost--6-1Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionYLefthost-16-0Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.017221233603603812,
+              "deltaKg": 0.017221233603603812
+            },
+            {
+              "family": "pinionYLefthost-16-0Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionYLefthost-16-1Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.017221233603603812,
+              "deltaKg": 0.017221233603603812
+            },
+            {
+              "family": "pinionYLefthost-16-1Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionYLeftringA",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0007280075488016701,
+              "deltaKg": 0.0007280075488016701
+            },
+            {
+              "family": "pinionYLeftringB",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0007280075488016701,
+              "deltaKg": 0.0007280075488016701
+            },
+            {
+              "family": "pinionYRight",
+              "bodyCount": 1,
+              "beforeKg": 0.07738928758070747,
+              "afterKg": 0.07764277647102655,
+              "deltaKg": 0.0002534888903190785
+            },
+            {
+              "family": "pinionYRightAnchor",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 1.6810518828694194,
+              "deltaKg": 1.6810518828694194
+            },
+            {
+              "family": "pinionYRightLowerStop",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00758481914983205,
+              "deltaKg": 0.00758481914983205
+            },
+            {
+              "family": "pinionYRightLowerStopNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYRightMotorBolt0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionYRightMotorBolt1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionYRightMotorBolt2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionYRightMotorBolt3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.010957726127288056,
+              "deltaKg": 0.010957726127288056
+            },
+            {
+              "family": "pinionYRightMotorNut0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYRightMotorNut1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYRightMotorNut2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYRightMotorNut3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYRightMotorRearWasher0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYRightMotorRearWasher1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYRightMotorRearWasher2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYRightMotorRearWasher3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYRightMotorWasher0",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYRightMotorWasher1",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYRightMotorWasher2",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYRightMotorWasher3",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0010164484800613018,
+              "deltaKg": 0.0010164484800613018
+            },
+            {
+              "family": "pinionYRightPivotBush",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.009848633787610084,
+              "deltaKg": 0.009848633787610084
+            },
+            {
+              "family": "pinionYRightPivotPin",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.025788237049163984,
+              "deltaKg": 0.025788237049163984
+            },
+            {
+              "family": "pinionYRightPivotThrustFront",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0026137240975280993,
+              "deltaKg": 0.0026137240975280993
+            },
+            {
+              "family": "pinionYRightPivotThrustRear",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0026137240975280993,
+              "deltaKg": 0.0026137240975280993
+            },
+            {
+              "family": "pinionYRightPreload",
+              "bodyCount": 1,
+              "beforeKg": 1.6068837148169777,
+              "afterKg": 0.8190439840661577,
+              "deltaKg": -0.7878397307508199
+            },
+            {
+              "family": "pinionYRightSpringAdjuster",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.03450299830432388,
+              "deltaKg": 0.03450299830432388
+            },
+            {
+              "family": "pinionYRightSpringAdjusterNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.009440147582696973,
+              "deltaKg": 0.009440147582696973
+            },
+            {
+              "family": "pinionYRightSpringAdjusterWasher",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0035728351501572463,
+              "deltaKg": 0.0035728351501572463
+            },
+            {
+              "family": "pinionYRightSpringCup",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00931742384930999,
+              "deltaKg": 0.00931742384930999
+            },
+            {
+              "family": "pinionYRightSpringPack",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.02841005068494322,
+              "deltaKg": 0.02841005068494322
+            },
+            {
+              "family": "pinionYRightUpperStop",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.00758481914983205,
+              "deltaKg": 0.00758481914983205
+            },
+            {
+              "family": "pinionYRightUpperStopNut",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0023809573891722608,
+              "deltaKg": 0.0023809573891722608
+            },
+            {
+              "family": "pinionYRighthost--6-0Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.017221233603603812,
+              "deltaKg": 0.017221233603603812
+            },
+            {
+              "family": "pinionYRighthost--6-0Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionYRighthost--6-1Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.017221233603603812,
+              "deltaKg": 0.017221233603603812
+            },
+            {
+              "family": "pinionYRighthost--6-1Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionYRighthost-16-0Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.017221233603603812,
+              "deltaKg": 0.017221233603603812
+            },
+            {
+              "family": "pinionYRighthost-16-0Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionYRighthost-16-1Bolt",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.017221233603603812,
+              "deltaKg": 0.017221233603603812
+            },
+            {
+              "family": "pinionYRighthost-16-1Washer",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0018292915968805105,
+              "deltaKg": 0.0018292915968805105
+            },
+            {
+              "family": "pinionYRightringA",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0007280075488016701,
+              "deltaKg": 0.0007280075488016701
+            },
+            {
+              "family": "pinionYRightringB",
+              "bodyCount": 1,
+              "beforeKg": 0.0,
+              "afterKg": 0.0007280075488016701,
+              "deltaKg": 0.0007280075488016701
+            },
+            {
+              "family": "rackMountXSection#Cleat#",
+              "bodyCount": 20,
+              "beforeKg": 0.0,
+              "afterKg": 5.355075204700466,
+              "deltaKg": 5.355075204700466
+            },
+            {
+              "family": "rackMountXSection#Cleat#BaseBolt#",
+              "bodyCount": 40,
+              "beforeKg": 0.0,
+              "afterKg": 0.3939183408962982,
+              "deltaKg": 0.3939183408962982
+            },
+            {
+              "family": "rackMountXSection#Cleat#BaseBolt#HeadWasher",
+              "bodyCount": 40,
+              "beforeKg": 0.0,
+              "afterKg": 0.04065793920245206,
+              "deltaKg": 0.04065793920245206
+            },
+            {
+              "family": "rackMountXSection#Cleat#BaseBolt#Nut",
+              "bodyCount": 40,
+              "beforeKg": 0.0,
+              "afterKg": 0.0952382955668905,
+              "deltaKg": 0.0952382955668905
+            },
+            {
+              "family": "rackMountXSection#Cleat#BaseBolt#Washer",
+              "bodyCount": 40,
+              "beforeKg": 0.0,
+              "afterKg": 0.04065793920245206,
+              "deltaKg": 0.04065793920245206
+            },
+            {
+              "family": "rackMountXSection#Cleat#NutCassette",
+              "bodyCount": 20,
+              "beforeKg": 0.0,
+              "afterKg": 1.3113326094347189,
+              "deltaKg": 1.3113326094347189
+            },
+            {
+              "family": "rackMountXSection#Cleat#NutCassetteCover",
+              "bodyCount": 20,
+              "beforeKg": 0.0,
+              "afterKg": 0.29794598837708064,
+              "deltaKg": 0.29794598837708064
+            },
+            {
+              "family": "rackMountXSection#Cleat#NutCassettecover-backBolt",
+              "bodyCount": 20,
+              "beforeKg": 0.0,
+              "afterKg": 0.01674403865612704,
+              "deltaKg": 0.01674403865612704
+            },
+            {
+              "family": "rackMountXSection#Cleat#NutCassettecover-frontBolt",
+              "bodyCount": 20,
+              "beforeKg": 0.0,
+              "afterKg": 0.01674403865612704,
+              "deltaKg": 0.01674403865612704
+            },
+            {
+              "family": "rackMountXSection#Cleat#Replication",
+              "bodyCount": 20,
+              "beforeKg": 0.0,
+              "afterKg": 0.24819496012869316,
+              "deltaKg": 0.24819496012869316
+            },
+            {
+              "family": "rackMountXSection#Cleat#WebBolt#",
+              "bodyCount": 40,
+              "beforeKg": 0.0,
+              "afterKg": 0.3051369325058509,
+              "deltaKg": 0.3051369325058509
+            },
+            {
+              "family": "rackMountXSection#Cleat#WebWasher#",
+              "bodyCount": 40,
+              "beforeKg": 0.0,
+              "afterKg": 0.04065793920245206,
+              "deltaKg": 0.04065793920245206
+            },
+            {
+              "family": "rackMountXSection#LocatingPin#",
+              "bodyCount": 8,
+              "beforeKg": 0.0,
+              "afterKg": 0.053268845034268535,
+              "deltaKg": 0.053268845034268535
+            },
+            {
+              "family": "rackMountXSection#Push#",
+              "bodyCount": 16,
+              "beforeKg": 0.0,
+              "afterKg": 0.01806985146423954,
+              "deltaKg": 0.01806985146423954
+            },
+            {
+              "family": "rackMountXSection#RackBolt#",
+              "bodyCount": 16,
+              "beforeKg": 0.0,
+              "afterKg": 0.13981105468042987,
+              "deltaKg": 0.13981105468042987
+            },
+            {
+              "family": "rackMountXSection#Receiver",
+              "bodyCount": 4,
+              "beforeKg": 0.0,
+              "afterKg": 10.58374110394527,
+              "deltaKg": 10.58374110394527
+            },
+            {
+              "family": "rackMountXSection#Spacer#",
+              "bodyCount": 16,
+              "beforeKg": 0.0,
+              "afterKg": 0.016263175680980825,
+              "deltaKg": 0.016263175680980825
+            },
+            {
+              "family": "rackMountXSection#Spacer#Inner",
+              "bodyCount": 16,
+              "beforeKg": 0.0,
+              "afterKg": 0.016263175680980825,
+              "deltaKg": 0.016263175680980825
+            },
+            {
+              "family": "rackX",
+              "bodyCount": 1,
+              "beforeKg": 4.432438680357503,
+              "afterKg": 5.196710648819134,
+              "deltaKg": 0.7642719684616308
+            },
+            {
+              "family": "railX",
+              "bodyCount": 1,
+              "beforeKg": 5.857670000000001,
+              "afterKg": 4.711720000000001,
+              "deltaKg": -1.14595
+            },
+            {
+              "family": "railXLower",
+              "bodyCount": 1,
+              "beforeKg": 5.857670000000001,
+              "afterKg": 4.711720000000001,
+              "deltaKg": -1.14595
+            },
+            {
+              "family": "railZ",
+              "bodyCount": 1,
+              "beforeKg": 1.5317312500000002,
+              "afterKg": 1.232075,
+              "deltaKg": -0.2996562500000002
+            },
+            {
+              "family": "railZRight",
+              "bodyCount": 1,
+              "beforeKg": 1.5317312500000002,
+              "afterKg": 1.232075,
+              "deltaKg": -0.2996562500000002
+            },
+            {
+              "family": "screwZ",
+              "bodyCount": 1,
+              "beforeKg": 0.6155510981737696,
+              "afterKg": 0.5609916180765273,
+              "deltaKg": -0.05455948009724232
+            },
+            {
+              "family": "screwZCoupling",
+              "bodyCount": 1,
+              "beforeKg": 0.09430966290965079,
+              "afterKg": 0.058951676550237364,
+              "deltaKg": -0.035357986359413424
+            },
+            {
+              "family": "screwZFixed",
+              "bodyCount": 1,
+              "beforeKg": 0.45082737169259635,
+              "afterKg": 0.41,
+              "deltaKg": -0.04082737169259637
+            },
+            {
+              "family": "screwZFixedBracket",
+              "bodyCount": 1,
+              "beforeKg": 0.07776000000000001,
+              "afterKg": 0.08067600000000001,
+              "deltaKg": 0.002916000000000002
+            },
+            {
+              "family": "switchTriggerYLeft",
+              "bodyCount": 1,
+              "beforeKg": 0.34854,
+              "afterKg": 0.3533442,
+              "deltaKg": 0.004804199999999981
+            },
+            {
+              "family": "switchTriggerYRight",
+              "bodyCount": 1,
+              "beforeKg": 0.34854,
+              "afterKg": 0.3533442,
+              "deltaKg": 0.004804199999999981
+            },
+            {
+              "family": "switchXhomeMount",
+              "bodyCount": 1,
+              "beforeKg": 0.6482433228786054,
+              "afterKg": 0.665039482878606,
+              "deltaKg": 0.016796160000000615
+            },
+            {
+              "family": "switchXnegativeLimitMount",
+              "bodyCount": 1,
+              "beforeKg": 0.6482433228786054,
+              "afterKg": 0.665039482878606,
+              "deltaKg": 0.016796160000000615
+            },
+            {
+              "family": "switchXpositiveLimitMount",
+              "bodyCount": 1,
+              "beforeKg": 0.6482433228786054,
+              "afterKg": 0.665039482878606,
+              "deltaKg": 0.016796160000000615
+            },
+            {
+              "family": "xCarriage",
+              "bodyCount": 1,
+              "beforeKg": 20.057557499999998,
+              "afterKg": 20.04539863165192,
+              "deltaKg": -0.012158868348077334
+            }
+          ]
+        },
+        {
+          "axis": "z",
+          "built": {
+            "massKg": 30.62321175798294,
+            "centreOfMassMm": {
+              "x": -3.245328081663393,
+              "y": 1360.0440339661502,
+              "z": 961.0805281066197
+            },
+            "centroidalInertiaKgMm2World": [
+              [
+                812474.9755212244,
+                -4009.7646932401976,
+                -5995.620693830828
+              ],
+              [
+                -4009.7646932401976,
+                885174.4151236439,
+                -79303.11477446106
+              ],
+              [
+                -5995.620693830828,
+                -79303.11477446106,
+                235888.50187966152
+              ]
+            ],
+            "bodyCount": 18
+          },
+          "frozen": {
+            "massKg": 31.22252425798294,
+            "centreOfMassMm": {
+              "x": -3.1830344096376733,
+              "y": 1361.4588108882106,
+              "z": 962.6337673834441
+            },
+            "centroidalInertiaKgMm2World": [
+              [
+                835055.0371889882,
+                -4150.368575458568,
+                -6149.985292892524
+              ],
+              [
+                -4150.368575458568,
+                909426.4691061872,
+                -82808.95196841208
+              ],
+              [
+                -6149.985292892524,
+                -82808.95196841208,
+                243977.7080169566
+              ]
+            ],
+            "bodyCount": 18
+          },
+          "deltaMassKg": -0.5993124999999999,
+          "changesByFamily": [
+            {
+              "family": "railZ",
+              "bodyCount": 1,
+              "beforeKg": 1.5317312500000002,
+              "afterKg": 1.232075,
+              "deltaKg": -0.2996562500000002
+            },
+            {
+              "family": "railZRight",
+              "bodyCount": 1,
+              "beforeKg": 1.5317312500000002,
+              "afterKg": 1.232075,
+              "deltaKg": -0.2996562500000002
+            }
+          ]
+        }
+      ],
+      "excludedFromCarriedBodies": [
+        "brakeResistor",
+        "cabinet",
+        "emergencyStop",
+        "mainBreaker",
+        "mainContactor",
+        "safetyRelay",
+        "vacuumBlower",
+        "vfd"
+      ],
+      "assumptions": [
+        "Whole cable-chain moving mass remains a conservative upper bound",
+        "Carried tensors retain each component distribution assumption",
+        "Do not add stock-beam density to aggregate weldment mass in a structural model"
+      ],
+      "detailReport": "build/router-mount-implementation/mass-3150.json"
+    }
+  ]
+}

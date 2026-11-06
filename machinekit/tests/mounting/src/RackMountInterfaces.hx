@@ -1,7 +1,6 @@
 import machinekit.assembly.AxisBuilder;
 import machinekit.structural.*;
 import machinekit.standard.*;
-import machinekit.component.MachineComponent;
 import materia.assembly.AssemblyFrames as F;
 import materia.casting.InsertHole;
 
@@ -19,6 +18,18 @@ class RackMountInterfaces {
         p + "LowerStop")) return "monotone hard-stop contact; native stroke bounds";
       if (pair(p + "Preload", p + "PivotThrustFront") || pair(p + "Preload",
         p + "PivotThrustRear")) return "coaxial planar thrust fit; native bounds and selected axial endplay";
+      if (pair(p + "PivotBush", p + "PivotThrustFront") || pair(p + "PivotBush", p + "PivotThrustRear")) {
+        var bush:machinekit.standard.Bushing = cast machine.component(p + "PivotBush");
+        var thrustId = a == p + "PivotBush" ? b : a;
+        var thrust:machinekit.standard.Bushing = cast machine.component(thrustId);
+        var relative = F.compose(F.inverse(machine.zeroPose(p + "PivotBush")), machine.zeroPose(thrustId));
+        var axis = F.transformVector(relative, 0, 0, 1);
+        if (Math.abs(relative.x) + Math.abs(relative.y) + Math.abs(axis.x) + Math.abs(axis.y) + Math.abs(axis.z - 1)
+          > 1e-6) throw "Thrust shim is not coaxial with its pivot bush";
+        var gap = relative.z < 0 ? -relative.z - thrust.length : relative.z - bush.length;
+        if (gap < 0.005 || gap > 0.02) throw "Pivot bush/thrust axial clearance outside selected fit";
+        return "rotation-invariant coaxial annular faces; positive selected axial clearance";
+      }
       if (pair(p + "PivotBush",
         p + "PivotPin")) return "coaxial circular journal; native stroke bounds and positive diametral clearance";
       if (pair(p + "SpringCup",
@@ -54,14 +65,16 @@ class RackMountInterfaces {
     var z = relative.z, overlap = false;
     for (section in shaft.sections) {
       var end = z + axis.z * section.length;
-      if (Math.min(Math.max(z, end), reducer.n("length")) > Math.max(Math.min(z, end), 0) + 1e-6) {
+      // The output journal may begin exactly at the housing's output plane.
+      // A face-seated, bore-sized shaft is also an intentional circular fit.
+      if (Math.min(Math.max(z, end), reducer.n("length")) >= Math.max(Math.min(z, end), 0) - 1e-6) {
         overlap = true;
         if (section.diameter
           > reducer.n("bore") + 1e-6) throw "Rotary shaft shoulder does not fit the declared reducer bore";
       }
       z = end;
     }
-    return overlap ? "coaxial circular shaft/reducer seating; all overlapping diameters checked" : null;
+    return overlap ? "coaxial circular shaft/reducer seating; all seated or overlapping diameters checked" : null;
   }
   /** These groups select their own fit tolerances; they never exempt solid
   * intersections. Independent groups retain the 1.5 mm installation envelope. */

@@ -10,6 +10,23 @@ class RouterRackMountChecks {
         RealRackMountTests.main();
       case "pivot":
         RadialPinionTests.main();
+      case "fits":
+        var machine = new SheetRouter(new SheetRouterSpec(3150));
+        for (suffix in ["X", "YLeft", "YRight"]) {
+          var a = "pinion" + suffix + "Reducer", b = "pinion" + suffix + "OutputShaft";
+          Sys.println(haxe.Json.stringify({
+            a: a,
+            b: b,
+            designationA: machine.component(a).designation,
+            designationB: machine.component(b).designation,
+            relative: materia.assembly.AssemblyFrames.compose(
+              materia.assembly.AssemblyFrames.inverse(machine.zeroPose(a)),
+              machine.zeroPose(b)
+            ),
+            parametersA: machine.component(a).values(),
+            qualification: RackMountInterfaces.boundedMotionFit(machine, a, b)
+          }));
+        }
       case "zero", "travel", "service", "model":
         var bed = args.length > 1 ? Std.parseFloat(args[1]) : 2600.0;
         if (bed != 2600 && bed != 3150) throw "Choose bed 2600 or 3150";

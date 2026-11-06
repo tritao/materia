@@ -6,10 +6,39 @@ import machinekit.structural.*;
 import cadkit.modeling.AssemblyState;
 import sys.FileSystem;
 import sys.io.File;
+import machinekit.assembly.MachineAssembly;
+import machinekit.assembly.MachineAssembly.MachineAssemblyComponent;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
+import materia.assembly.AssemblyFrames as F;
+
+/** The frozen structural model excludes independently floor-supported services.
+ * Keep their declared masses in a separate ledger; do not invent their inertia. */
+private class RouterFrameMassView extends MachineAssembly {
+  final source:SheetRouter;
+  final excluded:Array<String>;
+  public function new(source:SheetRouter, excluded:Array<String>) {
+    super();
+    this.source = source;
+    this.excluded = excluded;
+  }
+  override public function components():Array<MachineAssemblyComponent
+    > return [for (row in source.components()) if (excluded.indexOf(row.id) < 0) row];
+  override public function mateParents():Map<String, String> return source.mateParents();
+  override public function solvedPoses(?state:AssemblyState):Map<String,
+    AssemblyFrame> return source.solvedPoses(state);
+}
 
 /** Geometry/material ownership for the local mount solve. No STEP/mesh packet is
  * emitted here; native mass, inertia, poses and source drilling remain auditable. */
 class SheetRouterRackMountExport {
+  static function inputParameters(part:machinekit.component.MachineComponent):Dynamic {
+    // Some machined hardware has no reconstructible catalogue recipe. Its
+    // posed mass/bounds remain mandatory; explicit stock/bores are added below.
+    try return parameters(part.values()) catch (error:Dynamic) {
+      if (Std.string(error) != 'Component "' + part.designation + '" has no recipe values') throw error;
+      return {recipeAvailable: false, designation: part.designation};
+    }
+  }
   static function parameters(values:ComponentValues):Dynamic {
     var result:Dynamic = {};
     for (name in values.names()) {
@@ -39,7 +68,56 @@ class SheetRouterRackMountExport {
     state.setJoint("y", machine.routerSpec.workY / 2);
     state.setJoint("z", machine.routerSpec.travelZ);
     state.forwardKinematics();
-    var bodies = AssemblyFemExport.bodies(machine, state, folder, _ -> false), inputs:Array<Dynamic> = [];
+    var floorSeeds = [
+      "vacuumBlower",
+      "cabinet",
+      "vfd",
+      "brakeResistor",
+      "mainBreaker",
+      "mainContactor",
+      "safetyRelay",
+      "emergencyStop"
+    ], parents = machine.mateParents(), floorIds:Array<String> = [], floorParts:Array<Dynamic> = [], floorMass = 0.0;
+    for (member in machine.components()) {
+      var cursor:Null<String> = member.id, seen:Map<String, Bool> = [], independent = false;
+      while (cursor != null && !seen.exists(cursor)) {
+        seen.set(cursor, true);
+        if (floorSeeds.indexOf(cursor) >= 0) {
+          independent = true;
+          break;
+        }
+        cursor = parents.get(cursor);
+      }
+      if (!independent) continue;
+      var mass = member.component.massProperties(),
+        pose = state.worldPose(member.id), c = mass.centreOfMass, centre = F.transformPoint(
+          pose,
+          c.x,
+          c.y,
+          c.z
+        );
+      floorIds.push(member.id);
+      floorMass += mass.mass;
+      floorParts.push({
+        id: member.id,
+        parentId: parents.get(member.id),
+        massKg: mass.mass,
+        centreOfMassMm: centre,
+        poseMm: pose,
+        materialId: member.component.materialId,
+        centroidalInertiaKgMm2World: mass.inertia == null ? null : mass.inertia.rotated(
+          pose.qx,
+          pose.qy,
+          pose.qz,
+          pose.qw
+        ),
+        inertiaSource : mass.inertia == null ? "not declared; excluded from frame model" : "component tensor",
+        representation : "independent-floor-mass",
+        massSource : Std.string(mass.source)
+      });
+    }
+    var bodies = AssemblyFemExport.bodies(new RouterFrameMassView(machine,
+      floorIds), state, folder, _ -> false), inputs:Array<Dynamic> = [];
     for (binding in machine.cableChainBindings) {
       var rows = [for (row in bodies.parts) if (row.id == binding.member) row];
       if (rows.length != 1) throw "Missing chain mass owner";
@@ -72,7 +150,7 @@ class SheetRouterRackMountExport {
         designation: part.designation,
         material: part.materialSpec(),
         geometryKey: part.geometryKey(Preview),
-        parameters: parameters(part.values()),
+        parameters: inputParameters(part),
         pose: state.worldPose(member.id)
       };
       if (Std.isOfType(part, PinionPivotAnchor)) {
@@ -85,7 +163,16 @@ class SheetRouterRackMountExport {
       }
       if (Std.isOfType(part, LinearMountCleat)) {
         var cleat:LinearMountCleat = cast part;
-        Reflect.setField(row, "cleat", {stockBoxBounds: cleat.stockRegions(), cutBores: cleat.cutBores()});
+        Reflect.setField(
+          row,
+          "cleat",
+          {
+            stockBoxBounds: cleat.stockRegions(),
+            cutBores: cleat.cutBores(),
+            connectionEnvelopeN: {tangential: 1000, radial: 400, axial: 400},
+            connection: cleat.connection(1000, 400, 400)
+          }
+        );
       }
       if (Std.isOfType(part, RadialPinionCarrier)) {
         var carrier:RadialPinionCarrier = cast part;
@@ -109,8 +196,9 @@ class SheetRouterRackMountExport {
       "y1",
       "z0",
       "z1"
-    ], parts: bodies.parts,
-      totalMassKg: bodies.totalMassKg, materials: bodies.materials, mountInputs: inputs, moving: [for (axis in [
+    ], parts: bodies.parts, totalMassKg: bodies.totalMassKg + floorMass,
+      structuralBodyMassKg: bodies.totalMassKg, independentFloorMassKg: floorMass,
+      independentFloorParts: floorParts, materials: bodies.materials, mountInputs: inputs, moving: [for (axis in [
         "x",
         "y",
         "z"
@@ -121,11 +209,13 @@ class SheetRouterRackMountExport {
       "Declared rack/motor masses retain their catalogue or assumed distribution basis",
       "Moving cable-chain mass is the whole-chain upper bound; routed inertia is evaluated at the exported pose",
       "Local solid sections, drilling, fastener grips and pivot geometry are inputs, not stiffness ratings",
+      "Independent floor services follow the frozen model's exclusion; their declared masses remain in a separate ledger and missing inertia is not fabricated",
       "Preload/contact, bearing clearances, compound creep and actual material properties require explicit bounds",
       "Replay existing J6 histories with nominal stop only; final executed reduced-stop SR5/SR6 campaign remains held"
     ]};
     File.saveContent(folder + "/mount-input.json", haxe.Json.stringify(result, null, "  ") + "\n");
-    Sys.println('Built rack mount inputs ' + machine.routerSpec.workY + ': ' + bodies.totalMassKg + ' kg total');
+    Sys.println('Built rack mount inputs ' + machine.routerSpec.workY
+      + ': ' + bodies.totalMassKg + ' kg carried-body ledger; ' + floorMass + ' kg independent floor equipment');
     Sys.stdout().flush();
   }
   public static function main():Void {

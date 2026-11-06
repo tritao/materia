@@ -1935,3 +1935,25 @@ radial preload. Correct that layout and the native clearance conflicts in the
 future lightweight mount proposal. Keep frozen CAD, mount/API adoption and
 cutting release held; higher-mode/real-mount/weld qualification and SR6-C remain
 open. [Full comparison and retained evidence](fem/J6_EXECUTED_RERUN.md).
+
+Physical mount implementation checkpoint (2026-10-28): the user approved building
+[the lightweight proposal](mounting/LIGHTWEIGHT_PROPOSAL.md), superseding the
+2026-10-25 implementation hold above. Shared main now contains the physical
+rack/pinion mount and required-mount API migration in `2760c26cf`, with formatting
+in `ca93d4f4e`; neither commit establishes structural or fabrication acceptance.
+The real pivot passed 582 native assertions across both beds. The first fixed
+clearance screens exposed insufficient cleat-to-guide allowances, so the current
+follow-up recesses the existing M6 web heads and lengthens the cleats while
+retaining the conservative connection-load screen. Both beds now pass fixed,
+service and continuous full-travel/overtravel clearance on that revision, with
+the 1.5 mm independent-body tolerance budget and native-verified full pivot/rotor
+enclosures. The 2600/3150 beds have respectively 4,727/5,842 fixed native pairs,
+520/636 service trials and 961,085/1,239,253 certified travel pairs, all with zero
+failures. The shared-caller and existing router regression suites remain open.
+[Implementation and model boundaries](mounting/IMPLEMENTATION.md) track the
+native results, actual mass/compliance screen and the assumed sensor-fixing
+boundary. Retain the frame and braces. Keep SR5/SR6 release and cutting acceptance held:
+one final-geometry campaign must close braking error and the executed-J7 weld
+envelope together after the requested reduced-stop histories arrive; SR6-C still
+requires measurements. No hard-frequency gate or unsupported override policy is
+reintroduced. Existing nominal-stop histories are for the labelled screen only.
