@@ -107,6 +107,7 @@ class ComponentClassification {
     file(registry, "machinekit.motion.ballscrew-retainer", "Screws and nuts", ComponentKind.Generic);
     file(registry, "machinekit.motion.dsg-nut-housing", "Screws and nuts", ComponentKind.Supplier);
     file(registry, "machinekit.motion.sfu-drawing-screw", "Screws and nuts", ComponentKind.Reference);
+    file(registry, "machinekit.motion.nut-block", "Screws and nuts", ComponentKind.MachinePart);
     file(registry, "machinekit.motion.hzmotion-bk12-screw-end-study", "Screws and nuts", ComponentKind.Reference);
     file(registry, "machinekit.motion.flange-bearing-housing", "Bearings", ComponentKind.Generic);
     file(registry, "machinekit.motion.pillow-block", "Bearings", ComponentKind.Generic);
@@ -121,6 +122,7 @@ class ComponentClassification {
     file(registry, "machinekit.motion.planetary-reducer", "Motors and gearboxes", ComponentKind.Generic);
     file(registry, "machinekit.motion.purchased-rotary-part", "Motors and gearboxes", ComponentKind.Supplier);
     file(registry, "machinekit.motion.torque-motor", "Motors and gearboxes", ComponentKind.Reference);
+    file(registry, "machinekit.motion.erob-actuator-part", "Motors and gearboxes", ComponentKind.MachinePart);
     file(registry, "machinekit.motion.motor-driver", "Drives and power", ComponentKind.Generic);
     file(registry, "machinekit.motion.power-supply", "Drives and power", ComponentKind.Generic);
     file(registry, "machinekit.motion.limit-switch", "Sensors", ComponentKind.Generic);
@@ -128,6 +130,7 @@ class ComponentClassification {
     file(registry, "machinekit.motion.shaft-encoder", "Sensors", ComponentKind.Generic);
     file(registry, "machinekit.motion.linear-scale", "Sensors", ComponentKind.Generic);
     file(registry, "machinekit.motion.rotary-encoder-ring", "Sensors", ComponentKind.Reference);
+    file(registry, "machinekit.motion.sealed-scale-part", "Sensors", ComponentKind.MachinePart);
     file(registry, "machinekit.motion.shaft-coupling", "Couplings, shafts and brakes", ComponentKind.Generic);
     file(registry, "machinekit.motion.stepped-shaft", "Couplings, shafts and brakes", ComponentKind.Generic);
     file(registry, "machinekit.motion.shaft-brake-part", "Couplings, shafts and brakes", ComponentKind.Generic);
@@ -204,6 +207,8 @@ class ComponentClassification {
     file(registry, "machinekit.routing.vacuum-blower", "Vacuum workholding", ComponentKind.Generic);
     file(registry, "machinekit.routing.spoilboard", "Vacuum workholding", ComponentKind.Generic);
     file(registry, "machinekit.routing.dust-shoe", "Dust collection", ComponentKind.Generic);
+    // cover
+    file(registry, "machinekit.cover.way-cover-section", "Way covers", ComponentKind.Generic);
     // standard
     file(registry, "machinekit.standard.socket-head-cap-screw", "Fasteners", ComponentKind.Generic);
     file(registry, "machinekit.standard.hex-bolt", "Fasteners", ComponentKind.Generic);
@@ -225,6 +230,11 @@ class ComponentClassification {
     file(registry, "machinekit.structural.block-bracket", "Brackets and fixings", ComponentKind.Generic);
     file(registry, "machinekit.structural.slide-in-slot-nut", "Brackets and fixings", ComponentKind.Generic);
     file(registry, "machinekit.structural.leveling-foot", "Brackets and fixings", ComponentKind.Generic);
+    file(registry, "machinekit.structural.linear-mount-steel", "Brackets and fixings", ComponentKind.MachinePart);
+    file(registry, "machinekit.structural.linear-mount-cleat", "Brackets and fixings", ComponentKind.MachinePart);
+    file(registry, "machinekit.structural.mount-drilled-plate", "Brackets and fixings", ComponentKind.MachinePart);
+    file(registry, "machinekit.structural.linear-mount-replication", "Brackets and fixings", ComponentKind.MachinePart);
+    file(registry, "machinekit.structural.linear-mount-nut-cassette", "Brackets and fixings", ComponentKind.MachinePart);
     file(registry, "machinekit.structural.mineral-casting", "Castings", ComponentKind.Generic);
     file(registry, "machinekit.structural.cast-in-steel-insert", "Castings", ComponentKind.Generic);
     // tooling
