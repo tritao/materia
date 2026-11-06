@@ -246,7 +246,7 @@ class LinearMountContactTests {
         [0.0, 0, 1],
         [0.0, 1, 0]
       );
-      var backing = new machinekit.structural.SeatedPlate(40, 440, backingThickness, "thin backing fixture",
+      var backing = new machinekit.structural.SeatedPlate("TEST-THIN-BACKING", 40, 440, backingThickness, "thin backing fixture",
         [{name: "rail", frame: F.identity(), holes: rail.mountingConnectors().map(c -> {var p = F.compose(
           railPose,
           c.frame

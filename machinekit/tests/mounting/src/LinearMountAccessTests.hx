@@ -56,7 +56,7 @@ class LinearMountAccessTests {
         [Part.box(88, 542, 88).translated(new Vector(0, 0, -94))]
       );
       var host = own(Solids.cut(hollow, cutters));
-      var pad = new machinekit.structural.SeatedPlate(100, 440, 8,
+      var pad = new machinekit.structural.SeatedPlate("TEST-WELDED-HOST-PAD", 100, 440, 8,
         "welded host pad", [{name: "rail", frame: F.identity(), holes: element.connectors.map(c -> {var p = F.compose(
           railPose,
           c.frame

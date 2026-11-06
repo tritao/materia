@@ -74,7 +74,7 @@ class CastingMoldViewTests {
     var frame = PresentationEvaluator.evaluate(definition, solved, presentation, cursor, fingerprint);
     check(frame.visibility.get(CastingMoldView.REFERENCE_ID) == Hidden, "Mold view hides the casting reference");
     check(frame.visibility.get("bed") == Shown, "Mold view still shows its tooling");
-    cursor.view = CastingMoldView.REFERENCE_ID;
+    cursor = new materia.presentation.PresentationEvaluator.PresentationCursor(CastingMoldView.REFERENCE_ID, cursor.explode, cursor.procedure, cursor.step, cursor.progress);
     frame = PresentationEvaluator.evaluate(definition, solved, presentation, cursor, fingerprint);
     check(frame.visibility.get("bed") == Hidden, "Finished view hides mold tooling");
     for (id in [CastingMoldView.REFERENCE_ID, "insert-seat", "anchor-bolt", "lifting-insert"]) check(
@@ -96,12 +96,12 @@ class CastingMoldViewTests {
         "Engineering poses remain unchanged: " + id
       );
     }
-    cursor.view = CastingMoldView.AS_POURED_ID;
+    cursor = new materia.presentation.PresentationEvaluator.PresentationCursor(CastingMoldView.AS_POURED_ID, cursor.explode, cursor.procedure, cursor.step, cursor.progress);
     frame = PresentationEvaluator.evaluate(definition, solved, presentation, cursor, fingerprint);
     var poured = frame.poses.get(CastingMoldView.REFERENCE_ID);
     if (poured == null) throw "Missing as-poured pose";
     check(poured.z == 0 && poured.qw == 1, "As-poured view retains the mold orientation");
-    cursor.view = CastingMoldView.LIFTING_ID;
+    cursor = new materia.presentation.PresentationEvaluator.PresentationCursor(CastingMoldView.LIFTING_ID, cursor.explode, cursor.procedure, cursor.step, cursor.progress);
     frame = PresentationEvaluator.evaluate(definition, solved, presentation, cursor, fingerprint);
     check(
       frame.visibility.get(CastingMoldView.REFERENCE_ID) == Transparent,
@@ -111,14 +111,13 @@ class CastingMoldViewTests {
       frame.visibility.get("lifting-insert") == Shown && frame.visibility.get("insert-seat") == Hidden,
       "Lifting view isolates the declared lifting inserts"
     );
-    cursor.procedure = "locate-casting-lifting-points";
-    cursor.step = 0;
+    cursor = new materia.presentation.PresentationEvaluator.PresentationCursor(cursor.view, cursor.explode, "locate-casting-lifting-points", 0, cursor.progress);
     frame = PresentationEvaluator.evaluate(definition, solved, presentation, cursor, fingerprint);
     check(frame.highlight.indexOf("lifting-insert") >= 0, "Identification step highlights lifting inserts");
     check(frame.evidence == null, "Identification never claims lifting qualification");
     presentation.views[1].sections = [{occurrence: null, point: {x: 1, y: 2, z: 3}, normal: {x: 0, y: 0, z: 1}}];
     cursor = PresentationEvaluator.reset(presentation);
-    cursor.view = CastingMoldView.REFERENCE_ID;
+    cursor = new materia.presentation.PresentationEvaluator.PresentationCursor(CastingMoldView.REFERENCE_ID, cursor.explode, cursor.procedure, cursor.step, cursor.progress);
     frame = PresentationEvaluator.evaluate(definition, solved, presentation, cursor, fingerprint);
     check(
       frame.sections[0].point.z == 27 && frame.sections[0].normal.z == -1,

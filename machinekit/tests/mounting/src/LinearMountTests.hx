@@ -163,6 +163,7 @@ class LinearMountTests {
     var assembly = new machinekit.assembly.MachineAssembly();
     function plate(name:String,
       material:String):machinekit.structural.SeatedPlate return new machinekit.structural.SeatedPlate(
+        "TEST-" + name.toUpperCase(),
         60,
         60,
         20,
