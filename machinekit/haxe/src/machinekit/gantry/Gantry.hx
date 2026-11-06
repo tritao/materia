@@ -54,7 +54,6 @@ class Gantry extends AxisBuilder {
   public final rackMounts:Map<String, machinekit.assembly.RackMount> = [];
   public function new(spec:GantrySpec, drawingNamespace:String = "GANTRY") {
     super();
-    group("Positioning gantry");
     this.spec = spec;
     this.drawingNamespace = drawingNamespace;
     head = switch spec.head {
