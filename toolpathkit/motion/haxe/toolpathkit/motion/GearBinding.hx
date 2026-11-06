@@ -21,8 +21,23 @@ class GearBinding {
     binding.gearJointIds = [for (joint in model.joints) joint.id];
     binding.gearEncoders = new Map();
     var channels:Array<ProcessChannelDeclaration> = [];
+    // A master is a measured joint, not necessarily an actuator: a cartridge encoder sees belt stretch independently
+    // of the motor's feedback. The explicit controller rate schedules these measurements. Aliases of the same
+    // joint encoder must agree on quantization; conflicting sensors require an explicit selection in the model.
+    for (encoder in model.encoders) {
+      if (followers.indexOf(encoder.joint) >= 0) continue;
+      var delay = encoderDelayNs.get(encoder.joint);
+      if (delay == null) continue;
+      if (delay < 0 || delay > 1000000000) throw 'Invalid encoder latency for ${encoder.joint}';
+      var previous = binding.gearEncoders.get(encoder.joint);
+      if (previous != null && previous.quantum != encoder.resolution())
+        throw 'Gear master ${encoder.joint} has conflicting encoder resolutions';
+      binding.gearEncoders.set(encoder.joint,
+        {latencyNs: delay, quantum: encoder.resolution(), loopHz: controllerHz});
+    }
     for (i in 0...model.joints.length) {
       var joint = model.joints[i];
+      if (followers.indexOf(joint.id) < 0) continue;
       for (actuator in model.actuators) {
         var id = switch actuator.transmission {
           case SimpleTransmission(id, _, _):
@@ -30,14 +45,13 @@ class GearBinding {
         };
         if (id != joint.id || actuator.positionLoopRate <= 0) continue;
         var encoder = model.encoderFor(actuator), delay = encoderDelayNs.get(joint.id);
-        if (encoder == null || delay == null) continue;
+        if (encoder == null || encoder.joint != joint.id || delay == null) continue;
         if (delay < 0 || delay > 1000000000) throw 'Invalid encoder latency for ${joint.id}';
         binding.gearEncoders.set(
           joint.id,
           {latencyNs: delay, quantum: encoder.resolution(), loopHz: Math.min(controllerHz, actuator.positionLoopRate)}
         );
-        if (followers.indexOf(joint.id) >= 0
-          && actuator.processVelocity == null) channels.push(GearEvents.declaration(i));
+        if (actuator.processVelocity == null) channels.push(GearEvents.declaration(i));
       }
     }
     for (follower in followers) {

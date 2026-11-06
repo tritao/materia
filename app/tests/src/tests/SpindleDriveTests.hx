@@ -51,6 +51,7 @@ class SpindleDriveTests {
     near(spindle.speed(600), 60 * 2 * Math.PI, "Chained reduction respects a radian/second speed channel");
     near(spindle.direction(-1), 1, "Reverse spindle command through a reversing chain");
     checkLowering(spindle);
+    SpindleEncoderTests.run();
 
     var forward = blueprint(0, rpm);
     forward.couplings.push(new RobotRuntimeJointCouplingBlueprint(0, 1, 0.25, 0));

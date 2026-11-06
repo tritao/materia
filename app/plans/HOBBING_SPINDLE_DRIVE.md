@@ -33,9 +33,13 @@ now the cartridge encoder, while `hob-motor` is the servo's own encoder), the at
   stop commands through a reversed chained reduction, and the existing `.at_speed` startup barrier. Unbound CNC
   channels retain their ordinary RPM units; a bound physical drive supplies the explicit conversion. The toolpath's
   modal spindle RPM remains physical spindle RPM for work-revolution feeds.
-- G3 — Encoder timing: pending. Bind the master to the encoder on the actual hob joint, independently of the motor's
+- G3 — Encoder timing: complete. Bind the master to the encoder on the actual hob joint, independently of the motor's
   feedback encoder. The explicit controller rate schedules master sampling; follower timing remains bounded by its servo
   position loop. At-speed, tooth-pass windows and synchronization must continue to read measured B state.
+  Validation: the focused project passes 21 drive/lowering checks and six encoder checks. A master with no actuator
+  binds its cartridge encoder at the explicit controller rate; the table keeps its own feedback and servo ceiling.
+  Equivalent encoder aliases are accepted only when their resolutions agree, conflicting master resolutions are
+  rejected, and a follower cannot borrow feedback from another joint.
 - G4 — Regression and acceptance: pending. Cover direct, belt-coupled, reversed and chained drives, non-RPM speed units,
   and ambiguous/unsupported relations. Verify app tests, headless cutting playback, hobbing and machine-tending
   simulations, hobber tests (at least 2333 assertions), and bench-mill frame tests (917 assertions).
