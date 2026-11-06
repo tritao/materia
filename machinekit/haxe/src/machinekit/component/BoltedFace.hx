@@ -99,9 +99,15 @@ class BoltedFace {
 	 * one diameter, the steel rule, whatever the material, and the derivation reports a warning where the material's rule asks for more.
 	 */
   public final rated:Bool;
+  /**
+	 * A clamped face whose counterbore is shallower than an ISO 4762 head (a maker's Ø15 x 5.75 spot face for an M8): the screw is the low-head cap screw (DIN 7984,
+	 * `SocketHeadCapScrew.lowHead`), which the derivation uses in place of the ISO 4762 one.
+	 */
+  public final lowHead:Bool;
 
   function new(id:String, frame:AssemblyFrame, role:BoltedRole, holes:Null<Array<BoltHole>>, width:Float, height:Float,
-      ?thicknessAt:(Float, Float) -> Float, drawn:Bool = true, washer:Bool = false, ?alternative:String, rated:Bool = false) {
+      ?thicknessAt:(Float, Float) -> Float, drawn:Bool = true, washer:Bool = false, ?alternative:String, rated:Bool = false, lowHead:Bool = false) {
+    this.lowHead = lowHead;
     this.alternative = alternative;
     this.rated = rated;
     this.thicknessAt = thicknessAt;
@@ -146,7 +152,10 @@ class BoltedFace {
 
   /** A clamped face drilled to suit, with the holes one receiving face gave it. */
   public function paired(holes:Array<BoltHole>):BoltedFace return new BoltedFace(id, frame, role, holes, width, height, thicknessAt, drawn,
-      washer, alternative, rated);
+      washer, alternative, rated, lowHead);
+
+  /** This face with its screw the low-head cap screw (see `lowHead`). */
+  public function lowHeaded():BoltedFace return new BoltedFace(id, frame, role, holes, width, height, thicknessAt, drawn, washer, alternative, rated, true);
 
   public static function clamped(id:String, frame:AssemblyFrame, holes:Array<BoltHole>, clearance:Float, grip:Float,
       ?size:String, ?recess:BoltRecess, drawn:Bool = true, washer:Bool = false, ?alternative:String):BoltedFace return new BoltedFace(id, frame,

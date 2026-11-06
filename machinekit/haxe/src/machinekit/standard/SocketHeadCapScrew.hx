@@ -179,6 +179,23 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
       propertyClass
     );
 
+  /**
+   * DIN 7984 low-head cap screw (ISO 4762's dimensions with a lower head: M8 is Ø13 x 5, hex 6): for a spot face too shallow for the full head, such as
+   * the Yuheng JFT-40 housing's Ø15 x 5.75 end counterbores. Only M8 is tabulated, from the standard's nominal dimensions (unverified against a maker's sheet); it
+   * is a code-only part until the catalogue carries the low-head series.
+   */
+  public static function lowHeadSpec(size:String):MetricScrewSpec {
+    var base = catalog().get(size);
+    if (size != "M8") throw 'No low-head cap screw is tabulated for $size (M8 only)';
+    return {
+      size: base.size, diameter: base.diameter, pitch: base.pitch, headDiameter: 13, headHeight: 5, socketSize: 6, socketDepth: 2.5, threadLength: base.threadLength,
+      tapDrill: base.tapDrill, clearanceFine: base.clearanceFine, clearanceMedium: base.clearanceMedium, clearanceCoarse: base.clearanceCoarse,
+      counterboreDiameter: 15, counterboreDepth: 5.4
+    };
+  }
+
+  public static function lowHead(size:String, length:Float, propertyClass:PropertyClass = Steel129):SocketHeadCapScrew return custom(lowHeadSpec(size), length, propertyClass);
+
   public static function custom(spec:MetricScrewSpec,
     length:Float, propertyClass:PropertyClass = Steel129):SocketHeadCapScrew return new SocketHeadCapScrew(
       spec,

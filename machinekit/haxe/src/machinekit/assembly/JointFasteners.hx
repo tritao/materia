@@ -605,7 +605,7 @@ class JointFasteners {
       diagnostics.error("fasteners.size", id, '$id: no catalogue screw of size $size');
       return null;
     }
-    var spec = catalog.get(size);
+    var spec = a.face.lowHead ? SocketHeadCapScrew.lowHeadSpec(size) : catalog.get(size);
     // Pattern correspondence, in the receiving face frame.
     var local = AssemblyFrames.compose(AssemblyFrames.inverse(b.world), a.world);
     var points:Array<BoltHole> = [];
@@ -749,7 +749,7 @@ class JointFasteners {
       '$id: a ${round(drillDepth)} mm tapped hole leaves less than ${BACK_WALL} mm of back wall in ${round(wall)} mm of material'
     );
     if (hasErrorSince(diagnostics, before)) return null;
-    var screw = SocketHeadCapScrew.metric(size, length, propertyClass);
+    var screw = a.face.lowHead ? SocketHeadCapScrew.lowHead(size, length, propertyClass) : SocketHeadCapScrew.metric(size, length, propertyClass);
     var host = b.member + "#" + b.face.id;
     if (drilled) {
       if (!derived.exists(host)) derived.set(host, []);
