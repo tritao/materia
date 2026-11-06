@@ -35,7 +35,7 @@
 the reason stated). The app tests pass, the visuals are unchanged (or the LOD threshold is documented), and the benchmark is
 committed.
 
-**Status: measured CPU fixes complete; 60 fps remains unmet.** The best observed fixed run is 38.60 fps; the final awake
+**Round 1 status: measured CPU fixes complete; 60 fps remains unmet.** The best observed fixed run is 38.60 fps; the final awake
 paired comparison is 25.54 -> 30.04 fps. All application tests pass. Quality remains 4x MSAA with no LOD, tessellation,
 culling, batching or renderer architecture changes. Stop here at the native frame scheduling/presentation boundary;
 a reliable 60 fps result needs further native rendering work, rather than more camera-only UI caching.
@@ -336,7 +336,94 @@ Round 2, everything else, measured on the committed orbit benchmark (`app/tools/
    per-frame but camera-independent.
 5. **Scale.** Re-run on the bench mill and the tending cell as well as the hobber, so the gains are general.
 
-### Round 2 status: four fixes validated; final paired scale report in progress
+### Round 2 status: complete — four measured fixes, app/native tests pass
+
+Standard benchmark: routed captured middle-button orbit, one degree per rendered frame,
+fixed pitch 0.35, 60 warmup + 360 measured + 8 query-drain frames. Same built app,
+source project/artifact, isolated workspace, 1320x900 window, 4x MSAA and GTX 1060
+3GB / NVIDIA 550.144.03; logical viewport dimensions are preserved per project.
+Only the scene-renderer library varies: original `dfddf3806` versus final
+`cb4603900`. Warm opens reuse the generated scene. GPU time covers scene passes;
+CPU includes routed input and nested UI/native phases. FPS includes scheduling and
+is context only. No native/GTK pacing work was done in Round 2.
+
+Final full-orbit pairs (`r2-final-hobber-before-02` / `after-02`,
+`r2-final-bench-before-02` / `after-02`, `r2-final-cell-before-02` / `after-02`):
+
+| Scene | FPS before → after | CPU median before → after | GPU median before → after | Draws before → after | Triangles before → after |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Hobber | 25.46 → 27.65 | 5.781 → 3.921 ms | 6.999 → 5.606 ms | 1,540.0 → 910.5 | 2,299,637 → 1,832,299 |
+| Bench mill | 29.95 → 30.30 | 3.669 → 3.502 ms | 3.250 → 3.878 ms | 528.0 → 435.0 | 627,997 → 523,695 |
+| Tending cell | 28.99 → 28.83 | 7.357 → 5.800 ms | 7.520 → 3.112 ms | 3,398.0 → 1,667.0 | 1,722,098 → 1,438,642 |
+
+Hobber: 40.9% fewer draws, 20.3% fewer submitted triangles, 32.2% less median CPU
+and 19.9% less median GPU in this pair. Native preparation is 0.659 → 0.441 ms,
+submission 1.907 → 0.660 ms. Surface/edge/AO GPU medians are 4.017/2.179/0.425 →
+2.730/1.881/0.424 ms. CPU p95 is 20.197 → 18.541 ms; GPU p95 20.591 → 9.945 ms.
+
+Bench GPU timing is **inconclusive**, not a demonstrated regression or universal gain:
+the reverse-order pair (`r2-final-bench-after-03` then `before-03`) reports original
+CPU 5.834/GPU 4.053 ms versus final CPU 5.591/GPU 3.681 ms. Its native UI control
+is about 3 ms, versus 2 ms in pair 02. Edge GPU improves in both pairs:
+1.136 → 0.981 ms and 1.180 → 1.005 ms; surface GPU rises modestly in both:
+1.868 → 1.949 ms and 1.853 → 1.981 ms. Report both total-GPU outcomes. Work
+counts reproduce exactly: 17.6% fewer draws and 16.6% fewer triangles. Earlier
+three-fix bench timing was nearly flat (4.241 → 4.173 ms GPU).
+
+Cell: 50.9% fewer draws and 16.5% fewer triangles, median CPU 21.2% lower and GPU
+58.6% lower in the final pair. It uses the identical frozen full 819-object cell
+artifact documented below; current local cell source generation remains blocked
+by its missing source root/outdated reach certificate. This is render validation,
+not a claim that those machine-source issues were fixed.
+
+**Root causes and fix commits:**
+- `5b0af32ed`: per-occurrence material IDs split otherwise identical repeated parts;
+  retain resource ownership but instance geometry with exactly equal material values.
+- `5de7ad27d`: round stroke caps used two triangles each; use one circumscribed
+  triangle with the same signed-distance coverage. Edge triangles fall 25.2%.
+- `76099819e`: repeated pipeline binds reset uniform state; retain compatible binds
+  within each pass and upload pass globals only on real transitions.
+- `cb4603900`: the hob alone submits 151,696 surface triangles at machine scale;
+  cache index-only display LOD, selected by a documented **0.05-target-pixel**
+  position/normal error metric. It saves 132,770 triangles per orbit frame.
+
+Frustum culling, feature-edge caching and geometry revision checks already existed;
+steady orbit does not retessellate/re-upload the model. The warmed CPU profile found
+native UI preparation/execution and driver work as well as scene update/submission;
+the uniform fix removes redundant per-draw work without a renderer architecture change.
+
+**Validation and limits:** the full final app suite passes (exit 0,
+`r2-final-app-tests.log`), all 12 native renderer suites pass, eight benchmark-report
+regressions pass, and the C ABI audits on all four supported targets. Canonical shaders
+were checked with the pinned compiler. Final normal-zoom appearance was inspected.
+Hobber original/final endpoint differences are 34/376,922 pixels, maximum two channel
+levels; the LOD-only endpoint and full-detail hob close-up match pixel-for-pixel.
+Bench/cell final comparisons reproduce the previously inspected differences of
+543/max 6 and 1,190/max 158 pixels respectively over 402,864 interior pixels.
+The latter includes thin coincident details, so do not claim universal pixel identity.
+Final LOD builds select no LOD in bench/cell and match the three-fix work and images
+exactly. Picking, AO, sections, selection/hover and inspection retain original detail.
+
+LOD adds about 0.6 seconds to initial hob geometry preparation and 257,064 index bytes
+once; it adds no steady uploads. Its metric is not a strict Hausdorff guarantee.
+Hobber culling/instance updates have zero median uploads but 6,048 bytes at p95
+(original 288 bytes); the LOD-only pair has identical uploads on every measured frame.
+
+Artifacts, rejected captures and binary/source hashes remain under
+`/media/joao/DATA1/claude-hobber-tools/tmp/`. The runner rejects lost drags, missing
+scene/GPU samples and DPMS-Off windows; invalid captures were retained and retried,
+never included in summaries. `r2-lod-variant.json` maps the final source/binary pair;
+`r2-final-scale-accepted.json` identifies the final scale runs.
+No new haxeon/nativekit branch or pin change: the existing capture prerequisite is
+haxeon `viewport-perf-capture` / `84113e490`; NativeKit itself is unchanged.
+
+Remaining candidates are hardware back-face culling, native UI command preparation
+and LOD that preserves textured/stroked detail. They are not required for the measured
+savings above. Native/compositor frame pacing remains outside this task. Fixing local
+cell generation/certification belongs to the machine-source work. All Round 2 fixes
+and benchmark support are committed locally; no push or merge.
+
+**Chronological Round 2 record:** later validation supersedes earlier pending notes.
 
 Read the retained viewport, SceneRenderer, render compiler, GPU executor and nkgpu draw path.
 Frustum culling and geometry/material instancing already exist. Surface, stroke and AO passes
@@ -632,4 +719,4 @@ CAD part workflow. `r2-lod-scale-tests-status.txt` records bench/cell/app all ze
 Final-build scale captures `r2-scale-bench-after-02` and `r2-scale-cell-after-06`
 select no LOD; all 360 draw/triangle pairs and all 402,864 endpoint pixels match
 their accepted three-fix versions exactly. Fresh adjacent original/final scale
-pairs are running for the consolidated final report.
+pairs and the reverse bench control are recorded in the completion summary above.
