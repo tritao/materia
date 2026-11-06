@@ -9,6 +9,7 @@ import materia.project.SceneArtifact;
 class LeadshineServos {
   public static function assembly():MachineAssembly {
     var result = new MachineAssembly();
+    result.group("Servo samples");
     var names = ["0050MA40", "0100MA40", "0200MA60", "0400MA60", "0750MA80", "1000MA80"];
     for (brake in [false, true]) for (i in 0...names.length) {
       var motor = LeadshineServo.model('ELM1H-${names[i]}${brake ? "E" : "F"}');

@@ -51,6 +51,7 @@ class HzMotionPreview {
     var document = new Document();
     try {
       var assembly = new MachineAssembly(), i = 0;
+      assembly.group("Motion samples");
       for (name in HzMotionCatalog.models()) {
         var component = HzMotionParts.of(name, true);
         var values = component.values();

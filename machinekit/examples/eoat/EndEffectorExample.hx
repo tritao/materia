@@ -16,6 +16,7 @@ import machinekit.robotics.ToolChangerTool;
 class EndEffectorExample {
   public static function build():EndEffectorSet {
     var set = new EndEffectorSet();
+    set.group("Tool changer");
     set.addComponent("adapter", new EndEffectorPlate(new RobotFlange(50)));
     set.addComponent("master", new ToolChangerMaster(1));
     set.mount("adapter", "robot");
@@ -38,7 +39,9 @@ class EndEffectorExample {
 
   static function tool(reach:Float, cupDiameter:Float):EndEffector {
     var result = new EndEffector();
+    result.group("Tool interface");
     result.addComponent("changer", new ToolChangerTool(1));
+    result.group("Vacuum grip");
     result.addComponent("bar", new FrameBar(30, 20, reach));
     result.addComponent("manifold", new PneumaticManifold(1));
     result.addComponent("generator", new VacuumGenerator());

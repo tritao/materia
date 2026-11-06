@@ -432,6 +432,7 @@ function main():Void {
 private class ScrewRejectBin extends MachineAssembly {
   public function new() {
     super();
+    group("Reject bin");
     addComponent("floor", new ArmBlock(80, 80, 4, "steel", "Reject bin floor"));
     for (side in [-1, 1]) {
       var label = side < 0 ? "Left" : "Right";

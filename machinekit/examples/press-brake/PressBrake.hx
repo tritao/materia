@@ -219,6 +219,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
   public function new(withR:Bool = true,
     ?layout:ToolLayout, ?phases:CylinderPhaseSpeeds, fingerHalfSpacing:Float = 300) {
     super();
+    group("Frame");
     this.withR = withR;
     if (!Math.isFinite(fingerHalfSpacing)
       || fingerHalfSpacing <= GaugeFinger.WIDTH_MM / 2 || fingerHalfSpacing > (gaugeWidth - GaugeFinger.WIDTH_MM)
@@ -253,7 +254,9 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
       var x = side * (bedLength / 2 + 25);
       var frame = new PressSideFrame("PRESS-SIDE-FRAME", 50, throat, bedHeight, openHeight);
       frameVolumes.push({member: 'frame$name', boxes: frame.collisionBoxes()});
+      group("Frame");
       fixed('frame$name', frame, at(x, 0, 0), "bed");
+      group("Ram");
       slide(
         side < 0 ? "Y1" : "Y2",
         guide,
@@ -282,6 +285,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
       fixed('rod$name', cylinder.movingRod(), {x: side * 650, y: 0, z: tip, qx: 1, qy: 0, qz: 0, qw: 0}, guide);
     }
     addCoupling("torsion-bar", "Y1", "Y2", 1);
+    group("Hydraulics");
     fixed("hydraulicSupply", new HydraulicSupply(supplyPressurePa), at(500, 350, 500), "bed");
     fixed("ramValve", new HydraulicValve(), at(500, 350, 740), "bed");
     var hose:machinekit.component.BomItem = {
@@ -316,6 +320,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
       0.1
     );
     addSwitch("ram-bottom", "Y1", {lower: stroke - 0.1, upper: stroke + 0.1, velocity: null, effort: null}, 0.1);
+    group("Ram");
     fixed("ram", new PressBlock("PRESS-RAM", "Ram beam", bedLength, 100, 220), at(0, 0, bedHeight + openHeight), "guideLeft");
     for (side in [-1, 1]) fixed(
       side < 0 ? "ramBracketLeft" : "ramBracketRight",
@@ -334,15 +339,18 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
     );
     installTools();
     for (side in [-1, 1]) {
+      group("Sheet support");
       fixed(
         side < 0 ? "supportLeft" : "supportRight",
         new PressBlock("PRESS-FRONT-SHEET-SUPPORT", "Front sheet support", 80, 300, 20),
         at(side * 450, -240, bedHeight - 20),
         "bed"
       );
+      group("Safety");
       fixed(side < 0 ? "curtainLeft" : "curtainRight", new PressLightCurtain(), at(side * 900, -300, 600), "bed");
     }
     // Assumed 48 V bus covers simultaneous peak servo demand and a 1.5 kW braking shunt.
+    group("Electrical");
     fixed(
       "power",
       new PowerSupply(ServoMotor.LOW_VOLTAGE_BUS, new machinekit.power.DcCurrent(30), 3, 120, 60, 30, 1500),
@@ -350,6 +358,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
       "bed"
     );
     // The stop is independent of the ram. Its face descends by the commanded stopping travel.
+    group("Depth stop");
     slide(
       "depth",
       "depthStop",
@@ -371,6 +380,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
       "GENERIC-LV-SERVO-50W",
       1
     );
+    group("X backgauge");
     slide(
       "X",
       "gaugeX",
@@ -425,6 +435,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
     );
     var gaugeParent = "gaugeX";
     if (withR) {
+      group("R backgauge");
       slide(
         "R",
         "gaugeR",
@@ -486,6 +497,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
   }
 
   function installTools():Void {
+    group("Tooling");
     for (station in toolLayout.stations()) {
       var firstDie:Null<String> = null, firstPunch:Null<String> = null;
       for (placement in station.dies.placements(station.offset - bedLength / 2)) {
@@ -532,6 +544,12 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
     outlet:Int,
     parent:String = "bed"
   ):Void {
+    group(switch joint {
+      case "depth": "Depth stop/Drive";
+      case "X": "X backgauge/Drive";
+      case "R": "R backgauge/Drive";
+      default: joint + "/Drive";
+    });
     var motor = ServoMotor.model(motorName);
     var motorPose = {
       x: screwPose.x,

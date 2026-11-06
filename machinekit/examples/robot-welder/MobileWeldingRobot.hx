@@ -43,6 +43,7 @@ class MobileWeldingRobot extends MobileBase {
 
     var equipmentX = -storage.length / 2 - MobileBase.WHEEL_DIAMETER / 2 - EQUIPMENT_GAP;
     var top = DECK_Z + DECK_THICKNESS;
+    group("Welding services");
     addComponent("source", source, AssemblyFrames.translation(equipmentX, -inverter.width / 2 - EQUIPMENT_GAP, top));
     addComponent("inverter", inverter, AssemblyFrames.translation(equipmentX, source.depth / 2 + EQUIPMENT_GAP, top));
     addComponent(
@@ -60,9 +61,11 @@ class MobileWeldingRobot extends MobileBase {
       addMemberConnector("deck", name, local);
       addMate('$name-mount', "fixed", "deck", name, name, "base");
     }
+    group("Electrical");
     addComponent("computerSupply", computerSupply);
     addMemberConnector("basePlate", "computerSupply", Solids.axial(200, 160, BASE_THICKNESS));
     addMate("computer-supply-mount", "fixed", "basePlate", "computerSupply", "computerSupply", "mount");
+    group("Welding services");
     addComponent("feeder", feeder);
     addMemberConnector("arm/upperArm", "feederSeat", AssemblyFrames.alongY(40, 0, 160, 1, 0, 0));
     addMate("feeder-mount", "fixed", "arm/upperArm", "feederSeat", "feeder", "mount");

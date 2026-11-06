@@ -66,13 +66,16 @@ class EnclosedBenchMill extends MachineAssembly {
     opening = AssemblyFrames.translation(0, front, floorOffset + headBottom - openingSillBelowRetractedHead);
     var width = right - left, depth = back - front;
     var centreX = (left + right) / 2, centreY = (front + back) / 2;
+    group("Chip protection and enclosure");
     panel("chipTray", width, depth, trayThickness, centreX, centreY, standHeight);
+    group("Machine");
     include("mill", mill, AssemblyFrames.translation(0, 0, floorOffset));
     exposePort("mains", "mill/powerSupply", "mains");
     // Mineral-cast shell carries a steel cap; small feet are recessed under its corners.
     var deckThickness = 8.0, footHeight = 35.0;
     var pedestalHeight = standHeight - deckThickness - footHeight;
     var pedestal = new MillPedestal(width, depth, pedestalHeight);
+    group("Stand");
     include("stand", pedestal, AssemblyFrames.translation(centreX, centreY, footHeight));
     poses.set("stand/casting", AssemblyFrames.translation(centreX, centreY, footHeight));
     poses.set("stand/cap", AssemblyFrames.translation(centreX, centreY, standHeight - 20));
@@ -126,6 +129,7 @@ class EnclosedBenchMill extends MachineAssembly {
       );
       standIds.push(id);
     }
+    group("Chip protection and enclosure");
     panel("enclosureLeft", panelThickness, depth, top - bottom, left - panelThickness / 2, centreY, bottom);
     panel("enclosureRight", panelThickness, depth, top - bottom, right + panelThickness / 2, centreY, bottom);
     panel("enclosureBack", width, panelThickness, top - bottom, centreX, back + panelThickness / 2, bottom);
@@ -203,6 +207,7 @@ class EnclosedBenchMill extends MachineAssembly {
       "polycarbonate"
     );
     // A closed cabinet is six panels too; it keeps its real material mass.
+    group("Electrical");
     var cabinetX = right + 120, cabinetY = back - 100, cabinetZ = standHeight;
     panel("cabinetLeft", 2, 200, 300, cabinetX - 100, cabinetY, cabinetZ, false);
     panel("cabinetRight", 2, 200, 300, cabinetX + 100, cabinetY, cabinetZ, false);
@@ -252,6 +257,7 @@ class EnclosedBenchMill extends MachineAssembly {
       qz: doorAxis.qz,
       qw: doorAxis.qw
     };
+    group("Door");
     addComponent("doorCylinder", doorCylinder, doorPose);
     fixed(
       "doorCylinderRod",
@@ -263,6 +269,7 @@ class EnclosedBenchMill extends MachineAssembly {
     if (vise == null) throw "Enclosed bench mill needs a pneumatic vise";
     // One FRL and the existing two-outlet manifold supply both double-solenoid valves.
     var serviceX = cabinetX, serviceY = cabinetY;
+    group("Pneumatics");
     addComponent("airSupply", new AirSupply(600000), AssemblyFrames.translation(serviceX, serviceY, cabinetZ + 12));
     addComponent(
       "airManifold",
@@ -379,6 +386,7 @@ class EnclosedBenchMill extends MachineAssembly {
       y: Math.min(zoneFront, carriage.y - carriage.halfY) - 20,
       z: zoneTop
     }];
+    group("Electrical/Sensors");
     for (i in 0...heads.length) {
       var head = heads[i];
       fixed(head.id, new DigitalSensor(head.kind), AssemblyFrames.translation(head.x, head.y, head.z), "chipTray");

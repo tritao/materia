@@ -18,6 +18,7 @@ class HzMotionAxis extends MachineAssembly {
   public final coupling = new ShaftCoupling(14, 10, 25, 32);
   public function new(supplierFloating:Bool = true) {
     super();
+    group("Linear axis");
     addComponent("mount", mount);
     addComponent("motor", motor);
     addMate("motor-seat", "fixed", "mount", "motor", "motor", "mountFace");

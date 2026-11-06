@@ -44,6 +44,7 @@ class MillFrameCovers {
   /** Fresh parts: assembling a concept never drills a caller's reusable stage. */
   public static function stage(xy:MillXYStage):MachineAssembly {
     var l = xy.layout, result = xy.snapshot(), placer = new MillFrameCoverPlacer(result);
+    result.group("X axis/Protection");
     for (side in [-1, 1]) {
       var id = side < 0 ? "coverXLeft" : "coverXRight", wallId = id + "Wall";
       var xShape = WayCoverPlan.boxCover(80, 116, 97, true);

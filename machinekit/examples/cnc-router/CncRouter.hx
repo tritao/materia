@@ -730,6 +730,7 @@ class CncRouter extends AxisBuilder {
 
   public function new(belts:Bool = false, foldedZ:Bool = false) {
     super();
+    group("Frame");
     this.belts = belts;
     this.foldedZ = foldedZ;
     motorY = NemaStepper.frame(23);
@@ -745,11 +746,13 @@ class CncRouter extends AxisBuilder {
     var halfFrame = FRAME_LENGTH / 2;
     for (side in [-1, 1]) {
       var name = side < 0 ? "Left" : "Right";
+      group("Frame");
       place(
         'side$name',
         new ExtrusionMember(profile, FRAME_LENGTH),
         AxisBuilder.orient(side * SIDE_X, -halfFrame, 20, up, alongY)
       );
+      group("Y axis");
       place(
         'railY$name',
         LinearRail.metric(RAIL, FRAME_LENGTH - 40),
@@ -778,6 +781,7 @@ class CncRouter extends AxisBuilder {
       );
       place('motorY$name', side < 0 ? motorY : NemaStepper.frame(23), motorPose);
     }
+    group("Frame");
     var inner = 2 * (SIDE_X - 20);
     for (entry in [
       {id: "crossFront", y: -halfFrame + 20},
@@ -788,6 +792,7 @@ class CncRouter extends AxisBuilder {
       new ExtrusionMember(profile, inner),
       AxisBuilder.orient(-inner / 2, entry.y, 20, up, alongX)
     );
+    group("Workholding");
     place(
       "spoilboard",
       new RouterPlate("CNC-SPOILBOARD", inner - 10, FRAME_LENGTH - 40, SPOILBOARD_TOP - 40, "birch plywood", "Spoilboard"),
@@ -803,6 +808,7 @@ class CncRouter extends AxisBuilder {
     place("clampLeft", clamp, {x: -STOCK_WIDTH / 2, y: 0, z: SPOILBOARD_TOP, qx: 0, qy: 0, qz: 1, qw: 0});
 
     // Gantry, riding the Y rails. yb is the gantry's centre plane at y = 0.
+    group("Y axis");
     var yb = MACHINE_ZERO_Y + TOOL_OFFSET_Y;
     var ySpec = specs[1];
     slide(
@@ -881,6 +887,7 @@ class CncRouter extends AxisBuilder {
     var front = [0.0, -1, 0];
     var railX = 2 * (SIDE_X - 20);
     var railXFace = yb - 20 - railSpec.railHeight;
+    group("X axis");
     attach(
       "railXUpper",
       LinearRail.metric(RAIL, railX),
@@ -941,6 +948,7 @@ class CncRouter extends AxisBuilder {
     var xPlateFront = blockFace - plateThickness;
     var railZFace = xPlateFront - railSpec.railHeight;
     var railZ = xPlateHeight;
+    group("Z axis");
     var vertical = [0.0, 0, 1];
     for (side in [-1, 1]) {
       var name = side < 0 ? "Left" : "Right";
@@ -1025,6 +1033,7 @@ class CncRouter extends AxisBuilder {
       AssemblyFrames.translation(xc, toolY, zPlateBottom + 5),
       "zPlate"
     );
+    group("Spindle and tool");
     attach("spindle", spindle, AssemblyFrames.translation(xc, toolY, MACHINE_ZERO_Z), "spindleClamp");
     attach("tool", tool, AssemblyFrames.translation(xc, toolY, MACHINE_ZERO_Z - tool.stickout), "spindle");
     if (!belts) {
@@ -1238,20 +1247,20 @@ class CncRouter extends AxisBuilder {
   function addDriver(motor:String):String {
     var id = motor + "Driver";
     if (!supplyAdded) {
-      attach(
+      withGroup("Electrical", () -> attach(
         "powerSupply",
         new PowerSupply(new machinekit.power.DcVoltage(SUPPLY_VOLTS), new machinekit.power.DcCurrent(20), 4),
         AssemblyFrames.translation(0, -320, 0),
         "sideLeft"
-      );
+      ));
       supplyAdded = true;
     }
-    attach(
+    withGroup("Electrical", () -> attach(
       id,
       new MotorDriver("GENERIC-DM542", new machinekit.power.PhaseRmsCurrent(2.8), MICROSTEPS),
       AssemblyFrames.translation(-180 + 125 * driverIndex++, -200, 0),
       "sideLeft"
-    );
+    ));
     connectPorts('$id-power', "powerSupply", 'power$driverIndex', id, "power");
     return id;
   }
@@ -1264,7 +1273,7 @@ class CncRouter extends AxisBuilder {
     screw:LeadScrew,
     pose:AssemblyFrame,
     along:Array<Float>
-  ):Void driveScrew(
+  ):Void withGroup(axis.id.toUpperCase() + " axis/Drive", () -> driveScrew(
     axis,
     id,
     motor,
@@ -1273,7 +1282,7 @@ class CncRouter extends AxisBuilder {
     along,
     axis.id != "z",
     addDriver
-  );
+  ));
 
   /** Pitch radius of the 20-tooth GT2 belt pulleys, in millimetres. */
   static function beltRadius():Float return TimingPulley.profileDimensions(GT2).pitch * BELT_TEETH / (2 * Math.PI);

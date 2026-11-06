@@ -345,6 +345,7 @@ class TendingReach {
   /** The arm with its pneumatic service, as the study models it. */
   public static function armAssembly(source:CobotArm):MachineAssembly {
     var reachAssembly = new MachineAssembly();
+    reachAssembly.group("Robot");
     reachAssembly.include("arm", source);
     reachAssembly.addComponent("airSupply", new AirSupply(), AssemblyFrames.translation(1200, -500, 0));
     reachAssembly.connectPorts("arm-air", "airSupply", "air", "arm", "compressedAir");

@@ -121,6 +121,7 @@ class CoreXyPrinter extends AxisBuilder {
 
   public function new(?frontEnd:machinekit.control.ThermistorInput, ?material:machinekit.printing.PrintMaterialSpec) {
     super();
+    group("Frame");
     printMaterial = material == null ? machinekit.printing.PrintMaterialSpec.assumedPla175() : material;
     thermistorInput = frontEnd == null ? new machinekit.control.ThermistorInput(
       4700,
@@ -254,6 +255,7 @@ class CoreXyPrinter extends AxisBuilder {
       0.0,
       SHAPER_DAMPING
     );
+    group("XY motion");
     attach("beltA", beltA, AssemblyFrames.translation(0, 0, levelA), "sideTopLeft");
     attach("beltB", beltB, AssemblyFrames.translation(0, 0, levelB), "sideTopLeft");
     for (entry in [{id: "A", x: COLUMN_X}, {id: "B", x: -COLUMN_X}]) {
@@ -386,6 +388,7 @@ class CoreXyPrinter extends AxisBuilder {
       AssemblyFrames.translation(nx, (plateY - 3 + ny - 13) / 2, mountZ),
       "carriagePlate"
     );
+    group("Toolhead");
     attach("hotend", hotend, AssemblyFrames.translation(nx, ny, blockBottom), "toolheadMount");
     attach("nozzle", nozzle, AssemblyFrames.translation(nx, ny, NOZZLE_Z), "hotend");
     attach("cartridge",
@@ -413,7 +416,7 @@ class CoreXyPrinter extends AxisBuilder {
 
     // ---- Z: the bed on three screws and two MGN9 rails on the rear posts. --------------------------------------------
     addBed(zAxis, zSpec, shaft);
-    attach("thermistorInput", thermistorInput, AssemblyFrames.translation(140, FRONT_Y + 80, 26), "basePlate");
+    withGroup("Electrical", () -> attach("thermistorInput", thermistorInput, AssemblyFrames.translation(140, FRONT_Y + 80, 26), "basePlate"));
     connectPorts(
       "hotend-thermistor-input",
       "thermistor",
@@ -430,6 +433,7 @@ class CoreXyPrinter extends AxisBuilder {
     );
 
     // ---- Switches, drivers and the supply. -----------------------------------------------------------------------------
+    group("Homing");
     addHoming(xSpec, ySpec, zAxis, gy, xc, railZ, blockFront, plateY, railXFace, railTop, blockTop);
     homeAfter("x", ["z"]);
     homeAfter("y", ["z"]);
@@ -448,6 +452,7 @@ class CoreXyPrinter extends AxisBuilder {
 	 * extruder joint `e`; the motor's shaft follows it, three times as far, through the gear mesh.
 	 */
   function addExtruder(nx:Float, ny:Float, zE:Float, plateFront:Float):Void {
+    group("Extruder");
     var up = [0.0, 0, 1], alongY = [0.0, 1, 0];
     var spec = extruder.spec;
     var shaftX = nx + spec.hobDiameter / 2 + spec.filamentDiameter / 2;
@@ -499,6 +504,7 @@ class CoreXyPrinter extends AxisBuilder {
 
   function addBed(axis:PrinterAxisSpec,
     railSpec:machinekit.motion.LinearRailProfile.LinearRailProfileSpec, shaft:Float):Void {
+    group("Z bed");
     var up = [0.0, 0, 1], vertical = [0.0, 0, 1], alongY = [0.0, 1, 0];
     var thread = zThread();
     var bedTop = NOZZLE_Z;
@@ -691,16 +697,16 @@ class CoreXyPrinter extends AxisBuilder {
   function addDriver(motorId:String):String {
     var id = motorId + "Driver";
     if (!supplyAdded) {
-      attach(
+      withGroup("Electrical", () -> attach(
         "powerSupply",
         new PowerSupply(new machinekit.power.DcVoltage(SUPPLY_VOLTS), new machinekit.power.DcCurrent(20), 8),
         AssemblyFrames.translation(0, FRONT_Y + 40, 26),
         "basePlate"
-      );
+      ));
       supplyAdded = true;
     }
     var extruderMotor = motorId == "motorE";
-    attach(
+    withGroup("Electrical", () -> attach(
       id,
       new MotorDriver(
         "GENERIC-TMC2209",
@@ -709,7 +715,7 @@ class CoreXyPrinter extends AxisBuilder {
       ),
       AssemblyFrames.translation(-120 + 40 * driverIndex++, FRONT_Y + 80, 26),
       "basePlate"
-    );
+    ));
     connectPorts('$id-power', "powerSupply", 'power$driverIndex', id, "power");
     return id;
   }

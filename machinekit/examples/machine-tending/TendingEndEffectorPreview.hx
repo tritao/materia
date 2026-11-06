@@ -10,6 +10,7 @@ import materia.project.SceneArtifact;
 class TendingEndEffectorPreview {
   public static function preview():Bytes {
     var assembly = new MachineAssembly();
+    assembly.group("End effector");
     assembly.include(
       "tool",
       TendingReach.tendingTool().build(new RobotFlange(50)),

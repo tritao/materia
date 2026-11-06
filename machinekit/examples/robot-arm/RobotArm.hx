@@ -182,6 +182,7 @@ class RobotArm extends MachineAssembly {
     invertedMount:Bool = false
   ) {
     super();
+    group("Base and pedestal");
     this.cls = cls;
     reference = IndustrialArmReference.of(cls);
     if (armTool == null) armTool = new ArmSuctionTool();
@@ -236,10 +237,12 @@ class RobotArm extends MachineAssembly {
     // The flange turns over on the pedestal, so its plate top is the flange's z=-thickness face
     // looking along local -Z.
     addMemberConnector("baseFlange", "plateTop", AssemblyFrames.alongY(0, 0, -flange.thickness, 0, 0, -1));
+    group("Joint 1");
     addComponent("joint1", j1);
     addMate("base-joint1", "fixed", "baseFlange", "plateTop", "joint1", "stator");
     var linkNames = ["turret", "upperArm", "forearm", "wristBody", "hand"];
     for (i in 0...5) {
+      group("Joint " + (i + 1));
       addComponent(linkNames[i], links[i]);
       var start = "start";
       if (i == 2) {
@@ -251,11 +254,14 @@ class RobotArm extends MachineAssembly {
         );
       }
       revolute(specs[i], 'joint${i + 1}', "rotor", linkNames[i], start);
+      group("Joint " + (i + 2));
       addComponent('joint${i + 2}', joints[i + 1]);
       addMate('${linkNames[i]}-joint${i + 2}', "fixed", linkNames[i], "end", 'joint${i + 2}', "stator");
     }
+    group("Tool interface");
     addComponent("toolFlange", toolFlange);
     revolute(specs[5], "joint6", "tool", "toolFlange", "face");
+    group("Electrical");
     addComponent(
       "powerSupply",
       new PowerSupply(new machinekit.power.DcVoltage(48), new machinekit.power.DcCurrent(75), 6, 180, 80, 60, 2500)
@@ -265,16 +271,19 @@ class RobotArm extends MachineAssembly {
     // Each joint's servo, through its gearbox, drives it: the limits above are what the drives deliver.
     for (index in 0...6) {
       var driver = 'driver${index + 1}';
+      group("Electrical");
       addComponent(driver, new MotorDriver("GENERIC-LV-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(32)));
       addMemberConnector("pedestal", driver, Solids.axial(300, (index - 2.5) * 70, 0));
       addMate('$driver-mount', "fixed", "pedestal", driver, driver, "mount");
       connectPorts('$driver-power', "powerSupply", 'power${index + 1}', driver, "power");
       var gearbox = 'gearbox${index + 1}';
+      group("Joint " + (index + 1));
       addComponent(gearbox, specs[index].gearbox);
       addMate('$gearbox-mount', "fixed", 'joint${index + 1}', "gearbox", gearbox, "input");
       addMotor('drive_${specs[index].id}', specs[index].id, 'joint${index + 1}', driver, 0.5, gearbox);
     }
     tool = armTool.build(toolFlange);
+    group("Tool");
     include("tool", tool);
     addMate("tool-mount", "fixed", "toolFlange", "face", "tool/plate", "robot");
     exposeConnector("toolFace", "toolFlange", "face");
@@ -289,6 +298,7 @@ class RobotArm extends MachineAssembly {
 	 */
   function addCell():Void {
     function at(x:Float, y:Float, z:Float):AssemblyFrame return AssemblyFrames.translation(x, y, z);
+    group("Workholding");
     addComponent("table", new ArmTable(800, 500, TABLE_TOP), at(0, TABLE_CENTRE_Y, 0));
     var pad = new ArmBlock(WORKPIECE_WIDTH + 20, WORKPIECE_WIDTH + 20, PAD_HEIGHT, "rubber", "Pad", true);
     addComponent("padPick", pad, at(PICK_X, WORK_Y, TABLE_TOP));

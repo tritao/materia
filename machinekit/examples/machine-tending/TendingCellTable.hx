@@ -15,6 +15,7 @@ class TendingCellTable extends MachineAssembly {
 
   public function new(bankWidth:Float, depth:Float, topHeight:Float, bankOffsetX:Float) {
     super();
+    group("Support tables");
     if (!Math.isFinite(bankOffsetX) || bankOffsetX <= bankWidth / 2) throw "Table banks must be separate";
     this.bankWidth = bankWidth;
     this.depth = depth;

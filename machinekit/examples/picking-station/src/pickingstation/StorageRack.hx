@@ -17,6 +17,7 @@ class StorageRack extends MachineAssembly {
 
   public function new(config:PickingStationConfig) {
     super();
+    group("Storage rack");
     if (config == null) throw "Storage rack requires a configuration";
     this.config = config;
     frame = new RackFrame(

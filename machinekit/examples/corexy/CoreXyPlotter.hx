@@ -142,6 +142,7 @@ class CoreXyPlotter extends AxisBuilder {
 
   public function new() {
     super();
+    group("Frame");
     motor = NemaStepper.frame(17);
     var shaft = motor.variant.shaftLength;
     pulleyRadius = TimingPulley.profileDimensions(GT2).pitch * TEETH / (2 * Math.PI);
@@ -192,6 +193,7 @@ class CoreXyPlotter extends AxisBuilder {
         new BeltWrap(INNER_X, CORNER_Y, R, -1)
       ]
     );
+    group("XY motion");
     attach("beltA", beltA, AssemblyFrames.translation(0, 0, levelA), "base");
     attach("beltB", beltB, AssemblyFrames.translation(0, 0, levelB), "base");
 
@@ -347,6 +349,7 @@ class CoreXyPlotter extends AxisBuilder {
     exposeConnector("penTip", "pen", "tip");
 
     // Supply and drivers stay on the fixed frame; the supply's service port sets their voltage.
+    group("Electrical");
     attach(
       "powerSupply",
       new PowerSupply(new machinekit.power.DcVoltage(SUPPLY_VOLTS), new machinekit.power.DcCurrent(10), 2),

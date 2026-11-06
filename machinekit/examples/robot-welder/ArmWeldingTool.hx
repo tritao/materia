@@ -30,12 +30,14 @@ class ArmWeldingTool implements ArmTool {
 
   public function build(flange:RobotFlange):EndEffector {
     var result = new EndEffector();
+    result.group("Tool interface");
     result.addComponent("plate", new EndEffectorPlate(flange));
     var torch = new WeldingTorch(bendDegrees);
     var neck = new WeldingTorchNeck(bendDegrees);
     var nozzle = new WeldingTorchNozzle(bendDegrees);
     neck.includedInPurchase(torch.bom.partNumber);
     nozzle.includedInPurchase(torch.bom.partNumber);
+    result.group("Welding tool");
     result.addComponent("torch", torch);
     result.addComponent("neck", neck);
     result.addComponent("nozzle", nozzle);

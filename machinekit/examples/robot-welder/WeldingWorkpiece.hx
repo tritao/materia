@@ -72,6 +72,7 @@ class WeldingWorkpiece extends MachineAssembly {
 
   public function new(uprightLength:Float = PLATE_LENGTH, tubeSize:Float = 40) {
     super();
+    group("Weldment");
     this.uprightLength = uprightLength;
     this.tubeSize = tubeSize;
     addComponent("basePlate", new ArmBlock(PLATE_LENGTH, PLATE_WIDTH, PLATE_THICKNESS, "steel", "Base plate", true));

@@ -7,6 +7,7 @@ class MillBasePreview {
   public static function base():Bytes {
     var cell = new EnclosedBenchMill(false), state = cell.state();
     var base = new MachineAssembly();
+    base.group("Base and chip tray");
     for (member in cell.components()) if (cell.standIds.indexOf(member.id) >= 0
       || member.id == "chipTray") base.addComponent(
         member.id.split("/").join("-"),

@@ -41,6 +41,7 @@ class ToolServicePreview {
   }
   static function moduleScene(module:ToolServiceModule):haxe.io.Bytes {
     var assembly = new MachineAssembly();
+    assembly.group("Tool services");
     assembly.addComponent("junction", module);
     assembly.exposePort("powerIn", "junction", "powerIn");
     assembly.exposePort("signalIn", "junction", "signalIn");
@@ -134,6 +135,7 @@ class ToolServicePreview {
       {voltage: 24.0, current: 5.0, harness: 2.0, ok: false}
     ]) {
       var circuit = new MachineAssembly(), wrist = new ToolServiceModule(new ToolServiceSpec(24, rating.harness, 2));
+      circuit.group("Tool services");
       circuit.addComponent(
         "supply",
         new machinekit.motion.PowerSupply(
@@ -160,6 +162,7 @@ class ToolServicePreview {
       else reject(() -> junction.checkWiredLoads(circuit, "junction", loads), "actual wired source rating");
     }
     var boundary = new MachineAssembly();
+    boundary.group("Tool services");
     boundary.addComponent("junction", junction);
     boundary.exposePort("powerIn", "junction", "powerIn");
     boundary.exposePort("signalIn", "junction", "signalIn");
@@ -190,6 +193,7 @@ class ToolServicePreview {
       reject(() -> arm.installToolService(spec), "duplicate installation");
       assert(arm.hasPort("toolPower") && arm.hasPort("toolServicePowerIn"), "Missing arm electrical boundaries");
       var circuit = new MachineAssembly();
+      circuit.group("Tool services");
       circuit.include("arm", arm);
       circuit.addComponent("junction", junction, AssemblyFrames.translation(0, -200, 0));
       circuit.connectPorts("tool-power", "arm", "toolPower", "junction", "powerIn");

@@ -129,6 +129,7 @@ class MillLiftingPattern {
               if (missing
                 > 1e-6) throw "blank intersects an existing cavity or leaves the casting: " + missing + " mm3";
               var steel = new machinekit.assembly.MachineAssembly();
+              steel.group("Lifting hardware");
               steel.addComponent(id, candidate.part, F.identity());
               var checked = machinekit.design.AssemblyDesignChecks.check(steel);
               if (checked.hasErrors()) throw checked.items.map(item -> item.message).join("; ");

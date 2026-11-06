@@ -16,6 +16,7 @@ class MobileWelderCell extends MachineAssembly {
   public final tableTop:Float;
   public function new() {
     super();
+    group("Robot");
     robot = new MobileWeldingRobot();
     work = new WeldingWorkpiece();
     var carrierRadius = Math.sqrt(Math.pow(robot.length, 2) + Math.pow(robot.width, 2)) / 2;
@@ -25,13 +26,17 @@ class MobileWelderCell extends MachineAssembly {
     charger = new BatteryCharger(robot.battery.nominalVolts, 3000, dockStandoff);
     tableTop = RobotArm.TABLE_TOP + MobileBase.DECK_Z + MobileBase.DECK_THICKNESS;
     include("robot", robot, MobileBaseCell.floorFrame(ORIGIN));
+    group("Room");
     addComponent(
       "floor",
       new RoomBlock(8000, 6000, 50, "painted steel", "Floor"),
       AssemblyFrames.translation(0, 0, -50)
     );
+    group("Workholding");
     addComponent("table", new ArmTable(300, 900, tableTop), AssemblyFrames.translation(2000, 0, 0));
+    group("Weldment");
     include("work", work);
+    group("Charging");
     addComponent("charger", charger, AssemblyFrames.translation(ORIGIN.x, ORIGIN.y + dockStandoff, charger.height / 2));
     var desired:materia.assembly.AssemblyRecord.AssemblyFrame = {
       x: 2000,

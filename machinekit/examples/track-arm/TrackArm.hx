@@ -10,8 +10,10 @@ class TrackArm extends LinearTrack {
   public function new() {
     super(3000);
     arm = new RobotArm(false);
+    group("Robot");
     includeArm("arm", arm);
     tableTop = RobotArm.TABLE_TOP + mountZero.z;
+    group("Workholding");
     addComponent(
       "table",
       new ArmTable(3500, 500, tableTop),

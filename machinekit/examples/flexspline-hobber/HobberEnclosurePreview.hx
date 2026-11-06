@@ -152,7 +152,10 @@ class HobberEnclosurePreview {
   } {
     var machine = source == null ? new FlexsplineHobber() : source,
       fit = fitted(machine), shell = new GeneratedEnclosure(fit.layout), assembly = new MachineAssembly();
+      assembly.group("Machine and enclosure");
+    assembly.group("Machine");
     assembly.include("machine", machine);
+    assembly.group("Chip protection and enclosure");
     assembly.include("enclosure", shell);
     HobberEnclosureMounts.install(assembly, shell);
     HobberTrayMounts.install(assembly, shell);

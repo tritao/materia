@@ -309,6 +309,7 @@ class MobileBase extends MachineAssembly {
 	 */
   public function new(?arm:RobotArm, supplyVoltage:Float = WHEEL_SUPPLY, ?layout:MobileBaseLayout) {
     super();
+    group("Chassis");
     this.arm = arm;
     length = layout == null ? LENGTH : layout.length;
     width = layout == null ? WIDTH : layout.width;
@@ -336,6 +337,7 @@ class MobileBase extends MachineAssembly {
       AssemblyFrames.translation(0, 0, BASE_Z)
     );
 
+    group("Electrical");
     addComponent("battery", battery);
     addMate("battery-mount", "fixed", "basePlate", "battery", "battery", "base");
     if (driveSupply != null) {
@@ -349,6 +351,7 @@ class MobileBase extends MachineAssembly {
 
     // Drives: the bracket hangs from its seat, the motor sits on the bracket, and the wheel turns at the gearhead output.
     for (side in SIDES) {
+    group(side.name + " drive");
       addComponent('bracket${side.name}', bracket);
       addMate('bracket${side.name}-mount', "fixed", "basePlate", 'bracket${side.name}', 'bracket${side.name}', "top");
       addComponent('motor${side.name}', side.sign > 0 ? motor : NemaStepper.frame(23));
@@ -389,6 +392,7 @@ class MobileBase extends MachineAssembly {
       addMotor('drive${side.name}', side.joint, 'motor${side.name}', driver, 0.5, gearbox);
     }
 
+    group("Chassis");
     for (end in ["Front", "Rear"]) {
       addComponent('caster$end', caster);
       addMate('caster$end-mount', "fixed", "basePlate", 'caster$end', 'caster$end', "mount");
@@ -401,11 +405,13 @@ class MobileBase extends MachineAssembly {
     // The deck rests on all four posts; one carries it in the mate tree.
     addComponent("deck", new SeatedPlate("MOBILE-DECK", length, width, DECK_THICKNESS, "Deck", deckSeats()));
     addMate("deck-mount", "fixed", "postFrontLeft", "top", "deck", "postFrontLeft");
+    group("Sensing");
     addComponent("lidar", lidar);
     addMate("lidar-mount", "fixed", "deck", "lidar", "lidar", "base");
     exposeConnector("lidar", "lidar", "scan");
     exposeConnector("deckTop", "deck", "payload");
     if (arm != null) {
+    group("Robot");
       include("arm", arm);
       addMate("arm-mount", "fixed", "deck", "payload", "arm/pedestal", "floor");
       // Pass through the payload's declared services without assuming which tool it carries.

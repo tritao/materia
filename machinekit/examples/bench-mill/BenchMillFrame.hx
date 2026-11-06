@@ -59,6 +59,7 @@ private class MillCastingSource extends MachineAssembly {
     ?xyAxis:MillXYStageLayout
   ) {
     super();
+    group("Bed and column");
     var baseInserts = sizing.baseInserts, columnInserts = sizing.columnInserts;
     var stripCentre = sizing.stripCentre;
     base = new MineralFoundation(sizing.baseValues, baseInserts, null, null, liftingPoints(baseInserts));

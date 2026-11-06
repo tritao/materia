@@ -42,6 +42,7 @@ class MillGuidedXYStage extends AxisBuilder {
   public final guidedLayout:MillGuidedXYLayout;
   public function new(l:MillGuidedXYLayout) {
     super();
+    group("Y axis");
     guidedLayout = l;
     for (v in [
       l.saddleWidth,
@@ -171,6 +172,7 @@ class MillGuidedXYStage extends AxisBuilder {
         "saddle"
       );
     }
+    group("X axis");
     for (side in [-1, 1]) {
       attach(
         side < 0 ? "railXFront" : "railXRear",

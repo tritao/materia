@@ -507,6 +507,7 @@ class DhDualToolPreview {
       var moment = mass * 9.81 * cog.length() * 0.001;
       var serviceAdapter = machinekit.robotics.DhDualGripperServices.adapter();
       var servicePurchases = new machinekit.assembly.MachineAssembly();
+      servicePurchases.group("Tool services");
       machinekit.robotics.DhDualGripperServices.addPurchases(servicePurchases);
       sys.io.File.saveContent(
         directory + "/service-bom.json",

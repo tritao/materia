@@ -23,12 +23,15 @@ class TrackWelder extends machinekit.gantry.LinearTrack {
   public final clamp = new WorkClamp();
   public function new() {
     super(3000);
+    group("Robot");
     arm = new RobotArm(false, new ArmWeldingTool());
     includeArm("arm", arm);
     var top = RobotArm.TABLE_TOP + mountZero.z;
+    group("Workholding");
     addComponent("table", new ArmTable(3500, 500, top), AssemblyFrames.translation(1500, RobotArm.TABLE_CENTRE_Y, 0));
     addMemberConnector("table", "workSeat", Solids.axial(0, 0, top));
     var work = new MachineAssembly();
+    work.group("Weldment");
     work.addComponent("basePlate", new ArmBlock(3000, 180, 10, "steel", "Long base plate", true));
     work.addComponent("upright", new ArmBlock(2600, 8, 80, "steel", "Long upright", true));
     work.addMate("upright-mate", "fixed", "basePlate", "top", "upright", "base");
@@ -39,6 +42,7 @@ class TrackWelder extends machinekit.gantry.LinearTrack {
     addMemberConnector("work/basePlate", "clampSeat", Solids.axial(-1400, 75, 10));
     addComponent("clamp", clamp);
     addMate("clamp-mate", "fixed", "work/basePlate", "clampSeat", "clamp", "contact");
+    group("Welding services");
     addComponent("source", source, AssemblyFrames.translation(-800, 100, 0));
     addComponent("feeder", feeder, AssemblyFrames.translation(-700, 300, 0));
     addComponent("cylinder", cylinder, AssemblyFrames.translation(-800, 500, 0));

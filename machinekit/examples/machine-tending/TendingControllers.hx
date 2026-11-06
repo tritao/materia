@@ -41,6 +41,7 @@ class TendingControllers extends MachineAssembly {
 
   public function new(?production:TendingCyclePlan) {
     super();
+    group("Machine");
     this.production = production == null ? TendingCyclePlan.bearingBlocks() : production;
     // Tended stock enters as a free infeed blank; keep the vise empty in the machine body.
     mill = new EnclosedBenchMill(false);
@@ -65,6 +66,7 @@ class TendingControllers extends MachineAssembly {
     );
     cellTable = new TendingCellTable(reach.tableWidth, reach.tableDepth, reach.tableTop, reach.tableOffset);
     var infeedBlanks = new MachineAssembly();
+    infeedBlanks.group("Material handling");
     for (slot in infeed.slots) {
       var local = AssemblyFrames.compose(AssemblyFrames.inverse(infeed.frame), slot.frame);
       infeedBlanks.addComponent(
@@ -79,6 +81,7 @@ class TendingControllers extends MachineAssembly {
       );
     }
     var outfeedSensors = new MachineAssembly();
+    outfeedSensors.group("Material handling");
     for (slot in outfeed.slots) {
       var local = AssemblyFrames.compose(AssemblyFrames.inverse(outfeed.frame), slot.frame);
       outfeedSensors.addComponent(
@@ -96,6 +99,7 @@ class TendingControllers extends MachineAssembly {
     var robotNames = RobotInterfaceChannels.robotRequests();
     var fieldSensorCount = infeed.slots.length + outfeed.slots.length;
     var riserPose = AssemblyFrames.translation(baseX, baseY, 0);
+    group("Robot");
     addComponent("armRiser", new TendingCellRiser(riserHeight), riserPose);
     include("arm", arm, reach.armPlacement);
     addMemberConnector("armRiser", "armSeat", TendingCellRiser.armSeatFrame(arm, riserPose, reach.armPlacement));
@@ -110,10 +114,13 @@ class TendingControllers extends MachineAssembly {
       ),
       AssemblyFrames.translation(baseX + 350, baseY, 0)
     );
+    group("Infeed");
     include(infeed.id, infeedTray, infeed.frame);
     include("infeed", infeedBlanks, infeed.frame);
+    group("Outfeed");
     include(outfeed.id, outfeedTray, outfeed.frame);
     include("outfeed", outfeedSensors, outfeed.frame);
+    group("Support tables");
     include("cellTable", cellTable, reach.tableFrame);
     var robotInput = cncNames.length + 1;
     for (slot in infeed.slots) {
@@ -126,6 +133,7 @@ class TendingControllers extends MachineAssembly {
       addPresence(id, 'outfeedTray/${slot.name}', BenchMill.STOCK_HEIGHT + 5);
       connectPorts('field-${id}', id, "signal", "robotController", 'input${robotInput++}');
     }
+    group("Cell reference");
     addComponent("floorMarker", new MillPanel(100, 100, 2, "steel"), AssemblyFrames.translation(-1000, -1000, 0));
     for (index in 0...arm.modules.length) connectPorts(
       'robot-axis${index + 1}',

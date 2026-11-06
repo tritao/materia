@@ -71,16 +71,19 @@ class GantryWelder extends machinekit.gantry.Gantry {
     ), "GWL");
     var head:machinekit.gantry.RotaryHead = cast this.head;
     tool = new ArmWeldingTool().build(head.flange);
+    group("Welding tool");
     include("tool", tool);
     var flange = connector("toolFlange");
     addMate("torch-mount", "fixed", flange.instanceId, flange.connectorName, "tool/plate", "robot");
     exposeConnector("toolTcp", "tool/torch", "tcp");
     work = workpiece == null ? new WeldingWorkpiece() : workpiece;
     function at(x:Float, y:Float, z:Float):AssemblyFrame return AssemblyFrames.translation(x, y, z);
+    group("Welding services");
     addComponent("source", source, at(-800, 100, 0));
     addComponent("feeder", feeder, at(-700, 300, 0));
     addComponent("cylinder", cylinder, at(-800, 500, 0));
 
+    group("Workholding");
     addComponent("table", new ArmTable(900, 500, TABLE_TOP), at(600, TABLE_CENTRE_Y, 0));
     // The workpiece sits inside the gantry workspace, and its fixtures hold the plate's long edges.
     var seatY = WORK_Y - TABLE_CENTRE_Y;
@@ -93,6 +96,7 @@ class GantryWelder extends machinekit.gantry.Gantry {
     addComponent("fixtureFar", fixture);
     addMate("fixture-near-mate", "fixed", "table", "fixtureNearSeat", "fixtureNear", "base");
     addMate("fixture-far-mate", "fixed", "table", "fixtureFarSeat", "fixtureFar", "base");
+    group("Weldment");
     include("work", work);
     addMate("work-mate", "fixed", "table", "weldmentSeat", "work/basePlate", "base");
     // The work clamp sits on the plate's top, in a corner away from the seams; the work lead ends there.

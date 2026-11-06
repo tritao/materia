@@ -11,6 +11,7 @@ import materia.project.SceneArtifact;
 class EnclosureKitPreview {
   public static function assembly():MachineAssembly {
     var result = new MachineAssembly();
+    result.group("Frame");
     result.include("frame", new EnclosureFrame(1000, 600, 800));
     var root = AssemblyFrames.translation(-520, -320, -40);
     function panel(id:String, width:Float, pose:AssemblyFrame):Void {
@@ -26,12 +27,14 @@ class EnclosureKitPreview {
       );
       result.addMate(id + "-mount", "fixed", "frame/post00", id, id, "mount");
     }
+    result.group("Panels");
     panel("back", 1000, AssemblyFrames.translation(0, 320, 0));
     panel("left", 600, AssemblyFrames.fromRotationMatrix(-520, 0, 0, [0, -1, 0, 1, 0, 0, 0, 0, 1]));
     panel("right", 600, AssemblyFrames.fromRotationMatrix(520, 0, 0, [0, -1, 0, 1, 0, 0, 0, 0, 1]));
     panel("frontLeft", 250, AssemblyFrames.translation(-375, -320, 0));
     panel("frontRight", 250, AssemblyFrames.translation(375, -320, 0));
     var pose = AssemblyFrames.translation(0, -350, 0);
+    result.group("Door");
     result.include("door", new SlidingDoor(500, 800), pose);
     result.addMemberConnector("frame/post00", "door", AssemblyFrames.compose(AssemblyFrames.inverse(root), pose));
     result.addMate("door-mount", "fixed", "frame/post00", "door", "door/rail", "mount");

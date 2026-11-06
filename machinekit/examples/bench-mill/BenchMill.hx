@@ -138,8 +138,10 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
     gaugeZero = AssemblyFrames.translation(0, spindleY, tableTop + tool.stickout - specs[2].lower);
     var saddleY = spindleY + specs[1].upper / 2;
     var tableX = specs[0].upper / 2;
+    group("Bed and column");
     place("base", base, AssemblyFrames.translation(0, 0, 0));
     attach("column", column, columnPose, "base");
+    group("Y axis");
     var yRailStart = -base.depth / 2 + 5;
     var yRailLength = columnFront - 5 - yRailStart;
     var yRails:Array<LinearRail> = [];
@@ -167,6 +169,7 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
     attach("blockYRight", guideBlock, yBlocks[2], "saddle");
     attach("blockYRightRear", guideBlock, yBlocks[3], "saddle");
 
+    group("X axis");
     var xRailLength = saddle.width - 10;
     var xRails:Array<LinearRail> = [];
     for (side in [-1, 1]) {
@@ -193,6 +196,7 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
     attach("blockXBack", guideBlock, xBlocks[2], "table");
     attach("blockXBackRear", guideBlock, xBlocks[3], "table");
 
+    group("Z axis");
     var headZ = gaugeZero.z + spindle.connector("mount").frame.z;
     var zRailStart = columnPose.z + railSpec.railEndMargin;
     var zRailLength = column.height - 2 * railSpec.railEndMargin;
@@ -222,6 +226,7 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
     attach("blockZRight", guideBlock, zBlocks[2], "head");
     attach("blockZRightTop", guideBlock, zBlocks[3], "head");
     // The at-speed switch returns real feedback to the CNC program.
+    group("Spindle");
     addComponent("spindle", spindle);
     zeroPoses.set("spindle", gaugeZero);
     connect("head", "spindle");
@@ -239,6 +244,7 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
     addAtSpeed("spindle-at-speed", "spindle-turn");
     attach("holder", holder, gaugeZero, "spindle");
     attach("tool", tool, AssemblyFrames.translation(0, spindleY, gaugeZero.z - tool.stickout), "spindle");
+    group("Workholding");
     var installedVise = vise;
     if (installedVise == null) {
       if (includeWorkpiece) {
@@ -285,6 +291,7 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
 
     exposeConnector("gaugeLine", "spindle", "gaugeLine");
     exposeConnector("toolTip", "tool", "tip");
+    group("Electrical");
     attach(
       "powerSupply",
       new ThreePhaseRectifier(
@@ -336,6 +343,7 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
       column.height - Z_SCREW_SHORTENING,
       [zScrewX, (headBack + columnFront) / 2, headZ + head.height / 2]
     );
+    group("Spindle/Belt drive");
     var pulley = new TimingPulley(HTD5M, 20, 20, 15);
     var motorPulley = new TimingPulley(HTD5M, 20, 20, 15);
     var belt = TimingBelt.twoPulley(HTD5M,
@@ -391,6 +399,7 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
       Transmission.BeltReduction("spindleBelt", "spindlePulley", "spindleMotorPulley"),
       machinekit.assembly.Sense.Same
     );
+    group("Electrical");
     var spindleDriver = "spindleMotorDriver";
     attach(
       spindleDriver,
@@ -471,6 +480,7 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
   function coverFrom(id:String, row:String, wallParent:String, movingParent:String, leader:MillAxisSpec, origin:Array<Float>, moving0:Array<Float>,
       along:Array<Float>, up:Array<Float>, width:Float, height:Float, shape:WayCoverPlan.CoverShape, wallBores:Array<MountBore>, wallCuts:Array<MountCut>,
       wallBelow:Float, carrierBores:Null<Array<MountBore>>):WayCover {
+    group(leader.id.toUpperCase() + " axis/Protection");
     var axis = axisDirection(leader.id);
     var folded = dot(axis, along) > 0 ? leader.lower : leader.upper;
     var closest = [for (k in 0...3) moving0[k] + axis[k] * folded];
@@ -654,6 +664,7 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
     length:Float,
     nutCenter:Array<Float>
   ):Void {
+    group(spec.id.toUpperCase() + " axis/Drive");
     var id = "screw" + spec.id.toUpperCase();
     var motorId = "motor" + spec.id.toUpperCase();
     var motor = ServoMotor.model(spec.id == "z" ? "GENERIC-HV-SERVO-750W" : "GENERIC-HV-SERVO-400W");
@@ -828,12 +839,12 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
     supportScrew(id + "-lead", near.support, far.support);
     var driver = motorId + "Driver";
     var index = spec.id == "x" ? 1 : spec.id == "y" ? 2 : 3;
-    attach(
+    withGroup("Electrical", () -> attach(
       driver,
       new MotorDriver("GENERIC-400V-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(20)),
       AssemblyFrames.translation(-190 + index * 65, base.depth / 2 - 30, 0),
       "base"
-    );
+    ));
     powerCableCuts.push(cableCut(motorPose, zeroPose(driver), 0));
     encoderCableCuts.push(cableCut(motorPose, zeroPose(driver), motor.rating.bodyLength));
     connectPorts(driver + "-power", "powerSupply", 'power$index', driver, "power");

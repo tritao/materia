@@ -54,15 +54,21 @@ fixed and moving parts) and cross-cutting categories (all fasteners, everything 
   migrated.
 
 ## Status
-- G1 implemented: scoped functional ownership, schema 27, nested ownership roundtrips and export-time derived sets.
-  Final focused library suite passed 22 checks, including purchase-owned physical subparts.
-- G2 implemented: functional hierarchy, Sets section, independent eye/isolate controls and composed document masks.
-  Focused editor visibility suite passed (118 assertions), including rendered isolate keyboard activation and hidden-ancestor
-  isolation across save/load. Real-machine editor-tree integration passed 2858 checks. Full app validation is running.
-- G3 implemented, validated and committed: all 269 hobber members are grouped, with 16 derived sets. Final hobber baseline passed
-  2345 assertions (original baseline 2333). Changes to the hobber construction are group declarations/scopes only.
-- G4 implemented: legacy/framed mills and production hand-built examples, including inherited gantries and tracks.
-  Final hobbing, mill-frame and real-machine editor-tree tests are queued. The tree fixture covers generated artifact
-  ownership, viewport visibility, groups, derived sets and isolation persistence without CAD tessellation.
-- Initial app baseline confirmed the pre-existing CAD plate output-file failure after preceding tests passed.
-  Final app validation, tree evidence and the four separate step commits remain pending.
+- **G1 complete:** scoped functional ownership, schema 27, nested ownership roundtrips and export-time derived sets.
+  Focused library suite passed 22 checks. Older MachineAssembly descriptions must be regenerated.
+- **G2 complete:** functional hierarchy, Sets section, independent eye/isolate controls and composed document masks.
+  Focused editor visibility suite passed (118 assertions), including rendered isolate keyboard activation, overlapping
+  masks, document independence and hidden-ancestor isolation across save/load. Full app suite passed with exit 0.
+- **G3 complete:** all 269 hobber members are grouped, with 16 derived sets. Hobber baseline passed 2345 assertions
+  (original baseline 2333). Hobber construction changes are group declarations/scopes only.
+- **G4 complete:** legacy/framed mills and production hand-built examples, including inherited gantries and tracks.
+  The legacy mill has 169 grouped members; the framed concept has 474 grouped members and 33 derived sets.
+  Mill frame suite passed 951 assertions (baseline 917); hobbing suite passed 1159 assertions (baseline 1159).
+- Real-machine editor-tree integration passed 2858 checks across the hobber and both mills: artifact ownership,
+  fixed/moving visibility, group/set isolation and persisted masks. Generated evidence is
+  `app/tests/build/scene-groups-ui-tree.txt`, from `app/tests/haxeon.machine-groups.json` with an absolute output-path argument.
+  The hobber tree shows X axis (31), Fasteners (108) and Moves with X (124). UI-tree evidence and rendered control tests
+  cover the editor without using the known broken PNG capture/layout serialization path.
+- The initial app baseline reproduced the known CAD plate output-file failure. It did not recur in final validation;
+  the final full app run passed, including CAD workflow tests. No unresolved design decisions remain; optional authored
+  sets stay deferred as recorded above. G1–G4 are committed separately.

@@ -15,7 +15,9 @@ import machinekit.robotics.RobotFlange;
 class SchmalzEndEffectorExample {
   public static function build():EndEffector {
     var result = new EndEffector();
+    result.group("Tool interface");
     result.addComponent("plate", new EndEffectorPlate(new RobotFlange(50)));
+    result.group("Vacuum grip");
     result.addComponent("bar", new FrameBar(30, 20, 90));
     result.addComponent("ejector", VacuumGenerator.model("10.02.01.00563"));
     result.addComponent("cup", SuctionCup.model("10.01.01.11401"));

@@ -24,6 +24,7 @@ class MillCapacityStudy {
     var z = l.zLayout(), frame = BenchMillFrame.create(l.frame, z), xy = new MillGuidedXYStage(l.guidedXY());
     var a = MillFramePreview.assemble(new BenchMill(false, false), frame, xy);
     if (fixtureEnvelope) {
+      a.group("Workholding");
       a.addComponent(
         "fixture-envelope",
         new MillPanel(200, 150, l.fixtureHeight),

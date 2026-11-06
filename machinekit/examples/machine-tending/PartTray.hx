@@ -46,6 +46,7 @@ class PartTray extends MachineAssembly {
 
   public function new(rows:Int, columns:Int, partWidth:Float, partDepth:Float, pitchX:Float, pitchY:Float) {
     super();
+    group("Parts storage");
     if (rows < 1 || columns < 1 || !positive(partWidth) || !positive(partDepth)
       || !positive(pitchX) || !positive(pitchY) || pitchX < partWidth + PAD_EDGE_WIDTH || pitchY < partDepth
       + PAD_EDGE_DEPTH) throw 'Part tray ${rows}x${columns} needs positive stock sizes and room for its chamfered seats';

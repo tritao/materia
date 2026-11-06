@@ -46,6 +46,7 @@ class FixtureExport {
     var effector = tool.build(new RobotFlange(50));
     effector.mount("plate", "robot");
     var assembly = new MachineAssembly();
+    assembly.group("Tool and fixtures");
     assembly.include("tool", effector);
     assembly.addComponent("airSupply", new AirSupply(), AssemblyFrames.translation(1200, -500, 0));
     assembly.connectPorts("tool-air", "airSupply", "air", "tool", "compressedAir");
@@ -139,6 +140,7 @@ class FixtureExport {
       qw: grasp.toolRotation.w
     };
     var trays = new MachineAssembly(), seats:Array<Dynamic> = [];
+    trays.group("Tool and fixtures");
     var pitch:Array<Float> = config.trayPitchMm, centre:Array<Float> = config.trayTableCenterMm;
     var top:Float = config.trayTableTopMm, offset:Float = config.trayBankOffsetMm;
     var rows:Int = config.trayRows, columns:Int = config.trayColumns;

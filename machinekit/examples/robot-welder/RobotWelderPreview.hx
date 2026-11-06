@@ -329,6 +329,7 @@ class RobotWelderChecks {
     if (bare.groundedWork.join(",")
       != cell.weldment().reference) throw 'Without welds only the clamped plate is grounded, got ${bare.groundedWork}';
     var open = new machinekit.assembly.MachineAssembly();
+    open.group("Welding cell");
     open.addComponent("source", new WeldingPowerSource());
     open.addComponent("feeder", new machinekit.welding.WireFeeder());
     var failed = false;

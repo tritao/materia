@@ -28,6 +28,7 @@ class SupplierFasteners {
     var registry = machinekit.component.MachineKitComponents.standard();
     var library = new SupplierRecipeLibrary(sys.io.File.getContent(output + "/recipes.json"), registry);
     var assembly = new MachineAssembly(), plan = new SourcingPlan();
+    assembly.group("Hardware samples");
     var geometry:Array<Dynamic> = [];
     var exportStep = Sys.args().indexOf("--export-step") >= 0;
     var directory = output + "/step";
@@ -137,6 +138,7 @@ class SupplierFasteners {
     var profileOffersInput:Dynamic = haxe.Json.parse(sys.io.File.getContent(output + "/profile-families.json"));
     var profileOffers:Array<Dynamic> = profileOffersInput.supplier_offers;
     var profileAssembly = new MachineAssembly(), profilePlan = new SourcingPlan();
+    profileAssembly.group("Hardware samples");
     for (section in profiles) {
       var dimensions:Array<Float> = section.dimensions_mm;
       var drawing = new DrawingExtrusionProfile(section);

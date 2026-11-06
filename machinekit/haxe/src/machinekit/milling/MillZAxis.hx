@@ -19,6 +19,7 @@ class MillZAxis extends AxisBuilder {
 
   public function new(layout:MillZAxisLayout) {
     super();
+    group("Z axis");
     if (layout == null) throw "Z assembly needs a layout";
     this.layout = layout;
     var l = layout, f = l.frame, width = f.zRailSpacing + f.seatWidth;

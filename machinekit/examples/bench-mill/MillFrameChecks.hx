@@ -26,6 +26,10 @@ class MillFrameChecks {
       z.spindleY,
       BenchMill.RAIL
     );
+    check(reference.checkGroups().items.length == 0, "legacy mill fully grouped");
+    var referenceGroups = reference.functionalGroups();
+    for (id in ["railXFront", "table", "screwX", "motorX", "motorXEncoder"])
+      check(StringTools.startsWith(referenceGroups.get(id), "X axis"), "legacy X function owns " + id);
     // Envelope regression: shorten the front without moving the spindle or column.
     near(layout.yRailStart, -270, "compact front rail datum");
     near(layout.yRailLength, 410, "rails sized from stroke and support envelopes");
@@ -70,6 +74,7 @@ class MillFrameChecks {
     check(largerFrame.baseDepth > layout.baseDepth, "larger working envelope grows the structure");
     var frame = BenchMillFrame.create(layout, z, xy);
     frame.validate();
+    check(frame.checkGroups().items.length == 0, "cast frame fully grouped");
     var sourceDesign = machinekit.design.AssemblyDesignChecks.check(frame);
     check(
       !sourceDesign.hasErrors(),
@@ -297,6 +302,18 @@ class MillFrameChecks {
     }
     var study = MillFramePreview.concept(reference, frame);
     study.validate();
+    check(study.checkGroups().items.length == 0, "framed concept fully grouped");
+    var ownership = study.functionalGroups(), grouped = 0;
+    for (id in ownership.keys()) grouped++;
+    check(grouped == study.components().length, "framed concept ownership is total and single-valued");
+    check(ownership.get("zAxis/railLeft") == "Z axis/zAxis/Z axis", "Z fixed rail shares the axis function");
+    for (id in ownership.keys()) if (StringTools.startsWith(id, "rail-bolt-railZ"))
+      check(ownership.get(id) == ownership.get("zAxis/railLeft"), "Z rail bolt shares its fixed guide function");
+    var selections = study.sets();
+    var moves = selections.filter(s -> s.id == "moves:xyStage/x")[0].members;
+    check(moves.indexOf("xyStage/table") >= 0 && moves.indexOf("xyStage/railXFront") < 0, "mill moves-with X follows the table, not fixed guides");
+    check(selections.filter(s -> s.id == "kind:Fasteners")[0].members.length > 0, "mill fastener set derives from metadata");
+    Sys.println("Bench mill groups: " + grouped + " concept members, no ungrouped members; " + selections.length + " derived sets");
     var studyPoses:Map<String, AssemblyFrame> = study.solvedPoses();
     var referencePoses:Map<String, AssemblyFrame> = reference.solvedPoses();
     check(

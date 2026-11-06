@@ -41,6 +41,7 @@ class ScrewdrivingCell extends MachineAssembly {
     fieldHeads:Bool = false
   ) {
     super();
+    group("Robot");
     this.fieldHeads = fieldHeads;
     work = new FlangeBearingMount(
       bearing == null ? DeepGrooveBearing.metric("608") : bearing,
@@ -58,13 +59,16 @@ class ScrewdrivingCell extends MachineAssembly {
         fieldHeads
       );
     include("arm", arm);
+    group("Workholding");
     addComponent("table", new ArmTable(700, 400, RobotArm.TABLE_TOP), AssemblyFrames.translation(0, -520, 0));
+    group("Tool services");
     addComponent("controller", controller, AssemblyFrames.translation(-800, 200, 0));
     addComponent(
       "vacuum",
       new VacuumGenerator(60, null, machinekit.screwdriving.ScrewdrivingInterfaces.vacuum()),
       AssemblyFrames.translation(-800, 350, 0)
     );
+    group("Workholding");
     include("work", work);
     // The table constrains the tapped plate, not any screw or housing inferred from radius.
     addMemberConnector("table", "workSeat", Solids.axial(workX, 20, RobotArm.TABLE_TOP));
@@ -95,6 +99,7 @@ class ScrewdrivingCell extends MachineAssembly {
       addMemberConnector("table", name, Solids.axial(workX + side * stop, 20, RobotArm.TABLE_TOP));
       addMate(name + "-mount", "fixed", "table", name, name, "base");
     }
+    group("Screw supply");
     include("presenter", presenter, AssemblyFrames.translation(presenterX, presenterY, RobotArm.TABLE_TOP));
     // One cable carries distinct electrical and signal services.
     connectPorts("tool-power", "controller", "toolPower", "arm/tool/driver/body", "power");

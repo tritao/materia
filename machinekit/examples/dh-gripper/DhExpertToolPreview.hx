@@ -250,6 +250,7 @@ class DhExpertToolPreview {
     state.setJoint("a-" + DhGripperJaws.MASTER, 17);
     state.setJoint("b-" + DhGripperJaws.MASTER, 17);
     var purchases = new machinekit.assembly.MachineAssembly();
+    purchases.group("Tool services");
     machinekit.robotics.DhDualGripperServices.addPurchases(purchases);
     sys.io.File.saveContent(
       directory + "/service-bom.json",

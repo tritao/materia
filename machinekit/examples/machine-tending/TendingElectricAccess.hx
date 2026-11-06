@@ -367,6 +367,7 @@ class TendingElectricAccess {
       layout.tableFrame = shift(layout.tableFrame, 0, -setback, 0);
     }
     var cell = new EnclosedBenchMill(false), fixtures = new MachineAssembly();
+    fixtures.group("Cell fixtures");
     fixtures.include("mill", cell);
     fixtures.exposePort("mains", "mill/mill/powerSupply", "mains");
     var vise:machinekit.milling.PneumaticVise = cell.mill.vise;
@@ -374,6 +375,7 @@ class TendingElectricAccess {
     var fillOutfeed = Sys.args().indexOf("--plan-saved") >= 0 || Sys.args().indexOf("--geometry-only") >= 0;
     for (tray in layout.trays) {
       var inventory = new MachineAssembly();
+      inventory.group("Cell fixtures");
       fixtures.include(tray.id, new PartTray(2, 3, 60, 60, tray.pitchX, tray.pitchY), tray.frame);
       for (slot in tray.slots) {
         var name = slot.name.substr(5), local = AssemblyFrames.compose(AssemblyFrames.inverse(tray.frame), slot.frame);

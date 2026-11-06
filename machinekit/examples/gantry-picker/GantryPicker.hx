@@ -54,11 +54,13 @@ class GantryPicker extends Gantry {
     ), "GPK");
     var flange:RobotFlange = head == null ? cast component("flange") : head.flange;
     tool = new SuctionTool(flange);
+    group("Vacuum grip");
     include("tool", tool);
     var output = connector("toolFlange");
     addMate("tool-mount", "fixed", output.instanceId, output.connectorName, "tool/plate", "robot");
     exposeConnector("toolContact", "tool/cup", "contact");
     exposePort("compressedAir", "tool/ejector", "air");
+    group("Material handling");
     addComponent("infeed", new PickerTable(400, 300, TABLE_TOP), AssemblyFrames.translation(250, 200, 0));
     addComponent("palletTable", new PickerTable(500, 350, TABLE_TOP), AssemblyFrames.translation(1100, 650, 0));
     var pad = new PickerBlock(90, 90, PAD_HEIGHT, "rubber", "seat");

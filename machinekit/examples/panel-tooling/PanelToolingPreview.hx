@@ -119,6 +119,7 @@ class PanelToolingPreview {
     );
     var pairs = [keyed, PanelJoints.rebate("rebate", stock), PanelJoints.pinBolt("pins", stock)];
     var assembled = new MachineAssembly(), reports:Array<Dynamic> = [];
+    assembled.group("Panel tooling");
     var offsets = new Map<String, materia.assembly.AssemblyDefinition.AssemblyVector>();
     for (i in 0...pairs.length) {
       var pair = pairs[i],

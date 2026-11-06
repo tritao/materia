@@ -85,7 +85,9 @@ class MillFramePreview {
   public static function structure(frame:BenchMillFrame):MachineAssembly {
     if (frame.zAxis == null) throw "Z study needs a frame with drive interfaces";
     var axis = new MillZAxis(frame.zAxis), result = new MachineAssembly();
+    result.group("Bed and column");
     result.include("frame", frame);
+    result.group("Z axis");
     result.include("zAxis", axis);
     var framePoses:Map<String, AssemblyFrame> = frame.solvedPoses();
     var plate = axis.zeroPose("fixedMount");
@@ -96,6 +98,7 @@ class MillFramePreview {
     );
     result.addMemberConnector("zAxis/fixedMount", "frameSeat", F.identity());
     result.addMate("z-on-column", "fixed", "frame/column/railZLeft", "axisSeat", "zAxis/fixedMount", "frameSeat");
+    result.group(result.functionalGroups().get("zAxis/railLeft"));
     machinekit.milling.MillRailFasteners.install(
       result,
       frame.column,
@@ -125,6 +128,7 @@ class MillFramePreview {
     var result = structure(frame);
     attachSpindle(reference, result, frame.zAxis, spindle);
     var driven = Std.downcast(xy, machinekit.milling.MillXYStage);
+    result.group("XY stage");
     result.include("xyStage", driven == null ? xy : MillFrameCovers.stage(driven));
     var poses:Map<String, AssemblyFrame> = frame.solvedPoses();
     result.addMemberConnector(
@@ -134,6 +138,8 @@ class MillFramePreview {
     );
     result.addMemberConnector("xyStage/railYLeft", "frameSeat", F.identity());
     result.addMate("xy-on-base", "fixed", "frame/base/casting", "stageSeat", "xyStage/railYLeft", "frameSeat");
+    // The frame's rail bolts belong to the same function as the stage's fixed rails.
+    result.group(result.functionalGroups().get("xyStage/railYLeft"));
     machinekit.milling.MillRailFasteners.install(
       result,
       frame.base,
@@ -196,6 +202,7 @@ class MillFramePreview {
     spindleParts.addMemberConnector("tool", "seat", F.identity());
     spindleParts.addMate("tool-in-holder", "fixed", "holder", "toolSeat", "tool", "seat");
     declareSpindleServices(spindleParts);
+    result.group("Spindle");
     result.include("spindle", spindleParts);
     var axis = new MillZAxis(spindleLayout);
     result.addMemberConnector(

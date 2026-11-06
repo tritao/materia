@@ -19,6 +19,7 @@ class MillXYStage extends MillGuidedXYStage {
 
   public function new(layout:MillXYStageLayout) {
     super(requireGuides(layout));
+    group("Y axis/Drive");
     this.layout = layout;
     var l = layout;
     var y = orient(0, l.yScrewStart, l.yScrewZ, [0, 0, 1], [0, -1, 0]);
@@ -51,6 +52,7 @@ class MillXYStage extends MillGuidedXYStage {
       F.compose(y, F.translation(0, 0, l.yScrewStart - yFace - l.nut.bodyLength - l.nut.flangeThickness)),
       "nutBracketY"
     );
+    group("X axis/Drive");
     var x = orient(l.xScrewStart, l.centreY, l.xScrewZ, [0, 0, 1], [1, 0, 0]);
     foldedXDrive(x);
     movingNut("X", x, -l.xScrewStart, "table", true);
@@ -73,6 +75,7 @@ class MillXYStage extends MillGuidedXYStage {
     }
     // Nominal bearing bolts: 43 mm housing + 12 mm pedestal engagement.
     for (a in ["X", "Y"]) if (a != "Y" || !l.supplierY) for (end in ["fixed", "floating"]) for (side in [-1, 1]) {
+      group(a + " axis/Drive");
       var bearing = zeroPose('${end}Bearing$a');
       var centre = F.transformPoint(bearing, side * 23, 18, 0);
       attach(
@@ -82,6 +85,7 @@ class MillXYStage extends MillGuidedXYStage {
         '${end}Bearing$a'
       );
     }
+    group("X axis/Drive");
     for (side in [-1, 1]) for (height in [10, 70]) attach(
       'motorPlateBoltX$side$height',
       SocketHeadCapScrew.metric("M6", 25),
@@ -89,6 +93,7 @@ class MillXYStage extends MillGuidedXYStage {
       l.centreY + side * 32, l.saddleBottom + height, [0, 0, 1], [-1, 0, 0]),
       "motorMountX"
     );
+    group("Y axis/Protection");
     attach(
       "motorCoverY",
       new MillDriveHatch(new ComponentValues().setNumber("lowerZ", l.yHatchLowerZ).setNumber("upperZ", l.yHatchUpperZ)),
@@ -101,6 +106,7 @@ class MillXYStage extends MillGuidedXYStage {
       orient(side * 75, l.yServiceRear + 4, row.z, [0, 0, 1], [0, 1, 0]),
       "motorCoverY"
     );
+    group("X axis/Protection");
     attach(
       "motorCoverX",
       new MillMotorCover(new ComponentValues().setNumber("width", 90).setNumber("depth", 38).setNumber("height", 142)),

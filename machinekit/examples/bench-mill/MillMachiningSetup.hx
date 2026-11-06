@@ -42,6 +42,7 @@ class MillMachiningSetup {
     if (tablePart.parameterNumber("width") < 204
       || tablePart.parameterNumber("depth") < 194) throw "Table cannot support the 200 x 190 mm workholding adapter";
     var origin = F.translation(gauge.x, gauge.y, tableTop);
+    assembly.group("Workholding");
     assembly.include("workholding", vise, origin);
     assembly.addMemberConnector(table, "viseMount", F.compose(F.inverse(poses.get(table)), origin));
     assembly.addMemberConnector("workholding/body", "tableSeat", F.identity());

@@ -89,8 +89,10 @@ class MobileBaseCell extends MachineAssembly {
 
   public function new() {
     super();
+    group("Robot");
     include("robot", robot, floorFrame(ORIGIN));
     exposePort("compressedAir", "robot/arm/tool/ejector", "air");
+    group("Room");
     var hx = ROOM_LENGTH / 2, hy = ROOM_WIDTH / 2;
     var wallX = new RoomBlock(ROOM_LENGTH + 2 * WALL, WALL, WALL_HEIGHT, "painted steel", "Wall");
     var wallY = new RoomBlock(WALL, ROOM_WIDTH, WALL_HEIGHT, "painted steel", "Wall");
@@ -104,6 +106,7 @@ class MobileBaseCell extends MachineAssembly {
     addComponent("wallSouth", wallX, AssemblyFrames.translation(0, -hy - WALL / 2, 0));
     addComponent("wallEast", wallY, AssemblyFrames.translation(hx + WALL / 2, 0, 0));
     addComponent("wallWest", wallY, AssemblyFrames.translation(-hx - WALL / 2, 0, 0));
+    group("Workholding");
     table("tableNorth", 800, 500, AT_NORTH);
     table("tableEast", 500, 800, AT_EAST);
     var seat = seatAhead(AT_NORTH);

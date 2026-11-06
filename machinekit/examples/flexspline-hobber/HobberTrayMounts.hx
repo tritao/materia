@@ -8,6 +8,7 @@ import materia.assembly.AssemblyFrames as F;
 /** Separate clamp/bolt occurrences, anchored to local steel inserts rather than through the laminate. */
 class HobberTrayMounts {
   public static function install(assembly:MachineAssembly, shell:GeneratedEnclosure):Void {
+    assembly.group("Chip protection and enclosure/Mounts");
     var poses = assembly.solvedPoses(), casting = poses.get("machine/bed/casting"), i = 0;
     for (row in FoundationLayout.trayClampSeats()) {
       var parent = "machine/bed/" + row.id;

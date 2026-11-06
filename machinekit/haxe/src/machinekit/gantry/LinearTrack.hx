@@ -50,6 +50,7 @@ class LinearTrack extends AxisBuilder {
 
   public function new(travel:Float = 3000, initial:Float = 0) {
     super();
+    group("Track");
     if (!Math.isFinite(travel) || travel <= 0 || !Math.isFinite(initial) || initial < 0
       || initial > travel) throw "Track needs positive finite travel and an initial coordinate inside it";
     axis = {id: "track", lower: 0.0, upper: travel, initial: initial};
@@ -203,7 +204,7 @@ class LinearTrack extends AxisBuilder {
   /** Preserve the arm's level and its drives; only its floor interface is mated here. */
   public function includeArm(id:String, arm:MachineAssembly):Void {
     var floor = arm.connector("floor");
-    include(id, arm);
+    withGroup("Robot", () -> include(id, arm));
     for (name in arm.portNames()) {
       var port = arm.port(name, id);
       exposePort(id + "/" + name, port.instanceId, port.portName);

@@ -48,11 +48,13 @@ class WeldingCell extends MachineAssembly {
 
   public function new(?workpiece:WeldingWorkpiece) {
     super();
+    group("Robot");
     work = workpiece == null ? new WeldingWorkpiece() : workpiece;
     include("arm", arm);
     // The feeder rides on the upper arm, on the side the tube's centre line faces, and moves with it.
     var tube = 40.0;
     addMemberConnector("arm/upperArm", "feederSeat", AssemblyFrames.alongY(tube, 0, 160, 1, 0, 0));
+    group("Welding services");
     addComponent("feeder", feeder);
     addMate("feeder-mate", "fixed", "arm/upperArm", "feederSeat", "feeder", "mount");
 
@@ -60,6 +62,7 @@ class WeldingCell extends MachineAssembly {
     addComponent("source", source, at(-1000, 100, 0));
     addComponent("cylinder", cylinder, at(-1000, 500, 0));
 
+    group("Workholding");
     addComponent("table", new ArmTable(900, 500, TABLE_TOP), at(0, TABLE_CENTRE_Y, 0));
     // The workpiece sits at the arm's work position, and its fixtures hold the plate's long edges.
     var seatY = WORK_Y - TABLE_CENTRE_Y;
@@ -72,6 +75,7 @@ class WeldingCell extends MachineAssembly {
     addComponent("fixtureFar", fixture);
     addMate("fixture-near-mate", "fixed", "table", "fixtureNearSeat", "fixtureNear", "base");
     addMate("fixture-far-mate", "fixed", "table", "fixtureFarSeat", "fixtureFar", "base");
+    group("Weldment");
     include("work", work);
     addMate("work-mate", "fixed", "table", "weldmentSeat", "work/basePlate", "base");
     // The work clamp sits on the plate's top, in a corner away from the seams; the work lead ends there.

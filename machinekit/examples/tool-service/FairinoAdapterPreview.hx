@@ -18,6 +18,7 @@ class FairinoAdapterPreview {
     var dir = root + "/machinekit/examples/tool-service/build/fairino-adapters";
     sys.FileSystem.createDirectory(dir);
     var assembly = new MachineAssembly();
+    assembly.group("Tool adapters");
     var records:Array<{
       variant:String,
       manufacturer:String,
@@ -48,6 +49,7 @@ class FairinoAdapterPreview {
       part.exportStep(dir + "/" + variant.toLowerCase() + ".step");
       part.close();
       var single = new MachineAssembly();
+      single.group("Tool adapters");
       single.addComponent("adapter", adapter);
       single.exposePort("robotSignal", "adapter", "robotSignal");
       single.exposePort("powerIn", "adapter", "powerIn");
@@ -72,6 +74,7 @@ class FairinoAdapterPreview {
     // Repeated purchased units aggregate; Standard and Expert remain separate lines.
     assembly.addComponent("Standard-spare", new FairinoDualToolAdapter(), AssemblyFrames.translation(-100, 0, 0));
     var selected = new MachineAssembly();
+    selected.group("Tool adapters");
     machinekit.robotics.DhDualGripperServices.addPurchases(selected);
     var selectedBom = selected.billOfMaterials();
     check(

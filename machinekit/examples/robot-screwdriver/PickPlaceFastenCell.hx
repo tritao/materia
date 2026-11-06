@@ -51,12 +51,14 @@ class PickPlaceFastenCell extends ScrewdrivingCell {
       new ParallelGripperSpec(32, work.plate.width, 60, 16, false, 12, 6)
     );
     handling = new RobotArm(false, gripper);
+    group("Handling robot");
     include(
       "handling",
       handling,
       {x: -550, y: -450, z: 0, qx: 0, qy: 0, qz: Math.sin(Math.PI / 4), qw: Math.cos(Math.PI / 4)}
     );
     // Keep a 25 mm gap from the fastening table while supporting all three tray footprints.
+    group("Material handling");
     addComponent("handlingTable",
       new ArmTable(800, 350, RobotArm.TABLE_TOP), AssemblyFrames.translation(-400, -920, 0));
     housingTray = new PartTray(1, 1, housing.face, housing.face, housing.face + 20, housing.face + 20);
@@ -70,6 +72,7 @@ class PickPlaceFastenCell extends ScrewdrivingCell {
     // The placement targets are bottom datums; the runtime preserves the measured grasp offset.
     addMemberConnector("table", "plateSeat", AssemblyFrames.translation(0, 20, RobotArm.TABLE_TOP));
     addMemberConnector("work/plate", "housingSeat", AssemblyFrames.alongY(0, 0, work.plate.thickness, 0, 0, 1));
+    group("Controls and services");
     addComponent(HANDLING_CONTROLLER, new RobotController(6, 5, 1, 4), AssemblyFrames.translation(-1100, -450, 0));
     addComponent(FASTENING_CONTROLLER, new RobotController(6, 9, 9, 0), AssemblyFrames.translation(-450, 200, 0));
     for (axis in 1...7) {

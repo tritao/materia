@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machine-group-tree-tests"
+  },
+  "entry": "tests.MachineGroupTreeTests",
+  "sourceRoots": [
+    "machine-groups",
+    "../../processkit/tests/moonraker",
+    "../../machinekit/examples/flexspline-hobber",
+    "../../machinekit/examples/bench-mill",
+    "../../machinekit/examples/cnc-router",
+    "../../machinekit/examples/casting-shop"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "app": {
+      "path": ".."
+    },
+    "processkit": {
+      "path": "../../processkit"
+    },
+    "robotkit-autonomy": {
+      "path": "../../robotkit/autonomy"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/machine-groups"
+}

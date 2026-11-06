@@ -35,6 +35,7 @@ class PickingStation {
   /** The station's physical inventory, including hardware without a placed model. */
   public function assembly():MachineAssembly {
     var result = new MachineAssembly();
+    result.group("Picking station");
     result.include("rack", rack);
     result.addComponent("operator-bench", bench, AssemblyFrames.translation(benchX, 0, 0));
     result.addBomItem(SocketHeadCapScrew.metric("M5", 12).bom, 4);
