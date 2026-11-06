@@ -2,6 +2,7 @@
 """Measure a fixed full-turn desktop orbit, including the ordinary UI frame path."""
 
 import argparse
+import csv
 import json
 import math
 import os
@@ -32,6 +33,23 @@ def display_sample():
 
 def records(path):
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def inventory_summary(path):
+    with path.open() as source:
+        nodes = list(csv.DictReader(source, delimiter="\t"))
+    visible = [node for node in nodes if node["hidden"] == "0"]
+    return {
+        "nodes": len(nodes), "shownNodes": len(visible),
+        "shownGeometries": len({node["geometry"] for node in visible}),
+        "shownMaterials": len({node["material"] for node in visible}),
+        "shownGeometryMaterialPairs": len({(node["geometry"], node["material"]) for node in visible}),
+        "largestMeshes": [dict(name=node["name"], triangles=int(node["triangles"]),
+                               strokes=int(node["strokes"]), geometry=node["geometry"], material=node["material"])
+                          for node in sorted(visible, key=lambda node: int(node["triangles"]), reverse=True)[:20]],
+        "mostStrokes": [dict(name=node["name"], strokes=int(node["strokes"]))
+                        for node in sorted(visible, key=lambda node: int(node["strokes"]), reverse=True)[:20]],
+    }
 
 
 def summarize(output, warmup, count):
@@ -85,6 +103,7 @@ def summarize(output, warmup, count):
             sceneSubmitMs=sample["submitMilliseconds"],
             gpuMs=sample["gpuMilliseconds"],
             gpuPassMs=sample["gpuPassMilliseconds"],
+            passWork=sample.get("passWork", {}),
             drawCalls=sample["drawCalls"], triangles=sample["triangles"],
             uploadBytes=sample["uploadBytes"],
         ))
@@ -104,6 +123,19 @@ def summarize(output, warmup, count):
         values = sorted(row[name] for row in rows)
         summary[name] = {"mean": statistics.mean(values), "median": statistics.median(values),
                          "p95": values[int((len(values) - 1) * .95)], "max": max(values)}
+    summary["gpuPassMs"] = {}
+    summary["passWork"] = {}
+    for name in sorted(rows[0]["gpuPassMs"]):
+        values = sorted(row["gpuPassMs"][name] for row in rows)
+        summary["gpuPassMs"][name] = {"median": statistics.median(values),
+                                         "p95": values[int((len(values) - 1) * .95)]}
+    for name in sorted(rows[0]["passWork"]):
+        summary["passWork"][name] = {
+            metric: statistics.median(row["passWork"][name][metric] for row in rows)
+            for metric in ("drawCalls", "triangles")}
+    inventory = output / "scene-timeline.jsonl.inventory.tsv"
+    if inventory.exists():
+        summary["inventory"] = inventory_summary(inventory)
     (output / "orbit-summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     print("frame,cpu_ms,gpu_ms,draw_calls,triangles,upload_bytes")
     for row in rows:
@@ -118,6 +150,9 @@ def main():
     parser.add_argument("--frames", type=int, default=360)
     parser.add_argument("--warmup", type=int, default=60)
     parser.add_argument("--msaa", type=int, choices=(1, 2, 4), default=4)
+    parser.add_argument("--project", type=Path,
+                        default=ROOT / "machinekit/examples/flexspline-hobber/materia.project.json",
+                        help="project to orbit (default: flexspline hobber)")
     parser.add_argument("--launcher", default="", help="optional command prefix, e.g. 'heavy-run --slots 4 --need 4G --'")
     parser.add_argument("--report-only", action="store_true")
     args = parser.parse_args()
@@ -140,9 +175,9 @@ def main():
                    "--project", str(ROOT / "app/haxeon.json"), "--", "--orbit-benchmark",
                    "--perspective", "--width=1320", "--height=900", f"--msaa={args.msaa}",
                    f"--capture-dir={output}", f"--frames={args.frames + args.warmup + DRAIN_FRAMES}",
-                   "--project=" + str(ROOT / "machinekit/examples/flexspline-hobber/materia.project.json")]
+                   "--project=" + str(args.project.resolve())]
         (output / "command.json").write_text(json.dumps(command, indent=2) + "\n")
-        metadata = {"arguments": vars(args) | {"output": str(output)},
+        metadata = {"arguments": vars(args) | {"output": str(output), "project": str(args.project.resolve())},
                     "display": environment.get("DISPLAY")}
         for name, query in (("commit", ["git", "rev-parse", "HEAD"]),
                             ("haxeonCommit", ["git", "-C", "haxeon", "rev-parse", "HEAD"]),

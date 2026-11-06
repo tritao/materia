@@ -35,6 +35,7 @@ class OrbitReportTests(unittest.TestCase):
             self.gpu.append(dict(frame=index, startedAtSeconds=start + .001,
                                  prepareMilliseconds=.1, submitMilliseconds=.2,
                                  gpuMilliseconds=value * 2, gpuPassMilliseconds={"surfaces": value * 2},
+                                 passWork={"surfaces": {"drawCalls": value * 5, "triangles": value * 50}},
                                  drawCalls=value * 5, triangles=value * 50, uploadBytes=0))
             self.inputs.append(dict(startedAtSeconds=start + .003, inputMilliseconds=1,
                                     orbiting=True, yaw=index * math.pi / 180, pitch=.35,
@@ -63,11 +64,28 @@ class OrbitReportTests(unittest.TestCase):
         self.assertEqual(summary["inputMs"]["mean"], 1)
         self.assertEqual(summary["viewSetupMs"]["mean"], .5)
         self.assertEqual(summary["planPrepareMs"]["mean"], .3)
+        self.assertEqual(summary["gpuPassMs"]["surfaces"]["median"], 5)
+        self.assertEqual(summary["passWork"]["surfaces"], {"drawCalls": 12.5, "triangles": 125})
 
     def test_rejects_missing_gpu_result(self):
         self.gpu[3]["gpuMilliseconds"] = None
         with self.assertRaisesRegex(RuntimeError, "missing GPU"):
             self.report()
+
+    def test_inventory_distinguishes_occurrences_from_resources(self):
+        path = self.output / "scene-timeline.jsonl.inventory.tsv"
+        path.write_text("node\tgeometry\tmaterial\ttriangles\tstrokes\thidden\tculled\tname\n"
+                        "1\t1\t1\t100\t10\t0\t0\tFirst screw\n"
+                        "2\t1\t2\t100\t10\t0\t1\tSecond screw\n"
+                        "3\t2\t3\t9999\t99\t1\t0\tHidden part\n")
+        self.report()
+        census = json.loads((self.output / "orbit-summary.json").read_text())["inventory"]
+        self.assertEqual(census["nodes"], 3)
+        self.assertEqual(census["shownNodes"], 2)
+        self.assertEqual(census["shownGeometries"], 1)
+        self.assertEqual(census["shownMaterials"], 2)
+        self.assertEqual(census["shownGeometryMaterialPairs"], 2)
+        self.assertEqual(census["largestMeshes"][0]["triangles"], 100)
 
     def test_rejects_missing_input(self):
         del self.inputs[3]

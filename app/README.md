@@ -795,6 +795,15 @@ Use `--report-only` with the same frame/warmup settings to regenerate a report.
 Check report aggregation and failure handling without a display with
 `python3 app/tools/test-benchmark-orbit.py`.
 
+Use `--project=/absolute/path/to/materia.project.json` on the runner to repeat
+the same orbit on another machine (for example `bench-mill/materia.bench.project.json`
+or `machine-tending/materia.project.json` under `machinekit/examples`). Prime each
+project's cache before comparing warm opens. The summary also includes median/p95
+GPU time and draw/triangle work per pass. Native scene captures write a sibling
+`scene-timeline.jsonl.inventory.tsv` with the latest node names, geometry/material
+IDs, base triangle and stroke counts, and hidden/culled flags. Inventory export
+runs only when the scene snapshot changes and precedes scene timing.
+
 UIKit's reusable Component Lab can be opened through the same desktop host:
 
 ```sh

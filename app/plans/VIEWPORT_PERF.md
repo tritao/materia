@@ -335,3 +335,23 @@ Round 2, everything else, measured on the committed orbit benchmark (`app/tools/
 4. **CPU per frame.** Profile the remaining 4.4 ms (scene update, culling, uniform uploads, render-graph build) and cut what is
    per-frame but camera-independent.
 5. **Scale.** Re-run on the bench mill and the tending cell as well as the hobber, so the gains are general.
+
+### Round 2 status: diagnosis in progress
+
+Read the retained viewport, SceneRenderer, render compiler, GPU executor and nkgpu draw path.
+Frustum culling and geometry/material instancing already exist. Surface, stroke and AO passes
+each submit the visible batches; these are not per-face draws. Each loaded occurrence receives
+its own material resource, potentially splitting repeated geometry into separate batches.
+Quantify that split before changing ownership or batching.
+
+The orbit runner now accepts `--project` for the scale checks, summarizes GPU passes and
+per-pass draw/triangle work, and exports a node/resource inventory beside the native timeline.
+No rendering behavior, quality, tessellation or scheduling change yet. Native instrumentation
+compiles; eight report tests and the native compiler/GPU/AO/section-cap/contour suites pass.
+The first current-source hobber capture (`r2-baseline-hobber-01`) completed: 35.73 fps,
+8.74 ms median CPU (22.68 p95), 6.86 ms scene GPU (19.64 p95), 1,540 median draws and
+2,299,637 median submitted triangles. This run primed changed source geometry; it is not the
+warm acceptance baseline. Publishing the instrumentation library also invalidates the
+generator fingerprint, so `r2-baseline-hobber-02` primes that dependency before the unchanged
+warm run and resource census. No gain is claimed from the timing variation. Artifacts use the `r2-` prefix
+under `/media/joao/DATA1/claude-hobber-tools/tmp/`.

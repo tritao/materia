@@ -41,11 +41,13 @@ public:
         double submit_ms = 0.0;
         nkgpu_renderer_stats before{};
         std::uint64_t draw_calls = 0, triangles = 0, upload_bytes = 0;
+        std::map<std::string, std::uint64_t> pass_triangles, pass_draws;
+        std::string current_pass;
         bool active = false;
         bool gpu_failed = false;
     };
 
-    explicit CaptureProfiler(const char *path) : output_(path, std::ios::app) {
+    explicit CaptureProfiler(const char *path) : output_(path, std::ios::app), inventory_path_(std::string(path) + ".inventory.tsv") {
         if (const auto *value = std::getenv("NK_SCENE_GPU_TIMING_INTERVAL"); value && *value) {
             char *end = nullptr;
             const auto parsed = std::strtoul(value, &end, 10);
@@ -55,6 +57,28 @@ public:
     }
     bool enabled() const noexcept { return output_.is_open(); }
     bool active() const noexcept { return active_frame_; }
+
+    // Camera motion leaves the inventory intact. Keep the latest resource-level
+    // census beside the timeline, outside the measured submission interval.
+    void inventory(const RenderPlan &plan, const SceneSnapshot &snapshot) {
+        if (inventory_revision_ == snapshot.revision()) return;
+        inventory_revision_ = snapshot.revision();
+        std::ofstream out(inventory_path_);
+        out << "node\tgeometry\tmaterial\ttriangles\tstrokes\thidden\tculled\tname\n";
+        for (const auto &item : plan.items()) {
+            const auto *geometry = snapshot.find_geometry(item.geometry);
+            const auto *node = snapshot.find_node(item.node);
+            if (!geometry || !node) continue;
+            auto name = node->name;
+            for (auto &c : name) if (c == '\t' || c == '\n' || c == '\r') c = ' ';
+            out << item.node.value << '\t' << item.geometry.value << '\t' << item.material.value
+                << '\t' << geometry->payload->element_count()/3
+                << '\t' << geometry->payload->stroke_segments.size()
+                << '\t' << has_render_flag(item.flags, RenderFlags::Hidden)
+                << '\t' << has_render_flag(item.flags, RenderFlags::Culled)
+                << '\t' << name << '\n';
+        }
+    }
 
     Sample start(nkgpu_renderer renderer) {
         ++frame_count_;
@@ -112,12 +136,18 @@ public:
     };
     void pass(const char *name) { if(current_) begin(*current_,name); }
     void triangles(std::uint64_t elements, std::uint64_t instances = 1) {
-        if (current_) current_->triangles += (elements / 3) * instances;
+        if (current_) {
+            const auto count = (elements / 3) * instances;
+            current_->triangles += count;
+            current_->pass_triangles[current_->current_pass] += count;
+            ++current_->pass_draws[current_->current_pass];
+        }
     }
     void pause() { if(current_) end(*current_); }
     void begin(Sample &sample, const char *name="surfaces") {
         if (!sample.active) return;
         end(sample);
+        sample.current_pass = name;
         if (!queries_supported_ || pending_.size() >= 8) return;
         Interval interval;interval.pass=name;
         if(nkgpu_timestamp_begin(sample.renderer,&interval.query)!=NKGPU_OK) {
@@ -157,6 +187,8 @@ public:
 private:
     Sample *current_=nullptr;
     std::ofstream output_;
+    std::string inventory_path_;
+    std::uint64_t inventory_revision_ = ~std::uint64_t{0};
     std::vector<Sample> pending_;
     std::uint64_t frame_count_ = 0;
     std::uint64_t sample_interval_ = 16;
@@ -205,6 +237,12 @@ private:
         line<<",\"gpuPassMilliseconds\":{";
         bool first=true;
         for(const auto &[name,ms]:passes){if(!first)line<<",";first=false;line<<"\""<<name<<"\":";if(valid)line<<ms;else line<<"null";}
+        line << "},\"passWork\":{";
+        first=true;
+        for(const auto &[name,count]:sample.pass_triangles) {
+            if(!first)line<<",";first=false;
+            line<<"\""<<name<<"\":{\"triangles\":"<<count<<",\"drawCalls\":"<<sample.pass_draws.at(name)<<"}";
+        }
         line << "},\"clipPlaneCount\":"<<sample.clip_plane_count<<",\"viewProjection\":[";
         for(std::size_t i=0;i<sample.view_projection.size();++i){if(i)line<<",";line<<sample.view_projection[i];}
         line << "]}\n";

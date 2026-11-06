@@ -3085,6 +3085,7 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     state_->viewport_height = height;
 
     auto *profiler = state_->capture_profiler.get();
+    if (profiler) profiler->inventory(plan, snapshot);
     render_internal::CaptureProfiler::Sample timing;
     if (profiler) {
         timing = profiler->start(state_->renderer);
