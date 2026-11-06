@@ -162,7 +162,7 @@ def solve(tmap, E, nu):
         for n in tied_sole:
             T[3 * n, m] = 1.0
             T[3 * n, m + 1] = xy(n)[0] - x0
-            T[3 * n + 2, m + 1] = 1.0  # rotation about y (matches slope d w/dx)
+            T[3 * n + 2, m + 1] = -1.0  # ty = -dw/dx: the element's shear strain is w,x + ty (fixed 2026-11-06: the tie was +1, which put a shear strain 2 theta in the whole sole)
         T = T.tocsr()
         Kr = (T.T @ Kc @ T).tocsc()
         Fr = np.zeros(m + 2)

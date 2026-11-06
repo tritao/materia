@@ -19,7 +19,8 @@ R = HERE / "results"
 # Hand estimates (FRAME_PLAN.md 2026-11-04 / 2026-11-05 log, HobberFrameChecks.spindleDrive, frame_stiffness.py) and gates.
 HAND = {
     "cradle": {"axial_Hz": 1432, "vertical_Hz": 1870, "lateral_Hz": 3017, "unpreloaded_Hz": 940, "gate_Hz": 1248, "band_Hz": [199, 960]},
-    "carriage": {"front_tie_N_per_um": 28.9, "sole_tilt_kNm_per_rad": 263923.9},
+    # Plate model (frame_stiffness.py) steel 20 mm deck + 25 mm ribs; the sole tilt was 263923.9 before the ty sign fix of 2026-11-06 (see the FRAME_PLAN log).
+    "carriage": {"front_tie_N_per_um": 28.9, "sole_tilt_kNm_per_rad": 11751.4, "sole_tilt_flat_kNm_per_rad": 7306.1, "welded_U_front_tie_N_per_um": 3.68, "welded_U_sole_tilt_kNm_per_rad": 6272.8},
     "saddle": {},
 }
 
