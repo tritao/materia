@@ -750,6 +750,45 @@ include UI tree construction and native layout, but no window or GPU rendering.
 The command prints per-action frame and tree/style medians, node counts, and
 style-cache misses.
 
+To benchmark camera orbit through the complete desktop editor frame path on the
+flexspline hobber (requires a display and the pinned release HashLink runtime):
+
+```sh
+export CADKIT_OCCT_DIR=$HOME/dev/materia-cache/occt-f1dc4efb-release
+python3 app/tools/benchmark-orbit.py --output=/absolute/path/to/orbit-run
+```
+
+Run once to populate the scene cache, then compare warm opens on the same machine.
+On the shared development machine, add
+`--launcher='/home/joao/dev/materia-cache/tools/heavy-run --slots 4 --need 4G --label viewport --'`
+to queue the editor build/run with the other sessions.
+The runner sets `MATERIA_ROOT` to this checkout for supplier CAD resolution
+(Haxeon launches the app with `app/` as its working directory), and keeps
+temporary project-generation files inside the output directory.
+Compiler workers use a one-second idle timeout for these bounded runs so they
+release their retained build memory and inherited queue handles promptly.
+The benchmark uses an isolated default workspace at 1320×900, 4× MSAA, 60 warmup
+frames, a full 360-frame orbit at one degree per frame, and eight trailing frames
+to drain asynchronous GPU queries. `--msaa=1|2|4` overrides the sample count.
+The `--orbit-benchmark` editor flag routes captured middle-button drags through
+`UiContext` after each rendered frame, including navigation and hover hit-testing.
+Its dedicated pointer ID prevents physical mouse motion from changing the scripted
+arc; the report checks one degree per frame and constant pitch.
+It preserves normal UI submission, scene presentation, lighting and geometry.
+Per-frame CSV and summary JSON print to stdout; `orbit-frames.jsonl` and
+`orbit-summary.json` retain CPU/GPU milliseconds, draw calls, submitted triangles
+(including AO and edge triangles), and resource upload bytes. CPU phase splits
+come from the desktop host and SceneKit, with routed input time also recorded;
+GPU timestamps cover the scene passes. Frame CPU time includes the input callback.
+View setup and SceneKit plan preparation are timed separately from native executor
+preparation/submission. These are nested CPU phases within custom paint, not additive
+to the total frame CPU time.
+FPS uses frame start cadence, including host scheduling. Loading and warmup are
+excluded. Missing scene renders or GPU results fail the report instead of showing
+zero. Use `--report-only` with the same frame/warmup settings to regenerate a report.
+Check report aggregation and failure handling without a display with
+`python3 app/tools/test-benchmark-orbit.py`.
+
 UIKit's reusable Component Lab can be opened through the same desktop host:
 
 ```sh

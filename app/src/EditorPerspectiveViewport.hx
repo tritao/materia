@@ -78,8 +78,35 @@ class EditorPerspectiveViewport implements View implements Observable {
   var lightingPreset:Int = 0;
   var renderCount:Int = 0;
   var lastRenderSeconds:Float = 0.0;
+  @:unobservable var lastViewSetupSeconds:Float = 0.0;
   var totalRenderSeconds:Float = 0.0;
   final camera:PerspectiveCamera = new PerspectiveCamera();
+  @:unobservable var benchmarkGeometry:Null<ResolvedLayoutItem>;
+  @:unobservable var benchmarkDragging = false;
+  @:unobservable var benchmarkX = 0.0;
+  @:unobservable var benchmarkY = 0.0;
+  @:unobservable var benchmarkInputs:Array<Dynamic> = [];
+  static inline var BENCHMARK_POINTER_ID:Int = 2147483646;
+
+  /** Route one degree of captured middle-drag through the same UI handlers as desktop input. */
+  public function benchmarkOrbitStep(context:haxeon.ui.core.UiContext):Void {
+    var geometry = benchmarkGeometry;
+    if (geometry == null) return;
+    var started = Sys.time();
+    if (!benchmarkDragging) {
+      var point = geometry.localToViewport(new haxeon.ui.Point(geometry.width / 2, geometry.height / 2));
+      benchmarkX = point.x;
+      benchmarkY = point.y;
+      context.pointerDown(benchmarkX, benchmarkY, 2, 0, BENCHMARK_POINTER_ID);
+      benchmarkDragging = true;
+    }
+    // Captured pointer coordinates may leave the window, just as during a native drag.
+    benchmarkX -= Math.PI / 180.0 / 0.008;
+    context.pointerMove(benchmarkX, benchmarkY, 0, BENCHMARK_POINTER_ID);
+    benchmarkInputs.push({startedAtSeconds: started, inputMilliseconds: (Sys.time() - started) * 1000,
+      yaw: camera.yaw, pitch: camera.pitch, orbiting: orbiting(), viewSetupMilliseconds: lastViewSetupSeconds * 1000,
+      planPrepareMilliseconds: renderer == null ? 0.0 : renderer.lastPlanPrepareSeconds * 1000});
+  }
   public var presentation(default, null):Null<PresentationController>;
   @:unobservable var presentationCenters:Null<Map<String, Array<Float>>>;
   @:unobservable var presentationScale = 1.0;
@@ -716,6 +743,7 @@ class EditorPerspectiveViewport implements View implements Observable {
   function buildViewport(id:haxeon.ui.core.WidgetId):RenderNode {
     var node = new RenderNode(id, LayoutVisualKind.Custom, style);
     node.onResolved(function(geometry) {
+      benchmarkGeometry = geometry;
       updateViewportSize(geometry.width, geometry.height);
     });
     node.hitTestSelf = true;
@@ -795,6 +823,7 @@ class EditorPerspectiveViewport implements View implements Observable {
         sampleCountEffective = renderer.setSampleCount(sampleCountRequested);
         sampleCountApplied = sampleCountRequested;
       }
+      lastViewSetupSeconds = Sys.time() - started;
       var changes = scene.takeRenderChanges();
       var rendered:GraphicsImageRef;
       try rendered = renderer.renderImage(scene.renderSnapshot(),
@@ -910,6 +939,7 @@ class EditorPerspectiveViewport implements View implements Observable {
     renders: renderCount,
     sampleCount: sampleCountEffective,
     cpuTransferBytes: 0,
+    benchmarkInputs: benchmarkInputs,
     lastRenderMilliseconds: lastRenderSeconds * 1000.0,
     averageRenderMilliseconds: renderCount == 0 ? 0.0 : totalRenderSeconds * 1000.0 / renderCount,
     orbitPivot : orbitPivot,

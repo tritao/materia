@@ -155,7 +155,7 @@ class Main {
   public static function main():Int {
     var args = Sys.args();
     for (arg in args) if (arg != "--reset-workspace" && arg != "--snapshot" && arg != "--simulate"
-      && arg != "--lab" && arg != "--dark" && arg != "--inspection-camera" && arg != "--perspective" && arg != "--demo"
+      && arg != "--orbit-benchmark" && arg != "--lab" && arg != "--dark" && arg != "--inspection-camera" && arg != "--perspective" && arg != "--demo"
       && arg.indexOf("--story=") != 0 && arg.indexOf("--width=") != 0 && arg.indexOf("--height=") != 0
       && arg.indexOf("--capture-dir=") != 0 && arg.indexOf("--frames=") != 0 && arg.indexOf("--capture-seconds=") != 0
       && arg.indexOf("--msaa=") != 0 && arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0
@@ -169,7 +169,7 @@ class Main {
       && arg != "--worker-demo=gallery" && arg.indexOf("--worker-demo-step=") != 0 && arg != "--worker-demo-trace") {
       Sys.println("Usage: materia [--reset-workspace] [--snapshot [--simulate]] [--demo] "
         + "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] "
-        + "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] [--msaa=SAMPLES] [--frame=OBJECT-ID] "
+        + "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] [--orbit-benchmark] [--msaa=SAMPLES] [--frame=OBJECT-ID] "
         + "[--robot=HOST:PORT] [--setup-script=REFERENCE] [--project=PATH] "
         + "[--project-action=ID] [--record[=PATH]] [--character=GLTF [--character-clip=NAME] "
         + "[--character-hold=GLTF] [--character-display=mesh|capsules|skeleton] "
@@ -336,6 +336,7 @@ class Main {
     host.frameLimit = diagnostics.frameLimit;
     host.captureSeconds = diagnostics.captureSeconds;
     var activeEditor:Null<ReferenceEditorApp> = null;
+    var orbitBenchmark = args.indexOf("--orbit-benchmark") >= 0;
     // A launch project builds in the background; captures wait for it so they show the project.
     // `--simulate` presses Play once that project is open, so a capture can show a running simulation.
     var playOnOpen = args.indexOf("--simulate") >= 0;
@@ -344,6 +345,8 @@ class Main {
     for (arg in args) if (arg.indexOf("--frame=") == 0) frameId = arg.substr(8);
     host.onFrameRendered = function() {
       if (activeEditor != null) activeEditor.projectFrameRendered();
+      if (orbitBenchmark && activeEditor != null && !activeEditor.openingProject()
+        && activeEditor.perspectiveViewport != null) activeEditor.perspectiveViewport.benchmarkOrbitStep(activeEditor.context());
     };
     host.captureReady = function() {
       var ready = activeEditor == null || !activeEditor.openingProject();
@@ -365,7 +368,7 @@ class Main {
       return ready;
     };
     host.continuousFrames = function() return activeEditor != null
-      && (activeEditor.simulation.isRunning() || diagnostics.robotHost != null || activeEditor.hasCharacterPreview());
+      && (orbitBenchmark || activeEditor.simulation.isRunning() || diagnostics.robotHost != null || activeEditor.hasCharacterPreview());
     var hosted = DesktopUiHost.open(host, function(context) {
       // --dark overrides the saved color scheme for this run only.
       var activeTheme:Null<Theme> = diagnostics.darkTheme ? Theme.dark() : null;

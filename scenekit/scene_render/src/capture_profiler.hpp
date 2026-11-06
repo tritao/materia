@@ -39,6 +39,8 @@ public:
         double geometry_ms = 0.0;
         double packing_ms = 0.0;
         double submit_ms = 0.0;
+        nkgpu_renderer_stats before{};
+        std::uint64_t draw_calls = 0, triangles = 0, upload_bytes = 0;
         bool active = false;
         bool gpu_failed = false;
     };
@@ -68,6 +70,8 @@ public:
         sample.wall_seconds = std::chrono::duration<double>(
             std::chrono::system_clock::now().time_since_epoch()).count();
         sample.started = Clock::now();
+        sample.before.struct_size = sizeof(sample.before);
+        nkgpu_renderer_get_stats(renderer, &sample.before);
         return sample;
     }
 
@@ -107,6 +111,9 @@ public:
         Sample &sample_;
     };
     void pass(const char *name) { if(current_) begin(*current_,name); }
+    void triangles(std::uint64_t elements, std::uint64_t instances = 1) {
+        if (current_) current_->triangles += (elements / 3) * instances;
+    }
     void pause() { if(current_) end(*current_); }
     void begin(Sample &sample, const char *name="surfaces") {
         if (!sample.active) return;
@@ -129,6 +136,10 @@ public:
         if(!sample.active)return;
         end(sample);current_=nullptr;
         sample.submit_ms=milliseconds(Clock::now()-sample.prepared);
+        nkgpu_renderer_stats after{}; after.struct_size = sizeof(after);
+        nkgpu_renderer_get_stats(sample.renderer, &after);
+        sample.draw_calls = after.draw_calls - sample.before.draw_calls;
+        sample.upload_bytes = after.upload_bytes - sample.before.upload_bytes;
         if(!sample.intervals.empty())pending_.push_back(std::move(sample));
         else write(sample,false);
         sample.active=false;
@@ -184,6 +195,9 @@ private:
              << ",\"synchronizeMilliseconds\":" << sample.synchronize_ms
              << ",\"geometryMilliseconds\":" << sample.geometry_ms
              << ",\"packingMilliseconds\":" << sample.packing_ms
+             << ",\"drawCalls\":" << sample.draw_calls
+             << ",\"triangles\":" << sample.triangles
+             << ",\"uploadBytes\":" << sample.upload_bytes
              << ",\"submitMilliseconds\":" << sample.submit_ms << ",\"gpuMilliseconds\":";
         std::map<std::string,double> passes;double total=0;
         for(const auto &interval:sample.intervals){passes[interval.pass]+=interval.ms;total+=interval.ms;}

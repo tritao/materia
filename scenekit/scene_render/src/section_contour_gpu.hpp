@@ -81,6 +81,7 @@ bool draw_contours(StateT &state,const RenderPlan &plan,const SceneSnapshot &sna
         if(result==NKGPU_OK)result=nkgpu_apply_vertex_buffer(state.renderer,1,batch.buffer,static_cast<unsigned>(cap.instance*instance_stride));
         if(result==NKGPU_OK)result=nkgpu_draw(state.renderer,0,entry.count,1);
         if(result!=NKGPU_OK)return set_failure(state,stats,result);
+        if(state.capture_profiler)state.capture_profiler->triangles(entry.count);
         ++stats.draw_calls;
     }
     return true;

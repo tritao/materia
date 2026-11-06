@@ -75,6 +75,28 @@ Physical mouse input contaminated the earlier short pilot's pitch. The harness n
 and validates pitch as well as yaw. Recheck the full baseline with that hardened harness before comparative fix commits.
 These phase/allocation measurements point to transient view setup and drag input, rather than geometry re-upload; confirm
 the hot functions with the CPU profiler before optimizing.
+
+**Step 1 validated: hardened baseline.** `orbit-baseline-02` used the same full-turn path and matched the first run's camera,
+draw/triangle/upload statistics exactly. Its isolated pointer ID tolerated 94 physical pointer moves without changing pitch.
+Six report regressions pass. The committed runner command is documented in `app/README.md`.
+
+| Metric | Baseline 02 median | p95 |
+| --- | ---: | ---: |
+| CPU frame | 23.88 ms | 60.25 ms |
+| Scene GPU | 12.00 ms | 22.60 ms |
+| Routed input | 5.62 ms | 9.17 ms |
+| View setup | 6.82 ms | 8.27 ms |
+| Scene plan preparation | 0.49 ms | 0.68 ms |
+| UI submit | 3.37 ms | 4.53 ms |
+| Draw calls | 1,541 | 1,581 |
+| Submitted triangles | 2,275,358 | 2,290,826 |
+| Resource uploads | 0 bytes | 864 bytes |
+
+Cadence: 24.56 fps / 40.71 ms mean. Background shared-machine load varies (compare baseline 01); use matching paths and
+repeated runs before interpreting small gains. The first CPU sample capture is qualitative because one physical pointer
+event changed its pitch; it found cosmetic-thread checks and clip fitting in routed input. A hardened, warmed orbit profile
+is the next diagnostic, followed by independent measured fixes. Native plan refresh is already small; view setup and input
+are the principal CPU phase targets. No performance fix, LOD, quality reduction or renderer architecture change is applied yet.
 The capture serialization repair is committed as haxeon `84113e490` on branch `viewport-perf-capture`; the parent pin remains
 unchanged. Validation: parseable layout for 209 nodes/80 styles, 9,696 loading/empty-scene host timeline records and screenshot.
 Those records are capture validation only and are not hobber orbit measurements.

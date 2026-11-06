@@ -1108,6 +1108,7 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnaps
                                 static_cast<std::uint32_t>(batch.instances.size()));
         if (result != NKGPU_OK)
             return set_failure(state, stats, result);
+        if (state.capture_profiler) state.capture_profiler->triangles(geometry->second.stroke_vertex_count, batch.instances.size());
         ++stats.draw_calls;
     }
     return true;
@@ -1222,6 +1223,7 @@ nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSna
             (result = nkgpu_draw(state.renderer, 0, element_count,
                                  static_cast<std::uint32_t>(instance_count))) != NKGPU_OK)
             return result;
+        if (state.capture_profiler) state.capture_profiler->triangles(element_count, instance_count);
         ++stats.draw_calls;
         return NKGPU_OK;
     };
@@ -2679,6 +2681,7 @@ nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const Scene
             (result = nkgpu_draw(state.renderer, 0, element_count,
                                  static_cast<std::uint32_t>(batch.instances.size()))) != NKGPU_OK)
             return fail_frame(result);
+        if (state.capture_profiler) state.capture_profiler->triangles(element_count, batch.instances.size());
     }
     if((result=draw_caps(state,plan,snapshot,LightingUniformData{},1,true,for_ao,stats))!=NKGPU_OK)return fail_frame(result);
     if(state.capture_profiler)state.capture_profiler->pass("aoResolve");
@@ -3166,6 +3169,7 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
                  reinterpret_cast<const std::uint8_t *>(&data), sizeof(data))) != NKGPU_OK ||
             (result = nkgpu_draw(state_->renderer, 0, 3, 1)) != NKGPU_OK)
             return fail_frame(result);
+        if (profiler) profiler->triangles(3);
     }
 
     const auto clip_data = clip_uniform_data(plan);
@@ -3221,6 +3225,7 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
                                           state_->postprocess_sampler)) != NKGPU_OK)
             return fail_frame(result);
 
+        if (profiler) profiler->triangles(3);
         PostProcessUniformData post_data;
         post_data.color_params = {post_process.exposure_stops, post_process.gain,
                                   post_process.noise_stddev, post_process.quantization};

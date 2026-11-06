@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""Measure a fixed full-turn desktop orbit, including the ordinary UI frame path."""
+
+import argparse
+import json
+import math
+import os
+from pathlib import Path
+import shlex
+import shutil
+import statistics
+import subprocess
+
+ROOT = Path(__file__).resolve().parents[2]
+DRAIN_FRAMES = 8  # Let the final measured GPU queries become ready without a blocking wait.
+
+
+def records(path):
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def summarize(output, warmup, count):
+    state = json.loads((output / "app-state.json").read_text())
+    objects = state["scene"]["objects"]
+    if not any(item["id"].startswith("project:") for item in objects):
+        raise RuntimeError("benchmark project did not load; inspect app-state.json and launch.log")
+    inputs = state["perspective"]["benchmarkInputs"]
+    gpu = records(output / "scene-timeline.jsonl")
+    host = records(output / "frame-timeline.jsonl")
+    # Loading can render many frames. The last N are the bounded ready capture;
+    # each measured frame must contain an actual scene render, matched by wall time.
+    host = host[-(warmup + count + DRAIN_FRAMES):][warmup:warmup + count]
+    if len(host) != count:
+        raise RuntimeError(f"expected {count} measured host frames, got {len(host)}")
+    rows = []
+    for frame in host:
+        start = frame["startedAtSeconds"]
+        end = start + frame["frameSeconds"]
+        samples = [sample for sample in gpu if start <= sample["startedAtSeconds"] <= end]
+        if len(samples) != 1:
+            raise RuntimeError(f"host frame {frame['frame']} contains {len(samples)} scene samples")
+        sample = samples[0]
+        input_samples = [item for item in inputs if start <= item["startedAtSeconds"] <= end]
+        if len(input_samples) != 1:
+            raise RuntimeError(f"host frame {frame['frame']} contains {len(input_samples)} orbit inputs")
+        input_sample = input_samples[0]
+        if not input_sample["orbiting"]:
+            raise RuntimeError("scripted middle drag did not capture the perspective viewport")
+        if sample["gpuMilliseconds"] is None:
+            raise RuntimeError(f"missing GPU timer result for scene frame {sample['frame']}")
+        rows.append(dict(
+            frame=frame["frame"], startedAtSeconds=start,
+            cpuMs=frame["frameSeconds"] * 1000,
+            inputMs=input_sample["inputMilliseconds"], yaw=input_sample["yaw"], pitch=input_sample["pitch"],
+            viewSetupMs=input_sample["viewSetupMilliseconds"], planPrepareMs=input_sample["planPrepareMilliseconds"],
+            uiSubmitMs=frame["applicationSubmitSeconds"] * 1000,
+            customPaintMs=frame["customPaintSeconds"] * 1000,
+            nativeUiRenderMs=frame["nativeRenderSeconds"] * 1000,
+            gcMs=frame["frameGcSeconds"] * 1000,
+            scenePrepareMs=sample["prepareMilliseconds"],
+            sceneSubmitMs=sample["submitMilliseconds"],
+            gpuMs=sample["gpuMilliseconds"],
+            gpuPassMs=sample["gpuPassMilliseconds"],
+            drawCalls=sample["drawCalls"], triangles=sample["triangles"],
+            uploadBytes=sample["uploadBytes"],
+        ))
+    for previous, current in zip(rows, rows[1:]):
+        if not math.isclose(current["yaw"] - previous["yaw"], math.pi / 180, abs_tol=1e-7):
+            raise RuntimeError("camera did not advance by one degree per frame")
+        if not math.isclose(current["pitch"], previous["pitch"], abs_tol=1e-7):
+            raise RuntimeError("horizontal orbit changed the camera pitch")
+    (output / "orbit-frames.jsonl").write_text("".join(json.dumps(row) + "\n" for row in rows))
+    cadence = [(b["startedAtSeconds"] - a["startedAtSeconds"]) * 1000 for a, b in zip(rows, rows[1:])]
+    summary = {"frames": len(rows), "warmupFrames": warmup,
+               "fps": 1000 / statistics.mean(cadence),
+               "cadenceMs": statistics.mean(cadence)}
+    for name in ("cpuMs", "inputMs", "viewSetupMs", "planPrepareMs", "uiSubmitMs", "customPaintMs", "nativeUiRenderMs", "gcMs",
+                 "scenePrepareMs", "sceneSubmitMs", "gpuMs",
+                 "drawCalls", "triangles", "uploadBytes"):
+        values = sorted(row[name] for row in rows)
+        summary[name] = {"mean": statistics.mean(values), "median": statistics.median(values),
+                         "p95": values[int((len(values) - 1) * .95)], "max": max(values)}
+    (output / "orbit-summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    print("frame,cpu_ms,gpu_ms,draw_calls,triangles,upload_bytes")
+    for row in rows:
+        print(f"{row['frame']},{row['cpuMs']:.3f},{row['gpuMs']:.3f},"
+              f"{row['drawCalls']},{row['triangles']},{row['uploadBytes']}")
+    print(json.dumps(summary, indent=2))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--frames", type=int, default=360)
+    parser.add_argument("--warmup", type=int, default=60)
+    parser.add_argument("--msaa", type=int, choices=(1, 2, 4), default=4)
+    parser.add_argument("--launcher", default="", help="optional command prefix, e.g. 'heavy-run --slots 4 --need 4G --'")
+    parser.add_argument("--report-only", action="store_true")
+    args = parser.parse_args()
+    if args.frames < 2 or args.warmup < 1:
+        parser.error("use at least two measured frames and one warmup frame")
+    output = args.output.resolve()
+    if not args.report_only:
+        output.mkdir(parents=True, exist_ok=False)
+        environment = os.environ.copy()
+        environment.update(NK_SCENE_GPU_TIMINGS=str(output / "scene-timeline.jsonl"),
+                           NK_SCENE_GPU_TIMING_INTERVAL="1",
+                           REFERENCE_EDITOR_WORKSPACE=str(output / "workspace.json"),
+                           MATERIA_ROOT=str(ROOT), TMPDIR=str(output / "tmp"),
+                           HAXEON_COMPILER_IDLE_SECONDS="1")
+        (output / "tmp").mkdir()
+        command = shlex.split(args.launcher) + [str(ROOT / "haxeon/scripts/haxeon"), "run",
+                   "--project", str(ROOT / "app/haxeon.json"), "--", "--orbit-benchmark",
+                   "--perspective", "--width=1320", "--height=900", f"--msaa={args.msaa}",
+                   f"--capture-dir={output}", f"--frames={args.frames + args.warmup + DRAIN_FRAMES}",
+                   "--project=" + str(ROOT / "machinekit/examples/flexspline-hobber/materia.project.json")]
+        (output / "command.json").write_text(json.dumps(command, indent=2) + "\n")
+        metadata = {"arguments": vars(args) | {"output": str(output)},
+                    "display": environment.get("DISPLAY")}
+        for name, query in (("commit", ["git", "rev-parse", "HEAD"]),
+                            ("haxeonCommit", ["git", "-C", "haxeon", "rev-parse", "HEAD"]),
+                            ("gpu", ["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"])):
+            if shutil.which(query[0]) is None:
+                metadata[name] = None
+                continue
+            result = subprocess.run(query, cwd=ROOT, capture_output=True, text=True)
+            metadata[name] = result.stdout.strip()
+        (output / "environment.json").write_text(json.dumps(metadata, indent=2) + "\n")
+        with (output / "launch.log").open("w") as log:
+            result = subprocess.run(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
+        if result.returncode:
+            raise RuntimeError(f"editor exited {result.returncode}; see {output / 'launch.log'}")
+    summarize(output, args.warmup, args.frames)
+
+
+if __name__ == "__main__":
+    main()

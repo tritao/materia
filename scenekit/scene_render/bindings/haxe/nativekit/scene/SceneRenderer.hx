@@ -16,6 +16,8 @@ class SceneRenderer {
   var planOwner:Null<Ownednkscene_render_plan> = null;
   var lastUpdateValue:Null<nkscene_render_update> = null;
   var disposed:Bool = false;
+  /** CPU wall time of the latest plan compile/update/refresh, excluding GPU execution. */
+  public var lastPlanPrepareSeconds(default, null):Float = 0;
 
   private function new(renderer:nkgpu_renderer, borrowedRendererId:Int = 0) {
     if (borrowedRendererId == 0) {
@@ -154,6 +156,7 @@ class SceneRenderer {
   }
 
   function prepare(snapshot:SceneSnapshot, view:SceneView, changes:Null<ChangeSet>):Void {
+    var started = Sys.time();
     var snapshotValue = snapshot.nativeHandle(), viewValue = view.nativeValue();
     if (planOwner == null) {
       var compiled = NativeKitSceneRender.nkscene_render_plan_compile(snapshotValue, viewValue);
@@ -185,7 +188,7 @@ class SceneRenderer {
       checkScene(refreshResult.status, "sceneRenderer.refresh");
       lastUpdateValue = refreshResult.out_update;
     }
-
+    lastPlanPrepareSeconds = Sys.time() - started;
   }
 
   /** Renders one owned frame, including its optional incremental change set. */

@@ -125,6 +125,7 @@ nkgpu_result draw_caps(StateT &state,const RenderPlan &plan,const SceneSnapshot 
             }
             unsigned count=parity?(picking?gpu.pick_vertex_count:gpu.indexed?gpu.index_count:gpu.vertex_count):6;
             if((result=nkgpu_draw(state.renderer,0,count,1))!=NKGPU_OK)return result;
+            if(state.capture_profiler)state.capture_profiler->triangles(count);
             ++stats.draw_calls;
         }
         ++cap_index;
