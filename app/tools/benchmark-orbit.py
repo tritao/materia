@@ -10,9 +10,24 @@ import shlex
 import shutil
 import statistics
 import subprocess
+import time
 
 ROOT = Path(__file__).resolve().parents[2]
 DRAIN_FRAMES = 8  # Let the final measured GPU queries become ready without a blocking wait.
+SLEEPING_DISPLAY_STATES = {"Off", "Standby", "Suspend"}
+
+
+def display_sample():
+    state = "unavailable"
+    if shutil.which("xset"):
+        try:
+            result = subprocess.run(["xset", "q"], capture_output=True, text=True, timeout=2)
+            for line in result.stdout.splitlines():
+                if "Monitor is " in line:
+                    state = line.split("Monitor is ", 1)[1].strip()
+        except subprocess.TimeoutExpired:
+            pass
+    return {"atSeconds": time.time(), "state": state}
 
 
 def records(path):
@@ -32,6 +47,15 @@ def summarize(output, warmup, count):
     host = host[-(warmup + count + DRAIN_FRAMES):][warmup:warmup + count]
     if len(host) != count:
         raise RuntimeError(f"expected {count} measured host frames, got {len(host)}")
+    display_path = output / "display-timeline.jsonl"
+    if display_path.exists():
+        display = records(display_path)
+        start = host[0]["startedAtSeconds"]
+        end = host[-1]["startedAtSeconds"] + host[-1]["frameSeconds"]
+        for index, sample in enumerate(display):
+            next_at = display[index + 1]["atSeconds"] if index + 1 < len(display) else float("inf")
+            if sample["state"] in SLEEPING_DISPLAY_STATES and sample["atSeconds"] <= end and next_at >= start:
+                raise RuntimeError("display entered DPMS power saving during the measured window; run is invalid")
     rows = []
     for frame in host:
         start = frame["startedAtSeconds"]
@@ -102,6 +126,9 @@ def main():
     output = args.output.resolve()
     if not args.report_only:
         output.mkdir(parents=True, exist_ok=False)
+        initial_display = display_sample()
+        if initial_display["state"] in SLEEPING_DISPLAY_STATES:
+            raise RuntimeError("display is in DPMS power saving; wake it before benchmarking (xset dpms force on)")
         environment = os.environ.copy()
         environment.update(NK_SCENE_GPU_TIMINGS=str(output / "scene-timeline.jsonl"),
                            NK_SCENE_GPU_TIMING_INTERVAL="1",
@@ -126,10 +153,19 @@ def main():
             result = subprocess.run(query, cwd=ROOT, capture_output=True, text=True)
             metadata[name] = result.stdout.strip()
         (output / "environment.json").write_text(json.dumps(metadata, indent=2) + "\n")
-        with (output / "launch.log").open("w") as log:
-            result = subprocess.run(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
-        if result.returncode:
-            raise RuntimeError(f"editor exited {result.returncode}; see {output / 'launch.log'}")
+        with (output / "launch.log").open("w") as log, (output / "display-timeline.jsonl").open("w") as display_log:
+            with subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT) as process:
+                while True:
+                    display_log.write(json.dumps(display_sample()) + "\n")
+                    display_log.flush()
+                    try:
+                        result = process.wait(timeout=1)
+                        break
+                    except subprocess.TimeoutExpired:
+                        pass
+            display_log.write(json.dumps(display_sample()) + "\n")
+        if result:
+            raise RuntimeError(f"editor exited {result}; see {output / 'launch.log'}")
     summarize(output, args.warmup, args.frames)
 
 

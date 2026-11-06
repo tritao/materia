@@ -153,3 +153,35 @@ the remaining 30 fps ceiling to scene complexity. Quality remains at 4x MSAA for
 
 Retained-view allocation check: median host-frame allocations fall from 1,851,404 to 491,320 bytes (73.5%).
 Automatic GC collections over 360 frames fall from 10 to 3, with total measured GC time 164.33 -> 24.90 ms.
+
+Presentation diagnostic: `orbit-retained-msaa1-diagnostic` completes the identical 360-frame path at 1x MSAA: 29.79 fps,
+33.57 ms mean cadence, median CPU 10.17 ms, scene GPU 7.77 ms, identical draw/triangle counts. It does not remove
+the ceiling. GPU load differs, so this is a cadence diagnostic, not a quality-adjusted acceptance comparison.
+The acceptance setting remains 4x MSAA. A minimal native surface callback is the next control.
+
+
+The retained-view full app suite passed (exit 0; `viewport-retained-app-tests.log`), including 238 coordinate assertions,
+selection/pose/section invalidation, project UI frame preparation and the complete CAD workflow.
+A minimal native surface control (1320x900, clear only, self-requested on-demand frames, 30 warmup + 120 samples) reaches
+58.51 fps with no work and 42.75 fps with a 10 ms callback delay. Thus this is not an intrinsic fixed 30 fps backend cap;
+frame-clock deadlines are sensitive to callback work. The fixed-app warmed profile (`orbit-profile-retained`, frames
+150–509, 8.324–20.425 s) also measures native UI GPU time at 0.503 ms median / 0.537 ms p95. CAD input and overlay
+validation are no longer dominant, but UI submission still walks the tree for a camera-only widget patch.
+
+**Step 3c (measurement pending): paint-only invalidation.** Use the existing `RenderNode.invalidatePaint()` operation for the
+viewport's native-camera revision instead of `BuildContext.requestPatch()`. Resolve reconciled/replaced nodes through
+`RenderNode.latest` and validate their current self-updating registration before invalidating; an unmounted binding still
+requests the ordinary owner rebuild. Keep the custom display-list cache for unchanged frames. Both perspective and
+inspection views use `updateRetainedPaint`, removing the separate camera patch path. No new framework API or rendering
+architecture is introduced. Routed camera regressions now assert reuse of the submitted UI tree during each orbit move.
+
+
+**Benchmark hardening: DPMS.** The display entered DPMS Off during a later run, reducing cadence below 1 fps while the
+window remained focused and viewable. `orbit-stable-ui-01` is discarded. Wake the display without changing its power policy
+(`xset dpms force on`). The runner now samples X11 DPMS state once per second, records `display-timeline.jsonl`, rejects
+an initially sleeping display and rejects measured windows overlapping Off/Standby/Suspend. Unsupported queries are
+recorded as unavailable. Seven report tests pass, including rejection of sleeping measurement windows and exclusion of
+pre-warmup sleeping samples. `orbit-stable-ui-02` records On throughout: 38.60 fps, median CPU 7.74 ms, scene GPU 6.41 ms,
+1,540 draws and 2,275,354 triangles with the pending UI-frame fix. This is validation of an awake capture; GPU time varies
+with shared-machine load. Earlier healthy baselines predate DPMS recording; their cadence is tens of milliseconds rather
+than the multi-second power-saving cadence. Use a guarded paired comparison for the final report.

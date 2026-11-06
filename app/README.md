@@ -771,7 +771,8 @@ The benchmark uses an isolated default workspace at 1320×900, 4× MSAA, 60 warm
 frames, a full 360-frame orbit at one degree per frame, and eight trailing frames
 to drain asynchronous GPU queries. `--msaa=1|2|4` overrides the sample count.
 The `--orbit-benchmark` editor flag routes captured middle-button drags through
-`UiContext` after each rendered frame, including navigation and hover hit-testing.
+`UiContext` after each rendered frame, using the normal navigation handlers.
+Captured camera drags suspend hover picking; ordinary hover resumes on release.
 Its dedicated pointer ID prevents physical mouse motion from changing the scripted
 arc; the report checks one degree per frame and constant pitch.
 It preserves normal UI submission, scene presentation, lighting and geometry.
@@ -780,12 +781,17 @@ Per-frame CSV and summary JSON print to stdout; `orbit-frames.jsonl` and
 (including AO and edge triangles), and resource upload bytes. CPU phase splits
 come from the desktop host and SceneKit, with routed input time also recorded;
 GPU timestamps cover the scene passes. Frame CPU time includes the input callback.
+The upload counter covers geometry/image resource updates, not per-draw uniform state.
 View setup and SceneKit plan preparation are timed separately from native executor
 preparation/submission. These are nested CPU phases within custom paint, not additive
 to the total frame CPU time.
 FPS uses frame start cadence, including host scheduling. Loading and warmup are
 excluded. Missing scene renders or GPU results fail the report instead of showing
-zero. Use `--report-only` with the same frame/warmup settings to regenerate a report.
+zero. On X11, keep the display awake (`xset dpms force on` if needed): power saving
+can throttle the frame clock below 1 fps. The runner records `display-timeline.jsonl`
+and rejects measured windows that overlap DPMS Off, Standby or Suspend. Unsupported
+display-state queries are recorded as unavailable. It does not change power settings.
+Use `--report-only` with the same frame/warmup settings to regenerate a report.
 Check report aggregation and failure handling without a display with
 `python3 app/tools/test-benchmark-orbit.py`.
 

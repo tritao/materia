@@ -93,6 +93,17 @@ class OrbitReportTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "changed the camera pitch"):
             self.report()
 
+    def test_rejects_power_saving_during_measurement(self):
+        path = self.output / "display-timeline.jsonl"
+        def display(rows):
+            path.write_text("".join(json.dumps(dict(atSeconds=at, state=state)) + "\n" for at, state in rows))
+        display([(99, "On"), (100.12, "Off"), (100.3, "On")])
+        with self.assertRaisesRegex(RuntimeError, "DPMS power saving"):
+            self.report()
+        # Sleeping before warmup is safe once the display has woken before measurement.
+        display([(99, "Off"), (100.05, "On")])
+        self.report()
+
 
 if __name__ == "__main__":
     unittest.main()
