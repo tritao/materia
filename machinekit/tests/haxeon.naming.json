@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-naming-tests"},
+  "entry": "NamingAuditMain",
+  "sourceRoots": ["src"],
+  "dependencies": {"machinekit": {"path": ".."}},
+  "target": "host",
+  "outputDir": "build/naming"
+}
