@@ -54,6 +54,7 @@ class HobberAccuracyChecks {
     i.pressureAngle = machine.hob.parameterNumber("pressureAngle");
     i.hobLeadAngle = design.leadAngle;
     i.hobStarts = design.starts;
+    i.hobGashes = design.gashes;
     i.hobRpm = 300000 / (Math.PI * design.outsideDiameter);
     i.axes = axes(machine);
     // Stroke and height of the cut: the Z travel and the hob's height above the column sole (work z 280, FRAME_PLAN H1).
@@ -111,6 +112,13 @@ class HobberAccuracyChecks {
     for (c in rows) if (c.id == "C.accuracy") accuracy = c;
     check(accuracy != null, "C.accuracy row");
     near(accuracy.impact[1], 2 * s.pitchRadius() * machineTable(i, "absoluteAccuracy") * 1000, 1e-9, "C accuracy Fp = 2 r angle");
+    // C loop: low-frequency stiffness is huge, high-frequency stiffness tends to J w^2, the encoder error transmission to 1 and then 0.
+    var kLow = HobberAccuracyBudget.loopStiffness(i, 100, 0.25), kHigh = HobberAccuracyBudget.loopStiffness(i, 100, 5000);
+    check(kLow > 1e5 && kLow < 1e7, "C loop stiffness at the C speed: " + kLow);
+    near(kHigh / (HobberAccuracyBudget.cInertia(i) * Math.pow(2 * Math.PI * 5000, 2)), 1, 0.02, "C loop stiffness at 5 kHz is the inertia");
+    var terms = HobberAccuracyBudget.trackingTerms(i, 100);
+    for (t in terms) if (t.id == "C.trk.cogging") near(t.angle, t.amplitude / t.stiffness, 1e-15, "cogging position error = torque / stiffness");
+    check(HobberAccuracyBudget.trackingTerms(i, 200)[0].angle < terms[0].angle, "a faster loop rejects cogging better");
     // The compensated Abbe error is the residual share of the uncompensated one.
     var comp = HobberAccuracyBudget.build(i, true), raw = HobberAccuracyBudget.build(i, false), a = 0.0, b = 0.0;
     for (c in comp) if (c.id == "X.abbe(compensated)") a = c.value;
@@ -140,8 +148,8 @@ class HobberAccuracyChecks {
     for (line in HobberAccuracyBudget.report(i, result)) Sys.println(line);
     Sys.println("top limiting contributors (share of the class " + HobberAccuracyBudget.TARGET_CLASS + " limit on the worst parameter):");
     for (line in HobberAccuracyBudget.limiting(result)) Sys.println("  " + line);
-    var allowed = HobberAccuracyBudget.allowedRipple(i, result.contributors, result.limitTarget[1]);
-    Sys.println('C speed ripple that keeps Fp at class ${HobberAccuracyBudget.TARGET_CLASS} with every other row unchanged: ${Math.round(allowed * 1e6) / 1e4} % (modelled ${machineTable(i, "speedRipple") * 100} %)');
+    for (line in HobberAccuracyBudget.speedRippleCrossCheck(i)) Sys.println(line);
+    for (line in HobberAccuracyBudget.smoothnessSpec(i, result.contributors, result.limitTarget[1], [50, 100, 200])) Sys.println(line);
     var failures = HobberAccuracyBudget.failures(result);
     if (failures.length > 0) {
       for (f in failures) Sys.println("GATE FAIL " + f);

@@ -201,16 +201,28 @@ reads `FlexsplineHobber` (read-only), prints the budget and gates on it. Run: `h
   eRob output accuracy, mandrel eccentricity, roundness and band expansion, outboard stiffness. Assumed (each labelled in the printout): guide angular error 5" (the `HobberFrameChecks` value; no rail class in
   the catalogue), tilt-table residual 20 %, rail straightness 3 um per 200 mm, thermal dT 1 K (frame loops of 262 mm steel and 253 mm mineral cast from the poses), cartridge nose 50 N/um, unlisted structure equal to the listed,
   A torsional stiffness 2e4 N m/rad with 10 mm of engagement lever, B encoder accuracy 40", sync delay 1 us, cycle 250 us, B speed ripple 0.5 %. Forces are the HB10 values already quoted in the repository (radial 17.0 N, tangential 46.7 N, table torque 1.49 N m).
-- **Result (this model).** With the tilt table loaded: fp 1.1, Fp **60.1**, Fr 3.9, F-alpha 4.2, F-beta 1.2 um RSS, i.e. extrapolated classes 1, **9**, 2, 4, 1; worst-case sums 2.1, 68, 6.8, 11.9, 2.4 (classes 3, 10, 3, 7, 2).
-  The check **fails the gate on Fp only**, and the cause is a single modelled number: the table's once-per-turn speed ripple (assumed 0.1 %, 60 um of Fp; the same finding as the table-only screen above). Every other
-  row together is 4 um of Fp (RSS). The ripple that keeps Fp at class 6 with the rest unchanged is 0.038 % (RSS; the 0.0317 % above sums the amplitudes instead). The tilt-compensation step changes only tooth thickness
-  here (RSS 6.3 to 5.0 um): the Abbe offsets are 220 mm on X and Z, 72 mm on Y (5" gives 5.3 um uncompensated, 1.1 um after), and none of it reaches a class parameter for a spur gear.
-- **Top three limiting causes** (share of the class 6 limit on the worst parameter): 1. C table speed ripple, 261 % of Fp (measure it on the bench at 10-20 rpm; position-loop gain or torque-ripple feedforward; ask the vendor);
-  2. hob chain axial runout (hob, arbor, two spindle bearings, 2 um TIR each, assumed) 3.8 um on F-alpha, 40 % (square clamping faces, indicate the hob face, lower-runout cartridge);
-  3. hob chain radial runout (five 2 um sources, assumed) 1.5 um on F-alpha, 16 % (arbor and outboard coaxiality). Outside the class: X thermal growth 6.1 um per K is the largest tooth-thickness term (thermal control or a trim per part).
-  Also close: mandrel eccentricity 3 um on Fr and Fp (13 % of Fp). Not budgeted: hob lead and pitch errors, hob wear, flexspline wall compliance (HB10/HB11 simulate it), forced response at the tooth-pass frequency (the spindle drive modes keep a 1.3x margin from the band, so the quasi-static stiffness is used).
+- **C table model (2026-11-06, tracking error).** The C table is position-controlled and follows the B encoder, so the gear sees C's tracking error, not its speed error. Each smoothness disturbance
+  is turned into position error = torque / dynamic stiffness of the loop at its frequency, with a standard cascade (PI velocity inside P position; velocity bandwidth 100 Hz, Kp = w_v/4, integral corner
+  w_v/10, no delay or structural mode: all assumed), J = rotor 0.04 (table field) + 0.01 kg m2 load (assumed), at the C speed 14.9 rpm (0.249 Hz = hob rpm / z). Stiffness |J s^2 + Kv (1 + wi/s)(s + Kp)| is
+  4.9e5 N m/rad at 0.25 Hz, 1.3e4 at the 48th harmonic (12 Hz) and J w^2 above the bandwidth. Rows: cogging 48x rev; torque ripple 1x/2x/3x rev (0.2 %, 0.1 %, 0.05 % of the 54.9 N m continuous torque, Kt = 54.9/3.43 = 16 N m/A);
+  seal drag ripple 2x; encoder interpolation (4096th harmonic, 0.5") times the loop's transmission at 1 kHz; cutting torque variation at the gash-pass frequency (12 gashes x z, aliases to zero on the pitch: it
+  maps to a flank ripple, F-alpha = r x angle x cos(alpha), not fp/Fp); B speed ripple through the ratio (lag omega_C x 0.5 % / max(Kp, w) x 5 % residual after velocity feedforward). Mapping: per-rev and low harmonics give Fp = 2 r x angle
+  and fp = Fp |sin(n pi/z)|; the encoder accuracy (5") and repeatability (2") are not rejected by the loop (the loop reads them). **Smoothness inputs (assumed, the RFQ asks for them):** cogging 0.1 N m peak (0.18 % of continuous torque),
+  torque ripple 0.2 % of continuous torque at 1x rev, seal ripple 0.1 N m, interpolation 0.5"; typical direct-drive values, no vendor data (none is published for RTV210-050; STRAIN_WAVE_RESEARCH lists them as required data).
+- **Result (this model).** With the tilt table loaded: fp 0.9, Fp **4.1**, Fr 3.9, F-alpha 4.2, F-beta 1.2 um RSS, i.e. extrapolated classes 1, **1**, 2, 4, 1; worst-case sums 1.7, 9.2, 6.8, 12.0, 2.4 (classes 2, 4, 3, 7, 2). **The gate
+  passes** (class 4 overall, set by F-alpha). The earlier 60 um Fp was the 0.1 % once-per-turn speed ripple integrated to angle (2 r x 0.001 rad), which is the open-loop (velocity mode) view: a vendor's speed ripple is measured in velocity mode,
+  and the position loop corrects it (sensitivity |s/(s + Kp)| = 0.010 at 0.25 Hz, leaving 0.6 um; as torque it is 1.2e-4 N m). The C smoothness terms together now give 0.9 um of Fp (cogging 0.87 um, seal 0.06, ripple 0.05, interpolation 0.01);
+  the C table's whole Fp is 1.7 um (accuracy 1.45 um, reaction 0.45, repeatability 0.58, lag 0.08). What the loop cannot reject and so sets the table's contribution is the encoder: accuracy 5" and repeatability 2".
+  Fp is dominated by mandrel/table runout (3 um + 2 um TIR, Fr = Fp). The tilt-compensation step changes only tooth thickness (RSS 6.3 to 5.0 um).
+- **C smoothness spec for class 6 Fp (what to ask Demat).** With every other row unchanged (RSS 4.0 um, room to 23 um): at a 50 Hz velocity loop the smoothness set can be scaled x5.9 (cogging <= 0.6 N m peak, torque ripple <= 1.2 % of continuous torque at 1x rev,
+  seal ripple <= 0.6 N m, interpolation <= 3"); at 100 Hz x26 (cogging 2.6 N m); at 200 Hz x146. Each alone at 50 Hz: cogging 0.6 N m, ripple 10 % of continuous torque, interpolation 1500" (loop attenuates it). Ask for: cogging torque (N m peak and
+  harmonic order), torque ripple % at 10-20 rpm, interpolation error ("), achievable velocity-loop bandwidth with 0.05 kg m2 load, and encoder accuracy 5" with repeatability 2" (those two pass through the loop undiminished). The decision is therefore
+  not smoothness but the loop: below about 30 Hz velocity bandwidth the cogging term would start to matter, above 50 Hz it does not.
+- **Top three limiting causes** (share of the class 6 limit on the worst parameter): 1. hob chain axial runout (hob, arbor, two spindle bearings, 2 um TIR each, assumed) 3.8 um on F-alpha, 40 % (square clamping faces, indicate the hob face, lower-runout cartridge);
+  2. hob chain radial runout (five 2 um sources, assumed) 1.5 um on F-alpha, 16 %; 3. mandrel eccentricity 3 um on Fr and Fp, 14 %. Outside the class: X thermal growth 6.1 um per K is the largest tooth-thickness term.
+  Not budgeted: hob lead and pitch errors, hob wear, flexspline wall compliance (HB10/HB11 simulate it), structural modes and delay of the C loop.
 - **Limits of the budget.** It is analytic and untrimmed; static terms (thickness, a constant helix error from A or deflection) can be trimmed from a first article. Most rows are assumptions until a bench measurement; the ranking
-  is robust, the absolute Fp number is not (it is one assumed ripple). The full-cut error budget (`stockkit.hobbing.errors`) remains the simulation; this one ranks the machine's parts.
+  is robust, the absolute numbers are not (the C figures assume an ideal PI/P loop with no delay or resonance and typical, unmeasured smoothness). The full-cut error budget (`stockkit.hobbing.errors`) remains the simulation; this one ranks the machine's parts.
 
 ## Feedback and drive requirements (open, 2026-11-01)
 
@@ -241,8 +253,10 @@ Open decisions:
    47 µm case in PLAN.md. Spindle accuracy limits are hob/arbor runout, bearing preload and
    thermal growth (HB14), not the encoder.
 3. **C drive and protocol.** The table encoder protocol must match the C drive. The design's own
-   screen is limited by assumed 0.1 % once-per-revolution table speed ripple, which must be
-   ≤ 0.0317 %. Raise this with the table vendor; better scales do not fix it.
+   old screen (assumed 0.1 % once-per-revolution speed ripple integrated to 60 µm Fp) was an open-loop
+   view; the position-controlled tracking-error model (accuracy budget above) puts the table's smoothness at
+   ~1 µm Fp. Ask the vendor for cogging, torque ripple at 10–20 rpm, interpolation error and the achievable
+   velocity-loop bandwidth; class 6 Fp holds with cogging ≤ 0.6 N m and ripple ≤ 1.2 % at a 50 Hz loop.
 4. **Scale purge air.** Branch from the 6 bar clamp supply: regulator (≈ 1 bar), coalescing
    and fine filters, and a dryer, to ISO 8573-1 class 1:4:1 (oil-free). Then a distribution block
    to the X/Y/Z scales. Optionally add a pressure switch as a cut-permission interlock.

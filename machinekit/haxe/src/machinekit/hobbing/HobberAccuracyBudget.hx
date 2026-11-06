@@ -91,6 +91,29 @@ class HobberAccuracyInputs {
   public var cyclePeriodUs:Float = 250.0;
   public var bSpeedRipple:Float = 0.005;
 
+  /**
+   * C table position loop and smoothness (the tracking-error model, `HobberAccuracyBudget.trackingTerms`). The C table is position-controlled and follows the
+   * B encoder, so what reaches the gear is the loop's tracking error: disturbance torque / dynamic stiffness at the disturbance frequency.
+   * Loop: standard cascade, PI velocity (bandwidth `cLoopVelocityHz`, gain Kv = J w_v, integral corner w_v / `cIntegralRatio`) inside a P position loop
+   * (Kp = w_v / `cPositionRatio`); no delay, no structural mode (assumed; a vendor drive tuned to these would reach about this). Typical direct-drive
+   * table drives run 100-200 Hz velocity bandwidth.
+   */
+  public var cLoopVelocityHz:Float = 100;
+  public var cPositionRatio:Float = 4;
+  public var cIntegralRatio:Float = 10;
+  /** Mandrel, part and clamp inertia added to the table's rotor/platen inertia, kg m2 (assumed: a 100 mm steel mandrel and part, ~2 kg). */
+  public var cLoadInertia:Float = 0.01;
+  /** Torque ripple at 1x revolution (current offset/gain error, commutation), as a fraction of the table's continuous torque (assumed typical direct-drive value; the RFQ asks for it); 2x and 3x revolution at 1/2 and 1/4 of it. */
+  public var cTorqueRipple:Float = 0.002;
+  /** Share of the HB10 table reaction torque that varies at the hob's gash-pass frequency (assumed). */
+  public var cCutRippleShare:Float = 0.3;
+  /** Gashes (flutes) of the hob: the cutting force repeats at this many times the hob revolution (set from the hob design). */
+  public var hobGashes:Int = 12;
+  /** Share of the B speed ripple left in the C reference after the master's velocity feedforward (assumed; 1.0 would be no feedforward). */
+  public var cFeedforwardResidual:Float = 0.05;
+  /** Frequency of the B speed ripple, in B revolutions (assumed, once per B revolution). */
+  public var bRippleOrder:Float = 1;
+
   /** Mandrel (workholding): eccentricity amplitude, clamped roundness, band expansion variation, micrometres. */
   public var mandrelEccentricityUm:Float = 1.5;
   public var mandrelRoundnessUm:Float = 1.5;
@@ -130,6 +153,35 @@ class AccuracyContributor {
     this.size = size;
     this.improve = improve;
     this.family = id;
+  }
+}
+
+/** One smoothness disturbance of the C table as position error: its torque (or encoder error), harmonic order, frequency, loop stiffness there, and angle amplitude. */
+class TrackingTerm {
+  public final id:String;
+  public final kind:String;
+  public final basis:String;
+  /** Disturbance amplitude: N m (arcsec for the interpolation term). */
+  public final amplitude:Float;
+  public final angle:Float;
+  public final order:Float;
+  public final frequencyHz:Float;
+  public final stiffness:Float;
+  public final note:String;
+  public final improve:String;
+  public final toothPass:Bool;
+  public function new(id:String, kind:String, basis:String, amplitude:Float, angle:Float, order:Float, frequencyHz:Float, stiffness:Float, note:String, improve:String, toothPass:Bool) {
+    this.id = id;
+    this.kind = kind;
+    this.basis = basis;
+    this.amplitude = amplitude;
+    this.angle = angle;
+    this.order = order;
+    this.frequencyHz = frequencyHz;
+    this.stiffness = stiffness;
+    this.note = note;
+    this.improve = improve;
+    this.toothPass = toothPass;
   }
 }
 
@@ -304,28 +356,39 @@ class HobberAccuracyBudget {
     rowOf(list, "A.torsion", "A swivel", aAngle * 1e6, "urad", "Assumed", "cutting force " + r2(inputs.tangentialForceN) + " N (load study peak) x lever " + r2(inputs.aLeverMm)
       + " mm about A (hob centre offset from the A axis (model) plus " + r2(inputs.aEngagementMm) + " mm of engagement half-length, assumed) / torsional stiffness " + inputs.aTorsionStiffness + " N m/rad (assumed: strain-wave size class, not in the maker data we hold; brake holding path unknown)",
       "helix: face width x angle", 0, 0, 0, 0, b * aAngle * um, 0, "Torsional stiffness and brake rigidity from ZeroErr; trim A at the first article against the load");
-    var servoK = tv(inputs, "servoTorsionalStiffness");
-    var dTorque = inputs.tableTorqueNm / servoK;
-    rowOf(list, "C.reaction", "C table", dTorque * 1e6, "urad", inputs.tableBasis.get("servoTorsionalStiffness"), "table torque bound " + inputs.tableTorqueNm + " N m (HB10) / servo torsional stiffness "
-      + servoK + " N m/rad", "pitch: 2 r x angle", 0, 2 * r * dTorque * um, 0, 0, 0, 0, "Stiffer C loop (feedforward of the load torque from B torque)");
+    var fC = cSpeedHz(inputs);
+    var kRev = loopStiffness(inputs, inputs.cLoopVelocityHz, fC);
+    var dTorque = inputs.tableTorqueNm / kRev;
+    rowOf(list, "C.reaction", "C table", dTorque * 1e6, "urad", "Derived", "table torque bound " + inputs.tableTorqueNm + " N m (HB10), varying once per revolution (" + r3(fC) + " Hz), / loop dynamic stiffness there "
+      + r2(kRev) + " N m/rad (" + inputs.cLoopVelocityHz + " Hz velocity loop, assumed)", "pitch: 2 r x angle", 0, 2 * r * dTorque * um, 0, 0, 0, 0, "Feedforward of the load torque from B torque; higher loop bandwidth");
 
     // ---- Rotary axes ------------------------------------------------------------------------------------------------------------
     var gc = "C table";
-    function harmonic(id:String, field:String, amplitude:Float, order:Float, note:String, improve:String):Void {
-      rowOf(list, id, gc, amplitude / ARC, "arcsec", inputs.tableBasis.get(field), note,
+    function harmonic(id:String, basis:String, amplitude:Float, order:Float, note:String, improve:String):Void {
+      rowOf(list, id, gc, amplitude / ARC, "arcsec", basis, note,
         "pitch: Fp = 2 r x angle = " + r3(2 * r * um * ARC) + " um per arcsec; fp = Fp x |sin(order x pi / z)| for order " + order, 2 * r * amplitude * Math.abs(Math.sin(order * Math.PI / z)) * um,
         2 * r * amplitude * um, 0, 0, 0, 0, improve);
     }
-    harmonic("C.accuracy", "absoluteAccuracy", tv(inputs, "absoluteAccuracy"), 4, "table positioning accuracy (catalogue), assumed order 4", "Calibrate the table (error map in the controller)");
+    harmonic("C.accuracy", inputs.tableBasis.get("absoluteAccuracy"), tv(inputs, "absoluteAccuracy"), 4, "table positioning accuracy (catalogue), assumed order 4: encoder error is read by the loop, so it is not rejected", "Calibrate the table (error map in the controller)");
     var rep = tv(inputs, "repeatability");
     rowOf(list, "C.repeatability", gc, rep / ARC, "arcsec", inputs.tableBasis.get("repeatability"), "table repeatability (catalogue); acts tooth to tooth",
       "pitch: fp = Fp = 2 r x angle", 2 * r * rep * um, 2 * r * rep * um, 0, 0, 0, 0, "Direct-drive table with a finer encoder; repeatability is the floor for fp");
-    harmonic("C.interpolation", "interpolationError", tv(inputs, "interpolationError"), 4096, "encoder interpolation, assumed 4096th harmonic", "Higher-grade encoder");
-    harmonic("C.speedRipple", "speedRipple", tv(inputs, "speedRipple"), 1,
-      "once-per-turn speed ripple fraction " + tv(inputs, "speedRipple") + " integrates to that many radians (assumed 0.1 %, loop rejection not credited, bench measurement at 15 rpm required)",
-      "Measure the real ripple on the bench; raise the position-loop gain or add torque-ripple feedforward; ask the table vendor for the ripple at 10-20 rpm");
-    harmonic("C.cogging", "coggingTorque", tv(inputs, "coggingTorque") / servoK, 48, "cogging torque / servo torsional stiffness, 48th harmonic", "Cogging compensation table");
-    harmonic("C.sealDrag", "sealDragRipple", tv(inputs, "sealDragRipple") / servoK, 2, "seal drag ripple / servo torsional stiffness, twice per turn", "Low-drag seal");
+    for (t in trackingTerms(inputs, inputs.cLoopVelocityHz)) {
+      var note = t.note + "; " + r3(t.frequencyHz) + " Hz at " + r2(fC * 60) + " rpm" + (t.stiffness > 0 ? ", dynamic stiffness " + r2(t.stiffness) + " N m/rad (loop " + inputs.cLoopVelocityHz + " Hz)" : "");
+      if (t.toothPass) {
+        // Every hob facet cuts every tooth at the same C phase (order = gashes x z aliases to zero): no pitch error, a ripple on the flank normal (u cos(alpha)).
+        rowOf(list, t.id, gc, t.angle / ARC, "arcsec", t.basis, note, "profile: tangential ripple r x angle x cos(alpha), repeats on every tooth (no pitch error)", 0, 0, 0, r * t.angle * um * cosA, 0, 0, t.improve);
+      } else {
+        harmonic(t.id, t.basis, t.angle, t.order, note, t.improve);
+      }
+    }
+    var omegaC = 2 * Math.PI * fC;
+    var kp = 2 * Math.PI * inputs.cLoopVelocityHz / inputs.cPositionRatio;
+    var wf = 2 * Math.PI * inputs.bRippleOrder * inputs.hobRpm / 60;
+    var lag = omegaC * inputs.bSpeedRipple / Math.max(kp, wf) * inputs.cFeedforwardResidual;
+    rowOf(list, "C.trackLag", gc, lag / ARC, "arcsec", "Assumed", "B speed ripple " + inputs.bSpeedRipple * 100 + " % (assumed) at " + r2(inputs.bRippleOrder * inputs.hobRpm / 60) + " Hz reaches the C reference as speed variation; the position loop (Kp " + r2(kp)
+      + " 1/s) follows it with lag omega_C x ripple / max(Kp, w) = " + r2(omegaC * inputs.bSpeedRipple / Math.max(kp, wf) / ARC) + "\" without feedforward, x " + inputs.cFeedforwardResidual + " left after the master's velocity feedforward (assumed)",
+      "pitch: 2 r x angle; order " + inputs.bRippleOrder * z + " per revolution", 2 * r * lag * um, 2 * r * lag * um, 0, 0, 0, 0, "Velocity feedforward from the B master; faster cycle");
     var runout = tv(inputs, "radialRunout") * um;
     rowOf(list, "C.radialRunout", gc, runout, "um TIR", inputs.tableBasis.get("radialRunout"), "table radial runout (total, periodic plus non-repeatable); the teeth are cut about the table axis, the bore datum is eccentric to it",
       "runout and pitch about the bore: Fr = Fp = TIR; fp = TIR x sin(pi/z)", runout * perToothIndex, runout, runout, 0, 0, 0, "Table bearing runout grade; tap the mandrel in on the table");
@@ -458,17 +521,99 @@ class HobberAccuracyBudget {
     return out;
   }
 
-  /** The largest once-per-turn C speed ripple fraction that keeps Fp at the target class, all other rows unchanged (RSS). */
-  public static function allowedRipple(inputs:HobberAccuracyInputs, rows:Array<AccuracyContributor>, limit:Float):Float {
-    var others = 0.0, own = 0.0;
-    for (c in rows) {
-      if (c.id == "C.speedRipple") own = c.impact[1];
-      else others += c.impact[1] * c.impact[1];
+  /** C table speed under the electronic gearbox, Hz: hob revolutions per second x starts / teeth. */
+  public static function cSpeedHz(inputs:HobberAccuracyInputs):Float return inputs.hobRpm / 60 * inputs.hobStarts / inputs.spec.teeth;
+
+  /** Total inertia of the C axis, kg m2. */
+  public static function cInertia(inputs:HobberAccuracyInputs):Float return tv(inputs, "rotorInertia") + inputs.cLoadInertia;
+
+  /** Torque constant from the table's continuous torque and current, N m/A rms (the table's own `torqueConstant` row has the same basis). */
+  public static function torqueConstant(inputs:HobberAccuracyInputs):Float return tv(inputs, "continuousTorque") / tv(inputs, "continuousCurrent");
+
+  /** Disturbance torque to position (dynamic stiffness) and encoder error to position (transmission) of the cascade, at `hz`: the denominator J s^2 + Kv (1 + wi/s)(s + Kp) and numerator Kv (1 + wi/s)(s + Kp). */
+  static function loopTerms(inputs:HobberAccuracyInputs, velocityHz:Float, hz:Float):{stiffness:Float, transmission:Float} {
+    var j = cInertia(inputs), wv = 2 * Math.PI * velocityHz, kv = j * wv, kp = wv / inputs.cPositionRatio, wi = wv / inputs.cIntegralRatio, w = 2 * Math.PI * Math.max(hz, 1e-6);
+    var nr = kv * (kp + wi), ni = kv * (w - wi * kp / w);
+    var dr = nr - j * w * w, di = ni;
+    var d = Math.sqrt(dr * dr + di * di);
+    return {stiffness: d, transmission: Math.sqrt(nr * nr + ni * ni) / d};
+  }
+
+  /** Dynamic stiffness of the C position loop at `hz`, N m/rad. */
+  public static function loopStiffness(inputs:HobberAccuracyInputs, velocityHz:Float, hz:Float):Float return loopTerms(inputs, velocityHz, hz).stiffness;
+
+  /**
+   * The C table's smoothness disturbances turned into position error: torque / dynamic stiffness at the harmonic's frequency (cogging, torque ripple at 1x, 2x, 3x
+   * revolution, seal drag ripple at 2x, cutting force at the gash-pass frequency), and the encoder's interpolation error times the loop's transmission at the
+   * signal-period frequency. Angle amplitudes, radians. `scalable` terms are the ones the vendor's smoothness numbers set (the RFQ spec).
+   */
+  public static function trackingTerms(inputs:HobberAccuracyInputs, velocityHz:Float):Array<TrackingTerm> {
+    var out:Array<TrackingTerm> = [], fC = cSpeedHz(inputs), z = inputs.spec.teeth;
+    function torque(id:String, kind:String, basis:String, amplitudeNm:Float, order:Float, note:String, improve:String, tooth:Bool = false):Void {
+      var f = fC * order, k = loopStiffness(inputs, velocityHz, f);
+      out.push(new TrackingTerm(id, kind, basis, amplitudeNm, amplitudeNm / k, order, f, k, note, improve, tooth));
     }
+    torque("C.trk.cogging", "cogging", inputs.tableBasis.get("coggingTorque"), tv(inputs, "coggingTorque"), 48, "cogging torque " + tv(inputs, "coggingTorque") + " N m peak, 48th harmonic", "Cogging compensation table; skewed or low-cogging motor; vendor value");
+    var rip = inputs.cTorqueRipple * tv(inputs, "continuousTorque");
+    for (h in 1...4) torque("C.trk.ripple" + h, "ripple", "Assumed", rip / Math.pow(2, h - 1), h, "torque ripple " + inputs.cTorqueRipple * 100 / Math.pow(2, h - 1) + " % of continuous torque " + tv(inputs, "continuousTorque") + " N m (assumed), " + h + "x revolution", "Current-loop offset and gain calibration; vendor ripple figure");
+    torque("C.trk.seal", "seal", inputs.tableBasis.get("sealDragRipple"), tv(inputs, "sealDragRipple"), 2, "seal drag ripple " + tv(inputs, "sealDragRipple") + " N m peak, twice per revolution", "Low-drag or non-contact seal");
+    torque("C.trk.cut", "cut", "Assumed", inputs.cCutRippleShare * inputs.tableTorqueNm, inputs.hobGashes * z, "cutting torque variation " + inputs.cCutRippleShare * 100 + " % (assumed) of the " + inputs.tableTorqueNm + " N m reaction at the gash-pass frequency (" + inputs.hobGashes + " gashes)", "Hob with more gashes; none needed", true);
+    var order = 4096, f = fC * order, tr = loopTerms(inputs, velocityHz, f).transmission, amp = tv(inputs, "interpolationError");
+    var t = new TrackingTerm("C.trk.interpolation", "interpolation", inputs.tableBasis.get("interpolationError"), amp / ARC, amp * tr, order, f, 0, "encoder interpolation " + r2(amp / ARC) + "\" at the 4096th harmonic ("
+      + r2(f) + " Hz) x loop transmission " + Std.string(Math.round(tr * 1e4) / 1e4) + " there", "Encoder with a stated, low interpolation error; two read heads", false);
+    out.push(t);
+    return out;
+  }
+
+  /**
+   * The C smoothness specification for the RFQ: for each velocity-loop bandwidth, the largest cogging torque, torque ripple (fraction of continuous torque at 1x revolution,
+   * 2x and 3x at the same ratios), seal ripple and encoder interpolation error that each keep Fp at `limit` alone, and the common scale of the assumed values that does
+   * so together, every other row unchanged (RSS).
+   */
+  public static function smoothnessSpec(inputs:HobberAccuracyInputs, rows:Array<AccuracyContributor>, limit:Float, bandwidths:Array<Float>):Array<String> {
+    var lines = [], r2x = 2 * inputs.spec.pitchRadius() * 1000;
+    var others = 0.0;
+    for (c in rows) if (c.id.indexOf("C.trk.") != 0) others += c.impact[1] * c.impact[1];
     var room = limit * limit - others;
-    if (room <= 0 || own <= 0) return 0;
-    var ripple = tv(inputs, "speedRipple");
-    return ripple * Math.sqrt(room) / own;
+    lines.push("C table smoothness spec (Fp class " + TARGET_CLASS + " limit " + r2(limit) + " um; every row outside the C smoothness terms uses " + r2(Math.sqrt(others)) + " um RSS, room " + (room > 0 ? Std.string(r2(Math.sqrt(room))) : "none") + " um):");
+    for (fv in bandwidths) {
+      var terms = trackingTerms(inputs, fv), total = 0.0, kinds:Map<String, Float> = new Map(), amps:Map<String, Float> = new Map();
+      for (t in terms) if (!t.toothPass) {
+        var fp = r2x * t.angle;
+        total += fp * fp;
+        var k0 = got(kinds, t.kind);
+        kinds.set(t.kind, k0 + fp * fp);
+        var a0 = got(amps, t.kind);
+        amps.set(t.kind, a0 + t.amplitude);
+      }
+      function alone(kind:String, unit:Float, name:String):String {
+        var sumSq = got(kinds, kind), own:Float = Math.sqrt(sumSq), rest = total - own * own, left = room - rest;
+        if (left <= 0) return name + " none";
+        var first = got(amps, kind);
+        return name + " <= " + Std.string(Math.round(first * Math.sqrt(left) / own / unit * 1000) / 1000);
+      }
+      var k = room > 0 ? Math.sqrt(room / total) : 0.0;
+      lines.push("  velocity loop " + fv + " Hz (position " + r2(fv / inputs.cPositionRatio) + " Hz): Fp from the assumed smoothness set " + r2(Math.sqrt(total)) + " um; each alone: " + alone("cogging", 1, "cogging N m")
+        + ", " + alone("ripple", tv(inputs, "continuousTorque") / 100 * 1.75, "ripple % of continuous torque at 1x rev") + ", " + alone("seal", 1, "seal ripple N m") + ", " + alone("interpolation", 1, "interpolation arcsec")
+        + "; all together scaled x" + r2(k) + " (cogging " + r3(k * tv(inputs, "coggingTorque")) + " N m, ripple " + r3(k * inputs.cTorqueRipple * 100) + " %, seal " + r3(k * tv(inputs, "sealDragRipple")) + " N m, interpolation " + r2(k * tv(inputs, "interpolationError") / ARC) + "\")");
+    }
+    return lines;
+  }
+
+  static function got(m:Map<String, Float>, k:String):Float {
+    var v = m.get(k);
+    return v == null ? 0.0 : v;
+  }
+
+  /** The earlier view for comparison: the once-per-turn speed ripple integrated to angle, and what the position loop leaves of it. */
+  public static function speedRippleCrossCheck(inputs:HobberAccuracyInputs):Array<String> {
+    var rho = tv(inputs, "speedRipple"), r = inputs.spec.pitchRadius(), fC = cSpeedHz(inputs), kp = 2 * Math.PI * inputs.cLoopVelocityHz / inputs.cPositionRatio;
+    var open = 2 * r * rho * 1000, w = 2 * Math.PI * fC, sp = w / Math.sqrt(w * w + kp * kp);
+    var equivalentTorque = rho * w * cInertia(inputs) * w;
+    return ["Cross-check (the earlier view): a " + rho * 100 + " % once-per-turn speed ripple at " + r2(fC * 60) + " rpm integrated to angle is " + r2(open) + " um of Fp (2 r x " + rho + " rad), the open-loop (velocity mode) figure.",
+      "  In position mode with the B encoder as reference the position loop corrects it: sensitivity |s / (s + Kp)| = " + Std.string(Math.round(sp * 1e4) / 1e4) + " at " + r3(fC) + " Hz (Kp " + r2(kp) + " 1/s), leaving "
+      + r2(open * sp) + " um; a vendor's speed ripple is measured in velocity mode, so it overstates what a position-controlled table does. The same torque, seen as a disturbance, is "
+      + Std.string(Math.round(equivalentTorque * 1e6) / 1e6) + " N m (J w^2 x ripple) at that frequency, far below the cogging and ripple torques that now decide."];
   }
 
   static function pad(s:String, n:Int):String {
