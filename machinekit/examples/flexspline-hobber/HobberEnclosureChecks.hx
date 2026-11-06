@@ -5,11 +5,44 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 
 class HobberEnclosureChecks {
+  /** Mounts split into the frame outriggers and the tray clamps by bed edge; each clamp shares its bolt's group. */
+  static function checkMountGroups(assembly:MachineAssembly):Void {
+    var root = "Chip protection and enclosure/Mounts/",
+      groups = assembly.functionalGroups(), poses = assembly.solvedPoses();
+    var counts:Map<String, Int> = [];
+    for (id => path in groups) if (StringTools.startsWith(path, root)) counts.set(
+      path,
+      (counts.exists(path) ? counts.get(path) : 0) + 1
+    );
+    if (counts.get(root + "Enclosure frame")
+      != 4) throw "Mounts: expected the four frame outriggers in Enclosure frame";
+    var table = poses.get("machine/bed/tablePlate");
+    if (table == null) throw "Mounts: missing machine/bed/tablePlate";
+    var clamps = 0, nearest = {end: "", distance: 1e18};
+    for (id => path in groups) if (StringTools.startsWith(id, "enclosureTrayClamp")) {
+      clamps++;
+      if (!StringTools.startsWith(path, root + "Chip tray/")) throw 'Mounts: $id is outside Chip tray ($path)';
+      if (groups.get(StringTools.replace(id,
+        "Clamp", "Bolt")) != path) throw 'Mounts: $id and its bolt are in different groups';
+      if (!StringTools.endsWith(path, " end")) continue;
+      var p = poses.get(id);
+      if (p == null) throw 'Mounts: missing pose for $id';
+      var d = Math.sqrt(Math.pow(p.x - table.x, 2) + Math.pow(p.y - table.y, 2));
+      if (d < nearest.distance) nearest = {end: path, distance: d};
+    }
+    var edges = [for (path in counts.keys()) if (StringTools.startsWith(path, root + "Chip tray/")) path];
+    if (clamps != 12 || edges.length != 4 || !counts.exists(root + "Chip tray/Table end") || !counts.exists(root
+      + "Chip tray/Column end")) throw "Mounts: expected 12 tray clamps on two ends and two sides, got "
+      + [for (k => v in counts) '$k=$v'].join(", ");
+    if (nearest.end != root + "Chip tray/Table end") throw "Mounts: the clamp nearest the table is in " + nearest.end;
+  }
+
   public static function main():Void {
     HobberElectricalChecks.run(new FlexsplineHobber());
     var fitted = HobberEnclosurePreview.assembled(), assembly = fitted.assembly, shell = fitted.shell;
     var guardReport = HobberEnclosureGuardChecks.run(assembly, shell.layout.stroke);
     if (assembly.validate().length != 0) throw "Enclosed hobber assembly does not validate";
+    checkMountGroups(assembly);
     var model = new cadkit.modeling.AssemblyModel("mm");
     assembly.addTo(model, "");
     var state = model.initialState();

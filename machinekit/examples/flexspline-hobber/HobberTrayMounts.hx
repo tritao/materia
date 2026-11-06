@@ -8,8 +8,10 @@ import materia.assembly.AssemblyFrames as F;
 /** Separate clamp/bolt occurrences, anchored to local steel inserts rather than through the laminate. */
 class HobberTrayMounts {
   public static function install(assembly:MachineAssembly, shell:GeneratedEnclosure):Void {
-    assembly.group("Chip protection and enclosure/Mounts");
     var poses = assembly.solvedPoses(), casting = poses.get("machine/bed/casting"), i = 0;
+    // Group the clamps by the bed edge they hold: the two ends are named by the table they face (the column runs at the
+    // other end), the long sides by the scene axis they face.
+    var tableX = F.compose(F.inverse(casting), poses.get("machine/bed/tablePlate")).x;
     for (row in FoundationLayout.trayClampSeats()) {
       var parent = "machine/bed/" + row.id;
       var seat = F.compose(poses.get(parent), assembly.memberConnectorFrame(parent, "top"));
@@ -21,6 +23,9 @@ class HobberTrayMounts {
           0
         );
       var pose = F.fromRotationMatrix(seat.x, seat.y, seat.z, [out.x, -out.y, 0, out.y, out.x, 0, 0, 0, 1]);
+      var edge = Math.abs(row.pose.y) > 300 ? (Math.abs(out.x) > Math.abs(out.y) ? (out.x < 0 ? "-X side" : "+X side")
+        : (out.y < 0 ? "-Y side" : "+Y side")) : ((row.pose.x < 0) == (tableX < 0) ? "Table end" : "Column end");
+      assembly.group("Chip protection and enclosure/Mounts/Chip tray/" + edge);
       var height = row.clampHeight == null ? machinekit.enclosure.TraySeat.TOP : row.clampHeight;
       var id = "enclosureTrayClamp" + i,
         bolt = "enclosureTrayBolt" + i, clamp = new TrayClamp(height), screw = SocketHeadCapScrew.metric(
