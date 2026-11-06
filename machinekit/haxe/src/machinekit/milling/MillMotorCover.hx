@@ -34,10 +34,10 @@ class MillMotorCover extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var w = parameterNumber("width"), d = parameterNumber("depth"), h = parameterNumber("height");
     return Solids.union([
-      Part.box(w, d, 2).translated(new Vector(0, 0, h - 2)),
-      Part.box(w, 2, h).translated(new Vector(0, -d / 2 + 1, 0)),
-      Part.box(2, d, h).translated(new Vector(-w / 2 + 1, 0, 0)),
-      Part.box(2, d, h).translated(new Vector(w / 2 - 1, 0, 0))
+      Solids.named(Part.box(w, d, 2).translated(new Vector(0, 0, h - 2)), "top"),
+      Solids.named(Part.box(w, 2, h).translated(new Vector(0, -d / 2 + 1, 0)), "front"),
+      Solids.named(Part.box(2, d, h).translated(new Vector(-w / 2 + 1, 0, 0)), "left"),
+      Solids.named(Part.box(2, d, h).translated(new Vector(w / 2 - 1, 0, 0)), "right")
     ]);
   }
 }

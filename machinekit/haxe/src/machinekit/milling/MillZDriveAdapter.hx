@@ -38,30 +38,30 @@ class MillZDriveAdapter extends MachineComponent {
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var t = parameterNumber("thickness"), body = Solids.union([
-      Part.box(parameterNumber("width"), t, 40),
-      Part.box(parameterNumber("stemWidth"), t, parameterNumber("stemHeight")).translated(new Vector(
+      Solids.named(Part.box(parameterNumber("width"), t, 40), "plate"),
+      Solids.named(Part.box(parameterNumber("stemWidth"), t, parameterNumber("stemHeight")).translated(new Vector(
         0,
         0,
         -parameterNumber("stemHeight")
-      ))
+      )), "stem")
     ]);
     var tools:Array<Part> = [];
-    for (side in [-1, 1]) tools.push(Part.cylinderAlongY(
+    for (k => side in [-1, 1]) tools.push(Solids.named(Part.cylinderAlongY(
       3.3,
       -t / 2 - 1,
       t / 2 + 1,
       side * parameterNumber("spacing") / 2,
       10
-    ));
+    ), "anchor" + (k + 1)));
     var asset = machinekit.assembly.HzMotionCatalog.cadAsset("M80E-BK15-C");
     if (asset.interfaces == null) throw "Z adapter requires measured STEP holes";
-    for (h in asset.interfaces.baseHoles) tools.push(Part.cylinderAlongY(
+    for (k => h in asset.interfaces.baseHoles) tools.push(Solids.named(Part.cylinderAlongY(
       2.5,
       t / 2 - 15,
       t / 2 + 1,
       -h.x,
       parameterNumber("motorOffset") - h.z
-    ));
+    ), "motor-tap" + (k + 1)));
     return Solids.cut(body, tools);
   }
 }

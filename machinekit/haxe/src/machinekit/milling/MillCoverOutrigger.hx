@@ -65,7 +65,7 @@ class MillCoverOutrigger extends MachineComponent {
   override public function machinable():Bool return true;
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return machined(Solids.union([
-    Part.box(195, 24, 16).translated(new Vector(side * 97.5, 0, 64)),
-    Part.box(14, 24, 40).translated(new Vector(side * 7, 0, 40))
+    Solids.named(Part.box(195, 24, 16).translated(new Vector(side * 97.5, 0, 64)), "arm"),
+    Solids.named(Part.box(14, 24, 40).translated(new Vector(side * 7, 0, 40)), "post")
   ]));
 }

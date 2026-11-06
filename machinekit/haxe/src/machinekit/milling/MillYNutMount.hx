@@ -101,38 +101,38 @@ class MillYNutMount extends MachineComponent {
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
     if (values().boolean("reinforced")) {
-      var nut = new BallNut(), pieces = [Part.box(100, 92, THICKNESS).translated(new Vector(0, 18, 0))];
+      var nut = new BallNut(), pieces = [Solids.named(Part.box(100, 92, THICKNESS).translated(new Vector(0, 18, 0)), "plate")];
       // Shallow rear lip locates the nut flange without moving its axial seat.
       pieces.push(Solids.cut(
-        Part.cylinderSpan(nut.flangeDiameter / 2 + 3.5, -1.5, 1),
+        Solids.named(Part.cylinderSpan(nut.flangeDiameter / 2 + 3.5, -1.5, 1), "flange-register"),
         [
-          Part.cylinderSpan(nut.flangeDiameter / 2 + 0.05, -2, 2),
-          Part.box(values().boolean("serviceAccess") ? SERVICE_WIDTH : 10, 12, 3).translated(new Vector(0, 28, -2))
+          Solids.named(Part.cylinderSpan(nut.flangeDiameter / 2 + 0.05, -2, 2), "register-bore"),
+          Solids.named(Part.box(values().boolean("serviceAccess") ? SERVICE_WIDTH : 10, 12, 3).translated(new Vector(0, 28, -2)), "register-gap")
         ]
       ));
-      for (p in pilots()) pieces.push(Part.cylinderSpan(3, -8, 1, p.x, p.y));
-      var cuts = [Part.cylinderSpan((nut.screwDiameter + 2) / 2, -1, THICKNESS + 1)];
-      if (!values().boolean("serviceAccess")) for (p in nut.boltPattern()) cuts.push(Part.cylinderSpan(
+      for (k => p in pilots()) pieces.push(Solids.named(Part.cylinderSpan(3, -8, 1, p.x, p.y), "pilot" + (k + 1)));
+      var cuts = [Solids.named(Part.cylinderSpan((nut.screwDiameter + 2) / 2, -1, THICKNESS + 1), "shaft-clearance")];
+      if (!values().boolean("serviceAccess")) for (k => p in nut.boltPattern()) cuts.push(Solids.named(Part.cylinderSpan(
         2.1,
         -1,
         10,
         p.x,
         p.y
-      ));
+      ), "flange-tap" + (k + 1)));
       if (values().boolean("serviceAccess")) {
         // Open, end-milled service slot, not a drilled hole tangent to an edge.
-        cuts.push(Part.cylinderSpan(SERVICE_WIDTH / 2, -2, THICKNESS + 1, 0, SERVICE_BOTTOM + SERVICE_WIDTH / 2));
-        cuts.push(Part.box(SERVICE_WIDTH, 40, THICKNESS + 3).translated(new Vector(
+        cuts.push(Solids.named(Part.cylinderSpan(SERVICE_WIDTH / 2, -2, THICKNESS + 1, 0, SERVICE_BOTTOM + SERVICE_WIDTH / 2), "service-slot-root"));
+        cuts.push(Solids.named(Part.box(SERVICE_WIDTH, 40, THICKNESS + 3).translated(new Vector(
           0,
           SERVICE_BOTTOM + SERVICE_WIDTH / 2 + 20,
           -2
-        )));
+        )), "service-slot"));
       }
       if (values().boolean("serviceAccess")) for (tool in machinekit
         .design.DesignInterfaces.of(this).drillingTools()) cuts.push(tool);
-      else for (p in anchors()) {
-        cuts.push(Part.cylinderSpan(3.3, -1, THICKNESS + 1, p.x, p.y));
-        cuts.push(Part.cylinderSpan(5.5, ANCHOR_SEAT, THICKNESS + 1, p.x, p.y));
+      else for (k => p in anchors()) {
+        cuts.push(Solids.named(Part.cylinderSpan(3.3, -1, THICKNESS + 1, p.x, p.y), "anchor" + (k + 1)));
+        cuts.push(Solids.named(Part.cylinderSpan(5.5, ANCHOR_SEAT, THICKNESS + 1, p.x, p.y), "anchor-seat" + (k + 1)));
       }
       var raw = Solids.cut(Solids.union(pieces), cuts);
       try {
@@ -144,9 +144,9 @@ class MillYNutMount extends MachineComponent {
         throw e;
       }
     }
-    var tools = [Part.cylinderSpan(9, -1, 13)];
-    for (p in new BallNut().boltPattern()) tools.push(Part.cylinderSpan(2.75, -1, 13, p.x, p.y));
-    for (x in [-32.0, 32.0]) tools.push(Part.cylinderSpan(3.3, -1, 13, x, 12));
-    return Solids.cut(Part.box(84, 54, 12), tools);
+    var tools = [Solids.named(Part.cylinderSpan(9, -1, 13), "shaft-clearance")];
+    for (k => p in new BallNut().boltPattern()) tools.push(Solids.named(Part.cylinderSpan(2.75, -1, 13, p.x, p.y), "flange-bolt" + (k + 1)));
+    for (k => x in [-32.0, 32.0]) tools.push(Solids.named(Part.cylinderSpan(3.3, -1, 13, x, 12), "anchor" + (k + 1)));
+    return Solids.cut(Solids.named(Part.box(84, 54, 12), "plate"), tools);
   }
 }

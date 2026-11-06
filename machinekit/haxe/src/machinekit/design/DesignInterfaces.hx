@@ -2,6 +2,7 @@ package machinekit.design;
 
 import machinekit.component.ComponentFacet;
 import machinekit.component.MachineComponent;
+import machinekit.component.Solids;
 import machinekit.assembly.PosedParts;
 import cadkit.modeling.Part;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -151,29 +152,29 @@ class DesignInterfaces implements ComponentFacet {
     for (h in holes) if (h.id == id) return h;
     throw 'Unknown hole "$id"';
   }
+  /** The tools that drill every declared hole, each named `<hole id>-bore`, `-relief` or `-counterbore`, so the faces they cut are strong. */
   public function drillingTools():Array<Part> {
     var tools:Array<Part> = [];
     try for (h in holes) {
-      var local = Part.cylinderSpan(h.radius, -1, h.depth + (h.through == true ? 1 : 0));
-      tools.push(PosedParts.moved(local, h.frame));
-      local.close();
-      if (h.relief != null) {
-        var relief = Part.cylinderSpan(h.relief.diameter / 2, h.relief.start, h.depth);
-        try tools.push(PosedParts.moved(relief, h.frame)) catch (error:Dynamic) {
-          relief.close();
-          throw error;
-        }
-        relief.close();
-      }
-      if (h.counterbore != null) {
-        var cb = Part.cylinderSpan(h.counterbore.radius, -1, h.counterbore.depth);
-        tools.push(PosedParts.moved(cb, h.frame));
-        cb.close();
-      }
+      tools.push(drillingTool(Part.cylinderSpan(h.radius, -1, h.depth + (h.through == true ? 1 : 0)), h.frame, h.id + "-bore"));
+      if (h.relief != null) tools.push(drillingTool(Part.cylinderSpan(h.relief.diameter / 2, h.relief.start, h.depth), h.frame, h.id + "-relief"));
+      if (h.counterbore != null) tools.push(drillingTool(Part.cylinderSpan(h.counterbore.radius, -1, h.counterbore.depth), h.frame, h.id + "-counterbore"));
     } catch (e:Dynamic) {
       for (t in tools) t.close();
       throw e;
     }
     return tools;
+  }
+
+  /** `part` placed at `frame` and named `id`; consumes `part`. */
+  static function drillingTool(part:Part, frame:AssemblyFrame, id:String):Part {
+    try {
+      var placed = PosedParts.moved(part, frame);
+      part.close();
+      return Solids.named(placed, id);
+    } catch (error:Dynamic) {
+      if (!part.shape.isClosed()) part.close();
+      throw error;
+    }
   }
 }

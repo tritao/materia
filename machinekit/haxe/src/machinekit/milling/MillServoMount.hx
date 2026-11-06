@@ -41,22 +41,22 @@ class MillServoMount extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var w = parameterNumber("width"), s = parameterNumber("shaftHeight"), d = s + 33, cy = (33 - s) / 2;
     var pieces = [
-      Part.box(w, d, 8).translated(new Vector(0, cy, 0)),
-      Part.box(w, d, 8).translated(new Vector(0, cy, 47))
+      Solids.named(Part.box(w, d, 8).translated(new Vector(0, cy, 0)), "lower-plate"),
+      Solids.named(Part.box(w, d, 8).translated(new Vector(0, cy, 47)), "motor-plate")
     ];
-    for (side in [-1, 1]) pieces.push(Part.box(12, d, 39).translated(new Vector(side * (w / 2 - 6), cy, 8)));
-    var tools = [Part.cylinderSpan(14.1, -1, 9), Part.cylinderSpan(8.5, 46, 56)];
+    for (k => side in [-1, 1]) pieces.push(Solids.named(Part.box(12, d, 39).translated(new Vector(side * (w / 2 - 6), cy, 8)), "leg" + (k + 1)));
+    var tools = [Solids.named(Part.cylinderSpan(14.1, -1, 9), "lower-bore"), Solids.named(Part.cylinderSpan(8.5, 46, 56), "shaft-clearance")];
     var mounting = machinekit.motion.LeadshineServo.model("ELM2H-0400LA60F").mounting();
     if (mounting == null) throw "Servo cage needs catalog mounting data";
-    tools.push(Part.cylinderSpan((mounting.pilotDiameter + 0.2) / 2, 55 - mounting.pilotHeight - 0.2, 56));
-    for (p in mounting.holes) tools.push(Part.cylinderSpan(mounting.holeDiameter / 2, 46, 56, p.x, p.y));
-    for (side in [-1, 1]) tools.push(Part.cylinderSpan(
+    tools.push(Solids.named(Part.cylinderSpan((mounting.pilotDiameter + 0.2) / 2, 55 - mounting.pilotHeight - 0.2, 56), "pilot"));
+    for (k => p in mounting.holes) tools.push(Solids.named(Part.cylinderSpan(mounting.holeDiameter / 2, 46, 56, p.x, p.y), "motor-bolt" + (k + 1)));
+    for (k => side in [-1, 1]) tools.push(Solids.named(Part.cylinderSpan(
       3.3,
       -1,
       56,
       side * (w / 2 - 8),
       parameterNumber("pedestalHeight") / 2 - s
-    ));
+    ), "anchor" + (k + 1)));
     return Solids.cut(Solids.union(pieces), tools);
   }
 }

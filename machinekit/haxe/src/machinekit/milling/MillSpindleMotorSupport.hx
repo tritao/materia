@@ -34,8 +34,8 @@ class MillSpindleMotorSupport extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var h = parameterNumber("height");
     return Solids.union([
-      Part.box(20, 80, h).translated(new Vector(48, 0, 0)),
-      Part.box(62, 80, 8).translated(new Vector(69, 0, h - 8))
+      Solids.named(Part.box(20, 80, h).translated(new Vector(48, 0, 0)), "web"),
+      Solids.named(Part.box(62, 80, 8).translated(new Vector(69, 0, h - 8)), "flange")
     ]);
   }
 }

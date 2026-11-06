@@ -34,16 +34,16 @@ class MillYDriveSeat extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var depth = floating ? 20.0 : 83.0;
     var body = Part.box(100, depth, 15), tools:Array<Part> = [];
-    if (!floating) tools.push(Part.box(101, 14.01, 16).translated(new Vector(0, depth / 2 - 7, 0)));
-    if (floating) for (x in [-23.0, 23]) tools.push(Part.cylinderSpan(2.5, 0, 16, x, 0));
-    else for (hole in machinekit.assembly.HzMotionCatalog.get("M60D-BK12-C").baseHoles) tools.push(Part.cylinderSpan(
+    if (!floating) tools.push(Solids.named(Part.box(101, 14.01, 16).translated(new Vector(0, depth / 2 - 7, 0)), "pocket"));
+    if (floating) for (k => x in [-23.0, 23]) tools.push(Solids.named(Part.cylinderSpan(2.5, 0, 16, x, 0), "support-tap" + (k + 1)));
+    else for (k => hole in machinekit.assembly.HzMotionCatalog.get("M60D-BK12-C").baseHoles) tools.push(Solids.named(Part.cylinderSpan(
       2.5,
       0,
       16,
       hole.x,
       41.5 - hole.z
-    ));
-    for (x in [-42.0, 42]) tools.push(Part.cylinderSpan(3.3, -1, 16, x, floating ? 0 : -10));
+    ), "support-tap" + (k + 1)));
+    for (k => x in [-42.0, 42]) tools.push(Solids.named(Part.cylinderSpan(3.3, -1, 16, x, floating ? 0 : -10), "anchor" + (k + 1)));
     return Solids.cut(body, tools);
   }
 }

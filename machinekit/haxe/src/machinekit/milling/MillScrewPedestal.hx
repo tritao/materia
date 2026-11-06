@@ -38,11 +38,11 @@ class MillScrewPedestal extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var w = parameterNumber("width"), d = parameterNumber("depth"), h = parameterNumber("height");
     var tools = [];
-    for (x in [-23.0, 23.0]) tools.push(Part.cylinderSpan(2.5, Math.max(-1, h - 16), h + 1, x, 0));
-    for (s in [-1, 1]) {
+    for (k => x in [-23.0, 23.0]) tools.push(Solids.named(Part.cylinderSpan(2.5, Math.max(-1, h - 16), h + 1, x, 0), "support-tap" + (k + 1)));
+    for (k => s in [-1, 1]) {
       var x = s * (w / 2 - 8);
-      tools.push(Part.cylinderSpan(3.3, -1, h + 1, x, -d / 2 + 6));
-      if (values().boolean("motorAnchors")) tools.push(Part.cylinderAlongY(2.5, d / 2 - 12, d / 2 + 1, x, h / 2));
+      tools.push(Solids.named(Part.cylinderSpan(3.3, -1, h + 1, x, -d / 2 + 6), "anchor" + (k + 1)));
+      if (values().boolean("motorAnchors")) tools.push(Solids.named(Part.cylinderAlongY(2.5, d / 2 - 12, d / 2 + 1, x, h / 2), "motor-anchor" + (k + 1)));
     }
     return Solids.cut(Part.box(w, d, h), tools);
   }

@@ -33,11 +33,12 @@ class MillBeltMotorPlate extends MachineComponent {
   override public function componentType():Null<ComponentType> return recipeType();
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
-    var holes = [Part.cylinderAlongY(8.5, -7, 7, 0, 40)];
+    var holes = [Solids.named(Part.cylinderAlongY(8.5, -7, 7, 0, 40), "shaft-clearance")];
     var m = machinekit.motion.AxisMotor.of(machinekit.motion.LeadshineServo.model(motor)).flange;
-    holes.push(Part.cylinderAlongY((m.pilotDiameter + 0.2) / 2, -7, -6 + m.pilotHeight + 0.2, 0, 40));
-    for (p in m.holes) holes.push(Part.cylinderAlongY(m.holeDiameter / 2, -7, 7, p.x, 40 + p.y));
-    for (x in [-32.0, 32.0]) for (z in [10.0, 70.0]) holes.push(Part.cylinderAlongY(3.3, -7, 7, x, z));
+    holes.push(Solids.named(Part.cylinderAlongY((m.pilotDiameter + 0.2) / 2, -7, -6 + m.pilotHeight + 0.2, 0, 40), "pilot"));
+    for (k => p in m.holes) holes.push(Solids.named(Part.cylinderAlongY(m.holeDiameter / 2, -7, 7, p.x, 40 + p.y), "motor-bolt" + (k + 1)));
+    var anchor = 0;
+    for (x in [-32.0, 32.0]) for (z in [10.0, 70.0]) holes.push(Solids.named(Part.cylinderAlongY(3.3, -7, 7, x, z), "anchor" + (++anchor)));
     return Solids.cut(Part.box(86, 12, 80), holes);
   }
 }
