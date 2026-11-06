@@ -4,7 +4,8 @@ A vertical GE-class moving-column hobber: fixed direct-drive work table, radial
 column infeed, vertical head feed, direct swivel and twin-rail hob shift.
 
 See [MACHINE_DESIGN.md](MACHINE_DESIGN.md) for datums, travel, support and
-acceptance scope, and [PLAN.md](PLAN.md) for engineering evidence and open gates.
+acceptance scope, [PLAN.md](PLAN.md) for engineering evidence and open gates, and
+[INSPECTION.md](INSPECTION.md) for physical gear inspection.
 The project entry point is `materia.project.json`; run it through Materia's
 project-source loader. `check-quick.sh app` runs the coarse app/cycle smoke check.
 Full reference metrology and error-budget cuts are separate, expensive checks.

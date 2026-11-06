@@ -634,15 +634,17 @@ r 30 mm. HB7 and HB11 must show this.
 Only if the prototype target (HB12) holds and finer gears are wanted.
 
 **Why it changes the work.** Class 3 is 2.8× tighter than class 6 (√2 per class). The limits for
-the reference part are below. They come from the HB-D6 formulas, extrapolated below module 0.5,
-with Fr and Fα rough; all of them need checking.
+the reference part are below. They come from the ISO 1328-1:2013 formulas (HB-D6), extrapolated
+below module 0.5, for d 60 mm and b 8 mm. Fr uses Annex E's 0.9·Fp basis. The full budget is in
+[INSPECTION.md](INSPECTION.md).
 
 | Parameter | Class 6 | Class 3 | Table angle at r 30 mm (class 3) |
 |---|---|---|---|
 | fp | 7.3 µm | 2.6 µm | ≈ 18″ |
 | Fp | 23.5 µm | 8.3 µm | ≈ 57″ |
-| Fr (≈ 0.8–0.9·Fp) | ≈ 20 µm | ≈ 7 µm | total eccentricity ≲ 3.5 µm |
-| Fα | ≈ 6–7 µm | ≈ 2–2.5 µm | — |
+| Fr (0.9·Fp) | 21.1 µm | 7.5 µm | total eccentricity ≲ 3.7 µm |
+| Fα | 9.4 µm | 3.3 µm | — |
+| fHα | 5.9 µm | 2.1 µm | — |
 
 Class 6 is mostly a sync problem. Class 3 is a datum and rotation-accuracy problem. The 3–5 µm
 mandrel runout in the reference numbers is fine for class 6 and not enough for class 3.
