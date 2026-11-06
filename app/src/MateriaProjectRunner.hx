@@ -453,11 +453,17 @@ class MateriaProjectRunner {
       var binaries = pairs(record, "binaries");
       var nativeRoot:Dynamic = Reflect.field(record, "nativeRoot");
       if (binaries == null || !Std.isOfType(nativeRoot, String)) return stale("record binaries");
-      var current = binaryStamps(home, nativeRoot);
-      if (current.length != binaries.length) return stale("native library set");
+      // The tool's own binaries (compiler, VM, runtime) are stamped where the fingerprint tool recorded them, so a
+      // relocated VM never needs to be rediscovered here; only the package native libraries are listed again.
+      var recordedPaths = [for (binary in binaries) binary.length == 3 ? binary[0] : ""];
+      var listed = nativeLibraryPaths(nativeRoot);
+      var recordedNative = [for (path in recordedPaths) if (path != "" && StringTools.startsWith(path, nativeRoot + "/")) path];
+      if (recordedPaths.indexOf("") >= 0 || recordedNative.length != listed.length) return stale("native library set");
+      for (path in listed) if (recordedPaths.indexOf(path) < 0) return stale("native library set");
+      var current = stamps(recordedPaths);
       for (index in 0...current.length) {
         var expected = binaries[index], actual = current[index];
-        if (expected.length != 3 || expected[0] != actual[0] || expected[1] != actual[1] || expected[2] != actual[2]) return stale(actual[0]);
+        if (expected[1] != actual[1] || expected[2] != actual[2]) return stale(actual[0]);
       }
       var directories = pairs(record, "directories");
       if (directories == null || directories.length == 0) return stale("record directories");
@@ -501,20 +507,19 @@ class MateriaProjectRunner {
     return result;
   }
 
-  /** The tool's binary stamps, in its order: its pinned tools, then every package native library. */
-  static function binaryStamps(home:String, nativeRoot:String):Array<Array<String>> {
-    var binaries = [
-      ProjectPath.join([home, ".tools", "haxe", "haxe"]),
-      ProjectPath.join([home, ".tools", "hashlink", "hl"]),
-      ProjectPath.join([home, "out", "haxeon_runtime.hdll"])
-    ];
+  /** Every package native library under the app's native build directory. */
+  static function nativeLibraryPaths(nativeRoot:String):Array<String> {
+    var paths:Array<String> = [];
     if (FileSystem.exists(nativeRoot)) for (kit in FileSystem.readDirectory(nativeRoot)) {
       var nativeDirectory = ProjectPath.join([nativeRoot, kit]);
       if (FileSystem.isDirectory(nativeDirectory)) for (name in FileSystem.readDirectory(nativeDirectory))
-        if (StringTools.endsWith(name, ".hdll") || name.indexOf(".so") >= 0) binaries.push(ProjectPath.join([nativeDirectory, name]));
+        if (StringTools.endsWith(name, ".hdll") || name.indexOf(".so") >= 0) paths.push(ProjectPath.join([nativeDirectory, name]));
     }
-    binaries.sort(Reflect.compare);
-    return [for (path in binaries) {
+    return paths;
+  }
+
+  static function stamps(paths:Array<String>):Array<Array<String>> {
+    return [for (path in paths) {
       var metadata = FileSystem.exists(path) ? FileSystem.metadata(path) : null;
       metadata == null ? [path, "missing", ""] : [path, Std.string(metadata.size), Std.string(metadata.modified)];
     }];
