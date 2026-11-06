@@ -16,10 +16,21 @@ class MachineKitNamingAudit {
 	*/
   static var UNNAMED:Array<String> = ["machinekit.motion.pillow-block", "machinekit.motion.shaft-coupling"];
 
+  /**
+   * Recipes with no default part: each is built from the identity of a source part, so `create()` without it is
+   * rejected. Their faces are named where the sources build them.
+   */
+  static var NEEDS_SOURCE:Array<String> = [
+    "machinekit.structural.cast-in-steel-insert",
+    "machinekit.structural.linear-mount-nut-cassette",
+    "machinekit.tooling.source-casting"
+  ];
+
   public static function run():Void {
     var failures:Array<String> = [];
     var report = Sys.getEnv("MACHINEKIT_NAMING_AUDIT") == "print";
     for (type in MachineKitComponents.defaultRegistry().all()) {
+      if (NEEDS_SOURCE.indexOf(type.id) >= 0) continue;
       var bad = weakFaces(type.id);
       if (bad == null) continue;
       if (report && bad.length
