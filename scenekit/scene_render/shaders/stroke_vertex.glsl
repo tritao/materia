@@ -84,7 +84,8 @@ void main() {
     vec2 normal = vec2(-tangent.y, tangent.x);
     float half_width = stroke_view[0].z;
     float extent = half_width + 1.0;
-    // The body spans [0,1]; separate cap quads use [-1,0] and [1,2].
+    // The body spans [0,1]; separate circumscribed triangles cover the caps
+    // on either side. Their x coordinates extend past 0 or 1, respectively.
     // Keeping the body endpoints fixed preserves its original depth slope.
     float cap_extension = (stroke_coordinate.x - along) * extent;
     vec4 clip = mix(a, b, along);

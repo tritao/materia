@@ -72,13 +72,18 @@ struct InstanceData {
 
 static_assert(sizeof(InstanceData) == instance_stride);
 
-constexpr std::array<std::array<float, 2>, 18> stroke_corners{{
+// The signed-distance shader contributes only within radius half_width + 1
+// of a cap's endpoint. A circumscribed half-diamond covers that disk using
+// one triangle, with the same affine cap-depth ramp as the former quad.
+// Round sqrt(2) upward; y must stay below the shader's support-triangle tag.
+constexpr float stroke_cap_extent = 1.414214f;
+static_assert(stroke_cap_extent < 1.5f);
+constexpr std::array<std::array<float, 2>, 12> stroke_corners{{
         {{0.0f, -1.0f}}, {{0.0f, 1.0f}}, {{1.0f, 1.0f}},
         {{0.0f, -1.0f}}, {{1.0f, 1.0f}}, {{1.0f, -1.0f}},
-        {{-1.0f, -1.0f}}, {{-1.0f, 1.0f}}, {{0.0f, 1.0f}},
-        {{-1.0f, -1.0f}}, {{0.0f, 1.0f}}, {{0.0f, -1.0f}},
-        {{1.0f, -1.0f}}, {{1.0f, 1.0f}}, {{2.0f, 1.0f}},
-        {{1.0f, -1.0f}}, {{2.0f, 1.0f}}, {{2.0f, -1.0f}}}};
+        {{-stroke_cap_extent, 0.0f}}, {{0.0f, stroke_cap_extent}}, {{0.0f, -stroke_cap_extent}},
+        {{1.0f, stroke_cap_extent}}, {{1.0f + stroke_cap_extent, 0.0f}}, {{1.0f, -stroke_cap_extent}}}};
+constexpr std::size_t max_stroke_vertices = stroke_corners.size() + 6; // Two incident support triangles.
 
 struct ClipUniformData {
     std::array<std::array<float, 4>, RenderPlan::max_clip_planes> planes{};
@@ -1838,14 +1843,14 @@ bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecuti
         pick_vertex_count / 3 > 0x00ffffffu)
         return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
     if (resource.payload->stroke_segments.size() >
-        std::numeric_limits<std::uint32_t>::max() / (24 * sizeof(StrokeVertex)))
+        std::numeric_limits<std::uint32_t>::max() / (max_stroke_vertices * sizeof(StrokeVertex)))
         return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
     const bool revision_changed = inserted || cached.revision != resource.revision;
     if (!revision_changed)
         return true;
     const auto supports = render_internal::stroke_supports(*resource.payload);
     std::vector<StrokeVertex> stroke_vertices;
-    stroke_vertices.reserve(resource.payload->stroke_segments.size() * 24);
+    stroke_vertices.reserve(resource.payload->stroke_segments.size() * max_stroke_vertices);
     for (std::size_t index=0; index<resource.payload->stroke_segments.size(); ++index) {
         const auto &segment=resource.payload->stroke_segments[index];
         for (const auto &corner : stroke_corners)

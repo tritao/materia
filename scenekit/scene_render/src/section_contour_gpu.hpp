@@ -22,9 +22,9 @@ bool prepare_contours(StateT &state,const RenderPlan &plan,const SceneSnapshot &
         else ++stats.section_contour_cache_hits;
         if(entry.uploaded)continue;
         const auto &segments=entry.section.segments;
-        if(segments.size()>std::numeric_limits<std::uint32_t>::max()/(18*sizeof(StrokeVertex)))
+        if(segments.size()>std::numeric_limits<std::uint32_t>::max()/(stroke_corners.size()*sizeof(StrokeVertex)))
             return set_failure(state,stats,NKGPU_ERROR_INVALID_ARGUMENT);
-        std::vector<StrokeVertex> vertices;vertices.reserve(segments.size()*18);
+        std::vector<StrokeVertex> vertices;vertices.reserve(segments.size()*stroke_corners.size());
         for(const auto &segment:segments)for(const auto &corner:stroke_corners)
             vertices.push_back({segment.start,segment.end,corner});
         const auto bytes=static_cast<std::uint32_t>(vertices.size()*sizeof(StrokeVertex));

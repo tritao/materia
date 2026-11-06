@@ -23,7 +23,11 @@ The generator validates both OpenGL variants with `glslangValidator`. Desktop
 OpenGL requires a 4.1 context. Picking stores face IDs in an expanded vertex
 buffer so the same shader works on every backend.
 
-Stroke geometry uses a body quad and two cap quads. The body endpoints keep
+Stroke geometry uses a body quad and one circumscribed triangle per round cap.
+The cap triangle's two axes extend by sqrt(2) times the antialias footprint;
+its hypotenuse encloses the unit semicircle. Signed-distance coverage is zero
+outside that circle, so the smaller triangle count retains the same coverage.
+The body endpoints keep
 those of the original projected segment, preserving its depth slope. Caps
 extend depth only away from the eye, so their round coverage cannot pull a
 hidden edge through an occluding face. Keep depth interpolation in rasterization

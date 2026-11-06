@@ -131,6 +131,65 @@ void highlight_alpha_regression(nkgpu_renderer renderer) {
 
 // Touching opposite faces must resolve by sidedness, not submission order or depth bias.
 // Mirrored transforms and explicit two-sided sheets use the same rules for color and picking.
+void round_stroke_caps_regression(nkgpu_renderer renderer) {
+    auto scene = std::make_shared<Scene>();
+    const auto geometry = scene->reserve_geometry_id();
+    auto &mesh = scene->geometry_store().create(geometry);
+    const auto material = scene->reserve_material_id();
+    scene->material_store().create(material);
+    const auto node = scene->reserve_node_id();
+    Transaction create(scene);
+    create.add_create(node); create.add_geometry(node, geometry); create.add_material(node, material);
+    ChangeSet changes;
+    assert(scene->commit(create, changes) == NKS_OK); create.close();
+    nkscene::SceneView view;
+    view.studio_lighting.edges_on_light = view.studio_lighting.edges_on_dark = {0,0,0};
+    nkscene::NativeKitGpuExecutor executor(renderer);
+    constexpr int side = 96;
+    for (const auto samples : {1u, 4u}) {
+        executor.set_sample_count(samples);
+        for (const float length : {0.04f, 0.8f}) for (int angle = 0; angle < 24; ++angle) {
+            const float radians = angle * 3.14159265359f / 12;
+            const std::array<float,3> a{-std::cos(radians)*length/2 + 0.003f,
+                                       -std::sin(radians)*length/2 + 0.007f, -0.2f};
+            const std::array<float,3> b{std::cos(radians)*length/2 + 0.003f,
+                                       std::sin(radians)*length/2 + 0.007f, 0.2f};
+            const auto capture = [&](bool reverse) {
+                mesh.edit_payload().stroke_segments = {{reverse ? b : a, reverse ? a : b, 1}};
+                scene->publish();
+                auto plan = nkscene::compile(scene->snapshot(), view);
+                std::vector<std::uint8_t> image;
+                assert(executor.capture_rgba8(plan, scene->snapshot(), side, side, {0,0,0,0}, image) == NKGPU_OK);
+                return image;
+            };
+            const auto forward = capture(false), reverse = capture(true);
+            for (std::size_t i = 0; i < forward.size(); ++i)
+                assert(std::abs(int(forward[i])-int(reverse[i])) <= 2);
+            // Readback y may be flipped by the backend. Test both reflected
+            // screen directions; a cap must contribute beyond each endpoint.
+            bool endpoints_visible = false;
+            for (int y_sign : {-1, 1}) {
+                bool both = true;
+                for (int end : {0, 1}) {
+                    const auto &p = end ? b : a;
+                    const float px = (p[0]+1)*side/2, py = (y_sign*p[1]+1)*side/2;
+                    const float dx = std::cos(radians)*(end ? 1 : -1);
+                    const float dy = y_sign*std::sin(radians)*(end ? 1 : -1);
+                    unsigned cap_alpha = 0;
+                    for (int y = int(py)-3; y <= int(py)+3; ++y)
+                        for (int x = int(px)-3; x <= int(px)+3; ++x)
+                            if (x >= 0 && y >= 0 && x < side && y < side &&
+                                (x+0.5f-px)*dx+(y+0.5f-py)*dy > 0.0f)
+                                cap_alpha += forward[(y*side+x)*4+3];
+                    both = both && cap_alpha > 0;
+                }
+                endpoints_visible = endpoints_visible || both;
+            }
+            assert(endpoints_visible);
+        }
+    }
+}
+
 void equivalent_material_batch_regression(nkgpu_renderer renderer) {
     auto scene = std::make_shared<Scene>();
     const auto geometry = scene->reserve_geometry_id();
@@ -424,6 +483,7 @@ int main() {
     }
 
     highlight_alpha_regression(renderer);
+    round_stroke_caps_regression(renderer);
     equivalent_material_batch_regression(renderer);
     sidedness_regression(renderer);
     contact_edge_regression(renderer);

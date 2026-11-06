@@ -398,15 +398,55 @@ draws become 311.5 surfaces, 291 edges and 308.5 AO surfaces. Timings vary under
 shared-machine load; the work reduction is deterministic. At the identical final
 camera, 3 of 376,922 interior viewport pixels differ by at most one 8-bit channel
 level (`comparison.json`); no visible quality, resolution, MSAA or LOD change.
-The full app suite is running (`r2-material-batches-app-tests.log`); scale checks,
+The full app suite passed (exit 0, `r2-material-batches-app-tests.log`); scale checks,
 triangle reduction and remaining CPU/GPU work are pending. Source hashes are in
 `r2-material-batches-variant.json`. No haxeon/nativekit changes for this fix.
 
-Next measured candidates (not implemented): the stroke buffer uses six triangles
+**Triangle-cap fix measured:** the stroke buffer used six triangles
 per segment for its body and two round caps, plus up to two incident support triangles.
-Each cap's circular antialias footprint can potentially be covered by one circumscribed
-triangle instead of a quad, retaining the shader's exact coverage/depth rule; validate
-pixels and section/contact tests. Surface shaders already discard single-sided back
+Each cap's circular antialias footprint is now covered by one circumscribed triangle
+instead of a quad, retaining the shader's coverage/depth rule. Body endpoints,
+support triangles, opacity, clipping, stroke width and MSAA stay unchanged. Reserve
+and overflow limits derive from the actual corner count, also for section contours.
+All 11 renderer suites pass, including new short/long stroke endpoint coverage and
+reversal checks at 24 angles with 1x/4x MSAA. Canonical shaders remain up to date
+with the pinned shader compiler (only a comment changed). No LOD.
+
+`r2-triangle-caps-hobber-01`, identical full source-project orbit and 4x MSAA:
+
+| Median metric | Material batches 01 | Triangle caps 01 |
+| --- | ---: | ---: |
+| CPU / p95 | 6.18 / 20.20 ms | 3.90 / 19.18 ms |
+| Scene GPU / p95 | 6.11 / 16.66 ms | 4.70 / 15.09 ms |
+| Native preparation | 0.669 ms | 0.463 ms |
+| Native submission | 1.260 ms | 0.782 ms |
+| Draw calls | 910.5 | 910.5 |
+| Submitted triangles | 2,299,637 | 1,965,069 |
+| Edge triangles | 1,328,858 | 994,290 |
+| Edge GPU | 2.465 ms | 1.637 ms |
+| Surface GPU | 2.861 ms | 2.582 ms |
+| Throughput (context only) | 35.48 fps | 52.28 fps |
+
+Edge triangles fall 25.2%; total submitted triangles fall 14.5%. All 360 per-frame
+draw counts and surface triangle counts match. At the same final camera, 34 of
+376,922 interior pixels differ, maximum two 8-bit channel levels (only two pixels
+exceed one level). This is raster interpolation rounding, with no visible quality
+change. Comparisons are in `comparison.json`; source hashes in
+`r2-triangle-caps-variant.json`. Timing also varies under shared load; attribute the
+deterministic work reduction to this fix, not every CPU/surface timing change.
+The full app suite passed for material batching; final app validation after remaining
+render changes and the bench-mill/tending-cell comparisons are still pending.
+
+**Remaining CPU diagnosis:** `r2-orbit-profile-01` reuses the built cap version with
+500 Hz CPU sampling and allocations disabled. The source open is cached (2.19 s).
+Inspect only host frames 133–492, 5.668–12.486 s (60 warmup/360 measured/8 drain),
+not loading. Bounded native report: 1,059 on-CPU samples; UI `prepareCommands` has
+13.79% inclusive, native UI execution 17.75%, NVIDIA 14.45%, scene plan update 4.82%,
+and the scene surface draw lambda 3.12%. `Std.isOfType`/safe casts also remain.
+Artifact `orbit-cpu-report.txt` records this window; full capture wall/GC summaries
+include loading and are not steady-orbit results. Compositor waiting is excluded.
+
+Further candidates (not implemented): surface shaders already discard single-sided back
 faces, while all ordinary pipelines disable hardware culling. A per-batch winding
 classification (positive, reflected, mixed/singular), retained with instance transforms,
 could safely reject the same faces earlier; reflected batches need front culling with
