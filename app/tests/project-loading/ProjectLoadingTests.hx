@@ -305,7 +305,12 @@ class ProjectLoadingTests {
       check(File.getContent(counter) == "x", "artifact opens never execute source");
       var standalone = SceneArtifact.decode(artifactBytes);
       standalone.recipeDocument = null;
-      File.saveBytes(exported, SceneArtifact.encode(standalone));
+      var exportedBytes = SceneArtifact.encode(standalone);
+      File.saveBytes(exported, exportedBytes);
+      var hasNul = false;
+      for (index in 0...exportedBytes.length) if (exportedBytes.get(index) == 0) hasNul = true;
+      // Reading this file as text throws "HashLink String cannot contain NUL"; a document open must read bytes.
+      check(hasNul, "the .mtrg fixture is binary");
       var session = new app.ProjectDocumentSession(null, false);
       session.open(exported);
       session.save(root + "/Saved.materia");

@@ -216,6 +216,14 @@ class ProjectDocumentSession implements Observable {
 
   public function open(file:String):Void {
     var absolute = checkedPath(file);
+    // A prebuilt artifact is binary, so it is read as bytes by the artifact loader, never as scene text.
+    if (ProjectSourceLoader.isPrebuilt(absolute)) {
+      var generated:GeneratedAssemblyScene;
+      try generated =
+        ProjectSourceLoader.load(absolute) catch (error:Dynamic) throw 'Could not read scene artifact "$absolute": ${Std.string(error)}';
+      openGeneratedProject(generated, absolute);
+      return;
+    }
     var text:String;
     try text =
       File.getContent(absolute) catch (error:Dynamic) throw 'Could not read scene "$absolute": ${Std.string(error)}';
