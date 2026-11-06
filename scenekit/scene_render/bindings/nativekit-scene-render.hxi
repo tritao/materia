@@ -165,7 +165,7 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		visible_items: u64 @offset(80);
 		culled_items: u64 @offset(88);
 	}
-	struct nkscene_render_view @layout(584, 8) {
+	struct nkscene_render_view @layout(592, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		root: nkscene_node_id @offset(8);
 		include_invisible: u32 @offset(16);
@@ -243,6 +243,11 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		 */
 		studio_edges_on_light: array<f32, 4> @offset(552);
 		studio_edges_on_dark: array<f32, 4> @offset(568);
+		/**
+		 * Optional: retain original surface triangles for inspection/face overlays.
+		 * Zero permits automatic display LOD; picking always uses original geometry.
+		 */
+		full_detail: u32 @offset(584);
 	}
 	struct nkscene_render_visibility_override @layout(16, 8) {
 		node: nkscene_node_id @offset(0);

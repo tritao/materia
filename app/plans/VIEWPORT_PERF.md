@@ -336,7 +336,7 @@ Round 2, everything else, measured on the committed orbit benchmark (`app/tools/
    per-frame but camera-independent.
 5. **Scale.** Re-run on the bench mill and the tending cell as well as the hobber, so the gains are general.
 
-### Round 2 status: three fixes and scale validation complete; LOD validation in progress
+### Round 2 status: four fixes validated; final paired scale report in progress
 
 Read the retained viewport, SceneRenderer, render compiler, GPU executor and nkgpu draw path.
 Frustum culling and geometry/material instancing already exist. Surface, stroke and AO passes
@@ -573,3 +573,63 @@ The full app suite after all three fixes passes (exit 0,
 `r2-three-fixes-app-tests.log`; `r2-cell-and-tests-status.txt` reports both cell and
 app tests zero). The LOD prototype is still uncommitted and under separate native
 correctness and benchmark validation; the measurements above contain no LOD.
+
+**Screen-size surface LOD measured:** cache up to three index-only levels when
+geometry changes. Reuse original packed vertices, with exact position/normal
+welding only in the simplifier's input indices. Flat-shaded triangle soups need
+attribute-aware collapses across their tiny normal discontinuities; strict seam
+locking produced no accepted levels for the hob. The position/normal metric uses
+normal weight 0.5, retains open boundaries, and does not update source vertices.
+Meshoptimizer 1.2 is vendored from the pinned HashLink copy, with license and
+source hashes; SceneKit has no runtime dependency on HashLink's private symbols.
+
+Eligibility: at least 8,192 triangles, no feature strokes, constant vertex colour,
+opaque material and no textures. Each existing instance group uses the finest level
+required by its largest projected instance. The weighted error must project to at
+most **0.05 target pixels**, using a conservative perspective/AABB Jacobian bound
+expanded by the error radius. This is a simplification metric, not a strict
+Hausdorff guarantee. Reflected/nonuniform instances and eye-plane crossings are
+handled conservatively. Sections, selection, hover, source-face overlays, read-only
+inspection and unknown target dimensions use full detail. Picking and AO always
+retain the original mesh. No camera-time LOD regrouping or buffer upload.
+
+Same-app warm full orbits, `r2-lod-hobber-before-01` (frozen `76099819e` renderer)
+and `r2-final-hobber-after-02`:
+
+| Median metric | Three fixes | With LOD |
+| --- | ---: | ---: |
+| CPU / p95 | 3.910 / 19.153 ms | 3.921 / 18.541 ms |
+| Scene GPU / p95 | 5.732 / 15.896 ms | 5.606 / 9.945 ms |
+| Surface GPU | 3.156 ms | 2.730 ms |
+| Draw calls | 910.5 | 910.5 |
+| Submitted triangles | 1,965,069 | 1,832,299 |
+| LOD draws / triangles saved | 0 / 0 | 1 / 132,770 |
+| Throughput (context only) | 27.76 fps | 27.65 fps |
+
+The hob goes from 151,696 to 18,926 surface triangles throughout the measured
+orbit; AO remains full resolution. All 360 draw counts, AO/edge triangles and
+resource-upload counts match. CPU is unchanged; the total GPU gain is modest
+(2.2%), while total submitted triangles fall another 6.8%. Shared-load variation
+also affects the unchanged passes; do not attribute all GPU p95 changes to LOD.
+The final normal-zoom endpoint is pixel-identical over 376,922 interior pixels
+(`lod-comparison.json`). It views the enclosure; this alone does not show the hob.
+`r2-lod-close-before-01` / `after-01` use `--frame-object=project:machine/hob` and
+show the actual teeth/threads. Both correctly choose full detail, all 16 work
+counts match, and all 376,922 endpoint pixels match (`close-comparison.json`).
+These short close-up runs are correctness checks, not performance comparisons.
+
+LOD construction has a cost: the diagnostic first-geometry sample rose from
+318 to 942 ms, with 257,064 extra index bytes uploaded once. Both variants of the
+steady full-orbit pair have median zero uploads and p95 6,048 bytes, caused by
+existing culling/instance membership updates; LOD contributes none. Native tests
+verify simplification of indexed and unindexed input, projection bounds, camera
+zoom fallback, full-detail/selection/hover behavior, image identity on a flat
+surface, original picking, cache invalidation after geometry edits, zero steady
+LOD uploads/resource creation and complete buffer cleanup. All 12 renderer suites
+pass. The updated C ABI audits on all four supported targets, and the app builds.
+The full final app suite passes (exit 0, `r2-final-app-tests.log`), including the
+CAD part workflow. `r2-lod-scale-tests-status.txt` records bench/cell/app all zero.
+Final-build scale captures `r2-scale-bench-after-02` and `r2-scale-cell-after-06`
+select no LOD; all 360 draw/triangle pairs and all 402,864 endpoint pixels match
+their accepted three-fix versions exactly. Fresh adjacent original/final scale
+pairs are running for the consolidated final report.

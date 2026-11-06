@@ -10,6 +10,10 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -34,6 +38,109 @@ bool wait_for_surface(nk_surface surface) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     return false;
+}
+
+void surface_lod_regression(nkgpu_renderer renderer) {
+    const auto path = std::filesystem::temp_directory_path() /
+        ("scene-lod-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".jsonl");
+    const auto *previous = std::getenv("NK_SCENE_GPU_TIMINGS");
+    const std::string saved = previous ? previous : "";
+    const auto *previous_interval = std::getenv("NK_SCENE_GPU_TIMING_INTERVAL");
+    const std::string saved_interval = previous_interval ? previous_interval : "";
+    setenv("NK_SCENE_GPU_TIMINGS", path.c_str(), 1);
+    setenv("NK_SCENE_GPU_TIMING_INTERVAL", "1", 1);
+    auto scene = std::make_shared<Scene>();
+    const auto geometry = scene->reserve_geometry_id();
+    auto &mesh = scene->geometry_store().create(geometry);
+    auto &payload = mesh.edit_payload();
+    mesh.bounds = {{-0.8f,-0.8f,0}, {0.8f,0.8f,0}, true};
+    constexpr unsigned side = 96;
+    for (unsigned y=0; y<=side; ++y) for (unsigned x=0; x<=side; ++x)
+        payload.vertices.push_back({{{float(x)/side*1.6f-0.8f, float(y)/side*1.6f-0.8f, 0}}});
+    for (unsigned y=0; y<side; ++y) for (unsigned x=0; x<side; ++x) {
+        const auto a=y*(side+1)+x, b=a+1, c=a+side+1, d=c+1;
+        payload.indices.insert(payload.indices.end(), {a,b,d,a,d,c});
+    }
+    const auto original_indices = payload.indices;
+    const auto material = scene->reserve_material_id();
+    scene->material_store().create(material).edit_state().base_color = {0.3f,0.6f,0.2f,1};
+    const auto node = scene->reserve_node_id();
+    Transaction create(scene);
+    create.add_create(node); create.add_geometry(node,geometry); create.add_material(node,material);
+    ChangeSet changes;
+    assert(scene->commit(create,changes) == NKS_OK); create.close();
+    nkscene::SceneView view;
+    auto plan = nkscene::compile(scene->snapshot(),view);
+    nkgpu_renderer_stats lifetime_before{}; lifetime_before.struct_size=sizeof(lifetime_before);
+    assert(nkgpu_renderer_get_stats(renderer,&lifetime_before) == NKGPU_OK);
+    {
+        nkscene::NativeKitGpuExecutor executor(renderer);
+        const auto capture = [&]() {
+            std::vector<std::uint8_t> pixels;
+            assert(executor.capture_rgba8(plan,scene->snapshot(),64,64,{0,0,0,0},pixels) == NKGPU_OK);
+            return pixels;
+        };
+        const auto automatic = capture();
+        nkgpu_renderer_stats before{}, after{}; before.struct_size=sizeof(before); after.struct_size=sizeof(after);
+        assert(nkgpu_renderer_get_stats(renderer,&before) == NKGPU_OK);
+        assert(capture() == automatic);
+        assert(nkgpu_renderer_get_stats(renderer,&after) == NKGPU_OK);
+        assert(before.upload_bytes == after.upload_bytes && before.resource_creations == after.resource_creations);
+        view.full_detail = true;
+        nkscene::refresh(plan,scene->snapshot(),view);
+        assert(plan.full_detail() && capture() == automatic);
+        view.full_detail = false;
+        view.set_selection_material_override(node,material);
+        nkscene::refresh(plan,scene->snapshot(),view);
+        assert(plan.full_detail() && capture() == automatic);
+        nkscene::PickResult pick;
+        assert(executor.pick_pixel(plan,scene->snapshot(),64,64,32,32,&pick) == NKGPU_OK);
+        assert(pick.node == node);
+        assert(scene->snapshot().find_geometry(geometry)->payload->indices == original_indices);
+        view.clear_selection_material_overrides();
+        view.set_hover_material_override(node,material);
+        nkscene::refresh(plan,scene->snapshot(),view);
+        assert(plan.full_detail() && capture() == automatic);
+        view.clear_hover_material_overrides();
+        mesh.edit_payload().indices.resize(6);
+        scene->publish();
+        nkscene::refresh(plan,scene->snapshot(),view);
+        assert(!plan.full_detail());
+        assert(capture() != automatic); // Edited geometry must discard cached LODs.
+        auto &curved = mesh.edit_payload();
+        curved.indices = original_indices;
+        for (auto &vertex : curved.vertices) {
+            const auto x=vertex.position[0], y=vertex.position[1];
+            vertex.position[2] = 0.1f*(x*x+y*y);
+        }
+        mesh.bounds.maximum[2] = 0.128f;
+        scene->publish();
+        nkscene::refresh(plan,scene->snapshot(),view);
+        capture(); // Small curved surface permits LOD at this target size.
+        view.camera.enabled = true;
+        view.camera.view_projection[0] = view.camera.view_projection[5] = 1000000;
+        nkscene::refresh(plan,scene->snapshot(),view);
+        capture(); // Large projected errors must restore original triangles.
+    }
+    nkgpu_renderer_stats lifetime_after{}; lifetime_after.struct_size=sizeof(lifetime_after);
+    assert(nkgpu_renderer_get_stats(renderer,&lifetime_after) == NKGPU_OK);
+    assert(lifetime_before.buffers_live == lifetime_after.buffers_live);
+    if (previous) setenv("NK_SCENE_GPU_TIMINGS",saved.c_str(),1); else unsetenv("NK_SCENE_GPU_TIMINGS");
+    if (previous_interval) setenv("NK_SCENE_GPU_TIMING_INTERVAL",saved_interval.c_str(),1);
+    else unsetenv("NK_SCENE_GPU_TIMING_INTERVAL");
+    std::ifstream input(path);
+    std::string line;
+    unsigned lod=0, full=0;
+    std::vector<bool> selected_lod;
+    while (std::getline(input,line)) {
+        lod += line.find("\"lodDrawCalls\":1") != std::string::npos;
+        full += line.find("\"lodDrawCalls\":0") != std::string::npos;
+        selected_lod.push_back(line.find("\"lodDrawCalls\":1") != std::string::npos);
+    }
+    assert(lod >= 2 && full >= 2);
+    assert(selected_lod.size() >= 8 && selected_lod[selected_lod.size()-2] && !selected_lod.back());
+    std::filesystem::remove(path);
+    std::filesystem::remove(path.string()+".inventory.tsv");
 }
 
 // Real pixel coverage: selection/hover must preserve custom alpha, then update in place.
@@ -530,6 +637,7 @@ int main() {
     }
 
     highlight_alpha_regression(renderer);
+    surface_lod_regression(renderer);
     mixed_surface_pass_regression(renderer);
     round_stroke_caps_regression(renderer);
     equivalent_material_batch_regression(renderer);

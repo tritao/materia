@@ -79,6 +79,8 @@ nkscene_result copy_view(const nkscene_render_view *input, nkscene::SceneView &o
     const bool has_studio_edges =
         input->struct_size >= offsetof(nkscene_render_view, studio_edges_on_dark) +
                                   sizeof(input->studio_edges_on_dark);
+    const bool has_full_detail = input->struct_size >=
+        offsetof(nkscene_render_view, full_detail) + sizeof(input->full_detail);
     if ((has_diagnostic_overrides && input->diagnostic_override_count != 0 && !input->diagnostic_overrides) ||
         (input->visibility_override_count != 0 && !input->visibility_overrides) ||
         (input->material_override_count != 0 && !input->material_overrides) ||
@@ -98,6 +100,7 @@ nkscene_result copy_view(const nkscene_render_view *input, nkscene::SceneView &o
 
     output.root = {input->root.value};
     output.include_invisible = input->include_invisible != 0;
+    output.full_detail = has_full_detail && input->full_detail != 0;
     if (has_camera_node)
         output.camera_node = {input->camera_node.value};
     if (has_pose_overrides) {

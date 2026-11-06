@@ -5,6 +5,7 @@
 #include "section_contours.hpp"
 #include "stroke_support.hpp"
 #include "material_batches.hpp"
+#include "surface_lod.hpp"
 
 #include <algorithm>
 #include <array>
@@ -424,6 +425,8 @@ std::vector<DesiredBatch> desired_batches(const RenderPlan &plan,
 
 struct NativeKitGpuExecutor::State {
     struct GeometryGpu {
+        struct Lod { nkgpu_buffer buffer{}; std::uint32_t index_count = 0; float error = 0; };
+        std::vector<Lod> lods;
         nkgpu_buffer buffer{};
         nkgpu_buffer index_buffer{};
         std::shared_ptr<const GeometryPayload> index_payload;
@@ -595,6 +598,8 @@ struct NativeKitGpuExecutor::State {
                 (void)nkgpu_buffer_destroy(renderer, resource.pick_buffer);
             if (renderer.id && resource.stroke_buffer.id)
                 (void)nkgpu_buffer_destroy(renderer, resource.stroke_buffer);
+            if (renderer.id) for (const auto &lod : resource.lods)
+                (void)nkgpu_buffer_destroy(renderer, lod.buffer);
         }
         for (auto &[id, resource] : material_resources) {
             (void)id;
@@ -1154,6 +1159,8 @@ bool ensure_surface_pipelines(StateT &state, const SceneSnapshot &snapshot, std:
             if (element_count &&
                 !ensure_pipeline(state, stats, geometry->second.indexed, blended, samples))
                 return false;
+            if (!geometry->second.indexed && !geometry->second.lods.empty() &&
+                !ensure_pipeline(state, stats, true, blended, samples)) return false;
         }
         if (geometry->second.stroke_vertex_count && !ensure_stroke_pipeline(state, stats, samples))
             return false;
@@ -1173,7 +1180,7 @@ nkgpu_result draw_caps(StateT &,const RenderPlan &,const SceneSnapshot &,const L
 template <class StateT>
 nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSnapshot &snapshot,
                            const ClipUniformData &clip_data, const LightingUniformData &lighting_data,
-                           std::uint32_t samples, GpuExecutionStats &stats) {
+                           std::uint32_t samples, GpuExecutionStats &stats, bool image_lod = false) {
     const auto &set = state.pipelines[pipeline_slot(samples)];
     nkgpu_pipeline active_pipeline{};
     const auto draw = [&](const auto &batch, std::size_t first_instance,
@@ -1181,14 +1188,39 @@ nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSna
         const auto geometry = state.geometry_resources.find(batch.key.geometry);
         if (geometry == state.geometry_resources.end() || !geometry->second.buffer.id)
             return NKGPU_OK;
-        const auto element_count =
-            geometry->second.indexed ? geometry->second.index_count : geometry->second.vertex_count;
+        const auto original_count = geometry->second.indexed ? geometry->second.index_count : geometry->second.vertex_count;
+        const auto *material = snapshot.find_material(batch.key.material);
+        const auto *lod = [&]() -> const typename StateT::GeometryGpu::Lod * {
+            if (!image_lod || blended || plan.full_detail() || !plan.clip_planes().empty() ||
+                geometry->second.lods.empty() || !material) return nullptr;
+            const auto &s = *material->state;
+            if (s.alpha_mode != AlphaMode::Opaque || s.base_color[3]*s.opacity < 1.0f ||
+                s.base_color_texture.valid() || s.metallic_roughness_texture.valid() ||
+                s.normal_texture.valid() || s.emissive_texture.valid() || s.occlusion_texture.valid()) return nullptr;
+            const auto *resource = snapshot.find_geometry(batch.key.geometry);
+            if (!resource) return nullptr;
+            float radius = 0;
+            for (const auto &level : geometry->second.lods) radius = std::max(radius, level.error);
+            double scale = 0;
+            // One level for the entire existing instance group: the largest
+            // projected instance controls quality, with no camera-time uploads.
+            for (const auto &record : batch.records) {
+                const auto projected = render_internal::surface_lod_pixel_scale(resource->bounds,
+                    plan.view_projection(), record.transform, state.viewport_width, state.viewport_height, radius);
+                if (!std::isfinite(projected)) return nullptr;
+                scale = std::max(scale, projected);
+            }
+            for (auto level = geometry->second.lods.rbegin(); level != geometry->second.lods.rend(); ++level)
+                if (level->error * scale <= render_internal::surface_lod_pixel_error) return &*level;
+            return nullptr;
+        }();
+        const auto element_count = lod ? lod->index_count : original_count;
+        const bool indexed = lod || geometry->second.indexed;
         if (!element_count)
             return NKGPU_OK;
         const auto &pipeline =
-            blended ? (geometry->second.indexed ? set.indexed_blend : set.blend)
-                    : (geometry->second.indexed ? set.indexed : set.surface);
-        const auto *material = snapshot.find_material(batch.key.material);
+            blended ? (indexed ? set.indexed_blend : set.blend)
+                    : (indexed ? set.indexed : set.surface);
         MaterialUniformData material_data;
         if (material) {
             material_data.base_color = material->state->base_color;
@@ -1224,8 +1256,8 @@ nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSna
         }
         if ((result = nkgpu_apply_vertex_buffer(state.renderer, 0, geometry->second.buffer, 0)) !=
                 NKGPU_OK ||
-            (geometry->second.indexed &&
-             (result = nkgpu_apply_index_buffer(state.renderer, geometry->second.index_buffer,
+            (indexed &&
+             (result = nkgpu_apply_index_buffer(state.renderer, lod ? lod->buffer : geometry->second.index_buffer,
                                                 0)) != NKGPU_OK) ||
             (result = nkgpu_apply_vertex_buffer(
                  state.renderer, 1, batch.buffer,
@@ -1252,6 +1284,7 @@ nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSna
                                  static_cast<std::uint32_t>(instance_count))) != NKGPU_OK)
             return result;
         if (state.capture_profiler) state.capture_profiler->triangles(element_count, instance_count);
+        if (lod && state.capture_profiler) state.capture_profiler->surfaceLod(original_count, element_count, instance_count);
         ++stats.draw_calls;
         return NKGPU_OK;
     };
@@ -1857,6 +1890,8 @@ bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecuti
     const bool revision_changed = inserted || cached.revision != resource.revision;
     if (!revision_changed)
         return true;
+    for (const auto &lod : cached.lods) (void)nkgpu_buffer_destroy(state.renderer, lod.buffer);
+    cached.lods.clear();
     const auto supports = render_internal::stroke_supports(*resource.payload);
     std::vector<StrokeVertex> stroke_vertices;
     stroke_vertices.reserve(resource.payload->stroke_segments.size() * max_stroke_vertices);
@@ -1961,6 +1996,25 @@ bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecuti
                                                      &cached.stroke_buffer);
         if (result != NKGPU_OK)
             return set_failure(state, stats, result);
+    }
+    if (resource.payload->stroke_segments.empty() && !packed_vertices.empty() &&
+        std::all_of(packed_vertices.begin(), packed_vertices.end(), [&](const auto &v) {
+            return v.color == packed_vertices.front().color;
+        })) {
+        const auto levels = render_internal::build_surface_lods(packed_vertices.front().position.data(),
+            packed_vertices.front().normal.data(), packed_vertices.size(), sizeof(SceneVertex), resource.payload->indices);
+        for (const auto &level : levels) {
+            nkgpu_buffer_desc descriptor{};
+            descriptor.struct_size = sizeof(descriptor);
+            descriptor.usage = NKGPU_BUFFER_INDEX;
+            descriptor.size = static_cast<std::uint32_t>(level.indices.size() * sizeof(std::uint32_t));
+            descriptor.data = reinterpret_cast<const std::uint8_t *>(level.indices.data());
+            descriptor.data_size = descriptor.size;
+            nkgpu_buffer buffer{};
+            const auto result = nkgpu_buffer_create_desc(state.renderer, &descriptor, &buffer);
+            if (result != NKGPU_OK) return set_failure(state, stats, result);
+            cached.lods.push_back({buffer, static_cast<std::uint32_t>(level.indices.size()), level.error});
+        }
     }
     cached.index_payload = resource.payload;
     cached.revision = resource.revision;
@@ -2429,6 +2483,8 @@ template <class StateT> void remove_geometry_resource(StateT &state, GeometryId 
         (void)nkgpu_buffer_destroy(state.renderer, found->second.pick_buffer);
     if (state.renderer.id && found->second.stroke_buffer.id)
         (void)nkgpu_buffer_destroy(state.renderer, found->second.stroke_buffer);
+    if (state.renderer.id) for (const auto &lod : found->second.lods)
+        (void)nkgpu_buffer_destroy(state.renderer, lod.buffer);
     state.geometry_resources.erase(found);
 }
 
@@ -2571,6 +2627,8 @@ bool prepare_resources(StateT &state, const RenderPlan &plan, const SceneSnapsho
             (void)nkgpu_buffer_destroy(state.renderer, found->second.pick_buffer);
         if (state.renderer.id && found->second.stroke_buffer.id)
             (void)nkgpu_buffer_destroy(state.renderer, found->second.stroke_buffer);
+        if (state.renderer.id) for (const auto &lod : found->second.lods)
+            (void)nkgpu_buffer_destroy(state.renderer, lod.buffer);
         found = state.geometry_resources.erase(found);
     }
     for (auto found = state.material_revisions.begin(); found != state.material_revisions.end();) {
@@ -3212,7 +3270,7 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
         lighting_data.ao_params = detail;
         lighting_data.ao_viewport = {1.0f / width, 1.0f / height, 0.0f, 0.0f};
     }
-    if ((result = draw_surfaces(*state_, plan, snapshot, clip_data, lighting_data, samples, stats)) !=
+    if ((result = draw_surfaces(*state_, plan, snapshot, clip_data, lighting_data, samples, stats, true)) !=
         NKGPU_OK)
         return fail_frame(result);
     if(profiler)profiler->pass("surfaceEdges");

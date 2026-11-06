@@ -107,6 +107,7 @@ def summarize(output, warmup, count):
             passWork=sample.get("passWork", {}),
             drawCalls=sample["drawCalls"], triangles=sample["triangles"],
             uploadBytes=sample["uploadBytes"],
+            lodDrawCalls=sample.get("lodDrawCalls", 0), lodTrianglesSaved=sample.get("lodTrianglesSaved", 0),
         ))
     for previous, current in zip(rows, rows[1:]):
         if not math.isclose(current["yaw"] - previous["yaw"], math.pi / 180, abs_tol=1e-7):
@@ -120,7 +121,7 @@ def summarize(output, warmup, count):
                "cadenceMs": statistics.mean(cadence)}
     for name in ("cpuMs", "inputMs", "viewSetupMs", "planPrepareMs", "uiSubmitMs", "customPaintMs", "nativeUiRenderMs", "gcMs",
                  "scenePrepareMs", "sceneSubmitMs", "gpuMs",
-                 "drawCalls", "triangles", "uploadBytes"):
+                 "drawCalls", "triangles", "uploadBytes", "lodDrawCalls", "lodTrianglesSaved"):
         values = sorted(row[name] for row in rows)
         summary[name] = {"mean": statistics.mean(values), "median": statistics.median(values),
                          "p95": values[int((len(values) - 1) * .95)], "max": max(values)}
@@ -151,6 +152,7 @@ def main():
     parser.add_argument("--frames", type=int, default=360)
     parser.add_argument("--warmup", type=int, default=60)
     parser.add_argument("--msaa", type=int, choices=(1, 2, 4), default=4)
+    parser.add_argument("--frame-object", help="frame a scene object before orbiting (for close-zoom checks)")
     parser.add_argument("--project", type=Path,
                         default=ROOT / "machinekit/examples/flexspline-hobber/materia.project.json",
                         help="project to orbit (default: flexspline hobber)")
@@ -189,6 +191,8 @@ def main():
                    "--perspective", "--width=1320", "--height=900", f"--msaa={args.msaa}",
                    f"--capture-dir={output}", f"--frames={args.frames + args.warmup + DRAIN_FRAMES}",
                    "--project=" + str(args.project.resolve())]
+        if args.frame_object:
+            command.append("--frame=" + args.frame_object)
         (output / "command.json").write_text(json.dumps(command, indent=2) + "\n")
         metadata = {"arguments": {key: str(value) if isinstance(value, Path) else value
                                   for key, value in vars(args).items()} | {"output": str(output), "project": str(args.project.resolve())},

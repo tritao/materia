@@ -804,6 +804,22 @@ GPU time and draw/triangle work per pass. Native scene captures write a sibling
 IDs, base triangle and stroke counts, and hidden/culled flags. Inventory export
 runs only when the scene snapshot changes and precedes scene timing.
 
+Surface display LOD uses cached index buffers over the original vertices. Only
+untextured opaque meshes with at least 8,192 triangles, constant vertex colour and
+no feature strokes qualify. The largest projected instance controls each existing
+instance group: its simplification metric must project to at most 0.05 target
+pixels. The metric includes position and normals (normal weight 0.5); it is a
+meshoptimizer error estimate, not a strict Hausdorff bound. A conservative
+perspective/AABB scale also handles reflected and nonuniform instance transforms.
+Sections, selection, hover, source-face overlays and read-only inspection retain
+full detail. Picking and AO always use original geometry. Geometry revisions
+rebuild the LOD cache; camera frames select an index buffer without LOD uploads.
+Existing visibility/culling changes can still update instance buffers.
+The capture reports `lodDrawCalls` and `lodTrianglesSaved` separately. LOD creation
+is paid once on first geometry preparation, outside the warmed orbit window.
+Use `--frame-object=project:machine/hob` for a close-zoom comparison using the
+editor's existing frame-object command; omit it for the standard whole-machine path.
+
 `--skip-build` reuses the built app through `app/run-built.sh`. For paired native
 renderer variants, combine it with `--native-library-dir=/absolute/library/directory`
 containing `libnativekit_scene_render.so` and its soname symlink. The built launcher

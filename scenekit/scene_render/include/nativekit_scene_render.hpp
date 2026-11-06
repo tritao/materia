@@ -183,6 +183,8 @@ struct WorkplaneGrid {
 };
 
 struct SceneView {
+    /** Keep original display triangles for inspection and per-face overlays. */
+    bool full_detail = false;
     /** Invalid means that the view contains every node. */
     NodeId root;
     /** Include scene-hidden nodes as visible for inspection views. */
@@ -456,6 +458,7 @@ class RenderPlan {
     std::span<const RenderItem> items() const noexcept { return items_; }
     std::span<const WorldTransform> transforms() const noexcept { return transforms_; }
     std::span<const InstanceBatch> batches() const noexcept { return batches_; }
+    bool full_detail() const noexcept { return full_detail_; }
     std::span<const std::size_t> batches_for_geometry(GeometryId geometry) const noexcept {
         const auto found = batches_by_geometry_.find(geometry);
         return found == batches_by_geometry_.end() ? std::span<const std::size_t>{}
@@ -528,6 +531,7 @@ class RenderPlan {
     std::vector<EntityId> item_sources_;
     std::vector<std::vector<NodeId>> item_ancestors_;
     std::vector<InstanceBatch> batches_;
+    bool full_detail_ = false;
     std::unordered_map<NodeId, std::size_t> item_by_node_;
     std::unordered_map<EntityId, std::vector<std::size_t>> items_by_source_;
     std::unordered_map<NodeId, std::vector<std::size_t>> items_by_ancestor_;

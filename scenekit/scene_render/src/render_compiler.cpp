@@ -144,6 +144,7 @@ RenderPlan compile(const SceneSnapshot &snapshot, const SceneView &view) {
     plan.culling_signature_ = render_internal::culling_signature(view);
     plan.camera_enabled_ = plan.camera_.enabled;
     plan.studio_lighting_ = view.studio_lighting;
+    plan.full_detail_ = view.full_detail || !view.selection_material_overrides.empty() || !view.hover_material_overrides.empty();
     plan.workplane_grid_ = view.workplane_grid;
     plan.geometry_revisions_.reserve(snapshot.geometries().size());
     for (const auto &resource : snapshot.geometries())
@@ -878,6 +879,7 @@ RenderUpdate update(RenderPlan &plan, const SceneSnapshot &snapshot, const Chang
     plan.view_root_ = view.root;
     plan.culling_signature_ = next_culling_signature;
     plan.studio_lighting_ = view.studio_lighting;
+    plan.full_detail_ = view.full_detail || !view.selection_material_overrides.empty() || !view.hover_material_overrides.empty();
     plan.workplane_grid_ = view.workplane_grid;
     plan.camera_ = render_internal::camera_for_snapshot(snapshot, view);
     plan.camera_enabled_ = plan.camera_.enabled;

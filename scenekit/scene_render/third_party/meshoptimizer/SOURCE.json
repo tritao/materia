@@ -1,0 +1,12 @@
+{
+  "upstream": "https://github.com/zeux/meshoptimizer",
+  "version": "1.2 (MESHOPTIMIZER_VERSION 1020)",
+  "source": "HashLink vendored copy in haxeon/vendor/hashlink/include/meshoptimizer",
+  "hashlinkCommit": "d1eb613699d13dc2573bd6a8bd23ffcfc4fa75bc",
+  "files": {
+    "meshoptimizer.h": "21a72040a75bacf6ddefb7e74f1cf566af1e68ea5e4dc0db598278f4681e0b87",
+    "simplifier.cpp": "dc40aadb307577ed3f7adb5102a506263de8b9fea1d5582a24c04bff2874a2cc",
+    "allocator.cpp": "d2cc48691fe2f4c6d097bf7a766389cfb7f83ca14a5f747e3944332656d02254",
+    "indexgenerator.cpp": "0e971dd8cc2ced68cd0374163461fc6c3e846267aee7b47203837164991a015e"
+  }
+}

@@ -18,7 +18,14 @@ add_custom_target(nativekit_scene_render_shaders_check
     DEPENDS ${NKSCENE_RENDER_SHADER_INPUTS}
     VERBATIM)
 
+set(NKSCENE_SURFACE_LOD_SOURCES
+    src/surface_lod.cpp
+    third_party/meshoptimizer/simplifier.cpp
+    third_party/meshoptimizer/indexgenerator.cpp
+    third_party/meshoptimizer/allocator.cpp)
+
 add_library(nativekit_scene_render ${NK_LIBRARY_TYPE}
+    ${NKSCENE_SURFACE_LOD_SOURCES}
     src/gpu_executor.cpp
     src/instance_batches.cpp
     src/picking.cpp
@@ -48,6 +55,12 @@ set_target_properties(nativekit_scene_render PROPERTIES
     SOVERSION 0)
 
 if(NK_BUILD_TESTS)
+    add_executable(nativekit_scene_render_lod_tests tests/surface_lod.cpp ${NKSCENE_SURFACE_LOD_SOURCES})
+    target_compile_features(nativekit_scene_render_lod_tests PRIVATE cxx_std_20)
+    target_include_directories(nativekit_scene_render_lod_tests PRIVATE src)
+    target_link_libraries(nativekit_scene_render_lod_tests PRIVATE NativeKit::scene)
+    add_test(NAME scene_render_surface_lod COMMAND nativekit_scene_render_lod_tests)
+    set_tests_properties(scene_render_surface_lod PROPERTIES LABELS "scene;render" TIMEOUT 30)
     add_executable(nativekit_scene_render_benchmark bench/benchmark.cpp)
     target_compile_features(nativekit_scene_render_benchmark PRIVATE cxx_std_20)
     target_include_directories(nativekit_scene_render_benchmark PRIVATE

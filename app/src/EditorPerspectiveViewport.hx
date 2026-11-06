@@ -1031,6 +1031,9 @@ class EditorPerspectiveViewport implements View implements Observable {
       retainedRenderView = sectionView(scene.configureRenderView(
         new SceneView(), projection, displayPoses(), hoveredObjectId, hoveredFaceIndex, collisionPairs, cosmeticThreadsVisible
       ));
+      var sourceSelection = scene.sourceSelection;
+      var sourceFeatures = sourceSelection == null ? null : sourceSelection();
+      retainedRenderView.setFullDetail(readOnly || (sourceFeatures != null && sourceFeatures.length > 0));
       // Creating derived overlays can publish a new visual revision; retain the resulting state.
       retainedRenderViewKey = renderViewKey();
     } else retainedRenderView.setViewProjection(projection);

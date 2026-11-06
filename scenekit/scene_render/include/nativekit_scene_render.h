@@ -152,6 +152,9 @@ typedef struct nkscene_render_view {
         colours). Zero luminance keeps one dark edge colour for every part. */
     float studio_edges_on_light[4];
     float studio_edges_on_dark[4];
+    /** Optional: retain original surface triangles for inspection/face overlays.
+        Zero permits automatic display LOD; picking always uses original geometry. */
+    uint32_t full_detail NK_BOOL32;
 } nkscene_render_view;
 
 /* ------------------------------------------------------------------------- */

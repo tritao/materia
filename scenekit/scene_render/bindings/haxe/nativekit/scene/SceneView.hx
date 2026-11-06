@@ -29,6 +29,12 @@ class SceneView {
     return this;
   }
 
+  /** Keep original triangles for inspection/face overlays; picking is always full detail. */
+  public function setFullDetail(enabled:Bool):SceneView {
+    value.set_full_detail(enabled ? 1 : 0);
+    return this;
+  }
+
   public function clearRoot():SceneView {
     value.set_root(new nkscene_node_id());
     return this;

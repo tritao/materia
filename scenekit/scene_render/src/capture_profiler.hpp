@@ -41,6 +41,7 @@ public:
         double submit_ms = 0.0;
         nkgpu_renderer_stats before{};
         std::uint64_t draw_calls = 0, triangles = 0, upload_bytes = 0;
+        std::uint64_t lod_draw_calls = 0, lod_triangles_saved = 0;
         std::map<std::string, std::uint64_t> pass_triangles, pass_draws;
         std::string current_pass;
         bool active = false;
@@ -144,6 +145,12 @@ public:
         }
     }
     void pause() { if(current_) end(*current_); }
+    void surfaceLod(std::uint64_t original, std::uint64_t selected, std::uint64_t instances) {
+        if (current_ && original > selected) {
+            ++current_->lod_draw_calls;
+            current_->lod_triangles_saved += (original-selected)/3*instances;
+        }
+    }
     void begin(Sample &sample, const char *name="surfaces") {
         if (!sample.active) return;
         end(sample);
@@ -229,6 +236,8 @@ private:
              << ",\"packingMilliseconds\":" << sample.packing_ms
              << ",\"drawCalls\":" << sample.draw_calls
              << ",\"triangles\":" << sample.triangles
+             << ",\"lodDrawCalls\":" << sample.lod_draw_calls
+             << ",\"lodTrianglesSaved\":" << sample.lod_triangles_saved
              << ",\"uploadBytes\":" << sample.upload_bytes
              << ",\"submitMilliseconds\":" << sample.submit_ms << ",\"gpuMilliseconds\":";
         std::map<std::string,double> passes;double total=0;
