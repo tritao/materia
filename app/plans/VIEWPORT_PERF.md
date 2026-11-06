@@ -310,3 +310,28 @@ FPS gain. Scene submission remains 15.85 ms at p95 and GPU 18.28 ms at p95. Medi
 2.38 ms surface edges, 0.44 ms AO surfaces, and 0.03 ms resolve. Full app suite passed (exit 0; `viewport-retained-bounds-app-tests-03.log`),
 including 88 clip assertions, 268 routed coordinate assertions and the complete CAD workflow. The new bounds fixture uses
 an empty scene so default editor objects cannot mask a moved object's clip range.
+
+## Round 2 (2026-11-06, lead)
+
+Round 1 is merged (9ae2bb27f): camera frames take the retained UI path, hover picking is suspended while navigating, bounds are
+retained. CPU went from 15.9 to 4.4 ms median, GPU from 8.0 to 6.3 ms, and allocation from 1.85 MB to 0.12 MB per frame.
+
+**Out of scope: native/GTK frame pacing.** The 30 fps (33 ms) cap is the compositor. The user has a separate patch for it. Don't
+investigate it, and don't judge success by fps: measure per-frame CPU and GPU milliseconds and the work counts.
+
+Round 2, everything else, measured on the committed orbit benchmark (`app/tools/test-benchmark-orbit.py`):
+1. **Draw calls (1,540 for 403 objects).**
+   - Find why there are so many: per-face or per-feature draws, edge and section passes, picking, overlays, and duplicated draws
+     for repeated parts.
+   - Cut them: batch static geometry by material, instance repeated parts (screws, dowels, wipers, blocks, rails), and merge
+     per-part sub-draws.
+2. **Triangles (2.28 M).**
+   - Find which parts dominate: threads, gear and hob teeth, cable spirals, fillets, STEP-imported parts (eRob, BK12 mounts,
+     scales).
+   - Add view-dependent level of detail or tessellation tolerance by screen size, and frustum culling. Keep visible quality the
+     same at normal zoom, and document any threshold.
+3. **GPU passes.** The cost of edges and silhouettes, section caps and contours, MSAA and shadows per frame. Cache what doesn't
+   change with the camera.
+4. **CPU per frame.** Profile the remaining 4.4 ms (scene update, culling, uniform uploads, render-graph build) and cut what is
+   per-frame but camera-independent.
+5. **Scale.** Re-run on the bench mill and the tending cell as well as the hobber, so the gains are general.
