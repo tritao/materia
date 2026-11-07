@@ -61,7 +61,40 @@ class SceneTreeHoverTests {
       submit = () -> host.submit(frame);
       editor = host;
     }
+    var expansionOnly = Sys.args().indexOf("--expand") >= 0;
+    var host = editor;
+    if (expansionOnly && host != null) host.treeModel.selectKey("scene");
+    frame.deltaSeconds = expansionOnly ? 1 / 60 : 0;
     var root = submit();
+    if (expansionOnly && host != null) {
+      var key = host.treeModel.assemblyKey();
+      for (cycle in 0...12) {
+        var target:Null<RenderNode> = null;
+        root.walk(row -> {
+          if (row.semantics != null && row.semantics.role == AccessibilityRole.TreeItem && row.semantics.label == key)
+            row.walk(node -> {
+              if (node.semantics != null && node.semantics.role == AccessibilityRole.Button
+                  && (node.semantics.label == "Expand" || node.semantics.label == "Collapse")) target = node;
+            });
+        });
+        var arrow = target;
+        if (arrow == null) throw "Missing assembly disclosure";
+        var bounds = arrow.globalBounds();
+        var started = Sys.time();
+        ui.pointerMove(bounds.x + 8, bounds.y + bounds.height / 2);
+        ui.pointerDown(bounds.x + 8, bounds.y + bounds.height / 2, 0);
+        ui.pointerUp(bounds.x + 8, bounds.y + bounds.height / 2, 0);
+        var clicked = Sys.time();
+        root = submit();
+        var ended = Sys.time();
+        var metrics = ui.frameMetrics;
+        if (metrics == null) throw "missing expansion metrics";
+        Sys.println('EXPANSION cycle=$cycle input_ms=${(clicked-started)*1000} submit_ms=${(ended-clicked)*1000} view_ms=${metrics.viewSeconds*1000} tree_ms=${metrics.treeAndStyleSeconds*1000} layout_ms=${metrics.nativeLayoutSeconds*1000} reconcile_ms=${metrics.reconcileSeconds*1000} nodes=${metrics.nodeCount} styles=${metrics.styleResolutions}');
+        for (_ in 0...12) root = submit();
+      }
+      host.dispose(); fonts.dispose(); runtime.dispose();
+      return 0;
+    }
     var rows:Array<RenderNode> = [];
     root.walk(node -> {
       if (node.semantics != null && node.semantics.role == AccessibilityRole.TreeItem
