@@ -335,7 +335,10 @@ class MachineComponent {
     var effective = effectiveDensity();
     var basis:ComponentDetail = effective == null ? Preview : Envelope;
     var modelled = effective == null ? massGeometry() : null;
-    var shareKey = type == null ? null : geometryKey(basis) + (modelled == null ? "" : "|mass-model");
+    // The mass is computed by this concrete class's code (virtual geometry and analyticVolume), so its identity is part of the key;
+    // a class with no identity (private, in the root package) is not shared.
+    var code = machinekit.cache.CodeIdentity.ofObject(this);
+    var shareKey = type == null || code == null ? null : geometryKey(basis) + (modelled == null ? "" : "|mass-model") + "|code:" + code;
     var computed = false;
     var mass = ComponentType.masses.get(shareKey, () -> {
       computed = true;

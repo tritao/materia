@@ -8,4 +8,7 @@ package machinekit.cache;
  */
 class CodeIdentity {
   public static function of(moduleName:String):Null<String> return haxeon.build.CodeIdentity.ofModule(moduleName);
+
+  /** The identity of the module defining `object`'s concrete class (its own code and everything it imports), or null. */
+  public static function ofObject(object:Dynamic):Null<String> return haxeon.build.CodeIdentity.ofObject(object);
 }
