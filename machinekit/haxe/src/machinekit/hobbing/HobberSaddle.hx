@@ -15,6 +15,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
  * Dimensions are mm; construction is unwelded. Strength and modal stiffness
  * estimates retain their stated assumptions pending Phase D. */
 class HobberSaddle extends MachineComponent {
+  public static inline final ELECTRICAL_HEIGHT = FoundationLayout.PLINTH_HEIGHT - machinekit.enclosure.TraySeat.DEPTH - 6;
   final designId:String;
   static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [
@@ -1005,7 +1006,7 @@ class HobberSaddle extends MachineComponent {
       case "GE-enclosure":
         [box(-270, 780, -360, -356, 0, 950), box(-270, 780, 356, 360, 0, 950), box(776, 780, -360, 360, 0, 950)];
       case "electrical-panel":
-        var parts = [box(-210, 210, -10, 0, 0, 850), box(-230, 230, -150, 50, 0, 20)];
+        var parts = [box(-210, 210, -10, 0, 0, ELECTRICAL_HEIGHT), box(-230, 230, -150, 50, 0, 20)];
         // Two welded triangular webs tie the upright to its floor base.
         for (x in [-190.0, 190.0]) {
           var web = Part.prism([new Vector(0, 20), new Vector(-130, 20), new Vector(0, 200)], -3, 3);

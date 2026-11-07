@@ -77,6 +77,7 @@ class FlexsplineHobberChecks {
     var covers = selections.filter(s -> s.id == "kind:Covers and wipers")[0].members;
     check(covers.indexOf("Xskirt") >= 0 && covers.indexOf("ZcoverLeft") >= 0, "covers set derives from component metadata");
     Sys.println("Hobber groups: " + count + " members, no ungrouped members; " + selections.length + " derived sets");
+    assertions += HobberXAssembly.check(machine);
     assertions += HobberDesignChecks.run(machine);
     assertions += HobberFrameChecks.run(machine);
     assertions += HobberCastingMassChecks.run(machine);
