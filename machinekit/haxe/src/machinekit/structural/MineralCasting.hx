@@ -116,7 +116,16 @@ class MineralCasting extends MachineComponent {
     super.setMaterial(spec);
   }
 
-  override public function geometry(detail:ComponentDetail = Preview):Part {
+  /**
+   * A casting's solid is a large boolean of its envelope, cores, pockets and embedded anchors, and one run asks for it several
+   * times (sizing its mass, fitting the enclosure around it, exporting the scene). Build it once per recipe key and hand each
+   * caller its own copy.
+   */
+  static final geometries = machinekit.cache.Memos.parts("mineral-casting-geometry", 8);
+
+  override public function geometry(detail:ComponentDetail = Preview):Part return geometries.get(geometryKey(detail), () -> build(detail));
+
+  function build(detail:ComponentDetail):Part {
     var parts:Array<Part> = [];
     try {
       for (p in castingEnvelope()) parts.push(CastingCavityCad.prism(p));
