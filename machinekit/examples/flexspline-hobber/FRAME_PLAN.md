@@ -102,7 +102,7 @@ A review of `HobberSaddle` and `FlexsplineHobber` found:
 - **Guard and service qualification:** P4 fixed shields and P5 rearward X / complete Z-module removals replace the earlier bellows and blocked-service open item; historical numbers remain in the Log. Qualify the four oil-compatible D10 / 2 mm-panel NBR plugs, the sheet shop's bend allowance, the long AF4 service key and the hoist/sling and temporary Z-reader support arrangements. These procurement/shop inputs remain assumed, not vendor-rated model fixtures.
 - **BT30 procurement:** obtain the chosen RobotDigg BT30 option's verified outline, gripper/pull-stud details, retention force, runout and permissible belt load. The linked NT30 drawing does not verify the assumed BT30 packaging. Qualify arbor material/heat treatment, bearing-seat fits and the indicated 5 um outboard radial budget before manufacture.
 - **A brake holding torque is assumed** (87 N m = rated output torque, `FlexsplineHobber.A_BRAKE_HOLDING`), as is the A acceleration limit (pi/2 rad/s^2, `A_ACCELERATION`); bearing moment rating still unknown (R3 reports the demand: see Log).
-- Thicker X carriage deck: needs the X rails 10-20 mm lower on the bed inserts (user decision; today 20 mm + ribs).
+- ~~Thicker X carriage deck: needs the X rails 10-20 mm lower on the bed inserts~~ decided 2026-11-07: 20 mm ground plate with bolted ribs, rails unchanged (Phase Y, step XC).
 
 - **Accuracy target (2026-11-06, user decision to confirm):** the docs state ISO 1328 class 5-6 on every parameter (PLAN.md HB12), no single class. `HobberAccuracyChecks` gates on **class 6** for fp, Fp, Fr, F-alpha, F-beta (ISO 1328-1:2013 formulas extrapolated to m 0.3); decide whether class 5 is the commitment. The gate currently **fails on Fp** (predicted class 9) because the purchased table's once-per-turn speed ripple is an assumed 0.1 % with no vendor or bench value: decide who measures it (bench at 10-20 rpm) or whether to ask the table vendor for the figure. Also open: rail class and guide angular error (assumed 5"), thermal dT, A torsional stiffness (ZeroErr), spindle bearing/arbor runouts (assumed 2 um each).
 
@@ -192,6 +192,10 @@ raised rail lands and a floor that takes the HZMotion M60D-BK12 and the BF12 cen
 the carriage; the JFT-40 ML 70 seat, head bracket, travel window, cable and air are module features. This unblocks the
 "Y screw centred" item without a new small-screw drive family. Z is not converted: its rails stay on the column's cast
 inserts (the eRob fixes the screw at y -82), and it gets a bellows cover only.
+The same round applies the plan's structure rule (castings for mass, ground flat stock for precision, derived heights,
+location by part type) to the X carriage: a bought ground 20 mm plate with bolted, dowelled and bonded bright-bar ribs
+replaces the one-piece milled `GE-X-carriage`, with no change to the bed or the X rail height (step XC). This
+supersedes the Open item "Thicker X carriage deck: needs the X rails lower".
 
 ## Suppliers (outside the model)
 
