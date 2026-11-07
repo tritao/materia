@@ -65,6 +65,16 @@ nested and filtered groups, undo, and scene/generated-project save/open:
 ./haxeon/scripts/haxeon run --project=app/tests/haxeon.visibility.json
 ```
 
+Scene-row hover keeps geometry and labels retained; isolate glyphs repaint in place,
+and informational hints wait for a pause. The hover regression reports timings and
+checks that sweeping between rows reuses the submitted UI without layout:
+
+```sh
+./haxeon/scripts/haxeon run --project=app/tests/tree-hover/haxeon.json
+# Exercise the complete editor with an existing generated scene:
+./haxeon/scripts/haxeon run --project=app/tests/tree-hover/haxeon.json -- --artifact=/path/to/scene.mtrg
+```
+
 Perspective rendering uses the displayed viewport dimensions for the camera,
 overlays and pointer input. The GPU texture is capped at 2048 pixels per axis;
 that resolution limit does not change the camera aspect ratio. Window and dock

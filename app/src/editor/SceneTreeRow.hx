@@ -55,16 +55,16 @@ class SceneTreeRow implements View {
   public function build(context:BuildContext):RenderNode {
     return context.withScope(new Key("item-row:" + key), () -> {
       var rowId = context.id("row");
-      // Only this row updates when its hover changes; reserve action space to avoid label movement.
-      return context.selfUpdating(rowId, () -> buildRow(context, rowId));
+      // Hover changes only the isolate glyph paint; keep the row and its label layout retained.
+      return context.selfUpdating(rowId, () -> buildRow(context, rowId), false);
     });
   }
   function buildRow(context:BuildContext, rowId:WidgetId):RenderNode {
-    var hovered = (context.interactionStates.get(rowId) & StyleState.Hovered) != 0;
     var color = visible ? context.theme.tokens.textPrimary : context.theme.tokens.textSecondary;
     var text = new MiddleEllipsisText("label:" + key, label, true, TextStyleOverride.foreground(color));
     var tooltip = new Tooltip("label-tip:" + key, text, new Text(detail == null ? label : detail));
     tooltip.fillAnchor = true;
+    tooltip.placement = TooltipPlacement.Right;
     tooltip.showWhen = () -> detail != null || text.truncated;
     var style = new LayoutStyle();
     style.width = LayoutAxis.grow();
@@ -74,8 +74,9 @@ class SceneTreeRow implements View {
     // Keep the 24px eye target clear of the overlay scrollbar (12px + 2px inset).
     style.padding = new Insets(0, 0, 16, 0);
     var children = [new KeyedView("icon", new Icon("glyph:" + key, icon, 15, color)), new KeyedView("label", tooltip)];
+    var action:Null<IsolateAction> = null;
     if (isolate != null) {
-      var action = new IsolateAction("isolate:" + key, "Isolate " + label, hovered, isolate);
+      action = new IsolateAction("isolate:" + key, "Isolate " + label, rowId, isolate);
       var hint = new Tooltip("isolate-tip:" + key, action, new Text("Isolate " + label));
       hint.placement = TooltipPlacement.Right;
       children.push(new KeyedView("isolate", hint));
@@ -97,6 +98,15 @@ class SceneTreeRow implements View {
     node.states = flags;
     node.computedStyle = computed;
     for (child in children) node.add(context.withStyleParent(computed, () -> child.build(context)));
+    var isolateAction = action;
+    if (isolateAction != null) {
+      // The glyph reads this row's hover while painting, so invalidate only that small display list.
+      var repaint:UiEvent -> Void = event -> {
+        if (event.target.equals(rowId)) isolateAction.invalidatePaint();
+      };
+      node.on(UiEventKind.HoverEnter, repaint);
+      node.on(UiEventKind.HoverLeave, repaint);
+    }
     return node;
   }
 }
@@ -105,20 +115,24 @@ class SceneTreeRow implements View {
 private class IsolateAction implements View {
   final key:String;
   final label:String;
-  final rowHovered:Bool;
+  final rowId:WidgetId;
+  var paintNode:Null<RenderNode> = null;
   final activate:Void -> Void;
-  public function new(key:String, label:String, rowHovered:Bool, activate:Void -> Void) {
+  public function new(key:String, label:String, rowId:WidgetId, activate:Void -> Void) {
     this.key = key;
     this.label = label;
-    this.rowHovered = rowHovered;
+    this.rowId = rowId;
     this.activate = activate;
+  }
+  public function invalidatePaint():Void {
+    var current = paintNode;
+    if (current != null) RenderNode.latest(current).invalidatePaint();
   }
   public function build(context:BuildContext):RenderNode return context.withScope(new Key(key), () -> {
     var id = context.id("action");
-    return context.selfUpdating(id, () -> {
+    var result = context.selfUpdating(id, () -> {
       var flags = context.interactionStates.get(id);
       var focused = (flags & StyleState.Focused) != 0;
-      var shown = rowHovered || focused || (flags & StyleState.Hovered) != 0;
       var style = new LayoutStyle();
       style.width = LayoutAxis.fixed(24);
       style.height = LayoutAxis.fixed(24);
@@ -142,6 +156,7 @@ private class IsolateAction implements View {
       var color = context.theme.tokens.textSecondary;
       var focusColor = context.theme.tokens.focusRing;
       node.onPaint((canvas, _) -> {
+        var shown = focused || (context.interactionStates.get(rowId) & StyleState.Hovered) != 0;
         if (focused) canvas.strokeTransient(new PathBuilder().roundRect(0.75, 0.75, 22.5, 22.5, 4).build(), focusColor, 1.5);
         if (shown) canvas.withState(target -> {
           target.translate(5, 5);
@@ -149,9 +164,12 @@ private class IsolateAction implements View {
           target.strokeTransient(IconData.build(IconName.Inspect), color, 2.0,
             haxeon.ui.LineCap.Round, haxeon.ui.LineJoin.Round);
         });
-      });
+      }, 'isolate:$focused:' + color.red + ':' + color.green + ':' + color.blue + ':' + color.alpha
+        + ':' + focusColor.red + ':' + focusColor.green + ':' + focusColor.blue + ':' + focusColor.alpha);
       return node;
-    });
+    }, false);
+    paintNode = result;
+    return result;
   });
 }
 

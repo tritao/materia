@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "package": {
+    "name": "scene-tree-hover-tests"
+  },
+  "entry": "SceneTreeHoverTests",
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "app": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}
