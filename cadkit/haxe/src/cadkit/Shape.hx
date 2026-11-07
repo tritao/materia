@@ -349,17 +349,33 @@ class Shape {
     return CadKit.vertexPositionChecked(native.borrow());
   }
 
+  /**
+   * The mesh of this shape. Pure: it meshes an independent copy, so the shape's own topology, `bounds()` and later meshes never
+   * depend on what was meshed before (OCCT stores triangulations on the shape's faces and a coarser request after a finer one
+   * returns the finer mesh). A keyed shape's mesh is kept on disk (`OpCache.query`); the copy keeps topology order and names, so
+   * the mesh's face and edge indices are this shape's.
+   */
   public function tessellate(linearDeflection:Float = 0.1, angularDeflection:Float = 0.5):Mesh {
     for (entry in meshCache) {
       if (entry.linearDeflection == linearDeflection && entry.angularDeflection == angularDeflection) return entry.mesh;
     }
-    var mesh = Mesh.fromShape(
-      native.borrow(),
-      Geometry.meshOptions(linearDeflection, angularDeflection),
-      linearDeflection
-    );
+    var mesh = cadkit.cache.OpCache.query("tessellate", "cadkit.Shape", this,
+      ShapeKey.number(linearDeflection) + "," + ShapeKey.number(angularDeflection), () -> meshOfCopy(linearDeflection, angularDeflection),
+      value -> value.toBytes(), Mesh.fromBytes);
     meshCache.push({linearDeflection: linearDeflection, angularDeflection: angularDeflection, mesh: mesh});
     return mesh;
+  }
+
+  private function meshOfCopy(linearDeflection:Float, angularDeflection:Float):Mesh {
+    var copy = CadKit.shapeTranslateChecked(native.borrow(), Geometry.vec3(0, 0, 0));
+    try {
+      var mesh = Mesh.fromShape(copy.borrow(), Geometry.meshOptions(linearDeflection, angularDeflection), linearDeflection);
+      copy.close();
+      return mesh;
+    } catch (error:Dynamic) {
+      copy.close();
+      throw error;
+    }
   }
 
   /** Tessellate with a linear deflection relative to this shape's size. */

@@ -2,6 +2,8 @@ import CadKit;
 import cadkit.Geometry;
 import cadkit.Shape;
 import cadkit.cache.DiskStore;
+import cadkit.Mesh;
+import cadkit.ShapeKey;
 import cadkit.cache.OpCache;
 import cadkit.modeling.Curve;
 import cadkit.modeling.Location;
@@ -334,6 +336,123 @@ class ShapeKeySmoke {
     DiskStore.useProcess(null);
   }
 
+  static function meshHex(m:Mesh):String return hex(m.toBytes());
+
+  static function boundsText(s:Shape):String {
+    var b = s.bounds(), lo = b.get_min(), hi = b.get_max();
+    return [lo.get_x(), lo.get_y(), lo.get_z(), hi.get_x(), hi.get_y(), hi.get_z()].join(",");
+  }
+
+  /** Area of the triangles a mesh puts in the range of face `index`. */
+  static function rangeArea(m:Mesh, first:Int, count:Int):Float {
+    var total = 0.0;
+    var t = 0;
+    while (t < count) {
+      var pts = [for (k in 0...3) {
+        var vi = m.indices.getInt32((first + t + k) * 4);
+        [for (c in 0...3) m.vertices.getDouble((vi * 3 + c) * 8)];
+      }];
+      var ux = pts[1][0] - pts[0][0], uy = pts[1][1] - pts[0][1], uz = pts[1][2] - pts[0][2];
+      var wx = pts[2][0] - pts[0][0], wy = pts[2][1] - pts[0][1], wz = pts[2][2] - pts[0][2];
+      var cx = uy * wz - uz * wy, cy = uz * wx - ux * wz, cz = ux * wy - uy * wx;
+      total += 0.5 * Math.sqrt(cx * cx + cy * cy + cz * cz);
+      t += 3;
+    }
+    return total;
+  }
+
+  /** Tessellation is pure (meshes a copy) and a keyed shape's mesh is kept on disk. */
+  static function tessellation():Void {
+    DiskStore.useProcess(null);
+    // Purity: the shape is not changed by meshing, and a mesh does not depend on what was meshed before.
+    var s = block(10);
+    var before = boundsText(s);
+    var fine = s.tessellate(0.01, 0.5);
+    check(boundsText(s) == before, "meshing leaves bounds() as they were");
+    var coarse = s.tessellate(1.0, 0.5);
+    check(meshHex(coarse) == meshHex(block(10).tessellate(1.0, 0.5)), "a coarse mesh after a fine one equals a fresh coarse mesh");
+    check(meshHex(fine) == meshHex(block(10).tessellate(0.01, 0.5)), "and the fine one equals a fresh fine mesh");
+    check(s.tessellate(1.0, 0.5) == coarse, "the same request returns the same mesh");
+    var rel = s.tessellateRelative(0.005, 0.5);
+    check(meshHex(rel) == meshHex(block(10).tessellateRelative(0.005, 0.5)), "a relative mesh does not depend on earlier meshes");
+    var ball = Shape.sphere(7);
+    var tight = boundsText(ball);
+    ball.tessellate(0.001, 0.2);
+    check(boundsText(ball) == tight, "a sphere's bounds stay tight after meshing");
+    // The mesh's face indices are the shape's own: each range's triangles have the area of that face.
+    var worst = 0.0;
+    for (r in fine.faceRanges) {
+      var face = s.subshape(CadKit.ShapeKind.Face, r.faceIndex);
+      var area = face.area();
+      worst = Math.max(worst, Math.abs(rangeArea(fine, r.firstIndex, r.indexCount) - area) / Math.max(area, 1e-9));
+    }
+    check(fine.faceRanges.length == s.subshapeCount(CadKit.ShapeKind.Face) && worst < 0.01, "mesh face ranges map to the shape's faces by area: " + worst);
+    var edgeCount = s.subshapeCount(CadKit.ShapeKind.Edge), badEdge = false;
+    for (i in 0...Std.int(fine.edgeIds.length / 4)) {
+      var id = fine.edgeIds.getInt32(i * 4);
+      if (id < 0 || id >= edgeCount) badEdge = true;
+    }
+    check(!badEdge, "mesh edge ids are the shape's edge indices");
+    // The mesh round-trips as bytes, exactly.
+    var back = Mesh.fromBytes(fine.toBytes());
+    check(meshHex(back) == meshHex(fine) && back.vertexCount == fine.vertexCount && back.indexCount == fine.indexCount
+      && back.linearDeflection == fine.linearDeflection && back.faceRanges.length == fine.faceRanges.length, "a mesh round-trips through bytes in every field");
+    var failed = false;
+    try Mesh.fromBytes(Bytes.ofString("xx")) catch (error:Dynamic) failed = true;
+    check(failed, "a short mesh buffer is refused");
+    var extra = fine.toBytes(), padded = Bytes.alloc(extra.length + 1);
+    padded.blit(0, extra, 0, extra.length);
+    failed = false;
+    try Mesh.fromBytes(padded) catch (error:Dynamic) failed = true;
+    check(failed, "a mesh buffer with trailing bytes is refused");
+    // The persistent tier.
+    var store = freshStore();
+    DiskStore.useProcess(store);
+    OpCache.resetStats();
+    var a = block(10), b = block(10), c = block(11);
+    var m1 = a.tessellate(0.05, 0.5);
+    check(queryStats("tessellate").misses == 1 && queryStats("tessellate").hits == 0, "a first mesh is a miss");
+    var m2 = b.tessellate(0.05, 0.5);
+    check(queryStats("tessellate").hits == 1 && queryStats("tessellate").misses == 1, "the same construction, another shape object: a hit, no tessellation");
+    check(meshHex(m1) == meshHex(m2), "a hit equals the computed mesh to the bit");
+    a.tessellate(0.05, 0.5);
+    check(queryStats("tessellate").hits == 1, "the shape's own memory answers a repeat without touching the store");
+    a.tessellate(0.5, 0.5);
+    check(queryStats("tessellate").misses == 2, "other deflections are other entries");
+    a.tessellate(0.05, 0.25);
+    check(queryStats("tessellate").misses == 3, "another angular deflection is another entry");
+    c.tessellate(0.05, 0.5);
+    check(queryStats("tessellate").misses == 4, "another shape is another entry");
+    var relA = a.tessellateRelative(0.01, 0.5), relB = block(10).tessellateRelative(0.01, 0.5);
+    check(meshHex(relA) == meshHex(relB) && queryStats("tessellate").hits >= 2, "relative meshes are cached by their resolved deflection");
+    DiskStore.useProcess(null);
+    check(meshHex(block(10).tessellate(0.05, 0.5)) == meshHex(m1), "with the tier off the mesh is the same");
+    DiskStore.useProcess(store);
+    var unkeyed = block(10).unkeyed("test");
+    var seen = queryStats("tessellate");
+    check(meshHex(unkeyed.tessellate(0.05, 0.5)) == meshHex(m1) && queryStats("tessellate").hits == seen.hits && queryStats("tessellate").misses == seen.misses,
+      "an unkeyed shape bypasses the cache and gives the same mesh");
+    // Verify mode and damage.
+    DiskStore.forceVerify(true);
+    var honest = block(10).tessellate(0.05, 0.5);
+    DiskStore.forceVerify(null);
+    check(meshHex(honest) == meshHex(m1) && queryStats("tessellate").verified == 1, "verify mode accepts an honest entry");
+    var params = ShapeKey.number(0.05) + "," + ShapeKey.number(0.5);
+    var key = OpCache.queryKey("tessellate", "cadkit.Shape", a, params);
+    check(key != null, "a keyed shape has a mesh store key");
+    store.write(key, c.tessellate(0.05, 0.5).toBytes());
+    DiskStore.forceVerify(true);
+    var message = "";
+    try block(10).tessellate(0.05, 0.5) catch (error:Dynamic) message = Std.string(error);
+    DiskStore.forceVerify(null);
+    check(message.indexOf("stale") >= 0, "verify mode refuses a planted wrong mesh: " + message);
+    store.write(key, Bytes.ofString("junk"));
+    check(meshHex(block(10).tessellate(0.05, 0.5)) == meshHex(m1), "a damaged entry is a miss");
+    check(meshHex(block(10).tessellate(0.05, 0.5)) == meshHex(m1), "and was rewritten whole");
+    store.clear();
+    DiskStore.useProcess(null);
+  }
+
   /** `canonical` is an operation on the key: another shape to anything keyed on how it was made. */
   static function canonicalKeys():Void {
     var a = block(10), b = block(10);
@@ -363,6 +482,7 @@ class ShapeKeySmoke {
     lofts();
     queries();
     canonicalKeys();
+    tessellation();
     Sys.println("shape key smoke: " + passed + " checks passed");
   }
 }
