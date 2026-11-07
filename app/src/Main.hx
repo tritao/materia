@@ -993,6 +993,7 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
    * camera and advances viewport animation. Builds only read what it leaves.
    */
   public function updatePresentation(deltaSeconds:Float):Void {
+    if (perspectiveViewport != null) perspectiveViewport.flushAssemblyDrag();
     if (workspace.isOpen("start")) preferences.refreshRecentAvailability();
     projectVariants.update();
     updateProjectUiExtension();
@@ -1171,39 +1172,7 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
       windowLayers.push(new StackChild("editor-more-menu", toolbarMenu, 0.0, 0.0, 25));
     }
     if (hierarchyAddVisible && documentDialog == null) {
-      var items:Array<MenuItem> = [];
-      var addSection = function(name:String, ids:Array<String>) {
-        items.push(new MenuItem("heading:" + name, name.toUpperCase(), null, false));
-        for (id in ids) {
-          var command = commands.get(id);
-          if (command == null) continue;
-          var selectedId = id;
-          items.push(new MenuItem(id, command.label, function() {
-            commands.executeContext(selectedId, ui.commandContext);
-            invalidateView();
-          }, command.isEnabled(ui.commandContext)));
-        }
-      };
-      addSection("Primitive", ObjectKindRegistry.addMenuCommands("Primitive"));
-      addSection("CAD", ObjectKindRegistry.addMenuCommands("CAD"));
-      addSection("Machining", ObjectKindRegistry.addMenuCommands("Machining"));
-      addSection("People", ObjectKindRegistry.addMenuCommands("People"));
-      addSection(
-        "Feature",
-        [
-          "scene.create-sketch",
-          "scene.create-face-sketch",
-          "scene.create-extrusion",
-          "scene.create-sheet-base",
-          "scene.create-sheet-flange",
-          "scene.add-face-hole",
-          "scene.create-pocket",
-          "scene.create-vertical-fillet",
-          "scene.roll-back-to-feature",
-          "scene.roll-forward"
-        ]
-      );
-      addSection("Import", ObjectKindRegistry.addMenuCommands("Import"));
+      var items = app.editor.SceneAddMenu.items(commands, ui.commandContext, invalidateView);
       var addMenu = new Menu("hierarchy-add-menu", items, hierarchyAddX, hierarchyAddY, function() {
         hierarchyAddVisible = false;
         invalidateView();

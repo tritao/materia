@@ -61,6 +61,12 @@ class PresentationEvaluator {
     playing:Bool = false
   ):PresentationFrame {
     PresentationCodec.validate(definition, value);
+    return evaluateValidated(definition, solved, value, cursor, fingerprint, playing);
+  }
+
+  @:allow(materia.presentation.CompiledPresentation)
+  static function evaluateValidated(definition:AssemblyDefinition, solved:Map<String, AssemblyFrame>,
+    value:AssemblyPresentation, cursor:PresentationCursor, fingerprint:String, playing:Bool):PresentationFrame {
     var flat = AssemblyDefinitionFlattener.flattenView(definition);
     if (cursor == null
       || !Math.isFinite(cursor.explode) || cursor.explode < 0 || cursor.explode > 1 || !Math.isFinite(cursor.progress)

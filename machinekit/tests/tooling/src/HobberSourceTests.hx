@@ -42,30 +42,6 @@ import materia.assembly.AssemblyFrames as F;
           "Every source cavity network has a declared body opening: " + [for (feature in members) feature.id].join(", ")
         );
       }
-      if (kind == "bed") {
-        for (site in FoundationLayout.trayClampSeats().filter(row -> row.id == "trayClampSeat10"
-          || row.id == "trayClampSeat11")) {
-          var featureId = site.id == "trayClampSeat10"
-            ? "pocket-rearDeckRibRight-leftCap-capTop" : "pocket-rearDeckRibRight-rightDeckRibInside-capTop";
-          var local = site.part.geometry(), steel = machinekit.assembly.PosedParts.moved(local, site.pose);
-          local.close();
-          try for (box in byFeature.get(featureId)) {
-            var cavity = machinekit.tooling.ToolingBlock.placedBox(box);
-            try check(
-              steel.shape.distance(cavity.shape) + 1e-7 >= FoundationLayout.SOURCE_STEEL_COVER_MM,
-              "Relocated rear socket retains exact native cover to its actual adjacent core: " + site.id
-            ) catch (error:Dynamic) {
-              cavity.close();
-              throw error;
-            }
-            cavity.close();
-          } catch (error:Dynamic) {
-            steel.close();
-            throw error;
-          }
-          steel.close();
-        }
-      }
       if (kind == "column") {
         check(
           cuts.length == 3 && cuts.filter(feature -> feature.kind == ServiceOpening && StringTools.startsWith(

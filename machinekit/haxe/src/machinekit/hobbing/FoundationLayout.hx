@@ -20,6 +20,19 @@ typedef InsertLocation = {
   @:optional var clampHeight:Float;
 }
 
+/** Ground corner contact, in the X-carriage/work frame; column coordinates derive from it. */
+typedef ColumnSolePad = {
+  var id:String;
+  var side:Int;
+  var front:Bool;
+  var x0:Float;
+  var x1:Float;
+  var y0:Float;
+  var y1:Float;
+  var boltXs:Array<Float>;
+  var boltY:Float;
+}
+
 /** Machine design intent. Exterior openings are authored here, never inferred. */
 class FoundationLayout {
   public static inline final TABLE_FACE = 228.0;
@@ -42,6 +55,53 @@ class FoundationLayout {
   public static inline final LIFT_SEAT_HEIGHT = 770.0;
   public static inline final LIFT_CENTRE_Y = 310.0;
   public static inline final BED_RAIL_CENTRE = 220.0;
+  public static inline final COLUMN_SOLE_THICKNESS = 20.0;
+  public static inline final BED_RAIL_INSERT_THICKNESS = 20.0;
+  public static function bedRailSeatTop():Float return TABLE_SEAT - TABLE_SEAT_HEIGHT
+    + RAIL_SEAT_HEIGHT + BED_RAIL_INSERT_THICKNESS;
+  public static function columnSoleTop():Float return HobberSaddle.xCarriageTop() + COLUMN_SOLE_THICKNESS;
+  public static inline final COLUMN_RAIL_CENTRE = 145.0;
+
+  /** Keep four ground rectangles on resin-backed corner lands; the front pair
+   * clear the same source recess that clears the actuator. Dimensions are
+   * derived from the casting, rail centres, M8 edge/pitch and running gap. */
+  public static function columnSolePads():Array<ColumnSolePad> {
+    var screw = machinekit.standard.SocketHeadCapScrew.catalog().get("M8");
+    if (screw == null) throw "Column sole screw unavailable";
+    var outer = (dimensions("column")[0] - COLUMN_SOLE_THICKNESS) / 2;
+    var depth = dimensions("column")[1] - COLUMN_SOLE_THICKNESS;
+    var pitch = machinekit.assembly.JointFasteners.SPACING_DIAMETERS * screw.diameter;
+    var edge = machinekit.assembly.JointFasteners.EDGE_DIAMETERS * screw.diameter + 0.5;
+    // Leave two screw diameters beyond the service-hole edge allowance
+    // for the separately demand-sized cast-anchor pattern (layout allowance,
+    // not a supplier limit). Exact source selection verifies its capacity.
+    var anchorLand = 2*screw.diameter;
+    var length = Math.ceil((2*(edge+anchorLand) + pitch)/10)*10;
+    var centreX = HobberZLayout.SEAT_FACE_X + HobberZLayout.SPINE_FRONT_COLUMN_Y;
+    var out:Array<ColumnSolePad> = [];
+    for (front in [true,false]) for (side in [-1,1]) {
+      var inner = front ? Math.ceil((columnRecessOuter(side) + HobberScales.RUNNING_CLEARANCE)/5)*5
+        : 2*COLUMN_RAIL_CENTRE - outer;
+      var cx = centreX + (front ? -1 : 1)*(depth-length)/2;
+      var y0 = side < 0 ? -outer : inner;
+      var y1 = side < 0 ? -inner : outer;
+      // Rear right row lies between the scale rib and the outboard
+      // source anchor. Keep its underside driver corridor outside the rib.
+      var rearRight = Math.ceil((outer-2*edge+HobberScales.RUNNING_CLEARANCE)*2)/2;
+      var boltY = side < 0 ? -150.0 : front ? 175.0 : rearRight;
+      if (inner >= outer || boltY < y0 + screw.diameter || boltY > y1 - screw.diameter)
+        throw "Column corner land cannot carry its derived bolt pattern";
+      out.push({id:"sole"+(front?"Front":"Rear")+(side<0?"Left":"Right"),side:side,front:front,
+        x0:cx-length/2,x1:cx+length/2,y0:y0,y1:y1,boltXs:[cx-pitch/2,cx+pitch/2],boltY:boltY});
+    }
+    return out;
+  }
+
+  static function columnRecessOuter(side:Int):Float {
+    var driveSide = HobberZLayout.axisY() < 0 ? -1 : 1;
+    var driveOuter = Math.abs(HobberZLayout.axisY()) + HobberDrives.PAD_WIDTH/2 + DRIVE_RECESS_CLEARANCE;
+    return side == driveSide ? Math.max(driveOuter,COLUMN_HEAD_WIDTH/2) : COLUMN_HEAD_WIDTH/2;
+  }
   public static inline final BED_RAIL_SEAT_WIDTH = 50.0;
   public static inline final BED_RAIL_BEAM_WIDTH = 110.0;
   public static inline final FOOT_FLOOR = 40.0;
@@ -80,13 +140,16 @@ class FoundationLayout {
     holes:String,
     scope:String = "bed"
   ):InsertLocation {
+    var stock=CastInsert.boxValues(w,d,h);
+    if (scope=="column" && role==ColumnMount)
+      stock=CastInsert.manufacturedValues(materia.casting.InsertMaterial.C45Ground).setToken("body",stock.token("body"));
     return {
       id: id,
       purpose:role,
       part: new CastInsert(CastInsert.precastHoles(
-        CastInsert.boxValues(w, d, h).setToken("role", role).setToken("label", label).setToken("partId", "HOBBER-" + scope + "-" + id).setToken(
+        stock.setToken("role", role).setToken("label", label).setToken("partId", "HOBBER-" + scope + "-" + id).setToken(
           "finish",
-          GroundAfterCasting
+          scope == "column" && role == ColumnMount ? AsSupplied : GroundAfterCasting
         ),
         holes
       )),
@@ -144,30 +207,10 @@ class FoundationLayout {
       d[2] - depth,
       "tray"
     ),
-    // The removable bridge owns the middle span. The two ledges stop
-    // at its edges rather than claiming the same cavity twice.
     Patterns.box(
-      "tray-rear-ledge-left",
-      InterfaceRecess,
-      faces(["body.x-max", "body.y-min", "body.z-max"]),
-      a,
-      (l - TRAY_REAR_BRIDGE_WIDTH) / 2,
-      depth,
-      w / 2 - a / 2,
-      -(l + TRAY_REAR_BRIDGE_WIDTH) / 4,
-      d[2] - depth,
-      "tray"
-    ), Patterns.box(
-      "tray-rear-ledge-right",
-      InterfaceRecess,
-      faces(["body.x-max", "body.y-max", "body.z-max"]),
-      a,
-      (l - TRAY_REAR_BRIDGE_WIDTH) / 2,
-      depth,
-      w / 2 - a / 2,
-      (l + TRAY_REAR_BRIDGE_WIDTH) / 4,
-      d[2] - depth,
-      "tray"
+      "tray-rear-ledge", InterfaceRecess,
+      faces(["body.x-max", "body.y-min", "body.y-max", "body.z-max"]),
+      a, l, depth, w / 2 - a / 2, 0, d[2] - depth, "tray"
     ), Patterns.box(
       "tray-left-ledge",
       InterfaceRecess,
@@ -194,7 +237,6 @@ class FoundationLayout {
   }
 
   /** Unverified exterior study choices; published bore/thread dimensions live in the catalogue variant. */
-  public static inline final TRAY_REAR_BRIDGE_WIDTH = 150.0;
   public static inline final TRAY_SOCKET_OUTSIDE_DIAMETER = 8.0;
   public static inline final TRAY_SOCKET_RELIEF_DIAMETER = 6.2;
   public static inline final TRAY_SOCKET_TAIL_WIDTH = 11.0;
@@ -234,8 +276,8 @@ class FoundationLayout {
       clampHeight: height
     });
     for (side in [-1, 1]) for (x in [-1, 0, 1]) add(x * (d[0] / 2 - 100), side * (d[1] / 2 - TRAY_SOCKET_EDGE_INSET));
-    for (side in [-1, 1]) for (y in [-150.0, 150.0]) add(side * (d[0] / 2 - TRAY_SOCKET_END_INSET), y);
-    for (y in [-75.0, 75.0]) add(d[0] / 2 - TRAY_SOCKET_END_INSET, y, 17);
+    for (side in [-1, 1]) for (sign in [-1, 1]) add(side * (d[0] / 2 - TRAY_SOCKET_END_INSET),
+      sign * (HobberChipCover.OUTER_HALF_WIDTH + machinekit.enclosure.TrayClamp.WIDTH / 2 + 70));
     return out;
   }
 
@@ -252,7 +294,7 @@ class FoundationLayout {
       F.fromRotationMatrix(
         HobberZLayout.SEAT_FACE_X + HobberZLayout.SPINE_FRONT_COLUMN_Y,
         0,
-        HobberZLayout.FOUNDATION_ORIGIN_Z,
+        columnSoleTop() - COLUMN_SOLE_THICKNESS / 2,
         [0.0, -1, 0, 1, 0, 0, 0, 0, 1]
       );
     default:
@@ -364,18 +406,6 @@ class FoundationLayout {
         0
       ));
       cores = cores.concat(trayLedges());
-      for (side in [-1, 1]) cores.push(Patterns.box(
-        "tray-rear-bridge-seat-" + (side < 0 ? "left" : "right"),
-        InterfaceRecess,
-        faces(["body.x-max", "body.z-max"]).concat([C.feature("X-drive-channel")]),
-        25,
-        (TRAY_REAR_BRIDGE_WIDTH - DRIVE_CHANNEL_WIDTH) / 2,
-        10,
-        d[0] / 2 - 12.5,
-        side * (TRAY_REAR_BRIDGE_WIDTH + DRIVE_CHANNEL_WIDTH) / 4,
-        d[2] - 10,
-        "tray-rear-bridge"
-      ));
       // Preserve the reviewed cable centreline. The filled outer band now
       // needs a real longitudinal duct opening at both body end faces.
       var cable = Patterns.box(
@@ -400,10 +430,9 @@ class FoundationLayout {
       // The Z screw stands off the A axis housing on one side (`HobberZOffset`), its pads against the spine's front: the recess on that
       // side stops at the spine's front face, like the centre one, and opens to `DRIVE_RECESS_CLEARANCE` past the pads' outer edge.
       var driveSide = HobberZLayout.axisY() < 0 ? -1 : 1;
-      var driveOuter = Math.abs(HobberZLayout.axisY()) + HobberDrives.PAD_WIDTH / 2 + DRIVE_RECESS_CLEARANCE;
       for (side in [-1, 1]) {
         var drive = side == driveSide;
-        var outer = drive ? Math.max(driveOuter, COLUMN_HEAD_WIDTH / 2) : COLUMN_HEAD_WIDTH / 2;
+        var outer = columnRecessOuter(side);
         var width = outer - COLUMN_SPINE_HALF_WIDTH;
         cores.push(Patterns.box(
           "head-recess-" + (side < 0 ? "left" : "right"),
@@ -494,7 +523,7 @@ class FoundationLayout {
         "preloaded column guide seat",
         BED_RAIL_SEAT_WIDTH,
         layout.railLength,
-        20,
+        BED_RAIL_INSERT_THICKNESS,
         F.fromRotationMatrix(
           layout.railStart + layout.railLength / 2 - centre,
           side * BED_RAIL_CENTRE,
@@ -534,20 +563,12 @@ class FoundationLayout {
         none
       );
     } else {
-      // Author the sole from its actual underside service face. This changes
-      // no steel envelope or drilling position; rear anchors then face resin.
-      out.push(boxInsert(
-        "basePlate",
-        ColumnMount,
-        "column carriage sole",
-        380,
-        100,
-        20,
-        F.fromRotationMatrix(0, -40, 10, [1.0, 0, 0, 0, -1, 0, 0, 0, -1]),
-        ["body.z-min"],
-        fixtureHoles(20),
-        "column"
-      ));
+      for (pad in columnSolePads()) out.push(boxInsert(pad.id,ColumnMount,
+        "column corner sole " + pad.id,pad.y1-pad.y0,pad.x1-pad.x0,COLUMN_SOLE_THICKNESS,
+        F.fromRotationMatrix((pad.y0+pad.y1)/2,
+          HobberZLayout.SEAT_FACE_X+HobberZLayout.SPINE_FRONT_COLUMN_Y-(pad.x0+pad.x1)/2,
+          COLUMN_SOLE_THICKNESS/2,[1.0,0,0,0,-1,0,0,0,-1]),
+        ["body.z-min"],fixtureHoles(COLUMN_SOLE_THICKNESS),"column"));
       for (side in [-1, 1]) out.push(boxInsert(
         side < 0 ? "railLeft" : "railRight",
         GuideSeat,
@@ -555,7 +576,7 @@ class FoundationLayout {
         30,
         470,
         20,
-        F.fromRotationMatrix(side * 145, 90, 245, [1.0, 0, 0, 0, 0, 1, 0, -1, 0]),
+        F.fromRotationMatrix(side * COLUMN_RAIL_CENTRE, 90, 245, [1.0, 0, 0, 0, 0, 1, 0, -1, 0]),
         ["body.y-max"],
         none,
         "column"

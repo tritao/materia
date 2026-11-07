@@ -158,7 +158,10 @@ class HobberEnclosurePreview {
     report: Dynamic
   } {
     var machine = source == null ? new FlexsplineHobber() : source,
-      fit = fitted(machine), shell = new GeneratedEnclosure(fit.layout), assembly = new MachineAssembly();
+      fit = fitted(machine), shell = new GeneratedEnclosure(fit.layout, {
+        halfWidth: machinekit.hobbing.HobberChipCover.OUTER_HALF_WIDTH + machinekit.enclosure.TraySeat.SEAM,
+        rearY: FlexsplineHobber.MACHINE_FROM_WORK.y + machinekit.hobbing.HobberChipCover.REAR_END
+      }), assembly = new MachineAssembly();
     assembly.includeAsGroup("Machine", "machine", machine);
     assembly.includeAsGroup(ENCLOSURE_GROUP, SHELL_ID, shell);
     HobberEnclosureMounts.install(assembly, shell);
@@ -230,9 +233,9 @@ class HobberEnclosurePreview {
         ledgeDepthMm: 4,
         compressedGasketMm: 2,
         topAboveCastingMm: 11,
-        clamps: 12,
-        fasteners: "Ten M6 x 30 plus two M6 x 35 for the cover; nominal threads, torque and retention unqualified",
-        rearBridge: "Removable raised motor-clearance cover: 150 x 30 mm roof, 6 mm feet on 10 mm-deep pockets",
+        clamps: 10,
+        fasteners: "Ten M6 x 30; nominal threads, torque and retention unqualified",
+        motorBay: "Single machine/XrearCover lid; top-access screws, 3 mm lift, derived rearward slide, then lift clear; no tray parts removed",
         seams: "2 mm panel joints on gasketed backing; removable wet sealant required",
         materialQualification: false
       },

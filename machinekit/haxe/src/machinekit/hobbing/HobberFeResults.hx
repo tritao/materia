@@ -25,6 +25,15 @@ class HobberFeResults {
   /** Shim pack and contact of the rest block, series stiffness N/mm (assumed; the FE sensitivity to a jack-screw pair at 6e5 is in the table). */
   public static final REST_PACK_N_PER_MM = 3.0e6;
 
+  /** XC10 mm C3D10: ground deck +4 ribs +4 replicated guide pads, four80 mm
+   * corner sole contact patches spanning380x180 mm,
+   * pads restrained in z (LM0 boundary conditions). Bolts-only interface gives
+   * a conservative operating point without adhesive stiffness credit. See
+   * fem/results/carriage.json.
+   * Replication E=4 GPa, bolt patches and closed preload contact are ASSUMED. */
+  public static final CARRIAGE_SOLE_TILT_NM_PER_RAD = 17076760.469294;
+  public static final CARRIAGE_FRONT_TIE_N_PER_UM = 43.633364;
+
   /**
    * Constants of the cradle hand model (`HobberFrameChecks.spindleDrive`), fitted to the FE of 15 cradle variants (wall 8..15 mm, rib solid / windowed / absent,
    * rest block of three widths and stiffnesses, floor bolts at two rows; `fem/results/cradle-variants.json`):

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "inspector-resize-tests"},
+  "entry": "InspectorResizeTests",
+  "sourceRoots": ["."],
+  "dependencies": {"app": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}

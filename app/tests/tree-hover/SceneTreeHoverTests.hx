@@ -33,6 +33,7 @@ private class SceneRows implements TreeViewModel {
 class SceneTreeHoverTests {
   static function check(value:Bool, message:String):Void if (!value) throw message;
   public static function main():Int {
+    FrameAssemblyDragTests.run();
     var runtime = Runtime.start();
     var fonts = FontCollection.create();
     fonts.addSystemFallbacks();
@@ -71,6 +72,7 @@ class SceneTreeHoverTests {
       var origin = [item.x, item.y, item.z];
       var drag = dragHost.scene.beginAssemblyDrag(item.id, origin);
       if (drag == null) throw "Xbridge cannot be dragged";
+      var contentRevision = dragHost.scene.contentRevision;
       for (i in 0...40) {
         var start = Sys.time();
         drag.update(origin[0] + 0.01 * Math.sin(i * 0.2), origin[1], origin[2]);
@@ -79,6 +81,7 @@ class SceneTreeHoverTests {
         var end = Sys.time();
         Sys.println('DRAG step=$i update_ms=${(moved-start)*1000} submit_ms=${(end-moved)*1000}');
       }
+      check(dragHost.scene.contentRevision == contentRevision, "pose previews retain hierarchy and cosmetic content caches");
       drag.cancel();
       var restored = dragHost.scene.object(item.id);
       check(restored != null && Math.abs(restored.x - origin[0]) < 1e-9, "cancel restores Xbridge");

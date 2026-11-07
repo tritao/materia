@@ -61,7 +61,7 @@ class AssemblyState {
     kinematicState = new KinematicState(kinematics.model);
     snapshot = new KinematicSnapshot(kinematics.model);
     if (state != null) {
-      AssemblyDefinitionCodec.validateState(this.definition, state);
+      model.validateState(state);
       for (coordinate in state.jointCoordinates) coordinates.set(coordinate.joint, coordinate.value);
       for (root in state.rootPoses) rootPoses.set(root.occurrence, copyFrame(root.pose));
     }
@@ -335,7 +335,7 @@ class AssemblyState {
       jointCoordinates: values,
       rootPoses: roots
     };
-    AssemblyDefinitionCodec.validateState(definition, result);
+    model.validateState(result);
     return result;
   }
 }

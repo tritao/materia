@@ -10,17 +10,26 @@ import materia.presentation.PresentationEvaluator;
 
 /** Each viewport owns one cursor; changes derive display state and never edit engineering state. */
 class PresentationController implements Observable {
+  final compiled:materia.presentation.CompiledPresentation;
+  final sourceDefinition:AssemblyDefinition;
+  final sourceRecord:AssemblyPresentation;
   public final definition:AssemblyDefinition;
   public final record:AssemblyPresentation;
   public var cursor(default, null):PresentationCursor;
   public var animating(default, null):Bool = false;
   static inline var MOTION_SECONDS:Float = 0.6;
   public function new(definition:AssemblyDefinition, record:AssemblyPresentation) {
-    PresentationCodec.validate(definition, record);
-    this.definition = definition;
-    this.record = record;
-    cursor = PresentationEvaluator.reset(record);
+    sourceDefinition = definition;
+    sourceRecord = record;
+    compiled = new materia.presentation.CompiledPresentation(definition, record);
+    this.definition = compiled.definition;
+    this.record = compiled.record;
+    cursor = PresentationEvaluator.reset(this.record);
   }
+  /** Binding identity belongs to the published source; evaluation owns an independent snapshot. */
+  public function matchesSource(record:Null<AssemblyPresentation>, definition:Null<AssemblyDefinition>):Bool
+    return sourceRecord == record && sourceDefinition == definition;
+  public function matchesDefinition(definition:AssemblyDefinition):Bool return sourceDefinition == definition;
   public function retainCursor(previous:PresentationController):Void {
     var old = previous.cursor;
     if (record.views.filter(v -> v.id == old.view).length == 0) return;
@@ -95,10 +104,8 @@ class PresentationController implements Observable {
     return true;
   }
   public function evaluate(solved:Map<String,
-    AssemblyFrame>, fingerprint:String, playing:Bool = false):PresentationFrame return PresentationEvaluator.evaluate(
-      definition,
+    AssemblyFrame>, fingerprint:String, playing:Bool = false):PresentationFrame return compiled.evaluate(
       solved,
-      record,
       cursor,
       fingerprint,
       playing

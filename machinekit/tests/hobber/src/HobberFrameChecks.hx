@@ -26,7 +26,10 @@ class HobberFrameChecks {
       fittedBefore: [
         // Fit the belt after fastening the servo flange; the stationary loop covers its wrench access.
         {member: "spindle/belt", fastened: ["spindle/motor"]},
-        {member: "column/", fastened: ["Xbridge"]},
+        {member: "column/", fastened: ["Xbridge"], faces: ["blockL1", "blockL2", "blockR1", "blockR2", "nut-block"]},
+        {member: "XscaleHead", fastened: ["Xrib-scale"], faces: ["plate"]},
+        // Tighten the sole after lowering the column, before fitting its removable skirt.
+        {member: "Xskirt", fastened: ["Xbridge"], faces: [for (pad in machinekit.hobbing.FoundationLayout.columnSolePads()) "column-sole-"+pad.id]},
         // The ring's heads are sunk at the plate end: its screws into the output flange are fitted before the swivel plate goes on.
         {member: "swivelPlate", fastened: ["swivel/output"]},
         // The outboard support's carrier is screwed to the saddle plate's face before the plate is (its driver axis passes the plate).
@@ -47,6 +50,9 @@ class HobberFrameChecks {
     // onto the bed and fit its foot screws through capped tool ports, then fit
     // the carriage. The casting otherwise obstructs the lid-nut driver's axis.
     options.fittedBefore = options.fittedBefore.concat([
+      // XA: supports are tightened before the carriage and guard sheets go on.
+      {member:"Xbridge",fastened:["Xfixed","Xfloating"]},
+      {member:"XrearCover",fastened:["Xfixed","Xfloating"]},
       {member:"bed/casting",fastened:["XfrontCover","XrearCover"]},
       {member:"Xbridge",fastened:["XcoverFrontLeft","XcoverFrontRight","XcoverRearLeft","XcoverRearRight"]}
     ]);
@@ -61,6 +67,7 @@ class HobberFrameChecks {
 
   public static function integrity(machine:FlexsplineHobber, sweep:Bool, gap:Float = 2.0):Array<String> {
     var report = AssemblyIntegrity.check(machine, integrityOptions(machine, sweep, gap));
+    for (item in report.diagnostics.items) if (item.code == "fasteners.edge-support") Sys.println(item.code + " " + item.message);
     return [for (item in report.errors()) item.code + " " + item.message];
   }
 
@@ -775,10 +782,15 @@ class HobberFrameChecks {
       Sys.println('  world: origin ${w(0, 0, 0)} x ${w(1, 0, 0)} y ${w(0, 1, 0)} z ${w(0, 0, 1)} base centre ${w(0, -b.centreHeight, b.thickness / 2)}');
     }
     if (args.indexOf("crash") >= 0) for (line in HobberCrashProtection.report(machine)) Sys.println(line);
-    if (args.indexOf("fasteners") >= 0) for (line in HobberFastenerChecks.report(machine)) Sys.println(line);
+    if (args.indexOf("fasteners") >= 0) {
+      Sys.println(machinekit.hobbing.HobberCarriageStockCheck.report());
+      for (line in HobberFastenerChecks.report(machine)) Sys.println(line);
+    }
     var checkedIntegrity:Null<Array<String>> = null;
     if (args.indexOf("fastenerfit") >= 0) {
       var report = AssemblyIntegrity.fasteners(machine, integrityOptions(machine, false));
+      for (item in report.diagnostics.items) if (item.code == "fasteners.edge-support")
+        Sys.println(item.code + " " + item.message);
       for (e in report.errors()) Sys.println(e.code + " " + e.message);
       Sys.println('fastener fit: ${report.errors().length} errors');
       report.require();

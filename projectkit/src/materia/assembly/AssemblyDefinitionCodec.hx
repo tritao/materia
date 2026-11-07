@@ -413,6 +413,11 @@ class AssemblyDefinitionCodec {
     validate(definition);
     state = AssemblyDefinitionFlattener.flattenState(definition, state);
     definition = AssemblyDefinitionFlattener.flattenView(definition);
+    validateStateForValidatedDefinition(definition, state);
+  }
+
+  /** State boundary for an immutable, already validated and flattened compiled definition. */
+  public static function validateStateForValidatedDefinition(definition:AssemblyDefinition, state:AssemblyStateRecord):Void {
     if (state == null
       || !supportedVersion(state.schemaVersion) || state.definition != definition.id || state.jointCoordinates == null
       || state.rootPoses == null || state.jointCoordinates.length > definition.joints.length || state.rootPoses.length

@@ -37,7 +37,7 @@ import haxeon.ui.widgets.text.Text;
     addButton.onClickEvent = function(event) {
       var bounds = app.menuTriggerBounds(event);
       app.hierarchyAddX = Math.max(8.0, Math.min(app.viewportWidth - 228.0, bounds.x));
-      app.hierarchyAddY = Math.max(8.0, Math.min(app.viewportHeight - 560.0, bounds.y + bounds.height));
+      app.hierarchyAddY = bounds.y + bounds.height + 4.0;
       app.hierarchyAddVisible = true;
       app.invalidateView();
     };

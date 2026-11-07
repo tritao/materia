@@ -46,7 +46,42 @@ class HobberMountingHoles {
       var row = result[index];
       result[index] = {id: row.id, purpose:row.purpose, pose: row.pose, openings: row.openings, part: addPadHoles(kind, row)};
     }
+    if (kind == "column") for (pad in FoundationLayout.columnSolePads())
+      for (index in 0...result.length) if (result[index].id == pad.id) {
+        var row=result[index];
+        result[index]={id:row.id,purpose:row.purpose,pose:row.pose,openings:row.openings,part:addSoleHoles(row,pad)};
+      }
     return result;
+  }
+
+  /** Reserve the sole joint's transferred service threads before choosing
+   * cast anchors. The clamped face owns the pattern; no second hole list. */
+  static function addSoleHoles(row:CastInsertPlacement,pad:FoundationLayout.ColumnSolePad):CastInsert {
+    var face=HobberSaddle.columnSoleFace(pad);
+    var size=switch face.role {
+      case Clamped(thread,_,_,_): if (thread==null) throw "Sole joint needs a selected thread"; thread;
+      case _: throw "Sole source needs its clamped joint face";
+    };
+    var choice=InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(Std.parseFloat(size.substr(1))).mating());
+    var part=row.part;
+    var spec=part.insertSpec();
+    var thickness=part.boxDimensions(row.id).height;
+    var toInsert=F.compose(F.inverse(F.compose(FoundationLayout.worldPose("column"),row.pose)),face.frame);
+    var n=0;
+    for (point in face.holes) {
+      var q=F.transformPoint(toInsert,point.x,point.y,0);
+      if (Math.abs(q.z-thickness)>1e-6) throw "Sole joint source drilling misses insert top: "+row.id;
+      var hole=InsertHoles.records(InsertHoles.tappedBlind(choice,thickness))[0];
+      hole.id="soleJoint"+(++n);
+      hole.frame.x=q.x;hole.frame.y=q.y;
+      spec.holes.push(hole);
+      switch spec.origin {
+        case Fabricated(manufacturing): manufacturing.holeRoutes.push({holeId:hole.id,route:TransferAfterCasting});
+        case Catalogue(_): throw "Sole source must be a made insert";
+      }
+    }
+    return new CastInsert(part.values().copy().setToken("holes",InsertHoles.fromNeutral(spec.holes))
+      .setToken("origin",haxe.Json.stringify(materia.casting.InsertOrigin.InsertOriginCodec.record(spec.origin))));
   }
 
   /** The tapped holes the drive pad's screws thread into: blind, in the insert's top face, before casting like the fixture thread. */
