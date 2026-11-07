@@ -3,11 +3,11 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** Floor-standing rack; device local XY mounting faces lie on the vertical backplate. */
 class HobberElectricalLayout {
-  public static function panelPose():AssemblyFrame return F.translation(
-    -650,
-    100,
-    -FlexsplineHobber.MACHINE_FROM_WORK.z
-  );
+  /**
+   * The rack stands free on the floor with no mate, so this pose is used as given: in the machine frame, whose floor (the feet's
+   * soles) is z 0. Mated members are solved from the bed instead, which is why the work-frame floor height does not apply here.
+   */
+  public static function panelPose():AssemblyFrame return F.translation(-650, 100, 0);
 
   public static function devicePose(offsetX:Float, heightFromFloor:Float):AssemblyFrame {
     var panel = panelPose();
