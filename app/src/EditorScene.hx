@@ -155,7 +155,20 @@ class EditorScene implements Observable {
   final failedWorkerVisualAssets:Map<String, String> = new Map();
   var objects(get, set):Array<EditorSceneObject>;
   function get_objects():Array<EditorSceneObject> return model.objects;
-  function set_objects(value:Array<EditorSceneObject>):Array<EditorSceneObject> return model.objects = value;
+  // Membership is tracked separately from per-object fields, so lookup does not subscribe to every object's ID.
+  final objectIndex:Map<String, EditorSceneObject> = new Map();
+  var objectMembershipRevision:Int = 0;
+  function set_objects(value:Array<EditorSceneObject>):Array<EditorSceneObject> {
+    objectIndex.clear();
+    for (item in value) objectIndex.set(item.id, item);
+    objectMembershipRevision++;
+    return model.objects = value;
+  }
+  function appendObject(item:EditorSceneObject):Void {
+    model.objects.push(item);
+    objectIndex.set(item.id, item);
+    objectMembershipRevision++;
+  }
   var cadSessions:Map<String, CadDocumentSession>;
   /** Derived per-object simulations; rebuilt from the record's block size when it changes. */
   final stockSimulations:Map<String, StockSimulationSession> = new Map();
@@ -216,6 +229,13 @@ class EditorScene implements Observable {
 
   final kinematicOccurrences:Map<String, Bool> = new Map();
   final componentFinishes:Map<String, SceneObjectData> = new Map();
+  /** Generated source identity; rebuilt from the artifact rather than persisted as a label override. */
+  public var partNumbers:Map<String, String> = new Map();
+
+  public function objectDetail(id:String):String {
+    var number = partNumbers.get(id);
+    return number == null ? id : number + " · " + id.substr(8);
+  }
   var assemblyPropertyProvider:Null<String -> Array<PropertyDescriptor>> = null;
   var assemblyDragProvider:Null<(String, Array<Float>) -> Null<SceneAssemblyDrag>> = null;
   /** Optional editor-owned semantic action sink. */
@@ -490,7 +510,7 @@ class EditorScene implements Observable {
         profileLoadEnd("transactionCommit", phaseStarted);
         phaseStarted = profileLoadStart();
         bridge.attach(id, node, geometry, material);
-        objects.push(new EditorSceneObject(
+        appendObject(new EditorSceneObject(
           id,
           label,
           kind,
@@ -617,7 +637,7 @@ class EditorScene implements Observable {
     for (index in 0...data.length) {
       var item = data[index];
       bridge.attach(item.id, nodes[index], geometries[geometryIndexes[index]], materials[index]);
-      objects.push(candidates[index]);
+      appendObject(candidates[index]);
     }
     profileLoadEnd("applicationBookkeeping", bookkeepingStarted);
   }
@@ -1948,8 +1968,8 @@ class EditorScene implements Observable {
   }
 
   public function object(id:String):Null<EditorSceneObject> {
-    for (item in objects) if (item.id == id) return item;
-    return null;
+    var membership = objectMembershipRevision;
+    return objectIndex.get(id);
   }
 
   function runtimeFor(id:String):EditorSceneRuntimeObject {

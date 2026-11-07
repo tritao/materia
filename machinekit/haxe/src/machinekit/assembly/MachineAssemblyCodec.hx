@@ -165,13 +165,15 @@ class MachineAssemblyCodec {
         table.push(entry);
         entries.set(id, entry);
         records.push({path: childPath, definition: tableId, machine: child.machine});
-        level.occurrences.push({
+        var occurrence:AssemblyComponentOccurrence = {
           id: id,
           definition: tableId,
           assembly: tableId,
           groupPath: assembly.memberGroups.get(id),
           initialPose: sub.pose == null ? AssemblyFrames.identity() : MachineAssembly.copyFrame(sub.pose)
-        });
+        };
+        if (assembly.isGroupInclude(id)) occurrence.includeFolder = false;
+        level.occurrences.push(occurrence);
         continue;
       }
       var connectors:Array<materia.assembly.AssemblyRecord.AssemblyConnector
@@ -474,6 +476,7 @@ class MachineAssemblyCodec {
           assembly: child,
           pose: MachineAssembly.copyFrame(occurrence.initialPose)
         });
+        if (occurrence.includeFolder == false) target.groupIncludes.set(occurrence.id, true);
         target.changed();
         continue;
       }

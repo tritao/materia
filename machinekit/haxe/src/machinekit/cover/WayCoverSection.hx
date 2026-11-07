@@ -44,7 +44,7 @@ class WayCoverSection extends MachineComponent {
     if (role == Moving && level != plan.movingLevel()) throw 'The moving flange carries skin ${plan.movingLevel()}';
     if (role == Sleeve && (level < 1 || level >= plan.levels)) throw "A loose skin is neither the first nor the last";
     super(
-      baseNumber(row, width, height, stroke, space, plan.shape) + (role == Fixed ? "" : role == Moving ? "-M" : '-S$level'),
+      purchaseNumber(row, width, height, stroke, space, plan.shape) + (role == Fixed ? "" : role == Moving ? "-M" : '-S$level'),
       row.description + ", " + Dimension.format(width) + " x " + Dimension.format(height) + " opening, " + Dimension.format(stroke) + " mm stroke"
       + (plan.shape.open ? ", box cover" : "") + (role == Fixed ? "" : role == Moving ? " (moving flange and skin)" : ' (skin $level)'),
       row.material,
@@ -61,17 +61,19 @@ class WayCoverSection extends MachineComponent {
     if (role != Fixed) includedInPurchase(purchaseNumber(row, width, height, stroke, space, plan.shape));
   }
 
-  /** Descriptive model designation. The shorter purchaseNumber is the BOM identity. */
-  public static function baseNumber(row:WayCoverRow, width:Float, height:Float, stroke:Float, space:Float, ?shape:CoverShape):String
-    return 'WAYCOVER-${row.id}-${Dimension.format(width)}x${Dimension.format(height)}-S${Dimension.format(stroke)}-L${Dimension.format(space)}'
-      + (shape != null && shape.open ? "-BOX" : "") + (shape != null && shape.reversed ? "-R" : "");
-
   /** Readable purchase identity; full family and dimensional selection remain structured BOM requirements. */
   public static function purchaseNumber(row:WayCoverRow, width:Float, height:Float, stroke:Float, space:Float, ?shape:CoverShape):String {
     var code = row.purchaseCode;
     if (code == null) code = row.id;
-    return 'WAYCOVER-$code-${Dimension.format(width)}x${Dimension.format(height)}-S${Dimension.format(stroke)}-L${Dimension.format(space)}'
+    var readable = 'WAYCOVER-$code-${Dimension.format(width)}x${Dimension.format(height)}-S${Dimension.format(stroke)}-L${Dimension.format(space)}'
       + (shape != null && shape.open ? "-B" : "") + (shape != null && shape.reversed ? "-R" : "");
+    var inputs = [width, height, stroke, space];
+    var lossless = true;
+    for (value in inputs) if (Std.parseFloat(Dimension.format(value)) != value) lossless = false;
+    if (readable.length <= machinekit.component.PartNumberLint.MAX_LENGTH - 4 && lossless) return readable;
+    return machinekit.component.PartNumbers.geometry("WAYCOVER", "COVER", machinekit.component.PartNumbers.exactKey({
+      row:row.id, dimensions:inputs, open:shape != null && shape.open, reversed:shape != null && shape.reversed
+    }));
   }
 
   /** The direct component's intent and its recipe describe the same purchased cover, including its family and section. */

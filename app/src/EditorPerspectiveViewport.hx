@@ -656,8 +656,11 @@ class EditorPerspectiveViewport implements View implements Observable {
   final sensorMarkerPath = new PathBuilder();
   final sensorRayPath = new PathBuilder();
   var robotVisuals:Array<SimulationRobotVisual> = [];
+  var annotationRobots:Array<app.ViewportRobotAnnotations.ViewportRobotAnnotation> = [];
   final missionOverlay = new MissionOverlayView();
   var overlaysVisible:Bool = true;
+  var annotations = new ViewportAnnotations();
+  var annotationSourceRevision:String = "";
 
   static final LINK_MARKER_COLOR = Color.rgba(0.2, 0.85, 0.55, 0.9);
   static final SENSOR_MARKER_COLOR = Color.rgba(1.0, 0.75, 0.2, 0.95);
@@ -729,7 +732,7 @@ class EditorPerspectiveViewport implements View implements Observable {
   }
 
   function paintKey():String return "perspective:" + scene.visualRevision + ":" + runtimeRevision + ":" + presentationRevision
-        + ":cosmetic:" + cosmeticThreadsVisible + ":overlays:" + overlaysVisible
+        + ":cosmetic:" + cosmeticThreadsVisible + ":overlays:" + overlaysVisible + ":annotations:" + annotations.key() + ":" + annotationSourceRevision
         + ":" + sketchDragRevision + ":" + assemblyDragRevision + ":hover:" + hoverRevision + ":" + camera.revision
         + ":orbit:" + orbiting() + ":light:" + lightingRevision + ":aa:" + sampleCountRequested + ":" + renderedWidth
         + "x" + renderedHeight + ":grid:" + gridVisible + ":" + gridStep + ":collisions:" + collisionRevision;
@@ -856,7 +859,7 @@ class EditorPerspectiveViewport implements View implements Observable {
     paintWorkplane(canvas, geometry.width, geometry.height);
     if (surface != null) canvas.drawSurface(surface, new Rect(0, 0, geometry.width, geometry.height));
     paintSensors(canvas, geometry.width, geometry.height);
-    if (simulationActive) missionOverlay.paint(canvas, camera, geometry.width, geometry.height);
+    if (simulationActive && overlaysVisible) missionOverlay.paint(canvas, camera, geometry.width, geometry.height);
     paintCollisions(canvas, geometry.width, geometry.height);
     paintAssemblyDrag(canvas, geometry.width, geometry.height);
     paintPresentationOffset(canvas, geometry.width, geometry.height);
@@ -1147,10 +1150,26 @@ class EditorPerspectiveViewport implements View implements Observable {
       pose
     );
     robotVisuals = robots == null ? [] : robots.copy();
+    annotationRobots = ViewportRobotAnnotations.measured(robotVisuals);
   }
-  /** What the running mission shows on the floor: its route, costmap, sensed obstacles and odometry; null shows none. */
-  /** Whether sensor rays (and, through `setMissionOverlay`, the mission's overlays) are drawn. */
+  /** Master visibility for inspection annotations and live mission overlays. */
   public function setSimulationOverlays(visible:Bool):Void overlaysVisible = visible;
+
+  public function annotationsRequested():Bool return overlaysVisible && annotations.any();
+
+  public function setAnnotationRobots(robots:Array<app.ViewportRobotAnnotations.ViewportRobotAnnotation>, revision:String):Void {
+    annotationRobots = robots;
+    if (annotationSourceRevision == revision) return;
+    annotationSourceRevision = revision;
+    host.requestFrame();
+  }
+
+  public function setAnnotations(value:ViewportAnnotations):Void {
+    if (value == null) throw "Viewport annotations require a visibility policy";
+    if (annotations.key() == value.key()) return;
+    annotations = value;
+    host.requestFrame();
+  }
 
   /** The pairs to tint and draw; an unchanged query result keeps the rendered image. */
   public function setCollisions(pairs:Array<SceneCollision.SceneCollisionPair>):Void {
@@ -1179,13 +1198,27 @@ class EditorPerspectiveViewport implements View implements Observable {
 
   /** The closest pairs' closest points, joined: red where they collide, amber where they are only near. */
   function paintCollisions(canvas:Canvas, width:Float, height:Float):Void {
-    for (index in 0...Std.int(Math.min(MAX_DRAWN_COLLISIONS, collisionPairs.length))) {
-      var pair = collisionPairs[index], a = pair.pointA, b = pair.pointB;
+    if (!overlaysVisible || !annotations.enabled || collisionPairs.length == 0) return;
+    var selected = selectionTree == null ? [scene.selectedId] : selectionTree.selectedObjects();
+    var projection = camera.viewProjection(width / Math.max(1.0, height));
+    var occlusionView = annotations.throughGeometry ? null : sectionView(scene.configureRenderView(
+      new SceneView(), projection, displayPoses(), null, -1, null, cosmeticThreadsVisible
+    ));
+    var drawn = 0;
+    for (pair in collisionPairs) {
+      if (!annotations.collisionVisible(pair.a, pair.b, selected)) continue;
+      if (drawn++ >= MAX_DRAWN_COLLISIONS) break;
+      var a = pair.pointA, b = pair.pointB;
       var color = pair.colliding() ? Color.rgba(0.95, 0.2, 0.18, 0.95) : Color.rgba(1.0, 0.66, 0.18, 0.95);
+      var visiblePoints = 0;
       for (point in [a, b]) {
         var at = camera.project(point[0], point[1], point[2], width, height);
-        if (at != null) canvas.fillRect(new Rect(at.x - 3, at.y - 3, 6, 6), color);
+        if (at != null && annotationVisible(occlusionView, point[0], point[1], point[2], at.x, at.y, width, height)) {
+          canvas.fillRect(new Rect(at.x - 3, at.y - 3, 6, 6), color);
+          visiblePoints++;
+        }
       }
+      if (visiblePoints != 2) continue;
       var segment = camera.projectSegment(a[0], a[1], a[2], b[0], b[1], b[2], width, height);
       if (segment == null) continue;
       var path = new PathBuilder();
@@ -1754,14 +1787,17 @@ class EditorPerspectiveViewport implements View implements Observable {
   }
 
   function paintSensors(canvas:Canvas, width:Float, height:Float):Void {
-    if (!simulationActive) return;
+    if (!overlaysVisible || !annotations.any() || annotationRobots.length == 0) return;
     var projection = camera.viewProjection(width / Math.max(1.0, height));
-    for (robot in robotVisuals) {
+    var occlusionView = annotations.throughGeometry ? null : sectionView(scene.configureRenderView(
+      new SceneView(), projection, displayPoses(), null, -1, null, cosmeticThreadsVisible
+    ));
+    for (robot in annotationRobots) {
       linkMarkerPath.clear();
       sensorMarkerPath.clear();
       sensorRayPath.clear();
       var hasLinkMarkers = false, hasSensorMarkers = false, visibleRays = 0;
-      for (link in robot.links) {
+      if (annotations.linksVisible()) for (link in robot.links) {
         var point = camera.projectWithMatrix(
           projection,
           link.position[0],
@@ -1770,20 +1806,25 @@ class EditorPerspectiveViewport implements View implements Observable {
           width,
           height
         );
-        if (point != null) {
+        if (point != null && annotationVisible(occlusionView, link.position[0], link.position[1], link.position[2],
+          point.x, point.y, width, height)) {
+          paintAnnotationFrame(canvas, projection, link.position, link.rotation, width, height, occlusionView);
           appendMarker(linkMarkerPath, point.x, point.y, 4.0);
           hasLinkMarkers = true;
         }
       }
       for (sensor in robot.sensors) {
+        var showMount = annotations.mountVisible(robot.id, sensor.id);
+        var showReadings = annotations.readingsVisible(robot.id, sensor.id);
+        if (!showMount && !showReadings) continue;
         var linkPosition = robot.position, linkRotation = robot.rotation;
         for (link in robot.links) if (link.id == sensor.linkId) {
           linkPosition = link.position;
           linkRotation = link.rotation;
           break;
         }
-        var mountPosition = sensor.mountPosition;
-        var mx = mountPosition.get(0), my = mountPosition.get(1), mz = mountPosition.get(2);
+        var mountPosition = sensor.position;
+        var mx = mountPosition[0], my = mountPosition[1], mz = mountPosition[2];
         var qx = linkRotation[0], qy = linkRotation[1], qz = linkRotation[2], qw = linkRotation[3];
         var tx = 2 * (qy * mz - qz * my), ty = 2 * (qz * mx - qx * mz), tz = 2 * (qx * my - qy * mx);
         var originX = linkPosition[0] + mx + qw * tx + qy * tz - qz * ty;
@@ -1791,20 +1832,25 @@ class EditorPerspectiveViewport implements View implements Observable {
         var originZ = linkPosition[2] + mz + qw * tz + qx * ty - qy * tx;
         var mount = camera.projectWithMatrix(projection, originX, originY, originZ, width, height);
         if (mount == null) continue;
-        appendMarker(sensorMarkerPath, mount.x, mount.y, 3.0);
-        hasSensorMarkers = true;
-        if (!overlaysVisible || sensor.kind != "lidar" || sensor.values.length == 0) continue;
-
-        var mountRotation = sensor.mountRotation;
+        var visibleMount = annotationVisible(occlusionView, originX, originY, originZ,
+          mount.x, mount.y, width, height);
+        if (showMount && visibleMount) {
+          appendMarker(sensorMarkerPath, mount.x, mount.y, 3.0);
+          hasSensorMarkers = true;
+        }
+        var mountRotation = sensor.rotation;
         var rx = qw
-          * mountRotation.get(0) + qx * mountRotation.get(3) + qy * mountRotation.get(2) - qz * mountRotation.get(1);
+          * mountRotation[0] + qx * mountRotation[3] + qy * mountRotation[2] - qz * mountRotation[1];
         var ry = qw
-          * mountRotation.get(1) - qx * mountRotation.get(2) + qy * mountRotation.get(3) + qz * mountRotation.get(0);
+          * mountRotation[1] - qx * mountRotation[2] + qy * mountRotation[3] + qz * mountRotation[0];
         var rz = qw
-          * mountRotation.get(2) + qx * mountRotation.get(1) - qy * mountRotation.get(0) + qz * mountRotation.get(3);
+          * mountRotation[2] + qx * mountRotation[1] - qy * mountRotation[0] + qz * mountRotation[3];
         var rw = qw
-          * mountRotation.get(3) - qx * mountRotation.get(0) - qy * mountRotation.get(1) - qz * mountRotation.get(2);
-        var values = sensor.values;
+          * mountRotation[3] - qx * mountRotation[0] - qy * mountRotation[1] - qz * mountRotation[2];
+        if (showMount && visibleMount) paintAnnotationFrame(canvas, projection, [originX, originY, originZ],
+          [rx, ry, rz, rw], width, height, occlusionView);
+        if (!showReadings || sensor.kind != "lidar" || sensor.reading == null || sensor.reading.values.length == 0 || !visibleMount) continue;
+        var values = sensor.reading.values;
         for (index in 0...values.length) {
           var angle = index * 6.283185307179586 / values.length;
           var vx = Math.cos(angle), vy = Math.sin(angle);
@@ -1821,7 +1867,9 @@ class EditorPerspectiveViewport implements View implements Observable {
             width,
             height
           );
-          if (hit != null && (hit.x != mount.x || hit.y != mount.y)) {
+          if (hit != null && (hit.x != mount.x || hit.y != mount.y) && annotationVisible(occlusionView,
+            originX + directionX * distance, originY + directionY * distance, originZ + directionZ * distance,
+            hit.x, hit.y, width, height)) {
             sensorRayPath.moveTo(mount.x, mount.y).lineTo(hit.x, hit.y);
             visibleRays++;
           }
@@ -1831,6 +1879,38 @@ class EditorPerspectiveViewport implements View implements Observable {
       if (hasLinkMarkers) canvas.fillTransient(linkMarkerPath.build(), LINK_MARKER_COLOR);
       if (hasSensorMarkers) canvas.fillTransient(sensorMarkerPath.build(), SENSOR_MARKER_COLOR);
       if (visibleRays > 0) canvas.strokeTransient(sensorRayPath.build(), SENSOR_RAY_COLOR, 1.0);
+    }
+  }
+
+  /** Use the same posed, visible, sectioned scene as viewport picking. */
+  function annotationVisible(view:Null<SceneView>, x:Float, y:Float, z:Float,
+    screenX:Float, screenY:Float, width:Float, height:Float):Bool {
+    if (view == null) return true;
+    var ray = camera.screenRay(screenX, screenY, width, height);
+    var distance = (x - ray.originX) * ray.directionX + (y - ray.originY) * ray.directionY
+      + (z - ray.originZ) * ray.directionZ;
+    var hit = scene.pickHitRayWithView(view, ray.originX, ray.originY, ray.originZ,
+      ray.directionX, ray.directionY, ray.directionZ);
+    var hitDistance:Null<Float> = hit.id == "scene" ? null : (hit.x - ray.originX) * ray.directionX
+      + (hit.y - ray.originY) * ray.directionY + (hit.z - ray.originZ) * ray.directionZ;
+    return ViewportAnnotations.unobstructed(distance, hitDistance, Math.max(0.00001, distance * 0.00001));
+  }
+
+  function paintAnnotationFrame(canvas:Canvas, projection:Transform, position:Array<Float>, rotation:Array<Float>,
+    width:Float, height:Float, occlusionView:Null<SceneView>):Void {
+    var frame = robotkit.spatial.Transform3.fromArrays(position, rotation);
+    var length = camera.distance * 0.025;
+    var colors = [Color.rgba(0.85, 0.25, 0.2, 0.9), Color.rgba(0.2, 0.7, 0.3, 0.9), Color.rgba(0.25, 0.5, 1, 0.9)];
+    for (axis in 0...3) {
+      var end = frame.transformPoint(new robotkit.spatial.Vec3(axis == 0 ? length : 0,
+        axis == 1 ? length : 0, axis == 2 ? length : 0));
+      var segment = camera.projectSegmentWithMatrix(projection, position[0], position[1], position[2],
+        end.x, end.y, end.z, width, height);
+      if (segment == null || !annotationVisible(occlusionView, end.x, end.y, end.z,
+        segment[1].x, segment[1].y, width, height)) continue;
+      var path = new PathBuilder();
+      path.moveTo(segment[0].x, segment[0].y).lineTo(segment[1].x, segment[1].y);
+      canvas.strokeTransient(path.build(), colors[axis], 1.5);
     }
   }
 

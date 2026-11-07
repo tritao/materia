@@ -22,7 +22,7 @@ class HobberTrayBom {
     var proposal:Dynamic = haxe.Json.parse(sys.io.File.getContent(folder + "/tray-mounting-proposal.json"));
     if (data.revision != proposal.revision) throw "Stale tray BOM revision";
     var items:Array<Dynamic> = data.items, bom = new Bom(), assembly = new machinekit.assembly.MachineAssembly(), ids:Map<String, Bool> = [];
-    assembly.group("Chip tray");
+    assembly.group("Floor tray");
     var materials:Map<String, Null<String>> = [];
     for (raw in items) {
       var item:BomItem = {

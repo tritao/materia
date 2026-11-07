@@ -13,6 +13,9 @@ class SceneDocumentController implements Observable {
   final commitPendingEdit:Void -> Void;
   final cancelPendingEdit:Void -> Void;
   var pending:Null<Void -> Void> = null;
+  var nativeConfirmation = false;
+  /** A null result falls back to the in-app prompt when native dialogs are unavailable. */
+  public var confirmUnsaved:Null<String -> (Null<String> -> Void) -> Void> = null;
   var trustedOpen:Null<String> = null;
   public var trustReference(default, null):Null<String> = null;
   public var choosing(default, null):Bool = false;
@@ -40,7 +43,7 @@ class SceneDocumentController implements Observable {
     :cancelPendingEdit;
   }
 
-  public function needsConfirmation():Bool return pending != null;
+  public function needsConfirmation():Bool return pending != null && !nativeConfirmation;
   public function needsTrustConfirmation():Bool return trustedOpen != null;
   public function blocked():Bool return choosing
     || pending != null || trustedOpen != null || error != null || (busy != null && busy());
@@ -128,6 +131,7 @@ class SceneDocumentController implements Observable {
   public function resolve(choice:String):Void {
     var action = pending;
     if (action == null) return;
+    nativeConfirmation = false;
     pending = null;
     changed();
     switch (choice) {
@@ -149,6 +153,16 @@ class SceneDocumentController implements Observable {
     if (blocked()) return;
     if (session.isDirty()) {
       pending = action;
+      var confirm = confirmUnsaved;
+      if (confirm != null) {
+        nativeConfirmation = true;
+        try confirm(session.label(), function(choice) {
+          if (!nativeConfirmation || pending != action) return;
+          nativeConfirmation = false;
+          if (choice == null) changed();
+          else resolve(choice);
+        }) catch (_:Dynamic) nativeConfirmation = false;
+      }
       changed();
     } else action();
   }

@@ -27,6 +27,67 @@ private class NumberedTestPart extends MachineComponent {
 class PartNumberKeyTests {
   public static function main():Void run();
   public static function run():Void {
+    if (machinekit.component.PartNumbers.exactKey({x:1, y:0.0})
+      != machinekit.component.PartNumbers.exactKey({y:-0.0, x:1.0})
+      || machinekit.component.PartNumbers.exactKey({size:1.000001})
+        == machinekit.component.PartNumbers.exactKey({size:1.000002}))
+      throw "Exact defining keys must normalize record order and zero while preserving dimensions";
+    var customFine = machinekit.standard.SocketHeadCapScrew.lowHead("M8", 25.000001);
+    var customOther = machinekit.standard.SocketHeadCapScrew.lowHead("M8", 25.000002);
+    var customAgain = machinekit.standard.SocketHeadCapScrew.lowHead("M8", 25.000001);
+    if (customFine.designation == customOther.designation || customFine.designation != customAgain.designation
+      || customFine.bom.partNumber != customFine.designation
+      || PartNumberLint.problems(customFine.designation).length != 0)
+      throw "Custom fastener numbers must preserve exact dimensions and stable BOM identity";
+    var sourceDefaults = ["machinekit.structural.cast-in-steel-insert",
+      "machinekit.structural.linear-mount-nut-cassette", "machinekit.tooling.source-casting"];
+    var defaultCount = 0;
+    var defaultFailures:Array<String> = [];
+    for (type in machinekit.component.MachineKitComponents.standard().all()) {
+      if (sourceDefaults.indexOf(type.id) >= 0) continue;
+      // Unexpected construction errors, including overlong designations, must fail the gate.
+      try {
+        var component = type.create();
+        if (component.designation.length > PartNumberLint.MAX_LENGTH)
+          defaultFailures.push('Recipe ${type.id} has an overlong designation: ${component.designation}');
+        var problems = PartNumberLint.problems(component.bom.partNumber);
+        if (problems.length > 0) defaultFailures.push('Recipe ${type.id} part number: ${problems.join(", ")}');
+        defaultCount++;
+      } catch (error:Dynamic) defaultFailures.push('Recipe ${type.id}: ' + Std.string(error));
+    }
+    if (defaultFailures.length > 0) throw defaultFailures.join("; ");
+    if (defaultCount == 0) throw "Default recipe naming gate checked no components";
+    Sys.println('Recipe naming gate: $defaultCount defaults passed');
+
+    var atCap = StringTools.lpad("A", "A", PartNumberLint.MAX_LENGTH);
+    var capPart = new machinekit.gantry.GantryParts.GantryPlate(atCap, "cap boundary", 10, 10, 2);
+    if (capPart.designation != atCap) throw "A designation at the cap must remain unchanged";
+    var capRejected = false;
+    try new machinekit.gantry.GantryParts.GantryPlate(atCap + "A", "cap rejection", 10, 10, 2)
+    catch (error:Dynamic) {
+      if (Std.string(error).indexOf("Designation exceeds") < 0) throw error;
+      capRejected = true;
+    }
+    if (!capRejected) throw "Component construction must enforce the designation cap";
+    if (PartNumberLint.problems(atCap).length != 0 || PartNumberLint.problems(atCap + "A").length == 0)
+      throw "Part-number lint must enforce the exact length boundary";
+    var longRole = StringTools.lpad("SEAT", "LONG-ROLE-", 100);
+    var compact = machinekit.component.PartNumbers.geometry("BRACKET", longRole, "exact-input-a");
+    if (compact.length > PartNumberLint.MAX_LENGTH || PartNumberLint.problems(compact).length != 0
+      || compact != machinekit.component.PartNumbers.geometry("BRACKET", longRole, "exact-input-a")
+      || compact == machinekit.component.PartNumbers.geometry("BRACKET", longRole, "exact-input-b"))
+      throw "Geometry numbers must be bounded, stable and distinguish defining inputs";
+    var bracketA:machinekit.structural.BlockBracket.BracketBlock = {min:[0.0, 0.0, 0.0], max:[10.0, 10.0, 10.0]};
+    var bracketB:machinekit.structural.BlockBracket.BracketBlock = {min:[10.0, 0.0, 0.0], max:[20.0, 10.0, 10.0]};
+    var original = new machinekit.structural.BlockBracket("seat", [bracketA, bracketB]);
+    var reordered = new machinekit.structural.BlockBracket("seat", [bracketB, bracketA]);
+    var changed = new machinekit.structural.BlockBracket("seat", [bracketA,
+      {min:[10.0, 0.0, 0.0], max:[20.000001, 10.0, 10.0]}]);
+    if (original.designation != reordered.designation || original.bom.partNumber != reordered.bom.partNumber
+      || original.bom.valuesKey != reordered.bom.valuesKey || original.bom.fingerprint != reordered.bom.fingerprint
+      || original.designation == changed.designation || original.bom.partNumber == changed.bom.partNumber)
+      throw "Bracket identity must preserve reordering and distinguish exact geometry";
+
     var plate = new machinekit.gantry.GantryParts.GantryPlate("TEST-MOTORXPLATE", "test motor mount", 80, 80, 6);
     var changedPlate = new machinekit.gantry.GantryParts.GantryPlate("TEST-MOTORXPLATE", "test motor mount", 81, 80, 6);
     var otherDesign = new machinekit.gantry.GantryParts.GantryPlate("OTHER-MOTORXPLATE", "test motor mount", 80, 80, 6);
@@ -171,8 +232,14 @@ class PartNumberKeyTests {
     var plainShaft = shaft.create().bom.partNumber;
     var groovedShaft = shaft.create(new ComponentValues().setToken("grooves",
       '[{"name":"ringA","z0":2,"width":1.1,"diameter":9.6}]')).bom.partNumber;
-    if (plainShaft != "SHAFT-10x100" || groovedShaft != "SHAFT-10x100-G1"
+    if (plainShaft != "SHAFT-10x100" || !~/^SHAFT-STEPPED-[A-F0-9]{8}$/.match(groovedShaft)
       || PartNumberLint.problems(groovedShaft).length != 0) throw 'Stepped shaft identities: $plainShaft, $groovedShaft';
+    var shiftedShaft = shaft.create(new ComponentValues().setToken("grooves",
+      '[{"name":"ringA","z0":3,"width":1.1,"diameter":9.6}]')).bom.partNumber;
+    var sameShaft = shaft.create(new ComponentValues().setToken("grooves",
+      '[{"name":"ringA","z0":2,"width":1.1,"diameter":9.6}]')).bom.partNumber;
+    if (shiftedShaft == groovedShaft || sameShaft != groovedShaft)
+      throw "Shaft numbers must encode defining groove geometry rather than counts";
     var rectifier = machinekit.power.ThreePhaseRectifier.recipeType().create().bom.partNumber;
     if (rectifier != "RECT-ASSUMED-400V-50HZ-20A-4O-8000W" || PartNumberLint.problems(rectifier).length != 0)
       throw "Rectifier identity must include the input and output requirements";
@@ -326,7 +393,8 @@ class PartNumberKeyTests {
       machinekit.robotics.EndEffectorPlate.recipeType().create().bom.partNumber,
       machinekit.robotics.Pedestal.recipeType().create().bom.partNumber,
       machinekit.robotics.ArmWristFork.recipeType().create().bom.partNumber];
-    var robotExpected = ["ARM-JOINT-100x70-P61x36", "EOAT-40-4-12-65-4M5", "PEDESTAL-F40-D60-L150", "ARM-FORK-60x70-W8-D24"];
+    if (!~/^ARM-JOINT-GEARED-[A-F0-9]{8}$/.match(robotParts[0])) throw "Bounded geared housing number";
+    var robotExpected = [robotParts[0], "EOAT-40-4-12-65-4M5", "PEDESTAL-F40-D60-L150", "ARM-FORK-60x70-W8-D24"];
     for (i in 0...robotParts.length) if (robotParts[i] != robotExpected[i]
       || PartNumberLint.problems(robotParts[i]).length != 0) throw 'Robot part identity: ${robotParts[i]}';
     var cobot = machinekit.robotics.CobotJoint.moduleRecipeType().create().bom.partNumber;
@@ -436,6 +504,16 @@ class PartNumberKeyTests {
       "FOOT-PLATE-ASSUMED-80x80x10-D21", "FOOT-NUT-ASSUMED-M20-H30x15"];
     for (i in 0...footParts.length) if (footParts[i] != footPartsExpected[i]
       || PartNumberLint.problems(footParts[i]).length != 0) throw 'Leveling foot part identity: ${footParts[i]}';
+    var finePanel = new machinekit.enclosure.EnclosurePanel(600.000001, 800);
+    var otherPanel = new machinekit.enclosure.EnclosurePanel(600.000002, 800);
+    var samePanel = new machinekit.enclosure.EnclosurePanel(600.000001, 800);
+    if (finePanel.designation != finePanel.bom.partNumber
+      || finePanel.bom.partNumber == otherPanel.bom.partNumber
+      || finePanel.bom.partNumber != samePanel.bom.partNumber
+      || finePanel.bom.valuesKey != samePanel.bom.valuesKey
+      || finePanel.bom.fingerprint != samePanel.bom.fingerprint
+      || PartNumberLint.problems(finePanel.bom.partNumber).length != 0)
+      throw "Panel identity must preserve exact dimensions and same-geometry merging";
     var panel = machinekit.enclosure.EnclosurePanel.recipeType().create().bom.partNumber;
     var cutPanel = machinekit.enclosure.EnclosureCutPanel.cutRecipeType().create().bom.partNumber;
     if (panel != "P-FR-ACM-4-600x800" || cutPanel != "P-STEEL-2-600x800-R100x100-X0-Z400"
@@ -482,7 +560,7 @@ class PartNumberKeyTests {
       machinekit.structural.SlideInSlotNut.recipeType().create().bom.partNumber,
       machinekit.structural.MineralCasting.recipeType().create().bom.partNumber,
       machinekit.structural.MountDrilledPlate.recipeType().create().bom.partNumber];
-    var structuralExpected = ["TUBE-30x30x2-L750", "BRACKET-BRACKET", "SLIDE-M6-15.9x15.5x5.9-R8x1.9",
+    var structuralExpected = ["TUBE-30x30x2-L750", "BRACKET-BRACKET-D3BD5D94", "SLIDE-M6-15.9x15.5x5.9-R8x1.9",
       "MINERAL-650x550x120", "HOST-PAD-100x500x12-MACHINED-STEEL"];
     for (i in 0...structural.length) if (structural[i] != structuralExpected[i]
       || PartNumberLint.problems(structural[i]).length != 0) throw 'Structural identity: ${structural[i]}';
@@ -501,9 +579,23 @@ class PartNumberKeyTests {
       mountSteel.create(new ComponentValues().setToken("stock", "weldable-mild-steel").setToken("role", "adjustment-bar")).bom.partNumber,
       machinekit.structural.LinearMountCleat.recipeType().create().bom.partNumber,
       machinekit.structural.LinearMountReplication.recipeType().create().bom.partNumber];
-    var mountExpected = ["LM-C45-RECEIVER-28x500x20", "LM-MILD-ADJUSTMENT-BAR-28x500x20", "LINEAR-MOUNT-CLEAT-H32", "LM-REPLICATION-140x540x4"];
+    var cleatRecipe = machinekit.structural.LinearMountCleat.recipeType();
+    var cleatFront = cleatRecipe.create(new ComponentValues().setToken("endBias", "front"));
+    var cleatBack = cleatRecipe.create(new ComponentValues().setToken("endBias", "back"));
+    var cleatFine = cleatRecipe.create(new ComponentValues().setNumber("height", 32.000001));
+    var cleatOther = cleatRecipe.create(new ComponentValues().setNumber("height", 32.000002));
+    var cleatAgain = cleatRecipe.create(new ComponentValues().setNumber("height", 32.000001));
+    if (cleatFront.bom.partNumber == cleatBack.bom.partNumber
+      || cleatFine.bom.partNumber == cleatOther.bom.partNumber
+      || cleatFine.bom.partNumber != cleatAgain.bom.partNumber)
+      throw "Cleat identities must distinguish bias and exact height while remaining stable";
+    for (cleat in [cleatFront, cleatBack, cleatFine, cleatOther])
+      if (cleat.designation != cleat.bom.partNumber || PartNumberLint.problems(cleat.bom.partNumber).length != 0)
+        throw "Cleat scene and BOM must share one bounded identity";
+    var mountExpected = ["LM-C45-RECEIVER-28x500x20", "LM-MILD-ADJUSTMENT-BAR-28x500x20", "LM-C45-CLEAT-H32-MIDDLE", mountParts[3]];
     for (i in 0...mountParts.length) if (mountParts[i] != mountExpected[i]
       || PartNumberLint.problems(mountParts[i]).length != 0) throw 'Mount part identity: ${mountParts[i]}';
+    if (!~/^LM-REPLICATION-[A-F0-9]{8}$/.match(mountParts[3])) throw "Bounded replication geometry identity";
     var replication = machinekit.structural.LinearMountReplication.recipeType();
     var hole = machinekit.structural.InsertHoles.records(machinekit.structural.InsertHoles.through(6.6, 4))[0];
     hole.id = "source-a";
@@ -519,6 +611,13 @@ class PartNumberKeyTests {
       || replication.bomKey(replicationA) != replication.bomKey(replicationB)
       || replication.bomKey(replicationA) == replication.bomKey(replicationChanged))
       throw "Replication purchase identity must ignore source IDs but preserve actual hole geometry";
+    var layerA = replication.create(replicationA);
+    var layerB = replication.create(replicationB);
+    var layerChanged = replication.create(replicationChanged);
+    if (layerA.bom.partNumber != layerB.bom.partNumber
+      || layerA.bom.partNumber == layerChanged.bom.partNumber
+      || layerA.designation != layerA.bom.partNumber)
+      throw "Replication numbers must preserve source-independent merging and distinguish drilling geometry";
     var cassetteType = machinekit.structural.LinearMountNutCassette.recipeType();
     var cassetteA = new ComponentValues().setToken("stations", '[{"connector":"a","x":0,"y":0}]')
       .setToken("sourceFingerprint", haxe.crypto.Sha256.encode("source-a"));
@@ -532,7 +631,7 @@ class PartNumberKeyTests {
       throw "Cassette purchase identity must ignore source IDs but preserve station geometry";
     var motorPlate = machinekit.assembly.MotorPlate.recipeType().create().bom.partNumber;
     var carriage = machinekit.assembly.LinearAxis.Carriage.recipeType().create().bom.partNumber;
-    if (motorPlate != "MOTOR-PLATE-17HS19-1684S1-T6" || carriage != "CARRIAGE-70x50-D8-TR-D8-P2-S1-RH"
+    if (motorPlate != "MOTOR-PLATE-17HS19-1684S1-T6" || !~/^CARRIAGE-LEAD-SCREW-[A-F0-9]{8}$/.match(carriage)
       || PartNumberLint.problems(motorPlate).length != 0 || PartNumberLint.problems(carriage).length != 0)
       throw 'Axis mount identities: $motorPlate, $carriage';
     var twinRail = machinekit.assembly.ScrewAxisPart.recipeType();
@@ -541,9 +640,8 @@ class PartNumberKeyTests {
       twinRail.create(new ComponentValues().setToken("kind", "carriage")).bom.partNumber,
       sfuAxis.create().bom.partNumber,
       sfuAxis.create(new ComponentValues().setToken("kind", "riserLeft")).bom.partNumber];
-    var axisExpected = ["TWIN-RAIL-SCREW-BASE", "TWIN-RAIL-SCREW-CARRIAGE", "SFU20-AXIS-BASE", "SFU20-AXIS-RISERLEFT"];
-    for (i in 0...axisParts.length) if (axisParts[i] != axisExpected[i]
-      || PartNumberLint.problems(axisParts[i]).length != 0) throw 'Axis part identity: ${axisParts[i]}';
+    for (number in axisParts) if (!~/^(TWIN-RAIL-SCREW|SFU20-AXIS)-[A-Z]+-[A-F0-9]{8}$/.match(number)
+      || PartNumberLint.problems(number).length != 0) throw 'Axis part identity: $number';
     var routerParts = [machinekit.routing.ToolFork.recipeType().create().bom.partNumber,
       machinekit.routing.ToolRack.recipeType().create().bom.partNumber,
       machinekit.routing.DustShoe.recipeType().create().bom.partNumber,
@@ -583,7 +681,7 @@ class PartNumberKeyTests {
     for (i in 0...hobberParts.length) if (hobberParts[i] != hobberExpected[i]
       || PartNumberLint.problems(hobberParts[i]).length != 0) throw 'Hobber part identity: ${hobberParts[i]}';
     var toolService = machinekit.robotics.ToolServiceModule.recipeType().create().bom.partNumber;
-    if (toolService != "TOOL-SVC-ASSUMED-24V-5A-2A-8P-1O" || PartNumberLint.problems(toolService).length != 0)
+    if (!~/^TOOL-SERVICE-SOCKET-[A-F0-9]{8}$/.match(toolService) || PartNumberLint.problems(toolService).length != 0)
       throw 'Tool service identity: $toolService';
     var hob = machinekit.hobbing.Hob.recipeType().create().bom.partNumber;
     if (hob != "HOB-ASSUMED-M0.3-D32-B16-1S-12G" || PartNumberLint.problems(hob).length != 0)

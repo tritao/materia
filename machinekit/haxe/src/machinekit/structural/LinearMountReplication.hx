@@ -28,15 +28,16 @@ class LinearMountReplication extends MachineComponent {
       false,
       null,
       false
-    ).numbered(v -> 'LM-REPLICATION-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("length"))}x${Dimension.format(v.number("thickness"))}-'
-      + haxe.crypto.Sha256.encode(v.token("holes") + "|" + v.token("reference")).substr(0, 12)).purchaseKeyed(v -> {
-      var holes = InsertHoles.records(v.token("holes"));
-      for (i in 0...holes.length) holes[i].id = Std.string(i);
-      return [ComponentNumberKey.encode(v.number("width")), ComponentNumberKey.encode(v.number("length")),
-        ComponentNumberKey.encode(v.number("thickness")), InsertHoles.fromNeutral(holes), v.token("reference")].join("|");
-    }).procured(_ -> Make("casting replication compound"))
+    ).numbered(numberFor).purchaseKeyed(purchaseKey).procured(_ -> Make("casting replication compound"))
       .requiringInputs(["width", "length", "thickness"], [], []));
   }
+  static function purchaseKey(v:ComponentValues):String {
+    var holes = InsertHoles.records(v.token("holes"));
+    for (i in 0...holes.length) holes[i].id = Std.string(i);
+    return [ComponentNumberKey.encode(v.number("width")), ComponentNumberKey.encode(v.number("length")),
+      ComponentNumberKey.encode(v.number("thickness")), InsertHoles.fromNeutral(holes), v.token("reference")].join("|");
+  }
+  static function numberFor(v:ComponentValues):String return PartNumbers.geometry("LM", "REPLICATION", purchaseKey(v));
   public function new(?overrides:ComponentValues) {
     var v = P.resolve(inputs(), overrides, false);
     width = v.number("width");
@@ -60,7 +61,7 @@ class LinearMountReplication extends MachineComponent {
         || Math.abs(hole.depth - thickness) > 1e-9)
         throw "Replication clearance must cross the layer normally and retain one mm ASSUMED edge wall: " + hole.id;
     }
-    super("LINEAR-MOUNT-REPLICATION",
+    super(numberFor(v),
       "Unqualified replication study layer", "replication compound (assumed)", false, v);
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Assumed")));
     lockManufacturingMaterial("replication compound (assumed)");

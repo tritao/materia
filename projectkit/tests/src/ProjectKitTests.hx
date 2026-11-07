@@ -2602,6 +2602,21 @@ class ProjectKitTests {
     check(AssemblyBodies.displayName("tool/suctionCup") == "Tool › Suction cup", "path segments");
     check(AssemblyBodies.displayName("rack-frame_2") == "Rack frame 2", "separators");
     check(AssemblyBodies.displayName("ARM") == "Arm", "capitals in a row stay one word");
+    var roleIds = ["machine/rightHanger1", "machine/railYLeft", "machine/enclosure-seat00-bolt2"];
+    var roles = AssemblyBodies.occurrenceLabels(roleIds);
+    check(roles.get(roleIds[0]) == "Right hanger 1", "role omits the occurrence path");
+    check(roles.get(roleIds[1]) == "Rail Y left", "role splits axis words");
+    check(roles.get(roleIds[2]) == "Enclosure seat 00 bolt 2", "role retains local indices");
+    check(AssemblyBodies.displayName("XYZDrive") == "Xyz drive", "acronym before a word");
+    check(AssemblyBodies.displayName("rail--z_left") == "Rail Z left", "axis words and repeated separators");
+    var duplicates = AssemblyBodies.occurrenceLabels(["left/bolt", "right/bolt"]);
+    check(duplicates.get("left/bolt") == "Bolt (1)" && duplicates.get("right/bolt") == "Bolt (2)",
+      "duplicate sibling roles use short suffixes");
+    var normalized = AssemblyBodies.occurrenceLabels(["group/rail-left", "group/railLeft"]);
+    check(normalized.get("group/rail-left") == "Rail left (1)"
+      && normalized.get("group/railLeft") == "Rail left (2)", "normalized sibling spellings remain distinct");
+    var reordered = AssemblyBodies.occurrenceLabels(["right/bolt", "left/bolt"]);
+    check(duplicates.get("left/bolt") == reordered.get("left/bolt"), "suffixes do not depend on traversal order");
   }
 
   static function main():Void {

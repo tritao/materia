@@ -16,6 +16,8 @@ typedef GeneratedAssemblyScene = {
   @:optional var projectJob:String;
   @:optional var presentationGeometryFingerprint:String;
   @:optional var presentation:materia.presentation.AssemblyPresentation;
+  /** Source part numbers keyed by scene object id; independent of editable role labels. */
+  @:optional var partNumbers:Map<String, String>;
   var objects:Array<SceneObjectData>;
   var geometryBySnapshot:Map<String,
   GeometryData>;

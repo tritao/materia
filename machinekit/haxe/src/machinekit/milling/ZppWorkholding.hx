@@ -76,10 +76,12 @@ class ZppWorkholding extends MachineAssembly {
     }
     addCoupling("self-centering", "half-opening", "opposite-jaw", 1);
     var studHalf = pneumatic ? 48 : 26;
+    var studIndex = 0;
     for (x in [-studHalf, studHalf]) for (y in [-studHalf, studHalf]) {
+      studIndex++;
       var z = base + 5.08;
-      fixed('pullStud$x-$y', new ZppComponent(pneumatic ? "stud96" : "stud"), F.translation(x, y, z), "vise");
-      fixed('studLink$x-$y', new ZppComponent(pneumatic ? "stud-link96" : "stud-link"), F.translation(x, y, z), "vise");
+      fixed("pullStud" + studIndex, new ZppComponent(pneumatic ? "stud96" : "stud"), F.translation(x, y, z), "vise");
+      fixed("studLink" + studIndex, new ZppComponent(pneumatic ? "stud-link96" : "stud-link"), F.translation(x, y, z), "vise");
     }
     if (!pneumatic) for (side in [-1, 1]) fixed(
       "parallel" + side,

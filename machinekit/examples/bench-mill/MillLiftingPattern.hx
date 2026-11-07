@@ -140,7 +140,7 @@ class MillLiftingPattern {
                 Casting(resin, candidate.pose, resinKey),
                 share
               );
-              neighbours.add({id: candidate.id, part: anchored, pose: candidate.pose, openings: candidate.openings});
+              neighbours.add({id: candidate.id, purpose:candidate.purpose, part: anchored, pose: candidate.pose, openings: candidate.openings});
               chosen = candidate;
               break;
             } catch (error:Dynamic) {
@@ -210,6 +210,7 @@ class MillLiftingPattern {
     if (x <= 0 || y <= 0 || z < 0) throw "Source lifting blank exceeds the foundation envelope";
     return {
       id: id,
+      purpose:materia.casting.InsertSpec.InsertRole.LiftingMount,
       part: part,
       pose: seed.turn == 0 ? F.translation(sx * x, sy * y, z) : F.fromRotationMatrix(
         sx * x,

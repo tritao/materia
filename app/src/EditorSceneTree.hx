@@ -236,6 +236,24 @@ import materia.assembly.AssemblyDefinition;
       kind: setMembers.exists(key) ? "Set" : group.path == "" ? "Assembly" : "Group",
       count: members.length, shown: shown};
   }
+  /** Copyable row name without visibility, motion or occurrence-count decorations. */
+  public function itemName(key:String):String {
+    if (key == "scene") return "Scene";
+    var group = groups.get(key);
+    if (group != null) return group.label;
+    var source = sourceFeature(key);
+    if (source != null) return source.label;
+    var item = scene.object(key);
+    if (item != null) return item.label;
+    var marker = key.indexOf(":feature:");
+    if (marker >= 0) {
+      var id = key.substr(0, marker), index = Std.parseInt(key.substr(marker + 9));
+      if (index != null && index >= 0 && index < scene.cadFeatureCount(id))
+        return "Feature " + (index + 1) + " · " + scene.cadFeatureNameAt(id, index);
+      return "Feature";
+    }
+    return displayLabel(key);
+  }
   /** Object names are resolved when project overrides are materialized, never in the tree. */
   function displayLabel(key:String):String {
     var source = sourceFeature(key);
@@ -257,6 +275,7 @@ import materia.assembly.AssemblyDefinition;
     var item = scene.object(key);
     if (item != null) {
       if (displayLabel(key).toLowerCase().indexOf(filter) >= 0
+        || scene.objectDetail(key).toLowerCase().indexOf(filter) >= 0
         || item.kind.toLowerCase().indexOf(filter) >= 0) return true;
       if (group != null) for (child in group) if (matches(child)) return true;
       var map = scene.sourceMap;
@@ -438,19 +457,14 @@ import materia.assembly.AssemblyDefinition;
         key,
         shown + (joint == null ? "" : " · " + joint) + (scene.isVisible(key) ? "" : " (hidden)"),
         IconName.Cube,
-        item.id
+        scene.objectDetail(item.id)
       );
     }
     var marker = key.indexOf(":feature:");
     if (marker >= 0) {
-      var id = key.substr(0, marker), index = Std.parseInt(key.substr(marker + 9));
       return iconLabeledItem(
         key,
-        index == null || index < 0
-        || index >= scene.cadFeatureCount(id) ? "Feature" : "Feature " + (index + 1) + " · " + scene.cadFeatureNameAt(
-          id,
-          index
-        ),
+        itemName(key),
         IconName.Grid
       );
     }

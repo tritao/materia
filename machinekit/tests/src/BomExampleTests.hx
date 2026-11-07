@@ -71,6 +71,7 @@ class BomExampleTests {
   }
 
   static function check(name:String, machine:MachineAssembly):Void {
+    machinekit.assembly.OccurrenceNames.requireReadable([for (occurrence in machine.definition().occurrences) occurrence.id]);
     var document = machine.bomDocument(name, "test-commit", "2026-01-01T00:00:00Z");
     checkNumbers(name, document.assembly);
     var json:Dynamic = haxe.Json.parse(haxe.Json.stringify(document));
@@ -144,7 +145,8 @@ class BomExampleTests {
     }
     if (name == "cnc-router") {
       var yBracket = [for (line in document.procurement)
-        if (line.item.partNumber == "BRACKET-HOME-SWITCH-BRACKET-Y") line];
+        if (line.item.typeId == "machinekit.structural.block-bracket"
+          && line.item.description == "Home switch bracket y") line];
       if (yBracket.length != 1 || yBracket[0].item.quantity.value != 2)
         throw "Identical Y home-switch brackets must roll up to two pieces";
     }

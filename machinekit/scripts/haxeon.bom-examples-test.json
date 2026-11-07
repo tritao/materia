@@ -55,6 +55,7 @@
     "../haxe/src/machinekit/welding/WeldingTorch.hx",
     "../haxe/src/machinekit/welding/WireFeeder.hx",
     "BomExport.hx",
+    "OccurrenceNamesAudit.hx",
     "../examples/bench-mill/BearingBlock.hx",
     "../examples/bench-mill/BearingBlockJob.hx",
     "../examples/bench-mill/BenchMill.hx",

@@ -61,9 +61,10 @@ class Rke92Vise extends MachineAssembly {
       F.fromRotationMatrix(0, FIXED_FACE + stockDepth, BED_HEIGHT, reverse),
       "slide"
     );
-    for (jaw in ["fixedPlate", "movingPlate"]) for (x in [-31.5, 31.5]) {
+    for (jaw in ["fixedPlate", "movingPlate"]) for (boltIndex in 0...2) {
+      var x = boltIndex == 0 ? -31.5 : 31.5;
       var head = F.fromRotationMatrix(x, -6.4, 14, [1, 0, 0, 0, 0, 1, 0, -1, 0]);
-      fixed(jaw + "Bolt" + x, SocketHeadCapScrew.metric("M6", 30), F.compose(zero.get(jaw), head), jaw);
+      fixed(jaw + "Bolt" + (boltIndex + 1), SocketHeadCapScrew.metric("M6", 30), F.compose(zero.get(jaw), head), jaw);
     }
     for (side in [-1, 1]) fixed(
       "parallel" + side,
@@ -98,8 +99,9 @@ class Rke92Vise extends MachineAssembly {
     fixed("drive", new Rke92VisePart("drive"), F.translation(0, BODY_LENGTH, 48), "screw");
     // Local X=+/-80 maps onto the mill's +/-80 mm table slots after installation.
     var washer = FlatWasher.metric("M6");
+    var clampIndex = 0;
     for (side in [-1, 1]) for (y in [30.0, 200.0]) {
-      var tag = side + "-" + y, flip = side < 0 ? [-1.0, 0, 0, 0, -1, 0, 0, 0, 1] : [1.0, 0, 0, 0, 1, 0, 0, 0, 1];
+      var tag = Std.string(++clampIndex), flip = side < 0 ? [-1.0, 0, 0, 0, -1, 0, 0, 0, 1] : [1.0, 0, 0, 0, 1, 0, 0, 0, 1];
       fixed("clamp" + tag, new Rke92VisePart("clamp"), F.fromRotationMatrix(side * 70, y, 12, flip), "body");
       fixed("heel" + tag, new MillPanel(16, 24, 12), F.translation(side * 92, y, 0), "body");
       fixed("washer" + tag, washer, F.translation(side * 80, y, 22), "body");
@@ -112,7 +114,8 @@ class Rke92Vise extends MachineAssembly {
       fixed("slotNut" + tag,
         new SlideInSlotNut(17.4, 24, 5.8, 9.6, 2, "M6"), F.translation(side * 80, y, -6.2), "body");
     }
-    for (y in [30.0, 170.0]) fixed("key" + y, new Rke92VisePart("key"), F.translation(0, y, 0), "body");
+    for (index in 0...2) fixed("key" + (index + 1), new Rke92VisePart("key"),
+      F.translation(0, index == 0 ? 30.0 : 170.0, 0), "body");
     addMemberConnector("body", "stockSeat", seat);
     exposeConnector("stockSeat", "body", "stockSeat");
     exposeConnector("mount", "body", "mount");

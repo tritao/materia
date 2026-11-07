@@ -38,10 +38,23 @@ import haxeon.ui.core.UiModifier;
       app.preferences.store.set(AppSettings.GRID_VISIBLE, PropertyValue.Bool(!app.gridVisible));
       app.log(app.gridVisible ? "Grid enabled" : "Grid disabled");
     }, null, null, function() return app.gridVisible));
-    app.commands.register(new Command("scene.toggle-simulation-overlays", "Toggle simulation overlays", function() {
+    app.commands.register(new Command("scene.toggle-simulation-overlays", "Viewport overlays", function() {
       app.preferences.store.set(AppSettings.SIMULATION_OVERLAYS, PropertyValue.Bool(!app.simulationOverlaysVisible));
-      app.log(app.simulationOverlaysVisible ? "Simulation overlays shown" : "Simulation overlays hidden");
+      app.log(app.simulationOverlaysVisible ? "Viewport overlays shown" : "Viewport overlays hidden");
     }, null, null, function() return app.simulationOverlaysVisible));
+    for (entry in [
+      {id: "scene.toggle-collision-details", label: "Collision details", setting: AppSettings.COLLISION_DETAILS},
+      {id: "scene.toggle-sensors", label: "Sensors", setting: AppSettings.SENSOR_MOUNTS},
+      {id: "scene.toggle-sensor-readings", label: "Sensor readings", setting: AppSettings.SENSOR_READINGS},
+      {id: "scene.toggle-link-frames", label: "Link frames", setting: AppSettings.LINK_FRAMES},
+      {id: "scene.toggle-annotations-through-geometry", label: "Show annotations through geometry",
+        setting: AppSettings.ANNOTATIONS_THROUGH_GEOMETRY}
+    ]) {
+      var setting = entry.setting;
+      app.commands.register(new Command(entry.id, entry.label, function() {
+        app.preferences.store.set(setting, PropertyValue.Bool(!app.preferences.store.getBool(setting)));
+      }, null, null, function() return app.preferences.store.getBool(setting)));
+    }
     app.commands.register(new Command("scene.toggle-collisions", "Toggle collisions", function() {
       app.preferences.store.set(AppSettings.COLLISIONS_VISIBLE, PropertyValue.Bool(!app.collisionsVisible));
       app.log(app.collisionsVisible ? "Collisions shown" : "Collisions hidden");

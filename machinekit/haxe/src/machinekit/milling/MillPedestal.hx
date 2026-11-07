@@ -68,6 +68,7 @@ class MillPedestal extends MineralFoundation {
       v,
       [{
         id: "cap",
+        purpose:InsertRole.GenericMount,
         part: cap,
         openings: [
           CastingPatterns.face("body.z-max"),

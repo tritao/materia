@@ -6,11 +6,23 @@ import materia.assembly.AssemblyFrames as F;
 
 /** Geometry/tolerance checks only. No structural, modal or process adequacy claim. */
 class FoundationIntegrity {
+  /** Every foundation member declares functional ownership, including subsequently added members. */
+  public static function checkGroups(foundation:MineralFoundation):Diagnostics {
+    var out = new Diagnostics();
+    var groups = foundation.functionalGroups();
+    for (member in foundation.components()) {
+      var path = groups.get(member.id);
+      if (path == null || path.length == 0 || path.split("/").indexOf("Ungrouped") >= 0)
+        out.error("foundation.ungrouped", member.id, 'Foundation member "${member.id}" has no purpose group');
+    }
+    return out;
+  }
+
   public static function check(
     foundation:MineralFoundation,
     ?measured:Map<String, materia.assembly.AssemblyRecord.AssemblyFrame>
   ):Diagnostics {
-    var out = new Diagnostics(),
+    var out = checkGroups(foundation),
       poses = measured == null ? foundation.solvedPoses() : measured, bodyPose = poses.get("casting");
     if (bodyPose == null) throw "missing casting pose";
     for (row in foundation.insertLocations()) {

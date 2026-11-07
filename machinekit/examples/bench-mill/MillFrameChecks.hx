@@ -74,6 +74,17 @@ class MillFrameChecks {
     check(largerFrame.baseDepth > layout.baseDepth, "larger working envelope grows the structure");
     var frame = BenchMillFrame.create(layout, z, xy);
     frame.validate();
+    check(frame.column.postCureLocations().length > 0, "foundation grouping exercises post-cure members");
+    for (foundation in [frame.base, frame.column]) {
+      var grouping = FoundationIntegrity.checkGroups(foundation);
+      check(!grouping.hasErrors(), "mill foundation members all grouped: "
+        + [for (item in grouping.items) item.message].join("; "));
+      var groups = foundation.functionalGroups();
+      for (insert in foundation.postCureLocations())
+        check(groups.get(insert.id) == machinekit.structural.MineralFoundation.purposeGroup(insert.purpose),
+          "mill post-cure member uses its installation purpose " + insert.id);
+    }
+    Sys.println("Foundation grouping: bench-mill post-cure members " + frame.column.postCureLocations().length + " passed");
     check(frame.checkGroups().items.length == 0, "cast frame fully grouped");
     var sourceDesign = machinekit.design.AssemblyDesignChecks.check(frame);
     check(

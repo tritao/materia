@@ -5,36 +5,64 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 
 class HobberEnclosureChecks {
-  /** Mounts split into the frame outriggers and the tray clamps by bed edge; each clamp shares its bolt's group. */
-  static function checkMountGroups(assembly:MachineAssembly):Void {
-    var root = "Chip protection and enclosure/Mounts/",
-      groups = assembly.functionalGroups(), poses = assembly.solvedPoses();
+  /**
+   * The enclosure's scene groups: the shell's frame and door folders, its panels, and its chip tray by function; the host's
+   * frame outriggers sit in the frame folder and its tray clamps (each with its bolt) under the tray by bed edge.
+   */
+  static function checkEnclosureGroups(assembly:MachineAssembly):Void {
+    var groups = assembly.functionalGroups(), poses = assembly.solvedPoses(), shell = HobberEnclosurePreview.shellGroup;
+    var allowed = [shell("Panels"), shell("Floor tray/"), shell("frame"), shell("door")];
     var counts:Map<String, Int> = [];
-    for (id => path in groups) if (StringTools.startsWith(path, root)) counts.set(
-      path,
-      (counts.exists(path) ? counts.get(path) : 0) + 1
-    );
-    if (counts.get(root + "Enclosure frame")
-      != 4) throw "Mounts: expected the four frame outriggers in Enclosure frame";
+    for (id => path in groups) {
+      if (!StringTools.startsWith(path, HobberEnclosurePreview.ENCLOSURE_GROUP)) continue;
+      if (![for (a in allowed) StringTools.startsWith(path,
+        a)].contains(true)) throw 'Enclosure group: $id is in $path';
+      counts.set(path, (counts.exists(path) ? counts.get(path) : 0) + 1);
+    }
+    for (folder in [
+      "Panels",
+      "Floor tray/Panels",
+      "Floor tray/Supports",
+      "Floor tray/Seals",
+      "Floor tray/Joints",
+      "Floor tray/Service bridge",
+      "Floor tray/Lips"
+    ]) if (!counts.exists(shell(folder))) throw 'Enclosure group: $folder is empty';
+    if (counts.get(shell("frame/Base outriggers")) != 4) throw "Enclosure group: expected the four frame outriggers";
     var table = poses.get("machine/bed/tablePlate");
-    if (table == null) throw "Mounts: missing machine/bed/tablePlate";
-    var clamps = 0, nearest = {end: "", distance: 1e18};
+    if (table == null) throw "Enclosure group: missing machine/bed/tablePlate";
+    var clamps = 0, nearest = {end: "", distance: 1e18}, edges:Map<String, Bool> = [];
     for (id => path in groups) if (StringTools.startsWith(id, "enclosureTrayClamp")) {
       clamps++;
-      if (!StringTools.startsWith(path, root + "Chip tray/")) throw 'Mounts: $id is outside Chip tray ($path)';
+      if (!StringTools.startsWith(path,
+        shell("Floor tray/Clamps/"))) throw 'Enclosure group: $id is outside the tray clamps ($path)';
       if (groups.get(StringTools.replace(id,
-        "Clamp", "Bolt")) != path) throw 'Mounts: $id and its bolt are in different groups';
+        "Clamp", "Bolt")) != path) throw 'Enclosure group: $id and its bolt are in different groups';
+      edges.set(path, true);
       if (!StringTools.endsWith(path, " end")) continue;
       var p = poses.get(id);
-      if (p == null) throw 'Mounts: missing pose for $id';
+      if (p == null) throw 'Enclosure group: missing pose for $id';
       var d = Math.sqrt(Math.pow(p.x - table.x, 2) + Math.pow(p.y - table.y, 2));
       if (d < nearest.distance) nearest = {end: path, distance: d};
     }
-    var edges = [for (path in counts.keys()) if (StringTools.startsWith(path, root + "Chip tray/")) path];
-    if (clamps != 12 || edges.length != 4 || !counts.exists(root + "Chip tray/Table end") || !counts.exists(root
-      + "Chip tray/Column end")) throw "Mounts: expected 12 tray clamps on two ends and two sides, got "
+    if (clamps != 12
+      || [for (k in edges.keys()) k].length != 4 || !edges.exists(shell("Floor tray/Clamps/Table end")) || !edges
+      .exists(shell("Floor tray/Clamps/Column end"))) throw "Enclosure group: expected 12 tray clamps on two ends and two sides, got "
       + [for (k => v in counts) '$k=$v'].join(", ");
-    if (nearest.end != root + "Chip tray/Table end") throw "Mounts: the clamp nearest the table is in " + nearest.end;
+    if (nearest.end
+      != shell("Floor tray/Clamps/Table end")) throw "Enclosure group: the clamp nearest the table is in " + nearest.end;
+  }
+
+  /** Keep the scene tree browsable: no folder holds more than this many parts directly (subfolders group the rest). */
+  static inline final MAX_FOLDER_PARTS = 16;
+
+  static function checkFolderSizes(assembly:MachineAssembly):Void {
+    var counts:Map<String, Int> = [];
+    for (id => path in assembly.functionalGroups()) counts.set(path, (counts.exists(path) ? counts.get(path) : 0) + 1);
+    var large = [for (path => count in counts) if (count > MAX_FOLDER_PARTS) '$path ($count)'];
+    if (large.length > 0) throw "Scene folders with more than " + MAX_FOLDER_PARTS + " parts: " + large.join(", ");
+    for (folder in ["door/Track", "door/Lower guides", "door/Left leaf/Hanger 1", "door/Right leaf/Hanger 2"]) if (!counts.exists(HobberEnclosurePreview.shellGroup(folder)))
+      throw 'Enclosure group: $folder is empty';
   }
 
   public static function main():Void {
@@ -42,7 +70,8 @@ class HobberEnclosureChecks {
     var fitted = HobberEnclosurePreview.assembled(), assembly = fitted.assembly, shell = fitted.shell;
     var guardReport = HobberEnclosureGuardChecks.run(assembly, shell.layout.stroke);
     if (assembly.validate().length != 0) throw "Enclosed hobber assembly does not validate";
-    checkMountGroups(assembly);
+    checkEnclosureGroups(assembly);
+    checkFolderSizes(assembly);
     var model = new cadkit.modeling.AssemblyModel("mm");
     assembly.addTo(model, "");
     var state = model.initialState();

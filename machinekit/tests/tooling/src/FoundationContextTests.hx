@@ -74,7 +74,7 @@ class FoundationContextTests {
       var declared = materia.casting.InterfaceRequirement.InterfaceRequirements.copy(requirements);
       declared[0].relationshipIds.push(side < 0 ? "seat-axis-left" : "seat-axis-right");
       {
-        id:side < 0 ? "left" : "right", part : new CastInsert(values.copy().setToken(
+        id:side < 0 ? "left" : "right", purpose:materia.casting.InsertSpec.InsertRole.GuideSeat, part : new CastInsert(values.copy().setToken(
           "interfaces",
           haxe.Json.stringify(materia.casting.InterfaceRequirement.InterfaceRequirements.records(declared))
         )), pose : F.translation(

@@ -59,8 +59,7 @@ class WayCoverMount extends MachineComponent {
   public final attachment:Null<MountAttachment>;
 
   public function new(drawing:String, halfWidth:Float, height:Float, thickness:Float, ?bores:Array<MountBore>, ?cuts:Array<MountCut>, below:Float = 0, ?attachment:MountAttachment) {
-    super('WAYCOVER-MOUNT-${Dimension.format(2 * halfWidth)}x${Dimension.format(height)}x${Dimension.format(thickness)}-${cutKey(bores, cuts)}' + (below > 0 ? '-D${Dimension.format(below)}' : '')
-      + (attachment == null ? '' : '-F' + attachmentKey(attachment).substr(0, 8)),
+    super(drawing,
       "Way cover mounting plate", "steel", true);
     if (!(halfWidth > 0) || !(height > 0) || !(thickness >= 8)) throw "A cover mount needs a width, a height and at least 8 mm of steel to tap";
     declareDrawingNumber(drawing);
@@ -184,13 +183,6 @@ class WayCoverMount extends MachineComponent {
       holes: [for (h in pin.holes) dimensionsKey([h.x, h.y])], dimensions: dimensionsKey([pin.diameter, pin.depth]),
       through: pin.through, drawn: pin.drawn, fit: pin.fit}];
     return machinekit.component.BomRevision.fingerprint(haxe.Json.stringify({stock: stock, bolts: bolts, pins: pins}), 1);
-  }
-
-  static function cutKey(bores:Null<Array<MountBore>>, cuts:Null<Array<MountCut>>):String {
-    var parts:Array<String> = [];
-    if (bores != null) for (b in bores) parts.push('B${Dimension.format(b.x)},${Dimension.format(b.y)},${Dimension.format(b.d)}');
-    if (cuts != null) for (c in cuts) parts.push('C${Dimension.format(c.x0)},${Dimension.format(c.x1)},${Dimension.format(c.y0)},${Dimension.format(c.y1)}');
-    return parts.length == 0 ? "plain" : machinekit.component.BomRevision.fingerprint(parts.join("|"), 1).substr(0, 8);
   }
 
   override public function revisionFingerprint():Null<String> {

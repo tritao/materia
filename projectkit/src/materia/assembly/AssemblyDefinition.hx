@@ -112,6 +112,11 @@ enum abstract AssemblyMateKind(String) from String to String {
   @:id(8) @:optional var groupPath:String;
   /** Semantic categories derived by the generator from its component metadata. */
   @:id(9) @:optional var selectionKinds:Array<String>;
+  /**
+   * For an included assembly: false puts its members directly in `groupPath`, with no folder named after this occurrence (the
+   * include is that group). Omitted means the include keeps its own folder below its group.
+   */
+  @:id(10) @:optional var includeFolder:Bool;
 }
 
 /** A placement relation between two occurrence connectors (see `AssemblyMateKind`). */

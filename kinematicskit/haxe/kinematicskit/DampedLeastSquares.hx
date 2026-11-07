@@ -13,7 +13,9 @@ package kinematicskit;
  * `maxStep` (unlimited by default, which is the original iteration) caps
  * each step: if any DOF would move more than `maxStep` (radians, or
  * `maxStep · translationScale` for a prismatic DOF), the whole step is
- * scaled down, keeping its direction. Targets far outside the reachable set
+ * scaled down, keeping its direction. `translationScale` also scales the damping
+ * of linear columns, so expressing the same mechanism in millimetres or metres
+ * does not change its resistance to motion. Targets far outside the reachable set
  * otherwise produce linearised steps of several radians.
  */
 class DampedLeastSquares {
@@ -51,7 +53,12 @@ class DampedLeastSquares {
         false
       );
       LinearAlgebra.normalEquationsDense(work.jacobian, rows, width, work.residual, work.normal, work.rhs);
-      for (i in 0...width) work.normal[i * width + i] += damping * damping;
+      for (i in 0...width) {
+        // Regularize physical motion: one translationScale of linear travel has
+        // the same damping as one radian, independent of the model's length unit.
+        var columnDamping = damping / columnScale(problem, i, translationScale);
+        work.normal[i * width + i] += columnDamping * columnDamping;
+      }
       if (!LinearAlgebra.solveInPlace(work.normal, work.rhs, width, work.delta, 1e-15)) return SolverSupport.finish(
         problem,
         state,

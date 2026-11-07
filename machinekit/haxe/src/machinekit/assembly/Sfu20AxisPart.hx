@@ -14,8 +14,7 @@ class Sfu20AxisPart extends MachineComponent {
     if (layout == null) layout = new Sfu20AxisLayout();
     if (kinds().indexOf(kind) < 0) throw "Unknown SFU20 fabrication";
     super(
-      "SFU20-" + kind + "-v1-L" + Dimension.format(layout.screwLength)
-      + "-R" + Dimension.format(layout.railLength) + "-S" + Dimension.format(layout.railSpacing),
+      numberFor(kind, layout),
       "SFU20 axis " + kind,
       "aluminium 6061"
     );
@@ -23,6 +22,11 @@ class Sfu20AxisPart extends MachineComponent {
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.kind = kind;
     this.layout = layout;
+  }
+  static function numberFor(kind:String, layout:Sfu20AxisLayout):String {
+    var key = "v1:" + ComponentNumberKey.encode(layout.screwLength) + ":"
+      + ComponentNumberKey.encode(layout.railLength) + ":" + ComponentNumberKey.encode(layout.railSpacing);
+    return PartNumbers.geometry("SFU20-AXIS", kind, key);
   }
   static function box(w:Float, h:Float, l:Float, x:Float, y:Float, z:Float):Part {
     var raw = Part.box(w, h, l), p = raw.translated(new Vector(x, y, z));
@@ -117,7 +121,8 @@ class Sfu20AxisPart extends MachineComponent {
       true,
       false,
       ["travel"]
-    ).numbered(v -> 'SFU20-AXIS-${v.token("kind").toUpperCase()}')
+    ).numbered(v -> numberFor(v.token("kind"), new Sfu20AxisLayout(
+      v.number("travel"), v.number("screwLength"), v.number("railLength"), v.number("railSpacing"))))
       .procured(_ -> Make("CNC machining")));
   }
   override public function componentType():Null<ComponentType> return recipeType();

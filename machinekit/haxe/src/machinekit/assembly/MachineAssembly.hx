@@ -97,6 +97,8 @@ typedef MachineAssemblyMassProperties = {
   final massByDefinition:Map<String, MassProperties> = [];
   var flatCache:Null<FlatAssembly>;
   final memberGroups:Map<String, String> = [];
+  /** Includes that are their group: their members sit directly in it, without a folder named after the include. */
+  final groupIncludes:Map<String, Bool> = [];
   var activeGroup:String = "Ungrouped";
 
   /** Functional folder for subsequently added local members and includes. */
@@ -139,7 +141,7 @@ typedef MachineAssemblyMassProperties = {
       var path = folder == "" ? local : local == "Ungrouped" ? folder : folder + "/" + local;
       var memberId = prefix == "" ? id : prefix + "/" + id;
       if (mechanical.member(id) != null) result.set(memberId, path);
-      else mechanical.requireSubassembly(id).assembly.collectGroups(result, memberId, path + "/" + id);
+      else mechanical.requireSubassembly(id).assembly.collectGroups(result, memberId, groupIncludes.exists(id) ? path : path + "/" + id);
     }
   }
 
@@ -222,6 +224,7 @@ typedef MachineAssemblyMassProperties = {
       }
     }
     for (id => path in memberGroups) target.memberGroups.set(id, path);
+    for (id in groupIncludes.keys()) target.groupIncludes.set(id, true);
     for (entry in mechanical.memberConnectors) target.mechanical.memberConnectors.push({
       instanceId: entry.instanceId,
       name: entry.name,
@@ -368,6 +371,20 @@ typedef MachineAssemblyMassProperties = {
     memberGroups.set(id, activeGroup);
     changed();
   }
+
+  /**
+   * Include `assembly` as subassembly `id` that is the scene group `path`: its members are `id/...` as with `include`, but in the
+   * tree they sit directly in `path` (and its own groups below it), without a second folder named after the include. Use it when
+   * one include fills a group on its own; keep `include` when a group holds several includes that need their own folders.
+   */
+  public function includeAsGroup(path:String, id:String, assembly:MachineAssembly, ?pose:AssemblyFrame):Void {
+    withGroup(path, () -> include(id, assembly, pose));
+    groupIncludes.set(id, true);
+    changed();
+  }
+
+  /** Whether include `id` is its group (see `includeAsGroup`). */
+  public function isGroupInclude(id:String):Bool return groupIncludes.exists(id);
 
   public function subassemblies():Array<MachineSubassembly> return mechanical.subassemblies.copy();
 

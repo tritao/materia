@@ -149,7 +149,7 @@ class RealRackMountTests {
       shape.close();
     }
     machinekit.assembly.PosedParts.scope(cache -> {for (i in 1...6) for (y in [-18, 18]) {
-      var layer = "rackMountSection1Cleat" + i + "Replication", bolt = "rackMountSection1Cleat" + i + "BaseBolt" + y;
+      var layer = "rackMountSection1Cleat" + i + "Replication", bolt = "rackMountSection1Cleat" + i + "BaseBolt" + (y < 0 ? 1 : 2);
       check(
         cache.overlap(b.component(layer), b.zeroPose(layer), b.component(bolt), b.zeroPose(bolt)) < 0.001,
         "bedding clearance follows the placed end-cleat datum: " + bolt
@@ -165,7 +165,7 @@ class RealRackMountTests {
       one
     );
     built.mount.validate(b, one, location.pose);
-    var webId = "rackMountSection1Cleat1WebBolt-14", receiverId = "rackMountSection1Receiver";
+    var webId = "rackMountSection1Cleat1WebBolt1", receiverId = "rackMountSection1Receiver";
     var fit = RackMountInterfaces.threadFit(b, receiverId, webId);
     check(fit != null && fit.fullThreadTipGapMm >= 1, "assembled web screw retains free usable thread");
     machinekit.assembly.PosedParts.scope(cache -> RackMountInterfaces.validateThreadSolid(b, cache, fit));

@@ -224,12 +224,8 @@ class PillowBlock extends MachineComponent {
     bearing = DeepGrooveBearing.metric(spec.bearingDesignation);
     if (Math.abs(bearing.bore - spec.boreDiameter)
       > 1e-9) throw 'Pillow block bearing "${spec.bearingDesignation}" bore does not match ${spec.boreDiameter} mm';
-    var customName =
-      '${spec.family}-${spec.designation}-${spec.bearingDesignation}-B${Dimension.format(spec.boreDiameter)}x${Dimension.format(spec.baseWidth)}x${Dimension.format(spec.length)}'
-      + '-H${Dimension.format(spec.shaftHeight)}x${Dimension.format(spec.baseHeight)}x${Dimension.format(spec.overallHeight)}'
-      + '-P${Dimension.format(spec.boltSpacing)}-D${Dimension.format(spec.mountHoleDiameter)}-M${spec.mountScrew}';
     super(
-      codeOnly ? customDesignation(customName) : spec.designation,
+      codeOnly ? customDesignation("PILLOW-BLOCK", spec) : spec.designation,
       '${spec.family} base-mounted pillow block unit',
       "cast iron",
       codeOnly

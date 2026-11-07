@@ -104,9 +104,8 @@ class CastingMoldCad {
         anchorage: insert.anchorage
       };
       for (hardware in machinekit.tooling.InsertAnchorGeometry.components(spec)) {
-        var prefix = "anchor-" + haxe.crypto.Sha256.encode(insert.id + "/" + hardware.anchorId).substr(0, 20);
         result.push({
-          id: prefix + "-" + hardware.kind,
+          id: insert.id + "-" + hardware.role,
           insertId: insert.id,
           anchorId: hardware.anchorId,
           part: hardware.part,

@@ -71,10 +71,8 @@ class RetainingRing extends MachineComponent {
       .shaftDiameter)) throw 'Retaining ring for ${Dimension.format(spec.shaftDiameter)} mm shaft has inconsistent dimensions';
     var shaft = Dimension.format(spec.shaftDiameter);
     var designation = 'DIN471-$shaft';
-    var customName = '$shaft-G${Dimension.format(spec.grooveDiameter)}-OD${Dimension.format(spec.outerDiameter)}'
-      + '-W${Dimension.format(spec.grooveWidth)}-T${Dimension.format(spec.thickness)}';
     super(
-      codeOnly ? customDesignation(customName) : designation,
+      codeOnly ? customDesignation("RETAINING-RING", spec) : designation,
       'External retaining ring for $shaft mm shaft',
       "spring steel",
       codeOnly

@@ -65,20 +65,22 @@ private class MillCastingSource extends MachineAssembly {
     base = new MineralFoundation(sizing.baseValues, baseInserts, null, null, liftingPoints(baseInserts));
     if (l.footPockets) for (sx in [-1, 1]) for (sy in [-1, 1]) {
       var id = corner(sx, sy);
-      base.addComponent(
-        'foot$id',
-        machinekit.structural.LevelingFoot.of(Plate(
-          details.footPlateSide,
-          details.footPlateSide,
-          details.footPlateThickness,
-          details.levelingClearanceDiameter
-        )),
-        F.translation(
-          sx * (l.baseWidth / 2 - l.wall),
-          (sy < 0 ? l.front + details.footEndSetback : l.rear - details.footEndSetback) - l.baseCentreY,
-          details.footRoof - details.footPlateThickness
-        )
-      );
+      base.withGroup(MineralFoundation.purposeGroup(InsertRole.LevelingSeat), () -> {
+        base.addComponent(
+          'foot$id',
+          machinekit.structural.LevelingFoot.of(Plate(
+            details.footPlateSide,
+            details.footPlateSide,
+            details.footPlateThickness,
+            details.levelingClearanceDiameter
+          )),
+          F.translation(
+            sx * (l.baseWidth / 2 - l.wall),
+            (sy < 0 ? l.front + details.footEndSetback : l.rear - details.footEndSetback) - l.baseCentreY,
+            details.footRoof - details.footPlateThickness
+          )
+        );
+      });
     }
     include("base", base, F.translation(0, l.baseCentreY, 0));
     if (l.footPockets) for (sx in [-1, 1]) for (sy in [-1, 1]) {
@@ -440,6 +442,7 @@ private class MillCastingSizing {
       var id = corner(sx, sy), x = sx * clampX, y = l.columnCentreY + sy * (l.columnDepth / 2 - l.roof);
       baseInserts.push({
         id: 'column$id',
+        purpose:InsertRole.ColumnMount,
         openings: [CastingPatterns.face("body.z-max")],
         part: jointSeat(
           new CastInsert(CastInsert.precastHoles(
@@ -676,6 +679,7 @@ private class MillCastingSizing {
       );
       columnInserts.push({
         id: id,
+        purpose:InsertRole.ColumnMount,
         part: part,
         pose: pose,
         openings: [
@@ -759,7 +763,7 @@ private class MillCastingSizing {
         z,
         [1, 0, 0, 0, 0, 1, 0, -1, 0]
       );
-      postCure.push({id: id, part: part, pose: pose});
+      postCure.push({id: id, purpose:InsertRole.HatchMount, part: part, pose: pose});
       var receiver = InsertHoles.records(InsertHoles.through(details.hatchReceiverDiameter,
         details.hatchReceiverDepth))[0];
       receiver.id = id + "-receiver";
@@ -845,7 +849,7 @@ private class MillCastingSizing {
         details.permittedRailHoleRoutes,
         details.railHoleBudget
       );
-      result[index] = {id: row.id, pose: row.pose, openings: row.openings, part: part};
+      result[index] = {id: row.id, purpose:row.purpose, pose: row.pose, openings: row.openings, part: part};
     }
     return result;
   }
@@ -946,7 +950,7 @@ private class MillCastingSizing {
         haxe.Json.stringify(materia.casting.InterfaceRequirement.InterfaceRequirements.records([requirement]))
       ));
     }
-    return {id: id, part: part, pose: pose, openings: openings};
+    return {id: id, purpose:role, part: part, pose: pose, openings: openings};
   }
 
   static function body(width:Float,

@@ -92,6 +92,11 @@ A review of `HobberSaddle` and `FlexsplineHobber` found:
 
 ## Open
 
+- **Casting freeze gate (2026-11-07).** Do not release the bed or column to a mould maker until these have landed and the casting
+  package (`supplier-packages/casting/`) has been regenerated and passes: step XA (motor bay replacing the tray rear service
+  bridge and its two seat pockets, replicated drive seats in place of the X and Z pads, guard feet on inserts), the column sole
+  redesign in XC, the moved motor-end tray clamp seats, and [ALIGNMENT.md](ALIGNMENT.md) (replication allowances on every precision
+  insert: rail seats, drive seats, table seat, column sole). Each changes insert positions, pockets or allowances.
 - **Y screw centred between the rails in a 30 mm swivel plate (head redesign item 1): NOT DONE, numbers in the Log (2026-11-04).** It needs a small-screw drive family (SFU1204 or compact nut with BK10/BF10 supports and a 40-60 frame motor mount) that the library does not have; the SFU1605/BK12/M60D drive cannot be centred in a 30 mm plate (the motor mount stands 22 mm into the plate from the rail plane and its body meets the Y saddle) and
   its supports cannot sit "outside the saddle's travel" on a plate shorter than the saddle (plate 230, saddle -130..222 mm, so about 400 mm). Decision needed: new drive family rows (maker data to source) or a different Y drive.
 - Spindle drive: belt strength (HTD5M 15 mm tight-side 375 N at the motor's peak torque) and the pulley/encoder parts are not checked against a maker's data; the first-mode estimate (`HobberFrameChecks.spindleDrive`) is analytic with stated joint assumptions, to be confirmed by an FE model of the cradle on the seat and an impact test.

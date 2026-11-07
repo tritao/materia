@@ -129,7 +129,7 @@ class FoundationToolingTests {
     ));
     var foundation = new MineralFoundation(
       new ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber("height", 100),
-      [{id: "round", part: insert, pose: F.translation(0, 0, 60), openings: [CastingPatterns.face("body.z-max")]}]
+      [{id: "round", purpose:materia.casting.InsertSpec.InsertRole.GenericMount, part: insert, pose: F.translation(0, 0, 60), openings: [CastingPatterns.face("body.z-max")]}]
     );
     var input = FoundationToolingAdapter.snapshot(foundation, "round-foundation", 1);
     check(switch materia.casting.InsertSpec.InsertBodyCodec.mouth(input.inserts[0].body) {
@@ -218,7 +218,7 @@ class FoundationToolingTests {
     );
     var foundation = new MineralFoundation(
       new ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber("height", 100),
-      [{id: "socket", part: socket, pose: F.translation(0, 0, 60), openings: [CastingPatterns.face("body.z-max")]}]
+      [{id: "socket", purpose:materia.casting.InsertSpec.InsertRole.GenericMount, part: socket, pose: F.translation(0, 0, 60), openings: [CastingPatterns.face("body.z-max")]}]
     );
     var input = FoundationToolingAdapter.snapshot(foundation, "socket-source", 1);
     var qualification = materia.tooling.casting.InsertQualifications.check(input.inserts);
@@ -709,9 +709,10 @@ class FoundationToolingTests {
       "source insert publishes the authoritative interface holes"
     );
     var placements:Array<CastInsertPlacement> = [
-      {id: "topSeat", part: seat, openings: [CastingPatterns.face("body.z-max")], pose: F.translation(80, 0, 170)},
+      {id: "topSeat", purpose:materia.casting.InsertSpec.InsertRole.GuideSeat, part: seat, openings: [CastingPatterns.face("body.z-max")], pose: F.translation(80, 0, 170)},
       {
         id: "sideSeat",
+        purpose:materia.casting.InsertSpec.InsertRole.GuideSeat,
         openings: [CastingPatterns.face("body.y-min")],
         part: seat,
         pose: F.fromRotationMatrix(0, -90, 80, [1, 0, 0, 0, 0, -1, 0, 1, 0])
@@ -792,6 +793,7 @@ class FoundationToolingTests {
       values,
       [{
         id: "finished",
+        purpose:materia.casting.InsertSpec.InsertRole.GenericMount,
         part: finished,
         openings: [
           CastingPatterns.face("body.z-min"),

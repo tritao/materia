@@ -250,6 +250,7 @@ import materia.assembly.AssemblyFrames as F;
         };
         var bad:machinekit.structural.MineralFoundation.CastInsertPlacement = {
           id: site.id,
+          purpose:site.purpose,
           part: site.part,
           openings: site.openings,
           pose: F.compose(site.pose, F.translation(0, 1, 0))

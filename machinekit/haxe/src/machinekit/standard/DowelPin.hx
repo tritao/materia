@@ -71,9 +71,8 @@ class DowelPin extends MachineComponent {
     if (spec == null || !(spec.diameter > 0) || !(spec.chamfer >= 0) || !(length > 2 * spec.chamfer))
       throw "Dowel pin specification has inconsistent ISO 8734 dimensions";
     var designation = 'ISO8734-${spec.size}x${Dimension.format(length)}';
-    var customName = '${spec.size}-D${Dimension.format(spec.diameter)}-L${Dimension.format(length)}';
     super(
-      codeOnly ? customDesignation(customName) : designation,
+      codeOnly ? customDesignation("DOWEL", {spec:spec, length:length}) : designation,
       'Dowel pin ${Dimension.format(spec.diameter)} m6 x ${Dimension.format(length)} mm',
       "steel",
       codeOnly

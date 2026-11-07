@@ -123,9 +123,12 @@ class HmiPart extends MachineComponent {
       solid.close();
     }
     var assembly = new MachineAssembly();
+    var type = componentType();
+    if (type == null) throw "Expanded HMI bodies require a declared recipe";
+    var definingKey = type.key(stored);
     for (i in 0...specs.length) {
       var spec = specs[i];
-      var name = i == 0 ? designation : designation + "-" + spec.id.toUpperCase();
+      var name = i == 0 ? designation : machinekit.component.PartNumbers.geometry("HMI", spec.id, definingKey);
       assembly.addComponent(
         spec.id,
         new DeviceBody(

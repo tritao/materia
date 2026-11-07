@@ -135,6 +135,7 @@ class CastingTests {
     ));
     var placements:Array<CastInsertPlacement> = [{
       id: "seat",
+      purpose:materia.casting.InsertSpec.InsertRole.GenericMount,
       part: insert,
       openings: [CastingPatterns.face("body.z-max"), CastingPatterns.face("body.x-max")],
       pose: F.translation(80, 0, 90)

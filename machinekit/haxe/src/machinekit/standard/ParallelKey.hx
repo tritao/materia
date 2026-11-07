@@ -82,11 +82,8 @@ class ParallelKey extends MachineComponent {
       || !(spec.hubDepth <= spec.height)) throw "Parallel key specification has inconsistent DIN 6885 dimensions";
     var size = '${Dimension.format(spec.width)}x${Dimension.format(spec.height)}';
     var designation = 'DIN6885-B-${size}x${Dimension.format(length)}';
-    var customName =
-      '${size}x${Dimension.format(length)}-S${Dimension.format(spec.minShaft)}-${Dimension.format(spec.maxShaft)}'
-      + '-D${Dimension.format(spec.shaftDepth)}x${Dimension.format(spec.hubDepth)}';
     super(
-      codeOnly ? customDesignation(customName) : designation,
+      codeOnly ? customDesignation("PARALLEL-KEY", {spec:spec, length:length}) : designation,
       'Form B parallel key $size, ${Dimension.format(length)} mm long',
       "steel C45",
       codeOnly

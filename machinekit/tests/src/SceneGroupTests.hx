@@ -31,6 +31,20 @@ class SceneGroupTests {
     var fallback = new MachineAssembly(); fallback.addComponent("nut", HexNut.metric("M5"));
     parent.include("fallback", fallback);
     expect(parent.functionalGroups().get("fallback/nut") == "X axis/fallback" && parent.checkGroups().items.length == 0, "include supplies ownership to ungrouped descendants");
+    // An include that is its group: no second folder named after the include, through encode/decode and the flat export.
+    var unit = new MachineAssembly();
+    unit.group("Drive");
+    unit.addComponent("nut", HexNut.metric("M5"));
+    var host = new MachineAssembly();
+    host.includeAsGroup("Machine", "machine", unit);
+    host.includeAsGroup("Shell", "shell", fallback);
+    expect(host.functionalGroups().get("machine/nut") == "Machine/Drive", "include as group puts its groups directly under it");
+    expect(host.functionalGroups().get("shell/nut") == "Shell", "include as group owns its ungrouped members");
+    var hostRestored = MachineAssembly.decode(host.encode());
+    expect(hostRestored.functionalGroups().get("machine/nut") == "Machine/Drive", "include as group survives the description");
+    var hostFlat = materia.assembly.AssemblyDefinitionFlattener.flattenView(host.describe().mechanical);
+    expect(hostFlat.occurrences.filter(o -> o.id == "machine/nut")[0].groupPath == "Machine/Drive", "flat export agrees with include as group");
+    expect(hostFlat.occurrences.filter(o -> o.id == "shell/nut")[0].groupPath == "Shell", "flat export gives ungrouped members the include's group");
     var definition = restored.definition();
     definition.joints = [
       {id:"X", type:"prismatic", role:"tree", parent:"base", parentConnector:"front", child:"fixed", childConnector:"front",

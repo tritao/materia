@@ -68,6 +68,36 @@ class AssemblyBodies {
     return parts.length == 0 ? id : parts.join(" › ");
   }
 
+  /** Role labels for one sibling set. Suffixes distinguish spelling variants without exposing paths. */
+  public static function occurrenceLabels(ids:Array<String>):Map<String, String> {
+    var base = new Map<String, String>();
+    var counts = new Map<String, Int>();
+    for (id in ids) {
+      var label = displayName(id.substr(id.lastIndexOf("/") + 1));
+      base.set(id, label);
+      var count = counts.get(label);
+      counts.set(label, count == null ? 1 : count + 1);
+    }
+    var ordered = ids.copy();
+    ordered.sort(Reflect.compare);
+    var result = new Map<String, String>();
+    var used = new Map<String, Bool>();
+    for (id in ordered) {
+      var label = base.get(id);
+      if (label == null) throw 'Missing occurrence label "$id"';
+      var count = counts.get(label);
+      var shown = label;
+      if (count != null && count > 1) {
+        var index = 1;
+        while (used.exists(label + " (" + index + ")") || counts.exists(label + " (" + index + ")")) index++;
+        shown = label + " (" + index + ")";
+      }
+      used.set(shown, true);
+      result.set(id, shown);
+    }
+    return result;
+  }
+
   static function isDigit(c:String):Bool {
     if (c.length != 1) return false;
     var code = StringTools.fastCodeAt(c, 0);
@@ -87,13 +117,16 @@ class AssemblyBodies {
         previous = " ";
         continue;
       }
+      var next = segment.charAt(index + 1);
       var boundary = previous != ""
-        && previous != " " && ((isUpper(c) && !isUpper(previous)) || isDigit(c) != isDigit(previous));
+        && previous != " " && ((isUpper(c) && (!isUpper(previous) || next != next.toUpperCase())) || isDigit(c) != isDigit(previous));
       if (boundary) out.add(" ");
       out.add(c.toLowerCase());
       previous = c;
     }
-    var text = out.toString();
+    var tokens = [for (token in out.toString().split(" ")) if (token.length > 0)
+      token == "x" || token == "y" || token == "z" ? token.toUpperCase() : token];
+    var text = tokens.join(" ");
     return text.charAt(0).toUpperCase() + text.substr(1);
   }
 }

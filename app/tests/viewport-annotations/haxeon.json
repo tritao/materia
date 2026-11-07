@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "viewport-annotations-tests"},
+  "entry": "ViewportAnnotationsTests",
+  "sourceRoots": ["."],
+  "dependencies": {"app": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}

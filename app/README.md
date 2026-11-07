@@ -51,6 +51,11 @@ children; showing a hidden parent preserves child settings. **Show all** and
 **Isolate selected** are also available in the popup. Escape or an outside click
 closes it. Visibility controls remain available during simulation.
 
+Right-click any scene-tree row for **Copy reference** or **Copy name**. A reference
+contains the scene, source project/document and variant when available, readable
+ownership path and exact occurrence/group/feature key. Copy name omits visibility
+and count decorations. Both actions work during playback and in read-only projects.
+
 Right-click an object or group for **Isolate selected** or **Show all**. Isolation
 preserves hidden descendants when the selected row is a group; Show all clears
 all visibility masks and enables every object's Visible setting. These actions
@@ -247,6 +252,14 @@ viewport or tree toggles the selection's visibility using the eye button's undoa
 a hidden part or group stays selected so a second press shows it again. Holding Space does not
 repeat the toggle, and typing in a text field does not change visibility.
 
+The hobber viewport's **Scenario** strip uses compact choices and a dropdown in narrow panes.
+Hover or focus a choice for playback instructions; choosing the current scenario leaves the
+run intact. Scenario changes stay disabled during playback. Layout and keyboard coverage:
+
+```sh
+./haxeon/scripts/haxeon run --project=app/tests/scenario-selector/haxeon.json
+```
+
 The hobber's CNC pane shows cycle metrics and inspection qualification before profile and
 lead charts. Charts stack in narrow panes and sit side by side from 760 logical pixels.
 Sampling, coverage, assessment warnings, load assumptions and run details expand independently.
@@ -321,7 +334,9 @@ and filtered deviations in µm. Opening details does not rerun stock removal or 
   generated source path) and `*` for unsaved changes. Paths that do not fit are
   shortened from the left, preserving the filename; hover or focus reveals the
   complete path in an overlay only while the inline label is truncated.
-- New, Open, and window close ask Save / Discard / Cancel when edits are unsaved.
+- New, Open, and window close use the native Save / Don't Save / Cancel dialog
+  when edits are unsaved. Browser builds and unavailable native dialogs use the
+  in-app prompt.
   Cancelling a chooser or a failed save keeps the current document open.
 - Docking preferences remain separate and save automatically. The command
   palette also exposes Save workspace.
@@ -526,8 +541,18 @@ Scene rectangles persist an extrusion depth plus independent collision-enabled,
 dynamic-body, and mass settings. Visibility affects rendering only. Application
 runs default to the bundled MuJoCo backend, while the sensor panel can select
 the Test backend used by automated checks; changing backend remains pending until
-Rebuild. The perspective viewport overlays read-only runtime robot poses, sensor mounts,
-and LiDAR rays. New/Open stops and detaches the previous document's simulated
+Rebuild. The perspective viewport shows the machine without sensor or link markers
+by default. The visible Sensors panel reveals the inspected sensor's mount and
+orientation, plus available LiDAR readings. Viewport options independently enable
+all Sensors, Sensor readings, Link frames, and Collision details. Amber proximity
+and red collision closest-point markers appear only for selected parts or when
+Collision details is enabled; the collision query and toolbar summary are retained.
+Show annotations through geometry reveals otherwise occluded inspection aids. Viewport overlays is the master
+visibility switch. Authored mounts are inspectable before Play, without fabricated
+readings; live inspection follows measured robot poses. These aids do not change
+machine geometry or document state. Regression coverage:
+`./haxeon/scripts/haxeon run --project=app/tests/viewport-annotations/haxeon.json`.
+New/Open stops and detaches the previous document's simulated
 robots but leaves independently attached remote robots untouched.
 
 ## Script-owned setups
@@ -602,6 +627,12 @@ Run the scene editing, document, and CAD plate regression checks from the reposi
 
 ```sh
 ./haxeon/scripts/haxeon run --project app/tests/haxeon.json
+```
+
+Run just the document workflow checks, including native prompt responses and fallback:
+
+```sh
+./haxeon/scripts/haxeon run --project app/tests/haxeon.scene-document.json
 ```
 
 The scripted regression opens and saves the two-robot setup, checks typed overrides,

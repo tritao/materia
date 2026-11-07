@@ -168,13 +168,8 @@ class HexBolt extends MachineComponent implements ScrewFastener {
     var name = '${spec.size}x${Dimension.format(length)}';
     var classSuffix = propertyClass == Steel88 ? "" : '-' + PropertyClasses.token(propertyClass);
     var designation = 'ISO4017-$name$classSuffix';
-    var customName =
-      '${spec.size}-D${Dimension.format(spec.diameter)}-P${Dimension.format(spec.pitch)}-AF${Dimension.format(spec.acrossFlats)}'
-      + '-H${Dimension.format(spec.headHeight)}-TD${Dimension.format(spec.tapDrill)}'
-      + '-C${Dimension.format(spec.clearanceFine)}x${Dimension.format(spec.clearanceMedium)}x${Dimension.format(spec.clearanceCoarse)}'
-      + '-L${Dimension.format(length)}-PC${PropertyClasses.token(propertyClass)}';
     super(
-      codeOnly ? customDesignation(customName) : designation,
+      codeOnly ? customDesignation("HEX-BOLT-" + spec.size, {spec:spec, length:length, propertyClass:PropertyClasses.token(propertyClass)}) : designation,
       'Hex bolt $name$classSuffix',
       PropertyClasses.material(propertyClass),
       codeOnly

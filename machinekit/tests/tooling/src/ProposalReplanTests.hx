@@ -93,6 +93,7 @@ class ProposalReplanTests {
       var insert = new CastInsert(values);
       placements.push({
         id: "lift-" + index,
+        purpose:InsertRole.LiftingMount,
         part: insert,
         pose: F.translation(position.x, position.y, position.z - INSERT_HEIGHT),
         openings: [CastingPatterns.face("body.z-max")]

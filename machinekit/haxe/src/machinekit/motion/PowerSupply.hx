@@ -41,8 +41,7 @@ class PowerSupply extends MachineComponent implements ElectricalSource {
     if (!(regenerativePower >= 0)
       || !Math.isFinite(regenerativePower)) throw "Regenerative capacity must be finite and nonnegative";
     super(
-      'DC-SUPPLY-${Dimension.format(voltage.volts())}V-${Dimension.format(current.amps())}A-'
-      + '${Dimension.format(width)}x${Dimension.format(height)}x${Dimension.format(depth)}-$outlets-OUT-${Dimension.format(regenerativePower)}W-SHUNT',
+      numberFor(voltage.volts(), current.amps(), width, height, depth, outlets, regenerativePower),
       'DC supply, ${Dimension.format(voltage.volts())} V, ${Dimension.format(current.amps())} A',
       "aluminium 6061"
     );
@@ -72,6 +71,17 @@ class PowerSupply extends MachineComponent implements ElectricalSource {
     return {voltage: voltage, current: current, regenerativePower: regenerativePower};
   }
 
+  static function numberFor(voltage:Float, current:Float, width:Float, height:Float, depth:Float,
+    outlets:Int, regenerativePower:Float):String {
+    var readable = 'PSU-ASSUMED-${Dimension.format(voltage)}V${Dimension.format(current)}A-'
+      + '${Dimension.format(width)}x${Dimension.format(height)}x${Dimension.format(depth)}-'
+      + '${outlets}O-${Dimension.format(regenerativePower)}';
+    if (readable.length <= machinekit.component.PartNumberLint.MAX_LENGTH) return readable;
+    var key = [for (value in [voltage, current, width, height, depth, outlets, regenerativePower])
+      machinekit.component.ComponentNumberKey.encode(value)].join("|");
+    return machinekit.component.PartNumbers.geometry("PSU", "ASSUMED", key);
+  }
+
   public static function recipeType():ComponentType {
     return recipe.get(() -> new ComponentType(
       "machinekit.motion.power-supply",
@@ -93,9 +103,8 @@ class PowerSupply extends MachineComponent implements ElectricalSource {
         v.number("depth"),
         v.number("regenerativePower")
       )
-    ).numbered(v -> 'PSU-ASSUMED-${Dimension.format(v.number("voltage"))}V${Dimension.format(v.number("current"))}A-'
-      + '${Dimension.format(v.number("width"))}x${Dimension.format(v.number("height"))}x${Dimension.format(v.number("depth"))}-'
-      + '${v.integer("outlets")}O-${Dimension.format(v.number("regenerativePower"))}')
+    ).numbered(v -> numberFor(v.number("voltage"), v.number("current"), v.number("width"),
+      v.number("height"), v.number("depth"), v.integer("outlets"), v.number("regenerativePower")))
       .procured(_ -> Buy(null, null, null)).requiring(v -> {
         var req = machinekit.component.Procurement.ProcurementCodec.requirement;
         return [req("voltage", "V", null, null, v.number("voltage")), req("current", "A", v.number("current")),

@@ -63,11 +63,8 @@ class LinearRail extends MachineComponent {
     if (drawing != NOMINAL && drawing != MEASURED) throw 'Unknown linear rail drawing "$drawing"';
     if (drawing == MEASURED && !hasMeasuredSection(spec)) throw 'No measured section for rail ${spec.rail}';
     var lengthText = Dimension.format(length);
-    var customName =
-      '${spec.family}-${spec.rail}-RW${Dimension.format(spec.railWidth)}-RH${Dimension.format(spec.railHeight)}'
-      + '-HP${Dimension.format(spec.railHolePitch)}-EM${Dimension.format(spec.railEndMargin)}-L$lengthText';
     super(
-      codeOnly ? customDesignation(customName) : '${spec.family}-${spec.rail}-L$lengthText',
+      codeOnly ? customDesignation("LINEAR-RAIL", {spec:spec, length:length}) : '${spec.family}-${spec.rail}-L$lengthText',
       '${spec.family} ${spec.rail} profile rail, $lengthText mm long',
       "steel",
       codeOnly

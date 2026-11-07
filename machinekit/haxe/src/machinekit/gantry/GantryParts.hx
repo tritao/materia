@@ -79,18 +79,13 @@ class GantryPlate extends MachineComponent {
     for (value in [width,
       depth, height]) if (!Math.isFinite(value) || value <= 0) throw "Gantry plate dimensions must be positive";
     if ((motor == null) != (motorFace == null)) throw "A motor mounting plate needs its motor face";
-    var mountIdentity = motor == null || motorFace == null ? "" : "-" + motor.designation + "-AT" + [
-      motorFace.x,
-      motorFace.y,
-      motorFace.z,
-      motorFace.qx,
-      motorFace.qy,
-      motorFace.qz,
-      motorFace.qw
-    ].join(",");
+    var dimensions = [width, depth, height];
+    if (motorFace != null) for (value in [motorFace.x, motorFace.y, motorFace.z,
+      motorFace.qx, motorFace.qy, motorFace.qz, motorFace.qw]) dimensions.push(value);
+    var key = haxe.Json.stringify([dimensions.map(machinekit.component.ComponentNumberKey.encode).join(":"),
+      motor == null ? "none" : motor.designation, motor == null ? "none" : motor.bom.fingerprint]);
     super(
-      "GANTRY-" + name
-      + "-" + Dimension.format(width) + "x" + Dimension.format(depth) + "x" + Dimension.format(height) + mountIdentity,
+      drawing == null ? machinekit.component.PartNumbers.geometry("GANTRY", name, key) : drawing,
       "Gantry " + name,
       "aluminium 6061",
       true
@@ -275,7 +270,7 @@ class GantryNutMount extends MachineComponent {
   public final size:Float;
   public static inline var THICKNESS:Float = 6;
   public function new(drawing:String, nut:LeadScrewNut) {
-    super("GANTRY-NUT-MOUNT-" + nut.designation, "Gantry screw nut mounting plate", "aluminium 6061", true);
+    super(drawing, "Gantry screw nut mounting plate", "aluminium 6061", true);
     declareDrawingNumber(drawing);
     addFacet(new machinekit.component.ProcurementIntent(Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
@@ -423,7 +418,7 @@ class GantrySwitchTrigger extends MachineComponent {
     bridgeY:Float
   ) {
     super(
-      "GANTRY-STEPPED-TRIGGER-" + [width, depth, height, bridgeWidth, bridgeDepth, bridgeX, bridgeY].join("-"),
+      drawing,
       "Gantry stepped Z switch trigger",
       "steel",
       true

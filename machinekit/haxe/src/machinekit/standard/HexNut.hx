@@ -69,11 +69,7 @@ class HexNut extends MachineComponent {
     if (!(spec.diameter > 0) || !(spec.acrossFlats > spec.diameter)
       || !(spec.height > 0)) throw 'Hex nut ${spec.size} has inconsistent dimensions';
     var designation = 'ISO4032-${spec.size}';
-    var customName =
-      '${spec.size}-D${Dimension.format(spec.diameter)}-AF${Dimension.format(spec.acrossFlats)}-H${Dimension.format(spec.height)}';
-    if (thread != null) customName +=
-      '-P${Dimension.format((cast thread : ThreadSpec).pitch)}-S${(cast thread : ThreadSpec).starts}-${(cast thread : ThreadSpec).hand}-${(cast thread : ThreadSpec).profile}-${(cast thread : ThreadSpec).toleranceClass}';
-    super(codeOnly ? customDesignation(customName) : designation, 'Hex nut ${spec.size}', "steel 8", codeOnly);
+    super(codeOnly ? customDesignation("HEX-NUT-" + spec.size, {spec:spec, thread:thread == null ? null : {diameter:thread.majorDiameter, pitch:thread.pitch, starts:thread.starts, hand:Std.string(thread.hand), profile:Std.string(thread.profile), tolerance:thread.toleranceClass}}) : designation, 'Hex nut ${spec.size}', "steel 8", codeOnly);
     if (codeOnly) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null)));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", codeOnly ? "Stated" : "Catalog").setToken("errorsBasis", "Assumed")

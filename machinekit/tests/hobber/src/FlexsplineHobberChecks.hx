@@ -37,6 +37,33 @@ class FlexsplineHobberChecks {
   public static function run():Void {
     var machine = new FlexsplineHobber();
     machine.validate();
+    for (role in materia.casting.InsertSpec.InsertRoles.tokens())
+      check(machinekit.structural.MineralFoundation.purposeGroup(role).length > 0, "foundation purpose group " + role);
+    var foundations:Array<machinekit.structural.MineralFoundation> = [machine.bed, machine.column];
+    for (foundation in foundations) {
+      check(!FoundationIntegrity.checkGroups(foundation).hasErrors(), "foundation members all declare a purpose");
+      var groups = foundation.functionalGroups();
+      check(groups.get("casting") == "casting", "casting has its own group");
+      var anchorCount = 0;
+      for (insert in foundation.insertLocations()) {
+        // An insert with anchor bolts has its own folder in its purpose group; its bolts share it.
+        var anchored = [for (member in foundation.components()) if (StringTools.startsWith(member.id, insert.id + "-bolt")) member].length > 0;
+        var expected = machinekit.structural.MineralFoundation.purposeGroup(insert.purpose) + (anchored ? "/" + insert.id : "");
+        check(groups.get(insert.id) == expected, "insert belongs to its declared purpose " + insert.id);
+        for (member in foundation.components()) if (StringTools.startsWith(member.id, insert.id + "-bolt")) {
+          anchorCount++;
+          check(groups.get(member.id) == expected, "anchor shares insert purpose " + member.id);
+        }
+      }
+      check(anchorCount > 0, "foundation grouping test exercises actual anchor hardware");
+      for (insert in foundation.postCureLocations())
+        check(groups.get(insert.id) == machinekit.structural.MineralFoundation.purposeGroup(insert.purpose),
+          "post-cure insert belongs to its installation purpose " + insert.id);
+    }
+    var groupingProbe = new machinekit.structural.MineralFoundation(new machinekit.component.ComponentValues(), []);
+    groupingProbe.addComponent("unassignedProbe", groupingProbe.body);
+    check(FoundationIntegrity.checkGroups(groupingProbe).hasErrors(), "ungrouped appended foundation member is rejected");
+
     check(machine.checkGroups().items.length == 0, "every hobber member has authored functional ownership");
     var ownership = machine.functionalGroups(), count = 0;
     for (id in ownership.keys()) count++;

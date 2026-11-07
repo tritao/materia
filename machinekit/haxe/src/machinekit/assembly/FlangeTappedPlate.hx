@@ -35,10 +35,12 @@ class FlangeTappedPlate extends MachineComponent {
       || tapDepth > thickness || edgeMargin < 10) throw "Fixture tap depth and edge margin must fit its plate";
     var nominal = thread == null ? screw.thread.mating() : cast thread;
     if (!nominal.internal) throw "Fixture plate requires an internal thread";
+    var key = haxe.Json.stringify([housing.designation, screw.designation, nominal.designation,
+      Std.string(nominal.starts), Std.string(nominal.hand), Std.string(nominal.profile), nominal.toleranceClass,
+      [housing.face, thickness, tapDepth, holeShift, edgeMargin, nominal.majorDiameter, nominal.pitch,
+        screw.spec.tapDrill].map(machinekit.component.ComponentNumberKey.encode).join(":")]);
     super(
-      'FLANGEPLATE-${housing.designation}-T${Dimension.format(thickness)}-D${Dimension.format(tapDepth)}-X${Dimension.format(holeShift)}'
-      + (edgeMargin == 10 ? "" : '-E${Dimension.format(edgeMargin)}')
-      + '-${nominal.designation}-${nominal.majorDiameter}-${nominal.pitch}-${nominal.starts}-${nominal.hand}-${nominal.profile}-${nominal.toleranceClass}-DRILL${screw.spec.tapDrill}',
+      machinekit.component.PartNumbers.geometry("FLANGEPLATE", "TAPPED", key),
       "Tapped flange fixture plate",
       "aluminium 6061",
       true

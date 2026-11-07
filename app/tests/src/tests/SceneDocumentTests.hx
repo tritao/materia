@@ -15,6 +15,11 @@ import sys.io.File;
 import haxe.Json;
 
 class SceneDocumentTests {
+  public static function main():Void {
+    run();
+    Sys.println("Scene document tests passed");
+  }
+
   static function property(properties:Array<PropertyDescriptor>, key:String):PropertyDescriptor {
     for (candidate in properties) if (StringTools.endsWith(candidate.id, ":" + key)) return candidate;
     throw "Missing property: " + key;
@@ -145,6 +150,32 @@ class SceneDocumentTests {
         function(_, _, done) done(chosen, chooserError), function() {
       }
       );
+      var answer:Null<String> -> Void = function(_) throw "No native prompt is pending";
+      var confirmations = 0;
+      controller.confirmUnsaved = function(label, done) {
+        check(label == session.label(), "native prompt identifies the current document");
+        confirmations++;
+        answer = done;
+      };
+      var nativeClosed = false;
+      controller.requestClose(function() nativeClosed = true);
+      check(controller.blocked() && !controller.needsConfirmation(), "native prompt blocks edits without an overlay");
+      controller.requestNew();
+      check(confirmations == 1, "repeated actions cannot open duplicate native prompts");
+      answer("cancel");
+      check(!nativeClosed && !controller.blocked() && session.isDirty(), "native Cancel preserves the document");
+      controller.requestClose(function() nativeClosed = true);
+      answer("discard");
+      check(nativeClosed && !controller.blocked(), "native Don't Save continues closing");
+      controller.confirmUnsaved = function(_, done) done(null);
+      controller.requestNew();
+      check(controller.needsConfirmation(), "native failure restores the custom prompt");
+      controller.resolve("cancel");
+      controller.confirmUnsaved = function(_, _) throw "unavailable";
+      controller.requestNew();
+      check(controller.needsConfirmation(), "native startup failure restores the custom prompt");
+      controller.resolve("cancel");
+      controller.confirmUnsaved = null;
       controller.requestNew();
       check(controller.needsConfirmation(), "New asks before discarding edits");
       controller.resolve("cancel");
@@ -156,6 +187,11 @@ class SceneDocumentTests {
         "Discard creates a fresh untitled document"
       );
       edit(session, 5);
+      controller.confirmUnsaved = function(_, done) done("save");
+      var cancelledNativeClose = false;
+      controller.requestClose(function() cancelledNativeClose = true);
+      check(!cancelledNativeClose && session.isDirty() && !controller.blocked(), "native Save with a cancelled chooser keeps the document open");
+      controller.confirmUnsaved = null;
       var closed = false;
       controller.requestClose(function() closed = true);
       controller.resolve("save");

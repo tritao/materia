@@ -16,6 +16,9 @@ class OpposedSlidingDoor extends MachineAssembly {
     super();
     stroke = width / 2 + gap;
     var railPose = F.identity(), half = width / 2 + stroke + 20;
+    // Scene groups: the track (rail, its frame standoffs, end stops, splash hood), the lower guide shoes, and one group per
+    // leaf with its two roller hangers.
+    group("Track");
     // Downward-facing 8 mm slot; twin roller treads run on the two lower lips.
     addComponent(
       "rail",
@@ -61,6 +64,7 @@ class OpposedSlidingDoor extends MachineAssembly {
         F.identity()
       );
       // Two fixed shoes overlap in engagement as each short leaf traverses them.
+      group("Lower guides");
       for (x in [side * (width / 2 - 30), side * (stroke + 30)]) fixed(
         'guide$side-$x',
         new BlockBracket(
@@ -75,6 +79,7 @@ class OpposedSlidingDoor extends MachineAssembly {
         "rail",
         F.identity()
       );
+      group("Track");
     }
     fixed(
       "headerCover",
@@ -95,7 +100,8 @@ class OpposedSlidingDoor extends MachineAssembly {
         0,
         0
       );
-      var leaf = new EnclosurePanel(width / 2, height, constructionId);
+      var leaf = new EnclosurePanel(width / 2, height, constructionId), leafGroup = left ? "Left leaf" : "Right leaf";
+      group(leafGroup);
       addComponent(id, leaf, pose);
       addMemberConnector("rail", joint, F.compose(F.inverse(railPose), F.compose(pose, leaf.connector("mount").frame)));
       addMateOnAxis(
@@ -131,8 +137,9 @@ class OpposedSlidingDoor extends MachineAssembly {
         id,
         F.identity()
       );
-      for (hanger in [-1, 1]) {
-        var x = hanger * width / 8, name = prefix + 'Hanger$hanger';
+      for (hangerIndex in 0...2) {
+        var x = (hangerIndex == 0 ? -1 : 1) * width / 8, name = prefix + "Hanger" + (hangerIndex + 1);
+        group(leafGroup + "/Hanger " + (hangerIndex + 1));
         fixed(
           name,
           new BlockBracket(
@@ -159,11 +166,12 @@ class OpposedSlidingDoor extends MachineAssembly {
           id,
           F.fromRotationMatrix(x, -13.6, height + 25, [1, 0, 0, 0, 0, 1, 0, -1, 0])
         );
-        for (y in [-4.6, 3.0]) fixed(
-          name + 'Spacer$y',
+        var spacerPositions = [-4.6, 3.0];
+        for (index in 0...spacerPositions.length) fixed(
+          name + "Spacer" + (index + 1),
           machinekit.standard.FlatWasher.metric("M8"),
           id,
-          F.fromRotationMatrix(x, y, height + 25, [1, 0, 0, 0, 0, 1, 0, -1, 0])
+          F.fromRotationMatrix(x, spacerPositions[index], height + 25, [1, 0, 0, 0, 0, 1, 0, -1, 0])
         );
         var washer = machinekit.standard.FlatWasher.metric("M6");
         fixed(name + "Washer", washer, id, F.fromRotationMatrix(x, 11.6, height + 25, [1, 0, 0, 0, 0, 1, 0, -1, 0]));
@@ -173,9 +181,11 @@ class OpposedSlidingDoor extends MachineAssembly {
           id,
           F.fromRotationMatrix(x, 11.6 + washer.spec.thickness, height + 25, [1, 0, 0, 0, 0, 1, 0, -1, 0])
         );
-        for (y in [-11.6, 4.6]) {
+        var rollerPositions = [-11.6, 4.6];
+        for (index in 0...rollerPositions.length) {
           var wheel = DeepGrooveBearing.metric("608");
-          fixed(name + 'Roller$y', wheel, id, F.fromRotationMatrix(x, y, height + 25, [1, 0, 0, 0, 0, 1, 0, -1, 0]));
+          fixed(name + "Roller" + (index + 1), wheel, id,
+            F.fromRotationMatrix(x, rollerPositions[index], height + 25, [1, 0, 0, 0, 0, 1, 0, -1, 0]));
         }
       }
 

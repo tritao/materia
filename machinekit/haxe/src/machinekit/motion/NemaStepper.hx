@@ -259,14 +259,8 @@ class NemaStepper extends MachineComponent implements MotorDrive {
     if (variant.housingProfile != null && variant.housingProfile != "openbuilds-nema23-v1"
       && variant.housingProfile != StepperOnline23Geometry.PROFILE) throw "Unknown motor housing profile";
     SocketHeadCapScrew.catalog().get(variant.mountScrew);
-    var customName =
-      '${variant.designation}-IF${Dimension.format(spec.face)}x${Dimension.format(spec.boltSpacing)}x${Dimension.format(spec.pilotDiameter)}'
-      + '-B${Dimension.format(variant.bodyFace)}x${Dimension.format(variant.bodyLength)}-S${Dimension.format(variant.shaftDiameter)}x${Dimension.format(variant.shaftLength)}'
-      + '-P${Dimension.format(variant.pilotHeight)}-M${variant.mountScrew}-${variant.tappedMount ? "T" : "C"}${Dimension.format(variant.mountHoleDepth)}'
-      + (variant.housingProfile == null ? "" : '-${variant.housingProfile}') + (variant.mountHoleDiameter
-      == null ? "" : '-H${Dimension.format(variant.mountHoleDiameter)}');
     super(
-      codeOnly ? customDesignation(customName) : variant.designation,
+      codeOnly ? customDesignation("STEPPER", {spec:spec, variant:variant}) : variant.designation,
       '${variant.designation} NEMA ${spec.frame} stepper motor',
       null,
       codeOnly

@@ -144,6 +144,13 @@ class HobberEnclosurePreview {
       throw error;
     }
   }
+  /** The scene group the shell is (`includeAsGroup`): its own groups sit directly under it. */
+  public static inline final ENCLOSURE_GROUP = "Enclosure";
+  public static inline final SHELL_ID = "enclosure";
+
+  /** A group inside the shell's, so host-side parts (mounts, clamps) sit beside the shell parts they serve. */
+  public static function shellGroup(path:String):String return ENCLOSURE_GROUP + "/" + path;
+
   public static function assembled(?source:FlexsplineHobber): {
     assembly: MachineAssembly,
     shell: GeneratedEnclosure,
@@ -152,11 +159,8 @@ class HobberEnclosurePreview {
   } {
     var machine = source == null ? new FlexsplineHobber() : source,
       fit = fitted(machine), shell = new GeneratedEnclosure(fit.layout), assembly = new MachineAssembly();
-      assembly.group("Machine and enclosure");
-    assembly.group("Machine");
-    assembly.include("machine", machine);
-    assembly.group("Chip protection and enclosure");
-    assembly.include("enclosure", shell);
+    assembly.includeAsGroup("Machine", "machine", machine);
+    assembly.includeAsGroup(ENCLOSURE_GROUP, SHELL_ID, shell);
     HobberEnclosureMounts.install(assembly, shell);
     HobberTrayMounts.install(assembly, shell);
     for (name in machine.portNames()) {
@@ -322,7 +326,11 @@ class HobberEnclosurePreview {
     return scene;
   }
   public static function unified():materia.project.SceneArtifact.SceneArtifactData {
-    var machine = new FlexsplineHobber(new gearkit.GearSpec(1, 40, 4, new gearkit.Involute(20 * Math.PI / 180)), 4, true);
+    var machine = new FlexsplineHobber(
+      new gearkit.GearSpec(1, 40, 4, new gearkit.Involute(20 * Math.PI / 180)),
+      4,
+      true
+    );
     var fitted = assembled(machine);
     return runtimeScene(fitted.assembly, machine, fitted.shell.layout.stroke, true);
   }

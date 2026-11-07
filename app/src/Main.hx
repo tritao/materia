@@ -810,6 +810,8 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
   @:unobservable var syncedPerspectiveViewport:Null<EditorPerspectiveViewport> = null;
   @:unobservable var syncedPerspectiveFrame:Null<ApplicationPresentationSnapshot> = null;
   @:unobservable var syncedPerspectiveActive:Bool = false;
+  @:unobservable var annotationPreviewKey:String = "";
+  @:unobservable var annotationPreview:Array<app.ViewportRobotAnnotations.ViewportRobotAnnotation> = [];
   var refinementFrameSubmitted:Bool = false;
   final semanticRecordPath:Null<String>;
   var lastRecordedSelection:String = "";
@@ -902,6 +904,9 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
       if (chooser == null) complete(null, "File dialogs require the desktop host");
       else chooser.choose(save, path, complete);
     }, documentChanged, commitActiveDrag, cancelActiveDrag);
+    #if !wasm
+    if (files != null) documents.confirmUnsaved = files.confirmUnsaved;
+    #end
     projectVariants = new ProjectVariantController(session,
       simulation, documents.requestRun, invalidateView, function() {
       documentChanged();
@@ -1016,6 +1021,33 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
       }
       var mission = simulation.missionPlayer();
       perspectiveViewport.setSimulationOverlays(simulationOverlaysVisible);
+      var inspectedSensor = ViewportAnnotations.panelVisible(workspace.root, "sensors") ? sensors.selected() : null;
+      var annotationSettings = preferences.store;
+      perspectiveViewport.setAnnotations(new ViewportAnnotations(
+        simulationOverlaysVisible,
+        annotationSettings.getBool(AppSettings.SENSOR_MOUNTS),
+        annotationSettings.getBool(AppSettings.SENSOR_READINGS),
+        annotationSettings.getBool(AppSettings.LINK_FRAMES),
+        annotationSettings.getBool(AppSettings.ANNOTATIONS_THROUGH_GEOMETRY),
+        inspectedSensor == null ? null : sensors.robotId,
+        inspectedSensor == null ? null : inspectedSensor.id,
+        annotationSettings.getBool(AppSettings.COLLISION_DETAILS)
+      ));
+      if (perspectiveViewport.annotationsRequested()) {
+        var previewKey = session.generation + ":" + sensors.document.revision + ":" + scene.visualRevision;
+        if (annotationPreviewKey != previewKey) {
+          annotationPreview = ViewportRobotAnnotations.authored(sensors, session.liveAssemblyState, session.assemblyUnitMetres());
+          annotationPreviewKey = previewKey;
+        }
+        var annotationRevision = previewKey;
+        if (active && frame != null) {
+          annotationRevision += ":" + frame.revision;
+          for (robot in frame.robots) for (sensor in robot.sensors)
+            annotationRevision += ":" + robot.id + ":" + sensor.sensorId + ":" + sensor.sequence;
+        }
+        perspectiveViewport.setAnnotationRobots(active && frame != null
+          ? ViewportRobotAnnotations.measured(frame.robots, annotationPreview) : annotationPreview, annotationRevision);
+      }
       perspectiveViewport.setCosmeticThreads(cosmeticThreadsVisible);
       perspectiveViewport.setCollisions(editingCollisions());
       perspectiveViewport.setMissionOverlay(mission == null
@@ -1181,11 +1213,17 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
     }
     if (hierarchyMenuVisible && documentDialog == null) {
       var sceneLink = projectVariants.navigation(treeModel.selectionKey());
-      var objectItems = [new MenuItem(
+      var copiedItem = app.editor.SceneTreeReference.capture(treeModel, treeModel.selectionKey(),
+        session.projectReference ?? session.path, session.projectVariant ?? session.projectJob);
+      var objectItems = app.editor.SceneTreeReference.copyItems(copiedItem, text -> {
+        ui.clipboard.writeText(text);
+        hierarchyMenuVisible = false;
+        invalidateView();
+      }).concat([new MenuItem(
         "visibility",
         "Show / hide (Space)",
         function() treeModel.toggleVisibility(treeModel.selectionKey()),
-        !documents.blocked()
+        !documents.blocked(), null, true
       ), new MenuItem(
         "isolate",
         "Isolate selected",
@@ -1221,7 +1259,7 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
           "Frame selected",
           function() commands.execute("scene.frame-selected"),
           scene.object(scene.selectedId) != null
-        )];
+        )]);
       if (sceneLink != null) objectItems.unshift(new MenuItem("open-linked-scene", sceneLink.label, function() {
         projectVariants.navigate(sceneLink);
         hierarchyMenuVisible = false;
@@ -1262,6 +1300,8 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
       optionIds = optionIds.concat(["scene.antialiasing-off", "scene.antialiasing-2x", "scene.antialiasing-4x"]);
       optionIds.push("scene.toggle-collisions");
       optionIds.push("scene.toggle-cosmetic-threads");
+      optionIds = optionIds.concat(["scene.toggle-simulation-overlays", "scene.toggle-sensors",
+        "scene.toggle-sensor-readings", "scene.toggle-link-frames", "scene.toggle-collision-details", "scene.toggle-annotations-through-geometry"]);
       var options = new CommandMenu("viewport-options-menu",
         optionIds, viewportOptionsX, viewportOptionsY, commands, ui.commandContext, function() {
         viewportOptionsVisible = false;
@@ -2648,7 +2688,7 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
       ));
     }
     var canvas:View = new Stack("perspective-canvas-overlay", layers);
-    var hobberControls = app.editor.HobberScenePanel.build(this);
+    var hobberControls = app.editor.HobberScenePanel.build(this, availableWidth);
     var viewportRows:Array<KeyedView> = [
       new KeyedView("toolbar", toolbar),
       new KeyedView("divider", divider),

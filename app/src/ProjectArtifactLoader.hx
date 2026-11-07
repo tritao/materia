@@ -12,6 +12,7 @@ import materia.project.SceneArtifact.SceneArtifactPart;
 import materia.project.MaterialLibrary;
 import materia.project.MeshMassProperties;
 import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyBodies;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import cadkit.modeling.AssemblyState;
 import nativekit.scene.GeometryData;
@@ -57,7 +58,8 @@ class ProjectArtifactLoader {
     var geometryBySnapshot:Map<String, GeometryData> = new Map();
     var scale = artifact.metresPerUnit;
     var poses:Map<String, AssemblyFrame> = new Map();
-    var componentUseCount = new Map<String, Int>();
+    var partNumbers = new Map<String, String>();
+    var labels = new Map<String, String>();
     var runtimeState:Null<AssemblyState> = null;
     if (artifact.assemblyDefinition != null) {
       var initialState = artifact.assemblyState
@@ -70,9 +72,21 @@ class ProjectArtifactLoader {
       runtimeState = AssemblyState.fromModel(model, initialState);
       for (occurrence in model.definition.occurrences) {
         poses.set(occurrence.id, runtimeState.worldPose(occurrence.id));
-        var count = componentUseCount.get(occurrence.definition);
-        componentUseCount.set(occurrence.definition, count == null ? 1 : count + 1);
       }
+      var siblings = new Map<String, Array<String>>();
+      for (occurrence in model.definition.occurrences) {
+        var parent = occurrence.groupPath != null ? occurrence.groupPath
+          : occurrence.includePath == null ? "" : occurrence.includePath;
+        var ids = siblings.get(parent);
+        if (ids == null) {
+          ids = [];
+          siblings.set(parent, ids);
+        }
+        ids.push(occurrence.id);
+      }
+      for (ids in siblings) for (id => label in AssemblyBodies.occurrenceLabels(ids)) labels.set(id, label);
+    } else {
+      labels = AssemblyBodies.occurrenceLabels([for (part in artifact.parts) part.id]);
     }
 
     var boundsByDefinition:Map<String, {minimum:Array<Float>, maximum:Array<Float>}> = new Map();
@@ -143,27 +157,31 @@ class ProjectArtifactLoader {
           occurrence.id,
           occurrence.definition,
           poses.get(occurrence.id),
-          componentUseCount.get(occurrence.definition),
+          labels.get(occurrence.id),
           boundsByDefinition,
           geometryKeyByDefinition,
           scale
         );
+        partNumbers.set("project:" + occurrence.id, component.name);
         if (occurrence.visible == false) records[records.length - 1].visible = false;
         // Empty authored hulls explicitly mark a visual-only assembly component.
         if (visualOnly.exists(occurrence.definition)) records[records.length - 1].collisionEnabled = false;
       }
     } else {
-      for (component in artifact.parts) addOccurrenceRecord(
+      for (component in artifact.parts) {
+        partNumbers.set("project:" + component.id, component.name);
+        addOccurrenceRecord(
         records,
         component,
         component.id,
         component.id,
         null,
-        1,
+        labels.get(component.id),
         boundsByDefinition,
         geometryKeyByDefinition,
         scale
       );
+      }
     }
 
     var project = artifact.project;
@@ -182,6 +200,7 @@ class ProjectArtifactLoader {
 
     return {
       objects: records,
+      partNumbers: partNumbers,
       sourceMap: project == null ? null : project.sources,
       navigation : project == null ? null : project.navigation,
       histories : project == null ? null : project.histories,
@@ -326,7 +345,7 @@ class ProjectArtifactLoader {
     occurrenceId:String,
     definitionId:String,
     pose:Null<AssemblyFrame>,
-    useCount:Null<Int>,
+    label:Null<String>,
     boundsByDefinition:Map<String, {minimum:Array<Float>, maximum:Array<Float>}>,
     geometryKeyByDefinition:Map<String, String>,
     scale:Float
@@ -341,7 +360,7 @@ class ProjectArtifactLoader {
       x:centerX, y:centerY, z:centerZ
     }
     :AssemblyFrames.transformPoint(pose, centerX, centerY, centerZ);
-    var label = useCount != null && useCount > 1 ? component.name + " · " + occurrenceId : component.name;
+    if (label == null) throw 'Missing role label for occurrence "$occurrenceId"';
     var volume = component.volume == null ? MeshMassProperties.compute(component.vertices,
       component.indices).volume : component.volume;
     var materialId = component.materialId == null ? "neutral" : component.materialId;

@@ -105,11 +105,8 @@ class DeepGrooveBearing extends MachineComponent {
         section
       )) throw 'Invalid deep groove bearing "${spec.designation}"';
     var designation = spec.designation + (shielded ? "-2Z" : "");
-    var customName =
-      '${spec.designation}-D${Dimension.format(spec.bore)}x${Dimension.format(spec.outside)}x${Dimension.format(spec.width)}-C${Dimension.format(spec.chamfer)}'
-      + (shielded ? "-2Z" : "-OPEN");
     super(
-      codeOnly ? customDesignation(customName) : designation,
+      codeOnly ? customDesignation("BEARING-" + spec.designation, {spec:spec, shielded:shielded}) : designation,
       'Deep groove ball bearing ${spec.designation}${shielded ? " shielded" : ""} '
       + '${Dimension.format(spec.bore)}x${Dimension.format(spec.outside)}x${Dimension.format(spec.width)}',
       "bearing steel",

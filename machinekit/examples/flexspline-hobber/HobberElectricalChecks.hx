@@ -1,5 +1,4 @@
 import machinekit.assembly.PosedParts;
-import materia.assembly.AssemblyFrames as F;
 
 /** Geometric rack support and mounting checks; generic device mounting holes remain unspecified. */
 class HobberElectricalChecks {
@@ -10,15 +9,14 @@ class HobberElectricalChecks {
       var rackBox = cache.box(rack.component, rackPose);
       if (Math.abs(rackBox.minZ) > 1e-6) throw "Electrical stand is not on the machine floor datum";
       var panel = HobberElectricalLayout.panelPose(), count = 0;
-      var devices = [for (m in members) if (m.id == "powerSupply" || m.id == "supply48" || m.id == "bissMaster" || StringTools.endsWith(m.id, "-driver")) m];
+      var devices = [for (m in members) if (m.id == "powerSupply"
+        || m.id == "supply48" || m.id == "bissMaster" || StringTools.endsWith(
+          m.id,
+          "-driver"
+        )) m];
       for (m in devices) {
-        var pose = poses.get(m.id), solid = cache.posed(m.component, pose), work = PosedParts.moved(
-          solid,
-          F.inverse(FlexsplineHobber.MACHINE_FROM_WORK)
-        );
-        solid.close();
-        var b = PosedParts.boxOf(work);
-        work.close();
+        // The rack stands free in the machine frame (`HobberElectricalLayout.panelPose`), so its devices are compared there too.
+        var pose = poses.get(m.id), b = cache.box(m.component, pose);
         if (Math.abs(b.maxY - (panel.y - 10)) > 1e-6) throw '${m.id} mounting face does not meet the backplate';
         if (b.minX < panel.x - 210 || b.maxX > panel.x + 210 || b.minZ < panel.z + 20
           || b.maxZ > panel.z + 850) throw '${m.id} extends beyond the supported backplate area';
@@ -32,7 +30,8 @@ class HobberElectricalChecks {
         ) > 0.001) throw 'Electrical items overlap: ${m.id} and ${other.id}';
         count++;
       }
-      if (count != 8) throw "Electrical layout must mount the rectifier, the 48 V supply, the BiSS master and five drives (A has its own amplifier)";
+      if (count
+        != 8) throw "Electrical layout must mount the rectifier, the 48 V supply, the BiSS master and five drives (A has its own amplifier)";
       cache.close();
       Sys.println("Electrical rack: floor support and eight flush, non-overlapping device mounts passed");
     } catch (error:Dynamic) {

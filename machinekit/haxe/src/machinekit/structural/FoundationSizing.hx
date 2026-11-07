@@ -149,7 +149,7 @@ class FoundationSizing {
         var parts = machinekit.cache.Parallel.all([for (row in rows) () -> fixed.exists(row.id) ? fixed.get(row.id) : machinekit
           .tooling.InsertAnchorGeometry.derive(row.id, row.part, rule, Casting(body, row.pose, bodyKey), demand * shareCount(row.id))]);
         var result:Array<CastInsertPlacement> = [for (index in 0...rows.length) {
-          id:rows[index].id, pose:rows[index].pose, openings:rows[index].openings, part:parts[index]
+          id:rows[index].id, purpose:rows[index].purpose, pose:rows[index].pose, openings:rows[index].openings, part:parts[index]
         }
         ];
         var resolved = share(result);

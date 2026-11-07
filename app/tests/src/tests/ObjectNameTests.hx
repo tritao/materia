@@ -50,7 +50,20 @@ import app.ProjectSceneRecord.ProjectFieldOverride;
       var source = session.scene.records()[0];
       var tree = editor.treeModel;
       var id = source.id;
-      check(tree.displayLabel(id) == "Source steel frame", "Tree uses the source name, never a prettified ID");
+      check(tree.displayLabel(id) == "Internal frame id", "A non-assembly artifact also uses the occurrence role");
+      check(session.scene.objectDetail(id) == "Source steel frame · internal-frame-id",
+        "Detail retains the part number and full occurrence path");
+      check(session.scene.partNumbers.get(id) == "Source steel frame", "Part identity is separate from its role");
+      session.scene.select(id);
+      var properties = session.scene.properties();
+      var numberFields = properties.filter(p -> p.label == "Part number");
+      var pathFields = properties.filter(p -> p.label == "Occurrence path");
+      check(numberFields.length == 1 && numberFields[0].readOnly
+        && (switch numberFields[0].readValue() {case Text(value): value == "Source steel frame"; default: false;}),
+        "Inspector exposes the source part number as read-only");
+      check(pathFields.length == 1 && pathFields[0].readOnly
+        && (switch pathFields[0].readValue() {case Text(value): value == "internal-frame-id"; default: false;}),
+        "Inspector exposes the occurrence path as read-only");
       var item = session.scene.object(id);
       if (item == null) throw "Missing test object";
       check(tree.visibilityLabel(id) == item.label, "Visibility and Rename use the same name");
@@ -85,7 +98,38 @@ import app.ProjectSceneRecord.ProjectFieldOverride;
       tree.setFilter("internal frame");
       check(tree.childCount("scene") == 1, "Search uses the same visible name");
       tree.setFilter("Source steel frame");
-      check(tree.childCount("scene") == 0, "Search does not use a stale generated name");
+      check(tree.childCount("scene") == 1, "Search retains the part number after renaming the role");
+      tree.setFilter("internal-frame-id");
+      check(tree.childCount("scene") == 1, "Search retains the complete occurrence path");
+      artifact.assemblyDefinition = {
+        schemaVersion:materia.assembly.AssemblyDefinitionCodec.VERSION, id:"role-fixture", lengthUnit:"m",
+        definitions:[{id:"internal-frame-id", connectors:[]}],
+        occurrences:[for (role in ["left/bolt", "right/bolt", "third/bolt", "machine/rightHanger1"]) {
+          id:role, definition:"internal-frame-id", initialPose:materia.assembly.AssemblyFrames.identity(),
+          groupPath:role == "third/bolt" ? "separate" : "hardware"
+        }], joints:[]
+      };
+      var shared = new app.ProjectArtifactLoader().load(materia.project.SceneArtifact.encode(artifact));
+      function roleLabel(role:String):String {
+        for (record in shared.objects) if (record.id == "project:" + role) return record.label;
+        throw "Missing role fixture " + role;
+      }
+      check(roleLabel("left/bolt") == "Bolt (1)" && roleLabel("right/bolt") == "Bolt (2)",
+        "Duplicate siblings are distinct without full paths");
+      check(roleLabel("third/bolt") == "Bolt", "Labels in separate authored groups need no suffix");
+      check(roleLabel("machine/rightHanger1") == "Right hanger 1", "Reused definitions still name the role");
+      var sharedState = shared.assemblyState;
+      if (sharedState == null) throw "Missing shared assembly state";
+      var moved = app.MateriaProjectRunner.evaluateAssemblyState(shared, sharedState);
+      check(moved.partNumbers != null && moved.partNumbers.get("project:left/bolt") == "Source steel frame",
+        "Assembly reevaluation retains source identity");
+      session.openGeneratedProject(shared, fixture);
+      editor.documentChanged();
+      session.scene.select("scene");
+      tree = editor.treeModel;
+      tree.setFilter("right/bolt");
+      check(tree.matches("project:right/bolt") && !tree.matches("project:left/bolt"),
+        "Search distinguishes complete occurrence paths for shared definitions");
       editor.dispose();
       if (sys.FileSystem.exists(fixture)) sys.FileSystem.deleteFile(fixture);
     } catch (error:Dynamic) {

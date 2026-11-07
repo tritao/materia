@@ -48,6 +48,8 @@ enum abstract InsertAnchorComponentKind(String) to String {
 }
 
 typedef InsertAnchorComponent = {
+  /** Local occurrence role, independent of source anchor hashes or coordinates. */
+  var role:String;
   var anchorId:String;
   var kind:InsertAnchorComponentKind;
   var part:MachineComponent;
@@ -561,6 +563,7 @@ class InsertAnchorGeometry {
           if (failures.length > 0) throw "Anchor source thread fit fails: "
             + anchor.id + ": " + [for (f in failures) f.message].join("; ");
           result.push({
+            role: "bolt" + (result.length + 1),
             anchorId: anchor.id,
             kind: InsertAnchorComponentKind.Bolt,
             part: screw,

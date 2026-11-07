@@ -363,7 +363,7 @@ class ProjectDocumentSession implements Observable {
     presentationGeometryFingerprint = generated.presentationGeometryFingerprint
       == null ? "" : generated.presentationGeometryFingerprint;
     scene.sourceMap = generated.sourceMap;
-    registerHistories(generated);
+    registerGeneratedMetadata(generated);
     navigation = generated.navigation;
     generatedPresentation = generated.presentation;
     var presentationDefinition = generated.assemblyDefinition;
@@ -375,7 +375,8 @@ class ProjectDocumentSession implements Observable {
   }
 
   /** Remember each part's recorded steps with the frame of its static geometry, so it can be rolled back later. */
-  function registerHistories(generated:GeneratedAssemblyScene):Void {
+  function registerGeneratedMetadata(generated:GeneratedAssemblyScene):Void {
+    scene.partNumbers = generated.partNumbers == null ? new Map() : generated.partNumbers;
     scene.histories.clear();
     var histories = generated.histories, definition = generated.assemblyDefinition;
     if (histories == null || definition == null) return;
@@ -568,7 +569,7 @@ class ProjectDocumentSession implements Observable {
     presentationGeometryFingerprint = generated.presentationGeometryFingerprint
       == null ? "" : generated.presentationGeometryFingerprint;
     scene.sourceMap = generated.sourceMap;
-    registerHistories(generated);
+    registerGeneratedMetadata(generated);
     navigation = generated.navigation;
     generatedPresentation = generated.presentation;
     var presentationDefinition = generated.assemblyDefinition;
@@ -1708,7 +1709,7 @@ class ProjectDocumentSession implements Observable {
     presentationGeometryFingerprint = generated.presentationGeometryFingerprint
       == null ? "" : generated.presentationGeometryFingerprint;
     scene.sourceMap = generated.sourceMap;
-    registerHistories(generated);
+    registerGeneratedMetadata(generated);
     navigation = generated.navigation;
     generatedPresentation = generated.presentation;
     presentation = nextPresentation;

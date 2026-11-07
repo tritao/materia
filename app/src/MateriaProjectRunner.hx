@@ -868,6 +868,7 @@ class MateriaProjectRunner {
     }
     return {
       objects: objects,
+      partNumbers: generated.partNumbers,
       sourceMap: generated.sourceMap,
       navigation: generated.navigation,
       presentation: generated.presentation,

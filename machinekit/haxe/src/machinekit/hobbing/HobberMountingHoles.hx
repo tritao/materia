@@ -39,17 +39,17 @@ class HobberMountingHoles {
           requiredMarginMm : Unresolved("RM0 required clearance margin")
         }
       );
-      result[index] = {id: row.id, pose: row.pose, openings: row.openings, part: addFixture(row.id, part)};
+      result[index] = {id: row.id, purpose:row.purpose, pose: row.pose, openings: row.openings, part: addFixture(row.id, part)};
     }
     // The drive pad bar's screws: the pad declares its pattern (`HobberPadBolts`), the cast insert under it is tapped to suit.
     for (index in 0...result.length) if (result[index].id == "driveSeat") {
       var row = result[index];
-      result[index] = {id: row.id, pose: row.pose, openings: row.openings, part: addPadHoles(kind, row)};
+      result[index] = {id: row.id, purpose:row.purpose, pose: row.pose, openings: row.openings, part: addPadHoles(kind, row)};
     }
     if (kind == "column") for (pad in FoundationLayout.columnSolePads())
       for (index in 0...result.length) if (result[index].id == pad.id) {
         var row=result[index];
-        result[index]={id:row.id,pose:row.pose,openings:row.openings,part:addSoleHoles(row,pad)};
+        result[index]={id:row.id,purpose:row.purpose,pose:row.pose,openings:row.openings,part:addSoleHoles(row,pad)};
       }
     return result;
   }
