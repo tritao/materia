@@ -127,6 +127,7 @@ definitions, 165 distinct scene numbers. Files: `tmp/rn-metrics/before.mtrg`,
 | --- | ---: | ---: | ---: | ---: |
 | Before | 192 | 53.7221 | 47 | 192 |
 | R1 | 48 | 21.9950 | 47 | 192 |
+| R2 | 33 | 15.5707 | 38 | 192 |
 
 Before's longest label/number is the coordinate-coded captured roller track.
 Longest ID is `machine/column/anchor-297d29ec08a4196e572c-bolt`.
@@ -136,7 +137,7 @@ including brackets, panels, shafts and a supply. Full survey: rn-designation-sur
 
 ## Current state and remaining work
 
-R1 is implemented and verified; commit follows this verification. ProjectKit passed 413 assertions and app naming
+R1 is committed as `61eec37b0`. ProjectKit passed 413 assertions and app naming
 passed 24 assertions. A test-only hard-coded schema v1 was corrected to the
 codec VERSION constant (v11); no production schema changed. Full R1 regressions
 are complete: all focused projects passed (app, hobber 2345,
@@ -146,8 +147,18 @@ zero fit findings. Handle 4276 is terminal. All 24 smoke shards match exactly (9
 The standalone BOM-example test reproduces the exact pre-existing cleat
 collision. Both regression handles are terminal; no new failures.
 
-R2–R4 drafts are outside source roots in tmp/rn-r2, rn-r3, rn-r4. They are
-unapplied and uncompiled. Inspect current source before applying; do not
+R2 is implemented and verified; its separate commit follows. AssemblyIntegrity passes. The initial actual-example audit found
+coordinate IDs in rack push screws and enclosure spacers/rollers; those and
+hanger sign IDs now use indices. The final audit passed 28 assemblies/4561 occurrences, including RKE/ZPP variants; fresh enclosure metrics
+preserve 403 parts/183 definitions. Longest label is now "Tray rear centre
+joint seal right" (33), longest path enclosure/trayRearCentreJointSealRight
+(38), average 15.5707. Both focused checks are terminal. Full R2 baseline
+regressions passed the same focused projects. All24 smoke shards match exactly
+(9 pass, same15 exceptions); standalone BOM-example reproduces the same cleat
+collision. Focused rack-mount adds64 passing local contact assertions and both
+router builds. All R2 handles are terminal; no new regression.
+R3–R4 drafts remain unapplied/uncompiled outside source roots in tmp/rn-r3
+and rn-r4. Inspect current source before applying; do not
 regenerate old drafts over fixes. R2 needs actual all-example/enclosure runtime
 proof and anchor regression coverage. R3 needs remaining generators exposed by
 constructor enforcement, default-recipe hard failure accounting, exact identity

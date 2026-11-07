@@ -273,10 +273,10 @@ class LinearRackMount {
           receiverId
         );
       }
-      for (y in derived.holes.map(h -> h.frame.y)) attach(
-        prefix + "Push" + y,
+      for (index in 0...derived.holes.length) attach(
+        prefix + "Push" + (index + 1),
         SocketSetScrew.forThread(FastenerThreads.coarse(4), 12),
-        F.compose(frame, AxisBuilder.orient(-20, y, 29.1, [0.0, 1, 0], [-1.0, 0, 0])),
+        F.compose(frame, AxisBuilder.orient(-20, derived.holes[index].frame.y, 29.1, [0.0, 1, 0], [-1.0, 0, 0])),
         receiverId
       );
       // x in this frame is radial up, z is outward from the receiver.
@@ -366,11 +366,12 @@ class LinearRackMount {
         if (Math.sqrt(18 * 18 + 15 * 15) > 24 || Math.sqrt(58 * 58 + 18 * 18)
           > tube.profile.width - 2 * tube.profile.wall || Math.sqrt(58 * 58 + 15 * 15) > tube.profile.height
           - 2 * tube.profile.wall) throw "Captive-nut cassette cannot be inserted and turned inside the host";
-        for (y in [-14.0, 14.0]) {
+        for (webIndex in 0...2) {
+          var y = webIndex == 0 ? -14.0 : 14.0;
           var screw = SocketHeadCapScrew.metric("M6",
             LinearMountCleat.WEB_BOLT_LENGTH, Steel109), flat = FlatWasher.metric("M6");
           attach(
-            cleatId + "WebWasher" + y,
+            cleatId + "WebWasher" + (webIndex + 1),
             flat,
             F.compose(
               cleatFrame,
@@ -379,18 +380,19 @@ class LinearRackMount {
             cleatId
           );
           attach(
-            cleatId + "WebBolt" + y,
+            cleatId + "WebBolt" + (webIndex + 1),
             screw,
             F.compose(
               cleatFrame,
               AxisBuilder.orient(LinearMountCleat.webBoltSeat(), y, cleatHeight - 10, [0.0, 1, 0], [1.0, 0, 0])
             ),
-            cleatId + "WebWasher" + y
+            cleatId + "WebWasher" + (webIndex + 1)
           );
         }
         var layerHoles:Array<InsertHole> = [];
-        for (y in [-18.0, 18.0]) {
-          var boltId = cleatId + "BaseBolt" + y, seat = F.compose(
+        for (baseIndex in 0...2) {
+          var y = baseIndex == 0 ? -18.0 : 18.0;
+          var boltId = cleatId + "BaseBolt" + (baseIndex + 1), seat = F.compose(
             cleatFrame,
             F.translation(LinearMountCleat.BOLT_X, y, LinearMountCleat.BASE - 8 + 1.6)
           );

@@ -236,6 +236,8 @@ class AssemblyIntegrity {
     this.assembly = assembly;
     flat = assembly.derived();
     definition = flat.definition;
+    for (occurrence in definition.occurrences) for (problem in OccurrenceNames.problems(occurrence.id))
+      diagnostics.error("assembly.occurrence-name", occurrence.id, problem);
     contactTolerance = options.contactTolerance == null ? CONTACT_TOLERANCE : options.contactTolerance;
     overlapLimit = options.overlapLimit == null ? OVERLAP_LIMIT : options.overlapLimit;
     meshOverlapLimit = options.meshOverlapLimit == null ? MESH_OVERLAP_LIMIT : options.meshOverlapLimit;

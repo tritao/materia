@@ -71,6 +71,7 @@ class BomExampleTests {
   }
 
   static function check(name:String, machine:MachineAssembly):Void {
+    machinekit.assembly.OccurrenceNames.requireReadable([for (occurrence in machine.definition().occurrences) occurrence.id]);
     var document = machine.bomDocument(name, "test-commit", "2026-01-01T00:00:00Z");
     checkNumbers(name, document.assembly);
     var json:Dynamic = haxe.Json.parse(haxe.Json.stringify(document));

@@ -67,7 +67,7 @@ class MillWorkholdingChecks {
         posed.close();
       }
     }
-    for (id in ["pullStud-26--26", "pullStud26-26"]) {
+    for (id in ["pullStud1", "pullStud4"]) {
       var member = [for (row in zpp.components()) if (row.id == id) row.component][0];
       var stud = cache.posed(member, zs.worldPose(id));
       for (other in ["plate", "vise"]) {
@@ -126,7 +126,7 @@ class MillWorkholdingChecks {
       near(ast.worldPose("positive-jaw").x, half - 29.75, "pneumatic right carrier follows release clearance");
       near(ast.worldPose("negative-jaw").x, 29.75 - half, "pneumatic opposite carrier follows release clearance");
     }
-    for (id in ["pullStud-48--48", "pullStud48-48"]) {
+    for (id in ["pullStud1", "pullStud4"]) {
       var member = [for (row in airVise.components()) if (row.id == id) row.component][0];
       var stud = cache.posed(member, ast.worldPose(id));
       for (other in ["plate", "vise"]) {

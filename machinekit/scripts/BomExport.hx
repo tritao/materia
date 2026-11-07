@@ -13,6 +13,10 @@ private class BomExample {
 class BomExport {
   public static function main():Void {
     var args = Sys.args();
+    if (args.length == 1 && args[0] == "--occurrence-names") {
+      OccurrenceNamesAudit.main();
+      return;
+    }
     if (args.length != 4) throw "Expected machine, source commit, generation time and output path";
     var machine = build(args[0]);
     var releasePath = "machinekit/examples/" + args[0] + "/releases.json";

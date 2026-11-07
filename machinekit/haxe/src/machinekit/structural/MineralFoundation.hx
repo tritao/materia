@@ -106,8 +106,7 @@ class MineralFoundation extends MachineAssembly {
       try anchors = InsertAnchorGeometry.components(row.part.insertSpec()) catch (error:Dynamic) throw "Insert "
         + row.id + ": " + Std.string(error);
       for (hardware in anchors) {
-        var id = "anchor-" + haxe.crypto.Sha256.encode(row.id + "/" + hardware.anchorId).substr(0,
-          20) + "-" + hardware.kind;
+        var id = row.id + "-" + hardware.role;
         if (ids.exists(id)) throw "Duplicate foundation anchor member: " + id;
         ids.set(id, true);
         addComponent(id, hardware.part, F.compose(row.pose, hardware.pose));

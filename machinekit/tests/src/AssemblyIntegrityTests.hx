@@ -84,6 +84,19 @@ class AssemblyIntegrityTests {
   }
 
   public static function run():Void {
+    for (id in ["machine/bed/rail-seat-bolt1", "guide00", "column/lifting-point2"])
+      check(machinekit.assembly.OccurrenceNames.problems(id).length == 0, 'readable occurrence $id');
+    for (id in ["bed/anchor-deadbeef-bolt", "anchor-ABCDEF12", "seat-1.25", "seat-.5", "seat-2."])
+      check(machinekit.assembly.OccurrenceNames.problems(id).length > 0, 'unreadable occurrence $id rejected');
+    var namingRejected = false;
+    try machinekit.assembly.OccurrenceNames.requireReadable(["sound-role", "anchor-deadbeef"])
+    catch (_:Dynamic) namingRejected = true;
+    check(namingRejected, "export naming check rejects unreadable paths");
+    var badNames = new AxisBuilder();
+    badNames.place("anchor-deadbeef", new GantryPlate("TEST-NAMING-PLATE", "Naming test", 20, 20, 5),
+      AssemblyFrames.identity());
+    expectOnly(AssemblyIntegrity.check(badNames), ["assembly.occurrence-name"],
+      "assembly integrity rejects hashed occurrence ids");
     beltSupports();
     expectClean(AssemblyIntegrity.check(stack(0), {floorZ: 0}), "a plate standing on a plate on the floor");
     expectOnly(
