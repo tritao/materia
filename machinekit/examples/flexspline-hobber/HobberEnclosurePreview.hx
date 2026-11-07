@@ -158,7 +158,10 @@ class HobberEnclosurePreview {
     report: Dynamic
   } {
     var machine = source == null ? new FlexsplineHobber() : source,
-      fit = fitted(machine), shell = new GeneratedEnclosure(fit.layout), assembly = new MachineAssembly();
+      fit = fitted(machine), shell = new GeneratedEnclosure(fit.layout, {
+        halfWidth: machinekit.hobbing.HobberChipCover.OUTER_HALF_WIDTH + machinekit.enclosure.TraySeat.SEAM,
+        rearY: FlexsplineHobber.MACHINE_FROM_WORK.y + machinekit.hobbing.HobberChipCover.REAR_END
+      }), assembly = new MachineAssembly();
     assembly.includeAsGroup("Machine", "machine", machine);
     assembly.includeAsGroup(ENCLOSURE_GROUP, SHELL_ID, shell);
     HobberEnclosureMounts.install(assembly, shell);
@@ -230,9 +233,9 @@ class HobberEnclosurePreview {
         ledgeDepthMm: 4,
         compressedGasketMm: 2,
         topAboveCastingMm: 11,
-        clamps: 12,
-        fasteners: "Ten M6 x 30 plus two M6 x 35 for the cover; nominal threads, torque and retention unqualified",
-        rearBridge: "Removable raised motor-clearance cover: 150 x 30 mm roof, 6 mm feet on 10 mm-deep pockets",
+        clamps: 10,
+        fasteners: "Ten M6 x 30; nominal threads, torque and retention unqualified",
+        motorBay: "Single machine/XrearCover lid; top-access screws, 3 mm lift, derived rearward slide, then lift clear; no tray parts removed",
         seams: "2 mm panel joints on gasketed backing; removable wet sealant required",
         materialQualification: false
       },
@@ -326,13 +329,23 @@ class HobberEnclosurePreview {
     return scene;
   }
   public static function unified():materia.project.SceneArtifact.SceneArtifactData {
+    var t0 = Sys.time();
     var machine = new FlexsplineHobber(
       new gearkit.GearSpec(1, 40, 4, new gearkit.Involute(20 * Math.PI / 180)),
       4,
       true
     );
+    var t1 = Sys.time();
     var fitted = assembled(machine);
-    return runtimeScene(fitted.assembly, machine, fitted.shell.layout.stroke, true);
+    var t2 = Sys.time();
+    var scene = runtimeScene(fitted.assembly, machine, fitted.shell.layout.stroke, true);
+    var t3 = Sys.time();
+    if (Sys.getEnv("HOBBER_PHASES") == "1") {
+      Sys.println("PHASES build=" + Math.round(t1 - t0) + "s fit=" + Math.round(t2 - t1) + "s export=" + Math.round(t3 - t2) + "s");
+      for (line in machinekit.cache.Memos.report()) Sys.println("MEMO " + line);
+      for (line in cadkit.cache.OpCache.report()) Sys.println("OPS " + line);
+    }
+    return scene;
   }
   public static function scene():haxe.io.Bytes return SceneArtifact.encode(unified());
   public static function main():Void {

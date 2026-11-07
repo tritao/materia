@@ -65,6 +65,8 @@ class HaxeonSmoke {
     SketchFreedomSmoke.run();
     SketchReferenceSmoke.run();
     SketchDragSmoke.run();
+    ShapeBytesSmoke.run();
+    ShapeKeySmoke.run();
     NamingSmoke.run();
     NamingFeaturesSmoke.run();
     NamingRepairSmoke.run();

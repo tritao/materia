@@ -14,6 +14,47 @@ class Memos {
   public static function parts(name:String, capacity:Int):machinekit.cache.Memo<Part> return new machinekit.cache.Memo<Part>(name, capacity, part -> new Part(independent(part.shape)),
     part -> part.close());
 
+  /**
+   * Native solids kept on disk too (see `Memo.persist`): the key must name every input (a component's `geometryKey`), `module`
+   * is the qualified name of the module whose code computes them. Values are the canonical form (`Shape.canonical`) on a miss,
+   * with the tier on or off.
+   */
+  public static function persistentParts(name:String, capacity:Int, module:String):machinekit.cache.Memo<Part> return parts(name, capacity)
+    .canonicalize(canonicalPart).persist(CodeIdentity.of(module), encodePart, decodePart);
+
+  /** The shape's bytes with its construction key (`Shape.key`), so a restored solid is as keyed as a computed one. */
+  static function encodePart(part:Part):haxe.io.Bytes {
+    var out = new haxe.io.BytesOutput(), key = part.shape.key, bytes = part.shape.toBytes();
+    out.writeByte(key == null ? 0 : 1);
+    if (key != null) Codecs.writeText(out, key);
+    out.writeInt32(bytes.length);
+    out.write(bytes);
+    return out.getBytes();
+  }
+
+  static function decodePart(bytes:haxe.io.Bytes):Part {
+    var input = new haxe.io.BytesInput(bytes);
+    var key:Null<String> = input.readByte() == 0 ? null : Codecs.readText(input);
+    var length = input.readInt32();
+    if (length < 0) throw "stored solid has a negative length";
+    var shape = Shape.fromBytes(input.read(length));
+    Codecs.finished(input, bytes);
+    shape.key = key;
+    shape.gap = key == null ? "restored" : null;
+    return new Part(shape);
+  }
+
+  static function canonicalPart(part:Part):Part {
+    try {
+      var restored = part.shape.canonical();
+      part.close();
+      return new Part(restored);
+    } catch (error:Dynamic) {
+      part.close();
+      throw error;
+    }
+  }
+
   /** Native shapes, each caller getting its own deep copy (see `Memo`). */
   public static function shapes(name:String, capacity:Int):machinekit.cache.Memo<Shape> return new machinekit.cache.Memo<Shape>(name, capacity, shape -> independent(shape),
     shape -> shape.close());
@@ -24,6 +65,14 @@ class Memos {
    * any triangulation; the coordinates are unchanged to the bit.
    */
   public static function independent(shape:Shape):Shape return shape.translate(new cadkit.modeling.Vector(0, 0, 0).native());
+
+  /**
+   * The native build every persistent value came from: the CadKit libraries this program loads (their content), the OCCT it
+   * runs on (its version text and the names and sizes of the loaded `libTK*` libraries, never their location: the same OCCT
+   * installed elsewhere gives the same identity), the naming scheme version and `MATERIA_MEMO_SALT` (set it after changing
+   * something these cannot see). Null when the program has no CadKit build beside it, which turns the persistent tier off.
+   */
+  public static function nativeIdentity():Null<String> return cadkit.cache.NativeIdentity.get();
 
   public static function register(table:MemoTable):Void {
     var known = tables;
@@ -49,6 +98,6 @@ class Memos {
 
   /** One line per memo: hits, misses, evictions, entries and the time spent computing misses. */
   public static function report():Array<String> return [for (s in all()) s.name + ": " + s.hits + " hits, " + s.misses
-    + " misses, " + s.evictions + " evicted, " + s.size + "/" + s.capacity + " kept, " + Math.round(s.computeSeconds * 1000)
+    + " misses (" + s.diskHits + " from disk), " + s.evictions + " evicted, " + s.size + "/" + s.capacity + " kept, " + Math.round(s.computeSeconds * 1000)
     + " ms computing"];
 }

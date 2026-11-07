@@ -15,6 +15,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
  * Dimensions are mm; construction is unwelded. Strength and modal stiffness
  * estimates retain their stated assumptions pending Phase D. */
 class HobberSaddle extends MachineComponent {
+  public static inline final ELECTRICAL_HEIGHT = FoundationLayout.PLINTH_HEIGHT - machinekit.enclosure.TraySeat.DEPTH - 6;
   final designId:String;
   static final recipe = new machinekit.cache.Once<ComponentType>();
   public static function parameters():Array<ComponentParameter> return [
@@ -54,7 +55,7 @@ class HobberSaddle extends MachineComponent {
       "machinekit.hobbing.saddle",
       parameters(),
       v -> new HobberSaddle(v.token("design"), v)
-    ).numbered(v -> 'HOBBER-${v.token("design").toUpperCase()}')
+    ).versioned(2).numbered(v -> 'HOBBER-${v.token("design").toUpperCase()}')
       .procured(_ -> Make("steel fabrication and machining"))
       .requiringInputs(["design", "tableFaceDiameter", "tableHousingDiameter", "tableFaceHeight", "tableSeatHeight"]));
   }
@@ -202,6 +203,17 @@ class HobberSaddle extends MachineComponent {
       {diameter: screw.headDiameter + 2, depth: thickness - sole});
   }
 
+  /** One joint declaration also reserves its source drilling before cast-anchor
+   * selection. Anchor hardware must never be selected through a service thread. */
+  public static function columnSoleFace(pad:machinekit.hobbing.FoundationLayout.ColumnSolePad):BoltedFace {
+    var cx=(pad.x0+pad.x1)/2;
+    var cy=(pad.y0+pad.y1)/2;
+    return BoltedFace.clamped("column-sole-"+pad.id,
+      BoltedFace.frameOf({x:cx,y:cy,z:xCarriageTop()},{x:0,y:0,z:-1},{x:1,y:0,z:0}),
+      [for (x in pad.boltXs) {x:x-cx,y:cy-pad.boltY}],
+      9.0,11.0,"M8",{diameter:15.0,depth:9.0},false);
+  }
+
   /** The nut block's base end on the carriage, saddle or seat that carries it: two clearance holes for the block's tapped base, `grip` of material, in this part's frame (`origin` is the part frame's origin in the work frame). */
   static function nutBlockFace(axis:HobberDriveAxis, grip:Float, origin:Array<Float>, ?recess:machinekit.component.BoltedFace.BoltRecess):BoltedFace {
     var block = HobberDrives.nutBlock(axis, new machinekit.motion.BallNut());
@@ -232,6 +244,27 @@ class HobberSaddle extends MachineComponent {
 
   /** Material under the heads of the guide-block screws (the pocket is cut from the far face), mm: M6 into a 20 mm deck, M4 into the 13 and 12 mm plates. */
   static inline final X_BLOCK_SOLE = 10.0;
+  public static inline final X_CARRIAGE_THICKNESS = 20.0;
+  /** Derive every X stack plane from the fixed bed seat and catalogue guide.
+   * Replicated block pads occupy relieved plate material, adding no axis height. */
+  public static function xGuideOriginZ():Float return FoundationLayout.bedRailSeatTop() + xGuideSpec().railHeight;
+  static function xGuideSpec():machinekit.motion.LinearRailProfile.LinearRailProfileSpec {
+    var spec=machinekit.motion.LinearRailSystem.catalog().get("HGH25CA");
+    if (spec==null) throw "X guide specification unavailable";
+    return spec;
+  }
+  public static function xCarriageBottom():Float return FoundationLayout.bedRailSeatTop() + xGuideSpec().blockHeight;
+  public static function xCarriageTop():Float return xCarriageBottom() + X_CARRIAGE_THICKNESS;
+
+
+  /** Buy the carriage width outward from the outermost guide-block bolt and its
+   * edge/head wall requirement, in 10 mm full-width stock increments. */
+  public static function xCarriageHalfWidth():Float {
+    var block = machinekit.motion.LinearRailBlock.metric("HGH25CA");
+    var screw = machinekit.standard.SocketHeadCapScrew.catalog().get(block.spec.blockMountThread);
+    var edge = machinekit.assembly.JointFasteners.requiredEdgeRadius(screw.diameter, screw.headDiameter + 2);
+    return Math.ceil((FoundationLayout.BED_RAIL_CENTRE + block.spec.blockHoleSpacingAcross / 2 + edge) / 5) * 5;
+  }
   static inline final PLATE_BLOCK_SOLE = 6.0;
 
   /** The middle y of the Y bracket under `support` (its foot's bolts are centred on it). */
@@ -287,7 +320,14 @@ class HobberSaddle extends MachineComponent {
 
   override public function pinnedFaces():Array<machinekit.component.BoltedFace.PinnedFace> {
     return switch designId {
-      case "GE-X-carriage": [nutBlockPins(HobberDrives.x(), [0.0, 0, 0])];
+      case "GE-X-carriage":
+        var pins = [nutBlockPins(HobberDrives.x(), [0.0, 0, 0])];
+        for (role in HobberCarriageRib.ROLES) {
+          var rib = new HobberCarriageRib(new ComponentValues().setToken("role", role));
+          pins.push(new PinnedFace("rib-" + role, rib.interfaceFrame(1),
+            [for (x in rib.pinXs()) {x: x - 263, y: 0.0}], 4, 8));
+        }
+        pins;
       case "GE-Z-saddle": [nutBlockPins(HobberDrives.z(), [0.0, 0, Z_SADDLE_ORIGIN_Z])];
       case "GE-X-drive-pad": padPins(HobberDrives.x(), ["fixed", "floating"], 15);
       case "GE-Z-drive-pad": padPins(HobberDrives.z(), ["fixed", "floating"], 40);
@@ -328,12 +368,19 @@ class HobberSaddle extends MachineComponent {
       case "GE-X-carriage":
         var block = machinekit.motion.LinearRailBlock.metric("HGH25CA", machinekit.motion.LinearRailBlock.SUPPLIER);
         for (side in [-1, 1]) for (row in [HobberXLayout.BLOCK_FRONT, HobberXLayout.BLOCK_REAR])
-          faces.push(blockFace("block" + (side < 0 ? "L" : "R") + (row == HobberXLayout.BLOCK_FRONT ? "1" : "2"), [row, side * FoundationLayout.BED_RAIL_CENTRE, 260.0],
+          faces.push(blockFace("block" + (side < 0 ? "L" : "R") + (row == HobberXLayout.BLOCK_FRONT ? "1" : "2"), [row, side * FoundationLayout.BED_RAIL_CENTRE, xCarriageBottom()],
             [0.0, 0, 1], [1.0, 0, 0], block, 20, X_BLOCK_SOLE));
-        faces.push(nutBlockFace(HobberDrives.x(), 20, [0.0, 0, 0]));
+        // Two derived M8 per ground corner pad, spread over the whole column base.
+        for (pad in FoundationLayout.columnSolePads()) faces.push(columnSoleFace(pad));
+        faces.push(nutBlockFace(HobberDrives.x(), X_CARRIAGE_THICKNESS, [0.0, 0, 0]));
         faces = faces.concat(HobberChipCover.carriageReceivers());
         // The X scale head's two M4 enter from the seat side (below, before the carriage is set on the rails) and thread into the rib's underside.
-        faces.push(HobberScales.carrierFace(HobberScales.x(), [0.0, 0, 0], X_HEAD_HOLE_DEPTH, 260 - HobberScales.headFace(HobberScales.x())[2]));
+        for (role in HobberCarriageRib.ROLES) {
+          var rib = new HobberCarriageRib(new ComponentValues().setToken("role", role));
+          var b = rib.band();
+          faces.push(BoltedFace.drilledToSuit("rib-" + role, rib.interfaceFrame(1),
+            246, b.high - b.low, 15, 20, BoltedFace.ThreadMaterial.Steel, rib.boltSize()));
+        }
       case "GE-Z-saddle":
         var block = machinekit.motion.LinearRailBlock.metric("HGH15CA", machinekit.motion.LinearRailBlock.SUPPLIER);
         for (side in [-1, 1]) for (row in [0.0, 110.0])
@@ -444,7 +491,7 @@ class HobberSaddle extends MachineComponent {
         if (flange == null) flange = machinekit.motion.ServoMotor.assumedMounting(motor.rating.designation);
         faces.push(BoltedFace.through("motor", BoltedFace.frameOf({x: CRADLE_MOTOR_X, y: CRADLE_FACE_Y, z: HobSpindle.motorHeight()},
           {x: 0, y: 1, z: 0}, {x: 1, y: 0, z: 0}), [for (h in flange.holes) {x: h.x, y: -h.y}], flange.holeDiameter, CRADLE_WALL,
-          "M" + Std.int(flange.holeDiameter - 0.5)));
+          "M" + Std.int(flange.holeDiameter - 0.5)).withSlots(CRADLE_SLOT, HobSpindle.TENSION_TRAVEL, "y"));
       default:
     }
     return faces;
@@ -747,11 +794,10 @@ class HobberSaddle extends MachineComponent {
     function bar(thickness:Float, faces:Array<MachinedFace>):ManufacturingRoute return ManufacturingRoute.groundStock(GroundStock.bar(design == "GE-X-drive-pad" ? HobberDrives.X_PAD_WIDTH : PAD_WIDTH, thickness), faces);
     return switch design {
       case "GE-X-carriage":
-        ManufacturingRoute.milled(2, "fine", [
-          {name: "block pads, underside", tolerance: 0.02, roughnessRa: 1.6},
-          {name: "column sole, top", tolerance: 0.02, roughnessRa: 1.6},
-          {name: "scale head seat, rib underside", tolerance: HobberScales.x().head.mounting().headParallelism, roughnessRa: 1.6}
-        ], 490);
+        ManufacturingRoute.groundStock(GroundStock.plate(GroundStock.STEEL, X_CARRIAGE_THICKNESS), [
+          {name: "four block pads replicated against one master to 0.01 mm; stock flatness fails", tolerance: 0.01, roughnessRa: 1.6},
+          {name: "column sole seat and rib bond lands", tolerance: 0.02, roughnessRa: 1.6}
+        ]);
       case "GE-Z-saddle":
         ManufacturingRoute.milled(2, "fine", [
           {name: "block faces, back", tolerance: 0.02, roughnessRa: 1.6},
@@ -839,18 +885,16 @@ class HobberSaddle extends MachineComponent {
   function pieces():Array<Part> {
     return switch designId {
       case "GE-X-carriage":
-        // One milled part: a 20 mm deck between the block plane (260) and the column sole plane (280), open at the front over the
-        // swivel stack and the head's swing (x 60-140, 300 wide; a front bar would meet the Y guides at A +-15 deg, Y and Z at -10); 25 mm deep ribs under the deck run
-        // beside the rails (y +-120..140 and +-160..180), clear of the blocks (y 196..244) and the bed.
-        [
-          Solids.cut(box(60, 386, -245, 245, 260, 280), [box(55, 140, -150, 150, 259, 281)]),
-          box(140, 386, -140, -120, 235, 260),
-          box(140, 386, 120, 140, 235, 260),
-          box(140, 386, -180, -160, 235, 260),
-          // The rib on the scale's side stands over the head, level with the housing beside it: its underside is the head's seat.
-          box(140, 386, HobberScales.carrierBox(HobberScales.x(), HobberScales.HEAD_CARRIER_MARGIN)[2], HobberScales.carrierBox(HobberScales.x(), HobberScales.HEAD_CARRIER_MARGIN)[3],
-            HobberScales.headFace(HobberScales.x())[2], 260)
-        ];
+        // Ground plate; separate bolted ribs carry their own joints and scale seat.
+        var cuts = [box(55, 140, -150, 150, 259, 281)];
+        var block = machinekit.motion.LinearRailBlock.metric("HGH25CA");
+        var layer = HobberCarriageStockCheck.padLayer().nominalMm;
+        for (side in [-1, 1]) for (row in [HobberXLayout.BLOCK_FRONT, HobberXLayout.BLOCK_REAR]) {
+          var y = side * FoundationLayout.BED_RAIL_CENTRE;
+          cuts.push(box(row - block.spec.blockLength / 2, row + block.spec.blockLength / 2,
+            y - block.spec.blockWidth / 2, y + block.spec.blockWidth / 2, xCarriageBottom() - 1, xCarriageBottom() + layer));
+        }
+        [Solids.cut(box(60, 386, -xCarriageHalfWidth(), xCarriageHalfWidth(), xCarriageBottom(), xCarriageTop()), cuts)];
       case "GE-Z-saddle":
         // One milled plate between the swivel seat (x 135) and the block faces (x 148), with the nut block's bolts.
         // The eRob's pocket opens in the back face (x 148); the web in front of the housing carries its 16 screws and the output bore.
@@ -962,7 +1006,7 @@ class HobberSaddle extends MachineComponent {
       case "GE-enclosure":
         [box(-270, 780, -360, -356, 0, 950), box(-270, 780, 356, 360, 0, 950), box(776, 780, -360, 360, 0, 950)];
       case "electrical-panel":
-        var parts = [box(-210, 210, -10, 0, 0, 850), box(-230, 230, -150, 50, 0, 20)];
+        var parts = [box(-210, 210, -10, 0, 0, ELECTRICAL_HEIGHT), box(-230, 230, -150, 50, 0, 20)];
         // Two welded triangular webs tie the upright to its floor base.
         for (x in [-190.0, 190.0]) {
           var web = Part.prism([new Vector(0, 20), new Vector(-130, 20), new Vector(0, 200)], -3, 3);

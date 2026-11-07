@@ -51,6 +51,14 @@ class HobberJointLoads {
 
   public static function of(machine:FlexsplineHobber):Array<JointLoad> {
     var loads:Array<JointLoad> = [], g = 9.80665;
+    // Conservative column interface shear: the whole X-moving mass is charged
+    // to this joint. Gravity is normal to this horizontal interface, not shear.
+    var xCrash = HobberCrashProtection.axis(machine, "X");
+    for (pad in machinekit.hobbing.FoundationLayout.columnSolePads()) loads.push({
+      label: "Column sole pad " + pad.id + " on the X carriage (whole shear charged to each pad)",
+      between: ["column/"+pad.id, "Xbridge"],
+      shear: {peak: xCrash.movingKg * 0.5 + CUTTING_FORCE,
+        momentary: xCrash.limit.thrust + CUTTING_FORCE}});
     // The A axis: the eRob's output torque passes the output flange, the adapter ring and the swivel plate, and its reaction the housing and the Z saddle.
     // Design peak and momentary (collision or emergency stop) torque are the maker's for the ratio; the flange M4 are tightened to the maker-table torque
     // of 12.9 M4 (4.95 N m, 6790 N, `FastenerTightening`: 80 % of proof) because 70 % leaves only 1.12 x on the momentary torque.

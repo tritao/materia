@@ -12,6 +12,8 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
  * Mounting holes are cut only by JointFasteners. Tool ports follow PanelHolePlug
  * and the foot-bolt axes. The rear flat lid is laser cut; other roles are formed. */
 class HobberChipCover extends MachineComponent {
+  public static inline final OUTER_HALF_WIDTH = 70.0;
+  public static inline final REAR_END = 630.0;
   public final role:String;
   public static final MADE:Array<String> = ["XleftFront", "XrightFront", "XleftRear", "XrightRear", "Xfront", "Xrear", "Xskirt", "Zleft", "Zright"];
 
@@ -36,11 +38,15 @@ class HobberChipCover extends MachineComponent {
     for(front in [true,false])for(side in [-1,1]) rows.push({id:"Xcover"+(front?"Front":"Rear")+(side<0?"Left":"Right"),
       role:"X"+(side<0?"left":"right")+(front?"Front":"Rear"),parent:"XdrivePad",seat:plane(footX(front),side*37,155,1)});
     rows.push({id:"XfrontCover",role:"Xfront",parent:"XcoverFrontLeft",seat:plane(242,-51,222,1)});
-    rows.push({id:"XrearCover",role:"Xrear",parent:"XcoverRearLeft",seat:plane(390,-51,232,1)});
+    rows.push({id:"XrearCover",role:"Xrear",parent:"XcoverRearLeft",seat:plane(rearLidCentre(),-51,232,1)});
     rows.push({id:"Xskirt",role:"Xskirt",parent:"Xbridge",seat:plane(170,-100,260,-1)});
     for(side in [-1,1]) rows.push({id:"Zcover"+(side<0?"Left":"Right"),role:side<0?"Zleft":"Zright",parent:"Xbridge",seat:plane(149,side*100,260,-1)});
     return rows;
   }
+  // Front row stays behind the skirt at the parked carriage, including driver radius.
+  public static function rearLidCentre():Float return (386 + HobberXLayout.RETRACT + 9 + 560) / 2;
+  public static function rearLidHoles():Array<BoltHole> return [
+    {x:386 + HobberXLayout.RETRACT + 9 - rearLidCentre(), y:0.0}, {x:560 - rearLidCentre(), y:0.0}];
   public static function plugs():Array<{id:String,parent:String,x:Float,y:Float,z:Float}> return [
     for(front in [true,false])for(side in [-1,1]) {id:"X"+(front?"front":"rear")+"Plug"+(side<0?"Left":"Right"),
       parent:front?"XfrontCover":"XrearCover",x:footX(front),y:side*37.0,z:front?224.0:234.0}
@@ -59,12 +65,16 @@ class HobberChipCover extends MachineComponent {
     if(StringTools.startsWith(role,"Xleft")||StringTools.startsWith(role,"Xright")) {
       var front=StringTools.endsWith(role,"Front");
       return [BoltedFace.clamped("pad",plane(footX(front),side*37,155,1),zero,4.0,2,"M3",null,false,true),
-        BoltedFace.clamped("lid",plane(front?242:455,side*51,front?222:232,-1),front?zero:[{x:-65.0,y:0.0},{x:65.0,y:0.0}],4.0,2,"M3",null,false,true)];
+        front ? BoltedFace.clamped("lid",plane(242,side*51,222,-1),zero,4.0,2,"M3",null,false,true)
+          : BoltedFace.through("lid",plane(rearLidCentre(),side*51,232,-1),rearLidHoles(),4.0,2,"M3",false)];
     }
     if(role=="Xfront"||role=="Xrear") {
       var front=role=="Xfront";
-      return [for(side in [-1,1]) BoltedFace.through("side"+side,plane(front?242:455,side*51,front?222:232,1),
-        front?zero:[{x:-65.0,y:0.0},{x:65.0,y:0.0}],4.0,2,"M3",false)];
+      // Rear nuts are fitted on the bench. A flat AF5.5 spanner enters along
+      // the open rear channel for service; no captive retention is assumed.
+      return [for(side in [-1,1]) front
+        ? BoltedFace.through("side"+side,plane(242,side*51,222,1),zero,4.0,2,"M3",false)
+        : BoltedFace.clamped("side"+side,plane(rearLidCentre(),side*51,232,1),rearLidHoles(),4.0,2,"M3",null,false,true)];
     }
     if(role=="Xskirt") return [for(x in [170.0,350.0])for(side in [-1,1])
       BoltedFace.clamped("tab"+x+"-"+side,plane(x,side*100,260,-1),zero,5.0,2,"M4",null,false,true)];
@@ -108,8 +118,8 @@ class HobberChipCover extends MachineComponent {
     var b=cache.box(block,HobberDrives.nutBlockPose(drive,new machinekit.motion.BallNut()));cache.close();return b;
   }
   static function side(front:Bool):Part {
-    var x0=front?179.0:250.0,x1=front?279.0:630.0,roof=front?220.0:230.0,top=front?228.0:242.0;
-    var p=[box(x0,x1,47,66,roof,roof+2),bendX(x0,x1,66,roof+4,1,-1),box(x0,x1,68,70,roof+4,top)];
+    var x0=front?179.0:250.0,x1=front?279.0:REAR_END,roof=front?220.0:230.0,top=front?228.0:242.0;
+    var p=[box(x0,x1,47,66,roof,roof+2),bendX(x0,x1,66,roof+4,1,-1),box(x0,x1,OUTER_HALF_WIDTH-2,OUTER_HALF_WIDTH,roof+4,top)];
     var xx=front?179.0:378.0;
     p.push(box(xx,xx+100,33.5,41,155,157));
     p.push(bendX(xx,xx+100,41,159,1,-1));
@@ -120,7 +130,7 @@ class HobberChipCover extends MachineComponent {
   static function lid(front:Bool):Part {
     var b=nutBounds(), end=20+b.minX-3, start=115+b.maxX+3;
     var p=front ? Solids.union([box(174,end,-65,65,222,224),bendY(-65,65,174,220,-1,1),box(170,172,-65,65,215,220)])
-      : box(start,630,-65,65,232,234);
+      : box(start,REAR_END,-65,65,232,234);
     var tools=[for(y in [-37.0,37.0]) Part.cylinderSpan(machinekit.standard.PanelHolePlug.HOLE/2,front?221:231,front?225:235,footX(front),y)];
     return Solids.cut(p,tools);
   }

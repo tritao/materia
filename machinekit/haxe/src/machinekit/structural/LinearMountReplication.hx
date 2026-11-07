@@ -48,15 +48,24 @@ class LinearMountReplication extends MachineComponent {
     holes = InsertHoles.records(v.token("holes"));
     for (hole in holes) {
       if (hole.thread != null || hole.extent != Through) throw "Replication is not a threaded clamp member";
-      materia.casting.InsertStages.validateServiceHole(
-        hole,
-        {x: -width / 2, y: -length / 2, z: 0.0, width: width, depth: length, height: thickness}
-      );
+      // This layer supplies neither steel threads nor steel insert ligament.
+      // Its inherited clearance must remain inside the footprint, with the
+      // declared one-mm compound edge wall (engineering assumption).
+      var mouth = materia.assembly.AssemblyFrames.transformPoint(hole.frame, 0, 0, 0);
+      var axis = materia.assembly.AssemblyFrames.transformVector(hole.frame, 0, 0, 1);
+      var wall = hole.diameter / 2 + 1.0;
+      if (Math.abs(axis.x) > 1e-9 || Math.abs(axis.y) > 1e-9 || Math.abs(axis.z) < 0.999999
+        || Math.abs(mouth.x) + wall > width / 2 + 1e-9
+        || Math.abs(mouth.y) + wall > length / 2 + 1e-9
+        || Math.abs(mouth.z - thickness) > 1e-9 || axis.z > 0
+        || Math.abs(hole.depth - thickness) > 1e-9)
+        throw "Replication clearance must cross the layer normally and retain one mm ASSUMED edge wall: " + hole.id;
     }
     super(numberFor(v),
       "Unqualified replication study layer", "replication compound (assumed)", false, v);
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("errorsBasis", "Assumed").setToken("source", "").setToken("ratingsBasis", "Assumed")));
     lockManufacturingMaterial("replication compound (assumed)");
+    addFacet(new InterfaceLayer(thickness));
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
     addConnector("top", Mount, Solids.axial(0, 0, thickness));
   }

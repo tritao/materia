@@ -3,6 +3,11 @@ package app.editor;
 import app.Main.ReferenceEditorApp;
 import app.EditorScene.EditorSceneObject;
 import haxeon.ui.Insets;
+import haxeon.ui.LayoutAxis;
+import haxeon.ui.LayoutStyle;
+import haxeon.ui.widgets.scroll.ScrollAxis;
+import haxeon.ui.widgets.scroll.ScrollController;
+import haxeon.ui.widgets.scroll.ScrollView;
 import haxeon.ui.core.TextStyleOverride;
 import haxeon.ui.core.View;
 import haxeon.ui.core.RetainedVariants;
@@ -71,7 +76,7 @@ import haxeon.ui.widgets.text.TextField;
         new KeyedView("visibility", visibility),
         new KeyedView("isolate", isolate)
       ];
-      return new Column("inspector-assembly", rows, style);
+      return scrollingRows("inspector-assembly:" + groupKey, rows, style);
     }
     var selected = scene.object(scene.selectedId);
     if (selected == null) {
@@ -83,7 +88,7 @@ import haxeon.ui.widgets.text.TextField;
       var projectPanel = app.projectUiPanel();
       if (projectPanel != null) emptyRows.push(new KeyedView("project-ui", projectPanel));
       if (sheetWorkflow != null) emptyRows.push(new KeyedView("sheet-workflow", sheetWorkflow));
-      return new Column("inspector-empty", emptyRows, style);
+      return scrollingRows("inspector-empty", emptyRows, style);
     }
     if (app.sceneInspector == null || app.inspectorSelectionRevision != scene.selectionRevision) {
       var feature = scene.selectedFeatureKey;
@@ -116,7 +121,10 @@ import haxeon.ui.widgets.text.TextField;
       app.inspectorSelectionRevision = scene.selectionRevision;
     }
     var inspector = app.sceneInspector;
-    inspector.setStyle(style);
+    var propertyStyle = style.copy();
+    propertyStyle.height = LayoutAxis.fit();
+    inspector.setStyle(propertyStyle);
+    inspector.scrollable = false;
     var widthClass = app.viewportWidth < 760.0 ? 0 : app.viewportWidth < 1180.0 ? 1 : 2;
     inspector.labelWidth = widthClass == 0 ? 56.0 : widthClass == 1 ? 76.0 : 108.0;
     var ownership = session.scriptOwnership;
@@ -436,13 +444,25 @@ import haxeon.ui.widgets.text.TextField;
     rows.push(new KeyedView("properties", new RetainedVariants("scene-properties", Std.string(app.inspectorModelId),
       function(_) return inspector,
       function() return inspector.labelWidth + ":" +
-        inspector.enabled + ":" + inspector.stackedRows + ":" + inspector.searchQuery,
+        inspector.enabled + ":" + inspector.stackedRows + ":" + inspector.scrollable + ":" + inspector.searchQuery,
       4, true)));
     var sheetWorkflow = SheetWorkflowPanel.build(app);
     var projectPanel = app.projectUiPanel();
     if (projectPanel != null) rows.push(new KeyedView("project-ui", projectPanel));
     if (sheetWorkflow != null) rows.push(new KeyedView("sheet-workflow", sheetWorkflow));
-    return new Column("inspector-panel", rows, style);
+    return scrollingRows("inspector-panel", rows, style, inspector.controller);
+  }
+
+  /** Metadata and property editors share one scroll document, so wrapping can grow naturally. */
+  static function scrollingRows(key:String, rows:Array<KeyedView>, style:LayoutStyle,
+    ?controller:ScrollController):View {
+    var contentStyle = style.copy();
+    contentStyle.height = LayoutAxis.fit();
+    var viewportStyle = style.copy();
+    viewportStyle.padding = new Insets(0, 0, 0, 0);
+    viewportStyle.childGap = 0;
+    return new ScrollView(key + ":viewport", new Column(key, rows, contentStyle),
+      viewportStyle, ScrollAxis.Vertical, controller);
   }
 
 }

@@ -101,7 +101,9 @@ class FoundationSizing {
       throw "No shared declared anchor thread fits the casting: " + failures.join("; ");
     }
     var casting = new machinekit.structural.MineralCasting(castingValues);
-    var body = casting.geometry(), bodyKey = casting.geometryKey();
+    var body = casting.geometry(), code = machinekit.cache.CodeIdentity.ofObject(casting);
+    // The key names the casting's code as well as its inputs: anchor derivations are kept on disk under it.
+    var bodyKey = code == null ? null : casting.geometryKey() + "|code:" + code;
     try {
       var lifting = rows.filter(row -> row.part.parameterToken("role")
         == materia.casting.InsertSpec.InsertRole.LiftingMount);

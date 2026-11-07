@@ -21,6 +21,13 @@ typedef SweepSample = {moved:Map<String, AssemblyFrame>, sample:Map<String, Floa
 /** The root leader of a drive, where it rests and the small step the drive check moves it by. */
 typedef LeaderMove = {id:String, from:Float, step:Float};
 
+/** One assembly-order rule, optionally limited to the named fastening faces. */
+typedef FastenerFitOrder = {
+  var member:String;
+  var fastened:Array<String>;
+  @:optional var faces:Array<String>;
+}
+
 typedef IntegrityOptions = {
   /** Optional named removal audit. Absent checks every removal; guarded channels are always checked.
    * Unknown names are errors. An empty list checks the guarded channels only. */
@@ -74,7 +81,7 @@ typedef IntegrityOptions = {
 	 * (it is there once built), and it may not be a member of a joint it is installed after (`fasteners.order`). Unlike `removable`,
 	 * which exempts a part from every screw, this is per fastener: a screw fitted after `member` is installed is still blocked by it.
 	 */
-  @:optional var fittedBefore:Array<{member:String, fastened:Array<String>}>;
+  @:optional var fittedBefore:Array<FastenerFitOrder>;
   /** Pairs of members the machine's process brings together (a hob in the work, a tool in the stock); they may share volume. */
   @:optional var processContacts:Array<{a:String, b:String}>;
   /** All three of the above at their defaults. */
@@ -220,7 +227,7 @@ class AssemblyIntegrity {
   final flangeCutouts:Bool;
   final fastenerFit:Bool;
   final removable = new Map<String, Bool>();
-  var fittedBefore:Array<{member:String, fastened:Array<String>}> = [];
+  var fittedBefore:Array<FastenerFitOrder> = [];
   /** Pairs joined by a moving mate, keyed "a|b" both ways: they run in contact by design. */
   final movingPairs = new Map<String, Bool>();
   final gapReported = new Map<String, Bool>();
@@ -458,7 +465,12 @@ class AssemblyIntegrity {
       if (belts.exists(joint.child) && joint.type == AssemblyJointType.Fixed) continue;
       var gap = touching(parts, boxes, joint.parent, joint.child);
       if (gap <= contactTolerance) join(joint.parent, joint.child);
-      else diagnostics.error(
+      else if (joint.type == AssemblyJointType.Fixed && interfaceLayers(joint.parent, joint.child, parts, boxes).length > 0) {
+        for (layer in interfaceLayers(joint.parent, joint.child, parts, boxes)) {
+          join(joint.parent, layer);
+          join(layer, joint.child);
+        }
+      } else diagnostics.error(
         "integrity.support.gap",
         joint.id,
         'Mate ${joint.id} (${joint.type}) holds ${joint.child} on ${joint.parent}, ' + (Math.isFinite(gap)
@@ -607,8 +619,13 @@ class AssemblyIntegrity {
       if (joint.role != AssemblyJointRole.Tree || joint.type != AssemblyJointType.Fixed
         || !carries.exists(joint.child) || flat.member(joint.child).fastensByForm()) continue;
       var gap = touching(parts, boxes, joint.parent, joint.child);
-      if (gap > contactTolerance) continue;
-      var area = contactArea(parts, boxes, joint.child, joint.parent, gap);
+      var area = 0.0;
+      if (gap > contactTolerance) {
+        for (layer in interfaceLayers(joint.parent, joint.child, parts, boxes))
+          area += Math.min(contactArea(parts, boxes, joint.parent, layer, touching(parts, boxes, joint.parent, layer)),
+            contactArea(parts, boxes, joint.child, layer, touching(parts, boxes, joint.child, layer)));
+        if (area == 0) continue; // support-gap diagnostic already identifies this mate
+      } else area = contactArea(parts, boxes, joint.child, joint.parent, gap);
       if (area < least) diagnostics.error(
         "integrity.contact.area",
         joint.id,
@@ -616,6 +633,21 @@ class AssemblyIntegrity {
         + '${round(area)} mm² (at least ${round(least)} mm² wanted)'
       );
     }
+  }
+
+  /** Only an explicitly declared layer fixed to one mate member can bridge its
+   * gap. Both physical contacts are checked in every sampled state. */
+  function interfaceLayers(a:String, b:String, parts:Map<String, Part>, boxes:Map<String, PartBox>):Array<String> {
+    var result:Array<String> = [];
+    for (joint in definition.joints) {
+      if (joint.role != AssemblyJointRole.Tree || joint.type != AssemblyJointType.Fixed
+        || (joint.parent != a && joint.parent != b)) continue;
+      var layer = joint.child;
+      if (layer == a || layer == b || machinekit.component.InterfaceLayer.of(flat.member(layer)) == null) continue;
+      if (touching(parts, boxes, a, layer) <= contactTolerance
+        && touching(parts, boxes, b, layer) <= contactTolerance) result.push(layer);
+    }
+    return result;
   }
 
   function contactArea(
@@ -712,6 +744,7 @@ class AssemblyIntegrity {
     var group = JointFasteners.rigidGroups(assembly);
     // A part cannot be installed after the joint it is a member of: it is part of what the screw clamps or threads into.
     for (joint in derivation.joints) for (rule in fittedBefore) for (member in [joint.clampedMember, joint.receivingMember]) {
+      if (rule.faces != null && rule.faces.indexOf(joint.clampedFace) < 0 && rule.faces.indexOf(joint.receivingFace) < 0) continue;
       var matches = StringTools.endsWith(rule.member, "/") ? StringTools.startsWith(member, rule.member) : member == rule.member;
       if (matches && (rule.fastened.indexOf(joint.clampedMember) >= 0 || rule.fastened.indexOf(joint.receivingMember) >= 0)) diagnostics.error(
         "fasteners.order",
@@ -727,6 +760,8 @@ class AssemblyIntegrity {
       var face = faces.get(key);
       if (face == null) throw 'Assembly integrity lost the face "$key" of joint ${joint.id}';
       var frame = AssemblyFrames.compose(need(poses, joint.receivingMember), face.frame);
+      JointFasteners.checkEdgeSupport(joint, face, frame, flat.member(joint.clampedMember),
+        flat.member(joint.receivingMember), parts, diagnostics);
       var reported = new Map<String, Bool>();
       for (volume in joint.volumes) for (point in joint.hostHoles) {
         var local = Part.cylinderSpan(volume.diameter / 2, volume.from, volume.to, point.x, point.y);
@@ -760,6 +795,7 @@ class AssemblyIntegrity {
   /** Whether member `id` is installed after the fasteners of `joint` are fitted (`IntegrityOptions.fittedBefore`). */
   function installedLater(id:String, joint:JointFasteners.FastenedJoint):Bool {
     for (rule in fittedBefore) {
+      if (rule.faces != null && rule.faces.indexOf(joint.clampedFace) < 0 && rule.faces.indexOf(joint.receivingFace) < 0) continue;
       var matches = StringTools.endsWith(rule.member, "/") ? StringTools.startsWith(id, rule.member) : id == rule.member;
       if (matches && (rule.fastened.indexOf(joint.clampedMember) >= 0 || rule.fastened.indexOf(joint.receivingMember) >= 0)) return true;
     }

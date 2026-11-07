@@ -109,6 +109,19 @@ RM2 completion or production mount release.
   fixture is the other remedy. The model computes the budget per hole and chooses only routes the
   interface requirement permits; when none closes, it raises a design change request.
 
+- **RM-D11. Screw-support seats (XA process; physical conversion pending).** Use an
+  alignment arbor instead of the screw, referenced to the installed rail line/plane and
+  the carriage nut bore through a height reference. Hold the fixed mount and BF coaxial
+  and parallel while injecting replication compound under each support foot, with release
+  agent, dams and bore masks. Derive each layer from the required support plane minus
+  the insert's as-cast height, including cast-height tolerance; check both extrema against
+  the selected product's published thickness range. Until a grade is chosen those limits,
+  modulus and creep are ASSUMED, never Moglice/SKC vendor data. After cure, torque into
+  steel, indicate again and match-drill/ream service-return pins into the steel inserts.
+  Compound supplies no thread engagement. The nut travels in the open channel between
+  the separate seats; verify travel and overtravel. Arbors, height references, release
+  agent, compound and dams belong to the tooling BOM and the A3/A7 sequence.
+
 ## Accuracy budgets (inputs)
 
 Budgets are per machine and stay explicit inputs until set. Each row becomes an

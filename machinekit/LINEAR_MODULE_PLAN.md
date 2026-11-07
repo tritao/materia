@@ -1,188 +1,95 @@
-# Linear module plan
-
-**Goal.** A MachineKit component for a screw-driven precision linear module, in the style of the HZMotion HZM200:
-a ground steel base with raised rail seats, the screw centred on the floor between them, an HZMotion motor mount
-at one end and a floating support at the other, a carriage on four blocks, a cover, and a sealed linear scale built
-in. The first user is the flexspline hobber's Y axis (hob shift). The same round applies the structure rule below to
-the hobber's X carriage and gives Z its cover. Status: plan, 2026-11-07.
-
-## Why
-
-The hobber's Y axis is built from loose parts: HGH15 rails on the 15 mm swivel plate, the HZMotion M60D-BK12 mount
-and BF12 on two milled L brackets, a nut seat bar, and a JFT-40 on its own seat bar. The screw is off-centre. It
-looks improvised, and it carries a known open item: FRAME_PLAN could not centre the Y screw because the M60D
-reaches 22 mm below the rail plane and meets the plate. Raised rail seats remove that conflict, because the mount
-and the BF then stand on a floor below the rail plane.
-
-FRAME_PLAN rejected *bought* KK modules for Y (the shortest KK86 is 440 mm for a 30 mm need, +5.7 kg on the eRob,
-stiffness unpublished). This plan does not reverse that: the module here is ours, sized to the stroke, and built on a
-plate the host already has.
-
-The X carriage (`GE-X-carriage`) is one milled steel part, a 20 mm deck with 25 mm ribs, because the deck is capped
-at 20 mm between the block plane (z 260) and the column sole (z 280). It is the most expensive part to have made
-(about 20 kg of chips, pad faces between ribs) for a stiffness a plate with bolted ribs can give.
-
-## Structure rule (2026-11-07)
-
-This is the long-term construction rule for the hobber, and the pattern the module expresses. It refines the
-FRAME_PLAN parts rule (a part is a structural member or a real adjustment/interface element).
-
-- **Castings and cast inserts** give mass, damping and coarse location. Nothing precise is machined into a casting;
-  insert heights are outputs of the height stack.
-- **Precision lives in ground flat stock.** Bodies are ground plates (carriages, saddles, bases). Bars are height
-  spacers (rail risers, drive pads, scale seats); they exist only where the height stack needs them, can be reground
-  or replaced, and disappear when the derived thickness is zero. Each part has two ground faces, drilled and tapped
-  holes, and at most one ground reference edge; ribs, pockets or steps only where a number shows they are needed.
-- **Heights are derived per axis** from block height, rail height, plate thickness and the mount's screw-axis height;
-  bar thicknesses (from standard stock) and insert heights come out.
-- **Location depends on the part:**
-  - rails: pushed against a ground reference edge (push screws or clamps), never dowelled;
-  - screw supports (HZMotion mount, BF): indicated to the rails at assembly, then match-reamed and pinned (two pins),
-    so a service removal returns without re-indicating;
-  - scales: housing on its seat face; the read head adjusted with shims or slots to the vendor's tolerances;
-  - structural joints (plate and ribs, bars on plates): bolted, dowelled for assembly, and bonded where the joint
-    must act as one part.
-- **Buy ground where possible.** Precision-ground plate cut to size and ground flat bar are stock items; custom
-  grinding only where stock cannot meet a checked tolerance. Where stock flatness fails a check, replicate only the
-  failing faces (Moglice or SKC against a reference, as in `RAIL_MOUNTING.md`) before paying for custom grinding.
+# Precision screw linear module
 
 ## Decisions
 
-- **HZMotion drive parts.** The fixed end is an HZMotion integrated mount (`SupportedScrewDrive`: M60D-BK12-C or
-  M80E-BK15-C), the floating end a BF unit. No custom motor housing.
-- **Riser bars are the default base.** The module's base is a flat ground plate with two ground riser bars under the
-  rails and the mount and BF on the plate between them. Integral lands (rail seats and floor ground into one stepped
-  part) remain a library option for a host that justifies them.
-- **Host-integrated mode.** The module either brings its own base plate or uses a plate the host supplies (for the
-  hobber, the swivel plate): it adds its bars, holes, dowels and seats to that plate. Same recipe and checks.
-- **The scale belongs to the module.** Its seat bar, head bracket, travel window, cable and air are module features,
-  checked against the vendor's mounting tolerances, not added afterwards by the host.
-- **X carriage:** a bought ground 20 mm steel plate with bright drawn flat-bar ribs underneath, bolted from below,
-  dowelled and bonded. The bed, the X rail height and the stiffness target stay.
-- **Z stays on the column** (2026-11-07). The Z screw is at y -82 because the eRob housing stands on the centre line,
-  the rails sit on cast inserts with no added joint, and the column's insert rows and ground pad bar already follow
-  the rule. Z gets a bellows cover only.
-
-## Phases
-
-One worktree, one commit per step, every step keeps the baselines (LM0) and the existing suites green.
-Order: LM0, XC, LM1, LM2, LM3, LM4, LM5, ZB, LM6.
-
-### LM0. Baseline
-
-Record before any change, in this plan's Log:
-- Y moving mass, head mass and centre of mass, A-axis tilt moment and torque against the eRob figures;
-- accuracy budget rows (`HobberAccuracyBudget`), the scales' Abbe offsets (`HobberFrameChecks.scales`);
-- integrity, derived fasteners, collisions over Y travel and A ±15°, service removals;
-- member count and BOM lines for the X carriage and the Y subtree;
-- X carriage plate FE (`fem/frame_stiffness.py`): today 28.9 N/um front tie, 263.9 MN m/rad sole tilt, 27.4 kg.
-
-### XC. X carriage: ground plate with bolted ribs
-
-- Replace `GE-X-carriage` with a 20 mm ground steel plate (stock: precision-ground plate cut to size) and bright drawn
-  flat-bar ribs in today's rib positions (y ±120..140, ±160..180), screwed from below into tapped holes so the column
-  sole face stays clean, two dowels per rib, a bonded joint (adhesive declared as a process with its assumed data).
-- Joints declared as faces: `JointFasteners` derives the screws and dowels; assembly order with `fittedBefore`.
-- Gates:
-  1. plate FE with ribs tied (upper bound) and with independent bars (lower bound); the design must land near the
-     upper bound and at least match the LM0 values;
-  2. slip check at every rib bolt: shear flow under the worst case (column weight, process load, X acceleration)
-     against preload × friction (ground steel 0.2, assumed), margin ≥ 3, ignoring the bond;
-  3. plate flatness of the stock row against HIWIN's allowable height difference between HG25 blocks for the
-     declared preload; if it fails, replicate the four block pads and record why;
-  4. collisions: ribs clear the blocks, the X nut block, the chip skirt and the shields over the full travel;
-  5. hobber checks, integrity, fasteners, service removals unchanged or better.
-
-### LM1. Library component
-
-`machinekit.motion.ScrewLinearModule` (name to confirm against the naming audit), with a spec:
-- rail family and size (unified linear-rail recipe), rail spacing, blocks per rail, block spacing;
-- stroke, overtravel, carriage length and width, carriage hole pattern;
-- the `SupportedScrewDrive` (mount, BF, motor, coupling, screw and nut);
-- base: own plate (stock row) or a host plate; riser bars (default) or integral lands;
-- optional sealed scale (LM2) and cover (LM3).
-
-Parts and features:
-- **Riser bars:** ground flat stock; one ground reference edge per rail; bar thickness derived so the screw axis meets
-  the nut (from the mount's catalogue axis height and the nut housing), from standard stock thicknesses.
-- **Plate:** the mount and BF on the plate between the bars, each match-pinned; bolt and dowel pattern underneath when
-  the module brings its own plate; hard stops in line with the carriage.
-- **Carriage:** plate on the blocks with the nut housing underneath; its top pattern is the host's interface.
-- **Faces** declared so `JointFasteners` derives the screws, dowels and holes; a `ManufacturingRoute` per made part;
-  BOM lines; service removals (motor, screw with nut, rails, carriage).
-
-Checks, in a standalone test project with two or three sizes:
-- integrity (no overlaps, every part supported) and collisions across the full travel;
-- the screw axis meets the nut within the mount's tolerance; supports coaxial by construction;
-- the nut and carriage reach the hard stops before the nut meets either support;
-- derived fasteners resolve; BOM complete; service paths clear.
-
-### LM2. Linear encoder integration
-
-Using `SealedScaleData` (JFT-40 slim series; mounting tolerances: housing parallelism 0.1, head parallelism 0.05,
-head lateral 0.2, gap 1 ± 0.3 mm):
-- **Seat:** a ground seat bar located from the same reference edge as the rail bars, so its parallelism to the rails
-  is a grinding and edge tolerance; checked against `housingParallelism`.
-- **Head:** a bracket on the carriage with a declared adjustment (shims or slots) that covers `gap`, `headLateral` and
-  `headParallelism`; the check reports the adjustment range against the tolerance stack.
-- **Measuring length:** the smallest standard ML (`standardLength`) for stroke plus 2 × overtravel; the hard stops are
-  reached while the head is still inside the window, at both ends.
-- **Abbe:** offsets of the scale's reading line from the module's declared functional point (for the hobber: the hob
-  centre), reported for every tilt the host declares.
-- **Cable and air:** cable exit with `CABLE_BEND_RADIUS` (75 mm) and the straight run respected into the host's moving
-  cable path; the purge port (`airThread`) reachable and routed.
-- **Signals:** the module exposes the scale as the axis's position feedback and the motor encoder as velocity feedback
-  (dual loop over BiSS-C), as ports the host wires to its drive's second encoder input and its BiSS master.
-- **Service:** the head and the housing can be removed without moving the rails or the screw.
-
-### LM3. Cover
-
-Pick the cover from the stroke. For short strokes (the hobber's ±15 mm), block wipers plus a fixed top plate that the
-carriage skirt overlaps; telescopic or bellows covers only when the stroke needs them. Use the way-cover library
-(`machinekit.cover`), its drain and service rules, and the existing wiper rows.
-
-### LM4. Hobber Y conversion
-
-- The swivel plate stays a flat ground steel plate and becomes the module's host plate: two riser bars under the
-  HGH15 rails, the M60D-BK12 and BF12 centred between them on the plate, the JFT-40 seat bar.
-- The Y saddle stays as the carriage: it carries the spindle seat and becomes the module's carriage part, with the
-  nut housing and the scale head bracket.
-- Remove the two L brackets, the nut seat bar and the old Y scale seat bar; their roles move into the module.
-- Swivel plate thickness: keep 15 mm unless a number requires more; record the A-axis effect of any change.
-- Settle FRAME_PLAN's "Y screw centred between the rails" item with numbers.
-
-### LM5. Verify on the hobber
-
-Against the LM0 baseline:
-- hobber checks, integrity, derived fasteners, collisions over Y travel and A ±15°;
-- service removals (motor, screw and nut, scale housing and head);
-- crash and hard stops;
-- accuracy budget, Abbe offsets, A tilt moment and torque against the eRob figures;
-- cradle FE if the plate or saddle changed;
-- editor screenshots of the X carriage and the Y axis before and after.
-
-### ZB. Z bellows
-
-A bellows cover over the Z rails and screw on the column, from the way-cover library, with its drain and service
-rules; no structural change to Z.
-
-### LM6. Documentation and manufacturing
-
-FRAME_PLAN, PARTS and `MACHINE_DESIGN.md` updates; drawings and RFQ rows in `supplier-packages/machined/` for the X
-plate and ribs, the Y swivel plate and riser bars, the scale seat bar and any changed saddle, each with the stock it is
-bought as (ground plate, ground flat bar, bright drawn bar) so quotes replace the estimates.
-
-## Rough cost (estimates, not quotes)
-
-X carriage at about 370 × 370 mm: one-piece milled with ribs about €400–700 (China) / €900–1,500 (EU); 20 mm plate with
-ground bars €250–450 / €500–900; bought ground plate with bright drawn ribs €120–250 / €250–450. LM6 replaces these
-with quotes.
-
-## Open
-
-- Swivel plate thickness (LM4 decides by numbers).
-- The scale's mounting tolerances are datasheet values; the Y scale seat and head adjustment are only as good as them.
-- The bond's strength and creep are assumed until a maker's data sheet is chosen; the slip gate ignores it.
-- NJPE drawings for the BK12 bracket and BF12 (already requested for X and Z) also cover Y.
+- **Structure:** castings provide mass; precision belongs in bought ground plate and flat bar.
+  Bars provide only derived height spacing. Derive heights from the catalogue/stock stack.
+  Locate rails at reference edges, never with dowels. Fixture-replicate or indicate screw supports, then match-pin;
+  adjust scales at the head. Structural joints are bolted, dowelled for assembly, bonded only
+  where needed. Buy ground stock first; replicate failing faces before custom grinding.
+- No welding, legacy alternatives or parts merged just for count. Bolts, holes and pins come
+  from BoltedFace/PinnedFace and JointFasteners; declare fittedBefore and check load slip.
+- **Lean execution (user,2026-11-07):** about90 minutes per step. Model checks only: integrity,
+  derived fasteners, collisions, service paths and hobber suite. No new FE scripts or cases
+  unless stiffness load paths change; then one run. No new library components/fields unless
+  named by the step. Commit what works at the timebox and report remaining work.
+- **XC is three commits:** edge check; X ground plate and ribs; column sole pads. Keep the
+  passing whole-machine sweep; rerun only hobber after trimming. Existing hobbing,
+  joint-fasteners and assembly-integrity passes remain the gates. No FE service framework.
+- **Edge check:** made clearance1.5d; steel tapped d plus0.5d wall beyond major radius;
+  counterbores fully on the face. Bought own holes excluded by kind. Enlarge made parts or
+  report findings; no certified-edge exceptions. See BOM_PLAN F1. Report other machines in
+  one Log line; do not alter their hardware.
+- **X carriage:** ground20 mm deck, bright-bar ribs bolted from below and dowelled; bond may
+  be used but gets no stiffness credit. Keep the small SawnBar manufacturing route. The X
+  rail height is unchanged. Stock flatness0.440 mm ASSUMED exceeds HIWIN S1 mounting
+  allowance0.0748 mm and matched class-C height variation0.020 mm. Replicate all four block
+  pads against one master set from the installed blocks to0.010 mm. Nominal layer0.8 mm,
+  worst-case0.23..1.37 mm versus ASSUMED compound range0.2..2.0 mm. Preload/accuracy remain
+  procurement notes, not LinearRailBlock recipe fields.
+- **X stiffness:** one script,fem/carriage_fem.py, and one current result,fem/results/carriage.json.
+  Bolts-only43.633 N/um front tie and17.077 MN m/rad sole tilt, C3D10 size10 mm, pads held z.
+  Use17.077 in the accuracy budget. LM0 authoritative reference20.232/10.345; fresh unchanged
+  STEP19.529/9.672. Plate approximation28.90/11.75 is diagnostic; old263.9 tilt was invalid.
+- **Column sole:** four ground C45 pads span380x180 mm; front pair clear the casting recess
+  and actuator path. Pads are80 mm deep, widths65/60/90/90 mm, with two M8 each. Reserve
+  the same joint-declared source drilling before cast-anchor sizing. Catalogue stock first;
+  inspect after cure. A6 alignment and assembly match-pins belong to XA. The former full
+  rectangular sole collided with the actuator and is deleted. No dowel credit in sole slip.
+- **Order:** LM0,XC edge/carriage/sole,XA,LM1,LM2,LM3,LM4,LM5,ZB,LM6. Merge main after XC
+  and before XA (authorized); preserve submodule pointers. Main carries electrical-rack,
+  readable-name/foundation-group changes and ALIGNMENT.md; follow its datums/methods.
+- **XA:** keep the X motor inline and low. Declare alignment per precision joint: reference
+  edge / indicate then match-pin / shim or adjust / drawing dowels / fixture-replicated;
+  reject a missing declaration. Indicate the nut block at both travel ends, then match-pin.
+  Check assembly order and tools: bed/inserts, rails/blocks, supports, screw/nut, carriage,
+  nut block, scale/head, guards/skirt, tray. Every fastener needs clear access at its step.
+- **XA drive seats:** delete X/Z ground drive pads and nutGroove. One fixture-replicated seat
+  per support on cast inserts; an arbor and carriage-nut-bore height reference hold supports
+  coaxial and parallel to rails during cure. Derive layer thickness/tolerance and check an
+  ASSUMED product range until chosen. Bolt and match-pin for service return. Move guard feet
+  off precision seats. Nut travel/overtravel must clear the open channel. Update RAIL_MOUNTING.
+- **XA motor bay:** tray ends at one straight edge ahead of motor; one removable lid exposes
+  motor/mount/coupling. Remove rear bridge, its seals and two casting pockets. Keep rearward
+  screw withdrawal. Remove/reposition clamps10/11, deriving seats from named cover/clamp widths;
+  clamps and bolts clear every machine part except the bolt's own threaded seat (M6 major
+  thread/tap-drill representation51.84 mm3 over6 mm). All tray blanks/lid clear removal paths.
+  Pass enclosure end to end after merging main. Head/wipers accessible with guards removed;
+  blind/captive fasteners need a reason. Record motor heat and cooling only if budget requires.
+- **LM1:** a library ScrewLinearModule, own test project, two or three sizes. Spec: rail family,
+  spacing, blocks/spacing, stroke/overtravel, carriage and host pattern, SupportedScrewDrive,
+  own/host ground base plate, derived ground riser bars. HZMotion mount/BF sit between rails.
+  Derived fasteners/pins, hard stops before support contact, alignment, BOM and removals checked.
+- **LM2:** integrate sealed scale, smallest standard ML for stroke+2overtravel. Seat referenced
+  to rail edges; head adjustment covers JFT-40 housing parallelism0.1, head parallelism0.05,
+  lateral0.2 and gap1+/-0.3 mm. Check reading window, Abbe,75 mm cable bend, air access,
+  dual-loop scale-position/motor-velocity feedback ports and independent scale service.
+- **Module scale:** JFT-40 beside the guides, ground40x20 seat derived from M8 engagement,
+  separate fitted head carrier; head slides out along travel and housing sideways after it,
+  leaving the carriage. Cable bends away from housing at R75. Fit head normal face within
+  +/-0.5 mm; head/attachment clearances give +/-0.55 gap adjustment. Stack0.24/0.22 mm is
+  ASSUMED. Base/riser/block stock screen0.45/0.55/0.76 mm already fails0.01; inspect all
+  stock faces (including carriage), then replicate failing faces. Qualification remains open.
+- **LM3:** cover chosen from stroke: short-stroke wipers/fixed top or telescoping, longer bellows.
+  Keep chip ingress, travel, fasteners and removal checks in the module test project.
+- **LM4:** use the module for hobber Y, screw centred, ground base and derived rail risers.
+  Delete L brackets, old nut seat and scale seat bars. Apply XA alignment/assembly/service
+  treatment. Preserve swivel/head interfaces and the dual-loop feedback wiring.
+- **LM5:** verify hobber model gates; report before/after Y/head mass/CoM, A moment/torque,
+  accuracy, Abbe, clearances and scale tolerance stack. Supplier-unknown values stay ASSUMED.
+- **ZB:** way-cover-library bellows on Z, no structural redesign; check full travel and removal.
+- **LM6:** update FRAME_PLAN,PARTS,MACHINE_DESIGN and regenerate/check machined supplier package.
+  Assembly tools get separate BOM rows, ASSUMED prices until quoted, and checked sequence refs:
+  X/Z arbors/height references, replication epoxy/release/dams, C test mandrel, square/granite,
+  level/straightedge/ground spindle arbor, indicators/bases, AF4 key>=400 mm and added fixtures.
+- UI capture is unavailable in this session; do not access the user's protected editor worktree.
 
 ## Log
+
+- 2026-11-07 LM0 (`fedf4ff0c`): before edits,hobber2345/hobbing1161; joint-fasteners,assembly-integrity,way-cover PASS; requested frames0 errors,13 services,269 members,68 joints246 screws26 pins. X carriage24.586824 kg; Y28.132885 kg; head39.16 kg; A tilt48.39 Nm, max gravity35.10 versus87 rated204 peak (brake87 ASSUMED). FE baseline/Abbe/budget details: examples/flexspline-hobber/LINEAR_MODULE_BASELINE.json.
+- 2026-11-07 XC edge complete: plain made-only rule; bought own holes excluded. Bench unchanged232 screws16 pins,60 findings (saddle22,table12,X/Z nut brackets6 each,motor plates4 each,wall2); other examples have no derived joints. Post-trim hobber2453 PASS;50 existing hobber findings elsewhere, none on the new carriage/sole joints; no material exceptions.
+- 2026-11-07 XC carriage complete:20 mm ground deck +bright-bar ribs,26.242 kg versus24.587; bolts-only43.633 N/um,17.077 MN m/rad; accuracy PASS29 s, predicted class4/target6. Post-trim hobber2453 PASS; retained pre-trim hobbing1194,joint-fasteners,assembly-integrity,way-cover and frames0 errors1728 s/13 services gates as directed. Single FE result; service framework and unrelated head changes removed.
+- 2026-11-07 XC sole complete:four80 mm deep ground-stock corner pads,8 M8; contact-only tilt screen2.225x before, per-pad whole-shear slip38.1 normal/7.2 limited crash. Source anchor demand includes joint service threads; central actuator path stays open. Trimmed hobber2453 PASS; split commits689a2fbb4 (edge),f28c59f45 (carriage),25f7ca127 (sole),3.696 kg pads.
+- 2026-11-07 XA partial (lean timebox): bridge,6 seals,2 pockets and2 clamp/socket pairs removed;10 clamps,70 mm cover clearance; lid3/67.715/100 mm path at X45.215.21 joint methods,9 steps,6 tool corridors PASS (AF3/AF5.5 profiles ASSUMED); rib friction screen4 PASS, minimum1.545 normal/1.368 crash (mu0.15,2x sharing ASSUMED,no bond/pin credit). Hobbing1186,joint-fasteners,assembly-integrity,enclosure48 states/66 pairs/30 lid samples PASS; hobber2633 and focused31 checks PASS, including adjacent fasteners in the offset-spanner corridor. X/Z replicated seats,guard-foot relocation,A6 pins and complete Z/wiper service treatment remain open; motor40 W ASSUMED, no cooling part until the 1 K budget is measured.
+- 2026-11-07 LM1 nominal module: own/host base, derived ground risers, M60D-BK12/BF12/SFU1605, four guide blocks and joint-derived stops; HG15 strokes20/80 and HG25 stroke200 PASS60 checks including strict integrity, three service paths, end-stop contact, slip, roundtrip and alignment for every joint. Screws170/240/370 mm, rails220/300/440, risers25x25/25x25/25x15;58/62/70 screws and18 pins. Hobber2633,hobbing1186,joint-fasteners and assembly-integrity PASS. Stock flatness0.10/0.05 mm ASSUMED versus0.01 acceptance remains unqualified; host pattern/torque-limit qualification and physical corrective replication remain open. No FE added.
+- 2026-11-07 LM2 model gates: JFT-40 ML70/120/220,208/258/358 mm housings on ground40x20 seats;66/70/78 screws,18 pins. Own102 checks PASS (physical made edges, five services, key/air corridors, overtravel window, roundtrip, independent position/native-motor feedback); hobber2633 PASS. Head normal/gap stacks0.24/0.22 versus+/-0.5/0.55 mm settings, R75 cable, key D3.5x8/90 and air socket D14x35 ASSUMED. Abbe from module carriage interface111.2/36 mm HG15 and133.2/38 HG25; minimum slip4.482 normal/1.494 momentary, scale89.411/44.706 at ASSUMED20/40 N. Base/riser/block stock screens0.45/0.55/0.76 versus0.01 mm fail; inspect/replicate and qualify fitted head face before release. Fixed M6/pin annulus by66 mm bolt spacing; no FE.

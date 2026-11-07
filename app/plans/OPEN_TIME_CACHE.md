@@ -20,34 +20,132 @@ solid even though none changed.
 
 ## Design
 
-Every build-time memo (`machinekit.cache.Memo`) can opt into a **persistent tier**, keyed on its inputs and on the identity
-of the code that computes it.
+A **content-addressed cache of pure derived values**: a value is a function of its inputs and of the code and native build that
+computed it, and the key says exactly that, so a hit equals a recomputation.
 
-- **Code identity from haxeon.** The build records, for each module, a fingerprint of its transitive dependency closure (its
-  source, every module it imports, the compiler version), and exposes it at runtime (for example `CodeIdentity.of(Class)`).
-  Editing a module or anything it depends on changes the fingerprint; editing an unrelated module does not. Module closures,
-  not per-function hashing: simpler, and geometry code changes rarely.
-- **Persistent tier in `Memo`.** Opt-in per memo. Key: memo name, input key, the owning module's code identity, the native
-  build identity (CadKit/OCCT). Values in a content-addressed store under `$XDG_CACHE_HOME/materia/memo`, with a size cap and
-  least-recently-used eviction. Shapes stored as OCCT BREP, plain data as JsonWire. A verify mode (environment variable)
-  recomputes on every hit and fails on a difference, so a missing dependency shows up as an error, never as a stale shape.
-- **Turn it on where it pays:** casting solids, the hob mesh, anchor windows, sizing layouts, and the tessellated scene
-  part from `AssemblyPreview.part` (mesh, mass properties, face descriptors) keyed on the part's `geometryKey` and the
-  tessellation settings.
+- **Code identity from haxeon.** The build records, per module, a fingerprint of its transitive dependency closure (source,
+  imports, compiler version) and exposes it at runtime (`CodeIdentity.of`). Module closures, not per-function hashing; the
+  interface stays coarse enough to refine later. Clean and incremental builds must agree.
+- **Native identity from the build.** haxeon already fingerprints native actions; the CadKit and OCCT build hash is exposed at
+  runtime and is part of every key (replaces the `naming` version + `MATERIA_MEMO_SALT` stand-in).
+- **Persistent tier in `Memo`** (`DiskStore`, done in OC2). Opt-in per memo; key = memo name, code identity, native identity,
+  input key; files under `$XDG_CACHE_HOME/materia/memo`, size cap, LRU. Verify mode (`MATERIA_MEMO_VERIFY=1`) recomputes every
+  hit and fails on a difference.
+- **Shapes are serializable.** CadKit gains `cad_shape_write/read` (OCCT binary BREP plus the naming and surface attributes),
+  so solids are cacheable as solids and downstream booleans too. No bounding-box-only workarounds.
+- **The cache boundary is the component.** `ComponentType.key(values)` is already a canonical exact-input key. Geometry per
+  detail, display mesh, physical properties, bounds and anchor windows are cached per `(type, key(values), detail)`; the
+  hand-keyed memos that this subsumes are deleted. In-process `Memo` stays as the fast tier in front.
+- **Typed keys** from `@:wire` codecs where they exist, so a forgotten input cannot happen.
+- **Scene export per part**, keyed by `geometryKey` and tessellation settings, so opening is a diff against cached parts.
+
+Until OC1 lands there is no trustworthy code identity: `CodeIdentity.of` returns null (tier off) unless
+`MATERIA_MEMO_STANDIN` is set, which is for measuring and tests only.
 
 ## Steps
 
-- **OC1. Code identity.** haxeon emits module closure fingerprints with the build and a runtime lookup; tests: editing a
-  module changes its own and its dependants' fingerprints and nothing else; deterministic across clean and incremental
-  builds.
-- **OC2. Persistent memo tier.** Store, keys, size cap and eviction, BREP and JsonWire values, verify mode; tests for
-  hit/miss, invalidation by code identity and by native build, eviction, verify-mode failure on a planted stale entry,
-  concurrent writers.
-- **OC3. Turn it on.** Castings, hob mesh, anchor windows, sizing layouts, scene parts. Measure the hobber cold open after
-  (a) an edit to `FlexsplineHobber.hx`, (b) an edit to `MineralCasting.hx`, (c) no edit; record before/after in the Log.
-  The scene output must be byte-identical to an uncached build (or the difference explained).
-- **OC4. Docs.** How to clear and inspect the cache, the verify mode, and the rule for adding a persistent memo.
+- **OC2. Persistent memo tier. DONE.** `DiskStore`, `Memo.persist`, `Codecs`, verify mode; `PersistentMemoTests`
+  (54 checks); first user `HobMesh.build`.
+- **OC1. Code identity. DONE** (haxeon d463bd509). haxeon emits module-closure fingerprints with the build and a runtime lookup; tests: editing a module
+  changes its own and its dependants' fingerprints and nothing else; identical across clean and incremental builds.
+- **OC1b. Native identity. DONE.** `CodeIdentity.nativeBuild(package)` hashes the libraries published beside the program; OCCT is
+  covered by `CADKIT_OCCT_DIR` and `MATERIA_MEMO_SALT` (its libraries live outside the program directory).
+- **OC5. Shape serialization.** `cad_shape_write/read` with names and attributes; round-trip tests: names, volume, face and
+  edge counts, tessellation byte-identical, a boolean on a restored shape equals one on the original.
+- **OC3. Component-boundary cache.** Castings, hob mesh, anchor windows, sizing layouts, bounds per component; scene parts
+  per `geometryKey`. Measure the hobber cold open after (a) an edit to `FlexsplineHobber.hx`, (b) an edit to
+  `MineralCasting.hx`, (c) no edit; scene output byte-identical to an uncached build.
+- **OC6. Verify gate.** Run the whole test suite with `MATERIA_MEMO_VERIFY=1` (and a cold store) once; fix every missing
+  dependency it finds.
+- **OC4. Docs.** Clearing and inspecting the cache, verify mode, the rule for adding a persistent memo.
 
 Target: (a) about the compile plus 20 s; (b) the casting rebuilt, everything else cached; (c) unchanged.
 
+## Using the cache
+
+Two layers share one store (`cadkit.cache.DiskStore`, files named by the SHA-256 of the full key):
+
+- **Kernel cache** (`cadkit.cache.OpCache`): pure CadKit work keyed by construction history (`Shape.key`): fuse, cut and common,
+  loft, and the queries mass properties, face descriptors and tessellation. Correct by construction: a key names the inputs
+  of a pure operation, the CadKit/OCCT build and the cadkit code. Haxe source edits never enter these keys.
+- **Component memos** (`machinekit.cache.Memo.persist`): masses, scene parts, anchor derivations, casting solids, the hob mesh.
+  Keyed on the input key plus the code identity of the code that computes them (`CodeIdentity`) and the native build.
+
+**Environment** (all optional)
+
+| Variable | Effect |
+|---|---|
+| `MATERIA_MEMO_DIR` | Cache directory. Default `$XDG_CACHE_HOME/materia/memo`, else `~/.cache/materia/memo`. |
+| `MATERIA_MEMO=off` | No persistent tier. Results are identical, only slower. |
+| `MATERIA_MEMO_MAX_MB` | Size cap, default 2048. Least recently used entries are evicted past it. |
+| `MATERIA_MEMO_VERIFY=1` | Recompute every hit and fail on any difference (see below). |
+| `MATERIA_MEMO_SALT` | Extra text in the native identity. Set it after rebuilding OCCT or CadKit in a way the library hashes and OCCT version cannot see (same sizes, same version text). |
+
+**Clear and inspect.** Clear: delete the cache directory (it is only a cache). Inspect: `HOBBER_PHASES=1` on the hobber scene
+(`machinekit/examples/flexspline-hobber/haxeon.enclosure.json`) prints the build/fit/export times, one `MEMO` line per memo
+(hits, misses, how many came from disk, time spent computing) and `OPS` lines for the kernel cache (keyed and unkeyed
+booleans, history booleans that cannot be cached and why, queries).
+
+**Verify mode.** `MATERIA_MEMO_VERIFY=1` makes every disk hit recompute and compare bytes; a difference throws
+`persistent memo "<name>" is stale ...`. It means the key or the identity missed an input. To find missing dependencies across
+commits: fill the cache on one commit, switch to a commit that changed code, run with verify on. It is slow by design: use it as
+a gate, not in everyday runs.
+
+**Adding a persistent memo**
+1. The key must name every input of the value: a component's `geometryKey` (type, exact inputs, material, detail) is the model.
+   Never build keys from object identity or anything that varies between runs; a null key means "not cached".
+2. If the computing code is virtual (a component's `geometry`, `massProperties`), add `CodeIdentity.ofObject(instance)` to the
+   key: the memo's own identity covers only the module that owns it.
+3. Give `persist` the module whose code computes the value (`CodeIdentity.of("pkg.Module")`) and exact codecs
+   (`Codecs`): decode(encode(x)) must equal x to the bit.
+4. Solids use `Memos.persistentParts`: the value is always the canonical form (`Shape.canonical`), on a miss, a hit and with the
+   tier off, so results never depend on the cache state.
+5. Test it the way `PersistentMemoTests` does: miss, hit, another identity, damaged entry, verify mode refusing a planted
+   stale value.
+
+**Adding a keyed operation** (kernel cache). Give the result a key (`ShapeKey`) built from the operation name, exact-bit
+parameters and the input keys. An operation that cannot name its inputs returns a null key, which makes everything built on it
+uncached (never wrong). Shapes carrying face attributes, and operations that keep their history (`Part.combine`, `subtract`), are
+not cached today: see the follow-ups.
+
+**Known limits.** Cold runs are not faster (a shared, read-only cache would be the answer). Code identity is the import closure of
+a module, which in this codebase is nearly the whole program for generic modules (`AssemblyPreview`, `MachineComponent`), so an
+edit to a widely imported module invalidates the component memos; the kernel cache is what makes recomputing them cheap.
+Tessellation meshes an independent copy, so it never changes its input or its `bounds()`.
+
 ## Log
+
+- 2026-11-07 OC2 done. Hob display mesh (default hob, debug build): 153 s computed, 0.09 s from the persistent tier in a new
+  process, digest identical; a different parameter set is a separate entry. The mesh entry is 38 MB.
+- 2026-11-07 OC1/OC1b done. Identity per module = source (64-bit) + imports' identities (cycles condensed) + compiler + defines,
+  written as one generated literal per compile (<= 8 ms for 1500 modules). Persistent memos are on by default; a module's
+  identity changes with its own or a dependency's edit (HobSolid edit changed HobMesh/HobSolid/Hob, which form an import cycle,
+  and not Memo). Hob mesh with real identities: 142 s miss, 0.08 s hit in a new process.
+- 2026-11-07 OC5 follow-up. Root cause of the non-idempotent shape bytes: OCCT's `BinTools_LocationSet::Read` rebuilds each
+  location with `gp_Trsf::SetValues` (determinant normalisation, then Gram-Schmidt `Orthogonalize`) and surface placements
+  through `gp_Ax3` (Y recomputed from N x X), so a read moves last bits and flips signed zeros; round-off makes it converge
+  over a few passes (a fully chamfered box takes five), not one. Fix: `cad_shape_write_bytes` writes the fixed point (repeat
+  write-read until the B-rep bytes stop changing), so `fromBytes(b).toBytes() == b` exactly and `Shape.canonical()` is
+  `fromBytes(toBytes())`. A shape built from scratch can still differ from its canonical form in signed zeros, in the last
+  bits of rotated placements, and in where a rotated cylinder's triangulation starts, so **a persistent shape memo must return
+  the canonical form on a miss as well as on a hit, and also when the tier is off.** The OC5 tessellation change (-0.0 written
+  as +0.0) is removed: it changed every mesh (4569 of 1.3 M values in the height-12 hob mesh) to hide the reader's signed
+  zeros; the default hob digest is back to `27fd345a...`.
+- 2026-11-07 Landed on local main (materia 69ccdb1db, haxeon 691ac35f; unpushed). Stages: OC2 persistent `Memo`, OC1/OC1b code and
+  native identity, OC1c `CodeIdentity.ofObject` + OCCT version in the native identity, OC5 shape bytes (fixed point,
+  `Shape.canonical`), component-level caches (masses, scene parts, anchor derivations, castings, hob mesh), then the kernel
+  cache: stage 1 `Shape.key` + persistent fuse/cut/common, 2 spline/loft keys + `Part.combineKept`, 3 mass properties and face
+  descriptors, 4 tessellation made pure (meshes an independent copy) and cached, 5 lofts cached (`Part.loftKept`).
+  Hobber scene, including compile: uncached 234 s; cold 199 s; warm 27 s; edit to FlexsplineHobber.hx ~56 s; edit to
+  MineralCasting.hx 103 s (was 194 s before the kernel cache; machine loaded by other sessions, timings +-20 %). Artifact digest
+  `0fab9107c808d6b2` in every run, cache on or off. Verify gate (MATERIA_MEMO_VERIFY=1 on the populated cache, same code and after a
+  MineralCasting edit): 4259 booleans, 333 mass, 145 face-descriptor and 198 tessellation queries recomputed and equal, no stale.
+  Profile of the edit run: loft 26 % (now cached), history-keeping fuse on shapes with face attributes 15 %, `describeFaces` 11 %,
+  JSON key building in InsertAnchorGeometry.derive ~13 %, `HobMesh.fromShape` array conversion < 1 %.
+- Follow-ups (none scheduled): (1) key face attributes (threads, details) so attributed shapes and `Part.combine`/`subtract` history
+  booleans (~17 s in the edit run) are cached; (2) a cheaper derivation key than `Json.stringify` of the rule and pose;
+  (3) one mechanism: let the kernel cache carry geometry and shrink the identity-keyed memos to non-geometric data; the import closure
+  of generic modules is nearly the whole program (`MachineAssemblyCodec` falls back to the full catalogue, `PrecisionErrors` imports
+  `MachineAssembly`, `import machinekit.component.*` pulls the registry): cutting it was tried and abandoned (stash "catalog package
+  move"); (4) a test that fails when keyed boolean coverage drops on a reference model; (5) a shared read-only cache for cold runs;
+  (6) lazy shape restoration for deep chains of cached operations; (7) the display-mesh array conversion in `HobMesh`.

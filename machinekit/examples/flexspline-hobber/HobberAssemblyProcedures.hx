@@ -215,13 +215,15 @@ class HobberAssemblyProcedures {
 
   public static function build(machine:FlexsplineHobber):Array<Procedure> {
     var result:Array<Procedure> = [];
-    for (travel in machine.travel) result.push(alignScrewSupports(travel.id, {lower: travel.lower, upper: travel.upper}));
+    result.push({id:"x-assembly", label:"X: checked assembly and alignment", kind:Assembly, start:Assembled,
+      steps:[for (i => step in HobberXAssembly.steps()) note("x"+i, step.id,
+        step.measurement + " Tools: " + step.tools.join(", ") + ".", step.parts)], source:Generated("hobber")});
+    for (travel in machine.travel) if (travel.id != "X") result.push(alignScrewSupports(travel.id, {lower: travel.lower, upper: travel.upper}));
     result.push(tensionBelt(machine));
     result.push(fitBt30Arbor());
     result.push(alignOutboard());
     result.push(fitChipGuards());
     result = result.concat(serviceAxes(machine));
-    result.push(setRails("X", ["railXLeft", "railXRight"]));
     result.push(setRails("Z", ["railZLeft", "railZRight"]));
     result.push(setRails("Y", ["railYLeft", "railYRight"]));
     var rails = ["X" => ["railXLeft", "railXRight"], "Y" => ["railYLeft", "railYRight"], "Z" => ["railZLeft", "railZRight"]];
