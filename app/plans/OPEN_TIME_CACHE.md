@@ -131,4 +131,21 @@ Tessellation meshes an independent copy, so it never changes its input or its `b
   the canonical form on a miss as well as on a hit, and also when the tier is off.** The OC5 tessellation change (-0.0 written
   as +0.0) is removed: it changed every mesh (4569 of 1.3 M values in the height-12 hob mesh) to hide the reader's signed
   zeros; the default hob digest is back to `27fd345a...`.
-
+- 2026-11-07 Landed on local main (materia 69ccdb1db, haxeon 691ac35f; unpushed). Stages: OC2 persistent `Memo`, OC1/OC1b code and
+  native identity, OC1c `CodeIdentity.ofObject` + OCCT version in the native identity, OC5 shape bytes (fixed point,
+  `Shape.canonical`), component-level caches (masses, scene parts, anchor derivations, castings, hob mesh), then the kernel
+  cache: stage 1 `Shape.key` + persistent fuse/cut/common, 2 spline/loft keys + `Part.combineKept`, 3 mass properties and face
+  descriptors, 4 tessellation made pure (meshes an independent copy) and cached, 5 lofts cached (`Part.loftKept`).
+  Hobber scene, including compile: uncached 234 s; cold 199 s; warm 27 s; edit to FlexsplineHobber.hx ~56 s; edit to
+  MineralCasting.hx 103 s (was 194 s before the kernel cache; machine loaded by other sessions, timings +-20 %). Artifact digest
+  `0fab9107c808d6b2` in every run, cache on or off. Verify gate (MATERIA_MEMO_VERIFY=1 on the populated cache, same code and after a
+  MineralCasting edit): 4259 booleans, 333 mass, 145 face-descriptor and 198 tessellation queries recomputed and equal, no stale.
+  Profile of the edit run: loft 26 % (now cached), history-keeping fuse on shapes with face attributes 15 %, `describeFaces` 11 %,
+  JSON key building in InsertAnchorGeometry.derive ~13 %, `HobMesh.fromShape` array conversion < 1 %.
+- Follow-ups (none scheduled): (1) key face attributes (threads, details) so attributed shapes and `Part.combine`/`subtract` history
+  booleans (~17 s in the edit run) are cached; (2) a cheaper derivation key than `Json.stringify` of the rule and pose;
+  (3) one mechanism: let the kernel cache carry geometry and shrink the identity-keyed memos to non-geometric data; the import closure
+  of generic modules is nearly the whole program (`MachineAssemblyCodec` falls back to the full catalogue, `PrecisionErrors` imports
+  `MachineAssembly`, `import machinekit.component.*` pulls the registry): cutting it was tried and abandoned (stash "catalog package
+  move"); (4) a test that fails when keyed boolean coverage drops on a reference model; (5) a shared read-only cache for cold runs;
+  (6) lazy shape restoration for deep chains of cached operations; (7) the display-mesh array conversion in `HobMesh`.
