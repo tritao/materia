@@ -16,6 +16,9 @@ class OpposedSlidingDoor extends MachineAssembly {
     super();
     stroke = width / 2 + gap;
     var railPose = F.identity(), half = width / 2 + stroke + 20;
+    // Scene groups: the track (rail, its frame standoffs, end stops, splash hood), the lower guide shoes, and one group per
+    // leaf with its two roller hangers.
+    group("Track");
     // Downward-facing 8 mm slot; twin roller treads run on the two lower lips.
     addComponent(
       "rail",
@@ -61,6 +64,7 @@ class OpposedSlidingDoor extends MachineAssembly {
         F.identity()
       );
       // Two fixed shoes overlap in engagement as each short leaf traverses them.
+      group("Lower guides");
       for (x in [side * (width / 2 - 30), side * (stroke + 30)]) fixed(
         'guide$side-$x',
         new BlockBracket(
@@ -75,6 +79,7 @@ class OpposedSlidingDoor extends MachineAssembly {
         "rail",
         F.identity()
       );
+      group("Track");
     }
     fixed(
       "headerCover",
@@ -95,7 +100,8 @@ class OpposedSlidingDoor extends MachineAssembly {
         0,
         0
       );
-      var leaf = new EnclosurePanel(width / 2, height, constructionId);
+      var leaf = new EnclosurePanel(width / 2, height, constructionId), leafGroup = left ? "Left leaf" : "Right leaf";
+      group(leafGroup);
       addComponent(id, leaf, pose);
       addMemberConnector("rail", joint, F.compose(F.inverse(railPose), F.compose(pose, leaf.connector("mount").frame)));
       addMateOnAxis(
@@ -133,6 +139,7 @@ class OpposedSlidingDoor extends MachineAssembly {
       );
       for (hangerIndex in 0...2) {
         var x = (hangerIndex == 0 ? -1 : 1) * width / 8, name = prefix + "Hanger" + (hangerIndex + 1);
+        group(leafGroup + "/Hanger " + (hangerIndex + 1));
         fixed(
           name,
           new BlockBracket(

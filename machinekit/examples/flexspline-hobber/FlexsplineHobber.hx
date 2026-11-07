@@ -75,9 +75,9 @@ class FlexsplineHobber extends MachineAssembly {
     column = cast foundations[1];
     group("Bed and column");
     includeAt("bed", bed, FoundationLayout.worldPose("bed"));
-    group("Bed and column/Leveling feet");
     var footCentres = FoundationLayout.feet();
     for (i in 0...footCentres.length) {
+      group("Bed and column/Leveling feet/Foot " + (i + 1));
       var p = footCentres[i], x = p.x + HobberXLayout.front().bedCentre, y = p.y;
       var roof = -590 + FoundationLayout.FOOT_ROOF, plateBottom = roof - FoundationLayout.FOOT_PLATE_THICKNESS;
       var plate = machinekit.structural.LevelingFoot.of(Plate(
@@ -333,6 +333,7 @@ class FlexsplineHobber extends MachineAssembly {
     fixExisting("motor-mount", "motorCradle", "spindle/motor",
       F.alongY(centre - HobSpindle.MOTOR_OFFSET, HobberSwivelLayout.SPINDLE_Y - HobSpindle.MOTOR_FACE_Z, HobberZLayout.SEAT_Z + HobSpindle.motorHeight(), 0, 1, 0));
     fixAt("hob", hob, F.fromRotationMatrix(centre, 20, HobberZLayout.SEAT_Z, e0), "spindle/arbor");
+    group("B spindle/Outboard support");
     fixAt("outboardCarrier", new HobberSaddle("GE-outboard-carrier"), F.translation(centre, 0, HobberZLayout.SEAT_Z), "Yplate",
       F.alongY(centre + 45, -100, HobberZLayout.SEAT_Z, 1, 0, 0));
     var supportPose = F.compose(F.translation(centre, 0, HobberZLayout.SEAT_Z), HobberOutboardLayout.bodyPose());

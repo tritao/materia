@@ -46,7 +46,9 @@ class FlexsplineHobberChecks {
       check(groups.get("casting") == "casting", "casting has its own group");
       var anchorCount = 0;
       for (insert in foundation.insertLocations()) {
-        var expected = machinekit.structural.MineralFoundation.purposeGroup(insert.purpose);
+        // An insert with anchor bolts has its own folder in its purpose group; its bolts share it.
+        var anchored = [for (member in foundation.components()) if (StringTools.startsWith(member.id, insert.id + "-bolt")) member].length > 0;
+        var expected = machinekit.structural.MineralFoundation.purposeGroup(insert.purpose) + (anchored ? "/" + insert.id : "");
         check(groups.get(insert.id) == expected, "insert belongs to its declared purpose " + insert.id);
         for (member in foundation.components()) if (StringTools.startsWith(member.id, insert.id + "-bolt")) {
           anchorCount++;

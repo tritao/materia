@@ -53,12 +53,25 @@ class HobberEnclosureChecks {
       != shell("Floor tray/Clamps/Table end")) throw "Enclosure group: the clamp nearest the table is in " + nearest.end;
   }
 
+  /** Keep the scene tree browsable: no folder holds more than this many parts directly (subfolders group the rest). */
+  static inline final MAX_FOLDER_PARTS = 16;
+
+  static function checkFolderSizes(assembly:MachineAssembly):Void {
+    var counts:Map<String, Int> = [];
+    for (id => path in assembly.functionalGroups()) counts.set(path, (counts.exists(path) ? counts.get(path) : 0) + 1);
+    var large = [for (path => count in counts) if (count > MAX_FOLDER_PARTS) '$path ($count)'];
+    if (large.length > 0) throw "Scene folders with more than " + MAX_FOLDER_PARTS + " parts: " + large.join(", ");
+    for (folder in ["door/Track", "door/Lower guides", "door/Left leaf/Hanger 1", "door/Right leaf/Hanger 2"]) if (!counts.exists(HobberEnclosurePreview.shellGroup(folder)))
+      throw 'Enclosure group: $folder is empty';
+  }
+
   public static function main():Void {
     HobberElectricalChecks.run(new FlexsplineHobber());
     var fitted = HobberEnclosurePreview.assembled(), assembly = fitted.assembly, shell = fitted.shell;
     var guardReport = HobberEnclosureGuardChecks.run(assembly, shell.layout.stroke);
     if (assembly.validate().length != 0) throw "Enclosed hobber assembly does not validate";
     checkEnclosureGroups(assembly);
+    checkFolderSizes(assembly);
     var model = new cadkit.modeling.AssemblyModel("mm");
     assembly.addTo(model, "");
     var state = model.initialState();

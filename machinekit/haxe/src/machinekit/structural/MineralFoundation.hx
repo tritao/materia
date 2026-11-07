@@ -95,7 +95,12 @@ class MineralFoundation extends MachineAssembly {
     validateHoleExits();
     withGroup("casting", () -> addComponent("casting", body));
     for (row in inserts) {
-      withGroup(purposeGroup(row.purpose), () -> addComponent(row.id, row.part, row.pose));
+      var anchors:Array<InsertAnchorGeometry.InsertAnchorComponent>;
+      try anchors = InsertAnchorGeometry.components(row.part.insertSpec()) catch (error:Dynamic) throw "Insert "
+        + row.id + ": " + Std.string(error);
+      // An insert with anchor hardware gets its own folder inside its purpose group, so its bolts sit with it.
+      var group = anchors.length == 0 ? purposeGroup(row.purpose) : purposeGroup(row.purpose) + "/" + row.id;
+      withGroup(group, () -> addComponent(row.id, row.part, row.pose));
       pouredMembers.push(row.id);
       if (row.id == rootInsert) {
         addMemberConnector(row.id, "castingSeat", F.compose(F.inverse(row.pose), body.connector("mount").frame));
@@ -104,14 +109,11 @@ class MineralFoundation extends MachineAssembly {
         addMemberConnector("casting", row.id + "Seat", F.compose(row.pose, row.part.connector("mount").frame));
         addMate(row.id + "-cast-in", "fixed", "casting", row.id + "Seat", row.id, "mount");
       }
-      var anchors:Array<InsertAnchorGeometry.InsertAnchorComponent>;
-      try anchors = InsertAnchorGeometry.components(row.part.insertSpec()) catch (error:Dynamic) throw "Insert "
-        + row.id + ": " + Std.string(error);
       for (hardware in anchors) {
         var id = row.id + "-" + hardware.role;
         if (ids.exists(id)) throw "Duplicate foundation anchor member: " + id;
         ids.set(id, true);
-        withGroup(purposeGroup(row.purpose), () -> addComponent(id, hardware.part, F.compose(row.pose, hardware.pose)));
+        withGroup(group, () -> addComponent(id, hardware.part, F.compose(row.pose, hardware.pose)));
         pouredMembers.push(id);
         addMemberConnector(row.id, id + "Seat", hardware.pose);
         addMemberConnector(id, "castAnchorSeat", F.identity());
