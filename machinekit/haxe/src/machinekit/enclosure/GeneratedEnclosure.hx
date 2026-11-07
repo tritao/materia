@@ -42,6 +42,17 @@ class GeneratedEnclosure extends MachineAssembly {
     ];
     include("frame", new EnclosureFrame(w, d, h), F.translation(cx, cy, floor));
     var root = F.translation(layout.lowX - 20, layout.frontY - 20, floor - 40);
+    var doorPose = F.translation(
+      layout.doorX,
+      layout.frontY - (layout.input.opposedDoors == true ? 80 : 50),
+      floor + 30
+    );
+    if (layout.input.opposedDoors == true) include("door", new OpposedSlidingDoor(layout.doorWidth, h - 30), doorPose);
+    else include("door", new SlidingDoor(layout.doorWidth, h - 30), doorPose);
+    addMemberConnector("frame/post00", "door", F.compose(F.inverse(root), doorPose));
+    addMate("door-mount", "fixed", "frame/post00", "door", "door/rail", "mount");
+    // The frame and the door are their own folders; the shell's members are grouped by function below.
+    group("Panels");
     function add(id:String, panel:EnclosurePanel, pose:AssemblyFrame):Void {
       addComponent(id, panel, pose);
       addMemberConnector(
@@ -98,6 +109,7 @@ class GeneratedEnclosure extends MachineAssembly {
         )
       );
     }
+    group("Chip tray/Panels");
     tile("trayLeft", layout.lowX + 2, layout.frontY + 2, b.minX, layout.rearY - 2);
     tile("trayRight", b.maxX, layout.frontY + 2, layout.highX - 2, layout.rearY - 2);
     tile("trayFront", b.minX + TraySeat.SEAM, layout.frontY + 2, b.maxX - TraySeat.SEAM, b.minY);
@@ -117,6 +129,7 @@ class GeneratedEnclosure extends MachineAssembly {
       addMemberConnector("frame/post00", id, F.compose(F.inverse(root), pose));
       addMate(id + "-mount", "fixed", "frame/post00", id, id, "mount");
     }
+    group("Chip tray/Supports");
     for (side in [-1, 1]) {
       // Local X runs from the extrusion's inside face towards the tray opening.
       var x = side < 0 ? layout.lowX : layout.highX;
@@ -143,16 +156,11 @@ class GeneratedEnclosure extends MachineAssembly {
       support(id, [{min: [0.0, 0, 0], max: [x1 - x0, y1 - y0, z1 - z0]}], F.translation(x0, y0, floor + z0), material);
     }
     // Compressed gasket envelopes; the actual grade/free thickness still needs coolant qualification.
-    function seal(id:String, x0:Float, y0:Float, x1:Float, y1:Float):Void box(
-      id,
-      x0,
-      y0,
-      -TraySeat.DEPTH,
-      x1,
-      y1,
-      TraySeat.BOTTOM,
-      "nitrile rubber NBR"
+    function seal(id:String, x0:Float, y0:Float, x1:Float, y1:Float):Void withGroup(
+      "Chip tray/Seals",
+      () -> box(id, x0, y0, -TraySeat.DEPTH, x1, y1, TraySeat.BOTTOM, "nitrile rubber NBR")
     );
+    group("Chip tray/Joints");
     seal("trayOuterSealLeft", layout.lowX, layout.frontY, layout.lowX + 25, layout.rearY);
     seal("trayOuterSealRight", layout.highX - 25, layout.frontY, layout.highX, layout.rearY);
     seal("trayOuterSealFront", layout.lowX + 25, layout.frontY, layout.highX - 25, layout.frontY + 25);
@@ -172,6 +180,7 @@ class GeneratedEnclosure extends MachineAssembly {
     }
     // Stepped service bridge clears the X motor, whose rear end reaches into the ledge area.
     // Six-millimetre feet bear on deeper pockets; the cover is removable after the rear blanks.
+    group("Chip tray/Service bridge");
     support(
       "trayRearServiceBridge",
       [
@@ -191,12 +200,14 @@ class GeneratedEnclosure extends MachineAssembly {
     box("trayBridgeEdgeSealLeft", bx - 60, b.maxY, -2, bx - 58, b.maxY + 25, 11, "nitrile rubber NBR");
     box("trayBridgeEdgeSealRight", bx + 58, b.maxY, -2, bx + 60, b.maxY + 25, 11, "nitrile rubber NBR");
     box("trayBridgeEdgeSealRear", bx - 58, b.maxY + 23, -2, bx + 58, b.maxY + 25, 11, "nitrile rubber NBR");
+    group("Chip tray/Joints");
     for (side in [-1, 1]) {
       var x = bx + side * 60, suffix = side < 0 ? "Left" : "Right";
       box("trayRearCentreJoint" + suffix, x - 15, b.maxY + 25, -10, x + 15, layout.rearY - 25, -4, "aluminium 6061");
       seal("trayRearCentreJointSeal" + suffix, x - 10, b.maxY + 25, x + 10, layout.rearY - 25);
     }
     // Upstands follow the shell's infill planes; the central opening mates to the plinth's own chip volume.
+    group("Chip tray/Lips");
     add(
       "trayFrontLip",
       new EnclosurePanel(w + 2, 30, "steel-2"),
@@ -213,10 +224,5 @@ class GeneratedEnclosure extends MachineAssembly {
         [0, -1, 0, 1, 0, 0, 0, 0, 1]
       )
     );
-    var pose = F.translation(layout.doorX, layout.frontY - (layout.input.opposedDoors == true ? 80 : 50), floor + 30);
-    if (layout.input.opposedDoors == true) include("door", new OpposedSlidingDoor(layout.doorWidth, h - 30), pose);
-    else include("door", new SlidingDoor(layout.doorWidth, h - 30), pose);
-    addMemberConnector("frame/post00", "door", F.compose(F.inverse(root), pose));
-    addMate("door-mount", "fixed", "frame/post00", "door", "door/rail", "mount");
   }
 }
