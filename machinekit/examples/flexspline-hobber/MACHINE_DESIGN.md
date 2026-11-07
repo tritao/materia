@@ -789,3 +789,22 @@ outboard and fixed-X-guard removals remain declared. Service sweeps sample at
 2 mm and require no positive-volume interference; operating clearances are
 checked separately by strict integrity. Historical failed alternatives remain
 only in the FRAME_PLAN Log.
+
+### X motor heat (XA, 2026-11-07)
+
+The inline X motor remains on the M60D-BK12, low in the channel. Treat it as a heat
+source into the mount/support seat, bed and screw, with convection to the bay air.
+For a rated 400 W operating point the existing assumed winding model assigns 5 %
+copper loss and 5 % mechanical loss: approximately **40 W ASSUMED**, not supplier
+thermal data; actual duty-cycle current and losses must be measured. X has no brake.
+The existing accuracy budget allocates 1 K total structural drift (about 6.1 um/K
+X growth). Even if the whole allowance were available to this motor, 40 W requires
+the heat-to-metrology-loop transfer to stay below 0.025 K/W. That transfer and the
+ambient share are unknown; the geometry does not prove the thermal budget.
+
+Keep the present flange stack and add no cooling part yet. Commission with motor,
+mount, bed and scale temperatures logged over the intended duty; accept only if
+the total loop stays inside the allocated 1 K. If it fails, prefer a cooling plate
+that preserves the pilot/axis stack; qualify an insulating flange spacer only
+with the resulting coupling engagement and motor heat rejection checked. Neither
+option is released or credited by the accuracy budget.

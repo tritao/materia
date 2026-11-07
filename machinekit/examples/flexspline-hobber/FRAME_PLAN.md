@@ -49,8 +49,7 @@ A review of `HobberSaddle` and `FlexsplineHobber` found:
 - **Y:** two rails + SFU1605 screw with the standard bracket and a nut block (R0). Bought KK modules rejected: the
   shortest KK86 is 440 mm long (210 stroke for a 30 mm need) on a 230 mm head, +5.7 kg on the eRob, stiffness
   unpublished; KK60 cannot take the 400 W servo.
-- **X carriage:** one milled steel part, 20 mm deck with 25 mm ribs, U open at the front (H1: a front bar meets the Y
-  guides at A ±15°; a thicker deck needs the X rails lower).
+- **X carriage:** bought ground 20 mm deck with separate bolted bright-bar ribs and four full-footprint sole pads (XC); X rail height unchanged. Bond is optional and gets no stiffness credit.
 - **Machined parts:** a part exists either as a structural member or as the deliberate adjustment/interface element at a joint (height
   spacer, alignment bar, actuator adapter). Don't merge parts to reduce count; judge by the joints in the precision paths (tool-to-work
   stiffness, screw alignment, scale alignment). Kept separate on purpose: the scale seat bars and the Z scale arm (alignment and shimming
@@ -191,11 +190,15 @@ Status: **complete** — P1–P5 accepted on branch `hobber-round-r5`; supplier 
 
 ## Phase Y: Y as a linear module (started 2026-11-07)
 
-Status: **LM0 complete; XC complete in three lean commits; XA next** on `linear-module`.
+Status: **LM0 complete; XC complete in three lean commits; XA partial; LM1 next** on `linear-module`.
 Keep the ground20 mm X deck, bolted bright-bar ribs and four corner sole pads.
 One bolts-only FE result:43.633 N/um /17.077 MN m/rad. Passing frame sweep0 errors,
 13 removals; trimmed hobber2453 PASS. XA then LM1-LM5,ZB,LM6 run lean (about90 min
-per step, model gates, no FE unless a stiffness path changes).
+per step, model gates, no FE unless a stiffness path changes). XA's motor bay, tray paths,
+21 alignment declarations and six service-tool corridors pass; hobber2633, hobbing1186,
+joint-fasteners,assembly-integrity and enclosure48 states/66 pairs/30 lid samples pass.
+The replicated X/Z drive seats, guard-foot relocation and A6/Z/wiper release remain open;
+the XA commit records this checked subset.
 
 Y becomes an instance of the MachineKit screw linear module, planned in
 [LINEAR_MODULE_PLAN.md](../../LINEAR_MODULE_PLAN.md) (LM0-LM6): the swivel plate is the module's host, with two ground
@@ -204,7 +207,7 @@ the carriage; the JFT-40 ML 70 seat, head bracket, travel window, cable and air 
 "Y screw centred" item without a new small-screw drive family. Z is not converted: its rails stay on the column's cast
 inserts (the eRob fixes the screw at y -82), and it gets a bellows cover only.
 The same round applies the plan's structure rule (castings for mass, ground flat stock for precision, derived heights,
-location by part type) to the X carriage: a bought ground 20 mm plate with bolted, dowelled and bonded bright-bar ribs
+location by part type) to the X carriage: a bought ground 20 mm plate with bolted and dowelled bright-bar ribs (bond optional, no stiffness credit)
 replaces the one-piece milled `GE-X-carriage`, with no change to the bed or the X rail height (step XC). This
 supersedes the Open item "Thicker X carriage deck: needs the X rails lower".
 

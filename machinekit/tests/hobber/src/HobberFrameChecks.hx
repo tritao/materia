@@ -50,6 +50,9 @@ class HobberFrameChecks {
     // onto the bed and fit its foot screws through capped tool ports, then fit
     // the carriage. The casting otherwise obstructs the lid-nut driver's axis.
     options.fittedBefore = options.fittedBefore.concat([
+      // XA: supports are tightened before the carriage and guard sheets go on.
+      {member:"Xbridge",fastened:["Xfixed","Xfloating"]},
+      {member:"XrearCover",fastened:["Xfixed","Xfloating"]},
       {member:"bed/casting",fastened:["XfrontCover","XrearCover"]},
       {member:"Xbridge",fastened:["XcoverFrontLeft","XcoverFrontRight","XcoverRearLeft","XcoverRearRight"]}
     ]);

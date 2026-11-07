@@ -207,30 +207,10 @@ class FoundationLayout {
       d[2] - depth,
       "tray"
     ),
-    // The removable bridge owns the middle span. The two ledges stop
-    // at its edges rather than claiming the same cavity twice.
     Patterns.box(
-      "tray-rear-ledge-left",
-      InterfaceRecess,
-      faces(["body.x-max", "body.y-min", "body.z-max"]),
-      a,
-      (l - TRAY_REAR_BRIDGE_WIDTH) / 2,
-      depth,
-      w / 2 - a / 2,
-      -(l + TRAY_REAR_BRIDGE_WIDTH) / 4,
-      d[2] - depth,
-      "tray"
-    ), Patterns.box(
-      "tray-rear-ledge-right",
-      InterfaceRecess,
-      faces(["body.x-max", "body.y-max", "body.z-max"]),
-      a,
-      (l - TRAY_REAR_BRIDGE_WIDTH) / 2,
-      depth,
-      w / 2 - a / 2,
-      (l + TRAY_REAR_BRIDGE_WIDTH) / 4,
-      d[2] - depth,
-      "tray"
+      "tray-rear-ledge", InterfaceRecess,
+      faces(["body.x-max", "body.y-min", "body.y-max", "body.z-max"]),
+      a, l, depth, w / 2 - a / 2, 0, d[2] - depth, "tray"
     ), Patterns.box(
       "tray-left-ledge",
       InterfaceRecess,
@@ -257,7 +237,6 @@ class FoundationLayout {
   }
 
   /** Unverified exterior study choices; published bore/thread dimensions live in the catalogue variant. */
-  public static inline final TRAY_REAR_BRIDGE_WIDTH = 150.0;
   public static inline final TRAY_SOCKET_OUTSIDE_DIAMETER = 8.0;
   public static inline final TRAY_SOCKET_RELIEF_DIAMETER = 6.2;
   public static inline final TRAY_SOCKET_TAIL_WIDTH = 11.0;
@@ -297,8 +276,8 @@ class FoundationLayout {
       clampHeight: height
     });
     for (side in [-1, 1]) for (x in [-1, 0, 1]) add(x * (d[0] / 2 - 100), side * (d[1] / 2 - TRAY_SOCKET_EDGE_INSET));
-    for (side in [-1, 1]) for (y in [-150.0, 150.0]) add(side * (d[0] / 2 - TRAY_SOCKET_END_INSET), y);
-    for (y in [-75.0, 75.0]) add(d[0] / 2 - TRAY_SOCKET_END_INSET, y, 17);
+    for (side in [-1, 1]) for (sign in [-1, 1]) add(side * (d[0] / 2 - TRAY_SOCKET_END_INSET),
+      sign * (HobberChipCover.OUTER_HALF_WIDTH + machinekit.enclosure.TrayClamp.WIDTH / 2 + 70));
     return out;
   }
 
@@ -427,18 +406,6 @@ class FoundationLayout {
         0
       ));
       cores = cores.concat(trayLedges());
-      for (side in [-1, 1]) cores.push(Patterns.box(
-        "tray-rear-bridge-seat-" + (side < 0 ? "left" : "right"),
-        InterfaceRecess,
-        faces(["body.x-max", "body.z-max"]).concat([C.feature("X-drive-channel")]),
-        25,
-        (TRAY_REAR_BRIDGE_WIDTH - DRIVE_CHANNEL_WIDTH) / 2,
-        10,
-        d[0] / 2 - 12.5,
-        side * (TRAY_REAR_BRIDGE_WIDTH + DRIVE_CHANNEL_WIDTH) / 4,
-        d[2] - 10,
-        "tray-rear-bridge"
-      ));
       // Preserve the reviewed cable centreline. The filled outer band now
       // needs a real longitudinal duct opening at both body end faces.
       var cable = Patterns.box(

@@ -11,7 +11,7 @@ class GeneratedEnclosure extends MachineAssembly {
   public final serviceAccess:Array<{panelId:String, bounds:machinekit.assembly.PosedParts.PartBox}>;
   public final seamMethod:String =
     "Continuous wet-rated sealant on tray seams; gasketed removable panels and plinth interface (unqualified)";
-  public function new(layout:EnclosureLayout) {
+  public function new(layout:EnclosureLayout, motorBay:{halfWidth:Float, rearY:Float}) {
     super();
     this.layout = layout;
     var w = layout.width(), d = layout.depth(),
@@ -113,10 +113,10 @@ class GeneratedEnclosure extends MachineAssembly {
     tile("trayLeft", layout.lowX + 2, layout.frontY + 2, b.minX, layout.rearY - 2);
     tile("trayRight", b.maxX, layout.frontY + 2, layout.highX - 2, layout.rearY - 2);
     tile("trayFront", b.minX + TraySeat.SEAM, layout.frontY + 2, b.maxX - TraySeat.SEAM, b.minY);
-    var bx = (b.minX + b.maxX) / 2;
-    tile("trayRearLeft", b.minX + TraySeat.SEAM, b.maxY, bx - 60, layout.rearY - 2);
-    tile("trayRearRight", bx + 60, b.maxY, b.maxX - TraySeat.SEAM, layout.rearY - 2);
-    tile("trayRearCentre", bx - 58, b.maxY + 25, bx + 58, layout.rearY - 2);
+    var bx = (b.minX + b.maxX) / 2, bay = motorBay.halfWidth;
+    tile("trayRearLeft", b.minX + TraySeat.SEAM, b.maxY, bx - bay, layout.rearY - 2);
+    tile("trayRearRight", bx + bay, b.maxY, b.maxX - TraySeat.SEAM, layout.rearY - 2);
+    tile("trayRearCentre", bx - bay + TraySeat.SEAM, motorBay.rearY + TraySeat.SEAM, bx + bay - TraySeat.SEAM, layout.rearY - 2);
     // Independent tray ledges on the inside of the lower frame; the tray does not carry posts.
     function support(
       id:String,
@@ -168,8 +168,8 @@ class GeneratedEnclosure extends MachineAssembly {
     seal("trayInnerSealLeft", b.minX - 18, b.minY - 18, b.minX - 6, b.maxY + 18);
     seal("trayInnerSealRight", b.maxX + 6, b.minY - 18, b.maxX + 18, b.maxY + 18);
     seal("trayInnerSealFront", b.minX - 6, b.minY - 18, b.maxX + 6, b.minY - 6);
-    seal("trayInnerSealRearLeft", b.minX - 6, b.maxY + 6, bx - 60, b.maxY + 18);
-    seal("trayInnerSealRearRight", bx + 60, b.maxY + 6, b.maxX + 6, b.maxY + 18);
+    seal("trayInnerSealRearLeft", b.minX - 6, b.maxY + 6, bx - bay, b.maxY + 18);
+    seal("trayInnerSealRearRight", bx + bay, b.maxY + 6, b.maxX + 6, b.maxY + 18);
     // Joint backing bridges the dry gap to the casting; the rebate supports the rest of each seam.
     for (side in [-1, 1]) {
       var x = side < 0 ? b.minX : b.maxX, suffix = side < 0 ? "Left" : "Right";
@@ -178,33 +178,12 @@ class GeneratedEnclosure extends MachineAssembly {
       seal("trayFrontJointSeal" + suffix, x - 10, layout.frontY + 25, x + 10, b.minY - 18);
       seal("trayRearJointSeal" + suffix, x - 10, b.maxY + 18, x + 10, layout.rearY - 25);
     }
-    // Stepped service bridge clears the X motor, whose rear end reaches into the ledge area.
-    // Six-millimetre feet bear on deeper pockets; the cover is removable after the rear blanks.
-    group("Floor tray/Service bridge");
-    support(
-      "trayRearServiceBridge",
-      [
-        {min: [-75.0, 0, -10], max: [-55.0, 25, -4]},
-        {min: [55.0, 0, -10], max: [75.0, 25, -4]},
-        {min: [-58.0, 0, -4], max: [-55.0, 23, 13]},
-        {min: [55.0, 0, -4], max: [58.0, 23, 13]},
-        {min: [-55.0, 21, -4], max: [55.0, 23, 13]},
-        {min: [-75.0, 0, 13], max: [75.0, 30, 17]}
-      ],
-      F.translation(bx, b.maxY, floor),
-      "steel"
-    );
-    box("trayBridgeSealLeft", bx - 75, b.maxY, 11, bx - 60, b.maxY + 25, 13, "nitrile rubber NBR");
-    box("trayBridgeSealRight", bx + 60, b.maxY, 11, bx + 75, b.maxY + 25, 13, "nitrile rubber NBR");
-    box("trayBridgeSealRear", bx - 75, b.maxY + 25, 11, bx + 75, b.maxY + 30, 13, "nitrile rubber NBR");
-    box("trayBridgeEdgeSealLeft", bx - 60, b.maxY, -2, bx - 58, b.maxY + 25, 11, "nitrile rubber NBR");
-    box("trayBridgeEdgeSealRight", bx + 58, b.maxY, -2, bx + 60, b.maxY + 25, 11, "nitrile rubber NBR");
-    box("trayBridgeEdgeSealRear", bx - 58, b.maxY + 23, -2, bx + 58, b.maxY + 25, 11, "nitrile rubber NBR");
+    // The existing machine channel lid closes the motor bay; no tray bridge or captive tray feet.
     group("Floor tray/Joints");
     for (side in [-1, 1]) {
-      var x = bx + side * 60, suffix = side < 0 ? "Left" : "Right";
-      box("trayRearCentreJoint" + suffix, x - 15, b.maxY + 25, -10, x + 15, layout.rearY - 25, -4, "aluminium 6061");
-      seal("trayRearCentreJointSeal" + suffix, x - 10, b.maxY + 25, x + 10, layout.rearY - 25);
+      var x = bx + side * bay, suffix = side < 0 ? "Left" : "Right";
+      box("trayRearCentreJoint" + suffix, x - 15, motorBay.rearY + 25, -10, x + 15, layout.rearY - 25, -4, "aluminium 6061");
+      seal("trayRearCentreJointSeal" + suffix, x - 10, motorBay.rearY + 25, x + 10, layout.rearY - 25);
     }
     // Upstands follow the shell's infill planes; the central opening mates to the plinth's own chip volume.
     group("Floor tray/Lips");

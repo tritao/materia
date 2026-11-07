@@ -380,10 +380,10 @@ class FlexsplineHobber extends MachineAssembly {
     exposePort("mains", "powerSupply", "mains");
     // The 48 V bus for the A actuator, from the same mains: it takes back what the actuator regenerates in a brake chopper and resistor.
     fixAt("supply48", new ThreePhaseDcSupply(new AcMains(ThreePhase, new AcRmsVoltage(400), 50), 48, 20, 1, 125, 125, 120, 300),
-      HobberElectricalLayout.devicePose(-105, 700), "electricalPanel");
+      HobberElectricalLayout.devicePose(-105, HobberSaddle.ELECTRICAL_HEIGHT - 120), "electricalPanel");
     exposePort("mains48", "supply48", "mains");
     // The three sealed scales are read by a BiSS-C master module of the controller.
-    fixAt("bissMaster", new BissMaster(4), HobberElectricalLayout.devicePose(110, 700), "electricalPanel");
+    fixAt("bissMaster", new BissMaster(4), HobberElectricalLayout.devicePose(110, HobberSaddle.ELECTRICAL_HEIGHT - 120), "electricalPanel");
     // Drive seats: one ground bar under both supports of X and Z (the nut block travels above it; grinding makes both seats coplanar and
     // it stays the re-grindable height spacer), two brackets on the swivel plate for Y.
     var xDrive = HobberDrives.x(), yDrive = HobberDrives.y(), zDrive = HobberDrives.z();
@@ -602,6 +602,11 @@ class FlexsplineHobber extends MachineAssembly {
     out.push(ServiceRemoval("xScrewWithdrawal", ["Xscrew", "Xcoupling", "Xnut"],
       [{direction: worldDir(1,0,0), distance: rearward}],
       ["Xmotor", "Xmotor-shaft", "Xfixed", "XfloatingRing"], []));
+    var bayPark = travel.filter(t -> t.id == "X")[0].lower;
+    var baySlide = 386 + bayPark - (115 + HobberChipCover.nutBounds().maxX + 3) + 3;
+    out.push(ServiceRemoval("xMotorBayLid", ["XrearCover", "XrearPlugLeft", "XrearPlugRight"],
+      [{direction:worldDir(0,0,1),distance:3.0}, {direction:worldDir(1,0,0),distance:baySlide},
+       {direction:worldDir(0,0,1),distance:100.0}], [], [{joint:"X",value:bayPark}]));
     var stack = below("Xbridge").concat(["Xbridge"]).filter(id -> id != "Xnut");
     out.push(ServiceRemoval("xChipGuardWithdrawal",HobberChipCover.fixedMembers(),
       [{direction:worldDir(0,0,1),distance:100.0}],stack,[]));

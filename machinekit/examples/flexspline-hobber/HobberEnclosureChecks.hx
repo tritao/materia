@@ -1,3 +1,4 @@
+import machinekit.design.DesignRequirement;
 import machinekit.assembly.PosedParts;
 import machinekit.assembly.MachineAssembly;
 import machinekit.enclosure.EnclosureCutPanel;
@@ -25,7 +26,6 @@ class HobberEnclosureChecks {
       "Floor tray/Supports",
       "Floor tray/Seals",
       "Floor tray/Joints",
-      "Floor tray/Service bridge",
       "Floor tray/Lips"
     ]) if (!counts.exists(shell(folder))) throw 'Enclosure group: $folder is empty';
     if (counts.get(shell("frame/Base outriggers")) != 4) throw "Enclosure group: expected the four frame outriggers";
@@ -45,9 +45,9 @@ class HobberEnclosureChecks {
       var d = Math.sqrt(Math.pow(p.x - table.x, 2) + Math.pow(p.y - table.y, 2));
       if (d < nearest.distance) nearest = {end: path, distance: d};
     }
-    if (clamps != 12
+    if (clamps != 10
       || [for (k in edges.keys()) k].length != 4 || !edges.exists(shell("Floor tray/Clamps/Table end")) || !edges
-      .exists(shell("Floor tray/Clamps/Column end"))) throw "Enclosure group: expected 12 tray clamps on two ends and two sides, got "
+      .exists(shell("Floor tray/Clamps/Column end"))) throw "Enclosure group: expected 10 tray clamps on two ends and two sides, got "
       + [for (k => v in counts) '$k=$v'].join(", ");
     if (nearest.end
       != shell("Floor tray/Clamps/Table end")) throw "Enclosure group: the clamp nearest the table is in " + nearest.end;
@@ -156,10 +156,10 @@ class HobberEnclosureChecks {
         }
       }
       var clamps = [for (p in panels) if (StringTools.startsWith(p.id, "enclosureTrayClamp")) p];
-      if (clamps.length != 12) throw "Expected ten tray clamps and two rear-cover clamps";
+      if (clamps.length != 10) throw "Expected ten tray clamps";
       for (p in clamps) {
         var contact = false;
-        for (tile in panels) if (tray.indexOf(tile) >= 0 || tile.id == "enclosure/trayRearServiceBridge") {
+        for (tile in panels) if (tray.indexOf(tile) >= 0) {
           var pose = state.worldPose(tile.id), lift = materia.assembly.AssemblyFrames.compose(
             materia.assembly.AssemblyFrames.translation(0, 0, -0.1),
             state.worldPose(p.id)
@@ -169,6 +169,18 @@ class HobberEnclosureChecks {
             state.worldPose(p.id), tile.component, pose) > 0.001) throw "Clamp penetrates tray: " + p.id;
         }
         if (!contact) throw "Clamp toe misses all tray pieces: " + p.id;
+      }
+      for (p in panels) if (StringTools.startsWith(p.id, "enclosureTrayClamp") || StringTools.startsWith(p.id, "enclosureTrayBolt")) {
+        var bolt = StringTools.startsWith(p.id, "enclosureTrayBolt");
+        var suffix = p.id.substr(bolt ? "enclosureTrayBolt".length : "enclosureTrayClamp".length);
+        var ownSeat = "machine/bed/trayClampSeat" + suffix;
+        for (m in machine) {
+          var pp = state.worldPose(p.id), mp = state.worldPose(m.id);
+          if (PosedParts.apart(cache.box(p.component, pp), cache.box(m.component, mp), 0)) continue;
+          var volume = cache.overlap(p.component, pp, m.component, mp);
+          var allowed = bolt && m.id == ownSeat ? 51.84 + 0.001 : 0.001;
+          if (volume > allowed) throw 'Tray hardware collision ${p.id} / ${m.id}: $volume mm3';
+        }
       }
       var trayParts = [for (p in panels) if (StringTools.startsWith(p.id, "enclosure/tray") || StringTools.startsWith(
         p.id,
@@ -190,10 +202,7 @@ class HobberEnclosureChecks {
           state.worldPose(tile.id)
         );
         for (other in parts) if (other.id != tile.id && !StringTools.startsWith(other.id,
-          "enclosureTray") && !StringTools.startsWith(
-            other.id,
-            "enclosure/trayBridge"
-          ) && other.id != "enclosure/trayRearServiceBridge") {
+          "enclosureTray")) {
           var otherPose = state.worldPose(other.id);
           if (!PosedParts.apart(cache.box(tile.component,
             pose), cache.box(other.component, otherPose), 0) && cache.overlap(
@@ -204,7 +213,38 @@ class HobberEnclosureChecks {
             ) > 0.001) throw 'Tray removal obstructed: ${tile.id} / ${other.id} at lift ' + step * 5;
         }
       }
-      var source = new FlexsplineHobber(), ranges = [for (t in source.travel)[t.lower, t.upper]];
+      // The bay lid uses the machine's declared path, including its carriage park.
+      var source = fitted.machine, baySamples = 0;
+      for (requirement in source.serviceRemovals()) switch requirement {
+        case ServiceRemoval("xMotorBayLid", moving, steps, prerequisites, park):
+          for (coordinate in park) state.setJoint("machine/" + coordinate.joint, coordinate.value);
+          state.forwardKinematics();
+          var movingIds = [for (id in moving) "machine/" + id];
+          var removedIds = movingIds.concat([for (id in prerequisites) "machine/" + id]);
+          var offset = materia.assembly.AssemblyFrames.identity();
+          for (legIndex => leg in steps) {
+            for (sample in 1...11) {
+              var shift = materia.assembly.AssemblyFrames.compose(offset, materia.assembly.AssemblyFrames.translation(
+                leg.direction[0] * leg.distance * sample / 10, leg.direction[1] * leg.distance * sample / 10,
+                leg.direction[2] * leg.distance * sample / 10));
+              for (p in machine) if (movingIds.contains(p.id)) {
+                var pp = materia.assembly.AssemblyFrames.compose(shift, state.worldPose(p.id));
+                for (q in parts) if (!removedIds.contains(q.id)) {
+                  var qp = state.worldPose(q.id);
+                  if (!PosedParts.apart(cache.box(p.component, pp), cache.box(q.component, qp), 0)
+                    && cache.overlap(p.component, pp, q.component, qp) > 0.001)
+                    throw 'Motor bay lid removal obstructed: ${p.id} / ${q.id}, leg $legIndex sample $sample';
+                }
+              }
+              baySamples++;
+            }
+            offset = materia.assembly.AssemblyFrames.compose(offset, materia.assembly.AssemblyFrames.translation(
+              leg.direction[0] * leg.distance, leg.direction[1] * leg.distance, leg.direction[2] * leg.distance));
+          }
+        default:
+      }
+      if (baySamples != 30) throw "Missing motor bay lid service path";
+      var ranges = [for (t in source.travel)[t.lower, t.upper]];
       for (x in ranges[0]) for (y in ranges[1]) for (z in ranges[2]) for (a in [-Math.PI / 12, 0.0, Math.PI / 12]) {
         state.setJoint("machine/X", x);
         state.setJoint("machine/Y", y);
@@ -221,8 +261,9 @@ class HobberEnclosureChecks {
             if (verifiedPairs.exists(key)) continue;
             checked++;
             var volume = cache.overlap(p.component, pp, m.component, mp);
-            if (volume
-              > 0.001) throw 'Enclosure collision ${p.id} / ${m.id}: $volume mm3 at X$x Y$y Z$z A$a door$door; machine bounds '
+            var ownThread = StringTools.startsWith(p.id, "enclosureTrayBolt")
+              && m.id == "machine/bed/trayClampSeat" + p.id.substr("enclosureTrayBolt".length);
+            if (volume > (ownThread ? 51.841 : 0.001)) throw 'Enclosure collision ${p.id} / ${m.id}: $volume mm3 at X$x Y$y Z$z A$a door$door; machine bounds '
               + haxe.Json.stringify(cache.box(
                 m.component,
                 mp
@@ -344,7 +385,9 @@ class HobberEnclosureChecks {
             baseSupports: 4,
             traySupports: 4,
             trayPieces: 6,
-            trayClamps: 12,
+            trayClamps: 10,
+            bayLidSamples: baySamples,
+            clampMachineClear: true,
             trayLiftClearanceMm: 25,
             trayConstructionClear: true,
             trayStackMm: [4, 2, 13, 11],

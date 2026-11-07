@@ -6,6 +6,7 @@ import machinekit.component.*;
 
 /** Removable stepped toe clamp. Local +X points over the panel; M6 clearance bore is explicit. */
 class TrayClamp extends MachineComponent {
+  public static inline final WIDTH = 20.0;
   static final recipe = new machinekit.cache.Once<ComponentType>();
   public final height:Float;
   public function new(height:Float = TraySeat.TOP) {
@@ -30,7 +31,7 @@ class TrayClamp extends MachineComponent {
   );
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part {
-    var rawHeel = Part.box(20, 20, height), rawToe = Part.box(40, 20, 4);
+    var rawHeel = Part.box(20, WIDTH, height), rawToe = Part.box(40, WIDTH, 4);
     var heel = Solids.named(rawHeel.translated(new Vector(-5, 0, 0)), "heel"), toe = Solids.named(rawToe.translated(new Vector(5, 0, height)), "toe");
     rawHeel.close();
     rawToe.close();
