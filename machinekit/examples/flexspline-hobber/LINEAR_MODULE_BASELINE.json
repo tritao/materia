@@ -3934,5 +3934,57 @@
     "service zLeftGuardWithdrawal: clear",
     "service zRightGuardWithdrawal: clear",
     "service erobWithSaddle: clear"
-  ]
+  ],
+  "solidFeRemeasurement": {
+    "source": "unchanged LM0 construction exported with HobberFemExport; carriage_fem.run geometry=step; 14 and 10 mm C3D10 meshes",
+    "boundaryConditions": "carriage_fem.py: front pair loaded 1 kN each, sole held in z; sole rotation on rigid master, pads held z-only and xyz variants",
+    "results": [
+      {
+        "geometry": "step",
+        "size": 14.0,
+        "elements": 7237,
+        "dofs": 43989,
+        "volume_step": 3132079.4794337447,
+        "volume_filled": 3158239.6,
+        "pad_nodes": [
+          106,
+          108,
+          108,
+          102
+        ],
+        "sole_nodes": 932,
+        "front_tie_N_per_um": 20.021391842161822,
+        "front_tie_work_N_per_um": 10.010695921080913,
+        "volume_mesh": 3158239.5999999987,
+        "sole_tilt_kNm_per_rad_pads_uz": 9859.980954058532,
+        "sole_tilt_kNm_per_rad_pads_xyz": 13529.197461682037
+      },
+      {
+        "geometry": "step",
+        "size": 10.0,
+        "elements": 18938,
+        "dofs": 102708,
+        "volume_step": 3132079.4794337447,
+        "volume_filled": 3158239.6,
+        "pad_nodes": [
+          204,
+          191,
+          198,
+          166
+        ],
+        "sole_nodes": 1836,
+        "front_tie_N_per_um": 19.528750663936073,
+        "front_tie_work_N_per_um": 9.76437533196804,
+        "volume_mesh": 3158239.599999999,
+        "sole_tilt_kNm_per_rad_pads_uz": 9671.718126271906,
+        "sole_tilt_kNm_per_rad_pads_xyz": 13322.875308024197
+      }
+    ],
+    "historicalReference": {
+      "frontTieNPerUm": 20.23185335521772,
+      "soleTiltKNmPerRadPadsUz": 10344.513590821074,
+      "soleTiltKNmPerRadPadsXyz": 14121.867068520349
+    },
+    "note": "Fresh current STEP differs from historical stored reference; no construction edits made before this export. Preserve both records; no claim of identical historical geometry."
+  }
 }

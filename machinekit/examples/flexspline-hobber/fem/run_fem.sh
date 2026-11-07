@@ -15,7 +15,7 @@ cd "$here"
 # 2. the cradle on the seat: the design with its rest block (final) and the joint / support / coupling brackets
 ${HEAVY:-} python3 cradle_fem.py "$work/export" results/cradle-final.json final
 # 3. the X carriage and the Z saddle
-${HEAVY:-} python3 carriage_fem.py "$work/export" results/carriage.json 14 10
+${HEAVY:-} python3 carriage_fem.py "$work/export" results/carriage.json 10
 ${HEAVY:-} python3 saddle_fem.py "$work/export" results/saddle.json 14 10
 # 4. the hand model against the variants (and its refit: add `fit`), then the report
 python3 cradle_handmodel.py "$work/export"

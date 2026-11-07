@@ -83,7 +83,30 @@ class AssemblyIntegrityTests {
       "a declared belt path cannot conceal missing physical support");
   }
 
+  static function interfaceLayers():Void {
+    function layered(width:Float, thickness:Float, declared:Bool):AxisBuilder {
+      var builder = stack(1);
+      var layer:MachineComponent = declared
+        ? new machinekit.structural.LinearMountReplication(new machinekit.component.ComponentValues()
+          .setNumber("width", width).setNumber("length", width).setNumber("thickness", thickness))
+        : new GantryPlate("TEST-UNDECLARED-LAYER", "Undeclared layer", width, width, thickness);
+      builder.attach("layer", layer, AssemblyFrames.translation(0, 0, 10), "base");
+      builder.attach("cap", new GantryPlate("TEST-LAYER-CAP", "Carried member", 20, 20, 2),
+        AssemblyFrames.translation(0, 0, 21), "top");
+      return builder;
+    }
+    expectClean(AssemblyIntegrity.check(layered(80, 1, true), {floorZ:0, minContactArea:625}),
+      "a declared physical layer supports both faces of a fixed mate");
+    check(codes(AssemblyIntegrity.check(layered(80, 0.5, true), {floorZ:0})).indexOf("integrity.support.gap") >= 0,
+      "a layer missing its upper contact cannot bridge a mate gap");
+    check(codes(AssemblyIntegrity.check(layered(80, 1, false), {floorZ:0})).indexOf("integrity.support.gap") >= 0,
+      "an undeclared intervening body cannot conceal a mate gap");
+    check(codes(AssemblyIntegrity.check(layered(10, 1, true), {floorZ:0, minContactArea:625})).indexOf("integrity.contact.area") >= 0,
+      "a declared layer must supply the required contact area on both sides");
+  }
+
   public static function run():Void {
+    interfaceLayers();
     beltSupports();
     expectClean(AssemblyIntegrity.check(stack(0), {floorZ: 0}), "a plate standing on a plate on the floor");
     expectOnly(

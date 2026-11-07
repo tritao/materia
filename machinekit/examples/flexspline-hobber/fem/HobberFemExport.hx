@@ -42,6 +42,31 @@ class HobberFemExport {
       geo.close();
       Sys.println("exported " + design);
     }
+    // XC: export the actual separate members, including inherited drilling.
+    // The solid FE must use these shapes rather than reconstructing an obsolete
+    // integral rib carriage from nominal boxes.
+    for (entry in machine.components()) {
+      if (!StringTools.startsWith(entry.id, "Xrib-") && !StringTools.startsWith(entry.id, "Xpad-")) continue;
+      var component = entry.component;
+      var shape = component.geometry();
+      shape.shape.exportStep('$dir/${entry.id}.step');
+      var props = component.massProperties();
+      var origin = at(entry.id, 0, 0, 0);
+      var ax = at(entry.id, 1, 0, 0);
+      var ay = at(entry.id, 0, 1, 0);
+      var az = at(entry.id, 0, 0, 1);
+      partList.push({name: entry.id, pose: {id: entry.id,
+        origin: [r(origin.x), r(origin.y), r(origin.z - seatZ)],
+        axes: [[r(ax.x-origin.x,6),r(ax.y-origin.y,6),r(ax.z-origin.z,6)],
+          [r(ay.x-origin.x,6),r(ay.y-origin.y,6),r(ay.z-origin.z,6)],
+          [r(az.x-origin.x,6),r(az.y-origin.y,6),r(az.z-origin.z,6)]]},
+        volume: shape.volume(), mass: props.mass,
+        comLocal: [props.centreOfMass.x, props.centreOfMass.y, props.centreOfMass.z],
+        material: component.materialSpec(), recipeKey: component.bom.valuesKey,
+        holes: component.derivedRouteHoles()});
+      shape.close();
+      Sys.println("exported " + entry.id);
+    }
     // Component poses: where each part's authored frame lies in the work frame (to see the offset to the authored frame).
     // Servo group on the cradle: exactly the members and weights HobberFrameChecks.spindleDrive uses.
     var ids = ["spindle/motor", "spindle/motorShaft", "spindle/motorPulley", "spindle/motorEncoder", "motorCradle"], servo = {mass: 0.0, x: 0.0, y: 0.0, z: 0.0}, parts:Array<Dynamic> = [];
@@ -101,6 +126,25 @@ class HobberFemExport {
       zz += props.mass * p.z;
     }
     out.zMoving = {mass: zm, com: [r(zx / zm), r(zy / zm), r(zz / zm - seatZ)]};
+    // Use the actual column steel contacts; no second footprint declaration.
+    var footprints:Array<{x0:Float,x1:Float,y0:Float,y1:Float}>=[];
+    var xmin=Math.POSITIVE_INFINITY;
+    var xmax=Math.NEGATIVE_INFINITY;
+    var toDeck=F.inverse(poses.get("Xbridge"));
+    for (entry in machine.components()) if (StringTools.startsWith(entry.id,"column/")
+      && Std.isOfType(entry.component,machinekit.structural.CastInsert)
+      && entry.component.parameterToken("role")=="column-mount") {
+      var local=entry.component.geometry();
+      var placed=machinekit.assembly.PosedParts.moved(local,F.compose(toDeck,poses.get(entry.id)));
+      local.close();
+      var box=machinekit.assembly.PosedParts.boxOf(placed);
+      placed.close();
+      footprints.push({x0:r(box.minX,6),x1:r(box.maxX,6),y0:r(box.minY,6),y1:r(box.maxY,6)});
+      xmin=Math.min(xmin,box.minX);xmax=Math.max(xmax,box.maxX);
+    }
+    if (footprints.length==0) throw "Carriage FE export needs column steel contacts";
+    out.columnSoleJoint={contactCentreLocal:[r((xmin+xmax)/2,6),0.0,HobberSaddle.xCarriageTop()],
+      deckThicknessMm:HobberSaddle.X_CARRIAGE_THICKNESS,contactFootprints:footprints};
     sys.io.File.saveContent('$dir/hobber-fem-export.json', haxe.Json.stringify(out, null, "  "));
     Sys.println("wrote " + dir + "/hobber-fem-export.json");
   }

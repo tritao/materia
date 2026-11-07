@@ -1,23 +1,14 @@
-"""X carriage (GE-X-carriage, milled steel 20 mm deck + 25 mm ribs): front-tie vertical stiffness and column-sole tilt stiffness, solid FE.
-
-Same two numbers as `../frame_stiffness.py` (Mindlin plate, ribs as lumped thickness), on the real solid (holes under 20 mm filled so they do not
-drive the mesh: volume +0.9 %, a small stiffness overestimate):
-  front tie   1 kN on each of the two front block pads (x = 102, y = +-220; 83 x 48 on the z = 260 underside, spread by area), the column sole
-              (x 276..376, |y| <= 190 on the z = 280 top) held in z; stiffness = 1 kN / mean pad displacement (N/um).
-  sole tilt   the sole top tied to a rigid master (x 326, z 280) that may only move in z and rotate about y; all four block pads held; 1 kN m about
-              y; stiffness = moment / rotation (kN m/rad). `pads_uz` holds the pads in z only (the plate model's assumption), `pads_xyz` holds them in
-              all directions (blocks bolted to the rails).
+"""Bolts-only C3D10 X carriage check: actual ground deck, four bars and four
+replicated pads. No adhesive stiffness credit. Small holes <=20 mm are filled
+for stiffness; CAD integrity retains them. Run through heavy-run, slots4.
+Usage: carriage_fem.py EXPORT_DIR OUTPUT_JSON [SIZE_MM=10] [METHOD=amg]
 """
-import json
-import sys
+import json,sys
+from pathlib import Path
 import numpy as np
 import fe
-
-SOLE = (276.0, 376.0, -190.0, 190.0)
-PADS = [(x, s * 220.0) for x in (102.0, 300.0) for s in (-1, 1)]
-PAD_HALF = (41.5, 24.0)
-Z_BLOCK, Z_SOLE = 260.0, 280.0
-
+PADS=[(x,s*220.) for x in (102.,300.) for s in (-1,1)]
+PAD_HALF=(41.5,24.)
 
 def surface_nodes(nodes, ids, z, box):
     p = nodes[ids]
@@ -45,109 +36,130 @@ def face_weights(conn, nodes, sel_nodes, z):
     return w
 
 
-def primitive_step(path, ribbed):
-    """The plate model's geometry (frame_stiffness.py `after_flat` / `after_ribbed`) as solids: 20 mm deck x 60..386, |y| <= 245, window x <= 140, |y| <= 150,
-    and for `ribbed` four 20 wide, 25 deep ribs under the deck at |y| = 130 and 170 for x >= 140."""
+
+def prepare(root, parts, names):
     gmsh = fe.import_gmsh()
     gmsh.initialize()
+    paths, volumes, pad_bounds = [], {}, {}
+    origin = np.asarray(parts[names[0]]['pose']['origin'])
     try:
-        gmsh.option.setNumber("General.Terminal", 0)
-        gmsh.model.add("p")
-        o = gmsh.model.occ
-        deck = o.addBox(60, -245, 260, 326, 490, 20)
-        window = o.addBox(60, -150, 259, 80, 300, 22)
-        parts = [(3, deck)]
-        tools = [(3, window)]
-        out, _ = o.cut(parts, tools)
-        if ribbed:
-            ribs = [(3, o.addBox(140, yc - 10, 235, 246, 20, 25)) for yc in (-170.0, -130.0, 130.0, 170.0)]
-            out, _ = o.fuse(out, ribs)
-        o.synchronize()
-        gmsh.write(path)
-        return sum(o.getMass(3, t) for _, t in out)
+        gmsh.option.setNumber('General.Terminal', 0)
+        for name in names:
+            if not name.startswith('Xpad-'):
+                continue
+            gmsh.clear()
+            tags = gmsh.model.occ.importShapes(str(root / (name + '.step')))
+            gmsh.model.occ.synchronize()
+            # OCC boxes include its geometric tolerance; nominal coordinates in
+            # this export are mm to six decimals. Retain one micron precision.
+            box = [round(v, 6) for v in gmsh.model.getBoundingBox(-1, -1)]
+            pad_bounds[name] = box
+        for name in names:
+            gmsh.clear()
+            occ = gmsh.model.occ
+            tags = [v for v in occ.importShapes(str(root / (name + '.step'))) if v[0] == 3]
+            before = sum(occ.getMass(*tag) for tag in tags)
+            delta = np.asarray(parts[name]['pose']['origin']) - origin
+            if not np.allclose(parts[name]['pose']['axes'], parts[names[0]]['pose']['axes']):
+                raise ValueError('rotated XC member ' + name)
+            if name in pad_bounds:
+                # These declared layers are rectangular stock with through
+                # clearances only. Suppress those holes, not their compliance.
+                occ.remove(tags, recursive=True)
+                b = pad_bounds[name]
+                tags = [(3, occ.addBox(*b[:3], *(np.array(b[3:]) - b[:3])))]
+            else:
+                tools = []
+                for hole in parts[name]['holes']:
+                    if not 0 < hole['diameter'] <= 20:
+                        continue
+                    p = hole['position']; d = np.asarray(hole['direction']) * hole['depth']
+                    tools.append((3, occ.addCylinder(*p, *d, hole['diameter'] / 2)))
+                if tools:
+                    tags, _ = occ.fuse(tags, tools)
+                if name == 'GE-X-carriage':
+                    # Filling clearance holes must not make steel pillars in
+                    # the replicated pad pockets. Restore each actual pocket.
+                    pockets = []
+                    for pad, b in pad_bounds.items():
+                        shift = np.asarray(parts[pad]['pose']['origin']) - origin
+                        low = np.array(b[:3]) + shift
+                        span = np.array(b[3:]) - b[:3]
+                        pockets.append((3, occ.addBox(*low, *span)))
+                    tags, _ = occ.cut(tags, pockets)
+            after = sum(occ.getMass(*tag) for tag in tags)
+            volumes[name] = dict(originalMm3=before, smallHolesFilledMm3=after)
+            occ.translate(tags, *delta)
+            occ.synchronize()
+            path = root / (name + '-stiffness.step')
+            gmsh.write(str(path)); paths.append(str(path))
     finally:
         gmsh.finalize()
+    return paths, volumes
 
 
-def run(export_dir, size=14.0, curvature=0, method="auto", geometry="step"):
-    export = json.load(open(f"{export_dir}/hobber-fem-export.json"))
-    holes = [h for p in export["parts"] if p["name"] == "GE-X-carriage" for h in p["holes"]]
-    import os
-    tmp = os.environ.get("TMPDIR", "/tmp")
-    filled = f"{tmp}/GE-X-carriage-filled.step"
-    if geometry == "step":
-        v1, v0 = fe.filled_step(f"{export_dir}/GE-X-carriage.step", holes, filled)
-    else:
-        filled = f"{tmp}/GE-X-carriage-{geometry}.step"
-        v1 = v0 = primitive_step(filled, geometry == "ribbed")
-    pts, (conn,) = fe.mesh_parts([filled], size, min_size=size / 2, curvature=curvature)
-    ids = fe.used_nodes(conn)
-    out = {"geometry": geometry, "size": size, "elements": len(conn), "dofs": 3 * len(ids), "volume_step": v0, "volume_filled": v1}
-    pads = [surface_nodes(pts, ids, Z_BLOCK, (px - PAD_HALF[0], px + PAD_HALF[0], py - PAD_HALF[1], py + PAD_HALF[1])) for px, py in PADS]
-    sole = surface_nodes(pts, ids, Z_SOLE, SOLE)
-    out["pad_nodes"] = [len(p) for p in pads]
-    out["sole_nodes"] = len(sole)
-
+def run(export_dir,size=10.,method='amg'):
+    root=Path(export_dir)
+    data=json.loads((root/'hobber-fem-export.json').read_text())
+    parts={p['name']:p for p in data['parts']}
+    names=['GE-X-carriage']+sorted(n for n in parts if n.startswith('Xrib-'))+sorted(n for n in parts if n.startswith('Xpad-'))
+    if len(names)!=9:raise ValueError('expected deck, four ribs and four replication pads')
+    paths,_=prepare(root,parts,names)
+    pts,cs=fe.mesh_parts(paths,size,min_size=size/3,curvature=0)
+    pts,cs,pairs=fe.split_interface(pts,cs)
+    ids=fe.used_nodes(cs[0])
+    joint=data['columnSoleJoint'];origin=np.asarray(joint['contactCentreLocal'])
+    z=origin[2];pad_z=z-joint['deckThicknessMm']
+    patches=[surface_nodes(pts,ids,z,(p['x0'],p['x1'],p['y0'],p['y1'])) for p in joint['contactFootprints']]
+    if not patches or any(not p for p in patches):raise ValueError('missing column corner contact')
+    sole=sorted(set(n for patch in patches for n in patch))
+    pc=np.vstack([c for n,c in zip(names,cs) if n.startswith('Xpad-')]);pi=fe.used_nodes(pc)
+    pads=[surface_nodes(pts,pi,pad_z,(x-PAD_HALF[0],x+PAD_HALF[0],y-PAD_HALF[1],y+PAD_HALF[1])) for x,y in PADS]
+    if any(not p for p in pads):raise ValueError('missing guide contact')
+    rib_for_node={int(node):n for n,c in zip(names,cs) if n.startswith('Xrib-') for node in np.unique(c)}
+    bolts={n:[h['position'][:2] for h in parts[n]['holes'] if h['kind']=='clearance'] for n in names if n.startswith('Xrib-')}
     def model():
-        m = fe.Model()
-        m.add_nodes(pts)
-        m.add_body("carriage", conn, fe.STEEL)
+        m=fe.Model();m.add_nodes(pts)
+        for n,c in zip(names,cs):m.add_body(n,c,dict(E=4000.,nu=.35,rho=1.8e-9) if n.startswith('Xpad-') else fe.STEEL)
+        for a,b in pairs:
+            rib=rib_for_node.get(b)
+            if rib is None:m.tie(b,a);continue
+            at_bolt=any(np.hypot(pts[a][0]-x,pts[a][1]-y)<=6 for x,y in bolts[rib])
+            m.tie(b,a) if at_bolt else m.tie(b,a,(2,))
         return m
+    residuals=[]
+    def solve(m,load):
+        K,_,_=m.system();T,free=m.reduction()
+        u=m.static_solver(K,T,free,method=method)(load)
+        f=np.zeros(m.ndof())
+        for d,v in load.items():f[d]=v
+        residual=float(np.linalg.norm(T.T@(K@u-f))/max(np.linalg.norm(T.T@f),1.))
+        if not np.isfinite(residual) or residual>1e-6:raise ValueError('unconverged carriage solve')
+        residuals.append(residual);return u
+    m=model()
+    for n in sole:m.fix(n,(2,))
+    a,b=sorted(sole,key=lambda n:pts[n][0])[::len(sole)-1];m.fix(a,(0,1));m.fix(b,(1,))
+    load={};weights=[]
+    for p in pads[:2]:
+        w=face_weights(pc,pts,p,pad_z);total=sum(w.values());weights.append(w)
+        for n,area in w.items():load[3*n+2]=1000*area/total
+    u=solve(m,load);delta=np.mean([sum(u[3*n+2]*a for n,a in w.items())/sum(w.values()) for w in weights])
+    front=1/abs(delta)
+    m=model()
+    for p in pads:
+        for n in p:m.fix(n,(2,))
+    m.fix(pads[0][0],(0,1));m.fix(pads[2][0],(1,))
+    master=m.add_master('sole',origin);m.rigid(master,sole)
+    for d in (0,1,3,5):m.fix_dof(m.master_dof(master,d))
+    u=solve(m,{m.master_dof(master,4):1e6})
+    return dict(size=size,elements=[len(c) for c in cs],members=names,
+        front_tie_N_per_um=front,sole_tilt_kNm_per_rad_pads_uz=1/abs(u[m.master_dof(master,4)]),
+        relativeResidualFront=residuals[0],relativeResidualTilt=residuals[1],
+        assumptions=['Bolts-only: radius6 mm tied patches, normal contact closed elsewhere; no bond credit',
+            'Replication E4 GPa, nu0.35 ASSUMED; small holes<=20 mm filled',
+            'Front pair 1 kN each; column contact held z; tilt 1 kN m, block pads held z'])
 
-    # ---- front tie
-    m = model()
-    for n in sole:
-        m.fix(n, (2,))
-    a, b = sorted(sole, key=lambda n: pts[n][0])[0], sorted(sole, key=lambda n: pts[n][0])[-1]
-    m.fix(a, (0, 1))
-    m.fix(b, (1,))
-    front = [pads[i] for i, (px, _) in enumerate(PADS) if px == 102.0]
-    load, weights = {}, []
-    for pad in front:
-        w = face_weights(conn, pts, pad, Z_BLOCK)
-        tot = sum(w.values())
-        for n, a_ in w.items():
-            load[3 * n + 2] = 1000.0 * a_ / tot
-        weights.append(w)
-    K, M, vols = m.system()
-    T, _ = m.reduction()
-    u = m.solve_static(load, K, T, method=method)
-    num = sum(sum(u[3 * n + 2] * a_ for n, a_ in w.items()) / sum(w.values()) for w in weights) / len(weights)
-    out["front_tie_N_per_um"] = 1000.0 / (abs(num) * 1000.0)
-    # compliance-based equivalent (work done by the loads)
-    work = sum(f * u[d] for d, f in load.items())
-    out["front_tie_work_N_per_um"] = 2 * 1000.0 ** 2 / (2 * abs(work)) / 1000.0 * 1.0
-    out["volume_mesh"] = vols["carriage"]
-    # ---- sole tilt
-    for tag, dirs in (("pads_uz", (2,)), ("pads_xyz", (0, 1, 2))):
-        m = model()
-        for pad in pads:
-            for n in pad:
-                m.fix(n, dirs)
-        if tag == "pads_uz":
-            n0 = pads[0][0]
-            n1 = pads[2][0]
-            m.fix(n0, (0, 1))
-            m.fix(n1, (1,))
-        mi = m.add_master("sole", (326.0, 0.0, Z_SOLE))
-        m.rigid(mi, sole)
-        for k in (0, 1, 3, 5):
-            m.fix_dof(m.master_dof(mi, k))
-        K, M, _ = m.system()
-        T, _ = m.reduction()
-        moment = 1e6  # N mm
-        u = m.solve_static({m.master_dof(mi, 4): moment}, K, T, method=method)
-        theta = u[m.master_dof(mi, 4)]
-        out[f"sole_tilt_kNm_per_rad_{tag}"] = moment / abs(theta) / 1e6
-    return out
-
-
-if __name__ == "__main__":
-    d, out = sys.argv[1], sys.argv[2]
-    sizes = [float(x) for x in sys.argv[3:]] or [14.0, 10.0]
-    results = []
-    for size in sizes:
-        for geometry in (("step", "flat", "ribbed") if size == sizes[0] else ("step",)):
-            results.append(run(d, size, geometry=geometry))
-            json.dump(results, open(out, "w"), indent=1)
-            print(json.dumps(results[-1]), flush=True)
+if __name__=='__main__':
+    result=run(sys.argv[1],float(sys.argv[3]) if len(sys.argv)>3 else 10.,sys.argv[4] if len(sys.argv)>4 else 'amg')
+    Path(sys.argv[2]).write_text(json.dumps([result],indent=2)+'\n')
+    print(json.dumps(result,indent=2))

@@ -41,6 +41,9 @@ class FoundationLayout {
   public static inline final LIFT_SEAT_HEIGHT = 770.0;
   public static inline final LIFT_CENTRE_Y = 310.0;
   public static inline final BED_RAIL_CENTRE = 220.0;
+  public static inline final BED_RAIL_INSERT_THICKNESS = 20.0;
+  public static function bedRailSeatTop():Float return TABLE_SEAT - TABLE_SEAT_HEIGHT
+    + RAIL_SEAT_HEIGHT + BED_RAIL_INSERT_THICKNESS;
   public static inline final BED_RAIL_SEAT_WIDTH = 50.0;
   public static inline final BED_RAIL_BEAM_WIDTH = 110.0;
   public static inline final FOOT_FLOOR = 40.0;
@@ -491,7 +494,7 @@ class FoundationLayout {
         "preloaded column guide seat",
         BED_RAIL_SEAT_WIDTH,
         layout.railLength,
-        20,
+        BED_RAIL_INSERT_THICKNESS,
         F.fromRotationMatrix(
           layout.railStart + layout.railLength / 2 - centre,
           side * BED_RAIL_CENTRE,
