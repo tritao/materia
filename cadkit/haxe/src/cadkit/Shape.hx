@@ -41,11 +41,19 @@ class Shape {
   }
 
   public static function box(width:Float, depth:Float, height:Float):Shape {
-    return primitive(new Shape(CadKit.boxChecked(width, depth, height)), "box", ShapeKey.number(width) + "," + ShapeKey.number(depth) + "," + ShapeKey.number(height));
+    return primitive(
+      new Shape(CadKit.boxChecked(width, depth, height)),
+      "box",
+      ShapeKey.number(width) + "," + ShapeKey.number(depth) + "," + ShapeKey.number(height)
+    );
   }
 
   public static function cylinder(radius:Float, height:Float):Shape {
-    return primitive(new Shape(CadKit.cylinderChecked(radius, height)), "cylinder", ShapeKey.number(radius) + "," + ShapeKey.number(height));
+    return primitive(
+      new Shape(CadKit.cylinderChecked(radius, height)),
+      "cylinder",
+      ShapeKey.number(radius) + "," + ShapeKey.number(height)
+    );
   }
 
   public static function sphere(radius:Float):Shape {
@@ -60,7 +68,11 @@ class Shape {
 
   /** Import an authored STEP text payload without relying on its original file path. */
   public static function importStepText(text:String):Shape {
-    return primitive(new Shape(CadKit.stepImportTextChecked(text)), "step", ShapeKey.bytesHash(haxe.io.Bytes.ofString(text)));
+    return primitive(
+      new Shape(CadKit.stepImportTextChecked(text)),
+      "step",
+      ShapeKey.bytesHash(haxe.io.Bytes.ofString(text))
+    );
   }
 
   public function exportStep(path:String):Void {
@@ -72,7 +84,12 @@ class Shape {
   public function refined():Shape return operationShape(refineOperation());
 
   public function refineOperation():Operation {
-    return new Operation(CadKit.shapeRefineOperationChecked(native.borrow()), [this], ShapeKey.op("refine-op", "", [this]), "refine");
+    return new Operation(
+      CadKit.shapeRefineOperationChecked(native.borrow()),
+      [this],
+      ShapeKey.op("refine-op", "", [this]),
+      "refine"
+    );
   }
 
   public function cloneShape():Shape {
@@ -117,8 +134,15 @@ class Shape {
    * Compute volume, area, centroid, and unit-density centroidal inertia. A keyed shape's answer is kept on disk
    * (`OpCache.query`): it is the same whether or not the shape was meshed before (checked in ShapeKeySmoke).
    */
-  public function massProperties():PhysicalProperties return cadkit.cache.OpCache.query("mass", "cadkit.Shape", this, "", () -> computeMassProperties(),
-    properties -> properties.toBytes(), PhysicalProperties.fromBytes);
+  public function massProperties():PhysicalProperties return cadkit.cache.OpCache.query(
+    "mass",
+    "cadkit.Shape",
+    this,
+    "",
+    () -> computeMassProperties(),
+    properties -> properties.toBytes(),
+    PhysicalProperties.fromBytes
+  );
 
   private function computeMassProperties():PhysicalProperties {
     var nativeProperties = CadKit.shapePhysicalPropertiesChecked(native.borrow());
@@ -261,7 +285,12 @@ class Shape {
 		wire edges and their vertices.
 	**/
   public function withElementNames(kind:CadKit.ShapeKind, ids:Array<String>):Shape {
-    return derived(copiedAttributes(new Shape(CadKit.shapeSeedNamesChecked(native.borrow(), kind, ids.join("\n"))), true), "names", Std.string(kind) + "\n" + ids.join("\n"), [this]);
+    return derived(
+      copiedAttributes(new Shape(CadKit.shapeSeedNamesChecked(native.borrow(), kind, ids.join("\n"))), true),
+      "names",
+      Std.string(kind) + "\n" + ids.join("\n"),
+      [this]
+    );
   }
 
   /** A copy whose names that no input has are prefixed by `tag:`: what was created from the inputs. */
@@ -272,7 +301,12 @@ class Shape {
       ref.set_shape(input.borrowHandle());
       refs.push(ref);
     }
-    return derived(copiedAttributes(new Shape(CadKit.shapeStampNamesChecked(native.borrow(), tag, refs)), true), "stamp", tag, [this].concat(inputs));
+    return derived(
+      copiedAttributes(new Shape(CadKit.shapeStampNamesChecked(native.borrow(), tag, refs)), true),
+      "stamp",
+      tag,
+      [this].concat(inputs)
+    );
   }
 
   /**
@@ -359,9 +393,15 @@ class Shape {
     for (entry in meshCache) {
       if (entry.linearDeflection == linearDeflection && entry.angularDeflection == angularDeflection) return entry.mesh;
     }
-    var mesh = cadkit.cache.OpCache.query("tessellate", "cadkit.Shape", this,
-      ShapeKey.number(linearDeflection) + "," + ShapeKey.number(angularDeflection), () -> meshOfCopy(linearDeflection, angularDeflection),
-      value -> value.toBytes(), Mesh.fromBytes);
+    var mesh = cadkit.cache.OpCache.query(
+      "tessellate",
+      "cadkit.Shape",
+      this,
+      ShapeKey.number(linearDeflection) + "," + ShapeKey.number(angularDeflection),
+      () -> meshOfCopy(linearDeflection, angularDeflection),
+      value -> value.toBytes(),
+      Mesh.fromBytes
+    );
     meshCache.push({linearDeflection: linearDeflection, angularDeflection: angularDeflection, mesh: mesh});
     return mesh;
   }
@@ -369,7 +409,11 @@ class Shape {
   private function meshOfCopy(linearDeflection:Float, angularDeflection:Float):Mesh {
     var copy = CadKit.shapeTranslateChecked(native.borrow(), Geometry.vec3(0, 0, 0));
     try {
-      var mesh = Mesh.fromShape(copy.borrow(), Geometry.meshOptions(linearDeflection, angularDeflection), linearDeflection);
+      var mesh = Mesh.fromShape(
+        copy.borrow(),
+        Geometry.meshOptions(linearDeflection, angularDeflection),
+        linearDeflection
+      );
       copy.close();
       return mesh;
     } catch (error:Dynamic) {
@@ -392,49 +436,101 @@ class Shape {
 
   public function translate(delta:CadKit.Vec3):Shape {
     if (threadAttributes.length > 0) return operationShape(translateOperation(delta));
-    return derived(new Shape(CadKit.shapeTranslateChecked(native.borrow(), delta)), "translate", ShapeKey.vec(delta), [this]);
+    return derived(
+      new Shape(CadKit.shapeTranslateChecked(native.borrow(), delta)),
+      "translate",
+      ShapeKey.vec(delta),
+      [this]
+    );
   }
 
   public function translateOperation(delta:CadKit.Vec3):Operation {
-    return new Operation(CadKit.shapeTranslateOperationChecked(native.borrow(), delta), [this], ShapeKey.op("translate-op", ShapeKey.vec(delta), [this]), "translate");
+    return new Operation(
+      CadKit.shapeTranslateOperationChecked(native.borrow(), delta),
+      [this],
+      ShapeKey.op("translate-op", ShapeKey.vec(delta), [this]),
+      "translate"
+    );
   }
 
   public function extrude(delta:CadKit.Vec3):Shape {
     if (threadAttributes.length > 0) return operationShape(extrudeOperation(delta));
-    return derived(new Shape(CadKit.shapeExtrudeChecked(native.borrow(), delta)), "extrude", ShapeKey.vec(delta), [this]);
+    return derived(
+      new Shape(CadKit.shapeExtrudeChecked(native.borrow(), delta)),
+      "extrude",
+      ShapeKey.vec(delta),
+      [this]
+    );
   }
 
   public function extrudeOperation(delta:CadKit.Vec3):Operation {
-    return new Operation(CadKit.shapeExtrudeOperationChecked(native.borrow(), delta), [this], ShapeKey.op("extrude-op", ShapeKey.vec(delta), [this]), "extrude");
+    return new Operation(
+      CadKit.shapeExtrudeOperationChecked(native.borrow(), delta),
+      [this],
+      ShapeKey.op("extrude-op", ShapeKey.vec(delta), [this]),
+      "extrude"
+    );
   }
 
   public function revolve(axisOrigin:CadKit.Vec3, axisDirection:CadKit.Vec3, angle:Float):Shape {
     if (threadAttributes.length > 0) return operationShape(revolveOperation(axisOrigin, axisDirection, angle));
-    return derived(new Shape(CadKit.shapeRevolveChecked(native.borrow(), axisOrigin, axisDirection, angle)), "revolve", ShapeKey.vec(axisOrigin) + "|" + ShapeKey.vec(axisDirection) + "|" + ShapeKey.number(angle), [this]);
+    return derived(
+      new Shape(CadKit.shapeRevolveChecked(native.borrow(), axisOrigin, axisDirection, angle)),
+      "revolve",
+      ShapeKey.vec(axisOrigin) + "|" + ShapeKey.vec(axisDirection) + "|" + ShapeKey.number(angle),
+      [this]
+    );
   }
 
   public function revolveOperation(axisOrigin:CadKit.Vec3, axisDirection:CadKit.Vec3, angle:Float):Operation {
-    return new Operation(CadKit.shapeRevolveOperationChecked(native.borrow(),
-      axisOrigin, axisDirection, angle), [this],
-      ShapeKey.op("revolve-op", ShapeKey.vec(axisOrigin) + "|" + ShapeKey.vec(axisDirection) + "|" + ShapeKey.number(angle), [this]), "revolve");
+    return new Operation(
+      CadKit.shapeRevolveOperationChecked(native.borrow(), axisOrigin, axisDirection, angle),
+      [this],
+      ShapeKey.op(
+        "revolve-op",
+        ShapeKey.vec(axisOrigin) + "|" + ShapeKey.vec(axisDirection) + "|" + ShapeKey.number(angle),
+        [this]
+      ),
+      "revolve"
+    );
   }
 
   public function fillet(radius:Float):Shape {
     if (threadAttributes.length > 0) return operationShape(filletOperation(radius));
-    return derived(new Shape(CadKit.shapeFilletChecked(native.borrow(), radius)), "fillet", ShapeKey.number(radius), [this]);
+    return derived(
+      new Shape(CadKit.shapeFilletChecked(native.borrow(), radius)),
+      "fillet",
+      ShapeKey.number(radius),
+      [this]
+    );
   }
 
   public function filletOperation(radius:Float):Operation {
-    return new Operation(CadKit.shapeFilletOperationChecked(native.borrow(), radius), [this], ShapeKey.op("fillet-op", ShapeKey.number(radius), [this]), "fillet");
+    return new Operation(
+      CadKit.shapeFilletOperationChecked(native.borrow(), radius),
+      [this],
+      ShapeKey.op("fillet-op", ShapeKey.number(radius), [this]),
+      "fillet"
+    );
   }
 
   public function chamfer(distance:Float):Shape {
     if (threadAttributes.length > 0) return operationShape(chamferOperation(distance));
-    return derived(new Shape(CadKit.shapeChamferChecked(native.borrow(), distance)), "chamfer", ShapeKey.number(distance), [this]);
+    return derived(
+      new Shape(CadKit.shapeChamferChecked(native.borrow(), distance)),
+      "chamfer",
+      ShapeKey.number(distance),
+      [this]
+    );
   }
 
   public function chamferOperation(distance:Float):Operation {
-    return new Operation(CadKit.shapeChamferOperationChecked(native.borrow(), distance), [this], ShapeKey.op("chamfer-op", ShapeKey.number(distance), [this]), "chamfer");
+    return new Operation(
+      CadKit.shapeChamferOperationChecked(native.borrow(), distance),
+      [this],
+      ShapeKey.op("chamfer-op", ShapeKey.number(distance), [this]),
+      "chamfer"
+    );
   }
 
   public function filletEdges(edges:Array<Edge>, radius:Float):Shape {
@@ -443,33 +539,64 @@ class Shape {
   }
 
   public function filletEdgesOperation(edges:Array<Edge>, radius:Float):Operation {
-    return new Operation(CadKit.shapeFilletEdgesOperationChecked(native.borrow(), edgeRefs(edges), radius), [this], null, "fillet-edges");
+    return new Operation(
+      CadKit.shapeFilletEdgesOperationChecked(native.borrow(), edgeRefs(edges), radius),
+      [this],
+      null,
+      "fillet-edges"
+    );
   }
 
   public function chamferEdges(edges:Array<Edge>, distance:Float):Shape {
     if (threadAttributes.length > 0) return operationShape(chamferEdgesOperation(edges, distance));
-    return new Shape(CadKit.shapeChamferEdgesChecked(native.borrow(), edgeRefs(edges), distance)).unkeyed("chamfer-edges");
+    return new Shape(CadKit.shapeChamferEdgesChecked(native.borrow(),
+      edgeRefs(edges), distance)).unkeyed("chamfer-edges");
   }
 
   public function chamferEdgesOperation(edges:Array<Edge>, distance:Float):Operation {
-    return new Operation(CadKit.shapeChamferEdgesOperationChecked(native.borrow(), edgeRefs(edges), distance), [this], null, "chamfer-edges");
+    return new Operation(
+      CadKit.shapeChamferEdgesOperationChecked(native.borrow(), edgeRefs(edges), distance),
+      [this],
+      null,
+      "chamfer-edges"
+    );
   }
 
   public function rotateOperation(axis:CadKit.Vec3, angle:Float):Operation {
-    return new Operation(CadKit.shapeRotateOperationChecked(native.borrow(), axis, angle), [this], ShapeKey.op("rotate-op", ShapeKey.vec(axis) + "|" + ShapeKey.number(angle), [this]), "rotate");
+    return new Operation(
+      CadKit.shapeRotateOperationChecked(native.borrow(), axis, angle),
+      [this],
+      ShapeKey.op("rotate-op", ShapeKey.vec(axis) + "|" + ShapeKey.number(angle), [this]),
+      "rotate"
+    );
   }
 
   public function mirror(planeOrigin:CadKit.Vec3, planeNormal:CadKit.Vec3):Shape {
     if (threadAttributes.length > 0) return operationShape(mirrorOperation(planeOrigin, planeNormal));
-    return derived(new Shape(CadKit.shapeMirrorChecked(native.borrow(), planeOrigin, planeNormal)), "mirror", ShapeKey.vec(planeOrigin) + "|" + ShapeKey.vec(planeNormal), [this]);
+    return derived(
+      new Shape(CadKit.shapeMirrorChecked(native.borrow(), planeOrigin, planeNormal)),
+      "mirror",
+      ShapeKey.vec(planeOrigin) + "|" + ShapeKey.vec(planeNormal),
+      [this]
+    );
   }
 
   public function mirrorOperation(planeOrigin:CadKit.Vec3, planeNormal:CadKit.Vec3):Operation {
-    return new Operation(CadKit.shapeMirrorOperationChecked(native.borrow(), planeOrigin, planeNormal), [this], ShapeKey.op("mirror-op", ShapeKey.vec(planeOrigin) + "|" + ShapeKey.vec(planeNormal), [this]), "mirror");
+    return new Operation(
+      CadKit.shapeMirrorOperationChecked(native.borrow(), planeOrigin, planeNormal),
+      [this],
+      ShapeKey.op("mirror-op", ShapeKey.vec(planeOrigin) + "|" + ShapeKey.vec(planeNormal), [this]),
+      "mirror"
+    );
   }
 
   /** Kept on disk under the construction keys of both inputs when they have them (`OpCache`); the result is then the canonical form. */
-  public function fuse(other:Shape):Shape return cadkit.cache.OpCache.boolean("fuse", this, other, () -> fuseDirect(other));
+  public function fuse(other:Shape):Shape return cadkit.cache.OpCache.boolean(
+    "fuse",
+    this,
+    other,
+    () -> fuseDirect(other)
+  );
 
   private function fuseDirect(other:Shape):Shape {
     if (threadAttributes.length > 0 || other.threadAttributes.length > 0) return operationShape(fuseOperation(other));
@@ -480,11 +607,21 @@ class Shape {
     // History-keeping booleans are keyed under their own name: their result is the built form, not the canonical one a cached
     // `fuse` gives, and a key must name one form only.
     var key = ShapeKey.op("fuse-history", "", [this, other]);
-    return cadkit.cache.OpCache.historyOperation("fuse", key == null ? ShapeKey.gapOf("fuse", [this, other]) : null, () -> new Operation(CadKit.fuseOperationChecked(native.borrow(), other.native.borrow()), [this, other], key, "fuse"));
+    return cadkit.cache.OpCache.historyOperation(
+      "fuse",
+      key == null ? ShapeKey.gapOf("fuse", [this, other]) : null,
+      () -> new Operation(
+        CadKit.fuseOperationChecked(native.borrow(), other.native.borrow()),
+        [this, other],
+        key,
+        "fuse"
+      )
+    );
   }
 
   /** Kept on disk under the construction keys of both inputs when they have them (`OpCache`); the result is then the canonical form. */
-  public function cut(other:Shape):Shape return cadkit.cache.OpCache.boolean("cut", this, other, () -> cutDirect(other));
+  public function cut(other:Shape):Shape return cadkit.cache.OpCache.boolean("cut",
+    this, other, () -> cutDirect(other));
 
   private function cutDirect(other:Shape):Shape {
     if (threadAttributes.length > 0 || other.threadAttributes.length > 0) return operationShape(cutOperation(other));
@@ -495,11 +632,20 @@ class Shape {
     // History-keeping booleans are keyed under their own name: their result is the built form, not the canonical one a cached
     // `cut` gives, and a key must name one form only.
     var key = ShapeKey.op("cut-history", "", [this, other]);
-    return cadkit.cache.OpCache.historyOperation("cut", key == null ? ShapeKey.gapOf("cut", [this, other]) : null, () -> new Operation(CadKit.cutOperationChecked(native.borrow(), other.native.borrow()), [this, other], key, "cut"));
+    return cadkit.cache.OpCache.historyOperation(
+      "cut",
+      key == null ? ShapeKey.gapOf("cut", [this, other]) : null,
+      () -> new Operation(CadKit.cutOperationChecked(native.borrow(), other.native.borrow()), [this, other], key, "cut")
+    );
   }
 
   /** Kept on disk under the construction keys of both inputs when they have them (`OpCache`); the result is then the canonical form. */
-  public function common(other:Shape):Shape return cadkit.cache.OpCache.boolean("common", this, other, () -> commonDirect(other));
+  public function common(other:Shape):Shape return cadkit.cache.OpCache.boolean(
+    "common",
+    this,
+    other,
+    () -> commonDirect(other)
+  );
 
   private function commonDirect(other:Shape):Shape {
     if (threadAttributes.length > 0 || other.threadAttributes.length > 0) return operationShape(commonOperation(other));
@@ -510,7 +656,16 @@ class Shape {
     // History-keeping booleans are keyed under their own name: their result is the built form, not the canonical one a cached
     // `common` gives, and a key must name one form only.
     var key = ShapeKey.op("common-history", "", [this, other]);
-    return cadkit.cache.OpCache.historyOperation("common", key == null ? ShapeKey.gapOf("common", [this, other]) : null, () -> new Operation(CadKit.commonOperationChecked(native.borrow(), other.native.borrow()), [this, other], key, "common"));
+    return cadkit.cache.OpCache.historyOperation(
+      "common",
+      key == null ? ShapeKey.gapOf("common", [this, other]) : null,
+      () -> new Operation(
+        CadKit.commonOperationChecked(native.borrow(), other.native.borrow()),
+        [this, other],
+        key,
+        "common"
+      )
+    );
   }
 
   /** The planar faces of this solid on the plane through `origin` with `normal`, holes kept; an empty region when it misses. */

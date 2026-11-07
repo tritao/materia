@@ -15,7 +15,12 @@ class Operation {
    * `key` is the construction key of the result (see `ShapeKey`), null when an input has none; `name` says what the operation
    * is, for coverage reports of unkeyed results.
    */
-  public function new(native:CadKit.OwnedOperationHandle, inputs:Array<Shape> = null, key:Null<String> = null, name:Null<String> = null) {
+  public function new(
+    native:CadKit.OwnedOperationHandle,
+    inputs:Array<Shape> = null,
+    key:Null<String> = null,
+    name:Null<String> = null
+  ) {
     this.native = native;
     resultKey = key;
     resultGap = key != null ? "" : inputs == null ? (name ?? "operation") : ShapeKey.gapOf(name ?? "operation", inputs);

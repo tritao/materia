@@ -27,17 +27,25 @@ class FaceAttributeCodec {
       out.writeDouble(spec.pitch);
       out.writeInt32(spec.starts);
       out.writeByte(switch spec.hand {
-        case RightHand: 1;
-        case LeftHand: 2;
-      });
+        case RightHand:
+          1;
+        case LeftHand:
+          2;
+      }
+      );
       out.writeByte(spec.internal ? 1 : 0);
       text(out, spec.toleranceClass);
       out.writeByte(switch spec.profile {
-        case Metric: 1;
-        case Trapezoidal: 2;
-        case Acme: 3;
-        case Ball: 4;
-      });
+        case Metric:
+          1;
+        case Trapezoidal:
+          2;
+        case Acme:
+          3;
+        case Ball:
+          4;
+      }
+      );
       out.writeDouble(attribute.start);
       out.writeInt32(attribute.direction);
       var length = attribute.length;
@@ -87,26 +95,36 @@ class FaceAttributeCodec {
       var majorDiameter = input.readDouble(), pitch = input.readDouble();
       var starts = input.readInt32();
       var hand = switch input.readByte() {
-        case 1: ThreadHand.RightHand;
-        case 2: ThreadHand.LeftHand;
-        default: throw "Damaged face attribute bytes";
+        case 1:
+          ThreadHand.RightHand;
+        case 2:
+          ThreadHand.LeftHand;
+        default:
+          throw "Damaged face attribute bytes";
       };
       var internal = flag(input);
       var toleranceClass = readText(input, bytes);
       var profile = switch input.readByte() {
-        case 1: ThreadProfile.Metric;
-        case 2: ThreadProfile.Trapezoidal;
-        case 3: ThreadProfile.Acme;
-        case 4: ThreadProfile.Ball;
-        default: throw "Damaged face attribute bytes";
+        case 1:
+          ThreadProfile.Metric;
+        case 2:
+          ThreadProfile.Trapezoidal;
+        case 3:
+          ThreadProfile.Acme;
+        case 4:
+          ThreadProfile.Ball;
+        default:
+          throw "Damaged face attribute bytes";
       };
       var spec = new ThreadSpec(designation, majorDiameter, pitch, starts, hand, internal, toleranceClass, profile);
       var start = input.readDouble();
       var direction = input.readInt32();
       var length:Null<Float> = flag(input) ? input.readDouble() : null;
       var detail:Null<SurfaceDetail> = switch input.readByte() {
-        case 0: null;
-        case 1: Knurl(input.readInt32(), input.readDouble());
+        case 0:
+          null;
+        case 1:
+          Knurl(input.readInt32(), input.readDouble());
         case 2:
           var divisions = input.readInt32(), numberedEvery = input.readInt32();
           var slant = input.readDouble(), endRadius = input.readDouble();
@@ -120,10 +138,13 @@ class FaceAttributeCodec {
           var bindings = [for (_ in 0...bindingCount) {
             var signal = readText(input, bytes);
             new DisplayBinding(signal, readText(input, bytes));
-          }];
+          }
+          ];
           var channel = readText(input, bytes);
-          Display(new DisplaySpec(width, height, offsetX, offsetY, source, profileName, bindings, channel, flag(input)));
-        default: throw "Damaged face attribute bytes";
+          Display(new DisplaySpec(width,
+            height, offsetX, offsetY, source, profileName, bindings, channel, flag(input)));
+        default:
+          throw "Damaged face attribute bytes";
       };
       result.push(new ThreadedFace(faceName, spec, start, direction, length, detail));
     }
@@ -145,8 +166,11 @@ class FaceAttributeCodec {
   }
 
   static function flag(input:BytesInput):Bool return switch input.readByte() {
-    case 0: false;
-    case 1: true;
-    default: throw "Damaged face attribute bytes";
+    case 0:
+      false;
+    case 1:
+      true;
+    default:
+      throw "Damaged face attribute bytes";
   };
 }

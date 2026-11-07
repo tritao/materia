@@ -110,7 +110,8 @@ class DiskStore {
         written = 0;
         evict();
       }
-    } catch (error:Dynamic) {}
+    } catch (error:Dynamic) {
+    }
   }
 
   /** Deletes every entry. */
@@ -169,6 +170,7 @@ class DiskStore {
   }
 
   static function deleteQuietly(path:String):Void {
-    try FileSystem.deleteFile(path) catch (error:Dynamic) {}
+    try FileSystem.deleteFile(path) catch (error:Dynamic) {
+    }
   }
 }

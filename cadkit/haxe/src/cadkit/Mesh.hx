@@ -124,9 +124,20 @@ class Mesh {
     try {
       input.readByte();
       extra = true;
-    } catch (error:Dynamic) {}
+    } catch (error:Dynamic) {
+    }
     if (extra) throw "stored mesh has trailing bytes";
-    return new Mesh(streams[0], streams[1], streams[2], streams[3], streams[4], vertexCount, indexCount, ranges, linearDeflection);
+    return new Mesh(
+      streams[0],
+      streams[1],
+      streams[2],
+      streams[3],
+      streams[4],
+      vertexCount,
+      indexCount,
+      ranges,
+      linearDeflection
+    );
   }
 
   /** Return the index range for a face from the tessellated shape snapshot. */

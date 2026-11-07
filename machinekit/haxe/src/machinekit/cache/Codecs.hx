@@ -77,19 +77,31 @@ class Codecs {
     var mass = input.readDouble();
     var centre = new Vector(input.readDouble(), input.readDouble(), input.readDouble());
     var source:MassSource = switch input.readByte() {
-      case 0: Computed(Envelope);
-      case 1: Computed(Preview);
-      case 2: Declared;
-      case 3: EffectiveDensity(input.readDouble());
-      case 4: Modelled;
-      default: throw "stored mass has an unknown source";
+      case 0:
+        Computed(Envelope);
+      case 1:
+        Computed(Preview);
+      case 2:
+        Declared;
+      case 3:
+        EffectiveDensity(input.readDouble());
+      case 4:
+        Modelled;
+      default:
+        throw "stored mass has an unknown source";
     };
     var inertia:Null<InertiaTensor> = null;
     switch input.readByte() {
       case 0:
       case 1:
-        inertia = new InertiaTensor(input.readDouble(), input.readDouble(), input.readDouble(), input.readDouble(), input.readDouble(),
-          input.readDouble());
+        inertia = new InertiaTensor(
+          input.readDouble(),
+          input.readDouble(),
+          input.readDouble(),
+          input.readDouble(),
+          input.readDouble(),
+          input.readDouble()
+        );
       default:
         throw "stored mass has a bad inertia flag";
     }
@@ -129,13 +141,20 @@ class Codecs {
     for (_ in 0...input.readInt32()) {
       var name = readText(input);
       switch input.readByte() {
-        case 0: values.setNumber(name, input.readDouble());
-        case 1: values.setInteger(name, input.readInt32());
-        case 2: values.setBoolean(name, false);
-        case 3: values.setBoolean(name, true);
-        case 4: values.setToken(name, readText(input));
-        case 5: values.setUnset(name);
-        default: throw "stored component value has an unknown type";
+        case 0:
+          values.setNumber(name, input.readDouble());
+        case 1:
+          values.setInteger(name, input.readInt32());
+        case 2:
+          values.setBoolean(name, false);
+        case 3:
+          values.setBoolean(name, true);
+        case 4:
+          values.setToken(name, readText(input));
+        case 5:
+          values.setUnset(name);
+        default:
+          throw "stored component value has an unknown type";
       }
     }
     return values;
@@ -161,7 +180,8 @@ class Codecs {
     for (value in list) out.writeDouble(value);
   }
 
-  static function readFloats(input:BytesInput):Array<Float> return [for (_ in 0...input.readInt32()) input.readDouble()];
+  static function readFloats(input:BytesInput):Array<Float
+    > return [for (_ in 0...input.readInt32()) input.readDouble()];
 
   /** A stored value must be consumed exactly; anything else is damage, which the memo treats as a miss. */
   static function done(input:BytesInput, bytes:Bytes):Void {
@@ -169,7 +189,8 @@ class Codecs {
     try {
       input.readByte();
       rest = 1;
-    } catch (error:Dynamic) {}
+    } catch (error:Dynamic) {
+    }
     if (rest != 0) throw "stored value has trailing bytes";
   }
 }

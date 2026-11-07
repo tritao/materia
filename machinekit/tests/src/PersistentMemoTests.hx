@@ -29,7 +29,12 @@ class PersistentMemoTests {
   }
 
   static function memo(name:String, store:DiskStore, identity:String, runs:Array<Int>):Memo<Array<Float>> {
-    return new Memo<Array<Float>>(name, 64, list -> list.copy()).persistIn(store, identity, Codecs.floats, Codecs.unfloats);
+    return new Memo<Array<Float>>(name, 64, list -> list.copy()).persistIn(
+      store,
+      identity,
+      Codecs.floats,
+      Codecs.unfloats
+    );
   }
 
   static function compute(runs:Array<Int>, seed:Float):Array<Float> {
@@ -61,7 +66,10 @@ class PersistentMemoTests {
     check(next.get("k1", () -> compute(runs, 99)).length == 6, "a value read from disk is still copied out");
     next.get("k2", () -> compute(runs, 8));
     check(runs[0] == 2 && store.count() == 2, "another key is another entry");
-    check(first.get(null, () -> compute(runs, 1)) != null && runs[0] == 3 && store.count() == 2, "a null key is never stored");
+    check(
+      first.get(null, () -> compute(runs, 1)) != null && runs[0] == 3 && store.count() == 2,
+      "a null key is never stored"
+    );
     store.clear();
   }
 
@@ -122,12 +130,14 @@ class PersistentMemoTests {
     var store = freshStore(entrySize * 10.5);
     var runs = [0];
     var m = memo("persist-h", store, "id1", runs);
-    for (i in 0...40) m.get("k" + i, () -> {
-      runs[0]++;
-      return [for (j in 0...100) 1.0 * j + i];
+    for (i in 0...40) m.get("k" + i, () -> {runs[0]++;
+    return [for (j in 0...100) 1.0 * j + i];
     });
     store.evict();
-    check(store.usage() <= entrySize * 10.5, "the store stays under its cap: " + store.usage() + " vs " + entrySize * 10.5);
+    check(
+      store.usage() <= entrySize * 10.5,
+      "the store stays under its cap: " + store.usage() + " vs " + entrySize * 10.5
+    );
     check(store.count() >= 5 && store.count() <= 10, "eviction keeps a useful number of entries: " + store.count());
     var count = store.count();
     store.evict();
@@ -145,8 +155,12 @@ class PersistentMemoTests {
       memo("persist-i", store, "id1", runs).get("k", () -> compute(runs, 1));
       check(runs[0] == 2, "verify mode recomputes a disk hit");
       var message = "";
-      try memo("persist-i", store, "id1", runs).get("k", () -> compute(runs, 2)) catch (error:Dynamic) message = Std.string(error);
-      check(message.indexOf("stale") >= 0 && message.indexOf("persist-i") >= 0, "verify mode fails on a differing recomputation: " + message);
+      try memo("persist-i",
+        store, "id1", runs).get("k", () -> compute(runs, 2)) catch (error:Dynamic) message = Std.string(error);
+      check(
+        message.indexOf("stale") >= 0 && message.indexOf("persist-i") >= 0,
+        "verify mode fails on a differing recomputation: " + message
+      );
       var fresh = memo("persist-i", store, "id1", runs).get("k2", () -> compute(runs, 3));
       check(fresh.length == 6, "verify mode still computes and stores a miss");
       memo("persist-i", store, "id1", runs).get("k2", () -> compute(runs, 3));
@@ -163,19 +177,17 @@ class PersistentMemoTests {
     var store = freshStore();
     var runs = [0];
     // Separate memos stand for separate processes writing the same keys at once.
-    var results = Parallel.all([for (t in 0...8) () -> {
-      var m = memo("persist-j", store, "id1", [0]);
-      var sum = 0.0;
-      for (round in 0...3) for (k in 0...12) sum += m.get("k" + k, () -> [for (j in 0...2000) 1.0 * k + j * 0.5])[k];
-      sum;
+    var results = Parallel.all([for (t in 0...8)() -> {var m = memo("persist-j", store, "id1", [0]);
+    var sum = 0.0;
+    for (round in 0...3) for (k in 0...12) sum += m.get("k" + k, () -> [for (j in 0...2000) 1.0 * k + j * 0.5])[k];
+    sum;
     }]);
     for (r in results) check(r == results[0], "every thread saw the same values");
     check(store.count() == 12, "each key was stored exactly once: " + store.count());
     var again = memo("persist-j", store, "id1", runs);
     for (k in 0...12) {
-      var v = again.get("k" + k, () -> {
-        runs[0]++;
-        return [];
+      var v = again.get("k" + k, () -> {runs[0]++;
+      return [];
       });
       check(v.length == 2000 && v[5] == 1.0 * k + 2.5, "stored values are whole after concurrent writes");
     }
@@ -184,9 +196,16 @@ class PersistentMemoTests {
   }
 
   static function meshCodec():Void {
-    var mesh = {positions: [0.1, -0.0, 1e-300, 123456789.123456789], normals: [0.0, 0.0, 1.0, 0.5], indices: [0, 1, 2, 2147483647, -1]};
+    var mesh = {
+      positions: [0.1, -0.0, 1e-300, 123456789.123456789],
+      normals: [0.0, 0.0, 1.0, 0.5],
+      indices: [0, 1, 2, 2147483647, -1]
+    };
     var back = Codecs.undisplayMesh(Codecs.displayMesh(mesh));
-    check(sameFloats(back.positions, mesh.positions) && sameFloats(back.normals, mesh.normals), "mesh floats round-trip exactly");
+    check(
+      sameFloats(back.positions, mesh.positions) && sameFloats(back.normals, mesh.normals),
+      "mesh floats round-trip exactly"
+    );
     check(back.indices.join(",") == mesh.indices.join(","), "mesh indices round-trip");
     var empty = Codecs.undisplayMesh(Codecs.displayMesh({positions: [], normals: [], indices: []}));
     check(empty.positions.length == 0 && empty.indices.length == 0, "an empty mesh round-trips");
@@ -210,14 +229,24 @@ class PersistentMemoTests {
     check(memoId == machinekit.cache.CodeIdentity.of("machinekit.cache.Memo"), "an identity is stable within a run");
     check(machinekit.cache.CodeIdentity.of("machinekit.no.SuchModule") == null, "an unknown module has no identity");
     var native = machinekit.cache.Memos.nativeIdentity();
-    check(native != null && native.indexOf("cadkit:") == 0, "the CadKit build beside the program has an identity: " + native);
+    check(
+      native != null && native.indexOf("cadkit:") == 0,
+      "the CadKit build beside the program has an identity: " + native
+    );
     check(native == machinekit.cache.Memos.nativeIdentity(), "and it is stable");
 
     var store = freshStore();
     DiskStore.useProcess(store);
     var runs = [0];
-    function make(module:String):Memo<Array<Float>> return new Memo<Array<Float>>("persist-real", 8, list -> list.copy())
-      .persist(machinekit.cache.CodeIdentity.of(module), Codecs.floats, Codecs.unfloats);
+    function make(module:String):Memo<Array<Float>> return new Memo<Array<Float>>(
+      "persist-real",
+      8,
+      list -> list.copy()
+    ).persist(
+      machinekit.cache.CodeIdentity.of(module),
+      Codecs.floats,
+      Codecs.unfloats
+    );
     make("machinekit.cache.Memo").get("k", () -> compute(runs, 1));
     make("machinekit.cache.Memo").get("k", () -> compute(runs, 1));
     check(runs[0] == 1 && store.count() == 1, "with real identities a second memo reads what the first stored");
@@ -236,7 +265,10 @@ class PersistentMemoTests {
 
   static function block(runs:Array<Int>, width:Float):Part {
     runs[0]++;
-    return Solids.cut(Part.box(width, 20, 30), [Part.cylinderSpan(4, -5, 40, 2, 3), Part.cylinderSpan(2, 5, 40, -3, -6)]);
+    return Solids.cut(
+      Part.box(width, 20, 30),
+      [Part.cylinderSpan(4, -5, 40, 2, 3), Part.cylinderSpan(2, 5, 40, -3, -6)]
+    );
   }
 
   static function bytesOf(part:Part):String {
@@ -253,7 +285,10 @@ class PersistentMemoTests {
     var runs = [0];
     var first = Memos.persistentParts("persist-shape", 8, "PersistentMemoTests");
     var a = first.get("k", () -> block(runs, 10));
-    check(runs[0] == 1 && store.count() >= 1, "a solid miss builds once and stores its entry (and its booleans' entries)");
+    check(
+      runs[0] == 1 && store.count() >= 1,
+      "a solid miss builds once and stores its entry (and its booleans' entries)"
+    );
     var aBytes = bytesOf(a);
     var again = first.get("k", () -> block(runs, 10));
     check(runs[0] == 1 && bytesOf(again) == aBytes, "a memory hit is the same bytes");
@@ -277,7 +312,8 @@ class PersistentMemoTests {
       var v = vm.get("k", () -> block(runs, 10));
       check(runs[0] == 3 && bytesOf(v) == aBytes, "verify mode recomputes and accepts an honest hit");
       var message = "";
-      try Memos.persistentParts("persist-shape", 8, "PersistentMemoTests").get("k", () -> block(runs, 11)) catch (error:Dynamic) message = Std.string(error);
+      try Memos.persistentParts("persist-shape",
+        8, "PersistentMemoTests").get("k", () -> block(runs, 11)) catch (error:Dynamic) message = Std.string(error);
       check(message.indexOf("stale") >= 0, "verify mode refuses a solid whose recomputation differs: " + message);
     } catch (error:Dynamic) {
       DiskStore.forceVerify(null);
@@ -305,8 +341,16 @@ class PersistentMemoTests {
     Memos.clearAll();
     var runs = [0];
     var material = "steel-s355";
-    try materia.project.MaterialLibrary.require(material) catch (error:Dynamic) material = new machinekit.hobbing.Hob().materialId;
-    var make = (id:String, name:String, w:Float, m:String, deflection:Null<Float>) -> machinekit.assembly.AssemblyPreview.part(id, name, block(runs, w), m, deflection);
+    try materia.project.MaterialLibrary.require(material) catch (error:Dynamic) material =
+      new machinekit.hobbing.Hob().materialId;
+    var make = (id:String,
+      name:String, w:Float, m:String, deflection:Null<Float>) -> machinekit.assembly.AssemblyPreview.part(
+        id,
+        name,
+        block(runs, w),
+        m,
+        deflection
+      );
     var a = make("a", "A", 10, material, null);
     check(a.id == "a" && a.name == "A" && a.vertexCount > 0, "a part carries the caller's id and name");
     var aBytes = sceneBytes(a);
@@ -346,7 +390,8 @@ class PersistentMemoTests {
       var path = Sys.getEnv(variable);
       if (path != null && path.length > 3) check(identity.indexOf(path) < 0, "and no location (" + variable + ")");
     }
-    check(haxeon.build.CodeIdentity.loadedLibraries("libNoSuchLibrary") == null, "no libraries match an unknown prefix");
+    check(haxeon.build.CodeIdentity.loadedLibraries("libNoSuchLibrary") == null,
+      "no libraries match an unknown prefix");
   }
 
   public static function main():Void {

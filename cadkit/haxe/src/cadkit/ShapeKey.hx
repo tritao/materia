@@ -18,7 +18,8 @@ class ShapeKey {
   /** A float's exact bits: -0.0 and 0.0 are different keys (a miss, never a wrong hit). */
   public static function number(value:Float):String return haxe.Int64.toStr(FloatBits.toInt64(value));
 
-  public static function vec(value:CadKit.Vec3):String return number(value.get_x()) + "," + number(value.get_y()) + "," + number(value.get_z());
+  public static function vec(value:CadKit.Vec3):String return number(value.get_x())
+    + "," + number(value.get_y()) + "," + number(value.get_z());
 
   public static function hash(text:String):String return Sha256.encode(text);
 

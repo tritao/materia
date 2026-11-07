@@ -86,7 +86,8 @@ class Memo<V> implements MemoTable {
       stored = store.read(diskKey);
       if (stored != null && !DiskStore.verifying()) {
         var decoded:Null<MemoFound<V>> = null;
-        try decoded = new MemoFound<V>(tier.decode(stored)) catch (error:Dynamic) {}
+        try decoded = new MemoFound<V>(tier.decode(stored)) catch (error:Dynamic) {
+        }
         if (decoded != null) {
           count(true);
           return keep(key, decoded.value, 0);
@@ -101,7 +102,8 @@ class Memo<V> implements MemoTable {
     if (tier != null && diskKey != null) {
       var encoded = tier.encode(value);
       if (stored != null) {
-        if (!sameBytes(stored, encoded)) throw 'persistent memo "$name" is stale for key "$key": the stored value differs from a recomputation (a dependency is missing from its code identity)';
+        if (!sameBytes(stored,
+          encoded)) throw 'persistent memo "$name" is stale for key "$key": the stored value differs from a recomputation (a dependency is missing from its code identity)';
         count(true);
       } else store.write(diskKey, encoded);
     }

@@ -7,9 +7,16 @@ import machinekit.component.ComponentDisplayMesh.ComponentDisplayMeshData;
     No independent tooth, core or end-cap construction lives in the renderer. */
 class HobMesh {
   /** Persistent: building the detailed mesh costs about a minute and depends only on the hob's parameters. */
-  static final meshes:machinekit.cache.Memo<ComponentDisplayMeshData> = new machinekit.cache.Memo<ComponentDisplayMeshData>("hob-display-mesh", 16, copyMesh)
-    .persist(machinekit.cache.CodeIdentity.of("machinekit.hobbing.HobMesh"), machinekit.cache.Codecs.displayMesh,
-      machinekit.cache.Codecs.undisplayMesh);
+  static final meshes:machinekit.cache.Memo<ComponentDisplayMeshData
+    > = new machinekit.cache.Memo<ComponentDisplayMeshData>(
+      "hob-display-mesh",
+      16,
+      copyMesh
+    ).persist(
+      machinekit.cache.CodeIdentity.of("machinekit.hobbing.HobMesh"),
+      machinekit.cache.Codecs.displayMesh,
+      machinekit.cache.Codecs.undisplayMesh
+    );
 
   static function copyMesh(mesh:ComponentDisplayMeshData):ComponentDisplayMeshData return {
     positions: mesh.positions.copy(),
@@ -17,7 +24,10 @@ class HobMesh {
     indices: mesh.indices.copy()
   };
 
-  public static function build(hob:Hob):ComponentDisplayMeshData return meshes.get(Hob.recipeType().key(hob.values()), () -> compute(hob));
+  public static function build(hob:Hob):ComponentDisplayMeshData return meshes.get(
+    Hob.recipeType().key(hob.values()),
+    () -> compute(hob)
+  );
 
   static function compute(hob:Hob):ComponentDisplayMeshData {
     var solid = HobSolid.build(hob);

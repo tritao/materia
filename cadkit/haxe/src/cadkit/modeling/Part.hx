@@ -163,12 +163,16 @@ class Part extends Model {
    * `combine`, with its history.
    */
   static function joined(a:Part, b:Part, mode:Mode):Part {
-    if (a.shape.key != null && b.shape.key != null && a.shape.faceAttributes().length == 0 && b.shape.faceAttributes().length == 0)
-      return new Part(switch mode {
-        case Add: a.shape.fuse(b.shape);
-        case Subtract: a.shape.cut(b.shape);
-        case Intersect: a.shape.common(b.shape);
-      });
+    if (a.shape.key != null && b.shape.key != null
+      && a.shape.faceAttributes().length == 0 && b.shape.faceAttributes().length == 0) return new Part(switch mode {
+      case Add:
+        a.shape.fuse(b.shape);
+      case Subtract:
+        a.shape.cut(b.shape);
+      case Intersect:
+        a.shape.common(b.shape);
+    }
+    );
     return a.combine(b, mode);
   }
 
@@ -195,7 +199,9 @@ class Part extends Model {
       // A loft is a function of its ordered sections and its ruled flag: keyed when every section is.
       var result = fromOperation(new Operation(
         CadKit.loftOperationChecked(Model.refs(shapes), 1, ruled ? 1 : 0),
-        shapes, ShapeKey.op("loft", ruled ? "ruled" : "smooth", shapes), "loft"
+        shapes,
+        ShapeKey.op("loft", ruled ? "ruled" : "smooth", shapes),
+        "loft"
       ));
       for (wire in wires) wire.close();
       return result;
@@ -223,16 +229,21 @@ class Part extends Model {
         for (wire in wires) wire.close();
         return loft(sections, ruled);
       }
-      var result = new Part(OpCache.construct("loft-kept", ruled ? "ruled" : "smooth", shapes, () -> {
-        var operation = new Operation(CadKit.loftOperationChecked(Model.refs(shapes), 1, ruled ? 1 : 0), shapes, null, "loft");
-        try {
-          var built = operation.resultShape();
-          operation.close();
-          return built;
-        } catch (error:Dynamic) {
-          operation.close();
-          throw error;
-        }
+      var result = new Part(OpCache.construct("loft-kept",
+        ruled ? "ruled" : "smooth", shapes, () -> {var operation = new Operation(
+          CadKit.loftOperationChecked(Model.refs(shapes), 1, ruled ? 1 : 0),
+          shapes,
+          null,
+          "loft"
+        );
+      try {
+        var built = operation.resultShape();
+        operation.close();
+        return built;
+      } catch (error:Dynamic) {
+        operation.close();
+        throw error;
+      }
       }));
       for (wire in wires) wire.close();
       return result;
@@ -322,7 +333,9 @@ class Part extends Model {
   public function shell(faces:Selection, thickness:Float):Part {
     return fromOperation(new Operation(
       CadKit.shellOperationChecked(shape.borrowHandle(), Model.refs(faces.borrowShapes()), thickness),
-      [shape], null, "shell"
+      [shape],
+      null,
+      "shell"
     ));
   }
 

@@ -102,7 +102,13 @@ class AssemblyPreview {
           Sys.println("Assembly preview mesh: " + entry.id);
           Sys.stdout().flush();
         }
-        var rendered = componentPart(definitionId, entry.component.designation, entry.component, mass, maxGeometricFaces);
+        var rendered = componentPart(
+          definitionId,
+          entry.component.designation,
+          entry.component,
+          mass,
+          maxGeometricFaces
+        );
         if (Std.isOfType(entry.component, machinekit.transmission.TimingBelt)) {
           var belt:machinekit.transmission.TimingBelt = cast entry.component;
           var moving = [for (value in machineMotion.belts) if (value.occurrence == entry.id) value];
@@ -282,12 +288,12 @@ class AssemblyPreview {
     maxGeometricFaces:Int = 0
   ):SceneArtifactPart {
     var key:Null<String> = null;
-    try key = partKey(part, materialId, deflection, massProperties, maxGeometricFaces) catch (error:Dynamic) {}
+    try key = partKey(part, materialId, deflection, massProperties, maxGeometricFaces) catch (error:Dynamic) {
+    }
     var built = false;
-    var result = parts.get(key, () -> {
-      built = true;
-      // Stored under a fixed id and name: they belong to the caller, not to the geometry.
-      return buildPart("part", "part", part, materialId, deflection, massProperties, maxGeometricFaces);
+    var result = parts.get(key, () -> {built = true;
+    // Stored under a fixed id and name: they belong to the caller, not to the geometry.
+    return buildPart("part", "part", part, materialId, deflection, massProperties, maxGeometricFaces);
     });
     if (!built) part.close();
     result.id = id;
@@ -300,27 +306,39 @@ class AssemblyPreview {
    * it is meshed, which changes what it writes afterwards) with the material, tessellation, mass and face-limit inputs. A solid
    * that was already meshed writes other bytes: that is a miss, never a wrong hit.
    */
-  static function partKey(part:Part, materialId:String, deflection:Null<Float>, mass:Null<MassProperties>, maxFaces:Int):String {
+  static function partKey(part:Part,
+    materialId:String, deflection:Null<Float>, mass:Null<MassProperties>, maxFaces:Int):String {
     var digest = haxe.crypto.Sha256.make(part.shape.toBytes());
     var hex = new StringBuf();
     for (index in 0...digest.length) hex.add(StringTools.hex(digest.get(index), 2));
     var massText = massKey(mass);
-    return hex.toString() + "|" + materialId + "|" + (deflection == null ? "relative" : ComponentNumberKey.encode(deflection)) + "|" + massText + "|" + maxFaces;
+    return hex.toString() + "|" + materialId + "|" + (deflection
+      == null ? "relative" : ComponentNumberKey.encode(deflection)) + "|" + massText + "|" + maxFaces;
   }
 
 
   static function massKey(mass:Null<MassProperties>):String {
     if (mass == null) return "none";
     var inertia = mass.inertia == null ? "none" : [for (v in [
-      mass.inertia.xx, mass.inertia.xy, mass.inertia.xz, mass.inertia.yy, mass.inertia.yz, mass.inertia.zz]) ComponentNumberKey.encode(v)].join(",");
-    return ComponentNumberKey.encode(mass.mass) + "|" + ComponentNumberKey.encode(mass.centreOfMass.x) + ","
-      + ComponentNumberKey.encode(mass.centreOfMass.y) + "," + ComponentNumberKey.encode(mass.centreOfMass.z) + "|" + inertia + "|"
-      + switch mass.source {
-        case Declared: "declared";
-        case EffectiveDensity(density): "density:" + ComponentNumberKey.encode(density);
-        case Modelled: "modelled";
-        case Computed(detail): "computed:" + Std.string(detail);
-      };
+      mass.inertia.xx,
+      mass.inertia.xy,
+      mass.inertia.xz,
+      mass.inertia.yy,
+      mass.inertia.yz,
+      mass.inertia.zz
+    ]) ComponentNumberKey.encode(v)].join(",");
+    return ComponentNumberKey.encode(mass.mass)
+      + "|" + ComponentNumberKey.encode(mass.centreOfMass.x) + "," + ComponentNumberKey.encode(mass.centreOfMass.y)
+      + "," + ComponentNumberKey.encode(mass.centreOfMass.z) + "|" + inertia + "|" + switch mass.source {
+      case Declared:
+        "declared";
+      case EffectiveDensity(density):
+        "density:" + ComponentNumberKey.encode(density);
+      case Modelled:
+        "modelled";
+      case Computed(detail):
+        "computed:" + Std.string(detail);
+    };
   }
 
   /**
@@ -328,26 +346,53 @@ class AssemblyPreview {
    * identity, the key is that name plus the class's code identity, so an unchanged component costs nothing, not even building its
    * solid; otherwise the solid is built and the part is keyed on its content (`part`).
    */
-  static function componentPart(id:String, name:String, component:machinekit.component.MachineComponent, mass:MassProperties,
-      maxGeometricFaces:Int):SceneArtifactPart {
+  static function componentPart(
+    id:String,
+    name:String,
+    component:machinekit.component.MachineComponent,
+    mass:MassProperties,
+    maxGeometricFaces:Int
+  ):SceneArtifactPart {
     var code = machinekit.cache.CodeIdentity.ofObject(component);
     var geometry = component.geometryKey(ComponentDetail.Preview);
-    var key:Null<String> = code == null || StringTools.startsWith(geometry, "instance|") ? null
-      : geometry + "|code:" + code + "|" + massKey(mass) + "|" + maxGeometricFaces;
-    var result = componentParts.get(key, () -> part("part", "part", component.geometry(ComponentDetail.Preview), component.materialId, null,
-      mass, maxGeometricFaces));
+    var key:Null<String> = code == null || StringTools.startsWith(geometry,
+      "instance|") ? null : geometry + "|code:" + code + "|" + massKey(mass) + "|" + maxGeometricFaces;
+    var result = componentParts.get(
+      key,
+      () -> part(
+        "part",
+        "part",
+        component.geometry(ComponentDetail.Preview),
+        component.materialId,
+        null,
+        mass,
+        maxGeometricFaces
+      )
+    );
     result.id = id;
     result.name = name;
     return result;
   }
 
-  static final componentParts:machinekit.cache.Memo<SceneArtifactPart> = new machinekit.cache.Memo<SceneArtifactPart>("scene-component-part",
-    256, value -> Reflect.copy(value))
-    .persist(machinekit.cache.CodeIdentity.of("machinekit.assembly.AssemblyPreview"), encodePart, decodePart);
+  static final componentParts:machinekit.cache.Memo<SceneArtifactPart> = new machinekit.cache.Memo<SceneArtifactPart>(
+    "scene-component-part",
+    256,
+    value -> Reflect.copy(value)
+  ).persist(
+    machinekit.cache.CodeIdentity.of("machinekit.assembly.AssemblyPreview"),
+    encodePart,
+    decodePart
+  );
 
-  static final parts:machinekit.cache.Memo<SceneArtifactPart> = new machinekit.cache.Memo<SceneArtifactPart>("scene-part", 256,
-    value -> Reflect.copy(value))
-    .persist(machinekit.cache.CodeIdentity.of("machinekit.assembly.AssemblyPreview"), encodePart, decodePart);
+  static final parts:machinekit.cache.Memo<SceneArtifactPart> = new machinekit.cache.Memo<SceneArtifactPart>(
+    "scene-part",
+    256,
+    value -> Reflect.copy(value)
+  ).persist(
+    machinekit.cache.CodeIdentity.of("machinekit.assembly.AssemblyPreview"),
+    encodePart,
+    decodePart
+  );
 
   /** One part stored as a one-part scene artifact: the artifact format already is the exact form of every field. */
   static function encodePart(value:SceneArtifactPart):haxe.io.Bytes return materia.project.SceneArtifact.encode({
@@ -356,7 +401,8 @@ class AssemblyPreview {
     parts: [value]
   });
 
-  static function decodePart(bytes:haxe.io.Bytes):SceneArtifactPart return materia.project.SceneArtifact.decode(bytes).parts[0];
+  static function decodePart(bytes:haxe
+    .io.Bytes):SceneArtifactPart return materia.project.SceneArtifact.decode(bytes).parts[0];
 
   static function buildPart(
     id:String,

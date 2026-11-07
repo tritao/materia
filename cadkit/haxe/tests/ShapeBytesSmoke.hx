@@ -17,27 +17,50 @@ class ShapeBytesSmoke {
     passed++;
   }
 
-  static function kinds():Array<CadKit.ShapeKind> return [CadKit.ShapeKind.Solid, CadKit.ShapeKind.Face, CadKit.ShapeKind.Edge, CadKit.ShapeKind.Vertex];
+  static function kinds():Array<CadKit.ShapeKind> return [
+    CadKit.ShapeKind.Solid,
+    CadKit.ShapeKind.Face,
+    CadKit.ShapeKind.Edge,
+    CadKit.ShapeKind.Vertex
+  ];
 
   static function sameBytes(a:Bytes, b:Bytes):Bool return a.length == b.length && a.compare(b) == 0;
 
-  static function near(a:Float, b:Float, tolerance:Float):Bool return a == b || Math.abs(a - b) <= tolerance * Math.max(1, Math.max(Math.abs(a), Math.abs(b)));
+  static function near(a:Float, b:Float, tolerance:Float):Bool return a == b || Math.abs(a - b) <= tolerance * Math.max(
+    1,
+    Math.max(Math.abs(a), Math.abs(b))
+  );
 
   static function attributeText(shape:Shape):String {
     var parts:Array<String> = [];
     for (attribute in shape.faceAttributes()) {
       var spec = attribute.spec;
-      parts.push([attribute.faceName, spec.designation, Std.string(spec.majorDiameter), Std.string(spec.pitch), Std.string(spec.starts),
-        Std.string(spec.hand), Std.string(spec.internal), spec.toleranceClass, Std.string(spec.profile), Std.string(attribute.start),
-        Std.string(attribute.direction), Std.string(attribute.length), describe(attribute.detail)].join("|"));
+      parts.push([
+        attribute.faceName,
+        spec.designation,
+        Std.string(spec.majorDiameter),
+        Std.string(spec.pitch),
+        Std.string(spec.starts),
+        Std.string(spec.hand),
+        Std.string(spec.internal),
+        spec.toleranceClass,
+        Std.string(spec.profile),
+        Std.string(attribute.start),
+        Std.string(attribute.direction),
+        Std.string(attribute.length),
+        describe(attribute.detail)
+      ].join("|"));
     }
     return parts.join("\n");
   }
 
   static function describe(detail:Null<SurfaceDetail>):String return detail == null ? "-" : switch detail {
-    case Knurl(teeth, depth): 'knurl $teeth $depth';
-    case Graduation(divisions, numberedEvery, slant, endRadius): 'grad $divisions $numberedEvery $slant $endRadius';
-    case Display(spec): 'display ${spec.width} ${spec.height} ${spec.offsetX} ${spec.offsetY} ${spec.source} ${spec.profile} ${[for (b in spec.bindings) b.signal + "=" + b.joint].join(",")} ${spec.channel} ${spec.round}';
+    case Knurl(teeth, depth):
+      'knurl $teeth $depth';
+    case Graduation(divisions, numberedEvery, slant, endRadius):
+      'grad $divisions $numberedEvery $slant $endRadius';
+    case Display(spec):
+      'display ${spec.width} ${spec.height} ${spec.offsetX} ${spec.offsetY} ${spec.source} ${spec.profile} ${[for (b in spec.bindings) b.signal + "=" + b.joint].join(",")} ${spec.channel} ${spec.round}';
   };
 
   /** Doubles equal as numbers: a signed zero is the same value as a plain one. */
@@ -53,8 +76,10 @@ class ShapeBytesSmoke {
   /** The distinct vertices of a mesh to a micron, sorted, as one text. */
   static function vertexSet(vertices:Bytes):String {
     var keys:Map<String, Bool> = [];
-    for (i in 0...Std.int(vertices.length / 24))
-      keys.set([for (k in 0...3) Std.string(Math.round(vertices.getDouble(i * 24 + k * 8) * 1e6) + 0.0)].join(","), true);
+    for (i in 0...Std.int(vertices.length / 24)) keys.set(
+      [for (k in 0...3) Std.string(Math.round(vertices.getDouble(i * 24 + k * 8) * 1e6) + 0.0)].join(","),
+      true
+    );
     var list = [for (key in keys.keys()) key];
     list.sort(Reflect.compare);
     return list.join(";");
@@ -63,9 +88,14 @@ class ShapeBytesSmoke {
   /** Two meshes of one canonical form: every byte equal. */
   static function sameMeshBytes(a:Shape, b:Shape, what:String):Void {
     var ma = a.tessellate(0.05, 0.3), mb = b.tessellate(0.05, 0.3);
-    check(sameBytes(ma.vertices, mb.vertices) && sameBytes(ma.normals, mb.normals) && sameBytes(ma.indices, mb.indices),
-      what + ": canonical meshes are byte-identical");
-    check(sameBytes(ma.edgeSegments, mb.edgeSegments) && sameBytes(ma.edgeIds, mb.edgeIds), what + ": canonical edge segments are byte-identical");
+    check(
+      sameBytes(ma.vertices, mb.vertices) && sameBytes(ma.normals, mb.normals) && sameBytes(ma.indices, mb.indices),
+      what + ": canonical meshes are byte-identical"
+    );
+    check(
+      sameBytes(ma.edgeSegments, mb.edgeSegments) && sameBytes(ma.edgeIds, mb.edgeIds),
+      what + ": canonical edge segments are byte-identical"
+    );
   }
 
   /**
@@ -78,36 +108,76 @@ class ShapeBytesSmoke {
       check(a.subshapeCount(kind) == b.subshapeCount(kind), what + ": " + kind + " count");
       check(a.elementNames(kind).join("\n") == b.elementNames(kind).join("\n"), what + ": " + kind + " names");
     }
-    for (kind in [CadKit.ShapeKind.Face, CadKit.ShapeKind.Solid])
-      check([for (list in a.elementAliases(kind)) list.join(",")].join(";") == [for (list in b.elementAliases(kind)) list.join(",")].join(";"),
-        what + ": " + kind + " aliases");
+    for (kind in [CadKit.ShapeKind.Face, CadKit.ShapeKind.Solid]) check(
+      [for (list in a.elementAliases(kind)) list.join(",")].join(";")
+      == [for (list in b.elementAliases(kind)) list.join(",")].join(";"),
+      what + ": " + kind + " aliases"
+    );
     check(a.kind() == b.kind(), what + ": kind");
     if (a.subshapeCount(CadKit.ShapeKind.Vertex) > 0) {
       var boundsA = a.bounds(), boundsB = b.bounds();
-      check(near(boundsA.get_min().get_x(), boundsB.get_min().get_x(), tolerance) && near(boundsA.get_min().get_y(), boundsB.get_min().get_y(), tolerance)
-        && near(boundsA.get_min().get_z(), boundsB.get_min().get_z(), tolerance) && near(boundsA.get_max().get_x(), boundsB.get_max().get_x(), tolerance)
-        && near(boundsA.get_max().get_y(), boundsB.get_max().get_y(), tolerance) && near(boundsA.get_max().get_z(), boundsB.get_max().get_z(), tolerance),
-        what + ": bounds");
+      check(
+        near(boundsA.get_min().get_x(), boundsB.get_min().get_x(), tolerance) && near(
+          boundsA.get_min().get_y(),
+          boundsB.get_min().get_y(),
+          tolerance
+        ) && near(
+          boundsA.get_min().get_z(),
+          boundsB.get_min().get_z(),
+          tolerance
+        ) && near(
+          boundsA.get_max().get_x(),
+          boundsB.get_max().get_x(),
+          tolerance
+        ) && near(
+          boundsA.get_max().get_y(),
+          boundsB.get_max().get_y(),
+          tolerance
+        ) && near(
+          boundsA.get_max().get_z(),
+          boundsB.get_max().get_z(),
+          tolerance
+        ),
+        what + ": bounds"
+      );
     }
     if (a.hasSolidBoundary()) {
       check(near(a.volume(), b.volume(), tolerance), what + ": volume " + a.volume() + " vs " + b.volume());
       check(near(a.area(), b.area(), tolerance), what + ": area");
       var pa = a.massProperties(), pb = b.massProperties();
-      check(near(pa.centerOfMass.x, pb.centerOfMass.x, tolerance) && near(pa.centerOfMass.y, pb.centerOfMass.y, tolerance)
-        && near(pa.centerOfMass.z, pb.centerOfMass.z, tolerance), what + ": centre of mass");
+      check(
+        near(pa.centerOfMass.x,
+        pb.centerOfMass.x, tolerance) && near(pa.centerOfMass.y, pb.centerOfMass.y, tolerance) && near(
+          pa.centerOfMass.z,
+          pb.centerOfMass.z,
+          tolerance
+        ),
+        what + ": centre of mass"
+      );
     }
     check(attributeText(a) == attributeText(b), what + ": face attributes");
     if (withMesh && a.hasSolidBoundary()) {
       var ma = a.tessellate(0.05, 0.3), mb = b.tessellate(0.05, 0.3);
       check(ma.vertexCount == mb.vertexCount && ma.indexCount == mb.indexCount, what + ": mesh size");
       if (tolerance == 0) {
-        check(sameDoubles(ma.vertices, mb.vertices) && sameDoubles(ma.normals, mb.normals) && sameBytes(ma.indices, mb.indices),
-          what + ": mesh values");
-        check(sameDoubles(ma.edgeSegments, mb.edgeSegments) && sameBytes(ma.edgeIds, mb.edgeIds), what + ": edge segments");
+        check(
+          sameDoubles(ma.vertices, mb.vertices) && sameDoubles(ma.normals, mb.normals) && sameBytes(
+            ma.indices,
+            mb.indices
+          ),
+          what + ": mesh values"
+        );
+        check(
+          sameDoubles(ma.edgeSegments, mb.edgeSegments) && sameBytes(ma.edgeIds, mb.edgeIds),
+          what + ": edge segments"
+        );
       } else {
         // A rotation stored in a location is rebuilt by the reader, and a cylinder's triangulation can then start elsewhere:
         // the same vertices in another order. The canonical form is what is deterministic (see sameMeshBytes).
-        check(ma.indexCount == mb.indexCount && vertexSet(ma.vertices) == vertexSet(mb.vertices), what + ": the same mesh vertices");
+        check(
+          ma.indexCount == mb.indexCount && vertexSet(ma.vertices) == vertexSet(mb.vertices),
+          what + ": the same mesh vertices"
+        );
       }
     }
   }
@@ -143,7 +213,10 @@ class ShapeBytesSmoke {
     // meshing; triangulations themselves are never written, and original and restored follow each other through meshing.
     var meshed = shape.toBytes();
     check(meshed.length == bytes.length, what + ": meshing leaves the size alone");
-    check(meshed.length == restored.toBytes().length, what + ": original and restored write alike in size after both were meshed");
+    check(
+      meshed.length == restored.toBytes().length,
+      what + ": original and restored write alike in size after both were meshed"
+    );
     return restored;
   }
 
@@ -192,7 +265,10 @@ class ShapeBytesSmoke {
       var restored = roundTrip(entry.shape, entry.name, true, 1e-12);
       restored.close();
     }
-    check(fused.elementAliases(CadKit.ShapeKind.Face).join("").length > 0, "the fused shape really has aliases to preserve");
+    check(
+      fused.elementAliases(CadKit.ShapeKind.Face).join("").length > 0,
+      "the fused shape really has aliases to preserve"
+    );
     for (shape in [box, hole, drilled, filleted, chamfered, stamped, fused, moved, rotated, tilted]) shape.close();
   }
 
@@ -209,14 +285,27 @@ class ShapeBytesSmoke {
     check(solid.volume() == original.volume(), "a solid taken from the restored compound matches");
     var empty = Shape.compound([]);
     var back = roundTrip(empty, "empty compound");
-    check(back.subshapeCount(CadKit.ShapeKind.Face) == 0 && back.subshapeCount(CadKit.ShapeKind.Solid) == 0, "empty stays empty");
+    check(
+      back.subshapeCount(CadKit.ShapeKind.Face) == 0 && back.subshapeCount(CadKit.ShapeKind.Solid) == 0,
+      "empty stays empty"
+    );
     for (shape in [a, b, c, compound, restored, solid, original, empty, back]) shape.close();
   }
 
   static function attributes():Void {
     var cylinder = Shape.cylinder(5, 30);
     var spec = new ThreadSpec("M10", 10, 1.5, 2, LeftHand, true, "6H", Metric);
-    var display = new DisplaySpec(20, 10, 1.5, -2.5, "lcd", "operator", [new DisplayBinding("x", "joint_x"), new DisplayBinding("y", "joint_y")], "main", true);
+    var display = new DisplaySpec(
+      20,
+      10,
+      1.5,
+      -2.5,
+      "lcd",
+      "operator",
+      [new DisplayBinding("x", "joint_x"), new DisplayBinding("y", "joint_y")],
+      "main",
+      true
+    );
     var attributed = cylinder.cloneShape();
     attributed.setThreadedFaces([
       new ThreadedFace("cyl.side", spec, 2.5, -1, 12.25),
@@ -227,7 +316,10 @@ class ShapeBytesSmoke {
     ]);
     var restored = roundTrip(attributed, "attributed");
     check(restored.faceAttributes().length == 5, "all five attributes survive");
-    check(restored.threadedFaces().length == 2 && restored.surfaceDetails().length == 3, "threads and details stay separate");
+    check(
+      restored.threadedFaces().length == 2 && restored.surfaceDetails().length == 3,
+      "threads and details stay separate"
+    );
     // A fresh shape: cloneShape shares topology, and bounds depend on whether OCCT has meshed that topology.
     var fresh = Shape.cylinder(5, 30);
     var plain = roundTrip(fresh, "plain cylinder");
@@ -252,11 +344,21 @@ class ShapeBytesSmoke {
     sameShape(base.cut(tool), restoredBase.cut(tool), "cut with one side restored", true, 1e-6);
     var slab = Shape.box(60, 8, 60).translate(Geometry.vec3(-10, 2, -10)).stamped("slab", []);
     var restoredSlab = Shape.fromBytes(slab.toBytes());
-    sameShape(base.cut(tool).common(slab), restoredBase.cut(restoredTool).common(restoredSlab), "cut then common", true, 1e-6);
-    sameShape(base.fuse(tool).cut(slab), restoredBase.fuse(restoredTool).cut(restoredSlab), "fuse then cut", true, 1e-6);
+    sameShape(
+      base.cut(tool).common(slab),
+      restoredBase.cut(restoredTool).common(restoredSlab),
+      "cut then common",
+      true,
+      1e-6
+    );
+    sameShape(base.fuse(tool).cut(slab),
+      restoredBase.fuse(restoredTool).cut(restoredSlab), "fuse then cut", true, 1e-6);
     // Stamping and moving a restored shape names things as the original does.
-    sameShape(base.translate(Geometry.vec3(1, 2, 3)).stamped("m", [base]), restoredBase.translate(Geometry.vec3(1, 2, 3)).stamped("m", [restoredBase]),
-      "move and stamp");
+    sameShape(
+      base.translate(Geometry.vec3(1, 2, 3)).stamped("m", [base]),
+      restoredBase.translate(Geometry.vec3(1, 2, 3)).stamped("m", [restoredBase]),
+      "move and stamp"
+    );
   }
 
   static function imported():Void {
@@ -273,7 +375,10 @@ class ShapeBytesSmoke {
       var part = Shape.importStep(file);
       var restored = roundTrip(part, "imported STEP part " + file.substr(file.lastIndexOf("/") + 1));
       check(restored.subshapeCount(CadKit.ShapeKind.Face) == part.subshapeCount(CadKit.ShapeKind.Face), "STEP faces");
-      check(restored.elementNames(CadKit.ShapeKind.Face).join(",").indexOf("face#") >= 0, "an imported part keeps its weak index names");
+      check(
+        restored.elementNames(CadKit.ShapeKind.Face).join(",").indexOf("face#") >= 0,
+        "an imported part keeps its weak index names"
+      );
       part.close();
       restored.close();
     }
@@ -287,8 +392,11 @@ class ShapeBytesSmoke {
     fails(() -> Shape.fromBytes(Bytes.alloc(0)), "empty bytes");
     fails(() -> Shape.fromBytes(Bytes.ofString("not a shape at all, just text")), "text");
     fails(() -> Shape.fromBytes(Bytes.alloc(4096)), "zeros");
-    for (cut in [1, 3, 4, 8, 11, 12, 16, 40, bytes.length >> 1, bytes.length - 12, bytes.length - 5, bytes.length - 1])
-      fails(() -> Shape.fromBytes(Bytes.view(bytes, 0, cut)), 'truncation to $cut of ${bytes.length} bytes');
+    for (cut in [1,
+      3, 4, 8, 11, 12, 16, 40, bytes.length >> 1, bytes.length - 12, bytes.length - 5, bytes.length - 1]) fails(
+        () -> Shape.fromBytes(Bytes.view(bytes, 0, cut)),
+        'truncation to $cut of ${bytes.length} bytes'
+      );
     // A flipped bit anywhere is caught: by the container, the native checksum, or the attribute checksum.
     var step = Std.int(Math.max(1, bytes.length / 60));
     var position = 0;
