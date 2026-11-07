@@ -41,7 +41,7 @@ class ScrewLinearModuleSpec {
     drive=SupportedScrewDrive.m60dBk12(true);drive.fixed.footPinned=true;drive.floating.footPinned=true;
     var nut=new BallNut(), mount=drive.fixed.spec, bolt=machinekit.standard.SocketHeadCapScrew.catalog().get(guide.blockMountThread);
     var scale=SealedScalePart.pair("JFT-40",stroke+2*overtravel,"3","5",false,
-      new ComponentValues().setToken("airPort","end").setToken("cableBend","-y"));
+      new ComponentValues().setToken("airPort","end").setToken("cableBend",stroke<=20?"-x":"-y"));
     scaleHousing=scale.housing;scaleHead=scale.head;
     baseThickness=GroundStock.atLeast("plate",16);carriageThickness=GroundStock.atLeast("plate",12);
     carrierThickness=GroundStock.atLeast("flat bar",16);

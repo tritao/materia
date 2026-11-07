@@ -56,7 +56,9 @@ class ScrewLinearModuleChecks {
       {profile:"HGH15CA",stroke:80.0,spacing:150.0,blocks:100.0},
       {profile:"HGH25CA",stroke:200.0,spacing:180.0,blocks:100.0}]) if(requested.length==0||requested.contains("stroke="+machinekit.component.Dimension.format(size.stroke))) {
       selected++;
-      var spec=new ScrewLinearModuleSpec(size.profile,size.stroke,size.spacing,size.blocks),axis=new ScrewLinearModule(spec);
+      var spec=new ScrewLinearModuleSpec(size.profile,size.stroke,size.spacing,size.blocks);
+      var host=new ScrewLinearModulePart(spec.values().setToken("role","carriage")),axis=new ScrewLinearModule(spec,null,host);
+      check(axis.component("carriage")==host,"Containing machine supplies its carriage interface");
       check(axis.validate().length==0,"Module assembly validation");
       var fasteners=axis.deriveFasteners();
       check(!fasteners.diagnostics.hasErrors(),"Joint-derived module hardware");
@@ -131,6 +133,12 @@ class ScrewLinearModuleChecks {
       for(endpoint in [-size.stroke/2-spec.overtravel,size.stroke/2+spec.overtravel]) {
         overState.setJoint("travel",endpoint);overState.forwardKinematics();
         var reading=overState.worldPose("scaleHead").x-overState.worldPose("scaleHousing").x;
+        if(size.stroke<=20)for(role in ["coverFront","coverRear"]) {
+          var headBody=new PosedParts();
+          var headShape=headBody.posed(spec.scaleHead,overState.worldPose("scaleHead")),guard=headBody.posed(axis.component(role),overState.worldPose(role));
+          var common=headShape.intersect(guard);check(common.volume()<0.001&&headShape.shape.distance(guard.shape)>=ScrewLinearModuleSpec.GAP-1e-6,"Outward cable keeps running gap through overtravel");
+          common.close();headShape.close();guard.close();headBody.close();
+        }
         check(reading>=spec.scaleHousing.startOffset()-1e-7&&reading<=spec.scaleHousing.startOffset()+spec.scaleHousing.measuringLength+1e-7,"Actual head stays inside reading window through overtravel");
       }
       for(x in [-size.stroke/2,size.stroke/2]){state.setJoint("travel",x);state.forwardKinematics();check(Math.abs(state.worldPose("carriage").x-x)<1e-7,"Carriage follows module travel");}

@@ -66,7 +66,8 @@
   dual-loop scale-position/motor-velocity feedback ports and independent scale service.
 - **Module scale:** JFT-40 beside the guides, ground40x20 seat derived from M8 engagement,
   separate fitted head carrier; head slides out along travel and housing sideways after it,
-  leaving the carriage. Cable bends away from housing at R75. Fit head normal face within
+  leaving the carriage. Short modules turn the R75 cable outboard beyond the housing end; long modules keep
+  the normal bend so the cable never crosses the longer housing during travel. Fit head normal face within
   +/-0.5 mm; head/attachment clearances give +/-0.55 gap adjustment. Stack0.24/0.22 mm is
   ASSUMED. Base/riser/block stock screen0.45/0.55/0.76 mm already fails0.01; inspect all
   stock faces (including carriage), then replicate failing faces. Qualification remains open.
@@ -74,10 +75,13 @@
   Keep chip ingress, travel, fasteners and removal checks in the module test project.
 - **Module cover:** up to20 mm stroke, split formed-sheet guards and separate clip-in PU
   wipers leave a62x192 mm default payload window,10 mm overlap through overtravel and6 mm
-  roof gap; the cable has a separate bolted hood. Longer strokes use the existing lamella
+  roof gap. The short cable exits the open end below the roof, with derived corner relief
+  for2 mm running clearance through overtravel; the tall hood is deleted. Short covers
+  withdraw longitudinally: remove the head first at the front, motor/shaft first at the
+  rear. A containing machine may supply the carriage interface. Longer strokes use the existing lamella
   bellows library with through-tapped flange plates and side-clamped feet. The full R75
   cable bend/tail drives the large envelope:396.8x186.25 /424.2x179.95 mm for80/200 stroke.
-  Geometry masses1.881/8.775/8.018 kg, rigid moving guards0/4.135/3.710 kg; bought cover
+  Geometry masses about1.833/8.775/8.018 kg, rigid moving guards0/4.135/3.710 kg; bought cover
   density/geometry, clip retention and end sealing remain ASSUMED/unqualified. No stiffness credit.
 - **LM4:** use the module for hobber Y, screw centred, ground base and derived rail risers.
   Delete L brackets, old nut seat and scale seat bars. Apply XA alignment/assembly/service
@@ -101,3 +105,5 @@
 - 2026-11-07 LM1 nominal module: own/host base, derived ground risers, M60D-BK12/BF12/SFU1605, four guide blocks and joint-derived stops; HG15 strokes20/80 and HG25 stroke200 PASS60 checks including strict integrity, three service paths, end-stop contact, slip, roundtrip and alignment for every joint. Screws170/240/370 mm, rails220/300/440, risers25x25/25x25/25x15;58/62/70 screws and18 pins. Hobber2633,hobbing1186,joint-fasteners and assembly-integrity PASS. Stock flatness0.10/0.05 mm ASSUMED versus0.01 acceptance remains unqualified; host pattern/torque-limit qualification and physical corrective replication remain open. No FE added.
 - 2026-11-07 LM2 model gates: JFT-40 ML70/120/220,208/258/358 mm housings on ground40x20 seats;66/70/78 screws,18 pins. Own102 checks PASS (physical made edges, five services, key/air corridors, overtravel window, roundtrip, independent position/native-motor feedback); hobber2633 PASS. Head normal/gap stacks0.24/0.22 versus+/-0.5/0.55 mm settings, R75 cable, key D3.5x8/90 and air socket D14x35 ASSUMED. Abbe from module carriage interface111.2/36 mm HG15 and133.2/38 HG25; minimum slip4.482 normal/1.494 momentary, scale89.411/44.706 at ASSUMED20/40 N. Base/riser/block stock screens0.45/0.55/0.76 versus0.01 mm fail; inspect/replicate and qualify fitted head face before release. Fixed M6/pin annulus by66 mm bolt spacing; no FE.
 - 2026-11-07 LM3 model gates: short split cover/retainers/PU lips plus bolted cable hood; long80/200 use two/four-fold lamella bellows with22/38 mm compressed,30/50 space,120/260 extended. Own276 assertions PASS across all three sizes (integrity, physical made edges, slip, contact, access, service, seal contact/overtravel, part refs, roundtrip/feedback); hobber2633 PASS.86/122/130 screws,18 pins; minimum joint factors4.482/1.494. Fixed/moving flange contacts nominal672/736 mm2 versus625; short payload62x192,overlap10,roof gap6 mm. Guard masses1.881/8.775/8.018 kg (rigid moving0/4.135/3.710), cover geometry/density ASSUMED; clip/end-seal/vendor qualification open. No precision stiffness path changed, no FE.
+
+- 2026-11-07 LM4 partial (lean checkpoint): host-carriage interface, short R75 outboard cable without tall hood, longitudinal guard removals with head/motor prerequisites and2 mm overtravel gap. Own282 PASS;82/122/130 screws18 pins, guards1.833/8.775/8.018 kg (geometry/density ASSUMED). Hobber2633,hobbing1186,joint-fasteners,assembly-integrity,way-cover PASS; explicitly typed way-cover order fixtures. Actual hobber Y replacement remains open: actuator/base bolt interface and swept fit failed the first layouts; global masses/Abbe and precision stiffness paths unchanged, no FE.

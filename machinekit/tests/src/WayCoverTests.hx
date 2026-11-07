@@ -154,7 +154,7 @@ class WayCoverTests {
       // The rail is screwed down before the cover goes over it; without that order its screws are under the cover's skin.
       var open = AssemblyIntegrity.fasteners(sound.builder);
       check(codes(open).indexOf("fasteners.access") >= 0, "the cover stands over the rail screws until they are fitted first: " + codes(open));
-      var order = [for (id in sound.cover.members().concat(["wall"])) {member: id, fastened: ["rail", "bed"]}];
+      var order:Array<machinekit.assembly.AssemblyIntegrity.FastenerFitOrder> = [for (id in sound.cover.members().concat(["wall"])) {member: id, fastened: ["rail", "bed"]}];
       var fasteners = AssemblyIntegrity.fasteners(sound.builder, {fittedBefore: order});
       check(fasteners.errors().length == 0, "the box flange screws fit on " + row + ": " + messages(fasteners));
       // A post across the bed inside the envelope is found by the sweep.
@@ -170,7 +170,7 @@ class WayCoverTests {
     check(cast(moving, machinekit.cover.WayCoverSection).holes().length >= 3, "the narrow flange still has holes on the host");
     var report = AssemblyIntegrity.check(small.builder, {runningGap: 1.0});
     check(report.errors().length == 0, "reversed box cover should be sound on its bed, found: " + messages(report));
-    var order = [for (id in small.cover.members().concat(["wall"])) {member: id, fastened: ["rail", "bed"]}];
+    var order:Array<machinekit.assembly.AssemblyIntegrity.FastenerFitOrder> = [for (id in small.cover.members().concat(["wall"])) {member: id, fastened: ["rail", "bed"]}];
     var screws = AssemblyIntegrity.fasteners(small.builder, {fittedBefore: order});
     check(screws.errors().length == 0, "the reversed cover's flange screws fit: " + messages(screws));
     for (id in small.cover.members()) {
