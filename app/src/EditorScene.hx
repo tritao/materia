@@ -216,6 +216,13 @@ class EditorScene implements Observable {
 
   final kinematicOccurrences:Map<String, Bool> = new Map();
   final componentFinishes:Map<String, SceneObjectData> = new Map();
+  /** Generated source identity; rebuilt from the artifact rather than persisted as a label override. */
+  public var partNumbers:Map<String, String> = new Map();
+
+  public function objectDetail(id:String):String {
+    var number = partNumbers.get(id);
+    return number == null ? id : number + " · " + id.substr(8);
+  }
   var assemblyPropertyProvider:Null<String -> Array<PropertyDescriptor>> = null;
   var assemblyDragProvider:Null<(String, Array<Float>) -> Null<SceneAssemblyDrag>> = null;
   /** Optional editor-owned semantic action sink. */

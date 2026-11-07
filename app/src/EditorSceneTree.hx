@@ -275,6 +275,7 @@ import materia.assembly.AssemblyDefinition;
     var item = scene.object(key);
     if (item != null) {
       if (displayLabel(key).toLowerCase().indexOf(filter) >= 0
+        || scene.objectDetail(key).toLowerCase().indexOf(filter) >= 0
         || item.kind.toLowerCase().indexOf(filter) >= 0) return true;
       if (group != null) for (child in group) if (matches(child)) return true;
       var map = scene.sourceMap;
@@ -456,7 +457,7 @@ import materia.assembly.AssemblyDefinition;
         key,
         shown + (joint == null ? "" : " · " + joint) + (scene.isVisible(key) ? "" : " (hidden)"),
         IconName.Cube,
-        item.id
+        scene.objectDetail(item.id)
       );
     }
     var marker = key.indexOf(":feature:");

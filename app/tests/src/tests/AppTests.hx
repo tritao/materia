@@ -5,6 +5,7 @@ import app.MachineKitRecipeProjectTests;
 /** Default app regression entry point. */
 class AppTests {
   static function main():Int {
+    ObjectNameTests.main();
     ProjectProcessTests.run();
     SceneVisibilityTests.run();
     SceneTreeSelectionTests.run();

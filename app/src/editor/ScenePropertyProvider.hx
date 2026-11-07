@@ -64,6 +64,19 @@ import haxeon.ui.properties.PropertyValue;
           throw "Name requires text";
       }
     }, name));
+    var partNumber = scene.partNumbers.get(id);
+    if (partNumber != null) {
+      for (field in [{key:"partNumber", label:"Part number", value:partNumber},
+        {key:"occurrencePath", label:"Occurrence path", value:id.substr(8)}]) {
+        var identity = new PropertyDescriptorOptions();
+        identity.category = "Identity";
+        identity.readOnly = true;
+        identity.recordHistory = false;
+        var text = field.value;
+        result.push(new PropertyDescriptor(prefix + field.key, field.label, PropertyType.Text,
+          function() return PropertyValue.Text(text), function(_, _) {}, identity));
+      }
+    }
     var importedShape = scene.requiredObject(id).kind == "cad-step";
     var genericPart = scene.requiredObject(id).kind == "cad-part";
     if (!importedShape && !genericPart) {
