@@ -53,13 +53,13 @@ class FoundationDesignTests {
         + added.volume() + " mm3; removed " + removed.volume() + " mm3");
       var oldRows:Array<machinekit.structural.MineralFoundation.PostCureInsertPlacement
         > = [for (row in previous.column.insertLocations()) {
-        id:row.id, part:row.part, pose:row.pose
+        id:row.id, purpose:row.purpose, part:row.part, pose:row.pose
       }
       ];
       oldRows = oldRows.concat(previous.column.postCureLocations());
       var rows:Array<machinekit.structural.MineralFoundation.PostCureInsertPlacement
         > = [for (row in frame.column.insertLocations()) {
-        id:row.id, part:row.part, pose:row.pose
+        id:row.id, purpose:row.purpose, part:row.part, pose:row.pose
       }
       ];
       rows = rows.concat(frame.column.postCureLocations());
@@ -178,6 +178,7 @@ class FoundationDesignTests {
       dimensions,
       [{
         id: "anchor",
+        purpose:materia.casting.InsertSpec.InsertRole.ThreadedAnchor,
         pose: F.translation(0, 0, 35),
         openings: [materia.casting.CastingPatterns.face("body.z-max")],
         part: new machinekit.structural.CastInsert(insertValues.setToken(
@@ -193,6 +194,7 @@ class FoundationDesignTests {
       dimensions,
       [{
         id: "anchor",
+        purpose:materia.casting.InsertSpec.InsertRole.ThreadedAnchor,
         pose: F.translation(0, 0, 35),
         openings: [materia.casting.CastingPatterns.face("body.z-max")],
         part: new machinekit.structural.CastInsert(insertValues.setToken(
@@ -223,6 +225,7 @@ class FoundationDesignTests {
         dimensions.setToken("features", materia.casting.CastingPatterns.encode([opening])),
         [{
           id: "anchor",
+          purpose:materia.casting.InsertSpec.InsertRole.ThreadedAnchor,
           pose: F.translation(0, 0, 35),
           openings: [
             materia.casting.CastingPatterns.face("body.z-max"),

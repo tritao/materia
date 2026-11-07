@@ -157,6 +157,7 @@ class HobberFoundationSizing {
       ));
       result.push({
         id: original.id,
+        purpose:original.purpose,
         part: part,
         pose: F.translation(x, centreY, d[2] - LIFT_THICKNESS_MM),
         openings: [materia.casting.CastingPatterns.face("body.z-max")]
@@ -194,7 +195,7 @@ class HobberFoundationSizing {
     var existing = rows.filter(row -> row.part.parameterToken("role") == LiftingMount);
     var result = rows.filter(row -> row.part.parameterToken("role") != LiftingMount);
     var sites:Array<CastInsertPlacement> = [for (row in existing) {
-      id:row.id, part:blank(LIFT_MAXIMUM_WIDTH_MM, LIFT_DEPTH_MM), openings:row.openings, pose:F.compose(
+      id:row.id, purpose:row.purpose, part:blank(LIFT_MAXIMUM_WIDTH_MM, LIFT_DEPTH_MM), openings:row.openings, pose:F.compose(
         row.pose,
         F.translation(0, 0, row.part.boxDimensions(row.id).height - LIFT_THICKNESS_MM)
       )
@@ -229,6 +230,7 @@ class HobberFoundationSizing {
       Sys.println("Hobber source lifting proposal bed: " + point.x + ", " + point.y + ", " + point.z);
       sites.push({
         id: "liftAdditional" + (index + 1),
+        purpose:InsertRole.LiftingMount,
         part: blank(LIFT_MAXIMUM_WIDTH_MM, LIFT_DEPTH_MM),
         pose: F.translation(point.x, point.y, point.z - LIFT_THICKNESS_MM),
         openings: [materia.casting.CastingPatterns.face("body.z-max")]
@@ -271,6 +273,7 @@ class HobberFoundationSizing {
             );
             var candidate:CastInsertPlacement = {
               id: site.id,
+              purpose:site.purpose,
               part: blank(width, stock.depth),
               pose: pose,
               openings: site.openings
@@ -295,7 +298,7 @@ class HobberFoundationSizing {
                 liftingShareN
               );
               chosen = candidate;
-              chosenHardware = {id: site.id, part: anchored, pose: pose, openings: site.openings};
+              chosenHardware = {id: site.id, purpose:site.purpose, part: anchored, pose: pose, openings: site.openings};
               break;
             } catch (error:Dynamic) {
               if (Std.isOfType(error, machinekit.tooling.InsertAnchorGeometry.InsertAnchorScreenDefect)) throw error;

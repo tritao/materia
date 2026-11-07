@@ -13,6 +13,7 @@ import machinekit.structural.InsertHoles;
 
 typedef InsertLocation = {
   var id:String;
+  var purpose:InsertRole;
   var part:CastInsert;
   var pose:AssemblyFrame;
   var openings:Array<CastingOpening>;
@@ -81,6 +82,7 @@ class FoundationLayout {
   ):InsertLocation {
     return {
       id: id,
+      purpose:role,
       part: new CastInsert(CastInsert.precastHoles(
         CastInsert.boxValues(w, d, h).setToken("role", role).setToken("label", label).setToken("partId", "HOBBER-" + scope + "-" + id).setToken(
           "finish",
@@ -225,6 +227,7 @@ class FoundationLayout {
     var out:Array<InsertLocation> = [], d = dimensions("bed");
     function add(x:Float, y:Float, height:Float = 11):Void out.push({
       id: "trayClampSeat" + out.length,
+      purpose:InsertRole.TrayClampMount,
       part: traySocket(),
       openings: faces(["body.z-max"]),
       pose: F.translation(x, y, d[2] - machinekit.structural.FixingSockets.LENGTH),
@@ -433,7 +436,7 @@ class FoundationLayout {
   }
 
   public static function placements(kind:String):Array<CastInsertPlacement> return [for (row in inserts(kind)) {
-    id:row.id, part:row.part, pose:row.pose, openings:row.openings
+    id:row.id, purpose:row.purpose, part:row.part, pose:row.pose, openings:row.openings
   }
   ];
 

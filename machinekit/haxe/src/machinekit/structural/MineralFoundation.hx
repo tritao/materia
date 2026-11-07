@@ -10,6 +10,7 @@ import materia.assembly.AssemblyFrames as F;
 
 typedef CastInsertPlacement = {
   final id:String;
+  final purpose:materia.casting.InsertSpec.InsertRole;
   final part:CastInsert;
   final pose:AssemblyFrame;
   final openings:Array<CastingOpening>;
@@ -17,6 +18,7 @@ typedef CastInsertPlacement = {
 
 typedef PostCureInsertPlacement = {
   final id:String;
+  final purpose:materia.casting.InsertSpec.InsertRole;
   final part:CastInsert;
   final pose:AssemblyFrame;
 }
@@ -64,7 +66,7 @@ class MineralFoundation extends MachineAssembly {
       // Validate references with the complete feature set, including caller features.
       var copy = recess;
       features.push(copy);
-      inserts.push({id: row.id, part: row.part, pose: copy.geometry.pose, openings: copy.openings});
+      inserts.push({id: row.id, purpose:row.purpose, part: row.part, pose: copy.geometry.pose, openings: copy.openings});
     }
     materia.casting.CastingLiftingPoint.CastingLiftingPoints.validate(declaredLifting, [for (row in inserts) {
       id:row.id, role:cast row.part.parameterToken("role"), spec:row.part.insertSpec()
@@ -91,9 +93,9 @@ class MineralFoundation extends MachineAssembly {
     body = new MineralCasting(v);
     validateDatums();
     validateHoleExits();
-    addComponent("casting", body);
+    withGroup("casting", () -> addComponent("casting", body));
     for (row in inserts) {
-      addComponent(row.id, row.part, row.pose);
+      withGroup(purposeGroup(row.purpose), () -> addComponent(row.id, row.part, row.pose));
       pouredMembers.push(row.id);
       if (row.id == rootInsert) {
         addMemberConnector(row.id, "castingSeat", F.compose(F.inverse(row.pose), body.connector("mount").frame));
@@ -109,7 +111,7 @@ class MineralFoundation extends MachineAssembly {
         var id = row.id + "-" + hardware.role;
         if (ids.exists(id)) throw "Duplicate foundation anchor member: " + id;
         ids.set(id, true);
-        addComponent(id, hardware.part, F.compose(row.pose, hardware.pose));
+        withGroup(purposeGroup(row.purpose), () -> addComponent(id, hardware.part, F.compose(row.pose, hardware.pose)));
         pouredMembers.push(id);
         addMemberConnector(row.id, id + "Seat", hardware.pose);
         addMemberConnector(id, "castAnchorSeat", F.identity());
@@ -126,15 +128,33 @@ class MineralFoundation extends MachineAssembly {
       var matches = bonds.filter(bond -> bond.insertId == row.id);
       if (matches.length != 1) throw "Missing post-cure receiver: " + row.id;
       validateBond(row, matches[0]);
-      bonded.push({id: row.id, part: row.part, pose: F.compose(F.identity(), row.pose)});
-      addComponent(row.id, row.part, row.pose);
+      bonded.push({id: row.id, purpose:row.purpose, part: row.part, pose: F.compose(F.identity(), row.pose)});
+      withGroup(purposeGroup(row.purpose), () -> addComponent(row.id, row.part, row.pose));
       addMemberConnector("casting", row.id + "Bond", row.pose);
       addMate(row.id + "-bonded-after-cure", "fixed", "casting", row.id + "Bond", row.id, "mount");
       exposeConnector(row.id, row.id, "top");
     }
     if (rootInsert != null) exposeConnector("mount", rootInsert, "mount");
     else exposeConnector("mount", "casting", "mount");
+    FoundationIntegrity.checkGroups(this).throwIfErrors();
   }
+
+  /** Library source purpose owns both an insert and its anchor hardware. */
+  public static function purposeGroup(role:String):String return switch role {
+    case "table-mount": "tableSeats";
+    case "lifting-mount": "liftingPoints";
+    case "threaded-anchor": "threadedAnchors";
+    case "generic-mount": "mountingSeats";
+    case "guide-seat": "guideSeats";
+    case "bearing-seat": "bearingSeats";
+    case "column-mount": "columnMounts";
+    case "leveling-seat": "levelingSeats";
+    case "hatch-mount": "hatchMounts";
+    case "drive-mount": "driveSeats";
+    case "enclosure-mount": "enclosureSeats";
+    case "tray-clamp-mount": "trayClampSeats";
+    default: throw 'Unknown foundation insert purpose "$role"';
+  };
 
   public function liftingPoints():Array<materia.casting.CastingLiftingPoint> return materia.casting.CastingLiftingPoint
     .CastingLiftingPoints.snapshot(materia.casting.CastingLiftingPoint.CastingLiftingPoints.records(declaredLifting));
@@ -187,7 +207,7 @@ class MineralFoundation extends MachineAssembly {
   }
 
   public function postCureLocations():Array<PostCureInsertPlacement> return [for (row in bonded) {
-    id:row.id, part:row.part, pose:F.compose(F.identity(), row.pose)
+    id:row.id, purpose:row.purpose, part:row.part, pose:F.compose(F.identity(), row.pose)
   }
   ];
 
@@ -281,7 +301,7 @@ class MineralFoundation extends MachineAssembly {
   public function castingMemberIds():Array<String> return pouredMembers.copy();
 
   public function insertLocations():Array<CastInsertPlacement> return [for (row in inserts) {
-    id:row.id, part:row.part, pose:F.compose(F.identity(), row.pose), openings:[for (opening in row.openings) {
+    id:row.id, purpose:row.purpose, part:row.part, pose:F.compose(F.identity(), row.pose), openings:[for (opening in row.openings) {
       kind:opening.kind, target:opening.target
     }
     ]

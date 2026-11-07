@@ -16,7 +16,7 @@ import materia.tooling.casting.InsertFixturePlanner.InsertPlateOptions;
 class HobberSocketFixtureSetup {
   public static function document():ToolingDocument {
     var placements:Array<CastInsertPlacement> = [for (i in 0...2) {
-      id:"socket" + i, part:FoundationLayout.traySocket(),
+      id:"socket" + i, purpose:materia.casting.InsertSpec.InsertRole.TrayClampMount, part:FoundationLayout.traySocket(),
         pose:F.translation(i == 0 ? -80 : 80, 0, 30), openings : [CastingPatterns.face("body.z-max")]
     }
     ];

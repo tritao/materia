@@ -67,6 +67,7 @@ class InsertAnchorTests {
       120).setNumber("depth", 100).setNumber("height", 80),
       [{
         id: "seat",
+        purpose:materia.casting.InsertSpec.InsertRole.GenericMount,
         part: source,
         pose: F.translation(0, 0, 60),
         openings: [materia.casting.CastingPatterns.face("body.z-max")]
@@ -696,6 +697,7 @@ class InsertAnchorTests {
       ));
       rows.push({
         id: "seat-" + diameter,
+        purpose:materia.casting.InsertSpec.InsertRole.GenericMount,
         part: part,
         pose: materia.assembly.AssemblyFrames.translation(diameter == 4 ? -100 : 100, 0, 70),
         openings : [materia.casting.CastingPatterns.face("body.z-max")]
@@ -747,6 +749,7 @@ class InsertAnchorTests {
         ),
         [{
           id: "seat",
+          purpose:materia.casting.InsertSpec.InsertRole.GenericMount,
           part: new CastInsert(collisionValues),
           pose: F.translation(0, 0, 60),
           openings: [materia.casting.CastingPatterns.face("body.z-max")]

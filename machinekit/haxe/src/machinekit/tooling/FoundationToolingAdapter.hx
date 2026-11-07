@@ -34,7 +34,7 @@ class FoundationToolingAdapter {
       features: foundation.body.castingFeatures(), postCureInserts: [for (row in foundation.postCureLocations()) {
       insert:insert(row), bond:foundation.body.postCureBonds().filter(bond -> bond.insertId == row.id)[0]
     }
-    ], inserts:[for (row in foundation.insertLocations()) insert({id: row.id, part: row.part, pose: row.pose})]});
+    ], inserts:[for (row in foundation.insertLocations()) insert({id: row.id, purpose:row.purpose, part: row.part, pose: row.pose})]});
   }
 
   static function insert(row:machinekit.structural.MineralFoundation.PostCureInsertPlacement):CastingToolingInsert {

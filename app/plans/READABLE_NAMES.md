@@ -54,8 +54,7 @@ including tray clamps; derive group names from that purpose. Keep catalogue
 socket recipe roles and BOM fingerprints unchanged. Do not infer purpose from
 hobber IDs. FoundationIntegrity must reject ungrouped members. Use existing `withGroup` scopes for each part addition so appended
 members cannot inherit a purpose silently. Test role coverage, bed/column groups, real anchor colocation,
-post-cure members and ungrouped additions. Bed/column subclasses add no members
-after foundation construction.
+post-cure members and ungrouped additions. Late additions must declare their own purpose group.
 
 ## Initial evidence
 
@@ -128,6 +127,7 @@ definitions, 165 distinct scene numbers. Files: `tmp/rn-metrics/before.mtrg`,
 | R1 | 48 | 21.9950 | 47 | 192 |
 | R2 | 33 | 15.5707 | 38 | 192 |
 | R3 | 33 | 15.5707 | 38 | 45 |
+| R4 | 33 | 15.5707 | 38 | 45 |
 
 Before's longest label/number is the coordinate-coded captured roller track.
 Longest ID is `machine/column/anchor-297d29ec08a4196e572c-bolt`.
@@ -135,7 +135,7 @@ R1's longest remaining label is a formatted hashed anchor; R2 must remove it.
 R3 survey: 39 of 165 distinct enclosure designations exceed 48 characters,
 including brackets, panels, shafts and a supply. Full survey: rn-designation-survey.json.
 
-## Current state and remaining work
+## Implementation and validation
 
 R1 is committed as `61eec37b0`; R2 as `5b4976e2e`. Both passed all focused
 baseline projects; their 24 smoke shards exactly match the measured baseline
@@ -143,7 +143,7 @@ baseline projects; their 24 smoke shards exactly match the measured baseline
 the initial cleat collision. ProjectKit passed 413; app naming 24. R2 additionally
 passed 28 assemblies/4561 occurrence names and 64 local rack contact assertions.
 
-R3 is applied and uncommitted. Its hard constructor/lint cap is 48. Temporary
+R3 is committed as `140c14d63`. Its hard constructor/lint cap is 48. Temporary
 report-only diagnostic passes were removed before validation. All 225 defaults
 and exact-identity/cap-boundary tests pass, with only the same 3 source-dependent
 defaults excluded. Actual naming audit passed 28 assemblies/4561 occurrences.
@@ -163,27 +163,47 @@ R3 full focused regressions pass, including hobber 2345/hobbing 1161, app CAD,
 BOM-document/key, procurement, integrity and unchanged joint-fastener totals.
 The example-build matrix and dedicated mill-frame suite (951) pass. Smoke
 improves 9→10 passes: sheet-router shard 6 passes 426 assertions. No previously
-passing shard remains failed. Tending shards15/16/24 only change their current
+passing shard remains failed. Tending shards 15/16/24 only change their current
 fingerprint; shard 21/standalone now reach the pre-existing hobber selection
 failure after the identity collisions are cleared. Other failures match exactly.
 HMI child bodies use exact parent recipe keys plus role; their purchased
 control number and geometry stay unchanged. The Y bracket test now checks its
 recipe/description and unchanged quantity 2 instead of a superseded literal.
-All R3 handles are terminal; the separate R3 commit follows verification.
+R3 is committed as `140c14d63`.
 
-R4 is next. Its library groups use typed placement purposes and existing
-`withGroup` scopes, preserving catalogue socket roles and part identity.
-Verify all producers/copies, actual artifact group paths, 106 anchor colocation,
-post-cure members in the runnable mill-frame fixture, ungrouped rejection and
-full regression comparisons before its separate commit. No portable artifact
-schema change is needed.
+R4 groups foundation members by declared installation purpose. Cast/post-cure placements
+require a typed purpose; all resizing, projection and fixture copies preserve
+it. MineralFoundation uses scoped library groups derived from that purpose.
+Casting owns its group; anchors share their insert's group. FoundationIntegrity
+rejects unassigned members locally, including later additions. Mill leveling
+plates added after construction explicitly declare the leveling-seat purpose.
 
-Tools/evidence: rn-regress.sh, rn-compare-smoke.py, rn-r1-results/.
+The saved before/after artifacts prove bed 96 flat members→7 purpose folders,
+column 42→5, with 106 anchors colocated and no orphan. All 403 labels/IDs and 183
+part-number entries are identical to R3. The hobber passes 2500 assertions
+(previous 2345), mill frame 958 (previous 951), including 4 post-cure members.
+The tooling foundation-design build compiles 1991 source files; final ProjectKit
+passes 413. No scene artifact schema or catalogue socket-role change is needed.
+All eight required focused projects pass, including app CAD, hobber 2500,
+hobbing 1161, BOM-document/key, procurement, assembly integrity and joint
+fasteners (51 joints / 232 screws / 16 dowels, zero fit findings). The example
+build matrix passes. All 21 successful BOM exports match R3's engineering and
+procurement data exactly (3710 occurrences / 1066 lines), with zero invalid
+numbers. The default naming gate passes 225 recipes; the same three require
+source inputs. Occurrence audit: 28 assemblies / 4561 occurrences pass.
+All 24 smoke shards match R3 outcomes (10 pass, 14 fail); the only changed
+exception text is tending's current input fingerprint in shards 15/16/24:
+`91001ec375bfb77821cea654d1a9f136a1364946ce40d4c553efb207f061a21c`.
+The stored certificate is unchanged. Standalone BOM-example tests reproduce the same pre-existing ROBOTDIGG
+structured-selection requirements failure as R3.
+
+Tools/evidence: rn-regress.sh, rn-compare-smoke.py, rn-r1-results/ through
+rn-r4-results/, plus rn-metrics/ for saved artifacts and measurements.
 The comparison keeps pending shards pending and flags changed failures for
 review. Do not normalize away unexplained geometry or numeric differences.
 Detailed preparation history was preserved in tmp/rn-work-log.md.
 
-Before completion, audit every original requirement plus R4 against actual
-source, committed history, logs and metrics. Final report includes separate
-step explanations/results, complete before/after table, BOM changes and open
-decisions. Keep the goal active until all four commits and verification are done.
+All four steps are implemented in separate commits. R4 changes group ownership
+without changing labels, occurrence IDs, geometry definitions or BOM identity.
+No open naming or grouping decisions remain. Existing unrelated test/export
+failures are retained and documented above and in machinekit/BOM_BASELINE.md.

@@ -472,3 +472,64 @@ the stale certificate with the new current-input fingerprint above. Shard21
 and the standalone BOM-example test get past the cleared identity collisions
 and now stop at hobber's already-measured missing structured requirements.
 Every other remaining exception matches the initial baseline exactly.
+
+
+## Mineral-foundation purpose groups R4 — 2026-11-07
+
+R4 declares installation purpose on cast/post-cure placements, independently
+of part recipes, and preserves it through placement copies. Library grouping
+uses that purpose for inserts and their anchor bolts; casting has its own
+folder. Local FoundationIntegrity checks reject missing/ungrouped ownership,
+including members appended after construction. The mill's later-added leveling
+plates explicitly use the library's leveling-seat purpose. Catalogue socket
+roles and part identity are unchanged; no portable artifact schema changed.
+
+The same 403-occurrence/183-definition enclosure was exported before/after.
+All object IDs, labels and part-number entries match R3 exactly. Labels average
+15.5707 characters (maximum 33); longest path 38; longest designation 45.
+The bed's 96 flat members now occupy 7 purpose folders, the column's 42 occupy 5.
+All 106 anchor bolts share their insert's exact group path; neither casting
+shares an insert folder and no foundation member remains unassigned.
+
+| Purpose group | Bed members | Column members |
+| --- | ---: | ---: |
+| Casting | 1 | 1 |
+| Guide seats | 26 | 14 |
+| Drive seats | 6 | 6 |
+| Table seats | 3 | — |
+| Column mounts | — | 3 |
+| Tray clamp seats | 12 | — |
+| Enclosure seats | 12 | — |
+| Lifting points | 36 | 18 |
+| Total | 96 | 42 |
+
+Member counts include the inserts and their anchor bolts. Group paths remain
+scoped beneath each foundation's include path. Purpose-group vocabulary also
+covers generic mounts, threaded anchors, bearing seats, leveling seats and
+hatch mounts for other foundations.
+
+Focused grouping checks pass: hobber 2500 assertions (2345 before), mill frame
+958 (951 before), including 4 non-vacuous post-cure checks and rejection of an
+ungrouped appended probe. Tooling foundation-design fixtures build across 1991
+source files; ProjectKit passes 413. The full app and hobber suites pass.
+The example-build matrix, including CAD drawing exports, passes. The occurrence
+audit passes 28 assemblies / 4561 occurrences; tending remains unavailable at
+its existing stale certificate.
+
+All 23 BOM factory exports were attempted: the same 21 succeed. Every successful
+engineering assembly and procurement array is exactly equal to R3 (3710
+engineering occurrences / 1066 procurement lines). No part numbers, quantities,
+line merging or uses change. Lint reports zero invalid numbers in those exports
+and 225 valid default recipes; the same three defaults need source inputs.
+Hobber still requires structured selection requirements for
+`ROBOTDIGG-2049-BT30-D80-6000`. Tending's stored certificate is unchanged; its
+current input fingerprint is now
+`91001ec375bfb77821cea654d1a9f136a1364946ce40d4c553efb207f061a21c`.
+All eight required focused projects pass: app CAD, hobber 2500, hobbing 1161,
+BOM-document/key, procurement, assembly integrity and joint fasteners. Joint
+counts remain 51 / 232 screws / 16 dowels, with zero fit findings.
+All 24 smoke shards retain R3 outcomes (10 pass, 14 fail). The only changed
+exception text is tending's current input fingerprint in shards 15/16/24;
+all other failure messages match exactly. No previously passing shard fails.
+Standalone BOM-example tests retain R3's existing ROBOTDIGG structured-selection
+requirements failure.
