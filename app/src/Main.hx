@@ -993,6 +993,7 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
    * camera and advances viewport animation. Builds only read what it leaves.
    */
   public function updatePresentation(deltaSeconds:Float):Void {
+    if (perspectiveViewport != null) perspectiveViewport.flushAssemblyDrag();
     if (workspace.isOpen("start")) preferences.refreshRecentAvailability();
     projectVariants.update();
     updateProjectUiExtension();

@@ -157,6 +157,17 @@ class PresentationTests {
         ]
       }]
     };
+    var compiled = new materia.presentation.CompiledPresentation(definition, value);
+    var compiledCursor = PresentationEvaluator.reset(value);
+    var compiledPoses:Map<String, materia.assembly.AssemblyRecord.AssemblyFrame> = [];
+    for (occurrence in definition.occurrences) compiledPoses.set(occurrence.id, occurrence.initialPose);
+    check(signature(compiled.evaluate(compiledPoses, compiledCursor, "geometry"))
+      == signature(PresentationEvaluator.evaluate(definition, compiledPoses, value, compiledCursor, "geometry")),
+      "compiled and boundary-validated presentation evaluation agree");
+    value.defaultView = "missing";
+    check(compiled.evaluate(compiledPoses, compiledCursor, "geometry").view == "assembled", "compiled presentation snapshots authoring data");
+    rejects(() -> new materia.presentation.CompiledPresentation(definition, value));
+    value.defaultView = "assembled";
     nestedComposition(value);
     rigidGroups(definition);
     var engineering = AssemblyDefinitionCodec.encode(definition);

@@ -318,6 +318,8 @@ class EditorScene implements Observable {
   var savedSketchDraftPresent(get, set):Bool;
   function get_savedSketchDraftPresent():Bool return sketchController.savedSketchDraftPresent;
   function set_savedSketchDraftPresent(value:Bool):Bool return sketchController.savedSketchDraftPresent = value;
+  /** Changes to hierarchy, geometry or appearance; pose-only previews keep this stable. */
+  public var contentRevision(default, null):Int = 0;
   public var revision(default, null):Int;
   public var visualRevision(default, null):Int;
   /** Changes only when simulation-consumed scene content changes, not selection. */
@@ -1946,12 +1948,13 @@ class EditorScene implements Observable {
       )) changed.push(update);
     if (changed.length == 0) return;
     var transaction = scene.beginTransaction();
+    var changes:Null<ChangeSet> = null;
     try {
       for (update in changed) transaction.setTransform(
         update.runtime.node,
         objectTransform(update.x, update.y, update.z, update.rotation)
       );
-      transaction.commit();
+      changes = transaction.commitWithChanges();
     } catch (error:Dynamic) {
       transaction.dispose();
       throw error;
@@ -1964,10 +1967,11 @@ class EditorScene implements Observable {
       update.item.rotation = update.rotation;
       updatedNodes.push(update.runtime.node);
     }
-    publish(updatedNodes);
+    publish(updatedNodes, true, changes, true);
   }
 
   public function object(id:String):Null<EditorSceneObject> {
+    if (id == null) return null;
     var membership = objectMembershipRevision;
     return objectIndex.get(id);
   }
@@ -2770,7 +2774,8 @@ class EditorScene implements Observable {
     runtime.material.dispose();
   }
 
-  function publish(?updatedNodes:Array<NodeId>, ?physicsChanged:Bool = true, ?changes:Null<ChangeSet>):Void {
+  function publish(?updatedNodes:Array<NodeId>, ?physicsChanged:Bool = true, ?changes:Null<ChangeSet>, poseOnly:Bool = false):Void {
+    if (!poseOnly) contentRevision++;
     if (changes == null) requireRenderRefresh();
     else queueRenderChanges(changes);
     nextRevision++;

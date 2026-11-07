@@ -288,10 +288,10 @@ import materia.assembly.AssemblyDefinition;
     return key == "scene";
   }
   function visibleChildren(parentKey:String):Array<String> {
-    if (cachedSceneRevision != scene.revision
+    if (cachedSceneRevision != scene.contentRevision
       || cachedFilterRevision != filterRevision || cachedSelectionKey != selectionKey()) {
       childCache.clear();
-      cachedSceneRevision = scene.revision;
+      cachedSceneRevision = scene.contentRevision;
       cachedFilterRevision = filterRevision;
       cachedSelectionKey = selectionKey();
     }

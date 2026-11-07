@@ -58,6 +58,7 @@ private typedef ThreadGroup = {
   final groups:Map<String, ThreadGroup> = [];
   final textures:Map<String, ThreadTextures> = [];
   var sampler:Null<Sampler>;
+  var ensuredContentRevision:Int = -1;
 
   public function new() {
   }
@@ -73,6 +74,7 @@ private typedef ThreadGroup = {
 
   /** Native owners are rebuilt only when the base geometry or appearance changes. */
   public function ensure(owner:EditorScene):Void {
+    if (ensuredContentRevision == owner.contentRevision) return;
     var seen:Map<String, Bool> = [];
     var changed = false;
     for (item in owner.items()) {
@@ -196,6 +198,7 @@ private typedef ThreadGroup = {
       changed = true;
     }
     if (changed) owner.publish(null, false);
+    ensuredContentRevision = owner.contentRevision;
   }
 
   /**
@@ -305,7 +308,10 @@ private typedef ThreadGroup = {
   }
 
   /** Called after an atomic edit has retired this object's nodes. */
-  public function release(owner:EditorScene, id:String):Void remove(owner, id);
+  public function release(owner:EditorScene, id:String):Void {
+    ensuredContentRevision = -1;
+    remove(owner, id);
+  }
 
   public function show(owner:EditorScene, view:SceneView, visible:Bool):Void {
     for (id in groups.keys()) {

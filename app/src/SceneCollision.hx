@@ -67,6 +67,10 @@ class SceneCollision {
   var world:Null<CollisionWorld> = null;
   var build:Null<CollisionBuild> = null;
   var contentKey:Null<String> = null;
+  var contentScene:Null<EditorScene>;
+  var contentRevision:Int = -1;
+  var contentProject:Null<ProjectDocumentSession>;
+  var contentGeneration:Int = -1;
   /** The scene object behind each described body, and how to pose that body. */
   var bodyObjects:Array<String> = [];
   var bodyCentres:Array<Null<Array<Float>>> = [];
@@ -98,8 +102,16 @@ class SceneCollision {
     if (!Math.isFinite(contact) || contact < 0) throw "The contact tolerance must be finite and nonnegative";
     var revision = scene.revision + ":" + contact + (poses == null ? "" : ":sim" + posesRevision);
     if (revision == queriedRevision && near == queriedNear) return queried;
-    var key = keyOf(scene, project);
-    if (key != contentKey) rebuild(scene, project, key);
+    var generation = project == null ? -1 : project.generation;
+    if (contentKey == null || contentScene != scene || contentRevision != scene.contentRevision
+      || contentProject != project || contentGeneration != generation) {
+      var key = keyOf(scene, project);
+      if (key != contentKey) rebuild(scene, project, key);
+      contentScene = scene;
+      contentRevision = scene.contentRevision;
+      contentProject = project;
+      contentGeneration = generation;
+    }
     queried = pairs(scene, near, contact, poses);
     queriedRevision = revision;
     queriedNear = near;
