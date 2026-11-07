@@ -189,11 +189,16 @@ Status: **complete** — P1–P5 accepted on branch `hobber-round-r5`; supplier 
   removed with the Z saddle, and declare that path.
 - **Y centred screw:** blocked on SFU1204/BK10/BF10/40-frame data; not in this round.
 
-## Phase Y: Y as a linear module (planned 2026-11-07)
+## Phase Y: Y as a linear module (started 2026-11-07)
+
+Status: **LM0 complete; XC next** on `linear-module`: inventory, accuracy and corrected plate
+baselines recorded in LINEAR_MODULE_PLAN. Hobber 2345 / hobbing 1161 assertions; joint-fasteners,
+assembly-integrity and way-cover pass; strict sweep 0 errors, all 13 service paths clear.
+No construction changes yet. Order: LM0, XC, LM1–LM5, ZB, LM6; one commit per step.
 
 Y becomes an instance of the MachineKit screw linear module, planned in
-[LINEAR_MODULE_PLAN.md](../../LINEAR_MODULE_PLAN.md) (LM0-LM6): the swivel plate is the module's host, with integral
-raised rail lands and a floor that takes the HZMotion M60D-BK12 and the BF12 centred between the rails; the Y saddle is
+[LINEAR_MODULE_PLAN.md](../../LINEAR_MODULE_PLAN.md) (LM0-LM6): the swivel plate is the module's host, with two ground
+riser bars under the rails and a floor that takes the HZMotion M60D-BK12 and the BF12 centred between the rails; the Y saddle is
 the carriage; the JFT-40 ML 70 seat, head bracket, travel window, cable and air are module features. This unblocks the
 "Y screw centred" item without a new small-screw drive family. Z is not converted: its rails stay on the column's cast
 inserts (the eRob fixes the screw at y -82), and it gets a bellows cover only.
