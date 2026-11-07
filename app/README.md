@@ -541,8 +541,18 @@ Scene rectangles persist an extrusion depth plus independent collision-enabled,
 dynamic-body, and mass settings. Visibility affects rendering only. Application
 runs default to the bundled MuJoCo backend, while the sensor panel can select
 the Test backend used by automated checks; changing backend remains pending until
-Rebuild. The perspective viewport overlays read-only runtime robot poses, sensor mounts,
-and LiDAR rays. New/Open stops and detaches the previous document's simulated
+Rebuild. The perspective viewport shows the machine without sensor or link markers
+by default. The visible Sensors panel reveals the inspected sensor's mount and
+orientation, plus available LiDAR readings. Viewport options independently enable
+all Sensors, Sensor readings, Link frames, and Collision details. Amber proximity
+and red collision closest-point markers appear only for selected parts or when
+Collision details is enabled; the collision query and toolbar summary are retained.
+Show annotations through geometry reveals otherwise occluded inspection aids. Viewport overlays is the master
+visibility switch. Authored mounts are inspectable before Play, without fabricated
+readings; live inspection follows measured robot poses. These aids do not change
+machine geometry or document state. Regression coverage:
+`./haxeon/scripts/haxeon run --project=app/tests/viewport-annotations/haxeon.json`.
+New/Open stops and detaches the previous document's simulated
 robots but leaves independently attached remote robots untouched.
 
 ## Script-owned setups

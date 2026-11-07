@@ -22,7 +22,12 @@ class AppSettings {
   /** Metres between grid lines, and the snapping step. */
   public static inline var GRID_SPACING:String = "editors/3d/grid/spacing";
 
-  /** Whether a running simulation draws its robots' sensor rays and mission overlays (route, costmap, odometry). */
+  public static inline var COLLISION_DETAILS:String = "editors/3d/annotations/collision_details";
+  public static inline var SENSOR_MOUNTS:String = "editors/3d/annotations/sensors";
+  public static inline var SENSOR_READINGS:String = "editors/3d/annotations/readings";
+  public static inline var LINK_FRAMES:String = "editors/3d/annotations/link_frames";
+  public static inline var ANNOTATIONS_THROUGH_GEOMETRY:String = "editors/3d/annotations/through_geometry";
+  /** Master visibility of viewport inspection aids and live mission overlays. */
   public static inline var SIMULATION_OVERLAYS:String = "editors/3d/simulation/show_overlays";
   /** Whether the viewport tints and joins objects that collide or come near while editing (COLLISION.md CL8b). */
   public static inline var COLLISIONS_VISIBLE:String = "editors/3d/collision/show";
@@ -90,10 +95,23 @@ class AppSettings {
     threads.tooltip = "Draw the nominal threads on named bore and shank faces.";
     registry.define(COSMETIC_THREADS, PropertyType.Bool, PropertyValue.Bool(true), threads);
     var overlays = new SettingOptions();
-    overlays.label = "Show Simulation Overlays";
+    overlays.label = "Show Viewport Overlays";
     overlays.tooltip =
-      "Draw lidar rays, and a mission's route, costmap, sensed obstacles and odometry, while a simulation runs.";
+      "Show enabled inspection annotations and live mission overlays.";
     registry.define(SIMULATION_OVERLAYS, PropertyType.Bool, PropertyValue.Bool(true), overlays);
+    for (entry in [
+      {path: COLLISION_DETAILS, label: "Collision details", tooltip: "Show closest-point markers for all collision and proximity pairs; selection reveals related pairs automatically."},
+      {path: SENSOR_MOUNTS, label: "Sensors", tooltip: "Show all sensor mounts; the inspected sensor is shown automatically."},
+      {path: SENSOR_READINGS, label: "Sensor readings", tooltip: "Show available sensor readings in the viewport."},
+      {path: LINK_FRAMES, label: "Link frames", tooltip: "Show robot link origins and orientation axes."},
+      {path: ANNOTATIONS_THROUGH_GEOMETRY, label: "Show annotations through geometry",
+        tooltip: "Reveal inspection aids hidden behind machine geometry."}
+    ]) {
+      var option = new SettingOptions();
+      option.label = entry.label;
+      option.tooltip = entry.tooltip;
+      registry.define(entry.path, PropertyType.Bool, PropertyValue.Bool(false), option);
+    }
     var collisions = new SettingOptions();
     collisions.label = "Show Collisions";
     collisions.tooltip =
