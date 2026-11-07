@@ -76,11 +76,13 @@ class Memo<V> implements MemoTable {
     var found = lookup(key);
     if (found != null) return found.value;
     var tier = disk;
+    var store = tier == null ? null : tier.store();
+    if (store == null) tier = null;
     var diskKey:Null<String> = null;
     var stored:Null<Bytes> = null;
     if (tier != null) {
       diskKey = tier.keyFor(name, key);
-      stored = tier.store.read(diskKey);
+      stored = store.read(diskKey);
       if (stored != null && !DiskStore.verifying()) {
         var decoded:Null<MemoFound<V>> = null;
         try decoded = new MemoFound<V>(tier.decode(stored)) catch (error:Dynamic) {}
@@ -100,7 +102,7 @@ class Memo<V> implements MemoTable {
       if (stored != null) {
         if (!sameBytes(stored, encoded)) throw 'persistent memo "$name" is stale for key "$key": the stored value differs from a recomputation (a dependency is missing from its code identity)';
         count(true);
-      } else tier.store.write(diskKey, encoded);
+      } else store.write(diskKey, encoded);
     }
     return keep(key, value, seconds);
   }
@@ -124,9 +126,8 @@ class Memo<V> implements MemoTable {
    * (null identity) or no CadKit build sits beside the program.
    */
   public function persist(identity:Null<String>, encode:V -> Bytes, decode:Bytes -> V):Memo<V> {
-    var store = DiskStore.process();
-    var native = store == null || identity == null ? null : Memos.nativeIdentity();
-    disk = store == null || identity == null || native == null ? null : new MemoDisk<V>(store, identity + "|" + native, encode, decode);
+    var native = identity == null || DiskStore.process() == null ? null : Memos.nativeIdentity();
+    disk = identity == null || native == null ? null : new MemoDisk<V>(null, identity + "|" + native, encode, decode);
     return this;
   }
 
@@ -309,13 +310,16 @@ private class MemoEntry<V> {
 
 /** A memo's persistent tier: the store, the code identity, and the value codec. */
 private class MemoDisk<V> {
-  public final store:DiskStore;
+  /** An explicit store (tests), else the process-wide one, looked up at each use so tests can point it elsewhere. */
+  final fixed:Null<DiskStore>;
   final identity:String;
   public final encode:V -> Bytes;
   public final decode:Bytes -> V;
 
-  public function new(store:DiskStore, identity:String, encode:V -> Bytes, decode:Bytes -> V) {
-    this.store = store;
+  public function store():Null<DiskStore> return fixed == null ? DiskStore.process() : fixed;
+
+  public function new(fixed:Null<DiskStore>, identity:String, encode:V -> Bytes, decode:Bytes -> V) {
+    this.fixed = fixed;
     this.identity = identity;
     this.encode = encode;
     this.decode = decode;

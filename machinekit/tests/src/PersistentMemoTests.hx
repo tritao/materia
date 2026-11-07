@@ -289,6 +289,53 @@ class PersistentMemoTests {
     store.clear();
   }
 
+  static function sceneBytes(part:materia.project.SceneArtifact.SceneArtifactPart):String {
+    part.id = "p";
+    part.name = "p";
+    var b = materia.project.SceneArtifact.encode({lengthUnit: "mm", metresPerUnit: 0.001, parts: [part]});
+    var buf = new StringBuf();
+    for (i in 0...b.length) buf.add(StringTools.hex(b.get(i), 2));
+    return buf.toString();
+  }
+
+  /** Scene parts: keyed on the solid's content, identical from memory, from disk and recomputed; other inputs differ. */
+  static function sceneParts():Void {
+    var store = freshStore();
+    DiskStore.useProcess(store);
+    Memos.clearAll();
+    var runs = [0];
+    var material = "steel-s355";
+    try materia.project.MaterialLibrary.require(material) catch (error:Dynamic) material = new machinekit.hobbing.Hob().materialId;
+    var make = (id:String, name:String, w:Float, m:String, deflection:Null<Float>) -> machinekit.assembly.AssemblyPreview.part(id, name, block(runs, w), m, deflection);
+    var a = make("a", "A", 10, material, null);
+    check(a.id == "a" && a.name == "A" && a.vertexCount > 0, "a part carries the caller's id and name");
+    var aBytes = sceneBytes(a);
+    var b = make("b", "B", 10, material, null);
+    check(b.id == "b" && b.name == "B", "a hit carries the new caller's id and name");
+    check(sceneBytes(b) == aBytes, "the same solid gives the same part from memory");
+    check(store.count() >= 1, "the part was stored");
+    Memos.clearAll();
+    var c = make("c", "C", 10, material, null);
+    check(sceneBytes(c) == aBytes, "and from disk");
+    var diskHits = 0;
+    for (line in Memos.report()) if (line.indexOf("scene-part") == 0 && line.indexOf("(1 from disk)") >= 0) diskHits++;
+    check(diskHits == 1, "that was a disk hit");
+    check(sceneBytes(make("d", "D", 11, material, null)) != aBytes, "another solid is another part");
+    check(sceneBytes(make("e", "E", 10, material, 0.05)) != aBytes, "another tessellation deflection is another part");
+    DiskStore.forceVerify(true);
+    try {
+      Memos.clearAll();
+      check(sceneBytes(make("f", "F", 10, material, null)) == aBytes, "verify mode recomputes a scene part and agrees");
+    } catch (error:Dynamic) {
+      DiskStore.forceVerify(null);
+      DiskStore.useProcess(null);
+      throw error;
+    }
+    DiskStore.forceVerify(null);
+    DiskStore.useProcess(null);
+    store.clear();
+  }
+
   public static function main():Void {
     roundTrip();
     invalidation();
@@ -298,6 +345,7 @@ class PersistentMemoTests {
     concurrent();
     meshCodec();
     shapes();
+    sceneParts();
     realIdentities();
     Sys.println("persistent memo tests: " + passed + " checks passed");
   }

@@ -4,6 +4,7 @@ import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.Part;
 import cadkit.threads.Threads;
 import machinekit.component.ComponentDetail;
+import machinekit.component.ComponentNumberKey;
 import machinekit.component.MassProperties;
 import machinekit.component.MassProperties.MassSource;
 import materia.assembly.AssemblyDefinition;
@@ -287,6 +288,64 @@ class AssemblyPreview {
     ?deflection:Float,
     ?massProperties:MassProperties,
     maxGeometricFaces:Int = 0
+  ):SceneArtifactPart {
+    var key:Null<String> = null;
+    try key = partKey(part, materialId, deflection, massProperties, maxGeometricFaces) catch (error:Dynamic) {}
+    var built = false;
+    var result = parts.get(key, () -> {
+      built = true;
+      // Stored under a fixed id and name: they belong to the caller, not to the geometry.
+      return buildPart("part", "part", part, materialId, deflection, massProperties, maxGeometricFaces);
+    });
+    if (!built) part.close();
+    result.id = id;
+    result.name = name;
+    return result;
+  }
+
+  /**
+   * A scene part is a function of the solid's content, not of where it came from, so the key is the solid's bytes (taken before
+   * it is meshed, which changes what it writes afterwards) with the material, tessellation, mass and face-limit inputs. A solid
+   * that was already meshed writes other bytes: that is a miss, never a wrong hit.
+   */
+  static function partKey(part:Part, materialId:String, deflection:Null<Float>, mass:Null<MassProperties>, maxFaces:Int):String {
+    var digest = haxe.crypto.Sha256.make(part.shape.toBytes());
+    var hex = new StringBuf();
+    for (index in 0...digest.length) hex.add(StringTools.hex(digest.get(index), 2));
+    var inertia = mass == null || mass.inertia == null ? "none" : [for (v in [
+      mass.inertia.xx, mass.inertia.xy, mass.inertia.xz, mass.inertia.yy, mass.inertia.yz, mass.inertia.zz]) ComponentNumberKey.encode(v)].join(",");
+    var massText = mass == null ? "none" : ComponentNumberKey.encode(mass.mass) + "|" + ComponentNumberKey.encode(mass.centreOfMass.x) + ","
+      + ComponentNumberKey.encode(mass.centreOfMass.y) + "," + ComponentNumberKey.encode(mass.centreOfMass.z) + "|" + inertia + "|"
+      + switch mass.source {
+        case Declared: "declared";
+        case EffectiveDensity(density): "density:" + ComponentNumberKey.encode(density);
+        case Modelled: "modelled";
+        case Computed(detail): "computed:" + Std.string(detail);
+      };
+    return hex.toString() + "|" + materialId + "|" + (deflection == null ? "relative" : ComponentNumberKey.encode(deflection)) + "|" + massText + "|" + maxFaces;
+  }
+
+  static final parts:machinekit.cache.Memo<SceneArtifactPart> = new machinekit.cache.Memo<SceneArtifactPart>("scene-part", 256,
+    value -> Reflect.copy(value))
+    .persist(machinekit.cache.CodeIdentity.of("machinekit.assembly.AssemblyPreview"), encodePart, decodePart);
+
+  /** One part stored as a one-part scene artifact: the artifact format already is the exact form of every field. */
+  static function encodePart(value:SceneArtifactPart):haxe.io.Bytes return materia.project.SceneArtifact.encode({
+    lengthUnit: "mm",
+    metresPerUnit: LengthUnit.metresPerUnit("mm"),
+    parts: [value]
+  });
+
+  static function decodePart(bytes:haxe.io.Bytes):SceneArtifactPart return materia.project.SceneArtifact.decode(bytes).parts[0];
+
+  static function buildPart(
+    id:String,
+    name:String,
+    part:Part,
+    materialId:String,
+    deflection:Null<Float>,
+    massProperties:Null<MassProperties>,
+    maxGeometricFaces:Int
   ):SceneArtifactPart {
     var material = MaterialLibrary.require(materialId);
     var color = material.visual.baseColor;
