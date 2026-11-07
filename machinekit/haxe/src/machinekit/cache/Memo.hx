@@ -1,5 +1,6 @@
 package machinekit.cache;
 
+import cadkit.cache.DiskStore;
 import haxe.io.Bytes;
 import sys.thread.Mutex;
 

@@ -340,6 +340,7 @@ class HobberEnclosurePreview {
     if (Sys.getEnv("HOBBER_PHASES") == "1") {
       Sys.println("PHASES build=" + Math.round(t1 - t0) + "s fit=" + Math.round(t2 - t1) + "s export=" + Math.round(t3 - t2) + "s");
       for (line in machinekit.cache.Memos.report()) Sys.println("MEMO " + line);
+      for (line in cadkit.cache.OpCache.report()) Sys.println("OPS " + line);
     }
     return scene;
   }

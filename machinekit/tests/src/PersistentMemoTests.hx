@@ -1,6 +1,6 @@
 import haxe.io.Bytes;
 import machinekit.cache.Codecs;
-import machinekit.cache.DiskStore;
+import cadkit.cache.DiskStore;
 import cadkit.modeling.Part;
 import machinekit.cache.Memo;
 import machinekit.cache.Memos;
@@ -204,7 +204,7 @@ class PersistentMemoTests {
   /** The compiler's module identities and the native build, wired through `persist`. */
   static function realIdentities():Void {
     var memoId = machinekit.cache.CodeIdentity.of("machinekit.cache.Memo");
-    var storeId = machinekit.cache.CodeIdentity.of("machinekit.cache.DiskStore");
+    var storeId = machinekit.cache.CodeIdentity.of("cadkit.cache.DiskStore");
     check(memoId != null && memoId.length == 32, "a module in the program has a 32-character identity: " + memoId);
     check(storeId != null && storeId != memoId, "different modules have different identities");
     check(memoId == machinekit.cache.CodeIdentity.of("machinekit.cache.Memo"), "an identity is stable within a run");
@@ -221,7 +221,7 @@ class PersistentMemoTests {
     make("machinekit.cache.Memo").get("k", () -> compute(runs, 1));
     make("machinekit.cache.Memo").get("k", () -> compute(runs, 1));
     check(runs[0] == 1 && store.count() == 1, "with real identities a second memo reads what the first stored");
-    make("machinekit.cache.DiskStore").get("k", () -> compute(runs, 1));
+    make("cadkit.cache.DiskStore").get("k", () -> compute(runs, 1));
     check(runs[0] == 2 && store.count() == 2, "another module's identity is another entry");
     make("machinekit.no.SuchModule").get("k", () -> compute(runs, 1));
     make("machinekit.no.SuchModule").get("k", () -> compute(runs, 1));
@@ -253,7 +253,7 @@ class PersistentMemoTests {
     var runs = [0];
     var first = Memos.persistentParts("persist-shape", 8, "PersistentMemoTests");
     var a = first.get("k", () -> block(runs, 10));
-    check(runs[0] == 1 && store.count() == 1, "a solid miss builds once and stores one entry");
+    check(runs[0] == 1 && store.count() >= 1, "a solid miss builds once and stores its entry (and its booleans' entries)");
     var aBytes = bytesOf(a);
     var again = first.get("k", () -> block(runs, 10));
     check(runs[0] == 1 && bytesOf(again) == aBytes, "a memory hit is the same bytes");

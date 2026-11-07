@@ -2,6 +2,7 @@ package cadkit.modeling;
 
 import CadKit;
 import cadkit.Shape;
+import cadkit.ShapeKey;
 import cadkit.Operation;
 
 /** Rigid placement. compose(child) applies child first, then this placement. */
@@ -64,8 +65,16 @@ class Location {
         plane.xDirection.native(),
         plane.normal.native()
       ),
-      [shape]
+      [shape],
+      ShapeKey.op("place-op", placeParams(), [shape]),
+      "place"
     );
+  }
+
+  /** The placement as key text: exact bits of the plane the shape is carried to. */
+  function placeParams():String {
+    function v(x:Vector):String return ShapeKey.number(x.x) + "," + ShapeKey.number(x.y) + "," + ShapeKey.number(x.z);
+    return v(plane.origin) + "|" + v(plane.xDirection) + "|" + v(plane.normal);
   }
 
   public function apply(shape:Shape):Shape {
@@ -80,11 +89,15 @@ class Location {
         throw error;
       }
     }
-    return Shape.fromOwnedHandle(CadKit.shapePlaceChecked(
+    var result = Shape.fromOwnedHandle(CadKit.shapePlaceChecked(
       shape.borrowHandle(),
       plane.origin.native(),
       plane.xDirection.native(),
       plane.normal.native()
     ));
+    var key = ShapeKey.op("place", placeParams(), [shape]);
+    result.key = key;
+    result.gap = key == null ? ShapeKey.gapOf("place", [shape]) : null;
+    return result;
   }
 }

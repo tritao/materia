@@ -50,15 +50,7 @@ class Memos {
    * installed elsewhere gives the same identity), the naming scheme version and `MATERIA_MEMO_SALT` (set it after changing
    * something these cannot see). Null when the program has no CadKit build beside it, which turns the persistent tier off.
    */
-  public static function nativeIdentity():Null<String> {
-    var cadkit = haxeon.build.CodeIdentity.nativeBuild("cadkit");
-    if (cadkit == null) return null;
-    // The first CadKit call loads the native library and with it OCCT's, so ask for the version before listing what is loaded.
-    var version = Shape.occtVersion(), salt = Sys.getEnv("MATERIA_MEMO_SALT");
-    var libraries = haxeon.build.CodeIdentity.loadedLibraries("libTK");
-    return "cadkit:" + cadkit + "|occt:" + version + (libraries == null ? "" : "+" + libraries) + (salt == null ? "" : "|salt:" + salt)
-      + "|naming:" + Shape.namingScheme();
-  }
+  public static function nativeIdentity():Null<String> return cadkit.cache.NativeIdentity.get();
 
   public static function register(table:MemoTable):Void {
     var known = tables;

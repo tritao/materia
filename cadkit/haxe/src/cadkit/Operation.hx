@@ -8,9 +8,17 @@ import cadkit.threads.Threads;
 class Operation {
   private var threadSources:Array<{attribute:ThreadedFace, face:Shape}>;
   private var native:CadKit.OwnedOperationHandle;
+  private var resultKey:Null<String>;
+  private var resultGap:String;
 
-  public function new(native:CadKit.OwnedOperationHandle, inputs:Array<Shape> = null) {
+  /**
+   * `key` is the construction key of the result (see `ShapeKey`), null when an input has none; `name` says what the operation
+   * is, for coverage reports of unkeyed results.
+   */
+  public function new(native:CadKit.OwnedOperationHandle, inputs:Array<Shape> = null, key:Null<String> = null, name:Null<String> = null) {
     this.native = native;
+    resultKey = key;
+    resultGap = key != null ? "" : inputs == null ? (name ?? "operation") : ShapeKey.gapOf(name ?? "operation", inputs);
     threadSources = [];
     try {
       if (inputs != null) for (input in inputs) for (attribute in input.faceAttributes()) threadSources.push({
@@ -64,6 +72,14 @@ class Operation {
         if (!deleted) throw 'Thread face ${source.attribute.faceName} lost without proven deletion';
       }
       result.setThreadedFaces(attributes);
+      // An input with face attributes has no key, so a keyed operation never carried attributes into its result.
+      if (resultKey != null && attributes.length == 0) {
+        result.key = resultKey;
+        result.gap = null;
+      } else {
+        result.key = null;
+        result.gap = resultGap == "" ? "attributes" : resultGap;
+      }
       return result;
     } catch (error:Dynamic) {
       result.close();

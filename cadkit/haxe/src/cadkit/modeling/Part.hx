@@ -140,11 +140,11 @@ class Part extends Model {
   static function fuseRange(parts:Array<Part>, from:Int, to:Int):Part {
     var count = to - from;
     if (count == 1) return new Part(parts[from].shape.cloneShape());
-    if (count == 2) return parts[from].combine(parts[from + 1]);
+    if (count == 2) return joined(parts[from], parts[from + 1], Add);
     var middle = from + (count >> 1), left = fuseRange(parts, from, middle), right:Null<Part> = null;
     try {
       right = fuseRange(parts, middle, to);
-      var result = left.combine(right);
+      var result = joined(left, right, Add);
       left.close();
       right.close();
       return result;
@@ -153,6 +153,17 @@ class Part extends Model {
       if (right != null) right.close();
       throw error;
     }
+  }
+
+  /**
+   * `a` fused with (or less) `b` for `fuseAll` and `subtractAll`: through the cached boolean (`Shape.fuse`, `cut`) when both
+   * shapes carry construction keys, which gives a part without an operation history (these results never use it); otherwise as
+   * `combine`, with its history.
+   */
+  static function joined(a:Part, b:Part, mode:Mode):Part {
+    if (a.shape.key != null && b.shape.key != null && a.shape.faceAttributes().length == 0 && b.shape.faceAttributes().length == 0)
+      return new Part(mode == Add ? a.shape.fuse(b.shape) : a.shape.cut(b.shape));
+    return a.combine(b, mode);
   }
 
   public static function sphere(radius:Float):Part {
@@ -170,7 +181,7 @@ class Part extends Model {
       }
       var result = fromOperation(new Operation(
         CadKit.loftOperationChecked(Model.refs(shapes), 1, ruled ? 1 : 0),
-        shapes
+        shapes, null, "loft"
       ));
       for (wire in wires) wire.close();
       return result;
@@ -220,7 +231,7 @@ class Part extends Model {
     if (tools.length == 0) return new Part(shape.cloneShape());
     var tool = Part.fuseAll(tools);
     try {
-      var result = subtract(tool);
+      var result = joined(this, tool, Subtract);
       tool.close();
       return result;
     } catch (error:Dynamic) {
@@ -260,7 +271,7 @@ class Part extends Model {
   public function shell(faces:Selection, thickness:Float):Part {
     return fromOperation(new Operation(
       CadKit.shellOperationChecked(shape.borrowHandle(), Model.refs(faces.borrowShapes()), thickness),
-      [shape]
+      [shape], null, "shell"
     ));
   }
 

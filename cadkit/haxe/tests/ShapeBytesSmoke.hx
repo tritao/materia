@@ -235,19 +235,25 @@ class ShapeBytesSmoke {
     for (shape in [cylinder, attributed, restored, fresh, plain]) shape.close();
   }
 
+  /**
+   * A boolean of keyed shapes returns the canonical form (`OpCache`): a fresh shape with topology of its own. One of restored
+   * shapes (no key) is the built form, which shares topology with its inputs, so meshing an earlier result puts triangulations on
+   * the inputs and moves the bounds of the next result by the mesh deflection. They agree to that, not bit for bit, so these
+   * comparisons carry a tolerance.
+   */
   static function booleans():Void {
     var base = Shape.box(30, 30, 30).stamped("base", []);
     var tool = Shape.cylinder(5, 50).translate(Geometry.vec3(5, 5, -10)).stamped("tool", []);
     var restoredBase = Shape.fromBytes(base.toBytes());
     var restoredTool = Shape.fromBytes(tool.toBytes());
-    sameShape(base.cut(tool), restoredBase.cut(restoredTool), "cut");
-    sameShape(base.fuse(tool), restoredBase.fuse(restoredTool), "fuse");
-    sameShape(base.common(tool), restoredBase.common(restoredTool), "common");
-    sameShape(base.cut(tool), restoredBase.cut(tool), "cut with one side restored");
+    sameShape(base.cut(tool), restoredBase.cut(restoredTool), "cut", true, 1e-6);
+    sameShape(base.fuse(tool), restoredBase.fuse(restoredTool), "fuse", true, 1e-6);
+    sameShape(base.common(tool), restoredBase.common(restoredTool), "common", true, 1e-6);
+    sameShape(base.cut(tool), restoredBase.cut(tool), "cut with one side restored", true, 1e-6);
     var slab = Shape.box(60, 8, 60).translate(Geometry.vec3(-10, 2, -10)).stamped("slab", []);
     var restoredSlab = Shape.fromBytes(slab.toBytes());
-    sameShape(base.cut(tool).common(slab), restoredBase.cut(restoredTool).common(restoredSlab), "cut then common");
-    sameShape(base.fuse(tool).cut(slab), restoredBase.fuse(restoredTool).cut(restoredSlab), "fuse then cut");
+    sameShape(base.cut(tool).common(slab), restoredBase.cut(restoredTool).common(restoredSlab), "cut then common", true, 1e-6);
+    sameShape(base.fuse(tool).cut(slab), restoredBase.fuse(restoredTool).cut(restoredSlab), "fuse then cut", true, 1e-6);
     // Stamping and moving a restored shape names things as the original does.
     sameShape(base.translate(Geometry.vec3(1, 2, 3)).stamped("m", [base]), restoredBase.translate(Geometry.vec3(1, 2, 3)).stamped("m", [restoredBase]),
       "move and stamp");
