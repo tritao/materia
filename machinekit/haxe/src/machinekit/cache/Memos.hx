@@ -25,6 +25,15 @@ class Memos {
    */
   public static function independent(shape:Shape):Shape return shape.translate(new cadkit.modeling.Vector(0, 0, 0).native());
 
+  /**
+   * The native build the stored shapes' numbers came from, as part of every persistent key. CadKit's naming scheme version plus
+   * `MATERIA_MEMO_SALT` (set it, or clear the cache, after rebuilding CadKit or OCCT in a way that changes results).
+   */
+  public static function nativeIdentity():String {
+    var salt = Sys.getEnv("MATERIA_MEMO_SALT");
+    return "naming" + Shape.namingScheme() + (salt == null ? "" : "+" + salt);
+  }
+
   public static function register(table:MemoTable):Void {
     var known = tables;
     if (known == null) {
@@ -49,6 +58,6 @@ class Memos {
 
   /** One line per memo: hits, misses, evictions, entries and the time spent computing misses. */
   public static function report():Array<String> return [for (s in all()) s.name + ": " + s.hits + " hits, " + s.misses
-    + " misses, " + s.evictions + " evicted, " + s.size + "/" + s.capacity + " kept, " + Math.round(s.computeSeconds * 1000)
+    + " misses (" + s.diskHits + " from disk), " + s.evictions + " evicted, " + s.size + "/" + s.capacity + " kept, " + Math.round(s.computeSeconds * 1000)
     + " ms computing"];
 }
