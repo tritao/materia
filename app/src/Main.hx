@@ -2648,7 +2648,7 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
       ));
     }
     var canvas:View = new Stack("perspective-canvas-overlay", layers);
-    var hobberControls = app.editor.HobberScenePanel.build(this);
+    var hobberControls = app.editor.HobberScenePanel.build(this, availableWidth);
     var viewportRows:Array<KeyedView> = [
       new KeyedView("toolbar", toolbar),
       new KeyedView("divider", divider),

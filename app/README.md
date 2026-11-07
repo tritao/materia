@@ -247,6 +247,14 @@ viewport or tree toggles the selection's visibility using the eye button's undoa
 a hidden part or group stays selected so a second press shows it again. Holding Space does not
 repeat the toggle, and typing in a text field does not change visibility.
 
+The hobber viewport's **Scenario** strip uses compact choices and a dropdown in narrow panes.
+Hover or focus a choice for playback instructions; choosing the current scenario leaves the
+run intact. Scenario changes stay disabled during playback. Layout and keyboard coverage:
+
+```sh
+./haxeon/scripts/haxeon run --project=app/tests/scenario-selector/haxeon.json
+```
+
 The hobber's CNC pane shows cycle metrics and inspection qualification before profile and
 lead charts. Charts stack in narrow panes and sit side by side from 760 logical pixels.
 Sampling, coverage, assessment warnings, load assumptions and run details expand independently.
