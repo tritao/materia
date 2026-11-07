@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "selection-reference-tests"},
+  "entry": "SelectionReferenceTests",
+  "sourceRoots": ["selection-reference"],
+  "dependencies": {"app": {"path": ".."}},
+  "target": "host",
+  "outputDir": "../build/selection-reference"
+}

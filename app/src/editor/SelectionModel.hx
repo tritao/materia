@@ -5,6 +5,7 @@ import Observable;
 import app.EditorScene;
 import cadkit.Shape;
 import cadkit.parametric.TopologyFingerprint;
+import app.editor.SelectionReference.PickedFace;
 
 /** Selection state has its own revision, independent of scene content. */
 @:access(app.EditorScene) class SelectionModel implements Observable {
@@ -16,6 +17,8 @@ import cadkit.parametric.TopologyFingerprint;
   public var selectedCadFaceY:Float = 0.0;
   public var selectedCadFaceFingerprint:Null<TopologyFingerprint> = null;
   public var selectedCadFace:Null<Shape> = null;
+  /** The face under the last plain click on the selected part (any kind of part), for the status bar and its copy text. */
+  public var pickedFace:Null<PickedFace> = null;
   public var revision:Int = 1;
 
   public function new() {

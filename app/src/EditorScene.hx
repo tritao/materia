@@ -65,6 +65,8 @@ import app.CadPlateModel.CadPlateHoleEdit;
 import app.CadBracketModel;
 import app.SketchDraftCodec.SketchDraftRecord;
 import app.editor.SelectionModel;
+import app.editor.SelectionReference;
+import app.editor.SelectionReference.PickedFace;
 import app.editor.SceneModel;
 import app.editor.ScenePresentation;
 import app.editor.ScenePropertyProvider;
@@ -1786,6 +1788,7 @@ class EditorScene implements Observable {
     selection.selectedCadFaceFingerprint = null;
     selection.selectedCadFaceX = 0.0;
     selection.selectedCadFaceY = 0.0;
+    selection.pickedFace = null;
   }
 
   function refreshSelectionRevision():Void {
@@ -2061,6 +2064,28 @@ class EditorScene implements Observable {
       directionY,
       directionZ
     ));
+  }
+
+  /** `pickRayWithView` that also selects what it hit and records the picked face (the read-only viewport's click). */
+  public function selectPickedRayWithView(
+    view:SceneView,
+    originX:Float,
+    originY:Float,
+    originZ:Float,
+    directionX:Float,
+    directionY:Float,
+    directionZ:Float,
+    edgeAngularTolerance:Float = 0.0
+  ):String {
+    refreshPresentationIfStale();
+    var hit = edgeAngularTolerance > 0.0 ? spatial.pickRayWithViewEdges(view, originX, originY, originZ, directionX, directionY,
+      directionZ, edgeAngularTolerance) : spatial.pickRayWithView(view, originX, originY, originZ, directionX, directionY, directionZ);
+    var id = idForHit(hit);
+    select(id);
+    var previous = selection.pickedFace;
+    selection.pickedFace = pickedFaceOf(id, object(id), hit, hit.subelement());
+    if (!samePickedFace(previous, selection.pickedFace)) selection.changed(this);
+    return id;
   }
 
   public function pickRayWithView(
@@ -2447,9 +2472,41 @@ class EditorScene implements Observable {
     if (item != null && item.kind == "cad-preview" && sources != null && subelement >= 0
       && (subelement & 0x40000000) == 0 && sources.features.filter(feature -> "project:" + feature.occurrence
       == id).length > 0) selection.selectedCadFaceIndex = subelement;
-    if (previousFace != selectedCadFaceIndex || previousEdge != selectedCadEdgeIndex) selection.changed(this);
+    var previousPicked = selection.pickedFace;
+    selection.pickedFace = pickedFaceOf(id, item, hit, subelement);
+    if (previousFace != selectedCadFaceIndex || previousEdge != selectedCadEdgeIndex
+      || !samePickedFace(previousPicked, selection.pickedFace)) selection.changed(this);
     return id;
   }
+
+  /**
+   * The face a click landed on, for the status bar: the hit's face index (a CAD-document part's own index when it has one) with the
+   * hit point in the part's frame and, for a CAD part, the face's persistent name. Null for a click on nothing, an edge, or a stock mesh.
+   */
+  function pickedFaceOf(id:String, item:Null<EditorSceneObject>, hit:PickResult, subelement:Int):Null<PickedFace> {
+    if (item == null || id == "scene" || subelement < 0 || (subelement & 0x40000000) != 0
+      || item.kind == StockSimulationSession.KIND) return null;
+    var index = isCadKind(item.kind) ? selectedCadFaceIndex : subelement;
+    if (index < 0) return null;
+    var point:Null<Array<Float>> = null;
+    try {
+      var node = info(id).worldTransform();
+      point = SelectionReference.localPointMm([for (i in 0...16) node.element(i)], hit.worldX(), hit.worldY(), hit.worldZ());
+    } catch (error:Dynamic) {}
+    var name:Null<String> = null;
+    if (isCadKind(item.kind)) try {
+      var output = requireCadSession(id).document.outputFeatureOrNull();
+      var shape = output == null ? null : output.currentShape();
+      if (shape != null && index < shape.subshapeCount(CadKit.ShapeKind.Face)) name = shape.elementName(CadKit.ShapeKind.Face, index);
+    } catch (error:Dynamic) {}
+    return new PickedFace(index, point, name);
+  }
+
+  static function samePickedFace(a:Null<PickedFace>, b:Null<PickedFace>):Bool return a == null ? b == null : a.same(b);
+
+  /** The face recorded by the last click on the selected part, or null. */
+  public var pickedFace(get, never):Null<PickedFace>;
+  function get_pickedFace():Null<PickedFace> return selection.pickedFace;
 
   function idForHit(hit:PickResult):String {
     var id = bridge.idForNode(hit.node());
