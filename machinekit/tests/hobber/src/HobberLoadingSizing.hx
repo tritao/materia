@@ -1,3 +1,4 @@
+import machinekit.hobbing.HobberDrives;
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import machinekit.assembly.PosedParts;
@@ -55,7 +56,7 @@ class HobberLoadingSizing {
   }
   static function group(machine:FlexsplineHobber, axis:String):Map<String, Bool> {
     var def = machine.definition(), ids:Map<String, Bool> = [];
-    ids.set(def.joints.filter(j -> j.id == axis)[0].child, true);
+    ids.set(def.joints.filter(j -> j.id == HobberDrives.jointId(axis))[0].child, true);
     var changed = true;
     while (changed) {
       changed = false;
@@ -72,7 +73,7 @@ class HobberLoadingSizing {
     var state = model.initialState(),
       cache = new PosedParts(), canonical = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK);
     state.setJoint("X", machine.travel[0].upper);
-    state.setJoint("Y", 0);
+    state.setJoint(FlexsplineHobber.Y, 0);
     state.setJoint("Z", 0);
     state.setJoint(FlexsplineHobber.A, 0);
     state.forwardKinematics();

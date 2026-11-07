@@ -1,3 +1,4 @@
+import machinekit.hobbing.HobberDrives;
 import machinekit.assembly.PosedParts;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.MachineKitComponents;
@@ -37,7 +38,7 @@ class HobberDesignChecks {
       }
       arbSolid.close(); rotorSolid.close();
       var canonical = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK), centre = F.compose(canonical, cutter);
-      for (id in ["railYLeft", "railYRight"]) {
+      for (id in ["Ymodule/railLeft", "Ymodule/railRight"]) {
         var frame = F.compose(canonical,
           poses.get(id)), normal = F.transformVector(frame, 0, 1, 0), axis = F.transformVector(
             frame,
@@ -101,7 +102,7 @@ class HobberDesignChecks {
         if (cache.local(m.component).solidCount() != 1) throw 'disconnected designed weldment ${m.id}';
       }
       for (m in members) if (Std.isOfType(m.component, machinekit.motion.LinearRailBlock)) {
-        var axis = m.id.substr(5, 1), railId = "rail" + axis + (m.id.indexOf("Left") >= 0 ? "Left" : "Right");
+        var axis = StringTools.startsWith(m.id,"Ymodule/") ? "Y" : m.id.substr(5, 1), railId = HobberDrives.railMember(axis,m.id.indexOf("Left") >= 0 ? "Left" : "Right");
         var rail:machinekit.motion.LinearRail = cast members.filter(p -> p.id == railId)[0].component;
         var block:machinekit.motion.LinearRailBlock = cast m.component;
         count++;

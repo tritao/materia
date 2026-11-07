@@ -70,6 +70,10 @@ class HobberCarriageRib extends MachineComponent {
       xs[2] = 220;
       xs[4] = 325;
     }
+    // Added central fixing for the installed Y module load. The retained
+    // six-fixing FE is the baseline; the added bore needs final FE review.
+    // No bond is credited.
+    if(role!="scale")xs.push(255);
     return xs;
   }
   public function pinXs():Array<Float> return [175, 345];

@@ -1,3 +1,4 @@
+import machinekit.hobbing.HobberDrives;
 import gearkit.GearSpec;
 import gearkit.Involute;
 import materia.assembly.AssemblyFrames as F;
@@ -19,7 +20,7 @@ class HobberGERangeChecks {
         for (id in ["X", "Y", "Z"]) {
           // The supplier-drawing screw (the HZMotion BK12/BF12 ends) the supported drives are made for.
           var screw:machinekit.motion.HzMotionDrawingScrew = cast machine.components().filter(m -> m.id
-            == id + "screw")[0].component;
+            == HobberDrives.member(id,"screw"))[0].component;
           if (screw.endProfile != "BK12") throw "supported drive screw must have the BK12 end";
           count++;
         }

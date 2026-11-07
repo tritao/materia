@@ -1,24 +1,53 @@
 package machinekit.hobbing;
 
-/**
- * Y drive screw. Y travel is only +-10 mm (5 mm overtravel), so the SFU1605 is short, on the standard 51 / 11 mm ends.
- * Measured from the fixed end face: NUT_STATION is the nut body centre, the 35 mm body spans +-17.5 and the 10 mm flange
- * follows towards the floating end. At the limits (+-15) the body starts at 100-15-17.5 = 67.5 (16.5 mm from the 51 mm
- * shoulder) and the flange ends at 100+15+17.5+10 = 142.5 (10.5 mm from the BF12 housing face at 170-17 = 153).
- * The fixed end, motor and Y drive frame stay where they were; only the far end of the screw is 80 mm shorter.
- *
- * With the nut on a `NutBlock` (flange outward on the floating side, block behind it on the motor side) the flange's outer
- * face is 45 mm from the nut part's start, which sits 17.5 mm before NUT_STATION: at +15 it ends at 100+15+27.5 = 142.5.
- * The BF12 housing face is at 170-17 = 153, so 10.5 mm clear. The next shorter 10 mm step, 160, leaves 143 - 142.5 =
- * 0.5 mm, under the 2 mm running clearance, so 170 is the shortest standard length; the nut would have to move 8 mm
- * towards the motor to use 160.
- */
+/** Derived stack and swept host interfaces for the hobber Y module. */
 class HobberYLayout {
-  public static inline final SCREW_LENGTH = 170.0;
-  public static inline final NUT_STATION = 100.0;
-  /**
-   * Y axis (z 508) above the top of the nut seat bar on the Y saddle (z 458 + 16). The bar is 16 thick so that the block's M6 (12.9, tapped 10 deep, 9 mm
-   * of thread usable) pass it with a standard length: grip 16 + 9 mm engagement is an M6 x 25; at 20 mm there is none (x 25 engages 5, x 30 engages 10).
-   */
-  public static inline final NUT_BLOCK_HEIGHT = 34.0;
+  public static final JOINT="Ymodule/travel";
+  static final cached=new machinekit.cache.Once<machinekit.motion.ScrewLinearModuleSpec>();
+  public static function moduleSpec():machinekit.motion.ScrewLinearModuleSpec return cached.get(()->{
+    var first=new machinekit.motion.ScrewLinearModuleSpec(),face=HobberSaddle.headFaceX();
+    var roof=machinekit.motion.ScrewLinearModuleCover.roof(first)-first.carriageBottom()-first.carriageThickness+1.5;
+    var raw=cadkit.modeling.Part.box(roof,2000,2000),slab=raw.translated(new cadkit.modeling.Vector(face-roof/2,0,-1000));raw.close();
+    var y=0.0,loZ=0.0,hiZ=0.0;
+    for(role in ["GE-spindle-seat","GE-motor-cradle","GE-outboard-carrier"]) {
+      var part=new HobberSaddle(role).geometry(),cut=part.intersect(slab);
+      if(cut.volume()>0.001){var b=machinekit.assembly.PosedParts.boxOf(cut);y=Math.max(y,Math.max(Math.abs(b.minY),Math.abs(b.maxY)));loZ=Math.min(loZ,b.minZ);hiZ=Math.max(hiZ,b.maxZ);}
+      cut.close();part.close();
+    }
+    slab.close();
+    var bore=Bt30SpindleData.FLANGE_DIAMETER/2+3,bolt=machinekit.standard.SocketHeadCapScrew.catalog().get(first.guide.blockMountThread);
+    var reach=Math.max(first.railSpacing/2+first.guide.blockHoleSpacingAcross/2,Math.abs(first.scaleCarrierY()));
+    var lift:Float=Math.ceil((reach+1.5*bolt.diameter+Math.sqrt(Math.max(0.0,bore*bore-face*face)))/5)*5;
+    var required=lift,length=2*(y+2*(first.stroke/2+first.overtravel)+10+4+machinekit.motion.ScrewLinearModuleSpec.GAP);
+    for(i in 0...5) {
+      var width=2*(Math.max(Math.abs(loZ-lift),Math.abs(hiZ-lift))+10+4+machinekit.motion.ScrewLinearModuleSpec.GAP);
+      var s=new machinekit.motion.ScrewLinearModuleSpec("HGH15CA",20,150,80,5,length,width);
+      var next=Math.max(required,s.baseWidth/2+1.5+machinekit.motion.ScrewLinearModuleSpec.GAP+HobberSaddle.xCarriageTop()-HobberZLayout.SEAT_Z);
+      if(Math.abs(next-lift)<1e-6)return s;lift=next;
+    }
+    throw "Y stock/cover stack did not converge";
+  });
+  public static function moduleLift():Float return Math.max(requiredLift(),moduleSpec().baseWidth/2+1.5+machinekit.motion.ScrewLinearModuleSpec.GAP+HobberSaddle.xCarriageTop()-HobberZLayout.SEAT_Z);
+  static function requiredLift():Float {
+    var s=moduleSpec(),bore=Bt30SpindleData.FLANGE_DIAMETER/2+3,face=HobberSaddle.headFaceX(),bolt=machinekit.standard.SocketHeadCapScrew.catalog().get(s.guide.blockMountThread);
+    return Math.ceil((Math.max(s.railSpacing/2+s.guide.blockHoleSpacingAcross/2,Math.abs(s.scaleCarrierY()))+1.5*bolt.diameter+Math.sqrt(Math.max(0.0,bore*bore-face*face)))/5)*5;
+  }
+  public static function modulePose():materia.assembly.AssemblyRecord.AssemblyFrame {
+    var s=moduleSpec(),back=HobberSaddle.headFaceX()+s.carriageThickness+s.carriageBottom();
+    return materia.assembly.AssemblyFrames.fromRotationMatrix(back,s.centre,HobberZLayout.SEAT_Z+moduleLift(),[0.0,0,-1,-1,0,0,0,1,0]);
+  }
+  public static function headInModule():materia.assembly.AssemblyRecord.AssemblyFrame return materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.inverse(modulePose()),materia.assembly.AssemblyFrames.translation(0,0,HobberZLayout.SEAT_Z));
+  static final reliefCache=new machinekit.cache.Once<cadkit.modeling.Part>();
+  public static function sweptDeckRelief():cadkit.modeling.Part {
+    var raw=reliefCache.get(()->{
+      var deck=HobberSaddle.xDeckKeepout(machinekit.motion.ScrewLinearModuleSpec.GAP),local=machinekit.assembly.PosedParts.moved(deck,materia.assembly.AssemblyFrames.translation(0,0,-HobberZLayout.SEAT_Z));deck.close();
+      var copies:Array<cadkit.modeling.Part>=[];
+      for(i in 0...13) {
+        var angle=-HobberSwivelLayout.RANGE+2*HobberSwivelLayout.RANGE*i/12,c=Math.cos(angle),s=Math.sin(angle);
+        copies.push(machinekit.assembly.PosedParts.moved(local,materia.assembly.AssemblyFrames.fromRotationMatrix(0,0,0,[1.0,0,0,0,c,-s,0,s,c])));
+      }
+      local.close();return machinekit.component.Solids.union(copies);
+    });
+    return machinekit.assembly.PosedParts.moved(raw,headInModule());
+  }
 }

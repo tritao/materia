@@ -47,7 +47,7 @@ class HobberMotorStudy {
     var cache = new PosedParts();
     var adapter = Part.box(10, 89, 72).translated(new Vector(-53, 194.5, HobberZLayout.SEAT_Z - 36));
     var adapterMass = adapter.volume() * 1e-9 * 7850;
-    var targets = ["bed/casting", "column/casting", "Xbridge", "Zplate", "Yplate", "swivelPlate", "railYLeft", "railYRight", "YdriveFixed", "YdriveFloating", "YnutSeat", "ZdrivePad"];
+    var targets = ["bed/casting", "column/casting", "Xbridge", "Zplate", "Ymodule/carriage", "Ymodule/base", "Ymodule/railLeft", "Ymodule/railRight", "Ymodule/base", "Ymodule/base", "Ymodule/carriage", "ZdrivePad"];
     var lower = machinekit.hobbing.HobberXLayout.MIN;
     for (side in [0, -1, 1]) {
       var c = side == 0 ? 1.0 : 0.0, s = side * 1.0;
@@ -72,7 +72,7 @@ class HobberMotorStudy {
       var tilt = -mass * 9.80665 * x / 1000 + 100 * (face.x - tool.x) / 1000;
       var minimum = 1e9, nearest = "", overlap = 0.0, witness = "", sampled = 0;
       for (xx in [lower - 5, 115.0]) for (yy in [-15.0, 15.0]) for (zz in [-15.0, 195.0]) for (aa in [-15.0, 0.0, 15.0]) {
-        state.setJoint("X", xx); state.setJoint("Y", yy); state.setJoint("Z", zz); state.setJoint(FlexsplineHobber.A, aa * Math.PI / 180); state.forwardKinematics(); sampled++;
+        state.setJoint("X", xx); state.setJoint(FlexsplineHobber.Y, yy); state.setJoint("Z", zz); state.setJoint(FlexsplineHobber.A, aa * Math.PI / 180); state.forwardKinematics(); sampled++;
         var spindlePose = state.worldPose("spindle/housing");
         var rotation = F.compose(spindlePose, F.compose(rotate, F.inverse(spindlePose)));
         for (id in group) {

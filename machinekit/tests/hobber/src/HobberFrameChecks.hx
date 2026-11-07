@@ -1,3 +1,4 @@
+import machinekit.hobbing.HobberDrives;
 import machinekit.assembly.AssemblyIntegrity;
 import machinekit.assembly.PosedParts;
 import machinekit.design.DesignRequirement;
@@ -30,20 +31,10 @@ class HobberFrameChecks {
         {member: "XscaleHead", fastened: ["Xrib-scale"], faces: ["plate"]},
         // Tighten the sole after lowering the column, before fitting its removable skirt.
         {member: "Xskirt", fastened: ["Xbridge"], faces: [for (pad in machinekit.hobbing.FoundationLayout.columnSolePads()) "column-sole-"+pad.id]},
-        // The ring's heads are sunk at the plate end: its screws into the output flange are fitted before the swivel plate goes on.
-        {member: "swivelPlate", fastened: ["swivel/output"]},
-        // The outboard support's carrier is screwed to the saddle plate's face before the plate is (its driver axis passes the plate).
-        {member: "Yplate", fastened: ["outboard"]},
-        // The Y scale is bolted to the plate's front after the plate's screws into the ring (and its rails and the bracket feet) are fitted: the joints are named
-        // by their other members, since the plate itself is part of the scale's own joint.
-        {member: "Yscale", fastened: ["swivelAdapter", "railYLeft", "railYRight", "YdriveFixed", "YdriveFloating", "swivel/output"]},
+        // Indicate the housing on its carrier before mounting the carriage.
+        {member:"Ymodule/carriage",fastened:["outboard"]},
         // The servo goes on the cradle after the cradle is bolted to the seat (the floor bolts' heads are under the servo).
         {member: "spindle/motor", fastened: ["spindleSeat"]},
-        // The Y nut seat is bolted to the saddle and the nut block to the seat before the guide blocks are screwed on (their rows stand over the block's bolts)
-        // and before the nut and screw go in (the nut stands over the seat's).
-        {member: "blockYLeft", fastened: ["YnutSeat"]}, {member: "blockYLeftFront", fastened: ["YnutSeat"]},
-        {member: "blockYRight", fastened: ["YnutSeat"]}, {member: "blockYRightFront", fastened: ["YnutSeat"]},
-        {member: "Ynut", fastened: ["Yplate"]},
         // The Z scale head's screws are driven from the arm's inner face, where the eRob housing will stand: the head is screwed on before the actuator is fitted.
         {member: "swivel/housing", fastened: ["ZscaleArm"]}]};
     // Assemble the fixed shield/lid joints on the bench, lower that assembly
@@ -59,8 +50,16 @@ class HobberFrameChecks {
     // The scale heads' M4 enter from the seat side (their slots run through the head), so each head is fitted last on its carrier, with the carrier's neighbours already
     // bolted on: the Y head after the outboard support's screws (its access runs where the head stands), the Z head before the guide blocks that stand beside its arm (a driver
     // from the wall side passes the blocks' row), and, once the carrier is a separate part on the bench, the X head with the carriage off the rails.
-    options.fittedBefore = options.fittedBefore.concat([{member: "YscaleHead", fastened: FlexsplineHobber.outboardMembers()},
+    options.fittedBefore = options.fittedBefore.concat([{member: "Ymodule/scaleHead", fastened: FlexsplineHobber.outboardMembers()},
       {member: "blockZLeft", fastened: ["ZscaleArm"]}, {member: "blockZLeftUpper", fastened: ["ZscaleArm"]}]);
+    var order=options.fittedBefore;if(order==null)throw "Missing assembly order";
+    for(rule in machine.yModule.fittingOrder()) {
+      var mapped:machinekit.assembly.AssemblyIntegrity.FastenerFitOrder={member:"Ymodule/"+rule.member,fastened:[for(id in rule.fastened)"Ymodule/"+id]};
+      var faces=rule.faces;if(faces!=null)mapped.faces=faces.copy();order.push(mapped);
+    }
+    for(member in ["scaleSeat","scaleHousing","riserLeft","riserRight"])order.push({member:"Ymodule/"+member,fastened:["Ymodule/base"],faces:["actuator-output"]});
+    for(member in ["spindleSeat","outboardCarrier"])order.push({member:member,fastened:["Ymodule/carriage"],faces:["block-1-1","block-11","block1-1","block11","nut-carrier"]});
+    order.push({member:"Ymodule/scaleHead",fastened:["Ymodule/carriage"],faces:["seat","outboard-carrier"]});
     if (!sweep) options.sweepStates = [];
     return options;
   }
@@ -180,7 +179,7 @@ class HobberFrameChecks {
     var toolWork = F.transformPoint(back, tool.x, tool.y, tool.z);
     for (a in HobberScales.all()) {
       var travel = machine.travel.filter(t -> t.id == a.id)[0];
-      var housing = poses.get(a.id + "scale"), head = poses.get(a.id + "scaleHead");
+      var housing = poses.get(HobberScales.member(a.id)), head = poses.get(HobberScales.member(a.id,true));
       if (housing == null || head == null) throw 'axis ${a.id} has no scale members';
       var origin = F.transformPoint(back, housing.x, housing.y, housing.z);
       var worldAlong = F.transformVector(housing, 0, 0, 1), along = F.transformVector(back, worldAlong.x, worldAlong.y, worldAlong.z);
@@ -253,12 +252,12 @@ class HobberFrameChecks {
     var oldMass = 0.0;
     for (m in old.components()) oldMass += m.component.massProperties().mass;
     var newMass = 0.0;
-    for (id in ["swivel/housing", "swivel/output", "swivelAdapter"]) for (m in machine.components()) if (m.id == id) newMass += m.component.massProperties().mass;
+    for (id in ["swivel/housing", "swivel/output", "Ymodule/base"]) for (m in machine.components()) if (m.id == id) newMass += m.component.massProperties().mass;
     var lines = [
       'A head: ${r(mass)} kg on the output flange (${count} members), centre of mass x ${r(com.x, 1)} y ${r(com.y, 1)} z ${r(com.z, 1)} mm relative to the output face; ' +
       'overhang ${r(overhang * 1000, 1)} mm in front of the output face',
       'A head change: swivel stack was ${r(oldMass)} kg (torque motor, crossed roller, clamp, housing, platen), now actuator ${r(machine.swivel.housing.massProperties().mass + machine.swivel.output.massProperties().mass)} kg ' +
-      '+ adapter ring, ${r(newMass - machine.swivel.housing.massProperties().mass - machine.swivel.output.massProperties().mass)} kg',
+      '+ profiled ground module base, ${r(newMass - machine.swivel.housing.massProperties().mass - machine.swivel.output.massProperties().mass)} kg',
       'A output bearing: gravity tilting moment ${r(tilt)} N m, cutting ${cutting} N at the hob (${r(hobOverhang * 1000, 1)} mm out) ${r(cutTilt)} N m, together ${r(bearingMoment)} N m; ' +
       (moment == null ? "moment rating: unknown (asked ZeroErr)" : 'moment rating ${moment} N m (assumed), margin ${r(moment / bearingMoment)}x'),
       'A torque about the axis: gravity ${r(at0)} N m at 0, ${r(worst)} N m at most over +-15 deg; cutting ${r(cutTorque)} N m (${cutting} N at a ${r(hobLever * 1000, 1)} mm lever); ' +
@@ -601,7 +600,7 @@ class HobberFrameChecks {
     var xl = machine.travel.filter(t -> t.id == "X")[0].lower, xu = machine.travel.filter(t -> t.id == "X")[0].upper;
     for (s in [{x: xl, y: 0.0, z: 0.0, a: 0.0}, {x: xl, y: -10.0, z: -10.0, a: 15 * Math.PI / 180}, {x: (xl + xu) / 2, y: 7.0, z: 120.0, a: -9 * Math.PI / 180}]) {
       state.setJoint("X", s.x);
-      state.setJoint("Y", s.y);
+      state.setJoint(FlexsplineHobber.Y, s.y);
       state.setJoint("Z", s.z);
       state.setJoint("swivel/A", s.a);
       state.forwardKinematics();
@@ -694,8 +693,8 @@ class HobberFrameChecks {
     var report:Dynamic = FlexsplineHobberLayoutReport.measure(machine), lines:Array<String> = [];
     for (entry in (report.drives : Array<Dynamic>)) {
       var id:String = entry.axis, members = machine.components();
-      var motor:machinekit.motion.ServoMotor = cast members.filter(m -> m.id == id + "motor")[0].component;
-      var nut:machinekit.motion.BallNut = cast members.filter(m -> m.id == id + "nut")[0].component;
+      var motor:machinekit.motion.ServoMotor = cast members.filter(m -> m.id == HobberDrives.member(id,"motor"))[0].component;
+      var nut:machinekit.motion.BallNut = cast members.filter(m -> m.id == HobberDrives.member(id,"nut"))[0].component;
       var lead = 0.005, q = lead / (2 * Math.PI), mass:Float = entry.movingMassKg;
       var demand = machinekit.sizing.LinearDriveSizing.demand({
         massKg: mass, motors: 1, metresPerRadian: q, efficiency: nut.efficiency(), rotaryInertiaKgM2: 0.4e-4,
@@ -747,6 +746,9 @@ class HobberFrameChecks {
     }
     var machine = new FlexsplineHobber();
     Sys.println('machine built: ${machine.components().length} members in ${Math.round(Sys.time() - began)} s (${Math.round(Sys.cpuTime())} s CPU)');
+    if (args.indexOf("ymodule") >= 0) {
+      for(entry in machine.components())if(StringTools.startsWith(entry.id,"Ymodule/")) Sys.println(entry.id+" "+entry.component.massProperties().mass+" kg");
+    }
     if (args.indexOf("memos") >= 0) for (line in machinekit.cache.Memos.report()) Sys.println(line);
     if (args.indexOf("procedures") >= 0) {
       var presentation = materia.presentation.Presentations.assembled(machine.definition(), -1.1, 0.35, "hobber");
@@ -771,7 +773,7 @@ class HobberFrameChecks {
     if (args.indexOf("spindledrive") >= 0) for (line in spindleDrive(machine).lines) Sys.println(line);
     if (args.indexOf("zsaddle") >= 0) for (line in zSaddleModes(machine)) Sys.println(line);
     if (args.indexOf("spindlerelief") >= 0) for (line in spindleRelief(machine)) Sys.println(line);
-    if (args.indexOf("nutblocks") >= 0) for (d in machinekit.hobbing.HobberDrives.all()) {
+    if (args.indexOf("nutblocks") >= 0) for (d in machinekit.hobbing.HobberDrives.all().filter(axis->axis.id!="Y")) {
       var nut = new machinekit.motion.BallNut(), b = machinekit.hobbing.HobberDrives.nutBlock(d, nut), pose = machinekit.hobbing.HobberDrives.nutBlockPose(d, nut);
       function w(x:Float, y:Float, z:Float) {
         var p = F.transformPoint(pose, x, y, z);

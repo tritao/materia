@@ -74,7 +74,7 @@ class HobberEnclosurePreview {
       var step = (upper - lower) / steps;
       for (x in ranges[0]) for (y in ranges[1]) for (z in ranges[2]) for (a in 0...steps + 1) {
         state.setJoint("X", x);
-        state.setJoint("Y", y);
+        state.setJoint(FlexsplineHobber.Y, y);
         state.setJoint("Z", z);
         state.setJoint(FlexsplineHobber.A, lower + a * step);
         state.forwardKinematics();

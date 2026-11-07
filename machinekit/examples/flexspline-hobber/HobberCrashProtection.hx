@@ -1,3 +1,4 @@
+import machinekit.hobbing.HobberDrives;
 import machinekit.motion.BallNut;
 import machinekit.motion.ServoMotor;
 import machinekit.sizing.CrashProtection;
@@ -20,10 +21,10 @@ class HobberCrashProtection {
 
   /** The duty and the crash protection of axis `id` on `machine`. */
   public static function axis(machine:FlexsplineHobber, id:String):AxisCrash {
-    var motor:ServoMotor = HobberJointLoads.member(machine, id + "motor"), nut:BallNut = HobberJointLoads.member(machine, id + "nut");
+    var motor:ServoMotor = HobberJointLoads.member(machine, HobberDrives.member(id,"motor")), nut:BallNut = HobberJointLoads.member(machine, HobberDrives.member(id,"nut"));
     var g = 9.80665, q = HobberJointLoads.LEAD / (2 * Math.PI), first = switch id {
       case "X": "blockXLeft";
-      case "Y": "blockYLeft";
+      case "Y": "Ymodule/blockLeftFront";
       default: "blockZLeft";
     }, moving = HobberJointLoads.movingMass(machine, first);
     var gravity = id == "Z" ? moving * g : id == "Y" ? moving * g * Math.sin(Math.PI / 12) : 0.0;

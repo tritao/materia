@@ -45,7 +45,7 @@ class HobberTrayClearanceStudy {
       var ranges = [for (t in machine.travel)[t.lower, t.upper]];
       for (x in ranges[0]) for (y in ranges[1]) for (z in ranges[2]) for (a in [-Math.PI / 12, 0.0, Math.PI / 12]) {
         state.setJoint("X", x);
-        state.setJoint("Y", y);
+        state.setJoint(FlexsplineHobber.Y, y);
         state.setJoint("Z", z);
         state.setJoint(FlexsplineHobber.A, a);
         state.forwardKinematics();

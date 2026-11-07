@@ -423,9 +423,16 @@ class ScrewSupportUnit extends MachineComponent {
       "machinekit.motion.screw-support-unit",
       [
         ComponentRecipeSupport.choice("model", ScrewSupportCatalog.models(), "BK12"),
-        ComponentRecipeSupport.choice("geometry", [NOMINAL, "vallder", "hzmotion"], NOMINAL)
+        ComponentRecipeSupport.choice("geometry", [NOMINAL, "vallder", "hzmotion"], NOMINAL),
+        ComponentRecipeSupport.flag("footPinned",false),
+        ComponentRecipeSupport.flag("footBolted",true),
+        ComponentRecipeSupport.text("screwSize","auto")
       ],
-      v -> new ScrewSupportUnit(v.token("model"), v.token("geometry")),
+      v -> {
+        var support=new ScrewSupportUnit(v.token("model"),v.token("geometry"));
+        support.footPinned=v.boolean("footPinned");support.footBolted=v.boolean("footBolted");
+        var size=v.token("screwSize");support.screwSize=size=="auto"?null:size;return support;
+      },
       true,
       false,
       ["geometry"]
@@ -440,5 +447,5 @@ class ScrewSupportUnit extends MachineComponent {
   ).setToken(
     "material",
     materialSpec()
-  );
+  ).setBoolean("footPinned",footPinned).setBoolean("footBolted",footBolted).setToken("screwSize",screwSize==null?"auto":screwSize);
 }

@@ -5,7 +5,7 @@ import machinekit.design.DesignRequirement;
 
 /** Copies portable data and remaps every reference when nesting an assembly. */
 class DesignRequirements {
-  public static function copy(requirement:DesignRequirement, map:String -> String):DesignRequirement {
+  public static function copy(requirement:DesignRequirement, map:String -> String, ?frame:materia.assembly.AssemblyRecord.AssemblyFrame):DesignRequirement {
     var r:DesignRequirement = JsonWire.decode(JsonWire.encode(requirement));
     return switch (r) {
       case FastenerJoint(id, screw, target, through):
@@ -35,6 +35,9 @@ class DesignRequirements {
         FoundationConnection(map(id), materia.casting.FoundationJoint.FoundationJoints.remap(joint, map));
       case ServiceRemoval(id, members, steps, prerequisites, pose):
         for (j in pose) j.joint = map(j.joint);
+        if(frame!=null)for(step in steps) {
+          var v=materia.assembly.AssemblyFrames.transformVector(frame,step.direction[0],step.direction[1],step.direction[2]);step.direction=[v.x,v.y,v.z];
+        }
         ServiceRemoval(map(id), members.map(map), steps, prerequisites.map(map), pose);
       case GuardedChannel(id, channel, covers, drain):
         for (d in drain) d.drain = map(d.drain);

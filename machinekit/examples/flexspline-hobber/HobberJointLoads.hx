@@ -65,8 +65,10 @@ class HobberJointLoads {
     var row = ErobActuatorData.row(machine.swivel.housing.ratio);
     var torque:LoadCase = {peak: row.peakTorque, momentary: row.momentaryTorque};
     loads.push({label: "A axis: housing reaction on the Z saddle", between: ["Zplate", "swivel/housing"], torque: torque});
-    loads.push({label: "A axis: output flange to the adapter ring", between: ["swivelAdapter", "swivel/output"], torque: torque, utilisation: 0.8});
-    loads.push({label: "A axis: adapter ring to the swivel plate", between: ["swivelPlate", "swivelAdapter"], torque: torque});
+    var headKg=movingMass(machine,"Ymodule/base"),headWeight=headKg*g,radius=ErobActuatorData.OUTPUT_PITCH_CIRCLE/2000;
+    // Same-radius flange bolts: T + W*r bounds the most loaded bolt when
+    // direct gravity shear and torsion act together, without pin credit.
+    loads.push({label: "A output combined gravity/torsion, head "+headKg+" kg",between:["Ymodule/base","swivel/output"],torque:{peak:row.peakTorque+headWeight*radius,momentary:row.momentaryTorque+headWeight*radius},utilisation:0.8});
     // The drives' thrust. The design peak is the drive sizing's duty (`HobberCrashProtection`: 0.5 m/s2, 100 N process and 100 N friction, gravity on Z and
     // along the tilted Y, the rotor's inertia and drag) on the axis's moving mass: the sizing's peak torque through the nut's efficiency and the lead. The
     // momentary load (a jam against the stops, a collision) is what the drive's crash protection lets through: the torque limit (`CrashProtection`, 2 x the
@@ -75,7 +77,6 @@ class HobberJointLoads {
     // located against it by dowels (X and Z) or by a key on the seat (Y), and the seat is held to the Y saddle by friction alone.
     for (axis in [
       {id: "X", pad: "XdrivePad", foot: "Xfixed", carriage: "Xbridge", block: "XnutBlock", seat: null, insert: "bed/driveSeat"},
-      {id: "Y", pad: "YdriveFixed", foot: "Yfixed", carriage: "Yplate", block: "YnutBlock", seat: "YnutSeat", insert: null},
       {id: "Z", pad: "ZdrivePad", foot: "Zfixed", carriage: "Zplate", block: "ZnutBlock", seat: null, insert: "column/driveSeat"}
     ]) {
       var crash = HobberCrashProtection.axis(machine, axis.id);
@@ -91,12 +92,36 @@ class HobberJointLoads {
       loads.push({label: axis.id + " drive: screw thrust through the nut block", between: [base, axis.block], shear: {peak: design, momentary: jam}});
       if (axis.seat != null) loads.push({label: axis.id + " drive: screw thrust from the nut seat into the saddle", between: [axis.seat, axis.carriage], shear: {peak: design, momentary: jam}});
     }
+    var yCrash=HobberCrashProtection.axis(machine,"Y"),yg=yCrash.movingKg*g,ys=machine.yModule.spec;
+    var normal=yCrash.limit.designThrust,crash=yCrash.limit.thrust+yCrash.gravityN;
+    loads.push({label:"Y fixed support",between:["Ymodule/base","Ymodule/motorMount"],shear:{peak:normal,momentary:crash}});
+    loads.push({label:"Y nut carrier",between:["Ymodule/carriage","Ymodule/nutCarrier"],shear:{peak:normal,momentary:crash}});
+    loads.push({label:"Y motor pilot",between:["Ymodule/motor","Ymodule/motorMount"],torque:{peak:ys.drive.motor.rating.ratedTorque,momentary:ys.drive.motor.rating.peakTorque}});
+    // Rails transmit the A couple and transverse payload loads. Screw thrust
+    // passes through the nut/fixed support; a Y stop takes a Y-axis crash.
+    // Charge the whole moving weight and the assumed100 N guide drag to EACH
+    // rail, then add the100 N cutting bound in its worst direction.
+    var angle=machinekit.hobbing.HobberSwivelLayout.RANGE,along=yg*Math.sin(angle)+100,across=yg*Math.cos(angle);
+    var fPeak=row.peakTorque/(ys.railSpacing/1000)+along,fCrash=row.momentaryTorque/(ys.railSpacing/1000)+along;
+    var railPeak=Math.sqrt(fPeak*fPeak+across*across)+CUTTING_FORCE,railCrash=Math.sqrt(fCrash*fCrash+across*across)+CUTTING_FORCE;
+    var railLoad:LoadCase={peak:railPeak,momentary:railCrash};
+    for(side in ["Left","Right"]) {
+      loads.push({label:"Y riser "+side,between:["Ymodule/riser"+side,"Ymodule/base"],shear:railLoad});
+      loads.push({label:"Y rail "+side,between:["Ymodule/rail"+side,"Ymodule/riser"+side],shear:railLoad});
+      for(end in ["Front","Rear"])loads.push({label:"Y guide block "+side+end,between:["Ymodule/carriage","Ymodule/block"+side+end],shear:{peak:railPeak/2,momentary:railCrash/2}});
+    }
+    for(end in ["Front","Rear"]) {
+      for(side in ["Left","Right"])loads.push({label:"Y stop "+end+side,between:["Ymodule/stop"+end+side,"Ymodule/base"],shear:{peak:normal,momentary:crash}});
+      loads.push({label:"Y guard "+end,between:["Ymodule/cover"+end,"Ymodule/base"],shear:{peak:30.0,momentary:100.0}});
+      loads.push({label:"Y retainer "+end,between:["Ymodule/retainer"+end,"Ymodule/cover"+end],shear:{peak:10.0,momentary:20.0}});
+    }
+    for(pair in [["scaleSeat","base"],["scaleHousing","scaleSeat"],["scaleHead","scaleHeadCarrier"],["carriage","scaleHeadCarrier"]])loads.push({label:"Y scale "+pair[0],between:["Ymodule/"+pair[0],"Ymodule/"+pair[1]],shear:{peak:20.0,momentary:40.0}}); // ASSUMED scale/cable drag.
     // The spindle seat on the Y saddle's plate carries the weight of the seat, cradle and spindle (with the Y axis's 0.5 m/s2) and the cutting force; a jammed
     // hob loads it with the tangential force the servo's peak torque makes at the hob's radius.
     var mass = massOf(machine, ["spindleSeat", "motorCradle", "spindle"]);
     var jam = machine.spindle.jointTorque(machine.spindle.motor.rating.peakTorque) / HOB_RADIUS;
     var weight = mass * (g + 0.5);
-    loads.push({label: "Spindle seat on the Y saddle plate", between: ["Yplate", "spindleSeat"], shear: {peak: weight + CUTTING_FORCE, momentary: weight + jam}});
+    loads.push({label: "Spindle seat on the Y saddle plate", between: ["Ymodule/carriage", "spindleSeat"], shear: {peak: weight + CUTTING_FORCE, momentary: weight + jam}});
     // The cradle on the seat carries the belt's pull on the servo at its peak torque (twice the pretension, `HobberFrameChecks.spindleDrive`) and the servo group's weight.
     var pull = 2 * machinekit.hobbing.HobSpindle.pretension(machine.spindle.motor.rating.peakTorque, machine.spindle.motorPulley.pitchDiameter);
     loads.push({
@@ -105,7 +130,7 @@ class HobberJointLoads {
       shear: {peak: pull + massOf(machine, ["motorCradle", "spindle/motor"]) * g}
     });
     var outboardWeight = massOf(machine, FlexsplineHobber.outboardMembers().concat(["outboardInnerSpacer", "outboardLocknut"])) * (g + 0.5);
-    loads.push({label: "Outboard carrier on the Y saddle", between: ["outboardCarrier", "Yplate"],
+    loads.push({label: "Outboard carrier on the Y saddle", between: ["outboardCarrier", "Ymodule/carriage"],
       shear: {peak: CUTTING_FORCE + outboardWeight, momentary: jam + outboardWeight}});
     loads.push({label: "Indicated housing on its carrier", between: ["outboard", "outboardCarrier"],
       shear: {peak: CUTTING_FORCE + outboardWeight, momentary: jam + outboardWeight}});

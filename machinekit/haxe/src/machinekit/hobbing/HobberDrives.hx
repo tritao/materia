@@ -60,16 +60,21 @@ class HobberDrives {
     return axis;
   });
 
-  /** Y: screw along -y at z 508 (rel 145), supports on brackets standing on the swivel plate's top edge. */
-  public static function y():HobberDriveAxis return yCache.get(() -> {
-    var axis:HobberDriveAxis = {id: "Y", drive: SupportedScrewDrive.m60dBk12(true),
-      axis: {start: [70.0, HobberYLayout.NUT_STATION, 508.0], direction: [0.0, -1.0, 0], normal: [1.0, 0, 0]},
-      length: HobberYLayout.SCREW_LENGTH, nutStation: partStart(HobberYLayout.NUT_STATION), nutUp: [0.0, 0, -1], blockHeight: HobberYLayout.NUT_BLOCK_HEIGHT};
-    // The floating bracket is 59 mm long (it stops short of the nut seat's travel): M5 screws in the BF12's 6.6 mm holes keep 1.5 diameters to its ends, M6 would not.
-    axis.drive.floating.screwSize = "M5";
-    pin(axis);
-    return axis;
+  /** Y is the library module's screw in the unchanged hobber work frame. */
+  public static function y():HobberDriveAxis return yCache.get(()->{
+    var s=HobberYLayout.moduleSpec(),pose=HobberYLayout.modulePose(),local=s.axis();
+    var p=F.transformPoint(pose,local.start[0],local.start[1],local.start[2]);
+    var d=F.transformVector(pose,local.direction[0],local.direction[1],local.direction[2]);
+    var n=F.transformVector(pose,local.normal[0],local.normal[1],local.normal[2]);
+    var up=F.transformVector(F.compose(pose,s.nutPose()),0,1,0);
+    return {id:"Y",drive:s.drive,axis:{start:[p.x,p.y,p.z],direction:[d.x,d.y,d.z],normal:[n.x,n.y,n.z]},length:s.screwLength,nutStation:s.nutStation,nutUp:[up.x,up.y,up.z],blockHeight:s.carrierHeight()};
   });
+  public static function jointId(id:String):String return id=="Y"?HobberYLayout.JOINT:id;
+  public static function member(id:String,role:String):String {
+    if(id=="Y")return "Ymodule/"+switch(role){case "mount":"motorMount";case "floating":"floatingBearing";case "ring":"floatingRing";case _:role;};
+    return id+switch(role){case "mount":"fixed";case "nutCarrier":"nutBlock";case "motorShaft":"motor-shaft";case "ring":"floatingRing";case _:role;};
+  }
+  public static function railMember(id:String,side:String):String return id=="Y"?"Ymodule/rail"+side:"rail"+id+side;
 
   /** Both supports of an axis are located by dowels, reamed through the foot and the seat at assembly (`ScrewSupportUnit.footPinned`). */
   static function pin(axis:HobberDriveAxis):Void {
@@ -100,6 +105,7 @@ class HobberDrives {
   public static function all():Array<HobberDriveAxis> return [x(), y(), z()];
 
   public static function poses(d:HobberDriveAxis):Map<String, AssemblyFrame> {
+    if(d.id=="Y") {var at=d.drive.poses(d.axis,d.length,d.nutStation);at.set("nut",F.compose(HobberYLayout.modulePose(),HobberYLayout.moduleSpec().nutPose()));return at;}
     var at = d.drive.poses(d.axis, d.length, d.nutStation);
     var nut = at.get("nut");
     if (nut == null) throw "Hobber drive lost its nut pose";
@@ -107,23 +113,11 @@ class HobberDrives {
     return at;
   }
 
-  /**
-   * The nut block for this axis, on the barrel side of the nut's flange, its base end `blockHeight` from the axis. X and Z blocks are pinned (two dowels in the
-   * base end locate them against a crash); the Y block has no room for dowels (its screws are 16 mm apart on a 20 mm base) and is located by a key on its seat
-   * (`HobberSaddle.KEY_HEIGHT`).
-   */
-  public static function nutBlock(d:HobberDriveAxis, nut:BallNut):NutBlock return new NutBlock("HOBBER-" + d.id + "-NUT-BLOCK", nut, d.blockHeight, null, d.id == "Y" ? Y_BLOCK_THICKNESS : null,
-    d.id == "Y" ? Y_BLOCK_BASE_EDGE : NutBlock.BASE_EDGE, d.id == "Y" ? Y_BLOCK_BASE_DEPTH : NutBlock.BASE_DEPTH, d.id != "Y");
-
-  /**
-   * The Y nut block's base holes stand 16 mm apart (x 70 +- 8), not 40: its seat sits between the Y saddle's plate (x to 57) and the swivel plate (x from 85), and
-   * bolts at the usual 40 would stand over each, with no room for a head under the seat or a driver below it.
-   */
-  public static inline final Y_BLOCK_BASE_EDGE = 22.0;
-  /** ... and 10 deep, not 12: close to the middle the holes would reach the nut flange's lower bolt (the web check of `NutBlock`). */
-  public static inline final Y_BLOCK_BASE_DEPTH = 10.0;
-  /** ... and 20 thick, not 16: the seat is only 42 wide (3 mm short of the swivel plate), and the 16 mm block bore on it less than the 625 mm2 a mate that carries members wants. */
-  public static inline final Y_BLOCK_THICKNESS = 20.0;
+  /** X and Z nut blocks; Y uses the module's integral nut carrier. */
+  public static function nutBlock(d:HobberDriveAxis, nut:BallNut):NutBlock {
+    if(d.id=="Y") throw "Y uses ScrewLinearModule nutCarrier";
+    return new NutBlock("HOBBER-"+d.id+"-NUT-BLOCK",nut,d.blockHeight,null,null,NutBlock.BASE_EDGE,NutBlock.BASE_DEPTH,true);
+  }
 
   /** The nut block's world frame: the nut's pose composed with the nut's flange seat. */
   public static function nutBlockPose(d:HobberDriveAxis, nut:BallNut):AssemblyFrame {

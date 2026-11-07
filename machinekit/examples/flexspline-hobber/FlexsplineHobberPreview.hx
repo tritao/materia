@@ -16,7 +16,7 @@ class FlexsplineHobberPreview {
     var state = model.initialState("flexspline-hobber-detailed"),
       job = FlexsplineHobberCam.job(machine), pass = job.passes[job.passes.length - 1];
     state.setJoint("X", pass.centreDistance);
-    state.setJoint("Y", pass.shift);
+    state.setJoint(FlexsplineHobber.Y, pass.shift);
     state.setJoint("Z", machine.spec.faceWidth / 2);
     state.setJoint(FlexsplineHobber.A, -machine.hob.design.leadAngle);
     state.setJoint(FlexsplineHobber.B, 0);

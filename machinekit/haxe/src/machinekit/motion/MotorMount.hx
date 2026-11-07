@@ -542,11 +542,13 @@ class MotorMount extends MachineComponent {
       P.choice("model", models(), "M60D-BK12-C"),
       P.choice("revision", revisions(), HzMotionCatalog.revision()),
       P.choice("bearingGrade", ["unspecified", "C3", "C4", "C5"], "unspecified"),
-      P.choice("geometry", [NOMINAL, "hzmotion", "vallder"], NOMINAL)
+      P.choice("geometry", [NOMINAL, "hzmotion", "vallder"], NOMINAL),
+      P.flag("footPinned",false)
     ], v -> {var model = v.token("model"), revision = v.token("revision");
     // A revision belongs to one maker's tables; the default follows the model.
     if ((rbkModels().indexOf(model) >= 0) != (revision == "vallder-rbk-v1")) revision = defaultRevision(model);
-    return new MotorMount(model, revision, v.token("geometry"), v.token("bearingGrade"));
+    var mount=new MotorMount(model, revision, v.token("geometry"), v.token("bearingGrade"));
+    mount.footPinned=v.boolean("footPinned");return mount;
     }, true, false, ["geometry"], false).procured(_ -> Buy(null, null, null)));
   }
 
@@ -561,5 +563,5 @@ class MotorMount extends MachineComponent {
   ).setToken(
     "geometry",
     drawing
-  );
+  ).setBoolean("footPinned",footPinned);
 }

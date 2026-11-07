@@ -61,12 +61,6 @@ class HobberScales {
    * moving: the bar's edge on that side stops `RUNNING_CLEARANCE` short of the head (1.2 mm inside the reading face) and it runs on past the housing's other face.
    */
   public static inline final SEAT_BAR_WIDTH = 32.0;
-  /** The relief milled in the swivel plate's front face under the Y head's path, mm: the head runs beside the housing at its seat plane (the plate's face), so the plate must stand back from it. */
-  public static inline final PLATE_RELIEF = 3.0;
-  /** Margin the relief leaves on each side of the head, mm. */
-  public static inline final PLATE_RELIEF_MARGIN = 2.5;
-  /** How far the relief runs past the housing's ends, mm: the head's body (97.5 long) overhangs the measuring window's ends, and the 230 mm plate's edge is 11 mm past the housing's. */
-  public static inline final PLATE_RELIEF_RUNOUT = 11.0;
   /** Running gap the sweep wants between a moving part and a fixed one, mm (`AssemblyIntegrity`'s 2), and the clearance kept just beyond it. */
   public static inline final RUNNING_CLEARANCE = 2.2;
   /** Inner face of the column channel wall (work y), mm: the casting's wall stands at +120 and -120. */
@@ -80,11 +74,6 @@ class HobberScales {
    * stands at x 219.7..232.7, reached by an arm from the saddle.
    */
   public static inline final Z_COLUMN_X = 200.0;
-  /**
-   * Where the Y scale's hole line runs across the plate, from the A axis line (z), mm. The head body and the housing (x 67..85) must clear the heads of the ring's four
-   * M6 (Ø10 at 33.6 mm from the axis on each diagonal, standing 6 mm proud of the plate's front face): the housing and head together (46.9 mm) fit between them, z 335..392.
-   */
-  public static inline final Y_HOLE_LINE_Z = -10.0;
   /**
    * Where the X scale's hole line runs along y, mm: the housing covers y 161.3..193.5, clear of the guide blocks (y 196) by the running gap, and the bar y 162.5..194.5 (they reach 2.5
    * mm and 3.7 mm past the beam's inner edge at y 165: the flat strip between that edge and the rail seat at y 195 is 30 mm wide, narrower than the 32.2 mm housing).
@@ -109,7 +98,14 @@ class HobberScales {
   };
 
   public static function x():HobberScaleAxis return axis("X");
-  public static function y():HobberScaleAxis return axis("Y");
+  public static function y():HobberScaleAxis return cache.get("Y",()->{
+    var s=HobberYLayout.moduleSpec(),mount=HobberYLayout.modulePose();
+    var hp=F.compose(mount,s.scalePose()),tp=F.compose(mount,s.scalePose(true));
+    var normal=F.transformVector(hp,0,1,0),along=F.transformVector(hp,0,0,1),across=F.transformVector(hp,-1,0,0);
+    var body=new machinekit.motion.ScrewLinearModulePart(s.values().setToken("role","scaleSeat")).geometry(),b=machinekit.assembly.PosedParts.boxOf(body);body.close();
+    return {id:"Y",housing:s.scaleHousing,head:s.scaleHead,housingPose:hp,headPose:tp,toSeat:[normal.x,normal.y,normal.z],along:[along.x,along.y,along.z],across:[across.x,across.y,across.z],seatBar:worldBox(mount,[b.minX,b.maxX,b.minY,b.maxY,b.minZ,b.maxZ])};
+  });
+  public static function member(id:String,head:Bool=false):String return id=="Y"?"Ymodule/"+(head?"scaleHead":"scaleHousing"):id+(head?"scaleHead":"scale");
   public static function z():HobberScaleAxis return axis("Z");
   public static function all():Array<HobberScaleAxis> return [x(), y(), z()];
 
@@ -120,9 +116,6 @@ class HobberScales {
         // The head centre is at x 262 at joint zero; the housing starts so the head's travel sits in the window.
         var at = 262.0 - startFor;
         {toSeat: [0.0, 0, -1], along: [1.0, 0, 0], start: [at, X_HOLE_LINE_Y, BED_BEAM_TOP + SEAT_BAR], side: 1.0, plate: false, headCentre: startFor, air: "end", bend: "none"};
-      case "Y":
-        // The joint runs along -y; the scale is read along +y (the sign is set in the drive). The plate is 230 long (y +-115).
-        {toSeat: [1.0, 0, 0], along: [0.0, 1, 0], start: [85.0, -104.0, HobberZLayout.SEAT_Z + Y_HOLE_LINE_Z], side: 1.0, plate: true, headCentre: startFor, air: "end", bend: "+x"};
       case "Z":
         var at = HobberZLayout.SEAT_Z + 50.0 - startFor, w = zWallSign();
         {toSeat: [0.0, w, 0], along: [0.0, 0, 1], start: [Z_COLUMN_X, w * (COLUMN_WALL_Y - SEAT_BAR), at], side: w, plate: false, headCentre: startFor, air: "end", bend: "none"};
@@ -164,11 +157,7 @@ class HobberScales {
     return result;
   }
 
-  /** The relief in the swivel plate under the Y head's path as {x0, x1, y0, y1, z0, z1}: `PLATE_RELIEF` deep from the front face, the head's width plus a margin each side, the length of the housing and its runout (open at the plate's edges). */
-  public static function reliefBox(a:HobberScaleAxis):Array<Float> {
-    var hb = a.head.bodyBox(), t = a.housing.series.housingThickness;
-    return worldBox(a.housingPose, [hb[0] - PLATE_RELIEF_MARGIN, hb[1] + PLATE_RELIEF_MARGIN, t, t + PLATE_RELIEF, -PLATE_RELIEF_RUNOUT, a.housing.overallLength() + PLATE_RELIEF_RUNOUT]);
-  }
+
 
   /** A box of a part frame ({x0, x1, y0, y1, z0, z1}) as the box of the work frame that holds it, grown by `grow`. */
   public static function worldBox(pose:AssemblyFrame, box:Array<Float>, grow:Float = 0):Array<Float> {

@@ -17,9 +17,9 @@ class ScrewLinearModuleCover extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return ScrewLinearModulePart.parameters().filter(p->p.name!="role").concat([P.choice("role",ROLES,"coverFront")]);
   public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.motion.screw-module-cover",parameters(),v->new ScrewLinearModuleCover(v),false,false,null,false)
     .numbered(numberFor).procured(v->StringTools.startsWith(v.token("role"),"lip")?Buy(null,null,null):Make(StringTools.startsWith(v.token("role"),"mount")?"machined cover interface":"cut sheet / guard forming")));
-  static function numberFor(v:ComponentValues):String return PartNumbers.geometry("SCREW-MODULE-COVER",v.token("role"),v.token("profile")+"|"+v.number("stroke")+"|"+v.number("railSpacing")+"|"+v.number("blockSpacing")+"|"+v.number("overtravel"));
+  static function numberFor(v:ComponentValues):String return PartNumbers.geometry("SCREW-MODULE-COVER",v.token("role"),v.token("profile")+"|"+v.number("stroke")+"|"+v.number("railSpacing")+"|"+v.number("blockSpacing")+"|"+v.number("overtravel")+"|"+v.number("hostLength")+"|"+v.number("hostWidth"));
   public function new(?overrides:ComponentValues) {
-    var v=P.resolve(parameters(),overrides);spec=new ScrewLinearModuleSpec(v.token("profile"),v.number("stroke"),v.number("railSpacing"),v.number("blockSpacing"),v.number("overtravel"));role=v.token("role");front=StringTools.endsWith(role,"Front");
+    var v=P.resolve(parameters(),overrides);spec=new ScrewLinearModuleSpec(v.token("profile"),v.number("stroke"),v.number("railSpacing"),v.number("blockSpacing"),v.number("overtravel"),v.number("hostLength"),v.number("hostWidth"));role=v.token("role");front=StringTools.endsWith(role,"Front");
     super(numberFor(v),"Screw module "+role,isLip()?"polyurethane PU":isMount()?"steel":"stainless A2-70",false,v);
     if(!isLip()&&!isMount())addFacet(isCover()?ManufacturingRoute.foldedSheet(1.5,2,1.5):ManufacturingRoute.cutPlate());
     if(isMount())addFacet(StringTools.startsWith(role,"mountFixed")?ManufacturingRoute.milled(2,"general",[],2*ScrewLinearModuleBellows.plan(spec).plateHalf()):ManufacturingRoute.cutPlate());
@@ -84,9 +84,9 @@ class ScrewLinearModuleCover extends MachineComponent {
         // the adjacent side-wall corner for its full overtravel envelope.
         var stub=s.scaleHead.cableStubEnd(),at=F.transformPoint(s.scalePose(true),stub[0],stub[1],stub[2]);
         var wire=s.scaleHead.series.cableDiameter/2+ScrewLinearModuleSpec.GAP,r=SealedScaleData.CABLE_BEND_RADIUS;
-        var rise=Math.max(0.0,Math.min(r,s.baseWidth/2-at.y-wire));
+        var rise=Math.max(0.0,Math.min(r,s.baseWidth/2-Math.abs(at.y)-wire));
         var end=at.x-Math.sqrt(r*r-(r-rise)*(r-rise))+s.stroke/2+s.overtravel+wire;
-        if(end>lo)body=Solids.cut(body,[box(lo-1,end,s.baseWidth/2-1,s.baseWidth/2+3,at.z-wire,at.z+wire)]);
+        if(end>lo&&Math.abs(at.y)+r+s.scaleHead.series.cableStraight+wire>s.baseWidth/2)body=Solids.cut(body,[box(lo-1,end,-s.baseWidth/2-3,-s.baseWidth/2+1,at.z-wire,at.z+wire)]);
       }
     } else {
       var x0=front?s.centre-a:s.centre,x1=front?s.centre:s.centre+a;

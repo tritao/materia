@@ -21,7 +21,7 @@ class HobberLoadingChecks {
       machine.addTo(model, "");
       var state = model.initialState();
       state.setJoint("X", HobberXLayout.RETRACT);
-      state.setJoint("Y", 0);
+      state.setJoint(FlexsplineHobber.Y, 0);
       state.setJoint("Z", 0);
       state.setJoint(FlexsplineHobber.B, 0);
       var members = machine.components(), cup = members.filter(m -> m.id == "blank")[0], cache = new PosedParts();

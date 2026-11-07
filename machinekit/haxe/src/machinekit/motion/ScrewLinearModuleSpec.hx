@@ -11,6 +11,8 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 class ScrewLinearModuleSpec {
   public final scaleHousing:SealedScalePart;
   public final scaleHead:SealedScalePart;
+  public final hostLength:Float;
+  public final hostWidth:Float;
   public final profile:String;
   public final stroke:Float;
   public final overtravel:Float;
@@ -34,14 +36,16 @@ class ScrewLinearModuleSpec {
   public final carrierWidth:Float;
   public final carrierThickness:Float;
   public static inline final GAP=2.0;
-  public function new(profile:String="HGH15CA",stroke:Float=20,railSpacing:Float=150,blockSpacing:Float=80,overtravel:Float=5) {
+  public function new(profile:String="HGH15CA",stroke:Float=20,railSpacing:Float=150,blockSpacing:Float=80,overtravel:Float=5,hostLength:Float=0,hostWidth:Float=0) {
     for(n in [stroke,railSpacing,blockSpacing,overtravel])if(!Math.isFinite(n)||n<=0)throw "Invalid linear module dimensions";
+    for(n in [hostLength,hostWidth])if(!Math.isFinite(n)||n<0)throw "Invalid host footprint";
+    this.hostLength=hostLength;this.hostWidth=hostWidth;
     this.profile=profile;this.stroke=stroke;this.overtravel=overtravel;this.railSpacing=railSpacing;this.blockSpacing=blockSpacing;
     var row=LinearRailSystem.catalog().get(profile);if(row==null)throw "Unknown module guide: "+profile;guide=row;
     drive=SupportedScrewDrive.m60dBk12(true);drive.fixed.footPinned=true;drive.floating.footPinned=true;
     var nut=new BallNut(), mount=drive.fixed.spec, bolt=machinekit.standard.SocketHeadCapScrew.catalog().get(guide.blockMountThread);
     var scale=SealedScalePart.pair("JFT-40",stroke+2*overtravel,"3","5",false,
-      new ComponentValues().setToken("airPort","end").setToken("cableBend",stroke<=20?"-x":"-y"));
+      new ComponentValues().setToken("airPort","end").setToken("headSide","-x").setToken("cableBend",stroke<=20?"+x":"-y"));
     scaleHousing=scale.housing;scaleHead=scale.head;
     baseThickness=GroundStock.atLeast("plate",16);carriageThickness=GroundStock.atLeast("plate",12);
     carrierThickness=GroundStock.atLeast("flat bar",16);
@@ -50,9 +54,8 @@ class ScrewLinearModuleSpec {
     var widths=GroundStock.barWidths().filter(w->w>=Math.max(guide.railWidth,riserHeight));
     if(widths.length==0)throw "No ground riser section";riserWidth=widths[0];
     railLength=Math.ceil((blockSpacing+guide.blockLength+stroke+2*overtravel+2*guide.railEndMargin)/20)*20;
-    carriageLength=Math.ceil((blockSpacing+guide.blockHoleSpacingAlong+3*bolt.diameter)/10)*10;
-    carriageWidth=Math.ceil(Math.max(railSpacing+guide.blockHoleSpacingAcross+3*bolt.diameter,2*(scaleHeadY()+scaleHead.series.headWidth/2))/10)*10;
-    baseWidth=Math.ceil(Math.max(railSpacing+riserWidth+24,2*(scaleSeatY()+20+GAP))/10)*10;
+    carriageLength=Math.ceil(Math.max(hostLength,blockSpacing+guide.blockHoleSpacingAlong+3*bolt.diameter)/10)*10;
+    carriageWidth=Math.ceil(Math.max(hostWidth,Math.max(railSpacing+guide.blockHoleSpacingAcross+3*bolt.diameter,2*(Math.abs(scaleHeadY())+scaleHead.series.headWidth/2)))/10)*10;
     if(railSpacing-riserWidth<mount.width+2*GAP)throw "Module rails do not clear the fixed support";
     var half=stroke/2+overtravel, nutLength=nut.bodyLength+nut.flangeThickness;
     var fixedReach=Math.max(nutLength+carrierThickness/2,carriageLength/2);
@@ -68,16 +71,26 @@ class ScrewLinearModuleSpec {
     for(hole in holes)max=Math.max(max,hole.position.x+9);
     baseMin=Math.floor(Math.min(scaleStart()-GAP,Math.min(Math.min(railStart(),drive.floatingEnd-drive.floating.length/2)-10,centre-half-carriageLength/2-60-10))/10)*10;
     baseMax=Math.ceil(Math.max(scaleStart()+scaleHousing.overallLength()+GAP,Math.max(max,centre+half+carriageLength/2+60+10))/10)*10;
+    var width:Float=Math.ceil(Math.max(carriageWidth+7,Math.max(railSpacing+riserWidth+24,2*(Math.abs(scaleSeatY())+20+GAP)))/10)*10;
+    if(stroke<=20) {
+      var stub=scaleHead.cableStubEnd(),at=F.transformPoint(scalePose(true),stub[0],stub[1],stub[2]);
+      var wire=scaleHead.series.cableDiameter/2+GAP,r=SealedScaleData.CABLE_BEND_RADIUS;
+      var rise=Math.max(0.0,Math.min(r,width/2-Math.abs(at.y)-wire));
+      // An end-exiting cable needs only corner relief. A long host body
+      // contains the complete bend/tail instead of putting a slot in its wall.
+      if(baseMin<at.x-Math.sqrt(r*r-(r-rise)*(r-rise)))width=Math.max(width,2*(Math.abs(at.y)+r+scaleHead.series.cableStraight+wire));
+    }
+    baseWidth=Math.ceil(width/10)*10;
   }
   public function scaleSeatThickness():Float {
     var screw=machinekit.standard.SocketHeadCapScrew.catalog().get("M8");
     return GroundStock.atLeast("flat bar",1.75*screw.diameter+2*screw.pitch+0.3*screw.diameter+1);
   }
-  public function scaleReadingY():Float return railSpacing/2+guide.blockWidth/2+GAP+scaleHead.series.headWidth+scaleHousing.gap();
-  public function scaleHoleY():Float return scaleReadingY()+scaleHousing.series.housingWidth-(scaleHousing.series.holeOffset??scaleHousing.series.housingWidth/2);
-  public function scaleSeatY():Float return scaleReadingY()+GAP+20;
-  public function scaleHeadY():Float return scaleReadingY()-scaleHousing.gap()-scaleHead.series.headWidth/2;
-  public function scaleCarrierY():Float return scaleHeadY()-1.0;
+  public function scaleReadingY():Float return -(railSpacing/2+guide.blockWidth/2+GAP+scaleHead.series.headWidth+scaleHousing.gap());
+  public function scaleHoleY():Float return scaleReadingY()-scaleHousing.series.housingWidth+(scaleHousing.series.holeOffset??scaleHousing.series.housingWidth/2);
+  public function scaleSeatY():Float return scaleReadingY()-GAP-20;
+  public function scaleHeadY():Float return scaleReadingY()+scaleHousing.gap()+scaleHead.series.headWidth/2;
+  public function scaleCarrierY():Float return scaleHeadY()+1.0;
   public function driveBayEnd():Float {
     var end=railStart()+railLength+10;
     for(hole in drive.seatHoles(axis(),screwLength))end=Math.max(end,hole.position.x+9);
@@ -113,5 +126,5 @@ class ScrewLinearModuleSpec {
     return [railStart()+h[0]+guide.railHolePitch/4,railStart()+h[h.length-1]-guide.railHolePitch/4];
   }
   public function values():ComponentValues return new ComponentValues().setToken("profile",profile).setNumber("stroke",stroke)
-    .setNumber("railSpacing",railSpacing).setNumber("blockSpacing",blockSpacing).setNumber("overtravel",overtravel);
+    .setNumber("railSpacing",railSpacing).setNumber("blockSpacing",blockSpacing).setNumber("overtravel",overtravel).setNumber("hostLength",hostLength).setNumber("hostWidth",hostWidth);
 }

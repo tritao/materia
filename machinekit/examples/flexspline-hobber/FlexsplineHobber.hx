@@ -30,6 +30,7 @@ class FlexsplineHobber extends MachineAssembly {
   /** The servo's own joint: the belt couples it to B, and the hob drive is bound on it. */
   public static final B_MOTOR = "spindle/motor-turn";
   public static final A = "swivel/A";
+  public static final Y = HobberYLayout.JOINT;
   /**
    * ASSUMED holding torque of the A brake, N m at the output flange. ZeroErr has not published it (asked 2026-11-03); this is the
    * actuator's rated output torque (87 N m, ratio 100), a placeholder for a spring-applied holding brake of this class. Replace it from
@@ -47,6 +48,7 @@ class FlexsplineHobber extends MachineAssembly {
   public final tableSpec:machinekit.motion.RotaryAxisSpec;
   public final spindle:HobSpindle;
   public final swivel:ErobActuator;
+  public final yModule:ScrewLinearModule;
   public final travel:Array<HobberTravel>;
   public final workOrigin:AssemblyFrame;
   public final precisionMounts:Array<{name:String, parent:String}> = [];
@@ -286,53 +288,25 @@ class FlexsplineHobber extends MachineAssembly {
         fixAt("Zplate", new HobberSaddle("GE-Z-saddle"), F.translation(centre, 0, HobberZLayout.SEAT_Z), id, face);
       } else fixAt(id, block, pose, "Zplate", face);
     }
-    // A axis (FRAME_PLAN R1): the eRob 110 actuator, its housing in a pocket cut into the Z saddle from behind, a turned adapter ring on its
-    // output flange and the ground swivel plate on the ring. The actuator's own brake holds the head; its holding torque is an assumption.
+    // A axis: eRob housing in the Z saddle pocket, with the ground Y module base directly on its output flange. The actuator's own brake holds the head; its holding torque is an assumption.
     group("A swivel");
     swivel = new ErobActuator(100, 20, true, "A", new ComponentValues().setNumber("brakeHoldingTorque", A_BRAKE_HOLDING), HobberSwivelLayout.RANGE, A_ACCELERATION);
     includeAt("swivel", swivel, HobberSwivelLayout.pose());
     fixExisting("swivel-mount", "Zplate", "swivel/housing", F.alongY(HobberSwivelLayout.OUTPUT_X + 6, 0, HobberZLayout.SEAT_Z, 1, 0, 0));
     var e0 = HobberSwivelLayout.SPINDLE_ROTATION;
-    fixAt(
-      "swivelAdapter",
-      new HobberSaddle("GE-swivel-adapter"),
-      F.translation(centre, 0, HobberZLayout.SEAT_Z),
-      "swivel/output",
-      F.alongY(HobberSwivelLayout.OUTPUT_X, 0, HobberZLayout.SEAT_Z, -1, 0, 0)
-    );
-    fixAt(
-      "swivelPlate",
-      new HobberSaddle("GE-swivel-plate"),
-      F.translation(centre, 0, HobberZLayout.SEAT_Z),
-      "swivelAdapter",
-      F.alongY(HobberSwivelLayout.PLATE_X, 0, HobberZLayout.SEAT_Z, -1, 0, 0)
-    );
     group("Y axis");
-    for (side in [-1, 1]) fixAt(
-      side < 0 ? "railYLeft" : "railYRight",
-      LinearRail.metric("HGH15CA", 220),
-      AxisBuilder.orient(centre + 70, 110, HobberZLayout.SEAT_Z + side * 60, [-1.0, 0, 0], [0.0, -1, 0]),
-      "swivelPlate",
-      F.alongY(centre + 85, 110, HobberZLayout.SEAT_Z + side * 60, -1, 0, 0)
-    );
-    for (side in [-1, 1]) for (row in [-40, 40]) {
-      var id = "blockY" + (side < 0 ? "Left" : "Right") + (row < 0 ? "" : "Front");
-      var block = LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER);
-      var pose = AxisBuilder.orient(centre + 70, row, HobberZLayout.SEAT_Z + side * 60, [-1.0, 0, 0], [0.0, -1, 0]);
-      var face = F.alongY(centre + 57, row, HobberZLayout.SEAT_Z + side * 60, -1, 0, 0);
-      if (id == "blockYLeft") {
-        addComponent(id, block);
-        zero.set(id, pose);
-        moving("Y", Prismatic, "railYLeft", id, F.translation(centre + 70, 0, HobberZLayout.SEAT_Z), [0.0, -1, 0], 0, -10, 10);
-        fixAt("Yplate", new HobberSaddle("GE-Y-saddle"), F.translation(centre, 0, HobberZLayout.SEAT_Z), id, face);
-      } else fixAt(id, block, pose, "Yplate", face);
-    }
+    var yGuards=new Map<String,MachineComponent>();
+    for(role in ["coverFront","coverRear"])yGuards.set(role,new HobberYPart(new ComponentValues().setToken("role",role)));
+    yModule=new ScrewLinearModule(HobberYLayout.moduleSpec(),new HobberYPart(new ComponentValues().setToken("role","base")),new HobberYPart(new ComponentValues().setToken("role","carriage")),yGuards);
+    yModule.takeServiceRemoval("carriage");
+    includeAt("Ymodule",yModule,HobberYLayout.modulePose());
+    fixExisting("Ymodule-mount","swivel/output","Ymodule/base",F.alongY(HobberSwivelLayout.OUTPUT_X,0,HobberZLayout.SEAT_Z,-1,0,0));
     group("B spindle");
     spindle = new HobSpindle();
     includeAt("spindle", spindle, F.fromRotationMatrix(centre, HobberSwivelLayout.SPINDLE_Y, HobberZLayout.SEAT_Z, e0));
     // One milled split-clamp block holds the Ø80 cartridge (FRAME_PLAN R2): bore with a slit up the +z side, three clamp screws across it,
     // four M8 and two dowels into the Y saddle's plate.
-    fixAt("spindleSeat", new HobberSaddle("GE-spindle-seat"), F.translation(centre, 0, HobberZLayout.SEAT_Z), "Yplate",
+    fixAt("spindleSeat", new HobberSaddle("GE-spindle-seat"), F.translation(centre, 0, HobberZLayout.SEAT_Z), "Ymodule/carriage",
       F.alongY(centre + 45, 150, HobberZLayout.SEAT_Z, 1, 0, 0));
     fixExisting("spindle-mount", "spindleSeat", "spindle/housing", F.alongY(centre + 40, 150, HobberZLayout.SEAT_Z, 1, 0, 0));
     // The belt-drive servo stands above the cartridge on a milled cradle bolted to the top of the spindle seat block (the stiffest part
@@ -343,7 +317,7 @@ class FlexsplineHobber extends MachineAssembly {
       F.alongY(centre - HobSpindle.MOTOR_OFFSET, HobberSwivelLayout.SPINDLE_Y - HobSpindle.MOTOR_FACE_Z, HobberZLayout.SEAT_Z + HobSpindle.motorHeight(), 0, 1, 0));
     fixAt("hob", hob, F.fromRotationMatrix(centre, 20, HobberZLayout.SEAT_Z, e0), "spindle/arbor");
     group("B spindle/Outboard support");
-    fixAt("outboardCarrier", new HobberSaddle("GE-outboard-carrier"), F.translation(centre, 0, HobberZLayout.SEAT_Z), "Yplate",
+    fixAt("outboardCarrier", new HobberSaddle("GE-outboard-carrier"), F.translation(centre, 0, HobberZLayout.SEAT_Z), "Ymodule/carriage",
       F.alongY(centre + 45, -100, HobberZLayout.SEAT_Z, 1, 0, 0));
     var supportPose = F.compose(F.translation(centre, 0, HobberZLayout.SEAT_Z), HobberOutboardLayout.bodyPose());
     fixAt("outboard", new OutboardSupport(), supportPose, "outboardCarrier",
@@ -386,7 +360,7 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt("bissMaster", new BissMaster(4), HobberElectricalLayout.devicePose(110, HobberSaddle.ELECTRICAL_HEIGHT - 120), "electricalPanel");
     // Drive seats: one ground bar under both supports of X and Z (the nut block travels above it; grinding makes both seats coplanar and
     // it stays the re-grindable height spacer), two brackets on the swivel plate for Y.
-    var xDrive = HobberDrives.x(), yDrive = HobberDrives.y(), zDrive = HobberDrives.z();
+    var xDrive = HobberDrives.x(), zDrive = HobberDrives.z();
     var xb = HobberDrives.padBoundsBoth(xDrive, HobberDrives.PAD_WIDTH, 15), zb = HobberDrives.padBoundsBoth(zDrive, HobberDrives.PAD_WIDTH, 40);
     group("X axis/Drive");
     fixAt("XdrivePad", new HobberSaddle("GE-X-drive-pad"), F.identity(), "bed/driveSeat", F.alongY((xb[0] + xb[3]) / 2, 0, 140, 0, 0, 1));
@@ -395,24 +369,12 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt("ZdrivePad", new HobberSaddle("GE-Z-drive-pad"), F.identity(), "column/driveSeat",
       F.alongY(HobberZLayout.SEAT_FACE_X, 0, (zb[2] + zb[5]) / 2, -1, 0, 0));
     precisionMounts.push({name: "ZdrivePad-mount", parent: "column/driveSeat"});
-    group("Y axis/Drive");
-    for (support in ["fixed", "floating"]) {
-      var name = support == "fixed" ? "Fixed" : "Floating";
-      var yHoles = HobberDrives.seatHoles(yDrive, support), yLo = 1e9, yHi = -1e9;
-      for (h in yHoles) {
-        yLo = Math.min(yLo, h.position[1]);
-        yHi = Math.max(yHi, h.position[1]);
-      }
-      fixAt("Ydrive" + name, new HobberSaddle("GE-Y-drive-" + support), F.identity(), "swivelPlate",
-        F.alongY(92.5, support == "fixed" ? (yLo + yHi) / 2 : -85, 458, 0, 0, 1));
-    }
-    fixAt("YnutSeat", new HobberSaddle("GE-Y-nut-seat"), F.identity(), "Yplate", F.alongY(60, -10, 458, 0, 0, 1));
-    drive(xDrive, "XdrivePad", "XdrivePad", "Xbridge");
-    drive(zDrive, "ZdrivePad", "ZdrivePad", "Zplate");
-    drive(yDrive, "YdriveFixed", "YdriveFloating", "YnutSeat");
+    drive(xDrive,"XdrivePad","XdrivePad","Xbridge");
+    drive(zDrive,"ZdrivePad","ZdrivePad","Zplate");
+    bind("Ydrive","Ymodule/screw-turn","Ymodule/motor");
     // Sealed scales (FRAME_PLAN H4): X on a ground bar on the bed beam, Z on a bar on the column channel's wall with its head on
     // an arm from the Z saddle, Y on the swivel plate with its head on a boss of the Y saddle.
-    var scaleX = HobberScales.x(), scaleY = HobberScales.y(), scaleZ = HobberScales.z();
+    var scaleX = HobberScales.x(), scaleZ = HobberScales.z();
     group("X axis/Scale");
     fixAt("XscaleSeat", new HobberSaddle("GE-X-scale-seat"), F.identity(), "bed/casting", scaleBarContact(scaleX));
     group("Z axis/Scale");
@@ -421,7 +383,7 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt("ZscaleArm", new HobberSaddle("GE-Z-scale-arm"), F.translation(0, 0, HobberZLayout.SEAT_Z), "Zplate",
       F.alongY(148, armFace[1] - HobberScales.Z_ARM_THICKNESS / 2, armFace[2], 1, 0, 0));
     scale(scaleX, "XscaleSeat", "Xrib-scale");
-    scale(scaleY, "swivelPlate", "Yplate");
+    connectPorts("Y-biss","Ymodule/scaleHead","biss","bissMaster","ch"+(bissChannel++ + 1));
     scale(scaleZ, "ZscaleSeat", "ZscaleArm");
     // The chip tray around the table is part of the work zone; the coolant nozzle belongs to the hob it feeds.
     withGroup("C table and work", () -> {
@@ -449,7 +411,7 @@ class FlexsplineHobber extends MachineAssembly {
         "coolantPort",
         new HobberSaddle("GE-coolant"),
         F.translation(centre, 0, HobberZLayout.SEAT_Z),
-        "Yplate",
+        "Ymodule/carriage",
         F.alongY(centre + 45, 64.35, 435, 1, 0, 0)
       );
     });
@@ -579,11 +541,15 @@ class FlexsplineHobber extends MachineAssembly {
   public function serviceRemovals():Array<DesignRequirement> {
     var away = (d:Array<Float>) -> [for (c in d) -c];
     var out:Array<DesignRequirement> = [];
-    for (axis in ["X", "Y", "Z"]) {
-      var back = away(axisOf(axis + "motor", 0, 0, 1));
-      out.push(ServiceRemoval(axis.toLowerCase() + "MotorWithdrawal", [axis + "motor", axis + "motor-shaft"],
+    for (axis in ["X", "Z"]) {
+      var back = away(axisOf(HobberDrives.member(axis,"motor"), 0, 0, 1));
+      out.push(ServiceRemoval(axis.toLowerCase() + "MotorWithdrawal", [HobberDrives.member(axis,"motor"), HobberDrives.member(axis,"motorShaft")],
         [{direction: back, distance: 30 + 10 + SERVICE_CLEARANCE}], [], []));
     }
+    var nutGroup=below("Ymodule/nutCarrier").concat(["Ymodule/nutCarrier"]);
+    var carriageBundle=below("Ymodule/carriage").concat(["Ymodule/carriage"]).filter(id->!nutGroup.contains(id)&&!StringTools.startsWith(id,"Ymodule/block")&&id!="Ymodule/scaleHead");
+    out.push(ServiceRemoval("yCarriageWithdrawal",carriageBundle,[{direction:worldDir(-1,0,0),distance:HobberYLayout.moduleSpec().carriageThickness+40}],
+      ["Ymodule/coverFront","Ymodule/coverRear","Ymodule/retainerFront","Ymodule/retainerRear","Ymodule/lipFront","Ymodule/lipRear","Ymodule/scaleHead"],[{joint:"X",value:HobberXLayout.RETRACT}]));
     var shaft = spindle.motor.rating.shaftLength;
     out.push(ServiceRemoval("bMotorWithdrawal", ["spindle/motor", "spindle/motorShaft", "spindle/motorEncoder"],
       [{direction: away(axisOf("spindle/motor", 0, 0, 1)), distance: shaft + 10 + SERVICE_CLEARANCE}], ["spindle/belt", "spindle/motorPulley"], []));
@@ -592,9 +558,9 @@ class FlexsplineHobber extends MachineAssembly {
     out.push(ServiceRemoval("outboardRetainersWithdrawal", ["outboardLocknut", "outboardInnerSpacer"],
       [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 16.0}], [], [{joint: "X", value: HobberXLayout.RETRACT}]));
     out.push(ServiceRemoval("outboardWithdrawal", outboardMembers(),
-      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 55.0}], ["outboardLocknut", "outboardInnerSpacer", "YscaleHead"], [{joint: "X", value: HobberXLayout.RETRACT}]));
+      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 55.0}], ["outboardLocknut", "outboardInnerSpacer", "Ymodule/scaleHead"], [{joint: "X", value: HobberXLayout.RETRACT}]));
     out.push(ServiceRemoval("spindleCartridgeWithdrawal", cartridgeMembers(),
-      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 180 + 60}], ["spindle/belt", "outboardLocknut", "outboardInnerSpacer", "YscaleHead"].concat(outboardMembers()), [{joint: "X", value: HobberXLayout.RETRACT}]));
+      [{direction: axisOf("spindle/housing", 0, 0, 1), distance: 180 + 60}], ["spindle/belt", "outboardLocknut", "outboardInnerSpacer", "Ymodule/scaleHead"].concat(outboardMembers()), [{joint: "X", value: HobberXLayout.RETRACT}]));
     // The flange is motor-side. Release the nut flange, motor and BK12;
     // the BF12 stays and the barrel slides through the stationary nut block.
     var x = HobberDrives.x();
@@ -610,19 +576,19 @@ class FlexsplineHobber extends MachineAssembly {
     var stack = below("Xbridge").concat(["Xbridge"]).filter(id -> id != "Xnut");
     out.push(ServiceRemoval("xChipGuardWithdrawal",HobberChipCover.fixedMembers(),
       [{direction:worldDir(0,0,1),distance:100.0}],stack,[]));
-    var head = below("swivelAdapter").concat(["swivelAdapter"]).filter(id -> id != "Ymotor" && id != "Ymotor-shaft");
+    var head = below("Ymodule/base").concat(["Ymodule/base"]).filter(id -> id != "Ymodule/motor" && id != "Ymodule/motorShaft");
     var retract = [{joint:"X",value:HobberXLayout.RETRACT}];
     // Free the under-deck foot, lift it above the deck, then move the
     // C-profile clear of the head. Left/right shields leave to their own side.
     for (side in [-1,1]) out.push(ServiceRemoval(side<0?"zLeftGuardWithdrawal":"zRightGuardWithdrawal",
       [side<0?"ZcoverLeft":"ZcoverRight"],
       [{direction:worldDir(-1,0,0),distance:19.0}, {direction:worldDir(0,0,1),distance:24.0},
-       {direction:worldDir(1,0,0),distance:4.0}, {direction:worldDir(0,side,0),distance:200.0}],side>0?["Ymotor","Ymotor-shaft"]:[],retract));
+       {direction:worldDir(1,0,0),distance:4.0}, {direction:worldDir(0,side,0),distance:200.0}],side>0?["Ymodule/motor","Ymodule/motorShaft"]:[],retract));
     // Keep the head on the actuator: the adapter output screws are buried
     // behind the swivel plate. Release the saddle from its blocks and nut
     // block, and support the disconnected scale head on the fixed scale.
     out.push(ServiceRemoval("erobWithSaddle",["Zplate","swivel/housing","swivel/output","ZscaleArm"].concat(head),
-      [{direction:worldDir(-1,0,0),distance:60.0}],HobberChipCover.zMembers().concat(["Ymotor","Ymotor-shaft"]),retract));
+      [{direction:worldDir(-1,0,0),distance:60.0}],HobberChipCover.zMembers().concat(["Ymodule/motor","Ymodule/motorShaft"]),retract));
     return out;
   }
 
@@ -697,31 +663,31 @@ class FlexsplineHobber extends MachineAssembly {
     group(hd.id + " axis/Drive");
     var id = hd.id, dr = hd.drive, at = HobberDrives.poses(hd), d = hd.axis.direction, s = hd.axis.start;
     var motor = dr.motor, screw = new HzMotionDrawingScrew(hd.length, dr.endProfile), nut = new BallNut();
-    fixAt(id + "fixed", dr.fixed, at.get("mount"), fixedPad);
-    fixAt(id + "motor", motor, at.get("motor"), id + "fixed");
-    addComponent(id + "screw", screw);
-    zero.set(id + "screw", at.get("screw"));
+    fixAt(HobberDrives.member(id,"mount"), dr.fixed, at.get("mount"), fixedPad);
+    fixAt(HobberDrives.member(id,"motor"), motor, at.get("motor"), HobberDrives.member(id,"mount"));
+    addComponent(HobberDrives.member(id,"screw"), screw);
+    zero.set(HobberDrives.member(id,"screw"), at.get("screw"));
     var f = F.alongY(s[0], s[1], s[2], d[0], d[1], d[2]);
     // The screw turns in the mount's bearings: the mount is the joint's parent (the motor is bolted to it).
-    addMemberConnector(id + "fixed", id + "turnParent", F.compose(F.inverse(required(id + "fixed")), f));
-    addMemberConnector(id + "screw", id + "turnChild", F.compose(F.inverse(required(id + "screw")), f));
+    addMemberConnector(HobberDrives.member(id,"mount"), id + "turnParent", F.compose(F.inverse(required(HobberDrives.member(id,"mount"))), f));
+    addMemberConnector(HobberDrives.member(id,"screw"), id + "turnChild", F.compose(F.inverse(required(HobberDrives.member(id,"screw"))), f));
     var block = HobberDrives.nutBlock(hd, nut), blockPose = HobberDrives.nutBlockPose(hd, nut);
-    fixAt(id + "nutBlock", block, blockPose, blockHost, F.compose(blockPose, F.translation(0, -block.centreHeight, block.thickness / 2)));
-    fixAt(id + "nut", nut, at.get("nut"), id + "nutBlock", blockPose);
-    var ratio = addTransmission(id + "lead", id, id + "screw-turn", Transmission.LeadScrew(id + "screw", id + "nut"), id == "Z" ? Opposite : id == "X" ? Opposite : Same);
+    fixAt(HobberDrives.member(id,"nutCarrier"), block, blockPose, blockHost, F.compose(blockPose, F.translation(0, -block.centreHeight, block.thickness / 2)));
+    fixAt(HobberDrives.member(id,"nut"), nut, at.get("nut"), HobberDrives.member(id,"nutCarrier"), blockPose);
+    var ratio = addTransmission(HobberDrives.member(id,"lead"), id, HobberDrives.member(id,"screw-turn"), Transmission.LeadScrew(HobberDrives.member(id,"screw"), HobberDrives.member(id,"nut")), id == "Z" ? Opposite : id == "X" ? Opposite : Same);
     var initial = travel.filter(t -> t.id == id)[0].initial;
-    addMate(id + "screw-turn", Continuous, id + "fixed", id + "turnParent", id + "screw", id + "turnChild", ratio * initial);
-    fixAt(id + "floating", dr.floating, at.get("floating"), floatingPad);
-    fixAt(id + "floatingRing", dr.ring, at.get("ring"), id + "floating");
-    supportScrew(id + "lead", ScrewSupport.Fixed, dr.floating.support);
-    fixAt(id + "coupling", dr.coupling, at.get("coupling"), id + "screw");
-    fixAt(id + "motor-shaft", motor.shaft(), at.get("motor"), id + "coupling");
-    mountContacts.push({parent: fixedPad, child: id + "fixed"});
-    mountContacts.push({parent: floatingPad, child: id + "floating"});
+    addMate(HobberDrives.member(id,"screw-turn"), Continuous, HobberDrives.member(id,"mount"), id + "turnParent", HobberDrives.member(id,"screw"), id + "turnChild", ratio * initial);
+    fixAt(HobberDrives.member(id,"floating"), dr.floating, at.get("floating"), floatingPad);
+    fixAt(HobberDrives.member(id,"ring"), dr.ring, at.get("ring"), HobberDrives.member(id,"floating"));
+    supportScrew(HobberDrives.member(id,"lead"), ScrewSupport.Fixed, dr.floating.support);
+    fixAt(HobberDrives.member(id,"coupling"), dr.coupling, at.get("coupling"), HobberDrives.member(id,"screw"));
+    fixAt(HobberDrives.member(id,"motorShaft"), motor.shaft(), at.get("motor"), HobberDrives.member(id,"coupling"));
+    mountContacts.push({parent: fixedPad, child: HobberDrives.member(id,"mount")});
+    mountContacts.push({parent: floatingPad, child: HobberDrives.member(id,"floating")});
     // Position feedback comes from the sealed scales (`scale`).
-    bind(id + "drive", id + "screw-turn", id + "motor");
+    bind(id + "drive", HobberDrives.member(id,"screw-turn"), HobberDrives.member(id,"motor"));
     // The braked Z servo holds its axis when the power drops: the controller releases the brake and reads back that it let go.
-    if (dr.motor.motorBrakeSpec() != null) bindMotorBrake(id + "drive", id + "motor", id + ".brakeRelease", id + ".brakeReleased", 250, 30);
+    if (dr.motor.motorBrakeSpec() != null) bindMotorBrake(id + "drive", HobberDrives.member(id,"motor"), id + ".brakeRelease", id + ".brakeReleased", 250, 30);
   }
   /** Where a scale's seat bar rests on its host: the far face of the bar from the housing, normal toward the host. */
   function scaleBarContact(a:HobberScaleAxis):AssemblyFrame {
@@ -734,7 +700,7 @@ class FlexsplineHobber extends MachineAssembly {
   /** One axis's sealed scale: the housing on its seat, the head on its carrier, and the head as the axis's position encoder. */
   function scale(a:HobberScaleAxis, seatHost:String, headHost:String):Void {
     group(a.id + " axis/Scale");
-    var housing = a.id + "scale", head = a.id + "scaleHead";
+    var housing = HobberScales.member(a.id), head = HobberScales.member(a.id,true);
     fixAt(housing, a.housing, a.housingPose, seatHost, F.compose(a.housingPose, a.housing.connector("mount").frame));
     fixAt(head, a.head, a.headPose, headHost, F.compose(a.headPose, a.head.connector("mount").frame));
     addEncoder(a.id + "position", a.id, head);

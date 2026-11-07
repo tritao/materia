@@ -1,0 +1,121 @@
+package machinekit.hobbing;
+
+import cadkit.modeling.Part;
+import cadkit.modeling.Vector;
+import machinekit.assembly.PosedParts;
+import machinekit.component.*;
+import machinekit.component.ComponentRecipeSupport as P;
+import machinekit.component.BoltedFace.PinnedFace;
+import machinekit.motion.*;
+import machinekit.structural.GroundStock;
+import materia.assembly.AssemblyFrames as F;
+
+/** Host stock and hole patterns; the mechanism, scale and cover remain library
+ * module features. The head face stays on its existing work-frame datum. */
+class HobberYPart extends MachineComponent {
+  static final recipe=new machinekit.cache.Once<ComponentType>();
+  public final role:String;
+  public final spec:ScrewLinearModuleSpec;
+  public static function parameters():Array<ComponentParameter> return [P.choice("role",["base","carriage","coverFront","coverRear"],"base")];
+  public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.hobbing.y-module-part",parameters(),v->new HobberYPart(v),false,false,null,false).numbered(v->"HOBBER-Y-MODULE-"+v.token("role").toUpperCase()).procured(_->Make("ground stock / formed guard, joint drilling")));
+  public function new(?overrides:ComponentValues) {
+    var v=P.resolve(parameters(),overrides);role=v.token("role");spec=HobberYLayout.moduleSpec();
+    super("HOBBER-Y-MODULE-"+role.toUpperCase(),"Y module "+role,StringTools.startsWith(role,"cover")?"stainless A2-70":"steel",false,v);
+    if(StringTools.startsWith(role,"cover"))addFacet(ManufacturingRoute.foldedSheet(1.5,2,1.5));
+    else addFacet(ManufacturingRoute.groundStock(GroundStock.plate(GroundStock.STEEL,role=="base"?GroundStock.atLeast("plate",spec.baseThickness-actuatorPoint().z):spec.carriageThickness),[{name:"joint interfaces; inspect stock, replicate failing faces before grinding",tolerance:0.01,roughnessRa:0.8}]));
+    addFacet(new EngineeringMetadata(new ComponentValues().setToken("ratingsBasis","Assumed").setToken("errorsBasis","Assumed").setToken("source","Stock acceptance and end seals require qualification")));
+    addConnector("mount",Mount,F.identity());addConnector("interface",Mount,F.translation(spec.centre,0,spec.carriageBottom()+spec.carriageThickness));
+  }
+  override public function componentType():Null<ComponentType> return recipeType();
+  override public function machinable():Bool return true;
+  function body():MachineComponent return StringTools.startsWith(role,"cover")?new ScrewLinearModuleCover(spec.values().setToken("role",role)):new ScrewLinearModulePart(spec.values().setToken("role",role));
+  public static function actuatorPoint():{x:Float,y:Float,z:Float} return F.transformPoint(F.inverse(HobberYLayout.modulePose()),HobberSwivelLayout.OUTPUT_X,0,HobberZLayout.SEAT_Z);
+  override public function fasteningFaces():Array<BoltedFace> {
+    var out=body().fasteningFaces();
+    if(role=="base") {
+      var at=actuatorPoint(),bolt=machinekit.standard.SocketHeadCapScrew.catalog().get("M4");
+      var length=machinekit.standard.SocketHeadCapScrew.standardLengthAtLeast(3*bolt.diameter);if(length==null)throw "No actuator screw";
+      var grip=length-1.25*bolt.diameter;
+      out.push(BoltedFace.clamped("actuator-output",ScrewLinearModulePart.plane(at.x,at.y,at.z,1),[for(i in 0...ErobActuatorData.OUTPUT_BOLT_COUNT){x:ErobActuatorPart.outputBolt(i).x,y:-ErobActuatorPart.outputBolt(i).y}],ErobActuatorData.OUTPUT_CLEARANCE_HOLE,grip,"M4",{diameter:bolt.counterboreDiameter,depth:spec.baseThickness-at.z-grip},false));
+    }
+    if(role=="carriage")for(face in HobberSaddle.yHeadFaces())switch face.role {
+      case Clamped(size,clearance,grip,recess):
+        var holes=face.holes;if(holes==null)throw "Head interface needs its pattern";
+        out.push(BoltedFace.clamped(face.id,F.compose(HobberYLayout.headInModule(),face.frame),holes,clearance,grip,size,recess,false,face.washer));
+      case _:throw "Unexpected head interface";
+    }
+    return out;
+  }
+  override public function pinnedFaces():Array<PinnedFace> {
+    var out=body().pinnedFaces();
+    if(role=="carriage")for(face in HobberSaddle.yHeadPins())out.push(new PinnedFace(face.id,F.compose(HobberYLayout.headInModule(),face.frame),face.holes,face.diameter,face.depth,face.through,false,face.fit));
+    return out;
+  }
+  static function box(a:Float,b:Float,c:Float,d:Float,e:Float,f:Float):Part {
+    var raw=Part.box(b-a,d-c,f-e),shape=raw.translated(new Vector((a+b)/2,(c+d)/2,e));raw.close();return shape;
+  }
+  /** All webs are profiles cut from the ONE ground blank, not separate parts. */
+  function retainedProfile():Part {
+    var s=spec,z0=role=="base"?0.0:s.carriageBottom(),z1=z0+(role=="base"?s.baseThickness:s.carriageThickness);
+    var lo=role=="base"?s.baseMin:s.centre-s.carriageLength/2,hi=role=="base"?s.baseMax:s.centre+s.carriageLength/2;
+    var half=role=="base"?s.baseWidth/2:s.carriageWidth/2;
+    var rim=role=="base"?8.0+ScrewLinearModuleSpec.GAP:10+4+ScrewLinearModuleSpec.GAP;
+    var frame=Solids.cut(box(lo,hi,-half,half,z0-1,z1+1),[box(lo+rim,hi-rim,-half+rim,half-rim,z0-2,z1+2)]);
+    var keep:Array<Part>=[frame];
+    if(role=="base") {
+      var at=actuatorPoint(),m4=machinekit.standard.SocketHeadCapScrew.catalog().get("M4");
+      var low=Math.min(at.y-ErobActuatorData.OUTPUT_PITCH_CIRCLE/2-1.5*m4.diameter-ScrewLinearModuleSpec.GAP,s.scaleSeatY()-20-ScrewLinearModuleSpec.GAP);
+      var high=s.riserY(1)+s.riserWidth/2+ScrewLinearModuleSpec.GAP;
+      // A central output web joins the two full rail lands. Unloaded
+      // material outside those paths is profiled from the ground blank.
+      var web=ErobActuatorData.OUTPUT_PITCH_CIRCLE/2+1.5*m4.diameter+ScrewLinearModuleSpec.GAP;
+      keep.push(box(at.x-web,at.x+web,low,high,z0-1,z1+1));
+      for(side in [-1,1])keep.push(box(s.railStart()-ScrewLinearModuleSpec.GAP,s.railStart()+s.railLength+ScrewLinearModuleSpec.GAP,
+        s.riserY(side)-s.riserWidth/2-ScrewLinearModuleSpec.GAP,s.riserY(side)+s.riserWidth/2+ScrewLinearModuleSpec.GAP,z0-1,z1+1));
+      for(side in [-1,1]) {
+        var stop=s.drive.fixed.spec.width/2+ScrewLinearModuleSpec.GAP+10;
+        keep.push(box(lo,hi,side*stop-10,side*stop+10,z0-1,z1+1));
+      }
+      keep.push(box(s.scaleStart()-ScrewLinearModuleSpec.GAP,s.scaleStart()+s.scaleHousing.overallLength()+ScrewLinearModuleSpec.GAP,s.scaleSeatY()-20-ScrewLinearModuleSpec.GAP,s.scaleSeatY()+20+ScrewLinearModuleSpec.GAP,z0-1,z1+1));
+      var poses=s.drive.poses(s.axis(),s.screwLength);
+      var supports:Array<{part:MachineComponent,key:String}>=[{part:s.drive.fixed,key:"mount"},{part:s.drive.floating,key:"floating"}];
+      for(support in supports) {
+        var pose=poses.get(support.key);if(pose==null)throw "Missing support footprint";
+        var raw=support.part.geometry(Envelope),placed=PosedParts.moved(raw,pose);raw.close();
+        var b=PosedParts.boxOf(placed);placed.close();var pad=machinekit.standard.SocketHeadCapScrew.catalog().get("M6").diameter;
+        keep.push(box(b.minX-pad,b.maxX+pad,b.minY-pad,b.maxY+pad,z0-1,z1+1));
+      }
+    } else {
+      var screw=machinekit.standard.SocketHeadCapScrew.catalog().get(s.guide.blockMountThread);
+      var web=Math.ceil((s.guide.blockHoleSpacingAlong+3*screw.diameter)/5)*5;
+      var reach=Math.ceil((s.railSpacing/2+s.guide.blockHoleSpacingAcross/2+1.5*screw.diameter)/5)*5;
+      for(row in [-1,1])keep.push(box(s.centre+row*s.blockSpacing/2-web/2,s.centre+row*s.blockSpacing/2+web/2,-reach,reach,z0-1,z1+1));
+      var bridge=0.0;for(h in ScrewLinearModulePart.carrierBolts())bridge=Math.max(bridge,Math.abs(h.y));
+      bridge=Math.ceil((bridge+1.5*machinekit.standard.SocketHeadCapScrew.catalog().get("M6").diameter+ScrewLinearModuleSpec.GAP)/5)*5;
+      keep.push(box(s.centre-s.blockSpacing/2-web/2,s.centre+s.blockSpacing/2+web/2,-bridge,bridge,z0-1,z1+1));
+      // The head contact plate reaches the lower guide centre; unused steel
+      // above it is replaced by the coplanar guide webs and seal rim.
+      var top=HobberYLayout.moduleLift()-s.railSpacing/2,face=HobberSaddle.headFaceX();
+      var raw=Part.prism([for(p in [{y:-130.0,z:-40.0},{y:-65.0,z:-75.0},{y:65.0,z:-75.0},{y:90.0,z:-55.0},{y:90.0,z:top},{y:-130.0,z:top}])new Vector(p.y,p.z)],face,face+s.carriageThickness);
+      var outline=PosedParts.moved(raw,F.fromRotationMatrix(0,0,0,[0.0,0,1,1,0,0,0,1,0]));raw.close();
+      outline=Solids.union([outline,box(face,face+s.carriageThickness,90,222,-52,top)]);
+      keep.push(PosedParts.moved(outline,HobberYLayout.headInModule()));outline.close();
+    }
+    return Solids.union(keep);
+  }
+  override public function geometry(detail:ComponentDetail=Preview):Part {
+    var shape=body().geometry(detail);
+    if(role=="base"||role=="carriage") {
+      var profile=retainedProfile(),trimmed=shape.intersect(profile);profile.close();shape.close();shape=trimmed;
+    }
+    if(role=="base") {
+      var at=actuatorPoint();
+      shape=Solids.cut(shape,[box(spec.baseMin-1,spec.baseMax+1,-spec.baseWidth,spec.baseWidth,-1,spec.baseThickness-GroundStock.atLeast("plate",spec.baseThickness-at.z)),Part.cylinderSpan(ErobActuatorData.BODY_DIAMETER/2,-1,at.z,at.x,at.y),Part.cylinderSpan((ErobActuatorData.BORE_DIAMETER+0.4)/2,-1,spec.baseThickness+1,at.x,at.y)]);
+    }
+    if(role=="carriage") {
+      var bore=Part.cylinderAlong(Bt30SpindleData.FLANGE_DIAMETER/2+3,new Vector(0,-132,0),Vector.Y(),HobberSwivelLayout.SPINDLE_Y-Bt30SpindleData.FLANGE_FROM+134);
+      var tool=PosedParts.moved(bore,HobberYLayout.headInModule());bore.close();shape=Solids.cut(shape,[tool]);
+    } else shape=Solids.cut(shape,[HobberYLayout.sweptDeckRelief()]);
+    return machined(shape);
+  }
+}

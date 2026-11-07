@@ -18,15 +18,15 @@ class ScrewLinearModulePart extends MachineComponent {
   public final role:String;
   public static final ROLES=["base","riserLeft","riserRight","carriage","nutCarrier","stopFrontLeft","stopFrontRight","stopRearLeft","stopRearRight","scaleSeat","scaleHeadCarrier"];
   public static function parameters():Array<ComponentParameter> return [P.choice("role",ROLES,"base"),
-    P.text("profile","HGH15CA"),P.length("stroke",20),P.length("railSpacing",150),P.length("blockSpacing",80),P.length("overtravel",5)];
+    P.text("profile","HGH15CA"),P.length("stroke",20),P.length("railSpacing",150),P.length("blockSpacing",80),P.length("overtravel",5),P.scalar("hostLength",0),P.scalar("hostWidth",0)];
   public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.motion.screw-linear-module-part",parameters(),v->new ScrewLinearModulePart(v),false,false,null,false)
     .numbered(numberFor).procured(_->Make("ground plate/flat bar, cut and joint-drilled")));
   static function numberFor(v:ComponentValues):String {
-    var keys=[v.token("profile")];for(k in ["stroke","railSpacing","blockSpacing","overtravel"])keys.push(ComponentNumberKey.encode(v.number(k)));
+    var keys=[v.token("profile")];for(k in ["stroke","railSpacing","blockSpacing","overtravel","hostLength","hostWidth"])keys.push(ComponentNumberKey.encode(v.number(k)));
     return PartNumbers.geometry("SCREW-MODULE",v.token("role"),keys.join("|"));
   }
   public function new(?overrides:ComponentValues) {
-    var v=P.resolve(parameters(),overrides);spec=new ScrewLinearModuleSpec(v.token("profile"),v.number("stroke"),v.number("railSpacing"),v.number("blockSpacing"),v.number("overtravel"));role=v.token("role");
+    var v=P.resolve(parameters(),overrides);spec=new ScrewLinearModuleSpec(v.token("profile"),v.number("stroke"),v.number("railSpacing"),v.number("blockSpacing"),v.number("overtravel"),v.number("hostLength"),v.number("hostWidth"));role=v.token("role");
     super(numberFor(v),"Precision screw module "+role,"steel",false,v);
     var stock=role=="scaleSeat"?GroundStock.bar(40,spec.scaleSeatThickness())
       :role=="scaleHeadCarrier"?GroundStock.bar(20,GroundStock.atLeast("flat bar",spec.carriageBottom()-spec.scaleHeadTop()+0.5))

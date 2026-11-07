@@ -1,3 +1,4 @@
+import machinekit.hobbing.HobberDrives;
 import materia.assembly.AssemblyFrames as F;
 class FlexsplineHobberLayoutReport {
   public static function sceneBounds(path:String):Dynamic {
@@ -55,13 +56,13 @@ class FlexsplineHobberLayoutReport {
       "blockZLeft",
       "swivel/housing",
       "swivel/output",
-      "swivelAdapter",
-      "swivelPlate",
-      "railYLeft",
-      "railYRight",
-      "blockYLeft",
-      "blockYRight",
-      "Yplate",
+      "Ymodule/base",
+      "Ymodule/base",
+      "Ymodule/railLeft",
+      "Ymodule/railRight",
+      "Ymodule/blockLeftFront",
+      "Ymodule/blockRightFront",
+      "Ymodule/carriage",
       "spindle/housing",
       "hob",
       "table/platen",
@@ -80,12 +81,6 @@ class FlexsplineHobberLayoutReport {
           x1 = 148;
           z0 = -65;
           z1 = 170;
-        }
-        if (id == "Yplate") {
-          x0 = 45;
-          x1 = 57;
-          z0 = -75;
-          z1 = 95;
         }
         if (id == "column/casting") x0 = 261; // Central recess: the rear wall, not its side cheeks.
         function rect(a:Float,
@@ -144,7 +139,7 @@ class FlexsplineHobberLayoutReport {
     > = [];
     for (axis in ["X", "Y", "Z"]) {
       var rail = members.filter(m -> Std.isOfType(m.component,
-        machinekit.motion.LinearRail) && m.id.indexOf("rail" + axis) == 0)[0];
+        machinekit.motion.LinearRail) && m.id == HobberDrives.railMember(axis,"Left"))[0];
       var frame:materia.assembly.AssemblyRecord.AssemblyFrame = poses.get(rail.id);
       var normal = F.transformVector(frame, 0, 1, 0);
       offsets.set(
@@ -161,7 +156,7 @@ class FlexsplineHobberLayoutReport {
     }
     var moving:Map<String, Float> = [];
     for (axis in ["X", "Y", "Z"]) {
-      var root = def.joints.filter(j -> j.id == axis)[0].child, ids:Map<String, Bool> = [];
+      var root = def.joints.filter(j -> j.id == HobberDrives.jointId(axis))[0].child, ids:Map<String, Bool> = [];
       ids.set(root, true);
       var changed = true;
       while (changed) {
@@ -177,8 +172,8 @@ class FlexsplineHobberLayoutReport {
     }
     var drives:Array<Dynamic> = [];
     for (axis in ["X", "Y", "Z"]) {
-      var motor:machinekit.motion.ServoMotor = cast members.filter(m -> m.id == axis + "motor")[0].component;
-      var nut:machinekit.motion.BallNut = cast members.filter(m -> m.id == axis + "nut")[0].component;
+      var motor:machinekit.motion.ServoMotor = cast members.filter(m -> m.id == HobberDrives.member(axis,"motor"))[0].component;
+      var nut:machinekit.motion.BallNut = cast members.filter(m -> m.id == HobberDrives.member(axis,"nut"))[0].component;
       var available = 2 * Math.PI * motor.rating.ratedTorque * nut.efficiency() / 0.005 * 0.8;
       var mass:Float = cast moving.get(axis);
       var demand = mass * (0.5 + (axis == "Z" ? 9.80665 : axis == "Y" ? 9.80665 * Math.sin(Math.PI / 12) : 0)) + 200;

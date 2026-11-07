@@ -82,6 +82,11 @@ class ScrewLinearModuleChecks {
       check([for(finding in report.diagnostics.items)if(finding.code=="fasteners.edge-support")finding].length==0,"Made module parts pass edge support");
       check(report.errors().length==0,"Module integrity/clearance/fastener access");
       scaleAccess(axis);
+      if(size.stroke<=20) {
+        var rotated=new AxisBuilder();rotated.include("module",axis,F.fromRotationMatrix(0,0,0,[0.0,-1,0,1,0,0,0,0,1]));
+        var removal=AssemblyIntegrity.service(rotated,{serviceProcedures:["module/motor"]});
+        check(removal.errors().length==0,"Rotated module motor withdraws along its included axis");
+      }
       var fit=axis.scaleAdjustment(),limits=spec.scaleHousing.series.mounting;
       check(fit.normalFit>=fit.normalStack,"Head fitting covers ASSUMED normal stack");
       check(fit.gapAdjustment>=fit.gapStack,"Head gap setting covers ASSUMED lateral stack");
@@ -124,6 +129,8 @@ class ScrewLinearModuleChecks {
       cache.close();
       var rebuilt=MachineAssembly.decode(axis.encode());
       check(rebuilt.components().length==axis.components().length,"Module round trip");
+      var savedPinEnds=0;for(member in rebuilt.components())for(face in member.component.pinnedFaces())savedPinEnds+=face.holes.length;
+      check(savedPinEnds==2*fasteners.dowelCount(),"Both ends of every match-pin survive snapshot and persistence");
       var model=new cadkit.modeling.AssemblyModel("mm");axis.addTo(model,"");var state=model.initialState();
       var line=state.worldConnector("scaleHousing","axis"),mount=state.worldConnector("carriage","interface");
       Sys.println('Scale Abbe from carriage interface: ${Math.abs(line.y-mount.y)} across / ${Math.abs(line.z-mount.z)} normal mm; cable R${SealedScaleData.CABLE_BEND_RADIUS}.');

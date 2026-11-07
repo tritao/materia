@@ -165,6 +165,17 @@ typedef MachineAssemblyMassProperties = {
     designRequirementList.push(machinekit.design.DesignRequirements.copy(requirement, same));
     changed();
   }
+  /** Transfer a local removal to a containing machine which owns its payload.
+   * The parent must declare the replacement with the complete member bundle. */
+  public function takeServiceRemoval(id:String):machinekit.design.DesignRequirement {
+    for(i in 0...designRequirementList.length)switch designRequirementList[i] {
+      case ServiceRemoval(name,_,_,_,_) if(name==id):
+        var taken=designRequirementList.splice(i,1)[0];changed();
+        return machinekit.design.DesignRequirements.copy(taken,same);
+      case _:
+    }
+    throw 'No local service procedure "$id"';
+  }
   /** Add assembly-specific preparation to a local service procedure before including this assembly. */
   public function addServicePrerequisites(id:String, off:Array<String>):Void {
     for (i in 0...designRequirementList.length) switch designRequirementList[i] {
@@ -1517,7 +1528,7 @@ typedef MachineAssemblyMassProperties = {
       portName: entry.portName
     });
     for (entry in drives.transmissions) flat.transmissions.push(DriveSystem.copyTransmission(entry, map));
-    for (r in designRequirementList) flat.designRequirements.push(machinekit.design.DesignRequirements.copy(r, map));
+    for (r in designRequirementList) flat.designRequirements.push(machinekit.design.DesignRequirements.copy(r, map, pose));
     for (entry in drives.beltPaths) flat.beltPaths.push(DriveSystem.copyBeltPath(entry, map));
     for (entry in drives.motors) flat.motors.push(DriveSystem.copyMotor(entry, map));
     for (entry in drives.encoders) flat.encoders.push(DriveSystem.copyEncoder(entry, map));

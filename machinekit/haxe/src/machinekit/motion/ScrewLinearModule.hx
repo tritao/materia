@@ -12,7 +12,7 @@ import machinekit.assembly.AssemblyIntegrity.FastenerFitOrder;
 class ScrewLinearModule extends AxisBuilder {
   public final spec:ScrewLinearModuleSpec;
   public final travel:AxisSpec;
-  public function new(?spec:ScrewLinearModuleSpec,?hostBase:MachineComponent,?hostCarriage:MachineComponent) {
+  public function new(?spec:ScrewLinearModuleSpec,?hostBase:MachineComponent,?hostCarriage:MachineComponent,?hostGuards:Map<String,MachineComponent>) {
     super();this.spec=spec==null?new ScrewLinearModuleSpec():spec;
     var s=this.spec;
     travel={id:"travel",lower:-s.stroke/2,upper:s.stroke/2,initial:0.0};
@@ -24,11 +24,11 @@ class ScrewLinearModule extends AxisBuilder {
       attach("rail"+label,LinearRail.metric(s.profile,s.railLength),s.railPose(side),"riser"+label);
     }
     var blockPoses=[for(side in [-1,1])for(row in [-1,1])blockPose(side,row)];
-    slide(travel,"railLeft","blockLeftFront",LinearRailBlock.metric(s.profile),blockPoses[0],{x:1.0,y:0,z:0},blockPoses,s.overtravel);
+    slide(travel,"railLeft","blockLeftFront",LinearRailBlock.metric(s.profile,LinearRailBlock.SUPPLIER),blockPoses[0],{x:1.0,y:0,z:0},blockPoses,s.overtravel);
     group("Carriage");
     attach("carriage",hostCarriage==null?made("carriage"):hostCarriage,F.identity(),"blockLeftFront");
     for(side in [-1,1])for(row in [-1,1])if(side!=-1||row!=-1)
-      attach("block"+(side<0?"Left":"Right")+(row<0?"Front":"Rear"),LinearRailBlock.metric(s.profile),blockPose(side,row),"carriage");
+      attach("block"+(side<0?"Left":"Right")+(row<0?"Front":"Rear"),LinearRailBlock.metric(s.profile,LinearRailBlock.SUPPLIER),blockPose(side,row),"carriage");
     attach("nutCarrier",made("nutCarrier"),F.identity(),"carriage");
     group("Screw drive");
     var screw=new HzMotionDrawingScrew(s.screwLength,s.drive.endProfile);
@@ -48,7 +48,9 @@ class ScrewLinearModule extends AxisBuilder {
       group("Chip guard");
       for(front in [true,false]) {
         var suffix=front?"Front":"Rear",cover="cover"+suffix,retainer="retainer"+suffix;
-        attach(cover,new ScrewLinearModuleCover(s.values().setToken("role",cover)),F.identity(),"base");
+        var supplied=hostGuards==null?null:hostGuards.get(cover);
+        if(supplied==null)supplied=new ScrewLinearModuleCover(s.values().setToken("role",cover));
+        attach(cover,supplied,F.identity(),"base");
         attach(retainer,new ScrewLinearModuleCover(s.values().setToken("role",retainer)),F.identity(),cover);
         attach("lip"+suffix,new ScrewLinearModuleCover(s.values().setToken("role","lip"+suffix)),F.identity(),retainer);
       }
@@ -117,7 +119,7 @@ class ScrewLinearModule extends AxisBuilder {
     machinekit.design.DesignRequirement.ServiceRemoval("screw",["screw","coupling","nut"],[{direction:[1.0,0,0],distance:spec.baseMax+10}],
       ["motor","motorShaft","motorMount","floatingRing"],[]),
     machinekit.design.DesignRequirement.ServiceRemoval("scaleHead",["scaleHead"],[{direction:[-1.0,0,0],distance:spec.centre-spec.baseMin+spec.scaleHead.series.headLength+20}],[],[]),
-    machinekit.design.DesignRequirement.ServiceRemoval("scaleHousing",["scaleHousing"],[{direction:[0.0,1,0],distance:spec.baseWidth}],["scaleHead"].concat(spec.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec)),[]),
+    machinekit.design.DesignRequirement.ServiceRemoval("scaleHousing",["scaleHousing"],[{direction:[1.0,0,0],distance:spec.baseMax-spec.scaleStart()+spec.scaleHousing.overallLength()+20}],["scaleHead"].concat(spec.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec)),[]),
     machinekit.design.DesignRequirement.ServiceRemoval("carriage",["carriage","scaleHeadCarrier","scaleHead"],[{direction:[0.0,0,1],distance:spec.carriageThickness+20}],spec.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec),[])
   ];
   /** Rated thrust / peak motor torque, plus the containing machine's declared

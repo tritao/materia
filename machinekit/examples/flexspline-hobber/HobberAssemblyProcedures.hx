@@ -1,3 +1,4 @@
+import machinekit.hobbing.HobberDrives;
 import machinekit.design.DesignRequirement;
 import machinekit.hobbing.HobSpindle;
 import materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
@@ -22,8 +23,8 @@ class HobberAssemblyProcedures {
   /** Fit the supports loose, run the carriage to both ends so the screw centres on the nut, tighten, ream and pin. */
   public static function alignScrewSupports(axis:String, travel:{lower:Float, upper:Float}):Procedure {
     // X and Z have one ground bar under both supports; Y has a bracket under each.
-    var fixedPad = axis == "Y" ? "YdriveFixed" : axis + "drivePad", floatingPad = axis == "Y" ? "YdriveFloating" : axis + "drivePad";
-    var members = [axis + "fixed", axis + "floating", axis + "screw", axis + "nut", axis + "nutBlock"];
+    var fixedPad = axis == "Y" ? "Ymodule/base" : axis + "drivePad", floatingPad = axis == "Y" ? "Ymodule/base" : axis + "drivePad";
+    var members = [HobberDrives.member(axis,"mount"), HobberDrives.member(axis,"floating"), HobberDrives.member(axis,"screw"), HobberDrives.member(axis,"nut"), HobberDrives.member(axis,"nutCarrier")];
     return {
       id: axis.toLowerCase() + "-align-supports",
       label: axis + ": align the screw supports and pin them",
@@ -32,21 +33,21 @@ class HobberAssemblyProcedures {
       steps: [
         note("seat", "Fit the supports loose",
           "Bolt the motor mount to its pad and the BF12 to the floating pad with the tapped bolts only snug (no dowels). The pads are drilled and tapped, "
-          + "not reamed: the supports can still move about 0.5 mm.", (fixedPad == floatingPad ? [fixedPad] : [fixedPad, floatingPad]).concat([axis + "fixed", axis + "floating"])),
+          + "not reamed: the supports can still move about 0.5 mm.", (fixedPad == floatingPad ? [fixedPad] : [fixedPad, floatingPad]).concat([HobberDrives.member(axis,"mount"), HobberDrives.member(axis,"floating")])),
         note("nut", "Bolt the nut block to the carriage",
           "Fit the nut, its block and the block's two carriage bolts, then thread the screw through the nut into the mount and the BF12.",
-          [axis + "nut", axis + "nutBlock", axis + "screw"]),
+          [HobberDrives.member(axis,"nut"), HobberDrives.member(axis,"nutCarrier"), HobberDrives.member(axis,"screw")]),
         {id: "low", title: "Run the carriage to the lower end", instruction: "Turn the screw by hand until the carriage rests at the lower end of its travel; the nut must turn freely.",
-          highlight: [select(axis + "nut")], action: SetJoints([{joint: axis, value: travel.lower}])},
+          highlight: [select(HobberDrives.member(axis,"nut"))], action: SetJoints([{joint: HobberDrives.jointId(axis), value: travel.lower}])},
         note("centre-low", "Centre the screw on the nut",
-          "With the nut at this end, move the floating support (the end the screw sits loose in) until the screw spins without binding at the nut; snug its bolts.", [axis + "floating"]),
+          "With the nut at this end, move the floating support (the end the screw sits loose in) until the screw spins without binding at the nut; snug its bolts.", [HobberDrives.member(axis,"floating")]),
         {id: "high", title: "Run the carriage to the upper end", instruction: "Turn the screw by hand to the other end; the nut must still turn freely.",
-          highlight: [select(axis + "nut")], action: SetJoints([{joint: axis, value: travel.upper}])},
+          highlight: [select(HobberDrives.member(axis,"nut"))], action: SetJoints([{joint: HobberDrives.jointId(axis), value: travel.upper}])},
         note("centre-high", "Check the screw is centred at both ends",
           "Repeat the free-turning check at both ends. If it binds, loosen the supports and shift them by half the difference.", members),
         note("tighten", "Tighten, then ream and pin",
           "Tighten all support bolts. Ream the two dowel holes in each support foot through the pad at "
-          + "5 mm and drive the dowels. The pins keep the alignment, so the pad needs no precision machining.", (fixedPad == floatingPad ? [fixedPad] : [fixedPad, floatingPad]).concat([axis + "fixed", axis + "floating"]))
+          + "5 mm and drive the dowels. The pins keep the alignment, so the pad needs no precision machining.", (fixedPad == floatingPad ? [fixedPad] : [fixedPad, floatingPad]).concat([HobberDrives.member(axis,"mount"), HobberDrives.member(axis,"floating")]))
       ],
       source: Generated("hobber")
     };
@@ -131,7 +132,7 @@ class HobberAssemblyProcedures {
    * compensated instead of left in the part. Roll about the travel is not measured here (it needs a level or the optics' roll option).
    */
   public static function compensateTilt(axis:String, travel:{lower:Float, upper:Float}, rails:Array<String>):Procedure {
-    var scale = axis + "scale";
+    var scale = machinekit.hobbing.HobberScales.member(axis);
     return {
       id: axis.toLowerCase() + "-compensate-tilt",
       label: axis + ": measure pitch and yaw and load the correction table",
@@ -142,12 +143,12 @@ class HobberAssemblyProcedures {
           "Put the autocollimator or laser angular reflector on the carriage (or the tool seat) and the optics on a stand beside the machine, aligned to the " + axis
           + " travel. Let the machine reach its working temperature first.", rails),
         {id: "low", title: "Carriage at the lower end", instruction: "Move " + axis + " to the lower end of its travel and zero the optics.",
-          highlight: [select(scale)], action: SetJoints([{joint: axis, value: travel.lower}])},
+          highlight: [select(scale)], action: SetJoints([{joint: HobberDrives.jointId(axis), value: travel.lower}])},
         note("sweep", "Step through the travel",
           "Move in 20 mm steps to the upper end and back, stopping at each point to read pitch and yaw (the two angles about the axes across the travel) "
           + "from the scale reading. Repeat once in the other direction to see the hysteresis.", [scale]),
         {id: "high", title: "Carriage at the upper end", instruction: "Read the last point at the upper end of the travel.",
-          highlight: [select(scale)], action: SetJoints([{joint: axis, value: travel.upper}])},
+          highlight: [select(scale)], action: SetJoints([{joint: HobberDrives.jointId(axis), value: travel.upper}])},
         note("table", "Load the correction table",
           "Enter pitch and yaw against scale position in the controller's tilt correction table for " + axis + ", with the Abbe offsets to the hob centre from the "
           + "machine's scale report. Re-run the sweep with the table on and keep the residual as the acceptance record.", [scale])
@@ -203,8 +204,8 @@ class HobberAssemblyProcedures {
         note("refit","Refit and recheck the axis","Reverse the path, refit the BF ring and pinned support, tighten the nut flange and drive fasteners, then check free running, end reserves and encoder zero before restoring motion.",["Xscrew","Xnut","Xfixed"])
       ],source:Generated("hobber")},
       {id:"z-service-erob",label:"Z: remove the saddle, eRob and head as a module",kind:Service,start:Assembled,steps:[
-        {id:"park",title:"Park for module removal",instruction:"Park X at retract, centre Y and A, and set Z to joint zero. Stop and isolate drives; retain the Z brake. Clear the work area.",highlight:[select("Zplate")],action:SetJoints([{joint:"X",value:110.0},{joint:"Y",value:0.0},{joint:"Z",value:0.0},{joint:FlexsplineHobber.A,value:0.0}])},
-        note("ymotor","Remove the Y servo first","Withdraw the Y servo and shaft stub along their already declared axial path. Its connector envelope blocks the right Z shield's first forward move; keep the servo off for module removal.",["Ymotor","Ymotor-shaft","ZcoverRight"]),
+        {id:"park",title:"Park for module removal",instruction:"Park X at retract, centre Y and A, and set Z to joint zero. Stop and isolate drives; retain the Z brake. Clear the work area.",highlight:[select("Zplate")],action:SetJoints([{joint:"X",value:110.0},{joint:FlexsplineHobber.Y,value:0.0},{joint:"Z",value:0.0},{joint:FlexsplineHobber.A,value:0.0}])},
+        note("ymotor","Remove the Y servo first","Withdraw the Y servo and shaft stub along their already declared axial path. Its connector envelope blocks the right Z shield's first forward move; keep the servo off for module removal.",["Ymodule/motor","Ymodule/motorShaft","ZcoverRight"]),
         note("guards","Remove the two Z shields","Unbolt each shield's two underside foot screws and support the loose sheet. Move it 19 mm forward, 24 mm upward, 4 mm back, then 200 mm outwards to its own side. This frees the under-deck foot and clears the head before sideways withdrawal. Fit by reversing this path after the Z saddle is assembled.",["ZcoverLeft","ZcoverRight"]),
         note("support","Support the complete module","The selected module weighs " + kg + " kg from the installed parts. Support the saddle and head with a rated hoist and qualified shop slings/fixture before releasing it. Lifting arrangement and load balance remain shop assumptions to qualify; no unmodelled lifting holes are implied. Disconnect A/B/Y cables, feedback and coolant services.",module),
         note("release","Leave the nut block and guide blocks on the machine","Support the Z scale reading head on the fixed scale and unbolt its arm from the saddle's back face (the head's own M4 are driven from the channel wall's side, closed once the saddle is on the rails: the head stays on its arm), and secure it without loading its cable. Release the Z nut block's base screws and dowels from the saddle, leaving nut and block on the braked screw. Remove the saddle-to-guide-block screws; all four blocks stay on the rails. Keep the eRob, adapter and complete head bolted to the saddle: the adapter output screws are buried behind the swivel plate.",["Zplate","ZnutBlock","ZscaleArm","ZscaleHead"]),
@@ -218,15 +219,18 @@ class HobberAssemblyProcedures {
     result.push({id:"x-assembly", label:"X: checked assembly and alignment", kind:Assembly, start:Assembled,
       steps:[for (i => step in HobberXAssembly.steps()) note("x"+i, step.id,
         step.measurement + " Tools: " + step.tools.join(", ") + ".", step.parts)], source:Generated("hobber")});
-    for (travel in machine.travel) if (travel.id != "X") result.push(alignScrewSupports(travel.id, {lower: travel.lower, upper: travel.upper}));
+    for (travel in machine.travel) if (travel.id == "Z") result.push(alignScrewSupports(travel.id, {lower: travel.lower, upper: travel.upper}));
+    result.push({id:"y-assembly",label:"Y: assemble and indicate the screw module",kind:Assembly,start:Assembled,
+      steps:[for(i => step in machine.yModule.assemblySteps()) note("y"+i,"Y module stage "+(i+1),
+        step.measurement+" Tools: "+step.tools.join(", ")+".",[for(part in step.parts) "Ymodule/"+part])],source:Generated("hobber")});
     result.push(tensionBelt(machine));
     result.push(fitBt30Arbor());
     result.push(alignOutboard());
     result.push(fitChipGuards());
     result = result.concat(serviceAxes(machine));
     result.push(setRails("Z", ["railZLeft", "railZRight"]));
-    result.push(setRails("Y", ["railYLeft", "railYRight"]));
-    var rails = ["X" => ["railXLeft", "railXRight"], "Y" => ["railYLeft", "railYRight"], "Z" => ["railZLeft", "railZRight"]];
+    result.push(setRails("Y", ["Ymodule/railLeft", "Ymodule/railRight"]));
+    var rails = ["X" => ["railXLeft", "railXRight"], "Y" => ["Ymodule/railLeft", "Ymodule/railRight"], "Z" => ["railZLeft", "railZRight"]];
     for (travel in machine.travel) if (rails.exists(travel.id)) result.push(compensateTilt(travel.id, {lower: travel.lower, upper: travel.upper}, rails.get(travel.id)));
     return result;
   }

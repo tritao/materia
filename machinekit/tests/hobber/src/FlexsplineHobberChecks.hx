@@ -212,7 +212,7 @@ class FlexsplineHobberChecks {
         ]) {
         var b = 0.73, c = 1.13;
         state.setJoint("X", x);
-        state.setJoint("Y", y);
+        state.setJoint(FlexsplineHobber.Y, y);
         state.setJoint("Z", z);
         state.setJoint(FlexsplineHobber.A, a);
         state.setJoint(FlexsplineHobber.B, b);

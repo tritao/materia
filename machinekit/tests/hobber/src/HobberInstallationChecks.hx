@@ -128,7 +128,7 @@ class HobberInstallationChecks {
       mounts();
       var actual = machine.hobToWork(state), expected = new HobbingAxes(
         state.joint("X"),
-        state.joint("Y"),
+        state.joint(FlexsplineHobber.Y),
         state.joint("Z"),
         state.joint(FlexsplineHobber.A),
         0,
@@ -187,7 +187,7 @@ class HobberInstallationChecks {
         Math.PI
       ]) {
         state.setJoint("X", x);
-        state.setJoint("Y", y);
+        state.setJoint(FlexsplineHobber.Y, y);
         state.setJoint("Z", z);
         state.setJoint(FlexsplineHobber.A, a);
         state.setJoint(FlexsplineHobber.B, b);

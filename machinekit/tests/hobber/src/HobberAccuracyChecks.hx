@@ -25,7 +25,7 @@ class HobberAccuracyChecks {
     var tool = F.compose(poses.get("hob"), machine.hob.connector("centre").frame);
     var toolWork = F.transformPoint(back, tool.x, tool.y, tool.z);
     for (a in HobberScales.all()) {
-      var housing = poses.get(a.id + "scale"), head = poses.get(a.id + "scaleHead");
+      var housing = poses.get(HobberScales.member(a.id)), head = poses.get(HobberScales.member(a.id,true));
       if (housing == null || head == null) throw 'axis ${a.id} has no scale members';
       var origin = F.transformPoint(back, housing.x, housing.y, housing.z);
       var worldAlong = F.transformVector(housing, 0, 0, 1), along = F.transformVector(back, worldAlong.x, worldAlong.y, worldAlong.z);

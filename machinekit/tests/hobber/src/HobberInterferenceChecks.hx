@@ -34,7 +34,7 @@ class HobberInterferenceChecks {
     var overlaps:Array<Dynamic> = [], checked = 0, began = Sys.time(), completed = 0, unexpected = 0;
     var samples = [{x: machine.travel[0].initial, y: 0.0, z: 0.0, a: 0.0}];
     var setup = FlexsplineHobberPreview.inspectionState(machine);
-    samples.push({x: setup.joint("X"), y: setup.joint("Y"), z: setup.joint("Z"), a: setup.joint(FlexsplineHobber.A)});
+    samples.push({x: setup.joint("X"), y: setup.joint(FlexsplineHobber.Y), z: setup.joint("Z"), a: setup.joint(FlexsplineHobber.A)});
     var job = FlexsplineHobberCam.job(machine);
     for (pass in job.passes) for (z in [pass.zStart, pass.zEnd]) samples.push({
       x: pass.centreDistance,
@@ -85,7 +85,7 @@ class HobberInterferenceChecks {
       for (index in 0...samples.length) {
         var s = samples[index];
         state.setJoint("X", s.x);
-        state.setJoint("Y", s.y);
+        state.setJoint(FlexsplineHobber.Y, s.y);
         state.setJoint("Z", s.z);
         state.setJoint(FlexsplineHobber.A, s.a);
         state.forwardKinematics();
