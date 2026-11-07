@@ -387,7 +387,7 @@ class AssemblyDefinitionFlattener {
           nested.elasticNetworks,
           nested.switches,
           parentVisible && occurrence.visible != false,
-          occurrence.groupPath == null ? groupPrefix : (occurrence.groupPath == "Ungrouped" && groupPrefix != "" ? groupPrefix : (groupPrefix == "" ? "" : groupPrefix + "/") + occurrence.groupPath) + "/" + occurrence.id
+          includeGroup(groupPrefix, occurrence)
         );
         active.remove(nested.id);
         connectors = exposed(nested.exposedConnectors, children, path);
@@ -592,6 +592,16 @@ class AssemblyDefinitionFlattener {
   }
 
   static function scoped(prefix:String, name:String):String return prefix == "" ? name : prefix + "/" + name;
+
+  /**
+   * The group folder an included assembly's members are placed under: the include's own group below the parent's, then a folder
+   * named after the include, unless the occurrence says the include is that group (`includeFolder` false).
+   */
+  static function includeGroup(groupPrefix:String, occurrence:AssemblyComponentOccurrence):String {
+    if (occurrence.groupPath == null) return groupPrefix;
+    var own = occurrence.groupPath == "Ungrouped" && groupPrefix != "" ? groupPrefix : (groupPrefix == "" ? "" : groupPrefix + "/") + occurrence.groupPath;
+    return occurrence.includeFolder == false ? own : own + "/" + occurrence.id;
+  }
 
   static function validName(name:String):Bool return name != null && name.length > 0 && name.indexOf("/") < 0;
 

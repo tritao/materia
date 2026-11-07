@@ -144,12 +144,12 @@ class HobberEnclosurePreview {
       throw error;
     }
   }
-  /** The scene group holding the shell; the shell's own groups sit under its include folder. */
+  /** The scene group the shell is (`includeAsGroup`): its own groups sit directly under it. */
   public static inline final ENCLOSURE_GROUP = "Chip protection and enclosure";
   public static inline final SHELL_ID = "enclosure";
 
-  /** A group inside the shell's folder, so host-side parts (mounts, clamps) sit beside the shell parts they serve. */
-  public static function shellGroup(path:String):String return ENCLOSURE_GROUP + "/" + SHELL_ID + "/" + path;
+  /** A group inside the shell's, so host-side parts (mounts, clamps) sit beside the shell parts they serve. */
+  public static function shellGroup(path:String):String return ENCLOSURE_GROUP + "/" + path;
 
   public static function assembled(?source:FlexsplineHobber): {
     assembly: MachineAssembly,
@@ -159,10 +159,8 @@ class HobberEnclosurePreview {
   } {
     var machine = source == null ? new FlexsplineHobber() : source,
       fit = fitted(machine), shell = new GeneratedEnclosure(fit.layout), assembly = new MachineAssembly();
-    assembly.group("Machine");
-    assembly.include("machine", machine);
-    assembly.group(ENCLOSURE_GROUP);
-    assembly.include(SHELL_ID, shell);
+    assembly.includeAsGroup("Machine", "machine", machine);
+    assembly.includeAsGroup(ENCLOSURE_GROUP, SHELL_ID, shell);
     HobberEnclosureMounts.install(assembly, shell);
     HobberTrayMounts.install(assembly, shell);
     for (name in machine.portNames()) {
