@@ -1,0 +1,103 @@
+package machinekit.motion;
+
+import machinekit.assembly.*;
+import machinekit.component.*;
+import materia.assembly.AssemblyFrames as F;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
+import machinekit.assembly.AxisBuilder.AxisSpec;
+import machinekit.assembly.AssemblyIntegrity.FastenerFitOrder;
+
+/** Screw-driven precision module. The containing machine derives hardware once
+ * for the complete assembly. No hobber layout or part identity enters here. */
+class ScrewLinearModule extends AxisBuilder {
+  public final spec:ScrewLinearModuleSpec;
+  public final travel:AxisSpec;
+  public function new(?spec:ScrewLinearModuleSpec,?hostBase:MachineComponent) {
+    super();this.spec=spec==null?new ScrewLinearModuleSpec():spec;
+    var s=this.spec;
+    travel={id:"travel",lower:-s.stroke/2,upper:s.stroke/2,initial:0.0};
+    group("Ground base and guides");
+    place("base",hostBase==null?made("base"):hostBase,F.identity());
+    for(side in [-1,1]) {
+      var label=side<0?"Left":"Right";
+      attach("riser"+label,made("riser"+label),F.identity(),"base");
+      attach("rail"+label,LinearRail.metric(s.profile,s.railLength),s.railPose(side),"riser"+label);
+    }
+    var blockPoses=[for(side in [-1,1])for(row in [-1,1])blockPose(side,row)];
+    slide(travel,"railLeft","blockLeftFront",LinearRailBlock.metric(s.profile),blockPoses[0],{x:1.0,y:0,z:0},blockPoses,s.overtravel);
+    group("Carriage");
+    attach("carriage",made("carriage"),F.identity(),"blockLeftFront");
+    for(side in [-1,1])for(row in [-1,1])if(side!=-1||row!=-1)
+      attach("block"+(side<0?"Left":"Right")+(row<0?"Front":"Rear"),LinearRailBlock.metric(s.profile),blockPose(side,row),"carriage");
+    attach("nutCarrier",made("nutCarrier"),F.identity(),"carriage");
+    group("Screw drive");
+    var screw=new HzMotionDrawingScrew(s.screwLength,s.drive.endProfile);
+    s.drive.place(this,s.axis(),{fixedHost:"base",floatingHost:"base",nutHost:"nutCarrier"},screw);
+    attach("nut",new BallNut(),s.nutPose(),"nutCarrier");
+    addTransmission("lead","travel","screw-turn",Transmission.LeadScrew("screw","nut"),Sense.Opposite);
+    supportScrew("lead",ScrewSupport.Fixed,s.drive.floating.support);
+    group("Stops");
+    for(role in ScrewLinearModulePart.ROLES)if(StringTools.startsWith(role,"stop"))attach(role,made(role),F.identity(),"base");
+    exposeConnector("mount","base","mount");exposeConnector("carriage","carriage","interface");
+    // Deliberately no controller/drive choice in the mechanical library component.
+    for(requirement in serviceRemovals())addDesignRequirement(requirement);
+  }
+  function made(role:String):ScrewLinearModulePart return new ScrewLinearModulePart(spec.values().setToken("role",role));
+  function blockPose(side:Int,row:Int):AssemblyFrame return AxisBuilder.orient(spec.centre+row*spec.blockSpacing/2,spec.railY(side),
+    spec.baseThickness+spec.riserHeight+spec.guide.railHeight,[0.0,0,1],[1.0,0,0]);
+  public function fittingOrder():Array<FastenerFitOrder> return [
+    {member:"railLeft",fastened:["riserLeft"],faces:["stock-base"]},{member:"railRight",fastened:["riserRight"],faces:["stock-base"]},
+    {member:"carriage",fastened:["motorMount","floatingBearing"],faces:["foot"]}
+  ];
+  /** Every derived joint has one alignment instruction; unknown additions fail
+   * rather than inheriting a precision assumption from their member name. */
+  public function alignment():Map<String,String> {
+    var derived=derivedFasteners();if(derived==null)throw "Derive module joints before alignment";
+    var methods=new Map<String,String>();
+    for(joint in derived.joints) {
+      var member=joint.clampedMember, face=joint.clampedFace, method:String;
+      if(member=="railLeft"||member=="railRight"||member=="motor")method="reference edge";
+      else if(member=="motorMount"||member=="floatingBearing"||member=="nut")method="indicate then match-pin";
+      else if(member=="riserLeft"||member=="riserRight"||StringTools.startsWith(member,"stop"))method="drawing dowels";
+      else if(member=="carriage"&&face=="nut-carrier")method="indicate then match-pin";
+      else if(member=="carriage"&&StringTools.startsWith(face,"block"))method="shim or adjust";
+      else throw 'Module precision joint ${joint.id} needs an alignment declaration';
+      methods.set(joint.id,method);
+    }
+    return methods;
+  }
+  /** Tool IDs are shared with the containing machine's tooling BOM. */
+  public function assemblySteps():Array<{parts:Array<String>,tools:Array<String>,measurement:String}> return [
+    {parts:["base","riserLeft","riserRight"],tools:["straightedge-granite","indicator-base","torque-driver"],measurement:"Inspect bought stock; require 0.01 mm block-pad coplanarity, replicate failing faces before custom grinding. Fit drawing dowels after bolting risers."},
+    {parts:["railLeft","railRight","blockLeftFront","blockLeftRear","blockRightFront","blockRightRear"],tools:["straightedge-granite","indicator-base","block-transfer-sleeves"],measurement:"Locate rails on reference edges, indicate parallel and transfer matched blocks without losing balls."},
+    {parts:["motorMount","floatingBearing","screw","motor"],tools:["drive-alignment-arbor","nut-bore-height-reference","indicator-base","torque-driver"],measurement:"Indicate arbor coaxial and parallel to rails at carriage nut-bore height; tighten then match-drill and ream support dowels. Catalogue motor pilot locates the motor."},
+    {parts:["nut","nutCarrier","carriage"],tools:["indicator-base","torque-driver"],measurement:"Indicate nut carrier to screw at BOTH ends of travel, tighten then match-drill and ream; do not pre-drill carrier dowels. Adjust block pads to coplanarity target."},
+    {parts:["stopFrontLeft","stopFrontRight","stopRearLeft","stopRearRight"],tools:["indicator-base","torque-driver"],measurement:"Fit drawing dowels and verify both overtravel stops engage before screw support contact. Host must limit torque to the bought bearing rating."}
+  ];
+  public function stopContacts():Array<{a:String,b:String}> return [for(role in ScrewLinearModulePart.ROLES)if(StringTools.startsWith(role,"stop")){a:"carriage",b:role}];
+  public function serviceRemovals():Array<machinekit.design.DesignRequirement> return [
+    machinekit.design.DesignRequirement.ServiceRemoval("motor",["motor","motorShaft"],[{direction:[1.0,0,0],distance:spec.drive.motor.rating.shaftLength+10}],[],[]),
+    machinekit.design.DesignRequirement.ServiceRemoval("screw",["screw","coupling","nut"],[{direction:[1.0,0,0],distance:spec.baseMax+10}],
+      ["motor","motorShaft","motorMount","floatingRing"],[]),
+    machinekit.design.DesignRequirement.ServiceRemoval("carriage",["carriage"],[{direction:[0.0,0,1],distance:spec.carriageThickness+20}],[],[])
+  ];
+  /** Rated thrust / peak motor torque, plus the containing machine's declared
+   * payload shear. Half thrust per guide is 2x equal sharing over four blocks. */
+  public function loads(payload:machinekit.assembly.JointSlip.LoadCase):Array<machinekit.assembly.JointSlip.JointLoad> {
+    var nut=new BallNut(),motor=spec.drive.motor.rating;
+    var rated=motor.ratedTorque*2*Math.PI/(nut.lead/1000),peak=motor.peakTorque*2*Math.PI/(nut.lead/1000);
+    var out:Array<machinekit.assembly.JointSlip.JointLoad>=[
+      {label:"Fixed screw support",between:["motorMount","base"],shear:{peak:rated,momentary:peak}},
+      {label:"Nut carrier",between:["carriage","nutCarrier"],shear:{peak:rated,momentary:peak}},
+      {label:"Motor flange",between:["motor","motorMount"],torque:{peak:motor.ratedTorque,momentary:motor.peakTorque}}
+    ];
+    for(side in ["Left","Right"]) {
+      out.push({label:"Rail "+side,between:["rail"+side,"riser"+side],shear:{peak:rated/2,momentary:peak/2}});
+      out.push({label:"Riser "+side,between:["riser"+side,"base"],shear:payload});
+      for(row in ["Front","Rear"])out.push({label:"Guide block "+side+row,between:["carriage","block"+side+row],shear:{peak:rated/2,momentary:peak/2}});
+    }
+    for(role in ScrewLinearModulePart.ROLES)if(StringTools.startsWith(role,"stop"))out.push({label:"End stop "+role,between:[role,"base"],shear:{peak:rated,momentary:peak}});
+    return out;
+  }
+  public function stockAcceptance():String return "ASSUMED stock flatness 0.10 mm plate / 0.05 mm bar; require 0.01 mm block-pad coplanarity. Inspect bought ground stock, replicate failing faces before custom grinding; process qualification remains open.";
+}

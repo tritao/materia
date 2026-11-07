@@ -219,8 +219,8 @@ class SupportedScrewDrive {
       "attach-" + screwId,
       {x: axis.direction[0], y: axis.direction[1], z: axis.direction[2]}
     );
-    builder.attach("motorShaft" + suffix, motor.shaft(), need(at, "motor"), screwId);
     builder.attach("coupling" + suffix, coupling, need(at, "coupling"), screwId);
+    builder.attach("motorShaft" + suffix, motor.shaft(), need(at, "motor"), "coupling" + suffix);
     builder.attach("floatingBearing" + suffix, floating, need(at, "floating"), hosts.floatingHost);
     builder.attach("floatingRing" + suffix, ring, need(at, "ring"), "floatingBearing" + suffix);
     if (nut != null) builder.attach("nut" + suffix, nut, need(at, "nut"), hosts.nutHost);
