@@ -9,6 +9,8 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 /** X is travel, Y across the guides, Z off the ground base. Supplier geometry
  * owns the drive/guide stack; stock acceptance tolerances remain assumptions. */
 class ScrewLinearModuleSpec {
+  public final scaleHousing:SealedScalePart;
+  public final scaleHead:SealedScalePart;
   public final profile:String;
   public final stroke:Float;
   public final overtravel:Float;
@@ -38,16 +40,19 @@ class ScrewLinearModuleSpec {
     var row=LinearRailSystem.catalog().get(profile);if(row==null)throw "Unknown module guide: "+profile;guide=row;
     drive=SupportedScrewDrive.m60dBk12(true);drive.fixed.footPinned=true;drive.floating.footPinned=true;
     var nut=new BallNut(), mount=drive.fixed.spec, bolt=machinekit.standard.SocketHeadCapScrew.catalog().get(guide.blockMountThread);
+    var scale=SealedScalePart.pair("JFT-40",stroke+2*overtravel,"3","5",false,
+      new ComponentValues().setToken("airPort","end").setToken("cableBend","-y"));
+    scaleHousing=scale.housing;scaleHead=scale.head;
     baseThickness=GroundStock.atLeast("plate",16);carriageThickness=GroundStock.atLeast("plate",12);
     carrierThickness=GroundStock.atLeast("flat bar",16);
-    carrierWidth=80; // M6 base bolts at +/-31; match-pins at +/-20, clear of flange bores.
+    carrierWidth=80; // M6 base bolts at +/-33; match-pins at +/-20, clear of flange bores.
     riserHeight=GroundStock.atLeast("flat bar",mount.shaftHeight+nut.flangeDiameter/2+4-guide.blockHeight);
     var widths=GroundStock.barWidths().filter(w->w>=Math.max(guide.railWidth,riserHeight));
     if(widths.length==0)throw "No ground riser section";riserWidth=widths[0];
     railLength=Math.ceil((blockSpacing+guide.blockLength+stroke+2*overtravel+2*guide.railEndMargin)/20)*20;
     carriageLength=Math.ceil((blockSpacing+guide.blockHoleSpacingAlong+3*bolt.diameter)/10)*10;
-    carriageWidth=Math.ceil((railSpacing+guide.blockHoleSpacingAcross+3*bolt.diameter)/10)*10;
-    baseWidth=Math.ceil((railSpacing+riserWidth+24)/10)*10;
+    carriageWidth=Math.ceil(Math.max(railSpacing+guide.blockHoleSpacingAcross+3*bolt.diameter,2*(scaleHeadY()+scaleHead.series.headWidth/2))/10)*10;
+    baseWidth=Math.ceil(Math.max(railSpacing+riserWidth+24,2*(scaleSeatY()+20+GAP))/10)*10;
     if(railSpacing-riserWidth<mount.width+2*GAP)throw "Module rails do not clear the fixed support";
     var half=stroke/2+overtravel, nutLength=nut.bodyLength+nut.flangeThickness;
     var fixedReach=Math.max(nutLength+carrierThickness/2,carriageLength/2);
@@ -61,9 +66,26 @@ class ScrewLinearModuleSpec {
     nutStation=screwLength-centre-nutLength-carrierThickness/2;
     var holes=drive.seatHoles(axis(),screwLength), max=railStart()+railLength+10;
     for(hole in holes)max=Math.max(max,hole.position.x+9);
-    baseMin=Math.floor(Math.min(Math.min(railStart(),drive.floatingEnd-drive.floating.length/2)-10,centre-half-carriageLength/2-60-10)/10)*10;
-    baseMax=Math.ceil(Math.max(max,centre+half+carriageLength/2+60+10)/10)*10;
+    baseMin=Math.floor(Math.min(scaleStart()-GAP,Math.min(Math.min(railStart(),drive.floatingEnd-drive.floating.length/2)-10,centre-half-carriageLength/2-60-10))/10)*10;
+    baseMax=Math.ceil(Math.max(scaleStart()+scaleHousing.overallLength()+GAP,Math.max(max,centre+half+carriageLength/2+60+10))/10)*10;
   }
+  public function scaleSeatThickness():Float {
+    var screw=machinekit.standard.SocketHeadCapScrew.catalog().get("M8");
+    return GroundStock.atLeast("flat bar",1.75*screw.diameter+2*screw.pitch+0.3*screw.diameter+1);
+  }
+  public function scaleReadingY():Float return railSpacing/2+guide.blockWidth/2+GAP+scaleHead.series.headWidth+scaleHousing.gap();
+  public function scaleHoleY():Float return scaleReadingY()+scaleHousing.series.housingWidth-(scaleHousing.series.holeOffset??scaleHousing.series.housingWidth/2);
+  public function scaleSeatY():Float return scaleReadingY()+GAP+20;
+  public function scaleHeadY():Float return scaleReadingY()-scaleHousing.gap()-scaleHead.series.headWidth/2;
+  public function scaleCarrierY():Float return scaleHeadY()-1.0;
+  public function driveBayEnd():Float {
+    var end=railStart()+railLength+10;
+    for(hole in drive.seatHoles(axis(),screwLength))end=Math.max(end,hole.position.x+9);
+    return Math.ceil(Math.max(end,centre+stroke/2+overtravel+carriageLength/2+70)/10)*10;
+  }
+  public function scaleStart():Float return centre-scaleHousing.startOffset()-scaleHousing.measuringLength/2;
+  public function scaleHeadTop():Float return baseThickness+scaleSeatThickness()+scaleHead.series.housingThickness;
+  public function scalePose(head:Bool=false):AssemblyFrame return machinekit.assembly.AxisBuilder.orient(head?centre:scaleStart(),scaleHoleY(),scaleHeadTop(),[0.0,0,-1],[1.0,0,0]);
   public function axis():SupportedScrewDrive.ScrewDriveAxis return {start:[screwLength,0.0,axisHeight()],direction:[-1.0,0,0],normal:[0.0,0,1]};
   public function axisHeight():Float return baseThickness+drive.fixed.spec.shaftHeight;
   public function carriageBottom():Float return baseThickness+riserHeight+guide.blockHeight;
