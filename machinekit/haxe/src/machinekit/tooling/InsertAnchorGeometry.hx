@@ -1155,8 +1155,9 @@ class InsertAnchorGeometry {
               return false;
             }
           }
-          var exposed = keep(keep(Part.fuseAll(hardware)).subtract(exterior));
-          if (keep(exposed.subtract(bulk)).volume() > 1e-6) {
+          // Only the volume, bounds and distance of these results are read, never their operation history: the cached boolean serves them.
+          var exposed = keep(keep(Part.fuseAll(hardware)).combineKept(exterior, cadkit.modeling.Mode.Subtract));
+          if (keep(exposed.combineKept(bulk, cadkit.modeling.Mode.Subtract)).volume() > 1e-6) {
             accepted = false;
           }
           var bounds = exposed.shape.bounds(), lo = bounds.get_min(), hi = bounds.get_max();

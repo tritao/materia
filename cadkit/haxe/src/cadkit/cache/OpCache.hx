@@ -59,6 +59,19 @@ class OpCache {
    * the construction key; see the class comment. Takes no ownership of the inputs. The op name must be one that names only this
    * result form (a history-keeping variant of the same operation uses another name).
    */
+  /** The failure `Shape.toBytes` reports for a shape that does not settle, and the coverage gap named after it. */
+  static final noCanonicalForm = "did not reach a canonical form";
+  static final markerText = "cadkit-op: no canonical form";
+
+  /** For tests: makes every canonicalization fail as a shape that never settles does. */
+  public static var simulateNoCanonicalForm = false;
+
+  static function isMarker(bytes:Bytes):Bool {
+    if (bytes.length != markerText.length) return false;
+    for (index in 0...bytes.length) if (bytes.get(index) != markerText.charCodeAt(index)) return false;
+    return true;
+  }
+
   public static function construct(op:String, params:String, inputs:Array<Shape>, compute:() -> Shape):Shape {
     var key = ShapeKey.op(op, params, inputs);
     var counts = stats();
@@ -77,6 +90,15 @@ class OpCache {
     if (store != null && tier != null) {
       diskKey = "cadkit-op/1\n" + tier + "\n" + key;
       stored = store.read(diskKey);
+      if (stored != null && isMarker(stored)) {
+        // This result has no canonical form (see below): it is built every time, as the history-keeping operation would.
+        var began = Sys.time();
+        var result = compute();
+        counts.unkeyed(noCanonicalForm, Sys.time() - began, size);
+        result.key = null;
+        result.gap = noCanonicalForm;
+        return result;
+      }
       if (stored != null && !DiskStore.verifying()) {
         var restored:Null<Shape> = null;
         try restored = Shape.fromBytes(stored) catch (error:Dynamic) {
@@ -95,11 +117,22 @@ class OpCache {
     var bytes:Bytes = null;
     var canonical:Shape = null;
     try {
+      if (simulateNoCanonicalForm) throw noCanonicalForm;
       bytes = built.toBytes();
       canonical = Shape.fromBytes(bytes);
     } catch (error:Dynamic) {
-      built.close();
-      throw error;
+      if (Std.string(error).indexOf(noCanonicalForm) < 0) {
+        built.close();
+        throw error;
+      }
+      // Some results (an imported supplier solid cut by a slab, say) never settle into a byte-stable form. They cannot be
+      // kept or restored exactly, so they are not cached: the built shape is returned unkeyed, which is what the
+      // history-keeping boolean gave. A marker spares later runs the 32 write-and-read passes that found it out.
+      counts.unkeyed(noCanonicalForm, Sys.time() - began, size);
+      if (diskKey != null && store != null && stored == null) store.write(diskKey, Bytes.ofString(markerText));
+      built.key = null;
+      built.gap = noCanonicalForm;
+      return built;
     }
     built.close();
     counts.miss(Sys.time() - began, size);

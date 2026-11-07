@@ -45,6 +45,44 @@ class ShapeKeySmoke {
     return store;
   }
 
+  /** A result that never settles into a byte-stable form is returned unkeyed, uncached and marked, never an error. */
+  static function noCanonicalForm():Void {
+    var store = freshStore();
+    DiskStore.useProcess(store);
+    OpCache.resetStats();
+    var reference = Shape.box(10, 10, 10).cut(Shape.box(4, 4, 20)).volume();
+    OpCache.resetStats();
+    store.clear();
+    OpCache.simulateNoCanonicalForm = true;
+    var first = Shape.box(10, 10, 10).cut(Shape.box(4, 4, 20));
+    OpCache.simulateNoCanonicalForm = false;
+    var s1 = OpCache.snapshot();
+    check(
+      first.key == null && first.gap != null && first.gap.indexOf("canonical form") >= 0,
+      "a result with no canonical form is unkeyed with that reason"
+    );
+    check(Math.abs(first.volume() - reference) < 1e-9, "and it is the same solid the cache would have given");
+    check(
+      s1.unkeyedCount == 1 && s1.misses == 0 && s1.hits == 0,
+      "it counts as one unkeyed boolean, not a miss: " + s1.unkeyedCount + "/" + s1.misses + "/" + s1.hits
+    );
+    check(store.count() == 1, "a marker was stored so later runs skip the attempt");
+    // Later, with canonicalization working again, the marker is honoured: built every time, never cached.
+    var second = Shape.box(10, 10, 10).cut(Shape.box(4, 4, 20));
+    var s2 = OpCache.snapshot();
+    check(
+      second.key == null && s2.unkeyedCount == 2 && s2.misses == 0,
+      "the marker makes the next run build it unkeyed too: " + s2.unkeyedCount + "/" + s2.misses
+    );
+    check(store.count() == 1, "and nothing else was stored");
+    check(Math.abs(second.volume() - reference) < 1e-9, "with the same volume");
+    // Other operations are unaffected.
+    var other = Shape.box(10, 10, 10).fuse(Shape.box(4, 4, 20));
+    check(other.key != null && OpCache.snapshot().misses == 1, "another operation is still keyed and cached");
+    DiskStore.useProcess(null);
+    store.clear();
+  }
+
   static function negativeZero():Float {
     return 1.0 / Math.NEGATIVE_INFINITY;
   }
@@ -842,6 +880,7 @@ class ShapeKeySmoke {
 
   public static function run():Void {
     keys();
+    noCanonicalForm();
     attributed();
     cache();
     attributedBooleans();
