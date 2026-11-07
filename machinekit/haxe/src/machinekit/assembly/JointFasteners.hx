@@ -1,5 +1,8 @@
 package machinekit.assembly;
 
+import cadkit.modeling.Part;
+import machinekit.component.Solids;
+
 import machinekit.component.BoltedFace;
 import machinekit.component.BoltedFace.BoltHole;
 import machinekit.component.BoltedFace.BoltRecess;
@@ -189,6 +192,19 @@ class JointFasteners {
   public static inline var TOLERANCE:Float = 0.05;
   /** Centre-to-edge distance of a derived hole in a footprint, in nominal diameters. */
   public static inline var EDGE_DIAMETERS:Float = 1.5;
+  /** Lead's 2026-11-07 made-steel thread rule: centre >=d and wall beyond major >=d/2. */
+  public static inline var TAPPED_EDGE_DIAMETERS:Float = 1.0;
+
+  /** Supplier-designed holes are outside the made-part edge rule, by procurement kind. */
+  public static function requiresEdgeCheck(part:MachineComponent):Bool return switch part.bom.procurement {
+    case Buy(_, _, _): false;
+    case _: true;
+  };
+
+  public static function receivingEdgeRadius(face:BoltedFace, diameter:Float):Float return switch face.role {
+    case Receiving(_, _, _, _, Steel): TAPPED_EDGE_DIAMETERS * diameter;
+    case _: EDGE_DIAMETERS * diameter;
+  };
   /** Centre-to-centre distance of holes derived in one footprint, in nominal diameters. */
   public static inline var SPACING_DIAMETERS:Float = 2.5;
   /** Back wall left behind a blind drilling, mm. */
@@ -197,6 +213,138 @@ class JointFasteners {
   public static inline var ACCESS_LENGTH:Float = 25;
   /** Nuts stand this many pitches beyond the plate's washer: the screw shows at least this far past the nut. */
   public static inline var NUT_PROTRUSION_PITCHES:Float = 2;
+
+  /** Actual-solid edge support for every hole of a derived joint. The caller
+   * supplies both finished, posed members after joint machining. No supplier
+   * hole-pattern exceptions are inferred here. Bought members are excluded by
+   * procurement kind; their made mating members are still checked. */
+  public static function checkEdgeSupport(joint:FastenedJoint, receivingFace:BoltedFace,
+    receivingFrame:AssemblyFrame, clampedPart:MachineComponent, receivingPart:MachineComponent,
+    parts:Map<String, Part>, diagnostics:Diagnostics):Void {
+    // Edge distance is a property of the actual member, not the declared rectangular
+    // fastening footprint. Inspect each hole on both sides of every derived joint.
+    var screwSpec = machinekit.standard.SocketHeadCapScrew.catalog().get(joint.size);
+    var clampedClearance = screwSpec.clearanceMedium;
+    var receivingClearance = joint.nutted ? screwSpec.clearanceMedium : joint.tapDrill;
+    var recessDepth = 0.0;
+    var counterboreDiameter = 0.0;
+    var bearingDiameter = screwSpec.headDiameter;
+    var clampedSlot:Null<machinekit.component.BoltedFace.BoltSlot> = null;
+    for (face in clampedPart.fasteningFaces()) if (face.id == joint.clampedFace) clampedSlot = face.slot;
+    for (clampedFace in clampedPart.fasteningFaces()) if (clampedFace.id == joint.clampedFace)
+      switch clampedFace.role {
+        case Clamped(_, clearance, _, recess):
+          clampedClearance = clearance;
+          if (recess != null) {
+            bearingDiameter = Math.max(bearingDiameter, recess.diameter);
+            recessDepth = recess.depth;
+            counterboreDiameter = recess.diameter;
+          }
+        case _:
+      }
+    if (joint.nutted) switch receivingFace.role {
+      case Through(_, clearance, _): receivingClearance = clearance;
+      case _:
+    }
+    for (v in joint.volumes) if (v.name == "head" || v.name == "head washer")
+      bearingDiameter = Math.max(bearingDiameter, v.diameter);
+    var receiverRadius = receivingEdgeRadius(receivingFace, screwSpec.diameter);
+    var receiverFrom = 0.01;
+    var receiverTo = 0.2;
+    var receiverBearingRadius = 0.0;
+    // A through plate is loaded under its far-side nut/washer, as a clamped
+    // counterbore is loaded at its floor. A front pilot recess is not that seat.
+    switch receivingFace.role {
+      case Through(_, _, thickness):
+        receiverFrom = thickness - Math.min(0.2, thickness / 2);
+        receiverTo = thickness - 0.01;
+        for (v in joint.volumes) if (v.name == "nut" || v.name == "nut washer") {
+          receiverBearingRadius = Math.max(receiverBearingRadius, v.diameter / 2 + HEAD_EDGE_WALL);
+          receiverRadius = Math.max(receiverRadius, receiverBearingRadius);
+        }
+      case _:
+    }
+    var supportSections = [
+      {section: "head bearing", member: joint.clampedMember, inner: clampedClearance / 2 + 0.01,
+        outer: requiredEdgeRadius(screwSpec.diameter, bearingDiameter),
+        from: -joint.grip + 0.01, to: -joint.grip + Math.min(0.2, joint.grip / 2)},
+      {section: "receiving face", member: joint.receivingMember, inner: receivingClearance / 2 + 0.01,
+        outer: receiverRadius, from: receiverFrom, to: receiverTo}
+    ];
+    if (recessDepth > 0) supportSections.push({section: "counterbore mouth", member: joint.clampedMember,
+      inner: counterboreDiameter / 2 + 0.01,
+      outer: requiredEdgeRadius(screwSpec.diameter, counterboreDiameter),
+      from: -joint.grip - recessDepth + 0.01,
+      to: -joint.grip - recessDepth + Math.min(0.2, recessDepth / 2)});
+    for (side in supportSections) {
+      if (!requiresEdgeCheck(side.member == joint.clampedMember ? clampedPart : receivingPart)) continue;
+      var body = parts.get(side.member);
+      if (body == null) throw 'Missing fastener edge-check member ${side.member}';
+      for (point in joint.hostHoles) {
+        var at = AssemblyFrames.compose(receivingFrame, AssemblyFrames.translation(point.x, point.y, 0));
+        var slot = side.member == joint.receivingMember ? receivingFace.slot : clampedSlot;
+        var support = edgeSupportFraction(body, at, side.inner, side.outer, side.from, side.to, slot);
+        if (support < 0.99999) diagnostics.warning("fasteners.edge-support", joint.id,
+          '${joint.id}: ${side.member} lacks actual face support around ${joint.size} hole '
+          + '(${edgeRound(point.x)}, ${edgeRound(point.y)}), ${side.section}: ${edgeRound(100 * support)}% of required wall; '
+          + 'required supported radius ${side.outer} mm; made-part clearance edge >=1.5d, steel thread edge >=d '
+          + '(wall beyond thread major >=0.5d), head/counterbore wall >=${HEAD_EDGE_WALL} mm');
+      }
+    }
+  }
+
+  /** Minimum material beyond a head/counterbore; stated design requirement, mm. */
+  public static inline final HEAD_EDGE_WALL = 1.0;
+
+  public static function requiredEdgeRadius(screwDiameter:Float, bearingDiameter:Float):Float {
+    if (!(screwDiameter > 0) || !(bearingDiameter > 0)
+      || !Math.isFinite(screwDiameter + bearingDiameter)) throw "Invalid fastener edge dimensions";
+    return Math.max(EDGE_DIAMETERS * screwDiameter, bearingDiameter / 2 + HEAD_EDGE_WALL);
+  }
+
+  /** Fraction of the required annular wall present in the actual solid.
+   * A section just inside the face avoids counting a neighbouring part as support.
+   * The input body is borrowed; every temporary native shape is released. */
+  public static function edgeSupportFraction(body:Part, frame:AssemblyFrame, innerRadius:Float,
+    outerRadius:Float, from:Float, to:Float, ?slot:machinekit.component.BoltedFace.BoltSlot):Float {
+    if (!(innerRadius > 0) || !(outerRadius > innerRadius) || !(to > from)
+      || !Math.isFinite(innerRadius + outerRadius + from + to)) throw "Invalid edge-support annulus";
+    if (slot != null && slot.width / 2 + 0.01 >= outerRadius) throw "Slot leaves no edge-support section";
+    var ring = slot == null ? Solids.cut(Part.cylinderSpan(outerRadius, from, to),
+      [Part.cylinderSpan(innerRadius, from - 1, to + 1)])
+      : Solids.cut(edgeCapsule(outerRadius, slot, from, to),
+        [edgeCapsule(Math.max(innerRadius, slot.width / 2 + 0.01), slot, from - 1, to + 1)]);
+    var probe:Null<Part> = null;
+    var overlap:Null<Part> = null;
+    try {
+      probe = PosedParts.moved(ring, frame);
+      overlap = body.intersect(probe);
+      var expected = ring.volume();
+      var result = Math.max(0.0, Math.min(1.0, overlap.volume() / expected));
+      overlap.close();
+      probe.close();
+      ring.close();
+      return result;
+    } catch (e:Dynamic) {
+      if (overlap != null) overlap.close();
+      if (probe != null) probe.close();
+      ring.close();
+      throw e;
+    }
+  }
+
+  static function edgeCapsule(radius:Float, slot:machinekit.component.BoltedFace.BoltSlot, from:Float, to:Float):Part {
+    var h = slot.halfTravel;
+    var alongX = slot.axis == "x";
+    var bridge = Part.box(alongX ? 2*h : 2*radius, alongX ? 2*radius : 2*h, to-from);
+    var shifted = bridge.translated(new cadkit.modeling.Vector(0, 0, from));
+    bridge.close();
+    return Solids.union([shifted,
+      Part.cylinderSpan(radius, from, to, alongX ? -h : 0, alongX ? 0 : -h),
+      Part.cylinderSpan(radius, from, to, alongX ? h : 0, alongX ? 0 : h)]);
+  }
+
+  static function edgeRound(value:Float):Float return Math.round(value * 1000) / 1000;
 
   public static function derive(assembly:MachineAssembly, ?options:FastenerOptions):FastenerDerivation {
     var result = new FastenerDerivation();
@@ -617,10 +765,11 @@ class JointFasteners {
       var at = AssemblyFrames.transformPoint(local, hole.x, hole.y, 0);
       points.push({x: at.x, y: at.y});
       if (tappedHoles == null) {
-        if (!over(b.face, at.x, at.y, tolerance, EDGE_DIAMETERS * spec.diameter)) diagnostics.error(
+        var requiredEdge = receivingEdgeRadius(b.face, spec.diameter);
+        if (!over(b.face, at.x, at.y, tolerance, requiredEdge)) diagnostics.error(
           "fasteners.edge",
           id,
-          '$id: hole ${index + 1} at (${round(at.x)}, ${round(at.y)}) is within ${EDGE_DIAMETERS} diameters of the edge of the '
+          '$id: hole ${index + 1} at (${round(at.x)}, ${round(at.y)}) needs ${round(requiredEdge)} mm to the edge of the '
           + 'receiving footprint ${round(b.face.width)} x ${round(b.face.height)} or outside it'
         );
       } else {

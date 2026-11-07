@@ -485,6 +485,22 @@ and readers reject anything else. It contains:
 Status: first slice done (local main 15c70f491): the bench mill's rail and motor screws are derived and the B6
 declarations are deleted. Second slice below (items 1-3 of the old open list, and the nut flange adopters).
 
+Made-part hole edge check (lead ruling,2026-11-07; project design limits, not vendor data):
+`JointFasteners.checkEdgeSupport` inspects the actual finished bearing face at every derived
+hole. Bought parts' own holes are excluded by `Procurement.Buy`; their made mates are checked.
+Clearance holes require centre-to-edge>=1.5d; steel tapped holes>=d, leaving>=0.5d wall beyond
+the major-thread radius. Other materials retain1.5d. Counterbores and heads must remain on
+the face; the extra1 mm head/counterbore wall is an ASSUMED project allowance.
+The plain check reports `fasteners.edge-support` findings by member and joint. Enlarge the
+made part or report the finding; there is no certified-material exception mechanism. These
+reported findings do not waive ordinary hole, head-interference or tool-access errors.
+
+Declared adjustment slots are checked with a swept capsule outside their own opening,
+including both travel endpoints; they cannot disappear into a round-hole exclusion.
+For a through plate, the receiving bearing section is under the far-side nut/washer,
+not inside a front pilot recess. The ordinary head or counterbore floor is checked
+at its actual bearing section, with the counterbore mouth checked separately.
+
 Vocabulary (one path, no hand-declared fallback):
 
 - `component/BoltedFace` is the port a part declares through
