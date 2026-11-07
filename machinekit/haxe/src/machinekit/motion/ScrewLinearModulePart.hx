@@ -16,7 +16,7 @@ class ScrewLinearModulePart extends MachineComponent {
   static final recipe=new machinekit.cache.Once<ComponentType>();
   public final spec:ScrewLinearModuleSpec;
   public final role:String;
-  public static final ROLES=["base","riserLeft","riserRight","carriage","nutCarrier","stopFrontLeft","stopFrontRight","stopRearLeft","stopRearRight"];
+  public static final ROLES=["base","riserLeft","riserRight","carriage","nutCarrier","stopFrontLeft","stopFrontRight","stopRearLeft","stopRearRight","scaleSeat","scaleHeadCarrier"];
   public static function parameters():Array<ComponentParameter> return [P.choice("role",ROLES,"base"),
     P.text("profile","HGH15CA"),P.length("stroke",20),P.length("railSpacing",150),P.length("blockSpacing",80),P.length("overtravel",5)];
   public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.motion.screw-linear-module-part",parameters(),v->new ScrewLinearModulePart(v),false,false,null,false)
@@ -28,7 +28,9 @@ class ScrewLinearModulePart extends MachineComponent {
   public function new(?overrides:ComponentValues) {
     var v=P.resolve(parameters(),overrides);spec=new ScrewLinearModuleSpec(v.token("profile"),v.number("stroke"),v.number("railSpacing"),v.number("blockSpacing"),v.number("overtravel"));role=v.token("role");
     super(numberFor(v),"Precision screw module "+role,"steel",false,v);
-    var stock=StringTools.startsWith(role,"riser")?GroundStock.bar(spec.riserWidth,spec.riserHeight)
+    var stock=role=="scaleSeat"?GroundStock.bar(40,spec.scaleSeatThickness())
+      :role=="scaleHeadCarrier"?GroundStock.bar(20,GroundStock.atLeast("flat bar",spec.carriageBottom()-spec.scaleHeadTop()+0.5))
+      :StringTools.startsWith(role,"riser")?GroundStock.bar(spec.riserWidth,spec.riserHeight)
       :StringTools.startsWith(role,"stop")?GroundStock.bar(60,20)
       :role=="nutCarrier"?GroundStock.bar(spec.carrierWidth,spec.carrierThickness)
       :GroundStock.plate(GroundStock.STEEL,role=="carriage"?spec.carriageThickness:spec.baseThickness);
@@ -43,7 +45,7 @@ class ScrewLinearModulePart extends MachineComponent {
   function side():Int return StringTools.endsWith(role,"Left")?-1:1;
   public function carrierFace(into:Float):AssemblyFrame return BoltedFace.frameOf({x:spec.centre+spec.carrierThickness/2,y:0.0,z:spec.axisHeight()},{x:into,y:0.0,z:0},{x:0.0,y:0,z:1});
   public static function carrierPins():Array<BoltHole> return [{x:0.0,y:-20.0},{x:0.0,y:20.0}];
-  public static function carrierBolts():Array<BoltHole> return [{x:0.0,y:-31.0},{x:0.0,y:31.0}];
+  public static function carrierBolts():Array<BoltHole> return [{x:0.0,y:-33.0},{x:0.0,y:33.0}];
   public function stopCentre():{x:Float,y:Float} {
     var front=StringTools.startsWith(role,"stopFront"), half=spec.stroke/2+spec.overtravel;
     return {x:spec.centre+(front?-1:1)*(half+spec.carriageLength/2+30),y:side()*(spec.drive.fixed.spec.width/2+ScrewLinearModuleSpec.GAP+10)};
@@ -51,6 +53,7 @@ class ScrewLinearModulePart extends MachineComponent {
   override public function fasteningFaces():Array<BoltedFace> {
     var s=spec, faces:Array<BoltedFace>=[];
     if(role=="base") {
+      faces.push(BoltedFace.drilledToSuit("scale-seat",plane(s.scaleStart()+s.scaleHousing.overallLength()/2,s.scaleSeatY(),s.baseThickness,-1),s.scaleHousing.overallLength(),40,12,s.baseThickness,BoltedFace.ThreadMaterial.Steel,"M6"));
       // Non-overlapping receiver footprints, independently indicated and pinned.
       for(support in ["fixed","floating"]) {
         var points=[for(h in s.drive.seatHoles(s.axis(),s.screwLength))if(h.support==support&&h.kind=="tapped")h.position];
@@ -73,10 +76,20 @@ class ScrewLinearModulePart extends MachineComponent {
         [for(x in [-1,1])for(y in [-1,1]){x:x*s.guide.blockHoleSpacingAlong/2,y:y*s.guide.blockHoleSpacingAcross/2}],screw.clearanceMedium,s.carriageThickness-(screw.headHeight+0.2),s.guide.blockMountThread,{diameter:screw.counterboreDiameter,depth:screw.headHeight+0.2},false));
       var carrierScrew=machinekit.standard.SocketHeadCapScrew.catalog().get("M6");
       faces.push(BoltedFace.clamped("nut-carrier",plane(s.centre,0,s.carriageBottom(),1),carrierBolts(),carrierScrew.clearanceMedium,s.carriageThickness-carrierScrew.counterboreDepth,"M6",{diameter:carrierScrew.counterboreDiameter,depth:carrierScrew.counterboreDepth},false));
+      var headScrew=machinekit.standard.SocketHeadCapScrew.catalog().get("M4");
+      faces.push(BoltedFace.clamped("scale-head-carrier",plane(s.centre,s.scaleCarrierY(),s.carriageBottom(),1),[{x:-30.0,y:0.0},{x:30.0,y:0.0}],headScrew.clearanceMedium,s.carriageThickness-headScrew.counterboreDepth,"M4",{diameter:headScrew.counterboreDiameter,depth:headScrew.counterboreDepth},false));
       faces.push(BoltedFace.drilledToSuit("host",plane(s.centre,0,s.carriageBottom()+s.carriageThickness,-1),s.carriageLength,s.carriageWidth,8,s.carriageThickness,BoltedFace.ThreadMaterial.Steel));
     } else if(role=="nutCarrier") {
       faces.push(BoltedFace.drilledToSuit("nut",carrierFace(-1),2*s.carrierReach(),s.carrierWidth,s.carrierThickness,s.carrierThickness,BoltedFace.ThreadMaterial.Steel,"M5",true));
       faces.push(BoltedFace.drilledToSuit("carriage",plane(s.centre,0,s.carriageBottom(),-1),s.carrierThickness,s.carrierWidth,10,s.carrierHeight(),BoltedFace.ThreadMaterial.Steel,"M6"));
+    } else if(role=="scaleSeat") {
+      var screw=machinekit.standard.SocketHeadCapScrew.catalog().get("M6"),length=s.scaleHousing.overallLength();
+      faces.push(BoltedFace.clamped("base",plane(s.scaleStart(),s.scaleSeatY(),s.baseThickness,1),[{x:35.0,y:0.0},{x:length-35,y:0.0}],screw.clearanceMedium,s.scaleSeatThickness()-screw.counterboreDepth,"M6",{diameter:screw.counterboreDiameter,depth:screw.counterboreDepth},false));
+      faces.push(BoltedFace.drilledToSuit("housing",plane(s.scaleStart()+length/2,s.scaleHoleY(),s.baseThickness+s.scaleSeatThickness(),-1),length,40,1.75*8,s.scaleSeatThickness(),BoltedFace.ThreadMaterial.Steel,"M8"));
+    } else if(role=="scaleHeadCarrier") {
+      faces.push(BoltedFace.drilledToSuit("carriage",plane(s.centre,s.scaleCarrierY(),s.carriageBottom(),-1),80,12,10,s.carriageBottom()-s.scaleHeadTop(),BoltedFace.ThreadMaterial.Steel,"M4"));
+      var headFrame=F.compose(F.compose(s.scalePose(true),s.scaleHead.fasteningFaces()[0].frame),F.translation(s.scaleHead.series.headHoleOffset,0,0));
+      faces.push(BoltedFace.drilledToSuit("head",F.compose(headFrame,F.fromRotationMatrix(0,0,0,[1.0,0,0,0,-1,0,0,0,-1])),80,12,10,s.carriageBottom()-s.scaleHeadTop(),BoltedFace.ThreadMaterial.Steel,"M4"));
     } else {
       var p=stopCentre(),height=s.carriageBottom()+s.carriageThickness-s.baseThickness,screw=machinekit.standard.SocketHeadCapScrew.catalog().get("M6");
       faces.push(BoltedFace.clamped("base",plane(p.x,p.y,s.baseThickness,1),[{x:-20.0,y:0.0},{x:20.0,y:0.0}],screw.clearanceMedium,height-screw.counterboreDepth,"M6",{diameter:screw.counterboreDiameter,depth:screw.counterboreDepth},false));
@@ -107,6 +120,7 @@ class ScrewLinearModulePart extends MachineComponent {
     var s=spec,body:Part;
     if(role=="base") {
       body=box(s.baseMin,s.baseMax,-s.baseWidth/2,s.baseWidth/2,0,s.baseThickness);
+      if(s.baseMax>s.driveBayEnd())body=Solids.cut(body,[box(s.driveBayEnd(),s.baseMax+1,-s.drive.fixed.spec.width/2-ScrewLinearModuleSpec.GAP,s.drive.fixed.spec.width/2+ScrewLinearModuleSpec.GAP,-1,s.baseThickness+1)]);
       // Shallow clearance in the ground body, derived from carrier reach and travel.
       var reach=s.carrierReach(),depth=Math.max(0.0,ScrewLinearModuleSpec.GAP+1-(s.drive.fixed.spec.shaftHeight-reach));
       body=Solids.cut(body,[box(s.centre-s.stroke/2-s.overtravel-s.carrierThickness/2-2,s.centre+s.stroke/2+s.overtravel+s.carrierThickness/2+2,
@@ -115,6 +129,8 @@ class ScrewLinearModulePart extends MachineComponent {
     else if(role=="carriage")body=box(s.centre-s.carriageLength/2,s.centre+s.carriageLength/2,-s.carriageWidth/2,s.carriageWidth/2,s.carriageBottom(),s.carriageBottom()+s.carriageThickness);
     else if(role=="nutCarrier")body=Solids.cut(box(s.centre-s.carrierThickness/2,s.centre+s.carrierThickness/2,-s.carrierWidth/2,s.carrierWidth/2,s.axisHeight()-s.carrierReach(),s.carriageBottom()),
       [Part.cylinderAlong(new BallNut().screwDiameter/2+ScrewLinearModuleSpec.GAP+0.2,new Vector(s.centre-s.carrierThickness/2-1,0,s.axisHeight()),Vector.X(),s.carrierThickness+2)]);
+    else if(role=="scaleSeat")body=box(s.scaleStart(),s.scaleStart()+s.scaleHousing.overallLength(),s.scaleSeatY()-20,s.scaleSeatY()+20,s.baseThickness,s.baseThickness+s.scaleSeatThickness());
+    else if(role=="scaleHeadCarrier")body=box(s.centre-40,s.centre+50,s.scaleCarrierY()-6,s.scaleCarrierY()+6,s.scaleHeadTop(),s.carriageBottom());
     else {var p=stopCentre();body=box(p.x-30,p.x+30,p.y-10,p.y+10,s.baseThickness,s.carriageBottom()+s.carriageThickness);}
     return machined(body);
   }

@@ -36,6 +36,12 @@ class ScrewLinearModule extends AxisBuilder {
     attach("nut",new BallNut(),s.nutPose(),"nutCarrier");
     addTransmission("lead","travel","screw-turn",Transmission.LeadScrew("screw","nut"),Sense.Opposite);
     supportScrew("lead",ScrewSupport.Fixed,s.drive.floating.support);
+    group("Sealed scale");
+    attach("scaleSeat",made("scaleSeat"),F.identity(),"base");
+    attach("scaleHousing",s.scaleHousing,s.scalePose(),"scaleSeat");
+    attach("scaleHeadCarrier",made("scaleHeadCarrier"),F.identity(),"carriage");
+    attach("scaleHead",s.scaleHead,s.scalePose(true),"scaleHeadCarrier");
+    addEncoder("position","travel","scaleHead");exposePort("position-feedback","scaleHead","biss");exposePort("scale-air","scaleHousing","air");
     group("Stops");
     for(role in ScrewLinearModulePart.ROLES)if(StringTools.startsWith(role,"stop"))attach(role,made(role),F.identity(),"base");
     exposeConnector("mount","base","mount");exposeConnector("carriage","carriage","interface");
@@ -47,6 +53,7 @@ class ScrewLinearModule extends AxisBuilder {
     spec.baseThickness+spec.riserHeight+spec.guide.railHeight,[0.0,0,1],[1.0,0,0]);
   public function fittingOrder():Array<FastenerFitOrder> return [
     {member:"railLeft",fastened:["riserLeft"],faces:["stock-base"]},{member:"railRight",fastened:["riserRight"],faces:["stock-base"]},
+    {member:"scaleHousing",fastened:["scaleSeat"],faces:["base"]},
     {member:"carriage",fastened:["motorMount","floatingBearing"],faces:["foot"]}
   ];
   /** Every derived joint has one alignment instruction; unknown additions fail
@@ -59,6 +66,7 @@ class ScrewLinearModule extends AxisBuilder {
       if(member=="railLeft"||member=="railRight"||member=="motor")method="reference edge";
       else if(member=="motorMount"||member=="floatingBearing"||member=="nut")method="indicate then match-pin";
       else if(member=="riserLeft"||member=="riserRight"||StringTools.startsWith(member,"stop"))method="drawing dowels";
+      else if(member=="scaleSeat"||member=="scaleHousing"||member=="scaleHead"||member=="carriage"&&face=="scale-head-carrier")method="shim or adjust";
       else if(member=="carriage"&&face=="nut-carrier")method="indicate then match-pin";
       else if(member=="carriage"&&StringTools.startsWith(face,"block"))method="shim or adjust";
       else throw 'Module precision joint ${joint.id} needs an alignment declaration';
@@ -72,6 +80,7 @@ class ScrewLinearModule extends AxisBuilder {
     {parts:["railLeft","railRight","blockLeftFront","blockLeftRear","blockRightFront","blockRightRear"],tools:["straightedge-granite","indicator-base","block-transfer-sleeves"],measurement:"Locate rails on reference edges, indicate parallel and transfer matched blocks without losing balls."},
     {parts:["motorMount","floatingBearing","screw","motor"],tools:["drive-alignment-arbor","nut-bore-height-reference","indicator-base","torque-driver"],measurement:"Indicate arbor coaxial and parallel to rails at carriage nut-bore height; tighten then match-drill and ream support dowels. Catalogue motor pilot locates the motor."},
     {parts:["nut","nutCarrier","carriage"],tools:["indicator-base","torque-driver"],measurement:"Indicate nut carrier to screw at BOTH ends of travel, tighten then match-drill and ream; do not pre-drill carrier dowels. Adjust block pads to coplanarity target."},
+    {parts:["scaleSeat","scaleHousing","scaleHeadCarrier","scaleHead"],tools:["indicator-base","feeler-gauges","af3-low-profile-key","air-fitting-socket"],measurement:"Reference housing seat to guide edge. Indicate housing to 0.1 mm and head to 0.05 mm parallelism. Fit carrier face to measured stack (0.5 mm each-way allowance ASSUMED); set lateral offset within 0.2 mm, gap 1 +/-0.3 mm at the head; confirm the reading window and 75 mm cable bend. Head screws use the low-profile key from below and slide the head out longitudinally for service."},
     {parts:["stopFrontLeft","stopFrontRight","stopRearLeft","stopRearRight"],tools:["indicator-base","torque-driver"],measurement:"Fit drawing dowels and verify both overtravel stops engage before screw support contact. Host must limit torque to the bought bearing rating."}
   ];
   public function stopContacts():Array<{a:String,b:String}> return [for(role in ScrewLinearModulePart.ROLES)if(StringTools.startsWith(role,"stop")){a:"carriage",b:role}];
@@ -79,7 +88,9 @@ class ScrewLinearModule extends AxisBuilder {
     machinekit.design.DesignRequirement.ServiceRemoval("motor",["motor","motorShaft"],[{direction:[1.0,0,0],distance:spec.drive.motor.rating.shaftLength+10}],[],[]),
     machinekit.design.DesignRequirement.ServiceRemoval("screw",["screw","coupling","nut"],[{direction:[1.0,0,0],distance:spec.baseMax+10}],
       ["motor","motorShaft","motorMount","floatingRing"],[]),
-    machinekit.design.DesignRequirement.ServiceRemoval("carriage",["carriage"],[{direction:[0.0,0,1],distance:spec.carriageThickness+20}],[],[])
+    machinekit.design.DesignRequirement.ServiceRemoval("scaleHead",["scaleHead"],[{direction:[-1.0,0,0],distance:spec.centre-spec.baseMin+spec.scaleHead.series.headLength+20}],[],[]),
+    machinekit.design.DesignRequirement.ServiceRemoval("scaleHousing",["scaleHousing"],[{direction:[0.0,1,0],distance:spec.baseWidth}],["scaleHead"],[]),
+    machinekit.design.DesignRequirement.ServiceRemoval("carriage",["carriage","scaleHeadCarrier","scaleHead"],[{direction:[0.0,0,1],distance:spec.carriageThickness+20}],[],[])
   ];
   /** Rated thrust / peak motor torque, plus the containing machine's declared
    * payload shear. Half thrust per guide is 2x equal sharing over four blocks. */
@@ -96,8 +107,26 @@ class ScrewLinearModule extends AxisBuilder {
       out.push({label:"Riser "+side,between:["riser"+side,"base"],shear:payload});
       for(row in ["Front","Rear"])out.push({label:"Guide block "+side+row,between:["carriage","block"+side+row],shear:{peak:rated/2,momentary:peak/2}});
     }
+    for(connection in [["scaleSeat","base"],["scaleHousing","scaleSeat"],["scaleHead","scaleHeadCarrier"],["carriage","scaleHeadCarrier"]])
+      out.push({label:"Scale "+connection[0],between:connection,shear:{peak:20.0,momentary:40.0}}); // ASSUMED includes 4 N scale drag and moving cable.
     for(role in ScrewLinearModulePart.ROLES)if(StringTools.startsWith(role,"stop"))out.push({label:"End stop "+role,between:[role,"base"],shear:{peak:rated,momentary:peak}});
     return out;
   }
-  public function stockAcceptance():String return "ASSUMED stock flatness 0.10 mm plate / 0.05 mm bar; require 0.01 mm block-pad coplanarity. Inspect bought ground stock, replicate failing faces before custom grinding; process qualification remains open.";
+  /** Worst-case setting allowance, not a supplier height-tolerance claim.
+   * Fit the separate carrier's head face to the measured stack; leave 0.5 mm
+   * stock each way. Native slots/clearance set gap and parallelism at the head. */
+  public function scaleAdjustment():{normalStack:Float,normalFit:Float,gapStack:Float,gapAdjustment:Float} {
+    var screw=machinekit.standard.SocketHeadCapScrew.catalog().get("M4");
+    var headHole=spec.scaleHead.series.headHoleDiameter;if(headHole==null)throw "Scale head needs its catalogue mounting holes";
+    // ASSUMED: base flatness, riser thickness, block height, scale-seat thickness, carrier finish.
+    return {normalStack:0.10+0.05+0.02+0.05+0.02,normalFit:0.5,
+      gapStack:0.05+0.05+0.02+0.10,
+      gapAdjustment:(screw.clearanceMedium-screw.diameter)/2+(headHole-screw.diameter)/2};
+  }
+  public function stockAcceptance():String {
+    var plate=machinekit.structural.GroundStock.plate(machinekit.structural.GroundStock.STEEL,spec.baseThickness);
+    var bar=machinekit.structural.GroundStock.bar(spec.riserWidth,spec.riserHeight);
+    var worst=plate.flatness*Math.max(spec.baseMax-spec.baseMin,spec.baseWidth)/100+bar.flatness*spec.railLength/100+0.02;
+    return 'ASSUMED conservative stock/block bound $worst mm (plate/bar figures per100 mm, block height variation0.02 ASSUMED) versus0.01 mm required block-pad coplanarity. Inspect bought ground stock, replicate failing faces before custom grinding; process qualification remains open.';
+  }
 }
