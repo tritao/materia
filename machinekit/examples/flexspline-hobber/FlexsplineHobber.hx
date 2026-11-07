@@ -264,7 +264,10 @@ class FlexsplineHobber extends MachineAssembly {
     }
     group("Bed and column");
     includeAt("column", column, FoundationLayout.worldPose("column"));
-    fixExisting("column-mount", "Xbridge", "column/basePlate", F.alongY(centre + 326, 0, HobberSaddle.xCarriageTop(), 0, 0, 1));
+    var firstSolePad = FoundationLayout.columnSolePads()[0];
+    fixExisting("column-mount", "Xbridge", "column/"+firstSolePad.id,
+      F.alongY(centre+(firstSolePad.x0+firstSolePad.x1)/2,(firstSolePad.y0+firstSolePad.y1)/2,
+        HobberSaddle.xCarriageTop(),0,0,1));
     group("Z axis");
     for (placed in HobberRailPlacement.placements("column", FoundationLayout.placements("column"))) {
       var insert = "column/" + placed.insertId;
