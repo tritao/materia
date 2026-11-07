@@ -202,6 +202,17 @@ class HobberSaddle extends MachineComponent {
       {diameter: screw.headDiameter + 2, depth: thickness - sole});
   }
 
+  /** One joint declaration also reserves its source drilling before cast-anchor
+   * selection. Anchor hardware must never be selected through a service thread. */
+  public static function columnSoleFace(pad:machinekit.hobbing.FoundationLayout.ColumnSolePad):BoltedFace {
+    var cx=(pad.x0+pad.x1)/2;
+    var cy=(pad.y0+pad.y1)/2;
+    return BoltedFace.clamped("column-sole-"+pad.id,
+      BoltedFace.frameOf({x:cx,y:cy,z:xCarriageTop()},{x:0,y:0,z:-1},{x:1,y:0,z:0}),
+      [for (x in pad.boltXs) {x:x-cx,y:cy-pad.boltY}],
+      9.0,11.0,"M8",{diameter:15.0,depth:9.0},false);
+  }
+
   /** The nut block's base end on the carriage, saddle or seat that carries it: two clearance holes for the block's tapped base, `grip` of material, in this part's frame (`origin` is the part frame's origin in the work frame). */
   static function nutBlockFace(axis:HobberDriveAxis, grip:Float, origin:Array<Float>, ?recess:machinekit.component.BoltedFace.BoltRecess):BoltedFace {
     var block = HobberDrives.nutBlock(axis, new machinekit.motion.BallNut());
@@ -358,6 +369,8 @@ class HobberSaddle extends MachineComponent {
         for (side in [-1, 1]) for (row in [HobberXLayout.BLOCK_FRONT, HobberXLayout.BLOCK_REAR])
           faces.push(blockFace("block" + (side < 0 ? "L" : "R") + (row == HobberXLayout.BLOCK_FRONT ? "1" : "2"), [row, side * FoundationLayout.BED_RAIL_CENTRE, xCarriageBottom()],
             [0.0, 0, 1], [1.0, 0, 0], block, 20, X_BLOCK_SOLE));
+        // Two derived M8 per ground corner pad, spread over the whole column base.
+        for (pad in FoundationLayout.columnSolePads()) faces.push(columnSoleFace(pad));
         faces.push(nutBlockFace(HobberDrives.x(), X_CARRIAGE_THICKNESS, [0.0, 0, 0]));
         faces = faces.concat(HobberChipCover.carriageReceivers());
         // The X scale head's two M4 enter from the seat side (below, before the carriage is set on the rails) and thread into the rib's underside.

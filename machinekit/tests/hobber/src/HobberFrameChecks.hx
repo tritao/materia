@@ -28,6 +28,8 @@ class HobberFrameChecks {
         {member: "spindle/belt", fastened: ["spindle/motor"]},
         {member: "column/", fastened: ["Xbridge"], faces: ["blockL1", "blockL2", "blockR1", "blockR2", "nut-block"]},
         {member: "XscaleHead", fastened: ["Xrib-scale"], faces: ["plate"]},
+        // Tighten the sole after lowering the column, before fitting its removable skirt.
+        {member: "Xskirt", fastened: ["Xbridge"], faces: [for (pad in machinekit.hobbing.FoundationLayout.columnSolePads()) "column-sole-"+pad.id]},
         // The ring's heads are sunk at the plate end: its screws into the output flange are fitted before the swivel plate goes on.
         {member: "swivelPlate", fastened: ["swivel/output"]},
         // The outboard support's carrier is screwed to the saddle plate's face before the plate is (its driver axis passes the plate).

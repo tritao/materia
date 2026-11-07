@@ -139,7 +139,27 @@ class HobberPartTests {
       0,
       "bed radial length covers loading retract"
     );
-    near(new MineralCastColumn().body.parameterNumber("height"), 500, 0, "moving column height");
+    var column = new MineralCastColumn();
+    near(column.body.parameterNumber("height"), 500, 0, "moving column height");
+    check(column.components().filter(entry -> entry.id == "basePlate").length == 0,
+      "column sole uses separate supported corners, without the replaced rear strip");
+    for (pad in FoundationLayout.columnSolePads()) {
+      var matches=column.components().filter(entry -> entry.id == pad.id);
+      check(matches.length == 1,"one physical column sole pad "+pad.id);
+      var insert:CastInsert=cast matches[0].component;
+      check(insert.parameterToken("stockMaterial") == "c45-en-1.0503-ground", "sole precision comes from bought ground stock "+pad.id);
+      check(insert.parameterToken("finish") == "as-supplied", "sole does not prescribe custom grinding before measurement "+pad.id);
+      var spec=insert.insertSpec();
+      var service=spec.holes.filter(hole -> StringTools.startsWith(hole.id,"soleJoint"));
+      check(service.length == 2,"sole joint drilling reserved before anchor selection "+pad.id);
+      switch spec.anchorage {
+        case Bolted(rules,_):
+          var demand=rules.demand.servicePreloads.filter(load -> StringTools.startsWith(load.holeId,"soleJoint"));
+          check(demand.length == 2,"both sole service preloads size the cast anchors "+pad.id);
+          check(demand[0].preloadN+demand[1].preloadN>30000,"anchor demand includes structural sole preload "+pad.id);
+        case _: throw "Column sole lacks declared bolted cast anchors: "+pad.id;
+      }
+    }
     var largeBearing = new CrossedRollerBearing(new ComponentValues().setNumber("outside", 180).setNumber("bore", 150));
     check(
       largeBearing.bom.partNumber != new CrossedRollerBearing().bom.partNumber,
