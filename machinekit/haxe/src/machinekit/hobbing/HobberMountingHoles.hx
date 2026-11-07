@@ -49,7 +49,7 @@ class HobberMountingHoles {
     if (kind == "column") for (pad in FoundationLayout.columnSolePads())
       for (index in 0...result.length) if (result[index].id == pad.id) {
         var row=result[index];
-        result[index]={id:row.id,pose:row.pose,openings:row.openings,part:addSoleHoles(row,pad)};
+        result[index]={id:row.id,purpose:row.purpose,pose:row.pose,openings:row.openings,part:addSoleHoles(row,pad)};
       }
     return result;
   }
