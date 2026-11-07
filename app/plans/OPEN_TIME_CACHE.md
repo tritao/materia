@@ -160,4 +160,17 @@ Tessellation meshes an independent copy, so it never changes its input or its `b
   differ from it differ only in normals (threaded fasteners and feet, whose booleans now return the canonical form). The earlier "JSON key
   building ~13 %" was a double count: it is 7.6 % over four callers (`AssemblyDefinitionFlattener.flatten`, `BeltPoseContext`,
   `InsertHoleCodec.snapshot`, `solvedPoses`), no single fix.
+- 2026-11-08 Stage 7 (landed, materia 79ccb6672 + haxeon 6c910e58): JSON was the largest non-cache cost after stage 6. Two causes: (1)
+  `haxe.format.JsonPrinter.enter` scanned every active ancestor with `Dynamic ==` on each array/object (slow in HashLink: `$enum-dynamic-equal`,
+  66 % of `JsonWireWriter.getString`; it affects every `JsonWire.encode`), now an identity-keyed `ObjectMap` with the same cycle semantics;
+  (2) `BeltPoseContext.new` made a full JSON copy of the machine's assembly definition on every `DriveSystem.derive`/`solvedPoses`, now it
+  copies only what it changes (couplings, actuators, encoders, elasticNetworks, joint limits/stop; `BeltPoseTests` keeps the old constructor as
+  the oracle, 45 checks). Matched sampler profile of the MineralCasting-edit run: phases build 31/fit 10/export 26 (67 s) -> 19/6/17 (42 s),
+  samples 22185 -> 14608. Artifact digest unchanged (`ef53215727e1edf8`) in all four runs; wall-clock matrix at load 10-16 is not comparable
+  (cache off 208 s, cold 229 s, warm 33 s, edit 119 s). Left: `InsertHoleCodec.snapshot` 5.8 %, the flattener's JsonWire decode 3.3 %.
+  NEGATIVE RESULT, do not retry: keying `anchor-derivations` by the body solid's `Shape.key` cannot make it hit after a casting code edit, because
+  the memo's own identity is `InsertAnchorGeometry`'s import closure (1184 modules, whole program) and MineralCasting is reached by five
+  routes (InsertAnchorGeometry -> MineralFoundation typedef; CastInsert -> registry; HobberChipCover -> HobberFoundationSizing; RadialPinionAssembly ->
+  CastingVolumeAgreement; RackMesh -> RadialPinionAssembly). Only narrowing that identity (module lists / annotations, rejected) or the import
+  refactor (abandoned) would change it; the same holds for the sibling anchor memos.
 
