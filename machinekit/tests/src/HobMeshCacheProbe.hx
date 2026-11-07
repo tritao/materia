@@ -8,6 +8,10 @@ import machinekit.hobbing.Hob;
 /** Builds one hob display mesh and prints its digest and time: run it in separate processes against one cache directory. */
 class HobMeshCacheProbe {
   public static function main():Void {
+    for (module in ["machinekit.hobbing.HobMesh", "machinekit.hobbing.HobSolid", "machinekit.hobbing.Hob", "machinekit.cache.Memo"])
+      Sys.println("identity " + module + " " + machinekit.cache.CodeIdentity.of(module));
+    Sys.println("native " + machinekit.cache.Memos.nativeIdentity());
+    if (Sys.getEnv("PROBE_IDENTITIES_ONLY") == "1") return;
     var hob = new Hob(new ComponentValues().setBoolean("renderTeeth", true).setNumber("height", Std.parseFloat(Sys.getEnv("PROBE_HEIGHT") ?? "40")));
     var facet = ComponentDisplayMesh.of(hob);
     if (facet == null) throw "no display mesh facet";

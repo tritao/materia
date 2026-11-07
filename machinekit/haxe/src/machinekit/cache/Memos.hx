@@ -26,12 +26,16 @@ class Memos {
   public static function independent(shape:Shape):Shape return shape.translate(new cadkit.modeling.Vector(0, 0, 0).native());
 
   /**
-   * The native build the stored shapes' numbers came from, as part of every persistent key. CadKit's naming scheme version plus
-   * `MATERIA_MEMO_SALT` (set it, or clear the cache, after rebuilding CadKit or OCCT in a way that changes results).
+   * The native build every persistent value came from: the CadKit libraries this program loads (their content), the OCCT
+   * prefix in use (`CADKIT_OCCT_DIR`, whose directory name carries OCCT's revision) and `MATERIA_MEMO_SALT` (set it after
+   * changing something the other two cannot see). Null when the program has no CadKit build beside it, which turns the
+   * persistent tier off.
    */
-  public static function nativeIdentity():String {
-    var salt = Sys.getEnv("MATERIA_MEMO_SALT");
-    return "naming" + Shape.namingScheme() + (salt == null ? "" : "+" + salt);
+  public static function nativeIdentity():Null<String> {
+    var cadkit = haxeon.build.CodeIdentity.nativeBuild("cadkit");
+    if (cadkit == null) return null;
+    var occt = Sys.getEnv("CADKIT_OCCT_DIR"), salt = Sys.getEnv("MATERIA_MEMO_SALT");
+    return "cadkit:" + cadkit + (occt == null ? "" : "|occt:" + occt) + (salt == null ? "" : "|salt:" + salt) + "|naming:" + Shape.namingScheme();
   }
 
   public static function register(table:MemoTable):Void {

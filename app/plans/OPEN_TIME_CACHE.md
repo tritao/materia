@@ -46,9 +46,10 @@ Until OC1 lands there is no trustworthy code identity: `CodeIdentity.of` returns
 
 - **OC2. Persistent memo tier. DONE.** `DiskStore`, `Memo.persist`, `Codecs`, verify mode; `PersistentMemoTests`
   (54 checks); first user `HobMesh.build`.
-- **OC1. Code identity.** haxeon emits module-closure fingerprints with the build and a runtime lookup; tests: editing a module
+- **OC1. Code identity. DONE** (haxeon d463bd509). haxeon emits module-closure fingerprints with the build and a runtime lookup; tests: editing a module
   changes its own and its dependants' fingerprints and nothing else; identical across clean and incremental builds.
-- **OC1b. Native identity.** CadKit/OCCT build hash at runtime, into every key.
+- **OC1b. Native identity. DONE.** `CodeIdentity.nativeBuild(package)` hashes the libraries published beside the program; OCCT is
+  covered by `CADKIT_OCCT_DIR` and `MATERIA_MEMO_SALT` (its libraries live outside the program directory).
 - **OC5. Shape serialization.** `cad_shape_write/read` with names and attributes; round-trip tests: names, volume, face and
   edge counts, tessellation byte-identical, a boolean on a restored shape equals one on the original.
 - **OC3. Component-boundary cache.** Castings, hob mesh, anchor windows, sizing layouts, bounds per component; scene parts
@@ -64,3 +65,7 @@ Target: (a) about the compile plus 20 s; (b) the casting rebuilt, everything els
 
 - 2026-11-07 OC2 done. Hob display mesh (default hob, debug build): 153 s computed, 0.09 s from the persistent tier in a new
   process, digest identical; a different parameter set is a separate entry. The mesh entry is 38 MB.
+- 2026-11-07 OC1/OC1b done. Identity per module = source (64-bit) + imports' identities (cycles condensed) + compiler + defines,
+  written as one generated literal per compile (<= 8 ms for 1500 modules). Persistent memos are on by default; a module's
+  identity changes with its own or a dependency's edit (HobSolid edit changed HobMesh/HobSolid/Hob, which form an import cycle,
+  and not Memo). Hob mesh with real identities: 142 s miss, 0.08 s hit in a new process.

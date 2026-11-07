@@ -1,14 +1,11 @@
 package machinekit.cache;
 
 /**
- * Which code computed a persistent memo's values. Until the compiler provides module-closure fingerprints (OC1) there is no
- * trustworthy identity, so this returns null (the persistent tier stays off) unless `MATERIA_MEMO_STANDIN` is set. The
- * stand-in identity is that variable's value, for measuring and for tests: it never changes with the code, so whoever sets
- * it owns clearing the cache after a code change.
+ * Which code computed a persistent memo's values: the compiler's fingerprint of a module and everything it imports
+ * (`haxeon.build.CodeIdentity`). Editing the module or a module it depends on changes it, so values computed by the old code
+ * are never read; editing any other module does not. Null (the persistent tier stays off) for a module the program does not
+ * contain, which also catches a misspelt module name.
  */
 class CodeIdentity {
-  public static function of(moduleName:String):Null<String> {
-    var standIn = Sys.getEnv("MATERIA_MEMO_STANDIN");
-    return standIn == null || standIn == "" ? null : moduleName + "@" + standIn;
-  }
+  public static function of(moduleName:String):Null<String> return haxeon.build.CodeIdentity.ofModule(moduleName);
 }

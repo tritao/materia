@@ -106,12 +106,14 @@ class Memo<V> implements MemoTable {
    * Adds the persistent tier: a miss in memory is looked up on disk before it is computed, and a computed value is stored.
    * `identity` names the code that computes the values (see `CodeIdentity`); an entry made under another identity is never
    * read. `encode` and `decode` must round-trip exactly, since the cached scene has to equal an uncached one to the bit.
-   * With `MATERIA_MEMO_VERIFY=1` a disk hit is recomputed and compared, and any difference throws. Does nothing when the
-   * process has no store (`MATERIA_MEMO=off`) or the identity is null (no trustworthy code identity yet).
+   * With `MATERIA_MEMO_VERIFY=1` a disk hit is recomputed and compared, and any difference throws. The key also carries the native
+   * build (`Memos.nativeIdentity`). Does nothing when the process has no store (`MATERIA_MEMO=off`), the module is unknown
+   * (null identity) or no CadKit build sits beside the program.
    */
   public function persist(identity:Null<String>, encode:V -> Bytes, decode:Bytes -> V):Memo<V> {
     var store = DiskStore.process();
-    disk = store == null || identity == null ? null : new MemoDisk<V>(store, identity, encode, decode);
+    var native = store == null || identity == null ? null : Memos.nativeIdentity();
+    disk = store == null || identity == null || native == null ? null : new MemoDisk<V>(store, identity + "|" + native, encode, decode);
     return this;
   }
 
@@ -306,6 +308,6 @@ private class MemoDisk<V> {
     this.decode = decode;
   }
 
-  /** Everything a stored value depends on, as one text: format, memo, code identity, native build, input key. */
-  public function keyFor(name:String, key:String):String return "memo/1\n" + name + "\n" + identity + "\n" + Memos.nativeIdentity() + "\n" + key;
+  /** Everything a stored value depends on, as one text: format, memo, code and native identity, input key. */
+  public function keyFor(name:String, key:String):String return "memo/1\n" + name + "\n" + identity + "\n" + key;
 }

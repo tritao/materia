@@ -86,7 +86,7 @@ class PersistentMemoTests {
   static function damage():Void {
     var store = freshStore();
     var runs = [0];
-    var key = "memo/1\npersist-f\nid1\n" + machinekit.cache.Memos.nativeIdentity() + "\nk";
+    var key = "memo/1\npersist-f\nid1\nk";
     memo("persist-f", store, "id1", runs).get("k", () -> compute(runs, 5));
     var path = store.fileFor(key);
     check(FileSystem.exists(path), "the entry file is where the key says");
@@ -198,6 +198,38 @@ class PersistentMemoTests {
     check(failed, "trailing bytes are refused");
   }
 
+  /** The compiler's module identities and the native build, wired through `persist`. */
+  static function realIdentities():Void {
+    var memoId = machinekit.cache.CodeIdentity.of("machinekit.cache.Memo");
+    var storeId = machinekit.cache.CodeIdentity.of("machinekit.cache.DiskStore");
+    check(memoId != null && memoId.length == 32, "a module in the program has a 32-character identity: " + memoId);
+    check(storeId != null && storeId != memoId, "different modules have different identities");
+    check(memoId == machinekit.cache.CodeIdentity.of("machinekit.cache.Memo"), "an identity is stable within a run");
+    check(machinekit.cache.CodeIdentity.of("machinekit.no.SuchModule") == null, "an unknown module has no identity");
+    var native = machinekit.cache.Memos.nativeIdentity();
+    check(native != null && native.indexOf("cadkit:") == 0, "the CadKit build beside the program has an identity: " + native);
+    check(native == machinekit.cache.Memos.nativeIdentity(), "and it is stable");
+
+    var store = freshStore();
+    DiskStore.useProcess(store);
+    var runs = [0];
+    function make(module:String):Memo<Array<Float>> return new Memo<Array<Float>>("persist-real", 8, list -> list.copy())
+      .persist(machinekit.cache.CodeIdentity.of(module), Codecs.floats, Codecs.unfloats);
+    make("machinekit.cache.Memo").get("k", () -> compute(runs, 1));
+    make("machinekit.cache.Memo").get("k", () -> compute(runs, 1));
+    check(runs[0] == 1 && store.count() == 1, "with real identities a second memo reads what the first stored");
+    make("machinekit.cache.DiskStore").get("k", () -> compute(runs, 1));
+    check(runs[0] == 2 && store.count() == 2, "another module's identity is another entry");
+    make("machinekit.no.SuchModule").get("k", () -> compute(runs, 1));
+    make("machinekit.no.SuchModule").get("k", () -> compute(runs, 1));
+    check(runs[0] == 4 && store.count() == 2, "an unknown module leaves the tier off");
+    DiskStore.useProcess(null);
+    make("machinekit.cache.Memo").get("other", () -> compute(runs, 1));
+    make("machinekit.cache.Memo").get("other", () -> compute(runs, 1));
+    check(runs[0] == 6 && store.count() == 2, "with no process store (MATERIA_MEMO=off) nothing is stored");
+    store.clear();
+  }
+
   public static function main():Void {
     roundTrip();
     invalidation();
@@ -206,6 +238,7 @@ class PersistentMemoTests {
     verify();
     concurrent();
     meshCodec();
+    realIdentities();
     Sys.println("persistent memo tests: " + passed + " checks passed");
   }
 }
