@@ -1,7 +1,10 @@
 import haxe.io.Bytes;
 import machinekit.cache.Codecs;
 import machinekit.cache.DiskStore;
+import cadkit.modeling.Part;
 import machinekit.cache.Memo;
+import machinekit.cache.Memos;
+import machinekit.component.Solids;
 import machinekit.cache.Parallel;
 import sys.FileSystem;
 
@@ -230,6 +233,62 @@ class PersistentMemoTests {
     store.clear();
   }
 
+
+  static function block(runs:Array<Int>, width:Float):Part {
+    runs[0]++;
+    return Solids.cut(Part.box(width, 20, 30), [Part.cylinderSpan(4, -5, 40, 2, 3), Part.cylinderSpan(2, 5, 40, -3, -6)]);
+  }
+
+  static function bytesOf(part:Part):String {
+    var b = part.shape.toBytes();
+    var buf = new StringBuf();
+    for (i in 0...b.length) buf.add(StringTools.hex(b.get(i), 2));
+    return buf.toString();
+  }
+
+  /** Solids: the value is the canonical form on a miss, a disk hit and with the tier off, and verify mode accepts it. */
+  static function shapes():Void {
+    var store = freshStore();
+    DiskStore.useProcess(store);
+    var runs = [0];
+    var first = Memos.persistentParts("persist-shape", 8, "PersistentMemoTests");
+    var a = first.get("k", () -> block(runs, 10));
+    check(runs[0] == 1 && store.count() == 1, "a solid miss builds once and stores one entry");
+    var aBytes = bytesOf(a);
+    var again = first.get("k", () -> block(runs, 10));
+    check(runs[0] == 1 && bytesOf(again) == aBytes, "a memory hit is the same bytes");
+    // Meshing a handed-out copy must not change what the memo hands out next.
+    a.shape.tessellate(0.1);
+    check(bytesOf(first.get("k", () -> block(runs, 10))) == aBytes, "meshing a copy leaves the kept value alone");
+    var next = Memos.persistentParts("persist-shape", 8, "PersistentMemoTests");
+    var b = next.get("k", () -> block(runs, 10));
+    check(runs[0] == 1 && next.stats().diskHits == 1, "a later memo restores the solid from disk without building");
+    check(bytesOf(b) == aBytes, "the restored solid has the miss's bytes");
+    check(b.shape.tessellate(0.1).vertexCount == a.shape.tessellate(0.1).vertexCount, "and the same mesh size");
+    check(Math.abs(b.volume() - a.volume()) == 0, "and exactly the same volume");
+    DiskStore.useProcess(null);
+    var off = Memos.persistentParts("persist-shape", 8, "PersistentMemoTests");
+    var c = off.get("k", () -> block(runs, 10));
+    check(runs[0] == 2 && bytesOf(c) == aBytes, "with the tier off the computed value is the same canonical bytes");
+    DiskStore.useProcess(store);
+    DiskStore.forceVerify(true);
+    try {
+      var vm = Memos.persistentParts("persist-shape", 8, "PersistentMemoTests");
+      var v = vm.get("k", () -> block(runs, 10));
+      check(runs[0] == 3 && bytesOf(v) == aBytes, "verify mode recomputes and accepts an honest hit");
+      var message = "";
+      try Memos.persistentParts("persist-shape", 8, "PersistentMemoTests").get("k", () -> block(runs, 11)) catch (error:Dynamic) message = Std.string(error);
+      check(message.indexOf("stale") >= 0, "verify mode refuses a solid whose recomputation differs: " + message);
+    } catch (error:Dynamic) {
+      DiskStore.forceVerify(null);
+      DiskStore.useProcess(null);
+      throw error;
+    }
+    DiskStore.forceVerify(null);
+    DiskStore.useProcess(null);
+    store.clear();
+  }
+
   public static function main():Void {
     roundTrip();
     invalidation();
@@ -238,6 +297,7 @@ class PersistentMemoTests {
     verify();
     concurrent();
     meshCodec();
+    shapes();
     realIdentities();
     Sys.println("persistent memo tests: " + passed + " checks passed");
   }

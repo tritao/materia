@@ -14,6 +14,25 @@ class Memos {
   public static function parts(name:String, capacity:Int):machinekit.cache.Memo<Part> return new machinekit.cache.Memo<Part>(name, capacity, part -> new Part(independent(part.shape)),
     part -> part.close());
 
+  /**
+   * Native solids kept on disk too (see `Memo.persist`): the key must name every input (a component's `geometryKey`), `module`
+   * is the qualified name of the module whose code computes them. Values are the canonical form (`Shape.canonical`) on a miss,
+   * with the tier on or off.
+   */
+  public static function persistentParts(name:String, capacity:Int, module:String):machinekit.cache.Memo<Part> return parts(name, capacity)
+    .canonicalize(canonicalPart).persist(CodeIdentity.of(module), part -> part.shape.toBytes(), bytes -> new Part(Shape.fromBytes(bytes)));
+
+  static function canonicalPart(part:Part):Part {
+    try {
+      var restored = part.shape.canonical();
+      part.close();
+      return new Part(restored);
+    } catch (error:Dynamic) {
+      part.close();
+      throw error;
+    }
+  }
+
   /** Native shapes, each caller getting its own deep copy (see `Memo`). */
   public static function shapes(name:String, capacity:Int):machinekit.cache.Memo<Shape> return new machinekit.cache.Memo<Shape>(name, capacity, shape -> independent(shape),
     shape -> shape.close());

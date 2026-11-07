@@ -43,6 +43,7 @@ class Memo<V> implements MemoTable {
   var computeSeconds:Float;
   var diskHitCount:Int;
   var disk:Null<MemoDisk<V>>;
+  var canonical:Null<V -> V>;
 
   /**
    * `copyOut` gives each caller its own value (identity when omitted: the value must then never be changed by anyone);
@@ -65,6 +66,7 @@ class Memo<V> implements MemoTable {
     computeSeconds = 0;
     diskHitCount = 0;
     disk = null;
+    canonical = null;
     Memos.register(this);
   }
 
@@ -91,6 +93,7 @@ class Memo<V> implements MemoTable {
     }
     var began = Sys.time();
     var value = compute();
+    if (canonical != null) value = canonical(value);
     var seconds = Sys.time() - began;
     if (tier != null && diskKey != null) {
       var encoded = tier.encode(value);
@@ -100,6 +103,16 @@ class Memo<V> implements MemoTable {
       } else tier.store.write(diskKey, encoded);
     }
     return keep(key, value, seconds);
+  }
+
+  /**
+   * Every computed value passes through `fn` (which takes ownership of its argument) before it is kept, whether or not the
+   * persistent tier is on, so a miss and a hit give the same value. For native shapes `fn` is `Shape.canonical`: a shape
+   * restored from bytes differs from the one built in last-bit details, and results must not depend on the cache state.
+   */
+  public function canonicalize(fn:V -> V):Memo<V> {
+    canonical = fn;
+    return this;
   }
 
   /**

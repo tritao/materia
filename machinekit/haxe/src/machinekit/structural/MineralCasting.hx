@@ -121,7 +121,7 @@ class MineralCasting extends MachineComponent {
    * times (sizing its mass, fitting the enclosure around it, exporting the scene). Build it once per recipe key and hand each
    * caller its own copy.
    */
-  static final geometries = machinekit.cache.Memos.parts("mineral-casting-geometry", 8);
+  static final geometries = machinekit.cache.Memos.persistentParts("mineral-casting-geometry", 8, "machinekit.structural.MineralCasting");
 
   override public function geometry(detail:ComponentDetail = Preview):Part return geometries.get(geometryKey(detail), () -> build(detail));
 
