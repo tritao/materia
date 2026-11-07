@@ -86,15 +86,25 @@ class SealedScaleStepTests {
     near(hb.get_max().get_z() - hb.get_min().get_z(), m.headLength, 'ML $ml head body length');
     near(hb.get_max().get_x() - hb.get_min().get_x(), m.headThickness, 'ML $ml head body thickness');
     near(hb.get_max().get_y() - readingY, housing.gap() + m.headWidth, 'ML $ml head top above the reading face (gap + height)');
-    var slotsAt = [], slotWidth = [], boreWidth = [], slotY = [];
+    var slotsAt = [], slotWidth = [], boreWidth = [], slotY = [], boreTop:Array<Float> = [];
     for (c in cylinders(body)) if (Math.abs(Math.abs(c.d[0]) - 1) < 1e-6) {
       if (Math.abs(c.r - 2.3) < 1e-6) {
         slotsAt.push(c.o[2] - hb.get_min().get_z());
         slotY.push(c.o[1] - readingY - housing.gap());
         slotWidth.push(2 * c.r);
       }
-      if (Math.abs(c.r - 3.8) < 1e-6) boreWidth.push(c.max[0] - c.min[0]);
+      if (Math.abs(2 * c.r - (m.headCounterbore ?? 0)) < 1e-6) {
+        boreWidth.push(c.max[0] - c.min[0]);
+        boreTop.push(c.o[1] + c.r);
+      }
     }
+    // The counterbores are the maker's: their diameter is the datasheet's, and the wall they leave to the head's top edge is
+    // measured here rather than assumed (it is thin on this head).
+    // The STEP splits each arc face in two, so the four arcs (two slots, both ends) appear as four or eight faces.
+    check(boreWidth.length == 4 || boreWidth.length == 8, 'ML $ml head has a counterbore arc at each end of both slots, found ${boreWidth.length}');
+    var thinnest = Math.POSITIVE_INFINITY;
+    for (top in boreTop) thinnest = Math.min(thinnest, hb.get_max().get_y() - top);
+    Sys.println('ML $ml head counterbore wall to the top edge (maker STEP): ' + Math.round(thinnest * 100) / 100 + ' mm');
     slotsAt.sort(Reflect.compare);
     check(slotsAt.length == 4, 'ML $ml head has two slots of two arcs, found ${slotsAt.length} arcs');
     near(slotsAt[1] - slotsAt[0], m.headHoleSlot, 'ML $ml slot length (arc centres)', 0.01);

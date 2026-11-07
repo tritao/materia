@@ -268,14 +268,14 @@ class EditorPerspectiveViewport implements View implements Observable {
   ):Void {
     // Ordinary editor refreshes rebind the same generated record while the preview owns a temporary controller.
     if (offsetOriginal != null
-      && record == offsetOriginal.record && definition == offsetOriginal.definition && !readOnly) return;
+      && offsetOriginal.matchesSource(record, definition) && !readOnly) return;
     if (offsetOriginal != null) cancelPresentationOffsetEdit();
     this.readOnly = readOnly;
     var current = presentation;
     if (current == null && (record == null || definition == null)) return;
-    if (current != null && current.record == record && current.definition == definition) return;
+    if (current != null && current.matchesSource(record, definition)) return;
     var next = record == null || definition == null ? null : new PresentationController(definition, record);
-    if (next != null && current != null && current.definition == definition) next.retainCursor(current);
+    if (next != null && current != null && current.matchesDefinition(definition)) next.retainCursor(current);
     presentation = next;
     presentationCenters = centers;
     presentationScale = scale;
@@ -624,7 +624,7 @@ class EditorPerspectiveViewport implements View implements Observable {
   @:unobservable var hoverSceneRevision:Int = -1;
   var objectDrag:Null<PerspectiveSceneDrag> = null;
   /** An IK drag of a joint-driven part: the pressed point follows a screen-parallel plane. */
-  var assemblyDrag:Null<SceneAssemblyDrag> = null;
+  var assemblyDrag:Null<FrameAssemblyDrag> = null;
   var assemblyDragPlane:Array<Float> = [0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
   var assemblyDragRevision:Int = 0;
   /** The face mate being picked (see `MatePickTool`), or null. */
@@ -1334,9 +1334,15 @@ class EditorPerspectiveViewport implements View implements Observable {
     if (drag == null) return false;
     var normal = camera.viewDirection();
     assemblyDragPlane = [hit.x, hit.y, hit.z, normal[0], normal[1], normal[2]];
-    assemblyDrag = drag;
+    assemblyDrag = new FrameAssemblyDrag(drag);
     assemblyDragRevision++;
     return true;
+  }
+
+  /** Apply input before panels, collision queries and presentation sample this frame. */
+  public function flushAssemblyDrag():Void {
+    var drag = assemblyDrag;
+    if (drag != null && drag.flush()) assemblyDragRevision++;
   }
 
   function updateAssemblyDrag(localX:Float, localY:Float):Void {
@@ -2336,8 +2342,11 @@ class EditorPerspectiveViewport implements View implements Observable {
       } else if (navigationMode == 6 && sketchPointDragging) {
         endSketchPointDrag(event.kind == UiEventKind.PointerUp);
       } else if (navigationMode == 5 && assemblyDrag != null) {
-        if (event.kind == UiEventKind.PointerUp) assemblyDrag.commit();
-        else assemblyDrag.cancel();
+        if (event.kind == UiEventKind.PointerUp) {
+          assemblyDrag.setFreeDetents((event.modifiers & UiModifier.Alt) != 0);
+          updateAssemblyDrag(event.localX, event.localY);
+          assemblyDrag.commit();
+        } else assemblyDrag.cancel();
         assemblyDrag = null;
         assemblyDragRevision++;
       } else if (navigationMode == 4 && sketchDrag != null) {

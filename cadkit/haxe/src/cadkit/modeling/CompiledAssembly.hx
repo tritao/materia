@@ -24,6 +24,10 @@ class CompiledAssembly {
     kinematics = AssemblyKinematics.compile(definition);
   }
 
+  /** Validates changing coordinates against this model's already validated immutable topology. */
+  public function validateState(state:materia.assembly.AssemblyDefinition.AssemblyStateRecord):Void
+    AssemblyDefinitionCodec.validateStateForValidatedDefinition(definition, state);
+
   /** Snapshot caller-owned editable data; later edits cannot affect this model. */
   public static function snapshot(source:AssemblyDefinition):CompiledAssembly {
     AssemblyDefinitionCodec.validate(source);
