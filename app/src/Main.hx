@@ -1181,11 +1181,17 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
     }
     if (hierarchyMenuVisible && documentDialog == null) {
       var sceneLink = projectVariants.navigation(treeModel.selectionKey());
-      var objectItems = [new MenuItem(
+      var copiedItem = app.editor.SceneTreeReference.capture(treeModel, treeModel.selectionKey(),
+        session.projectReference ?? session.path, session.projectVariant ?? session.projectJob);
+      var objectItems = app.editor.SceneTreeReference.copyItems(copiedItem, text -> {
+        ui.clipboard.writeText(text);
+        hierarchyMenuVisible = false;
+        invalidateView();
+      }).concat([new MenuItem(
         "visibility",
         "Show / hide (Space)",
         function() treeModel.toggleVisibility(treeModel.selectionKey()),
-        !documents.blocked()
+        !documents.blocked(), null, true
       ), new MenuItem(
         "isolate",
         "Isolate selected",
@@ -1221,7 +1227,7 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
           "Frame selected",
           function() commands.execute("scene.frame-selected"),
           scene.object(scene.selectedId) != null
-        )];
+        )]);
       if (sceneLink != null) objectItems.unshift(new MenuItem("open-linked-scene", sceneLink.label, function() {
         projectVariants.navigate(sceneLink);
         hierarchyMenuVisible = false;

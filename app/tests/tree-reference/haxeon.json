@@ -1,0 +1,1 @@
+{"version":1,"package":{"name":"scene-tree-reference-tests"},"entry":"SceneTreeReferenceTests","sourceRoots":["."],"dependencies":{"app":{"path":"../.."}},"target":"host","outputDir":"build"}

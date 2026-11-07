@@ -51,6 +51,11 @@ children; showing a hidden parent preserves child settings. **Show all** and
 **Isolate selected** are also available in the popup. Escape or an outside click
 closes it. Visibility controls remain available during simulation.
 
+Right-click any scene-tree row for **Copy reference** or **Copy name**. A reference
+contains the scene, source project/document and variant when available, readable
+ownership path and exact occurrence/group/feature key. Copy name omits visibility
+and count decorations. Both actions work during playback and in read-only projects.
+
 Right-click an object or group for **Isolate selected** or **Show all**. Isolation
 preserves hidden descendants when the selected row is a group; Show all clears
 all visibility masks and enables every object's Visible setting. These actions
