@@ -272,6 +272,11 @@ class Shape {
     }
   }
 
+  /** The version text of the OCCT this CadKit was built against (the same text shape bytes carry). */
+  public static function occtVersion():String {
+    return CadKit.occtVersion();
+  }
+
   public static function namingScheme():Int {
     return CadKit.namingSchemeVersionChecked();
   }

@@ -94,6 +94,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_mesh_index_count(mesh: cad_mesh, out_count: ptr<u32> @out) -> cad_result;
 	extern fn cad_mesh_vertex_count(mesh: cad_mesh, out_count: ptr<u32> @out) -> cad_result;
 	extern fn cad_naming_scheme_version(out_version: ptr<u32> @out) -> cad_result;
+	extern fn cad_occt_version() -> utf8 @borrowed;
 	extern fn cad_operation_destroy(operation: cad_operation) -> void;
 	extern fn cad_operation_history_count(operation: cad_operation, relation: cad_history_relation, out_count: ptr<u32> @out) -> cad_result;
 	extern fn cad_operation_history_source_at(operation: cad_operation, relation: cad_history_relation, index: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;

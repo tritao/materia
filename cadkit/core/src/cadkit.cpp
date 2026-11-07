@@ -4297,6 +4297,10 @@ extern "C" CADKIT_API void cad_operation_destroy(cad_operation operation) {
     release_operation_locked(operation);
 }
 
+extern "C" CADKIT_API const char* cad_occt_version(void) {
+    return OCC_VERSION_STRING_EXT;
+}
+
 extern "C" CADKIT_API const char* cad_last_error(void) {
     return g_last_error.c_str();
 }

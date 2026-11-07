@@ -45,16 +45,19 @@ class Memos {
   public static function independent(shape:Shape):Shape return shape.translate(new cadkit.modeling.Vector(0, 0, 0).native());
 
   /**
-   * The native build every persistent value came from: the CadKit libraries this program loads (their content), the OCCT
-   * prefix in use (`CADKIT_OCCT_DIR`, whose directory name carries OCCT's revision) and `MATERIA_MEMO_SALT` (set it after
-   * changing something the other two cannot see). Null when the program has no CadKit build beside it, which turns the
-   * persistent tier off.
+   * The native build every persistent value came from: the CadKit libraries this program loads (their content), the OCCT it
+   * runs on (its version text and the names and sizes of the loaded `libTK*` libraries, never their location: the same OCCT
+   * installed elsewhere gives the same identity), the naming scheme version and `MATERIA_MEMO_SALT` (set it after changing
+   * something these cannot see). Null when the program has no CadKit build beside it, which turns the persistent tier off.
    */
   public static function nativeIdentity():Null<String> {
     var cadkit = haxeon.build.CodeIdentity.nativeBuild("cadkit");
     if (cadkit == null) return null;
-    var occt = Sys.getEnv("CADKIT_OCCT_DIR"), salt = Sys.getEnv("MATERIA_MEMO_SALT");
-    return "cadkit:" + cadkit + (occt == null ? "" : "|occt:" + occt) + (salt == null ? "" : "|salt:" + salt) + "|naming:" + Shape.namingScheme();
+    // The first CadKit call loads the native library and with it OCCT's, so ask for the version before listing what is loaded.
+    var version = Shape.occtVersion(), salt = Sys.getEnv("MATERIA_MEMO_SALT");
+    var libraries = haxeon.build.CodeIdentity.loadedLibraries("libTK");
+    return "cadkit:" + cadkit + "|occt:" + version + (libraries == null ? "" : "+" + libraries) + (salt == null ? "" : "|salt:" + salt)
+      + "|naming:" + Shape.namingScheme();
   }
 
   public static function register(table:MemoTable):Void {

@@ -336,6 +336,19 @@ class PersistentMemoTests {
     store.clear();
   }
 
+  /** The native identity names the build, not where OCCT is installed. */
+  static function nativeIdentity():Void {
+    var identity = Memos.nativeIdentity();
+    check(identity != null, "a program with a CadKit build beside it has a native identity");
+    check(identity == Memos.nativeIdentity(), "the native identity is stable within a run");
+    check(identity.indexOf("occt:" + cadkit.Shape.occtVersion()) >= 0, "and carries the OCCT version: " + identity);
+    for (variable in ["CADKIT_OCCT_DIR", "HOME"]) {
+      var path = Sys.getEnv(variable);
+      if (path != null && path.length > 3) check(identity.indexOf(path) < 0, "and no location (" + variable + ")");
+    }
+    check(haxeon.build.CodeIdentity.loadedLibraries("libNoSuchLibrary") == null, "no libraries match an unknown prefix");
+  }
+
   public static function main():Void {
     roundTrip();
     invalidation();
@@ -345,6 +358,7 @@ class PersistentMemoTests {
     concurrent();
     meshCodec();
     shapes();
+    nativeIdentity();
     sceneParts();
     realIdentities();
     Sys.println("persistent memo tests: " + passed + " checks passed");

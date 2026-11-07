@@ -818,6 +818,9 @@ CADKIT_API void cad_operation_destroy(cad_operation operation);
 
 CADKIT_API const char* cad_last_error(void) CADKIT_HXI_RETURNS_BORROWED_UTF8;
 
+/* The version text of the OCCT this library was built against; the same text shape bytes carry. Never null. */
+CADKIT_API const char* cad_occt_version(void) CADKIT_HXI_RETURNS_BORROWED_UTF8;
+
 #ifdef __cplusplus
 }
 #endif
