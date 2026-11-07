@@ -498,6 +498,13 @@ The plain check reports `fasteners.edge-support` findings by member and joint. E
 made part or report the finding; there is no certified-material exception mechanism. These
 reported findings do not waive ordinary hole, head-interference or tool-access errors.
 
+The hobber X ribs additionally specify bare blast-cleaned faying lands (mask the guide
+pad datums; exclude oil, paint and adhesive). RCSC 2020 sections5.4/8.4 gives a0.50 mean
+coefficient for Class B blast-cleaned steel: https://www.boltcouncil.org/files/2020RCSCSpecification.pdf.
+The hobber's0.40 is an ASSUMED shop acceptance floor, requiring a slip coupon for these
+small metric joints; it is not vendor data or RCSC certification. Its rib check requires
+factors>=3 on both normal and limited-crash loads, with no bond/dowel credit.
+
 Declared adjustment slots are checked with a swept capsule outside their own opening,
 including both travel endpoints; they cannot disappear into a round-hole exclusion.
 For a through plate, the receiving bearing section is under the far-side nut/washer,

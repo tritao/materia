@@ -11,6 +11,10 @@ import materia.assembly.AssemblyFrames as F;
  * The scale carrier is a deliberate height interface derived from its head seat.
  * Hole geometry and purchase hardware come only from the declared joints. */
 class HobberCarriageRib extends MachineComponent {
+  /** ASSUMED shop acceptance floor. RCSC 2020 section 5.4/8.4 gives
+   * mu=0.50 for bare blast-cleaned steel; qualify these small metric joints
+   * with a coupon before release. No coating, oil or adhesive on the lands. */
+  public static inline final ASSUMED_FAYING_FRICTION=0.40;
   public static final ROLES = ["leftOuter", "leftInner", "rightInner", "scale"];
   public final role:String;
   static final recipe = new machinekit.cache.Once<ComponentType>();
@@ -24,7 +28,7 @@ class HobberCarriageRib extends MachineComponent {
     super("HOBBER-X-RIB-" + v.token("role").toUpperCase(), "Bolted bright drawn steel carriage rib", "steel", false, v);
     role = v.token("role");
     addConnector("datum", Mount, F.identity());
-    // Bond the rib lands during assembly; stiffness and slip take no bond credit.
+    // Blast-clean the dry steel lands; no bond or dowel credit in rib slip.
     addFacet(routeFor(role));
   }
   override public function componentType():Null<ComponentType> return recipeType();
@@ -52,8 +56,8 @@ class HobberCarriageRib extends MachineComponent {
       thickness = nominal;
     }
     var blank:machinekit.component.ManufacturingRoute.BarBlank = {width:width, thickness:thickness,
-      length:246, source:"nominal bright drawn steel section; supplier quote and bond-face qualification pending", assumed:true};
-    var faces:Array<machinekit.component.ManufacturingRoute.MachinedFace> = [{name:"bond face prepared and fixture-controlled; joint holes drilled, counterbored and match-reamed", tolerance:0.1, roughnessRa:null}];
+      length:246, source:"nominal bright drawn steel section; supplier quote and blast-cleaned faying-face qualification pending", assumed:true};
+    var faces:Array<machinekit.component.ManufacturingRoute.MachinedFace> = [{name:"bare blast-cleaned steel faying face, mu>=0.40 ASSUMED until coupon-qualified; mask block-pad datums, no paint/oil/adhesive; holes drilled, counterbored and match-reamed", tolerance:0.1, roughnessRa:null}];
     return role == "scale" ? ManufacturingRoute.milledFromBar(blank, faces) : ManufacturingRoute.sawnBar(blank, faces);
   }
   public function interfaceFrame(into:Float):materia.assembly.AssemblyRecord.AssemblyFrame {
@@ -70,10 +74,6 @@ class HobberCarriageRib extends MachineComponent {
       xs[2] = 220;
       xs[4] = 325;
     }
-    // Added central fixing for the installed Y module load. The retained
-    // six-fixing FE is the baseline; the added bore needs final FE review.
-    // No bond is credited.
-    if(role!="scale")xs.push(255);
     return xs;
   }
   public function pinXs():Array<Float> return [175, 345];

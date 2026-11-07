@@ -17,12 +17,12 @@ class HobberYPart extends MachineComponent {
   public final role:String;
   public final spec:ScrewLinearModuleSpec;
   public static function parameters():Array<ComponentParameter> return [P.choice("role",["base","carriage","coverFront","coverRear"],"base")];
-  public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.hobbing.y-module-part",parameters(),v->new HobberYPart(v),false,false,null,false).numbered(v->"HOBBER-Y-MODULE-"+v.token("role").toUpperCase()).procured(_->Make("ground stock / formed guard, joint drilling")));
+  public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.hobbing.y-module-part",parameters(),v->new HobberYPart(v),false,false,null,false).versioned(2).numbered(v->"HOBBER-Y-MODULE-"+v.token("role").toUpperCase()).procured(_->Make("ground stock / formed guard, joint drilling")));
   public function new(?overrides:ComponentValues) {
     var v=P.resolve(parameters(),overrides);role=v.token("role");spec=HobberYLayout.moduleSpec();
     super("HOBBER-Y-MODULE-"+role.toUpperCase(),"Y module "+role,StringTools.startsWith(role,"cover")?"stainless A2-70":"steel",false,v);
-    if(StringTools.startsWith(role,"cover"))addFacet(ManufacturingRoute.foldedSheet(1.5,2,1.5));
-    else addFacet(ManufacturingRoute.groundStock(GroundStock.plate(GroundStock.STEEL,role=="base"?GroundStock.atLeast("plate",spec.baseThickness-actuatorPoint().z):spec.carriageThickness),[{name:"joint interfaces; inspect stock, replicate failing faces before grinding",tolerance:0.01,roughnessRa:0.8}]));
+    if(StringTools.startsWith(role,"cover"))addFacet(ManufacturingRoute.foldedSheet(ScrewLinearModuleCover.SHEET,2,1.5));
+    else addFacet(ManufacturingRoute.groundStock(GroundStock.plate(GroundStock.STEEL,role=="base"?GroundStock.atLeast("plate",spec.baseThickness-actuatorPoint().z):spec.carriageThickness),[{name:"joint interfaces; inspect stock, replicate failing faces before grinding",tolerance:0.01,roughnessRa:0.8},{name:"mill nonprecision guard and seal lands; retain full-depth joint webs",tolerance:0.2,roughnessRa:3.2}]));
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("ratingsBasis","Assumed").setToken("errorsBasis","Assumed").setToken("source","Stock acceptance and end seals require qualification")));
     addConnector("mount",Mount,F.identity());addConnector("interface",Mount,F.translation(spec.centre,0,spec.carriageBottom()+spec.carriageThickness));
   }
@@ -60,12 +60,22 @@ class HobberYPart extends MachineComponent {
     var lo=role=="base"?s.baseMin:s.centre-s.carriageLength/2,hi=role=="base"?s.baseMax:s.centre+s.carriageLength/2;
     var half=role=="base"?s.baseWidth/2:s.carriageWidth/2;
     var rim=role=="base"?8.0+ScrewLinearModuleSpec.GAP:10+4+ScrewLinearModuleSpec.GAP;
-    var frame=Solids.cut(box(lo,hi,-half,half,z0-1,z1+1),[box(lo+rim,hi-rim,-half+rim,half-rim,z0-2,z1+2)]);
+    // The lip spans the complete nominal stroke and overtravel, not just
+    // the neutral aperture. Keep solid steel beneath that swept contact.
+    var endRim=role=="base"?rim:s.stroke+2*s.overtravel+10+4;
+    // The perimeter carries only the sheet guards / PU seal. Keep the
+    // precision core full thickness, but mill the underside of this land.
+    var frameLow=role=="base"?s.baseThickness/2-4:z1-3;
+    var frameHigh=role=="base"?s.baseThickness/2+4:z1;
+    var frame=Solids.cut(box(lo,hi,-half,half,frameLow,frameHigh),[box(lo+endRim,hi-endRim,-half+rim,half-rim,frameLow-1,frameHigh+1)]);
     var keep:Array<Part>=[frame];
     if(role=="base") {
       var at=actuatorPoint(),m4=machinekit.standard.SocketHeadCapScrew.catalog().get("M4");
       var low=Math.min(at.y-ErobActuatorData.OUTPUT_PITCH_CIRCLE/2-1.5*m4.diameter-ScrewLinearModuleSpec.GAP,s.scaleSeatY()-20-ScrewLinearModuleSpec.GAP);
       var high=s.riserY(1)+s.riserWidth/2+ScrewLinearModuleSpec.GAP;
+      // The deck-sweep relief interrupts the long lower guard land. A
+      // central tab inside the deck window retains it as part of this plate.
+      keep.push(box(at.x-rim/2,at.x+rim/2,-half,low+ScrewLinearModuleSpec.GAP,frameLow,frameHigh));
       // A central output web joins the two full rail lands. Unloaded
       // material outside those paths is profiled from the ground blank.
       var web=ErobActuatorData.OUTPUT_PITCH_CIRCLE/2+1.5*m4.diameter+ScrewLinearModuleSpec.GAP;
@@ -90,12 +100,23 @@ class HobberYPart extends MachineComponent {
       var web=Math.ceil((s.guide.blockHoleSpacingAlong+3*screw.diameter)/5)*5;
       var reach=Math.ceil((s.railSpacing/2+s.guide.blockHoleSpacingAcross/2+1.5*screw.diameter)/5)*5;
       for(row in [-1,1])keep.push(box(s.centre+row*s.blockSpacing/2-web/2,s.centre+row*s.blockSpacing/2+web/2,-reach,reach,z0-1,z1+1));
+      var carrierLand=1.5*machinekit.standard.SocketHeadCapScrew.catalog().get("M4").diameter+ScrewLinearModuleSpec.GAP;
+      keep.push(box(s.centre-carrierLand,s.centre+carrierLand,s.railY(-1)-10-carrierLand,0,z0-1,z1+1));
       var bridge=0.0;for(h in ScrewLinearModulePart.carrierBolts())bridge=Math.max(bridge,Math.abs(h.y));
       bridge=Math.ceil((bridge+1.5*machinekit.standard.SocketHeadCapScrew.catalog().get("M6").diameter+ScrewLinearModuleSpec.GAP)/5)*5;
       keep.push(box(s.centre-s.blockSpacing/2-web/2,s.centre+s.blockSpacing/2+web/2,-bridge,bridge,z0-1,z1+1));
       // The head contact plate reaches the lower guide centre; unused steel
       // above it is replaced by the coplanar guide webs and seal rim.
       var top=HobberYLayout.moduleLift()-s.railSpacing/2,face=HobberSaddle.headFaceX();
+      for(joint in HobberSaddle.yHeadFaces()) {
+        var holes=joint.holes;if(holes==null)continue;
+        switch joint.role {
+          case Clamped(size,_,_,_):
+            var edge=1.5*machinekit.standard.SocketHeadCapScrew.catalog().get(size).diameter;
+            for(hole in holes)top=Math.max(top,F.transformPoint(joint.frame,hole.x,hole.y,0).z+edge);
+          case _:
+        }
+      }
       var raw=Part.prism([for(p in [{y:-130.0,z:-40.0},{y:-65.0,z:-75.0},{y:65.0,z:-75.0},{y:90.0,z:-55.0},{y:90.0,z:top},{y:-130.0,z:top}])new Vector(p.y,p.z)],face,face+s.carriageThickness);
       var outline=PosedParts.moved(raw,F.fromRotationMatrix(0,0,0,[0.0,0,1,1,0,0,0,1,0]));raw.close();
       outline=Solids.union([outline,box(face,face+s.carriageThickness,90,222,-52,top)]);
@@ -116,6 +137,15 @@ class HobberYPart extends MachineComponent {
       var bore=Part.cylinderAlong(Bt30SpindleData.FLANGE_DIAMETER/2+3,new Vector(0,-132,0),Vector.Y(),HobberSwivelLayout.SPINDLE_Y-Bt30SpindleData.FLANGE_FROM+134);
       var tool=PosedParts.moved(bore,HobberYLayout.headInModule());bore.close();shape=Solids.cut(shape,[tool]);
     } else shape=Solids.cut(shape,[HobberYLayout.sweptDeckRelief()]);
-    return machined(shape);
+    var made=machined(shape);
+    if(made.solidCount()!=1) {
+      var fragments=[];
+      for(i in 0...made.solidCount()) {
+        var piece=new Part(made.shape.subshape(CadKit.ShapeKind.Solid,i));
+        fragments.push({volume:piece.volume(),box:PosedParts.boxOf(piece)});piece.close();
+      }
+      made.close();throw "Disconnected made Y member: "+role+" "+haxe.Json.stringify(fragments);
+    }
+    return made;
   }
 }

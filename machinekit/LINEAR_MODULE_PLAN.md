@@ -27,6 +27,13 @@
   pads against one master set from the installed blocks to0.010 mm. Nominal layer0.8 mm,
   worst-case0.23..1.37 mm versus ASSUMED compound range0.2..2.0 mm. Preload/accuracy remain
   procurement notes, not LinearRailBlock recipe fields.
+- **Rib faying process:** blast-clean both bare steel lands, mask precision block-pad
+  datums, and keep paint, oil and adhesive off the contact. RCSC 2020 sections5.4/8.4
+  ([source](https://www.boltcouncil.org/files/2020RCSCSpecification.pdf)) gives0.50 for its
+  Class B surfaces. This model uses0.40 as an ASSUMED acceptance floor for our small
+  metric joints, pending a shop slip coupon; it is not a vendor rating or a claim of RCSC
+  qualification. Check normal AND crash factors>=3 without bond/pin credit. Retain the
+  six-fixing pattern and its original FE geometry; the seventh-fixing draft is deleted.
 - **X stiffness:** one script,fem/carriage_fem.py, and one current result,fem/results/carriage.json.
   Bolts-only43.633 N/um front tie and17.077 MN m/rad sole tilt, C3D10 size10 mm, pads held z.
   Use17.077 in the accuracy budget. LM0 authoritative reference20.232/10.345; fresh unchanged
@@ -107,3 +114,5 @@
 - 2026-11-07 LM3 model gates: short split cover/retainers/PU lips plus bolted cable hood; long80/200 use two/four-fold lamella bellows with22/38 mm compressed,30/50 space,120/260 extended. Own276 assertions PASS across all three sizes (integrity, physical made edges, slip, contact, access, service, seal contact/overtravel, part refs, roundtrip/feedback); hobber2633 PASS.86/122/130 screws,18 pins; minimum joint factors4.482/1.494. Fixed/moving flange contacts nominal672/736 mm2 versus625; short payload62x192,overlap10,roof gap6 mm. Guard masses1.881/8.775/8.018 kg (rigid moving0/4.135/3.710), cover geometry/density ASSUMED; clip/end-seal/vendor qualification open. No precision stiffness path changed, no FE.
 
 - 2026-11-07 LM4 partial (lean checkpoint): main merged de3795a23; f3005413a library checkpoint passes282/2633/1186. Draft actual Y replaces six legacy recipes, preserves head datum/dual-loop feedback, profiles ground base/carriage and adds checked assembly;302 members,86 joints,302 screws46 pins before three added rib fixings. Module286/hobbing1186,joint-fasteners,assembly-integrity PASS; procedures,roundtrip,scale windows and pre-trim fastener fit0 errors PASS. Abbe88.0 versus76.2 mm. Load-screen payload102.11 reduced59.80 kg before further profiling (rotating report60.12 including output); latest Z moving67.43 kg still FAILS sustained reserve. Rib7-fixing slip PASS (mu0.15 ASSUMED); retained six-fixing FE needs final review. Strict static/service34 errors (4 overlaps,30 removal obstructions); Z shield/Y module fit, latest supplier-CAD/service rerun, stiffness/accuracy and remaining baseline gates OPEN. No new FE or release claim.
+
+- 2026-11-07 LM5 partial: retain raised, derived Y stack; integral nonprecision lands8 mm (base guards)/3 mm (carriage seals), precision webs15/12 mm. Connected solids and6 full wiper-footprint probes PASS. X/Y/Z moving203.30/29.80/63.24 kg versus191.48/28.13/51.42; all drive sizing PASS. Rotating head50.97 versus39.16 kg, COM(-75.8,34.6,77.0) mm from output; bearing demand50.31 Nm UNKNOWN rating, A gravity26.65 Nm versus87 rated/204 peak (brake87 ASSUMED). AbbeY87.8 versus76.2 mm; head stacks0.24/0.22 versus+/-0.5/0.55 after stock acceptance; raw host stock bound0.91 versus0.01 mm requires qualification/replication. Six-fixing rib factors3.89 normal/3.47 crash with ASSUMED coupon-qualified mu0.40; original X FE retained. Module286,hobbing1186,joint-fasteners,assembly-integrity,way-cover PASS; cache-revision refresh286 PASS; whole-machine sweep FAIL65 (4 rest overlaps,34 swept overlaps,11 running gaps,16 guard service obstructions; 2201 s). Centre-low trial rejected on bed/table fit; FE trial failed residual gate (no result credited), valid Y stiffness/accuracy and Z guard service fit remain OPEN.

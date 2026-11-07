@@ -9,6 +9,8 @@ import materia.assembly.AssemblyFrames as F;
 /** Short-stroke split guard. The clip-in PU seal profile is ASSUMED until quoted;
  * each steel retainer is separate and its ordinary nuts are serviced on the bench. */
 class ScrewLinearModuleCover extends MachineComponent {
+  public static inline final SHEET=1.0;
+  static inline final BEND_RADIUS=1.5;
   static final recipe=new machinekit.cache.Once<ComponentType>();
   public final spec:ScrewLinearModuleSpec;
   public final role:String;
@@ -16,12 +18,12 @@ class ScrewLinearModuleCover extends MachineComponent {
   public static final ROLES=["coverFront","coverRear","retainerFront","retainerRear","lipFront","lipRear","mountFixedFront","mountFixedRear","mountMovingFront","mountMovingRear"];
   public static function parameters():Array<ComponentParameter> return ScrewLinearModulePart.parameters().filter(p->p.name!="role").concat([P.choice("role",ROLES,"coverFront")]);
   public static function recipeType():ComponentType return recipe.get(()->new ComponentType("machinekit.motion.screw-module-cover",parameters(),v->new ScrewLinearModuleCover(v),false,false,null,false)
-    .numbered(numberFor).procured(v->StringTools.startsWith(v.token("role"),"lip")?Buy(null,null,null):Make(StringTools.startsWith(v.token("role"),"mount")?"machined cover interface":"cut sheet / guard forming")));
+    .versioned(2).numbered(numberFor).procured(v->StringTools.startsWith(v.token("role"),"lip")?Buy(null,null,null):Make(StringTools.startsWith(v.token("role"),"mount")?"machined cover interface":"cut sheet / guard forming")));
   static function numberFor(v:ComponentValues):String return PartNumbers.geometry("SCREW-MODULE-COVER",v.token("role"),v.token("profile")+"|"+v.number("stroke")+"|"+v.number("railSpacing")+"|"+v.number("blockSpacing")+"|"+v.number("overtravel")+"|"+v.number("hostLength")+"|"+v.number("hostWidth"));
   public function new(?overrides:ComponentValues) {
     var v=P.resolve(parameters(),overrides);spec=new ScrewLinearModuleSpec(v.token("profile"),v.number("stroke"),v.number("railSpacing"),v.number("blockSpacing"),v.number("overtravel"),v.number("hostLength"),v.number("hostWidth"));role=v.token("role");front=StringTools.endsWith(role,"Front");
     super(numberFor(v),"Screw module "+role,isLip()?"polyurethane PU":isMount()?"steel":"stainless A2-70",false,v);
-    if(!isLip()&&!isMount())addFacet(isCover()?ManufacturingRoute.foldedSheet(1.5,2,1.5):ManufacturingRoute.cutPlate());
+    if(!isLip()&&!isMount())addFacet(isCover()?ManufacturingRoute.foldedSheet(SHEET,2,BEND_RADIUS):ManufacturingRoute.cutPlate());
     if(isMount())addFacet(StringTools.startsWith(role,"mountFixed")?ManufacturingRoute.milled(2,"general",[],2*ScrewLinearModuleBellows.plan(spec).plateHalf()):ManufacturingRoute.cutPlate());
     addFacet(new EngineeringMetadata(new ComponentValues().setToken("ratingsBasis","Assumed").setToken("errorsBasis","Assumed").setToken("source","Short stroke gravity-chip shield; clip-in PU profile/retention and end sealing require qualification")));
   }
@@ -54,28 +56,28 @@ class ScrewLinearModuleCover extends MachineComponent {
     if(isMount())return ScrewLinearModuleBellows.faces(s,role);
     if(isCover()) {
       var lo=front?s.baseMin:s.centre,hi=front?s.centre:s.baseMax,screw=machinekit.standard.SocketHeadCapScrew.catalog().get("M4");
-      for(side in [-1,1])out.push(BoltedFace.clamped("edge"+side,sideFrame(s,front,side,side),[{x:-(hi-lo)/2+12,y:0.0},{x:(hi-lo)/2-12,y:0.0}],screw.clearanceMedium,1.5,"M4",null,false,true));
-      out.push(BoltedFace.through("seal",ScrewLinearModulePart.plane(s.centre,0,roof(s)+1.5,-1),holes(s,front),3.4,1.5,"M3",false));
-    } else if(!isLip())out.push(BoltedFace.clamped("seal",ScrewLinearModulePart.plane(s.centre,0,roof(s)+1.5,1),holes(s,front),3.4,2,"M3",null,false,true));
+      for(side in [-1,1])out.push(BoltedFace.clamped("edge"+side,sideFrame(s,front,side,side),[{x:-(hi-lo)/2+12,y:0.0},{x:(hi-lo)/2-12,y:0.0}],screw.clearanceMedium,SHEET,"M4",null,false,true));
+      out.push(BoltedFace.through("seal",ScrewLinearModulePart.plane(s.centre,0,roof(s)+SHEET,-1),holes(s,front),3.4,SHEET,"M3",false));
+    } else if(!isLip())out.push(BoltedFace.clamped("seal",ScrewLinearModulePart.plane(s.centre,0,roof(s)+SHEET,1),holes(s,front),3.4,2,"M3",null,false,true));
     return out;
   }
   static function box(x0:Float,x1:Float,y0:Float,y1:Float,z0:Float,z1:Float):Part {
     var raw=Part.box(x1-x0,y1-y0,z1-z0),out=raw.translated(new Vector((x0+x1)/2,(y0+y1)/2,z0));raw.close();return out;
   }
   static function bend(lo:Float,hi:Float,half:Float,z:Float,side:Int):Part {
-    var centre=side*(half-1.5),height=z-1.5;
-    var ring=Solids.cut(Part.cylinderAlong(3,new Vector(lo,centre,height),Vector.X(),hi-lo),[Part.cylinderAlong(1.5,new Vector(lo-1,centre,height),Vector.X(),hi-lo+2)]);
-    var trim=box(lo-1,hi+1,side>0?centre:centre-3,side>0?centre+3:centre,height,height+3),out=ring.intersect(trim);ring.close();trim.close();return out;
+    var centre=side*(half-BEND_RADIUS),height=z-BEND_RADIUS,outer=BEND_RADIUS+SHEET;
+    var ring=Solids.cut(Part.cylinderAlong(outer,new Vector(lo,centre,height),Vector.X(),hi-lo),[Part.cylinderAlong(BEND_RADIUS,new Vector(lo-1,centre,height),Vector.X(),hi-lo+2)]);
+    var trim=box(lo-1,hi+1,side>0?centre:centre-outer,side>0?centre+outer:centre,height,height+outer),out=ring.intersect(trim);ring.close();trim.close();return out;
   }
   override public function geometry(detail:ComponentDetail=Preview):Part {
     var s=spec,a=openingHalf(s),b=openingWidthHalf(s),z=roof(s),lo=front?s.baseMin:s.centre,hi=front?s.centre:s.baseMax,body:Part;
     if(isMount())return machined(ScrewLinearModuleBellows.mount(s,role).geometry(detail));
     if(isCover()) {
-      var top=box(lo,hi,-s.baseWidth/2+1.5,s.baseWidth/2-1.5,z,z+1.5);
+      var top=box(lo,hi,-s.baseWidth/2+BEND_RADIUS,s.baseWidth/2-BEND_RADIUS,z,z+SHEET);
       top=Solids.cut(top,[box(front?s.centre-a:s.centre-1,front?s.centre+1:s.centre+a,-b,b,z-1,z+3)]);
       var parts=[top];
       for(side in [-1,1]) {
-        parts.push(box(lo,hi,side<0?-s.baseWidth/2-1.5:s.baseWidth/2,side<0?-s.baseWidth/2:s.baseWidth/2+1.5,0,z-1.5));
+        parts.push(box(lo,hi,side<0?-s.baseWidth/2-SHEET:s.baseWidth/2,side<0?-s.baseWidth/2:s.baseWidth/2+SHEET,0,z-BEND_RADIUS));
         parts.push(bend(lo,hi,s.baseWidth/2,z,side));
       }
       body=Solids.union(parts);
@@ -90,7 +92,7 @@ class ScrewLinearModuleCover extends MachineComponent {
       }
     } else {
       var x0=front?s.centre-a:s.centre,x1=front?s.centre:s.centre+a;
-      var low=isLip()?s.carriageBottom()+s.carriageThickness:z+1.5,high=isLip()?z+1.5:z+3.5;
+      var low=isLip()?s.carriageBottom()+s.carriageThickness:z+SHEET,high=isLip()?z+SHEET:z+SHEET+2;
       var inner=b-4,outer=isLip()?b:b+12;
       var cross0=front?s.centre-a-(isLip()?0:12):s.centre+a-4;
       var cross1=front?s.centre-a+4:s.centre+a+(isLip()?0:12);

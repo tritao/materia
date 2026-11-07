@@ -87,6 +87,29 @@ class HobberFrameChecks {
     return lines;
   }
 
+  /** Probe the complete lip footprint into the actual profiled host plate.
+   * A distance-only check can pass while most of a lip hangs over a window. */
+  public static function yModuleSeats(machine:FlexsplineHobber):Int {
+    var s=machine.yModule.spec,members=machine.components(),count=0;
+    var carriage=members.filter(m->m.id=="Ymodule/carriage")[0].component.geometry();
+    for(side in ["Front","Rear"]) {
+      var lip=members.filter(m->m.id=="Ymodule/lip"+side)[0].component.geometry();
+      var b=PosedParts.boxOf(lip),depth=0.1;
+      var raw=cadkit.modeling.Part.box(b.maxX-b.minX+2,b.maxY-b.minY+2,depth);
+      var slab=raw.translated(new cadkit.modeling.Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,s.carriageBottom()+s.carriageThickness));raw.close();
+      var slice=lip.intersect(slab);slab.close();lip.close();
+      var expected=slice.volume(),probe=slice.translated(new cadkit.modeling.Vector(0,0,-depth));slice.close();
+      if(expected<=0)throw "Y wiper has no contact footprint";
+      for(q in [-s.stroke/2-s.overtravel,0.0,s.stroke/2+s.overtravel]) {
+        var moved=carriage.translated(new cadkit.modeling.Vector(q,0,0)),common=moved.intersect(probe);
+        var supported=common.volume();common.close();moved.close();count++;
+        if(supported<expected*(1-1e-5))throw 'Y wiper $side has only ${100*supported/expected}% support at $q';
+      }
+      probe.close();
+    }
+    carriage.close();return count;
+  }
+
   /** Thickness of a cover end wall and of a carrier on the moving member, mm (the bench mill's `COVER_PLATE`). */
   static inline final COVER_PLATE = 14.0;
   /** Gap kept between a cover's plates and the supports and nut around them, mm (the running gap of the integrity check). */
@@ -666,6 +689,7 @@ class HobberFrameChecks {
     var presentation = materia.presentation.Presentations.assembled(machine.definition(), -1.1, 0.35, "hobber");
     presentation.procedures = HobberAssemblyProcedures.build(machine);
     materia.presentation.PresentationCodec.validate(machine.definition(), presentation);
+    var moduleChecks=yModuleSeats(machine);
     var headReport = swivelLoad(machine);
     // A common translation of the entire machine cannot change head load on
     // the output face. This catches mixing posed COM with a construction datum.
@@ -675,7 +699,7 @@ class HobberFrameChecks {
     var lines = HobberServiceDesignChecks.run(machine).concat(bt30(machine)).concat(outboard(machine)).concat(sizing(machine)).concat(scales(machine)).concat(headReport).concat(zOffsetMoments(machine)).concat(spindleSeat(machine)).concat(spindleDrive(machine).lines).concat(zSaddleModes(machine)).concat(spindleRelief(machine)), errors = newErrors(machine, sweep);
     for (line in lines) Sys.println(line);
     if (errors.length > 0) throw 'hobber strict integrity: ${errors.length} findings\n  ' + errors.join("\n  ");
-    return presentation.procedures.length + lines.length + 2;
+    return presentation.procedures.length + lines.length + moduleChecks + 2;
   }
 
   /** The machine survives encode and decode with its member recipes and collision hulls. */
@@ -747,6 +771,7 @@ class HobberFrameChecks {
     var machine = new FlexsplineHobber();
     Sys.println('machine built: ${machine.components().length} members in ${Math.round(Sys.time() - began)} s (${Math.round(Sys.cpuTime())} s CPU)');
     if (args.indexOf("ymodule") >= 0) {
+      Sys.println("Y host wiper footprint: "+yModuleSeats(machine)+" checks passed");
       for(entry in machine.components())if(StringTools.startsWith(entry.id,"Ymodule/")) Sys.println(entry.id+" "+entry.component.massProperties().mass+" kg");
     }
     if (args.indexOf("memos") >= 0) for (line in machinekit.cache.Memos.report()) Sys.println(line);

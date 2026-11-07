@@ -6,7 +6,7 @@ class HobberYLayout {
   static final cached=new machinekit.cache.Once<machinekit.motion.ScrewLinearModuleSpec>();
   public static function moduleSpec():machinekit.motion.ScrewLinearModuleSpec return cached.get(()->{
     var first=new machinekit.motion.ScrewLinearModuleSpec(),face=HobberSaddle.headFaceX();
-    var roof=machinekit.motion.ScrewLinearModuleCover.roof(first)-first.carriageBottom()-first.carriageThickness+1.5;
+    var roof=machinekit.motion.ScrewLinearModuleCover.roof(first)-first.carriageBottom()-first.carriageThickness+machinekit.motion.ScrewLinearModuleCover.SHEET;
     var raw=cadkit.modeling.Part.box(roof,2000,2000),slab=raw.translated(new cadkit.modeling.Vector(face-roof/2,0,-1000));raw.close();
     var y=0.0,loZ=0.0,hiZ=0.0;
     for(role in ["GE-spindle-seat","GE-motor-cradle","GE-outboard-carrier"]) {
@@ -22,12 +22,12 @@ class HobberYLayout {
     for(i in 0...5) {
       var width=2*(Math.max(Math.abs(loZ-lift),Math.abs(hiZ-lift))+10+4+machinekit.motion.ScrewLinearModuleSpec.GAP);
       var s=new machinekit.motion.ScrewLinearModuleSpec("HGH15CA",20,150,80,5,length,width);
-      var next=Math.max(required,s.baseWidth/2+1.5+machinekit.motion.ScrewLinearModuleSpec.GAP+HobberSaddle.xCarriageTop()-HobberZLayout.SEAT_Z);
+      var next=Math.max(required,s.baseWidth/2+machinekit.motion.ScrewLinearModuleCover.SHEET+machinekit.motion.ScrewLinearModuleSpec.GAP+HobberSaddle.xCarriageTop()-HobberZLayout.SEAT_Z);
       if(Math.abs(next-lift)<1e-6)return s;lift=next;
     }
     throw "Y stock/cover stack did not converge";
   });
-  public static function moduleLift():Float return Math.max(requiredLift(),moduleSpec().baseWidth/2+1.5+machinekit.motion.ScrewLinearModuleSpec.GAP+HobberSaddle.xCarriageTop()-HobberZLayout.SEAT_Z);
+  public static function moduleLift():Float return Math.max(requiredLift(),moduleSpec().baseWidth/2+machinekit.motion.ScrewLinearModuleCover.SHEET+machinekit.motion.ScrewLinearModuleSpec.GAP+HobberSaddle.xCarriageTop()-HobberZLayout.SEAT_Z);
   static function requiredLift():Float {
     var s=moduleSpec(),bore=Bt30SpindleData.FLANGE_DIAMETER/2+3,face=HobberSaddle.headFaceX(),bolt=machinekit.standard.SocketHeadCapScrew.catalog().get(s.guide.blockMountThread);
     return Math.ceil((Math.max(s.railSpacing/2+s.guide.blockHoleSpacingAcross/2,Math.abs(s.scaleCarrierY()))+1.5*bolt.diameter+Math.sqrt(Math.max(0.0,bore*bore-face*face)))/5)*5;

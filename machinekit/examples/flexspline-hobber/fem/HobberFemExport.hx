@@ -13,12 +13,43 @@ class HobberFemExport {
     return Math.round(v * f) / f;
   }
 
+  /** One Y plate-path model; all coordinates are in the included module frame. */
+  static function exportY(machine:FlexsplineHobber,dir:String):Void {
+    var poses=machine.solvedPoses(),base=poses.get("Ymodule/base");if(base==null)throw "Missing Y base";
+    var inverse=F.inverse(base),parts:Array<Dynamic>=[];
+    for(role in ["base","carriage"]) {
+      var member=machine.components().filter(m->m.id=="Ymodule/"+role)[0],shape=member.component.geometry();
+      shape.shape.exportStep(dir+"/Y-"+role+".step");
+      parts.push({name:role,volume:shape.volume(),holes:member.component.derivedRouteHoles()});shape.close();
+    }
+    function point(p:{x:Float,y:Float,z:Float}):Array<Float> {
+      var v=F.transformPoint(inverse,p.x,p.y,p.z);return [v.x,v.y,v.z];
+    }
+    var held:Array<Array<Float>>=[],head:Array<Dynamic>=[],blocks:Array<Dynamic>=[];
+    var derived=machine.derivedFasteners();if(derived==null)throw "Y FE needs derived interfaces";
+    for(joint in derived.joints) {
+      if(joint.clampedMember=="Ymodule/base"&&joint.receivingMember=="swivel/output")for(p in joint.worldHoles)held.push(point(p));
+      if(joint.clampedMember=="Ymodule/carriage") {
+        var diameter=machinekit.standard.SocketHeadCapScrew.catalog().get(joint.size).diameter;
+        if(joint.receivingMember=="spindleSeat"||joint.receivingMember=="outboardCarrier")for(p in joint.worldHoles)head.push({point:point(p),radius:1.5*diameter});
+        if(StringTools.startsWith(joint.receivingMember,"Ymodule/block"))for(p in joint.worldHoles)blocks.push({point:point(p),radius:1.5*diameter});
+      }
+    }
+    var hob=F.compose(poses.get("hob"),machine.hob.connector("centre").frame),s=machine.yModule.spec;
+    var data={parts:parts,held:held,head:head,blocks:blocks,hob:point({x:hob.x,y:hob.y,z:hob.z}),
+      centre:s.centre,railStart:s.railStart(),railLength:s.railLength,riserWidth:s.riserWidth,railSpacing:s.railSpacing,riserCentres:[s.riserY(-1),s.riserY(1)],
+      baseThickness:s.baseThickness,carriageBottom:s.carriageBottom()};
+    sys.io.File.saveContent(dir+"/y-module.json",haxe.Json.stringify(data,null,"  "));
+    Sys.println("exported Y plate-path geometry and joint-derived boundary patches");
+  }
+
   static function main() {
     var args = Sys.args();
-    if (args.length != 1) throw "usage: hl main.hl <output dir>";
+    if (args.length < 1 || args.length > 2) throw "usage: hl main.hl <output dir>";
     var dir = args[0];
     sys.FileSystem.createDirectory(dir);
     var machine = new FlexsplineHobber();
+    if(args.length==2&&args[1]=="y-module") {exportY(machine,dir);return;}
     var poses = machine.solvedPoses(), back = F.inverse(FlexsplineHobber.MACHINE_FROM_WORK), seatZ = HobberZLayout.SEAT_Z;
     var partList:Array<Dynamic> = [];
     var out:Dynamic = {parts: partList};

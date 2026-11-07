@@ -25,7 +25,7 @@ class HobberXAssembly {
       measurement:"Support screw during insertion; retain nut on transfer sleeve; check free rotation.",
       joints:[{member:"Xnut",face:"*",method:"indicate then match-pin"}]},
     {id:"A4 carriage", parts:["Xbridge"].concat([for (role in HobberCarriageRib.ROLES) "Xrib-"+role]),
-      tools:["block-pad-master","indicator-base"], measurement:"Replicate four block pads against one master; bolt ribs before lowering carriage. Indicate nut block to screw at BOTH travel ends, tighten, then match-drill/ream; never pre-drill its dowels from drawing coordinates.",
+      tools:["block-pad-master","indicator-base"], measurement:"Replicate four block pads against one master; mask those datums and blast-clean both steel rib lands. Qualify mu>=0.40 with a slip coupon; keep oil, paint and adhesive off the lands. Bolt ribs before lowering carriage. Indicate nut block to screw at BOTH travel ends, tighten, then match-drill/ream; never pre-drill its dowels from drawing coordinates.",
       joints:[for (face in ["blockL1","blockL2","blockR1","blockR2"]) {member:"Xbridge",face:face,method:"fixture-replicated"}]
         .concat([{member:"Xbridge",face:"nut-block",method:"indicate then match-pin"}])
         .concat([for (role in HobberCarriageRib.ROLES) {member:"Xrib-"+role,face:"*",method:"drawing dowels"}])},
@@ -161,11 +161,12 @@ class HobberXAssembly {
       var screws=[for (joint in derived.joints) if(joint.clampedMember==entry.id && joint.receivingMember=="Xbridge")
         {id:joint.id,size:joint.size,propertyClass:joint.propertyClass,points:joint.worldHoles}];
       var checks=machinekit.assembly.JointSlip.check({label:"Rib friction-only "+entry.id,between:[entry.id,"Xbridge"],
-        shear:{peak:force,momentary:force+crash.limit.thrust+HobberJointLoads.CUTTING_FORCE}},screws,[]);
+        shear:{peak:force,momentary:force+crash.limit.thrust+HobberJointLoads.CUTTING_FORCE},friction:HobberCarriageRib.ASSUMED_FAYING_FRICTION},screws,[]);
       if(checks.length!=1)throw "Missing rib friction check: "+entry.id;
       for (result in checks) {
         Sys.println(machinekit.assembly.JointSlip.describe(result));
-        if(!result.passes) {cache.close();throw "Rib slips: "+entry.id;}
+        var momentary=result.momentaryFactor;
+        if(!result.passes || result.peakFactor<3 || momentary==null || momentary<3) {cache.close();throw "Rib lacks factor 3: "+entry.id;}
         count++;
       }
     }
