@@ -293,7 +293,11 @@ class GeometricConnectors {
 		faces that have a feature (index, feature, frame data, fingerprint). Read with
 		`GeometricCandidates.ofDescriptors`, captured with `captureDescribed`.
 	*/
-  public static function describeFaces(shape:Shape):String {
+  public static function describeFaces(shape:Shape):String return cadkit.cache.OpCache.query("describe-faces",
+    "cadkit.parametric.GeometricConnectors", shape, "", () -> computeDescribeFaces(shape), text -> haxe.io.Bytes.ofString(text),
+    bytes -> bytes.toString());
+
+  static function computeDescribeFaces(shape:Shape):String {
     var records:Array<Dynamic> = [for (candidate in measure(shape, CadKit.ShapeKind.Face)) {
       var feature = candidate.feature;
       {

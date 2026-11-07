@@ -102,6 +102,59 @@ class OpCache {
     return canonical;
   }
 
+  static final queryIdentities:Map<String, Null<String>> = [];
+
+  /** The text a stored query is keyed under besides its shape key: the code of the module that computes it and the native build. */
+  static function queryIdentity(module:String):Null<String> {
+    if (queryIdentities.exists(module)) return queryIdentities.get(module);
+    var native = NativeIdentity.get(), code = haxeon.build.CodeIdentity.ofModule(module);
+    var result = native == null || code == null ? null : "code:" + code + "|" + native;
+    queryIdentities.set(module, result);
+    return result;
+  }
+
+  /** The store key of query `name` (implemented by `module`) of `shape` with `params`; null for an unkeyed shape or no trustworthy identity. For tests. */
+  public static function queryKey(name:String, module:String, shape:Shape, params:String):Null<String> {
+    var key = shape.key, tier = queryIdentity(module);
+    return key == null || tier == null ? null : "cadkit-query/1\n" + name + "\n" + tier + "\n" + params + "\n" + key;
+  }
+
+  /**
+   * A pure query of a keyed shape (mass properties, face descriptors): its answer is a function of the shape's construction
+   * key, `params`, the native build and the code of `module`, so it is kept on disk and read back instead of computed. Only
+   * queries that do not depend on what was done to the shape's topology before (meshing it, for one) may use this: a query
+   * whose answer changes with that history (a tessellation, a bounding box) is not a function of the key.
+   *
+   * An unkeyed shape, `MATERIA_MEMO=off` or an unknown identity compute as always. `encode` and `decode` must round-trip
+   * exactly. With `MATERIA_MEMO_VERIFY=1` a stored answer is recomputed and compared; a difference throws.
+   */
+  public static function query<T>(name:String, module:String, shape:Shape, params:String, compute:() -> T, encode:T -> Bytes, decode:Bytes -> T):T {
+    var store = DiskStore.process();
+    var diskKey = store == null ? null : queryKey(name, module, shape, params);
+    if (store == null || diskKey == null) return compute();
+    var counts = stats();
+    var stored = store.read(diskKey);
+    if (stored != null && !DiskStore.verifying()) {
+      var decoded:Null<{value:T}> = null;
+      try decoded = {value: decode(stored)} catch (error:Dynamic) {}
+      if (decoded != null) {
+        counts.queryHit(name);
+        return decoded.value;
+      }
+      stored = null;
+    }
+    var began = Sys.time();
+    var value = compute();
+    var seconds = Sys.time() - began;
+    var bytes = encode(value);
+    if (stored != null) {
+      if (!same(stored, bytes)) throw 'persistent shape query "$name" is stale: the stored answer differs from a recomputation (a dependency is missing from its key)';
+      counts.queryVerified(name);
+    } else store.write(diskKey, bytes);
+    counts.queryMiss(name, seconds);
+    return value;
+  }
+
   /** Runs a history-keeping boolean (its result is built, uncached) and counts its time; `unkeyed` says whether an input had no key. */
   public static function historyOperation(op:String, gap:Null<String>, run:() -> Operation):Operation {
     var began = Sys.time();
@@ -130,6 +183,7 @@ class OpCache {
     var lines = ['keyed booleans: ${s.hits} hits, ${s.misses} misses (${Math.round(s.missSeconds * 1000)} ms computing and canonicalising), ${s.verified} verified',
       'unkeyed booleans: ${s.unkeyedCount} (${Math.round(s.unkeyedSeconds * 1000)} ms)',
       'history booleans: ${s.historyKeyed} keyed + ${s.historyUnkeyed} unkeyed (${Math.round(s.historySeconds * 1000)} ms, not cached: callers keep the operation history)'];
+    for (name => q in s.queries) lines.push('query $name: ${q.hits} hits, ${q.misses} misses (${Math.round(q.seconds * 1000)} ms computing), ${q.verified} verified');
     for (gap => entry in s.gaps) lines.push('  unkeyed because "$gap": ${entry.count} (${Math.round(entry.seconds * 1000)} ms)');
     for (gap => entry in s.historyGaps) lines.push('  history unkeyed because "$gap": ${entry.count} (${Math.round(entry.seconds * 1000)} ms)');
     for (bucket => entry in s.sizes) lines.push('  size ${bucket}: ${entry.count} keyed, ${Math.round(entry.seconds * 1000)} ms computing');
@@ -152,7 +206,10 @@ typedef OpStats = {
   var gaps:Map<String, OpGap>;
   var sizes:Map<String, OpGap>;
   var historyGaps:Map<String, OpGap>;
+  var queries:Map<String, OpQuery>;
 }
+
+typedef OpQuery = {hits:Int, misses:Int, verified:Int, seconds:Float};
 
 private class Counters {
   var hitCount = 0;
@@ -167,6 +224,7 @@ private class Counters {
   final gaps:Map<String, OpGap> = [];
   final sizes:Map<String, OpGap> = [];
   final historyGaps:Map<String, OpGap> = [];
+  final queries:Map<String, OpQuery> = [];
   final lock = new sys.thread.Mutex();
 
   public function new() {}
@@ -229,13 +287,43 @@ private class Counters {
     lock.release();
   }
 
+  function queryEntry(name:String):OpQuery {
+    var entry = queries.get(name);
+    if (entry == null) {
+      entry = {hits: 0, misses: 0, verified: 0, seconds: 0.0};
+      queries.set(name, entry);
+    }
+    return entry;
+  }
+
+  public function queryHit(name:String):Void {
+    lock.acquire();
+    queryEntry(name).hits++;
+    lock.release();
+  }
+
+  public function queryMiss(name:String, seconds:Float):Void {
+    lock.acquire();
+    var entry = queryEntry(name);
+    entry.misses++;
+    entry.seconds += seconds;
+    lock.release();
+  }
+
+  public function queryVerified(name:String):Void {
+    lock.acquire();
+    queryEntry(name).verified++;
+    lock.release();
+  }
+
   public function snapshot():OpStats {
     lock.acquire();
     var result:OpStats = {hits: hitCount, misses: missCount, verified: verifiedCount, missSeconds: missTime, unkeyedCount: unkeyedCount,
       unkeyedSeconds: unkeyedTime, historyKeyed: historyKeyed, historyUnkeyed: historyUnkeyed, historySeconds: historyTime,
       gaps: [for (k => v in gaps) k => {count: v.count, seconds: v.seconds}],
       sizes: [for (k => v in sizes) k => {count: v.count, seconds: v.seconds}],
-      historyGaps: [for (k => v in historyGaps) k => {count: v.count, seconds: v.seconds}]};
+      historyGaps: [for (k => v in historyGaps) k => {count: v.count, seconds: v.seconds}],
+      queries: [for (k => v in queries) k => {hits: v.hits, misses: v.misses, verified: v.verified, seconds: v.seconds}]};
     lock.release();
     return result;
   }

@@ -20,7 +20,29 @@ class Memos {
    * with the tier on or off.
    */
   public static function persistentParts(name:String, capacity:Int, module:String):machinekit.cache.Memo<Part> return parts(name, capacity)
-    .canonicalize(canonicalPart).persist(CodeIdentity.of(module), part -> part.shape.toBytes(), bytes -> new Part(Shape.fromBytes(bytes)));
+    .canonicalize(canonicalPart).persist(CodeIdentity.of(module), encodePart, decodePart);
+
+  /** The shape's bytes with its construction key (`Shape.key`), so a restored solid is as keyed as a computed one. */
+  static function encodePart(part:Part):haxe.io.Bytes {
+    var out = new haxe.io.BytesOutput(), key = part.shape.key, bytes = part.shape.toBytes();
+    out.writeByte(key == null ? 0 : 1);
+    if (key != null) Codecs.writeText(out, key);
+    out.writeInt32(bytes.length);
+    out.write(bytes);
+    return out.getBytes();
+  }
+
+  static function decodePart(bytes:haxe.io.Bytes):Part {
+    var input = new haxe.io.BytesInput(bytes);
+    var key:Null<String> = input.readByte() == 0 ? null : Codecs.readText(input);
+    var length = input.readInt32();
+    if (length < 0) throw "stored solid has a negative length";
+    var shape = Shape.fromBytes(input.read(length));
+    Codecs.finished(input, bytes);
+    shape.key = key;
+    shape.gap = key == null ? "restored" : null;
+    return new Part(shape);
+  }
 
   static function canonicalPart(part:Part):Part {
     try {

@@ -7,6 +7,8 @@ import cadkit.modeling.Curve;
 import cadkit.modeling.Location;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
+import cadkit.parametric.GeometricConnectors;
+import cadkit.PhysicalProperties;
 import haxe.io.Bytes;
 import sys.FileSystem;
 
@@ -255,6 +257,103 @@ class ShapeKeySmoke {
     store.clear();
   }
 
+  static function sameProps(a:PhysicalProperties, b:PhysicalProperties):Bool return hex(a.toBytes()) == hex(b.toBytes());
+
+  static function queryStats(name:String):{hits:Int, misses:Int, verified:Int, seconds:Float} {
+    var q = OpCache.snapshot().queries.get(name);
+    return q == null ? {hits: 0, misses: 0, verified: 0, seconds: 0.0} : q;
+  }
+
+  /** Mass properties and face descriptors of keyed shapes: kept on disk, equal to a recomputation, independent of meshing. */
+  static function queries():Void {
+    var store = freshStore();
+    DiskStore.useProcess(store);
+    OpCache.resetStats();
+    // The answers do not depend on whether the shape was meshed: that is what lets them be a function of the key.
+    var probe = block(10), meshed = block(10);
+    meshed.tessellate(0.1, 0.5);
+    DiskStore.useProcess(null);
+    var plainProps = probe.massProperties(), meshedProps = meshed.massProperties();
+    var plainFaces = GeometricConnectors.describeFaces(probe), meshedFaces = GeometricConnectors.describeFaces(meshed);
+    check(sameProps(plainProps, meshedProps), "mass properties are the same before and after meshing");
+    check(plainFaces == meshedFaces, "face descriptors are the same before and after meshing");
+    DiskStore.useProcess(store);
+    OpCache.resetStats();
+    // Mass properties.
+    var a = block(10), b = block(10), c = block(11);
+    var base = store.count();
+    var p1 = a.massProperties();
+    check(queryStats("mass").misses == 1 && queryStats("mass").hits == 0 && store.count() == base + 1, "a first query is a miss and is stored");
+    var p2 = b.massProperties();
+    check(queryStats("mass").misses == 1 && queryStats("mass").hits == 1, "the same construction, another shape object: a hit, no recomputation");
+    check(sameProps(p1, p2) && sameProps(p1, plainProps), "a hit equals the computed answer to the bit");
+    c.massProperties();
+    check(queryStats("mass").misses == 2 && store.count() == base + 2, "another shape is another entry");
+    // The tier off, an unkeyed shape: computed as always, nothing stored or counted.
+    DiskStore.useProcess(null);
+    check(sameProps(block(10).massProperties(), p1), "with the tier off the answer is the same");
+    DiskStore.useProcess(store);
+    var unkeyed = block(10).unkeyed("test");
+    var before = queryStats("mass");
+    check(sameProps(unkeyed.massProperties(), p1) && queryStats("mass").hits == before.hits && queryStats("mass").misses == before.misses && store.count() == base + 2,
+      "an unkeyed shape bypasses the cache");
+    // Face descriptors.
+    var f1 = GeometricConnectors.describeFaces(a);
+    check(queryStats("describe-faces").misses == 1 && f1 == plainFaces, "descriptors: first query is a miss");
+    var f2 = GeometricConnectors.describeFaces(b);
+    check(queryStats("describe-faces").hits == 1 && f2 == f1, "descriptors: a hit equals the computed text");
+    check(GeometricConnectors.describeFaces(c) != f1 && queryStats("describe-faces").misses == 2, "descriptors: another shape, another entry");
+    DiskStore.useProcess(null);
+    check(GeometricConnectors.describeFaces(block(10)) == f1, "descriptors: tier off, same text");
+    DiskStore.useProcess(store);
+    // A hit returns what is stored; verify mode accepts an honest entry and refuses a planted one.
+    DiskStore.forceVerify(true);
+    var honest = block(10).massProperties();
+    DiskStore.forceVerify(null);
+    check(sameProps(honest, p1) && queryStats("mass").verified == 1, "verify mode accepts an honest entry");
+    var kmass = OpCache.queryKey("mass", "cadkit.Shape", a, ""), kfaces = OpCache.queryKey("describe-faces", "cadkit.parametric.GeometricConnectors", a, "");
+    check(kmass != null && kfaces != null && kmass != kfaces, "each query has its own store key");
+    check(OpCache.queryKey("mass", "cadkit.Shape", unkeyed, "") == null, "an unkeyed shape has no store key");
+    store.write(kmass, c.massProperties().toBytes());
+    DiskStore.forceVerify(true);
+    var message = "";
+    try block(10).massProperties() catch (error:Dynamic) message = Std.string(error);
+    DiskStore.forceVerify(null);
+    check(message.indexOf("stale") >= 0, "verify mode refuses a planted wrong mass entry: " + message);
+    store.write(kfaces, haxe.io.Bytes.ofString("[]"));
+    DiskStore.forceVerify(true);
+    message = "";
+    try GeometricConnectors.describeFaces(block(10)) catch (error:Dynamic) message = Std.string(error);
+    DiskStore.forceVerify(null);
+    check(message.indexOf("stale") >= 0, "verify mode refuses planted wrong descriptors: " + message);
+    // Damaged bytes are a miss, recomputed and rewritten.
+    store.write(kmass, haxe.io.Bytes.ofString("junk"));
+    check(sameProps(block(10).massProperties(), p1), "a damaged entry is a miss");
+    check(sameProps(block(10).massProperties(), p1), "and was rewritten whole");
+    store.clear();
+    DiskStore.useProcess(null);
+  }
+
+  /** `canonical` is an operation on the key: another shape to anything keyed on how it was made. */
+  static function canonicalKeys():Void {
+    var a = block(10), b = block(10);
+    var ca = a.canonical(), cb = b.canonical();
+    check(ca.key != null && ca.key != a.key, "the canonical form has its own key");
+    check(ca.key == cb.key, "equal construction, equal canonical keys");
+    check(block(11).canonical().key != ca.key, "another shape, another canonical key");
+    check(ca.canonical().key != ca.key && ca.canonical().key == ca.canonical().key, "canonical of canonical is a further, deterministic key");
+    var un = Shape.box(1, 2, 3).unkeyed("test").canonical();
+    check(un.key == null, "an unkeyed shape stays unkeyed");
+    // Queries on a canonical keyed shape are cached under its own key.
+    var store = freshStore();
+    DiskStore.useProcess(store);
+    OpCache.resetStats();
+    var m1 = ca.massProperties(), m2 = cb.massProperties();
+    check(queryStats("mass").misses == 1 && queryStats("mass").hits == 1 && sameProps(m1, m2), "queries on canonical keyed shapes are cached");
+    store.clear();
+    DiskStore.useProcess(null);
+  }
+
   public static function main():Void run();
 
   public static function run():Void {
@@ -262,6 +361,8 @@ class ShapeKeySmoke {
     cache();
     parts();
     lofts();
+    queries();
+    canonicalKeys();
     Sys.println("shape key smoke: " + passed + " checks passed");
   }
 }

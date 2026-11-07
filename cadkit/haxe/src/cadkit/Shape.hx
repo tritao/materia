@@ -113,8 +113,14 @@ class Shape {
     return CadKit.shapeVolumeChecked(native.borrow());
   }
 
-  /** Compute volume, area, centroid, and unit-density centroidal inertia. */
-  public function massProperties():PhysicalProperties {
+  /**
+   * Compute volume, area, centroid, and unit-density centroidal inertia. A keyed shape's answer is kept on disk
+   * (`OpCache.query`): it is the same whether or not the shape was meshed before (checked in ShapeKeySmoke).
+   */
+  public function massProperties():PhysicalProperties return cadkit.cache.OpCache.query("mass", "cadkit.Shape", this, "", () -> computeMassProperties(),
+    properties -> properties.toBytes(), PhysicalProperties.fromBytes);
+
+  private function computeMassProperties():PhysicalProperties {
     var nativeProperties = CadKit.shapePhysicalPropertiesChecked(native.borrow());
     var tensor = nativeProperties.get_inertia();
     return new PhysicalProperties(
@@ -547,7 +553,16 @@ class Shape {
    * bits of rotated placements and in the sign of zeros), so anything that stores shapes and also computes them, a persistent
    * memo, must return the canonical form on both paths, never the computed shape on one and the restored one on the other.
    */
-  public function canonical():Shape return fromBytes(toBytes());
+  public function canonical():Shape {
+    var result = fromBytes(toBytes());
+    // The canonical form differs from the built one in last-bit details, so it is another shape to anything keyed on how it was
+    // made: `canonical` is an operation on the key (an unkeyed shape stays unkeyed).
+    if (key != null) {
+      result.key = ShapeKey.hash("cadkit-shape/1\ncanonical\n" + key);
+      result.gap = null;
+    } else result.gap = gap ?? "canonical";
+    return result;
+  }
 
   /** A shape from `toBytes`; damaged, truncated or foreign bytes throw. */
   public static function fromBytes(bytes:haxe.io.Bytes):Shape {
