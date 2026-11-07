@@ -85,7 +85,9 @@ class ShapeKeySmoke {
     check(p1.named("one").shape.key != p1.named("two").shape.key, "Part.named tags differ");
     // Unkeyed sources and propagation.
     var spline = Curve.spline([new Vector(0, 0, 0), new Vector(1, 1, 0), new Vector(2, 0, 0)]);
-    check(spline.shape.key == null && spline.shape.gap == "spline", "a spline has no key and says why");
+    check(spline.shape.key != null && spline.shape.key == Curve.spline([new Vector(0, 0, 0), new Vector(1, 1, 0), new Vector(2, 0, 0)]).shape.key,
+      "equal splines, equal keys");
+    check(spline.shape.key != Curve.spline([new Vector(0, 0, 0), new Vector(1, 1, 0), new Vector(2, 0, 1)]).shape.key, "another point, another spline key");
     var raw = Shape.fromOwnedHandle(CadKit.boxChecked(1, 1, 1));
     check(raw.key == null, "a raw native shape has no key");
     check(raw.translate(v(1, 0, 0)).key == null && raw.fuse(a).key == null && a.cut(raw).key == null, "null propagates through operations");
@@ -170,12 +172,96 @@ class ShapeKeySmoke {
     DiskStore.useProcess(null);
   }
 
+
+  /** Sections like the hob's: closed polylines at stepped heights and twists. */
+  static function sections(twist:Float):Array<Curve> {
+    var out:Array<Curve> = [];
+    for (i in 0...4) {
+      var z = i * 3.0, r = 4 + 0.2 * i, a = twist * i;
+      var points = [for (k in 0...6) new Vector(r * Math.cos(a + k * Math.PI / 3), r * Math.sin(a + k * Math.PI / 3), z)];
+      out.push(Curve.polyline(points, true));
+    }
+    return out;
+  }
+
+  static function closeAll(curves:Array<Curve>):Void for (c in curves) c.close();
+
+  static function loftClip(twist:Float):Part {
+    var s = sections(twist);
+    var base = Part.loft(s, false);
+    closeAll(s);
+    var blank = Part.cylinderSpan(6, -1, 11);
+    var clipped = base.combineKept(blank, cadkit.modeling.Mode.Intersect);
+    var tool = Part.cylinderSpan(1, -2, 12, 0.5, 0);
+    var result = clipped.subtractAll([tool]);
+    base.close();
+    blank.close();
+    clipped.close();
+    tool.close();
+    return result;
+  }
+
+  /** Lofts and splines are keyed; a clipped loft is cached like any other keyed boolean. */
+  static function lofts():Void {
+    var a = sections(0.1), b = sections(0.1), c = sections(0.2);
+    var la = Part.loft(a, false), lb = Part.loft(b, false), lc = Part.loft(c, false), lr = Part.loft(sections(0.1), true);
+    check(la.shape.key != null && la.shape.key == lb.shape.key, "equal sections, equal loft keys");
+    check(la.shape.key != lc.shape.key, "other sections, another loft key");
+    check(la.shape.key != lr.shape.key, "the ruled flag is part of the loft key");
+    var reordered = sections(0.1);
+    reordered.reverse();
+    check(Part.loft(reordered, false).shape.key != la.shape.key, "section order is part of the loft key");
+    // A section with no key makes an unkeyed loft, with the reason carried along.
+    var rawSection = new Curve(Shape.fromOwnedHandle(CadKit.polylineChecked([v(0, 0, 0), v(2, 0, 0), v(2, 2, 0), v(0, 2, 0)], 1)));
+    var other = Curve.polyline([new Vector(0, 0, 3), new Vector(2, 0, 3), new Vector(2, 2, 3), new Vector(0, 2, 3)], true);
+    var unkeyed = Part.loft([rawSection, other], false);
+    check(unkeyed.shape.key == null, "a loft with an unkeyed section is unkeyed");
+    // combineKept: cached when keyed, exactly `combine` (with history) when not.
+    var kept = la.combineKept(Part.cylinderSpan(6, -1, 11), cadkit.modeling.Mode.Intersect);
+    check(kept.shape.key != null && kept.operation == null, "combineKept of keyed parts is a keyed result without history");
+    var plain = unkeyed.combineKept(Part.box(1, 1, 1), cadkit.modeling.Mode.Add);
+    check(plain.operation != null && plain.shape.key == null, "combineKept of an unkeyed part is combine, with its history");
+    closeAll(a);
+    closeAll(b);
+    closeAll(c);
+    // Cached: the second build runs no boolean and gives the same bytes; with the tier off the bytes are the same again.
+    var store = freshStore();
+    DiskStore.useProcess(store);
+    OpCache.resetStats();
+    var first = loftClip(0.1);
+    var s1 = OpCache.snapshot();
+    check(first.shape.key != null && s1.misses >= 2 && s1.unkeyedCount == 0, "a clipped loft was all cached booleans: " + s1.misses + "/" + s1.unkeyedCount);
+    var bytes = first.shape.toBytes();
+    var second = loftClip(0.1);
+    var s2 = OpCache.snapshot();
+    check(s2.misses == s1.misses && s2.hits == s1.misses, "the rebuild ran no boolean: " + s2.misses + "/" + s2.hits);
+    check(hex(second.shape.toBytes()) == hex(bytes) && second.shape.key == first.shape.key, "and gave the same bytes and key");
+    check(hex(loftClip(0.2).shape.toBytes()) != hex(bytes), "another twist is another result");
+    DiskStore.useProcess(null);
+    var off = loftClip(0.1);
+    check(hex(off.shape.toBytes()) == hex(bytes), "with the tier off the clipped loft has the same canonical bytes");
+    DiskStore.forceVerify(true);
+    DiskStore.useProcess(store);
+    try {
+      var verified = loftClip(0.1);
+      check(hex(verified.shape.toBytes()) == hex(bytes), "verify mode accepts a clipped loft");
+    } catch (error:Dynamic) {
+      DiskStore.forceVerify(null);
+      DiskStore.useProcess(null);
+      throw error;
+    }
+    DiskStore.forceVerify(null);
+    DiskStore.useProcess(null);
+    store.clear();
+  }
+
   public static function main():Void run();
 
   public static function run():Void {
     keys();
     cache();
     parts();
+    lofts();
     Sys.println("shape key smoke: " + passed + " checks passed");
   }
 }

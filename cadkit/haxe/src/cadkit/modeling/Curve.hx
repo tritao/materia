@@ -65,7 +65,8 @@ class Curve extends Model {
   public static function spline(points:Array<Vector>):Curve {
     var values:Array<CadKit.Vec3> = [];
     for (p in points) values.push(p.native());
-    return new Curve(Shape.fromOwnedHandle(CadKit.splineChecked(values)).unkeyed("spline"));
+    // The same points give the same curve: keyed by their exact bits.
+    return new Curve(leaf(Shape.fromOwnedHandle(CadKit.splineChecked(values)), "spline", [for (p in points) vec(p)].join(";")));
   }
 
   public static function polyline(points:Array<Vector>, closed:Bool = false):Curve {

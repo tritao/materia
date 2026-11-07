@@ -4,6 +4,7 @@ import CadKit;
 import cadkit.Shape;
 import cadkit.PhysicalProperties;
 import cadkit.Operation;
+import cadkit.ShapeKey;
 
 /** Solid results may contain zero, one, or several solids. */
 class Part extends Model {
@@ -162,9 +163,20 @@ class Part extends Model {
    */
   static function joined(a:Part, b:Part, mode:Mode):Part {
     if (a.shape.key != null && b.shape.key != null && a.shape.faceAttributes().length == 0 && b.shape.faceAttributes().length == 0)
-      return new Part(mode == Add ? a.shape.fuse(b.shape) : a.shape.cut(b.shape));
+      return new Part(switch mode {
+        case Add: a.shape.fuse(b.shape);
+        case Subtract: a.shape.cut(b.shape);
+        case Intersect: a.shape.common(b.shape);
+      });
     return a.combine(b, mode);
   }
+
+  /**
+   * `combine` for a result that does not need the operation's history (its face and edge correspondences): through the cached
+   * boolean when both shapes carry construction keys, which returns the canonical form (see `OpCache`); otherwise exactly
+   * `combine`. Use it where the result only feeds further booleans, a mesh or a measurement.
+   */
+  public function combineKept(other:Part, mode:Mode = Add):Part return joined(this, other, mode);
 
   public static function sphere(radius:Float):Part {
     return new Part(Shape.sphere(radius));
@@ -179,9 +191,10 @@ class Part extends Model {
         wires.push(wire);
         shapes.push(wire.shape);
       }
+      // A loft is a function of its ordered sections and its ruled flag: keyed when every section is.
       var result = fromOperation(new Operation(
         CadKit.loftOperationChecked(Model.refs(shapes), 1, ruled ? 1 : 0),
-        shapes, null, "loft"
+        shapes, ShapeKey.op("loft", ruled ? "ruled" : "smooth", shapes), "loft"
       ));
       for (wire in wires) wire.close();
       return result;

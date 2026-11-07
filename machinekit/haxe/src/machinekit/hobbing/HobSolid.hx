@@ -96,7 +96,8 @@ class HobSolid {
           )
         );
         try {
-          var clipped = moved.combine(blank, cadkit.modeling.Mode.Intersect);
+          // The clipped land only feeds the fuse below, so its history is not needed and the cached boolean serves.
+          var clipped = moved.combineKept(blank, cadkit.modeling.Mode.Intersect);
           parts.push(clipped);
           trace("gash " + g + " clipped");
         } catch (e:Dynamic) {
