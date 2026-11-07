@@ -190,7 +190,7 @@ Status: **complete** — P1–P5 accepted on branch `hobber-round-r5`; supplier 
 
 ## Phase Y: Y as a linear module (started 2026-11-07)
 
-Status: **LM0 complete; XC complete in three lean commits; XA partial; LM1 next** on `linear-module`.
+Status: **LM0 complete; XC complete in three lean commits; XA partial; LM1 nominal module implemented, qualification open; LM2 next** on `linear-module`.
 Keep the ground20 mm X deck, bolted bright-bar ribs and four corner sole pads.
 One bolts-only FE result:43.633 N/um /17.077 MN m/rad. Passing frame sweep0 errors,
 13 removals; trimmed hobber2453 PASS. XA then LM1-LM5,ZB,LM6 run lean (about90 min
