@@ -61,6 +61,58 @@ Until OC1 lands there is no trustworthy code identity: `CodeIdentity.of` returns
 
 Target: (a) about the compile plus 20 s; (b) the casting rebuilt, everything else cached; (c) unchanged.
 
+## Using the cache
+
+Two layers share one store (`cadkit.cache.DiskStore`, files named by the SHA-256 of the full key):
+
+- **Kernel cache** (`cadkit.cache.OpCache`): pure CadKit work keyed by construction history (`Shape.key`): fuse, cut and common,
+  loft, and the queries mass properties, face descriptors and tessellation. Correct by construction: a key names the inputs
+  of a pure operation, the CadKit/OCCT build and the cadkit code. Haxe source edits never enter these keys.
+- **Component memos** (`machinekit.cache.Memo.persist`): masses, scene parts, anchor derivations, casting solids, the hob mesh.
+  Keyed on the input key plus the code identity of the code that computes them (`CodeIdentity`) and the native build.
+
+**Environment** (all optional)
+
+| Variable | Effect |
+|---|---|
+| `MATERIA_MEMO_DIR` | Cache directory. Default `$XDG_CACHE_HOME/materia/memo`, else `~/.cache/materia/memo`. |
+| `MATERIA_MEMO=off` | No persistent tier. Results are identical, only slower. |
+| `MATERIA_MEMO_MAX_MB` | Size cap, default 2048. Least recently used entries are evicted past it. |
+| `MATERIA_MEMO_VERIFY=1` | Recompute every hit and fail on any difference (see below). |
+| `MATERIA_MEMO_SALT` | Extra text in the native identity. Set it after rebuilding OCCT or CadKit in a way the library hashes and OCCT version cannot see (same sizes, same version text). |
+
+**Clear and inspect.** Clear: delete the cache directory (it is only a cache). Inspect: `HOBBER_PHASES=1` on the hobber scene
+(`machinekit/examples/flexspline-hobber/haxeon.enclosure.json`) prints the build/fit/export times, one `MEMO` line per memo
+(hits, misses, how many came from disk, time spent computing) and `OPS` lines for the kernel cache (keyed and unkeyed
+booleans, history booleans that cannot be cached and why, queries).
+
+**Verify mode.** `MATERIA_MEMO_VERIFY=1` makes every disk hit recompute and compare bytes; a difference throws
+`persistent memo "<name>" is stale ...`. It means the key or the identity missed an input. To find missing dependencies across
+commits: fill the cache on one commit, switch to a commit that changed code, run with verify on. It is slow by design: use it as
+a gate, not in everyday runs.
+
+**Adding a persistent memo**
+1. The key must name every input of the value: a component's `geometryKey` (type, exact inputs, material, detail) is the model.
+   Never build keys from object identity or anything that varies between runs; a null key means "not cached".
+2. If the computing code is virtual (a component's `geometry`, `massProperties`), add `CodeIdentity.ofObject(instance)` to the
+   key: the memo's own identity covers only the module that owns it.
+3. Give `persist` the module whose code computes the value (`CodeIdentity.of("pkg.Module")`) and exact codecs
+   (`Codecs`): decode(encode(x)) must equal x to the bit.
+4. Solids use `Memos.persistentParts`: the value is always the canonical form (`Shape.canonical`), on a miss, a hit and with the
+   tier off, so results never depend on the cache state.
+5. Test it the way `PersistentMemoTests` does: miss, hit, another identity, damaged entry, verify mode refusing a planted
+   stale value.
+
+**Adding a keyed operation** (kernel cache). Give the result a key (`ShapeKey`) built from the operation name, exact-bit
+parameters and the input keys. An operation that cannot name its inputs returns a null key, which makes everything built on it
+uncached (never wrong). Shapes carrying face attributes, and operations that keep their history (`Part.combine`, `subtract`), are
+not cached today: see the follow-ups.
+
+**Known limits.** Cold runs are not faster (a shared, read-only cache would be the answer). Code identity is the import closure of
+a module, which in this codebase is nearly the whole program for generic modules (`AssemblyPreview`, `MachineComponent`), so an
+edit to a widely imported module invalidates the component memos; the kernel cache is what makes recomputing them cheap.
+Tessellation meshes an independent copy, so it never changes its input or its `bounds()`.
+
 ## Log
 
 - 2026-11-07 OC2 done. Hob display mesh (default hob, debug build): 153 s computed, 0.09 s from the persistent tier in a new
