@@ -727,6 +727,8 @@ class AssemblyIntegrity {
       var face = faces.get(key);
       if (face == null) throw 'Assembly integrity lost the face "$key" of joint ${joint.id}';
       var frame = AssemblyFrames.compose(need(poses, joint.receivingMember), face.frame);
+      JointFasteners.checkEdgeSupport(joint, face, frame, flat.member(joint.clampedMember),
+        flat.member(joint.receivingMember), parts, diagnostics);
       var reported = new Map<String, Bool>();
       for (volume in joint.volumes) for (point in joint.hostHoles) {
         var local = Part.cylinderSpan(volume.diameter / 2, volume.from, volume.to, point.x, point.y);

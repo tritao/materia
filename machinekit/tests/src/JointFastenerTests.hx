@@ -384,7 +384,7 @@ class JointFastenerTests {
       builder.deriveFasteners();
       return builder;
     }
-    function codes(builder:AxisBuilder, ?fittedBefore:Array<{member:String, fastened:Array<String>}>):Array<String> {
+    function codes(builder:AxisBuilder, ?fittedBefore:Array<machinekit.assembly.AssemblyIntegrity.FastenerFitOrder>):Array<String> {
       var report = machinekit.assembly.AssemblyIntegrity.check(builder, {fasteners: true, fittedBefore: fittedBefore});
       return [for (item in report.diagnostics.items) if (StringTools.startsWith(item.code, "fasteners.")) item.code];
     }
@@ -515,8 +515,13 @@ class JointFastenerTests {
     var fit = machinekit.assembly.AssemblyIntegrity.fasteners(machine, {fasteners: true, removable: machine.workholdingMembers(), fittedBefore: machine.coverInstallationOrder()});
     Sys.println('bench mill fastener fit: ${fit.errors().length} findings in ${Math.round(Sys.time() - started)} s');
     for (item in fit.errors()) Sys.println("  " + item.code + ": " + item.message);
-    // The motors' flange screws have corner reliefs behind the flange (`MotorBody`) and nothing stands in their heads' way.
-    check(fit.errors().length == 0, 'the derived fasteners fit the mill: ${[for (item in fit.errors()) item.message].join("; ")}');
+    // Lead ruling 2026-11-07: run the new made-part edge rule on every machine,
+    // but report other examples without changing their hardware in this session.
+    // Preserve the pre-existing holes/head/driver regression gate independently.
+    var otherFitErrors = fit.errors().filter(item -> item.code != "fasteners.edge-support");
+    var edgeFindings = fit.diagnostics.items.filter(item -> item.code == "fasteners.edge-support");
+    Sys.println('unmodified bench-mill made-part edge findings (reported separately): ${edgeFindings.length}');
+    check(otherFitErrors.length == 0, 'the mill holes, heads and driver corridors fit: ${[for (item in otherFitErrors) item.message].join("; ")}');
     // The steel bosses cast into the column fill the pockets cut for them: no volume shared with the casting, and the support's foot on the boss.
     var poses = machine.solvedPoses(), posed = new machinekit.assembly.PosedParts();
     var parts = new Map<String, machinekit.component.MachineComponent>();

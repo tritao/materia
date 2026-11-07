@@ -16,6 +16,9 @@ enum ThreadMaterial {
 /** The counterbore a fastener head sinks into: the recess floor is the bearing seat. */
 typedef BoltRecess = {diameter:Float, depth:Float}
 
+/** Uniform drawn adjustment slots, centred on each listed hole; axis is in the face frame. */
+typedef BoltSlot = {width:Float, halfTravel:Float, axis:String}
+
 /**
  * One round hole or recess `JointFasteners` derives for a part: a cylinder of `diameter` on the axis through (`x`, `y`) of
  * `frame` (a frame in the part's own frame), spanning `from` to `to` along that frame's +Z, mm. A part that `machinable()`
@@ -104,9 +107,11 @@ class BoltedFace {
 	 * `SocketHeadCapScrew.lowHead`), which the derivation uses in place of the ISO 4762 one.
 	 */
   public final lowHead:Bool;
+  public final slot:Null<BoltSlot>;
 
   function new(id:String, frame:AssemblyFrame, role:BoltedRole, holes:Null<Array<BoltHole>>, width:Float, height:Float,
-      ?thicknessAt:(Float, Float) -> Float, drawn:Bool = true, washer:Bool = false, ?alternative:String, rated:Bool = false, lowHead:Bool = false) {
+      ?thicknessAt:(Float, Float) -> Float, drawn:Bool = true, washer:Bool = false, ?alternative:String, rated:Bool = false, lowHead:Bool = false, ?slot:BoltSlot) {
+    this.slot = slot;
     this.lowHead = lowHead;
     this.alternative = alternative;
     this.rated = rated;
@@ -152,10 +157,18 @@ class BoltedFace {
 
   /** A clamped face drilled to suit, with the holes one receiving face gave it. */
   public function paired(holes:Array<BoltHole>):BoltedFace return new BoltedFace(id, frame, role, holes, width, height, thicknessAt, drawn,
-      washer, alternative, rated, lowHead);
+      washer, alternative, rated, lowHead, slot);
 
   /** This face with its screw the low-head cap screw (see `lowHead`). */
-  public function lowHeaded():BoltedFace return new BoltedFace(id, frame, role, holes, width, height, thicknessAt, drawn, washer, alternative, rated, true);
+  public function lowHeaded():BoltedFace return new BoltedFace(id, frame, role, holes, width, height, thicknessAt, drawn, washer, alternative, rated, true, slot);
+
+  /** Drawn slots retain the edge requirement over their entire adjustment interval. */
+  public function withSlots(slotWidth:Float, halfTravel:Float, axis:String):BoltedFace {
+    if (!drawn || !(slotWidth > 0) || !(halfTravel > 0) || !Math.isFinite(slotWidth + halfTravel)
+      || (axis != "x" && axis != "y")) throw "Invalid drawn bolted-face slots";
+    return new BoltedFace(id, frame, role, holes, width, height, thicknessAt, drawn, washer, alternative,
+      rated, lowHead, {width:slotWidth, halfTravel:halfTravel, axis:axis});
+  }
 
   public static function clamped(id:String, frame:AssemblyFrame, holes:Array<BoltHole>, clearance:Float, grip:Float,
       ?size:String, ?recess:BoltRecess, drawn:Bool = true, washer:Bool = false, ?alternative:String):BoltedFace return new BoltedFace(id, frame,
