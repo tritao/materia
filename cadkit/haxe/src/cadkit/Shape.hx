@@ -482,6 +482,55 @@ class Shape {
     return CadKit.planarCopyBoundaryBytesChecked(native.borrow(), chordTolerance);
   }
 
+  /**
+   * The shape as bytes for a cache on disk: the native B-rep and element names (`cad_shape_write_bytes`) and the face
+   * attributes CadKit keeps in Haxe. Triangulations are not kept, so a restored shape meshes as a fresh one does.
+   */
+  public function toBytes():haxe.io.Bytes {
+    var nativeBytes = CadKit.shapeWriteBytesChecked(native.borrow());
+    var attributes = cadkit.threads.FaceAttributeCodec.encode(threadAttributes);
+    var out = new haxe.io.BytesOutput();
+    out.writeInt32(shapeBytesVersion);
+    out.writeInt32(nativeBytes.length);
+    out.write(nativeBytes);
+    out.writeInt32(attributes.length);
+    out.write(attributes);
+    out.writeInt32(adler(attributes));
+    return out.getBytes();
+  }
+
+  /** A shape from `toBytes`; damaged, truncated or foreign bytes throw. */
+  public static function fromBytes(bytes:haxe.io.Bytes):Shape {
+    var input = new haxe.io.BytesInput(bytes);
+    if (input.readInt32() != shapeBytesVersion) throw "Unsupported shape bytes";
+    var nativeLength = input.readInt32();
+    if (nativeLength < 0 || nativeLength > bytes.length) throw "Damaged shape bytes";
+    var nativeBytes = input.read(nativeLength);
+    var attributeLength = input.readInt32();
+    if (attributeLength < 0 || attributeLength > bytes.length) throw "Damaged shape bytes";
+    var attributeBytes = input.read(attributeLength);
+    if (input.readInt32() != adler(attributeBytes)) throw "Damaged shape bytes (attribute checksum)";
+    var attributes = cadkit.threads.FaceAttributeCodec.decode(attributeBytes);
+    var trailing = true;
+    try input.readByte() catch (error:Dynamic) trailing = false;
+    if (trailing) throw "Damaged shape bytes";
+    var shape = new Shape(CadKit.shapeReadBytesChecked(nativeBytes));
+    shape.setThreadedFaces(attributes);
+    return shape;
+  }
+
+  static final shapeBytesVersion = 1;
+
+  /** Adler-32 of the attribute section (the native section carries its own checksum). */
+  static function adler(bytes:haxe.io.Bytes):Int {
+    var a = 1, b = 0;
+    for (index in 0...bytes.length) {
+      a = (a + bytes.get(index)) % 65521;
+      b = (b + a) % 65521;
+    }
+    return (b << 16) | a;
+  }
+
   public function close():Bool {
     meshCache.resize(0);
     return native.close();

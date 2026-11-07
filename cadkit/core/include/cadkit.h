@@ -305,6 +305,21 @@ CADKIT_API cad_result cad_step_export(
     cad_shape shape,
     const char* path CADKIT_HXI_UTF8);
 
+/* A shape as bytes, for a cache on disk: the B-rep (OCCT binary, without triangulations, so a restored shape meshes
+ * the way a fresh one does) together with the shape's element names and aliases, which CadKit keeps outside the B-rep.
+ * The bytes carry a format version, the OCCT version and a checksum. The byte capacity is both the query result and
+ * the input capacity in bytes. Writing the same shape twice gives the same bytes. */
+CADKIT_API cad_result cad_shape_write_bytes(
+    cad_shape shape,
+    uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
+    uint32_t* byte_capacity CADKIT_HXI_INOUT);
+
+/* A shape from bytes written by cad_shape_write_bytes. Truncated, damaged, foreign or other-version bytes fail with
+ * CAD_ERROR_INVALID_ARGUMENT and a message; nothing is read from them before the checksum has been verified. */
+CADKIT_API cad_result cad_shape_read_bytes(
+    const uint8_t* data CADKIT_HXI_IN_ARRAY(byte_count), uint32_t byte_count,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
 /* Transform functions return a new shape and leave the input shape unchanged. */
 CADKIT_API cad_result cad_shape_translate(
     cad_shape shape,

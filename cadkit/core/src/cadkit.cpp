@@ -65,6 +65,9 @@
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <BRepTools.hxx>
+#include <BinTools.hxx>
+#include <BinTools_FormatVersion.hxx>
+#include <Standard_Version.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepGProp.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
@@ -300,6 +303,11 @@ OperationEntry* lookup_operation_locked(cad_operation handle) {
         return nullptr;
     }
     return &entry;
+}
+
+// -0.0 as +0.0, anything else unchanged.
+double plain_zero(double value) {
+    return value == 0.0 ? 0.0 : value;
 }
 
 cad_result insert_shape(TopoDS_Shape shape, cad_shape* out_shape, naming::ElementMapPtr names = nullptr) {
@@ -1730,11 +1738,13 @@ cad_result build_mesh(
             }
 
             const auto first_index = static_cast<std::uint32_t>(out_mesh.vertices.size());
-            out_mesh.vertices.push_back({point1.X(), point1.Y(), point1.Z()});
-            out_mesh.vertices.push_back({point2.X(), point2.Y(), point2.Z()});
-            out_mesh.vertices.push_back({point3.X(), point3.Y(), point3.Z()});
+            // Signed zeros are made plain zeros: a B-rep read back from bytes may hold -0.0 where the original held
+            // +0.0, and both must mesh to the same bytes.
+            out_mesh.vertices.push_back({plain_zero(point1.X()), plain_zero(point1.Y()), plain_zero(point1.Z())});
+            out_mesh.vertices.push_back({plain_zero(point2.X()), plain_zero(point2.Y()), plain_zero(point2.Z())});
+            out_mesh.vertices.push_back({plain_zero(point3.X()), plain_zero(point3.Y()), plain_zero(point3.Z())});
             for (const auto& vertex_normal : vertex_normals) {
-                out_mesh.normals.push_back({vertex_normal.X(), vertex_normal.Y(), vertex_normal.Z()});
+                out_mesh.normals.push_back({plain_zero(vertex_normal.X()), plain_zero(vertex_normal.Y()), plain_zero(vertex_normal.Z())});
             }
             out_mesh.indices.push_back(first_index);
             out_mesh.indices.push_back(first_index + 1u);
@@ -1768,8 +1778,8 @@ cad_result build_mesh(
                     const auto second = points.Value(point_index + 1);
                     if (first.SquareDistance(second) <= 1e-18)
                         continue;
-                    out_mesh.edge_segment_endpoints.push_back({first.X(), first.Y(), first.Z()});
-                    out_mesh.edge_segment_endpoints.push_back({second.X(), second.Y(), second.Z()});
+                    out_mesh.edge_segment_endpoints.push_back({plain_zero(first.X()), plain_zero(first.Y()), plain_zero(first.Z())});
+                    out_mesh.edge_segment_endpoints.push_back({plain_zero(second.X()), plain_zero(second.Y()), plain_zero(second.Z())});
                     out_mesh.edge_segment_ids.push_back(static_cast<std::uint32_t>(edge_index - 1));
                 }
             }
@@ -1783,8 +1793,8 @@ cad_result build_mesh(
             second.Transform(transform);
             if (first.SquareDistance(second) <= 1e-18)
                 continue;
-            out_mesh.edge_segment_endpoints.push_back({first.X(), first.Y(), first.Z()});
-            out_mesh.edge_segment_endpoints.push_back({second.X(), second.Y(), second.Z()});
+            out_mesh.edge_segment_endpoints.push_back({plain_zero(first.X()), plain_zero(first.Y()), plain_zero(first.Z())});
+            out_mesh.edge_segment_endpoints.push_back({plain_zero(second.X()), plain_zero(second.Y()), plain_zero(second.Z())});
             out_mesh.edge_segment_ids.push_back(static_cast<std::uint32_t>(edge_index - 1));
         }
     }
@@ -2021,6 +2031,220 @@ extern "C" CADKIT_API cad_result cad_step_export(
     const char* path) {
     clear_error();
     return export_step_shape(shape, path);
+}
+
+namespace {
+
+// Bytes of a shape: magic, format, naming scheme, OCCT version text, name and B-rep section sizes, the sections, and an
+// FNV-1a checksum of everything before it. Little-endian. See cadkit.h.
+constexpr char kShapeMagic[4] = {'C', 'K', 'S', 'H'};
+constexpr std::uint32_t kShapeFormat = 1;
+
+std::uint64_t shape_checksum(const std::uint8_t* data, std::size_t size) {
+    std::uint64_t hash = 1469598103934665603ull;
+    for (std::size_t i = 0; i < size; ++i) {
+        hash ^= data[i];
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
+void put_u32(std::vector<std::uint8_t>& out, std::uint32_t value) {
+    for (int i = 0; i < 4; ++i) out.push_back(static_cast<std::uint8_t>((value >> (8 * i)) & 0xffu));
+}
+
+void put_u64(std::vector<std::uint8_t>& out, std::uint64_t value) {
+    for (int i = 0; i < 8; ++i) out.push_back(static_cast<std::uint8_t>((value >> (8 * i)) & 0xffu));
+}
+
+void put_text(std::vector<std::uint8_t>& out, const std::string& text) {
+    put_u32(out, static_cast<std::uint32_t>(text.size()));
+    out.insert(out.end(), text.begin(), text.end());
+}
+
+void put_texts(std::vector<std::uint8_t>& out, const std::vector<std::string>& texts) {
+    put_u32(out, static_cast<std::uint32_t>(texts.size()));
+    for (const auto& text : texts) put_text(out, text);
+}
+
+void put_text_lists(std::vector<std::uint8_t>& out, const std::vector<std::vector<std::string>>& lists) {
+    put_u32(out, static_cast<std::uint32_t>(lists.size()));
+    for (const auto& list : lists) put_texts(out, list);
+}
+
+struct ByteReader {
+    const std::uint8_t* data;
+    std::size_t size;
+    std::size_t position = 0;
+
+    bool u32(std::uint32_t& value) {
+        if (size - position < 4) return false;
+        value = 0;
+        for (int i = 0; i < 4; ++i) value |= static_cast<std::uint32_t>(data[position + i]) << (8 * i);
+        position += 4;
+        return true;
+    }
+    bool text(std::string& value) {
+        std::uint32_t length = 0;
+        if (!u32(length) || size - position < length) return false;
+        value.assign(reinterpret_cast<const char*>(data + position), length);
+        position += length;
+        return true;
+    }
+    bool texts(std::vector<std::string>& values) {
+        std::uint32_t count = 0;
+        // Every entry takes at least four bytes, so a count beyond that is damage, not a reason to allocate.
+        if (!u32(count) || count > (size - position) / 4) return false;
+        values.resize(count);
+        for (auto& value : values) if (!text(value)) return false;
+        return true;
+    }
+    bool text_lists(std::vector<std::vector<std::string>>& values) {
+        std::uint32_t count = 0;
+        if (!u32(count) || count > (size - position) / 4) return false;
+        values.resize(count);
+        for (auto& value : values) if (!texts(value)) return false;
+        return true;
+    }
+};
+
+int subshape_count(const TopoDS_Shape& shape, TopAbs_ShapeEnum type) {
+    naming::ShapeIndex index;
+    TopExp::MapShapes(shape, type, index);
+    return index.Extent();
+}
+
+}  // namespace
+
+extern "C" CADKIT_API cad_result cad_shape_write_bytes(
+    cad_shape shape,
+    std::uint8_t* output,
+    std::uint32_t* byte_capacity) {
+    clear_error();
+    if (byte_capacity == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "byte_capacity must not be null");
+    }
+    naming::NamedShape named;
+    const auto copied = copy_named_shape(shape, named);
+    if (copied != CAD_OK) return copied;
+    try {
+        std::ostringstream stream(std::ios::out | std::ios::binary);
+        BinTools::Write(named.shape, stream, false, false, BinTools_FormatVersion_CURRENT);
+        const auto brep = stream.str();
+
+        std::vector<std::uint8_t> names;
+        put_texts(names, named.names->faces);
+        put_texts(names, named.names->edges);
+        put_texts(names, named.names->vertices);
+        put_texts(names, named.names->solids);
+        put_text_lists(names, named.names->face_aliases);
+        put_text_lists(names, named.names->solid_aliases);
+
+        if (brep.size() > 0x7fffffffu || names.size() > 0x7fffffffu) {
+            return fail(CAD_ERROR_OUT_OF_MEMORY, "shape exceeds 32-bit range");
+        }
+        std::vector<std::uint8_t> bytes;
+        bytes.reserve(brep.size() + names.size() + 128);
+        bytes.insert(bytes.end(), kShapeMagic, kShapeMagic + 4);
+        put_u32(bytes, kShapeFormat);
+        put_u32(bytes, naming::kSchemeVersion);
+        put_text(bytes, OCC_VERSION_STRING_EXT);
+        put_u32(bytes, static_cast<std::uint32_t>(names.size()));
+        put_u32(bytes, static_cast<std::uint32_t>(brep.size()));
+        bytes.insert(bytes.end(), names.begin(), names.end());
+        bytes.insert(bytes.end(), brep.begin(), brep.end());
+        put_u64(bytes, shape_checksum(bytes.data(), bytes.size()));
+
+        if (bytes.size() > 0xffffffffu) return fail(CAD_ERROR_OUT_OF_MEMORY, "shape exceeds 32-bit range");
+        const auto required = static_cast<std::uint32_t>(bytes.size());
+        const auto capacity = *byte_capacity;
+        *byte_capacity = required;
+        if (capacity < required || output == nullptr) {
+            return fail(CAD_ERROR_BUFFER_TOO_SMALL, "shape output buffer is too small");
+        }
+        std::memcpy(output, bytes.data(), bytes.size());
+        return CAD_OK;
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
+}
+
+extern "C" CADKIT_API cad_result cad_shape_read_bytes(
+    const std::uint8_t* data,
+    std::uint32_t byte_count,
+    cad_shape* out_shape) {
+    clear_error();
+    if (out_shape == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_shape must not be null");
+    }
+    *out_shape = 0;
+    // magic, format, scheme, text length, names size, B-rep size, checksum
+    constexpr std::size_t kMinimum = 4 + 4 + 4 + 4 + 4 + 4 + 8;
+    if (data == nullptr || byte_count < kMinimum) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes are truncated");
+    }
+    if (std::memcmp(data, kShapeMagic, 4) != 0) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "not shape bytes");
+    }
+    const std::size_t body = byte_count - 8;
+    std::uint64_t stored = 0;
+    for (int i = 0; i < 8; ++i) stored |= static_cast<std::uint64_t>(data[body + i]) << (8 * i);
+    if (stored != shape_checksum(data, body)) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes are damaged (checksum mismatch)");
+    }
+    try {
+        ByteReader reader{data, body, 4};
+        std::uint32_t format = 0, scheme = 0, names_size = 0, brep_size = 0;
+        std::string occt;
+        if (!reader.u32(format) || !reader.u32(scheme) || !reader.text(occt) || !reader.u32(names_size) ||
+            !reader.u32(brep_size)) {
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes are truncated");
+        }
+        if (format != kShapeFormat) return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes have an unsupported format version");
+        if (scheme != naming::kSchemeVersion) return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes use another naming scheme");
+        if (occt != OCC_VERSION_STRING_EXT) return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes were written by another OCCT version");
+        if (body - reader.position != static_cast<std::uint64_t>(names_size) + brep_size) {
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes have inconsistent section sizes");
+        }
+
+        ByteReader names_reader{data + reader.position, names_size, 0};
+        auto names = std::make_shared<naming::ElementMap>();
+        if (!names_reader.texts(names->faces) || !names_reader.texts(names->edges) || !names_reader.texts(names->vertices) ||
+            !names_reader.texts(names->solids) || !names_reader.text_lists(names->face_aliases) ||
+            !names_reader.text_lists(names->solid_aliases) || names_reader.position != names_size) {
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "shape name section is damaged");
+        }
+
+        std::istringstream stream(
+            std::string(reinterpret_cast<const char*>(data + reader.position + names_size), brep_size),
+            std::ios::in | std::ios::binary);
+        TopoDS_Shape restored;
+        BinTools::Read(restored, stream);
+        if (restored.IsNull()) return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes hold no shape");
+
+        const bool consistent =
+            names->faces.size() == static_cast<std::size_t>(subshape_count(restored, TopAbs_FACE)) &&
+            names->edges.size() == static_cast<std::size_t>(subshape_count(restored, TopAbs_EDGE)) &&
+            names->vertices.size() == static_cast<std::size_t>(subshape_count(restored, TopAbs_VERTEX)) &&
+            names->solids.size() == static_cast<std::size_t>(subshape_count(restored, TopAbs_SOLID)) &&
+            names->face_aliases.size() == names->faces.size() && names->solid_aliases.size() == names->solids.size();
+        if (!consistent) return fail(CAD_ERROR_INVALID_ARGUMENT, "shape names do not match the shape");
+        return insert_shape(std::move(restored), out_shape, naming::ElementMapPtr(std::move(names)));
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
 }
 
 extern "C" CADKIT_API cad_result cad_shape_translate(
