@@ -77,13 +77,14 @@ class Operation {
         if (!deleted) throw 'Thread face ${source.attribute.faceName} lost without proven deletion';
       }
       result.setThreadedFaces(attributes);
-      // An input with face attributes has no key, so a keyed operation never carried attributes into its result.
-      if (resultKey != null && attributes.length == 0) {
+      // The attributes the history carried into the result are a function of the inputs (their attributes are part of their keys),
+      // so the operation's key names the result with them.
+      if (resultKey != null) {
         result.key = resultKey;
         result.gap = null;
       } else {
         result.key = null;
-        result.gap = resultGap == "" ? "attributes" : resultGap;
+        result.gap = resultGap == "" ? "operation" : resultGap;
       }
       return result;
     } catch (error:Dynamic) {

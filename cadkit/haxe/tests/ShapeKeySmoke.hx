@@ -10,6 +10,12 @@ import cadkit.modeling.Location;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import cadkit.parametric.GeometricConnectors;
+import cadkit.threads.ThreadSpec;
+import cadkit.threads.Threads;
+import cadkit.threads.Details;
+import cadkit.threads.SurfaceDetail;
+import cadkit.threads.ThreadedFace;
+import cadkit.threads.ThreadedFace.ThreadStart;
 import cadkit.PhysicalProperties;
 import haxe.io.Bytes;
 import sys.FileSystem;
@@ -138,6 +144,156 @@ class ShapeKeySmoke {
       new Vector(1, 0, 0)
     ]);
     check(cs.shape.key == ds.shape.key, "equal polylines, equal keys");
+  }
+
+  /** A shank with a thread on its side face: a keyed primitive carrying a face attribute. */
+  static function shank(length:Float = 40, pitch:Float = 1):Shape {
+    var part = Part.cylinderSpan(3, -length, 0);
+    var attached = Threads.attach(
+      part.shape,
+      "cyl.side",
+      new ThreadSpec("M6", 6, pitch, 1, RightHand, false),
+      AxisMaximum,
+      18,
+      22
+    );
+    part.close();
+    return attached;
+  }
+
+  static function attributeText(shape:Shape):String {
+    return hex(cadkit.threads.FaceAttributeCodec.encode(shape.faceAttributes()));
+  }
+
+  static function cutter(z:Float):Shape {
+    var box = Shape.box(20, 20, 30);
+    var moved = box.translate(v(0, 0, z));
+    box.close();
+    return moved;
+  }
+
+  /** Face attributes are part of a shape's key: kept, equal for equal attributes, another for any other. */
+  static function attributed():Void {
+    var a = shank();
+    check(a.faceAttributes().length == 1, "the shank carries its thread");
+    check(a.key != null, "an attributed shape keeps a key");
+    var b = shank();
+    check(b.key == a.key, "the same construction and attributes give the same key");
+    check(shank(40, 1.5).key != a.key, "another thread spec gives another key");
+    check(shank(41, 1).key != a.key, "another construction gives another key");
+    var plain = Part.cylinderSpan(3, -40, 0);
+    check(
+      plain.shape.key != null && plain.shape.key != a.key,
+      "the plain shape and the threaded one are different keys"
+    );
+    var detailed = Details.attach(plain.shape, "cyl.side", Knurl(24, 0.3));
+    var detailed2 = Details.attach(plain.shape, "cyl.side", Knurl(24, 0.3));
+    check(
+      detailed.key != null && detailed.key == detailed2.key && detailed.key != a.key && detailed.key != plain.shape.key,
+      "a surface detail is keyed the same way"
+    );
+    check(Details.attach(plain.shape, "cyl.side", Knurl(25, 0.3)).key != detailed.key, "another detail is another key");
+    // A clone is the same shape; a canonical form is another shape (as for unattributed ones).
+    check(a.cloneShape().key == a.key, "a clone of an attributed shape has its key");
+    var canonical = a.canonical();
+    check(
+      canonical.key != null && canonical.key != a.key && attributeText(canonical) == attributeText(a),
+      "the canonical form of an attributed shape keeps its attributes and has its own key"
+    );
+    // Operations: attributed inputs make keyed results.
+    var cut = a.cut(cutter(-10));
+    check(cut.key != null, "a cut of an attributed shape is keyed");
+    check(Shape.compound([a, shank(41)]).key == null, "a compound stays unkeyed");
+    for (s in [a, b, plain.shape, detailed, detailed2, canonical, cut]) s.close();
+  }
+
+  /** Cached booleans of attributed shapes: same bytes and attributes as the uncached history path, and no boolean on a hit. */
+  static function attributedBooleans():Void {
+    var store = freshStore();
+    DiskStore.useProcess(null);
+    // The reference: with the tier off the result is the canonical form of the history path.
+    var tool = cutter(-10);
+    var base = shank();
+    var reference = base.cut(tool);
+    var referenceBytes = hex(reference.toBytes());
+    var referenceAttributes = attributeText(reference);
+    // The history path's own result (not through the cache) carries the same attributes by name and spec.
+    var operation = base.cutOperation(tool);
+    var history = operation.resultShape();
+    operation.close();
+    check(
+      history.faceAttributes().length == reference.faceAttributes().length && history.faceAttributes().length > 0,
+      "the history path carries the thread into the cut"
+    );
+    check(attributeText(history) == referenceAttributes, "the cached path's attributes are the history path's");
+    var names = [for (attribute in history.faceAttributes()) attribute.faceName];
+    var restoredNames = [for (attribute in reference.faceAttributes()) attribute.faceName];
+    check(
+      names.join(",") == restoredNames.join(","),
+      "and the same face names: " + names.join(",") + " vs " + restoredNames.join(",")
+    );
+    for (attribute in reference.faceAttributes()) check(
+      Threads.namedIndices(reference, attribute.faceName).length == 1,
+      "every attribute's face still resolves by name in the result"
+    );
+    DiskStore.useProcess(store);
+    OpCache.resetStats();
+    var first = shank().cut(cutter(-10));
+    var s1 = OpCache.snapshot();
+    check(
+      s1.misses == 1 && s1.hits == 0 && s1.unkeyedCount == 0,
+      "the attributed cut is a keyed miss: " + s1.misses + "/" + s1.hits + "/" + s1.unkeyedCount
+    );
+    check(
+      hex(first.toBytes()) == referenceBytes && attributeText(first) == referenceAttributes,
+      "the cached miss equals the tier-off result in bytes and attributes"
+    );
+    var second = shank().cut(cutter(-10));
+    var s2 = OpCache.snapshot();
+    check(
+      s2.misses == 1 && s2.hits == 1,
+      "the second build is a hit that runs no boolean: " + s2.misses + "/" + s2.hits
+    );
+    check(
+      hex(second.toBytes()) == referenceBytes
+      && attributeText(second) == referenceAttributes && second.key == first.key,
+      "the hit returns the same bytes, attributes and key"
+    );
+    check(shank(40, 1.5).cut(cutter(-10)).key != first.key, "another attribute is another result key");
+    // Fuse of attributed shapes, and through Part.fuseAll / subtractAll (the path PosedParts.box takes).
+    var fused = shank().fuse(cutter(-50));
+    check(
+      fused.key != null && fused.faceAttributes().length == 1,
+      "a fuse of an attributed shape is keyed and keeps its thread"
+    );
+    var partA = new Part(shank()), partB = new Part(cutter(-50));
+    OpCache.resetStats();
+    var viaAll = Part.fuseAll([partA, partB]);
+    var s3 = OpCache.snapshot();
+    check(
+      s3.unkeyedCount == 0 && s3.historyUnkeyed == 0,
+      "fuseAll of an attributed part uses the cached boolean: " + s3.unkeyedCount + "/" + s3.historyUnkeyed
+    );
+    check(
+      hex(viaAll.shape.toBytes()) == hex(fused.toBytes()) && attributeText(viaAll.shape) == attributeText(fused),
+      "and gives the same result as Shape.fuse"
+    );
+    // Verify mode accepts an honest entry, refuses a planted one.
+    DiskStore.forceVerify(true);
+    var verified = shank().cut(cutter(-10));
+    check(
+      hex(verified.toBytes()) == referenceBytes && OpCache.snapshot().verified >= 1,
+      "verify mode recomputes an attributed hit and agrees"
+    );
+    var files = [for (name in FileSystem.readDirectory(store.directory)) if (StringTools.endsWith(name, ".memo")) name];
+    var planted = Shape.box(7, 7, 7).toBytes();
+    for (name in files) sys.io.File.saveBytes(store.directory + "/" + name, planted);
+    var message = "";
+    try shank().cut(cutter(-10)) catch (error:Dynamic) message = Std.string(error);
+    DiskStore.forceVerify(null);
+    check(message.indexOf("stale") >= 0, "verify mode refuses a planted wrong entry for an attributed cut: " + message);
+    DiskStore.useProcess(null);
+    store.clear();
   }
 
   static function cache():Void {
@@ -686,7 +842,9 @@ class ShapeKeySmoke {
 
   public static function run():Void {
     keys();
+    attributed();
     cache();
+    attributedBooleans();
     parts();
     lofts();
     loftCache();
