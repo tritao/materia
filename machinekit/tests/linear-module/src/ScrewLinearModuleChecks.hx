@@ -51,15 +51,20 @@ class ScrewLinearModuleChecks {
     air.close();cache.close();
   }
   public static function main():Void {
+    var requested=Sys.args(),selected=0;
     for(size in [{profile:"HGH15CA",stroke:20.0,spacing:150.0,blocks:80.0},
       {profile:"HGH15CA",stroke:80.0,spacing:150.0,blocks:100.0},
-      {profile:"HGH25CA",stroke:200.0,spacing:180.0,blocks:100.0}]) {
+      {profile:"HGH25CA",stroke:200.0,spacing:180.0,blocks:100.0}]) if(requested.length==0||requested.contains("stroke="+machinekit.component.Dimension.format(size.stroke))) {
+      selected++;
       var spec=new ScrewLinearModuleSpec(size.profile,size.stroke,size.spacing,size.blocks),axis=new ScrewLinearModule(spec);
       check(axis.validate().length==0,"Module assembly validation");
       var fasteners=axis.deriveFasteners();
       check(!fasteners.diagnostics.hasErrors(),"Joint-derived module hardware");
       check([for(method in axis.alignment())method].length==fasteners.joints.length,"Every module joint declares alignment");
-      for(step in axis.assemblySteps())check(step.parts.length>0&&step.tools.length>0&&step.measurement.length>0,"Assembly step declares parts tools and measurement");
+      for(step in axis.assemblySteps()) {
+        check(step.parts.length>0&&step.tools.length>0&&step.measurement.length>0,"Assembly step declares parts tools and measurement");
+        for(id in step.parts)check(axis.component(id)!=null,"Assembly step references a modelled part: "+id);
+      }
       axis.checkJointLoads(axis.loads({peak:1000.0,momentary:2000.0}));
       var normalFactor=1e30,crashFactor=1e30,scaleFactor=1e30;
       for(slip in fasteners.slips) {
@@ -91,6 +96,29 @@ class ScrewLinearModuleChecks {
         var common=moving.intersect(fixed);check(common.volume()<0.001,"Stop has no penetration: "+role);
         common.close();moving.close();fixed.close();
       }
+      if(size.stroke<=20) {
+        check(ScrewLinearModuleCover.openingHalf(spec)>4,"Short cover leaves a payload aperture");
+        for(endpoint in [-size.stroke/2-spec.overtravel,size.stroke/2+spec.overtravel]) {
+          var plate=cache.posed(carriage,F.translation(endpoint,0,0));
+          for(side in ["Front","Rear"]) {
+            var lip=cache.posed(axis.component("lip"+side),F.identity()),common=plate.intersect(lip);
+            check(common.volume()<0.001,"Wiper has no rigid penetration at overtravel");check(plate.shape.distance(lip.shape)<0.001,"Wiper stays on the carriage at overtravel");common.close();lip.close();
+          }
+          plate.close();
+        }
+        Sys.println('Short guard: exposed payload aperture ${2*(ScrewLinearModuleCover.openingHalf(spec)-4)} x ${2*(ScrewLinearModuleCover.openingWidthHalf(spec)-4)} mm; overlap10, roof gap6; clip/end sealing unqualified.');
+      } else {
+        var plan=axis.coverPlan();if(plan==null)throw "Long module needs bellows sizing";
+        check(plan.compressed<=plan.space,"Bellows fits declared folded space");check(plan.extended>=size.stroke+2*spec.overtravel,"Bellows spans overtravel");
+        Sys.println('Long guard: ${plan.folds} folds, compressed ${plan.compressed} / space ${plan.space}, extended ${plan.extended}, outer ${plan.outerWidth()} x ${plan.outerHeight()}; catalogue row and retention ASSUMED.');
+      }
+      var guardIds=size.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec);
+      var guardMass=0.0,rigidMovingGuardMass=0.0;
+      for(member in axis.components())if(guardIds.contains(member.id)) {
+        var mass=member.component.massProperties().mass;guardMass+=mass;
+        if(StringTools.startsWith(member.id,"mountMoving")||StringTools.endsWith(member.id,"-moving"))rigidMovingGuardMass+=mass;
+      }
+      Sys.println('Guard geometry mass $guardMass kg, rigid moving guards $rigidMovingGuardMass kg; bought PU/lamella density and geometry are ASSUMED, hardware excluded.');
       cache.close();
       var rebuilt=MachineAssembly.decode(axis.encode());
       check(rebuilt.components().length==axis.components().length,"Module round trip");
@@ -116,6 +144,7 @@ class ScrewLinearModuleChecks {
       check([for(encoder in definition.encoders)if(encoder.id=="test-drive.encoder"&&encoder.joint=="screw-turn")encoder].length==1,"Native motor velocity feedback survives load scale");
       Sys.println(axis.stockAcceptance());
     }
+    check(selected>0,"Requested module size exists");
     Sys.println('ScrewLinearModuleChecks: $assertions assertions passed');
   }
 }

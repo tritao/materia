@@ -44,18 +44,41 @@ class ScrewLinearModule extends AxisBuilder {
     addEncoder("position","travel","scaleHead");exposePort("position-feedback","scaleHead","biss");exposePort("scale-air","scaleHousing","air");
     group("Stops");
     for(role in ScrewLinearModulePart.ROLES)if(StringTools.startsWith(role,"stop"))attach(role,made(role),F.identity(),"base");
+    if(s.stroke<=20) {
+      group("Chip guard");
+      for(front in [true,false]) {
+        var suffix=front?"Front":"Rear",cover="cover"+suffix,retainer="retainer"+suffix;
+        attach(cover,new ScrewLinearModuleCover(s.values().setToken("role",cover)),F.identity(),"base");
+        attach(retainer,new ScrewLinearModuleCover(s.values().setToken("role",retainer)),F.identity(),cover);
+        attach("lip"+suffix,new ScrewLinearModuleCover(s.values().setToken("role","lip"+suffix)),F.identity(),retainer);
+      }
+      attach("hoodFront",new ScrewLinearModuleCover(s.values().setToken("role","hoodFront")),F.identity(),"coverFront");
+    }
+    if(s.stroke>20)ScrewLinearModuleBellows.install(this);
     exposeConnector("mount","base","mount");exposeConnector("carriage","carriage","interface");
     // Deliberately no controller/drive choice in the mechanical library component.
     for(requirement in serviceRemovals())addDesignRequirement(requirement);
+    if(s.stroke<=20)for(front in [true,false]) {
+      var suffix=front?"Front":"Rear";
+      addDesignRequirement(machinekit.design.DesignRequirement.ServiceRemoval("guard"+suffix,["cover"+suffix,"retainer"+suffix,"lip"+suffix].concat(front?["hoodFront"]:[]),
+        [{direction:[0.0,0,1],distance:150}],[],[]));
+    }
   }
   function made(role:String):ScrewLinearModulePart return new ScrewLinearModulePart(spec.values().setToken("role",role));
   function blockPose(side:Int,row:Int):AssemblyFrame return AxisBuilder.orient(spec.centre+row*spec.blockSpacing/2,spec.railY(side),
     spec.baseThickness+spec.riserHeight+spec.guide.railHeight,[0.0,0,1],[1.0,0,0]);
-  public function fittingOrder():Array<FastenerFitOrder> return [
-    {member:"railLeft",fastened:["riserLeft"],faces:["stock-base"]},{member:"railRight",fastened:["riserRight"],faces:["stock-base"]},
-    {member:"scaleHousing",fastened:["scaleSeat"],faces:["base"]},
-    {member:"carriage",fastened:["motorMount","floatingBearing"],faces:["foot"]}
-  ];
+  public function fittingOrder():Array<FastenerFitOrder> {
+    var out:Array<FastenerFitOrder>=[
+      {member:"railLeft",fastened:["riserLeft"],faces:["stock-base"]},{member:"railRight",fastened:["riserRight"],faces:["stock-base"]},
+      {member:"scaleHousing",fastened:["scaleSeat"],faces:["base"]},
+      {member:"carriage",fastened:["motorMount","floatingBearing"],faces:["foot"]}
+    ];
+    if(spec.stroke<=20) {
+      out.push({member:"coverFront",fastened:["stopFrontLeft","stopFrontRight"],faces:["base"]});
+      out.push({member:"coverRear",fastened:["stopRearLeft","stopRearRight"],faces:["base"]});
+    }
+    return out;
+  }
   /** Every derived joint has one alignment instruction; unknown additions fail
    * rather than inheriting a precision assumption from their member name. */
   public function alignment():Map<String,String> {
@@ -66,6 +89,7 @@ class ScrewLinearModule extends AxisBuilder {
       if(member=="railLeft"||member=="railRight"||member=="motor")method="reference edge";
       else if(member=="motorMount"||member=="floatingBearing"||member=="nut")method="indicate then match-pin";
       else if(member=="riserLeft"||member=="riserRight"||StringTools.startsWith(member,"stop"))method="drawing dowels";
+      else if(StringTools.startsWith(member,"cover")||StringTools.startsWith(member,"retainer")||member=="hoodFront"||StringTools.startsWith(member,"mount")||StringTools.startsWith(member,"bellows"))method="shim or adjust";
       else if(member=="scaleSeat"||member=="scaleHousing"||member=="scaleHead"||member=="carriage"&&face=="scale-head-carrier")method="shim or adjust";
       else if(member=="carriage"&&face=="nut-carrier")method="indicate then match-pin";
       else if(member=="carriage"&&StringTools.startsWith(face,"block"))method="shim or adjust";
@@ -81,16 +105,20 @@ class ScrewLinearModule extends AxisBuilder {
     {parts:["motorMount","floatingBearing","screw","motor"],tools:["drive-alignment-arbor","nut-bore-height-reference","indicator-base","torque-driver"],measurement:"Indicate arbor coaxial and parallel to rails at carriage nut-bore height; tighten then match-drill and ream support dowels. Catalogue motor pilot locates the motor."},
     {parts:["nut","nutCarrier","carriage"],tools:["indicator-base","torque-driver"],measurement:"Indicate nut carrier to screw at BOTH ends of travel, tighten then match-drill and ream; do not pre-drill carrier dowels. Adjust block pads to coplanarity target."},
     {parts:["scaleSeat","scaleHousing","scaleHeadCarrier","scaleHead"],tools:["indicator-base","feeler-gauges","af3-low-profile-key","air-fitting-socket"],measurement:"Reference housing seat to guide edge. Indicate housing to 0.1 mm and head to 0.05 mm parallelism. Fit carrier face to measured stack (0.5 mm each-way allowance ASSUMED); set lateral offset within 0.2 mm, gap 1 +/-0.3 mm at the head; confirm the reading window and 75 mm cable bend. Head screws use the low-profile key from below and slide the head out longitudinally for service."},
-    {parts:["stopFrontLeft","stopFrontRight","stopRearLeft","stopRearRight"],tools:["indicator-base","torque-driver"],measurement:"Fit drawing dowels and verify both overtravel stops engage before screw support contact. Host must limit torque to the bought bearing rating."}
+    {parts:["stopFrontLeft","stopFrontRight","stopRearLeft","stopRearRight"],tools:["indicator-base","torque-driver"],measurement:"Fit drawing dowels and verify both overtravel stops engage before screw support contact. Host must limit torque to the bought bearing rating."},
+    {parts:spec.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec),tools:["af2.5-key","af5.5-long-spanner","torque-driver"],measurement:spec.stroke<=20?"Preassemble the split covers and separate steel retainers with clip-in PU lips on the bench. Ordinary retainer nuts remain accessible after sliding off one cover; do not trap or glue them. Fit covers last through base edge joints. Check 10 mm minimum roof/carriage overlap and continuous lip contact through overtravel. End sealing and clip profile require qualification.":"Install the declared bellows and separate flange mounts; through-tapped flange holes return on the bolted interface. Indicate the two mount planes parallel and check full travel before fitting guards. Catalogue row and cable envelope remain ASSUMED."}
   ];
-  public function stopContacts():Array<{a:String,b:String}> return [for(role in ScrewLinearModulePart.ROLES)if(StringTools.startsWith(role,"stop")){a:"carriage",b:role}];
+  public function stopContacts():Array<{a:String,b:String}> {
+    var out=[for(role in ScrewLinearModulePart.ROLES)if(StringTools.startsWith(role,"stop")){a:"carriage",b:role}];
+    if(spec.stroke<=20)for(side in ["Front","Rear"])out.push({a:"carriage",b:"lip"+side});return out;
+  }
   public function serviceRemovals():Array<machinekit.design.DesignRequirement> return [
     machinekit.design.DesignRequirement.ServiceRemoval("motor",["motor","motorShaft"],[{direction:[1.0,0,0],distance:spec.drive.motor.rating.shaftLength+10}],[],[]),
     machinekit.design.DesignRequirement.ServiceRemoval("screw",["screw","coupling","nut"],[{direction:[1.0,0,0],distance:spec.baseMax+10}],
       ["motor","motorShaft","motorMount","floatingRing"],[]),
     machinekit.design.DesignRequirement.ServiceRemoval("scaleHead",["scaleHead"],[{direction:[-1.0,0,0],distance:spec.centre-spec.baseMin+spec.scaleHead.series.headLength+20}],[],[]),
-    machinekit.design.DesignRequirement.ServiceRemoval("scaleHousing",["scaleHousing"],[{direction:[0.0,1,0],distance:spec.baseWidth}],["scaleHead"],[]),
-    machinekit.design.DesignRequirement.ServiceRemoval("carriage",["carriage","scaleHeadCarrier","scaleHead"],[{direction:[0.0,0,1],distance:spec.carriageThickness+20}],[],[])
+    machinekit.design.DesignRequirement.ServiceRemoval("scaleHousing",["scaleHousing"],[{direction:[0.0,1,0],distance:spec.baseWidth}],["scaleHead"].concat(spec.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec)),[]),
+    machinekit.design.DesignRequirement.ServiceRemoval("carriage",["carriage","scaleHeadCarrier","scaleHead"],[{direction:[0.0,0,1],distance:spec.carriageThickness+20}],spec.stroke<=20?ScrewLinearModuleCover.ROLES.filter(id->!StringTools.startsWith(id,"mount")):ScrewLinearModuleBellows.members(spec),[])
   ];
   /** Rated thrust / peak motor torque, plus the containing machine's declared
    * payload shear. Half thrust per guide is 2x equal sharing over four blocks. */
@@ -107,6 +135,13 @@ class ScrewLinearModule extends AxisBuilder {
       out.push({label:"Riser "+side,between:["riser"+side,"base"],shear:payload});
       for(row in ["Front","Rear"])out.push({label:"Guide block "+side+row,between:["carriage","block"+side+row],shear:{peak:rated/2,momentary:peak/2}});
     }
+    if(spec.stroke>20)for(suffix in ["Front","Rear"])for(connection in [["mountFixed"+suffix,"base"],["mountMoving"+suffix,"carriage"],["bellows"+suffix+"-fixed","mountFixed"+suffix],["bellows"+suffix+"-moving","mountMoving"+suffix]])
+      out.push({label:"Bellows "+connection[0],between:connection,shear:{peak:40.0,momentary:100.0},torque:{peak:5.0,momentary:10.0}}); // ASSUMED guard loads.
+    if(spec.stroke<=20)out.push({label:"Cable hood",between:["hoodFront","coverFront"],shear:{peak:30.0,momentary:100.0}});
+    if(spec.stroke<=20)for(suffix in ["Front","Rear"]) {
+      out.push({label:"Guard "+suffix,between:["cover"+suffix,"base"],shear:{peak:30.0,momentary:100.0}});
+      out.push({label:"Wiper retainer "+suffix,between:["retainer"+suffix,"cover"+suffix],shear:{peak:10.0,momentary:20.0}});
+    }
     for(connection in [["scaleSeat","base"],["scaleHousing","scaleSeat"],["scaleHead","scaleHeadCarrier"],["carriage","scaleHeadCarrier"]])
       out.push({label:"Scale "+connection[0],between:connection,shear:{peak:20.0,momentary:40.0}}); // ASSUMED includes 4 N scale drag and moving cable.
     for(role in ScrewLinearModulePart.ROLES)if(StringTools.startsWith(role,"stop"))out.push({label:"End stop "+role,between:[role,"base"],shear:{peak:rated,momentary:peak}});
@@ -115,6 +150,8 @@ class ScrewLinearModule extends AxisBuilder {
   /** Worst-case setting allowance, not a supplier height-tolerance claim.
    * Fit the separate carrier's head face to the measured stack; leave 0.5 mm
    * stock each way. Native slots/clearance set gap and parallelism at the head. */
+  /** Long-stroke bellows include the complete scale cable envelope. */
+  public function coverPlan():Null<machinekit.cover.WayCoverPlan> return spec.stroke<=20?null:ScrewLinearModuleBellows.plan(spec);
   public function scaleAdjustment():{normalStack:Float,normalFit:Float,gapStack:Float,gapAdjustment:Float} {
     var screw=machinekit.standard.SocketHeadCapScrew.catalog().get("M4");
     var headHole=spec.scaleHead.series.headHoleDiameter;if(headHole==null)throw "Scale head needs its catalogue mounting holes";

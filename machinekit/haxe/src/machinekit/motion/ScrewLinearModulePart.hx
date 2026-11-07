@@ -53,6 +53,7 @@ class ScrewLinearModulePart extends MachineComponent {
   override public function fasteningFaces():Array<BoltedFace> {
     var s=spec, faces:Array<BoltedFace>=[];
     if(role=="base") {
+      faces=faces.concat(ScrewLinearModuleCover.receivers(s)).concat(ScrewLinearModuleBellows.baseReceivers(s));
       faces.push(BoltedFace.drilledToSuit("scale-seat",plane(s.scaleStart()+s.scaleHousing.overallLength()/2,s.scaleSeatY(),s.baseThickness,-1),s.scaleHousing.overallLength(),40,12,s.baseThickness,BoltedFace.ThreadMaterial.Steel,"M6"));
       // Non-overlapping receiver footprints, independently indicated and pinned.
       for(support in ["fixed","floating"]) {
@@ -76,9 +77,11 @@ class ScrewLinearModulePart extends MachineComponent {
         [for(x in [-1,1])for(y in [-1,1]){x:x*s.guide.blockHoleSpacingAlong/2,y:y*s.guide.blockHoleSpacingAcross/2}],screw.clearanceMedium,s.carriageThickness-(screw.headHeight+0.2),s.guide.blockMountThread,{diameter:screw.counterboreDiameter,depth:screw.headHeight+0.2},false));
       var carrierScrew=machinekit.standard.SocketHeadCapScrew.catalog().get("M6");
       faces.push(BoltedFace.clamped("nut-carrier",plane(s.centre,0,s.carriageBottom(),1),carrierBolts(),carrierScrew.clearanceMedium,s.carriageThickness-carrierScrew.counterboreDepth,"M6",{diameter:carrierScrew.counterboreDiameter,depth:carrierScrew.counterboreDepth},false));
+      if(s.stroke>20)for(front in [true,false])faces.push(BoltedFace.drilledToSuit("bellows-"+(front?"front":"rear"),
+        BoltedFace.frameOf({x:s.centre+(front?-1:1)*s.carriageLength/2,y:0.0,z:s.carriageBottom()+s.carriageThickness/2},{x:front?1.0:-1.0,y:0,z:0},{x:0.0,y:1,z:0}),s.carriageWidth,s.carriageThickness,8,20,BoltedFace.ThreadMaterial.Steel,"M4"));
       var headScrew=machinekit.standard.SocketHeadCapScrew.catalog().get("M4");
       faces.push(BoltedFace.clamped("scale-head-carrier",plane(s.centre,s.scaleCarrierY(),s.carriageBottom(),1),[{x:-30.0,y:0.0},{x:30.0,y:0.0}],headScrew.clearanceMedium,s.carriageThickness-headScrew.counterboreDepth,"M4",{diameter:headScrew.counterboreDiameter,depth:headScrew.counterboreDepth},false));
-      faces.push(BoltedFace.drilledToSuit("host",plane(s.centre,0,s.carriageBottom()+s.carriageThickness,-1),s.carriageLength,s.carriageWidth,8,s.carriageThickness,BoltedFace.ThreadMaterial.Steel));
+      faces.push(BoltedFace.drilledToSuit("host",plane(s.centre,0,s.carriageBottom()+s.carriageThickness,-1),s.stroke<=20?2*(ScrewLinearModuleCover.openingHalf(s)-4):s.carriageLength,s.stroke<=20?2*(ScrewLinearModuleCover.openingWidthHalf(s)-4):s.carriageWidth,8,s.carriageThickness,BoltedFace.ThreadMaterial.Steel));
     } else if(role=="nutCarrier") {
       faces.push(BoltedFace.drilledToSuit("nut",carrierFace(-1),2*s.carrierReach(),s.carrierWidth,s.carrierThickness,s.carrierThickness,BoltedFace.ThreadMaterial.Steel,"M5",true));
       faces.push(BoltedFace.drilledToSuit("carriage",plane(s.centre,0,s.carriageBottom(),-1),s.carrierThickness,s.carrierWidth,10,s.carrierHeight(),BoltedFace.ThreadMaterial.Steel,"M6"));
