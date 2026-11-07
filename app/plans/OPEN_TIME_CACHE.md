@@ -149,3 +149,15 @@ Tessellation meshes an independent copy, so it never changes its input or its `b
   `MachineAssembly`, `import machinekit.component.*` pulls the registry): cutting it was tried and abandoned (stash "catalog package
   move"); (4) a test that fails when keyed boolean coverage drops on a reference model; (5) a shared read-only cache for cold runs;
   (6) lazy shape restoration for deep chains of cached operations; (7) the display-mesh array conversion in `HobMesh`.
+- 2026-11-08 Stage 6: face-attributed shapes get construction keys (key = old key + hash of the exact `FaceAttributeCodec` bytes; `ShapeKey.op`
+  no longer refuses attributed inputs; `Part.joined` no longer falls back to the uncached history path), so the history-fuse path and the
+  describe-faces/mass/tessellate queries on threaded fasteners and feet are cached. Landed on local main 0bd86d874 (unpushed). Hobber scene,
+  including compile (load avg ~6): cache off 185 s, cold 185 s, warm 28 s, edit to MineralCasting.hx 83 s (103 s at stage 5, 194 s before the
+  kernel cache). The edit run now has 5608 keyed boolean hits, 0 misses and 0 unkeyed booleans; still uncached: `Part.combine`/`subtract`
+  history booleans (557, 6.9 s). Remaining edit-run memo time: anchor derivations 13.8 s, scene component parts 9.9 s, masses 7.2 s,
+  hob mesh 2.8 s. The artifact digest is now `ef53215727e1edf8` in every run, cache on or off: the stage-5 baseline `0fab9107...` was stale
+  because it predates merging main; with the stage-5 cadkit on the merged tree the cache-off digest is `987472b3...`, and the 10 parts that
+  differ from it differ only in normals (threaded fasteners and feet, whose booleans now return the canonical form). The earlier "JSON key
+  building ~13 %" was a double count: it is 7.6 % over four callers (`AssemblyDefinitionFlattener.flatten`, `BeltPoseContext`,
+  `InsertHoleCodec.snapshot`, `solvedPoses`), no single fix.
+

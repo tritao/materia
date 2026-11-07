@@ -8,6 +8,8 @@ import cadkit.threads.Threads;
 /** Owning, headless CAD shape façade for Haxeon applications. */
 class Shape {
   private var threadAttributes:Array<ThreadedFace>;
+  /** Hash of the exact bytes of `threadAttributes` ("" when there are none): the part of the key that names the attributes. */
+  private var attributeDigest:String;
   private var native:CadKit.OwnedShapeHandle;
   /** How this shape was made, hashed (see `ShapeKey`); null when it was made by something unkeyed. */
   public var key:Null<String>;
@@ -27,6 +29,7 @@ class Shape {
     key = null;
     gap = "native-handle";
     threadAttributes = [];
+    attributeDigest = "";
     meshCache = [];
     faceNames = null;
     edgeNames = null;
@@ -94,9 +97,9 @@ class Shape {
 
   public function cloneShape():Shape {
     var copy = copiedAttributes(new Shape(CadKit.shapeCloneChecked(native.borrow())));
-    // A clone is the same shape: same key (an attributed shape has none), same reason when it has none.
-    copy.key = threadAttributes.length > 0 ? null : key;
-    copy.gap = copy.key == null ? (gap ?? "face-attributes") : null;
+    // A clone is the same shape, attributes included: same key, same reason when it has none.
+    copy.key = key;
+    copy.gap = key == null ? (gap ?? "unkeyed") : null;
     return copy;
   }
 
@@ -787,14 +790,19 @@ class Shape {
   /** Every face attribute, threads and details: what an operation carries from its inputs to its result. */
   public function faceAttributes():Array<ThreadedFace> return threadAttributes.copy();
 
-  /** Internal propagation boundary; attributes contain no native handles. */
+  /**
+   * Internal propagation boundary; attributes contain no native handles.
+   *
+   * Face attributes live in Haxe beside the B-rep, so they are part of what a shape is: a keyed shape whose attributes change
+   * is keyed again from its old key and the exact bytes of the new attributes (the same construction with the same attributes
+   * gives the same key, any other attribute another). Attributes are immutable, so the digest cannot go stale.
+   */
   public function setThreadedFaces(attributes:Array<ThreadedFace>):Void {
+    var digest = attributes.length == 0 ? "" : ShapeKey.bytesHash(cadkit.threads.FaceAttributeCodec.encode(attributes));
+    var changed = digest != attributeDigest;
     threadAttributes = attributes.copy();
-    // Face attributes live in Haxe, outside any operation's inputs: a shape that carries them has no construction key.
-    if (attributes.length > 0) {
-      key = null;
-      gap = "face-attributes";
-    }
+    attributeDigest = digest;
+    if (changed && key != null) key = ShapeKey.hash("cadkit-shape/1\nattributes\n" + key + "\n" + digest);
   }
 
   private function copiedAttributes(copy:Shape, rename:Bool = false):Shape {

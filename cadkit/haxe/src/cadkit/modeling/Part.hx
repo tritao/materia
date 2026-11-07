@@ -163,8 +163,7 @@ class Part extends Model {
    * `combine`, with its history.
    */
   static function joined(a:Part, b:Part, mode:Mode):Part {
-    if (a.shape.key != null && b.shape.key != null
-      && a.shape.faceAttributes().length == 0 && b.shape.faceAttributes().length == 0) return new Part(switch mode {
+    if (a.shape.key != null && b.shape.key != null) return new Part(switch mode {
       case Add:
         a.shape.fuse(b.shape);
       case Subtract:
