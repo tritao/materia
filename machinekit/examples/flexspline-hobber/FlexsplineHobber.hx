@@ -247,18 +247,24 @@ class FlexsplineHobber extends MachineAssembly {
     for (side in [-1, 1]) for (row in [HobberXLayout.BLOCK_FRONT, HobberXLayout.BLOCK_REAR]) {
       var id = "blockX" + (side < 0 ? "Left" : "Right") + (row == HobberXLayout.BLOCK_FRONT ? "" : "Front");
       var block = LinearRailBlock.metric("HGH25CA", LinearRailBlock.SUPPLIER);
-      var pose = AxisBuilder.orient(centre + row, side * FoundationLayout.BED_RAIL_CENTRE, 242, [0.0, 0, 1], [1.0, 0, 0]);
-      var top = F.alongY(centre + row, side * FoundationLayout.BED_RAIL_CENTRE, 260, 0, 0, 1);
+      var pose = AxisBuilder.orient(centre + row, side * FoundationLayout.BED_RAIL_CENTRE, HobberSaddle.xGuideOriginZ(), [0.0, 0, 1], [1.0, 0, 0]);
+      var top = F.alongY(centre + row, side * FoundationLayout.BED_RAIL_CENTRE, HobberSaddle.xCarriageBottom(), 0, 0, 1);
       if (id == "blockXLeft") {
         addComponent(id, block);
         zero.set(id, pose);
-        moving("X", Prismatic, "railXLeft", id, F.translation(0, 0, 242), [1.0, 0, 0], cutDistance, minX, HobberXLayout.RETRACT);
+        moving("X", Prismatic, "railXLeft", id, F.translation(0, 0, HobberSaddle.xGuideOriginZ()), [1.0, 0, 0], cutDistance, minX, HobberXLayout.RETRACT);
         fixAt("Xbridge", new HobberSaddle("GE-X-carriage"), F.translation(centre, 0, 0), id, top);
       } else fixAt(id, block, pose, "Xbridge", top);
     }
+    for (role in HobberCarriageRib.ROLES) {
+      var rib = new HobberCarriageRib(new ComponentValues().setToken("role", role));
+      var b = rib.band();
+      fixAt("Xrib-" + role, rib, F.identity(), "Xbridge",
+        F.alongY(263, (b.low + b.high) / 2, HobberSaddle.xCarriageBottom(), 0, 0, 1));
+    }
     group("Bed and column");
     includeAt("column", column, FoundationLayout.worldPose("column"));
-    fixExisting("column-mount", "Xbridge", "column/basePlate", F.alongY(centre + 326, 0, 280, 0, 0, 1));
+    fixExisting("column-mount", "Xbridge", "column/basePlate", F.alongY(centre + 326, 0, HobberSaddle.xCarriageTop(), 0, 0, 1));
     group("Z axis");
     for (placed in HobberRailPlacement.placements("column", FoundationLayout.placements("column"))) {
       var insert = "column/" + placed.insertId;
@@ -411,7 +417,7 @@ class FlexsplineHobber extends MachineAssembly {
     var armFace = HobberScales.headFace(scaleZ);
     fixAt("ZscaleArm", new HobberSaddle("GE-Z-scale-arm"), F.translation(0, 0, HobberZLayout.SEAT_Z), "Zplate",
       F.alongY(148, armFace[1] - HobberScales.Z_ARM_THICKNESS / 2, armFace[2], 1, 0, 0));
-    scale(scaleX, "XscaleSeat", "Xbridge");
+    scale(scaleX, "XscaleSeat", "Xrib-scale");
     scale(scaleY, "swivelPlate", "Yplate");
     scale(scaleZ, "ZscaleSeat", "ZscaleArm");
     // The chip tray around the table is part of the work zone; the coolant nozzle belongs to the hob it feeds.
@@ -474,6 +480,44 @@ class FlexsplineHobber extends MachineAssembly {
     });
     // The screws, washers, nuts and the holes they need follow from the bolted faces the parts declare (BOM_PLAN F1).
     deriveFasteners();
+    // Replicated pad drilling follows the carriage joints, never a second bolt list.
+    var deck:Null<MachineComponent> = null;
+    for (entry in components()) if (entry.id == "Xbridge") deck = entry.component;
+    if (deck == null) throw "Missing X carriage for replicated pads";
+    var guide = LinearRailBlock.metric("HGH25CA");
+    var film = HobberCarriageStockCheck.padLayer().nominalMm;
+    for (side in [-1, 1]) for (row in [HobberXLayout.BLOCK_FRONT, HobberXLayout.BLOCK_REAR]) {
+      var y = side * FoundationLayout.BED_RAIL_CENTRE;
+      var holes:Array<materia.casting.InsertHole> = [];
+      for (hole in deck.derivedRouteHoles()) {
+        if (hole.kind != "clearance" || Math.abs(hole.position[0] - row) > guide.spec.blockLength / 2
+          || Math.abs(hole.position[1] - y) > guide.spec.blockWidth / 2) continue;
+        var record = machinekit.structural.InsertHoles.records(machinekit.structural.InsertHoles.through(hole.diameter, film))[0];
+        record.id = hole.id;
+        record.frame = F.fromRotationMatrix(Math.round((hole.position[0] - row) * 1e6) / 1e6,
+          Math.round((hole.position[1] - y) * 1e6) / 1e6, film,
+          [1, 0, 0, 0, -1, 0, 0, 0, -1]);
+        holes.push(record);
+      }
+      if (holes.length != 4) throw "X replicated pad must inherit four joint-derived clearances";
+      holes.sort((a, b) -> a.frame.x == b.frame.x
+        ? (a.frame.y < b.frame.y ? -1 : a.frame.y > b.frame.y ? 1 : 0)
+        : (a.frame.x < b.frame.x ? -1 : 1));
+      for (i in 0...holes.length) holes[i].id = "clearance-" + (i + 1);
+      var pad = new machinekit.structural.LinearMountReplication(new ComponentValues()
+        .setNumber("width", guide.spec.blockLength).setNumber("length", guide.spec.blockWidth)
+        .setNumber("thickness", film).setToken("holes", machinekit.structural.InsertHoles.fromNeutral(holes))
+        .setToken("reference", "ASSUMED compound/process properties; four pads replicated against one master to 0.01 mm; "
+          + HobberCarriageStockCheck.report()));
+      var padId = "Xpad-" + (side < 0 ? "L" : "R") + (row == HobberXLayout.BLOCK_FRONT ? "1" : "2");
+      fixAt(padId, pad,
+        F.translation(row, y, HobberSaddle.xCarriageBottom()), "Xbridge", F.alongY(row, y, HobberSaddle.xCarriageBottom() + film, 0, 0, 1));
+      var blockId = "blockX" + (side < 0 ? "Left" : "Right") + (row == HobberXLayout.BLOCK_FRONT ? "" : "Front");
+      var oldContacts = mountContacts.filter(c -> (c.parent == "Xbridge" && c.child == blockId)
+        || (c.child == "Xbridge" && c.parent == blockId));
+      for (contact in oldContacts) mountContacts.remove(contact);
+      mountContacts.push({parent: blockId, child: padId});
+    }
     // The loads the joints carry come from the finished parts (masses), so they are checked after the derived holes are cut.
     checkJointLoads(HobberJointLoads.of(this));
     // Chip protection and service (FRAME_PLAN, "Chip protection and service"): wipers on every guide block, and the removals a technician needs.

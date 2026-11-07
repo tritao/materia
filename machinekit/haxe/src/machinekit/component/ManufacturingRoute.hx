@@ -7,6 +7,8 @@ import machinekit.structural.GroundStock.GroundStockRow;
 enum RouteKind {
   /** Cut from ground plate or flat bar; only the faces named in `machinedFaces` are touched after grinding. */
   GroundStock;
+  /** Sawn bright drawn bar with drilled/counterbored and reamed joint holes. */
+  SawnBar;
   /** Laser- or waterjet-cut plate, flat as rolled. */
   CutPlate;
   /** Cut and brake-formed sheet; bend count is distinct from machining setups. */
@@ -21,6 +23,14 @@ typedef SheetForm = {
   final thickness:Float;
   final bends:Int;
   final insideRadius:Float;
+}
+
+typedef BarBlank = {
+  final width:Float;
+  final thickness:Float;
+  final length:Float;
+  final source:String;
+  final assumed:Bool;
 }
 
 /** A machined face and what is asked of it. Faces not listed stay as the stock or the cut leaves them. */
@@ -78,8 +88,9 @@ class ManufacturingRoute implements ComponentFacet {
   public final stock:Null<GroundStockRow>;
   final faces:Array<MachinedFace>;
   public final sheet:Null<SheetForm>;
+  public final bar:Null<BarBlank>;
 
-  function new(kind:RouteKind, setups:Int, toleranceClass:String, stock:Null<GroundStockRow>, machined:Array<MachinedFace>, ?sheet:SheetForm) {
+  function new(kind:RouteKind, setups:Int, toleranceClass:String, stock:Null<GroundStockRow>, machined:Array<MachinedFace>, ?sheet:SheetForm, ?bar:BarBlank) {
     if (setups < 0) throw "A route has a non-negative number of setups";
     if (toleranceClasses().indexOf(toleranceClass) < 0) throw 'Unknown tolerance class "$toleranceClass"';
     for (face in machined) {
@@ -91,6 +102,10 @@ class ManufacturingRoute implements ComponentFacet {
     this.toleranceClass = toleranceClass;
     this.stock = stock;
     this.sheet = sheet;
+    if (bar != null && (!(bar.width > 0) || !(bar.thickness > 0) || !(bar.length > 0)
+      || !Math.isFinite(bar.width + bar.thickness + bar.length) || StringTools.trim(bar.source) == ""))
+      throw "Bar blank requires positive dimensions and provenance";
+    this.bar = bar;
     faces = [for (face in machined) {name: face.name, tolerance: face.tolerance, roughnessRa: face.roughnessRa}];
   }
 
@@ -103,6 +118,15 @@ class ManufacturingRoute implements ComponentFacet {
 
   /** Laser- or waterjet-cut plate; holes and the profile come with the cut. */
   public static function cutPlate():ManufacturingRoute return new ManufacturingRoute(CutPlate, 0, "general", null, []);
+
+  public static function sawnBar(blank:BarBlank, machined:Array<MachinedFace>):ManufacturingRoute
+    return new ManufacturingRoute(SawnBar, 1, "general", null, machined, null, blank);
+
+  public static function milledFromBar(blank:BarBlank, machined:Array<MachinedFace>):ManufacturingRoute {
+    if (Math.max(blank.length, Math.max(blank.width, blank.thickness)) > MAX_EXTENT)
+      throw "Milled bar exceeds the three-axis machine envelope";
+    return new ManufacturingRoute(Milled, 1, "general", null, machined, null, blank);
+  }
 
   /** Formed from one blank, with the specified finished inside bend radius. */
   public static function foldedSheet(thickness:Float, bends:Int, insideRadius:Float):ManufacturingRoute {
@@ -136,6 +160,10 @@ class ManufacturingRoute implements ComponentFacet {
       var row = stock;
       if (row == null) throw "Ground stock route lost its row";
       "ground " + row.kind + " " + Dimension.format(row.thickness) + " mm, cut" + (faces.length == 0 ? "" : " and machined");
+    case SawnBar:
+      var blank = bar;
+      if (blank == null) throw "Sawn bar route lost its blank";
+      'bright drawn flat bar ${Dimension.format(blank.width)}x${Dimension.format(blank.thickness)} mm, sawn, drilled and reamed';
     case CutPlate:
       "cut plate";
     case FoldedSheet:
@@ -158,6 +186,14 @@ class ManufacturingRoute implements ComponentFacet {
     out.push(ProcurementCodec.choice("toleranceClass", toleranceClass));
     var row = stock;
     if (row != null) out.push(ProcurementCodec.requirement("stockThickness", "mm", null, null, row.thickness));
+    var blank = bar;
+    if (blank != null) {
+      out.push(ProcurementCodec.choice("barStock", "bright drawn steel"));
+      out.push(ProcurementCodec.requirement("barWidth", "mm", null, null, blank.width));
+      out.push(ProcurementCodec.requirement("barThickness", "mm", null, null, blank.thickness));
+      out.push(ProcurementCodec.requirement("blankLength", "mm", null, null, blank.length));
+      out.push(ProcurementCodec.choice("stockBasis", blank.assumed ? "ASSUMED: " + blank.source : blank.source));
+    }
     var form = sheet;
     if (form != null) {
       out.push(ProcurementCodec.requirement("sheetThickness", "mm", null, null, form.thickness));
@@ -179,6 +215,8 @@ class ManufacturingRoute implements ComponentFacet {
   public function supplier():String return switch kind {
     case GroundStock:
       faces.length == 0 ? "stock supplier" : "stock supplier and machine shop";
+    case SawnBar:
+      "bar supplier and drilling shop";
     case CutPlate:
       "plate cutter";
     case FoldedSheet:

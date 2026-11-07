@@ -4,7 +4,7 @@
 Pipeline (all under the shared heavy-run queue; see README in the FRAME_PLAN log line):
   1. export     haxeon run --project fem/haxeon.json -- <dir>        STEP of the four parts + masses and centres (HobberFemExport.hx)
   2. cradle     python3 cradle_fem.py <dir> results/cradle-medium.json medium   (also `foot`, `fine`)
-  3. carriage   python3 carriage_fem.py <dir> results/carriage.json 14 10         (+ results/carriage-primitives.json: plate-model geometry)
+  3. carriage   python3 carriage_fem.py <dir> results/carriage.json 10
   4. saddle     python3 saddle_fem.py <dir> results/saddle.json 14 10
   5. report     python3 hobber_fem.py report                           -> results/hobber-fem-results.json and a Markdown table on stdout
   All of it: run_fem.sh. The cradle's final design (2026-11-06: floor extension, front bolt row at y 135, rest block under the servo body) is `cradle_fem.py ... final`
@@ -59,10 +59,10 @@ def carriage_summary():
     rows = load("carriage.json")
     if not rows:
         return None
-    out = {"step": rows, "primitives": load("carriage-primitives.json")}
+    out = {"step": rows}
     last = rows[-1]
     out["front_tie_N_per_um"] = last["front_tie_N_per_um"]
-    out["sole_tilt_kNm_per_rad"] = {"pads_uz": last["sole_tilt_kNm_per_rad_pads_uz"], "pads_xyz": last["sole_tilt_kNm_per_rad_pads_xyz"]}
+    out["sole_tilt_kNm_per_rad"] = {"pads_uz": last["sole_tilt_kNm_per_rad_pads_uz"]}
     return out
 
 

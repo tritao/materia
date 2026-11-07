@@ -458,7 +458,7 @@ class BenchMill extends MachineAssembly implements machinekit.cover.WayCover.Cov
     if (Std.isOfType(entry.component, WayCoverMount) || Std.isOfType(entry.component, WayCoverSection)) entry.id];
 
   /** A rail is unbolted with its cover off; a cover's own host remains present for its fastener checks. */
-  public function coverInstallationOrder():Array<{member:String, fastened:Array<String>}> {
+  public function coverInstallationOrder():Array<machinekit.assembly.AssemblyIntegrity.FastenerFitOrder> {
     var members = coverMembers();
     var ground = [for (entry in components()) if (members.indexOf(entry.id) < 0) entry.id];
     var derived = derivedFasteners();
