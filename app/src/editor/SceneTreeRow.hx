@@ -6,12 +6,16 @@ import haxeon.ui.LayoutAxis;
 import haxeon.ui.LayoutAlignmentY;
 import haxeon.ui.LayoutVisualKind;
 import haxeon.ui.PathBuilder;
+import haxeon.ui.style.StyleState;
+import haxeon.ui.icons.IconData;
+import haxeon.ui.widgets.overlays.TooltipPlacement;
 import haxeon.ui.core.*;
 import haxeon.ui.icons.IconName;
 import haxeon.ui.semantics.*;
 import haxeon.ui.widgets.Icon;
 import haxeon.ui.widgets.KeyedView;
-import haxeon.ui.widgets.layout.Row;
+import haxeon.ui.style.StyleTarget;
+import haxeon.ui.LayoutDirection;
 import haxeon.ui.widgets.overlays.Tooltip;
 import haxeon.ui.widgets.text.MiddleEllipsisText;
 import haxeon.ui.widgets.text.Text;
@@ -49,6 +53,14 @@ class SceneTreeRow implements View {
     this.isolate = isolate;
   }
   public function build(context:BuildContext):RenderNode {
+    return context.withScope(new Key("item-row:" + key), () -> {
+      var rowId = context.id("row");
+      // Only this row updates when its hover changes; reserve action space to avoid label movement.
+      return context.selfUpdating(rowId, () -> buildRow(context, rowId));
+    });
+  }
+  function buildRow(context:BuildContext, rowId:WidgetId):RenderNode {
+    var hovered = (context.interactionStates.get(rowId) & StyleState.Hovered) != 0;
     var color = visible ? context.theme.tokens.textPrimary : context.theme.tokens.textSecondary;
     var text = new MiddleEllipsisText("label:" + key, label, true, TextStyleOverride.foreground(color));
     var tooltip = new Tooltip("label-tip:" + key, text, new Text(detail == null ? label : detail));
@@ -56,39 +68,91 @@ class SceneTreeRow implements View {
     tooltip.showWhen = () -> detail != null || text.truncated;
     var style = new LayoutStyle();
     style.width = LayoutAxis.grow();
+    style.direction = LayoutDirection.LeftToRight;
     style.childAlignY = LayoutAlignmentY.Center;
     style.childGap = 6;
     // Keep the 24px eye target clear of the overlay scrollbar (12px + 2px inset).
     style.padding = new Insets(0, 0, 16, 0);
     var children = [new KeyedView("icon", new Icon("glyph:" + key, icon, 15, color)), new KeyedView("label", tooltip)];
     if (isolate != null) {
-      var activate:Void -> Void = isolate;
-      var button = new haxeon.ui.widgets.controls.Button("", null, activate, "isolate:" + key);
-      button.leadingIcon = IconName.Inspect;
-      button.variant = haxeon.ui.widgets.controls.ButtonVariant.Navigation;
-      button.accessibilityLabel = "Isolate " + label;
-      button.onClickEvent = event -> {
-        event.preventDefault();
-        event.stopPropagation();
-        activate();
-      };
-      children.push(new KeyedView("isolate", new Tooltip("isolate-tip:" + key, button, new Text("Isolate " + label))));
+      var action = new IsolateAction("isolate:" + key, "Isolate " + label, hovered, isolate);
+      var hint = new Tooltip("isolate-tip:" + key, action, new Text("Isolate " + label));
+      hint.placement = TooltipPlacement.Right;
+      children.push(new KeyedView("isolate", hint));
     }
     if (toggle != null) {
       var hint = (ownVisible ? "Hide " : "Show ") + label + " (Space)";
       if (ownVisible && !visible) hint += " · Hidden by object, group or set visibility";
       else if (mixed) hint += " · Some descendants hidden";
-      children.push(new KeyedView(
-        "eye",
-        new Tooltip(
-          "eye-tip:" + key,
-          new VisibilityEye("eye:" + key, hint, ownVisible, visible, mixed, toggle),
-          new Text(hint)
-        )
-      ));
+      var hintView = new Tooltip("eye-tip:" + key,
+        new VisibilityEye("eye:" + key, hint, ownVisible, visible, mixed, toggle), new Text(hint));
+      hintView.placement = TooltipPlacement.Right;
+      children.push(new KeyedView("eye", hintView));
     }
-    return new Row("item-row:" + key, children, style).build(context);
+    var rowKey = "item-row:" + key;
+    var flags = context.interactionStates.get(rowId);
+    var computed = context.resolveStyle(new StyleTarget("row", rowKey, rowKey, null, ["row"], flags), style);
+    var node = new RenderNode(rowId, LayoutVisualKind.Box, computed.toLayoutStyle());
+    node.setStyleIdentity("row", rowKey, rowKey, null, ["row"]);
+    node.states = flags;
+    node.computedStyle = computed;
+    for (child in children) node.add(context.withStyleParent(computed, () -> child.build(context)));
+    return node;
   }
+}
+
+/** Quiet row action: its target and keyboard semantics remain available while the glyph is hidden. */
+private class IsolateAction implements View {
+  final key:String;
+  final label:String;
+  final rowHovered:Bool;
+  final activate:Void -> Void;
+  public function new(key:String, label:String, rowHovered:Bool, activate:Void -> Void) {
+    this.key = key;
+    this.label = label;
+    this.rowHovered = rowHovered;
+    this.activate = activate;
+  }
+  public function build(context:BuildContext):RenderNode return context.withScope(new Key(key), () -> {
+    var id = context.id("action");
+    return context.selfUpdating(id, () -> {
+      var flags = context.interactionStates.get(id);
+      var focused = (flags & StyleState.Focused) != 0;
+      var shown = rowHovered || focused || (flags & StyleState.Hovered) != 0;
+      var style = new LayoutStyle();
+      style.width = LayoutAxis.fixed(24);
+      style.height = LayoutAxis.fixed(24);
+      var node = new RenderNode(id, LayoutVisualKind.Custom, style);
+      node.states = flags;
+      node.focusable = true;
+      node.semantics = new Semantics(AccessibilityRole.Button, label);
+      node.semantics.actions = AccessibilityAction.Activate;
+      node.semantics.states |= AccessibilityState.Focusable;
+      node.on(UiEventKind.PointerDown, event -> {
+        if (event.button == 0) {
+          context.requestFocus(id);
+          event.stopPropagation();
+        }
+      });
+      node.onActivate(event -> {
+        event.preventDefault();
+        event.stopPropagation();
+        activate();
+      });
+      var color = context.theme.tokens.textSecondary;
+      var focusColor = context.theme.tokens.focusRing;
+      node.onPaint((canvas, _) -> {
+        if (focused) canvas.strokeTransient(new PathBuilder().roundRect(0.75, 0.75, 22.5, 22.5, 4).build(), focusColor, 1.5);
+        if (shown) canvas.withState(target -> {
+          target.translate(5, 5);
+          target.scale(14 / 24, 14 / 24);
+          target.strokeTransient(IconData.build(IconName.Inspect), color, 2.0,
+            haxeon.ui.LineCap.Round, haxeon.ui.LineJoin.Round);
+        });
+      });
+      return node;
+    });
+  });
 }
 
 private class VisibilityEye implements View {

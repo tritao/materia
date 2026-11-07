@@ -16,11 +16,21 @@ import haxeon.ui.core.WidgetId;
 import sys.io.File;
 import sys.FileSystem;
 
+@:access(haxeon.ui.core.RenderNode)
 @:access(haxeon.ui.core.UiContext) class SceneVisibilityTests {
   static var assertions = 0;
   static function check(value:Bool, message:String):Void {
     assertions++;
     if (!value) throw message;
+  }
+  static function paintCommands(node:haxeon.ui.core.RenderNode):Int {
+    var canvas = new haxeon.ui.Canvas();
+    node.paintContent(canvas);
+    var list = haxeon.ui.DisplayList.create();
+    canvas.update(list);
+    var count = list.info().commandCount;
+    list.dispose();
+    return count;
   }
   static function item(scene:EditorScene, id:String):app.EditorScene.EditorSceneObject {
     var result = scene.object(id);
@@ -263,10 +273,32 @@ import sys.FileSystem;
       fonts.add(TestPaths.font());
       var ui = new haxeon.ui.core.UiContext(null, fonts);
       try {
-        var root = ui.submit(tree.buildItem(fasteners), new haxeon.ui.LayoutFrame(420, 40));
+        var rowBuilds = 0;
+        var buildRow = () -> {rowBuilds++; return tree.buildItem(fasteners);};
+        var rowFrame = new haxeon.ui.LayoutFrame(420, 40);
+        var root = ui.submitCached(buildRow, rowFrame, "isolate-row");
         var isolate = findNode(root, node -> node.semantics != null && node.semantics.label == "Isolate Fasteners (2)");
         if (isolate == null) throw "Missing set row isolate control";
+        var actionBounds = isolate.globalBounds();
+        check(actionBounds.width == 24 && actionBounds.height == 24, "isolate retains a 24px target");
+        check(paintCommands(isolate) == 0, "idle isolate action has no background or glyph");
+        ui.pointerMove(30, 12);
+        root = ui.submitCached(buildRow, rowFrame, "isolate-row");
+        isolate = findNode(root, node -> node.semantics != null && node.semantics.label == "Isolate Fasteners (2)");
+        if (isolate == null) throw "Missing set row isolate control";
+        check(paintCommands(isolate) > 0, "hovering the row reveals its isolate glyph");
+        check(rowBuilds == 1, "hover updates the row without rebuilding its owner");
+        check(isolate.globalBounds().x == actionBounds.x, "revealing isolate does not shift the row layout");
+        ui.pointerLeave();
+        root = ui.submitCached(buildRow, rowFrame, "isolate-row");
+        isolate = findNode(root, node -> node.semantics != null && node.semantics.label == "Isolate Fasteners (2)");
+        if (isolate == null) throw "Missing set row isolate control";
+        check(paintCommands(isolate) == 0, "leaving the row hides its isolate glyph");
         ui.focusWidget(isolate.id);
+        root = ui.submitCached(buildRow, rowFrame, "isolate-row");
+        isolate = findNode(root, node -> node.semantics != null && node.semantics.label == "Isolate Fasteners (2)");
+        if (isolate == null) throw "Missing set row isolate control";
+        check(paintCommands(isolate) > 0, "keyboard focus reveals isolate without hover");
         ui.key(UiEventKind.KeyDown, UiKey.Enter);
         ui.key(UiEventKind.KeyUp, UiKey.Enter);
         check(scene.isVisible("project:bracket") && scene.isVisible("project:other") && !scene.isVisible("project:slide"), "rendered set row isolate activates once by keyboard");
