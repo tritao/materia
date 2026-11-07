@@ -220,14 +220,8 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
     var material = PropertyClasses.material(propertyClass);
     var materialSuffix = propertyClass == Steel129 ? "" : '-' + PropertyClasses.token(propertyClass);
     var designation = 'ISO4762-$name$materialSuffix';
-    var customName = '${spec.size}-D${Dimension.format(spec.diameter)}-P${Dimension.format(spec.pitch)}'
-      + '-HD${Dimension.format(spec.headDiameter)}x${Dimension.format(spec.headHeight)}-S${Dimension.format(spec.socketSize)}x${Dimension.format(spec.socketDepth)}'
-      + '-TL${Dimension.format(spec.threadLength)}-TD${Dimension.format(spec.tapDrill)}'
-      + '-C${Dimension.format(spec.clearanceFine)}x${Dimension.format(spec.clearanceMedium)}x${Dimension.format(spec.clearanceCoarse)}'
-      + '-CB${Dimension.format(spec.counterboreDiameter)}x${Dimension.format(spec.counterboreDepth)}'
-      + '-L${Dimension.format(length)}-M${StringTools.replace(material, " ", "-")}';
     super(
-      codeOnly ? customDesignation(customName) : designation,
+      codeOnly ? customDesignation("SOCKET-SCREW-" + spec.size, {spec:spec, length:length, propertyClass:PropertyClasses.token(propertyClass)}) : designation,
       'Socket head cap screw $name$materialSuffix',
       material,
       codeOnly

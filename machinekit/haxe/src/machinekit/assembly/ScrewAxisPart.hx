@@ -23,8 +23,7 @@ class ScrewAxisPart extends MachineComponent {
     if (kinds().indexOf(kind) < 0) throw "Unknown axis fabrication part";
     if (revision != "v2-tapped") throw "Unknown fabrication revision";
     super(
-      "TWIN-RAIL-SCREW-" + kind + "-v2-tapped" + "-L" + Dimension.format(layout.screwLength)
-      + "-R" + Dimension.format(layout.railLength) + "-S" + Dimension.format(layout.railSpacing),
+      numberFor(kind, revision, layout),
       "Twin rail screw axis " + kind,
       "aluminium 6061"
     );
@@ -54,6 +53,11 @@ class ScrewAxisPart extends MachineComponent {
         addConnector("guideRight", Mount, F.translation(layout.halfSpacing(), 0, 0));
       default:
     }
+  }
+  static function numberFor(kind:String, revision:String, layout:ScrewAxisLayout):String {
+    var key = revision + ":" + ComponentNumberKey.encode(layout.screwLength) + ":"
+      + ComponentNumberKey.encode(layout.railLength) + ":" + ComponentNumberKey.encode(layout.railSpacing);
+    return PartNumbers.geometry("TWIN-RAIL-SCREW", kind, key);
   }
   static function box(w:Float, h:Float, l:Float, x:Float, y:Float, z:Float):Part {
     var raw = Part.box(w, h, l), posed = raw.translated(new Vector(x, y, z));
@@ -147,7 +151,8 @@ class ScrewAxisPart extends MachineComponent {
         )
       ),
       true
-    ).numbered(v -> 'TWIN-RAIL-SCREW-${v.token("kind").toUpperCase()}')
+    ).numbered(v -> numberFor(v.token("kind"), v.token("revision"), new ScrewAxisLayout(
+      v.number("travel"), v.number("screwLength"), v.number("railLength"), v.number("railSpacing"))))
       .procured(_ -> Make("CNC machining")));
   }
   override public function componentType():Null<ComponentType> return recipeType();

@@ -181,6 +181,8 @@ class MachineComponent {
     instanceId = nextInstanceId++;
     instanceIdLock.release();
     if (designation == null || designation.length == 0) throw "Machine component needs a designation";
+    if (designation.length > PartNumberLint.MAX_LENGTH)
+      throw 'Designation exceeds ${PartNumberLint.MAX_LENGTH} characters: $designation';
     this.designation = designation;
     materialId = MaterialLibrary.fromSpec(material);
     this.codeOnly = codeOnly;
@@ -195,10 +197,8 @@ class MachineComponent {
     cachedBom = null;
   }
 
-  public static function customDesignation(designation:String):String return StringTools.startsWith(
-    designation,
-    "CUSTOM-"
-  ) ? designation : 'CUSTOM-$designation';
+  public static function customDesignation(role:String, definingGeometry:Dynamic):String
+    return PartNumbers.geometry("CUSTOM", role, PartNumbers.exactKey(definingGeometry));
 
   public function materialSpec():String return MaterialLibrary.require(materialId).physical.spec;
 

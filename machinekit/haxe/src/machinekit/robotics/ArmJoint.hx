@@ -32,13 +32,26 @@ class ArmJoint extends MachineComponent implements MotorDrive {
   /** The servo motor inside the module, or null when it is only a housing. */
   public final servo:Null<ServoMotor>;
 
-  public function new(diameter:Float, length:Float, ?flange:RobotFlange, ?servo:ServoMotor, variant:String = "") {
+  public function new(diameter:Float, length:Float, ?flange:RobotFlange, ?servo:ServoMotor, ?pocket:{diameter:Float, length:Float}) {
     if (!Math.isFinite(diameter) || !Math.isFinite(length)
       || !(diameter > 0) || !(length > 0)) throw "Arm joint needs a positive diameter and length";
     var text = '${Dimension.format(diameter)}x${Dimension.format(length)}';
     var base = flange == null ? 'ARM-JOINT-D$text' : 'ARM-JOINT-D$text-${flange.designation}';
+    var readable = (servo == null ? base : '$base-${servo.designation}')
+      + (pocket == null ? "" : "-POCKET-" + Dimension.format(pocket.diameter) + "x" + Dimension.format(pocket.length));
+    var exact = machinekit.component.ComponentNumberKey.encode(diameter) + ":"
+      + machinekit.component.ComponentNumberKey.encode(length) + ":" + (flange == null ? "none" : flange.designation)
+      + ":" + (servo == null ? "none" : servo.designation)
+      + (pocket == null ? "" : ":" + machinekit.component.ComponentNumberKey.encode(pocket.diameter)
+        + ":" + machinekit.component.ComponentNumberKey.encode(pocket.length));
+    var lossless = Std.parseFloat(Dimension.format(diameter)) == diameter
+      && Std.parseFloat(Dimension.format(length)) == length
+      && (pocket == null || (Std.parseFloat(Dimension.format(pocket.diameter)) == pocket.diameter
+        && Std.parseFloat(Dimension.format(pocket.length)) == pocket.length));
+    var number = readable.length <= machinekit.component.PartNumberLint.MAX_LENGTH && lossless ? readable
+      : machinekit.component.PartNumbers.geometry("ARM-JOINT", pocket == null ? "HOUSING" : "GEARED", exact);
     super(
-      (servo == null ? base : '$base-${servo.designation}') + variant,
+      number,
       'Arm joint module, $text mm' + (servo == null ? "" : ' with ${servo.designation}'),
       "steel 12.9",
       true

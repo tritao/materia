@@ -63,10 +63,8 @@ class LinearBearing extends MachineComponent {
   private function new(spec:LinearBearingSpec, codeOnly:Bool = false) {
     if (!(spec.boreDiameter > 0) || !(spec.outerDiameter > spec.boreDiameter)
       || !(spec.length > 0)) throw 'Linear bearing ${spec.designation} has inconsistent dimensions';
-    var customName =
-      '${spec.designation}-D${Dimension.format(spec.boreDiameter)}x${Dimension.format(spec.outerDiameter)}x${Dimension.format(spec.length)}';
     super(
-      codeOnly ? customDesignation(customName) : spec.designation,
+      codeOnly ? customDesignation("LINEAR-BEARING", spec) : spec.designation,
       'Linear ball bearing ${spec.designation}',
       "steel",
       codeOnly

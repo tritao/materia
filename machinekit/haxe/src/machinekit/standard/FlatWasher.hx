@@ -62,9 +62,7 @@ class FlatWasher extends MachineComponent {
     if (!(spec.innerDiameter > 0) || !(spec.outerDiameter > spec.innerDiameter)
       || !(spec.thickness > 0)) throw 'Flat washer ${spec.size} has inconsistent dimensions';
     var designation = 'ISO7089-${spec.size}';
-    var customName =
-      '${spec.size}-ID${Dimension.format(spec.innerDiameter)}-OD${Dimension.format(spec.outerDiameter)}-T${Dimension.format(spec.thickness)}';
-    super(codeOnly ? customDesignation(customName) : designation, 'Flat washer ${spec.size}', "steel", codeOnly);
+    super(codeOnly ? customDesignation("WASHER-" + spec.size, spec) : designation, 'Flat washer ${spec.size}', "steel", codeOnly);
     if (codeOnly) addFacet(new machinekit.component.ProcurementIntent(Buy(null, null, null)));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", codeOnly ? "Stated" : "Catalog").setToken("errorsBasis", "Assumed")

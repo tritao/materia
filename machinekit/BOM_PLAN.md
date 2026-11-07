@@ -273,8 +273,11 @@ and readers reject anything else. It contains:
 - The initial survey found three built-in defaults that cannot be constructed.
   `ComponentType.keyFor` also rounds numeric inputs, so its key is not exact
   as required by this plan. Keep both findings visible in the rollout.
-- Rules: `[A-Z0-9][A-Z0-9.\-x/]*`, ≤ 40 chars, no `null`, no unformatted
-  floats, no `|`. Dimensions in names only through `Dimension.format`.
+- Rules: `[A-Z0-9][A-Z0-9.\-x/]*`, ≤ 48 chars (shared `PartNumberLint.MAX_LENGTH`), no `null`, no unformatted
+  floats, no `|`. Short readable dimensions use `Dimension.format` only when
+  lossless for geometry identity. Geometry-heavy or overlong generated numbers
+  use FAMILY-ROLE-eight-hex from canonical exact defining inputs. Constructors
+  enforce the same cap as BOM lint; no compatibility aliases.
 - Add a lint check over every registered recipe's default part and every
   exported example BOM. It starts as a report and becomes a hard failure in
   B7.
@@ -687,6 +690,14 @@ Seventh slice (2026-11-05, branch `hobber-crash`): the three open items of the s
   The bars' and the plate's M8 holes stay the seats' own (`HobberScales.seatHoles`): a 20 mm bar cannot be a drilled-to-suit host at the 1.5 d edge rule.
 
 ### B7 — Rollout and hard gate
+
+- Readable-name follow-up (2026-11-07): invalid part numbers include anything
+  longer than the shared 48-character cap. Constructors reject overlong
+  designations; default-recipe and exported-BOM gates use the same lint limit.
+  Geometry identities use exact canonical inputs and short family/role hashes;
+  declared drawing identities stay stable. Current measurements are appended to
+  `BOM_BASELINE.md`; implementation/scene-label decisions are in
+  `app/plans/READABLE_NAMES.md`.
 - Done in `fa1f1534f`. The full gate passed 11/24 shards with no new
   failure or exception compared with B6. The only differences from the
   untouched baseline remain the accepted tending input fingerprints in shards

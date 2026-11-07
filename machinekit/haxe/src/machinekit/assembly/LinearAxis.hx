@@ -56,7 +56,7 @@ class Carriage extends MachineComponent {
     var bore = Dimension.format(boreDiameter),
       widthText = Dimension.format(width), lengthText = Dimension.format(length);
     super(
-      'CARRIAGE-D$bore-${widthText}x$lengthText-G${Dimension.format(guideSpacing)}-${nut.designation}',
+      numberFor(boreDiameter, width, length, guideSpacing, guideSeatDiameter, nut, guideSeatFit, railMountY),
       'Lead-screw carriage ${widthText}x${widthText}x$lengthText',
       "aluminium 6061"
     );
@@ -78,6 +78,17 @@ class Carriage extends MachineComponent {
     if (hasRailMount) addConnector("railMount", Mount, Solids.axial(0, this.railMountY, length / 2));
   }
 
+  static function numberFor(bore:Float, width:Float, length:Float, guideSpacing:Float,
+    guideSeat:Float, nut:LeadScrewNut, fit:BearingHousingFit, railY:Null<Float>):String {
+    var key = haxe.Json.stringify([
+      [bore, width, length, guideSpacing, guideSeat, nut.bodyDiameter, nut.bodyLength, nut.flangeDiameter,
+        nut.flangeThickness, nut.flangeOffset, nut.boltCircleDiameter]
+        .map(machinekit.component.ComponentNumberKey.encode).join(":"),
+      Std.string(nut.boltCount), nut.mountScrew, Std.string(fit),
+      railY == null ? "absent" : machinekit.component.ComponentNumberKey.encode(railY)]);
+    return machinekit.component.PartNumbers.geometry("CARRIAGE", "LEAD-SCREW", key);
+  }
+
   static final recipeTypeCache = new machinekit.cache.Once<ComponentType>();
 
   public static function recipeType():ComponentType {
@@ -94,7 +105,13 @@ class Carriage extends MachineComponent {
         ComponentRecipeSupport.scalar("railMountY", 0),
         ComponentRecipeSupport.count("nutBoltCount", 4)
       ].concat(ComponentRecipeSupport.threadParameters()),
-      v -> new Carriage(
+      fromRecipe,
+      true
+    ).numbered(v -> fromRecipe(v).designation).procured(_ -> Make("CNC machining")));
+  }
+
+  static function fromRecipe(v:machinekit.component.ComponentValues):Carriage {
+    return new Carriage(
         v.number("boreDiameter"),
         v.number("width"),
         v.number("length"),
@@ -103,10 +120,7 @@ class Carriage extends MachineComponent {
         new machinekit.motion.LeadScrewNut(ComponentRecipeSupport.thread(v), v.integer("nutBoltCount")),
         ComponentRecipeSupport.fit(v.token("guideSeatFit")),
         v.boolean("hasRailMount") ? v.number("railMountY") : null
-      ),
-      true
-    ).numbered(v -> 'CARRIAGE-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("length"))}-D${Dimension.format(v.number("boreDiameter"))}-'
-      + ComponentRecipeSupport.threadPartNumber(v)).procured(_ -> Make("CNC machining")));
+      );
   }
 
   /** Subclasses must declare their own recipe and saved values. */

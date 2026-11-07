@@ -52,9 +52,8 @@ anchor bolts share the same group. Cover guide/bearing, drive, table, column,
 enclosure, tray-clamp, lifting and other declared roles. Declare typed installation purpose on cast/post-cure insert placements,
 including tray clamps; derive group names from that purpose. Keep catalogue
 socket recipe roles and BOM fingerprints unchanged. Do not infer purpose from
-hobber IDs. FoundationIntegrity must reject ungrouped members. Reset the
-active group after construction so appended members cannot inherit a purpose
-silently. Test role coverage, bed/column groups, real anchor colocation,
+hobber IDs. FoundationIntegrity must reject ungrouped members. Use existing `withGroup` scopes for each part addition so appended
+members cannot inherit a purpose silently. Test role coverage, bed/column groups, real anchor colocation,
 post-cure members and ungrouped additions. Bed/column subclasses add no members
 after foundation construction.
 
@@ -128,6 +127,7 @@ definitions, 165 distinct scene numbers. Files: `tmp/rn-metrics/before.mtrg`,
 | Before | 192 | 53.7221 | 47 | 192 |
 | R1 | 48 | 21.9950 | 47 | 192 |
 | R2 | 33 | 15.5707 | 38 | 192 |
+| R3 | 33 | 15.5707 | 38 | 45 |
 
 Before's longest label/number is the coordinate-coded captured roller track.
 Longest ID is `machine/column/anchor-297d29ec08a4196e572c-bolt`.
@@ -137,35 +137,46 @@ including brackets, panels, shafts and a supply. Full survey: rn-designation-sur
 
 ## Current state and remaining work
 
-R1 is committed as `61eec37b0`. ProjectKit passed 413 assertions and app naming
-passed 24 assertions. A test-only hard-coded schema v1 was corrected to the
-codec VERSION constant (v11); no production schema changed. Full R1 regressions
-are complete: all focused projects passed (app, hobber 2345,
-hobbing 1161, BOM-document/key, procurement, assembly integrity and joint
-fasteners). Joint-fastener totals match: 51 joints, 232 screws, 16 dowels,
-zero fit findings. Handle 4276 is terminal. All 24 smoke shards match exactly (9 pass, same 15 exceptions).
-The standalone BOM-example test reproduces the exact pre-existing cleat
-collision. Both regression handles are terminal; no new failures.
+R1 is committed as `61eec37b0`; R2 as `5b4976e2e`. Both passed all focused
+baseline projects; their 24 smoke shards exactly match the measured baseline
+(9 pass, same 15 exceptions), and the standalone BOM-example check reproduces
+the initial cleat collision. ProjectKit passed 413; app naming 24. R2 additionally
+passed 28 assemblies/4561 occurrence names and 64 local rack contact assertions.
 
-R2 is implemented and verified; its separate commit follows. AssemblyIntegrity passes. The initial actual-example audit found
-coordinate IDs in rack push screws and enclosure spacers/rollers; those and
-hanger sign IDs now use indices. The final audit passed 28 assemblies/4561 occurrences, including RKE/ZPP variants; fresh enclosure metrics
-preserve 403 parts/183 definitions. Longest label is now "Tray rear centre
-joint seal right" (33), longest path enclosure/trayRearCentreJointSealRight
-(38), average 15.5707. Both focused checks are terminal. Full R2 baseline
-regressions passed the same focused projects. All24 smoke shards match exactly
-(9 pass, same15 exceptions); standalone BOM-example reproduces the same cleat
-collision. Focused rack-mount adds64 passing local contact assertions and both
-router builds. All R2 handles are terminal; no new regression.
-R3–R4 drafts remain unapplied/uncompiled outside source roots in tmp/rn-r3
-and rn-r4. Inspect current source before applying; do not
-regenerate old drafts over fixes. R2 needs actual all-example/enclosure runtime
-proof and anchor regression coverage. R3 needs remaining generators exposed by
-constructor enforcement, default-recipe hard failure accounting, exact identity
-and merging tests, and BOM baseline updates with reasons. R4 needs compiled
-behavioral coverage, including post-cure and non-vacuous anchor assertions.
-No step is complete until its required regression comparison and separate
-commit are done.
+R3 is applied and uncommitted. Its hard constructor/lint cap is 48. Temporary
+report-only diagnostic passes were removed before validation. All 225 defaults
+and exact-identity/cap-boundary tests pass, with only the same 3 source-dependent
+defaults excluded. Actual naming audit passed 28 assemblies/4561 occurrences.
+Enclosure export preserves 403 occurrences/183 definitions, with longest number 45.
+Distinct scene numbers rise 165→167: two rounded outrigger names previously
+covered different exact block inputs. Identical/reordered block definitions
+retain one number/values key/fingerprint.
+
+All 23 BOM exports were attempted: 21 succeed (1066 procurement lines), including
+newly exportable sheet-router 172. Hobber retains missing structured selection
+requirements; tending retains its stale certificate, now with current fingerprint
+3314e3d4f2431a95675633dfc45e8b41c1aec07e109e97562e47b87c2d1a5c88.
+All 20 previously successful exports preserve line identities/quantities/uses
+under canonical block ordering. Lint: 3710 engineering occurrences and 1066
+procurement lines, zero invalid; 225 defaults valid, same 3 unavailable.
+R3 full focused regressions pass, including hobber 2345/hobbing 1161, app CAD,
+BOM-document/key, procurement, integrity and unchanged joint-fastener totals.
+The example-build matrix and dedicated mill-frame suite (951) pass. Smoke
+improves 9→10 passes: sheet-router shard 6 passes 426 assertions. No previously
+passing shard remains failed. Tending shards15/16/24 only change their current
+fingerprint; shard 21/standalone now reach the pre-existing hobber selection
+failure after the identity collisions are cleared. Other failures match exactly.
+HMI child bodies use exact parent recipe keys plus role; their purchased
+control number and geometry stay unchanged. The Y bracket test now checks its
+recipe/description and unchanged quantity 2 instead of a superseded literal.
+All R3 handles are terminal; the separate R3 commit follows verification.
+
+R4 is next. Its library groups use typed placement purposes and existing
+`withGroup` scopes, preserving catalogue socket roles and part identity.
+Verify all producers/copies, actual artifact group paths, 106 anchor colocation,
+post-cure members in the runnable mill-frame fixture, ungrouped rejection and
+full regression comparisons before its separate commit. No portable artifact
+schema change is needed.
 
 Tools/evidence: rn-regress.sh, rn-compare-smoke.py, rn-r1-results/.
 The comparison keeps pending shards pending and flags changed failures for

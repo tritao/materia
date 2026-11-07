@@ -1212,7 +1212,7 @@ private class MillNutBracket extends MachineComponent {
   final axis:String;
   final mountRise:Float;
   public function new(nut:BallNut, axis:String, mountRise:Float) {
-    super('MILL-NUT-BRACKET-${nut.designation}-$axis-$mountRise', "Ball-nut flange adapter", "steel", true);
+    super("MILL-NUT-BRACKET-" + axis.toUpperCase(), "Ball-nut flange adapter", "steel", true);
     declareDrawingNumber("MILL-NUT-BRACKET-" + axis.toUpperCase());
     addFacet(new machinekit.component.ProcurementIntent(machinekit.component.Procurement.Make("CNC machining")));
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()

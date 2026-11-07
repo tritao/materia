@@ -35,7 +35,7 @@ class CobotToolLink extends MachineComponent {
     if (!Math.isFinite(length) || length <= CobotWristLink.HUB_DEPTH
       + END_DEPTH + 2 * WALL) throw "Tool housing needs room for its mounting faces and hollow shell";
     super(
-      'COBOT-TOOL-HOUSING-${module.size}-${Dimension.format(d)}-${flange.designation}',
+      drawing,
       "Tapered rotating tool-flange housing",
       "aluminium 6061",
       true

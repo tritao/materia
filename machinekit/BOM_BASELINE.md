@@ -382,3 +382,93 @@ The standalone BOM example test passed. The later declared-section identity
 follow-up addresses the supplier-demo drawn-profile collision found during B8.
 Its full gate passed 11/24 shards with no new failing shard or exception
 message compared with B8; its direct runtime results are recorded in the plan.
+
+
+## Readable names R3 measurement — 2026-11-07
+
+This follow-up starts at `4a8654c53`, measured before implementation rather
+than treating the historical B7 counts above as the current checkout. R1 and
+R2 are `61eec37b0` and `5b4976e2e`. The initial current baseline had 20 successful
+exports/894 procurement lines; sheet-router stopped at an aliased cleat number,
+hobber at missing structured selection requirements, and tending at a stale
+reach certificate. Its full smoke gate passed 9/24 shards. R1/R2 reproduce
+all 24 baseline outcomes exactly and pass the focused projects.
+
+R3 sets a shared 48-character cap, enforced by constructors and BOM lint.
+Geometry-heavy generated parts use family/role/eight-hex identities from exact
+inputs. Custom standards share one canonical defining-record formatter.
+Drawing-based parts use their declared drawing identities. Short catalogue and
+size numbers remain readable. Bracket block ordering and shaft feature ordering
+are canonical so equivalent declarations retain the same identity.
+
+The hard key tests pass 225 constructible defaults and explicit stability,
+distinction, canonical-record, custom-fastener, merging and 48/49-character
+boundary cases. The same 3 defaults need explicit source inputs: cast-in steel
+insert, linear-mount nut cassette, source casting. No unexpected construction
+failure is hidden as an unavailable default.
+
+All 23 factories were attempted. 21 export 1066 procurement lines. The previous 20
+successful exports preserve line identities, quantities and per-use quantities;
+comparison accounts for canonical block ordering. Two CoreXY belt line groups
+share descriptive/fingerprint fields, so their complete unchanged records were
+compared as multisets. Sheet-router now exports 172 lines: cleat numbers include
+bias/exact height; replication-layer numbers share the existing purchase key
+that includes drilling geometry and removes source hole IDs. These clear old
+identity collisions without changing purchase-key merging.
+
+BOM lint reports 0 invalid numbers across 3710 engineering occurrences and 1066
+procurement lines. The actual assembly naming audit passes 28 assemblies/4561
+occurrences, including the enclosure and RKE/ZPP variants. Tending is reported
+unavailable at its existing stale certificate; its current input fingerprint is
+`3314e3d4f2431a95675633dfc45e8b41c1aec07e109e97562e47b87c2d1a5c88`.
+Hobber still requires structured selection requirements for
+`ROBOTDIGG-2049-BT30-D80-6000`; no supplier assumptions or certificate were changed.
+
+| Machine | Initial procurement lines | R3 procurement lines |
+| --- | ---: | ---: |
+| bench-mill | 79 | 79 |
+| cnc-router | 38 | 38 |
+| cobot-arm | 25 | 25 |
+| corexy-plotter | 16 | 16 |
+| corexy-printer | 53 | 53 |
+| enclosed-bench-mill | 116 | 116 |
+| flexspline-hobber | Unavailable | Unavailable |
+| gantry-picker | 74 | 74 |
+| gantry-welder | 84 | 84 |
+| linear-stage | 11 | 11 |
+| machine-tending | Unavailable | Unavailable |
+| mobile-base-cell | 42 | 42 |
+| mobile-base | 11 | 11 |
+| mobile-welder | 43 | 43 |
+| overhead-arm | 76 | 76 |
+| picking-station | 7 | 7 |
+| press-brake | 31 | 31 |
+| robot-arm | 30 | 30 |
+| robot-screwdriver | 33 | 33 |
+| robot-welder | 33 | 33 |
+| sheet-router | Unavailable | 172 |
+| track-arm | 47 | 47 |
+| xyz-stage | 45 | 45 |
+
+The saved enclosure remains 403 occurrences/183 geometry definitions. Labels
+average 53.7221 characters initially, 21.9950 after R1,15.5707 after R2/R3; maximum
+label 192→48→33. R3 reduces maximum scene designation 192→45. Distinct scene
+numbers 165→167: two rounded outrigger names each previously covered different
+exact block inputs. Identical defining geometry still shares one number; exact
+coordinates are not rounded into a new collision.
+
+R3 full focused regressions pass: app (including CAD plate workflow), hobber
+2345 assertions, hobbing 1161, BOM-document, BOM-key, procurement, assembly
+integrity and joint-fasteners (zero findings; 51 joints, 232 screws, 16 dowels).
+The example-build matrix and screwdriver drawings pass; the dedicated mill
+frame suite passes 951 assertions. HMI child-body expansion uses exact parent
+recipe keys and short body roles, preventing an overlong terminal-screw name.
+The Y bracket merging assertion identifies its recipe/description rather than
+an obsolete literal number and still requires quantity 2.
+
+The smoke gate improves 9→10 passing shards; shard 6 passes 426 sheet-router
+assertions. No previously passing shard remains failed. Shards 15/16/24 retain
+the stale certificate with the new current-input fingerprint above. Shard21
+and the standalone BOM-example test get past the cleared identity collisions
+and now stop at hobber's already-measured missing structured requirements.
+Every other remaining exception matches the initial baseline exactly.

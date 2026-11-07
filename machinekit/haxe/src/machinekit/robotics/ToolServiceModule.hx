@@ -19,7 +19,7 @@ class ToolServiceModule extends MachineComponent {
   public function new(spec:ToolServiceSpec, outlets:Int = 1) {
     if (spec == null || outlets < 1 || outlets > 2) throw "Tool service module needs a contract and one or two outlets";
     super(
-      'TOOL-SERVICE-${spec.key()}-${spec.pins}PIN-${spec.totalCurrent}A-${spec.branchCurrent}A-$outlets',
+      numberFor(spec, outlets),
       outlets == 1 ? "Provisional wrist power/data socket" : "Provisional passive dual-gripper junction",
       "aluminium 6061",
       true
@@ -73,6 +73,13 @@ class ToolServiceModule extends MachineComponent {
       addBridge("powerIn", 'power$i');
       addBridge("signalIn", 'signal$i');
     }
+  }
+  static function numberFor(spec:ToolServiceSpec, outlets:Int):String {
+    var key = haxe.Json.stringify([spec.connectorKey, spec.protocol,
+      machinekit.component.ComponentNumberKey.encode(spec.voltage),
+      machinekit.component.ComponentNumberKey.encode(spec.totalCurrent),
+      machinekit.component.ComponentNumberKey.encode(spec.branchCurrent), Std.string(spec.pins), Std.string(outlets)]);
+    return machinekit.component.PartNumbers.geometry("TOOL-SERVICE", outlets == 1 ? "SOCKET" : "JUNCTION", key);
   }
   /** Explicit circuit budget check; the generic port graph alone does not check current. */
   public function checkLoads(sourceVoltage:Float,
@@ -154,7 +161,12 @@ class ToolServiceModule extends MachineComponent {
         machinekit.component.ComponentRecipeSupport.count("pins", 8),
         machinekit.component.ComponentRecipeSupport.count("outlets", 1)
       ],
-      v -> new ToolServiceModule(
+      fromRecipe,
+      true
+    ).numbered(v -> fromRecipe(v).designation));
+  }
+  static function fromRecipe(v:machinekit.component.ComponentValues):ToolServiceModule {
+    return new ToolServiceModule(
         new ToolServiceSpec(
           v.number("voltage"),
           v.number("totalCurrent"),
@@ -164,9 +176,7 @@ class ToolServiceModule extends MachineComponent {
           v.integer("pins")
         ),
         v.integer("outlets")
-      ),
-      true
-    ).numbered(v -> 'TOOL-SVC-ASSUMED-${machinekit.component.Dimension.format(v.number("voltage"))}V-${machinekit.component.Dimension.format(v.number("totalCurrent"))}A-${machinekit.component.Dimension.format(v.number("branchCurrent"))}A-${v.integer("pins")}P-${v.integer("outlets")}O'));
+      );
   }
   override public function componentType():Null<machinekit.component.ComponentType> return recipeType();
   override public function values():machinekit

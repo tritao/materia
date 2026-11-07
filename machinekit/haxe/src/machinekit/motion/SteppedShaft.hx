@@ -108,13 +108,15 @@ class SteppedShaft extends MachineComponent {
     var total = 0.0;
     for (section in sections) total += section.length;
     var sizes = [for (section in sections) '${Dimension.format(section.diameter)}x${Dimension.format(section.length)}'];
-    var resolvedDetail:ShaftDetail = detail == null ? emptyDetail() : detail;
+    var resolvedDetail:ShaftDetail = canonicalDetail(detail);
     var resolvedKeyways = keyways == null ? [] : keyways.copy();
     var resolvedGrooves = grooves == null ? [] : grooves.copy();
     var resolvedFaces = namedFaces == null ? [] : namedFaces.copy();
-    var featureSuffix = featureDesignation(resolvedFaces, resolvedKeyways, resolvedGrooves, resolvedDetail);
+    resolvedFaces.sort((a, b) -> Reflect.compare(Json.stringify(a), Json.stringify(b)));
+    resolvedKeyways.sort((a, b) -> Reflect.compare(a.name, b.name));
+    resolvedGrooves.sort((a, b) -> Reflect.compare(Json.stringify(a), Json.stringify(b)));
     super(
-      "SHAFT-" + sizes.join("-") + featureSuffix,
+      geometryNumber(sections, resolvedFaces, resolvedKeyways, resolvedGrooves, resolvedDetail),
       "Stepped shaft " + sizes.join(" / ") + detailDescription(resolvedDetail),
       "steel C45"
     );
@@ -257,41 +259,44 @@ class SteppedShaft extends MachineComponent {
 
   function sectionLengthAfter(z:Float):Float return sections[shoulderIndex(z) + 1].length;
 
-  static function featureDesignation(
-    faces:Array<{name:String, z:Float}>,
-    keyways:Array<ShaftKeyway>,
-    grooves:Array<ShaftGroove>,
-    detail:ShaftDetail
-  ):String {
+  static function geometryNumber(sections:Array<ShaftSection>, faces:Array<{name:String, z:Float}>,
+    keyways:Array<ShaftKeyway>, grooves:Array<ShaftGroove>, detail:ShaftDetail):String {
+    function number(value:Null<Float>):String return machinekit.component.ComponentNumberKey.encode(value == null ? 0 : value);
+    function thread(value:Null<ShaftThreadEnd>):String return value == null ? "none"
+      : [number(value.diameter), number(value.pitch), number(value.length)].join(":");
     var features:Array<String> = [];
-    for (face in faces) features.push('F${face.name.length}:${face.name}@${Dimension.format(face.z)}');
-    for (keyway in keyways) features
-      .push('K${keyway.name.length}:${keyway.name}@${Dimension.format(keyway.z0)}:${keyway.key.designation}'
-      + '-S${Dimension.format(keyway.key.spec.minShaft)}x${Dimension.format(keyway.key.spec.maxShaft)}'
-      + '-D${Dimension.format(keyway.key.spec.shaftDepth)}x${Dimension.format(keyway.key.spec.hubDepth)}');
-    for (groove in grooves) {
-      var name = groove.name == null ? "" : groove.name;
-      features
-        .push('G${name.length}:$name@${Dimension.format(groove.z0)}x${Dimension.format(groove.width)}x${Dimension.format(groove.diameter)}');
+    for (face in faces) features.push("face:" + face.name.length + ":" + face.name + ":" + number(face.z));
+    for (entry in keyways) {
+      var spec = entry.key.spec;
+      features.push("key:" + entry.name.length + ":" + entry.name + ":" + [number(entry.z0),
+        number(entry.key.length), number(spec.minShaft), number(spec.maxShaft), number(spec.width),
+        number(spec.height), number(spec.shaftDepth), number(spec.hubDepth)].join(":"));
     }
-    if (detail.inputChamfer != null
-      && detail.inputChamfer > 0) features.push('CI${Dimension.format(detail.inputChamfer)}');
-    if (detail.outputChamfer != null
-      && detail.outputChamfer > 0) features.push('CO${Dimension.format(detail.outputChamfer)}');
-    var inputThread = detail.inputThread, outputThread = detail.outputThread;
-    if (inputThread != null) features
-      .push('TI${Dimension.format(inputThread.diameter)}x${Dimension.format(inputThread.pitch)}x${Dimension.format(inputThread.length)}');
-    if (outputThread != null) features
-      .push('TO${Dimension.format(outputThread.diameter)}x${Dimension.format(outputThread.pitch)}x${Dimension.format(outputThread.length)}');
-    if (detail.shoulders != null) for (shoulder in detail.shoulders) {
-      var feature = 'S${Dimension.format(shoulder.z)}';
-      if (shoulder.fillet != null) feature += '-R${Dimension.format(shoulder.fillet)}';
-      if (shoulder.reliefWidth != null) feature +=
-        '-U${Dimension.format(shoulder.reliefWidth)}x${Dimension.format(optionalFloat(shoulder.reliefDiameter))}';
-      features.push(feature);
-    }
+    for (entry in grooves) features.push("groove:" + (entry.name == null ? "" : entry.name.length + ":" + entry.name)
+      + ":" + [number(entry.z0), number(entry.width), number(entry.diameter)].join(":"));
+    if (detail.shoulders != null) for (entry in detail.shoulders) features.push("shoulder:" +
+      [number(entry.z), number(entry.fillet), number(entry.reliefWidth), number(entry.reliefDiameter)].join(":"));
+    var featured = features.length > 0 || optionalFloat(detail.inputChamfer) != 0
+      || optionalFloat(detail.outputChamfer) != 0 || detail.inputThread != null || detail.outputThread != null;
+    var readable = "SHAFT-" + [for (section in sections)
+      Dimension.format(section.diameter) + "x" + Dimension.format(section.length)].join("-");
+    if (!featured && readable.length <= machinekit.component.PartNumberLint.MAX_LENGTH) return readable;
     features.sort(Reflect.compare);
-    return features.length == 0 ? "" : "-" + features.join("-");
+    var sectionKeys = [for (section in sections) number(section.diameter) + ":" + number(section.length)];
+    var key = haxe.Json.stringify({sections:sectionKeys, features:features, inputChamfer:number(detail.inputChamfer),
+      outputChamfer:number(detail.outputChamfer), inputThread:thread(detail.inputThread), outputThread:thread(detail.outputThread)});
+    return machinekit.component.PartNumbers.geometry("SHAFT", "STEPPED", key);
+  }
+
+  static function canonicalDetail(value:Null<ShaftDetail>):ShaftDetail {
+    if (value == null) return emptyDetail();
+    var shoulders:Array<ShaftShoulderDetail> = value.shoulders == null ? [] : [for (entry in value.shoulders) {
+      z:entry.z, fillet:entry.fillet, reliefWidth:entry.reliefWidth, reliefDiameter:entry.reliefDiameter
+    }];
+    shoulders.sort((a, b) -> a.z < b.z ? -1 : a.z > b.z ? 1 : 0);
+    return {inputChamfer:optionalFloat(value.inputChamfer) == 0 ? null : value.inputChamfer,
+      outputChamfer:optionalFloat(value.outputChamfer) == 0 ? null : value.outputChamfer,
+      inputThread:value.inputThread, outputThread:value.outputThread, shoulders:shoulders.length == 0 ? null : shoulders};
   }
 
   static function emptyDetail():ShaftDetail return {
@@ -423,14 +428,7 @@ class SteppedShaft extends MachineComponent {
       ],
       v -> SteppedShaft.fromRecipe(v),
       true
-    ).numbered(v -> {
-      var sections:Array<Dynamic> = Json.parse(v.token("sections"));
-      var sizes = [for (section in sections) Dimension.format(section.diameter) + "x" + Dimension.format(section.length)];
-      var grooves:Array<Dynamic> = Json.parse(v.token("grooves"));
-      var keyways:Array<Dynamic> = Json.parse(v.token("keyways"));
-      return "SHAFT-" + sizes.join("-") + (grooves.length == 0 ? "" : "-G" + grooves.length)
-        + (keyways.length == 0 ? "" : "-K" + keyways.length);
-    }).procured(_ -> Make("turning and CNC machining")));
+    ).numbered(v -> fromRecipe(v).designation).procured(_ -> Make("turning and CNC machining")));
   }
 
   /** Subclasses must declare their own recipe and saved values. */

@@ -24,7 +24,8 @@ class EnclosurePanel extends MachineComponent {
       || !(height > 0) || !Math.isFinite(width + height)) throw "Enclosure panel needs finite positive dimensions";
     var panel = PanelCatalogue.require(constructionId);
     super(
-      'ENCLOSURE-PANEL-$constructionId-${width}x$height',
+      numberFor(new ComponentValues().setToken("construction", constructionId)
+        .setNumber("width", width).setNumber("height", height)),
       "Enclosure infill panel",
       MaterialLibrary.require(panel.layers[0].materialId).physical.spec
     );
@@ -89,8 +90,18 @@ class EnclosurePanel extends MachineComponent {
       false
     ).numbered(numberFor));
   }
-  public static function numberFor(v:ComponentValues):String
-    return 'P-${v.token("construction").toUpperCase()}-${Dimension.format(v.number("width"))}x${Dimension.format(v.number("height"))}';
+  public static function numberFor(v:ComponentValues):String {
+    var width = v.number("width");
+    var height = v.number("height");
+    var formattedWidth = Dimension.format(width);
+    var formattedHeight = Dimension.format(height);
+    var readable = 'P-${v.token("construction").toUpperCase()}-${formattedWidth}x${formattedHeight}';
+    if (readable.length <= machinekit.component.PartNumberLint.MAX_LENGTH
+      && Std.parseFloat(formattedWidth) == width && Std.parseFloat(formattedHeight) == height) return readable;
+    var key = v.token("construction") + ":" + machinekit.component.ComponentNumberKey.encode(width)
+      + ":" + machinekit.component.ComponentNumberKey.encode(height);
+    return machinekit.component.PartNumbers.geometry("P", v.token("construction"), key);
+  }
   override public function componentType():Null<ComponentType> return recipeType();
   override public function values():ComponentValues return new ComponentValues().setNumber("width", width).setNumber(
     "height",

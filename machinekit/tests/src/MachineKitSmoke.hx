@@ -598,7 +598,7 @@ class MachineKitSmoke {
     check(
       customBearing.componentType() == null && StringTools.startsWith(
         customBearing.designation,
-        "CUSTOM-608-D8x22x7-C0.3"
+        "CUSTOM-BEARING-608-"
       ) && customBearing.bom.partNumber == customBearing.designation && customBearing.bom.typeId == null,
       "custom catalog dimensions produce a code-only, prefixed component"
     );
@@ -626,7 +626,7 @@ class MachineKitSmoke {
       }
     );
     check(
-      customMotor.componentType() == null && StringTools.startsWith(customMotor.designation, "CUSTOM-17HS19-custom-IF"),
+      customMotor.componentType() == null && StringTools.startsWith(customMotor.designation, "CUSTOM-STEPPER-"),
       "custom NEMA variants are code-only and prefixed"
     );
     customCodeOnly(HexBolt.custom(HexBolt.catalog().get("M5"), 20), "hex bolt");

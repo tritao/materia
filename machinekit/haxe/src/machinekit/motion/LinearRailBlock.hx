@@ -57,12 +57,8 @@ class LinearRailBlock extends MachineComponent {
       <= spec.railHeight) throw 'Linear rail profile "${spec.designation}" has invalid block dimensions';
     if (drawing != NOMINAL && drawing != SUPPLIER) throw 'Unknown carriage drawing "$drawing"';
     if (drawing == SUPPLIER && !hasSupplierCad(spec)) throw 'No pinned supplier CAD for carriage ${spec.designation}';
-    var customName =
-      '${spec.family}-${spec.designation}-BW${Dimension.format(spec.blockWidth)}-BH${Dimension.format(spec.blockHeight)}'
-      + '-BL${Dimension.format(spec.blockLength)}-A${Dimension.format(spec.blockHoleSpacingAlong)}'
-      + '-X${Dimension.format(spec.blockHoleSpacingAcross)}-${spec.blockMountThread}';
     super(
-      codeOnly ? customDesignation(customName) : '${spec.family}-${spec.designation}',
+      codeOnly ? customDesignation("RAIL-BLOCK", spec) : '${spec.family}-${spec.designation}',
       '${spec.family} ${spec.designation} carriage block',
       "steel",
       codeOnly

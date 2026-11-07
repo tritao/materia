@@ -65,10 +65,8 @@ class ShaftCollar extends MachineComponent {
       > 0)) throw 'Shaft collar for ${Dimension.format(spec.boreDiameter)} mm shaft has inconsistent dimensions';
     var bore = Dimension.format(spec.boreDiameter);
     var designation = 'COLLAR-$bore';
-    var customName =
-      '$bore-OD${Dimension.format(spec.outerDiameter)}-W${Dimension.format(spec.width)}-SS${spec.setScrew}';
     super(
-      codeOnly ? customDesignation(customName) : designation,
+      codeOnly ? customDesignation("SHAFT-COLLAR", spec) : designation,
       'Shaft collar for $bore mm shaft, ${spec.setScrew} set screw',
       "steel",
       codeOnly

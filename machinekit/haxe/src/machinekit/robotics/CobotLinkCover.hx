@@ -17,7 +17,7 @@ class CobotLinkCover extends MachineComponent {
     if (!Math.isFinite(length) || !Math.isFinite(width)
       || length < 40 || width < 30) throw "Link service cover has no room for its opening and four fasteners";
     super(
-      'COBOT-LINK-COVER-$length-$width-$gasket',
+      drawing,
       gasket ? "Arm service-cover gasket" : "Removable arm service cover",
       gasket ? "nitrile rubber NBR" : "aluminium 6061",
       true

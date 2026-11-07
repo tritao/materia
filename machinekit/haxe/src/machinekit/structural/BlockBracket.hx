@@ -5,7 +5,6 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
 import machinekit.component.CollisionHullFacet;
-import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 
@@ -29,9 +28,7 @@ class BlockBracket extends MachineComponent {
       for (i in 0...3) if (!Math.isFinite(block.min[i] + block.max[i])
         || !(block.max[i] - block.min[i] > 0)) throw 'Bracket "$name" has an empty or nonfinite block';
     }
-    var key = [for (block in blocks)[for (i in 0...3) Dimension.format(block.min[i])
-      + ":" + Dimension.format(block.max[i])].join(",")].join(";");
-    super('BRACKET-${name.toUpperCase().split(" ").join("-")}-${key}', name, material, true);
+    super(numberFor(name, blocks), name, material, true);
     addFacet(new machinekit.component.EngineeringMetadata(new machinekit.component.ComponentValues()
       .setToken("ratingsBasis", "Stated").setToken("errorsBasis", "Assumed").setToken("source", "")));
     this.label = name;
@@ -39,6 +36,7 @@ class BlockBracket extends MachineComponent {
       min:block.min.copy(), max:block.max.copy()
     }
     ];
+    this.blocks.sort((a, b) -> Reflect.compare(blockKey(a), blockKey(b)));
     // Preserve the space inside an L-shaped support in simulation and planning.
     addFacet(CollisionHullFacet.fromBoxes([for (block in this.blocks)[
       block.min[0],
@@ -48,6 +46,17 @@ class BlockBracket extends MachineComponent {
       block.max[1],
       block.max[2]
     ]]));
+  }
+
+  /** Identity uses exact block inputs; block declaration order does not change the part. */
+  static function blockKey(block:BracketBlock):String return [for (axis in 0...3)
+    machinekit.component.ComponentNumberKey.encode(block.min[axis]) + ":"
+    + machinekit.component.ComponentNumberKey.encode(block.max[axis])].join(",");
+
+  static function numberFor(name:String, blocks:Array<BracketBlock>):String {
+    var keys = [for (block in blocks) blockKey(block)];
+    keys.sort(Reflect.compare);
+    return machinekit.component.PartNumbers.geometry("BRACKET", name, keys.join(";"));
   }
 
   static function readBlocks(text:String):Array<BracketBlock> {
@@ -70,7 +79,7 @@ class BlockBracket extends MachineComponent {
       ],
       v -> new BlockBracket(v.token("label"), readBlocks(v.token("blocks"))),
       true
-    ).numbered(v -> 'BRACKET-${v.token("label").toUpperCase().split(" ").join("-")}')
+    ).numbered(v -> numberFor(v.token("label"), readBlocks(v.token("blocks"))))
       .procured(_ -> Make("CNC machining")));
   }
   override public function componentType():Null<machinekit.component.ComponentType> return recipeType();
