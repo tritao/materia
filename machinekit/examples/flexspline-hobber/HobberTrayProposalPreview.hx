@@ -100,7 +100,7 @@ class HobberTrayProposalPreview {
     closedProbe.close();
     socketGeometry.close();
     var recipeAssembly = new machinekit.assembly.MachineAssembly();
-    recipeAssembly.group("Chip tray");
+    recipeAssembly.group("Floor tray");
     recipeAssembly.addComponent("socket", socket);
     var recreated = machinekit.assembly.MachineAssembly.decode(recipeAssembly.encode());
     var recreatedSocket:machinekit.structural.CastInsert = cast recreated.components()[0].component;

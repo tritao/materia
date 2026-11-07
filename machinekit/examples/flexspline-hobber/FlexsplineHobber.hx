@@ -413,33 +413,36 @@ class FlexsplineHobber extends MachineAssembly {
     scale(scaleX, "XscaleSeat", "Xbridge");
     scale(scaleY, "swivelPlate", "Yplate");
     scale(scaleZ, "ZscaleSeat", "ZscaleArm");
-    group("Chip protection and enclosure");
-    fixAt(
-      "chipTray",
-      new HobberSaddle(
-        "GE-chip-tray",
-        new ComponentValues().setNumber("tableFaceDiameter", tableSpec.number("faceDiameter")).setNumber(
-          "tableHousingDiameter",
-          tableSpec.number("housingDiameter")
-        ).setNumber(
-          "tableFaceHeight",
-          FoundationLayout.TABLE_FACE
-        ).setNumber(
-          "tableSeatHeight",
-          tableBase
-        )
-      ),
-      F.identity(),
-      "bed/tablePlate"
-    );
-    fixAt(
-      "coolantPort",
-      new HobberSaddle("GE-coolant"),
-      F.translation(centre, 0, HobberZLayout.SEAT_Z),
-      "Yplate",
-      F.alongY(centre + 45, 64.35, 435, 1, 0, 0)
-    );
-    // Enclosure envelope reserved; panels omitted for the current open inspection layout.
+    // The chip tray around the table is part of the work zone; the coolant nozzle belongs to the hob it feeds.
+    withGroup("C table and work", () -> {
+      fixAt(
+        "chipTray",
+        new HobberSaddle(
+          "GE-chip-tray",
+          new ComponentValues().setNumber("tableFaceDiameter", tableSpec.number("faceDiameter")).setNumber(
+            "tableHousingDiameter",
+            tableSpec.number("housingDiameter")
+          ).setNumber(
+            "tableFaceHeight",
+            FoundationLayout.TABLE_FACE
+          ).setNumber(
+            "tableSeatHeight",
+            tableBase
+          )
+        ),
+        F.identity(),
+        "bed/tablePlate"
+      );
+    });
+    withGroup("B spindle", () -> {
+      fixAt(
+        "coolantPort",
+        new HobberSaddle("GE-coolant"),
+        F.translation(centre, 0, HobberZLayout.SEAT_Z),
+        "Yplate",
+        F.alongY(centre + 45, 64.35, 435, 1, 0, 0)
+      );
+    });
     bind("table-drive", C, "table/" + tableSpec.drivePart);
     // A: the actuator's own amplifier (EtherCAT, 48 V), no separate driver.
     connectPorts("swivel-power", "supply48", "power1", "swivel/housing", "power");

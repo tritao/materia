@@ -109,7 +109,7 @@ class GeneratedEnclosure extends MachineAssembly {
         )
       );
     }
-    group("Chip tray/Panels");
+    group("Floor tray/Panels");
     tile("trayLeft", layout.lowX + 2, layout.frontY + 2, b.minX, layout.rearY - 2);
     tile("trayRight", b.maxX, layout.frontY + 2, layout.highX - 2, layout.rearY - 2);
     tile("trayFront", b.minX + TraySeat.SEAM, layout.frontY + 2, b.maxX - TraySeat.SEAM, b.minY);
@@ -129,7 +129,7 @@ class GeneratedEnclosure extends MachineAssembly {
       addMemberConnector("frame/post00", id, F.compose(F.inverse(root), pose));
       addMate(id + "-mount", "fixed", "frame/post00", id, id, "mount");
     }
-    group("Chip tray/Supports");
+    group("Floor tray/Supports");
     for (side in [-1, 1]) {
       // Local X runs from the extrusion's inside face towards the tray opening.
       var x = side < 0 ? layout.lowX : layout.highX;
@@ -157,10 +157,10 @@ class GeneratedEnclosure extends MachineAssembly {
     }
     // Compressed gasket envelopes; the actual grade/free thickness still needs coolant qualification.
     function seal(id:String, x0:Float, y0:Float, x1:Float, y1:Float):Void withGroup(
-      "Chip tray/Seals",
+      "Floor tray/Seals",
       () -> box(id, x0, y0, -TraySeat.DEPTH, x1, y1, TraySeat.BOTTOM, "nitrile rubber NBR")
     );
-    group("Chip tray/Joints");
+    group("Floor tray/Joints");
     seal("trayOuterSealLeft", layout.lowX, layout.frontY, layout.lowX + 25, layout.rearY);
     seal("trayOuterSealRight", layout.highX - 25, layout.frontY, layout.highX, layout.rearY);
     seal("trayOuterSealFront", layout.lowX + 25, layout.frontY, layout.highX - 25, layout.frontY + 25);
@@ -180,7 +180,7 @@ class GeneratedEnclosure extends MachineAssembly {
     }
     // Stepped service bridge clears the X motor, whose rear end reaches into the ledge area.
     // Six-millimetre feet bear on deeper pockets; the cover is removable after the rear blanks.
-    group("Chip tray/Service bridge");
+    group("Floor tray/Service bridge");
     support(
       "trayRearServiceBridge",
       [
@@ -200,14 +200,14 @@ class GeneratedEnclosure extends MachineAssembly {
     box("trayBridgeEdgeSealLeft", bx - 60, b.maxY, -2, bx - 58, b.maxY + 25, 11, "nitrile rubber NBR");
     box("trayBridgeEdgeSealRight", bx + 58, b.maxY, -2, bx + 60, b.maxY + 25, 11, "nitrile rubber NBR");
     box("trayBridgeEdgeSealRear", bx - 58, b.maxY + 23, -2, bx + 58, b.maxY + 25, 11, "nitrile rubber NBR");
-    group("Chip tray/Joints");
+    group("Floor tray/Joints");
     for (side in [-1, 1]) {
       var x = bx + side * 60, suffix = side < 0 ? "Left" : "Right";
       box("trayRearCentreJoint" + suffix, x - 15, b.maxY + 25, -10, x + 15, layout.rearY - 25, -4, "aluminium 6061");
       seal("trayRearCentreJointSeal" + suffix, x - 10, b.maxY + 25, x + 10, layout.rearY - 25);
     }
     // Upstands follow the shell's infill planes; the central opening mates to the plinth's own chip volume.
-    group("Chip tray/Lips");
+    group("Floor tray/Lips");
     add(
       "trayFrontLip",
       new EnclosurePanel(w + 2, 30, "steel-2"),

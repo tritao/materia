@@ -11,7 +11,7 @@ class HobberEnclosureChecks {
    */
   static function checkEnclosureGroups(assembly:MachineAssembly):Void {
     var groups = assembly.functionalGroups(), poses = assembly.solvedPoses(), shell = HobberEnclosurePreview.shellGroup;
-    var allowed = [shell("Panels"), shell("Chip tray/"), shell("frame"), shell("door")];
+    var allowed = [shell("Panels"), shell("Floor tray/"), shell("frame"), shell("door")];
     var counts:Map<String, Int> = [];
     for (id => path in groups) {
       if (!StringTools.startsWith(path, HobberEnclosurePreview.ENCLOSURE_GROUP)) continue;
@@ -21,12 +21,12 @@ class HobberEnclosureChecks {
     }
     for (folder in [
       "Panels",
-      "Chip tray/Panels",
-      "Chip tray/Supports",
-      "Chip tray/Seals",
-      "Chip tray/Joints",
-      "Chip tray/Service bridge",
-      "Chip tray/Lips"
+      "Floor tray/Panels",
+      "Floor tray/Supports",
+      "Floor tray/Seals",
+      "Floor tray/Joints",
+      "Floor tray/Service bridge",
+      "Floor tray/Lips"
     ]) if (!counts.exists(shell(folder))) throw 'Enclosure group: $folder is empty';
     if (counts.get(shell("frame/Base outriggers")) != 4) throw "Enclosure group: expected the four frame outriggers";
     var table = poses.get("machine/bed/tablePlate");
@@ -35,7 +35,7 @@ class HobberEnclosureChecks {
     for (id => path in groups) if (StringTools.startsWith(id, "enclosureTrayClamp")) {
       clamps++;
       if (!StringTools.startsWith(path,
-        shell("Chip tray/Clamps/"))) throw 'Enclosure group: $id is outside the tray clamps ($path)';
+        shell("Floor tray/Clamps/"))) throw 'Enclosure group: $id is outside the tray clamps ($path)';
       if (groups.get(StringTools.replace(id,
         "Clamp", "Bolt")) != path) throw 'Enclosure group: $id and its bolt are in different groups';
       edges.set(path, true);
@@ -46,11 +46,11 @@ class HobberEnclosureChecks {
       if (d < nearest.distance) nearest = {end: path, distance: d};
     }
     if (clamps != 12
-      || [for (k in edges.keys()) k].length != 4 || !edges.exists(shell("Chip tray/Clamps/Table end")) || !edges
-      .exists(shell("Chip tray/Clamps/Column end"))) throw "Enclosure group: expected 12 tray clamps on two ends and two sides, got "
+      || [for (k in edges.keys()) k].length != 4 || !edges.exists(shell("Floor tray/Clamps/Table end")) || !edges
+      .exists(shell("Floor tray/Clamps/Column end"))) throw "Enclosure group: expected 12 tray clamps on two ends and two sides, got "
       + [for (k => v in counts) '$k=$v'].join(", ");
     if (nearest.end
-      != shell("Chip tray/Clamps/Table end")) throw "Enclosure group: the clamp nearest the table is in " + nearest.end;
+      != shell("Floor tray/Clamps/Table end")) throw "Enclosure group: the clamp nearest the table is in " + nearest.end;
   }
 
   public static function main():Void {

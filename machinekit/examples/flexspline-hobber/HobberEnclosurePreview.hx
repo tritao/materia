@@ -145,7 +145,7 @@ class HobberEnclosurePreview {
     }
   }
   /** The scene group the shell is (`includeAsGroup`): its own groups sit directly under it. */
-  public static inline final ENCLOSURE_GROUP = "Chip protection and enclosure";
+  public static inline final ENCLOSURE_GROUP = "Enclosure";
   public static inline final SHELL_ID = "enclosure";
 
   /** A group inside the shell's, so host-side parts (mounts, clamps) sit beside the shell parts they serve. */
