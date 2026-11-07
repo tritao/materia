@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-belt-pose-tests"},
+  "entry": "BeltPoseTests",
+  "sourceRoots": ["src", "../examples/corexy"],
+  "dependencies": {"machinekit": {"path": ".."}, "projectkit": {"path": "../../projectkit"}, "cadkit": {"path": "../../cadkit"}},
+  "target": "host",
+  "outputDir": "build/belt-pose"
+}
