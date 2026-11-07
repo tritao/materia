@@ -21,7 +21,56 @@ class SceneAddMenuDiagnostics {
     root.walk(node -> {if (node.semantics != null && node.semantics.label == "Menu") count++;});
     return count;
   }
+  /** Capture the real popup in an isolated temporary workspace, in either theme. */
+  static function capture():Int {
+    var options = new haxeon.ui.host.DesktopUiHostOptions();
+    var dark = Sys.args().indexOf("--dark") >= 0;
+    var output = "/tmp/materia-add-menu-" + (dark ? "dark-" : "light-") + Sys.getPid();
+    FileSystem.createDirectory(output);
+    options.title = "Materia Add menu capture " + Sys.getPid();
+    options.width = 1000;
+    options.height = 650;
+    var app:Null<ReferenceEditorApp> = null;
+    var menuFrames = 0;
+    var host:Null<haxeon.ui.host.DesktopUiHostContext> = null;
+    options.onFrameRendered = function() {
+      var editor = app;
+      if (editor == null) return;
+      var root = editor.ui.root;
+      if (root == null) return;
+      if (editor.hierarchyAddVisible && menuCount(root) == 1) {
+        // The host callback precedes presentation; let the first menu frame
+        // reach the window before asking the window system for its pixels.
+        menuFrames++;
+        if (menuFrames < 2) {editor.invalidateView(); return;}
+        var screenshot = output + "/frame.png";
+        if (Sys.command("import", ["-window", options.title, screenshot]) != 0) throw "Menu screenshot failed";
+        Sys.println("Menu screenshot: " + screenshot);
+        var context = host;
+        if (context != null) context.requestClose();
+        return;
+      }
+      var trigger = find(root, "hierarchy-add");
+      if (trigger == null || trigger.resolved == null) return;
+      var bounds = trigger.globalBounds();
+      editor.hierarchyAddX = bounds.x;
+      editor.hierarchyAddY = bounds.y + bounds.height + 4;
+      editor.hierarchyAddVisible = true;
+      editor.invalidateView();
+    };
+    return haxeon.ui.host.DesktopUiHost.run(options, context -> {
+      host = context;
+      var editor = new ReferenceEditorApp(context.fonts, output + "/workspace.json",
+        dark ? haxeon.ui.theme.Theme.dark() : haxeon.ui.theme.Theme.light(), null, context,
+        null, null, null, true);
+      editor.workspace.close("start");
+      editor.workspace.activate("hierarchy");
+      app = editor;
+      return editor;
+    });
+  }
   public static function main():Int {
+    if (Sys.args().indexOf("--capture-menu") >= 0) return capture();
     var runtime = Runtime.start();
     var rootDir = Sys.getCwd();
     while (!FileSystem.exists(rootDir + "/app/src/Main.hx")) rootDir = haxe.io.Path.directory(rootDir);
@@ -68,6 +117,24 @@ class SceneAddMenuDiagnostics {
           if (submitted) {
             var expectedMenus = editor.hierarchyAddVisible ? 1 : 0;
             if (row.menuCount != expectedMenus) throw 'Popup/state mismatch at ${size[0]} / $mode / $index';
+            if (editor.hierarchyAddVisible) {
+              var labels:Array<String> = [];
+              root.walk(node -> {
+                if (node.semantics != null && node.semantics.role == haxeon.ui.semantics.AccessibilityRole.MenuItem)
+                  labels.push(node.semantics.label);
+              });
+              var expected = ["Rectangle", "Empty part", "Mounting plate", "L bracket", "Stock simulation", "Worker", "Import STEP part…"];
+              if (labels.join("|") != expected.join("|")) throw "Unexpected creation menu: " + labels.join("|");
+              var dividers = 0;
+              root.walk(node -> {
+                if (node.styleKey != null && StringTools.endsWith(node.styleKey, "-separator-spacing")) {
+                  dividers++;
+                  var line = node.children[0];
+                  if (line.resolved == null || line.globalBounds().width < 100) throw "Menu divider collapsed";
+                }
+              });
+              if (dividers != 2) throw "Expected two menu dividers";
+            }
             if (!editor.hierarchyAddVisible) {
               var closedHit = editor.ui.events.hitTestPath(x, y);
               var reachesAdd = false;
