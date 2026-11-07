@@ -46,19 +46,28 @@ class OpCache {
   }
 
   /** `compute()` for the boolean `op` of `a` and `b`; see the class comment. Takes no ownership of the inputs. */
-  public static function boolean(op:String, a:Shape, b:Shape, compute:() -> Shape):Shape {
-    var key = ShapeKey.op(op, "", [a, b]);
+  public static function boolean(op:String, a:Shape, b:Shape, compute:() -> Shape):Shape return construct(op, "", [a, b], compute);
+
+  /**
+   * `compute()` for the construction `op` (with parameter text `params`) of `inputs`: a boolean, or another pure native
+   * constructor whose result is a function of its inputs' keys (a loft). The result is the canonical form, kept on disk under
+   * the construction key; see the class comment. Takes no ownership of the inputs. The op name must be one that names only this
+   * result form (a history-keeping variant of the same operation uses another name).
+   */
+  public static function construct(op:String, params:String, inputs:Array<Shape>, compute:() -> Shape):Shape {
+    var key = ShapeKey.op(op, params, inputs);
     var counts = stats();
+    var size = 0;
+    for (input in inputs) size += faces(input);
     if (key == null) {
-      var gap = ShapeKey.gapOf(op, [a, b]);
+      var gap = ShapeKey.gapOf(op, inputs);
       var began = Sys.time();
       var result = compute();
-      counts.unkeyed(gap, Sys.time() - began, faces(a) + faces(b));
+      counts.unkeyed(gap, Sys.time() - began, size);
       result.key = null;
       result.gap = gap;
       return result;
     }
-    var size = faces(a) + faces(b);
     var store = DiskStore.process(), tier = tierIdentity(), diskKey:Null<String> = null, stored:Null<Bytes> = null;
     if (store != null && tier != null) {
       diskKey = "cadkit-op/1\n" + tier + "\n" + key;

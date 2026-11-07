@@ -259,6 +259,68 @@ class ShapeKeySmoke {
     store.clear();
   }
 
+  static function loftKeptBytes(twist:Float, ruled:Bool = false):String {
+    var s = sections(twist);
+    var part = Part.loftKept(s, ruled);
+    closeAll(s);
+    var bytes = hex(part.shape.toBytes());
+    part.close();
+    return bytes;
+  }
+
+  /** `Part.loftKept` is a cached constructor: miss then hit equal to the bit, no native loft on a hit, history-free. */
+  static function loftCache():Void {
+    var store = freshStore();
+    DiskStore.useProcess(store);
+    OpCache.resetStats();
+    var s = sections(0.1);
+    var first = Part.loftKept(s, false);
+    closeAll(s);
+    var s1 = OpCache.snapshot();
+    check(first.shape.key != null && first.operation == null && s1.misses == 1 && s1.hits == 0, "a keyed loftKept is one miss, a keyed result without history: " + s1.misses + "/" + s1.hits);
+    check(store.count() == 1, "stored once");
+    var plain = sections(0.1);
+    var history = Part.loft(plain, false);
+    closeAll(plain);
+    check(history.shape.key != first.shape.key, "loftKept and loft name different result forms, so they have different keys");
+    var bytes = hex(first.shape.toBytes());
+    check(hex(first.shape.canonical().toBytes()) == bytes, "the kept loft is already the canonical form");
+    check(loftKeptBytes(0.1) == bytes, "a rebuild gives the same bytes");
+    var s2 = OpCache.snapshot();
+    check(s2.misses == 1 && s2.hits == 1, "and runs no native loft: " + s2.misses + "/" + s2.hits);
+    check(loftKeptBytes(0.2) != bytes, "other sections are another entry");
+    check(loftKeptBytes(0.1, true) != bytes, "the ruled flag is another entry");
+    check(store.count() == 3, "three entries: " + store.count());
+    // A section with no key bypasses the cache and is exactly `loft`.
+    var raw = new Curve(Shape.fromOwnedHandle(CadKit.polylineChecked([v(0, 0, 0), v(2, 0, 0), v(2, 2, 0), v(0, 2, 0)], 1)));
+    var top = Curve.polyline([new Vector(0, 0, 3), new Vector(2, 0, 3), new Vector(2, 2, 3), new Vector(0, 2, 3)], true);
+    OpCache.resetStats();
+    var bypass = Part.loftKept([raw, top], false);
+    check(bypass.shape.key == null && bypass.operation != null && OpCache.snapshot().misses == 0, "an unkeyed section behaves exactly like loft, with its history");
+    // The persistent tier off gives the same bytes.
+    DiskStore.useProcess(null);
+    check(loftKeptBytes(0.1) == bytes, "with the tier off the loft has the same canonical bytes");
+    // Verify mode accepts an honest entry and refuses a planted wrong one.
+    DiskStore.useProcess(store);
+    DiskStore.forceVerify(true);
+    try {
+      check(loftKeptBytes(0.1) == bytes, "verify mode accepts an honest loft entry");
+      var files = [for (name in FileSystem.readDirectory(store.directory)) if (StringTools.endsWith(name, ".memo")) name];
+      var planted = Shape.box(7, 7, 7).toBytes();
+      for (name in files) sys.io.File.saveBytes(store.directory + "/" + name, planted);
+      var message = "";
+      try loftKeptBytes(0.1) catch (error:Dynamic) message = Std.string(error);
+      check(message.indexOf("stale") >= 0, "verify mode refuses a planted wrong loft entry: " + message);
+    } catch (error:Dynamic) {
+      DiskStore.forceVerify(null);
+      DiskStore.useProcess(null);
+      throw error;
+    }
+    DiskStore.forceVerify(null);
+    DiskStore.useProcess(null);
+    store.clear();
+  }
+
   static function sameProps(a:PhysicalProperties, b:PhysicalProperties):Bool return hex(a.toBytes()) == hex(b.toBytes());
 
   static function queryStats(name:String):{hits:Int, misses:Int, verified:Int, seconds:Float} {
@@ -480,6 +542,7 @@ class ShapeKeySmoke {
     cache();
     parts();
     lofts();
+    loftCache();
     queries();
     canonicalKeys();
     tessellation();

@@ -5,6 +5,7 @@ import cadkit.Shape;
 import cadkit.PhysicalProperties;
 import cadkit.Operation;
 import cadkit.ShapeKey;
+import cadkit.cache.OpCache;
 
 /** Solid results may contain zero, one, or several solids. */
 class Part extends Model {
@@ -196,6 +197,43 @@ class Part extends Model {
         CadKit.loftOperationChecked(Model.refs(shapes), 1, ruled ? 1 : 0),
         shapes, ShapeKey.op("loft", ruled ? "ruled" : "smooth", shapes), "loft"
       ));
+      for (wire in wires) wire.close();
+      return result;
+    } catch (error:Dynamic) {
+      for (wire in wires) wire.close();
+      throw error;
+    }
+  }
+
+  /**
+   * `loft` for a result that does not need the operation's history (its face and edge correspondences): through the cached
+   * constructor when every section is keyed, which returns the canonical form (see `OpCache`); otherwise exactly `loft`. Its key
+   * is named `loft-kept`, apart from `loft`'s, so one key never names two result forms.
+   */
+  public static function loftKept(sections:Array<Curve>, ruled:Bool = false):Part {
+    var wires:Array<Curve> = [];
+    var shapes:Array<Shape> = [];
+    try {
+      for (section in sections) {
+        var wire = section.asWire();
+        wires.push(wire);
+        shapes.push(wire.shape);
+      }
+      if (ShapeKey.op("loft-kept", ruled ? "ruled" : "smooth", shapes) == null) {
+        for (wire in wires) wire.close();
+        return loft(sections, ruled);
+      }
+      var result = new Part(OpCache.construct("loft-kept", ruled ? "ruled" : "smooth", shapes, () -> {
+        var operation = new Operation(CadKit.loftOperationChecked(Model.refs(shapes), 1, ruled ? 1 : 0), shapes, null, "loft");
+        try {
+          var built = operation.resultShape();
+          operation.close();
+          return built;
+        } catch (error:Dynamic) {
+          operation.close();
+          throw error;
+        }
+      }));
       for (wire in wires) wire.close();
       return result;
     } catch (error:Dynamic) {

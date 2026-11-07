@@ -78,7 +78,8 @@ class HobSolid {
         profile.push(new Vector(inner * Math.cos(angle), inner * Math.sin(angle), profile[0].z));
         sections.push(Curve.polyline(profile, true));
       }
-      base = Part.loft(sections, false);
+      // Only the clipped copies of this loft are used, never its operation history, so the cached constructor serves.
+      base = Part.loftKept(sections, false);
       trace("loft complete");
       for (section in sections) section.close();
       sections = [];
