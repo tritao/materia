@@ -58,9 +58,8 @@ class ZppComponent extends MachineComponent {
   }
   public static function directory():String {
     var overridePath = Sys.getEnv("MATERIA_ZPP_ROOT");
-    if (overridePath != null) return overridePath;
-    var root = Sys.getEnv("MATERIA_ROOT");
-    return (root == null ? Sys.getCwd() : root) + "/build/suppliers/zppcnc";
+    if (overridePath != null && overridePath != "") return overridePath;
+    return machinekit.catalog.RepositoryRoot.path("build/suppliers/zppcnc");
   }
   public static function hash(model:String):String return switch model {
     case "CV15075":

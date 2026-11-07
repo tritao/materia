@@ -8,6 +8,7 @@ import haxe.crypto.Sha256;
 import haxe.io.Bytes;
 import haxe.io.Path as ProjectPath;
 import sys.io.AtomicFile;
+import materia.project.LaunchPaths;
 import materia.project.SceneArtifact;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyDefinition;
@@ -33,7 +34,7 @@ class MateriaProjectRunner {
 
   /** Inspect a project without compiling or executing its entrypoint. */
   public static function executionRequirement(projectPath:String, ?variantId:String):ProjectExecutionRequirement {
-    var manifestPath = FileSystem.fullPath(projectPath);
+    var manifestPath = LaunchPaths.existing(projectPath);
     if (!FileSystem.exists(manifestPath)
       || FileSystem.isDirectory(manifestPath)) throw 'Materia project file not found: $manifestPath';
     var root:Dynamic = Json.parse(File.getContent(manifestPath));
@@ -67,7 +68,7 @@ class MateriaProjectRunner {
     ?variantId:String
   ):GeneratedAssemblyScene {
     var scene = loadGeneratedProject(projectPath, recipeDocument, control, variantId);
-    var manifestPath = FileSystem.fullPath(projectPath);
+    var manifestPath = LaunchPaths.existing(projectPath);
     var selected = ProjectVariants.selected(Json.parse(File.getContent(manifestPath)), variantId);
     scene.projectVariant = selected == null || selected.kind == "job" ? null : selected.id;
     scene.projectJob = selected == null || selected.kind != "job" ? null : selected.id;
@@ -159,7 +160,7 @@ class MateriaProjectRunner {
     ?control:ProjectLoadControl,
     ?variantId:String
   ):Bytes {
-    var manifestPath = FileSystem.fullPath(projectPath);
+    var manifestPath = LaunchPaths.existing(projectPath);
     if (!FileSystem.exists(manifestPath)
       || FileSystem.isDirectory(manifestPath)) throw 'Materia project file not found: $manifestPath';
     var projectRoot = directory(manifestPath), root:Dynamic;
@@ -319,7 +320,7 @@ class MateriaProjectRunner {
 
   /** Resolves source-only runtime settings into a self-contained downloadable artifact. */
   public static function exportArtifact(projectPath:String, ?variantId:String):Bytes {
-    var path = FileSystem.fullPath(projectPath);
+    var path = LaunchPaths.existing(projectPath);
     var artifact = SceneArtifact.decodeView(generateArtifact(path, null, null, variantId));
     var manifest:Dynamic = Json.parse(File.getContent(path));
     var selected = ProjectVariants.selected(manifest, variantId);
@@ -332,7 +333,7 @@ class MateriaProjectRunner {
 
   /** The artifact remains small; preserve the program's relative path when writing these files. */
   public static function exportArtifactBundle(projectPath:String, ?variantId:String):Map<String, Bytes> {
-    var path = FileSystem.fullPath(projectPath);
+    var path = LaunchPaths.existing(projectPath);
     var bytes = generateArtifact(path, null, null, variantId);
     var artifact = SceneArtifact.decodeView(bytes);
     var files = new Map<String, Bytes>();

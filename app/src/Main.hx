@@ -182,7 +182,7 @@ class Main {
 
     if (args.indexOf("--snapshot") >= 0) {
       var projectPath:String = "";
-      for (arg in args) if (arg.indexOf("--project=") == 0) projectPath = arg.substr(10);
+      for (arg in args) if (arg.indexOf("--project=") == 0) projectPath = materia.project.LaunchPaths.resolve(arg.substr(10));
       var editor = args.indexOf("--demo") >= 0 ? new ReferenceEditorApp(
         null,
         null,
@@ -581,7 +581,7 @@ private class ReferenceEditorLaunchOptions {
       } else if (arg.indexOf("--setup-script=") == 0) {
         setupScript = arg.substr(15);
       } else if (arg.indexOf("--project=") == 0) {
-        projectPath = arg.substr(10);
+        projectPath = materia.project.LaunchPaths.resolve(arg.substr(10));
       }
     }
     if (directory != null && directory.length == 0) {

@@ -13,7 +13,7 @@ class SupplierLibraries {
     vallderOverride = path;
   }
 
-  /** `MATERIA_VALLDER_ROOT`, else build/suppliers/vallder in the repository. */
+  /** `MATERIA_VALLDER_ROOT`, else build/suppliers/vallder in the repository (`RepositoryRoot`: `MATERIA_ROOT`, else found from the working directory). */
   public static function vallder():String {
     if (vallderOverride != null) return vallderOverride;
     return configured("MATERIA_VALLDER_ROOT", "build/suppliers/vallder");
@@ -34,7 +34,6 @@ class SupplierLibraries {
   static function configured(variable:String, relative:String):String {
     var value = Sys.getEnv(variable);
     if (value != null && value.length > 0) return value;
-    var root = Sys.getEnv("MATERIA_ROOT");
-    return root == null ? relative : root + "/" + relative;
+    return RepositoryRoot.path(relative);
   }
 }
