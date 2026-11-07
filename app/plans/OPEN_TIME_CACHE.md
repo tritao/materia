@@ -173,4 +173,16 @@ Tessellation meshes an independent copy, so it never changes its input or its `b
   routes (InsertAnchorGeometry -> MineralFoundation typedef; CastInsert -> registry; HobberChipCover -> HobberFoundationSizing; RadialPinionAssembly ->
   CastingVolumeAgreement; RackMesh -> RadialPinionAssembly). Only narrowing that identity (module lists / annotations, rejected) or the import
   refactor (abandoned) would change it; the same holds for the sibling anchor memos.
+- 2026-11-08 Stage 8 (landed, materia 41416c65d; no haxeon change): `InsertAnchorGeometry.contained`, `HobberDrives.measureRelief` and
+  `BoxMaterialVolume` only read volumes/bounds/distances, so they use `Part.combineKept` and hit the cached boolean path: `Part.combine`
+  11.5 % -> 4.8 % of samples, total samples 14608 -> 13267 (-9 %, matched profile). `OpCache.construct` now tolerates a result that never reaches
+  a byte-stable canonical form within the 32 write/read passes (an imported supplier motor mount intersected with a slab in `measureRelief`):
+  it returns the built shape unkeyed, as the history path did, and writes a marker so later runs skip the attempt (3 results, ~0.8 s; reported
+  as the unkeyed gap "did not reach a canonical form"; the OCCT location read keeps drifting for that shape, root cause not chased).
+  Hobber matrix at load 3-5, digest `ef53215727e1edf8` in every run: cache off 175 s, cold 172 s, warm 22 s, edit (MineralCasting comment) 72 s;
+  edit run 5849 keyed boolean hits, 0 misses. NEGATIVE RESULT, do not retry: replacing the `Json.parse(Json.stringify(raw))` normalization in
+  `InsertHoleCodec.snapshot` with a dynamic walk that reproduces it (3071 oracle checks) saved 0.3 % of samples, the walk costs as much as the
+  JSON (4.1 %); the remaining JSON is the wire decoder (`JsonWireReader.new` 3.2 %) and a JsonParser rewrite would gain ~2 %. Not run: the
+  `haxeon.anchor-process.json` project does not compile (`box-mold/SinglePocketSetup.hx:28 Missing object field "purpose"`), existing drift in an
+  example unrelated to these changes.
 
