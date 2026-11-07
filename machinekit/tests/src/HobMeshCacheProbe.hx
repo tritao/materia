@@ -23,6 +23,9 @@ class HobMeshCacheProbe {
     if (Codecs.displayMesh(again).length != bytes.length) throw "second build differs";
     Sys.println("probe digest=" + Sha256.encode(Std.string(bytes.length) + ":" + hex(bytes)) + " vertices=" + mesh.positions.length / 3
       + " seconds=" + Math.round(seconds * 1000) / 1000);
+    var negativeZeros = 0;
+    for (list in [mesh.positions, mesh.normals]) for (value in list) if (value == 0 && 1 / value < 0) negativeZeros++;
+    Sys.println("probe negative-zeros=" + negativeZeros + " of " + (mesh.positions.length + mesh.normals.length) + " values");
     for (line in Memos.report()) if (line.indexOf("hob-display-mesh") == 0) Sys.println(line);
   }
 

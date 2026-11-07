@@ -69,3 +69,14 @@ Target: (a) about the compile plus 20 s; (b) the casting rebuilt, everything els
   written as one generated literal per compile (<= 8 ms for 1500 modules). Persistent memos are on by default; a module's
   identity changes with its own or a dependency's edit (HobSolid edit changed HobMesh/HobSolid/Hob, which form an import cycle,
   and not Memo). Hob mesh with real identities: 142 s miss, 0.08 s hit in a new process.
+- 2026-11-07 OC5 follow-up. Root cause of the non-idempotent shape bytes: OCCT's `BinTools_LocationSet::Read` rebuilds each
+  location with `gp_Trsf::SetValues` (determinant normalisation, then Gram-Schmidt `Orthogonalize`) and surface placements
+  through `gp_Ax3` (Y recomputed from N x X), so a read moves last bits and flips signed zeros; round-off makes it converge
+  over a few passes (a fully chamfered box takes five), not one. Fix: `cad_shape_write_bytes` writes the fixed point (repeat
+  write-read until the B-rep bytes stop changing), so `fromBytes(b).toBytes() == b` exactly and `Shape.canonical()` is
+  `fromBytes(toBytes())`. A shape built from scratch can still differ from its canonical form in signed zeros, in the last
+  bits of rotated placements, and in where a rotated cylinder's triangulation starts, so **a persistent shape memo must return
+  the canonical form on a miss as well as on a hit, and also when the tier is off.** The OC5 tessellation change (-0.0 written
+  as +0.0) is removed: it changed every mesh (4569 of 1.3 M values in the height-12 hob mesh) to hide the reader's signed
+  zeros; the default hob digest is back to `27fd345a...`.
+

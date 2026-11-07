@@ -227,28 +227,55 @@ void damage() {
     assert(after.shape_count == before.shape_count);
 }
 
+// The bytes are the canonical form: OCCT's reader rebuilds locations and surface placements (signed zeros, last bits), so a
+// built shape and its restored twin can differ in those, but every read of the same bytes gives the same shape, reading and
+// writing again gives the same bytes, and the numbers agree.
 void meshes_agree() {
-    cad_shape cylinder = 0;
-    assert(cad_cylinder(7, 25, &cylinder) == CAD_OK);
-    const auto bytes = write_shape(cylinder);
-    cad_shape restored = 0;
-    assert(cad_shape_read_bytes(bytes.data(), static_cast<std::uint32_t>(bytes.size()), &restored) == CAD_OK);
-    cad_mesh_options options{0.05, 0.3};
-    cad_mesh a = 0, b = 0;
-    assert(cad_shape_tessellate(cylinder, &options, &a) == CAD_OK && cad_shape_tessellate(restored, &options, &b) == CAD_OK);
-    std::uint32_t na = 0, nb = 0;
-    assert(cad_mesh_vertex_count(a, &na) == CAD_OK && cad_mesh_vertex_count(b, &nb) == CAD_OK && na == nb && na > 0);
-    std::vector<cad_vec3> va(na), vb(nb), normals_a(na), normals_b(nb);
-    assert(cad_mesh_copy_vertices(a, va.data(), na) == CAD_OK && cad_mesh_copy_vertices(b, vb.data(), nb) == CAD_OK);
-    assert(cad_mesh_copy_normals(a, normals_a.data(), na) == CAD_OK && cad_mesh_copy_normals(b, normals_b.data(), nb) == CAD_OK);
-    // Bit for bit: signed zeros included (they are written as plain zeros).
-    assert(std::memcmp(va.data(), vb.data(), na * sizeof(cad_vec3)) == 0);
-    assert(std::memcmp(normals_a.data(), normals_b.data(), na * sizeof(cad_vec3)) == 0);
-    for (const auto& n : normals_a) assert(!std::signbit(n.x) || n.x != 0.0);
-    cad_mesh_destroy(a);
-    cad_mesh_destroy(b);
-    cad_shape_destroy(cylinder);
-    cad_shape_destroy(restored);
+    // The chamfered box has rotated corner locations whose rebuild takes five reads to settle: the case a single write-read
+    // pass gets wrong.
+    for (int which = 0; which < 3; ++which) {
+        cad_shape built = 0;
+        if (which == 0) assert(cad_cylinder(7, 25, &built) == CAD_OK);
+        if (which == 1) assert(cad_sphere(9, &built) == CAD_OK);
+        if (which == 2) {
+            cad_shape box = 0;
+            assert(cad_box(20, 20, 20, &box) == CAD_OK && cad_shape_chamfer(box, 2.0, &built) == CAD_OK);
+            cad_shape_destroy(box);
+        }
+        const auto bytes = write_shape(built);
+        cad_shape restored = 0, again = 0;
+        assert(cad_shape_read_bytes(bytes.data(), static_cast<std::uint32_t>(bytes.size()), &restored) == CAD_OK);
+        assert(cad_shape_read_bytes(bytes.data(), static_cast<std::uint32_t>(bytes.size()), &again) == CAD_OK);
+        // Fixed point: write(read(b)) == b.
+        assert(write_shape(restored) == bytes);
+        assert(write_shape(again) == bytes);
+        cad_mesh_options options{0.05, 0.3};
+        cad_mesh a = 0, b = 0, c = 0;
+        assert(cad_shape_tessellate(built, &options, &a) == CAD_OK && cad_shape_tessellate(restored, &options, &b) == CAD_OK &&
+               cad_shape_tessellate(again, &options, &c) == CAD_OK);
+        std::uint32_t na = 0, nb = 0, nc = 0;
+        assert(cad_mesh_vertex_count(a, &na) == CAD_OK && cad_mesh_vertex_count(b, &nb) == CAD_OK && cad_mesh_vertex_count(c, &nc) == CAD_OK);
+        assert(na == nb && nb == nc && na > 0);
+        std::vector<cad_vec3> va(na), vb(nb), vc(nc), normals_a(na), normals_b(nb), normals_c(nc);
+        assert(cad_mesh_copy_vertices(a, va.data(), na) == CAD_OK && cad_mesh_copy_vertices(b, vb.data(), nb) == CAD_OK &&
+               cad_mesh_copy_vertices(c, vc.data(), nc) == CAD_OK);
+        assert(cad_mesh_copy_normals(a, normals_a.data(), na) == CAD_OK && cad_mesh_copy_normals(b, normals_b.data(), nb) == CAD_OK &&
+               cad_mesh_copy_normals(c, normals_c.data(), nc) == CAD_OK);
+        // Two reads of the same bytes mesh to the same bytes, signed zeros included.
+        assert(std::memcmp(vb.data(), vc.data(), nb * sizeof(cad_vec3)) == 0);
+        assert(std::memcmp(normals_b.data(), normals_c.data(), nb * sizeof(cad_vec3)) == 0);
+        // The built shape agrees with them as numbers (a signed zero equals a plain zero).
+        for (std::uint32_t i = 0; i < na; ++i) {
+            assert(va[i].x == vb[i].x && va[i].y == vb[i].y && va[i].z == vb[i].z);
+            assert(normals_a[i].x == normals_b[i].x && normals_a[i].y == normals_b[i].y && normals_a[i].z == normals_b[i].z);
+        }
+        cad_mesh_destroy(a);
+        cad_mesh_destroy(b);
+        cad_mesh_destroy(c);
+        cad_shape_destroy(built);
+        cad_shape_destroy(restored);
+        cad_shape_destroy(again);
+    }
 }
 
 }  // namespace

@@ -308,7 +308,11 @@ CADKIT_API cad_result cad_step_export(
 /* A shape as bytes, for a cache on disk: the B-rep (OCCT binary, without triangulations, so a restored shape meshes
  * the way a fresh one does) together with the shape's element names and aliases, which CadKit keeps outside the B-rep.
  * The bytes carry a format version, the OCCT version and a checksum. The byte capacity is both the query result and
- * the input capacity in bytes. Writing the same shape twice gives the same bytes. */
+ * the input capacity in bytes. Writing the same shape twice gives the same bytes. The bytes are the shape's canonical
+ * form: OCCT's reader rebuilds locations and surface placements (last bits, signed zeros), so the writer repeats
+ * write-and-read until the B-rep bytes stop changing and hands out that fixed point. A shape read from these bytes writes
+ * exactly them again, and meshes the same as any other read of them; it can differ from the shape that was written in the
+ * last bits of rotated placements and in the sign of zeros. Take the bytes before meshing. */
 CADKIT_API cad_result cad_shape_write_bytes(
     cad_shape shape,
     uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),

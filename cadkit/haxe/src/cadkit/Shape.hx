@@ -484,7 +484,8 @@ class Shape {
 
   /**
    * The shape as bytes for a cache on disk: the native B-rep and element names (`cad_shape_write_bytes`) and the face
-   * attributes CadKit keeps in Haxe. Triangulations are not kept, so a restored shape meshes as a fresh one does.
+   * attributes CadKit keeps in Haxe. Triangulations are not kept, so a restored shape meshes as a fresh one does. The bytes
+   * are the canonical form (see `canonical`), so they read back to a shape that writes exactly them again.
    */
   public function toBytes():haxe.io.Bytes {
     var nativeBytes = CadKit.shapeWriteBytesChecked(native.borrow());
@@ -498,6 +499,19 @@ class Shape {
     out.writeInt32(adler(attributes));
     return out.getBytes();
   }
+
+  /**
+   * The canonical form of this shape: `fromBytes(toBytes())`, the one form a cache keeps and hands out.
+   *
+   * OCCT's binary reader rebuilds every `gp_Trsf` (locations: determinant normalisation and Gram-Schmidt) and `gp_Ax3`
+   * (surface placements: Y recomputed from N and X), which moves last bits and flips signed zeros, in the geometry and so in
+   * meshes built from it. Round-off makes that converge over a few passes rather than one, so `toBytes` writes the fixed point
+   * (`cad_shape_write_bytes`): `fromBytes(b).toBytes()` is exactly `b`, and `canonical().canonical()` equals `canonical()`
+   * in every byte, mesh included. A shape built from scratch is generally not its own canonical form (it can differ in the last
+   * bits of rotated placements and in the sign of zeros), so anything that stores shapes and also computes them, a persistent
+   * memo, must return the canonical form on both paths, never the computed shape on one and the restored one on the other.
+   */
+  public function canonical():Shape return fromBytes(toBytes());
 
   /** A shape from `toBytes`; damaged, truncated or foreign bytes throw. */
   public static function fromBytes(bytes:haxe.io.Bytes):Shape {

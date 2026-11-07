@@ -130,6 +130,7 @@
 #include <new>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -303,11 +304,6 @@ OperationEntry* lookup_operation_locked(cad_operation handle) {
         return nullptr;
     }
     return &entry;
-}
-
-// -0.0 as +0.0, anything else unchanged.
-double plain_zero(double value) {
-    return value == 0.0 ? 0.0 : value;
 }
 
 cad_result insert_shape(TopoDS_Shape shape, cad_shape* out_shape, naming::ElementMapPtr names = nullptr) {
@@ -1738,13 +1734,11 @@ cad_result build_mesh(
             }
 
             const auto first_index = static_cast<std::uint32_t>(out_mesh.vertices.size());
-            // Signed zeros are made plain zeros: a B-rep read back from bytes may hold -0.0 where the original held
-            // +0.0, and both must mesh to the same bytes.
-            out_mesh.vertices.push_back({plain_zero(point1.X()), plain_zero(point1.Y()), plain_zero(point1.Z())});
-            out_mesh.vertices.push_back({plain_zero(point2.X()), plain_zero(point2.Y()), plain_zero(point2.Z())});
-            out_mesh.vertices.push_back({plain_zero(point3.X()), plain_zero(point3.Y()), plain_zero(point3.Z())});
+            out_mesh.vertices.push_back({point1.X(), point1.Y(), point1.Z()});
+            out_mesh.vertices.push_back({point2.X(), point2.Y(), point2.Z()});
+            out_mesh.vertices.push_back({point3.X(), point3.Y(), point3.Z()});
             for (const auto& vertex_normal : vertex_normals) {
-                out_mesh.normals.push_back({plain_zero(vertex_normal.X()), plain_zero(vertex_normal.Y()), plain_zero(vertex_normal.Z())});
+                out_mesh.normals.push_back({vertex_normal.X(), vertex_normal.Y(), vertex_normal.Z()});
             }
             out_mesh.indices.push_back(first_index);
             out_mesh.indices.push_back(first_index + 1u);
@@ -1778,8 +1772,8 @@ cad_result build_mesh(
                     const auto second = points.Value(point_index + 1);
                     if (first.SquareDistance(second) <= 1e-18)
                         continue;
-                    out_mesh.edge_segment_endpoints.push_back({plain_zero(first.X()), plain_zero(first.Y()), plain_zero(first.Z())});
-                    out_mesh.edge_segment_endpoints.push_back({plain_zero(second.X()), plain_zero(second.Y()), plain_zero(second.Z())});
+                    out_mesh.edge_segment_endpoints.push_back({first.X(), first.Y(), first.Z()});
+                    out_mesh.edge_segment_endpoints.push_back({second.X(), second.Y(), second.Z()});
                     out_mesh.edge_segment_ids.push_back(static_cast<std::uint32_t>(edge_index - 1));
                 }
             }
@@ -1793,8 +1787,8 @@ cad_result build_mesh(
             second.Transform(transform);
             if (first.SquareDistance(second) <= 1e-18)
                 continue;
-            out_mesh.edge_segment_endpoints.push_back({plain_zero(first.X()), plain_zero(first.Y()), plain_zero(first.Z())});
-            out_mesh.edge_segment_endpoints.push_back({plain_zero(second.X()), plain_zero(second.Y()), plain_zero(second.Z())});
+            out_mesh.edge_segment_endpoints.push_back({first.X(), first.Y(), first.Z()});
+            out_mesh.edge_segment_endpoints.push_back({second.X(), second.Y(), second.Z()});
             out_mesh.edge_segment_ids.push_back(static_cast<std::uint32_t>(edge_index - 1));
         }
     }
@@ -2108,6 +2102,38 @@ struct ByteReader {
     }
 };
 
+std::string brep_bytes(const TopoDS_Shape& shape) {
+    std::ostringstream stream(std::ios::out | std::ios::binary);
+    BinTools::Write(shape, stream, false, false, BinTools_FormatVersion_CURRENT);
+    return stream.str();
+}
+
+TopoDS_Shape brep_from_bytes(const char* data, std::size_t size) {
+    std::istringstream stream(std::string(data, size), std::ios::in | std::ios::binary);
+    TopoDS_Shape restored;
+    BinTools::Read(restored, stream);
+    return restored;
+}
+
+// OCCT's reader does not return what the writer was given: it rebuilds every location with gp_Trsf::SetValues (divide by the
+// cube root of the determinant, then Gram-Schmidt) and every surface placement with gp_Ax3 (Y recomputed as N x X), which
+// moves last bits and flips signed zeros. Round-off makes that converge over a few passes instead of one (a box with all its
+// edges chamfered takes five). The bytes handed out are the fixed point, so reading them and writing again gives them back
+// exactly, and everything built from a restored shape (meshes included) is the same whether it came from this process or a
+// cache. The bound is generous: no shape has needed more than six writes.
+constexpr int kCanonicalPasses = 32;
+
+std::string canonical_brep_bytes(const TopoDS_Shape& shape) {
+    auto bytes = brep_bytes(shape);
+    for (int pass = 0; pass < kCanonicalPasses; ++pass) {
+        const auto restored = brep_from_bytes(bytes.data(), bytes.size());
+        auto next = brep_bytes(restored);
+        if (next == bytes) return bytes;
+        bytes = std::move(next);
+    }
+    throw std::runtime_error("shape did not reach a canonical form");
+}
+
 int subshape_count(const TopoDS_Shape& shape, TopAbs_ShapeEnum type) {
     naming::ShapeIndex index;
     TopExp::MapShapes(shape, type, index);
@@ -2128,9 +2154,7 @@ extern "C" CADKIT_API cad_result cad_shape_write_bytes(
     const auto copied = copy_named_shape(shape, named);
     if (copied != CAD_OK) return copied;
     try {
-        std::ostringstream stream(std::ios::out | std::ios::binary);
-        BinTools::Write(named.shape, stream, false, false, BinTools_FormatVersion_CURRENT);
-        const auto brep = stream.str();
+        const auto brep = canonical_brep_bytes(named.shape);
 
         std::vector<std::uint8_t> names;
         put_texts(names, named.names->faces);
@@ -2221,11 +2245,8 @@ extern "C" CADKIT_API cad_result cad_shape_read_bytes(
             return fail(CAD_ERROR_INVALID_ARGUMENT, "shape name section is damaged");
         }
 
-        std::istringstream stream(
-            std::string(reinterpret_cast<const char*>(data + reader.position + names_size), brep_size),
-            std::ios::in | std::ios::binary);
-        TopoDS_Shape restored;
-        BinTools::Read(restored, stream);
+        TopoDS_Shape restored =
+            brep_from_bytes(reinterpret_cast<const char*>(data + reader.position + names_size), brep_size);
         if (restored.IsNull()) return fail(CAD_ERROR_INVALID_ARGUMENT, "shape bytes hold no shape");
 
         const bool consistent =

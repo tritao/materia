@@ -21,6 +21,8 @@ class ShapeBytesSmoke {
 
   static function sameBytes(a:Bytes, b:Bytes):Bool return a.length == b.length && a.compare(b) == 0;
 
+  static function near(a:Float, b:Float, tolerance:Float):Bool return a == b || Math.abs(a - b) <= tolerance * Math.max(1, Math.max(Math.abs(a), Math.abs(b)));
+
   static function attributeText(shape:Shape):String {
     var parts:Array<String> = [];
     for (attribute in shape.faceAttributes()) {
@@ -38,8 +40,40 @@ class ShapeBytesSmoke {
     case Display(spec): 'display ${spec.width} ${spec.height} ${spec.offsetX} ${spec.offsetY} ${spec.source} ${spec.profile} ${[for (b in spec.bindings) b.signal + "=" + b.joint].join(",")} ${spec.channel} ${spec.round}';
   };
 
-  /** Everything observable, before either shape has been meshed. */
-  static function sameShape(a:Shape, b:Shape, what:String, withMesh:Bool = true):Void {
+  /** Doubles equal as numbers: a signed zero is the same value as a plain one. */
+  static function sameDoubles(a:Bytes, b:Bytes, tolerance:Float = 0):Bool {
+    if (a.length != b.length) return false;
+    for (index in 0...Std.int(a.length / 8)) {
+      var x = a.getDouble(index * 8), y = b.getDouble(index * 8);
+      if (x != y && Math.abs(x - y) > tolerance) return false;
+    }
+    return true;
+  }
+
+  /** The distinct vertices of a mesh to a micron, sorted, as one text. */
+  static function vertexSet(vertices:Bytes):String {
+    var keys:Map<String, Bool> = [];
+    for (i in 0...Std.int(vertices.length / 24))
+      keys.set([for (k in 0...3) Std.string(Math.round(vertices.getDouble(i * 24 + k * 8) * 1e6) + 0.0)].join(","), true);
+    var list = [for (key in keys.keys()) key];
+    list.sort(Reflect.compare);
+    return list.join(";");
+  }
+
+  /** Two meshes of one canonical form: every byte equal. */
+  static function sameMeshBytes(a:Shape, b:Shape, what:String):Void {
+    var ma = a.tessellate(0.05, 0.3), mb = b.tessellate(0.05, 0.3);
+    check(sameBytes(ma.vertices, mb.vertices) && sameBytes(ma.normals, mb.normals) && sameBytes(ma.indices, mb.indices),
+      what + ": canonical meshes are byte-identical");
+    check(sameBytes(ma.edgeSegments, mb.edgeSegments) && sameBytes(ma.edgeIds, mb.edgeIds), what + ": canonical edge segments are byte-identical");
+  }
+
+  /**
+   * Everything observable, before either shape has been meshed. `a` is the original and `b` its canonical form: they agree in
+   * every number but possibly the sign of a zero (and, where a rotation is stored in a location, the last bit); `tolerance`
+   * bounds that for such shapes, zero for the rest.
+   */
+  static function sameShape(a:Shape, b:Shape, what:String, withMesh:Bool = true, tolerance:Float = 0):Void {
     for (kind in kinds()) {
       check(a.subshapeCount(kind) == b.subshapeCount(kind), what + ": " + kind + " count");
       check(a.elementNames(kind).join("\n") == b.elementNames(kind).join("\n"), what + ": " + kind + " names");
@@ -50,38 +84,61 @@ class ShapeBytesSmoke {
     check(a.kind() == b.kind(), what + ": kind");
     if (a.subshapeCount(CadKit.ShapeKind.Vertex) > 0) {
       var boundsA = a.bounds(), boundsB = b.bounds();
-      check(boundsA.get_min().get_x() == boundsB.get_min().get_x() && boundsA.get_min().get_y() == boundsB.get_min().get_y()
-        && boundsA.get_min().get_z() == boundsB.get_min().get_z() && boundsA.get_max().get_x() == boundsB.get_max().get_x()
-        && boundsA.get_max().get_y() == boundsB.get_max().get_y() && boundsA.get_max().get_z() == boundsB.get_max().get_z(), what + ": bounds");
+      check(near(boundsA.get_min().get_x(), boundsB.get_min().get_x(), tolerance) && near(boundsA.get_min().get_y(), boundsB.get_min().get_y(), tolerance)
+        && near(boundsA.get_min().get_z(), boundsB.get_min().get_z(), tolerance) && near(boundsA.get_max().get_x(), boundsB.get_max().get_x(), tolerance)
+        && near(boundsA.get_max().get_y(), boundsB.get_max().get_y(), tolerance) && near(boundsA.get_max().get_z(), boundsB.get_max().get_z(), tolerance),
+        what + ": bounds");
     }
     if (a.hasSolidBoundary()) {
-      check(a.volume() == b.volume(), what + ": volume " + a.volume() + " vs " + b.volume());
-      check(a.area() == b.area(), what + ": area");
+      check(near(a.volume(), b.volume(), tolerance), what + ": volume " + a.volume() + " vs " + b.volume());
+      check(near(a.area(), b.area(), tolerance), what + ": area");
       var pa = a.massProperties(), pb = b.massProperties();
-      check(pa.centerOfMass.x == pb.centerOfMass.x && pa.centerOfMass.y == pb.centerOfMass.y && pa.centerOfMass.z == pb.centerOfMass.z,
-        what + ": centre of mass");
+      check(near(pa.centerOfMass.x, pb.centerOfMass.x, tolerance) && near(pa.centerOfMass.y, pb.centerOfMass.y, tolerance)
+        && near(pa.centerOfMass.z, pb.centerOfMass.z, tolerance), what + ": centre of mass");
     }
     check(attributeText(a) == attributeText(b), what + ": face attributes");
     if (withMesh && a.hasSolidBoundary()) {
       var ma = a.tessellate(0.05, 0.3), mb = b.tessellate(0.05, 0.3);
       check(ma.vertexCount == mb.vertexCount && ma.indexCount == mb.indexCount, what + ": mesh size");
-      check(sameBytes(ma.vertices, mb.vertices) && sameBytes(ma.normals, mb.normals) && sameBytes(ma.indices, mb.indices),
-        what + ": mesh bytes");
-      check(sameBytes(ma.edgeSegments, mb.edgeSegments) && sameBytes(ma.edgeIds, mb.edgeIds), what + ": edge segments");
+      if (tolerance == 0) {
+        check(sameDoubles(ma.vertices, mb.vertices) && sameDoubles(ma.normals, mb.normals) && sameBytes(ma.indices, mb.indices),
+          what + ": mesh values");
+        check(sameDoubles(ma.edgeSegments, mb.edgeSegments) && sameBytes(ma.edgeIds, mb.edgeIds), what + ": edge segments");
+      } else {
+        // A rotation stored in a location is rebuilt by the reader, and a cylinder's triangulation can then start elsewhere:
+        // the same vertices in another order. The canonical form is what is deterministic (see sameMeshBytes).
+        check(ma.indexCount == mb.indexCount && vertexSet(ma.vertices) == vertexSet(mb.vertices), what + ": the same mesh vertices");
+      }
     }
   }
 
-  static function roundTrip(shape:Shape, what:String, withMesh:Bool = true):Shape {
+  static function roundTrip(shape:Shape, what:String, withMesh:Bool = true, tolerance:Float = 0):Shape {
     var bytes = shape.toBytes();
     var restored = Shape.fromBytes(bytes);
     check(sameBytes(bytes, shape.toBytes()), what + ": writing twice gives the same bytes");
-    // Reading re-derives some internal curve data (signed zeros, last-bit values), so a restored shape may write different
-    // bytes than the original; restoring the same bytes always gives the same shape, though, and everything observable matches.
+    // OCCT's reader rebuilds locations and surface placements from stored values (signed zeros, last bits), over several passes
+    // for some shapes. toBytes writes the fixed point, so what it hands out reads back to a shape that writes exactly it again.
     var again = Shape.fromBytes(bytes);
-    check(sameBytes(restored.toBytes(), again.toBytes()), what + ": restoring the same bytes twice gives the same shape");
-    check(restored.toBytes().length == bytes.length, what + ": the restored shape writes as many bytes");
-    again.close();
-    sameShape(shape, restored, what, withMesh);
+    var canonicalBytes = restored.toBytes();
+    check(sameBytes(canonicalBytes, bytes), what + ": the restored shape writes exactly the bytes it was read from");
+    check(sameBytes(again.toBytes(), bytes), what + ": restoring the same bytes twice gives the same shape");
+    var second = Shape.fromBytes(canonicalBytes);
+    var secondBytes = second.toBytes();
+    check(sameBytes(secondBytes, canonicalBytes), what + ": write-then-read is a fixed point");
+    var third = Shape.fromBytes(secondBytes);
+    check(sameBytes(third.toBytes(), secondBytes), what + ": and stays one");
+    var canonical = shape.canonical();
+    check(sameBytes(canonical.toBytes(), canonicalBytes), what + ": canonical() is the restored shape");
+    var twice = canonical.canonical();
+    check(sameBytes(twice.toBytes(), canonicalBytes), what + ": canonical() of a canonical shape changes nothing");
+    // Bounds depend on whether OCCT has meshed a shape's topology, so everything unmeshed is compared first.
+    sameShape(shape, restored, what, withMesh, tolerance);
+    if (withMesh && shape.hasSolidBoundary()) {
+      sameMeshBytes(restored, again, what);
+      sameMeshBytes(restored, second, what + " (second pass)");
+      sameMeshBytes(restored, twice, what + " (canonical twice)");
+    }
+    for (extra in [again, second, third, canonical, twice]) extra.close();
     // Meshing may enlarge a few edge/vertex tolerances (OCCT writes them into the B-rep), so bytes should be taken before
     // meshing; triangulations themselves are never written, and original and restored follow each other through meshing.
     var meshed = shape.toBytes();
@@ -117,6 +174,8 @@ class ShapeBytesSmoke {
     var stamped = Shape.box(10, 10, 10).stamped("f3", []);
     var fused = Shape.box(10, 20, 30).stamped("a", []).fuse(Shape.box(10, 20, 30).stamped("b", []));
     var moved = fused.translate(Geometry.vec3(5, -3, 2));
+    var rotated = Shape.box(20, 10, 5).stamped("r", []).rotateOperation(Geometry.vec3(1, 1, 0), 0.7).resultShape();
+    var tilted = Shape.cylinder(4, 15).stamped("t", []).rotateOperation(Geometry.vec3(0, 1, 1), 1.1).resultShape();
     for (entry in [
       {name: "drilled", shape: drilled},
       {name: "filleted", shape: filleted},
@@ -128,8 +187,13 @@ class ShapeBytesSmoke {
       var restored = roundTrip(entry.shape, entry.name);
       restored.close();
     }
+    // Rotations live in locations, which OCCT's reader rebuilds from the stored matrix: values move by about 1e-16.
+    for (entry in [{name: "rotated box", shape: rotated}, {name: "tilted cylinder", shape: tilted}]) {
+      var restored = roundTrip(entry.shape, entry.name, true, 1e-12);
+      restored.close();
+    }
     check(fused.elementAliases(CadKit.ShapeKind.Face).join("").length > 0, "the fused shape really has aliases to preserve");
-    for (shape in [box, hole, drilled, filleted, chamfered, stamped, fused, moved]) shape.close();
+    for (shape in [box, hole, drilled, filleted, chamfered, stamped, fused, moved, rotated, tilted]) shape.close();
   }
 
   static function compounds():Void {
@@ -244,6 +308,31 @@ class ShapeBytesSmoke {
     fine.close();
   }
 
+  static function negativeZeros(bytes:Bytes):Int {
+    var count = 0;
+    for (index in 0...Std.int(bytes.length / 8)) {
+      var value = bytes.getDouble(index * 8);
+      if (value == 0 && 1 / value < 0) count++;
+    }
+    return count;
+  }
+
+  /**
+   * Tessellation reports the geometry as it is, signed zeros included: a mesh is never normalised, so meshes of existing
+   * shapes keep their bytes. (OC5 once rewrote -0.0 as +0.0 in every mesh to hide the reader's signed zeros; the cure is the
+   * canonical form instead, and this keeps the tessellator from growing that rewrite again.)
+   */
+  static function tessellationKeepsSignedZeros():Void {
+    var total = 0;
+    for (shape in [Shape.cylinder(5, 30), Shape.sphere(9), Shape.box(10, 20, 30).fillet(1.5)]) {
+      var mesh = shape.tessellate(0.05, 0.3);
+      total += negativeZeros(mesh.vertices) + negativeZeros(mesh.normals) + negativeZeros(mesh.edgeSegments);
+      shape.close();
+    }
+    Sys.println("negative zeros in built primitive meshes: " + total);
+    check(total > 0, "built shapes mesh with signed zeros intact (" + total + ")");
+  }
+
   public static function main():Void run();
 
   public static function run():Void {
@@ -254,6 +343,7 @@ class ShapeBytesSmoke {
     booleans();
     imported();
     hostile();
+    tessellationKeepsSignedZeros();
     Sys.println("shape bytes smoke: " + passed + " checks passed");
   }
 }
