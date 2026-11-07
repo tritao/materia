@@ -22,6 +22,40 @@ class SceneFileDialogs {
 
   public function new(host:DesktopUiHostContext) this.host = host;
 
+  /** Native Save / Don't Save / Cancel; null asks the caller to use its fallback UI. */
+  public function confirmUnsaved(label:String, complete:Null<String> -> Void):Void {
+    var options = new MessageDialogOptions();
+    options.set_struct_size(MessageDialogOptions.size());
+    options.set_title("Unsaved changes");
+    options.set_message("Save changes to " + label + " before continuing?");
+    options.set_kind(MessageKind.Warning);
+    options.set_buttons(MessageButtons.Save | MessageButtons.DontSave | MessageButtons.Cancel);
+    var id = NativeKit.nk_dialog_message_checked(new Handle(host.window.rawValue()), options);
+    var future = host.events.requests.trackNative(id, function(event:PlatformEvent):Outcome<String> {
+      return switch (event) {
+        case DialogMessage(_, result, button, _):
+          if (result == Result.ErrorCancelled) Outcome.Cancelled;
+          else if (result != Result.Ok) Outcome.Failure(new NativeKitError(result, "SceneFileDialogs.confirmUnsaved", null));
+          else Outcome.Success(button == MessageResult.Yes ? "save" : button == MessageResult.No ? "discard" : "cancel");
+        default: throw "Unexpected message dialog response";
+      }
+    }, function() NativeKit.nk_dialog_cancel_checked(id));
+    var mine = ++ticket;
+    stopPending = function() {
+      future.cancel();
+      future.stopObserving();
+    };
+    future.onComplete(function(outcome) {
+      if (mine != ticket) return;
+      stopPending = null;
+      switch (outcome) {
+        case Success(choice): complete(choice);
+        case Cancelled | Stopped: complete("cancel");
+        case Failure(_): complete(null);
+      }
+    });
+  }
+
   public function choose(save:Bool, current:Null<String>, complete:Null<String> -> Null<String> -> Void):Void {
     chooseResource(save, save ? "Save scene" : "Open scene", save ? "Untitled.materia.json" : null, current, complete);
   }

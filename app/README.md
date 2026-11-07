@@ -334,7 +334,9 @@ and filtered deviations in µm. Opening details does not rerun stock removal or 
   generated source path) and `*` for unsaved changes. Paths that do not fit are
   shortened from the left, preserving the filename; hover or focus reveals the
   complete path in an overlay only while the inline label is truncated.
-- New, Open, and window close ask Save / Discard / Cancel when edits are unsaved.
+- New, Open, and window close use the native Save / Don't Save / Cancel dialog
+  when edits are unsaved. Browser builds and unavailable native dialogs use the
+  in-app prompt.
   Cancelling a chooser or a failed save keeps the current document open.
 - Docking preferences remain separate and save automatically. The command
   palette also exposes Save workspace.
@@ -615,6 +617,12 @@ Run the scene editing, document, and CAD plate regression checks from the reposi
 
 ```sh
 ./haxeon/scripts/haxeon run --project app/tests/haxeon.json
+```
+
+Run just the document workflow checks, including native prompt responses and fallback:
+
+```sh
+./haxeon/scripts/haxeon run --project app/tests/haxeon.scene-document.json
 ```
 
 The scripted regression opens and saves the two-robot setup, checks typed overrides,

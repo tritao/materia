@@ -902,6 +902,9 @@ class ReferenceEditorApp implements DesktopUiApplication implements Observable {
       if (chooser == null) complete(null, "File dialogs require the desktop host");
       else chooser.choose(save, path, complete);
     }, documentChanged, commitActiveDrag, cancelActiveDrag);
+    #if !wasm
+    if (files != null) documents.confirmUnsaved = files.confirmUnsaved;
+    #end
     projectVariants = new ProjectVariantController(session,
       simulation, documents.requestRun, invalidateView, function() {
       documentChanged();
