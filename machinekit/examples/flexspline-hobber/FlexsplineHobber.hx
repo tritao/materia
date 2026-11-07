@@ -75,6 +75,7 @@ class FlexsplineHobber extends MachineAssembly {
     column = cast foundations[1];
     group("Bed and column");
     includeAt("bed", bed, FoundationLayout.worldPose("bed"));
+    group("Bed and column/Leveling feet");
     var footCentres = FoundationLayout.feet();
     for (i in 0...footCentres.length) {
       var p = footCentres[i], x = p.x + HobberXLayout.front().bedCentre, y = p.y;
