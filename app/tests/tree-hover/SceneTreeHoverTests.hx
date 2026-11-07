@@ -61,6 +61,64 @@ class SceneTreeHoverTests {
       submit = () -> host.submit(frame);
       editor = host;
     }
+    var dragHost = editor;
+    if (Sys.args().indexOf("--drag") >= 0 && dragHost != null) {
+      submit();
+      frame.deltaSeconds = 1 / 60;
+      var item = dragHost.scene.object("project:machine/Xbridge");
+      if (item == null) item = dragHost.scene.object("project:Xbridge");
+      if (item == null) throw "The drag benchmark requires a hobber artifact containing Xbridge";
+      var origin = [item.x, item.y, item.z];
+      var drag = dragHost.scene.beginAssemblyDrag(item.id, origin);
+      if (drag == null) throw "Xbridge cannot be dragged";
+      for (i in 0...40) {
+        var start = Sys.time();
+        drag.update(origin[0] + 0.01 * Math.sin(i * 0.2), origin[1], origin[2]);
+        var moved = Sys.time();
+        submit();
+        var end = Sys.time();
+        Sys.println('DRAG step=$i update_ms=${(moved-start)*1000} submit_ms=${(end-moved)*1000}');
+      }
+      drag.cancel();
+      var restored = dragHost.scene.object(item.id);
+      check(restored != null && Math.abs(restored.x - origin[0]) < 1e-9, "cancel restores Xbridge");
+      var definition = dragHost.session.projectAssemblyDefinition;
+      var record = dragHost.session.projectAssemblyState;
+      if (definition == null || record == null) throw "Hobber has no assembly state";
+      var state = new cadkit.modeling.AssemblyState(definition, record);
+      var model = state.kinematicModel().model;
+      var jointId = item.id == "project:Xbridge" ? "X" : "machine/X";
+      var snapshot = kinematicskit.KinematicSnapshot.of(state.kinematicSeed());
+      var axis = snapshot.jointWorldAxis(model.jointIndex(jointId));
+      var committedDrag:Null<app.SceneAssemblyDrag> = null;
+      var attempts:Array<String> = [];
+      for (direction in [-1, 1]) {
+        if (committedDrag != null) continue;
+        var candidate = dragHost.scene.beginAssemblyDrag(item.id, origin);
+        if (candidate == null) throw "Cannot restart Xbridge drag";
+        candidate.update(origin[0] + direction * 0.001 * axis.x,
+          origin[1] + direction * 0.001 * axis.y, origin[2] + direction * 0.001 * axis.z);
+        attempts.push(candidate.message());
+        if (candidate.following()) committedDrag = candidate;
+        else candidate.cancel();
+      }
+      if (committedDrag == null) throw "No reachable Xbridge pull: " + attempts.join("; ");
+      var heldItem = dragHost.scene.object(item.id);
+      if (heldItem == null) throw "Xbridge disappeared during drag";
+      var held = [heldItem.x, heldItem.y, heldItem.z];
+      check(committedDrag.commit(), "release commits Xbridge as an edit");
+      dragHost.session.document.undo();
+      restored = dragHost.scene.object(item.id);
+      check(restored != null && Math.abs(restored.x - origin[0]) < 1e-9, "undo restores Xbridge");
+      dragHost.session.document.redo();
+      restored = dragHost.scene.object(item.id);
+      check(restored != null && Math.abs(restored.x - held[0]) < 1e-6
+        && Math.abs(restored.y - held[1]) < 1e-6 && Math.abs(restored.z - held[2]) < 1e-6,
+        "redo restores the dragged Xbridge pose");
+      Sys.println("DRAG cancel/commit/undo/redo passed");
+      dragHost.dispose(); fonts.dispose(); runtime.dispose();
+      return 0;
+    }
     var expansionOnly = Sys.args().indexOf("--expand") >= 0;
     var host = editor;
     if (expansionOnly && host != null) host.treeModel.selectKey("scene");

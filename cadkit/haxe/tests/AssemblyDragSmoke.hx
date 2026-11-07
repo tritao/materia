@@ -8,10 +8,37 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** Dragging assembly frames the way the editor's IK gizmo does, in millimetres. */
 class AssemblyDragSmoke {
+  public static function main():Void {
+    AssemblyCouplingSmoke.run();
+    AssemblyLoopSmoke.run();
+    run();
+    Sys.println("Assembly drag, coupling and closure checks passed");
+  }
+
   public static function run():Void {
+    followsASlideInEitherUnit();
     dragsASerialArm();
     reportsWhyItCannotFollow();
     keepsALinkageClosed();
+  }
+
+  static function followsASlideInEitherUnit():Void {
+    for (unit in ["mm", "m"]) {
+      var scale = unit == "mm" ? 1000.0 : 1.0;
+      var definition = AssemblyLoopSmoke.definition("slide",
+        [AssemblyLoopSmoke.bar("base", 0), AssemblyLoopSmoke.bar("carriage", 0)],
+        [AssemblyLoopSmoke.joint("slide", AssemblyJointType.Prismatic, AssemblyJointRole.Tree,
+          "base", "a", "carriage", "a", 0, -scale, scale, true)]);
+      definition.lengthUnit = unit;
+      var state = new AssemblyState(definition);
+      var drag = new AssemblyDrag(state, "carriage", null, null, false);
+      var result = drag.drag(at(0.001 * scale, 0, 0));
+      check(result.status == Following, 'a 1 mm slide pull follows in one update in $unit (${result.message})');
+      near(drag.grabbedPose().x / scale, 0.001, 1e-6, "slide motion has the same physical accuracy in either unit");
+      var far = drag.drag(at(2 * scale, 0, 0));
+      check(far.status == Limited, "unit-scaled damping still reports a slide limit");
+      near(drag.grabbedPose().x / scale, 1, 1e-6, "the slide stops at its physical limit");
+    }
   }
 
   /** Three links (400, 300, 200 mm) on vertical-axis hinges, with a tool connector at the tip. */
@@ -74,6 +101,8 @@ class AssemblyDragSmoke {
     // Drag the tool 60 mm along a straight line in 30 small steps, as a mouse would.
     var previous = [state.joint("shoulder"), state.joint("elbow"), state.joint("wrist")];
     var largestStep = 0.0;
+    var firstPreview:Null<materia.assembly.AssemblyDefinition.AssemblyStateRecord> = null;
+    var firstPreviewX = 0.0;
     var result:Null<cadkit.modeling.AssemblyDrag.AssemblyDragResult> = null;
     for (step in 1...31) {
       var target = at(before.x - 2.0 * step, before.y + 1.0 * step, before.z);
@@ -81,7 +110,22 @@ class AssemblyDragSmoke {
       check(result.status == Following, 'every small step is followed (${result.message})');
       for (i in 0...3) largestStep = Math.max(largestStep, Math.abs(result.coordinates[i] - previous[i]));
       previous = result.coordinates;
+      var record = drag.commit();
+      var published = AssemblyState.fromModel(state.model, record);
+      near(published.worldConnector("tip-link", "tool").x, target.x, 1e-3, "each preview publishes the current pose");
+      near(state.worldConnector("tip-link", "tool").x, before.x, 1e-9, "publishing leaves the source unchanged");
+      if (firstPreview == null) {
+        firstPreview = record;
+        firstPreviewX = published.worldConnector("tip-link", "tool").x;
+      }
     }
+    if (firstPreview == null) throw "No preview was published";
+    near(
+      AssemblyState.fromModel(state.model, firstPreview).worldConnector("tip-link", "tool").x,
+      firstPreviewX,
+      1e-9,
+      "later previews do not mutate an earlier record"
+    );
     check(largestStep < 0.02, 'joints move smoothly along the drag ($largestStep rad per step)');
     var tool = drag.grabbedPose();
     near(tool.x, before.x - 60, 1e-3, "the tool ends on the target (x)");

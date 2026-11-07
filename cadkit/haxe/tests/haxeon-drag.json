@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "package": {
+    "name": "cadkit-assembly-drag"
+  },
+  "entry": "AssemblyDragSmoke",
+  "sourceRoots": [
+    ".",
+    "../../examples/modeling"
+  ],
+  "dependencies": {
+    "cadkit": {
+      "path": "../.."
+    },
+    "projectkit": {
+      "path": "../../../projectkit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/assembly-drag"
+}

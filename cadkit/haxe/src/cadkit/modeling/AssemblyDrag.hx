@@ -241,7 +241,9 @@ class AssemblyDrag {
    * edit. Coupled joints follow their leaders.
    */
   public function commit():AssemblyStateRecord {
-    var result = new AssemblyState(state.definition, state.record());
+    // A drag changes coordinates, never topology. Keep each returned record independent
+    // while sharing the immutable model already owned by the source state.
+    var result = AssemblyState.fromModel(state.model, state.record());
     var model = kinematics.model;
     for (dof in dofs) result.setJoint(model.dofId(dof), preview.q[dof]);
     return result.record();
