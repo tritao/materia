@@ -12,7 +12,7 @@ remain assumed inputs.
 This section is the current state; the sections below keep their history and are corrected where a figure changed. All of it is
 model, not released manufacturing, and every assumption is listed in [FRAME_PLAN.md](FRAME_PLAN.md) (Decisions, Open).
 
-- **Frames, no welding:** X is a bought ground20 mm plate with four bolted bright-bar ribs and four full-footprint column sole pads. The retained bolts-only carriage FE is43.633 N/um and17.077 MN m/rad; no adhesive or dowel strength is credited. Rib lands require bare blast-cleaned steel and an ASSUMED coupon-qualified friction floor0.40. Z retains its milled saddle. Y is the library `ScrewLinearModule`, attached directly to the actuator output through a profiled ground base, with derived rail risers and a ground carriage carrying the original spindle-seat and outboard interfaces. The L brackets, Y nut/scale bars, swivel plate and adapter ring are deleted. X/Z support bars remain pending the requested fixture-replicated seat replacement (XA OPEN). Routes and joint-derived holes feed `supplier-packages/machined/`.
+- **Frames, no welding:** X is a bought ground20 mm plate with four bolted bright-bar ribs and four full-footprint column sole pads. The current bolts-only carriage FE is45.201 N/um and24.616 MN m/rad; no adhesive or dowel strength is credited. Rib lands require bare blast-cleaned steel and an ASSUMED coupon-qualified friction floor0.40. Z retains its milled saddle. Y is the library `ScrewLinearModule`, attached directly to the actuator output through a profiled ground base, with derived rail risers and a ground carriage carrying the original spindle-seat and outboard interfaces. The L brackets, Y nut/scale bars, swivel plate and adapter ring are deleted. X/Z supports use two short matched ground bars per axis, with the nut traversing the open channel; supports are indicated to rails and actual screw/nut then pinned. Ground-face acceptance and A6 remain OPEN. Routes and joint-derived holes feed `supplier-packages/machined/`.
 - **Drives:** SFU1605 screws (X260 and Z420 mm; Y length derived by the module), HZMotion M60D-BK12-C mount with BF12, Leadshine ELM2H-0400 servo on each axis, Z with its built-in
   brake (holding torque assumed 2 × rated), steel nut blocks.
 - **Scales:** Yuheng JFT-40 sealed absolute BiSS-C scales, X ML 120, Y ML 70, Z ML 220, with the Abbe offset of each printed by `HobberFrameChecks.scales`.
@@ -69,6 +69,9 @@ the exposed mechanism is an inspection model with wipers on the guide blocks.
 Ground screws and linear scales serve
 all three translations; screw manufacturing grades and preload need procurement
 confirmation.
+
+This is the historical moving-column revision comparison; current moving masses
+and the linear-module comparison are in the LM5 wrap-up below.
 
 | Quantity | Previous overhead bridge | Moving column |
 |---|---:|---:|
@@ -668,7 +671,7 @@ metrology tolerance is relaxed.
 ## Offset Z drive
 
 The ground SFU1605 screw lies 19 mm behind the Z guides' radial plane (screw X=176 mm after the 25 mm BK12 shaft height
-in front of the 40 mm ground pads at the column's seat) but is no longer at Y=0: the eRob housing of the A axis (Ø110, rear boss and
+in front of the derived40 mm ground-bar stack at the column seat) but is no longer at Y=0: the eRob housing of the A axis (Ø110, rear boss and
 connectors, 88 mm deep) stands behind the Z saddle there. The offset is derived, not typed (`HobberZOffset`): the least |Y| at which the
 BK12 mount, the BF12 support, the ball nut and its block keep 2 mm from the housing swept over the Z travel (BF12 governs: 81 mm), on the
 side of the Z moving mass's centre of mass (+Y: the head and its spindle seat lie at Y 70..222), within the casting's limit (the drive seat insert
@@ -691,14 +694,21 @@ command still raises the head; an actual-pose/right-hand-thread regression
 verifies the transmission sign.
 
 The nut is a steel nut block bolted to the Z saddle's back face. The BK12 mount (M60D-BK12-C, 400 W braked servo) and the BF12 stand on
-one ground steel bar pad (40 mm) under both, against one ground steel insert in the column's drive seat, whose width and position are derived
-from the offset. The rear casting spine keeps its full backing behind that insert (`z-drive-checks` asserts 125 mm). The Z scale
+two short40 mm ground bars on the existing cast-in steel seat, whose width and position derive
+from the offset. X uses matched15 mm bars. Finished fixed/BF footprints are70x75/65x35 mm,
+sawn from80 mm bought ground stock. Inspect ground faces and match each pair within0.01 mm;
+stock tolerances remain ASSUMED procurement inputs. Bar clamp screws engage the inserts;
+support screws and service pins engage their bars. Indicate supports to the rails using the
+actual screw/nut at both travel ends, torque then match-pin. No drive epoxy, separate spacers,
+alignment arbor or compound-friction screen remains. The nut travels between bars over the
+open channel through overtravel; no groove exists. Guard feet stay on the bed insert.
+The rear casting spine keeps its full backing behind that insert (`z-drive-checks` asserts 125 mm). The Z scale
 stands on the channel wall opposite the drive. The motor platform's 40 × 40 mm R3 coupling window is no longer part of the model;
-the coupling clears the pad by at least 2 mm. Motor mounting/centering and nut fastener details remain assumed pending the
+the coupling must clear both separate support seats by at least2 mm. Motor mounting/centering and nut fastener details remain assumed pending the
 selected hardware drawings; this is a layout, not a manufacturing release.
 
 Checks cover 5 mm of reserve beyond both soft stops: minimum nut/race margin
-39.5 mm and minimum moving saddle/drive clearance 11 mm. The reinforced column
+48.5 mm and minimum moving saddle/drive clearance 10 mm. The reinforced column
 adds mass, included in the updated X/Z moving masses and thrust margins above.
 The work height remains 1000 mm. Local spine/adapter stiffness and a Z holding
 brake specification remain open; the simulation models powered holding.
@@ -710,15 +720,131 @@ See [Z_DRIVE_SECTION.svg](Z_DRIVE_SECTION.svg) and [Z_DRIVE_REPORT.json](Z_DRIVE
 Block wipers: an end scraper at each end of every guide block (`WIPER-HG25-SCRAPER` on the four X blocks, `WIPER-HG15-SCRAPER` on the four Z and four Y blocks, 24 in all;
 `WayWiperCatalog`, added lengths assumed; BOM lines only, the block models do not carry them).
 
-Current protection uses seven X sheets (four sides, two lids and skirt), the Y module's split guards, and four Z rail bellows. The two broad fixed Z shields are deleted. X guard feet still stand on the ground drive bar pending XA's move onto inserts or a nonprecision bracket. All fixings follow BoltedFace joints. Fixed X nuts are fitted on the bench and reached through declared tool corridors; all four tool ports are capped. X end overlap includes5 mm overtravel; side overlap is6 mm.
+Current protection uses seven X sheets (four sides, two lids and skirt), the Y module's split guards, and four Z rail bellows. The two broad fixed Z shields are deleted. X guard feet stand on the bed drive insert beside the ground bars, with their transverse position derived from the bar widths plus2 mm gap and a10 mm foot land. Four D3.5x100 mm AF2.5 key corridors pass with plugs removed (tool ASSUMED). All fixings follow BoltedFace joints. Fixed X nuts are fitted on the bench and reached through declared tool corridors; all four tool ports are capped. X end overlap includes5 mm overtravel; side overlap is6 mm.
 
 The Z bellows cover210 mm including overtravel, fold into30 mm and use cropped H24 steel end plates. Fabric0.2 mm, packing ratio and seals are ASSUMED custom RFQ data, not supplier ratings. The end plates are relieved around the catalogue screw supports; the M4 bracket feet retain their full edge lands. Moving brackets are fitted to the saddle on the bench. Park Z high for lower end screws and low for upper end screws:32 derived driver corridors pass. Before saddle service, unbolt the moving ends and support them on the declared temporary straps. The saddle keeps its brackets; complete bellows then leave16 mm forward,100 mm outward and500 mm forward. The model checks internal overlap separately before applying each bought cover's internal clearance allowance. Full travel and end sealing remain release gates.
 
-Assembly tooling is a separate BOM category, outside machine mass and hardware counts. `HobberAssemblyTooling` validates X/Y/Z step references and exports `assembly-tooling.csv`, with ASSUMED EUR prices until quoted. It includes alignment arbors/height reference, replication kit, C mandrel, squareness and indicator references, AF4 key>=400 mm, low-profile keys, hoist/slings and bellows support straps. See ALIGNMENT.md for datums and measurement methods.
+Assembly tooling is a separate BOM category, outside machine mass and hardware counts. `HobberAssemblyTooling` validates X/Y/Z step references and exports `assembly-tooling.csv`, with ASSUMED EUR prices until quoted. It includes the C mandrel, spindle test arbor, squareness and indicator references, AF4 key>=400 mm, low-profile keys, hoist/slings and bellows support straps. See ALIGNMENT.md for datums and measurement methods.
 
-The integrated Y uses profiled ground base/carriage plates of9.526/7.310 kg. Moving X/Y/Z masses are203.88/30.88/65.30 kg; rotating head52.69 kg with COM(-74.7,32.9,80.7) mm from A output. Bearing tilt demand51.0 Nm has an UNKNOWN supplier rating; maximum gravity torque27.24 Nm is below87 Nm rated/204 Nm peak. The87 Nm brake is ASSUMED. Y Abbe87.8 mm versus76.2 mm before; scale acceptance stack0.24/0.22 mm requires accepted/replicated stock, since raw stock bound0.91 mm exceeds0.01 mm.
+### LM5 wrap-up comparison (2026-11-08)
 
-The host guards split into upper/lower halves across the guides. Park X retracted, Z high and Y/A centred; the upper half moves135 mm up and the lower202 mm down after clearing the workholding mandrel, then each moves108 mm forward. Precision supports and the X skirt stay installed. The lower guard uses two M5 at45 mm pitch on a full-thickness central base land, with no new bracket. Normal/momentary handling-moment slip factors are5.6/1.7 at ASSUMED30/100 N and390 mm lever. Both guards come off before unbolting stops; the scale head needs the front-left stop off. Six full wiper-footprint probes,32 conservative sweeps of retained retainer head/nut envelopes, made Y edge checks and fastener fit pass; enclosure48 states/128 near pairs passes. Clip-in PU retention, release/peeling past projecting head-interface bolts, fixed-port sealing and elastic strain remain ASSUMED shop qualifications; the rigid-path checks do not qualify them. Hobber3357 and the full requested sweep pass (0 errors in2217 s;18 root removal reports clear). The Y plate FE case diverged and was rejected; the accuracy budget remains partial for the new Y structure. Valid Y stiffness/accuracy, XA replicated seats/A6,29 other made-edge findings and Z screw ingress remain OPEN. The RFQ package describes the model and does not release those interfaces.
+LM0 is the recorded baseline, not a reconstruction. Current masses/centres are
+read from installed solids at the same work pose. The A rotating assembly includes
+the output part; its payload-only subset excludes it. Component BOM lines aggregate
+part numbers; the second figure includes clamped screws/extras and internal pins.
+The global LM0 BOM-line count was not recorded, so no global before value is invented.
+
+| Quantity | LM0 | Wrap-up |
+|---|---:|---:|
+| Machine members / global BOM lines |269 / not recorded|426 /163|
+| Joint screws / pins |246 /26|347 /46 (98 joints,23 pinned)|
+| X moving mass,kg |191.48|196.25|
+| Y moving mass,kg |28.132885|30.877474|
+| Z moving mass,kg |51.42|65.30|
+| X deck+ribs,kg / members |24.586824 /1|26.340135 /5|
+| X deck+ribs CoM work,mm |293.294,-3.115,266.893|293.493,-6.311,264.696|
+| Y moving CoM work,mm |55.811,107.181,392.242|59.784,96.579,409.590|
+| Y moving members / BOM lines |34 /29 /42|34 /29 /44|
+| Head payload,kg / members |38.328895 /47|52.365757 /58|
+| Head payload CoM work,mm |73.971,86.794,399.869|94.418,33.143,444.241|
+| Head payload component/with-fasteners BOM lines |41 /60|52 /80|
+| A rotating assembly,kg / members |39.16 /49|52.687357 /59|
+| A rotating CoM relative output,mm |-93.7,84.9,36.1|-74.7,32.9,80.7|
+| A bearing tilt gravity+cut,Nm |35.99+12.4=48.39|38.6+12.4=51.0|
+| A gravity torque at0 / maximum,Nm |32.62 /35.10|17.02 /27.24|
+| A rated / peak,Nm |87 /204|87 /204|
+| A brake,Nm |87 ASSUMED|87 ASSUMED (3.2x demand)|
+| X/Y/Z Abbe magnitude,mm |209.05 /76.2 /235.9|209.05 /87.77 /235.9|
+| Machined RFQ designs/instances,kg |not recorded|48 /52,80.7414|
+
+The single updated carriage C3D10 case (10 mm,20774 elements, five steel bodies)
+gives45.201 N/um front tie and24.616 MN m/rad sole tilt with LM0 guide-pad z restraints,
+versus20.232/10.345 at LM0:2.23x/2.38x, without bond credit. Direct ground guide
+contact replaces four replica films and supersedes43.633/17.077. Relative residuals
+6.14e-11/7.49e-11; wall106.81 s, peak3730764 KiB under heavy-run8G/4slots,
+one BLAS thread. No Y solve is accepted. BF support-bar length35 mm covers its
+declared foot-contact extent as well as hole edges; the first20 mm draft failed
+strict seat support and is replaced. No height or carriage stiffness path changed.
+
+The eRob bearing moment rating remains UNKNOWN; the motor torque pass does not
+qualify that bearing. X/Y/Z motor sizing passes at peak0.427/0.423/0.936 Nm and
+RMS0.332/0.302/0.823 versus1.27 rated/3.81 peak Nm; Z thrust reserve276 N.
+
+The deleted continuous bars were2.731868 kg X (299x100x15) and10.014043 kg Z
+(459x80x40). Four short ground bars total0.843108 kg X and2.308094 kg Z and keep the support planes at their old heights,
+with an open nut channel and no groove. Fixed-bar/insert normal/crash slip factors
+are7.4/3.8 X and3.4/1.3 Z at ordinary ASSUMED steel-joint mu0.15; no compound screen.
+Column pads carry whole shear per pad at37.6/7.2, with no dowel strength credit.
+Service support pins stay in their original support patterns, engaging the ground
+bars. Covered bar clamps are tightened first; rare bar replacement removes supports.
+
+The existing Z drive checker passes42 assertions on the final bars: minimum race
+margin48.5 mm, saddle/drive gap10.0 mm and coupling/bar gap12.5 mm, including
+travel and overtravel. Casting backing remains125 mm. These are geometry gates,
+not brake, thermal or structural qualification.
+
+Scale head normal/gap stacks0.24/0.22 mm fit+/-0.5/0.55 mm adjustment after accepted
+stock. Raw Y stock/block stack0.91 mm exceeds0.01: select/finish faces and inspect.
+X raw flatness0.440 mm exceeds HIWIN S1 allowance0.0748 mm and class-C height
+variation0.020 mm ASSUMED; inspect/select or finish-grind all four block lands to0.010 mm.
+No small replicated layers or custom block tolerance recipe fields remain.
+
+Accuracy below is **conditional** on the existing assumed compliance inputs and
+commissioning. The attempted Y FE solve was rejected (residual48778 versus1e-7),
+so no valid new Y stiffness is credited and no machine ISO class is released.
+At LM0 the recorded RSS(fp,Fp,Fr,Falpha,Fbeta) was(0.86,4.07,3.89,3.45,1.49) um,
+worst sum(1.72,9.21,6.76,7.85,3.11). Current RSS is
+(0.8603, 4.0712, 3.8918, 3.4532, 1.4917) um; worst sum
+(1.7185, 9.2107, 6.7648, 7.8548, 3.1006). The unchanged target limits are
+(7.5,23,21,9.5,11) um; conditional RSS class4 versus target6.
+The table gives each source's input before/after and its current five ISO impacts;
+size is tooth-thickness error, outside the ISO vector. Catalogue versus ASSUMED
+basis remains in the source budget; identical rows are shown to make omissions visible.
+
+| Budget source | LM0 bound | Current bound | Current fp,Fp,Fr,Falpha,Fbeta,um | Size,um |
+|---|---|---|---|---:|
+| X.scale | 3 um (+-) | 3 um (+-) | 0.000, 0.000, 0.000, 0.000, 0.000 | 2.184 |
+| X.abbe(compensated) | 1.01 um | 1.013 um | 0.000, 0.000, 0.000, 0.000, 0.000 | 0.738 |
+| X.thermal | 6.1 um | 6.101 um | 0.000, 0.000, 0.000, 0.000, 0.000 | 4.441 |
+| X.screw | - um | 0 um | 0.000, 0.000, 0.000, 0.000, 0.000 | 0.000 |
+| X.roll | 5 arcsec | 5 arcsec | 0.000, 0.000, 0.000, 0.000, 0.194 | 0.000 |
+| Y.scale | 5 um (+-) | 3 um (+-) | 0.000, 0.000, 0.000, 0.000, 0.000 | 0.021 |
+| Y.abbe(compensated) | 0.37 um | 0.4255 um | 0.000, 0.000, 0.000, 0.000, 0.000 | 0.003 |
+| Z.scale | 5 um (+-) | 5 um (+-) | 0.000, 0.000, 0.000, 0.000, 0.000 | 0.000 |
+| Z.abbe(compensated) | 1.14 um | 1.144 um | 0.000, 0.000, 0.000, 0.000, 0.000 | 0.000 |
+| Z.tilt | 5 arcsec | 5 arcsec | 0.000, 0.000, 0.000, 0.000, 0.194 | 0.000 |
+| Z.straightness | 3 um over 200 mm | 3 um over 200 mm | 0.000, 0.000, 0.000, 0.000, 0.041 | 0.000 |
+| structure.radial | 2.52 um | 2.504 um | 0.000, 0.000, 0.000, 0.000, 0.857 | 1.823 |
+| table.tilt | 3.31 urad | 3.313 urad | 0.000, 0.000, 0.000, 0.000, 0.027 | 0.000 |
+| A.torsion | 23.35 urad | 23.35 urad | 0.000, 0.000, 0.000, 0.000, 0.187 | 0.000 |
+| C.reaction | 7.51 urad | 7.506 urad | 0.000, 0.450, 0.000, 0.000, 0.000 | 0.000 |
+| C.accuracy | 5 arcsec | 5 arcsec | 0.091, 1.454, 0.000, 0.000, 0.000 | 0.000 |
+| C.repeatability | 2 arcsec | 2 arcsec | 0.582, 0.582, 0.000, 0.000, 0.000 | 0.000 |
+| C.trk.cogging | 3.01 arcsec | 3.006 arcsec | 0.599, 0.874, 0.000, 0.000, 0.000 | 0.000 |
+| C.trk.ripple1 | 0.11 arcsec | 0.1141 arcsec | 0.001, 0.033, 0.000, 0.000, 0.000 | 0.000 |
+| C.trk.ripple2 | 0.11 arcsec | 0.114 arcsec | 0.001, 0.033, 0.000, 0.000, 0.000 | 0.000 |
+| C.trk.ripple3 | 0.09 arcsec | 0.08532 arcsec | 0.001, 0.025, 0.000, 0.000, 0.000 | 0.000 |
+| C.trk.seal | 0.21 arcsec | 0.2076 arcsec | 0.002, 0.060, 0.000, 0.000, 0.000 | 0.000 |
+| C.trk.cut | 0.13 arcsec | 0.1306 arcsec | 0.000, 0.000, 0.000, 0.018, 0.000 | 0.000 |
+| C.trk.interpolation | 0.05 arcsec | 0.04903 arcsec | 0.014, 0.014, 0.000, 0.000, 0.000 | 0.000 |
+| C.trackLag | 0.26 arcsec | 0.2578 arcsec | 0.075, 0.075, 0.000, 0.000, 0.000 | 0.000 |
+| C.radialRunout | 2 um TIR | 2 um TIR | 0.031, 2.000, 2.000, 0.000, 0.000 | 0.000 |
+| C.radialCompliance | 0.34 um | 0.3398 um | 0.005, 0.340, 0.340, 0.000, 0.000 | 0.000 |
+| A.setting | 15 arcsec (+-) | 15 arcsec (+-) | 0.000, 0.000, 0.000, 0.000, 0.582 | 0.000 |
+| B.encoder | 40 arcsec | 40 arcsec | 0.058, 0.058, 0.000, 0.000, 0.000 | 0.000 |
+| sync.delay | 1 us | 1 us | 0.094, 0.094, 0.000, 0.000, 0.000 | 0.000 |
+| sync.loop | 250 us cycle | 250 us cycle | 0.117, 0.117, 0.000, 0.000, 0.000 | 0.000 |
+| hob.axialRunout | 2 um TIR | 2 um TIR | 0.000, 0.000, 0.000, 1.879, 0.000 | 0.000 |
+| hob.profileError | 1 um | 1 um | 0.000, 0.000, 0.000, 1.000, 0.000 | 0.000 |
+| hob.radialRunout | 2 um TIR | 2 um TIR | 0.000, 0.000, 0.000, 0.684, 0.000 | 0.000 |
+| outboard.radialRunout | 5 um TIR | 5 um TIR | 0.000, 0.000, 0.000, 1.710, 0.000 | 0.000 |
+| spindle/arbor.axialRunout | 2 um TIR | 2 um TIR | 0.000, 0.000, 0.000, 1.879, 0.000 | 0.000 |
+| spindle/arbor.radialRunout | 2 um TIR | 2 um TIR | 0.000, 0.000, 0.000, 0.684, 0.000 | 0.000 |
+| mandrel.eccentricity | 1.5 um amplitude | 1.5 um amplitude | 0.047, 3.000, 3.000, 0.000, 0.000 | 0.000 |
+| mandrel.roundness | 1.5 um | 1.5 um | 0.000, 0.000, 1.425, 0.000, 0.000 | 0.000 |
+| mandrel.bandExpansion | 3 um | 3 um | 0.000, 0.000, 0.000, 0.000, 1.020 | 0.000 |
+
+The host guards split into upper/lower halves across the guides. Park X retracted, Z high and Y/A centred; the upper half moves135 mm up and the lower202 mm down after clearing the workholding mandrel, then each moves108 mm forward. Precision supports and the X skirt stay installed. The lower guard uses two M5 at45 mm pitch on a full-thickness central base land, with no new bracket. Normal/momentary handling-moment slip factors are5.6/1.7 at ASSUMED30/100 N and390 mm lever. Both guards come off before unbolting stops; the scale head needs the front-left stop off. Six full wiper-footprint probes,32 conservative sweeps of retained retainer head/nut envelopes, made Y edge checks and fastener fit pass; enclosure48 states/128 near pairs passes. Clip-in PU retention, release/peeling past projecting head-interface bolts, fixed-port sealing and elastic strain remain ASSUMED shop qualifications; the rigid-path checks do not qualify them. The final wrap-up gates are recorded in LINEAR_MODULE_PLAN. The Y plate FE case diverged and was rejected; the accuracy budget remains partial for the new Y structure. Valid Y stiffness/accuracy, A6,21 other made-edge findings and Z screw ingress remain OPEN. The RFQ package describes the model and does not release those interfaces.
 
 Phase P5 puts the X nut flange on the motor side of its block. The physical
 block face is the datum, X232.5..248.5 at joint zero, and remains in the same
@@ -756,6 +882,7 @@ only in the FRAME_PLAN Log.
 
 The inline X motor remains on the M60D-BK12, low in the channel. Treat it as a heat
 source into the mount/support seat, bed and screw, with convection to the bay air.
+The matched ground bars retain a steel conduction path into the inserts; no thermal-isolation credit is taken.
 For a rated 400 W operating point the existing assumed winding model assigns 5 %
 copper loss and 5 % mechanical loss: approximately **40 W ASSUMED**, not supplier
 thermal data; actual duty-cycle current and losses must be measured. X has no brake.
