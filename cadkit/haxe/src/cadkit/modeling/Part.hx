@@ -228,22 +228,9 @@ class Part extends Model {
         for (wire in wires) wire.close();
         return loft(sections, ruled);
       }
-      var result = new Part(OpCache.construct("loft-kept",
-        ruled ? "ruled" : "smooth", shapes, () -> {var operation = new Operation(
-          CadKit.loftOperationChecked(Model.refs(shapes), 1, ruled ? 1 : 0),
-          shapes,
-          null,
-          "loft"
-        );
-      try {
-        var built = operation.resultShape();
-        operation.close();
-        return built;
-      } catch (error:Dynamic) {
-        operation.close();
-        throw error;
-      }
-      }));
+      // The plain native loft: collecting the operation's history costs time quadratic in the sections' edges, and this result keeps none.
+      var result = new Part(OpCache.construct("loft-kept", ruled ? "ruled" : "smooth", shapes,
+        () -> new Shape(CadKit.loftChecked(Model.refs(shapes), 1, ruled ? 1 : 0))));
       for (wire in wires) wire.close();
       return result;
     } catch (error:Dynamic) {
