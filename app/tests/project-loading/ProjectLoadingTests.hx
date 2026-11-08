@@ -366,8 +366,15 @@ class ProjectLoadingTests {
         "changed editable input"
       );
       check(files(artifacts, ".hl").length == 1, "recipe changes reuse compiled code");
-      check(File.getContent(counter) == "xxx", "editable input always executes");
-      File.saveContent(files(artifacts, ".mtrg")[0], "corrupt");
+      check(File.getContent(counter) == "xxx", "each new editable input executes once");
+      check(
+        MateriaProjectRunner.loadProject(manifest, "recipe-a").recipeDocument == "recipe-a-v1",
+        "unchanged editable input reopens"
+      );
+      check(File.getContent(counter) == "xxx", "unchanged editable input hits the output cache");
+      var plain = files(artifacts, ".mtrg");
+      plain.sort((a, b) -> a.length - b.length);
+      File.saveContent(plain[0], "corrupt");
       check(MateriaProjectRunner.loadProject(manifest).recipeDocument == "first-v1", "corrupt output regenerates");
       check(File.getContent(counter) == "xxxx", "corrupt output executes again");
       File.saveContent(data, "other");

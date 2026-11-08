@@ -200,9 +200,10 @@ class MateriaProjectRunner {
       tools,
       control
     );
-    // Compiled code is reusable even when the entrypoint's output is not deterministic.
-    var cache = recipeDocument == null && Reflect.hasField(entry,
-      "cache") && buildCache != null ? buildCache + ".mtrg" : null;
+    // Compiled code is reusable even when the entrypoint's output is not deterministic. The document, when there is one, is an
+    // input like any other: its content joins the key, so an unchanged document hits and an edited one regenerates.
+    var cache = Reflect.hasField(entry, "cache") && buildCache != null ? buildCache + (recipeDocument == null ? "" : "."
+      + Sha256.encode(recipeDocument).substr(0, 16)) + ".mtrg" : null;
     if (control != null) control.throwIfCancelled();
     if (cache != null && FileSystem.exists(cache)) {
       if (control != null) control.phase("Reading the cached build");
