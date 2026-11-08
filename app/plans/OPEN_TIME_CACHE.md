@@ -186,3 +186,18 @@ Tessellation meshes an independent copy, so it never changes its input or its `b
   `haxeon.anchor-process.json` project does not compile (`box-mold/SinglePocketSetup.hx:28 Missing object field "purpose"`), existing drift in an
   example unrelated to these changes.
 
+
+### Stage 9 (2026-11-08): cold opens (hobber scene 186 s -> about 114 s, digest `ef53215727e1edf8` unchanged)
+
+Profiled cold opens with `perf` (native, call stacks) and `haxeon run --profile=instrument` (exact spans). Findings and fixes, all landed:
+
+- `Part.loftKept` built the loft with its operation history (`cad_loft_operation`), whose collection calls `ThruSections::Generated` per sub-shape (quadratic in the sections' edges) and discarded it. It now uses the plain `cad_loft`. Export 99 s -> 80 s.
+- `cad_shape_subshape_at` rebuilt the parent's four index maps (`TopExp::MapShapes`) on every call, so taking every face was quadratic (22 % of samples). `naming::restrict_to` now keeps the last parent's maps. Face descriptors 12 s -> 2.6 s.
+- `DiskStore` wrote each entry durably (fsync): 57 s over 7258 writes in an instrumented cold open. Writes are now unflushed temp + rename; entries carry a length frame so a torn one is a miss.
+- Canonicalising (write+read bytes) is only about 4 s of the 94 s of keyed-boolean time; OCCT's own booleans are the rest.
+
+Negative results (do not retry): `BRepCheck_Analyzer` in parallel mode (no gain under load, thread contention); canonicalisation tuning (4 s); Part.fuseAll is already a balanced tree.
+
+Profiling notes: the instrumented flavor probes functions that GCC finds in headers, including a prebuilt OCCT's inline accessors (10 billion calls, 2x slower). Build it with Clang: `CC=clang CXX=clang++ haxeon run --profile=instrument --profile-min-call=20 ...` (874 million dropped calls, 1.5x). The CMake tree identity includes CC/CXX, so this gets its own tree; a `-DCMAKE_CXX_COMPILER` argument alone does not reconfigure an existing tree. `hlprof-live export --format perfetto --output F` then sum B/E spans per name (the `report` subcommand only ranks samples).
+
+Where cold time still goes (clang-instrumented, native only): cad_fuse 49 s (1544 calls), the one hob loft 25 s, cad_common 22 s, cad_cut 11 s, write_bytes 11 s, shape_place 10 s. Next: open on display data and defer masses/anchors/containment; shared read-only cache.
