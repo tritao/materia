@@ -93,7 +93,7 @@ class ProjectLoadingTests {
         + 'var part:materia.project.SceneArtifact.SceneArtifactPart = {id: "tetra", name: "Tetra", red: 0.5, green: 0.5, blue: 0.5, vertexCount: 4, indexCount: 12, '
         + 'vertices: vertices, normals: Bytes.alloc(96), indices: indices, faceRanges: []};\n'
         + 'return SceneArtifact.encode({metresPerUnit: 1.0, parts: [part]}); }}\n');
-      var entry:Dynamic = {kind: "cad-preview", module: "KernelPreview"};
+      var entry:Dynamic = {kind: "cad-preview", module: "KernelPreview", cache: {}};
       Reflect.setField(entry, "function", "preview");
       var manifest = root + "/materia.project.json";
       File.saveContent(manifest, Json.stringify({
@@ -108,6 +108,10 @@ class ProjectLoadingTests {
       MateriaProjectRunner.loadProject(manifest);
       check(stored(store, "kernel").length > 0, "the generator's kernel operations are in the store after the open");
       check(stored(store, "generator").length == 1 && stored(store, "record").length == 1, "and so are its generator and record");
+      // The generator created the store's directories while it ran; asking whether they existed must not make its output stale.
+      var again = new ProjectLoadControl();
+      MateriaProjectRunner.loadProject(manifest, null, again);
+      check(!hasPhase(again, "Running the project"), "a generator that used the kernel cache is not regenerated on the next open");
     } catch (error:Dynamic) {
       Sys.putEnv("XDG_CACHE_HOME", previousCache);
       DiskStore.useProcess(null);
