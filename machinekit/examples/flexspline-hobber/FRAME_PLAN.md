@@ -190,7 +190,7 @@ Status: **complete** — P1–P5 accepted on branch `hobber-round-r5`; supplier 
 
 ## Phase Y: Y as a linear module (started 2026-11-07)
 
-Status: **LM0/XC complete; XA partial; library module289 checks pass; LM4 upper/lower guard service, six wiper probes,32 carried-hardware envelopes and fastener fit0 pass, with0 Y made-edge findings; enclosure48/128 passes. Hobber3357 and the full requested sweep pass (0 errors in2217 s;18 root removal reports clear). LM5 drive sizing passes at Z65.30 kg, Y stiffness/accuracy remains unqualified; ZB screw ingress, XA replicated seats/A6 and29 other made-edge findings remain open. LM6 tooling and routed RFQ generation are implemented; the regenerated package passes46 designs/50 instances/90.22 kg** on `linear-module`.
+Status: **LM0/XC complete; XA partial; library module289 checks pass; LM4 upper/lower guard service, six wiper probes,32 carried-hardware envelopes and fastener fit0 pass, with0 Y made-edge findings; enclosure48/128 passes. Hobber3357 and the full requested sweep pass (0 errors in2199 s;18 root removal reports clear). LM5 drive sizing passes at Z65.30 kg, Y stiffness/accuracy remains unqualified; ZB screw ingress, XA replicated seats/A6 and29 other made-edge findings remain open. LM6 tooling and routed RFQ generation are implemented; the regenerated package passes46 designs/50 instances/90.22 kg** on `linear-module`.
 Keep the ground20 mm X deck, bolted bright-bar ribs and four corner sole pads.
 One bolts-only FE result:43.633 N/um /17.077 MN m/rad. Passing frame sweep0 errors,
 13 removals; trimmed hobber2453 PASS. XA then LM1-LM5,ZB,LM6 run lean (about90 min
@@ -212,7 +212,7 @@ stop unbolting; the scale head needs the front-left stop off. Six full wiper-foo
 probes,32 conservative carried head/nut sweeps and the focused guard paths pass.
 The lower attachment is two M5 at45 mm pitch on the existing base's full-thickness
 central land; all Y made-hole edge checks pass. The previous3 deck/7 service findings
-are closed in the model: hobber3357 and full sweep0 errors in2217 s;18 root removal reports clear. Valid Y stiffness/accuracy and
+are closed in the model: hobber3357 and full sweep0 errors in2199 s;18 root removal reports clear. Valid Y stiffness/accuracy and
 shop stock/seal qualifications remain release gates.
 LM6 declares27 tooling rows separately from machine parts,89 checked sequence references,
 and regenerates46 routed machined RFQ parts (90.22 kg). Prices and custom bellows data

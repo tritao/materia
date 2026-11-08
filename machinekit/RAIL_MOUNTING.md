@@ -118,7 +118,12 @@ RM2 completion or production mount release.
   the selected product's published thickness range. Until a grade is chosen those limits,
   modulus and creep are ASSUMED, never Moglice/SKC vendor data. After cure, torque into
   steel, indicate again and match-drill/ream service-return pins into the steel inserts.
-  Compound supplies no thread engagement. The nut travels in the open channel between
+  Compound supplies no thread or pin engagement. A separate plain height spacer may
+  make up the derived height; the same support bolts and match-pins pass through its
+  masked holes into the insert. Model every spacer and compound layer physically:
+  `JointFasteners` verifies a continuous contacting stack and includes it in bolt grip,
+  without counting it as steel engagement. Product thickness and sustained-load checks
+  still require the chosen compound's datasheet. The nut travels in the open channel between
   the separate seats; verify travel and overtravel. Arbors, height references, release
   agent, compound and dams belong to the tooling BOM and the A3/A7 sequence.
 
